@@ -1,0 +1,17 @@
+// (c) Copyright 2011 Cloudera, Inc.
+
+package com.cloudera.impala.parser;
+
+import java.lang.String;
+
+// simply wraps the numeric limit inside a Symbol
+class LimitClause extends beaver.Symbol {
+    private long limit_;
+
+    public LimitClause(long limit) {
+	super();
+	limit_ = limit;
+  }
+
+    public long limit() { return limit_; }
+}
