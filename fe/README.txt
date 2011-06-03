@@ -5,6 +5,14 @@ Running Tests
 
 From the fe directory ("impala/fe" typically) type
 
+  $ mvn test
+
+this will generate code, compile, run all the tests and report
+success/failure.
+
+If you want to install the generated artifacts in your local
+repository (typically not necessary for developers) type
+
   $ mvn install
 
 It may take a bit of time the first time through - pulling
