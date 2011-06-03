@@ -57,6 +57,11 @@
         <enabled>false</enabled>
       </snapshots>
     </repository>
+    <repository>
+      <id>maven-cup-plugin-repo</id>
+      <name>maven-cup-plugin repository on GitHub</name>
+      <url>http://phunt.github.com/maven-cup-plugin/repository/</url>
+    </repository>
   </repositories>
 
   <pluginRepositories>
@@ -121,9 +126,9 @@
   <build>
     <plugins>
       <plugin>
-        <groupId>org.shortbus</groupId>
+        <groupId>net.sourceforge.czt</groupId>
         <artifactId>maven-cup-plugin</artifactId>
-        <version>1.6.1</version>
+        <version>1.6.3</version>
         <executions>
           <execution>
             <id>cup</id>
@@ -135,6 +140,7 @@
               <extension>y</extension>
               <parserOutput>SqlParser</parserOutput>
               <symbolOutput>SqlParserSymbols</symbolOutput>
+	      <outputDirectory>${project.build.directory}/generated-sources/cup</outputDirectory>
             </configuration>
           </execution>
         </executions>
