@@ -131,7 +131,7 @@
       <plugin>
         <groupId>net.sourceforge.czt</groupId>
         <artifactId>maven-cup-plugin</artifactId>
-        <version>1.6.3</version>
+        <version>1.6.4</version>
         <executions>
           <execution>
             <id>cup</id>
@@ -232,6 +232,14 @@
       <name>Cloudera Third Party Repository</name>
       <snapshots>
         <enabled>false</enabled>
+      </snapshots>
+    </pluginRepository>
+    <pluginRepository>
+      <id>cloudera.snapshot.repo</id>
+      <url>https://repository.cloudera.com/content/repositories/snapshots</url>
+      <name>Cloudera Snapshot Repository</name>
+      <snapshots>
+        <enabled>true</enabled>
       </snapshots>
     </pluginRepository>
   </pluginRepositories>
