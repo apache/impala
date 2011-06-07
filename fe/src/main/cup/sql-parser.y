@@ -1,5 +1,8 @@
+// Copyright (c) 2011 Cloudera, Inc. All rights reserved.  
+
 package com.cloudera.impala.parser;
-//import "java.io.IOException", "java.lang.StringBuffer";
+
+import com.cloudera.impala.catalog.PrimitiveType;
 import java.util.ArrayList;
 
 parser code {:
@@ -59,7 +62,8 @@ terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
 terminal String IDENT;
 terminal String NUMERIC_OVERFLOW;
 terminal Boolean BOOL_LITERAL;
-terminal Number NUMERIC_LITERAL;
+terminal Long INTEGER_LITERAL;
+terminal Double FLOATINGPOINT_LITERAL;
 terminal String STRING_LITERAL;
 
 nonterminal SelectStmt select_stmt;
@@ -77,8 +81,8 @@ nonterminal Predicate predicate, comparison_predicate, compound_predicate,
   like_predicate, literal_predicate;
 nonterminal ArrayList<Expr> group_by_clause;
 nonterminal Predicate having_clause;
-nonterminal ArrayList<OrderByExpr> order_by_expr_list, order_by_clause;
-nonterminal OrderByExpr order_by_expr;
+nonterminal ArrayList<OrderByElement> order_by_elements, order_by_clause;
+nonterminal OrderByElement order_by_element;
 nonterminal Number limit_clause;
 nonterminal Expr cast_expr, case_else_clause, literal, aggregate_expr;
 nonterminal CaseExpr case_expr;
@@ -296,37 +300,37 @@ having_clause ::=
   ;
 
 order_by_clause ::=
-  KW_ORDER KW_BY order_by_expr_list:l
+  KW_ORDER KW_BY order_by_elements:l
   {: RESULT = l; :}
   | /* empty */
   {: RESULT = null; :}
   ;
 
-order_by_expr_list ::=
-  order_by_expr:e
+order_by_elements ::=
+  order_by_element:e
   {:
-    ArrayList<OrderByExpr> list = new ArrayList<OrderByExpr>();
+    ArrayList<OrderByElement> list = new ArrayList<OrderByElement>();
     list.add(e);
     RESULT = list;
   :}
-  | order_by_expr_list:list COMMA order_by_expr:e
+  | order_by_elements:list COMMA order_by_element:e
   {:
     list.add(e);
     RESULT = list;
   :}
   ;
 
-order_by_expr ::=
+order_by_element ::=
   expr:e
-  {: RESULT = new OrderByExpr(e, true); :}
+  {: RESULT = new OrderByElement(e, true); :}
   | expr:e KW_ASC
-  {: RESULT = new OrderByExpr(e, true); :}
+  {: RESULT = new OrderByElement(e, true); :}
   | expr:e KW_DESC
-  {: RESULT = new OrderByExpr(e, false); :}
+  {: RESULT = new OrderByElement(e, false); :}
   ;
 
 limit_clause ::=
-  KW_LIMIT NUMERIC_LITERAL:l
+  KW_LIMIT INTEGER_LITERAL:l
   {: RESULT = l; :}
   | /* empty */
   {: RESULT = null; :}
@@ -405,7 +409,7 @@ arithmetic_expr ::=
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.MINUS, e1, e2); :}
   | MINUS expr:e
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.MULTIPLY,
-                               LiteralExpr.createNumericLiteral(-1), e);
+                                 new IntLiteral((long)-1), e);
   :} %prec UNARY_MINUS
   | expr:e1 BITAND expr:e2
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.BITAND, e1, e2); :}
@@ -418,14 +422,16 @@ arithmetic_expr ::=
   ;
 
 literal ::=
-  NUMERIC_LITERAL:l
-  {: RESULT = LiteralExpr.createNumericLiteral(l); :}
+  INTEGER_LITERAL:l
+  {: RESULT = new IntLiteral(l); :}
+  | FLOATINGPOINT_LITERAL:l
+  {: RESULT = new FloatLiteral(l); :}
   | NUMERIC_OVERFLOW:l
-  {: RESULT = LiteralExpr.createStringLiteral(l); :}
+  {: RESULT = new StringLiteral(l); :}
   | STRING_LITERAL:l
-  {: RESULT = LiteralExpr.createStringLiteral(l); :}
+  {: RESULT = new StringLiteral(l); :}
   | BOOL_LITERAL:l
-  {: RESULT = LiteralExpr.createBoolLiteral(l); :}
+  {: RESULT = new BoolLiteral(l); :}
   ;
 
 aggregate_expr ::=
@@ -508,6 +514,9 @@ compound_predicate ::=
   {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.OR, p1, p2); :}
   | KW_NOT predicate:p
   {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT, p, null); :}
+  // TODO
+  //| NOT predicate:p
+  //{: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT, p, null); :}
   ;
 
 literal_predicate ::=
@@ -522,9 +531,14 @@ column_ref ::=
   {:
     RESULT = new SlotRef(null, col);
   :}
+  // table_name:tblName DOT IDENT:col causes reduce/reduce conflicts
   | IDENT:tbl DOT IDENT:col
   {:
-    RESULT = new SlotRef(tbl, col);
+    RESULT = new SlotRef(new TableName(null, tbl), col);
+  :}
+  | IDENT:db DOT IDENT:tbl DOT IDENT:col
+  {:
+    RESULT = new SlotRef(new TableName(db, tbl), col);
   :}
   ;
 

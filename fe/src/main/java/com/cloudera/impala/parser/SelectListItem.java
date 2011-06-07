@@ -1,21 +1,23 @@
-// (c) Copyright 2011 Cloudera, Inc.
+// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 package com.cloudera.impala.parser;
 
-import java.lang.String;
+import com.google.common.base.Preconditions;
 
 class SelectListItem {
-  private Expr expr;
+  private final Expr expr;
   private String alias;
 
   // for "[name.]*"
-  private TableName tblName;
-  private boolean isStar;
+  private final TableName tblName;
+  private final boolean isStar;
 
   public SelectListItem(Expr expr, String alias) {
     super();
+    Preconditions.checkNotNull(expr);
     this.expr = expr;
     this.alias = alias;
+    this.tblName = null;
     this.isStar = false;
   }
 
@@ -26,12 +28,24 @@ class SelectListItem {
 
   private SelectListItem(TableName tblName) {
     super();
+    this.expr = null;
     this.tblName = tblName;
     this.isStar = true;
   }
 
-  public boolean isStar() { return isStar; }
-  public TableName tblName() { return tblName; }
-  public Expr expr() { return expr; }
-  public String alias() { return alias; }
+  public boolean isStar() {
+    return isStar;
+  }
+
+  public TableName getTblName() {
+    return tblName;
+  }
+
+  public Expr getExpr() {
+    return expr;
+  }
+
+  public String getAlias() {
+    return alias;
+  }
 }

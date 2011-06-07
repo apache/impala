@@ -1,12 +1,28 @@
-// (c) Copyright 2011 Cloudera, Inc.
+// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 package com.cloudera.impala.parser;
 
-import java.lang.String;
-import java.util.ArrayList;
+import java.util.List;
 
 class FunctionCallExpr extends Expr {
-  public FunctionCallExpr(String functionName, ArrayList<Expr> params) {
+  private final String functionName;
+
+  public FunctionCallExpr(String functionName, List<Expr> params) {
     super();
+    this.functionName = functionName;
+    children.addAll(params);
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (!super.equals(obj)) {
+      return false;
+    }
+    return ((FunctionCallExpr) obj).functionName.equals(functionName);
+  }
+
+  @Override
+  public void analyze(Analyzer analyzer) throws Analyzer.Exception {
+    throw new Analyzer.Exception("CAST not supported");
   }
 }

@@ -1,19 +1,19 @@
-// (c) Copyright 2011 Cloudera, Inc.
+// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 package com.cloudera.impala.parser;
 
 import java.lang.String;
-import java.util.ArrayList;
+import java.util.List;
 
 // return value of the grammar production that parses aggregate function
 // parameters
 class AggregateParamsList {
   private boolean isStar;
   private boolean isDistinct;
-  private ArrayList<Expr> exprs;
+  private List<Expr> exprs;
 
   // c'tor for non-star params
-  public AggregateParamsList(boolean isDistinct, ArrayList<Expr> exprs) {
+  public AggregateParamsList(boolean isDistinct, List<Expr> exprs) {
     super();
     isStar = false;
     this.isDistinct = isDistinct;
@@ -26,7 +26,7 @@ class AggregateParamsList {
 
   public boolean isStar() { return isStar; }
   public boolean isDistinct() { return isDistinct; }
-  public ArrayList<Expr> exprs() { return exprs; }
+  public List<Expr> exprs() { return exprs; }
 
   // c'tor for <agg>(*)
   private AggregateParamsList() {

@@ -1,27 +1,24 @@
-// (c) Copyright 2011 Cloudera, Inc.
+// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 package com.cloudera.impala.parser;
 
-import beaver.Parser;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.fail;
 
-import java.io.IOException;
 import java.io.StringReader;
-import java.lang.Double;
-import java.lang.Long;
-import java.lang.String;
-import org.junit.*;
-import static org.junit.Assert.*;
+
+import org.junit.Test;
 
 public class ParserTest {
   // Asserts in case of parser error.
   public void ParsesOk(String stmt) {
-    // yyreset() instead?
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
     Object result = null;
     try {
       result = parser.parse().value;
-    } catch (java.lang.Exception e) {
+    } catch (Exception e) {
       System.err.println(e.toString());
       fail("\n" + parser.getErrorMsg(stmt));
     }
@@ -35,7 +32,6 @@ public class ParserTest {
     try {
       parser.parse();
     } catch (java.lang.Exception e) {
-      //System.err.println(parser.getErrorMsg(stmt));
       if (expectedErrorString != null) {
         String errorString = parser.getErrorMsg(stmt);
         assertEquals(errorString, expectedErrorString);
@@ -126,6 +122,16 @@ public class ParserTest {
     ParserError("select a, b, count(c) from test group by order by a");
   }
 
+  @Test public void TestOrderBy() {
+    // TODO: fix parser bug and parser error msg (currently points to 'from' as source of error)
+    //ParsesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
+             //"order by by string_col, 15.7 * float_col, int_col + bigint_col");
+    //ParsesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
+             //"order by by string_col asc, 15.7 * float_col desc, int_col + bigint_col asc");
+    ParserError("select int_col, string_col, bigint_col, count(*) from alltypes " +
+                "order by by string_col asc desc");
+  }
+
   @Test public void TestHaving() {
     ParsesOk("select a, b, count(c) from test group by a, b having count(*) > 5");
     ParserError("select a, b, count(c) from test group by a, b having 5");
@@ -164,6 +170,7 @@ public class ParserTest {
   @Test public void TestArithmeticExprs() {
     ParsesOk("select (i + 5) * (i - -5) / (a % 10) from t");
     ParsesOk("select a & b, a | b, a ^ b, ~a from t");
+    ParsesOk("select 15.7 * f from t");
     ParserError("select (i + 5)(1 - i) from t");
     ParserError("select +a from t");
     ParserError("select %a from t");
@@ -213,17 +220,32 @@ public class ParserTest {
     ParsesOk("select a, b, c from t where i like 'abc%'");
     ParsesOk("select a, b, c from t where i rlike 'abc.*'");
     ParsesOk("select a, b, c from t where i regexp 'abc.*'");
-    ParsesOk("select a, b, c from t where a = 5 and b = 6");
-    ParsesOk("select a, b, c from t where a = 5 or b = 6");
-    ParsesOk("select a, b, c from t where (a = 5 or b = 6) and c = 7");
-    ParsesOk("select a, b, c from t where not a = 5");
-    ParsesOk("select a, b, c from t where (not a = 5 or not b = 6) and not c = 7");
     ParsesOk("select a, b, c from t where i is null");
     ParsesOk("select a, b, c from t where i is not null");
     ParsesOk("select a, b, c from t where i + 5 is not null");
     ParsesOk("select a, b, c from t where true");
     ParsesOk("select a, b, c from t where false");
     ParsesOk("select a, b, c from t where false and true");
+  }
+  @Test public void TestCompoundPredicates() {
+    ParsesOk("select a, b, c from t where a = 5 and b = 6");
+    ParsesOk("select a, b, c from t where a = 5 or b = 6");
+    ParsesOk("select a, b, c from t where (a = 5 or b = 6) and c = 7");
+    ParsesOk("select a, b, c from t where not a = 5");
+    ParsesOk("select a, b, c from t where (not a = 5 or not b = 6) and not c = 7");
+    // TODO: fix these, they should work
+    //ParsesOk("select a, b, c from t where !a = 5");
+    //ParsesOk("select a, b, c from t where (! a = 5 or ! b = 6) and ! c = 7");
+    // unbalanced parentheses
+    ParserError("select a, b, c from t where (a = 5 or b = 6) and c = 7)");
+    ParserError("select a, b, c from t where ((a = 5 or b = 6) and c = 7");
+  }
+
+  @Test public void TestSlotRef() {
+    ParsesOk("select a from t where b > 5");
+    ParsesOk("select a.b from a where b > 5");
+    ParsesOk("select a.b.c from a.b where b > 5");
+    ParserError("select a.b.c.d from a.b where b > 5");
   }
 
   @Test public void TestGetErrorMsg() {

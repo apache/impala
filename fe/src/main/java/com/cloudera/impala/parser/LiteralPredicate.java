@@ -1,9 +1,9 @@
-// (c) Copyright 2011 Cloudera, Inc.
+// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 package com.cloudera.impala.parser;
 
 class LiteralPredicate extends Predicate {
-  private boolean value;
+  private final boolean value;
 
   static public LiteralPredicate True() {
     return new LiteralPredicate(true);
@@ -15,6 +15,14 @@ class LiteralPredicate extends Predicate {
 
   private LiteralPredicate(boolean val) {
     super();
-    value = val;
+    this.value = val;
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (!super.equals(obj)) {
+      return false;
+    }
+    return ((LiteralPredicate) obj).value == value;
   }
 }

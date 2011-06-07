@@ -1,12 +1,24 @@
-// (c) Copyright 2011 Cloudera, Inc.
+// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 package com.cloudera.impala.parser;
 
-import java.lang.String;
 
 // captures info of a single WHEN expr THEN expr clause
 class CaseWhenClause {
-  public CaseWhenClause(Expr when_expr, Expr then_expr) {
+  private final Expr whenExpr;
+  private final Expr thenExpr;
+
+  public CaseWhenClause(Expr whenExpr, Expr thenExpr) {
     super();
+    this.whenExpr = whenExpr;
+    this.thenExpr = thenExpr;
+  }
+
+  public Expr getWhenExpr() {
+    return whenExpr;
+  }
+
+  public Expr getThenExpr() {
+    return thenExpr;
   }
 }

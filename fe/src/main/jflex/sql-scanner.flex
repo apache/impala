@@ -1,3 +1,5 @@
+// Copyright (c) 2011 Cloudera, Inc. All rights reserved.  
+
 package com.cloudera.impala.parser;
 
 import java_cup.runtime.Symbol;
@@ -149,7 +151,7 @@ EndOfLineComment = "--" {NonTerminator}* {LineTerminator}?
   } catch (NumberFormatException e) {
     return newToken(SqlParserSymbols.NUMERIC_OVERFLOW, yytext());
   }
-  return newToken(SqlParserSymbols.NUMERIC_LITERAL, val);
+  return newToken(SqlParserSymbols.INTEGER_LITERAL, val);
 }
 
 {DoubleLiteral} {
@@ -159,7 +161,7 @@ EndOfLineComment = "--" {NonTerminator}* {LineTerminator}?
   } catch (NumberFormatException e) {
     return newToken(SqlParserSymbols.NUMERIC_OVERFLOW, yytext());
   }
-  return newToken(SqlParserSymbols.NUMERIC_LITERAL, val);
+  return newToken(SqlParserSymbols.FLOATINGPOINT_LITERAL, val);
 }
 
 {Comment} { /* ignore */ }

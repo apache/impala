@@ -1,18 +1,38 @@
-// (c) Copyright 2011 Cloudera, Inc.
+// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 package com.cloudera.impala.parser;
 
-import java.lang.String;
-import java.util.ArrayList;
+import java.util.List;
+
+import com.google.common.base.Preconditions;
 
 class TableRef {
-  private TableName name;
-  private String alias;
+  private final TableName name;
+  private final String alias;
+  private TupleDescriptor desc;  // analysis output
 
   public TableRef(TableName name, String alias) {
     super();
+    Preconditions.checkArgument(!name.toString().isEmpty());
     this.name = name;
+    Preconditions.checkArgument(alias == null || !alias.isEmpty());
     this.alias = alias;
+  }
+
+  public TupleDescriptor getDesc() {
+    return desc;
+  }
+
+  public void setDesc(TupleDescriptor desc) {
+    this.desc = desc;
+  }
+
+  public TableName getName() {
+    return name;
+  }
+
+  public String getExplicitAlias() {
+    return alias;
   }
 
   public void setJoinOperator(JoinOperator op) {
@@ -21,6 +41,16 @@ class TableRef {
   public void setOnClause(Predicate pred) {
   }
 
-  public void setUsingClause(ArrayList<String> colNames) {
+  public void setUsingClause(List<String> colNames) {
   }
+
+  // Return alias by which this table is referenced in select block.
+  public String getAlias() {
+    if (alias == null) {
+      return name.toString().toLowerCase();
+    } else {
+      return alias;
+    }
+  }
+
 }
