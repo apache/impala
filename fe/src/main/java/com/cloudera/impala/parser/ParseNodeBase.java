@@ -2,9 +2,11 @@
 
 package com.cloudera.impala.parser;
 
+import com.cloudera.impala.common.AnalysisException;
+
 public class ParseNodeBase implements ParseNode {
-  public void analyze(Analyzer analyzer) throws Analyzer.Exception {
-    throw new Analyzer.Exception("not implemented");
+  public void analyze(Analyzer analyzer) throws AnalysisException {
+    throw new AnalysisException("not implemented");
   }
 
   // Print SQL syntax corresponding to this node.

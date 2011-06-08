@@ -2,11 +2,15 @@
 
 package com.cloudera.impala.parser;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.TreeNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -23,17 +27,24 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return type;
   }
 
-  // Perform semantic analysis of node and all of its children.
-  // Throws exception if any errors found.
-  public void analyze(Analyzer analyzer) throws Analyzer.Exception {
+  /* Perform semantic analysis of node and all of its children.
+   * Throws exception if any errors found.
+   * @see com.cloudera.impala.parser.ParseNode#analyze(com.cloudera.impala.parser.Analyzer)
+   */
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     for (Expr child: children) {
       child.analyze(analyzer);
     }
   }
 
-  // Helper function: analyze list of exprs
+  /**
+   * Helper function: analyze list of exprs
+   * @param exprs
+   * @param analyzer
+   * @throws AnalysisException
+   */
   public static void analyze(List<? extends Expr> exprs, Analyzer analyzer)
-      throws Analyzer.Exception {
+      throws AnalysisException {
     for (Expr expr: exprs) {
       expr.analyze(analyzer);
     }
@@ -47,15 +58,20 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return "";
   }
 
-  // We use clone() instead of defining our own deepCopy() in order to take advantage
-  // of having Java generate the field-by-field copy c'tors for the Expr subclasses.
+  /* We use clone() instead of defining our own deepCopy() in order to take advantage
+   * of having Java generate the field-by-field copy c'tors for the Expr subclasses.
+   * @see java.lang.Object#clone()
+   */
   @Override
   public Expr clone() {
     try {
       return (Expr) super.clone();
     } catch (CloneNotSupportedException e) {
-      // TODO: fail
-      return null;
+      // all Expr subclasses should implement Cloneable
+      Writer w = new StringWriter();
+      PrintWriter pw = new PrintWriter(w);
+      e.printStackTrace(pw);
+      throw new UnsupportedOperationException(w.toString());
     }
   }
 
@@ -85,7 +101,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     throw new UnsupportedOperationException("Expr.hashCode() is not implemented");
   }
 
-  // Map of expression substitutions (lhs[i] gets substituted with rhs[i]).
+  /**
+   * Map of expression substitutions (lhs[i] gets substituted with rhs[i]).
+   *
+   */
   static class SubstitutionMap {
     public ArrayList<Expr> lhs;  // left-hand side
     public ArrayList<Expr> rhs;  // right-hand side
@@ -96,8 +115,12 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     }
   }
 
-  // Create a deep copy of 'this'. If substMap is non-null,
-  // use it to substitute 'this' or its subnodes.
+  /**
+   * Create a deep copy of 'this'. If substMap is non-null,
+   * use it to substitute 'this' or its subnodes.
+   * @param substMap
+   * @return
+   */
   public Expr clone(SubstitutionMap substMap) {
     if (substMap != null) {
       for (int i = 0; i < substMap.lhs.size(); ++i) {
@@ -114,7 +137,13 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return result;
   }
 
-  // Create a deep copy of 'l'. If substMap is non-null, use it to substitute the elements of l.
+  /**
+   * Create a deep copy of 'l'. If substMap is non-null, use it to substitute the elements of l.
+   * @param <C>
+   * @param l
+   * @param substMap
+   * @return
+   */
   public static <C extends Expr> ArrayList<C> cloneList(
       List<C> l, SubstitutionMap substMap) {
     ArrayList<C> result = new ArrayList<C>();
@@ -124,8 +153,15 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return result;
   }
 
-  // This can't go into TreeNode<>, because we'd be using the template param
-  // NodeType.
+  /**
+   * Collect all Expr nodes of type 'cl' present in 'input'.
+   * This can't go into TreeNode<>, because we'd be using the template param
+   * NodeType.
+   * @param <C>
+   * @param input
+   * @param cl
+   * @param output
+   */
   public static <C extends Expr> void collectList(
       List<? extends Expr> input, Class<C> cl, List<C> output) {
     for (Expr e: input) {
@@ -133,9 +169,12 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     }
   }
 
-  // Return true if the list contains a node of type C in any of
-  // its elements or their children, otherwise return false.
-  // TODO: do I need the <C extends Expr>?
+  /**
+   * Return true if the list contains a node of type C in any of
+   * its elements or their children, otherwise return false.
+   * @param input
+   * @return
+   */
   public static <C extends Expr> boolean contains(
       List<? extends Expr> input, Class<C> cl) {
     for (Expr e: input) {
@@ -146,8 +185,12 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return false;
   }
 
-  // Return 'this' with all sub-exprs substituted according to
-  // substMap.
+  /**
+   * Return 'this' with all sub-exprs substituted according to
+   * substMap.
+   * @param substMap
+   * @return
+   */
   public Expr substitute(SubstitutionMap substMap) {
     Preconditions.checkNotNull(substMap);
     for (int i = 0; i < substMap.lhs.size(); ++i) {
@@ -161,7 +204,12 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return this;
   }
 
-  // Substitute sub-exprs in the input list according to substMap.
+  /**
+   * Substitute sub-exprs in the input list according to substMap.
+   * @param <C>
+   * @param l
+   * @param substMap
+   */
   public static <C extends Expr> void substituteList(
       List<C> l, SubstitutionMap substMap) {
     ListIterator<C> it = l.listIterator();

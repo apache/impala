@@ -3,8 +3,8 @@
 package com.cloudera.impala.catalog;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
@@ -17,7 +17,7 @@ import com.google.common.collect.Maps;
  */
 public class Catalog {
   // map from db name to DB
-  private final HashMap<String, Db> dbs;
+  private final Map<String, Db> dbs;
 
   public Catalog(HiveMetaStoreClient msClient) {
     this.dbs = Maps.newHashMap();

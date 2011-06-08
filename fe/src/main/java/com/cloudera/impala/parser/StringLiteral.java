@@ -19,4 +19,8 @@ class StringLiteral extends LiteralExpr {
     }
     return ((StringLiteral) obj).value.equals(value);
   }
+
+  public String toSql() {
+    return "'" + value + "'";
+  }
 }

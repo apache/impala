@@ -4,6 +4,7 @@ package com.cloudera.impala.catalog;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
@@ -15,7 +16,7 @@ public class Db {
   private final String name;
 
   // map from table name to Table
-  private final HashMap<String, Table> tables;
+  private final Map<String, Table> tables;
 
   private Db(String name) {
     this.name = name;
@@ -45,7 +46,7 @@ public class Db {
     return name;
   }
 
-  public HashMap<String, Table> getTables() {
+  public Map<String, Table> getTables() {
     return tables;
   }
 

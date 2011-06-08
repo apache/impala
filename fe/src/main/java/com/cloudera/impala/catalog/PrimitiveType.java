@@ -34,12 +34,12 @@ public enum PrimitiveType {
     return this != INVALID_TYPE;
   }
 
-    /**
+  /**
    * matrix that records "smallest" assignment-compatible type of two types
    * (INVALID_TYPE if no such type exists, ie, if the input types are fundamentally
    * incompatible)
-   * TODO: figure out what mysql's matrix is, I'm sure some of these
-   * are wrong (should bool be coerceable to all integer types and vice versa?)
+   * TODO: implement mysql's matrix, as described here:
+   * http://dev.mysql.com/doc/refman/5.0/en/type-conversion.html
    */
   private static PrimitiveType[][] compatibilityMatrix;
   static {

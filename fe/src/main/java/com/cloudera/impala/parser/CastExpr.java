@@ -3,6 +3,7 @@
 package com.cloudera.impala.parser;
 
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
 class CastExpr extends Expr {
@@ -17,8 +18,8 @@ class CastExpr extends Expr {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws Analyzer.Exception {
-    throw new Analyzer.Exception("CAST not supported");
+  public void analyze(Analyzer analyzer) throws AnalysisException {
+    throw new AnalysisException("CAST not supported");
   }
 
   @Override

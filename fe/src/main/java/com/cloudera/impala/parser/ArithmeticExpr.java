@@ -3,6 +3,7 @@
 package com.cloudera.impala.parser;
 
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
 class ArithmeticExpr extends Expr {
@@ -21,6 +22,23 @@ class ArithmeticExpr extends Expr {
     public boolean isBitwiseOperation() {
       return this == BITAND || this == BITOR || this == BITXOR || this == BITNOT;
     }
+
+    @Override
+    public String toString() {
+      switch (this) {
+        case MULTIPLY: return "*";
+        case DIVIDE: return "/";
+        case MOD: return "%";
+        case INT_DIVIDE: return "DIV";
+        case PLUS: return "+";
+        case MINUS: return "-";
+        case BITAND: return "&";
+        case BITOR: return "|";
+        case BITXOR: return "&";
+        case BITNOT: return "~";
+        default: return "undefined ArithmeticExpr.Operator";
+      }
+    }
   }
   private final Operator op;
 
@@ -37,6 +55,16 @@ class ArithmeticExpr extends Expr {
   }
 
   @Override
+  public String toSql() {
+    if (children.size() == 1) {
+      return op.toString() + " " + getChild(0).toSql();
+    } else {
+      Preconditions.checkState(children.size() == 2);
+      return getChild(0).toSql() + " " + op.toString() + " " + getChild(1).toSql();
+    }
+  }
+
+  @Override
   public boolean equals(Object obj) {
     if (!super.equals(obj)) {
       return false;
@@ -47,12 +75,12 @@ class ArithmeticExpr extends Expr {
   // TODO: this only determines the type; we also need to insert operand casts
   // when their types aren't identical
   @Override
-  public void analyze(Analyzer analyzer) throws Analyzer.Exception {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     for (Expr child: children) {
       Expr operand = (Expr) child;
       if (!operand.type.isNumericType()) {
-        throw new Analyzer.Exception("Arithmetic operation requires numeric operands: " + toSql());
+        throw new AnalysisException("Arithmetic operation requires numeric operands: " + toSql());
       }
     }
 

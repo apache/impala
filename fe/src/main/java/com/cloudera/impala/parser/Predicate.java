@@ -3,6 +3,7 @@
 package com.cloudera.impala.parser;
 
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.common.AnalysisException;
 
 class Predicate extends Expr {
   public Predicate() {
@@ -10,7 +11,7 @@ class Predicate extends Expr {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws Analyzer.Exception {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     type = PrimitiveType.BOOLEAN;
   }

@@ -34,4 +34,8 @@ class IntLiteral extends LiteralExpr {
     }
     return value == ((IntLiteral) obj).value;
   }
+
+  public String toSql() {
+    return Long.toString(value);
+  }
 }

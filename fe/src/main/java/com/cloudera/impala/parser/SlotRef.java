@@ -2,6 +2,8 @@
 
 package com.cloudera.impala.parser;
 
+import com.cloudera.impala.common.AnalysisException;
+
 
 class SlotRef extends Expr {
   private final TableName tblName;
@@ -27,7 +29,7 @@ class SlotRef extends Expr {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws Analyzer.Exception {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     SlotDescriptor slotD = analyzer.registerColumnRef(tblName, col);
     id = slotD.getId();
     type = slotD.getType();
@@ -35,6 +37,12 @@ class SlotRef extends Expr {
 
   @Override
   public String toSql() {
-    return tblName.toString() + "." + col;
+    if (tblName != null) {
+      return tblName.toString() + "." + col;
+    } else if (col != null) {
+      return col;
+    } else {
+      return "<slot " + Integer.toString(id.getId()) + ">";
+    }
   }
 }

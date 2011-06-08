@@ -31,4 +31,8 @@ public abstract class Id {
   public int hashCode() {
     return Integer.valueOf(id).hashCode();
   }
+
+  public int getId() {
+    return id;
+  }
 }

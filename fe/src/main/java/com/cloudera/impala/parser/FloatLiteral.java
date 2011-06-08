@@ -26,4 +26,8 @@ class FloatLiteral extends LiteralExpr {
     }
     return ((FloatLiteral) obj).value == value;
   }
+
+  public String toSql() {
+    return Double.toString(value);
+  }
 }

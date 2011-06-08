@@ -4,6 +4,8 @@ package com.cloudera.impala.parser;
 
 import java.util.List;
 
+import com.cloudera.impala.common.AnalysisException;
+
 class FunctionCallExpr extends Expr {
   private final String functionName;
 
@@ -22,7 +24,7 @@ class FunctionCallExpr extends Expr {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws Analyzer.Exception {
-    throw new Analyzer.Exception("CAST not supported");
+  public void analyze(Analyzer analyzer) throws AnalysisException {
+    throw new AnalysisException("CAST not supported");
   }
 }

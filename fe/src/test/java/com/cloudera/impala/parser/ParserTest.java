@@ -11,7 +11,10 @@ import java.io.StringReader;
 import org.junit.Test;
 
 public class ParserTest {
-  // Asserts in case of parser error.
+  /**
+   * Asserts in case of parser error.
+   * @param stmt
+   */
   public void ParsesOk(String stmt) {
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
@@ -25,7 +28,11 @@ public class ParserTest {
     assertNotNull(result);
   }
 
-  // Asserts if stmt parses fine or the error string doesn't match and it is non-null.
+  /**
+   * Asserts if stmt parses fine or the error string doesn't match and it is non-null.
+   * @param stmt
+   * @param expectedErrorString
+   */
   public void ParserError(String stmt, String expectedErrorString) {
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
@@ -41,7 +48,10 @@ public class ParserTest {
     fail("Stmt didn't result in parsing error: " + stmt);
   }
 
-  // Asserts if stmt parses fine.
+  /**
+   * Asserts if stmt parses fine.
+   * @param stmt
+   */
   public void ParserError(String stmt) {
     ParserError(stmt, null);
   }

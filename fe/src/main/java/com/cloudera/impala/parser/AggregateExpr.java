@@ -5,6 +5,7 @@ package com.cloudera.impala.parser;
 import java.util.List;
 
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
 class AggregateExpr extends Expr {
@@ -23,8 +24,8 @@ class AggregateExpr extends Expr {
         case MAX: return "MAX";
         case SUM: return "SUM";
         case AVG: return "AVG";
+        default: return "undefined AggregateExpr.Operator";
       }
-      return "";
     }
   }
   private final Operator op;
@@ -45,6 +46,18 @@ class AggregateExpr extends Expr {
     }
   }
 
+  public Operator getOp() {
+    return op;
+  }
+
+  public boolean isStar() {
+    return isStar;
+  }
+
+  public boolean isDistinct() {
+    return isDistinct;
+  }
+
   @Override
   public boolean equals(Object obj) {
     if (!super.equals(obj)) {
@@ -56,17 +69,37 @@ class AggregateExpr extends Expr {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws Analyzer.Exception {
+  public String toSql() {
+    StringBuilder sb = new StringBuilder(op.toString());
+    sb.append("(");
+    if (isStar) {
+      sb.append("*");
+    }
+    if (isDistinct) {
+      sb.append("DISTINCT ");
+    }
+    for (int i = 0; i < children.size(); ++i) {
+      if (i > 0) {
+        sb.append(", ");
+      }
+      sb.append(getChild(i).toSql());
+    }
+    sb.append(")");
+    return sb.toString();
+  }
+
+  @Override
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     if (isStar && op != Operator.COUNT) {
-      throw new Analyzer.Exception(
+      throw new AnalysisException(
           "'*' can only be used in conjunction with COUNT: "
           + this.toSql());
     }
     // subexprs must not contain aggregates
     for (Expr child: children) {
       if (child.contains(AggregateExpr.class)) {
-        throw new Analyzer.Exception(
+        throw new AnalysisException(
             "aggregate function cannot contain aggregate parameters: " + this.toSql());
       }
     }
@@ -78,7 +111,7 @@ class AggregateExpr extends Expr {
 
     // only COUNT can contain multiple exprs
     if (children.size() != 1) {
-      throw new Analyzer.Exception(
+      throw new AnalysisException(
           op.toString() + " requires exactly one parameter: " + this.toSql());
     }
 
@@ -87,7 +120,7 @@ class AggregateExpr extends Expr {
 
     // SUM and AVG cannot be applied to non-numeric types
     if ((op == Operator.AVG || op == Operator.SUM) && !arg.type.isNumericType()) {
-      throw new Analyzer.Exception(
+      throw new AnalysisException(
           op.toString() + " requires a numeric parameter: " + this.toSql());
     }
 

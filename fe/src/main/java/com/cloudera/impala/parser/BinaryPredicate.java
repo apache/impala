@@ -3,6 +3,7 @@
 package com.cloudera.impala.parser;
 
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
 // Most predicates with two operands.
@@ -13,7 +14,20 @@ class BinaryPredicate extends Predicate {
     LE, // <=
     GE, // >=
     LT, // <
-    GT, // >
+    GT; // >
+
+    @Override
+    public String toString() {
+      switch (this) {
+        case EQ: return "-";
+        case NE: return "!=";
+        case LE: return "<=";
+        case GE: return ">=";
+        case LT: return "<";
+        case GT: return ">";
+        default: return "undefined BinaryPredicate.Operator";
+      }
+    }
   };
   private final Operator op;
 
@@ -34,15 +48,20 @@ class BinaryPredicate extends Predicate {
     return ((BinaryPredicate) obj).op == op;
   }
 
+  @Override
+  public String toSql() {
+    return getChild(0).toSql() + " " + op.toString() + " " + getChild(1).toSql();
+  }
+
   // TODO: this only checks the operand types; we also need to insert operand casts
   // when their types aren't identical
   @Override
-  public void analyze(Analyzer analyzer) throws Analyzer.Exception {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     if (!PrimitiveType.getAssignmentCompatibleType(getChild(0).getType(), getChild(1).getType())
         .isValid()) {
       // there is no type to which both are assignment-compatible -> we can't compare them
-      throw new Analyzer.Exception("operands are not comparable: " + this.toSql());
+      throw new AnalysisException("operands are not comparable: " + this.toSql());
     }
   }
 }

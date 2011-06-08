@@ -5,6 +5,7 @@ package com.cloudera.impala.catalog;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -23,7 +24,7 @@ public class Table {
   private final ArrayList<Column> colsByPos;
 
   // map from lowercase col. name to Column
-  private final HashMap<String, Column> colsByName;
+  private final Map<String, Column> colsByName;
 
   private Table(String name, String owner) {
     this.name = name;

@@ -4,6 +4,7 @@ package com.cloudera.impala.parser;
 
 import java.util.List;
 
+import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
 // CaseExpr represents the SQL expression
@@ -40,7 +41,7 @@ class CaseExpr extends Expr {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws Analyzer.Exception {
-    throw new Analyzer.Exception("CASE not supported");
+  public void analyze(Analyzer analyzer) throws AnalysisException {
+    throw new AnalysisException("CASE not supported");
   }
 }

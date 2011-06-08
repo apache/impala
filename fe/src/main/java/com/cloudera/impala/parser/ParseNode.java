@@ -2,14 +2,16 @@
 
 package com.cloudera.impala.parser;
 
-interface ParseNode {
+import com.cloudera.impala.common.AnalysisException;
+
+public interface ParseNode {
   /**
    * Perform semantic analysis of node and all of its children.
    * Throws exception if any errors found.
    * @param analyzer
-   * @throws Analyzer.Exception
+   * @throws AnalysisException
    */
-  public void analyze(Analyzer analyzer) throws Analyzer.Exception;
+  public void analyze(Analyzer analyzer) throws AnalysisException;
 
   /**
    * @return SQL syntax corresponding to this node.

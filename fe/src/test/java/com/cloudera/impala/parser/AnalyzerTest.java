@@ -7,6 +7,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.fail;
 
 import java.io.StringReader;
+import java.util.ArrayList;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.junit.BeforeClass;
@@ -14,6 +15,7 @@ import org.junit.Test;
 
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.TestSchemaUtils;
+import com.cloudera.impala.common.AnalysisException;
 
 public class AnalyzerTest {
   private static Catalog catalog;
@@ -23,8 +25,12 @@ public class AnalyzerTest {
     catalog = new Catalog(client);
   }
 
-  // Asserts in case of analysis error.
-  public void AnalyzesOk(String stmt) {
+  /**
+   * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
+   * @param stmt
+   * @return
+   */
+  public ParseNode AnalyzesOk(String stmt) {
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
     ParseNode node = null;
@@ -38,13 +44,18 @@ public class AnalyzerTest {
     Analyzer analyzer = new Analyzer(catalog);
     try {
       node.analyze(analyzer);
-    } catch (Analyzer.Exception e) {
+    } catch (AnalysisException e) {
       fail("Analysis error:\n" + e.toString());
     }
+    return node;
   }
 
-  // Asserts if stmt passes analysis or the error string doesn't match and it
-  // is non-null.
+  /**
+   * Asserts if stmt passes analysis or the error string doesn't match and it
+   * is non-null.
+   * @param stmt
+   * @param expectedErrorString
+   */
   public void AnalysisError(String stmt, String expectedErrorString) {
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
@@ -59,7 +70,7 @@ public class AnalyzerTest {
     Analyzer analyzer = new Analyzer(catalog);
     try {
       node.analyze(analyzer);
-    } catch (Analyzer.Exception e) {
+    } catch (AnalysisException e) {
       if (expectedErrorString != null) {
         String errorString = parser.getErrorMsg(stmt);
         assertEquals(errorString, expectedErrorString);
@@ -70,7 +81,10 @@ public class AnalyzerTest {
     fail("Stmt didn't result in analysis error: " + stmt);
   }
 
-  // Asserts if stmt passes analysis.
+  /**
+   * Asserts if stmt passes analysis.
+   * @param stmt
+   */
   public void AnalysisError(String stmt) {
     AnalysisError(stmt, null);
   }
@@ -123,6 +137,7 @@ public class AnalyzerTest {
   @Test public void TestAggregates() {
     AnalyzesOk("select count(*), min(id), max(id), sum(id), avg(id) from testtbl");
     AnalyzesOk("select count(id, zip) from testtbl");
+    AnalysisError("select id, zip from testtbl where count(*) > 0");
 
     // only count() allows '*'
     AnalysisError("select avg(*) from testtbl");
@@ -153,6 +168,7 @@ public class AnalyzerTest {
 
   @Test public void TestGroupBy() {
     AnalyzesOk("select zip, count(*) from testtbl group by zip");
+    AnalyzesOk("select id, zip from testtbl group by zip having count(*) > 0");
     // resolves ordinals
     AnalyzesOk("select zip, count(*) from testtbl group by 1");
     AnalyzesOk("select count(*), zip from testtbl group by 2");
@@ -178,6 +194,19 @@ public class AnalyzerTest {
     AnalysisError("select int_col + 0.5, count(*) from alltypes group by 1");
   }
 
+  @Test public void TestAvgSubstitution() {
+    SelectStmt select = (SelectStmt) AnalyzesOk("select avg(id) from testtbl having count(id) > 0");
+    ArrayList<Expr> selectListExprs = select.getSelectListExprs();
+    assertNotNull(selectListExprs);
+    assertEquals(selectListExprs.size(), 1);
+    // all agg exprs are replaced with refs to agg output slots
+    assertEquals(selectListExprs.get(0).toSql(), "<slot 1> / <slot 2>");
+    Expr havingPred = select.getHavingClause();
+    assertNotNull(havingPred);
+    // we only have one 'count(id)' slot (slot 2)
+    assertEquals(havingPred.toSql(), "<slot 2> > 0");
+  }
+
   @Test public void TestOrderBy() {
     AnalyzesOk("select zip, count(*) from testtbl order by zip");
     AnalyzesOk("select zip, count(*) from testtbl order by zip asc");
@@ -198,9 +227,8 @@ public class AnalyzerTest {
     AnalyzesOk("select zip, count(*) from testtbl order by count(*) + min(zip)");
 
     // multiple ordering exprs
-    // TODO: fix bugs
-    //AnalyzesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
-    //           "order by by string_col, 15.7 * float_col, int_col + bigint_col");
+    AnalyzesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
+               "order by string_col, 15.7 * float_col, int_col + bigint_col");
     AnalyzesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
                "order by 2, 1, 3");
     AnalyzesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +

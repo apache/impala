@@ -9,8 +9,12 @@ import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.common.AnalysisException;
 
-// Repository of analysis state for single select block.
+/**
+ * Repository of analysis state for single select block..
+ *
+ */
 class Analyzer {
   private final DescriptorTable descTbl;
   private final Catalog catalog;
@@ -28,28 +32,27 @@ class Analyzer {
     this.slotRefMap = new HashMap<String, SlotDescriptor>();
   }
 
-  public static class Exception extends java.lang.Exception {
-    public Exception(String msg) {
-      super(msg);
-    }
-  }
-
-  // Checks that 'name' references an existing table and that alias
-  // isn't already registered. Creates and returns an empty TupleDescriptor
-  // and registers it against alias. If alias is empty, register
-  // "name.tbl" and "name.db.tbl" as aliases.
-  public TupleDescriptor registerTableRef(TableRef ref) throws Exception {
+  /**
+   * Checks that 'name' references an existing table and that alias
+   * isn't already registered. Creates and returns an empty TupleDescriptor
+   * and registers it against alias. If alias is empty, register
+   * "name.tbl" and "name.db.tbl" as aliases.
+   * @param ref
+   * @return newly created TupleDescriptor
+   * @throws AnalysisException
+   */
+  public TupleDescriptor registerTableRef(TableRef ref) throws AnalysisException {
     String lookupAlias = ref.getAlias();
     if (aliasMap.containsKey(lookupAlias)) {
-      throw new Exception("duplicate table alias: " + lookupAlias);
+      throw new AnalysisException("duplicate table alias: '" + lookupAlias + "'");
     }
     Db db = catalog.getDb(ref.getName().getDb());
     if (db == null) {
-      throw new Exception("unknown db: " + ref.getName().getDb());
+      throw new AnalysisException("unknown db: '" + ref.getName().getDb() + "'");
     }
     Table tbl = db.getTable(ref.getName().getTbl());
     if (tbl == null) {
-      throw new Exception("unknown table: " + ref.getName().getTbl());
+      throw new AnalysisException("unknown table: '" + ref.getName().getTbl() + "'");
     }
     TupleDescriptor result = descTbl.createTupleDescriptor();
     result.setTable(tbl);
@@ -57,48 +60,67 @@ class Analyzer {
     return result;
   }
 
-  // Return descriptor of registered table/alias. Returns null if not
-  // registered.
+  /**
+   * Return descriptor of registered table/alias.
+   * @param name
+   * @return  null if not registered.
+   */
   public TupleDescriptor getDescriptor(TableName name) {
     return aliasMap.get(name.toString().toLowerCase());
   }
 
-  // Checks that 'col' references an existing column for a registered table alias;
-  // if alias is empty, tries to resolve the column name in the context of any of the
-  // registered tables. Creates and returns an empty SlotDescriptor if the
-  // column hasn't previously been registered, otherwise returns the existing
-  // descriptor.
+  /**
+   * Checks that 'col' references an existing column for a registered table alias;
+   * if alias is empty, tries to resolve the column name in the context of any of the
+   * registered tables. Creates and returns an empty SlotDescriptor if the
+   * column hasn't previously been registered, otherwise returns the existing
+   * descriptor.
+   * @param tblName
+   * @param colName
+   * @return
+   * @throws AnalysisException
+   */
   public SlotDescriptor registerColumnRef(TableName tblName, String colName)
-      throws Exception {
+      throws AnalysisException {
     String alias;
     if (tblName == null) {
       alias = resolveColumnRef(colName);
       if (alias == null) {
-        throw new Exception("couldn't resolve column reference: " + colName);
+        throw new AnalysisException("couldn't resolve column reference: '" + colName + "'");
       }
     } else {
       alias = tblName.toString().toLowerCase();
     }
     TupleDescriptor d = aliasMap.get(alias);
     if (d == null) {
-      throw new Exception("unknown table alias: " + alias);
+      throw new AnalysisException("unknown table alias: '" + alias + "'");
     }
 
     Column col = d.getTable().getColumn(colName);
     if (col == null) {
-      throw new Exception("unknown column " + colName + " (table alias " + alias);
+      throw new AnalysisException("unknown column '" + colName + "' (table alias '" + alias + "')");
     }
 
-    SlotDescriptor result = descTbl.addSlotDescriptor(d);
+    String key = alias + "." + col.getName();
+    SlotDescriptor result = slotRefMap.get(key);
+    if (result != null) {
+      return result;
+    }
+    result = descTbl.addSlotDescriptor(d);
     result.setColumn(col);
     slotRefMap.put(alias + "." + col.getName(), result);
     return result;
   }
 
-  // Resolves column name in context of any of the registered table aliases.
-  // Returns null if not found or multiple bindings exist, otherwise returns
-  // the alias.
-  private String resolveColumnRef(String colName) throws Exception {
+  /**
+   * Resolves column name in context of any of the registered table aliases.
+   * Returns null if not found or multiple bindings exist, otherwise returns
+   * the alias.
+   * @param colName
+   * @return
+   * @throws AnalysisException
+   */
+  private String resolveColumnRef(String colName) throws AnalysisException {
     int numMatches = 0;
     String result = null;
     for (String alias: aliasMap.keySet()) {
@@ -107,8 +129,8 @@ class Analyzer {
     	result = alias;
         ++numMatches;
         if (numMatches > 1) {
-          throw new Exception(
-              "Unqualified column reference " + colName + " is ambiguous");
+          throw new AnalysisException(
+              "Unqualified column reference '" + colName + "' is ambiguous");
         }
       }
     }

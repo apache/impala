@@ -50,7 +50,18 @@ public class AggregateInfo {
   public void createAggTuple(DescriptorTable descTbl) {
     aggTupleDesc = descTbl.createTupleDescriptor();
     if (groupingExprs != null) {
-      for (Expr groupingExpr: groupingExprs) {
+      for (int i = 0; i < groupingExprs.size(); ++i) {
+        Expr groupingExpr = groupingExprs.get(i);
+        // skip this if it's a duplicate
+        boolean skip = false;
+        for (int j = 0; j < i; ++j) {
+          if (groupingExprs.get(j).equals(groupingExpr)) {
+            skip = true;
+            break;
+          }
+        }
+        if (skip) continue;
+
         SlotDescriptor slotD = descTbl.addSlotDescriptor(aggTupleDesc);
         Preconditions.checkArgument(groupingExpr.getType() != PrimitiveType.INVALID_TYPE);
         slotD.setType(groupingExpr.getType());
@@ -58,7 +69,18 @@ public class AggregateInfo {
         aggTupleSubstMap.rhs.add(new SlotRef(slotD));
       }
     }
-    for (AggregateExpr aggExpr: aggregateExprs) {
+    for (int i = 0; i < aggregateExprs.size(); ++i) {
+      AggregateExpr aggExpr = aggregateExprs.get(i);
+      // skip this if it's a duplicate
+      boolean skip = false;
+      for (int j = 0; j < i; ++j) {
+        if (aggregateExprs.get(j).equals(aggExpr)) {
+          skip = true;
+          break;
+        }
+      }
+      if (skip) continue;
+
       SlotDescriptor slotD = descTbl.addSlotDescriptor(aggTupleDesc);
       Preconditions.checkArgument(aggExpr.getType() != PrimitiveType.INVALID_TYPE);
       slotD.setType(aggExpr.getType());

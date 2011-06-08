@@ -3,6 +3,7 @@
 package com.cloudera.impala.parser;
 
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
 class LikePredicate extends Predicate {
@@ -17,8 +18,8 @@ class LikePredicate extends Predicate {
         case LIKE: return "LIKE";
         case RLIKE: return "RLIKE";
         case REGEXP: return "REGEXP";
+        default: return "undefined LikePredicate.Operator";
       }
-      return "";
     }
   }
   private final Operator op;
@@ -41,14 +42,14 @@ class LikePredicate extends Predicate {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws Analyzer.Exception {
+  public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     if (getChild(0).getType() != PrimitiveType.STRING) {
-      throw new Analyzer.Exception(
+      throw new AnalysisException(
           "left operand of " + op.toString() + " must be of type STRING: " + this.toSql());
     }
     if (getChild(1).getType() != PrimitiveType.STRING) {
-      throw new Analyzer.Exception(
+      throw new AnalysisException(
           "right operand of " + op.toString() + " must be of type STRING: " + this.toSql());
     }
   }
