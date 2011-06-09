@@ -4,30 +4,79 @@ package com.cloudera.impala.parser;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import java.util.ArrayList;
+import java.util.List;
+import java_cup.runtime.Symbol;
 
 parser code {:
-  private java_cup.runtime.Symbol errorToken;
-
+  private Symbol errorToken;
+  
+  // list of expected tokens ids from current parsing state 
+  // for generating syntax error message
+  private final List<Integer> expectedTokenIds = new ArrayList<Integer>();
+  
+  // to avoid reporting trivial tokens as expected tokens in error messages
+  private boolean reportExpectedToken(Integer tokenId) {
+    if (SqlScanner.isKeyword(tokenId) || 
+        tokenId.intValue() == SqlParserSymbols.COMMA ||
+        tokenId.intValue() == SqlParserSymbols.IDENT) {
+      return true;
+    } else {
+      return false;
+    }
+  }  
+  
+  private String getErrorTypeMessage(int lastTokenId) {
+    String msg = null;
+    switch(lastTokenId) {
+      case SqlParserSymbols.UNMATCHED_STRING_LITERAL: 
+        msg = "Unmatched string literal";
+        break;    
+      case SqlParserSymbols.NUMERIC_OVERFLOW:
+        msg = "Numeric overflow";
+        break;      
+      default:
+        msg = "Syntax error";
+        break;
+    }    
+    return msg;
+  }  
+  
   // override to save error token
   public void syntax_error(java_cup.runtime.Symbol token) {
     errorToken = token;
-    done_parsing();
+    
+    // derive expected tokens from current parsing state
+    expectedTokenIds.clear();    
+    int state = ((Symbol)stack.peek()).parse_state;    
+    // get row of actions table corresponding to current parsing state    
+    // the row consists of pairs of <tokenId, actionId> 
+    // a pair is stored as row[i] (tokenId) and row[i+1] (actionId)
+    // the last pair is a special error action
+    short[] row = action_tab[state];
+    short tokenId;
+    // the expected tokens are all the symbols with a 
+    // corresponding action from the current parsing state 
+    for (int i = 0; i < row.length-2; ++i) {
+      // get tokenId and skip actionId
+      tokenId = row[i++];
+      expectedTokenIds.add(new Integer(tokenId));      
+    }  
   }
-
+  
   // override to keep it from calling report_fatal_error()
-  public void unrecovered_syntax_error(java_cup.runtime.Symbol cur_token)
-    throws java.lang.Exception {
-    throw new java.lang.Exception("Syntax error");
+  public void unrecovered_syntax_error(Symbol cur_token)
+    throws java.lang.Exception {            
+    throw new java.lang.Exception(getErrorTypeMessage(cur_token.sym));
   }
   
   // Returns error string, consisting of the original
   // stmt with a '^' under the offending token. Assumes
-  // that parse() has been called and threw an exception
+  // that parse() has been called and threw an exception  
   public String getErrorMsg(String stmt) {
     if (errorToken == null || stmt == null) return null;
     String[] lines = stmt.split("\n");
     StringBuffer result = new StringBuffer();
-    result.append("Syntax error at:\n");
+    result.append(getErrorTypeMessage(errorToken.sym) + " at:\n");
 
     // print lines up to and including the one with the error
     for (int i = 0; i < errorToken.left; ++i) {
@@ -44,7 +93,39 @@ parser code {:
       result.append(lines[i]);
       result.append('\n');
     }
-
+    
+    // only report encountered and expected tokens for syntax errors
+    if (errorToken.sym == SqlParserSymbols.UNMATCHED_STRING_LITERAL ||
+        errorToken.sym == SqlParserSymbols.NUMERIC_OVERFLOW) {
+      return result.toString();                    
+    }
+    
+    // append last encountered token
+    result.append("Encountered: ");
+    String lastToken = 
+      SqlScanner.tokenIdMap.get(new Integer(errorToken.sym));
+    if (lastToken != null) {
+      result.append(lastToken);
+    } else {
+      result.append("Unknown last token with id: " + errorToken.sym);
+    }
+    
+    // append expected tokens
+    result.append('\n');
+    result.append("Expected: ");
+    String expectedToken = null;
+    Integer tokenId = null;
+    for (int i = 0; i < expectedTokenIds.size(); ++i) {
+      tokenId = expectedTokenIds.get(i);
+      if (reportExpectedToken(tokenId)) {
+       expectedToken = SqlScanner.tokenIdMap.get(tokenId);        
+         result.append(expectedToken + ", ");        
+      }
+    }
+    // remove trailing ", "
+    result.delete(result.length()-2, result.length());    
+    result.append('\n');
+    
     return result.toString();
   }
 :};
@@ -65,6 +146,7 @@ terminal Boolean BOOL_LITERAL;
 terminal Long INTEGER_LITERAL;
 terminal Double FLOATINGPOINT_LITERAL;
 terminal String STRING_LITERAL;
+terminal String UNMATCHED_STRING_LITERAL;
 
 nonterminal SelectStmt select_stmt;
 nonterminal ArrayList<SelectListItem> select_clause;
@@ -126,7 +208,7 @@ select_stmt ::=
 
 select_clause ::=
   KW_SELECT select_list:l
-  {: RESULT = l; :}
+  {: RESULT = l; :}  
   ;
 
 select_list ::=
@@ -140,7 +222,7 @@ select_list ::=
   {:
     list.add(item);
     RESULT = list;
-  :}
+  :}    
   ;
 
 select_list_item ::=
@@ -149,7 +231,7 @@ select_list_item ::=
   | expr:expr
   {: RESULT = new SelectListItem(expr, null); :}
   | star_expr:expr
-  {: RESULT = expr; :}
+  {: RESULT = expr; :}  
   ;
   
 alias_clause ::=
@@ -391,7 +473,7 @@ expr ::=
   | arithmetic_expr:e
   {: RESULT = e; :}
   | LPAREN expr:e RPAREN
-  {: RESULT = e; :}
+  {: RESULT = e; :}  
   ;
 
 arithmetic_expr ::=
@@ -425,13 +507,46 @@ literal ::=
   INTEGER_LITERAL:l
   {: RESULT = new IntLiteral(l); :}
   | FLOATINGPOINT_LITERAL:l
-  {: RESULT = new FloatLiteral(l); :}
-  | NUMERIC_OVERFLOW:l
-  {: RESULT = new StringLiteral(l); :}
+  {: RESULT = new FloatLiteral(l); :}  
   | STRING_LITERAL:l
   {: RESULT = new StringLiteral(l); :}
   | BOOL_LITERAL:l
-  {: RESULT = new BoolLiteral(l); :}
+  {: RESULT = new BoolLiteral(l); :}    
+  | UNMATCHED_STRING_LITERAL:l expr:e
+  {: 
+    // we have an unmatched string literal.
+    // to correctly report the root cause of this syntax error
+    // we must force parsing to fail at this point,
+    // and generate an unmatched string literal symbol 
+    // to be passed as the last seen token in the
+    // error handling routine (otherwise some other token could be reported)
+    Symbol errorToken = parser.getSymbolFactory().newSymbol("literal",
+        SqlParserSymbols.UNMATCHED_STRING_LITERAL,
+        ((Symbol) CUP$SqlParser$stack.peek()),
+        ((Symbol) CUP$SqlParser$stack.peek()), RESULT);
+    // call syntax error to gather information about expected tokens, etc.
+    // syntax_error does not throw an exception
+    parser.syntax_error(errorToken);
+    // unrecovered_syntax_error throws an exception and will terminate parsing
+    parser.unrecovered_syntax_error(errorToken);
+    RESULT = null;
+  :}
+  | NUMERIC_OVERFLOW:l
+  {: 
+    // similar to the unmatched string literal case
+    // we must terminate parsing at this point
+    // and generate a corresponding symbol to be reported
+    Symbol errorToken = parser.getSymbolFactory().newSymbol("literal",
+        SqlParserSymbols.NUMERIC_OVERFLOW,
+        ((Symbol) CUP$SqlParser$stack.peek()),
+        ((Symbol) CUP$SqlParser$stack.peek()), RESULT);
+    // call syntax error to gather information about expected tokens, etc.
+    // syntax_error does not throw an exception
+    parser.syntax_error(errorToken);
+    // unrecovered_syntax_error throws an exception and will terminate parsing
+    parser.unrecovered_syntax_error(errorToken);    
+    RESULT = null; 
+  :}
   ;
 
 aggregate_expr ::=
@@ -470,7 +585,7 @@ predicate ::=
   | expr:e KW_IS KW_NOT KW_NULL
   {: RESULT = new IsNullPredicate(e, true); :}
   | comparison_predicate:p
-  {: RESULT = p; :}
+  {: RESULT = p; :}  
   | compound_predicate:p
   {: RESULT = p; :}
   | like_predicate:p
@@ -514,9 +629,8 @@ compound_predicate ::=
   {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.OR, p1, p2); :}
   | KW_NOT predicate:p
   {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT, p, null); :}
-  // TODO
-  //| NOT predicate:p
-  //{: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT, p, null); :}
+  | NOT predicate:p
+  {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT, p, null); :}
   ;
 
 literal_predicate ::=

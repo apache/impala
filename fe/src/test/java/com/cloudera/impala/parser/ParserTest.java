@@ -22,7 +22,7 @@ public class ParserTest {
     try {
       result = parser.parse().value;
     } catch (Exception e) {
-      System.err.println(e.toString());
+      System.err.println(parser.getErrorMsg(stmt));
       fail("\n" + parser.getErrorMsg(stmt));
     }
     assertNotNull(result);
@@ -41,7 +41,7 @@ public class ParserTest {
     } catch (java.lang.Exception e) {
       if (expectedErrorString != null) {
         String errorString = parser.getErrorMsg(stmt);
-        assertEquals(errorString, expectedErrorString);
+        assertEquals(expectedErrorString, errorString);
       }
       return;
     }
@@ -54,6 +54,21 @@ public class ParserTest {
    */
   public void ParserError(String stmt) {
     ParserError(stmt, null);
+  }
+
+  @Test public void TestSelect() {
+    ParsesOk("select a from tbl");
+    ParsesOk("select a, b, c, d from tbl");
+    ParserError("a from tbl");
+    ParserError("select a b c from tbl");
+  }
+
+  @Test public void TestAlias() {
+    ParsesOk("select a b from tbl");
+    ParsesOk("select a b, c from tbl");
+    ParsesOk("select a as a, b as b, c as c, d as d from tbl");
+    ParserError("a from tbl");
+    ParserError("select a as a, b c d from tbl");
   }
 
   @Test public void TestStar() {
@@ -133,11 +148,10 @@ public class ParserTest {
   }
 
   @Test public void TestOrderBy() {
-    // TODO: fix parser bug and parser error msg (currently points to 'from' as source of error)
-    //ParsesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
-             //"order by by string_col, 15.7 * float_col, int_col + bigint_col");
-    //ParsesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
-             //"order by by string_col asc, 15.7 * float_col desc, int_col + bigint_col asc");
+    ParsesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
+             "order by string_col, 15.7 * float_col, int_col + bigint_col");
+    ParsesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
+             "order by string_col asc, 15.7 * float_col desc, int_col + bigint_col asc");
     ParserError("select int_col, string_col, bigint_col, count(*) from alltypes " +
                 "order by by string_col asc desc");
   }
@@ -162,12 +176,32 @@ public class ParserTest {
     ParsesOk("select " + Long.toString(Long.MIN_VALUE) + " from test");
     ParsesOk("select " + Double.toString(Double.MAX_VALUE) + " from test");
     ParsesOk("select " + Double.toString(Double.MIN_VALUE) + " from test");
+    ParsesOk("select 0.0 from test");
+    ParserError("select " + Long.toString(Long.MAX_VALUE) + "1 from test");
+    ParserError("select " + Long.toString(Long.MIN_VALUE) + "1 from test");
+    // java converts a float overflow to infinity, we consider it an error
+    ParserError("select " + Double.toString(Double.MAX_VALUE) + "1 from test");
+    // java converts a float underflow to 0.0
+    // since there is no easy, reliable way to detect underflow,
+    // we don't consider it an error
+    ParsesOk("select " + Double.toString(Double.MIN_VALUE) + "1 from test");
   }
 
   @Test public void TestLiteralExprs() {
+    // negative integer literal
+    ParsesOk("select -1 from t");
+    ParsesOk("select - 1 from t");
+    ParsesOk("select a - - 1 from t");
+    // test string literals with and without quotes in the literal
     ParsesOk("select 5, 'five', 5.0, i + 5 from t");
-    // TODO: introduce UNMATCHED_STRING token and error production
-    //ParserError("select '5 from t");
+    ParsesOk("select \"\\\"five\\\"\" from t\n");
+    ParsesOk("select \"\'five\'\" from t\n");
+    ParsesOk("select \"\'five\" from t\n");
+    // missing quotes
+    ParserError("select \'5 from t");
+    ParserError("select \"5 from t");
+    ParserError("select '5 from t");
+    ParserError("select \"\"five\"\" from t\n");
     ParserError("select 5.0.5 from t");
   }
 
@@ -237,18 +271,23 @@ public class ParserTest {
     ParsesOk("select a, b, c from t where false");
     ParsesOk("select a, b, c from t where false and true");
   }
+
   @Test public void TestCompoundPredicates() {
     ParsesOk("select a, b, c from t where a = 5 and b = 6");
     ParsesOk("select a, b, c from t where a = 5 or b = 6");
     ParsesOk("select a, b, c from t where (a = 5 or b = 6) and c = 7");
     ParsesOk("select a, b, c from t where not a = 5");
     ParsesOk("select a, b, c from t where (not a = 5 or not b = 6) and not c = 7");
-    // TODO: fix these, they should work
-    //ParsesOk("select a, b, c from t where !a = 5");
-    //ParsesOk("select a, b, c from t where (! a = 5 or ! b = 6) and ! c = 7");
+    ParsesOk("select a, b, c from t where !a = 5");
+    ParsesOk("select a, b, c from t where (! a = 5 or ! b = 6) and ! c = 7");
+    ParsesOk("select a, b, c from t where (!(!a = 5))");
     // unbalanced parentheses
     ParserError("select a, b, c from t where (a = 5 or b = 6) and c = 7)");
     ParserError("select a, b, c from t where ((a = 5 or b = 6) and c = 7");
+    // incorrectly positioned negation (!)
+    ParserError("select a, b, c from t where a = !5");
+    ParserError("select a, b, c from t where a = 5 or !");
+    ParserError("select a, b, c from t where !(a = 5) or !");
   }
 
   @Test public void TestSlotRef() {
@@ -259,21 +298,108 @@ public class ParserTest {
   }
 
   @Test public void TestGetErrorMsg() {
+
+    // missing select
+    ParserError("c, b, c from t",
+        "Syntax error at:\n" +
+        "c, b, c from t\n" +
+        "^\n" +
+        "Encountered: IDENTIFIER\n" +
+        "Expected: SELECT\n");
+
+    // missing select list
+    ParserError("select from t",
+        "Syntax error at:\n" +
+        "select from t\n" +
+        "       ^\n" +
+        "Encountered: FROM\n" +
+        "Expected: AVG, CASE, CAST, COUNT, MIN, MAX, SUM, " +
+        "IDENTIFIER\n");
+
+    // missing from
+    ParserError("select c, b, c where a = 5",
+        "Syntax error at:\n" +
+        "select c, b, c where a = 5\n" +
+        "               ^\n" +
+        "Encountered: WHERE\n" +
+        "Expected: AS, DIV, FROM, COMMA, IDENTIFIER\n");
+
+    // missing table list
+    ParserError("select c, b, c from where a = 5",
+        "Syntax error at:\n" +
+        "select c, b, c from where a = 5\n" +
+        "                    ^\n" +
+        "Encountered: WHERE\n" +
+        "Expected: IDENTIFIER\n");
+
+    // missing predicate in where clause (no group by)
+    ParserError("select c, b, c from t where",
+        "Syntax error at:\n" +
+        "select c, b, c from t where\n" +
+        "                           ^\n" +
+        "Encountered: EOF\n" +
+        "Expected: AVG, CASE, CAST, COUNT, FALSE, MIN, MAX, NOT, SUM, " +
+        "TRUE, IDENTIFIER\n");
+
+    // missing predicate in where clause (group by)
+    ParserError("select c, b, c from t where group by a, b",
+        "Syntax error at:\n" +
+        "select c, b, c from t where group by a, b\n" +
+        "                            ^\n" +
+        "Encountered: GROUP\n" +
+        "Expected: AVG, CASE, CAST, COUNT, FALSE, MIN, MAX, NOT, SUM, " +
+        "TRUE, IDENTIFIER\n");
+
+    // unmatched string literal starting with "
+    ParserError("select c, \"b, c from t",
+        "Unmatched string literal at:\n" +
+        "select c, \"b, c from t\n" +
+        "           ^\n");
+
+    // unmatched string literal starting with '
+    ParserError("select c, 'b, c from t",
+        "Unmatched string literal at:\n" +
+        "select c, 'b, c from t\n" +
+        "           ^\n");
+
+    // numeric overflow for Long literal
+    ParserError("select " + Long.toString(Long.MAX_VALUE) + "1 from t",
+        "Numeric overflow at:\n" +
+        "select 92233720368547758071 from t\n" +
+        "       ^\n");
+
+    // test placement of error indicator ^ on queries with multiple lines
     ParserError("select (i + 5)(1 - i) from t",
         "Syntax error at:\n" +
         "select (i + 5)(1 - i) from t\n" +
-        "              ^\n");
+        "              ^\n" +
+        "Encountered: (\n" +
+        "Expected: AND, AS, ASC, DESC, DIV, ELSE, END, FROM, FULL, " +
+        "GROUP, HAVING, IS, INNER, JOIN, LEFT, LIKE, LIMIT, OR, ORDER, " +
+        "REGEXP, RLIKE, RIGHT, WHEN, WHERE, THEN, COMMA, " +
+        "IDENTIFIER\n");
+
     ParserError("select (i + 5)\n(1 - i) from t",
         "Syntax error at:\n" +
         "select (i + 5)\n" +
         "(1 - i) from t\n" +
-        "^\n");
+        "^\n" +
+        "Encountered: (\n" +
+        "Expected: AND, AS, ASC, DESC, DIV, ELSE, END, FROM, FULL, " +
+        "GROUP, HAVING, IS, INNER, JOIN, LEFT, LIKE, LIMIT, OR, ORDER, " +
+        "REGEXP, RLIKE, RIGHT, WHEN, WHERE, THEN, COMMA, " +
+        "IDENTIFIER\n");
+
     ParserError("select (i + 5)\n(1 - i)\nfrom t",
         "Syntax error at:\n" +
         "select (i + 5)\n" +
         "(1 - i)\n" +
         "^\n" +
-        "from t\n");
+        "from t\n" +
+        "Encountered: (\n" +
+        "Expected: AND, AS, ASC, DESC, DIV, ELSE, END, FROM, FULL, " +
+        "GROUP, HAVING, IS, INNER, JOIN, LEFT, LIKE, LIMIT, OR, ORDER, " +
+        "REGEXP, RLIKE, RIGHT, WHEN, WHERE, THEN, COMMA, " +
+        "IDENTIFIER\n");
   }
-
 }

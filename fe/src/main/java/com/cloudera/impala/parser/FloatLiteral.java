@@ -10,12 +10,12 @@ class FloatLiteral extends LiteralExpr {
 
   public FloatLiteral(Double value) {
     this.value = value.doubleValue();
-    if (this.value <= Float.MAX_VALUE && this.value >= Float.MIN_VALUE) {
+    if ((this.value <= Float.MAX_VALUE && this.value >= Float.MIN_VALUE) || this.value == 0.0f) {
       type = PrimitiveType.FLOAT;
     } else {
-      Preconditions.checkState(this.value <= Double.MAX_VALUE
-          && this.value >= Double.MIN_VALUE);
-      type = PrimitiveType.BIGINT;
+      Preconditions.checkState((this.value <= Double.MAX_VALUE
+          && this.value >= Double.MIN_VALUE) || this.value == 0.0);
+      type = PrimitiveType.DOUBLE;
     }
   }
 
