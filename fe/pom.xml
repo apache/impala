@@ -18,7 +18,7 @@
   <packaging>jar</packaging>
 
   <name>Cloudera Impala Query Engine Frontend</name>
-
+  
   <dependencies>
     <dependency>
       <groupId>net.sf.squirrel-sql.thirdparty-non-maven</groupId>
@@ -185,6 +185,13 @@
         <version>2.7.2</version>
         <configuration>
           <redirectTestOutputToFile>true</redirectTestOutputToFile>
+          <systemPropertyVariables>
+            <test.hive.warehouse.dir>${project.build.directory}/test-warehouse</test.hive.warehouse.dir>
+            <test.hive.metastore.jdbc.url>jdbc:derby:;databaseName=${project.build.directory}/test_metastore_db;create=true;logDevice=${project.build.directory}/test_metastore_db</test.hive.metastore.jdbc.url>
+            <test.hive.metastore.jdbc.driver>org.apache.derby.jdbc.EmbeddedDriver</test.hive.metastore.jdbc.driver>
+            <test.hive.metastore.jdbc.username>APP</test.hive.metastore.jdbc.username>
+            <test.hive.metastore.jdbc.password>mine</test.hive.metastore.jdbc.password>
+          </systemPropertyVariables>
         </configuration>
       </plugin>
 

@@ -17,5 +17,3 @@ target
 *~
 
 derby.log
-junit_metastore_db
-hive-site.xml

@@ -43,33 +43,26 @@ or in parser debug mode (spits out transitions to stdout):
 Setting up Eclipse
 ------------------
 
-Background: http://maven.apache.org/guides/mini/guide-ide-eclipse.html
+1) Install the M2Eclipse Maven plugin: http://m2eclipse.sonatype.org/
 
-cd into the fe directory ("impala/fe" typically)
+2) Start Eclipse and navigate to Preferences->Maven
 
-If you haven't already:
-mvn install
-mvn -Declipse.workspace=<path-to-eclipse-workspace> eclipse:configure-workspace
+   - Check the box for "Update Maven projects on startup"
+   
+   - Add "process-resources" to the list of goals to run on project import.
 
-One of the things this will do is to add the M2_REPO classpath variable to
-Eclipse. You can verify this in the Eclipse Preferences:
+   - Add "process-resources" to the list of goals to run when updating
+     the project configuration.
 
-  Java->Build Path->Classpath Variables
+   Background: http://m2eclipse.sonatype.org/m2eclipse-faq.html#7
 
-It should be set to /home/<user>/.m2/repository on a Linux machine, and
-something equivalent on a Mac.
+3) Import the Maven project into Eclipse:
 
-Then generate the eclipse projects:
-mvn -DdownloadSources=true -DdownloadJavadocs=true eclipse:eclipse
+   - Navigate to File->Import->Maven->Existing Maven Projects
 
-Then, in Eclipse do the following:
+   - Select the "fe" directory as your "Root Directory".
 
-1. File->Import...
-2. General->Existing projects into workspace 
-3. select the "next" button
-4. select the "impala/fe" directory
-5. select the "finish" button
-
+   - Click on "Finish".
 
 Whitespace
 ----------

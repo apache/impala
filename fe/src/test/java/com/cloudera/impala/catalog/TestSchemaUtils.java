@@ -89,15 +89,7 @@ public class TestSchemaUtils {
 
   // Create client for test schema.
   public static HiveMetaStoreClient createSchemaAndClient() throws Exception {
-    HiveConf hiveConf = new HiveConf(TestSchemaUtils.class);
-    // configure for embedded metastore
-    hiveConf.set("javax.jdo.option.ConnectionURL",
-        "jdbc:derby:;databaseName=junit_metastore_db;create=true");
-    hiveConf.set("javax.jdo.option.ConnectionDriverName",
-        "org.apache.derby.jdbc.EmbeddedDriver");
-    hiveConf.set("hive.metastore.local", "true");
-
-    HiveMetaStoreClient client = new HiveMetaStoreClient(hiveConf);
+    HiveMetaStoreClient client = new HiveMetaStoreClient(new HiveConf(TestSchemaUtils.class));
     createTestSchema(client);
     return client;
   }
