@@ -15,4 +15,17 @@ public class ScanNode extends PlanNode {
   public ScanNode(Table tbl) {
     this.tbl = tbl;
   }
+
+  @Override
+  protected String debugString() {
+    return "Scan(" + tbl.getFullName() + " " + super.debugString() + ")";
+  }
+
+
+  @Override
+  protected String getExplainString(String prefix) {
+    StringBuilder output = new StringBuilder();
+    output.append(prefix + "SCAN table=" + tbl.getFullName());
+    return output.toString();
+  }
 }

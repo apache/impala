@@ -2,14 +2,16 @@
 
 package com.cloudera.impala.parser;
 
-import java.lang.String;
 import java.util.List;
 
-// return value of the grammar production that parses aggregate function
-// parameters
+/**
+ * Return value of the grammar production that parses aggregate function
+ * parameters.
+ *
+ */
 class AggregateParamsList {
-  private boolean isStar;
-  private boolean isDistinct;
+  private final boolean isStar;
+  private final boolean isDistinct;
   private List<Expr> exprs;
 
   // c'tor for non-star params

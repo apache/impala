@@ -6,7 +6,7 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
-class CastExpr extends Expr {
+public class CastExpr extends Expr {
   private final PrimitiveType targetType;
 
   public CastExpr(PrimitiveType targetType, Expr e) {

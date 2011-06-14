@@ -15,7 +15,7 @@ import com.cloudera.impala.common.AnalysisException;
  * Repository of analysis state for single select block..
  *
  */
-class Analyzer {
+public class Analyzer {
   private final DescriptorTable descTbl;
   private final Catalog catalog;
 

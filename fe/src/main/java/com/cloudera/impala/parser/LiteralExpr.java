@@ -2,5 +2,5 @@
 
 package com.cloudera.impala.parser;
 
-class LiteralExpr extends Expr {
+public class LiteralExpr extends Expr {
 }

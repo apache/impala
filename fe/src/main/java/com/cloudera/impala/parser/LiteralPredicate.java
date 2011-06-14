@@ -2,7 +2,7 @@
 
 package com.cloudera.impala.parser;
 
-class LiteralPredicate extends Predicate {
+public class LiteralPredicate extends Predicate {
   private final boolean value;
 
   static public LiteralPredicate True() {

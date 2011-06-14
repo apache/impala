@@ -4,7 +4,7 @@ package com.cloudera.impala.parser;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 
-class StringLiteral extends LiteralExpr {
+public class StringLiteral extends LiteralExpr {
   private final String value;
 
   public StringLiteral(String value) {
@@ -20,6 +20,7 @@ class StringLiteral extends LiteralExpr {
     return ((StringLiteral) obj).value.equals(value);
   }
 
+  @Override
   public String toSql() {
     return "'" + value + "'";
   }

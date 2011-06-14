@@ -5,7 +5,7 @@ package com.cloudera.impala.parser;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 
-class Predicate extends Expr {
+public class Predicate extends Expr {
   public Predicate() {
     super();
   }

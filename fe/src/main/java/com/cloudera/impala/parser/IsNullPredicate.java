@@ -4,7 +4,7 @@ package com.cloudera.impala.parser;
 
 import com.google.common.base.Preconditions;
 
-class IsNullPredicate extends Predicate {
+public class IsNullPredicate extends Predicate {
   private final boolean isNotNull;
 
   public IsNullPredicate(Expr e, boolean isNotNull) {

@@ -6,18 +6,24 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
-class ArithmeticExpr extends Expr {
+public class ArithmeticExpr extends Expr {
   enum Operator {
-    MULTIPLY,
-    DIVIDE,
-    MOD,
-    INT_DIVIDE,
-    PLUS,
-    MINUS,
-    BITAND,
-    BITOR,
-    BITXOR,
-    BITNOT;
+    MULTIPLY("*"),
+    DIVIDE("/"),
+    MOD("%"),
+    INT_DIVIDE("DIV"),
+    PLUS("+"),
+    MINUS("-"),
+    BITAND("&"),
+    BITOR("|"),
+    BITXOR("^"),
+    BITNOT("~");
+
+    private final String description;
+
+    private Operator(String description) {
+      this.description = description;
+    }
 
     public boolean isBitwiseOperation() {
       return this == BITAND || this == BITOR || this == BITXOR || this == BITNOT;
@@ -25,19 +31,7 @@ class ArithmeticExpr extends Expr {
 
     @Override
     public String toString() {
-      switch (this) {
-        case MULTIPLY: return "*";
-        case DIVIDE: return "/";
-        case MOD: return "%";
-        case INT_DIVIDE: return "DIV";
-        case PLUS: return "+";
-        case MINUS: return "-";
-        case BITAND: return "&";
-        case BITOR: return "|";
-        case BITXOR: return "&";
-        case BITNOT: return "~";
-        default: return "undefined ArithmeticExpr.Operator";
-      }
+      return description;
     }
   }
   private final Operator op;

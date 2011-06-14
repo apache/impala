@@ -5,7 +5,7 @@ package com.cloudera.impala.parser;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.google.common.base.Preconditions;
 
-class FloatLiteral extends LiteralExpr {
+public class FloatLiteral extends LiteralExpr {
   private final double value;
 
   public FloatLiteral(Double value) {
@@ -27,6 +27,7 @@ class FloatLiteral extends LiteralExpr {
     return ((FloatLiteral) obj).value == value;
   }
 
+  @Override
   public String toSql() {
     return Double.toString(value);
   }

@@ -5,18 +5,28 @@ package com.cloudera.impala.catalog;
 import com.google.common.base.Preconditions;
 
 public enum PrimitiveType {
-  INVALID_TYPE,
-  BOOLEAN,
-  TINYINT,
-  SMALLINT,
-  INT,
-  BIGINT,
-  FLOAT,
-  DOUBLE,
-  DATE,
-  DATETIME,
-  TIMESTAMP,
-  STRING;
+  INVALID_TYPE("INVALID_TYPE"),
+  BOOLEAN("BOOLEAN"),
+  TINYINT("TINYINT"),
+  SMALLINT("SMALLINT"),
+  INT("INT"),
+  BIGINT("BIGINT"),
+  FLOAT("FLOAT"),
+  DOUBLE("DOUBLE"),
+  DATE("DATE"),
+  DATETIME("DATETIME"),
+  TIMESTAMP("TIMESTAMP"),
+  STRING("STRING");
+
+  private final String description;
+
+  private PrimitiveType(String description) {
+    this.description = description;
+  }
+
+  public String toString() {
+    return description;
+  }
 
   public boolean isFixedPointType() {
     return this == TINYINT || this == SMALLINT || this == INT || this == BIGINT;

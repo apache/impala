@@ -7,11 +7,14 @@ import java.util.List;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
-// CaseExpr represents the SQL expression
-// CASE [expr] WHEN expr THEN expr [WHEN expr THEN expr ...] [ELSE expr] END
-// Each expr is stored as a child, the first one at children[0], etc., and each
-// When/Then clause occupying two child slots.
-class CaseExpr extends Expr {
+/**
+ * CaseExpr represents the SQL expression
+ * CASE [expr] WHEN expr THEN expr [WHEN expr THEN expr ...] [ELSE expr] END
+ * Each expr is stored as a child, the first one at children[0], etc., and each
+ * When/Then clause occupying two child slots..
+ *
+ */
+public class CaseExpr extends Expr {
   private boolean hasCaseExpr;
   private boolean hasElseExpr;
 

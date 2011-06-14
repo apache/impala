@@ -2,7 +2,10 @@
 
 package com.cloudera.impala.parser;
 
-// Integer ids that cannot accidentally be compared with ints.
+/**
+ * Integer ids that cannot accidentally be compared with ints..
+ *
+ */
 public abstract class Id {
   private final int id;
 

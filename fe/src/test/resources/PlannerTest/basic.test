@@ -1,0 +1,20 @@
+select zip, count(*)
+from testtbl
+where name like 'm%'
+group by 1
+----
+AGGREGATE
+GROUP BY: zip
+    SCAN table=default.testtbl
+====
+select zip, count(*)
+from testtbl
+where name like 'm%'
+group by 1
+order by 2 desc
+----
+SORT
+ORDER BY: <slot 3> DESC
+  AGGREGATE
+  GROUP BY: zip
+    SCAN table=default.testtbl

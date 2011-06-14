@@ -4,9 +4,12 @@ package com.cloudera.impala.parser;
 
 import java.util.HashMap;
 
-// Repository for tuple (and slot) descriptors.
-// Descriptors should only be created through this class, which assigns
-// them unique ids.
+/**
+ * Repository for tuple (and slot) descriptors.
+ * Descriptors should only be created through this class, which assigns
+ * them unique ids..
+ *
+ */
 public class DescriptorTable {
   private final HashMap<TupleId, TupleDescriptor> tupleDescs;
   private int nextTupleId;

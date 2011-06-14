@@ -6,20 +6,21 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
-class LikePredicate extends Predicate {
+public class LikePredicate extends Predicate {
   enum Operator {
-    LIKE,
-    RLIKE,
-    REGEXP;
+    LIKE("LIKE"),
+    RLIKE("RLIKE"),
+    REGEXP("REGEXP");
+
+    private final String description;
+
+    private Operator(String description) {
+      this.description = description;
+    }
 
     @Override
     public String toString() {
-      switch (this) {
-        case LIKE: return "LIKE";
-        case RLIKE: return "RLIKE";
-        case REGEXP: return "REGEXP";
-        default: return "undefined LikePredicate.Operator";
-      }
+      return description;
     }
   }
   private final Operator op;

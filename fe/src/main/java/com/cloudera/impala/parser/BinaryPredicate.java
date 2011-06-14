@@ -6,27 +6,28 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
-// Most predicates with two operands.
-class BinaryPredicate extends Predicate {
+/**
+ * Most predicates with two operands..
+ *
+ */
+public class BinaryPredicate extends Predicate {
   enum Operator {
-    EQ, // =
-    NE, // !=, <>
-    LE, // <=
-    GE, // >=
-    LT, // <
-    GT; // >
+    EQ("="),
+    NE("!="),
+    LE("<="),
+    GE(">="),
+    LT("<"),
+    GT(">");
+
+    private final String description;
+
+    private Operator(String description) {
+      this.description = description;
+    }
 
     @Override
     public String toString() {
-      switch (this) {
-        case EQ: return "-";
-        case NE: return "!=";
-        case LE: return "<=";
-        case GE: return ">=";
-        case LT: return "<";
-        case GT: return ">";
-        default: return "undefined BinaryPredicate.Operator";
-      }
+      return description;
     }
   };
   private final Operator op;

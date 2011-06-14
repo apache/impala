@@ -3,7 +3,10 @@
 package com.cloudera.impala.parser;
 
 
-// combination of expr and ASC/DESC
+/**
+ * Combination of expr and ASC/DESC.
+ *
+ */
 class OrderByElement {
   private final Expr expr;
   private final boolean isAsc;
@@ -18,7 +21,7 @@ class OrderByElement {
     return expr;
   }
 
-  public boolean isAsc() {
+  public boolean getIsAsc() {
     return isAsc;
   }
 }

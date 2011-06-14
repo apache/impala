@@ -5,7 +5,7 @@ package com.cloudera.impala.parser;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.google.common.base.Preconditions;
 
-class IntLiteral extends LiteralExpr {
+public class IntLiteral extends LiteralExpr {
   private final long value;
 
   public IntLiteral(Long value) {
@@ -35,6 +35,7 @@ class IntLiteral extends LiteralExpr {
     return value == ((IntLiteral) obj).value;
   }
 
+  @Override
   public String toSql() {
     return Long.toString(value);
   }

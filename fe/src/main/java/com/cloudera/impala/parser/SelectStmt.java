@@ -6,26 +6,47 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.Lists;
 
-class SelectStmt extends ParseNodeBase {
-  ArrayList<SelectListItem> selectList;
-  List<TableRef> tableRefs;
-  Predicate whereClause;
-  ArrayList<Expr> groupingExprs;
-  Predicate havingClause;
-  ArrayList<OrderByElement> orderByElememts;
-  long limit;
+/**
+ * Representation of a single select block, including GROUP BY, ORDERY BY and HAVING clauses.
+ *
+ */
+public class SelectStmt extends ParseNodeBase {
+  private final ArrayList<SelectListItem> selectList;
+  private final List<TableRef> tableRefs;
+  private final Predicate whereClause;
+  private final ArrayList<Expr> groupingExprs;
+  private final Predicate havingClause;  // original having clause
+  private final ArrayList<OrderByElement> orderByElements;
+  private final long limit;
 
-  // map from SlotRef(alias) to corresp. select list expr
-  Expr.SubstitutionMap aliasSubstMap;
+  /**  map from SlotRef(alias) to corresp. select list expr */
+  private final Expr.SubstitutionMap aliasSubstMap;
 
-  // star-expanded list of exprs in select clause
-  ArrayList<Expr> selectListExprs;
+  /**
+   * list of executable exprs in select clause (star-expanded, ordinals and
+   * aliases substituted, agg output substituted
+   */
+  private final ArrayList<Expr> selectListExprs;
 
-  AggregateInfo aggInfo;
+  /**  list of ordering exprs with ordinals, aliases and agg output resolved */
+  private List<Expr> orderingExprs;
+
+  /** list of ordering directions; mirrors orderingExprs */
+  private List<Boolean> isAscOrder;
+
+  /**  havingClause with aliases and agg output resolved */
+  private Predicate havingPred;
+
+  private AggregateInfo aggInfo;
+
+  private final static Logger log = LoggerFactory.getLogger(SelectStmt.class);
 
   SelectStmt(ArrayList<SelectListItem> selectList,
              List<TableRef> tableRefList,
@@ -37,11 +58,53 @@ class SelectStmt extends ParseNodeBase {
     this.whereClause = wherePredicate;
     this.groupingExprs = groupingExprs;
     this.havingClause = havingPredicate;
-    this.orderByElememts = orderByElements;
+    this.orderByElements = orderByElements;
     this.limit = limit;
 
     this.aliasSubstMap = new Expr.SubstitutionMap();
     this.selectListExprs = Lists.newArrayList();
+    this.orderingExprs = null;
+    this.isAscOrder = null;
+    this.havingPred = null;
+    this.aggInfo = null;
+  }
+
+  /**
+   * @return the original select list items from the query
+   */
+  public ArrayList<SelectListItem> getSelectList() {
+    return selectList;
+  }
+
+  /**
+   * @return the list of post-analysis exprs corresponding to the
+   * select list from the original query ('*'-expanded)
+   */
+  public ArrayList<Expr> getSelectListExprs() {
+    return selectListExprs;
+  }
+
+  /**
+   * @return the list of post-analysis exprs corresponding to the
+   * ORDER BY clause (aliases and ordinals resolved)
+   */
+  public List<Expr> getOrderingExprs() {
+    return orderingExprs;
+  }
+
+  /**
+   * @return a list of bools corresponding to the explicit or implicit
+   * ordering directions of the ORDER BY clause; true = ASC, false = DESC
+   */
+  public List<Boolean> getOrderingDirections() {
+    return isAscOrder;
+  }
+
+  /**
+   * @return the HAVING clause post-analysis and with aliases resolved
+   */
+  public Predicate getHavingPred() {
+    return havingPred;
   }
 
   public List<TableRef> getTableRefs() {
@@ -52,20 +115,12 @@ class SelectStmt extends ParseNodeBase {
     return whereClause;
   }
 
-  public Predicate getHavingClause() {
-    return havingClause;
-  }
-
-  public ArrayList<OrderByElement> getOrderByElememts() {
-    return orderByElememts;
+  public ArrayList<OrderByElement> getOrderByElements() {
+    return orderByElements;
   }
 
   public long getLimit() {
     return limit;
-  }
-
-  public ArrayList<Expr> getSelectListExprs() {
-    return selectListExprs;
   }
 
   public AggregateInfo getAggInfo() {
@@ -108,11 +163,10 @@ class SelectStmt extends ParseNodeBase {
             "aggregation function not allowed in WHERE clause");
       }
     }
-    createAggInfo(analyzer);
-
-    if (orderByElememts != null) {
+    if (orderByElements != null) {
       analyzeOrderByClause(analyzer);
     }
+    createAggInfo(analyzer);
   }
 
   /**
@@ -161,9 +215,10 @@ class SelectStmt extends ParseNodeBase {
 
   /**
    * Analyze aggregation-relevant components of the select block (Group By clause,
-   * select list), substite AVG with SUM/COUNT, create the AggregationInfo, including
-   * the agg output tuple, and transform all post-agg exprs given
+   * select list, Order By clause), substite AVG with SUM/COUNT, create the
+   * AggregationInfo, including the agg output tuple, and transform all post-agg exprs given
    * AggregationInfo's substmap.
+   *
    * @param analyzer
    * @throws AnalysisException
    */
@@ -171,6 +226,16 @@ class SelectStmt extends ParseNodeBase {
     if (groupingExprs == null && !Expr.contains(selectListExprs, AggregateExpr.class)) {
       // we're not computing aggregates
       return;
+    }
+
+    // disallow '*' and aggregation (we can't group by '*', and if you need to
+    // name all star-expanded cols in the group by clause you might as well do it
+    // in the select list)
+    for (SelectListItem item : selectList) {
+      if (item.isStar()) {
+        throw new AnalysisException(
+            "cannot combine '*' in select list with aggregation: " + item.toSql());
+      }
     }
 
     // analyze grouping exprs
@@ -187,12 +252,12 @@ class SelectStmt extends ParseNodeBase {
           // reference the original expr in the error msg
           throw new AnalysisException(
               "GROUP BY expression must not contain aggregate functions: "
-              + groupingExprs.get(i).toSql());
+                  + groupingExprs.get(i).toSql());
         }
         if (groupingExprsCopy.get(i).getType().isFloatingPointType()) {
           throw new AnalysisException(
               "GROUP BY expression must have a discrete (non-floating point) type: "
-              + groupingExprs.get(i).toSql());
+                  + groupingExprs.get(i).toSql());
         }
       }
     }
@@ -200,20 +265,23 @@ class SelectStmt extends ParseNodeBase {
     // analyze having clause
     if (havingClause != null) {
       // substitute aliases in place (ordinals not allowed in having clause)
-      havingClause = (Predicate) havingClause.substitute(aliasSubstMap);
-      havingClause.analyze(analyzer);
+      havingPred = (Predicate) havingClause.clone(aliasSubstMap);
+      havingPred.analyze(analyzer);
     }
 
     // build substmap AVG -> SUM/COUNT;
     // assumes that select list and having clause have been analyzed
     ArrayList<AggregateExpr> aggExprs = Lists.newArrayList();
     Expr.collectList(selectListExprs, AggregateExpr.class, aggExprs);
-    if (havingClause != null) {
-      havingClause.collect(AggregateExpr.class, aggExprs);
+    if (havingPred != null) {
+      havingPred.collect(AggregateExpr.class, aggExprs);
+    }
+    if (orderingExprs != null) {
+      Expr.collectList(orderingExprs, AggregateExpr.class, aggExprs);
     }
 
     Expr.SubstitutionMap avgSubstMap = new Expr.SubstitutionMap();
-    for (AggregateExpr aggExpr: aggExprs) {
+    for (AggregateExpr aggExpr : aggExprs) {
       if (aggExpr.getOp() != AggregateExpr.Operator.AVG) {
         continue;
       }
@@ -230,35 +298,74 @@ class SelectStmt extends ParseNodeBase {
       avgSubstMap.rhs.add(divExpr);
     }
 
-    // substitute select list and having clause
+    // substitute select list, having clause, order by clause
     Expr.substituteList(selectListExprs, avgSubstMap);
-    if (havingClause != null) {
-      havingClause = (Predicate) havingClause.substitute(avgSubstMap);
+    if (havingPred != null) {
+      havingPred = (Predicate) havingPred.substitute(avgSubstMap);
     }
+    Expr.substituteList(orderingExprs, avgSubstMap);
 
     // collect agg exprs again
     aggExprs.clear();
     Expr.collectList(selectListExprs, AggregateExpr.class, aggExprs);
-    if (havingClause != null) {
-      havingClause.collect(AggregateExpr.class, aggExprs);
+    if (havingPred != null) {
+      havingPred.collect(AggregateExpr.class, aggExprs);
+    }
+    if (orderingExprs != null) {
+      Expr.collectList(orderingExprs, AggregateExpr.class, aggExprs);
     }
     aggInfo = new AggregateInfo(groupingExprsCopy, aggExprs);
     aggInfo.createAggTuple(analyzer.getDescTbl());
 
-    // change all post-agg exprs to point to agg output
+    // change select list, having and ordering exprs to point to agg output
+    log.debug("agg substmap: " + aggInfo.getAggTupleSubstMap().debugString());
     Expr.substituteList(selectListExprs, aggInfo.getAggTupleSubstMap());
-    if (havingClause != null) {
-      havingClause = (Predicate) havingClause.substitute(aggInfo.getAggTupleSubstMap());
+    log.debug("post-agg selectListExprs: " + Expr.debugString(selectListExprs));
+    if (havingPred != null) {
+      havingPred = (Predicate) havingPred.substitute(aggInfo.getAggTupleSubstMap());
+      log.debug("post-agg havingPred: " + havingPred.debugString());
+    }
+    Expr.substituteList(orderingExprs, aggInfo.getAggTupleSubstMap());
+    log.debug("post-agg orderingExprs: " + Expr.debugString(orderingExprs));
+
+    // check that all post-agg exprs point to agg output
+    for (int i = 0; i < selectList.size(); ++i) {
+      if (!selectListExprs.get(i).isBound(aggInfo.getAggTupleId())) {
+        throw new AnalysisException(
+            "select list expression not produced by aggregation output "
+            + "(missing from GROUP BY clause?): "
+            + selectList.get(i).getExpr().toSql());
+      }
+    }
+    if (orderByElements != null) {
+      for (int i = 0; i < orderByElements.size(); ++i) {
+        if (!orderingExprs.get(i).isBound(aggInfo.getAggTupleId())) {
+          throw new AnalysisException(
+              "ORDER BY expression not produced by aggregation output "
+              + "(missing from GROUP BY clause?): "
+              + orderByElements.get(i).getExpr().toSql());
+        }
+      }
+    }
+    if (havingPred != null) {
+      if (!havingPred.isBound(aggInfo.getAggTupleId())) {
+        throw new AnalysisException(
+            "HAVING clause not produced by aggregation output "
+            + "(missing from GROUP BY clause?): "
+            + havingClause.toSql());
+      }
     }
   }
 
   private void analyzeOrderByClause(Analyzer analyzer) throws AnalysisException {
-    ArrayList<Expr> orderingExprs = Lists.newArrayList();
+    orderingExprs = Lists.newArrayList();
+    isAscOrder = Lists.newArrayList();
     // extract exprs
-    for (OrderByElement orderByExpr: orderByElememts) {
+    for (OrderByElement orderByElement: orderByElements) {
       // create copies, we don't want to modify the original parse node, in case
       // we need to print it
-      orderingExprs.add(orderByExpr.getExpr().clone());
+      orderingExprs.add(orderByElement.getExpr().clone());
+      isAscOrder.add(new Boolean(orderByElement.getIsAsc()));
     }
     substituteOrdinals(orderingExprs, "ORDER BY");
     Expr.substituteList(orderingExprs, aliasSubstMap);
@@ -267,7 +374,7 @@ class SelectStmt extends ParseNodeBase {
 
   /**
    * Substitute exprs of the form "<number>"  with the corresponding
-   *expressions from select list
+   * expressions from select list
    * @param exprs
    * @param errorPrefix
    * @throws AnalysisException

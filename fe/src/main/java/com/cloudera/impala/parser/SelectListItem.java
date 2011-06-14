@@ -48,4 +48,15 @@ class SelectListItem {
   public String getAlias() {
     return alias;
   }
+
+  public String toSql() {
+    if (!isStar) {
+      Preconditions.checkNotNull(expr);
+      return expr.toSql();
+    } else if (tblName != null) {
+      return tblName.toString() + ".*";
+    } else {
+      return "*";
+    }
+  }
 }

@@ -12,9 +12,14 @@ import java.util.ListIterator;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.TreeNode;
+import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
+/**
+ * Root of the expr node hierarchy.
+ *
+ */
 abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneable {
   protected PrimitiveType type;  // result of analysis
 
@@ -55,7 +60,18 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   public String debugString() {
-    return "";
+    return debugString(children);
+  }
+
+  public static String debugString(List<? extends Expr> exprs) {
+    if (exprs == null || exprs.isEmpty()) {
+      return "";
+    }
+    List<String> strings = Lists.newArrayList();
+    for (Expr expr: exprs) {
+      strings.add(expr.debugString());
+    }
+    return "(" + Joiner.on(" ").join(strings) + ")";
   }
 
   /* We use clone() instead of defining our own deepCopy() in order to take advantage
@@ -113,6 +129,15 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       this.lhs = Lists.newArrayList();
       this.rhs = Lists.newArrayList();
     }
+
+    public String debugString() {
+      Preconditions.checkState(lhs.size() == rhs.size());
+      List<String> output = Lists.newArrayList();
+      for (int i = 0; i < lhs.size(); ++i) {
+        output.add(lhs.get(i).debugString() + ":" + rhs.get(i).debugString());
+      }
+      return "substmap(" + Joiner.on(" ").join(output) + ")";
+    }
   }
 
   /**
@@ -146,6 +171,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    */
   public static <C extends Expr> ArrayList<C> cloneList(
       List<C> l, SubstitutionMap substMap) {
+    Preconditions.checkNotNull(l);
     ArrayList<C> result = new ArrayList<C>();
     for (C element: l) {
       result.add((C) element.clone(substMap));
@@ -164,6 +190,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    */
   public static <C extends Expr> void collectList(
       List<? extends Expr> input, Class<C> cl, List<C> output) {
+    Preconditions.checkNotNull(input);
     for (Expr e: input) {
       e.collect(cl, output);
     }
@@ -177,6 +204,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    */
   public static <C extends Expr> boolean contains(
       List<? extends Expr> input, Class<C> cl) {
+    Preconditions.checkNotNull(input);
     for (Expr e: input) {
       if (e.contains(cl)) {
         return true;
@@ -212,9 +240,40 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    */
   public static <C extends Expr> void substituteList(
       List<C> l, SubstitutionMap substMap) {
+    if (l == null) {
+      return;
+    }
     ListIterator<C> it = l.listIterator();
     while (it.hasNext()) {
       it.set((C) it.next().substitute(substMap));
     }
+  }
+
+  /**
+   * Returns true if expr is fully bound by tid, otherwise false.
+   */
+  public boolean isBound(TupleId tid) {
+    return isBound(Lists.newArrayList(tid));
+  }
+
+  /**
+   * Returns true if expr is fully bound by tids, otherwise false.
+   */
+  public boolean isBound(List<TupleId> tids) {
+    for (Expr child: children) {
+      if (!child.isBound(tids)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  public static boolean isBound(List<? extends Expr> exprs, List<TupleId> tids) {
+    for (Expr expr: exprs) {
+      if (!expr.isBound(tids)) {
+        return false;
+      }
+    }
+    return true;
   }
 }

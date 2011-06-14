@@ -29,7 +29,7 @@ public class Db {
       List<String> tblNames = null;
       tblNames = client.getTables(dbName, "*");
       for (String tblName : tblNames) {
-        Table table = Table.loadTable(client, dbName, tblName);
+        Table table = Table.loadTable(client, db, tblName);
         if (table == null) {
           return null;
         }

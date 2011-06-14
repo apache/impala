@@ -2,11 +2,12 @@
 
 package com.cloudera.impala.common;
 
+
 /**
  * The parent class of all custom Impala exceptions.
  *
  */
-abstract public class ImpalaException extends java.lang.Exception {
+abstract public class ImpalaException extends Exception {
   protected ImpalaException(String msg) {
     super(msg);
   }

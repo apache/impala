@@ -4,12 +4,26 @@ package com.cloudera.impala.parser;
 
 import com.google.common.base.Preconditions;
 
-// &&, ||, ! predicates
-class CompoundPredicate extends Predicate {
+/**
+ * &&, ||, ! predicates.
+ *
+ */
+public class CompoundPredicate extends Predicate {
   enum Operator {
-    AND,
-    OR,
-    NOT
+    AND("AND"),
+    OR("OR"),
+    NOT("NOT");
+
+    private final String description;
+
+    private Operator(String description) {
+      this.description = description;
+    }
+
+    @Override
+    public String toString() {
+      return description;
+    }
   }
   private final Operator op;
 

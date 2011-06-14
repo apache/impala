@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.TestSchemaUtils;
@@ -19,6 +21,7 @@ import com.cloudera.impala.common.AnalysisException;
 
 public class AnalyzerTest {
   private static Catalog catalog;
+  private final static Logger log = LoggerFactory.getLogger(AnalyzerTest.class);
 
   @BeforeClass public static void setUp() throws Exception {
     HiveMetaStoreClient client = TestSchemaUtils.createSchemaAndClient();
@@ -31,6 +34,7 @@ public class AnalyzerTest {
    * @return
    */
   public ParseNode AnalyzesOk(String stmt) {
+    log.info("analyzing " + stmt);
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
     ParseNode node = null;
@@ -57,6 +61,7 @@ public class AnalyzerTest {
    * @param expectedErrorString
    */
   public void AnalysisError(String stmt, String expectedErrorString) {
+    log.info("analyzing " + stmt);
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
     ParseNode node = null;
@@ -129,9 +134,10 @@ public class AnalyzerTest {
   }
 
   @Test public void TestWhereClause() {
-    AnalyzesOk("select id, name, count(zip) from testtbl where id > 15");
-    AnalysisError("select id, name, count(zip) from testtbl where badcol > 15");
+    AnalyzesOk("select zip, name from testtbl where id > 15");
+    AnalysisError("select zip, name from testtbl where badcol > 15");
     AnalyzesOk("select * from testtbl where true");
+    AnalysisError("select * from testtbl where count(*) > 0");
   }
 
   @Test public void TestAggregates() {
@@ -168,7 +174,14 @@ public class AnalyzerTest {
 
   @Test public void TestGroupBy() {
     AnalyzesOk("select zip, count(*) from testtbl group by zip");
-    AnalyzesOk("select id, zip from testtbl group by zip having count(*) > 0");
+    AnalyzesOk("select zip + count(*) from testtbl group by zip");
+    // doesn't group by all non-agg select list items
+    AnalysisError("select zip, count(*) from testtbl");
+    AnalysisError("select zip + count(*) from testtbl");
+
+    AnalyzesOk("select id, zip from testtbl group by zip, id having count(*) > 0");
+    AnalysisError("select id, zip from testtbl group by id having count(*) > 0");
+    AnalysisError("select id from testtbl group by id having zip + count(*) > 0");
     // resolves ordinals
     AnalyzesOk("select zip, count(*) from testtbl group by 1");
     AnalyzesOk("select count(*), zip from testtbl group by 2");
@@ -195,48 +208,51 @@ public class AnalyzerTest {
   }
 
   @Test public void TestAvgSubstitution() {
-    SelectStmt select = (SelectStmt) AnalyzesOk("select avg(id) from testtbl having count(id) > 0");
+    SelectStmt select = (SelectStmt) AnalyzesOk(
+        "select avg(id) from testtbl having count(id) > 0 order by avg(zip)");
     ArrayList<Expr> selectListExprs = select.getSelectListExprs();
     assertNotNull(selectListExprs);
     assertEquals(selectListExprs.size(), 1);
     // all agg exprs are replaced with refs to agg output slots
-    assertEquals(selectListExprs.get(0).toSql(), "<slot 1> / <slot 2>");
-    Expr havingPred = select.getHavingClause();
+    assertEquals(selectListExprs.get(0).toSql(), "<slot 2> / <slot 3>");
+    Expr havingPred = select.getHavingPred();
     assertNotNull(havingPred);
     // we only have one 'count(id)' slot (slot 2)
-    assertEquals(havingPred.toSql(), "<slot 2> > 0");
+    assertEquals(havingPred.toSql(), "<slot 3> > 0");
+    Expr orderingExpr = select.getOrderingExprs().get(0);
+    assertNotNull(orderingExpr);
+    assertEquals(orderingExpr.toSql(), "<slot 4> / <slot 5>");
   }
 
   @Test public void TestOrderBy() {
-    AnalyzesOk("select zip, count(*) from testtbl order by zip");
-    AnalyzesOk("select zip, count(*) from testtbl order by zip asc");
-    AnalyzesOk("select zip, count(*) from testtbl order by zip desc");
+    AnalyzesOk("select zip, id from testtbl order by zip");
+    AnalyzesOk("select zip, id from testtbl order by zip asc");
+    AnalyzesOk("select zip, id from testtbl order by zip desc");
     // resolves ordinals
-    AnalyzesOk("select zip, count(*) from testtbl order by 1");
-    AnalyzesOk("select zip, count(*) from testtbl order by 2 desc, 1 asc");
+    AnalyzesOk("select zip, id from testtbl order by 1");
+    AnalyzesOk("select zip, id from testtbl order by 2 desc, 1 asc");
     // ordinal out of range
-    AnalysisError("select zip, count(*) from testtbl order by 0");
-    AnalysisError("select zip, count(*) from testtbl order by 3");
+    AnalysisError("select zip, id from testtbl order by 0");
+    AnalysisError("select zip, id from testtbl order by 3");
     // can't order by '*'
     AnalysisError("select * from alltypes order by 1");
     // picks up select item alias
-    AnalyzesOk("select zip z, count(*) c from testtbl order by z, c");
+    AnalyzesOk("select zip z, id c from testtbl order by z, c");
 
     // can introduce additional aggregates in order by clause
-    AnalyzesOk("select zip, count(*) from testtbl order by count(*)");
-    AnalyzesOk("select zip, count(*) from testtbl order by count(*) + min(zip)");
+    AnalyzesOk("select zip, count(*) from testtbl group by 1 order by count(*)");
+    AnalyzesOk("select zip, count(*) from testtbl group by 1 order by count(*) + min(zip)");
+    AnalysisError("select zip, count(*) from testtbl group by 1 order by id");
 
     // multiple ordering exprs
-    AnalyzesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
+    AnalyzesOk("select int_col, string_col, bigint_col from alltypes " +
                "order by string_col, 15.7 * float_col, int_col + bigint_col");
-    AnalyzesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
+    AnalyzesOk("select int_col, string_col, bigint_col from alltypes " +
                "order by 2, 1, 3");
-    AnalyzesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
-               "order by 2, 1, 4");
 
     // ordering by floating-point exprs is okay
-    AnalyzesOk("select float_col, count(*) from alltypes order by 1");
-    AnalyzesOk("select int_col + 0.5, count(*) from alltypes order by 1");
+    AnalyzesOk("select float_col, int_col + 0.5 from alltypes order by 1, 2");
+    AnalyzesOk("select float_col, int_col + 0.5 from alltypes order by 2, 1");
   }
 
   @Test public void TestBinaryPredicates() {

@@ -8,24 +8,23 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
-class AggregateExpr extends Expr {
+public class AggregateExpr extends Expr {
   enum Operator {
-    COUNT,
-    MIN,
-    MAX,
-    SUM,
-    AVG;
+    COUNT("COUNT"),
+    MIN("MIN"),
+    MAX("MAX"),
+    SUM("SUM"),
+    AVG("AVG");
+
+    private final String description;
+
+    private Operator(String description) {
+      this.description = description;
+    }
 
     @Override
     public String toString() {
-      switch (this) {
-        case COUNT: return "COUNT";
-        case MIN: return "MIN";
-        case MAX: return "MAX";
-        case SUM: return "SUM";
-        case AVG: return "AVG";
-        default: return "undefined AggregateExpr.Operator";
-      }
+      return description;
     }
   }
   private final Operator op;
@@ -66,6 +65,16 @@ class AggregateExpr extends Expr {
     AggregateExpr expr = (AggregateExpr) obj;
     return op == expr.op && isStar == expr.isStar
         && isDistinct == expr.isDistinct;
+  }
+
+  @Override
+  public String debugString() {
+    StringBuilder output = new StringBuilder("agg[");
+    output.append("op=" + op.toString());
+    output.append(" isstar=" + (isStar ? "true" : "false"));
+    output.append(" isdistinct=" + (isDistinct ? "true" : "false"));
+    output.append(" " + super.debugString() + "]");
+    return output.toString();
   }
 
   @Override

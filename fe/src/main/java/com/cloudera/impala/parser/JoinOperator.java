@@ -1,8 +1,8 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved. 
+// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 package com.cloudera.impala.parser;
 
-enum JoinOperator {
+public enum JoinOperator {
   INNER_JOIN,
   LEFT_OUTER_JOIN,
   LEFT_SEMI_JOIN,

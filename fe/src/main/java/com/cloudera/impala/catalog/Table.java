@@ -19,6 +19,7 @@ import org.apache.thrift.TException;
  * Internal representation of table-related metadata. Owned by Catalog instance.
  */
 public class Table {
+  private final Db db;
   private final String name;
   private final String owner;
   private final ArrayList<Column> colsByPos;
@@ -26,20 +27,21 @@ public class Table {
   // map from lowercase col. name to Column
   private final Map<String, Column> colsByName;
 
-  private Table(String name, String owner) {
+  private Table(Db db, String name, String owner) {
+    this.db = db;
     this.name = name;
     this.owner = owner;
     this.colsByPos = new ArrayList<Column>();
     this.colsByName = new HashMap<String, Column>();
   }
 
-  public static Table loadTable(HiveMetaStoreClient client, String dbName,
+  public static Table loadTable(HiveMetaStoreClient client, Db db,
                                  String tblName) {
     // turn all exceptions into unchecked exception
     try {
-      org.apache.hadoop.hive.metastore.api.Table msTbl = client.getTable(dbName, tblName);
-      Table table = new Table(tblName, msTbl.getOwner());
-      List<FieldSchema> fieldSchemas = client.getFields(dbName, tblName);
+      org.apache.hadoop.hive.metastore.api.Table msTbl = client.getTable(db.getName(), tblName);
+      Table table = new Table(db, tblName, msTbl.getOwner());
+      List<FieldSchema> fieldSchemas = client.getFields(db.getName(), tblName);
       int pos = 0;
       for (FieldSchema s : fieldSchemas) {
         Column col = new Column(s.getName(), getPrimitiveType(s.getType()), pos);
@@ -91,6 +93,10 @@ public class Table {
 
   public String getName() {
     return name;
+  }
+
+  public String getFullName() {
+    return db.getName() + "." + name;
   }
 
   public String getOwner() {

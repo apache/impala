@@ -6,8 +6,8 @@ import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.PrimitiveType;
 
 public class SlotDescriptor {
-  private SlotId id;
-  private TupleDescriptor parent;
+  private final SlotId id;
+  private final TupleDescriptor parent;
   private PrimitiveType type;
   private Column column;  // underlying column, if there is one
 
@@ -39,5 +39,14 @@ public class SlotDescriptor {
   public void setColumn(Column column) {
     this.column = column;
     this.type = column.getType();
+  }
+
+  public String debugString() {
+    StringBuilder output = new StringBuilder("[slot_id=");
+    output.append(id.getId());
+    output.append(" col=" + (column == null ? "null" : column.getName()));
+    output.append(" type=" + (type == null ? "null" : type.toString()));
+    output.append("]");
+    return output.toString();
   }
 }

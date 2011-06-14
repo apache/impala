@@ -4,7 +4,7 @@ package com.cloudera.impala.parser;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 
-class BoolLiteral extends LiteralExpr {
+public class BoolLiteral extends LiteralExpr {
   private final boolean value;
 
   public BoolLiteral(Boolean value) {

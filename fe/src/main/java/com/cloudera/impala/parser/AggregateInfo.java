@@ -3,16 +3,21 @@
 package com.cloudera.impala.parser;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
-// Encapsulates all the information needed to compute the aggregate functions of a single
-// Select block.
+/**
+ * Encapsulates all the information needed to compute the aggregate functions of a single
+ * Select block.
+ *
+ */
 public class AggregateInfo {
   private final ArrayList<Expr> groupingExprs;  // all exprs from Group By clause
   private final ArrayList<AggregateExpr> aggregateExprs;
-    // all agg exprs from select list and having clause
+    // all agg exprs from select block
 
   // The tuple into which the output of the aggregation computation is materialized; contains
   // groupingExprs.size() + aggregateExprs.size() slots, the first groupingExprs.size() of
@@ -43,49 +48,49 @@ public class AggregateInfo {
     return aggTupleDesc;
   }
 
+  public TupleId getAggTupleId() {
+    return aggTupleDesc.getId();
+  }
+
   public Expr.SubstitutionMap getAggTupleSubstMap() {
     return aggTupleSubstMap;
   }
 
   public void createAggTuple(DescriptorTable descTbl) {
     aggTupleDesc = descTbl.createTupleDescriptor();
+    List<Expr> exprs = Lists.newLinkedList();
     if (groupingExprs != null) {
-      for (int i = 0; i < groupingExprs.size(); ++i) {
-        Expr groupingExpr = groupingExprs.get(i);
-        // skip this if it's a duplicate
-        boolean skip = false;
-        for (int j = 0; j < i; ++j) {
-          if (groupingExprs.get(j).equals(groupingExpr)) {
-            skip = true;
-            break;
-          }
-        }
-        if (skip) continue;
-
-        SlotDescriptor slotD = descTbl.addSlotDescriptor(aggTupleDesc);
-        Preconditions.checkArgument(groupingExpr.getType() != PrimitiveType.INVALID_TYPE);
-        slotD.setType(groupingExpr.getType());
-        aggTupleSubstMap.lhs.add(groupingExpr.clone(null));
-        aggTupleSubstMap.rhs.add(new SlotRef(slotD));
-      }
+      exprs.addAll(groupingExprs);
     }
-    for (int i = 0; i < aggregateExprs.size(); ++i) {
-      AggregateExpr aggExpr = aggregateExprs.get(i);
+    exprs.addAll(aggregateExprs);
+    for (int i = 0; i < exprs.size(); ++i) {
+      Expr expr = exprs.get(i);
       // skip this if it's a duplicate
       boolean skip = false;
       for (int j = 0; j < i; ++j) {
-        if (aggregateExprs.get(j).equals(aggExpr)) {
+        if (exprs.get(j).equals(expr)) {
           skip = true;
           break;
         }
       }
-      if (skip) continue;
+      if (skip) {
+        continue;
+      }
 
       SlotDescriptor slotD = descTbl.addSlotDescriptor(aggTupleDesc);
-      Preconditions.checkArgument(aggExpr.getType() != PrimitiveType.INVALID_TYPE);
-      slotD.setType(aggExpr.getType());
-      aggTupleSubstMap.lhs.add(aggExpr.clone(null));
+      Preconditions.checkArgument(expr.getType() != PrimitiveType.INVALID_TYPE);
+      slotD.setType(expr.getType());
+      aggTupleSubstMap.lhs.add(expr.clone(null));
       aggTupleSubstMap.rhs.add(new SlotRef(slotD));
     }
+  }
+
+  public String debugString() {
+    StringBuilder output = new StringBuilder("AggInfo(");
+    output.append("\ngrouping_exprs=" + Expr.debugString(groupingExprs));
+    output.append("\naggregate_exprs=" + Expr.debugString(aggregateExprs));
+    output.append("\nagg_tuple="
+        + (aggTupleDesc == null ? "null" : aggTupleDesc.debugString()));
+    return output.toString();
   }
 }

@@ -3,7 +3,10 @@
 package com.cloudera.impala.parser;
 
 
-// captures info of a single WHEN expr THEN expr clause
+/**
+ * captures info of a single WHEN expr THEN expr clause.
+ *
+ */
 class CaseWhenClause {
   private final Expr whenExpr;
   private final Expr thenExpr;

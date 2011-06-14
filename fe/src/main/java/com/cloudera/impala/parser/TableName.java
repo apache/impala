@@ -4,7 +4,6 @@ package com.cloudera.impala.parser;
 
 import com.google.common.base.Preconditions;
 
-
 class TableName {
   private final String db;
   private final String tbl;

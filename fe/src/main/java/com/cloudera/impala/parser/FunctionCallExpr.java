@@ -6,7 +6,7 @@ import java.util.List;
 
 import com.cloudera.impala.common.AnalysisException;
 
-class FunctionCallExpr extends Expr {
+public class FunctionCallExpr extends Expr {
   private final String functionName;
 
   public FunctionCallExpr(String functionName, List<Expr> params) {
