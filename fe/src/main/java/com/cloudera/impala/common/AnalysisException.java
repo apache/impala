@@ -7,6 +7,9 @@ package com.cloudera.impala.common;
  *
  */
 public class AnalysisException extends ImpalaException {
+  public AnalysisException(String msg, Throwable cause) {
+    super(msg, cause);
+  }
 
   public AnalysisException(String msg) {
     super(msg);

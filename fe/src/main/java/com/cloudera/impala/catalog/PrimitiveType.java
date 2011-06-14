@@ -44,12 +44,32 @@ public enum PrimitiveType {
     return this != INVALID_TYPE;
   }
 
+  public boolean isDateType() {
+    return (this == DATE || this == DATETIME || this == TIMESTAMP);
+  }
+
+  public boolean isStringType() {
+    return (this == STRING);
+  }
+
   /**
    * matrix that records "smallest" assignment-compatible type of two types
    * (INVALID_TYPE if no such type exists, ie, if the input types are fundamentally
    * incompatible)
-   * TODO: implement mysql's matrix, as described here:
+   *
+   * we follow Hive's type casting behavior as described in:
+   * http://wiki.apache.org/hadoop/Hive/Tutorial
+   * summary of Hive's type casting:
+   * implicit conversion is done from child to an ancestor,
+   * in the type hierarchy.
+   * Special case for STRING -> DOUBLE
+   *
+   * we chose not to follow MySQL's type casting behavior as described here:
    * http://dev.mysql.com/doc/refman/5.0/en/type-conversion.html
+   * for the following reasons:
+   * conservative casting in arithmetic exprs: TINYINT + TINYINT -> BIGINT
+   * comparison of many types as double: INT < FLOAT -> comparison as DOUBLE
+   * special cases when dealing with dates and timestamps
    */
   private static PrimitiveType[][] compatibilityMatrix;
   static {
@@ -76,7 +96,7 @@ public enum PrimitiveType {
     compatibilityMatrix[TINYINT.ordinal()][DATE.ordinal()] = INVALID_TYPE;
     compatibilityMatrix[TINYINT.ordinal()][DATETIME.ordinal()] = INVALID_TYPE;
     compatibilityMatrix[TINYINT.ordinal()][TIMESTAMP.ordinal()] = INVALID_TYPE;
-    compatibilityMatrix[TINYINT.ordinal()][STRING.ordinal()] = INVALID_TYPE;
+    compatibilityMatrix[TINYINT.ordinal()][STRING.ordinal()] = TINYINT;
 
     compatibilityMatrix[SMALLINT.ordinal()][SMALLINT.ordinal()] = SMALLINT;
     compatibilityMatrix[SMALLINT.ordinal()][INT.ordinal()] = INT;
@@ -86,16 +106,16 @@ public enum PrimitiveType {
     compatibilityMatrix[SMALLINT.ordinal()][DATE.ordinal()] = INVALID_TYPE;
     compatibilityMatrix[SMALLINT.ordinal()][DATETIME.ordinal()] = INVALID_TYPE;
     compatibilityMatrix[SMALLINT.ordinal()][TIMESTAMP.ordinal()] = INVALID_TYPE;
-    compatibilityMatrix[SMALLINT.ordinal()][STRING.ordinal()] = INVALID_TYPE;
+    compatibilityMatrix[SMALLINT.ordinal()][STRING.ordinal()] = SMALLINT;
 
     compatibilityMatrix[INT.ordinal()][INT.ordinal()] = INT;
     compatibilityMatrix[INT.ordinal()][BIGINT.ordinal()] = BIGINT;
-    compatibilityMatrix[INT.ordinal()][FLOAT.ordinal()] = FLOAT; // DOUBLE?
+    compatibilityMatrix[INT.ordinal()][FLOAT.ordinal()] = FLOAT;
     compatibilityMatrix[INT.ordinal()][DOUBLE.ordinal()] = DOUBLE;
     compatibilityMatrix[INT.ordinal()][DATE.ordinal()] = INVALID_TYPE;
     compatibilityMatrix[INT.ordinal()][DATETIME.ordinal()] = INVALID_TYPE;
     compatibilityMatrix[INT.ordinal()][TIMESTAMP.ordinal()] = INVALID_TYPE;
-    compatibilityMatrix[INT.ordinal()][STRING.ordinal()] = INVALID_TYPE;
+    compatibilityMatrix[INT.ordinal()][STRING.ordinal()] = INT;
 
     compatibilityMatrix[BIGINT.ordinal()][BIGINT.ordinal()] = BIGINT;
     compatibilityMatrix[BIGINT.ordinal()][FLOAT.ordinal()] = DOUBLE;
@@ -103,32 +123,32 @@ public enum PrimitiveType {
     compatibilityMatrix[BIGINT.ordinal()][DATE.ordinal()] = INVALID_TYPE;
     compatibilityMatrix[BIGINT.ordinal()][DATETIME.ordinal()] = INVALID_TYPE;
     compatibilityMatrix[BIGINT.ordinal()][TIMESTAMP.ordinal()] = INVALID_TYPE;
-    compatibilityMatrix[BIGINT.ordinal()][STRING.ordinal()] = INVALID_TYPE;
+    compatibilityMatrix[BIGINT.ordinal()][STRING.ordinal()] = BIGINT;
 
     compatibilityMatrix[FLOAT.ordinal()][FLOAT.ordinal()] = FLOAT;
     compatibilityMatrix[FLOAT.ordinal()][DOUBLE.ordinal()] = DOUBLE;
     compatibilityMatrix[FLOAT.ordinal()][DATE.ordinal()] = INVALID_TYPE;
     compatibilityMatrix[FLOAT.ordinal()][DATETIME.ordinal()] = INVALID_TYPE;
     compatibilityMatrix[FLOAT.ordinal()][TIMESTAMP.ordinal()] = INVALID_TYPE;
-    compatibilityMatrix[FLOAT.ordinal()][STRING.ordinal()] = INVALID_TYPE;
+    compatibilityMatrix[FLOAT.ordinal()][STRING.ordinal()] = FLOAT;
 
     compatibilityMatrix[DOUBLE.ordinal()][DOUBLE.ordinal()] = DOUBLE;
     compatibilityMatrix[DOUBLE.ordinal()][DATE.ordinal()] = INVALID_TYPE;
     compatibilityMatrix[DOUBLE.ordinal()][DATETIME.ordinal()] = INVALID_TYPE;
     compatibilityMatrix[DOUBLE.ordinal()][TIMESTAMP.ordinal()] = INVALID_TYPE;
-    compatibilityMatrix[DOUBLE.ordinal()][STRING.ordinal()] = INVALID_TYPE;
+    compatibilityMatrix[DOUBLE.ordinal()][STRING.ordinal()] = DOUBLE;
 
     compatibilityMatrix[DATE.ordinal()][DATE.ordinal()] = DATE;
     compatibilityMatrix[DATE.ordinal()][DATETIME.ordinal()] = DATETIME;
     compatibilityMatrix[DATE.ordinal()][TIMESTAMP.ordinal()] = TIMESTAMP;
-    compatibilityMatrix[DATE.ordinal()][STRING.ordinal()] = INVALID_TYPE;
+    compatibilityMatrix[DATE.ordinal()][STRING.ordinal()] = DATE;
 
     compatibilityMatrix[DATETIME.ordinal()][DATETIME.ordinal()] = DATETIME;
     compatibilityMatrix[DATETIME.ordinal()][TIMESTAMP.ordinal()] = TIMESTAMP;
-    compatibilityMatrix[DATETIME.ordinal()][STRING.ordinal()] = INVALID_TYPE;
+    compatibilityMatrix[DATETIME.ordinal()][STRING.ordinal()] = DATETIME;
 
     compatibilityMatrix[TIMESTAMP.ordinal()][TIMESTAMP.ordinal()] = TIMESTAMP;
-    compatibilityMatrix[TIMESTAMP.ordinal()][STRING.ordinal()] = INVALID_TYPE;
+    compatibilityMatrix[TIMESTAMP.ordinal()][STRING.ordinal()] = TIMESTAMP;
 
     compatibilityMatrix[STRING.ordinal()][STRING.ordinal()] = STRING;
   }

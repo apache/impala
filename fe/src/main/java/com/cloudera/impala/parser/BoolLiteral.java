@@ -19,4 +19,8 @@ public class BoolLiteral extends LiteralExpr {
     }
     return ((BoolLiteral) obj).value == value;
   }
+
+  public boolean getValue() {
+    return value;
+  }
 }

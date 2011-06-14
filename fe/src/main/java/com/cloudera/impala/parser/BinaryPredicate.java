@@ -54,15 +54,25 @@ public class BinaryPredicate extends Predicate {
     return getChild(0).toSql() + " " + op.toString() + " " + getChild(1).toSql();
   }
 
-  // TODO: this only checks the operand types; we also need to insert operand casts
-  // when their types aren't identical
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
-    if (!PrimitiveType.getAssignmentCompatibleType(getChild(0).getType(), getChild(1).getType())
-        .isValid()) {
+
+    PrimitiveType t1 = getChild(0).getType();
+    PrimitiveType t2 = getChild(1).getType();
+    PrimitiveType compatibleType = PrimitiveType.getAssignmentCompatibleType(t1, t2);
+
+    if (!compatibleType.isValid()) {
       // there is no type to which both are assignment-compatible -> we can't compare them
       throw new AnalysisException("operands are not comparable: " + this.toSql());
+    }
+
+    // add operand casts
+    if (t1 != compatibleType) {
+      castChild(compatibleType, 0);
+    }
+    if (t2 != compatibleType) {
+      castChild(compatibleType, 1);
     }
   }
 }

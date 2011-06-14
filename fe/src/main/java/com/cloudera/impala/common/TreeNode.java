@@ -20,6 +20,10 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
     children.add(n);
   }
 
+  public void setChild(int index, NodeType n) {
+    children.set(index, n);
+  }
+
   public ArrayList<NodeType> getChildren() {
     return children;
   }

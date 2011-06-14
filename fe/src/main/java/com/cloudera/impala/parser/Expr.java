@@ -282,4 +282,71 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       child.getIds(tupleIds, slotIds);
     }
   }
+
+  /**
+   * @return true if this is an instance of LiteralExpr
+   */
+  public boolean isLiteral() {
+    return this instanceof LiteralExpr;
+  }
+
+  /**
+   * Checks validity of cast, and
+   * calls uncheckedCastTo() to
+   * create a cast expression that casts
+   * this to a specific type.
+   *
+   * @param targetType
+   *          type to be cast to
+   * @return cast expression, or converted literal,
+   *         should never return null
+   * @throws AnalysisException
+   *           when an invalid cast is asked for, for example,
+   *           failure to convert a string literal to a date literal
+   *
+   */
+  public final Expr castTo(PrimitiveType targetType) throws AnalysisException {
+    PrimitiveType type = PrimitiveType.getAssignmentCompatibleType(this.type, targetType);
+    Preconditions.checkState(type.isValid());
+    // requested cast must be to assignment-compatible type
+    // (which implies no loss of precision)
+    Preconditions.checkArgument(type == targetType);
+    return uncheckedCastTo(targetType);
+  }
+
+  /**
+   * Create an expression equivalent to 'this' but returning targetType;
+   * possibly by inserting an implicit cast,
+   * or by returning an altogether new expression
+   * or by returning 'this' with a modified return type'.
+   *
+   * @param targetType
+   *          type to be cast to
+   * @return cast expression, or converted literal,
+   *         should never return null
+   * @throws AnalysisException
+   *           when an invalid cast is asked for, for example,
+   *           failure to convert a string literal to a date literal
+   *
+   */
+  protected Expr uncheckedCastTo(PrimitiveType targetType) throws AnalysisException {
+    return new CastExpr(targetType, this, true);
+  }
+
+  /**
+   * Add a cast expression above child.
+   * If child is a literal expression, we attempt to
+   * convert the value of the child directly, and not insert a cast node.
+   *
+   * @param targetType
+   *          type to be cast to
+   * @param childIndex
+   *          index of child to be cast
+   */
+  public void castChild(PrimitiveType targetType,
+      int childIndex) throws AnalysisException {
+    Expr child = getChild(childIndex);
+    Expr newChild = child.castTo(targetType);
+    setChild(childIndex, newChild);
+  }
 }

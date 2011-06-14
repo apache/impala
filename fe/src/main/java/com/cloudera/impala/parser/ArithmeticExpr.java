@@ -66,45 +66,69 @@ public class ArithmeticExpr extends Expr {
     return ((ArithmeticExpr) obj).op == op;
   }
 
-  // TODO: this only determines the type; we also need to insert operand casts
-  // when their types aren't identical
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     for (Expr child: children) {
       Expr operand = (Expr) child;
-      if (!operand.type.isNumericType()) {
-        throw new AnalysisException("Arithmetic operation requires numeric operands: " + toSql());
+      if (!operand.type.isNumericType() && !operand.type.isStringType()) {
+        throw new AnalysisException("Arithmetic operation requires " +
+            "numeric or string operands: " + toSql());
       }
     }
 
-    if (op.isBitwiseOperation()) {
-      // TODO: this is what mysql does; check whether Hive has the same semantics
-      type = PrimitiveType.BIGINT;
+    // bitnot is the only unary op, deal with it here
+    if (op == Operator.BITNOT) {
+      PrimitiveType childType = getChild(0).getType();
+      if (!childType.isFixedPointType()) {
+        throw new AnalysisException("Bitwise ops only allowed on fixed-point types: " + toSql());
+      }
+      type = childType;
       return;
     }
 
     PrimitiveType t1 = getChild(0).getType();
     PrimitiveType t2 = getChild(1).getType();  // only bitnot is unary
+
     switch (op) {
       case MULTIPLY:
       case MOD:
       case PLUS:
       case MINUS:
         type = PrimitiveType.getAssignmentCompatibleType(t1, t2);
-        return;
+        break;
       case DIVIDE:
-        // FLOAT in some cases?
         type = PrimitiveType.DOUBLE;
-        return;
+        break;
       case INT_DIVIDE:
-        // the result is always an integer
-        if (PrimitiveType.getAssignmentCompatibleType(t1, t2) == PrimitiveType.DOUBLE) {
-          type = PrimitiveType.BIGINT;
-        } else {
-          type = PrimitiveType.INT;
+      case BITAND:
+      case BITOR:
+      case BITXOR:
+      case BITNOT:
+        if (t1.isFloatingPointType() || t2.isFloatingPointType()) {
+          throw new AnalysisException("Invalid floating point argument to op: " +
+          		op.toString() + " " + this.toSql());
         }
-        return;
+        PrimitiveType compatibleType =
+          PrimitiveType.getAssignmentCompatibleType(t1, t2);
+        // the result is always an integer
+        Preconditions.checkState(compatibleType.isFixedPointType());
+        type = compatibleType;
+        break;
+      default:
+        // the programmer forgot to deal with a case
+        Preconditions.checkState(false,
+            "Unknown arithmetic op " + op.toString() + " in: " + this.toSql());
+        break;
+    }
+
+    // add operand casts
+    Preconditions.checkState(type.isValid());
+    if (t1 != type) {
+      castChild(type, 0);
+    }
+    if (t2 != type) {
+      castChild(type, 1);
     }
   }
 }

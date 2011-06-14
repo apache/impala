@@ -3,6 +3,7 @@
 package com.cloudera.impala.parser;
 
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
 public class FloatLiteral extends LiteralExpr {
@@ -19,6 +20,14 @@ public class FloatLiteral extends LiteralExpr {
     }
   }
 
+  /**
+   * C'tor forcing type, e.g., due to implicit cast
+   */
+  public FloatLiteral(Double value, PrimitiveType type) {
+    this.value = value.doubleValue();
+    this.type = type;
+  }
+
   @Override
   public boolean equals(Object obj) {
     if (!super.equals(obj)) {
@@ -30,5 +39,16 @@ public class FloatLiteral extends LiteralExpr {
   @Override
   public String toSql() {
     return Double.toString(value);
+  }
+
+  public double getValue() {
+    return value;
+  }
+
+  @Override
+  protected Expr uncheckedCastTo(PrimitiveType targetType) throws AnalysisException {
+    Preconditions.checkState(targetType.isFloatingPointType());
+    type = targetType;
+    return this;
   }
 }

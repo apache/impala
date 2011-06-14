@@ -35,6 +35,11 @@ public class LikePredicate extends Predicate {
   }
 
   @Override
+  public String toSql() {
+    return getChild(0).toSql() + " LIKE " + getChild(1).toSql();
+  }
+
+  @Override
   public boolean equals(Object obj) {
     if (!super.equals(obj)) {
       return false;

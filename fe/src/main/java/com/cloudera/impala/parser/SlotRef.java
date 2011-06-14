@@ -109,4 +109,8 @@ public class SlotRef extends Expr {
     slotIds.add(desc.getId());
     tupleIds.add(desc.getParent().getId());
   }
+
+  public String getColumnName() {
+    return col;
+  }
 }

@@ -420,7 +420,7 @@ limit_clause ::=
 
 cast_expr ::=
   KW_CAST LPAREN expr:e KW_AS primitive_type:targetType RPAREN
-  {: RESULT = new CastExpr((PrimitiveType) targetType, e); :}
+  {: RESULT = new CastExpr((PrimitiveType) targetType, e, false); :}
   ;
 
 case_expr ::=
