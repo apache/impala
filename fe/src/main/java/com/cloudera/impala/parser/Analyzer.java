@@ -2,7 +2,8 @@
 
 package com.cloudera.impala.parser;
 
-import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import com.cloudera.impala.catalog.Catalog;
@@ -10,6 +11,8 @@ import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 /**
  * Repository of analysis state for single select block..
@@ -20,16 +23,28 @@ public class Analyzer {
   private final Catalog catalog;
 
   // map from lowercase table alias to descriptor
-  private final HashMap<String, TupleDescriptor> aliasMap;
+  private final Map<String, TupleDescriptor> aliasMap;
 
   // map from lowercase qualified column name ("alias.col") to descriptor
-  private final HashMap<String, SlotDescriptor> slotRefMap;
+  private final Map<String, SlotDescriptor> slotRefMap;
+
+  // map from tuple id to list of predicates referencing tuple
+  private final Map<TupleId, List<Predicate> > tuplePredicates;
+
+  // map from slot id to list of predicates referencing slot
+  private final Map<SlotId, List<Predicate> > slotPredicates;
+
+  // list of all registered conjuncts
+  private final List<Predicate> conjuncts;
 
   public Analyzer(Catalog catalog) {
     this.catalog = catalog;
     this.descTbl = new DescriptorTable();
-    this.aliasMap = new HashMap<String, TupleDescriptor>();
-    this.slotRefMap = new HashMap<String, SlotDescriptor>();
+    this.aliasMap = Maps.newHashMap();
+    this.slotRefMap = Maps.newHashMap();
+    this.tuplePredicates = Maps.newHashMap();
+    this.slotPredicates = Maps.newHashMap();
+    this.conjuncts = Lists.newArrayList();
   }
 
   /**
@@ -132,6 +147,68 @@ public class Analyzer {
           throw new AnalysisException(
               "Unqualified column reference '" + colName + "' is ambiguous");
         }
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Register all conjuncts that make up the predicate.
+   * @param p
+   */
+  public void registerPredicate(Predicate p) {
+    if (p instanceof CompoundPredicate
+        && ((CompoundPredicate) p).getOp() == CompoundPredicate.Operator.AND) {
+      registerConjunct((Predicate) p.getChild(0));
+      registerConjunct((Predicate) p.getChild(1));
+    } else {
+      registerConjunct(p);
+    }
+  }
+
+  /**
+   * Register individual conjunct with all tuple and slot ids it references
+   * and with the global conjunct list.
+   * @param p
+   */
+  private void registerConjunct(Predicate p) {
+    conjuncts.add(p);
+
+    List<TupleId> tupleIds = Lists.newArrayList();
+    List<SlotId> slotIds = Lists.newArrayList();
+    p.getIds(tupleIds, slotIds);
+
+    for (TupleId id: tupleIds) {
+      if (!tuplePredicates.containsKey(id)) {
+        List<Predicate> predList = Lists.newLinkedList();
+        predList.add(p);
+        tuplePredicates.put(id, predList);
+      } else {
+        tuplePredicates.get(id).add(p);
+      }
+    }
+    for (SlotId id: slotIds) {
+      if (!slotPredicates.containsKey(id)) {
+        List<Predicate> predList = Lists.newLinkedList();
+        predList.add(p);
+        slotPredicates.put(id, predList);
+      } else {
+        slotPredicates.get(id).add(p);
+      }
+    }
+  }
+
+  /**
+   * Return all registered conjuncts that are fully bound by given
+   * list of tuple ids.
+   * @param tupleIds
+   * @return possibly empty list of Predicates
+   */
+  public List<Predicate> getConjuncts(List<TupleId> tupleIds) {
+    List<Predicate> result = Lists.newArrayList();
+    for (Predicate pred: conjuncts) {
+      if (pred.isBound(tupleIds)) {
+        result.add(pred);
       }
     }
     return result;

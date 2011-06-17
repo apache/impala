@@ -127,6 +127,7 @@ public class ParserTest {
         "where src2.bla = src3.bla " +
         "order by src1.key, src1.value, src2.key, src2.value, src3.key, src3.value");
     ParserError("select * from src src1 join src src2 using (1)");
+    ParserError("select * from src src1 join src src2 on ('a')");
     ParserError("select * from src src1 " +
         "left outer join src src2 on (src1.key = src2.key and)");
   }

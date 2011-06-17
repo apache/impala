@@ -130,8 +130,15 @@ public class SelectStmt extends ParseNodeBase {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     // start out with table refs to establish aliases
+    TableRef leftTblRef = null;  // the one to the left of tblRef
     for (TableRef tblRef: tableRefs) {
       tblRef.setDesc(analyzer.registerTableRef(tblRef));
+      tblRef.expandUsingClause(leftTblRef, analyzer.getCatalog());
+      if (tblRef.getOnClause() != null) {
+        tblRef.getOnClause().analyze(analyzer);
+        analyzer.registerPredicate(tblRef.getOnClause());
+      }
+      leftTblRef = tblRef;
     }
 
     // populate selectListExprs and aliasSubstMap
@@ -162,6 +169,7 @@ public class SelectStmt extends ParseNodeBase {
         throw new AnalysisException(
             "aggregation function not allowed in WHERE clause");
       }
+      analyzer.registerPredicate(whereClause);
     }
     if (orderByElements != null) {
       analyzeOrderByClause(analyzer);

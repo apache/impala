@@ -128,9 +128,48 @@ public class AnalyzerTest {
     // resolves dbs correctly
     AnalyzesOk("select zip from testtbl");
     AnalysisError("select zip from testdb1.testtbl");
+  }
 
-    // unknown alias in on clause
-    // missing alias in on clause
+  @Test public void TestOnClause() {
+    AnalyzesOk("select a.int_col from alltypes a join alltypes b on (a.int_col = b.int_col)");
+    AnalyzesOk(
+        "select a.int_col " +
+        "from alltypes a join alltypes b on " +
+        "(a.int_col = b.int_col and a.string_col = b.string_col)");
+    // unknown column
+    AnalysisError("select a.int_col from alltypes a join alltypes b on (a.int_col = b.badcol)");
+    // ambiguous col ref
+    AnalysisError("select a.int_col from alltypes a join alltypes b on (int_col = int_col)");
+    // unknown alias
+    AnalysisError(
+        "select a.int_col from alltypes a join alltypes b on (a.int_col = badalias.int_col)");
+    // incompatible comparison
+    AnalysisError("select a.int_col from alltypes a join alltypes b on (a.int_col = b.date_col)");
+    AnalyzesOk(
+        "select a.int_col, b.int_col, c.int_col " +
+        "from alltypes a join alltypes b on " +
+        "(a.int_col = b.int_col and a.string_col = b.string_col)" +
+        "join alltypes c on " +
+        "(b.int_col = c.int_col and b.string_col = c.string_col and b.bool_col = c.bool_col)");
+    // can't reference an alias that gets declared afterwards
+    AnalysisError(
+        "select a.int_col, b.int_col, c.int_col " +
+        "from alltypes a join alltypes b on " +
+        "(c.int_col = b.int_col and a.string_col = b.string_col)" +
+        "join alltypes c on " +
+        "(b.int_col = c.int_col and b.string_col = c.string_col and b.bool_col = c.bool_col)");
+  }
+
+  @Test public void TestUsingClause() {
+    AnalyzesOk("select a.int_col, b.int_col from alltypes a join alltypes b using (int_col)");
+    AnalyzesOk("select a.int_col, b.int_col from alltypes a join alltypes b using (int_col, string_col)");
+    AnalyzesOk(
+        "select a.int_col, b.int_col, c.int_col " +
+        "from alltypes a join alltypes b using (int_col, string_col) " +
+        "join alltypes c using (int_col, string_col, bool_col)");
+    // unknown column
+    AnalysisError("select a.int_col from alltypes a join alltypes b using (badcol)");
+    AnalysisError("select a.int_col from alltypes a join alltypes b using (int_col, badcol)");
   }
 
   @Test public void TestWhereClause() {

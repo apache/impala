@@ -39,6 +39,10 @@ public class CompoundPredicate extends Predicate {
     }
   }
 
+  public Operator getOp() {
+    return op;
+  }
+
   @Override
   public boolean equals(Object obj) {
     if (!super.equals(obj)) {

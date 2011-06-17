@@ -4,6 +4,7 @@ package com.cloudera.impala.parser;
 
 import java.util.List;
 
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -64,6 +65,7 @@ public class SlotRef extends Expr {
     return "slotref[" + Joiner.on(" ").join(output) + "]";
   }
 
+  @Override
   public boolean equals(Object obj) {
     if (!super.equals(obj)) {
       return false;
@@ -74,10 +76,18 @@ public class SlotRef extends Expr {
     if (desc != null && other.desc != null) {
       return desc.getId().equals(other.desc.getId());
     }
-    if ((tblName == null) != (other.tblName == null)) return false;
-    if (tblName != null && !tblName.equals(other.tblName)) return false;
-    if ((col == null) != (other.col == null)) return false;
-    if (col != null && !col.equals(other.col)) return false;
+    if ((tblName == null) != (other.tblName == null)) {
+      return false;
+    }
+    if (tblName != null && !tblName.equals(other.tblName)) {
+      return false;
+    }
+    if ((col == null) != (other.col == null)) {
+      return false;
+    }
+    if (col != null && !col.equals(other.col)) {
+      return false;
+    }
     return true;
   }
 
@@ -90,5 +100,13 @@ public class SlotRef extends Expr {
       }
     }
     return false;
+  }
+
+  @Override
+  public void getIds(List<TupleId> tupleIds, List<SlotId> slotIds) {
+    Preconditions.checkState(type != PrimitiveType.INVALID_TYPE);
+    Preconditions.checkState(desc != null);
+    slotIds.add(desc.getId());
+    tupleIds.add(desc.getParent().getId());
   }
 }

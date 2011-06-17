@@ -276,4 +276,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     }
     return true;
   }
+
+  public void getIds(List<TupleId> tupleIds, List<SlotId> slotIds) {
+    for (Expr child: children) {
+      child.getIds(tupleIds, slotIds);
+    }
+  }
 }
