@@ -5,6 +5,7 @@ package com.cloudera.impala.parser;
 import java.util.List;
 
 import com.cloudera.impala.common.AnalysisException;
+import com.google.common.base.Joiner;
 
 public class FunctionCallExpr extends Expr {
   private final String functionName;
@@ -21,6 +22,11 @@ public class FunctionCallExpr extends Expr {
       return false;
     }
     return ((FunctionCallExpr) obj).functionName.equals(functionName);
+  }
+
+  @Override
+  public String toSql() {
+    return functionName + "(" + Joiner.on(", ").join(childrenToSql()) + ")";
   }
 
   @Override

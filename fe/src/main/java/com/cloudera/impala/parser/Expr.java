@@ -59,6 +59,14 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return "";
   }
 
+  public List<String> childrenToSql() {
+    List<String> result = Lists.newArrayList();
+    for (Expr child: children) {
+      result.add(child.toSql());
+    }
+    return result;
+  }
+
   public String debugString() {
     return debugString(children);
   }

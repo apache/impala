@@ -18,6 +18,11 @@ public class AnalysisContext {
     this.catalog = catalog;
   }
 
+  static public class AnalysisResult {
+    public SelectStmt selectStmt;
+    public Analyzer analyzer;
+  }
+
   /**
    * Parse and analyze 'stmt'.
    *
@@ -26,17 +31,20 @@ public class AnalysisContext {
    * @throws AnalysisException
    *           on any kind of error, including parsing error.
    */
-  public SelectStmt analyze(String stmt) throws AnalysisException {
+  public AnalysisResult analyze(String stmt) throws AnalysisException {
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
     try {
-      ParseNode node = (ParseNode) parser.parse().value;
-      if (node == null) {
+      AnalysisResult result = new AnalysisResult();
+      result.selectStmt = (SelectStmt) parser.parse().value;
+      if (result.selectStmt == null) {
         return null;
       }
-      Analyzer analyzer = new Analyzer(catalog);
-      node.analyze(analyzer);
-      return (SelectStmt) node;
+      result.analyzer = new Analyzer(catalog);
+      result.selectStmt.analyze(result.analyzer);
+      return result;
+    } catch (AnalysisException e) {
+      throw new AnalysisException(e.getMessage() + " (in " + stmt + ")");
     } catch (Exception e) {
       throw new AnalysisException(parser.getErrorMsg(stmt));
     }

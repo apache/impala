@@ -1,0 +1,5 @@
+select *
+from testtbl t1 join testtbl t2 using(id)
+where t1.zip = 94611
+----
+not implemented

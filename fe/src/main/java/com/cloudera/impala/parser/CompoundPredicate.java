@@ -50,4 +50,14 @@ public class CompoundPredicate extends Predicate {
     }
     return ((CompoundPredicate) obj).op == op;
   }
+
+  @Override
+  public String toSql() {
+    if (children.size() == 1) {
+      Preconditions.checkState(op == Operator.NOT);
+      return "NOT " + getChild(0).toSql();
+    } else {
+      return getChild(0).toSql() + " " + op.toString() + " " + getChild(1).toSql();
+    }
+  }
 }

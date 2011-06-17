@@ -21,4 +21,9 @@ public class IsNullPredicate extends Predicate {
     }
     return ((IsNullPredicate) obj).isNotNull == isNotNull;
   }
+
+  @Override
+  public String toSql() {
+    return getChild(0).toSql() + (isNotNull ? " IS NOT NULL" : " IS NULL");
+  }
 }

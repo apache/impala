@@ -1,6 +1,11 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved. 
+// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 package com.cloudera.impala.parser;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import com.google.common.collect.Lists;
 
 public class SlotId extends Id {
   public SlotId() {
@@ -9,5 +14,11 @@ public class SlotId extends Id {
 
   public SlotId(int id) {
     super(id);
+  }
+
+  public List<SlotId> asList() {
+    ArrayList<SlotId> list = Lists.newArrayList();
+    list.add(this);
+    return list;
   }
 }

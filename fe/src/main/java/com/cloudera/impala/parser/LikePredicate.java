@@ -48,6 +48,11 @@ public class LikePredicate extends Predicate {
   }
 
   @Override
+  public String toSql() {
+    return getChild(0).toSql() + " " + op.toString() + " " + getChild(1).toSql();
+  }
+
+  @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     if (getChild(0).getType() != PrimitiveType.STRING) {

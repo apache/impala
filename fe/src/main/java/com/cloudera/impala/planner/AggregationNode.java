@@ -27,9 +27,9 @@ public class AggregationNode extends PlanNode {
     output.append(prefix + "AGGREGATE\n");
     output.append(prefix + "GROUP BY: ");
     output.append(getExplainString(aggInfo.getGroupingExprs()) + "\n");
-    if (predicates != null) {
+    if (conjuncts != null) {
       output.append(prefix + "HAVING: ");
-      output.append(getExplainString(predicates) + "\n");
+      output.append(getExplainString(conjuncts) + "\n");
     }
     output.append(getChild(0).getExplainString(prefix + "  "));
     return output.toString();

@@ -157,12 +157,9 @@ public class Analyzer {
    * @param p
    */
   public void registerPredicate(Predicate p) {
-    if (p instanceof CompoundPredicate
-        && ((CompoundPredicate) p).getOp() == CompoundPredicate.Operator.AND) {
-      registerConjunct((Predicate) p.getChild(0));
-      registerConjunct((Predicate) p.getChild(1));
-    } else {
-      registerConjunct(p);
+    List<Predicate> conjuncts = p.getConjuncts();
+    for (Predicate conjunct: conjuncts) {
+      registerConjunct(conjunct);
     }
   }
 

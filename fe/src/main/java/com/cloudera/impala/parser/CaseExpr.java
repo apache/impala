@@ -43,6 +43,23 @@ public class CaseExpr extends Expr {
     return hasCaseExpr == expr.hasCaseExpr && hasElseExpr == expr.hasElseExpr;
   }
 
+  public String toSql() {
+    StringBuilder output = new StringBuilder("CASE");
+    int childIdx = 0;
+    if (hasCaseExpr) {
+      output.append(children.get(childIdx++).toSql());
+    }
+    while (childIdx + 2 <= children.size()) {
+      output.append(" WHEN " + children.get(childIdx++).toSql());
+      output.append(" THEN " + children.get(childIdx++).toSql());
+    }
+    if (hasElseExpr) {
+      output.append(" ELSE " + children.get(childIdx).toSql());
+    }
+    output.append(" END");
+    return output.toString();
+  }
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     throw new AnalysisException("CASE not supported");

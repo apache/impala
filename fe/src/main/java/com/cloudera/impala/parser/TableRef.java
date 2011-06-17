@@ -40,6 +40,10 @@ public class TableRef {
     return desc;
   }
 
+  public TupleId getId() {
+    return desc.getId();
+  }
+
   public void setDesc(TupleDescriptor desc) {
     this.desc = desc;
   }

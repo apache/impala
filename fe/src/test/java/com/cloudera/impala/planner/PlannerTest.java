@@ -19,7 +19,6 @@ import com.cloudera.impala.catalog.TestSchemaUtils;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.parser.AnalysisContext;
-import com.cloudera.impala.parser.SelectStmt;
 import com.google.common.collect.Lists;
 
 public class PlannerTest {
@@ -107,15 +106,15 @@ public class PlannerTest {
   private void RunQuery(String query, ArrayList<String> expectedPlan) {
     try {
       Log.info("running query " + query);
-      SelectStmt selectStmt = analysisCtxt.analyze(query);
+      AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
       Planner planner = new Planner();
-      PlanNode plan = planner.createPlan(selectStmt);
+      PlanNode plan = planner.createPlan(analysisResult.selectStmt, analysisResult.analyzer);
       String result = compareOutput(plan.getExplainString().split("\n"), expectedPlan);
       if (!result.isEmpty()) {
         fail("query:\n" + query + "\n" + result);
       }
     } catch (AnalysisException e) {
-      fail("analysis error: " + e.toString());
+      fail("analysis error: " + e.getMessage());
     } catch (NotImplementedException e) {
       fail("plan not implemented");
     }
@@ -123,12 +122,12 @@ public class PlannerTest {
 
   private void RunUnimplementedQuery(String query) {
     try {
-      SelectStmt selectStmt = analysisCtxt.analyze(query);
+      AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
       Planner planner = new Planner();
-      PlanNode plan = planner.createPlan(selectStmt);
+      PlanNode plan = planner.createPlan(analysisResult.selectStmt, analysisResult.analyzer);
       fail("query produced a plan\nquery=" + query + "\nplan=\n" + plan.getExplainString());
     } catch (AnalysisException e) {
-      fail("analysis error: " + e.toString());
+      fail("analysis error: " + e.getMessage());
     } catch (NotImplementedException e) {
       // expected
     }
@@ -185,5 +184,6 @@ public class PlannerTest {
 
   @Test public void Test() {
     RunTests("basic");
+    RunTests("joins");
   }
 }

@@ -16,7 +16,13 @@ import com.cloudera.impala.parser.Predicate;
  */
 abstract public class PlanNode extends TreeNode<PlanNode> {
   protected long limit; // max. # of rows to be returned; 0: no limit
-  protected List<Predicate> predicates;
+
+  /**
+   * all conjuncts can be executed in the context of this node, ie,
+   * they only reference tuples materialized by this node or one of
+   * its children
+   */
+  protected List<Predicate> conjuncts;
 
   public long getLimit() {
     return limit;
@@ -26,12 +32,12 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     this.limit = limit;
   }
 
-  public List<Predicate> getPredicates() {
-    return predicates;
+  public List<Predicate> getConjuncts() {
+    return conjuncts;
   }
 
-  public void setPredicates(List<Predicate> predicates) {
-    this.predicates = predicates;
+  public void setConjuncts(List<Predicate> conjuncts) {
+    this.conjuncts = conjuncts;
   }
 
   public String getExplainString() {
@@ -42,7 +48,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   protected String debugString() {
     StringBuilder output = new StringBuilder();
-    output.append("preds=" + Expr.debugString(predicates));
+    output.append("preds=" + Expr.debugString(conjuncts));
     output.append(" limit=" + Long.toString(limit));
     return output.toString();
   }

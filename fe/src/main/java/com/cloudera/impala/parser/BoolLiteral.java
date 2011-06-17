@@ -23,4 +23,8 @@ public class BoolLiteral extends LiteralExpr {
   public boolean getValue() {
     return value;
   }
+
+  public String toSql() {
+    return value ? "TRUE" : "FALSE";
+  }
 }

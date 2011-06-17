@@ -25,7 +25,8 @@ public class ScanNode extends PlanNode {
   @Override
   protected String getExplainString(String prefix) {
     StringBuilder output = new StringBuilder();
-    output.append(prefix + "SCAN table=" + tbl.getFullName());
+    output.append(prefix + "SCAN table=" + tbl.getFullName() + "\n");
+    output.append(prefix + "  PREDICATES: " + getExplainString(conjuncts));
     return output.toString();
   }
 }

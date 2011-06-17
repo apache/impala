@@ -6,6 +6,19 @@ group by 1
 AGGREGATE
 GROUP BY: zip
     SCAN table=default.testtbl
+        PREDICATES: name LIKE 'm%'
+====
+select name, count(*)
+from testtbl
+where name regexp 'm*'
+group by 1
+having count(*) > 1
+----
+AGGREGATE
+GROUP BY: name
+HAVING: <slot 2> > 1
+    SCAN table=default.testtbl
+        PREDICATES: name REGEXP 'm*'
 ====
 select zip, count(*)
 from testtbl
@@ -18,3 +31,4 @@ ORDER BY: <slot 3> DESC
   AGGREGATE
   GROUP BY: zip
     SCAN table=default.testtbl
+          PREDICATES: name LIKE 'm%'

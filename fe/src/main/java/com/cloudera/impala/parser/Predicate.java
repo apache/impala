@@ -2,8 +2,11 @@
 
 package com.cloudera.impala.parser;
 
+import java.util.List;
+
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.google.common.collect.Lists;
 
 public class Predicate extends Expr {
   public Predicate() {
@@ -14,5 +17,17 @@ public class Predicate extends Expr {
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
     type = PrimitiveType.BOOLEAN;
+  }
+
+  public List<Predicate> getConjuncts() {
+    List<Predicate> list = Lists.newArrayList();
+    if (this instanceof CompoundPredicate
+        && ((CompoundPredicate) this).getOp() == CompoundPredicate.Operator.AND) {
+      list.addAll(((Predicate) getChild(0)).getConjuncts());
+      list.addAll(((Predicate) getChild(1)).getConjuncts());
+    } else {
+      list.add(this);
+    }
+    return list;
   }
 }
