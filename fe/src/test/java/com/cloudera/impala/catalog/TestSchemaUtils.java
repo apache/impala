@@ -104,6 +104,21 @@ public class TestSchemaUtils {
     testTblCols.add(new FieldSchema("name", Constants.STRING_TYPE_NAME, ""));
     testTblCols.add(new FieldSchema("birthday", Constants.DATE_TYPE_NAME, ""));
     createTable(client, "testdb1", "TestTbl", testTblCols);
+
+    // Tables with complex types, one table per complex type
+    for (String collectionType : Constants.CollectionTypes) {
+      String tableName = getComplexTypeTableName(collectionType);
+      ArrayList<FieldSchema> complexTblCols = new ArrayList<FieldSchema>();
+      complexTblCols.add(new FieldSchema("id", Constants.BIGINT_TYPE_NAME, ""));
+      complexTblCols.add(new FieldSchema("name", Constants.STRING_TYPE_NAME, ""));
+      complexTblCols.add(new FieldSchema("collection_col", collectionType, ""));
+      try {
+        createTable(client, "default", tableName, complexTblCols);
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+      createTable(client, "testdb1", tableName, complexTblCols);
+    }
   }
 
   // Create client for test schema.
@@ -111,6 +126,10 @@ public class TestSchemaUtils {
     HiveMetaStoreClient client = new HiveMetaStoreClient(new HiveConf(TestSchemaUtils.class));
     createTestSchema(client);
     return client;
+  }
+
+  public static String getComplexTypeTableName(String type) {
+    return type + "_tbl";
   }
 
   public static String getAllTypesColumn(PrimitiveType type) {

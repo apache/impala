@@ -13,7 +13,10 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.hive.metastore.api.UnknownTableException;
+import org.apache.hadoop.hive.serde.Constants;
 import org.apache.thrift.TException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Internal representation of table-related metadata. Owned by Catalog instance.
@@ -26,6 +29,8 @@ public class Table {
 
   // map from lowercase col. name to Column
   private final Map<String, Column> colsByName;
+
+  private final static Logger log = LoggerFactory.getLogger(Table.class);
 
   private Table(Db db, String name, String owner) {
     this.db = db;
@@ -44,6 +49,14 @@ public class Table {
       List<FieldSchema> fieldSchemas = client.getFields(db.getName(), tblName);
       int pos = 0;
       for (FieldSchema s : fieldSchemas) {
+        // catch currently unsupported hive schema elements
+        if (!Constants.PrimitiveTypes.contains(s.getType())) {
+          log.warn("Ignoring table {}.{} because column {} " +
+              "contains a field of unsupported type {}. " +
+              "Only primitive types are currently supported.",
+              new Object[] {db.getName(), tblName, s.getName(), s.getType()});
+          return null;
+        }
         Column col = new Column(s.getName(), getPrimitiveType(s.getType()), pos);
         table.colsByPos.add(col);
         table.colsByName.put(s.getName(), col);

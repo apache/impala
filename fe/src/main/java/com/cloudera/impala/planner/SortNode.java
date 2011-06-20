@@ -7,6 +7,7 @@ import java.util.List;
 
 import com.cloudera.impala.parser.Expr;
 import com.google.common.base.Joiner;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -27,16 +28,15 @@ public class SortNode extends PlanNode {
 
   @Override
   protected String debugString() {
-    StringBuilder output = new StringBuilder("Sort(");
-    output.append("ordering_exprs=" + Expr.debugString(orderingExprs));
-    output.append(" is_asc=");
     List<String> strings = Lists.newArrayList();
-    for (Boolean isAsc: isAscOrder) {
+    for (Boolean isAsc : isAscOrder) {
       strings.add(isAsc ? "a" : "d");
     }
-    output.append("[" + Joiner.on(" ").join(strings) + "]");
-    output.append(" " + super.debugString() + ")");
-    return output.toString();
+    return Objects.toStringHelper(this)
+        .add("ordering_exprs", Expr.debugString(orderingExprs))
+        .add("is_asc", "[" + Joiner.on(" ").join(strings) + "]")
+        .addValue(super.debugString())
+        .toString();
   }
 
   @Override

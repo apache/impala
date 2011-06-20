@@ -3,6 +3,7 @@
 package com.cloudera.impala.planner;
 
 import com.cloudera.impala.parser.AggregateInfo;
+import com.google.common.base.Objects;
 
 /**
  * Aggregation computation.
@@ -18,7 +19,10 @@ public class AggregationNode extends PlanNode {
 
   @Override
   protected String debugString() {
-    return "Agg(" + aggInfo.debugString() + " " + super.debugString() + ")";
+    return Objects.toStringHelper(this)
+        .add("aggInfo", aggInfo.debugString())
+        .addValue(super.debugString())
+        .toString();
   }
 
   @Override

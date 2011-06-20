@@ -3,6 +3,7 @@
 package com.cloudera.impala.planner;
 
 import com.cloudera.impala.catalog.Table;
+import com.google.common.base.Objects;
 
 /**
  * Scan of a single single table. Currently limited to full-table scans.
@@ -18,9 +19,11 @@ public class ScanNode extends PlanNode {
 
   @Override
   protected String debugString() {
-    return "Scan(" + tbl.getFullName() + " " + super.debugString() + ")";
+    return Objects.toStringHelper(this)
+        .add("tblName", tbl.getFullName())
+        .addValue(super.debugString())
+        .toString();
   }
-
 
   @Override
   protected String getExplainString(String prefix) {

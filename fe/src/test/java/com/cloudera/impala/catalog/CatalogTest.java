@@ -4,12 +4,14 @@ package com.cloudera.impala.catalog;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.serde.Constants;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -93,6 +95,12 @@ public class CatalogTest {
 
     // case-insensitive lookup
     assertEquals(defaultDb.getTable("alltypes"), defaultDb.getTable("AllTypes"));
-  }
 
+    // check that tables with unsupported types were ignored
+    for (String collectionType : Constants.CollectionTypes) {
+      String tableName = TestSchemaUtils.getComplexTypeTableName(collectionType);
+      assertNull(defaultDb.getTable(tableName));
+      assertNull(testDb.getTable(tableName));
+    }
+  }
 }

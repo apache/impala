@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -86,11 +87,10 @@ public class AggregateInfo {
   }
 
   public String debugString() {
-    StringBuilder output = new StringBuilder("AggInfo(");
-    output.append("\ngrouping_exprs=" + Expr.debugString(groupingExprs));
-    output.append("\naggregate_exprs=" + Expr.debugString(aggregateExprs));
-    output.append("\nagg_tuple="
-        + (aggTupleDesc == null ? "null" : aggTupleDesc.debugString()));
-    return output.toString();
+    return Objects.toStringHelper(this)
+        .add("grouping_exprs", Expr.debugString(groupingExprs))
+        .add("aggregate_exprs", Expr.debugString(aggregateExprs))
+        .add("agg_tuple", (aggTupleDesc == null ? "null" : aggTupleDesc.debugString()))
+        .toString();
   }
 }

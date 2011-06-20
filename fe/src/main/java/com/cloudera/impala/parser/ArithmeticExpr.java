@@ -81,7 +81,8 @@ public class ArithmeticExpr extends Expr {
     if (op == Operator.BITNOT) {
       PrimitiveType childType = getChild(0).getType();
       if (!childType.isFixedPointType()) {
-        throw new AnalysisException("Bitwise ops only allowed on fixed-point types: " + toSql());
+        throw new AnalysisException("Bitwise operations only allowed on fixed-point types: "
+            + toSql());
       }
       type = childType;
       return;
@@ -104,10 +105,9 @@ public class ArithmeticExpr extends Expr {
       case BITAND:
       case BITOR:
       case BITXOR:
-      case BITNOT:
         if (t1.isFloatingPointType() || t2.isFloatingPointType()) {
-          throw new AnalysisException("Invalid floating point argument to op: " +
-          		op.toString() + " " + this.toSql());
+          throw new AnalysisException("Invalid floating point argument to operation " +
+          		op.toString() + ": " + this.toSql());
         }
         PrimitiveType compatibleType =
           PrimitiveType.getAssignmentCompatibleType(t1, t2);
@@ -118,7 +118,7 @@ public class ArithmeticExpr extends Expr {
       default:
         // the programmer forgot to deal with a case
         Preconditions.checkState(false,
-            "Unknown arithmetic op " + op.toString() + " in: " + this.toSql());
+            "Unknown arithmetic operation " + op.toString() + " in: " + this.toSql());
         break;
     }
 

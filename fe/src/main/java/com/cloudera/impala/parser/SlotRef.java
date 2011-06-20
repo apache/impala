@@ -6,9 +6,8 @@ import java.util.List;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
-import com.google.common.base.Joiner;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 public class SlotRef extends Expr {
   private final TableName tblName;
@@ -52,17 +51,13 @@ public class SlotRef extends Expr {
 
   @Override
   public String debugString() {
-    List<String> output = Lists.newArrayList();
-    if (tblName != null) {
-      output.add("tblname=" + tblName.toString());
-    }
-    if (col != null) {
-      output.add("col=" + col);
-    }
-    if (desc != null) {
-      output.add("id=" + Integer.toString(desc.getId().getId()));
-    }
-    return "slotref[" + Joiner.on(" ").join(output) + "]";
+    Objects.ToStringHelper toStrHelper = Objects.toStringHelper(this);
+    String tblNameStr = (tblName == null ? "null" : tblName.toString());
+    toStrHelper.add("tblName", tblNameStr);
+    toStrHelper.add("col", col);
+    String idStr = (desc == null ? "null" : Integer.toString(desc.getId().getId()));
+    toStrHelper.add("id", idStr);
+    return toStrHelper.toString();
   }
 
   @Override

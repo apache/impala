@@ -47,6 +47,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   protected abstract String getExplainString(String prefix);
 
   protected String debugString() {
+    // not using Objects.toStrHelper because
+    // PlanNode.debugString() is embedded by debug strings of the subclasses
     StringBuilder output = new StringBuilder();
     output.append("preds=" + Expr.debugString(conjuncts));
     output.append(" limit=" + Long.toString(limit));

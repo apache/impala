@@ -6,6 +6,7 @@ import java.util.List;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 public class AggregateExpr extends Expr {
@@ -69,12 +70,12 @@ public class AggregateExpr extends Expr {
 
   @Override
   public String debugString() {
-    StringBuilder output = new StringBuilder("agg[");
-    output.append("op=" + op.toString());
-    output.append(" isstar=" + (isStar ? "true" : "false"));
-    output.append(" isdistinct=" + (isDistinct ? "true" : "false"));
-    output.append(" " + super.debugString() + "]");
-    return output.toString();
+    return Objects.toStringHelper(this)
+        .add("op", op)
+        .add("isStar", isStar)
+        .add("isDistinct", isDistinct)
+        .addValue(super.debugString())
+        .toString();
   }
 
   @Override

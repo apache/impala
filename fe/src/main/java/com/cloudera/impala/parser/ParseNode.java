@@ -5,6 +5,7 @@ package com.cloudera.impala.parser;
 import com.cloudera.impala.common.AnalysisException;
 
 public interface ParseNode {
+
   /**
    * Perform semantic analysis of node and all of its children.
    * Throws exception if any errors found.

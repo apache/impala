@@ -23,6 +23,16 @@ public class Db {
     this.tables = new HashMap<String, Table>();
   }
 
+  /**
+   * Load the metadata of a Hive database into our own
+   * in-memory metadata representation.
+   * Ignore tables with columns of unsupported types (all complex types).
+   *
+   * @param client
+   *          HiveMetaStoreClient to communicate with Metastore
+   * @param dbName
+   * @return non-null Db instance (possibly containing no tables)
+   */
   public static Db loadDb(HiveMetaStoreClient client, String dbName) {
     try {
       Db db = new Db(dbName);
@@ -30,10 +40,9 @@ public class Db {
       tblNames = client.getTables(dbName, "*");
       for (String tblName : tblNames) {
         Table table = Table.loadTable(client, db, tblName);
-        if (table == null) {
-          return null;
+        if (table != null) {
+          db.tables.put(tblName, table);
         }
-        db.tables.put(tblName, table);
       }
       return db;
     } catch (MetaException e) {

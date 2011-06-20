@@ -4,6 +4,7 @@ package com.cloudera.impala.parser;
 
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.google.common.base.Objects;
 
 public class SlotDescriptor {
   private final SlotId id;
@@ -42,11 +43,12 @@ public class SlotDescriptor {
   }
 
   public String debugString() {
-    StringBuilder output = new StringBuilder("[slot_id=");
-    output.append(id.getId());
-    output.append(" col=" + (column == null ? "null" : column.getName()));
-    output.append(" type=" + (type == null ? "null" : type.toString()));
-    output.append("]");
-    return output.toString();
+    String colStr = (column == null ? "null" : column.getName());
+    String typeStr = (type == null ? "null" : type.toString());
+    return Objects.toStringHelper(this)
+        .add("id", id.getId())
+        .add("col", colStr)
+        .add("type", typeStr)
+        .toString();
   }
 }
