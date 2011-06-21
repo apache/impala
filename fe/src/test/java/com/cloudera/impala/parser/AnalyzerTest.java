@@ -25,8 +25,9 @@ import com.cloudera.impala.catalog.TestSchemaUtils;
 import com.cloudera.impala.common.AnalysisException;
 
 public class AnalyzerTest {
+  private final static Logger LOG = LoggerFactory.getLogger(AnalyzerTest.class);
+
   private static Catalog catalog;
-  private final static Logger log = LoggerFactory.getLogger(AnalyzerTest.class);
 
   // maps from type to string that will result in literal of that type
   private static Map<PrimitiveType, String> typeToLiteralValue =
@@ -56,7 +57,7 @@ public class AnalyzerTest {
    * @return
    */
   public ParseNode AnalyzesOk(String stmt) {
-    log.info("analyzing " + stmt);
+    LOG.info("analyzing " + stmt);
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
     ParseNode node = null;
@@ -84,7 +85,7 @@ public class AnalyzerTest {
    * @param expectedErrorString
    */
   public void AnalysisError(String stmt, String expectedErrorString) {
-    log.info("analyzing " + stmt);
+    LOG.info("analyzing " + stmt);
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
     ParseNode node = null;

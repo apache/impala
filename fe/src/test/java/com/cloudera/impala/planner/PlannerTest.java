@@ -12,7 +12,8 @@ import java.util.Scanner;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.mortbay.log.Log;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.TestSchemaUtils;
@@ -22,6 +23,8 @@ import com.cloudera.impala.parser.AnalysisContext;
 import com.google.common.collect.Lists;
 
 public class PlannerTest {
+  private final static Logger LOG = LoggerFactory.getLogger(PlannerTest.class);
+
   private static Catalog catalog;
   private static AnalysisContext analysisCtxt;
   private final String testDir = "PlannerTest";
@@ -105,7 +108,7 @@ public class PlannerTest {
 
   private void RunQuery(String query, ArrayList<String> expectedPlan) {
     try {
-      Log.info("running query " + query);
+      LOG.info("running query " + query);
       AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
       Planner planner = new Planner();
       PlanNode plan = planner.createPlan(analysisResult.selectStmt, analysisResult.analyzer);

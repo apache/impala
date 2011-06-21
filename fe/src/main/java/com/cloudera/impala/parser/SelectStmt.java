@@ -18,6 +18,8 @@ import com.google.common.collect.Lists;
  *
  */
 public class SelectStmt extends ParseNodeBase {
+  private final static Logger LOG = LoggerFactory.getLogger(SelectStmt.class);
+
   private final ArrayList<SelectListItem> selectList;
   private final List<TableRef> tableRefs;
   private final Predicate whereClause;
@@ -45,8 +47,6 @@ public class SelectStmt extends ParseNodeBase {
   private Predicate havingPred;
 
   private AggregateInfo aggInfo;
-
-  private final static Logger log = LoggerFactory.getLogger(SelectStmt.class);
 
   SelectStmt(ArrayList<SelectListItem> selectList,
              List<TableRef> tableRefList,
@@ -326,15 +326,15 @@ public class SelectStmt extends ParseNodeBase {
     aggInfo.createAggTuple(analyzer.getDescTbl());
 
     // change select list, having and ordering exprs to point to agg output
-    log.debug("agg substmap: " + aggInfo.getAggTupleSubstMap().debugString());
+    LOG.debug("agg substmap: " + aggInfo.getAggTupleSubstMap().debugString());
     Expr.substituteList(selectListExprs, aggInfo.getAggTupleSubstMap());
-    log.debug("post-agg selectListExprs: " + Expr.debugString(selectListExprs));
+    LOG.debug("post-agg selectListExprs: " + Expr.debugString(selectListExprs));
     if (havingPred != null) {
       havingPred = (Predicate) havingPred.substitute(aggInfo.getAggTupleSubstMap());
-      log.debug("post-agg havingPred: " + havingPred.debugString());
+      LOG.debug("post-agg havingPred: " + havingPred.debugString());
     }
     Expr.substituteList(orderingExprs, aggInfo.getAggTupleSubstMap());
-    log.debug("post-agg orderingExprs: " + Expr.debugString(orderingExprs));
+    LOG.debug("post-agg orderingExprs: " + Expr.debugString(orderingExprs));
 
     // check that all post-agg exprs point to agg output
     for (int i = 0; i < selectList.size(); ++i) {
