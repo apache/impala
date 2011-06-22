@@ -26,6 +26,7 @@ public class LiteralPredicate extends Predicate {
     return ((LiteralPredicate) obj).value == value;
   }
 
+  @Override
   public String toSql() {
     return (value ? "TRUE" : "FALSE");
   }

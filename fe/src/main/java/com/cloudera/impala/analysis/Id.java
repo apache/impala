@@ -23,6 +23,10 @@ public abstract class Id {
 
   @Override
   public boolean equals(Object obj) {
+    if (obj == null) {
+      return false;
+    }
+
     // only ids of the same subclass are comparable
     if (obj.getClass() != this.getClass()) {
       return false;

@@ -59,14 +59,14 @@ parser code {:
     for (int i = 0; i < row.length-2; ++i) {
       // get tokenId and skip actionId
       tokenId = row[i++];
-      expectedTokenIds.add(new Integer(tokenId));      
+      expectedTokenIds.add(Integer.valueOf(tokenId));
     }  
   }
   
   // override to keep it from calling report_fatal_error()
   public void unrecovered_syntax_error(Symbol cur_token)
-    throws java.lang.Exception {            
-    throw new java.lang.Exception(getErrorTypeMessage(cur_token.sym));
+    throws Exception {
+    throw new Exception(getErrorTypeMessage(cur_token.sym));
   }
   
   // Returns error string, consisting of the original
@@ -103,7 +103,7 @@ parser code {:
     // append last encountered token
     result.append("Encountered: ");
     String lastToken = 
-      SqlScanner.tokenIdMap.get(new Integer(errorToken.sym));
+      SqlScanner.tokenIdMap.get(Integer.valueOf(errorToken.sym));
     if (lastToken != null) {
       result.append(lastToken);
     } else {

@@ -373,7 +373,7 @@ public class SelectStmt extends ParseNodeBase {
       // create copies, we don't want to modify the original parse node, in case
       // we need to print it
       orderingExprs.add(orderByElement.getExpr().clone());
-      isAscOrder.add(new Boolean(orderByElement.getIsAsc()));
+      isAscOrder.add(Boolean.valueOf(orderByElement.getIsAsc()));
     }
     substituteOrdinals(orderingExprs, "ORDER BY");
     Expr.substituteList(orderingExprs, aliasSubstMap);
