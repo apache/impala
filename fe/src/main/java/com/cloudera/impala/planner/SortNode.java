@@ -5,7 +5,7 @@ package com.cloudera.impala.planner;
 import java.util.Iterator;
 import java.util.List;
 
-import com.cloudera.impala.parser.Expr;
+import com.cloudera.impala.analysis.Expr;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;

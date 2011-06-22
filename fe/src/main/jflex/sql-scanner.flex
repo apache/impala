@@ -1,6 +1,6 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.  
 
-package com.cloudera.impala.parser;
+package com.cloudera.impala.analysis;
 
 import java_cup.runtime.Symbol;
 import java.lang.Integer;
@@ -10,7 +10,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ArrayList;
 
-import com.cloudera.impala.parser.SqlParserSymbols;
+import com.cloudera.impala.analysis.SqlParserSymbols;
 
 %%
 

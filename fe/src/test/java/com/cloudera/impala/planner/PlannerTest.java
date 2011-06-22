@@ -19,7 +19,7 @@ import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.TestSchemaUtils;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.NotImplementedException;
-import com.cloudera.impala.parser.AnalysisContext;
+import com.cloudera.impala.analysis.AnalysisContext;
 import com.google.common.collect.Lists;
 
 public class PlannerTest {

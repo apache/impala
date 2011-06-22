@@ -5,8 +5,8 @@ package com.cloudera.impala.planner;
 import java.util.List;
 
 import com.cloudera.impala.common.TreeNode;
-import com.cloudera.impala.parser.Expr;
-import com.cloudera.impala.parser.Predicate;
+import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.Predicate;
 
 /**
  * Each PlanNode represents a single relational operator

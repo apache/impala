@@ -5,11 +5,11 @@ package com.cloudera.impala.planner;
 import java.util.List;
 
 import com.cloudera.impala.common.NotImplementedException;
-import com.cloudera.impala.parser.AggregateInfo;
-import com.cloudera.impala.parser.Analyzer;
-import com.cloudera.impala.parser.Expr;
-import com.cloudera.impala.parser.SelectStmt;
-import com.cloudera.impala.parser.TableRef;
+import com.cloudera.impala.analysis.AggregateInfo;
+import com.cloudera.impala.analysis.Analyzer;
+import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.SelectStmt;
+import com.cloudera.impala.analysis.TableRef;
 
 /**
  * The planner is responsible for turning parse trees into plan fragments that

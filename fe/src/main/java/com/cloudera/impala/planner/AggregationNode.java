@@ -2,7 +2,7 @@
 
 package com.cloudera.impala.planner;
 
-import com.cloudera.impala.parser.AggregateInfo;
+import com.cloudera.impala.analysis.AggregateInfo;
 import com.google.common.base.Objects;
 
 /**

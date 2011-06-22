@@ -1,6 +1,6 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.  
 
-package com.cloudera.impala.parser;
+package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import java.util.ArrayList;
