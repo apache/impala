@@ -103,7 +103,9 @@ public class AnalyzerTest {
     } catch (AnalysisException e) {
       if (expectedErrorString != null) {
         String errorString = e.getMessage();
-        Assert.assertTrue(errorString.startsWith(expectedErrorString));
+        Assert.assertTrue(
+            "got error:\n" + errorString + "\nexpected:\n" + expectedErrorString,
+            errorString.startsWith(expectedErrorString));
       }
       return;
     }
@@ -150,7 +152,7 @@ public class AnalyzerTest {
     // aliases work
     AnalyzesOk("select a.int_col from alltypes a");
     // implicit aliases
-    AnalyzesOk("select int_col, id from alltypes, testtbl");
+    AnalyzesOk("select int_col, zip from alltypes, testtbl");
     // duplicate alias
     AnalysisError("select a.int_col, a.id from alltypes a, testtbl a", "duplicate table alias");
     // duplicate implicit alias
@@ -178,8 +180,8 @@ public class AnalyzerTest {
         "select a.int_col from alltypes a join alltypes b on (a.int_col = badalias.int_col)",
         "unknown table alias: 'badalias'");
     // incompatible comparison
-    AnalysisError("select a.int_col from alltypes a join alltypes b on (a.int_col = b.date_col)",
-        "operands are not comparable: a.int_col = b.date_col");
+    AnalysisError("select a.int_col from alltypes a join alltypes b on (a.bool_col = b.string_col)",
+        "operands are not comparable: a.bool_col = b.string_col");
     AnalyzesOk(
         "select a.int_col, b.int_col, c.int_col " +
         "from alltypes a join alltypes b on " +
@@ -245,12 +247,13 @@ public class AnalyzerTest {
         "aggregate function cannot contain aggregate parameters");
 
     // wrong type
-    AnalysisError("select sum(date_col) from alltypes", "SUM requires a numeric parameter");
-    AnalysisError("select avg(date_col) from alltypes", "AVG requires a numeric parameter");
-    AnalysisError("select sum(datetime_col) from alltypes", "SUM requires a numeric parameter");
-    AnalysisError("select avg(datetime_col) from alltypes", "AVG requires a numeric parameter");
-    AnalysisError("select sum(timestamp_col) from alltypes", "SUM requires a numeric parameter");
-    AnalysisError("select avg(timestamp_col) from alltypes", "AVG requires a numeric parameter");
+    // TODO: uncomment tests as soon as we have date-related types
+    //AnalysisError("select sum(date_col) from alltypes", "SUM requires a numeric parameter");
+    //AnalysisError("select avg(date_col) from alltypes", "AVG requires a numeric parameter");
+    //AnalysisError("select sum(datetime_col) from alltypes", "SUM requires a numeric parameter");
+    //AnalysisError("select avg(datetime_col) from alltypes", "AVG requires a numeric parameter");
+    //AnalysisError("select sum(timestamp_col) from alltypes", "SUM requires a numeric parameter");
+    //AnalysisError("select avg(timestamp_col) from alltypes", "AVG requires a numeric parameter");
     AnalysisError("select sum(string_col) from alltypes", "SUM requires a numeric parameter");
     AnalysisError("select avg(string_col) from alltypes", "AVG requires a numeric parameter");
   }
@@ -372,10 +375,12 @@ public class AnalyzerTest {
     AnalyzesOk("select * from alltypes where int_col = '0'");
     AnalyzesOk("select * from alltypes where string_col = 15");
     // invalid casts
-    AnalysisError("select * from alltypes where date_col = 15",
-        "operands are not comparable: date_col = 15");
-    AnalysisError("select * from alltypes where datetime_col = 1.0",
-        "operands are not comparable: datetime_col = 1.0");
+    AnalysisError("select * from alltypes where bool_col = '15'",
+        "operands are not comparable: bool_col = '15'");
+    //AnalysisError("select * from alltypes where date_col = 15",
+        //"operands are not comparable: date_col = 15");
+    //AnalysisError("select * from alltypes where datetime_col = 1.0",
+        //"operands are not comparable: datetime_col = 1.0");
   }
 
   @Test
@@ -459,9 +464,9 @@ public class AnalyzerTest {
     ArithmeticExpr.Operator arithOp = ArithmeticExpr.Operator.PLUS;
     // test on all comparison ops
     for (BinaryPredicate.Operator cmpOp : BinaryPredicate.Operator.values()) {
-      // test all numeric and date types
+      // test all numeric
       for (PrimitiveType type : PrimitiveType.values()) {
-        if (!type.isNumericType() && !type.isDateType()) {
+        if (!type.isNumericType()) {
           continue;
         }
         // non-literals
@@ -475,6 +480,8 @@ public class AnalyzerTest {
   /**
    * If literalMode is true there is exactly one literal (and one non-literal)
    * otherwise we assume two non-literals
+   * Note: at the moment, we don't test on date-related types, because they're
+   * not supported by Hive.
    *
    * @param type
    *          type to test
@@ -493,7 +500,7 @@ public class AnalyzerTest {
       boolean literalMode, ArithmeticExpr.Operator arithOp,
       BinaryPredicate.Operator cmpOp) {
     for (PrimitiveType t : PrimitiveType.values()) {
-      if (!type.isValid() || t.ordinal() < type.ordinal()) {
+      if (!type.isValid() || type.isDateType() || t.ordinal() < type.ordinal()) {
         continue;
       }
       PrimitiveType resultType =
@@ -560,8 +567,9 @@ public class AnalyzerTest {
     }
   }
 
-  @Test
-  public void TestStringLiteralToDateCasts() {
+  // TODO: re-enable tests as soon as we have date-related types
+  //@Test
+  public void DoNotTestStringLiteralToDateCasts() {
     // positive tests are included in TestComparisonTypeCasts
     AnalysisError("select int_col from alltypes where date_col = 'ABCD'",
         "Unable to parse string 'ABCD' to date");

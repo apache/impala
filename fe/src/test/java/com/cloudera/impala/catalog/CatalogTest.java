@@ -66,24 +66,22 @@ public class CatalogTest {
 
     checkTable(defaultDb, "alltypes",
         new String[]
-          {"bool_col", "tinyint_col", "smallint_col", "int_col", "bigint_col",
-           "float_col", "double_col", "date_col", "datetime_col", "timestamp_col",
+          {"year", "month", "id", "bool_col", "tinyint_col", "smallint_col",
+           "int_col", "bigint_col", "float_col", "double_col", "date_string_col",
            "string_col"},
         new PrimitiveType[]
-          {PrimitiveType.BOOLEAN, PrimitiveType.TINYINT, PrimitiveType.SMALLINT,
+          {PrimitiveType.INT, PrimitiveType.INT, PrimitiveType.INT,
+           PrimitiveType.BOOLEAN, PrimitiveType.TINYINT, PrimitiveType.SMALLINT,
            PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.FLOAT,
-           PrimitiveType.DOUBLE, PrimitiveType.DATE, PrimitiveType.DATETIME,
-           PrimitiveType.TIMESTAMP, PrimitiveType.STRING});
+           PrimitiveType.DOUBLE, PrimitiveType.STRING, PrimitiveType.STRING});
     checkTable(testDb, "alltypes",
         new String[]
-          {"bool_col", "tinyint_col", "smallint_col", "int_col", "bigint_col",
-           "float_col", "double_col", "date_col", "datetime_col", "timestamp_col",
-           "string_col"},
+          {"id", "bool_col", "tinyint_col", "smallint_col", "int_col", "bigint_col",
+           "float_col", "double_col", "date_string_col", "string_col"},
         new PrimitiveType[]
-          {PrimitiveType.BOOLEAN, PrimitiveType.TINYINT, PrimitiveType.SMALLINT,
+          {PrimitiveType.INT, PrimitiveType.BOOLEAN, PrimitiveType.TINYINT, PrimitiveType.SMALLINT,
            PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.FLOAT,
-           PrimitiveType.DOUBLE, PrimitiveType.DATE, PrimitiveType.DATETIME,
-           PrimitiveType.TIMESTAMP, PrimitiveType.STRING});
+           PrimitiveType.DOUBLE, PrimitiveType.STRING, PrimitiveType.STRING});
     checkTable(defaultDb, "testtbl",
         new String[] {"id", "name", "zip"},
         new PrimitiveType[]
@@ -91,7 +89,7 @@ public class CatalogTest {
     checkTable(testDb, "testtbl",
         new String[] {"id", "name", "birthday"},
         new PrimitiveType[]
-          {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.DATE});
+          {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.STRING});
 
     // case-insensitive lookup
     assertEquals(defaultDb.getTable("alltypes"), defaultDb.getTable("AllTypes"));

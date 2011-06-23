@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" encoding="UTF-8"?>
 
 <!--
   Copyright (c) 2011 Cloudera, Inc. All rights reserved.  
@@ -18,6 +18,15 @@
   <packaging>jar</packaging>
 
   <name>Cloudera Impala Query Engine Frontend</name>
+
+  <properties>
+    <test.hive.testdata>${project.basedir}/../testdata/target/AllTypes.txt</test.hive.testdata>
+    <test.hive.warehouse.dir>${project.build.directory}/test-warehouse</test.hive.warehouse.dir>
+    <test.hive.metastore.jdbc.url>jdbc:derby:;databaseName=${project.build.directory}/test_metastore_db;create=true;logDevice=${project.build.directory}/test_metastore_db</test.hive.metastore.jdbc.url>
+    <test.hive.metastore.jdbc.driver>org.apache.derby.jdbc.EmbeddedDriver</test.hive.metastore.jdbc.driver>
+    <test.hive.metastore.jdbc.username>APP</test.hive.metastore.jdbc.username>
+    <test.hive.metastore.jdbc.password>mine</test.hive.metastore.jdbc.password>
+  </properties>
   
   <dependencies>
     <dependency>
@@ -186,11 +195,11 @@
         <configuration>
           <redirectTestOutputToFile>true</redirectTestOutputToFile>
           <systemPropertyVariables>
-            <test.hive.warehouse.dir>${project.build.directory}/test-warehouse</test.hive.warehouse.dir>
-            <test.hive.metastore.jdbc.url>jdbc:derby:;databaseName=${project.build.directory}/test_metastore_db;create=true;logDevice=${project.build.directory}/test_metastore_db</test.hive.metastore.jdbc.url>
-            <test.hive.metastore.jdbc.driver>org.apache.derby.jdbc.EmbeddedDriver</test.hive.metastore.jdbc.driver>
-            <test.hive.metastore.jdbc.username>APP</test.hive.metastore.jdbc.username>
-            <test.hive.metastore.jdbc.password>mine</test.hive.metastore.jdbc.password>
+            <test.hive.warehouse.dir>${test.hive.warehouse.dir}</test.hive.warehouse.dir>
+            <test.hive.metastore.jdbc.url>${test.hive.metastore.jdbc.url}</test.hive.metastore.jdbc.url>
+            <test.hive.metastore.jdbc.driver>${test.hive.metastore.jdbc.driver}</test.hive.metastore.jdbc.driver>
+            <test.hive.metastore.jdbc.username>${test.hive.metastore.jdbc.username}</test.hive.metastore.jdbc.username>
+            <test.hive.metastore.jdbc.password>${test.hive.metastore.jdbc.password}</test.hive.metastore.jdbc.password>
           </systemPropertyVariables>
         </configuration>
       </plugin>
@@ -252,5 +261,52 @@
       </snapshots>
     </pluginRepository>
   </pluginRepositories>
+
+  <profiles>
+    <profile>
+      <!-- -->
+      <id>load-testdata</id>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <version>1.6</version>
+            <executions>
+              <execution>
+                <phase>process-test-resources</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <configuration>
+                  <target>
+                    <exec executable="/bin/bash">
+                      <arg value="${project.basedir}/../testdata/bin/run-hive.sh"/>
+                      <arg value="${project.basedir}/src/test/resources"/>
+                      <arg value="${project.basedir}/../testdata/bin/create.sql"/>
+                      <arg value="${test.hive.warehouse.dir}"/>
+                      <arg value="${test.hive.metastore.jdbc.url}"/>
+                      <arg value="${test.hive.metastore.jdbc.driver}"/>
+                      <arg value="${test.hive.metastore.jdbc.username}"/>
+                      <arg value="${test.hive.metastore.jdbc.password}"/>
+                    </exec>
+                    <exec executable="/bin/bash">
+                      <arg value="${project.basedir}/../testdata/bin/run-hive.sh"/>
+                      <arg value="${project.basedir}/src/test/resources"/>
+                      <arg value="${project.basedir}/../testdata/bin/load.sql"/>
+                      <arg value="${test.hive.warehouse.dir}"/>
+                      <arg value="${test.hive.metastore.jdbc.url}"/>
+                      <arg value="${test.hive.metastore.jdbc.driver}"/>
+                      <arg value="${test.hive.metastore.jdbc.username}"/>
+                      <arg value="${test.hive.metastore.jdbc.password}"/>
+                    </exec>
+                  </target>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 
 </project>

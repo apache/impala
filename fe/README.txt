@@ -1,5 +1,21 @@
 Welcome to the Impala Frontend
 
+Loading Test Data
+-----------------
+
+Before running any of the tests for the first time you need to load the test data.
+
+From the fe directory: mvn clean install
+From ../testdata: ./recreate_store.sh
+This will generate the test data (written to testdata/target).
+
+(For now, you also need to delete the existing metastore instance, due to some
+incompatibility between the hive cli and the metastore client that's part of Impala:
+from the fe directory: rm -rf target/test_metastore_db)
+
+From the fe directory: mvn -Pload-testdata process-test-resources
+This creates the test tables and loads the data.
+
 Running Tests
 -------------
 

@@ -124,7 +124,10 @@ public class TestSchemaUtils {
   // Create client for test schema.
   public static HiveMetaStoreClient createSchemaAndClient() throws Exception {
     HiveMetaStoreClient client = new HiveMetaStoreClient(new HiveConf(TestSchemaUtils.class));
-    createTestSchema(client);
+    // disable programmatic schema creating, this is now achieved by running
+    // testdata/bin/create.sql through the hive cli
+    // TODO: replace this with a schema verification function
+    // createTestSchema(client);
     return client;
   }
 
