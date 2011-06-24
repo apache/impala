@@ -7,9 +7,9 @@ import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
 public class FloatLiteral extends LiteralExpr {
-  private final double value;
+  private double value;
 
-  public FloatLiteral(Double value) {
+  private void init(Double value) {
     this.value = value.doubleValue();
     if ((this.value <= Float.MAX_VALUE && this.value >= Float.MIN_VALUE) || this.value == 0.0f) {
       type = PrimitiveType.FLOAT;
@@ -20,12 +20,26 @@ public class FloatLiteral extends LiteralExpr {
     }
   }
 
+  public FloatLiteral(Double value) {
+    init(value);
+  }
+
   /**
    * C'tor forcing type, e.g., due to implicit cast
    */
   public FloatLiteral(Double value, PrimitiveType type) {
     this.value = value.doubleValue();
     this.type = type;
+  }
+
+  public FloatLiteral(String value) throws AnalysisException {
+    Double floatValue = null;
+    try {
+      floatValue = new Double(value);
+    } catch (NumberFormatException e) {
+      throw new AnalysisException("invalid floating-point literal: " + value);
+    }
+    init(floatValue);
   }
 
   @Override

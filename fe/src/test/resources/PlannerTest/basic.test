@@ -7,6 +7,7 @@ AGGREGATE
 GROUP BY: zip
     SCAN table=default.testtbl
         PREDICATES: name LIKE 'm%'
+        FILES:
 ====
 select name, count(*)
 from testtbl
@@ -19,6 +20,7 @@ GROUP BY: name
 HAVING: <slot 2> > 1
     SCAN table=default.testtbl
         PREDICATES: name REGEXP 'm*'
+        FILES:
 ====
 select zip, count(*)
 from testtbl
@@ -32,3 +34,4 @@ ORDER BY: <slot 3> DESC
   GROUP BY: zip
     SCAN table=default.testtbl
           PREDICATES: name LIKE 'm%'
+          FILES:

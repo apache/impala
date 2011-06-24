@@ -7,9 +7,9 @@ import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
 public class IntLiteral extends LiteralExpr {
-  private final long value;
+  private long value;
 
-  public IntLiteral(Long value) {
+  private void init(Long value) {
     this.value = value.longValue();
     if (this.value <= Byte.MAX_VALUE && this.value >= Byte.MIN_VALUE) {
       type = PrimitiveType.TINYINT;
@@ -24,10 +24,24 @@ public class IntLiteral extends LiteralExpr {
     }
   }
 
+  public IntLiteral(Long value) {
+    init(value);
+  }
+
   /** C'tor forcing type, e.g., due to implicit cast */
   public IntLiteral(Long value, PrimitiveType type) {
     this.value = value.longValue();
     this.type = type;
+  }
+
+  public IntLiteral(String value) throws AnalysisException {
+    Long intValue = null;
+    try {
+      intValue = new Long(value);
+    } catch (NumberFormatException e) {
+      throw new AnalysisException("invalid integer literal: " + value);
+    }
+    init(intValue);
   }
 
   public long getValue() {
