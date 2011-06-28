@@ -26,6 +26,8 @@
     <test.hive.metastore.jdbc.driver>org.apache.derby.jdbc.EmbeddedDriver</test.hive.metastore.jdbc.driver>
     <test.hive.metastore.jdbc.username>APP</test.hive.metastore.jdbc.username>
     <test.hive.metastore.jdbc.password>mine</test.hive.metastore.jdbc.password>
+
+    <thrift.executable>/usr/local/bin/thrift</thrift.executable>
   </properties>
   
   <dependencies>
@@ -213,6 +215,23 @@
           <generateXml>true</generateXml>
         </configuration>
       </plugin>
+
+    <plugin>
+        <groupId>org.apache.thrift.tools</groupId>
+        <artifactId>maven-thrift-plugin</artifactId>
+        <version>0.1.10</version>
+        <configuration>
+          <thriftExecutable>${thrift.executable}</thriftExecutable>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>compile</goal>
+              <goal>testCompile</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
               
@@ -258,6 +277,17 @@
       <name>Cloudera Snapshot Repository</name>
       <snapshots>
         <enabled>true</enabled>
+      </snapshots>
+    </pluginRepository>
+
+    <pluginRepository>
+      <id>dtrott</id>
+      <url>http://maven.davidtrott.com/repository</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
       </snapshots>
     </pluginRepository>
   </pluginRepositories>
@@ -307,6 +337,50 @@
         </plugins>
       </build>
     </profile>
+
+    <profile>
+      <id>profile-buildthrift</id>
+      <activation>
+        <file>
+          <exists>${thrift.executable}</exists>
+        </file>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>generate-sources</id>
+                <phase>generate-sources</phase>
+                <configuration>
+                  <tasks>
+                    <exec executable="${thrift.executable}">
+                      <arg value="--gen" />
+                      <arg value="java"/>
+                      <arg value="-o"/>
+                      <arg value="target/generated-sources"/>
+                      <arg value="src/main/thrift/Exprs.thrift"/>
+                    </exec>
+                    <exec executable="${thrift.executable}">
+                      <arg value="--gen" />
+                      <arg value="java"/>
+                      <arg value="-o"/>
+                      <arg value="target/generated-sources"/>
+                      <arg value="src/main/thrift/PlanNodes.thrift"/>
+                    </exec>
+                  </tasks>
+                </configuration>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
   </profiles>
 
 </project>

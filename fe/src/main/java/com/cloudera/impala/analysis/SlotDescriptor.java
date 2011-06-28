@@ -4,6 +4,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.thrift.TSlotDescriptor;
 import com.google.common.base.Objects;
 
 public class SlotDescriptor {
@@ -80,11 +81,17 @@ public class SlotDescriptor {
     this.byteOffset = byteOffset;
   }
 
+  public TSlotDescriptor toThrift() {
+    return new TSlotDescriptor(
+        id.asInt(), parent.getId().asInt(), type.toThrift(), byteOffset,
+        nullIndicatorByte, nullIndicatorBit);
+  }
+
   public String debugString() {
     String colStr = (column == null ? "null" : column.getName());
     String typeStr = (type == null ? "null" : type.toString());
     return Objects.toStringHelper(this)
-        .add("id", id.getId())
+        .add("id", id.asInt())
         .add("col", colStr)
         .add("type", typeStr)
         .toString();

@@ -4,6 +4,9 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TExprNode;
+import com.cloudera.impala.thrift.TExprNodeType;
+import com.cloudera.impala.thrift.TExprOperator;
 import com.google.common.base.Preconditions;
 
 /**
@@ -12,22 +15,28 @@ import com.google.common.base.Preconditions;
  */
 public class BinaryPredicate extends Predicate {
   enum Operator {
-    EQ("="),
-    NE("!="),
-    LE("<="),
-    GE(">="),
-    LT("<"),
-    GT(">");
+    EQ("=", TExprOperator.EQ),
+    NE("!=", TExprOperator.NE),
+    LE("<=", TExprOperator.LE),
+    GE(">=", TExprOperator.GE),
+    LT("<", TExprOperator.LT),
+    GT(">", TExprOperator.GT);
 
     private final String description;
+    private final TExprOperator thriftOp;
 
-    private Operator(String description) {
+    private Operator(String description, TExprOperator thriftOp) {
       this.description = description;
+      this.thriftOp = thriftOp;
     }
 
     @Override
     public String toString() {
       return description;
+    }
+
+    public TExprOperator toThrift() {
+      return thriftOp;
     }
   };
   private final Operator op;
@@ -52,6 +61,12 @@ public class BinaryPredicate extends Predicate {
   @Override
   public String toSql() {
     return getChild(0).toSql() + " " + op.toString() + " " + getChild(1).toSql();
+  }
+
+  @Override
+  protected void toThrift(TExprNode msg) {
+    msg.node_type = TExprNodeType.BINARY_PRED;
+    msg.op = op.toThrift();
   }
 
   @Override

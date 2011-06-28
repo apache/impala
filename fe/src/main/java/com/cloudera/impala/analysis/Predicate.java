@@ -8,7 +8,7 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.Lists;
 
-public class Predicate extends Expr {
+public abstract class Predicate extends Expr {
   public Predicate() {
     super();
   }

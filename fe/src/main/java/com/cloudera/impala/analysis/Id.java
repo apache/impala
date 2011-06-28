@@ -39,7 +39,7 @@ public abstract class Id {
     return Integer.valueOf(id).hashCode();
   }
 
-  public int getId() {
+  public int asInt() {
     return id;
   }
 }

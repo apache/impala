@@ -7,6 +7,7 @@ import java.util.List;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.thrift.TTupleDescriptor;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -52,10 +53,14 @@ public class TupleDescriptor {
       slotStrings.add(slot.debugString());
     }
     return Objects.toStringHelper(this)
-        .add("tuple_id", id.getId())
+        .add("tuple_id", id.asInt())
         .add("tbl", tblStr)
         .add("slots", "[" + Joiner.on(", ").join(slotStrings) + "]")
         .toString();
+  }
+
+  public TTupleDescriptor toThrift() {
+    return new TTupleDescriptor(id.asInt());
   }
 
   protected void computeMemLayout() {

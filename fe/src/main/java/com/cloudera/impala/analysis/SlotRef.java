@@ -6,6 +6,9 @@ import java.util.List;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TExprNode;
+import com.cloudera.impala.thrift.TExprNodeType;
+import com.cloudera.impala.thrift.TSlotRef;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
@@ -45,8 +48,14 @@ public class SlotRef extends Expr {
     } else if (col != null) {
       return col;
     } else {
-      return "<slot " + Integer.toString(desc.getId().getId()) + ">";
+      return "<slot " + Integer.toString(desc.getId().asInt()) + ">";
     }
+  }
+
+  @Override
+  protected void toThrift(TExprNode msg) {
+    msg.node_type = TExprNodeType.SLOT_REF;
+    msg.slot_ref = new TSlotRef(desc.getId().asInt());
   }
 
   @Override
@@ -55,7 +64,7 @@ public class SlotRef extends Expr {
     String tblNameStr = (tblName == null ? "null" : tblName.toString());
     toStrHelper.add("tblName", tblNameStr);
     toStrHelper.add("col", col);
-    String idStr = (desc == null ? "null" : Integer.toString(desc.getId().getId()));
+    String idStr = (desc == null ? "null" : Integer.toString(desc.getId().asInt()));
     toStrHelper.add("id", idStr);
     return toStrHelper.toString();
   }

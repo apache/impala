@@ -5,6 +5,8 @@ package com.cloudera.impala.analysis;
 import java.util.Collection;
 import java.util.HashMap;
 
+import com.cloudera.impala.thrift.TDescriptorTable;
+
 /**
  * Repository for tuple (and slot) descriptors.
  * Descriptors should only be created through this class, which assigns
@@ -48,5 +50,16 @@ public class DescriptorTable {
     for (TupleDescriptor d: tupleDescs.values()) {
       d.computeMemLayout();
     }
+  }
+
+  public TDescriptorTable toThrift() {
+    TDescriptorTable result = new TDescriptorTable();
+    for (TupleDescriptor tupleD: tupleDescs.values()) {
+      result.addToTuple_descriptors(tupleD.toThrift());
+      for (SlotDescriptor slotD: tupleD.getSlots()) {
+        result.addToSlot_descriptors(slotD.toThrift());
+      }
+    }
+    return result;
   }
 }

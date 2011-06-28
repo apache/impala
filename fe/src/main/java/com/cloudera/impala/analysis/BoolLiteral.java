@@ -4,6 +4,9 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TBoolLiteral;
+import com.cloudera.impala.thrift.TExprNode;
+import com.cloudera.impala.thrift.TExprNodeType;
 
 public class BoolLiteral extends LiteralExpr {
   private final boolean value;
@@ -39,5 +42,11 @@ public class BoolLiteral extends LiteralExpr {
   @Override
   public String toSql() {
     return value ? "TRUE" : "FALSE";
+  }
+
+  @Override
+  protected void toThrift(TExprNode msg) {
+    msg.node_type = TExprNodeType.BOOL_LITERAL;
+    msg.bool_literal = new TBoolLiteral(value);
   }
 }

@@ -2,32 +2,40 @@
 
 package com.cloudera.impala.catalog;
 
+import com.cloudera.impala.thrift.TPrimitiveType;
 import com.google.common.base.Preconditions;
 
 public enum PrimitiveType {
-  INVALID_TYPE("INVALID_TYPE", -1),
-  BOOLEAN("BOOLEAN", 1),
-  TINYINT("TINYINT", 1),
-  SMALLINT("SMALLINT", 2),
-  INT("INT", 4),
-  BIGINT("BIGINT", 8),
-  FLOAT("FLOAT", 4),
-  DOUBLE("DOUBLE", 8),
-  DATE("DATE", 4),
-  DATETIME("DATETIME", 8),
-  TIMESTAMP("TIMESTAMP", 8),
-  STRING("STRING", 8);
+  INVALID_TYPE("INVALID_TYPE", -1, TPrimitiveType.INVALID_TYPE),
+  BOOLEAN("BOOLEAN", 1, TPrimitiveType.BOOLEAN),
+  TINYINT("TINYINT", 1, TPrimitiveType.TINYINT),
+  SMALLINT("SMALLINT", 2, TPrimitiveType.SMALLINT),
+  INT("INT", 4, TPrimitiveType.INT),
+  BIGINT("BIGINT", 8, TPrimitiveType.BIGINT),
+  FLOAT("FLOAT", 4, TPrimitiveType.FLOAT),
+  DOUBLE("DOUBLE", 8, TPrimitiveType.DOUBLE),
+  DATE("DATE", 4, TPrimitiveType.DATE),
+  DATETIME("DATETIME", 8, TPrimitiveType.DATETIME),
+  TIMESTAMP("TIMESTAMP", 8, TPrimitiveType.TIMESTAMP),
+  STRING("STRING", 8, TPrimitiveType.STRING);
 
   private final String description;
   private final int slotSize;  // size of tuple slot for this type
+  private final TPrimitiveType thriftType;
 
-  private PrimitiveType(String description, int slotSize) {
+  private PrimitiveType(String description, int slotSize, TPrimitiveType thriftType) {
     this.description = description;
     this.slotSize = slotSize;
+    this.thriftType = thriftType;
   }
 
+  @Override
   public String toString() {
     return description;
+  }
+
+  public TPrimitiveType toThrift() {
+    return thriftType;
   }
 
   public int getSlotSize() {

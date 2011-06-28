@@ -4,9 +4,11 @@ package com.cloudera.impala.planner;
 
 import java.util.List;
 
-import com.cloudera.impala.common.TreeNode;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.Predicate;
+import com.cloudera.impala.common.TreeNode;
+import com.cloudera.impala.thrift.TPlan;
+import com.cloudera.impala.thrift.TPlanNode;
 
 /**
  * Each PlanNode represents a single relational operator
@@ -45,6 +47,32 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   protected abstract String getExplainString(String prefix);
+
+  // Convert this plan node, including all children, to its Thrift representation.
+  public TPlan treeToThrift() {
+    TPlan result = new TPlan();
+    treeToThriftHelper(result);
+    return result;
+  }
+
+  // Append a flattened version of this plan node, including all children, to 'container'.
+  private void treeToThriftHelper(TPlan container) {
+    TPlanNode msg = new TPlanNode();
+    msg.num_children = children.size();
+    msg.limit = limit;
+    for (Predicate p: conjuncts) {
+      msg.addToConjuncts(p.treeToThrift());
+    }
+    toThrift(msg);
+    container.addToNodes(msg);
+    for (PlanNode child: children) {
+      child.treeToThriftHelper(container);
+    }
+  }
+
+  // Convert this plan node into msg (excluding children), which requires setting
+  // the node type and the node-specific field.
+  protected abstract void toThrift(TPlanNode msg);
 
   protected String debugString() {
     // not using Objects.toStrHelper because

@@ -6,7 +6,7 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Preconditions;
 
-public class LiteralExpr extends Expr {
+public abstract class LiteralExpr extends Expr {
 
   public static LiteralExpr create(String value, PrimitiveType type) throws AnalysisException {
     Preconditions.checkArgument(type != PrimitiveType.INVALID_TYPE);

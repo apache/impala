@@ -4,6 +4,9 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TExprNode;
+import com.cloudera.impala.thrift.TExprNodeType;
+import com.cloudera.impala.thrift.TFloatLiteral;
 import com.google.common.base.Preconditions;
 
 public class FloatLiteral extends LiteralExpr {
@@ -53,6 +56,12 @@ public class FloatLiteral extends LiteralExpr {
   @Override
   public String toSql() {
     return Double.toString(value);
+  }
+
+  @Override
+  protected void toThrift(TExprNode msg) {
+    msg.node_type = TExprNodeType.FLOAT_LITERAL;
+    msg.float_literal = new TFloatLiteral(value);
   }
 
   public double getValue() {

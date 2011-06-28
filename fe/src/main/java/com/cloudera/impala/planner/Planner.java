@@ -33,7 +33,7 @@ public class Planner {
     for (Table.Partition p: tblRef.getTable().getPartitions()) {
       filePaths.addAll(p.filePaths);
     }
-    PlanNode scanNode = new ScanNode(tblRef.getTable(), filePaths);
+    PlanNode scanNode = new ScanNode(tblRef.getDesc(), filePaths);
     scanNode.setConjuncts(analyzer.getConjuncts(tblRef.getId().asList()));
     return scanNode;
   }

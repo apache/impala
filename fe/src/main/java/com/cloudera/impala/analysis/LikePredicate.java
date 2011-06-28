@@ -4,23 +4,32 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TExprNode;
+import com.cloudera.impala.thrift.TExprNodeType;
+import com.cloudera.impala.thrift.TExprOperator;
 import com.google.common.base.Preconditions;
 
 public class LikePredicate extends Predicate {
   enum Operator {
-    LIKE("LIKE"),
-    RLIKE("RLIKE"),
-    REGEXP("REGEXP");
+    LIKE("LIKE", TExprOperator.LIKE),
+    RLIKE("RLIKE", TExprOperator.LIKE),
+    REGEXP("REGEXP", TExprOperator.LIKE);
 
     private final String description;
+    private final TExprOperator thriftOp;
 
-    private Operator(String description) {
+    private Operator(String description, TExprOperator thriftOp) {
       this.description = description;
+      this.thriftOp = thriftOp;
     }
 
     @Override
     public String toString() {
       return description;
+    }
+
+    public TExprOperator toThrift() {
+      return thriftOp;
     }
   }
   private final Operator op;
@@ -45,6 +54,12 @@ public class LikePredicate extends Predicate {
   @Override
   public String toSql() {
     return getChild(0).toSql() + " " + op.toString() + " " + getChild(1).toSql();
+  }
+
+  @Override
+  protected void toThrift(TExprNode msg) {
+    msg.node_type = TExprNodeType.LIKE_PRED;
+    msg.op = op.toThrift();
   }
 
   @Override

@@ -12,6 +12,8 @@ import java.util.ListIterator;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.TreeNode;
+import com.cloudera.impala.thrift.TExpr;
+import com.cloudera.impala.thrift.TExprNode;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -57,6 +59,37 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   public String toSql() {
     return "";
+  }
+
+  // Convert this expr, including all children, to its Thrift representation.
+  public TExpr treeToThrift() {
+    TExpr result = new TExpr();
+    treeToThriftHelper(result);
+    return result;
+  }
+
+  // Append a flattened version of this expr, including all children, to 'container'.
+  private void treeToThriftHelper(TExpr container) {
+    TExprNode msg = new TExprNode();
+    msg.type = type.toThrift();
+    msg.num_children = children.size();
+    toThrift(msg);
+    container.addToNodes(msg);
+    for (Expr child: children) {
+      child.treeToThriftHelper(container);
+    }
+  }
+
+  // Convert this expr into msg (excluding children), which requires setting
+  // msg.op as well as the expr-specific field.
+  protected abstract void toThrift(TExprNode msg);
+
+  public static List<TExpr> treesToThrift(List<? extends Expr> exprs) {
+    List<TExpr> result = Lists.newArrayList();
+    for (Expr expr: exprs) {
+      result.add(expr.treeToThrift());
+    }
+    return result;
   }
 
   public List<String> childrenToSql() {

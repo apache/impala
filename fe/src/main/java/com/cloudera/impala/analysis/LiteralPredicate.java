@@ -2,6 +2,10 @@
 
 package com.cloudera.impala.analysis;
 
+import com.cloudera.impala.thrift.TExprNode;
+import com.cloudera.impala.thrift.TExprNodeType;
+import com.cloudera.impala.thrift.TLiteralPredicate;
+
 public class LiteralPredicate extends Predicate {
   private final boolean value;
 
@@ -30,4 +34,11 @@ public class LiteralPredicate extends Predicate {
   public String toSql() {
     return (value ? "TRUE" : "FALSE");
   }
+
+  @Override
+  protected void toThrift(TExprNode msg) {
+    msg.node_type = TExprNodeType.LITERAL_PRED;
+    msg.literal_pred = new TLiteralPredicate(value);
+  }
+
 }

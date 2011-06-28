@@ -11,6 +11,9 @@ import java.util.List;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TDateLiteral;
+import com.cloudera.impala.thrift.TExprNode;
+import com.cloudera.impala.thrift.TExprNodeType;
 import com.google.common.base.Preconditions;
 
 class DateLiteral extends LiteralExpr {
@@ -67,6 +70,12 @@ class DateLiteral extends LiteralExpr {
   @Override
   public String toSql() {
     return acceptedFormat.format(value);
+  }
+
+  @Override
+  protected void toThrift(TExprNode msg) {
+    msg.node_type = TExprNodeType.DATE_LITERAL;
+    msg.date_literal = new TDateLiteral(value.getTime());
   }
 
   public Timestamp getValue() {

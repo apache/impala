@@ -6,6 +6,9 @@ import java.util.Iterator;
 import java.util.List;
 
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.thrift.TPlanNode;
+import com.cloudera.impala.thrift.TPlanNodeType;
+import com.cloudera.impala.thrift.TSortNode;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -37,6 +40,12 @@ public class SortNode extends PlanNode {
         .add("is_asc", "[" + Joiner.on(" ").join(strings) + "]")
         .addValue(super.debugString())
         .toString();
+  }
+
+  @Override
+  protected void toThrift(TPlanNode msg) {
+    msg.node_type = TPlanNodeType.SORT_NODE;
+    msg.sort_node = new TSortNode(Expr.treesToThrift(orderingExprs), isAscOrder);
   }
 
   @Override

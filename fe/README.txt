@@ -9,9 +9,12 @@ From the fe directory: mvn clean install
 From ../testdata: ./recreate_store.sh
 This will generate the test data (written to testdata/target).
 
-(For now, you also need to delete the existing metastore instance, due to some
+For now, you also need to delete the existing metastore instance, due to some
 incompatibility between the hive cli and the metastore client that's part of Impala:
-from the fe directory: rm -rf target/test_metastore_db)
+from the fe directory: rm -rf target/test_metastore_db
+
+(If you see the following error message when trying to load the data, you forgot to rm test_metastore_db:
+"[exec] Caused by: java.sql.SQLException: Database at /home/marcel/impala/fe/target/test_metastore_db has an incompatible format with the current version of the software.  The database was created by or upgraded by version 10.6.")
 
 From the fe directory: mvn -Pload-testdata process-test-resources
 This creates the test tables and loads the data.

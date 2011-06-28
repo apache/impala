@@ -5,6 +5,9 @@ package com.cloudera.impala.analysis;
 import java.util.List;
 
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TCaseExpr;
+import com.cloudera.impala.thrift.TExprNode;
+import com.cloudera.impala.thrift.TExprNodeType;
 import com.google.common.base.Preconditions;
 
 /**
@@ -43,6 +46,7 @@ public class CaseExpr extends Expr {
     return hasCaseExpr == expr.hasCaseExpr && hasElseExpr == expr.hasElseExpr;
   }
 
+  @Override
   public String toSql() {
     StringBuilder output = new StringBuilder("CASE");
     int childIdx = 0;
@@ -58,6 +62,12 @@ public class CaseExpr extends Expr {
     }
     output.append(" END");
     return output.toString();
+  }
+
+  @Override
+  protected void toThrift(TExprNode msg) {
+    msg.node_type = TExprNodeType.CASE_EXPR;
+    msg.case_expr = new TCaseExpr(hasCaseExpr, hasElseExpr);
   }
 
   @Override

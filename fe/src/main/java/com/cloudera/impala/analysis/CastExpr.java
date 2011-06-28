@@ -4,6 +4,8 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TExprNode;
+import com.cloudera.impala.thrift.TExprNodeType;
 import com.google.common.base.Preconditions;
 
 public class CastExpr extends Expr {
@@ -26,6 +28,11 @@ public class CastExpr extends Expr {
   @Override
   public String toSql() {
     return "CAST(" + getChild(0).toSql() + " AS " + targetType.toString() + ")";
+  }
+
+  @Override
+  protected void toThrift(TExprNode msg) {
+    msg.node_type = TExprNodeType.CAST_EXPR;
   }
 
   @Override

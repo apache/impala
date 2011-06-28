@@ -6,26 +6,36 @@ import java.util.List;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TAggregateExpr;
+import com.cloudera.impala.thrift.TExprNode;
+import com.cloudera.impala.thrift.TExprNodeType;
+import com.cloudera.impala.thrift.TExprOperator;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 public class AggregateExpr extends Expr {
   enum Operator {
-    COUNT("COUNT"),
-    MIN("MIN"),
-    MAX("MAX"),
-    SUM("SUM"),
-    AVG("AVG");
+    COUNT("COUNT", TExprOperator.AGG_COUNT),
+    MIN("MIN", TExprOperator.AGG_MIN),
+    MAX("MAX", TExprOperator.AGG_MAX),
+    SUM("SUM", TExprOperator.AGG_SUM),
+    AVG("AVG", TExprOperator.INVALID_OP);
 
     private final String description;
+    private final TExprOperator thriftOp;
 
-    private Operator(String description) {
+    private Operator(String description, TExprOperator thriftOp) {
       this.description = description;
+      this.thriftOp = thriftOp;
     }
 
     @Override
     public String toString() {
       return description;
+    }
+
+    public TExprOperator toThrift() {
+      return thriftOp;
     }
   }
   private final Operator op;
@@ -96,6 +106,13 @@ public class AggregateExpr extends Expr {
     }
     sb.append(")");
     return sb.toString();
+  }
+
+  @Override
+  protected void toThrift(TExprNode msg) {
+    msg.node_type = TExprNodeType.AGG_EXPR;
+    msg.op = op.toThrift();
+    msg.agg_expr = new TAggregateExpr(isStar, isDistinct);
   }
 
   @Override

@@ -4,25 +4,30 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TExprNode;
+import com.cloudera.impala.thrift.TExprNodeType;
+import com.cloudera.impala.thrift.TExprOperator;
 import com.google.common.base.Preconditions;
 
 public class ArithmeticExpr extends Expr {
   enum Operator {
-    MULTIPLY("*"),
-    DIVIDE("/"),
-    MOD("%"),
-    INT_DIVIDE("DIV"),
-    PLUS("+"),
-    MINUS("-"),
-    BITAND("&"),
-    BITOR("|"),
-    BITXOR("^"),
-    BITNOT("~");
+    MULTIPLY("*", TExprOperator.MULTIPLY),
+    DIVIDE("/", TExprOperator.DIVIDE),
+    MOD("%", TExprOperator.MOD),
+    INT_DIVIDE("DIV", TExprOperator.INT_DIVIDE),
+    PLUS("+", TExprOperator.PLUS),
+    MINUS("-", TExprOperator.MINUS),
+    BITAND("&", TExprOperator.BITAND),
+    BITOR("|", TExprOperator.BITOR),
+    BITXOR("^", TExprOperator.BITXOR),
+    BITNOT("~", TExprOperator.BITNOT);
 
     private final String description;
+    private final TExprOperator thriftOp;
 
-    private Operator(String description) {
+    private Operator(String description, TExprOperator thriftOp) {
       this.description = description;
+      this.thriftOp = thriftOp;
     }
 
     public boolean isBitwiseOperation() {
@@ -32,6 +37,10 @@ public class ArithmeticExpr extends Expr {
     @Override
     public String toString() {
       return description;
+    }
+
+    public TExprOperator toThrift() {
+      return thriftOp;
     }
   }
   private final Operator op;
@@ -56,6 +65,12 @@ public class ArithmeticExpr extends Expr {
       Preconditions.checkState(children.size() == 2);
       return getChild(0).toSql() + " " + op.toString() + " " + getChild(1).toSql();
     }
+  }
+
+  @Override
+  protected void toThrift(TExprNode msg) {
+    msg.node_type = TExprNodeType.ARITHMETIC_EXPR;
+    msg.op = op.toThrift();
   }
 
   @Override
