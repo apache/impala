@@ -1,0 +1,17 @@
+Prerequisites
+-------------
+1) Boost (libbost<>-dev package)
+2) Thrift source installation (unlike Java, C++ needs extra header files).
+Download this from Apache, then build. Requires Boost and python<version>-dev.
+3) cmake
+
+Building
+--------
+1) You first need to generate the thrift structures, which are written into be/generated-sources/gen-cpp.  To do that:
+	cd impala/fe
+	mvn compile
+
+2) Run 'cmake .' from impala/be; this will generated makefiles
+
+3) From impala/be: make
+

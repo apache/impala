@@ -11,17 +11,18 @@ typedef i32 TSlotId
 struct TSlotDescriptor {
   1: required TSlotId id
   2: required TTupleId parent
-  3: required Types.TPrimitiveType type
-  4: required i32 byte_offset  // into tuple
-  5: required i32 null_indicator_byte
-  6: required i32 null_indicator_bit
+  3: required Types.TPrimitiveType slotType
+  4: required i32 byteOffset  // into tuple
+  5: required i32 nullIndicatorByte
+  6: required i32 nullIndicatorBit
 }
 
 struct TTupleDescriptor {
   1: required TTupleId id
+  2: required i32 byteSize
 }
 
 struct TDescriptorTable {
-  1: required list<TSlotDescriptor> slot_descriptors;
-  2: required list<TTupleDescriptor> tuple_descriptors;
+  1: required list<TSlotDescriptor> slotDescriptors;
+  2: required list<TTupleDescriptor> tupleDescriptors;
 }

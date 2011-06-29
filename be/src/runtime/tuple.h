@@ -1,0 +1,63 @@
+// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+
+#ifndef IMPALA_RUNTIME_TUPLE_H
+#define IMPALA_RUNTIME_TUPLE_H
+
+#include <cstring>
+#include "runtime/descriptors.h"
+#include "runtime/mem-pool.h"
+
+namespace impala {
+
+// The format of a string-typed slot.
+struct StringValue {
+  // TODO: change ptr to an offset relative to a contiguous memory block,
+  // so that we can send row batches between nodes without having to swizzle
+  // pointers
+  void* ptr;
+  int len;
+};
+
+// A tuple is stored as a contiguous sequence of bytes containing a fixed number
+// of fixed-size slots. The slots are arranged in order of increasing byte length;
+// the tuple might contain padding between slots in order to align them according
+// to their type.
+// 
+// The contents of a tuple:
+// 1) a number of bytes holding a bitvector of null indicators
+// 2) bool slots
+// 3) tinyint slots
+// 4) smallint slots
+// 5) int slots
+// 6) float slots
+// 7) bigint slots
+// 8) double slots
+// 9) string slots
+class Tuple {
+ public:
+  // initialize individual tuple with data residing in mem pool
+  static Tuple* Create(int size, MemPool* pool) {
+    // assert(size > 0);
+    Tuple* result = reinterpret_cast<Tuple*>(pool->Allocate(size));
+    bzero(result, size);
+    return result;
+  }
+
+  void SetNull(const NullIndicatorOffset& offset, bool value);
+  bool IsNull(const NullIndicatorOffset& offset);
+
+  void* GetSlot(int offset) {
+    return reinterpret_cast<void*>(this + offset);
+  }
+
+  StringValue* GetStringSlot(int offset) {
+    return reinterpret_cast<StringValue*>(this + offset);
+  }
+
+ private:
+  void* data_;
+};
+
+}
+
+#endif

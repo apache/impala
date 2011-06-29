@@ -1,6 +1,6 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
-namespace cpp impala_thrift
+namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
 include "Descriptors.thrift"

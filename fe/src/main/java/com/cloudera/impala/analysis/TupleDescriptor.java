@@ -60,7 +60,7 @@ public class TupleDescriptor {
   }
 
   public TTupleDescriptor toThrift() {
-    return new TTupleDescriptor(id.asInt());
+    return new TTupleDescriptor(id.asInt(), byteSize);
   }
 
   protected void computeMemLayout() {

@@ -55,9 +55,9 @@ public class DescriptorTable {
   public TDescriptorTable toThrift() {
     TDescriptorTable result = new TDescriptorTable();
     for (TupleDescriptor tupleD: tupleDescs.values()) {
-      result.addToTuple_descriptors(tupleD.toThrift());
+      result.addToTupleDescriptors(tupleD.toThrift());
       for (SlotDescriptor slotD: tupleD.getSlots()) {
-        result.addToSlot_descriptors(slotD.toThrift());
+        result.addToSlotDescriptors(slotD.toThrift());
       }
     }
     return result;
