@@ -5,15 +5,21 @@ package com.cloudera.impala.catalog;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.serde.Constants;
 import org.junit.BeforeClass;
 import org.junit.Test;
+
+import com.cloudera.impala.analysis.IntLiteral;
+import com.cloudera.impala.analysis.LiteralExpr;
+import com.google.common.collect.Sets;
 
 public class CatalogTest {
   private static Catalog catalog;
@@ -23,7 +29,7 @@ public class CatalogTest {
     catalog = new Catalog(client);
   }
 
-  private void checkTable(Db db, String tblName, String[] colNames,
+  private void checkTableCols(Db db, String tblName, String[] colNames,
                           PrimitiveType[] colTypes) {
     Table tbl = db.getTable(tblName);
     assertEquals(tbl.getName(), tblName);
@@ -40,7 +46,7 @@ public class CatalogTest {
     }
   }
 
-  @Test public void TestLoad() {
+  @Test public void TestColSchema() {
     Collection<Db> dbs = catalog.getDbs();
     Db defaultDb = null;
     Db testDb = null;
@@ -64,7 +70,7 @@ public class CatalogTest {
     assertNotNull(testDb.getTable("alltypes"));
     assertNotNull(testDb.getTable("testtbl"));
 
-    checkTable(defaultDb, "alltypes",
+    checkTableCols(defaultDb, "alltypes",
         new String[]
           {"year", "month", "id", "bool_col", "tinyint_col", "smallint_col",
            "int_col", "bigint_col", "float_col", "double_col", "date_string_col",
@@ -74,7 +80,7 @@ public class CatalogTest {
            PrimitiveType.BOOLEAN, PrimitiveType.TINYINT, PrimitiveType.SMALLINT,
            PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.FLOAT,
            PrimitiveType.DOUBLE, PrimitiveType.STRING, PrimitiveType.STRING});
-    checkTable(testDb, "alltypes",
+    checkTableCols(testDb, "alltypes",
         new String[]
           {"id", "bool_col", "tinyint_col", "smallint_col", "int_col", "bigint_col",
            "float_col", "double_col", "date_string_col", "string_col"},
@@ -82,18 +88,49 @@ public class CatalogTest {
           {PrimitiveType.INT, PrimitiveType.BOOLEAN, PrimitiveType.TINYINT, PrimitiveType.SMALLINT,
            PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.FLOAT,
            PrimitiveType.DOUBLE, PrimitiveType.STRING, PrimitiveType.STRING});
-    checkTable(defaultDb, "testtbl",
+    checkTableCols(defaultDb, "testtbl",
         new String[] {"id", "name", "zip"},
         new PrimitiveType[]
           {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.INT});
-    checkTable(testDb, "testtbl",
+    checkTableCols(testDb, "testtbl",
         new String[] {"id", "name", "birthday"},
         new PrimitiveType[]
           {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.STRING});
 
     // case-insensitive lookup
     assertEquals(defaultDb.getTable("alltypes"), defaultDb.getTable("AllTypes"));
+  }
 
+  @Test public void TestPartitions() {
+    List<Table.Partition> partitions =
+        catalog.getDb("default").getTable("AllTypes").getPartitions();
+    // check that partition keys cover the date range 1/1/2009-12/31/2010
+    // and that we have one file per partition
+    assertEquals(partitions.size(), 24);
+    Set<Long> months = Sets.newHashSet();
+    for (Table.Partition p: partitions) {
+      assertEquals(p.keyValues.size(), 2);
+
+      LiteralExpr key1Expr = p.keyValues.get(0);
+      assertTrue(key1Expr instanceof IntLiteral);
+      long key1 = ((IntLiteral) key1Expr).getValue();
+      assertTrue(key1 == 2009 || key1 == 2010);
+
+      LiteralExpr key2Expr = p.keyValues.get(1);
+      assertTrue(key2Expr instanceof IntLiteral);
+      long key2 = ((IntLiteral) key2Expr).getValue();
+      assertTrue(key2 >= 1 && key2 <= 12);
+
+      months.add(key1 * 100 + key2);
+
+      assertEquals(p.filePaths.size(), 1);
+    }
+    assertEquals(months.size(), 24);
+  }
+
+  @Test public void TestIgnored() {
+    Db defaultDb = catalog.getDb("default");
+    Db testDb = catalog.getDb("testdb1");
     // check that tables with unsupported types were ignored
     for (String collectionType : Constants.CollectionTypes) {
       String tableName = TestSchemaUtils.getComplexTypeTableName(collectionType);
