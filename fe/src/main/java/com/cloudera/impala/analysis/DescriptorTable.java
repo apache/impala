@@ -2,6 +2,7 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.Collection;
 import java.util.HashMap;
 
 /**
@@ -35,5 +36,17 @@ public class DescriptorTable {
 
   public TupleDescriptor getTupleDesc(TupleId id) {
     return tupleDescs.get(id);
+  }
+
+  public Collection<TupleDescriptor> getTupleDescs() {
+    return tupleDescs.values();
+  }
+
+  // Computes physical layout parameters of all descriptors.
+  // Call this only after the last descriptor was added.
+  public void computeMemLayout() {
+    for (TupleDescriptor d: tupleDescs.values()) {
+      d.computeMemLayout();
+    }
   }
 }

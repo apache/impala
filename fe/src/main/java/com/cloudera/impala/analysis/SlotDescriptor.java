@@ -12,9 +12,31 @@ public class SlotDescriptor {
   private PrimitiveType type;
   private Column column;  // underlying column, if there is one
 
+  // physical layout parameters
+  private int byteSize;
+  private int byteOffset;  // within tuple
+  private int nullIndicatorByte;  // index into byte array
+  private int nullIndicatorBit; // index within byte
+
   SlotDescriptor(int id, TupleDescriptor parent) {
     this.id = new SlotId(id);
     this.parent = parent;
+  }
+
+  public int getNullIndicatorByte() {
+    return nullIndicatorByte;
+  }
+
+  public void setNullIndicatorByte(int nullIndicatorByte) {
+    this.nullIndicatorByte = nullIndicatorByte;
+  }
+
+  public int getNullIndicatorBit() {
+    return nullIndicatorBit;
+  }
+
+  public void setNullIndicatorBit(int nullIndicatorBit) {
+    this.nullIndicatorBit = nullIndicatorBit;
   }
 
   public SlotId getId() {
@@ -40,6 +62,22 @@ public class SlotDescriptor {
   public void setColumn(Column column) {
     this.column = column;
     this.type = column.getType();
+  }
+
+  public int getByteSize() {
+    return byteSize;
+  }
+
+  public void setByteSize(int byteSize) {
+    this.byteSize = byteSize;
+  }
+
+  public int getByteOffset() {
+    return byteOffset;
+  }
+
+  public void setByteOffset(int byteOffset) {
+    this.byteOffset = byteOffset;
   }
 
   public String debugString() {

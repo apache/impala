@@ -26,8 +26,9 @@ import com.cloudera.impala.common.AnalysisException;
 
 public class AnalyzerTest {
   private final static Logger LOG = LoggerFactory.getLogger(AnalyzerTest.class);
-
   private static Catalog catalog;
+
+  private Analyzer analyzer;
 
   // maps from type to string that will result in literal of that type
   private static Map<PrimitiveType, String> typeToLiteralValue =
@@ -69,7 +70,7 @@ public class AnalyzerTest {
       fail("\nParser error:\n" + parser.getErrorMsg(stmt));
     }
     assertNotNull(node);
-    Analyzer analyzer = new Analyzer(catalog);
+    analyzer = new Analyzer(catalog);
     try {
       node.analyze(analyzer);
     } catch (AnalysisException e) {
@@ -97,7 +98,7 @@ public class AnalyzerTest {
       fail("\nParser error:\n" + parser.getErrorMsg(stmt));
     }
     assertNotNull(node);
-    Analyzer analyzer = new Analyzer(catalog);
+    analyzer = new Analyzer(catalog);
     try {
       node.analyze(analyzer);
     } catch (AnalysisException e) {
@@ -120,6 +121,34 @@ public class AnalyzerTest {
    */
   public void AnalysisError(String stmt) {
     AnalysisError(stmt, null);
+  }
+
+  @Test
+  public void TestMemLayout() {
+    AnalyzesOk("select * from AllTypes");
+    DescriptorTable descTbl = analyzer.getDescTbl();
+    descTbl.computeMemLayout();
+    checkLayoutParams("alltypes.bool_col", 1, 2, 0, 0);
+    checkLayoutParams("alltypes.tinyint_col", 1, 3, 0, 1);
+    checkLayoutParams("alltypes.smallint_col", 2, 4, 0, 2);
+    checkLayoutParams("alltypes.year", 4, 8, 0, 3);
+    checkLayoutParams("alltypes.month", 4, 12, 0, 4);
+    checkLayoutParams("alltypes.id", 4, 16, 0, 5);
+    checkLayoutParams("alltypes.int_col", 4, 20, 0, 6);
+    checkLayoutParams("alltypes.float_col", 4, 24, 0, 7);
+    checkLayoutParams("alltypes.bigint_col", 8, 32, 1, 0);
+    checkLayoutParams("alltypes.double_col", 8, 40, 1, 1);
+    checkLayoutParams("alltypes.date_string_col", 8, 48, 1, 2);
+    checkLayoutParams("alltypes.string_col", 8, 56, 1, 3);
+  }
+
+  private void checkLayoutParams(String colAlias, int byteSize, int byteOffset,
+                                 int nullIndicatorByte, int nullIndicatorBit) {
+    SlotDescriptor d = analyzer.getSlotDescriptor(colAlias);
+    Assert.assertEquals(byteSize, d.getByteSize());
+    Assert.assertEquals(byteOffset, d.getByteOffset());
+    Assert.assertEquals(nullIndicatorByte, d.getNullIndicatorByte());
+    Assert.assertEquals(nullIndicatorBit, d.getNullIndicatorBit());
   }
 
   @Test

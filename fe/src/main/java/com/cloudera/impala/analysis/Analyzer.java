@@ -84,6 +84,10 @@ public class Analyzer {
     return aliasMap.get(name.toString().toLowerCase());
   }
 
+  public SlotDescriptor getSlotDescriptor(String colAlias) {
+    return slotRefMap.get(colAlias);
+  }
+
   /**
    * Checks that 'col' references an existing column for a registered table alias;
    * if alias is empty, tries to resolve the column name in the context of any of the

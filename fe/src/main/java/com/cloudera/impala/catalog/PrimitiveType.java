@@ -5,27 +5,37 @@ package com.cloudera.impala.catalog;
 import com.google.common.base.Preconditions;
 
 public enum PrimitiveType {
-  INVALID_TYPE("INVALID_TYPE"),
-  BOOLEAN("BOOLEAN"),
-  TINYINT("TINYINT"),
-  SMALLINT("SMALLINT"),
-  INT("INT"),
-  BIGINT("BIGINT"),
-  FLOAT("FLOAT"),
-  DOUBLE("DOUBLE"),
-  DATE("DATE"),
-  DATETIME("DATETIME"),
-  TIMESTAMP("TIMESTAMP"),
-  STRING("STRING");
+  INVALID_TYPE("INVALID_TYPE", -1),
+  BOOLEAN("BOOLEAN", 1),
+  TINYINT("TINYINT", 1),
+  SMALLINT("SMALLINT", 2),
+  INT("INT", 4),
+  BIGINT("BIGINT", 8),
+  FLOAT("FLOAT", 4),
+  DOUBLE("DOUBLE", 8),
+  DATE("DATE", 4),
+  DATETIME("DATETIME", 8),
+  TIMESTAMP("TIMESTAMP", 8),
+  STRING("STRING", 8);
 
   private final String description;
+  private final int slotSize;  // size of tuple slot for this type
 
-  private PrimitiveType(String description) {
+  private PrimitiveType(String description, int slotSize) {
     this.description = description;
+    this.slotSize = slotSize;
   }
 
   public String toString() {
     return description;
+  }
+
+  public int getSlotSize() {
+    return slotSize;
+  }
+
+  public static int getMaxSlotSize() {
+    return STRING.slotSize;
   }
 
   public boolean isFixedPointType() {
