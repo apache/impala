@@ -17,13 +17,16 @@ class RuntimeState {
   ObjectPool* obj_pool() const { return obj_pool_; }
   const DescriptorTbl& descs() const { return descs_; }
   int batch_size() const { return batch_size_; }
+  int file_buf_size() const { return file_buf_size_; }
 
  private:
   const DescriptorTbl& descs_;
   ObjectPool* obj_pool_;
   int batch_size_;
+  int file_buf_size_;
 
   static const int DEFAULT_BATCH_SIZE = 1024;
+  static const int DEFAULT_FILE_BUF_SIZE = 131072; // 128K
 };
 
 }

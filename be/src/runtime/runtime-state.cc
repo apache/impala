@@ -8,7 +8,8 @@ namespace impala {
 RuntimeState::RuntimeState(const DescriptorTbl& descs)
   : descs_(descs),
     obj_pool_(new ObjectPool()),
-    batch_size_(DEFAULT_BATCH_SIZE) {
+    batch_size_(DEFAULT_BATCH_SIZE),
+    file_buf_size_(DEFAULT_FILE_BUF_SIZE) {
 }
 
 }

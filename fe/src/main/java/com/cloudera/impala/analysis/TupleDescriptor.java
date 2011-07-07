@@ -7,6 +7,7 @@ import java.util.List;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.thrift.TTable;
 import com.cloudera.impala.thrift.TTupleDescriptor;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
@@ -60,7 +61,20 @@ public class TupleDescriptor {
   }
 
   public TTupleDescriptor toThrift() {
-    return new TTupleDescriptor(id.asInt(), byteSize);
+    // We only support single-byte characters as delimiters.
+    TTable ttable = new TTable(table.getColumns().size(),
+        (byte)table.getLineDelim().charAt(0),
+        (byte)table.getFieldDelim().charAt(0),
+        (byte)table.getCollectionDelim().charAt(0),
+        (byte)table.getMapKeyDelim().charAt(0),
+        (byte)table.getEscapeChar().charAt(0));
+    // Set optional quote char.
+    if (table.getQuoteChar() != null) {
+      ttable.setQuoteChar((byte)table.getQuoteChar().charAt(0));
+    }
+    TTupleDescriptor ttupleDesc = new TTupleDescriptor(id.asInt(), byteSize);
+    ttupleDesc.setTable(ttable);
+    return ttupleDesc;
   }
 
   protected void computeMemLayout() {

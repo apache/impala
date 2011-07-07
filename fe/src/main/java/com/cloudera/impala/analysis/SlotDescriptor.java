@@ -83,8 +83,9 @@ public class SlotDescriptor {
 
   public TSlotDescriptor toThrift() {
     return new TSlotDescriptor(
-        id.asInt(), parent.getId().asInt(), type.toThrift(), byteOffset,
-        nullIndicatorByte, nullIndicatorBit);
+        id.asInt(), parent.getId().asInt(), type.toThrift(),
+        ((column != null) ? column.getPosition() : -1),
+        byteOffset, nullIndicatorByte, nullIndicatorBit);
   }
 
   public String debugString() {

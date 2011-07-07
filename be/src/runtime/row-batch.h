@@ -39,6 +39,11 @@ class RowBatch {
     return num_rows_++;
   }
 
+  // Returns true if row_batch has reached capacity, false otherwise
+  bool IsFull() {
+    return num_rows_ == capacity_;
+  }
+
   TupleRow* GetRow(int row_idx) {
     // assert(row_idx >= 0 && row_idx < num_rows_);
     return reinterpret_cast<TupleRow*>(reinterpret_cast<char*>(tuple_ptrs_) +

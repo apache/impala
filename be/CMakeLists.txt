@@ -26,6 +26,9 @@ include_directories(${CMAKE_SOURCE_DIR}/src)
 # resolve includes of generated code
 include_directories(${CMAKE_SOURCE_DIR}/generated-sources)
 
+# allow linking of static libs into dynamic lib
+add_definitions(-fPIC)
+
 # compile these subdirs using their own CMakeLists.txt
 add_subdirectory(src/common)
 add_subdirectory(src/exec)

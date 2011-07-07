@@ -15,6 +15,7 @@ import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
+import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.UnknownDBException;
 import org.apache.hadoop.hive.metastore.api.UnknownTableException;
 import org.apache.hadoop.hive.serde.Constants;
@@ -31,9 +32,21 @@ import com.google.common.collect.Maps;
  * Internal representation of table-related metadata. Owned by Catalog instance.
  */
 public class Table {
+
+  private static final String DEFAULT_LINE_DELIM = "\n";
+  private static final String DEFAULT_FIELD_DELIM = ",";
+  private static final String DEFAULT_ESCAPE_CHAR = "\\";
+
   private final Db db;
   private final String name;
   private final String owner;
+  private String lineDelim;
+  private String fieldDelim;
+  private String collectionDelim;
+  private String mapKeyDelim;
+  private String escapeChar;
+  private String quoteChar;
+
   private int numPartitionKeys;
 
   /**  the first 'numPartitionKeys' cols are partition keys */
@@ -154,6 +167,17 @@ public class Table {
       org.apache.hadoop.hive.metastore.api.Table msTbl = client.getTable(db.getName(), tblName);
       Table table = new Table(db, tblName, msTbl.getOwner());
 
+      // we only support single-character delimiters,
+      // ignore this table if we find a multi-character delimiter
+      try {
+        table.setDelimiters(msTbl.getSd().getSerdeInfo());
+      } catch (Exception e) {
+        LOG.warn("Ignoring table {} because setting delimiters failed, " +
+            "with exceptin message {}",
+            new Object[] {tblName, e.getMessage()});
+        return null;
+      }
+
       // populate with both partition keys and regular columns
       List<FieldSchema> fieldSchemas = msTbl.getPartitionKeys();
       table.numPartitionKeys = fieldSchemas.size();
@@ -206,6 +230,99 @@ public class Table {
     } else {
       return PrimitiveType.INVALID_TYPE;
     }
+  }
+
+
+
+  // the metastore may return null for delimiter parameters,
+  // which means we need to use a default instead.
+  // we tried long and hard to find default values for delimiters in Hive,
+  // but could not find them
+  private void setDelimiters(SerDeInfo serdeInfo) throws Exception {
+    lineDelim = serdeInfo.getParameters().get(Constants.LINE_DELIM);
+    if (lineDelim != null) {
+      if (lineDelim.length() != 1) {
+        throw new Exception("We only support single-character line delimiters. " +
+        		"Line delimiter found: '" + lineDelim + "'");
+      }
+    } else {
+      // default value
+      lineDelim = DEFAULT_LINE_DELIM;
+    }
+    fieldDelim = serdeInfo.getParameters().get(Constants.FIELD_DELIM);
+    if (fieldDelim != null) {
+      if (fieldDelim.length() != 1) {
+        throw new Exception("We only support single-character field delimiters. " +
+            "Field delimiter found: '" + fieldDelim + "'");
+      }
+    } else {
+      // default value
+      fieldDelim = DEFAULT_FIELD_DELIM;
+    }
+    collectionDelim = serdeInfo.getParameters().get(Constants.COLLECTION_DELIM);
+    if (collectionDelim != null) {
+      if (collectionDelim.length() != 1) {
+        throw new Exception("We only support single-character collection-item delimiters. " +
+            "Collection-item delimiter found: '" + collectionDelim + "'");
+      }
+    } else {
+      // default value
+      collectionDelim = fieldDelim;
+    }
+    mapKeyDelim = serdeInfo.getParameters().get(Constants.MAPKEY_DELIM);
+    if (mapKeyDelim != null) {
+      if (mapKeyDelim.length() != 1) {
+        throw new Exception("We only support single-character MapKey delimiters. " +
+            "MapKey delimiter found: '" + mapKeyDelim + "'");
+      }
+    } else {
+      // default value
+      mapKeyDelim = fieldDelim;
+    }
+    escapeChar = serdeInfo.getParameters().get(Constants.ESCAPE_CHAR);
+    if (escapeChar != null) {
+      if (escapeChar.length() != 1) {
+        throw new Exception("We only support single-character string quotes. " +
+            "String quote found: '" + escapeChar + "'");
+      }
+    } else {
+      // default value
+      escapeChar = DEFAULT_ESCAPE_CHAR;
+    }
+    quoteChar = serdeInfo.getParameters().get(Constants.QUOTE_CHAR);
+    if (quoteChar != null) {
+      if (quoteChar.length() != 1) {
+        throw new Exception("We only support single-character string quotes. " +
+            "String quote found: '" + quoteChar + "'");
+      }
+    } else {
+      // unset
+      quoteChar = null;
+    }
+  }
+
+  public String getLineDelim() {
+    return lineDelim;
+  }
+
+  public String getFieldDelim() {
+    return fieldDelim;
+  }
+
+  public String getCollectionDelim() {
+    return collectionDelim;
+  }
+
+  public String getMapKeyDelim() {
+    return mapKeyDelim;
+  }
+
+  public String getQuoteChar() {
+    return quoteChar;
+  }
+
+  public String getEscapeChar() {
+    return escapeChar;
   }
 
   public String getName() {

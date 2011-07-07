@@ -6,6 +6,7 @@
 #include <vector>
 #include <tr1/unordered_map>
 #include <vector>
+#include <boost/scoped_ptr.hpp>
 
 #include "common/status.h"
 #include "gen-cpp/Types_types.h"
@@ -15,6 +16,7 @@ namespace impala {
 class ObjectPool;
 class TDescriptorTable;
 class TSlotDescriptor;
+class TTable;
 class TTupleDescriptor;
 
 // for now, these are simply ints; if we find we need to generate ids in the
@@ -55,6 +57,7 @@ extern PrimitiveType ThriftToType(TPrimitiveType::type ttype);
 class SlotDescriptor {
  public:
   PrimitiveType data_type() const { return type_; }
+  int col_pos() const { return col_pos_; }
   int tuple_offset() const { return tuple_offset_; }
   const NullIndicatorOffset& null_indicator_offset() const {
     return null_indicator_offset_;
@@ -64,20 +67,45 @@ class SlotDescriptor {
   friend class DescriptorTbl;
 
   PrimitiveType type_;
+  int col_pos_;
   int tuple_offset_;
   NullIndicatorOffset null_indicator_offset_;
 
   SlotDescriptor(const TSlotDescriptor& tdesc);
 };
 
+class TableDescriptor {
+ public:
+  TableDescriptor(const TTable& ttable);
+  int num_cols() const { return num_cols_; }
+  char line_delim() const { return line_delim_; }
+  char field_delim() const { return field_delim_; }
+  char collection_delim() const { return collection_delim_; }
+  char escape_char() const { return escape_char_; }
+  char quote_char() const { return quote_char_; }
+  bool strings_are_quoted() const { return strings_are_quoted_; }
+
+ protected:
+  int num_cols_;
+  char line_delim_;
+  char field_delim_;
+  char collection_delim_;
+  char escape_char_;
+  char quote_char_;
+  bool strings_are_quoted_;
+};
+
 class TupleDescriptor {
  public:
   int byte_size() const { return byte_size_; }
+  const std::vector<SlotDescriptor*> slots() const { return slots_; }
+  const TableDescriptor* table_desc() const { return table_desc_.get(); }
 
  protected:
   friend class DescriptorTbl;
 
   TupleDescriptor(const TTupleDescriptor& tdesc);
+  const boost::scoped_ptr<TableDescriptor> table_desc_;
   int byte_size_;
   std::vector<SlotDescriptor*> slots_;
 

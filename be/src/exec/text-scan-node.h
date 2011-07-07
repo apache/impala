@@ -4,91 +4,205 @@
 #define IMPALA_EXEC_TEXT_SCAN_NODE_H_
 
 #include <vector>
-#include <fstream>
-#include <boost/tokenizer.hpp>
+#include <stdint.h>
+#include <hdfs.h>
+#include <boost/scoped_ptr.hpp>
+#include "runtime/descriptors.h"
 #include "exec-node.h"
-#include "runtime/columntype.h"
-#include "runtime/row-batch.h"
 
 namespace impala {
-namespace exec {
 
+class TScanNode;
+class RowBatch;
+class Status;
+class TupleDescriptor;
+class MemPool;
+class Tuple;
+class SlotDescriptor;
+
+// This execution node parses delimited text files from HDFS,
+// and writes their content as tuples in the
+// Impala in-memory representation of data (tuples, rows, row batches).
+// We read HDFS files one file buffer at a time,
+// allocating new buffers with file_buf_pool_ as needed.
+// We parse each file buffer character-by-character and
+// write tuples into a fixed-size tuple buffer that is allocated once in Prepare().
+// For variable-length fields (e.g. strings), our tuples
+// contain pointers to the variable-length data.
+// The variable length data may be located in the following places:
+// 1. In the original file buffer (we cannot overwrite the buffer until the next GetNext() call)
+// 2. Memory allocated from the var_len_pool_
+// The data of variable-length slots has to be copied into a
+// separate memory location (allocated from var_len_pool_) in the following situations:
+// 1. The originating column spans multiple file blocks
+// 2. The slot is a string type that must be unescaped
+//
+// Columns could span multiple file blocks.
+// In such scenarios we construct the complete column by
+// appending the partial-column bytes to a boundary_column.
 class TextScanNode : public ExecNode {
-public:
-  TextScanNode(const std::vector<ColumnType>& schema, 
-		 const std::vector<unsigned>& target_offsets,
-		 size_t out_record_size,
-		 char row_delim = '\n', 
-		 char field_delim = ',', 
-		 char coll_item_delim = ';')
-    : schema_(schema), 
-      target_offs_(target_offsets),
-      out_record_size_(out_record_size),
-      row_delim(row_delim), 
-      field_delim_(field_delim), 
-      coll_item_delim_(coll_item_delim), 
-      flen_out_buf_(NULL), 
-      flen_out_buf_size_(0),      
-      vlen_out_buf_(NULL),
-      vlen_out_buf_size_(0),
-      flen_out_runner_(NULL),
-      vlen_out_runner_(NULL),
-      els(NULL)
-  {}
-  
-  Status Prepare(RuntimeState* state) {
-		std::string escape_indicator("\\");
-		std::string field_delims;
-		field_delims.append(1, field_delim_);
-		field_delims.append(1, coll_item_delim_);
-		std::string quote_chars("\"\'");
-		els = new boost::escaped_list_separator<char>(escape_indicator, field_delims, quote_chars);
+ public:
+  TextScanNode(const TScanNode& tscan_node);
 
-		// TODO: need to call SetOutput from here?
-		return 0;
-	}
+  // Allocates tuple buffer.
+  // Sets tuple_idx_ and tuple_desc_ using RuntimeState.
+  // Sets delimiters from table_desc_ in tuple_desc_.
+  // Creates mapping from field index in table to slot index in output tuple.
+  virtual Status Prepare(RuntimeState* state);
 
-  void SetOutput(char* __restrict__ flen_out_buf, unsigned flen_out_buf_size, char* __restrict__ vlen_out_buf, unsigned vlen_out_buf_size) {
-    flen_out_buf_ = flen_out_buf;
-    flen_out_buf_size_ = flen_out_buf_size;
-    vlen_out_buf_ = vlen_out_buf;
-    vlen_out_buf_size_ = vlen_out_buf_size;
-  }
-  
-  Status GetNext(RuntimeState* state, RowBatch* row_batch);
+  // Connects to HDFS.
+  virtual Status Open(RuntimeState* state);
 
-  unsigned Parse(std::ifstream& in);
-  void Print(unsigned num_records);
+  // Writes parsed tuples into tuple buffer,
+  // and sets pointers in row_batch to point to them.
+  // row_batch will be non-full when all blocks of all files have been read and parsed.
+  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch);
 
-  Status Close(RuntimeState* state) {
-		delete els;
-		return 0;
-	}
+  // Disconnects from HDFS.
+  virtual Status Close(RuntimeState* state);
 
-private:
-	const std::vector<ColumnType>& schema_;
-	const std::vector<unsigned>& target_offs_;
-	const size_t out_record_size_;
-	const char row_delim;
-	const char field_delim_;
-	const char coll_item_delim_;
+ private:
 
-	char* __restrict__ flen_out_buf_;
-	unsigned flen_out_buf_size_;
-	char* __restrict__ vlen_out_buf_;
-	unsigned vlen_out_buf_size_;
+  // Parser configuration parameters:
 
-	char* flen_out_runner_;
-	char* vlen_out_runner_;
+  // List of HDFS paths to read.
+  const std::vector<std::string>& files_;
 
-	boost::escaped_list_separator<char>* els;
+  // Tuple id resolved in Prepare() to set tuple_desc_;
+  TupleId tuple_id_;
 
-	void WriteField(unsigned field_ix, const std::string& str,
-			char* __restrict__ fixed_len_target);
-	void PrintField(unsigned field_ix, void* __restrict__ tuple_off);
+  // Descriptor of tuples in input files.
+  const TupleDescriptor* tuple_desc_;
+
+  // Tuple index in tuple row.
+  int tuple_idx_;
+
+  // Character delimiting tuples.
+  char tuple_delim_;
+
+  // Character delimiting fields (to become slots).
+  char field_delim_;
+
+  // Character delimiting collection items (to become slots).
+  char collection_item_delim_;
+
+  // Escape character. Ignored if strings are not quoted.
+  char escape_char_;
+
+  // Indicates whether strings are quoted. If set to false, string quotes will simply be copied.
+  bool strings_are_quoted_;
+
+  // Character in which quotes strings are enclosed in data files.
+  // Ignored if strings_are_quoted_ is false.
+  char string_quote_;
+
+  // Memory pools created in c'tor and destroyed in d'tor.
+
+  // Pool for allocating tuple buffer.
+  boost::scoped_ptr<MemPool> tuple_buf_pool_;
+
+  // Pool for allocating file buffers;
+  boost::scoped_ptr<MemPool> file_buf_pool_;
+
+  // Pool for allocating memory for variable-length slots.
+  boost::scoped_ptr<MemPool> var_len_pool_;
+
+  // Pseudo ring of file buffers, to avoid reallocation.
+  // file_bufs_[0] always points to the file buffer from a previous GetNext() call.
+  // For reading HDFS files, we hand off buffers starting from index 1,
+  // so we never overwrite the buffer from a previous GetNext() call.
+  // Whenever a row batch fills up, we swap file_bufs_[file_buf_idx_] with file_bufs_[0].
+  // Also see GetFileBuffer().
+  std::vector<void*> file_bufs_;
+
+
+  // Parser internal state:
+
+  // Connection to hdfs, established in Open() and closed in Close().
+  hdfsFS hdfs_connection_;
+
+  // File handle of current partition being processed.
+  hdfsFile hdfs_file_;
+
+  // Actual bytes received from last file read.
+  tSize file_buf_actual_size_;
+
+  // Index of current file being processed.
+  int file_idx_;
+
+  // Buffer where tuples are written into.
+  // Must be valid until next GetNext().
+  void* tuple_buf_;
+
+  // Current tuple.
+  Tuple* tuple_;
+
+  // Buffer for data read from file.
+  char* file_buf_;
+
+  // Current position in file buffer.
+  char* file_buf_ptr_;
+
+  // Ending position of file buffer.
+  char* file_buf_end_;
+
+  // Mapping from column index in table to slot index in output tuple.
+  // Created in Prepare() from SlotDescriptors.
+  std::vector<int> column_idx_to_slot_idx;
+
+  // Helper string for dealing with columns that span file blocks.
+  std::string boundary_column_;
+
+  // Parses the current file_buf_ and writes tuples into the tuple buffer.
+  // Input Parameters
+  //   row_batch: Row batch into which to write new tuples.
+  // Input/Output Parameters:
+  //   The following parameters make up the state that must be maintained across file buffers.
+  //   These parameters are changed within ParseFileBuffer.
+  //   row_idx: Index of current row. Possibly updated within ParseFileBuffer.
+  //   field_idx: Index of current field in file.
+  //   last_char_is_escape: Indicates whether the last character was an escape character.
+  //   unescape_string: Indicates whether the current string-slot contains an escape,
+  //                    and must be copied unescaped into the the var_len_buffer.
+  //   quote_char: Indicates the last quote character starting a quoted string.
+  //               Set to NOT_IN_STRING if string_are_quoted==false,
+  //               or we have not encountered a quote.
+  //
+  Status ParseFileBuffer(RowBatch* row_batch, int* row_idx, int* column_idx,
+      bool* last_char_is_escape, bool* unescape_string, char* quote_char);
+
+  // Converts slot data (begin, end) into type of slot_desc,
+  // and writes the result into the tuples's slot.
+  // copy_string indicates whether we need to make a separate copy of the string data:
+  // For regular unescaped strings, we point to the original data in the file_buf_.
+  // For regular escaped strings,
+  // we copy an its unescaped string into a separate buffer and point to it.
+  // For boundary string fields,
+  // we create a contiguous copy of the string data into a separate buffer.
+  // Throws an exception if conversion is unsuccessful (we use boost::lexical_cast).
+  void ConvertAndWriteSlotBytes(const char* begin, const char* end, Tuple* tuple,
+      const SlotDescriptor* slot_desc, bool copy_string, bool unescape_string);
+
+  // Removes escape characters from len characters of the null-terminated string src,
+  // and copies the unescaped string into dest, changing *len to the unescaped length.
+  // No null-terminator is added to dest.
+  void UnescapeString(const char* src, void* dest, int* len);
+
+  // Returns the next valid file buffer for reading HDFS files.
+  // We maintain a pseudo ring list of file buffers in file_bufs_.
+  // We return file buffers starting from file_bufs_[1],
+  // adding new buffers as necessary (allocated from file_buf_pool_).
+  // file_bufs_[0] points to the file buffer from a previous call to GetNext().
+  // input/output parameter:
+  //   file_buf_idx: Index of current file buffer, will be incremented.
+  void* GetFileBuffer(RuntimeState* state, int* file_buf_idx);
+
+  const static char NOT_IN_STRING = -1;
+  const static int POOL_INIT_SIZE = 4096;
+  const static char DELIM_INIT = -1;
+  const static int SKIP_COLUMN = -1;
 };
 
-} // namespace exec
-} // namespace impala
+}
 
 #endif

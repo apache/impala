@@ -12,14 +12,26 @@ struct TSlotDescriptor {
   1: required TSlotId id
   2: required TTupleId parent
   3: required Types.TPrimitiveType slotType
-  4: required i32 byteOffset  // into tuple
-  5: required i32 nullIndicatorByte
-  6: required i32 nullIndicatorBit
+  4: required i32 columnPos   // in originating table
+  5: required i32 byteOffset  // into tuple
+  6: required i32 nullIndicatorByte
+  7: required i32 nullIndicatorBit
+}
+
+struct TTable {
+  1: required i32 numCols
+  2: required byte lineDelim
+  3: required byte fieldDelim
+  4: required byte collectionDelim
+  5: required byte mapKeyDelim
+  6: required byte escapeChar
+  7: optional byte quoteChar
 }
 
 struct TTupleDescriptor {
   1: required TTupleId id
   2: required i32 byteSize
+  3: optional TTable table
 }
 
 struct TDescriptorTable {

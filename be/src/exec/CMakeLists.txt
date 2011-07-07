@@ -13,4 +13,5 @@ set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/exec")
 
 add_library(Exec STATIC
   exec-node.cc
+  text-scan-node.cc
 )

@@ -3,6 +3,7 @@
 #include "runtime/descriptors.h"
 #include "common/object-pool.h"
 #include "gen-cpp/Descriptors_types.h"
+#include "gen-cpp/PlanNodes_types.h"
 
 using namespace std;
 
@@ -28,12 +29,24 @@ PrimitiveType ThriftToType(TPrimitiveType::type ttype) {
 
 SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc)
   : type_(ThriftToType(tdesc.slotType)),
+    col_pos_(tdesc.columnPos),
     tuple_offset_(tdesc.byteOffset),
     null_indicator_offset_(tdesc.nullIndicatorByte, tdesc.nullIndicatorBit) {
 }
 
+TableDescriptor::TableDescriptor(const TTable& ttable)
+  : num_cols_(ttable.numCols),
+    line_delim_(ttable.lineDelim),
+    field_delim_(ttable.fieldDelim),
+    collection_delim_(ttable.collectionDelim),
+    escape_char_(ttable.escapeChar),
+    quote_char_((ttable.__isset.quoteChar) ? ttable.quoteChar : -1),
+    strings_are_quoted_(ttable.__isset.quoteChar) {
+}
+
 TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
-  : byte_size_(tdesc.byteSize),
+  : table_desc_((tdesc.__isset.table) ? new TableDescriptor(tdesc.table) : NULL),
+    byte_size_(tdesc.byteSize),
     slots_() {
 }
 
