@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "common/status.h"
+#include "gen-cpp/Types_types.h"
 
 namespace impala {
 
@@ -45,6 +46,8 @@ enum PrimitiveType {
   TYPE_TIMESTAMP,
   TYPE_STRING
 };
+
+extern PrimitiveType ThriftToType(TPrimitiveType::type ttype);
 
 class SlotDescriptor {
  public:

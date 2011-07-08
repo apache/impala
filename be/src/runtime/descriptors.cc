@@ -8,7 +8,7 @@ using namespace std;
 
 namespace impala {
 
-static PrimitiveType ConvertType(TPrimitiveType::type ttype) {
+PrimitiveType ThriftToType(TPrimitiveType::type ttype) {
   switch (ttype) {
     case TPrimitiveType::INVALID_TYPE: return INVALID_TYPE;
     case TPrimitiveType::BOOLEAN: return TYPE_BOOLEAN;
@@ -27,7 +27,7 @@ static PrimitiveType ConvertType(TPrimitiveType::type ttype) {
 }
 
 SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc)
-  : type_(ConvertType(tdesc.slotType)),
+  : type_(ThriftToType(tdesc.slotType)),
     tuple_offset_(tdesc.byteOffset),
     null_indicator_offset_(tdesc.nullIndicatorByte, tdesc.nullIndicatorBit) {
 }

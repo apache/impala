@@ -12,7 +12,8 @@
 
 namespace impala {
 
-struct RuntimeState;
+class ObjectPool;
+class RuntimeState;
 class TColumnValue;
 class TExpr;
 class TExprNode;
@@ -40,13 +41,9 @@ class Expr {
 
   const std::vector<Expr*>& children() const { return children_; }
 
-  // create expression tree from the list of nodes contained in texpr
-  // returns root of expression tree
-  // it is the caller's responsibility to delete the memory of the expression tree
-  static Status CreateExprTree(const TExpr& texpr, Expr** root_expr);
-
-  // delete the expression (sub-)tree rooted at expr
-  static void DeleteExprTree(Expr* expr);
+  // Create expression tree from the list of nodes contained in texpr
+  // within 'pool'. Returns root of expression tree.
+  static Status CreateExprTree(ObjectPool* pool, const TExpr& texpr, Expr** root_expr);
 
  protected:
   Expr(const TExprNode& node);
@@ -63,25 +60,23 @@ class Expr {
   std::vector<Expr*> children_;
 
  private:
-  // create a new Expr based on texpr_node.node_type
-  // caller owns the memory pointed to by Expr*
-  static Status CreateExpr(const TExprNode& texpr_node, Expr** expr);
+  // Create a new Expr based on texpr_node.node_type within 'pool'.
+  static Status CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** expr);
 
-  // recursive procedure for re-creating
-  // an expression tree from a dfs list of thrift-based nodes.
-  // input parameters
+  // Creates an expr tree for the node rooted at 'node_idx' via depth-first traversal.
+  // parameters
   //   nodes: vector of thrift expression nodes to be translated
-  //   node_idx: used to propagate state during recursion. points to current index into nodes vector.
-  //             should be called with node_idx == 0
-  //   parent: used to propagate state during recursion.
-  //           parent of current expression, should be called with NULL
-  // output parameter
-  //   root_expr: root of expression tree to be set
+  //   parent: parent of node at node_idx (or NULL for node_idx == 0)
+  //   node_idx:
+  //     in: root of TExprNode tree
+  //     out: next node in 'nodes' that isn't part of tree
+  //   root_expr: out: root of constructed expr tree
   // return
   //   status.ok() if successful
   //   !status.ok() if tree is inconsistent or corrupt
-  static Status CreateTreeFromThrift(const std::vector<TExprNode>& nodes,
-      int* node_idx, Expr* parent, Expr** root_expr);
+  static Status CreateTreeFromThrift(ObjectPool* pool,
+      const std::vector<TExprNode>& nodes, Expr* parent, int* node_idx,
+      Expr** root_expr);
 };
 
 // Reference to a single slot of a tuple.

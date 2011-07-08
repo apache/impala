@@ -9,4 +9,6 @@ set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/")
 # add .cc files and uncomment line
 add_library(Runtime
   descriptors.cc
+  mem-pool.cc
+  runtime-state.cc
 )
