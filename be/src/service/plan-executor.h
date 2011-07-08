@@ -28,17 +28,10 @@ class PlanExecutor {
   // The caller is responsible for deleting *batch.
   Status FetchResult(RowBatch** batch);
 
-  int batch_size() const { return batch_size_; }
-  void set_batch_size(int batch_size) { batch_size_ = batch_size; }
-
  private:
-  static const int DEFAULT_BATCH_SIZE = 1024;
-
   ExecNode* plan_;
-  const DescriptorTbl& descs_;
   std::vector<const TupleDescriptor*> tuple_descs_;
   RuntimeState runtime_state_;
-  int batch_size_;
   bool done_;
 };
 

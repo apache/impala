@@ -1,5 +1,7 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
+#include <sstream>
+
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exprs/expr.h"
@@ -19,6 +21,7 @@
 #include "exprs/literal-predicate.h"
 #include "exprs/string-literal.h"
 #include "gen-cpp/Exprs_types.h"
+#include "gen-cpp/ImpalaService_types.h"
 
 using namespace std;
 using namespace impala;
@@ -184,4 +187,96 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
       return Status::OK;
     }
   }
+}
+
+// TODO: create machine-independent typedefs for 1/2/4/8-byte ints
+void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
+  void* value = GetValue(row);
+  if (value == NULL) return;
+
+  if (as_ascii) {
+    PrintValue(value, &col_val->stringVal);
+    col_val->__isset.stringVal = true;
+  }
+
+  switch (type_) {
+    case TYPE_BOOLEAN:
+      col_val->boolVal = *reinterpret_cast<bool*>(value);
+      col_val->__isset.boolVal = true;
+      break;
+    case TYPE_TINYINT:
+      col_val->intVal = *reinterpret_cast<char*>(value);
+      col_val->__isset.intVal = true;
+      break;
+    case TYPE_SMALLINT:
+      col_val->intVal = *reinterpret_cast<short*>(value);
+      col_val->__isset.intVal = true;
+      break;
+    case TYPE_INT:
+      col_val->intVal = *reinterpret_cast<int*>(value);
+      col_val->__isset.intVal = true;
+      break;
+    case TYPE_BIGINT:
+      col_val->longVal = *reinterpret_cast<long*>(value);
+      col_val->__isset.longVal = true;
+      break;
+    case TYPE_FLOAT:
+      col_val->doubleVal = *reinterpret_cast<float*>(value);
+      col_val->__isset.doubleVal = true;
+      break;
+    case TYPE_DOUBLE:
+      col_val->doubleVal = *reinterpret_cast<double*>(value);
+      col_val->__isset.doubleVal = true;
+      break;
+    case TYPE_STRING:
+      StringValue* string_val = reinterpret_cast<StringValue*>(value);
+      string tmp(static_cast<char*>(string_val->ptr), string_val->len);
+      col_val->stringVal.swap(tmp);
+      col_val->__isset.stringVal = true;
+      break;
+  }
+}
+
+void Expr::PrintValue(TupleRow* row, std::string* str) {
+  PrintValue(GetValue(row), str);
+}
+
+void Expr::PrintValue(void* value, std::string* str) {
+  if (value == NULL) {
+    str->clear();
+    return;
+  }
+
+  stringstream out;
+  switch (type_) {
+    case TYPE_BOOLEAN: {
+      bool val = *reinterpret_cast<bool*>(value);
+      *str = (val ? "true" : "false");
+      return;
+    }
+    case TYPE_TINYINT:
+      out << *reinterpret_cast<signed char*>(value);
+      break;
+    case TYPE_SMALLINT:
+      out << *reinterpret_cast<short*>(value);
+      break;
+    case TYPE_INT:
+      out << *reinterpret_cast<int*>(value);
+      break;
+    case TYPE_BIGINT:
+      out << *reinterpret_cast<long*>(value);
+      break;
+    case TYPE_FLOAT:
+      out << *reinterpret_cast<float*>(value);
+      break;
+    case TYPE_DOUBLE:
+      out << *reinterpret_cast<double*>(value);
+      break;
+    case TYPE_STRING:
+      StringValue* string_val = reinterpret_cast<StringValue*>(value);
+      string tmp(static_cast<char*>(string_val->ptr), string_val->len);
+      str->swap(tmp);
+      return;
+  }
+  *str = out.str();
 }

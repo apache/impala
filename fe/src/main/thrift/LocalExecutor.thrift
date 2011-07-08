@@ -12,5 +12,4 @@ struct TExecutePlanRequest {
   1: PlanNodes.TPlan plan
   2: Descriptors.TDescriptorTable descTbl
   3: list<Exprs.TExpr> selectListExprs
-  4: list<Types.TPrimitiveType> selectListExprTypes;
 }

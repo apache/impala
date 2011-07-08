@@ -29,11 +29,22 @@ class Expr {
   // valid as long as 'row' doesn't change.
   void* GetValue(TupleRow* row);
 
-  // Convenience function: extract value into col_val.
-  void GetValue(TupleRow* row, PrimitiveType col_type, TColumnValue* col_val);
+  // Convenience function: extract value into col_val and sets the
+  // appropriate __isset flag.
+  // If the value is NULL, nothing is set.
+  // If 'as_ascii' is true, writes the value in ascii into stringVal;
+  // if it is false, the specific field in col_val that receives the value is
+  // based on the type of the expr:
+  // TYPE_BOOLEAN: boolVal
+  // TYPE_TINYINT/SMALLINT/INT: intVal
+  // TYPE_BIGINT: longVal
+  // TYPE_FLOAT/DOUBLE: doubleVal
+  // TYPE_STRING: stringVal
+  void GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val);
 
   // Convenience function: print value into 'str'.
-  void PrintValue(TupleRow* row, PrimitiveType col_type, std::string* str);
+  // NULL turns into an empty string.
+  void PrintValue(TupleRow* row, std::string* str);
 
   void AddChild(Expr* expr) { children_.push_back(expr); }
 
@@ -77,6 +88,8 @@ class Expr {
   static Status CreateTreeFromThrift(ObjectPool* pool,
       const std::vector<TExprNode>& nodes, Expr* parent, int* node_idx,
       Expr** root_expr);
+
+  void PrintValue(void* value, std::string* str);
 };
 
 // Reference to a single slot of a tuple.

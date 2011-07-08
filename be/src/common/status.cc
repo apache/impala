@@ -26,14 +26,14 @@ Status::~Status() {
   if (error_detail_ != NULL) delete error_detail_;
 }
 
-void Status::GetErrorMsgs(vector<string>* msgs) {
+void Status::GetErrorMsgs(vector<string>* msgs) const {
   msgs->clear();
   if (error_detail_ != NULL) {
     *msgs = error_detail_->error_msgs;
   }
 }
 
-void Status::GetErrorMsg(string* msg) {
+void Status::GetErrorMsg(string* msg) const {
 }
 
 }

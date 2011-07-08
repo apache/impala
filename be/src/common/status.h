@@ -47,10 +47,10 @@ class Status {
   void AddErrorMsg(const std::string& msg);
 
   // Return all accumulated error msgs.
-  void GetErrorMsgs(std::vector<std::string>* msgs);
+  void GetErrorMsgs(std::vector<std::string>* msgs) const;
 
   // Return all accumulated error msgs in a single string.
-  void GetErrorMsg(std::string* msg);
+  void GetErrorMsg(std::string* msg) const;
 
  private:
   struct ErrorDetail;

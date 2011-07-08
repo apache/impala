@@ -15,11 +15,10 @@ namespace impala {
 
 PlanExecutor::PlanExecutor(ExecNode* plan, const DescriptorTbl& descs)
   : plan_(plan),
-    descs_(descs),
     tuple_descs_(),
-    runtime_state_(),
-    batch_size_(DEFAULT_BATCH_SIZE),
+    runtime_state_(descs),
     done_(false) {
+  // stash these, we need to pass them into the RowBatch c'tor
   descs.GetTupleDescs(&tuple_descs_);
 }
 
@@ -37,9 +36,26 @@ Status PlanExecutor::FetchResult(RowBatch** batch) {
     *batch = NULL;
     return Status::OK;
   }
-  *batch = new RowBatch(tuple_descs_, batch_size_);
+  *batch = new RowBatch(tuple_descs_, runtime_state_.batch_size());
   RETURN_IF_ERROR(plan_->GetNext(&runtime_state_, *batch));
   return Status::OK;
+}
+
+static void ThrowJavaExc(JNIEnv* env, jclass exc_class, const Status& status) {
+  string error_msg;
+  status.GetErrorMsg(&error_msg);
+  env->ThrowNew(exc_class, error_msg.c_str());
+}
+
+static void DeserializeRequest(
+    JNIEnv* env,
+    jbyteArray thrift_execute_plan_request,
+    ExecNode** plan,
+    DescriptorTbl** descs,
+    vector<Expr*>* select_list_exprs) {
+  jboolean is_copy;
+  jbyte* byte_array = env->GetByteArrayElements(thrift_execute_plan_request, &is_copy);
+  TExecutePlanRequest exec_request;
 }
 
 extern "C"
@@ -48,11 +64,10 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativePlanExecutor_ExecP
     jboolean as_ascii, jobject result_queue) {
   // TODO: use boost::scoped_ptr
   // deserialize plan and desc tbl
-  TExecutePlanRequest exec_request;
   ExecNode* plan;
   DescriptorTbl* descs;
   vector<Expr*> select_list_exprs;
-  vector<PrimitiveType> select_list_expr_types;
+  DeserializeRequest(env, thrift_execute_plan_request, &plan, &descs, &select_list_exprs);
 
   // setup
   jclass blocking_queue_if = env->FindClass("java.util.concurrent.BlockingQueue");
@@ -79,18 +94,14 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativePlanExecutor_ExecP
 
   Status status;
   if (!(status = executor.Exec()).ok()) {
-    string error_msg;
-    status.GetErrorMsg(&error_msg);
-    env->ThrowNew(impala_exc_cl, error_msg.c_str());
+    ThrowJavaExc(env, impala_exc_cl, status);
     return;
   }
 
   while (true) {
     RowBatch* batch;
     if (!(status = executor.FetchResult(&batch)).ok()) {
-      string error_msg;
-      status.GetErrorMsg(&error_msg);
-      env->ThrowNew(impala_exc_cl, error_msg.c_str());
+      ThrowJavaExc(env, impala_exc_cl, status);
       return;
     }
     if (batch == NULL) {
@@ -103,29 +114,21 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativePlanExecutor_ExecP
       jobject result_row = env->NewObject(result_row_cl, result_row_ctor);
       for (int j = 0; j < select_list_exprs.size(); ++j) {
         TColumnValue col_val;
-        if (as_ascii) {
-          select_list_exprs[j]->PrintValue(row, select_list_expr_types[j], &col_val.stringVal);
-        } else {
-          select_list_exprs[j]->GetValue(row, select_list_expr_types[j], &col_val);
-        }
+        select_list_exprs[j]->GetValue(row, as_ascii, &col_val);
 
         jobject java_col_val = env->NewObject(column_value_cl, column_value_ctor);
-        /* TODO: figure out how to check what's been set
-        if (col_val.isSetBoolVal()) {
+        if (col_val.__isset.boolVal) {
           env->SetBooleanField(java_col_val, bool_val_field, col_val.boolVal);
-        } else if (col_val.isSetIntVal()) {
+        } else if (col_val.__isset.intVal) {
           env->SetIntField(java_col_val, int_val_field, col_val.intVal);
-        } else if (col_val.isSetLongVal()) {
+        } else if (col_val.__isset.longVal) {
           env->SetLongField(java_col_val, long_val_field, col_val.longVal);
-        } else if (col_val.isSetDoubleVal()) {
+        } else if (col_val.__isset.doubleVal) {
           env->SetDoubleField(java_col_val, double_val_field, col_val.doubleVal);
-        } else if (col_val.isSetStringVal()) {
+        } else if (col_val.__isset.stringVal) {
           env->SetObjectField(
               java_col_val, string_val_field, env->NewStringUTF(col_val.stringVal.c_str()));
-        } else {
-          // TODO: signal error
         }
-        */
 
         env->CallVoidMethod(result_row, add_to_col_vals_id, java_col_val);
       }

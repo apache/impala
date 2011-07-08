@@ -52,14 +52,10 @@ public class Coordinator {
     PlanNode plan = planner.createPlan(analysisResult.selectStmt, analysisResult.analyzer);
 
     // execute locally
-    List<TPrimitiveType> selectListTypes = Lists.newArrayList();
-    List<Expr> selectListExprs = analysisResult.selectStmt.getSelectListExprs();
-    for (Expr expr: selectListExprs) {
-      selectListTypes.add(expr.getType().toThrift());
-    }
-    TExecutePlanRequest execRequest = new TExecutePlanRequest(plan.treeToThrift(),
+    TExecutePlanRequest execRequest = new TExecutePlanRequest(
+        plan.treeToThrift(),
         analysisResult.analyzer.getDescTbl().toThrift(),
-        Expr.treesToThrift(selectListExprs), selectListTypes);
+        Expr.treesToThrift(analysisResult.selectStmt.getSelectListExprs()));
     NativePlanExecutor.ExecPlan(
         thriftToByteArray(execRequest), request.returnAsAscii, resultQueue);
   }

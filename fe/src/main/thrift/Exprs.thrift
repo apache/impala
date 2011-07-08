@@ -84,8 +84,6 @@ struct TCaseExpr {
   2: required bool has_else_expr
 }
 
-// do we need something for cast exprs? they don't even have opcodes
-
 struct TDateLiteral {
   1: required Types.TTimestamp value
 }
