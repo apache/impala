@@ -6,8 +6,14 @@
 
 namespace impala {
 
+// TODO: generate cast eval functions between all legal combinations of source
+// and target type
+
 CastExpr::CastExpr(const TExprNode& node)
   : Expr(node) {
+}
+
+void CastExpr::Prepare(RuntimeState* state) {
 }
 
 }

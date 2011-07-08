@@ -15,8 +15,12 @@ class LiteralPredicate: public Predicate {
 
   LiteralPredicate(const TExprNode& node);
 
+  virtual void Prepare(RuntimeState* state);
+
  private:
-  const bool value_;
+  ExprValue result_;
+
+  static void* ComputeFunction(Expr* e, TupleRow* row);
 };
 
 }

@@ -15,12 +15,14 @@ class CaseExpr: public Expr {
 
   CaseExpr(const TExprNode& node);
 
-  bool has_case_expr() const { return has_case_expr_; }
-  bool has_else_expr() const { return has_else_expr_; }
+  virtual void Prepare(RuntimeState* state);
 
  private:
   const bool has_case_expr_;
   const bool has_else_expr_;
+  ExprValue result_;
+
+  static void* ComputeFunction(Expr* e, TupleRow* row);
 };
 
 }

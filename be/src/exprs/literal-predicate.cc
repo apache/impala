@@ -6,8 +6,17 @@
 
 namespace impala {
 
+void* LiteralPredicate::ComputeFunction(Expr* e, TupleRow* row) {
+  LiteralPredicate* p = static_cast<LiteralPredicate*>(e);
+  return &p->result_.bool_val;
+}
+
 LiteralPredicate::LiteralPredicate(const TExprNode& node)
-  : Predicate(node), value_(node.literal_pred.value) {
+  : Predicate(node), result_(node.literal_pred.value) {
+}
+
+void LiteralPredicate::Prepare(RuntimeState* state) {
+  compute_function_ = ComputeFunction;
 }
 
 }

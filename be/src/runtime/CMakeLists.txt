@@ -11,4 +11,5 @@ add_library(Runtime
   descriptors.cc
   mem-pool.cc
   runtime-state.cc
+  string-value.cc
 )

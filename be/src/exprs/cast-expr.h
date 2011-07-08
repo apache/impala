@@ -10,10 +10,15 @@ namespace impala {
 class TExprNode;
 
 class CastExpr: public Expr {
+ public:
+  virtual void Prepare(RuntimeState* state);
+
  protected:
   friend class Expr;
-
   CastExpr(const TExprNode& node);
+
+ private:
+  ExprValue result_;
 };
 
 }

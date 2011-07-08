@@ -17,8 +17,12 @@ class ArithmeticExpr: public Expr {
 
   ArithmeticExpr(const TExprNode& node);
 
+  virtual void Prepare(RuntimeState* state);
+
  private:
+  friend class GetValueFunctions;
   const TExprOperator::type op_;
+  ExprValue result_;
 };
 
 }

@@ -9,14 +9,7 @@
 
 namespace impala {
 
-// The format of a string-typed slot.
-struct StringValue {
-  // TODO: change ptr to an offset relative to a contiguous memory block,
-  // so that we can send row batches between nodes without having to swizzle
-  // pointers
-  void* ptr;
-  int len;
-};
+struct StringValue;
 
 // A tuple is stored as a contiguous sequence of bytes containing a fixed number
 // of fixed-size slots. The slots are arranged in order of increasing byte length;

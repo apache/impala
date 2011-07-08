@@ -41,7 +41,7 @@ public class ScanNode extends PlanNode {
 
   @Override
   protected void toThrift(TPlanNode msg) {
-    msg.node_type = TPlanNodeType.SCAN_NODE;
+    msg.node_type = TPlanNodeType.TEXT_SCAN_NODE;
     msg.scan_node = new TScanNode(desc.getId().asInt(), filePaths);
   }
 

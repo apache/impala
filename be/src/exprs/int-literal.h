@@ -15,8 +15,12 @@ class IntLiteral: public Expr {
 
   IntLiteral(const TExprNode& node);
 
+  virtual void Prepare(RuntimeState* state);
+
  private:
-  const long value_;
+  long value_;
+
+  static void* ReturnValue(Expr* e, TupleRow* row);
 };
 
 }

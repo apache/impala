@@ -14,8 +14,14 @@ class LikePredicate: public Predicate {
 
   LikePredicate(const TExprNode& node);
 
+  virtual void Prepare(RuntimeState* state);
+
  private:
   const TExprOperator::type op_;
+  ExprValue result_;
+
+  static void* LikeFunction(Expr* e, TupleRow* row);
+  static void* RegexpFunction(Expr* e, TupleRow* row);
 };
 
 }

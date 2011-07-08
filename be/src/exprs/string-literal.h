@@ -5,6 +5,7 @@
 
 #include <string>
 #include "exprs/expr.h"
+#include "runtime/tuple.h"  // for StringValue
 
 namespace impala {
 
@@ -16,8 +17,12 @@ class StringLiteral: public Expr {
 
   StringLiteral(const TExprNode& node);
 
+  virtual void Prepare(RuntimeState* state);
+
  private:
-  const std::string value_;
+  ExprValue value_;
+
+  static void* ComputeFunction(Expr* e, TupleRow* row);
 };
 
 }

@@ -15,8 +15,13 @@ class IsNullPredicate: public Predicate {
 
   IsNullPredicate(const TExprNode& node);
 
+  virtual void Prepare(RuntimeState* state);
+
  private:
   const bool is_not_null_;
+  ExprValue result_;
+
+  static void* ComputeFunction(Expr* e, TupleRow* row);
 };
 
 }

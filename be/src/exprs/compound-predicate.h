@@ -12,10 +12,17 @@ class CompoundPredicate: public Predicate {
  protected:
   friend class Expr;
 
-  CompoundPredicate(TExprNode node);
+  CompoundPredicate(const TExprNode& node);
+
+  virtual void Prepare(RuntimeState* state);
 
  private:
   const TExprOperator::type op_;
+  bool value_;  // holds result of GetValue()
+
+  static void* AndComputeFunction(Expr* e, TupleRow* row);
+  static void* OrComputeFunction(Expr* e, TupleRow* row);
+  static void* NotComputeFunction(Expr* e, TupleRow* row);
 };
 
 }

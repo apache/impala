@@ -15,8 +15,12 @@ class FloatLiteral: public Expr {
 
   FloatLiteral(const TExprNode& node);
 
+  virtual void Prepare(RuntimeState* state);
+
  private:
-  const double value_;
+  double value_;
+
+  static void* ComputeFunction(Expr* e, TupleRow* row);
 };
 
 }

@@ -14,10 +14,13 @@ class BoolLiteral: public Expr {
   friend class Expr;
 
   BoolLiteral(const TExprNode& node);
-  bool value() const { return value_; }
+
+  virtual void Prepare(RuntimeState* state);
 
  private:
-  const bool value_;
+  bool value_;
+
+  static void* ReturnValue(Expr* e, TupleRow* row);
 };
 
 }

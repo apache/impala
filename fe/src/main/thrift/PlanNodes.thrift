@@ -7,7 +7,7 @@ include "Descriptors.thrift"
 include "Exprs.thrift"
 
 enum TPlanNodeType {
-  SCAN_NODE,
+  TEXT_SCAN_NODE,
   AGGREGATION_NODE,
   SORT_NODE,
 }
