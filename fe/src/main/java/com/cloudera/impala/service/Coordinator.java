@@ -52,9 +52,10 @@ public class Coordinator {
   // Also populates 'colTypes'.
   public void runQuery(TQueryRequest request,
                        List<PrimitiveType> colTypes,
+                       List<String> colNames,
                        BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
     init();
-    AnalysisContext.AnalysisResult analysisResult = analyzeQuery(request, colTypes);
+    AnalysisContext.AnalysisResult analysisResult = analyzeQuery(request, colTypes, colNames);
     execQuery(analysisResult, request.returnAsAscii, resultQueue);
     addSentinelRow(resultQueue);
   }
@@ -66,10 +67,10 @@ public class Coordinator {
   // getErrorMsg() will return a non-empty string if an error occured, otherwise
   // null.
   public void asyncRunQuery(
-      final TQueryRequest request, List<PrimitiveType> colTypes,
+      final TQueryRequest request, List<PrimitiveType> colTypes, List<String> colNames,
       final BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
     init();
-    final AnalysisContext.AnalysisResult analysisResult = analyzeQuery(request, colTypes);
+    final AnalysisContext.AnalysisResult analysisResult = analyzeQuery(request, colTypes, colNames);
     Runnable execCall = new Runnable() {
       public void run() {
         try {
@@ -110,17 +111,22 @@ public class Coordinator {
 
   // Analyze query and return analysis result and types of select list exprs.
   private AnalysisContext.AnalysisResult analyzeQuery(
-      TQueryRequest request, List<PrimitiveType> colTypes) throws ImpalaException {
+      TQueryRequest request, List<PrimitiveType> colTypes, List<String> colNames) throws ImpalaException {
     AnalysisContext analysisCtxt = new AnalysisContext(catalog);
     AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(request.stmt);
     Preconditions.checkNotNull(analysisResult.selectStmt);
 
     // TODO: handle EXPLAIN SELECT
 
-    // populate colTypes
+    // populate colTypes and colNames
     colTypes.clear();
     for (Expr expr : analysisResult.selectStmt.getSelectListExprs()) {
       colTypes.add(expr.getType());
+    }
+
+    // populate colnames
+    for (String s : analysisResult.selectStmt.getColLabels()) {
+      colNames.add(s);
     }
 
     return analysisResult;
@@ -188,10 +194,11 @@ public class Coordinator {
     int numRows = 0;
     TQueryRequest request = new TQueryRequest(args[0], true);
     List<PrimitiveType> colTypes = Lists.newArrayList();
+    List<String> colNames = Lists.newArrayList();
     BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
     Coordinator coordinator = new Coordinator(catalog);
     try {
-      coordinator.asyncRunQuery(request, colTypes, resultQueue);
+      coordinator.asyncRunQuery(request, colTypes, colNames, resultQueue);
     } catch (ImpalaException e) {
       System.err.println(e.getMessage());
       System.exit(2);

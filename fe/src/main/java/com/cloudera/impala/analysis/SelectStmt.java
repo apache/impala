@@ -21,6 +21,7 @@ public class SelectStmt extends ParseNodeBase {
   private final static Logger LOG = LoggerFactory.getLogger(SelectStmt.class);
 
   private final ArrayList<SelectListItem> selectList;
+  private final ArrayList<String> colLabels; // lower case column labels
   private final List<TableRef> tableRefs;
   private final Predicate whereClause;
   private final ArrayList<Expr> groupingExprs;
@@ -63,6 +64,7 @@ public class SelectStmt extends ParseNodeBase {
 
     this.aliasSubstMap = new Expr.SubstitutionMap();
     this.selectListExprs = Lists.newArrayList();
+    this.colLabels = Lists.newArrayList();
     this.orderingExprs = null;
     this.isAscOrder = null;
     this.havingPred = null;
@@ -127,6 +129,10 @@ public class SelectStmt extends ParseNodeBase {
     return aggInfo;
   }
 
+  public ArrayList<String> getColLabels() {
+    return colLabels;
+  }
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     // start out with table refs to establish aliases
@@ -141,7 +147,7 @@ public class SelectStmt extends ParseNodeBase {
       leftTblRef = tblRef;
     }
 
-    // populate selectListExprs and aliasSubstMap
+    // populate selectListExprs, aliasSubstMap, and colNames
     for (SelectListItem item: selectList) {
       if (item.isStar()) {
         TableName tblName = item.getTblName();
@@ -156,6 +162,9 @@ public class SelectStmt extends ParseNodeBase {
           aliasSubstMap.lhs.add(
               new SlotRef(null, item.getAlias().toLowerCase()));
           aliasSubstMap.rhs.add(item.getExpr().clone(null));
+          colLabels.add(item.getAlias().toLowerCase());
+        } else {
+          colLabels.add(item.toSql().toLowerCase());
         }
       }
     }
@@ -218,6 +227,7 @@ public class SelectStmt extends ParseNodeBase {
     for (Column col: desc.getTable().getColumns()) {
       selectListExprs.add(
           new SlotRef(new TableName(null, alias), col.getName()));
+      colLabels.add(col.getName().toLowerCase());
     }
   }
 

@@ -125,3 +125,20 @@ bin/runquery.sh "select id, bool_col, tinyint_col, smallint_col, int_col, bigint
 or
 
 mvn exec:java -Dexec.classpathScope=test -Dexec.args="'select * from foo'"
+
+
+Running the CLI
+---------------
+The IMPALA_HOME environment variable needs to be set, e.g., for me it is /home/abehm/impala
+
+From impala/fe:
+
+  ## the package phase will copy all dependency jars into target/dependency
+  $ mvn package
+  $ cd src/main/scripts
+  $ ./cli.sh
+  ## "connect" to impala: Load the metadata from hive's metastore into the Impala in-memory metadata representation.
+  ## Note that sqlline supports tab completion.
+  sqlline>!properties impala.properties;
+  ## Enter any password.
+  sqlline>select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col from alltypessmall;
