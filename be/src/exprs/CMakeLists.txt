@@ -6,7 +6,7 @@ set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/exprs")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/exprs")
 
-add_library(exprs-lib 
+add_library(Exprs
   agg-expr.cc
   arithmetic-expr.cc
   binary-predicate.cc
@@ -14,6 +14,7 @@ add_library(exprs-lib
   case-expr.cc
   cast-expr.cc
   compound-predicate.cc
+  date-literal.cc
   expr.cc
   float-literal.cc
   function-call.cc

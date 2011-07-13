@@ -25,7 +25,7 @@ public class CatalogTest {
   private static Catalog catalog;
 
   @BeforeClass public static void setUp() throws Exception {
-    HiveMetaStoreClient client = TestSchemaUtils.createSchemaAndClient();
+    HiveMetaStoreClient client = TestSchemaUtils.createClient();
     catalog = new Catalog(client);
   }
 

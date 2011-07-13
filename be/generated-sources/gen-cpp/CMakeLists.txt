@@ -28,3 +28,5 @@ add_library(ThriftExprs
   Exprs_constants.cpp
   Exprs_types.cpp
 )
+
+add_library(thrift STATIC IMPORTED)

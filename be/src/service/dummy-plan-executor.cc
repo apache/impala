@@ -2,6 +2,12 @@
 
 #include "service/plan-executor.h"
 
+#include <boost/shared_ptr.hpp>
+#include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/protocol/TProtocol.h>
+#include <thrift/transport/TBufferTransports.h>
+
+#include "common/object-pool.h"
 #include "exec/exec-node.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
@@ -9,7 +15,21 @@
 #include "gen-cpp/ImpalaService_types.h"
 #include "gen-cpp/LocalExecutor_types.h"
 
+using namespace boost;
 using namespace std;
+using namespace apache::thrift::protocol;
+using namespace apache::thrift::transport;
+
+#define THROW_IF_ERROR(stmt, env, exc_class) \
+  do { \
+    Status status = (stmt); \
+    if (!status.ok()) { \
+      string error_msg; \
+      status.GetErrorMsg(&error_msg); \
+      env->ThrowNew(exc_class, error_msg.c_str()); \
+      return; \
+    } \
+  } while (false)
 
 namespace impala {
 
@@ -44,6 +64,28 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativePlanExecutor_ExecP
   jmethodID column_value_ctor = env->GetMethodID(column_value_cl, "<init>", "()V");
 
   jclass impala_exc_cl = env->FindClass("com.cloudera.impala.common.ImpalaException");
+
+  jboolean is_copy;
+  jbyte* buf = env->GetByteArrayElements(thrift_execute_plan_request, &is_copy);
+  jsize len = env->GetArrayLength(thrift_execute_plan_request);
+  shared_ptr<TTransport> mem_buf(new TMemoryBuffer(reinterpret_cast<uint8_t*>(buf), len));
+  shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
+  shared_ptr<TProtocol> proto(protocol_factory->getProtocol(mem_buf));
+
+  TExecutePlanRequest request;
+  request.read(proto.get());
+
+  ObjectPool exec_pool;
+  ExecNode* plan_root;
+  THROW_IF_ERROR(
+      ExecNode::CreateTree(&exec_pool, request.plan, &plan_root), env, impala_exc_cl);
+  DescriptorTbl* desc_tbl;
+  THROW_IF_ERROR(
+      DescriptorTbl::Create(&exec_pool, request.descTbl, &desc_tbl), env, impala_exc_cl);
+  vector<Expr*> select_list_exprs;
+  THROW_IF_ERROR(
+      Expr::CreateExprTrees(&exec_pool, request.selectListExprs, &select_list_exprs),
+      env, impala_exc_cl);
 }
 
 }

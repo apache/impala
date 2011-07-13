@@ -1,6 +1,13 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 #include "exec/exec-node.h"
+#include "common/object-pool.h"
+#include "common/status.h"
+#include "gen-cpp/PlanNodes_types.h"
+
+using namespace std;
+
+namespace impala {
 
 Status ExecNode::CreateTree(ObjectPool* pool, const TPlan& plan, ExecNode** root) {
   if (plan.nodes.size() == 0) {
@@ -19,16 +26,16 @@ Status ExecNode::CreateTree(ObjectPool* pool, const TPlan& plan, ExecNode** root
 
 Status ExecNode::CreateTreeHelper(
     ObjectPool* pool,
-    const vector<TPlanNode*>& tnodes,
+    const vector<TPlanNode>& tnodes,
     ExecNode* parent,
     int* node_idx,
     ExecNode** root) {
   // propagate error case
-  if (*node_idx >= nodes.size()) {
+  if (*node_idx >= tnodes.size()) {
     // TODO: print thrift msg
     return Status("Failed to reconstruct plan tree from thrift.");
   }
-  int num_children = nodes[*node_idx].num_children;
+  int num_children = tnodes[*node_idx].num_children;
   ExecNode* node = NULL;
   RETURN_IF_ERROR(CreateNode(pool, tnodes[*node_idx], &node));
   // assert(parent != NULL || (node_idx == 0 && root_expr != NULL));
@@ -52,11 +59,13 @@ Status ExecNode::CreateTreeHelper(
 
 Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode, ExecNode** node) {
   switch (tnode.node_type) {
-    case TEXT_SCAN_NODE:
+    case TPlanNodeType::TEXT_SCAN_NODE:
       return Status("Text scan node not implemented");
-    case AGGREGATION_NODE:
+    case TPlanNodeType::AGGREGATION_NODE:
       return Status("Aggregation node not implemented");
-    case SORT_NODE:
+    case TPlanNodeType::SORT_NODE:
       return Status("Sort node not implemented");
   }
+}
+
 }

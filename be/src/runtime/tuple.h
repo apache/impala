@@ -36,15 +36,23 @@ class Tuple {
     return result;
   }
 
-  void SetNull(const NullIndicatorOffset& offset, bool value);
-  bool IsNull(const NullIndicatorOffset& offset);
+  // Turn null indicator bit on.
+  void SetNull(const NullIndicatorOffset& offset) {
+    char* null_indicator_byte = reinterpret_cast<char*>(this) + offset.byte_offset;
+    *null_indicator_byte |= offset.bit_mask;
+  }
+
+  bool IsNull(const NullIndicatorOffset& offset) {
+    char* null_indicator_byte = reinterpret_cast<char*>(this) + offset.byte_offset;
+    return (*null_indicator_byte & offset.bit_mask) != 0;
+  }
 
   void* GetSlot(int offset) {
-    return reinterpret_cast<void*>(this + offset);
+    return reinterpret_cast<char*>(this) + offset;
   }
 
   StringValue* GetStringSlot(int offset) {
-    return reinterpret_cast<StringValue*>(this + offset);
+    return reinterpret_cast<StringValue*>(reinterpret_cast<char*>(this) + offset);
   }
 
  private:

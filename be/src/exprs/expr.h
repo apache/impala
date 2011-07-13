@@ -4,6 +4,7 @@
 #define IMPALA_EXPRS_EXPR_H
 
 #include <string>
+#include <vector>
 
 #include "common/status.h"
 #include "runtime/descriptors.h"
@@ -54,8 +55,15 @@ class Expr {
   const std::vector<Expr*>& children() const { return children_; }
 
   // Create expression tree from the list of nodes contained in texpr
-  // within 'pool'. Returns root of expression tree.
+  // within 'pool'. Returns root of expression tree in 'root_expr'.
+  // Returns OK if successful, otherwise an error.
   static Status CreateExprTree(ObjectPool* pool, const TExpr& texpr, Expr** root_expr);
+
+  // Creates vector of exprs from given vector of TExprs within 'pool'.
+  // Returns an error if any of the individual conversions caused an error,
+  // otherwise OK.
+  static Status CreateExprTrees(ObjectPool* pool, const std::vector<TExpr>& texprs,
+                                std::vector<Expr*>* exprs);
 
  protected:
   Expr(const TExprNode& node);

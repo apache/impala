@@ -52,7 +52,7 @@ class ExecNode {
   // Create a single exec node derived from thrift node; place exec node in 'pool'.
   static Status CreateNode(ObjectPool* pool, const TPlanNode& tnode, ExecNode** node);
 
-  static Status CreateTreeHelper(ObjectPool* pool, const std::vector<TPlanNode*>& tnodes,
+  static Status CreateTreeHelper(ObjectPool* pool, const std::vector<TPlanNode>& tnodes,
       ExecNode* parent, int* node_idx, ExecNode** root);
 };
 

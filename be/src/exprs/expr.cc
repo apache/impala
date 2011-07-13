@@ -52,6 +52,17 @@ Status Expr::CreateExprTree(ObjectPool* pool, const TExpr& texpr, Expr** root_ex
   return Status::OK;
 }
 
+Status Expr::CreateExprTrees(ObjectPool* pool, const std::vector<TExpr>& texprs,
+                             std::vector<Expr*>* exprs) {
+  exprs->clear();
+  for (int i = 0; i < texprs.size(); ++i) {
+    Expr* expr;
+    RETURN_IF_ERROR(CreateExprTree(pool, texprs[i], &expr));
+    exprs->push_back(expr);
+  }
+  return Status::OK;
+}
+
 Status Expr::CreateTreeFromThrift(ObjectPool* pool, const vector<TExprNode>& nodes,
     Expr* parent, int* node_idx, Expr** root_expr) {
   // propagate error case

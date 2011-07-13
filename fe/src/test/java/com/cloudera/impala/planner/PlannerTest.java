@@ -30,7 +30,7 @@ public class PlannerTest {
   private final String testDir = "PlannerTest";
 
   @BeforeClass public static void setUp() throws Exception {
-    HiveMetaStoreClient client = TestSchemaUtils.createSchemaAndClient();
+    HiveMetaStoreClient client = TestSchemaUtils.createClient();
     catalog = new Catalog(client);
     analysisCtxt = new AnalysisContext(catalog);
   }

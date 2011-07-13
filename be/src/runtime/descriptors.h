@@ -12,6 +12,7 @@
 
 namespace impala {
 
+class ObjectPool;
 class TDescriptorTable;
 class TSlotDescriptor;
 class TTupleDescriptor;
@@ -25,10 +26,12 @@ typedef int SlotId;
 // Location information for null indicator bit for particular slot.
 struct NullIndicatorOffset {
   int byte_offset;
-  int bit_offset;
+  char bit_mask;  // to extract null indicator
 
   NullIndicatorOffset(int byte_offset, int bit_offset)
-    : byte_offset(byte_offset), bit_offset(bit_offset) {}
+    : byte_offset(byte_offset), bit_mask(1 << bit_offset) {
+    //assert(bit_offset >= 0 && bit_offset <= 7);
+  }
 };
 
 // split this off into separate .h?
@@ -83,10 +86,10 @@ class TupleDescriptor {
 
 class DescriptorTbl {
  public:
-  // Creates a descriptor tbl from thrift_tbl and returns it via 'tbl'. The caller
-  // is responsible for deallocation.
+  // Creates a descriptor tbl within 'pool' from thrift_tbl and returns it via 'tbl'.
   // Returns OK on success, otherwise error (in which case 'tbl' will be unset).
-  static Status Create(const TDescriptorTable& thrift_tbl, DescriptorTbl** tbl);
+  static Status Create(ObjectPool* pool, const TDescriptorTable& thrift_tbl,
+                       DescriptorTbl** tbl);
 
   const TupleDescriptor* GetTupleDescriptor(TupleId id) const;
   const SlotDescriptor* GetSlotDescriptor(SlotId id) const;

@@ -1,7 +1,7 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 #include "runtime/descriptors.h"
-
+#include "common/object-pool.h"
 #include "gen-cpp/Descriptors_types.h"
 
 using namespace std;
@@ -41,15 +41,16 @@ void TupleDescriptor::AddSlot(SlotDescriptor* slot) {
   slots_.push_back(slot);
 }
 
-Status DescriptorTbl::Create(const TDescriptorTable& thrift_tbl, DescriptorTbl** tbl) {
-  *tbl = new DescriptorTbl();
+Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tbl,
+                             DescriptorTbl** tbl) {
+  *tbl = pool->Add(new DescriptorTbl());
   for (int i = 0; i < thrift_tbl.tupleDescriptors.size(); ++i) {
     const TTupleDescriptor& tdesc = thrift_tbl.tupleDescriptors[i];
-    (*tbl)->tuple_desc_map_[tdesc.id] = new TupleDescriptor(tdesc);
+    (*tbl)->tuple_desc_map_[tdesc.id] = pool->Add(new TupleDescriptor(tdesc));
   }
   for (int i = 0; i < thrift_tbl.slotDescriptors.size(); ++i) {
     const TSlotDescriptor& tdesc = thrift_tbl.slotDescriptors[i];
-    SlotDescriptor* slot_d = new SlotDescriptor(tdesc);
+    SlotDescriptor* slot_d = pool->Add(new SlotDescriptor(tdesc));
     (*tbl)->slot_desc_map_[tdesc.id] = slot_d;
 
     // link to parent

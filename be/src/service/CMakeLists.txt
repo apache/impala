@@ -9,3 +9,17 @@ set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/service")
 add_library(Service
   plan-executor.cc
 )
+
+add_library(planexec SHARED
+  dummy-plan-executor.cc
+)
+target_link_libraries(planexec
+  Common
+  Exec
+  Exprs
+  Runtime
+  thrift
+  ThriftExprs
+  ThriftRuntime
+  ThriftService
+)

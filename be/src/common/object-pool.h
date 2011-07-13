@@ -28,7 +28,7 @@ class ObjectPool {
 
  private:
   struct GenericElement {
-    virtual ~GenericElement() = 0;
+    virtual ~GenericElement() {}
   };
 
   template <class T>
