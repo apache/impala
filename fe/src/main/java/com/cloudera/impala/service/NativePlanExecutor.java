@@ -13,7 +13,9 @@ class NativePlanExecutor {
       boolean asAscii, BlockingQueue<TResultRow> resultQueue) throws ImpalaException;
 
   static {
-    System.loadLibrary("libplanexec");
+    // TODO: get this working:
+    // System.loadLibrary("libplanexec");
+    System.load("/home/marcel/impala/be/build/service/libplanexec.so");
   }
 }
 

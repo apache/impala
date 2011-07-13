@@ -88,6 +88,7 @@ public class Coordinator {
     Catalog catalog = new Catalog(client);
     Coordinator coordinator = new Coordinator(catalog);
 
+    System.out.println("Running query '" + args[0] + "'");
     TQueryRequest request = new TQueryRequest(args[0], true);
     List<PrimitiveType> colTypes = Lists.newArrayList();
     BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();

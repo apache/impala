@@ -34,7 +34,7 @@ class Status {
   // c'tor for error case
   Status(const std::string& error_msg);
 
-  // copy c'tor passes error detail so Status can be returned by value
+  // copy c'tor makes copy of error detail so Status can be returned by value
   Status(const Status& status);
 
   // assign from stringstream

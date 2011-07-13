@@ -1,8 +1,10 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 #include "exec/exec-node.h"
+#include "exec/text-scan-node.h"
 #include "common/object-pool.h"
 #include "common/status.h"
+#include "runtime/mem-pool.h"
 #include "gen-cpp/PlanNodes_types.h"
 
 using namespace std;
@@ -60,7 +62,8 @@ Status ExecNode::CreateTreeHelper(
 Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode, ExecNode** node) {
   switch (tnode.node_type) {
     case TPlanNodeType::TEXT_SCAN_NODE:
-      return Status("Text scan node not implemented");
+      *node = pool->Add(new TextScanNode(tnode.scan_node));
+      return Status::OK;
     case TPlanNodeType::AGGREGATION_NODE:
       return Status("Aggregation node not implemented");
     case TPlanNodeType::SORT_NODE:

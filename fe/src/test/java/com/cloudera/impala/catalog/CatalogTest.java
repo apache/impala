@@ -11,6 +11,8 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.serde.Constants;
@@ -19,6 +21,12 @@ import org.junit.Test;
 
 import com.cloudera.impala.analysis.IntLiteral;
 import com.cloudera.impala.analysis.LiteralExpr;
+import com.cloudera.impala.common.ImpalaException;
+import com.cloudera.impala.service.Coordinator;
+import com.cloudera.impala.thrift.TColumnValue;
+import com.cloudera.impala.thrift.TQueryRequest;
+import com.cloudera.impala.thrift.TResultRow;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
 public class CatalogTest {

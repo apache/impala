@@ -4,6 +4,9 @@
 
 using namespace impala;
 
+const int MemPool::DEFAULT_INITIAL_CHUNK_SIZE;
+const int MemPool::MAX_CHUNK_SIZE;
+
 MemPool::MemPool()
   : last_chunk_(0),
     free_offset_(0),

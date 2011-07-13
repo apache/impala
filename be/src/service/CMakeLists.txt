@@ -19,7 +19,5 @@ target_link_libraries(planexec
   Exprs
   Runtime
   thrift
-  ThriftExprs
-  ThriftRuntime
-  ThriftService
+  ImpalaThrift
 )

@@ -1,8 +1,11 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
+#include <boost/algorithm/string/join.hpp>
+
 #include "common/status.h"
 
 using namespace std;
+using namespace boost::algorithm;
 
 namespace impala {
 
@@ -19,7 +22,10 @@ Status::Status(const string& error_msg)
 }
 
 Status::Status(const Status& status)
-  : error_detail_(status.error_detail_) {
+  : error_detail_(
+      status.error_detail_ != NULL
+        ? new ErrorDetail(*status.error_detail_)
+        : NULL) {
 }
 
 Status::~Status() {
@@ -34,6 +40,10 @@ void Status::GetErrorMsgs(vector<string>* msgs) const {
 }
 
 void Status::GetErrorMsg(string* msg) const {
+  msg->clear();
+  if (error_detail_ != NULL) {
+    *msg = join(error_detail_->error_msgs, "\n");
+  }
 }
 
 }

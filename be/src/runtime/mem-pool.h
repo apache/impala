@@ -58,7 +58,10 @@ class MemPool {
   }
 
   // Makes all allocated chunks available for re-use, but doesn't delete any chunks.
-  void Clear();
+  void Clear() {
+    last_chunk_ = 0;
+    free_offset_ = 0;
+  }
 
  private:
   std::vector<char*> mem_chunks_;

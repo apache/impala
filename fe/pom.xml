@@ -270,6 +270,47 @@
           </execution>
         </executions>
       </plugin>
+
+         <plugin> 
+             <groupId>org.codehaus.mojo</groupId> 
+             <artifactId>exec-maven-plugin</artifactId> 
+             <executions> 
+                 <execution> 
+                     <goals> 
+                         <goal>java</goal> 
+                     </goals> 
+                 </execution> 
+             </executions> 
+             <configuration> 
+                 <mainClass>com.cloudera.impala.service.Coordinator</mainClass> 
+                 <systemProperties> 
+                     <systemProperty> 
+                       <key>test.hive.testdata</key>
+		       <value>${project.basedir}/../testdata/target/AllTypes.txt</value> 
+		     </systemProperty>
+		     <systemProperty>
+		       <key>test.hive.warehouse.dir</key>
+		       <value>${project.build.directory}/test-warehouse</value>
+		     </systemProperty>
+		     <systemProperty>
+		       <key>test.hive.metastore.jdbc.url</key>
+		       <value>jdbc:derby:;databaseName=${project.build.directory}/test_metastore_db;create=true;logDevice=${project.build.directory}/test_metastore_db</value>
+		     </systemProperty>
+		     <systemProperty>
+		       <key>test.hive.metastore.jdbc.driver</key>
+		       <value>org.apache.derby.jdbc.EmbeddedDriver</value>
+		     </systemProperty>
+		     <systemProperty>
+		       <key>test.hive.metastore.jdbc.username</key>
+		       <value>APP</value>
+		     </systemProperty>
+		     <systemProperty>
+		       <key>test.hive.metastore.jdbc.password</key>
+		       <value>mine</value>
+                     </systemProperty> 
+                 </systemProperties> 
+             </configuration> 
+         </plugin> 
     </plugins>
   </build>
               
