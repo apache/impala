@@ -9,11 +9,15 @@ exec_program(thrift ARGS -version OUTPUT_VARIABLE Thrift_VERSION
              RETURN_VALUE Thrift_RETURN)
 
 find_path(Thrift_INCLUDE_DIR Thrift.h PATHS
+  $ENV{THRIFT_HOME}/include/thrift
   /usr/local/include/thrift
   /opt/local/include/thrift
 )
 
-set(Thrift_LIB_PATHS /usr/local/lib /opt/local/lib)
+set(Thrift_LIB_PATHS
+  $ENV{THRIFT_HOME}/lib
+  /usr/local/lib
+  /opt/local/lib)
 
 find_library(Thrift_LIB NAMES thrift PATHS ${Thrift_LIB_PATHS})
 

@@ -376,6 +376,17 @@
       </build>
     </profile>
 
+    <profile>
+      <id>thrift-home-defined</id>
+      <activation>
+        <file>
+          <exists>${env.THRIFT_HOME}/bin/thrift</exists>
+          </file>
+      </activation>
+      <properties>
+        <thrift.executable>${env.THRIFT_HOME}/bin/thrift</thrift.executable>
+      </properties>
+    </profile>
   </profiles>
 
 </project>
