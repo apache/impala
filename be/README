@@ -4,6 +4,11 @@ Prerequisites
 2) Thrift source installation (unlike Java, C++ needs extra header files).
 Download this from Apache, then build. Requires Boost and python<version>-dev.
 3) cmake
+4) Hadoop 
+https://ccp.cloudera.com/display/CDHDOC/Installing+CDH3+on+a+Single+Linux+Node+in+Pseudo-distributed+Mode
+To run an exec linked against libhdfs, the CLASSPATH must include 
+all jars in $HADOOP_HOME and $HADOOP_HOME/lib, 
+as well as the path with hdfs-site.xml.
 
 Building
 --------
@@ -14,4 +19,6 @@ Building
 2) Run 'cmake .' from impala/be; this will generated makefiles
 
 3) From impala/be: make
+
+
 
