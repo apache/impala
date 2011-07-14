@@ -18,8 +18,6 @@ class LiteralPredicate: public Predicate {
   virtual void Prepare(RuntimeState* state);
 
  private:
-  ExprValue result_;
-
   static void* ComputeFunction(Expr* e, TupleRow* row);
 };
 

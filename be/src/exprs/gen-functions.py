@@ -45,6 +45,18 @@ op_signatures = {
     'string_pred': ('StringValue', 'bool_val'),
 }
 
+# map from native type to corresponding result field
+result_fields = {
+    'bool': 'bool_val',
+    'char': 'tinyint_val',
+    'short': 'smallint_val',
+    'int': 'int_val',
+    'long': 'bigint_val',
+    'float': 'float_val',
+    'double': 'double_val',
+    'StringValue': 'string_val'
+}
+
 binary_op_invocations = [
     ('ArithmeticExpr',
       ['add', 'subtract', 'multiply'],
@@ -111,20 +123,56 @@ void* GetValueFunctions::${function_name}(Expr* e, TupleRow* row) {\n\
 
 cast_template = Template("\
 void* GetValueFunctions::${function_name}(Expr* e, TupleRow* row) {\n\
-  CastExpr* expr = static_cast<CastExpr*>(e);\n\
   // assert(p->children_.size() == 1);\n\
   Expr* op = e->children()[0];\n\
   ${native_type}* val = reinterpret_cast<${native_type}*>(op->GetValue(row));\n\
   if (val == NULL) return NULL;\n\
-  expr->result_.${result_field} = *val;\n\
-  return &expr->result_.${result_field};\n\
+  e->result_.${result_field} = *val;\n\
+  return &e->result_.${result_field};\n\
 }\n")
 
-# TODO: add cast invocations
-invocations = [
+string_to_numeric_cast_template = Template("\
+void* GetValueFunctions::${function_name}(Expr* e, TupleRow* row) {\n\
+  // assert(p->children_.size() == 1);\n\
+  Expr* op = e->children()[0];\n\
+  StringValue* val = reinterpret_cast<StringValue*>(op->GetValue(row));\n\
+  if (val == NULL) return NULL;\n\
+  std::string tmp(val->ptr, val->len);\n\
+  try {\n\
+    e->result_.${result_field} = boost::lexical_cast<${result_type}>(tmp);\n\
+  } catch (boost::bad_lexical_cast &) {\n\
+    return NULL;\n\
+  }\n\
+  return &e->result_.${result_field};\n\
+}\n")
+
+numeric_to_string_cast_template = Template("\
+void* GetValueFunctions::${function_name}(Expr* e, TupleRow* row) {\n\
+  // assert(p->children_.size() == 1);\n\
+  Expr* op = e->children()[0];\n\
+  ${native_type}* val = reinterpret_cast<${native_type}*>(op->GetValue(row));\n\
+  if (val == NULL) return NULL;\n\
+  e->result_.SetStringVal(boost::lexical_cast<std::string>(*val));\n\
+  return &e->result_.string_val;\n\
+}\n")
+
+op_invocations = [
     (unary_op_invocations, unary_op_template),
     (binary_op_invocations, binary_op_template),
     (member_fn_invocations, member_fn_template),
+]
+
+# entry: src-type, dest-type, template
+cast_invocations = [
+    (['char', 'short', 'int', 'long', 'float', 'double'],
+     ['char', 'short', 'int', 'long', 'float', 'double'],
+     cast_template),
+    (['StringValue'],
+     ['char', 'short', 'int', 'long', 'float', 'double'],
+     string_to_numeric_cast_template),
+    (['char', 'short', 'int', 'long', 'float', 'double'],
+     ['StringValue'],
+     numeric_to_string_cast_template)
 ]
 
 cc_preamble = '\
@@ -132,6 +180,10 @@ cc_preamble = '\
 // This is a generated file, DO NOT EDIT IT.\n\
 \n\
 #include "exprs/functions.h"\n\
+\n\
+#include <boost/lexical_cast.hpp>\n\
+#include <string>\n\
+\n\
 #include "exprs/arithmetic-expr.h"\n\
 #include "exprs/binary-predicate.h"\n\
 #include "runtime/tuple.h"\n\
@@ -167,7 +219,7 @@ cc_file.write(cc_preamble)
 h_file = open('functions.h', 'w')
 h_file.write(h_preamble)
 
-for i in invocations:
+for i in op_invocations:
   for entry in i[0]:
       for op in entry[1]:
           for operand_type in entry[2]:
@@ -181,6 +233,21 @@ for i in invocations:
               d["op"] = operators[op]
               cc_file.write(i[1].substitute(d))
               cc_file.write('\n')
+
+for i in cast_invocations:
+  for src_type in i[0]:
+      for dest_type in i[1]:
+          if src_type == dest_type:
+            continue
+          d = {}
+          fn_name= "Cast_" + src_type + "_" + dest_type
+          h_file.write("  static void* " + fn_name + "(Expr* e, TupleRow* row);\n")
+          d["function_name"] = fn_name
+          d["native_type"] = src_type
+          d["result_type"] = dest_type
+          d["result_field"] = result_fields[dest_type]
+          cc_file.write(i[2].substitute(d))
+          cc_file.write('\n')
 
 cc_file.write(cc_epilogue)
 cc_file.close()

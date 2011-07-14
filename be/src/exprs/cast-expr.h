@@ -16,9 +16,6 @@ class CastExpr: public Expr {
  protected:
   friend class Expr;
   CastExpr(const TExprNode& node);
-
- private:
-  ExprValue result_;
 };
 
 }

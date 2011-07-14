@@ -18,8 +18,6 @@ class IntLiteral: public Expr {
   virtual void Prepare(RuntimeState* state);
 
  private:
-  long value_;
-
   static void* ReturnValue(Expr* e, TupleRow* row);
 };
 

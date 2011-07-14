@@ -7,13 +7,13 @@
 namespace impala {
 
 StringLiteral::StringLiteral(const TExprNode& node)
-  : Expr(node),
-    value_(node.string_literal.value) {
+  : Expr(node) {
+  result_.SetStringVal(node.string_literal.value);
 }
 
 void* StringLiteral::ComputeFunction(Expr* e, TupleRow* row) {
   StringLiteral* l = static_cast<StringLiteral*>(e);
-  return &l->value_.string_val;
+  return &l->result_.string_val;
 }
 
 void StringLiteral::Prepare(RuntimeState* state) {

@@ -186,7 +186,7 @@ class TextScanNode : public ExecNode {
   // Removes escape characters from len characters of the null-terminated string src,
   // and copies the unescaped string into dest, changing *len to the unescaped length.
   // No null-terminator is added to dest.
-  void UnescapeString(const char* src, void* dest, int* len);
+  void UnescapeString(const char* src, char* dest, int* len);
 
   // Returns the next valid file buffer for reading HDFS files.
   // We maintain a pseudo ring list of file buffers in file_bufs_.

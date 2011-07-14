@@ -391,7 +391,7 @@ void TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, 
       if (!copy_string) {
         slot->ptr = const_cast<char*>(data_start);
       } else {
-        void* slot_data = var_len_pool_->Allocate(slot->len);
+        char* slot_data = reinterpret_cast<char*>(var_len_pool_->Allocate(slot->len));
         if (unescape_string) {
           UnescapeString(data_start, slot_data, &slot->len);
         } else {
@@ -407,8 +407,8 @@ void TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, 
   }
 }
 
-void TextScanNode::UnescapeString(const char* src, void* dest, int* len) {
-  char* dest_ptr = reinterpret_cast<char*>(dest);
+void TextScanNode::UnescapeString(const char* src, char* dest, int* len) {
+  char* dest_ptr = dest;
   const char* end = src + *len;
   while (src < end) {
     if (*src == escape_char_) {

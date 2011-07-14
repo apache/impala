@@ -18,7 +18,6 @@ class LikePredicate: public Predicate {
 
  private:
   const TExprOperator::type op_;
-  ExprValue result_;
 
   static void* LikeFunction(Expr* e, TupleRow* row);
   static void* RegexpFunction(Expr* e, TupleRow* row);

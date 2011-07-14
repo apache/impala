@@ -7,13 +7,14 @@
 namespace impala {
 
 BoolLiteral::BoolLiteral(const TExprNode& node)
-  : Expr(node), value_(node.bool_literal.value) {
+  : Expr(node) {
+  result_.bool_val = node.bool_literal.value;
 }
 
 
 void* BoolLiteral::ReturnValue(Expr* e, TupleRow* row) {
   BoolLiteral* l = static_cast<BoolLiteral*>(e);
-  return &l->value_;
+  return &l->result_.bool_val;
 }
 
 void BoolLiteral::Prepare(RuntimeState* state) {

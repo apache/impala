@@ -20,6 +20,50 @@ class TColumnValue;
 class TExpr;
 class TExprNode;
 
+// The materialized value returned by Expr::GetValue().
+struct ExprValue {
+  bool bool_val;
+  char tinyint_val;
+  short smallint_val;
+  int int_val;
+  long bigint_val;
+  float float_val;
+  double double_val;
+  std::string string_data;
+  StringValue string_val;
+
+  ExprValue()
+    : bool_val(false),
+      tinyint_val(0),
+      smallint_val(0),
+      int_val(0),
+      bigint_val(0),
+      float_val(0.0),
+      double_val(0.0),
+      string_data(),
+      string_val(NULL, 0) {
+  }
+
+  ExprValue(bool v): bool_val(v) {}
+  ExprValue(char v): tinyint_val(v) {}
+  ExprValue(short v): smallint_val(v) {}
+  ExprValue(int v): int_val(v) {}
+  ExprValue(float v): float_val(v) {}
+  ExprValue(double v): double_val(v) {}
+
+  // c'tor for string values
+  ExprValue(const std::string& str)
+    : string_data(str),
+      string_val(const_cast<char*>(string_data.data()), string_data.size()) {
+  }
+
+  void SetStringVal(const std::string& str) {
+    string_data = str;
+    string_val.ptr = const_cast<char*>(string_data.data());
+    string_val.len = string_data.size();
+  }
+};
+
 // This is the superclass of all expr evaluation nodes.
 class Expr {
  public:
@@ -66,6 +110,8 @@ class Expr {
                                 std::vector<Expr*>* exprs);
 
  protected:
+  friend class GetValueFunctions;
+
   Expr(const TExprNode& node);
   Expr(const TExprNode& node, bool is_slotref);
 
@@ -78,6 +124,7 @@ class Expr {
   // analysis is done, types are fixed at this point
   const PrimitiveType type_;
   std::vector<Expr*> children_;
+  ExprValue result_;
 
  private:
   // Create a new Expr based on texpr_node.node_type within 'pool'.
@@ -99,50 +146,6 @@ class Expr {
       Expr** root_expr);
 
   void PrintValue(void* value, std::string* str);
-};
-
-// The materialized value returned by Expr::GetValue().
-struct ExprValue {
-  bool bool_val;
-  char tinyint_val;
-  short smallint_val;
-  int int_val;
-  long bigint_val;
-  float float_val;
-  double double_val;
-  std::string string_data;
-  StringValue string_val;
-
-  ExprValue()
-    : bool_val(false),
-      tinyint_val(0),
-      smallint_val(0),
-      int_val(0),
-      bigint_val(0),
-      float_val(0.0),
-      double_val(0.0),
-      string_data(),
-      string_val(NULL, 0) {
-  }
-
-  ExprValue(bool v): bool_val(v) {}
-  ExprValue(char v): tinyint_val(v) {}
-  ExprValue(short v): smallint_val(v) {}
-  ExprValue(int v): int_val(v) {}
-  ExprValue(float v): float_val(v) {}
-  ExprValue(double v): double_val(v) {}
-
-  // c'tor for string values
-  ExprValue(const std::string& str)
-    : string_data(str),
-      string_val(const_cast<char*>(string_data.data()), string_data.size()) {
-  }
-
-  void SetStringVal(const std::string& str) {
-    string_data = str;
-    string_val.ptr = const_cast<char*>(string_data.data());
-    string_val.len = string_data.size();
-  }
 };
 
 // Reference to a single slot of a tuple.

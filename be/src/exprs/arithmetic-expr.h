@@ -20,9 +20,7 @@ class ArithmeticExpr: public Expr {
   virtual void Prepare(RuntimeState* state);
 
  private:
-  friend class GetValueFunctions;
   const TExprOperator::type op_;
-  ExprValue result_;
 };
 
 }

@@ -14,9 +14,6 @@ class DateLiteral: public Expr {
   friend class Expr;
 
   DateLiteral(const TExprNode& node);
-
- private:
-  int64_t value_;
 };
 
 }

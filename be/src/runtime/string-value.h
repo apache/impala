@@ -14,10 +14,10 @@ struct StringValue {
   // TODO: change ptr to an offset relative to a contiguous memory block,
   // so that we can send row batches between nodes without having to swizzle
   // pointers
-  void* ptr;
+  char* ptr;
   int len;
 
-  StringValue(void* ptr, int len): ptr(ptr), len(len) {}
+  StringValue(char* ptr, int len): ptr(ptr), len(len) {}
   StringValue(): ptr(NULL), len(0) {}
 
   // Byte-by-byte comparison. Returns:

@@ -7,12 +7,13 @@
 namespace impala {
 
 FloatLiteral::FloatLiteral(const TExprNode& node)
-  : Expr(node), value_(node.float_literal.value) {
+  : Expr(node) {
+  result_.double_val = node.float_literal.value;
 }
 
 void* FloatLiteral::ComputeFunction(Expr* e, TupleRow* row) {
   FloatLiteral* l = static_cast<FloatLiteral*>(e);
-  return &l->value_;
+  return &l->result_.double_val;
 }
 
 void FloatLiteral::Prepare(RuntimeState* state) {

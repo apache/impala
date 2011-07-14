@@ -7,7 +7,8 @@
 namespace impala {
 
 DateLiteral::DateLiteral(const TExprNode& node)
-  : Expr(node), value_(node.date_literal.value) {
+  : Expr(node) {
+  result_.bigint_val = node.date_literal.value;
 }
 
 }

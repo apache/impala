@@ -20,7 +20,6 @@ class CaseExpr: public Expr {
  private:
   const bool has_case_expr_;
   const bool has_else_expr_;
-  ExprValue result_;
 
   static void* ComputeFunction(Expr* e, TupleRow* row);
 };

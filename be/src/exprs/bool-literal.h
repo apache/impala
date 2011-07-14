@@ -18,8 +18,6 @@ class BoolLiteral: public Expr {
   virtual void Prepare(RuntimeState* state);
 
  private:
-  bool value_;
-
   static void* ReturnValue(Expr* e, TupleRow* row);
 };
 

@@ -12,7 +12,8 @@ void* LiteralPredicate::ComputeFunction(Expr* e, TupleRow* row) {
 }
 
 LiteralPredicate::LiteralPredicate(const TExprNode& node)
-  : Predicate(node), result_(node.literal_pred.value) {
+  : Predicate(node) {
+  result_.bool_val = node.literal_pred.value;
 }
 
 void LiteralPredicate::Prepare(RuntimeState* state) {

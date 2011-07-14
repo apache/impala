@@ -18,8 +18,6 @@ class FloatLiteral: public Expr {
   virtual void Prepare(RuntimeState* state);
 
  private:
-  double value_;
-
   static void* ComputeFunction(Expr* e, TupleRow* row);
 };
 

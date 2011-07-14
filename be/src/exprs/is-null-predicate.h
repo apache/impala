@@ -19,7 +19,6 @@ class IsNullPredicate: public Predicate {
 
  private:
   const bool is_not_null_;
-  ExprValue result_;
 
   static void* ComputeFunction(Expr* e, TupleRow* row);
 };

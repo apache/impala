@@ -18,7 +18,6 @@ class CompoundPredicate: public Predicate {
 
  private:
   const TExprOperator::type op_;
-  bool value_;  // holds result of GetValue()
 
   static void* AndComputeFunction(Expr* e, TupleRow* row);
   static void* OrComputeFunction(Expr* e, TupleRow* row);

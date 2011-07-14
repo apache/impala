@@ -20,8 +20,6 @@ class StringLiteral: public Expr {
   virtual void Prepare(RuntimeState* state);
 
  private:
-  ExprValue value_;
-
   static void* ComputeFunction(Expr* e, TupleRow* row);
 };
 

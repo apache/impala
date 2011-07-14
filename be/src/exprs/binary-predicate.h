@@ -17,9 +17,7 @@ class BinaryPredicate : public Predicate {
   virtual void Prepare(RuntimeState* state);
 
  private:
-  friend class GetValueFunctions;
   const TExprOperator::type  op_;
-  ExprValue result_;
 };
 
 }

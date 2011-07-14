@@ -18,15 +18,15 @@ void* CompoundPredicate::AndComputeFunction(Expr* e, TupleRow* row) {
   bool* val2 = reinterpret_cast<bool*>(op2->GetValue(row));
   // <> && false is false
   if (val1 != NULL && !*val1 || val2 != NULL && !*val2) {
-    p->value_ = false;
-    return &p->value_;
+    p->result_.bool_val = false;
+    return &p->result_.bool_val;
   }
   // true && NULL is NULL
   if (val1 == NULL || val2 == NULL) {
     return NULL;
   }
-  p->value_ = true;
-  return &p->value_;
+  p->result_.bool_val = true;
+  return &p->result_.bool_val;
 }
 
 void* CompoundPredicate::OrComputeFunction(Expr* e, TupleRow* row) {
@@ -39,15 +39,15 @@ void* CompoundPredicate::OrComputeFunction(Expr* e, TupleRow* row) {
   bool* val2 = reinterpret_cast<bool*>(op2->GetValue(row));
   // <> || true is true
   if (val1 != NULL && *val1 || val2 != NULL && *val2) {
-    p->value_ = true;
-    return &p->value_;
+    p->result_.bool_val = true;
+    return &p->result_.bool_val;
   }
   // false || NULL is NULL
   if (val1 == NULL || val2 == NULL) {
     return NULL;
   }
-  p->value_ = false;
-  return &p->value_;
+  p->result_.bool_val = false;
+  return &p->result_.bool_val;
 }
 
 void* CompoundPredicate::NotComputeFunction(Expr* e, TupleRow* row) {
@@ -57,8 +57,8 @@ void* CompoundPredicate::NotComputeFunction(Expr* e, TupleRow* row) {
   Expr* op = e->children()[0];
   bool* val = reinterpret_cast<bool*>(op->GetValue(row));
   if (val == NULL) return NULL;
-  p->value_ = !*val;
-  return &p->value_;
+  p->result_.bool_val = !*val;
+  return &p->result_.bool_val;
 }
 
 void CompoundPredicate::Prepare(RuntimeState* state) {
