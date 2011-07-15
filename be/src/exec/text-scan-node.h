@@ -66,7 +66,7 @@ class TextScanNode : public ExecNode {
   // Parser configuration parameters:
 
   // List of HDFS paths to read.
-  const std::vector<std::string>& files_;
+  const std::vector<std::string> files_;
 
   // Tuple id resolved in Prepare() to set tuple_desc_;
   TupleId tuple_id_;
@@ -130,6 +130,9 @@ class TextScanNode : public ExecNode {
   // Index of current file being processed.
   int file_idx_;
 
+  // Size of tuple buffer determined by size of tuples and capacity of row batches.
+  int tuple_buf_size_;
+
   // Buffer where tuples are written into.
   // Must be valid until next GetNext().
   void* tuple_buf_;
@@ -179,7 +182,7 @@ class TextScanNode : public ExecNode {
   // we copy an its unescaped string into a separate buffer and point to it.
   // For boundary string fields,
   // we create a contiguous copy of the string data into a separate buffer.
-  // Throws an exception if conversion is unsuccessful (we use boost::lexical_cast).
+  // Unsuccessful conversions are turned into NULLs.
   void ConvertAndWriteSlotBytes(const char* begin, const char* end, Tuple* tuple,
       const SlotDescriptor* slot_desc, bool copy_string, bool unescape_string);
 

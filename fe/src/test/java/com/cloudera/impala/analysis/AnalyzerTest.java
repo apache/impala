@@ -138,8 +138,9 @@ public class AnalyzerTest {
     checkLayoutParams("alltypes.float_col", 4, 24, 0, 7);
     checkLayoutParams("alltypes.bigint_col", 8, 32, 1, 0);
     checkLayoutParams("alltypes.double_col", 8, 40, 1, 1);
-    checkLayoutParams("alltypes.date_string_col", 8, 48, 1, 2);
-    checkLayoutParams("alltypes.string_col", 8, 56, 1, 3);
+    int strSlotSize = PrimitiveType.STRING.getSlotSize();
+    checkLayoutParams("alltypes.date_string_col", strSlotSize, 48, 1, 2);
+    checkLayoutParams("alltypes.string_col", strSlotSize, 48 + strSlotSize, 1, 3);
   }
 
   private void checkLayoutParams(String colAlias, int byteSize, int byteOffset,

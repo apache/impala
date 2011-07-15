@@ -20,12 +20,13 @@ struct TSlotDescriptor {
 
 struct TTable {
   1: required i32 numCols
-  2: required byte lineDelim
-  3: required byte fieldDelim
-  4: required byte collectionDelim
-  5: required byte mapKeyDelim
-  6: required byte escapeChar
-  7: optional byte quoteChar
+  2: required i32 numPartitionKeys
+  3: required byte lineDelim
+  4: required byte fieldDelim
+  5: required byte collectionDelim
+  6: required byte mapKeyDelim
+  7: required byte escapeChar
+  8: optional byte quoteChar
 }
 
 struct TTupleDescriptor {

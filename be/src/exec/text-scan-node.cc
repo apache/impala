@@ -1,7 +1,8 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 #include "text-scan-node.h"
-#include <boost/lexical_cast.hpp>
+#include <cstring>
+#include <cstdlib>
 #include <boost/algorithm/string/predicate.hpp>
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
@@ -64,17 +65,27 @@ Status TextScanNode::Prepare(RuntimeState* state) {
   strings_are_quoted_ = tuple_desc_->table_desc()->strings_are_quoted();
 
   // Create mapping from column index in table to slot index in output tuple.
+  // First, initialize all columns to SKIP_COLUMN.
   int num_cols = tuple_desc_->table_desc()->num_cols();
   column_idx_to_slot_idx.reserve(num_cols);
+  column_idx_to_slot_idx.resize(num_cols);
   for (int i = 0; i < num_cols; i++) {
     column_idx_to_slot_idx[i] = SKIP_COLUMN;
   }
+
+  // Next, set mapping from column index to slot index for all slots in the query.
   const std::vector<SlotDescriptor*>& slots = tuple_desc_->slots();
-  for (int i = 0; i < tuple_desc_->slots().size(); i++) {
-    column_idx_to_slot_idx[slots[i]->col_pos()] = i;
+  for (int i = 0; i < slots.size(); i++) {
+    // TODO: this seems like the wrong place to do this subtraction.
+    int file_col_pos = slots[i]->col_pos() - tuple_desc_->table_desc()->num_partition_keys();
+    if (file_col_pos >= 0) {
+      column_idx_to_slot_idx[file_col_pos] = i;
+    }
   }
 
-  tuple_buf_ = tuple_buf_pool_->Allocate(state->batch_size() * tuple_desc_->byte_size());
+  // Allocate tuple buffer.
+  tuple_buf_size_ = state->batch_size() * tuple_desc_->byte_size();
+  tuple_buf_ = tuple_buf_pool_->Allocate(tuple_buf_size_);
 
   // TODO(marcel): add int tuple_idx_[] indexed by TupleId somewhere in runtime-state.h
   tuple_idx_ = 0;
@@ -113,6 +124,7 @@ void* TextScanNode::GetFileBuffer(RuntimeState* state, int* file_buf_idx) {
 
 Status TextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
   tuple_ = reinterpret_cast<Tuple*>(tuple_buf_);
+  bzero(tuple_buf_, tuple_buf_size_);
   boundary_column_.clear();
 
   // Index into file buffer list.
@@ -222,10 +234,7 @@ Status TextScanNode::ParseFileBuffer(RowBatch* row_batch, int* row_idx, int* col
 
     // 0. Determine whether we need to add a new row.
     if (!row_batch->IsFull() && *row_idx == RowBatch::INVALID_ROW_INDEX) {
-      char* new_tuple = reinterpret_cast<char*>(tuple_);
-      new_tuple += tuple_desc_->byte_size();
-      // assert(new_tuple < tuple_buf_ + state->batch_size() * tuple_desc_->byte_size());
-      tuple_ = reinterpret_cast<Tuple*>(new_tuple);
+      *row_idx = row_batch->AddRow();
       TupleRow* tuple_row = row_batch->GetRow(*row_idx);
       tuple_row->SetTuple(tuple_idx_, tuple_);
     }
@@ -306,6 +315,10 @@ Status TextScanNode::ParseFileBuffer(RowBatch* row_batch, int* row_idx, int* col
     // 2.2 Check if we finished a tuple, and whether the tuple buffer is full.
     if (new_tuple) {
       *column_idx = 0;
+      char* new_tuple = reinterpret_cast<char*> (tuple_);
+      new_tuple += tuple_desc_->byte_size();
+      // assert(new_tuple < tuple_buf_ + state->batch_size() * tuple_desc_->byte_size());
+      tuple_ = reinterpret_cast<Tuple*> (new_tuple);
       // Will be set to a valid row_idx in the next iteration,
       // possibly after returning from this function and then re-entering with a new file buffer.
       *row_idx = RowBatch::INVALID_ROW_INDEX;
@@ -335,7 +348,7 @@ void TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, 
     tuple->SetNull(slot_desc->null_indicator_offset());
     return;
   }
-
+  // TODO: Handle out-of-range and other error conditions.
   switch (slot_desc->data_type()) {
     case TYPE_BOOLEAN: {
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
@@ -348,32 +361,38 @@ void TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, 
     }
     case TYPE_TINYINT: {
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<char*>(slot) = lexical_cast<char>(begin);
+      *reinterpret_cast<char*>(slot) =
+          static_cast<char>(strtol(begin, const_cast<char**>(&end), 0));
       break;
     }
     case TYPE_SMALLINT: {
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<short*>(slot) = lexical_cast<short>(begin);
+      *reinterpret_cast<short*>(slot) =
+          static_cast<short>(strtol(begin, const_cast<char**>(&end), 0));
       break;
     }
     case TYPE_INT: {
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<int*>(slot) = lexical_cast<int>(begin);
+      *reinterpret_cast<int*>(slot) =
+          static_cast<int>(strtol(begin, const_cast<char**>(&end), 0));
+      // Set NULL if inconvertible.
+      if (*end != '\0') tuple->SetNull(slot_desc->null_indicator_offset());
       break;
     }
     case TYPE_BIGINT: {
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<long*>(slot) = lexical_cast<long>(begin);
+      *reinterpret_cast<long*>(slot) = strtol(begin, const_cast<char**>(&end), 0);
       break;
     }
     case TYPE_FLOAT: {
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<float*>(slot) = lexical_cast<float>(begin);
+      *reinterpret_cast<float*>(slot) =
+          static_cast<float>(strtod(begin, const_cast<char**>(&end)));
       break;
     }
     case TYPE_DOUBLE: {
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<double*>(slot) = lexical_cast<double>(begin);
+      *reinterpret_cast<double*>(slot) = strtod(begin, const_cast<char**>(&end));
       break;
     }
     case TYPE_STRING: {
@@ -405,6 +424,10 @@ void TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, 
       break;
     }
   }
+  // Set NULL if inconvertible.
+  if (*end != '\0') {
+    tuple->SetNull(slot_desc->null_indicator_offset());
+  }
 }
 
 void TextScanNode::UnescapeString(const char* src, char* dest, int* len) {
@@ -420,4 +443,3 @@ void TextScanNode::UnescapeString(const char* src, char* dest, int* len) {
   char* dest_start = reinterpret_cast<char*>(dest);
   *len = dest_ptr - dest_start;
 }
-

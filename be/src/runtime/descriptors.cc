@@ -36,6 +36,7 @@ SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc)
 
 TableDescriptor::TableDescriptor(const TTable& ttable)
   : num_cols_(ttable.numCols),
+    num_partition_keys_(ttable.numPartitionKeys),
     line_delim_(ttable.lineDelim),
     field_delim_(ttable.fieldDelim),
     collection_delim_(ttable.collectionDelim),

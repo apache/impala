@@ -63,6 +63,7 @@ public class TupleDescriptor {
   public TTupleDescriptor toThrift() {
     // We only support single-byte characters as delimiters.
     TTable ttable = new TTable(table.getColumns().size(),
+        table.getNumPartitionKeys(),
         (byte)table.getLineDelim().charAt(0),
         (byte)table.getFieldDelim().charAt(0),
         (byte)table.getCollectionDelim().charAt(0),

@@ -11,10 +11,29 @@
 
 namespace impala {
 
+class Expr;
 class ExecNode;
 class DescriptorTbl;
 class RowBatch;
 class TupleDescriptor;
+
+// Deserialize plan_bytes into a TExecutePlanRequest.
+// Then reconstruct plan, descs and select_list_exprs from TExecutePlanRequest.
+// Input parameters:
+//   env: Java environment needed to get underlying memory of  execute_plan_request_bytes.
+//   execute_plan_request_bytes: Serialized TExecutePlanRequest.
+//   obj_pool: Pool to allocate objects needed for plan, descs and select_list_exprs.
+// Output parameters:
+//   plan: Root of exec node tree.
+//   descs: Descriptor table with information about slots and tables.
+//   select_list_exprs: Expressions in select list.
+Status DeserializeRequest(
+    JNIEnv* env,
+    jbyteArray execute_plan_request_bytes,
+    ObjectPool* obj_pool,
+    ExecNode** plan,
+    DescriptorTbl** descs,
+    std::vector<Expr*>* select_list_exprs);
 
 class PlanExecutor {
  public:
@@ -27,6 +46,8 @@ class PlanExecutor {
   // Return results through 'batch'. Sets 'batch' to NULL if no more results.
   // The caller is responsible for deleting *batch.
   Status FetchResult(RowBatch** batch);
+
+  RuntimeState* runtime_state() { return &runtime_state_; }
 
  private:
   ExecNode* plan_;

@@ -341,6 +341,10 @@ public class Table {
     return colsByPos;
   }
 
+  public int getNumPartitionKeys() {
+    return numPartitionKeys;
+  }
+
   /**
    * Case-insensitive lookup.
    */

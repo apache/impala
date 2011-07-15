@@ -10,9 +10,17 @@ add_library(Service
   plan-executor.cc
 )
 
-add_library(planexec SHARED
-  dummy-plan-executor.cc
+target_link_libraries(Service
+  Exec
+  Runtime
+  thrift  
+  ImpalaThrift
 )
+
+add_library(planexec SHARED
+  plan-executor.cc  
+)
+
 target_link_libraries(planexec
   Common
   Exec
@@ -20,4 +28,22 @@ target_link_libraries(planexec
   Runtime
   thrift
   ImpalaThrift
+  ${HDFS_LIBS}
+)
+
+add_executable(planexecmain 
+  plan-executor-main.cc
+)
+
+target_link_libraries(planexecmain
+  Common
+  Exec
+  Exprs
+  Runtime
+  thrift
+  ImpalaThrift
+  Service
+  pthread
+  ${HDFS_LIBS}
+  ${JAVA_JVM_LIBRARY}    
 )

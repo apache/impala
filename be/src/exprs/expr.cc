@@ -208,6 +208,7 @@ void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
   if (as_ascii) {
     PrintValue(value, &col_val->stringVal);
     col_val->__isset.stringVal = true;
+    return;
   }
 
   switch (type_) {
@@ -266,7 +267,8 @@ void Expr::PrintValue(void* value, std::string* str) {
       return;
     }
     case TYPE_TINYINT:
-      out << *reinterpret_cast<signed char*>(value);
+      // Extra casting for chars since they should not be interpreted as ASCII.
+      out << static_cast<int>(*reinterpret_cast<signed char*>(value));
       break;
     case TYPE_SMALLINT:
       out << *reinterpret_cast<short*>(value);

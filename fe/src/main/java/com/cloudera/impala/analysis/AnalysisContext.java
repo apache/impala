@@ -42,6 +42,7 @@ public class AnalysisContext {
       }
       result.analyzer = new Analyzer(catalog);
       result.selectStmt.analyze(result.analyzer);
+      result.analyzer.getDescTbl().computeMemLayout();
       return result;
     } catch (AnalysisException e) {
       throw new AnalysisException(e.getMessage() + " (in " + stmt + ")");

@@ -20,6 +20,11 @@ find_package(JNI REQUIRED)
 include_directories(${JNI_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${JNI_LIBRARIES})
 
+# find HDFS headers and libs
+find_package(HDFS REQUIRED)
+include_directories(${HDFS_INCLUDE_DIR})
+set(LIBS ${LIBS} ${HDFS_LIBS})
+
 # resolve "#include "<subdir>/<name>.h"
 include_directories(${CMAKE_SOURCE_DIR}/src)
 

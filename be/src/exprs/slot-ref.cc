@@ -3,6 +3,9 @@
 #include "exprs/expr.h"  // contains SlotRef definition
 
 #include "gen-cpp/Exprs_types.h"
+#include "runtime/runtime-state.h"
+
+#include <iostream>
 
 namespace impala {
 
@@ -14,6 +17,13 @@ SlotRef::SlotRef(const TExprNode& node)
 }
 
 void SlotRef::Prepare(RuntimeState* state) {
+  const SlotDescriptor* slot_desc  = state->descs().GetSlotDescriptor(slot_id_);
+  // TODO: report error
+  if (slot_desc == NULL) return;
+  // TODO(marcel): get from runtime state
+  this->tuple_idx_ = 0;
+  this->slot_offset_ = slot_desc->tuple_offset();
+  this->null_indicator_offset_ = slot_desc->null_indicator_offset();
 }
 
 }

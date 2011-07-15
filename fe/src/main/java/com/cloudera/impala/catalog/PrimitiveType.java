@@ -17,7 +17,8 @@ public enum PrimitiveType {
   DATE("DATE", 4, TPrimitiveType.DATE),
   DATETIME("DATETIME", 8, TPrimitiveType.DATETIME),
   TIMESTAMP("TIMESTAMP", 8, TPrimitiveType.TIMESTAMP),
-  STRING("STRING", 8, TPrimitiveType.STRING);
+  // 8-byte pointer and 4-byte length indicator (12 bytes total). Aligning to 8 bytes so 16 total.
+  STRING("STRING", 16, TPrimitiveType.STRING);
 
   private final String description;
   private final int slotSize;  // size of tuple slot for this type

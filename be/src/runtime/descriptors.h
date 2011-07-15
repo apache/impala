@@ -78,6 +78,7 @@ class TableDescriptor {
  public:
   TableDescriptor(const TTable& ttable);
   int num_cols() const { return num_cols_; }
+  int num_partition_keys() const { return num_partition_keys_; }
   char line_delim() const { return line_delim_; }
   char field_delim() const { return field_delim_; }
   char collection_delim() const { return collection_delim_; }
@@ -87,6 +88,7 @@ class TableDescriptor {
 
  protected:
   int num_cols_;
+  int num_partition_keys_;
   char line_delim_;
   char field_delim_;
   char collection_delim_;
