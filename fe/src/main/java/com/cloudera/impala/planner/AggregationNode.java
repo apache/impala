@@ -19,6 +19,7 @@ public class AggregationNode extends PlanNode {
   private final AggregateInfo aggInfo;
 
   public AggregationNode(PlanNode input, AggregateInfo aggInfo) {
+    super();
     this.aggInfo = aggInfo;
     this.children.add(input);
   }
@@ -49,7 +50,7 @@ public class AggregationNode extends PlanNode {
     output.append(prefix + "AGGREGATE\n");
     output.append(prefix + "GROUP BY: ");
     output.append(getExplainString(aggInfo.getGroupingExprs()) + "\n");
-    if (conjuncts != null) {
+    if (!conjuncts.isEmpty()) {
       output.append(prefix + "HAVING: ");
       output.append(getExplainString(conjuncts) + "\n");
     }

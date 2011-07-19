@@ -20,5 +20,10 @@ Building
 
 3) From impala/be: make
 
-
-
+Debugging
+---------
+1) To run the backend under gdb, start the runquery binary (build/service/runquery),
+passing the query string as a parameter.
+2) This binary uses a mock hdfs implementation that can only read local files and
+requires that a version of the front be run as a demon. Run fe/bin/runplanservice
+to start that demon process.

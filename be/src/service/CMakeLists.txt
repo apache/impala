@@ -31,11 +31,13 @@ target_link_libraries(planexec
   ${HDFS_LIBS}
 )
 
-add_executable(planexecmain 
-  plan-executor-main.cc
+add_executable(runquery 
+  run-query.cc
 )
-
-target_link_libraries(planexecmain
+# don't link this against hdfs_libs or java_jvm_library;
+# we need to avoid jni calls in order to be able to run under gdb,
+# and TestUtil contains a mock libhdfs implementation
+target_link_libraries(runquery
   Common
   Exec
   Exprs
@@ -44,6 +46,5 @@ target_link_libraries(planexecmain
   ImpalaThrift
   Service
   pthread
-  ${HDFS_LIBS}
-  ${JAVA_JVM_LIBRARY}    
+  TestUtil
 )

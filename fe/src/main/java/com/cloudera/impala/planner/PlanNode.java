@@ -9,6 +9,7 @@ import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.common.TreeNode;
 import com.cloudera.impala.thrift.TPlan;
 import com.cloudera.impala.thrift.TPlanNode;
+import com.google.common.collect.Lists;
 
 /**
  * Each PlanNode represents a single relational operator
@@ -25,6 +26,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * its children
    */
   protected List<Predicate> conjuncts;
+
+  PlanNode() {
+    this.conjuncts = Lists.newArrayList();
+  }
 
   public long getLimit() {
     return limit;
@@ -84,6 +89,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   protected String getExplainString(List<? extends Expr> exprs) {
+    if (exprs == null) {
+      return "";
+    }
     StringBuilder output = new StringBuilder();
     for (int i = 0; i < exprs.size(); ++i) {
       if (i > 0) {

@@ -167,7 +167,6 @@ class SlotRef : public Expr {
 };
 
 inline void* SlotRef::ComputeFunction(Expr* expr, TupleRow* row) {
-  // TODO: does boost have different cast for this?
   SlotRef* ref = static_cast<SlotRef*>(expr);
   Tuple* t = row->GetTuple(ref->tuple_idx_);
   if (t == NULL || t->IsNull(ref->null_indicator_offset_)) return NULL;

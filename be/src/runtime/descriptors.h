@@ -56,7 +56,7 @@ extern PrimitiveType ThriftToType(TPrimitiveType::type ttype);
 
 class SlotDescriptor {
  public:
-  PrimitiveType data_type() const { return type_; }
+  PrimitiveType type() const { return type_; }
   int col_pos() const { return col_pos_; }
   int tuple_offset() const { return tuple_offset_; }
   const NullIndicatorOffset& null_indicator_offset() const {

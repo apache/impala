@@ -61,20 +61,22 @@ public class TupleDescriptor {
   }
 
   public TTupleDescriptor toThrift() {
-    // We only support single-byte characters as delimiters.
-    TTable ttable = new TTable(table.getColumns().size(),
-        table.getNumPartitionKeys(),
-        (byte)table.getLineDelim().charAt(0),
-        (byte)table.getFieldDelim().charAt(0),
-        (byte)table.getCollectionDelim().charAt(0),
-        (byte)table.getMapKeyDelim().charAt(0),
-        (byte)table.getEscapeChar().charAt(0));
-    // Set optional quote char.
-    if (table.getQuoteChar() != null) {
-      ttable.setQuoteChar((byte)table.getQuoteChar().charAt(0));
-    }
     TTupleDescriptor ttupleDesc = new TTupleDescriptor(id.asInt(), byteSize);
-    ttupleDesc.setTable(ttable);
+    if (table != null) {
+      // We only support single-byte characters as delimiters.
+      TTable ttable = new TTable(table.getColumns().size(),
+          table.getNumPartitionKeys(),
+          (byte)table.getLineDelim().charAt(0),
+          (byte)table.getFieldDelim().charAt(0),
+          (byte)table.getCollectionDelim().charAt(0),
+          (byte)table.getMapKeyDelim().charAt(0),
+          (byte)table.getEscapeChar().charAt(0));
+      // Set optional quote char.
+      if (table.getQuoteChar() != null) {
+        ttable.setQuoteChar((byte)table.getQuoteChar().charAt(0));
+      }
+      ttupleDesc.setTable(ttable);
+    }
     return ttupleDesc;
   }
 

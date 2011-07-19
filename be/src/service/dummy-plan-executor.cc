@@ -119,6 +119,9 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativePlanExecutor_ExecP
   ExecNode* plan_root;
   THROW_IF_ERROR(
       ExecNode::CreateTree(&exec_pool, request.plan, &plan_root), env, impala_exc_cl);
+  
+  // release w/o copying anything back
+  env->ReleaseByteArrayElements(thrift_execute_plan_request, buf, JNI_ABORT);
 }
 
 }

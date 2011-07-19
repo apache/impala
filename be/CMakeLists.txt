@@ -40,6 +40,7 @@ add_subdirectory(src/exec)
 add_subdirectory(src/exprs)
 add_subdirectory(src/runtime)
 add_subdirectory(src/service)
+add_subdirectory(src/testutil)
 
 add_subdirectory(generated-sources/gen-cpp)
 
@@ -49,6 +50,7 @@ link_directories(
   ${CMAKE_SOURCE_DIR}/build/exprs
   ${CMAKE_SOURCE_DIR}/build/runtime
   ${CMAKE_SOURCE_DIR}/build/service
+  ${CMAKE_SOURCE_DIR}/build/testutil
   ${CMAKE_SOURCE_DIR}/build/thrift
 )
 

@@ -23,6 +23,7 @@ public class SortNode extends PlanNode {
   private final List<Boolean> isAscOrder;
 
   public SortNode(PlanNode input, List<Expr> orderingExprs, List<Boolean> isAscOrder) {
+    super();
     Preconditions.checkArgument(orderingExprs.size() == isAscOrder.size());
     this.orderingExprs = orderingExprs;
     this.isAscOrder = isAscOrder;

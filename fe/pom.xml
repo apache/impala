@@ -283,7 +283,9 @@
                  </execution> 
              </executions> 
              <configuration> 
+<!--
                  <mainClass>com.cloudera.impala.service.Coordinator</mainClass> 
+-->
                  <systemProperties> 
 		    <systemProperty>
 		       <key>java.library.path</key>

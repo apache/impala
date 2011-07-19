@@ -25,6 +25,7 @@ public class ScanNode extends PlanNode {
    * @param filePaths
    */
   public ScanNode(TupleDescriptor desc, List<String> filePaths) {
+    super();
     this.desc = desc;
     this.filePaths = filePaths;
   }

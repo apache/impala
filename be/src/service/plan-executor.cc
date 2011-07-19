@@ -104,11 +104,10 @@ Status DeserializeRequest(
   boost::shared_ptr<TProtocol> tproto = tproto_factory.getProtocol(tmem_transport);
   exec_request.read(tproto.get());
 
-  ExecNode* plan_ptr = NULL;
   RETURN_IF_ERROR(ExecNode::CreateTree(obj_pool, exec_request.plan, plan));
-  DescriptorTbl* descs_ptr = NULL;
   RETURN_IF_ERROR(DescriptorTbl::Create(obj_pool, exec_request.descTbl, descs));
-  RETURN_IF_ERROR(Expr::CreateExprTrees(obj_pool, exec_request.selectListExprs, select_list_exprs));
+  RETURN_IF_ERROR(
+      Expr::CreateExprTrees(obj_pool, exec_request.selectListExprs, select_list_exprs));
 
   return Status::OK;
 }

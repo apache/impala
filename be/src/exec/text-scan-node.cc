@@ -349,7 +349,7 @@ void TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, 
     return;
   }
   // TODO: Handle out-of-range and other error conditions.
-  switch (slot_desc->data_type()) {
+  switch (slot_desc->type()) {
     case TYPE_BOOLEAN: {
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
       if (iequals(begin, "true")) {
