@@ -8,8 +8,7 @@ DATALOC=target
 # regenerate the test data generator
 mvn clean package
 
-# run test data generator
-mkdir -p $DATALOC
+# find jars
 CP=""
 JARS=`find target/*.jar 2> /dev/null || true`
 for i in $JARS; do
@@ -20,6 +19,7 @@ for i in $JARS; do
     fi
 done
 
+# run test data generator
+mkdir -p $DATALOC
 java -cp $CP com.cloudera.impala.datagenerator.TestDataGenerator $DATALOC
-
 echo "SUCCESS, data generated into $DATALOC"

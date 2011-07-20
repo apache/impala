@@ -13,6 +13,9 @@ CREATE TABLE AllTypes (
 partitioned by (year int, month int)
 row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
 
+DROP TABLE IF EXISTS AllTypesSmall;
+CREATE TABLE AllTypesSmall LIKE AllTypes;
+
 DROP TABLE IF EXISTS TestTbl;
 CREATE TABLE TestTbl (
   id bigint,
