@@ -8,7 +8,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.junit.BeforeClass;
@@ -19,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.TestSchemaUtils;
+import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.testutil.TestFileParser;
 import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.TColumnValue;
@@ -39,57 +39,58 @@ public class QueryTest {
     coordinator = new Coordinator(catalog);
   }
 
-  private void RunQuery(String query, ArrayList<String> expectedTypes, ArrayList<String> expectedResults) {
+  private void runQuery(String query, ArrayList<String> expectedTypes,
+                        ArrayList<String> expectedResults) {
+    LOG.info("running query " + query);
+    TQueryRequest request = new TQueryRequest(query, true);
+    List<PrimitiveType> colTypes = new ArrayList<PrimitiveType>();
+    BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
+    ArrayList<String> actualResults = new ArrayList<String>();
     try {
-      LOG.info("running query " + query);
-      TQueryRequest request = new TQueryRequest(query, true);
-      List<PrimitiveType> colTypes = new ArrayList<PrimitiveType>();
-      BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
-      ArrayList<String> actualResults = new ArrayList<String>();
-      coordinator.RunQuery(request, colTypes, resultQueue);
-      // Check types filled in by RunQuery()
-      String[] expectedTypesArr = expectedTypes.get(0).split(",");
-      String typeResult = TestUtils.compareOutputTypes(colTypes, expectedTypesArr);
-      if (!typeResult.isEmpty()) {
-        fail("query:\n" + query + "\n" + typeResult);
-      }
-      while (true) {
-        TResultRow resultRow = null;
-        try {
-          // We use a timeout here, because it is conceivable that the c++ backend
-          // has not written anything to the queue yet by the time we reach this piece of code.
-          // In that case we would report an empty query result.
-          // By adding a timeout we poll the queue until the timeout is reached.
-          resultRow = resultQueue.poll(10, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-          e.printStackTrace();
-        }
-        if (resultRow == null) {
-          break;
-        }
-
-        // Concatenate columns separated by ","
-        StringBuilder line = new StringBuilder();
-        for (TColumnValue val : resultRow.colVals) {
-          line.append(val.stringVal);
-          line.append(',');
-        }
-        // remove trailing ','
-        line.deleteCharAt(line.length()-1);
-        actualResults.add(line.toString());
-      }
-      String[] actualResultsArray = new String[actualResults.size()];
-      actualResults.toArray(actualResultsArray);
-      String result = TestUtils.compareOutput(actualResultsArray, expectedResults);
-      if (!result.isEmpty()) {
-        fail("query:\n" + query + "\n" + result);
-      }
-    } catch (Exception e) {
+      coordinator.runQuery(request, colTypes, resultQueue);
+    } catch (ImpalaException e) {
       fail(e.getMessage());
+    }
+
+    // Check types filled in by RunQuery()
+    String[] expectedTypesArr = expectedTypes.get(0).split(",");
+    String typeResult = TestUtils.compareOutputTypes(colTypes, expectedTypesArr);
+    if (!typeResult.isEmpty()) {
+      fail("query:\n" + query + "\n" + typeResult);
+    }
+
+    while (true) {
+      TResultRow resultRow = null;
+      try {
+        resultRow = resultQueue.take();
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+        fail("unexpected interrupt");
+      }
+      if (resultRow.colVals == null) {
+        break;
+      }
+
+      // Concatenate columns separated by ","
+      StringBuilder line = new StringBuilder();
+      for (TColumnValue val : resultRow.colVals) {
+        line.append(val.stringVal);
+        line.append(',');
+      }
+      // remove trailing ','
+      line.deleteCharAt(line.length()-1);
+      actualResults.add(line.toString());
+    }
+    String[] actualResultsArray = new String[actualResults.size()];
+    actualResults.toArray(actualResultsArray);
+    String result = TestUtils.compareOutput(actualResultsArray, expectedResults);
+    if (!result.isEmpty()) {
+      fail("query:\n" + query + "\n" + result);
     }
   }
 
-  private void RunTests(String testCase) {
+
+  private void runTests(String testCase) {
     String fileName = testDir + "/" + testCase + ".test";
     TestFileParser queryFileParser = new TestFileParser(fileName);
     queryFileParser.open();
@@ -98,13 +99,13 @@ public class QueryTest {
       String query = queryFileParser.getQuery();
       ArrayList<String> expectedTypes = queryFileParser.getExpectedResult(0);
       ArrayList<String> expectedResults = queryFileParser.getExpectedResult(1);
-      RunQuery(query, expectedTypes, expectedResults);
+      runQuery(query, expectedTypes, expectedResults);
     }
     queryFileParser.close();
   }
 
   @Test
   public void Test() {
-    RunTests("textscannode");
+    runTests("textscannode");
   }
 }
