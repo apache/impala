@@ -2,6 +2,7 @@
 
 package com.cloudera.impala.service;
 
+import java.io.File;
 import java.util.concurrent.BlockingQueue;
 
 import com.cloudera.impala.common.ImpalaException;
@@ -13,11 +14,14 @@ class NativePlanExecutor {
       boolean asAscii, BlockingQueue<TResultRow> resultQueue) throws ImpalaException;
 
   static {
-    // TODO: get this working:
+    // The path to the backend lib must be set in the java.library.path system property.
+    // For some reason the following calls just hang:
+    // System.loadLibrary("libplanexec.so");
     // System.loadLibrary("libplanexec");
-    //System.load("/home/marcel/impala/be/build/service/libplanexec.so");
-    //System.load("/home/abehm/hive/build/hadoopcore/hadoop-0.20.2-cdh3u1-SNAPSHOT/c++/Linux-amd64-64/lib/libhdfs.so");
-    System.load("/home/abehm/impala/be/build/service/libplanexec.so");
+    // System.loadLibrary("planexec");
+    // There seem to be some known issues with System.loadLibrary() that cause deadlock.
+    String libPath = System.getProperty("java.library.path");
+    System.load(libPath + File.separator + "libplanexec.so");
   }
 }
 

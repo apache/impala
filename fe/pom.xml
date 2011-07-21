@@ -284,6 +284,10 @@
              <configuration> 
                  <mainClass>com.cloudera.impala.service.Coordinator</mainClass> 
                  <systemProperties> 
+		    <systemProperty>
+		       <key>java.library.path</key>
+		       <value>${project.basedir}/../be/build/service</value>
+		    </systemProperty>
                      <systemProperty> 
                        <key>test.hive.testdata</key>
 		       <value>${project.basedir}/../testdata/target/AllTypes.txt</value> 
