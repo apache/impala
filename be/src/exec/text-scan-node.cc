@@ -305,9 +305,9 @@ Status TextScanNode::ParseFileBuffer(RowBatch* row_batch, int* row_idx, int* col
           boundary_column_.clear();
           *unescape_string = false;
         }
-        ++(*column_idx);
-        column_start = file_buf_ptr_ + 1;
       }
+      ++(*column_idx);
+      column_start = file_buf_ptr_ + 1;
     }
 
     ++file_buf_ptr_;
