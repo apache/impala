@@ -2,6 +2,7 @@
 
 package com.cloudera.impala.service;
 
+import java.io.PrintStream;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -49,28 +50,28 @@ public class Coordinator {
   // Run the query synchronously (ie, this function blocks until the query
   // is finished) and place the results in resultQueue, followed by an empty
   // row that acts as an end-of-stream marker.
-  // Also populates 'colTypes'.
+  // Also populates 'colTypes' and 'colLabels'.
   public void runQuery(TQueryRequest request,
                        List<PrimitiveType> colTypes,
-                       List<String> colNames,
+                       List<String> colLabels,
                        BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
     init();
-    AnalysisContext.AnalysisResult analysisResult = analyzeQuery(request, colTypes, colNames);
+    AnalysisContext.AnalysisResult analysisResult = analyzeQuery(request, colTypes, colLabels);
     execQuery(analysisResult, request.returnAsAscii, resultQueue);
     addSentinelRow(resultQueue);
   }
 
   // Run the query asynchronously, returning immediately after starting
-  // query execution and populating 'colTypes'. Places an empty row as
+  // query execution and populating 'colTypes' and 'colLabels'. Places an empty row as
   // a marker at the end of the queue once all result rows have been added to the
-  // queue or an error occured.
-  // getErrorMsg() will return a non-empty string if an error occured, otherwise
+  // queue or an error occurred.
+  // getErrorMsg() will return a non-empty string if an error occurred, otherwise
   // null.
   public void asyncRunQuery(
-      final TQueryRequest request, List<PrimitiveType> colTypes, List<String> colNames,
+      final TQueryRequest request, List<PrimitiveType> colTypes, List<String> colLabels,
       final BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
     init();
-    final AnalysisContext.AnalysisResult analysisResult = analyzeQuery(request, colTypes, colNames);
+    final AnalysisContext.AnalysisResult analysisResult = analyzeQuery(request, colTypes, colLabels);
     Runnable execCall = new Runnable() {
       public void run() {
         try {
@@ -86,7 +87,7 @@ public class Coordinator {
   }
 
   // When executing asynchronously, this waits for execution to finish and returns
-  // an error message if an error occured, otherwise null.
+  // an error message if an error occurred, otherwise null.
   public String getErrorMsg() {
     if (execThread != null) {
       try {
@@ -110,24 +111,22 @@ public class Coordinator {
   }
 
   // Analyze query and return analysis result and types of select list exprs.
-  private AnalysisContext.AnalysisResult analyzeQuery(
-      TQueryRequest request, List<PrimitiveType> colTypes, List<String> colNames) throws ImpalaException {
+  public AnalysisContext.AnalysisResult analyzeQuery(
+      TQueryRequest request, List<PrimitiveType> colTypes, List<String> colLabels) throws ImpalaException {
     AnalysisContext analysisCtxt = new AnalysisContext(catalog);
     AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(request.stmt);
     Preconditions.checkNotNull(analysisResult.selectStmt);
 
     // TODO: handle EXPLAIN SELECT
 
-    // populate colTypes and colNames
+    // populate colTypes
     colTypes.clear();
     for (Expr expr : analysisResult.selectStmt.getSelectListExprs()) {
       colTypes.add(expr.getType());
     }
 
-    // populate colnames
-    for (String s : analysisResult.selectStmt.getColLabels()) {
-      colNames.add(s);
-    }
+    // populate column labels
+    colLabels = (List<String>) analysisResult.selectStmt.getColLabels().clone();
 
     return analysisResult;
   }
@@ -172,15 +171,7 @@ public class Coordinator {
     return serializer.serialize(execRequest);
   }
 
-  // Run single query against test instance
-  public static void main(String args[]) {
-    if (args.length != 1) {
-      for (int i = 0; i < args.length; ++i) {
-        System.err.println(args[i]);
-      }
-      System.err.println("coordinator \"query string\"");
-      System.exit(1);
-    }
+  public static Catalog createCatalog() {
     HiveMetaStoreClient client = null;
     try {
       client = new HiveMetaStoreClient(new HiveConf(Coordinator.class));
@@ -188,20 +179,38 @@ public class Coordinator {
       System.err.println(e.getMessage());
       System.exit(2);
     }
-    Catalog catalog = new Catalog(client);
+    return new Catalog(client);
+  }
 
-    System.out.println("Running query '" + args[0] + "'");
+  /**
+   * Run single query and write its results to the given PrintStream.
+   * If catalog is null, a new one is is created from the HiveMetaStore.
+   *
+   * @param query
+   *          Query to be executed.
+   * @param catalog
+   *          Catalog containing metadata. Must be non-null.
+   * @param asyncExec
+   *          Whether to use synchronous or asynchronous query execution.
+   * @param targetStream
+   *          Stream to write the query results to.
+   *          Result rows are separated by newlines and fields are tabs.
+   * @return
+   *         The number of result rows.
+   */
+  public static int runQuery(String query, Catalog catalog, boolean asyncExec,
+      PrintStream targetStream) throws ImpalaException {
+    Preconditions.checkNotNull(catalog);
     int numRows = 0;
-    TQueryRequest request = new TQueryRequest(args[0], true);
+    TQueryRequest request = new TQueryRequest(query, true);
     List<PrimitiveType> colTypes = Lists.newArrayList();
-    List<String> colNames = Lists.newArrayList();
+    List<String> colLabels = Lists.newArrayList();
     BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
     Coordinator coordinator = new Coordinator(catalog);
-    try {
-      coordinator.asyncRunQuery(request, colTypes, colNames, resultQueue);
-    } catch (ImpalaException e) {
-      System.err.println(e.getMessage());
-      System.exit(2);
+    if (asyncExec) {
+      coordinator.asyncRunQuery(request, colTypes, colLabels, resultQueue);
+    } else {
+      coordinator.runQuery(request, colTypes, colLabels, resultQueue);
     }
     while (true) {
       TResultRow resultRow = null;
@@ -214,18 +223,36 @@ public class Coordinator {
         break;
       }
       ++numRows;
-      StringBuilder output = new StringBuilder();
-      for (TColumnValue val: resultRow.colVals) {
-        output.append('\t');
-        output.append(val.stringVal);
+      for (TColumnValue val : resultRow.colVals) {
+        targetStream.append('\t');
+        targetStream.append(val.stringVal);
       }
-      System.out.println(output.toString());
+      targetStream.print("\n");
     }
-    String errorMsg = coordinator.getErrorMsg();
-    if (errorMsg != null) {
-      System.err.println("encountered error:\n" + errorMsg);
+    if (asyncExec) {
+      String errorMsg = coordinator.getErrorMsg();
+      if (errorMsg != null) {
+        System.err.println("encountered error:\n" + errorMsg);
+        return -1;
+      } else {
+        return numRows;
+      }
     } else {
-      System.out.println("TOTAL ROWS: " + numRows);
+      return numRows;
     }
+  }
+
+  // Run single query against test instance
+  public static void main(String args[]) throws ImpalaException {
+    if (args.length != 1) {
+      for (int i = 0; i < args.length; ++i) {
+        System.err.println(args[i]);
+      }
+      System.err.println("coordinator \"query string\"");
+      System.exit(1);
+    }
+    Catalog catalog = createCatalog();
+    int numRows = runQuery(args[0], catalog, true, System.out);
+    System.out.println("TOTAL ROWS: " + numRows);
   }
 }

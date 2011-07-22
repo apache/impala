@@ -2,6 +2,9 @@
 
 cmake_minimum_required(VERSION 2.6)
 
+# set flags for CMAKE_BUILD_TYPE=Debug
+SET(CMAKE_CXX_FLAGS_DEBUG "-g -Wall")
+
 # where to find cmake modules
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake_modules")
 

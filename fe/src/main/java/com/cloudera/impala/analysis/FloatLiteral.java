@@ -40,7 +40,7 @@ public class FloatLiteral extends LiteralExpr {
     try {
       floatValue = new Double(value);
     } catch (NumberFormatException e) {
-      throw new AnalysisException("invalid floating-point literal: " + value);
+      throw new AnalysisException("invalid floating-point literal: " + value, e);
     }
     init(floatValue);
   }

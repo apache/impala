@@ -44,7 +44,7 @@ public class Planner {
    * @param selectStmt
    * @param analyzer
    * @return root node of plan tree
-   * @throws NotImplementedException if selectStmt contains joins
+   * @throws NotImplementedException if selectStmt contains joins, order by or aggregates
    */
   public PlanNode createPlan(SelectStmt selectStmt, Analyzer analyzer)
       throws NotImplementedException {
@@ -56,16 +56,20 @@ public class Planner {
 
     AggregateInfo aggInfo = selectStmt.getAggInfo();
     if (aggInfo != null) {
-      topNode = new AggregationNode(topNode, aggInfo);
-      if (selectStmt.getHavingPred() != null) {
-        topNode.setConjuncts(selectStmt.getHavingPred().getConjuncts());
-      }
+      throw new NotImplementedException("Aggregates currently not supported.");
+      // TODO: Uncomment once AggregationNode is implemented.
+      // topNode = new AggregationNode(topNode, aggInfo);
+      // if (selectStmt.getHavingPred() != null) {
+      //   topNode.setConjuncts(selectStmt.getHavingPred().getConjuncts());
+      // }
     }
 
     List<Expr> orderingExprs = selectStmt.getOrderingExprs();
     if (orderingExprs != null) {
-      topNode =
-          new SortNode(topNode, orderingExprs, selectStmt.getOrderingDirections());
+      throw new NotImplementedException("Aggregates currently not supported.");
+      // TODO: Uncomment once SortNode is implemented.
+      // topNode =
+      //    new SortNode(topNode, orderingExprs, selectStmt.getOrderingDirections());
     }
 
     topNode.setLimit(selectStmt.getLimit());

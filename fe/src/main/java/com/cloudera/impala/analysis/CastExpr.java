@@ -27,6 +27,9 @@ public class CastExpr extends Expr {
 
   @Override
   public String toSql() {
+    if (isImplicit) {
+      return getChild(0).toSql();
+    }
     return "CAST(" + getChild(0).toSql() + " AS " + targetType.toString() + ")";
   }
 

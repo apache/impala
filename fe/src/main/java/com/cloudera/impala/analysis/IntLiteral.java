@@ -42,7 +42,7 @@ public class IntLiteral extends LiteralExpr {
     try {
       intValue = new Long(value);
     } catch (NumberFormatException e) {
-      throw new AnalysisException("invalid integer literal: " + value);
+      throw new AnalysisException("invalid integer literal: " + value, e);
     }
     init(intValue);
   }

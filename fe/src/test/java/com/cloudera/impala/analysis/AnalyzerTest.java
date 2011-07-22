@@ -343,14 +343,14 @@ public class AnalyzerTest {
     assertEquals(selectListExprs.size(), 1);
     // all agg exprs are replaced with refs to agg output slots
     Expr havingPred = select.getHavingPred();
-    assertEquals("CAST(<slot 2> AS DOUBLE) / CAST(<slot 3> AS DOUBLE)",
+    assertEquals("<slot 2> / <slot 3>",
         selectListExprs.get(0).toSql());
     assertNotNull(havingPred);
     // we only have one 'count(id)' slot (slot 2)
     assertEquals(havingPred.toSql(), "<slot 3> > 0");
     Expr orderingExpr = select.getOrderingExprs().get(0);
     assertNotNull(orderingExpr);
-    assertEquals("CAST(<slot 4> AS DOUBLE) / CAST(<slot 5> AS DOUBLE)", orderingExpr.toSql());
+    assertEquals("<slot 4> / <slot 5>", orderingExpr.toSql());
   }
 
   @Test public void TestOrderBy() {

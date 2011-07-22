@@ -425,4 +425,49 @@ public class SelectStmt extends ParseNodeBase {
       i.set(selectList.get((int)pos - 1).getExpr().clone(null));
     }
   }
+
+  @Override
+  public String toSql() {
+    StringBuilder strBuilder = new StringBuilder();
+    // Select list
+    strBuilder.append("SELECT ");
+    for (int i = 0; i < selectList.size(); ++i) {
+      strBuilder.append(selectList.get(i).toSql());
+      strBuilder.append((i+1 != selectList.size()) ? ", " : "");
+    }
+    // From clause
+    strBuilder.append(" FROM ");
+    for (int i = 0; i < tableRefs.size(); ++i) {
+      strBuilder.append(tableRefs.get(i).toSql());
+      strBuilder.append((i+1 != tableRefs.size()) ? ", " : "");
+    }
+    // Where clause
+    if (whereClause != null) {
+      strBuilder.append(" WHERE ");
+      strBuilder.append(whereClause.toSql());
+    }
+    // Group By clause
+    if (groupingExprs != null) {
+      strBuilder.append(" GROUP BY ");
+      for (int i = 0; i < groupingExprs.size(); ++i) {
+        strBuilder.append(groupingExprs.get(i). toSql());
+        strBuilder.append((i+1 != groupingExprs.size()) ? ", " : "");
+      }
+    }
+    // Having clause
+    if (havingClause != null) {
+      strBuilder.append(" HAVING ");
+      strBuilder.append(havingClause.toSql());
+    }
+    // Order By clause
+    if (orderByElements != null) {
+      strBuilder.append(" ORDER BY ");
+      for (int i = 0; i < orderByElements.size(); ++i) {
+        strBuilder.append(orderByElements.get(i).getExpr().toSql());
+        strBuilder.append((isAscOrder.get(i)) ? " ASC" : " DESC");
+        strBuilder.append((i+1 != orderByElements.size()) ? ", " : "");
+      }
+    }
+    return strBuilder.toString();
+  }
 }

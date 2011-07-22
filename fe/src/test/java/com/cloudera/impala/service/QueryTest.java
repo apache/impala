@@ -44,11 +44,11 @@ public class QueryTest {
     LOG.info("running query " + query);
     TQueryRequest request = new TQueryRequest(query, true);
     List<PrimitiveType> colTypes = new ArrayList<PrimitiveType>();
-    List<String> colNames = new ArrayList<String>();
+    List<String> colLabels = new ArrayList<String>();
     BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
     ArrayList<String> actualResults = new ArrayList<String>();
     try {
-      coordinator.runQuery(request, colTypes, colNames, resultQueue);
+      coordinator.runQuery(request, colTypes, colLabels, resultQueue);
     } catch (ImpalaException e) {
       fail(e.getMessage());
     }
