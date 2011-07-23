@@ -12,6 +12,7 @@ set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/exec")
 set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/exec")
 
 add_library(Exec STATIC
+  aggregation-node.cc
   exec-node.cc
   text-scan-node.cc
 )

@@ -2,13 +2,11 @@
 
 package com.cloudera.impala.service;
 
-import static org.junit.Assert.fail;
-
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 
-import junit.framework.Assert;
-
+import static org.junit.Assert.fail;
+import org.junit.Assert;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.Catalog;
@@ -50,6 +48,7 @@ public class CoordinatorTest {
   @Test
   public void runTest() throws ImpalaException {
     runTestSuccess("select tinyint_col, int_col, id from alltypessmall", 100);
+    runTestSuccess("select sum(double_col), count(double_col), avg(double_col) from alltypessmall", 1);
 
     // Syntax error.
     runTestFailure("slect tinyint_col from alltypessmall", 100);

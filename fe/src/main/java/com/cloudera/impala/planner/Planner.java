@@ -4,12 +4,14 @@ package com.cloudera.impala.planner;
 
 import java.util.List;
 
+import com.cloudera.impala.analysis.AggregateExpr;
 import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.analysis.TableRef;
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.NotImplementedException;
 import com.google.common.base.Preconditions;
@@ -68,20 +70,30 @@ public class Planner {
     }
     TableRef tblRef = selectStmt.getTableRefs().get(0);
     PlanNode topNode = createScanNode(analyzer, tblRef);
+    // TODO:
+    //ArrayList<Int> tupleIdxMap =
+        //computeTblRefIdxMap(selectStmt.getTableRefs(), analyzer.getDescTbl());
+    //topNode.setTupleIdxMap(tupleIdxMap);
 
     AggregateInfo aggInfo = selectStmt.getAggInfo();
     if (aggInfo != null) {
-      throw new NotImplementedException("Aggregates currently not supported.");
-      // TODO: Uncomment once AggregationNode is implemented.
-      // topNode = new AggregationNode(topNode, aggInfo);
-      // if (selectStmt.getHavingPred() != null) {
-      //   topNode.setConjuncts(selectStmt.getHavingPred().getConjuncts());
-      // }
+      // we can't aggregate strings at the moment
+      // TODO: fix this
+      for (AggregateExpr aggExpr: aggInfo.getAggregateExprs()) {
+        if (aggExpr.hasChild(0) && aggExpr.getChild(0).getType() == PrimitiveType.STRING) {
+          throw new NotImplementedException(
+              aggExpr.getOp().toString() + " currently not supported for strings");
+        }
+      }
+      topNode = new AggregationNode(topNode, aggInfo);
+      if (selectStmt.getHavingPred() != null) {
+        topNode.setConjuncts(selectStmt.getHavingPred().getConjuncts());
+      }
     }
 
     List<Expr> orderingExprs = selectStmt.getOrderingExprs();
     if (orderingExprs != null) {
-      throw new NotImplementedException("Aggregates currently not supported.");
+      throw new NotImplementedException("ORDER BY currently not supported.");
       // TODO: Uncomment once SortNode is implemented.
       // topNode =
       //    new SortNode(topNode, orderingExprs, selectStmt.getOrderingDirections());
@@ -90,4 +102,5 @@ public class Planner {
     topNode.setLimit(selectStmt.getLimit());
     return topNode;
   }
+
 }

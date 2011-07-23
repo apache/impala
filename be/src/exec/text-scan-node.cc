@@ -12,6 +12,7 @@
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
 #include "runtime/mem-pool.h"
+#include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
@@ -258,6 +259,10 @@ void TextScanNode::ParseFileBuffer(
   // 2.1 Write a new slot (if new_column==true and we don't ignore this column)
   // 2.2 Check if we finished a tuple, and whether the tuple buffer is full.
   TupleRow* current_row = NULL;
+  if (*row_idx != RowBatch::INVALID_ROW_INDEX) {
+    current_row = row_batch->GetRow(*row_idx);
+  }
+
   while (file_buf_ptr_ != file_buf_end_) {
 
     // Indicates whether we have found a new complete slot.
@@ -267,16 +272,19 @@ void TextScanNode::ParseFileBuffer(
     bool new_tuple = false;
 
     // add new row
-    *row_idx = row_batch->AddRow();
-    current_row = row_batch->GetRow(*row_idx);
-    current_row->SetTuple(tuple_idx_, tuple_);
+    if (!row_batch->IsFull() && *row_idx == RowBatch::INVALID_ROW_INDEX) {
+      *row_idx = row_batch->AddRow();
+      current_row = row_batch->GetRow(*row_idx);
+      current_row->SetTuple(tuple_idx_, tuple_);
 
-    // Materialize partition-key values (if any).
-    for (int i = 0; i < key_idx_to_slot_idx_.size(); ++i) {
-      int expr_idx = file_idx_ * num_partition_keys_ + key_idx_to_slot_idx_[i].first;
-      Expr* expr = key_values_[expr_idx];
-      int slot_idx = key_idx_to_slot_idx_[i].second;
-      WriteValue(expr->GetValue(NULL), tuple_, tuple_desc_->slots()[slot_idx]);
+      // Materialize partition-key values (if any).
+      for (int i = 0; i < key_idx_to_slot_idx_.size(); ++i) {
+        int expr_idx = file_idx_ * num_partition_keys_ + key_idx_to_slot_idx_[i].first;
+        Expr* expr = key_values_[expr_idx];
+        int slot_idx = key_idx_to_slot_idx_[i].second;
+        RawValue::Write(expr->GetValue(NULL), tuple_, tuple_desc_->slots()[slot_idx],
+                        var_len_pool_.get());
+      }
     }
 
     // 1. Determine action based on current character:
@@ -464,61 +472,6 @@ void TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, 
   // Set NULL if inconvertible.
   if (*end != '\0') {
     tuple->SetNull(slot_desc->null_indicator_offset());
-  }
-}
-
-void TextScanNode::WriteValue(const void* value, Tuple* tuple, const SlotDescriptor* slot_desc) {
-  switch (slot_desc->type()) {
-    case TYPE_BOOLEAN: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<bool*>(slot) = *reinterpret_cast<const bool*>(value);
-      break;
-    }
-    case TYPE_TINYINT: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<char*>(slot) = static_cast<char>(*reinterpret_cast<const long*>(value));
-      break;
-    }
-    case TYPE_SMALLINT: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<short*>(slot) = static_cast<short>(*reinterpret_cast<const long*>(value));
-      break;
-    }
-    case TYPE_INT: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<int*>(slot) = static_cast<int>(*reinterpret_cast<const long*>(value));
-      break;
-    }
-    case TYPE_BIGINT: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<long*>(slot) = *reinterpret_cast<const long*>(value);
-      break;
-    }
-    case TYPE_FLOAT: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<int*>(slot) = static_cast<float>(*reinterpret_cast<const double*>(value));
-      break;
-    }
-    case TYPE_DOUBLE: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<double*>(slot) = *reinterpret_cast<const double*>(value);
-      break;
-    }
-    case TYPE_STRING: {
-      // Copy the string value.
-      // TODO: Copy this value only once per scanned file.
-      const StringValue* dest = reinterpret_cast<const StringValue*>(value);
-      StringValue* slot = tuple->GetStringSlot(slot_desc->tuple_offset());
-      slot->len = dest->len;
-      char* slot_data = reinterpret_cast<char*> (var_len_pool_->Allocate(slot->len));
-      memcpy(slot_data, dest->ptr, slot->len);
-      break;
-    }
-    case INVALID_TYPE: {
-      break;
-    }
-    default:
-      DCHECK(false) << "WriteValue(): bad type: " << TypeToString(slot_desc->type());
   }
 }
 

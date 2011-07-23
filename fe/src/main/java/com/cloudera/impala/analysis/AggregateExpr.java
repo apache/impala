@@ -14,7 +14,7 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 public class AggregateExpr extends Expr {
-  enum Operator {
+  public enum Operator {
     COUNT("COUNT", TExprOperator.AGG_COUNT),
     MIN("MIN", TExprOperator.AGG_MIN),
     MAX("MAX", TExprOperator.AGG_MAX),
@@ -156,15 +156,18 @@ public class AggregateExpr extends Expr {
       // TODO: make it a float if the param type is <bigint?
       type = (arg.type == PrimitiveType.FLOAT ? PrimitiveType.FLOAT : PrimitiveType.DOUBLE);
       return;
-    } else {
+    } else if (op == Operator.SUM) {
       // numeric types need to be accumulated at maximum precision
       if (arg.type.isFixedPointType()) {
         type = PrimitiveType.BIGINT;
-      } else if (arg.type.isFloatingPointType()) {
-        type = PrimitiveType.DOUBLE;
       } else {
-        type = arg.type;
+        type = PrimitiveType.DOUBLE;
       }
+      if (arg.type != type) {
+        castChild(type, 0);
+      }
+    } else if (op == Operator.MIN || op == Operator.MAX) {
+      type = arg.type;
     }
   }
 }

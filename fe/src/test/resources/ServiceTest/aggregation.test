@@ -1,0 +1,74 @@
+select count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col), avg(tinyint_col)
+from alltypes
+----
+bigint, tinyint, tinyint, bigint, double
+----
+7300,0,9,32850,4.5
+=====
+select count(*), min(smallint_col), max(smallint_col), sum(smallint_col), avg(smallint_col)
+from alltypes
+----
+bigint, smallint, smallint, bigint, double
+----
+7300,0,9,32850,4.5
+=====
+select count(*), min(int_col), max(int_col), sum(int_col), avg(int_col)
+from alltypes
+----
+bigint, int, int, bigint, double
+----
+7300,0,9,32850,4.5
+=====
+select count(*), min(bigint_col), max(bigint_col), sum(bigint_col), avg(bigint_col)
+from alltypes
+----
+bigint, bigint, bigint, bigint, double
+----
+7300,0,90,328500,45
+=====
+select count(*), min(float_col), max(float_col), sum(float_col), avg(float_col)
+from alltypes
+----
+bigint, float, float, double, double
+----
+7300,0,9,32850,4.5
+=====
+select count(*), min(double_col), max(double_col), sum(double_col), avg(double_col)
+from alltypes
+----
+bigint, double, double, double, double
+----
+7300,0,90.9,331785,45.45
+=====
+select tinyint_col, count(*) from alltypes group by 1
+----
+tinyint, bigint
+----
+4,730
+5,730
+6,730
+7,730
+8,730
+9,730
+0,730
+1,730
+2,730
+3,730
+====
+select tinyint_col, string_col, count(*)
+from alltypes
+group by 1, 2
+----
+tinyint, string, bigint
+----
+4,'4',730
+0,'0',730
+2,'2',730
+6,'6',730
+5,'5',730
+3,'3',730
+8,'8',730
+1,'1',730
+9,'9',730
+7,'7',730
+====

@@ -94,9 +94,9 @@ class Expr {
   void PrintValue(TupleRow* row, std::string* str);
 
   void AddChild(Expr* expr) { children_.push_back(expr); }
+  Expr* GetChild(int i) const { return children_[i]; }
 
   PrimitiveType type() const { return type_; }
-
   const std::vector<Expr*>& children() const { return children_; }
 
   // Create expression tree from the list of nodes contained in texpr
@@ -109,6 +109,12 @@ class Expr {
   // otherwise OK.
   static Status CreateExprTrees(ObjectPool* pool, const std::vector<TExpr>& texprs,
                                 std::vector<Expr*>* exprs);
+
+  // Prepare all exprs.
+  static void Prepare(const std::vector<Expr*>& exprs, RuntimeState* state);
+
+  virtual std::string DebugString() const;
+  static std::string DebugString(const std::vector<Expr*>& exprs);
 
  protected:
   friend class GetValueFunctions;

@@ -92,7 +92,7 @@ class TableDescriptor {
 class TupleDescriptor {
  public:
   int byte_size() const { return byte_size_; }
-  const std::vector<SlotDescriptor*> slots() const { return slots_; }
+  const std::vector<SlotDescriptor*>& slots() const { return slots_; }
   const TableDescriptor* table_desc() const { return table_desc_.get(); }
 
   std::string DebugString() const;
@@ -116,11 +116,11 @@ class DescriptorTbl {
   static Status Create(ObjectPool* pool, const TDescriptorTable& thrift_tbl,
                        DescriptorTbl** tbl);
 
-  const TupleDescriptor* GetTupleDescriptor(TupleId id) const;
-  const SlotDescriptor* GetSlotDescriptor(SlotId id) const;
+  TupleDescriptor* GetTupleDescriptor(TupleId id) const;
+  SlotDescriptor* GetSlotDescriptor(SlotId id) const;
 
   // return all registered tuple descriptors
-  void GetTupleDescs(std::vector<const TupleDescriptor*>* descs) const;
+  void GetTupleDescs(std::vector<TupleDescriptor*>* descs) const;
 
   std::string DebugString() const;
 

@@ -137,7 +137,7 @@ Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tb
   return Status::OK;
 }
 
-const TupleDescriptor* DescriptorTbl::GetTupleDescriptor(TupleId id) const {
+TupleDescriptor* DescriptorTbl::GetTupleDescriptor(TupleId id) const {
   // TODO: is there some boost function to do exactly this?
   TupleDescriptorMap::const_iterator i = tuple_desc_map_.find(id);
   if (i == tuple_desc_map_.end()) {
@@ -147,7 +147,7 @@ const TupleDescriptor* DescriptorTbl::GetTupleDescriptor(TupleId id) const {
   }
 }
 
-const SlotDescriptor* DescriptorTbl::GetSlotDescriptor(SlotId id) const {
+SlotDescriptor* DescriptorTbl::GetSlotDescriptor(SlotId id) const {
   // TODO: is there some boost function to do exactly this?
   SlotDescriptorMap::const_iterator i = slot_desc_map_.find(id);
   if (i == slot_desc_map_.end()) {
@@ -158,7 +158,7 @@ const SlotDescriptor* DescriptorTbl::GetSlotDescriptor(SlotId id) const {
 }
 
 // return all registered tuple descriptors
-void DescriptorTbl::GetTupleDescs(vector<const TupleDescriptor*>* descs) const {
+void DescriptorTbl::GetTupleDescs(vector<TupleDescriptor*>* descs) const {
   descs->clear();
   for (TupleDescriptorMap::const_iterator i = tuple_desc_map_.begin();
        i != tuple_desc_map_.end(); ++i) {

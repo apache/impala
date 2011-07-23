@@ -42,6 +42,12 @@ class Tuple {
     *null_indicator_byte |= offset.bit_mask;
   }
 
+  // Turn null indicator bit off.
+  void SetNotNull(const NullIndicatorOffset& offset) {
+    char* null_indicator_byte = reinterpret_cast<char*>(this) + offset.byte_offset;
+    *null_indicator_byte &= ~offset.bit_mask;
+  }
+
   bool IsNull(const NullIndicatorOffset& offset) {
     char* null_indicator_byte = reinterpret_cast<char*>(this) + offset.byte_offset;
     return (*null_indicator_byte & offset.bit_mask) != 0;
@@ -49,6 +55,10 @@ class Tuple {
 
   void* GetSlot(int offset) {
     return reinterpret_cast<char*>(this) + offset;
+  }
+
+  const void* GetSlot(int offset) const {
+    return reinterpret_cast<const char*>(this) + offset;
   }
 
   StringValue* GetStringSlot(int offset) {

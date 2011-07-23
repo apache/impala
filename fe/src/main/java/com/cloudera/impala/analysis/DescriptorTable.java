@@ -44,6 +44,10 @@ public class DescriptorTable {
     return tupleDescs.values();
   }
 
+  public TupleId getMaxTupleId() {
+    return new TupleId(nextTupleId - 1);
+  }
+
   // Computes physical layout parameters of all descriptors.
   // Call this only after the last descriptor was added.
   public void computeMemLayout() {

@@ -6,10 +6,11 @@
 
 #include <sstream>
 
-#include "exprs/expr.h"
-#include "exec/text-scan-node.h"
 #include "common/object-pool.h"
 #include "common/status.h"
+#include "exprs/expr.h"
+#include "exec/aggregation-node.h"
+#include "exec/text-scan-node.h"
 #include "runtime/mem-pool.h"
 #include "gen-cpp/PlanNodes_types.h"
 
@@ -22,6 +23,14 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode) {
   DCHECK(status.ok())
       << "ExecNode c'tor: deserialization of conjuncts failed:\n"
       << status.GetErrorMsg();
+}
+
+Status ExecNode::Prepare(RuntimeState* state) {
+  PrepareConjuncts(state);
+  for (int i = 0; i < children_.size(); ++i) {
+    RETURN_IF_ERROR(children_[i]->Prepare(state));
+  }
+  return Status::OK;
 }
 
 Status ExecNode::CreateTree(ObjectPool* pool, const TPlan& plan, ExecNode** root) {
@@ -78,7 +87,8 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode, ExecNode**
       *node = pool->Add(new TextScanNode(pool, tnode));
       return Status::OK;
     case TPlanNodeType::AGGREGATION_NODE:
-      return Status("Aggregation node not implemented");
+      *node = pool->Add(new AggregationNode(pool, tnode));
+      return Status::OK;
     case TPlanNodeType::SORT_NODE:
       return Status("Sort node not implemented");
   }

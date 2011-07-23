@@ -26,7 +26,8 @@ class ExecNode {
   // Sets up internal structures, etc., without doing any actual work.
   // Must be called prior to Open(). Will only be called once in this
   // node's lifetime.
-  virtual Status Prepare(RuntimeState* state) = 0;
+  // Default implementation only calls Prepare() on the children.
+  virtual Status Prepare(RuntimeState* state);
 
   // Performs any preparatory work prior to calling GetNext().
   // Can be called repeatedly (after calls to Close()).

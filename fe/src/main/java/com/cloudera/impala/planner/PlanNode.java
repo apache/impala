@@ -27,8 +27,14 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    */
   protected List<Predicate> conjuncts;
 
+  // TODO:
+  // Map from TupleId to ordinal position of that tuple in the output
+  // rows produced by this node.
+  //protected ArrayList<Int> tupleIdxMap;
+
   PlanNode() {
     this.conjuncts = Lists.newArrayList();
+    //this.tupleIdxMap = Lists.newArrayList();
   }
 
   public long getLimit() {

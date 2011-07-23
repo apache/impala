@@ -100,7 +100,7 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
       if (!texpr_node.__isset.agg_expr) {
         return Status("Aggregation expression not set in thrift node");
       }
-      *expr = pool->Add(new AggExpr(texpr_node));
+      *expr = pool->Add(new AggregateExpr(texpr_node));
       return Status::OK;
     }
     case TExprNodeType::ARITHMETIC_EXPR: {
@@ -266,4 +266,25 @@ void Expr::Prepare(RuntimeState* state) {
   for (int i = 0; i < children_.size(); ++i) {
     children_[i]->Prepare(state);
   }
+}
+
+void Expr::Prepare(const std::vector<Expr*>& exprs, RuntimeState* state) {
+  for (int i = 0; i < exprs.size(); ++i) {
+    exprs[i]->Prepare(state);
+  }
+}
+
+std::string Expr::DebugString() const {
+  // TODO: implement partial debug string for member vars
+  return "";
+}
+
+std::string Expr::DebugString(const std::vector<Expr*>& exprs) {
+  stringstream out;
+  out << "[";
+  for (int i = 0; i < exprs.size(); ++i) {
+    out << (i == 0 ? "" : " ") << exprs[i]->DebugString();
+  }
+  out << "]";
+  return out.str();
 }

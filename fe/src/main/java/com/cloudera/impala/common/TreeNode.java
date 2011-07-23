@@ -16,6 +16,10 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
     return children.get(i);
   }
 
+  public boolean hasChild(int i) {
+    return children.size() > i;
+  }
+
   public void addChild(NodeType n) {
     children.add(n);
   }

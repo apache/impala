@@ -196,9 +196,9 @@ Status QueryExecutor::FetchResult(std::vector<void*>* select_list_values) {
     return Status::OK;
   }
 
+  select_list_values->clear();
   if (row_batch_.get() == NULL || row_batch_->num_rows() == next_row_) {
     if (eos_) {
-      select_list_values->clear();
       return Status::OK;
     }
 
@@ -212,10 +212,14 @@ Status QueryExecutor::FetchResult(std::vector<void*>* select_list_values) {
     next_row_ = 0;
     if (row_batch_->num_rows() < row_batch_->capacity()) {
       eos_ = true;
+      if (row_batch_->num_rows() == 0) {
+        // empty result
+        return Status::OK;
+      }
     }
   }
 
-  select_list_values->clear();
+  DCHECK(next_row_ < row_batch_->num_rows());
   TupleRow* row = row_batch_->GetRow(next_row_);
   for (int i = 0; i < select_list_exprs_.size(); ++i) {
     select_list_values->push_back(select_list_exprs_[i]->GetValue(row));

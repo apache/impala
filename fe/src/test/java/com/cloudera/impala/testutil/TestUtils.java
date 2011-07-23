@@ -103,7 +103,7 @@ public class TestUtils {
     }
     for (int i = 0; i < expectedStrTypes.length; ++i) {
       String upperCaseTypeStr = expectedStrTypes[i].toUpperCase();
-      PrimitiveType expectedType = typeNameMap.get(upperCaseTypeStr);
+      PrimitiveType expectedType = typeNameMap.get(upperCaseTypeStr.trim());
       if (actual.get(i) != expectedType) {
         return "Slot: " + i + ". Found: " + actual.get(i).toString() + ". Expected: "
             + upperCaseTypeStr;

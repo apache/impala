@@ -20,7 +20,7 @@ class TupleDescriptor;
 class RowBatch {
  public:
   // Create RowBatch for for num_rows rows of tuples specified by 'descriptors'.
-  RowBatch(const std::vector<const TupleDescriptor*>& descriptors, int capacity)
+  RowBatch(const std::vector<TupleDescriptor*>& descriptors, int capacity)
     : num_rows_(0),
       capacity_(capacity),
       num_tuples_per_row_(descriptors.size()),
@@ -62,6 +62,14 @@ class RowBatch {
   // Add a mempool containing tuple data.
   void AddMemPool(MemPool* pool) {
     mem_pools_.push_back(pool);
+  }
+
+  void Reset() {
+    num_rows_ = 0;
+    for (int i = 0; i < mem_pools_.size(); ++i) {
+      delete mem_pools_[i];
+    }
+    mem_pools_.clear();
   }
 
   int num_rows() const { return num_rows_; }

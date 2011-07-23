@@ -51,7 +51,7 @@ class PlanExecutor {
 
  private:
   ExecNode* plan_;
-  std::vector<const TupleDescriptor*> tuple_descs_;
+  std::vector<TupleDescriptor*> tuple_descs_;
   RuntimeState runtime_state_;
   bool done_;
 };

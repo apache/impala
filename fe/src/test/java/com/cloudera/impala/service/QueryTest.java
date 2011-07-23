@@ -31,12 +31,14 @@ public class QueryTest {
   private static Catalog catalog;
   private static Coordinator coordinator;
   private final String testDir = "ServiceTest";
+  private static StringBuilder errorLog;
 
   @BeforeClass
   public static void setUp() throws Exception {
     HiveMetaStoreClient client = TestSchemaUtils.createClient();
     catalog = new Catalog(client);
     coordinator = new Coordinator(catalog);
+    errorLog = new StringBuilder();
   }
 
   private void runQuery(String query, ArrayList<String> expectedTypes,
@@ -50,14 +52,16 @@ public class QueryTest {
     try {
       coordinator.runQuery(request, colTypes, colLabels, resultQueue);
     } catch (ImpalaException e) {
-      fail(e.getMessage());
+      errorLog.append("error executing query '" + query + "':\n" + e.getMessage());
+      return;
     }
 
     // Check types filled in by RunQuery()
     String[] expectedTypesArr = expectedTypes.get(0).split(",");
     String typeResult = TestUtils.compareOutputTypes(colTypes, expectedTypesArr);
     if (!typeResult.isEmpty()) {
-      fail("query:\n" + query + "\n" + typeResult);
+      errorLog.append("query:\n" + query + "\n" + typeResult);
+      return;
     }
 
     while (true) {
@@ -66,7 +70,8 @@ public class QueryTest {
         resultRow = resultQueue.take();
       } catch (InterruptedException e) {
         e.printStackTrace();
-        fail("unexpected interrupt");
+        errorLog.append("unexpected interrupt");
+        return;
       }
       if (resultRow.colVals == null) {
         break;
@@ -86,7 +91,8 @@ public class QueryTest {
     actualResults.toArray(actualResultsArray);
     String result = TestUtils.compareOutput(actualResultsArray, expectedResults);
     if (!result.isEmpty()) {
-      fail("query:\n" + query + "\n" + result);
+      errorLog.append("query:\n" + query + "\n" + result);
+      return;
     }
   }
 
@@ -107,6 +113,10 @@ public class QueryTest {
 
   @Test
   public void Test() {
+    runTests("aggregation");
     runTests("textscannode");
+    if (errorLog.length() != 0) {
+      fail(errorLog.toString());
+    }
   }
 }

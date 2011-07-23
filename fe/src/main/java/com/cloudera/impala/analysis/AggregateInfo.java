@@ -16,9 +16,10 @@ import com.google.common.collect.Lists;
  *
  */
 public class AggregateInfo {
-  private final ArrayList<Expr> groupingExprs;  // all exprs from Group By clause
+  // all exprs from Group By clause, duplicates removed
+  private final ArrayList<Expr> groupingExprs;
+  // all agg exprs from select block, duplicates removed
   private final ArrayList<AggregateExpr> aggregateExprs;
-    // all agg exprs from select block
 
   // The tuple into which the output of the aggregation computation is materialized; contains
   // groupingExprs.size() + aggregateExprs.size() slots, the first groupingExprs.size() of
@@ -33,7 +34,9 @@ public class AggregateInfo {
   // c'tor takes ownership of groupingExprs and aggExprs
   public AggregateInfo(ArrayList<Expr> groupingExprs, ArrayList<AggregateExpr> aggExprs) {
     this.groupingExprs = groupingExprs;
+    Expr.removeDuplicates(this.groupingExprs);
     this.aggregateExprs = aggExprs;
+    Expr.removeDuplicates(this.aggregateExprs);
     this.aggTupleSubstMap = new Expr.SubstitutionMap();
   }
 
@@ -66,18 +69,6 @@ public class AggregateInfo {
     exprs.addAll(aggregateExprs);
     for (int i = 0; i < exprs.size(); ++i) {
       Expr expr = exprs.get(i);
-      // skip this if it's a duplicate
-      boolean skip = false;
-      for (int j = 0; j < i; ++j) {
-        if (exprs.get(j).equals(expr)) {
-          skip = true;
-          break;
-        }
-      }
-      if (skip) {
-        continue;
-      }
-
       SlotDescriptor slotD = descTbl.addSlotDescriptor(aggTupleDesc);
       Preconditions.checkArgument(expr.getType() != PrimitiveType.INVALID_TYPE);
       slotD.setType(expr.getType());

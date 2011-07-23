@@ -16,7 +16,11 @@ from testtbl
 where name like 'm%'
 group by 1
 ----
-not implemented
+AGGREGATE
+GROUP BY: zip
+  SCAN table=default.testtbl
+    PREDICATES: name LIKE 'm%'
+    FILES: 
 ====
 select name, count(*)
 from testtbl
@@ -24,7 +28,12 @@ where name regexp 'm*'
 group by 1
 having count(*) > 1
 ----
-not implemented
+AGGREGATE
+GROUP BY: name
+HAVING: <slot 2> > 1
+  SCAN table=default.testtbl
+    PREDICATES: name REGEXP 'm*'
+    FILES:
 ====
 select zip, count(*)
 from testtbl

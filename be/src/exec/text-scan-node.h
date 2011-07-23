@@ -212,11 +212,6 @@ class TextScanNode : public ExecNode {
   void ConvertAndWriteSlotBytes(const char* begin, const char* end, Tuple* tuple,
       const SlotDescriptor* slot_desc, bool copy_string, bool unescape_string);
 
-  // Writes the bytes of a given value into the slot of a tuple.
-  // value is assumed to be the result of an expression evaluation (typically a LiteralExpr).
-  // For string values, the string data is copied into memory allocated from the var_len_pool_.
-  void WriteValue(const void* value, Tuple* tuple, const SlotDescriptor* slot_desc);
-
   // Removes escape characters from len characters of the null-terminated string src,
   // and copies the unescaped string into dest, changing *len to the unescaped length.
   // No null-terminator is added to dest.
