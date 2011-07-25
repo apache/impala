@@ -16,10 +16,13 @@ import com.cloudera.impala.catalog.Catalog;
  * Minimal implementation required to run select queries with sqlline.
  * The implemented methods must return non-null values.
  * Most methods are not implemented because they are not required to make sqlline work.
+ * Unimplemented methods throw an UnsupportedOperationException that includes the method name of the
+ * called method for easier debugging.
  *
- * This class registers an instance of itself in the DriverManager such that clients can connect to it.
- * When a client requests a connection, the DiverManager goes through all registered drivers to find
- * a driver that accepts the connection URL given by the user.
+ * This class registers an instance of itself in the DriverManager
+ * such that clients can connect to it.
+ * When a client requests a connection, the DiverManager goes through all registered drivers
+ * to find a driver that accepts the connection URL given by the user.
  * The current driver accepts any url that contains "impala", and accepts any username/password.
  */
 public class ImpalaDriver implements java.sql.Driver {
@@ -58,8 +61,7 @@ public class ImpalaDriver implements java.sql.Driver {
 
   @Override
   public DriverPropertyInfo[] getPropertyInfo(String url, Properties info) throws SQLException {
-    // TODO Auto-generated method stub
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override

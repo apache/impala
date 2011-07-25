@@ -6,6 +6,7 @@ import java.sql.Array;
 import java.sql.Blob;
 import java.sql.CallableStatement;
 import java.sql.Clob;
+import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.NClob;
 import java.sql.PreparedStatement;
@@ -26,6 +27,8 @@ import com.cloudera.impala.service.Coordinator;
  * Minimal implementation required to run select queries with sqlline.
  * The implemented methods must return non-null values.
  * Most methods are not implemented because they are not required to make sqlline work.
+ * Unimplemented methods throw an UnsupportedOperationException that includes the method name of the
+ * called method for easier debugging.
  *
  * This class creates ImpalaStatements and provides ImpalaDatabaseMetaData.
  */
@@ -37,13 +40,14 @@ public class ImpalaConnection implements java.sql.Connection {
   private final Properties info;
   // For executing queries.
   private final Coordinator coordinator;
-  // Whether to auto-commit a single-statement query.
-  private boolean autoCommit = true;
+  // Connection status.
+  private boolean isClosed = true;
 
   public ImpalaConnection(String url, Properties info, Catalog catalog) {
     this.url = url;
     this.info = info;
     coordinator = new Coordinator(catalog);
+    isClosed = false;
   }
 
   @Override
@@ -57,232 +61,249 @@ public class ImpalaConnection implements java.sql.Connection {
   }
 
   @Override
-  public void setAutoCommit(boolean autoCommit) throws SQLException {
-    this.autoCommit = autoCommit;
+  public boolean isClosed() throws SQLException {
+    return isClosed;
   }
 
   @Override
+  public void close() throws SQLException {
+    isClosed = true;
+  }
+
+  // We currently don't support transactions.
+  @Override
+  public void setAutoCommit(boolean autoCommit) throws SQLException {
+    // Don't throw to avoid an error message in sqlline.
+  }
+
+  // We don't support transactions, so commit doesn't make sense.
+  @Override
   public boolean getAutoCommit() throws SQLException {
-    return autoCommit;
+    return false;
+  }
+
+  // We currently don't support transactions.
+  @Override
+  public void setTransactionIsolation(int level) throws SQLException {
+    // Don't throw to avoid an error message in sqlline.
+  }
+
+  // We currently don't support transactions. For some reason sqlline still reports REPEATABLE_READ.
+  @Override
+  public int getTransactionIsolation() throws SQLException {
+    return Connection.TRANSACTION_NONE;
   }
 
   // Non-essential and unimplemented methods start here.
 
   @Override
   public <T> T unwrap(Class<T> iface) throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public boolean isWrapperFor(Class<?> iface) throws SQLException {
-    return false;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public PreparedStatement prepareStatement(String sql) throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public CallableStatement prepareCall(String sql) throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public String nativeSQL(String sql) throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public void commit() throws SQLException {
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public void rollback() throws SQLException {
-  }
-
-  @Override
-  public void close() throws SQLException {
-  }
-
-  @Override
-  public boolean isClosed() throws SQLException {
-    return false;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public void setReadOnly(boolean readOnly) throws SQLException {
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public boolean isReadOnly() throws SQLException {
-    return false;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public void setCatalog(String catalog) throws SQLException {
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public String getCatalog() throws SQLException {
-    return null;
-  }
-
-  @Override
-  public void setTransactionIsolation(int level) throws SQLException {
-  }
-
-  @Override
-  public int getTransactionIsolation() throws SQLException {
-    return 0;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public SQLWarning getWarnings() throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public void clearWarnings() throws SQLException {
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public Statement createStatement(int resultSetType, int resultSetConcurrency) throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency)
       throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency)
       throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public Map<String, Class<?>> getTypeMap() throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public void setTypeMap(Map<String, Class<?>> map) throws SQLException {
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public void setHoldability(int holdability) throws SQLException {
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public int getHoldability() throws SQLException {
-    return 0;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public Savepoint setSavepoint() throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public Savepoint setSavepoint(String name) throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public void rollback(Savepoint savepoint) throws SQLException {
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public void releaseSavepoint(Savepoint savepoint) throws SQLException {
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public Statement createStatement(int resultSetType, int resultSetConcurrency,
       int resultSetHoldability) throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public PreparedStatement prepareStatement(String sql, int resultSetType,
       int resultSetConcurrency, int resultSetHoldability) throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public CallableStatement prepareCall(String sql, int resultSetType, int resultSetConcurrency,
       int resultSetHoldability) throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
-  public PreparedStatement prepareStatement(String sql, int autoGeneratedKeys) throws SQLException {
-    return null;
+  public PreparedStatement prepareStatement(String sql, int autoGeneratedKeys)
+      throws SQLException {
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public PreparedStatement prepareStatement(String sql, int[] columnIndexes) throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public PreparedStatement prepareStatement(String sql, String[] columnNames) throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public Clob createClob() throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public Blob createBlob() throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public NClob createNClob() throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public SQLXML createSQLXML() throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public boolean isValid(int timeout) throws SQLException {
-    return false;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public void setClientInfo(String name, String value) throws SQLClientInfoException {
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public void setClientInfo(Properties properties) throws SQLClientInfoException {
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public String getClientInfo(String name) throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public Properties getClientInfo() throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public Array createArrayOf(String typeName, Object[] elements) throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   @Override
   public Struct createStruct(String typeName, Object[] attributes) throws SQLException {
-    return null;
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
-
 }
