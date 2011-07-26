@@ -231,6 +231,9 @@
         <configuration>
           <generateHtml>true</generateHtml>
           <generateXml>true</generateXml>
+	  <excludes>
+	    <exclude>${project.basedir}/src/main/java/com/cloudera/impala/jdbc/*</exclude>
+	  </excludes>
         </configuration>
       </plugin>
 
