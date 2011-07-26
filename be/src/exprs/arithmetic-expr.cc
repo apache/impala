@@ -1,5 +1,7 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
+#include <glog/logging.h>
+
 #include "exprs/arithmetic-expr.h"
 #include "exprs/functions.h"
 
@@ -38,8 +40,8 @@ void ArithmeticExpr::Prepare(RuntimeState* state) {
         case TYPE_DOUBLE:
           compute_function_ = GetValueFunctions::ArithmeticExpr_multiply_double;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad MULTIPLY type: " << type();
       }
       return;
 
@@ -65,8 +67,8 @@ void ArithmeticExpr::Prepare(RuntimeState* state) {
         case TYPE_BIGINT:
           compute_function_ = GetValueFunctions::ArithmeticExpr_mod_long;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad DIVIDE type: " << type();
       }
       return;
 
@@ -84,8 +86,8 @@ void ArithmeticExpr::Prepare(RuntimeState* state) {
         case TYPE_BIGINT:
           compute_function_ = GetValueFunctions::ArithmeticExpr_divide_long;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad INT_DIVIDE type: " << type();
       }
       return;
 
@@ -109,8 +111,8 @@ void ArithmeticExpr::Prepare(RuntimeState* state) {
         case TYPE_DOUBLE:
           compute_function_ = GetValueFunctions::ArithmeticExpr_add_double;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad PLUS type: " << type();
       }
       return;
 
@@ -134,8 +136,8 @@ void ArithmeticExpr::Prepare(RuntimeState* state) {
         case TYPE_DOUBLE:
           compute_function_ = GetValueFunctions::ArithmeticExpr_subtract_double;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad MINUS type: " << type();
       }
       return;
 
@@ -153,8 +155,8 @@ void ArithmeticExpr::Prepare(RuntimeState* state) {
         case TYPE_BIGINT:
           compute_function_ = GetValueFunctions::ArithmeticExpr_bitand_long;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad BITAND type: " << type();
       }
       return;
 
@@ -172,8 +174,8 @@ void ArithmeticExpr::Prepare(RuntimeState* state) {
         case TYPE_BIGINT:
           compute_function_ = GetValueFunctions::ArithmeticExpr_bitor_long;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad BITOR type: " << type();
       }
       return;
 
@@ -191,8 +193,8 @@ void ArithmeticExpr::Prepare(RuntimeState* state) {
         case TYPE_BIGINT:
           compute_function_ = GetValueFunctions::ArithmeticExpr_bitxor_long;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad BITXOR type: " << type();
       }
       return;
 
@@ -210,10 +212,12 @@ void ArithmeticExpr::Prepare(RuntimeState* state) {
         case TYPE_BIGINT:
           compute_function_ = GetValueFunctions::ArithmeticExpr_bitnot_long;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad BITNOT type: " << type();
       }
       return;
+    default:
+      DCHECK(false) << "bad arithmetic op: " << op_;
   }
 }
 

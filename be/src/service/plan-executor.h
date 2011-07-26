@@ -56,6 +56,10 @@ class PlanExecutor {
   bool done_;
 };
 
+extern "C"
+JNIEXPORT void Java_com_cloudera_impala_service_NativePlanExecutor_Init(
+    JNIEnv* env, jclass caller_class);
+
 // JNI-callable wrapper to the plan executor
 extern "C"
 JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativePlanExecutor_ExecPlan(

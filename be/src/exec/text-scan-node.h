@@ -171,8 +171,9 @@ class TextScanNode : public ExecNode {
   //               Set to NOT_IN_STRING if string_are_quoted==false,
   //               or we have not encountered a quote.
   //
-  Status ParseFileBuffer(RowBatch* row_batch, int* row_idx, int* column_idx,
-      bool* last_char_is_escape, bool* unescape_string, char* quote_char);
+  void ParseFileBuffer(RowBatch* row_batch, int* row_idx, int* column_idx,
+                       bool* last_char_is_escape, bool* unescape_string,
+                       char* quote_char);
 
   // Converts slot data (begin, end) into type of slot_desc,
   // and writes the result into the tuples's slot.

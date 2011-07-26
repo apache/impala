@@ -6,6 +6,8 @@
 #include <protocol/TBinaryProtocol.h>
 #include <transport/TBufferTransports.h>
 #include <boost/scoped_ptr.hpp>
+#include <glog/logging.h>
+
 #include "common/object-pool.h"
 #include "exec/exec-node.h"
 #include "exprs/expr.h"
@@ -73,12 +75,6 @@ Status PlanExecutor::FetchResult(RowBatch** batch) {
   return Status::OK;
 }
 
-static void ThrowJavaExc(JNIEnv* env, jclass exc_class, const Status& status) {
-  string error_msg;
-  status.GetErrorMsg(&error_msg);
-  env->ThrowNew(exc_class, error_msg.c_str());
-}
-
 Status DeserializeRequest(
     JNIEnv* env,
     jbyteArray execute_plan_request_bytes,
@@ -99,9 +95,10 @@ Status DeserializeRequest(
 
   // Deserialize plan bytes into c++ plan request using memory transport.
   TExecutePlanRequest exec_request;
-  boost::shared_ptr<TTransport> tmem_transport(new TMemoryBuffer(native_plan_bytes, plan_buf_size));
+  shared_ptr<TTransport> tmem_transport(
+      new TMemoryBuffer(native_plan_bytes, plan_buf_size));
   TBinaryProtocolFactoryT<TMemoryBuffer> tproto_factory;
-  boost::shared_ptr<TProtocol> tproto = tproto_factory.getProtocol(tmem_transport);
+  shared_ptr<TProtocol> tproto = tproto_factory.getProtocol(tmem_transport);
   exec_request.read(tproto.get());
 
   RETURN_IF_ERROR(ExecNode::CreateTree(obj_pool, exec_request.plan, plan));
@@ -113,6 +110,14 @@ Status DeserializeRequest(
 }
 
 extern "C"
+JNIEXPORT void Java_com_cloudera_impala_service_NativePlanExecutor_Init(
+    JNIEnv* env, jclass caller_class) {
+  google::InitGoogleLogging("impala-backend");
+  // install libunwind before activating this on 64-bit systems:
+  //google::InstallFailureSignalHandler();
+}
+
+extern "C"
 JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativePlanExecutor_ExecPlan(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_execute_plan_request,
     jboolean as_ascii, jobject result_queue) {
@@ -121,7 +126,8 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativePlanExecutor_ExecP
   DescriptorTbl* descs;
   vector<Expr*> select_list_exprs;
   ObjectPool obj_pool;
-  DeserializeRequest(env, thrift_execute_plan_request, &obj_pool, &plan, &descs, &select_list_exprs);
+  DeserializeRequest(env, thrift_execute_plan_request, &obj_pool, &plan, &descs,
+                     &select_list_exprs);
 
   // setup
   jclass impala_exc_cl = env->FindClass("com/cloudera/impala/common/ImpalaException");
@@ -174,7 +180,7 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativePlanExecutor_ExecP
   PlanExecutor executor(plan, *descs);
 
   // Prepare select list expressions.
-  for (int i = 0; i < select_list_exprs.size(); ++i) {
+  for (size_t i = 0; i < select_list_exprs.size(); ++i) {
     select_list_exprs[i]->Prepare(executor.runtime_state());
   }
 
@@ -190,7 +196,7 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativePlanExecutor_ExecP
       TupleRow* row = batch->GetRow(i);
       jobject result_row = env->NewObject(result_row_cl, result_row_ctor);
       THROW_IF_EXC(env, impala_exc_cl, throwable_to_string_id);
-      for (int j = 0; j < select_list_exprs.size(); ++j) {
+      for (size_t j = 0; j < select_list_exprs.size(); ++j) {
         TColumnValue col_val;
         select_list_exprs[j]->GetValue(row, as_ascii, &col_val);
         jobject java_col_val = env->NewObject(column_value_cl, column_value_ctor);

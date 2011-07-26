@@ -69,6 +69,7 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode, ExecNode**
     case TPlanNodeType::SORT_NODE:
       return Status("Sort node not implemented");
   }
+  return Status::OK;
 }
 
 }

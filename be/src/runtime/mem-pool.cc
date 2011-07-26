@@ -23,7 +23,7 @@ MemPool::MemPool(int chunk_size)
 }
 
 MemPool::~MemPool() {
-  for (int i = 0; i < mem_chunks_.size(); ++i) {
+  for (size_t i = 0; i < mem_chunks_.size(); ++i) {
     delete [] mem_chunks_[i];
   }
 }

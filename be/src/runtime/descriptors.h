@@ -34,6 +34,8 @@ struct NullIndicatorOffset {
     : byte_offset(byte_offset), bit_mask(1 << bit_offset) {
     //assert(bit_offset >= 0 && bit_offset <= 7);
   }
+
+  std::string DebugString() const;
 };
 
 // split this off into separate .h?
@@ -53,6 +55,7 @@ enum PrimitiveType {
 };
 
 extern PrimitiveType ThriftToType(TPrimitiveType::type ttype);
+extern std::string TypeToString(PrimitiveType t);
 
 class SlotDescriptor {
  public:
@@ -63,13 +66,16 @@ class SlotDescriptor {
     return null_indicator_offset_;
   }
 
+  std::string DebugString() const;
+
  protected:
   friend class DescriptorTbl;
 
-  PrimitiveType type_;
-  int col_pos_;
-  int tuple_offset_;
-  NullIndicatorOffset null_indicator_offset_;
+  const SlotId id_;
+  const PrimitiveType type_;
+  const int col_pos_;
+  const int tuple_offset_;
+  const NullIndicatorOffset null_indicator_offset_;
 
   SlotDescriptor(const TSlotDescriptor& tdesc);
 };
@@ -103,14 +109,17 @@ class TupleDescriptor {
   const std::vector<SlotDescriptor*> slots() const { return slots_; }
   const TableDescriptor* table_desc() const { return table_desc_.get(); }
 
+  std::string DebugString() const;
+
  protected:
   friend class DescriptorTbl;
 
-  TupleDescriptor(const TTupleDescriptor& tdesc);
+  const TupleId id_;
   const boost::scoped_ptr<TableDescriptor> table_desc_;
-  int byte_size_;
+  const int byte_size_;
   std::vector<SlotDescriptor*> slots_;
 
+  TupleDescriptor(const TTupleDescriptor& tdesc);
   void AddSlot(SlotDescriptor* slot);
 };
 
@@ -126,6 +135,8 @@ class DescriptorTbl {
 
   // return all registered tuple descriptors
   void GetTupleDescs(std::vector<const TupleDescriptor*>* descs) const;
+
+  std::string DebugString() const;
 
  private:
   typedef std::tr1::unordered_map<TupleId, TupleDescriptor*> TupleDescriptorMap;

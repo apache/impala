@@ -18,4 +18,6 @@ exception TAnalysisException {
 service ImpalaPlanService {
   LocalExecutor.TExecutePlanRequest GetExecRequest(1:string query)
     throws (1:TAnalysisException e);
+
+  void ShutdownServer();
 }

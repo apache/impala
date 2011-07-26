@@ -48,17 +48,6 @@ If you want to run just one test, try
 That looks for TestName and runs that tests.
 
 
-Running the Parser
-------------------
-From the impala/fe directory you can run the parser via
-
-  $ mvn exec:java -Dexec.mainClass=com.cloudera.impala.parser.Main -Dexec.args="'select * from foo'"
-
-or in parser debug mode (spits out transitions to stdout):
-
-  $ mvn exec:java -Dexec.mainClass=com.cloudera.impala.parser.Main -Dexec.args="-d 'select * from foo'"
-
-
 Setting up Eclipse
 ------------------
 

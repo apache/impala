@@ -10,13 +10,6 @@ add_library(Service
   plan-executor.cc
 )
 
-target_link_libraries(Service
-  Exec
-  Runtime
-  thrift  
-  ImpalaThrift
-)
-
 add_library(planexec SHARED
   plan-executor.cc  
 )
@@ -29,22 +22,30 @@ target_link_libraries(planexec
   thrift
   ImpalaThrift
   ${HDFS_LIBS}
+  glog
 )
 
 add_executable(runquery 
   run-query.cc
 )
-# don't link this against hdfs_libs or java_jvm_library;
+# Don't link this against hdfs_libs or java_jvm_library;
 # we need to avoid jni calls in order to be able to run under gdb,
-# and TestUtil contains a mock libhdfs implementation
+# and MockHdfs contains a mock libhdfs implementation.
+# Also, make sure to specify link libraries in reverse order of dependency
+# (ie, if libA uses symbols from libB, libA must precede libB), otherwise
+# when linking statically the linker won't look for the needed symbols.
+# TODO: is there a better way to specify link dependencies without having to
+# list all included libs for each specific binary? any gcc flags to help with this?
 target_link_libraries(runquery
-  Common
+  TestUtil
+  Service
   Exec
   Exprs
   Runtime
+  Common
   thrift
   ImpalaThrift
-  Service
-  pthread
-  TestUtil
+  MockHdfs
+  ${Boost_LIBRARIES}
+  glog
 )

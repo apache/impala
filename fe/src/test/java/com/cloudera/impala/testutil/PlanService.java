@@ -73,6 +73,10 @@ public class PlanService {
           Expr.treesToThrift(analysisResult.selectStmt.getSelectListExprs()));
       return execRequest;
     }
+
+    public void ShutdownServer() {
+      System.exit(0);
+    }
   }
 
   public static void main(String[] args) {

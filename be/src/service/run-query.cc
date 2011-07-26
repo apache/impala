@@ -1,28 +1,18 @@
 // (c) 2011 Cloudera, Inc. All rights reserved.
 
 #include <iostream>
-#include <vector>
-#include <boost/scoped_ptr.hpp>
+#include <iomanip>
+#include <sys/time.h>
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 
-#include <protocol/TBinaryProtocol.h>
-#include <transport/TSocket.h>
-#include <transport/TTransportUtils.h>
-
-#include "common/object-pool.h"
-#include "common/status.h"
-#include "exec/exec-node.h"
-#include "exprs/expr.h"
-#include "runtime/descriptors.h"
-#include "runtime/row-batch.h"
-#include "service/plan-executor.h"
+#include "testutil/query-executor.h"
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
 
+DEFINE_string(query, "", "query to execute");
+
 using namespace std;
-using namespace boost;
-using namespace apache::thrift;
-using namespace apache::thrift::protocol;
-using namespace apache::thrift::transport;
 using namespace impala;
 
 #define EXIT_IF_ERROR(stmt) \
@@ -36,82 +26,34 @@ using namespace impala;
     } \
   } while (false)
 
-static Status ExecutePlan(
-    PlanExecutor* executor,
-    const vector<Expr*>& select_list_exprs) {
-  Status status;
-  RETURN_IF_ERROR(executor->Exec());
-  scoped_ptr<RowBatch> batch;
-  string str;
-  int num_rows = 0;
-  while (true) {
-    RowBatch* batch_ptr;
-    RETURN_IF_ERROR(executor->FetchResult(&batch_ptr));
-    batch.reset(batch_ptr);
-    if (batch == NULL) {
-      return Status("Internal error: row batch is NULL.");
-    }
-    for (int i = 0; i < batch->num_rows(); ++i) {
-      TupleRow* row = batch->GetRow(i);
-      for (int j = 0; j < select_list_exprs.size(); ++j) {
-        select_list_exprs[j]->PrintValue(row, &str);
-        cout << (j > 0 ? ", " : "") << str;
-      }
-      cout << endl;
-    }
-    num_rows += batch->num_rows();
-    if (batch->num_rows() < batch->capacity()) {
-      break;
-    }
-  }
-  cout << "returned " << num_rows << (num_rows == 1 ? " row " : " rows ") << endl;
-
-  return Status::OK;
-}
-
 
 int main(int argc, char** argv) {
-  if (argc != 2) {
-    cerr << "usage: " << argv[0] << " <query>\n";
-    exit(1);
+  google::ParseCommandLineFlags(&argc, &argv, true);
+  google::InitGoogleLogging(argv[0]);
+
+  QueryExecutor executor;
+  EXIT_IF_ERROR(executor.Setup());
+
+  struct timeval start_time;
+  gettimeofday(&start_time, NULL);
+
+  EXIT_IF_ERROR(executor.Exec(FLAGS_query));
+  int num_rows = 0;
+  while (true) {
+    string row;
+    EXIT_IF_ERROR(executor.FetchResult(&row));
+    if (row.empty()) break;
+    cout << row << endl;
+    ++num_rows;
   }
 
-  shared_ptr<TTransport> socket(new TSocket("localhost", 20000));
-  shared_ptr<TTransport> transport(new TBufferedTransport(socket));
-  shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
-  ImpalaPlanServiceClient client(protocol);
+  struct timeval end_time;
+  gettimeofday(&end_time, NULL);
+  double elapsed_usec = end_time.tv_sec * 1000000 + end_time.tv_usec;
+  elapsed_usec -= start_time.tv_sec * 1000000 + start_time.tv_usec;
 
-  try {
-    transport->open();
-
-    TExecutePlanRequest request;
-    try {
-      client.GetExecRequest(request, argv[1]);
-    } catch (TAnalysisException& e) {
-      cerr << e.msg << endl;
-      exit(1);
-    }
-
-    ObjectPool pool;
-    ExecNode* plan_root;
-    EXIT_IF_ERROR(ExecNode::CreateTree(&pool, request.plan, &plan_root));
-    DescriptorTbl* descs;
-    EXIT_IF_ERROR(DescriptorTbl::Create(&pool, request.descTbl, &descs));
-    vector<Expr*> select_list_exprs;
-    EXIT_IF_ERROR(
-        Expr::CreateExprTrees(&pool, request.selectListExprs, &select_list_exprs));
-
-    // Prepare select list expressions.
-    PlanExecutor executor(plan_root, *descs);
-    for (int i = 0; i < select_list_exprs.size(); ++i) {
-      select_list_exprs[i]->Prepare(executor.runtime_state());
-    }
-
-    EXIT_IF_ERROR(ExecutePlan(&executor, select_list_exprs));
-
-    transport->close();
-  } catch (TException& tx) {
-    printf("ERROR: %s\n", tx.what());
-  }
+  cout << "returned " << num_rows << (num_rows == 1 ? " row" : " rows")
+       << " in " << setiosflags(ios::fixed) << setprecision(3)
+       << elapsed_usec/1000000.0 << " s" << endl;
 }
 

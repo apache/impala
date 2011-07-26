@@ -1,14 +1,22 @@
 Prerequisites
 -------------
 1) Boost (libbost<>-dev package)
-2) Thrift source installation (unlike Java, C++ needs extra header files).
+2) Boost threads (libbost-thread-dev)
+3) Thrift source installation (unlike Java, C++ needs extra header files).
 Download this from Apache, then build. Requires Boost and python<version>-dev.
-3) cmake
-4) Hadoop
+4) cmake
+5) Hadoop
 $HADOO_HOME must be set (e.g. mine is /home/abehm/hive/build/hadoopcore/hadoop-0.20.2-cdh3u1-SNAPSHOT).
 To run an exec linked against libhdfs, the CLASSPATH must include 
 all jars in $HADOOP_HOME and $HADOOP_HOME/lib, 
 as well as the path with hdfs-site.xml.
+6) Google command line flags library (gflags):
+download the tarball from http://code.google.com/p/google-gflags, then install as per instructions. 
+7) Google logging library (glog):
+This depends on gflags; download from download link accessible from
+http://code.google.com/p/google-glog, then install as per instructions.
+At the moment it needs to be linked dynamically (until I figure out how to change that), so you need
+to set LD_LIBRARY_PATH to where libglog.so.0 is (on my Ubuntu box, those go into /usr/local/lib).
 
 Building
 --------

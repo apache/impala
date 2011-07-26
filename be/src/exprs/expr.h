@@ -77,8 +77,9 @@ class Expr {
 
   // Convenience function: extract value into col_val and sets the
   // appropriate __isset flag.
-  // If the value is NULL, nothing is set.
-  // If 'as_ascii' is true, writes the value in ascii into stringVal;
+  // If the value is NULL and as_ascii is false, nothing is set.
+  // If 'as_ascii' is true, writes the value in ascii into stringVal
+  // (nulls turn into "NULL");
   // if it is false, the specific field in col_val that receives the value is
   // based on the type of the expr:
   // TYPE_BOOLEAN: boolVal
@@ -89,7 +90,7 @@ class Expr {
   void GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val);
 
   // Convenience function: print value into 'str'.
-  // NULL turns into an empty string.
+  // NULL turns into "NULL".
   void PrintValue(TupleRow* row, std::string* str);
 
   void AddChild(Expr* expr) { children_.push_back(expr); }

@@ -21,12 +21,13 @@ TextScanNode::TextScanNode(const TScanNode& tscan_node)
     : files_(tscan_node.file_paths),
       tuple_id_(tscan_node.tuple_id),
       tuple_desc_(NULL),
+      tuple_idx_(0),
       tuple_delim_(DELIM_INIT),
       field_delim_(DELIM_INIT),
       collection_item_delim_(DELIM_INIT),
       escape_char_(DELIM_INIT),
-      string_quote_(DELIM_INIT),
       strings_are_quoted_(false),
+      string_quote_(DELIM_INIT),
       tuple_buf_pool_(new MemPool(POOL_INIT_SIZE)),
       file_buf_pool_(new MemPool(POOL_INIT_SIZE)),
       var_len_pool_(new MemPool(POOL_INIT_SIZE)),
@@ -35,7 +36,6 @@ TextScanNode::TextScanNode(const TScanNode& tscan_node)
       file_buf_actual_size_(0),
       file_idx_(0),
       tuple_buf_(NULL),
-      tuple_idx_(0),
       tuple_(NULL),
       file_buf_(NULL),
       file_buf_ptr_(NULL),
@@ -75,7 +75,7 @@ Status TextScanNode::Prepare(RuntimeState* state) {
 
   // Next, set mapping from column index to slot index for all slots in the query.
   const std::vector<SlotDescriptor*>& slots = tuple_desc_->slots();
-  for (int i = 0; i < slots.size(); i++) {
+  for (size_t i = 0; i < slots.size(); i++) {
     // TODO: this seems like the wrong place to do this subtraction.
     int file_col_pos = slots[i]->col_pos() - tuple_desc_->table_desc()->num_partition_keys();
     if (file_col_pos >= 0) {
@@ -176,8 +176,8 @@ Status TextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
       // appending tuples into the tuple buffer until:
       // a) file buffer has been completely parsed or
       // b) tuple buffer is full
-      RETURN_IF_ERROR(ParseFileBuffer(row_batch, &row_idx, &column_idx,
-          &last_char_is_escape, &unescape_string, &quote_char));
+      ParseFileBuffer(row_batch, &row_idx, &column_idx, &last_char_is_escape,
+                      &unescape_string, &quote_char);
 
       if (row_batch->IsFull()) {
         // Swap file buffers, so previous buffer is always found at index 0,
@@ -207,7 +207,8 @@ Status TextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
   return Status::OK;
 }
 
-Status TextScanNode::ParseFileBuffer(RowBatch* row_batch, int* row_idx, int* column_idx,
+void TextScanNode::ParseFileBuffer(
+    RowBatch* row_batch, int* row_idx, int* column_idx,
     bool* last_char_is_escape, bool* unescape_string, char* quote_char) {
 
   // Points to beginning of current column data.
@@ -324,7 +325,7 @@ Status TextScanNode::ParseFileBuffer(RowBatch* row_batch, int* row_idx, int* col
       *row_idx = RowBatch::INVALID_ROW_INDEX;
       if (row_batch->IsFull()) {
         // Tuple buffer is full.
-        return Status::OK;
+        return;
       }
     }
   }
@@ -334,8 +335,6 @@ Status TextScanNode::ParseFileBuffer(RowBatch* row_batch, int* row_idx, int* col
   if (column_start != file_buf_ptr_) {
     boundary_column_.append(column_start, file_buf_ptr_ - column_start);
   }
-
-  return Status::OK;
 }
 
 void TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, Tuple* tuple,

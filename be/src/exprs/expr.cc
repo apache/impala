@@ -203,13 +203,12 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
 // TODO: create machine-independent typedefs for 1/2/4/8-byte ints
 void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
   void* value = GetValue(row);
-  if (value == NULL) return;
-
   if (as_ascii) {
     PrintValue(value, &col_val->stringVal);
     col_val->__isset.stringVal = true;
     return;
   }
+  if (value == NULL) return;
 
   switch (type_) {
     case TYPE_BOOLEAN:
@@ -249,13 +248,13 @@ void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
   }
 }
 
-void Expr::PrintValue(TupleRow* row, std::string* str) {
+void Expr::PrintValue(TupleRow* row, string* str) {
   PrintValue(GetValue(row), str);
 }
 
-void Expr::PrintValue(void* value, std::string* str) {
+void Expr::PrintValue(void* value, string* str) {
   if (value == NULL) {
-    str->clear();
+    *str = "NULL";
     return;
   }
 
