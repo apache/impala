@@ -63,11 +63,18 @@ public class CatalogTest {
     assertNotNull(testDb);
     assertEquals(testDb.getName(), "testdb1");
 
-    // both dbs contain tables alltypes and testtbl
+    // default contains tables alltypes, alltypessmall and testtbl.
+    assertEquals(3, defaultDb.getTables().size());
     assertNotNull(defaultDb.getTable("alltypes"));
+    assertNotNull(defaultDb.getTable("alltypessmall"));
     assertNotNull(defaultDb.getTable("testtbl"));
+    // testdb contains tables alltypes and testtbl.
+    assertEquals(2, testDb.getTables().size());
     assertNotNull(testDb.getTable("alltypes"));
     assertNotNull(testDb.getTable("testtbl"));
+
+    // We should have failed to load this table.
+    assertNull(defaultDb.getTable("delimerrortable"));
 
     checkTableCols(defaultDb, "alltypes",
         new String[]

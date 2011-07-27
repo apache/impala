@@ -173,7 +173,7 @@ public class Table {
         table.setDelimiters(msTbl.getSd().getSerdeInfo());
       } catch (Exception e) {
         LOG.warn("Ignoring table {} because setting delimiters failed, " +
-            "with exceptin message {}",
+            "with exception message:\n{}",
             new Object[] {tblName, e.getMessage()});
         return null;
       }
@@ -232,18 +232,18 @@ public class Table {
     }
   }
 
-
-
-  // the metastore may return null for delimiter parameters,
+  // The metastore may return null for delimiter parameters,
   // which means we need to use a default instead.
-  // we tried long and hard to find default values for delimiters in Hive,
-  // but could not find them
+  // We tried long and hard to find default values for delimiters in Hive,
+  // but could not find them.
   private void setDelimiters(SerDeInfo serdeInfo) throws Exception {
+    // For reporting all exceptions.
+    ArrayList<String> exceptionMessages = new ArrayList<String>();
+    // Hive currently only supports newline.
     lineDelim = serdeInfo.getParameters().get(Constants.LINE_DELIM);
     if (lineDelim != null) {
       if (lineDelim.length() != 1) {
-        throw new Exception("We only support single-character line delimiters. " +
-        		"Line delimiter found: '" + lineDelim + "'");
+        exceptionMessages.add("Line delimiter found: '" + lineDelim + "'");
       }
     } else {
       // default value
@@ -252,8 +252,7 @@ public class Table {
     fieldDelim = serdeInfo.getParameters().get(Constants.FIELD_DELIM);
     if (fieldDelim != null) {
       if (fieldDelim.length() != 1) {
-        throw new Exception("We only support single-character field delimiters. " +
-            "Field delimiter found: '" + fieldDelim + "'");
+        exceptionMessages.add("Field delimiter found: '" + fieldDelim + "'");
       }
     } else {
       // default value
@@ -262,8 +261,7 @@ public class Table {
     collectionDelim = serdeInfo.getParameters().get(Constants.COLLECTION_DELIM);
     if (collectionDelim != null) {
       if (collectionDelim.length() != 1) {
-        throw new Exception("We only support single-character collection-item delimiters. " +
-            "Collection-item delimiter found: '" + collectionDelim + "'");
+        exceptionMessages.add("Collection-item delimiter found: '" + collectionDelim + "'");
       }
     } else {
       // default value
@@ -272,8 +270,7 @@ public class Table {
     mapKeyDelim = serdeInfo.getParameters().get(Constants.MAPKEY_DELIM);
     if (mapKeyDelim != null) {
       if (mapKeyDelim.length() != 1) {
-        throw new Exception("We only support single-character MapKey delimiters. " +
-            "MapKey delimiter found: '" + mapKeyDelim + "'");
+        exceptionMessages.add("MapKey delimiter found: '" + mapKeyDelim + "'");
       }
     } else {
       // default value
@@ -282,8 +279,7 @@ public class Table {
     escapeChar = serdeInfo.getParameters().get(Constants.ESCAPE_CHAR);
     if (escapeChar != null) {
       if (escapeChar.length() != 1) {
-        throw new Exception("We only support single-character string quotes. " +
-            "String quote found: '" + escapeChar + "'");
+        exceptionMessages.add("Escape character found: '" + escapeChar + "'");
       }
     } else {
       // default value
@@ -292,12 +288,24 @@ public class Table {
     quoteChar = serdeInfo.getParameters().get(Constants.QUOTE_CHAR);
     if (quoteChar != null) {
       if (quoteChar.length() != 1) {
-        throw new Exception("We only support single-character string quotes. " +
-            "String quote found: '" + quoteChar + "'");
+        exceptionMessages.add("String quote found: '" + quoteChar + "'");
       }
     } else {
       // unset
       quoteChar = null;
+    }
+    // Throw exception if we failed to set at least one delimiter/quote/escape char.
+    if (!exceptionMessages.isEmpty()) {
+      StringBuilder strBuilder = new StringBuilder();
+      strBuilder.append("We only support single-character delimiters, quotes, and excape chars. " +
+          "Found the following properties:\n");
+      for (String s : exceptionMessages) {
+        strBuilder.append(s);
+        strBuilder.append('\n');
+      }
+      // Remove trailing newline.
+      strBuilder.deleteCharAt(strBuilder.length()-1);
+      throw new Exception(strBuilder.toString());
     }
   }
 

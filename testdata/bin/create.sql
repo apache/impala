@@ -16,6 +16,17 @@ row format delimited fields terminated by ','  escaped by '\\' stored as textfil
 DROP TABLE IF EXISTS AllTypesSmall;
 CREATE TABLE AllTypesSmall LIKE AllTypes;
 
+DROP TABLE IF EXISTS DelimErrorTable;
+CREATE TABLE DelimErrorTable (
+  id int,
+  name string)
+partitioned by (year int, month int) row format delimited 
+  fields terminated by '<>'
+  escaped by '$$'
+  collection items terminated by '^^'
+  map keys terminated by '**' 
+  stored as textfile;
+
 DROP TABLE IF EXISTS TestTbl;
 CREATE TABLE TestTbl (
   id bigint,
