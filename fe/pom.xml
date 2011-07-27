@@ -232,7 +232,7 @@
           <generateHtml>true</generateHtml>
           <generateXml>true</generateXml>
 	  <excludes>
-	    <exclude>${project.basedir}/src/main/java/com/cloudera/impala/jdbc/*</exclude>
+	    <exclude>**/jdbc/*.java</exclude>
 	  </excludes>
         </configuration>
       </plugin>
