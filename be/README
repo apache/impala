@@ -12,11 +12,16 @@ all jars in $HADOOP_HOME and $HADOOP_HOME/lib,
 as well as the path with hdfs-site.xml.
 6) Google command line flags library (gflags):
 download the tarball from http://code.google.com/p/google-gflags, then install as per instructions. 
+Static linking:
+To enable linking the static library into shared libraries, you must compile the package with -fPIC.
+You need to manually add -fPIC to the CXXFLAGS in the Makefile (line 318 in my version 0.3.1).
 7) Google logging library (glog):
 This depends on gflags; download from download link accessible from
 http://code.google.com/p/google-glog, then install as per instructions.
-At the moment it needs to be linked dynamically (until I figure out how to change that), so you need
-to set LD_LIBRARY_PATH to where libglog.so.0 is (on my Ubuntu box, those go into /usr/local/lib).
+Static linking:
+To statically link this library, you must also statically link the gflags library.
+To enable linking the static library into shared libraries, you must compile the package with -fPIC.
+You need to manually add -fPIC to the CXXFLAGS in the Makefile (line 191 in my version 1.5).
 
 Building
 --------

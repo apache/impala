@@ -22,7 +22,8 @@ target_link_libraries(planexec
   thrift
   ImpalaThrift
   ${HDFS_LIBS}
-  glog
+  glogstatic
+  gflagsstatic
 )
 
 add_executable(runquery 
@@ -47,5 +48,6 @@ target_link_libraries(runquery
   ImpalaThrift
   MockHdfs
   ${Boost_LIBRARIES}
-  glog
+  glogstatic
+  gflagsstatic
 )

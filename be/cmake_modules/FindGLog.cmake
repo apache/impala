@@ -1,0 +1,45 @@
+# - Find GLOG (logging.h, libglog.a, libglog.so, and libglog.so.0)
+# This module defines
+#  GLOG_INCLUDE_DIR, directory containing headers
+#  GLOG_LIBS, directory containing glog libraries
+#  GLOG_STATIC_LIB, path to libglog.a (
+#  GLOG_FOUND, whether glog has been found
+
+set(GLOG_SEARCH_HEADER_PATHS
+  /usr/local/include/
+  /usr/local/include/glog
+)
+
+set(GLOG_SEARCH_LIB_PATH
+  /usr/local/lib
+)
+
+find_path(GLOG_INCLUDE_DIR logging.h PATHS
+  ${GLOG_SEARCH_HEADER_PATHS}
+)
+
+find_library(GLOG_LIB_PATH NAMES glog PATHS ${GLOG_SEARCH_LIB_PATH})
+
+if (GLOG_LIB_PATH)
+  set(GLOG_FOUND TRUE)
+  set(GLOG_LIBS ${GLOG_SEARCH_LIB_PATH})
+  set(GLOG_STATIC_LIB ${GLOG_SEARCH_LIB_PATH}/libglog.a)
+else ()
+  set(GLOG_FOUND FALSE)
+endif ()
+
+if (GLOG_FOUND)
+  if (NOT GLOG_FIND_QUIETLY)
+    message(STATUS "GLog Found in ${GLOG_SEARCH_LIB_PATH}")
+  endif ()
+else ()
+  message(STATUS "GLog includes and libraries NOT found."
+    "Looked for headers in ${GLOG_SEARCH_HEADER_PATHS}, "
+    "and for libs in ${GLOG_SEARCH_LIB_PATHS}")
+endif ()
+
+mark_as_advanced(
+  GLOG_INCLUDE_DIR
+  GLOG_LIBS
+  GLOG_STATIC_LIB
+)
