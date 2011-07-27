@@ -51,6 +51,7 @@ class Status {
 
   // Return all accumulated error msgs in a single string.
   void GetErrorMsg(std::string* msg) const;
+  std::string GetErrorString() const;
 
  private:
   struct ErrorDetail;
@@ -60,6 +61,17 @@ class Status {
 // some generally useful macros
 #define RETURN_IF_ERROR(stmt) \
   do { Status status = (stmt); if (!status.ok()) return status; } while (false)
+
+#define EXIT_IF_ERROR(stmt) \
+  do { \
+    Status status = (stmt); \
+    if (!status.ok()) { \
+      string msg; \
+      status.GetErrorMsg(&msg); \
+      cerr << msg; \
+      exit(1); \
+    } \
+  } while (false)
 
 }
 

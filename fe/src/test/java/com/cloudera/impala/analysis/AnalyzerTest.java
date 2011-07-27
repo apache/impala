@@ -9,6 +9,7 @@ import static org.junit.Assert.fail;
 import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import junit.framework.Assert;
@@ -23,6 +24,8 @@ import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.TestSchemaUtils;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.TExpr;
+import com.google.common.base.Preconditions;
 
 public class AnalyzerTest {
   private final static Logger LOG = LoggerFactory.getLogger(AnalyzerTest.class);
@@ -62,9 +65,9 @@ public class AnalyzerTest {
     LOG.info("analyzing " + stmt);
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
-    ParseNode node = null;
+    SelectStmt node = null;
     try {
-      node = (ParseNode) parser.parse().value;
+      node = (SelectStmt) parser.parse().value;
     } catch (Exception e) {
       System.err.println(e.toString());
       fail("\nParser error:\n" + parser.getErrorMsg(stmt));
@@ -75,6 +78,13 @@ public class AnalyzerTest {
       node.analyze(analyzer);
     } catch (AnalysisException e) {
       fail("Analysis error:\n" + e.toString());
+    }
+
+    // convert select list exprs to thrift
+    List<Expr> selectListExprs = node.getSelectListExprs();
+    List<TExpr> thriftExprs = Expr.treesToThrift(selectListExprs);
+    for (TExpr expr: thriftExprs) {
+      LOG.info(expr.toString() + "\n");
     }
     return node;
   }
@@ -191,6 +201,13 @@ public class AnalyzerTest {
     // resolves dbs correctly
     AnalyzesOk("select zip from testtbl");
     AnalysisError("select zip from testdb1.testtbl", "couldn't resolve column reference");
+  }
+
+  @Test
+  public void TestNoFromClause() {
+    AnalyzesOk("select 'test'");
+    AnalyzesOk("select 1 + 1, -128, 'two', 1.28");
+    AnalysisError("select a + 1");
   }
 
   @Test public void TestOnClause() {
@@ -454,146 +471,140 @@ public class AnalyzerTest {
   }
 
   /**
-   * Test of all arithmetic type casts
-   * following Hive's casting policy
-   *
+   * Test of all arithmetic type casts following mysql's casting policy.
    */
   @Test
   public void TestArithmeticTypeCasts() {
-    // default comparison op - ignored in this test
-    BinaryPredicate.Operator cmpOp = BinaryPredicate.Operator.EQ;
-    // test on all possible arithmetic ops
-    for (ArithmeticExpr.Operator arithOp : ArithmeticExpr.Operator.values()) {
-      // we have a special test cases for these later on
-      if (arithOp.isBitwiseOperation() ||
-          arithOp == ArithmeticExpr.Operator.INT_DIVIDE ||
-          arithOp == ArithmeticExpr.Operator.DIVIDE) {
-        continue;
-      }
-      // test all numeric types
-      for (PrimitiveType type : PrimitiveType.values()) {
-        if (!type.isNumericType()) {
+    List<PrimitiveType> numericPlusString =
+        (List<PrimitiveType>) PrimitiveType.getNumericTypes().clone();
+    numericPlusString.add(PrimitiveType.STRING);
+
+    for (PrimitiveType type1 : PrimitiveType.getNumericTypes()) {
+      for (PrimitiveType type2 : numericPlusString) {
+        PrimitiveType compatibleType =
+            PrimitiveType.getAssignmentCompatibleType(type1, type2);
+        PrimitiveType promotedType = compatibleType.getMaxResolutionType();
+
+        // +, -, *
+        typeCastTest(type1, type2, false, ArithmeticExpr.Operator.PLUS, null,
+                      promotedType);
+        typeCastTest(type1, type2, true, ArithmeticExpr.Operator.PLUS, null,
+                      promotedType);
+        typeCastTest(type1, type2, false, ArithmeticExpr.Operator.MINUS, null,
+                      promotedType);
+        typeCastTest(type1, type2, true, ArithmeticExpr.Operator.MINUS, null,
+                      promotedType);
+        typeCastTest(type1, type2, false, ArithmeticExpr.Operator.MULTIPLY, null,
+                      promotedType);
+        typeCastTest(type1, type2, true, ArithmeticExpr.Operator.MULTIPLY, null,
+                      promotedType);
+
+        // /
+        typeCastTest(type1, type2, false, ArithmeticExpr.Operator.DIVIDE, null,
+                      PrimitiveType.DOUBLE);
+        typeCastTest(type1, type2, true, ArithmeticExpr.Operator.DIVIDE, null,
+                      PrimitiveType.DOUBLE);
+
+        // %
+        typeCastTest(type1, type2, false, ArithmeticExpr.Operator.MOD, null,
+                      compatibleType);
+        typeCastTest(type1, type2, true, ArithmeticExpr.Operator.MOD, null,
+                      compatibleType);
+
+        // div, &, |, ^ only for fixed-point types
+        if (!type1.isFixedPointType() || !type2.isFixedPointType()) {
           continue;
         }
-        // non-literals
-        typeCastTest(type, true, false, arithOp, cmpOp);
-        // literals
-        typeCastTest(type, true, true, arithOp, cmpOp);
+        typeCastTest(type1, type2, false, ArithmeticExpr.Operator.INT_DIVIDE, null,
+                      compatibleType);
+        typeCastTest(type1, type2, true, ArithmeticExpr.Operator.INT_DIVIDE, null,
+                      compatibleType);
+        typeCastTest(type1, type2, false, ArithmeticExpr.Operator.BITAND, null,
+                      compatibleType);
+        typeCastTest(type1, type2, true, ArithmeticExpr.Operator.BITAND, null,
+                      compatibleType);
+        typeCastTest(type1, type2, false, ArithmeticExpr.Operator.BITOR, null,
+                      compatibleType);
+        typeCastTest(type1, type2, true, ArithmeticExpr.Operator.BITOR, null,
+                      compatibleType);
+        typeCastTest(type1, type2, false, ArithmeticExpr.Operator.BITXOR, null,
+                      compatibleType);
+        typeCastTest(type1, type2, true, ArithmeticExpr.Operator.BITXOR, null,
+                      compatibleType);
       }
+    }
+
+    for (PrimitiveType type : PrimitiveType.getFixedPointTypes()) {
+      typeCastTest(null, type, false, ArithmeticExpr.Operator.BITNOT, null, type);
     }
   }
 
   /**
-   * Test of all type casts in comparisons
-   * following Hive's casting policy
-   *
+   * Test of all type casts in comparisons following mysql's casting policy.
    */
   @Test
   public void TestComparisonTypeCasts() {
-    // default arithmetic op - ignored in this test
-    ArithmeticExpr.Operator arithOp = ArithmeticExpr.Operator.PLUS;
     // test on all comparison ops
     for (BinaryPredicate.Operator cmpOp : BinaryPredicate.Operator.values()) {
       // test all numeric
-      for (PrimitiveType type : PrimitiveType.values()) {
-        if (!type.isNumericType()) {
-          continue;
+      for (PrimitiveType type1 : PrimitiveType.getNumericTypes()) {
+        for (PrimitiveType type2 : PrimitiveType.getNumericTypes()) {
+          PrimitiveType compatibleType =
+              PrimitiveType.getAssignmentCompatibleType(type1, type2);
+          typeCastTest(type1, type2, false, null, cmpOp, compatibleType);
+          typeCastTest(type1, type2, true, null, cmpOp, compatibleType);
         }
-        // non-literals
-        typeCastTest(type, false, false, arithOp, cmpOp);
-        // literals
-        typeCastTest(type, false, true, arithOp, cmpOp);
       }
     }
   }
 
   /**
-   * If literalMode is true there is exactly one literal (and one non-literal)
-   * otherwise we assume two non-literals
-   * Note: at the moment, we don't test on date-related types, because they're
-   * not supported by Hive.
-   *
-   * @param type
-   *          type to test
-   * @param arithmeticMode
-   *          if true test casts in an arithmetic expression,
-   *          otherwise tests casts in a binary predicate
-   * @param literalMode
-   *          whether to test a literal or non-literal
-   * @param arithOp
-   *          arithmetic operator to use (ignored if not arithmeticMode)
-   * @param cmpOp
-   *          comparison operator to use (ignored if arithmeticMode)
-   *
+   * Generate an expr of the form "<type1> <arithmeticOp | cmpOp> <type2>"
+   * and make sure that the expr has the correct type (opType for arithmetic
+   * ops or bool for comparisons) and that both operands are of type 'opType'.
    */
-  private void typeCastTest(PrimitiveType type, boolean arithmeticMode,
-      boolean literalMode, ArithmeticExpr.Operator arithOp,
-      BinaryPredicate.Operator cmpOp) {
-    for (PrimitiveType t : PrimitiveType.values()) {
-      if (!type.isValid() || type.isDateType() || t.ordinal() < type.ordinal()) {
-        continue;
-      }
-      PrimitiveType resultType =
-          PrimitiveType.getAssignmentCompatibleType(type, t);
-      if (!resultType.isValid()) {
-        continue;
-      }
-      String lval = null;
-      if (literalMode) {
-        lval = typeToLiteralValue.get(type);
+  private void typeCastTest(PrimitiveType type1, PrimitiveType type2,
+      boolean op1IsLiteral, ArithmeticExpr.Operator arithmeticOp,
+      BinaryPredicate.Operator cmpOp, PrimitiveType opType) {
+    Preconditions.checkState((arithmeticOp == null) != (cmpOp == null));
+    boolean arithmeticMode = arithmeticOp != null;
+    String op1 = "";
+    if (type1 != null) {
+      if (op1IsLiteral) {
+        op1 = typeToLiteralValue.get(type1);
       } else {
-        lval = TestSchemaUtils.getAllTypesColumn(type);
+        op1 = TestSchemaUtils.getAllTypesColumn(type1);
       }
-      String rval = TestSchemaUtils.getAllTypesColumn(t);
-      String queryStr = null;
-      if (arithmeticMode) {
-        queryStr = "select " + lval + " " + arithOp.toString() + " " + rval +
+    }
+    String op2 = TestSchemaUtils.getAllTypesColumn(type2);
+    String queryStr = null;
+    if (arithmeticMode) {
+      queryStr = "select " + op1 + " " + arithmeticOp.toString() + " " + op2 +
             " AS a from alltypes";
-      } else {
-        queryStr = "select int_col from alltypes " +
-            "where " + lval + " " + cmpOp.toString() + " " + rval;
-      }
-      System.err.println(queryStr);
-      SelectStmt select = (SelectStmt) AnalyzesOk(queryStr);
-      Expr exprToCheck = null;
-      if (arithmeticMode) {
-        ArrayList<Expr> selectListExprs = select.getSelectListExprs();
-        assertNotNull(selectListExprs);
-        assertEquals(selectListExprs.size(), 1);
-        // check the first expr in select list
-        exprToCheck = selectListExprs.get(0);
-        assertEquals(resultType, exprToCheck.getType());
-      } else {
-        // check the where clause
-        exprToCheck = select.getWhereClause();
-        assertEquals(PrimitiveType.BOOLEAN, exprToCheck.getType());
-      }
-      if (t == PrimitiveType.STRING) {
-        if (type.isDateType() && literalMode) {
-          // comparing two strings, no cast
-          assertNoCastNode(exprToCheck, 0, PrimitiveType.STRING);
-          assertNoCastNode(exprToCheck, 1, PrimitiveType.STRING);
-        } else {
-          // always cast the string
-          assertNoCastNode(exprToCheck, 0, resultType);
-          assertCastNode(exprToCheck, 1, resultType);
-        }
-      } else if (t.ordinal() == type.ordinal()) {
-        // types identical, no casts
-        assertNoCastNode(exprToCheck, 0, resultType);
-        assertNoCastNode(exprToCheck, 1, resultType);
-      } else {
-        if (literalMode) {
-          assertNoCastNode(exprToCheck, 0, resultType);
-        } else {
-          assertCastNode(exprToCheck, 0, resultType);
-        }
-        if (t == resultType) {
-          assertNoCastNode(exprToCheck, 1, resultType);
-        } else {
-          assertCastNode(exprToCheck, 1, resultType);
-        }
-      }
+    } else {
+      queryStr = "select int_col from alltypes " +
+            "where " + op1 + " " + cmpOp.toString() + " " + op2;
+    }
+    System.err.println(queryStr);
+    SelectStmt select = (SelectStmt) AnalyzesOk(queryStr);
+    Expr expr = null;
+    if (arithmeticMode) {
+      ArrayList<Expr> selectListExprs = select.getSelectListExprs();
+      assertNotNull(selectListExprs);
+      assertEquals(selectListExprs.size(), 1);
+      // check the first expr in select list
+      expr = selectListExprs.get(0);
+      assertEquals(opType, expr.getType());
+    } else {
+      // check the where clause
+      expr = select.getWhereClause();
+      assertEquals(PrimitiveType.BOOLEAN, expr.getType());
+    }
+
+    checkCasts(expr);
+    assertEquals(opType, expr.getChild(0).getType());
+    if (type1 != null) {
+      assertEquals(opType, expr.getChild(1).getType());
     }
   }
 
@@ -615,48 +626,9 @@ public class AnalyzerTest {
         "Unable to parse string '2006-10-10 12:11:05.ABC' to date");
   }
 
-  @Test
-  public void TestDivisionArithmeticOps() {
-    // test all numeric types
-    for (PrimitiveType ltype : PrimitiveType.values()) {
-      if (!ltype.isNumericType()) {
-        continue;
-      }
-      // test all numeric and string types
-      for (PrimitiveType rtype : PrimitiveType.values()) {
-        if (!rtype.isNumericType() && !rtype.isStringType()) {
-          continue;
-        }
-        String lval = TestSchemaUtils.getAllTypesColumn(ltype);
-        String rval = TestSchemaUtils.getAllTypesColumn(rtype);
-        String queryStr = "select " +
-            lval + " / " + " " + rval + " from alltypes";
-        SelectStmt select = (SelectStmt) AnalyzesOk(queryStr);
-        ArrayList<Expr> selectListExprs = select.getSelectListExprs();
-        assertEquals(selectListExprs.size(), 1);
-        Expr exprToCheck = selectListExprs.get(0);
-        // division always yields double
-        assertEquals(PrimitiveType.DOUBLE, exprToCheck.getType());
-        // check for casts
-        if(ltype != PrimitiveType.DOUBLE) {
-          assertCastNode(exprToCheck, 0, PrimitiveType.DOUBLE);
-        } else {
-          assertNoCastNode(exprToCheck, 0, PrimitiveType.DOUBLE);
-        }
-        if(rtype != PrimitiveType.DOUBLE) {
-          assertCastNode(exprToCheck, 1, PrimitiveType.DOUBLE);
-        } else {
-          assertNoCastNode(exprToCheck, 1, PrimitiveType.DOUBLE);
-        }
-      }
-    }
-  }
-
+  // TODO: generate all possible error combinations of types and operands
   @Test
   public void TestFixedPointArithmeticOps() {
-    // positive tests
-    testFixedPointArithmeticOpsPositive();
-
     // negative tests, no floating point types allowed
     AnalysisError("select ~float_col from alltypes",
         "Bitwise operations only allowed on fixed-point types");
@@ -670,88 +642,20 @@ public class AnalyzerTest {
         "Arithmetic operation requires numeric or string operands");
   }
 
-  private void testFixedPointArithmeticOpsPositive() {
-    // test all bitwise ops
-    for(ArithmeticExpr.Operator arithOp : ArithmeticExpr.Operator.values()) {
-      if (!arithOp.isBitwiseOperation() &&
-          arithOp != ArithmeticExpr.Operator.INT_DIVIDE) {
-        continue;
-      }
-      // test all combinations of fixed-point types
-      for (PrimitiveType ltype : PrimitiveType.values()) {
-        if (!ltype.isFixedPointType()) {
-          continue;
-        }
-        for (PrimitiveType rtype : PrimitiveType.values()) {
-          if (!rtype.isFixedPointType()) {
-            continue;
-          }
-          if(rtype.ordinal() < ltype.ordinal()) {
-            continue;
-          }
-          String lval = TestSchemaUtils.getAllTypesColumn(ltype);
-          String rval = TestSchemaUtils.getAllTypesColumn(rtype);
-          String queryStr = null;
-          if(arithOp == ArithmeticExpr.Operator.BITNOT) {
-            queryStr = "select " + arithOp + "" + lval + " from alltypes";
-          } else {
-            queryStr = "select " + lval + " " +
-                arithOp.toString() + " " + rval + " from alltypes";
-          }
-          SelectStmt select = (SelectStmt) AnalyzesOk(queryStr);
-          ArrayList<Expr> selectListExprs = select.getSelectListExprs();
-          assertEquals(selectListExprs.size(), 1);
-          Expr exprToCheck = selectListExprs.get(0);
-          // special casting logic for bitwise ops
-          // the result is always an integer
-          PrimitiveType expectedType =
-            PrimitiveType.getAssignmentCompatibleType(ltype, rtype);
-          if (arithOp == ArithmeticExpr.Operator.BITNOT) {
-            expectedType = ltype;
-          }
-          assertEquals(expectedType, exprToCheck.getType());
-        }
-      }
+  /**
+   * Check that:
+   * - we don't cast literals (we should have simply converted the literal
+   *   to the target type)
+   * - we don't do redundant casts (ie, we don't cast a bigint expr to a bigint)
+   */
+  private void checkCasts(Expr expr) {
+    if (expr instanceof CastExpr) {
+      Assert.assertFalse(expr.getType() == expr.getChild(0).getType());
+      Assert.assertFalse(expr.getChild(0) instanceof LiteralExpr);
+    }
+    for (Expr child: expr.getChildren()) {
+      checkCasts(child);
     }
   }
 
-  /**
-   * Asserts that the childIndex child
-   * of the given expression
-   * is a cast node of castType
-   *
-   * @param select
-   *          Select Statement
-   * @param childIndex
-   *          child of select's first expression
-   * @param castType
-   *          expected target type of cast node
-   */
-  private void assertCastNode(Expr expr,
-      int childIndex,
-      PrimitiveType castType) {
-    Expr child = expr.getChild(childIndex);
-    Assert.assertTrue(child instanceof CastExpr);
-    CastExpr cast = (CastExpr) child;
-    assertEquals(castType, cast.getType());
-  }
-
-  /**
-   * Asserts that the childIndex child
-   * of the first expression in the select
-   * is not a cast node, and returns a given type
-   *
-   * @param select
-   *          Select Statement
-   * @param childIndex
-   *          child of select's first expression
-   * @param type
-   *          expected type
-   */
-  private void assertNoCastNode(Expr expr,
-      int childIndex, PrimitiveType type) {
-    Expr child = expr.getChild(childIndex);
-    Assert.assertFalse(child instanceof CastExpr);
-    assertEquals(type, child.getType());
-  }
 }

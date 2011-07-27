@@ -10,6 +10,7 @@
 
 #include "common/status.h"
 #include "gen-cpp/Types_types.h"
+#include "runtime/primitive-type.h"
 
 namespace impala {
 
@@ -37,25 +38,6 @@ struct NullIndicatorOffset {
 
   std::string DebugString() const;
 };
-
-// split this off into separate .h?
-enum PrimitiveType {
-  INVALID_TYPE = 0,
-  TYPE_BOOLEAN,
-  TYPE_TINYINT,
-  TYPE_SMALLINT,
-  TYPE_INT,
-  TYPE_BIGINT,
-  TYPE_FLOAT,
-  TYPE_DOUBLE,
-  TYPE_DATE,
-  TYPE_DATETIME,
-  TYPE_TIMESTAMP,
-  TYPE_STRING
-};
-
-extern PrimitiveType ThriftToType(TPrimitiveType::type ttype);
-extern std::string TypeToString(PrimitiveType t);
 
 class SlotDescriptor {
  public:

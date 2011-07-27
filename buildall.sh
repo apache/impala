@@ -98,6 +98,10 @@ NEWCXXFLAGS=$OLDCXXFLAGS" -fPIC"
 sed -i "s/$OLDCXXFLAGS/$NEWCXXFLAGS/g" Makefile
 make
 
+cd $IMPALA_HOME/thirdparty/gtest-1.6.0
+cmake .
+make
+
 # build backend
 cd $IMPALA_BE_DIR
 cmake . && make

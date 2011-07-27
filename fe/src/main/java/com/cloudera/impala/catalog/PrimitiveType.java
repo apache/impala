@@ -2,8 +2,11 @@
 
 package com.cloudera.impala.catalog;
 
+import java.util.ArrayList;
+
 import com.cloudera.impala.thrift.TPrimitiveType;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 public enum PrimitiveType {
   INVALID_TYPE("INVALID_TYPE", -1, TPrimitiveType.INVALID_TYPE),
@@ -55,6 +58,16 @@ public enum PrimitiveType {
     return this == FLOAT || this == DOUBLE;
   }
 
+  public PrimitiveType getMaxResolutionType() {
+    if (isFixedPointType()) {
+      return BIGINT;
+    } else if (isFloatingPointType()) {
+      return DOUBLE;
+    } else {
+      return INVALID_TYPE;
+    }
+  }
+
   public boolean isNumericType() {
     return isFixedPointType() || isFloatingPointType();
   }
@@ -71,19 +84,51 @@ public enum PrimitiveType {
     return (this == STRING);
   }
 
+  private static ArrayList<PrimitiveType> numericTypes;
+  static {
+    numericTypes = Lists.newArrayList();
+    numericTypes.add(TINYINT);
+    numericTypes.add(SMALLINT);
+    numericTypes.add(INT);
+    numericTypes.add(BIGINT);
+    numericTypes.add(FLOAT);
+    numericTypes.add(DOUBLE);
+  }
+
+  public static ArrayList<PrimitiveType> getNumericTypes() {
+    return numericTypes;
+  }
+
+  private static ArrayList<PrimitiveType> fixedPointTypes;
+  static {
+    fixedPointTypes = Lists.newArrayList();
+    fixedPointTypes.add(TINYINT);
+    fixedPointTypes.add(SMALLINT);
+    fixedPointTypes.add(INT);
+    fixedPointTypes.add(BIGINT);
+  }
+
+  public static ArrayList<PrimitiveType> getFixedPointTypes() {
+    return fixedPointTypes;
+  }
+
   /**
-   * matrix that records "smallest" assignment-compatible type of two types
+   * Matrix that records "smallest" assignment-compatible type of two types
    * (INVALID_TYPE if no such type exists, ie, if the input types are fundamentally
-   * incompatible)
+   * incompatible). A value of any of the two types could be assigned to a slot
+   * of the assignment-compatible type without loss of precision.
    *
-   * we follow Hive's type casting behavior as described in:
+   * TODO: this doesn't belong here, move it somewhere else (we're not talking
+   * about casting here, that's the task of the particular expr); also, it's out
+   * of date.
+   * We follow Hive's type casting behavior as described in:
    * http://wiki.apache.org/hadoop/Hive/Tutorial
    * summary of Hive's type casting:
    * implicit conversion is done from child to an ancestor,
    * in the type hierarchy.
    * Special case for STRING -> DOUBLE
    *
-   * we chose not to follow MySQL's type casting behavior as described here:
+   * We chose not to follow MySQL's type casting behavior as described here:
    * http://dev.mysql.com/doc/refman/5.0/en/type-conversion.html
    * for the following reasons:
    * conservative casting in arithmetic exprs: TINYINT + TINYINT -> BIGINT

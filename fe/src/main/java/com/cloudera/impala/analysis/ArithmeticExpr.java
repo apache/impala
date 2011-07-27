@@ -108,9 +108,14 @@ public class ArithmeticExpr extends Expr {
 
     switch (op) {
       case MULTIPLY:
-      case MOD:
       case PLUS:
       case MINUS:
+        // numeric ops must be promoted to highest-resolution type
+        // (otherwise we can't guarantee that a <op> b won't result in an overflow/underflow)
+        type = PrimitiveType.getAssignmentCompatibleType(t1, t2).getMaxResolutionType();
+        Preconditions.checkState(type.isValid());
+        break;
+      case MOD:
         type = PrimitiveType.getAssignmentCompatibleType(t1, t2);
         break;
       case DIVIDE:
@@ -121,14 +126,14 @@ public class ArithmeticExpr extends Expr {
       case BITOR:
       case BITXOR:
         if (t1.isFloatingPointType() || t2.isFloatingPointType()) {
-          throw new AnalysisException("Invalid floating point argument to operation " +
-          		op.toString() + ": " + this.toSql());
+          throw new AnalysisException(
+              "Invalid floating point argument to operation " +
+              op.toString() + ": " + this.toSql());
         }
-        PrimitiveType compatibleType =
+        type =
           PrimitiveType.getAssignmentCompatibleType(t1, t2);
         // the result is always an integer
-        Preconditions.checkState(compatibleType.isFixedPointType());
-        type = compatibleType;
+        Preconditions.checkState(type.isFixedPointType());
         break;
       default:
         // the programmer forgot to deal with a case

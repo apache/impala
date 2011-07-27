@@ -1,5 +1,7 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
+#include <glog/logging.h>
+
 #include "exprs/binary-predicate.h"
 #include "exprs/functions.h"
 
@@ -12,6 +14,7 @@ BinaryPredicate::BinaryPredicate(const TExprNode& node)
 }
 
 void BinaryPredicate::Prepare(RuntimeState* state) {
+  Expr::Prepare(state);
   switch (op_) {
     case TExprOperator::EQ:
       switch (type()) {
@@ -36,8 +39,8 @@ void BinaryPredicate::Prepare(RuntimeState* state) {
         case TYPE_STRING:
           compute_function_ = GetValueFunctions::BinaryPredicate_eq_fn_StringValue;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad EQ type: " << TypeToString(type());
       }
       return;
 
@@ -64,8 +67,8 @@ void BinaryPredicate::Prepare(RuntimeState* state) {
         case TYPE_STRING:
           compute_function_ = GetValueFunctions::BinaryPredicate_ne_fn_StringValue;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad NE type: " << TypeToString(type());
       }
       return;
 
@@ -92,8 +95,8 @@ void BinaryPredicate::Prepare(RuntimeState* state) {
         case TYPE_STRING:
           compute_function_ = GetValueFunctions::BinaryPredicate_le_fn_StringValue;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad LE type: " << TypeToString(type());
       }
       return;
 
@@ -120,8 +123,8 @@ void BinaryPredicate::Prepare(RuntimeState* state) {
         case TYPE_STRING:
           compute_function_ = GetValueFunctions::BinaryPredicate_ge_fn_StringValue;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad GE type: " << TypeToString(type());
       }
       return;
 
@@ -148,8 +151,8 @@ void BinaryPredicate::Prepare(RuntimeState* state) {
         case TYPE_STRING:
           compute_function_ = GetValueFunctions::BinaryPredicate_lt_fn_StringValue;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad LT type: " << TypeToString(type());
       }
       return;
 
@@ -176,11 +179,13 @@ void BinaryPredicate::Prepare(RuntimeState* state) {
         case TYPE_STRING:
           compute_function_ = GetValueFunctions::BinaryPredicate_gt_fn_StringValue;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad GT type: " << TypeToString(type());
       }
       return;
 
+    default:
+      DCHECK(false) << "bad binary predicate op: " << op_;
   }
 }
 

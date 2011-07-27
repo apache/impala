@@ -46,6 +46,7 @@ public class PlanService {
       try {
         analysisResult = analysisCtxt.analyze(stmt);
       } catch (AnalysisException e) {
+        System.out.println(e.getMessage());
         throw new TAnalysisException(e.getMessage());
       }
       Preconditions.checkNotNull(analysisResult.selectStmt);
@@ -65,12 +66,17 @@ public class PlanService {
       } catch (NotImplementedException e) {
         throw new TAnalysisException(e.getMessage());
       }
-      System.out.println(plan.getExplainString());
+      if (plan != null) {
+        System.out.println(plan.getExplainString());
+      }
 
       TExecutePlanRequest execRequest = new TExecutePlanRequest(
-          plan.treeToThrift(),
-          analysisResult.analyzer.getDescTbl().toThrift(),
           Expr.treesToThrift(analysisResult.selectStmt.getSelectListExprs()));
+      if (plan != null) {
+        execRequest.setPlan(plan.treeToThrift());
+        execRequest.setDescTbl(analysisResult.analyzer.getDescTbl().toThrift());
+      }
+      System.out.println("returned exec request: " + execRequest.toString());
       return execRequest;
     }
 

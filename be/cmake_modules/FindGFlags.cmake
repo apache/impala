@@ -15,6 +15,8 @@ set(GFLAGS_SEARCH_LIB_PATH
 
 find_path(GFLAGS_INCLUDE_DIR gflags/gflags.h PATHS
   ${GFLAGS_SEARCH_HEADER_PATHS}
+  # make sure we don't accidentally pick up a different version
+  NO_DEFAULT_PATH
 )
 
 find_library(GFLAGS_LIB_PATH NAMES gflags PATHS ${GFLAGS_SEARCH_LIB_PATH})

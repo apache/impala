@@ -51,6 +51,10 @@ public class Planner {
     if (selectStmt.getTableRefs().size() > 1) {
       throw new NotImplementedException("FROM clause limited to a single table");
     }
+    if (selectStmt.getTableRefs().isEmpty()) {
+      // no from clause -> nothing to plan
+      return null;
+    }
     TableRef tblRef = selectStmt.getTableRefs().get(0);
     PlanNode topNode = createScanNode(analyzer, tblRef);
 

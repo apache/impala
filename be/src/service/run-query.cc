@@ -6,6 +6,7 @@
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include "common/status.h"
 #include "testutil/query-executor.h"
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
@@ -15,21 +16,9 @@ DEFINE_string(query, "", "query to execute");
 using namespace std;
 using namespace impala;
 
-#define EXIT_IF_ERROR(stmt) \
-  do { \
-    Status status = (stmt); \
-    if (!status.ok()) { \
-      string msg; \
-      status.GetErrorMsg(&msg); \
-      cerr << msg; \
-      exit(1); \
-    } \
-  } while (false)
-
-
 int main(int argc, char** argv) {
-  google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
+  google::ParseCommandLineFlags(&argc, &argv, true);
 
   QueryExecutor executor;
   EXIT_IF_ERROR(executor.Setup());
@@ -37,7 +26,7 @@ int main(int argc, char** argv) {
   struct timeval start_time;
   gettimeofday(&start_time, NULL);
 
-  EXIT_IF_ERROR(executor.Exec(FLAGS_query));
+  EXIT_IF_ERROR(executor.Exec(FLAGS_query, NULL));
   int num_rows = 0;
   while (true) {
     string row;

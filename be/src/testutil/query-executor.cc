@@ -14,6 +14,7 @@
 #include <glog/logging.h>
 
 #include <protocol/TBinaryProtocol.h>
+#include <protocol/TDebugProtocol.h>
 #include <transport/TSocket.h>
 #include <transport/TTransportUtils.h>
 
@@ -22,7 +23,9 @@
 #include "exec/exec-node.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
+#include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
+#include "runtime/runtime-state.h"
 #include "service/plan-executor.h"
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
@@ -73,7 +76,6 @@ static void FindRunplanservice(string* path) {
   }
   if (i < 0) return;
   elems.erase(elems.begin() + i, elems.end());
-  elems.push_back("fe");
   elems.push_back("bin");
   elems.push_back("runplanservice");
   *path = join(elems, "/");
@@ -126,39 +128,77 @@ Status QueryExecutor::Setup() {
   return Status::OK;
 }
 
-Status QueryExecutor::Exec(const std::string& query) {
+Status QueryExecutor::Exec(const std::string& query, vector<PrimitiveType>* col_types) {
+  VLOG(1) << "query: " << query;
   TExecutePlanRequest request;
   try {
     client_->GetExecRequest(request, query.c_str());
   } catch (TAnalysisException& e) {
     return Status(e.msg);
   }
+  VLOG(1) << "thrift request: " << ThriftDebugString(request);
 
-  ExecNode* plan_root;
-  RETURN_IF_ERROR(ExecNode::CreateTree(pool_.get(), request.plan, &plan_root));
-  VLOG(1) << plan_root->DebugString();
-  DescriptorTbl* descs;
-  RETURN_IF_ERROR(DescriptorTbl::Create(pool_.get(), request.descTbl, &descs));
-  VLOG(1) << descs->DebugString();
+  ExecNode* plan_root = NULL;;
+  if (request.__isset.plan) {
+    RETURN_IF_ERROR(ExecNode::CreateTree(pool_.get(), request.plan, &plan_root));
+    VLOG(1) << plan_root->DebugString();
+  }
+  DescriptorTbl* descs = NULL;;
+  if (request.__isset.descTbl) {
+    RETURN_IF_ERROR(DescriptorTbl::Create(pool_.get(), request.descTbl, &descs));
+    VLOG(1) << descs->DebugString();
+  }
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(pool_.get(), request.selectListExprs, &select_list_exprs_));
 
   // Prepare select list expressions.
-  executor_.reset(new PlanExecutor(plan_root, *descs));
-  for (int i = 0; i < select_list_exprs_.size(); ++i) {
-    select_list_exprs_[i]->Prepare(executor_->runtime_state());
+  RuntimeState local_runtime_state(*descs);
+  RuntimeState* runtime_state = &local_runtime_state;
+  if (plan_root != NULL) {
+    executor_.reset(new PlanExecutor(plan_root, *descs));
+    runtime_state = executor_->runtime_state();
   }
-  executor_->Exec();
-  next_row_ = 0;
+  for (int i = 0; i < select_list_exprs_.size(); ++i) {
+    select_list_exprs_[i]->Prepare(runtime_state);
+    if (col_types != NULL) col_types->push_back(select_list_exprs_[i]->type());
+  }
+  if (plan_root != NULL) executor_->Exec();
   eos_ = false;
+  next_row_ = 0;
 
   return Status::OK;
 }
 
 Status QueryExecutor::FetchResult(std::string* result) {
+  vector<void*> row;
+  RETURN_IF_ERROR(FetchResult(&row));
+  result->clear();
+  if (row.empty()) return Status::OK;
+  string str;
+  for (int i = 0; i < select_list_exprs_.size(); ++i) {
+    RawValue::PrintValue(row[i], select_list_exprs_[i]->type(), &str);
+    if (i > 0) result->append(", ");
+    result->append(str);
+  }
+  return Status::OK;
+}
+
+Status QueryExecutor::FetchResult(std::vector<void*>* select_list_values) {
+  if (executor_.get() == NULL) {
+    // query without FROM clause: we return exactly one row
+    select_list_values->clear();
+    if (!eos_) {
+      for (int i = 0; i < select_list_exprs_.size(); ++i) {
+        select_list_values->push_back(select_list_exprs_[i]->GetValue(NULL));
+      }
+    }
+    eos_ = true;
+    return Status::OK;
+  }
+
   if (row_batch_.get() == NULL || row_batch_->num_rows() == next_row_) {
     if (eos_) {
-      *result = "";
+      select_list_values->clear();
       return Status::OK;
     }
 
@@ -175,17 +215,18 @@ Status QueryExecutor::FetchResult(std::string* result) {
     }
   }
 
+  select_list_values->clear();
   TupleRow* row = row_batch_->GetRow(next_row_);
-  result->clear();
-  string str;
   for (int i = 0; i < select_list_exprs_.size(); ++i) {
-    select_list_exprs_[i]->PrintValue(row, &str);
-    if (i > 0) result->append(", ");
-    result->append(str);
+    select_list_values->push_back(select_list_exprs_[i]->GetValue(row));
   }
   ++num_rows_;
   ++next_row_;
   return Status::OK;
+}
+
+RuntimeState* QueryExecutor::runtime_state() {
+  return executor_->runtime_state();
 }
 
 Status QueryExecutor::EndQuery() {

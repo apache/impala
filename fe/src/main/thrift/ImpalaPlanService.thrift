@@ -7,7 +7,14 @@ include "Types.thrift"
 include "Descriptors.thrift"
 include "Exprs.thrift"
 include "PlanNodes.thrift"
-include "LocalExecutor.thrift"
+
+// The plan is optional, because a select stmt without a from clause
+// doesn't need a plan or descriptors.
+struct TExecutePlanRequest {
+  1: optional PlanNodes.TPlan plan
+  2: optional Descriptors.TDescriptorTable descTbl
+  3: list<Exprs.TExpr> selectListExprs
+}
 
 exception TAnalysisException {
   1: string msg;
@@ -16,7 +23,7 @@ exception TAnalysisException {
 // We're running the Impala frontend as a service from which the backend
 // test driver can get plans to run.
 service ImpalaPlanService {
-  LocalExecutor.TExecutePlanRequest GetExecRequest(1:string query)
+  TExecutePlanRequest GetExecRequest(1:string query)
     throws (1:TAnalysisException e);
 
   void ShutdownServer();

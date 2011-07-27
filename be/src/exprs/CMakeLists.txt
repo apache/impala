@@ -31,3 +31,22 @@ add_custom_command(
   OUTPUT functions.cc
   COMMAND "./gen-functions.py"
 )
+
+add_executable(expr-test
+  expr-test.cc
+)
+target_link_libraries(expr-test
+  TestUtil
+  Service
+  Exec
+  Exprs
+  Runtime
+  Common
+  thrift
+  ImpalaThrift
+  MockHdfs
+  gtest
+  ${Boost_LIBRARIES}
+)
+
+add_test(expr-test expr-test)

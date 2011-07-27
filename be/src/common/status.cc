@@ -46,4 +46,10 @@ void Status::GetErrorMsg(string* msg) const {
   }
 }
 
+string Status::GetErrorString() const {
+  string msg;
+  GetErrorMsg(&msg);
+  return msg;
+}
+
 }

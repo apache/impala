@@ -56,6 +56,12 @@ public class ParserTest {
     ParserError(stmt, null);
   }
 
+  @Test public void TestNoFromClause() {
+    ParsesOk("select 1 + 1, 'two', f(3), a + b");
+    ParserError("select 1 + 1 'two' f(3) a + b");
+    ParserError("select a, 2 where a > 2");
+  }
+
   @Test public void TestSelect() {
     ParsesOk("select a from tbl");
     ParsesOk("select a, b, c, d from tbl");

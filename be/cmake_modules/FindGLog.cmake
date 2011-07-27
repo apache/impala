@@ -15,6 +15,8 @@ set(GLOG_SEARCH_LIB_PATH
 
 find_path(GLOG_INCLUDE_DIR glog/logging.h PATHS
   ${GLOG_SEARCH_HEADER_PATHS}
+  # make sure we don't accidentally pick up a different version
+  NO_DEFAULT_PATH
 )
 
 find_library(GLOG_LIB_PATH NAMES glog PATHS ${GLOG_SEARCH_LIB_PATH})

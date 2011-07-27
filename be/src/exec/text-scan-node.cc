@@ -1,11 +1,15 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 #include "text-scan-node.h"
+
 #include <cstring>
 #include <cstdlib>
 #include <sstream>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
+#include <glog/logging.h>
+
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
 #include "runtime/mem-pool.h"
@@ -19,9 +23,9 @@ using namespace std;
 using namespace boost;
 using namespace impala;
 
-TextScanNode::TextScanNode(const TScanNode& tscan_node)
-    : files_(tscan_node.file_paths),
-      tuple_id_(tscan_node.tuple_id),
+TextScanNode::TextScanNode(const TPlanNode& tnode)
+    : files_(tnode.scan_node.file_paths),
+      tuple_id_(tnode.scan_node.tuple_id),
       tuple_desc_(NULL),
       tuple_idx_(0),
       tuple_delim_(DELIM_INIT),
@@ -421,9 +425,8 @@ void TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, 
       }
       break;
     }
-    case INVALID_TYPE: {
-      break;
-    }
+    default:
+      DCHECK(false) << "bad slot type: " << TypeToString(slot_desc->type());
   }
   // Set NULL if inconvertible.
   if (*end != '\0') {

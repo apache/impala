@@ -12,7 +12,7 @@
 
 namespace impala {
 
-class TScanNode;
+class TPlanNode;
 class RowBatch;
 class Status;
 class TupleDescriptor;
@@ -43,7 +43,7 @@ class stringstream;
 // appending the partial-column bytes to a boundary_column.
 class TextScanNode : public ExecNode {
  public:
-  TextScanNode(const TScanNode& tscan_node);
+  TextScanNode(const TPlanNode& tnode);
 
   // Allocates tuple buffer.
   // Sets tuple_idx_ and tuple_desc_ using RuntimeState.

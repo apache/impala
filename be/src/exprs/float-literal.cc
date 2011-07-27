@@ -2,22 +2,47 @@
 
 #include "float-literal.h"
 
+#include <glog/logging.h>
+
 #include "gen-cpp/Exprs_types.h"
 
 namespace impala {
 
 FloatLiteral::FloatLiteral(const TExprNode& node)
   : Expr(node) {
-  result_.double_val = node.float_literal.value;
+  switch (type_) {
+    case TYPE_FLOAT:
+      result_.float_val = node.float_literal.value;
+      break;
+    case TYPE_DOUBLE:
+      result_.double_val = node.float_literal.value;
+      break;
+    default:
+      DCHECK(false) << "FloatLiteral ctor: bad type: " << TypeToString(type_);
+  }
 }
 
-void* FloatLiteral::ComputeFunction(Expr* e, TupleRow* row) {
+void* FloatLiteral::ReturnFloatValue(Expr* e, TupleRow* row) {
+  FloatLiteral* l = static_cast<FloatLiteral*>(e);
+  return &l->result_.float_val;
+}
+
+void* FloatLiteral::ReturnDoubleValue(Expr* e, TupleRow* row) {
   FloatLiteral* l = static_cast<FloatLiteral*>(e);
   return &l->result_.double_val;
 }
 
 void FloatLiteral::Prepare(RuntimeState* state) {
-  compute_function_ = ComputeFunction;
+  switch (type_) {
+    case TYPE_FLOAT:
+      compute_function_ = ReturnFloatValue;
+      break;
+    case TYPE_DOUBLE:
+      compute_function_ = ReturnDoubleValue;
+      break;
+    default:
+      DCHECK(false) << "FloatLiteral::Prepare(): bad type: " << TypeToString(type_);
+  }
 }
 
 }

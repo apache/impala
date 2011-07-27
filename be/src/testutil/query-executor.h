@@ -9,6 +9,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include "common/status.h"
+#include "runtime/primitive-type.h"
 #include "runtime/runtime-state.h"
 
 namespace apache { namespace thrift { namespace transport { class TTransport; } } }
@@ -30,12 +31,20 @@ class QueryExecutor {
   Status Setup();
 
   // Start running query. Call this prior to FetchResult().
-  Status Exec(const std::string& query);
+  // If 'col_types' is non-NULL, returns the types of the select list items.
+  Status Exec(const std::string& query, std::vector<PrimitiveType>* col_types);
 
   // Return single row as comma-separated list of values.
   // Indicates end-of-stream by setting 'row' to the empty string.
   // Returns OK if successful, otherwise error.
   Status FetchResult(std::string* row);
+
+  // Return single row as vector of raw values.
+  // Indicates end-of-stream by returning empty 'row'.
+  // Returns OK if successful, otherwise error.
+  Status FetchResult(std::vector<void*>* row);
+
+  RuntimeState* runtime_state();
 
  private:
   boost::shared_ptr<apache::thrift::transport::TTransport> socket_;

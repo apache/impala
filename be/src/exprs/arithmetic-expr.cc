@@ -16,6 +16,7 @@ ArithmeticExpr::ArithmeticExpr(const TExprNode& node)
 // TODO: replace this with a generic function registry
 // (registered by opcode and parameter types)
 void ArithmeticExpr::Prepare(RuntimeState* state) {
+  Expr::Prepare(state);
   // assert(type_ != INVALID_TYPE);
   // assert(children_.size() <= 2);
   // assert(children_.size() == 1 || chilren_[0].type() == children_[1].type());

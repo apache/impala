@@ -65,7 +65,7 @@ Status ExecNode::CreateTreeHelper(
 Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode, ExecNode** node) {
   switch (tnode.node_type) {
     case TPlanNodeType::TEXT_SCAN_NODE:
-      *node = pool->Add(new TextScanNode(tnode.scan_node));
+      *node = pool->Add(new TextScanNode(tnode));
       return Status::OK;
     case TPlanNodeType::AGGREGATION_NODE:
       return Status("Aggregation node not implemented");

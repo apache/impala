@@ -193,6 +193,9 @@ start with select_stmt;
 
 select_stmt ::=
     select_clause:selectList
+  {: RESULT = new SelectStmt(selectList, null, null, null, null, null, -1); :}
+  |
+    select_clause:selectList
     from_clause:tableRefList
     where_clause:wherePredicate
     group_by_clause:groupingExprs

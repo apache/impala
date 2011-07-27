@@ -143,9 +143,11 @@ public class Coordinator {
     // execute locally
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     TExecutePlanRequest execRequest = new TExecutePlanRequest(
-        plan.treeToThrift(),
-        analysisResult.analyzer.getDescTbl().toThrift(),
         Expr.treesToThrift(analysisResult.selectStmt.getSelectListExprs()));
+    if (plan != null) {
+      execRequest.setPlan(plan.treeToThrift());
+      execRequest.setDescTbl(analysisResult.analyzer.getDescTbl().toThrift());
+    }
     try {
       NativePlanExecutor.ExecPlan(
           serializer.serialize(execRequest), returnAsAscii, resultQueue);
@@ -165,9 +167,11 @@ public class Coordinator {
     PlanNode plan = planner.createPlan(analysisResult.selectStmt, analysisResult.analyzer);
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     TExecutePlanRequest execRequest = new TExecutePlanRequest(
-        plan.treeToThrift(),
-        analysisResult.analyzer.getDescTbl().toThrift(),
         Expr.treesToThrift(analysisResult.selectStmt.getSelectListExprs()));
+    if (plan != null) {
+      execRequest.setPlan(plan.treeToThrift());
+      execRequest.setDescTbl(analysisResult.analyzer.getDescTbl().toThrift());
+    }
     return serializer.serialize(execRequest);
   }
 

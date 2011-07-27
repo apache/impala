@@ -2,6 +2,9 @@
 
 cmake_minimum_required(VERSION 2.6)
 
+# generate CTest input files
+enable_testing()
+
 # set flags for CMAKE_BUILD_TYPE=Debug;
 # suppress warnings for comparison of signed and unsigned integers
 SET(CMAKE_CXX_FLAGS_DEBUG "-g -Wall -Wno-sign-compare")
@@ -52,6 +55,16 @@ add_library(glogstatic STATIC IMPORTED)
 set_target_properties(glogstatic PROPERTIES IMPORTED_LOCATION ${GLOG_STATIC_LIB})
 
 message(STATUS ${GLOG_INCLUDE_DIR})
+
+# find GTest headers and libs
+find_package(GTest REQUIRED)
+include_directories(${GTEST_INCLUDE_DIR})
+set(LIBS ${LIBS} ${GTEST_LIBRARIES})
+add_library(gtest STATIC IMPORTED)
+set_target_properties(gtest PROPERTIES IMPORTED_LOCATION "${GTEST_LIBRARY}")
+
+message(STATUS ${GTEST_INCLUDE_DIR})
+message(STATUS ${GTEST_LIBRARY})
 
 # resolve "#include "<subdir>/<name>.h"
 include_directories(${CMAKE_SOURCE_DIR}/src)

@@ -1,6 +1,7 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 #include <sstream>
+#include <glog/logging.h>
 
 #include "common/object-pool.h"
 #include "common/status.h"
@@ -22,6 +23,7 @@
 #include "exprs/string-literal.h"
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/ImpalaService_types.h"
+#include "runtime/raw-value.h"
 
 using namespace std;
 using namespace impala;
@@ -191,7 +193,7 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
       return Status::OK;
     }
     case TExprNodeType::STRING_LITERAL: {
-      if (texpr_node.__isset.string_literal) {
+      if (!texpr_node.__isset.string_literal) {
         return Status("String literal not set in thrift node");
       }
       *expr = pool->Add(new StringLiteral(texpr_node));
@@ -210,6 +212,8 @@ void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
   }
   if (value == NULL) return;
 
+  StringValue* string_val = NULL;
+  string tmp;
   switch (type_) {
     case TYPE_BOOLEAN:
       col_val->boolVal = *reinterpret_cast<bool*>(value);
@@ -240,11 +244,13 @@ void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
       col_val->__isset.doubleVal = true;
       break;
     case TYPE_STRING:
-      StringValue* string_val = reinterpret_cast<StringValue*>(value);
-      string tmp(static_cast<char*>(string_val->ptr), string_val->len);
+      string_val = reinterpret_cast<StringValue*>(value);
+      tmp.assign(static_cast<char*>(string_val->ptr), string_val->len);
       col_val->stringVal.swap(tmp);
       col_val->__isset.stringVal = true;
       break;
+    default:
+      DCHECK(false) << "bad GetValue() type: " << TypeToString(type_);
   }
 }
 
@@ -253,42 +259,11 @@ void Expr::PrintValue(TupleRow* row, string* str) {
 }
 
 void Expr::PrintValue(void* value, string* str) {
-  if (value == NULL) {
-    *str = "NULL";
-    return;
-  }
+  RawValue::PrintValue(value, type_, str);
+}
 
-  stringstream out;
-  switch (type_) {
-    case TYPE_BOOLEAN: {
-      bool val = *reinterpret_cast<bool*>(value);
-      *str = (val ? "true" : "false");
-      return;
-    }
-    case TYPE_TINYINT:
-      // Extra casting for chars since they should not be interpreted as ASCII.
-      out << static_cast<int>(*reinterpret_cast<signed char*>(value));
-      break;
-    case TYPE_SMALLINT:
-      out << *reinterpret_cast<short*>(value);
-      break;
-    case TYPE_INT:
-      out << *reinterpret_cast<int*>(value);
-      break;
-    case TYPE_BIGINT:
-      out << *reinterpret_cast<long*>(value);
-      break;
-    case TYPE_FLOAT:
-      out << *reinterpret_cast<float*>(value);
-      break;
-    case TYPE_DOUBLE:
-      out << *reinterpret_cast<double*>(value);
-      break;
-    case TYPE_STRING:
-      StringValue* string_val = reinterpret_cast<StringValue*>(value);
-      string tmp(static_cast<char*>(string_val->ptr), string_val->len);
-      str->swap(tmp);
-      return;
+void Expr::Prepare(RuntimeState* state) {
+  for (int i = 0; i < children_.size(); ++i) {
+    children_[i]->Prepare(state);
   }
-  *str = out.str();
 }

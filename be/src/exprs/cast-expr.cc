@@ -1,5 +1,7 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
+#include <glog/logging.h>
+
 #include "exprs/cast-expr.h"
 #include "exprs/functions.h"
 
@@ -15,6 +17,7 @@ CastExpr::CastExpr(const TExprNode& node)
 }
 
 void CastExpr::Prepare(RuntimeState* state) {
+  Expr::Prepare(state);
   switch (children_[0]->type()) {
     case TYPE_TINYINT:
       switch (type_) {
@@ -36,8 +39,8 @@ void CastExpr::Prepare(RuntimeState* state) {
         case TYPE_STRING:
           compute_function_ = GetValueFunctions::Cast_char_StringValue;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad cast type: " << TypeToString(type_);
       }
       return;
 
@@ -61,8 +64,8 @@ void CastExpr::Prepare(RuntimeState* state) {
         case TYPE_STRING:
           compute_function_ = GetValueFunctions::Cast_short_StringValue;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad cast type: " << TypeToString(type_);
       }
       return;
 
@@ -86,8 +89,8 @@ void CastExpr::Prepare(RuntimeState* state) {
         case TYPE_STRING:
           compute_function_ = GetValueFunctions::Cast_int_StringValue;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad cast type: " << TypeToString(type_);
       }
       return;
 
@@ -111,8 +114,8 @@ void CastExpr::Prepare(RuntimeState* state) {
         case TYPE_STRING:
           compute_function_ = GetValueFunctions::Cast_long_StringValue;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad cast type: " << TypeToString(type_);
       }
       return;
 
@@ -136,8 +139,8 @@ void CastExpr::Prepare(RuntimeState* state) {
         case TYPE_STRING:
           compute_function_ = GetValueFunctions::Cast_float_StringValue;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad cast type: " << TypeToString(type_);
       }
       return;
 
@@ -161,8 +164,8 @@ void CastExpr::Prepare(RuntimeState* state) {
         case TYPE_STRING:
           compute_function_ = GetValueFunctions::Cast_double_StringValue;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad cast type: " << TypeToString(type_);
       }
       return;
 
@@ -186,13 +189,13 @@ void CastExpr::Prepare(RuntimeState* state) {
         case TYPE_DOUBLE:
           compute_function_ = GetValueFunctions::Cast_StringValue_double;
           return;
-        //default:
-          // assert(false);
+        default:
+          DCHECK(false) << "bad cast type: " << TypeToString(type_);
       }
       return;
 
-    //default:
-      // assert(false);
+    default:
+      DCHECK(false) << "bad cast child type: " << TypeToString(children_[0]->type());
   }
 }
 

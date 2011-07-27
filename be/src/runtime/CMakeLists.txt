@@ -10,6 +10,7 @@ set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/runtime")
 add_library(Runtime STATIC
   descriptors.cc
   mem-pool.cc
+  raw-value.cc
   runtime-state.cc
   string-value.cc
 )

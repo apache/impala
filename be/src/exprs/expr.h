@@ -67,9 +67,9 @@ struct ExprValue {
 // This is the superclass of all expr evaluation nodes.
 class Expr {
  public:
-  // Prepare for evaluation. In particular, set compute_function_.
-  // TODO: make function pure, default for now to make compile
-  virtual void Prepare(RuntimeState* state) {}
+  // Prepare expr tree for evaluation. In particular, set compute_function_.
+  // This implementation simply invokes it recursively for the entire tree.
+  virtual void Prepare(RuntimeState* state);
 
   // Evaluate expr and return pointer to result. The result is
   // valid as long as 'row' doesn't change.

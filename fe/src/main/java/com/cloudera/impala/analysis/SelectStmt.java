@@ -55,7 +55,11 @@ public class SelectStmt extends ParseNodeBase {
              Predicate havingPredicate, ArrayList<OrderByElement> orderByElements,
              long limit) {
     this.selectList = selectList;
-    this.tableRefs = tableRefList;
+    if (tableRefList == null) {
+      this.tableRefs = Lists.newArrayList();
+    } else {
+      this.tableRefs = tableRefList;
+    }
     this.whereClause = wherePredicate;
     this.groupingExprs = groupingExprs;
     this.havingClause = havingPredicate;

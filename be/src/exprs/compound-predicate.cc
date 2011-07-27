@@ -1,5 +1,7 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
+#include <glog/logging.h>
+
 #include "compound-predicate.h"
 
 namespace impala {
@@ -17,7 +19,7 @@ void* CompoundPredicate::AndComputeFunction(Expr* e, TupleRow* row) {
   Expr* op2 = e->children()[1];
   bool* val2 = reinterpret_cast<bool*>(op2->GetValue(row));
   // <> && false is false
-  if (val1 != NULL && !*val1 || val2 != NULL && !*val2) {
+  if ((val1 != NULL && !*val1) || (val2 != NULL && !*val2)) {
     p->result_.bool_val = false;
     return &p->result_.bool_val;
   }
@@ -38,7 +40,7 @@ void* CompoundPredicate::OrComputeFunction(Expr* e, TupleRow* row) {
   Expr* op2 = e->children()[1];
   bool* val2 = reinterpret_cast<bool*>(op2->GetValue(row));
   // <> || true is true
-  if (val1 != NULL && *val1 || val2 != NULL && *val2) {
+  if ((val1 != NULL && *val1) || (val2 != NULL && *val2)) {
     p->result_.bool_val = true;
     return &p->result_.bool_val;
   }
@@ -62,6 +64,7 @@ void* CompoundPredicate::NotComputeFunction(Expr* e, TupleRow* row) {
 }
 
 void CompoundPredicate::Prepare(RuntimeState* state) {
+  Expr::Prepare(state);
   switch (op_) {
     case TExprOperator::AND:
       compute_function_ = AndComputeFunction;
@@ -72,6 +75,8 @@ void CompoundPredicate::Prepare(RuntimeState* state) {
     case TExprOperator::NOT:
       compute_function_ = NotComputeFunction;
       return;
+    default:
+      DCHECK(false) << "Invalid compound predicate op: " << op_;
   }
 }
 
