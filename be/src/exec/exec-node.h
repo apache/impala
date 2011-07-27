@@ -46,6 +46,17 @@ class ExecNode {
   // Returns error if 'plan' is corrupted, otherwise success.
   static Status CreateTree(ObjectPool* pool, const TPlan& plan, ExecNode** root);
 
+  // Returns a string representation in DFS order of the plan rooted at this.
+  std::string DebugString() const;
+
+  // Recursive helper method for generating a string for DebugString().
+  // Implementations should call DebugString(int, std::stringstream) on their children.
+  // Input parameters:
+  //   indentation_level: Current level in plan tree.
+  // Output parameters:
+  //   out: Stream to accumulate debug string.
+  virtual void DebugString(int indentation_level, std::stringstream* out) const = 0;
+
  protected:
   std::vector<ExecNode*> children_;
 

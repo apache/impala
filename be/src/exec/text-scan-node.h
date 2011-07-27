@@ -19,6 +19,7 @@ class TupleDescriptor;
 class MemPool;
 class Tuple;
 class SlotDescriptor;
+class stringstream;
 
 // This execution node parses delimited text files from HDFS,
 // and writes their content as tuples in the
@@ -61,12 +62,17 @@ class TextScanNode : public ExecNode {
   // Disconnects from HDFS.
   virtual Status Close(RuntimeState* state);
 
+ protected:
+  // Write debug string of this into out.
+  virtual void DebugString(int indentation_level, std::stringstream* out) const;
+
  private:
 
   // Parser configuration parameters:
 
   // List of HDFS paths to read.
   const std::vector<std::string> files_;
+
 
   // Tuple id resolved in Prepare() to set tuple_desc_;
   TupleId tuple_id_;

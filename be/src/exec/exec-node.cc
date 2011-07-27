@@ -1,6 +1,9 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 #include "exec/exec-node.h"
+
+#include <sstream>
+
 #include "exec/text-scan-node.h"
 #include "common/object-pool.h"
 #include "common/status.h"
@@ -70,6 +73,13 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode, ExecNode**
       return Status("Sort node not implemented");
   }
   return Status::OK;
+}
+
+std::string ExecNode::DebugString() const {
+  std::stringstream out;
+  out << "EXEC NODE TREE:" << endl;
+  this->DebugString(0, &out);
+  return out.str();
 }
 
 }

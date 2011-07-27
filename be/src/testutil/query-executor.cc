@@ -136,6 +136,7 @@ Status QueryExecutor::Exec(const std::string& query) {
 
   ExecNode* plan_root;
   RETURN_IF_ERROR(ExecNode::CreateTree(pool_.get(), request.plan, &plan_root));
+  VLOG(1) << plan_root->DebugString();
   DescriptorTbl* descs;
   RETURN_IF_ERROR(DescriptorTbl::Create(pool_.get(), request.descTbl, &descs));
   VLOG(1) << descs->DebugString();

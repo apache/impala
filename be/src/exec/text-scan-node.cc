@@ -3,7 +3,9 @@
 #include "text-scan-node.h"
 #include <cstring>
 #include <cstdlib>
+#include <sstream>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string.hpp>
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
 #include "runtime/mem-pool.h"
@@ -441,4 +443,12 @@ void TextScanNode::UnescapeString(const char* src, char* dest, int* len) {
   }
   char* dest_start = reinterpret_cast<char*>(dest);
   *len = dest_ptr - dest_start;
+}
+
+void TextScanNode::DebugString(int indentation_level, std::stringstream* out) const {
+  *out << string(indentation_level * 2, ' ');
+  *out << "TextScanNode(tupleid=" << tuple_id_ << " files[" << join(files_, ",") << "])" << endl;
+  for (int i = 0; i < children_.size(); ++i) {
+    children_[i]->DebugString(indentation_level + 1, out);
+  }
 }
