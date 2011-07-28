@@ -20,6 +20,8 @@
 #include "common/object-pool.h"
 #include "gen-cpp/PlanNodes_types.h"
 
+#include <iostream>
+
 using namespace std;
 using namespace boost;
 using namespace impala;
@@ -180,6 +182,12 @@ Status TextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
   // Else it is set to the quote char that started the quoted string.
   char quote_char = NOT_IN_STRING;
 
+  // Indicates whether the current row has errors.
+  bool error_in_row = false;
+
+  // Counts the number of errors in the current file.
+  int num_errors = 0;
+
   while (file_idx_ < files_.size()) {
     // Did we finish reading the previous file? if so, open next file
     if (file_buf_actual_size_ == 0) {
@@ -188,6 +196,7 @@ Status TextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
         // TODO: make sure we print all available diagnostic output to our error log
         return Status("Failed to open HDFS file.");
       }
+      num_errors = 0;
     }
 
     do {
@@ -205,8 +214,9 @@ Status TextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
       // appending tuples into the tuple buffer until:
       // a) file buffer has been completely parsed or
       // b) tuple buffer is full
-      ParseFileBuffer(row_batch, &row_idx, &column_idx, &last_char_is_escape,
-                      &unescape_string, &quote_char);
+      // c) a parsing error was encountered and the user requested to abort on errors.
+      RETURN_IF_ERROR(ParseFileBuffer(state, row_batch, &row_idx, &column_idx, &last_char_is_escape,
+          &unescape_string, &quote_char, &error_in_row, &num_errors));
 
       if (row_batch->IsFull()) {
         // Swap file buffers, so previous buffer is always found at index 0,
@@ -218,12 +228,19 @@ Status TextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
       }
     } while (file_buf_actual_size_ > 0);
 
-    // Move on to next file
+    // Close current file.
     int hdfs_ret = hdfsCloseFile(hdfs_connection_, hdfs_file_);
     if (hdfs_ret != 0) {
       // TODO: make sure we print all available diagnostic output to our error log
       return Status("Failed to close HDFS file.");
     }
+
+    // Report number of errors encountered in the current file, if any.
+    if (num_errors > 0) {
+      state->ReportFileErrors(files_[file_idx_], num_errors);
+    }
+
+    // Move on to next file.
     ++file_idx_;
   }
 
@@ -232,19 +249,22 @@ Status TextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
   row_batch->AddMemPool(file_buf_pool_.get());
   row_batch->AddMemPool(var_len_pool_.get());
 
-  // We have read all partitions (tuple buffer not necessarily full)
+  // We have read all partitions (tuple buffer not necessarily full).
   return Status::OK;
 }
 
 // This first assembles the full tuple before applying the conjuncts.
 // TODO: apply conjuncts as slots get materialized and skip to the end of the row
 // if we determine it's not a match.
-void TextScanNode::ParseFileBuffer(
-    RowBatch* row_batch, int* row_idx, int* column_idx,
-    bool* last_char_is_escape, bool* unescape_string, char* quote_char) {
+Status TextScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, int* row_idx,
+    int* column_idx, bool* last_char_is_escape, bool* unescape_string, char* quote_char,
+    bool* error_in_row, int* num_errors) {
 
   // Points to beginning of current column data.
   char* column_start = file_buf_ptr_;
+
+  // Points to beginning of current line data.
+  char* line_start = file_buf_ptr_;
 
   // We go through the file buffer character-by-character and:
   // 0. Determine whether we need to add a new row.
@@ -339,19 +359,30 @@ void TextScanNode::ParseFileBuffer(
       // Replace field delimiter with zero terminator.
       int slot_idx = column_idx_to_slot_idx_[*column_idx];
       if (slot_idx != SKIP_COLUMN) {
+        char delim_char = *file_buf_ptr_;
         *file_buf_ptr_ = '\0';
+        bool parsed_ok = true;
         if (boundary_column_.empty()) {
-          ConvertAndWriteSlotBytes(column_start, file_buf_ptr_, tuple_,
-              tuple_desc_->slots()[slot_idx], *unescape_string,
+          parsed_ok = ConvertAndWriteSlotBytes(column_start, file_buf_ptr_,
+              tuple_, tuple_desc_->slots()[slot_idx], *unescape_string,
               *unescape_string);
         } else {
           boundary_column_.append(file_buf_, file_buf_ptr_ - file_buf_);
-          ConvertAndWriteSlotBytes(boundary_column_.data(),
+          parsed_ok = ConvertAndWriteSlotBytes(boundary_column_.data(),
               boundary_column_.data() + boundary_column_.size(), tuple_,
               tuple_desc_->slots()[slot_idx], true, *unescape_string);
           boundary_column_.clear();
           *unescape_string = false;
         }
+        // Error logging. Append string to error_msg.
+        if (!parsed_ok) {
+          *error_in_row = true;
+          if (state->LogHasSpace()) {
+            state->error_stream() << "Error converting column: " << *column_idx <<
+                " TO " << TypeToString(tuple_desc_->slots()[slot_idx]->type()) << endl;
+          }
+        }
+        *file_buf_ptr_ = delim_char;
       }
       ++(*column_idx);
       column_start = file_buf_ptr_ + 1;
@@ -361,32 +392,55 @@ void TextScanNode::ParseFileBuffer(
 
     // 2.2 Check if we finished a tuple, and whether the tuple buffer is full.
     if (new_tuple) {
+      // Error logging: Write the errors and the erroneous line to the log.
+      if (*error_in_row) {
+        ++(*num_errors);
+        *error_in_row = false;
+        if (state->LogHasSpace()) {
+          state->error_stream() << "file: " << files_[file_idx_] << endl;
+          state->error_stream() << "line: ";
+          if (!boundary_row_.empty()) {
+            // Log the beginning of the line from the previous file buffer(s)
+            state->error_stream() << boundary_row_;
+          }
+          // Log the erroneous line (or the suffix of a line if !boundary_line.empty()).
+          state->error_stream() << string(line_start, file_buf_ptr_ - line_start - 1);
+          state->LogErrorStream();
+        }
+        if (state->abort_on_error()) {
+          state->ReportFileErrors(files_[file_idx_], 1);
+          return Status("Aborted TextScanNode due to parse errors. View error log for details.");
+        }
+      }
       *column_idx = 0;
+      line_start = file_buf_ptr_;
+      boundary_row_.clear();
       if (EvalConjuncts(current_row)) {
         row_batch->CommitLastRow();
         char* new_tuple = reinterpret_cast<char*>(tuple_);
         new_tuple += tuple_desc_->byte_size();
         // assert(new_tuple < tuple_buf_ + state->batch_size() * tuple_desc_->byte_size());
         tuple_ = reinterpret_cast<Tuple*> (new_tuple);
-        // Will be set to a valid row_idx in the next iteration,
-        // possibly after returning from this function and then re-entering with a new file buffer.
         *row_idx = RowBatch::INVALID_ROW_INDEX;
         if (row_batch->IsFull()) {
           // Tuple buffer is full.
-          return;
+          return Status::OK;
         }
       }
     }
   }
 
-  // Deal with beginning of boundary column.
+  // Deal with beginning of boundary column/line.
   // Also handles case where entire new file block belongs to previous boundary column.
   if (column_start != file_buf_ptr_) {
     boundary_column_.append(column_start, file_buf_ptr_ - column_start);
+    boundary_row_.append(line_start, file_buf_ptr_ - line_start);
   }
+
+  return Status::OK;
 }
 
-void TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, Tuple* tuple,
+bool TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, Tuple* tuple,
     const SlotDescriptor* slot_desc, bool copy_string, bool unescape_string) {
 
   // Check for null columns.
@@ -394,7 +448,7 @@ void TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, 
   // such as "...,,..." become NULLs, and not empty strings.
   if (begin == end) {
     tuple->SetNull(slot_desc->null_indicator_offset());
-    return;
+    return true;
   }
   // TODO: Handle out-of-range conditions.
   switch (slot_desc->type()) {
@@ -472,7 +526,10 @@ void TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, 
   // Set NULL if inconvertible.
   if (*end != '\0') {
     tuple->SetNull(slot_desc->null_indicator_offset());
+    return false;
   }
+
+  return true;
 }
 
 void TextScanNode::UnescapeString(const char* src, char* dest, int* len) {

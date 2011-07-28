@@ -128,7 +128,8 @@ Status QueryExecutor::Setup() {
   return Status::OK;
 }
 
-Status QueryExecutor::Exec(const std::string& query, vector<PrimitiveType>* col_types) {
+Status QueryExecutor::Exec(const std::string& query, vector<PrimitiveType>* col_types,
+    bool abort_on_error, int max_errors) {
   VLOG(1) << "query: " << query;
   TExecutePlanRequest request;
   try {
@@ -152,12 +153,13 @@ Status QueryExecutor::Exec(const std::string& query, vector<PrimitiveType>* col_
       Expr::CreateExprTrees(pool_.get(), request.selectListExprs, &select_list_exprs_));
 
   // Prepare select list expressions.
-  RuntimeState local_runtime_state(*descs);
+  RuntimeState local_runtime_state(*descs, abort_on_error, max_errors);
   RuntimeState* runtime_state = &local_runtime_state;
   if (plan_root != NULL) {
-    executor_.reset(new PlanExecutor(plan_root, *descs));
+    executor_.reset(new PlanExecutor(plan_root, *descs, abort_on_error, max_errors));
     runtime_state = executor_->runtime_state();
   }
+
   for (int i = 0; i < select_list_exprs_.size(); ++i) {
     select_list_exprs_[i]->Prepare(runtime_state);
     if (col_types != NULL) col_types->push_back(select_list_exprs_[i]->type());
@@ -184,9 +186,9 @@ Status QueryExecutor::FetchResult(std::string* result) {
 }
 
 Status QueryExecutor::FetchResult(std::vector<void*>* select_list_values) {
+  select_list_values->clear();
   if (executor_.get() == NULL) {
     // query without FROM clause: we return exactly one row
-    select_list_values->clear();
     if (!eos_) {
       for (int i = 0; i < select_list_exprs_.size(); ++i) {
         select_list_values->push_back(select_list_exprs_[i]->GetValue(NULL));
@@ -224,6 +226,7 @@ Status QueryExecutor::FetchResult(std::vector<void*>* select_list_values) {
   for (int i = 0; i < select_list_exprs_.size(); ++i) {
     select_list_values->push_back(select_list_exprs_[i]->GetValue(row));
   }
+
   ++num_rows_;
   ++next_row_;
   return Status::OK;
@@ -249,4 +252,18 @@ void QueryExecutor::Shutdown() {
     }
   }
   transport_->close();
+}
+
+std::string QueryExecutor::ErrorString() const {
+  if (executor_.get() == NULL) {
+    return "";
+  }
+  return executor_->runtime_state()->ErrorLog();
+}
+
+std::string QueryExecutor::FileErrors() const {
+  if (executor_.get() == NULL) {
+    return "";
+  }
+  return executor_->runtime_state()->FileErrors();
 }

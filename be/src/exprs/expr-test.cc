@@ -5,8 +5,6 @@
 #include <gtest/gtest.h>
 #include <boost/lexical_cast.hpp>
 #include <boost/random/mersenne_twister.hpp>
-//#include <boost/random/uniform_int_distribution.hpp>
-
 #include "runtime/primitive-type.h"
 #include "runtime/string-value.h"
 #include "testutil/query-executor.h"
@@ -45,7 +43,7 @@ class ExprTest : public testing::Test {
   void GetValue(const string& expr, PrimitiveType expr_type, void** value) {
     string stmt = "select " + expr;
     vector<PrimitiveType> result_types;
-    Status status = executor_.Exec(stmt, &result_types);
+    Status status = executor_.Exec(stmt, &result_types, false, 0);
     ASSERT_TRUE(status.ok()) << status.GetErrorMsg();
     vector<void*> result_row;
     ASSERT_TRUE(executor_.FetchResult(&result_row).ok());

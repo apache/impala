@@ -27,3 +27,7 @@ LOAD DATA LOCAL INPATH '../testdata/target/AllTypesSmall/0901.txt' OVERWRITE INT
 LOAD DATA LOCAL INPATH '../testdata/target/AllTypesSmall/0902.txt' OVERWRITE INTO TABLE AllTypesSmall PARTITION(year=2009, month=2);
 LOAD DATA LOCAL INPATH '../testdata/target/AllTypesSmall/0903.txt' OVERWRITE INTO TABLE AllTypesSmall PARTITION(year=2009, month=3);
 LOAD DATA LOCAL INPATH '../testdata/target/AllTypesSmall/0904.txt' OVERWRITE INTO TABLE AllTypesSmall PARTITION(year=2009, month=4);
+
+LOAD DATA LOCAL INPATH '../testdata/AllTypesError/0901.txt' OVERWRITE INTO TABLE AllTypesError PARTITION(year=2009, month=1);
+LOAD DATA LOCAL INPATH '../testdata/AllTypesError/0902.txt' OVERWRITE INTO TABLE AllTypesError PARTITION(year=2009, month=2);
+LOAD DATA LOCAL INPATH '../testdata/AllTypesError/0903.txt' OVERWRITE INTO TABLE AllTypesError PARTITION(year=2009, month=3);

@@ -3,7 +3,10 @@
 package com.cloudera.impala.service;
 
 import java.io.PrintStream;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -31,6 +34,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 public class Coordinator {
+  public static final boolean DEFAULT_ABORT_ON_ERROR = false;
+  public static final int DEFAULT_MAX_ERRORS = 100;
+
   private final Catalog catalog;
 
   // for async execution
@@ -51,13 +57,13 @@ public class Coordinator {
   // is finished) and place the results in resultQueue, followed by an empty
   // row that acts as an end-of-stream marker.
   // Also populates 'colTypes' and 'colLabels'.
-  public void runQuery(TQueryRequest request,
-                       List<PrimitiveType> colTypes,
-                       List<String> colLabels,
-                       BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
+  public void runQuery(TQueryRequest request, List<PrimitiveType> colTypes, List<String> colLabels,
+      boolean abortOnError, int maxErrors, List<String> errorLog, Map<String, Integer> fileErrors,
+      BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
     init();
     AnalysisContext.AnalysisResult analysisResult = analyzeQuery(request, colTypes, colLabels);
-    execQuery(analysisResult, request.returnAsAscii, resultQueue);
+    execQuery(analysisResult, abortOnError, maxErrors, errorLog, fileErrors, request.returnAsAscii,
+        resultQueue);
     addSentinelRow(resultQueue);
   }
 
@@ -69,13 +75,16 @@ public class Coordinator {
   // null.
   public void asyncRunQuery(
       final TQueryRequest request, List<PrimitiveType> colTypes, List<String> colLabels,
-      final BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
+      final boolean abortOnError, final int maxErrors, final List<String> errorLog,
+      final Map<String, Integer> fileErrors, final BlockingQueue<TResultRow> resultQueue)
+      throws ImpalaException {
     init();
     final AnalysisContext.AnalysisResult analysisResult = analyzeQuery(request, colTypes, colLabels);
     Runnable execCall = new Runnable() {
       public void run() {
         try {
-          execQuery(analysisResult, request.returnAsAscii, resultQueue);
+          execQuery(analysisResult, abortOnError, maxErrors, errorLog, fileErrors,
+              request.returnAsAscii, resultQueue);
         } catch (ImpalaException e) {
           errorMsg = e.getMessage();
         }
@@ -112,7 +121,8 @@ public class Coordinator {
 
   // Analyze query and return analysis result and types of select list exprs.
   public AnalysisContext.AnalysisResult analyzeQuery(
-      TQueryRequest request, List<PrimitiveType> colTypes, List<String> colLabels) throws ImpalaException {
+      TQueryRequest request, List<PrimitiveType> colTypes, List<String> colLabels)
+      throws ImpalaException {
     AnalysisContext analysisCtxt = new AnalysisContext(catalog);
     AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(request.stmt);
     Preconditions.checkNotNull(analysisResult.selectStmt);
@@ -136,8 +146,9 @@ public class Coordinator {
   // 'resultQueue'. If 'returnAsAscii' is true, returns results as printable
   // strings.
   private void execQuery(
-      AnalysisContext.AnalysisResult analysisResult, boolean returnAsAscii,
-      BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
+      AnalysisContext.AnalysisResult analysisResult,
+      boolean abortOnError, int maxErrors, List<String> errorLog, Map<String, Integer> fileErrors,
+      boolean returnAsAscii, BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
     // create plan
     Planner planner = new Planner();
     PlanNode plan = planner.createPlan(analysisResult.selectStmt, analysisResult.analyzer);
@@ -151,7 +162,8 @@ public class Coordinator {
     }
     try {
       NativePlanExecutor.ExecPlan(
-          serializer.serialize(execRequest), returnAsAscii, resultQueue);
+          serializer.serialize(execRequest), abortOnError, maxErrors, errorLog, fileErrors,
+          returnAsAscii, resultQueue);
     } catch (TException e) {
       throw new RuntimeException(e.getMessage());
     }
@@ -200,6 +212,7 @@ public class Coordinator {
    * @param targetStream
    *          Stream to write the query results to.
    *          Result rows are separated by newlines and fields are tabs.
+   *          Runtime error log is written after the results.
    * @return
    *         The number of result rows.
    */
@@ -208,14 +221,18 @@ public class Coordinator {
     Preconditions.checkNotNull(catalog);
     int numRows = 0;
     TQueryRequest request = new TQueryRequest(query, true);
+    List<String> errorLog = new ArrayList<String>();
+    Map<String, Integer> fileErrors = new HashMap<String, Integer>();
     List<PrimitiveType> colTypes = Lists.newArrayList();
     List<String> colLabels = Lists.newArrayList();
     BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
     Coordinator coordinator = new Coordinator(catalog);
     if (asyncExec) {
-      coordinator.asyncRunQuery(request, colTypes, colLabels, resultQueue);
+      coordinator.asyncRunQuery(request, colTypes, colLabels, DEFAULT_ABORT_ON_ERROR,
+          DEFAULT_MAX_ERRORS, errorLog, fileErrors, resultQueue);
     } else {
-      coordinator.runQuery(request, colTypes, colLabels, resultQueue);
+      coordinator.runQuery(request, colTypes, colLabels, DEFAULT_ABORT_ON_ERROR,
+          DEFAULT_MAX_ERRORS, errorLog, fileErrors, resultQueue);
     }
     while (true) {
       TResultRow resultRow = null;
@@ -233,6 +250,16 @@ public class Coordinator {
         targetStream.append(val.stringVal);
       }
       targetStream.print("\n");
+    }
+    // Append runtime error log.
+    for (String s : errorLog) {
+      targetStream.append(s);
+      targetStream.append('\n');
+    }
+    // Append runtime file errors.
+    for (Map.Entry<String, Integer> entry : fileErrors.entrySet()) {
+      targetStream.append(entry.getValue() + " errors in " + entry.getKey());
+      targetStream.append('\n');
     }
     if (asyncExec) {
       String errorMsg = coordinator.getErrorMsg();

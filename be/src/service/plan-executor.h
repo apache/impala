@@ -37,7 +37,7 @@ Status DeserializeRequest(
 
 class PlanExecutor {
  public:
-  PlanExecutor(ExecNode* plan, const DescriptorTbl& descs);
+  PlanExecutor(ExecNode* plan, const DescriptorTbl& descs, bool abort_on_error, int max_errors);
   ~PlanExecutor();
 
   // Start running query. Call this prior to FetchResult().
@@ -61,9 +61,13 @@ JNIEXPORT void Java_com_cloudera_impala_service_NativePlanExecutor_Init(
     JNIEnv* env, jclass caller_class);
 
 // JNI-callable wrapper to the plan executor
+// protected native static void ExecPlan(byte[] thriftExecutePlanRequest,
+//      boolean abortOnError, int maxErrors, List<String> errorLog, Map<String, Integer> fileErrors,
+//      boolean asAscii, BlockingQueue<TResultRow> resultQueue) throws ImpalaException;
 extern "C"
 JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativePlanExecutor_ExecPlan(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_execute_plan_request,
+    jboolean abort_on_error, jint max_errors, jobject error_log, jobject file_errors,
     jboolean as_ascii, jobject result_queue);
 
 }

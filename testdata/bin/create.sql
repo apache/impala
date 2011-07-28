@@ -16,6 +16,9 @@ row format delimited fields terminated by ','  escaped by '\\' stored as textfil
 DROP TABLE IF EXISTS AllTypesSmall;
 CREATE TABLE AllTypesSmall LIKE AllTypes;
 
+DROP TABLE IF EXISTS AlltypesError;
+CREATE TABLE AllTypesError LIKE AllTypes;
+
 DROP TABLE IF EXISTS DelimErrorTable;
 CREATE TABLE DelimErrorTable (
   id int,

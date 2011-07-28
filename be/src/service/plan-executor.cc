@@ -21,13 +21,15 @@ using namespace boost;
 using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
 
-#define THROW_IF_ERROR(stmt, env, exc_class) \
+#define THROW_IF_ERROR(stmt, env, adaptor) \
   do { \
     Status status = (stmt); \
     if (!status.ok()) { \
+      (adaptor)->WriteErrorLog(); \
+      (adaptor)->WriteFileErrors(); \
       string error_msg; \
       status.GetErrorMsg(&error_msg); \
-      (env)->ThrowNew((exc_class), error_msg.c_str()); \
+      (env)->ThrowNew((adaptor)->impala_exc_cl(), error_msg.c_str()); \
       return; \
     } \
   } while (false)
@@ -55,10 +57,10 @@ using namespace apache::thrift::transport;
 
 namespace impala {
 
-PlanExecutor::PlanExecutor(ExecNode* plan, const DescriptorTbl& descs)
+PlanExecutor::PlanExecutor(ExecNode* plan, const DescriptorTbl& descs, bool abort_on_error, int max_errors)
   : plan_(plan),
     tuple_descs_(),
-    runtime_state_(descs),
+    runtime_state_(descs, abort_on_error, max_errors),
     done_(false) {
   // stash these, we need to pass them into the RowBatch c'tor
   descs.GetTupleDescs(&tuple_descs_);
@@ -86,9 +88,14 @@ Status PlanExecutor::FetchResult(RowBatch** batch) {
 class PlanExecutorAdaptor {
  public:
   PlanExecutorAdaptor(JNIEnv* env_, jbyteArray thrift_execute_plan_request,
-                      jboolean as_ascii, jobject result_queue)
-    : env_(env_), thrift_execute_plan_request_(thrift_execute_plan_request),
-      as_ascii_(as_ascii), result_queue_(result_queue) {}
+      jboolean abort_on_error, jint max_errors,
+      jobject error_log, jobject file_errors,
+      jboolean as_ascii, jobject result_queue) :
+    env_(env_), thrift_execute_plan_request_(thrift_execute_plan_request),
+        abort_on_error_(abort_on_error), max_errors_(max_errors),
+        error_log_(error_log), file_errors_(file_errors),
+        as_ascii_(as_ascii), result_queue_(result_queue) {
+  }
 
   // Indicate error by throwing a new java exception.
   void Init();
@@ -98,6 +105,12 @@ class PlanExecutorAdaptor {
 
   // Indicate error by throwing a new java exception.
   void AddResultRow(TupleRow* row);
+
+  // Copy c++ runtime error log into Java error_log.
+  void WriteErrorLog();
+
+  // Copy c++ runtime file error stats into Java file_errors.
+  void WriteFileErrors();
 
   PlanExecutor* executor() { return executor_.get(); }
 
@@ -110,6 +123,10 @@ class PlanExecutorAdaptor {
  private:
   JNIEnv* env_;
   jbyteArray thrift_execute_plan_request_;
+  bool abort_on_error_;
+  int max_errors_;
+  jobject error_log_;
+  jobject file_errors_;
   bool as_ascii_;
   jobject result_queue_;
   ObjectPool obj_pool_;
@@ -124,12 +141,18 @@ class PlanExecutorAdaptor {
   jclass blocking_queue_if_;
   jclass result_row_cl_;
   jclass column_value_cl_;
+  jclass list_cl_;
+  jclass map_cl_;
+  jclass integer_cl_;
 
   // methods
   jmethodID throwable_to_string_id_;
   jmethodID put_id_;
   jmethodID result_row_ctor_, add_to_col_vals_id_;
   jmethodID column_value_ctor_;
+  jmethodID list_add_id_;
+  jmethodID map_put_id_;
+  jmethodID integer_ctor_;
 
   // fields
   jfieldID bool_val_field_;
@@ -189,6 +212,21 @@ void PlanExecutorAdaptor::Init() {
   THROW_IF_EXC(env_, impala_exc_cl_, throwable_to_string_id_);
   string_val_field_ = env_->GetFieldID(column_value_cl_, "stringVal", "Ljava/lang/String;");
   THROW_IF_EXC(env_, impala_exc_cl_, throwable_to_string_id_);
+
+  list_cl_ = env_->FindClass("java/util/List");
+  THROW_IF_EXC(env_, impala_exc_cl_, throwable_to_string_id_);
+  list_add_id_ = env_->GetMethodID(list_cl_, "add", "(Ljava/lang/Object;)Z");
+  THROW_IF_EXC(env_, impala_exc_cl_, throwable_to_string_id_);
+
+  map_cl_ = env_->FindClass("java/util/Map");
+  THROW_IF_EXC(env_, impala_exc_cl_, throwable_to_string_id_);
+  map_put_id_ = env_->GetMethodID(map_cl_, "put",
+      "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+  THROW_IF_EXC(env_, impala_exc_cl_, throwable_to_string_id_);
+  integer_cl_ = env_->FindClass("java/lang/Integer");
+  THROW_IF_EXC(env_, impala_exc_cl_, throwable_to_string_id_);
+  integer_ctor_ = env_->GetMethodID(integer_cl_, "<init>", "(I)V");
+  THROW_IF_EXC(env_, impala_exc_cl_, throwable_to_string_id_);
 }
 
 void PlanExecutorAdaptor::DeserializeRequest() {
@@ -212,29 +250,28 @@ void PlanExecutorAdaptor::DeserializeRequest() {
 
   if (exec_request.__isset.plan) {
     THROW_IF_ERROR(ExecNode::CreateTree(&obj_pool_, exec_request.plan, &plan_), env_,
-                   impala_exc_cl_);
+                   this);
   } else {
     plan_ = NULL;
   }
   if (exec_request.__isset.descTbl) {
     THROW_IF_ERROR(DescriptorTbl::Create(&obj_pool_, exec_request.descTbl, &descs_), env_,
-                   impala_exc_cl_);
+                   this);
   } else {
     descs_ = NULL;
   }
   // TODO: check that (descs_ == NULL) == (plan_ == NULL)
   THROW_IF_ERROR(
       Expr::CreateExprTrees(&obj_pool_, exec_request.selectListExprs,
-                            &select_list_exprs_),
-      env_, impala_exc_cl_);
+                            &select_list_exprs_), env_, this);
 }
 
 void PlanExecutorAdaptor::Exec() {
   DeserializeRequest();
   RETURN_IF_EXC(env_);
   if (plan_ == NULL) return;
-  executor_.reset(new PlanExecutor(plan_, *descs_));
-  THROW_IF_ERROR(executor_->Exec(), env_, impala_exc_cl_);
+  executor_.reset(new PlanExecutor(plan_, *descs_, abort_on_error_, max_errors_));
+  THROW_IF_ERROR(executor_->Exec(), env_, this);
 }
 
 void PlanExecutorAdaptor::AddResultRow(TupleRow* row) {
@@ -272,6 +309,24 @@ void PlanExecutorAdaptor::AddResultRow(TupleRow* row) {
   THROW_IF_EXC(env_, impala_exc_cl_, throwable_to_string_id_);
 }
 
+void PlanExecutorAdaptor::WriteErrorLog() {
+  const vector<string>& runtime_error_log = executor_->runtime_state()->error_log();
+  for (int i = 0; i < runtime_error_log.size(); ++i) {
+    env_->CallObjectMethod(error_log_, list_add_id_,
+        env_->NewStringUTF(runtime_error_log[i].c_str()));
+  }
+}
+
+void PlanExecutorAdaptor::WriteFileErrors() {
+  const vector<pair<string, int> >& runtime_file_errors =
+      executor_->runtime_state()->file_errors();
+  for (int i = 0; i < runtime_file_errors.size(); ++i) {
+    env_->CallObjectMethod(file_errors_, map_put_id_,
+        env_->NewStringUTF(runtime_file_errors[i].first.c_str()),
+        env_->NewObject(integer_cl_, integer_ctor_, runtime_file_errors[i].second));
+  }
+}
+
 extern "C"
 JNIEXPORT void Java_com_cloudera_impala_service_NativePlanExecutor_Init(
     JNIEnv* env_, jclass caller_class) {
@@ -283,9 +338,11 @@ JNIEXPORT void Java_com_cloudera_impala_service_NativePlanExecutor_Init(
 extern "C"
 JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativePlanExecutor_ExecPlan(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_execute_plan_request,
+    jboolean abort_on_error, jint max_errors, jobject error_log, jobject file_errors,
     jboolean as_ascii, jobject result_queue) {
 
-  PlanExecutorAdaptor adaptor(env, thrift_execute_plan_request, as_ascii, result_queue);
+  PlanExecutorAdaptor adaptor(env, thrift_execute_plan_request, abort_on_error, max_errors,
+      error_log, file_errors, as_ascii, result_queue);
   adaptor.Init();
   RETURN_IF_EXC(env);
   adaptor.Exec();
@@ -309,7 +366,7 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativePlanExecutor_ExecP
   scoped_ptr<RowBatch> batch;
   while (true) {
     RowBatch* batch_ptr;
-    THROW_IF_ERROR(executor->FetchResult(&batch_ptr), env, adaptor.impala_exc_cl());
+    THROW_IF_ERROR(executor->FetchResult(&batch_ptr), env, &adaptor);
     batch.reset(batch_ptr);
     for (int i = 0; i < batch->num_rows(); ++i) {
       TupleRow* row = batch->GetRow(i);
@@ -320,6 +377,10 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativePlanExecutor_ExecP
       break;
     }
   }
+
+  // Report error log and file error stats.
+  adaptor.WriteErrorLog();
+  adaptor.WriteFileErrors();
 }
 
 }

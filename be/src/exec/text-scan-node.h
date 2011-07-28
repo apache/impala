@@ -178,27 +178,43 @@ class TextScanNode : public ExecNode {
   // Created in Prepare() from the TableDescriptor and SlotDescriptors.
   std::vector<std::pair<int, int> > key_idx_to_slot_idx_;
 
+  // Helper string for dealing with input rows that span file blocks.
+  // We keep track of a whole line that spans file blocks to be able to report
+  // the line as erroneous in case of parsing errors.
+  std::string boundary_row_;
+
   // Helper string for dealing with columns that span file blocks.
   std::string boundary_column_;
 
   // Parses the current file_buf_ and writes tuples into the tuple buffer.
   // Input Parameters
+  //   state: Runtime state into which we log errors.
   //   row_batch: Row batch into which to write new tuples.
   // Input/Output Parameters:
   //   The following parameters make up the state that must be maintained across file buffers.
   //   These parameters are changed within ParseFileBuffer.
+  //   row_batch: Row batch into which to add tuples.
   //   row_idx: Index of current row. Possibly updated within ParseFileBuffer.
-  //   field_idx: Index of current field in file.
+  //   column_idx: Index of current field in file.
   //   last_char_is_escape: Indicates whether the last character was an escape character.
   //   unescape_string: Indicates whether the current string-slot contains an escape,
   //                    and must be copied unescaped into the the var_len_buffer.
   //   quote_char: Indicates the last quote character starting a quoted string.
   //               Set to NOT_IN_STRING if string_are_quoted==false,
   //               or we have not encountered a quote.
-  //
-  void ParseFileBuffer(RowBatch* row_batch, int* row_idx, int* column_idx,
-                       bool* last_char_is_escape, bool* unescape_string,
-                       char* quote_char);
+  //   error_in_row: Indicates whether the current row being parsed has an error.
+  //                 Used for counting the number of errors per file.
+  //                 Once the error log is full, error_in_row will still be set,
+  //                 in order to be able to record the errors per file,
+  //                 even though not all details are logged.
+  //   num_errors_: Counts the number of errors in the current file.
+  //                Used for error reporting.
+  // Returns Status::OK if no errors were found,
+  // or if errors were found but state->abort_on_error() is false.
+  // Returns error message if errors were found and state->abort_on_error() is true.
+  Status ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, int* row_idx,
+      int* column_idx, bool* last_char_is_escape, bool* unescape_string,
+      char* quote_char, bool* error_in_row, int* num_errors);
 
   // Converts slot data (begin, end) into type of slot_desc,
   // and writes the result into the tuples's slot.
@@ -209,8 +225,10 @@ class TextScanNode : public ExecNode {
   // For boundary string fields,
   // we create a contiguous copy of the string data into a separate buffer.
   // Unsuccessful conversions are turned into NULLs.
-  void ConvertAndWriteSlotBytes(const char* begin, const char* end, Tuple* tuple,
-      const SlotDescriptor* slot_desc, bool copy_string, bool unescape_string);
+  // Returns true if value was converted and written successfully, false otherwise.
+  bool ConvertAndWriteSlotBytes(const char* begin,
+      const char* end, Tuple* tuple, const SlotDescriptor* slot_desc,
+      bool copy_string, bool unescape_string);
 
   // Removes escape characters from len characters of the null-terminated string src,
   // and copies the unescaped string into dest, changing *len to the unescaped length.

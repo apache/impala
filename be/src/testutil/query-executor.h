@@ -32,7 +32,8 @@ class QueryExecutor {
 
   // Start running query. Call this prior to FetchResult().
   // If 'col_types' is non-NULL, returns the types of the select list items.
-  Status Exec(const std::string& query, std::vector<PrimitiveType>* col_types);
+  Status Exec(const std::string& query, std::vector<PrimitiveType>* col_types,
+      bool abort_on_error, int max_errors);
 
   // Return single row as comma-separated list of values.
   // Indicates end-of-stream by setting 'row' to the empty string.
@@ -45,6 +46,12 @@ class QueryExecutor {
   Status FetchResult(std::vector<void*>* row);
 
   RuntimeState* runtime_state();
+
+  // Returns the error log lines in executor_'s runtime state as a string joined with '\n'.
+  std::string ErrorString() const;
+
+  // Returns a string representation of the file_errors_.
+  std::string FileErrors() const;
 
  private:
   boost::shared_ptr<apache::thrift::transport::TTransport> socket_;

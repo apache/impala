@@ -5,8 +5,6 @@
 #include "gen-cpp/Exprs_types.h"
 #include "runtime/runtime-state.h"
 
-#include <iostream>
-
 namespace impala {
 
 SlotRef::SlotRef(const TExprNode& node)

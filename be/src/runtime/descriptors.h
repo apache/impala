@@ -26,6 +26,8 @@ class TTupleDescriptor;
 typedef int TupleId;
 typedef int SlotId;
 
+std::string TypeToString(PrimitiveType t);
+
 // Location information for null indicator bit for particular slot.
 struct NullIndicatorOffset {
   int byte_offset;

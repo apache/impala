@@ -3,6 +3,8 @@
 package com.cloudera.impala.service;
 
 import java.io.File;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 
 import org.slf4j.Logger;
@@ -19,6 +21,7 @@ class NativePlanExecutor {
   protected native static void Init();
 
   protected native static void ExecPlan(byte[] thriftExecutePlanRequest,
+      boolean abortOnError, int maxErrors, List<String> errorLog, Map<String, Integer> fileErrors,
       boolean asAscii, BlockingQueue<TResultRow> resultQueue) throws ImpalaException;
 
   static {

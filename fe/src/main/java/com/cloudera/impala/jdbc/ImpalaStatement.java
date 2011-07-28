@@ -8,7 +8,9 @@ import java.sql.SQLException;
 import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -41,6 +43,10 @@ public class ImpalaStatement implements Statement {
   private final List<PrimitiveType> colTypes = new ArrayList<PrimitiveType>();
   // Output column labels
   private final List<String> colLabels = new ArrayList<String>();
+  // List of error strings received from query execution.
+  private final List<String> errorLog = new ArrayList<String>();
+  // Maps from file name to number of errors encountered in that file.
+  private final Map<String, Integer> fileErrors = new HashMap<String, Integer>();
   // Queue where results are placed in.
   private final BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
 
@@ -65,13 +71,16 @@ public class ImpalaStatement implements Statement {
 
   @Override
   public ResultSet executeQuery(String sql) throws SQLException {
+    errorLog.clear();
+    fileErrors.clear();
     resultQueue.clear();
     colTypes.clear();
     colLabels.clear();
     request.stmt = sql;
     request.returnAsAscii = true;
     try {
-      coordinator.runQuery(request, colTypes, colLabels, resultQueue);
+      coordinator.runQuery(request, colTypes, colLabels, Coordinator.DEFAULT_ABORT_ON_ERROR,
+          Coordinator.DEFAULT_MAX_ERRORS, errorLog, fileErrors, resultQueue);
     } catch (ImpalaException e) {
       throw new SQLException(e);
     }

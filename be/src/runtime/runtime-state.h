@@ -4,6 +4,10 @@
 #define IMPALA_RUNTIME_RUNTIME_STATE_H
 
 #include <boost/scoped_ptr.hpp>
+#include <vector>
+#include <string>
+// stringstream is a typedef, so can't forward declare it.
+#include <sstream>
 
 namespace impala {
 
@@ -14,18 +18,56 @@ class ObjectPool;
 // query and potentially shared across execution nodes.
 class RuntimeState {
  public:
-  RuntimeState(const DescriptorTbl& descs);
+  RuntimeState(const DescriptorTbl& descs, bool abort_on_error, int max_errors);
 
   ObjectPool* obj_pool() const { return obj_pool_.get(); }
   const DescriptorTbl& descs() const { return descs_; }
   int batch_size() const { return batch_size_; }
   int file_buf_size() const { return file_buf_size_; }
+  bool abort_on_error() const { return abort_on_error_; }
+  int max_errors() const { return max_errors_; }
+  const std::vector<std::string>& error_log() const { return error_log_; }
+  // Get error stream for appending error message snippets.
+  std::stringstream& error_stream() { return error_stream_; }
+  const std::vector<std::pair<std::string, int> >& file_errors() const { return file_errors_; }
+
+  // Append contents of error_stream_ as one message to error_log_. Clears error_stream_.
+  void LogErrorStream();
+
+  // Returns true if the error log has not reached max_errors_.
+  bool LogHasSpace() const { return error_log_.size() < max_errors_; }
+
+  // Clears the error log.
+  void ClearErrorLog() { error_log_.clear(); }
+
+  // Report that num_errors occurred while parsing file_name.
+  void ReportFileErrors(const std::string& file_name, int num_errors);
+
+  // Clear the file errors.
+  void ClearFileErrors() { file_errors_.clear(); }
+
+  // Returns the error log lines as a string joined with '\n'.
+  std::string ErrorLog() const;
+
+  // Returns a string representation of the file_errors_.
+  std::string FileErrors() const;
 
  private:
   const DescriptorTbl& descs_;
   boost::scoped_ptr<ObjectPool> obj_pool_;
   int batch_size_;
   int file_buf_size_;
+  // A buffer for error messages.
+  // The entire error stream is written to the error_log_ in log_error_stream().
+  std::stringstream error_stream_;
+  // Logs error messages.
+  std::vector<std::string> error_log_;
+  // Stores the number of parse errors per file.
+  std::vector<std::pair<std::string, int> > file_errors_;
+  // Whether to abort if an error is encountered.
+  const bool abort_on_error_;
+  // Maximum number of errors to log.
+  const int max_errors_;
 
   static const int DEFAULT_BATCH_SIZE = 1024;
   static const int DEFAULT_FILE_BUF_SIZE = 131072; // 128K

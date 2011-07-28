@@ -32,10 +32,16 @@ import com.google.common.collect.Lists;
 // Note that <QUERY STRING> and <EXPECTED RESULT SECTIONS> can consist of multiple lines.
 public class TestFileParser {
   private final StringBuilder query = new StringBuilder();
+  private final StringBuilder confString = new StringBuilder();
   private final ArrayList<ArrayList<String>> expectedResultSections = Lists.newArrayList();
   private final String fileName;
   private InputStream stream;
   private Scanner scanner;
+
+  enum ParserState {
+    QUERY,
+    EXPECTED_RESULT
+  }
 
   public TestFileParser(String fileName) {
     this.fileName = fileName;
@@ -57,8 +63,9 @@ public class TestFileParser {
 
   public void next() {
     expectedResultSections.clear();
+    confString.setLength(0);
     query.setLength(0);
-    boolean readQuery = true;
+    ParserState state = ParserState.QUERY;
     ArrayList<String> resultSection = null;
     while (scanner.hasNextLine()) {
       String line = scanner.nextLine();
@@ -71,14 +78,22 @@ public class TestFileParser {
       }
       if (line.startsWith("-")) {
         // start of plan output section
+        state = ParserState.EXPECTED_RESULT;
         resultSection = new ArrayList<String>();
         expectedResultSections.add(resultSection);
-        readQuery = false;
-      } else if (readQuery) {
-        query.append(line);
-        query.append(" ");
       } else {
-        resultSection.add(line);
+        // Line is not a section indicator.
+        switch(state) {
+        case QUERY: {
+          query.append(line);
+          query.append(" ");
+          break;
+        }
+        case EXPECTED_RESULT: {
+          resultSection.add(line);
+          break;
+        }
+        }
       }
     }
   }
@@ -96,7 +111,15 @@ public class TestFileParser {
   }
 
   public ArrayList<String> getExpectedResult(int sectionIndex) {
-    return expectedResultSections.get(sectionIndex);
+    if (sectionIndex < expectedResultSections.size()) {
+      return expectedResultSections.get(sectionIndex);
+    } else {
+      return new ArrayList<String>();
+    }
+  }
+
+  public String getConfString() {
+    return confString.toString();
   }
 
   public String getQuery() {
