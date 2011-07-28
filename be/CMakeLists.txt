@@ -39,7 +39,9 @@ include_directories(${GFLAGS_INCLUDE_DIR})
 set(LIBS ${LIBS} ${GFLAGS_LIBS})
 # for static linking with GFLAGS, GFLAGS_STATIC_LIB is set in GFLAGS' find module
 add_library(gflagsstatic STATIC IMPORTED)
-set_target_properties(gflagsstatic PROPERTIES IMPORTED_LOCATION "${GFLAGS_STATIC_LIB}")
+set_target_properties(gflagsstatic PROPERTIES IMPORTED_LOCATION ${GFLAGS_STATIC_LIB})
+
+message(STATUS ${GFLAGS_INCLUDE_DIR})
 
 # find GLog headers and libs
 find_package(GLog REQUIRED)
@@ -47,7 +49,9 @@ include_directories(${GLOG_INCLUDE_DIR})
 set(LIBS ${LIBS} ${GLOG_LIBS})
 # for static linking with GLOG, GLOG_STATIC_LIB is set in GLOG's find module
 add_library(glogstatic STATIC IMPORTED)
-set_target_properties(glogstatic PROPERTIES IMPORTED_LOCATION "${GLOG_STATIC_LIB}")
+set_target_properties(glogstatic PROPERTIES IMPORTED_LOCATION ${GLOG_STATIC_LIB})
+
+message(STATUS ${GLOG_INCLUDE_DIR})
 
 # resolve "#include "<subdir>/<name>.h"
 include_directories(${CMAKE_SOURCE_DIR}/src)

@@ -13,5 +13,10 @@ add_library(MockHdfs STATIC
 )
 
 add_library(TestUtil STATIC
-  query-executor.cc
+  query-executor.cc  
+)
+
+target_link_libraries(TestUtil
+  glogstatic
+  gflagsstatic  
 )

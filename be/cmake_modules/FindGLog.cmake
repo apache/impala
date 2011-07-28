@@ -6,15 +6,14 @@
 #  GLOG_FOUND, whether glog has been found
 
 set(GLOG_SEARCH_HEADER_PATHS
-  /usr/local/include/
-  /usr/local/include/glog
+  $ENV{IMPALA_HOME}/thirdparty/glog-0.3.1/src
 )
 
 set(GLOG_SEARCH_LIB_PATH
-  /usr/local/lib
+  $ENV{IMPALA_HOME}/thirdparty/glog-0.3.1/.libs
 )
 
-find_path(GLOG_INCLUDE_DIR logging.h PATHS
+find_path(GLOG_INCLUDE_DIR glog/logging.h PATHS
   ${GLOG_SEARCH_HEADER_PATHS}
 )
 
@@ -33,9 +32,9 @@ if (GLOG_FOUND)
     message(STATUS "GLog Found in ${GLOG_SEARCH_LIB_PATH}")
   endif ()
 else ()
-  message(STATUS "GLog includes and libraries NOT found."
-    "Looked for headers in ${GLOG_SEARCH_HEADER_PATHS}, "
-    "and for libs in ${GLOG_SEARCH_LIB_PATHS}")
+  message(STATUS "GLog includes and libraries NOT found. "
+    "Looked for headers in ${GLOG_SEARCH_HEADER_PATH}, "
+    "and for libs in ${GLOG_SEARCH_LIB_PATH}")
 endif ()
 
 mark_as_advanced(

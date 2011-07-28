@@ -5,16 +5,15 @@
 #  GFLAGS_STATIC_LIB, path to libgflags.a
 #  GFLAGS_FOUND, whether gflags has been found
 
-set(GFLAGS_SEARCH_HEADER_PATHS
-  /usr/local/include/
-  /usr/local/include/gflags
+set(GFLAGS_SEARCH_HEADER_PATHS  
+  $ENV{IMPALA_HOME}/thirdparty/gflags-1.5/src
 )
 
 set(GFLAGS_SEARCH_LIB_PATH
-  /usr/local/lib
+  $ENV{IMPALA_HOME}/thirdparty/gflags-1.5/.libs
 )
 
-find_path(GFLAGS_INCLUDE_DIR gflags.h PATHS
+find_path(GFLAGS_INCLUDE_DIR gflags/gflags.h PATHS
   ${GFLAGS_SEARCH_HEADER_PATHS}
 )
 
@@ -33,9 +32,9 @@ if (GFLAGS_FOUND)
     message(STATUS "GFlags Found in ${GFLAGS_SEARCH_LIB_PATH}")
   endif ()
 else ()
-  message(STATUS "GFlags includes and libraries NOT found."
-    "Looked for headers in ${GFLAGS_SEARCH_HEADER_PATHS}, "
-    "and for libs in ${GFLAGS_SEARCH_LIB_PATHS}")
+  message(STATUS "GFlags includes and libraries NOT found. "
+    "Looked for headers in ${GFLAGS_SEARCH_HEADER_PATH}, "
+    "and for libs in ${GFLAGS_SEARCH_LIB_PATH}")
 endif ()
 
 mark_as_advanced(
