@@ -100,7 +100,7 @@ cmake .
 make
 cd ..
 
-# build frontend
+# build frontend and run tests
 cd fe
-mvn package
+mvn test
 cd ..
