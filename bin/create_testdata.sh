@@ -1,11 +1,17 @@
-#!/bin/sh
+#!/usr/bin/env bash
+# Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+
+bin=`dirname "$0"`
+bin=`cd "$bin"; pwd`
+. "$bin"/impala-config.sh
 
 set -e
 
 # location of the generated data
-DATALOC=target
+DATALOC=$IMPALA_HOME/testdata/target
 
 # regenerate the test data generator
+cd $IMPALA_HOME/testdata
 mvn clean package
 
 # find jars

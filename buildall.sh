@@ -1,10 +1,24 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 # run buildall.sh -help to see options
+
+root=`dirname "$0"`
+root=`cd "$root"; pwd`
+
+export IMPALA_HOME=$root
+
+. "$root"/bin/impala-config.sh
+
+# Exit on non-true return value
+set -e
+# Exit on reference to unitialized variable
+set -u
 
 clean_action=1
 config_action=1
 testdata_action=1
+skiptests_action=false
 
 # parse command line options
 for ARG in $*
@@ -18,6 +32,9 @@ do
       ;;
     -notestdata)
       testdata_action=0
+      ;;
+    -skiptests)
+      skiptests_action=true
       ;;
     -help)
       echo "buildall.sh [-noclean] [-noconfig] [-notestdata]"
@@ -33,45 +50,33 @@ done
 if [ $clean_action -eq 1 ]
 then
   # clean thirdparty
-  cd thirdparty
-  cd gflags-1.5
-  make clean
-  rm Makefile
-  cd ..
-  cd glog-0.3.1
-  make clean
-  rm Makefile
-  cd ../../
+  cd $IMPALA_HOME/thirdparty
+  # remove everything that is not checked in
+  git clean -dfx
 
-  # clean frontend
-  cd fe
-  mvn clean
-  cd ..
+  # clean fe
+  cd $IMPALA_HOME/fe
+  # remove everything listed in .gitignore
+  git clean -Xf
 
-  # clean backend
-  cd be
-  cmake .
-  make clean
-  cd ..
+  # clean be
+  cd $IMPALA_HOME/be
+  # remove everything listed in .gitignore
+  git clean -Xf
+
 fi
-
-# exit script if any following command gives a non-zero return
-set -e
-
 
 if [ $testdata_action -eq 1 ]
 then
   # create test data
-  cd testdata
-  ./recreate_store.sh
-  cd ../fe
+  cd $IMPALA_HOME/testdata
+  $IMPALA_HOME/bin/create_testdata.sh
+  cd $IMPALA_HOME/fe
   mvn -Pload-testdata process-test-resources
-  cd ..
 fi
 
 # build thirdparty
-cd thirdparty
-cd gflags-1.5
+cd $IMPALA_HOME/thirdparty/gflags-1.5
 if [ $config_action -eq 1 ]
 then
   ./configure
@@ -81,8 +86,8 @@ OLDCXXFLAGS=$(grep -w "CXXFLAGS =" Makefile)
 NEWCXXFLAGS=$OLDCXXFLAGS" -fPIC"
 sed -i "s/$OLDCXXFLAGS/$NEWCXXFLAGS/g" Makefile
 make
-cd ..
-cd glog-0.3.1
+
+cd $IMPALA_HOME/thirdparty/glog-0.3.1
 if [ $config_action -eq 1 ]
 then
   ./configure
@@ -92,15 +97,11 @@ OLDCXXFLAGS=$(grep -w "CXXFLAGS =" Makefile)
 NEWCXXFLAGS=$OLDCXXFLAGS" -fPIC"
 sed -i "s/$OLDCXXFLAGS/$NEWCXXFLAGS/g" Makefile
 make
-cd ../../
 
 # build backend
-cd be
-cmake .
-make
-cd ..
+cd $IMPALA_BE_DIR
+cmake . && make
 
 # build frontend and run tests
-cd fe
-mvn test
-cd ..
+cd $IMPALA_FE_DIR
+mvn package -DskipTests=${skiptests_action}

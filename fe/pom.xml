@@ -40,22 +40,22 @@
     <dependency>
       <groupId>org.apache.hadoop.hive</groupId>
       <artifactId>hive-metastore</artifactId>
-      <version>0.7.0-cdh3u0</version>
+      <version>0.7.1-cdh3u1</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop.hive</groupId>
       <artifactId>hive-common</artifactId>
-      <version>0.7.0-cdh3u0</version>
+      <version>0.7.1-cdh3u1</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop.hive</groupId>
       <artifactId>hive-serde</artifactId>
-      <version>0.7.0-cdh3u0</version>
+      <version>0.7.1-cdh3u1</version>
     </dependency>
     <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-core</artifactId>
-      <version>0.20.2-cdh3u0</version>
+      <version>0.20.2-cdh3u1</version>
     </dependency>
     <dependency>
       <groupId>beaver</groupId>
@@ -85,7 +85,7 @@
     <dependency>
       <groupId>org.apache.hadoop.hive</groupId>
       <artifactId>hive-shims</artifactId>
-      <version>0.7.0-cdh3u0</version>
+      <version>0.7.1-cdh3u1</version>
     </dependency>
 
     <dependency>
@@ -400,7 +400,6 @@
 
   <profiles>
     <profile>
-      <!-- -->
       <id>load-testdata</id>
       <build>
         <plugins>
@@ -415,25 +414,19 @@
                 </goals>
                 <configuration>
                   <target>
-                    <exec executable="/bin/bash">
-                      <arg value="${project.basedir}/../testdata/bin/run-hive.sh"/>
-                      <arg value="${project.basedir}/src/test/resources"/>
+                    <exec executable="${env.HIVE_HOME}/bin/hive">
+                      <arg value="-hiveconf"/>
+                      <arg value="hive.root.logger=WARN,console"/>
+                      <arg value="-v"/>
+                      <arg value="-f"/>
                       <arg value="${project.basedir}/../testdata/bin/create.sql"/>
-                      <arg value="${test.hive.warehouse.dir}"/>
-                      <arg value="${test.hive.metastore.jdbc.url}"/>
-                      <arg value="${test.hive.metastore.jdbc.driver}"/>
-                      <arg value="${test.hive.metastore.jdbc.username}"/>
-                      <arg value="${test.hive.metastore.jdbc.password}"/>
                     </exec>
-                    <exec executable="/bin/bash">
-                      <arg value="${project.basedir}/../testdata/bin/run-hive.sh"/>
-                      <arg value="${project.basedir}/src/test/resources"/>
+                    <exec executable="${env.HIVE_HOME}/bin/hive">
+                      <arg value="-hiveconf"/>
+                      <arg value="hive.root.logger=WARN,console"/>
+                      <arg value="-v"/>
+                      <arg value="-f"/>
                       <arg value="${project.basedir}/../testdata/bin/load.sql"/>
-                      <arg value="${test.hive.warehouse.dir}"/>
-                      <arg value="${test.hive.metastore.jdbc.url}"/>
-                      <arg value="${test.hive.metastore.jdbc.driver}"/>
-                      <arg value="${test.hive.metastore.jdbc.username}"/>
-                      <arg value="${test.hive.metastore.jdbc.password}"/>
                     </exec>
                   </target>
                 </configuration>

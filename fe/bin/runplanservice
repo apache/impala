@@ -1,3 +1,0 @@
-#!/bin/sh
-cd `dirname $0`/..
-mvn exec:java -Dexec.mainClass=com.cloudera.impala.testutil.PlanService -Dexec.classpathScope=test

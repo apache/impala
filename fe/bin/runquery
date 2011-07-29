@@ -1,1 +1,0 @@
-mvn exec:java -Dexec.mainClass=com.cloudera.impala.service.Coordinator -Dexec.classpathScope=test -Dexec.args="'$1'"
