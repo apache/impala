@@ -13,9 +13,23 @@ find_path(HDFS_INCLUDE_DIR hdfs.h PATHS
   $ENV{HADOOP_HOME}/src/c++/libhdfs
 )
 
-set(HDFS_LIB_PATHS
-  $ENV{HADOOP_HOME}/c++/Linux-amd64-64/lib
-)
+if ("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
+  set(arch_hint "x64")
+elseif ("$ENV{LIB}" MATCHES "(amd64|ia64)")
+  set(arch_hint "x64")
+else ()
+  set(arch_hint "x86")
+endif()
+
+message(STATUS "Architecture: ${arch_hint}")
+
+if ("${arch_hint}" STREQUAL "x64")
+  set(HDFS_LIB_PATHS $ENV{HADOOP_HOME}/c++/Linux-amd64-64/lib)
+else ()
+  set(HDFS_LIB_PATHS $ENV{HADOOP_HOME}/c++/Linux-i386-32/lib)
+endif ()
+
+message(STATUS "HDFS_LIB_PATHS: ${HDFS_LIB_PATHS}")
 
 find_library(HDFS_LIB NAMES hdfs PATHS ${HDFS_LIB_PATHS})
 
@@ -29,6 +43,8 @@ endif ()
 if (HDFS_FOUND)
   if (NOT HDFS_FIND_QUIETLY)
     message(STATUS "${Hadoop_VERSION}")
+    message(STATUS "HDFS_INCLUDE_DIR: ${HDFS_INCLUDE_DIR}")
+    message(STATUS "HDFS_LIBS: ${HDFS_LIBS}")
   endif ()
 else ()
   message(STATUS "HDFS includes and libraries NOT found."
