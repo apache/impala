@@ -57,12 +57,12 @@ then
   # clean fe
   cd $IMPALA_HOME/fe
   # remove everything listed in .gitignore
-  git clean -Xf
+  git clean -Xdf
 
   # clean be
   cd $IMPALA_HOME/be
   # remove everything listed in .gitignore
-  git clean -Xf
+  git clean -Xdf
 
 fi
 
