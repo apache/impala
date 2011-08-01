@@ -4,6 +4,8 @@ package com.cloudera.impala.planner;
 
 import java.util.List;
 
+import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
@@ -18,16 +20,19 @@ import com.google.common.base.Objects;
 public class ScanNode extends PlanNode {
   private final TupleDescriptor desc;
   private final List<String> filePaths;  // data files to scan
+  public List<LiteralExpr> keyValues; // partition key values per file
 
   /**
    * Constructs node to scan given data files of table 'tbl'.
    * @param tbl
    * @param filePaths
+   * @param keyValues
    */
-  public ScanNode(TupleDescriptor desc, List<String> filePaths) {
+  public ScanNode(TupleDescriptor desc, List<String> filePaths, List<LiteralExpr> keyValues) {
     super();
     this.desc = desc;
     this.filePaths = filePaths;
+    this.keyValues = keyValues;
   }
 
   @Override
@@ -44,6 +49,9 @@ public class ScanNode extends PlanNode {
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.TEXT_SCAN_NODE;
     msg.scan_node = new TScanNode(desc.getId().asInt(), filePaths);
+    if (!keyValues.isEmpty()) {
+      msg.scan_node.setKey_values(Expr.treesToThrift(keyValues));
+    }
   }
 
   @Override

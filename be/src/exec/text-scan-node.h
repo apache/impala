@@ -20,6 +20,7 @@ class MemPool;
 class Tuple;
 class SlotDescriptor;
 class stringstream;
+class Expr;
 
 // This execution node parses delimited text files from HDFS,
 // and writes their content as tuples in the
@@ -73,7 +74,6 @@ class TextScanNode : public ExecNode {
   // List of HDFS paths to read.
   const std::vector<std::string> files_;
 
-
   // Tuple id resolved in Prepare() to set tuple_desc_;
   TupleId tuple_id_;
 
@@ -112,6 +112,10 @@ class TextScanNode : public ExecNode {
 
   // Pool for allocating memory for variable-length slots.
   boost::scoped_ptr<MemPool> var_len_pool_;
+
+  // Pool for allocating objects.
+  // Currently only used for creating LiteralExprs from TExpr for partition keys in Prepare().
+  boost::scoped_ptr<ObjectPool> obj_pool_;
 
   // Pseudo ring of file buffers, to avoid reallocation.
   // file_bufs_[0] always points to the file buffer from a previous GetNext() call.
@@ -157,7 +161,22 @@ class TextScanNode : public ExecNode {
 
   // Mapping from column index in table to slot index in output tuple.
   // Created in Prepare() from SlotDescriptors.
-  std::vector<int> column_idx_to_slot_idx;
+  std::vector<int> column_idx_to_slot_idx_;
+
+  // Number of partition keys for the files_. Set in Prepare().
+  int num_partition_keys_;
+
+  // Flattened list of LiteralExpr* representing the partition keys for each file.
+  // key_values_[i*numPartitionKeys+j] is the j-th partition key of the i-th file.
+  // Set in Prepare().
+  std::vector<Expr*> key_values_;
+
+  // Mapping from partition key index to slot index
+  // for materializing the virtual partition keys (if any) into Tuples.
+  // pair.first refers to the partition key index.
+  // pair.second refers to the target slot index.
+  // Created in Prepare() from the TableDescriptor and SlotDescriptors.
+  std::vector<std::pair<int, int> > key_idx_to_slot_idx_;
 
   // Helper string for dealing with columns that span file blocks.
   std::string boundary_column_;
@@ -192,6 +211,11 @@ class TextScanNode : public ExecNode {
   // Unsuccessful conversions are turned into NULLs.
   void ConvertAndWriteSlotBytes(const char* begin, const char* end, Tuple* tuple,
       const SlotDescriptor* slot_desc, bool copy_string, bool unescape_string);
+
+  // Writes the bytes of a given value into the slot of a tuple.
+  // value is assumed to be the result of an expression evaluation (typically a LiteralExpr).
+  // For string values, the string data is copied into memory allocated from the var_len_pool_.
+  void WriteValue(const void* value, Tuple* tuple, const SlotDescriptor* slot_desc);
 
   // Removes escape characters from len characters of the null-terminated string src,
   // and copies the unescaped string into dest, changing *len to the unescaped length.

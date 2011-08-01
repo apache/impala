@@ -73,6 +73,10 @@ class TableDescriptor {
   char escape_char() const { return escape_char_; }
   char quote_char() const { return quote_char_; }
   bool strings_are_quoted() const { return strings_are_quoted_; }
+  // Partition keys are the first n column indexes.
+  bool IsPartitionKey(const SlotDescriptor* slot_desc) const {
+    return slot_desc->col_pos() < num_partition_keys_;
+  }
 
  protected:
   int num_cols_;

@@ -15,6 +15,7 @@ enum TPlanNodeType {
 struct TScanNode {
   1: required Descriptors.TTupleId tuple_id
   2: required list<string> file_paths
+  3: optional list<Exprs.TExpr> key_values
 }
 
 struct TAggregationNode {

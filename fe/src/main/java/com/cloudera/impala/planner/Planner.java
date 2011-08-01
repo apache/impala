@@ -7,10 +7,12 @@ import java.util.List;
 import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.NotImplementedException;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
@@ -30,10 +32,19 @@ public class Planner {
    */
   private PlanNode createScanNode(Analyzer analyzer, TableRef tblRef) {
     List<String> filePaths = Lists.newArrayList();
+    List<LiteralExpr> keyValues = Lists.newArrayList();
+    int numPartitionKeys = 0;
     for (Table.Partition p: tblRef.getTable().getPartitions()) {
       filePaths.addAll(p.filePaths);
+      // Make sure all partitions have same number of partition keys.
+      Preconditions.checkState(numPartitionKeys == 0 ||
+          numPartitionKeys == tblRef.getTable().getNumPartitionKeys());
+      numPartitionKeys = tblRef.getTable().getNumPartitionKeys();
+      // Make sure we are adding exactly numPartitionKeys LiteralExprs.
+      Preconditions.checkState(p.keyValues.size() == numPartitionKeys);
+      keyValues.addAll(p.keyValues);
     }
-    PlanNode scanNode = new ScanNode(tblRef.getDesc(), filePaths);
+    PlanNode scanNode = new ScanNode(tblRef.getDesc(), filePaths, keyValues);
     scanNode.setConjuncts(analyzer.getConjuncts(tblRef.getId().asList()));
     return scanNode;
   }

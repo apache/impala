@@ -7,9 +7,8 @@
 #include <sstream>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
 #include <glog/logging.h>
-
+#include "exprs/expr.h"
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
 #include "runtime/mem-pool.h"
@@ -17,6 +16,7 @@
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
 #include "runtime/string-value.h"
+#include "common/object-pool.h"
 #include "gen-cpp/PlanNodes_types.h"
 
 using namespace std;
@@ -37,6 +37,7 @@ TextScanNode::TextScanNode(const TPlanNode& tnode)
       tuple_buf_pool_(new MemPool(POOL_INIT_SIZE)),
       file_buf_pool_(new MemPool(POOL_INIT_SIZE)),
       var_len_pool_(new MemPool(POOL_INIT_SIZE)),
+      obj_pool_(new ObjectPool()),
       hdfs_connection_(NULL),
       hdfs_file_(NULL),
       file_buf_actual_size_(0),
@@ -45,7 +46,14 @@ TextScanNode::TextScanNode(const TPlanNode& tnode)
       tuple_(NULL),
       file_buf_(NULL),
       file_buf_ptr_(NULL),
-      file_buf_end_(NULL) {
+      file_buf_end_(NULL),
+      num_partition_keys_(0) {
+  // Create Expr* from TExpr* for partition keys.
+  // TODO: We should remove the partition-key LiteralExprs from TScanNode,
+  // and instead extract the partition-key values from the file names themselves.
+  // We would then use a single LiteralExpr for each requested partition-key slot,
+  // and reset it's value upon opening a new file.
+  Expr::CreateExprTrees(obj_pool_.get(), tnode.scan_node.key_values, &key_values_);
 }
 
 Status TextScanNode::Prepare(RuntimeState* state) {
@@ -73,20 +81,32 @@ Status TextScanNode::Prepare(RuntimeState* state) {
   // Create mapping from column index in table to slot index in output tuple.
   // First, initialize all columns to SKIP_COLUMN.
   int num_cols = tuple_desc_->table_desc()->num_cols();
-  column_idx_to_slot_idx.reserve(num_cols);
-  column_idx_to_slot_idx.resize(num_cols);
+  column_idx_to_slot_idx_.reserve(num_cols);
+  column_idx_to_slot_idx_.resize(num_cols);
   for (int i = 0; i < num_cols; i++) {
-    column_idx_to_slot_idx[i] = SKIP_COLUMN;
+    column_idx_to_slot_idx_[i] = SKIP_COLUMN;
   }
+  num_partition_keys_ = tuple_desc_->table_desc()->num_partition_keys();
 
   // Next, set mapping from column index to slot index for all slots in the query.
+  // We also set the key_idx_to_slot_idx_ to mapping for materializing partition keys.
   const std::vector<SlotDescriptor*>& slots = tuple_desc_->slots();
   for (size_t i = 0; i < slots.size(); i++) {
-    // TODO: this seems like the wrong place to do this subtraction.
-    int file_col_pos = slots[i]->col_pos() - tuple_desc_->table_desc()->num_partition_keys();
-    if (file_col_pos >= 0) {
-      column_idx_to_slot_idx[file_col_pos] = i;
+    if (tuple_desc_->table_desc()->IsPartitionKey(slots[i])) {
+      // Set partition-key index to slot mapping.
+      // assert(key_idx_to_slot_idx_.size() * num_partition_keys_ + slots[i]->col_pos()
+      //        < key_values_.size());
+      key_idx_to_slot_idx_.push_back(make_pair(slots[i]->col_pos(), i));
+    } else {
+      // Set column to slot mapping.
+      // assert(slots[i]->col_pos() - num_partition_keys_ >= 0);
+      column_idx_to_slot_idx_[slots[i]->col_pos() - num_partition_keys_] = i;
     }
+  }
+
+  // Prepare key_values_.
+  for (int i = 0; i < key_values_.size(); ++i) {
+    key_values_[i]->Prepare(state);
   }
 
   // Allocate tuple buffer.
@@ -224,6 +244,7 @@ void TextScanNode::ParseFileBuffer(
   // 0. Determine whether we need to add a new row.
   //    This could be due a new row batch or file buffer,
   //    or because we added a new tuple in the previous iteration of the current file buffer.
+  //    Also materialize the virtual partition keys (if any) into the tuple.
   // 1. Determine action based on current character:
   // 1.1 Recognize field and collection delimiters (ignore delimiters if enclosed in quotes)
   // 1.2 Recognize tuple delimiter
@@ -244,6 +265,13 @@ void TextScanNode::ParseFileBuffer(
       *row_idx = row_batch->AddRow();
       TupleRow* tuple_row = row_batch->GetRow(*row_idx);
       tuple_row->SetTuple(tuple_idx_, tuple_);
+      // Materialize partition-key values (if any).
+      for (int i = 0; i < key_idx_to_slot_idx_.size(); ++i) {
+        int expr_idx = file_idx_ * num_partition_keys_ + key_idx_to_slot_idx_[i].first;
+        Expr* expr = key_values_[expr_idx];
+        int slot_idx = key_idx_to_slot_idx_[i].second;
+        WriteValue(expr->GetValue(NULL), tuple_, tuple_desc_->slots()[slot_idx]);
+      }
     }
 
     // 1. Determine action based on current character:
@@ -269,7 +297,6 @@ void TextScanNode::ParseFileBuffer(
       // The problem is that column_idx will only be incremented once,
       // which will corrupt the output tuple or cause an
       // exception to be thrown in ConvertAndWriteSlotBytes due to a failed type conversion.
-      // TODO: log the offending lines for broken input.
       if (*quote_char == NOT_IN_STRING) {
         *quote_char = c;
       } else {
@@ -297,7 +324,7 @@ void TextScanNode::ParseFileBuffer(
     // 2.1 Write a new slot
     if (new_column) {
       // Replace field delimiter with zero terminator.
-      int slot_idx = column_idx_to_slot_idx[*column_idx];
+      int slot_idx = column_idx_to_slot_idx_[*column_idx];
       if (slot_idx != SKIP_COLUMN) {
         *file_buf_ptr_ = '\0';
         if (boundary_column_.empty()) {
@@ -353,7 +380,7 @@ void TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, 
     tuple->SetNull(slot_desc->null_indicator_offset());
     return;
   }
-  // TODO: Handle out-of-range and other error conditions.
+  // TODO: Handle out-of-range conditions.
   switch (slot_desc->type()) {
     case TYPE_BOOLEAN: {
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
@@ -380,8 +407,6 @@ void TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, 
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
       *reinterpret_cast<int*>(slot) =
           static_cast<int>(strtol(begin, const_cast<char**>(&end), 0));
-      // Set NULL if inconvertible.
-      if (*end != '\0') tuple->SetNull(slot_desc->null_indicator_offset());
       break;
     }
     case TYPE_BIGINT: {
@@ -431,6 +456,59 @@ void TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, 
   // Set NULL if inconvertible.
   if (*end != '\0') {
     tuple->SetNull(slot_desc->null_indicator_offset());
+  }
+}
+
+void TextScanNode::WriteValue(const void* value, Tuple* tuple, const SlotDescriptor* slot_desc) {
+  switch (slot_desc->type()) {
+    case TYPE_BOOLEAN: {
+      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
+      *reinterpret_cast<bool*>(slot) = *reinterpret_cast<const bool*>(value);
+      break;
+    }
+    case TYPE_TINYINT: {
+      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
+      *reinterpret_cast<char*>(slot) = static_cast<char>(*reinterpret_cast<const long*>(value));
+      break;
+    }
+    case TYPE_SMALLINT: {
+      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
+      *reinterpret_cast<short*>(slot) = static_cast<short>(*reinterpret_cast<const long*>(value));
+      break;
+    }
+    case TYPE_INT: {
+      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
+      *reinterpret_cast<int*>(slot) = static_cast<int>(*reinterpret_cast<const long*>(value));
+      break;
+    }
+    case TYPE_BIGINT: {
+      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
+      *reinterpret_cast<long*>(slot) = *reinterpret_cast<const long*>(value);
+      break;
+    }
+    case TYPE_FLOAT: {
+      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
+      *reinterpret_cast<int*>(slot) = static_cast<float>(*reinterpret_cast<const double*>(value));
+      break;
+    }
+    case TYPE_DOUBLE: {
+      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
+      *reinterpret_cast<double*>(slot) = *reinterpret_cast<const double*>(value);
+      break;
+    }
+    case TYPE_STRING: {
+      // Copy the string value.
+      // TODO: Copy this value only once per scanned file.
+      const StringValue* dest = reinterpret_cast<const StringValue*>(value);
+      StringValue* slot = tuple->GetStringSlot(slot_desc->tuple_offset());
+      slot->len = dest->len;
+      char* slot_data = reinterpret_cast<char*> (var_len_pool_->Allocate(slot->len));
+      memcpy(slot_data, dest->ptr, slot->len);
+      break;
+    }
+    case INVALID_TYPE: {
+      break;
+    }
   }
 }
 
