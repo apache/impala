@@ -46,10 +46,10 @@ public class ImpalaResultSet implements ResultSet {
   private final List<String> colLabels;
 
   public ImpalaResultSet(BlockingQueue<TResultRow> resultQueue, List<PrimitiveType> colTypes,
-      List<String> colNames) {
+      List<String> colLabels) {
     this.resultQueue = resultQueue;
     this.colTypes = colTypes;
-    this.colLabels = colNames;
+    this.colLabels = colLabels;
   }
 
   @Override

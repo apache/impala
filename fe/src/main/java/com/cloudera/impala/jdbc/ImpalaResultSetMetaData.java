@@ -23,9 +23,9 @@ public class ImpalaResultSetMetaData implements ResultSetMetaData {
   private final List<PrimitiveType> colTypes;
   private final List<String> colLabels;
 
-  public ImpalaResultSetMetaData(List<PrimitiveType> colTypes, List<String> colNames) {
+  public ImpalaResultSetMetaData(List<PrimitiveType> colTypes, List<String> colLabels) {
     this.colTypes = colTypes;
-    this.colLabels = colNames;
+    this.colLabels = colLabels;
   }
 
   @Override
@@ -45,10 +45,10 @@ public class ImpalaResultSetMetaData implements ResultSetMetaData {
     return colLabels.get(column - 1);
   }
 
-  // Unimplemented for now. sqlline uses this method when executing queries.
+  // Unimplemented for now but must not throw. sqlline uses this method when executing queries.
   @Override
   public String getTableName(int column) throws SQLException {
-    throw UnsupportedOpHelper.newUnimplementedMethodException();
+    return null;
   }
 
   // Non-essential and unimplemented methods start here.

@@ -125,8 +125,9 @@ public class Coordinator {
       colTypes.add(expr.getType());
     }
 
-    // populate column labels
-    colLabels = (List<String>) analysisResult.selectStmt.getColLabels().clone();
+    // populate column labels for display purposes (e.g., via the CLI).
+    colLabels.clear();
+    colLabels.addAll(analysisResult.selectStmt.getColLabels());
 
     return analysisResult;
   }
