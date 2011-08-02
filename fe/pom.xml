@@ -438,6 +438,84 @@
     </profile>
 
     <profile>
+      <id>load-mstr-eatwh1</id>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <version>1.6</version>
+            <executions>
+              <execution>
+                <phase>process-test-resources</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <configuration>
+                  <target>
+                    <exec executable="${env.HIVE_HOME}/bin/hive">
+                      <arg value="-hiveconf"/>
+                      <arg value="hive.root.logger=WARN,console"/>
+                      <arg value="-v"/>
+                      <arg value="-f"/>
+                      <arg value="${project.basedir}/../testdata/data/mstr/eatwh1/EATWH1-DDL.sql"/>
+                    </exec>
+		    <exec executable="${env.HIVE_HOME}/bin/hive">
+                      <arg value="-hiveconf"/>
+		      <arg value="mstr.eatwh1.data.dir=${project.basedir}/../testdata/data/mstr/eatwh1/csv"/>
+                      <arg value="hive.root.logger=WARN,console"/>
+                      <arg value="-v"/>
+                      <arg value="-f"/>
+                      <arg value="${project.basedir}/../testdata/data/mstr/eatwh1/LoadTablesEATWH1.sql"/>
+                    </exec>
+                  </target>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <profile>
+      <id>load-mstr-eatwh2</id>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <version>1.6</version>
+            <executions>
+              <execution>
+                <phase>process-test-resources</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <configuration>
+                  <target>
+                    <exec executable="${env.HIVE_HOME}/bin/hive">
+                      <arg value="-hiveconf"/>
+                      <arg value="hive.root.logger=WARN,console"/>
+                      <arg value="-v"/>
+                      <arg value="-f"/>
+                      <arg value="${project.basedir}/../testdata/data/mstr/eatwh2/EATWH2-DDL.sql"/>
+                    </exec>
+		    <exec executable="${env.HIVE_HOME}/bin/hive">
+                      <arg value="-hiveconf"/>
+		      <arg value="mstr.eatwh2.data.dir=${project.basedir}/../testdata/data/mstr/eatwh2/csv"/>
+                      <arg value="hive.root.logger=WARN,console"/>
+                      <arg value="-v"/>
+                      <arg value="-f"/>
+                      <arg value="${project.basedir}/../testdata/mstr/data/eatwh2/LoadTablesEATWH2.sql"/>
+                    </exec>
+                  </target>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <profile>
       <id>thrift-home-defined</id>
       <activation>
         <file>

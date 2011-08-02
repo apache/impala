@@ -125,9 +125,14 @@ public class Table {
       List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions,
       org.apache.hadoop.hive.metastore.api.Table msTbl) {
     try {
+      // This table has no declared partitions, which means it consists of a single file.
+      if (msPartitions.isEmpty()) {
+        Partition p = new Partition();
+        loadFilePaths(msTbl.getSd().getLocation(), p);
+        return true;
+      }
       for (org.apache.hadoop.hive.metastore.api.Partition msPartition: msPartitions) {
         Partition p = new Partition();
-
         // load key values
         int numPartitionKey = 0;
         for (String partitionKey: msPartition.getValues()) {
@@ -140,15 +145,7 @@ public class Table {
         }
 
         // load file paths
-        Path path = new Path(msPartition.getSd().getLocation());
-        FileSystem fs = path.getFileSystem(new Configuration());
-        FileStatus[] fileStatus = fs.listStatus(path);
-        for (int i = 0; i < fileStatus.length; ++i) {
-          p.filePaths.add(fileStatus[i].getPath().toString());
-        }
-
-        partitions.add(p);
-
+        loadFilePaths(msPartition.getSd().getLocation(), p);
       }
     } catch (AnalysisException e) {
       // couldn't parse one of the partition key values, something wrong with the md
@@ -162,6 +159,16 @@ public class Table {
       return false;
     }
     return true;
+  }
+
+  private void loadFilePaths(String location, Partition p) throws IOException {
+    Path path = new Path(location);
+    FileSystem fs = path.getFileSystem(new Configuration());
+    FileStatus[] fileStatus = fs.listStatus(path);
+    for (int i = 0; i < fileStatus.length; ++i) {
+      p.filePaths.add(fileStatus[i].getPath().toString());
+    }
+    partitions.add(p);
   }
 
   public static Table loadTable(HiveMetaStoreClient client, Db db,

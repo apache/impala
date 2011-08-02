@@ -19,6 +19,14 @@ from the fe directory: rm -rf target/test_metastore_db
 From the fe directory: mvn -Pload-testdata process-test-resources
 This creates the test tables and loads the data.
 
+To load the MSRT data run:
+Prerequisites:
+The data is in testdata/data/mstr
+You have done "source bin/impala-config.sh"
+Load data:
+mvn -Pload-mstr-eatwh1 process-test-resources
+mvn -Pload-mstr-eatwh2 process-test-resources
+
 Running Tests
 -------------
 
