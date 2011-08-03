@@ -23,6 +23,7 @@ import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.Lists;
@@ -130,8 +131,11 @@ public class Table {
         // load key values
         int numPartitionKey = 0;
         for (String partitionKey: msPartition.getValues()) {
-          p.keyValues.add(
-              LiteralExpr.create(partitionKey, colsByPos.get(numPartitionKey).getType()));
+          PrimitiveType type = colsByPos.get(numPartitionKey).getType();
+          Expr expr = LiteralExpr.create(partitionKey, type);
+          // Force the literal to be of type declared in the metadata.
+          expr = expr.castTo(type);
+          p.keyValues.add((LiteralExpr)expr);
           ++numPartitionKey;
         }
 
