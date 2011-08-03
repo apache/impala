@@ -2,8 +2,11 @@
 
 #include "exec/exec-node.h"
 
+#include <glog/logging.h>
+
 #include <sstream>
 
+#include "exprs/expr.h"
 #include "exec/text-scan-node.h"
 #include "common/object-pool.h"
 #include "common/status.h"
@@ -13,6 +16,13 @@
 using namespace std;
 
 namespace impala {
+
+ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode) {
+  Status status = Expr::CreateExprTrees(pool, tnode.conjuncts, &conjuncts_);
+  DCHECK(status.ok())
+      << "ExecNode c'tor: deserialization of conjuncts failed:\n"
+      << status.GetErrorMsg();
+}
 
 Status ExecNode::CreateTree(ObjectPool* pool, const TPlan& plan, ExecNode** root) {
   if (plan.nodes.size() == 0) {
@@ -65,7 +75,7 @@ Status ExecNode::CreateTreeHelper(
 Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode, ExecNode** node) {
   switch (tnode.node_type) {
     case TPlanNodeType::TEXT_SCAN_NODE:
-      *node = pool->Add(new TextScanNode(tnode));
+      *node = pool->Add(new TextScanNode(pool, tnode));
       return Status::OK;
     case TPlanNodeType::AGGREGATION_NODE:
       return Status("Aggregation node not implemented");
@@ -80,6 +90,20 @@ std::string ExecNode::DebugString() const {
   out << "EXEC NODE TREE:" << endl;
   this->DebugString(0, &out);
   return out.str();
+}
+
+void ExecNode::PrepareConjuncts(RuntimeState* state) {
+  for (vector<Expr*>::iterator i = conjuncts_.begin(); i != conjuncts_.end(); ++i) {
+    (*i)->Prepare(state);
+  }
+}
+
+bool ExecNode::EvalConjuncts(TupleRow* row) {
+  for (vector<Expr*>::iterator i = conjuncts_.begin(); i != conjuncts_.end(); ++i) {
+    void* value = (*i)->GetValue(row);
+    if (value == NULL || *reinterpret_cast<bool*>(value) == false) return false;
+  }
+  return true;
 }
 
 }

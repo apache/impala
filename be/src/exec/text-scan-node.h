@@ -44,7 +44,7 @@ class Expr;
 // appending the partial-column bytes to a boundary_column.
 class TextScanNode : public ExecNode {
  public:
-  TextScanNode(const TPlanNode& tnode);
+  TextScanNode(ObjectPool* pool, const TPlanNode& tnode);
 
   // Allocates tuple buffer.
   // Sets tuple_idx_ and tuple_desc_ using RuntimeState.

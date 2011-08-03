@@ -51,7 +51,8 @@ class Status {
 
   // Return all accumulated error msgs in a single string.
   void GetErrorMsg(std::string* msg) const;
-  std::string GetErrorString() const;
+  //std::string GetErrorString() const;
+  std::string GetErrorMsg() const;
 
  private:
   struct ErrorDetail;

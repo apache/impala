@@ -9,15 +9,20 @@
 
 namespace impala {
 
+class Expr;
 class ObjectPool;
 class RowBatch;
 struct RuntimeState;
 class TPlan;
 class TPlanNode;
+class TupleRow;
 
 // Superclass of all executor nodes.
 class ExecNode {
  public:
+  // Init conjuncts.
+  ExecNode(ObjectPool* pool, const TPlanNode& tnode);
+
   // Sets up internal structures, etc., without doing any actual work.
   // Must be called prior to Open(). Will only be called once in this
   // node's lifetime.
@@ -58,6 +63,7 @@ class ExecNode {
   virtual void DebugString(int indentation_level, std::stringstream* out) const = 0;
 
  protected:
+  std::vector<Expr*> conjuncts_;
   std::vector<ExecNode*> children_;
 
   // Create a single exec node derived from thrift node; place exec node in 'pool'.
@@ -65,6 +71,11 @@ class ExecNode {
 
   static Status CreateTreeHelper(ObjectPool* pool, const std::vector<TPlanNode>& tnodes,
       ExecNode* parent, int* node_idx, ExecNode** root);
+
+  void PrepareConjuncts(RuntimeState* state);
+
+  // Evaluate conjuncts. Return true if all conjuncts return true, otherwise false.
+  bool EvalConjuncts(TupleRow* row);
 };
 
 }

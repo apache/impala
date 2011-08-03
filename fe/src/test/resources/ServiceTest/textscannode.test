@@ -1,4 +1,6 @@
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col from alltypessmall
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
+double_col, date_string_col, string_col
+from alltypessmall
 ----
 int,boolean,tinyint,smallint,int,bigint,float,double,string,string
 ----
@@ -418,3 +420,12 @@ int,string,int
 4,'04/03/09',2009
 4,'04/03/09',2009
 ====
+select id from alltypessmall where id = 10
+---
+int
+---
+10
+10
+10
+10
+===

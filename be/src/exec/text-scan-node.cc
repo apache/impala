@@ -23,8 +23,9 @@ using namespace std;
 using namespace boost;
 using namespace impala;
 
-TextScanNode::TextScanNode(const TPlanNode& tnode)
-    : files_(tnode.scan_node.file_paths),
+TextScanNode::TextScanNode(ObjectPool* pool, const TPlanNode& tnode)
+    : ExecNode(pool, tnode),
+      files_(tnode.scan_node.file_paths),
       tuple_id_(tnode.scan_node.tuple_id),
       tuple_desc_(NULL),
       tuple_idx_(0),
@@ -57,6 +58,7 @@ TextScanNode::TextScanNode(const TPlanNode& tnode)
 }
 
 Status TextScanNode::Prepare(RuntimeState* state) {
+  PrepareConjuncts(state);
   // Initialize ptr to end, to initiate reading the first file block
   file_buf_ptr_ = file_buf_end_;
 
@@ -233,6 +235,9 @@ Status TextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
   return Status::OK;
 }
 
+// This first assembles the full tuple before applying the conjuncts.
+// TODO: apply conjuncts as slots get materialized and skip to the end of the row
+// if we determine it's not a match.
 void TextScanNode::ParseFileBuffer(
     RowBatch* row_batch, int* row_idx, int* column_idx,
     bool* last_char_is_escape, bool* unescape_string, char* quote_char) {
@@ -252,6 +257,7 @@ void TextScanNode::ParseFileBuffer(
   // 2. Take action if necessary:
   // 2.1 Write a new slot (if new_column==true and we don't ignore this column)
   // 2.2 Check if we finished a tuple, and whether the tuple buffer is full.
+  TupleRow* current_row = NULL;
   while (file_buf_ptr_ != file_buf_end_) {
 
     // Indicates whether we have found a new complete slot.
@@ -260,18 +266,17 @@ void TextScanNode::ParseFileBuffer(
     // new_tuple==true implies new_column==true
     bool new_tuple = false;
 
-    // 0. Determine whether we need to add a new row.
-    if (!row_batch->IsFull() && *row_idx == RowBatch::INVALID_ROW_INDEX) {
-      *row_idx = row_batch->AddRow();
-      TupleRow* tuple_row = row_batch->GetRow(*row_idx);
-      tuple_row->SetTuple(tuple_idx_, tuple_);
-      // Materialize partition-key values (if any).
-      for (int i = 0; i < key_idx_to_slot_idx_.size(); ++i) {
-        int expr_idx = file_idx_ * num_partition_keys_ + key_idx_to_slot_idx_[i].first;
-        Expr* expr = key_values_[expr_idx];
-        int slot_idx = key_idx_to_slot_idx_[i].second;
-        WriteValue(expr->GetValue(NULL), tuple_, tuple_desc_->slots()[slot_idx]);
-      }
+    // add new row
+    *row_idx = row_batch->AddRow();
+    current_row = row_batch->GetRow(*row_idx);
+    current_row->SetTuple(tuple_idx_, tuple_);
+
+    // Materialize partition-key values (if any).
+    for (int i = 0; i < key_idx_to_slot_idx_.size(); ++i) {
+      int expr_idx = file_idx_ * num_partition_keys_ + key_idx_to_slot_idx_[i].first;
+      Expr* expr = key_values_[expr_idx];
+      int slot_idx = key_idx_to_slot_idx_[i].second;
+      WriteValue(expr->GetValue(NULL), tuple_, tuple_desc_->slots()[slot_idx]);
     }
 
     // 1. Determine action based on current character:
@@ -349,16 +354,19 @@ void TextScanNode::ParseFileBuffer(
     // 2.2 Check if we finished a tuple, and whether the tuple buffer is full.
     if (new_tuple) {
       *column_idx = 0;
-      char* new_tuple = reinterpret_cast<char*> (tuple_);
-      new_tuple += tuple_desc_->byte_size();
-      // assert(new_tuple < tuple_buf_ + state->batch_size() * tuple_desc_->byte_size());
-      tuple_ = reinterpret_cast<Tuple*> (new_tuple);
-      // Will be set to a valid row_idx in the next iteration,
-      // possibly after returning from this function and then re-entering with a new file buffer.
-      *row_idx = RowBatch::INVALID_ROW_INDEX;
-      if (row_batch->IsFull()) {
-        // Tuple buffer is full.
-        return;
+      if (EvalConjuncts(current_row)) {
+        row_batch->CommitLastRow();
+        char* new_tuple = reinterpret_cast<char*>(tuple_);
+        new_tuple += tuple_desc_->byte_size();
+        // assert(new_tuple < tuple_buf_ + state->batch_size() * tuple_desc_->byte_size());
+        tuple_ = reinterpret_cast<Tuple*> (new_tuple);
+        // Will be set to a valid row_idx in the next iteration,
+        // possibly after returning from this function and then re-entering with a new file buffer.
+        *row_idx = RowBatch::INVALID_ROW_INDEX;
+        if (row_batch->IsFull()) {
+          // Tuple buffer is full.
+          return;
+        }
       }
     }
   }
@@ -509,6 +517,8 @@ void TextScanNode::WriteValue(const void* value, Tuple* tuple, const SlotDescrip
     case INVALID_TYPE: {
       break;
     }
+    default:
+      DCHECK(false) << "WriteValue(): bad type: " << TypeToString(slot_desc->type());
   }
 }
 

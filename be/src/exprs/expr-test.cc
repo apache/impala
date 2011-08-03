@@ -24,7 +24,7 @@ class ExprTest : public testing::Test {
     string stmt = "select " + expr;
     vector<PrimitiveType> result_types;
     Status status = executor_.Exec(stmt, &result_types);
-    ASSERT_TRUE(status.ok()) << status.GetErrorString();
+    ASSERT_TRUE(status.ok()) << status.GetErrorMsg();
     vector<void*> result_row;
     ASSERT_TRUE(executor_.FetchResult(&result_row).ok());
     ASSERT_EQ(1, result_row.size());

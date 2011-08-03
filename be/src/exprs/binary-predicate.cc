@@ -15,9 +15,10 @@ BinaryPredicate::BinaryPredicate(const TExprNode& node)
 
 void BinaryPredicate::Prepare(RuntimeState* state) {
   Expr::Prepare(state);
+  PrimitiveType op_type = children_[0]->type();
   switch (op_) {
     case TExprOperator::EQ:
-      switch (type()) {
+      switch (op_type) {
         case TYPE_TINYINT:
           compute_function_ = GetValueFunctions::BinaryPredicate_eq_char;
           return;
@@ -40,12 +41,12 @@ void BinaryPredicate::Prepare(RuntimeState* state) {
           compute_function_ = GetValueFunctions::BinaryPredicate_eq_fn_StringValue;
           return;
         default:
-          DCHECK(false) << "bad EQ type: " << TypeToString(type());
+          DCHECK(false) << "bad EQ type: " << TypeToString(op_type);
       }
       return;
 
     case TExprOperator::NE:
-      switch (type()) {
+      switch (op_type) {
         case TYPE_TINYINT:
           compute_function_ = GetValueFunctions::BinaryPredicate_ne_char;
           return;
@@ -68,12 +69,12 @@ void BinaryPredicate::Prepare(RuntimeState* state) {
           compute_function_ = GetValueFunctions::BinaryPredicate_ne_fn_StringValue;
           return;
         default:
-          DCHECK(false) << "bad NE type: " << TypeToString(type());
+          DCHECK(false) << "bad NE type: " << TypeToString(op_type);
       }
       return;
 
     case TExprOperator::LE:
-      switch (type()) {
+      switch (op_type) {
         case TYPE_TINYINT:
           compute_function_ = GetValueFunctions::BinaryPredicate_le_char;
           return;
@@ -96,12 +97,12 @@ void BinaryPredicate::Prepare(RuntimeState* state) {
           compute_function_ = GetValueFunctions::BinaryPredicate_le_fn_StringValue;
           return;
         default:
-          DCHECK(false) << "bad LE type: " << TypeToString(type());
+          DCHECK(false) << "bad LE type: " << TypeToString(op_type);
       }
       return;
 
     case TExprOperator::GE:
-      switch (type()) {
+      switch (op_type) {
         case TYPE_TINYINT:
           compute_function_ = GetValueFunctions::BinaryPredicate_ge_char;
           return;
@@ -124,12 +125,12 @@ void BinaryPredicate::Prepare(RuntimeState* state) {
           compute_function_ = GetValueFunctions::BinaryPredicate_ge_fn_StringValue;
           return;
         default:
-          DCHECK(false) << "bad GE type: " << TypeToString(type());
+          DCHECK(false) << "bad GE type: " << TypeToString(op_type);
       }
       return;
 
     case TExprOperator::LT:
-      switch (type()) {
+      switch (op_type) {
         case TYPE_TINYINT:
           compute_function_ = GetValueFunctions::BinaryPredicate_lt_char;
           return;
@@ -152,12 +153,12 @@ void BinaryPredicate::Prepare(RuntimeState* state) {
           compute_function_ = GetValueFunctions::BinaryPredicate_lt_fn_StringValue;
           return;
         default:
-          DCHECK(false) << "bad LT type: " << TypeToString(type());
+          DCHECK(false) << "bad LT type: " << TypeToString(op_type);
       }
       return;
 
     case TExprOperator::GT:
-      switch (type()) {
+      switch (op_type) {
         case TYPE_TINYINT:
           compute_function_ = GetValueFunctions::BinaryPredicate_gt_char;
           return;
@@ -180,7 +181,7 @@ void BinaryPredicate::Prepare(RuntimeState* state) {
           compute_function_ = GetValueFunctions::BinaryPredicate_gt_fn_StringValue;
           return;
         default:
-          DCHECK(false) << "bad GT type: " << TypeToString(type());
+          DCHECK(false) << "bad GT type: " << TypeToString(op_type);
       }
       return;
 
