@@ -14,7 +14,7 @@
 #include "runtime/descriptors.h"
 #include "runtime/row-batch.h"
 #include "gen-cpp/ImpalaService_types.h"
-#include "gen-cpp/LocalExecutor_types.h"
+#include "gen-cpp/ImpalaPlanService_types.h"
 
 using namespace std;
 using namespace boost;

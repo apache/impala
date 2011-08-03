@@ -15,8 +15,6 @@ add_library(ImpalaThrift
   ImpalaService.cpp
   ImpalaService_constants.cpp
   ImpalaService_types.cpp
-  LocalExecutor_constants.cpp
-  LocalExecutor_types.cpp
   Descriptors_constants.cpp
   Descriptors_types.cpp
   PlanNodes_constants.cpp
