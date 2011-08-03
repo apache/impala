@@ -104,7 +104,7 @@ make
 
 # build backend
 cd $IMPALA_BE_DIR
-cmake . && make
+cmake -DCMAKE_BUILD_TYPE=Debug . && make -j4
 
 # build frontend and run tests
 cd $IMPALA_FE_DIR

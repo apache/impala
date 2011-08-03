@@ -5,6 +5,7 @@ Makefile
 CMakeCache.txt
 CMakeFiles
 cmake_install.cmake
+CTestTestfile.cmake
 
 build
 generated-sources
