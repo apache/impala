@@ -180,7 +180,10 @@ public class ParserTest {
 
   @Test public void TestOverflow() {
     ParsesOk("select " + Long.toString(Long.MAX_VALUE) + " from test");
-    ParsesOk("select " + Long.toString(Long.MIN_VALUE) + " from test");
+    // We need to add 1 to MIN_VALUE because there are no negative integer literals.
+    // The reason is that whether a minus belongs to an
+    // arithmetic expr or a literal must be decided by the parser, not the lexer.
+    ParsesOk("select " + Long.toString(Long.MIN_VALUE+1) + " from test");
     ParsesOk("select " + Double.toString(Double.MAX_VALUE) + " from test");
     ParsesOk("select " + Double.toString(Double.MIN_VALUE) + " from test");
     ParsesOk("select 0.0 from test");

@@ -14,6 +14,8 @@ using namespace boost;
 
 namespace impala {
 
+// TODO: add a test with '1 - - 1'
+// for testing handling of '-' as part of arithmetic exprs and negative int literals
 class ExprTest : public testing::Test {
  protected:
   virtual void SetUp() {

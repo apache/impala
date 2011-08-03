@@ -139,10 +139,9 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
 LineTerminator = \r|\n|\r\n
 NonTerminator = [^\r\n]
 Whitespace = {LineTerminator} | [ \t\f]
-SignOrSpace = -|-{Whitespace}
 
 IdentifierOrKw = [:jletter:][:jletterdigit:]*
-IntegerLiteral = {SignOrSpace}?[:digit:][:digit:]*
+IntegerLiteral = [:digit:][:digit:]*
 SingleQuoteStringLiteral = \'([^\n\r\']|\\\\|\\\')*\'
 DoubleQuoteStringLiteral = \"([^\n\r\"]|\\\\|\\\")*\"
 
@@ -198,13 +197,10 @@ EndOfLineComment = "--" {NonTerminator}* {LineTerminator}?
 
 {IntegerLiteral} {
   Long val = null;
-  // remove all white spaces since we want to recognize "- 1"
-  String text = yytext();
-  text = text.replaceAll("[ \t\f]","");
   try {
-    val = new Long(text);
+    val = new Long(yytext());
   } catch (NumberFormatException e) {
-    return newToken(SqlParserSymbols.NUMERIC_OVERFLOW, text);
+    return newToken(SqlParserSymbols.NUMERIC_OVERFLOW, yytext());
   }
   return newToken(SqlParserSymbols.INTEGER_LITERAL, val);
 }
