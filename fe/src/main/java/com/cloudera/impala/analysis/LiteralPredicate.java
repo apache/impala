@@ -22,6 +22,10 @@ public class LiteralPredicate extends Predicate {
     this.value = val;
   }
 
+  public boolean getValue() {
+    return value;
+  }
+
   @Override
   public boolean equals(Object obj) {
     if (!super.equals(obj)) {

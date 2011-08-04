@@ -323,8 +323,7 @@ public class ParserTest {
         "select from t\n" +
         "       ^\n" +
         "Encountered: FROM\n" +
-        "Expected: AVG, CASE, CAST, COUNT, MIN, MAX, SUM, " +
-        "IDENTIFIER\n");
+        "Expected: AVG, CASE, CAST, COUNT, FALSE, MIN, MAX, NOT, SUM, TRUE, IDENTIFIER\n");
 
     // missing from
     ParserError("select c, b, c where a = 5",
@@ -332,7 +331,7 @@ public class ParserTest {
         "select c, b, c where a = 5\n" +
         "               ^\n" +
         "Encountered: WHERE\n" +
-        "Expected: AS, DIV, FROM, COMMA, IDENTIFIER\n");
+        "Expected: AS, DIV, FROM, IS, LIKE, REGEXP, RLIKE, COMMA, IDENTIFIER\n");
 
     // missing table list
     ParserError("select c, b, c from where a = 5",

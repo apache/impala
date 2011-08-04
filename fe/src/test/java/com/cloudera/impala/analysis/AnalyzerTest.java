@@ -173,6 +173,23 @@ public class AnalyzerTest {
     AnalyzesOk("select * from alltypes, testdb1.alltypes");
   }
 
+  @Test public void TestBooleanValueExprs() {
+    // Test predicates in where clause.
+    AnalyzesOk("select * from AllTypes where true");
+    AnalyzesOk("select * from AllTypes where false");
+    AnalyzesOk("select * from AllTypes where bool_col = true");
+    AnalyzesOk("select * from AllTypes where bool_col = false");
+    AnalyzesOk("select * from AllTypes where true or false");
+    AnalyzesOk("select * from AllTypes where true and false");
+    AnalyzesOk("select * from AllTypes where true or false and bool_col = false");
+    AnalyzesOk("select * from AllTypes where true and false or bool_col = false");
+    // Test predicates in select list.
+    AnalyzesOk("select bool_col = true from AllTypes");
+    AnalyzesOk("select bool_col = false from AllTypes");
+    AnalyzesOk("select true or false and bool_col = false from AllTypes");
+    AnalyzesOk("select true and false or bool_col = false from AllTypes");
+  }
+
   @Test
   public void TestOrdinals() {
     // can't group or order on *
@@ -209,6 +226,11 @@ public class AnalyzerTest {
     AnalyzesOk("select 1 + 1, -128, 'two', 1.28");
     AnalyzesOk("select -1.0, -1, 1 - 1, 10 - -1");
     AnalysisError("select a + 1");
+    // Test predicates in select list.
+    AnalyzesOk("select true");
+    AnalyzesOk("select false");
+    AnalyzesOk("select true or false");
+    AnalyzesOk("select true and false");
   }
 
   @Test public void TestOnClause() {
@@ -453,13 +475,6 @@ public class AnalyzerTest {
     AnalyzesOk("select * from alltypes where (string_col = '5' or int_col = 5) and string_col > '1'");
     AnalyzesOk("select * from alltypes where not string_col = '5'");
     AnalyzesOk("select * from alltypes where int_col = '5'");
-  }
-
-  @Test
-  public void TestLiteralPredicates() {
-    AnalyzesOk("select * from alltypes where true");
-    AnalyzesOk("select * from alltypes where false");
-    AnalyzesOk("select * from alltypes where true or false");
   }
 
   @Test

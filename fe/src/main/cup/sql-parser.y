@@ -160,7 +160,8 @@ nonterminal ArrayList<String> ident_list;
 nonterminal TableName table_name;
 nonterminal Predicate where_clause;
 nonterminal Predicate predicate, comparison_predicate, compound_predicate,
-  like_predicate, literal_predicate;
+  like_predicate;
+nonterminal LiteralPredicate literal_predicate;
 nonterminal ArrayList<Expr> group_by_clause;
 nonterminal Predicate having_clause;
 nonterminal ArrayList<OrderByElement> order_by_elements, order_by_clause;
@@ -233,6 +234,11 @@ select_list_item ::=
   {: RESULT = new SelectListItem(expr, alias); :}
   | expr:expr
   {: RESULT = new SelectListItem(expr, null); :}
+  // allow predicates in the select list
+  | predicate:p alias_clause:alias
+  {: RESULT = new SelectListItem(p, alias); :}
+  | predicate:p
+  {: RESULT = new SelectListItem(p, null); :}  
   | star_expr:expr
   {: RESULT = expr; :}  
   ;
@@ -614,6 +620,45 @@ comparison_predicate ::=
   {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.LT, e1, e2); :}
   | expr:e1 GREATERTHAN expr:e2
   {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.GT, e1, e2); :}
+  // A bool literal should be both an expr (to act as a BoolLiteral)
+  // and a predicate (to act as a LiteralPredicate).
+  // Implementing this directly will lead to shift-reduce conflicts.
+  // We decided that a bool literal shall be literal predicate. 
+  // This means we must list all combinations with bool literals in the equality/inequality below,
+  // transforming the literal predicate to a literal expr.
+  // We could have chosen the other way (bool literal as a literal expr), but
+  // this would have required more and uglier code, 
+  // e.g., a special-case rule for dealing with "where true/false".
+  // EQUALS combinations
+  | expr:e1 EQUAL literal_predicate:l
+  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.EQ, 
+                                  e1, new BoolLiteral(l.getValue())); :}
+  | literal_predicate:l EQUAL expr:e2
+  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.EQ, 
+                                  new BoolLiteral(l.getValue()), e2); :}
+  | literal_predicate:l1 EQUAL literal_predicate:l2
+  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.EQ, 
+                                  new BoolLiteral(l1.getValue()), new BoolLiteral(l2.getValue())); :}
+  // NOT EQUALS combinations
+  | expr:e1 NOT EQUAL literal_predicate:l
+  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NE, 
+                                  e1, new BoolLiteral(l.getValue())); :}
+  | literal_predicate:l NOT EQUAL expr:e2
+  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NE, 
+                                  new BoolLiteral(l.getValue()), e2); :}
+  | literal_predicate:l1 NOT EQUAL literal_predicate:l2
+  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NE, 
+                                  new BoolLiteral(l1.getValue()), new BoolLiteral(l2.getValue())); :}
+  // LESSTHAN GREATERTHAN combinations
+  | expr:e1 LESSTHAN GREATERTHAN literal_predicate:l
+  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NE, 
+                                  e1, new BoolLiteral(l.getValue())); :}
+  | literal_predicate:l LESSTHAN GREATERTHAN expr:e2
+  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NE, 
+                                  new BoolLiteral(l.getValue()), e2); :}
+  | literal_predicate:l1 LESSTHAN GREATERTHAN literal_predicate:l2
+  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NE, 
+                                  new BoolLiteral(l1.getValue()), new BoolLiteral(l2.getValue())); :}
   ;
 
 like_predicate ::=

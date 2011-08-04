@@ -11,8 +11,8 @@ import com.cloudera.impala.thrift.TExprNodeType;
 public class BoolLiteral extends LiteralExpr {
   private final boolean value;
 
-  public BoolLiteral(Boolean value) {
-    this.value = value.booleanValue();
+  public BoolLiteral(boolean value) {
+    this.value = value;
     type = PrimitiveType.BOOLEAN;
   }
 
