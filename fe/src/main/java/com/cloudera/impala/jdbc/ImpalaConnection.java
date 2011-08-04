@@ -34,18 +34,26 @@ import com.cloudera.impala.service.Coordinator;
  */
 public class ImpalaConnection implements java.sql.Connection {
 
+  // Name of catalog, used as identifier for calls in ImpalaDatabaseMetaData
+  public static final String CATALOG_NAME = "ImpalaInMemoryCatalog";
   // Connection url passed in by the user.
   private final String url;
+  // The name of the database this connection refers to.
+  private final String dbName;
   // Connection properties such as user name.
   private final Properties info;
+  // For providing metadata.
+  private final Catalog catalog;
   // For executing queries.
   private final Coordinator coordinator;
   // Connection status.
   private boolean isClosed = true;
 
-  public ImpalaConnection(String url, Properties info, Catalog catalog) {
+  public ImpalaConnection(String url, String dbName, Properties info, Catalog catalog) {
     this.url = url;
+    this.dbName = dbName;
     this.info = info;
+    this.catalog = catalog;
     coordinator = new Coordinator(catalog);
     isClosed = false;
   }
@@ -57,7 +65,17 @@ public class ImpalaConnection implements java.sql.Connection {
 
   @Override
   public DatabaseMetaData getMetaData() throws SQLException {
-    return new ImpalaDatabaseMetaData(url);
+    return new ImpalaDatabaseMetaData(this, url, dbName, catalog);
+  }
+
+  @Override
+  public void setCatalog(String catalog) throws SQLException {
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
+  }
+
+  @Override
+  public String getCatalog() throws SQLException {
+    return CATALOG_NAME;
   }
 
   @Override
@@ -138,16 +156,6 @@ public class ImpalaConnection implements java.sql.Connection {
 
   @Override
   public boolean isReadOnly() throws SQLException {
-    throw UnsupportedOpHelper.newUnimplementedMethodException();
-  }
-
-  @Override
-  public void setCatalog(String catalog) throws SQLException {
-    throw UnsupportedOpHelper.newUnimplementedMethodException();
-  }
-
-  @Override
-  public String getCatalog() throws SQLException {
     throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 

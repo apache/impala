@@ -8,6 +8,8 @@ import java.sql.ResultSet;
 import java.sql.RowIdLifetime;
 import java.sql.SQLException;
 
+import com.cloudera.impala.catalog.Catalog;
+
 /**
  * Minimal implementation required to run select queries with sqlline.
  * The implemented methods must return non-null values.
@@ -22,14 +24,28 @@ public class ImpalaDatabaseMetaData implements DatabaseMetaData {
 
   // Connection url passed in by the user.
   private final String url;
+  // Name of database this metadata refers to.
+  private final String dbName;
+  // For providing metadata.
+  private final Catalog catalog;
+  // Remember the parent connection.
+  private final Connection conn;
 
-  public ImpalaDatabaseMetaData(String url) {
+  public ImpalaDatabaseMetaData(Connection conn, String url, String dbName, Catalog catalog) {
+    this.conn = conn;
     this.url = url;
+    this.dbName = dbName;
+    this.catalog = catalog;
   }
 
   @Override
   public String getURL() throws SQLException {
     return url;
+  }
+
+  @Override
+  public Connection getConnection() throws SQLException {
+    return conn;
   }
 
   @Override
@@ -65,6 +81,35 @@ public class ImpalaDatabaseMetaData implements DatabaseMetaData {
   @Override
   public int getDriverMinorVersion() {
     return 0;
+  }
+
+  @Override
+  public ResultSet getTables(String catalog, String schemaPattern, String tableNamePattern,
+      String[] types) throws SQLException {
+    // TODO: We ignore all method parameters for now.
+    return new ImpalaTableMetaDataResultSet(this.catalog, dbName);
+  }
+
+  @Override
+  public ResultSet getColumns(String catalog, String schemaPattern, String tableNamePattern,
+      String columnNamePattern) throws SQLException {
+    // TODO: We ignore all method parameters tableNamePattern for now.
+    return new ImpalaColumnMetaDataResultSet(this.catalog, dbName, tableNamePattern);
+  }
+
+  @Override
+  public ResultSet getCatalogs() throws SQLException {
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
+  }
+
+  @Override
+  public ResultSet getSchemas() throws SQLException {
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
+  }
+
+  @Override
+  public ResultSet getTableTypes() throws SQLException {
+    throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 
   // As far as I know, sqlline uses the following methods for performing tab completion.
@@ -645,33 +690,6 @@ public class ImpalaDatabaseMetaData implements DatabaseMetaData {
   }
 
   @Override
-  public ResultSet getTables(String catalog, String schemaPattern, String tableNamePattern,
-      String[] types) throws SQLException {
-    throw UnsupportedOpHelper.newUnimplementedMethodException();
-  }
-
-  @Override
-  public ResultSet getSchemas() throws SQLException {
-    throw UnsupportedOpHelper.newUnimplementedMethodException();
-  }
-
-  @Override
-  public ResultSet getCatalogs() throws SQLException {
-    throw UnsupportedOpHelper.newUnimplementedMethodException();
-  }
-
-  @Override
-  public ResultSet getTableTypes() throws SQLException {
-    throw UnsupportedOpHelper.newUnimplementedMethodException();
-  }
-
-  @Override
-  public ResultSet getColumns(String catalog, String schemaPattern, String tableNamePattern,
-      String columnNamePattern) throws SQLException {
-    throw UnsupportedOpHelper.newUnimplementedMethodException();
-  }
-
-  @Override
   public ResultSet getColumnPrivileges(String catalog, String schema, String table,
       String columnNamePattern) throws SQLException {
     throw UnsupportedOpHelper.newUnimplementedMethodException();
@@ -790,11 +808,6 @@ public class ImpalaDatabaseMetaData implements DatabaseMetaData {
   @Override
   public ResultSet getUDTs(String catalog, String schemaPattern, String typeNamePattern, int[] types)
       throws SQLException {
-    throw UnsupportedOpHelper.newUnimplementedMethodException();
-  }
-
-  @Override
-  public Connection getConnection() throws SQLException {
     throw UnsupportedOpHelper.newUnimplementedMethodException();
   }
 

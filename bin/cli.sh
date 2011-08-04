@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
+properties_file=$1
+if [ "$properties_file" = "" ]
+then
+  echo "Defaulting to impala-default.properties"
+  properties_file="impala-default.properties"
+fi
+
+
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 . "$bin"/impala-config.sh
@@ -16,5 +24,5 @@ java -Dtest.hive.warehouse.dir=${IMPALA_FE_DIR}/fe/target/test-warehouse \
      -Djava.library.path=${IMPALA_BE_DIR}/build/service \
      -Djava.ext.dirs=${EXT_DIRS} \
      -jar $IMPALA_FE_DIR/lib/sqlline-1_0_2.jar \
-     $IMPALA_HOME/bin/impala-cli.properties
+     "$properties_file"
 

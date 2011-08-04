@@ -23,6 +23,7 @@ public class ImpalaResultSetMetaData implements ResultSetMetaData {
   private final List<PrimitiveType> colTypes;
   private final List<String> colLabels;
 
+  // C'tor for query results.
   public ImpalaResultSetMetaData(List<PrimitiveType> colTypes, List<String> colLabels) {
     this.colTypes = colTypes;
     this.colLabels = colLabels;
@@ -30,7 +31,7 @@ public class ImpalaResultSetMetaData implements ResultSetMetaData {
 
   @Override
   public int getColumnCount() throws SQLException {
-    return colTypes.size();
+    return colLabels.size();
   }
 
   @Override

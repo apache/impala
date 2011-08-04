@@ -46,15 +46,44 @@ public class ImpalaDriver implements java.sql.Driver {
 
   @Override
   public ImpalaConnection connect(String url, Properties info) throws SQLException {
-    return new ImpalaConnection(url, info, catalog);
+    String dbName = extractDbName(url);
+    if (catalog.getDb(dbName) == null) {
+      throw new SQLException("Can't connect to database '" + dbName + "' given in url '"
+          + url + "'. Database doesn't exist.");
+    }
+    return new ImpalaConnection(url, dbName, info, catalog);
   }
 
   @Override
   public boolean acceptsURL(String url) throws SQLException {
     if (url.contains("impala")) {
-      return true;
+      String dbName = extractDbName(url);
+      if (dbName != null) {
+        return true;
+      } else {
+        return false;
+      }
     }
     return false;
+  }
+
+  // The field after "impala" names the database.
+  // For example, in 'jdbc:impala:mydb' the database would be 'mydb'
+  // or, in 'abc:impala:mydb:xyz', the database would be 'mydb'
+  // or, in 'abc:impala:impala:xyz', the database would be 'impala'
+  private String extractDbName(String url) {
+    String[] urlParts = url.split(":");
+    boolean firstImpalaFound = false;
+    String dbName = null;
+    for (String s : urlParts) {
+      if (firstImpalaFound) {
+        dbName = s;
+      }
+      if (!firstImpalaFound && s.equals("impala")) {
+        firstImpalaFound = true;
+      }
+    }
+    return dbName;
   }
 
   // Non-essential and unimplemented methods start here.

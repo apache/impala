@@ -124,10 +124,17 @@ From impala/fe:
 
   ## the package phase will copy all dependency jars into target/dependency
   $ mvn package
-  $ cd src/main/scripts
-  $ ./cli.sh
+  $ cd IMPALA_HOME/bin
+  $ ./cli.sh [.properties_file]
+  ## if you didn't specify a .properties file, 
   ## "connect" to impala: Load the metadata from hive's metastore into the Impala in-memory metadata representation.
   ## Note that sqlline supports tab completion.
-  sqlline>!properties impala.properties;
+  sqlline>!properties impala-default.properties;
   ## Enter any password.
   sqlline>select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col from alltypessmall;
+  ## querying metadata
+  sqlline>!tables
+  sqlline>!columns table_name
+  sqlline>!describe tabl_name
+  
+  
