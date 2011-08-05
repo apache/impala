@@ -4,6 +4,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.cloudera.impala.thrift.TFloatLiteral;
@@ -14,11 +15,15 @@ public class FloatLiteral extends LiteralExpr {
 
   private void init(Double value) {
     this.value = value.doubleValue();
-    if ((this.value <= Float.MAX_VALUE && this.value >= Float.MIN_VALUE) || this.value == 0.0f) {
+    if ((this.value <= Float.MAX_VALUE && this.value >= Float.MIN_VALUE) ||
+        (this.value <= -Float.MIN_VALUE && this.value >= -Float.MAX_VALUE) ||
+        this.value == 0.0f) {
       type = PrimitiveType.FLOAT;
     } else {
       Preconditions.checkState((this.value <= Double.MAX_VALUE
-          && this.value >= Double.MIN_VALUE) || this.value == 0.0);
+          && this.value >= Double.MIN_VALUE) ||
+          (this.value <= -Double.MIN_VALUE && this.value >= -Double.MAX_VALUE) ||
+          this.value == 0.0);
       type = PrimitiveType.DOUBLE;
     }
   }
@@ -73,5 +78,11 @@ public class FloatLiteral extends LiteralExpr {
     Preconditions.checkState(targetType.isFloatingPointType());
     type = targetType;
     return this;
+  }
+
+  @Override
+  public void swapSign() throws NotImplementedException {
+    // swapping sign does not change the type
+    value = -value;
   }
 }

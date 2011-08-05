@@ -4,6 +4,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.NotImplementedException;
 import com.google.common.base.Preconditions;
 
 public abstract class LiteralExpr extends Expr {
@@ -29,5 +30,11 @@ public abstract class LiteralExpr extends Expr {
         throw new AnalysisException("DATE/DATETIME/TIMESTAMP literals not supported: " + value);
     }
     return null;
+  }
+
+  // Swaps the sign of numeric literals.
+  // Throws for non-numeric literals.
+  public void swapSign() throws NotImplementedException {
+    throw new NotImplementedException("swapSign() only implemented for numeric literals");
   }
 }

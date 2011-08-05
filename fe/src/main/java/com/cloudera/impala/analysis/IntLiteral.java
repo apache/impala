@@ -4,6 +4,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.cloudera.impala.thrift.TIntLiteral;
@@ -80,5 +81,11 @@ public class IntLiteral extends LiteralExpr {
       return new FloatLiteral(new Double(value), targetType);
     }
     return this;
+  }
+
+  @Override
+  public void swapSign() throws NotImplementedException {
+    // swapping sign does not change the type
+    value = -value;
   }
 }

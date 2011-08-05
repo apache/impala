@@ -224,7 +224,8 @@ public class AnalyzerTest {
   public void TestNoFromClause() {
     AnalyzesOk("select 'test'");
     AnalyzesOk("select 1 + 1, -128, 'two', 1.28");
-    AnalyzesOk("select -1.0, -1, 1 - 1, 10 - -1");
+    AnalyzesOk("select -1, 1 - 1, 10 - -1, 1 - - - 1");
+    AnalyzesOk("select -1.0, 1.0 - 1.0, 10.0 - -1.0, 1.0 - - - 1.0");
     AnalysisError("select a + 1");
     // Test predicates in select list.
     AnalyzesOk("select true");

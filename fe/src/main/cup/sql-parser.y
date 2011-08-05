@@ -178,6 +178,7 @@ nonterminal TableRef table_ref;
 nonterminal JoinOperator join_operator;
 nonterminal opt_inner, opt_outer;
 nonterminal PrimitiveType primitive_type;
+nonterminal Expr minus_chain_expr;
 
 precedence left KW_OR;
 precedence left KW_AND;
@@ -466,8 +467,23 @@ case_else_clause ::=
   {: RESULT = null; :}
   ;
 
+minus_chain_expr ::=    
+  MINUS expr:e
+  {:      
+    // integrate signs into literals 
+    if (e.isLiteral() && e.getType().isNumericType()) {
+      ((LiteralExpr)e).swapSign();
+      RESULT = e;
+    } else {
+      RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.MULTIPLY, new IntLiteral((long)-1), e);
+    }
+  :}
+  ;
+
 expr ::=
-  literal:l
+  minus_chain_expr:e
+  {: RESULT = e; :}  
+  | literal:l
   {: RESULT = l; :}
   | IDENT:functionName LPAREN expr_list:exprs RPAREN
   {: RESULT = new FunctionCallExpr(functionName, exprs); :}
@@ -482,7 +498,7 @@ expr ::=
   | arithmetic_expr:e
   {: RESULT = e; :}
   | LPAREN expr:e RPAREN
-  {: RESULT = e; :}  
+  {: RESULT = e; :}
   ;
 
 arithmetic_expr ::=
@@ -497,11 +513,7 @@ arithmetic_expr ::=
   | expr:e1 PLUS expr:e2
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.PLUS, e1, e2); :}
   | expr:e1 MINUS expr:e2
-  {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.MINUS, e1, e2); :}
-  | MINUS expr:e
-  {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.MULTIPLY,
-                                 new IntLiteral((long)-1), e);
-  :} %prec UNARY_MINUS
+  {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.MINUS, e1, e2); :}     
   | expr:e1 BITAND expr:e2
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.BITAND, e1, e2); :}
   | expr:e1 BITOR expr:e2
@@ -516,7 +528,7 @@ literal ::=
   INTEGER_LITERAL:l
   {: RESULT = new IntLiteral(l); :}
   | FLOATINGPOINT_LITERAL:l
-  {: RESULT = new FloatLiteral(l); :}  
+  {: RESULT = new FloatLiteral(l); :}
   | STRING_LITERAL:l
   {: RESULT = new StringLiteral(l); :}
   | BOOL_LITERAL:l

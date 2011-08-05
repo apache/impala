@@ -2,10 +2,11 @@
 
 package com.cloudera.impala.service;
 
+import static org.junit.Assert.fail;
+
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 
-import static org.junit.Assert.fail;
 import org.junit.Assert;
 import org.junit.Test;
 
