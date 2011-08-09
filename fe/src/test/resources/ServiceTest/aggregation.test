@@ -31,7 +31,7 @@ from alltypes
 ----
 bigint, float, float, double, double
 ----
-7300,0,9,32850,4.5
+7300,0,9.9,36135,4.95
 =====
 select count(*), min(double_col), max(double_col), sum(double_col), avg(double_col)
 from alltypes
@@ -71,4 +71,122 @@ tinyint, string, bigint
 1,'1',730
 9,'9',730
 7,'7',730
+====
+# grouping by different data types, with NULLs
+select tinyint_col, count(*) from alltypesagg where day = 1 group by 1
+----
+tinyint, bigint
+----
+4,100
+5,100
+6,100
+7,100
+8,100
+9,100
+NULL,100
+1,100
+2,100
+3,100
+====
+select smallint_col % 10, count(*) from alltypesagg where day = 1 group by 1
+----
+smallint, bigint
+----
+8,100
+9,100
+0,90
+NULL,10
+1,100
+2,100
+3,100
+4,100
+5,100
+6,100
+7,100
+====
+select int_col % 10, count(*) from alltypesagg where day = 1 group by 1
+----
+int, bigint
+----
+8,100
+9,100
+0,99
+NULL,1
+1,100
+2,100
+3,100
+4,100
+5,100
+6,100
+7,100
+====
+select bigint_col % 100, count(*) from alltypesagg where day = 1 group by 1
+----
+bigint, bigint
+----
+60,100
+10,100
+80,100
+30,100
+50,100
+0,99
+NULL,1
+70,100
+20,100
+90,100
+40,100
+====
+# TODO: group by string col
+select date_string_col, count(*) from alltypesagg where day >= 1 group by 1
+----
+string, bigint
+----
+'01/06/10',1000
+'01/02/10',1000
+'01/04/10',1000
+'01/07/10',1000
+'01/10/10',1000
+'01/05/10',1000
+'01/03/10',1000
+'01/08/10',1000
+'01/01/10',1000
+'01/09/10',1000
+====
+# grouping by multiple exprs, with nulls
+select tinyint_col % 3, smallint_col % 3, count(*) from alltypesagg where day = 1 group by 1, 2
+----
+tinyint, smallint, bigint
+----
+1,0,90
+2,2,120
+2,1,90
+NULL,0,30
+1,1,120
+0,0,120
+NULL,NULL,10
+1,2,90
+0,2,90
+NULL,2,30
+NULL,1,30
+0,1,90
+2,0,90
+====
+# same result as previous query
+select tinyint_col % 3, smallint_col % 3, count(*) from alltypesagg where day = 1 group by 2, 1
+----
+tinyint, smallint, bigint
+----
+NULL,1,30
+0,1,90
+2,2,120
+1,2,90
+NULL,0,30
+1,1,120
+0,0,120
+NULL,NULL,10
+2,1,90
+2,0,90
+1,0,90
+0,2,90
+NULL,2,30
 ====

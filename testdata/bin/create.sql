@@ -19,6 +19,21 @@ CREATE TABLE AllTypesSmall LIKE AllTypes;
 DROP TABLE IF EXISTS AlltypesError;
 CREATE TABLE AllTypesError LIKE AllTypes;
 
+DROP TABLE IF EXISTS AllTypesAgg;
+CREATE TABLE AllTypesAgg (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string)
+partitioned by (year int, month int, day int)
+row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
+
 DROP TABLE IF EXISTS DelimErrorTable;
 CREATE TABLE DelimErrorTable (
   id int,

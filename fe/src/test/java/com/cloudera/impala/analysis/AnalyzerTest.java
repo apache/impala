@@ -80,11 +80,40 @@ public class AnalyzerTest {
       fail("Analysis error:\n" + e.toString());
     }
 
-    // convert select list exprs to thrift
+    // convert select list exprs and where clause to thrift
     List<Expr> selectListExprs = node.getSelectListExprs();
     List<TExpr> thriftExprs = Expr.treesToThrift(selectListExprs);
+    LOG.info("select list:\n");
     for (TExpr expr: thriftExprs) {
       LOG.info(expr.toString() + "\n");
+    }
+    for (Expr expr: selectListExprs) {
+      checkBinaryExprs(expr);
+    }
+    if (node.getWhereClause() != null) {
+      TExpr thriftWhere = node.getWhereClause().treeToThrift();
+      LOG.info("WHERE pred: " + thriftWhere.toString() + "\n");
+      checkBinaryExprs(node.getWhereClause());
+    }
+    AggregateInfo aggInfo = node.getAggInfo();
+    if (aggInfo != null) {
+      if (aggInfo.getGroupingExprs() != null) {
+        LOG.info("grouping exprs:\n");
+        for (Expr expr: aggInfo.getGroupingExprs()) {
+          LOG.info(expr.treeToThrift().toString() + "\n");
+          checkBinaryExprs(expr);
+        }
+      }
+      LOG.info("aggregate exprs:\n");
+      for (Expr expr: aggInfo.getAggregateExprs()) {
+        LOG.info(expr.treeToThrift().toString() + "\n");
+        checkBinaryExprs(expr);
+      }
+      if (node.getHavingPred() != null) {
+        TExpr thriftHaving = node.getHavingPred().treeToThrift();
+        LOG.info("HAVING pred: " + thriftHaving.toString() + "\n");
+        checkBinaryExprs(node.getHavingPred());
+      }
     }
     return node;
   }
@@ -131,6 +160,21 @@ public class AnalyzerTest {
    */
   public void AnalysisError(String stmt) {
     AnalysisError(stmt, null);
+  }
+
+  /**
+   * Makes sure that operands to binary exprs having same type.
+   */
+  private void checkBinaryExprs(Expr expr) {
+    if (expr instanceof BinaryPredicate
+        || (expr instanceof ArithmeticExpr
+            && ((ArithmeticExpr) expr).getOp() != ArithmeticExpr.Operator.BITNOT)) {
+      Assert.assertEquals(expr.getChildren().size(), 2);
+      Assert.assertEquals(expr.getChild(0).getType(), expr.getChild(1).getType());
+    }
+    for (Expr child: expr.getChildren()) {
+      checkBinaryExprs(child);
+    }
   }
 
   @Test

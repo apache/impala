@@ -1,0 +1,14 @@
+# IS NULL predicate
+select count(*) from alltypesagg
+----
+bigint
+====
+select count(*) from alltypesagg where tinyint_col is null
+----
+bigint
+====
+select count(*) from alltypesagg where tinyint_col is not null
+----
+bigint
+====
+

@@ -10,7 +10,8 @@ void* IsNullPredicate::ComputeFunction(Expr* e, TupleRow* row) {
   IsNullPredicate* p = static_cast<IsNullPredicate*>(e);
   // assert(p->children_.size() == 1);
   Expr* op = e->children()[0];
-  p->result_.bool_val = (op == NULL) == !p->is_not_null_;
+  void* val = op->GetValue(row);
+  p->result_.bool_val = (val == NULL) == !p->is_not_null_;
   return &p->result_.bool_val;
 }
 

@@ -32,8 +32,12 @@ class Tuple {
   static Tuple* Create(int size, MemPool* pool) {
     // assert(size > 0);
     Tuple* result = reinterpret_cast<Tuple*>(pool->Allocate(size));
-    bzero(result, size);
+    result->Init(size);
     return result;
+  }
+
+  void Init(int size) {
+    bzero(this, size);
   }
 
   // Turn null indicator bit on.

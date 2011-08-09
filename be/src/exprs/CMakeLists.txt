@@ -49,4 +49,4 @@ target_link_libraries(expr-test
   ${Boost_LIBRARIES}
 )
 
-add_test(expr-test expr-test)
+add_test(expr-test ${CMAKE_SOURCE_DIR}/build/exprs/expr-test)

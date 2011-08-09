@@ -50,7 +50,11 @@ size_t AggregationNode::GroupingExprHash::operator()(Tuple* const& t) const {
     SlotDescriptor* slot_d = agg_tuple_desc_->slots()[i];
     const void* value;
     if (t != NULL) {
-      value = t->GetSlot(slot_d->tuple_offset());
+      if (t->IsNull(slot_d->null_indicator_offset())) {
+        value = NULL;
+      } else {
+        value = t->GetSlot(slot_d->tuple_offset());
+      }
     } else {
       // compute grouping exprs value over node->current_row_
       value = (*grouping_exprs_)[i]->GetValue(node_->current_row_);
@@ -70,16 +74,26 @@ void AggregationNode::GroupingExprEquals::Init(
   grouping_exprs_ = &grouping_exprs;
 }
 
-bool AggregationNode::GroupingExprEquals::operator()(Tuple* const& t1, Tuple* const& t2) const {
+bool AggregationNode::GroupingExprEquals::operator()(
+    Tuple* const& t1, Tuple* const& t2) const {
   for (int i = 0; i < grouping_exprs_->size(); ++i) {
     SlotDescriptor* slot_d = agg_tuple_desc_->slots()[i];
     const void* value1;
     if (t1 != NULL) {
-      value1 = t1->GetSlot(slot_d->tuple_offset());
+      if (t1->IsNull(slot_d->null_indicator_offset())) {
+        value1 = NULL;
+      } else {
+        value1 = t1->GetSlot(slot_d->tuple_offset());
+      }
     } else {
       value1 = (*grouping_exprs_)[i]->GetValue(node_->current_row_);
     }
-    const void* value2 = t2->GetSlot(slot_d->tuple_offset());
+    const void* value2;
+    if (t2->IsNull(slot_d->null_indicator_offset())) {
+      value2 = NULL;
+    } else {
+      value2 = t2->GetSlot(slot_d->tuple_offset());
+    }
     if (value1 == NULL || value2 == NULL) {
       // nulls are considered equal for the purpose of grouping
       if (value1 != NULL || value2 != NULL) return false;
@@ -137,7 +151,7 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
     int row_idx = row_batch->AddRow();
     TupleRow* row = row_batch->GetRow(row_idx);
     row->SetTuple(0, *output_iterator_);
-    row_batch->CommitLastRow();
+    if (ExecNode::EvalConjuncts(row)) row_batch->CommitLastRow();
     ++output_iterator_;
   }
   return Status::OK;

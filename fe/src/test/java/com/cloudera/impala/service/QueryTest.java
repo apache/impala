@@ -38,8 +38,8 @@ public class QueryTest {
       String query = queryFileParser.getQuery();
       ArrayList<String> expectedTypes = queryFileParser.getExpectedResult(0);
       ArrayList<String> expectedResults = queryFileParser.getExpectedResult(1);
-      TestUtils.runQuery(coordinator, query, abortOnError, maxErrors, expectedTypes, expectedResults,
-          null, null, testErrorLog);
+      TestUtils.runQuery(coordinator, query, abortOnError, maxErrors, expectedTypes,
+                         expectedResults, null, null, testErrorLog);
     }
     queryFileParser.close();
   }
@@ -47,7 +47,11 @@ public class QueryTest {
   @Test
   public void Test() {
     runTests("aggregation", false, 1000);
+    // TODO: enable this test in follow-on change (something is broken right now)
+    //runTests("exprs", false, 1000);
     runTests("textscannode", false, 1000);
+
+    // check whether any of the tests had errors
     if (testErrorLog.length() != 0) {
       fail(testErrorLog.toString());
     }

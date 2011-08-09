@@ -420,12 +420,16 @@ Status TextScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, i
         char* new_tuple = reinterpret_cast<char*>(tuple_);
         new_tuple += tuple_desc_->byte_size();
         // assert(new_tuple < tuple_buf_ + state->batch_size() * tuple_desc_->byte_size());
-        tuple_ = reinterpret_cast<Tuple*> (new_tuple);
+        tuple_ = reinterpret_cast<Tuple*>(new_tuple);
         *row_idx = RowBatch::INVALID_ROW_INDEX;
         if (row_batch->IsFull()) {
           // Tuple buffer is full.
           return Status::OK;
         }
+      } else {
+        // make sure to reset null indicators since we're overwriting
+        // the tuple assembled for the previous row
+        tuple_->Init(tuple_desc_->byte_size());
       }
     }
   }
@@ -442,7 +446,6 @@ Status TextScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, i
 
 bool TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, Tuple* tuple,
     const SlotDescriptor* slot_desc, bool copy_string, bool unescape_string) {
-
   // Check for null columns.
   // The below code implies that unquoted empty strings
   // such as "...,,..." become NULLs, and not empty strings.

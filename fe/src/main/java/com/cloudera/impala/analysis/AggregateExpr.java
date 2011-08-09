@@ -152,17 +152,12 @@ public class AggregateExpr extends Expr {
     }
 
     if (op == Operator.AVG) {
-      // division always results in a floating-point value
-      // TODO: make it a float if the param type is <bigint?
-      type = (arg.type == PrimitiveType.FLOAT ? PrimitiveType.FLOAT : PrimitiveType.DOUBLE);
+      // division always results in a double value
+      type = PrimitiveType.DOUBLE;
       return;
     } else if (op == Operator.SUM) {
       // numeric types need to be accumulated at maximum precision
-      if (arg.type.isFixedPointType()) {
-        type = PrimitiveType.BIGINT;
-      } else {
-        type = PrimitiveType.DOUBLE;
-      }
+      type = arg.type.getMaxResolutionType();
       if (arg.type != type) {
         castChild(type, 0);
       }

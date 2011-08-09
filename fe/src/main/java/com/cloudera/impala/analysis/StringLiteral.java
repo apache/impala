@@ -71,7 +71,7 @@ public class StringLiteral extends LiteralExpr {
       } catch (NumberFormatException e) {
         throw new AnalysisException("Cannot convert " + value + " to a fixed-point type", e);
       }
-      return new IntLiteral(newValue);
+      return (LiteralExpr) new IntLiteral(newValue).castTo(targetType);
     } else {
       // floating point type
       Preconditions.checkArgument(targetType.isFloatingPointType());
@@ -88,7 +88,7 @@ public class StringLiteral extends LiteralExpr {
             targetType.toString() +
             " resulted in infinity or NaN.");
       }
-      return new FloatLiteral(newValue);
+      return (LiteralExpr) new FloatLiteral(newValue).castTo(targetType);
     }
   }
 

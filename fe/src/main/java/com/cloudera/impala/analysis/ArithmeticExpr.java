@@ -45,6 +45,10 @@ public class ArithmeticExpr extends Expr {
   }
   private final Operator op;
 
+  public Operator getOp() {
+    return op;
+  }
+
   public ArithmeticExpr(Operator op, Expr e1, Expr e2) {
     super();
     this.op = op;
