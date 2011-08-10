@@ -197,11 +197,40 @@ public class ParserTest {
     ParsesOk("select " + Double.toString(Double.MIN_VALUE) + "1 from test");
   }
 
+  @Test public void TestLiteralPredicates() {
+    // NULL literal predicate.
+    ParsesOk("select a from t where NULL OR NULL");
+    ParsesOk("select a from t where NULL AND NULL");
+    // NULL in select list currently becomes a literal predicate.
+    ParsesOk("select NULL from t");
+    // bool literal predicate
+    ParsesOk("select a from t where true");
+    ParsesOk("select a from t where false");
+    ParsesOk("select a from t where true OR true");
+    ParsesOk("select a from t where true OR false");
+    ParsesOk("select a from t where false OR false");
+    ParsesOk("select a from t where false OR true");
+    ParsesOk("select a from t where true AND true");
+    ParsesOk("select a from t where true AND false");
+    ParsesOk("select a from t where false AND false");
+    ParsesOk("select a from t where false AND true");
+  }
+
   @Test public void TestLiteralExprs() {
     // negative integer literal
     ParsesOk("select -1 from t");
     ParsesOk("select - 1 from t");
     ParsesOk("select a - - 1 from t");
+    ParsesOk("select a - - - 1 from t");
+    // NULL literal in binary predicate.
+    for (BinaryPredicate.Operator op : BinaryPredicate.Operator.values()) {
+      ParsesOk("select a from t where a " +  op.toString() + " NULL");
+    }
+    // bool literal in binary predicate.
+    for (BinaryPredicate.Operator op : BinaryPredicate.Operator.values()) {
+      ParsesOk("select a from t where a " +  op.toString() + " true");
+      ParsesOk("select a from t where a " +  op.toString() + " false");
+    }
     // test string literals with and without quotes in the literal
     ParsesOk("select 5, 'five', 5.0, i + 5 from t");
     ParsesOk("select \"\\\"five\\\"\" from t\n");
@@ -213,6 +242,15 @@ public class ParserTest {
     ParserError("select '5 from t");
     ParserError("select \"\"five\"\" from t\n");
     ParserError("select 5.0.5 from t");
+    // NULL literal in arithmetic expr
+    for (ArithmeticExpr.Operator op : ArithmeticExpr.Operator.values()) {
+      ParserError("select a from t where a " +  op.toString() + " NULL");
+    }
+    // bool literal in arithmetic expr
+    for (ArithmeticExpr.Operator op : ArithmeticExpr.Operator.values()) {
+      ParserError("select a from t where a " +  op.toString() + " true");
+      ParserError("select a from t where a " +  op.toString() + " false");
+    }
   }
 
   @Test public void TestFunctionCallExprs() {
@@ -323,7 +361,7 @@ public class ParserTest {
         "select from t\n" +
         "       ^\n" +
         "Encountered: FROM\n" +
-        "Expected: AVG, CASE, CAST, COUNT, FALSE, MIN, MAX, NOT, SUM, TRUE, IDENTIFIER\n");
+        "Expected: AVG, CASE, CAST, COUNT, FALSE, MIN, MAX, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
 
     // missing from
     ParserError("select c, b, c where a = 5",
@@ -347,7 +385,7 @@ public class ParserTest {
         "select c, b, c from t where\n" +
         "                           ^\n" +
         "Encountered: EOF\n" +
-        "Expected: AVG, CASE, CAST, COUNT, FALSE, MIN, MAX, NOT, SUM, " +
+        "Expected: AVG, CASE, CAST, COUNT, FALSE, MIN, MAX, NOT, NULL, SUM, " +
         "TRUE, IDENTIFIER\n");
 
     // missing predicate in where clause (group by)
@@ -356,7 +394,7 @@ public class ParserTest {
         "select c, b, c from t where group by a, b\n" +
         "                            ^\n" +
         "Encountered: GROUP\n" +
-        "Expected: AVG, CASE, CAST, COUNT, FALSE, MIN, MAX, NOT, SUM, " +
+        "Expected: AVG, CASE, CAST, COUNT, FALSE, MIN, MAX, NOT, NULL, SUM, " +
         "TRUE, IDENTIFIER\n");
 
     // unmatched string literal starting with "

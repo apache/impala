@@ -19,6 +19,7 @@ class LiteralPredicate: public Predicate {
 
  private:
   static void* ComputeFunction(Expr* e, TupleRow* row);
+  bool is_null_;
 };
 
 }

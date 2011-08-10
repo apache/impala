@@ -276,6 +276,10 @@ public class AnalyzerTest {
     AnalyzesOk("select false");
     AnalyzesOk("select true or false");
     AnalyzesOk("select true and false");
+    // Test NULL's in select list.
+    AnalyzesOk("select null");
+    AnalyzesOk("select null and null");
+    AnalyzesOk("select null or null");
   }
 
   @Test public void TestOnClause() {
@@ -335,6 +339,30 @@ public class AnalyzerTest {
     AnalyzesOk("select * from testtbl where true");
     AnalysisError("select * from testtbl where count(*) > 0",
         "aggregation function not allowed in WHERE clause");
+    // NULL literal in binary predicate.
+    for (BinaryPredicate.Operator op : BinaryPredicate.Operator.values()) {
+      AnalyzesOk("select id from testtbl where id " +  op.toString() + " NULL");
+    }
+    // bool literal in binary predicate.
+    for (BinaryPredicate.Operator op : BinaryPredicate.Operator.values()) {
+      AnalyzesOk("select id from testtbl where id " +  op.toString() + " true");
+      AnalyzesOk("select id from testtbl where id " +  op.toString() + " false");
+    }
+    // NULL literal predicate.
+    AnalyzesOk("select id from testtbl where NULL OR NULL");
+    AnalyzesOk("select id from testtbl where NULL AND NULL");
+    AnalyzesOk("select id from testtbl where NOT NULL");
+    // bool literal predicate
+    AnalyzesOk("select id from testtbl where true");
+    AnalyzesOk("select id from testtbl where false");
+    AnalyzesOk("select id from testtbl where true OR true");
+    AnalyzesOk("select id from testtbl where true OR false");
+    AnalyzesOk("select id from testtbl where false OR false");
+    AnalyzesOk("select id from testtbl where false OR true");
+    AnalyzesOk("select id from testtbl where true AND true");
+    AnalyzesOk("select id from testtbl where true AND false");
+    AnalyzesOk("select id from testtbl where false AND false");
+    AnalyzesOk("select id from testtbl where false AND true");
   }
 
   @Test

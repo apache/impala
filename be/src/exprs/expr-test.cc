@@ -253,7 +253,7 @@ TEST_F(ExprTest, LiteralExprs) {
   TestValue("true", TYPE_BOOLEAN, true);
   TestValue("false", TYPE_BOOLEAN, false);
   TestStringValue("'test'", "test");
-  // TODO: NULLs?
+  TestIsNull("null", TYPE_BOOLEAN);
 }
 
 TEST_F(ExprTest, ArithmeticExprs) {
@@ -387,12 +387,11 @@ TEST_F(ExprTest, CompoundPredicates) {
   TestValue("(TRUE OR FALSE) AND TRUE", TYPE_BOOLEAN, true);
   TestValue("TRUE OR (FALSE AND TRUE)", TYPE_BOOLEAN, true);
   TestValue("TRUE AND TRUE OR FALSE", TYPE_BOOLEAN, true);
-  // TODO: Uncomment once we have NULL literals.
-  //TestIsNull("TRUE AND NULL", TYPE_BOOLEAN);
-  //TestValue("FALSE AND NULL", TYPE_BOOLEAN, false);
-  //TestValue("TRUE OR NULL", TYPE_BOOLEAN, true);
-  //TestIsNull("FALSE OR NULL", TYPE_BOOLEAN);
-  //TestIsNull("NOT NULL", TYPE_BOOLEAN);
+  TestIsNull("TRUE AND NULL", TYPE_BOOLEAN);
+  TestValue("FALSE AND NULL", TYPE_BOOLEAN, false);
+  TestValue("TRUE OR NULL", TYPE_BOOLEAN, true);
+  TestIsNull("FALSE OR NULL", TYPE_BOOLEAN);
+  TestIsNull("NOT NULL", TYPE_BOOLEAN);
 }
 
 }

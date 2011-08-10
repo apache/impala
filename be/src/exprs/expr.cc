@@ -20,6 +20,7 @@
 #include "exprs/is-null-predicate.h"
 #include "exprs/like-predicate.h"
 #include "exprs/literal-predicate.h"
+#include "exprs/null-literal.h"
 #include "exprs/string-literal.h"
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/ImpalaService_types.h"
@@ -183,6 +184,10 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
         return Status("Literal predicate not set in thrift node");
       }
       *expr = pool->Add(new LiteralPredicate(texpr_node));
+      return Status::OK;
+    }
+    case TExprNodeType::NULL_LITERAL: {
+      *expr = pool->Add(new NullLiteral(texpr_node));
       return Status::OK;
     }
     case TExprNodeType::SLOT_REF: {

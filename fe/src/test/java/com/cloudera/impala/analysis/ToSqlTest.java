@@ -52,6 +52,8 @@ public class ToSqlTest {
   public void selectListTest() {
     testToSql("select 1234, 1234.0, 1234.0 + 1, 1234.0 + 1.0, 1 + 1, \"abc\" from alltypes",
         "SELECT 1234, 1234.0, 1234.0 + 1.0, 1234.0 + 1.0, 1 + 1, 'abc' FROM alltypes");
+    testToSql("select null, 1234 < 5678, 1234.0 < 5678.0, 1234 < null from alltypes",
+        "SELECT NULL, 1234 < 5678, 1234.0 < 5678.0, 1234 < NULL FROM alltypes");
     testToSql("select int_col + int_col, " +
     		"tinyint_col + int_col, " +
     		"float_col + double_col, " +

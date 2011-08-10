@@ -532,7 +532,7 @@ literal ::=
   | STRING_LITERAL:l
   {: RESULT = new StringLiteral(l); :}
   | BOOL_LITERAL:l
-  {: RESULT = new BoolLiteral(l); :}    
+  {: RESULT = new BoolLiteral(l); :}
   | UNMATCHED_STRING_LITERAL:l expr:e
   {: 
     // we have an unmatched string literal.
@@ -637,7 +637,7 @@ binary_comparison_operator ::=
 comparison_predicate ::=
   expr:e1 binary_comparison_operator:op expr:e2
   {: RESULT = new BinaryPredicate(op, e1, e2); :}  
-  // A bool literal should be both an expr (to act as a BoolLiteral)
+  // A bool/null literal should be both an expr (to act as a BoolLiteral)
   // and a predicate (to act as a LiteralPredicate).
   // Implementing this directly will lead to shift-reduce conflicts.
   // We decided that a bool literal shall be literal predicate. 
@@ -647,12 +647,21 @@ comparison_predicate ::=
   // this would have required more and uglier code, 
   // e.g., a special-case rule for dealing with "where true/false".
   | expr:e1 binary_comparison_operator:op literal_predicate:l
-  {: RESULT = new BinaryPredicate(op, e1, new BoolLiteral(l.getValue())); :}
+  {: 
+    Expr e2 = (l.isNull()) ? new NullLiteral() : new BoolLiteral(l.getValue());
+    RESULT = new BinaryPredicate(op, e1, e2);  
+  :}
   | literal_predicate:l binary_comparison_operator:op expr:e2
-  {: RESULT = new BinaryPredicate(op, new BoolLiteral(l.getValue()), e2); :}
+  {: 
+    Expr e1 = (l.isNull()) ? new NullLiteral() : new BoolLiteral(l.getValue());
+    RESULT = new BinaryPredicate(op, e1, e2);
+  :}
   | literal_predicate:l1 binary_comparison_operator:op literal_predicate:l2
-  {: RESULT = new BinaryPredicate(op, new BoolLiteral(l1.getValue()), 
-                                      new BoolLiteral(l2.getValue())); :}  
+  {:     
+    Expr e1 = (l1.isNull()) ? new NullLiteral() : new BoolLiteral(l1.getValue());
+    Expr e2 = (l2.isNull()) ? new NullLiteral() : new BoolLiteral(l2.getValue());
+    RESULT = new BinaryPredicate(op, e1, e2);
+  :}
   ;
 
 like_predicate ::=
@@ -680,6 +689,8 @@ literal_predicate ::=
   {: RESULT = LiteralPredicate.True(); :}
   | KW_FALSE
   {: RESULT = LiteralPredicate.False(); :}
+  | KW_NULL
+  {: RESULT = LiteralPredicate.Null(); :}
   ;
 
 column_ref ::=

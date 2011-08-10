@@ -23,6 +23,7 @@ add_library(Exprs
   is-null-predicate.cc
   like-predicate.cc
   literal-predicate.cc
+  null-literal.cc
   slot-ref.cc
   string-literal.cc
 )

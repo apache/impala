@@ -21,6 +21,7 @@ enum TExprNodeType {
   IS_NULL_PRED,
   LIKE_PRED,
   LITERAL_PRED,
+  NULL_LITERAL,
   SLOT_REF,
   STRING_LITERAL,
 }
@@ -102,6 +103,7 @@ struct TIsNullPredicate {
 
 struct TLiteralPredicate {
   1: required bool value
+  2: required bool is_null
 }
 
 struct TSlotRef {
