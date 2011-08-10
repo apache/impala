@@ -28,7 +28,7 @@ operators = {
 }
 
 # map of signatures (operand types and return type/result field)
-op_signatures = {
+op_signatures = {    
     'tinyint_op': ('char', 'tinyint_val'),
     'smallint_op': ('short', 'smallint_val'),
     'int_op': ('int', 'int_val'),
@@ -36,6 +36,7 @@ op_signatures = {
     'float_op': ('float', 'float_val'),
     'double_op': ('double', 'double_val'),
     'string_op': ('string', 'string_val'),
+    'bool_pred': ('bool', 'bool_val'),
     'tinyint_pred': ('char', 'bool_val'),
     'smallint_pred': ('short', 'bool_val'),
     'int_pred': ('int', 'bool_val'),
@@ -69,7 +70,7 @@ binary_op_invocations = [
       ['tinyint_op', 'smallint_op', 'int_op', 'bigint_op']),
     ('BinaryPredicate',
       ['eq', 'ne', 'le', 'ge', 'lt', 'gt'],
-      ['tinyint_pred', 'smallint_pred', 'int_pred', 'bigint_pred', 'float_pred', 'double_pred']),
+      ['bool_pred', 'tinyint_pred', 'smallint_pred', 'int_pred', 'bigint_pred', 'float_pred', 'double_pred']),
 ]
 
 member_fn_invocations = [

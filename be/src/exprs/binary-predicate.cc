@@ -19,6 +19,9 @@ void BinaryPredicate::Prepare(RuntimeState* state) {
   switch (op_) {
     case TExprOperator::EQ:
       switch (op_type) {
+        case TYPE_BOOLEAN:
+          compute_function_ = GetValueFunctions::BinaryPredicate_eq_bool;
+          return;
         case TYPE_TINYINT:
           compute_function_ = GetValueFunctions::BinaryPredicate_eq_char;
           return;
@@ -47,6 +50,9 @@ void BinaryPredicate::Prepare(RuntimeState* state) {
 
     case TExprOperator::NE:
       switch (op_type) {
+        case TYPE_BOOLEAN:
+          compute_function_ = GetValueFunctions::BinaryPredicate_ne_bool;
+          return;
         case TYPE_TINYINT:
           compute_function_ = GetValueFunctions::BinaryPredicate_ne_char;
           return;
@@ -75,6 +81,9 @@ void BinaryPredicate::Prepare(RuntimeState* state) {
 
     case TExprOperator::LE:
       switch (op_type) {
+        case TYPE_BOOLEAN:
+          compute_function_ = GetValueFunctions::BinaryPredicate_le_bool;
+          return;
         case TYPE_TINYINT:
           compute_function_ = GetValueFunctions::BinaryPredicate_le_char;
           return;
@@ -103,6 +112,9 @@ void BinaryPredicate::Prepare(RuntimeState* state) {
 
     case TExprOperator::GE:
       switch (op_type) {
+        case TYPE_BOOLEAN:
+          compute_function_ = GetValueFunctions::BinaryPredicate_ge_bool;
+          return;
         case TYPE_TINYINT:
           compute_function_ = GetValueFunctions::BinaryPredicate_ge_char;
           return;
@@ -131,6 +143,9 @@ void BinaryPredicate::Prepare(RuntimeState* state) {
 
     case TExprOperator::LT:
       switch (op_type) {
+        case TYPE_BOOLEAN:
+          compute_function_ = GetValueFunctions::BinaryPredicate_lt_bool;
+          return;
         case TYPE_TINYINT:
           compute_function_ = GetValueFunctions::BinaryPredicate_lt_char;
           return;
@@ -159,6 +174,9 @@ void BinaryPredicate::Prepare(RuntimeState* state) {
 
     case TExprOperator::GT:
       switch (op_type) {
+        case TYPE_BOOLEAN:
+          compute_function_ = GetValueFunctions::BinaryPredicate_gt_bool;
+          return;
         case TYPE_TINYINT:
           compute_function_ = GetValueFunctions::BinaryPredicate_gt_char;
           return;

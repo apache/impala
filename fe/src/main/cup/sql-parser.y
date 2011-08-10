@@ -137,7 +137,7 @@ terminal KW_AND, KW_AS, KW_ASC, KW_AVG, KW_BIGINT, KW_BOOLEAN, KW_BY,
   KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_REGEXP,
   KW_RLIKE, KW_RIGHT, KW_SELECT, KW_SEMI, KW_SMALLINT, KW_STRING, KW_SUM,
   KW_TINYINT, KW_TRUE, KW_USING, KW_WHEN, KW_WHERE, KW_THEN, KW_TIMESTAMP;
-terminal COMMA, DOT, STAR, LPAREN, RPAREN, DIVIDE, MOD, PLUS, MINUS, UNARY_MINUS;
+terminal COMMA, DOT, STAR, LPAREN, RPAREN, DIVIDE, MOD, PLUS, MINUS;
 terminal BITAND, BITOR, BITXOR, BITNOT;
 terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
 terminal String IDENT;
@@ -179,6 +179,7 @@ nonterminal JoinOperator join_operator;
 nonterminal opt_inner, opt_outer;
 nonterminal PrimitiveType primitive_type;
 nonterminal Expr minus_chain_expr;
+nonterminal BinaryPredicate.Operator binary_comparison_operator;
 
 precedence left KW_OR;
 precedence left KW_AND;
@@ -188,7 +189,6 @@ precedence left EQUAL, LESSTHAN, GREATERTHAN;
 precedence left PLUS, MINUS;
 precedence left STAR, DIVIDE, MOD, KW_DIV;
 precedence left BITAND, BITOR, BITXOR, BITNOT;
-precedence left UNARY_MINUS;
 precedence left RPAREN;
 
 start with select_stmt;
@@ -617,60 +617,42 @@ predicate ::=
   {: RESULT = p; :}
   ;
 
+binary_comparison_operator ::=
+  EQUAL:op
+  {: RESULT = BinaryPredicate.Operator.EQ; :}
+  | NOT EQUAL:op
+  {: RESULT = BinaryPredicate.Operator.NE; :}
+  | LESSTHAN GREATERTHAN:op
+  {: RESULT = BinaryPredicate.Operator.NE; :}
+  | LESSTHAN EQUAL:op
+  {: RESULT = BinaryPredicate.Operator.LE; :}
+  | GREATERTHAN EQUAL:op
+  {: RESULT = BinaryPredicate.Operator.GE; :}
+  | LESSTHAN:op
+  {: RESULT = BinaryPredicate.Operator.LT; :}
+  | GREATERTHAN:op
+  {: RESULT = BinaryPredicate.Operator.GT; :}
+  ;
+
 comparison_predicate ::=
-  expr:e1 EQUAL expr:e2
-  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.EQ, e1, e2); :}
-  | expr:e1 NOT EQUAL expr:e2
-  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NE, e1, e2); :}
-  | expr:e1 LESSTHAN GREATERTHAN expr:e2
-  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NE, e1, e2); :}
-  | expr:e1 LESSTHAN EQUAL expr:e2
-  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.LE, e1, e2); :}
-  | expr:e1 GREATERTHAN EQUAL expr:e2
-  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.GE, e1, e2); :}
-  | expr:e1 LESSTHAN expr:e2
-  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.LT, e1, e2); :}
-  | expr:e1 GREATERTHAN expr:e2
-  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.GT, e1, e2); :}
+  expr:e1 binary_comparison_operator:op expr:e2
+  {: RESULT = new BinaryPredicate(op, e1, e2); :}  
   // A bool literal should be both an expr (to act as a BoolLiteral)
   // and a predicate (to act as a LiteralPredicate).
   // Implementing this directly will lead to shift-reduce conflicts.
   // We decided that a bool literal shall be literal predicate. 
-  // This means we must list all combinations with bool literals in the equality/inequality below,
+  // This means we must list all combinations with bool literals in the ops below,
   // transforming the literal predicate to a literal expr.
   // We could have chosen the other way (bool literal as a literal expr), but
   // this would have required more and uglier code, 
   // e.g., a special-case rule for dealing with "where true/false".
-  // EQUALS combinations
-  | expr:e1 EQUAL literal_predicate:l
-  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.EQ, 
-                                  e1, new BoolLiteral(l.getValue())); :}
-  | literal_predicate:l EQUAL expr:e2
-  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.EQ, 
-                                  new BoolLiteral(l.getValue()), e2); :}
-  | literal_predicate:l1 EQUAL literal_predicate:l2
-  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.EQ, 
-                                  new BoolLiteral(l1.getValue()), new BoolLiteral(l2.getValue())); :}
-  // NOT EQUALS combinations
-  | expr:e1 NOT EQUAL literal_predicate:l
-  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NE, 
-                                  e1, new BoolLiteral(l.getValue())); :}
-  | literal_predicate:l NOT EQUAL expr:e2
-  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NE, 
-                                  new BoolLiteral(l.getValue()), e2); :}
-  | literal_predicate:l1 NOT EQUAL literal_predicate:l2
-  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NE, 
-                                  new BoolLiteral(l1.getValue()), new BoolLiteral(l2.getValue())); :}
-  // LESSTHAN GREATERTHAN combinations
-  | expr:e1 LESSTHAN GREATERTHAN literal_predicate:l
-  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NE, 
-                                  e1, new BoolLiteral(l.getValue())); :}
-  | literal_predicate:l LESSTHAN GREATERTHAN expr:e2
-  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NE, 
-                                  new BoolLiteral(l.getValue()), e2); :}
-  | literal_predicate:l1 LESSTHAN GREATERTHAN literal_predicate:l2
-  {: RESULT = new BinaryPredicate(BinaryPredicate.Operator.NE, 
-                                  new BoolLiteral(l1.getValue()), new BoolLiteral(l2.getValue())); :}
+  | expr:e1 binary_comparison_operator:op literal_predicate:l
+  {: RESULT = new BinaryPredicate(op, e1, new BoolLiteral(l.getValue())); :}
+  | literal_predicate:l binary_comparison_operator:op expr:e2
+  {: RESULT = new BinaryPredicate(op, new BoolLiteral(l.getValue()), e2); :}
+  | literal_predicate:l1 binary_comparison_operator:op literal_predicate:l2
+  {: RESULT = new BinaryPredicate(op, new BoolLiteral(l1.getValue()), 
+                                      new BoolLiteral(l2.getValue())); :}  
   ;
 
 like_predicate ::=

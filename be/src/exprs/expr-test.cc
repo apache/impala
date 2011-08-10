@@ -54,13 +54,6 @@ class ExprTest : public testing::Test {
     *value = result_row[0];
   }
 
-#if 0
-  void TestBoolValue(const string& expr, bool expected_result) {
-    void* result = GetValue(expr, TYPE_BOOLEAN);
-    EXPECT_EQ(*reinterpret_cast<bool*>(result), expected_result);
-  }
-#endif
-
   void TestStringValue(const string& expr, const string& expected_result) {
     StringValue* result;
     GetValue(expr, TYPE_STRING, reinterpret_cast<void**>(&result));
@@ -120,7 +113,6 @@ class ExprTest : public testing::Test {
                    lexical_cast<string>(t_max + 1));
     }
   }
-
 
   template <typename T> void TestNumericComparisons(bool test_boundaries) {
     T t_min = numeric_limits<T>::min();
@@ -228,17 +220,29 @@ class ExprTest : public testing::Test {
     TestValue(a_str + " % " + b_str, expected_type, cast_a % cast_b);
   }
 
-#if 0
-  template <typename T> void TestArithmeticOps(const T& op1, const T& op2) {
-    string add_expr = lexical_cast<string>(op1) + " + " + lexical_cast<string>(op2);
-    TestValue(add_expr, op1 + op2);
-  }
-#endif
-
-
  private:
   QueryExecutor executor_;
 };
+
+// TODO: Remove this specialization once the parser supports
+// int literals with value numeric_limits<int64_t>::min().
+// Currently the parser can handle negative int literals up to numeric_limits<int64_t>::min()+1.
+template <>
+void ExprTest::TestFixedPointComparisons<int64_t>(bool test_boundaries) {
+  int64_t t_min = numeric_limits<int64_t>::min() + 1;
+  int64_t t_max = numeric_limits<int64_t>::max();
+  TestLessThan(lexical_cast<string>(t_min), lexical_cast<string>(t_max));
+  TestEqual(lexical_cast<string>(t_min));
+  TestEqual(lexical_cast<string>(t_max));
+  if (test_boundaries) {
+    // this requires a cast of the second operand to a higher-resolution type
+    TestLessThan(lexical_cast<string>(t_min - 1),
+                 lexical_cast<string>(t_max));
+    // this requires a cast of the first operand to a higher-resolution type
+    TestLessThan(lexical_cast<string>(t_min),
+                 lexical_cast<string>(t_max + 1));
+  }
+}
 
 TEST_F(ExprTest, LiteralExprs) {
   TestFixedPointLimits<int8_t>(TYPE_TINYINT);
@@ -248,9 +252,8 @@ TEST_F(ExprTest, LiteralExprs) {
   TestFloatingPointLimits<float>(TYPE_FLOAT);
   TestFloatingPointLimits<double>(TYPE_DOUBLE);
 
-  // bool literals currently aren't supported
-  //TestValue("true", TYPE_BOOLEAN, true);
-  //TestValue("false", TYPE_BOOLEAN, false);
+  TestValue("true", TYPE_BOOLEAN, true);
+  TestValue("false", TYPE_BOOLEAN, false);
   TestStringValue("'test'", "test");
   // TODO: NULLs?
 }
@@ -356,11 +359,9 @@ TEST_F(ExprTest, ArithmeticExprs) {
   TestValue("- 1 --1", TYPE_TINYINT, -1);
 }
 
-#if 0
 // There are two tests of ranges, the second of which requires a cast
 // of the second operand to a higher-resolution type.
 TEST_F(ExprTest, BinaryPredicates) {
-  // bool
   TestLessThan("false", "true");
   TestEqual("false");
   TestEqual("true");
@@ -381,20 +382,20 @@ TEST_F(ExprTest, CompoundPredicates) {
   TestValue("TRUE OR FALSE", TYPE_BOOLEAN, true);
   TestValue("FALSE OR TRUE", TYPE_BOOLEAN, true);
   TestValue("FALSE OR FALSE", TYPE_BOOLEAN, false);
-  TestIsNull("TRUE AND NULL", TYPE_BOOLEAN);
-  TestValue("FALSE AND NULL", TYPE_BOOLEAN, false);
-  TestValue("TRUE OR NULL", TYPE_BOOLEAN, true);
-  TestIsNull("FALSE OR NULL", TYPE_BOOLEAN);
   TestValue("NOT TRUE", TYPE_BOOLEAN, false);
   TestValue("NOT FALSE", TYPE_BOOLEAN, true);
-  TestIsNull("NOT NULL", TYPE_BOOLEAN);
   TestValue("TRUE AND (TRUE OR FALSE)", TYPE_BOOLEAN, true);
   TestValue("(TRUE AND TRUE) OR FALSE", TYPE_BOOLEAN, true);
   TestValue("(TRUE OR FALSE) AND TRUE", TYPE_BOOLEAN, true);
-  TestValue("TRUE OR (FALSE AND TRUE)", TYPE_BOOLEAN, false);
-  TestValue("TRUE AND TRUE OR FALSE", TYPE_BOOLEAN, false);
+  TestValue("TRUE OR (FALSE AND TRUE)", TYPE_BOOLEAN, true);
+  TestValue("TRUE AND TRUE OR FALSE", TYPE_BOOLEAN, true);
+  // TODO: Uncomment once we have NULL literals.
+  //TestIsNull("TRUE AND NULL", TYPE_BOOLEAN);
+  //TestValue("FALSE AND NULL", TYPE_BOOLEAN, false);
+  //TestValue("TRUE OR NULL", TYPE_BOOLEAN, true);
+  //TestIsNull("FALSE OR NULL", TYPE_BOOLEAN);
+  //TestIsNull("NOT NULL", TYPE_BOOLEAN);
 }
-#endif
 
 }
 
