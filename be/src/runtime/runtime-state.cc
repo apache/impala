@@ -30,7 +30,7 @@ string RuntimeState::ErrorLog() const {
 string RuntimeState::FileErrors() const {
   stringstream out;
   for (int i = 0; i < file_errors_.size(); ++i) {
-    out << file_errors_[i].second << " errors in " << file_errors_[i].first;
+    out << file_errors_[i].second << " errors in " << file_errors_[i].first << endl;
   }
   return out.str();
 }

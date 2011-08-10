@@ -456,8 +456,11 @@ bool TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, 
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
       if (iequals(begin, "true")) {
         *reinterpret_cast<char*>(slot) = true;
-      } else {
+      } else if (iequals(begin, "false")) {
         *reinterpret_cast<char*>(slot) = false;
+      } else {
+        // Inconvertible value. Set to NULL after switch statement.
+        end = begin;
       }
       break;
     }
