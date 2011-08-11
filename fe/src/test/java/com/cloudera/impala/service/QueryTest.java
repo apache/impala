@@ -38,8 +38,8 @@ public class QueryTest {
       String query = queryFileParser.getQuery();
       ArrayList<String> expectedTypes = queryFileParser.getExpectedResult(0);
       ArrayList<String> expectedResults = queryFileParser.getExpectedResult(1);
-      TestUtils.runQuery(coordinator, query, abortOnError, maxErrors, expectedTypes,
-                         expectedResults, null, null, testErrorLog);
+      TestUtils.runQuery(coordinator, query, abortOnError, maxErrors, expectedTypes, expectedResults,
+          null, null, testErrorLog);
     }
     queryFileParser.close();
   }

@@ -7,6 +7,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
+import java.util.SortedMap;
+import java.util.TreeMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -22,6 +24,7 @@ import com.cloudera.impala.thrift.TResultRow;
 
 public class TestUtils {
   private final static Logger LOG = LoggerFactory.getLogger(TestUtils.class);
+  private final static String expectedFilePrefix = "file:";
 
   // Maps from uppercase type name to PrimitiveType
   private static Map<String, PrimitiveType> typeNameMap = new HashMap<String, PrimitiveType>();
@@ -34,6 +37,9 @@ public class TestUtils {
   /**
    * Do a line-by-line comparison of actual and expected output.
    * Comparison of the individual lines ignores whitespace.
+   * If an expected line starts with expectedFilePrefix,
+   * then the expected vs. actual comparison is successful if the actual string contains
+   * the expected line (ignoring the expectedFilePrefix prefix).
    *
    * @param actual
    * @param expected
@@ -43,13 +49,28 @@ public class TestUtils {
     int mismatch = -1; // line w/ mismatch
     int maxLen = Math.min(actual.length, expected.size());
     for (int i = 0; i < maxLen; ++i) {
+      String expectedStr = expected.get(i);
+      String actualStr = actual[i];
+      // Look for special prefixes in containsPrefixes.
+      boolean containsPrefix = expectedStr.startsWith(expectedFilePrefix);
+      if (containsPrefix) {
+        expectedStr = expectedStr.replaceFirst(expectedFilePrefix, "");
+        actualStr = actualStr.replaceFirst(expectedFilePrefix, "");
+      }
       // do a whitespace-insensitive comparison
-      Scanner a = new Scanner(actual[i]);
-      Scanner e = new Scanner(expected.get(i));
+      Scanner e = new Scanner(expectedStr);
+      Scanner a = new Scanner(actualStr);
       while (a.hasNext() && e.hasNext()) {
-        if (!a.next().equals(e.next())) {
-          mismatch = i;
-          break;
+        if (containsPrefix) {
+          if (!a.next().contains(e.next())) {
+            mismatch = i;
+            break;
+          }
+        } else {
+          if (!a.next().equals(e.next())) {
+            mismatch = i;
+            break;
+          }
         }
       }
       if (mismatch != -1) {
@@ -127,42 +148,6 @@ public class TestUtils {
   }
 
   /**
-   * Do an element-by-element comparison of actual and expected number of failures per file.
-   *
-   * @param actual
-   * @param expected
-   * @return an error message if actual does not match expected, "" otherwise.
-   */
-  public static String compareFileErrors(Map<String, Integer> actual, Map<String, Integer> expected) {
-    if (actual.size() != expected.size()) {
-      StringBuilder expectedMapStr = new StringBuilder();
-      for (Map.Entry<String, Integer> entry : expected.entrySet()) {
-        expectedMapStr.append(entry.getKey() + " " + entry.getValue() + "\n");
-      }
-      StringBuilder actualMapStr = new StringBuilder();
-      for (Map.Entry<String, Integer> entry : actual.entrySet()) {
-        actualMapStr.append(entry.getKey() + " " + entry.getValue() + "\n");
-      }
-      return "Unequal number of file errors. Found: " + actual.size() + ". Expected: "
-          + expected.size() + "\nActual Map:\n" + actualMapStr.toString() +
-          "\nExpected Map:\n" + expectedMapStr.toString();
-    }
-
-    // Iterate over expected and find actual.
-    for (Map.Entry<String, Integer> entry : expected.entrySet()) {
-      Integer numErrors = actual.get(entry.getKey());
-      if (numErrors == null) {
-        return "Expected a file error entry for: " + entry.getKey() + " but non actually found.";
-      }
-      if (numErrors.intValue() != entry.getValue().intValue()) {
-        return "Expected " + entry.getValue().intValue() + " errors in file " + entry.getKey() +
-        " but found " + numErrors.intValue() + " errors";
-      }
-    }
-    return "";
-  }
-
-  /**
    * Executes query, retrieving query results and error messages.
    * Compares the following actual vs. expected outputs:
    * 1. Actual and expected types of exprs in the query's select list.
@@ -194,12 +179,12 @@ public class TestUtils {
    */
   public static void runQuery(Coordinator coordinator, String query, boolean abortOnError, int maxErrors,
       ArrayList<String> expectedTypes, ArrayList<String> expectedResults,
-      ArrayList<String> expectedErrors, Map<String, Integer> expectedFileErrors,
+      ArrayList<String> expectedErrors, ArrayList<String> expectedFileErrors,
       StringBuilder testErrorLog) {
     LOG.info("running query " + query);
     TQueryRequest request = new TQueryRequest(query, true);
     ArrayList<String> errors = new ArrayList<String>();
-    Map<String, Integer> fileErrors = new HashMap<String, Integer>();
+    SortedMap<String, Integer> fileErrors = new TreeMap<String, Integer>();
     ArrayList<PrimitiveType> colTypes = new ArrayList<PrimitiveType>();
     ArrayList<String> colLabels = new ArrayList<String>();
     BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
@@ -264,8 +249,8 @@ public class TestUtils {
   }
 
   private static void compareErrors(String query,
-      ArrayList<String> actualErrors, Map<String, Integer> actualFileErrors,
-      ArrayList<String> expectedErrors, Map<String, Integer> expectedFileErrors,
+      ArrayList<String> actualErrors, SortedMap<String, Integer> actualFileErrors,
+      ArrayList<String> expectedErrors, ArrayList<String> expectedFileErrors,
       StringBuilder testErrorLog) {
     // Compare expected messages in error log.
     if (expectedErrors != null) {
@@ -287,7 +272,13 @@ public class TestUtils {
     }
     // Compare expected errors per file.
     if (expectedFileErrors != null) {
-      String fileErrorsResult = TestUtils.compareFileErrors(actualFileErrors, expectedFileErrors);
+      String[] actualFileErrorsArray = new String[actualFileErrors.size()];
+      int ix = 0;
+      for(SortedMap.Entry<String, Integer> entry : actualFileErrors.entrySet()) {
+        actualFileErrorsArray[ix] = "file: " + entry.getKey() + "," + entry.getValue();
+        ++ix;
+      }
+      String fileErrorsResult = TestUtils.compareOutput(actualFileErrorsArray, expectedFileErrors);
       if (!fileErrorsResult.isEmpty()) {
         fail("query:\n" + query + "\n" + fileErrorsResult);
       }

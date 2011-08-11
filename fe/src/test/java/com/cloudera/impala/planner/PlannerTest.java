@@ -19,7 +19,6 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.testutil.TestFileParser;
 import com.cloudera.impala.testutil.TestUtils;
-import com.cloudera.impala.thrift.TPlan;
 
 public class PlannerTest {
   private final static Logger LOG = LoggerFactory.getLogger(PlannerTest.class);
@@ -40,8 +39,6 @@ public class PlannerTest {
       AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
       Planner planner = new Planner();
       PlanNode plan = planner.createPlan(analysisResult.selectStmt, analysisResult.analyzer);
-      TPlan thriftPlan = plan.treeToThrift();
-      LOG.info(thriftPlan.toString() + "\n");
       String result = TestUtils.compareOutput(plan.getExplainString().split("\n"), expectedPlan);
       if (!result.isEmpty()) {
         fail("query:\n" + query + "\n" + result);

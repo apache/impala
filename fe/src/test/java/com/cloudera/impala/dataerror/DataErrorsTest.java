@@ -5,8 +5,6 @@ package com.cloudera.impala.dataerror;
 import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.junit.BeforeClass;
@@ -57,23 +55,14 @@ public class DataErrorsTest {
       while (expectedErrors.size() > lastLine) {
         expectedErrors.remove(expectedErrors.size() - 1);
       }
-      // Parse expected file errors.
-      ArrayList<String> expectedFileErrorStrings = queryFileParser.getExpectedResult(1);
-      Map<String, Integer> expectedFileErrors = new HashMap<String, Integer>();
-      for (String fileError : expectedFileErrorStrings) {
-        String[] fileErrorSplits = fileError.split(",");
-        Integer numErrors = null;
-        try {
-          numErrors = Integer.parseInt(fileErrorSplits[1]);
-          // We expect only one error for the first file if abort is requested.
-          if (abortOnError) {
-            expectedFileErrors.put(fileErrorSplits[0], 1);
-            break;
-          }
-          expectedFileErrors.put(fileErrorSplits[0], numErrors);
-        } catch (Exception e) {
-          fail("Could not parse file error string: " + fileError + "\n");
-        }
+      // File error entries must be sorted by filename within .test file.
+      ArrayList<String> expectedFileErrors = queryFileParser.getExpectedResult(1);
+      if (abortOnError && !expectedFileErrors.isEmpty()) {
+        String[] fileErrSplits = expectedFileErrors.get(0).split(",");
+        // We are expecting only a single file with a single error.
+        String expectedFileError = fileErrSplits[0] + ",1";
+        expectedFileErrors.clear();
+        expectedFileErrors.add(expectedFileError);
       }
       TestUtils.runQuery(coordinator, query, abortOnError, maxErrors, null, null, expectedErrors,
           expectedFileErrors, testErrorLog);
