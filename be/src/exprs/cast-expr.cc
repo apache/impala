@@ -1,11 +1,14 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
+#include <sstream>
 #include <glog/logging.h>
 
 #include "exprs/cast-expr.h"
 #include "exprs/functions.h"
 
 #include "gen-cpp/Exprs_types.h"
+
+using namespace std;
 
 namespace impala {
 
@@ -197,6 +200,12 @@ void CastExpr::Prepare(RuntimeState* state) {
     default:
       DCHECK(false) << "bad cast child type: " << TypeToString(children_[0]->type());
   }
+}
+
+string CastExpr::DebugString() const {
+  stringstream out;
+  out << "CastExpr(" << Expr::DebugString() << ")";
+  return out.str();
 }
 
 }

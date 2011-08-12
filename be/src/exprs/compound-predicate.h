@@ -3,6 +3,7 @@
 #ifndef IMPALA_EXPRS_COMPOUND_PREDICATE_H_
 #define IMPALA_EXPRS_COMPOUND_PREDICATE_H_
 
+#include <string>
 #include "exprs/predicate.h"
 #include "gen-cpp/Exprs_types.h"
 
@@ -15,6 +16,7 @@ class CompoundPredicate: public Predicate {
   CompoundPredicate(const TExprNode& node);
 
   virtual void Prepare(RuntimeState* state);
+  virtual std::string DebugString() const;
 
  private:
   const TExprOperator::type op_;

@@ -1,8 +1,12 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
+#include <sstream>
 #include <glog/logging.h>
 
-#include "compound-predicate.h"
+#include "exprs/compound-predicate.h"
+#include "util/debug-string-util.h"
+
+using namespace std;
 
 namespace impala {
 
@@ -78,6 +82,12 @@ void CompoundPredicate::Prepare(RuntimeState* state) {
     default:
       DCHECK(false) << "Invalid compound predicate op: " << op_;
   }
+}
+
+string CompoundPredicate::DebugString() const {
+  stringstream out;
+  out << "CompoundPredicate(op=" << op_ << " " << Expr::DebugString() << ")";
+  return out.str();
 }
 
 }

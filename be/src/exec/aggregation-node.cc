@@ -31,6 +31,7 @@ AggregationNode::AggregationNode(ObjectPool* pool, const TPlanNode& tnode)
     equals_fn_(this),
     agg_tuple_id_(tnode.agg_node.agg_tuple_id),
     agg_tuple_desc_(NULL),
+    singleton_output_tuple_(NULL),
     current_row_(NULL),
     tuple_pool_(new MemPool()) {
   // ignore return status for now
@@ -121,26 +122,41 @@ Status AggregationNode::Prepare(RuntimeState* state) {
 
 Status AggregationNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(children_[0]->Open(state));
+
+  if (grouping_exprs_.empty()) {
+    // create single output tuple now; we need to output something
+    // even if our input is empty
+    singleton_output_tuple_ = ConstructAggTuple(NULL);
+  }
+
   RowBatch batch(input_tuple_descs_, state->batch_size());
   while (true) {
     RETURN_IF_ERROR(children_[0]->GetNext(state, &batch));
     for (int i = 0; i < batch.num_rows(); ++i) {
       current_row_ = batch.GetRow(i);
-      // find(NULL) finds the entry for current_row_
-      HashTable::iterator entry = hash_tbl_->find(NULL);
-      if (entry == hash_tbl_->end()) {
-        // new entry
-        Tuple* agg_tuple = ConstructAggTuple(current_row_);
-        UpdateAggTuple(agg_tuple, current_row_);
-        hash_tbl_->insert(agg_tuple);
+      Tuple* agg_tuple;
+      if (singleton_output_tuple_ != NULL) {
+        agg_tuple = singleton_output_tuple_;
       } else {
-        UpdateAggTuple(*entry, current_row_);
+        // find(NULL) finds the entry for current_row_
+        HashTable::iterator entry = hash_tbl_->find(NULL);
+        if (entry == hash_tbl_->end()) {
+          // new entry
+          agg_tuple = ConstructAggTuple(current_row_);
+          hash_tbl_->insert(agg_tuple);
+        } else {
+          agg_tuple = *entry;
+        }
       }
+      UpdateAggTuple(agg_tuple, current_row_);
     }
     if (batch.num_rows() < batch.capacity()) break;
     batch.Reset();
   }
   RETURN_IF_ERROR(children_[0]->Close(state));
+  if (singleton_output_tuple_ != NULL) {
+    hash_tbl_->insert(singleton_output_tuple_);
+  }
 
   output_iterator_ = hash_tbl_->begin();
   return Status::OK;
@@ -345,13 +361,11 @@ void AggregationNode::UpdateAggTuple(Tuple* tuple, TupleRow* row) {
   }
 }
 
-// TODO: implement
 void AggregationNode::DebugString(int indentation_level, std::stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
   *out << "AggregationNode(tuple_id=" << agg_tuple_id_
        << " grouping_exprs=" << Expr::DebugString(grouping_exprs_)
-       << " agg_exprs=" << Expr::DebugString(aggregate_exprs_) << ")";
-  for (int i = 0; i < children_.size(); ++i) {
-    children_[i]->DebugString(indentation_level + 1, out);
-  }
+       << " agg_exprs=" << Expr::DebugString(aggregate_exprs_);
+  ExecNode::DebugString(indentation_level, out);
+  *out << ")";
 }

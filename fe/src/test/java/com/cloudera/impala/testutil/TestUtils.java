@@ -4,6 +4,7 @@ import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
@@ -177,7 +178,8 @@ public class TestUtils {
    *          Records error messages of failed tests to be reported at the very end of a test run.
    * @return an error message if actual does not match expected, "" otherwise.
    */
-  public static void runQuery(Coordinator coordinator, String query, boolean abortOnError, int maxErrors,
+  public static void runQuery(Coordinator coordinator, String query, int lineNum,
+      boolean abortOnError, int maxErrors,
       ArrayList<String> expectedTypes, ArrayList<String> expectedResults,
       ArrayList<String> expectedErrors, ArrayList<String> expectedFileErrors,
       StringBuilder testErrorLog) {
@@ -197,7 +199,9 @@ public class TestUtils {
       if (abortOnError && expectedErrors != null) {
         compareErrors(query, errors, fileErrors, expectedErrors, expectedFileErrors, testErrorLog);
       } else {
-        testErrorLog.append("error executing query '" + query + "':\n" + e.getMessage());
+        testErrorLog.append(
+            "line " + Integer.toString(lineNum) + ": error executing query '" + query +
+            "':\n" + e.getMessage());
       }
       return;
     }
@@ -227,12 +231,17 @@ public class TestUtils {
 
       // Concatenate columns separated by ","
       StringBuilder line = new StringBuilder();
-      for (TColumnValue val : resultRow.colVals) {
-        line.append(val.stringVal);
-        line.append(',');
+      Iterator<TColumnValue> colVal = resultRow.colVals.iterator();
+      for (int i = 0; i < colTypes.size(); ++i) {
+        if (i > 0) {
+          line.append(',');
+        }
+        if (colTypes.get(i) == PrimitiveType.STRING) {
+          line.append("'" + colVal.next().stringVal + "'");
+        } else {
+          line.append(colVal.next().stringVal);
+        }
       }
-      // remove trailing ','
-      line.deleteCharAt(line.length()-1);
       actualResults.add(line.toString());
     }
     // Compare expected results.

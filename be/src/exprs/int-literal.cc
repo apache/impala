@@ -3,8 +3,11 @@
 #include "int-literal.h"
 
 #include <glog/logging.h>
+#include <sstream>
 
 #include "gen-cpp/Exprs_types.h"
+
+using namespace std;
 
 namespace impala {
 
@@ -49,6 +52,7 @@ void* IntLiteral::ReturnBigintValue(Expr* e, TupleRow* row) {
 }
 
 void IntLiteral::Prepare(RuntimeState* state) {
+  Expr::Prepare(state);
   switch (type_) {
     case TYPE_TINYINT:
       compute_function_ = ReturnTinyintValue;
@@ -65,6 +69,12 @@ void IntLiteral::Prepare(RuntimeState* state) {
     default:
       DCHECK(false) << "IntLiteral::Prepare(): bad type: " << TypeToString(type_);
   }
+}
+
+string IntLiteral::DebugString() const {
+  stringstream out;
+  out << "IntLiteral(value=" << result_.bigint_val << ")";
+  return out.str();
 }
 
 }

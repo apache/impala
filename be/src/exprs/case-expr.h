@@ -3,6 +3,7 @@
 #ifndef IMPALA_EXPRS_CASE_EXPR_H_
 #define IMPALA_EXPRS_CASE_EXPR_H_
 
+#include <string>
 #include "expr.h"
 
 namespace impala {
@@ -16,6 +17,7 @@ class CaseExpr: public Expr {
   CaseExpr(const TExprNode& node);
 
   virtual void Prepare(RuntimeState* state);
+  virtual std::string DebugString() const;
 
  private:
   const bool has_case_expr_;

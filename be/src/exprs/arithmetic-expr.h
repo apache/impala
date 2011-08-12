@@ -3,8 +3,8 @@
 #ifndef IMPALA_EXPRS_ARITHMETIC_EXPR_H_
 #define IMPALA_EXPRS_ARITHMETIC_EXPR_H_
 
+#include <string>
 #include "exprs/expr.h"
-
 #include "gen-cpp/Exprs_types.h"
 
 namespace impala {
@@ -18,6 +18,7 @@ class ArithmeticExpr: public Expr {
   ArithmeticExpr(const TExprNode& node);
 
   virtual void Prepare(RuntimeState* state);
+  virtual std::string DebugString() const;
 
  private:
   const TExprOperator::type op_;

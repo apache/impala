@@ -2,7 +2,11 @@
 
 #include "literal-predicate.h"
 
+#include <sstream>
+
 #include "gen-cpp/Exprs_types.h"
+
+using namespace std;
 
 namespace impala {
 
@@ -17,7 +21,14 @@ LiteralPredicate::LiteralPredicate(const TExprNode& node)
 }
 
 void LiteralPredicate::Prepare(RuntimeState* state) {
+  Expr::Prepare(state);
   compute_function_ = ComputeFunction;
+}
+
+string LiteralPredicate::DebugString() const {
+  stringstream out;
+  out << "LiteralPredicate(value=" << result_.bool_val << ")";
+  return out.str();
 }
 
 }

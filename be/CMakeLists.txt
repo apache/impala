@@ -82,6 +82,7 @@ add_subdirectory(src/exprs)
 add_subdirectory(src/runtime)
 add_subdirectory(src/service)
 add_subdirectory(src/testutil)
+add_subdirectory(src/util)
 
 add_subdirectory(generated-sources/gen-cpp)
 
@@ -93,6 +94,7 @@ link_directories(
   ${CMAKE_SOURCE_DIR}/build/service
   ${CMAKE_SOURCE_DIR}/build/testutil
   ${CMAKE_SOURCE_DIR}/build/thrift
+  ${CMAKE_SOURCE_DIR}/build/util
 )
 
 # only generate statically linked libs and executables

@@ -32,6 +32,7 @@ import com.google.common.collect.Lists;
 // Note that <QUERY STRING> and <EXPECTED RESULT SECTIONS> can consist of multiple lines.
 public class TestFileParser {
   private final StringBuilder query = new StringBuilder();
+  private int lineNum = 0;
   private final StringBuilder confString = new StringBuilder();
   private final ArrayList<ArrayList<String>> expectedResultSections = Lists.newArrayList();
   private final String fileName;
@@ -69,14 +70,15 @@ public class TestFileParser {
     ArrayList<String> resultSection = null;
     while (scanner.hasNextLine()) {
       String line = scanner.nextLine();
+      ++lineNum;
       // ignore comments
       if (line.startsWith("//") || line.startsWith("#")) {
         continue;
       }
-      if (line.startsWith("=")) {
+      if (line.startsWith("====")) {
         break; // done w/ this query
       }
-      if (line.startsWith("-")) {
+      if (line.startsWith("----")) {
         // start of plan output section
         state = ParserState.EXPECTED_RESULT;
         resultSection = new ArrayList<String>();
@@ -124,5 +126,9 @@ public class TestFileParser {
 
   public String getQuery() {
     return query.toString();
+  }
+
+  public int getLineNum() {
+    return lineNum;
   }
 }

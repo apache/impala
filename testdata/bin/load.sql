@@ -42,3 +42,14 @@ LOAD DATA LOCAL INPATH '../testdata/target/AllTypesAgg/100107.txt' OVERWRITE INT
 LOAD DATA LOCAL INPATH '../testdata/target/AllTypesAgg/100108.txt' OVERWRITE INTO TABLE AllTypesAgg PARTITION(year=2010, month=1, day=8);
 LOAD DATA LOCAL INPATH '../testdata/target/AllTypesAgg/100109.txt' OVERWRITE INTO TABLE AllTypesAgg PARTITION(year=2010, month=1, day=9);
 LOAD DATA LOCAL INPATH '../testdata/target/AllTypesAgg/100110.txt' OVERWRITE INTO TABLE AllTypesAgg PARTITION(year=2010, month=1, day=10);
+
+LOAD DATA LOCAL INPATH '../testdata/target/AllTypesAggNoNulls/100101.txt' OVERWRITE INTO TABLE AllTypesAggNoNulls PARTITION(year=2010, month=1, day=1);
+LOAD DATA LOCAL INPATH '../testdata/target/AllTypesAggNoNulls/100102.txt' OVERWRITE INTO TABLE AllTypesAggNoNulls PARTITION(year=2010, month=1, day=2);
+LOAD DATA LOCAL INPATH '../testdata/target/AllTypesAggNoNulls/100103.txt' OVERWRITE INTO TABLE AllTypesAggNoNulls PARTITION(year=2010, month=1, day=3);
+LOAD DATA LOCAL INPATH '../testdata/target/AllTypesAggNoNulls/100104.txt' OVERWRITE INTO TABLE AllTypesAggNoNulls PARTITION(year=2010, month=1, day=4);
+LOAD DATA LOCAL INPATH '../testdata/target/AllTypesAggNoNulls/100105.txt' OVERWRITE INTO TABLE AllTypesAggNoNulls PARTITION(year=2010, month=1, day=5);
+LOAD DATA LOCAL INPATH '../testdata/target/AllTypesAggNoNulls/100106.txt' OVERWRITE INTO TABLE AllTypesAggNoNulls PARTITION(year=2010, month=1, day=6);
+LOAD DATA LOCAL INPATH '../testdata/target/AllTypesAggNoNulls/100107.txt' OVERWRITE INTO TABLE AllTypesAggNoNulls PARTITION(year=2010, month=1, day=7);
+LOAD DATA LOCAL INPATH '../testdata/target/AllTypesAggNoNulls/100108.txt' OVERWRITE INTO TABLE AllTypesAggNoNulls PARTITION(year=2010, month=1, day=8);
+LOAD DATA LOCAL INPATH '../testdata/target/AllTypesAggNoNulls/100109.txt' OVERWRITE INTO TABLE AllTypesAggNoNulls PARTITION(year=2010, month=1, day=9);
+LOAD DATA LOCAL INPATH '../testdata/target/AllTypesAggNoNulls/100110.txt' OVERWRITE INTO TABLE AllTypesAggNoNulls PARTITION(year=2010, month=1, day=10);

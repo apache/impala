@@ -204,6 +204,10 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
       *expr = pool->Add(new StringLiteral(texpr_node));
       return Status::OK;
     }
+    default:
+      stringstream os;
+      os << "Unknown expr node type: " << texpr_node.node_type;
+      return Status(os.str());
   }
 }
 
@@ -279,12 +283,17 @@ void Expr::Prepare(const std::vector<Expr*>& exprs, RuntimeState* state) {
   }
 }
 
-std::string Expr::DebugString() const {
+string Expr::DebugString() const {
   // TODO: implement partial debug string for member vars
-  return "";
+  stringstream out;
+  out << "type=" << TypeToString(type_);
+  if (!children_.empty()) {
+    out << " children=" << DebugString(children_);
+  }
+  return out.str();
 }
 
-std::string Expr::DebugString(const std::vector<Expr*>& exprs) {
+string Expr::DebugString(const std::vector<Expr*>& exprs) {
   stringstream out;
   out << "[";
   for (int i = 0; i < exprs.size(); ++i) {

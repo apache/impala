@@ -1,11 +1,14 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
+#include <sstream>
 #include <glog/logging.h>
 
 #include "exprs/arithmetic-expr.h"
 #include "exprs/functions.h"
-
+#include "util/debug-string-util.h"
 #include "gen-cpp/Exprs_types.h"
+
+using namespace std;
 
 namespace impala {
 
@@ -220,6 +223,12 @@ void ArithmeticExpr::Prepare(RuntimeState* state) {
     default:
       DCHECK(false) << "bad arithmetic op: " << op_;
   }
+}
+
+string ArithmeticExpr::DebugString() const {
+  stringstream out;
+  out << "ArithmeticExpr(op=" << op_ << " " << Expr::DebugString() << ")";
+  return out.str();
 }
 
 }

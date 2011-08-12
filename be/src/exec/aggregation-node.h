@@ -83,6 +83,7 @@ class AggregationNode : public ExecNode {
   std::vector<Expr*> aggregate_exprs_;
   TupleId agg_tuple_id_;
   TupleDescriptor* agg_tuple_desc_;
+  Tuple* singleton_output_tuple_;  // result of aggregation w/o GROUP BY
   TupleRow* current_row_;  // needed for GroupingExprHash/-Equals
   std::vector<TupleDescriptor*> input_tuple_descs_;
 

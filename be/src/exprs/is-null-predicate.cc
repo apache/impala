@@ -1,8 +1,12 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
-#include "is-null-predicate.h"
+#include "exprs/is-null-predicate.h"
+
+#include <sstream>
 
 #include "gen-cpp/Exprs_types.h"
+
+using namespace std;
 
 namespace impala {
 
@@ -21,7 +25,14 @@ IsNullPredicate::IsNullPredicate(const TExprNode& node)
 }
 
 void IsNullPredicate::Prepare(RuntimeState* state) {
+  Expr::Prepare(state);
   compute_function_ = ComputeFunction;
+}
+
+string IsNullPredicate::DebugString() const {
+  stringstream out;
+  out << "IsNullPredicate(not_null=" << is_not_null_ << Expr::DebugString() << ")";
+  return out.str();
 }
 
 }

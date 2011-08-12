@@ -2,6 +2,7 @@
 
 #include "runtime/descriptors.h"
 
+#include <ios>
 #include <sstream>
 
 #include "common/object-pool.h"
@@ -50,9 +51,14 @@ std::string TypeToString(PrimitiveType t) {
 
 string NullIndicatorOffset::DebugString() const {
   stringstream out;
-  out << "(offset=" << byte_offset << " mask=" << static_cast<int>(bit_mask)
-      << ")";
+  out << "(offset=" << byte_offset
+      << " mask=" << hex << static_cast<int>(bit_mask) << dec << ")";
   return out.str();
+}
+
+ostream& operator<<(ostream& os, const NullIndicatorOffset& null_indicator) {
+  os << null_indicator.DebugString();
+  return os;
 }
 
 SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc)

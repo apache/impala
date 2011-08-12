@@ -48,9 +48,9 @@ public class CoordinatorTest {
 
   @Test
   public void runTest() throws ImpalaException {
-    //runTestSuccess("select tinyint_col, int_col, id from alltypessmall", 100);
-    runTestSuccess("select tinyint_col, avg(float_col) from alltypesagg where day=1 group by 1 having avg(float_col) > 551", 4);
-    runTestSuccess("select sum(double_col), count(double_col), avg(double_col) from alltypessmall", 1);
+    runTestSuccess("select tinyint_col, int_col, id from alltypessmall", 100);
+    runTestSuccess("select sum(double_col), count(double_col), avg(double_col) " +
+                   "from alltypessmall", 1);
 
     // Syntax error.
     runTestFailure("slect tinyint_col from alltypessmall", 100);

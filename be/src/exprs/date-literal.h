@@ -3,6 +3,7 @@
 #ifndef IMPALA_EXPRS_DATE_LITERAL_H_
 #define IMPALA_EXPRS_DATE_LITERAL_H_
 
+#include <string>
 #include "exprs/expr.h"
 
 namespace impala {

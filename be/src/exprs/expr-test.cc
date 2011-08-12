@@ -44,7 +44,7 @@ class ExprTest : public testing::Test {
     string stmt = "select " + expr;
     vector<PrimitiveType> result_types;
     Status status = executor_.Exec(stmt, &result_types, false, 0);
-    ASSERT_TRUE(status.ok()) << status.GetErrorMsg();
+    ASSERT_TRUE(status.ok()) << "stmt: " << stmt << "\nerror: " << status.GetErrorMsg();
     vector<void*> result_row;
     ASSERT_TRUE(executor_.FetchResult(&result_row).ok());
     ASSERT_EQ(1, result_row.size());
@@ -99,69 +99,137 @@ class ExprTest : public testing::Test {
   template <typename T> void TestFixedPointComparisons(bool test_boundaries) {
     int64_t t_min = numeric_limits<T>::min();
     int64_t t_max = numeric_limits<T>::max();
-    TestLessThan(lexical_cast<string>(t_min), lexical_cast<string>(t_max));
-    TestEqual(lexical_cast<string>(t_min));
-    TestEqual(lexical_cast<string>(t_max));
+    TestLessThan(lexical_cast<string>(t_min), lexical_cast<string>(t_max), true);
+    TestEqual(lexical_cast<string>(t_min), true);
+    TestEqual(lexical_cast<string>(t_max), true);
     if (test_boundaries) {
       // this requires a cast of the second operand to a higher-resolution type
       TestLessThan(lexical_cast<string>(t_min - 1),
-                   lexical_cast<string>(t_max));
+                   lexical_cast<string>(t_max), true);
       // this requires a cast of the first operand to a higher-resolution type
       TestLessThan(lexical_cast<string>(t_min),
-                   lexical_cast<string>(t_max + 1));
+                   lexical_cast<string>(t_max + 1), true);
     }
   }
 
-  template <typename T> void TestNumericComparisons(bool test_boundaries) {
+  template <typename T> void TestFloatingPointComparisons(bool test_boundaries) {
+    // t_min is the smallest positive value
     T t_min = numeric_limits<T>::min();
     T t_max = numeric_limits<T>::max();
-    TestLessThan(lexical_cast<string>(t_min), lexical_cast<string>(t_max));
-    TestEqual(lexical_cast<string>(t_min));
-    TestEqual(lexical_cast<string>(t_max));
+    TestLessThan(lexical_cast<string>(t_min), lexical_cast<string>(t_max), true);
+    TestLessThan(lexical_cast<string>(-1.0 * t_max), lexical_cast<string>(t_max), true);
+    TestEqual(lexical_cast<string>(t_min), true);
+    TestEqual(lexical_cast<string>(t_max), true);
     if (test_boundaries) {
       // this requires a cast of the second operand to a higher-resolution type
       TestLessThan(lexical_cast<string>(numeric_limits<T>::min() - 1),
-                   lexical_cast<string>(numeric_limits<T>::max()));
+                   lexical_cast<string>(numeric_limits<T>::max()), true);
       // this requires a cast of the first operand to a higher-resolution type
       TestLessThan(lexical_cast<string>(numeric_limits<T>::min()),
-                   lexical_cast<string>(numeric_limits<T>::max() + 1));
+                   lexical_cast<string>(numeric_limits<T>::max() + 1), true);
     }
   }
 
-  // Generate all possible tests for combinations of <smaller> <op> <larger>
-  void TestLessThan(const string& smaller, const string& larger) {
+  // Generate all possible tests for combinations of <smaller> <op> <larger>.
+  // Also test conversions from strings.
+  void TestLessThan(const string& smaller, const string& larger, bool compare_strings) {
+    // disabled for now, because our implicit casts from strings are broken
+    // and might return analysis errors when they shouldn't
+    // TODO: fix and re-enable tests
+    compare_strings = false;
     string eq_pred = smaller + " = " + larger;
     TestValue(eq_pred, TYPE_BOOLEAN, false);
+    if (compare_strings) {
+      eq_pred = smaller + " = '" + larger + "'";
+      TestValue(eq_pred, TYPE_BOOLEAN, false);
+    }
     string ne_pred = smaller + " != " + larger;
     TestValue(ne_pred, TYPE_BOOLEAN, true);
+    if (compare_strings) {
+      ne_pred = smaller + " != '" + larger + "'";
+      TestValue(ne_pred, TYPE_BOOLEAN, true);
+    }
     string ne2_pred = smaller + " <> " + larger;
     TestValue(ne2_pred, TYPE_BOOLEAN, true);
+    if (compare_strings) {
+      ne2_pred = smaller + " <> '" + larger + "'";
+      TestValue(ne2_pred, TYPE_BOOLEAN, true);
+    }
     string lt_pred = smaller + " < " + larger;
     TestValue(lt_pred, TYPE_BOOLEAN, true);
+    if (compare_strings) {
+      lt_pred = smaller + " < '" + larger + "'";
+      TestValue(lt_pred, TYPE_BOOLEAN, true);
+    }
     string le_pred = smaller + " <= " + larger;
     TestValue(le_pred, TYPE_BOOLEAN, true);
+    if (compare_strings) {
+      le_pred = smaller + " <= '" + larger + "'";
+      TestValue(le_pred, TYPE_BOOLEAN, true);
+    }
     string gt_pred = smaller + " > " + larger;
     TestValue(gt_pred, TYPE_BOOLEAN, false);
+    if (compare_strings) {
+      gt_pred = smaller + " > '" + larger + "'";
+      TestValue(gt_pred, TYPE_BOOLEAN, false);
+    }
     string ge_pred = smaller + " >= " + larger;
     TestValue(ge_pred, TYPE_BOOLEAN, false);
+    if (compare_strings) {
+      ge_pred = smaller + " >= '" + larger + "'";
+      TestValue(ge_pred, TYPE_BOOLEAN, false);
+    }
   }
 
   // Generate all possible tests for combinations of <value> <op> <value>
-  void TestEqual(const string& value) {
+  // Also test conversions from strings.
+  void TestEqual(const string& value, bool compare_strings) {
+    // disabled for now, because our implicit casts from strings are broken
+    // and might return analysis errors when they shouldn't
+    // TODO: fix and re-enable tests
+    compare_strings = false;
     string eq_pred = value + " = " + value;
     TestValue(eq_pred, TYPE_BOOLEAN, true);
+    if (compare_strings) {
+      eq_pred = value + " = '" + value + "'";
+      TestValue(eq_pred, TYPE_BOOLEAN, true);
+    }
     string ne_pred = value + " != " + value;
     TestValue(ne_pred, TYPE_BOOLEAN, false);
+    if (compare_strings)  {
+      ne_pred = value + " != '" + value + "'";
+      TestValue(ne_pred, TYPE_BOOLEAN, false);
+    }
     string ne2_pred = value + " <> " + value;
     TestValue(ne2_pred, TYPE_BOOLEAN, false);
+    if (compare_strings)  {
+      ne2_pred = value + " <> '" + value + "'";
+      TestValue(ne2_pred, TYPE_BOOLEAN, false);
+    }
     string lt_pred = value + " < " + value;
     TestValue(lt_pred, TYPE_BOOLEAN, false);
+    if (compare_strings)  {
+      lt_pred = value + " < '" + value + "'";
+      TestValue(lt_pred, TYPE_BOOLEAN, false);
+    }
     string le_pred = value + " <= " + value;
     TestValue(le_pred, TYPE_BOOLEAN, true);
+    if (compare_strings)  {
+      le_pred = value + " <= '" + value + "'";
+      TestValue(le_pred, TYPE_BOOLEAN, true);
+    }
     string gt_pred = value + " > " + value;
     TestValue(gt_pred, TYPE_BOOLEAN, false);
+    if (compare_strings)  {
+      gt_pred = value + " > '" + value + "'";
+      TestValue(gt_pred, TYPE_BOOLEAN, false);
+    }
     string ge_pred = value + " >= " + value;
     TestValue(ge_pred, TYPE_BOOLEAN, true);
+    if (compare_strings)  {
+      ge_pred = value + " >= '" + value + "'";
+      TestValue(ge_pred, TYPE_BOOLEAN, true);
+    }
   }
 
   template <typename T> void TestFixedPointLimits(PrimitiveType type) {
@@ -177,8 +245,13 @@ class ExprTest : public testing::Test {
   }
 
   template <typename T> void TestFloatingPointLimits(PrimitiveType type) {
+    // numeric_limits<>::min() is the smallest positive value
     TestValue(lexical_cast<string>(numeric_limits<T>::min()), type,
               numeric_limits<T>::min());
+    TestValue(lexical_cast<string>(-1.0 * numeric_limits<T>::min()), type,
+              -1.0 * numeric_limits<T>::min());
+    TestValue(lexical_cast<string>(-1.0 * numeric_limits<T>::max()), type,
+              -1.0 * numeric_limits<T>::max());
     TestValue(lexical_cast<string>(numeric_limits<T>::max() - 1.0), type,
               numeric_limits<T>::max());
   }
@@ -201,7 +274,8 @@ class ExprTest : public testing::Test {
         static_cast<double>(a) / static_cast<double>(b));
   }
 
-  // Test int ops that promote to assignment compatible type: BITAND, BITOR, BITXOR, BITNOT, INT_DIVIDE, MOD.
+  // Test int ops that promote to assignment compatible type: BITAND, BITOR, BITXOR,
+  // BITNOT, INT_DIVIDE, MOD.
   // As a convention we use RightOp should denote the higher resolution type.
   template <typename LeftOp, typename RightOp>
   void TestVariableResultTypeIntOps(LeftOp a, RightOp b, PrimitiveType expected_type) {
@@ -224,21 +298,22 @@ class ExprTest : public testing::Test {
 
 // TODO: Remove this specialization once the parser supports
 // int literals with value numeric_limits<int64_t>::min().
-// Currently the parser can handle negative int literals up to numeric_limits<int64_t>::min()+1.
+// Currently the parser can handle negative int literals up to
+// numeric_limits<int64_t>::min()+1.
 template <>
 void ExprTest::TestFixedPointComparisons<int64_t>(bool test_boundaries) {
   int64_t t_min = numeric_limits<int64_t>::min() + 1;
   int64_t t_max = numeric_limits<int64_t>::max();
-  TestLessThan(lexical_cast<string>(t_min), lexical_cast<string>(t_max));
-  TestEqual(lexical_cast<string>(t_min));
-  TestEqual(lexical_cast<string>(t_max));
+  TestLessThan(lexical_cast<string>(t_min), lexical_cast<string>(t_max), true);
+  TestEqual(lexical_cast<string>(t_min), true);
+  TestEqual(lexical_cast<string>(t_max), true);
   if (test_boundaries) {
     // this requires a cast of the second operand to a higher-resolution type
     TestLessThan(lexical_cast<string>(t_min - 1),
-                 lexical_cast<string>(t_max));
+                 lexical_cast<string>(t_max), true);
     // this requires a cast of the first operand to a higher-resolution type
     TestLessThan(lexical_cast<string>(t_min),
-                 lexical_cast<string>(t_max + 1));
+                 lexical_cast<string>(t_max + 1), true);
   }
 }
 
@@ -257,7 +332,6 @@ TEST_F(ExprTest, LiteralExprs) {
 }
 
 TEST_F(ExprTest, ArithmeticExprs) {
-
   // Test float ops.
   TestFixedResultTypeOps<float, float, double>(min_float_values_[TYPE_FLOAT],
       min_float_values_[TYPE_FLOAT], TYPE_DOUBLE);
@@ -360,15 +434,15 @@ TEST_F(ExprTest, ArithmeticExprs) {
 // There are two tests of ranges, the second of which requires a cast
 // of the second operand to a higher-resolution type.
 TEST_F(ExprTest, BinaryPredicates) {
-  TestLessThan("false", "true");
-  TestEqual("false");
-  TestEqual("true");
+  TestLessThan("false", "true", false);
+  TestEqual("false", false);
+  TestEqual("true", false);
   TestFixedPointComparisons<int8_t>(true);
   TestFixedPointComparisons<int16_t>(true);
   TestFixedPointComparisons<int32_t>(true);
   TestFixedPointComparisons<int64_t>(false);
-  TestNumericComparisons<float>(true);
-  TestNumericComparisons<double>(false);
+  TestFloatingPointComparisons<float>(true);
+  TestFloatingPointComparisons<double>(false);
 }
 
 TEST_F(ExprTest, CompoundPredicates) {
@@ -392,6 +466,11 @@ TEST_F(ExprTest, CompoundPredicates) {
   TestValue("TRUE OR NULL", TYPE_BOOLEAN, true);
   TestIsNull("FALSE OR NULL", TYPE_BOOLEAN);
   TestIsNull("NOT NULL", TYPE_BOOLEAN);
+}
+
+TEST_F(ExprTest, IsNullPredicate) {
+  TestValue("5 IS NULL", TYPE_BOOLEAN, false);
+  TestValue("5 IS NOT NULL", TYPE_BOOLEAN, true);
 }
 
 }

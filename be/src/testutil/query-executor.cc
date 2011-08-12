@@ -142,7 +142,6 @@ Status QueryExecutor::Exec(const std::string& query, vector<PrimitiveType>* col_
   ExecNode* plan_root = NULL;;
   if (request.__isset.plan) {
     RETURN_IF_ERROR(ExecNode::CreateTree(pool_.get(), request.plan, &plan_root));
-    VLOG(1) << plan_root->DebugString();
   }
   DescriptorTbl* descs = NULL;;
   if (request.__isset.descTbl) {
@@ -164,7 +163,10 @@ Status QueryExecutor::Exec(const std::string& query, vector<PrimitiveType>* col_
     select_list_exprs_[i]->Prepare(runtime_state);
     if (col_types != NULL) col_types->push_back(select_list_exprs_[i]->type());
   }
-  if (plan_root != NULL) executor_->Exec();
+  if (plan_root != NULL) {
+    executor_->Exec();
+    VLOG(1) << plan_root->DebugString();
+  }
   eos_ = false;
   next_row_ = 0;
 

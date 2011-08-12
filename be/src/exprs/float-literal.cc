@@ -2,9 +2,12 @@
 
 #include "float-literal.h"
 
+#include <sstream>
 #include <glog/logging.h>
 
 #include "gen-cpp/Exprs_types.h"
+
+using namespace std;
 
 namespace impala {
 
@@ -33,6 +36,7 @@ void* FloatLiteral::ReturnDoubleValue(Expr* e, TupleRow* row) {
 }
 
 void FloatLiteral::Prepare(RuntimeState* state) {
+  Expr::Prepare(state);
   switch (type_) {
     case TYPE_FLOAT:
       compute_function_ = ReturnFloatValue;
@@ -43,6 +47,12 @@ void FloatLiteral::Prepare(RuntimeState* state) {
     default:
       DCHECK(false) << "FloatLiteral::Prepare(): bad type: " << TypeToString(type_);
   }
+}
+
+string FloatLiteral::DebugString() const {
+  stringstream out;
+  out << "FloatLiteral(value=" << result_.double_val << ")";
+  return out.str();
 }
 
 }

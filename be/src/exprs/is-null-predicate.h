@@ -3,6 +3,7 @@
 #ifndef IMPALA_EXPRS_IS_NULL_PREDICATE_H_
 #define IMPALA_EXPRS_IS_NULL_PREDICATE_H_
 
+#include <string>
 #include "exprs/predicate.h"
 
 namespace impala {
@@ -16,6 +17,7 @@ class IsNullPredicate: public Predicate {
   IsNullPredicate(const TExprNode& node);
 
   virtual void Prepare(RuntimeState* state);
+  virtual std::string DebugString() const;
 
  private:
   const bool is_not_null_;

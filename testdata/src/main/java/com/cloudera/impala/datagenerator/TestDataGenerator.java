@@ -34,7 +34,8 @@ class TestDataGenerator {
     }
   }
 
-  private static void GenerateAllTypesAggData(String dir) throws IOException {
+  private static void GenerateAllTypesAggData(String dir, boolean writeNulls)
+      throws IOException {
     int startYear = 2010;
     GregorianCalendar date = new GregorianCalendar(startYear, Calendar.JANUARY, 1);
     GregorianCalendar endDate = (GregorianCalendar) date.clone();
@@ -42,7 +43,7 @@ class TestDataGenerator {
     while (date.before(endDate)) {
       GregorianCalendar nextDay = (GregorianCalendar) date.clone();
       nextDay.add(Calendar.DAY_OF_MONTH, 1);
-      GenerateAllTypesPartition(dir, date, nextDay, 1000, 1000, true);
+      GenerateAllTypesPartition(dir, date, nextDay, 1000, 1000, writeNulls);
       date = nextDay;
     }
   }
@@ -64,7 +65,6 @@ class TestDataGenerator {
         short smallint_col = (short) (int_col % 100);
         long bigint_col = int_col * 10;
         float float_col = (float) (1.1 * int_col);
-        //float float_col = (byte) (1.1 * int_col);
         double double_col = 10.1 * int_col;
         String date_string_col = df.format(date.getTime());
         String string_col = String.valueOf(int_col);
@@ -73,7 +73,7 @@ class TestDataGenerator {
             (writeNulls && smallint_col == 0 ? "" : Short.toString(smallint_col)),
             (writeNulls && int_col == 0 ? "" : Integer.toString(int_col)),
             (writeNulls && bigint_col == 0 ? "" : Long.toString(bigint_col)));
-        writer.format("%s,%s,'%s','%s'\n",
+        writer.format("%s,%s,%s,%s\n",
             (writeNulls && int_col == 0 ? "" : Float.toString(float_col)),
             (writeNulls && int_col == 0 ? "" : Double.toString(double_col)),
             date_string_col, string_col);
@@ -98,22 +98,28 @@ class TestDataGenerator {
     }
     
     // Generate AllTypes
-    String allTypesDirName = args[0] + "/AllTypes";
-    File allTypesDir = new File(allTypesDirName);
-    allTypesDir.mkdirs();    
-    GenerateAllTypesData(allTypesDirName, DEFAULT_NUM_PARTITIONS,
+    String dirName = args[0] + "/AllTypes";
+    File dir = new File(dirName);
+    dir.mkdirs();    
+    GenerateAllTypesData(dirName, DEFAULT_NUM_PARTITIONS,
         DEFAULT_MAX_TUPLES_PER_PARTITION);
     
     // Generate AllTypesSmall
-    String allTypesSmallDirName = args[0] + "/AllTypesSmall";
-    File allTypesSmallDir = new File(allTypesSmallDirName);
-    allTypesSmallDir.mkdirs();
-    GenerateAllTypesData(allTypesSmallDirName, 4, 25);
+    dirName = args[0] + "/AllTypesSmall";
+    dir = new File(dirName);
+    dir.mkdirs();
+    GenerateAllTypesData(dirName, 4, 25);
 
     // Generate AllTypesAgg
-    String allTypesAggDirName = args[0] + "/AllTypesAgg";
-    File allTypesAggDir = new File(allTypesAggDirName);
-    allTypesAggDir.mkdirs();
-    GenerateAllTypesAggData(allTypesAggDirName);
+    dirName = args[0] + "/AllTypesAgg";
+    dir = new File(dirName);
+    dir.mkdirs();
+    GenerateAllTypesAggData(dirName, true);
+
+    // Generate AllTypesAgg w/o nulls
+    dirName = args[0] + "/AllTypesAggNoNulls";
+    dir = new File(dirName);
+    dir.mkdirs();
+    GenerateAllTypesAggData(dirName, false);
   }
 }

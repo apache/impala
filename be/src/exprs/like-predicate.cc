@@ -1,8 +1,11 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
+#include <sstream>
 #include <glog/logging.h>
 
 #include "like-predicate.h"
+
+using namespace std;
 
 namespace impala {
 
@@ -21,6 +24,7 @@ LikePredicate::LikePredicate(const TExprNode& node)
 }
 
 void LikePredicate::Prepare(RuntimeState* state) {
+  Expr::Prepare(state);
   switch (op_) {
     case TExprOperator::LIKE:
       compute_function_ = LikeFunction;
@@ -32,6 +36,12 @@ void LikePredicate::Prepare(RuntimeState* state) {
     default:
       DCHECK(false) << "bad LIKE op: " << op_;
   }
+}
+
+string LikePredicate::DebugString() const {
+  stringstream out;
+  out << "LikePredicate(op=" << op_ << Expr::DebugString() << ")";
+  return out.str();
 }
 
 }

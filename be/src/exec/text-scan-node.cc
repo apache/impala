@@ -296,15 +296,8 @@ Status TextScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, i
       *row_idx = row_batch->AddRow();
       current_row = row_batch->GetRow(*row_idx);
       current_row->SetTuple(tuple_idx_, tuple_);
-
-      // Materialize partition-key values (if any).
-      for (int i = 0; i < key_idx_to_slot_idx_.size(); ++i) {
-        int expr_idx = file_idx_ * num_partition_keys_ + key_idx_to_slot_idx_[i].first;
-        Expr* expr = key_values_[expr_idx];
-        int slot_idx = key_idx_to_slot_idx_[i].second;
-        RawValue::Write(expr->GetValue(NULL), tuple_, tuple_desc_->slots()[slot_idx],
-                        var_len_pool_.get());
-      }
+      // don't materialize partition key values at this point, we might
+      // not find a matching tuple until we start reading a new file
     }
 
     // 1. Determine action based on current character:
@@ -415,6 +408,16 @@ Status TextScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, i
       *column_idx = 0;
       line_start = file_buf_ptr_;
       boundary_row_.clear();
+
+      // Materialize partition-key values (if any).
+      for (int i = 0; i < key_idx_to_slot_idx_.size(); ++i) {
+        int expr_idx = file_idx_ * num_partition_keys_ + key_idx_to_slot_idx_[i].first;
+        Expr* expr = key_values_[expr_idx];
+        int slot_idx = key_idx_to_slot_idx_[i].second;
+        RawValue::Write(expr->GetValue(NULL), tuple_, tuple_desc_->slots()[slot_idx],
+                        var_len_pool_.get());
+      }
+
       if (EvalConjuncts(current_row)) {
         row_batch->CommitLastRow();
         char* new_tuple = reinterpret_cast<char*>(tuple_);
@@ -427,8 +430,9 @@ Status TextScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, i
           return Status::OK;
         }
       } else {
-        // make sure to reset null indicators since we're overwriting
-        // the tuple assembled for the previous row
+        // Make sure to reset null indicators since we're overwriting
+        // the tuple assembled for the previous row;
+        // this also wipes out materialized partition key values.
         tuple_->Init(tuple_desc_->byte_size());
       }
     }
@@ -554,8 +558,7 @@ void TextScanNode::UnescapeString(const char* src, char* dest, int* len) {
 
 void TextScanNode::DebugString(int indentation_level, std::stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
-  *out << "TextScanNode(tupleid=" << tuple_id_ << " files[" << join(files_, ",") << "])" << endl;
-  for (int i = 0; i < children_.size(); ++i) {
-    children_[i]->DebugString(indentation_level + 1, out);
-  }
+  *out << "TextScanNode(tupleid=" << tuple_id_ << " files[" << join(files_, ",");
+  ExecNode::DebugString(indentation_level, out);
+  *out << "])" << endl;
 }

@@ -34,6 +34,9 @@ CREATE TABLE AllTypesAgg (
 partitioned by (year int, month int, day int)
 row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
 
+DROP TABLE IF EXISTS AllTypesAggNoNulls;
+CREATE TABLE AllTypesAggNoNulls LIKE AllTypesAgg;
+
 DROP TABLE IF EXISTS DelimErrorTable;
 CREATE TABLE DelimErrorTable (
   id int,

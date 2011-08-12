@@ -2,7 +2,11 @@
 
 #include "string-literal.h"
 
+#include <sstream>
+
 #include "gen-cpp/Exprs_types.h"
+
+using namespace std;
 
 namespace impala {
 
@@ -17,7 +21,14 @@ void* StringLiteral::ComputeFunction(Expr* e, TupleRow* row) {
 }
 
 void StringLiteral::Prepare(RuntimeState* state) {
+  Expr::Prepare(state);
   compute_function_ = ComputeFunction;
+}
+
+string StringLiteral::DebugString() const {
+  stringstream out;
+  out << "StringLiteral(value=" << result_.string_data << ")";
+  return out.str();
 }
 
 }

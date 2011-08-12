@@ -4,6 +4,7 @@
 #define IMPALA_EXEC_EXEC_NODE_H
 
 #include <vector>
+#include <sstream>
 
 #include "common/status.h"
 
@@ -61,7 +62,7 @@ class ExecNode {
   //   indentation_level: Current level in plan tree.
   // Output parameters:
   //   out: Stream to accumulate debug string.
-  virtual void DebugString(int indentation_level, std::stringstream* out) const = 0;
+  virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  protected:
   std::vector<Expr*> conjuncts_;

@@ -3,8 +3,8 @@
 #ifndef IMPALA_EXPRS_AGG_EXPR_H_
 #define IMPALA_EXPRS_AGG_EXPR_H_
 
+#include <string>
 #include "expr.h"
-
 #include "gen-cpp/Exprs_types.h"
 
 namespace impala {
@@ -16,6 +16,7 @@ class AggregateExpr: public Expr {
   TExprOperator::type op() const { return op_; }
   bool is_star() const { return is_star_; }
   bool is_distinct() const { return is_distinct_; }
+  virtual std::string DebugString() const;
 
  protected:
   friend class Expr;

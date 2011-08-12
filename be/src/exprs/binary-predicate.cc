@@ -1,11 +1,14 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
+#include <sstream>
 #include <glog/logging.h>
 
 #include "exprs/binary-predicate.h"
 #include "exprs/functions.h"
-
+#include "util/debug-string-util.h"
 #include "gen-cpp/Exprs_types.h"
+
+using namespace std;
 
 namespace impala {
 
@@ -206,6 +209,12 @@ void BinaryPredicate::Prepare(RuntimeState* state) {
     default:
       DCHECK(false) << "bad binary predicate op: " << op_;
   }
+}
+
+string BinaryPredicate::DebugString() const {
+  stringstream out;
+  out << "BinaryPredicate(op=" << op_ << " " << Expr::DebugString() << ")";
+  return out.str();
 }
 
 }

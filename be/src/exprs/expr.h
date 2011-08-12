@@ -165,6 +165,7 @@ class SlotRef : public Expr {
 
   virtual void Prepare(RuntimeState* state);
   static void* ComputeFunction(Expr* expr, TupleRow* row);
+  virtual std::string DebugString() const;
 
  protected:
   int tuple_idx_;  // within row

@@ -63,12 +63,13 @@ public class CatalogTest {
     assertNotNull(testDb);
     assertEquals(testDb.getName(), "testdb1");
 
-    // default contains tables alltypes, alltypessmall and testtbl.
-    assertEquals(5, defaultDb.getTables().size());
+    // default contains tables alltypes, alltypessmall, alltypesagg and testtbl.
+    assertEquals(6, defaultDb.getTables().size());
     assertNotNull(defaultDb.getTable("alltypes"));
     assertNotNull(defaultDb.getTable("alltypessmall"));
     assertNotNull(defaultDb.getTable("alltypeserror"));
     assertNotNull(defaultDb.getTable("alltypesagg"));
+    assertNotNull(defaultDb.getTable("alltypesaggnonulls"));
     assertNotNull(defaultDb.getTable("testtbl"));
     // testdb contains tables alltypes and testtbl.
     assertEquals(2, testDb.getTables().size());

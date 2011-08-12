@@ -7,6 +7,7 @@
 #include <tr1/unordered_map>
 #include <vector>
 #include <boost/scoped_ptr.hpp>
+#include <ostream>
 
 #include "common/status.h"
 #include "gen-cpp/Types_types.h"
@@ -31,7 +32,7 @@ std::string TypeToString(PrimitiveType t);
 // Location information for null indicator bit for particular slot.
 struct NullIndicatorOffset {
   int byte_offset;
-  char bit_mask;  // to extract null indicator
+  uint8_t bit_mask;  // to extract null indicator
 
   NullIndicatorOffset(int byte_offset, int bit_offset)
     : byte_offset(byte_offset), bit_mask(1 << bit_offset) {
@@ -40,6 +41,8 @@ struct NullIndicatorOffset {
 
   std::string DebugString() const;
 };
+
+std::ostream& operator<<(std::ostream& os, const NullIndicatorOffset& null_indicator);
 
 class SlotDescriptor {
  public:

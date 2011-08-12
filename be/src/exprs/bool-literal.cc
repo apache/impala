@@ -2,7 +2,10 @@
 
 #include "bool-literal.h"
 
+#include <sstream>
 #include "gen-cpp/Exprs_types.h"
+
+using namespace std;
 
 namespace impala {
 
@@ -18,7 +21,14 @@ void* BoolLiteral::ReturnValue(Expr* e, TupleRow* row) {
 }
 
 void BoolLiteral::Prepare(RuntimeState* state) {
+  Expr::Prepare(state);
   compute_function_ = ReturnValue;
+}
+
+string BoolLiteral::DebugString() const {
+  stringstream out;
+  out << "BoolLiteral(value=" << result_.bool_val << ")";
+  return out.str();
 }
 
 }

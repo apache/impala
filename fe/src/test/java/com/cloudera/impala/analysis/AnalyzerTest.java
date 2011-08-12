@@ -520,10 +520,23 @@ public class AnalyzerTest {
     // invalid casts
     AnalysisError("select * from alltypes where bool_col = '15'",
         "operands are not comparable: bool_col = '15'");
+    AnalysisError("select * from alltypes where tinyint_col = '0.5'", "");
+    AnalysisError("select * from alltypes where smallint_col = '0.5'", "");
+    AnalysisError("select * from alltypes where int_col = '0.5'", "");
+    AnalysisError("select * from alltypes where bigint_col = '0.5'", "");
     //AnalysisError("select * from alltypes where date_col = 15",
         //"operands are not comparable: date_col = 15");
     //AnalysisError("select * from alltypes where datetime_col = 1.0",
         //"operands are not comparable: datetime_col = 1.0");
+  }
+
+  @Test
+  public void TestStringCasts() {
+    // Comparing a float to a string representing a double should create a cast
+    // for the float, but it doesn't at the moment: it tries to cast
+    // the string to a float and determines it's out of range.
+    AnalyzesOk("select 1.0 = " + Double.MAX_VALUE);
+    AnalysisError("select 1.0 = '" + Double.MAX_VALUE + "'");
   }
 
   @Test

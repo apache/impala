@@ -3,6 +3,7 @@
 #ifndef IMPALA_EXPRS_INT_LITERAL_H_
 #define IMPALA_EXPRS_INT_LITERAL_H_
 
+#include <string>
 #include "exprs/expr.h"
 
 namespace impala {
@@ -16,6 +17,7 @@ class IntLiteral: public Expr {
   IntLiteral(const TExprNode& node);
 
   virtual void Prepare(RuntimeState* state);
+  virtual std::string DebugString() const;
 
  private:
   static void* ReturnTinyintValue(Expr* e, TupleRow* row);

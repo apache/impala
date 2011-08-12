@@ -1,9 +1,9 @@
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
 from alltypessmall
-----
+-----
 int,boolean,tinyint,smallint,int,bigint,float,double,string,string
-----
+-----
 0,true,0,0,0,0,0,0,'01/01/09','0'
 1,false,1,1,1,10,1.1,10.1,'01/01/09','1'
 2,true,2,2,2,20,2.2,20.2,'01/01/09','2'
@@ -104,11 +104,11 @@ int,boolean,tinyint,smallint,int,bigint,float,double,string,string
 22,true,2,2,2,20,2.2,20.2,'04/03/09','2'
 23,false,3,3,3,30,3.3,30.3,'04/03/09','3'
 24,true,4,4,4,40,4.4,40.4,'04/03/09','4'
-====
+=====
 select id from alltypessmall
-----
+-----
 int
-----
+-----
 0
 1
 2
@@ -209,11 +209,11 @@ int
 22
 23
 24
-====
+=====
 select * from alltypessmall
-----
+-----
 int,int,int,boolean,tinyint,smallint,int,bigint,float,double,string,string
-----
+-----
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0'
 2009,1,1,false,1,1,1,10,1.1,10.1,'01/01/09','1'
 2009,1,2,true,2,2,2,20,2.2,20.2,'01/01/09','2'
@@ -314,11 +314,11 @@ int,int,int,boolean,tinyint,smallint,int,bigint,float,double,string,string
 2009,4,22,true,2,2,2,20,2.2,20.2,'04/03/09','2'
 2009,4,23,false,3,3,3,30,3.3,30.3,'04/03/09','3'
 2009,4,24,true,4,4,4,40,4.4,40.4,'04/03/09','4'
-====
+=====
 select month, date_string_col, year from alltypessmall
-----
+-----
 int,string,int
-----
+-----
 1,'01/01/09',2009
 1,'01/01/09',2009
 1,'01/01/09',2009
@@ -419,21 +419,21 @@ int,string,int
 4,'04/03/09',2009
 4,'04/03/09',2009
 4,'04/03/09',2009
-=======
+========
 select id from alltypessmall where id = 10
----
+----
 int
----
+----
 10
 10
 10
 10
-===
+====
 # We expect that conversion errors are turned into NULLs
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col from alltypeserror
-----
+-----
 int,boolean,tinyint,smallint,int,bigint,float,double,string,string
-----
+-----
 NULL,true,0,0,0,0,0,0,'01/01/09','0'
 1,NULL,1,1,1,10,1,10.1,'01/01/09','1'
 2,true,NULL,2,2,20,2,20.2,'01/01/09','2'
@@ -464,4 +464,22 @@ NULL,false,1,1,1,10,1,10.1,'03/01/09','1'
 7,false,NULL,7,7,70,7,70.7,'03/01/09','7'
 8,true,8,8,8,80,8,80.8,'03/01/09','8'
 9,false,9,9,NULL,90,9,90.9,'03/01/09','9'
-====
+=====
+# partition key values are materialized correctly across file boundaries
+select day, month, year, string_col
+from alltypesagg
+where string_col = '0'
+-----
+int, int, int, string
+-----
+1,1,2010,'0'
+2,1,2010,'0'
+3,1,2010,'0'
+4,1,2010,'0'
+5,1,2010,'0'
+6,1,2010,'0'
+7,1,2010,'0'
+8,1,2010,'0'
+9,1,2010,'0'
+10,1,2010,'0'
+=====

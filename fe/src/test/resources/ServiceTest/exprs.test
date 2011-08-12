@@ -2,13 +2,320 @@
 select count(*) from alltypesagg
 ----
 bigint
+----
+10000
 ====
 select count(*) from alltypesagg where tinyint_col is null
 ----
 bigint
+----
+1000
 ====
 select count(*) from alltypesagg where tinyint_col is not null
 ----
 bigint
+----
+9000
 ====
-
+# =
+select count(*) from alltypesagg where tinyint_col = 1
+----
+bigint
+----
+1000
+====
+select count(*) from alltypesagg where smallint_col = 1
+----
+bigint
+----
+100
+====
+select count(*) from alltypesagg where int_col = 1
+----
+bigint
+----
+10
+====
+select count(*) from alltypesagg where bigint_col = 10
+----
+bigint
+----
+10
+====
+select count(*) from alltypesagg where float_col = 1.1
+----
+bigint
+----
+10
+====
+select count(*) from alltypesagg where double_col = 10.1
+----
+bigint
+----
+10
+====
+select count(*) from alltypesagg where date_string_col = '01/01/10'
+----
+bigint
+----
+1000
+====
+# <>
+select count(*) from alltypesagg where tinyint_col <> 1
+----
+bigint
+----
+8000
+====
+select count(*) from alltypesagg where smallint_col <> 1
+----
+bigint
+----
+9800
+====
+select count(*) from alltypesagg where int_col <> 1
+----
+bigint
+----
+9980
+====
+select count(*) from alltypesagg where bigint_col <> 1
+----
+bigint
+----
+9990
+====
+select count(*) from alltypesagg where float_col <> 1.1
+----
+bigint
+----
+9980
+====
+select count(*) from alltypesagg where double_col <> 10.1
+----
+bigint
+----
+9980
+====
+# <
+select count(*) from alltypesagg where tinyint_col < 2
+----
+bigint
+----
+1000
+====
+select count(*) from alltypesagg where smallint_col < 2
+----
+bigint
+----
+100
+====
+select count(*) from alltypesagg where int_col < 2
+----
+bigint
+----
+10
+====
+select count(*) from alltypesagg where bigint_col < 20
+----
+bigint
+----
+10
+====
+select count(*) from alltypesagg where float_col < 2.2
+----
+bigint
+----
+10
+====
+select count(*) from alltypesagg where double_col < 20.2
+----
+bigint
+----
+10
+====
+# >
+select count(*) from alltypesagg where tinyint_col > 1
+----
+bigint
+----
+8000
+====
+select count(*) from alltypesagg where smallint_col > 1
+----
+bigint
+----
+9800
+====
+select count(*) from alltypesagg where int_col > 1
+----
+bigint
+----
+9980
+====
+select count(*) from alltypesagg where bigint_col > 10
+----
+bigint
+----
+9980
+====
+select count(*) from alltypesagg where float_col > 1.1
+----
+bigint
+----
+9980
+====
+select count(*) from alltypesagg where double_col > 10.1
+----
+bigint
+----
+9980
+====
+# <=
+select count(*) from alltypesagg where tinyint_col <= 1
+----
+bigint
+----
+1000
+====
+select count(*) from alltypesagg where smallint_col <= 1
+----
+bigint
+----
+100
+====
+select count(*) from alltypesagg where int_col <= 1
+----
+bigint
+----
+10
+====
+select count(*) from alltypesagg where bigint_col <= 10
+----
+bigint
+----
+10
+====
+select count(*) from alltypesagg where float_col <= 1.1
+----
+bigint
+----
+10
+====
+select count(*) from alltypesagg where double_col <= 10.1
+----
+bigint
+----
+10
+====
+# >=
+select count(*) from alltypesagg where tinyint_col >= 2
+----
+bigint
+----
+8000
+====
+select count(*) from alltypesagg where smallint_col >= 2
+----
+bigint
+----
+9800
+====
+select count(*) from alltypesagg where int_col >= 2
+----
+bigint
+----
+9980
+====
+select count(*) from alltypesagg where bigint_col >= 20
+----
+bigint
+----
+9980
+====
+select count(*) from alltypesagg where float_col >= 2.2
+----
+bigint
+----
+9980
+====
+select count(*) from alltypesagg where double_col >= 20.2
+----
+bigint
+----
+9980
+====
+# +
+select
+SUM(tinyint_col) + SUM(smallint_col),
+SUM(tinyint_col + smallint_col),
+SUM(tinyint_col) + SUM(smallint_col) + SUM(int_col),
+SUM(tinyint_col + smallint_col + int_col),
+SUM(tinyint_col) + SUM(smallint_col) + SUM(int_col) + SUM(bigint_col),
+SUM(tinyint_col + smallint_col + int_col + bigint_col),
+SUM(tinyint_col) + SUM(smallint_col) + SUM(int_col) + SUM(bigint_col) + SUM(float_col),
+SUM(tinyint_col + smallint_col + int_col + bigint_col + float_col),
+SUM(tinyint_col) + SUM(smallint_col) + SUM(int_col) + SUM(bigint_col) + SUM(float_col) + SUM(double_col),
+SUM(tinyint_col + smallint_col + int_col + bigint_col + float_col + double_col)
+from alltypesaggnonulls
+----
+bigint, bigint, bigint, bigint, bigint, bigint, double, double, double, double
+----
+540000,540000,5535000,5535000,55485000,55485000,6.09795e+07,6.09795e+07,1.11429e+08,1.11429e+08
+====
+# -
+select 
+-1 * SUM(tinyint_col) - SUM(smallint_col),
+SUM(-1 * tinyint_col - smallint_col),
+-1 * SUM(tinyint_col) - SUM(smallint_col) - SUM(int_col),
+SUM(-1 * tinyint_col - smallint_col - int_col),
+-1 * SUM(tinyint_col) - SUM(smallint_col) - SUM(int_col) - SUM(bigint_col),
+SUM(-1 * tinyint_col - smallint_col - int_col - bigint_col),
+-1 * SUM(tinyint_col) - SUM(smallint_col) - SUM(int_col) - SUM(bigint_col) - SUM(float_col),
+SUM(-1 * tinyint_col - smallint_col - int_col - bigint_col - float_col),
+-1 * SUM(tinyint_col) - SUM(smallint_col) - SUM(int_col) - SUM(bigint_col) - SUM(float_col) - SUM(double_col),
+SUM(-1 * tinyint_col - smallint_col - int_col - bigint_col - float_col - double_col)
+from alltypesaggnonulls
+----
+bigint, bigint, bigint, bigint, bigint, bigint, double, double, double, double
+----
+-540000,-540000,-5535000,-5535000,-55485000,-55485000,-6.09795e+07,-6.09795e+07,-1.11429e+08,-1.11429e+08
+====
+# *
+select
+MAX(tinyint_col) * MAX(smallint_col),
+MAX(tinyint_col * smallint_col),
+MAX(tinyint_col) * MAX(smallint_col) * MAX(int_col),
+MAX(tinyint_col * smallint_col * int_col),
+MAX(tinyint_col) * MAX(smallint_col) * MAX(int_col) * MAX(bigint_col),
+MAX(tinyint_col * smallint_col * int_col * bigint_col),
+MAX(tinyint_col) * MAX(smallint_col) * MAX(int_col) * MAX(bigint_col) * MAX(float_col),
+MAX(tinyint_col * smallint_col * int_col * bigint_col * float_col),
+MAX(tinyint_col) * MAX(smallint_col) * MAX(int_col) * MAX(bigint_col) * MAX(float_col) * MAX(double_col),
+MAX(tinyint_col * smallint_col * int_col * bigint_col * float_col * double_col)
+from alltypesaggnonulls
+----
+bigint, bigint, bigint, bigint, bigint, bigint, double, double, double, double
+----
+891,891,890109,890109,8892188910,8892188910,9.77163e+12,9.77163e+12,9.85947e+16,9.85947e+16
+#====
+# /
+# On hive, max(tinyint_col / smallint_col) results in NaN. Mysql turns this into a NULL.
+# TODO: decide what to emulate; at the moment, we're also returning Nan
+#select
+#MAX(tinyint_col) / MAX(smallint_col),
+#MAX(tinyint_col / smallint_col),
+#MAX(tinyint_col) / MAX(smallint_col) / MAX(int_col),
+#MAX(tinyint_col / smallint_col / int_col),
+#MAX(tinyint_col) / MAX(smallint_col) / MAX(int_col) / MAX(bigint_col),
+#MAX(tinyint_col / smallint_col / int_col / bigint_col),
+#MAX(tinyint_col) / MAX(smallint_col) / MAX(int_col) / MAX(bigint_col) / MAX(float_col),
+#MAX(tinyint_col / smallint_col / int_col / bigint_col / float_col),
+#MAX(tinyint_col) / MAX(smallint_col) / MAX(int_col) / MAX(bigint_col) / MAX(float_col) / MAX(double_col),
+#MAX(tinyint_col / smallint_col / int_col / bigint_col / float_col / double_col)
+#from alltypesaggnonulls
+#----
+#double, double, double, double, double, double, double, double, double, double
+#----
+#891,891,890109,890109,8892188910,8892188910,9.77163e+12,9.77163e+12,9.85947e+16,9.85947e+16
+#====

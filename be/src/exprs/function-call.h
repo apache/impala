@@ -3,6 +3,7 @@
 #ifndef IMPALA_EXPRS_FUNCTION_CALL_H_
 #define IMPALA_EXPRS_FUNCTION_CALL_H_
 
+#include <string>
 #include "exprs/expr.h"
 
 namespace impala {
@@ -14,6 +15,8 @@ class FunctionCall: public Expr {
   friend class Expr;
 
   FunctionCall(const TExprNode& node);
+
+  virtual std::string DebugString() const;
 };
 
 }

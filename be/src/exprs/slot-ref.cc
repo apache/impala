@@ -5,6 +5,8 @@
 #include "gen-cpp/Exprs_types.h"
 #include "runtime/runtime-state.h"
 
+using namespace std;
+
 namespace impala {
 
 SlotRef::SlotRef(const TExprNode& node)
@@ -15,6 +17,7 @@ SlotRef::SlotRef(const TExprNode& node)
 }
 
 void SlotRef::Prepare(RuntimeState* state) {
+  Expr::Prepare(state);
   const SlotDescriptor* slot_desc  = state->descs().GetSlotDescriptor(slot_id_);
   // TODO: report error
   if (slot_desc == NULL) return;
@@ -22,6 +25,15 @@ void SlotRef::Prepare(RuntimeState* state) {
   this->tuple_idx_ = 0;
   this->slot_offset_ = slot_desc->tuple_offset();
   this->null_indicator_offset_ = slot_desc->null_indicator_offset();
+}
+
+string SlotRef::DebugString() const {
+  stringstream out;
+  out << "SlotRef(slot_id=" << slot_id_
+      << " tuple_idx=" << tuple_idx_ << " slot_offset=" << slot_offset_
+      << " null_indicator=" << null_indicator_offset_
+      << " " << Expr::DebugString() << ")";
+  return out.str();
 }
 
 }

@@ -4,6 +4,8 @@
 
 #include "gen-cpp/Exprs_types.h"
 
+using namespace std;
+
 namespace impala {
 
 void* CaseExpr::ComputeFunction(Expr* e, TupleRow* row) {
@@ -18,7 +20,12 @@ CaseExpr::CaseExpr(const TExprNode& node)
 }
 
 void CaseExpr::Prepare(RuntimeState* state) {
+  Expr::Prepare(state);
   compute_function_ = ComputeFunction;
+}
+
+string CaseExpr::DebugString() const {
+  return "";
 }
 
 }

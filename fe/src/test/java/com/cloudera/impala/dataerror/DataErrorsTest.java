@@ -36,7 +36,6 @@ public class DataErrorsTest {
     queryFileParser.open();
     while (queryFileParser.hasNext()) {
       queryFileParser.next();
-      String query = queryFileParser.getQuery();
       ArrayList<String> expectedErrors = queryFileParser.getExpectedResult(0);
       // The test file is assumed to contain all errors. We may only want to compare a few of them.
       int errorsToCompare = Math.min(expectedErrors.size(), maxErrors);
@@ -64,8 +63,9 @@ public class DataErrorsTest {
         expectedFileErrors.clear();
         expectedFileErrors.add(expectedFileError);
       }
-      TestUtils.runQuery(coordinator, query, abortOnError, maxErrors, null, null, expectedErrors,
-          expectedFileErrors, testErrorLog);
+      TestUtils.runQuery(coordinator, queryFileParser.getQuery(),
+          queryFileParser.getLineNum(), abortOnError, maxErrors, null, null,
+          expectedErrors, expectedFileErrors, testErrorLog);
     }
     queryFileParser.close();
   }

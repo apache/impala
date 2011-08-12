@@ -4,8 +4,6 @@
 
 #include <glog/logging.h>
 
-#include <sstream>
-
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exprs/expr.h"
@@ -95,11 +93,18 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode, ExecNode**
   return Status::OK;
 }
 
-std::string ExecNode::DebugString() const {
+string ExecNode::DebugString() const {
   std::stringstream out;
-  out << "EXEC NODE TREE:" << endl;
   this->DebugString(0, &out);
   return out.str();
+}
+
+void ExecNode::DebugString(int indentation_level, std::stringstream* out) const {
+  *out << " conjuncts=" << Expr::DebugString(conjuncts_);
+  for (int i = 0; i < children_.size(); ++i) {
+    *out << "\n";
+    children_[i]->DebugString(indentation_level + 1, out);
+  }
 }
 
 void ExecNode::PrepareConjuncts(RuntimeState* state) {

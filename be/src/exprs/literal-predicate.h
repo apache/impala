@@ -3,6 +3,7 @@
 #ifndef IMPALA_EXPRS_LITERAL_PREDICATE_H_
 #define IMPALA_EXPRS_LITERAL_PREDICATE_H_
 
+#include <string>
 #include "exprs/predicate.h"
 
 namespace impala {
@@ -16,6 +17,7 @@ class LiteralPredicate: public Predicate {
   LiteralPredicate(const TExprNode& node);
 
   virtual void Prepare(RuntimeState* state);
+  virtual std::string DebugString() const;
 
  private:
   static void* ComputeFunction(Expr* e, TupleRow* row);

@@ -28,6 +28,10 @@ add_library(Exprs
   string-literal.cc
 )
 
+target_link_libraries(Exprs
+  Util
+)
+
 add_custom_command(
   OUTPUT functions.cc
   COMMAND "./gen-functions.py"
