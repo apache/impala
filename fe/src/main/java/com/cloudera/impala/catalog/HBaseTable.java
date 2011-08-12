@@ -25,6 +25,12 @@ import com.google.common.base.Preconditions;
  * as loaded from Hive's metastore.
  * This implies that we inherit the metastore's limitations related to HBase,
  * for example the lack of support for composite HBase row keys.
+ * We sort the HBase columns (cols) by family/qualifier
+ * to simplify the retrieval logic in the backend, since
+ * HBase returns data ordered by family/qualifier.
+ * This implies that a "select *"-query on an HBase table
+ * will not have the columns ordered as they were declared in the DDL.
+ * They will be ordered by family/qualifier.
  *
  */
 public class HBaseTable extends Table {

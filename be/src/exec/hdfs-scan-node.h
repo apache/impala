@@ -21,6 +21,7 @@ class Tuple;
 class SlotDescriptor;
 class stringstream;
 class Expr;
+class TextConverter;
 
 // This execution node parses delimited text files from HDFS,
 // and writes their content as tuples in the
@@ -189,6 +190,9 @@ class HdfsScanNode : public ExecNode {
   // Helper string for dealing with columns that span file blocks.
   std::string boundary_column_;
 
+  // Helper class for converting text to other types;
+  boost::scoped_ptr<TextConverter> text_converter_;
+
   // Parses the current file_buf_ and writes tuples into the tuple buffer.
   // Input Parameters
   //   state: Runtime state into which we log errors.
@@ -218,25 +222,6 @@ class HdfsScanNode : public ExecNode {
   Status ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, int* row_idx,
       int* column_idx, bool* last_char_is_escape, bool* unescape_string,
       char* quote_char, bool* error_in_row, int* num_errors);
-
-  // Converts slot data (begin, end) into type of slot_desc,
-  // and writes the result into the tuples's slot.
-  // copy_string indicates whether we need to make a separate copy of the string data:
-  // For regular unescaped strings, we point to the original data in the file_buf_.
-  // For regular escaped strings,
-  // we copy an its unescaped string into a separate buffer and point to it.
-  // For boundary string fields,
-  // we create a contiguous copy of the string data into a separate buffer.
-  // Unsuccessful conversions are turned into NULLs.
-  // Returns true if value was converted and written successfully, false otherwise.
-  bool ConvertAndWriteSlotBytes(const char* begin,
-      const char* end, Tuple* tuple, const SlotDescriptor* slot_desc,
-      bool copy_string, bool unescape_string);
-
-  // Removes escape characters from len characters of the null-terminated string src,
-  // and copies the unescaped string into dest, changing *len to the unescaped length.
-  // No null-terminator is added to dest.
-  void UnescapeString(const char* src, char* dest, int* len);
 
   // Returns the next valid file buffer for reading HDFS files.
   // We maintain a pseudo ring list of file buffers in file_bufs_.

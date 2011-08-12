@@ -12,4 +12,12 @@ add_library(Exec STATIC
   aggregation-node.cc
   exec-node.cc
   hdfs-scan-node.cc
+  hbase-scan-node.cc
+  hbase-table-scanner.cc
+  text-converter.cc
+)
+
+target_link_libraries(Exec 
+  ${JAVA_JVM_LIBRARY}
+  ${HDFS_LIBS}
 )

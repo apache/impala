@@ -2,18 +2,25 @@
 
 #include "service/plan-executor.h"
 
+#include <Thrift.h>
+#include <protocol/TBinaryProtocol.h>
+#include <transport/TBufferTransports.h>
 #include <glog/logging.h>
 
 #include "common/object-pool.h"
 #include "exec/exec-node.h"
+#include "exec/hbase-table-scanner.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
 #include "runtime/row-batch.h"
+#include "util/jni-util.h"
 #include "gen-cpp/ImpalaService_types.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
 
 using namespace std;
 using namespace boost;
+using namespace apache::thrift::protocol;
+using namespace apache::thrift::transport;
 
 namespace impala {
 

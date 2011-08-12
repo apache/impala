@@ -112,7 +112,7 @@ class HBaseTableDescriptor : public TableDescriptor {
   HBaseTableDescriptor(const TTable& ttable);
   virtual std::string DebugString() const;
   const std::string table_name() const { return table_name_; }
-  const std::vector<std::pair<std::string, std::string> >& cols() { return cols_; }
+  const std::vector<std::pair<std::string, std::string> >& cols() const { return cols_; }
 
  protected:
   // native name of hbase table

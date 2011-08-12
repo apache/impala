@@ -5,17 +5,22 @@
 
 #include <jni.h>
 
-namespace impala {
+// JNI-interface method called upon loading this native library.
+extern "C"
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt);
+
+// JNI-interface method called upon unloading this native library.
+extern "C"
+JNIEXPORT void JNICALL JNI_OnUnload(JavaVM* vm, void* pvt);
 
 extern "C"
-JNIEXPORT void Java_com_cloudera_impala_service_NativeBackend_Init(
+JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_InitThread(
     JNIEnv* env, jclass caller_class);
 
 // JNI-callable wrapper to the plan executor
 // protected native static void ExecPlan(byte[] thriftExecutePlanRequest,
-//      boolean abortOnError, int maxErrors, List<String> errorLog,
-//      Map<String, Integer> fileErrors, boolean asAscii,
-//      BlockingQueue<TResultRow> resultQueue) throws ImpalaException;
+//      boolean abortOnError, int maxErrors, List<String> errorLog, Map<String, Integer> fileErrors,
+//      boolean asAscii, BlockingQueue<TResultRow> resultQueue) throws ImpalaException;
 extern "C"
 JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecPlan(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_execute_plan_request,
@@ -25,7 +30,5 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecPlan(
 extern "C"
 JNIEXPORT jboolean JNICALL Java_com_cloudera_impala_service_NativeBackend_EvalPredicate(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_predicate);
-
-}
 
 #endif

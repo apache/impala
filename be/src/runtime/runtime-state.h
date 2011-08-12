@@ -13,6 +13,7 @@ namespace impala {
 
 class DescriptorTbl;
 class ObjectPool;
+class Status;
 
 // A collection of items that are part of the global state of a 
 // query and potentially shared across execution nodes.
@@ -30,6 +31,12 @@ class RuntimeState {
   // Get error stream for appending error message snippets.
   std::stringstream& error_stream() { return error_stream_; }
   const std::vector<std::pair<std::string, int> >& file_errors() const { return file_errors_; }
+  static void* hbase_conf() { return hbase_conf_; }
+
+  // Creates a global reference to a new HBaseConfiguration object via JniUtil.
+  // Cleanup is done in JniUtil::Cleanup().
+  // Returns Status::OK if created successfully, non-ok status otherwise.
+  static Status InitHBaseConf();
 
   // Append contents of error_stream_ as one message to error_log_. Clears error_stream_.
   void LogErrorStream();
@@ -68,6 +75,8 @@ class RuntimeState {
   const bool abort_on_error_;
   // Maximum number of errors to log.
   const int max_errors_;
+  // HBaseConfiguration jobject. Initialized in InitHBaseConf().
+  static void* hbase_conf_;
 
   static const int DEFAULT_BATCH_SIZE = 1024;
   static const int DEFAULT_FILE_BUF_SIZE = 131072; // 128K

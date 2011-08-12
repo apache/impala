@@ -6,11 +6,17 @@ import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.planner.ScanNode;
 import com.cloudera.impala.thrift.THBaseScanNode;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.google.common.base.Objects;
 
+
+/**
+ * Full scan of an HBase table.
+ * Only families/qualifiers specified in TupleDescriptor will be retrieved in the backend.
+ */
 public class HBaseScanNode extends ScanNode {
   private final TupleDescriptor desc;
 
@@ -22,7 +28,6 @@ public class HBaseScanNode extends ScanNode {
   @Override
   public void finalize(Analyzer analyzer) throws InternalException {
   }
-
 
   @Override
   protected String debugString() {
@@ -50,5 +55,4 @@ public class HBaseScanNode extends ScanNode {
     output.append(prefix + "  PREDICATES: " + getExplainString(conjuncts) + "\n");
     return output.toString();
   }
-
 }

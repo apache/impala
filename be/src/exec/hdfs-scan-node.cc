@@ -2,12 +2,8 @@
 
 #include "exec/hdfs-scan-node.h"
 
-#include <cstring>
-#include <cstdlib>
-#include <sstream>
-#include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string.hpp>
-#include <glog/logging.h>
+#include "text-converter.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
@@ -19,8 +15,6 @@
 #include "runtime/string-value.h"
 #include "common/object-pool.h"
 #include "gen-cpp/PlanNodes_types.h"
-
-#include <iostream>
 
 using namespace std;
 using namespace boost;
@@ -51,7 +45,8 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode)
       file_buf_(NULL),
       file_buf_ptr_(NULL),
       file_buf_end_(NULL),
-      num_partition_keys_(0) {
+      num_partition_keys_(0),
+      text_converter_(NULL) {
   // Create Expr* from TExpr* for partition keys.
   // TODO: We should remove the partition-key LiteralExprs from TScanNode,
   // and instead extract the partition-key values from the file names themselves.
@@ -84,6 +79,8 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   escape_char_ = hdfs_table->escape_char();
   string_quote_ = hdfs_table->quote_char();
   strings_are_quoted_ = hdfs_table->strings_are_quoted();
+  text_converter_.reset(new TextConverter(strings_are_quoted_,
+      escape_char_, var_len_pool_.get()));
 
   // Create mapping from column index in table to slot index in output tuple.
   // First, initialize all columns to SKIP_COLUMN.
@@ -358,12 +355,11 @@ Status HdfsScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, i
         *file_buf_ptr_ = '\0';
         bool parsed_ok = true;
         if (boundary_column_.empty()) {
-          parsed_ok = ConvertAndWriteSlotBytes(column_start, file_buf_ptr_,
-              tuple_, tuple_desc_->slots()[slot_idx], *unescape_string,
-              *unescape_string);
+          parsed_ok = text_converter_->ConvertAndWriteSlotBytes(column_start, file_buf_ptr_,
+              tuple_, tuple_desc_->slots()[slot_idx], *unescape_string, *unescape_string);
         } else {
           boundary_column_.append(file_buf_, file_buf_ptr_ - file_buf_);
-          parsed_ok = ConvertAndWriteSlotBytes(boundary_column_.data(),
+          parsed_ok = text_converter_->ConvertAndWriteSlotBytes(boundary_column_.data(),
               boundary_column_.data() + boundary_column_.size(), tuple_,
               tuple_desc_->slots()[slot_idx], true, *unescape_string);
           boundary_column_.clear();
@@ -448,114 +444,6 @@ Status HdfsScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, i
   }
 
   return Status::OK;
-}
-
-bool HdfsScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, Tuple* tuple,
-    const SlotDescriptor* slot_desc, bool copy_string, bool unescape_string) {
-  // Check for null columns.
-  // The below code implies that unquoted empty strings
-  // such as "...,,..." become NULLs, and not empty strings.
-  if (begin == end) {
-    tuple->SetNull(slot_desc->null_indicator_offset());
-    return true;
-  }
-  // TODO: Handle out-of-range conditions.
-  switch (slot_desc->type()) {
-    case TYPE_BOOLEAN: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      if (iequals(begin, "true")) {
-        *reinterpret_cast<char*>(slot) = true;
-      } else if (iequals(begin, "false")) {
-        *reinterpret_cast<char*>(slot) = false;
-      } else {
-        // Inconvertible value. Set to NULL after switch statement.
-        end = begin;
-      }
-      break;
-    }
-    case TYPE_TINYINT: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<char*>(slot) =
-          static_cast<char>(strtol(begin, const_cast<char**>(&end), 0));
-      break;
-    }
-    case TYPE_SMALLINT: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<short*>(slot) =
-          static_cast<short>(strtol(begin, const_cast<char**>(&end), 0));
-      break;
-    }
-    case TYPE_INT: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<int*>(slot) =
-          static_cast<int>(strtol(begin, const_cast<char**>(&end), 0));
-      break;
-    }
-    case TYPE_BIGINT: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<long*>(slot) = strtol(begin, const_cast<char**>(&end), 0);
-      break;
-    }
-    case TYPE_FLOAT: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<float*>(slot) =
-          static_cast<float>(strtod(begin, const_cast<char**>(&end)));
-      break;
-    }
-    case TYPE_DOUBLE: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<double*>(slot) = strtod(begin, const_cast<char**>(&end));
-      break;
-    }
-    case TYPE_STRING: {
-      StringValue* slot = tuple->GetStringSlot(slot_desc->tuple_offset());
-      const char* data_start = NULL;
-      if (strings_are_quoted_) {
-        // take out 2 characters for the quotes
-        slot->len = end - begin - 2;
-        // skip the quote char at the beginning
-        data_start = begin + 1;
-      } else {
-        slot->len = end - begin;
-        data_start = begin;
-      }
-      if (!copy_string) {
-        slot->ptr = const_cast<char*>(data_start);
-      } else {
-        char* slot_data = reinterpret_cast<char*>(var_len_pool_->Allocate(slot->len));
-        if (unescape_string) {
-          UnescapeString(data_start, slot_data, &slot->len);
-        } else {
-          memcpy(slot_data, data_start, slot->len);
-        }
-        slot->ptr = slot_data;
-      }
-      break;
-    }
-    default:
-      DCHECK(false) << "bad slot type: " << TypeToString(slot_desc->type());
-  }
-  // Set NULL if inconvertible.
-  if (*end != '\0') {
-    tuple->SetNull(slot_desc->null_indicator_offset());
-    return false;
-  }
-
-  return true;
-}
-
-void HdfsScanNode::UnescapeString(const char* src, char* dest, int* len) {
-  char* dest_ptr = dest;
-  const char* end = src + *len;
-  while (src < end) {
-    if (*src == escape_char_) {
-      ++src;
-    } else {
-      *dest_ptr++ = *src++;
-    }
-  }
-  char* dest_start = reinterpret_cast<char*>(dest);
-  *len = dest_ptr - dest_start;
 }
 
 void HdfsScanNode::DebugString(int indentation_level, std::stringstream* out) const {

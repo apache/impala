@@ -83,15 +83,16 @@ public class CatalogTest {
     assertNotNull(testDb);
     assertEquals(testDb.getName(), "testdb1");
 
-    assertEquals(9, defaultDb.getTables().size());
+    assertEquals(11, defaultDb.getTables().size());
     assertNotNull(defaultDb.getTable("alltypes"));
     assertNotNull(defaultDb.getTable("alltypessmall"));
     assertNotNull(defaultDb.getTable("alltypeserror"));
     assertNotNull(defaultDb.getTable("alltypesagg"));
     assertNotNull(defaultDb.getTable("alltypesaggnonulls"));
     assertNotNull(defaultDb.getTable("testtbl"));
-    assertNotNull(defaultDb.getTable("hbasealltypes"));
     assertNotNull(defaultDb.getTable("hbasealltypessmall"));
+    assertNotNull(defaultDb.getTable("hbasealltypeserror"));
+    assertNotNull(defaultDb.getTable("hbasealltypeserrornonulls"));
     assertNotNull(defaultDb.getTable("hbasealltypesagg"));
     // testdb contains tables alltypes and testtbl.
     assertEquals(2, testDb.getTables().size());
@@ -128,7 +129,7 @@ public class CatalogTest {
         new PrimitiveType[]
           {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.STRING});
 
-    checkHBaseTableCols(defaultDb, "hbasealltypes", "hbasealltypes",
+    checkHBaseTableCols(defaultDb, "hbasealltypessmall", "hbasealltypessmall",
         new String[]
           {"id", "bool_col", "double_col", "float_col", "bigint_col", "int_col",
            "smallint_col", "tinyint_col", "date_string_col", "string_col"},
@@ -144,7 +145,23 @@ public class CatalogTest {
            PrimitiveType.SMALLINT, PrimitiveType.TINYINT, PrimitiveType.STRING,
            PrimitiveType.STRING});
 
-    checkHBaseTableCols(defaultDb, "hbasealltypessmall", "hbasealltypessmall",
+    checkHBaseTableCols(defaultDb, "hbasealltypeserror", "hbasealltypeserror",
+        new String[]
+          {"id", "bool_col", "double_col", "float_col", "bigint_col", "int_col",
+           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+        new String[]
+          {":key", "bools", "floats", "floats", "ints", "ints", "ints", "ints",
+           "strings", "strings"},
+        new String[]
+          {null, "bool_col", "double_col", "float_col", "bigint_col", "int_col",
+           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+        new PrimitiveType[]
+          {PrimitiveType.INT,PrimitiveType.BOOLEAN, PrimitiveType.DOUBLE,
+           PrimitiveType.FLOAT, PrimitiveType.BIGINT, PrimitiveType.INT,
+           PrimitiveType.SMALLINT, PrimitiveType.TINYINT, PrimitiveType.STRING,
+           PrimitiveType.STRING});
+
+    checkHBaseTableCols(defaultDb, "hbasealltypeserrornonulls", "hbasealltypeserrornonulls",
         new String[]
           {"id", "bool_col", "double_col", "float_col", "bigint_col", "int_col",
            "smallint_col", "tinyint_col", "date_string_col", "string_col"},

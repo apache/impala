@@ -1,0 +1,146 @@
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
+double_col, date_string_col, string_col
+from hbasealltypessmall
+-----
+int,boolean,tinyint,smallint,int,bigint,float,double,string,string
+-----
+0,true,0,0,0,0,0,0,'04/01/09','0'
+1,false,1,1,1,10,1.1,10.1,'04/01/09','1'
+10,true,0,0,0,0,0,0,'04/02/09','0'
+11,false,1,1,1,10,1.1,10.1,'04/02/09','1'
+12,true,2,2,2,20,2.2,20.2,'04/02/09','2'
+13,false,3,3,3,30,3.3,30.3,'04/02/09','3'
+14,true,4,4,4,40,4.4,40.4,'04/02/09','4'
+15,false,5,5,5,50,5.5,50.5,'04/02/09','5'
+16,true,6,6,6,60,6.6,60.6,'04/02/09','6'
+17,false,7,7,7,70,7.7,70.7,'04/02/09','7'
+18,true,8,8,8,80,8.8,80.8,'04/02/09','8'
+19,false,9,9,9,90,9.9,90.9,'04/02/09','9'
+2,true,2,2,2,20,2.2,20.2,'04/01/09','2'
+20,true,0,0,0,0,0,0,'04/03/09','0'
+21,false,1,1,1,10,1.1,10.1,'04/03/09','1'
+22,true,2,2,2,20,2.2,20.2,'04/03/09','2'
+23,false,3,3,3,30,3.3,30.3,'04/03/09','3'
+24,true,4,4,4,40,4.4,40.4,'04/03/09','4'
+3,false,3,3,3,30,3.3,30.3,'04/01/09','3'
+4,true,4,4,4,40,4.4,40.4,'04/01/09','4'
+5,false,5,5,5,50,5.5,50.5,'04/01/09','5'
+6,true,6,6,6,60,6.6,60.6,'04/01/09','6'
+7,false,7,7,7,70,7.7,70.7,'04/01/09','7'
+8,true,8,8,8,80,8.8,80.8,'04/01/09','8'
+9,false,9,9,9,90,9.9,90.9,'04/01/09','9'
+=====
+select id from hbasealltypessmall
+-----
+int
+-----
+0
+1
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+2
+20
+21
+22
+23
+24
+3
+4
+5
+6
+7
+8
+9
+=====
+select * from hbasealltypessmall
+-----
+int,boolean,double,float,bigint,int,smallint,tinyint,string,string
+-----
+0,true,0,0,0,0,0,0,'04/01/09','0'
+1,false,10.1,1.1,10,1,1,1,'04/01/09','1'
+10,true,0,0,0,0,0,0,'04/02/09','0'
+11,false,10.1,1.1,10,1,1,1,'04/02/09','1'
+12,true,20.2,2.2,20,2,2,2,'04/02/09','2'
+13,false,30.3,3.3,30,3,3,3,'04/02/09','3'
+14,true,40.4,4.4,40,4,4,4,'04/02/09','4'
+15,false,50.5,5.5,50,5,5,5,'04/02/09','5'
+16,true,60.6,6.6,60,6,6,6,'04/02/09','6'
+17,false,70.7,7.7,70,7,7,7,'04/02/09','7'
+18,true,80.8,8.8,80,8,8,8,'04/02/09','8'
+19,false,90.9,9.9,90,9,9,9,'04/02/09','9'
+2,true,20.2,2.2,20,2,2,2,'04/01/09','2'
+20,true,0,0,0,0,0,0,'04/03/09','0'
+21,false,10.1,1.1,10,1,1,1,'04/03/09','1'
+22,true,20.2,2.2,20,2,2,2,'04/03/09','2'
+23,false,30.3,3.3,30,3,3,3,'04/03/09','3'
+24,true,40.4,4.4,40,4,4,4,'04/03/09','4'
+3,false,30.3,3.3,30,3,3,3,'04/01/09','3'
+4,true,40.4,4.4,40,4,4,4,'04/01/09','4'
+5,false,50.5,5.5,50,5,5,5,'04/01/09','5'
+6,true,60.6,6.6,60,6,6,6,'04/01/09','6'
+7,false,70.7,7.7,70,7,7,7,'04/01/09','7'
+8,true,80.8,8.8,80,8,8,8,'04/01/09','8'
+9,false,90.9,9.9,90,9,9,9,'04/01/09','9'
+=====
+select * from hbasealltypesagg where smallint_col is null
+----
+int,boolean,double,float,bigint,int,smallint,tinyint,string,string
+----
+0,true,NULL,NULL,NULL,NULL,NULL,NULL,'01/09/10','0'
+100,true,1010,110,1000,100,NULL,NULL,'01/09/10','100'
+200,true,2020,220,2000,200,NULL,NULL,'01/09/10','200'
+300,true,3030,330,3000,300,NULL,NULL,'01/09/10','300'
+400,true,4040,440,4000,400,NULL,NULL,'01/09/10','400'
+500,true,5050,550,5000,500,NULL,NULL,'01/09/10','500'
+600,true,6060,660,6000,600,NULL,NULL,'01/09/10','600'
+700,true,7070,770,7000,700,NULL,NULL,'01/09/10','700'
+800,true,8080,880,8000,800,NULL,NULL,'01/09/10','800'
+900,true,9090,990,9000,900,NULL,NULL,'01/09/10','900'
+=====
+# test adapted from aggregation.test but using the hbase equivalent table
+select tinyint_col, count(bool_col) from hbasealltypesagg group by 1
+----
+tinyint,bigint
+----
+4,100
+5,100
+6,100
+7,100
+8,100
+9,100
+NULL,100
+1,100
+2,100
+3,100
+=====
+# test adapted from aggregation.test but using the hbase equivalent table
+# notice that the NULL value is missing because HBase does not
+# return those rows where tinyint_col does not exist 
+select tinyint_col, count(*) from hbasealltypesagg group by 1
+----
+tinyint,bigint
+----
+4,100
+5,100
+6,100
+7,100
+8,100
+9,100
+1,100
+2,100
+3,100
+=====
+select tinyint_col, count(*) from hbasealltypesagg where (int_col % 10) = 0 group by tinyint_col
+----
+tinyint,bigint
+----
+NULL,99
+=====

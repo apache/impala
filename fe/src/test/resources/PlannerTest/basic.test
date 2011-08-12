@@ -43,29 +43,29 @@ order by 2 desc
 ----
 not implemented
 ====
-select * from hbasealltypes
+select * from hbasealltypessmall
 ----
-SCAN HBASE table=hbasealltypes
+SCAN HBASE table=hbasealltypessmall
   PREDICATES: 
 ====
-select * from hbasealltypes
+select * from hbasealltypessmall
 where id < 5
 ----
-SCAN HBASE table=hbasealltypes
+SCAN HBASE table=hbasealltypessmall
   PREDICATES: id < 5
 ====
 select int_col, count(*) 
-from hbasealltypes
+from hbasealltypessmall
 where id < 5
 group by 1
 ----
 AGGREGATE
 GROUP BY: int_col
-  SCAN HBASE table=hbasealltypes
+  SCAN HBASE table=hbasealltypessmall
     PREDICATES: id < 5
 ====
 select int_col, sum(float_col) 
-from hbasealltypes
+from hbasealltypessmall
 where id < 5
 group by 1
 order by 2

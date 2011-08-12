@@ -9,6 +9,7 @@
 #include "exprs/expr.h"
 #include "exec/aggregation-node.h"
 #include "exec/hdfs-scan-node.h"
+#include "exec/hbase-scan-node.h"
 #include "runtime/mem-pool.h"
 #include "gen-cpp/PlanNodes_types.h"
 
@@ -85,10 +86,8 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode, ExecNode**
       *node = pool->Add(new HdfsScanNode(pool, tnode));
       return Status::OK;
     case TPlanNodeType::HBASE_SCAN_NODE:
-      // TODO: Uncomment once HBaseScanNode is implemented.
-      //*node = pool->Add(new HBaseScanNode(pool, tnode));
-      //return Status::OK;
-      return Status("HBase scan node not implemented");
+      *node = pool->Add(new HBaseScanNode(pool, tnode));
+      return Status::OK;
     case TPlanNodeType::AGGREGATION_NODE:
       *node = pool->Add(new AggregationNode(pool, tnode));
       return Status::OK;

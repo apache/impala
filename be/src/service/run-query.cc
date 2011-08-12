@@ -7,9 +7,12 @@
 #include <glog/logging.h>
 
 #include "common/status.h"
+#include "exec/hbase-table-scanner.h"
 #include "testutil/query-executor.h"
+#include "service/plan-executor-adaptor.h"
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
+#include "util/jni-util.h"
 
 DEFINE_string(query, "", "query to execute");
 
@@ -19,6 +22,11 @@ using namespace impala;
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, true);
+
+  EXIT_IF_ERROR(JniUtil::Init());
+  EXIT_IF_ERROR(HBaseTableScanner::Init());
+  EXIT_IF_ERROR(RuntimeState::InitHBaseConf());
+  EXIT_IF_ERROR(PlanExecutorAdaptor::Init());
 
   QueryExecutor executor;
   EXIT_IF_ERROR(executor.Setup());
@@ -55,5 +63,8 @@ int main(int argc, char** argv) {
   cout << "returned " << num_rows << (num_rows == 1 ? " row" : " rows")
        << " in " << setiosflags(ios::fixed) << setprecision(3)
        << elapsed_usec/1000000.0 << " s" << endl;
+
+  // Delete all global JNI references.
+  JniUtil::Cleanup();
 }
 

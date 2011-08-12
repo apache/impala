@@ -477,8 +477,13 @@
                       <arg value="-f"/>
                       <arg value="${project.basedir}/../testdata/bin/load.sql"/>
                     </exec>
+                    <!-- We do not want to stop HBase, 
+                         so the tests that need a running HBase can pass.
+                         Starting HBase when it is already running
+                         will result in a negligible warning.
                     <exec executable="${env.HBASE_HOME}/bin/stop-hbase.sh">
                     </exec>
+                    -->
                   </target>
                 </configuration>
               </execution>

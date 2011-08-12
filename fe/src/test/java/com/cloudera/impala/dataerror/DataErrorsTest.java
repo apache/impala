@@ -72,9 +72,9 @@ public class DataErrorsTest {
 
   @Test
   public void Test() {
-    runTests("textscannode-errors", false, 100);
-    runTests("textscannode-errors", false, 5);
-    runTests("textscannode-errors", true, 1);
+    runTests("hdfs-scan-node-errors", false, 100);
+    runTests("hdfs-scan-node-errors", false, 5);
+    runTests("hdfs-scan-node-errors", true, 1);
     if (testErrorLog.length() != 0) {
       fail(testErrorLog.toString());
     }

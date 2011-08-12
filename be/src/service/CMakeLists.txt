@@ -8,11 +8,13 @@ set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/service")
 
 add_library(Service
   plan-executor.cc
+  plan-executor-adaptor.cc
 )
 
 add_library(backend SHARED
   backend.cc
   plan-executor.cc  
+  plan-executor-adaptor.cc
 )
 
 target_link_libraries(backend
@@ -48,5 +50,5 @@ target_link_libraries(runquery
   thrift
   ImpalaThrift
   MockHdfs
-  ${Boost_LIBRARIES}
+  ${Boost_LIBRARIES}  
 )

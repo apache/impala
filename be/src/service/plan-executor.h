@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "common/status.h"
+#include "common/object-pool.h"
 #include "runtime/runtime-state.h"
 
 namespace impala {

@@ -430,11 +430,12 @@ int
 10
 ====
 # We expect that conversion errors are turned into NULLs
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col from alltypeserror
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col 
+from alltypeserrornonulls
 -----
 int,boolean,tinyint,smallint,int,bigint,float,double,string,string
 -----
-NULL,true,0,0,0,0,0,0,'01/01/09','0'
+0,true,0,0,0,0,0,0,'01/01/09','0'
 1,NULL,1,1,1,10,1,10.1,'01/01/09','1'
 2,true,NULL,2,2,20,2,20.2,'01/01/09','2'
 3,false,3,NULL,3,30,3,30.3,'01/01/09','3'
@@ -443,7 +444,7 @@ NULL,true,0,0,0,0,0,0,'01/01/09','0'
 6,true,6,6,6,60,NULL,60.6,'01/01/09','6'
 7,false,7,7,7,70,7,NULL,'01/01/09','7'
 8,false,8,8,8,80,8,80.8,'01/01/09','8'
-NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'01/01/09','9'
+9,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'01/01/09','9'
 0,true,0,0,0,0,0,0,'02/01/09','0'
 1,false,1,1,1,10,1,10.1,'02/01/09','1'
 2,true,2,2,2,20,2,20.2,'02/01/09','2'
@@ -455,7 +456,7 @@ NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'01/01/09','9'
 8,true,8,8,8,80,8,80.8,'02/01/09','8'
 9,false,9,9,9,90,9,90.9,'02/01/09','9'
 0,true,0,0,0,0,0,0,'03/01/09','0'
-NULL,false,1,1,1,10,1,10.1,'03/01/09','1'
+1,false,1,1,1,10,1,10.1,'03/01/09','1'
 2,true,2,2,2,20,2,20.2,'03/01/09','2'
 3,false,3,NULL,3,30,3,30.3,'03/01/09','3'
 4,true,4,4,4,40,4,40.4,'03/01/09','4'
@@ -464,7 +465,7 @@ NULL,false,1,1,1,10,1,10.1,'03/01/09','1'
 7,false,NULL,7,7,70,7,70.7,'03/01/09','7'
 8,true,8,8,8,80,8,80.8,'03/01/09','8'
 9,false,9,9,NULL,90,9,90.9,'03/01/09','9'
-=====
+====
 # partition key values are materialized correctly across file boundaries
 select day, month, year, string_col
 from alltypesagg

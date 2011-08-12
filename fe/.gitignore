@@ -19,4 +19,7 @@ target
 # Generated hive-site.xml file
 src/test/resources/hive-site.xml
 
+# Generated hbase-site.xml file
+src/test/resources/hbase-site.xml
+
 derby.log
