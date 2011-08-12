@@ -16,4 +16,7 @@ target
 # emacs backup files
 *~
 
+# Generated hive-site.xml file
+src/test/resources/hive-site.xml
+
 derby.log

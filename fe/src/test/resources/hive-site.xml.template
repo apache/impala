@@ -25,46 +25,25 @@
 <!-- users do not have to edit hadoop configuration files (that may be managed as a centralized -->
 <!-- resource).                                                                                 -->
 
-<!-- Hive Execution Parameters -->
-<!--property>
-  <name>hadoop.tmp.dir</name>
-  <value>${build.dir.hive}/test/hadoop-${user.name}</value>
-  <description>A base for other temporary directories.</description>
-</property-->
-
-<!--
-<property>
-  <name>hive.exec.reducers.max</name>
-  <value>1</value>
-  <description>maximum number of reducers</description>
-</property>
--->
-
-<!--property>
-  <name>hive.exec.scratchdir</name>
-  <value>${build.dir}/scratchdir</value>
-  <description>Scratch space for Hive jobs</description>
-</property-->
-
 <property>
   <name>javax.jdo.option.ConnectionURL</name>
   <!-- note: variable substituion not working here because it's loaded by jdo, not Hive -->
-  <value>${test.hive.metastore.jdbc.url}</value>
+  <value>jdbc:derby:;databaseName=${IMPALA_FE_DIR}/target/test_metastore_db;create=true;logDevice=${IMPALA_FE_DIR}/target/test_metastore_db</value>
 </property>
 
 <property>
   <name>javax.jdo.option.ConnectionDriverName</name>
-  <value>${test.hive.metastore.jdbc.driver}</value>
+  <value>org.apache.derby.jdbc.EmbeddedDriver</value>
 </property>
 
 <property>
   <name>javax.jdo.option.ConnectionUserName</name>
-  <value>${test.hive.metastore.jdbc.username}</value>
+  <value>APP</value>
 </property>
 
 <property>
   <name>javax.jdo.option.ConnectionPassword</name>
-  <value>${test.hive.metastore.jdbc.password}</value>
+  <value>mine</value>
 </property>
 
 <property>
@@ -76,7 +55,7 @@
 <property>
   <!--  this should eventually be deprecated since the metastore should supply this -->
   <name>hive.metastore.warehouse.dir</name>
-  <value>${test.hive.warehouse.dir}</value>
+  <value>${IMPALA_FE_DIR}/target/test-warehouse</value>
   <description></description>
 </property>
 
@@ -97,6 +76,7 @@
   <value>org.apache.hadoop.hive.metastore.ObjectStore</value>
   <description>Name of the class that implements org.apache.hadoop.hive.metastore.rawstore interface. This class is used to store and retrieval of raw metadata objects such as table, database</description>
 </property>
+
 
 
 </configuration>

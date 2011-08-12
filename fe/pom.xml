@@ -21,12 +21,6 @@
 
   <properties>
     <test.hive.testdata>${project.basedir}/../testdata/target/AllTypes.txt</test.hive.testdata>
-    <test.hive.warehouse.dir>${project.build.directory}/test-warehouse</test.hive.warehouse.dir>
-    <test.hive.metastore.jdbc.url>jdbc:derby:;databaseName=${project.build.directory}/test_metastore_db;create=true;logDevice=${project.build.directory}/test_metastore_db</test.hive.metastore.jdbc.url>
-    <test.hive.metastore.jdbc.driver>org.apache.derby.jdbc.EmbeddedDriver</test.hive.metastore.jdbc.driver>
-    <test.hive.metastore.jdbc.username>APP</test.hive.metastore.jdbc.username>
-    <test.hive.metastore.jdbc.password>mine</test.hive.metastore.jdbc.password>
-
     <thrift.executable>/usr/local/bin/thrift</thrift.executable>
   </properties>
   
@@ -214,11 +208,6 @@
         <configuration>
           <redirectTestOutputToFile>true</redirectTestOutputToFile>
           <systemPropertyVariables>
-            <test.hive.warehouse.dir>${test.hive.warehouse.dir}</test.hive.warehouse.dir>
-            <test.hive.metastore.jdbc.url>${test.hive.metastore.jdbc.url}</test.hive.metastore.jdbc.url>
-            <test.hive.metastore.jdbc.driver>${test.hive.metastore.jdbc.driver}</test.hive.metastore.jdbc.driver>
-            <test.hive.metastore.jdbc.username>${test.hive.metastore.jdbc.username}</test.hive.metastore.jdbc.username>
-            <test.hive.metastore.jdbc.password>${test.hive.metastore.jdbc.password}</test.hive.metastore.jdbc.password>
 	    <java.library.path>${java.library.path}:${project.basedir}/../be/build/service</java.library.path>
           </systemPropertyVariables>
         </configuration>
@@ -246,6 +235,7 @@
             <configuration>
               <tasks>
                 <apply executable="${thrift.executable}" force="true" type="file">
+                  <arg value="-v"/>
                   <arg value="--gen" />
                   <arg value="java:hashcode"/>
                   <arg value="-o"/>
@@ -255,6 +245,7 @@
                   </fileset>
                 </apply>
                 <apply executable="${thrift.executable}" force="true" type="file">
+                  <arg value="-v"/>
                   <arg value="--gen" />
                   <arg value="cpp"/>
                   <arg value="-o"/>
@@ -285,7 +276,12 @@
             </goals>
             <configuration>
               <sources>
+                <!-- Make sure Eclipse knows where to find generated sources.
+                        Note that the flex plugin appears to do this for you, but we have
+                        to do this manually for the CUP and Thrift generated code
+                        -->
                 <source>${project.build.directory}/generated-sources/gen-java</source>
+                <source>${project.build.directory}/generated-sources/cup</source>
               </sources>
             </configuration>
           </execution>
@@ -315,30 +311,65 @@
                        <key>test.hive.testdata</key>
 		       <value>${project.basedir}/../testdata/target/AllTypes.txt</value> 
 		     </systemProperty>
-		     <systemProperty>
-		       <key>test.hive.warehouse.dir</key>
-		       <value>${project.build.directory}/test-warehouse</value>
-		     </systemProperty>
-		     <systemProperty>
-		       <key>test.hive.metastore.jdbc.url</key>
-		       <value>jdbc:derby:;databaseName=${project.build.directory}/test_metastore_db;create=true;logDevice=${project.build.directory}/test_metastore_db</value>
-		     </systemProperty>
-		     <systemProperty>
-		       <key>test.hive.metastore.jdbc.driver</key>
-		       <value>org.apache.derby.jdbc.EmbeddedDriver</value>
-		     </systemProperty>
-		     <systemProperty>
-		       <key>test.hive.metastore.jdbc.username</key>
-		       <value>APP</value>
-		     </systemProperty>
-		     <systemProperty>
-		       <key>test.hive.metastore.jdbc.password</key>
-		       <value>mine</value>
-                     </systemProperty> 
                  </systemProperties> 
              </configuration> 
          </plugin> 
     </plugins>
+    <pluginManagement>
+      <plugins>
+        <!--This plugin's configuration is used to store Eclipse m2e settings only. It has no influence on the Maven build itself.-->
+        <plugin>
+          <groupId>org.eclipse.m2e</groupId>
+          <artifactId>lifecycle-mapping</artifactId>
+          <version>1.0.0</version>
+          <configuration>
+            <lifecycleMappingMetadata>
+              <pluginExecutions>
+                <pluginExecution>
+                  <pluginExecutionFilter>
+                    <groupId>net.sourceforge.czt</groupId>
+                    <artifactId>maven-cup-plugin</artifactId>
+                    <versionRange>[1.6.4,)</versionRange>
+                    <goals>
+                      <goal>generate</goal>
+                    </goals>
+                  </pluginExecutionFilter>
+                  <action>
+                    <ignore></ignore>
+                  </action>
+                </pluginExecution>
+                <pluginExecution>
+                  <pluginExecutionFilter>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-antrun-plugin</artifactId>
+                    <versionRange>[1.6,)</versionRange>
+                    <goals>
+                      <goal>run</goal>
+                    </goals>
+                  </pluginExecutionFilter>
+                  <action>
+                    <ignore></ignore>
+                  </action>
+                </pluginExecution>
+                <pluginExecution>
+                  <pluginExecutionFilter>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <versionRange>[2.0,)</versionRange>
+                    <goals>
+                      <goal>copy-dependencies</goal>
+                    </goals>
+                  </pluginExecutionFilter>
+                  <action>
+                    <ignore></ignore>
+                  </action>
+                </pluginExecution>
+              </pluginExecutions>
+            </lifecycleMappingMetadata>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
   </build>
               
   <repositories>

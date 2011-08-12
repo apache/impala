@@ -44,20 +44,10 @@ export HIVE_HOME=$IMPALA_HOME/thirdparty/hive-0.7.1-cdh3u1
 export PATH=$HIVE_HOME/bin:$PATH
 export HIVE_CONF_DIR=$IMPALA_HOME/fe/src/test/resources
 
-export IMPALA_METASTORE_DB_URL="jdbc:derby:;databaseName=${IMPALA_FE_DIR}/target/test_metastore_db;create=true;logDevice=${IMPALA_FE_DIR}/target/test_metastore_db"
-
-HIVE_OPTS="-hiveconf test.hive.warehouse.dir=$IMPALA_FE_DIR/target/test-warehouse"
-HIVE_OPTS="$HIVE_OPTS -hiveconf test.hive.metastore.jdbc.url=$IMPALA_METASTORE_DB_URL"
-HIVE_OPTS="$HIVE_OPTS -hiveconf test.hive.metastore.jdbc.driver=org.apache.derby.jdbc.EmbeddedDriver"
-HIVE_OPTS="$HIVE_OPTS -hiveconf test.hive.metastore.jdbc.username=APP"
-HIVE_OPTS="$HIVE_OPTS -hiveconf test.hive.metastore.jdbc.password=mine"
-export HIVE_OPTS
-
 if [[ $interactive -eq 1 || -n $IMPALA_DEBUG ]]; then
     echo "IMPALA_HOME    = $IMPALA_HOME"
     echo "HADOOP_HOME    = $HADOOP_HOME"
     echo "HIVE_HOME      = $HIVE_HOME"
     echo "HIVE_CONF_DIR  = $HIVE_CONF_DIR"
-    echo "HIVE_OPTS      = $HIVE_OPTS"
 fi
 
