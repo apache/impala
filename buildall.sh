@@ -77,6 +77,12 @@ cd ${IMPALA_FE_DIR}/src/test/resources
 perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
 hive-site.xml.template > hive-site.xml
 
+# Generate hbase-site.xml from template via env var substitution
+# TODO: Throw an error if the template references an undefined environment variable
+cd ${IMPALA_FE_DIR}/src/test/resources
+perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
+hbase-site.xml.template > hbase-site.xml
+
 if [ $testdata_action -eq 1 ]
 then
   # create test data

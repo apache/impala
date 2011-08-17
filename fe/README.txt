@@ -27,6 +27,7 @@ Load data:
 mvn -Pload-mstr-eatwh1 process-test-resources
 mvn -Pload-mstr-eatwh2 process-test-resources
 
+
 Running Tests
 -------------
 
@@ -145,4 +146,13 @@ From impala/fe:
   sqlline>!columns table_name
   sqlline>!describe tabl_name
   
-  
+Starting and stopping HBase
+--------------
+Make sure you have done "source impala-config.sh" in impala/bin
+
+Start HBase: 
+  impala/thirdparty/hbase-0.90.3-cdh3u1/bin/start-hbase.sh
+Stop HBase:
+  impala/thirdparty/hbase-0.90.3-cdh3u1/bin/stop-hbase.sh
+HBase shell (from anywhre since the bin is in PATH)
+  hbase shell

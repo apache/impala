@@ -53,3 +53,15 @@ LOAD DATA LOCAL INPATH '../testdata/target/AllTypesAggNoNulls/100107.txt' OVERWR
 LOAD DATA LOCAL INPATH '../testdata/target/AllTypesAggNoNulls/100108.txt' OVERWRITE INTO TABLE AllTypesAggNoNulls PARTITION(year=2010, month=1, day=8);
 LOAD DATA LOCAL INPATH '../testdata/target/AllTypesAggNoNulls/100109.txt' OVERWRITE INTO TABLE AllTypesAggNoNulls PARTITION(year=2010, month=1, day=9);
 LOAD DATA LOCAL INPATH '../testdata/target/AllTypesAggNoNulls/100110.txt' OVERWRITE INTO TABLE AllTypesAggNoNulls PARTITION(year=2010, month=1, day=10);
+
+INSERT OVERWRITE TABLE hbasealltypes
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col
+FROM alltypes;
+
+INSERT OVERWRITE TABLE hbasealltypessmall
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col
+FROM alltypessmall;
+
+INSERT OVERWRITE TABLE hbasealltypesagg
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col
+FROM alltypesagg;

@@ -8,9 +8,9 @@ package com.cloudera.impala.catalog;
  * Owned by Catalog instance.
  */
 public class Column {
-  private final String name;
-  private final PrimitiveType type;
-  private final int position;  // in table
+  protected final String name;
+  protected final PrimitiveType type;
+  protected int position;  // in table
 
   public Column(String name, PrimitiveType type, int position) {
     this.name = name;
@@ -28,6 +28,10 @@ public class Column {
 
   public int getPosition() {
     return position;
+  }
+
+  public void setPosition(int position) {
+    this.position = position;
   }
 
 }

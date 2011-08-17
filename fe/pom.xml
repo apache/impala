@@ -30,20 +30,25 @@
       <artifactId>java-cup</artifactId>
       <version>0.11a</version>
     </dependency>
-
+    
     <dependency>
       <groupId>org.apache.hadoop.hive</groupId>
       <artifactId>hive-metastore</artifactId>
       <version>0.7.1-cdh3u1</version>
-    </dependency>
+    </dependency>    
     <dependency>
       <groupId>org.apache.hadoop.hive</groupId>
       <artifactId>hive-common</artifactId>
       <version>0.7.1-cdh3u1</version>
-    </dependency>
+    </dependency>           
     <dependency>
       <groupId>org.apache.hadoop.hive</groupId>
       <artifactId>hive-serde</artifactId>
+      <version>0.7.1-cdh3u1</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hadoop.hive</groupId>
+      <artifactId>hive-shims</artifactId>
       <version>0.7.1-cdh3u1</version>
     </dependency>
     <dependency>
@@ -75,12 +80,7 @@
       <groupId>commons-dbcp</groupId>
       <artifactId>commons-dbcp</artifactId>
       <version>1.4</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop.hive</groupId>
-      <artifactId>hive-shims</artifactId>
-      <version>0.7.1-cdh3u1</version>
-    </dependency>
+    </dependency>    
 
     <dependency>
       <groupId>commons-cli</groupId>
@@ -110,6 +110,18 @@
       <artifactId>junit</artifactId>
       <version>4.8.2</version>
       <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hadoop.hive</groupId>
+      <artifactId>hive-hbase-handler</artifactId>
+      <version>0.7.1-cdh3u2-SNAPSHOT</version>
+    </dependency>    
+
+    <dependency>
+      <groupId>org.apache.hbase</groupId>
+      <artifactId>hbase</artifactId>
+      <version>0.90.3-cdh3u1</version>
     </dependency>
 
   </dependencies>
@@ -445,6 +457,12 @@
                 </goals>
                 <configuration>
                   <target>
+                    <exec executable="${env.HBASE_HOME}/bin/start-hbase.sh">
+                    </exec>
+                    <exec executable="${env.HBASE_HOME}/bin/hbase">
+		      <arg value="shell"/>
+		      <arg value="${project.basedir}/../testdata/bin/create.hbase"/>
+                    </exec>
                     <exec executable="${env.HIVE_HOME}/bin/hive">
                       <arg value="-hiveconf"/>
                       <arg value="hive.root.logger=WARN,console"/>
@@ -458,6 +476,8 @@
                       <arg value="-v"/>
                       <arg value="-f"/>
                       <arg value="${project.basedir}/../testdata/bin/load.sql"/>
+                    </exec>
+                    <exec executable="${env.HBASE_HOME}/bin/stop-hbase.sh">
                     </exec>
                   </target>
                 </configuration>

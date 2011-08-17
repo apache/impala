@@ -77,3 +77,60 @@ CREATE TABLE testdb1.TestTbl (
   name string,
   birthday string)
 row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
+
+DROP TABLE IF EXISTS hbasealltypes;
+CREATE EXTERNAL TABLE hbasealltypes (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string)
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES (
+  "hbase.columns.mapping" =
+  ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col"
+)
+TBLPROPERTIES("hbase.table.name" = "hbasealltypes");
+
+DROP TABLE IF EXISTS hbasealltypessmall;
+CREATE EXTERNAL TABLE hbasealltypessmall (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string)
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES (
+  "hbase.columns.mapping" =
+  ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col"
+)
+TBLPROPERTIES("hbase.table.name" = "hbasealltypessmall");
+
+DROP TABLE IF EXISTS hbasealltypesagg;
+CREATE EXTERNAL TABLE hbasealltypesagg (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string)
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES (
+  "hbase.columns.mapping" =
+  ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col"
+)
+TBLPROPERTIES("hbase.table.name" = "hbasealltypesagg");

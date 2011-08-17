@@ -44,6 +44,10 @@ export HIVE_HOME=$IMPALA_HOME/thirdparty/hive-0.7.1-cdh3u1
 export PATH=$HIVE_HOME/bin:$PATH
 export HIVE_CONF_DIR=$IMPALA_HOME/fe/src/test/resources
 
+export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-0.90.3-cdh3u1
+export PATH=$HBASE_HOME/bin:$PATH
+export HBASE_CONF_DIR=$HIVE_CONF_DIR
+
 if [[ $interactive -eq 1 || -n $IMPALA_DEBUG ]]; then
     echo "IMPALA_HOME    = $IMPALA_HOME"
     echo "HADOOP_HOME    = $HADOOP_HOME"

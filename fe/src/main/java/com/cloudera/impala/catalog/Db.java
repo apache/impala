@@ -39,7 +39,7 @@ public class Db {
       List<String> tblNames = null;
       tblNames = client.getTables(dbName, "*");
       for (String tblName : tblNames) {
-        Table table = Table.loadTable(client, db, tblName);
+        Table table = Table.load(client, db, tblName);
         if (table != null) {
           db.tables.put(tblName, table);
         }

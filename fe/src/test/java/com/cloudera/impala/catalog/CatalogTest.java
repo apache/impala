@@ -30,7 +30,7 @@ public class CatalogTest {
   }
 
   private void checkTableCols(Db db, String tblName, String[] colNames,
-                          PrimitiveType[] colTypes) {
+      PrimitiveType[] colTypes) {
     Table tbl = db.getTable(tblName);
     assertEquals(tbl.getName(), tblName);
     List<Column> cols = tbl.getColumns();
@@ -42,6 +42,25 @@ public class CatalogTest {
       Column col = it.next();
       assertEquals(col.getName(), colNames[i]);
       assertEquals(col.getType(), colTypes[i]);
+      ++i;
+    }
+  }
+
+  private void checkHBaseTableCols(Db db, String hiveTableName, String hbaseTableName,
+      String[] hiveColNames, String[] colFamilies, String[] colQualifiers,
+      PrimitiveType[] colTypes) {
+    checkTableCols(db, hiveTableName, hiveColNames, colTypes);
+    HBaseTable tbl = (HBaseTable) db.getTable(hiveTableName);
+    assertEquals(tbl.getHBaseTableName(), hbaseTableName);
+    List<Column> cols = tbl.getColumns();
+    assertEquals(colFamilies.length, colTypes.length);
+    assertEquals(colQualifiers.length, colTypes.length);
+    Iterator<Column> it = cols.iterator();
+    int i = 0;
+    while (it.hasNext()) {
+      HBaseColumn col = (HBaseColumn)it.next();
+      assertEquals(col.getColumnFamily(), colFamilies[i]);
+      assertEquals(col.getColumnQualifier(), colQualifiers[i]);
       ++i;
     }
   }
@@ -63,14 +82,16 @@ public class CatalogTest {
     assertNotNull(testDb);
     assertEquals(testDb.getName(), "testdb1");
 
-    // default contains tables alltypes, alltypessmall, alltypesagg and testtbl.
-    assertEquals(6, defaultDb.getTables().size());
+    assertEquals(9, defaultDb.getTables().size());
     assertNotNull(defaultDb.getTable("alltypes"));
     assertNotNull(defaultDb.getTable("alltypessmall"));
     assertNotNull(defaultDb.getTable("alltypeserror"));
     assertNotNull(defaultDb.getTable("alltypesagg"));
     assertNotNull(defaultDb.getTable("alltypesaggnonulls"));
     assertNotNull(defaultDb.getTable("testtbl"));
+    assertNotNull(defaultDb.getTable("hbasealltypes"));
+    assertNotNull(defaultDb.getTable("hbasealltypessmall"));
+    assertNotNull(defaultDb.getTable("hbasealltypesagg"));
     // testdb contains tables alltypes and testtbl.
     assertEquals(2, testDb.getTables().size());
     assertNotNull(testDb.getTable("alltypes"));
@@ -106,18 +127,67 @@ public class CatalogTest {
         new PrimitiveType[]
           {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.STRING});
 
+    checkHBaseTableCols(defaultDb, "hbasealltypes", "hbasealltypes",
+        new String[]
+          {"id", "bool_col", "double_col", "float_col", "bigint_col", "int_col",
+           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+        new String[]
+          {":key", "bools", "floats", "floats", "ints", "ints", "ints", "ints",
+           "strings", "strings"},
+        new String[]
+          {null, "bool_col", "double_col", "float_col", "bigint_col", "int_col",
+           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+        new PrimitiveType[]
+          {PrimitiveType.INT,PrimitiveType.BOOLEAN, PrimitiveType.DOUBLE,
+           PrimitiveType.FLOAT, PrimitiveType.BIGINT, PrimitiveType.INT,
+           PrimitiveType.SMALLINT, PrimitiveType.TINYINT, PrimitiveType.STRING,
+           PrimitiveType.STRING});
+
+    checkHBaseTableCols(defaultDb, "hbasealltypessmall", "hbasealltypessmall",
+        new String[]
+          {"id", "bool_col", "double_col", "float_col", "bigint_col", "int_col",
+           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+        new String[]
+          {":key", "bools", "floats", "floats", "ints", "ints", "ints", "ints",
+           "strings", "strings"},
+        new String[]
+          {null, "bool_col", "double_col", "float_col", "bigint_col", "int_col",
+           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+        new PrimitiveType[]
+          {PrimitiveType.INT,PrimitiveType.BOOLEAN, PrimitiveType.DOUBLE,
+           PrimitiveType.FLOAT, PrimitiveType.BIGINT, PrimitiveType.INT,
+           PrimitiveType.SMALLINT, PrimitiveType.TINYINT, PrimitiveType.STRING,
+           PrimitiveType.STRING});
+
+    checkHBaseTableCols(defaultDb, "hbasealltypesagg", "hbasealltypesagg",
+        new String[]
+          {"id", "bool_col", "double_col", "float_col", "bigint_col", "int_col",
+           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+        new String[]
+          {":key", "bools", "floats", "floats", "ints", "ints", "ints", "ints",
+           "strings", "strings"},
+        new String[]
+          {null, "bool_col", "double_col", "float_col", "bigint_col", "int_col",
+           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+        new PrimitiveType[]
+          {PrimitiveType.INT,PrimitiveType.BOOLEAN, PrimitiveType.DOUBLE,
+           PrimitiveType.FLOAT, PrimitiveType.BIGINT, PrimitiveType.INT,
+           PrimitiveType.SMALLINT, PrimitiveType.TINYINT, PrimitiveType.STRING,
+           PrimitiveType.STRING});
+
     // case-insensitive lookup
     assertEquals(defaultDb.getTable("alltypes"), defaultDb.getTable("AllTypes"));
   }
 
   @Test public void TestPartitions() {
-    List<Table.Partition> partitions =
-        catalog.getDb("default").getTable("AllTypes").getPartitions();
+    HdfsTable table = (HdfsTable) catalog.getDb("default").getTable("AllTypes");
+    List<HdfsTable.Partition> partitions = table.getPartitions();
+
     // check that partition keys cover the date range 1/1/2009-12/31/2010
     // and that we have one file per partition
     assertEquals(partitions.size(), 24);
     Set<Long> months = Sets.newHashSet();
-    for (Table.Partition p: partitions) {
+    for (HdfsTable.Partition p: partitions) {
       assertEquals(p.keyValues.size(), 2);
 
       LiteralExpr key1Expr = p.keyValues.get(0);

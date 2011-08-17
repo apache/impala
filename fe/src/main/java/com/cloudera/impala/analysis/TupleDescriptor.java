@@ -5,6 +5,7 @@ package com.cloudera.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.thrift.TTable;
@@ -46,7 +47,6 @@ public class TupleDescriptor {
     table = tbl;
   }
 
-
   public String debugString() {
     String tblStr = (table == null ? "null" : table.getFullName());
     List<String> slotStrings = Lists.newArrayList();
@@ -63,17 +63,19 @@ public class TupleDescriptor {
   public TTupleDescriptor toThrift() {
     TTupleDescriptor ttupleDesc = new TTupleDescriptor(id.asInt(), byteSize);
     if (table != null) {
+      // TODO: Assuming HdfsTable for now. Add support for HBaseTable in separate CL.
+      HdfsTable hiveTable = (HdfsTable) table;
       // We only support single-byte characters as delimiters.
-      TTable ttable = new TTable(table.getColumns().size(),
-          table.getNumPartitionKeys(),
-          (byte)table.getLineDelim().charAt(0),
-          (byte)table.getFieldDelim().charAt(0),
-          (byte)table.getCollectionDelim().charAt(0),
-          (byte)table.getMapKeyDelim().charAt(0),
-          (byte)table.getEscapeChar().charAt(0));
+      TTable ttable = new TTable(hiveTable.getColumns().size(),
+          hiveTable.getNumPartitionKeys(),
+          (byte)hiveTable.getLineDelim().charAt(0),
+          (byte)hiveTable.getFieldDelim().charAt(0),
+          (byte)hiveTable.getCollectionDelim().charAt(0),
+          (byte)hiveTable.getMapKeyDelim().charAt(0),
+          (byte)hiveTable.getEscapeChar().charAt(0));
       // Set optional quote char.
-      if (table.getQuoteChar() != null) {
-        ttable.setQuoteChar((byte)table.getQuoteChar().charAt(0));
+      if (hiveTable.getQuoteChar() != null) {
+        ttable.setQuoteChar((byte)hiveTable.getQuoteChar().charAt(0));
       }
       ttupleDesc.setTable(ttable);
     }
