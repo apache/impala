@@ -19,7 +19,7 @@ public class QueryTest {
   private static Catalog catalog;
   private static Coordinator coordinator;
   private static StringBuilder testErrorLog;
-  private final String testDir = "ServiceTest";
+  private final String testDir = "QueryTest";
 
   @BeforeClass
   public static void setUp() throws Exception {
