@@ -30,7 +30,6 @@ mvn -Pload-mstr-eatwh2 process-test-resources
 
 Running Tests
 -------------
-
 From the fe directory ("impala/fe" typically) type
 
   $ mvn test
@@ -148,11 +147,12 @@ From impala/fe:
   
 Starting and stopping HBase
 --------------
-Make sure you have done "source impala-config.sh" in impala/bin
+Make sure you have done "source impala-config.sh" in impala/bin, 
+such that ${HBASE_HOME}/bin is in PATH.
 
 Start HBase: 
-  impala/thirdparty/hbase-0.90.3-cdh3u1/bin/start-hbase.sh
+  start-hbase.sh
 Stop HBase:
-  impala/thirdparty/hbase-0.90.3-cdh3u1/bin/stop-hbase.sh
-HBase shell (from anywhre since the bin is in PATH)
+  stop-hbase.sh
+HBase shell
   hbase shell

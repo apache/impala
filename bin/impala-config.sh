@@ -53,5 +53,6 @@ if [[ $interactive -eq 1 || -n $IMPALA_DEBUG ]]; then
     echo "HADOOP_HOME    = $HADOOP_HOME"
     echo "HIVE_HOME      = $HIVE_HOME"
     echo "HIVE_CONF_DIR  = $HIVE_CONF_DIR"
+    echo "HBASE_HOME     = $HBASE_HOME"
+    echo "HBASE_CONF_DIR = $HBASE_CONF_DIR"
 fi
-
