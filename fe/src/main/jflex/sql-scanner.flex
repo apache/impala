@@ -16,6 +16,8 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
 
 %class SqlScanner
 %cup
+%public
+%final
 %eofval{
   return newToken(SqlParserSymbols.EOF, null);
 %eofval}

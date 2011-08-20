@@ -419,4 +419,43 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     Expr newChild = child.castTo(targetType);
     setChild(childIndex, newChild);
   }
+
+  /**
+   * Cast the operands of a binary operation as necessary,
+   * give their compatible type.
+   * String literals are converted first, to enable casting of the
+   * the other non-string operand.
+   *
+   * @param compatibleType
+   * @return
+   *         The possibly changed compatibleType
+   *         (if a string literal forced casting the other operand)
+   */
+  public PrimitiveType castBinaryOp(PrimitiveType compatibleType) throws AnalysisException {
+    Preconditions.checkState(this instanceof BinaryPredicate || this instanceof ArithmeticExpr);
+    PrimitiveType t1 = getChild(0).getType();
+    PrimitiveType t2 = getChild(1).getType();
+    // Convert string literals if the other operand is numeric,
+    // then get compatible type again to see if non-string type needs a cast as well.
+    if (t1.isStringType() && getChild(0).isLiteral() && t2.isNumericType() ) {
+      StringLiteral firstChild = (StringLiteral) getChild(0);
+      children.set(0, firstChild.convertToNumber());
+      t1 = getChild(0).getType();
+      compatibleType = PrimitiveType.getAssignmentCompatibleType(t1, t2);
+    } else if (t2.isStringType() && getChild(1).isLiteral() && t1.isNumericType()) {
+      StringLiteral secondChild = (StringLiteral) getChild(1);
+      children.set(1, secondChild.convertToNumber());
+      t2 = getChild(1).getType();
+      compatibleType = PrimitiveType.getAssignmentCompatibleType(t1, t2);
+    }
+    // add operand casts
+    Preconditions.checkState(compatibleType.isValid());
+    if (t1 != compatibleType) {
+      castChild(compatibleType, 0);
+    }
+    if (t2 != compatibleType) {
+      castChild(compatibleType, 1);
+    }
+    return compatibleType;
+  }
 }

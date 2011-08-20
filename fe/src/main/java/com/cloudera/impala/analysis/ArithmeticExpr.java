@@ -146,13 +146,6 @@ public class ArithmeticExpr extends Expr {
         break;
     }
 
-    // add operand casts
-    Preconditions.checkState(type.isValid());
-    if (t1 != type) {
-      castChild(type, 0);
-    }
-    if (t2 != type) {
-      castChild(type, 1);
-    }
+    type = castBinaryOp(type);
   }
 }

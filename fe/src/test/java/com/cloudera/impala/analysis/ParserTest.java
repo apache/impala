@@ -191,9 +191,9 @@ public class ParserTest {
     ParserError("select " + Long.toString(Long.MIN_VALUE) + "1 from test");
     // java converts a float overflow to infinity, we consider it an error
     ParserError("select " + Double.toString(Double.MAX_VALUE) + "1 from test");
-    // java converts a float underflow to 0.0
-    // since there is no easy, reliable way to detect underflow,
-    // we don't consider it an error
+    // Java converts a float underflow to 0.0.
+    // Since there is no easy, reliable way to detect underflow,
+    // we don't consider it an error.
     ParsesOk("select " + Double.toString(Double.MIN_VALUE) + "1 from test");
   }
 

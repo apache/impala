@@ -2,6 +2,11 @@
 
 package com.cloudera.impala.analysis;
 
+import java.io.IOException;
+import java.io.StringReader;
+
+import java_cup.runtime.Symbol;
+
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
@@ -45,7 +50,7 @@ public class StringLiteral extends LiteralExpr {
     Preconditions.checkState(targetType.isNumericType() || targetType.isDateType());
     LiteralExpr newLiteral = this;
     if (targetType.isNumericType()) {
-      newLiteral = convertToNumber(targetType);
+      newLiteral = convertToNumber();
     } else if (targetType.isDateType()) {
       newLiteral = convertToDate(targetType);
     }
@@ -53,54 +58,47 @@ public class StringLiteral extends LiteralExpr {
   }
 
   /**
-   * Convert a string literal to numeric literal
+   * Convert this string literal to numeric literal.
    *
-   * @param targetType
-   *          is the desired type
    * @return new converted literal (not null)
+   *         the type of the literal is determined by the lexical scanner
    * @throws AnalysisException
    *           if NumberFormatException occurs,
    *           or if floating point value is NaN or infinite
    */
-  private LiteralExpr convertToNumber(PrimitiveType targetType)
+  public LiteralExpr convertToNumber()
       throws AnalysisException {
-    LiteralExpr result = null;
-    if (targetType.isFixedPointType()) {
-      Long newValue = null;
-      try {
-        newValue = new Long(value);
-      } catch (NumberFormatException e) {
-        throw new AnalysisException("Cannot convert " + value + " to a fixed-point type", e);
+    StringReader reader = new StringReader(value);
+    SqlScanner scanner = new SqlScanner(reader);
+    // For distinguishing positive and negative numbers.
+    double multiplier = 1;
+    Symbol sym;
+    try {
+      // We allow simple chaining of MINUS to recognize negative numbers.
+      // Currently we can't handle string literals containing full fledged expressions
+      // which are implicitly cast to a numeric literal. This would require invoking the parser.
+      sym = scanner.next_token();
+      while (sym.sym == SqlParserSymbols.MINUS) {
+        multiplier *= -1;
+        sym = scanner.next_token();
       }
-      result = new IntLiteral(newValue);
-    } else {
-      // floating point type
-      Preconditions.checkArgument(targetType.isFloatingPointType());
-      Double newValue = null;
-      try {
-        newValue = new Double(value);
-      } catch (NumberFormatException e) {
-        throw new AnalysisException("Cannot convert " + value + " to a floating point type", e);
-      }
-      // conversion succeeded but literal is infinity or not a number
-      if (newValue.isInfinite() || newValue.isNaN()) {
-        throw new AnalysisException("Conversion from " +
-            type.toString() + " to " +
-            targetType.toString() +
-            " resulted in infinity or NaN.");
-      }
-      result = new FloatLiteral(newValue);
+    } catch (IOException e) {
+      throw new AnalysisException("Failed to convert string literal to number.", e);
     }
-    if (PrimitiveType.getAssignmentCompatibleType(result.getType(), targetType)
-        != targetType) {
-      // We can't cast this string to the desired type w/o loss of precision.
-      // Reject for now.
-      // TODO: fix this by analyzing the string before attempting to cast it.
-      throw new AnalysisException(
-          "Cannot convert " + value + " to a " + targetType.toString());
+    if (sym.sym == SqlParserSymbols.NUMERIC_OVERFLOW) {
+      throw new AnalysisException("Number too large: " + value);
     }
-    return (LiteralExpr) result.castTo(targetType);
+    if (sym.sym == SqlParserSymbols.INTEGER_LITERAL) {
+      Long val = (Long) sym.value;
+      return new IntLiteral(new Long(val * (long)multiplier));
+    }
+    if (sym.sym == SqlParserSymbols.FLOATINGPOINT_LITERAL) {
+      return new FloatLiteral((Double) sym.value * multiplier);
+    }
+    // Symbol is not an integer or floating point literal.
+    throw new AnalysisException("Failed to convert string literal '" + value + "' to number.");
   }
+
 
   /**
    * Convert a string literal to a date literal

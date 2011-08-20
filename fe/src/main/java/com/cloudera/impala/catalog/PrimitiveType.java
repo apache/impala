@@ -4,6 +4,7 @@ package com.cloudera.impala.catalog;
 
 import java.util.ArrayList;
 
+import com.cloudera.impala.analysis.SqlParserSymbols;
 import com.cloudera.impala.thrift.TPrimitiveType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -232,6 +233,20 @@ public enum PrimitiveType {
     PrimitiveType result =  compatibilityMatrix[smallerType.ordinal()][largerType.ordinal()];
     Preconditions.checkNotNull(result);
     return result;
+  }
+
+  // Returns the highest resolution type
+  // corresponding to the lexer symbol of numeric literals.
+  // Currently used to determine whether the literal is fixed or floating point.
+  public static PrimitiveType literalSymbolIdToType(int symbolId) {
+    switch (symbolId) {
+      case SqlParserSymbols.INTEGER_LITERAL:
+        return BIGINT;
+      case SqlParserSymbols.FLOATINGPOINT_LITERAL:
+        return DOUBLE;
+      default:
+        return INVALID_TYPE;
+    }
   }
 }
 

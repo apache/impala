@@ -82,12 +82,7 @@ public class BinaryPredicate extends Predicate {
       throw new AnalysisException("operands are not comparable: " + this.toSql());
     }
 
-    // add operand casts
-    if (t1 != compatibleType) {
-      castChild(compatibleType, 0);
-    }
-    if (t2 != compatibleType) {
-      castChild(compatibleType, 1);
-    }
+    // Ignore return value because type is always bool for predicates.
+    castBinaryOp(compatibleType);
   }
 }

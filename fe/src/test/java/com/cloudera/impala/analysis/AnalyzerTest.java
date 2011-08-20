@@ -520,10 +520,6 @@ public class AnalyzerTest {
     // invalid casts
     AnalysisError("select * from alltypes where bool_col = '15'",
         "operands are not comparable: bool_col = '15'");
-    AnalysisError("select * from alltypes where tinyint_col = '0.5'", "");
-    AnalysisError("select * from alltypes where smallint_col = '0.5'", "");
-    AnalysisError("select * from alltypes where int_col = '0.5'", "");
-    AnalysisError("select * from alltypes where bigint_col = '0.5'", "");
     //AnalysisError("select * from alltypes where date_col = 15",
         //"operands are not comparable: date_col = 15");
     //AnalysisError("select * from alltypes where datetime_col = 1.0",
@@ -532,11 +528,46 @@ public class AnalyzerTest {
 
   @Test
   public void TestStringCasts() {
-    // Comparing a float to a string representing a double should create a cast
-    // for the float, but it doesn't at the moment: it tries to cast
-    // the string to a float and determines it's out of range.
-    AnalyzesOk("select 1.0 = " + Double.MAX_VALUE);
-    AnalysisError("select 1.0 = '" + Double.MAX_VALUE + "'");
+    AnalyzesOk("select * from alltypes where tinyint_col = '0.5'");
+    AnalyzesOk("select * from alltypes where tinyint_col = '0.5'");
+    AnalyzesOk("select * from alltypes where smallint_col = '0.5'");
+    AnalyzesOk("select * from alltypes where int_col = '0.5'");
+    AnalyzesOk("select * from alltypes where bigint_col = '0.5'");
+    AnalyzesOk("select 1.0 = '" + Double.toString(Double.MIN_VALUE) + "'");
+    AnalyzesOk("select 1.0 = '-" + Double.toString(Double.MIN_VALUE) + "'");
+    AnalyzesOk("select 1.0 = '" + Double.toString(Double.MAX_VALUE) + "'");
+    AnalyzesOk("select 1.0 = '-" + Double.toString(Double.MAX_VALUE) + "'");
+    // Test chains of minus. Note that "--" is the a comment symbol.
+    AnalyzesOk("select * from alltypes where tinyint_col = '-1'");
+    AnalyzesOk("select * from alltypes where tinyint_col = '- -1'");
+    AnalyzesOk("select * from alltypes where tinyint_col = '- - -1'");
+    AnalyzesOk("select * from alltypes where tinyint_col = '- - - -1'");
+    // Test correct casting to compatible type on bitwise ops.
+    AnalyzesOk("select 1 | '" + Byte.toString(Byte.MIN_VALUE) + "'");
+    AnalyzesOk("select 1 | '" + Byte.toString(Byte.MAX_VALUE) + "'");
+    AnalyzesOk("select 1 | '" + Short.toString(Short.MIN_VALUE) + "'");
+    AnalyzesOk("select 1 | '" + Short.toString(Short.MAX_VALUE) + "'");
+    AnalyzesOk("select 1 | '" + Integer.toString(Integer.MIN_VALUE) + "'");
+    AnalyzesOk("select 1 | '" + Integer.toString(Integer.MAX_VALUE) + "'");
+    // We need to add 1 to MIN_VALUE because there are no negative integer literals.
+    // The reason is that whether a minus belongs to an
+    // arithmetic expr or a literal must be decided by the parser, not the lexer.
+    AnalyzesOk("select 1 | '" + Long.toString(Long.MIN_VALUE+1)  + "'");
+    AnalyzesOk("select 1 | '" + Long.toString(Long.MAX_VALUE) + "'");
+    // Numeric overflow
+    AnalysisError("select * from alltypes where tinyint_col = " +
+    		"'" + Long.toString(Long.MIN_VALUE) + "1'");
+    AnalysisError("select * from alltypes where tinyint_col = " +
+        "'" + Long.toString(Long.MAX_VALUE) + "1'");
+    AnalysisError("select * from alltypes where tinyint_col = " +
+        "'" + Double.toString(Double.MAX_VALUE) + "1'");
+    // Java converts a float underflow to 0.0.
+    // Since there is no easy, reliable way to detect underflow,
+    // we don't consider it an error.
+    AnalyzesOk("select * from alltypes where tinyint_col = " +
+        "'" + Double.toString(Double.MIN_VALUE) + "1'");
+    // Failure to convert a comment.
+    AnalysisError("select * from alltypes where tinyint_col = '--1'");
   }
 
   @Test
