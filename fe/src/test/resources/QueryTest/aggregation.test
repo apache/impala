@@ -231,3 +231,135 @@ bigint, double, double, double, double
 ----
 0,NULL,NULL,NULL,NULL
 ====
+# HAVING clauses over all aggregation functions, plus compound HAVING clauses
+select int_col % 7, count(*), max(int_col) from alltypesagg group by 1
+----
+int, bigint, int
+----
+4,1430,998
+5,1430,999
+6,1420,993
+0,1420,994
+NULL,10,NULL
+1,1430,995
+2,1430,996
+3,1430,997
+====
+select int_col % 7, count(*) from alltypesagg group by 1 having max(int_col) > 991
+----
+int, bigint
+----
+4,1430
+5,1430
+6,1420
+0,1420
+1,1430
+2,1430
+3,1430
+====
+select int_col % 7, count(*) from alltypesagg group by 1
+having max(int_col) > 991 and count(*) > 1420
+----
+int, bigint
+----
+4,1430
+5,1430
+1,1430
+2,1430
+3,1430
+====
+select int_col % 7, count(*) from alltypesagg group by 1
+having min(int_col) < 7
+----
+int, bigint
+----
+4,1430
+5,1430
+6,1420
+1,1430
+2,1430
+3,1430
+====
+select int_col % 7, count(*) from alltypesagg group by 1
+having min(int_col) < 7 and count(*) > 1420
+----
+int, bigint
+----
+4,1430
+5,1430
+1,1430
+2,1430
+3,1430
+====
+select int_col % 7, count(*), sum(int_col) from alltypesagg group by 1
+----
+int, bigint, bigint
+----
+4,1430,716430
+5,1430,717860
+6,1420,709290
+0,1420,710710
+NULL,10,NULL
+1,1430,712140
+2,1430,713570
+3,1430,715000
+====
+select int_col % 7, count(*), sum(int_col) from alltypesagg group by 1
+having sum(int_col) >= 715000
+----
+int, bigint, bigint
+----
+4,1430,716430
+5,1430,717860
+3,1430,715000
+====
+select int_col % 7, count(*), sum(int_col) from alltypesagg group by 1
+having sum(int_col) >= 715000 or count(*) > 1420
+----
+int, bigint, bigint
+----
+4,1430,716430
+5,1430,717860
+1,1430,712140
+2,1430,713570
+3,1430,715000
+====
+select int_col % 7, count(*), sum(int_col) from alltypesagg group by 1
+having sum(int_col) is null
+----
+int, bigint, bigint
+----
+NULL,10,NULL
+====
+select int_col % 7, count(*), avg(int_col) from alltypesagg group by 1
+----
+int, bigint, double
+----
+4,1430,501
+5,1430,502
+6,1420,499.5
+0,1420,500.5
+NULL,10,NULL
+1,1430,498
+2,1430,499
+3,1430,500
+====
+select int_col % 7, count(*), avg(int_col) from alltypesagg group by 1
+having avg(int_col) > 500
+----
+int, bigint, double
+----
+4,1430,501
+5,1430,502
+0,1420,500.5
+====
+select int_col % 7, count(*), avg(int_col) from alltypesagg group by 1
+having avg(int_col) > 500 or count(*) = 10
+----
+int, bigint, double
+----
+4,1430,501
+5,1430,502
+0,1420,500.5
+NULL,10,NULL
+====

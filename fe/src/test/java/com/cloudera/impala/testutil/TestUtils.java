@@ -135,7 +135,7 @@ public class TestUtils {
   public static String compareOutputTypes(List<PrimitiveType> actual, String[] expectedStrTypes) {
     if (actual.size() != expectedStrTypes.length) {
       return "Unequal number of types. Found: " + actual.size() + ". Expected: "
-          + expectedStrTypes.length;
+          + expectedStrTypes.length + "\n";
     }
     for (int i = 0; i < expectedStrTypes.length; ++i) {
       String upperCaseTypeStr = expectedStrTypes[i].toUpperCase();
