@@ -25,6 +25,9 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.thrift.THdfsTable;
+import com.cloudera.impala.thrift.TTable;
+import com.cloudera.impala.thrift.TTableType;
 import com.google.common.collect.Lists;
 
 /**
@@ -273,6 +276,24 @@ public class HdfsTable extends Table {
       strBuilder.deleteCharAt(strBuilder.length()-1);
       throw new Exception(strBuilder.toString());
     }
+  }
+
+  @Override
+  public TTable toThrift() {
+    TTable ttable = new TTable(TTableType.HDFS_TABLE, colsByPos.size());
+    // We only support single-byte characters as delimiters.
+    THdfsTable tHdfsTable = new THdfsTable(numPartitionKeys,
+            (byte) lineDelim.charAt(0),
+            (byte) fieldDelim.charAt(0),
+            (byte) collectionDelim.charAt(0),
+            (byte) mapKeyDelim.charAt(0),
+            (byte) escapeChar.charAt(0));
+    // Set optional quote char.
+    if (quoteChar != null) {
+      tHdfsTable.setQuoteChar((byte) quoteChar.charAt(0));
+    }
+    ttable.setHdfsTable(tHdfsTable);
+    return ttable;
   }
 
   public String getLineDelim() {

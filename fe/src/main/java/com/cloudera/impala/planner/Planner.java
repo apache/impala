@@ -31,24 +31,32 @@ public class Planner {
    * @param analyzer
    * @param tblRef
    * @return
+   * @throws NotImplementedException
    */
   private PlanNode createScanNode(Analyzer analyzer, TableRef tblRef) {
-    List<String> filePaths = Lists.newArrayList();
-    List<LiteralExpr> keyValues = Lists.newArrayList();
-    int numPartitionKeys = 0;
-    // TODO: Assuming HdfsTable for now. Add support for HBaseTable in separate CL.
-    HdfsTable hiveTable = (HdfsTable) tblRef.getTable();
-    for (HdfsTable.Partition p: hiveTable.getPartitions()) {
-      filePaths.addAll(p.filePaths);
-      // Make sure all partitions have same number of partition keys.
-      Preconditions.checkState(numPartitionKeys == 0 ||
-          numPartitionKeys == hiveTable.getNumPartitionKeys());
-      numPartitionKeys = hiveTable.getNumPartitionKeys();
-      // Make sure we are adding exactly numPartitionKeys LiteralExprs.
-      Preconditions.checkState(p.keyValues.size() == numPartitionKeys);
-      keyValues.addAll(p.keyValues);
+    // HBase or Test Scan Node?
+    PlanNode scanNode = null;
+    if (tblRef.getTable() instanceof HdfsTable) {
+      // HDFS table
+      HdfsTable hdfsTable = (HdfsTable)tblRef.getTable();
+      List<String> filePaths = Lists.newArrayList();
+      List<LiteralExpr> keyValues = Lists.newArrayList();
+      int numPartitionKeys = 0;
+      for (HdfsTable.Partition p: hdfsTable.getPartitions()) {
+        filePaths.addAll(p.filePaths);
+        // Make sure all partitions have same number of partition keys.
+        Preconditions.checkState(numPartitionKeys == 0 ||
+            numPartitionKeys == hdfsTable.getNumPartitionKeys());
+        numPartitionKeys = hdfsTable.getNumPartitionKeys();
+        // Make sure we are adding exactly numPartitionKeys LiteralExprs.
+        Preconditions.checkState(p.keyValues.size() == numPartitionKeys);
+        keyValues.addAll(p.keyValues);
+      }
+      scanNode = new HdfsScanNode(tblRef.getDesc(), filePaths, keyValues);
+    } else {
+      // HBase table
+      scanNode = new HBaseScanNode(tblRef.getDesc());
     }
-    PlanNode scanNode = new ScanNode(tblRef.getDesc(), filePaths, keyValues);
     scanNode.setConjuncts(analyzer.getConjuncts(tblRef.getId().asList()));
     return scanNode;
   }

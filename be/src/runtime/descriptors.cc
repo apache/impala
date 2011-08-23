@@ -2,6 +2,7 @@
 
 #include "runtime/descriptors.h"
 
+#include <glog/logging.h>
 #include <ios>
 #include <sstream>
 
@@ -78,21 +79,76 @@ std::string SlotDescriptor::DebugString() const {
 }
 
 TableDescriptor::TableDescriptor(const TTable& ttable)
-  : num_cols_(ttable.numCols),
-    num_partition_keys_(ttable.numPartitionKeys),
-    line_delim_(ttable.lineDelim),
-    field_delim_(ttable.fieldDelim),
-    collection_delim_(ttable.collectionDelim),
-    escape_char_(ttable.escapeChar),
-    quote_char_((ttable.__isset.quoteChar) ? ttable.quoteChar : -1),
-    strings_are_quoted_(ttable.__isset.quoteChar) {
+  : num_cols_(ttable.numCols) {
+}
+
+string TableDescriptor::DebugString() const {
+  stringstream out;
+  out << "Table #col=" << num_cols_;
+  return out.str();
+}
+
+HdfsTableDescriptor::HdfsTableDescriptor(const TTable& ttable)
+  : TableDescriptor(ttable),
+    num_partition_keys_(ttable.hdfsTable.numPartitionKeys),
+    line_delim_(ttable.hdfsTable.lineDelim),
+    field_delim_(ttable.hdfsTable.fieldDelim),
+    collection_delim_(ttable.hdfsTable.collectionDelim),
+    escape_char_(ttable.hdfsTable.escapeChar),
+    quote_char_((ttable.hdfsTable.__isset.quoteChar) ? ttable.hdfsTable.quoteChar : -1),
+    strings_are_quoted_(ttable.hdfsTable.__isset.quoteChar) {
+}
+
+string HdfsTableDescriptor::DebugString() const {
+  stringstream out;
+  out << "HdfsTable(#cols=" << num_cols_
+      << " #pkeys=" << num_partition_keys_
+      << " line_delim='" << line_delim_ << "'"
+      << " field_delim='" << field_delim_ << "'"
+      << " coll_delim='" << collection_delim_ << "'"
+      << " escape_char='" << escape_char_ << "'"
+      << " quote_char='" << quote_char_ << "'"
+      << " quoted=" << strings_are_quoted_ << ")";
+  return out.str();
+}
+
+HBaseTableDescriptor::HBaseTableDescriptor(const TTable& ttable)
+  : TableDescriptor(ttable),
+    table_name_(ttable.hbaseTable.tableName) {
+  for (int i = 0; i < ttable.hbaseTable.families.size(); ++i) {
+    cols_.push_back(make_pair(ttable.hbaseTable.families[i],
+        ttable.hbaseTable.qualifiers[i]));
+  }
+}
+
+string HBaseTableDescriptor::DebugString() const {
+  stringstream out;
+  out << "HBaseTable(#cols=" << num_cols_ << " table=" << table_name_;
+  out << " columns [";
+  for (int i = 0; i < cols_.size(); ++i) {
+    out << cols_[i].first << ":" << cols_[i].second;
+  }
+  out << "])";
+  return out.str();
 }
 
 TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
   : id_(tdesc.id),
-    table_desc_((tdesc.__isset.table) ? new TableDescriptor(tdesc.table) : NULL),
+    table_desc_(NULL),
     byte_size_(tdesc.byteSize),
     slots_() {
+  if (tdesc.__isset.table) {
+    switch(tdesc.table.tableType) {
+      case TTableType::HDFS_TABLE:
+        table_desc_.reset(new HdfsTableDescriptor(tdesc.table));
+        break;
+      case TTableType::HBASE_TABLE:
+        table_desc_.reset(new HBaseTableDescriptor(tdesc.table));
+        break;
+      default:
+        DCHECK(false) << "invalid table type: " << tdesc.table.tableType;
+    }
+  }
 }
 
 void TupleDescriptor::AddSlot(SlotDescriptor* slot) {
@@ -101,22 +157,16 @@ void TupleDescriptor::AddSlot(SlotDescriptor* slot) {
 
 string TupleDescriptor::DebugString() const {
   stringstream out;
-  out << "Tuple(id=" << id_ << " size=" << byte_size_ << " slots=[";
+  out << "Tuple(id=" << id_ << " size=" << byte_size_;
+  if (table_desc_.get() != NULL) {
+    out << " " << table_desc_->DebugString();
+  }
+  out << " slots=[";
   for (size_t i = 0; i < slots_.size(); ++i) {
     if (i > 0) out << ", ";
     out << slots_[i]->DebugString();
   }
   out << "]";
-  if (table_desc_.get() != NULL) {
-    out << " #cols=" << table_desc_->num_cols()
-        << " #pkeys=" << table_desc_->num_partition_keys()
-        << " line_delim='" << table_desc_->line_delim() << "'"
-        << " field_delim='" << table_desc_->field_delim() << "'"
-        << " coll_delim='" << table_desc_->collection_delim() << "'"
-        << " escape_char='" << table_desc_->escape_char() << "'"
-        << " quote_char='" << table_desc_->quote_char() << "'"
-        << " quoted=" << table_desc_->strings_are_quoted();
-  }
   out << ")";
   return out.str();
 }

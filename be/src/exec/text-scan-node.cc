@@ -28,8 +28,8 @@ using namespace impala;
 
 TextScanNode::TextScanNode(ObjectPool* pool, const TPlanNode& tnode)
     : ExecNode(pool, tnode),
-      files_(tnode.scan_node.file_paths),
-      tuple_id_(tnode.scan_node.tuple_id),
+      files_(tnode.text_scan_node.file_paths),
+      tuple_id_(tnode.text_scan_node.tuple_id),
       tuple_desc_(NULL),
       tuple_idx_(0),
       tuple_delim_(DELIM_INIT),
@@ -57,7 +57,7 @@ TextScanNode::TextScanNode(ObjectPool* pool, const TPlanNode& tnode)
   // and instead extract the partition-key values from the file names themselves.
   // We would then use a single LiteralExpr for each requested partition-key slot,
   // and reset it's value upon opening a new file.
-  Expr::CreateExprTrees(obj_pool_.get(), tnode.scan_node.key_values, &key_values_);
+  Expr::CreateExprTrees(obj_pool_.get(), tnode.text_scan_node.key_values, &key_values_);
 }
 
 Status TextScanNode::Prepare(RuntimeState* state) {
@@ -76,28 +76,30 @@ Status TextScanNode::Prepare(RuntimeState* state) {
     // TODO: make sure we print all available diagnostic output to our error log
     return Status("Tuple descriptor does not have table descriptor set.");
   }
-  tuple_delim_ = tuple_desc_->table_desc()->line_delim();
-  field_delim_ = tuple_desc_->table_desc()->field_delim();
-  collection_item_delim_ = tuple_desc_->table_desc()->collection_delim();
-  escape_char_ = tuple_desc_->table_desc()->escape_char();
-  string_quote_ = tuple_desc_->table_desc()->quote_char();
-  strings_are_quoted_ = tuple_desc_->table_desc()->strings_are_quoted();
+  const HdfsTableDescriptor* hdfs_table =
+      static_cast<const HdfsTableDescriptor*>(tuple_desc_->table_desc());
+  tuple_delim_ = hdfs_table->line_delim();
+  field_delim_ = hdfs_table->field_delim();
+  collection_item_delim_ = hdfs_table->collection_delim();
+  escape_char_ = hdfs_table->escape_char();
+  string_quote_ = hdfs_table->quote_char();
+  strings_are_quoted_ = hdfs_table->strings_are_quoted();
 
   // Create mapping from column index in table to slot index in output tuple.
   // First, initialize all columns to SKIP_COLUMN.
-  int num_cols = tuple_desc_->table_desc()->num_cols();
+  int num_cols = hdfs_table->num_cols();
   column_idx_to_slot_idx_.reserve(num_cols);
   column_idx_to_slot_idx_.resize(num_cols);
   for (int i = 0; i < num_cols; i++) {
     column_idx_to_slot_idx_[i] = SKIP_COLUMN;
   }
-  num_partition_keys_ = tuple_desc_->table_desc()->num_partition_keys();
+  num_partition_keys_ = hdfs_table->num_partition_keys();
 
   // Next, set mapping from column index to slot index for all slots in the query.
   // We also set the key_idx_to_slot_idx_ to mapping for materializing partition keys.
   const std::vector<SlotDescriptor*>& slots = tuple_desc_->slots();
   for (size_t i = 0; i < slots.size(); i++) {
-    if (tuple_desc_->table_desc()->IsPartitionKey(slots[i])) {
+    if (hdfs_table->IsPartitionKey(slots[i])) {
       // Set partition-key index to slot mapping.
       // assert(key_idx_to_slot_idx_.size() * num_partition_keys_ + slots[i]->col_pos()
       //        < key_values_.size());

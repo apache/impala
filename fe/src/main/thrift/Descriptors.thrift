@@ -18,15 +18,33 @@ struct TSlotDescriptor {
   7: required i32 nullIndicatorBit
 }
 
+enum TTableType {
+  HDFS_TABLE,
+  HBASE_TABLE
+}
+
+struct THdfsTable {
+  1: required i32 numPartitionKeys
+  2: required byte lineDelim
+  3: required byte fieldDelim
+  4: required byte collectionDelim
+  5: required byte mapKeyDelim
+  6: required byte escapeChar
+  7: optional byte quoteChar
+}
+
+struct THBaseTable {
+  1: required string tableName
+  2: required list<binary> families
+  3: required list<binary> qualifiers
+}
+
+// "Union" of all table types.
 struct TTable {
-  1: required i32 numCols
-  2: required i32 numPartitionKeys
-  3: required byte lineDelim
-  4: required byte fieldDelim
-  5: required byte collectionDelim
-  6: required byte mapKeyDelim
-  7: required byte escapeChar
-  8: optional byte quoteChar
+  1: required TTableType tableType
+  2: required i32 numCols
+  3: optional THdfsTable hdfsTable
+  4: optional THBaseTable hbaseTable
 }
 
 struct TTupleDescriptor {

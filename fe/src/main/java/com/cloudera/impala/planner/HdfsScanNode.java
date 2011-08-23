@@ -9,7 +9,7 @@ import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
-import com.cloudera.impala.thrift.TScanNode;
+import com.cloudera.impala.thrift.TTextScanNode;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 
@@ -17,7 +17,7 @@ import com.google.common.base.Objects;
  * Scan of a single single table. Currently limited to full-table scans.
  * TODO: pass in range restrictions.
  */
-public class ScanNode extends PlanNode {
+public class HdfsScanNode extends PlanNode {
   private final TupleDescriptor desc;
   private final List<String> filePaths;  // data files to scan
   public List<LiteralExpr> keyValues; // partition key values per file
@@ -28,7 +28,7 @@ public class ScanNode extends PlanNode {
    * @param filePaths
    * @param keyValues
    */
-  public ScanNode(TupleDescriptor desc, List<String> filePaths, List<LiteralExpr> keyValues) {
+  public HdfsScanNode(TupleDescriptor desc, List<String> filePaths, List<LiteralExpr> keyValues) {
     super();
     this.desc = desc;
     this.filePaths = filePaths;
@@ -48,16 +48,16 @@ public class ScanNode extends PlanNode {
   @Override
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.TEXT_SCAN_NODE;
-    msg.scan_node = new TScanNode(desc.getId().asInt(), filePaths);
+    msg.text_scan_node = new TTextScanNode(desc.getId().asInt(), filePaths);
     if (!keyValues.isEmpty()) {
-      msg.scan_node.setKey_values(Expr.treesToThrift(keyValues));
+      msg.text_scan_node.setKey_values(Expr.treesToThrift(keyValues));
     }
   }
 
   @Override
   protected String getExplainString(String prefix) {
     StringBuilder output = new StringBuilder();
-    output.append(prefix + "SCAN table=" + desc.getTable().getFullName() + "\n");
+    output.append(prefix + "SCAN HDFS table=" + desc.getTable().getFullName() + "\n");
     output.append(prefix + "  PREDICATES: " + getExplainString(conjuncts) + "\n");
     output.append(prefix + "  FILES: " + Joiner.on(", ").join(filePaths));
     return output.toString();

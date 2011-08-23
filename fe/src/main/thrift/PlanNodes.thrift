@@ -8,14 +8,20 @@ include "Exprs.thrift"
 
 enum TPlanNodeType {
   TEXT_SCAN_NODE,
+  HBASE_SCAN_NODE,
   AGGREGATION_NODE,
   SORT_NODE,
 }
 
-struct TScanNode {
+struct TTextScanNode {
   1: required Descriptors.TTupleId tuple_id
   2: required list<string> file_paths
   3: optional list<Exprs.TExpr> key_values
+}
+
+struct THBaseScanNode {
+  1: required Descriptors.TTupleId tuple_id
+  2: required string table_name
 }
 
 struct TAggregationNode {
@@ -39,9 +45,10 @@ struct TPlanNode {
   4: optional list<Exprs.TExpr> conjuncts
 
   // one field per PlanNode subclass
-  5: optional TScanNode scan_node
-  6: optional TAggregationNode agg_node
-  7: optional TSortNode sort_node
+  5: optional TTextScanNode text_scan_node
+  6: optional THBaseScanNode hbase_scan_node
+  7: optional TAggregationNode agg_node
+  8: optional TSortNode sort_node
 }
 
 // A flattened representation of a tree of PlanNodes, obtained by depth-first

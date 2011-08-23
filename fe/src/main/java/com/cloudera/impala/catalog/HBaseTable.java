@@ -2,17 +2,22 @@
 
 package com.cloudera.impala.catalog;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hive.hbase.HBaseSerDe;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.serde2.SerDeException;
 
+import com.cloudera.impala.thrift.THBaseTable;
+import com.cloudera.impala.thrift.TTable;
+import com.cloudera.impala.thrift.TTableType;
 import com.google.common.base.Preconditions;
 
 /**
@@ -108,6 +113,28 @@ public class HBaseTable extends Table {
       }
     }
     return tableName;
+  }
+
+  @Override
+  public TTable toThrift() {
+    THBaseTable tHbaseTable = new THBaseTable();
+    tHbaseTable.setTableName(hbaseTableName);
+    for (Column c : colsByPos) {
+      HBaseColumn hbaseCol = (HBaseColumn) c;
+      ByteBuffer familyBytes = ByteBuffer.wrap(Bytes.toBytes(hbaseCol.getColumnFamily()));
+      tHbaseTable.addToFamilies(familyBytes);
+      ByteBuffer qualifierBytes = null;
+      // Column qualifier is null for the row key.
+      if (hbaseCol.getColumnQualifier() != null) {
+        qualifierBytes = ByteBuffer.wrap(Bytes.toBytes(hbaseCol.getColumnQualifier()));
+      } else {
+        qualifierBytes = ByteBuffer.wrap(new byte[]{});
+      }
+      tHbaseTable.addToQualifiers(qualifierBytes);
+    }
+    TTable ttable = new TTable(TTableType.HBASE_TABLE, colsByPos.size());
+    ttable.setHbaseTable(tHbaseTable);
+    return ttable;
   }
 
   public String getHBaseTableName() {

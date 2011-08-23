@@ -67,10 +67,19 @@ class SlotDescriptor {
   SlotDescriptor(const TSlotDescriptor& tdesc);
 };
 
+// Base class for table descriptors.
 class TableDescriptor {
  public:
   TableDescriptor(const TTable& ttable);
   int num_cols() const { return num_cols_; }
+  virtual std::string DebugString() const;
+ protected:
+  int num_cols_;
+};
+
+class HdfsTableDescriptor : public TableDescriptor {
+ public:
+  HdfsTableDescriptor(const TTable& ttable);
   int num_partition_keys() const { return num_partition_keys_; }
   char line_delim() const { return line_delim_; }
   char field_delim() const { return field_delim_; }
@@ -82,9 +91,9 @@ class TableDescriptor {
   bool IsPartitionKey(const SlotDescriptor* slot_desc) const {
     return slot_desc->col_pos() < num_partition_keys_;
   }
+  virtual std::string DebugString() const;
 
  protected:
-  int num_cols_;
   int num_partition_keys_;
   char line_delim_;
   char field_delim_;
@@ -92,6 +101,19 @@ class TableDescriptor {
   char escape_char_;
   char quote_char_;
   bool strings_are_quoted_;
+};
+
+class HBaseTableDescriptor : public TableDescriptor {
+ public:
+  HBaseTableDescriptor(const TTable& ttable);
+  virtual std::string DebugString() const;
+  const std::string table_name() const { return table_name_; }
+  const std::vector<std::pair<std::string, std::string> >& cols() { return cols_; }
+
+ protected:
+  std::string table_name_;
+  // List of family/qualifier pairs.
+  std::vector<std::pair<std::string, std::string> > cols_;
 };
 
 class TupleDescriptor {
@@ -106,7 +128,7 @@ class TupleDescriptor {
   friend class DescriptorTbl;
 
   const TupleId id_;
-  const boost::scoped_ptr<TableDescriptor> table_desc_;
+  boost::scoped_ptr<TableDescriptor> table_desc_;
   const int byte_size_;
   std::vector<SlotDescriptor*> slots_;
 

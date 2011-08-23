@@ -11,6 +11,7 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.thrift.TException;
 
+import com.cloudera.impala.thrift.TTable;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -114,6 +115,8 @@ public abstract class Table {
       return PrimitiveType.INVALID_TYPE;
     }
   }
+
+  public abstract TTable toThrift();
 
   public Db getDb() {
     return db;
