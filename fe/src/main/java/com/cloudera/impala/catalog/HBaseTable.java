@@ -46,7 +46,8 @@ public class HBaseTable extends Table {
   }
 
   @Override
-  public Table load(HiveMetaStoreClient client, org.apache.hadoop.hive.metastore.api.Table msTbl) {
+  public Table load(HiveMetaStoreClient client,
+                    org.apache.hadoop.hive.metastore.api.Table msTbl) {
     try {
       hbaseTableName = getHBaseTableName(msTbl);
       Map<String, String> serdeParam = msTbl.getSd().getSerdeInfo().getParameters();
@@ -88,6 +89,11 @@ public class HBaseTable extends Table {
         colsByPos.add(col);
         colsByName.put(col.getName(), col);
       }
+
+      // since we don't support composite hbase rowkeys yet, all hbase tables have a
+      // single clustering col
+      numClusteringCols = 1;
+
       return this;
     } catch (SerDeException e) {
       throw new UnsupportedOperationException(e.toString());
@@ -132,7 +138,8 @@ public class HBaseTable extends Table {
       }
       tHbaseTable.addToQualifiers(qualifierBytes);
     }
-    TTable ttable = new TTable(TTableType.HBASE_TABLE, colsByPos.size());
+    TTable ttable =
+        new TTable(TTableType.HBASE_TABLE, colsByPos.size(), numClusteringCols);
     ttable.setHbaseTable(tHbaseTable);
     return ttable;
   }

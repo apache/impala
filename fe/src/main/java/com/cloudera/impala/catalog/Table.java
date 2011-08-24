@@ -17,6 +17,13 @@ import com.google.common.collect.Maps;
 
 /**
  * Base class for table metadata.
+ * 
+ * This includes the concept of clustering columns, which are columns by which the table
+ * data is physically clustered. In other words, if two rows share the same values
+ * for the clustering columns, those two rows are most likely colocated. Note that this
+ * is more general than Hive's CLUSTER BY ... INTO BUCKETS clause (which partitions
+ * a key range into a fixed number of buckets).
+ *
  * Current subclasses are HdfsTable and HBaseTable.
  *
  */
@@ -25,7 +32,13 @@ public abstract class Table {
   protected final String name;
   protected final String owner;
 
-  /** for concrete type HdfsTable the first 'numPartitionKeys' cols are partition keys */
+  /** Number of clustering columns. */
+  protected int numClusteringCols;
+
+  /**
+   * colsByPos[i] refers to the ith column in the table. The first numClusteringCols are
+   * the clustering columns.
+   */
   protected final ArrayList<Column> colsByPos;
 
   /**  map from lowercase col. name to Column */
@@ -144,4 +157,9 @@ public abstract class Table {
   public Column getColumn(String name) {
     return colsByName.get(name.toLowerCase());
   }
+
+  public int getNumClusteringCols() {
+    return numClusteringCols;
+  }
+
 }

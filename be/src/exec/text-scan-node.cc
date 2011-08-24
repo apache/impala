@@ -93,13 +93,13 @@ Status TextScanNode::Prepare(RuntimeState* state) {
   for (int i = 0; i < num_cols; i++) {
     column_idx_to_slot_idx_[i] = SKIP_COLUMN;
   }
-  num_partition_keys_ = hdfs_table->num_partition_keys();
+  num_partition_keys_ = hdfs_table->num_clustering_cols();
 
   // Next, set mapping from column index to slot index for all slots in the query.
   // We also set the key_idx_to_slot_idx_ to mapping for materializing partition keys.
   const std::vector<SlotDescriptor*>& slots = tuple_desc_->slots();
   for (size_t i = 0; i < slots.size(); i++) {
-    if (hdfs_table->IsPartitionKey(slots[i])) {
+    if (hdfs_table->IsClusteringCol(slots[i])) {
       // Set partition-key index to slot mapping.
       // assert(key_idx_to_slot_idx_.size() * num_partition_keys_ + slots[i]->col_pos()
       //        < key_values_.size());

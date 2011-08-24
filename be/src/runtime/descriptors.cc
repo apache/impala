@@ -79,18 +79,18 @@ std::string SlotDescriptor::DebugString() const {
 }
 
 TableDescriptor::TableDescriptor(const TTable& ttable)
-  : num_cols_(ttable.numCols) {
+  : num_cols_(ttable.numCols),
+    num_clustering_cols_(ttable.numClusteringCols) {
 }
 
 string TableDescriptor::DebugString() const {
   stringstream out;
-  out << "Table #col=" << num_cols_;
+  out << "#cols=" << num_cols_ << " #clustering_cols=" << num_clustering_cols_;
   return out.str();
 }
 
 HdfsTableDescriptor::HdfsTableDescriptor(const TTable& ttable)
   : TableDescriptor(ttable),
-    num_partition_keys_(ttable.hdfsTable.numPartitionKeys),
     line_delim_(ttable.hdfsTable.lineDelim),
     field_delim_(ttable.hdfsTable.fieldDelim),
     collection_delim_(ttable.hdfsTable.collectionDelim),
@@ -101,8 +101,7 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTable& ttable)
 
 string HdfsTableDescriptor::DebugString() const {
   stringstream out;
-  out << "HdfsTable(#cols=" << num_cols_
-      << " #pkeys=" << num_partition_keys_
+  out << "HdfsTable(" << TableDescriptor::DebugString()
       << " line_delim='" << line_delim_ << "'"
       << " field_delim='" << field_delim_ << "'"
       << " coll_delim='" << collection_delim_ << "'"
@@ -123,10 +122,10 @@ HBaseTableDescriptor::HBaseTableDescriptor(const TTable& ttable)
 
 string HBaseTableDescriptor::DebugString() const {
   stringstream out;
-  out << "HBaseTable(#cols=" << num_cols_ << " table=" << table_name_;
-  out << " columns [";
+  out << "HBaseTable(" << TableDescriptor::DebugString() << " table=" << table_name_;
+  out << " cols=[";
   for (int i = 0; i < cols_.size(); ++i) {
-    out << cols_[i].first << ":" << cols_[i].second;
+    out << (i > 0 ? " " : "") << cols_[i].first << ":" << cols_[i].second;
   }
   out << "])";
   return out.str();

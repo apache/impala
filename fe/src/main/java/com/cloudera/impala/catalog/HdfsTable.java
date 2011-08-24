@@ -31,8 +31,9 @@ import com.cloudera.impala.thrift.TTableType;
 import com.google.common.collect.Lists;
 
 /**
- * Internal representation of table-related metadata of a hive table.
+ * Internal representation of table-related metadata of an hdfs-resident  table.
  * Owned by Catalog instance.
+ * The partition keys constitute the clustering columns.
  */
 public class HdfsTable extends Table {
 
@@ -46,8 +47,6 @@ public class HdfsTable extends Table {
   private String mapKeyDelim;
   private String escapeChar;
   private String quoteChar;
-
-  private int numPartitionKeys;
 
   /**
    * Query-relevant information for one table partition.
@@ -176,7 +175,7 @@ public class HdfsTable extends Table {
 
       // populate with both partition keys and regular columns
       List<FieldSchema> fieldSchemas = msTbl.getPartitionKeys();
-      numPartitionKeys = fieldSchemas.size();
+      numClusteringCols = fieldSchemas.size();
       fieldSchemas.addAll(client.getFields(db.getName(), name));
       if (!loadColumns(fieldSchemas)) {
         return null;
@@ -280,14 +279,13 @@ public class HdfsTable extends Table {
 
   @Override
   public TTable toThrift() {
-    TTable ttable = new TTable(TTableType.HDFS_TABLE, colsByPos.size());
+    TTable ttable =
+        new TTable(TTableType.HDFS_TABLE, colsByPos.size(), numClusteringCols);
     // We only support single-byte characters as delimiters.
-    THdfsTable tHdfsTable = new THdfsTable(numPartitionKeys,
-            (byte) lineDelim.charAt(0),
-            (byte) fieldDelim.charAt(0),
-            (byte) collectionDelim.charAt(0),
-            (byte) mapKeyDelim.charAt(0),
-            (byte) escapeChar.charAt(0));
+    THdfsTable tHdfsTable = new THdfsTable(
+        (byte) lineDelim.charAt(0), (byte) fieldDelim.charAt(0),
+        (byte) collectionDelim.charAt(0), (byte) mapKeyDelim.charAt(0),
+        (byte) escapeChar.charAt(0));
     // Set optional quote char.
     if (quoteChar != null) {
       tHdfsTable.setQuoteChar((byte) quoteChar.charAt(0));
@@ -318,9 +316,5 @@ public class HdfsTable extends Table {
 
   public String getEscapeChar() {
     return escapeChar;
-  }
-
-  public int getNumPartitionKeys() {
-    return numPartitionKeys;
   }
 }

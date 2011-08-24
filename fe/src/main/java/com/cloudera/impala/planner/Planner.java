@@ -41,15 +41,10 @@ public class Planner {
       HdfsTable hdfsTable = (HdfsTable)tblRef.getTable();
       List<String> filePaths = Lists.newArrayList();
       List<LiteralExpr> keyValues = Lists.newArrayList();
-      int numPartitionKeys = 0;
       for (HdfsTable.Partition p: hdfsTable.getPartitions()) {
         filePaths.addAll(p.filePaths);
-        // Make sure all partitions have same number of partition keys.
-        Preconditions.checkState(numPartitionKeys == 0 ||
-            numPartitionKeys == hdfsTable.getNumPartitionKeys());
-        numPartitionKeys = hdfsTable.getNumPartitionKeys();
-        // Make sure we are adding exactly numPartitionKeys LiteralExprs.
-        Preconditions.checkState(p.keyValues.size() == numPartitionKeys);
+        // Make sure we are adding exactly numClusteringCols LiteralExprs.
+        Preconditions.checkState(p.keyValues.size() == hdfsTable.getNumClusteringCols());
         keyValues.addAll(p.keyValues);
       }
       scanNode = new HdfsScanNode(tblRef.getDesc(), filePaths, keyValues);

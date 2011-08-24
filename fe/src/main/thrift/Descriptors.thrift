@@ -24,13 +24,12 @@ enum TTableType {
 }
 
 struct THdfsTable {
-  1: required i32 numPartitionKeys
-  2: required byte lineDelim
-  3: required byte fieldDelim
-  4: required byte collectionDelim
-  5: required byte mapKeyDelim
-  6: required byte escapeChar
-  7: optional byte quoteChar
+  1: required byte lineDelim
+  2: required byte fieldDelim
+  3: required byte collectionDelim
+  4: required byte mapKeyDelim
+  5: required byte escapeChar
+  6: optional byte quoteChar
 }
 
 struct THBaseTable {
@@ -43,8 +42,9 @@ struct THBaseTable {
 struct TTable {
   1: required TTableType tableType
   2: required i32 numCols
-  3: optional THdfsTable hdfsTable
-  4: optional THBaseTable hbaseTable
+  3: required i32 numClusteringCols
+  4: optional THdfsTable hdfsTable
+  5: optional THBaseTable hbaseTable
 }
 
 struct TTupleDescriptor {

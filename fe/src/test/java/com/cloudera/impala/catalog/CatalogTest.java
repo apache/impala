@@ -29,10 +29,11 @@ public class CatalogTest {
     catalog = new Catalog(client);
   }
 
-  private void checkTableCols(Db db, String tblName, String[] colNames,
-      PrimitiveType[] colTypes) {
+  private void checkTableCols(Db db, String tblName, int numClusteringCols,
+      String[] colNames, PrimitiveType[] colTypes) {
     Table tbl = db.getTable(tblName);
     assertEquals(tbl.getName(), tblName);
+    assertEquals(tbl.getNumClusteringCols(), numClusteringCols);
     List<Column> cols = tbl.getColumns();
     assertEquals(colNames.length, colTypes.length);
     assertEquals(cols.size(), colNames.length);
@@ -49,7 +50,7 @@ public class CatalogTest {
   private void checkHBaseTableCols(Db db, String hiveTableName, String hbaseTableName,
       String[] hiveColNames, String[] colFamilies, String[] colQualifiers,
       PrimitiveType[] colTypes) {
-    checkTableCols(db, hiveTableName, hiveColNames, colTypes);
+    checkTableCols(db, hiveTableName, 1, hiveColNames, colTypes);
     HBaseTable tbl = (HBaseTable) db.getTable(hiveTableName);
     assertEquals(tbl.getHBaseTableName(), hbaseTableName);
     List<Column> cols = tbl.getColumns();
@@ -100,7 +101,7 @@ public class CatalogTest {
     // We should have failed to load this table.
     assertNull(defaultDb.getTable("delimerrortable"));
 
-    checkTableCols(defaultDb, "alltypes",
+    checkTableCols(defaultDb, "alltypes", 2,
         new String[]
           {"year", "month", "id", "bool_col", "tinyint_col", "smallint_col",
            "int_col", "bigint_col", "float_col", "double_col", "date_string_col",
@@ -110,7 +111,7 @@ public class CatalogTest {
            PrimitiveType.BOOLEAN, PrimitiveType.TINYINT, PrimitiveType.SMALLINT,
            PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.FLOAT,
            PrimitiveType.DOUBLE, PrimitiveType.STRING, PrimitiveType.STRING});
-    checkTableCols(testDb, "alltypes",
+    checkTableCols(testDb, "alltypes", 0,
         new String[]
           {"id", "bool_col", "tinyint_col", "smallint_col", "int_col", "bigint_col",
            "float_col", "double_col", "date_string_col", "string_col"},
@@ -118,11 +119,11 @@ public class CatalogTest {
           {PrimitiveType.INT, PrimitiveType.BOOLEAN, PrimitiveType.TINYINT, PrimitiveType.SMALLINT,
            PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.FLOAT,
            PrimitiveType.DOUBLE, PrimitiveType.STRING, PrimitiveType.STRING});
-    checkTableCols(defaultDb, "testtbl",
+    checkTableCols(defaultDb, "testtbl", 0,
         new String[] {"id", "name", "zip"},
         new PrimitiveType[]
           {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.INT});
-    checkTableCols(testDb, "testtbl",
+    checkTableCols(testDb, "testtbl", 0,
         new String[] {"id", "name", "birthday"},
         new PrimitiveType[]
           {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.STRING});

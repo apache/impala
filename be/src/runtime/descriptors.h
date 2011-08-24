@@ -72,29 +72,33 @@ class TableDescriptor {
  public:
   TableDescriptor(const TTable& ttable);
   int num_cols() const { return num_cols_; }
+  int num_clustering_cols() const { return num_clustering_cols_; }
   virtual std::string DebugString() const;
+
+  // The first num_clustering_cols_ columns by position are clustering
+  // columns.
+  bool IsClusteringCol(const SlotDescriptor* slot_desc) const {
+    return slot_desc->col_pos() < num_clustering_cols_;
+  }
+
  protected:
   int num_cols_;
+  int num_clustering_cols_;
 };
 
 class HdfsTableDescriptor : public TableDescriptor {
  public:
   HdfsTableDescriptor(const TTable& ttable);
-  int num_partition_keys() const { return num_partition_keys_; }
   char line_delim() const { return line_delim_; }
   char field_delim() const { return field_delim_; }
   char collection_delim() const { return collection_delim_; }
   char escape_char() const { return escape_char_; }
   char quote_char() const { return quote_char_; }
   bool strings_are_quoted() const { return strings_are_quoted_; }
-  // Partition keys are the first n column indexes.
-  bool IsPartitionKey(const SlotDescriptor* slot_desc) const {
-    return slot_desc->col_pos() < num_partition_keys_;
-  }
+
   virtual std::string DebugString() const;
 
  protected:
-  int num_partition_keys_;
   char line_delim_;
   char field_delim_;
   char collection_delim_;
@@ -111,7 +115,9 @@ class HBaseTableDescriptor : public TableDescriptor {
   const std::vector<std::pair<std::string, std::string> >& cols() { return cols_; }
 
  protected:
+  // native name of hbase table
   std::string table_name_;
+
   // List of family/qualifier pairs.
   std::vector<std::pair<std::string, std::string> > cols_;
 };
