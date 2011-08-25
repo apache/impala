@@ -7,13 +7,13 @@ include "Descriptors.thrift"
 include "Exprs.thrift"
 
 enum TPlanNodeType {
-  TEXT_SCAN_NODE,
+  HDFS_SCAN_NODE,
   HBASE_SCAN_NODE,
   AGGREGATION_NODE,
   SORT_NODE,
 }
 
-struct TTextScanNode {
+struct THdfsScanNode {
   1: required Descriptors.TTupleId tuple_id
   2: required list<string> file_paths
   3: optional list<Exprs.TExpr> key_values
@@ -45,7 +45,7 @@ struct TPlanNode {
   4: optional list<Exprs.TExpr> conjuncts
 
   // one field per PlanNode subclass
-  5: optional TTextScanNode text_scan_node
+  5: optional THdfsScanNode hdfs_scan_node
   6: optional THBaseScanNode hbase_scan_node
   7: optional TAggregationNode agg_node
   8: optional TSortNode sort_node

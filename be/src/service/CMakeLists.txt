@@ -10,11 +10,12 @@ add_library(Service
   plan-executor.cc
 )
 
-add_library(planexec SHARED
+add_library(backend SHARED
+  backend.cc
   plan-executor.cc  
 )
 
-target_link_libraries(planexec
+target_link_libraries(backend
   Common
   Exec
   Exprs

@@ -5,7 +5,9 @@ package com.cloudera.impala.planner;
 import java.util.Iterator;
 import java.util.List;
 
+import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TSortNode;

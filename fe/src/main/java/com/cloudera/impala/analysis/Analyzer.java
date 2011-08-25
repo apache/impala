@@ -215,6 +215,19 @@ public class Analyzer {
     return result;
   }
 
+  /**
+   * Return slot descriptor corresponding to column referenced in the context of
+   * tupleDesc, or null if no such reference exists.
+   */
+  public SlotDescriptor getColumnSlot(TupleDescriptor tupleDesc, Column col) {
+    for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
+      if (slotDesc.getColumn() == col) {
+        return slotDesc;
+      }
+    }
+    return null;
+  }
+
   public DescriptorTable getDescTbl() {
     return descTbl;
   }

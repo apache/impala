@@ -1,7 +1,7 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
-#ifndef IMPALA_EXEC_TEXT_SCAN_NODE_H_
-#define IMPALA_EXEC_TEXT_SCAN_NODE_H_
+#ifndef IMPALA_EXEC_HDFS_SCAN_NODE_H_
+#define IMPALA_EXEC_HDFS_SCAN_NODE_H_
 
 #include <vector>
 #include <stdint.h>
@@ -42,9 +42,12 @@ class Expr;
 // Columns could span multiple file blocks.
 // In such scenarios we construct the complete column by
 // appending the partial-column bytes to a boundary_column.
-class TextScanNode : public ExecNode {
+//
+// TODO: separate file handling and parsing of text files; the latter should go into
+// a separate helper class
+class HdfsScanNode : public ExecNode {
  public:
-  TextScanNode(ObjectPool* pool, const TPlanNode& tnode);
+  HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode);
 
   // Allocates tuple buffer.
   // Sets tuple_idx_ and tuple_desc_ using RuntimeState.

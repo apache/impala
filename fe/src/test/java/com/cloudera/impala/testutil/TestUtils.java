@@ -53,7 +53,7 @@ public class TestUtils {
       String expectedStr = expected.get(i);
       String actualStr = actual[i];
       // Look for special prefixes in containsPrefixes.
-      boolean containsPrefix = expectedStr.startsWith(expectedFilePrefix);
+      boolean containsPrefix = expectedStr.trim().startsWith(expectedFilePrefix);
       if (containsPrefix) {
         expectedStr = expectedStr.replaceFirst(expectedFilePrefix, "");
         actualStr = actualStr.replaceFirst(expectedFilePrefix, "");

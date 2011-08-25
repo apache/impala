@@ -1,6 +1,6 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
-#include "text-scan-node.h"
+#include "exec/hdfs-scan-node.h"
 
 #include <cstring>
 #include <cstdlib>
@@ -26,10 +26,10 @@ using namespace std;
 using namespace boost;
 using namespace impala;
 
-TextScanNode::TextScanNode(ObjectPool* pool, const TPlanNode& tnode)
+HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode)
     : ExecNode(pool, tnode),
-      files_(tnode.text_scan_node.file_paths),
-      tuple_id_(tnode.text_scan_node.tuple_id),
+      files_(tnode.hdfs_scan_node.file_paths),
+      tuple_id_(tnode.hdfs_scan_node.tuple_id),
       tuple_desc_(NULL),
       tuple_idx_(0),
       tuple_delim_(DELIM_INIT),
@@ -57,10 +57,10 @@ TextScanNode::TextScanNode(ObjectPool* pool, const TPlanNode& tnode)
   // and instead extract the partition-key values from the file names themselves.
   // We would then use a single LiteralExpr for each requested partition-key slot,
   // and reset it's value upon opening a new file.
-  Expr::CreateExprTrees(obj_pool_.get(), tnode.text_scan_node.key_values, &key_values_);
+  Expr::CreateExprTrees(obj_pool_.get(), tnode.hdfs_scan_node.key_values, &key_values_);
 }
 
-Status TextScanNode::Prepare(RuntimeState* state) {
+Status HdfsScanNode::Prepare(RuntimeState* state) {
   PrepareConjuncts(state);
   // Initialize ptr to end, to initiate reading the first file block
   file_buf_ptr_ = file_buf_end_;
@@ -126,7 +126,7 @@ Status TextScanNode::Prepare(RuntimeState* state) {
   return Status::OK;
 }
 
-Status TextScanNode::Open(RuntimeState* state) {
+Status HdfsScanNode::Open(RuntimeState* state) {
   hdfs_connection_ = hdfsConnect("default", 0);
   if (hdfs_connection_ == NULL) {
     // TODO: make sure we print all available diagnostic output to our error log
@@ -136,7 +136,7 @@ Status TextScanNode::Open(RuntimeState* state) {
   }
 }
 
-Status TextScanNode::Close(RuntimeState* state) {
+Status HdfsScanNode::Close(RuntimeState* state) {
   int hdfs_ret = hdfsDisconnect(hdfs_connection_);
   if (hdfs_ret == 0) {
     return Status::OK;
@@ -146,7 +146,7 @@ Status TextScanNode::Close(RuntimeState* state) {
   }
 }
 
-void* TextScanNode::GetFileBuffer(RuntimeState* state, int* file_buf_idx) {
+void* HdfsScanNode::GetFileBuffer(RuntimeState* state, int* file_buf_idx) {
   // Never return file buffer 0, because it could contain valid data from a previous GetNext().
   ++*file_buf_idx;
   while (*file_buf_idx >= file_bufs_.size()) {
@@ -155,7 +155,7 @@ void* TextScanNode::GetFileBuffer(RuntimeState* state, int* file_buf_idx) {
   return file_bufs_[*file_buf_idx];
 }
 
-Status TextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
+Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
   tuple_ = reinterpret_cast<Tuple*>(tuple_buf_);
   bzero(tuple_buf_, tuple_buf_size_);
   boundary_column_.clear();
@@ -258,7 +258,7 @@ Status TextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
 // This first assembles the full tuple before applying the conjuncts.
 // TODO: apply conjuncts as slots get materialized and skip to the end of the row
 // if we determine it's not a match.
-Status TextScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, int* row_idx,
+Status HdfsScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, int* row_idx,
     int* column_idx, bool* last_char_is_escape, bool* unescape_string, char* quote_char,
     bool* error_in_row, int* num_errors) {
 
@@ -404,7 +404,7 @@ Status TextScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, i
         }
         if (state->abort_on_error()) {
           state->ReportFileErrors(files_[file_idx_], 1);
-          return Status("Aborted TextScanNode due to parse errors. View error log for details.");
+          return Status("Aborted HdfsScanNode due to parse errors. View error log for details.");
         }
       }
       *column_idx = 0;
@@ -450,7 +450,7 @@ Status TextScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, i
   return Status::OK;
 }
 
-bool TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, Tuple* tuple,
+bool HdfsScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, Tuple* tuple,
     const SlotDescriptor* slot_desc, bool copy_string, bool unescape_string) {
   // Check for null columns.
   // The below code implies that unquoted empty strings
@@ -544,7 +544,7 @@ bool TextScanNode::ConvertAndWriteSlotBytes(const char* begin, const char* end, 
   return true;
 }
 
-void TextScanNode::UnescapeString(const char* src, char* dest, int* len) {
+void HdfsScanNode::UnescapeString(const char* src, char* dest, int* len) {
   char* dest_ptr = dest;
   const char* end = src + *len;
   while (src < end) {
@@ -558,9 +558,9 @@ void TextScanNode::UnescapeString(const char* src, char* dest, int* len) {
   *len = dest_ptr - dest_start;
 }
 
-void TextScanNode::DebugString(int indentation_level, std::stringstream* out) const {
+void HdfsScanNode::DebugString(int indentation_level, std::stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
-  *out << "TextScanNode(tupleid=" << tuple_id_ << " files[" << join(files_, ",");
+  *out << "HdfsScanNode(tupleid=" << tuple_id_ << " files[" << join(files_, ",");
   ExecNode::DebugString(indentation_level, out);
   *out << "])" << endl;
 }

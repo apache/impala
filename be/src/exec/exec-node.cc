@@ -8,7 +8,7 @@
 #include "common/status.h"
 #include "exprs/expr.h"
 #include "exec/aggregation-node.h"
-#include "exec/text-scan-node.h"
+#include "exec/hdfs-scan-node.h"
 #include "runtime/mem-pool.h"
 #include "gen-cpp/PlanNodes_types.h"
 
@@ -81,8 +81,8 @@ Status ExecNode::CreateTreeHelper(
 
 Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode, ExecNode** node) {
   switch (tnode.node_type) {
-    case TPlanNodeType::TEXT_SCAN_NODE:
-      *node = pool->Add(new TextScanNode(pool, tnode));
+    case TPlanNodeType::HDFS_SCAN_NODE:
+      *node = pool->Add(new HdfsScanNode(pool, tnode));
       return Status::OK;
     case TPlanNodeType::HBASE_SCAN_NODE:
       // TODO: Uncomment once HBaseScanNode is implemented.

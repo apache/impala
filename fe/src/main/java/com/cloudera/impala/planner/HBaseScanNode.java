@@ -2,20 +2,27 @@
 
 package com.cloudera.impala.planner;
 
+import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.catalog.HBaseTable;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.THBaseScanNode;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.google.common.base.Objects;
 
-public class HBaseScanNode extends PlanNode {
+public class HBaseScanNode extends ScanNode {
   private final TupleDescriptor desc;
 
   public HBaseScanNode(TupleDescriptor desc) {
-    super();
+    super(desc);
     this.desc = desc;
   }
+
+  @Override
+  public void finalize(Analyzer analyzer) throws InternalException {
+  }
+
 
   @Override
   protected String debugString() {

@@ -14,7 +14,7 @@ import com.google.common.base.Preconditions;
  *
  */
 public class BinaryPredicate extends Predicate {
-  enum Operator {
+  public enum Operator {
     EQ("=", TExprOperator.EQ),
     NE("!=", TExprOperator.NE),
     LE("<=", TExprOperator.LE),
@@ -40,6 +40,10 @@ public class BinaryPredicate extends Predicate {
     }
   };
   private final Operator op;
+
+  public Operator getOp() {
+    return op;
+  }
 
   public BinaryPredicate(Operator op, Expr e1, Expr e2) {
     super();
@@ -84,5 +88,36 @@ public class BinaryPredicate extends Predicate {
 
     // Ignore return value because type is always bool for predicates.
     castBinaryOp(compatibleType);
+  }
+
+  /**
+   * If predicate is of the form "<slotref> <op> <expr>", returns expr,
+   * otherwise returns null. Slotref may be wrapped in a CastExpr.
+   */
+  public Expr getSlotBinding(SlotId id) {
+    SlotRef slotRef = null;
+    // check left operand
+    if (getChild(0) instanceof SlotRef) {
+      slotRef = (SlotRef) getChild(0);
+    } else if (getChild(0) instanceof CastExpr
+               && getChild(0).getChild(0) instanceof SlotRef) {
+      slotRef = (SlotRef) getChild(0).getChild(0);
+    }
+    if (slotRef != null && slotRef.getId() == id) {
+      return getChild(1);
+    }
+
+    // check right operand
+    if (getChild(1) instanceof SlotRef) {
+      slotRef = (SlotRef) getChild(1);
+    } else if (getChild(1) instanceof CastExpr
+               && getChild(1).getChild(0) instanceof SlotRef) {
+      slotRef = (SlotRef) getChild(1).getChild(0);
+    }
+    if (slotRef != null && slotRef.getId() == id) {
+      return getChild(0);
+    }
+
+    return null;
   }
 }

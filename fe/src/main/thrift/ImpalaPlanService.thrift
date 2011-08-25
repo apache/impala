@@ -16,15 +16,14 @@ struct TExecutePlanRequest {
   3: list<Exprs.TExpr> selectListExprs
 }
 
-exception TAnalysisException {
+exception TException {
   1: string msg;
 }
 
 // We're running the Impala frontend as a service from which the backend
 // test driver can get plans to run.
 service ImpalaPlanService {
-  TExecutePlanRequest GetExecRequest(1:string query)
-    throws (1:TAnalysisException e);
+  TExecutePlanRequest GetExecRequest(1:string query) throws (1:TException e);
 
   void ShutdownServer();
 }

@@ -5,6 +5,7 @@
 
 #include <boost/algorithm/string/join.hpp>
 #include "common/object-pool.h"
+#include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
 
 #include <iostream>

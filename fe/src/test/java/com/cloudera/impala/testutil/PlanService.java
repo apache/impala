@@ -6,9 +6,10 @@ import java.util.List;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.thrift.TException;
 import org.apache.thrift.server.TServer;
-import org.apache.thrift.server.TServer.Args;
 import org.apache.thrift.server.TSimpleServer;
+import org.apache.thrift.server.TServer.Args;
 import org.apache.thrift.transport.TServerSocket;
 import org.apache.thrift.transport.TServerTransport;
 
@@ -17,11 +18,11 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.planner.PlanNode;
 import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.thrift.ImpalaPlanService;
-import com.cloudera.impala.thrift.TAnalysisException;
 import com.cloudera.impala.thrift.TExecutePlanRequest;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -39,7 +40,7 @@ public class PlanService {
       this.catalog = catalog;
     }
 
-    public TExecutePlanRequest GetExecRequest(String stmt) throws TAnalysisException {
+    public TExecutePlanRequest GetExecRequest(String stmt) throws TException {
       System.out.println("Executing '" + stmt + "'");
       AnalysisContext analysisCtxt = new AnalysisContext(catalog);
       AnalysisContext.AnalysisResult analysisResult = null;
@@ -47,7 +48,7 @@ public class PlanService {
         analysisResult = analysisCtxt.analyze(stmt);
       } catch (AnalysisException e) {
         System.out.println(e.getMessage());
-        throw new TAnalysisException(e.getMessage());
+        throw new TException(e.getMessage());
       }
       Preconditions.checkNotNull(analysisResult.selectStmt);
 
@@ -64,7 +65,9 @@ public class PlanService {
       try {
         plan = planner.createPlan(analysisResult.selectStmt, analysisResult.analyzer);
       } catch (NotImplementedException e) {
-        throw new TAnalysisException(e.getMessage());
+        throw new TException(e.getMessage());
+      } catch (InternalException e) {
+        throw new TException(e.getMessage());
       }
       if (plan != null) {
         System.out.println(plan.getExplainString());

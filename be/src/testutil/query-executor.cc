@@ -134,7 +134,7 @@ Status QueryExecutor::Exec(const std::string& query, vector<PrimitiveType>* col_
   TExecutePlanRequest request;
   try {
     client_->GetExecRequest(request, query.c_str());
-  } catch (TAnalysisException& e) {
+  } catch (TException& e) {
     return Status(e.msg);
   }
   VLOG(1) << "thrift request: " << ThriftDebugString(request);

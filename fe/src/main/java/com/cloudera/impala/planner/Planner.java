@@ -2,19 +2,23 @@
 
 package com.cloudera.impala.planner;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.ListIterator;
 
 import com.cloudera.impala.analysis.AggregateExpr;
 import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.Analyzer;
+import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.LiteralExpr;
+import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SelectStmt;
+import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
@@ -27,6 +31,59 @@ public class Planner {
   }
 
   /**
+   * Transform '=', '<[=]' and '>[=]' comparisons for given slot into
+   * ValueRange. Also removes those predicates which were used for the construction
+   * of ValueRange from 'conjuncts'. Only looks at comparisons w/ constants
+   * (ie, the bounds of the result can be evaluated with Expr::GetValue(NULL)).
+   * If there are multiple competing comparison predicates that could be used
+   * to construct a ValueRange, only the first one from each category is chosen.
+   */
+  private ValueRange createScanRange(SlotDescriptor d, List<Predicate> conjuncts) {
+    ListIterator<Predicate> i = conjuncts.listIterator();
+    ValueRange result = null;
+    while (i.hasNext()) {
+      Predicate p = i.next();
+      if (!(p instanceof BinaryPredicate)) {
+        continue;
+      }
+      BinaryPredicate comp = (BinaryPredicate) p;
+      if (comp.getOp() == BinaryPredicate.Operator.NE) {
+        continue;
+      }
+      Expr slotBinding = comp.getSlotBinding(d.getId());
+      if (slotBinding == null || !slotBinding.isConstant()) {
+        continue;
+      }
+
+      if (comp.getOp() == BinaryPredicate.Operator.EQ) {
+        i.remove();
+        return ValueRange.createEqRange(slotBinding);
+      }
+
+      if (result == null) {
+        result = new ValueRange();
+      }
+
+      // TODO: do we need copies here?
+      if (comp.getOp() == BinaryPredicate.Operator.GT
+          || comp.getOp() == BinaryPredicate.Operator.GE) {
+        if (result.lowerBound == null) {
+          result.lowerBound = slotBinding;
+          result.lowerBoundInclusive = (comp.getOp() == BinaryPredicate.Operator.GE);
+          i.remove();
+        }
+      } else {
+        if (result.upperBound == null) {
+          result.upperBound = slotBinding;
+          result.upperBoundInclusive = (comp.getOp() == BinaryPredicate.Operator.LE);
+          i.remove();
+        }
+      }
+    }
+    return result;
+  }
+
+  /**
    * Create node for scanning all data files of a particular table.
    * @param analyzer
    * @param tblRef
@@ -35,24 +92,31 @@ public class Planner {
    */
   private PlanNode createScanNode(Analyzer analyzer, TableRef tblRef) {
     // HBase or Test Scan Node?
-    PlanNode scanNode = null;
+    ScanNode scanNode = null;
     if (tblRef.getTable() instanceof HdfsTable) {
-      // HDFS table
-      HdfsTable hdfsTable = (HdfsTable)tblRef.getTable();
-      List<String> filePaths = Lists.newArrayList();
-      List<LiteralExpr> keyValues = Lists.newArrayList();
-      for (HdfsTable.Partition p: hdfsTable.getPartitions()) {
-        filePaths.addAll(p.filePaths);
-        // Make sure we are adding exactly numClusteringCols LiteralExprs.
-        Preconditions.checkState(p.keyValues.size() == hdfsTable.getNumClusteringCols());
-        keyValues.addAll(p.keyValues);
-      }
-      scanNode = new HdfsScanNode(tblRef.getDesc(), filePaths, keyValues);
+      scanNode = new HdfsScanNode(tblRef.getDesc(), (HdfsTable) tblRef.getTable());
     } else {
       // HBase table
       scanNode = new HBaseScanNode(tblRef.getDesc());
     }
-    scanNode.setConjuncts(analyzer.getConjuncts(tblRef.getId().asList()));
+
+    List<Predicate> conjuncts = analyzer.getConjuncts(tblRef.getId().asList());
+    ArrayList<ValueRange> keyRanges = Lists.newArrayList();
+    // determine scan predicates for clustering cols
+    for (int i = 0; i < tblRef.getTable().getNumClusteringCols(); ++i) {
+      SlotDescriptor slotDesc =
+          analyzer.getColumnSlot(tblRef.getDesc(), tblRef.getTable().getColumns().get(i));
+      if (slotDesc == null) {
+        // clustering col not referenced in this query
+        keyRanges.add(null);
+      } else {
+        ValueRange keyRange = createScanRange(slotDesc, conjuncts);
+        keyRanges.add(keyRange);
+      }
+    }
+    scanNode.setKeyRanges(keyRanges);
+    scanNode.setConjuncts(conjuncts);
+
     return scanNode;
   }
 
@@ -65,7 +129,7 @@ public class Planner {
    * @throws NotImplementedException if selectStmt contains joins, order by or aggregates
    */
   public PlanNode createPlan(SelectStmt selectStmt, Analyzer analyzer)
-      throws NotImplementedException {
+      throws NotImplementedException, InternalException {
     if (selectStmt.getTableRefs().size() > 1) {
       throw new NotImplementedException("FROM clause limited to a single table");
     }
@@ -105,6 +169,7 @@ public class Planner {
     }
 
     topNode.setLimit(selectStmt.getLimit());
+    topNode.finalize(analyzer);
     return topNode;
   }
 

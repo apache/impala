@@ -3,7 +3,6 @@
 #ifndef IMPALA_SERVICE_PLAN_EXECUTOR_H
 #define IMPALA_SERVICE_PLAN_EXECUTOR_H
 
-#include <jni.h>
 #include <vector>
 
 #include "common/status.h"
@@ -16,24 +15,6 @@ class ExecNode;
 class DescriptorTbl;
 class RowBatch;
 class TupleDescriptor;
-
-// Deserialize plan_bytes into a TExecutePlanRequest.
-// Then reconstruct plan, descs and select_list_exprs from TExecutePlanRequest.
-// Input parameters:
-//   env: Java environment needed to get underlying memory of  execute_plan_request_bytes.
-//   execute_plan_request_bytes: Serialized TExecutePlanRequest.
-//   obj_pool: Pool to allocate objects needed for plan, descs and select_list_exprs.
-// Output parameters:
-//   plan: Root of exec node tree.
-//   descs: Descriptor table with information about slots and tables.
-//   select_list_exprs: Expressions in select list.
-Status DeserializeRequest(
-    JNIEnv* env,
-    jbyteArray execute_plan_request_bytes,
-    ObjectPool* obj_pool,
-    ExecNode** plan,
-    DescriptorTbl** descs,
-    std::vector<Expr*>* select_list_exprs);
 
 class PlanExecutor {
  public:
@@ -55,20 +36,6 @@ class PlanExecutor {
   RuntimeState runtime_state_;
   bool done_;
 };
-
-extern "C"
-JNIEXPORT void Java_com_cloudera_impala_service_NativePlanExecutor_Init(
-    JNIEnv* env, jclass caller_class);
-
-// JNI-callable wrapper to the plan executor
-// protected native static void ExecPlan(byte[] thriftExecutePlanRequest,
-//      boolean abortOnError, int maxErrors, List<String> errorLog, Map<String, Integer> fileErrors,
-//      boolean asAscii, BlockingQueue<TResultRow> resultQueue) throws ImpalaException;
-extern "C"
-JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativePlanExecutor_ExecPlan(
-    JNIEnv* env, jclass caller_class, jbyteArray thrift_execute_plan_request,
-    jboolean abort_on_error, jint max_errors, jobject error_log, jobject file_errors,
-    jboolean as_ascii, jobject result_queue);
 
 }
 

@@ -16,6 +16,8 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.Expr;
@@ -23,9 +25,11 @@ import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.planner.PlanNode;
 import com.cloudera.impala.planner.Planner;
+import com.cloudera.impala.planner.ValueRange;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TExecutePlanRequest;
 import com.cloudera.impala.thrift.TQueryRequest;
@@ -34,6 +38,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 public class Coordinator {
+  private final static Logger LOG = LoggerFactory.getLogger(ValueRange.class);
+
   public static final boolean DEFAULT_ABORT_ON_ERROR = false;
   public static final int DEFAULT_MAX_ERRORS = 100;
 
@@ -152,6 +158,7 @@ public class Coordinator {
     // create plan
     Planner planner = new Planner();
     PlanNode plan = planner.createPlan(analysisResult.selectStmt, analysisResult.analyzer);
+    LOG.info(plan.getExplainString());
     // execute locally
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     TExecutePlanRequest execRequest = new TExecutePlanRequest(
@@ -161,7 +168,7 @@ public class Coordinator {
       execRequest.setDescTbl(analysisResult.analyzer.getDescTbl().toThrift());
     }
     try {
-      NativePlanExecutor.ExecPlan(
+      NativeBackend.ExecPlan(
           serializer.serialize(execRequest), abortOnError, maxErrors, errorLog, fileErrors,
           returnAsAscii, resultQueue);
     } catch (TException e) {
@@ -170,7 +177,8 @@ public class Coordinator {
   }
 
   public static byte[] getThriftPlan(String queryStr)
-      throws MetaException, NotImplementedException, AnalysisException, TException {
+      throws MetaException, NotImplementedException, AnalysisException,
+      InternalException, TException {
     HiveMetaStoreClient client = new HiveMetaStoreClient(new HiveConf(Coordinator.class));
     Catalog catalog = new Catalog(client);
     AnalysisContext analysisCtxt = new AnalysisContext(catalog);

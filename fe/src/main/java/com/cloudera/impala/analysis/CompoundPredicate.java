@@ -12,7 +12,7 @@ import com.google.common.base.Preconditions;
  *
  */
 public class CompoundPredicate extends Predicate {
-  enum Operator {
+  public enum Operator {
     AND("AND", TExprOperator.AND),
     OR("OR", TExprOperator.OR),
     NOT("NOT", TExprOperator.NOT);

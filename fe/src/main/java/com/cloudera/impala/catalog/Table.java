@@ -3,7 +3,6 @@
 package com.cloudera.impala.catalog;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
@@ -17,7 +16,7 @@ import com.google.common.collect.Maps;
 
 /**
  * Base class for table metadata.
- * 
+ *
  * This includes the concept of clustering columns, which are columns by which the table
  * data is physically clustered. In other words, if two rows share the same values
  * for the clustering columns, those two rows are most likely colocated. Note that this
@@ -147,7 +146,7 @@ public abstract class Table {
     return owner;
   }
 
-  public List<Column> getColumns() {
+  public ArrayList<Column> getColumns() {
     return colsByPos;
   }
 

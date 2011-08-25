@@ -19,6 +19,18 @@ public class SlotRef extends Expr {
   // results of analysis
   private SlotDescriptor desc;
 
+  public SlotDescriptor getDesc() {
+    Preconditions.checkState(isAnalyzed);
+    Preconditions.checkNotNull(desc);
+    return desc;
+  }
+
+  public SlotId getId() {
+    Preconditions.checkState(isAnalyzed);
+    Preconditions.checkNotNull(desc);
+    return desc.getId();
+  }
+
   public SlotRef(TableName tblName, String col) {
     super();
     this.tblName = tblName;
@@ -37,6 +49,7 @@ public class SlotRef extends Expr {
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    super.analyze(analyzer);
     desc = analyzer.registerColumnRef(tblName, col);
     type = desc.getType();
   }

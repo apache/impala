@@ -53,7 +53,8 @@ public class QueryTest {
   public void Test() {
     runTests("aggregation", false, 1000);
     runTests("exprs", false, 1000);
-    runTests("textscannode", false, 1000);
+    runTests("hdfs-scan-node", false, 1000);
+    runTests("hdfs-partitions", false, 1000);
 
     // check whether any of the tests had errors
     if (testErrorLog.length() != 0) {

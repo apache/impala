@@ -4,8 +4,10 @@ package com.cloudera.impala.planner;
 
 import java.util.List;
 
+import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.Predicate;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.TreeNode;
 import com.cloudera.impala.thrift.TPlan;
 import com.cloudera.impala.thrift.TPlanNode;
@@ -50,7 +52,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   public void setConjuncts(List<Predicate> conjuncts) {
-    this.conjuncts = conjuncts;
+    if (!conjuncts.isEmpty()) {
+      this.conjuncts = conjuncts;
+    }
   }
 
   public String getExplainString() {
@@ -78,6 +82,17 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     container.addToNodes(msg);
     for (PlanNode child: children) {
       child.treeToThriftHelper(container);
+    }
+  }
+
+  /**
+   * Computes internal state. Call this once on the root of the plan tree before
+   * calling toThrift(). The default implementation simply calls finalize()
+   * on the children.
+   */
+  public void finalize(Analyzer analyzer) throws InternalException {
+    for (PlanNode child: children) {
+      child.finalize(analyzer);
     }
   }
 
