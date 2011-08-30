@@ -123,8 +123,12 @@ public class SlotRef extends Expr {
   public void getIds(List<TupleId> tupleIds, List<SlotId> slotIds) {
     Preconditions.checkState(type != PrimitiveType.INVALID_TYPE);
     Preconditions.checkState(desc != null);
-    slotIds.add(desc.getId());
-    tupleIds.add(desc.getParent().getId());
+    if (slotIds != null) {
+      slotIds.add(desc.getId());
+    }
+    if (tupleIds != null) {
+      tupleIds.add(desc.getParent().getId());
+    }
   }
 
   public String getColumnName() {

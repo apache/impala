@@ -5,9 +5,8 @@ package com.cloudera.impala.planner;
 import java.util.Iterator;
 import java.util.List;
 
-import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TSortNode;
@@ -25,7 +24,7 @@ public class SortNode extends PlanNode {
   private final List<Boolean> isAscOrder;
 
   public SortNode(PlanNode input, List<Expr> orderingExprs, List<Boolean> isAscOrder) {
-    super();
+    super(new TupleId().asList());
     Preconditions.checkArgument(orderingExprs.size() == isAscOrder.size());
     this.orderingExprs = orderingExprs;
     this.isAscOrder = isAscOrder;

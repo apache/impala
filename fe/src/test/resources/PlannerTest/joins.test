@@ -2,4 +2,109 @@ select *
 from testtbl t1 join testtbl t2 using(id)
 where t1.zip = 94611
 ----
+HASH JOIN
+HASH PREDICATES:
+  t1.id = t2.id
+  SCAN HDFS table=default.testtbl
+    PREDICATES: t1.zip = 94611
+    FILES:
+  SCAN HDFS table=default.testtbl
+    PREDICATES: 
+    FILES:
+====
+# general exprs on both sides of equi-join predicates
+select *
+from testtbl t1 join testtbl t2 
+on (t1.id - 1 = t2.id + 1)
+where t1.zip = 94611
+----
+HASH JOIN
+HASH PREDICATES:
+  t1.id - 1 = t2.id + 1
+  SCAN HDFS table=default.testtbl
+    PREDICATES: t1.zip = 94611
+    FILES:
+  SCAN HDFS table=default.testtbl
+    PREDICATES: 
+    FILES:
+====
+# multiple join predicates;
+# scan predicates get propagated correctly;
+# non-eq join predicates are evaluated as extra conjuncts by the join node
+select *
+from alltypesagg a join alltypessmall b using (id, int_col)
+where a.day >= 6
+and b.month > 2
+and a.tinyint_col = 15
+and b.string_col = '15'
+and a.tinyint_col + b.tinyint_col < 15
+----
+HASH JOIN
+HASH PREDICATES:
+  a.id = b.id
+  a.int_col = b.int_col
+OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
+  SCAN HDFS table=default.alltypesagg
+    PREDICATES: a.tinyint_col = 15
+    FILES:
+      file:/fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt
+      file:/fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt
+      file:/fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt
+      file:/fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt
+      file:/fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt
+  SCAN HDFS table=default.alltypessmall
+    PREDICATES: b.string_col = '15'
+    FILES:
+      file:/fe/target/test-warehouse/alltypessmall/year=2009/month=3/090301.txt
+      file:/fe/target/test-warehouse/alltypessmall/year=2009/month=4/090401.txt
+====
+# same as before, with 3 tables;
+# non-eq join predicates are evaluated at the correct join node
+select *
+from alltypesagg a
+join alltypessmall b using (id, int_col)
+join alltypesaggnonulls c on (a.id = c.id and b.string_col = c.string_col)
+where a.day >= 6
+and b.month > 2
+and c.day < 3
+and a.tinyint_col = 15
+and b.string_col = '15'
+and a.tinyint_col + b.tinyint_col < 15
+and a.float_col - c.double_col < 0
+and (b.double_col * c.tinyint_col > 1000 or c.tinyint_col < 1000)
+----
+HASH JOIN
+HASH PREDICATES:
+  a.id = c.id
+  b.string_col = c.string_col
+OTHER PREDICATES: a.float_col - c.double_col < 0.0, b.double_col * c.tinyint_col > 1000.0 OR c.tinyint_col < 1000
+  HASH JOIN
+  HASH PREDICATES:
+    a.id = b.id
+    a.int_col = b.int_col
+  OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
+    SCAN HDFS table=default.alltypesagg
+      PREDICATES: a.tinyint_col = 15
+      FILES:
+        file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt
+        file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt
+        file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt
+        file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt
+        file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt
+    SCAN HDFS table=default.alltypessmall
+      PREDICATES: b.string_col = '15'
+      FILES:
+        file:fe/target/test-warehouse/alltypessmall/year=2009/month=3/090301.txt
+        file:fe/target/test-warehouse/alltypessmall/year=2009/month=4/090401.txt
+  SCAN HDFS table=default.alltypesaggnonulls
+    PREDICATES: 
+    FILES:
+      file:fe/target/test-warehouse/alltypesaggnonulls/year=2010/month=1/day=1/100101.txt
+      file:fe/target/test-warehouse/alltypesaggnonulls/year=2010/month=1/day=2/100102.txt
+====
+# non-equi join predicate not supported
+select *
+from testtbl t1 join testtbl t2
+where t1.zip < t2.zip
+----
 not implemented

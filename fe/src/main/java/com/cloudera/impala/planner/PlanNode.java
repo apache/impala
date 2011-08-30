@@ -2,15 +2,18 @@
 
 package com.cloudera.impala.planner;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.Predicate;
+import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.TreeNode;
 import com.cloudera.impala.thrift.TPlan;
 import com.cloudera.impala.thrift.TPlanNode;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
@@ -21,6 +24,7 @@ import com.google.common.collect.Lists;
  */
 abstract public class PlanNode extends TreeNode<PlanNode> {
   protected long limit; // max. # of rows to be returned; 0: no limit
+  protected ArrayList<TupleId> tupleIds;  // ids materialized by the tree rooted at this node
 
   /**
    * all conjuncts can be executed in the context of this node, ie,
@@ -34,7 +38,17 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // rows produced by this node.
   //protected ArrayList<Int> tupleIdxMap;
 
-  PlanNode() {
+  protected PlanNode(ArrayList<TupleId> tupleIds) {
+    this.limit = -1;
+    // make a copy, just to be on the safe side
+    this.tupleIds = Lists.newArrayList(tupleIds);
+    this.conjuncts = Lists.newArrayList();
+    //this.tupleIdxMap = Lists.newArrayList();
+  }
+
+  protected PlanNode() {
+    this.limit = -1;
+    this.tupleIds = Lists.newArrayList();
     this.conjuncts = Lists.newArrayList();
     //this.tupleIdxMap = Lists.newArrayList();
   }
@@ -45,6 +59,11 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   public void setLimit(long limit) {
     this.limit = limit;
+  }
+
+  public List<TupleId> getTupleIds() {
+    Preconditions.checkState(tupleIds != null);
+    return tupleIds;
   }
 
   public List<Predicate> getConjuncts() {

@@ -88,8 +88,11 @@ public class HdfsScanNode extends ScanNode {
     StringBuilder output = new StringBuilder();
     output.append(prefix + "SCAN HDFS table=" + desc.getTable().getFullName() + "\n");
     output.append(prefix + "  PREDICATES: " + getExplainString(conjuncts) + "\n");
-    output.append(prefix + "  FILES:\n    " + prefix);
-    output.append(Joiner.on("\n    " + prefix).join(filePaths));
+    output.append(prefix + "  FILES:");
+    if (!filePaths.isEmpty()) {
+      output.append("\n    " + prefix);
+      output.append(Joiner.on("\n    " + prefix).join(filePaths));
+    }
     return output.toString();
   }
 }

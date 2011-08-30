@@ -98,7 +98,7 @@ public class PlannerTest {
   }
 
   @Test public void Test() {
-    //RunTests("basic");
+    RunTests("basic");
     RunTests("hdfs");
     RunTests("joins");
 

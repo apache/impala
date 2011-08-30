@@ -9,6 +9,7 @@ include "Exprs.thrift"
 enum TPlanNodeType {
   HDFS_SCAN_NODE,
   HBASE_SCAN_NODE,
+  HASH_JOIN_NODE,
   AGGREGATION_NODE,
   SORT_NODE,
 }
@@ -22,6 +23,17 @@ struct THdfsScanNode {
 struct THBaseScanNode {
   1: required Descriptors.TTupleId tuple_id
   2: required string table_name
+}
+
+struct TEqJoinCondition {
+  // left-hand side of "<a> = <b>"
+  1: required Exprs.TExpr left;
+  // right-hand side of "<a> = <b>"
+  2: required Exprs.TExpr right;
+}
+
+struct THashJoinNode {
+  1: required list<TEqJoinCondition> join_predicates;
 }
 
 struct TAggregationNode {
@@ -47,8 +59,9 @@ struct TPlanNode {
   // one field per PlanNode subclass
   5: optional THdfsScanNode hdfs_scan_node
   6: optional THBaseScanNode hbase_scan_node
-  7: optional TAggregationNode agg_node
-  8: optional TSortNode sort_node
+  7: optional THashJoinNode hash_join_node
+  8: optional TAggregationNode agg_node
+  9: optional TSortNode sort_node
 }
 
 // A flattened representation of a tree of PlanNodes, obtained by depth-first

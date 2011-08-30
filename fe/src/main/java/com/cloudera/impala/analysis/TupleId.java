@@ -3,7 +3,6 @@
 package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
-import java.util.List;
 
 import com.google.common.collect.Lists;
 
@@ -16,7 +15,7 @@ public class TupleId extends Id {
     super(id);
   }
 
-  public List<TupleId> asList() {
+  public ArrayList<TupleId> asList() {
     ArrayList<TupleId> list = Lists.newArrayList();
     list.add(this);
     return list;

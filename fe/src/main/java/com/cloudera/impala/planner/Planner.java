@@ -19,6 +19,7 @@ import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
+import com.cloudera.impala.common.Pair;
 import com.google.common.collect.Lists;
 
 /**
@@ -102,22 +103,56 @@ public class Planner {
 
     List<Predicate> conjuncts = analyzer.getConjuncts(tblRef.getId().asList());
     ArrayList<ValueRange> keyRanges = Lists.newArrayList();
-    // determine scan predicates for clustering cols
-    for (int i = 0; i < tblRef.getTable().getNumClusteringCols(); ++i) {
-      SlotDescriptor slotDesc =
-          analyzer.getColumnSlot(tblRef.getDesc(), tblRef.getTable().getColumns().get(i));
-      if (slotDesc == null) {
-        // clustering col not referenced in this query
-        keyRanges.add(null);
-      } else {
-        ValueRange keyRange = createScanRange(slotDesc, conjuncts);
-        keyRanges.add(keyRange);
+    if (scanNode instanceof HdfsScanNode) {
+      // TODO: enable for hbase scan node
+      // determine scan predicates for clustering cols
+      for (int i = 0; i < tblRef.getTable().getNumClusteringCols(); ++i) {
+        SlotDescriptor slotDesc =
+            analyzer.getColumnSlot(tblRef.getDesc(), tblRef.getTable().getColumns().get(i));
+        if (slotDesc == null) {
+          // clustering col not referenced in this query
+          keyRanges.add(null);
+        } else {
+          ValueRange keyRange = createScanRange(slotDesc, conjuncts);
+          keyRanges.add(keyRange);
+        }
       }
     }
+
     scanNode.setKeyRanges(keyRanges);
     scanNode.setConjuncts(conjuncts);
 
     return scanNode;
+  }
+
+  /**
+   * Create HashJoinNode to join outer with inner.
+   */
+  private PlanNode createHashJoinNode(
+      Analyzer analyzer, PlanNode outer, PlanNode inner) throws NotImplementedException {
+    List<Pair<Expr, Expr> > joinPredicates = Lists.newArrayList();
+    List<Predicate> joinConjuncts = Lists.newArrayList();
+    analyzer.getEqJoinPredicates(
+        outer.getTupleIds(), inner.getTupleIds().get(0),
+        joinPredicates, joinConjuncts);
+    if (joinPredicates.isEmpty()) {
+      throw new NotImplementedException(
+          "Join requires at least one equality predicate between the two tables.");
+    }
+    HashJoinNode result = new HashJoinNode(outer, inner, joinPredicates);
+
+    // All conjuncts that are join predicates are evaluated by the hash join
+    // implicitly as part of the hash table lookup; all conjuncts that are bound by
+    // outer.getTupleIds() are evaluated by outer (or one of its children);
+    // only the remaining conjuncts that are bound by result.getTupleIds()
+    // need to be evaluated explicitly by the hash join.
+    ArrayList<Predicate> conjuncts =
+      new ArrayList<Predicate>(analyzer.getConjuncts(result.getTupleIds()));
+    conjuncts.removeAll(joinConjuncts);
+    conjuncts.removeAll(analyzer.getConjuncts(outer.getTupleIds()));
+    conjuncts.removeAll(analyzer.getConjuncts(inner.getTupleIds()));
+    result.setConjuncts(conjuncts);
+    return result;
   }
 
   /**
@@ -130,19 +165,21 @@ public class Planner {
    */
   public PlanNode createPlan(SelectStmt selectStmt, Analyzer analyzer)
       throws NotImplementedException, InternalException {
-    if (selectStmt.getTableRefs().size() > 1) {
-      throw new NotImplementedException("FROM clause limited to a single table");
-    }
     if (selectStmt.getTableRefs().isEmpty()) {
       // no from clause -> nothing to plan
       return null;
     }
     TableRef tblRef = selectStmt.getTableRefs().get(0);
-    PlanNode topNode = createScanNode(analyzer, tblRef);
+    PlanNode root = createScanNode(analyzer, tblRef);
     // TODO:
     //ArrayList<Int> tupleIdxMap =
         //computeTblRefIdxMap(selectStmt.getTableRefs(), analyzer.getDescTbl());
-    //topNode.setTupleIdxMap(tupleIdxMap);
+    //root.setTupleIdxMap(tupleIdxMap);
+    for (int i = 1; i < selectStmt.getTableRefs().size(); ++i) {
+      TableRef innerRef = selectStmt.getTableRefs().get(i);
+      PlanNode inner = createScanNode(analyzer, innerRef);
+      root = createHashJoinNode(analyzer, root, inner);
+    }
 
     AggregateInfo aggInfo = selectStmt.getAggInfo();
     if (aggInfo != null) {
@@ -154,9 +191,9 @@ public class Planner {
               aggExpr.getOp().toString() + " currently not supported for strings");
         }
       }
-      topNode = new AggregationNode(topNode, aggInfo);
+      root = new AggregationNode(root, aggInfo);
       if (selectStmt.getHavingPred() != null) {
-        topNode.setConjuncts(selectStmt.getHavingPred().getConjuncts());
+        root.setConjuncts(selectStmt.getHavingPred().getConjuncts());
       }
     }
 
@@ -164,13 +201,14 @@ public class Planner {
     if (orderingExprs != null) {
       throw new NotImplementedException("ORDER BY currently not supported.");
       // TODO: Uncomment once SortNode is implemented.
-      // topNode =
-      //    new SortNode(topNode, orderingExprs, selectStmt.getOrderingDirections());
+      // root =
+      //    new SortNode(root, orderingExprs, selectStmt.getOrderingDirections());
     }
 
-    topNode.setLimit(selectStmt.getLimit());
-    topNode.finalize(analyzer);
-    return topNode;
+    root.setLimit(selectStmt.getLimit());
+    root.finalize(analyzer);
+    return root;
   }
 
 }
+;

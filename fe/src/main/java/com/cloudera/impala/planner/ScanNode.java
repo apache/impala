@@ -22,7 +22,7 @@ abstract public class ScanNode extends PlanNode {
   protected List<ValueRange> keyRanges;
 
   public ScanNode(TupleDescriptor desc) {
-    super();
+    super(desc.getId().asList());
     this.desc = desc;
   }
 

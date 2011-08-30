@@ -88,6 +88,8 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode, ExecNode**
     case TPlanNodeType::HBASE_SCAN_NODE:
       *node = pool->Add(new HBaseScanNode(pool, tnode));
       return Status::OK;
+    case TPlanNodeType::HASH_JOIN_NODE:
+      return Status("Hash join node not implemented");
     case TPlanNodeType::AGGREGATION_NODE:
       *node = pool->Add(new AggregationNode(pool, tnode));
       return Status::OK;

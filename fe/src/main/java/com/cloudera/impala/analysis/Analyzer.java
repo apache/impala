@@ -2,6 +2,7 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -11,6 +12,8 @@ import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.Pair;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -34,6 +37,14 @@ public class Analyzer {
   // map from slot id to list of predicates referencing slot
   private final Map<SlotId, List<Predicate> > slotPredicates;
 
+  // eqJoinPredicates[tid] contains all predicates of the form
+  // "<lhs> = <rhs>" in which either lhs or rhs is fully bound by tid
+  // and the other side is not bound by tid (ie, predicates that express equi-join
+  // conditions between two tablerefs).
+  // A predicate such as "t1.a = t2.b" has two entries, one for 't1' and
+  // another one for 't2'.
+  private final Map<TupleId, List<Predicate> > eqJoinPredicates;
+
   // list of all registered conjuncts
   private final List<Predicate> conjuncts;
 
@@ -44,6 +55,7 @@ public class Analyzer {
     this.slotRefMap = Maps.newHashMap();
     this.tuplePredicates = Maps.newHashMap();
     this.slotPredicates = Maps.newHashMap();
+    this.eqJoinPredicates = Maps.newHashMap();
     this.conjuncts = Lists.newArrayList();
   }
 
@@ -170,16 +182,18 @@ public class Analyzer {
   /**
    * Register individual conjunct with all tuple and slot ids it references
    * and with the global conjunct list.
+   *
    * @param p
    */
   private void registerConjunct(Predicate p) {
     conjuncts.add(p);
 
-    List<TupleId> tupleIds = Lists.newArrayList();
-    List<SlotId> slotIds = Lists.newArrayList();
+    ArrayList<TupleId> tupleIds = Lists.newArrayList();
+    ArrayList<SlotId> slotIds = Lists.newArrayList();
     p.getIds(tupleIds, slotIds);
 
-    for (TupleId id: tupleIds) {
+    // update tuplePredicates
+    for (TupleId id : tupleIds) {
       if (!tuplePredicates.containsKey(id)) {
         List<Predicate> predList = Lists.newLinkedList();
         predList.add(p);
@@ -188,13 +202,42 @@ public class Analyzer {
         tuplePredicates.get(id).add(p);
       }
     }
-    for (SlotId id: slotIds) {
+
+    // update slotPredicates
+    for (SlotId id : slotIds) {
       if (!slotPredicates.containsKey(id)) {
         List<Predicate> predList = Lists.newLinkedList();
         predList.add(p);
         slotPredicates.put(id, predList);
       } else {
         slotPredicates.get(id).add(p);
+      }
+    }
+
+    // update eqJoinPredicates
+    if (!(p instanceof BinaryPredicate)) {
+      return;
+    }
+    BinaryPredicate binaryPred = (BinaryPredicate) p;
+    if (binaryPred.getOp() != BinaryPredicate.Operator.EQ) {
+      return;
+    }
+    if (tupleIds.size() != 2) {
+      return;
+    }
+
+    // examine children
+    for (int i = 0; i < 2; ++i) {
+      List<TupleId> lhsTupleIds = Lists.newArrayList();
+      binaryPred.getChild(i).getIds(lhsTupleIds, null);
+      if (lhsTupleIds.size() == 1) {
+        if (!eqJoinPredicates.containsKey(lhsTupleIds.get(0))) {
+          List<Predicate> predList = Lists.newLinkedList();
+          predList.add(p);
+          eqJoinPredicates.put(lhsTupleIds.get(0), predList);
+        } else {
+          eqJoinPredicates.get(lhsTupleIds.get(0)).add(p);
+        }
       }
     }
   }
@@ -213,6 +256,47 @@ public class Analyzer {
       }
     }
     return result;
+  }
+
+  /**
+   * Return all registered conjuncts that are equi-join predicates
+   * in which one side is fully bound by lhsIds and the other by rhsId.
+   * Returns the conjuncts in 'joinConjuncts' and also in their disassembled
+   * form in 'joinPredicates' (in which "<lhs> = <rhs>" is returned as
+   * Pair(<lhs>, <rhs>)).
+   */
+  public void getEqJoinPredicates(
+      List<TupleId> lhsIds, TupleId rhsId,
+      List<Pair<Expr, Expr> > joinPredicates,
+      List<Predicate> joinConjuncts) {
+    joinPredicates.clear();
+    joinConjuncts.clear();
+    List<Predicate> candidates = eqJoinPredicates.get(rhsId);
+    if (candidates == null) return;
+    for (Predicate p: candidates) {
+      Expr rhsExpr = null;
+      if (p.getChild(0).isBound(rhsId.asList())) {
+        rhsExpr = p.getChild(0);
+      } else {
+        Preconditions.checkState(p.getChild(1).isBound(rhsId.asList()));
+        rhsExpr = p.getChild(1);
+      }
+
+      Expr lhsExpr = null;
+      if (p.getChild(0).isBound(lhsIds)) {
+        lhsExpr = p.getChild(0);
+      } else if (p.getChild(1).isBound(lhsIds)) {
+        lhsExpr = p.getChild(1);
+      } else {
+        // not an equi-join condition between lhsIds and rhsId
+        continue;
+      }
+
+      Preconditions.checkState(lhsExpr != rhsExpr);
+      joinConjuncts.add(p);
+      Pair<Expr, Expr> entry = Pair.create(lhsExpr, rhsExpr);
+      joinPredicates.add(entry);
+    }
   }
 
   /**
