@@ -1,25 +1,85 @@
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col from alltypeserror
 ----
 Error converting column: 1 TO BOOL
-file: file:/home/abehm/impala/fe/target/test-warehouse/alltypeserror/year=2009/month=1/0901.txt
+file: alltypeserror/year=2009/month=1/0901.txt
+line: 1,errfalse,,1,1,10,1.000000,10.100000,01/01/09,1
+Error converting column: 2 TO TINYINT
+file: alltypeserror/year=2009/month=1/0901.txt
+line: 2,true,err2,,2,20,2.000000,20.200000,01/01/09,2
+Error converting column: 3 TO SMALLINT
+file: alltypeserror/year=2009/month=1/0901.txt
+line: 3,false,3,err3,,30,3.000000,30.300000,01/01/09,3
+Error converting column: 4 TO INT
+file: alltypeserror/year=2009/month=1/0901.txt
+line: 4,true,4,4,err4,,4.000000,40.400000,01/01/09,4
+Error converting column: 5 TO BIGINT
+file: alltypeserror/year=2009/month=1/0901.txt
+line: 5,false,5,5,5,err50,,50.500000,01/01/09,5
+Error converting column: 6 TO FLOAT
+file: alltypeserror/year=2009/month=1/0901.txt
+line: 6,true,6,6,6,60,err6.000000,,01/01/09,6
+Error converting column: 7 TO DOUBLE
+file: alltypeserror/year=2009/month=1/0901.txt
+line: 7,,,7,7,70,7.000000,err70.700000,01/01/09,7
+Error converting column: 1 TO BOOL
+Error converting column: 2 TO TINYINT
+Error converting column: 3 TO SMALLINT
+Error converting column: 4 TO INT
+Error converting column: 5 TO BIGINT
+Error converting column: 6 TO FLOAT
+Error converting column: 7 TO DOUBLE
+file: alltypeserror/year=2009/month=1/0901.txt
+line: 9,errtrue,err9,err9,err9,err90,err9.000000,err90.900000,01/01/09,9
+Error converting column: 6 TO FLOAT
+Error converting column: 7 TO DOUBLE
+file: alltypeserror/year=2009/month=2/0902.txt
+line: 13,false,3,3,,,xyz3.000000,xyz30.300000,02/01/09,3
+Error converting column: 2 TO TINYINT
+file: alltypeserror/year=2009/month=2/0902.txt
+line: 15,false,xyz5,5,5,50,5.000000,50.500000,02/01/09,5
+Error converting column: 7 TO DOUBLE
+file: alltypeserror/year=2009/month=2/0902.txt
+line: 17,false,7,7,7,70,7.000000,xyz70.700000,02/01/09,7
+Error converting column: 3 TO SMALLINT
+file: alltypeserror/year=2009/month=3/0903.txt
+line: 23,false,3,abc3,3,30,3.000000,30.300000,03/01/09,3
+Error converting column: 4 TO INT
+file: alltypeserror/year=2009/month=3/0903.txt
+line: 25,false,5,5,abc5,50,5.000000,50.500000,03/01/09,5
+Error converting column: 2 TO TINYINT
+file: alltypeserror/year=2009/month=3/0903.txt
+line: 27,false,abc7,7,7,70,7.000000,70.700000,03/01/09,7
+Error converting column: 4 TO INT
+file: alltypeserror/year=2009/month=3/0903.txt
+line: 29,false,9,9,abc9,90,9.000000,90.900000,03/01/09,9
+----
+# expected errors per file
+file: alltypeserror/year=2009/month=1/0901.txt,8
+file: alltypeserror/year=2009/month=2/0902.txt,3
+file: alltypeserror/year=2009/month=3/0903.txt,4
+====
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col from alltypeserrornonulls
+----
+Error converting column: 1 TO BOOL
+file: alltypeserrornonulls/year=2009/month=1/0901.txt
 line: 1,errfalse,1,1,1,10,1.000000,10.100000,01/01/09,1
 Error converting column: 2 TO TINYINT
-file: file:/home/abehm/impala/fe/target/test-warehouse/alltypeserror/year=2009/month=1/0901.txt
+file: alltypeserrornonulls/year=2009/month=1/0901.txt
 line: 2,true,err2,2,2,20,2.000000,20.200000,01/01/09,2
 Error converting column: 3 TO SMALLINT
-file: file:/home/abehm/impala/fe/target/test-warehouse/alltypeserror/year=2009/month=1/0901.txt
+file: alltypeserrornonulls/year=2009/month=1/0901.txt
 line: 3,false,3,err3,3,30,3.000000,30.300000,01/01/09,3
 Error converting column: 4 TO INT
-file: file:/home/abehm/impala/fe/target/test-warehouse/alltypeserror/year=2009/month=1/0901.txt
+file: alltypeserrornonulls/year=2009/month=1/0901.txt
 line: 4,true,4,4,err4,40,4.000000,40.400000,01/01/09,4
 Error converting column: 5 TO BIGINT
-file: file:/home/abehm/impala/fe/target/test-warehouse/alltypeserror/year=2009/month=1/0901.txt
+file: alltypeserrornonulls/year=2009/month=1/0901.txt
 line: 5,false,5,5,5,err50,5.000000,50.500000,01/01/09,5
 Error converting column: 6 TO FLOAT
-file: file:/home/abehm/impala/fe/target/test-warehouse/alltypeserror/year=2009/month=1/0901.txt
+file: alltypeserrornonulls/year=2009/month=1/0901.txt
 line: 6,true,6,6,6,60,err6.000000,60.600000,01/01/09,6
 Error converting column: 7 TO DOUBLE
-file: file:/home/abehm/impala/fe/target/test-warehouse/alltypeserror/year=2009/month=1/0901.txt
+file: alltypeserrornonulls/year=2009/month=1/0901.txt
 line: 7,false,7,7,7,70,7.000000,err70.700000,01/01/09,7
 Error converting column: 1 TO BOOL
 Error converting column: 2 TO TINYINT
@@ -28,33 +88,33 @@ Error converting column: 4 TO INT
 Error converting column: 5 TO BIGINT
 Error converting column: 6 TO FLOAT
 Error converting column: 7 TO DOUBLE
-file: file:/home/abehm/impala/fe/target/test-warehouse/alltypeserror/year=2009/month=1/0901.txt
+file: alltypeserrornonulls/year=2009/month=1/0901.txt
 line: 9,errtrue,err9,err9,err9,err90,err9.000000,err90.900000,01/01/09,9
 Error converting column: 6 TO FLOAT
 Error converting column: 7 TO DOUBLE
-file: file:/home/abehm/impala/fe/target/test-warehouse/alltypeserror/year=2009/month=2/0902.txt
-line: 3,false,3,3,3,30,xyz3.000000,xyz30.300000,02/01/09,3
+file: alltypeserrornonulls/year=2009/month=2/0902.txt
+line: 13,false,3,3,3,30,xyz3.000000,xyz30.300000,02/01/09,3
 Error converting column: 2 TO TINYINT
-file: file:/home/abehm/impala/fe/target/test-warehouse/alltypeserror/year=2009/month=2/0902.txt
-line: 5,false,xyz5,5,5,50,5.000000,50.500000,02/01/09,5
+file: alltypeserrornonulls/year=2009/month=2/0902.txt
+line: 15,false,xyz5,5,5,50,5.000000,50.500000,02/01/09,5
 Error converting column: 7 TO DOUBLE
-file: file:/home/abehm/impala/fe/target/test-warehouse/alltypeserror/year=2009/month=2/0902.txt
-line: 7,false,7,7,7,70,7.000000,xyz70.700000,02/01/09,7
+file: alltypeserrornonulls/year=2009/month=2/0902.txt
+line: 17,false,7,7,7,70,7.000000,xyz70.700000,02/01/09,7
 Error converting column: 3 TO SMALLINT
-file: file:/home/abehm/impala/fe/target/test-warehouse/alltypeserror/year=2009/month=3/0903.txt
-line: 3,false,3,abc3,3,30,3.000000,30.300000,03/01/09,3
+file: alltypeserrornonulls/year=2009/month=3/0903.txt
+line: 23,false,3,abc3,3,30,3.000000,30.300000,03/01/09,3
 Error converting column: 4 TO INT
-file: file:/home/abehm/impala/fe/target/test-warehouse/alltypeserror/year=2009/month=3/0903.txt
-line: 5,false,5,5,abc5,50,5.000000,50.500000,03/01/09,5
+file: alltypeserrornonulls/year=2009/month=3/0903.txt
+line: 25,false,5,5,abc5,50,5.000000,50.500000,03/01/09,5
 Error converting column: 2 TO TINYINT
-file: file:/home/abehm/impala/fe/target/test-warehouse/alltypeserror/year=2009/month=3/0903.txt
-line: 7,false,abc7,7,7,70,7.000000,70.700000,03/01/09,7
+file: alltypeserrornonulls/year=2009/month=3/0903.txt
+line: 27,false,abc7,7,7,70,7.000000,70.700000,03/01/09,7
 Error converting column: 4 TO INT
-file: file:/home/abehm/impala/fe/target/test-warehouse/alltypeserror/year=2009/month=3/0903.txt
-line: 9,false,9,9,abc9,90,9.000000,90.900000,03/01/09,9
+file: alltypeserrornonulls/year=2009/month=3/0903.txt
+line: 29,false,9,9,abc9,90,9.000000,90.900000,03/01/09,9
 ----
 # expected errors per file
-file: alltypeserror/year=2009/month=1/0901.txt,8
-file: alltypeserror/year=2009/month=2/0902.txt,3
-file: alltypeserror/year=2009/month=3/0903.txt,4
+file: alltypeserrornonulls/year=2009/month=1/0901.txt,8
+file: alltypeserrornonulls/year=2009/month=2/0902.txt,3
+file: alltypeserrornonulls/year=2009/month=3/0903.txt,4
 ====

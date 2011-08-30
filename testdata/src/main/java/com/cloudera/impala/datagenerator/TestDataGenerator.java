@@ -17,9 +17,12 @@ class TestDataGenerator {
   private static final int DEFAULT_MAX_TUPLES_PER_PARTITION = 310;
   // arbitrary default value
   private static final int DEFAULT_END_YEAR = 2010;
+  // for generating unique ids.
+  private static int id = 0;
   
   private static void GenerateAllTypesData(String dir, int numPartitions,
       int maxTuplesPerPartition) throws IOException {
+    id = 0;
     int numYears = Math.max((numPartitions / 12) - 1, 1);
     int startYear = Math.max(DEFAULT_END_YEAR - numYears, 0);
     GregorianCalendar date = new GregorianCalendar(startYear, Calendar.JANUARY, 1);
@@ -36,6 +39,7 @@ class TestDataGenerator {
 
   private static void GenerateAllTypesAggData(String dir, boolean writeNulls)
       throws IOException {
+    id = 0;
     int startYear = 2010;
     GregorianCalendar date = new GregorianCalendar(startYear, Calendar.JANUARY, 1);
     GregorianCalendar endDate = (GregorianCalendar) date.clone();
@@ -56,9 +60,9 @@ class TestDataGenerator {
         filenameFormat.format(startDate.getTime()) + ".txt")));
     Calendar date = (Calendar) startDate.clone();
     SimpleDateFormat df = new SimpleDateFormat("MM/dd/yy");
-    int id = 0;
-    while (date.before(endDate) && id < maxTuplesPerPartition) {
-      for (int int_col = 0; int_col < intsPerDay && id < maxTuplesPerPartition;
+    int count = 0;
+    while (date.before(endDate) && count < maxTuplesPerPartition) {
+      for (int int_col = 0; int_col < intsPerDay && count < maxTuplesPerPartition;
            ++int_col) {
         boolean bool_col = (id % 2 == 0 ? true : false);
         byte tinyint_col = (byte) (int_col % 10);
@@ -78,6 +82,7 @@ class TestDataGenerator {
             (writeNulls && int_col == 0 ? "" : Double.toString(double_col)),
             date_string_col, string_col);
         ++id;
+        ++count;
       }
       date.add(Calendar.DAY_OF_MONTH, 1);
     }
@@ -100,7 +105,7 @@ class TestDataGenerator {
     // Generate AllTypes
     String dirName = args[0] + "/AllTypes";
     File dir = new File(dirName);
-    dir.mkdirs();    
+    dir.mkdirs();
     GenerateAllTypesData(dirName, DEFAULT_NUM_PARTITIONS,
         DEFAULT_MAX_TUPLES_PER_PARTITION);
     

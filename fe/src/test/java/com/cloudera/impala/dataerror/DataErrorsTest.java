@@ -43,7 +43,9 @@ public class DataErrorsTest {
       int errorCount = 0;
       for (String line : expectedErrors) {
         // Indicates the last line of one error message.
-        if (line.startsWith("line:")) {
+        // The final line of an Hdfs error message starts with "line:",
+        // and for Hbase tables with "row key:".
+        if (line.startsWith("line:") || line.startsWith("row key:")) {
           errorCount++;
         }
         lastLine++;
@@ -75,6 +77,9 @@ public class DataErrorsTest {
     runTests("hdfs-scan-node-errors", false, 100);
     runTests("hdfs-scan-node-errors", false, 5);
     runTests("hdfs-scan-node-errors", true, 1);
+    runTests("hbase-scan-node-errors", false, 100);
+    runTests("hbase-scan-node-errors", false, 5);
+    runTests("hbase-scan-node-errors", true, 1);
     if (testErrorLog.length() != 0) {
       fail(testErrorLog.toString());
     }

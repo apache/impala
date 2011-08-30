@@ -28,4 +28,5 @@ done
 # run test data generator
 mkdir -p $DATALOC
 java -cp $CP com.cloudera.impala.datagenerator.TestDataGenerator $DATALOC
+java -cp $CP com.cloudera.impala.datagenerator.CsvToHBaseConverter
 echo "SUCCESS, data generated into $DATALOC"

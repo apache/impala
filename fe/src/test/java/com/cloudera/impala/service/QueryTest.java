@@ -12,7 +12,6 @@ import org.junit.Test;
 
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.TestSchemaUtils;
-import com.cloudera.impala.service.Coordinator;
 import com.cloudera.impala.testutil.TestFileParser;
 import com.cloudera.impala.testutil.TestUtils;
 
@@ -56,7 +55,7 @@ public class QueryTest {
     runTests("exprs", false, 1000);
     runTests("hdfs-scan-node", false, 1000);
     runTests("hdfs-partitions", false, 1000);
-    runTests("hbasescannode", false, 1000);
+    runTests("hbase-scan-node", false, 1000);
 
     // check whether any of the tests had errors
     if (testErrorLog.length() != 0) {

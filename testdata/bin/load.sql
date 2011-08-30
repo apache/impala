@@ -62,14 +62,6 @@ INSERT OVERWRITE TABLE hbasealltypessmall
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col
 FROM alltypessmall;
 
-INSERT OVERWRITE TABLE hbasealltypeserror
-SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col
-FROM alltypeserror;
-
-INSERT OVERWRITE TABLE hbasealltypeserrornonulls
-SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col
-FROM alltypeserrornonulls;
-
 INSERT OVERWRITE TABLE hbasealltypesagg
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col
 FROM alltypesagg;

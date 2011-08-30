@@ -83,15 +83,16 @@ Status HBaseScanNode::Open(RuntimeState* state) {
   return hbase_scanner_->StartScan(tuple_desc_);
 }
 
-void HBaseScanNode::WriteTextSlot(void* value, int value_length, SlotDescriptor* slot,
+void HBaseScanNode::WriteTextSlot(const string& family, const string& qualifier,
+    void* value, int value_length, SlotDescriptor* slot,
     RuntimeState* state, bool* error_in_row) {
   bool parsed_ok = text_converter_->ConvertAndWriteSlotBytes(reinterpret_cast<char*>(value),
       reinterpret_cast<char*>(value) + value_length, tuple_, slot, true, false);
   if (!parsed_ok) {
     *error_in_row = true;
     if (state->LogHasSpace()) {
-      state->error_stream() << "Error converting column value: "
-          << reinterpret_cast<char*>(value) << " TO "
+      state->error_stream() << "Error converting column " << family << ":" << qualifier << ": "
+          << "'" << reinterpret_cast<char*>(value) << "' TO "
           << TypeToString(slot->type()) << endl;
     }
   }
@@ -112,7 +113,14 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
   while (true) {
     if (row_batch->IsFull()) return Status::OK;
     RETURN_IF_ERROR(hbase_scanner_->Next(&has_next));
-    if (!has_next) return Status::OK;
+    if (!has_next) {
+      if (num_errors_ > 0) {
+        const HBaseTableDescriptor* hbase_table =
+            static_cast<const HBaseTableDescriptor*> (tuple_desc_->table_desc());
+        state->ReportFileErrors(hbase_table->table_name(), num_errors_);
+      }
+      return Status::OK;
+    }
 
     int row_idx = row_batch->AddRow();
     TupleRow* row = row_batch->GetRow(row_idx);
@@ -126,7 +134,8 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
       if (key == NULL) {
         tuple_->SetNull(row_key_slot_->null_indicator_offset());
       } else {
-        WriteTextSlot(key, key_length, row_key_slot_, state, &error_in_row);
+        WriteTextSlot("key", "",
+            key, key_length, row_key_slot_, state, &error_in_row);
       }
     }
 
@@ -139,7 +148,8 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
       if (value == NULL) {
         tuple_->SetNull(sorted_non_key_slots_[i]->null_indicator_offset());
       } else {
-        WriteTextSlot(value, value_length, sorted_non_key_slots_[i], state, &error_in_row);
+        WriteTextSlot(sorted_cols_[i]->first, sorted_cols_[i]->second,
+            value, value_length, sorted_non_key_slots_[i], state, &error_in_row);
       }
     }
     // Error logging: Flush error stream and add name of HBase table and current row key.
@@ -152,7 +162,8 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
         int key_length;
         hbase_scanner_->GetRowKey(&key, &key_length);
         state->error_stream() << "row key: "
-            << string(reinterpret_cast<const char*>(key), key_length) << endl;
+            << string(reinterpret_cast<const char*>(key), key_length);
+        state->LogErrorStream();
       }
       if (state->abort_on_error()) {
         state->ReportFileErrors(table_name_, 1);
@@ -173,8 +184,6 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
     }
     hbase_scanner_->ReleaseBuffer();
   }
-
-  return Status::OK;
 }
 
 Status HBaseScanNode::Close(RuntimeState* state) {

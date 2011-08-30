@@ -95,7 +95,8 @@ class HBaseScanNode : public ExecNode {
 
   // Writes a slot in tuple_ from an HBase value containing text data.
   // The HBase value is converted into the appropriate target type.
-  void WriteTextSlot(void* value, int value_length, SlotDescriptor* slot,
+  void WriteTextSlot(const std::string& family, const std::string& qualifier,
+      void* value, int value_length, SlotDescriptor* slot,
       RuntimeState* state, bool* error_in_row);
 };
 

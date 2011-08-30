@@ -1,0 +1,114 @@
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col from hbasealltypeserror
+----
+Error converting column bools:bool_col: 'errfalse' TO BOOL
+hbase table: hbasealltypeserror
+row key: 1
+Error converting column floats:double_col: 'xyz30.300000' TO DOUBLE
+Error converting column floats:float_col: 'xyz3.000000' TO FLOAT
+hbase table: hbasealltypeserror
+row key: 13
+Error converting column ints:tinyint_col: 'xyz5' TO TINYINT
+hbase table: hbasealltypeserror
+row key: 15
+Error converting column floats:double_col: 'xyz70.700000' TO DOUBLE
+hbase table: hbasealltypeserror
+row key: 17
+Error converting column ints:tinyint_col: 'err2' TO TINYINT
+hbase table: hbasealltypeserror
+row key: 2
+Error converting column ints:smallint_col: 'abc3' TO SMALLINT
+hbase table: hbasealltypeserror
+row key: 23
+Error converting column ints:int_col: 'abc5' TO INT
+hbase table: hbasealltypeserror
+row key: 25
+Error converting column ints:tinyint_col: 'abc7' TO TINYINT
+hbase table: hbasealltypeserror
+row key: 27
+Error converting column ints:int_col: 'abc9' TO INT
+hbase table: hbasealltypeserror
+row key: 29
+Error converting column ints:smallint_col: 'err3' TO SMALLINT
+hbase table: hbasealltypeserror
+row key: 3
+Error converting column ints:int_col: 'err4' TO INT
+hbase table: hbasealltypeserror
+row key: 4
+Error converting column ints:bigint_col: 'err50' TO BIGINT
+hbase table: hbasealltypeserror
+row key: 5
+Error converting column floats:float_col: 'err6.000000' TO FLOAT
+hbase table: hbasealltypeserror
+row key: 6
+Error converting column floats:double_col: 'err70.700000' TO DOUBLE
+hbase table: hbasealltypeserror
+row key: 7
+Error converting column bools:bool_col: 'errtrue' TO BOOL
+Error converting column floats:double_col: 'err90.900000' TO DOUBLE
+Error converting column floats:float_col: 'err9.000000' TO FLOAT
+Error converting column ints:bigint_col: 'err90' TO BIGINT
+Error converting column ints:int_col: 'err9' TO INT
+Error converting column ints:smallint_col: 'err9' TO SMALLINT
+Error converting column ints:tinyint_col: 'err9' TO TINYINT
+hbase table: hbasealltypeserror
+row key: 9
+----
+file: hbasealltypeserror,15
+====
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col from hbasealltypeserrornonulls
+----
+Error converting column bools:bool_col: 'errfalse' TO BOOL
+hbase table: hbasealltypeserrornonulls
+row key: 1
+Error converting column floats:double_col: 'xyz30.300000' TO DOUBLE
+Error converting column floats:float_col: 'xyz3.000000' TO FLOAT
+hbase table: hbasealltypeserrornonulls
+row key: 13
+Error converting column ints:tinyint_col: 'xyz5' TO TINYINT
+hbase table: hbasealltypeserrornonulls
+row key: 15
+Error converting column floats:double_col: 'xyz70.700000' TO DOUBLE
+hbase table: hbasealltypeserrornonulls
+row key: 17
+Error converting column ints:tinyint_col: 'err2' TO TINYINT
+hbase table: hbasealltypeserrornonulls
+row key: 2
+Error converting column ints:smallint_col: 'abc3' TO SMALLINT
+hbase table: hbasealltypeserrornonulls
+row key: 23
+Error converting column ints:int_col: 'abc5' TO INT
+hbase table: hbasealltypeserrornonulls
+row key: 25
+Error converting column ints:tinyint_col: 'abc7' TO TINYINT
+hbase table: hbasealltypeserrornonulls
+row key: 27
+Error converting column ints:int_col: 'abc9' TO INT
+hbase table: hbasealltypeserrornonulls
+row key: 29
+Error converting column ints:smallint_col: 'err3' TO SMALLINT
+hbase table: hbasealltypeserrornonulls
+row key: 3
+Error converting column ints:int_col: 'err4' TO INT
+hbase table: hbasealltypeserrornonulls
+row key: 4
+Error converting column ints:bigint_col: 'err50' TO BIGINT
+hbase table: hbasealltypeserrornonulls
+row key: 5
+Error converting column floats:float_col: 'err6.000000' TO FLOAT
+hbase table: hbasealltypeserrornonulls
+row key: 6
+Error converting column floats:double_col: 'err70.700000' TO DOUBLE
+hbase table: hbasealltypeserrornonulls
+row key: 7
+Error converting column bools:bool_col: 'errtrue' TO BOOL
+Error converting column floats:double_col: 'err90.900000' TO DOUBLE
+Error converting column floats:float_col: 'err9.000000' TO FLOAT
+Error converting column ints:bigint_col: 'err90' TO BIGINT
+Error converting column ints:int_col: 'err9' TO INT
+Error converting column ints:smallint_col: 'err9' TO SMALLINT
+Error converting column ints:tinyint_col: 'err9' TO TINYINT
+hbase table: hbasealltypeserrornonulls
+row key: 9
+----
+file: hbasealltypeserrornonulls,15
+====
