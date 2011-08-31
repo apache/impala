@@ -15,7 +15,8 @@ import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.TableRef;
-import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.HdfsRCFileTable;
+import com.cloudera.impala.catalog.HdfsTextTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
@@ -92,12 +93,15 @@ public class Planner {
    * @throws NotImplementedException
    */
   private PlanNode createScanNode(Analyzer analyzer, TableRef tblRef) {
-    // HBase or Test Scan Node?
     ScanNode scanNode = null;
-    if (tblRef.getTable() instanceof HdfsTable) {
-      scanNode = new HdfsScanNode(tblRef.getDesc(), (HdfsTable) tblRef.getTable());
+    if (tblRef.getTable() instanceof HdfsTextTable) {
+      // Hive Text table
+      scanNode = new HdfsTextScanNode(tblRef.getDesc(), (HdfsTextTable) tblRef.getTable());
+    } else if (tblRef.getTable() instanceof HdfsRCFileTable) {
+      // Hive RCFile table
+      scanNode = new HdfsRCFileScanNode(tblRef.getDesc(), (HdfsRCFileTable) tblRef.getTable());
     } else {
-      // HBase table
+        // HBase table
       scanNode = new HBaseScanNode(tblRef.getDesc());
     }
 

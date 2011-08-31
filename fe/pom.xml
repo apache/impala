@@ -457,6 +457,8 @@
                 </goals>
                 <configuration>
                   <target>
+                    <exec executable="${env.HBASE_HOME}/bin/stop-hbase.sh">
+                    </exec>
                     <exec executable="${env.HBASE_HOME}/bin/start-hbase.sh">
                     </exec>
                     <exec executable="${env.HBASE_HOME}/bin/hbase">

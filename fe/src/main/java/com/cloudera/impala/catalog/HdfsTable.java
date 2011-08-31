@@ -27,7 +27,6 @@ import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.THdfsTable;
 import com.cloudera.impala.thrift.TTable;
-import com.cloudera.impala.thrift.TTableType;
 import com.google.common.collect.Lists;
 
 /**
@@ -35,7 +34,7 @@ import com.google.common.collect.Lists;
  * Owned by Catalog instance.
  * The partition keys constitute the clustering columns.
  */
-public class HdfsTable extends Table {
+public abstract class HdfsTable extends Table {
 
   private static final String DEFAULT_LINE_DELIM = "\n";
   private static final String DEFAULT_FIELD_DELIM = ",";
@@ -279,8 +278,9 @@ public class HdfsTable extends Table {
 
   @Override
   public TTable toThrift() {
-    TTable ttable =
-        new TTable(TTableType.HDFS_TABLE, colsByPos.size(), numClusteringCols);
+    TTable ttable = new TTable();
+    ttable.setNumCols(colsByPos.size());
+    ttable.setNumClusteringCols(numClusteringCols);
     // We only support single-byte characters as delimiters.
     THdfsTable tHdfsTable = new THdfsTable(
         (byte) lineDelim.charAt(0), (byte) fieldDelim.charAt(0),

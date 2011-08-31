@@ -1,7 +1,7 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
-#ifndef IMPALA_EXEC_HDFS_SCAN_NODE_H_
-#define IMPALA_EXEC_HDFS_SCAN_NODE_H_
+#ifndef IMPALA_EXEC_HDFS_TEXT_SCAN_NODE_H_
+#define IMPALA_EXEC_HDFS_TEXT_SCAN_NODE_H_
 
 #include <vector>
 #include <stdint.h>
@@ -46,9 +46,9 @@ class TextConverter;
 //
 // TODO: separate file handling and parsing of text files; the latter should go into
 // a separate helper class
-class HdfsScanNode : public ExecNode {
+class HdfsTextScanNode : public ExecNode {
  public:
-  HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode);
+  HdfsTextScanNode(ObjectPool* pool, const TPlanNode& tnode);
 
   // Allocates tuple buffer.
   // Sets tuple_idx_ and tuple_desc_ using RuntimeState.

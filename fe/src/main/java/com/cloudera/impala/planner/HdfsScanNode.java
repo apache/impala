@@ -12,7 +12,6 @@ import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.THdfsScanNode;
 import com.cloudera.impala.thrift.TPlanNode;
-import com.cloudera.impala.thrift.TPlanNodeType;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -22,7 +21,7 @@ import com.google.common.collect.Lists;
  * Scan of a single single table. Currently limited to full-table scans.
  * TODO: pass in range restrictions.
  */
-public class HdfsScanNode extends ScanNode {
+public abstract class HdfsScanNode extends ScanNode {
   private final HdfsTable tbl;
   private List<String> filePaths;  // data files to scan
   public List<LiteralExpr> keyValues; // partition key values per file
@@ -76,7 +75,6 @@ public class HdfsScanNode extends ScanNode {
 
   @Override
   protected void toThrift(TPlanNode msg) {
-    msg.node_type = TPlanNodeType.HDFS_SCAN_NODE;
     msg.hdfs_scan_node = new THdfsScanNode(desc.getId().asInt(), filePaths);
     if (!keyValues.isEmpty()) {
       msg.hdfs_scan_node.setKey_values(Expr.treesToThrift(keyValues));

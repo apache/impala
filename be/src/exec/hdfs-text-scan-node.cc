@@ -1,6 +1,6 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
-#include "exec/hdfs-scan-node.h"
+#include "exec/hdfs-text-scan-node.h"
 
 #include <boost/algorithm/string.hpp>
 #include "text-converter.h"
@@ -20,7 +20,7 @@ using namespace std;
 using namespace boost;
 using namespace impala;
 
-HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode)
+HdfsTextScanNode::HdfsTextScanNode(ObjectPool* pool, const TPlanNode& tnode)
     : ExecNode(pool, tnode),
       files_(tnode.hdfs_scan_node.file_paths),
       tuple_id_(tnode.hdfs_scan_node.tuple_id),
@@ -55,7 +55,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode)
   Expr::CreateExprTrees(obj_pool_.get(), tnode.hdfs_scan_node.key_values, &key_values_);
 }
 
-Status HdfsScanNode::Prepare(RuntimeState* state) {
+Status HdfsTextScanNode::Prepare(RuntimeState* state) {
   PrepareConjuncts(state);
   // Initialize ptr to end, to initiate reading the first file block
   file_buf_ptr_ = file_buf_end_;
@@ -123,7 +123,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   return Status::OK;
 }
 
-Status HdfsScanNode::Open(RuntimeState* state) {
+Status HdfsTextScanNode::Open(RuntimeState* state) {
   hdfs_connection_ = hdfsConnect("default", 0);
   if (hdfs_connection_ == NULL) {
     // TODO: make sure we print all available diagnostic output to our error log
@@ -133,7 +133,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   }
 }
 
-Status HdfsScanNode::Close(RuntimeState* state) {
+Status HdfsTextScanNode::Close(RuntimeState* state) {
   int hdfs_ret = hdfsDisconnect(hdfs_connection_);
   if (hdfs_ret == 0) {
     return Status::OK;
@@ -143,7 +143,7 @@ Status HdfsScanNode::Close(RuntimeState* state) {
   }
 }
 
-void* HdfsScanNode::GetFileBuffer(RuntimeState* state, int* file_buf_idx) {
+void* HdfsTextScanNode::GetFileBuffer(RuntimeState* state, int* file_buf_idx) {
   // Never return file buffer 0, because it could contain valid data from a previous GetNext().
   ++*file_buf_idx;
   while (*file_buf_idx >= file_bufs_.size()) {
@@ -152,7 +152,7 @@ void* HdfsScanNode::GetFileBuffer(RuntimeState* state, int* file_buf_idx) {
   return file_bufs_[*file_buf_idx];
 }
 
-Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
+Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
   tuple_ = reinterpret_cast<Tuple*>(tuple_buf_);
   bzero(tuple_buf_, tuple_buf_size_);
   boundary_column_.clear();
@@ -255,7 +255,7 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
 // This first assembles the full tuple before applying the conjuncts.
 // TODO: apply conjuncts as slots get materialized and skip to the end of the row
 // if we determine it's not a match.
-Status HdfsScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, int* row_idx,
+Status HdfsTextScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, int* row_idx,
     int* column_idx, bool* last_char_is_escape, bool* unescape_string, char* quote_char,
     bool* error_in_row, int* num_errors) {
 
@@ -400,7 +400,7 @@ Status HdfsScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, i
         }
         if (state->abort_on_error()) {
           state->ReportFileErrors(files_[file_idx_], 1);
-          return Status("Aborted HdfsScanNode due to parse errors. View error log for details.");
+          return Status("Aborted HdfsTextScanNode due to parse errors. View error log for details.");
         }
       }
       *column_idx = 0;
@@ -446,9 +446,9 @@ Status HdfsScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, i
   return Status::OK;
 }
 
-void HdfsScanNode::DebugString(int indentation_level, std::stringstream* out) const {
+void HdfsTextScanNode::DebugString(int indentation_level, std::stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
-  *out << "HdfsScanNode(tupleid=" << tuple_id_ << " files[" << join(files_, ",");
+  *out << "HdfsTextScanNode(tupleid=" << tuple_id_ << " files[" << join(files_, ",");
   ExecNode::DebugString(indentation_level, out);
   *out << "])" << endl;
 }

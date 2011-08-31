@@ -44,7 +44,7 @@ public class HBaseTable extends Table {
   protected String hbaseTableName;
 
   // Input format class for HBase tables read by Hive.
-  public static final String hbaseInputFormat =
+  private static final String hbaseInputFormat =
     "org.apache.hadoop.hive.hbase.HiveHBaseTableInputFormat";
 
   protected HBaseTable(Db db, String name, String owner) {
@@ -152,5 +152,10 @@ public class HBaseTable extends Table {
 
   public String getHBaseTableName() {
     return hbaseTableName;
+  }
+
+  public static boolean isHBaseTable(org.apache.hadoop.hive.metastore.api.Table msTbl) {
+    return (msTbl.getTableType().equals("EXTERNAL_TABLE") &&
+        msTbl.getSd().getInputFormat().equals(hbaseInputFormat));
   }
 }

@@ -138,7 +138,8 @@ TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
     slots_() {
   if (tdesc.__isset.table) {
     switch(tdesc.table.tableType) {
-      case TTableType::HDFS_TABLE:
+      case TTableType::HDFS_TEXT_TABLE:
+      case TTableType::HDFS_RCFILE_TABLE:
         table_desc_.reset(new HdfsTableDescriptor(tdesc.table));
         break;
       case TTableType::HBASE_TABLE:

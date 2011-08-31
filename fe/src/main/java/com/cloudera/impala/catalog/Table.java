@@ -23,7 +23,7 @@ import com.google.common.collect.Maps;
  * is more general than Hive's CLUSTER BY ... INTO BUCKETS clause (which partitions
  * a key range into a fixed number of buckets).
  *
- * Current subclasses are HdfsTable and HBaseTable.
+ * Current subclasses are HdfsTextTable, HdfsRCFileTable, and HBaseTable.
  *
  */
 public abstract class Table {
@@ -65,14 +65,13 @@ public abstract class Table {
 
 
   /**
-   * Creates the Impala representation of Hive metadata for one table.
-   * Distinguishes between HdfsTables and HBaseTables.
+   * Creates the Impala representation of Hive/HBase metadata for one table.
    * Calls load() on the appropriate instance of Table subclass.
    * @param client
    * @param db
    * @param tblName
    * @return
-   *         new instance of HdfsTable or HBaseTable
+   *         new instance of Hdfs[Text|RCFile]Table or HBaseTable
    *         null if loading table failed
    */
   public static Table load(HiveMetaStoreClient client, Db db,
@@ -81,13 +80,16 @@ public abstract class Table {
     try {
       org.apache.hadoop.hive.metastore.api.Table msTbl = client.getTable(db.getName(), tblName);
 
-      // Hdfs table or HBase table?
+      // Determine the table type
       Table table = null;
-      if (msTbl.getTableType().equals("EXTERNAL_TABLE") &&
-          msTbl.getSd().getInputFormat().equals(HBaseTable.hbaseInputFormat)) {
+      if (HBaseTable.isHBaseTable(msTbl)) {
         table = new HBaseTable(db, tblName, msTbl.getOwner());
+      } else if (HdfsTextTable.isTextTable(msTbl)) {
+        table = new HdfsTextTable(db, tblName, msTbl.getOwner());
+      } else if (HdfsRCFileTable.isRCFileTable(msTbl)) {
+        table = new HdfsRCFileTable(db, tblName, msTbl.getOwner());
       } else {
-        table = new HdfsTable(db, tblName, msTbl.getOwner());
+        throw new UnsupportedOperationException("Unrecognized table type");
       }
       // Have the table load itself.
       return table.load(client, msTbl);

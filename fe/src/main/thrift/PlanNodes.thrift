@@ -7,7 +7,8 @@ include "Descriptors.thrift"
 include "Exprs.thrift"
 
 enum TPlanNodeType {
-  HDFS_SCAN_NODE,
+  HDFS_TEXT_SCAN_NODE,
+  HDFS_RCFILE_SCAN_NODE,
   HBASE_SCAN_NODE,
   HASH_JOIN_NODE,
   AGGREGATION_NODE,
