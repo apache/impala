@@ -16,6 +16,7 @@ jclass HBaseTableScanner::resultscanner_cl_ = NULL;
 jclass HBaseTableScanner::result_cl_ = NULL;
 jclass HBaseTableScanner::immutable_bytes_writable_cl_ = NULL;
 jclass HBaseTableScanner::keyvalue_cl_ = NULL;
+jclass HBaseTableScanner::hconstants_cl_ = NULL;
 jmethodID HBaseTableScanner::htable_ctor_ = NULL;
 jmethodID HBaseTableScanner::htable_get_scanner_id_ = NULL;
 jmethodID HBaseTableScanner::htable_close_id_ = NULL;
@@ -37,6 +38,7 @@ jmethodID HBaseTableScanner::keyvalue_get_row_offset_id_ = NULL;
 jmethodID HBaseTableScanner::keyvalue_get_row_length_id_ = NULL;
 jmethodID HBaseTableScanner::keyvalue_get_value_offset_id_ = NULL;
 jmethodID HBaseTableScanner::keyvalue_get_value_length_id_ = NULL;
+jobject HBaseTableScanner::empty_row_ = NULL;
 
 HBaseTableScanner::HBaseTableScanner(JNIEnv* env)
   : env_(env),
@@ -65,7 +67,7 @@ Status HBaseTableScanner::Init() {
   }
 
   // Global class references:
-  // HTable, Scan, ResultScanner, Result, ImmutableBytesWritable, KeyValue.
+  // HTable, Scan, ResultScanner, Result, ImmutableBytesWritable, KeyValue, HConstants.
   RETURN_IF_ERROR(
       JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/client/HTable", &htable_cl_));
   RETURN_IF_ERROR(
@@ -80,6 +82,8 @@ Status HBaseTableScanner::Init() {
           &immutable_bytes_writable_cl_));
   RETURN_IF_ERROR(
       JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/KeyValue", &keyvalue_cl_));
+  RETURN_IF_ERROR(
+      JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/HConstants", &hconstants_cl_));
 
   // HTable method ids.
   htable_ctor_ = env->GetMethodID(htable_cl_, "<init>",
@@ -92,7 +96,7 @@ Status HBaseTableScanner::Init() {
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
 
   // Scan method ids.
-  scan_ctor_ = env->GetMethodID(scan_cl_, "<init>", "()V");
+  scan_ctor_ = env->GetMethodID(scan_cl_, "<init>", "([B[B)V");
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
   scan_set_max_versions_id_ = env->GetMethodID(scan_cl_, "setMaxVersions",
       "(I)Lorg/apache/hadoop/hbase/client/Scan;");
@@ -142,10 +146,18 @@ Status HBaseTableScanner::Init() {
   keyvalue_get_value_length_id_ = env->GetMethodID(keyvalue_cl_, "getValueLength", "()I");
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
 
+  // HConstants fields
+  jfieldID empty_start_row_id =
+      env->GetStaticFieldID(hconstants_cl_, "EMPTY_START_ROW", "[B");
+  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  empty_row_ = env->GetStaticObjectField(hconstants_cl_, empty_start_row_id);
+  RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, empty_row_, &empty_row_));
+
   return Status::OK;
 }
 
-Status HBaseTableScanner::StartScan(const TupleDescriptor* tuple_desc) {
+Status HBaseTableScanner::StartScan(
+    const TupleDescriptor* tuple_desc, const string& start_key, const string& end_key) {
   const HBaseTableDescriptor* hbase_table =
       static_cast<const HBaseTableDescriptor*>(tuple_desc->table_desc());
   // htable_ = new HTable(hbase_conf_, hbase_table->table_name());
@@ -153,15 +165,23 @@ Status HBaseTableScanner::StartScan(const TupleDescriptor* tuple_desc) {
   jstring jtable_name = env_->NewStringUTF(hbase_table->table_name().c_str());
   htable_ = env_->NewObject(htable_cl_, htable_ctor_, hbase_conf_, jtable_name);
   RETURN_ERROR_IF_EXC(env_, JniUtil::throwable_to_string_id());
-  // scan_ = new Scan();
-  scan_ = env_->NewObject(scan_cl_, scan_ctor_);
+
+  // scan_ = new Scan(start_key, stop_key);
+  jbyteArray start_bytes;
+  CreateRowKey(start_key, &start_bytes);
+  jbyteArray end_bytes;
+  CreateRowKey(end_key, &end_bytes);
+  scan_ = env_->NewObject(scan_cl_, scan_ctor_, start_bytes, end_bytes);
   RETURN_ERROR_IF_EXC(env_, JniUtil::throwable_to_string_id());
+
   // scan_.setMaxVersions(1);
   scan_ = env_->CallObjectMethod(scan_, scan_set_max_versions_id_, 1);
   RETURN_ERROR_IF_EXC(env_, JniUtil::throwable_to_string_id());
+
   // scan_.setCaching(rows_cached_);
   env_->CallObjectMethod(scan_, scan_set_caching_id_, rows_cached_);
   RETURN_ERROR_IF_EXC(env_, JniUtil::throwable_to_string_id());
+
   const vector<SlotDescriptor*>& slots = tuple_desc->slots();
   // Restrict scan to requested families/qualifiers.
   for (int i = 0; i < slots.size(); ++i) {
@@ -184,6 +204,25 @@ Status HBaseTableScanner::StartScan(const TupleDescriptor* tuple_desc) {
   }
   resultscanner_ = env_->CallObjectMethod(htable_, htable_get_scanner_id_, scan_);
   RETURN_ERROR_IF_EXC(env_, JniUtil::throwable_to_string_id());
+  return Status::OK;
+}
+
+Status HBaseTableScanner::CreateRowKey(const std::string& key, jbyteArray* bytes) {
+  if (!key.empty()) {
+    *bytes = env_->NewByteArray(key.size());
+    if (*bytes == NULL) {
+      return Status("Couldn't construct java byte array for key " + key);
+    }
+    jboolean is_copy;
+    jbyte* elements = env_->GetByteArrayElements(*bytes, &is_copy);
+    if (elements == NULL) {
+      return Status("Couldn't get java byte array elements for key " + key);
+    }
+    memcpy(elements, key.data(), key.size());
+    env_->ReleaseByteArrayElements(*bytes, elements, 0);
+  } else {
+    *bytes = reinterpret_cast<jbyteArray>(empty_row_);
+  }
   return Status::OK;
 }
 

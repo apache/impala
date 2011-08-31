@@ -98,9 +98,11 @@ public class PlannerTest {
   }
 
   @Test public void Test() {
-    RunTests("basic");
+    RunTests("aggregation");
+    RunTests("hbase");
     RunTests("hdfs");
     RunTests("joins");
+    RunTests("order");
 
     // check whether any of the tests had errors
     if (testErrorLog.length() != 0) {

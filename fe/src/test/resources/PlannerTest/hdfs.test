@@ -1,3 +1,16 @@
+# predicate is evaluated by the scan node
+select zip, count(*)
+from testtbl
+where name like 'm%'
+group by 1
+----
+AGGREGATE
+GROUP BY: zip
+  SCAN HDFS table=default.testtbl
+    PREDICATES: name LIKE 'm%'
+    FILES: 
+====
+# all partitions are selected
 select * from alltypes
 ----
 SCAN HDFS table=default.alltypes

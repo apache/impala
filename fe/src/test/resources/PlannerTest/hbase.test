@@ -1,0 +1,103 @@
+# full scan
+select * from hbasealltypessmall
+----
+SCAN HBASE table=hbasealltypessmall
+  PREDICATES: 
+====
+# predicate on row key doesn't get transformed into scan parameter, because
+# it's mapped as an int (but stored in ascii and ordered lexicographically)
+select * from hbasealltypessmall
+where id < 5
+----
+SCAN HBASE table=hbasealltypessmall
+  PREDICATES: id < 5
+====
+# if the row key is mapped as a string col, range predicates are applied to the scan
+select * from hbasestringids
+where id = '5'
+and tinyint_col = 5
+----
+SCAN HBASE table=hbasestringids
+  START KEY: 5
+  STOP KEY: 5\0
+  PREDICATES: tinyint_col = 5
+====
+select * from hbasestringids
+where id > '5'
+and tinyint_col = 5
+----
+SCAN HBASE table=hbasestringids
+  START KEY: 5\0
+  PREDICATES: tinyint_col = 5
+====
+select * from hbasestringids
+where id >= '5'
+and tinyint_col = 5
+----
+SCAN HBASE table=hbasestringids
+  START KEY: 5
+  PREDICATES: tinyint_col = 5
+====
+select * from hbasestringids
+where id < '5'
+and tinyint_col = 5
+----
+SCAN HBASE table=hbasestringids
+  STOP KEY: 5
+  PREDICATES: tinyint_col = 5
+====
+select * from hbasestringids
+where id <= '5'
+and tinyint_col = 5
+----
+SCAN HBASE table=hbasestringids
+  STOP KEY: 5\0
+  PREDICATES: tinyint_col = 5
+====
+select * from hbasestringids
+where id > '4' and id < '5'
+and tinyint_col = 5
+----
+SCAN HBASE table=hbasestringids
+  START KEY: 4\0
+  STOP KEY: 5
+  PREDICATES: tinyint_col = 5
+====
+select * from hbasestringids
+where id >= '4' and id < '5'
+and tinyint_col = 5
+----
+SCAN HBASE table=hbasestringids
+  START KEY: 4
+  STOP KEY: 5
+  PREDICATES: tinyint_col = 5
+====
+select * from hbasestringids
+where id > '4' and id <= '5'
+and tinyint_col = 5
+----
+SCAN HBASE table=hbasestringids
+  START KEY: 4\0
+  STOP KEY: 5\0
+  PREDICATES: tinyint_col = 5
+====
+select * from hbasestringids
+where id >= '4' and id <= '5'
+and tinyint_col = 5
+----
+SCAN HBASE table=hbasestringids
+  START KEY: 4
+  STOP KEY: 5\0
+  PREDICATES: tinyint_col = 5
+====
+# with aggregation
+select int_col, count(*) 
+from hbasealltypessmall
+where id < 5
+group by 1
+----
+AGGREGATE
+GROUP BY: int_col
+  SCAN HBASE table=hbasealltypessmall
+    PREDICATES: id < 5
+====

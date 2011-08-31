@@ -33,7 +33,9 @@ class HBaseTableScanner {
   static Status Init();
 
   // Perform a table scan, retrieving the families/qualifiers referenced in tuple_desc.
-  Status StartScan(const TupleDescriptor* tuple_desc);
+  // If start_/stop_key is not empty, is used for the corresponding role in the scan.
+  Status StartScan(const TupleDescriptor* tuple_desc,
+                   const std::string& start_key, const std::string& stop_key);
 
   // Position cursor to next row. Sets has_next to true if more rows exist, false otherwise.
   // Returns non-ok status if an error occurred.
@@ -65,11 +67,6 @@ class HBaseTableScanner {
 
   JNIEnv* env_;
 
-  // Lexicographically compares s with the string at offset in buffer_ having given length.
-  // Returns a value > 0 if s is greater, a value < 0 if s is smaller,
-  // and 0 if they are equal.
-  int CompareStrings(const std::string& s, int offset, int length);
-
   // Global class references created with JniUtil. Cleanup is done in JniUtil::Cleanup().
   static jclass htable_cl_;
   static jclass scan_cl_;
@@ -77,6 +74,7 @@ class HBaseTableScanner {
   static jclass result_cl_;
   static jclass immutable_bytes_writable_cl_;
   static jclass keyvalue_cl_;
+  static jclass hconstants_cl_;
 
   static jmethodID htable_ctor_;
   static jmethodID htable_get_scanner_id_;
@@ -100,6 +98,8 @@ class HBaseTableScanner {
   static jmethodID keyvalue_get_value_offset_id_;
   static jmethodID keyvalue_get_value_length_id_;
 
+  static jobject empty_row_;
+
   // HBaseConfiguration instance from runtime state.
   jobject hbase_conf_;
 
@@ -108,12 +108,13 @@ class HBaseTableScanner {
   jobject scan_;          // Java type Scan
   jobject resultscanner_; // Java type ResultScanner
 
-  // Helper members for retrieving results from a scan. Updated in Next(), and NextValue() methods.
-  jobject result_;                 // Java type Result
-  jobjectArray keyvalues_;         // Java type KeyValue[]. Result of result_.raw();
-  jobject keyvalue_;               // Java type KeyValue
-  jbyteArray byte_array_;          // Byte array backing the KeyValues[] created in one call to Next().
-  void* buffer_;                   // C version of byte_array_.
+  // Helper members for retrieving results from a scan. Updated in Next(), and
+  // NextValue() methods.
+  jobject result_;  // Java type Result
+  jobjectArray keyvalues_;  // Java type KeyValue[]. Result of result_.raw();
+  jobject keyvalue_; // Java type KeyValue
+  jbyteArray byte_array_;  // Byte array backing the KeyValues[] created in one call to Next().
+  void* buffer_;  // C version of byte_array_.
 
   // Current position in keyvalues_. Incremented in NextValue(). Reset in Next().
   int keyvalue_index_;
@@ -138,6 +139,14 @@ class HBaseTableScanner {
   // Number of rows for caching that will be passed to scanners.
   // Set in the HBase call Scan.setCaching();
   int rows_cached_;
+
+  // Lexicographically compares s with the string at offset in buffer_ having given length.
+  // Returns a value > 0 if s is greater, a value < 0 if s is smaller,
+  // and 0 if they are equal.
+  int CompareStrings(const std::string& s, int offset, int length);
+
+  // Turn string row key into java byte array.
+  Status CreateRowKey(const std::string& key, jbyteArray* bytes);
 };
 
 }

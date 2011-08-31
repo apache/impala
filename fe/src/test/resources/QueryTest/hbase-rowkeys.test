@@ -1,0 +1,104 @@
+# predicate on row key col is applied to scan if row key is mapped as string col
+select count(*)
+from hbasestringids
+where id = '5'
+----
+bigint
+----
+1
+====
+# predicate on row key col is not applied to scan if row key is mapped as non-string col
+# but the result is still correct
+select count(*)
+from hbasealltypesagg
+where id = 5
+----
+bigint
+----
+1
+====
+# ids are stored in ascii and ordered lexicographically
+# exclusive upper bound
+select count(*)
+from hbasestringids
+where id < '5'
+----
+bigint
+----
+4445
+====
+# inclusive upper bound
+select count(*)
+from hbasestringids
+where id <= '5'
+----
+bigint
+----
+4446
+====
+# inclusive lower bound
+select count(*)
+from hbasestringids
+where id >= '6'
+----
+bigint
+----
+4444
+====
+# exclusive lower bound
+select count(*)
+from hbasestringids
+where id > '6'
+----
+bigint
+----
+4443
+====
+# combinations
+select count(*)
+from hbasestringids
+where id > '5'
+and id < '6'
+----
+bigint
+----
+1110
+====
+select count(*)
+from hbasestringids
+where id >= '5'
+and id < '6'
+----
+bigint
+----
+1111
+====
+select count(*)
+from hbasestringids
+where id > '5'
+and id <= '6'
+----
+bigint
+----
+1111
+====
+select count(*)
+from hbasestringids
+where id >= '5'
+and id <= '6'
+----
+bigint
+----
+1112
+====
+# predicates on non-key cols are evaluated in the executor
+# and non-string comparisons work
+select count(*)
+from hbasestringids
+where id < '5'
+and smallint_col < 5
+----
+bigint
+----
+180
+====

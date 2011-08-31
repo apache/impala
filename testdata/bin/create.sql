@@ -81,8 +81,8 @@ CREATE TABLE testdb1.TestTbl (
   birthday string)
 row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
 
-DROP TABLE IF EXISTS hbasealltypessmall;
-CREATE EXTERNAL TABLE hbasealltypessmall (
+DROP TABLE IF EXISTS HbaseAllTypesSmall;
+CREATE EXTERNAL TABLE HbaseAllTypesSmall (
   id int,
   bool_col boolean,
   tinyint_col tinyint,
@@ -100,8 +100,8 @@ WITH SERDEPROPERTIES (
 )
 TBLPROPERTIES("hbase.table.name" = "hbasealltypessmall");
 
-DROP TABLE IF EXISTS hbasealltypeserror;
-CREATE EXTERNAL TABLE hbasealltypeserror (
+DROP TABLE IF EXISTS HbaseAllTypesError;
+CREATE EXTERNAL TABLE HbaseAllTypesError (
   id int,
   bool_col boolean,
   tinyint_col tinyint,
@@ -119,8 +119,8 @@ WITH SERDEPROPERTIES (
 )
 TBLPROPERTIES("hbase.table.name" = "hbasealltypeserror");
 
-DROP TABLE IF EXISTS hbasealltypeserrornonulls;
-CREATE EXTERNAL TABLE hbasealltypeserrornonulls (
+DROP TABLE IF EXISTS HbaseAllTypesErrorNoNulls;
+CREATE EXTERNAL TABLE HbaseAllTypesErrorNoNulls (
   id int,
   bool_col boolean,
   tinyint_col tinyint,
@@ -138,9 +138,28 @@ WITH SERDEPROPERTIES (
 )
 TBLPROPERTIES("hbase.table.name" = "hbasealltypeserrornonulls");
 
-DROP TABLE IF EXISTS hbasealltypesagg;
-CREATE EXTERNAL TABLE hbasealltypesagg (
+DROP TABLE IF EXISTS HbaseAllTypesAgg;
+CREATE EXTERNAL TABLE HbaseAllTypesAgg (
   id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string)
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES (
+  "hbase.columns.mapping" =
+  ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col"
+)
+TBLPROPERTIES("hbase.table.name" = "hbasealltypesagg");
+
+DROP TABLE IF EXISTS HbaseStringIds;
+CREATE EXTERNAL TABLE HbaseStringIds (
+  id string,
   bool_col boolean,
   tinyint_col tinyint,
   smallint_col smallint,

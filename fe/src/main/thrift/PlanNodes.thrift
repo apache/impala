@@ -24,6 +24,12 @@ struct THdfsScanNode {
 struct THBaseScanNode {
   1: required Descriptors.TTupleId tuple_id
   2: required string table_name
+  // TODO: switch to binary as soon as thrift060 is used by Hive
+  // (and we don't try to load different versions for our cli)
+  // 3: optional binary start_key
+  3: optional string start_key
+  // 4: optional binary stop_key
+  4: optional string stop_key
 }
 
 struct TEqJoinCondition {

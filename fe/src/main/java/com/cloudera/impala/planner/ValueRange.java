@@ -86,7 +86,6 @@ public class ValueRange {
       throw new InternalException(
           "couldn't analyze predicate " + p.toSql() + "\n" + e.toString());
     }
-    LOG.info(p.toSql());
 
     // call backend
     TExpr thriftExpr = p.treeToThrift();

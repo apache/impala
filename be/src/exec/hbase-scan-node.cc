@@ -18,6 +18,14 @@ HBaseScanNode::HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode)
       tuple_id_(tnode.hbase_scan_node.tuple_id),
       tuple_desc_(NULL),
       tuple_idx_(0),
+      start_key_(
+          tnode.hbase_scan_node.__isset.start_key
+            ? tnode.hbase_scan_node.start_key
+            : ""),
+      stop_key_(
+          tnode.hbase_scan_node.__isset.stop_key
+            ? tnode.hbase_scan_node.stop_key
+            : ""),
       num_errors_(0),
       tuple_buf_pool_(new MemPool(POOL_INIT_SIZE)),
       var_len_pool_(new MemPool(POOL_INIT_SIZE)),
@@ -80,7 +88,7 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
 }
 
 Status HBaseScanNode::Open(RuntimeState* state) {
-  return hbase_scanner_->StartScan(tuple_desc_);
+  return hbase_scanner_->StartScan(tuple_desc_, start_key_, stop_key_);
 }
 
 void HBaseScanNode::WriteTextSlot(const string& family, const string& qualifier,
@@ -197,7 +205,14 @@ Status HBaseScanNode::Close(RuntimeState* state) {
 
 void HBaseScanNode::DebugString(int indentation_level, stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
-  *out << "HBaseScanNode(tupleid=" << tuple_id_ << " table=" << table_name_ << ")" << endl;
+  *out << "HBaseScanNode(tupleid=" << tuple_id_ << " table=" << table_name_;
+  if (!start_key_.empty()) {
+    *out << " start_key=" << start_key_;
+  }
+  if (!stop_key_.empty()) {
+    *out << " stop_key=" << stop_key_;
+  }
+  *out << ")" << endl;
   for (int i = 0; i < children_.size(); ++i) {
     children_[i]->DebugString(indentation_level + 1, out);
   }

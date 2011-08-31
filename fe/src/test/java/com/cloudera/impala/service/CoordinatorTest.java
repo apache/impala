@@ -25,9 +25,9 @@ public class CoordinatorTest {
     // start at the beginning of the output stream for every test
     outputStream.reset();
     int syncNumRows = Coordinator.runQuery(query, catalog, false, printStream);
-    Assert.assertEquals(expectedRows, syncNumRows);
+    if (expectedRows != -1) Assert.assertEquals(expectedRows, syncNumRows);
     int asyncNumRows = Coordinator.runQuery(query, catalog, true, printStream);
-    Assert.assertEquals(expectedRows, asyncNumRows);
+    if (expectedRows != -1) Assert.assertEquals(expectedRows, asyncNumRows);
   }
 
   private void runTestFailure(String query, int expectedRows) {

@@ -67,6 +67,7 @@ public class Coordinator {
       boolean abortOnError, int maxErrors, List<String> errorLog, Map<String, Integer> fileErrors,
       BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
     init();
+    LOG.info("query: " + request.stmt);
     AnalysisContext.AnalysisResult analysisResult = analyzeQuery(request, colTypes, colLabels);
     execQuery(analysisResult, abortOnError, maxErrors, errorLog, fileErrors, request.returnAsAscii,
         resultQueue);
@@ -85,7 +86,9 @@ public class Coordinator {
       final Map<String, Integer> fileErrors, final BlockingQueue<TResultRow> resultQueue)
       throws ImpalaException {
     init();
-    final AnalysisContext.AnalysisResult analysisResult = analyzeQuery(request, colTypes, colLabels);
+    LOG.info("query: " + request.stmt);
+    final AnalysisContext.AnalysisResult analysisResult =
+        analyzeQuery(request, colTypes, colLabels);
     Runnable execCall = new Runnable() {
       public void run() {
         try {

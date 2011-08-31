@@ -83,7 +83,7 @@ public class CatalogTest {
     assertNotNull(testDb);
     assertEquals(testDb.getName(), "testdb1");
 
-    assertEquals(11, defaultDb.getTables().size());
+    assertEquals(12, defaultDb.getTables().size());
     assertNotNull(defaultDb.getTable("alltypes"));
     assertNotNull(defaultDb.getTable("alltypessmall"));
     assertNotNull(defaultDb.getTable("alltypeserror"));
@@ -94,6 +94,7 @@ public class CatalogTest {
     assertNotNull(defaultDb.getTable("hbasealltypeserror"));
     assertNotNull(defaultDb.getTable("hbasealltypeserrornonulls"));
     assertNotNull(defaultDb.getTable("hbasealltypesagg"));
+    assertNotNull(defaultDb.getTable("hbasestringids"));
     // testdb contains tables alltypes and testtbl.
     assertEquals(2, testDb.getTables().size());
     assertNotNull(testDb.getTable("alltypes"));
@@ -189,6 +190,22 @@ public class CatalogTest {
            "smallint_col", "tinyint_col", "date_string_col", "string_col"},
         new PrimitiveType[]
           {PrimitiveType.INT,PrimitiveType.BOOLEAN, PrimitiveType.DOUBLE,
+           PrimitiveType.FLOAT, PrimitiveType.BIGINT, PrimitiveType.INT,
+           PrimitiveType.SMALLINT, PrimitiveType.TINYINT, PrimitiveType.STRING,
+           PrimitiveType.STRING});
+
+    checkHBaseTableCols(defaultDb, "hbasestringids", "hbasealltypesagg",
+        new String[]
+          {"id", "bool_col", "double_col", "float_col", "bigint_col", "int_col",
+           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+        new String[]
+          {":key", "bools", "floats", "floats", "ints", "ints", "ints", "ints",
+           "strings", "strings"},
+        new String[]
+          {null, "bool_col", "double_col", "float_col", "bigint_col", "int_col",
+           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+        new PrimitiveType[]
+          {PrimitiveType.STRING,PrimitiveType.BOOLEAN, PrimitiveType.DOUBLE,
            PrimitiveType.FLOAT, PrimitiveType.BIGINT, PrimitiveType.INT,
            PrimitiveType.SMALLINT, PrimitiveType.TINYINT, PrimitiveType.STRING,
            PrimitiveType.STRING});

@@ -56,6 +56,7 @@ public class QueryTest {
     runTests("hdfs-scan-node", false, 1000);
     runTests("hdfs-partitions", false, 1000);
     runTests("hbase-scan-node", false, 1000);
+    runTests("hbase-rowkeys", false, 1000);
 
     // check whether any of the tests had errors
     if (testErrorLog.length() != 0) {

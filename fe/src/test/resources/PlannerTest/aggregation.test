@@ -1,0 +1,23 @@
+# basic aggregation
+select count(*)
+from testtbl
+where name like 'm%'
+----
+AGGREGATE
+GROUP BY:
+  SCAN HDFS table=default.testtbl
+    PREDICATES: name LIKE 'm%'
+    FILES: 
+====
+# with grouping
+select zip, count(*)
+from testtbl
+where name like 'm%'
+group by 1
+----
+AGGREGATE
+GROUP BY: zip
+  SCAN HDFS table=default.testtbl
+    PREDICATES: name LIKE 'm%'
+    FILES: 
+====

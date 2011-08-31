@@ -55,6 +55,10 @@ class HBaseScanNode : public ExecNode {
   // Tuple index in tuple row.
   int tuple_idx_;
 
+  // scan range; "" means bound is not set
+  std::string start_key_;
+  std::string stop_key_;
+
   // Counts the total number of conversion errors for this table.
   int num_errors_;
 

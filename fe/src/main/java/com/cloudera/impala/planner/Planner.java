@@ -107,23 +107,29 @@ public class Planner {
 
     List<Predicate> conjuncts = analyzer.getConjuncts(tblRef.getId().asList());
     ArrayList<ValueRange> keyRanges = Lists.newArrayList();
-    if (scanNode instanceof HdfsScanNode) {
-      // TODO: enable for hbase scan node
-      // determine scan predicates for clustering cols
-      for (int i = 0; i < tblRef.getTable().getNumClusteringCols(); ++i) {
-        SlotDescriptor slotDesc =
-            analyzer.getColumnSlot(tblRef.getDesc(), tblRef.getTable().getColumns().get(i));
-        if (slotDesc == null) {
-          // clustering col not referenced in this query
-          keyRanges.add(null);
-        } else {
-          ValueRange keyRange = createScanRange(slotDesc, conjuncts);
-          keyRanges.add(keyRange);
-        }
+    boolean addedRange = false;  // added non-null range
+    // determine scan predicates for clustering cols
+    for (int i = 0; i < tblRef.getTable().getNumClusteringCols(); ++i) {
+      SlotDescriptor slotDesc =
+          analyzer.getColumnSlot(tblRef.getDesc(), tblRef.getTable().getColumns().get(i));
+      if (slotDesc == null
+          || (scanNode instanceof HBaseScanNode
+              && slotDesc.getType() != PrimitiveType.STRING)) {
+        // clustering col not referenced in this query;
+        // or: the hbase row key is mapped to a non-string type
+        // (since it's stored in ascii it will be lexicographically ordered,
+        // and non-string comparisons won't work)
+        keyRanges.add(null);
+      } else {
+        ValueRange keyRange = createScanRange(slotDesc, conjuncts);
+        keyRanges.add(keyRange);
+        addedRange = true;
       }
     }
 
-    scanNode.setKeyRanges(keyRanges);
+    if (addedRange) {
+      scanNode.setKeyRanges(keyRanges);
+    }
     scanNode.setConjuncts(conjuncts);
 
     return scanNode;
