@@ -18,7 +18,7 @@ set -u
 clean_action=1
 config_action=1
 testdata_action=1
-skiptests_action=false
+tests_action=1
 
 # parse command line options
 for ARG in $*
@@ -34,7 +34,7 @@ do
       testdata_action=0
       ;;
     -skiptests)
-      skiptests_action=true
+      tests_action=0
       ;;
     -help)
       echo "buildall.sh [-noclean] [-noconfig] [-notestdata]"
@@ -60,9 +60,12 @@ then
   git clean -dfx
 
   # clean fe
+  # don't use git clean because we need to retain Eclipse conf files
   cd $IMPALA_HOME/fe
-  # remove everything listed in .gitignore
-  git clean -Xdf
+  rm -rf target
+  rm -f src/test/resources/hbase-site.xml
+  rm -f src/test/resources/hive-site.xml
+  rm -f derby.log
 
   # clean be
   cd $IMPALA_HOME/be
@@ -123,6 +126,14 @@ make
 cd $IMPALA_BE_DIR
 cmake -DCMAKE_BUILD_TYPE=Debug . && make -j4
 
-# build frontend and run tests
+# build frontend
+# skip tests since any failures will prevent the
+# package phase from completing.
 cd $IMPALA_FE_DIR
-mvn package -DskipTests=${skiptests_action}
+mvn package -DskipTests=true
+
+# run frontend tests
+if [ $tests_action -eq 1 ]
+then
+    mvn test
+fi
