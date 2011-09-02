@@ -35,8 +35,8 @@ struct THdfsTable {
 
 struct THBaseTable {
   1: required string tableName
-  2: required list<binary> families
-  3: required list<binary> qualifiers
+  2: required list<string> families
+  3: required list<string> qualifiers
 }
 
 // "Union" of all table types.

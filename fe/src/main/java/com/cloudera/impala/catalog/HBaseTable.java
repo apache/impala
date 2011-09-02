@@ -133,16 +133,12 @@ public class HBaseTable extends Table {
     tHbaseTable.setTableName(hbaseTableName);
     for (Column c : colsByPos) {
       HBaseColumn hbaseCol = (HBaseColumn) c;
-      ByteBuffer familyBytes = ByteBuffer.wrap(Bytes.toBytes(hbaseCol.getColumnFamily()));
-      tHbaseTable.addToFamilies(familyBytes);
-      ByteBuffer qualifierBytes = null;
-      // Column qualifier is null for the row key.
+      tHbaseTable.addToFamilies(hbaseCol.getColumnFamily());
       if (hbaseCol.getColumnQualifier() != null) {
-        qualifierBytes = ByteBuffer.wrap(Bytes.toBytes(hbaseCol.getColumnQualifier()));
+        tHbaseTable.addToQualifiers(hbaseCol.getColumnQualifier());
       } else {
-        qualifierBytes = ByteBuffer.wrap(new byte[]{});
+        tHbaseTable.addToQualifiers("");
       }
-      tHbaseTable.addToQualifiers(qualifierBytes);
     }
     TTable ttable =
         new TTable(TTableType.HBASE_TABLE, colsByPos.size(), numClusteringCols);
