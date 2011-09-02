@@ -276,6 +276,9 @@
             <phase>generate-sources</phase>
             <configuration>
               <tasks>
+                <exec executable="${thrift.executable}">
+                  <arg value="-version"/>
+                </exec>
                 <apply executable="${thrift.executable}" force="true" type="file">
                   <arg value="-v"/>
                   <arg value="--gen" />
