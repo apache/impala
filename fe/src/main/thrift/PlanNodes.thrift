@@ -21,6 +21,15 @@ struct THdfsScanNode {
   3: optional list<Exprs.TExpr> key_values
 }
 
+struct THBaseFilter {
+  1: required string family
+  2: required string qualifier
+  // Ordinal number into enum HBase CompareFilter.CompareOp. 
+  // We don't use TExprOperator because the op is interpreted by an HBase Filter, and not the c++ expr eval.
+  3: required i32 op_ordinal
+  4: required string filter_constant
+}
+
 struct THBaseScanNode {
   1: required Descriptors.TTupleId tuple_id
   2: required string table_name
@@ -30,6 +39,7 @@ struct THBaseScanNode {
   3: optional string start_key
   // 4: optional binary stop_key
   4: optional string stop_key
+  5: optional list<THBaseFilter> filters
 }
 
 struct TEqJoinCondition {

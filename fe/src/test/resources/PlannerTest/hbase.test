@@ -101,3 +101,81 @@ GROUP BY: int_col
   SCAN HBASE table=hbasealltypessmall
     PREDICATES: id < 5
 ====
+# predicates on string columns against a constant string are converted to HBase filters
+select * from hbasealltypessmall where string_col = '4'
+----
+SCAN HBASE table=hbasealltypessmall
+  HBASE FILTERS: strings:string_col EQUAL '4'
+  PREDICATES:   
+====
+# test all comparison ops
+select * from hbasealltypessmall where string_col != '4'
+----
+SCAN HBASE table=hbasealltypessmall
+  HBASE FILTERS: strings:string_col NOT_EQUAL '4'
+  PREDICATES:   
+====
+select * from hbasealltypessmall where string_col < '4'
+----
+SCAN HBASE table=hbasealltypessmall
+  HBASE FILTERS: strings:string_col LESS '4'
+  PREDICATES:   
+====
+select * from hbasealltypessmall where string_col > '4'
+----
+SCAN HBASE table=hbasealltypessmall
+  HBASE FILTERS: strings:string_col GREATER '4'
+  PREDICATES:   
+====
+select * from hbasealltypessmall where string_col <= '4'
+----
+SCAN HBASE table=hbasealltypessmall
+  HBASE FILTERS: strings:string_col LESS_OR_EQUAL '4'
+  PREDICATES:   
+====
+select * from hbasealltypessmall where string_col >= '4'
+----
+SCAN HBASE table=hbasealltypessmall
+  HBASE FILTERS: strings:string_col GREATER_OR_EQUAL '4'
+  PREDICATES:   
+====
+# test multiple filters
+select * from hbasealltypessmall
+where string_col >= '4' and string_col != '2' and date_string_col = '04/03/09'
+----
+SCAN HBASE table=hbasealltypessmall
+  HBASE FILTERS: 
+    strings:date_string_col EQUAL '04/03/09'
+    strings:string_col GREATER_OR_EQUAL '4'
+    strings:string_col NOT_EQUAL '2'
+  PREDICATES:   
+====
+# mix of predicates and hbase filters
+select * from hbasealltypessmall where string_col = '4' and tinyint_col = 5
+----
+SCAN HBASE table=hbasealltypessmall
+  HBASE FILTERS: strings:string_col EQUAL '4'
+  PREDICATES: tinyint_col = 5  
+====
+# mix of predicates, hbase filters and start/stop keys
+select * from hbasestringids 
+where string_col = '4' and tinyint_col = 5 and id >= '4' and id <= '5'
+----
+SCAN HBASE table=hbasestringids
+  START KEY: 4
+  STOP KEY: 5\0
+  HBASE FILTERS: strings:string_col EQUAL '4'
+  PREDICATES: tinyint_col = 5  
+====
+# predicates involving casts (ie, non-string comparisons) cannot be turned into filters
+select * from hbasealltypessmall where string_col >= 4
+----
+SCAN HBASE table=hbasealltypessmall
+  PREDICATES: string_col >= 4
+====
+# non-const comparisons cannot be turned into filters
+select * from hbasealltypessmall where string_col >= date_string_col
+----
+SCAN HBASE table=hbasealltypessmall
+  PREDICATES: string_col >= date_string_col
+====

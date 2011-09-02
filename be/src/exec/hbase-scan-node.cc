@@ -26,6 +26,7 @@ HBaseScanNode::HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode)
           tnode.hbase_scan_node.__isset.stop_key
             ? tnode.hbase_scan_node.stop_key
             : ""),
+      filters_(tnode.hbase_scan_node.filters),
       num_errors_(0),
       tuple_buf_pool_(new MemPool(POOL_INIT_SIZE)),
       var_len_pool_(new MemPool(POOL_INIT_SIZE)),
@@ -88,7 +89,7 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
 }
 
 Status HBaseScanNode::Open(RuntimeState* state) {
-  return hbase_scanner_->StartScan(tuple_desc_, start_key_, stop_key_);
+  return hbase_scanner_->StartScan(tuple_desc_, start_key_, stop_key_, filters_);
 }
 
 void HBaseScanNode::WriteTextSlot(const string& family, const string& qualifier,

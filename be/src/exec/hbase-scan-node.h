@@ -59,6 +59,9 @@ class HBaseScanNode : public ExecNode {
   std::string start_key_;
   std::string stop_key_;
 
+  // HBase Filters to be set in HBaseTableScanner.
+  std::vector<THBaseFilter> filters_;
+
   // Counts the total number of conversion errors for this table.
   int num_errors_;
 

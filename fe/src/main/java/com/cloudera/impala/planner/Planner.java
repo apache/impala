@@ -101,7 +101,7 @@ public class Planner {
       // Hive RCFile table
       scanNode = new HdfsRCFileScanNode(tblRef.getDesc(), (HdfsRCFileTable) tblRef.getTable());
     } else {
-        // HBase table
+      // HBase table
       scanNode = new HBaseScanNode(tblRef.getDesc());
     }
 

@@ -6,6 +6,7 @@
 #include <jni.h>
 #include <string>
 #include <boost/scoped_ptr.hpp>
+#include "gen-cpp/PlanNodes_types.h"
 
 namespace impala {
 
@@ -35,7 +36,8 @@ class HBaseTableScanner {
   // Perform a table scan, retrieving the families/qualifiers referenced in tuple_desc.
   // If start_/stop_key is not empty, is used for the corresponding role in the scan.
   Status StartScan(const TupleDescriptor* tuple_desc,
-                   const std::string& start_key, const std::string& stop_key);
+                   const std::string& start_key, const std::string& stop_key,
+                   const std::vector<THBaseFilter>& filters);
 
   // Position cursor to next row. Sets has_next to true if more rows exist, false otherwise.
   // Returns non-ok status if an error occurred.
@@ -75,6 +77,10 @@ class HBaseTableScanner {
   static jclass immutable_bytes_writable_cl_;
   static jclass keyvalue_cl_;
   static jclass hconstants_cl_;
+  static jclass filter_list_cl_;
+  static jclass filter_list_op_cl_;
+  static jclass single_column_value_filter_cl_;
+  static jclass compare_op_cl_;
 
   static jmethodID htable_ctor_;
   static jmethodID htable_get_scanner_id_;
@@ -83,6 +89,7 @@ class HBaseTableScanner {
   static jmethodID scan_set_max_versions_id_;
   static jmethodID scan_set_caching_id_;
   static jmethodID scan_add_column_id_;
+  static jmethodID scan_set_filter_id_;
   static jmethodID resultscanner_next_id_;
   static jmethodID resultscanner_close_id_;
   static jmethodID result_get_bytes_id_;
@@ -97,8 +104,13 @@ class HBaseTableScanner {
   static jmethodID keyvalue_get_row_length_id_;
   static jmethodID keyvalue_get_value_offset_id_;
   static jmethodID keyvalue_get_value_length_id_;
+  static jmethodID filter_list_ctor_;
+  static jmethodID filter_list_add_filter_id_;
+  static jmethodID single_column_value_filter_ctor_;
 
   static jobject empty_row_;
+  static jobject must_pass_all_op_;
+  static jobjectArray compare_ops_;
 
   // HBaseConfiguration instance from runtime state.
   jobject hbase_conf_;
@@ -145,8 +157,8 @@ class HBaseTableScanner {
   // and 0 if they are equal.
   int CompareStrings(const std::string& s, int offset, int length);
 
-  // Turn string row key into java byte array.
-  Status CreateRowKey(const std::string& key, jbyteArray* bytes);
+  // Turn string s into java byte array.
+  Status CreateByteArray(const std::string& s, jbyteArray* bytes);
 };
 
 }
