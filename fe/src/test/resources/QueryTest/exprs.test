@@ -318,4 +318,64 @@ bigint, bigint, bigint, bigint, bigint, bigint, double, double, double, double
 #double, double, double, double, double, double, double, double, double, double
 #----
 #891,891,890109,890109,8892188910,8892188910,9.77163e+12,9.77163e+12,9.85947e+16,9.85947e+16
-#====
+====
+# LIKE exprs w/ the like/regex pattern coming from a column
+select * from LikeTbl
+----
+string, string, string, string, string
+----
+'one','%one%','n%one%','.*one.*','n.*one.*'
+'two','%two%','n%two%','.*two.*','n.*two.*'
+'three','%three%','n%three%','.*three.*','n.*three.*'
+'four','%four%','n%four%','.*four.*','n.*four.*'
+'five','%five%','n%five%','.*five.*','n.*five.*'
+'six','%six%','n%six%','.*six.*','n.*six.*'
+'seven','%seven%','n%seven%','.*seven.*','n.*seven.*'
+'eight','%eight%','n%eight%','.*eight.*','n.*eight.*'
+'nine','%nine%','n%nine%','.*nine.*','n.*nine.*'
+'ten','%ten%','n%ten%','.*ten.*','n.*ten.*'
+====
+select str_col, match_like_col from LikeTbl
+where str_col LIKE match_like_col
+----
+string, string
+----
+'one','%one%'
+'two','%two%'
+'three','%three%'
+'four','%four%'
+'five','%five%'
+'six','%six%'
+'seven','%seven%'
+'eight','%eight%'
+'nine','%nine%'
+'ten','%ten%'
+====
+select str_col, match_like_col from LikeTbl
+where str_col LIKE no_match_like_col
+----
+string, string
+----
+====
+select str_col, match_regex_col from LikeTbl
+where str_col REGEXP match_regex_col
+----
+string, string
+----
+'one','.*one.*'
+'two','.*two.*'
+'three','.*three.*'
+'four','.*four.*'
+'five','.*five.*'
+'six','.*six.*'
+'seven','.*seven.*'
+'eight','.*eight.*'
+'nine','.*nine.*'
+'ten','.*ten.*'
+====
+select str_col, no_match_regex_col from LikeTbl
+where str_col REGEXP no_match_regex_col
+----
+string, string
+----
+====

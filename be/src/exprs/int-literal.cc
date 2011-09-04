@@ -51,7 +51,7 @@ void* IntLiteral::ReturnBigintValue(Expr* e, TupleRow* row) {
   return &l->result_.bigint_val;
 }
 
-void IntLiteral::Prepare(RuntimeState* state) {
+Status IntLiteral::Prepare(RuntimeState* state) {
   Expr::Prepare(state);
   switch (type_) {
     case TYPE_TINYINT:
@@ -69,6 +69,7 @@ void IntLiteral::Prepare(RuntimeState* state) {
     default:
       DCHECK(false) << "IntLiteral::Prepare(): bad type: " << TypeToString(type_);
   }
+  return Status::OK;
 }
 
 string IntLiteral::DebugString() const {

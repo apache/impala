@@ -17,7 +17,7 @@ class StringLiteral: public Expr {
 
   StringLiteral(const TExprNode& node);
 
-  virtual void Prepare(RuntimeState* state);
+  virtual Status Prepare(RuntimeState* state);
   virtual std::string DebugString() const;
 
  private:

@@ -19,9 +19,10 @@ CaseExpr::CaseExpr(const TExprNode& node)
     has_else_expr_(node.case_expr.has_else_expr) {
 }
 
-void CaseExpr::Prepare(RuntimeState* state) {
+Status CaseExpr::Prepare(RuntimeState* state) {
   Expr::Prepare(state);
   compute_function_ = ComputeFunction;
+  return Status::OK;
 }
 
 string CaseExpr::DebugString() const {

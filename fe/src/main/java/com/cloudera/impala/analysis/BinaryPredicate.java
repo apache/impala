@@ -80,7 +80,7 @@ public class BinaryPredicate extends Predicate {
     PrimitiveType t1 = getChild(0).getType();
     PrimitiveType t2 = getChild(1).getType();
     PrimitiveType compatibleType = PrimitiveType.getAssignmentCompatibleType(t1, t2);
-
+  
     if (!compatibleType.isValid()) {
       // there is no type to which both are assignment-compatible -> we can't compare them
       throw new AnalysisException("operands are not comparable: " + this.toSql());

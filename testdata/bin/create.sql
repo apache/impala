@@ -81,6 +81,15 @@ CREATE TABLE testdb1.TestTbl (
   birthday string)
 row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
 
+DROP TABLE IF EXISTS LikeTbl;
+CREATE TABLE LikeTbl (
+  str_col string,
+  match_like_col string,
+  no_match_like_col string,
+  match_regex_col string,
+  no_match_regex_col string)
+row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
+
 DROP TABLE IF EXISTS HbaseAllTypesSmall;
 CREATE EXTERNAL TABLE HbaseAllTypesSmall (
   id int,

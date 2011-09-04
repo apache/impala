@@ -20,9 +20,10 @@ void* BoolLiteral::ReturnValue(Expr* e, TupleRow* row) {
   return &l->result_.bool_val;
 }
 
-void BoolLiteral::Prepare(RuntimeState* state) {
+Status BoolLiteral::Prepare(RuntimeState* state) {
   Expr::Prepare(state);
   compute_function_ = ReturnValue;
+  return Status::OK;
 }
 
 string BoolLiteral::DebugString() const {

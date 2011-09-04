@@ -583,13 +583,16 @@ public class AnalyzerTest {
         "right operand of LIKE must be of type STRING");
     AnalysisError("select * from alltypes where int_col like 'test%'",
         "left operand of LIKE must be of type STRING");
+    AnalysisError("select * from alltypes where string_col regexp 'test]['",
+        "invalid regular expression in 'string_col REGEXP 'test][''");
   }
 
   @Test
   public void TestCompoundPredicates() {
     AnalyzesOk("select * from alltypes where string_col = '5' and int_col = 5");
     AnalyzesOk("select * from alltypes where string_col = '5' or int_col = 5");
-    AnalyzesOk("select * from alltypes where (string_col = '5' or int_col = 5) and string_col > '1'");
+    AnalyzesOk("select * from alltypes where (string_col = '5' " +
+               "or int_col = 5) and string_col > '1'");
     AnalyzesOk("select * from alltypes where not string_col = '5'");
     AnalyzesOk("select * from alltypes where int_col = '5'");
   }

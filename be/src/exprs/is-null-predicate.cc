@@ -24,9 +24,10 @@ IsNullPredicate::IsNullPredicate(const TExprNode& node)
     is_not_null_(node.is_null_pred.is_not_null) {
 }
 
-void IsNullPredicate::Prepare(RuntimeState* state) {
+Status IsNullPredicate::Prepare(RuntimeState* state) {
   Expr::Prepare(state);
   compute_function_ = ComputeFunction;
+  return Status::OK;
 }
 
 string IsNullPredicate::DebugString() const {

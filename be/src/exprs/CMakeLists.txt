@@ -30,6 +30,7 @@ add_library(Exprs
 
 target_link_libraries(Exprs
   Util
+  boost_regex-mt
 )
 
 add_custom_command(

@@ -14,7 +14,8 @@ void* NullLiteral::ReturnValue(Expr* e, TupleRow* row) {
   return NULL;
 }
 
-void NullLiteral::Prepare(RuntimeState* state) {
+Status NullLiteral::Prepare(RuntimeState* state) {
+  return Status::OK;
 }
 
 }

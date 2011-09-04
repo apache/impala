@@ -65,25 +65,25 @@ class ExprTest : public testing::Test {
     GetValue(expr, expr_type, &result);
     switch (expr_type) {
       case TYPE_BOOLEAN:
-        EXPECT_EQ(*reinterpret_cast<bool*>(result), expected_result);
+        EXPECT_EQ(*reinterpret_cast<bool*>(result), expected_result) << expr;
         break;
       case TYPE_TINYINT:
-        EXPECT_EQ(*reinterpret_cast<int8_t*>(result), expected_result);
+        EXPECT_EQ(*reinterpret_cast<int8_t*>(result), expected_result) << expr;
         break;
       case TYPE_SMALLINT:
-        EXPECT_EQ(*reinterpret_cast<int16_t*>(result), expected_result);
+        EXPECT_EQ(*reinterpret_cast<int16_t*>(result), expected_result) << expr;
         break;
       case TYPE_INT:
-        EXPECT_EQ(*reinterpret_cast<int32_t*>(result), expected_result);
+        EXPECT_EQ(*reinterpret_cast<int32_t*>(result), expected_result) << expr;
         break;
       case TYPE_BIGINT:
-        EXPECT_EQ(*reinterpret_cast<int64_t*>(result), expected_result);
+        EXPECT_EQ(*reinterpret_cast<int64_t*>(result), expected_result) << expr;
         break;
       case TYPE_FLOAT:
-        EXPECT_EQ(*reinterpret_cast<float*>(result), expected_result);
+        EXPECT_EQ(*reinterpret_cast<float*>(result), expected_result) << expr;
         break;
       case TYPE_DOUBLE:
-        EXPECT_EQ(*reinterpret_cast<double*>(result), expected_result);
+        EXPECT_EQ(*reinterpret_cast<double*>(result), expected_result) << expr;
         break;
       default:
         ASSERT_TRUE(false) << "invalid TestValue() type: " << TypeToString(expr_type);
@@ -471,6 +471,43 @@ TEST_F(ExprTest, CompoundPredicates) {
 TEST_F(ExprTest, IsNullPredicate) {
   TestValue("5 IS NULL", TYPE_BOOLEAN, false);
   TestValue("5 IS NOT NULL", TYPE_BOOLEAN, true);
+}
+
+TEST_F(ExprTest, LikePredicate) {
+  TestValue("'a' LIKE '%a%'", TYPE_BOOLEAN, true);
+  TestValue("'a' LIKE '_'", TYPE_BOOLEAN, true);
+  TestValue("'a' LIKE 'a'", TYPE_BOOLEAN, true);
+  TestValue("'a' LIKE 'b'", TYPE_BOOLEAN, false);
+  TestValue("'prefix1234' LIKE 'prefix%'", TYPE_BOOLEAN, true);
+  TestValue("'1234suffix' LIKE '%suffix'", TYPE_BOOLEAN, true);
+  TestValue("'1234substr5678' LIKE '%substr%'", TYPE_BOOLEAN, true);
+  TestValue("'a%a' LIKE 'a\\%a'", TYPE_BOOLEAN, true);
+  TestValue("'a123a' LIKE 'a\\%a'", TYPE_BOOLEAN, false);
+  TestValue("'a_a' LIKE 'a\\_a'", TYPE_BOOLEAN, true);
+  TestValue("'a1a' LIKE 'a\\_a'", TYPE_BOOLEAN, false);
+  TestValue("'abla' LIKE 'a%a'", TYPE_BOOLEAN, true);
+  TestValue("'ablb' LIKE 'a%a'", TYPE_BOOLEAN, false);
+  TestValue("'abxcy1234a' LIKE 'a_x_y%a'", TYPE_BOOLEAN, true);
+  TestValue("'axcy1234a' LIKE 'a_x_y%a'", TYPE_BOOLEAN, false);
+  TestValue("'abxcy1234a' REGEXP 'a.x.y.*a'", TYPE_BOOLEAN, true);
+  TestValue("'a.x.y.*a' REGEXP 'a\\.x\\.y\\.\\*a'", TYPE_BOOLEAN, true);
+  TestValue("'abxcy1234a' REGEXP 'a\\.x\\.y\\.\\*a'", TYPE_BOOLEAN, false);
+  TestValue("'abxcy1234a' RLIKE 'a.x.y.*a'", TYPE_BOOLEAN, true);
+  TestValue("'axcy1234a' REGEXP 'a.x.y.*a'", TYPE_BOOLEAN, false);
+  TestValue("'axcy1234a' RLIKE 'a.x.y.*a'", TYPE_BOOLEAN, false);
+  // regex escape chars; insert special character in the middle to prevent
+  // it from being matched as a substring
+  TestValue("'.[]{}()x\\*+?|^$' LIKE '.[]{}()_\\\\*+?|^$'", TYPE_BOOLEAN, true);
+  // escaped _ matches single _
+  TestValue("'\\_' LIKE '\\_'", TYPE_BOOLEAN, false);
+  TestValue("'_' LIKE '\\_'", TYPE_BOOLEAN, true);
+  TestValue("'a' LIKE '\\_'", TYPE_BOOLEAN, false);
+  // escaped escape char
+  TestValue("'\\a' LIKE '\\\\_'", TYPE_BOOLEAN, true);
+  TestValue("'_' LIKE '\\\\_'", TYPE_BOOLEAN, false);
+  // make sure the 3rd \ counts toward the _
+  TestValue("'\\_' LIKE '\\\\\\_'", TYPE_BOOLEAN, true);
+  TestValue("'\\\\a' LIKE '\\\\\\_'", TYPE_BOOLEAN, false);
 }
 
 }

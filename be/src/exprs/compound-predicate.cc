@@ -67,21 +67,24 @@ void* CompoundPredicate::NotComputeFunction(Expr* e, TupleRow* row) {
   return &p->result_.bool_val;
 }
 
-void CompoundPredicate::Prepare(RuntimeState* state) {
+Status CompoundPredicate::Prepare(RuntimeState* state) {
   Expr::Prepare(state);
+  DCHECK(type_ != INVALID_TYPE);
+  DCHECK_LE(children_.size(), 2);
   switch (op_) {
     case TExprOperator::AND:
       compute_function_ = AndComputeFunction;
-      return;
+      return Status::OK;
     case TExprOperator::OR:
       compute_function_ = OrComputeFunction;
-      return;
+      return Status::OK;
     case TExprOperator::NOT:
       compute_function_ = NotComputeFunction;
-      return;
+      return Status::OK;
     default:
       DCHECK(false) << "Invalid compound predicate op: " << op_;
   }
+  return Status::OK;
 }
 
 string CompoundPredicate::DebugString() const {

@@ -271,16 +271,18 @@ void Expr::PrintValue(void* value, string* str) {
   RawValue::PrintValue(value, type_, str);
 }
 
-void Expr::Prepare(RuntimeState* state) {
+Status Expr::Prepare(RuntimeState* state) {
   for (int i = 0; i < children_.size(); ++i) {
-    children_[i]->Prepare(state);
+    RETURN_IF_ERROR(children_[i]->Prepare(state));
   }
+  return Status::OK;
 }
 
-void Expr::Prepare(const std::vector<Expr*>& exprs, RuntimeState* state) {
+Status Expr::Prepare(const std::vector<Expr*>& exprs, RuntimeState* state) {
   for (int i = 0; i < exprs.size(); ++i) {
-    exprs[i]->Prepare(state);
+    RETURN_IF_ERROR(exprs[i]->Prepare(state));
   }
+  return Status::OK;
 }
 
 string Expr::DebugString() const {
@@ -302,3 +304,11 @@ string Expr::DebugString(const std::vector<Expr*>& exprs) {
   out << "]";
   return out.str();
 }
+
+bool Expr::IsConstant() const {
+  for (int i = 0; i < children_.size(); ++i) {
+    if (!children_[i]->IsConstant()) return false;
+  }
+  return true;
+}
+

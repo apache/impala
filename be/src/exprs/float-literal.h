@@ -16,7 +16,7 @@ class FloatLiteral: public Expr {
 
   FloatLiteral(const TExprNode& node);
 
-  virtual void Prepare(RuntimeState* state);
+  virtual Status Prepare(RuntimeState* state);
   virtual std::string DebugString() const;
 
  private:

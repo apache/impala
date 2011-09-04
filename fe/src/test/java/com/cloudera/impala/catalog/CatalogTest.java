@@ -83,13 +83,14 @@ public class CatalogTest {
     assertNotNull(testDb);
     assertEquals(testDb.getName(), "testdb1");
 
-    assertEquals(12, defaultDb.getTables().size());
+    assertEquals(13, defaultDb.getTables().size());
     assertNotNull(defaultDb.getTable("alltypes"));
     assertNotNull(defaultDb.getTable("alltypessmall"));
     assertNotNull(defaultDb.getTable("alltypeserror"));
     assertNotNull(defaultDb.getTable("alltypesagg"));
     assertNotNull(defaultDb.getTable("alltypesaggnonulls"));
     assertNotNull(defaultDb.getTable("testtbl"));
+    assertNotNull(defaultDb.getTable("liketbl"));
     assertNotNull(defaultDb.getTable("hbasealltypessmall"));
     assertNotNull(defaultDb.getTable("hbasealltypeserror"));
     assertNotNull(defaultDb.getTable("hbasealltypeserrornonulls"));
@@ -129,6 +130,13 @@ public class CatalogTest {
         new String[] {"id", "name", "birthday"},
         new PrimitiveType[]
           {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.STRING});
+    checkTableCols(defaultDb, "liketbl", 0,
+        new String[] {
+            "str_col", "match_like_col", "no_match_like_col", "match_regex_col",
+            "no_match_regex_col"},
+        new PrimitiveType[]
+          {PrimitiveType.STRING, PrimitiveType.STRING, PrimitiveType.STRING,
+           PrimitiveType.STRING, PrimitiveType.STRING});
 
     checkHBaseTableCols(defaultDb, "hbasealltypessmall", "hbasealltypessmall",
         new String[]

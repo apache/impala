@@ -35,7 +35,7 @@ void* FloatLiteral::ReturnDoubleValue(Expr* e, TupleRow* row) {
   return &l->result_.double_val;
 }
 
-void FloatLiteral::Prepare(RuntimeState* state) {
+Status FloatLiteral::Prepare(RuntimeState* state) {
   Expr::Prepare(state);
   switch (type_) {
     case TYPE_FLOAT:
@@ -47,6 +47,7 @@ void FloatLiteral::Prepare(RuntimeState* state) {
     default:
       DCHECK(false) << "FloatLiteral::Prepare(): bad type: " << TypeToString(type_);
   }
+  return Status::OK;
 }
 
 string FloatLiteral::DebugString() const {

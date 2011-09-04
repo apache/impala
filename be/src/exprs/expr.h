@@ -69,7 +69,8 @@ class Expr {
  public:
   // Prepare expr tree for evaluation. In particular, set compute_function_.
   // This implementation simply invokes it recursively for the entire tree.
-  virtual void Prepare(RuntimeState* state);
+  // Return OK if successful, otherwise return error status.
+  virtual Status Prepare(RuntimeState* state);
 
   // Evaluate expr and return pointer to result. The result is
   // valid as long as 'row' doesn't change.
@@ -95,9 +96,15 @@ class Expr {
 
   void AddChild(Expr* expr) { children_.push_back(expr); }
   Expr* GetChild(int i) const { return children_[i]; }
+  int GetNumChildren() const { return children_.size(); }
 
   PrimitiveType type() const { return type_; }
   const std::vector<Expr*>& children() const { return children_; }
+
+  // Returns true if expr doesn't contain slotrefs, ie, can be evaluated
+  // with GetValue(NULL). The default implementation returns true if all of
+  // the children are constant.
+  virtual bool IsConstant() const;
 
   // Create expression tree from the list of nodes contained in texpr
   // within 'pool'. Returns root of expression tree in 'root_expr'.
@@ -111,7 +118,7 @@ class Expr {
                                 std::vector<Expr*>* exprs);
 
   // Prepare all exprs.
-  static void Prepare(const std::vector<Expr*>& exprs, RuntimeState* state);
+  static Status Prepare(const std::vector<Expr*>& exprs, RuntimeState* state);
 
   virtual std::string DebugString() const;
   static std::string DebugString(const std::vector<Expr*>& exprs);
@@ -163,9 +170,10 @@ class SlotRef : public Expr {
  public:
   SlotRef(const TExprNode& node);
 
-  virtual void Prepare(RuntimeState* state);
+  virtual Status Prepare(RuntimeState* state);
   static void* ComputeFunction(Expr* expr, TupleRow* row);
   virtual std::string DebugString() const;
+  virtual bool IsConstant() const { return false; }
 
  protected:
   int tuple_idx_;  // within row

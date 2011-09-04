@@ -20,9 +20,10 @@ LiteralPredicate::LiteralPredicate(const TExprNode& node)
   result_.bool_val = node.literal_pred.value;
 }
 
-void LiteralPredicate::Prepare(RuntimeState* state) {
+Status LiteralPredicate::Prepare(RuntimeState* state) {
   Expr::Prepare(state);
   compute_function_ = ComputeFunction;
+  return Status::OK;
 }
 
 string LiteralPredicate::DebugString() const {

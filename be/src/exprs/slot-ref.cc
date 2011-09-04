@@ -2,6 +2,8 @@
 
 #include "exprs/expr.h"  // contains SlotRef definition
 
+#include <sstream>
+
 #include "gen-cpp/Exprs_types.h"
 #include "runtime/runtime-state.h"
 
@@ -16,15 +18,20 @@ SlotRef::SlotRef(const TExprNode& node)
     // slot_/null_indicator_offset_ are set in Prepare()
 }
 
-void SlotRef::Prepare(RuntimeState* state) {
+Status SlotRef::Prepare(RuntimeState* state) {
   Expr::Prepare(state);
   const SlotDescriptor* slot_desc  = state->descs().GetSlotDescriptor(slot_id_);
-  // TODO: report error
-  if (slot_desc == NULL) return;
+  if (slot_desc == NULL) {
+    // TODO: create macro MAKE_ERROR() that returns a stream
+    stringstream error;
+    error << "couldn't resolve slot descriptor " << slot_id_;
+    return Status(error.str());
+  }
   // TODO(marcel): get from runtime state
   this->tuple_idx_ = 0;
   this->slot_offset_ = slot_desc->tuple_offset();
   this->null_indicator_offset_ = slot_desc->null_indicator_offset();
+  return Status::OK;
 }
 
 string SlotRef::DebugString() const {

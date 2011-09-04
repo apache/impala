@@ -64,7 +64,6 @@ enum TExprOperator {
 
   // LIKE predicate
   LIKE,
-  RLIKE,
   REGEXP,
 
   // function opcodes
@@ -101,6 +100,10 @@ struct TIsNullPredicate {
   1: required bool is_not_null
 }
 
+struct TLikePredicate {
+  1: required string escape_char;
+}
+
 struct TLiteralPredicate {
   1: required bool value
   2: required bool is_null
@@ -128,9 +131,10 @@ struct TExprNode {
   9: optional TFloatLiteral float_literal
   10: optional TIntLiteral int_literal
   11: optional TIsNullPredicate is_null_pred
-  12: optional TLiteralPredicate literal_pred
-  13: optional TSlotRef slot_ref
-  14: optional TStringLiteral string_literal
+  12: optional TLikePredicate like_pred
+  13: optional TLiteralPredicate literal_pred
+  14: optional TSlotRef slot_ref
+  15: optional TStringLiteral string_literal
 }
 
 // A flattened representation of a tree of Expr nodes, obtained by depth-first
