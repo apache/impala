@@ -66,7 +66,7 @@ public class DataErrorsTest {
         expectedFileErrors.add(expectedFileError);
       }
       TestUtils.runQuery(coordinator, queryFileParser.getQuery(),
-          queryFileParser.getLineNum(), abortOnError, maxErrors, null, null,
+          queryFileParser.getLineNum(), abortOnError, maxErrors, null, null, null,
           expectedErrors, expectedFileErrors, testErrorLog);
     }
     queryFileParser.close();

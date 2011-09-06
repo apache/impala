@@ -166,6 +166,8 @@ public class TestUtils {
    *          will be compared in a catch clause.
    * @param maxErrors
    *          Indicates the maximum number of errors to gather.
+   * @param expectedColLabels
+   *          Expected column labels.
    * @param expectedTypes
    *          Expected types in query's select list. Ignored if null.
    * @param expectedResults
@@ -179,7 +181,7 @@ public class TestUtils {
    * @return an error message if actual does not match expected, "" otherwise.
    */
   public static void runQuery(Coordinator coordinator, String query, int lineNum,
-      boolean abortOnError, int maxErrors,
+      boolean abortOnError, int maxErrors, ArrayList<String> expectedColLabels,
       ArrayList<String> expectedTypes, ArrayList<String> expectedResults,
       ArrayList<String> expectedErrors, ArrayList<String> expectedFileErrors,
       StringBuilder testErrorLog) {
@@ -204,6 +206,17 @@ public class TestUtils {
             "':\n" + e.getMessage());
       }
       return;
+    }
+
+    // Check expected column labels.
+    if (expectedColLabels != null) {
+      String[] actualColLabelsArr = new String[colLabels.size()];
+      colLabels.toArray(actualColLabelsArr);
+      String typeResult = TestUtils.compareOutput(actualColLabelsArr, expectedColLabels);
+      if (!typeResult.isEmpty()) {
+        testErrorLog.append("query:\n" + query + "\n" + typeResult);
+        return;
+      }
     }
 
     // Check types filled in by RunQuery()

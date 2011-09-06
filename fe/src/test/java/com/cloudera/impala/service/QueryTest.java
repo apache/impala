@@ -40,7 +40,7 @@ public class QueryTest {
       ArrayList<String> expectedResults = queryFileParser.getExpectedResult(1);
       TestUtils.runQuery(
           coordinator, queryFileParser.getQuery(), queryFileParser.getLineNum(),
-          abortOnError, maxErrors, expectedTypes, expectedResults, null, null, errorLog);
+          abortOnError, maxErrors, null, expectedTypes, expectedResults, null, null, errorLog);
     }
     queryFileParser.close();
     if (errorLog.length() != 0) {
