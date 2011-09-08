@@ -10,6 +10,7 @@
 #include <ostream>
 
 #include "common/status.h"
+#include "gen-cpp/Descriptors_types.h"  // for TTupleId
 #include "gen-cpp/Types_types.h"
 #include "runtime/primitive-type.h"
 
@@ -26,6 +27,7 @@ class TTupleDescriptor;
 // assignment-incompatible
 typedef int TupleId;
 typedef int SlotId;
+typedef int TableId;
 
 std::string TypeToString(PrimitiveType t);
 
@@ -52,6 +54,7 @@ class SlotDescriptor {
   const NullIndicatorOffset& null_indicator_offset() const {
     return null_indicator_offset_;
   }
+  bool is_materialized() const { return is_materialized_; }
 
   std::string DebugString() const;
 
@@ -63,6 +66,7 @@ class SlotDescriptor {
   const int col_pos_;
   const int tuple_offset_;
   const NullIndicatorOffset null_indicator_offset_;
+  const bool is_materialized_;
 
   SlotDescriptor(const TSlotDescriptor& tdesc);
 };
@@ -70,7 +74,7 @@ class SlotDescriptor {
 // Base class for table descriptors.
 class TableDescriptor {
  public:
-  TableDescriptor(const TTable& ttable);
+  TableDescriptor(const TTableDescriptor& tdesc);
   int num_cols() const { return num_cols_; }
   int num_clustering_cols() const { return num_clustering_cols_; }
   virtual std::string DebugString() const;
@@ -82,13 +86,14 @@ class TableDescriptor {
   }
 
  protected:
+  TableId id_;
   int num_cols_;
   int num_clustering_cols_;
 };
 
 class HdfsTableDescriptor : public TableDescriptor {
  public:
-  HdfsTableDescriptor(const TTable& ttable);
+  HdfsTableDescriptor(const TTableDescriptor& tdesc);
   char line_delim() const { return line_delim_; }
   char field_delim() const { return field_delim_; }
   char collection_delim() const { return collection_delim_; }
@@ -109,7 +114,7 @@ class HdfsTableDescriptor : public TableDescriptor {
 
 class HBaseTableDescriptor : public TableDescriptor {
  public:
-  HBaseTableDescriptor(const TTable& ttable);
+  HBaseTableDescriptor(const TTableDescriptor& tdesc);
   virtual std::string DebugString() const;
   const std::string table_name() const { return table_name_; }
   const std::vector<std::pair<std::string, std::string> >& cols() const { return cols_; }
@@ -126,15 +131,16 @@ class TupleDescriptor {
  public:
   int byte_size() const { return byte_size_; }
   const std::vector<SlotDescriptor*>& slots() const { return slots_; }
-  const TableDescriptor* table_desc() const { return table_desc_.get(); }
+  const TableDescriptor* table_desc() const { return table_desc_; }
 
+  TupleId id() const { return id_; }
   std::string DebugString() const;
 
  protected:
   friend class DescriptorTbl;
 
   const TupleId id_;
-  boost::scoped_ptr<TableDescriptor> table_desc_;
+  TableDescriptor* table_desc_;
   const int byte_size_;
   std::vector<SlotDescriptor*> slots_;
 
@@ -149,6 +155,7 @@ class DescriptorTbl {
   static Status Create(ObjectPool* pool, const TDescriptorTable& thrift_tbl,
                        DescriptorTbl** tbl);
 
+  TableDescriptor* GetTableDescriptor(TableId id) const;
   TupleDescriptor* GetTupleDescriptor(TupleId id) const;
   SlotDescriptor* GetSlotDescriptor(SlotId id) const;
 
@@ -158,13 +165,41 @@ class DescriptorTbl {
   std::string DebugString() const;
 
  private:
+  typedef std::tr1::unordered_map<TableId, TableDescriptor*> TableDescriptorMap;
   typedef std::tr1::unordered_map<TupleId, TupleDescriptor*> TupleDescriptorMap;
   typedef std::tr1::unordered_map<SlotId, SlotDescriptor*> SlotDescriptorMap;
 
+  TableDescriptorMap tbl_desc_map_;
   TupleDescriptorMap tuple_desc_map_;
   SlotDescriptorMap slot_desc_map_;
 
-  DescriptorTbl(): tuple_desc_map_(), slot_desc_map_() {}
+  DescriptorTbl(): tbl_desc_map_(), tuple_desc_map_(), slot_desc_map_() {}
+};
+
+// Records positions of tuples within row produced by ExecNode.
+class RowDescriptor {
+ public:
+  RowDescriptor(const DescriptorTbl& desc_tbl, const std::vector<TTupleId>& row_tuples);
+
+  // Returns total size in bytes.
+  int GetRowSize() const;
+
+  static const int INVALID_IDX = -1;
+
+  // Returns INVALID_IDX if id not part of this row.
+  int GetTupleIdx(TupleId id) const;
+
+  // Return descriptors for all tuples in this row, in order of appearance.
+  const std::vector<TupleDescriptor*>& tuple_descriptors() const {
+    return tuple_desc_map_;
+  }
+
+ private:
+  // map from position of tuple w/in row to its descriptor
+  std::vector<TupleDescriptor*> tuple_desc_map_;
+
+  // map from TupleId to position of tuple w/in row
+  std::vector<int> tuple_idx_map_;
 };
 
 }

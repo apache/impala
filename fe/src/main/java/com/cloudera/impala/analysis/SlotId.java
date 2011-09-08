@@ -5,6 +5,7 @@ package com.cloudera.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.cloudera.impala.common.Id;
 import com.google.common.collect.Lists;
 
 public class SlotId extends Id {

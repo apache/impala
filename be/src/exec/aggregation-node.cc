@@ -14,6 +14,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
+#include "util/debug-util.h"
 
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/PlanNodes_types.h"
@@ -25,8 +26,9 @@ using namespace boost;
 // TODO: pass in maximum size; enforce by setting limit in mempool
 // TODO: have a Status ExecNode::Init(const TPlanNode&) member function
 // that does initialization outside of c'tor, so we can indicate errors
-AggregationNode::AggregationNode(ObjectPool* pool, const TPlanNode& tnode)
-  : ExecNode(pool, tnode),
+AggregationNode::AggregationNode(ObjectPool* pool, const TPlanNode& tnode,
+                                 const DescriptorTbl& descs)
+  : ExecNode(pool, tnode, descs),
     hash_fn_(this),
     equals_fn_(this),
     agg_tuple_id_(tnode.agg_node.agg_tuple_id),
@@ -110,9 +112,7 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   agg_tuple_desc_ = state->descs().GetTupleDescriptor(agg_tuple_id_);
   Expr::Prepare(grouping_exprs_, state);
   Expr::Prepare(aggregate_exprs_, state);
-  // TODO: fix this by adding a vector<TupleDescriptor*> ExecNode::materialized_tuples_
-  // for now, we assume our child is a single scan node (and that its id is always 0)
-  input_tuple_descs_.push_back(state->descs().GetTupleDescriptor(0));
+  input_tuple_descs_ = children_[0]->row_desc().tuple_descriptors();
   hash_fn_.Init(agg_tuple_desc_, grouping_exprs_);
   equals_fn_.Init(agg_tuple_desc_, grouping_exprs_);
   // TODO: how many buckets?

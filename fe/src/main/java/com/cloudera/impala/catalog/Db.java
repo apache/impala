@@ -33,13 +33,14 @@ public class Db {
    * @param dbName
    * @return non-null Db instance (possibly containing no tables)
    */
-  public static Db loadDb(HiveMetaStoreClient client, String dbName) {
+  public static Db loadDb(Catalog catalog, HiveMetaStoreClient client, String dbName) {
     try {
       Db db = new Db(dbName);
       List<String> tblNames = null;
       tblNames = client.getTables(dbName, "*");
       for (String tblName : tblNames) {
-        Table table = Table.load(client, db, tblName);
+        TableId id = catalog.getNextTableId();
+        Table table = Table.load(id, client, db, tblName);
         if (table != null) {
           db.tables.put(tblName, table);
         }

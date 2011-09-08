@@ -3,6 +3,7 @@
 package com.cloudera.impala.planner;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 
@@ -14,7 +15,10 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.analysis.SlotDescriptor;
+import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.TableRef;
+import com.cloudera.impala.analysis.TupleDescriptor;
+import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.catalog.HdfsRCFileTable;
 import com.cloudera.impala.catalog.HdfsTextTable;
 import com.cloudera.impala.catalog.PrimitiveType;
@@ -22,6 +26,7 @@ import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.Pair;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * The planner is responsible for turning parse trees into plan fragments that
@@ -166,8 +171,43 @@ public class Planner {
   }
 
   /**
+   * Mark slots that aren't being referenced by any conjuncts or select list
+   * exprs as non-materialized.
+   */
+  public void markUnrefdSlots(PlanNode root, SelectStmt selectStmt, Analyzer analyzer) {
+    PlanNode node = root;
+    List<SlotId> refdIdList = Lists.newArrayList();
+    while (node != null) {
+      Expr.getIds(node.getConjuncts(), null, refdIdList);
+      if (node.hasChild(1)) {
+        Expr.getIds(node.getChild(1).getConjuncts(), null, refdIdList);
+      }
+      // traverse down the leftmost path
+      node = node.getChild(0);
+    }
+    if (selectStmt.getAggInfo() != null) {
+      if (selectStmt.getAggInfo().getGroupingExprs() != null) {
+        Expr.getIds(selectStmt.getAggInfo().getGroupingExprs(), null, refdIdList);
+      }
+      Expr.getIds(selectStmt.getAggInfo().getAggregateExprs(), null, refdIdList);
+    }
+    Expr.getIds(selectStmt.getSelectListExprs(), null, refdIdList);
+
+    HashSet<SlotId> refdIds = Sets.newHashSet();
+    refdIds.addAll(refdIdList);
+    for (TupleDescriptor tupleDesc: analyzer.getDescTbl().getTupleDescs()) {
+      for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
+        if (!refdIds.contains(slotDesc.getId())) {
+          slotDesc.setIsMaterialized(false);
+        }
+      }
+    }
+  }
+
+  /**
    * Create tree of PlanNodes that implements the given selectStmt.
    * Currently only supports single-table queries plus aggregation.
+   * Also calls DescriptorTable.computeMemLayout().
    * @param selectStmt
    * @param analyzer
    * @return root node of plan tree
@@ -179,16 +219,25 @@ public class Planner {
       // no from clause -> nothing to plan
       return null;
     }
+    // collect ids of tuples materialized by the subtree that includes all joins
+    // and scans
+    ArrayList<TupleId> rowTuples = Lists.newArrayList();
+    for (TableRef tblRef: selectStmt.getTableRefs()) {
+      rowTuples.add(tblRef.getId());
+    }
+
     TableRef tblRef = selectStmt.getTableRefs().get(0);
     PlanNode root = createScanNode(analyzer, tblRef);
-    // TODO:
-    //ArrayList<Int> tupleIdxMap =
-        //computeTblRefIdxMap(selectStmt.getTableRefs(), analyzer.getDescTbl());
-    //root.setTupleIdxMap(tupleIdxMap);
+    root.rowTupleIds = rowTuples;
     for (int i = 1; i < selectStmt.getTableRefs().size(); ++i) {
       TableRef innerRef = selectStmt.getTableRefs().get(i);
+      // all joins are hash joins at this point, and the rows coming from the build
+      // node only need to have space for the tuple materialized by that node
+      // (this might change with nested-loop joins)
       PlanNode inner = createScanNode(analyzer, innerRef);
+      inner.rowTupleIds = Lists.newArrayList(innerRef.getId());
       root = createHashJoinNode(analyzer, root, inner);
+      root.rowTupleIds = rowTuples;
     }
 
     AggregateInfo aggInfo = selectStmt.getAggInfo();
@@ -217,8 +266,11 @@ public class Planner {
 
     root.setLimit(selectStmt.getLimit());
     root.finalize(analyzer);
+    markUnrefdSlots(root, selectStmt, analyzer);
+    // don't compute mem layout before marking slots that aren't being referenced
+    analyzer.getDescTbl().computeMemLayout();
+
     return root;
   }
 
 }
-;

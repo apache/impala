@@ -33,11 +33,9 @@ struct THBaseFilter {
 struct THBaseScanNode {
   1: required Descriptors.TTupleId tuple_id
   2: required string table_name
-  // TODO: switch to binary as soon as thrift060 is used by Hive
-  // (and we don't try to load different versions for our cli)
-  // 3: optional binary start_key
+  // TODO: does 'binary' have an advantage over string? strings can
+  // already store binary data
   3: optional string start_key
-  // 4: optional binary stop_key
   4: optional string stop_key
   5: optional list<THBaseFilter> filters
 }
@@ -71,14 +69,15 @@ struct TPlanNode {
   1: required TPlanNodeType node_type
   2: required i32 num_children
   3: optional i64 limit = 0
-  4: optional list<Exprs.TExpr> conjuncts
+  4: required list<Descriptors.TTupleId> row_tuples
+  5: optional list<Exprs.TExpr> conjuncts
 
   // one field per PlanNode subclass
-  5: optional THdfsScanNode hdfs_scan_node
-  6: optional THBaseScanNode hbase_scan_node
-  7: optional THashJoinNode hash_join_node
-  8: optional TAggregationNode agg_node
-  9: optional TSortNode sort_node
+  6: optional THdfsScanNode hdfs_scan_node
+  7: optional THBaseScanNode hbase_scan_node
+  8: optional THashJoinNode hash_join_node
+  9: optional TAggregationNode agg_node
+  10: optional TSortNode sort_node
 }
 
 // A flattened representation of a tree of PlanNodes, obtained by depth-first

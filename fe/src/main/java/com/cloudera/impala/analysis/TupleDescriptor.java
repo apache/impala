@@ -61,7 +61,7 @@ public class TupleDescriptor {
   public TTupleDescriptor toThrift() {
     TTupleDescriptor ttupleDesc = new TTupleDescriptor(id.asInt(), byteSize);
     if (table != null) {
-      ttupleDesc.setTable(table.toThrift());
+      ttupleDesc.setTableId(table.getId().asInt());
     }
     return ttupleDesc;
   }
@@ -74,7 +74,9 @@ public class TupleDescriptor {
       slotsBySize.add(new ArrayList<SlotDescriptor>());
     }
     for (SlotDescriptor d: slots) {
-      slotsBySize.get(d.getType().getSlotSize()).add(d);
+      if (d.getIsMaterialized()) {
+        slotsBySize.get(d.getType().getSlotSize()).add(d);
+      }
     }
     // we shouldn't have anything of size 0
     Preconditions.checkState(slotsBySize.get(0).isEmpty());

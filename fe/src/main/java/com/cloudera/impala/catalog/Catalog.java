@@ -16,15 +16,18 @@ import com.google.common.collect.Maps;
  * Caches all db-, table- and column-related md during construction.
  */
 public class Catalog {
+  private int nextTableId;
+
   // map from db name to DB
   private final Map<String, Db> dbs;
 
   public Catalog(HiveMetaStoreClient msClient) {
+    this.nextTableId = 0;
     this.dbs = Maps.newHashMap();
     try {
       List<String> msDbs = msClient.getAllDatabases();
       for (String dbName: msDbs) {
-        Db db = Db.loadDb(msClient, dbName);
+        Db db = Db.loadDb(this, msClient, dbName);
         dbs.put(dbName, db);
       }
     } catch (MetaException e) {
@@ -35,6 +38,10 @@ public class Catalog {
 
   public Collection<Db> getDbs() {
     return dbs.values();
+  }
+
+  public TableId getNextTableId() {
+    return new TableId(nextTableId++);
   }
 
   /**

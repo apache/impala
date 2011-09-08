@@ -10,7 +10,7 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.thrift.TException;
 
-import com.cloudera.impala.thrift.TTable;
+import com.cloudera.impala.thrift.TTableDescriptor;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -27,6 +27,7 @@ import com.google.common.collect.Maps;
  *
  */
 public abstract class Table {
+  protected final TableId id;
   protected final Db db;
   protected final String name;
   protected final String owner;
@@ -43,12 +44,17 @@ public abstract class Table {
   /**  map from lowercase col. name to Column */
   protected final Map<String, Column> colsByName;
 
-  protected Table(Db db, String name, String owner) {
+  protected Table(TableId id, Db db, String name, String owner) {
+    this.id = id;
     this.db = db;
     this.name = name;
     this.owner = owner;
     this.colsByPos = Lists.newArrayList();
     this.colsByName = Maps.newHashMap();
+  }
+
+  public TableId getId() {
+    return id;
   }
 
   /**
@@ -60,7 +66,8 @@ public abstract class Table {
    *         this if successful
    *         null if loading table failed
    */
-  public abstract Table load(HiveMetaStoreClient client,
+  public abstract Table load(
+      HiveMetaStoreClient client,
       org.apache.hadoop.hive.metastore.api.Table msTbl);
 
 
@@ -74,8 +81,8 @@ public abstract class Table {
    *         new instance of Hdfs[Text|RCFile]Table or HBaseTable
    *         null if loading table failed
    */
-  public static Table load(HiveMetaStoreClient client, Db db,
-      String tblName) {
+  public static Table load(TableId id, HiveMetaStoreClient client, Db db,
+                           String tblName) {
     // turn all exceptions into unchecked exception
     try {
       org.apache.hadoop.hive.metastore.api.Table msTbl = client.getTable(db.getName(), tblName);
@@ -83,11 +90,11 @@ public abstract class Table {
       // Determine the table type
       Table table = null;
       if (HBaseTable.isHBaseTable(msTbl)) {
-        table = new HBaseTable(db, tblName, msTbl.getOwner());
+        table = new HBaseTable(id, db, tblName, msTbl.getOwner());
       } else if (HdfsTextTable.isTextTable(msTbl)) {
-        table = new HdfsTextTable(db, tblName, msTbl.getOwner());
+        table = new HdfsTextTable(id, db, tblName, msTbl.getOwner());
       } else if (HdfsRCFileTable.isRCFileTable(msTbl)) {
-        table = new HdfsRCFileTable(db, tblName, msTbl.getOwner());
+        table = new HdfsRCFileTable(id, db, tblName, msTbl.getOwner());
       } else {
         throw new UnsupportedOperationException("Unrecognized table type");
       }
@@ -130,7 +137,7 @@ public abstract class Table {
     }
   }
 
-  public abstract TTable toThrift();
+  public abstract TTableDescriptor toThrift();
 
   public Db getDb() {
     return db;

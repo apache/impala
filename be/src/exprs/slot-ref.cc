@@ -27,6 +27,11 @@ Status SlotRef::Prepare(RuntimeState* state) {
     error << "couldn't resolve slot descriptor " << slot_id_;
     return Status(error.str());
   }
+  if (!slot_desc->is_materialized()) {
+    stringstream error;
+    error << "reference to non-materialized slot " << slot_id_;
+    return Status(error.str());
+  }
   // TODO(marcel): get from runtime state
   this->tuple_idx_ = 0;
   this->slot_offset_ = slot_desc->tuple_offset();

@@ -20,8 +20,9 @@ using namespace std;
 using namespace boost;
 using namespace impala;
 
-HdfsTextScanNode::HdfsTextScanNode(ObjectPool* pool, const TPlanNode& tnode)
-    : ExecNode(pool, tnode),
+HdfsTextScanNode::HdfsTextScanNode(ObjectPool* pool, const TPlanNode& tnode,
+                                   const DescriptorTbl& descs)
+    : ExecNode(pool, tnode, descs),
       files_(tnode.hdfs_scan_node.file_paths),
       tuple_id_(tnode.hdfs_scan_node.tuple_id),
       tuple_desc_(NULL),
@@ -96,6 +97,7 @@ Status HdfsTextScanNode::Prepare(RuntimeState* state) {
   // We also set the key_idx_to_slot_idx_ to mapping for materializing partition keys.
   const std::vector<SlotDescriptor*>& slots = tuple_desc_->slots();
   for (size_t i = 0; i < slots.size(); i++) {
+    if (!slots[i]->is_materialized()) continue;
     if (hdfs_table->IsClusteringCol(slots[i])) {
       // Set partition-key index to slot mapping.
       // assert(key_idx_to_slot_idx_.size() * num_partition_keys_ + slots[i]->col_pos()

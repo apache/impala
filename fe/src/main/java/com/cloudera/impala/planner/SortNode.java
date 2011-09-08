@@ -29,6 +29,7 @@ public class SortNode extends PlanNode {
     this.orderingExprs = orderingExprs;
     this.isAscOrder = isAscOrder;
     this.children.add(input);
+    this.rowTupleIds.add(tupleIds.get(0));
   }
 
   @Override

@@ -139,14 +139,14 @@ Status QueryExecutor::Exec(const std::string& query, vector<PrimitiveType>* col_
   }
   VLOG(1) << "thrift request: " << ThriftDebugString(request);
 
-  ExecNode* plan_root = NULL;;
-  if (request.__isset.plan) {
-    RETURN_IF_ERROR(ExecNode::CreateTree(pool_.get(), request.plan, &plan_root));
-  }
   DescriptorTbl* descs = NULL;;
   if (request.__isset.descTbl) {
     RETURN_IF_ERROR(DescriptorTbl::Create(pool_.get(), request.descTbl, &descs));
     VLOG(1) << descs->DebugString();
+  }
+  ExecNode* plan_root = NULL;;
+  if (request.__isset.plan) {
+    RETURN_IF_ERROR(ExecNode::CreateTree(pool_.get(), request.plan, *descs, &plan_root));
   }
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(pool_.get(), request.selectListExprs, &select_list_exprs_));

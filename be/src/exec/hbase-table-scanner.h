@@ -18,7 +18,6 @@ class Status;
 // JNI wrapper class implementing minimal functionality for scanning an HBase table.
 // Note: When none of the requested family/qualifiers exist in a particular row,
 // HBase will not return the row at all, leading to "missing" NULL values.
-// TODO: Push down predicates via HBase server-side filters.
 // TODO: Related to filtering, there is a special filter that allows only selecting the keyvalues.
 //       Currently, if only the row key is requested
 //       all keyvalues are fetched from HBase (since there is no family/qualifier restriction).
@@ -134,6 +133,10 @@ class HBaseTableScanner {
   // Number of requested keyvalues (i.e., the number of added family/qualifier pairs).
   // Set in StartScan().
   int num_requested_keyvalues_;
+
+  // number of cols requested in addition to num_requested_keyvalues_, to work around
+  // hbase bug
+  int num_addl_requested_cols_;
 
   // Number of keyvalues returned from last result_.raw().
   int num_keyvalues_;

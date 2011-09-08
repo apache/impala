@@ -21,36 +21,41 @@ import com.google.common.collect.Lists;
  * and encapsulates the information needed by the planner to
  * make optimization decisions.
  *
+ * finalize(): Computes internal state, such as keys for scan nodes; gets called once on
+ * the root of the plan tree before the call to toThrift(). Also finalizes the set
+ * of conjuncts, such that each remaining one requires all of its referenced slots to
+ * be materialized (ie, can be evaluated by calling GetValue(), rather than being
+ * implicitly evaluated as part of a scan key).
+ *
+ * conjuncts: Each node has a list of conjuncts that can be executed in the context of
+ * this node, ie, they only reference tuples materialized by this node or one of
+ * its children (= are bound by tupleIds). 
  */
 abstract public class PlanNode extends TreeNode<PlanNode> {
   protected long limit; // max. # of rows to be returned; 0: no limit
   protected ArrayList<TupleId> tupleIds;  // ids materialized by the tree rooted at this node
 
-  /**
-   * all conjuncts can be executed in the context of this node, ie,
-   * they only reference tuples materialized by this node or one of
-   * its children
-   */
-  protected List<Predicate> conjuncts;
+  // Composition of rows produced by this node. Possibly a superset of tupleIds
+  // (the same RowBatch passes through multiple nodes; for instances, join nodes
+  // form a left-deep chain and pass RowBatches on to their left children).
+  // rowTupleIds[0] is the first tuple in the row, rowTupleIds[1] the second, etc.
+  protected ArrayList<TupleId> rowTupleIds;
 
-  // TODO:
-  // Map from TupleId to ordinal position of that tuple in the output
-  // rows produced by this node.
-  //protected ArrayList<Int> tupleIdxMap;
+  protected List<Predicate> conjuncts;
 
   protected PlanNode(ArrayList<TupleId> tupleIds) {
     this.limit = -1;
     // make a copy, just to be on the safe side
     this.tupleIds = Lists.newArrayList(tupleIds);
     this.conjuncts = Lists.newArrayList();
-    //this.tupleIdxMap = Lists.newArrayList();
+    this.rowTupleIds = Lists.newArrayList();
   }
 
   protected PlanNode() {
     this.limit = -1;
     this.tupleIds = Lists.newArrayList();
     this.conjuncts = Lists.newArrayList();
-    //this.tupleIdxMap = Lists.newArrayList();
+    this.rowTupleIds = Lists.newArrayList();
   }
 
   public long getLimit() {
@@ -64,6 +69,11 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   public List<TupleId> getTupleIds() {
     Preconditions.checkState(tupleIds != null);
     return tupleIds;
+  }
+
+  public ArrayList<TupleId> getRowTupleIds() {
+    Preconditions.checkState(rowTupleIds != null);
+    return rowTupleIds;
   }
 
   public List<Predicate> getConjuncts() {
@@ -94,6 +104,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     TPlanNode msg = new TPlanNode();
     msg.num_children = children.size();
     msg.limit = limit;
+    for (TupleId tid: rowTupleIds) {
+      msg.addToRow_tuples(tid.asInt());
+    }
     for (Predicate p: conjuncts) {
       msg.addToConjuncts(p.treeToThrift());
     }

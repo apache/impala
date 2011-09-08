@@ -26,7 +26,8 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.THdfsTable;
-import com.cloudera.impala.thrift.TTable;
+import com.cloudera.impala.thrift.TTableDescriptor;
+import com.cloudera.impala.thrift.TTableType;
 import com.google.common.collect.Lists;
 
 /**
@@ -65,8 +66,8 @@ public abstract class HdfsTable extends Table {
 
   private final static Logger LOG = LoggerFactory.getLogger(HdfsTable.class);
 
-  protected HdfsTable(Db db, String name, String owner) {
-    super(db, name, owner);
+  protected HdfsTable(TableId id, Db db, String name, String owner) {
+    super(id, db, name, owner);
     this.partitions = Lists.newArrayList();
   }
 
@@ -277,10 +278,9 @@ public abstract class HdfsTable extends Table {
   }
 
   @Override
-  public TTable toThrift() {
-    TTable ttable = new TTable();
-    ttable.setNumCols(colsByPos.size());
-    ttable.setNumClusteringCols(numClusteringCols);
+  public TTableDescriptor toThrift() {
+    TTableDescriptor TTableDescriptor =
+        new TTableDescriptor(id.asInt(), TTableType.HBASE_TABLE, colsByPos.size(), numClusteringCols);
     // We only support single-byte characters as delimiters.
     THdfsTable tHdfsTable = new THdfsTable(
         (byte) lineDelim.charAt(0), (byte) fieldDelim.charAt(0),
@@ -290,8 +290,8 @@ public abstract class HdfsTable extends Table {
     if (quoteChar != null) {
       tHdfsTable.setQuoteChar((byte) quoteChar.charAt(0));
     }
-    ttable.setHdfsTable(tHdfsTable);
-    return ttable;
+    TTableDescriptor.setHdfsTable(tHdfsTable);
+    return TTableDescriptor;
   }
 
   public String getLineDelim() {

@@ -13,6 +13,10 @@ public class SlotDescriptor {
   private PrimitiveType type;
   private Column column;  // underlying column, if there is one
 
+  // if false, this slot doesn't need to be materialized in parent tuple
+  // (and physical layout parameters are invalid)
+  private boolean isMaterialized; 
+
   // physical layout parameters
   private int byteSize;
   private int byteOffset;  // within tuple
@@ -22,6 +26,8 @@ public class SlotDescriptor {
   SlotDescriptor(int id, TupleDescriptor parent) {
     this.id = new SlotId(id);
     this.parent = parent;
+    this.byteOffset = -1;  // invalid
+    this.isMaterialized = true;
   }
 
   public int getNullIndicatorByte() {
@@ -65,6 +71,14 @@ public class SlotDescriptor {
     this.type = column.getType();
   }
 
+  public boolean getIsMaterialized() {
+    return isMaterialized;
+  }
+
+  public void setIsMaterialized(boolean value) {
+    isMaterialized = value;
+  }
+
   public int getByteSize() {
     return byteSize;
   }
@@ -85,7 +99,7 @@ public class SlotDescriptor {
     return new TSlotDescriptor(
         id.asInt(), parent.getId().asInt(), type.toThrift(),
         ((column != null) ? column.getPosition() : -1),
-        byteOffset, nullIndicatorByte, nullIndicatorBit);
+        byteOffset, nullIndicatorByte, nullIndicatorBit, isMaterialized);
   }
 
   public String debugString() {
@@ -95,6 +109,11 @@ public class SlotDescriptor {
         .add("id", id.asInt())
         .add("col", colStr)
         .add("type", typeStr)
+        .add("materialized", isMaterialized)
+        .add("byteSize", byteSize)
+        .add("byteOffset", byteOffset)
+        .add("nullIndicatorByte", nullIndicatorByte)
+        .add("nullIndicatorBit", nullIndicatorBit)
         .toString();
   }
 }

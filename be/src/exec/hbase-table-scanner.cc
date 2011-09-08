@@ -63,6 +63,7 @@ HBaseTableScanner::HBaseTableScanner(JNIEnv* env)
     buffer_(NULL),
     keyvalue_index_(0),
     num_requested_keyvalues_(0),
+    num_addl_requested_cols_(0),
     num_keyvalues_(0),
     all_keyvalues_present_(false),
     value_pool_(new MemPool()),
@@ -234,8 +235,9 @@ Status HBaseTableScanner::StartScan(
   RETURN_ERROR_IF_EXC(env_, JniUtil::throwable_to_string_id());
 
   const vector<SlotDescriptor*>& slots = tuple_desc->slots();
-  // Restrict scan to requested families/qualifiers.
+  // Restrict scan to materialized families/qualifiers.
   for (int i = 0; i < slots.size(); ++i) {
+    if (!slots[i]->is_materialized()) continue;
     const string& family = hbase_table->cols()[slots[i]->col_pos()].first;
     const string& qualifier = hbase_table->cols()[slots[i]->col_pos()].second;
     // The row key has an empty qualifier.
@@ -247,6 +249,33 @@ Status HBaseTableScanner::StartScan(
     // scan_.addColumn(family_bytes, qualifier_bytes);
     env_->CallObjectMethod(scan_, scan_add_column_id_, family_bytes, qualifier_bytes);
     RETURN_ERROR_IF_EXC(env_, JniUtil::throwable_to_string_id());
+  }
+
+  // circumvent hbase bug: make sure to select all cols that have filters,
+  // otherwise the filter may not get applied;
+  // see HBASE-4364 (https://issues.apache.org/jira/browse/HBASE-4364)
+  num_addl_requested_cols_ = 0;
+  for (vector<THBaseFilter>::const_iterator it = filters.begin(); it != filters.end();
+       ++it) {
+    bool requested = false;
+    for (int i = 0; i < slots.size(); ++i) {
+      if (!slots[i]->is_materialized()) continue;
+      const string& family = hbase_table->cols()[slots[i]->col_pos()].first;
+      const string& qualifier = hbase_table->cols()[slots[i]->col_pos()].second;
+      if (family == it->family && qualifier == it->qualifier) {
+        requested = true;
+        break;
+      }
+    }
+    if (requested) continue;
+    jbyteArray family_bytes;
+    RETURN_IF_ERROR(CreateByteArray(it->family, &family_bytes));
+    jbyteArray qualifier_bytes;
+    RETURN_IF_ERROR(CreateByteArray(it->qualifier, &qualifier_bytes));
+    // scan_.addColumn(family_bytes, qualifier_bytes);
+    env_->CallObjectMethod(scan_, scan_add_column_id_, family_bytes, qualifier_bytes);
+    RETURN_ERROR_IF_EXC(env_, JniUtil::throwable_to_string_id());
+    ++num_addl_requested_cols_;
   }
 
   // Add HBase Filters.
@@ -307,12 +336,14 @@ Status HBaseTableScanner::Next(bool* has_next) {
   num_keyvalues_ = env_->GetArrayLength(keyvalues_);
   // Check that raw() didn't return more keyvalues than expected.
   // If num_requested_keyvalues_ is 0 then only row key is asked for and this check should pass.
-  if (num_keyvalues_ > num_requested_keyvalues_ && num_requested_keyvalues_ != 0) {
+  if (num_keyvalues_ > num_requested_keyvalues_ + num_addl_requested_cols_
+      && num_requested_keyvalues_ + num_addl_requested_cols_ != 0) {
     *has_next = false;
     return Status("Encountered more keyvalues than expected.");
   }
-  // If all requested columns are present, we avoid family-/qualifier comparisons in NextValue().
-  if (num_keyvalues_ == num_requested_keyvalues_) {
+  // If all requested columns are present, and we didn't ask for any extra ones to work
+  // around an hbase bug, we avoid family-/qualifier comparisons in NextValue().
+  if (num_keyvalues_ == num_requested_keyvalues_ && num_addl_requested_cols_ == 0) {
     all_keyvalues_present_ = true;
   } else {
     all_keyvalues_present_ = false;

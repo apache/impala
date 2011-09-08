@@ -1,6 +1,6 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
-package com.cloudera.impala.analysis;
+package com.cloudera.impala.common;
 
 /**
  * Integer ids that cannot accidentally be compared with ints..

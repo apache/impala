@@ -14,7 +14,7 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.serde2.SerDeException;
 
 import com.cloudera.impala.thrift.THBaseTable;
-import com.cloudera.impala.thrift.TTable;
+import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
 import com.google.common.base.Preconditions;
 
@@ -45,8 +45,8 @@ public class HBaseTable extends Table {
   private static final String hbaseInputFormat =
     "org.apache.hadoop.hive.hbase.HiveHBaseTableInputFormat";
 
-  protected HBaseTable(Db db, String name, String owner) {
-    super(db, name, owner);
+  protected HBaseTable(TableId id, Db db, String name, String owner) {
+    super(id,db, name, owner);
   }
 
   @Override
@@ -126,7 +126,7 @@ public class HBaseTable extends Table {
   }
 
   @Override
-  public TTable toThrift() {
+  public TTableDescriptor toThrift() {
     THBaseTable tHbaseTable = new THBaseTable();
     tHbaseTable.setTableName(hbaseTableName);
     for (Column c : colsByPos) {
@@ -138,10 +138,10 @@ public class HBaseTable extends Table {
         tHbaseTable.addToQualifiers("");
       }
     }
-    TTable ttable =
-        new TTable(TTableType.HBASE_TABLE, colsByPos.size(), numClusteringCols);
-    ttable.setHbaseTable(tHbaseTable);
-    return ttable;
+    TTableDescriptor TTableDescriptor =
+        new TTableDescriptor(id.asInt(), TTableType.HBASE_TABLE, colsByPos.size(), numClusteringCols);
+    TTableDescriptor.setHbaseTable(tHbaseTable);
+    return TTableDescriptor;
   }
 
   public String getHBaseTableName() {

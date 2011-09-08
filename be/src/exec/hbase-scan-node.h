@@ -14,7 +14,7 @@ namespace impala {
 
 class HBaseScanNode : public ExecNode {
  public:
-  HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode);
+  HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
   // Prepare conjuncts, create HBase columns to slots mapping,
   // initialize hbase_scanner_, and create text_converter_.

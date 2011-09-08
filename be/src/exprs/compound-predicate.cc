@@ -4,7 +4,7 @@
 #include <glog/logging.h>
 
 #include "exprs/compound-predicate.h"
-#include "util/debug-string-util.h"
+#include "util/debug-util.h"
 
 using namespace std;
 

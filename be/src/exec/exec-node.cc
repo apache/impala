@@ -2,6 +2,7 @@
 
 #include "exec/exec-node.h"
 
+#include <sstream>
 #include <glog/logging.h>
 
 #include "common/object-pool.h"
@@ -10,6 +11,7 @@
 #include "exec/aggregation-node.h"
 #include "exec/hdfs-text-scan-node.h"
 #include "exec/hbase-scan-node.h"
+#include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
 #include "gen-cpp/PlanNodes_types.h"
 
@@ -17,7 +19,8 @@ using namespace std;
 
 namespace impala {
 
-ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode) {
+ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
+  : row_descriptor_(descs, tnode.row_tuples) {
   Status status = Expr::CreateExprTrees(pool, tnode.conjuncts, &conjuncts_);
   DCHECK(status.ok())
       << "ExecNode c'tor: deserialization of conjuncts failed:\n"
@@ -32,13 +35,14 @@ Status ExecNode::Prepare(RuntimeState* state) {
   return Status::OK;
 }
 
-Status ExecNode::CreateTree(ObjectPool* pool, const TPlan& plan, ExecNode** root) {
+Status ExecNode::CreateTree(ObjectPool* pool, const TPlan& plan,
+                            const DescriptorTbl& descs, ExecNode** root) {
   if (plan.nodes.size() == 0) {
     *root = NULL;
     return Status::OK;
   }
   int node_idx = 0;
-  RETURN_IF_ERROR(CreateTreeHelper(pool, plan.nodes, NULL, &node_idx, root));
+  RETURN_IF_ERROR(CreateTreeHelper(pool, plan.nodes, descs, NULL, &node_idx, root));
   if (node_idx + 1 != plan.nodes.size()) {
     // TODO: print thrift msg for diagnostic purposes.
     return Status(
@@ -50,6 +54,7 @@ Status ExecNode::CreateTree(ObjectPool* pool, const TPlan& plan, ExecNode** root
 Status ExecNode::CreateTreeHelper(
     ObjectPool* pool,
     const vector<TPlanNode>& tnodes,
+    const DescriptorTbl& descs,
     ExecNode* parent,
     int* node_idx,
     ExecNode** root) {
@@ -60,7 +65,7 @@ Status ExecNode::CreateTreeHelper(
   }
   int num_children = tnodes[*node_idx].num_children;
   ExecNode* node = NULL;
-  RETURN_IF_ERROR(CreateNode(pool, tnodes[*node_idx], &node));
+  RETURN_IF_ERROR(CreateNode(pool, tnodes[*node_idx], descs, &node));
   // assert(parent != NULL || (node_idx == 0 && root_expr != NULL));
   if (parent != NULL) {
     parent->children_.push_back(node);
@@ -69,7 +74,7 @@ Status ExecNode::CreateTreeHelper(
   }
   for (int i = 0; i < num_children; i++) {
     ++*node_idx;
-    RETURN_IF_ERROR(CreateTreeHelper(pool, tnodes, node, node_idx, NULL));
+    RETURN_IF_ERROR(CreateTreeHelper(pool, tnodes, descs, node, node_idx, NULL));
     // we are expecting a child, but have used all nodes
     // this means we have been given a bad tree and must fail
     if (*node_idx >= tnodes.size()) {
@@ -80,23 +85,28 @@ Status ExecNode::CreateTreeHelper(
   return Status::OK;
 }
 
-Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode, ExecNode** node) {
+Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
+                            const DescriptorTbl& descs, ExecNode** node) {
+  std::stringstream error_msg;
   switch (tnode.node_type) {
     case TPlanNodeType::HDFS_TEXT_SCAN_NODE:
-      *node = pool->Add(new HdfsTextScanNode(pool, tnode));
+      *node = pool->Add(new HdfsTextScanNode(pool, tnode, descs));
       return Status::OK;
-    case TPlanNodeType:: HDFS_RCFILE_SCAN_NODE:
-      return Status("RCFile Scan node not implemented");
     case TPlanNodeType::HBASE_SCAN_NODE:
-      *node = pool->Add(new HBaseScanNode(pool, tnode));
+      *node = pool->Add(new HBaseScanNode(pool, tnode, descs));
       return Status::OK;
-    case TPlanNodeType::HASH_JOIN_NODE:
-      return Status("Hash join node not implemented");
     case TPlanNodeType::AGGREGATION_NODE:
-      *node = pool->Add(new AggregationNode(pool, tnode));
+      *node = pool->Add(new AggregationNode(pool, tnode, descs));
       return Status::OK;
-    case TPlanNodeType::SORT_NODE:
-      return Status("Sort node not implemented");
+    default:
+      map<int, const char*>::const_iterator i =
+          _TPlanNodeType_VALUES_TO_NAMES.find(tnode.node_type);
+      const char* str = "unknown node type";
+      if (i != _TPlanNodeType_VALUES_TO_NAMES.end()) {
+        str = i->second;
+      }
+      error_msg << str << " not implemented";
+      return Status(error_msg.str());
   }
   return Status::OK;
 }

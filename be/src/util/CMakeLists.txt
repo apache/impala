@@ -7,6 +7,6 @@ set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/util")
 set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/util")
 
 add_library(Util
-  debug-string-util.cc
+  debug-util.cc
   jni-util.cc
 )

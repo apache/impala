@@ -2,7 +2,7 @@
 
 #include <sstream>
 #include "exprs/agg-expr.h"
-#include "util/debug-string-util.h"
+#include "util/debug-util.h"
 #include "gen-cpp/Exprs_types.h"
 
 using namespace std;

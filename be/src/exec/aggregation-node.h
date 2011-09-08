@@ -26,7 +26,7 @@ class TupleDescriptor;
 // slots precede the aggregation expr slots in the output tuple descriptor).
 class AggregationNode : public ExecNode {
  public:
-  AggregationNode(ObjectPool* pool, const TPlanNode& tnode);
+  AggregationNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);

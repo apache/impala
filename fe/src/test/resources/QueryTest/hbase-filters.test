@@ -15,6 +15,24 @@ int,boolean,double,float,bigint,int,smallint,tinyint,string,string
 89,false,40.4,4.4,40,4,4,4,'04/02/09','4'
 99,false,40.4,4.4,40,4,4,4,'04/03/09','4'
 =====
+# make sure this works even when not requesting the col family w/ the predicate
+select tinyint_col from hbasealltypessmall where string_col = '4'
+----
+tinyint
+----
+4
+4
+4
+4
+4
+4
+4
+4
+4
+4
+4
+4
+====
 select count(*) from hbasealltypessmall where string_col = '4'
 -----
 bigint

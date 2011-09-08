@@ -17,17 +17,17 @@ void PlanExecutorAdaptor::DeserializeRequest() {
   TExecutePlanRequest exec_request;
   DeserializeThriftMsg(env_, thrift_execute_plan_request_, &exec_request);
 
-  if (exec_request.__isset.plan) {
-    THROW_IF_ERROR(ExecNode::CreateTree(&obj_pool_, exec_request.plan, &plan_), env_,
-                   impala_exc_cl_);
-  } else {
-    plan_ = NULL;
-  }
   if (exec_request.__isset.descTbl) {
     THROW_IF_ERROR(DescriptorTbl::Create(&obj_pool_, exec_request.descTbl, &descs_), env_,
                    impala_exc_cl_);
   } else {
     descs_ = NULL;
+  }
+  if (exec_request.__isset.plan) {
+    THROW_IF_ERROR(ExecNode::CreateTree(&obj_pool_, exec_request.plan, *descs_, &plan_), env_,
+                   impala_exc_cl_);
+  } else {
+    plan_ = NULL;
   }
   // TODO: check that (descs_ == NULL) == (plan_ == NULL)
   THROW_IF_ERROR(

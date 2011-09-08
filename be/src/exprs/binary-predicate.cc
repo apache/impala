@@ -5,7 +5,7 @@
 
 #include "exprs/binary-predicate.h"
 #include "exprs/functions.h"
-#include "util/debug-string-util.h"
+#include "util/debug-util.h"
 #include "gen-cpp/Exprs_types.h"
 
 using namespace std;

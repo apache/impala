@@ -67,7 +67,8 @@ SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc)
     type_(ThriftToType(tdesc.slotType)),
     col_pos_(tdesc.columnPos),
     tuple_offset_(tdesc.byteOffset),
-    null_indicator_offset_(tdesc.nullIndicatorByte, tdesc.nullIndicatorBit) {
+    null_indicator_offset_(tdesc.nullIndicatorByte, tdesc.nullIndicatorBit),
+    is_materialized_(tdesc.isMaterialized) {
 }
 
 std::string SlotDescriptor::DebugString() const {
@@ -78,9 +79,10 @@ std::string SlotDescriptor::DebugString() const {
   return out.str();
 }
 
-TableDescriptor::TableDescriptor(const TTable& ttable)
-  : num_cols_(ttable.numCols),
-    num_clustering_cols_(ttable.numClusteringCols) {
+TableDescriptor::TableDescriptor(const TTableDescriptor& tdesc)
+  : id_(tdesc.id),
+    num_cols_(tdesc.numCols),
+    num_clustering_cols_(tdesc.numClusteringCols) {
 }
 
 string TableDescriptor::DebugString() const {
@@ -89,14 +91,14 @@ string TableDescriptor::DebugString() const {
   return out.str();
 }
 
-HdfsTableDescriptor::HdfsTableDescriptor(const TTable& ttable)
-  : TableDescriptor(ttable),
-    line_delim_(ttable.hdfsTable.lineDelim),
-    field_delim_(ttable.hdfsTable.fieldDelim),
-    collection_delim_(ttable.hdfsTable.collectionDelim),
-    escape_char_(ttable.hdfsTable.escapeChar),
-    quote_char_((ttable.hdfsTable.__isset.quoteChar) ? ttable.hdfsTable.quoteChar : -1),
-    strings_are_quoted_(ttable.hdfsTable.__isset.quoteChar) {
+HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc)
+  : TableDescriptor(tdesc),
+    line_delim_(tdesc.hdfsTable.lineDelim),
+    field_delim_(tdesc.hdfsTable.fieldDelim),
+    collection_delim_(tdesc.hdfsTable.collectionDelim),
+    escape_char_(tdesc.hdfsTable.escapeChar),
+    quote_char_((tdesc.hdfsTable.__isset.quoteChar) ? tdesc.hdfsTable.quoteChar : -1),
+    strings_are_quoted_(tdesc.hdfsTable.__isset.quoteChar) {
 }
 
 string HdfsTableDescriptor::DebugString() const {
@@ -111,12 +113,12 @@ string HdfsTableDescriptor::DebugString() const {
   return out.str();
 }
 
-HBaseTableDescriptor::HBaseTableDescriptor(const TTable& ttable)
-  : TableDescriptor(ttable),
-    table_name_(ttable.hbaseTable.tableName) {
-  for (int i = 0; i < ttable.hbaseTable.families.size(); ++i) {
-    cols_.push_back(make_pair(ttable.hbaseTable.families[i],
-        ttable.hbaseTable.qualifiers[i]));
+HBaseTableDescriptor::HBaseTableDescriptor(const TTableDescriptor& tdesc)
+  : TableDescriptor(tdesc),
+    table_name_(tdesc.hbaseTable.tableName) {
+  for (int i = 0; i < tdesc.hbaseTable.families.size(); ++i) {
+    cols_.push_back(make_pair(tdesc.hbaseTable.families[i],
+        tdesc.hbaseTable.qualifiers[i]));
   }
 }
 
@@ -136,19 +138,6 @@ TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
     table_desc_(NULL),
     byte_size_(tdesc.byteSize),
     slots_() {
-  if (tdesc.__isset.table) {
-    switch(tdesc.table.tableType) {
-      case TTableType::HDFS_TEXT_TABLE:
-      case TTableType::HDFS_RCFILE_TABLE:
-        table_desc_.reset(new HdfsTableDescriptor(tdesc.table));
-        break;
-      case TTableType::HBASE_TABLE:
-        table_desc_.reset(new HBaseTableDescriptor(tdesc.table));
-        break;
-      default:
-        DCHECK(false) << "invalid table type: " << tdesc.table.tableType;
-    }
-  }
 }
 
 void TupleDescriptor::AddSlot(SlotDescriptor* slot) {
@@ -158,7 +147,7 @@ void TupleDescriptor::AddSlot(SlotDescriptor* slot) {
 string TupleDescriptor::DebugString() const {
   stringstream out;
   out << "Tuple(id=" << id_ << " size=" << byte_size_;
-  if (table_desc_.get() != NULL) {
+  if (table_desc_ != NULL) {
     out << " " << table_desc_->DebugString();
   }
   out << " slots=[";
@@ -171,13 +160,65 @@ string TupleDescriptor::DebugString() const {
   return out.str();
 }
 
+RowDescriptor::RowDescriptor(const DescriptorTbl& desc_tbl,
+                             const std::vector<TTupleId>& row_tuples) {
+  for (int i = 0; i < row_tuples.size(); ++i) {
+    tuple_desc_map_.push_back(desc_tbl.GetTupleDescriptor(row_tuples[i]));
+    DCHECK(tuple_desc_map_.back() != NULL);
+  }
+
+  // find max id
+  TupleId max_id = 0;
+  for (int i = 0; i < tuple_desc_map_.size(); ++i) {
+    max_id = max(tuple_desc_map_[i]->id(), max_id);
+  }
+
+  tuple_idx_map_.resize(max_id + 1, INVALID_IDX);
+  for (int i = 0; i < tuple_desc_map_.size(); ++i) {
+    tuple_idx_map_[tuple_desc_map_[i]->id()] = i;
+  }
+}
+
+int RowDescriptor::GetRowSize() const {
+  int size = 0;
+  for (int i = 0; i < tuple_desc_map_.size(); ++i) {
+    size += tuple_desc_map_[i]->byte_size();
+  }
+  return size;
+}
+
 Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tbl,
                              DescriptorTbl** tbl) {
   *tbl = pool->Add(new DescriptorTbl());
+  // deserialize table descriptors first, they are being referenced by tuple descriptors
+  for (size_t i = 0; i < thrift_tbl.tableDescriptors.size(); ++i) {
+    const TTableDescriptor& tdesc = thrift_tbl.tableDescriptors[i];
+    TableDescriptor* desc = NULL;
+    switch (tdesc.tableType) {
+      case TTableType::HDFS_TEXT_TABLE:
+      case TTableType::HDFS_RCFILE_TABLE:
+        desc = pool->Add(new HdfsTableDescriptor(tdesc));
+        break;
+      case TTableType::HBASE_TABLE:
+        desc = pool->Add(new HBaseTableDescriptor(tdesc));
+        break;
+      default:
+        DCHECK(false) << "invalid table type: " << tdesc.tableType;
+    }
+    (*tbl)->tbl_desc_map_[tdesc.id] = desc;
+  }
+
   for (size_t i = 0; i < thrift_tbl.tupleDescriptors.size(); ++i) {
     const TTupleDescriptor& tdesc = thrift_tbl.tupleDescriptors[i];
-    (*tbl)->tuple_desc_map_[tdesc.id] = pool->Add(new TupleDescriptor(tdesc));
+    TupleDescriptor* desc = pool->Add(new TupleDescriptor(tdesc));
+    // fix up table pointer
+    if (tdesc.__isset.tableId) {
+      desc->table_desc_ = (*tbl)->GetTableDescriptor(tdesc.tableId);
+      DCHECK(desc->table_desc_ != NULL);
+    }
+    (*tbl)->tuple_desc_map_[tdesc.id] = desc;
   }
+
   for (size_t i = 0; i < thrift_tbl.slotDescriptors.size(); ++i) {
     const TSlotDescriptor& tdesc = thrift_tbl.slotDescriptors[i];
     SlotDescriptor* slot_d = pool->Add(new SlotDescriptor(tdesc));
@@ -191,6 +232,16 @@ Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tb
     entry->second->AddSlot(slot_d);
   }
   return Status::OK;
+}
+
+TableDescriptor* DescriptorTbl::GetTableDescriptor(TableId id) const {
+  // TODO: is there some boost function to do exactly this?
+  TableDescriptorMap::const_iterator i = tbl_desc_map_.find(id);
+  if (i == tbl_desc_map_.end()) {
+    return NULL;
+  } else {
+    return i->second;
+  }
 }
 
 TupleDescriptor* DescriptorTbl::GetTupleDescriptor(TupleId id) const {

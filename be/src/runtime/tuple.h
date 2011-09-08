@@ -4,6 +4,7 @@
 #define IMPALA_RUNTIME_TUPLE_H
 
 #include <cstring>
+#include <glog/logging.h>
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
 
@@ -58,14 +59,17 @@ class Tuple {
   }
 
   void* GetSlot(int offset) {
+    DCHECK(offset != -1);  // 0 offset indicates non-materialized slot
     return reinterpret_cast<char*>(this) + offset;
   }
 
   const void* GetSlot(int offset) const {
+    DCHECK(offset != -1);  // 0 offset indicates non-materialized slot
     return reinterpret_cast<const char*>(this) + offset;
   }
 
   StringValue* GetStringSlot(int offset) {
+    DCHECK(offset != -1);  // 0 offset indicates non-materialized slot
     return reinterpret_cast<StringValue*>(reinterpret_cast<char*>(this) + offset);
   }
 

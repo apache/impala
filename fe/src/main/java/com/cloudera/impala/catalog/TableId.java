@@ -1,23 +1,24 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
-package com.cloudera.impala.analysis;
+package com.cloudera.impala.catalog;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import com.cloudera.impala.common.Id;
 import com.google.common.collect.Lists;
 
-public class TupleId extends Id {
-  public TupleId() {
+public class TableId extends Id {
+  public TableId() {
     super();
   }
 
-  public TupleId(int id) {
+  public TableId(int id) {
     super(id);
   }
 
-  public ArrayList<TupleId> asList() {
-    ArrayList<TupleId> list = Lists.newArrayList();
+  public List<TableId> asList() {
+    ArrayList<TableId> list = Lists.newArrayList();
     list.add(this);
     return list;
   }

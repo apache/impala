@@ -7,6 +7,7 @@
 #include <sstream>
 
 #include "common/status.h"
+#include "runtime/descriptors.h"  // for RowDescriptor
 
 namespace impala {
 
@@ -22,7 +23,7 @@ class TupleRow;
 class ExecNode {
  public:
   // Init conjuncts.
-  ExecNode(ObjectPool* pool, const TPlanNode& tnode);
+  ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
   // Sets up internal structures, etc., without doing any actual work.
   // Must be called prior to Open(). Will only be called once in this
@@ -51,7 +52,8 @@ class ExecNode {
   // Creates exec node tree from list of nodes contained in plan via depth-first
   // traversal. All nodes are placed in pool.
   // Returns error if 'plan' is corrupted, otherwise success.
-  static Status CreateTree(ObjectPool* pool, const TPlan& plan, ExecNode** root);
+  static Status CreateTree(ObjectPool* pool, const TPlan& plan,
+                           const DescriptorTbl& descs, ExecNode** root);
 
   // Returns a string representation in DFS order of the plan rooted at this.
   std::string DebugString() const;
@@ -64,15 +66,19 @@ class ExecNode {
   //   out: Stream to accumulate debug string.
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
+  const RowDescriptor& row_desc() const { return row_descriptor_; }
+
  protected:
   std::vector<Expr*> conjuncts_;
   std::vector<ExecNode*> children_;
+  RowDescriptor row_descriptor_;
 
   // Create a single exec node derived from thrift node; place exec node in 'pool'.
-  static Status CreateNode(ObjectPool* pool, const TPlanNode& tnode, ExecNode** node);
+  static Status CreateNode(ObjectPool* pool, const TPlanNode& tnode,
+                           const DescriptorTbl& descs, ExecNode** node);
 
   static Status CreateTreeHelper(ObjectPool* pool, const std::vector<TPlanNode>& tnodes,
-      ExecNode* parent, int* node_idx, ExecNode** root);
+      const DescriptorTbl& descs, ExecNode* parent, int* node_idx, ExecNode** root);
 
   void PrepareConjuncts(RuntimeState* state);
 

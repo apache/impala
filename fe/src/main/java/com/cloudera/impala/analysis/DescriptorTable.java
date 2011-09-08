@@ -4,8 +4,11 @@ package com.cloudera.impala.analysis;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 
+import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.thrift.TDescriptorTable;
+import com.google.common.collect.Sets;
 
 /**
  * Repository for tuple (and slot) descriptors.
@@ -58,11 +61,18 @@ public class DescriptorTable {
 
   public TDescriptorTable toThrift() {
     TDescriptorTable result = new TDescriptorTable();
+    HashSet<Table> referencedTbls = Sets.newHashSet();
     for (TupleDescriptor tupleD: tupleDescs.values()) {
       result.addToTupleDescriptors(tupleD.toThrift());
+      if (tupleD.getTable() != null) {
+        referencedTbls.add(tupleD.getTable());
+      }
       for (SlotDescriptor slotD: tupleD.getSlots()) {
         result.addToSlotDescriptors(slotD.toThrift());
       }
+    }
+    for (Table tbl: referencedTbls) {
+      result.addToTableDescriptors(tbl.toThrift());
     }
     return result;
   }

@@ -13,7 +13,7 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
   }
 
   public NodeType getChild(int i) {
-    return children.get(i);
+    return hasChild(i) ? children.get(i) : null;
   }
 
   public boolean hasChild(int i) {

@@ -22,6 +22,7 @@ public class AggregationNode extends PlanNode {
     super(aggInfo.getAggTupleId().asList());
     this.aggInfo = aggInfo;
     this.children.add(input);
+    this.rowTupleIds.add(aggInfo.getAggTupleId());
   }
 
   @Override

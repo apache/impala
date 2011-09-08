@@ -7,6 +7,7 @@ include "Types.thrift"
 
 typedef i32 TTupleId
 typedef i32 TSlotId
+typedef i32 TTableId
 
 struct TSlotDescriptor {
   1: required TSlotId id
@@ -16,6 +17,7 @@ struct TSlotDescriptor {
   5: required i32 byteOffset  // into tuple
   6: required i32 nullIndicatorByte
   7: required i32 nullIndicatorBit
+  8: required bool isMaterialized
 }
 
 enum TTableType {
@@ -40,21 +42,25 @@ struct THBaseTable {
 }
 
 // "Union" of all table types.
-struct TTable {
-  1: required TTableType tableType
-  2: required i32 numCols
-  3: required i32 numClusteringCols
-  4: optional THdfsTable hdfsTable
-  5: optional THBaseTable hbaseTable
+struct TTableDescriptor {
+  1: required TTableId id
+  2: required TTableType tableType
+  3: required i32 numCols
+  4: required i32 numClusteringCols
+  5: optional THdfsTable hdfsTable
+  6: optional THBaseTable hbaseTable
 }
 
 struct TTupleDescriptor {
   1: required TTupleId id
   2: required i32 byteSize
-  3: optional TTable table
+  3: optional TTableId tableId
 }
 
 struct TDescriptorTable {
   1: required list<TSlotDescriptor> slotDescriptors;
   2: required list<TTupleDescriptor> tupleDescriptors;
+
+  // all table descriptors referenced by tupleDescriptors
+  3: required list<TTableDescriptor> tableDescriptors;
 }

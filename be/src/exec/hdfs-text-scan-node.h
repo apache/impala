@@ -12,6 +12,7 @@
 
 namespace impala {
 
+class DescriptorTbl;
 class TPlanNode;
 class RowBatch;
 class Status;
@@ -48,7 +49,7 @@ class TextConverter;
 // a separate helper class
 class HdfsTextScanNode : public ExecNode {
  public:
-  HdfsTextScanNode(ObjectPool* pool, const TPlanNode& tnode);
+  HdfsTextScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
   // Allocates tuple buffer.
   // Sets tuple_idx_ and tuple_desc_ using RuntimeState.
