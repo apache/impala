@@ -16,8 +16,8 @@ BinaryPredicate::BinaryPredicate(const TExprNode& node)
   : Predicate(node), op_(node.op) {
 }
 
-Status BinaryPredicate::Prepare(RuntimeState* state) {
-  Expr::Prepare(state);
+Status BinaryPredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
+  Expr::Prepare(state, row_desc);
   PrimitiveType op_type = children_[0]->type();
   DCHECK(type_ != INVALID_TYPE);
   DCHECK_EQ(children_.size(), 2);

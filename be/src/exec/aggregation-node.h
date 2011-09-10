@@ -59,7 +59,7 @@ class AggregationNode : public ExecNode {
     void Init(TupleDescriptor* agg_tuple_d, const std::vector<Expr*>& grouping_exprs);
 
     // Return true if grouping slots of a and b are equal, otherwise false.
-    // If a is NULL, compares a with computed grouping exprs of
+    // If a is NULL, compares b with computed grouping exprs of
     // AggregationNode::current_row_.
     bool operator()(Tuple* const& a, Tuple* const& b) const;
 

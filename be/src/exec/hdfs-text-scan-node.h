@@ -4,6 +4,7 @@
 #define IMPALA_EXEC_HDFS_TEXT_SCAN_NODE_H_
 
 #include <vector>
+#include <memory>
 #include <stdint.h>
 #include <hdfs.h>
 #include <boost/scoped_ptr.hpp>
@@ -107,16 +108,18 @@ class HdfsTextScanNode : public ExecNode {
   // Ignored if strings_are_quoted_ is false.
   char string_quote_;
 
-  // Memory pools created in c'tor and destroyed in d'tor.
+  // Memory pools created in c'tor and destroyed in d'tor. These are auto_ptrs, as opposed
+  // to scoped_ptrs, because we need to be able to pass them up via the output RowBatch
+  // of GetNext().
 
   // Pool for allocating tuple buffer.
-  boost::scoped_ptr<MemPool> tuple_buf_pool_;
+  std::auto_ptr<MemPool> tuple_buf_pool_;
 
   // Pool for allocating file buffers;
-  boost::scoped_ptr<MemPool> file_buf_pool_;
+  std::auto_ptr<MemPool> file_buf_pool_;
 
   // Pool for allocating memory for variable-length slots.
-  boost::scoped_ptr<MemPool> var_len_pool_;
+  std::auto_ptr<MemPool> var_len_pool_;
 
   // Pool for allocating objects.
   // Currently only used for creating LiteralExprs from TExpr for partition keys in Prepare().

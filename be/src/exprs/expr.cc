@@ -271,16 +271,17 @@ void Expr::PrintValue(void* value, string* str) {
   RawValue::PrintValue(value, type_, str);
 }
 
-Status Expr::Prepare(RuntimeState* state) {
+Status Expr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   for (int i = 0; i < children_.size(); ++i) {
-    RETURN_IF_ERROR(children_[i]->Prepare(state));
+    RETURN_IF_ERROR(children_[i]->Prepare(state, row_desc));
   }
   return Status::OK;
 }
 
-Status Expr::Prepare(const std::vector<Expr*>& exprs, RuntimeState* state) {
+Status Expr::Prepare(const std::vector<Expr*>& exprs, RuntimeState* state,
+                     const RowDescriptor& row_desc) {
   for (int i = 0; i < exprs.size(); ++i) {
-    RETURN_IF_ERROR(exprs[i]->Prepare(state));
+    RETURN_IF_ERROR(exprs[i]->Prepare(state, row_desc));
   }
   return Status::OK;
 }

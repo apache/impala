@@ -15,7 +15,7 @@ class NullLiteral: public Expr {
 
   NullLiteral(const TExprNode& node);
 
-  virtual Status Prepare(RuntimeState* state);
+  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
 
  private:
   static void* ReturnValue(Expr* e, TupleRow* row);

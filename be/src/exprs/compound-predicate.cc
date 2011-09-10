@@ -67,8 +67,8 @@ void* CompoundPredicate::NotComputeFunction(Expr* e, TupleRow* row) {
   return &p->result_.bool_val;
 }
 
-Status CompoundPredicate::Prepare(RuntimeState* state) {
-  Expr::Prepare(state);
+Status CompoundPredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
+  Expr::Prepare(state, row_desc);
   DCHECK(type_ != INVALID_TYPE);
   DCHECK_LE(children_.size(), 2);
   switch (op_) {

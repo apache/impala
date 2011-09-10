@@ -25,7 +25,8 @@ struct THBaseFilter {
   1: required string family
   2: required string qualifier
   // Ordinal number into enum HBase CompareFilter.CompareOp. 
-  // We don't use TExprOperator because the op is interpreted by an HBase Filter, and not the c++ expr eval.
+  // We don't use TExprOperator because the op is interpreted by an HBase Filter, and
+  // not the c++ expr eval.
   3: required i32 op_ordinal
   4: required string filter_constant
 }

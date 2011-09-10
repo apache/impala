@@ -19,8 +19,8 @@ CastExpr::CastExpr(const TExprNode& node)
   : Expr(node) {
 }
 
-Status CastExpr::Prepare(RuntimeState* state) {
-  Expr::Prepare(state);
+Status CastExpr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
+  Expr::Prepare(state, row_desc);
   DCHECK(type_ != INVALID_TYPE);
   DCHECK_LE(children_.size(), 1);
   switch (children_[0]->type()) {

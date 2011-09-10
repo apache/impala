@@ -65,6 +65,7 @@ ostream& operator<<(ostream& os, const NullIndicatorOffset& null_indicator) {
 SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc)
   : id_(tdesc.id),
     type_(ThriftToType(tdesc.slotType)),
+    parent_(tdesc.parent),
     col_pos_(tdesc.columnPos),
     tuple_offset_(tdesc.byteOffset),
     null_indicator_offset_(tdesc.nullIndicatorByte, tdesc.nullIndicatorBit),
@@ -185,6 +186,11 @@ int RowDescriptor::GetRowSize() const {
     size += tuple_desc_map_[i]->byte_size();
   }
   return size;
+}
+
+int RowDescriptor::GetTupleIdx(TupleId id) const {
+  DCHECK_LT(id, tuple_idx_map_.size());
+  return tuple_idx_map_[id];
 }
 
 Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tbl,

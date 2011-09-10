@@ -51,8 +51,8 @@ void* IntLiteral::ReturnBigintValue(Expr* e, TupleRow* row) {
   return &l->result_.bigint_val;
 }
 
-Status IntLiteral::Prepare(RuntimeState* state) {
-  Expr::Prepare(state);
+Status IntLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
+  Expr::Prepare(state, row_desc);
   switch (type_) {
     case TYPE_TINYINT:
       compute_function_ = ReturnTinyintValue;

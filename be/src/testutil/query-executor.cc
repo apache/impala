@@ -160,7 +160,7 @@ Status QueryExecutor::Exec(const std::string& query, vector<PrimitiveType>* col_
   }
 
   for (int i = 0; i < select_list_exprs_.size(); ++i) {
-    select_list_exprs_[i]->Prepare(runtime_state);
+    select_list_exprs_[i]->Prepare(runtime_state, plan_root->row_desc());
     if (col_types != NULL) col_types->push_back(select_list_exprs_[i]->type());
   }
   if (plan_root != NULL) {

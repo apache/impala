@@ -35,8 +35,8 @@ void* FloatLiteral::ReturnDoubleValue(Expr* e, TupleRow* row) {
   return &l->result_.double_val;
 }
 
-Status FloatLiteral::Prepare(RuntimeState* state) {
-  Expr::Prepare(state);
+Status FloatLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
+  Expr::Prepare(state, row_desc);
   switch (type_) {
     case TYPE_FLOAT:
       compute_function_ = ReturnFloatValue;

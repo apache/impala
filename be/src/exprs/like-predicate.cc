@@ -71,8 +71,8 @@ void* LikePredicate::RegexFn(Expr* e, TupleRow* row) {
   return RegexMatch(e, row, false);
 }
 
-Status LikePredicate::Prepare(RuntimeState* state) {
-  Expr::Prepare(state);
+Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
+  Expr::Prepare(state, row_desc);
   DCHECK_EQ(children_.size(), 2);
   if (GetChild(1)->IsConstant()) {
     // determine pattern and decide on eval fn

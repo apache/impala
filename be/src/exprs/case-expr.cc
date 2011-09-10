@@ -19,8 +19,8 @@ CaseExpr::CaseExpr(const TExprNode& node)
     has_else_expr_(node.case_expr.has_else_expr) {
 }
 
-Status CaseExpr::Prepare(RuntimeState* state) {
-  Expr::Prepare(state);
+Status CaseExpr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
+  Expr::Prepare(state, row_desc);
   compute_function_ = ComputeFunction;
   return Status::OK;
 }

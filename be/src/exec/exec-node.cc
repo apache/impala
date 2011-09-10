@@ -9,6 +9,7 @@
 #include "common/status.h"
 #include "exprs/expr.h"
 #include "exec/aggregation-node.h"
+#include "exec/hash-join-node.h"
 #include "exec/hdfs-text-scan-node.h"
 #include "exec/hbase-scan-node.h"
 #include "runtime/descriptors.h"
@@ -20,7 +21,7 @@ using namespace std;
 namespace impala {
 
 ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-  : row_descriptor_(descs, tnode.row_tuples) {
+  : pool_(pool), row_descriptor_(descs, tnode.row_tuples) {
   Status status = Expr::CreateExprTrees(pool, tnode.conjuncts, &conjuncts_);
   DCHECK(status.ok())
       << "ExecNode c'tor: deserialization of conjuncts failed:\n"
@@ -98,6 +99,9 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
     case TPlanNodeType::AGGREGATION_NODE:
       *node = pool->Add(new AggregationNode(pool, tnode, descs));
       return Status::OK;
+    case TPlanNodeType::HASH_JOIN_NODE:
+      *node = pool->Add(new HashJoinNode(pool, tnode, descs));
+      return Status::OK;
     default:
       map<int, const char*>::const_iterator i =
           _TPlanNodeType_VALUES_TO_NAMES.find(tnode.node_type);
@@ -127,7 +131,7 @@ void ExecNode::DebugString(int indentation_level, std::stringstream* out) const 
 
 void ExecNode::PrepareConjuncts(RuntimeState* state) {
   for (vector<Expr*>::iterator i = conjuncts_.begin(); i != conjuncts_.end(); ++i) {
-    (*i)->Prepare(state);
+    (*i)->Prepare(state, row_desc());
   }
 }
 

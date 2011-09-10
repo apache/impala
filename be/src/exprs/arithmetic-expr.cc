@@ -18,8 +18,8 @@ ArithmeticExpr::ArithmeticExpr(const TExprNode& node)
 
 // TODO: replace this with a generic function registry
 // (registered by opcode and parameter types)
-Status ArithmeticExpr::Prepare(RuntimeState* state) {
-  Expr::Prepare(state);
+Status ArithmeticExpr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
+  Expr::Prepare(state, row_desc);
   DCHECK(type_ != INVALID_TYPE);
   DCHECK_LE(children_.size(), 2);
   DCHECK(children_.size() == 1 || children_[0]->type() == children_[1]->type());

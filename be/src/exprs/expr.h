@@ -15,6 +15,7 @@
 namespace impala {
 
 class ObjectPool;
+class RowDescriptor;
 class RuntimeState;
 class TColumnValue;
 class TExpr;
@@ -70,7 +71,7 @@ class Expr {
   // Prepare expr tree for evaluation. In particular, set compute_function_.
   // This implementation simply invokes it recursively for the entire tree.
   // Return OK if successful, otherwise return error status.
-  virtual Status Prepare(RuntimeState* state);
+  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
 
   // Evaluate expr and return pointer to result. The result is
   // valid as long as 'row' doesn't change.
@@ -118,7 +119,8 @@ class Expr {
                                 std::vector<Expr*>* exprs);
 
   // Prepare all exprs.
-  static Status Prepare(const std::vector<Expr*>& exprs, RuntimeState* state);
+  static Status Prepare(const std::vector<Expr*>& exprs, RuntimeState* state,
+                        const RowDescriptor& row_desc);
 
   virtual std::string DebugString() const;
   static std::string DebugString(const std::vector<Expr*>& exprs);
@@ -170,7 +172,7 @@ class SlotRef : public Expr {
  public:
   SlotRef(const TExprNode& node);
 
-  virtual Status Prepare(RuntimeState* state);
+  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
   static void* ComputeFunction(Expr* expr, TupleRow* row);
   virtual std::string DebugString() const;
   virtual bool IsConstant() const { return false; }
@@ -190,6 +192,7 @@ inline void* SlotRef::ComputeFunction(Expr* expr, TupleRow* row) {
 }
 
 inline void* Expr::GetValue(TupleRow* row) {
+  DCHECK(type_ != INVALID_TYPE);
   if (is_slotref_) {
     return SlotRef::ComputeFunction(this, row);
   } else {

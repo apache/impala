@@ -28,8 +28,9 @@ string PrintTuple(Tuple* t, const TupleDescriptor& d) {
     SlotDescriptor* slot_d = d.slots()[i];
     if (!slot_d->is_materialized()) continue;
     if (first_value) {
-      out << " ";
       first_value = false;
+    } else {
+      out << " ";
     }
     if (t->IsNull(slot_d->null_indicator_offset())) {
       out << "null";
@@ -48,7 +49,6 @@ string PrintRow(TupleRow* row, const RowDescriptor& d) {
   stringstream out;
   out << "[";
   for (int i = 0; i < d.tuple_descriptors().size(); ++i) {
-     if (i > 0) out << "\n";
      out << PrintTuple(row->GetTuple(i), *d.tuple_descriptors()[i]);
   }
   out << "]";

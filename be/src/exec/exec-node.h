@@ -69,9 +69,12 @@ class ExecNode {
   const RowDescriptor& row_desc() const { return row_descriptor_; }
 
  protected:
+  ObjectPool* pool_;
   std::vector<Expr*> conjuncts_;
   std::vector<ExecNode*> children_;
   RowDescriptor row_descriptor_;
+
+  ExecNode* child(int i) { return children_[i]; }
 
   // Create a single exec node derived from thrift node; place exec node in 'pool'.
   static Status CreateNode(ObjectPool* pool, const TPlanNode& tnode,

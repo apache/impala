@@ -110,8 +110,8 @@ bool AggregationNode::GroupingExprEquals::operator()(
 Status AggregationNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   agg_tuple_desc_ = state->descs().GetTupleDescriptor(agg_tuple_id_);
-  Expr::Prepare(grouping_exprs_, state);
-  Expr::Prepare(aggregate_exprs_, state);
+  Expr::Prepare(grouping_exprs_, state, child(0)->row_desc());
+  Expr::Prepare(aggregate_exprs_, state, child(0)->row_desc());
   input_tuple_descs_ = children_[0]->row_desc().tuple_descriptors();
   hash_fn_.Init(agg_tuple_desc_, grouping_exprs_);
   equals_fn_.Init(agg_tuple_desc_, grouping_exprs_);

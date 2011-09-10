@@ -6,6 +6,7 @@
 #include <glog/logging.h>
 
 #include "common/status.h"
+#include "exec/exec-node.h"
 #include "exec/hbase-table-scanner.h"
 #include "exprs/expr.h"
 #include "runtime/row-batch.h"
@@ -73,7 +74,7 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecPlan(
 
   // Prepare select list expressions.
   for (size_t i = 0; i < select_list_exprs.size(); ++i) {
-    select_list_exprs[i]->Prepare(executor->runtime_state());
+    select_list_exprs[i]->Prepare(executor->runtime_state(), adaptor.plan()->row_desc());
   }
 
   if (adaptor.plan() == NULL) {
@@ -124,7 +125,7 @@ JNIEXPORT jboolean JNICALL Java_com_cloudera_impala_service_NativeBackend_EvalPr
     return false;
   }
 
-  e->Prepare(NULL);
+  e->Prepare(NULL, RowDescriptor());
   bool* v = static_cast<bool*>(e->GetValue(NULL));
   return *v;
 }

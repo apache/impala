@@ -20,8 +20,8 @@ void* StringLiteral::ComputeFunction(Expr* e, TupleRow* row) {
   return &l->result_.string_val;
 }
 
-Status StringLiteral::Prepare(RuntimeState* state) {
-  Expr::Prepare(state);
+Status StringLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
+  Expr::Prepare(state, row_desc);
   compute_function_ = ComputeFunction;
   return Status::OK;
 }

@@ -15,6 +15,7 @@
 #include "util/jni-util.h"
 
 DEFINE_string(query, "", "query to execute");
+DEFINE_bool(init_hbase, true, "if true, call hbase jni initialization");
 
 using namespace std;
 using namespace impala;
@@ -62,8 +63,10 @@ int main(int argc, char** argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);
 
   EXIT_IF_ERROR(JniUtil::Init());
-  EXIT_IF_ERROR(HBaseTableScanner::Init());
-  EXIT_IF_ERROR(RuntimeState::InitHBaseConf());
+  if (FLAGS_init_hbase) {
+    EXIT_IF_ERROR(HBaseTableScanner::Init());
+    EXIT_IF_ERROR(RuntimeState::InitHBaseConf());
+  }
   EXIT_IF_ERROR(PlanExecutorAdaptor::Init());
 
   Exec();

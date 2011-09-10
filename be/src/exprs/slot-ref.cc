@@ -13,13 +13,14 @@ namespace impala {
 
 SlotRef::SlotRef(const TExprNode& node)
   : Expr(node, true),
+    slot_offset_(-1),  // invalid
     null_indicator_offset_(0, 0),
     slot_id_(node.slot_ref.slot_id) {
     // slot_/null_indicator_offset_ are set in Prepare()
 }
 
-Status SlotRef::Prepare(RuntimeState* state) {
-  Expr::Prepare(state);
+Status SlotRef::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
+  Expr::Prepare(state, row_desc);
   const SlotDescriptor* slot_desc  = state->descs().GetSlotDescriptor(slot_id_);
   if (slot_desc == NULL) {
     // TODO: create macro MAKE_ERROR() that returns a stream
@@ -33,9 +34,10 @@ Status SlotRef::Prepare(RuntimeState* state) {
     return Status(error.str());
   }
   // TODO(marcel): get from runtime state
-  this->tuple_idx_ = 0;
-  this->slot_offset_ = slot_desc->tuple_offset();
-  this->null_indicator_offset_ = slot_desc->null_indicator_offset();
+  tuple_idx_ = row_desc.GetTupleIdx(slot_desc->parent());
+  DCHECK(tuple_idx_ != RowDescriptor::INVALID_IDX);
+  slot_offset_ = slot_desc->tuple_offset();
+  null_indicator_offset_ = slot_desc->null_indicator_offset();
   return Status::OK;
 }
 

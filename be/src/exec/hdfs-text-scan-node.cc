@@ -112,7 +112,7 @@ Status HdfsTextScanNode::Prepare(RuntimeState* state) {
 
   // Prepare key_values_.
   for (int i = 0; i < key_values_.size(); ++i) {
-    key_values_[i]->Prepare(state);
+    key_values_[i]->Prepare(state, row_desc());
   }
 
   // Allocate tuple buffer.
@@ -216,8 +216,9 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
       // a) file buffer has been completely parsed or
       // b) tuple buffer is full
       // c) a parsing error was encountered and the user requested to abort on errors.
-      RETURN_IF_ERROR(ParseFileBuffer(state, row_batch, &row_idx, &column_idx, &last_char_is_escape,
-          &unescape_string, &quote_char, &error_in_row, &num_errors));
+      RETURN_IF_ERROR(
+          ParseFileBuffer(state, row_batch, &row_idx, &column_idx, &last_char_is_escape,
+                          &unescape_string, &quote_char, &error_in_row, &num_errors));
 
       if (row_batch->IsFull()) {
         // Swap file buffers, so previous buffer is always found at index 0,
@@ -246,9 +247,9 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
   }
 
   // No more work to be done. Clean up all pools with the last row batch.
-  row_batch->AddMemPool(tuple_buf_pool_.get());
-  row_batch->AddMemPool(file_buf_pool_.get());
-  row_batch->AddMemPool(var_len_pool_.get());
+  row_batch->AddMemPool(&tuple_buf_pool_);
+  row_batch->AddMemPool(&file_buf_pool_);
+  row_batch->AddMemPool(&var_len_pool_);
 
   // We have read all partitions (tuple buffer not necessarily full).
   return Status::OK;

@@ -11,6 +11,8 @@ set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/exec")
 add_library(Exec STATIC
   aggregation-node.cc
   exec-node.cc
+  hash-join-node.cc
+  hash-table.cc
   hdfs-text-scan-node.cc
   hbase-scan-node.cc
   hbase-table-scanner.cc

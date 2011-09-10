@@ -48,7 +48,9 @@ std::ostream& operator<<(std::ostream& os, const NullIndicatorOffset& null_indic
 
 class SlotDescriptor {
  public:
+  SlotId id() const { return id_; }
   PrimitiveType type() const { return type_; }
+  TupleId parent() const { return parent_; }
   int col_pos() const { return col_pos_; }
   int tuple_offset() const { return tuple_offset_; }
   const NullIndicatorOffset& null_indicator_offset() const {
@@ -63,6 +65,7 @@ class SlotDescriptor {
 
   const SlotId id_;
   const PrimitiveType type_;
+  const TupleId parent_;
   const int col_pos_;
   const int tuple_offset_;
   const NullIndicatorOffset null_indicator_offset_;
@@ -180,6 +183,9 @@ class DescriptorTbl {
 class RowDescriptor {
  public:
   RowDescriptor(const DescriptorTbl& desc_tbl, const std::vector<TTupleId>& row_tuples);
+
+  // dummy descriptor, needed for the JNI EvalPredicate() function
+  RowDescriptor() {}
 
   // Returns total size in bytes.
   int GetRowSize() const;

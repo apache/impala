@@ -58,6 +58,7 @@ public class QueryTest {
     runTests("hbase-scan-node", false, 1000);
     runTests("hbase-rowkeys", false, 1000);
     runTests("hbase-filters", false, 1000);
+    runTests("joins", false, 1000);
 
     // check whether any of the tests had errors
     if (testErrorLog.length() != 0) {
