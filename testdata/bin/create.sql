@@ -13,14 +13,38 @@ CREATE TABLE AllTypes (
 partitioned by (year int, month int)
 row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
 
+DROP TABLE IF EXISTS AllTypes_rc;
+CREATE TABLE AllTypes_rc (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string)
+partitioned by (year int, month int)
+STORED AS RCFILE;
+
 DROP TABLE IF EXISTS AllTypesSmall;
 CREATE TABLE AllTypesSmall LIKE AllTypes;
+
+DROP TABLE IF EXISTS AllTypesSmall_rc;
+CREATE TABLE AllTypesSmall_rc LIKE AllTypes_rc;
 
 DROP TABLE IF EXISTS AlltypesError;
 CREATE TABLE AllTypesError LIKE AllTypes;
 
+DROP TABLE IF EXISTS AlltypesError_rc;
+CREATE TABLE AllTypesError_rc LIKE AllTypes_rc;
+
 DROP TABLE IF EXISTS AlltypesErrorNoNulls;
 CREATE TABLE AllTypesErrorNoNulls LIKE AllTypes;
+
+DROP TABLE IF EXISTS AlltypesErrorNoNulls_rc;
+CREATE TABLE AllTypesErrorNoNulls_rc LIKE AllTypes_rc;
 
 DROP TABLE IF EXISTS AllTypesAgg;
 CREATE TABLE AllTypesAgg (
@@ -37,8 +61,26 @@ CREATE TABLE AllTypesAgg (
 partitioned by (year int, month int, day int)
 row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
 
+DROP TABLE IF EXISTS AllTypesAgg_rc;
+CREATE TABLE AllTypesAgg_rc (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string)
+partitioned by (year int, month int, day int)
+STORED AS RCFILE;
+
 DROP TABLE IF EXISTS AllTypesAggNoNulls;
 CREATE TABLE AllTypesAggNoNulls LIKE AllTypesAgg;
+
+DROP TABLE IF EXISTS AllTypesAggNoNulls_rc;
+CREATE TABLE AllTypesAggNoNulls_rc LIKE AllTypesAgg_rc;
 
 DROP TABLE IF EXISTS DelimErrorTable;
 CREATE TABLE DelimErrorTable (
@@ -57,6 +99,13 @@ CREATE TABLE TestTbl (
   name string,
   zip int)
 row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
+
+DROP TABLE IF EXISTS TestTbl_rc;
+CREATE TABLE TestTbl_rc (
+  id bigint,
+  name string,
+  zip int)
+STORED AS RCFILE;
 
 CREATE DATABASE IF NOT EXISTS testdb1;
 

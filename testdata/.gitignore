@@ -15,3 +15,6 @@ target
 
 # emacs backup files
 *~
+
+HBaseAllTypesError
+HBaseAllTypesErrorNoNulls

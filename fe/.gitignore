@@ -23,3 +23,5 @@ src/test/resources/hive-site.xml
 src/test/resources/hbase-site.xml
 
 derby.log
+
+TempStatsStore

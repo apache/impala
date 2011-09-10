@@ -83,19 +83,28 @@ public class CatalogTest {
     assertNotNull(testDb);
     assertEquals(testDb.getName(), "testdb1");
 
-    assertEquals(13, defaultDb.getTables().size());
+    assertEquals(20, defaultDb.getTables().size());
     assertNotNull(defaultDb.getTable("alltypes"));
+    assertNotNull(defaultDb.getTable("alltypes_rc"));
     assertNotNull(defaultDb.getTable("alltypessmall"));
+    assertNotNull(defaultDb.getTable("alltypessmall_rc"));
     assertNotNull(defaultDb.getTable("alltypeserror"));
+    assertNotNull(defaultDb.getTable("alltypeserror_rc"));
+    assertNotNull(defaultDb.getTable("alltypeserrornonulls"));
+    assertNotNull(defaultDb.getTable("alltypeserrornonulls_rc"));
     assertNotNull(defaultDb.getTable("alltypesagg"));
+    assertNotNull(defaultDb.getTable("alltypesagg_rc"));
     assertNotNull(defaultDb.getTable("alltypesaggnonulls"));
+    assertNotNull(defaultDb.getTable("alltypesaggnonulls_rc"));
     assertNotNull(defaultDb.getTable("testtbl"));
+    assertNotNull(defaultDb.getTable("testtbl_rc"));
     assertNotNull(defaultDb.getTable("liketbl"));
     assertNotNull(defaultDb.getTable("hbasealltypessmall"));
     assertNotNull(defaultDb.getTable("hbasealltypeserror"));
     assertNotNull(defaultDb.getTable("hbasealltypeserrornonulls"));
     assertNotNull(defaultDb.getTable("hbasealltypesagg"));
     assertNotNull(defaultDb.getTable("hbasestringids"));
+
     // testdb contains tables alltypes and testtbl.
     assertEquals(2, testDb.getTables().size());
     assertNotNull(testDb.getTable("alltypes"));
