@@ -43,13 +43,131 @@ LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesError/0901.txt' OVER
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesError/0902.txt' OVERWRITE INTO TABLE AllTypesError PARTITION(year=2009, month=2);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesError/0903.txt' OVERWRITE INTO TABLE AllTypesError PARTITION(year=2009, month=3);
 
-INSERT OVERWRITE TABLE alltypeserror_rc partition (year, month)
-SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, year, month
-FROM alltypeserror;
+
+-- Load broken data into the AllTypesError_rc table.
+-- This is a multistep process since we have to prevent
+-- Hive from interpreting the data while streaming it
+-- from the AllTypesError table into the AllTypesError_rc table.
+
+-- Step 1: Create a temporary EXTERNAL table on top of the AllTypesError
+-- table that interprets all fields as STRINGs:
+CREATE EXTERNAL TABLE alltypeserror_tmp (
+  id STRING,
+  bool_col STRING,
+  tinyint_col STRING,
+  smallint_col STRING,
+  int_col STRING,
+  bigint_col STRING,
+  float_col STRING,
+  double_col STRING,
+  date_string_col STRING,
+  string_col STRING)
+PARTITIONED BY (year INT, month INT)
+ROW FORMAT DELIMITED
+  FIELDS TERMINATED BY ','
+  ESCAPED BY '\\'
+STORED AS TEXTFILE
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/alltypeserror';
+
+-- Step 2: Make the Metastore aware of the partition directories:
+ALTER TABLE alltypeserror_tmp ADD
+PARTITION (year=2009, month=1)
+PARTITION (year=2009, month=2)
+PARTITION (year=2009, month=3);
+
+-- Step 3: Create a temporary EXTERNAL table on top of the AllTypesError_rc
+-- table that interprets all fields as STRINGs:
+CREATE EXTERNAL TABLE alltypeserror_rc_tmp (
+  id STRING,
+  bool_col STRING,
+  tinyint_col STRING,
+  smallint_col STRING,
+  int_col STRING,
+  bigint_col STRING,
+  float_col STRING,
+  double_col STRING,
+  date_string_col STRING,
+  string_col STRING)
+PARTITIONED BY (year INT, month INT)
+STORED AS RCFILE
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/alltypeserror_rc';
+
+set hive.exec.dynamic.partition=true;
+set hive.exec.dynamic.partition.mode=nonstrict;
+
+-- Step 4: Stream the data from AllTypesError_tmp into AllTypesError_rc_tmp:
+INSERT OVERWRITE TABLE alltypeserror_rc_tmp PARTITION (year, month)
+SELECT * FROM alltypeserror_tmp;
+
+-- Step 5: Make the Metastore aware of the new partition directories under the
+-- AllTypesError_rc table:
+ALTER TABLE AllTypesError_rc ADD
+PARTITION (year=2009, month=1)
+PARTITION (year=2009, month=2)
+PARTITION (year=2009, month=3);
+
+-- Step 6: Cleanup by dropping the two temporary tables:
+DROP TABLE AllTypesError_tmp;
+DROP TABLE AllTypesError_rc_tmp;
+
 
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesErrorNoNulls/0901.txt' OVERWRITE INTO TABLE AllTypesErrorNoNulls PARTITION(year=2009, month=1);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesErrorNoNulls/0902.txt' OVERWRITE INTO TABLE AllTypesErrorNoNulls PARTITION(year=2009, month=2);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesErrorNoNulls/0903.txt' OVERWRITE INTO TABLE AllTypesErrorNoNulls PARTITION(year=2009, month=3);
+
+
+-- Load data into AllTypesErrorNoNulls_rc following the same steps as above:
+CREATE EXTERNAL TABLE alltypeserrornonulls_tmp (
+  id STRING,
+  bool_col STRING,
+  tinyint_col STRING,
+  smallint_col STRING,
+  int_col STRING,
+  bigint_col STRING,
+  float_col STRING,
+  double_col STRING,
+  date_string_col STRING,
+  string_col STRING)
+PARTITIONED BY (year INT, month INT)
+ROW FORMAT DELIMITED
+  FIELDS TERMINATED BY ','
+  ESCAPED BY '\\'
+STORED AS TEXTFILE
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/alltypeserrornonulls';
+
+ALTER TABLE alltypeserrornonulls_tmp ADD
+PARTITION (year=2009, month=1)
+PARTITION (year=2009, month=2)
+PARTITION (year=2009, month=3);
+
+CREATE EXTERNAL TABLE alltypeserrornonulls_rc_tmp (
+  id STRING,
+  bool_col STRING,
+  tinyint_col STRING,
+  smallint_col STRING,
+  int_col STRING,
+  bigint_col STRING,
+  float_col STRING,
+  double_col STRING,
+  date_string_col STRING,
+  string_col STRING)
+PARTITIONED BY (year INT, month INT)
+STORED AS RCFILE
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/alltypeserrornonulls_rc';
+
+set hive.exec.dynamic.partition=true;
+set hive.exec.dynamic.partition.mode=nonstrict;
+INSERT OVERWRITE TABLE alltypeserrornonulls_rc_tmp PARTITION (year, month)
+SELECT * FROM alltypeserrornonulls_tmp;
+
+ALTER TABLE AllTypesErrorNoNulls_rc ADD
+PARTITION (year=2009, month=1)
+PARTITION (year=2009, month=2)
+PARTITION (year=2009, month=3);
+
+DROP TABLE AllTypesErrorNoNulls_tmp;
+DROP TABLE AllTypesErrorNoNulls_rc_tmp;
+
 
 INSERT OVERWRITE TABLE alltypeserrornonulls_rc partition (year, month)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, year, month

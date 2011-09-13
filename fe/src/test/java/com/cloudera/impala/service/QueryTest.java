@@ -18,7 +18,6 @@ import com.cloudera.impala.testutil.TestUtils;
 public class QueryTest {
   private static Catalog catalog;
   private static Executor executor;
-  private static StringBuilder testErrorLog;
   private final String testDir = "QueryTest";
 
   @BeforeClass
@@ -26,10 +25,9 @@ public class QueryTest {
     HiveMetaStoreClient client = TestSchemaUtils.createClient();
     catalog = new Catalog(client);
     executor = new Executor(catalog);
-    testErrorLog = new StringBuilder();
   }
 
-  private void runTests(String testCase, boolean abortOnError, int maxErrors) {
+  private void runQueryTestFile(String testCase, boolean abortOnError, int maxErrors) {
     String fileName = testDir + "/" + testCase + ".test";
     TestFileParser queryFileParser = new TestFileParser(fileName);
     queryFileParser.open();
@@ -56,29 +54,72 @@ public class QueryTest {
     }
     queryFileParser.close();
     if (errorLog.length() != 0) {
-      testErrorLog.append("\n\n" + testCase + "\n");
-      testErrorLog.append(errorLog);
+      fail(errorLog.toString());
     }
   }
 
   @Test
-  public void Test() {
-    runTests("aggregation", false, 1000);
-    runTests("exprs", false, 1000);
-    runTests("hdfs-scan-node", false, 1000);
-    runTests("hdfs-partitions", false, 1000);
-    runTests("hbase-scan-node", false, 1000);
-    runTests("hbase-rowkeys", false, 1000);
-    runTests("hbase-filters", false, 1000);
-    runTests("joins", false, 1000);
-    runTests("outer-joins", false, 1000);
-    runTests("limit", false, 1000);
-    runTests("top-n", false, 1000);
+  public void TestAggregation() {
+    runQueryTestFile("aggregation", false, 1000);
+  }
 
-    // check whether any of the tests had errors
-    if (testErrorLog.length() != 0) {
-      fail(testErrorLog.toString());
-      //fail(Integer.toString(testErrorLog.length()) + "\n" + testErrorLog.toString());
-    }
+  @Test
+  public void TestExprs() {
+    runQueryTestFile("exprs", false, 1000);
+  }
+
+  @Test
+  public void TestHdfsTextScanNode() {
+    runQueryTestFile("hdfs-scan-node", false, 1000);
+  }
+
+  @Test
+  public void TestHdfsTextPartitions() {
+    runQueryTestFile("hdfs-partitions", false, 1000);
+  }
+
+  @Test
+  public void TestHdfsRCFileScanNode() {
+    runQueryTestFile("hdfs-rcfile-scan-node", false, 1000);
+  }
+
+  @Test
+  public void TestHdfsRCFilePartitions() {
+    runQueryTestFile("hdfs-rcfile-partitions", false, 1000);
+  }
+
+  @Test
+  public void TestHBaseScanNode() {
+    runQueryTestFile("hbase-scan-node", false, 1000);
+  }
+
+  @Test
+  public void TestHBaseRowKeys() {
+    runQueryTestFile("hbase-rowkeys", false, 1000);
+  }
+
+  @Test
+  public void TestHBaseFilters() {
+    runQueryTestFile("hbase-filters", false, 1000);
+  }
+
+  @Test
+  public void TestJoins() {
+    runQueryTestFile("joins", false, 1000);
+  }
+
+  @Test
+  public void TestOuterJoins() {
+    runQueryTestFile("outer-joins", false, 1000);
+  }
+
+  @Test
+  public void TestLimit() {
+    runQueryTestFile("limit", false, 1000);
+  }
+
+  @Test
+  public void TestTopN() {
+    runQueryTestFile("top-n", false, 1000);
   }
 }

@@ -7,5 +7,5 @@ bin=`cd "$bin"; pwd`
 
 cd $IMPALA_FE_DIR
 
-mvn exec:java -Dexec.mainClass=com.cloudera.impala.testutil.PlanService \
+mvn -e exec:java -Dexec.mainClass=com.cloudera.impala.testutil.PlanService \
               -Dexec.classpathScope=test

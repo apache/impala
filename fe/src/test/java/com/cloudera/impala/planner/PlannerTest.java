@@ -31,13 +31,12 @@ public class PlannerTest {
   private static Catalog catalog;
   private static AnalysisContext analysisCtxt;
   private final String testDir = "PlannerTest";
-  private static StringBuilder testErrorLog;
 
-  @BeforeClass public static void setUp() throws Exception {
+  @BeforeClass
+  public static void setUp() throws Exception {
     HiveMetaStoreClient client = TestSchemaUtils.createClient();
     catalog = new Catalog(client);
     analysisCtxt = new AnalysisContext(catalog);
-    testErrorLog = new StringBuilder();
   }
 
   private void RunQuery(String query, int numNodes, TestFileParser parser,
@@ -106,7 +105,7 @@ public class PlannerTest {
     }
   }
 
-  private void RunTests(String testCase) {
+  private void runPlannerTestFile(String testCase) {
     String fileName = testDir + "/" + testCase + ".test";
     TestFileParser queryFileParser = new TestFileParser(fileName);
     queryFileParser.open();
@@ -128,23 +127,42 @@ public class PlannerTest {
     }
     queryFileParser.close();
     if (errorLog.length() != 0) {
-      testErrorLog.append("\n\n" + testCase + "\n");
-      testErrorLog.append(errorLog);
+      fail(errorLog.toString());
     }
   }
 
-  @Test public void Test() {
-    RunTests("aggregation");
-    RunTests("hbase");
-    RunTests("hdfs");
-    RunTests("insert");
-    RunTests("joins");
-    RunTests("order");
-    RunTests("topn");
+  @Test
+  public void testAggregation() {
+    runPlannerTestFile("aggregation");
+  }
 
-    // check whether any of the tests had errors
-    if (testErrorLog.length() != 0) {
-      fail(testErrorLog.toString());
-    }
+  @Test
+  public void testHBase() {
+    runPlannerTestFile("hbase");
+  }
+
+  @Test
+  public void testInsert() {
+    runPlannerTestFile("insert");
+  }
+
+  @Test
+  public void testHdfs() {
+    runPlannerTestFile("hdfs");
+  }
+
+  @Test
+  public void testJoins() {
+    runPlannerTestFile("joins");
+  }
+
+  @Test
+  public void testOrder() {
+    runPlannerTestFile("order");
+  }
+
+  @Test
+  public void testTopN() {
+    runPlannerTestFile("topn");
   }
 }

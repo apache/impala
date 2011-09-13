@@ -30,7 +30,8 @@ public class DataErrorsTest {
     testErrorLog = new StringBuilder();
   }
 
-  private void runTests(String testCase, boolean abortOnError, int maxErrors) {
+  private void runErrorTestFile(String testCase, boolean abortOnError, int maxErrors) {
+    StringBuilder errorLog = new StringBuilder();
     String fileName = testDir + "/" + testCase + ".test";
     TestFileParser queryFileParser = new TestFileParser(fileName);
     queryFileParser.open();
@@ -79,18 +80,30 @@ public class DataErrorsTest {
           expectedErrors, expectedFileErrors, testErrorLog);
     }
     queryFileParser.close();
+
+    if (errorLog.length() != 0) {
+      fail(errorLog.toString());
+    }
   }
 
   @Test
-  public void Test() {
-    runTests("hdfs-scan-node-errors", false, 100);
-    runTests("hdfs-scan-node-errors", false, 5);
-    runTests("hdfs-scan-node-errors", true, 1);
-    runTests("hbase-scan-node-errors", false, 100);
-    runTests("hbase-scan-node-errors", false, 5);
-    runTests("hbase-scan-node-errors", true, 1);
-    if (testErrorLog.length() != 0) {
-      fail(testErrorLog.toString());
-    }
+  public void TestHdfsScanNodeErrors() {
+    runErrorTestFile("hdfs-scan-node-errors", false, 100);
+    runErrorTestFile("hdfs-scan-node-errors", false, 5);
+    runErrorTestFile("hdfs-scan-node-errors", true, 1);
+  }
+
+  @Test
+  public void TestHdfsRCFileScanNodeErrors() {
+    runErrorTestFile("hdfs-rcfile-scan-node-errors", false, 100);
+    runErrorTestFile("hdfs-rcfile-scan-node-errors", false, 5);
+    runErrorTestFile("hdfs-rcfile-scan-node-errors", true, 1);
+  }
+  
+  @Test
+  public void TestHBaseScanNodeErrors() {
+    runErrorTestFile("hbase-scan-node-errors", false, 100);
+    runErrorTestFile("hbase-scan-node-errors", false, 5);
+    runErrorTestFile("hbase-scan-node-errors", true, 1);
   }
 }

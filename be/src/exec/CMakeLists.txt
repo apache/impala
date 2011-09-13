@@ -14,10 +14,13 @@ add_library(Exec STATIC
   hash-join-node.cc
   hash-table.cc
   hdfs-text-scan-node.cc
+  hdfs-rcfile-scan-node.cc
   hbase-scan-node.cc
   hbase-table-scanner.cc
   text-converter.cc
   topn-node.cc
+  rcfile-reader.cc
+  serde-utils.cc
 )
 
 target_link_libraries(Exec 

@@ -106,7 +106,7 @@ bool TextConverter::ConvertAndWriteSlotBytes(const char* begin, const char* end,
       DCHECK(false) << "bad slot type: " << TypeToString(slot_desc->type());
   }
   // Set NULL if inconvertible.
-  if (*end_ptr != '\0') {
+  if (*end_ptr != '\0' && slot_desc->type() != TYPE_STRING) {
     tuple->SetNull(slot_desc->null_indicator_offset());
     return false;
   }
