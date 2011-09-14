@@ -231,13 +231,13 @@
         <version>2.3</version>
         <executions>
           <execution>
-            <id>copy-dependencies</id>
+            <id>unpack-dependencies</id>
             <phase>package</phase>
             <goals>
-              <goal>copy-dependencies</goal>
+              <goal>unpack-dependencies</goal>
             </goals>
             <configuration>
-   
+              <excludeTypes>pom</excludeTypes>
             </configuration>
           </execution>
         </executions>

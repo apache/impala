@@ -48,6 +48,11 @@ export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-0.90.3-cdh3u1
 export PATH=$HBASE_HOME/bin:$PATH
 export HBASE_CONF_DIR=$HIVE_CONF_DIR
 
+CLASSPATH=$IMPALA_FE_DIR/target/dependency:$CLASSPATH
+CLASSPATH=$IMPALA_FE_DIR/target/classes:$CLASSPATH
+CLASSPATH=$IMPALA_FE_DIR/src/test/resources:$CLASSPATH
+export CLASSPATH
+
 if [[ $interactive -eq 1 || -n $IMPALA_DEBUG ]]; then
     echo "IMPALA_HOME    = $IMPALA_HOME"
     echo "HADOOP_HOME    = $HADOOP_HOME"
@@ -55,4 +60,5 @@ if [[ $interactive -eq 1 || -n $IMPALA_DEBUG ]]; then
     echo "HIVE_CONF_DIR  = $HIVE_CONF_DIR"
     echo "HBASE_HOME     = $HBASE_HOME"
     echo "HBASE_CONF_DIR = $HBASE_CONF_DIR"
+    echo "CLASSPATH      = $CLASSPATH"
 fi
