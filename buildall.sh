@@ -137,3 +137,6 @@ if [ $tests_action -eq 1 ]
 then
     mvn test
 fi
+
+# Generate list of files for Cscope to index
+$IMPALA_HOME/bin/gen-cscope.sh
