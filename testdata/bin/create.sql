@@ -107,6 +107,21 @@ CREATE TABLE TestTbl_rc (
   zip int)
 STORED AS RCFILE;
 
+DROP TABLE IF EXISTS DimTbl;
+CREATE TABLE DimTbl (
+  id bigint,
+  name string,
+  zip int)
+row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
+
+DROP TABLE IF EXISTS JoinTbl;
+CREATE TABLE JoinTbl (
+  test_id bigint,
+  test_name string,
+  test_zip int,
+  alltypes_id int)
+row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
+
 CREATE DATABASE IF NOT EXISTS testdb1;
 
 DROP TABLE IF EXISTS testdb1.AllTypes;

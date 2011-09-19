@@ -3,6 +3,7 @@ package com.cloudera.impala.testutil;
 import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -127,22 +128,19 @@ public class TestUtils {
 
   /**
    * Do an element-by-element comparison of actual and expected types.
-   *
-   * @param actual
-   * @param expected
    * @return an error message if actual does not match expected, "" otherwise.
    */
   public static String compareOutputTypes(List<PrimitiveType> actual, String[] expectedStrTypes) {
     if (actual.size() != expectedStrTypes.length) {
-      return "Unequal number of types. Found: " + actual.size() + ". Expected: "
-          + expectedStrTypes.length + "\n";
+      return "Unequal number of output types.\nFound: " + actual.toString()
+          + ".\nExpected: " + Arrays.toString(expectedStrTypes) + "\n";
     }
     for (int i = 0; i < expectedStrTypes.length; ++i) {
       String upperCaseTypeStr = expectedStrTypes[i].toUpperCase();
       PrimitiveType expectedType = typeNameMap.get(upperCaseTypeStr.trim());
       if (actual.get(i) != expectedType) {
-        return "Slot: " + i + ". Found: " + actual.get(i).toString() + ". Expected: "
-            + upperCaseTypeStr + "\n";
+        return "Mismatched output types.\nFound: " + actual.toString()
+            + ".\nExpected: " + Arrays.toString(expectedStrTypes) + "\n";
       }
     }
     return "";

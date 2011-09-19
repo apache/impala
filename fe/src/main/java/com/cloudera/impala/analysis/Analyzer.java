@@ -170,9 +170,8 @@ public class Analyzer {
 
   /**
    * Register all conjuncts that make up the predicate.
-   * @param p
    */
-  public void registerPredicate(Predicate p) {
+  public void registerConjuncts(Predicate p) {
     List<Predicate> conjuncts = p.getConjuncts();
     for (Predicate conjunct: conjuncts) {
       registerConjunct(conjunct);
@@ -182,8 +181,6 @@ public class Analyzer {
   /**
    * Register individual conjunct with all tuple and slot ids it references
    * and with the global conjunct list.
-   *
-   * @param p
    */
   private void registerConjunct(Predicate p) {
     conjuncts.add(p);
@@ -238,6 +235,7 @@ public class Analyzer {
         } else {
           eqJoinPredicates.get(lhsTupleIds.get(0)).add(p);
         }
+        binaryPred.setIsEqJoinConjunct(true);
       }
     }
   }
@@ -256,47 +254,6 @@ public class Analyzer {
       }
     }
     return result;
-  }
-
-  /**
-   * Return all registered conjuncts that are equi-join predicates
-   * in which one side is fully bound by lhsIds and the other by rhsId.
-   * Returns the conjuncts in 'joinConjuncts' and also in their disassembled
-   * form in 'joinPredicates' (in which "<lhs> = <rhs>" is returned as
-   * Pair(<lhs>, <rhs>)).
-   */
-  public void getEqJoinPredicates(
-      List<TupleId> lhsIds, TupleId rhsId,
-      List<Pair<Expr, Expr> > joinPredicates,
-      List<Predicate> joinConjuncts) {
-    joinPredicates.clear();
-    joinConjuncts.clear();
-    List<Predicate> candidates = eqJoinPredicates.get(rhsId);
-    if (candidates == null) return;
-    for (Predicate p: candidates) {
-      Expr rhsExpr = null;
-      if (p.getChild(0).isBound(rhsId.asList())) {
-        rhsExpr = p.getChild(0);
-      } else {
-        Preconditions.checkState(p.getChild(1).isBound(rhsId.asList()));
-        rhsExpr = p.getChild(1);
-      }
-
-      Expr lhsExpr = null;
-      if (p.getChild(0).isBound(lhsIds)) {
-        lhsExpr = p.getChild(0);
-      } else if (p.getChild(1).isBound(lhsIds)) {
-        lhsExpr = p.getChild(1);
-      } else {
-        // not an equi-join condition between lhsIds and rhsId
-        continue;
-      }
-
-      Preconditions.checkState(lhsExpr != rhsExpr);
-      joinConjuncts.add(p);
-      Pair<Expr, Expr> entry = Pair.create(lhsExpr, rhsExpr);
-      joinPredicates.add(entry);
-    }
   }
 
   /**
@@ -322,5 +279,9 @@ public class Analyzer {
 
   public Set<String> getAliases() {
     return aliasMap.keySet();
+  }
+
+  public List<Predicate> getEqJoinPredicates(TupleId id) {
+    return eqJoinPredicates.get(id);
   }
 }

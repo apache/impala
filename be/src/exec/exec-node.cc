@@ -136,7 +136,11 @@ void ExecNode::PrepareConjuncts(RuntimeState* state) {
 }
 
 bool ExecNode::EvalConjuncts(TupleRow* row) {
-  for (vector<Expr*>::iterator i = conjuncts_.begin(); i != conjuncts_.end(); ++i) {
+  return EvalConjuncts(conjuncts_, row);
+}
+
+bool ExecNode::EvalConjuncts(const vector<Expr*>& conjuncts, TupleRow* row) {
+  for (vector<Expr*>::const_iterator i = conjuncts.begin(); i != conjuncts.end(); ++i) {
     void* value = (*i)->GetValue(row);
     if (value == NULL || *reinterpret_cast<bool*>(value) == false) return false;
   }

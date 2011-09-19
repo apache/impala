@@ -288,6 +288,8 @@ public class AnalyzerTest {
         "select a.int_col " +
         "from alltypes a join alltypes b on " +
         "(a.int_col = b.int_col and a.string_col = b.string_col)");
+    // ON or USING clause not required for inner join
+    AnalyzesOk("select a.int_col from alltypes a join alltypes b");
     // unknown column
     AnalysisError("select a.int_col from alltypes a join alltypes b on (a.int_col = b.badcol)",
         "unknown column 'badcol'");
@@ -299,7 +301,8 @@ public class AnalyzerTest {
         "select a.int_col from alltypes a join alltypes b on (a.int_col = badalias.int_col)",
         "unknown table alias: 'badalias'");
     // incompatible comparison
-    AnalysisError("select a.int_col from alltypes a join alltypes b on (a.bool_col = b.string_col)",
+    AnalysisError(
+        "select a.int_col from alltypes a join alltypes b on (a.bool_col = b.string_col)",
         "operands are not comparable: a.bool_col = b.string_col");
     AnalyzesOk(
         "select a.int_col, b.int_col, c.int_col " +
@@ -315,6 +318,31 @@ public class AnalyzerTest {
         "join alltypes c on " +
         "(b.int_col = c.int_col and b.string_col = c.string_col and b.bool_col = c.bool_col)",
         "unknown table alias: 'c'");
+
+    // outer joins require ON/USING clause
+    AnalyzesOk("select * from alltypes a left outer join alltypes b on (a.id = b.id)");
+    AnalyzesOk("select * from alltypes a left outer join alltypes b using (id)");
+    AnalysisError("select * from alltypes a left outer join alltypes b",
+        "LEFT OUTER JOIN requires an ON or USING clause");
+    AnalyzesOk("select * from alltypes a right outer join alltypes b on (a.id = b.id)");
+    AnalyzesOk("select * from alltypes a right outer join alltypes b using (id)");
+    AnalysisError("select * from alltypes a right outer join alltypes b",
+        "RIGHT OUTER JOIN requires an ON or USING clause");
+    AnalyzesOk("select * from alltypes a full outer join alltypes b on (a.id = b.id)");
+    AnalyzesOk("select * from alltypes a full outer join alltypes b using (id)");
+    AnalysisError("select * from alltypes a full outer join alltypes b",
+        "FULL OUTER JOIN requires an ON or USING clause");
+
+    // semi join requires ON/USING clause
+    AnalyzesOk("select a.id from alltypes a left semi join alltypes b on (a.id = b.id)");
+    AnalyzesOk("select a.id from alltypes a left semi join alltypes b using (id)");
+    AnalysisError("select a.id from alltypes a left semi join alltypes b",
+        "LEFT SEMI JOIN requires an ON or USING clause");
+    // TODO: enable when implemented
+    // must not reference semi-joined alias outside of join clause
+    //AnalysisError(
+        //"select a.id, b.id from alltypes a left semi join alltypes b on (a.id = b.id)",
+        //"x");
   }
 
   @Test public void TestUsingClause() {

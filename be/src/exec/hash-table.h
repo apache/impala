@@ -117,7 +117,8 @@ class HashTable {
   };
 
   // Starts as a scan of tuples based on values of probe_exprs in the context
-  // of probe_row. Returns the scan through 'it'.
+  // of probe_row. Scans entire table if probe_row is NULL.
+  // Returns the scan through 'it'.
   void Scan(TupleRow* probe_row, Iterator* it);
 
 };

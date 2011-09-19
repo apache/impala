@@ -19,10 +19,19 @@ using namespace boost;
 
 HashJoinNode::HashJoinNode(
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-  : ExecNode(pool, tnode, descs) {
+  : ExecNode(pool, tnode, descs),
+    join_op_(tnode.hash_join_node.join_op) {
   // TODO: log errors in runtime state
   Status status = Init(pool, tnode);
-  DCHECK(status.ok());
+  DCHECK(status.ok())
+      << "HashJoinNode c'tor: Init() failed:\n"
+      << status.GetErrorMsg();
+
+  match_all_probe_ =
+    (join_op_ == TJoinOp::LEFT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN);
+  match_one_build_ = (join_op_ == TJoinOp::LEFT_SEMI_JOIN);
+  match_all_build_ =
+    (join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN);
 }
 
 HashJoinNode::~HashJoinNode() {
@@ -33,14 +42,18 @@ HashJoinNode::~HashJoinNode() {
 
 Status HashJoinNode::Init(ObjectPool* pool, const TPlanNode& tnode) {
   DCHECK(tnode.__isset.hash_join_node);
-  const vector<TEqJoinCondition>& join_preds = tnode.hash_join_node.join_predicates;
-  for (int i = 0; i < join_preds.size(); ++i) {
+  const vector<TEqJoinCondition>& eq_join_conjuncts =
+      tnode.hash_join_node.eq_join_conjuncts;
+  for (int i = 0; i < eq_join_conjuncts.size(); ++i) {
     Expr* expr;
-    RETURN_IF_ERROR(Expr::CreateExprTree(pool, join_preds[i].left, &expr));
+    RETURN_IF_ERROR(Expr::CreateExprTree(pool, eq_join_conjuncts[i].left, &expr));
     probe_exprs_.push_back(expr);
-    RETURN_IF_ERROR(Expr::CreateExprTree(pool, join_preds[i].right, &expr));
+    RETURN_IF_ERROR(Expr::CreateExprTree(pool, eq_join_conjuncts[i].right, &expr));
     build_exprs_.push_back(expr);
   }
+  RETURN_IF_ERROR(
+      Expr::CreateExprTrees(pool, tnode.hash_join_node.other_join_conjuncts,
+                            &other_join_conjuncts_));
   return Status::OK;
 }
 
@@ -80,25 +93,59 @@ Status HashJoinNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(child(1)->Close(state));
 
   RETURN_IF_ERROR(child(0)->Open(state));
-  // prime probe batch
+
+  // seed probe batch and current_probe_row_, etc.
   RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get()));
   probe_batch_pos_ = 0;
+  matched_probe_ = false;
+  current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
+  matched_probe_ = false;
+  hash_tbl_->Scan(current_probe_row_, &hash_tbl_iterator_);
+
   return Status::OK;
+}
+
+inline TupleRow* HashJoinNode::CreateOutputRow(
+    RowBatch* out_batch, TupleRow* probe_row, Tuple* build_tuple) {
+  DCHECK(!out_batch->IsFull());
+  // copy probe row to output
+  int row_idx = out_batch->AddRow();
+  TupleRow* out_row = out_batch->GetRow(row_idx);
+  if (probe_row != NULL) {
+    out_batch->CopyRow(probe_row, out_row);
+  } else {
+    out_batch->ClearRow(out_row);
+  }
+  out_row->SetTuple(build_tuple_idx_, build_tuple);
+  return out_row;
 }
 
 Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch) {
   while (!eos_) {
     Tuple* tuple;
-    while (!out_batch->IsFull() && (tuple = hash_tbl_iterator_.GetNext()) != NULL) {
-      // copy probe row to output
-      int row_idx = out_batch->AddRow();
-      TupleRow* out_row = out_batch->GetRow(row_idx);
-      out_batch->CopyRow(current_probe_row_, out_row);
-      out_row->SetTuple(build_tuple_idx_, tuple);
-      if (EvalConjuncts(out_row)) {
+    // create output rows as long as:
+    // * our output batch isn't full;
+    // * we haven't already created an output row for the probe row and are doing
+    //   a semi-join;
+    // * there are more matching build rows
+    while (!out_batch->IsFull()
+           && !(match_one_build_ && matched_probe_)
+           && (tuple = hash_tbl_iterator_.GetNext()) != NULL) {
+      TupleRow* out_row = CreateOutputRow(out_batch, current_probe_row_, tuple);
+      if (!EvalConjuncts(other_join_conjuncts_, out_row)) continue;
+      // we have a match for the purpose of the (outer?) join as soon as we
+      // satisfy the JOIN clause conjuncts
+      matched_probe_ = true;
+      if (match_all_build_) {
+        // remember that we matched this build tuple
+        joined_build_tuples_.insert(tuple);
+      }
+      if (EvalConjuncts(conjuncts_, out_row)) {
         out_batch->CommitLastRow();
       }
+      if (match_one_build_) break;
     }
+
     if (out_batch->IsFull()) return Status::OK;
 
     if (probe_batch_pos_ == probe_batch_->num_rows()) {
@@ -106,17 +153,39 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch) {
       if (probe_batch_->num_rows() < probe_batch_->capacity()) {
         // this was the last probe batch
         eos_ = true;
-        return Status::OK;
+        if (match_all_build_) hash_tbl_->Scan(NULL, &hash_tbl_iterator_);
+      } else {
+        // pass on pools, out_batch might still need them
+        out_batch->AddMemPools(probe_batch_.get());
+        RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get()));
+        probe_batch_pos_ = 0;
       }
-      // pass on pools, out_batch might still need them
-      out_batch->AddMemPools(probe_batch_.get());
-      RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get()));
-      probe_batch_pos_ = 0;
     }
+
+    if (match_all_probe_ && !matched_probe_) {
+      TupleRow* out_row = CreateOutputRow(out_batch, current_probe_row_, NULL);
+      if (EvalConjuncts(conjuncts_, out_row)) {
+        out_batch->CommitLastRow();
+      }
+    }
+    if (eos_) break;
 
     // join remaining rows in probe_batch_
     current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
+    matched_probe_ = false;
     hash_tbl_->Scan(current_probe_row_, &hash_tbl_iterator_);
+  }
+
+  if (match_all_build_) {
+    // output remaining unmatched build rows
+    Tuple* tuple;
+    while (!out_batch->IsFull() && (tuple = hash_tbl_iterator_.GetNext()) != NULL) {
+      if (joined_build_tuples_.find(tuple) != joined_build_tuples_.end()) continue;
+      TupleRow* out_row = CreateOutputRow(out_batch, NULL, tuple);
+      if (EvalConjuncts(conjuncts_, out_row)) {
+        out_batch->CommitLastRow();
+      }
+    }
   }
   return Status::OK;
 }

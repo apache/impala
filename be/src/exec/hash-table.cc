@@ -133,7 +133,11 @@ void HashTable::Insert(Tuple* t) {
 void HashTable::Scan(TupleRow* probe_row, Iterator* it) {
   current_probe_row_ = probe_row;
   current_build_row_ = NULL;
-  it->Reset(hash_tbl_->equal_range(NULL));
+  if (probe_row != NULL) {
+    it->Reset(hash_tbl_->equal_range(NULL));
+  } else {
+    it->Reset(make_pair(hash_tbl_->begin(), hash_tbl_->end()));
+  }
 }
 
 void HashTable::DebugString(int indentation_level, std::stringstream* out) const {

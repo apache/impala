@@ -3,6 +3,7 @@ from testtbl t1 join testtbl t2 using(id)
 where t1.zip = 94611
 ----
 HASH JOIN
+JOIN OP: INNER JOIN
 HASH PREDICATES:
   t1.id = t2.id
   SCAN HDFS table=default.testtbl
@@ -14,11 +15,12 @@ HASH PREDICATES:
 ====
 # general exprs on both sides of equi-join predicates
 select *
-from testtbl t1 join testtbl t2 
+from testtbl t1 left outer join testtbl t2 
 on (t1.id - 1 = t2.id + 1)
 where t1.zip = 94611
 ----
 HASH JOIN
+JOIN OP: LEFT OUTER JOIN
 HASH PREDICATES:
   t1.id - 1 = t2.id + 1
   SCAN HDFS table=default.testtbl
@@ -32,7 +34,7 @@ HASH PREDICATES:
 # scan predicates get propagated correctly;
 # non-eq join predicates are evaluated as extra conjuncts by the join node
 select *
-from alltypesagg a join alltypessmall b using (id, int_col)
+from alltypesagg a right outer join alltypessmall b using (id, int_col)
 where a.day >= 6
 and b.month > 2
 and a.tinyint_col = 15
@@ -40,6 +42,7 @@ and b.string_col = '15'
 and a.tinyint_col + b.tinyint_col < 15
 ----
 HASH JOIN
+JOIN OP: RIGHT OUTER JOIN
 HASH PREDICATES:
   a.id = b.id
   a.int_col = b.int_col
@@ -62,8 +65,8 @@ OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
 # non-eq join predicates are evaluated at the correct join node
 select *
 from alltypesagg a
-join alltypessmall b using (id, int_col)
-join alltypesaggnonulls c on (a.id = c.id and b.string_col = c.string_col)
+full outer join alltypessmall b using (id, int_col)
+right join alltypesaggnonulls c on (a.id = c.id and b.string_col = c.string_col)
 where a.day >= 6
 and b.month > 2
 and c.day < 3
@@ -74,11 +77,13 @@ and a.float_col - c.double_col < 0
 and (b.double_col * c.tinyint_col > 1000 or c.tinyint_col < 1000)
 ----
 HASH JOIN
+JOIN OP: RIGHT OUTER  JOIN
 HASH PREDICATES:
   a.id = c.id
   b.string_col = c.string_col
 OTHER PREDICATES: a.float_col - c.double_col < 0.0, b.double_col * c.tinyint_col > 1000.0 OR c.tinyint_col < 1000
   HASH JOIN
+  JOIN OP: FULL OUTER JOIN
   HASH PREDICATES:
     a.id = b.id
     a.int_col = b.int_col

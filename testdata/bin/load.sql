@@ -86,6 +86,8 @@ SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, 
 FROM alltypesaggnonulls;
 
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/LikeTbl/data.csv' OVERWRITE INTO TABLE LikeTbl;
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/DimTbl/data.csv' OVERWRITE INTO TABLE DimTbl;
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/JoinTbl/data.csv' OVERWRITE INTO TABLE JoinTbl;
 
 INSERT OVERWRITE TABLE hbasealltypessmall
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col

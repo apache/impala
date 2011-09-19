@@ -48,8 +48,23 @@ struct TEqJoinCondition {
   2: required Exprs.TExpr right;
 }
 
+enum TJoinOp {
+  INNER_JOIN,
+  LEFT_OUTER_JOIN,
+  LEFT_SEMI_JOIN,
+  RIGHT_OUTER_JOIN,
+  FULL_OUTER_JOIN
+}
+
 struct THashJoinNode {
-  1: required list<TEqJoinCondition> join_predicates;
+  1: required TJoinOp join_op
+
+  // anything from the ON, USING or WHERE clauses that's an equi-join predicate
+  2: required list<TEqJoinCondition> eq_join_conjuncts
+
+  // anything from the ON or USING clauses (but *not* the WHERE clause) that's not an
+  // equi-join predicate
+  3: optional list<Exprs.TExpr> other_join_conjuncts
 }
 
 struct TAggregationNode {

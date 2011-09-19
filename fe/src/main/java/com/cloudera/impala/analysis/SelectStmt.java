@@ -142,12 +142,8 @@ public class SelectStmt extends ParseNodeBase {
     // start out with table refs to establish aliases
     TableRef leftTblRef = null;  // the one to the left of tblRef
     for (TableRef tblRef: tableRefs) {
-      tblRef.setDesc(analyzer.registerTableRef(tblRef));
-      tblRef.expandUsingClause(leftTblRef, analyzer.getCatalog());
-      if (tblRef.getOnClause() != null) {
-        tblRef.getOnClause().analyze(analyzer);
-        analyzer.registerPredicate(tblRef.getOnClause());
-      }
+      tblRef.setLeftTblRef(leftTblRef);
+      tblRef.analyze(analyzer);
       leftTblRef = tblRef;
     }
 
@@ -182,7 +178,7 @@ public class SelectStmt extends ParseNodeBase {
         throw new AnalysisException(
             "aggregation function not allowed in WHERE clause");
       }
-      analyzer.registerPredicate(whereClause);
+      analyzer.registerConjuncts(whereClause);
     }
     if (orderByElements != null) {
       analyzeOrderByClause(analyzer);
@@ -443,7 +439,6 @@ public class SelectStmt extends ParseNodeBase {
     strBuilder.append(" FROM ");
     for (int i = 0; i < tableRefs.size(); ++i) {
       strBuilder.append(tableRefs.get(i).toSql());
-      strBuilder.append((i+1 != tableRefs.size()) ? ", " : "");
     }
     // Where clause
     if (whereClause != null) {

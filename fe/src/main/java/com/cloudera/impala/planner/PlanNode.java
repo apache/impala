@@ -8,6 +8,7 @@ import java.util.List;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.Predicate;
+import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.TreeNode;
@@ -29,7 +30,7 @@ import com.google.common.collect.Lists;
  *
  * conjuncts: Each node has a list of conjuncts that can be executed in the context of
  * this node, ie, they only reference tuples materialized by this node or one of
- * its children (= are bound by tupleIds). 
+ * its children (= are bound by tupleIds).
  */
 abstract public class PlanNode extends TreeNode<PlanNode> {
   protected long limit; // max. # of rows to be returned; 0: no limit
@@ -126,6 +127,16 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     for (PlanNode child: children) {
       child.finalize(analyzer);
     }
+  }
+
+  /**
+   * Appends ids of slots that need to be materialized for this node.
+   * By default, only slots referenced by conjuncts need to be materialized
+   * (the rationale being that only conjuncts need to be evaluated explicitly;
+   * exprs that are turned into scan predicates, etc., are evaluated implicitly).
+   */
+  public void getMaterializedIds(List<SlotId> ids) {
+    Expr.getIds(getConjuncts(), null, ids);
   }
 
   // Convert this plan node into msg (excluding children), which requires setting

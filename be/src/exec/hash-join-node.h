@@ -4,9 +4,12 @@
 #define IMPALA_EXEC_HASH_JOIN_NODE_H
 
 #include <boost/scoped_ptr.hpp>
+#include <boost/unordered_set.hpp>
 
 #include "exec/exec-node.h"
 #include "exec/hash-table.h"
+
+#include "gen-cpp/PlanNodes_types.h"  // for TJoinOp
 
 namespace impala {
 
@@ -42,11 +45,26 @@ class HashJoinNode : public ExecNode {
   boost::scoped_ptr<HashTable> hash_tbl_;
   HashTable::Iterator hash_tbl_iterator_;
 
+  // for right outer joins, keep track of what's been joined
+  typedef boost::unordered_set<Tuple*> BuildTupleSet;
+  BuildTupleSet joined_build_tuples_;
+
+  TJoinOp::type join_op_;
+
   // our equi-join predicates "<lhs> = <rhs>" are separated into
   // build_exprs_ (over child(1)) and probe_exprs_ (over child(0))
   std::vector<Expr*> probe_exprs_;
   std::vector<Expr*> build_exprs_;
 
+  // non-equi-join conjuncts from the JOIN clause
+  std::vector<Expr*> other_join_conjuncts_;
+
+  // derived from join_op_
+  bool match_all_probe_;  // output all tuples coming from the probe input
+  bool match_one_build_;  // match at most one build tuple to each probe tuple
+  bool match_all_build_;  // output all tuples coming from the build input
+
+  bool matched_probe_;  // if true, we have matched the current probe tuple
   bool eos_;  // if true, nothing left to return in GetNext()
   int build_tuple_idx_;  // w/in our output row
   std::vector<MemPool*> build_pools_;  // everything handed to us by the scan of child(1)
@@ -56,6 +74,10 @@ class HashJoinNode : public ExecNode {
 
   // set up build_- and probe_exprs_
   Status Init(ObjectPool* pool, const TPlanNode& tnode);
+
+  // Write combined row, consisting of probe_row and build_tuple, to out_batch
+  // and return row.
+  TupleRow* CreateOutputRow(RowBatch* out_batch, TupleRow* probe_row, Tuple* build_tuple);
 };
 
 }

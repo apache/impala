@@ -9,8 +9,19 @@ import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.Lists;
 
 public abstract class Predicate extends Expr {
+  protected boolean isEqJoinConjunct;
+
   public Predicate() {
     super();
+    this.isEqJoinConjunct = false;
+  }
+
+  public boolean isEqJoinConjunct() {
+    return isEqJoinConjunct;
+  }
+
+  public void setIsEqJoinConjunct(boolean v) {
+    isEqJoinConjunct = v;
   }
 
   @Override

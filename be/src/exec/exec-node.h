@@ -86,6 +86,9 @@ class ExecNode {
   void PrepareConjuncts(RuntimeState* state);
 
   // Evaluate conjuncts. Return true if all conjuncts return true, otherwise false.
+  bool EvalConjuncts(const std::vector<Expr*>& conjuncts, TupleRow* row);
+
+  // Evaluate conjuncts_. Return true if all conjuncts return true, otherwise false.
   bool EvalConjuncts(TupleRow* row);
 };
 

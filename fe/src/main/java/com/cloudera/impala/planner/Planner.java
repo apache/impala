@@ -25,6 +25,7 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.Pair;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 
@@ -141,29 +142,96 @@ public class Planner {
   }
 
   /**
+   * Return join conjuncts that can be used for hash table lookups.
+   * - for inner joins, those are equi-join predicates in which one side is fully bound
+   *   by lhsIds and the other by rhs' id;
+   * - for outer joins: same type of conjuncts as inner joins, but only from the JOIN
+   *   clause
+   * Returns the conjuncts in 'joinConjuncts' (in which "<lhs> = <rhs>" is returned
+   * as Pair(<lhs>, <rhs>)) and also in their original form in 'joinPredicates'.
+   */
+  public void getHashLookupJoinConjuncts(
+      Analyzer analyzer,
+      List<TupleId> lhsIds, TableRef rhs,
+      List<Pair<Expr, Expr> > joinConjuncts,
+      List<Predicate> joinPredicates) {
+    joinConjuncts.clear();
+    joinPredicates.clear();
+    TupleId rhsId = rhs.getId();
+    List<Predicate> candidates;
+    if (rhs.getJoinOp().isOuterJoin()) {
+      // TODO: create test for this
+      Preconditions.checkState(rhs.getOnClause() != null);
+      candidates = rhs.getEqJoinConjuncts();
+      Preconditions.checkState(candidates != null);
+    } else {
+      candidates = analyzer.getEqJoinPredicates(rhsId);
+    }
+    if (candidates == null) {
+      return;
+    }
+    for (Predicate p: candidates) {
+      Expr rhsExpr = null;
+      if (p.getChild(0).isBound(rhsId.asList())) {
+        rhsExpr = p.getChild(0);
+      } else {
+        Preconditions.checkState(p.getChild(1).isBound(rhsId.asList()));
+        rhsExpr = p.getChild(1);
+      }
+
+      Expr lhsExpr = null;
+      if (p.getChild(0).isBound(lhsIds)) {
+        lhsExpr = p.getChild(0);
+      } else if (p.getChild(1).isBound(lhsIds)) {
+        lhsExpr = p.getChild(1);
+      } else {
+        // not an equi-join condition between lhsIds and rhsId
+        continue;
+      }
+
+      Preconditions.checkState(lhsExpr != rhsExpr);
+      joinPredicates.add(p);
+      Pair<Expr, Expr> entry = Pair.create(lhsExpr, rhsExpr);
+      joinConjuncts.add(entry);
+    }
+  }
+
+  /**
    * Create HashJoinNode to join outer with inner.
    */
   private PlanNode createHashJoinNode(
-      Analyzer analyzer, PlanNode outer, PlanNode inner) throws NotImplementedException {
-    List<Pair<Expr, Expr> > joinPredicates = Lists.newArrayList();
-    List<Predicate> joinConjuncts = Lists.newArrayList();
-    analyzer.getEqJoinPredicates(
-        outer.getTupleIds(), inner.getTupleIds().get(0),
-        joinPredicates, joinConjuncts);
-    if (joinPredicates.isEmpty()) {
+      Analyzer analyzer, PlanNode outer, TableRef innerRef)
+      throws NotImplementedException {
+    // the rows coming from the build node only need to have space for the tuple
+    // materialized by that node
+    PlanNode inner = createScanNode(analyzer, innerRef);
+    inner.rowTupleIds = Lists.newArrayList(innerRef.getId());
+
+    List<Pair<Expr, Expr> > eqJoinConjuncts = Lists.newArrayList();
+    List<Predicate> eqJoinPredicates = Lists.newArrayList();
+    getHashLookupJoinConjuncts(
+        analyzer, outer.getTupleIds(), innerRef, eqJoinConjuncts, eqJoinPredicates);
+    if (eqJoinPredicates.isEmpty()) {
       throw new NotImplementedException(
           "Join requires at least one equality predicate between the two tables.");
     }
-    HashJoinNode result = new HashJoinNode(outer, inner, joinPredicates);
+    HashJoinNode result =
+        new HashJoinNode(outer, inner, innerRef.getJoinOp(), eqJoinConjuncts,
+                         innerRef.getOtherJoinConjuncts());
 
-    // All conjuncts that are join predicates are evaluated by the hash join
-    // implicitly as part of the hash table lookup; all conjuncts that are bound by
-    // outer.getTupleIds() are evaluated by outer (or one of its children);
-    // only the remaining conjuncts that are bound by result.getTupleIds()
-    // need to be evaluated explicitly by the hash join.
+    // conjuncts evaluated by this node:
+    // - equi-join conjuncts are evaluated as part of the hash table lookup
+    // - other join conjuncts are evaluated before establishing a match
+    // - all conjuncts that are bound by outer.getTupleIds() are evaluated by outer
+    //   (or one of its children)
+    // - the remaining conjuncts that are bound by result.getTupleIds()
+    //   need to be evaluated explicitly by the hash join
     ArrayList<Predicate> conjuncts =
       new ArrayList<Predicate>(analyzer.getConjuncts(result.getTupleIds()));
-    conjuncts.removeAll(joinConjuncts);
+    conjuncts.removeAll(eqJoinPredicates);
+    if (innerRef.getOtherJoinConjuncts() != null) {
+      conjuncts.removeAll(innerRef.getOtherJoinConjuncts());
+    }
     conjuncts.removeAll(analyzer.getConjuncts(outer.getTupleIds()));
     conjuncts.removeAll(analyzer.getConjuncts(inner.getTupleIds()));
     result.setConjuncts(conjuncts);
@@ -178,7 +246,7 @@ public class Planner {
     PlanNode node = root;
     List<SlotId> refdIdList = Lists.newArrayList();
     while (node != null) {
-      Expr.getIds(node.getConjuncts(), null, refdIdList);
+      node.getMaterializedIds(refdIdList);
       if (node.hasChild(1)) {
         Expr.getIds(node.getChild(1).getConjuncts(), null, refdIdList);
       }
@@ -231,12 +299,7 @@ public class Planner {
     root.rowTupleIds = rowTuples;
     for (int i = 1; i < selectStmt.getTableRefs().size(); ++i) {
       TableRef innerRef = selectStmt.getTableRefs().get(i);
-      // all joins are hash joins at this point, and the rows coming from the build
-      // node only need to have space for the tuple materialized by that node
-      // (this might change with nested-loop joins)
-      PlanNode inner = createScanNode(analyzer, innerRef);
-      inner.rowTupleIds = Lists.newArrayList(innerRef.getId());
-      root = createHashJoinNode(analyzer, root, inner);
+      root = createHashJoinNode(analyzer, root, innerRef);
       root.rowTupleIds = rowTuples;
     }
 

@@ -290,14 +290,14 @@ table_ref_list ::=
   :}
   | table_ref_list:list join_operator:op table_ref:t
   {:
-    t.setJoinOperator((JoinOperator) op);
+    t.setJoinOp((JoinOperator) op);
     list.add(t);
     RESULT = list;
   :}
   | table_ref_list:list join_operator:op table_ref:t
     KW_ON predicate:p
   {:
-    t.setJoinOperator((JoinOperator) op);
+    t.setJoinOp((JoinOperator) op);
     t.setOnClause(p);
     list.add(t);
     RESULT = list;
@@ -305,7 +305,7 @@ table_ref_list ::=
   | table_ref_list:list join_operator:op table_ref:t
     KW_USING LPAREN ident_list:colNames RPAREN
   {:
-    t.setJoinOperator((JoinOperator) op);
+    t.setJoinOp((JoinOperator) op);
     t.setUsingClause(colNames);
     list.add(t);
     RESULT = list;

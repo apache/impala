@@ -106,6 +106,10 @@ class RowBatch {
     memcpy(dest, src, num_tuples_per_row_ * sizeof(Tuple*));
   }
 
+  void ClearRow(TupleRow* row) {
+    memset(row, 0, num_tuples_per_row_ * sizeof(Tuple*));
+  }
+
   int num_rows() const { return num_rows_; }
   int capacity() const { return capacity_; }
 

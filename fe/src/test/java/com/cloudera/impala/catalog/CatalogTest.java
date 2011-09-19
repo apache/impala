@@ -83,7 +83,7 @@ public class CatalogTest {
     assertNotNull(testDb);
     assertEquals(testDb.getName(), "testdb1");
 
-    assertEquals(20, defaultDb.getTables().size());
+    assertEquals(22, defaultDb.getTables().size());
     assertNotNull(defaultDb.getTable("alltypes"));
     assertNotNull(defaultDb.getTable("alltypes_rc"));
     assertNotNull(defaultDb.getTable("alltypessmall"));
@@ -98,6 +98,8 @@ public class CatalogTest {
     assertNotNull(defaultDb.getTable("alltypesaggnonulls_rc"));
     assertNotNull(defaultDb.getTable("testtbl"));
     assertNotNull(defaultDb.getTable("testtbl_rc"));
+    assertNotNull(defaultDb.getTable("dimtbl"));
+    assertNotNull(defaultDb.getTable("jointbl"));
     assertNotNull(defaultDb.getTable("liketbl"));
     assertNotNull(defaultDb.getTable("hbasealltypessmall"));
     assertNotNull(defaultDb.getTable("hbasealltypeserror"));
@@ -146,6 +148,15 @@ public class CatalogTest {
         new PrimitiveType[]
           {PrimitiveType.STRING, PrimitiveType.STRING, PrimitiveType.STRING,
            PrimitiveType.STRING, PrimitiveType.STRING});
+    checkTableCols(defaultDb, "dimtbl", 0,
+        new String[] {"id", "name", "zip"},
+        new PrimitiveType[]
+          {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.INT});
+    checkTableCols(defaultDb, "jointbl", 0,
+        new String[] {"test_id", "test_name", "test_zip", "alltypes_id"},
+        new PrimitiveType[]
+          {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.INT,
+           PrimitiveType.INT});
 
     checkHBaseTableCols(defaultDb, "hbasealltypessmall", "hbasealltypessmall",
         new String[]
