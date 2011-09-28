@@ -74,6 +74,9 @@ class ExecNode {
   std::vector<ExecNode*> children_;
   RowDescriptor row_descriptor_;
 
+  int64_t limit_;  // -1: no limit
+  int64_t num_rows_returned_;
+
   ExecNode* child(int i) { return children_[i]; }
 
   // Create a single exec node derived from thrift node; place exec node in 'pool'.
@@ -90,6 +93,8 @@ class ExecNode {
 
   // Evaluate conjuncts_. Return true if all conjuncts return true, otherwise false.
   bool EvalConjuncts(TupleRow* row);
+
+  bool ReachedLimit() { return limit_ != -1 && num_rows_returned_ == limit_; }
 };
 
 }

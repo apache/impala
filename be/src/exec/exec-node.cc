@@ -21,7 +21,10 @@ using namespace std;
 namespace impala {
 
 ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-  : pool_(pool), row_descriptor_(descs, tnode.row_tuples) {
+  : pool_(pool),
+    row_descriptor_(descs, tnode.row_tuples),
+    limit_(tnode.limit),
+    num_rows_returned_(0) {
   Status status = Expr::CreateExprTrees(pool, tnode.conjuncts, &conjuncts_);
   DCHECK(status.ok())
       << "ExecNode c'tor: deserialization of conjuncts failed:\n"

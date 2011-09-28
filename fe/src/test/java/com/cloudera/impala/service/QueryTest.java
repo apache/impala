@@ -60,6 +60,7 @@ public class QueryTest {
     runTests("hbase-filters", false, 1000);
     runTests("joins", false, 1000);
     runTests("outer-joins", false, 1000);
+    runTests("limit", false, 1000);
 
     // check whether any of the tests had errors
     if (testErrorLog.length() != 0) {

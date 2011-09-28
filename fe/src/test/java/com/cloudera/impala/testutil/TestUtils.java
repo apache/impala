@@ -219,7 +219,12 @@ public class TestUtils {
 
     // Check types filled in by RunQuery()
     if (expectedTypes != null) {
-      String[] expectedTypesArr = expectedTypes.get(0).split(",");
+      String[] expectedTypesArr;
+      if (expectedTypes.isEmpty()) {
+        expectedTypesArr = new String[0];
+      } else {
+        expectedTypesArr = expectedTypes.get(0).split(",");
+      }
       String typeResult = TestUtils.compareOutputTypes(colTypes, expectedTypesArr);
       if (!typeResult.isEmpty()) {
         testErrorLog.append("query:\n" + query + "\n" + typeResult);

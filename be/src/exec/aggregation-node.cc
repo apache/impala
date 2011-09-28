@@ -163,11 +163,16 @@ Status AggregationNode::Open(RuntimeState* state) {
 }
 
 Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
+  if (ReachedLimit()) return Status::OK;
   while (output_iterator_ != hash_tbl_->end() && !row_batch->IsFull()) {
     int row_idx = row_batch->AddRow();
     TupleRow* row = row_batch->GetRow(row_idx);
     row->SetTuple(0, *output_iterator_);
-    if (ExecNode::EvalConjuncts(row)) row_batch->CommitLastRow();
+    if (ExecNode::EvalConjuncts(row)) {
+      row_batch->CommitLastRow();
+      ++num_rows_returned_;
+      if (ReachedLimit()) return Status::OK;
+    }
     ++output_iterator_;
   }
   return Status::OK;

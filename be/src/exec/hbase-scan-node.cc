@@ -110,6 +110,7 @@ void HBaseScanNode::WriteTextSlot(const string& family, const string& qualifier,
 }
 
 Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
+  if (ReachedLimit()) return Status::OK;
   tuple_ = reinterpret_cast<Tuple*>(tuple_buf_);
   bzero(tuple_buf_, tuple_buf_size_);
 
@@ -185,6 +186,8 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
     }
     if (EvalConjuncts(row)) {
       row_batch->CommitLastRow();
+      ++num_rows_returned_;
+      if (ReachedLimit()) return Status::OK;
       char* new_tuple = reinterpret_cast<char*>(tuple_);
       new_tuple += tuple_desc_->byte_size();
       tuple_ = reinterpret_cast<Tuple*>(new_tuple);

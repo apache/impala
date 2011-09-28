@@ -165,4 +165,12 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     }
     return output.toString();
   }
+
+  protected String getLimitExplainString(String prefix) {
+    if (limit != -1) {
+      return prefix + "  LIMIT: " + Long.toString(limit) + "\n";
+    } else {
+      return "";
+    }
+  }
 }

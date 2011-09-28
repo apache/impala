@@ -74,6 +74,10 @@ class HdfsTextScanNode : public ExecNode {
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
+  const static char NOT_IN_STRING = -1;
+  const static int POOL_INIT_SIZE = 4096;
+  const static char DELIM_INIT = -1;
+  const static int SKIP_COLUMN = -1;
 
   // Parser configuration parameters:
 
@@ -153,7 +157,7 @@ class HdfsTextScanNode : public ExecNode {
 
   // Buffer where tuples are written into.
   // Must be valid until next GetNext().
-  void* tuple_buf_;
+  char* tuple_buf_;
 
   // Current tuple.
   Tuple* tuple_;
@@ -236,10 +240,8 @@ class HdfsTextScanNode : public ExecNode {
   //   file_buf_idx: Index of current file buffer, will be incremented.
   void* GetFileBuffer(RuntimeState* state, int* file_buf_idx);
 
-  const static char NOT_IN_STRING = -1;
-  const static int POOL_INIT_SIZE = 4096;
-  const static char DELIM_INIT = -1;
-  const static int SKIP_COLUMN = -1;
+  // Attach pools to batch.
+  void FinalizeScan(RowBatch* batch);
 };
 
 }

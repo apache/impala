@@ -174,6 +174,7 @@ public class ParserTest {
     ParsesOk("select a, b, c from test inner join test2 using(a) limit 10");
     ParserError("select a, b, c from test inner join test2 using(a) limit 'a'");
     ParserError("select a, b, c from test inner join test2 using(a) limit a");
+    ParserError("select a, b, c from test inner join test2 using(a) limit 10 + 10");
     ParserError("select a, b, c from test inner join test2 using(a) limit 10 " +
         "where a > 10");
   }

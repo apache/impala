@@ -121,6 +121,7 @@ inline TupleRow* HashJoinNode::CreateOutputRow(
 }
 
 Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch) {
+  if (ReachedLimit()) return Status::OK;
   while (!eos_) {
     Tuple* tuple;
     // create output rows as long as:
@@ -142,6 +143,8 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch) {
       }
       if (EvalConjuncts(conjuncts_, out_row)) {
         out_batch->CommitLastRow();
+        ++num_rows_returned_;
+        if (ReachedLimit()) return Status::OK;
       }
       if (match_one_build_) break;
     }
@@ -166,6 +169,8 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch) {
       TupleRow* out_row = CreateOutputRow(out_batch, current_probe_row_, NULL);
       if (EvalConjuncts(conjuncts_, out_row)) {
         out_batch->CommitLastRow();
+        ++num_rows_returned_;
+        if (ReachedLimit()) return Status::OK;
       }
     }
     if (eos_) break;
@@ -184,6 +189,8 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch) {
       TupleRow* out_row = CreateOutputRow(out_batch, NULL, tuple);
       if (EvalConjuncts(conjuncts_, out_row)) {
         out_batch->CommitLastRow();
+        ++num_rows_returned_;
+        if (ReachedLimit()) return Status::OK;
       }
     }
   }

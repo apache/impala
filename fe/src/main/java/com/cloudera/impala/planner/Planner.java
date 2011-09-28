@@ -278,8 +278,7 @@ public class Planner {
    * Also calls DescriptorTable.computeMemLayout().
    * @param selectStmt
    * @param analyzer
-   * @return root node of plan tree
-   * @throws NotImplementedException if selectStmt contains joins, order by or aggregates
+   * @return root node of plan tree * @throws NotImplementedException if selectStmt contains joins, order by or aggregates
    */
   public PlanNode createPlan(SelectStmt selectStmt, Analyzer analyzer)
       throws NotImplementedException, InternalException {
@@ -328,6 +327,7 @@ public class Planner {
     }
 
     root.setLimit(selectStmt.getLimit());
+    System.out.println("limit=" + Long.toString(root.getLimit()) + "\n");
     root.finalize(analyzer);
     markUnrefdSlots(root, selectStmt, analyzer);
     // don't compute mem layout before marking slots that aren't being referenced

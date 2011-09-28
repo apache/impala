@@ -84,7 +84,7 @@ struct TPlanNode {
   // node id, needed to reassemble tree structure
   1: required TPlanNodeType node_type
   2: required i32 num_children
-  3: optional i64 limit = 0
+  3: required i64 limit
   4: required list<Descriptors.TTupleId> row_tuples
   5: optional list<Exprs.TExpr> conjuncts
 

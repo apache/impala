@@ -117,7 +117,7 @@ Status HdfsTextScanNode::Prepare(RuntimeState* state) {
 
   // Allocate tuple buffer.
   tuple_buf_size_ = state->batch_size() * tuple_desc_->byte_size();
-  tuple_buf_ = tuple_buf_pool_->Allocate(tuple_buf_size_);
+  tuple_buf_ = static_cast<char*>(tuple_buf_pool_->Allocate(tuple_buf_size_));
 
   // TODO(marcel): add int tuple_idx_[] indexed by TupleId somewhere in runtime-state.h
   tuple_idx_ = 0;
@@ -155,6 +155,7 @@ void* HdfsTextScanNode::GetFileBuffer(RuntimeState* state, int* file_buf_idx) {
 }
 
 Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
+  if (ReachedLimit()) return Status::OK;
   tuple_ = reinterpret_cast<Tuple*>(tuple_buf_);
   bzero(tuple_buf_, tuple_buf_size_);
   boundary_column_.clear();
@@ -220,15 +221,20 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
           ParseFileBuffer(state, row_batch, &row_idx, &column_idx, &last_char_is_escape,
                           &unescape_string, &quote_char, &error_in_row, &num_errors));
 
-      if (row_batch->IsFull()) {
+      if (ReachedLimit() || row_batch->IsFull()) {
         // Swap file buffers, so previous buffer is always found at index 0,
         // and will never be overwritten in the following GetNext() call.
         void* tmp = file_bufs_[0];
         file_bufs_[0] = file_buf_;
         file_bufs_[file_buf_idx] = tmp;
-        return Status::OK;
+        // If we've reached our limit, continue on to close the current file.
+        // Otherwise simply return, the next GetNext() call will pick up where we
+        // left off.
+        if (!ReachedLimit()) {
+          return Status::OK;
+        }
       }
-    } while (file_buf_actual_size_ > 0);
+    } while (!ReachedLimit() && file_buf_actual_size_ > 0);
 
     // Close current file.
     int hdfs_ret = hdfsCloseFile(hdfs_connection_, hdfs_file_);
@@ -242,17 +248,28 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
       state->ReportFileErrors(files_[file_idx_], num_errors);
     }
 
+    // if we hit our limit, return now, after having closed the current file
+    // and cleaned up the pools
+    if (ReachedLimit()) {
+      FinalizeScan(row_batch);
+      return Status::OK;
+    }
+
     // Move on to next file.
     ++file_idx_;
   }
 
   // No more work to be done. Clean up all pools with the last row batch.
-  row_batch->AddMemPool(&tuple_buf_pool_);
-  row_batch->AddMemPool(&file_buf_pool_);
-  row_batch->AddMemPool(&var_len_pool_);
+  FinalizeScan(row_batch);
 
   // We have read all partitions (tuple buffer not necessarily full).
   return Status::OK;
+}
+
+void HdfsTextScanNode::FinalizeScan(RowBatch* batch) {
+  batch->AddMemPool(&tuple_buf_pool_);
+  batch->AddMemPool(&file_buf_pool_);
+  batch->AddMemPool(&var_len_pool_);
 }
 
 // This first assembles the full tuple before applying the conjuncts.
@@ -403,7 +420,9 @@ Status HdfsTextScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batc
         }
         if (state->abort_on_error()) {
           state->ReportFileErrors(files_[file_idx_], 1);
-          return Status("Aborted HdfsTextScanNode due to parse errors. View error log for details.");
+          return Status(
+              "Aborted HdfsTextScanNode due to parse errors. View error "
+              "log for details.");
         }
       }
       *column_idx = 0;
@@ -421,15 +440,18 @@ Status HdfsTextScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batc
 
       if (EvalConjuncts(current_row)) {
         row_batch->CommitLastRow();
+        ++num_rows_returned_;
+        if (ReachedLimit()) return Status::OK;
         char* new_tuple = reinterpret_cast<char*>(tuple_);
         new_tuple += tuple_desc_->byte_size();
-        // assert(new_tuple < tuple_buf_ + state->batch_size() * tuple_desc_->byte_size());
         tuple_ = reinterpret_cast<Tuple*>(new_tuple);
         *row_idx = RowBatch::INVALID_ROW_INDEX;
         if (row_batch->IsFull()) {
           // Tuple buffer is full.
           return Status::OK;
         }
+        // don't check until we know we'll use tuple_
+        DCHECK_LE(new_tuple, tuple_buf_ + tuple_buf_size_ - tuple_desc_->byte_size());
       } else {
         // Make sure to reset null indicators since we're overwriting
         // the tuple assembled for the previous row;

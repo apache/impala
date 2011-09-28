@@ -55,6 +55,7 @@ public class AggregationNode extends PlanNode {
       output.append(prefix + "HAVING: ");
       output.append(getExplainString(conjuncts) + "\n");
     }
+    output.append(getLimitExplainString(prefix));
     output.append(getChild(0).getExplainString(prefix + "  "));
     return output.toString();
   }

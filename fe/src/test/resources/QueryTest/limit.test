@@ -1,0 +1,151 @@
+select * from alltypesagg limit 10
+----
+int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string
+----
+2010,1,1,0,true,NULL,NULL,NULL,NULL,NULL,NULL,'01/01/10','0'
+2010,1,1,1,false,1,1,1,10,1.1,10.1,'01/01/10','1'
+2010,1,1,2,true,2,2,2,20,2.2,20.2,'01/01/10','2'
+2010,1,1,3,false,3,3,3,30,3.3,30.3,'01/01/10','3'
+2010,1,1,4,true,4,4,4,40,4.4,40.4,'01/01/10','4'
+2010,1,1,5,false,5,5,5,50,5.5,50.5,'01/01/10','5'
+2010,1,1,6,true,6,6,6,60,6.6,60.6,'01/01/10','6'
+2010,1,1,7,false,7,7,7,70,7.7,70.7,'01/01/10','7'
+2010,1,1,8,true,8,8,8,80,8.8,80.8,'01/01/10','8'
+2010,1,1,9,false,9,9,9,90,9.9,90.9,'01/01/10','9'
+====
+# limit is applied after where clause
+select * from alltypesagg where tinyint_col is null limit 10
+----
+int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string
+----
+2010,1,1,0,true,NULL,NULL,NULL,NULL,NULL,NULL,'01/01/10','0'
+2010,1,1,10,true,NULL,10,10,100,11,101,'01/01/10','10'
+2010,1,1,20,true,NULL,20,20,200,22,202,'01/01/10','20'
+2010,1,1,30,true,NULL,30,30,300,33,303,'01/01/10','30'
+2010,1,1,40,true,NULL,40,40,400,44,404,'01/01/10','40'
+2010,1,1,50,true,NULL,50,50,500,55,505,'01/01/10','50'
+2010,1,1,60,true,NULL,60,60,600,66,606,'01/01/10','60'
+2010,1,1,70,true,NULL,70,70,700,77,707,'01/01/10','70'
+2010,1,1,80,true,NULL,80,80,800,88,808,'01/01/10','80'
+2010,1,1,90,true,NULL,90,90,900,99,909,'01/01/10','90'
+====
+select tinyint_col, count(*) from alltypesagg group by 1
+----
+tinyint, bigint
+----
+4,1000
+5,1000
+6,1000
+7,1000
+8,1000
+9,1000
+NULL,1000
+1,1000
+2,1000
+3,1000
+====
+select tinyint_col, count(*) from alltypesagg group by 1 limit 5
+----
+tinyint, bigint
+----
+4,1000
+5,1000
+6,1000
+7,1000
+8,1000
+====
+# limit and where clause don't interact
+select tinyint_col, count(*) from alltypesagg where smallint_col > 49 group by 1 limit 5
+----
+tinyint, bigint
+----
+4,500
+5,500
+6,500
+7,500
+8,500
+====
+# limit is applied after having
+select tinyint_col, count(*) from alltypesagg group by 1 having tinyint_col > 5 limit 5
+----
+tinyint, bigint
+----
+6,1000
+7,1000
+8,1000
+9,1000
+====
+select tinyint_col, count(*) from alltypesagg group by 1 having tinyint_col > 5 limit 2
+----
+tinyint, bigint
+----
+6,1000
+7,1000
+====
+select j.*, d.*
+from JoinTbl j inner join DimTbl d on (j.test_id = d.id)
+----
+bigint, string, int, int, bigint, string, int
+----
+1001,'Name1',94611,5000,1001,'Name1',94611
+1002,'Name2',94611,5000,1002,'Name2',94611
+1003,'Name3',94611,5000,1003,'Name3',94612
+1004,'Name4',94611,5000,1004,'Name4',94612
+1005,'Name5',94611,5000,1005,'Name5',94613
+1006,'Name16',94612,5000,1006,'Name6',94613
+1006,'Name6',94616,5000,1006,'Name6',94613
+1006,'Name16',94616,5000,1006,'Name6',94613
+1006,'Name16',94612,15000,1006,'Name6',94613
+1006,'Name6',94616,15000,1006,'Name6',94613
+1006,'Name16',94616,15000,1006,'Name6',94613
+====
+# limit is applied to join
+select j.*, d.*
+from JoinTbl j inner join DimTbl d on (j.test_id = d.id)
+limit 8
+----
+bigint, string, int, int, bigint, string, int
+----
+1001,'Name1',94611,5000,1001,'Name1',94611
+1002,'Name2',94611,5000,1002,'Name2',94611
+1003,'Name3',94611,5000,1003,'Name3',94612
+1004,'Name4',94611,5000,1004,'Name4',94612
+1005,'Name5',94611,5000,1005,'Name5',94613
+1006,'Name16',94612,5000,1006,'Name6',94613
+1006,'Name6',94616,5000,1006,'Name6',94613
+1006,'Name16',94616,5000,1006,'Name6',94613
+====
+# limit is not pushed down past join
+select j.*, d.*
+from JoinTbl j right outer join DimTbl d on (j.test_id = d.id)
+----
+bigint, string, int, int, bigint, string, int
+----
+1001,'Name1',94611,5000,1001,'Name1',94611
+1002,'Name2',94611,5000,1002,'Name2',94611
+1003,'Name3',94611,5000,1003,'Name3',94612
+1004,'Name4',94611,5000,1004,'Name4',94612
+1005,'Name5',94611,5000,1005,'Name5',94613
+1006,'Name16',94612,5000,1006,'Name6',94613
+1006,'Name6',94616,5000,1006,'Name6',94613
+1006,'Name16',94616,5000,1006,'Name6',94613
+1006,'Name16',94612,15000,1006,'Name6',94613
+1006,'Name6',94616,15000,1006,'Name6',94613
+1006,'Name16',94616,15000,1006,'Name6',94613
+NULL,'NULL',NULL,NULL,1007,'Name7',94614
+NULL,'NULL',NULL,NULL,1008,'Name8',94614
+NULL,'NULL',NULL,NULL,1009,'Name9',94615
+NULL,'NULL',NULL,NULL,1010,'Name10',94615
+====
+select j.*, d.*
+from JoinTbl j right outer join DimTbl d on (j.test_id = d.id)
+limit 5
+----
+bigint, string, int, int, bigint, string, int
+----
+1001,'Name1',94611,5000,1001,'Name1',94611
+1002,'Name2',94611,5000,1002,'Name2',94611
+1003,'Name3',94611,5000,1003,'Name3',94612
+1004,'Name4',94611,5000,1004,'Name4',94612
+1005,'Name5',94611,5000,1005,'Name5',94613
+====
