@@ -24,7 +24,8 @@ class RuntimeState {
   ObjectPool* obj_pool() const { return obj_pool_.get(); }
   const DescriptorTbl& descs() const { return descs_; }
   int batch_size() const { return batch_size_; }
-  int file_buf_size() const { return file_buf_size_; }
+  void set_batch_size(int batch_size) { batch_size_ = batch_size; }
+  int file_buffer_size() const { return file_buffer_size_; }
   bool abort_on_error() const { return abort_on_error_; }
   int max_errors() const { return max_errors_; }
   const std::vector<std::string>& error_log() const { return error_log_; }
@@ -60,10 +61,13 @@ class RuntimeState {
   std::string FileErrors() const;
 
  private:
+  static const int DEFAULT_BATCH_SIZE = 1024;
+  static const int DEFAULT_FILE_BUFFER_SIZE = 128 * 1024;
+
   const DescriptorTbl& descs_;
   boost::scoped_ptr<ObjectPool> obj_pool_;
   int batch_size_;
-  int file_buf_size_;
+  int file_buffer_size_;
   // A buffer for error messages.
   // The entire error stream is written to the error_log_ in log_error_stream().
   std::stringstream error_stream_;
@@ -77,9 +81,6 @@ class RuntimeState {
   const int max_errors_;
   // HBaseConfiguration jobject. Initialized in InitHBaseConf().
   static void* hbase_conf_;
-
-  static const int DEFAULT_BATCH_SIZE = 1024;
-  static const int DEFAULT_FILE_BUF_SIZE = 131072; // 128K
 
   // prohibit copies
   RuntimeState(const RuntimeState&);

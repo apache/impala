@@ -79,8 +79,10 @@ public class ImpalaStatement implements Statement {
     request.stmt = sql;
     request.returnAsAscii = true;
     try {
-      coordinator.runQuery(request, colTypes, colLabels, Coordinator.DEFAULT_ABORT_ON_ERROR,
-          Coordinator.DEFAULT_MAX_ERRORS, errorLog, fileErrors, resultQueue);
+      coordinator.runQuery(
+          request, colTypes, colLabels, Coordinator.DEFAULT_BATCH_SIZE,
+          Coordinator.DEFAULT_ABORT_ON_ERROR, Coordinator.DEFAULT_MAX_ERRORS,
+          errorLog, fileErrors, resultQueue);
     } catch (ImpalaException e) {
       throw new SQLException(e);
     }

@@ -21,6 +21,7 @@ ostream& operator<<(ostream& os, const TExprOperator::type& op) {
 }
 
 string PrintTuple(Tuple* t, const TupleDescriptor& d) {
+  if (t == NULL) return "null";
   stringstream out;
   out << "(";
   bool first_value = true;

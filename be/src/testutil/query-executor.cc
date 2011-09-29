@@ -128,8 +128,9 @@ Status QueryExecutor::Setup() {
   return Status::OK;
 }
 
-Status QueryExecutor::Exec(const std::string& query, vector<PrimitiveType>* col_types,
-    bool abort_on_error, int max_errors) {
+Status QueryExecutor::Exec(
+    const std::string& query, vector<PrimitiveType>* col_types,
+    int batch_size, bool abort_on_error, int max_errors) {
   VLOG(1) << "query: " << query;
   TExecutePlanRequest request;
   try {
@@ -158,6 +159,7 @@ Status QueryExecutor::Exec(const std::string& query, vector<PrimitiveType>* col_
     executor_.reset(new PlanExecutor(plan_root, *descs, abort_on_error, max_errors));
     runtime_state = executor_->runtime_state();
   }
+  if (batch_size != 0) runtime_state->set_batch_size(batch_size);
 
   for (int i = 0; i < select_list_exprs_.size(); ++i) {
     select_list_exprs_[i]->Prepare(runtime_state, plan_root->row_desc());

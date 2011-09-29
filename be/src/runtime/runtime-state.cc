@@ -24,7 +24,7 @@ RuntimeState::RuntimeState(const DescriptorTbl& descs, bool abort_on_error, int 
   : descs_(descs),
     obj_pool_(new ObjectPool()),
     batch_size_(DEFAULT_BATCH_SIZE),
-    file_buf_size_(DEFAULT_FILE_BUF_SIZE),
+    file_buffer_size_(DEFAULT_FILE_BUFFER_SIZE),
     abort_on_error_(abort_on_error),
     max_errors_(max_errors) {
 }

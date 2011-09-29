@@ -65,8 +65,17 @@ public class DataErrorsTest {
         expectedFileErrors.clear();
         expectedFileErrors.add(expectedFileError);
       }
+      // run query 3 ways: with backend's default batch size, with small batch size,
+      // and with batch size of 1, which should trigger a lot of corner cases
+      // in the execution engine code
       TestUtils.runQuery(coordinator, queryFileParser.getQuery(),
-          queryFileParser.getLineNum(), abortOnError, maxErrors, null, null, null,
+          queryFileParser.getLineNum(), 0, abortOnError, maxErrors, null, null, null,
+          expectedErrors, expectedFileErrors, testErrorLog);
+      TestUtils.runQuery(coordinator, queryFileParser.getQuery(),
+          queryFileParser.getLineNum(), 16, abortOnError, maxErrors, null, null, null,
+          expectedErrors, expectedFileErrors, testErrorLog);
+      TestUtils.runQuery(coordinator, queryFileParser.getQuery(),
+          queryFileParser.getLineNum(), 1, abortOnError, maxErrors, null, null, null,
           expectedErrors, expectedFileErrors, testErrorLog);
     }
     queryFileParser.close();

@@ -15,6 +15,7 @@ namespace impala {
 class Expr;
 class RowDescriptor;
 class Tuple;
+class TupleDescriptor;
 class TupleRow;
 
 // A hash table (a multi-set) that indexes Tuple* by a set of expressions over the
@@ -82,6 +83,7 @@ class HashTable {
   boost::scoped_ptr<HashSet> hash_tbl_;
   const std::vector<Expr*> build_exprs_;
   const std::vector<Expr*> probe_exprs_;
+  TupleDescriptor* build_tuple_desc_;
 
   // needed for Hash-/EqualsFn
   TupleRow* current_build_row_;
@@ -120,6 +122,8 @@ class HashTable {
   // of probe_row. Scans entire table if probe_row is NULL.
   // Returns the scan through 'it'.
   void Scan(TupleRow* probe_row, Iterator* it);
+
+  std::string DebugString();
 
 };
 

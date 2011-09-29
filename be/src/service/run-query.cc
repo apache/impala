@@ -5,6 +5,7 @@
 #include <sys/time.h>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <glog/vlog_is_on.h>
 
 #include "common/status.h"
 #include "exec/hbase-table-scanner.h"
@@ -16,6 +17,7 @@
 
 DEFINE_string(query, "", "query to execute");
 DEFINE_bool(init_hbase, true, "if true, call hbase jni initialization");
+DEFINE_int32(batch_size, 0, "backend's batch size");
 
 using namespace std;
 using namespace impala;
@@ -31,7 +33,8 @@ static void Exec() {
   bool abort_on_error = false;
   int max_errors = 100;
 
-  EXIT_IF_ERROR(executor.Exec(FLAGS_query, NULL, abort_on_error, max_errors));
+  EXIT_IF_ERROR(
+      executor.Exec(FLAGS_query, NULL, FLAGS_batch_size, abort_on_error, max_errors));
 
   int num_rows = 0;
   while (true) {

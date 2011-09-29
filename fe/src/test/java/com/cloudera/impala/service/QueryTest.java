@@ -38,9 +38,21 @@ public class QueryTest {
       queryFileParser.next();
       ArrayList<String> expectedTypes = queryFileParser.getExpectedResult(0);
       ArrayList<String> expectedResults = queryFileParser.getExpectedResult(1);
+      // run query 3 ways: with backend's default batch size, with small batch size,
+      // and with batch size of 1, which should trigger a lot of corner cases
+      // in the execution engine code
       TestUtils.runQuery(
           coordinator, queryFileParser.getQuery(), queryFileParser.getLineNum(),
-          abortOnError, maxErrors, null, expectedTypes, expectedResults, null, null, errorLog);
+          0, abortOnError, maxErrors, null, expectedTypes, expectedResults, null, null,
+          errorLog);
+      TestUtils.runQuery(
+          coordinator, queryFileParser.getQuery(), queryFileParser.getLineNum(),
+          16, abortOnError, maxErrors, null, expectedTypes, expectedResults, null, null,
+          errorLog);
+      TestUtils.runQuery(
+          coordinator, queryFileParser.getQuery(), queryFileParser.getLineNum(),
+          1, abortOnError, maxErrors, null, expectedTypes, expectedResults, null, null,
+          errorLog);
     }
     queryFileParser.close();
     if (errorLog.length() != 0) {

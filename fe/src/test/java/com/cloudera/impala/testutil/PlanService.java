@@ -74,7 +74,7 @@ public class PlanService {
       }
 
       TExecutePlanRequest execRequest = new TExecutePlanRequest(
-          Expr.treesToThrift(analysisResult.selectStmt.getSelectListExprs()));
+          Expr.treesToThrift(analysisResult.selectStmt.getSelectListExprs()), false, true, 1000, 0);
       if (plan != null) {
         execRequest.setPlan(plan.treeToThrift());
         execRequest.setDescTbl(analysisResult.analyzer.getDescTbl().toThrift());

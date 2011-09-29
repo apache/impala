@@ -25,8 +25,8 @@ target_link_libraries(backend
   thrift
   ImpalaThrift
   ${HDFS_LIBS}
-  glogstatic
   gflagsstatic
+  glogstatic
 )
 
 add_executable(runquery 

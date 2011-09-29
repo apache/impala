@@ -198,7 +198,7 @@ public class JdbcDriverTest {
     // Execute query via the coordinator and compare column labels, and query results.
     StringBuilder errorLog = new StringBuilder();
     TestUtils.runQuery(
-        coordinator, query, 0,
+        coordinator, query, 0, 0,
         false, 1000, expectedColLabels, null, expectedResults, null, null, errorLog);
   }
 

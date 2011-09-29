@@ -14,6 +14,7 @@
 namespace impala {
 
 class MemPool;
+class RowBatch;
 class TupleRow;
 
 // Node for in-memory hash joins:
@@ -31,7 +32,6 @@ class TupleRow;
 class HashJoinNode : public ExecNode {
  public:
   HashJoinNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
-  ~HashJoinNode();
 
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
@@ -67,7 +67,7 @@ class HashJoinNode : public ExecNode {
   bool matched_probe_;  // if true, we have matched the current probe tuple
   bool eos_;  // if true, nothing left to return in GetNext()
   int build_tuple_idx_;  // w/in our output row
-  std::vector<MemPool*> build_pools_;  // everything handed to us by the scan of child(1)
+  boost::scoped_ptr<MemPool> build_pool_;  // holds everything referenced in hash_tbl_
   boost::scoped_ptr<RowBatch> probe_batch_;
   int probe_batch_pos_;  // current scan pos in probe_batch_
   TupleRow* current_probe_row_;

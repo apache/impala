@@ -48,7 +48,7 @@ public class TestUtils {
    * @return an error message if actual does not match expected, "" otherwise.
    */
   public static String compareOutput(String[] actual, ArrayList<String> expected) {
-    int mismatch = -1; // line w/ mismatch
+    int mismatch = -1; // line in actual w/ mismatch
     int maxLen = Math.min(actual.length, expected.size());
     for (int i = 0; i < maxLen; ++i) {
       String expectedStr = expected.get(i);
@@ -84,7 +84,16 @@ public class TestUtils {
       }
     }
     if (mismatch == -1 && actual.length < expected.size()) {
-      mismatch = actual.length;
+      // actual is a prefix of expected
+      StringBuilder output =
+          new StringBuilder("actual result is missing lines:\n");
+      for (int i = 0; i < actual.length; ++i) {
+        output.append(actual[i]).append("\n");
+      }
+      output.append("missing:\n");
+      for (int i = actual.length; i < expected.size(); ++i) {
+        output.append(expected.get(i)).append("\n");
+      }
     }
 
     if (mismatch != -1) {
@@ -179,11 +188,13 @@ public class TestUtils {
    * @return an error message if actual does not match expected, "" otherwise.
    */
   public static void runQuery(Coordinator coordinator, String query, int lineNum,
-      boolean abortOnError, int maxErrors, ArrayList<String> expectedColLabels,
+      int batchSize, boolean abortOnError, int maxErrors,
+      ArrayList<String> expectedColLabels,
       ArrayList<String> expectedTypes, ArrayList<String> expectedResults,
       ArrayList<String> expectedErrors, ArrayList<String> expectedFileErrors,
       StringBuilder testErrorLog) {
-    LOG.info("running query " + query);
+    String queryReportString = query + " (batch size=" + Integer.toString(batchSize) + ")";
+    LOG.info("running query " + queryReportString);
     TQueryRequest request = new TQueryRequest(query, true);
     ArrayList<String> errors = new ArrayList<String>();
     SortedMap<String, Integer> fileErrors = new TreeMap<String, Integer>();
@@ -192,12 +203,14 @@ public class TestUtils {
     BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
     ArrayList<String> actualResults = new ArrayList<String>();
     try {
-      coordinator.runQuery(request, colTypes, colLabels, abortOnError, maxErrors,
+      coordinator.runQuery(
+          request, colTypes, colLabels, batchSize, abortOnError, maxErrors,
           errors, fileErrors, resultQueue);
     } catch (ImpalaException e) {
       // Compare errors if we are expecting some.
       if (abortOnError && expectedErrors != null) {
-        compareErrors(query, errors, fileErrors, expectedErrors, expectedFileErrors, testErrorLog);
+        compareErrors(queryReportString, errors, fileErrors, expectedErrors,
+                      expectedFileErrors, testErrorLog);
       } else {
         testErrorLog.append(
             "line " + Integer.toString(lineNum) + ": error executing query '" + query +
@@ -266,11 +279,12 @@ public class TestUtils {
       actualResults.toArray(actualResultsArray);
       String result = TestUtils.compareOutput(actualResultsArray, expectedResults);
       if (!result.isEmpty()) {
-        testErrorLog.append("query:\n" + query + "\n" + result);
+        testErrorLog.append("query:\n" + queryReportString  + "\n" + result);
         return;
       }
     }
-    compareErrors(query, errors, fileErrors, expectedErrors, expectedFileErrors, testErrorLog);
+    compareErrors(queryReportString, errors, fileErrors, expectedErrors,
+                  expectedFileErrors, testErrorLog);
   }
 
   private static void compareErrors(String query,

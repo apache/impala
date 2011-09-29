@@ -11,6 +11,7 @@
 namespace impala {
 
 struct StringValue;
+class TupleDescriptor;
 
 // A tuple is stored as a contiguous sequence of bytes containing a fixed number
 // of fixed-size slots. The slots are arranged in order of increasing byte length;
@@ -40,6 +41,10 @@ class Tuple {
   void Init(int size) {
     bzero(this, size);
   }
+
+  // Create a copy of 'this', including all of its referenced string data,
+  // using pool to allocate memory. Returns the copy.
+  Tuple* DeepCopy(const TupleDescriptor& desc, MemPool* pool);
 
   // Turn null indicator bit on.
   void SetNull(const NullIndicatorOffset& offset) {

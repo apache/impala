@@ -17,6 +17,11 @@ void PlanExecutorAdaptor::DeserializeRequest() {
   TExecutePlanRequest exec_request;
   DeserializeThriftMsg(env_, thrift_execute_plan_request_, &exec_request);
 
+  batch_size_ = exec_request.batch_size;
+  abort_on_error_ = exec_request.abort_on_error;
+  max_errors_ = exec_request.max_errors;
+  as_ascii_ = exec_request.as_ascii;
+
   if (exec_request.__isset.descTbl) {
     THROW_IF_ERROR(DescriptorTbl::Create(&obj_pool_, exec_request.descTbl, &descs_), env_,
                    impala_exc_cl_);
@@ -40,6 +45,9 @@ void PlanExecutorAdaptor::Exec() {
   RETURN_IF_EXC(env_);
   if (plan_ == NULL) return;
   executor_.reset(new PlanExecutor(plan_, *descs_, abort_on_error_, max_errors_));
+  if (batch_size_ != 0) {
+    executor_->runtime_state()->set_batch_size(batch_size_);
+  }
   THROW_IF_ERROR(executor_->Exec(), env_, impala_exc_cl_);
 }
 

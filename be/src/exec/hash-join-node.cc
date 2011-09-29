@@ -20,7 +20,8 @@ using namespace boost;
 HashJoinNode::HashJoinNode(
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
-    join_op_(tnode.hash_join_node.join_op) {
+    join_op_(tnode.hash_join_node.join_op),
+    build_pool_(new MemPool()) {
   // TODO: log errors in runtime state
   Status status = Init(pool, tnode);
   DCHECK(status.ok())
@@ -32,12 +33,6 @@ HashJoinNode::HashJoinNode(
   match_one_build_ = (join_op_ == TJoinOp::LEFT_SEMI_JOIN);
   match_all_build_ =
     (join_op_ == TJoinOp::RIGHT_OUTER_JOIN || join_op_ == TJoinOp::FULL_OUTER_JOIN);
-}
-
-HashJoinNode::~HashJoinNode() {
-  for (int i = 0; i < build_pools_.size(); ++i) {
-    delete build_pools_[i];
-  }
 }
 
 Status HashJoinNode::Init(ObjectPool* pool, const TPlanNode& tnode) {
@@ -83,22 +78,37 @@ Status HashJoinNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(child(1)->Open(state));
   while (true) {
     RETURN_IF_ERROR(child(1)->GetNext(state, &build_batch));
+    // take ownership of tuple data of build_batch
+    build_pool_->AcquireData(build_batch.tuple_data_pool(), false);
+
+    // insert build tuples into our hash table
     for (int i = 0; i < build_batch.num_rows(); ++i) {
-      hash_tbl_->Insert(build_batch.GetRow(i)->GetTuple(0));
+      Tuple* t = build_batch.GetRow(i)->GetTuple(0);
+      VLOG(1) << "build tuple " << t << ": "
+              << PrintTuple(t, *child(1)->row_desc().tuple_descriptors()[0]);
+      hash_tbl_->Insert(t);
+      VLOG(1) << hash_tbl_->DebugString();
     }
-    // hang on to tuple memory until the join is done
-    build_batch.ReleaseMemPools(&build_pools_);
+
     if (build_batch.num_rows() < build_batch.capacity()) break;
+    build_batch.Reset();
   }
   RETURN_IF_ERROR(child(1)->Close(state));
+
+  VLOG(1) << hash_tbl_->DebugString();
 
   RETURN_IF_ERROR(child(0)->Open(state));
 
   // seed probe batch and current_probe_row_, etc.
   RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get()));
   probe_batch_pos_ = 0;
+  if (probe_batch_->num_rows() == 0) {
+    eos_ = true;
+    return Status::OK;
+  }
   matched_probe_ = false;
   current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
+  VLOG(1) << "probe row: " << PrintRow(current_probe_row_, child(0)->row_desc());
   matched_probe_ = false;
   hash_tbl_->Scan(current_probe_row_, &hash_tbl_iterator_);
 
@@ -125,58 +135,67 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch) {
   while (!eos_) {
     Tuple* tuple;
     // create output rows as long as:
-    // * our output batch isn't full;
-    // * we haven't already created an output row for the probe row and are doing
-    //   a semi-join;
-    // * there are more matching build rows
-    while (!out_batch->IsFull()
-           && !(match_one_build_ && matched_probe_)
+    // 1) we haven't already created an output row for the probe row and are doing
+    //    a semi-join;
+    // 2) there are more matching build rows
+    while (!(matched_probe_ && match_one_build_)
            && (tuple = hash_tbl_iterator_.GetNext()) != NULL) {
       TupleRow* out_row = CreateOutputRow(out_batch, current_probe_row_, tuple);
-      if (!EvalConjuncts(other_join_conjuncts_, out_row)) continue;
+     if (!EvalConjuncts(other_join_conjuncts_, out_row)) continue;
       // we have a match for the purpose of the (outer?) join as soon as we
       // satisfy the JOIN clause conjuncts
       matched_probe_ = true;
       if (match_all_build_) {
         // remember that we matched this build tuple
         joined_build_tuples_.insert(tuple);
+        VLOG(1) << "joined build tuple: " << tuple;
       }
       if (EvalConjuncts(conjuncts_, out_row)) {
         out_batch->CommitLastRow();
+        VLOG(1) << "match row: " << PrintRow(out_row, row_desc());
         ++num_rows_returned_;
-        if (ReachedLimit()) return Status::OK;
+        if (out_batch->IsFull() || ReachedLimit()) return Status::OK;
       }
       if (match_one_build_) break;
     }
 
-    if (out_batch->IsFull()) return Status::OK;
+    // check whether we need to output the current probe row before
+    // getting a new probe batch
+    if (match_all_probe_ && !matched_probe_) {
+      TupleRow* out_row = CreateOutputRow(out_batch, current_probe_row_, NULL);
+      if (EvalConjuncts(conjuncts_, out_row)) {
+        out_batch->CommitLastRow();
+        VLOG(1) << "match row: " << PrintRow(out_row, row_desc());
+        ++num_rows_returned_;
+        matched_probe_ = true;
+        if (out_batch->IsFull() || ReachedLimit()) return Status::OK;
+      }
+    }
 
     if (probe_batch_pos_ == probe_batch_->num_rows()) {
       // get new probe batch
       if (probe_batch_->num_rows() < probe_batch_->capacity()) {
         // this was the last probe batch
         eos_ = true;
-        if (match_all_build_) hash_tbl_->Scan(NULL, &hash_tbl_iterator_);
       } else {
         // pass on pools, out_batch might still need them
-        out_batch->AddMemPools(probe_batch_.get());
+        probe_batch_->TransferTupleDataOwnership(out_batch);
         RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get()));
         probe_batch_pos_ = 0;
+        if (probe_batch_->num_rows() == 0) {
+          // we're done; don't exit here, we might still need to finish up an outer join
+          eos_ = true;
+        }
       }
+      // finish up right outer join
+      if (eos_ && match_all_build_) hash_tbl_->Scan(NULL, &hash_tbl_iterator_);
     }
 
-    if (match_all_probe_ && !matched_probe_) {
-      TupleRow* out_row = CreateOutputRow(out_batch, current_probe_row_, NULL);
-      if (EvalConjuncts(conjuncts_, out_row)) {
-        out_batch->CommitLastRow();
-        ++num_rows_returned_;
-        if (ReachedLimit()) return Status::OK;
-      }
-    }
     if (eos_) break;
 
     // join remaining rows in probe_batch_
     current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
+    VLOG(1) << "probe row: " << PrintRow(current_probe_row_, child(0)->row_desc());
     matched_probe_ = false;
     hash_tbl_->Scan(current_probe_row_, &hash_tbl_iterator_);
   }
@@ -189,6 +208,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch) {
       TupleRow* out_row = CreateOutputRow(out_batch, NULL, tuple);
       if (EvalConjuncts(conjuncts_, out_row)) {
         out_batch->CommitLastRow();
+        VLOG(1) << "match row: " << PrintRow(out_row, row_desc());
         ++num_rows_returned_;
         if (ReachedLimit()) return Status::OK;
       }

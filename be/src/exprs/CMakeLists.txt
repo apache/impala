@@ -41,6 +41,7 @@ add_custom_command(
 add_executable(expr-test
   expr-test.cc
 )
+
 target_link_libraries(expr-test
   TestUtil
   Service

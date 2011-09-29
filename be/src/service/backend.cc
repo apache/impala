@@ -62,11 +62,10 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM* vm, void* pvt) {
 extern "C"
 JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecPlan(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_execute_plan_request,
-    jboolean abort_on_error, jint max_errors, jobject error_log, jobject file_errors,
-    jboolean as_ascii, jobject result_queue) {
+    jobject error_log, jobject file_errors, jobject result_queue) {
 
-  PlanExecutorAdaptor adaptor(env, thrift_execute_plan_request, abort_on_error, max_errors,
-      error_log, file_errors, as_ascii, result_queue);
+  PlanExecutorAdaptor adaptor(
+      env, thrift_execute_plan_request, error_log, file_errors, result_queue);
   adaptor.Exec();
   RETURN_IF_EXC(env);
   const vector<Expr*>& select_list_exprs = adaptor.select_list_exprs();

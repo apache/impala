@@ -43,7 +43,7 @@ class ExprTest : public testing::Test {
   void GetValue(const string& expr, PrimitiveType expr_type, void** value) {
     string stmt = "select " + expr;
     vector<PrimitiveType> result_types;
-    Status status = executor_.Exec(stmt, &result_types, false, 0);
+    Status status = executor_.Exec(stmt, &result_types, 0, false, 0);
     ASSERT_TRUE(status.ok()) << "stmt: " << stmt << "\nerror: " << status.GetErrorMsg();
     vector<void*> result_row;
     ASSERT_TRUE(executor_.FetchResult(&result_row).ok());

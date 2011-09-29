@@ -38,11 +38,15 @@ class ExecNode {
   // Retrieves rows and returns them via row_batch. If row_batch
   // is not filled to capacity, it means that there are no more rows
   // to retrieve.
-  // All data referenced by any tuples returned in row_batch must be reachable
-  // until the next call to GetNext(). The row_batch, including all mempools that
-  // are attached to it, will be destroyed after the GetNext() call.
-  // (If mempools contain data that will only be returned in subsequent GetNext()
-  // calls, they must *not* be attached to this call's row_batch.)
+  // Data referenced by any tuples returned in row_batch must not be overwritten
+  // by the callee until Close() is called. The memory holding that data
+  // can be returned via row_batch's tuple_data_pool (in which case it may be deleted
+  // by the caller) or held on to by the callee. The row_batch, including its
+  // tuple_data_pool, will be destroyed by the caller at some point prior to the final
+  // Close() call.
+  // In other words, if the memory holding the tuple data will be referenced
+  // by the callee in subsequent GetNext() calls, it must *not* be attached to the
+  // row_batch's tuple_data_pool.
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch) = 0;
 
   // Releases all resources that were allocated in Open()/GetNext().

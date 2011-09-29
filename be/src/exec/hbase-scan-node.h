@@ -35,7 +35,6 @@ class HBaseScanNode : public ExecNode {
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
-  const static int POOL_INIT_SIZE = 4096;
   const static int SKIP_COLUMN = -1;
   // Column 0 in the Impala metadata refers to the HBasw row key.
   const static int ROW_KEY = 0;
@@ -65,13 +64,8 @@ class HBaseScanNode : public ExecNode {
   // Counts the total number of conversion errors for this table.
   int num_errors_;
 
-  // Memory pools created in c'tor and destroyed in d'tor.
-
-  // Pool for allocating tuple buffer.
-  boost::scoped_ptr<MemPool> tuple_buf_pool_;
-
-  // Pool for allocating memory for variable-length slots.
-  boost::scoped_ptr<MemPool> var_len_pool_;
+  // Pool for allocating tuple data, including all varying-length slots.
+  boost::scoped_ptr<MemPool> tuple_pool_;
 
   // Jni helper for scanning an HBase table.
   boost::scoped_ptr<HBaseTableScanner> hbase_scanner_;
@@ -88,11 +82,11 @@ class HBaseScanNode : public ExecNode {
   SlotDescriptor* row_key_slot_;
 
   // Size of tuple buffer determined by size of tuples and capacity of row batches.
-  int tuple_buf_size_;
+  int tuple_buffer_size_;
 
-  // Buffer where tuples are written into.
-  // Must be valid until next GetNext().
-  void* tuple_buf_;
+  // Buffer into which fixed-length portion of tuple data is written in current
+  // GetNext() call.
+  void* tuple_buffer_;
 
   // Current tuple.
   Tuple* tuple_;
@@ -102,7 +96,8 @@ class HBaseScanNode : public ExecNode {
 
   // Writes a slot in tuple_ from an HBase value containing text data.
   // The HBase value is converted into the appropriate target type.
-  void WriteTextSlot(const std::string& family, const std::string& qualifier,
+  void WriteTextSlot(
+      const std::string& family, const std::string& qualifier,
       void* value, int value_length, SlotDescriptor* slot,
       RuntimeState* state, bool* error_in_row);
 };

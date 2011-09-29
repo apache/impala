@@ -42,6 +42,7 @@ public class Coordinator {
 
   public static final boolean DEFAULT_ABORT_ON_ERROR = false;
   public static final int DEFAULT_MAX_ERRORS = 100;
+  public static final int DEFAULT_BATCH_SIZE = 0;  // backend's default
 
   private final Catalog catalog;
 
@@ -63,14 +64,15 @@ public class Coordinator {
   // is finished) and place the results in resultQueue, followed by an empty
   // row that acts as an end-of-stream marker.
   // Also populates 'colTypes' and 'colLabels'.
-  public void runQuery(TQueryRequest request, List<PrimitiveType> colTypes, List<String> colLabels,
-      boolean abortOnError, int maxErrors, List<String> errorLog, Map<String, Integer> fileErrors,
+  public void runQuery(TQueryRequest request, List<PrimitiveType> colTypes,
+      List<String> colLabels, int batchSize, boolean abortOnError, int maxErrors,
+      List<String> errorLog, Map<String, Integer> fileErrors,
       BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
     init();
     LOG.info("query: " + request.stmt);
     AnalysisContext.AnalysisResult analysisResult = analyzeQuery(request, colTypes, colLabels);
-    execQuery(analysisResult, abortOnError, maxErrors, errorLog, fileErrors, request.returnAsAscii,
-        resultQueue);
+    execQuery(analysisResult, batchSize, abortOnError, maxErrors, errorLog, fileErrors,
+              request.returnAsAscii, resultQueue);
     addSentinelRow(resultQueue);
   }
 
@@ -82,9 +84,9 @@ public class Coordinator {
   // null.
   public void asyncRunQuery(
       final TQueryRequest request, List<PrimitiveType> colTypes, List<String> colLabels,
-      final boolean abortOnError, final int maxErrors, final List<String> errorLog,
-      final Map<String, Integer> fileErrors, final BlockingQueue<TResultRow> resultQueue)
-      throws ImpalaException {
+      final int batchSize, final boolean abortOnError, final int maxErrors,
+      final List<String> errorLog, final Map<String, Integer> fileErrors,
+      final BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
     init();
     LOG.info("query: " + request.stmt);
     final AnalysisContext.AnalysisResult analysisResult =
@@ -92,8 +94,8 @@ public class Coordinator {
     Runnable execCall = new Runnable() {
       public void run() {
         try {
-          execQuery(analysisResult, abortOnError, maxErrors, errorLog, fileErrors,
-              request.returnAsAscii, resultQueue);
+          execQuery(analysisResult, batchSize, abortOnError, maxErrors, errorLog,
+                    fileErrors, request.returnAsAscii, resultQueue);
         } catch (ImpalaException e) {
           errorMsg = e.getMessage();
         }
@@ -156,8 +158,9 @@ public class Coordinator {
   // strings.
   private void execQuery(
       AnalysisContext.AnalysisResult analysisResult,
-      boolean abortOnError, int maxErrors, List<String> errorLog, Map<String, Integer> fileErrors,
-      boolean returnAsAscii, BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
+      int batchSize, boolean abortOnError, int maxErrors, List<String> errorLog,
+      Map<String, Integer> fileErrors, boolean returnAsAscii,
+      BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
     // create plan
     Planner planner = new Planner();
     PlanNode plan = planner.createPlan(analysisResult.selectStmt, analysisResult.analyzer);
@@ -165,15 +168,15 @@ public class Coordinator {
     // execute locally
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     TExecutePlanRequest execRequest = new TExecutePlanRequest(
-        Expr.treesToThrift(analysisResult.selectStmt.getSelectListExprs()));
+        Expr.treesToThrift(analysisResult.selectStmt.getSelectListExprs()), returnAsAscii,
+        abortOnError, maxErrors, batchSize);
     if (plan != null) {
       execRequest.setPlan(plan.treeToThrift());
       execRequest.setDescTbl(analysisResult.analyzer.getDescTbl().toThrift());
     }
     try {
       NativeBackend.ExecPlan(
-          serializer.serialize(execRequest), abortOnError, maxErrors, errorLog, fileErrors,
-          returnAsAscii, resultQueue);
+          serializer.serialize(execRequest), errorLog, fileErrors, resultQueue);
     } catch (TException e) {
       throw new RuntimeException(e.getMessage());
     }
@@ -191,7 +194,7 @@ public class Coordinator {
     PlanNode plan = planner.createPlan(analysisResult.selectStmt, analysisResult.analyzer);
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     TExecutePlanRequest execRequest = new TExecutePlanRequest(
-        Expr.treesToThrift(analysisResult.selectStmt.getSelectListExprs()));
+        Expr.treesToThrift(analysisResult.selectStmt.getSelectListExprs()), false, true, 1000, 0);
     if (plan != null) {
       execRequest.setPlan(plan.treeToThrift());
       execRequest.setDescTbl(analysisResult.analyzer.getDescTbl().toThrift());
@@ -239,10 +242,12 @@ public class Coordinator {
     BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
     Coordinator coordinator = new Coordinator(catalog);
     if (asyncExec) {
-      coordinator.asyncRunQuery(request, colTypes, colLabels, DEFAULT_ABORT_ON_ERROR,
+      coordinator.asyncRunQuery(
+          request, colTypes, colLabels, DEFAULT_BATCH_SIZE, DEFAULT_ABORT_ON_ERROR,
           DEFAULT_MAX_ERRORS, errorLog, fileErrors, resultQueue);
     } else {
-      coordinator.runQuery(request, colTypes, colLabels, DEFAULT_ABORT_ON_ERROR,
+      coordinator.runQuery(
+          request, colTypes, colLabels, DEFAULT_BATCH_SIZE, DEFAULT_ABORT_ON_ERROR,
           DEFAULT_MAX_ERRORS, errorLog, fileErrors, resultQueue);
     }
     while (true) {

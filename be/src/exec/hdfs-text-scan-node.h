@@ -29,7 +29,7 @@ class TextConverter;
 // and writes their content as tuples in the
 // Impala in-memory representation of data (tuples, rows, row batches).
 // We read HDFS files one file buffer at a time,
-// allocating new buffers with file_buf_pool_ as needed.
+// allocating new buffers with file_buffer_pool_ as needed.
 // We parse each file buffer character-by-character and
 // write tuples into a fixed-size tuple buffer that is allocated once in Prepare().
 // For variable-length fields (e.g. strings), our tuples
@@ -112,31 +112,16 @@ class HdfsTextScanNode : public ExecNode {
   // Ignored if strings_are_quoted_ is false.
   char string_quote_;
 
-  // Memory pools created in c'tor and destroyed in d'tor. These are auto_ptrs, as opposed
-  // to scoped_ptrs, because we need to be able to pass them up via the output RowBatch
-  // of GetNext().
+  // contains all memory for tuple data, including string data which we can't reference
+  // in the file buffers (because it needs to be unescaped or straddles two file buffers)
+  boost::scoped_ptr<MemPool> tuple_pool_;
 
-  // Pool for allocating tuple buffer.
-  std::auto_ptr<MemPool> tuple_buf_pool_;
-
-  // Pool for allocating file buffers;
-  std::auto_ptr<MemPool> file_buf_pool_;
-
-  // Pool for allocating memory for variable-length slots.
-  std::auto_ptr<MemPool> var_len_pool_;
+  // Pool for allocating file buffers.
+  boost::scoped_ptr<MemPool> file_buffer_pool_;
 
   // Pool for allocating objects.
   // Currently only used for creating LiteralExprs from TExpr for partition keys in Prepare().
   boost::scoped_ptr<ObjectPool> obj_pool_;
-
-  // Pseudo ring of file buffers, to avoid reallocation.
-  // file_bufs_[0] always points to the file buffer from a previous GetNext() call.
-  // For reading HDFS files, we hand off buffers starting from index 1,
-  // so we never overwrite the buffer from a previous GetNext() call.
-  // Whenever a row batch fills up, we swap file_bufs_[file_buf_idx_] with file_bufs_[0].
-  // Also see GetFileBuffer().
-  std::vector<void*> file_bufs_;
-
 
   // Parser internal state:
 
@@ -147,29 +132,34 @@ class HdfsTextScanNode : public ExecNode {
   hdfsFile hdfs_file_;
 
   // Actual bytes received from last file read.
-  tSize file_buf_actual_size_;
+  tSize file_buffer_read_size_;
 
   // Index of current file being processed.
   int file_idx_;
 
-  // Size of tuple buffer determined by size of tuples and capacity of row batches.
-  int tuple_buf_size_;
+  // Contiguous block of memory into which tuples are written, allocated
+  // from tuple_pool_. We don't allocate individual tuples from tuple_pool_ directly,
+  // because MemPool::Allocate() always rounds up to the next 8 bytes
+  // (ie, would be wasteful if we had 2-byte tuples).
+  char* tuple_buffer_;
 
-  // Buffer where tuples are written into.
-  // Must be valid until next GetNext().
-  char* tuple_buf_;
+  // Size of tuple_buffer_.
+  int tuple_buffer_size_;
 
   // Current tuple.
   Tuple* tuple_;
 
   // Buffer for data read from file.
-  char* file_buf_;
+  char* file_buffer_;
 
   // Current position in file buffer.
-  char* file_buf_ptr_;
+  char* file_buffer_ptr_;
 
   // Ending position of file buffer.
-  char* file_buf_end_;
+  char* file_buffer_end_;
+
+  // number of errors in current file
+  int num_errors_in_file_;
 
   // Mapping from column index in table to slot index in output tuple.
   // Created in Prepare() from SlotDescriptors.
@@ -201,7 +191,7 @@ class HdfsTextScanNode : public ExecNode {
   // Helper class for converting text to other types;
   boost::scoped_ptr<TextConverter> text_converter_;
 
-  // Parses the current file_buf_ and writes tuples into the tuple buffer.
+  // Parses the current file_buffer_ and writes tuples into the tuple buffer.
   // Input Parameters
   //   state: Runtime state into which we log errors.
   //   row_batch: Row batch into which to write new tuples.
@@ -222,26 +212,12 @@ class HdfsTextScanNode : public ExecNode {
   //                 Once the error log is full, error_in_row will still be set,
   //                 in order to be able to record the errors per file,
   //                 even though not all details are logged.
-  //   num_errors_: Counts the number of errors in the current file.
-  //                Used for error reporting.
   // Returns Status::OK if no errors were found,
   // or if errors were found but state->abort_on_error() is false.
   // Returns error message if errors were found and state->abort_on_error() is true.
   Status ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, int* row_idx,
       int* column_idx, bool* last_char_is_escape, bool* unescape_string,
-      char* quote_char, bool* error_in_row, int* num_errors);
-
-  // Returns the next valid file buffer for reading HDFS files.
-  // We maintain a pseudo ring list of file buffers in file_bufs_.
-  // We return file buffers starting from file_bufs_[1],
-  // adding new buffers as necessary (allocated from file_buf_pool_).
-  // file_bufs_[0] points to the file buffer from a previous call to GetNext().
-  // input/output parameter:
-  //   file_buf_idx: Index of current file buffer, will be incremented.
-  void* GetFileBuffer(RuntimeState* state, int* file_buf_idx);
-
-  // Attach pools to batch.
-  void FinalizeScan(RowBatch* batch);
+      char* quote_char, bool* error_in_row);
 };
 
 }

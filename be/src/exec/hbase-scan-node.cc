@@ -29,11 +29,10 @@ HBaseScanNode::HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode,
             : ""),
       filters_(tnode.hbase_scan_node.filters),
       num_errors_(0),
-      tuple_buf_pool_(new MemPool(POOL_INIT_SIZE)),
-      var_len_pool_(new MemPool(POOL_INIT_SIZE)),
+      tuple_pool_(new MemPool()),
       hbase_scanner_(NULL),
       row_key_slot_(NULL),
-      text_converter_(new TextConverter(false, '\\', var_len_pool_.get())) {
+      text_converter_(new TextConverter(false, '\\', tuple_pool_.get())) {
 }
 
 bool HBaseScanNode::CmpColPos(const SlotDescriptor* a, const SlotDescriptor* b) {
@@ -77,10 +76,6 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
     sorted_cols_.push_back(&hbase_table->cols()[sorted_non_key_slots_[i]->col_pos()]);
   }
 
-  // Allocate tuple buffer.
-  tuple_buf_size_ = state->batch_size() * tuple_desc_->byte_size();
-  tuple_buf_ = tuple_buf_pool_->Allocate(tuple_buf_size_);
-
   // TODO(marcel): add int tuple_idx_[] indexed by TupleId somewhere in runtime-state.h
   tuple_idx_ = 0;
 
@@ -94,7 +89,8 @@ Status HBaseScanNode::Open(RuntimeState* state) {
   return hbase_scanner_->StartScan(tuple_desc_, start_key_, stop_key_, filters_);
 }
 
-void HBaseScanNode::WriteTextSlot(const string& family, const string& qualifier,
+void HBaseScanNode::WriteTextSlot(
+    const string& family, const string& qualifier,
     void* value, int value_length, SlotDescriptor* slot,
     RuntimeState* state, bool* error_in_row) {
   bool parsed_ok = text_converter_->ConvertAndWriteSlotBytes(reinterpret_cast<char*>(value),
@@ -111,11 +107,12 @@ void HBaseScanNode::WriteTextSlot(const string& family, const string& qualifier,
 
 Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
   if (ReachedLimit()) return Status::OK;
-  tuple_ = reinterpret_cast<Tuple*>(tuple_buf_);
-  bzero(tuple_buf_, tuple_buf_size_);
 
-  // Reset pool to reuse its already allocated memory.
-  var_len_pool_->Clear();
+  // create new tuple buffer for row_batch
+  tuple_buffer_size_ = row_batch->capacity() * tuple_desc_->byte_size();
+  tuple_buffer_ = tuple_pool_->Allocate(tuple_buffer_size_);
+  bzero(tuple_buffer_, tuple_buffer_size_);
+  tuple_ = reinterpret_cast<Tuple*>(tuple_buffer_);
 
   // Indicates whether the current row has conversion errors. Used for error reporting.
   bool error_in_row = false;
@@ -123,7 +120,12 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
   // Indicates whether there are more rows to process. Set in hbase_scanner_.Next().
   bool has_next = false;
   while (true) {
-    if (row_batch->IsFull()) return Status::OK;
+    if (ReachedLimit() || row_batch->IsFull()) {
+      // hang on to last allocated chunk in pool, we'll keep writing into it in the
+      // next GetNext() call
+      row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), true);
+      return Status::OK;
+    }
     RETURN_IF_ERROR(hbase_scanner_->Next(&has_next));
     if (!has_next) {
       if (num_errors_ > 0) {
@@ -131,6 +133,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
             static_cast<const HBaseTableDescriptor*> (tuple_desc_->table_desc());
         state->ReportFileErrors(hbase_table->table_name(), num_errors_);
       }
+      row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), false);
       return Status::OK;
     }
 
@@ -187,7 +190,6 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
     if (EvalConjuncts(row)) {
       row_batch->CommitLastRow();
       ++num_rows_returned_;
-      if (ReachedLimit()) return Status::OK;
       char* new_tuple = reinterpret_cast<char*>(tuple_);
       new_tuple += tuple_desc_->byte_size();
       tuple_ = reinterpret_cast<Tuple*>(new_tuple);

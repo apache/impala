@@ -10,6 +10,7 @@
 #include "runtime/descriptors.h"
 #include "runtime/raw-value.h"
 #include "runtime/tuple-row.h"
+#include "util/debug-util.h"
 
 using namespace std;
 using namespace boost;
@@ -24,9 +25,13 @@ HashTable::HashTable(const std::vector<Expr*>& build_exprs,
   : hash_fn_(this),
     equals_fn_(this),
     // TODO: how many buckets?
-    hash_tbl_(new HashSet(17, hash_fn_, equals_fn_)),
+    // for now, we just pick some arbitrary prime number, but this should
+    // ideally be informed by the estimated size of the final table
+    // (but our planner isn't good enough yet to produce that estimate)
+    hash_tbl_(new HashSet(1031, hash_fn_, equals_fn_)),
     build_exprs_(build_exprs),
     probe_exprs_(probe_exprs),
+    build_tuple_desc_(build_row_desc.tuple_descriptors()[build_tuple_idx]),
     current_build_row_(NULL),
     current_probe_row_(NULL),
     build_row_data_(new Tuple*[build_row_desc.tuple_descriptors().size()]),
@@ -147,6 +152,18 @@ void HashTable::DebugString(int indentation_level, std::stringstream* out) const
        << " build_exprs=" << Expr::DebugString(build_exprs_)
        << " probe_exprs=" << Expr::DebugString(probe_exprs_);
   *out << ")";
+}
+
+string HashTable::DebugString() {
+  stringstream out;
+  out << "size=" << hash_tbl_->size() << "\n";
+  Iterator i;
+  Scan(NULL, &i);
+  Tuple* t;
+  while ((t = i.GetNext()) != NULL) {
+    out << "tuple " << t << ": " << PrintTuple(t, *build_tuple_desc_) << "\n";
+  }
+  return out.str();
 }
 
 }

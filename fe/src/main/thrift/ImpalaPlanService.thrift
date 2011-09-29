@@ -14,6 +14,20 @@ struct TExecutePlanRequest {
   1: optional PlanNodes.TPlan plan
   2: optional Descriptors.TDescriptorTable descTbl
   3: list<Exprs.TExpr> selectListExprs
+
+  // if true, return result in ascii, otherwise return in binary format
+  // (see TColumnValue)
+  4: required bool as_ascii
+
+  // if true, abort execution on the first error
+  5: required bool abort_on_error
+
+  // maximum # of errors to be reported
+  6: required i32 max_errors
+
+  // for debugging: set batch size used by backend internally;
+  // a size of 0 indicates backend default
+  7: required i32 batch_size
 }
 
 exception TException {

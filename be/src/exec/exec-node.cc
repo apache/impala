@@ -14,6 +14,7 @@
 #include "exec/hbase-scan-node.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
+#include "runtime/row-batch.h"
 #include "gen-cpp/PlanNodes_types.h"
 
 using namespace std;

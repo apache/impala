@@ -6,6 +6,7 @@
 #include <vector>
 #include <cstring>
 #include <glog/logging.h>
+#include <boost/scoped_ptr.hpp>
 
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
@@ -27,16 +28,14 @@ class RowBatch {
       num_rows_(0),
       capacity_(capacity),
       num_tuples_per_row_(descriptors.size()),
-      tuple_ptrs_(new char[capacity_ * num_tuples_per_row_ * sizeof(Tuple*)]) {
+      tuple_ptrs_(new char[capacity_ * num_tuples_per_row_ * sizeof(Tuple*)]),
+      tuple_data_pool_(new MemPool()) {
     DCHECK(!descriptors.empty());
     DCHECK_GT(capacity, 0);
   }
 
   ~RowBatch() {
     delete [] tuple_ptrs_;
-    for (int i = 0; i < mem_pools_.size(); ++i) {
-      delete mem_pools_[i];
-    }
   }
 
   static const int INVALID_ROW_INDEX = -1;
@@ -73,33 +72,17 @@ class RowBatch {
 
   void Reset() {
     num_rows_ = 0;
-    for (int i = 0; i < mem_pools_.size(); ++i) {
-      delete mem_pools_[i];
-    }
-    mem_pools_.clear();
+    tuple_data_pool_.reset(new MemPool());
   }
 
-  // Transfer ownership of pool to this batch.
-  void AddMemPool(std::auto_ptr<MemPool>* pool) {
-    mem_pools_.push_back(pool->release());
-  }
+  MemPool* tuple_data_pool() { return tuple_data_pool_.get(); }
 
-  // Release our mempools.
-  void ReleaseMemPools(std::vector<MemPool*>* pools) {
-    pools->insert(pools->end(), mem_pools_.begin(), mem_pools_.end());
-    mem_pools_.clear();
-    // make sure we can't access tuples after we gave up the pools holding the tuple data
-    Reset();
-  }
-
-  // Transfer ownership of src's mempools to this batch.
-  void AddMemPools(RowBatch* src) {
-    mem_pools_.insert(
-        mem_pools_.end(), src->mem_pools_.begin(), src->mem_pools_.end());
-    src->mem_pools_.clear();
-    // make sure we can't access src's tuples after it gave up the pools holding the
+  // Transfer ownership of our tuple data to dest.
+  void TransferTupleDataOwnership(RowBatch* dest) {
+    dest->tuple_data_pool_->AcquireData(tuple_data_pool_.get(), false);
+    // make sure we can't access our tuples after we gave up the pools holding the
     // tuple data
-    src->Reset();
+    Reset();
   }
 
   void CopyRow(TupleRow* src, TupleRow* dest) {
@@ -120,7 +103,9 @@ class RowBatch {
   int num_tuples_per_row_;
   // TODO: replace w/ tr1 array?
   char* tuple_ptrs_;
-  std::vector<MemPool*> mem_pools_;  // holding tuple data
+
+  // holding (some of the) data referenced by rows
+  boost::scoped_ptr<MemPool> tuple_data_pool_;
 };
 
 }

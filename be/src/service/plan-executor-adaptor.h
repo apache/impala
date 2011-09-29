@@ -28,13 +28,12 @@ class TupleDescriptor;
 class PlanExecutorAdaptor {
  public:
   PlanExecutorAdaptor(JNIEnv* env, jbyteArray thrift_execute_plan_request,
-      jboolean abort_on_error, jint max_errors,
-      jobject error_log, jobject file_errors,
-      jboolean as_ascii, jobject result_queue) :
-    env_(env), thrift_execute_plan_request_(thrift_execute_plan_request),
-        abort_on_error_(abort_on_error), max_errors_(max_errors),
-        error_log_(error_log), file_errors_(file_errors),
-        as_ascii_(as_ascii), result_queue_(result_queue) {
+                      jobject error_log, jobject file_errors, jobject result_queue)
+  : env_(env),
+    thrift_execute_plan_request_(thrift_execute_plan_request),
+    error_log_(error_log),
+    file_errors_(file_errors),
+    result_queue_(result_queue) {
   }
 
   // Indicate error with Status.
@@ -63,6 +62,7 @@ class PlanExecutorAdaptor {
  private:
   JNIEnv* env_;
   jbyteArray thrift_execute_plan_request_;
+  int batch_size_;
   bool abort_on_error_;
   int max_errors_;
   jobject error_log_;
