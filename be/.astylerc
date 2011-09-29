@@ -1,0 +1,73 @@
+# Reference: http://astyle.sourceforge.net/astyle.html
+
+# Indent using 2 spaces
+--indent=spaces=2
+
+# Indent using attached brackets, e.g.
+#  int Foo(bool isBar) {
+#      if (isBar) {
+#          bar();
+#          return 1;
+#      } else
+#          return 0;
+#  }
+#
+--brackets=attach
+
+# Indent 'switch' blocks so that the 'case X:' statements are indented in
+# the switch block. The entire case block is indented:
+#
+# switch (foo)
+# {
+# case 1:
+#     a += 1;
+#     break;
+#
+# case 2:
+# {
+#     a += 2;
+#     break;
+# }
+# }
+#
+#becomes:
+#
+# switch (foo)
+# {
+#     case 1:
+#         a += 1;
+#         break;
+#
+#     case 2:
+#     {
+#         a += 2;
+#         break;
+#     }
+# }
+--indent-switches
+
+# Insert space padding around operators. Any end of line comments will
+# remain in the original column, if possible. Note that there is no option
+# to unpad. Once padded, they stay padded.
+#
+# if (foo==2)
+#     a=bar((b-c)*a,d--);
+#
+#becomes:
+#
+# if (foo == 2)
+#      a = bar((b - c) * a, d--);
+--pad-oper
+
+# Attach a pointer or reference operator (* or &) to the variable type (left):
+#
+# char *foo1;
+# char &foo2;
+#
+# becomes (with align-pointer=type):
+#
+# char* foo1;
+# char& foo2;
+--align-pointer=type
+
+
