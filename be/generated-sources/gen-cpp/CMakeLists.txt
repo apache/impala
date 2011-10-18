@@ -9,6 +9,9 @@ set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/thrift")
 # keep everything in one library, the object files reference 
 # each other
 add_library(ImpalaThrift
+  ImpalaBackendService.cpp
+  ImpalaBackendService_constants.cpp
+  ImpalaBackendService_types.cpp
   ImpalaPlanService.cpp
   ImpalaPlanService_constants.cpp
   ImpalaPlanService_types.cpp

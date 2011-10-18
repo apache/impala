@@ -33,6 +33,7 @@ import com.google.common.collect.Lists;
  * its children (= are bound by tupleIds).
  */
 abstract public class PlanNode extends TreeNode<PlanNode> {
+  protected int id;  // unqiue w/in plan tree; assigned by planner
   protected long limit; // max. # of rows to be returned; 0: no limit
   protected ArrayList<TupleId> tupleIds;  // ids materialized by the tree rooted at this node
 
@@ -57,6 +58,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     this.tupleIds = Lists.newArrayList();
     this.conjuncts = Lists.newArrayList();
     this.rowTupleIds = Lists.newArrayList();
+  }
+
+  public int getId() {
+    return id;
   }
 
   public long getLimit() {
@@ -103,6 +108,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // Append a flattened version of this plan node, including all children, to 'container'.
   private void treeToThriftHelper(TPlan container) {
     TPlanNode msg = new TPlanNode();
+    msg.node_id = id;
     msg.num_children = children.size();
     msg.limit = limit;
     for (TupleId tid: rowTupleIds) {

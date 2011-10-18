@@ -7,12 +7,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
-import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
@@ -23,21 +23,19 @@ import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.planner.PlanNode;
 import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.planner.ValueRange;
 import com.cloudera.impala.thrift.TColumnValue;
-import com.cloudera.impala.thrift.TExecutePlanRequest;
+import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TQueryRequest;
 import com.cloudera.impala.thrift.TResultRow;
+import com.cloudera.impala.thrift.TUniqueId;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
-public class Coordinator {
+public class Executor {
   private final static Logger LOG = LoggerFactory.getLogger(ValueRange.class);
 
   public static final boolean DEFAULT_ABORT_ON_ERROR = false;
@@ -50,7 +48,7 @@ public class Coordinator {
   private Thread execThread;
   private String errorMsg;
 
-  public Coordinator(Catalog catalog) {
+  public Executor(Catalog catalog) {
     this.catalog = catalog;
     init();
   }
@@ -113,7 +111,7 @@ public class Coordinator {
       try {
         execThread.join();
       } catch (InterruptedException e) {
-        assert false : "unexpected interrupt: execThread.join()";
+        throw new AssertionError("unexpected interrupt: execThread.join()");
       }
       return errorMsg;
     } else {
@@ -126,7 +124,7 @@ public class Coordinator {
       resultQueue.put(new TResultRow());
     } catch (InterruptedException e) {
       // we don't expect to get interrupted
-      assert false : "unexpected blockingqueueinterrupt";
+      throw new AssertionError("unexpected blockingqueueinterrupt");
     }
   }
 
@@ -161,54 +159,42 @@ public class Coordinator {
       int batchSize, boolean abortOnError, int maxErrors, List<String> errorLog,
       Map<String, Integer> fileErrors, boolean returnAsAscii,
       BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
-    // create plan
+    // create plan fragments
     Planner planner = new Planner();
-    PlanNode plan = planner.createPlan(analysisResult.selectStmt, analysisResult.analyzer);
-    LOG.info(plan.getExplainString());
-    // execute locally
-    TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
-    TExecutePlanRequest execRequest = new TExecutePlanRequest(
-        Expr.treesToThrift(analysisResult.selectStmt.getSelectListExprs()), returnAsAscii,
-        abortOnError, maxErrors, batchSize);
-    if (plan != null) {
-      execRequest.setPlan(plan.treeToThrift());
-      execRequest.setDescTbl(analysisResult.analyzer.getDescTbl().toThrift());
+    List<PlanNode> planFragments = Lists.newArrayList();
+    // for now, only single-node execution
+    TQueryExecRequest execRequest = planner.createPlanFragments(
+        analysisResult.selectStmt, analysisResult.analyzer, 1, planFragments);
+    for (PlanNode plan: planFragments) {
+      LOG.info(plan.getExplainString());
     }
+
+    // set remaining execution parameters
+    UUID queryId = UUID.randomUUID();
+    execRequest.setQueryId(
+        new TUniqueId(queryId.getMostSignificantBits(),
+                      queryId.getLeastSignificantBits()));
+    execRequest.setAsAscii(returnAsAscii);
+    execRequest.setAbortOnError(abortOnError);
+    execRequest.setMaxErrors(maxErrors);
+    execRequest.setBatchSize(batchSize);
+
+    TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     try {
-      NativeBackend.ExecPlan(
+      NativeBackend.ExecQuery(
           serializer.serialize(execRequest), errorLog, fileErrors, resultQueue);
     } catch (TException e) {
       throw new RuntimeException(e.getMessage());
     }
   }
 
-  public static byte[] getThriftPlan(String queryStr)
-      throws MetaException, NotImplementedException, AnalysisException,
-      InternalException, TException {
-    HiveMetaStoreClient client = new HiveMetaStoreClient(new HiveConf(Coordinator.class));
-    Catalog catalog = new Catalog(client);
-    AnalysisContext analysisCtxt = new AnalysisContext(catalog);
-    AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(queryStr);
-    // create plan
-    Planner planner = new Planner();
-    PlanNode plan = planner.createPlan(analysisResult.selectStmt, analysisResult.analyzer);
-    TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
-    TExecutePlanRequest execRequest = new TExecutePlanRequest(
-        Expr.treesToThrift(analysisResult.selectStmt.getSelectListExprs()), false, true, 1000, 0);
-    if (plan != null) {
-      execRequest.setPlan(plan.treeToThrift());
-      execRequest.setDescTbl(analysisResult.analyzer.getDescTbl().toThrift());
-    }
-    return serializer.serialize(execRequest);
-  }
-
   public static Catalog createCatalog() {
     HiveMetaStoreClient client = null;
     try {
-      client = new HiveMetaStoreClient(new HiveConf(Coordinator.class));
+      client = new HiveMetaStoreClient(new HiveConf(Executor.class));
     } catch (Exception e) {
       System.err.println(e.getMessage());
-      System.exit(2);
+      throw new AssertionError("couldn't create HiveMetaStoreClient");
     }
     return new Catalog(client);
   }
@@ -228,19 +214,19 @@ public class Coordinator {
    *          Result rows are separated by newlines and fields are tabs.
    *          Runtime error log is written after the results.
    * @return
-   *         The number of result rows.
+   *         The number of result rows or -1 on error.
    */
   public static int runQuery(String query, Catalog catalog, boolean asyncExec,
       PrintStream targetStream) throws ImpalaException {
     Preconditions.checkNotNull(catalog);
     int numRows = 0;
-    TQueryRequest request = new TQueryRequest(query, true);
+    TQueryRequest request = new TQueryRequest(query, true, 1);
     List<String> errorLog = new ArrayList<String>();
     Map<String, Integer> fileErrors = new HashMap<String, Integer>();
     List<PrimitiveType> colTypes = Lists.newArrayList();
     List<String> colLabels = Lists.newArrayList();
     BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
-    Coordinator coordinator = new Coordinator(catalog);
+    Executor coordinator = new Executor(catalog);
     if (asyncExec) {
       coordinator.asyncRunQuery(
           request, colTypes, colLabels, DEFAULT_BATCH_SIZE, DEFAULT_ABORT_ON_ERROR,
@@ -255,7 +241,7 @@ public class Coordinator {
       try {
         resultRow = resultQueue.take();
       } catch (InterruptedException e) {
-        assert false : "unexpected interrupt";
+        throw new AssertionError("unexpected interrupt");
       }
       if (resultRow.colVals == null) {
         break;

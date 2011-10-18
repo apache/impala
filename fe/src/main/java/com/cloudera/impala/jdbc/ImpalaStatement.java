@@ -16,7 +16,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.service.Coordinator;
+import com.cloudera.impala.service.Executor;
 import com.cloudera.impala.thrift.TQueryRequest;
 import com.cloudera.impala.thrift.TResultRow;
 
@@ -36,7 +36,7 @@ public class ImpalaStatement implements Statement {
   // Database connection to run queries on.
   private final Connection connection;
   // For executing queries.
-  private final Coordinator coordinator;
+  private final Executor executor;
   // Thrift query request passed to coordinator.
   private final TQueryRequest request = new TQueryRequest();
   // Output column types
@@ -50,8 +50,8 @@ public class ImpalaStatement implements Statement {
   // Queue where results are placed in.
   private final BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
 
-  public ImpalaStatement(Coordinator coordinator, Connection connection) {
-    this.coordinator = coordinator;
+  public ImpalaStatement(Executor executor, Connection connection) {
+    this.executor = executor;
     this.connection = connection;
   }
 
@@ -79,9 +79,9 @@ public class ImpalaStatement implements Statement {
     request.stmt = sql;
     request.returnAsAscii = true;
     try {
-      coordinator.runQuery(
-          request, colTypes, colLabels, Coordinator.DEFAULT_BATCH_SIZE,
-          Coordinator.DEFAULT_ABORT_ON_ERROR, Coordinator.DEFAULT_MAX_ERRORS,
+      executor.runQuery(
+          request, colTypes, colLabels, Executor.DEFAULT_BATCH_SIZE,
+          Executor.DEFAULT_ABORT_ON_ERROR, Executor.DEFAULT_MAX_ERRORS,
           errorLog, fileErrors, resultQueue);
     } catch (ImpalaException e) {
       throw new SQLException(e);

@@ -25,8 +25,7 @@ using namespace impala;
 
 HdfsTextScanNode::HdfsTextScanNode(ObjectPool* pool, const TPlanNode& tnode,
                                    const DescriptorTbl& descs)
-    : ExecNode(pool, tnode, descs),
-      files_(tnode.hdfs_scan_node.file_paths),
+    : ScanNode(pool, tnode, descs),
       tuple_id_(tnode.hdfs_scan_node.tuple_id),
       tuple_desc_(NULL),
       tuple_idx_(0),
@@ -461,4 +460,12 @@ void HdfsTextScanNode::DebugString(int indentation_level, std::stringstream* out
   *out << "HdfsTextScanNode(tupleid=" << tuple_id_ << " files[" << join(files_, ",");
   ExecNode::DebugString(indentation_level, out);
   *out << "])" << endl;
+}
+
+void HdfsTextScanNode::SetScanRange(const TScanRange& scan_range) {
+  DCHECK(scan_range.__isset.hdfsFileSplits);
+  for (int i = 0; i < scan_range.hdfsFileSplits.size(); ++i) {
+    files_.push_back(scan_range.hdfsFileSplits[i].path);
+    // TODO: take into account offset and length 
+  }
 }

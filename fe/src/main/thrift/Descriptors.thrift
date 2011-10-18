@@ -5,13 +5,9 @@ namespace java com.cloudera.impala.thrift
 
 include "Types.thrift"
 
-typedef i32 TTupleId
-typedef i32 TSlotId
-typedef i32 TTableId
-
 struct TSlotDescriptor {
-  1: required TSlotId id
-  2: required TTupleId parent
+  1: required Types.TSlotId id
+  2: required Types.TTupleId parent
   3: required Types.TPrimitiveType slotType
   4: required i32 columnPos   // in originating table
   5: required i32 byteOffset  // into tuple
@@ -43,7 +39,7 @@ struct THBaseTable {
 
 // "Union" of all table types.
 struct TTableDescriptor {
-  1: required TTableId id
+  1: required Types.TTableId id
   2: required TTableType tableType
   3: required i32 numCols
   4: required i32 numClusteringCols
@@ -52,9 +48,9 @@ struct TTableDescriptor {
 }
 
 struct TTupleDescriptor {
-  1: required TTupleId id
+  1: required Types.TTupleId id
   2: required i32 byteSize
-  3: optional TTableId tableId
+  3: optional Types.TTableId tableId
 }
 
 struct TDescriptorTable {

@@ -51,4 +51,5 @@ target_link_libraries(runquery
   ImpalaThrift
   MockHdfs
   ${Boost_LIBRARIES}  
+  gflagsstatic
 )

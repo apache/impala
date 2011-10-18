@@ -12,22 +12,22 @@ import org.apache.hadoop.hbase.util.Bytes;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BinaryPredicate;
-import com.cloudera.impala.analysis.BinaryPredicate.Operator;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SlotDescriptor;
-import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.StringLiteral;
 import com.cloudera.impala.analysis.TupleDescriptor;
-import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.analysis.BinaryPredicate.Operator;
 import com.cloudera.impala.catalog.HBaseColumn;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.THBaseFilter;
+import com.cloudera.impala.thrift.THBaseKeyRange;
 import com.cloudera.impala.thrift.THBaseScanNode;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
+import com.cloudera.impala.thrift.TScanRange;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
@@ -134,12 +134,22 @@ public class HBaseScanNode extends ScanNode {
     if (!filters.isEmpty()) {
       msg.hbase_scan_node.setFilters(filters);
     }
-    if (startKey != null) {
-      msg.hbase_scan_node.setStart_key(Bytes.toString(startKey));
+  }
+
+  @Override
+  public void getScanParams(List<TScanRange> scanRanges, List<String> hosts) {
+    TScanRange scanRange = new TScanRange(id);
+    if (startKey != null || stopKey != null) {
+      THBaseKeyRange keyRange = new THBaseKeyRange();
+      if (startKey != null) {
+        keyRange.setStartKey(Bytes.toString(startKey));
+      }
+      if (stopKey != null) {
+        keyRange.setStopKey(Bytes.toString(stopKey));
+      }
+      scanRange.setHbaseKeyRange(keyRange);
     }
-    if (stopKey != null) {
-      msg.hbase_scan_node.setStop_key(Bytes.toString(stopKey));
-    }
+    scanRanges.add(scanRange);
   }
 
   @Override

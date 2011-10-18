@@ -26,7 +26,7 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.TestSchemaUtils;
 import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.service.Coordinator;
+import com.cloudera.impala.service.Executor;
 import com.cloudera.impala.testutil.TestUtils;
 
 public class JdbcDriverTest {
@@ -35,14 +35,14 @@ public class JdbcDriverTest {
   private static Catalog catalog;
 
   // For comparing results retrieved via JDBC.
-  private static Coordinator coordinator;
+  private static Executor coordinator;
 
   @BeforeClass
   public static void setUp() throws Exception {
     Class.forName("com.cloudera.impala.jdbc.ImpalaDriver");
     HiveMetaStoreClient client = TestSchemaUtils.createClient();
     catalog = new Catalog(client);
-    coordinator = new Coordinator(catalog);
+    coordinator = new Executor(catalog);
   }
 
   // Expected success when connecting to connSting.

@@ -5,6 +5,7 @@ package com.cloudera.impala.planner;
 import java.util.List;
 
 import com.cloudera.impala.analysis.TupleDescriptor;
+import com.cloudera.impala.thrift.TScanRange;
 import com.google.common.base.Objects;
 
 /**
@@ -31,6 +32,13 @@ abstract public class ScanNode extends PlanNode {
       this.keyRanges = keyRanges;
     }
   }
+
+  /**
+   * Returns one TScanRange per partition of the scan. If 'hosts' is non-null and there
+   * are multiple partitions, also returns hosts on which scan partitions are executed,
+   * one per range.
+   */
+  abstract public void getScanParams(List<TScanRange> scanRanges, List<String> hosts);
 
   @Override
   protected String debugString() {

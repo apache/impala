@@ -17,7 +17,7 @@ import com.cloudera.impala.thrift.TResultRow;
 public class NativeBackend {
   private final static Logger LOG = LoggerFactory.getLogger(NativeBackend.class);
 
-  protected native static void ExecPlan(byte[] thriftExecutePlanRequest,
+  protected native static void ExecQuery(byte[] thriftQueryExecRequest,
       List<String> errorLog, Map<String, Integer> fileErrors,
       BlockingQueue<TResultRow> resultQueue) throws ImpalaException;
 

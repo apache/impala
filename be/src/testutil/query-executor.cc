@@ -7,11 +7,14 @@
 #include <sys/stat.h>
 #include <iostream>
 #include <vector>
-//#include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread.hpp>
+// reversing the include order of the following two results in linker errors:
+// undefined reference to `fLI::FLAGS_v'
+// TODO: figure out why
 #include <glog/logging.h>
+#include <gflags/gflags.h>
 
 #include <protocol/TBinaryProtocol.h>
 #include <protocol/TDebugProtocol.h>
@@ -21,6 +24,7 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exec/exec-node.h"
+#include "exec/scan-node.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
 #include "runtime/raw-value.h"
@@ -29,6 +33,13 @@
 #include "service/plan-executor.h"
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
+
+DEFINE_int32(batch_size, 0,
+             "batch size to be used by backend; a batch size of 0 indicates the "
+             "backend's default batch size");
+DEFINE_int32(num_nodes, 1, "number of (local) nodes on which to run query");
+DEFINE_bool(abort_on_error, false, "if true, abort query when encountering any error");
+DEFINE_int32(max_errors, 100, "number of errors to report");
 
 using namespace std;
 using namespace boost;
@@ -129,37 +140,58 @@ Status QueryExecutor::Setup() {
 }
 
 Status QueryExecutor::Exec(
-    const std::string& query, vector<PrimitiveType>* col_types,
-    int batch_size, bool abort_on_error, int max_errors) {
+    const std::string& query, vector<PrimitiveType>* col_types) {
   VLOG(1) << "query: " << query;
-  TExecutePlanRequest request;
+  TQueryExecRequest query_request;
   try {
-    client_->GetExecRequest(request, query.c_str());
+    // TODO: use FLAGS_num_nodes here
+    client_->GetExecRequest(query_request, query.c_str(), 1);
   } catch (TException& e) {
     return Status(e.msg);
   }
-  VLOG(1) << "thrift request: " << ThriftDebugString(request);
+  VLOG(1) << "thrift request: " << ThriftDebugString(query_request);
 
-  DescriptorTbl* descs = NULL;;
+  DCHECK_EQ(query_request.fragmentRequests.size(), 1);
+  TPlanExecRequest& request = query_request.fragmentRequests[0];
+  DescriptorTbl* descs = NULL;
   if (request.__isset.descTbl) {
     RETURN_IF_ERROR(DescriptorTbl::Create(pool_.get(), request.descTbl, &descs));
     VLOG(1) << descs->DebugString();
   }
   ExecNode* plan_root = NULL;;
-  if (request.__isset.plan) {
-    RETURN_IF_ERROR(ExecNode::CreateTree(pool_.get(), request.plan, *descs, &plan_root));
+  if (request.__isset.planFragment) {
+    RETURN_IF_ERROR(
+        ExecNode::CreateTree(pool_.get(), request.planFragment, *descs, &plan_root));
+        
+    // set scan ranges
+    vector<ExecNode*> scan_nodes;
+    plan_root->CollectScanNodes(&scan_nodes);
+    DCHECK_GT(query_request.nodeRequestParams.size(), 0);
+    // the first nodeRequestParams list contains exactly one TPlanExecParams
+    // (it's meant for the coordinator fragment)
+    DCHECK_EQ(query_request.nodeRequestParams[0].size(), 1);
+    vector<TScanRange>& local_scan_ranges =
+        query_request.nodeRequestParams[0][0].scanRanges;
+    for (int i = 0; i < scan_nodes.size(); ++i) {
+      for (int j = 0; j < local_scan_ranges.size(); ++j) {
+        if (scan_nodes[i]->id() == local_scan_ranges[j].nodeId) {
+           static_cast<ScanNode*>(scan_nodes[i])->SetScanRange(local_scan_ranges[j]);
+        }
+      }
+    }
   }
   RETURN_IF_ERROR(
-      Expr::CreateExprTrees(pool_.get(), request.selectListExprs, &select_list_exprs_));
+      Expr::CreateExprTrees(pool_.get(), request.outputExprs, &select_list_exprs_));
 
   // Prepare select list expressions.
-  RuntimeState local_runtime_state(*descs, abort_on_error, max_errors);
+  RuntimeState local_runtime_state(*descs, FLAGS_abort_on_error, FLAGS_max_errors);
   RuntimeState* runtime_state = &local_runtime_state;
   if (plan_root != NULL) {
-    executor_.reset(new PlanExecutor(plan_root, *descs, abort_on_error, max_errors));
+    executor_.reset(
+        new PlanExecutor(plan_root, *descs, FLAGS_abort_on_error, FLAGS_max_errors));
     runtime_state = executor_->runtime_state();
   }
-  if (batch_size != 0) runtime_state->set_batch_size(batch_size);
+  if (FLAGS_batch_size != 0) runtime_state->set_batch_size(FLAGS_batch_size);
 
   for (int i = 0; i < select_list_exprs_.size(); ++i) {
     select_list_exprs_[i]->Prepare(runtime_state, plan_root->row_desc());

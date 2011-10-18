@@ -13,6 +13,7 @@
 #include <transport/TBufferTransports.h>
 #include "common/object-pool.h"
 #include "service/plan-executor.h"
+#include "gen-cpp/ImpalaBackendService_types.h"
 
 namespace impala {
 
@@ -25,16 +26,20 @@ class DescriptorTbl;
 class RowBatch;
 class TupleDescriptor;
 
+// Shim class to adapt backend plan executor to jni.
 class PlanExecutorAdaptor {
  public:
-  PlanExecutorAdaptor(JNIEnv* env, jbyteArray thrift_execute_plan_request,
+  PlanExecutorAdaptor(JNIEnv* env, jbyteArray thrift_query_exec_request,
                       jobject error_log, jobject file_errors, jobject result_queue)
   : env_(env),
-    thrift_execute_plan_request_(thrift_execute_plan_request),
+    thrift_query_exec_request_(thrift_query_exec_request),
     error_log_(error_log),
     file_errors_(file_errors),
     result_queue_(result_queue) {
   }
+
+  // Call before Exec() to deserialize query exec request passed into c'tor.
+  Status DeserializeRequest();
 
   // Indicate error with Status.
   static Status Init();
@@ -58,10 +63,12 @@ class PlanExecutorAdaptor {
   ExecNode* plan() { return plan_; }
 
   jclass impala_exc_cl() { return impala_exc_cl_; }
+  const TQueryExecRequest& query_exec_request() const { return query_exec_request_; }
 
  private:
   JNIEnv* env_;
-  jbyteArray thrift_execute_plan_request_;
+  jbyteArray thrift_query_exec_request_;
+  TQueryExecRequest query_exec_request_;
   int batch_size_;
   bool abort_on_error_;
   int max_errors_;
@@ -101,8 +108,6 @@ class PlanExecutorAdaptor {
   static jfieldID double_val_field_;
   static jfieldID string_val_field_;
 
-  // Indicate error by throwing a new java exception.
-  void DeserializeRequest();
 };
 
 template <class T>
@@ -130,4 +135,3 @@ void DeserializeThriftMsg(JNIEnv* env, jbyteArray serialized_msg, T* deserialize
 }
 
 #endif
-

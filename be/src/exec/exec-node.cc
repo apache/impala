@@ -22,7 +22,8 @@ using namespace std;
 namespace impala {
 
 ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
-  : pool_(pool),
+  : id_(tnode.node_id),
+    pool_(pool),
     row_descriptor_(descs, tnode.row_tuples),
     limit_(tnode.limit),
     num_rows_returned_(0) {
@@ -149,6 +150,13 @@ bool ExecNode::EvalConjuncts(const vector<Expr*>& conjuncts, TupleRow* row) {
     if (value == NULL || *reinterpret_cast<bool*>(value) == false) return false;
   }
   return true;
+}
+
+void ExecNode::CollectScanNodes(std::vector<ExecNode*>* scan_nodes) {
+  if (IsScanNode()) scan_nodes->push_back(this);
+  for (int i = 0; i < children_.size(); ++i) {
+    children_[i]->CollectScanNodes(scan_nodes);
+  }
 }
 
 }

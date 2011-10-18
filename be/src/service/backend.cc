@@ -60,12 +60,26 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM* vm, void* pvt) {
 }
 
 extern "C"
-JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecPlan(
-    JNIEnv* env, jclass caller_class, jbyteArray thrift_execute_plan_request,
+JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecQuery(
+    JNIEnv* env, jclass caller_class, jbyteArray thrift_query_exec_request,
     jobject error_log, jobject file_errors, jobject result_queue) {
-
   PlanExecutorAdaptor adaptor(
-      env, thrift_execute_plan_request, error_log, file_errors, result_queue);
+      env, thrift_query_exec_request, error_log, file_errors, result_queue);
+
+  if (!adaptor.DeserializeRequest().ok()) {
+    LOG(ERROR) << "couldn't deserialize request";
+    env->ThrowNew(adaptor.impala_exc_cl(), "couldn't deserialize request");
+    return;
+  }
+
+  // at the moment, we can only do single-node queries
+  if (adaptor.query_exec_request().fragmentRequests.size() != 1) {
+    LOG(ERROR) << "received distributed query request";
+    env->ThrowNew(
+        adaptor.impala_exc_cl(), "not implemented: distributed query execution");
+    return;
+  }
+
   adaptor.Exec();
   RETURN_IF_EXC(env);
   const vector<Expr*>& select_list_exprs = adaptor.select_list_exprs();

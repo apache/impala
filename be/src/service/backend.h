@@ -17,13 +17,13 @@ extern "C"
 JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_InitThread(
     JNIEnv* env, jclass caller_class);
 
-// JNI-callable wrapper to the plan executor
-// protected native static void ExecPlan(byte[] thriftExecutePlanRequest,
+// JNI-callable wrapper to the coordinator
+//  protected native static void ExecQuery(byte[] thriftQueryExecRequest,
 //      List<String> errorLog, Map<String, Integer> fileErrors,
 //      BlockingQueue<TResultRow> resultQueue) throws ImpalaException;
 extern "C"
-JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecPlan(
-    JNIEnv* env, jclass caller_class, jbyteArray thrift_execute_plan_request,
+JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecQuery(
+    JNIEnv* env, jclass caller_class, jbyteArray thrift_query_exec_request,
     jobject error_log, jobject file_errors, jobject result_queue);
 
 extern "C"

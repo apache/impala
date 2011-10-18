@@ -9,7 +9,7 @@
 #include <hdfs.h>
 #include <boost/scoped_ptr.hpp>
 #include "runtime/descriptors.h"
-#include "exec-node.h"
+#include "exec/scan-node.h"
 
 namespace impala {
 
@@ -24,6 +24,7 @@ class SlotDescriptor;
 class stringstream;
 class Expr;
 class TextConverter;
+class TScanRange;
 
 // This execution node parses delimited text files from HDFS,
 // and writes their content as tuples in the
@@ -48,7 +49,7 @@ class TextConverter;
 //
 // TODO: separate file handling and parsing of text files; the latter should go into
 // a separate helper class
-class HdfsTextScanNode : public ExecNode {
+class HdfsTextScanNode : public ScanNode {
  public:
   HdfsTextScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
@@ -69,6 +70,8 @@ class HdfsTextScanNode : public ExecNode {
   // Disconnects from HDFS.
   virtual Status Close(RuntimeState* state);
 
+  virtual void SetScanRange(const TScanRange& scan_range);
+
  protected:
   // Write debug string of this into out.
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
@@ -82,7 +85,7 @@ class HdfsTextScanNode : public ExecNode {
   // Parser configuration parameters:
 
   // List of HDFS paths to read.
-  const std::vector<std::string> files_;
+  std::vector<std::string> files_;
 
   // Tuple id resolved in Prepare() to set tuple_desc_;
   TupleId tuple_id_;

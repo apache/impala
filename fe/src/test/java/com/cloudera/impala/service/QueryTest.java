@@ -17,7 +17,7 @@ import com.cloudera.impala.testutil.TestUtils;
 
 public class QueryTest {
   private static Catalog catalog;
-  private static Coordinator coordinator;
+  private static Executor coordinator;
   private static StringBuilder testErrorLog;
   private final String testDir = "QueryTest";
 
@@ -25,7 +25,7 @@ public class QueryTest {
   public static void setUp() throws Exception {
     HiveMetaStoreClient client = TestSchemaUtils.createClient();
     catalog = new Catalog(client);
-    coordinator = new Coordinator(catalog);
+    coordinator = new Executor(catalog);
     testErrorLog = new StringBuilder();
   }
 

@@ -24,7 +24,7 @@ MemPool::MemPool(int chunk_size)
   : last_allocated_chunk_idx_(-1),
     free_offset_(0),
     // round up chunk size to nearest 8 bytes
-    chunk_size_((chunk_size + 7) / 8 * 8),
+    chunk_size_(((chunk_size + 7) / 8) * 8),
     allocated_bytes_(0),
     acquired_allocated_bytes_(0) {
   DCHECK_GT(chunk_size_, 0);

@@ -13,22 +13,22 @@ import org.junit.Test;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.common.ImpalaException;
 
-public class CoordinatorTest {
+public class ExecutorTest {
 
   // For buffering query results.
   private final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
   private final PrintStream printStream = new PrintStream(outputStream);
-  private final Catalog catalog = Coordinator.createCatalog();
+  private final Catalog catalog = Executor.createCatalog();
 
   private void runTestSuccess(String query, int expectedRows)
       throws ImpalaException {
     // start at the beginning of the output stream for every test
     outputStream.reset();
-    int syncNumRows = Coordinator.runQuery(query, catalog, false, printStream);
+    int syncNumRows = Executor.runQuery(query, catalog, false, printStream);
     if (expectedRows != -1) {
       Assert.assertEquals(expectedRows, syncNumRows);
     }
-    int asyncNumRows = Coordinator.runQuery(query, catalog, true, printStream);
+    int asyncNumRows = Executor.runQuery(query, catalog, true, printStream);
     if (expectedRows != -1) {
       Assert.assertEquals(expectedRows, asyncNumRows);
     }
@@ -38,13 +38,13 @@ public class CoordinatorTest {
     // start at the beginning of the output stream for every test
     outputStream.reset();
     try {
-      Coordinator.runQuery(query, catalog, false, printStream);
+      Executor.runQuery(query, catalog, false, printStream);
       fail("Expected query to fail: " + query);
     } catch (Exception e) {
     }
     outputStream.reset();
     try {
-      Coordinator.runQuery(query, catalog, true, printStream);
+      Executor.runQuery(query, catalog, true, printStream);
       fail("Expected query to fail: " + query);
     } catch (Exception e) {
     }

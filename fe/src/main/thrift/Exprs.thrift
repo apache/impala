@@ -3,7 +3,6 @@
 namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
-include "Descriptors.thrift"
 include "Types.thrift"
 
 enum TExprNodeType {
@@ -110,7 +109,7 @@ struct TLiteralPredicate {
 }
 
 struct TSlotRef {
-  1: required Descriptors.TSlotId slot_id
+  1: required Types.TSlotId slot_id
 }
 
 struct TStringLiteral {

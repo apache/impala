@@ -12,13 +12,13 @@ import org.junit.Test;
 
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.TestSchemaUtils;
-import com.cloudera.impala.service.Coordinator;
+import com.cloudera.impala.service.Executor;
 import com.cloudera.impala.testutil.TestFileParser;
 import com.cloudera.impala.testutil.TestUtils;
 
 public class DataErrorsTest {
   private static Catalog catalog;
-  private static Coordinator coordinator;
+  private static Executor coordinator;
   private static StringBuilder testErrorLog;
   private final String testDir = "DataErrorsTest";
 
@@ -26,7 +26,7 @@ public class DataErrorsTest {
   public static void setUp() throws Exception {
     HiveMetaStoreClient client = TestSchemaUtils.createClient();
     catalog = new Catalog(client);
-    coordinator = new Coordinator(catalog);
+    coordinator = new Executor(catalog);
     testErrorLog = new StringBuilder();
   }
 

@@ -13,26 +13,26 @@ import org.junit.Test;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.TestSchemaUtils;
-import com.cloudera.impala.service.Coordinator;
+import com.cloudera.impala.service.Executor;
 import com.cloudera.impala.thrift.TQueryRequest;
 
 public class ToSqlTest {
 
-  private static Coordinator coordinator;
+  private static Executor executor;
 
   @BeforeClass
   public static void setUp() throws Exception {
     HiveMetaStoreClient client = TestSchemaUtils.createClient();
     Catalog catalog = new Catalog(client);
-    coordinator = new Coordinator(catalog);
+    executor = new Executor(catalog);
   }
 
   private static AnalysisContext.AnalysisResult analyze(String query) {
     try {
-      TQueryRequest tqueryRequest = new TQueryRequest(query, false);
+      TQueryRequest tqueryRequest = new TQueryRequest(query, false, 1);
       ArrayList<PrimitiveType> colTypes = new ArrayList<PrimitiveType>();
       ArrayList<String> colLabels = new ArrayList<String>();
-      return coordinator.analyzeQuery(tqueryRequest, colTypes, colLabels);
+      return executor.analyzeQuery(tqueryRequest, colTypes, colLabels);
     } catch (Exception e) {
       fail("Failed to analyze query: " + query + "\n" + e.getMessage());
     }

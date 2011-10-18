@@ -3,8 +3,8 @@
 namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
-include "Descriptors.thrift"
 include "Exprs.thrift"
+include "Types.thrift"
 
 enum TPlanNodeType {
   HDFS_TEXT_SCAN_NODE,
@@ -15,10 +15,52 @@ enum TPlanNodeType {
   SORT_NODE,
 }
 
+// The information contained in subclasses of ScanNode captured in two separate
+// Thrift structs:
+// - TScanRange: the data range that's covered by the scan (which varies with the
+//   particular partition of the plan fragment of which the scan node is a part)
+// - T<subclass>: all other operational parameters that are the same across
+//   all plan fragments
+
+// Specification of subsection of a single hdfs file.
+// TODO: also specify file format, to support multi-format table partitions
+struct THdfsFileSplit {
+  // file path
+  1: required string path
+
+  // starting offset
+  2: required i64 offset
+
+  // length of split
+  3: required i64 length
+}
+
+// key range for single THBaseScanNode
+// TODO: does 'binary' have an advantage over string? strings can
+// already store binary data
+struct THBaseKeyRange {
+  // inclusive
+  1: optional string startKey
+
+  // exclusive
+  2: optional string stopKey
+}
+
+// Specification of data range for a particular scan node
+struct TScanRange {
+  // id of scan node
+  1: required Types.TPlanNodeId nodeId
+
+  // THdfsScanNode: range consists of a collection of splits
+  2: optional list<THdfsFileSplit> hdfsFileSplits
+
+  // THBaseScanNode
+  3: optional THBaseKeyRange hbaseKeyRange
+}
+
 struct THdfsScanNode {
-  1: required Descriptors.TTupleId tuple_id
-  2: required list<string> file_paths
-  3: optional list<Exprs.TExpr> key_values
+  1: required Types.TTupleId tuple_id
+  2: optional list<Exprs.TExpr> key_values
 }
 
 struct THBaseFilter {
@@ -32,13 +74,9 @@ struct THBaseFilter {
 }
 
 struct THBaseScanNode {
-  1: required Descriptors.TTupleId tuple_id
+  1: required Types.TTupleId tuple_id
   2: required string table_name
-  // TODO: does 'binary' have an advantage over string? strings can
-  // already store binary data
-  3: optional string start_key
-  4: optional string stop_key
-  5: optional list<THBaseFilter> filters
+  3: optional list<THBaseFilter> filters
 }
 
 struct TEqJoinCondition {
@@ -70,7 +108,7 @@ struct THashJoinNode {
 struct TAggregationNode {
   1: optional list<Exprs.TExpr> grouping_exprs
   2: required list<Exprs.TExpr> aggregate_exprs
-  3: required Descriptors.TTupleId agg_tuple_id
+  3: required Types.TTupleId agg_tuple_id
 }
 
 struct TSortNode {
@@ -82,18 +120,19 @@ struct TSortNode {
 // of PlanNode.
 struct TPlanNode {
   // node id, needed to reassemble tree structure
-  1: required TPlanNodeType node_type
-  2: required i32 num_children
-  3: required i64 limit
-  4: required list<Descriptors.TTupleId> row_tuples
-  5: optional list<Exprs.TExpr> conjuncts
+  1: required Types.TPlanNodeId node_id
+  2: required TPlanNodeType node_type
+  3: required i32 num_children
+  4: required i64 limit
+  5: required list<Types.TTupleId> row_tuples
+  6: optional list<Exprs.TExpr> conjuncts
 
   // one field per PlanNode subclass
-  6: optional THdfsScanNode hdfs_scan_node
-  7: optional THBaseScanNode hbase_scan_node
-  8: optional THashJoinNode hash_join_node
-  9: optional TAggregationNode agg_node
-  10: optional TSortNode sort_node
+  7: optional THdfsScanNode hdfs_scan_node
+  8: optional THBaseScanNode hbase_scan_node
+  9: optional THashJoinNode hash_join_node
+  10: optional TAggregationNode agg_node
+  11: optional TSortNode sort_node
 }
 
 // A flattened representation of a tree of PlanNodes, obtained by depth-first

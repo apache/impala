@@ -25,6 +25,10 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.Pair;
+import com.cloudera.impala.thrift.TPlanExecParams;
+import com.cloudera.impala.thrift.TPlanExecRequest;
+import com.cloudera.impala.thrift.TQueryExecRequest;
+import com.cloudera.impala.thrift.TScanRange;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -150,7 +154,7 @@ public class Planner {
    * Returns the conjuncts in 'joinConjuncts' (in which "<lhs> = <rhs>" is returned
    * as Pair(<lhs>, <rhs>)) and also in their original form in 'joinPredicates'.
    */
-  public void getHashLookupJoinConjuncts(
+  private void getHashLookupJoinConjuncts(
       Analyzer analyzer,
       List<TupleId> lhsIds, TableRef rhs,
       List<Pair<Expr, Expr> > joinConjuncts,
@@ -242,7 +246,7 @@ public class Planner {
    * Mark slots that aren't being referenced by any conjuncts or select list
    * exprs as non-materialized.
    */
-  public void markUnrefdSlots(PlanNode root, SelectStmt selectStmt, Analyzer analyzer) {
+  private void markUnrefdSlots(PlanNode root, SelectStmt selectStmt, Analyzer analyzer) {
     PlanNode node = root;
     List<SlotId> refdIdList = Lists.newArrayList();
     while (node != null) {
@@ -274,13 +278,13 @@ public class Planner {
 
   /**
    * Create tree of PlanNodes that implements the given selectStmt.
-   * Currently only supports single-table queries plus aggregation.
    * Also calls DescriptorTable.computeMemLayout().
    * @param selectStmt
    * @param analyzer
-   * @return root node of plan tree * @throws NotImplementedException if selectStmt contains joins, order by or aggregates
+   * @return root node of plan tree * @throws NotImplementedException if selectStmt
+   * contains Order By clause
    */
-  public PlanNode createPlan(SelectStmt selectStmt, Analyzer analyzer)
+  private PlanNode createPlan(SelectStmt selectStmt, Analyzer analyzer)
       throws NotImplementedException, InternalException {
     if (selectStmt.getTableRefs().isEmpty()) {
       // no from clause -> nothing to plan
@@ -293,18 +297,25 @@ public class Planner {
       rowTuples.add(tblRef.getId());
     }
 
+    // create left-deep sequence of binary hash joins; assign node ids as we go along
+    int nodeId = 0;
     TableRef tblRef = selectStmt.getTableRefs().get(0);
     PlanNode root = createScanNode(analyzer, tblRef);
+    root.id = nodeId++;
     root.rowTupleIds = rowTuples;
     for (int i = 1; i < selectStmt.getTableRefs().size(); ++i) {
       TableRef innerRef = selectStmt.getTableRefs().get(i);
       root = createHashJoinNode(analyzer, root, innerRef);
+      root.getChild(1).id = nodeId++;
+      root.id = nodeId++;
       root.rowTupleIds = rowTuples;
     }
 
     AggregateInfo aggInfo = selectStmt.getAggInfo();
     if (aggInfo != null) {
       root = new AggregationNode(root, aggInfo);
+      root.id = nodeId++;
+      root.rowTupleIds = Lists.newArrayList(aggInfo.getAggTupleDesc().getId());
       if (selectStmt.getHavingPred() != null) {
         root.setConjuncts(selectStmt.getHavingPred().getConjuncts());
       }
@@ -327,5 +338,57 @@ public class Planner {
 
     return root;
   }
+
+  /**
+   * Given a selectStmt, creates a sequence of plan fragments that implement the query.
+   * @param singleNodePlan result of call to createPlan()
+   * @param analyzer the same analyzer that was used to create singleNodePlan
+   * @param numNodes number of nodes on which to execute fragments; same semantics as
+   *     TQueryRequest.numNodes;
+   *     allowed values:
+   *     1: single-node execution
+   *     NUM_NODES_ALL: executes on all nodes that contain relevant data
+   *     NUM_NODES_ALL_RACKS: executes on one node per rack that holds relevant data
+   *     > 1: executes on at most that many nodes at any point in time (ie, there can be
+   *     more nodes than numNodes with plan fragments for this query, but at most
+   *     numNodes would be active at any point in time)
+   * @param planFragments non-thrift plan fragments, for debugging purposes
+   * @return query exec request containing plan fragments and all execution parameters
+   */
+  public TQueryExecRequest createPlanFragments(
+      SelectStmt selectStmt, Analyzer analyzer, int numNodes,
+      List<PlanNode> planFragments)
+      throws NotImplementedException, InternalException {
+    if (numNodes != 1) {
+      throw new NotImplementedException("can only generate single-node plans");
+    }
+    PlanNode plan = createPlan(selectStmt, analyzer);
+
+    TQueryExecRequest request = new TQueryExecRequest();
+    TPlanExecRequest fragmentRequest = new TPlanExecRequest(
+        new TupleId().asInt(), Expr.treesToThrift(selectStmt.getSelectListExprs()));
+    if (plan != null) {
+      planFragments.add(plan);
+      fragmentRequest.setPlanFragment(plan.treeToThrift());
+      fragmentRequest.setDescTbl(analyzer.getDescTbl().toThrift());
+    }
+    request.addToFragmentRequests(fragmentRequest);
+    if (plan == null) return request;
+
+    // unpartitioned scans executing on local host
+    TPlanExecParams execParams = new TPlanExecParams();
+    List<ScanNode> scanNodes = Lists.newArrayList();
+    plan.collectSubclasses(ScanNode.class, scanNodes);
+    for (ScanNode scan: scanNodes) {
+      List<TScanRange> scanRanges = Lists.newArrayList();
+      scan.getScanParams(scanRanges, null);
+      Preconditions.checkState(scanRanges.size() == 1);
+      execParams.setScanRanges(scanRanges);
+      execParams.setDestHosts(Lists.newArrayList("localhost"));
+    }
+    request.addToNodeRequestParams(Lists.newArrayList(execParams));
+
+    return request;
+}
 
 }

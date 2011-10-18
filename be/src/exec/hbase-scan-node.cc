@@ -14,19 +14,13 @@ using namespace impala;
 
 HBaseScanNode::HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode,
                              const DescriptorTbl& descs)
-    : ExecNode(pool, tnode, descs),
+    : ScanNode(pool, tnode, descs),
       table_name_(tnode.hbase_scan_node.table_name),
       tuple_id_(tnode.hbase_scan_node.tuple_id),
       tuple_desc_(NULL),
       tuple_idx_(0),
-      start_key_(
-          tnode.hbase_scan_node.__isset.start_key
-            ? tnode.hbase_scan_node.start_key
-            : ""),
-      stop_key_(
-          tnode.hbase_scan_node.__isset.stop_key
-            ? tnode.hbase_scan_node.stop_key
-            : ""),
+      start_key_(),
+      stop_key_(),
       filters_(tnode.hbase_scan_node.filters),
       num_errors_(0),
       tuple_pool_(new MemPool()),
@@ -223,5 +217,16 @@ void HBaseScanNode::DebugString(int indentation_level, stringstream* out) const 
   *out << ")" << endl;
   for (int i = 0; i < children_.size(); ++i) {
     children_[i]->DebugString(indentation_level + 1, out);
+  }
+}
+
+void HBaseScanNode::SetScanRange(const TScanRange& scan_range) {
+  if (!scan_range.__isset.hbaseKeyRange) return;
+  const THBaseKeyRange& key_range = scan_range.hbaseKeyRange;
+  if (key_range.__isset.startKey) {
+    start_key_ = key_range.startKey;
+  }
+  if (key_range.__isset.stopKey) {
+    stop_key_ = key_range.stopKey;
   }
 }

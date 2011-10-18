@@ -5,6 +5,7 @@ package com.cloudera.impala.planner;
 import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.junit.BeforeClass;
@@ -20,6 +21,7 @@ import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.testutil.TestFileParser;
 import com.cloudera.impala.testutil.TestUtils;
+import com.google.common.collect.Lists;
 
 public class PlannerTest {
   private final static Logger LOG = LoggerFactory.getLogger(PlannerTest.class);
@@ -42,7 +44,10 @@ public class PlannerTest {
       LOG.info("running query " + query);
       AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
       Planner planner = new Planner();
-      PlanNode plan = planner.createPlan(analysisResult.selectStmt, analysisResult.analyzer);
+      List<PlanNode> planFragments = Lists.newArrayList();
+      planner.createPlanFragments(
+          analysisResult.selectStmt, analysisResult.analyzer, 1, planFragments);
+      PlanNode plan = planFragments.get(0);
       LOG.info(plan.getExplainString());
       String result = TestUtils.compareOutput(plan.getExplainString().split("\n"), expectedPlan);
       if (!result.isEmpty()) {
@@ -62,7 +67,10 @@ public class PlannerTest {
     try {
       AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
       Planner planner = new Planner();
-      PlanNode plan = planner.createPlan(analysisResult.selectStmt, analysisResult.analyzer);
+      List<PlanNode> planFragments = Lists.newArrayList();
+      planner.createPlanFragments(
+          analysisResult.selectStmt, analysisResult.analyzer, 1, planFragments);
+      PlanNode plan = planFragments.get(0);
       errorLog.append(
           "query produced a plan\nquery=" + query + "\nplan=\n"
           + plan.getExplainString());

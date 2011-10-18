@@ -59,8 +59,9 @@ class MemPool {
   // of the the current chunk. Creates a new chunk if current chunk does not
   // have enough capacity or there aren't any.
   char* Allocate(int size) {
-    int num_bytes = (size + 7) / 8 * 8;  // round up to nearest 8 bytes
-    if (last_allocated_chunk_idx_ == -1 || num_bytes + free_offset_ > allocated_chunk_sizes_[last_allocated_chunk_idx_]) {
+    int num_bytes = ((size + 7) / 8) * 8;  // round up to nearest 8 bytes
+    if (last_allocated_chunk_idx_ == -1
+        || num_bytes + free_offset_ > allocated_chunk_sizes_[last_allocated_chunk_idx_]) {
       AllocChunk(num_bytes);
     }
     DCHECK_EQ(allocated_chunks_.size(), allocated_chunk_sizes_.size());

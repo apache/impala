@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.service.Coordinator;
+import com.cloudera.impala.service.Executor;
 
 /**
  * Minimal implementation required to run select queries with sqlline.
@@ -45,7 +45,7 @@ public class ImpalaConnection implements java.sql.Connection {
   // For providing metadata.
   private final Catalog catalog;
   // For executing queries.
-  private final Coordinator coordinator;
+  private final Executor coordinator;
   // Connection status.
   private boolean isClosed = true;
 
@@ -54,7 +54,7 @@ public class ImpalaConnection implements java.sql.Connection {
     this.dbName = dbName;
     this.info = info;
     this.catalog = catalog;
-    coordinator = new Coordinator(catalog);
+    coordinator = new Executor(catalog);
     isClosed = false;
   }
 

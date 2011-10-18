@@ -32,10 +32,8 @@ class QueryExecutor {
 
   // Start running query. Call this prior to FetchResult().
   // If 'col_types' is non-NULL, returns the types of the select list items.
-  // A batch_size of 0 indicates the backend's default batch size.
   Status Exec(
-      const std::string& query, std::vector<PrimitiveType>* col_types,
-      int batch_size, bool abort_on_error, int max_errors);
+      const std::string& query, std::vector<PrimitiveType>* col_types);
 
   // Return single row as comma-separated list of values.
   // Indicates end-of-stream by setting 'row' to the empty string.

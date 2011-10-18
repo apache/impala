@@ -59,6 +59,9 @@ class ExecNode {
   static Status CreateTree(ObjectPool* pool, const TPlan& plan,
                            const DescriptorTbl& descs, ExecNode** root);
 
+  // Collect all scan nodes that are part of this subtree, and return in 'scan_nodes'.
+  void CollectScanNodes(std::vector<ExecNode*>* scan_nodes);
+
   // Returns a string representation in DFS order of the plan rooted at this.
   std::string DebugString() const;
 
@@ -70,9 +73,11 @@ class ExecNode {
   //   out: Stream to accumulate debug string.
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
+  int id() const { return id_; }
   const RowDescriptor& row_desc() const { return row_descriptor_; }
 
  protected:
+  int id_;  // unique w/in single plan tree
   ObjectPool* pool_;
   std::vector<Expr*> conjuncts_;
   std::vector<ExecNode*> children_;
@@ -99,6 +104,8 @@ class ExecNode {
   bool EvalConjuncts(TupleRow* row);
 
   bool ReachedLimit() { return limit_ != -1 && num_rows_returned_ == limit_; }
+
+  virtual bool IsScanNode() const { return false; }
 };
 
 }

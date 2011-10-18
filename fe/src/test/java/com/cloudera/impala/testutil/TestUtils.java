@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.service.Coordinator;
+import com.cloudera.impala.service.Executor;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TQueryRequest;
 import com.cloudera.impala.thrift.TResultRow;
@@ -187,7 +187,7 @@ public class TestUtils {
    *          Records error messages of failed tests to be reported at the very end of a test run.
    * @return an error message if actual does not match expected, "" otherwise.
    */
-  public static void runQuery(Coordinator coordinator, String query, int lineNum,
+  public static void runQuery(Executor coordinator, String query, int lineNum,
       int batchSize, boolean abortOnError, int maxErrors,
       ArrayList<String> expectedColLabels,
       ArrayList<String> expectedTypes, ArrayList<String> expectedResults,
@@ -195,7 +195,7 @@ public class TestUtils {
       StringBuilder testErrorLog) {
     String queryReportString = query + " (batch size=" + Integer.toString(batchSize) + ")";
     LOG.info("running query " + queryReportString);
-    TQueryRequest request = new TQueryRequest(query, true);
+    TQueryRequest request = new TQueryRequest(query, true, 1);
     ArrayList<String> errors = new ArrayList<String>();
     SortedMap<String, Integer> fileErrors = new TreeMap<String, Integer>();
     ArrayList<PrimitiveType> colTypes = new ArrayList<PrimitiveType>();

@@ -8,11 +8,11 @@
 // TODO: Why can't we forward declare hbase-table-scanner and text-converter?
 #include "exec/hbase-table-scanner.h"
 #include "exec/text-converter.h"
-#include "exec/exec-node.h"
+#include "exec/scan-node.h"
 
 namespace impala {
 
-class HBaseScanNode : public ExecNode {
+class HBaseScanNode : public ScanNode {
  public:
   HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
@@ -29,6 +29,8 @@ class HBaseScanNode : public ExecNode {
 
   // Close the hbase_scanner_, and report errors.
   virtual Status Close(RuntimeState* state);
+
+  virtual void SetScanRange(const TScanRange& scan_range);
 
  protected:
   // Write debug string of this into out.

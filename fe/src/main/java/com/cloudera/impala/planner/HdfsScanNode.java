@@ -10,8 +10,10 @@ import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.thrift.THdfsFileSplit;
 import com.cloudera.impala.thrift.THdfsScanNode;
 import com.cloudera.impala.thrift.TPlanNode;
+import com.cloudera.impala.thrift.TScanRange;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -75,10 +77,21 @@ public abstract class HdfsScanNode extends ScanNode {
 
   @Override
   protected void toThrift(TPlanNode msg) {
-    msg.hdfs_scan_node = new THdfsScanNode(desc.getId().asInt(), filePaths);
+    msg.hdfs_scan_node = new THdfsScanNode(desc.getId().asInt());
+    // TODO: get rid of this and instead store a regex that allows the executor
+    // scan node to extract the key value from the file path
     if (!keyValues.isEmpty()) {
       msg.hdfs_scan_node.setKey_values(Expr.treesToThrift(keyValues));
     }
+  }
+
+  @Override
+  public void getScanParams(List<TScanRange> scanRanges, List<String> hosts) {
+    TScanRange scanRange = new TScanRange(id);
+    for (String filePath: filePaths) {
+      scanRange.addToHdfsFileSplits(new THdfsFileSplit(filePath, 0, 0));
+    }
+    scanRanges.add(scanRange);
   }
 
   @Override

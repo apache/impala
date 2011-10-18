@@ -1,7 +1,8 @@
 // (c) 2011 Cloudera, Inc. All rights reserved.
 
-#include "plan-executor-adaptor.h"
+#include "service/plan-executor-adaptor.h"
 #include "exec/exec-node.h"
+#include "exec/scan-node.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
 #include "util/jni-util.h"
@@ -12,37 +13,58 @@ using namespace std;
 
 namespace impala {
 
-void PlanExecutorAdaptor::DeserializeRequest() {
-  // Deserialize plan bytes into c++ plan request using memory transport.
-  TExecutePlanRequest exec_request;
-  DeserializeThriftMsg(env_, thrift_execute_plan_request_, &exec_request);
+Status PlanExecutorAdaptor::DeserializeRequest() {
+  descs_ = NULL;
+  plan_ = NULL;
+  // Deserialize request bytes into c++ request using memory transport.
+  DeserializeThriftMsg(env_, thrift_query_exec_request_, &query_exec_request_);
 
-  batch_size_ = exec_request.batch_size;
-  abort_on_error_ = exec_request.abort_on_error;
-  max_errors_ = exec_request.max_errors;
-  as_ascii_ = exec_request.as_ascii;
+  batch_size_ = query_exec_request_.batchSize;
+  abort_on_error_ = query_exec_request_.abortOnError;
+  max_errors_ = query_exec_request_.maxErrors;
+  as_ascii_ = query_exec_request_.asAscii;
 
-  if (exec_request.__isset.descTbl) {
-    THROW_IF_ERROR(DescriptorTbl::Create(&obj_pool_, exec_request.descTbl, &descs_), env_,
-                   impala_exc_cl_);
-  } else {
-    descs_ = NULL;
+  if (query_exec_request_.fragmentRequests.size() == 0) {
+    return Status("query exec request contains no plan fragments");
   }
-  if (exec_request.__isset.plan) {
-    THROW_IF_ERROR(ExecNode::CreateTree(&obj_pool_, exec_request.plan, *descs_, &plan_), env_,
-                   impala_exc_cl_);
-  } else {
-    plan_ = NULL;
+  const TPlanExecRequest& plan_exec_request = query_exec_request_.fragmentRequests[0];
+  if (plan_exec_request.__isset.descTbl) {
+    RETURN_IF_ERROR(DescriptorTbl::Create(&obj_pool_, plan_exec_request.descTbl, &descs_));
   }
-  // TODO: check that (descs_ == NULL) == (plan_ == NULL)
-  THROW_IF_ERROR(
-      Expr::CreateExprTrees(&obj_pool_, exec_request.selectListExprs,
-                            &select_list_exprs_), env_, impala_exc_cl_);
+  if (plan_exec_request.__isset.planFragment) {
+    RETURN_IF_ERROR(
+        ExecNode::CreateTree(
+            &obj_pool_, plan_exec_request.planFragment, *descs_, &plan_));
+
+    // set scan ranges
+    vector<ExecNode*> scan_nodes;
+    plan_->CollectScanNodes(&scan_nodes);
+    DCHECK_GT(query_exec_request_.nodeRequestParams.size(), 0);
+    // the first nodeRequestParams list contains exactly one TPlanExecParams
+    // (it's meant for the coordinator fragment)
+    DCHECK_EQ(query_exec_request_.nodeRequestParams[0].size(), 1);
+    vector<TScanRange>& local_scan_ranges =
+        query_exec_request_.nodeRequestParams[0][0].scanRanges;
+    for (int i = 0; i < scan_nodes.size(); ++i) {
+      for (int j = 0; j < local_scan_ranges.size(); ++j) {
+        if (scan_nodes[i]->id() == local_scan_ranges[j].nodeId) {
+           static_cast<ScanNode*>(scan_nodes[i])->SetScanRange(local_scan_ranges[j]);
+        }
+      }
+    }
+  }
+
+  if ((descs_ == NULL) != (plan_ == NULL)) {
+    return Status("bad TPlanExecRequest: only one of {plan_fragment, desc_tbl} is set");
+  }
+  RETURN_IF_ERROR(
+      Expr::CreateExprTrees(&obj_pool_, plan_exec_request.outputExprs,
+                            &select_list_exprs_));
+  return Status::OK;
 }
 
 void PlanExecutorAdaptor::Exec() {
-  DeserializeRequest();
-  RETURN_IF_EXC(env_);
+  THROW_IF_ERROR(DeserializeRequest(), env_, impala_exc_cl_);
   if (plan_ == NULL) return;
   executor_.reset(new PlanExecutor(plan_, *descs_, abort_on_error_, max_errors_));
   if (batch_size_ != 0) {

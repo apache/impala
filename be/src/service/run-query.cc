@@ -17,7 +17,6 @@
 
 DEFINE_string(query, "", "query to execute");
 DEFINE_bool(init_hbase, true, "if true, call hbase jni initialization");
-DEFINE_int32(batch_size, 0, "backend's batch size");
 
 using namespace std;
 using namespace impala;
@@ -29,12 +28,7 @@ static void Exec() {
   struct timeval start_time;
   gettimeofday(&start_time, NULL);
 
-  // Arbitrary default values for reporting runtime errors/warnings.
-  bool abort_on_error = false;
-  int max_errors = 100;
-
-  EXIT_IF_ERROR(
-      executor.Exec(FLAGS_query, NULL, FLAGS_batch_size, abort_on_error, max_errors));
+  EXIT_IF_ERROR(executor.Exec(FLAGS_query, NULL));
 
   int num_rows = 0;
   while (true) {
