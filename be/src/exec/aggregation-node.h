@@ -10,13 +10,16 @@
 
 #include "exec/exec-node.h"
 #include "runtime/descriptors.h"  // for TupleId
+#include "runtime/free-list.h"
+#include "runtime/mem-pool.h"
 
 namespace impala {
 
 class AggregateExpr;
-class MemPool;
+class AggregationTuple;
 class RowBatch;
 struct RuntimeState;
+struct StringValue;
 class Tuple;
 class TupleDescriptor;
 
@@ -24,6 +27,13 @@ class TupleDescriptor;
 // The node creates a hash set of aggregation output tuples, which
 // contain slots for all grouping and aggregation exprs (the grouping
 // slots precede the aggregation expr slots in the output tuple descriptor).
+//
+// For string aggregation, we need to append additional data to the tuple object
+// to reduce the number of string allocations (since we can not know the length of
+// the output string beforehand).  For each string slot in the output tuple, a int32 
+// will be appended to the end of the normal tuple data that stores the size of buffer 
+// for that string slot.  This also results in the correct alignment because StringValue 
+// slots are 8-byte aligned and form the tail end of the tuple.
 class AggregationNode : public ExecNode {
  public:
   AggregationNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
@@ -83,20 +93,45 @@ class AggregationNode : public ExecNode {
   std::vector<Expr*> aggregate_exprs_;
   TupleId agg_tuple_id_;
   TupleDescriptor* agg_tuple_desc_;
-  Tuple* singleton_output_tuple_;  // result of aggregation w/o GROUP BY
+  AggregationTuple* singleton_output_tuple_;  // result of aggregation w/o GROUP BY
   TupleRow* current_row_;  // needed for GroupingExprHash/-Equals
   std::vector<TupleDescriptor*> input_tuple_descs_;
+  FreeList string_buffer_free_list_;
+  int num_string_slots_; // number of string slots in the output tuple
 
   boost::scoped_ptr<MemPool> tuple_pool_;
 
   // Constructs a new aggregation output tuple (allocated from tuple_pool_),
   // initialized to grouping values computed over 'row'.
   // Aggregation expr slots are set to their initial values.
-  Tuple* ConstructAggTuple(TupleRow* row);
+  AggregationTuple* ConstructAggTuple(TupleRow* row);
 
+
+  // Allocates a string buffer that is at least the new_size.  The actual size of 
+  // the allocated buffer is returned in allocated_size.  
+  // The function first tries to allocate from the free list.  If there is nothing
+  // there, it will allocate from the MemPool.
+  char* AllocateStringBuffer(int new_size, int* allocated_size);
+
+  // Helper to update string value from src into dst.  This does a deep copy
+  // and will allocate a buffer for dst as necessary.
+  //  AggregationTuple: Contains the tuple data and the string buffer lengths
+  //  string_slot_idx: The i-th string slot in the aggregation tuple
+  //  dst: the target location to update the string.  This is part of the 
+  //          AggregationTuple that's also passed in.
+  //  str: the value to update dst to.  
+  void UpdateStringSlot(AggregationTuple*, int string_slot_idx, StringValue* dst, 
+                           const StringValue* str);
+
+  // Helpers to compute Aggregate.MIN/Aggregate.MAX
+  void UpdateMinStringSlot(AggregationTuple*, const NullIndicatorOffset&, 
+                           int slot_id, void* slot, void* value);
+  void UpdateMaxStringSlot(AggregationTuple*, const NullIndicatorOffset&, 
+                           int slot_id, void* slot, void* value);
+  
   // Updates the aggregation output tuple 'tuple' with aggregation values
   // computed over 'row'.
-  void UpdateAggTuple(Tuple* tuple, TupleRow* row);
+  void UpdateAggTuple(AggregationTuple* tuple, TupleRow* row);
 };
 
 }

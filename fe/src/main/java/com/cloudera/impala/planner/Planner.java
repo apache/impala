@@ -304,14 +304,6 @@ public class Planner {
 
     AggregateInfo aggInfo = selectStmt.getAggInfo();
     if (aggInfo != null) {
-      // we can't aggregate strings at the moment
-      // TODO: fix this
-      for (AggregateExpr aggExpr: aggInfo.getAggregateExprs()) {
-        if (aggExpr.hasChild(0) && aggExpr.getChild(0).getType() == PrimitiveType.STRING) {
-          throw new NotImplementedException(
-              aggExpr.getOp().toString() + " currently not supported for strings");
-        }
-      }
       root = new AggregationNode(root, aggInfo);
       if (selectStmt.getHavingPred() != null) {
         root.setConjuncts(selectStmt.getHavingPred().getConjuncts());

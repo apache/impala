@@ -46,6 +46,12 @@ bigint, bigint, double, double, double, double
 ----
 10000,9990,10.1,10089.9,5.04495e+07,5050
 =====
+select count(*), min(string_col), max(string_col), min(date_string_col), max(date_string_col) 
+from alltypesagg
+----
+bigint, string, string, string, string
+----
+10000,'0','999','01/01/10','01/10/10'
 # grouping by different data types, with NULLs
 select tinyint_col, count(*) from alltypesagg group by 1
 ----

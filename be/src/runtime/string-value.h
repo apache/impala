@@ -38,7 +38,11 @@ struct StringValue {
   bool Lt(const StringValue& other) { return Compare(other) < 0; }
   // >
   bool Gt(const StringValue& other) { return Compare(other) > 0; }
+
+  std::string DebugString() const;
 };
+
+std::ostream& operator<<(std::ostream& os, const StringValue& string_value);
 
 }
 

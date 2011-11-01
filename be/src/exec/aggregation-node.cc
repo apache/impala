@@ -23,6 +23,35 @@ using namespace impala;
 using namespace std;
 using namespace boost;
 
+// This object appends n-int32s to the end of a normal tuple object to maintain the lengths
+// of the string buffers in the tuple.
+namespace impala {
+
+class AggregationTuple {
+ public:
+  static AggregationTuple* Create(int tuple_size, int num_string_slots, MemPool* pool) {
+    int size = tuple_size + sizeof(int32_t) * num_string_slots;
+    AggregationTuple* result = reinterpret_cast<AggregationTuple*>(pool->Allocate(size));
+    result->Init(size);
+    return result;
+  }
+
+  void Init(int size) {
+    bzero(this, size);
+  }
+    
+  Tuple* tuple() { return reinterpret_cast<Tuple*>(this); }
+
+  int32_t* BufferLengths(int tuple_size) {
+    char* data = reinterpret_cast<char*>(this) + tuple_size;
+    return reinterpret_cast<int*>(data);
+  }
+ private:
+  void* data_;
+};
+
+}
+
 // TODO: pass in maximum size; enforce by setting limit in mempool
 // TODO: have a Status ExecNode::Init(const TPlanNode&) member function
 // that does initialization outside of c'tor, so we can indicate errors
@@ -35,6 +64,7 @@ AggregationNode::AggregationNode(ObjectPool* pool, const TPlanNode& tnode,
     agg_tuple_desc_(NULL),
     singleton_output_tuple_(NULL),
     current_row_(NULL),
+    num_string_slots_(0),
     tuple_pool_(new MemPool()) {
   // ignore return status for now
   Expr::CreateExprTrees(pool, tnode.agg_node.grouping_exprs, &grouping_exprs_);
@@ -77,7 +107,7 @@ void AggregationNode::GroupingExprEquals::Init(
   grouping_exprs_ = &grouping_exprs;
 }
 
-bool AggregationNode::GroupingExprEquals::operator()(
+bool AggregationNode::GroupingExprEquals::operator()( 
     Tuple* const& t1, Tuple* const& t2) const {
   for (int i = 0; i < grouping_exprs_->size(); ++i) {
     SlotDescriptor* slot_d = agg_tuple_desc_->slots()[i];
@@ -117,6 +147,14 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   equals_fn_.Init(agg_tuple_desc_, grouping_exprs_);
   // TODO: how many buckets?
   hash_tbl_.reset(new HashTable(5, hash_fn_, equals_fn_));
+  
+  // Determine the number of string slots in the output
+  for (vector<Expr*>::const_iterator expr = aggregate_exprs_.begin();
+       expr != aggregate_exprs_.end(); ++expr) {
+    AggregateExpr* agg_expr = static_cast<AggregateExpr*>(*expr);
+    if (agg_expr->type() == TYPE_STRING) ++num_string_slots_;
+  }
+
   return Status::OK;
 }
 
@@ -134,7 +172,7 @@ Status AggregationNode::Open(RuntimeState* state) {
     RETURN_IF_ERROR(children_[0]->GetNext(state, &batch));
     for (int i = 0; i < batch.num_rows(); ++i) {
       current_row_ = batch.GetRow(i);
-      Tuple* agg_tuple;
+      AggregationTuple* agg_tuple;
       if (singleton_output_tuple_ != NULL) {
         agg_tuple = singleton_output_tuple_;
       } else {
@@ -143,9 +181,9 @@ Status AggregationNode::Open(RuntimeState* state) {
         if (entry == hash_tbl_->end()) {
           // new entry
           agg_tuple = ConstructAggTuple(current_row_);
-          hash_tbl_->insert(agg_tuple);
+          hash_tbl_->insert(agg_tuple->tuple());
         } else {
-          agg_tuple = *entry;
+          agg_tuple = reinterpret_cast<AggregationTuple*>(*entry);
         }
       }
       UpdateAggTuple(agg_tuple, current_row_);
@@ -155,7 +193,7 @@ Status AggregationNode::Open(RuntimeState* state) {
   }
   RETURN_IF_ERROR(children_[0]->Close(state));
   if (singleton_output_tuple_ != NULL) {
-    hash_tbl_->insert(singleton_output_tuple_);
+    hash_tbl_->insert(singleton_output_tuple_->tuple());
   }
 
   output_iterator_ = hash_tbl_->begin();
@@ -182,8 +220,11 @@ Status AggregationNode::Close(RuntimeState* state) {
   return Status::OK;
 }
 
-Tuple* AggregationNode::ConstructAggTuple(TupleRow* row) {
-  Tuple* agg_tuple = Tuple::Create(agg_tuple_desc_->byte_size(), tuple_pool_.get());
+AggregationTuple* AggregationNode::ConstructAggTuple(TupleRow* row) {
+  AggregationTuple* agg_out_tuple = 
+      AggregationTuple::Create(agg_tuple_desc_->byte_size(), num_string_slots_, tuple_pool_.get());
+  Tuple* agg_tuple = agg_out_tuple->tuple();
+
   vector<SlotDescriptor*>::const_iterator slot_d = agg_tuple_desc_->slots().begin();
   // copy grouping values
   for (int i = 0; i < grouping_exprs_.size(); ++i, ++slot_d) {
@@ -206,7 +247,62 @@ Tuple* AggregationNode::ConstructAggTuple(TupleRow* row) {
       agg_tuple->SetNull((*slot_d)->null_indicator_offset());
     }
   }
-  return agg_tuple;
+
+  return agg_out_tuple;
+}
+
+char* AggregationNode::AllocateStringBuffer(int new_size, int* allocated_size) {
+  new_size = ::max(new_size, FreeList::MinSize());
+  char* buffer = string_buffer_free_list_.Allocate(new_size, allocated_size);
+  if (buffer == NULL)  {
+    buffer = tuple_pool_->Allocate(new_size);
+    *allocated_size = new_size;
+  }
+  return buffer;
+}
+
+inline void AggregationNode::UpdateStringSlot(AggregationTuple* tuple, int string_slot_idx,
+                                       StringValue* dst, const StringValue* src) {
+  int32_t* string_buffer_lengths = tuple->BufferLengths(agg_tuple_desc_->byte_size());
+  int curr_size = string_buffer_lengths[string_slot_idx];
+  if (curr_size < src->len) {
+    string_buffer_free_list_.Add(dst->ptr, curr_size);
+    dst->ptr = AllocateStringBuffer(src->len, &(string_buffer_lengths[string_slot_idx]));
+  }
+  strncpy(dst->ptr, src->ptr, src->len);
+  dst->len = src->len;
+}
+
+inline void AggregationNode::UpdateMinStringSlot(AggregationTuple* agg_tuple, 
+                                          const NullIndicatorOffset& null_indicator_offset, 
+                                          int string_slot_idx, void* slot, void* value) {
+  DCHECK(value != NULL);
+  Tuple* tuple = agg_tuple->tuple();
+  StringValue* dst_value = static_cast<StringValue*>(slot);
+  StringValue* src_value = static_cast<StringValue*>(value);
+
+  if (tuple->IsNull(null_indicator_offset)) {
+    tuple->SetNotNull(null_indicator_offset);
+  } else if (src_value->Compare(*dst_value) >= 0) {
+    return;
+  }
+  UpdateStringSlot(agg_tuple, string_slot_idx, dst_value, src_value);
+}
+
+inline void AggregationNode::UpdateMaxStringSlot(AggregationTuple* agg_tuple, 
+                                          const NullIndicatorOffset& null_indicator_offset,
+                                          int string_slot_idx, void* slot, void* value) {
+  DCHECK(value != NULL);
+  Tuple* tuple = agg_tuple->tuple();
+  StringValue* dst_value = static_cast<StringValue*>(slot);
+  StringValue* src_value = static_cast<StringValue*>(value);
+
+  if (tuple->IsNull(null_indicator_offset)) {
+    tuple->SetNotNull(null_indicator_offset);
+  } else if (src_value->Compare(*dst_value) <= 0) {
+    return;
+  }
+  UpdateStringSlot(agg_tuple, string_slot_idx, dst_value, src_value);
 }
 
 template <typename T>
@@ -248,13 +344,20 @@ void UpdateSumSlot(Tuple* tuple, const NullIndicatorOffset& null_indicator_offse
   }
 }
 
-void AggregationNode::UpdateAggTuple(Tuple* tuple, TupleRow* row) {
+void AggregationNode::UpdateAggTuple(AggregationTuple* agg_out_tuple, TupleRow* row) {
+  Tuple* tuple = agg_out_tuple->tuple();
+  int string_slot_idx = -1;
   vector<SlotDescriptor*>::const_iterator slot_d =
       agg_tuple_desc_->slots().begin() + grouping_exprs_.size();
   for (vector<Expr*>::iterator expr = aggregate_exprs_.begin();
        expr != aggregate_exprs_.end(); ++expr, ++slot_d) {
     void* slot = tuple->GetSlot((*slot_d)->tuple_offset());
     AggregateExpr* agg_expr = static_cast<AggregateExpr*>(*expr);
+
+    // keep track of which string slot we are on
+    if (agg_expr->type() == TYPE_STRING) {
+      ++string_slot_idx;
+    }
 
     // deal with COUNT(*) separately (no need to check the actual child expr value)
     if (agg_expr->op() == TExprOperator::AGG_COUNT && agg_expr->is_star()) {
@@ -299,6 +402,10 @@ void AggregationNode::UpdateAggTuple(Tuple* tuple, TupleRow* row) {
           case TYPE_DOUBLE:
             UpdateMinSlot<double>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
             break;
+          case TYPE_STRING:
+            UpdateMinStringSlot(agg_out_tuple, (*slot_d)->null_indicator_offset(), 
+                                string_slot_idx, slot, value);
+            break;
           default:
             DCHECK(false) << "invalid type: " << TypeToString(agg_expr->type());
         };
@@ -326,6 +433,10 @@ void AggregationNode::UpdateAggTuple(Tuple* tuple, TupleRow* row) {
             break;
           case TYPE_DOUBLE:
             UpdateMaxSlot<double>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
+            break;
+          case TYPE_STRING:
+            UpdateMaxStringSlot(agg_out_tuple, (*slot_d)->null_indicator_offset(), 
+                                string_slot_idx, slot, value);
             break;
           default:
             DCHECK(false) << "invalid type: " << TypeToString(agg_expr->type());
@@ -366,7 +477,7 @@ void AggregationNode::UpdateAggTuple(Tuple* tuple, TupleRow* row) {
   }
 }
 
-void AggregationNode::DebugString(int indentation_level, std::stringstream* out) const {
+void AggregationNode::DebugString(int indentation_level, stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
   *out << "AggregationNode(tuple_id=" << agg_tuple_id_
        << " grouping_exprs=" << Expr::DebugString(grouping_exprs_)

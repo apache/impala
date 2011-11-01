@@ -20,9 +20,22 @@ add_executable(mem-pool-test
   mem-pool-test.cc
 )
 
+add_executable(free-list-test
+  free-list-test.cc
+)
+
 # TODO: w/o the thrift dependency, we're getting a bunch of 'pthread_<> missing' linker
 # errors; figure out what we actually need to link against here
 target_link_libraries(mem-pool-test
+  Runtime
+  thrift
+  glogstatic
+  gflagsstatic
+  gtest
+  ${Boost_LIBRARIES}
+)
+
+target_link_libraries(free-list-test
   Runtime
   thrift
   glogstatic
@@ -36,3 +49,4 @@ target_link_libraries(Runtime
 )
 
 add_test(mem-pool-test ${CMAKE_SOURCE_DIR}/build/runtime/mem-pool-test)
+add_test(free-list-test ${CMAKE_SOURCE_DIR}/build/runtime/free-list-test)
