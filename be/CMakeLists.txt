@@ -66,6 +66,35 @@ set_target_properties(gtest PROPERTIES IMPORTED_LOCATION "${GTEST_LIBRARY}")
 message(STATUS ${GTEST_INCLUDE_DIR})
 message(STATUS ${GTEST_LIBRARY})
 
+# setup doc generation with Doxygen
+find_package(Doxygen)
+if (DOXYGEN_FOUND)
+  set(DOXYGEN_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/build/docs)
+  # Possible to not input the subdirs one by one?
+  set(CMAKE_DOXYGEN_INPUT 
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/common/
+    ${CMAKE_SOURCE_DIR}/src/exec/
+    ${CMAKE_SOURCE_DIR}/src/exprs/
+    ${CMAKE_SOURCE_DIR}/src/runtime/
+    ${CMAKE_SOURCE_DIR}/src/service/
+    ${CMAKE_SOURCE_DIR}/src/testutil/
+    ${CMAKE_SOURCE_DIR}/src/thrift/
+    ${CMAKE_SOURCE_DIR}/src/util/
+    )
+  # CMake appends using ';'. doxygen wants spaces
+  string(REPLACE ";" " " DOXYGEN_INPUT "${CMAKE_DOXYGEN_INPUT}")
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/.impala.doxy 
+                 ${CMAKE_SOURCE_DIR}/build/config/.impala.doxy)
+  file(MAKE_DIRECTORY ${DOXYGEN_OUTPUT_DIR})
+  add_custom_target(docs
+    COMMAND ${CMAKE_COMMAND} -E echo_append "Building Docs..."
+    COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_SOURCE_DIR}/build/config/.impala.doxy
+    )
+else (DOXYGEN_FOUND)
+  MESSAGE(STATUS "WARNING: Doxygen not found - Docs will not be created")
+endif(DOXYGEN_FOUND)
+
 # resolve "#include "<subdir>/<name>.h"
 include_directories(${CMAKE_SOURCE_DIR}/src)
 
