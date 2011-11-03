@@ -4,6 +4,7 @@
 #define IMPALA_SERVICE_PLAN_EXECUTOR_H
 
 #include <vector>
+#include <boost/scoped_ptr.hpp>
 
 #include "common/status.h"
 #include "common/object-pool.h"
@@ -16,6 +17,7 @@ class ExecNode;
 class DescriptorTbl;
 class RowBatch;
 class TupleDescriptor;
+class TRowBatch;
 
 class PlanExecutor {
  public:
@@ -36,6 +38,7 @@ class PlanExecutor {
   std::vector<TupleDescriptor*> tuple_descs_;
   RuntimeState runtime_state_;
   bool done_;
+  boost::scoped_ptr<TRowBatch> thrift_batch_;
 };
 
 }

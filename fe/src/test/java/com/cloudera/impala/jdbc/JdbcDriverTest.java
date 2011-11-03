@@ -35,14 +35,14 @@ public class JdbcDriverTest {
   private static Catalog catalog;
 
   // For comparing results retrieved via JDBC.
-  private static Executor coordinator;
+  private static Executor executor;
 
   @BeforeClass
   public static void setUp() throws Exception {
     Class.forName("com.cloudera.impala.jdbc.ImpalaDriver");
     HiveMetaStoreClient client = TestSchemaUtils.createClient();
     catalog = new Catalog(client);
-    coordinator = new Executor(catalog);
+    executor = new Executor(catalog);
   }
 
   // Expected success when connecting to connSting.
@@ -198,7 +198,7 @@ public class JdbcDriverTest {
     // Execute query via the coordinator and compare column labels, and query results.
     StringBuilder errorLog = new StringBuilder();
     TestUtils.runQuery(
-        coordinator, query, 0, 0,
+        executor, query, 0, 0,
         false, 1000, expectedColLabels, null, expectedResults, null, null, errorLog);
   }
 

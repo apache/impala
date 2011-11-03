@@ -11,6 +11,7 @@ add_library(Runtime STATIC
   descriptors.cc
   mem-pool.cc
   raw-value.cc
+  row-batch.cc
   runtime-state.cc
   string-value.cc
   tuple.cc

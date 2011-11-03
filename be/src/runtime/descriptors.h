@@ -134,6 +134,7 @@ class TupleDescriptor {
  public:
   int byte_size() const { return byte_size_; }
   const std::vector<SlotDescriptor*>& slots() const { return slots_; }
+  const std::vector<SlotDescriptor*>& string_slots() const { return string_slots_; }
   const TableDescriptor* table_desc() const { return table_desc_; }
 
   TupleId id() const { return id_; }
@@ -145,7 +146,8 @@ class TupleDescriptor {
   const TupleId id_;
   TableDescriptor* table_desc_;
   const int byte_size_;
-  std::vector<SlotDescriptor*> slots_;
+  std::vector<SlotDescriptor*> slots_;  // contains all slots
+  std::vector<SlotDescriptor*> string_slots_;  // contains only materialized string slots
 
   TupleDescriptor(const TTupleDescriptor& tdesc);
   void AddSlot(SlotDescriptor* slot);

@@ -44,12 +44,17 @@ class Tuple {
 
   // Create a copy of 'this', including all of its referenced string data,
   // using pool to allocate memory. Returns the copy.
-  Tuple* DeepCopy(const TupleDescriptor& desc, MemPool* pool);
+  // If 'convert_ptrs' is true, converts pointers that are part of the tuple
+  // into offsets in 'pool'.
+  Tuple* DeepCopy(const TupleDescriptor& desc, MemPool* pool, bool convert_ptrs = false);
 
   // Create a copy of 'this', including all its referenced string data.  This
   // version does not allocate a tuple, instead copying 'dst'.  dst must already 
   // be allocated to the correct size (desc.byte_size())
-  void DeepCopy(Tuple* dst, const TupleDescriptor& desc, MemPool* pool);
+  // If 'convert_ptrs' is true, converts pointers that are part of the tuple
+  // into offsets in 'pool'.
+  void DeepCopy(Tuple* dst, const TupleDescriptor& desc, MemPool* pool,
+                bool convert_ptrs = false);
 
   // Turn null indicator bit on.
   void SetNull(const NullIndicatorOffset& offset) {

@@ -7,28 +7,30 @@
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
 #include "runtime/string-value.h"
+#include "util/debug-util.h"
 
 using namespace std;
 
 namespace impala {
 
-Tuple* Tuple::DeepCopy(const TupleDescriptor& desc, MemPool* pool) {
+Tuple* Tuple::DeepCopy(const TupleDescriptor& desc, MemPool* pool, bool convert_ptrs) {
   Tuple* result = reinterpret_cast<Tuple*>(pool->Allocate(desc.byte_size()));
-  DeepCopy(result, desc, pool);
+  DeepCopy(result, desc, pool, convert_ptrs);
   return result;
 }
 
-void Tuple::DeepCopy(Tuple* dst, const TupleDescriptor& desc, MemPool* pool) {
+void Tuple::DeepCopy(Tuple* dst, const TupleDescriptor& desc, MemPool* pool,
+                     bool convert_ptrs) {
   memcpy(dst, this, desc.byte_size());
   // allocate in the same pool and then copy all string slots
-  for (vector<SlotDescriptor*>::const_iterator i = desc.slots().begin();
-       i != desc.slots().end(); ++i) {
-    if ((*i)->type() == TYPE_STRING) {
-      StringValue* string_v = dst->GetStringSlot((*i)->tuple_offset());
-      char* string_copy = pool->Allocate(string_v->len);
-      memcpy(string_copy, string_v->ptr, string_v->len);
-      string_v->ptr = string_copy;
-    }
+  for (vector<SlotDescriptor*>::const_iterator i = desc.string_slots().begin();
+       i != desc.string_slots().end(); ++i) {
+    DCHECK_EQ((*i)->type(), TYPE_STRING);
+    StringValue* string_v = dst->GetStringSlot((*i)->tuple_offset());
+    int offset = pool->GetCurrentOffset();
+    char* string_copy = pool->Allocate(string_v->len);
+    memcpy(string_copy, string_v->ptr, string_v->len);
+    string_v->ptr = (convert_ptrs ? reinterpret_cast<char*>(offset) : string_copy);
   }
 }
 

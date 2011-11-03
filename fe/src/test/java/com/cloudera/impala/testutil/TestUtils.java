@@ -94,6 +94,7 @@ public class TestUtils {
       for (int i = actual.length; i < expected.size(); ++i) {
         output.append(expected.get(i)).append("\n");
       }
+      return output.toString();
     }
 
     if (mismatch != -1) {
@@ -162,7 +163,7 @@ public class TestUtils {
    * 2. Actual and expected query results if expectedResults is non-null.
    * 3. Actual and expected errors if expectedErrors and expectedFileErrors are non-null.
    *
-   * @param coordinator
+   * @param executor
    *          Coordinator to run query with.
    * @param query
    *          Query to be executed.
@@ -187,7 +188,7 @@ public class TestUtils {
    *          Records error messages of failed tests to be reported at the very end of a test run.
    * @return an error message if actual does not match expected, "" otherwise.
    */
-  public static void runQuery(Executor coordinator, String query, int lineNum,
+  public static void runQuery(Executor executor, String query, int lineNum,
       int batchSize, boolean abortOnError, int maxErrors,
       ArrayList<String> expectedColLabels,
       ArrayList<String> expectedTypes, ArrayList<String> expectedResults,
@@ -203,7 +204,7 @@ public class TestUtils {
     BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
     ArrayList<String> actualResults = new ArrayList<String>();
     try {
-      coordinator.runQuery(
+      executor.runQuery(
           request, colTypes, colLabels, batchSize, abortOnError, maxErrors,
           errors, fileErrors, resultQueue);
     } catch (ImpalaException e) {

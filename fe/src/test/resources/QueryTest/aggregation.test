@@ -52,6 +52,7 @@ from alltypesagg
 bigint, string, string, string, string
 ----
 10000,'0','999','01/01/10','01/10/10'
+====
 # grouping by different data types, with NULLs
 select tinyint_col, count(*) from alltypesagg group by 1
 ----

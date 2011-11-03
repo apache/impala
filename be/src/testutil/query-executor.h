@@ -22,6 +22,7 @@ class ImpalaPlanServiceClient;
 class ObjectPool;
 class PlanExecutor;
 class RowBatch;
+class TRowBatch;
 
 class QueryExecutor {
  public:
@@ -63,6 +64,7 @@ class QueryExecutor {
   boost::scoped_ptr<PlanExecutor> executor_;
   std::vector<Expr*> select_list_exprs_;
   boost::scoped_ptr<RowBatch> row_batch_;
+  boost::scoped_ptr<TRowBatch> thrift_row_batch_;
   int next_row_;  // to return from row batch
   int num_rows_;  // total # of rows returned for current query
   bool eos_;  // if true, no more rows for current query

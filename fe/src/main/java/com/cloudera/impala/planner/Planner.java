@@ -382,14 +382,14 @@ public class Planner {
 
     // unpartitioned scans executing on local host
     TPlanExecParams execParams = new TPlanExecParams();
+    execParams.setDestHosts(Lists.newArrayList("localhost"));
     List<ScanNode> scanNodes = Lists.newArrayList();
     plan.collectSubclasses(ScanNode.class, scanNodes);
     for (ScanNode scan: scanNodes) {
       List<TScanRange> scanRanges = Lists.newArrayList();
       scan.getScanParams(scanRanges, null);
       Preconditions.checkState(scanRanges.size() == 1);
-      execParams.setScanRanges(scanRanges);
-      execParams.setDestHosts(Lists.newArrayList("localhost"));
+      execParams.addToScanRanges(scanRanges.get(0));
     }
     request.addToNodeRequestParams(Lists.newArrayList(execParams));
 

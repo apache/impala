@@ -3,6 +3,7 @@
 #include "service/backend.h"
 
 #include <boost/scoped_ptr.hpp>
+#include <gflags/gflags.h>
 #include <glog/logging.h>
 
 #include "common/status.h"
@@ -13,7 +14,11 @@
 #include "runtime/runtime-state.h"
 #include "service/plan-executor-adaptor.h"
 #include "util/jni-util.h"
+#include "util/debug-util.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
+#include "gen-cpp/Data_types.h"
+
+DECLARE_bool(serialize_batch);
 
 using namespace impala;
 using namespace std;
@@ -79,6 +84,7 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecQuery(
         adaptor.impala_exc_cl(), "not implemented: distributed query execution");
     return;
   }
+  LOG(INFO) << "query: " << adaptor.query_exec_request().selectStmt;
 
   adaptor.Exec();
   RETURN_IF_EXC(env);
@@ -98,19 +104,22 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecQuery(
     return;
   }
 
+  // TODO: turn this into a flag in the TQueryExecRequest
+  // FLAGS_serialize_batch = true;
   scoped_ptr<RowBatch> batch;
+  scoped_ptr<TRowBatch> thrift_batch;
   while (true) {
     RowBatch* batch_ptr;
     THROW_IF_ERROR_WITH_LOGGING(executor->FetchResult(&batch_ptr), env, &adaptor);
     batch.reset(batch_ptr);
+
     for (int i = 0; i < batch->num_rows(); ++i) {
       TupleRow* row = batch->GetRow(i);
+      LOG(INFO) << PrintRow(row, adaptor.plan()->row_desc());
       adaptor.AddResultRow(row);
       RETURN_IF_EXC(env);
     }
-    if (batch->num_rows() < batch->capacity()) {
-      break;
-    }
+    if (batch->eos()) break;
   }
 
   // Report error log and file error stats.

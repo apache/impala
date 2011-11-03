@@ -178,6 +178,8 @@ public class Executor {
     execRequest.setAbortOnError(abortOnError);
     execRequest.setMaxErrors(maxErrors);
     execRequest.setBatchSize(batchSize);
+    execRequest.setSelectStmt(analysisResult.selectStmt.toSql());
+    LOG.info(execRequest.toString());
 
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     try {

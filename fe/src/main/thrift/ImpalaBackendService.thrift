@@ -94,6 +94,9 @@ struct TQueryExecRequest {
   // for debugging: set batch size used by backend internally;
   // a size of 0 indicates backend default
   8: required i32 batchSize
+
+  // for debugging purposes (to allow backend to log the query string)
+  9: optional string selectStmt;
 }
 
 // Execution status

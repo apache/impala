@@ -33,6 +33,8 @@
 #include "service/plan-executor.h"
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
+#include "gen-cpp/Data_types.h"
+#include "util/debug-util.h"
 
 DEFINE_int32(batch_size, 0,
              "batch size to be used by backend; a batch size of 0 indicates the "
@@ -243,12 +245,13 @@ Status QueryExecutor::FetchResult(std::vector<void*>* select_list_values) {
     // we need a new row batch
     RowBatch* batch_ptr;
     RETURN_IF_ERROR(executor_->FetchResult(&batch_ptr));
+
     row_batch_.reset(batch_ptr);
     if (batch_ptr == NULL) {
       return Status("Internal error: row batch is NULL.");
     }
     next_row_ = 0;
-    if (row_batch_->num_rows() < row_batch_->capacity()) {
+    if (row_batch_->eos()) {
       eos_ = true;
       if (row_batch_->num_rows() == 0) {
         // empty result

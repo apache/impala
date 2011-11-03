@@ -143,6 +143,9 @@ TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
 
 void TupleDescriptor::AddSlot(SlotDescriptor* slot) {
   slots_.push_back(slot);
+  if (slot->type() == TYPE_STRING && slot->is_materialized()) {
+    string_slots_.push_back(slot);
+  }
 }
 
 string TupleDescriptor::DebugString() const {

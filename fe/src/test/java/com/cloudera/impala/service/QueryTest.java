@@ -17,7 +17,7 @@ import com.cloudera.impala.testutil.TestUtils;
 
 public class QueryTest {
   private static Catalog catalog;
-  private static Executor coordinator;
+  private static Executor executor;
   private static StringBuilder testErrorLog;
   private final String testDir = "QueryTest";
 
@@ -25,7 +25,7 @@ public class QueryTest {
   public static void setUp() throws Exception {
     HiveMetaStoreClient client = TestSchemaUtils.createClient();
     catalog = new Catalog(client);
-    coordinator = new Executor(catalog);
+    executor = new Executor(catalog);
     testErrorLog = new StringBuilder();
   }
 
@@ -42,15 +42,15 @@ public class QueryTest {
       // and with batch size of 1, which should trigger a lot of corner cases
       // in the execution engine code
       TestUtils.runQuery(
-          coordinator, queryFileParser.getQuery(), queryFileParser.getLineNum(),
+          executor, queryFileParser.getQuery(), queryFileParser.getLineNum(),
           0, abortOnError, maxErrors, null, expectedTypes, expectedResults, null, null,
           errorLog);
       TestUtils.runQuery(
-          coordinator, queryFileParser.getQuery(), queryFileParser.getLineNum(),
+          executor, queryFileParser.getQuery(), queryFileParser.getLineNum(),
           16, abortOnError, maxErrors, null, expectedTypes, expectedResults, null, null,
           errorLog);
       TestUtils.runQuery(
-          coordinator, queryFileParser.getQuery(), queryFileParser.getLineNum(),
+          executor, queryFileParser.getQuery(), queryFileParser.getLineNum(),
           1, abortOnError, maxErrors, null, expectedTypes, expectedResults, null, null,
           errorLog);
     }

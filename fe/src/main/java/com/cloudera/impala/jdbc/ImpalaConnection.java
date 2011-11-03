@@ -45,7 +45,7 @@ public class ImpalaConnection implements java.sql.Connection {
   // For providing metadata.
   private final Catalog catalog;
   // For executing queries.
-  private final Executor coordinator;
+  private final Executor executor;
   // Connection status.
   private boolean isClosed = true;
 
@@ -54,13 +54,13 @@ public class ImpalaConnection implements java.sql.Connection {
     this.dbName = dbName;
     this.info = info;
     this.catalog = catalog;
-    coordinator = new Executor(catalog);
+    executor = new Executor(catalog);
     isClosed = false;
   }
 
   @Override
   public Statement createStatement() throws SQLException {
-    return new ImpalaStatement(coordinator, this);
+    return new ImpalaStatement(executor, this);
   }
 
   @Override
