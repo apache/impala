@@ -24,11 +24,13 @@ public class ExecutorTest {
       throws ImpalaException {
     // start at the beginning of the output stream for every test
     outputStream.reset();
-    int syncNumRows = Executor.runQuery(query, catalog, false, printStream);
+    int syncNumRows = Executor.runQuery(query, catalog, false,
+        Executor.DEFAULT_BATCH_SIZE, printStream);
     if (expectedRows != -1) {
       Assert.assertEquals(expectedRows, syncNumRows);
     }
-    int asyncNumRows = Executor.runQuery(query, catalog, true, printStream);
+    int asyncNumRows = Executor.runQuery(query, catalog, true,
+        Executor.DEFAULT_BATCH_SIZE, printStream);
     if (expectedRows != -1) {
       Assert.assertEquals(expectedRows, asyncNumRows);
     }
@@ -38,13 +40,13 @@ public class ExecutorTest {
     // start at the beginning of the output stream for every test
     outputStream.reset();
     try {
-      Executor.runQuery(query, catalog, false, printStream);
+      Executor.runQuery(query, catalog, false, Executor.DEFAULT_BATCH_SIZE, printStream);
       fail("Expected query to fail: " + query);
     } catch (Exception e) {
     }
     outputStream.reset();
     try {
-      Executor.runQuery(query, catalog, true, printStream);
+      Executor.runQuery(query, catalog, true, Executor.DEFAULT_BATCH_SIZE, printStream);
       fail("Expected query to fail: " + query);
     } catch (Exception e) {
     }

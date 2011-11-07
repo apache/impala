@@ -32,9 +32,11 @@ MemPool::MemPool(int chunk_size)
 
 MemPool::~MemPool() {
   for (size_t i = 0; i < allocated_chunks_.size(); ++i) {
+    VLOG(2) << "MemPool: Deleting allocated chunk: " << (void*)allocated_chunks_[i];
     delete [] allocated_chunks_[i];
   }
   for (size_t i = 0; i < acquired_chunks_.size(); ++i) {
+    VLOG(2) << "MemPool: Deleting acquired chunk: " << (void*)acquired_chunks_[i];
     delete [] acquired_chunks_[i];
   }
 }
@@ -50,8 +52,10 @@ void MemPool::AllocChunk(int min_size) {
     free_offset_ = 0;
     if (allocated_chunk_sizes_[last_allocated_chunk_idx_] < min_size) {
       // insert a new min_size chunk
-      allocated_chunks_.insert(allocated_chunks_.begin() + last_allocated_chunk_idx_, new char[min_size]);
-      allocated_chunk_sizes_.insert(allocated_chunk_sizes_.begin() + last_allocated_chunk_idx_, min_size);
+      allocated_chunks_.insert(
+          allocated_chunks_.begin() + last_allocated_chunk_idx_, new char[min_size]);
+      allocated_chunk_sizes_.insert(
+          allocated_chunk_sizes_.begin() + last_allocated_chunk_idx_, min_size);
     }
     return;
   }
@@ -61,7 +65,8 @@ void MemPool::AllocChunk(int min_size) {
     if (last_allocated_chunk_idx_ == -1) {
       chunk_size = DEFAULT_INITIAL_CHUNK_SIZE;
     } else {
-      chunk_size = std::min(allocated_chunk_sizes_[last_allocated_chunk_idx_] * 2, MAX_CHUNK_SIZE);
+      chunk_size = ::min(
+          allocated_chunk_sizes_[last_allocated_chunk_idx_] * 2, MAX_CHUNK_SIZE);
     }
   }
   chunk_size = max(min_size, chunk_size);
@@ -126,19 +131,24 @@ void MemPool::AcquireData(MemPool* src, bool keep_current) {
   }
 }
 
-std::string MemPool::DebugString() {
+string MemPool::DebugString() {
   stringstream out;
   out << "MemPool(#chunks=" << allocated_chunks_.size()
       << " [";
-  for (int i = 0; i < allocated_chunk_sizes_.size(); ++i) {
-    out << (i > 0 ? " " : "") << allocated_chunk_sizes_[i];
+  for (int i = 0; i < allocated_chunks_.size(); ++i) {
+    out << (i > 0 ? " " : "") << allocated_chunk_sizes_[i] 
+        << "(" << (void*)allocated_chunks_[i] << ")";
   }
-  out << "] #acquired=" << acquired_chunks_.size()
-      << " last=" << last_allocated_chunk_idx_
-      << " free_offset=" << free_offset_
+  out << "] acquired=" << acquired_chunks_.size();
+  out << " [";
+  for (int i = 0; i < acquired_chunks_.size(); ++i) {
+    out << (i > 0 ? " " : "") << (void*)acquired_chunks_[i];
+  }
+  out << "] free_offset=" << free_offset_
       << " total_sizes=" << GetTotalChunkSizes()
       << " alloc=" << allocated_bytes_
       << " acq_alloc=" << acquired_allocated_bytes_
+      << " last_allocated_chunk_idx=" << last_allocated_chunk_idx_
       << ")";
   return out.str();
 }

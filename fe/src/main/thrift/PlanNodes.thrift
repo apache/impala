@@ -114,6 +114,8 @@ struct TAggregationNode {
 struct TSortNode {
   1: required list<Exprs.TExpr> ordering_exprs
   2: required list<bool> is_asc_order
+  // Indicates whether the backend service should use topn vs. sorting
+  3: required bool use_top_n;
 }
 
 // This is essentially a union of all messages corresponding to subclasses

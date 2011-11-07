@@ -12,6 +12,7 @@
 #include "exec/hash-join-node.h"
 #include "exec/hdfs-text-scan-node.h"
 #include "exec/hbase-scan-node.h"
+#include "exec/topn-node.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
 #include "runtime/row-batch.h"
@@ -106,6 +107,16 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       return Status::OK;
     case TPlanNodeType::HASH_JOIN_NODE:
       *node = pool->Add(new HashJoinNode(pool, tnode, descs));
+      return Status::OK;
+    case TPlanNodeType::SORT_NODE:
+      if (tnode.sort_node.use_top_n) {
+        *node = pool->Add(new TopNNode(pool, tnode, descs));
+      } else {
+      // TODO: Need Sort Node
+      //  *node = pool->Add(new SortNode(pool, tnode, descs));
+        error_msg << "ORDER BY with no LIMIT not implemented";
+        return Status(error_msg.str());
+      }
       return Status::OK;
     default:
       map<int, const char*>::const_iterator i =

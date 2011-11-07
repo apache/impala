@@ -108,7 +108,6 @@ public class HashJoinNode extends PlanNode {
       output.append("\n" + prefix + "  OTHER PREDICATES: ");
       output.append(getExplainString(conjuncts));
     }
-    output.append(getLimitExplainString(prefix));
     output.append("\n" + getChild(0).getExplainString(prefix + "    "));
     output.append("\n" + getChild(1).getExplainString(prefix + "    "));
     return output.toString();

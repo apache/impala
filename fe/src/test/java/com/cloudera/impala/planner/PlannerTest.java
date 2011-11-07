@@ -54,9 +54,9 @@ public class PlannerTest {
         errorLog.append("query:\n" + query + "\n" + result);
       }
     } catch (AnalysisException e) {
-      errorLog.append("query:\n" + query + "\nanalysis error: " + e.getMessage());
+      errorLog.append("query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
     } catch (InternalException e) {
-      errorLog.append("query:\n" + query + "\ninternal error: " + e.getMessage());
+      errorLog.append("query:\n" + query + "\ninternal error: " + e.getMessage() + "\n");
     } catch (NotImplementedException e) {
       errorLog.append("query:\n" + query + "\nplan not implemented");
     }
@@ -75,9 +75,9 @@ public class PlannerTest {
           "query produced a plan\nquery=" + query + "\nplan=\n"
           + plan.getExplainString());
     } catch (AnalysisException e) {
-      errorLog.append("query:\n" + query + "\nanalysis error: " + e.getMessage());
+      errorLog.append("query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
     } catch (InternalException e) {
-      errorLog.append("query:\n" + query + "\ninternal error: " + e.getMessage());
+      errorLog.append("query:\n" + query + "\ninternal error: " + e.getMessage() + "\n");
     } catch (NotImplementedException e) {
       // expected
     }
@@ -111,6 +111,7 @@ public class PlannerTest {
     RunTests("hdfs");
     RunTests("joins");
     RunTests("order");
+    RunTests("topn");
 
     // check whether any of the tests had errors
     if (testErrorLog.length() != 0) {

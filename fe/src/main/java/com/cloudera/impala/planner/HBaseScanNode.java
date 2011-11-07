@@ -180,7 +180,7 @@ public class HBaseScanNode extends ScanNode {
       }
       output.append('\n');
     }
-    output.append(prefix + "  PREDICATES: " + getExplainString(conjuncts) + "\n");
+    output.append(prefix + "  PREDICATES: " + getExplainString(conjuncts));
     return output.toString();
   }
 

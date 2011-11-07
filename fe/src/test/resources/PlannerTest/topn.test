@@ -1,0 +1,58 @@
+select name, zip
+from testtbl
+order by name
+limit 1
+----
+TOP-N (1)
+ORDER BY: name ASC
+  SCAN HDFS table=default.testtbl
+    PREDICATES: 
+    FILES:
+LIMIT: 1
+====
+select zip, count(*)
+from testtbl
+where name like 'm%'
+group by 1
+order by 2 desc
+limit 10
+----
+TOP-N (10)
+ORDER BY: <slot 3> DESC
+  AGGREGATE
+  GROUP BY: zip
+    SCAN HDFS table=default.testtbl
+      PREDICATES: name LIKE 'm%'
+      FILES:
+LIMIT: 10
+====
+select int_col, sum(float_col) 
+from hbasealltypessmall
+where id < 5
+group by 1
+order by 2
+limit 4
+----
+TOP-N (4)
+ORDER BY: <slot 4> ASC
+  AGGREGATE
+  GROUP BY: int_col
+    SCAN HBASE table=hbasealltypessmall
+      PREDICATES: id < 5
+LIMIT: 4
+====
+select int_col, sum(float_col), min(float_col) 
+from hbasealltypessmall
+group by 1
+order by 2,3 desc
+limit 0
+----
+TOP-N (0)
+ORDER BY: <slot 3> ASC
+, <slot 4> DESC
+  AGGREGATE
+  GROUP BY: int_col
+    SCAN HBASE table=hbasealltypessmall
+      PREDICATES: 
+LIMIT: 0
+====

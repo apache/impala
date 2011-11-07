@@ -20,3 +20,10 @@ order by 2
 ----
 not implemented
 ====
+select int_col, sum(float_col), min(float_col) 
+from hbasealltypessmall
+group by 1
+order by 2,3 desc
+----
+not implemented
+====

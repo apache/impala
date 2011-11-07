@@ -17,7 +17,7 @@ class TupleRow;
 
 std::ostream& operator<<(std::ostream& os, const TExprOperator::type& op);
 
-std::string PrintTuple(Tuple* t, const TupleDescriptor& d);
+std::string PrintTuple(const Tuple* t, const TupleDescriptor& d);
 std::string PrintRow(TupleRow* row, const RowDescriptor& d);
 
 }

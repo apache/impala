@@ -38,16 +38,12 @@ public class SelectStmt extends ParseNodeBase {
    */
   private final ArrayList<Expr> selectListExprs;
 
-  /**  list of ordering exprs with ordinals, aliases and agg output resolved */
-  private List<Expr> orderingExprs;
-
-  /** list of ordering directions; mirrors orderingExprs */
-  private List<Boolean> isAscOrder;
-
   /**  havingClause with aliases and agg output resolved */
   private Predicate havingPred;
 
   private AggregateInfo aggInfo;
+
+  private SortInfo sortInfo;
 
   SelectStmt(ArrayList<SelectListItem> selectList,
              List<TableRef> tableRefList,
@@ -69,10 +65,9 @@ public class SelectStmt extends ParseNodeBase {
     this.aliasSubstMap = new Expr.SubstitutionMap();
     this.selectListExprs = Lists.newArrayList();
     this.colLabels = Lists.newArrayList();
-    this.orderingExprs = null;
-    this.isAscOrder = null;
     this.havingPred = null;
     this.aggInfo = null;
+    this.sortInfo = null;
   }
 
   /**
@@ -88,22 +83,6 @@ public class SelectStmt extends ParseNodeBase {
    */
   public ArrayList<Expr> getSelectListExprs() {
     return selectListExprs;
-  }
-
-  /**
-   * @return the list of post-analysis exprs corresponding to the
-   * ORDER BY clause (aliases and ordinals resolved)
-   */
-  public List<Expr> getOrderingExprs() {
-    return orderingExprs;
-  }
-
-  /**
-   * @return a list of bools corresponding to the explicit or implicit
-   * ordering directions of the ORDER BY clause; true = ASC, false = DESC
-   */
-  public List<Boolean> getOrderingDirections() {
-    return isAscOrder;
   }
 
   /**
@@ -131,6 +110,10 @@ public class SelectStmt extends ParseNodeBase {
 
   public AggregateInfo getAggInfo() {
     return aggInfo;
+  }
+
+  public SortInfo getSortInfo() {
+    return sortInfo;
   }
 
   public ArrayList<String> getColLabels() {
@@ -180,9 +163,8 @@ public class SelectStmt extends ParseNodeBase {
       }
       analyzer.registerConjuncts(whereClause);
     }
-    if (orderByElements != null) {
-      analyzeOrderByClause(analyzer);
-    }
+
+    createSortInfo(analyzer);
     createAggInfo(analyzer);
   }
 
@@ -233,7 +215,7 @@ public class SelectStmt extends ParseNodeBase {
 
   /**
    * Analyze aggregation-relevant components of the select block (Group By clause,
-   * select list, Order By clause), substite AVG with SUM/COUNT, create the
+   * select list, Order By clause), substitute AVG with SUM/COUNT, create the
    * AggregationInfo, including the agg output tuple, and transform all post-agg exprs given
    * AggregationInfo's substmap.
    *
@@ -285,6 +267,11 @@ public class SelectStmt extends ParseNodeBase {
       // substitute aliases in place (ordinals not allowed in having clause)
       havingPred = (Predicate) havingClause.clone(aliasSubstMap);
       havingPred.analyze(analyzer);
+    }
+
+    List<Expr> orderingExprs = null;
+    if (sortInfo != null) {
+      orderingExprs = sortInfo.getOrderingExprs();
     }
 
     // build substmap AVG -> SUM/COUNT;
@@ -375,9 +362,15 @@ public class SelectStmt extends ParseNodeBase {
     }
   }
 
-  private void analyzeOrderByClause(Analyzer analyzer) throws AnalysisException {
-    orderingExprs = Lists.newArrayList();
-    isAscOrder = Lists.newArrayList();
+  private void createSortInfo(Analyzer analyzer) throws AnalysisException {
+    if (orderByElements == null) {
+      // not computing order by
+      return;
+    }
+
+    ArrayList<Expr> orderingExprs = Lists.newArrayList();
+    ArrayList<Boolean> isAscOrder = Lists.newArrayList();
+
     // extract exprs
     for (OrderByElement orderByElement: orderByElements) {
       // create copies, we don't want to modify the original parse node, in case
@@ -388,6 +381,8 @@ public class SelectStmt extends ParseNodeBase {
     substituteOrdinals(orderingExprs, "ORDER BY");
     Expr.substituteList(orderingExprs, aliasSubstMap);
     Expr.analyze(orderingExprs, analyzer);
+
+    sortInfo = new SortInfo(orderingExprs, isAscOrder);
   }
 
   /**
@@ -463,7 +458,7 @@ public class SelectStmt extends ParseNodeBase {
       strBuilder.append(" ORDER BY ");
       for (int i = 0; i < orderByElements.size(); ++i) {
         strBuilder.append(orderByElements.get(i).getExpr().toSql());
-        strBuilder.append((isAscOrder.get(i)) ? " ASC" : " DESC");
+        strBuilder.append((sortInfo.getIsAscOrder().get(i)) ? " ASC" : " DESC");
         strBuilder.append((i+1 != orderByElements.size()) ? ", " : "");
       }
     }

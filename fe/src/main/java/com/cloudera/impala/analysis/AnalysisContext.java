@@ -46,6 +46,7 @@ public class AnalysisContext {
     } catch (AnalysisException e) {
       throw new AnalysisException(e.getMessage() + " (in " + stmt + ")");
     } catch (Exception e) {
+      e.printStackTrace(System.err);
       throw new AnalysisException(parser.getErrorMsg(stmt));
     }
   }

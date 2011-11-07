@@ -5,7 +5,7 @@ using namespace std;
 
 namespace impala {
 
-int StringValue::Compare(const StringValue& other) {
+int StringValue::Compare(const StringValue& other) const {
   if (len == 0 && other.len == 0) return 0;
   if (len == 0) return -1;
   if (other.len == 0) return 1;

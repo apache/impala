@@ -46,6 +46,11 @@ class Tuple {
   // using pool to allocate memory. Returns the copy.
   Tuple* DeepCopy(const TupleDescriptor& desc, MemPool* pool);
 
+  // Create a copy of 'this', including all its referenced string data.  This
+  // version does not allocate a tuple, instead copying 'dst'.  dst must already 
+  // be allocated to the correct size (desc.byte_size())
+  void DeepCopy(Tuple* dst, const TupleDescriptor& desc, MemPool* pool);
+
   // Turn null indicator bit on.
   void SetNull(const NullIndicatorOffset& offset) {
     char* null_indicator_byte = reinterpret_cast<char*>(this) + offset.byte_offset;
@@ -58,8 +63,8 @@ class Tuple {
     *null_indicator_byte &= ~offset.bit_mask;
   }
 
-  bool IsNull(const NullIndicatorOffset& offset) {
-    char* null_indicator_byte = reinterpret_cast<char*>(this) + offset.byte_offset;
+  bool IsNull(const NullIndicatorOffset& offset) const {
+    const char* null_indicator_byte = reinterpret_cast<const char*>(this) + offset.byte_offset;
     return (*null_indicator_byte & offset.bit_mask) != 0;
   }
 

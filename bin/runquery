@@ -7,6 +7,20 @@ bin=`cd "$bin"; pwd`
 
 cd $IMPALA_FE_DIR
 
-mvn exec:java -Dexec.mainClass=com.cloudera.impala.service.Coordinator \
+# Convert arguments so mvn passes it to java correctly (i.e. mvn doesn't
+# try to parse the arguments as arguments to mvn)
+# For example, 
+#    runquery "select count(*) from table" -batchsize=10
+# args becomes:
+#    'select count(*) from table' '-batchsize=10'
+# Java main will see 2 arguments.  
+args="" 
+while [ "$1" != "" ] ; 
+do 
+  args="$args '$1'" 
+  shift 
+done
+
+mvn exec:java -Dexec.mainClass=com.cloudera.impala.service.Executor \
               -Dexec.classpathScope=test \
-              -Dexec.args="'$1'"
+              -Dexec.args="$args"

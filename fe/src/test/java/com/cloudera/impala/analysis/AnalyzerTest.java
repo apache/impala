@@ -489,7 +489,7 @@ public class AnalyzerTest {
     assertNotNull(havingPred);
     // we only have one 'count(id)' slot (slot 2)
     assertEquals(havingPred.toSql(), "<slot 3> > 0");
-    Expr orderingExpr = select.getOrderingExprs().get(0);
+    Expr orderingExpr = select.getSortInfo().getOrderingExprs().get(0);
     assertNotNull(orderingExpr);
     assertEquals("<slot 4> / <slot 5>", orderingExpr.toSql());
   }

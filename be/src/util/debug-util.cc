@@ -20,7 +20,7 @@ ostream& operator<<(ostream& os, const TExprOperator::type& op) {
   return os;
 }
 
-string PrintTuple(Tuple* t, const TupleDescriptor& d) {
+string PrintTuple(const Tuple* t, const TupleDescriptor& d) {
   if (t == NULL) return "null";
   stringstream out;
   out << "(";

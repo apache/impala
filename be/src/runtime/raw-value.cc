@@ -89,6 +89,8 @@ size_t RawValue::GetHashValue(const void* value, PrimitiveType type) {
 int RawValue::Compare(const void* v1, const void* v2, PrimitiveType type) {
   const StringValue* string_value1;
   const StringValue* string_value2;
+  float f1, f2;
+  double d1, d2;
   string tmp1, tmp2;
   switch (type) {
     case TYPE_BOOLEAN: 
@@ -100,11 +102,18 @@ int RawValue::Compare(const void* v1, const void* v2, PrimitiveType type) {
     case TYPE_INT: 
       return *reinterpret_cast<const int32_t*>(v1) - *reinterpret_cast<const int32_t*>(v2);
     case TYPE_BIGINT: 
+      // TODO: overflow issues?
       return *reinterpret_cast<const int64_t*>(v1) - *reinterpret_cast<const int64_t*>(v2);
     case TYPE_FLOAT: 
-      return *reinterpret_cast<const float*>(v1) - *reinterpret_cast<const float*>(v2);
+      // TODO: can this be faster? (just returning the difference has underflow problems)
+      f1 = *reinterpret_cast<const float*>(v1);
+      f2 = *reinterpret_cast<const float*>(v2);
+      return f1 > f2 ? 1 : (f1 < f2 ? -1 : 0);
     case TYPE_DOUBLE: 
-      return *reinterpret_cast<const double*>(v1) - *reinterpret_cast<const double*>(v2);
+      // TODO: can this be faster?
+      d1 = *reinterpret_cast<const double*>(v1);
+      d2 = *reinterpret_cast<const double*>(v2);
+      return d1 > d2 ? 1 : (d1 < d2 ? -1 : 0);
     case TYPE_STRING:
       string_value1 = reinterpret_cast<const StringValue*>(v1);
       tmp1.assign(static_cast<const char*>(string_value1->ptr), string_value1->len);

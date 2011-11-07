@@ -7,7 +7,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 
-import com.cloudera.impala.analysis.AggregateExpr;
 import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BinaryPredicate;
@@ -16,6 +15,7 @@ import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
+import com.cloudera.impala.analysis.SortInfo;
 import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
@@ -315,22 +315,25 @@ public class Planner {
     if (aggInfo != null) {
       root = new AggregationNode(root, aggInfo);
       root.id = nodeId++;
-      root.rowTupleIds = Lists.newArrayList(aggInfo.getAggTupleDesc().getId());
       if (selectStmt.getHavingPred() != null) {
         root.setConjuncts(selectStmt.getHavingPred().getConjuncts());
       }
     }
 
-    List<Expr> orderingExprs = selectStmt.getOrderingExprs();
-    if (orderingExprs != null) {
-      throw new NotImplementedException("ORDER BY currently not supported.");
-      // TODO: Uncomment once SortNode is implemented.
-      // root =
-      //    new SortNode(root, orderingExprs, selectStmt.getOrderingDirections());
+    SortInfo sortInfo = selectStmt.getSortInfo();
+    if (sortInfo != null) {
+      // Determine if we should use TopN or Sort in the backend
+      // TODO: only use topN if the memory footprint is expected to be low
+      // how to account for strings???
+      if (selectStmt.getLimit() != -1) {
+        root = new SortNode(root, sortInfo, true);
+        root.id = nodeId++;
+      } else {
+        throw new NotImplementedException("ORDER BY without LIMIT currently not supported");
+      }
     }
 
     root.setLimit(selectStmt.getLimit());
-    System.out.println("limit=" + Long.toString(root.getLimit()) + "\n");
     root.finalize(analyzer);
     markUnrefdSlots(root, selectStmt, analyzer);
     // don't compute mem layout before marking slots that aren't being referenced
@@ -373,7 +376,9 @@ public class Planner {
       fragmentRequest.setDescTbl(analyzer.getDescTbl().toThrift());
     }
     request.addToFragmentRequests(fragmentRequest);
-    if (plan == null) return request;
+    if (plan == null) {
+      return request;
+    }
 
     // unpartitioned scans executing on local host
     TPlanExecParams execParams = new TPlanExecParams();

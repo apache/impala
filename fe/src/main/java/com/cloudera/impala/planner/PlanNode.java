@@ -93,7 +93,11 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   public String getExplainString() {
-    return getExplainString("");
+    String explainString = getExplainString("");
+    if (this.limit != -1) {
+      explainString += "\nLIMIT: " + this.limit;
+    }
+    return explainString;
   }
 
   protected abstract String getExplainString(String prefix);
@@ -170,13 +174,5 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
       output.append(exprs.get(i).toSql());
     }
     return output.toString();
-  }
-
-  protected String getLimitExplainString(String prefix) {
-    if (limit != -1) {
-      return prefix + "  LIMIT: " + Long.toString(limit) + "\n";
-    } else {
-      return "";
-    }
   }
 }

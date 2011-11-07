@@ -72,7 +72,7 @@ Status ArithmeticExpr::Prepare(RuntimeState* state, const RowDescriptor& row_des
           compute_function_ = GetValueFunctions::ArithmeticExpr_mod_long;
           return Status::OK;
         default:
-          DCHECK(false) << "bad DIVIDE type: " << type();
+          DCHECK(false) << "bad MOD type: " << type();
       }
       return Status::OK;
 

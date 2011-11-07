@@ -17,6 +17,7 @@ add_library(Exec STATIC
   hbase-scan-node.cc
   hbase-table-scanner.cc
   text-converter.cc
+  topn-node.cc
 )
 
 target_link_libraries(Exec 

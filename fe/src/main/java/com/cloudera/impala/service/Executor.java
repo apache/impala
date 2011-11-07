@@ -209,6 +209,8 @@ public class Executor {
    *          Catalog containing metadata. Must be non-null.
    * @param asyncExec
    *          Whether to use synchronous or asynchronous query execution.
+   * @param batchSize
+   *          Internal executor batch size.
    * @param targetStream
    *          Stream to write the query results to.
    *          Result rows are separated by newlines and fields are tabs.
@@ -217,7 +219,7 @@ public class Executor {
    *         The number of result rows or -1 on error.
    */
   public static int runQuery(String query, Catalog catalog, boolean asyncExec,
-      PrintStream targetStream) throws ImpalaException {
+      int batchSize, PrintStream targetStream) throws ImpalaException {
     Preconditions.checkNotNull(catalog);
     int numRows = 0;
     TQueryRequest request = new TQueryRequest(query, true, 1);
@@ -229,11 +231,11 @@ public class Executor {
     Executor coordinator = new Executor(catalog);
     if (asyncExec) {
       coordinator.asyncRunQuery(
-          request, colTypes, colLabels, DEFAULT_BATCH_SIZE, DEFAULT_ABORT_ON_ERROR,
+          request, colTypes, colLabels, batchSize, DEFAULT_ABORT_ON_ERROR,
           DEFAULT_MAX_ERRORS, errorLog, fileErrors, resultQueue);
     } else {
       coordinator.runQuery(
-          request, colTypes, colLabels, DEFAULT_BATCH_SIZE, DEFAULT_ABORT_ON_ERROR,
+          request, colTypes, colLabels, batchSize, DEFAULT_ABORT_ON_ERROR,
           DEFAULT_MAX_ERRORS, errorLog, fileErrors, resultQueue);
     }
     while (true) {
@@ -276,17 +278,62 @@ public class Executor {
     }
   }
 
-  // Run single query against test instance
+  private static String ParseOption(String option) {
+    int equals = option.lastIndexOf("=");
+    return option.substring(equals + 1);
+  }
+
+
+  // Run single query against test instance.  In addition to the query string,
+  // the caller can specify options on how the query should be run.
+  // Options are case-insensitive.
+  // The options are:
+  //    -batchsize=<int> : the batchsize the executor should use
   public static void main(String args[]) throws ImpalaException {
-    if (args.length != 1) {
+    String queryString = "";
+    boolean valid = true;
+    String option = "";
+
+    // Default options
+    int batchSize = Executor.DEFAULT_BATCH_SIZE;
+
+    // Parse input for options
+    try {
       for (int i = 0; i < args.length; ++i) {
-        System.err.println(args[i]);
+        if (args[i].startsWith("-")) {
+          option = args[i].toLowerCase();
+          if (option.startsWith("-batchsize=")) {
+            batchSize = Integer.parseInt(ParseOption(option));
+          } else {
+            System.err.println("Coordinator:: Invalid option: " + option);
+            valid = false;
+            break;
+          }
+        } else {
+          if (queryString != "") {
+            System.err.println("Coordinator:: can not pass multiple queries at once.");
+            valid = false;
+            break;
+          }
+          queryString = args[i];
+        }
       }
-      System.err.println("coordinator \"query string\"");
+    } catch (NumberFormatException e) {
+      System.err.println("Coordinator::Invalid option: " + option);
+      valid = false;
+    }
+
+    if (valid && queryString == "") {
+      System.err.println("Coordinator:: No query string specified.");
+      valid = false;
+    }
+
+    if (!valid) {
       System.exit(1);
     }
+
     Catalog catalog = createCatalog();
-    int numRows = runQuery(args[0], catalog, true, System.out);
+    int numRows = runQuery(queryString, catalog, true, batchSize, System.out);
     System.out.println("TOTAL ROWS: " + numRows);
   }
 }

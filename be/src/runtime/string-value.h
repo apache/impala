@@ -24,20 +24,20 @@ struct StringValue {
   // this < other: -1
   // this == other: 0
   // this > other: 1
-  int Compare(const StringValue& other);
+  int Compare(const StringValue& other) const;
 
   // ==
-  bool Eq(const StringValue& other) { return Compare(other) == 0; }
+  bool Eq(const StringValue& other) const { return Compare(other) == 0; }
   // !=
-  bool Ne(const StringValue& other) { return Compare(other) != 0; }
+  bool Ne(const StringValue& other) const { return Compare(other) != 0; }
   // <=
-  bool Le(const StringValue& other) { return Compare(other) <= 0; }
+  bool Le(const StringValue& other) const { return Compare(other) <= 0; }
   // >=
-  bool Ge(const StringValue& other) { return Compare(other) >= 0; }
+  bool Ge(const StringValue& other) const { return Compare(other) >= 0; }
   // <
-  bool Lt(const StringValue& other) { return Compare(other) < 0; }
+  bool Lt(const StringValue& other) const { return Compare(other) < 0; }
   // >
-  bool Gt(const StringValue& other) { return Compare(other) > 0; }
+  bool Gt(const StringValue& other) const { return Compare(other) > 0; }
 
   std::string DebugString() const;
 };
