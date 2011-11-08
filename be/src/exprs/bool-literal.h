@@ -14,6 +14,8 @@ class BoolLiteral: public Expr {
  protected:
   friend class Expr;
 
+  // Construct a BoolLiteral expr from b
+  BoolLiteral(bool b);
   BoolLiteral(const TExprNode& node);
 
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);

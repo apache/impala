@@ -5,11 +5,22 @@
 #include <gtest/gtest.h>
 #include <boost/lexical_cast.hpp>
 #include <boost/random/mersenne_twister.hpp>
+#include "common/object-pool.h"
+#include "runtime/raw-value.h"
 #include "runtime/primitive-type.h"
 #include "runtime/string-value.h"
 #include "testutil/query-executor.h"
 #include "gen-cpp/ImpalaService_types.h"
 #include "gen-cpp/Exprs_types.h"
+#include "exprs/bool-literal.h"
+#include "exprs/float-literal.h"
+#include "exprs/function-call.h"
+#include "exprs/int-literal.h"
+#include "exprs/is-null-predicate.h"
+#include "exprs/like-predicate.h"
+#include "exprs/literal-predicate.h"
+#include "exprs/null-literal.h"
+#include "exprs/string-literal.h"
 
 
 using namespace std;
@@ -316,6 +327,43 @@ void ExprTest::TestFixedPointComparisons<int64_t>(bool test_boundaries) {
                  lexical_cast<string>(t_max + 1), true);
   }
 }
+
+void TestSingleLiteralConstruction(PrimitiveType type, void* value, const string& string_val) {
+  ObjectPool pool;
+  RowDescriptor desc;
+
+  Expr* expr = Expr::CreateLiteral(&pool, type, value);
+  EXPECT_TRUE(expr != NULL);
+  expr->Prepare(NULL, desc);
+  EXPECT_EQ(RawValue::Compare(expr->GetValue(NULL), value, type), 0);
+
+  expr = Expr::CreateLiteral(&pool, type, string_val);
+  EXPECT_TRUE(expr != NULL);
+  expr->Prepare(NULL, desc);
+  EXPECT_EQ(RawValue::Compare(expr->GetValue(NULL), value, type), 0);
+}
+
+TEST_F(ExprTest, LiteralConstruction) {
+  bool b_val = true;
+  char c_val = 'f';
+  short s_val = 123;
+  int i_val = 234;
+  long l_val = 345;
+  float f_val = 3.14f;
+  double d_val = 1.23;
+  string str_input = "Hello";
+  StringValue str_val(const_cast<char*>(str_input.data()), str_input.length());
+
+  TestSingleLiteralConstruction(TYPE_BOOLEAN, &b_val, "1");
+  TestSingleLiteralConstruction(TYPE_TINYINT, &c_val, "f");
+  TestSingleLiteralConstruction(TYPE_SMALLINT, &s_val, "123");
+  TestSingleLiteralConstruction(TYPE_INT, &i_val, "234");
+  TestSingleLiteralConstruction(TYPE_BIGINT, &l_val, "345");
+  TestSingleLiteralConstruction(TYPE_FLOAT, &f_val, "3.14");
+  TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val, "1.23");
+  TestSingleLiteralConstruction(TYPE_STRING, &str_val, "Hello");
+}
+  
 
 TEST_F(ExprTest, LiteralExprs) {
   TestFixedPointLimits<int8_t>(TYPE_TINYINT);

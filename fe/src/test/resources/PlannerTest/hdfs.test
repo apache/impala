@@ -15,6 +15,7 @@ select * from alltypes
 ----
 SCAN HDFS table=default.alltypes
   PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
     file:fe/target/test-warehouse/alltypes/year=2009/month=2/090201.txt
@@ -46,6 +47,7 @@ select * from alltypes where year = 2009
 ----
 SCAN HDFS table=default.alltypes
   PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
     file:fe/target/test-warehouse/alltypes/year=2009/month=2/090201.txt
@@ -65,6 +67,7 @@ select * from alltypes where year = 2009.0
 ----
 SCAN HDFS table=default.alltypes
   PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
     file:fe/target/test-warehouse/alltypes/year=2009/month=2/090201.txt
@@ -83,6 +86,7 @@ select * from alltypes where 2009 = year
 ----
 SCAN HDFS table=default.alltypes
   PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
     file:fe/target/test-warehouse/alltypes/year=2009/month=2/090201.txt
@@ -101,6 +105,7 @@ select * from alltypes where 2009.0 = year
 ----
 SCAN HDFS table=default.alltypes
   PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
     file:fe/target/test-warehouse/alltypes/year=2009/month=2/090201.txt
@@ -120,6 +125,7 @@ select * from alltypes where month=1
 ----
 SCAN HDFS table=default.alltypes
   PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
     file:fe/target/test-warehouse/alltypes/year=2010/month=1/100101.txt
@@ -129,6 +135,7 @@ select * from alltypes where year=2009 and month=1
 ----
 SCAN HDFS table=default.alltypes
   PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
 ====
@@ -137,6 +144,7 @@ select * from alltypes where year=2009 and month > 6
 ----
 SCAN HDFS table=default.alltypes
   PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=7/090701.txt
     file:fe/target/test-warehouse/alltypes/year=2009/month=8/090801.txt
@@ -149,6 +157,7 @@ select * from alltypes where year=2009 and month < 6
 ----
 SCAN HDFS table=default.alltypes
   PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
     file:fe/target/test-warehouse/alltypes/year=2009/month=2/090201.txt
@@ -161,6 +170,7 @@ select * from alltypes where year<=2009 and month < 6
 ----
 SCAN HDFS table=default.alltypes
   PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
     file:fe/target/test-warehouse/alltypes/year=2009/month=2/090201.txt
@@ -173,6 +183,7 @@ select * from alltypes where month < 9 and month > 6
 ----
 SCAN HDFS table=default.alltypes
   PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=7/090701.txt
     file:fe/target/test-warehouse/alltypes/year=2009/month=8/090801.txt
@@ -184,6 +195,7 @@ select * from alltypes where year < 2010 and year < 2009 and month > 6
 ----
 SCAN HDFS table=default.alltypes
   PREDICATES: year < 2009
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=7/090701.txt
     file:fe/target/test-warehouse/alltypes/year=2009/month=8/090801.txt
@@ -197,6 +209,7 @@ select * from alltypes where year < 2010 and month > 6 and month > 8
 ----
 SCAN HDFS table=default.alltypes
   PREDICATES: month > 8
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=7/090701.txt
     file:fe/target/test-warehouse/alltypes/year=2009/month=8/090801.txt
@@ -210,6 +223,7 @@ select * from alltypes where year - 1 = 2009
 ----
 SCAN HDFS table=default.alltypes
   PREDICATES: year - 1 = 2009
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
     file:fe/target/test-warehouse/alltypes/year=2009/month=2/090201.txt
@@ -235,3 +249,4 @@ SCAN HDFS table=default.alltypes
     file:fe/target/test-warehouse/alltypes/year=2010/month=10/101001.txt
     file:fe/target/test-warehouse/alltypes/year=2010/month=11/101101.txt
     file:fe/target/test-warehouse/alltypes/year=2010/month=12/101201.txt
+# empty file list

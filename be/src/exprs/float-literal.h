@@ -14,6 +14,9 @@ class FloatLiteral: public Expr {
  protected:
   friend class Expr;
 
+  // Construct a FloatLiteral expr. type/value must be TYPE_FLOAT/float* or 
+  // TYPE_DOUBLE/double*.  
+  FloatLiteral(PrimitiveType type, void* value);
   FloatLiteral(const TExprNode& node);
 
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);

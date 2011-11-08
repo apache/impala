@@ -5,9 +5,9 @@ package com.cloudera.impala.planner;
 import java.util.List;
 
 import com.cloudera.impala.analysis.Analyzer;
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.LiteralExpr;
+import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.TupleDescriptor;
+import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.THdfsFileSplit;
@@ -26,7 +26,9 @@ import com.google.common.collect.Lists;
 public abstract class HdfsScanNode extends ScanNode {
   private final HdfsTable tbl;
   private List<String> filePaths;  // data files to scan
-  public List<LiteralExpr> keyValues; // partition key values per file
+
+  // Regex that will be evaluated over filenames to generate partition key values
+  private String partitionKeyRegex;
 
   /**
    * Constructs node to scan given data files of table 'tbl'.
@@ -47,10 +49,9 @@ public abstract class HdfsScanNode extends ScanNode {
   /**
    * Compute file paths and key values based on key ranges.
    */
-  @Override
-  public void finalize(Analyzer analyzer) throws InternalException {
+  @Override  public void finalize(Analyzer analyzer) throws InternalException {
     filePaths = Lists.newArrayList();
-    keyValues = Lists.newArrayList();
+
     for (HdfsTable.Partition p: tbl.getPartitions()) {
       Preconditions.checkState(p.keyValues.size() == tbl.getNumClusteringCols());
       if (keyRanges != null) {
@@ -71,18 +72,22 @@ public abstract class HdfsScanNode extends ScanNode {
       }
 
       filePaths.addAll(p.filePaths);
-      keyValues.addAll(p.keyValues);
+    }
+
+    if (tbl.getNumClusteringCols() > 0) {
+      partitionKeyRegex = "^file:/.*/";
+      for (int i = 0; i < tbl.getNumClusteringCols(); ++i) {
+        Column col = tbl.getColumns().get(i);
+        partitionKeyRegex += col.getName() + "=([^\\/]*)/";
+      }
+    } else {
+      partitionKeyRegex = "";
     }
   }
 
   @Override
   protected void toThrift(TPlanNode msg) {
-    msg.hdfs_scan_node = new THdfsScanNode(desc.getId().asInt());
-    // TODO: get rid of this and instead store a regex that allows the executor
-    // scan node to extract the key value from the file path
-    if (!keyValues.isEmpty()) {
-      msg.hdfs_scan_node.setKey_values(Expr.treesToThrift(keyValues));
-    }
+    msg.hdfs_scan_node = new THdfsScanNode(desc.getId().asInt(), partitionKeyRegex);
   }
 
   @Override
@@ -99,6 +104,9 @@ public abstract class HdfsScanNode extends ScanNode {
     StringBuilder output = new StringBuilder();
     output.append(prefix + "SCAN HDFS table=" + desc.getTable().getFullName() + "\n");
     output.append(prefix + "  PREDICATES: " + getExplainString(conjuncts) + "\n");
+    if (partitionKeyRegex != "") {
+      output.append(prefix + "  REGEX: " + partitionKeyRegex + "\n");
+    }
     output.append(prefix + "  FILES:");
     if (!filePaths.isEmpty()) {
       output.append("\n    " + prefix);

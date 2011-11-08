@@ -15,6 +15,9 @@ class StringLiteral: public Expr {
  protected:
   friend class Expr;
 
+  // Construct a StringLiteral expr from str.
+  StringLiteral(const StringValue& str);
+  StringLiteral(const std::string& str);
   StringLiteral(const TExprNode& node);
 
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);

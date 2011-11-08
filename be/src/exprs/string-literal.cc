@@ -10,6 +10,16 @@ using namespace std;
 
 namespace impala {
 
+StringLiteral::StringLiteral(const StringValue& str) 
+  : Expr(TYPE_STRING) {
+  result_.SetStringVal(str);
+}
+
+StringLiteral::StringLiteral(const string& str) 
+  : Expr(TYPE_STRING) {
+  result_.SetStringVal(str);
+}
+
 StringLiteral::StringLiteral(const TExprNode& node)
   : Expr(node) {
   result_.SetStringVal(node.string_literal.value);

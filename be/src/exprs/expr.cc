@@ -29,6 +29,18 @@
 using namespace std;
 using namespace impala;
 
+template<class T> 
+bool ParseString(const string& str, T* val) {
+  istringstream stream(str);
+  stream >> *val;
+  return !stream.fail();
+}
+
+Expr::Expr(PrimitiveType type)
+    : is_slotref_(false),
+      type_(type) {
+}
+
 Expr::Expr(const TExprNode& node)
     : is_slotref_(false),
       type_(ThriftToType(node.type)) {
@@ -53,6 +65,79 @@ Status Expr::CreateExprTree(ObjectPool* pool, const TExpr& texpr, Expr** root_ex
         "Expression tree only partially reconstructed. Not all thrift nodes were used.");
   }
   return Status::OK;
+}
+
+Expr* Expr::CreateLiteral(ObjectPool* pool, PrimitiveType type, void* data) {
+  DCHECK(data != NULL);
+  Expr* result = NULL;
+
+  switch (type) {
+    case TYPE_BOOLEAN:
+      result = new BoolLiteral(*reinterpret_cast<bool*>(data));
+      break;
+    case TYPE_TINYINT:
+    case TYPE_SMALLINT:
+    case TYPE_INT:
+    case TYPE_BIGINT:
+      result = new IntLiteral(type, data);
+      break;
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE:
+      result = new FloatLiteral(type, data);
+      break;
+    case TYPE_STRING:
+      result = new StringLiteral(*reinterpret_cast<StringValue*>(data));
+      break;
+    default:
+      DCHECK(false) << "Invalid type.";
+  }
+  DCHECK(result != NULL);
+  pool->Add(result);
+  return result;
+}
+
+Expr* Expr::CreateLiteral(ObjectPool* pool, PrimitiveType type, const string& str) {
+  ExprValue val;
+  Expr* result = NULL;
+
+  switch (type) {
+    case TYPE_BOOLEAN:
+      if (ParseString<bool>(str, &val.bool_val)) 
+        result = new BoolLiteral(&val.bool_val);
+      break;
+    case TYPE_TINYINT:
+      if (ParseString<char>(str, &val.tinyint_val)) 
+        result = new IntLiteral(type, &val.tinyint_val);
+      break;
+    case TYPE_SMALLINT:
+      if (ParseString<short>(str, &val.smallint_val))
+        result = new IntLiteral(type, &val.smallint_val);
+      break;
+    case TYPE_INT:
+      if (ParseString<int>(str, &val.int_val))
+        result = new IntLiteral(type, &val.int_val);
+      break;
+    case TYPE_BIGINT:
+      if (ParseString<long>(str, &val.bigint_val)) 
+        result = new IntLiteral(type, &val.bigint_val);
+      break;
+    case TYPE_FLOAT:
+      if (ParseString<float>(str, &val.float_val)) 
+        result = new FloatLiteral(type, &val.float_val);
+      break;
+    case TYPE_DOUBLE:
+      if (ParseString<double>(str, &val.double_val)) 
+        result = new FloatLiteral(type, &val.double_val);
+      break;
+    case TYPE_STRING:
+      result = new StringLiteral(str);
+      break;
+    default:
+      DCHECK(false) << "Unrecognized type.";
+  }
+  DCHECK(result != NULL);
+  pool->Add(result);
+  return result;
 }
 
 Status Expr::CreateExprTrees(ObjectPool* pool, const std::vector<TExpr>& texprs,

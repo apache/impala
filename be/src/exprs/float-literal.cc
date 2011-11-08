@@ -11,6 +11,21 @@ using namespace std;
 
 namespace impala {
 
+FloatLiteral::FloatLiteral(PrimitiveType type, void* value)
+  : Expr(type) {
+  DCHECK(value != NULL);
+  switch (type_) {
+    case TYPE_FLOAT:
+      result_.float_val = *reinterpret_cast<float*>(value);
+      break;
+    case TYPE_DOUBLE:
+      result_.double_val = *reinterpret_cast<double*>(value);
+      break;
+    default:
+      DCHECK(false) << "FloatLiteral ctor: bad type: " << TypeToString(type_);
+  }
+}
+
 FloatLiteral::FloatLiteral(const TExprNode& node)
   : Expr(node) {
   switch (type_) {

@@ -2,6 +2,7 @@
 
 #include "exec/hdfs-text-scan-node.h"
 
+#include <sstream>
 #include <boost/algorithm/string.hpp>
 #include <glog/logging.h>
 
@@ -50,12 +51,21 @@ HdfsTextScanNode::HdfsTextScanNode(ObjectPool* pool, const TPlanNode& tnode,
       num_errors_in_file_(0),
       num_partition_keys_(0),
       text_converter_(NULL) {
-  // Create Expr* from TExpr* for partition keys.
-  // TODO: We should remove the partition-key LiteralExprs from TScanNode,
-  // and instead extract the partition-key values from the file names themselves.
-  // We would then use a single LiteralExpr for each requested partition-key slot,
-  // and reset it's value upon opening a new file.
-  Expr::CreateExprTrees(obj_pool_.get(), tnode.hdfs_scan_node.key_values, &key_values_);
+  // Initialize partition key regex
+  Status status = Init(pool, tnode);
+  DCHECK(status.ok()) << "HdfsTextScanNode c'tor:Init failed: \n" << status.GetErrorMsg();
+}
+
+Status HdfsTextScanNode::Init(ObjectPool* pool, const TPlanNode& tnode) {
+  try {
+    partition_key_regex_ = regex(tnode.hdfs_scan_node.partition_key_regex);
+  } catch(bad_expression&) {
+    std::stringstream ss;
+    ss << "HdfsTextScanNode::Init(): "
+       << "Invalid regex: " << tnode.hdfs_scan_node.partition_key_regex;
+    return Status(ss.str());
+  }  
+  return Status::OK;
 }
 
 Status HdfsTextScanNode::Prepare(RuntimeState* state) {
@@ -111,12 +121,8 @@ Status HdfsTextScanNode::Prepare(RuntimeState* state) {
       column_idx_to_slot_idx_[slots[i]->col_pos() - num_partition_keys_] = i;
     }
   }
-
-  // Prepare key_values_.
-  for (int i = 0; i < key_values_.size(); ++i) {
-    key_values_[i]->Prepare(state, row_desc());
-  }
-
+  partition_key_values_.resize(key_idx_to_slot_idx_.size());
+  
   // TODO(marcel): add int tuple_idx_[] indexed by TupleId somewhere in runtime-state.h
   tuple_idx_ = 0;
 
@@ -183,6 +189,8 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
         // TODO: make sure we print all available diagnostic output to our error log
         return Status("Failed to open HDFS file.");
       }
+      // Extract partition keys from this file path.
+      RETURN_IF_ERROR(ExtractPartitionKeyValues(state));
       num_errors_in_file_ = 0;
       VLOG(1) << "HdfsTextScanNode: opened file " << files_[file_idx_];
     }
@@ -414,11 +422,10 @@ Status HdfsTextScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batc
 
       // Materialize partition-key values (if any).
       for (int i = 0; i < key_idx_to_slot_idx_.size(); ++i) {
-        int expr_idx = file_idx_ * num_partition_keys_ + key_idx_to_slot_idx_[i].first;
-        Expr* expr = key_values_[expr_idx];
         int slot_idx = key_idx_to_slot_idx_[i].second;
-        RawValue::Write(expr->GetValue(NULL), tuple_, tuple_desc_->slots()[slot_idx],
-                        tuple_pool_.get());
+        Expr* expr = partition_key_values_[i];
+        SlotDescriptor* slot = tuple_desc_->slots()[slot_idx];
+        RawValue::Write(expr->GetValue(NULL), tuple_, slot, tuple_pool_.get());
       }
 
       if (EvalConjuncts(current_row)) {
@@ -456,8 +463,9 @@ Status HdfsTextScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batc
 }
 
 void HdfsTextScanNode::DebugString(int indentation_level, std::stringstream* out) const {
-  *out << string(indentation_level * 2, ' ');
-  *out << "HdfsTextScanNode(tupleid=" << tuple_id_ << " files[" << join(files_, ",");
+  *out << string(indentation_level * 2, ' ')
+       << "HdfsTextScanNode(tupleid=" << tuple_id_ << " files[" << join(files_, ",")
+       << " regex=" << partition_key_regex_ << " ";
   ExecNode::DebugString(indentation_level, out);
   *out << "])" << endl;
 }
@@ -469,3 +477,37 @@ void HdfsTextScanNode::SetScanRange(const TScanRange& scan_range) {
     // TODO: take into account offset and length 
   }
 }
+
+Status HdfsTextScanNode::ExtractPartitionKeyValues(RuntimeState* state) {
+  DCHECK_LT(file_idx_, files_.size());
+  if (key_idx_to_slot_idx_.size() == 0) return Status::OK;
+
+  smatch match;
+  const string& file = files_[file_idx_];
+  if (boost::regex_search(file, match, partition_key_regex_)) {
+    for (int i = 0; i < key_idx_to_slot_idx_.size(); ++i) {
+      int regex_idx = key_idx_to_slot_idx_[i].first + 1; //match[0] is input string
+      int slot_idx = key_idx_to_slot_idx_[i].second;
+      const SlotDescriptor* slot_desc = tuple_desc_->slots()[slot_idx];
+      PrimitiveType type = slot_desc->type();
+      const string& value = match[regex_idx]; 
+      Expr* expr = Expr::CreateLiteral(obj_pool_.get(), type, value);
+      if (expr == NULL) {
+        std::stringstream ss;
+        ss << "file name'" << file << "' does not have the correct format. "
+           << "Partition key: " << value << " is not of type: "
+           << TypeToString(type);
+        return Status(ss.str());
+      }
+      expr->Prepare(state, row_desc());
+      partition_key_values_[i] = expr;
+    }
+    return Status::OK;
+  }
+  
+  std::stringstream ss;
+  ss << "file name '" << file << "' " 
+     << "does not match partition key regex (" << partition_key_regex_ << ")";
+  return Status(ss.str());
+}
+

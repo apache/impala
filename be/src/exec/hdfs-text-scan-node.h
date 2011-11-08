@@ -7,9 +7,11 @@
 #include <memory>
 #include <stdint.h>
 #include <hdfs.h>
+#include <boost/regex.hpp>
 #include <boost/scoped_ptr.hpp>
-#include "runtime/descriptors.h"
+
 #include "exec/scan-node.h"
+#include "runtime/descriptors.h"
 
 namespace impala {
 
@@ -89,6 +91,13 @@ class HdfsTextScanNode : public ScanNode {
 
   // Tuple id resolved in Prepare() to set tuple_desc_;
   TupleId tuple_id_;
+
+  // Regular expressions to evaluate over file paths to extract partition key values
+  boost::regex partition_key_regex_;
+
+  // Partition key values.  This is computed once for each file and valid for the
+  // duration of that file.  The vector contains only literal exprs.
+  std::vector<Expr*> partition_key_values_;
 
   // Descriptor of tuples in input files.
   const TupleDescriptor* tuple_desc_;
@@ -171,11 +180,6 @@ class HdfsTextScanNode : public ScanNode {
   // Number of partition keys for the files_. Set in Prepare().
   int num_partition_keys_;
 
-  // Flattened list of LiteralExpr* representing the partition keys for each file.
-  // key_values_[i*numPartitionKeys+j] is the j-th partition key of the i-th file.
-  // Set in Prepare().
-  std::vector<Expr*> key_values_;
-
   // Mapping from partition key index to slot index
   // for materializing the virtual partition keys (if any) into Tuples.
   // pair.first refers to the partition key index.
@@ -221,6 +225,14 @@ class HdfsTextScanNode : public ScanNode {
   Status ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, int* row_idx,
       int* column_idx, bool* last_char_is_escape, bool* unescape_string,
       char* quote_char, bool* error_in_row);
+
+  // Initializes the scan node.  
+  //  - initialize partition key regex from fe input
+  Status Init(ObjectPool* pool, const TPlanNode& tnode);
+
+  // Updates 'partition_key_values_' by extracting the values from the current file path
+  // using 'partition_key_regex_'
+  Status ExtractPartitionKeyValues(RuntimeState* state);
 };
 
 }

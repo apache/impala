@@ -75,6 +75,10 @@ public abstract class HdfsTable extends Table {
     return partitions;
   }
 
+  public boolean isClusteringColumn(Column col) {
+    return col.getPosition() < getNumClusteringCols();
+  }
+
   /**
    * Create columns corresponding to fieldSchemas.
    * @param fieldSchemas
@@ -154,7 +158,6 @@ public abstract class HdfsTable extends Table {
     }
     partitions.add(p);
   }
-
 
   @Override
   public Table load(HiveMetaStoreClient client,

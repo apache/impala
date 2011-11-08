@@ -60,7 +60,8 @@ struct TScanRange {
 
 struct THdfsScanNode {
   1: required Types.TTupleId tuple_id
-  2: optional list<Exprs.TExpr> key_values
+  // Regex to be evaluated over filepath to extract partition key values
+  2: required string partition_key_regex
 }
 
 struct THBaseFilter {

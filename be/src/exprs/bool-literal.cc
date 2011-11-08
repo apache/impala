@@ -9,6 +9,11 @@ using namespace std;
 
 namespace impala {
 
+BoolLiteral::BoolLiteral(bool b) 
+  : Expr(TYPE_BOOLEAN) {
+    result_.bool_val = b;
+}
+
 BoolLiteral::BoolLiteral(const TExprNode& node)
   : Expr(node) {
   result_.bool_val = node.bool_literal.value;

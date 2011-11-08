@@ -58,6 +58,13 @@ struct ExprValue {
       string_val(const_cast<char*>(string_data.data()), string_data.size()) {
   }
 
+  // Set string value to copy of str
+  void SetStringVal(const StringValue& str) {
+    string_data = std::string(str.ptr, str.len);
+    string_val.ptr = const_cast<char*>(string_data.data());
+    string_val.len = string_data.size();
+  }
+
   void SetStringVal(const std::string& str) {
     string_data = str;
     string_val.ptr = const_cast<char*>(string_data.data());
@@ -122,12 +129,23 @@ class Expr {
   static Status Prepare(const std::vector<Expr*>& exprs, RuntimeState* state,
                         const RowDescriptor& row_desc);
 
+  // Create a new literal expr of 'type' with initial 'data'.
+  // data should match the PrimitiveType (i.e. type == TYPE_INT, data is a int*)
+  // The new Expr will be allocated from the pool.
+  static Expr* CreateLiteral(ObjectPool* pool, PrimitiveType type, void* data);
+
+  // Create a new literal expr of 'type' by parsing the string.
+  // NULL will be returned if the string and type are not compatible.
+  // The new Expr will be allocated from the pool.
+  static Expr* CreateLiteral(ObjectPool* pool, PrimitiveType type, const std::string&);
+
   virtual std::string DebugString() const;
   static std::string DebugString(const std::vector<Expr*>& exprs);
 
  protected:
   friend class GetValueFunctions;
 
+  Expr(PrimitiveType type);
   Expr(const TExprNode& node);
   Expr(const TExprNode& node, bool is_slotref);
 

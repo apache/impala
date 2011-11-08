@@ -11,6 +11,27 @@ using namespace std;
 
 namespace impala {
 
+IntLiteral::IntLiteral(PrimitiveType type, void* value)
+  : Expr(type) {
+  DCHECK(value != NULL);
+  switch (type_) {
+    case TYPE_TINYINT:
+      result_.tinyint_val = *reinterpret_cast<bool*>(value);
+      break;
+    case TYPE_SMALLINT:
+      result_.smallint_val = *reinterpret_cast<char*>(value);
+      break;
+    case TYPE_INT:
+      result_.int_val = *reinterpret_cast<int*>(value);
+      break;
+    case TYPE_BIGINT:
+      result_.bigint_val = *reinterpret_cast<long*>(value);
+      break;
+    default:
+      DCHECK(false) << "IntLiteral ctor: bad type: " << TypeToString(type_);
+  }
+}
+
 IntLiteral::IntLiteral(const TExprNode& node)
   : Expr(node) {
   switch (type_) {
