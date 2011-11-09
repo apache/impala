@@ -346,6 +346,71 @@ public class ParserTest {
     ParserError("select a.b.c.d from a.b where b > 5");
   }
 
+  /**
+   * Run positive tests for INSERT INTO/OVERWRITE:
+   *
+   * @param overwrite
+   *          If true, tests INSERT OVERWRITE, else tests INSERT INTO.
+   */
+  private void testInsert(boolean overwrite) {
+    String qualifier = null;
+    if (overwrite) {
+      qualifier = "overwrite";
+    } else {
+      qualifier = "into";
+    }
+    // Entire unpartitioned table.
+    ParsesOk("insert " + qualifier + " table t select a from src where b > 5");
+    // Static partition with one partitioning key.
+    ParsesOk("insert " + qualifier + " table t partition (pk1=10) select a from src where b > 5");
+    // Dynamic partition with one partitioning key.
+    ParsesOk("insert " + qualifier + " table t partition (pk1) select a from src where b > 5");
+    // Static partition with two partitioning keys.
+    ParsesOk("insert " + qualifier + " table t partition (pk1=10, pk2=20) " +
+        "select a from src where b > 5");
+    // Fully dynamic partition with two partitioning keys.
+    ParsesOk("insert " + qualifier + " table t partition (pk1, pk2) " +
+        "select a from src where b > 5");
+    // Partially dynamic partition with two partitioning keys.
+    ParsesOk("insert " + qualifier + " table t partition (pk1=10, pk2) " +
+        "select a from src where b > 5");
+    // Partially dynamic partition with two partitioning keys.
+    ParsesOk("insert " + qualifier + " table t partition (pk1, pk2=20) " +
+        "select a from src where b > 5");
+  }
+
+  @Test public void TestInsert() {
+    // Positive tests.
+    testInsert(true);
+    testInsert(false);
+    // Missing 'overwrite/insert'.
+    ParserError("insert table t select a from src where b > 5");
+    // Missing 'table'.
+    ParserError("insert overwrite t select a from src where b > 5");
+    // Missing 'table'.
+    ParserError("insert into t select a from src where b > 5");
+    // Missing target table identifier.
+    ParserError("insert overwrite table select a from src where b > 5");
+    // Missing target table identifier.
+    ParserError("insert into table select a from src where b > 5");
+    // Missing select statement.
+    ParserError("insert overwrite table t");
+    // Missing select statement.
+    ParserError("insert into table t");
+    // Missing parentheses around 'partition'.
+    ParserError("insert overwrite table t partition pk1=10 " +
+    		"select a from src where b > 5");
+    // Missing parentheses around 'partition'.
+    ParserError("insert into table t partition pk1=10 " +
+        "select a from src where b > 5");
+    // Missing comma in partition list.
+    ParserError("insert overwrite table t partition (pk1=10 pk2=20) " +
+    		"select a from src where b > 5");
+    // Missing comma in partition list.
+    ParserError("insert into table t partition (pk1=10 pk2=20) " +
+        "select a from src where b > 5");
+  }
+
   @Test public void TestGetErrorMsg() {
 
     // missing select
@@ -354,7 +419,7 @@ public class ParserTest {
         "c, b, c from t\n" +
         "^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: SELECT\n");
+        "Expected: SELECT, INSERT\n");
 
     // missing select list
     ParserError("select from t",

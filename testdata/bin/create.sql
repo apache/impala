@@ -13,6 +13,20 @@ CREATE TABLE AllTypes (
 partitioned by (year int, month int)
 row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
 
+DROP TABLE IF EXISTS AllTypesNoPart;
+CREATE TABLE AllTypesNoPart (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string)
+row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
+
 DROP TABLE IF EXISTS AllTypes_rc;
 CREATE TABLE AllTypes_rc (
   id int,

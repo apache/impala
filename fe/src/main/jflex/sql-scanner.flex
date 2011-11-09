@@ -56,6 +56,8 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("having", new Integer(SqlParserSymbols.KW_HAVING));
     keywordMap.put("is", new Integer(SqlParserSymbols.KW_IS));
     keywordMap.put("inner", new Integer(SqlParserSymbols.KW_INNER));
+    keywordMap.put("insert", new Integer(SqlParserSymbols.KW_INSERT));
+    keywordMap.put("into", new Integer(SqlParserSymbols.KW_INTO)); 
     keywordMap.put("join", new Integer(SqlParserSymbols.KW_JOIN));
     keywordMap.put("int", new Integer(SqlParserSymbols.KW_INT));    
     keywordMap.put("left", new Integer(SqlParserSymbols.KW_LEFT));
@@ -69,6 +71,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("or", new Integer(SqlParserSymbols.KW_OR));    
     keywordMap.put("order", new Integer(SqlParserSymbols.KW_ORDER));
     keywordMap.put("outer", new Integer(SqlParserSymbols.KW_OUTER));
+    keywordMap.put("overwrite", new Integer(SqlParserSymbols.KW_OVERWRITE));
     keywordMap.put("regexp", new Integer(SqlParserSymbols.KW_REGEXP));
     keywordMap.put("rlike", new Integer(SqlParserSymbols.KW_RLIKE));
     keywordMap.put("right", new Integer(SqlParserSymbols.KW_RIGHT));
@@ -77,13 +80,15 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("smallint", new Integer(SqlParserSymbols.KW_SMALLINT));
     keywordMap.put("string", new Integer(SqlParserSymbols.KW_STRING));
     keywordMap.put("sum", new Integer(SqlParserSymbols.KW_SUM));
+    keywordMap.put("partition", new Integer(SqlParserSymbols.KW_PARTITION));
+    keywordMap.put("table", new Integer(SqlParserSymbols.KW_TABLE));
     keywordMap.put("tinyint", new Integer(SqlParserSymbols.KW_TINYINT));
     keywordMap.put("using", new Integer(SqlParserSymbols.KW_USING));
     keywordMap.put("when", new Integer(SqlParserSymbols.KW_WHEN));
     keywordMap.put("where", new Integer(SqlParserSymbols.KW_WHERE));
     keywordMap.put("then", new Integer(SqlParserSymbols.KW_THEN));
     keywordMap.put("true", new Integer(SqlParserSymbols.KW_TRUE));
-    keywordMap.put("timestamp", new Integer(SqlParserSymbols.KW_TIMESTAMP));        
+    keywordMap.put("timestamp", new Integer(SqlParserSymbols.KW_TIMESTAMP)); 
   }
     
   // map from token id to token description

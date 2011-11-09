@@ -83,7 +83,7 @@ public class CatalogTest {
     assertNotNull(testDb);
     assertEquals(testDb.getName(), "testdb1");
 
-    assertEquals(22, defaultDb.getTables().size());
+    assertEquals(23, defaultDb.getTables().size());
     assertNotNull(defaultDb.getTable("alltypes"));
     assertNotNull(defaultDb.getTable("alltypes_rc"));
     assertNotNull(defaultDb.getTable("alltypessmall"));
@@ -96,6 +96,7 @@ public class CatalogTest {
     assertNotNull(defaultDb.getTable("alltypesagg_rc"));
     assertNotNull(defaultDb.getTable("alltypesaggnonulls"));
     assertNotNull(defaultDb.getTable("alltypesaggnonulls_rc"));
+    assertNotNull(defaultDb.getTable("alltypesnopart"));
     assertNotNull(defaultDb.getTable("testtbl"));
     assertNotNull(defaultDb.getTable("testtbl_rc"));
     assertNotNull(defaultDb.getTable("dimtbl"));

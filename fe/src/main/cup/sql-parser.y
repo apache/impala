@@ -136,7 +136,8 @@ terminal KW_AND, KW_AS, KW_ASC, KW_AVG, KW_BIGINT, KW_BOOLEAN, KW_BY,
   KW_HAVING, KW_IS, KW_INNER, KW_JOIN, KW_INT, KW_LEFT, KW_LIKE, KW_LIMIT, KW_MIN,
   KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_REGEXP,
   KW_RLIKE, KW_RIGHT, KW_SELECT, KW_SEMI, KW_SMALLINT, KW_STRING, KW_SUM,
-  KW_TINYINT, KW_TRUE, KW_USING, KW_WHEN, KW_WHERE, KW_THEN, KW_TIMESTAMP;
+  KW_TINYINT, KW_TRUE, KW_USING, KW_WHEN, KW_WHERE, KW_THEN, KW_TIMESTAMP,
+  KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION;
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, DIVIDE, MOD, PLUS, MINUS;
 terminal BITAND, BITOR, BITXOR, BITNOT;
 terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
@@ -148,6 +149,7 @@ terminal Double FLOATINGPOINT_LITERAL;
 terminal String STRING_LITERAL;
 terminal String UNMATCHED_STRING_LITERAL;
 
+nonterminal ParseNodeBase insert_or_select_stmt;
 nonterminal SelectStmt select_stmt;
 nonterminal ArrayList<SelectListItem> select_clause;
 nonterminal ArrayList<SelectListItem> select_list;
@@ -180,6 +182,10 @@ nonterminal opt_inner, opt_outer;
 nonterminal PrimitiveType primitive_type;
 nonterminal Expr minus_chain_expr;
 nonterminal BinaryPredicate.Operator binary_comparison_operator;
+nonterminal InsertStmt insert_stmt;
+nonterminal ArrayList<PartitionKeyValue> partition_clause;
+nonterminal ArrayList<PartitionKeyValue> partition_key_value_list;
+nonterminal PartitionKeyValue partition_key_value;
 
 precedence left KW_OR;
 precedence left KW_AND;
@@ -191,7 +197,51 @@ precedence left STAR, DIVIDE, MOD, KW_DIV;
 precedence left BITAND, BITOR, BITXOR, BITNOT;
 precedence left RPAREN;
 
-start with select_stmt;
+start with insert_or_select_stmt;
+
+insert_or_select_stmt ::= 
+    select_stmt:select
+    {: RESULT = select; :}
+    | insert_stmt:insert
+    {: RESULT = insert; :}
+    ;
+
+insert_stmt ::=
+    KW_INSERT KW_OVERWRITE KW_TABLE table_name:table partition_clause:list select_stmt:select
+    {: RESULT = new InsertStmt(table, true, list, select); :}
+    | KW_INSERT KW_INTO KW_TABLE table_name:table partition_clause:list select_stmt:select
+    {: RESULT = new InsertStmt(table, false, list, select); :}
+    ;
+    
+partition_clause ::=
+    KW_PARTITION LPAREN partition_key_value_list:list RPAREN
+    {: RESULT = list; :}
+    | 
+    {: RESULT = null; :}
+    ;
+    
+partition_key_value_list ::=
+  partition_key_value:item
+  {:
+    ArrayList<PartitionKeyValue> list = new ArrayList<PartitionKeyValue>();
+    list.add(item);
+    RESULT = list;
+  :}
+  | partition_key_value_list:list COMMA partition_key_value:item
+  {:
+    list.add(item);
+    RESULT = list;
+  :}
+  ;
+
+partition_key_value ::=
+    // Dynamic partition key values.
+    IDENT:column
+    {: RESULT = new PartitionKeyValue(column, null); :}
+    // Static partition key values.
+    | IDENT:column EQUAL literal:value
+    {: RESULT = new PartitionKeyValue(column, (LiteralExpr)value); :}
+    ;
 
 select_stmt ::=
     select_clause:selectList
