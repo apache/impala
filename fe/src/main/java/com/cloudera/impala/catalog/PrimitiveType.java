@@ -235,6 +235,14 @@ public enum PrimitiveType {
     return result;
   }
 
+  /**
+   * Returns if it is compatible to implicitly cast from t1 to t2 (casting from
+   * t1 to t2 results in no loss of precision.
+   */
+  public static boolean isImplicitlyCastable(PrimitiveType t1, PrimitiveType t2) {
+      return getAssignmentCompatibleType(t1, t2) == t2;
+  }
+
   // Returns the highest resolution type
   // corresponding to the lexer symbol of numeric literals.
   // Currently used to determine whether the literal is fixed or floating point.

@@ -36,7 +36,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 public class Executor {
-  private final static Logger LOG = LoggerFactory.getLogger(ValueRange.class);
+  private final static Logger LOG = LoggerFactory.getLogger(Executor.class);
 
   public static final boolean DEFAULT_ABORT_ON_ERROR = false;
   public static final int DEFAULT_MAX_ERRORS = 100;

@@ -4,6 +4,7 @@ namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
 include "Types.thrift"
+include "Opcodes.thrift"
 
 enum TExprNodeType {
   AGG_EXPR,
@@ -25,53 +26,18 @@ enum TExprNodeType {
   STRING_LITERAL,
 }
 
-// op-codes for all expr operators
-enum TExprOperator {
-  INVALID_OP,
-
-  // AggregateExpr
-  AGG_COUNT,
-  AGG_MIN,
-  AGG_MAX,
-  AGG_SUM,
-  // AGG_AVG is not executable
-
-  // ArithmeticExpr
-  MULTIPLY,
-  DIVIDE,
-  MOD,
-  INT_DIVIDE,
-  PLUS,
-  MINUS,
-  BITAND,
-  BITOR,
-  BITXOR,
-  BITNOT,
-
-  // BinaryPredicate
-  EQ,
-  NE,
-  LE,
-  GE,
-  LT,
-  GT,
-
-  // CompoundPredicate
-  AND,
-  OR,
-  NOT,
-
-  // LIKE predicate
-  LIKE,
-  REGEXP,
-
-  // function opcodes
-
+enum TAggregationOp {
+  INVALID,
+  COUNT,
+  MAX,
+  MIN,
+  SUM,
 }
 
 struct TAggregateExpr {
   1: required bool is_star
   2: required bool is_distinct
+  3: required TAggregationOp op
 }
 
 struct TBoolLiteral {
@@ -120,7 +86,7 @@ struct TStringLiteral {
 struct TExprNode {
   1: required TExprNodeType node_type
   2: required Types.TPrimitiveType type
-  3: optional TExprOperator op
+  3: optional Opcodes.TExprOpcode opcode
   4: required i32 num_children
 
   5: optional TAggregateExpr agg_expr

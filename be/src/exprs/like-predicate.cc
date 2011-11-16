@@ -15,7 +15,6 @@ namespace impala {
 
 LikePredicate::LikePredicate(const TExprNode& node)
   : Predicate(node),
-    op_(node.op),
     escape_char_(node.like_pred.escape_char[0]) {
   DCHECK_EQ(node.like_pred.escape_char.size(), 1);
 }
@@ -72,7 +71,7 @@ void* LikePredicate::RegexFn(Expr* e, TupleRow* row) {
 }
 
 Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
-  Expr::Prepare(state, row_desc);
+  RETURN_IF_ERROR(Expr::PrepareChildren(state, row_desc));
   DCHECK_EQ(children_.size(), 2);
   if (GetChild(1)->IsConstant()) {
     // determine pattern and decide on eval fn
@@ -80,14 +79,14 @@ Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc
     string pattern_str(pattern->ptr, pattern->len);
     regex substring_re("(%*)([^%_]*)(%*)", regex::extended);
     smatch match_res;
-    if (op_ == TExprOperator::LIKE
+    if (opcode_ == TExprOpcode::LIKE
         && regex_match(pattern_str, match_res, substring_re)) {
       // match_res.str(0) is the whole string, match_res.str(1) the first group, etc.
       substring_ = match_res.str(2);
       compute_function_ = ConstantSubstringFn;
     } else {
       string re_pattern;
-      if (op_ == TExprOperator::LIKE) {
+      if (opcode_ == TExprOpcode::LIKE) {
         ConvertLikePattern(pattern, &re_pattern);
       } else {
         re_pattern = pattern_str;
@@ -100,16 +99,16 @@ Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc
       compute_function_ = ConstantRegexFn;
     }
   } else {
-    switch (op_) {
-      case TExprOperator::LIKE:
+    switch (opcode_) {
+      case TExprOpcode::LIKE:
         compute_function_ = LikeFn;
         break;
-      case TExprOperator::REGEXP:
+      case TExprOpcode::REGEX:
         compute_function_ = RegexFn;
         break;
       default:
         stringstream error;
-        error << "Invalid LIKE operator: " << op_;
+        error << "Invalid LIKE operator: " << opcode_;
         return Status(error.str());
     }
   }

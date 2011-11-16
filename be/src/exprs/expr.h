@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "common/status.h"
+#include "gen-cpp/Opcodes_types.h"
 #include "runtime/descriptors.h"
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
@@ -14,6 +15,7 @@
 
 namespace impala {
 
+class Expr;
 class ObjectPool;
 class RowDescriptor;
 class RuntimeState;
@@ -75,8 +77,11 @@ struct ExprValue {
 // This is the superclass of all expr evaluation nodes.
 class Expr {
  public:
+  // typedef for compute functions.  
+  typedef void* (*ComputeFunction)(Expr*, TupleRow*);
+  
   // Prepare expr tree for evaluation. In particular, set compute_function_.
-  // This implementation simply invokes it recursively for the entire tree.
+  // Prepare should be invoked recurisvely on the expr tree.
   // Return OK if successful, otherwise return error status.
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
 
@@ -109,6 +114,8 @@ class Expr {
   PrimitiveType type() const { return type_; }
   const std::vector<Expr*>& children() const { return children_; }
 
+  TExprOpcode::type op() const { return opcode_; }
+  
   // Returns true if expr doesn't contain slotrefs, ie, can be evaluated
   // with GetValue(NULL). The default implementation returns true if all of
   // the children are constant.
@@ -143,15 +150,24 @@ class Expr {
   static std::string DebugString(const std::vector<Expr*>& exprs);
 
  protected:
-  friend class GetValueFunctions;
+  friend class ComputeFunctions;
+  friend class MathFunctions;
+  friend class StringFunctions;
 
   Expr(PrimitiveType type);
   Expr(const TExprNode& node);
   Expr(const TExprNode& node, bool is_slotref);
 
+  // Helper function that just calls prepare on all the children
+  // Does not do anything on the this expr.
+  // Return OK if successful, otherwise return error status.
+  Status PrepareChildren(RuntimeState* state, const RowDescriptor& row_desc);
+
   // function to evaluate expr; typically set in Prepare()
-  typedef void* (*ComputeFunction)(Expr*, TupleRow*);
   ComputeFunction compute_function_;
+
+  // function opcode
+  TExprOpcode::type opcode_;
 
   // recognize if this node is a slotref in order to speed up GetValue()
   const bool is_slotref_;

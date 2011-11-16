@@ -78,7 +78,7 @@ public class StringLiteral extends LiteralExpr {
       // Currently we can't handle string literals containing full fledged expressions
       // which are implicitly cast to a numeric literal. This would require invoking the parser.
       sym = scanner.next_token();
-      while (sym.sym == SqlParserSymbols.MINUS) {
+      while (sym.sym == SqlParserSymbols.SUBTRACT) {
         multiplier *= -1;
         sym = scanner.next_token();
       }

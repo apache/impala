@@ -15,6 +15,7 @@ void* NullLiteral::ReturnValue(Expr* e, TupleRow* row) {
 }
 
 Status NullLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
+  DCHECK_EQ(children_.size(), 0);
   return Status::OK;
 }
 

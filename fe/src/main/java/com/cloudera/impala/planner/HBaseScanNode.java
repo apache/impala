@@ -17,7 +17,6 @@ import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.StringLiteral;
 import com.cloudera.impala.analysis.TupleDescriptor;
-import com.cloudera.impala.analysis.BinaryPredicate.Operator;
 import com.cloudera.impala.catalog.HBaseColumn;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.PrimitiveType;
@@ -214,7 +213,7 @@ public class HBaseScanNode extends ScanNode {
     return result.toString();
   }
 
-  private static CompareFilter.CompareOp impalaOpToHBaseOp(Operator impalaOp) {
+  private static CompareFilter.CompareOp impalaOpToHBaseOp(BinaryPredicate.Operator impalaOp) {
     switch(impalaOp) {
       case EQ: return CompareFilter.CompareOp.EQUAL;
       case NE: return CompareFilter.CompareOp.NOT_EQUAL;

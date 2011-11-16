@@ -9,20 +9,20 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
-import com.cloudera.impala.thrift.TExprOperator;
+import com.cloudera.impala.thrift.TExprOpcode;
 import com.cloudera.impala.thrift.TLikePredicate;
 import com.google.common.base.Preconditions;
 
 public class LikePredicate extends Predicate {
   enum Operator {
-    LIKE("LIKE", TExprOperator.LIKE),
-    RLIKE("RLIKE", TExprOperator.REGEXP),
-    REGEXP("REGEXP", TExprOperator.REGEXP);
+    LIKE("LIKE", TExprOpcode.LIKE),
+    RLIKE("RLIKE", TExprOpcode.REGEX),
+    REGEXP("REGEXP", TExprOpcode.REGEX);
 
     private final String description;
-    private final TExprOperator thriftOp;
+    private final TExprOpcode thriftOp;
 
-    private Operator(String description, TExprOperator thriftOp) {
+    private Operator(String description, TExprOpcode thriftOp) {
       this.description = description;
       this.thriftOp = thriftOp;
     }
@@ -32,7 +32,7 @@ public class LikePredicate extends Predicate {
       return description;
     }
 
-    public TExprOperator toThrift() {
+    public TExprOpcode toThrift() {
       return thriftOp;
     }
   }
@@ -63,7 +63,7 @@ public class LikePredicate extends Predicate {
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.LIKE_PRED;
-    msg.op = op.toThrift();
+    msg.setOpcode(op.toThrift());
     msg.like_pred = new TLikePredicate("\\");
   }
 

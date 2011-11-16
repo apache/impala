@@ -51,7 +51,7 @@ void* FloatLiteral::ReturnDoubleValue(Expr* e, TupleRow* row) {
 }
 
 Status FloatLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
-  Expr::Prepare(state, row_desc);
+  DCHECK_EQ(children_.size(), 0);
   switch (type_) {
     case TYPE_FLOAT:
       compute_function_ = ReturnFloatValue;

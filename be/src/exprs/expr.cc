@@ -21,6 +21,7 @@
 #include "exprs/like-predicate.h"
 #include "exprs/literal-predicate.h"
 #include "exprs/null-literal.h"
+#include "exprs/opcode-registry.h"
 #include "exprs/string-literal.h"
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/ImpalaService_types.h"
@@ -37,17 +38,20 @@ bool ParseString(const string& str, T* val) {
 }
 
 Expr::Expr(PrimitiveType type)
-    : is_slotref_(false),
+    : opcode_(TExprOpcode::INVALID_OPCODE),
+      is_slotref_(false),
       type_(type) {
 }
 
 Expr::Expr(const TExprNode& node)
-    : is_slotref_(false),
+    : opcode_(node.__isset.opcode ? node.opcode : TExprOpcode::INVALID_OPCODE),
+      is_slotref_(false),
       type_(ThriftToType(node.type)) {
 }
 
 Expr::Expr(const TExprNode& node, bool is_slotref)
-    : is_slotref_(is_slotref),
+    : opcode_(node.__isset.opcode ? node.opcode : TExprOpcode::INVALID_OPCODE),
+      is_slotref_(is_slotref),
       type_(ThriftToType(node.type)) {
 }
 
@@ -190,16 +194,10 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
       return Status::OK;
     }
     case TExprNodeType::ARITHMETIC_EXPR: {
-      if (!texpr_node.__isset.op) {
-        return Status("Arithmetic expression not set in thrift node");
-      }
       *expr = pool->Add(new ArithmeticExpr(texpr_node));
       return Status::OK;
     }
     case TExprNodeType::BINARY_PRED: {
-      if (!texpr_node.__isset.op) {
-        return Status("Binary predicate not set in thrift node");
-      }
       *expr = pool->Add(new BinaryPredicate(texpr_node));
       return Status::OK;
     }
@@ -258,9 +256,6 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
       return Status::OK;
     }
     case TExprNodeType::LIKE_PRED: {
-      if (!texpr_node.__isset.op) {
-        return Status("Like predicate not set in thrift node");
-      }
       *expr = pool->Add(new LikePredicate(texpr_node));
       return Status::OK;
     }
@@ -356,9 +351,23 @@ void Expr::PrintValue(void* value, string* str) {
   RawValue::PrintValue(value, type_, str);
 }
 
-Status Expr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
+Status Expr::PrepareChildren(RuntimeState* state, const RowDescriptor& row_desc) {
+  DCHECK(type_ != INVALID_TYPE);
   for (int i = 0; i < children_.size(); ++i) {
     RETURN_IF_ERROR(children_[i]->Prepare(state, row_desc));
+  }
+  return Status::OK;
+}
+
+Status Expr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
+  PrepareChildren(state, row_desc);
+  // Not all exprs have opcodes (i.e. literals, agg-exprs)
+  DCHECK(opcode_ != TExprOpcode::INVALID_OPCODE);
+  compute_function_ = OpcodeRegistry::Instance()->GetFunction(opcode_);
+  if (compute_function_ == NULL) {
+    stringstream out;
+    out << "Expr::Prepare(): Opcode: " << opcode_ << " does not have a registry entry. ";
+    return Status(out.str());
   }
   return Status::OK;
 }
@@ -375,6 +384,9 @@ string Expr::DebugString() const {
   // TODO: implement partial debug string for member vars
   stringstream out;
   out << "type=" << TypeToString(type_);
+  if (opcode_ != TExprOpcode::INVALID_OPCODE) {
+    out << " opcode=" << opcode_;
+  }
   if (!children_.empty()) {
     out << " children=" << DebugString(children_);
   }

@@ -20,7 +20,7 @@ SlotRef::SlotRef(const TExprNode& node)
 }
 
 Status SlotRef::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
-  Expr::Prepare(state, row_desc);
+  DCHECK_EQ(children_.size(), 0);
   const SlotDescriptor* slot_desc  = state->descs().GetSlotDescriptor(slot_id_);
   if (slot_desc == NULL) {
     // TODO: create macro MAKE_ERROR() that returns a stream

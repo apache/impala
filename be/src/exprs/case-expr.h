@@ -23,6 +23,7 @@ class CaseExpr: public Expr {
   const bool has_case_expr_;
   const bool has_else_expr_;
 
+
   static void* ComputeFunction(Expr* e, TupleRow* row);
 };
 

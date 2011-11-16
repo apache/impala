@@ -15,11 +15,8 @@ class BinaryPredicate : public Predicate {
 
   BinaryPredicate(const TExprNode& node);
 
-  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
+  virtual Status Prepare(RuntimeState* state, const RowDescriptor& desc);
   virtual std::string DebugString() const;
-
- private:
-  const TExprOperator::type  op_;
 };
 
 }

@@ -4,9 +4,9 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
-import com.cloudera.impala.thrift.TExprOperator;
 import com.google.common.base.Preconditions;
 
 /**
@@ -15,19 +15,19 @@ import com.google.common.base.Preconditions;
  */
 public class BinaryPredicate extends Predicate {
   public enum Operator {
-    EQ("=", TExprOperator.EQ),
-    NE("!=", TExprOperator.NE),
-    LE("<=", TExprOperator.LE),
-    GE(">=", TExprOperator.GE),
-    LT("<", TExprOperator.LT),
-    GT(">", TExprOperator.GT);
+    EQ("=", FunctionOperator.EQ),
+    NE("!=", FunctionOperator.NE),
+    LE("<=", FunctionOperator.LE),
+    GE(">=", FunctionOperator.GE),
+    LT("<", FunctionOperator.LT),
+    GT(">", FunctionOperator.GT);
 
     private final String description;
-    private final TExprOperator thriftOp;
+    private final FunctionOperator functionOp;
 
-    private Operator(String description, TExprOperator thriftOp) {
+    private Operator(String description, FunctionOperator functionOp) {
       this.description = description;
-      this.thriftOp = thriftOp;
+      this.functionOp = functionOp;
     }
 
     @Override
@@ -35,10 +35,11 @@ public class BinaryPredicate extends Predicate {
       return description;
     }
 
-    public TExprOperator toThrift() {
-      return thriftOp;
+    public FunctionOperator toFunctionOp() {
+      return functionOp;
     }
-  };
+  }
+
   private final Operator op;
 
   public Operator getOp() {
@@ -59,7 +60,7 @@ public class BinaryPredicate extends Predicate {
     if (!super.equals(obj)) {
       return false;
     }
-    return ((BinaryPredicate) obj).op == op;
+    return ((BinaryPredicate) obj).opcode == this.opcode;
   }
 
   @Override
@@ -70,7 +71,7 @@ public class BinaryPredicate extends Predicate {
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.BINARY_PRED;
-    msg.op = op.toThrift();
+    msg.setOpcode(opcode);
   }
 
   @Override
@@ -80,7 +81,7 @@ public class BinaryPredicate extends Predicate {
     PrimitiveType t1 = getChild(0).getType();
     PrimitiveType t2 = getChild(1).getType();
     PrimitiveType compatibleType = PrimitiveType.getAssignmentCompatibleType(t1, t2);
-  
+
     if (!compatibleType.isValid()) {
       // there is no type to which both are assignment-compatible -> we can't compare them
       throw new AnalysisException("operands are not comparable: " + this.toSql());
@@ -88,6 +89,12 @@ public class BinaryPredicate extends Predicate {
 
     // Ignore return value because type is always bool for predicates.
     castBinaryOp(compatibleType);
+
+    OpcodeRegistry.Signature match = OpcodeRegistry.instance().getFunctionInfo(
+        op.toFunctionOp(), compatibleType, compatibleType);
+    Preconditions.checkState(match != null);
+    Preconditions.checkState(match.returnType == PrimitiveType.BOOLEAN);
+    this.opcode = match.opcode;
   }
 
   /**

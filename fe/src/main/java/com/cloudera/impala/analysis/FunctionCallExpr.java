@@ -4,7 +4,9 @@ package com.cloudera.impala.analysis;
 
 import java.util.List;
 
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.google.common.base.Joiner;
@@ -14,7 +16,7 @@ public class FunctionCallExpr extends Expr {
 
   public FunctionCallExpr(String functionName, List<Expr> params) {
     super();
-    this.functionName = functionName;
+    this.functionName = functionName.toLowerCase();
     children.addAll(params);
   }
 
@@ -23,7 +25,7 @@ public class FunctionCallExpr extends Expr {
     if (!super.equals(obj)) {
       return false;
     }
-    return ((FunctionCallExpr) obj).functionName.equals(functionName);
+    return ((FunctionCallExpr) obj).opcode == this.opcode;
   }
 
   @Override
@@ -31,16 +33,38 @@ public class FunctionCallExpr extends Expr {
     return functionName + "(" + Joiner.on(", ").join(childrenToSql()) + ")";
   }
 
-  // TODO: we need to encode the actual function opcodes;
-  // this ties in with replacing TExpr.op with an opcode
-  // that resolves to a single compute function for the backend
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.FUNCTION_CALL;
+    msg.setOpcode(opcode);
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
-    throw new AnalysisException("CAST not supported");
+    FunctionOperator op = OpcodeRegistry.instance().getFunctionOperator(functionName);
+    if (op == FunctionOperator.INVALID_OPERATOR) {
+      throw new AnalysisException(functionName + " unknown");
+    }
+
+    PrimitiveType[] argTypes = new PrimitiveType[this.children.size()];
+    for (int i = 0; i < this.children.size(); ++i) {
+      argTypes[i] = this.children.get(i).getType();
+    }
+    OpcodeRegistry.Signature match =
+      OpcodeRegistry.instance().getFunctionInfo(op, argTypes);
+    if (match == null) {
+      String error = "No matching function with those arguments: " + functionName
+        + Joiner.on(", ").join(argTypes) + ")";
+      throw new AnalysisException(error);
+    }
+    this.opcode = match.opcode;
+    this.type = match.returnType;
+
+    // Implicitly cast all the children to match the function if necessary
+    for (int i = 0; i < argTypes.length; ++i) {
+      if (argTypes[i] != match.argTypes[i]) {
+        castChild(match.argTypes[i], i);
+      }
+    }
   }
 }

@@ -35,6 +35,7 @@ fi
 
 export IMPALA_FE_DIR=$IMPALA_HOME/fe
 export IMPALA_BE_DIR=$IMPALA_HOME/be
+export IMPALA_COMMON_DIR=$IMPALA_HOME/common
 export PATH=$IMPALA_HOME/bin:$PATH
 
 export HADOOP_HOME=$IMPALA_HOME/thirdparty/hadoop-0.20.2-cdh3u1

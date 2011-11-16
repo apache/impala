@@ -15,11 +15,11 @@ class CompoundPredicate: public Predicate {
 
   CompoundPredicate(const TExprNode& node);
 
-  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
+  virtual Status Prepare(RuntimeState* state, const RowDescriptor& desc);
   virtual std::string DebugString() const;
 
  private:
-  const TExprOperator::type op_;
+  friend class OpcodeRegistry;
 
   static void* AndComputeFunction(Expr* e, TupleRow* row);
   static void* OrComputeFunction(Expr* e, TupleRow* row);

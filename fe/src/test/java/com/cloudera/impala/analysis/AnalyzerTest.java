@@ -664,13 +664,13 @@ public class AnalyzerTest {
         PrimitiveType promotedType = compatibleType.getMaxResolutionType();
 
         // +, -, *
-        typeCastTest(type1, type2, false, ArithmeticExpr.Operator.PLUS, null,
+        typeCastTest(type1, type2, false, ArithmeticExpr.Operator.ADD, null,
                       promotedType);
-        typeCastTest(type1, type2, true, ArithmeticExpr.Operator.PLUS, null,
+        typeCastTest(type1, type2, true, ArithmeticExpr.Operator.ADD, null,
                       promotedType);
-        typeCastTest(type1, type2, false, ArithmeticExpr.Operator.MINUS, null,
+        typeCastTest(type1, type2, false, ArithmeticExpr.Operator.SUBTRACT, null,
                       promotedType);
-        typeCastTest(type1, type2, true, ArithmeticExpr.Operator.MINUS, null,
+        typeCastTest(type1, type2, true, ArithmeticExpr.Operator.SUBTRACT, null,
                       promotedType);
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.MULTIPLY, null,
                       promotedType);
@@ -683,16 +683,14 @@ public class AnalyzerTest {
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.DIVIDE, null,
                       PrimitiveType.DOUBLE);
 
-        // %
-        typeCastTest(type1, type2, false, ArithmeticExpr.Operator.MOD, null,
-                      compatibleType);
-        typeCastTest(type1, type2, true, ArithmeticExpr.Operator.MOD, null,
-                      compatibleType);
-
-        // div, &, |, ^ only for fixed-point types
+        // % div, &, |, ^ only for fixed-point types
         if (!type1.isFixedPointType() || !type2.isFixedPointType()) {
           continue;
         }
+        typeCastTest(type1, type2, false, ArithmeticExpr.Operator.MOD, null,
+            compatibleType);
+        typeCastTest(type1, type2, true, ArithmeticExpr.Operator.MOD, null,
+            compatibleType);
         typeCastTest(type1, type2, false, ArithmeticExpr.Operator.INT_DIVIDE, null,
                       compatibleType);
         typeCastTest(type1, type2, true, ArithmeticExpr.Operator.INT_DIVIDE, null,

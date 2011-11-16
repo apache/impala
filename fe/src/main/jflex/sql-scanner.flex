@@ -116,7 +116,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     tokenIdMap.put(new Integer(SqlParserSymbols.UNMATCHED_STRING_LITERAL),
         "UNMATCHED STRING LITERAL");
     tokenIdMap.put(new Integer(SqlParserSymbols.MOD), "%");
-    tokenIdMap.put(new Integer(SqlParserSymbols.PLUS), "+");
+    tokenIdMap.put(new Integer(SqlParserSymbols.ADD), "+");
     tokenIdMap.put(new Integer(SqlParserSymbols.DIVIDE), "/");
     tokenIdMap.put(new Integer(SqlParserSymbols.EQUAL), "=");
     tokenIdMap.put(new Integer(SqlParserSymbols.STAR), "*");
@@ -124,7 +124,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     tokenIdMap.put(new Integer(SqlParserSymbols.DOT), ".");
     tokenIdMap.put(new Integer(SqlParserSymbols.STRING_LITERAL), "STRING LITERAL");
     tokenIdMap.put(new Integer(SqlParserSymbols.EOF), "EOF");
-    tokenIdMap.put(new Integer(SqlParserSymbols.MINUS), "-");
+    tokenIdMap.put(new Integer(SqlParserSymbols.SUBTRACT), "-");
     tokenIdMap.put(new Integer(SqlParserSymbols.BITAND), "&");
     tokenIdMap.put(new Integer(SqlParserSymbols.error), "ERROR");
     tokenIdMap.put(new Integer(SqlParserSymbols.BITXOR), "^");
@@ -171,8 +171,8 @@ EndOfLineComment = "--" {NonTerminator}* {LineTerminator}?
 ")" { return newToken(SqlParserSymbols.RPAREN, null); }
 "/" { return newToken(SqlParserSymbols.DIVIDE, null); }
 "%" { return newToken(SqlParserSymbols.MOD, null); }
-"+" { return newToken(SqlParserSymbols.PLUS, null); }
-"-" { return newToken(SqlParserSymbols.MINUS, null); }
+"+" { return newToken(SqlParserSymbols.ADD, null); }
+"-" { return newToken(SqlParserSymbols.SUBTRACT, null); }
 "&" { return newToken(SqlParserSymbols.BITAND, null); }
 "|" { return newToken(SqlParserSymbols.BITOR, null); }
 "^" { return newToken(SqlParserSymbols.BITXOR, null); }

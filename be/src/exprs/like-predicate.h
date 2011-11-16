@@ -15,13 +15,12 @@ namespace impala {
 class LikePredicate: public Predicate {
  protected:
   friend class Expr;
-
+  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
   LikePredicate(const TExprNode& node);
 
-  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
-
  private:
-  const TExprOperator::type op_;
+  friend class OpcodeRegistry;
+
   char escape_char_;
   std::string substring_;
   boost::scoped_ptr<boost::regex> regex_;

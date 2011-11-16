@@ -138,7 +138,7 @@ terminal KW_AND, KW_AS, KW_ASC, KW_AVG, KW_BIGINT, KW_BOOLEAN, KW_BY,
   KW_RLIKE, KW_RIGHT, KW_SELECT, KW_SEMI, KW_SMALLINT, KW_STRING, KW_SUM,
   KW_TINYINT, KW_TRUE, KW_USING, KW_WHEN, KW_WHERE, KW_THEN, KW_TIMESTAMP,
   KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION;
-terminal COMMA, DOT, STAR, LPAREN, RPAREN, DIVIDE, MOD, PLUS, MINUS;
+terminal COMMA, DOT, STAR, LPAREN, RPAREN, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
 terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
 terminal String IDENT;
@@ -180,7 +180,7 @@ nonterminal TableRef table_ref;
 nonterminal JoinOperator join_operator;
 nonterminal opt_inner, opt_outer;
 nonterminal PrimitiveType primitive_type;
-nonterminal Expr minus_chain_expr;
+nonterminal Expr subtract_chain_expr;
 nonterminal BinaryPredicate.Operator binary_comparison_operator;
 nonterminal InsertStmt insert_stmt;
 nonterminal ArrayList<PartitionKeyValue> partition_clause;
@@ -192,7 +192,7 @@ precedence left KW_AND;
 precedence left KW_NOT;
 precedence left KW_LIKE, KW_RLIKE, KW_REGEXP;
 precedence left EQUAL, LESSTHAN, GREATERTHAN;
-precedence left PLUS, MINUS;
+precedence left ADD, SUBTRACT;
 precedence left STAR, DIVIDE, MOD, KW_DIV;
 precedence left BITAND, BITOR, BITXOR, BITNOT;
 precedence left RPAREN;
@@ -517,8 +517,8 @@ case_else_clause ::=
   {: RESULT = null; :}
   ;
 
-minus_chain_expr ::=    
-  MINUS expr:e
+subtract_chain_expr ::=    
+  SUBTRACT expr:e
   {:      
     // integrate signs into literals 
     if (e.isLiteral() && e.getType().isNumericType()) {
@@ -531,10 +531,12 @@ minus_chain_expr ::=
   ;
 
 expr ::=
-  minus_chain_expr:e
+  subtract_chain_expr:e
   {: RESULT = e; :}  
   | literal:l
   {: RESULT = l; :}
+  | IDENT:functionName LPAREN RPAREN
+  {: RESULT = new FunctionCallExpr(functionName, new ArrayList<Expr>()); :}
   | IDENT:functionName LPAREN expr_list:exprs RPAREN
   {: RESULT = new FunctionCallExpr(functionName, exprs); :}
   | cast_expr:c
@@ -560,10 +562,10 @@ arithmetic_expr ::=
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.MOD, e1, e2); :}
   | expr:e1 KW_DIV expr:e2
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.INT_DIVIDE, e1, e2); :}
-  | expr:e1 PLUS expr:e2
-  {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.PLUS, e1, e2); :}
-  | expr:e1 MINUS expr:e2
-  {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.MINUS, e1, e2); :}     
+  | expr:e1 ADD expr:e2
+  {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.ADD, e1, e2); :}
+  | expr:e1 SUBTRACT expr:e2
+  {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.SUBTRACT, e1, e2); :}     
   | expr:e1 BITAND expr:e2
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.BITAND, e1, e2); :}
   | expr:e1 BITOR expr:e2

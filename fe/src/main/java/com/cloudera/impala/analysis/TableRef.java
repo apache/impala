@@ -4,7 +4,6 @@ package com.cloudera.impala.analysis;
 
 import java.util.List;
 
-import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.base.Joiner;

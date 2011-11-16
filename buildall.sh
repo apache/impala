@@ -74,6 +74,11 @@ then
 
 fi
 
+# build common
+cd $IMPALA_COMMON_DIR
+./gen_functions.py
+./gen_opcodes.py
+
 # Generate hive-site.xml from template via env var substitution
 # TODO: Throw an error if the template references an undefined environment variable
 cd ${IMPALA_FE_DIR}/src/test/resources
@@ -136,6 +141,21 @@ mvn package -DskipTests=true
 if [ $tests_action -eq 1 ]
 then
     mvn test
+fi
+
+# run backend tests
+if [ $tests_action -eq 1 ] 
+then
+  cd $IMPALA_FE_DIR
+  mvn exec:java -Dexec.mainClass=com.cloudera.impala.testutil.PlanService \
+              -Dexec.classpathScope=test & 
+  PID=$!
+  # Wait for planner to startup TODO: can we do something better than wait arbitrarily for
+  # 3 seconds.  Not a huge deal if it's not long enough, BE tests will just wait a bit
+  sleep 3
+  cd $IMPALA_BE_DIR
+  make test
+  kill $PID
 fi
 
 # Generate list of files for Cscope to index

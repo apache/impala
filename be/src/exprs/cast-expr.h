@@ -12,7 +12,7 @@ class TExprNode;
 
 class CastExpr: public Expr {
  public:
-  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
+  virtual Status Prepare(RuntimeState* state, const RowDescriptor& desc);
   virtual std::string DebugString() const;
 
  protected:

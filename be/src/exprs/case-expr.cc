@@ -20,7 +20,6 @@ CaseExpr::CaseExpr(const TExprNode& node)
 }
 
 Status CaseExpr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
-  Expr::Prepare(state, row_desc);
   compute_function_ = ComputeFunction;
   return Status::OK;
 }

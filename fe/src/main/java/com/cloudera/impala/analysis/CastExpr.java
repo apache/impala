@@ -4,11 +4,13 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
 import com.google.common.base.Preconditions;
 
 public class CastExpr extends Expr {
+
   private final PrimitiveType targetType;
   /** true if this is a "pre-analyzed" implicit cast */
   private final boolean isImplicit;
@@ -22,6 +24,11 @@ public class CastExpr extends Expr {
     children.add(e);
     if (isImplicit) {
       type = targetType;
+      OpcodeRegistry.Signature match = OpcodeRegistry.instance().getFunctionInfo(
+          FunctionOperator.CAST, getChild(0).getType(), type);
+      Preconditions.checkState(match != null);
+      Preconditions.checkState(match.returnType == type);
+      this.opcode = match.opcode;
     }
   }
 
@@ -36,26 +43,34 @@ public class CastExpr extends Expr {
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.CAST_EXPR;
+    msg.setOpcode(opcode);
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
 
-    if (!isImplicit) {
-      // cast was asked for in the query, check for validity of cast
-      PrimitiveType childType = getChild(0).getType();
-      PrimitiveType resultType =
-        PrimitiveType.getAssignmentCompatibleType(childType, targetType);
-
-      if (!resultType.isValid()) {
-        throw new AnalysisException("Invalid type cast from: " + childType.toString() +
-            " to " + targetType);
-      }
-
-      // this cast may result in loss of precision, but the user requested it
-      this.type = targetType;
+    if (isImplicit) {
+      return;
     }
+
+    // cast was asked for in the query, check for validity of cast
+    PrimitiveType childType = getChild(0).getType();
+    PrimitiveType resultType =
+      PrimitiveType.getAssignmentCompatibleType(childType, targetType);
+
+    if (!resultType.isValid()) {
+      throw new AnalysisException("Invalid type cast of " + getChild(0).toSql() +
+          " from " + childType + " to " + targetType);
+    }
+
+    // this cast may result in loss of precision, but the user requested it
+    this.type = targetType;
+    OpcodeRegistry.Signature match = OpcodeRegistry.instance().getFunctionInfo(
+        FunctionOperator.CAST, getChild(0).getType(), type);
+    Preconditions.checkState(match != null);
+    Preconditions.checkState(match.returnType == type);
+    this.opcode = match.opcode;
   }
 
   @Override
@@ -64,6 +79,6 @@ public class CastExpr extends Expr {
       return false;
     }
     CastExpr expr = (CastExpr) obj;
-    return targetType == expr.targetType;
+    return this.opcode == expr.opcode;
   }
 }

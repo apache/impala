@@ -26,7 +26,7 @@ void* BoolLiteral::ReturnValue(Expr* e, TupleRow* row) {
 }
 
 Status BoolLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
-  Expr::Prepare(state, row_desc);
+  DCHECK_EQ(children_.size(), 0);
   compute_function_ = ReturnValue;
   return Status::OK;
 }

@@ -114,6 +114,7 @@ add_subdirectory(src/testutil)
 add_subdirectory(src/util)
 
 add_subdirectory(generated-sources/gen-cpp)
+add_subdirectory(generated-sources/opcode)
 
 link_directories(
   ${CMAKE_SOURCE_DIR}/build/common

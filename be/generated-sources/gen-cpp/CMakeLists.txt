@@ -20,12 +20,14 @@ add_library(ImpalaThrift
   ImpalaService_types.cpp
   Descriptors_constants.cpp
   Descriptors_types.cpp
+  Exprs_constants.cpp
+  Exprs_types.cpp
+  Opcodes_constants.cpp
+  Opcodes_types.cpp
   PlanNodes_constants.cpp
   PlanNodes_types.cpp
   Types_constants.cpp
   Types_types.cpp
-  Exprs_constants.cpp
-  Exprs_types.cpp
 )
 
 add_library(thrift STATIC IMPORTED)

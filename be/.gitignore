@@ -7,9 +7,8 @@ CMakeFiles
 cmake_install.cmake
 CTestTestfile.cmake
 !CMakeLists.txt
+Testing/
 
 build
 generated-sources
-src/exprs/functions.cc
-src/exprs/functions.h
 

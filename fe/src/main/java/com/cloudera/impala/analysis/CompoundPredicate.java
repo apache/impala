@@ -4,7 +4,7 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
-import com.cloudera.impala.thrift.TExprOperator;
+import com.cloudera.impala.thrift.TExprOpcode;
 import com.google.common.base.Preconditions;
 
 /**
@@ -13,14 +13,14 @@ import com.google.common.base.Preconditions;
  */
 public class CompoundPredicate extends Predicate {
   public enum Operator {
-    AND("AND", TExprOperator.AND),
-    OR("OR", TExprOperator.OR),
-    NOT("NOT", TExprOperator.NOT);
+    AND("AND", TExprOpcode.COMPOUND_AND),
+    OR("OR", TExprOpcode.COMPOUND_OR),
+    NOT("NOT", TExprOpcode.COMPOUND_NOT);
 
     private final String description;
-    private final TExprOperator thriftOp;
+    private final TExprOpcode thriftOp;
 
-    private Operator(String description, TExprOperator thriftOp) {
+    private Operator(String description, TExprOpcode thriftOp) {
       this.description = description;
       this.thriftOp = thriftOp;
     }
@@ -30,7 +30,7 @@ public class CompoundPredicate extends Predicate {
       return description;
     }
 
-    public TExprOperator toThrift() {
+    public TExprOpcode toThrift() {
       return thriftOp;
     }
   }
@@ -73,6 +73,6 @@ public class CompoundPredicate extends Predicate {
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.COMPOUND_PRED;
-    msg.op = op.toThrift();
+    msg.setOpcode(op.toThrift());
   }
 }

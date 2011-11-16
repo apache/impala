@@ -25,7 +25,7 @@ IsNullPredicate::IsNullPredicate(const TExprNode& node)
 }
 
 Status IsNullPredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
-  Expr::Prepare(state, row_desc);
+  RETURN_IF_ERROR(Expr::PrepareChildren(state, row_desc));
   compute_function_ = ComputeFunction;
   return Status::OK;
 }

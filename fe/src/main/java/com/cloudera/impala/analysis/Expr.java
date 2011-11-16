@@ -14,6 +14,7 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.TreeNode;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TExprNode;
+import com.cloudera.impala.thrift.TExprOpcode;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -25,14 +26,20 @@ import com.google.common.collect.Lists;
 abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneable {
   protected PrimitiveType type;  // result of analysis
   protected boolean isAnalyzed;  // true after analyze() has been called
+  protected TExprOpcode opcode;  // opcode for this expr
 
   protected Expr() {
     super();
     type = PrimitiveType.INVALID_TYPE;
+    opcode = TExprOpcode.INVALID_OPCODE;
   }
 
   public PrimitiveType getType() {
     return type;
+  }
+
+  public TExprOpcode getOpcode() {
+    return opcode;
   }
 
   /* Perform semantic analysis of node and all of its children.

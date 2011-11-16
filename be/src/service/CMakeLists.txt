@@ -17,11 +17,17 @@ add_library(backend SHARED
   plan-executor-adaptor.cc
 )
 
+# The order of link libararies matter.  
+#  - Util must come before ImpalaThrift
+#  - Exprs & Opcode have a circular dependency (Exprs is included twice)
 target_link_libraries(backend
   Common
   Exec
   Exprs
+  Opcode
+  Exprs
   Runtime
+  Util
   thrift
   ImpalaThrift
   ${HDFS_LIBS}
@@ -40,13 +46,20 @@ add_executable(runquery
 # when linking statically the linker won't look for the needed symbols.
 # TODO: is there a better way to specify link dependencies without having to
 # list all included libs for each specific binary? any gcc flags to help with this?
+#
+# The order of link libararies matter.  
+#  - Util must come before ImpalaThrift
+#  - Exprs & Opcode have a circular dependency (Exprs is included twice)
 target_link_libraries(runquery
   TestUtil
   Service
   Exec
   Exprs
+  Opcode
+  Exprs
   Runtime
   Common
+  Util
   thrift
   ImpalaThrift
   MockHdfs

@@ -54,6 +54,8 @@ public class ExecutorTest {
 
   @Test
   public void runTest() throws ImpalaException {
+    runTestSuccess("select substring(\"Hello World\", 0)", 1);
+    runTestSuccess("select int_col+bigint_col from alltypessmall limit 1", 1);
     runTestSuccess("select year, tinyint_col, int_col, id from alltypessmall", 100);
     runTestSuccess("select sum(double_col), count(double_col), avg(double_col) " +
                    "from alltypessmall", 1);

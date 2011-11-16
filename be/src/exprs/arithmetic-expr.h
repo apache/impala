@@ -15,13 +15,10 @@ class ArithmeticExpr: public Expr {
  protected:
   friend class Expr;
 
+  virtual Status Prepare(RuntimeState* state, const RowDescriptor& desc);
   ArithmeticExpr(const TExprNode& node);
 
-  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
   virtual std::string DebugString() const;
-
- private:
-  const TExprOperator::type op_;
 };
 
 }

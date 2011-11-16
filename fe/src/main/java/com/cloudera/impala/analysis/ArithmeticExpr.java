@@ -4,34 +4,30 @@ package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
-import com.cloudera.impala.thrift.TExprOperator;
 import com.google.common.base.Preconditions;
 
 public class ArithmeticExpr extends Expr {
   enum Operator {
-    MULTIPLY("*", TExprOperator.MULTIPLY),
-    DIVIDE("/", TExprOperator.DIVIDE),
-    MOD("%", TExprOperator.MOD),
-    INT_DIVIDE("DIV", TExprOperator.INT_DIVIDE),
-    PLUS("+", TExprOperator.PLUS),
-    MINUS("-", TExprOperator.MINUS),
-    BITAND("&", TExprOperator.BITAND),
-    BITOR("|", TExprOperator.BITOR),
-    BITXOR("^", TExprOperator.BITXOR),
-    BITNOT("~", TExprOperator.BITNOT);
+    MULTIPLY("*", FunctionOperator.MULTIPLY),
+    DIVIDE("/", FunctionOperator.DIVIDE),
+    MOD("%", FunctionOperator.MOD),
+    INT_DIVIDE("DIV", FunctionOperator.INT_DIVIDE),
+    ADD("+", FunctionOperator.ADD),
+    SUBTRACT("-", FunctionOperator.SUBTRACT),
+    BITAND("&", FunctionOperator.BITAND),
+    BITOR("|", FunctionOperator.BITOR),
+    BITXOR("^", FunctionOperator.BITXOR),
+    BITNOT("~", FunctionOperator.BITNOT);
 
     private final String description;
-    private final TExprOperator thriftOp;
+    private final FunctionOperator functionOp;
 
-    private Operator(String description, TExprOperator thriftOp) {
+    private Operator(String description, FunctionOperator thriftOp) {
       this.description = description;
-      this.thriftOp = thriftOp;
-    }
-
-    public boolean isBitwiseOperation() {
-      return this == BITAND || this == BITOR || this == BITXOR || this == BITNOT;
+      this.functionOp = thriftOp;
     }
 
     @Override
@@ -39,10 +35,11 @@ public class ArithmeticExpr extends Expr {
       return description;
     }
 
-    public TExprOperator toThrift() {
-      return thriftOp;
+    public FunctionOperator toFunctionOp() {
+      return functionOp;
     }
   }
+
   private final Operator op;
 
   public Operator getOp() {
@@ -74,7 +71,7 @@ public class ArithmeticExpr extends Expr {
   @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.ARITHMETIC_EXPR;
-    msg.op = op.toThrift();
+    msg.setOpcode(opcode);
   }
 
   @Override
@@ -82,7 +79,7 @@ public class ArithmeticExpr extends Expr {
     if (!super.equals(obj)) {
       return false;
     }
-    return ((ArithmeticExpr) obj).op == op;
+    return ((ArithmeticExpr) obj).opcode == opcode;
   }
 
   @Override
@@ -98,12 +95,15 @@ public class ArithmeticExpr extends Expr {
 
     // bitnot is the only unary op, deal with it here
     if (op == Operator.BITNOT) {
-      PrimitiveType childType = getChild(0).getType();
-      if (!childType.isFixedPointType()) {
+      type = getChild(0).getType();
+      OpcodeRegistry.Signature match =
+        OpcodeRegistry.instance().getFunctionInfo(op.functionOp, type);
+      if (match == null) {
         throw new AnalysisException("Bitwise operations only allowed on fixed-point types: "
             + toSql());
       }
-      type = childType;
+      Preconditions.checkState(type == match.returnType);
+      opcode = match.opcode;
       return;
     }
 
@@ -112,8 +112,8 @@ public class ArithmeticExpr extends Expr {
 
     switch (op) {
       case MULTIPLY:
-      case PLUS:
-      case MINUS:
+      case ADD:
+      case SUBTRACT:
         // numeric ops must be promoted to highest-resolution type
         // (otherwise we can't guarantee that a <op> b won't result in an overflow/underflow)
         type = PrimitiveType.getAssignmentCompatibleType(t1, t2).getMaxResolutionType();
@@ -134,8 +134,7 @@ public class ArithmeticExpr extends Expr {
               "Invalid floating point argument to operation " +
               op.toString() + ": " + this.toSql());
         }
-        type =
-          PrimitiveType.getAssignmentCompatibleType(t1, t2);
+        type = PrimitiveType.getAssignmentCompatibleType(t1, t2);
         // the result is always an integer
         Preconditions.checkState(type.isFixedPointType());
         break;
@@ -147,5 +146,8 @@ public class ArithmeticExpr extends Expr {
     }
 
     type = castBinaryOp(type);
+    OpcodeRegistry.Signature match =
+      OpcodeRegistry.instance().getFunctionInfo(op.toFunctionOp(), type, type);
+    this.opcode = match.opcode;
   }
 }

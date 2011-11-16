@@ -18,14 +18,16 @@ add_library(Exprs
   expr.cc
   float-literal.cc
   function-call.cc
-  functions.cc
   int-literal.cc
   is-null-predicate.cc
   like-predicate.cc
   literal-predicate.cc
+  math-functions.cc
   null-literal.cc
+  opcode-registry.cc
   slot-ref.cc
   string-literal.cc
+  string-functions.cc
 )
 
 target_link_libraries(Exprs
@@ -33,22 +35,23 @@ target_link_libraries(Exprs
   boost_regex-mt
 )
 
-add_custom_command(
-  OUTPUT functions.cc
-  COMMAND "./gen-functions.py"
-)
-
 add_executable(expr-test
   expr-test.cc
 )
 
+# The order of link libaries matters.  Specifically:
+#  - Util must come before ImpalaThrift
+#  - Exprs & Opcode have a circular dependency (Exprs is included twice)
 target_link_libraries(expr-test
   TestUtil
   Service
   Exec
   Exprs
+  Opcode
+  Exprs
   Runtime
   Common
+  Util
   thrift
   ImpalaThrift
   MockHdfs

@@ -240,7 +240,7 @@ AggregationTuple* AggregationNode::ConstructAggTuple(TupleRow* row) {
   // (so that SUM(<col>) stays NULL if <col> only contains NULL values).
   for (int i = 0; i < aggregate_exprs_.size(); ++i, ++slot_d) {
     AggregateExpr* agg_expr = static_cast<AggregateExpr*>(aggregate_exprs_[i]);
-    if (agg_expr->op() == TExprOperator::AGG_COUNT) {
+    if (agg_expr->agg_op() == TAggregationOp::COUNT) {
       // we're only aggregating into bigint slots and never return NULL
       *reinterpret_cast<int64_t*>(agg_tuple->GetSlot((*slot_d)->tuple_offset())) = 0;
     } else {
@@ -360,7 +360,7 @@ void AggregationNode::UpdateAggTuple(AggregationTuple* agg_out_tuple, TupleRow* 
     }
 
     // deal with COUNT(*) separately (no need to check the actual child expr value)
-    if (agg_expr->op() == TExprOperator::AGG_COUNT && agg_expr->is_star()) {
+    if (agg_expr->agg_op() == TAggregationOp::COUNT && agg_expr->is_star()) {
       // we're only aggregating into bigint slots
       DCHECK_EQ((*slot_d)->type(), TYPE_BIGINT);
       ++*reinterpret_cast<int64_t*>(slot);
@@ -374,12 +374,12 @@ void AggregationNode::UpdateAggTuple(AggregationTuple* agg_out_tuple, TupleRow* 
       continue;
     }
 
-    switch (agg_expr->op()) {
-      case TExprOperator::AGG_COUNT:
+    switch (agg_expr->agg_op()) {
+      case TAggregationOp::COUNT:
         ++*reinterpret_cast<int64_t*>(slot);
         break;
 
-      case TExprOperator::AGG_MIN:
+      case TAggregationOp::MIN:
         switch (agg_expr->type()) {
           case TYPE_BOOLEAN:
             UpdateMinSlot<bool>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
@@ -411,7 +411,7 @@ void AggregationNode::UpdateAggTuple(AggregationTuple* agg_out_tuple, TupleRow* 
         };
         break;
 
-      case TExprOperator::AGG_MAX:
+      case TAggregationOp::MAX:
         switch (agg_expr->type()) {
           case TYPE_BOOLEAN:
             UpdateMaxSlot<bool>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
@@ -443,7 +443,7 @@ void AggregationNode::UpdateAggTuple(AggregationTuple* agg_out_tuple, TupleRow* 
         };
         break;
 
-      case TExprOperator::AGG_SUM:
+      case TAggregationOp::SUM:
         switch (agg_expr->type()) {
           case TYPE_BOOLEAN:
             UpdateSumSlot<bool>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
@@ -472,7 +472,7 @@ void AggregationNode::UpdateAggTuple(AggregationTuple* agg_out_tuple, TupleRow* 
         break;
 
       default:
-        DCHECK(false) << "bad aggregate operator: " << agg_expr->op();
+        DCHECK(false) << "bad aggregate operator: " << agg_expr->agg_op();
     }
   }
 }

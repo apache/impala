@@ -558,6 +558,22 @@ TEST_F(ExprTest, LikePredicate) {
   TestValue("'\\\\a' LIKE '\\\\\\_'", TYPE_BOOLEAN, false);
 }
 
+TEST_F(ExprTest, StringFunctions) {
+  TestStringValue("substring('Hello', 1)", "Hello");
+  TestStringValue("substring('Hello', -2)", "lo");
+  TestStringValue("substring('Hello', 0)", "");
+  TestStringValue("substring('Hello', -5)", "Hello");
+  TestStringValue("substring('Hello', -6)", "");
+  TestStringValue("substring('Hello', 100)", "");
+  TestStringValue("substring('Hello', 1, 1)", "H");
+  TestStringValue("substring('Hello', 2, 100)", "ello");
+  TestStringValue("substring('Hello', -3, 2)", "ll");
+  //TODO: this NULLs, currently we can't parse them inside function calls
+}
+
+TEST_F(ExprTest, MathFunctions) {
+  TestValue("pi()", TYPE_DOUBLE, M_PI);
+}
 }
 
 int main(int argc, char **argv) {

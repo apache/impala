@@ -13,7 +13,7 @@ class TExprNode;
 
 class AggregateExpr: public Expr {
  public:
-  TExprOperator::type op() const { return op_; }
+  TAggregationOp::type agg_op() const { return agg_op_; }
   bool is_star() const { return is_star_; }
   bool is_distinct() const { return is_distinct_; }
   virtual std::string DebugString() const;
@@ -21,10 +21,11 @@ class AggregateExpr: public Expr {
  protected:
   friend class Expr;
 
+  virtual Status Prepare(RuntimeState* state, const RowDescriptor& desc);
   AggregateExpr(const TExprNode& node);
 
  private:
-  const TExprOperator::type  op_;
+  const TAggregationOp::type agg_op_;
   const bool is_star_;
   const bool is_distinct_;
 };

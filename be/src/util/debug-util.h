@@ -6,6 +6,7 @@
 #include <ostream>
 #include <string>
 
+#include "gen-cpp/Opcodes_types.h"
 #include "gen-cpp/Exprs_types.h"
 
 namespace impala {
@@ -15,7 +16,8 @@ class TupleDescriptor;
 class Tuple;
 class TupleRow;
 
-std::ostream& operator<<(std::ostream& os, const TExprOperator::type& op);
+std::ostream& operator<<(std::ostream& os, const TExprOpcode::type& op);
+std::ostream& operator<<(std::ostream& os, const TAggregationOp::type& op);
 
 std::string PrintTuple(const Tuple* t, const TupleDescriptor& d);
 std::string PrintRow(TupleRow* row, const RowDescriptor& d);
