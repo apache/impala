@@ -37,8 +37,16 @@ abstract public class ScanNode extends PlanNode {
    * Returns one TScanRange per partition of the scan. If 'hosts' is non-null and there
    * are multiple partitions, also returns hosts on which scan partitions are executed,
    * one per range.
+   * @param numPartitions number of scan partitions; same semantics as
+   *     TQueryRequest.numNodes; must be >= 1 or one of these special values:
+   *     NUM_NODES_ALL: as many partitions as there are nodes that contain relevant data
+   *     NUM_NODES_ALL_RACKS: as many partitions as there are racks that holds relevant
+   *     data
+   * @param scanRanges output parameter
+   * @param hosts output parameter
    */
-  abstract public void getScanParams(List<TScanRange> scanRanges, List<String> hosts);
+  abstract public void getScanParams(
+      int numPartitions, List<TScanRange> scanRanges, List<String> hosts);
 
   @Override
   protected String debugString() {

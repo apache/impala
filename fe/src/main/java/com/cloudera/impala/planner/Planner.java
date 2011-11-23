@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 
+import com.cloudera.impala.analysis.AggregateExpr;
 import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BinaryPredicate;
@@ -15,6 +16,7 @@ import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
+import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.SortInfo;
 import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.analysis.TupleDescriptor;
@@ -22,6 +24,7 @@ import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.catalog.HdfsRCFileTable;
 import com.cloudera.impala.catalog.HdfsTextTable;
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.Pair;
@@ -39,6 +42,13 @@ import com.google.common.collect.Sets;
  *
  */
 public class Planner {
+  // counter to assign sequential node ids
+  private int nextNodeId = 0;
+
+  private int getNextNodeId() {
+    return nextNodeId++;
+  }
+
   public Planner() {
   }
 
@@ -277,14 +287,15 @@ public class Planner {
   }
 
   /**
-   * Create tree of PlanNodes that implements the given selectStmt.
+   * Create tree of PlanNodes that implements the Select/Project/Join part of the
+   * given selectStmt.
    * Also calls DescriptorTable.computeMemLayout().
    * @param selectStmt
    * @param analyzer
    * @return root node of plan tree * @throws NotImplementedException if selectStmt
    * contains Order By clause
    */
-  private PlanNode createPlan(SelectStmt selectStmt, Analyzer analyzer)
+  private PlanNode createSpjPlan(SelectStmt selectStmt, Analyzer analyzer)
       throws NotImplementedException, InternalException {
     if (selectStmt.getTableRefs().isEmpty()) {
       // no from clause -> nothing to plan
@@ -298,48 +309,84 @@ public class Planner {
     }
 
     // create left-deep sequence of binary hash joins; assign node ids as we go along
-    int nodeId = 0;
     TableRef tblRef = selectStmt.getTableRefs().get(0);
     PlanNode root = createScanNode(analyzer, tblRef);
-    root.id = nodeId++;
+    root.id = getNextNodeId();
     root.rowTupleIds = rowTuples;
     for (int i = 1; i < selectStmt.getTableRefs().size(); ++i) {
       TableRef innerRef = selectStmt.getTableRefs().get(i);
       root = createHashJoinNode(analyzer, root, innerRef);
-      root.getChild(1).id = nodeId++;
-      root.id = nodeId++;
+      root.getChild(1).id = getNextNodeId();
+      root.id = getNextNodeId();
       root.rowTupleIds = rowTuples;
     }
 
-    AggregateInfo aggInfo = selectStmt.getAggInfo();
-    if (aggInfo != null) {
-      root = new AggregationNode(root, aggInfo);
-      root.id = nodeId++;
-      if (selectStmt.getHavingPred() != null) {
-        root.setConjuncts(selectStmt.getHavingPred().getConjuncts());
-      }
-    }
-
-    SortInfo sortInfo = selectStmt.getSortInfo();
-    if (sortInfo != null) {
-      // Determine if we should use TopN or Sort in the backend
+    if (selectStmt.getSortInfo() != null && selectStmt.getLimit() == -1) {
       // TODO: only use topN if the memory footprint is expected to be low
       // how to account for strings???
-      if (selectStmt.getLimit() != -1) {
-        root = new SortNode(root, sortInfo, true);
-        root.id = nodeId++;
-      } else {
-        throw new NotImplementedException("ORDER BY without LIMIT currently not supported");
-      }
+      throw new NotImplementedException(
+          "ORDER BY without LIMIT currently not supported");
     }
 
-    root.setLimit(selectStmt.getLimit());
-    root.finalize(analyzer);
-    markUnrefdSlots(root, selectStmt, analyzer);
-    // don't compute mem layout before marking slots that aren't being referenced
-    analyzer.getDescTbl().computeMemLayout();
-
     return root;
+  }
+
+  /**
+   * Create AggregationNode as parent of inputNode that merges the aggregation
+   * output described by inputAggInfo:
+   * - grouping exprs: slotrefs to inputAggInfo's grouping slots
+   * - aggregate exprs: aggregation of inputAggInfo's aggregateExprs slots
+   *   (count is mapped to sum, everything else stays the same)
+   */
+  private PlanNode createMergeAggNode(
+      Analyzer analyzer, PlanNode inputNode, AggregateInfo inputAggInfo)
+      throws InternalException {
+    // construct grouping exprs
+    TupleDescriptor inputDesc = inputAggInfo.getAggTupleDesc();
+    ArrayList<Expr> groupingExprs = Lists.newArrayList();
+    for (int i = 0; i < inputAggInfo.getGroupingExprs().size(); ++i) {
+      groupingExprs.add(new SlotRef(inputDesc.getSlots().get(i)));
+    }
+
+    // construct agg exprs
+    ArrayList<AggregateExpr> aggExprs = Lists.newArrayList();
+    for (int i = 0; i < inputAggInfo.getAggregateExprs().size(); ++i) {
+      AggregateExpr inputExpr = inputAggInfo.getAggregateExprs().get(i);
+      Expr aggExprParam =
+          new SlotRef(inputDesc.getSlots().get(
+            i + inputAggInfo.getGroupingExprs().size()));
+      List<Expr> aggExprParamList = Lists.newArrayList(aggExprParam);
+      AggregateExpr aggExpr = null;
+      if (inputExpr.getOp() == AggregateExpr.Operator.COUNT) {
+        aggExpr =
+            new AggregateExpr(AggregateExpr.Operator.SUM, false, false, aggExprParamList);
+      } else {
+        aggExpr = new AggregateExpr(inputExpr.getOp(), false, false, aggExprParamList);
+      }
+      try {
+        aggExpr.analyze(analyzer);
+      } catch (AnalysisException e) {
+        // we shouldn't see this
+        throw new InternalException(
+            "error constructing merge aggregation node: " + e.getMessage());
+      }
+      aggExprs.add(aggExpr);
+    }
+
+    AggregateInfo mergeAggInfo = new AggregateInfo(groupingExprs, aggExprs);
+    mergeAggInfo.createAggTuple(analyzer.getDescTbl());
+    AggregationNode result = new AggregationNode(inputNode, mergeAggInfo);
+    return result;
+  }
+
+  private ScanNode getLeftmostScan(PlanNode root) {
+    if (root instanceof ScanNode) {
+      return (ScanNode) root;
+    }
+    if (root.getChildren().isEmpty()) {
+      return null;
+    }
+    return getLeftmostScan(root.getChildren().get(0));
   }
 
   /**
@@ -362,38 +409,150 @@ public class Planner {
       SelectStmt selectStmt, Analyzer analyzer, int numNodes,
       List<PlanNode> planFragments)
       throws NotImplementedException, InternalException {
-    if (numNodes != 1) {
-      throw new NotImplementedException("can only generate single-node plans");
-    }
-    PlanNode plan = createPlan(selectStmt, analyzer);
+    // distributed execution: plan that does the bulk of the execution
+    // (select-project-join; pre-aggregation is added later) and sends results back to
+    // the coordinator;
+    // single-node execution: the single plan
+    PlanNode slavePlan = createSpjPlan(selectStmt, analyzer);
 
-    TQueryExecRequest request = new TQueryExecRequest();
-    TPlanExecRequest fragmentRequest = new TPlanExecRequest(
-        new TupleId().asInt(), Expr.treesToThrift(selectStmt.getSelectListExprs()));
-    if (plan != null) {
-      planFragments.add(plan);
-      fragmentRequest.setPlanFragment(plan.treeToThrift());
-      fragmentRequest.setDescTbl(analyzer.getDescTbl().toThrift());
-    }
-    request.addToFragmentRequests(fragmentRequest);
-    if (plan == null) {
+    if (slavePlan == null) {
+      // SELECT without FROM clause
+      TQueryExecRequest request = new TQueryExecRequest();
+      TPlanExecRequest fragmentRequest = new TPlanExecRequest(
+          Expr.treesToThrift(selectStmt.getSelectListExprs()));
+      request.addToFragmentRequests(fragmentRequest);
       return request;
     }
 
-    // unpartitioned scans executing on local host
-    TPlanExecParams execParams = new TPlanExecParams();
-    execParams.setDestHosts(Lists.newArrayList("localhost"));
-    List<ScanNode> scanNodes = Lists.newArrayList();
-    plan.collectSubclasses(ScanNode.class, scanNodes);
-    for (ScanNode scan: scanNodes) {
-      List<TScanRange> scanRanges = Lists.newArrayList();
-      scan.getScanParams(scanRanges, null);
-      Preconditions.checkState(scanRanges.size() == 1);
-      execParams.addToScanRanges(scanRanges.get(0));
+    // distributed execution: plan fragment executed by the coordinator, which
+    // does merging and post-aggregation, if applicable
+    // single-node execution: always null
+    PlanNode coordPlan = null;
+
+    // add aggregation, if required, but without having predicate
+    AggregateInfo aggInfo = selectStmt.getAggInfo();
+    if (aggInfo != null) {
+      slavePlan = new AggregationNode(slavePlan, aggInfo);
+      slavePlan.id = getNextNodeId();
     }
-    request.addToNodeRequestParams(Lists.newArrayList(execParams));
+
+    int exchNodeId = -1;
+    // node that is currently the root of the PlanNode tree(s)
+    PlanNode currentPlanRoot = null;
+    if (numNodes != 1) {
+      // create coordinator plan fragment (single ExchangeNode, possibly
+      // followed by a merge aggregation step and a top-n node)
+      coordPlan = new ExchangeNode(slavePlan.getTupleIds());
+      coordPlan.id = exchNodeId = getNextNodeId();
+
+      if (aggInfo != null) {
+        coordPlan = currentPlanRoot = createMergeAggNode(analyzer, coordPlan, aggInfo);
+        coordPlan.id = getNextNodeId();
+      }
+    } else {
+      currentPlanRoot = slavePlan;
+    }
+
+    if (selectStmt.getHavingPred() != null) {
+      Preconditions.checkState(currentPlanRoot instanceof AggregationNode);
+      // only enforce having predicate after the final aggregation step
+      // TODO: substitute having pred
+      currentPlanRoot.setConjuncts(selectStmt.getHavingPred().getConjuncts());
+    }
+
+    // top-n is always applied at the very end
+    // (if we wanted to apply top-n to the slave plan fragments, they would need to be
+    // fragmented by the grouping exprs of the GROUP BY, which would only be possible
+    // if we grouped by the table's partitioning exprs, and even then do we want
+    // to use HDFS file splits for plan fragmentation)
+    SortInfo sortInfo = selectStmt.getSortInfo();
+    if (sortInfo != null) {
+      Preconditions.checkState(selectStmt.getLimit() != -1);
+      if (coordPlan != null) {
+        coordPlan = new SortNode(coordPlan, sortInfo, true);
+        currentPlanRoot = coordPlan;
+      } else {
+        slavePlan = new SortNode(slavePlan, sortInfo, true);
+        currentPlanRoot = slavePlan;
+      }
+      currentPlanRoot.id = getNextNodeId();
+    }
+
+    slavePlan.setLimit(selectStmt.getLimit());
+    slavePlan.finalize(analyzer);
+    markUnrefdSlots(slavePlan, selectStmt, analyzer);
+    if (coordPlan != null) {
+      coordPlan.setLimit(selectStmt.getLimit());
+      coordPlan.finalize(analyzer);
+    }
+    // don't compute mem layout before marking slots that aren't being referenced
+    analyzer.getDescTbl().computeMemLayout();
+
+    // TODO: determine if slavePlan produces more slots than are being
+    // ref'd by coordPlan; if so, insert MaterializationNode that trims the
+    // output
+    // TODO: substitute select list exprs against output of currentPlanRoot
+    // probably best to add PlanNode.substMap
+
+    TQueryExecRequest request = new TQueryExecRequest();
+    TPlanExecRequest fragmentRequest = new TPlanExecRequest(
+        Expr.treesToThrift(selectStmt.getSelectListExprs()));
+    if (coordPlan != null) {
+      // coordinator fragment comes first
+      planFragments.add(coordPlan);
+      fragmentRequest.setPlanFragment(coordPlan.treeToThrift());
+      fragmentRequest.setDescTbl(analyzer.getDescTbl().toThrift());
+      request.addToFragmentRequests(fragmentRequest);
+
+      // add one empty exec param (coord fragment doesn't scan any tables
+      // and doesn't send the output anywhere)
+      request.addToNodeRequestParams(Lists.newArrayList(new TPlanExecParams()));
+
+      fragmentRequest = new TPlanExecRequest();
+    }
+    fragmentRequest.setDestNodeId(exchNodeId);
+
+    planFragments.add(slavePlan);
+    fragmentRequest.setPlanFragment(slavePlan.treeToThrift());
+    fragmentRequest.setDescTbl(analyzer.getDescTbl().toThrift());
+    request.addToFragmentRequests(fragmentRequest);
+
+    // partition fragment by partitioning leftmost scan
+    ScanNode leftmostScan = getLeftmostScan(slavePlan);
+    Preconditions.checkState(leftmostScan != null);
+    List<TScanRange> scanRanges = Lists.newArrayList();
+    List<String> hosts = Lists.newArrayList();
+    leftmostScan.getScanParams(numNodes, scanRanges, hosts);
+    request.addToExecNodes(hosts);
+
+    // one TPlanExecParams per fragment/scan range
+    List<TPlanExecParams> fragmentParamsList = Lists.newArrayList();
+    for (TScanRange scanRange: scanRanges) {
+      TPlanExecParams fragmentParams = new TPlanExecParams();
+      fragmentParams.addToScanRanges(scanRange);
+      // all fragments sent to coordinator, which runs on localhost
+      fragmentParams.setDestHosts(Lists.newArrayList("localhost"));
+      fragmentParamsList.add(fragmentParams);
+    }
+
+    // add scan ranges for the non-partitioning scans to each of the fragment params
+    List<ScanNode> scanNodes = Lists.newArrayList();
+    slavePlan.collectSubclasses(ScanNode.class, scanNodes);
+    for (ScanNode scan: scanNodes) {
+      if (scan == leftmostScan) {
+        continue;
+      }
+      scanRanges = Lists.newArrayList();
+      scan.getScanParams(1, scanRanges, null);
+      Preconditions.checkState(scanRanges.size() == 1);
+      for (TPlanExecParams fragmentParams: fragmentParamsList) {
+        fragmentParams.addToScanRanges(scanRanges.get(0));
+      }
+    }
+
+    request.addToNodeRequestParams(fragmentParamsList);
 
     return request;
-}
+  }
 
 }

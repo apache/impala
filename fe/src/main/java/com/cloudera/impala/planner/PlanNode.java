@@ -35,7 +35,9 @@ import com.google.common.collect.Lists;
 abstract public class PlanNode extends TreeNode<PlanNode> {
   protected int id;  // unqiue w/in plan tree; assigned by planner
   protected long limit; // max. # of rows to be returned; 0: no limit
-  protected ArrayList<TupleId> tupleIds;  // ids materialized by the tree rooted at this node
+
+  // ids materialized by the tree rooted at this node
+  protected ArrayList<TupleId> tupleIds;
 
   // Composition of rows produced by this node. Possibly a superset of tupleIds
   // (the same RowBatch passes through multiple nodes; for instances, join nodes
@@ -72,7 +74,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     this.limit = limit;
   }
 
-  public List<TupleId> getTupleIds() {
+  public ArrayList<TupleId> getTupleIds() {
     Preconditions.checkState(tupleIds != null);
     return tupleIds;
   }
@@ -93,14 +95,16 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   public String getExplainString() {
-    String explainString = getExplainString("");
-    if (this.limit != -1) {
-      explainString += "\nLIMIT: " + this.limit;
-    }
-    return explainString;
+    return getExplainString("");
   }
 
-  protected abstract String getExplainString(String prefix);
+  protected String getExplainString(String prefix) {
+    if (limit != -1) {
+      return prefix + "LIMIT: " + limit + "\n";
+    } else {
+      return "";
+    }
+  }
 
   // Convert this plan node, including all children, to its Thrift representation.
   public TPlan treeToThrift() {

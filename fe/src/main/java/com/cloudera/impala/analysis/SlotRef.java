@@ -45,10 +45,14 @@ public class SlotRef extends Expr {
     this.col = null;
     this.desc = desc;
     this.type = desc.getType();
+    this.isAnalyzed = true;
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
+    if (isAnalyzed) {
+      return;
+    }
     super.analyze(analyzer);
     desc = analyzer.registerColumnRef(tblName, col);
     type = desc.getType();

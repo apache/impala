@@ -13,6 +13,7 @@ enum TPlanNodeType {
   HASH_JOIN_NODE,
   AGGREGATION_NODE,
   SORT_NODE,
+  EXCHANGE_NODE
 }
 
 // The information contained in subclasses of ScanNode captured in two separate

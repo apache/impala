@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -25,6 +26,7 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.THdfsTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
@@ -58,10 +60,12 @@ public abstract class HdfsTable extends Table {
   public static class Partition {
     public List<LiteralExpr> keyValues;
     public List<String> filePaths;  // paths of hdfs data files
+    public List<Long> fileLengths;  // length as returned by FileStatus.getLen()
 
     Partition() {
       this.keyValues = Lists.newArrayList();
       this.filePaths = Lists.newArrayList();
+      this.fileLengths = Lists.newArrayList();
     }
   }
 
@@ -158,6 +162,7 @@ public abstract class HdfsTable extends Table {
     FileStatus[] fileStatus = fs.listStatus(path);
     for (int i = 0; i < fileStatus.length; ++i) {
       p.filePaths.add(fileStatus[i].getPath().toString());
+      p.fileLengths.add(fileStatus[i].getLen());
     }
     partitions.add(p);
   }
@@ -271,7 +276,8 @@ public abstract class HdfsTable extends Table {
     // Throw exception if we failed to set at least one delimiter/quote/escape char.
     if (!exceptionMessages.isEmpty()) {
       StringBuilder strBuilder = new StringBuilder();
-      strBuilder.append("We only support single-character delimiters, quotes, and excape chars. " +
+      strBuilder.append(
+          "We only support single-character delimiters, quotes, and escape chars. " +
           "Found the following properties:\n");
       for (String s : exceptionMessages) {
         strBuilder.append(s);
@@ -286,7 +292,8 @@ public abstract class HdfsTable extends Table {
   @Override
   public TTableDescriptor toThrift() {
     TTableDescriptor TTableDescriptor =
-        new TTableDescriptor(id.asInt(), TTableType.HBASE_TABLE, colsByPos.size(), numClusteringCols);
+        new TTableDescriptor(
+            id.asInt(), TTableType.HBASE_TABLE, colsByPos.size(), numClusteringCols);
     // We only support single-byte characters as delimiters.
     THdfsTable tHdfsTable = new THdfsTable(
         (byte) lineDelim.charAt(0), (byte) fieldDelim.charAt(0),
@@ -322,5 +329,32 @@ public abstract class HdfsTable extends Table {
 
   public String getEscapeChar() {
     return escapeChar;
+  }
+
+  /**
+   * Return locations for all blocks in all files in filePaths.
+   * @return list of (file path, BlockLocation) pairs
+   */
+  public static List<Pair<String, BlockLocation>>
+      getBlockLocations(List<String> filePaths) {
+    List<Pair<String, BlockLocation>> result = Lists.newArrayList();
+    Configuration conf = new Configuration();
+    for (String path: filePaths) {
+      Path p = new Path(path);
+      BlockLocation[] locations = null;
+      try {
+        FileSystem fs = p.getFileSystem(conf);
+        FileStatus fileStatus = fs.getFileStatus(p);
+        locations = fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
+      } catch (IOException e) {
+        throw new RuntimeException(
+            "couldn't determine block locations for path '" + path + "':\n"
+            + e.getMessage());
+      }
+      for (int i = 0; i < locations.length; ++i) {
+        result.add(Pair.create(path, locations[i]));
+      }
+    }
+    return result;
   }
 }

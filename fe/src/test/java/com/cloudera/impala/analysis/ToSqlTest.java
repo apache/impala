@@ -85,9 +85,9 @@ public class ToSqlTest {
   // Test the toSql() output of aggregate and group by expressions.
   @Test
   public void aggregationTest() {
-    testToSql("select COUNT(*), count(id), COUNT(DISTINCT id), SUM(id), AVG(id) from alltypes " +
+    testToSql("select COUNT(*), count(id), COUNT(id), SUM(id), AVG(id) from alltypes " +
     		"group by tinyint_col",
-        "SELECT COUNT(*), COUNT(id), COUNT(DISTINCT id), SUM(id), AVG(id) FROM alltypes " +
+        "SELECT COUNT(*), COUNT(id), COUNT(id), SUM(id), AVG(id) FROM alltypes " +
     		"GROUP BY tinyint_col");
     testToSql("select avg(float_col / id) from alltypes group by tinyint_col",
         "SELECT AVG(float_col / id) " +
@@ -98,9 +98,9 @@ public class ToSqlTest {
     testToSql("select avg(id) from alltypes group by tinyint_col having count(tinyint_col) > 10",
         "SELECT AVG(id) FROM alltypes GROUP BY tinyint_col HAVING COUNT(tinyint_col) > 10");
     testToSql("select sum(id) from alltypes group by tinyint_col " +
-        "having avg(tinyint_col) > 10 AND count(distinct tinyint_col) > 5",
+        "having avg(tinyint_col) > 10 AND count(tinyint_col) > 5",
         "SELECT SUM(id) FROM alltypes GROUP BY tinyint_col " +
-            "HAVING AVG(tinyint_col) > 10 AND COUNT(DISTINCT tinyint_col) > 5");
+            "HAVING AVG(tinyint_col) > 10 AND COUNT(tinyint_col) > 5");
   }
 
   // Test the toSql() output of the order by clause.
@@ -122,12 +122,12 @@ public class ToSqlTest {
     testToSql("select bigint_col, avg(double_col), sum(tinyint_col) from alltypes " +
         "where double_col > 2.5 AND string_col != \"abc\"" +
         "group by bigint_col, int_col " +
-        "having count(distinct int_col) > 10 OR sum(bigint_col) > 20 " +
+        "having count(int_col) > 10 OR sum(bigint_col) > 20 " +
         "order by 2 DESC, 3 ASC",
         "SELECT bigint_col, AVG(double_col), SUM(tinyint_col) FROM alltypes " +
             "WHERE double_col > 2.5 AND string_col != 'abc' " +
             "GROUP BY bigint_col, int_col " +
-            "HAVING COUNT(DISTINCT int_col) > 10 OR SUM(bigint_col) > 20 " +
+            "HAVING COUNT(int_col) > 10 OR SUM(bigint_col) > 20 " +
             "ORDER BY 2 DESC, 3 ASC");
   }
 }

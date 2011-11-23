@@ -13,7 +13,6 @@ import com.google.common.collect.Lists;
 /**
  * Encapsulates all the information needed to compute the aggregate functions of a single
  * Select block.
- *
  */
 public class AggregateInfo {
   // all exprs from Group By clause, duplicates removed
@@ -21,10 +20,10 @@ public class AggregateInfo {
   // all agg exprs from select block, duplicates removed
   private final ArrayList<AggregateExpr> aggregateExprs;
 
-  // The tuple into which the output of the aggregation computation is materialized; contains
-  // groupingExprs.size() + aggregateExprs.size() slots, the first groupingExprs.size() of
-  // which contain the values of the grouping exprs, followed by slots for the values of the
-  // aggregate exprs.
+  // The tuple into which the output of the aggregation computation is materialized;
+  // contains groupingExprs.size() + aggregateExprs.size() slots, the first
+  // groupingExprs.size() of which contain the values of the grouping exprs, followed by
+  // slots for the values of the aggregate exprs.
   private TupleDescriptor aggTupleDesc;
 
   // map from all grouping and aggregate exprs to a SlotRef referencing the corresp. slot
@@ -33,9 +32,9 @@ public class AggregateInfo {
 
   // c'tor takes ownership of groupingExprs and aggExprs
   public AggregateInfo(ArrayList<Expr> groupingExprs, ArrayList<AggregateExpr> aggExprs) {
-    this.groupingExprs = groupingExprs;
+    this.groupingExprs = (groupingExprs != null ? groupingExprs : new ArrayList<Expr>());
     Expr.removeDuplicates(this.groupingExprs);
-    this.aggregateExprs = aggExprs;
+    this.aggregateExprs = (aggExprs != null ? aggExprs : new ArrayList<AggregateExpr>());
     Expr.removeDuplicates(this.aggregateExprs);
     this.aggTupleSubstMap = new Expr.SubstitutionMap();
   }

@@ -117,6 +117,11 @@ public class AggregateExpr extends Expr {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
+    if (isDistinct) {
+      throw new AnalysisException(
+          "DISTINCT not implemented: " + this.toSql());
+    }
+
     if (isStar && op != Operator.COUNT) {
       throw new AnalysisException(
           "'*' can only be used in conjunction with COUNT: "

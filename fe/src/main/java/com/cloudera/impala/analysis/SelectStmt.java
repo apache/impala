@@ -276,14 +276,7 @@ public class SelectStmt extends ParseNodeBase {
 
     // build substmap AVG -> SUM/COUNT;
     // assumes that select list and having clause have been analyzed
-    ArrayList<AggregateExpr> aggExprs = Lists.newArrayList();
-    Expr.collectList(selectListExprs, AggregateExpr.class, aggExprs);
-    if (havingPred != null) {
-      havingPred.collect(AggregateExpr.class, aggExprs);
-    }
-    if (orderingExprs != null) {
-      Expr.collectList(orderingExprs, AggregateExpr.class, aggExprs);
-    }
+    ArrayList<AggregateExpr> aggExprs = collectAggExprs();
 
     Expr.SubstitutionMap avgSubstMap = new Expr.SubstitutionMap();
     for (AggregateExpr aggExpr : aggExprs) {
@@ -302,35 +295,30 @@ public class SelectStmt extends ParseNodeBase {
       avgSubstMap.lhs.add(aggExpr);
       avgSubstMap.rhs.add(divExpr);
     }
+    LOG.debug("avg substmap: " + avgSubstMap.debugString());
 
-    // substitute select list, having clause, order by clause
-    Expr.substituteList(selectListExprs, avgSubstMap);
-    if (havingPred != null) {
-      havingPred = (Predicate) havingPred.substitute(avgSubstMap);
-    }
-    Expr.substituteList(orderingExprs, avgSubstMap);
-
-    // collect agg exprs again
-    aggExprs.clear();
-    Expr.collectList(selectListExprs, AggregateExpr.class, aggExprs);
-    if (havingPred != null) {
-      havingPred.collect(AggregateExpr.class, aggExprs);
-    }
-    if (orderingExprs != null) {
-      Expr.collectList(orderingExprs, AggregateExpr.class, aggExprs);
-    }
+    // substitute AVG before constructing AggregateInfo
+    Expr.substituteList(aggExprs, avgSubstMap);
+    ArrayList<AggregateExpr> nonAvgAggExprs = Lists.newArrayList();
+    Expr.collectList(aggExprs, AggregateExpr.class, nonAvgAggExprs);
+    aggExprs = nonAvgAggExprs;
+    LOG.debug("aggExprs=" + Expr.debugString(aggExprs));
     aggInfo = new AggregateInfo(groupingExprsCopy, aggExprs);
     aggInfo.createAggTuple(analyzer.getDescTbl());
+    LOG.debug("agg substmap: " + aggInfo.getAggTupleSubstMap().debugString());
+
+    Expr.SubstitutionMap combinedSubstMap =
+        Expr.SubstitutionMap.combine(avgSubstMap, aggInfo.getAggTupleSubstMap());
+    LOG.debug("combined substmap: " + combinedSubstMap.debugString());
 
     // change select list, having and ordering exprs to point to agg output
-    LOG.debug("agg substmap: " + aggInfo.getAggTupleSubstMap().debugString());
-    Expr.substituteList(selectListExprs, aggInfo.getAggTupleSubstMap());
+    Expr.substituteList(selectListExprs, combinedSubstMap);
     LOG.debug("post-agg selectListExprs: " + Expr.debugString(selectListExprs));
     if (havingPred != null) {
-      havingPred = (Predicate) havingPred.substitute(aggInfo.getAggTupleSubstMap());
+      havingPred = (Predicate) havingPred.substitute(combinedSubstMap);
       LOG.debug("post-agg havingPred: " + havingPred.debugString());
     }
-    Expr.substituteList(orderingExprs, aggInfo.getAggTupleSubstMap());
+    Expr.substituteList(orderingExprs, combinedSubstMap);
     LOG.debug("post-agg orderingExprs: " + Expr.debugString(orderingExprs));
 
     // check that all post-agg exprs point to agg output
@@ -360,6 +348,18 @@ public class SelectStmt extends ParseNodeBase {
             + havingClause.toSql());
       }
     }
+  }
+
+  private ArrayList<AggregateExpr> collectAggExprs() {
+    ArrayList<AggregateExpr> result = Lists.newArrayList();
+    Expr.collectList(selectListExprs, AggregateExpr.class, result);
+    if (havingPred != null) {
+      havingPred.collect(AggregateExpr.class, result);
+    }
+    if (sortInfo != null) {
+      Expr.collectList(sortInfo.getOrderingExprs(), AggregateExpr.class, result);
+    }
+    return result;
   }
 
   private void createSortInfo(Analyzer analyzer) throws AnalysisException {

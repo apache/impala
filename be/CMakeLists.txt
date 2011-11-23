@@ -7,7 +7,7 @@ enable_testing()
 
 # set flags for CMAKE_BUILD_TYPE=Debug;
 # suppress warnings for comparison of signed and unsigned integers
-SET(CMAKE_CXX_FLAGS_DEBUG "-g -Wall -Wno-sign-compare")
+SET(CMAKE_CXX_FLAGS_DEBUG "-ggdb -Wall -Wno-sign-compare")
 
 # where to find cmake modules
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake_modules")

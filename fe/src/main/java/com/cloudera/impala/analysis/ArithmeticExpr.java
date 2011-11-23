@@ -7,6 +7,7 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.thrift.TExprNode;
 import com.cloudera.impala.thrift.TExprNodeType;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
 public class ArithmeticExpr extends Expr {
@@ -56,6 +57,14 @@ public class ArithmeticExpr extends Expr {
     if (e2 != null) {
       children.add(e2);
     }
+  }
+
+  @Override
+  public String debugString() {
+    return Objects.toStringHelper(this)
+        .add("op", op)
+        .addValue(super.debugString())
+        .toString();
   }
 
   @Override

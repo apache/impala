@@ -40,7 +40,8 @@ struct TPlanExecRequest {
   2: optional Descriptors.TDescriptorTable descTbl
 
   // id of output tuple produced by this plan fragment
-  3: required Types.TTupleId outputTupleId
+  // TODO: do we need this?
+  //3: required Types.TTupleId outputTupleId
 
   // exprs that produce values for slots of output tuple (one expr per slot)
   4: list<Exprs.TExpr> outputExprs

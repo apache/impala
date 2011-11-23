@@ -5,16 +5,58 @@ where name like 'm%'
 group by 1
 ----
 AGGREGATE
+OUTPUT: COUNT(*)
 GROUP BY: zip
   SCAN HDFS table=default.testtbl
     PREDICATES: name LIKE 'm%'
     FILES: 
+----
+AGGREGATE
+OUTPUT: SUM(<slot 3>)
+GROUP BY: <slot 2>
+  EXCHANGE ID: 2
+----
+AGGREGATE
+OUTPUT: COUNT(*)
+GROUP BY: zip
+  SCAN HDFS table=default.testtbl
+    PREDICATES: name LIKE 'm%'
+    FILES:
 ====
 # all partitions are selected
 select * from alltypes
 ----
 SCAN HDFS table=default.alltypes
-  PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  FILES:
+    file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=2/090201.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=3/090301.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=4/090401.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=5/090501.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=6/090601.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=7/090701.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=8/090801.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=9/090901.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=10/091001.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=11/091101.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=12/091201.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=1/100101.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=2/100201.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=3/100301.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=4/100401.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=5/100501.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=6/100601.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=7/100701.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=8/100801.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=9/100901.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=10/101001.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=11/101101.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=12/101201.txt
+----
+EXCHANGE ID: 1
+----
+SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
@@ -46,7 +88,24 @@ SCAN HDFS table=default.alltypes
 select * from alltypes where year = 2009
 ----
 SCAN HDFS table=default.alltypes
-  PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  FILES:
+    file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=2/090201.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=3/090301.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=4/090401.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=5/090501.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=6/090601.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=7/090701.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=8/090801.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=9/090901.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=10/091001.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=11/091101.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=12/091201.txt
+----
+EXCHANGE ID: 1
+----
+SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
@@ -66,7 +125,24 @@ SCAN HDFS table=default.alltypes
 select * from alltypes where year = 2009.0
 ----
 SCAN HDFS table=default.alltypes
-  PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  FILES:
+    file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=2/090201.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=3/090301.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=4/090401.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=5/090501.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=6/090601.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=7/090701.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=8/090801.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=9/090901.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=10/091001.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=11/091101.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=12/091201.txt
+----
+EXCHANGE ID: 1
+----
+SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
@@ -85,7 +161,24 @@ SCAN HDFS table=default.alltypes
 select * from alltypes where 2009 = year
 ----
 SCAN HDFS table=default.alltypes
-  PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  FILES:
+    file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=2/090201.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=3/090301.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=4/090401.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=5/090501.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=6/090601.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=7/090701.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=8/090801.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=9/090901.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=10/091001.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=11/091101.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=12/091201.txt
+----
+EXCHANGE ID: 1
+----
+SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
@@ -104,7 +197,24 @@ SCAN HDFS table=default.alltypes
 select * from alltypes where 2009.0 = year
 ----
 SCAN HDFS table=default.alltypes
-  PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  FILES:
+    file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=2/090201.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=3/090301.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=4/090401.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=5/090501.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=6/090601.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=7/090701.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=8/090801.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=9/090901.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=10/091001.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=11/091101.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=12/091201.txt
+----
+EXCHANGE ID: 1
+----
+SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
@@ -124,7 +234,14 @@ SCAN HDFS table=default.alltypes
 select * from alltypes where month=1
 ----
 SCAN HDFS table=default.alltypes
-  PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  FILES:
+    file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=1/100101.txt
+----
+EXCHANGE ID: 1
+----
+SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
@@ -134,7 +251,13 @@ SCAN HDFS table=default.alltypes
 select * from alltypes where year=2009 and month=1
 ----
 SCAN HDFS table=default.alltypes
-  PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  FILES:
+    file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
+----
+EXCHANGE ID: 1
+----
+SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
@@ -143,7 +266,18 @@ SCAN HDFS table=default.alltypes
 select * from alltypes where year=2009 and month > 6
 ----
 SCAN HDFS table=default.alltypes
-  PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  FILES:
+    file:fe/target/test-warehouse/alltypes/year=2009/month=7/090701.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=8/090801.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=9/090901.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=10/091001.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=11/091101.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=12/091201.txt
+----
+EXCHANGE ID: 1
+----
+SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=7/090701.txt
@@ -156,7 +290,17 @@ SCAN HDFS table=default.alltypes
 select * from alltypes where year=2009 and month < 6
 ----
 SCAN HDFS table=default.alltypes
-  PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  FILES:
+    file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=2/090201.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=3/090301.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=4/090401.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=5/090501.txt
+----
+EXCHANGE ID: 1
+----
+SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
@@ -169,7 +313,17 @@ SCAN HDFS table=default.alltypes
 select * from alltypes where year<=2009 and month < 6
 ----
 SCAN HDFS table=default.alltypes
-  PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  FILES:
+    file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=2/090201.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=3/090301.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=4/090401.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=5/090501.txt
+----
+EXCHANGE ID: 1
+----
+SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
@@ -182,7 +336,16 @@ SCAN HDFS table=default.alltypes
 select * from alltypes where month < 9 and month > 6
 ----
 SCAN HDFS table=default.alltypes
-  PREDICATES: 
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  FILES:
+    file:fe/target/test-warehouse/alltypes/year=2009/month=7/090701.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=8/090801.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=7/100701.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=8/100801.txt
+----
+EXCHANGE ID: 1
+----
+SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
     file:fe/target/test-warehouse/alltypes/year=2009/month=7/090701.txt
@@ -203,9 +366,35 @@ SCAN HDFS table=default.alltypes
     file:fe/target/test-warehouse/alltypes/year=2009/month=10/091001.txt
     file:fe/target/test-warehouse/alltypes/year=2009/month=11/091101.txt
     file:fe/target/test-warehouse/alltypes/year=2009/month=12/091201.txt
+----
+EXCHANGE ID: 1
+----
+SCAN HDFS table=default.alltypes
+  PREDICATES: year < 2009
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  FILES:
+    file:fe/target/test-warehouse/alltypes/year=2009/month=7/090701.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=8/090801.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=9/090901.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=10/091001.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=11/091101.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=12/091201.txt
 ====
 # multiple predicates on second key; 2nd one applied as predicate
 select * from alltypes where year < 2010 and month > 6 and month > 8
+----
+SCAN HDFS table=default.alltypes
+  PREDICATES: month > 8
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  FILES:
+    file:fe/target/test-warehouse/alltypes/year=2009/month=7/090701.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=8/090801.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=9/090901.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=10/091001.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=11/091101.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=12/091201.txt
+----
+EXCHANGE ID: 1
 ----
 SCAN HDFS table=default.alltypes
   PREDICATES: month > 8
@@ -249,4 +438,35 @@ SCAN HDFS table=default.alltypes
     file:fe/target/test-warehouse/alltypes/year=2010/month=10/101001.txt
     file:fe/target/test-warehouse/alltypes/year=2010/month=11/101101.txt
     file:fe/target/test-warehouse/alltypes/year=2010/month=12/101201.txt
-# empty file list
+----
+EXCHANGE ID: 1
+----
+SCAN HDFS table=default.alltypes
+  PREDICATES: year - 1 = 2009
+  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  FILES:
+    file:fe/target/test-warehouse/alltypes/year=2009/month=1/090101.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=2/090201.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=3/090301.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=4/090401.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=5/090501.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=6/090601.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=7/090701.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=8/090801.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=9/090901.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=10/091001.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=11/091101.txt
+    file:fe/target/test-warehouse/alltypes/year=2009/month=12/091201.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=1/100101.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=2/100201.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=3/100301.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=4/100401.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=5/100501.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=6/100601.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=7/100701.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=8/100801.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=9/100901.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=10/101001.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=11/101101.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=12/101201.txt
+====

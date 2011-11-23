@@ -2,12 +2,20 @@
 select * from hbasealltypessmall
 ----
 SCAN HBASE table=hbasealltypessmall
-  PREDICATES: 
+----
+EXCHANGE ID: 1
+----
+SCAN HBASE table=hbasealltypessmall
 ====
 # predicate on row key doesn't get transformed into scan parameter, because
 # it's mapped as an int (but stored in ascii and ordered lexicographically)
 select * from hbasealltypessmall
 where id < 5
+----
+SCAN HBASE table=hbasealltypessmall
+  PREDICATES: id < 5
+----
+EXCHANGE ID: 1
 ----
 SCAN HBASE table=hbasealltypessmall
   PREDICATES: id < 5
@@ -21,10 +29,23 @@ SCAN HBASE table=hbasestringids
   START KEY: 5
   STOP KEY: 5\0
   PREDICATES: tinyint_col = 5
+----
+EXCHANGE ID: 1
+----
+SCAN HBASE table=hbasestringids
+  START KEY: 5
+  STOP KEY: 5\0
+  PREDICATES: tinyint_col = 5
 ====
 select * from hbasestringids
 where id > '5'
 and tinyint_col = 5
+----
+SCAN HBASE table=hbasestringids
+  START KEY: 5\0
+  PREDICATES: tinyint_col = 5
+----
+EXCHANGE ID: 1
 ----
 SCAN HBASE table=hbasestringids
   START KEY: 5\0
@@ -37,10 +58,22 @@ and tinyint_col = 5
 SCAN HBASE table=hbasestringids
   START KEY: 5
   PREDICATES: tinyint_col = 5
+----
+EXCHANGE ID: 1
+----
+SCAN HBASE table=hbasestringids
+  START KEY: 5
+  PREDICATES: tinyint_col = 5
 ====
 select * from hbasestringids
 where id < '5'
 and tinyint_col = 5
+----
+SCAN HBASE table=hbasestringids
+  STOP KEY: 5
+  PREDICATES: tinyint_col = 5
+----
+EXCHANGE ID: 1
 ----
 SCAN HBASE table=hbasestringids
   STOP KEY: 5
@@ -53,10 +86,23 @@ and tinyint_col = 5
 SCAN HBASE table=hbasestringids
   STOP KEY: 5\0
   PREDICATES: tinyint_col = 5
+----
+EXCHANGE ID: 1
+----
+SCAN HBASE table=hbasestringids
+  STOP KEY: 5\0
+  PREDICATES: tinyint_col = 5
 ====
 select * from hbasestringids
 where id > '4' and id < '5'
 and tinyint_col = 5
+----
+SCAN HBASE table=hbasestringids
+  START KEY: 4\0
+  STOP KEY: 5
+  PREDICATES: tinyint_col = 5
+----
+EXCHANGE ID: 1
 ----
 SCAN HBASE table=hbasestringids
   START KEY: 4\0
@@ -71,10 +117,24 @@ SCAN HBASE table=hbasestringids
   START KEY: 4
   STOP KEY: 5
   PREDICATES: tinyint_col = 5
+----
+EXCHANGE ID: 1
+----
+SCAN HBASE table=hbasestringids
+  START KEY: 4
+  STOP KEY: 5
+  PREDICATES: tinyint_col = 5
 ====
 select * from hbasestringids
 where id > '4' and id <= '5'
 and tinyint_col = 5
+----
+SCAN HBASE table=hbasestringids
+  START KEY: 4\0
+  STOP KEY: 5\0
+  PREDICATES: tinyint_col = 5
+----
+EXCHANGE ID: 1
 ----
 SCAN HBASE table=hbasestringids
   START KEY: 4\0
@@ -89,6 +149,13 @@ SCAN HBASE table=hbasestringids
   START KEY: 4
   STOP KEY: 5\0
   PREDICATES: tinyint_col = 5
+----
+EXCHANGE ID: 1
+----
+SCAN HBASE table=hbasestringids
+  START KEY: 4
+  STOP KEY: 5\0
+  PREDICATES: tinyint_col = 5
 ====
 # with aggregation
 select int_col, count(*) 
@@ -97,6 +164,18 @@ where id < 5
 group by 1
 ----
 AGGREGATE
+OUTPUT: COUNT(*)
+GROUP BY: int_col
+  SCAN HBASE table=hbasealltypessmall
+    PREDICATES: id < 5
+----
+AGGREGATE
+OUTPUT: SUM(<slot 3>)
+GROUP BY: <slot 2>
+  EXCHANGE ID: 2
+----
+AGGREGATE
+OUTPUT: COUNT(*)
 GROUP BY: int_col
   SCAN HBASE table=hbasealltypessmall
     PREDICATES: id < 5
@@ -106,38 +185,62 @@ select * from hbasealltypessmall where string_col = '4'
 ----
 SCAN HBASE table=hbasealltypessmall
   HBASE FILTERS: strings:string_col EQUAL '4'
-  PREDICATES:   
+----
+EXCHANGE ID: 1
+----
+SCAN HBASE table=hbasealltypessmall
+  HBASE FILTERS: strings:string_col EQUAL '4'
 ====
 # test all comparison ops
 select * from hbasealltypessmall where string_col != '4'
 ----
 SCAN HBASE table=hbasealltypessmall
   HBASE FILTERS: strings:string_col NOT_EQUAL '4'
-  PREDICATES:   
+----
+EXCHANGE ID: 1
+----
+SCAN HBASE table=hbasealltypessmall
+  HBASE FILTERS: strings:string_col NOT_EQUAL '4'
 ====
 select * from hbasealltypessmall where string_col < '4'
 ----
 SCAN HBASE table=hbasealltypessmall
   HBASE FILTERS: strings:string_col LESS '4'
-  PREDICATES:   
+----
+EXCHANGE ID: 1
+----
+SCAN HBASE table=hbasealltypessmall
+  HBASE FILTERS: strings:string_col LESS '4'
 ====
 select * from hbasealltypessmall where string_col > '4'
 ----
 SCAN HBASE table=hbasealltypessmall
   HBASE FILTERS: strings:string_col GREATER '4'
-  PREDICATES:   
+----
+EXCHANGE ID: 1
+----
+SCAN HBASE table=hbasealltypessmall
+  HBASE FILTERS: strings:string_col GREATER '4'
 ====
 select * from hbasealltypessmall where string_col <= '4'
 ----
 SCAN HBASE table=hbasealltypessmall
   HBASE FILTERS: strings:string_col LESS_OR_EQUAL '4'
-  PREDICATES:   
+----
+EXCHANGE ID: 1
+----
+SCAN HBASE table=hbasealltypessmall
+  HBASE FILTERS: strings:string_col LESS_OR_EQUAL '4'
 ====
 select * from hbasealltypessmall where string_col >= '4'
 ----
 SCAN HBASE table=hbasealltypessmall
   HBASE FILTERS: strings:string_col GREATER_OR_EQUAL '4'
-  PREDICATES:   
+----
+EXCHANGE ID: 1
+----
+SCAN HBASE table=hbasealltypessmall
+  HBASE FILTERS: strings:string_col GREATER_OR_EQUAL '4'
 ====
 # test multiple filters
 select * from hbasealltypessmall
@@ -148,10 +251,23 @@ SCAN HBASE table=hbasealltypessmall
     strings:date_string_col EQUAL '04/03/09'
     strings:string_col GREATER_OR_EQUAL '4'
     strings:string_col NOT_EQUAL '2'
-  PREDICATES:   
+----
+EXCHANGE ID: 1
+----
+SCAN HBASE table=hbasealltypessmall
+  HBASE FILTERS: 
+    strings:date_string_col EQUAL '04/03/09'
+    strings:string_col GREATER_OR_EQUAL '4'
+    strings:string_col NOT_EQUAL '2'
 ====
 # mix of predicates and hbase filters
 select * from hbasealltypessmall where string_col = '4' and tinyint_col = 5
+----
+SCAN HBASE table=hbasealltypessmall
+  HBASE FILTERS: strings:string_col EQUAL '4'
+  PREDICATES: tinyint_col = 5  
+----
+EXCHANGE ID: 1
 ----
 SCAN HBASE table=hbasealltypessmall
   HBASE FILTERS: strings:string_col EQUAL '4'
@@ -166,15 +282,33 @@ SCAN HBASE table=hbasestringids
   STOP KEY: 5\0
   HBASE FILTERS: strings:string_col EQUAL '4'
   PREDICATES: tinyint_col = 5  
+----
+EXCHANGE ID: 1
+----
+SCAN HBASE table=hbasestringids
+  START KEY: 4
+  STOP KEY: 5\0
+  HBASE FILTERS: strings:string_col EQUAL '4'
+  PREDICATES: tinyint_col = 5  
 ====
 # predicates involving casts (ie, non-string comparisons) cannot be turned into filters
 select * from hbasealltypessmall where string_col >= 4
 ----
 SCAN HBASE table=hbasealltypessmall
   PREDICATES: string_col >= 4
+----
+EXCHANGE ID: 1
+----
+SCAN HBASE table=hbasealltypessmall
+  PREDICATES: string_col >= 4
 ====
 # non-const comparisons cannot be turned into filters
 select * from hbasealltypessmall where string_col >= date_string_col
+----
+SCAN HBASE table=hbasealltypessmall
+  PREDICATES: string_col >= date_string_col
+----
+EXCHANGE ID: 1
 ----
 SCAN HBASE table=hbasealltypessmall
   PREDICATES: string_col >= date_string_col

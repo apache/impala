@@ -188,6 +188,21 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       }
       return "substmap(" + Joiner.on(" ").join(output) + ")";
     }
+
+    /**
+     * Create combined map which is equivalent to applying f followed by g.
+     */
+    public static SubstitutionMap combine(SubstitutionMap f, SubstitutionMap g) {
+      SubstitutionMap result = new SubstitutionMap();
+      // f's substitution targets need to be substituted via g
+      result.lhs = Expr.cloneList(f.lhs, null);
+      result.rhs = Expr.cloneList(f.rhs, g);
+      // substitution maps are cumulative: the combined map contains all
+      // substitutions from f and g
+      result.lhs.addAll(Expr.cloneList(g.lhs, null));
+      result.rhs.addAll(Expr.cloneList(g.rhs, null));
+      return result;
+    }
   }
 
   /**
@@ -213,7 +228,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
-   * Create a deep copy of 'l'. If substMap is non-null, use it to substitute the elements of l.
+   * Create a deep copy of 'l'. If substMap is non-null, use it to substitute the
+   * elements of l.
    * @param <C>
    * @param l
    * @param substMap
@@ -456,8 +472,10 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    *         The possibly changed compatibleType
    *         (if a string literal forced casting the other operand)
    */
-  public PrimitiveType castBinaryOp(PrimitiveType compatibleType) throws AnalysisException {
-    Preconditions.checkState(this instanceof BinaryPredicate || this instanceof ArithmeticExpr);
+  public PrimitiveType castBinaryOp(PrimitiveType compatibleType)
+      throws AnalysisException {
+    Preconditions.checkState(
+        this instanceof BinaryPredicate || this instanceof ArithmeticExpr);
     PrimitiveType t1 = getChild(0).getType();
     PrimitiveType t2 = getChild(1).getType();
     // Convert string literals if the other operand is numeric,

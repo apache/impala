@@ -415,17 +415,27 @@ public class AnalyzerTest {
         "aggregation function not allowed in WHERE clause");
 
     // only count() allows '*'
-    AnalysisError("select avg(*) from testtbl", "'*' can only be used in conjunction with COUNT");
-    AnalysisError("select min(*) from testtbl", "'*' can only be used in conjunction with COUNT");
-    AnalysisError("select max(*) from testtbl", "'*' can only be used in conjunction with COUNT");
-    AnalysisError("select sum(*) from testtbl", "'*' can only be used in conjunction with COUNT");
+    AnalysisError("select avg(*) from testtbl",
+        "'*' can only be used in conjunction with COUNT");
+    AnalysisError("select min(*) from testtbl",
+        "'*' can only be used in conjunction with COUNT");
+    AnalysisError("select max(*) from testtbl",
+        "'*' can only be used in conjunction with COUNT");
+    AnalysisError("select sum(*) from testtbl",
+        "'*' can only be used in conjunction with COUNT");
 
     // multiple args
     AnalyzesOk("select count(id, zip) from testtbl");
-    AnalysisError("select min(id, zip) from testtbl", "MIN requires exactly one parameter");
-    AnalysisError("select max(id, zip) from testtbl", "MAX requires exactly one parameter");
-    AnalysisError("select sum(id, zip) from testtbl", "SUM requires exactly one parameter");
-    AnalysisError("select avg(id, zip) from testtbl", "AVG requires exactly one parameter");
+    AnalysisError("select count(distinct id, zip) from testtbl",
+        "DISTINCT not implemented: COUNT(DISTINCT id, zip)");
+    AnalysisError("select min(id, zip) from testtbl",
+        "MIN requires exactly one parameter");
+    AnalysisError("select max(id, zip) from testtbl",
+        "MAX requires exactly one parameter");
+    AnalysisError("select sum(id, zip) from testtbl",
+        "SUM requires exactly one parameter");
+    AnalysisError("select avg(id, zip) from testtbl",
+        "AVG requires exactly one parameter");
 
     // nested aggregates
     AnalysisError("select sum(count(*)) from testtbl",

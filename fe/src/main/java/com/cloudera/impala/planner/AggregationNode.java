@@ -25,6 +25,10 @@ public class AggregationNode extends PlanNode {
     this.rowTupleIds.add(aggInfo.getAggTupleId());
   }
 
+  public AggregateInfo getAggInfo() {
+    return aggInfo;
+  }
+
   @Override
   protected String debugString() {
     return Objects.toStringHelper(this)
@@ -47,15 +51,18 @@ public class AggregationNode extends PlanNode {
 
   @Override
   protected String getExplainString(String prefix) {
-    StringBuilder output = new StringBuilder();
-    output.append(prefix + "AGGREGATE\n");
-    output.append(prefix + "GROUP BY: ");
-    output.append(getExplainString(aggInfo.getGroupingExprs()) + "\n");
+    StringBuilder output = new StringBuilder()
+        .append(prefix + "AGGREGATE\n")
+        .append(prefix + "OUTPUT: ")
+        .append(getExplainString(aggInfo.getAggregateExprs()) + "\n")
+        .append(prefix + "GROUP BY: ")
+        .append(getExplainString(aggInfo.getGroupingExprs()) + "\n");
     if (!conjuncts.isEmpty()) {
-      output.append(prefix + "HAVING: ");
-      output.append(getExplainString(conjuncts) + "\n");
+      output.append(prefix + "HAVING: ")
+          .append(getExplainString(conjuncts) + "\n");
     }
-    output.append(getChild(0).getExplainString(prefix + "  "));
+    output.append(super.getExplainString(prefix))
+        .append(getChild(0).getExplainString(prefix + "  "));
     return output.toString();
   }
 }

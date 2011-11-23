@@ -3,12 +3,20 @@ from testtbl
 order by name
 limit 1
 ----
-TOP-N (1)
+TOP-N
 ORDER BY: name ASC
-  SCAN HDFS table=default.testtbl
-    PREDICATES: 
-    FILES:
 LIMIT: 1
+  SCAN HDFS table=default.testtbl
+    FILES:
+----
+TOP-N
+ORDER BY: name ASC
+LIMIT: 1
+  EXCHANGE ID: 1
+----
+SCAN HDFS table=default.testtbl
+  FILES:
+  LIMIT: 1
 ====
 select zip, count(*)
 from testtbl
@@ -17,14 +25,31 @@ group by 1
 order by 2 desc
 limit 10
 ----
-TOP-N (10)
+TOP-N
 ORDER BY: <slot 3> DESC
+LIMIT: 10
   AGGREGATE
+  OUTPUT: COUNT(*)
   GROUP BY: zip
     SCAN HDFS table=default.testtbl
       PREDICATES: name LIKE 'm%'
       FILES:
+----
+TOP-N
+ORDER BY: <slot 3> DESC
 LIMIT: 10
+  AGGREGATE
+  OUTPUT: SUM(<slot 3>)
+  GROUP BY: <slot 2>
+    EXCHANGE ID: 2
+----
+AGGREGATE
+OUTPUT: COUNT(*)
+GROUP BY: zip
+LIMIT: 10
+  SCAN HDFS table=default.testtbl
+    PREDICATES: name LIKE 'm%'
+    FILES:
 ====
 select int_col, sum(float_col) 
 from hbasealltypessmall
@@ -33,13 +58,29 @@ group by 1
 order by 2
 limit 4
 ----
-TOP-N (4)
+TOP-N
 ORDER BY: <slot 4> ASC
+LIMIT: 4
   AGGREGATE
+  OUTPUT: SUM(float_col)
   GROUP BY: int_col
     SCAN HBASE table=hbasealltypessmall
       PREDICATES: id < 5
+----
+TOP-N
+ORDER BY: <slot 4> ASC
 LIMIT: 4
+  AGGREGATE
+  OUTPUT: SUM(<slot 4>)
+  GROUP BY: <slot 3>
+    EXCHANGE ID: 2
+----
+AGGREGATE
+OUTPUT: SUM(float_col)
+GROUP BY: int_col
+LIMIT: 4
+  SCAN HBASE table=hbasealltypessmall
+    PREDICATES: id < 5
 ====
 select int_col, sum(float_col), min(float_col) 
 from hbasealltypessmall
@@ -47,12 +88,25 @@ group by 1
 order by 2,3 desc
 limit 0
 ----
-TOP-N (0)
-ORDER BY: <slot 3> ASC
-, <slot 4> DESC
+TOP-N
+ORDER BY: <slot 3> ASC, <slot 4> DESC
+LIMIT: 0
   AGGREGATE
+  OUTPUT: SUM(float_col), MIN(float_col)
   GROUP BY: int_col
     SCAN HBASE table=hbasealltypessmall
-      PREDICATES: 
+----
+TOP-N
+ORDER BY: <slot 3> ASC, <slot 4> DESC
 LIMIT: 0
+  AGGREGATE
+  OUTPUT: SUM(<slot 3>), MIN(<slot 4>)
+  GROUP BY: <slot 2>
+    EXCHANGE ID: 2
+----
+AGGREGATE
+OUTPUT: SUM(float_col), MIN(float_col)
+GROUP BY: int_col
+LIMIT: 0
+  SCAN HBASE table=hbasealltypessmall
 ====

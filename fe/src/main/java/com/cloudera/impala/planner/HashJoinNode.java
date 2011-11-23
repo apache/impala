@@ -92,24 +92,26 @@ public class HashJoinNode extends PlanNode {
 
   @Override
   protected String getExplainString(String prefix) {
-    StringBuilder output = new StringBuilder();
-    output.append(prefix + "HASH JOIN\n");
-    output.append(prefix + "  JOIN OP: " + joinOp.toString() + "\n");
-    output.append(prefix + "  HASH PREDICATES:");
+    StringBuilder output = new StringBuilder()
+        .append(prefix + "HASH JOIN\n")
+        .append(prefix + "  JOIN OP: " + joinOp.toString() + "\n")
+        .append(prefix + "  HASH PREDICATES:");
     for (Pair<Expr, Expr> entry: eqJoinConjuncts) {
       output.append(
           "\n" + prefix + "  " + entry.first.toSql() + " = " + entry.second.toSql());
     }
+    output.append("\n");
     if (!otherJoinConjuncts.isEmpty()) {
-      output.append("\n" + prefix + "  OTHER JOIN PREDICATES: ");
-      output.append(getExplainString(otherJoinConjuncts));
+      output.append(prefix + "  OTHER JOIN PREDICATES: ")
+          .append(getExplainString(otherJoinConjuncts) + "\n");
     }
     if (!conjuncts.isEmpty()) {
-      output.append("\n" + prefix + "  OTHER PREDICATES: ");
-      output.append(getExplainString(conjuncts));
+      output.append(prefix + "  OTHER PREDICATES: ")
+          .append(getExplainString(conjuncts) + "\n");
     }
-    output.append("\n" + getChild(0).getExplainString(prefix + "    "));
-    output.append("\n" + getChild(1).getExplainString(prefix + "    "));
+    output.append(super.getExplainString(prefix))
+        .append(getChild(0).getExplainString(prefix + "    "))
+        .append(getChild(1).getExplainString(prefix + "    "));
     return output.toString();
   }
 }

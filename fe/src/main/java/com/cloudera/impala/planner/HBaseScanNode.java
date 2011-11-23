@@ -136,7 +136,8 @@ public class HBaseScanNode extends ScanNode {
   }
 
   @Override
-  public void getScanParams(List<TScanRange> scanRanges, List<String> hosts) {
+  public void getScanParams(
+      int numPartitions, List<TScanRange> scanRanges, List<String> hosts) {
     TScanRange scanRange = new TScanRange(id);
     if (startKey != null || stopKey != null) {
       THBaseKeyRange keyRange = new THBaseKeyRange();
@@ -154,8 +155,8 @@ public class HBaseScanNode extends ScanNode {
   @Override
   protected String getExplainString(String prefix) {
     HBaseTable tbl = (HBaseTable) desc.getTable();
-    StringBuilder output = new StringBuilder();
-    output.append(prefix + "SCAN HBASE table=" + tbl.getName() + "\n");
+    StringBuilder output = new StringBuilder()
+        .append(prefix + "SCAN HBASE table=" + tbl.getName() + "\n");
     if (startKey != null) {
       output.append(prefix + "  START KEY: " + printKey(startKey) + "\n");
     }
@@ -179,7 +180,10 @@ public class HBaseScanNode extends ScanNode {
       }
       output.append('\n');
     }
-    output.append(prefix + "  PREDICATES: " + getExplainString(conjuncts));
+    if (!conjuncts.isEmpty()) {
+      output.append(prefix + "  PREDICATES: " + getExplainString(conjuncts));
+    }
+    output.append(super.getExplainString(prefix));
     return output.toString();
   }
 

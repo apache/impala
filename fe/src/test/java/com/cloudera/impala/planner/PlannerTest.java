@@ -21,6 +21,7 @@ import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.testutil.TestFileParser;
 import com.cloudera.impala.testutil.TestUtils;
+import com.cloudera.impala.thrift.Constants;
 import com.google.common.collect.Lists;
 
 public class PlannerTest {
@@ -38,20 +39,26 @@ public class PlannerTest {
     testErrorLog = new StringBuilder();
   }
 
-  private void RunQuery(String query, ArrayList<String> expectedPlan,
-                        StringBuilder errorLog) {
+  private void RunQuery(String query, int numNodes, TestFileParser parser,
+                        int sectionStartIdx, StringBuilder errorLog) {
     try {
       LOG.info("running query " + query);
       AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
       Planner planner = new Planner();
       List<PlanNode> planFragments = Lists.newArrayList();
       planner.createPlanFragments(
-          analysisResult.selectStmt, analysisResult.analyzer, 1, planFragments);
-      PlanNode plan = planFragments.get(0);
-      LOG.info(plan.getExplainString());
-      String result = TestUtils.compareOutput(plan.getExplainString().split("\n"), expectedPlan);
-      if (!result.isEmpty()) {
-        errorLog.append("query:\n" + query + "\n" + result);
+          analysisResult.selectStmt, analysisResult.analyzer, numNodes, planFragments);
+      for (int i = 0; i < planFragments.size(); ++i) {
+        PlanNode fragment = planFragments.get(i);
+        String explainString = fragment.getExplainString();
+        LOG.info(explainString);
+        ArrayList<String> expectedPlan = parser.getExpectedResult(sectionStartIdx + i);
+        String result = TestUtils.compareOutput(explainString.split("\n"), expectedPlan);
+        if (!result.isEmpty()) {
+          errorLog.append(
+              "section " + Integer.toString(sectionStartIdx + i) + " of query:\n"
+              + query + "\n" + result);
+        }
       }
     } catch (AnalysisException e) {
       errorLog.append("query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
@@ -91,11 +98,16 @@ public class PlannerTest {
     while (queryFileParser.hasNext()) {
       queryFileParser.next();
       String query = queryFileParser.getQuery();
+      // each planner test case contains multiple result sections:
+      // - the first one is for the single-node plan
+      // - the subsequent ones are for distributed plans; there is one
+      //   section per plan fragment produced by the planner
       ArrayList<String> plan = queryFileParser.getExpectedResult(0);
       if (plan.size() > 0 && plan.get(0).toLowerCase().startsWith("not implemented")) {
         RunUnimplementedQuery(query, errorLog);
       } else {
-        RunQuery(query, plan, errorLog);
+        RunQuery(query, 1, queryFileParser, 0, errorLog);
+        RunQuery(query, Constants.NUM_NODES_ALL, queryFileParser, 1, errorLog);
       }
     }
     queryFileParser.close();

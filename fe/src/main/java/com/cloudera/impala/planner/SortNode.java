@@ -64,7 +64,7 @@ public class SortNode extends PlanNode {
   protected String getExplainString(String prefix) {
     StringBuilder output = new StringBuilder();
     if (useTopN) {
-      output.append(prefix + "TOP-N (" + limit + ")\n");
+      output.append(prefix + "TOP-N\n");
     } else {
       output.append(prefix + "SORT\n");
     }
@@ -80,8 +80,8 @@ public class SortNode extends PlanNode {
       }
       output.append(expr.next().toSql() + " ");
       output.append(isAsc.next() ? "ASC" : "DESC");
-      output.append("\n");
     }
+    output.append("\n" + super.getExplainString(prefix));
     output.append(getChild(0).getExplainString(prefix + "  "));
     return output.toString();
   }
