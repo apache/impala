@@ -38,10 +38,7 @@ target_link_libraries(backend
 add_executable(runquery 
   run-query.cc
 )
-# Don't link this against hdfs_libs or java_jvm_library;
-# we need to avoid jni calls in order to be able to run under gdb,
-# and MockHdfs contains a mock libhdfs implementation.
-# Also, make sure to specify link libraries in reverse order of dependency
+# Make sure to specify link libraries in reverse order of dependency
 # (ie, if libA uses symbols from libB, libA must precede libB), otherwise
 # when linking statically the linker won't look for the needed symbols.
 # TODO: is there a better way to specify link dependencies without having to
@@ -62,7 +59,6 @@ target_link_libraries(runquery
   Util
   thrift
   ImpalaThrift
-  MockHdfs
   ${Boost_LIBRARIES}  
   gflagsstatic
 )

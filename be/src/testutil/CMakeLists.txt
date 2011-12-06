@@ -8,10 +8,6 @@ set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/testutil")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/testutil")
 
-add_library(MockHdfs STATIC
-  mock-hdfs.cc
-)
-
 add_library(TestUtil STATIC
   query-executor.cc  
 )

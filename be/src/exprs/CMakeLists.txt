@@ -54,7 +54,6 @@ target_link_libraries(expr-test
   Util
   thrift
   ImpalaThrift
-  MockHdfs
   gtest
   ${Boost_LIBRARIES}
 )
