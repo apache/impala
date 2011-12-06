@@ -83,7 +83,7 @@ public class CatalogTest {
     assertNotNull(testDb);
     assertEquals(testDb.getName(), "testdb1");
 
-    assertEquals(23, defaultDb.getTables().size());
+    assertEquals(25, defaultDb.getTables().size());
     assertNotNull(defaultDb.getTable("alltypes"));
     assertNotNull(defaultDb.getTable("alltypes_rc"));
     assertNotNull(defaultDb.getTable("alltypessmall"));
@@ -107,6 +107,8 @@ public class CatalogTest {
     assertNotNull(defaultDb.getTable("hbasealltypeserrornonulls"));
     assertNotNull(defaultDb.getTable("hbasealltypesagg"));
     assertNotNull(defaultDb.getTable("hbasestringids"));
+    assertNotNull(defaultDb.getTable("greptiny"));
+    assertNotNull(defaultDb.getTable("grep1gb"));
 
     // testdb contains tables alltypes and testtbl.
     assertEquals(2, testDb.getTables().size());
@@ -238,6 +240,18 @@ public class CatalogTest {
            PrimitiveType.FLOAT, PrimitiveType.BIGINT, PrimitiveType.INT,
            PrimitiveType.SMALLINT, PrimitiveType.TINYINT, PrimitiveType.STRING,
            PrimitiveType.STRING});
+
+    checkTableCols(defaultDb, "greptiny", 0,
+        new String[]
+          {"field"},
+        new PrimitiveType[]
+          {PrimitiveType.STRING});
+
+    checkTableCols(defaultDb, "grep1gb", 1,
+        new String[]
+          {"chunk", "field"},
+        new PrimitiveType[]
+          {PrimitiveType.INT, PrimitiveType.STRING});
 
     // case-insensitive lookup
     assertEquals(defaultDb.getTable("alltypes"), defaultDb.getTable("AllTypes"));

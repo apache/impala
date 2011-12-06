@@ -262,3 +262,13 @@ WITH SERDEPROPERTIES (
   ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col"
 )
 TBLPROPERTIES("hbase.table.name" = "hbasealltypesagg");
+
+DROP TABLE IF EXISTS GrepTiny;
+CREATE TABLE GrepTiny (
+  field string);
+
+DROP TABLE IF EXISTS Grep1GB;
+CREATE TABLE Grep1GB (
+  field string)
+partitioned by (chunk int);
+
