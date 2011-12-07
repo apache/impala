@@ -6,18 +6,23 @@
 
 #include "runtime/mem-pool.h"
 #include "runtime/string-value.h"
-#include "gen-cpp/Data_types.h"
 
 using namespace std;
 
 namespace impala {
 
+RowBatch::~RowBatch() {
+  delete [] tuple_ptrs_;
+}
+
 void RowBatch::Serialize(TRowBatch* output_batch) {
+  // why does Thrift not generate a Clear() function?
+  output_batch->row_tuples.clear();
+  output_batch->tuple_offsets.clear();
+  output_batch->tuple_data.clear();
+
   output_batch->num_rows = num_rows_;
-  output_batch->row_tuples.reserve(descriptors_.size());
-  for (int i = 0; i < descriptors_.size(); ++i) {
-    output_batch->row_tuples.push_back(descriptors_[i]->id());
-  }
+  row_desc_.ToThrift(&output_batch->row_tuples);
   output_batch->tuple_offsets.reserve(num_rows_ * num_tuples_per_row_);
   MemPool output_pool;
 
@@ -28,8 +33,9 @@ void RowBatch::Serialize(TRowBatch* output_batch) {
   // string pointers into offset in the process)
   for (int i = 0; i < num_rows_; ++i) {
     TupleRow* row = GetRow(i);
-    vector<TupleDescriptor*>::const_iterator desc = descriptors_.begin();
-    for (int j = 0; desc != descriptors_.end(); ++desc, ++j) {
+    const vector<TupleDescriptor*>& tuple_descs = row_desc_.tuple_descriptors();
+    vector<TupleDescriptor*>::const_iterator desc = tuple_descs.begin();
+    for (int j = 0; desc != tuple_descs.end(); ++desc, ++j) {
       if (row->GetTuple(j) == NULL) {
         // NULLs are encoded as -1
         output_batch->tuple_offsets.push_back(-1);
@@ -89,13 +95,10 @@ RowBatch::RowBatch(const DescriptorTbl& desc_tbl, TRowBatch* input_batch)
     num_rows_(input_batch->num_rows),
     capacity_(num_rows_),
     num_tuples_per_row_(input_batch->row_tuples.size()),
+    row_desc_(desc_tbl, input_batch->row_tuples),
     tuple_ptrs_(new Tuple*[num_rows_ * input_batch->row_tuples.size()]),
+    thrift_batch_(input_batch),
     tuple_data_pool_(new MemPool(&input_batch->tuple_data)) {
-  // populate descriptors_
-  for (int i = 0; i < input_batch->row_tuples.size(); ++i) {
-    descriptors_.push_back(desc_tbl.GetTupleDescriptor(input_batch->row_tuples[i]));
-  }
-
   // convert input_batch->tuple_offsets into pointers
   int tuple_idx = 0;
   for (vector<int32_t>::iterator offset = input_batch->tuple_offsets.begin();
@@ -110,8 +113,9 @@ RowBatch::RowBatch(const DescriptorTbl& desc_tbl, TRowBatch* input_batch)
 
   // check whether we have string slots
   bool has_string_slots = false;
-  for (int i = 0; i < descriptors_.size(); ++i) {
-    if (!descriptors_[i]->string_slots().empty()) {
+  const vector<TupleDescriptor*>& tuple_descs = row_desc_.tuple_descriptors();
+  for (int i = 0; i < tuple_descs.size(); ++i) {
+    if (!tuple_descs[i]->string_slots().empty()) {
       has_string_slots = true;
       break;
     }
@@ -121,8 +125,8 @@ RowBatch::RowBatch(const DescriptorTbl& desc_tbl, TRowBatch* input_batch)
   // convert strings offsets contained in tuple data into pointers
   for (int i = 0; i < num_rows_; ++i) {
     TupleRow* row = GetRow(i);
-    vector<TupleDescriptor*>::const_iterator desc = descriptors_.begin();
-    for (int j = 0; desc != descriptors_.end(); ++desc, ++j) {
+    vector<TupleDescriptor*>::const_iterator desc = tuple_descs.begin();
+    for (int j = 0; desc != tuple_descs.end(); ++desc, ++j) {
       if ((*desc)->string_slots().empty()) continue;
       Tuple* t = row->GetTuple(j);
       if (t == NULL) continue;
@@ -136,6 +140,14 @@ RowBatch::RowBatch(const DescriptorTbl& desc_tbl, TRowBatch* input_batch)
       }
     }
   }
+}
+
+int RowBatch::GetBatchSize(TRowBatch* batch) {
+  int result = 0;
+  for (int i = 0; i < batch->tuple_data.size(); ++i) {
+    result += batch->tuple_data[i].size();
+  }
+  return result;
 }
 
 }

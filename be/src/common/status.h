@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "gen-cpp/Types_types.h"  // for TStatus
+
 namespace impala {
 
 // Status is used as a function return type to indicate success or failure
@@ -37,17 +39,30 @@ class Status {
   // copy c'tor makes copy of error detail so Status can be returned by value
   Status(const Status& status);
 
+  // same as copy c'tor
+  Status& operator=(const Status& status);
+
+  // "Copy" c'tor from TStatus.
+  // TODO: adopt the status code
+  Status(const TStatus& status);
+
+  // same as previous c'tor
+  Status& operator=(const TStatus& status);
+
   // assign from stringstream
   Status& operator=(const std::stringstream& stream);
 
   ~Status();
 
-  bool ok() { return error_detail_ == NULL; }
+  bool ok() const { return error_detail_ == NULL; }
 
   void AddErrorMsg(const std::string& msg);
 
   // Return all accumulated error msgs.
   void GetErrorMsgs(std::vector<std::string>* msgs) const;
+
+  // Convert into TStatus.
+  void ToThrift(TStatus* status);
 
   // Return all accumulated error msgs in a single string.
   void GetErrorMsg(std::string* msg) const;

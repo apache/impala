@@ -10,11 +10,11 @@
 
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
+#include "gen-cpp/Data_types.h"  // scoped_ptr wants to see TRowBatch
 
 namespace impala {
 
 class TupleDescriptor;
-class TRowBatch;
 
 // A RowBatch encapsulates a batch of rows, each composed of a number of tuples. 
 // The maximum number of rows is fixed at the time of construction, and the caller
@@ -22,31 +22,31 @@ class TRowBatch;
 // TODO: stick tuple_ptrs_ into a pool?
 class RowBatch {
  public:
-  // Create RowBatch for for num_rows rows of tuples specified by 'descriptors'.
-  RowBatch(const std::vector<TupleDescriptor*>& descriptors, int capacity)
+  // Create RowBatch for a maximum of 'capacity' rows of tuples specified
+  // by 'row_desc'.
+  RowBatch(const RowDescriptor& row_desc, int capacity)
     : has_in_flight_row_(false),
       is_self_contained_(false),
       num_rows_(0),
       capacity_(capacity),
-      descriptors_(descriptors),
-      num_tuples_per_row_(descriptors.size()),
+      num_tuples_per_row_(row_desc.tuple_descriptors().size()),
+      row_desc_(row_desc),
       tuple_ptrs_(new Tuple*[capacity_ * num_tuples_per_row_]),
+      thrift_batch_(NULL),
       tuple_data_pool_(new MemPool()) {
-    DCHECK(!descriptors.empty());
     DCHECK_GT(capacity, 0);
   }
 
   // Populate a row batch from input_batch by turning input_batch's
   // tuple_data into the row batch's mempool and converting all offsets
-  // in the data back into pointers. The row batch will be self-contained after the call.
-  // input_batch must not be deallocated during the lifetime of this RowBatch.
+  // in the data back into pointers. The row batch will be self-contained after the call
+  // and takes ownership of input_batch; input_batch must not be deallocated after
+  // calling this c'tor (it will be destroyed in ~RowBatch()).
   // TODO: figure out how to transfer the data from input_batch to this RowBatch
   // (so that we don't need to hang on to input_batch)
   RowBatch(const DescriptorTbl& desc_tbl, TRowBatch* input_batch);
 
-  ~RowBatch() {
-    delete [] tuple_ptrs_;
-  }
+  ~RowBatch();
 
   static const int INVALID_ROW_INDEX = -1;
 
@@ -113,11 +113,11 @@ class RowBatch {
   // after copying the data to TRowBatch.
   void Serialize(TRowBatch* output_batch);
 
+  // utility function: return total tuple data size of 'batch'.
+  static int GetBatchSize(TRowBatch* batch);
+
   int num_rows() const { return num_rows_; }
   int capacity() const { return capacity_; }
-
-  // Return true if end-of-stream condition of ExecNode::GetNext() is met.
-  bool eos() const { return num_rows_ == 0 || num_rows_ < capacity_; }
 
   // A self-contained row batch contains all of the tuple data it references
   // in tuple_data_pool_. The creator of the row batch needs to decide whether
@@ -126,19 +126,22 @@ class RowBatch {
   bool is_self_contained() const { return is_self_contained_; }
   void set_is_self_contained(bool v) { is_self_contained_ = v; }
 
-  const std::vector<TupleDescriptor*>& descs() const { return descriptors_; }
+  const RowDescriptor& row_desc() const { return row_desc_; }
 
  private:
   bool has_in_flight_row_;  // if true, last row hasn't been committed yet
   bool is_self_contained_;  // if true, contains all ref'd data in tuple_data_pool_
   int num_rows_;  // # of committed rows
   int capacity_;  // maximum # of rows
-  std::vector<TupleDescriptor*> descriptors_;
   int num_tuples_per_row_;
+  RowDescriptor row_desc_;
 
   // array of pointers (w/ capacity_ * num_tuples_per_row_ elements)
   // TODO: replace w/ tr1 array?
   Tuple** tuple_ptrs_;
+
+  // if set, contains data that we reference
+  boost::scoped_ptr<TRowBatch> thrift_batch_;
 
   // holding (some of the) data referenced by rows
   boost::scoped_ptr<MemPool> tuple_data_pool_;

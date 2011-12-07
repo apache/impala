@@ -13,6 +13,7 @@ struct Status::ErrorDetail {
   vector<string> error_msgs;
 
   ErrorDetail(const string& msg): error_msgs(1, msg) {}
+  ErrorDetail(const vector<string>& msgs): error_msgs(msgs) {}
 };
 
 const Status Status::OK;
@@ -26,6 +27,31 @@ Status::Status(const Status& status)
       status.error_detail_ != NULL
         ? new ErrorDetail(*status.error_detail_)
         : NULL) {
+}
+
+Status& Status::operator=(const Status& status) {
+  delete error_detail_;
+  if (status.error_detail_ == NULL) {
+    error_detail_ = NULL;
+  } else {
+    error_detail_ = new ErrorDetail(*status.error_detail_);
+  }
+  return *this;
+}
+
+Status::Status(const TStatus& status)
+  : error_detail_(
+      status.error_msgs.empty() ? NULL : new ErrorDetail(status.error_msgs)) {
+}
+
+Status& Status::operator=(const TStatus& status) {
+  delete error_detail_;
+  if (status.status_code == 0) {
+    error_detail_ = NULL;
+  } else {
+    error_detail_ = new ErrorDetail(status.error_msgs);
+  }
+  return *this;
 }
 
 Status::~Status() {
@@ -50,6 +76,19 @@ string Status::GetErrorMsg() const {
   string msg;
   GetErrorMsg(&msg);
   return msg;
+}
+
+void Status::ToThrift(TStatus* status) {
+  status->error_msgs.clear();
+  if (error_detail_ == NULL) {
+    status->status_code = 0;
+  } else {
+    // TODO: use codes in Status::ErrorDetail, similar to java exception types
+    status->status_code = 1;
+    for (int i = 0; i < error_detail_->error_msgs.size(); ++i) {
+      status->error_msgs.push_back(error_detail_->error_msgs[i]);
+    }
+  }
 }
 
 }

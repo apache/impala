@@ -64,8 +64,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
       new HashTable(build_exprs_, probe_exprs_, child(1)->row_desc(), 0, false));
   TupleDescriptor* build_tuple_desc = child(1)->row_desc().tuple_descriptors()[0];
   build_tuple_idx_ = row_descriptor_.GetTupleIdx(build_tuple_desc->id());
-  probe_batch_.reset(
-      new RowBatch(row_descriptor_.tuple_descriptors(), state->batch_size()));
+  probe_batch_.reset(new RowBatch(row_descriptor_, state->batch_size()));
   return Status::OK;
 }
 
@@ -73,11 +72,11 @@ Status HashJoinNode::Open(RuntimeState* state) {
   eos_ = false;
 
   // do a full scan of child(1) and store everything in hash_tbl_
-  RowBatch build_batch(
-      child(1)->row_desc().tuple_descriptors(), state->batch_size());
+  RowBatch build_batch(child(1)->row_desc(), state->batch_size());
   RETURN_IF_ERROR(child(1)->Open(state));
   while (true) {
-    RETURN_IF_ERROR(child(1)->GetNext(state, &build_batch));
+    bool eos;
+    RETURN_IF_ERROR(child(1)->GetNext(state, &build_batch, &eos));
     // take ownership of tuple data of build_batch
     build_pool_->AcquireData(build_batch.tuple_data_pool(), false);
 
@@ -90,7 +89,7 @@ Status HashJoinNode::Open(RuntimeState* state) {
       VLOG(1) << hash_tbl_->DebugString();
     }
 
-    if (build_batch.num_rows() < build_batch.capacity()) break;
+    if (eos) break;
     build_batch.Reset();
   }
   RETURN_IF_ERROR(child(1)->Close(state));
@@ -100,7 +99,8 @@ Status HashJoinNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(child(0)->Open(state));
 
   // seed probe batch and current_probe_row_, etc.
-  RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get()));
+  bool dummy;
+  RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &dummy));
   probe_batch_pos_ = 0;
   if (probe_batch_->num_rows() == 0) {
     eos_ = true;
@@ -130,8 +130,12 @@ inline TupleRow* HashJoinNode::CreateOutputRow(
   return out_row;
 }
 
-Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch) {
-  if (ReachedLimit()) return Status::OK;
+Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos) {
+  if (ReachedLimit()) {
+    *eos = true;
+    return Status::OK;
+  }
+
   while (!eos_) {
     Tuple* tuple;
     // create output rows as long as:
@@ -154,7 +158,10 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch) {
         out_batch->CommitLastRow();
         VLOG(1) << "match row: " << PrintRow(out_row, row_desc());
         ++num_rows_returned_;
-        if (out_batch->IsFull() || ReachedLimit()) return Status::OK;
+        if (out_batch->IsFull() || ReachedLimit()) {
+          *eos = ReachedLimit();
+          return Status::OK;
+        }
       }
       if (match_one_build_) break;
     }
@@ -168,7 +175,10 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch) {
         VLOG(1) << "match row: " << PrintRow(out_row, row_desc());
         ++num_rows_returned_;
         matched_probe_ = true;
-        if (out_batch->IsFull() || ReachedLimit()) return Status::OK;
+        if (out_batch->IsFull() || ReachedLimit()) {
+          *eos = ReachedLimit();
+          return Status::OK;
+        }
       }
     }
 
@@ -180,7 +190,8 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch) {
       } else {
         // pass on pools, out_batch might still need them
         probe_batch_->TransferTupleDataOwnership(out_batch);
-        RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get()));
+        bool dummy;  // we ignore eos and use the # of returned rows instead
+        RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &dummy));
         probe_batch_pos_ = 0;
         if (probe_batch_->num_rows() == 0) {
           // we're done; don't exit here, we might still need to finish up an outer join
@@ -200,6 +211,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch) {
     hash_tbl_->Scan(current_probe_row_, &hash_tbl_iterator_);
   }
 
+  *eos = true;
   if (match_all_build_) {
     // output remaining unmatched build rows
     Tuple* tuple;
@@ -210,9 +222,14 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch) {
         out_batch->CommitLastRow();
         VLOG(1) << "match row: " << PrintRow(out_row, row_desc());
         ++num_rows_returned_;
-        if (ReachedLimit()) return Status::OK;
+        if (ReachedLimit()) {
+          *eos = true;
+          return Status::OK;
+        }
       }
     }
+    // we're done if there are no more tuples left to check
+    *eos = tuple == NULL;
   }
   return Status::OK;
 }

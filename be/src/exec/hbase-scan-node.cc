@@ -99,8 +99,11 @@ void HBaseScanNode::WriteTextSlot(
   }
 }
 
-Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
-  if (ReachedLimit()) return Status::OK;
+Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  if (ReachedLimit()) {
+    *eos = true;
+    return Status::OK;
+  }
 
   // create new tuple buffer for row_batch
   tuple_buffer_size_ = row_batch->capacity() * tuple_desc_->byte_size();
@@ -117,7 +120,8 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
     if (ReachedLimit() || row_batch->IsFull()) {
       // hang on to last allocated chunk in pool, we'll keep writing into it in the
       // next GetNext() call
-      row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), true);
+      row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), !ReachedLimit());
+      *eos = ReachedLimit();
       return Status::OK;
     }
     RETURN_IF_ERROR(hbase_scanner_->Next(&has_next));
@@ -128,6 +132,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
         state->ReportFileErrors(hbase_table->table_name(), num_errors_);
       }
       row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), false);
+      *eos = true;
       return Status::OK;
     }
 
@@ -161,6 +166,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
             value, value_length, sorted_non_key_slots_[i], state, &error_in_row);
       }
     }
+
     // Error logging: Flush error stream and add name of HBase table and current row key.
     if (error_in_row) {
       error_in_row = false;
@@ -178,9 +184,11 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
         state->ReportFileErrors(table_name_, 1);
         hbase_scanner_->ReleaseBuffer();
         return Status(
-            "Aborted HBaseScanNode due to conversion errors. View error log for details.");
+            "Aborted HBaseScanNode due to conversion errors. View error log "
+            "for details.");
       }
     }
+
     if (EvalConjuncts(row)) {
       row_batch->CommitLastRow();
       ++num_rows_returned_;

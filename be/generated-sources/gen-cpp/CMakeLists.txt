@@ -18,6 +18,8 @@ add_library(ImpalaThrift
   ImpalaService.cpp
   ImpalaService_constants.cpp
   ImpalaService_types.cpp
+  Data_constants.cpp
+  Data_types.cpp
   DataSinks_constants.cpp
   DataSinks_types.cpp
   Descriptors_constants.cpp

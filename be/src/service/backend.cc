@@ -111,6 +111,7 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecQuery(
   while (true) {
     RowBatch* batch_ptr;
     THROW_IF_ERROR_WITH_LOGGING(executor->FetchResult(&batch_ptr), env, &adaptor);
+    if (batch_ptr == NULL) break;
     batch.reset(batch_ptr);
 
     for (int i = 0; i < batch->num_rows(); ++i) {
@@ -119,7 +120,6 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecQuery(
       adaptor.AddResultRow(row);
       RETURN_IF_EXC(env);
     }
-    if (batch->eos()) break;
   }
 
   // Report error log and file error stats.

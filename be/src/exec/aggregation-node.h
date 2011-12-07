@@ -40,7 +40,7 @@ class AggregationNode : public ExecNode {
 
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
-  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch);
+  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
   virtual Status Close(RuntimeState* state);
 
  protected:
@@ -95,7 +95,6 @@ class AggregationNode : public ExecNode {
   TupleDescriptor* agg_tuple_desc_;
   AggregationTuple* singleton_output_tuple_;  // result of aggregation w/o GROUP BY
   TupleRow* current_row_;  // needed for GroupingExprHash/-Equals
-  std::vector<TupleDescriptor*> input_tuple_descs_;
   FreeList string_buffer_free_list_;
   int num_string_slots_; // number of string slots in the output tuple
 

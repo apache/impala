@@ -21,7 +21,8 @@ class TRowBatch;
 
 class PlanExecutor {
  public:
-  PlanExecutor(ExecNode* plan, const DescriptorTbl& descs, bool abort_on_error, int max_errors);
+  PlanExecutor(ExecNode* plan, const DescriptorTbl& descs, bool abort_on_error,
+               int max_errors);
   ~PlanExecutor();
 
   // Start running query. Call this prior to FetchResult().

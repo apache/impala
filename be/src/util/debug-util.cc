@@ -8,6 +8,7 @@
 #include "runtime/descriptors.h"
 #include "runtime/raw-value.h"
 #include "runtime/tuple-row.h"
+#include "runtime/row-batch.h"
 #include "gen-cpp/Opcodes_types.h"
 
 #define PRECISION 2
@@ -138,6 +139,14 @@ string PrettyPrinter::Print(int64_t value, DataType type) {
       break;
   }
   return ss.str();
+}
+
+string PrintBatch(RowBatch* batch) {
+  stringstream out;
+  for (int i = 0; i < batch->num_rows(); ++i) {
+    out << PrintRow(batch->GetRow(i), batch->row_desc()) << "\n";
+  }
+  return out.str();
 }
 
 }

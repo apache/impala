@@ -137,7 +137,6 @@ Status AggregationNode::Prepare(RuntimeState* state) {
   agg_tuple_desc_ = state->descs().GetTupleDescriptor(agg_tuple_id_);
   Expr::Prepare(grouping_exprs_, state, child(0)->row_desc());
   Expr::Prepare(aggregate_exprs_, state, child(0)->row_desc());
-  input_tuple_descs_ = children_[0]->row_desc().tuple_descriptors();
   hash_fn_.Init(agg_tuple_desc_, grouping_exprs_);
   equals_fn_.Init(agg_tuple_desc_, grouping_exprs_);
   // TODO: how many buckets?
@@ -162,9 +161,10 @@ Status AggregationNode::Prepare(RuntimeState* state) {
 Status AggregationNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(children_[0]->Open(state));
 
-  RowBatch batch(input_tuple_descs_, state->batch_size());
+  RowBatch batch(children_[0]->row_desc(), state->batch_size());
   while (true) {
-    RETURN_IF_ERROR(children_[0]->GetNext(state, &batch));
+    bool eos;
+    RETURN_IF_ERROR(children_[0]->GetNext(state, &batch, &eos));
     if (singleton_output_tuple_ != NULL) {
       for (int i = 0; i < batch.num_rows(); ++i) {
         current_row_ = batch.GetRow(i);
@@ -188,7 +188,7 @@ Status AggregationNode::Open(RuntimeState* state) {
         UpdateAggTuple(agg_tuple, current_row_);
       }
     }
-    if (batch.num_rows() < batch.capacity()) break;
+    if (eos) break;
     batch.Reset();
   }
   RETURN_IF_ERROR(children_[0]->Close(state));
@@ -199,8 +199,11 @@ Status AggregationNode::Open(RuntimeState* state) {
   return Status::OK;
 }
 
-Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
-  if (ReachedLimit()) return Status::OK;
+Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  if (ReachedLimit()) {
+    *eos = true;
+    return Status::OK;
+  }
   while (output_iterator_ != hash_tbl_->end() && !row_batch->IsFull()) {
     int row_idx = row_batch->AddRow();
     TupleRow* row = row_batch->GetRow(row_idx);
@@ -208,10 +211,14 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
     if (ExecNode::EvalConjuncts(row)) {
       row_batch->CommitLastRow();
       ++num_rows_returned_;
-      if (ReachedLimit()) return Status::OK;
+      if (ReachedLimit()) {
+        *eos = true;
+        return Status::OK;
+      }
     }
     ++output_iterator_;
   }
+  *eos = output_iterator_ == hash_tbl_->end();
   return Status::OK;
 }
 

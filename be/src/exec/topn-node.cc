@@ -84,14 +84,15 @@ Status TopNNode::Prepare(RuntimeState* state) {
 Status TopNNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(child(0)->Open(state));
 
-  RowBatch batch(tuple_descs_, state->batch_size());
+  RowBatch batch(child(0)->row_desc(), state->batch_size());
+  bool eos;
   do {
     batch.Reset();
-    RETURN_IF_ERROR(child(0)->GetNext(state, &batch));
+    RETURN_IF_ERROR(child(0)->GetNext(state, &batch, &eos));
     for (int i = 0; i < batch.num_rows(); ++i) {
       InsertTupleRow(batch.GetRow(i));
     }
-  } while (batch.num_rows() == batch.capacity());
+  } while (!eos);
   
   DCHECK_LE(priority_queue_.size(), limit_);
   RETURN_IF_ERROR(children_[0]->Close(state));
@@ -99,7 +100,7 @@ Status TopNNode::Open(RuntimeState* state) {
   return Status::OK;
 }
 
-Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
+Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   while (!row_batch->IsFull() && (get_next_iter_ != sorted_top_n_.end())) {
     int row_idx = row_batch->AddRow();
     TupleRow* dst_row = row_batch->GetRow(row_idx);
@@ -109,6 +110,7 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
     row_batch->CommitLastRow();
     ++num_rows_returned_;
   }
+  *eos = get_next_iter_ == sorted_top_n_.end();
   return Status::OK; 
 }
 

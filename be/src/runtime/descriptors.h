@@ -28,6 +28,7 @@ class TTupleDescriptor;
 typedef int TupleId;
 typedef int SlotId;
 typedef int TableId;
+typedef int PlanNodeId;
 
 std::string TypeToString(PrimitiveType t);
 
@@ -45,6 +46,8 @@ struct NullIndicatorOffset {
 };
 
 std::ostream& operator<<(std::ostream& os, const NullIndicatorOffset& null_indicator);
+// TODO: find a better location for this
+std::ostream& operator<<(std::ostream& os, const TUniqueId& id);
 
 class SlotDescriptor {
  public:
@@ -186,6 +189,12 @@ class RowDescriptor {
  public:
   RowDescriptor(const DescriptorTbl& desc_tbl, const std::vector<TTupleId>& row_tuples);
 
+  // standard copy c'tor, made explicit here
+  RowDescriptor(const RowDescriptor& desc)
+    : tuple_desc_map_(desc.tuple_desc_map_),
+      tuple_idx_map_(desc.tuple_idx_map_) {
+  }
+
   // dummy descriptor, needed for the JNI EvalPredicate() function
   RowDescriptor() {}
 
@@ -201,6 +210,9 @@ class RowDescriptor {
   const std::vector<TupleDescriptor*>& tuple_descriptors() const {
     return tuple_desc_map_;
   }
+
+  // Populate row_tuple_ids with our ids.
+  void ToThrift(std::vector<TTupleId>* row_tuple_ids);
 
  private:
   // map from position of tuple w/in row to its descriptor

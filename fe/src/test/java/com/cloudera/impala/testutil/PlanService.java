@@ -10,7 +10,7 @@ import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.thrift.TException;
 import org.apache.thrift.server.TServer;
 import org.apache.thrift.server.TServer.Args;
-import org.apache.thrift.server.TSimpleServer;
+import org.apache.thrift.server.TThreadPoolServer;
 import org.apache.thrift.transport.TServerSocket;
 import org.apache.thrift.transport.TServerTransport;
 
@@ -127,7 +127,8 @@ public class PlanService {
       PlanServiceHandler handler = new PlanServiceHandler(catalog);
       ImpalaPlanService.Processor proc = new ImpalaPlanService.Processor(handler);
       TServerTransport transport = new TServerSocket(20000);
-      TServer server = new TSimpleServer(new Args(transport).processor(proc));
+      TServer server =
+          new TThreadPoolServer(new TThreadPoolServer.Args(transport).processor(proc));
       server.serve();
     } catch (Exception e) {
       System.err.println(e.getMessage());

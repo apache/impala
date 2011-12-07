@@ -25,7 +25,7 @@ class HBaseScanNode : public ScanNode {
 
   // Fill the next row batch by calling Next() on the hbase_scanner_,
   // converting text data in HBase cells to binary data.
-  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch);
+  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
 
   // Close the hbase_scanner_, and report errors.
   virtual Status Close(RuntimeState* state);

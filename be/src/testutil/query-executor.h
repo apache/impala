@@ -22,6 +22,7 @@ class ImpalaPlanServiceClient;
 class ObjectPool;
 class PlanExecutor;
 class RowBatch;
+class RowDescriptor;
 class TRowBatch;
 
 class QueryExecutor {
@@ -41,12 +42,19 @@ class QueryExecutor {
   // Returns OK if successful, otherwise error.
   Status FetchResult(std::string* row);
 
+  // Return result batch (which reflects plan obtained from query; it does
+  // *not* reflect the query's select list exprs) in 'batch'; set 'batch' to
+  // NULL if no more data. Batch is owned by QueryExecutor and must not be deallocated.
+  Status FetchResult(RowBatch** batch);
+
   // Return single row as vector of raw values.
   // Indicates end-of-stream by returning empty 'row'.
   // Returns OK if successful, otherwise error.
   Status FetchResult(std::vector<void*>* row);
 
   RuntimeState* runtime_state();
+
+  const RowDescriptor& row_desc() const { return *row_desc_; }
 
   // Returns the error log lines in executor_'s runtime state as a string joined with '\n'.
   std::string ErrorString() const;
@@ -65,6 +73,7 @@ class QueryExecutor {
   std::vector<Expr*> select_list_exprs_;
   boost::scoped_ptr<RowBatch> row_batch_;
   boost::scoped_ptr<TRowBatch> thrift_row_batch_;
+  const RowDescriptor* row_desc_;  // owned by plan root, which resides in pool_
   int next_row_;  // to return from row batch
   int num_rows_;  // total # of rows returned for current query
   bool eos_;  // if true, no more rows for current query

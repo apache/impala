@@ -62,6 +62,11 @@ ostream& operator<<(ostream& os, const NullIndicatorOffset& null_indicator) {
   return os;
 }
 
+ostream& operator<<(ostream& os, const TUniqueId& id) {
+  os << id.hi << ":" << id.lo;
+  return os;
+}
+
 SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc)
   : id_(tdesc.id),
     type_(ThriftToType(tdesc.slotType)),
@@ -194,6 +199,13 @@ int RowDescriptor::GetRowSize() const {
 int RowDescriptor::GetTupleIdx(TupleId id) const {
   DCHECK_LT(id, tuple_idx_map_.size());
   return tuple_idx_map_[id];
+}
+
+void RowDescriptor::ToThrift(std::vector<TTupleId>* row_tuple_ids) {
+  row_tuple_ids->clear();
+  for (int i = 0; i < tuple_desc_map_.size(); ++i) {
+    row_tuple_ids->push_back(tuple_desc_map_[i]->id());
+  }
 }
 
 Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tbl,

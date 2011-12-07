@@ -52,7 +52,7 @@ class HdfsRCFileScanNode : public ScanNode {
   // Writes parsed tuples into tuple buffer,
   // and sets pointers in row_batch to point to them.
   // row_batch will be non-full when all blocks of all files have been read and parsed.
-  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch);
+  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
 
   // Cleanup the RCFileReader and disconnect from HDFS.
   virtual Status Close(RuntimeState* state);

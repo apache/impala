@@ -179,8 +179,11 @@ Status HdfsTextScanNode::Close(RuntimeState* state) {
   }
 }
 
-Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
-  if (ReachedLimit()) return Status::OK;
+Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  if (ReachedLimit()) {
+    *eos = true;
+    return Status::OK;
+  }
 
   // create new tuple buffer for row_batch
   tuple_buffer_size_ = row_batch->capacity() * tuple_desc_->byte_size();
@@ -203,10 +206,11 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
   while (file_idx_ < files_.size()) {
     // Did we finish reading the previous file? if so, open next file
     if (file_buffer_read_size_ == 0) {
-      hdfs_file_ = hdfsOpenFile(hdfs_connection_, files_[file_idx_].c_str(), O_RDONLY, 0, 0, 0);
+      hdfs_file_ =
+          hdfsOpenFile(hdfs_connection_, files_[file_idx_].c_str(), O_RDONLY, 0, 0, 0);
       if (hdfs_file_ == NULL) {
         // TODO: make sure we print all available diagnostic output to our error log
-        return Status("Failed to open HDFS file.");
+        return Status("Failed to open HDFS file " + files_[file_idx_]);
       }
       // Extract partition keys from this file path.
       RETURN_IF_ERROR(ExtractPartitionKeyValues(state));
@@ -231,7 +235,8 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
           reuse_file_buffer_ = true;
         } 
         file_buffer_read_size_ =
-            hdfsRead(hdfs_connection_, hdfs_file_, file_buffer_, state->file_buffer_size());
+            hdfsRead(hdfs_connection_, hdfs_file_, file_buffer_,
+                     state->file_buffer_size());
         VLOG(1) << "HdfsTextScanNode: read " << file_buffer_read_size_
                 << " bytes in file " << files_[file_idx_];
         file_buffer_ptr_ = file_buffer_;
@@ -287,6 +292,7 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
           row_batch->tuple_data_pool()->AcquireData(file_buffer_pool_.get(), true);
           file_buffer_ = NULL;
         }
+        *eos = false;
         return Status::OK;
       }
     } while (!ReachedLimit() && file_buffer_read_size_ > 0);
@@ -294,7 +300,7 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
     int hdfs_ret = hdfsCloseFile(hdfs_connection_, hdfs_file_);
     if (hdfs_ret != 0) {
       // TODO: make sure we print all available diagnostic output to our error log
-      return Status("Failed to close HDFS file.");
+      return Status("Failed to close HDFS file " + files_[file_idx_]);
     }
 
     // Report number of errors encountered in the current file, if any.
@@ -307,6 +313,7 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
     if (ReachedLimit()) {
       row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), false);
       row_batch->tuple_data_pool()->AcquireData(file_buffer_pool_.get(), false);
+      *eos = true;
       return Status::OK;
     }
 
@@ -319,14 +326,16 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
   row_batch->tuple_data_pool()->AcquireData(file_buffer_pool_.get(), false);
 
   // We have read all partitions (tuple buffer not necessarily full).
+  *eos = true;
   return Status::OK;
 }
 
 // This first assembles the full tuple before applying the conjuncts.
 // TODO: apply conjuncts as slots get materialized and skip to the end of the row
 // if we determine it's not a match.
-Status HdfsTextScanNode::ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, int* row_idx,
-    bool* unescape_string, char* quote_char) {
+Status HdfsTextScanNode::ParseFileBuffer(
+    RuntimeState* state, RowBatch* row_batch, int* row_idx, bool* unescape_string,
+    char* quote_char) {
 
   // Points to beginning of current column data.
   char* column_start = file_buffer_ptr_;

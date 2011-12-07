@@ -8,6 +8,8 @@ set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/runtime")
 
 # add .cc files and uncomment line
 add_library(Runtime STATIC
+  data-stream-mgr.cc
+  data-stream-sender.cc
   descriptors.cc
   mem-pool.cc
   raw-value.cc
@@ -17,12 +19,12 @@ add_library(Runtime STATIC
   tuple.cc
 )
 
-add_executable(mem-pool-test
-  mem-pool-test.cc
+target_link_libraries(Runtime
+  Common
 )
 
-add_executable(free-list-test
-  free-list-test.cc
+add_executable(mem-pool-test
+  mem-pool-test.cc
 )
 
 # TODO: w/o the thrift dependency, we're getting a bunch of 'pthread_<> missing' linker
@@ -36,6 +38,10 @@ target_link_libraries(mem-pool-test
   ${Boost_LIBRARIES}
 )
 
+add_executable(free-list-test
+  free-list-test.cc
+)
+
 target_link_libraries(free-list-test
   Runtime
   thrift
@@ -45,9 +51,26 @@ target_link_libraries(free-list-test
   ${Boost_LIBRARIES}
 )
 
-target_link_libraries(Runtime
+add_executable(data-stream-test
+  data-stream-test.cc
+)
+
+target_link_libraries(data-stream-test
+  TestUtil
+  Service
+  Exec
+  Exprs
+  Opcode
+  Exprs
+  Runtime
   Common
+  Util
+  thrift
+  ImpalaThrift
+  gtest
+  ${Boost_LIBRARIES}
 )
 
 add_test(mem-pool-test ${CMAKE_SOURCE_DIR}/build/runtime/mem-pool-test)
 add_test(free-list-test ${CMAKE_SOURCE_DIR}/build/runtime/free-list-test)
+add_test(data-stream-test ${CMAKE_SOURCE_DIR}/build/runtime/data-stream-test)

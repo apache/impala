@@ -137,11 +137,15 @@ Status HdfsRCFileScanNode::Close(RuntimeState* state) {
   }
 }
 
-Status HdfsRCFileScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
+Status HdfsRCFileScanNode::GetNext(
+    RuntimeState* state, RowBatch* row_batch, bool* eos) {
   // Indicates whether the current row has errors.
   bool error_in_row = false;
   
-  if (ReachedLimit()) return Status::OK;
+  if (ReachedLimit()) {
+    *eos = true;
+    return Status::OK;
+  }
   tuple_ = reinterpret_cast<Tuple*>(tuple_buf_);
   bzero(tuple_buf_, tuple_buf_size_);
 
@@ -219,7 +223,8 @@ Status HdfsRCFileScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
         if (state->abort_on_error()) {
           state->ReportFileErrors(files_[rc_reader_->file_idx()], 1);
           return Status(
-              "Aborted HdfsRCFileScanNode due to parse errors. View error log for details.");
+              "Aborted HdfsRCFileScanNode due to parse errors. View error log for "
+              "details.");
         }
       }
       
@@ -254,19 +259,22 @@ Status HdfsRCFileScanNode::GetNext(RuntimeState* state, RowBatch* row_batch) {
   if (ReachedLimit() || (row_group_ != NULL && row_group_->num_rows() == 0)) {
     // We either reached the limit or hit the end of the table.
     // No more work to be done. Clean up all pools with the last row batch.
+    *eos = true;
     row_batch->tuple_data_pool()->AcquireData(tuple_buf_pool_.get(), false);
   } else {
     DCHECK(row_batch->IsFull());
     // The current row_batch is full, but we haven't yet reached our limit.
     // Hang on to the last chunks. We'll continue from there in the next
     // call to GetNext().
+    *eos = false;
     row_batch->tuple_data_pool()->AcquireData(tuple_buf_pool_.get(), true);
   }
   
   return Status::OK;
 }
 
-void HdfsRCFileScanNode::DebugString(int indentation_level, std::stringstream* out) const {
+void HdfsRCFileScanNode::DebugString(
+    int indentation_level, std::stringstream* out) const {
   // TODO: Add more details of internal state.
   *out << string(indentation_level * 2, ' ');
   *out << "HdfsRCFileScanNode(tupleid=" << tuple_id_ << " files[" << join(files_, ",");

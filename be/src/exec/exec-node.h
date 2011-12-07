@@ -35,9 +35,8 @@ class ExecNode {
   // Can be called repeatedly (after calls to Close()).
   virtual Status Open(RuntimeState* state) = 0;
 
-  // Retrieves rows and returns them via row_batch. If row_batch
-  // is not filled to capacity, it means that there are no more rows
-  // to retrieve.
+  // Retrieves rows and returns them via row_batch. Sets eos to true
+  // if subsequent calls will not retrieve any more rows.
   // Data referenced by any tuples returned in row_batch must not be overwritten
   // by the callee until Close() is called. The memory holding that data
   // can be returned via row_batch's tuple_data_pool (in which case it may be deleted
@@ -47,7 +46,7 @@ class ExecNode {
   // In other words, if the memory holding the tuple data will be referenced
   // by the callee in subsequent GetNext() calls, it must *not* be attached to the
   // row_batch's tuple_data_pool.
-  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch) = 0;
+  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) = 0;
 
   // Releases all resources that were allocated in Open()/GetNext().
   // Must call Open() again prior to subsequent calls to GetNext().

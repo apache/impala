@@ -57,6 +57,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake_modules")
 find_package(Thrift REQUIRED)
 include_directories(${Thrift_INCLUDE_DIR})
 set(LIBS ${LIBS} ${Thrift_LIBS})
+message(STATUS ${Thrift_INCLUDE_DIR}:${Thrift_LIBS})
 
 # find boost headers and libs
 set(Boost_DEBUG ON)

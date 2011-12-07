@@ -552,7 +552,7 @@ public class Planner {
       }
     } else {
       // Stream data sink that writes to an exchange node.
-      dataSink = new StreamDataSink(exchNodeId);
+      dataSink = new DataStreamSink(exchNodeId);
     }
     if (dataSink != null) {
       fragmentRequest.setDataSink(dataSink.toThrift());

@@ -52,9 +52,8 @@ Status PlanExecutor::FetchResult(RowBatch** batch) {
     *batch = NULL;
     return Status::OK;
   }
-  *batch = new RowBatch(plan_->row_desc().tuple_descriptors(),
-                        runtime_state_.batch_size());
-  RETURN_IF_ERROR(plan_->GetNext(&runtime_state_, *batch));
+  *batch = new RowBatch(plan_->row_desc(), runtime_state_.batch_size());
+  RETURN_IF_ERROR(plan_->GetNext(&runtime_state_, *batch, &done_));
 
   if (FLAGS_serialize_batch) {
     // serialize and deserialize; we need to hang on to the TRowBatch

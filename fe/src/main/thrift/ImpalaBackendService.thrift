@@ -8,6 +8,7 @@ include "Exprs.thrift"
 include "Descriptors.thrift"
 include "PlanNodes.thrift"
 include "DataSinks.thrift"
+include "Data.thrift"
 
 // Parameters for the execution of a plan fragment on a particular node.
 struct TPlanExecParams {
@@ -82,13 +83,19 @@ struct TQueryExecRequest {
   9: optional string sqlStmt;
 }
 
-// Execution status
-struct TExecStatus {
-  1: optional string errorMsg
-}
-
 service ImpalaBackendService {
   // Synchronous execution of plan fragment. Returns completion status.
-  TExecStatus ExecPlanFragment(
+  Types.TStatus ExecPlanFragment(
       1:Types.TUniqueId queryId, 2:TPlanExecRequest request, 3:TPlanExecParams params);
+
+  // Transmit single row batch. Returns error indication if queryId or destNodeId
+  // are unknown or if data couldn't be read.
+  Types.TStatus TransmitData(
+      1:Types.TUniqueId queryId, 2:Types.TPlanNodeId destNodeId,
+      3:Data.TRowBatch rowBatch);
+
+  // Close channel between this receiver and one of the data stream senders,
+  // indicating that no more data will be transmitted by this sender.
+  // TODO: do we need this or is eos enough?
+  Types.TStatus CloseChannel(1:Types.TUniqueId queryId, 2:Types.TPlanNodeId destNodeId);
 }

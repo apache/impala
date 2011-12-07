@@ -27,6 +27,11 @@ enum TPrimitiveType {
 // Wire format for UniqueId
 struct TUniqueId {
   1: required i64 hi
-  2: required i64 low
+  2: required i64 lo
+}
+
+struct TStatus {
+  1: required i32 status_code
+  2: list<string> error_msgs
 }
 

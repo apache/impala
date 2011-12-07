@@ -146,6 +146,7 @@ Status QueryExecutor::Exec(
   VLOG(1) << "query: " << query;
   TQueryExecRequest query_request;
   try {
+    CHECK(client_.get() != NULL) << "didn't call QueryExecutor::Setup()";
     // TODO: use FLAGS_num_nodes here
     client_->GetExecRequest(query_request, query.c_str(), 1);
   } catch (TException& e) {
@@ -164,6 +165,7 @@ Status QueryExecutor::Exec(
   if (request.__isset.planFragment) {
     RETURN_IF_ERROR(
         ExecNode::CreateTree(pool_.get(), request.planFragment, *descs, &plan_root));
+    row_desc_ = &plan_root->row_desc();
         
     // set scan ranges
     vector<ExecNode*> scan_nodes;
@@ -223,6 +225,17 @@ Status QueryExecutor::FetchResult(std::string* result) {
   return Status::OK;
 }
 
+Status QueryExecutor::FetchResult(RowBatch** batch) {
+  DCHECK(executor_.get() != NULL);
+  RETURN_IF_ERROR(executor_->FetchResult(batch));
+  if (*batch != NULL) {
+    row_batch_.reset(*batch);
+  } else {
+    eos_ = true;
+  }
+  return Status::OK;
+}
+
 Status QueryExecutor::FetchResult(std::vector<void*>* select_list_values) {
   select_list_values->clear();
   if (executor_.get() == NULL) {
@@ -245,19 +258,14 @@ Status QueryExecutor::FetchResult(std::vector<void*>* select_list_values) {
     // we need a new row batch
     RowBatch* batch_ptr;
     RETURN_IF_ERROR(executor_->FetchResult(&batch_ptr));
+    if (batch_ptr == NULL) {
+      // we hit eos
+      eos_ = true;
+      return Status::OK;
+    }
 
     row_batch_.reset(batch_ptr);
-    if (batch_ptr == NULL) {
-      return Status("Internal error: row batch is NULL.");
-    }
     next_row_ = 0;
-    if (row_batch_->eos()) {
-      eos_ = true;
-      if (row_batch_->num_rows() == 0) {
-        // empty result
-        return Status::OK;
-      }
-    }
   }
 
   DCHECK(next_row_ < row_batch_->num_rows());
