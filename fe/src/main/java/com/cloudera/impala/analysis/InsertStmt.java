@@ -15,6 +15,7 @@ import com.cloudera.impala.catalog.HdfsTable.Partition;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.planner.DataSink;
 import com.google.common.base.Preconditions;
 
 /**
@@ -177,6 +178,7 @@ public class InsertStmt extends ParseNodeBase {
       Expr expr = selectListExprs.get(exprMatchPos);
       Expr compatibleExpr = checkTypeCompatibility(tableColumn, expr);
       partitionKeyExprs.add(compatibleExpr);
+      ++exprMatchPos;
     }
     return numDynamicPartKeys;
   }
@@ -339,5 +341,37 @@ public class InsertStmt extends ParseNodeBase {
 
   public List<Expr> getPartitionKeyExprs() {
     return partitionKeyExprs;
+  }
+
+  public DataSink createDataSink() {
+    // analyze() must have been called before.
+    Preconditions.checkState(table != null);
+    return table.createDataSink(partitionKeyExprs, overwrite);
+  }
+
+  @Override
+  public String toSql() {
+    StringBuilder strBuilder = new StringBuilder();
+    strBuilder.append("INSERT ");
+    if (overwrite) {
+      strBuilder.append("OVERWRITE ");
+    } else {
+      strBuilder.append("INTO ");
+    }
+    strBuilder.append("TABLE " + targetTableName + " ");
+    if (partitionKeyValues != null) {
+      strBuilder.append("PARTITION (");
+      for (int i = 0; i < partitionKeyValues.size(); ++i) {
+        PartitionKeyValue pkv = partitionKeyValues.get(i);
+        strBuilder.append(pkv.getColName());
+        if (pkv.getValue() != null) {
+          strBuilder.append("=" + pkv.getValue().toSql());
+        }
+        strBuilder.append((i+1 != partitionKeyValues.size()) ? ", " : "");
+      }
+      strBuilder.append(") ");
+    }
+    strBuilder.append(selectStmt.toSql());
+    return strBuilder.toString();
   }
 }

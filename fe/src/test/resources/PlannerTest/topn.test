@@ -14,6 +14,8 @@ ORDER BY: name ASC
 LIMIT: 1
   EXCHANGE ID: 1
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 1
 SCAN HDFS table=default.testtbl
   FILES:
   LIMIT: 1
@@ -43,6 +45,8 @@ LIMIT: 10
   GROUP BY: <slot 2>
     EXCHANGE ID: 2
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 2
 AGGREGATE
 OUTPUT: COUNT(*)
 GROUP BY: zip
@@ -75,6 +79,8 @@ LIMIT: 4
   GROUP BY: <slot 3>
     EXCHANGE ID: 2
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 2
 AGGREGATE
 OUTPUT: SUM(float_col)
 GROUP BY: int_col
@@ -104,6 +110,8 @@ LIMIT: 0
   GROUP BY: <slot 2>
     EXCHANGE ID: 2
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 2
 AGGREGATE
 OUTPUT: SUM(float_col), MIN(float_col)
 GROUP BY: int_col

@@ -7,6 +7,7 @@ include "Types.thrift"
 include "Exprs.thrift"
 include "Descriptors.thrift"
 include "PlanNodes.thrift"
+include "DataSinks.thrift"
 
 // Parameters for the execution of a plan fragment on a particular node.
 struct TPlanExecParams {
@@ -15,20 +16,6 @@ struct TPlanExecParams {
 
   // host names of output destinations, one per output partition
   2: list<string> destHosts
-}
-
-// Specification of how plan fragment output is partitioned. If it is hash-partitioned,
-// partitionBoundaries is empty; instead, the hash value % n is used to create n
-// partitions, where n == the number of destination hosts.
-struct TOutputPartitionSpec {
-  // if true, partition based on hash value of partitionExpr
-  1: required bool isHashPartitioned
-
-  // partitionExpr computes partitioning value over output tuples
-  2: optional Exprs.TExpr partitionExpr
-
-  // n-1 boundary literal exprs for n partitions
-  3: list<Exprs.TExpr> partitionBoundaries
 }
 
 // TPlanExecRequest encapsulates info needed to execute a particular
@@ -45,17 +32,12 @@ struct TPlanExecRequest {
 
   // exprs that produce values for slots of output tuple (one expr per slot)
   4: list<Exprs.TExpr> outputExprs
-
-  // Specification of how the output is partitioned, which in conjunction with
-  // TPlanExecParams.destHosts determines where each output row is sent.
-  // An empty output partition specification in combination with multiple
-  // destination nodes means that the output is broadcast to those nodes.
-  // If the partition specification is non-empty, TPlanExecParams.destHosts's
-  // size must be the same as the number of partitions.
-  5: optional TOutputPartitionSpec outputPartitionSpec
-
-  // destination node id
-  6: optional Types.TPlanNodeId destNodeId
+  
+  // Specifies the destination of this plan fragment's output rows.
+  // For example, the destination could be a stream sink which forwards 
+  // the data to a remote plan fragment, 
+  // or a sink which writes to a table (for insert stmts).
+  5: optional DataSinks.TDataSink dataSink
 }
 
 // TQueryExecRequest encapsulates everything needed to execute all plan fragments
@@ -97,7 +79,7 @@ struct TQueryExecRequest {
   8: required i32 batchSize
 
   // for debugging purposes (to allow backend to log the query string)
-  9: optional string selectStmt;
+  9: optional string sqlStmt;
 }
 
 // Execution status

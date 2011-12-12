@@ -22,6 +22,7 @@ import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.testutil.TestFileParser;
 import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.Constants;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 public class PlannerTest {
@@ -46,11 +47,19 @@ public class PlannerTest {
       AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
       Planner planner = new Planner();
       List<PlanNode> planFragments = Lists.newArrayList();
-      planner.createPlanFragments(
-          analysisResult.selectStmt, analysisResult.analyzer, numNodes, planFragments);
+      List<DataSink> dataSinks = Lists.newArrayList();
+      planner.createPlanFragments(analysisResult, numNodes, planFragments, dataSinks);
+      Preconditions.checkState(planFragments.size() == dataSinks.size());
       for (int i = 0; i < planFragments.size(); ++i) {
+        DataSink dataSink = dataSinks.get(i);
         PlanNode fragment = planFragments.get(i);
-        String explainString = fragment.getExplainString();
+        String explainString;
+        // Coordinator fragment might not have an associated sink.
+        if (dataSink == null) {
+          explainString = fragment.getExplainString();
+        } else {
+          explainString = dataSink.getExplainString() + fragment.getExplainString();
+        }
         LOG.info(explainString);
         ArrayList<String> expectedPlan = parser.getExpectedResult(sectionStartIdx + i);
         String result = TestUtils.compareOutput(explainString.split("\n"), expectedPlan);
@@ -75,12 +84,19 @@ public class PlannerTest {
       AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
       Planner planner = new Planner();
       List<PlanNode> planFragments = Lists.newArrayList();
-      planner.createPlanFragments(
-          analysisResult.selectStmt, analysisResult.analyzer, 1, planFragments);
+      List<DataSink> dataSinks = Lists.newArrayList();
+      planner.createPlanFragments(analysisResult, 1, planFragments, dataSinks);
+      String explainString = null;
       PlanNode plan = planFragments.get(0);
+      if (analysisResult.isInsertStmt()) {
+        DataSink dataSink = dataSinks.get(0);
+        explainString = dataSink.getExplainString() + plan.getExplainString("  ");
+      } else {
+        explainString = plan.getExplainString();
+      }
       errorLog.append(
           "query produced a plan\nquery=" + query + "\nplan=\n"
-          + plan.getExplainString());
+          + explainString);
     } catch (AnalysisException e) {
       errorLog.append("query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
     } catch (InternalException e) {
@@ -121,6 +137,7 @@ public class PlannerTest {
     RunTests("aggregation");
     RunTests("hbase");
     RunTests("hdfs");
+    RunTests("insert");
     RunTests("joins");
     RunTests("order");
     RunTests("topn");

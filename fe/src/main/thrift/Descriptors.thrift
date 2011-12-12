@@ -23,12 +23,13 @@ enum TTableType {
 }
 
 struct THdfsTable {
-  1: required byte lineDelim
-  2: required byte fieldDelim
-  3: required byte collectionDelim
-  4: required byte mapKeyDelim
-  5: required byte escapeChar
-  6: optional byte quoteChar
+  1: required string hdfsBaseDir
+  2: required byte lineDelim
+  3: required byte fieldDelim
+  4: required byte collectionDelim
+  5: required byte mapKeyDelim
+  6: required byte escapeChar
+  7: optional byte quoteChar
 }
 
 struct THBaseTable {

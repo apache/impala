@@ -6,7 +6,7 @@ namespace java com.cloudera.impala.thrift
 include "Exprs.thrift"
 include "Types.thrift"
 
-enum TPlanNodeType {
+enum TPlanNodeType {  
   HDFS_TEXT_SCAN_NODE,
   HDFS_RCFILE_SCAN_NODE,
   HBASE_SCAN_NODE,

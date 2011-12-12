@@ -9,6 +9,7 @@ import java.util.ListIterator;
 
 import com.cloudera.impala.analysis.AggregateExpr;
 import com.cloudera.impala.analysis.AggregateInfo;
+import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.Expr;
@@ -390,30 +391,48 @@ public class Planner {
   }
 
   /**
-   * Given a selectStmt, creates a sequence of plan fragments that implement the query.
-   * @param singleNodePlan result of call to createPlan()
-   * @param analyzer the same analyzer that was used to create singleNodePlan
-   * @param numNodes number of nodes on which to execute fragments; same semantics as
-   *     TQueryRequest.numNodes;
-   *     allowed values:
-   *     1: single-node execution
-   *     NUM_NODES_ALL: executes on all nodes that contain relevant data
-   *     NUM_NODES_ALL_RACKS: executes on one node per rack that holds relevant data
-   *     > 1: executes on at most that many nodes at any point in time (ie, there can be
-   *     more nodes than numNodes with plan fragments for this query, but at most
-   *     numNodes would be active at any point in time)
-   * @param planFragments non-thrift plan fragments, for debugging purposes
+   * Given an analysisResult, creates a sequence of plan fragments that implement the query.
+   *
+   * @param analysisResult
+   *          result of query analysis
+   * @param planFragments
+   *          non-thrift plan fragments for testing/debugging
+   * @param dataSinks
+   *          non-thrift data sinks for testing/debugging.
+   *          the i-th sink corresponds to the i-th plan fragment.
+   *          the 0-th sink could possibly be null,
+   *          if the last fragment does not feed into anything.
+   * @param numNodes
+   *          number of nodes on which to execute fragments; same semantics as
+   *          TQueryRequest.numNodes;
+   *          allowed values:
+   *          1: single-node execution
+   *          NUM_NODES_ALL: executes on all nodes that contain relevant data
+   *          NUM_NODES_ALL_RACKS: executes on one node per rack that holds relevant data
+   *          > 1: executes on at most that many nodes at any point in time (ie, there can be
+   *          more nodes than numNodes with plan fragments for this query, but at most
+   *          numNodes would be active at any point in time)
    * @return query exec request containing plan fragments and all execution parameters
    */
   public TQueryExecRequest createPlanFragments(
-      SelectStmt selectStmt, Analyzer analyzer, int numNodes,
-      List<PlanNode> planFragments)
+      AnalysisContext.AnalysisResult analysisResult, int numNodes,
+      List<PlanNode> planFragments, List<DataSink> dataSinks)
       throws NotImplementedException, InternalException {
+
+    // Set selectStmt from analyzed SELECT or INSERT query.
+    SelectStmt selectStmt = null;
+    if (analysisResult.isInsertStmt()) {
+      selectStmt = analysisResult.getInsertStmt().getSelectStmt();
+    } else {
+      Preconditions.checkState(analysisResult.isSelectStmt());
+      selectStmt = analysisResult.getSelectStmt();
+    }
+
     // distributed execution: plan that does the bulk of the execution
     // (select-project-join; pre-aggregation is added later) and sends results back to
     // the coordinator;
     // single-node execution: the single plan
-    PlanNode slavePlan = createSpjPlan(selectStmt, analyzer);
+    PlanNode slavePlan = createSpjPlan(selectStmt, analysisResult.getAnalyzer());
 
     if (slavePlan == null) {
       // SELECT without FROM clause
@@ -446,7 +465,8 @@ public class Planner {
       coordPlan.id = exchNodeId = getNextNodeId();
 
       if (aggInfo != null) {
-        coordPlan = currentPlanRoot = createMergeAggNode(analyzer, coordPlan, aggInfo);
+        coordPlan = currentPlanRoot =
+          createMergeAggNode(analysisResult.getAnalyzer(), coordPlan, aggInfo);
         coordPlan.id = getNextNodeId();
       }
     } else {
@@ -479,14 +499,14 @@ public class Planner {
     }
 
     slavePlan.setLimit(selectStmt.getLimit());
-    slavePlan.finalize(analyzer);
-    markUnrefdSlots(slavePlan, selectStmt, analyzer);
+    slavePlan.finalize(analysisResult.getAnalyzer());
+    markUnrefdSlots(slavePlan, selectStmt, analysisResult.getAnalyzer());
     if (coordPlan != null) {
       coordPlan.setLimit(selectStmt.getLimit());
-      coordPlan.finalize(analyzer);
+      coordPlan.finalize(analysisResult.getAnalyzer());
     }
     // don't compute mem layout before marking slots that aren't being referenced
-    analyzer.getDescTbl().computeMemLayout();
+    analysisResult.getAnalyzer().getDescTbl().computeMemLayout();
 
     // TODO: determine if slavePlan produces more slots than are being
     // ref'd by coordPlan; if so, insert MaterializationNode that trims the
@@ -501,20 +521,46 @@ public class Planner {
       // coordinator fragment comes first
       planFragments.add(coordPlan);
       fragmentRequest.setPlanFragment(coordPlan.treeToThrift());
-      fragmentRequest.setDescTbl(analyzer.getDescTbl().toThrift());
+      fragmentRequest.setDescTbl(analysisResult.getAnalyzer().getDescTbl().toThrift());
       request.addToFragmentRequests(fragmentRequest);
 
       // add one empty exec param (coord fragment doesn't scan any tables
       // and doesn't send the output anywhere)
       request.addToNodeRequestParams(Lists.newArrayList(new TPlanExecParams()));
 
+      // Coordinator performs insert into a table.
+      if (analysisResult.isInsertStmt()) {
+        // Data sink to a table. For insert statements.
+        DataSink dataSink = analysisResult.getInsertStmt().createDataSink();
+        fragmentRequest.setDataSink(dataSink.toThrift());
+        dataSinks.add(dataSink);
+      } else {
+        // Coordinator does not feed into any sink.
+        dataSinks.add(null);
+      }
+
       fragmentRequest = new TPlanExecRequest();
     }
-    fragmentRequest.setDestNodeId(exchNodeId);
+
+    // Set data sink that slavePlan writes to.
+    DataSink dataSink = null;
+    if (coordPlan == null) {
+      if (analysisResult.isInsertStmt()) {
+        // Single node insert execution.
+        dataSink = analysisResult.getInsertStmt().createDataSink();
+      }
+    } else {
+      // Stream data sink that writes to an exchange node.
+      dataSink = new StreamDataSink(exchNodeId);
+    }
+    if (dataSink != null) {
+      fragmentRequest.setDataSink(dataSink.toThrift());
+    }
+    dataSinks.add(dataSink);
 
     planFragments.add(slavePlan);
     fragmentRequest.setPlanFragment(slavePlan.treeToThrift());
-    fragmentRequest.setDescTbl(analyzer.getDescTbl().toThrift());
+    fragmentRequest.setDescTbl(analysisResult.getAnalyzer().getDescTbl().toThrift());
     request.addToFragmentRequests(fragmentRequest);
 
     // partition fragment by partitioning leftmost scan
@@ -554,5 +600,4 @@ public class Planner {
 
     return request;
   }
-
 }

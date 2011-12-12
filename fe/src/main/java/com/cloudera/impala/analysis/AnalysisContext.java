@@ -19,15 +19,41 @@ public class AnalysisContext {
   }
 
   static public class AnalysisResult {
-    public SelectStmt selectStmt;
-    public Analyzer analyzer;
+    // SelectStmt or InsertStmt.
+    private ParseNode stmt;
+    private Analyzer analyzer;
+
+    public boolean isSelectStmt() {
+      return stmt instanceof SelectStmt;
+    }
+
+    public boolean isInsertStmt() {
+      return stmt instanceof InsertStmt;
+    }
+
+    public SelectStmt getSelectStmt() {
+      return (SelectStmt) stmt;
+    }
+
+    public InsertStmt getInsertStmt() {
+      return (InsertStmt) stmt;
+    }
+
+    public ParseNode getStmt() {
+      return stmt;
+    }
+
+    public Analyzer getAnalyzer() {
+      return analyzer;
+    }
   }
 
   /**
    * Parse and analyze 'stmt'.
    *
    * @param stmt
-   * @return SelectStmt corresponding to 'stmt'
+   * @return AnalysisResult
+   *         containing the analyzer and the analyzed insert or select statement.
    * @throws AnalysisException
    *           on any kind of error, including parsing error.
    */
@@ -36,12 +62,12 @@ public class AnalysisContext {
     SqlParser parser = new SqlParser(input);
     try {
       AnalysisResult result = new AnalysisResult();
-      result.selectStmt = (SelectStmt) parser.parse().value;
-      if (result.selectStmt == null) {
+      result.stmt = (ParseNode) parser.parse().value;
+      if (result.stmt == null) {
         return null;
       }
       result.analyzer = new Analyzer(catalog);
-      result.selectStmt.analyze(result.analyzer);
+      result.stmt.analyze(result.analyzer);
       return result;
     } catch (AnalysisException e) {
       throw new AnalysisException(e.getMessage() + " (in " + stmt + ")");

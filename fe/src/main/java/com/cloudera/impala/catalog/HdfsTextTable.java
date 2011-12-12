@@ -1,6 +1,11 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 package com.cloudera.impala.catalog;
 
+import java.util.List;
+
+import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.planner.HdfsTextTableSink;
+import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
 
@@ -28,4 +33,8 @@ public class HdfsTextTable extends HdfsTable {
     return msTbl.getSd().getInputFormat().equals(textInputFormat);
   }
 
+  @Override
+  public DataSink createDataSink(List<Expr> partitionKeyExprs, boolean overwrite) {
+    return new HdfsTextTableSink(this, partitionKeyExprs, overwrite);
+  }
 }

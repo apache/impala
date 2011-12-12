@@ -13,6 +13,8 @@ import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.serde2.SerDeException;
 
+import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.thrift.THBaseTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
@@ -151,5 +153,14 @@ public class HBaseTable extends Table {
   public static boolean isHBaseTable(org.apache.hadoop.hive.metastore.api.Table msTbl) {
     return (msTbl.getTableType().equals("EXTERNAL_TABLE") &&
         msTbl.getSd().getInputFormat().equals(hbaseInputFormat));
+  }
+
+  @Override
+  public DataSink createDataSink(List<Expr> partitionKeyExprs, boolean overwrite) {
+    // Partition clause doesn't make sense for an HBase table.
+    Preconditions.checkState(partitionKeyExprs.isEmpty());
+    // Overwrite doesn't make sense for an HBase table.
+    Preconditions.checkState(overwrite == false);
+    throw new UnsupportedOperationException("HBase Output Sink not implemented.");
   }
 }

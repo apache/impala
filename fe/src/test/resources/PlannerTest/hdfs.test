@@ -16,6 +16,8 @@ OUTPUT: SUM(<slot 3>)
 GROUP BY: <slot 2>
   EXCHANGE ID: 2
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 2
 AGGREGATE
 OUTPUT: COUNT(*)
 GROUP BY: zip
@@ -56,6 +58,8 @@ SCAN HDFS table=default.alltypes
 ----
 EXCHANGE ID: 1
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
@@ -105,6 +109,8 @@ SCAN HDFS table=default.alltypes
 ----
 EXCHANGE ID: 1
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
@@ -142,6 +148,8 @@ SCAN HDFS table=default.alltypes
 ----
 EXCHANGE ID: 1
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
@@ -178,6 +186,8 @@ SCAN HDFS table=default.alltypes
 ----
 EXCHANGE ID: 1
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
@@ -214,6 +224,8 @@ SCAN HDFS table=default.alltypes
 ----
 EXCHANGE ID: 1
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
@@ -241,6 +253,8 @@ SCAN HDFS table=default.alltypes
 ----
 EXCHANGE ID: 1
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
@@ -257,6 +271,8 @@ SCAN HDFS table=default.alltypes
 ----
 EXCHANGE ID: 1
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
@@ -277,6 +293,8 @@ SCAN HDFS table=default.alltypes
 ----
 EXCHANGE ID: 1
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
@@ -300,6 +318,8 @@ SCAN HDFS table=default.alltypes
 ----
 EXCHANGE ID: 1
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
@@ -323,6 +343,8 @@ SCAN HDFS table=default.alltypes
 ----
 EXCHANGE ID: 1
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
@@ -345,6 +367,8 @@ SCAN HDFS table=default.alltypes
 ----
 EXCHANGE ID: 1
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
@@ -369,6 +393,8 @@ SCAN HDFS table=default.alltypes
 ----
 EXCHANGE ID: 1
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
   PREDICATES: year < 2009
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
@@ -396,6 +422,8 @@ SCAN HDFS table=default.alltypes
 ----
 EXCHANGE ID: 1
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
   PREDICATES: month > 8
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
@@ -441,6 +469,8 @@ SCAN HDFS table=default.alltypes
 ----
 EXCHANGE ID: 1
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
   PREDICATES: year - 1 = 2009
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/

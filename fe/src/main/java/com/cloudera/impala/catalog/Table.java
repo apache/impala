@@ -3,6 +3,7 @@
 package com.cloudera.impala.catalog;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
@@ -10,6 +11,8 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.thrift.TException;
 
+import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -170,4 +173,10 @@ public abstract class Table {
     return numClusteringCols;
   }
 
+  /**
+   * @return
+   *         An output sink appropriate for writing to this table.
+   */
+  public abstract DataSink createDataSink(
+      List<Expr> partitionKeyExprs, boolean overwrite);
 }

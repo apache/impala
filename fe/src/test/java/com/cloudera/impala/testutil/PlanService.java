@@ -9,18 +9,20 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.thrift.TException;
 import org.apache.thrift.server.TServer;
-import org.apache.thrift.server.TSimpleServer;
 import org.apache.thrift.server.TServer.Args;
+import org.apache.thrift.server.TSimpleServer;
 import org.apache.thrift.transport.TServerSocket;
 import org.apache.thrift.transport.TServerTransport;
 
 import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
+import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.planner.PlanNode;
 import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.thrift.ImpalaPlanService;
@@ -54,22 +56,26 @@ public class PlanService {
         System.out.println(e.getMessage());
         throw new TException(e.getMessage());
       }
-      Preconditions.checkNotNull(analysisResult.selectStmt);
+      Preconditions.checkNotNull(analysisResult.getStmt());
 
       // populate colTypes
       List<PrimitiveType> colTypes = Lists.newArrayList();
-      for (Expr expr : analysisResult.selectStmt.getSelectListExprs()) {
-        colTypes.add(expr.getType());
+      if (analysisResult.isSelectStmt()) {
+        SelectStmt selectStmt = analysisResult.getSelectStmt();
+        for (Expr expr : selectStmt.getSelectListExprs()) {
+          colTypes.add(expr.getType());
+        }
       }
 
       // create plan
       Planner planner = new Planner();
 
       List<PlanNode> planFragments = Lists.newArrayList();
+      List<DataSink> dataSinks = Lists.newArrayList();
       TQueryExecRequest request;
       try {
         request = planner.createPlanFragments(
-            analysisResult.selectStmt, analysisResult.analyzer, numNodes, planFragments);
+            analysisResult, numNodes, planFragments, dataSinks);
       } catch (NotImplementedException e) {
         throw new TException(e.getMessage());
       } catch (InternalException e) {
@@ -85,11 +91,22 @@ public class PlanService {
       request.setMaxErrors(100);
       request.setBatchSize(0);
 
+      // Generate explain string and print it.
+      Preconditions.checkState(planFragments.size() == dataSinks.size());
       for (int i = 0; i < planFragments.size(); ++i) {
         if (i > 0) {
           System.out.println("----");
         }
-        System.out.println(planFragments.get(i).getExplainString());
+        String explainStr = null;
+        // First data sink may be null.
+        if (dataSinks.get(i) == null) {
+          Preconditions.checkState(i == 0);
+          explainStr = planFragments.get(i).getExplainString();
+        } else {
+          explainStr = dataSinks.get(i).getExplainString()
+              + planFragments.get(i).getExplainString();
+        }
+        System.out.println(explainStr);
       }
 
       System.out.println("returned exec request: " + request.toString());

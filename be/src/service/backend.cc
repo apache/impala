@@ -84,7 +84,7 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecQuery(
         adaptor.impala_exc_cl(), "not implemented: distributed query execution");
     return;
   }
-  LOG(INFO) << "query: " << adaptor.query_exec_request().selectStmt;
+  LOG(INFO) << "query: " << adaptor.query_exec_request().sqlStmt;
 
   adaptor.Exec();
   RETURN_IF_EXC(env);

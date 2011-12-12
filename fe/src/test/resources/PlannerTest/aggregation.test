@@ -25,6 +25,8 @@ OUTPUT: SUM(<slot 1>), SUM(<slot 2>), MIN(<slot 3>), MAX(<slot 4>), SUM(<slot 5>
 GROUP BY: 
   EXCHANGE ID: 2
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 2
 AGGREGATE
 OUTPUT: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
 GROUP BY: 
@@ -70,6 +72,8 @@ OUTPUT: SUM(<slot 2>), MIN(<slot 3>), MAX(<slot 4>), SUM(<slot 5>), SUM(<slot 6>
 GROUP BY: <slot 1>
   EXCHANGE ID: 2
 ----
+STREAM DATA SINK
+  EXCHANGE ID: 2
 AGGREGATE
 OUTPUT: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
 GROUP BY: tinyint_col

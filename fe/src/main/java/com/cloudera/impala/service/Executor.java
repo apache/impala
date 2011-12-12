@@ -21,12 +21,13 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.ImpalaException;
+import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.planner.PlanNode;
 import com.cloudera.impala.planner.Planner;
-import com.cloudera.impala.planner.ValueRange;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TQueryRequest;
@@ -134,19 +135,21 @@ public class Executor {
       throws ImpalaException {
     AnalysisContext analysisCtxt = new AnalysisContext(catalog);
     AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(request.stmt);
-    Preconditions.checkNotNull(analysisResult.selectStmt);
+    Preconditions.checkNotNull(analysisResult.getStmt());
 
-    // TODO: handle EXPLAIN SELECT
+    // TODO: handle EXPLAIN
+    if (analysisResult.isSelectStmt()) {
+      SelectStmt selectStmt = analysisResult.getSelectStmt();
+      // populate colTypes
+      colTypes.clear();
+      for (Expr expr : selectStmt.getSelectListExprs()) {
+        colTypes.add(expr.getType());
+      }
 
-    // populate colTypes
-    colTypes.clear();
-    for (Expr expr : analysisResult.selectStmt.getSelectListExprs()) {
-      colTypes.add(expr.getType());
+      // populate column labels for display purposes (e.g., via the CLI).
+      colLabels.clear();
+      colLabels.addAll(selectStmt.getColLabels());
     }
-
-    // populate column labels for display purposes (e.g., via the CLI).
-    colLabels.clear();
-    colLabels.addAll(analysisResult.selectStmt.getColLabels());
 
     return analysisResult;
   }
@@ -162,11 +165,24 @@ public class Executor {
     // create plan fragments
     Planner planner = new Planner();
     List<PlanNode> planFragments = Lists.newArrayList();
+    List<DataSink> dataSinks = Lists.newArrayList();
     // for now, only single-node execution
     TQueryExecRequest execRequest = planner.createPlanFragments(
-        analysisResult.selectStmt, analysisResult.analyzer, 1, planFragments);
-    for (PlanNode plan: planFragments) {
-      LOG.info(plan.getExplainString());
+        analysisResult, 1, planFragments, dataSinks);
+    // Log explain string.
+    // The i-th sink corresponds to the i-th plan fragment.
+    Preconditions.checkState(planFragments.size() == dataSinks.size());
+    for (int i = 0; i < planFragments.size(); ++i) {
+      String explainStr = null;
+      // First data sink may be null.
+      if (dataSinks.get(i) == null) {
+        Preconditions.checkState(i == 0);
+        explainStr = planFragments.get(i).getExplainString();
+      } else {
+        explainStr = dataSinks.get(i).getExplainString()
+            + planFragments.get(i).getExplainString();
+      }
+      LOG.info(explainStr);
     }
 
     // set remaining execution parameters
@@ -178,7 +194,7 @@ public class Executor {
     execRequest.setAbortOnError(abortOnError);
     execRequest.setMaxErrors(maxErrors);
     execRequest.setBatchSize(batchSize);
-    execRequest.setSelectStmt(analysisResult.selectStmt.toSql());
+    execRequest.setSqlStmt(analysisResult.getStmt().toSql());
     LOG.info(execRequest.toString());
 
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());

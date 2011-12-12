@@ -41,7 +41,7 @@ public class ToSqlTest {
 
   private void testToSql(String query, String expected) {
     AnalysisContext.AnalysisResult analysisResult = analyze(query);
-    String actual = analysisResult.selectStmt.toSql();
+    String actual = analysisResult.getStmt().toSql();
     if (!actual.equals(expected)) {
       fail("Expected: " + expected + "\n Actual: " + actual + "\n");
     }
@@ -129,5 +129,48 @@ public class ToSqlTest {
             "GROUP BY bigint_col, int_col " +
             "HAVING COUNT(int_col) > 10 OR SUM(bigint_col) > 20 " +
             "ORDER BY 2 DESC, 3 ASC");
+  }
+
+  // Test the toSql() output of insert queries.
+  @Test
+  public void insertTest() {
+    // Insert into unpartitioned table without partition clause.
+    testToSql("insert into table alltypesnopart " +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col from alltypes",
+        "INSERT INTO TABLE alltypesnopart SELECT id, bool_col, tinyint_col, " +
+        "smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, " +
+        "string_col FROM alltypes");
+    // Insert into overwrite unpartitioned table without partition clause.
+    testToSql("insert overwrite table alltypesnopart " +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col from alltypes",
+        "INSERT OVERWRITE TABLE alltypesnopart SELECT id, bool_col, tinyint_col, " +
+        "smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, " +
+        "string_col FROM alltypes");
+    // Static partition.
+    testToSql("insert into table alltypessmall " +
+        "partition (year=2009, month=4)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col from alltypes",
+        "INSERT INTO TABLE alltypessmall PARTITION (year=2009, month=4) SELECT id, " +
+        "bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, " +
+        "double_col, date_string_col, string_col FROM alltypes");
+    // Fully dynamic partitions.
+    testToSql("insert into table alltypessmall " +
+        "partition (year, month)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, year, month from alltypes",
+        "INSERT INTO TABLE alltypessmall PARTITION (year, month) SELECT id, bool_col, " +
+        "tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, " +
+        "date_string_col, string_col, year, month FROM alltypes");
+    // Partially dynamic partitions.
+    testToSql("insert into table alltypessmall " +
+        "partition (year=2009, month)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, month from alltypes",
+        "INSERT INTO TABLE alltypessmall PARTITION (year=2009, month) SELECT id, " +
+        "bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, " +
+        "double_col, date_string_col, string_col, month FROM alltypes");
   }
 }

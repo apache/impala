@@ -42,9 +42,9 @@ public abstract class HdfsTable extends Table {
   private static final String DEFAULT_LINE_DELIM = "\n";
 
   // hive by default uses ctrl-a as field delim
-  private static final String DEFAULT_FIELD_DELIM = "\u0001"; 
+  private static final String DEFAULT_FIELD_DELIM = "\u0001";
   // hive by default has no escape char
-  private static final String DEFAULT_ESCAPE_CHAR = "\u0000"; 
+  private static final String DEFAULT_ESCAPE_CHAR = "\u0000";
 
   private String lineDelim;
   private String fieldDelim;
@@ -70,6 +70,12 @@ public abstract class HdfsTable extends Table {
   }
 
   private final List<Partition> partitions;
+
+  // Base Hdfs directory where files of this table are stored.
+  // For unpartitioned tables it is simply the path where all files live.
+  // For partitioned tables it is the root directory
+  // under which partition dirs are placed.
+  protected String hdfsBaseDir;
 
   private final static Logger LOG = LoggerFactory.getLogger(HdfsTable.class);
 
@@ -120,6 +126,7 @@ public abstract class HdfsTable extends Table {
       List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions,
       org.apache.hadoop.hive.metastore.api.Table msTbl) {
     try {
+      hdfsBaseDir = msTbl.getSd().getLocation();
       // This table has no declared partitions, which means it consists of a single file.
       if (msPartitions.isEmpty()) {
         Partition p = new Partition();
@@ -295,7 +302,7 @@ public abstract class HdfsTable extends Table {
         new TTableDescriptor(
             id.asInt(), TTableType.HBASE_TABLE, colsByPos.size(), numClusteringCols);
     // We only support single-byte characters as delimiters.
-    THdfsTable tHdfsTable = new THdfsTable(
+    THdfsTable tHdfsTable = new THdfsTable(hdfsBaseDir,
         (byte) lineDelim.charAt(0), (byte) fieldDelim.charAt(0),
         (byte) collectionDelim.charAt(0), (byte) mapKeyDelim.charAt(0),
         (byte) escapeChar.charAt(0));
@@ -356,5 +363,9 @@ public abstract class HdfsTable extends Table {
       }
     }
     return result;
+  }
+
+  public String getHdfsBaseDir() {
+    return hdfsBaseDir;
   }
 }
