@@ -427,12 +427,13 @@ public class Planner {
       Preconditions.checkState(analysisResult.isSelectStmt());
       selectStmt = analysisResult.getSelectStmt();
     }
+    Analyzer analyzer = analysisResult.getAnalyzer();
 
     // distributed execution: plan that does the bulk of the execution
     // (select-project-join; pre-aggregation is added later) and sends results back to
     // the coordinator;
     // single-node execution: the single plan
-    PlanNode slavePlan = createSpjPlan(selectStmt, analysisResult.getAnalyzer());
+    PlanNode slavePlan = createSpjPlan(selectStmt, analyzer);
 
     if (slavePlan == null) {
       // SELECT without FROM clause
@@ -466,7 +467,7 @@ public class Planner {
 
       if (aggInfo != null) {
         coordPlan = currentPlanRoot =
-          createMergeAggNode(analysisResult.getAnalyzer(), coordPlan, aggInfo);
+          createMergeAggNode(analyzer, coordPlan, aggInfo);
         coordPlan.id = getNextNodeId();
       }
     } else {
@@ -499,14 +500,14 @@ public class Planner {
     }
 
     slavePlan.setLimit(selectStmt.getLimit());
-    slavePlan.finalize(analysisResult.getAnalyzer());
-    markUnrefdSlots(slavePlan, selectStmt, analysisResult.getAnalyzer());
+    slavePlan.finalize(analyzer);
+    markUnrefdSlots(slavePlan, selectStmt, analyzer);
     if (coordPlan != null) {
       coordPlan.setLimit(selectStmt.getLimit());
-      coordPlan.finalize(analysisResult.getAnalyzer());
+      coordPlan.finalize(analyzer);
     }
     // don't compute mem layout before marking slots that aren't being referenced
-    analysisResult.getAnalyzer().getDescTbl().computeMemLayout();
+    analyzer.getDescTbl().computeMemLayout();
 
     // TODO: determine if slavePlan produces more slots than are being
     // ref'd by coordPlan; if so, insert MaterializationNode that trims the
@@ -521,7 +522,7 @@ public class Planner {
       // coordinator fragment comes first
       planFragments.add(coordPlan);
       fragmentRequest.setPlanFragment(coordPlan.treeToThrift());
-      fragmentRequest.setDescTbl(analysisResult.getAnalyzer().getDescTbl().toThrift());
+      fragmentRequest.setDescTbl(analyzer.getDescTbl().toThrift());
       request.addToFragmentRequests(fragmentRequest);
 
       // add one empty exec param (coord fragment doesn't scan any tables
@@ -560,7 +561,7 @@ public class Planner {
 
     planFragments.add(slavePlan);
     fragmentRequest.setPlanFragment(slavePlan.treeToThrift());
-    fragmentRequest.setDescTbl(analysisResult.getAnalyzer().getDescTbl().toThrift());
+    fragmentRequest.setDescTbl(analyzer.getDescTbl().toThrift());
     request.addToFragmentRequests(fragmentRequest);
 
     // partition fragment by partitioning leftmost scan

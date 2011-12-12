@@ -153,7 +153,7 @@ WRITE TO HDFS table=default.alltypessmall
 SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
-    file:/home/abehm/impala/fe/target/test-warehouse/alltypes/year=2010/month=4/100401.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=4/100401.txt
 ----
 WRITE TO HDFS table=default.alltypessmall
   OVERWRITE=false
@@ -165,4 +165,4 @@ STREAM DATA SINK
 SCAN HDFS table=default.alltypes
   REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
   FILES:
-    file:/home/abehm/impala/fe/target/test-warehouse/alltypes/year=2010/month=4/100401.txt
+    file:fe/target/test-warehouse/alltypes/year=2010/month=4/100401.txt
