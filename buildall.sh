@@ -46,11 +46,6 @@ do
   esac
 done
 
-# Initialize and update submodules
-cd $IMPALA_HOME
-git submodule init
-git submodule update
-
 # option to clean everything first
 if [ $clean_action -eq 1 ]
 then
