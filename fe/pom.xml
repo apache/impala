@@ -21,7 +21,6 @@
 
   <properties>
     <test.hive.testdata>${project.basedir}/../testdata/target/AllTypes.txt</test.hive.testdata>
-    <thrift.executable>/usr/local/bin/thrift</thrift.executable>
   </properties>
   
   <dependencies>
@@ -269,45 +268,6 @@
       </plugin>
 
       <plugin>
-        <artifactId>maven-antrun-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>generate-thrift-sources</id>
-            <phase>generate-sources</phase>
-            <configuration>
-              <tasks>
-                <exec executable="${thrift.executable}">
-                  <arg value="-version"/>
-                </exec>
-                <apply executable="${thrift.executable}" force="true" type="file">
-                  <arg value="-v"/>
-                  <arg value="--gen" />
-                  <arg value="java:hashcode"/>
-                  <arg value="-o"/>
-                  <arg value="${project.build.directory}/generated-sources"/>
-                  <fileset dir="${project.basedir}/src/main/thrift">
-                    <include name="**/*.thrift"/>
-                  </fileset>
-                </apply>
-                <apply executable="${thrift.executable}" force="true" type="file">
-                  <arg value="-v"/>
-                  <arg value="--gen" />
-                  <arg value="cpp"/>
-                  <arg value="-o"/>
-                  <arg value="${project.basedir}/../be/generated-sources"/>
-                  <fileset dir="${project.basedir}/src/main/thrift">
-                    <include name="**/*.thrift"/>
-                  </fileset>
-                </apply>
-              </tasks>
-            </configuration>
-            <goals>
-              <goal>run</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>build-helper-maven-plugin</artifactId>
         <version>1.5</version>
@@ -325,7 +285,7 @@
                         Note that the flex plugin appears to do this for you, but we have
                         to do this manually for the CUP and Thrift generated code
                         -->
-                <source>${project.build.directory}/generated-sources/gen-java</source>
+                <source>${project.basedir}/generated-sources/gen-java</source>
                 <source>${project.build.directory}/generated-sources/cup</source>
               </sources>
             </configuration>

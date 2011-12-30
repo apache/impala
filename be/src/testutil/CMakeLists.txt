@@ -3,10 +3,10 @@
 cmake_minimum_required(VERSION 2.6)
 
 # where to put generated libraries
-set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/testutil")
+set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/be/build/testutil")
 
 # where to put generated binaries
-set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/testutil")
+set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/be/build/testutil")
 
 add_library(TestUtil STATIC
   query-executor.cc  

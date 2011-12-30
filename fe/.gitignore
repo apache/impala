@@ -23,7 +23,7 @@ src/test/resources/hive-site.xml
 src/test/resources/hbase-site.xml
 
 # Generated thrift files
-src/main/thrift/Opcodes.thrift
+generated-sources
 
 derby.log
 

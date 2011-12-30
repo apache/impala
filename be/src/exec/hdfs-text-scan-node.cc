@@ -547,7 +547,7 @@ inline void ProcessEscapeMask(int escape_mask, bool* last_char_is_escape, int* f
 }
 
 // SSE optimized raw text file parsing.  SSE4_2 added an instruction (with 3 modes) for text
-// processing.  The modes mimick strchr, strstr and strcmp.  For text parsing, we can leverage
+// processing.  The modes mimic strchr, strstr and strcmp.  For text parsing, we can leverage
 // the strchr functionality.
 //
 // The instruction operates on two sse registers:
@@ -583,8 +583,8 @@ Status HdfsTextScanNode::ParseFileBufferSSE(int max_tuples, int* num_tuples, int
   //        collection_item delim_char
   //  - xmm_escape_search_: the escape search register. Only contains escape char
   //  - xmm_tuple_mask: the result of doing strchr for the tuple delim
-  //  - xmm_field_mask: the reuslt of doing strchr for the field delim
-  //  - xmm_escape_mask: the reuslt of doing strchr for the escape char
+  //  - xmm_field_mask: the result of doing strchr for the field delim
+  //  - xmm_escape_mask: the result of doing strchr for the escape char
   __m128i xmm_buffer, xmm_tuple_mask, xmm_field_mask, xmm_escape_mask;
   
   // Length remaining of buffer to process
@@ -830,7 +830,7 @@ Status HdfsTextScanNode::WriteFields(RuntimeState* state, RowBatch* row_batch, i
     // parsing the tuple.  At this point we can:
     //  - Report errors if there are any
     //  - Reset line_start, materialized_slot_idx to be ready to parse the next row
-    //  - Matreialize partition key values
+    //  - Materialize partition key values
     //  - Evaluate conjuncts and add if necessary
     if (++slot_idx_ == num_materialized_slots_) {
       if (error_in_row_) {

@@ -30,7 +30,7 @@ SET(CXX_FLAGS_PROFILE_BUILD "${CXX_FLAGS_RELEASE} -fprofile-use")
 
 # if no build build type is specified, default to debug builds
 if (NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Debug CACHE STRING)
+  set(CMAKE_BUILD_TYPE Debug)
 endif(NOT CMAKE_BUILD_TYPE)
    
 STRING (TOUPPER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE)
@@ -50,77 +50,10 @@ endif ()
 
 Message(${CMAKE_CXX_FLAGS})
 
-# where to find cmake modules
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake_modules")
-
-# find thrift headers and libs
-find_package(Thrift REQUIRED)
-include_directories(${Thrift_INCLUDE_DIR})
-set(LIBS ${LIBS} ${Thrift_LIBS})
-message(STATUS ${Thrift_INCLUDE_DIR}:${Thrift_LIBS})
-
-# find boost headers and libs
-set(Boost_DEBUG ON)
-set(Boost_USE_STATIC_LIBS ON)
-set(Boost_USE_MULTITHREADED ON)
-set(Boost_USE_STATIC_RUNTIME OFF)
-find_package(Boost REQUIRED COMPONENTS thread regex-mt)
-include_directories(${Boost_INCLUDE_DIRS})
-set(LIBS ${LIBS} ${Boost_LIBRARIES})
-
-# find jni headers and libs
-find_package(JNI REQUIRED)
-include_directories(${JNI_INCLUDE_DIRS})
-set(LIBS ${LIBS} ${JNI_LIBRARIES})
-
-# find HDFS headers and libs
-find_package(HDFS REQUIRED)
-include_directories(${HDFS_INCLUDE_DIR})
-set(LIBS ${LIBS} ${HDFS_LIBS})
-
-# find GFlags headers and libs (needed for GLog)
-find_package(GFlags REQUIRED)
-include_directories(${GFLAGS_INCLUDE_DIR})
-set(LIBS ${LIBS} ${GFLAGS_LIBS})
-# for static linking with GFLAGS, GFLAGS_STATIC_LIB is set in GFLAGS' find module
-add_library(gflagsstatic STATIC IMPORTED)
-set_target_properties(gflagsstatic PROPERTIES IMPORTED_LOCATION ${GFLAGS_STATIC_LIB})
-
-message(STATUS ${GFLAGS_INCLUDE_DIR})
-
-# find GLog headers and libs
-find_package(GLog REQUIRED)
-include_directories(${GLOG_INCLUDE_DIR})
-set(LIBS ${LIBS} ${GLOG_LIBS})
-# for static linking with GLOG, GLOG_STATIC_LIB is set in GLOG's find module
-add_library(glogstatic STATIC IMPORTED)
-set_target_properties(glogstatic PROPERTIES IMPORTED_LOCATION ${GLOG_STATIC_LIB})
-
-message(STATUS ${GLOG_INCLUDE_DIR})
-
-# find PProf libs
-find_package(PProf REQUIRED)
-include_directories(${PPROF_INCLUDE_DIR})
-set (LIBS ${LIBS} ${PPROF_LIBRARIES})
-add_library(pprofstatic STATIC IMPORTED)
-set_target_properties(pprofstatic PROPERTIES IMPORTED_LOCATION "${PPROF_STATIC_LIB}")
-add_library(tcmallocstatic STATIC IMPORTED)
-set_target_properties(tcmallocstatic PROPERTIES IMPORTED_LOCATION "${HEAPPROF_STATIC_LIB}")
-
-# find GTest headers and libs
-find_package(GTest REQUIRED)
-include_directories(${GTEST_INCLUDE_DIR})
-set(LIBS ${LIBS} ${GTEST_LIBRARIES})
-add_library(gtest STATIC IMPORTED)
-set_target_properties(gtest PROPERTIES IMPORTED_LOCATION "${GTEST_LIBRARY}")
-
-message(STATUS ${GTEST_INCLUDE_DIR})
-message(STATUS ${GTEST_LIBRARY})
- 
 # setup doc generation with Doxygen
 find_package(Doxygen)
 if (DOXYGEN_FOUND)
-  set(DOXYGEN_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/build/docs)
+  set(DOXYGEN_OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/build/docs)
   # Possible to not input the subdirs one by one?
   set(CMAKE_DOXYGEN_INPUT 
     ${CMAKE_SOURCE_DIR}/src
@@ -136,21 +69,21 @@ if (DOXYGEN_FOUND)
   # CMake appends using ';'. doxygen wants spaces
   string(REPLACE ";" " " DOXYGEN_INPUT "${CMAKE_DOXYGEN_INPUT}")
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/.impala.doxy 
-                 ${CMAKE_SOURCE_DIR}/build/config/.impala.doxy)
+                 ${CMAKE_CURRENT_SOURCE_DIR}/build/config/.impala.doxy)
   file(MAKE_DIRECTORY ${DOXYGEN_OUTPUT_DIR})
   add_custom_target(docs
     COMMAND ${CMAKE_COMMAND} -E echo_append "Building Docs..."
-    COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_SOURCE_DIR}/build/config/.impala.doxy
+    COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/build/config/.impala.doxy
     )
 else (DOXYGEN_FOUND)
   MESSAGE(STATUS "WARNING: Doxygen not found - Docs will not be created")
 endif(DOXYGEN_FOUND)
 
 # resolve "#include "<subdir>/<name>.h"
-include_directories(${CMAKE_SOURCE_DIR}/src)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # resolve includes of generated code
-include_directories(${CMAKE_SOURCE_DIR}/generated-sources)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/generated-sources)
 
 # allow linking of static libs into dynamic lib
 add_definitions(-fPIC)
@@ -168,22 +101,22 @@ add_subdirectory(generated-sources/gen-cpp)
 add_subdirectory(generated-sources/opcode)
 
 link_directories(
-  ${CMAKE_SOURCE_DIR}/build/common
-  ${CMAKE_SOURCE_DIR}/build/exec
-  ${CMAKE_SOURCE_DIR}/build/exprs
-  ${CMAKE_SOURCE_DIR}/build/runtime
-  ${CMAKE_SOURCE_DIR}/build/service
-  ${CMAKE_SOURCE_DIR}/build/testutil
-  ${CMAKE_SOURCE_DIR}/build/thrift
-  ${CMAKE_SOURCE_DIR}/build/util
+  ${CMAKE_CURRENT_SOURCE_DIR}/build/common
+  ${CMAKE_CURRENT_SOURCE_DIR}/build/exec
+  ${CMAKE_CURRENT_SOURCE_DIR}/build/exprs
+  ${CMAKE_CURRENT_SOURCE_DIR}/build/runtime
+  ${CMAKE_CURRENT_SOURCE_DIR}/build/service
+  ${CMAKE_CURRENT_SOURCE_DIR}/build/testutil
+  ${CMAKE_CURRENT_SOURCE_DIR}/build/thrift
+  ${CMAKE_CURRENT_SOURCE_DIR}/build/util
 )
 
 # only generate statically linked libs and executables
 set(BUILD_SHARED_LIBS OFF)
 
 # where to put generated libraries
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/build/")
-set(ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/build/")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/")
+set(ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/")
 
 # where to put generated binaries
-set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/")
+set(EXECUTABLE_OUTPUT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/build/")

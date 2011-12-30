@@ -1,14 +1,5 @@
 *~
 
-# CMake:
-Makefile
-CMakeCache.txt
-CMakeFiles
-cmake_install.cmake
-CTestTestfile.cmake
-!CMakeLists.txt
-Testing/
-
 build
 generated-sources
 

@@ -1,10 +1,10 @@
 # Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 # where to put generated libraries
-set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/exprs")
+set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/be/build/exprs")
 
 # where to put generated binaries
-set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/exprs")
+set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/be/build/exprs")
 
 add_library(Exprs
   agg-expr.cc
@@ -58,4 +58,4 @@ target_link_libraries(expr-test
   ${Boost_LIBRARIES}
 )
 
-add_test(expr-test ${CMAKE_SOURCE_DIR}/build/exprs/expr-test)
+add_test(expr-test ${CMAKE_SOURCE_DIR}/be/build/exprs/expr-test)

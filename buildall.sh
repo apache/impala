@@ -69,32 +69,6 @@ then
 
 fi
 
-# build common
-cd $IMPALA_COMMON_DIR
-./gen_functions.py
-./gen_opcodes.py
-
-# Generate hive-site.xml from template via env var substitution
-# TODO: Throw an error if the template references an undefined environment variable
-cd ${IMPALA_FE_DIR}/src/test/resources
-perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
-hive-site.xml.template > hive-site.xml
-
-# Generate hbase-site.xml from template via env var substitution
-# TODO: Throw an error if the template references an undefined environment variable
-cd ${IMPALA_FE_DIR}/src/test/resources
-perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
-hbase-site.xml.template > hbase-site.xml
-
-if [ $testdata_action -eq 1 ]
-then
-  # create test data
-  cd $IMPALA_HOME/testdata
-  $IMPALA_HOME/bin/create_testdata.sh
-  cd $IMPALA_HOME/fe
-  mvn -Pload-testdata process-test-resources
-fi
-
 # build thirdparty
 cd $IMPALA_HOME/thirdparty/gflags-1.5
 if [ $config_action -eq 1 ]
@@ -138,9 +112,33 @@ cd $IMPALA_HOME/thirdparty/gtest-1.6.0
 cmake .
 make
 
-# build backend
-cd $IMPALA_BE_DIR
+# cleanup FE process
+$IMPALA_HOME/bin/clean-fe-processes.py
+
+# build common and backend
+cd $IMPALA_HOME
 cmake -DCMAKE_BUILD_TYPE=Debug . && make -j4
+
+# Generate hive-site.xml from template via env var substitution
+# TODO: Throw an error if the template references an undefined environment variable
+cd ${IMPALA_FE_DIR}/src/test/resources
+perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
+hive-site.xml.template > hive-site.xml
+
+# Generate hbase-site.xml from template via env var substitution
+# TODO: Throw an error if the template references an undefined environment variable
+cd ${IMPALA_FE_DIR}/src/test/resources
+perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
+hbase-site.xml.template > hbase-site.xml
+
+if [ $testdata_action -eq 1 ]
+then
+  # create test data
+  cd $IMPALA_HOME/testdata
+  $IMPALA_HOME/bin/create_testdata.sh
+  cd $IMPALA_HOME/fe
+  mvn -Pload-testdata process-test-resources
+fi
 
 # build frontend
 # skip tests since any failures will prevent the

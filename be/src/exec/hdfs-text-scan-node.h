@@ -275,7 +275,7 @@ class HdfsTextScanNode : public ScanNode {
 
   // Parses the current file_buffer_ using SSE ("Intel x86 instruction set extension 'Streaming
   // Simd Extension'). This should only be called if the hardware suports SSE4.2 instructions.  
-  // SSE4.2 added string processing instructions that allow for proecessing 16 characters at a time.
+  // SSE4.2 added string processing instructions that allow for processing 16 characters at a time.
   // This function will write field start/len to 'parsed_data_' which can then be written out
   // to tuples.
   // Input Parameters:

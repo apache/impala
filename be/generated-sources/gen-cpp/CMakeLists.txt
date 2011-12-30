@@ -1,14 +1,12 @@
 # Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 # where to put generated libraries
-set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/thrift")
+set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/be/build/thrift")
 
 # where to put generated binaries
-set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/build/thrift")
+set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/be/build/thrift")
 
-# keep everything in one library, the object files reference 
-# each other
-add_library(ImpalaThrift
+set(SRC_FILES
   ImpalaBackendService.cpp
   ImpalaBackendService_constants.cpp
   ImpalaBackendService_types.cpp
@@ -32,6 +30,13 @@ add_library(ImpalaThrift
   PlanNodes_types.cpp
   Types_constants.cpp
   Types_types.cpp
-)
+  )
+
+# keep everything in one library, the object files reference 
+# each other
+add_library(ImpalaThrift ${SRC_FILES})
+
+# Setting these files as code-generated lets make clean and incremental builds work correctly
+set_source_files_properties(${SRC_FILES} PROPERTIES GENERATED TRUE)
 
 add_library(thrift STATIC IMPORTED)
