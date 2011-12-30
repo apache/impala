@@ -2,7 +2,9 @@
 
 #include <string>
 
+#include <glog/logging.h>
 #include "runtime/primitive-type.h"
+#include "runtime/string-value.h"
 
 #ifndef IMPALA_RUNTIME_RAW_VALUE_H
 #define IMPALA_RUNTIME_RAW_VALUE_H
@@ -33,8 +35,40 @@ class RawValue {
   static void Write(const void* value, Tuple* tuple, const SlotDescriptor* slot_desc,
                     MemPool* pool);
 
+  // Returns true if v1 == v2.
+  // TODO: this is separate from Compare() == 0 because string equality comparison
+  // is currently much faster than generic Compare().  Remove this function when
+  // we have an SSE optimized strcmp.
+  static bool Eq(const void* v1, const void* v2, PrimitiveType type);
 };
 
+inline bool RawValue::Eq(const void* v1, const void* v2, PrimitiveType type) {
+  const StringValue* string_value1;
+  const StringValue* string_value2;
+  switch (type) {
+    case TYPE_BOOLEAN: 
+      return *reinterpret_cast<const bool*>(v1) == *reinterpret_cast<const bool*>(v2);
+    case TYPE_TINYINT:
+      return *reinterpret_cast<const int8_t*>(v1) == *reinterpret_cast<const int8_t*>(v2);
+    case TYPE_SMALLINT:
+      return *reinterpret_cast<const int16_t*>(v1) == *reinterpret_cast<const int16_t*>(v2);
+    case TYPE_INT: 
+      return *reinterpret_cast<const int32_t*>(v1) == *reinterpret_cast<const int32_t*>(v2);
+    case TYPE_BIGINT: 
+      return *reinterpret_cast<const int64_t*>(v1) == *reinterpret_cast<const int64_t*>(v2);
+    case TYPE_FLOAT: 
+      return *reinterpret_cast<const float*>(v1) == *reinterpret_cast<const float*>(v2);
+    case TYPE_DOUBLE: 
+      return *reinterpret_cast<const double*>(v1) == *reinterpret_cast<const double*>(v2);
+    case TYPE_STRING:
+      string_value1 = reinterpret_cast<const StringValue*>(v1);
+      string_value2 = reinterpret_cast<const StringValue*>(v2);
+      return string_value1->Eq(*string_value2);
+    default:
+      DCHECK(false) << "invalid type: " << TypeToString(type);
+      return 0;
+  };
+}
 }
 
 #endif

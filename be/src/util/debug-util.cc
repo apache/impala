@@ -2,12 +2,25 @@
 
 #include "util/debug-util.h"
 
+#include <iomanip>
 #include <sstream>
 
 #include "runtime/descriptors.h"
 #include "runtime/raw-value.h"
 #include "runtime/tuple-row.h"
 #include "gen-cpp/Opcodes_types.h"
+
+#define PRECISION 2
+#define KILOBYTE (1024)
+#define MEGABYTE (1024 * 1024)
+#define GIGABYTE (1024 * 1024 * 1024)
+
+#define SECOND (1000)
+#define MINUTE (1000 * 60)
+#define HOUR (1000 * 60 * 60)
+
+#define MILLION (1000000)
+#define THOUSAND (1000)
 
 using namespace std;
 
@@ -65,6 +78,66 @@ string PrintRow(TupleRow* row, const RowDescriptor& d) {
   }
   out << "]";
   return out.str();
+}
+
+string PrettyPrinter::Print(int64_t value, DataType type) {
+  stringstream ss;
+  ss.flags(ios::fixed);
+  switch (type) {
+    case UNIT:
+      if (value >= MILLION) {
+        ss << setprecision(PRECISION) << value / 1000000. << "M";
+      } else if (value >= THOUSAND) {
+        ss << setprecision(PRECISION) << value / 1000. << "K";
+      } else {
+        ss << value;
+      }
+      break;
+
+    case TIME_MS:
+      if (value == 0 ) {
+        ss << "0";
+        break;
+      } else {
+        bool hour = false;
+        bool minute = false;
+        if (value >= HOUR) {
+          ss << value / HOUR << "h";
+          value %= HOUR;
+          hour = true;
+        }
+        if (value >= MINUTE) {
+          ss << value / MINUTE << "m";
+          value %= MINUTE;
+          minute = true;
+        }
+        if (!hour && value >= SECOND) {
+          ss << value / SECOND << "s";
+          value %= SECOND;
+        }
+        if (!hour && !minute) {
+          ss << value << "ms";
+        }
+      }
+      break;
+
+    case BYTES:
+      if (value == 0) {
+        ss << value;
+      } else if (value > GIGABYTE) {
+        ss << setprecision(PRECISION) << value / (double) GIGABYTE << " GB";
+      } else if (value > MEGABYTE ) {
+        ss << setprecision(PRECISION) << value / (double) MEGABYTE << " MB";
+      } else if (value > KILOBYTE)  {
+        ss << setprecision(PRECISION) << value / (double) KILOBYTE << " KB";
+      } else {
+        ss << value << " B";
+      }
+      break;
+    default:
+      break;
+  }
+  return ss.str();
 }
 
 }

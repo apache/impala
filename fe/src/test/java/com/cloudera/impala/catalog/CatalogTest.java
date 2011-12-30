@@ -83,7 +83,6 @@ public class CatalogTest {
     assertNotNull(testDb);
     assertEquals(testDb.getName(), "testdb1");
 
-    assertEquals(25, defaultDb.getTables().size());
     assertNotNull(defaultDb.getTable("alltypes"));
     assertNotNull(defaultDb.getTable("alltypes_rc"));
     assertNotNull(defaultDb.getTable("alltypessmall"));
@@ -108,7 +107,8 @@ public class CatalogTest {
     assertNotNull(defaultDb.getTable("hbasealltypesagg"));
     assertNotNull(defaultDb.getTable("hbasestringids"));
     assertNotNull(defaultDb.getTable("greptiny"));
-    assertNotNull(defaultDb.getTable("grep1gb"));
+    assertNotNull(defaultDb.getTable("rankingssmall"));
+    assertNotNull(defaultDb.getTable("uservisitssmall"));
 
     // testdb contains tables alltypes and testtbl.
     assertEquals(2, testDb.getTables().size());
@@ -247,11 +247,20 @@ public class CatalogTest {
         new PrimitiveType[]
           {PrimitiveType.STRING});
 
-    checkTableCols(defaultDb, "grep1gb", 1,
+    checkTableCols(defaultDb, "rankingssmall", 0,
         new String[]
-          {"chunk", "field"},
+          {"pagerank", "pageurl", "avgduration"},
         new PrimitiveType[]
-          {PrimitiveType.INT, PrimitiveType.STRING});
+          {PrimitiveType.INT, PrimitiveType.STRING, PrimitiveType.INT});
+
+    checkTableCols(defaultDb, "uservisitssmall", 0,
+        new String[]
+          {"sourceip", "desturl", "visitdate",  "adrevenue", "useragent",
+           "ccode", "lcode", "skeyword", "avgtimeonsite"},
+        new PrimitiveType[]
+          {PrimitiveType.STRING, PrimitiveType.STRING, PrimitiveType.STRING,
+           PrimitiveType.FLOAT, PrimitiveType.STRING, PrimitiveType.STRING,
+           PrimitiveType.STRING, PrimitiveType.STRING, PrimitiveType.INT});
 
     // case-insensitive lookup
     assertEquals(defaultDb.getTable("alltypes"), defaultDb.getTable("AllTypes"));

@@ -40,7 +40,6 @@ import com.google.common.collect.Lists;
 public abstract class HdfsTable extends Table {
 
   private static final String DEFAULT_LINE_DELIM = "\n";
-
   // hive by default uses ctrl-a as field delim
   private static final String DEFAULT_FIELD_DELIM = "\u0001";
   // hive by default has no escape char

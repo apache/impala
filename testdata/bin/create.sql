@@ -263,12 +263,35 @@ WITH SERDEPROPERTIES (
 )
 TBLPROPERTIES("hbase.table.name" = "hbasealltypesagg");
 
+DROP TABLE IF EXISTS EscapeNoQuotes;
+CREATE TABLE EscapeNoQuotes (
+  col1 string,
+  col2 string,
+  col3 int,
+  col4 int)
+row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
+
 DROP TABLE IF EXISTS GrepTiny;
 CREATE TABLE GrepTiny (
   field string);
 
-DROP TABLE IF EXISTS Grep1GB;
-CREATE TABLE Grep1GB (
-  field string)
-partitioned by (chunk int);
+DROP TABLE IF EXISTS RankingsSmall;
+CREATE TABLE RankingsSmall (
+  pageRank int,
+  pageURL string,
+  avgDuration int)
+row format delimited fields terminated by '|'  stored as textfile;
+
+DROP TABLE IF EXISTS UserVisitsSmall;
+CREATE TABLE UserVisitsSmall (
+  sourceIP string,
+  destURL string,
+  visitDate string,
+  adRevenue float,
+  userAgent string,
+  cCode string,
+  lCode string,
+  sKeyword string,
+  avgTimeOnSite int)
+row format delimited fields terminated by '|'  stored as textfile;
 

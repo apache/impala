@@ -29,7 +29,7 @@ class TupleDescriptor;
 // slots precede the aggregation expr slots in the output tuple descriptor).
 //
 // For string aggregation, we need to append additional data to the tuple object
-// to reduce the number of string allocations (since we can not know the length of
+// to reduce the number of string allocations (since we cannot know the length of
 // the output string beforehand).  For each string slot in the output tuple, a int32 
 // will be appended to the end of the normal tuple data that stores the size of buffer 
 // for that string slot.  This also results in the correct alignment because StringValue 
@@ -99,12 +99,13 @@ class AggregationNode : public ExecNode {
   FreeList string_buffer_free_list_;
   int num_string_slots_; // number of string slots in the output tuple
 
+  std::vector<void*> grouping_values_cache_;
   boost::scoped_ptr<MemPool> tuple_pool_;
 
   // Constructs a new aggregation output tuple (allocated from tuple_pool_),
-  // initialized to grouping values computed over 'row'.
+  // initialized to grouping values computed over 'current_row_'.
   // Aggregation expr slots are set to their initial values.
-  AggregationTuple* ConstructAggTuple(TupleRow* row);
+  AggregationTuple* ConstructAggTuple();
 
 
   // Allocates a string buffer that is at least the new_size.  The actual size of 
@@ -132,6 +133,10 @@ class AggregationNode : public ExecNode {
   // Updates the aggregation output tuple 'tuple' with aggregation values
   // computed over 'row'.
   void UpdateAggTuple(AggregationTuple* tuple, TupleRow* row);
+
+  // Eval grouping exprs over 'current_row_' and store the results in 
+  // 'grouping_exprs_cache_'.  
+  void ComputeGroupingValues();
 };
 
 }

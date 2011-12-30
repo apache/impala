@@ -3,9 +3,7 @@
 #ifndef IMPALA_RUNTIME_STRING_VALUE_H
 #define IMPALA_RUNTIME_STRING_VALUE_H
 
-#include <cstring>
-#include "runtime/descriptors.h"
-#include "runtime/mem-pool.h"
+#include <string>
 
 namespace impala {
 
@@ -27,7 +25,7 @@ struct StringValue {
   int Compare(const StringValue& other) const;
 
   // ==
-  bool Eq(const StringValue& other) const { return Compare(other) == 0; }
+  bool Eq(const StringValue& other) const;
   // !=
   bool Ne(const StringValue& other) const { return Compare(other) != 0; }
   // <=

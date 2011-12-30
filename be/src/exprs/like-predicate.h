@@ -9,6 +9,7 @@
 
 #include "exprs/predicate.h"
 #include "gen-cpp/Exprs_types.h"
+#include "runtime/string-search.h"
 
 namespace impala {
 
@@ -23,6 +24,8 @@ class LikePredicate: public Predicate {
 
   char escape_char_;
   std::string substring_;
+  StringValue substring_sv_;
+  StringSearch substring_pattern_;
   boost::scoped_ptr<boost::regex> regex_;
 
   // Convert a LIKE pattern (with embedded % and _) into the corresponding

@@ -89,8 +89,7 @@ size_t AggregationNode::GroupingExprHash::operator()(Tuple* const& t) const {
         value = t->GetSlot(slot_d->tuple_offset());
       }
     } else {
-      // compute grouping exprs value over node->current_row_
-      value = (*grouping_exprs_)[i]->GetValue(node_->current_row_);
+      value = node_->grouping_values_cache_[i];
     }
     // don't ignore NULLs; we want (1, NULL) to return a different hash
     // value than (NULL, 1)
@@ -111,27 +110,23 @@ bool AggregationNode::GroupingExprEquals::operator()(
     Tuple* const& t1, Tuple* const& t2) const {
   for (int i = 0; i < grouping_exprs_->size(); ++i) {
     SlotDescriptor* slot_d = agg_tuple_desc_->slots()[i];
-    const void* value1;
-    if (t1 != NULL) {
-      if (t1->IsNull(slot_d->null_indicator_offset())) {
-        value1 = NULL;
-      } else {
-        value1 = t1->GetSlot(slot_d->tuple_offset());
-      }
-    } else {
-      value1 = (*grouping_exprs_)[i]->GetValue(node_->current_row_);
+    const void* value1 = NULL;
+    const void* value2 = NULL;
+
+    if (t1 == NULL) {
+      value1 = node_->grouping_values_cache_[i];
+    } else if (!t1->IsNull(slot_d->null_indicator_offset())) {
+      value1 = t1->GetSlot(slot_d->tuple_offset());
     }
-    const void* value2;
-    if (t2->IsNull(slot_d->null_indicator_offset())) {
-      value2 = NULL;
-    } else {
+    if (!t2->IsNull(slot_d->null_indicator_offset())) {
       value2 = t2->GetSlot(slot_d->tuple_offset());
     }
+    
     if (value1 == NULL || value2 == NULL) {
       // nulls are considered equal for the purpose of grouping
       if (value1 != NULL || value2 != NULL) return false;
     } else {
-      if (RawValue::Compare(value1, value2, slot_d->type()) != 0) return false;
+      if (!RawValue::Eq(value1, value2, slot_d->type())) return false;
     }
   }
   return true;
@@ -154,39 +149,44 @@ Status AggregationNode::Prepare(RuntimeState* state) {
     AggregateExpr* agg_expr = static_cast<AggregateExpr*>(*expr);
     if (agg_expr->type() == TYPE_STRING) ++num_string_slots_;
   }
-
+  
+  grouping_values_cache_.resize(grouping_exprs_.size());
+  if (grouping_exprs_.empty()) {
+    // create single output tuple now; we need to output something
+    // even if our input is empty
+    singleton_output_tuple_ = ConstructAggTuple();
+  }
   return Status::OK;
 }
 
 Status AggregationNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(children_[0]->Open(state));
 
-  if (grouping_exprs_.empty()) {
-    // create single output tuple now; we need to output something
-    // even if our input is empty
-    singleton_output_tuple_ = ConstructAggTuple(NULL);
-  }
-
   RowBatch batch(input_tuple_descs_, state->batch_size());
   while (true) {
     RETURN_IF_ERROR(children_[0]->GetNext(state, &batch));
-    for (int i = 0; i < batch.num_rows(); ++i) {
-      current_row_ = batch.GetRow(i);
-      AggregationTuple* agg_tuple;
-      if (singleton_output_tuple_ != NULL) {
-        agg_tuple = singleton_output_tuple_;
-      } else {
+    if (singleton_output_tuple_ != NULL) {
+      for (int i = 0; i < batch.num_rows(); ++i) {
+        current_row_ = batch.GetRow(i);
+        UpdateAggTuple(singleton_output_tuple_, current_row_);
+      }
+    } else {
+      for (int i = 0; i < batch.num_rows(); ++i) {
+        current_row_ = batch.GetRow(i);
+        // Compute and cache the grouping exprs for current_row_
+        ComputeGroupingValues();
+        AggregationTuple* agg_tuple = NULL; 
         // find(NULL) finds the entry for current_row_
         HashTable::iterator entry = hash_tbl_->find(NULL);
         if (entry == hash_tbl_->end()) {
           // new entry
-          agg_tuple = ConstructAggTuple(current_row_);
+          agg_tuple = ConstructAggTuple();
           hash_tbl_->insert(agg_tuple->tuple());
         } else {
           agg_tuple = reinterpret_cast<AggregationTuple*>(*entry);
         }
+        UpdateAggTuple(agg_tuple, current_row_);
       }
-      UpdateAggTuple(agg_tuple, current_row_);
     }
     if (batch.num_rows() < batch.capacity()) break;
     batch.Reset();
@@ -195,7 +195,6 @@ Status AggregationNode::Open(RuntimeState* state) {
   if (singleton_output_tuple_ != NULL) {
     hash_tbl_->insert(singleton_output_tuple_->tuple());
   }
-
   output_iterator_ = hash_tbl_->begin();
   return Status::OK;
 }
@@ -220,7 +219,14 @@ Status AggregationNode::Close(RuntimeState* state) {
   return Status::OK;
 }
 
-AggregationTuple* AggregationNode::ConstructAggTuple(TupleRow* row) {
+void AggregationNode::ComputeGroupingValues() {
+  DCHECK(current_row_ != NULL);
+  for (int i = 0; i < grouping_exprs_.size(); ++i) {
+    grouping_values_cache_[i] = grouping_exprs_[i]->GetValue(current_row_);
+  }
+}
+
+AggregationTuple* AggregationNode::ConstructAggTuple() {
   AggregationTuple* agg_out_tuple = 
       AggregationTuple::Create(agg_tuple_desc_->byte_size(), num_string_slots_, tuple_pool_.get());
   Tuple* agg_tuple = agg_out_tuple->tuple();
@@ -228,7 +234,7 @@ AggregationTuple* AggregationNode::ConstructAggTuple(TupleRow* row) {
   vector<SlotDescriptor*>::const_iterator slot_d = agg_tuple_desc_->slots().begin();
   // copy grouping values
   for (int i = 0; i < grouping_exprs_.size(); ++i, ++slot_d) {
-    void* grouping_val = grouping_exprs_[i]->GetValue(row);
+    void* grouping_val = grouping_values_cache_[i];
     if (grouping_val == NULL) {
       agg_tuple->SetNull((*slot_d)->null_indicator_offset());
     } else {

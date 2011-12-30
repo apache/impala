@@ -5,6 +5,7 @@
 #include <sstream>
 #include <boost/regex.hpp>
 #include <glog/logging.h>
+#include <string.h>
 
 #include "runtime/string-value.h"
 
@@ -23,8 +24,7 @@ void* LikePredicate::ConstantSubstringFn(Expr* e, TupleRow* row) {
   LikePredicate* p = static_cast<LikePredicate*>(e);
   DCHECK_EQ(p->GetNumChildren(), 2);
   StringValue* val = static_cast<StringValue*>(e->GetChild(0)->GetValue(row));
-  string string_val(val->ptr, val->len);
-  p->result_.bool_val = string_val.find(p->substring_) != string::npos;
+  p->result_.bool_val = p->substring_pattern_.Search(val) != -1;
   return &p->result_.bool_val;
 }
 
@@ -83,6 +83,8 @@ Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc
         && regex_match(pattern_str, match_res, substring_re)) {
       // match_res.str(0) is the whole string, match_res.str(1) the first group, etc.
       substring_ = match_res.str(2);
+      substring_sv_ = StringValue(const_cast<char*>(substring_.c_str()), substring_.size());
+      substring_pattern_ = StringSearch(&substring_sv_);
       compute_function_ = ConstantSubstringFn;
     } else {
       string re_pattern;

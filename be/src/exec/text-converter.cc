@@ -10,6 +10,7 @@
 
 using namespace boost;
 using namespace impala;
+using namespace std;
 
 TextConverter::TextConverter(bool strings_are_quoted, char escape_char, MemPool* var_len_pool)
   : strings_are_quoted_(strings_are_quoted),
@@ -114,11 +115,23 @@ bool TextConverter::ConvertAndWriteSlotBytes(const char* begin, const char* end,
   return true;
 }
 
+void TextConverter::UnescapeString(StringValue* value) {
+  char* new_data = reinterpret_cast<char*>(var_len_pool_->Allocate(value->len));
+  UnescapeString(value->ptr, new_data, &value->len);
+  value->ptr = new_data;
+}
+
 void TextConverter::UnescapeString(const char* src, char* dest, int* len) {
   char* dest_ptr = dest;
   const char* end = src + *len;
+  bool escape_next_char = false;
   while (src < end) {
     if (*src == escape_char_) {
+      escape_next_char = !escape_next_char;
+    } else {
+      escape_next_char = false;
+    }
+    if (escape_next_char) {
       ++src;
     } else {
       *dest_ptr++ = *src++;

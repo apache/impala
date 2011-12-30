@@ -215,11 +215,10 @@ INSERT OVERWRITE TABLE hbasealltypesagg
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col
 FROM alltypesagg;
 
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/grep/grep-tiny/part-00000' OVERWRITE INTO TABLE GrepTiny;
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/escape-no-quotes.txt' OVERWRITE INTO TABLE EscapeNoQuotes;
 
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/grep/grep-1GB/part-00000' OVERWRITE INTO TABLE Grep1GB PARTITION(chunk=0);
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/grep/grep-1GB/part-00001' OVERWRITE INTO TABLE Grep1GB PARTITION(chunk=1);
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/grep/grep-1GB/part-00002' OVERWRITE INTO TABLE Grep1GB PARTITION(chunk=2);
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/grep/grep-1GB/part-00003' OVERWRITE INTO TABLE Grep1GB PARTITION(chunk=3);
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/grep/grep-1GB/part-00004' OVERWRITE INTO TABLE Grep1GB PARTITION(chunk=4);
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/grep/grep-1GB/part-00005' OVERWRITE INTO TABLE Grep1GB PARTITION(chunk=5);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/grepTiny/part-00000' OVERWRITE INTO TABLE GrepTiny;
+
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/htmlTiny/Rankings.dat' OVERWRITE INTO TABLE RankingsSmall;
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/htmlTiny/UserVisits.dat' OVERWRITE INTO TABLE UserVisitsSmall;
+

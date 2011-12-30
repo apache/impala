@@ -107,6 +107,22 @@ NEWCXXFLAGS=$OLDCXXFLAGS" -fPIC"
 sed -i "s/$OLDCXXFLAGS/$NEWCXXFLAGS/g" Makefile
 make
 
+# Build pprof
+cd $IMPALA_HOME/thirdparty/google-perftools-1.8.3
+if [ $config_action -eq 1 ]
+then
+# TODO: google perf tools indicates this might be necessary on 64 bit systems.
+# we're not compiling the rest of our code to not omit frame pointers but it 
+# still seems to generate useful profiling data.
+  ./configure --enable-frame-pointers
+fi
+# add -fPIC to CXXFLAGS by finding and replacing the line that sets the CXXFLAGS in Makefile
+OLDCXXFLAGS=$(grep -w "CXXFLAGS =" Makefile)
+NEWCXXFLAGS=$OLDCXXFLAGS" -fPIC"
+sed -i "s/$OLDCXXFLAGS/$NEWCXXFLAGS/g" Makefile
+make
+
+# Build glog
 cd $IMPALA_HOME/thirdparty/glog-0.3.1
 if [ $config_action -eq 1 ]
 then

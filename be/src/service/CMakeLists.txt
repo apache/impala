@@ -33,6 +33,8 @@ target_link_libraries(backend
   ${HDFS_LIBS}
   gflagsstatic
   glogstatic
+  tcmallocstatic
+  pprofstatic
 )
 
 add_executable(runquery 
@@ -61,4 +63,6 @@ target_link_libraries(runquery
   ImpalaThrift
   ${Boost_LIBRARIES}  
   gflagsstatic
+  tcmallocstatic
+  pprofstatic
 )

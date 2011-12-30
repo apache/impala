@@ -60,7 +60,6 @@ void RawValue::PrintValue(const void* value, PrimitiveType type, string* str) {
 
 size_t RawValue::GetHashValue(const void* value, PrimitiveType type) {
   const StringValue* string_value;
-  string tmp;
   switch (type) {
     case TYPE_BOOLEAN:
       return hash<bool>().operator()(*reinterpret_cast<const bool*>(value));
@@ -78,8 +77,7 @@ size_t RawValue::GetHashValue(const void* value, PrimitiveType type) {
       return hash<double>().operator()(*reinterpret_cast<const double*>(value));
     case TYPE_STRING:
       string_value = reinterpret_cast<const StringValue*>(value);
-      tmp.assign(static_cast<const char*>(string_value->ptr), string_value->len);
-      return hash<string>().operator()(tmp);
+      return hash_range<char*>(string_value->ptr, string_value->ptr + string_value->len);
     default:
       DCHECK(false) << "invalid type: " << TypeToString(type);
       return 0;
@@ -91,7 +89,6 @@ int RawValue::Compare(const void* v1, const void* v2, PrimitiveType type) {
   const StringValue* string_value2;
   float f1, f2;
   double d1, d2;
-  string tmp1, tmp2;
   switch (type) {
     case TYPE_BOOLEAN: 
       return *reinterpret_cast<const bool*>(v1) - *reinterpret_cast<const bool*>(v2);
@@ -114,12 +111,10 @@ int RawValue::Compare(const void* v1, const void* v2, PrimitiveType type) {
       d1 = *reinterpret_cast<const double*>(v1);
       d2 = *reinterpret_cast<const double*>(v2);
       return d1 > d2 ? 1 : (d1 < d2 ? -1 : 0);
-    case TYPE_STRING:
+    case TYPE_STRING: 
       string_value1 = reinterpret_cast<const StringValue*>(v1);
-      tmp1.assign(static_cast<const char*>(string_value1->ptr), string_value1->len);
       string_value2 = reinterpret_cast<const StringValue*>(v2);
-      tmp2.assign(static_cast<const char*>(string_value2->ptr), string_value2->len);
-      return tmp1.compare(tmp2);
+      return string_value1->Compare(*string_value2);
     default:
       DCHECK(false) << "invalid type: " << TypeToString(type);
       return 0;

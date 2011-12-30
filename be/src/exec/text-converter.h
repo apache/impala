@@ -8,6 +8,7 @@ namespace impala {
 class Tuple;
 class SlotDescriptor;
 class MemPool;
+class StringValue;
 
 // Helper class for dealing with text data, e.g., converting text data to numeric types, etc.
 class TextConverter {
@@ -30,6 +31,10 @@ class TextConverter {
   // and copies the unescaped string into dest, changing *len to the unescaped length.
   // No null-terminator is added to dest.
   void UnescapeString(const char* src, char* dest, int* len);
+
+  // Removes escape characters from 'str', allocating a new string from var_len_pool_.
+  // 'str' is updated with the new ptr and length.
+  void UnescapeString(StringValue* str);
 
  private:
   bool strings_are_quoted_;

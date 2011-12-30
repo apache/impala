@@ -518,3 +518,14 @@ int, int, int, string
 9,1,2010,'0'
 10,1,2010,'0'
 =====
+# Tests escape characters
+select * from EscapeNoQuotes
+-----
+string, string, int, int
+-----
+'one','two',3,4
+'one,one','two',3,4
+'one\','two',3,4
+'one\,one','two',3,4
+'one\\','two',3,4
+=====

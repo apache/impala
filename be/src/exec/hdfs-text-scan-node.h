@@ -12,6 +12,7 @@
 
 #include "exec/scan-node.h"
 #include "runtime/descriptors.h"
+#include "util/sse-util.h"
 
 namespace impala {
 
@@ -170,6 +171,11 @@ class HdfsTextScanNode : public ScanNode {
   // Ending position of file buffer.
   char* file_buffer_end_;
 
+  // True if the current file buffer can be reused (not used to store any tuple data).
+  // The file buffer cannot be reused if the resulting tuples contain non-copied string slots
+  // as the file buffer contains the tuple data.
+  bool reuse_file_buffer_;
+
   // number of errors in current file
   int num_errors_in_file_;
 
@@ -179,6 +185,9 @@ class HdfsTextScanNode : public ScanNode {
 
   // Number of partition keys for the files_. Set in Prepare().
   int num_partition_keys_;
+
+  // Number of materialized slots (not including partition-key slots)
+  int num_materialized_slots_;
 
   // Mapping from partition key index to slot index
   // for materializing the virtual partition keys (if any) into Tuples.
@@ -197,7 +206,53 @@ class HdfsTextScanNode : public ScanNode {
 
   // Helper class for converting text to other types;
   boost::scoped_ptr<TextConverter> text_converter_;
+  
+  // Vector containing all the materialized, non-partitioning slot descriptors
+  std::vector<SlotDescriptor*> materialized_slots_;
 
+  // Intermediate structure used for two pass parsing approach.  In the first pass,
+  // ParseData structs are filled out and contain where all the fields start and
+  // their lengths.  In the second pass, the ParseData is used to write out the slots.
+  // We want to keep this struct as small as possible.
+  struct ParseData {
+    //start of field 
+    char* start;  
+    // Encodes the length and whether or not this fields needs to be unescaped.   
+    // If len < 0, then the field needs to be unescaped.
+    int len;
+  };
+  std::vector<ParseData> parse_data_;
+
+  // SSE(xmm) register containing the tuple search character.
+  __m128i xmm_tuple_search_;
+  
+  // SSE(xmm) register containing the field search character.
+  __m128i xmm_field_search_;
+  
+  // SSE(xmm) register containing the escape search character.
+  __m128i xmm_escape_search_;
+
+  // State that can be split between calls to GetNext().  Tuple data can be split across
+  // calls to GetNext().  Should be reset on file open since tuple data is not split across files.
+
+  // Index to keep track of the current current column in the current file
+  int column_idx_;
+
+  // Index into materialized_slots_ for the next slot to output for the current tuple.
+  int slot_idx_;
+
+  // Whether or not the previous character was the escape character
+  bool last_char_is_escape_;
+
+  // Whether or not the current column has an escape character in it (and needs to be unescaped)
+  bool current_column_has_escape_;
+  
+  // Whether or not there was a parse error in the current row.  Used for counting the
+  // number of errors per file.  Once the error log is full, error_in_row will still be
+  // set, in order to be able to record the errors per file, even if the details are not
+  // logged.
+  bool error_in_row_;
+  
   // Parses the current file_buffer_ and writes tuples into the tuple buffer.
   // Input Parameters
   //   state: Runtime state into which we log errors.
@@ -207,24 +262,61 @@ class HdfsTextScanNode : public ScanNode {
   //   These parameters are changed within ParseFileBuffer.
   //   row_batch: Row batch into which to add tuples.
   //   row_idx: Index of current row. Possibly updated within ParseFileBuffer.
-  //   column_idx: Index of current field in file.
-  //   last_char_is_escape: Indicates whether the last character was an escape character.
   //   unescape_string: Indicates whether the current string-slot contains an escape,
   //                    and must be copied unescaped into the the var_len_buffer.
   //   quote_char: Indicates the last quote character starting a quoted string.
   //               Set to NOT_IN_STRING if string_are_quoted==false,
   //               or we have not encountered a quote.
-  //   error_in_row: Indicates whether the current row being parsed has an error.
-  //                 Used for counting the number of errors per file.
-  //                 Once the error log is full, error_in_row will still be set,
-  //                 in order to be able to record the errors per file,
-  //                 even though not all details are logged.
   // Returns Status::OK if no errors were found,
   // or if errors were found but state->abort_on_error() is false.
   // Returns error message if errors were found and state->abort_on_error() is true.
   Status ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, int* row_idx,
-      int* column_idx, bool* last_char_is_escape, bool* unescape_string,
-      char* quote_char, bool* error_in_row);
+      bool* unescape_string, char* quote_char);
+
+  // Parses the current file_buffer_ using SSE ("Intel x86 instruction set extension 'Streaming
+  // Simd Extension'). This should only be called if the hardware suports SSE4.2 instructions.  
+  // SSE4.2 added string processing instructions that allow for proecessing 16 characters at a time.
+  // This function will write field start/len to 'parsed_data_' which can then be written out
+  // to tuples.
+  // Input Parameters:
+  //  max_tuples: The maximum number of tuples that should be parsed.  This is used to control
+  //              how the batching works.
+  // Output Parameters:
+  //  num_tuples: Number of tuples parsed 
+  //  num_fields: Number of materialized fields parsed
+  //  col_start: pointer within file_buffer_ where the next field starts
+  // TODO: Does not handle quoted strings.
+  Status ParseFileBufferSSE(int max_tuples, int* num_tuples, int* num_fields, char** col_start);
+
+  // Writes the intermediate data in parsed_data_ to slots, outputting tuples to row_batch as they
+  // complete.
+  // Input Paramters:
+  //  state: Runtime state into which we log errors
+  //  row_batch: Row batch into which to write new tuples
+  //  first_column_idx: The col idx for the raw file associated with parsed_data_[0]
+  //  num_fields: Total number of fields contained in parsed_data_
+  // Input/Output Parameters
+  //  row_idx: Index of current row in row_batch.
+  //  line_start: pointer to within file_buffer where the current line starts.  This is used
+  //              for better error reporting
+  Status WriteFields(RuntimeState* state, RowBatch* row_batch, int num_fields, 
+      int* row_idx, char** line_start);
+
+  // Write out tuples when there are no materialized fields (e.g. select count(*)).  
+  //  num_tuples: Total number of tuples to write out.
+  Status WriteTuples(RuntimeState* state, RowBatch* row_batch, int num_tuples, 
+      int* row_idx, char** line_start);
+
+  // Appends the current file and line to the RuntimeState's error log (if there is space).  
+  // Also, increments num_errors_in_file_.
+  void ReportRowParseError(RuntimeState* state, char* line_start, int len);
+
+  // Prepends field data that is was from the previous file buffer (This field straddled two file
+  // buffers).  'data' already contains the pointer/len from the current file buffer, 
+  // boundary_column_ contains the beginning of the data from the previous file buffer.
+  // This function will allocate a new string from the tuple pool, concatenate the two pieces and
+  // update 'data' to contain the new pointer/len.
+  void CopyBoundaryField(ParseData* data);
 
   // Initializes the scan node.  
   //  - initialize partition key regex from fe input
