@@ -72,7 +72,7 @@ class DataStreamTest : public testing::Test {
     query_id_.lo = 0;
     query_id_.hi = 0;
     stream_mgr_ = new DataStreamMgr();
-    DCHECK(exec_.Setup().ok());
+    EXPECT_TRUE(exec_.Setup().ok());
     sink_.destNodeId = DEST_NODE_ID;
     hosts_.push_back("localhost");
     backend_thread_ = thread(&DataStreamTest::StartBackend, this);
@@ -108,7 +108,7 @@ class DataStreamTest : public testing::Test {
 
   void PrepareQuery(const string& stmt) {
     stmt_ = stmt;
-    DCHECK(exec_.Exec(stmt, NULL).ok());
+    EXPECT_TRUE(exec_.Exec(stmt, NULL).ok());
     desc_tbl_ = &exec_.runtime_state()->descs();
   }
 
@@ -171,16 +171,16 @@ class DataStreamTest : public testing::Test {
   void Sender(int sender_num) {
     QueryExecutor exec;
     VLOG(1) << "exec setup";
-    DCHECK(exec.Setup().ok());
+    EXPECT_TRUE(exec.Setup().ok());
     VLOG(1) << "exec::exec";
-    DCHECK(exec.Exec(stmt_, NULL).ok());
+    EXPECT_TRUE(exec.Exec(stmt_, NULL).ok());
     VLOG(1) << "create sender";
     DataStreamSender sender(exec.row_desc(), query_id_, sink_, hosts_, 1024);
-    DCHECK(sender.Init().ok());
-    RowBatch* batch;
+    EXPECT_TRUE(sender.Init().ok());
+    RowBatch* batch = NULL;
     SenderInfo& info = sender_info_[sender_num];
     for (;;) {
-      DCHECK(exec.FetchResult(&batch).ok());
+      EXPECT_TRUE(exec.FetchResult(&batch).ok());
       if (batch == NULL) break;
       info.status = sender.Send(batch);
       if (!info.status.ok()) break;

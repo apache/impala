@@ -109,7 +109,11 @@ static void StartServer() {
     exit(1);
   }
   //cmdline.append(" > /dev/null 2> /dev/null");
-  ::system(cmdline.c_str());
+  int ret = ::system(cmdline.c_str());
+  if (ret == -1) {
+    cerr << "couldn't execute command: " << cmdline;
+    exit(1);
+  }
 }
 
 Status QueryExecutor::Setup() {

@@ -601,14 +601,16 @@ Status HdfsTextScanNode::ParseFileBufferSSE(int max_tuples, int* num_tuples, int
     // The strchr sse instruction returns the result in the lower bits of the sse register.
     // Since we only process 16 characters at a time, only the lower 16 bits can contain
     // non-zero values.
-    int tuple_mask = reinterpret_cast<int*>(&xmm_tuple_mask)[0];
-    int field_mask = reinterpret_cast<int*>(&xmm_field_mask)[0];
+    // _mm_extract_epi16 will extract 16 bits out of the xmm register.  The second parameter
+    // specifies which 16 bits to extract (0 for the lowest 16 bits).
+    int tuple_mask = _mm_extract_epi16(xmm_tuple_mask, 0);
+    int field_mask = _mm_extract_epi16(xmm_field_mask, 0);
     int escape_mask = 0;
 
     // If the table does not use escape characters, skip processing for it.
     if (escape_char_ != '\0') {
       xmm_escape_mask = _mm_cmpistrm(xmm_escape_search_, xmm_buffer, SSEUtil::STRCHR_MODE);
-      escape_mask = reinterpret_cast<int*>(&xmm_escape_mask)[0];
+      escape_mask = _mm_extract_epi16(xmm_escape_mask, 0);
       ProcessEscapeMask(escape_mask, &last_char_is_escape_, &field_mask, &tuple_mask);
     }
 

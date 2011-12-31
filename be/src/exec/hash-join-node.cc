@@ -214,7 +214,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
   *eos = true;
   if (match_all_build_) {
     // output remaining unmatched build rows
-    Tuple* tuple;
+    Tuple* tuple = NULL;
     while (!out_batch->IsFull() && (tuple = hash_tbl_iterator_.GetNext()) != NULL) {
       if (joined_build_tuples_.find(tuple) != joined_build_tuples_.end()) continue;
       TupleRow* out_row = CreateOutputRow(out_batch, NULL, tuple);
