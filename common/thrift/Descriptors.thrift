@@ -29,7 +29,6 @@ struct THdfsTable {
   4: required byte collectionDelim
   5: required byte mapKeyDelim
   6: required byte escapeChar
-  7: optional byte quoteChar
 }
 
 struct THBaseTable {

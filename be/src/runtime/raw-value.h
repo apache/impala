@@ -36,9 +36,8 @@ class RawValue {
                     MemPool* pool);
 
   // Returns true if v1 == v2.
-  // TODO: this is separate from Compare() == 0 because string equality comparison
-  // is currently much faster than generic Compare().  Remove this function when
-  // we have an SSE optimized strcmp.
+  // This is more performant than Compare() == 0 for string equality, mostly because of
+  // the length comparison check.
   static bool Eq(const void* v1, const void* v2, PrimitiveType type);
 };
 

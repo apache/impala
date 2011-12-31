@@ -7,6 +7,8 @@ org.eclipse.jdt.core.prefs
 
 pprof.out
 
+TempStatsStore
+
 # CMake:
 Makefile
 CMakeCache.txt

@@ -102,9 +102,7 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc)
     line_delim_(tdesc.hdfsTable.lineDelim),
     field_delim_(tdesc.hdfsTable.fieldDelim),
     collection_delim_(tdesc.hdfsTable.collectionDelim),
-    escape_char_(tdesc.hdfsTable.escapeChar),
-    quote_char_((tdesc.hdfsTable.__isset.quoteChar) ? tdesc.hdfsTable.quoteChar : -1),
-    strings_are_quoted_(tdesc.hdfsTable.__isset.quoteChar) {
+    escape_char_(tdesc.hdfsTable.escapeChar) {
 }
 
 string HdfsTableDescriptor::DebugString() const {

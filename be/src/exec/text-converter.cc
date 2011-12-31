@@ -12,9 +12,8 @@ using namespace boost;
 using namespace impala;
 using namespace std;
 
-TextConverter::TextConverter(bool strings_are_quoted, char escape_char, MemPool* var_len_pool)
-  : strings_are_quoted_(strings_are_quoted),
-    escape_char_(escape_char),
+TextConverter::TextConverter(char escape_char, MemPool* var_len_pool)
+  : escape_char_(escape_char),
     var_len_pool_(var_len_pool) {
 }
 
@@ -80,15 +79,9 @@ bool TextConverter::ConvertAndWriteSlotBytes(const char* begin, const char* end,
     case TYPE_STRING: {
       StringValue* slot = tuple->GetStringSlot(slot_desc->tuple_offset());
       const char* data_start = NULL;
-      if (strings_are_quoted_) {
-        // take out 2 characters for the quotes
-        slot->len = end - begin - 2;
-        // skip the quote char at the beginning
-        data_start = begin + 1;
-      } else {
-        slot->len = end - begin;
-        data_start = begin;
-      }
+      slot->len = end - begin;
+      data_start = begin;
+
       if (!copy_string) {
         DCHECK(!unescape_string);
         slot->ptr = const_cast<char*>(data_start);

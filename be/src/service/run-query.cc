@@ -17,20 +17,44 @@
 #include "gen-cpp/ImpalaPlanService_types.h"
 #include "util/jni-util.h"
 #include "util/perf-counters.h"
+#include "util/stat-util.h"
 
 DEFINE_string(query, "", "query to execute");
 DEFINE_bool(init_hbase, true, "if true, call hbase jni initialization");
 DEFINE_string(profile_output_file, "pprof.out", "google pprof output file");
 DEFINE_int32(iterations, 1, "Number of times to run the query (for perf testing)");
+DEFINE_bool(enable_counters, true, "if false, disable using counters (so a profiler can use them");
 
 using namespace std;
 using namespace impala;
 
 static void Exec() {
   bool enable_profiling = false;
-  if (FLAGS_profile_output_file.size() != 0) {
+  if (FLAGS_enable_counters && FLAGS_profile_output_file.size() != 0) {
     ProfilerStart(FLAGS_profile_output_file.c_str());
     enable_profiling = true;
+  }
+
+  vector<double> elapsed_times;
+  elapsed_times.resize(FLAGS_iterations);
+  int num_rows = 0;
+
+  // If the number of iterations is greater than 1, run once to Ignore JVM startup time.
+  if (FLAGS_iterations > 1) {
+    QueryExecutor executor;
+    EXIT_IF_ERROR(executor.Setup());
+    EXIT_IF_ERROR(executor.Exec(FLAGS_query, NULL));
+    while (true) {
+      string row;
+      EXIT_IF_ERROR(executor.FetchResult(&row));
+      if (row.empty()) break;
+    }
+  }
+  
+  PerfCounters counters;
+  if (FLAGS_enable_counters) {
+    counters.AddDefaultCounters();
+    counters.Snapshot("Setup");
   }
 
   for (int i = 0; i < FLAGS_iterations; ++i) {
@@ -40,41 +64,56 @@ static void Exec() {
     struct timeval start_time;
     gettimeofday(&start_time, NULL);
 
-    PerfCounters counters;
-    counters.AddDefaultCounters();
-    counters.Snapshot("Setup");
-
     EXIT_IF_ERROR(executor.Exec(FLAGS_query, NULL));
 
-    int num_rows = 0;
     while (true) {
       string row;
       EXIT_IF_ERROR(executor.FetchResult(&row));
       if (row.empty()) break;
-      cout << row << endl;
+      // Only print results for first run
+      if (i == 0) cout << row << endl;
       ++num_rows;
     }
-
-    // Print runtime errors, e.g., parsing errors.
-    cout << executor.ErrorString() << endl;
-
-    // Print file errors.
-    cout << executor.FileErrors() << endl;
-
-    counters.Snapshot("Query");
 
     struct timeval end_time;
     gettimeofday(&end_time, NULL);
     double elapsed_usec = end_time.tv_sec * 1000000 + end_time.tv_usec;
     elapsed_usec -= start_time.tv_sec * 1000000 + start_time.tv_usec;
+    elapsed_times[i] = elapsed_usec;
+  
+    if (FLAGS_enable_counters) {
+      counters.Snapshot("Query");
+    }
 
+    if (executor.ErrorString().size() > 0 || executor.FileErrors().size() > 0) {
+      // Print runtime errors, e.g., parsing errors.
+      cout << executor.ErrorString() << endl;
+      // Print file errors.
+      cout << executor.FileErrors() << endl;
+      break;
+    }
+  }
+  
+  num_rows /= FLAGS_iterations;
+
+  if (FLAGS_iterations == 1) {
     cout << "returned " << num_rows << (num_rows == 1 ? " row" : " rows")
-        << " in " << setiosflags(ios::fixed) << setprecision(3)
-        << elapsed_usec/1000000.0 << " s" << endl << endl;
-
-    counters.PrettyPrint(&cout);
+         << " in " << setiosflags(ios::fixed) << setprecision(3)
+         << elapsed_times[0]/1000000.0 << " s" << endl << endl;
+  } else {
+    double mean, stddev;
+    StatUtil::ComputeMeanStddev<double>(&elapsed_times[0], elapsed_times.size(), &mean, &stddev);
+    cout << "returned " << num_rows << (num_rows == 1 ? " row" : " rows")
+         << " in " << setiosflags(ios::fixed) << setprecision(3)
+         << mean/1000000.0 << " s with stddev " 
+         << setiosflags(ios::fixed) << setprecision(3) << stddev/1000000.0
+         << " s" << endl << endl;
   }
 
+  if (FLAGS_enable_counters) {
+    counters.PrettyPrint(&cout);
+  }
+  
   if (enable_profiling) {
     const char* profile = GetHeapProfile();
     fputs(profile, stdout);

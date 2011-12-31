@@ -50,7 +50,6 @@ public abstract class HdfsTable extends Table {
   private String collectionDelim;
   private String mapKeyDelim;
   private String escapeChar;
-  private String quoteChar;
 
   /**
    * Query-relevant information for one table partition.
@@ -270,15 +269,7 @@ public abstract class HdfsTable extends Table {
       // default value
       escapeChar = DEFAULT_ESCAPE_CHAR;
     }
-    quoteChar = serdeInfo.getParameters().get(Constants.QUOTE_CHAR);
-    if (quoteChar != null) {
-      if (quoteChar.length() != 1) {
-        exceptionMessages.add("String quote found: '" + quoteChar + "'");
-      }
-    } else {
-      // unset
-      quoteChar = null;
-    }
+
     // Throw exception if we failed to set at least one delimiter/quote/escape char.
     if (!exceptionMessages.isEmpty()) {
       StringBuilder strBuilder = new StringBuilder();
@@ -305,10 +296,6 @@ public abstract class HdfsTable extends Table {
         (byte) lineDelim.charAt(0), (byte) fieldDelim.charAt(0),
         (byte) collectionDelim.charAt(0), (byte) mapKeyDelim.charAt(0),
         (byte) escapeChar.charAt(0));
-    // Set optional quote char.
-    if (quoteChar != null) {
-      tHdfsTable.setQuoteChar((byte) quoteChar.charAt(0));
-    }
     TTableDescriptor.setHdfsTable(tHdfsTable);
     return TTableDescriptor;
   }
@@ -327,10 +314,6 @@ public abstract class HdfsTable extends Table {
 
   public String getMapKeyDelim() {
     return mapKeyDelim;
-  }
-
-  public String getQuoteChar() {
-    return quoteChar;
   }
 
   public String getEscapeChar() {

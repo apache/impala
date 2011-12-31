@@ -26,10 +26,10 @@ class TExprNode;
 // The materialized value returned by Expr::GetValue().
 struct ExprValue {
   bool bool_val;
-  char tinyint_val;
-  short smallint_val;
-  int int_val;
-  long bigint_val;
+  int8_t tinyint_val;
+  int16_t smallint_val;
+  int32_t int_val;
+  int64_t bigint_val;
   float float_val;
   double double_val;
   std::string string_data;
@@ -48,9 +48,10 @@ struct ExprValue {
   }
 
   ExprValue(bool v): bool_val(v) {}
-  ExprValue(char v): tinyint_val(v) {}
-  ExprValue(short v): smallint_val(v) {}
-  ExprValue(int v): int_val(v) {}
+  ExprValue(int8_t v): tinyint_val(v) {}
+  ExprValue(int16_t v): smallint_val(v) {}
+  ExprValue(int32_t v): int_val(v) {}
+  ExprValue(int64_t v): bigint_val(v) {}
   ExprValue(float v): float_val(v) {}
   ExprValue(double v): double_val(v) {}
 
@@ -59,6 +60,10 @@ struct ExprValue {
     : string_data(str),
       string_val(const_cast<char*>(string_data.data()), string_data.size()) {
   }
+  
+  // Update this ExprValue by parsing the string and return a pointer to the result.
+  // NULL will be returned if the string and type are not compatible.
+  void* TryParse(const std::string& string, PrimitiveType type);
 
   // Set string value to copy of str
   void SetStringVal(const StringValue& str) {

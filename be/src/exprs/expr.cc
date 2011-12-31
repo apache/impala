@@ -37,6 +37,38 @@ bool ParseString(const string& str, T* val) {
   return !stream.fail();
 }
 
+void* ExprValue::TryParse(const string& str, PrimitiveType type) {
+  switch(type) {
+    case TYPE_BOOLEAN: 
+      if (ParseString<bool>(str, &bool_val)) return &bool_val;
+      break;
+    case TYPE_TINYINT:
+      if (ParseString<int8_t>(str, &tinyint_val)) return &tinyint_val;
+      break;
+    case TYPE_SMALLINT:
+      if (ParseString<int16_t>(str, &smallint_val)) return &smallint_val;
+      break;
+    case TYPE_INT:
+      if (ParseString<int32_t>(str, &int_val)) return &int_val;
+      break;
+    case TYPE_BIGINT:
+      if (ParseString<int64_t>(str, &bigint_val)) return &bigint_val;
+      break;
+    case TYPE_FLOAT:
+      if (ParseString<float>(str, &float_val)) return &float_val;
+      break;
+    case TYPE_DOUBLE:
+      if (ParseString<double>(str, &double_val)) return &double_val;
+      break;
+    case TYPE_STRING:
+      SetStringVal(str);
+      return &string_val;
+    default:
+      DCHECK(false) << "Invalid type.";
+  }
+  return NULL;
+}
+
 Expr::Expr(PrimitiveType type)
     : opcode_(TExprOpcode::INVALID_OPCODE),
       is_slotref_(false),
@@ -110,19 +142,19 @@ Expr* Expr::CreateLiteral(ObjectPool* pool, PrimitiveType type, const string& st
         result = new BoolLiteral(&val.bool_val);
       break;
     case TYPE_TINYINT:
-      if (ParseString<char>(str, &val.tinyint_val)) 
+      if (ParseString<int8_t>(str, &val.tinyint_val)) 
         result = new IntLiteral(type, &val.tinyint_val);
       break;
     case TYPE_SMALLINT:
-      if (ParseString<short>(str, &val.smallint_val))
+      if (ParseString<int16_t>(str, &val.smallint_val))
         result = new IntLiteral(type, &val.smallint_val);
       break;
     case TYPE_INT:
-      if (ParseString<int>(str, &val.int_val))
+      if (ParseString<int32_t>(str, &val.int_val))
         result = new IntLiteral(type, &val.int_val);
       break;
     case TYPE_BIGINT:
-      if (ParseString<long>(str, &val.bigint_val)) 
+      if (ParseString<int64_t>(str, &val.bigint_val)) 
         result = new IntLiteral(type, &val.bigint_val);
       break;
     case TYPE_FLOAT:

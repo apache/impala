@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "common/compiler-util.h"
 #include "gen-cpp/Types_types.h"  // for TStatus
 
 namespace impala {
@@ -76,12 +77,12 @@ class Status {
 
 // some generally useful macros
 #define RETURN_IF_ERROR(stmt) \
-  do { Status status = (stmt); if (!status.ok()) return status; } while (false)
+  do { Status status = (stmt); if (UNLIKELY(!status.ok())) return status; } while (false)
 
 #define EXIT_IF_ERROR(stmt) \
   do { \
     Status status = (stmt); \
-    if (!status.ok()) { \
+    if (UNLIKELY(!status.ok())) { \
       string msg; \
       status.GetErrorMsg(&msg); \
       cerr << msg; \

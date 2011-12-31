@@ -271,6 +271,16 @@ CREATE TABLE EscapeNoQuotes (
   col4 int)
 row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
 
+DROP TABLE IF EXISTS Overflow;
+CREATE TABLE Overflow (
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double)
+row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
+
 DROP TABLE IF EXISTS GrepTiny;
 CREATE TABLE GrepTiny (
   field string);

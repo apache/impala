@@ -13,7 +13,7 @@ class StringValue;
 // Helper class for dealing with text data, e.g., converting text data to numeric types, etc.
 class TextConverter {
  public:
-  TextConverter(bool strings_are_quoted, char escape_char, MemPool* var_len_pool);
+  TextConverter(char escape_char, MemPool* var_len_pool);
 
   // Converts slot data (begin, end) into type of slot_desc,
   // and writes the result into the tuples's slot.
@@ -37,7 +37,6 @@ class TextConverter {
   void UnescapeString(StringValue* str);
 
  private:
-  bool strings_are_quoted_;
   char escape_char_;
   // Pool used to allocate memory for string copies.
   MemPool* var_len_pool_;

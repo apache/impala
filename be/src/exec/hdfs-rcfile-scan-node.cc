@@ -69,7 +69,7 @@ Status HdfsRCFileScanNode::Prepare(RuntimeState* state) {
   }
   const HdfsTableDescriptor* hdfs_table =
       static_cast<const HdfsTableDescriptor*>(tuple_desc_->table_desc());
-  text_converter_.reset(new TextConverter(false, 0, tuple_buf_pool_.get()));
+  text_converter_.reset(new TextConverter(0, tuple_buf_pool_.get()));
 
   // Create mapping from column index in table to slot index in output tuple.
   // First, initialize all columns to SKIP_COLUMN.

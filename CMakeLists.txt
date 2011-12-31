@@ -78,7 +78,17 @@ add_subdirectory(common/function-registry)
 add_subdirectory(common/thrift)
 add_subdirectory(be)
 
+# Run FE and BE tests
 add_custom_target(testall 
   COMMAND ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR}/fe mvn test
   COMMAND ${CMAKE_SOURCE_DIR}/bin/runbackendtests.sh
+)
+
+# Load test data
+add_custom_target(loadtestdata
+  COMMAND ${CMAKE_SOURCE_DIR}/bin/load-test-data.sh
+)
+
+add_custom_target(benchmark_run
+  COMMAND ${CMAKE_SOURCE_DIR}/be/bin/run_hive_benchmark.py
 )

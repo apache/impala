@@ -96,10 +96,6 @@ class HdfsTextScanNode : public ScanNode {
   // Regular expressions to evaluate over file paths to extract partition key values
   boost::regex partition_key_regex_;
 
-  // Partition key values.  This is computed once for each file and valid for the
-  // duration of that file.  The vector contains only literal exprs.
-  std::vector<Expr*> partition_key_values_;
-
   // Descriptor of tuples in input files.
   const TupleDescriptor* tuple_desc_;
 
@@ -115,15 +111,8 @@ class HdfsTextScanNode : public ScanNode {
   // Character delimiting collection items (to become slots).
   char collection_item_delim_;
 
-  // Escape character. Ignored if strings are not quoted.
+  // Escape character. 
   char escape_char_;
-
-  // Indicates whether strings are quoted. If set to false, string quotes will simply be copied.
-  bool strings_are_quoted_;
-
-  // Character in which quotes strings are enclosed in data files.
-  // Ignored if strings_are_quoted_ is false.
-  char string_quote_;
 
   // contains all memory for tuple data, including string data which we can't reference
   // in the file buffers (because it needs to be unescaped or straddles two file buffers)
@@ -135,6 +124,9 @@ class HdfsTextScanNode : public ScanNode {
   // Pool for allocating objects.
   // Currently only used for creating LiteralExprs from TExpr for partition keys in Prepare().
   boost::scoped_ptr<ObjectPool> obj_pool_;
+
+  // Pool for allocating partition key tuple and string buffers
+  boost::scoped_ptr<MemPool> partition_key_pool_;
 
   // Parser internal state:
 
@@ -149,6 +141,13 @@ class HdfsTextScanNode : public ScanNode {
 
   // Index of current file being processed.
   int file_idx_;
+
+  // A partially materialized tuple with only partition key slots set.  The non-partition key
+  // slots are set to NULL.  The template tuple must be copied into tuple_ before any of the
+  // other slots are materialized.
+  // Pointer is NULL if there are no partition key slots.
+  // This template tuple is computed once for each file and valid for the duration of that file.
+  Tuple* partition_key_template_tuple_; 
 
   // Contiguous block of memory into which tuples are written, allocated
   // from tuple_pool_. We don't allocate individual tuples from tuple_pool_ directly,
@@ -253,31 +252,13 @@ class HdfsTextScanNode : public ScanNode {
   // logged.
   bool error_in_row_;
   
-  // Parses the current file_buffer_ and writes tuples into the tuple buffer.
-  // Input Parameters
-  //   state: Runtime state into which we log errors.
-  //   row_batch: Row batch into which to write new tuples.
-  // Input/Output Parameters:
-  //   The following parameters make up the state that must be maintained across file buffers.
-  //   These parameters are changed within ParseFileBuffer.
-  //   row_batch: Row batch into which to add tuples.
-  //   row_idx: Index of current row. Possibly updated within ParseFileBuffer.
-  //   unescape_string: Indicates whether the current string-slot contains an escape,
-  //                    and must be copied unescaped into the the var_len_buffer.
-  //   quote_char: Indicates the last quote character starting a quoted string.
-  //               Set to NOT_IN_STRING if string_are_quoted==false,
-  //               or we have not encountered a quote.
-  // Returns Status::OK if no errors were found,
-  // or if errors were found but state->abort_on_error() is false.
-  // Returns error message if errors were found and state->abort_on_error() is true.
-  Status ParseFileBuffer(RuntimeState* state, RowBatch* row_batch, int* row_idx,
-      bool* unescape_string, char* quote_char);
-
-  // Parses the current file_buffer_ using SSE ("Intel x86 instruction set extension 'Streaming
-  // Simd Extension'). This should only be called if the hardware suports SSE4.2 instructions.  
+  // Parses the current file_buffer_ for the field and tuple breaks.  This function will write
+  // the field start & len to 'parsed_data_' which can then be written out to tuples.
+  // This function will use  SSE ("Intel x86 instruction set extension 'Streaming
+  // Simd Extension') if the hardware supports SSE4.2 instructions.  
   // SSE4.2 added string processing instructions that allow for processing 16 characters at a time.
   // This function will write field start/len to 'parsed_data_' which can then be written out
-  // to tuples.
+  // to tuples.  Otherwise, this function will walk the file_buffer_ character by character.
   // Input Parameters:
   //  max_tuples: The maximum number of tuples that should be parsed.  This is used to control
   //              how the batching works.
@@ -285,12 +266,11 @@ class HdfsTextScanNode : public ScanNode {
   //  num_tuples: Number of tuples parsed 
   //  num_fields: Number of materialized fields parsed
   //  col_start: pointer within file_buffer_ where the next field starts
-  // TODO: Does not handle quoted strings.
-  Status ParseFileBufferSSE(int max_tuples, int* num_tuples, int* num_fields, char** col_start);
+  Status ParseFileBuffer(int max_tuples, int* num_tuples, int* num_fields, char** col_start);
 
   // Writes the intermediate data in parsed_data_ to slots, outputting tuples to row_batch as they
   // complete.
-  // Input Paramters:
+  // Input Parameters:
   //  state: Runtime state into which we log errors
   //  row_batch: Row batch into which to write new tuples
   //  first_column_idx: The col idx for the raw file associated with parsed_data_[0]
@@ -322,8 +302,10 @@ class HdfsTextScanNode : public ScanNode {
   //  - initialize partition key regex from fe input
   Status Init(ObjectPool* pool, const TPlanNode& tnode);
 
-  // Updates 'partition_key_values_' by extracting the values from the current file path
-  // using 'partition_key_regex_'
+  // Allocate a key partition_key_template_tuple_ and write the slots by
+  // extracting the values from the current file path using 'partition_key_regex_'
+  // The template tuple is valid for the current file.
+  // Memory for tuple and tuple data comes from partition_key_pool_
   Status ExtractPartitionKeyValues(RuntimeState* state);
 };
 

@@ -26,7 +26,7 @@ HBaseScanNode::HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode,
       tuple_pool_(new MemPool()),
       hbase_scanner_(NULL),
       row_key_slot_(NULL),
-      text_converter_(new TextConverter(false, '\\', tuple_pool_.get())) {
+      text_converter_(new TextConverter('\\', tuple_pool_.get())) {
 }
 
 bool HBaseScanNode::CmpColPos(const SlotDescriptor* a, const SlotDescriptor* b) {
