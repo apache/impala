@@ -18,3 +18,4 @@ add_library(Opcode ${SRC_FILES})
 # Setting these files as code-generated lets make clean and incremental builds work correctly
 set_source_files_properties(${SRC_FILES} PROPERTIES GENERATED TRUE)
 
+add_dependencies(Opcode function-registry)

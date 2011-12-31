@@ -117,7 +117,13 @@ $IMPALA_HOME/bin/clean-fe-processes.py
 
 # build common and backend
 cd $IMPALA_HOME
-cmake -DCMAKE_BUILD_TYPE=Debug . && make -j4
+cmake -DCMAKE_BUILD_TYPE=Debug .
+cd $IMPALA_HOME/common/function-registry
+make
+cd $IMPALA_HOME/common/thrift
+make
+cd $IMPALA_BE_DIR
+make -j4
 
 # Generate hive-site.xml from template via env var substitution
 # TODO: Throw an error if the template references an undefined environment variable

@@ -40,3 +40,5 @@ add_library(ImpalaThrift ${SRC_FILES})
 set_source_files_properties(${SRC_FILES} PROPERTIES GENERATED TRUE)
 
 add_library(thrift STATIC IMPORTED)
+
+add_dependencies(ImpalaThrift thrift-cpp)
