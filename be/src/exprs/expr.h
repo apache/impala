@@ -63,12 +63,18 @@ struct ExprValue {
   // Set string value to copy of str
   void SetStringVal(const StringValue& str) {
     string_data = std::string(str.ptr, str.len);
-    string_val.ptr = const_cast<char*>(string_data.data());
-    string_val.len = string_data.size();
+    SyncStringVal();
   }
 
   void SetStringVal(const std::string& str) {
     string_data = str;
+    SyncStringVal();
+  }
+
+  // Updates string_val ptr / len pair to reflect any changes in
+  // string_data. If not called after mutating string_data,
+  // string_val->ptr may point at garbage.
+  void SyncStringVal() {
     string_val.ptr = const_cast<char*>(string_data.data());
     string_val.len = string_data.size();
   }
@@ -77,9 +83,9 @@ struct ExprValue {
 // This is the superclass of all expr evaluation nodes.
 class Expr {
  public:
-  // typedef for compute functions.  
+  // typedef for compute functions.
   typedef void* (*ComputeFunction)(Expr*, TupleRow*);
-  
+
   // Prepare expr tree for evaluation. In particular, set compute_function_.
   // Prepare should be invoked recurisvely on the expr tree.
   // Return OK if successful, otherwise return error status.
@@ -115,7 +121,7 @@ class Expr {
   const std::vector<Expr*>& children() const { return children_; }
 
   TExprOpcode::type op() const { return opcode_; }
-  
+
   // Returns true if expr doesn't contain slotrefs, ie, can be evaluated
   // with GetValue(NULL). The default implementation returns true if all of
   // the children are constant.

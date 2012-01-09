@@ -12,6 +12,9 @@ class TupleRow;
 class StringFunctions {
  public:
   static void* Substring(Expr* e, TupleRow* row);
+  static void* Length(Expr* e, TupleRow* row);
+  static void* Lower(Expr* e, TupleRow* row);
+  static void* Upper(Expr* e, TupleRow* row);
 };
 
 }

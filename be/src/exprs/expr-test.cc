@@ -363,7 +363,7 @@ TEST_F(ExprTest, LiteralConstruction) {
   TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val, "1.23");
   TestSingleLiteralConstruction(TYPE_STRING, &str_val, "Hello");
 }
-  
+
 
 TEST_F(ExprTest, LiteralExprs) {
   TestFixedPointLimits<int8_t>(TYPE_TINYINT);
@@ -568,7 +568,26 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("substring('Hello', 1, 1)", "H");
   TestStringValue("substring('Hello', 2, 100)", "ello");
   TestStringValue("substring('Hello', -3, 2)", "ll");
-  //TODO: this NULLs, currently we can't parse them inside function calls
+
+  TestStringValue("lower('')", "");
+  TestStringValue("lower('HELLO')", "hello");
+  TestStringValue("lower('Hello')", "hello");
+  TestStringValue("lower('hello!')", "hello!");
+  TestStringValue("lcase('HELLO')", "hello");
+
+  TestStringValue("upper('')", "");
+  TestStringValue("upper('HELLO')", "HELLO");
+  TestStringValue("upper('Hello')", "HELLO");
+  TestStringValue("upper('hello!')", "HELLO!");
+  TestStringValue("ucase('hello')", "HELLO");
+
+  TestValue("length('')", TYPE_INT, 0);
+  TestValue("length('a')", TYPE_INT, 1);
+  TestValue("length('abcdefg')", TYPE_INT, 7);
+
+  // TODO: tests with NULL arguments, currently we can't parse them
+  // inside function calls.
+  // e.g.   TestValue("length(NULL)", TYPE_INT, NULL);
 }
 
 TEST_F(ExprTest, MathFunctions) {
