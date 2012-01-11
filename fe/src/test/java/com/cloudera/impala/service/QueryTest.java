@@ -39,18 +39,16 @@ public class QueryTest {
       // run query 3 ways: with backend's default batch size, with small batch size,
       // and with batch size of 1, which should trigger a lot of corner cases
       // in the execution engine code
-      TestUtils.runQuery(
-          executor, queryFileParser.getQuery(), queryFileParser.getLineNum(),
-          0, abortOnError, maxErrors, null, expectedTypes, expectedResults, null, null,
-          errorLog);
-      TestUtils.runQuery(
-          executor, queryFileParser.getQuery(), queryFileParser.getLineNum(),
-          16, abortOnError, maxErrors, null, expectedTypes, expectedResults, null, null,
-          errorLog);
-      TestUtils.runQuery(
-          executor, queryFileParser.getQuery(), queryFileParser.getLineNum(),
-          1, abortOnError, maxErrors, null, expectedTypes, expectedResults, null, null,
-          errorLog);
+      int[] batchSizes = {0, 16, 1};
+      int[] numNodes = {1, 2};
+      for (int i = 0; i < batchSizes.length; ++i) {
+        for (int j = 0; j < numNodes.length; ++j) {
+          TestUtils.runQuery(
+              executor, queryFileParser.getQuery(), queryFileParser.getLineNum(),
+              numNodes[j], batchSizes[i], abortOnError, maxErrors, null, expectedTypes,
+              expectedResults, null, null, errorLog);
+        }
+      }
     }
     queryFileParser.close();
     if (errorLog.length() != 0) {

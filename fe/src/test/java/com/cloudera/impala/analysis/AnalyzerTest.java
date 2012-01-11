@@ -195,6 +195,9 @@ public class AnalyzerTest {
   public void TestMemLayout() {
     AnalyzesOk("select * from AllTypes");
     DescriptorTable descTbl = analyzer.getDescTbl();
+    for (SlotDescriptor slotD: descTbl.getTupleDesc(new TupleId(0)).getSlots()) {
+      slotD.setIsMaterialized(true);
+    }
     descTbl.computeMemLayout();
     checkLayoutParams("alltypes.bool_col", 1, 2, 0, 0);
     checkLayoutParams("alltypes.tinyint_col", 1, 3, 0, 1);

@@ -7,6 +7,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.ListIterator;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.AggregateExpr;
 import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.AnalysisContext;
@@ -29,10 +31,12 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.Pair;
+import com.cloudera.impala.thrift.THostPort;
 import com.cloudera.impala.thrift.TPlanExecParams;
 import com.cloudera.impala.thrift.TPlanExecRequest;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TScanRange;
+import com.cloudera.impala.thrift.TUniqueId;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -43,6 +47,8 @@ import com.google.common.collect.Sets;
  *
  */
 public class Planner {
+  private final static Logger LOG = LoggerFactory.getLogger(Planner.class);
+
   // counter to assign sequential node ids
   private int nextNodeId = 0;
 
@@ -254,10 +260,10 @@ public class Planner {
   }
 
   /**
-   * Mark slots that aren't being referenced by any conjuncts or select list
-   * exprs as non-materialized.
+   * Mark slots that are being referenced by any conjuncts or select list
+   * exprs as materialized.
    */
-  private void markUnrefdSlots(PlanNode root, SelectStmt selectStmt, Analyzer analyzer) {
+  private void markRefdSlots(PlanNode root, SelectStmt selectStmt, Analyzer analyzer) {
     PlanNode node = root;
     List<SlotId> refdIdList = Lists.newArrayList();
     while (node != null) {
@@ -280,8 +286,8 @@ public class Planner {
     refdIds.addAll(refdIdList);
     for (TupleDescriptor tupleDesc: analyzer.getDescTbl().getTupleDescs()) {
       for (SlotDescriptor slotDesc: tupleDesc.getSlots()) {
-        if (!refdIds.contains(slotDesc.getId())) {
-          slotDesc.setIsMaterialized(false);
+        if (refdIds.contains(slotDesc.getId())) {
+          slotDesc.setIsMaterialized(true);
         }
       }
     }
@@ -342,40 +348,8 @@ public class Planner {
   private PlanNode createMergeAggNode(
       Analyzer analyzer, PlanNode inputNode, AggregateInfo inputAggInfo)
       throws InternalException {
-    // construct grouping exprs
-    TupleDescriptor inputDesc = inputAggInfo.getAggTupleDesc();
-    ArrayList<Expr> groupingExprs = Lists.newArrayList();
-    for (int i = 0; i < inputAggInfo.getGroupingExprs().size(); ++i) {
-      groupingExprs.add(new SlotRef(inputDesc.getSlots().get(i)));
-    }
-
-    // construct agg exprs
-    ArrayList<AggregateExpr> aggExprs = Lists.newArrayList();
-    for (int i = 0; i < inputAggInfo.getAggregateExprs().size(); ++i) {
-      AggregateExpr inputExpr = inputAggInfo.getAggregateExprs().get(i);
-      Expr aggExprParam =
-          new SlotRef(inputDesc.getSlots().get(
-            i + inputAggInfo.getGroupingExprs().size()));
-      List<Expr> aggExprParamList = Lists.newArrayList(aggExprParam);
-      AggregateExpr aggExpr = null;
-      if (inputExpr.getOp() == AggregateExpr.Operator.COUNT) {
-        aggExpr =
-            new AggregateExpr(AggregateExpr.Operator.SUM, false, false, aggExprParamList);
-      } else {
-        aggExpr = new AggregateExpr(inputExpr.getOp(), false, false, aggExprParamList);
-      }
-      try {
-        aggExpr.analyze(analyzer);
-      } catch (AnalysisException e) {
-        // we shouldn't see this
-        throw new InternalException(
-            "error constructing merge aggregation node: " + e.getMessage());
-      }
-      aggExprs.add(aggExpr);
-    }
-
-    AggregateInfo mergeAggInfo = new AggregateInfo(groupingExprs, aggExprs);
-    mergeAggInfo.createAggTuple(analyzer.getDescTbl());
+    AggregateInfo mergeAggInfo =
+        AggregateInfo.createMergeAggInfo(inputAggInfo, analyzer);
     AggregationNode result = new AggregationNode(inputNode, mergeAggInfo);
     return result;
   }
@@ -439,7 +413,7 @@ public class Planner {
       // SELECT without FROM clause
       TQueryExecRequest request = new TQueryExecRequest();
       TPlanExecRequest fragmentRequest = new TPlanExecRequest(
-          Expr.treesToThrift(selectStmt.getSelectListExprs()));
+          new TUniqueId(), Expr.treesToThrift(selectStmt.getSelectListExprs()));
       request.addToFragmentRequests(fragmentRequest);
       return request;
     }
@@ -459,11 +433,13 @@ public class Planner {
     int exchNodeId = -1;
     // node that is currently the root of the PlanNode tree(s)
     PlanNode currentPlanRoot = null;
+    ExchangeNode exchangeNode = null;
     if (numNodes != 1) {
       // create coordinator plan fragment (single ExchangeNode, possibly
       // followed by a merge aggregation step and a top-n node)
-      coordPlan = new ExchangeNode(slavePlan.getTupleIds());
+      coordPlan = exchangeNode = new ExchangeNode(slavePlan.getTupleIds());
       coordPlan.id = exchNodeId = getNextNodeId();
+      coordPlan.rowTupleIds = slavePlan.rowTupleIds;
 
       if (aggInfo != null) {
         coordPlan = currentPlanRoot =
@@ -499,12 +475,19 @@ public class Planner {
       currentPlanRoot.id = getNextNodeId();
     }
 
-    slavePlan.setLimit(selectStmt.getLimit());
     slavePlan.finalize(analyzer);
-    markUnrefdSlots(slavePlan, selectStmt, analyzer);
+    markRefdSlots(slavePlan, selectStmt, analyzer);
     if (coordPlan != null) {
       coordPlan.setLimit(selectStmt.getLimit());
       coordPlan.finalize(analyzer);
+      markRefdSlots(coordPlan, selectStmt, analyzer);
+      if (coordPlan instanceof ExchangeNode) {
+        // if all we're doing is merging results from the slaves, we can
+        // also set the limit in the slaves
+        slavePlan.setLimit(selectStmt.getLimit());
+      }
+    } else {
+      slavePlan.setLimit(selectStmt.getLimit());
     }
     // don't compute mem layout before marking slots that aren't being referenced
     analyzer.getDescTbl().computeMemLayout();
@@ -515,9 +498,19 @@ public class Planner {
     // TODO: substitute select list exprs against output of currentPlanRoot
     // probably best to add PlanNode.substMap
 
+    // partition fragment by partitioning leftmost scan;
+    // do this now, so we set the correct number of senders for the exchange node
+    ScanNode leftmostScan = getLeftmostScan(slavePlan);
+    Preconditions.checkState(leftmostScan != null);
+    List<TScanRange> scanRanges = Lists.newArrayList();
+    List<String> hosts = Lists.newArrayList();
+    leftmostScan.getScanParams(numNodes, scanRanges, hosts);
     TQueryExecRequest request = new TQueryExecRequest();
+    request.addToExecNodes(hosts);
+    if (exchangeNode != null) exchangeNode.setNumSenders(hosts.size());
+
     TPlanExecRequest fragmentRequest = new TPlanExecRequest(
-        Expr.treesToThrift(selectStmt.getSelectListExprs()));
+        new TUniqueId(), Expr.treesToThrift(selectStmt.getSelectListExprs()));
     if (coordPlan != null) {
       // coordinator fragment comes first
       planFragments.add(coordPlan);
@@ -564,21 +557,16 @@ public class Planner {
     fragmentRequest.setDescTbl(analyzer.getDescTbl().toThrift());
     request.addToFragmentRequests(fragmentRequest);
 
-    // partition fragment by partitioning leftmost scan
-    ScanNode leftmostScan = getLeftmostScan(slavePlan);
-    Preconditions.checkState(leftmostScan != null);
-    List<TScanRange> scanRanges = Lists.newArrayList();
-    List<String> hosts = Lists.newArrayList();
-    leftmostScan.getScanParams(numNodes, scanRanges, hosts);
-    request.addToExecNodes(hosts);
-
     // one TPlanExecParams per fragment/scan range
     List<TPlanExecParams> fragmentParamsList = Lists.newArrayList();
     for (TScanRange scanRange: scanRanges) {
       TPlanExecParams fragmentParams = new TPlanExecParams();
       fragmentParams.addToScanRanges(scanRange);
       // all fragments sent to coordinator, which runs on localhost
-      fragmentParams.setDestHosts(Lists.newArrayList("localhost"));
+      THostPort hostPort = new THostPort();
+      hostPort.host = "localhost";
+      hostPort.port = 0;  // set elsewhere
+      fragmentParams.setDestinations(Lists.newArrayList(hostPort));
       fragmentParamsList.add(fragmentParams);
     }
 

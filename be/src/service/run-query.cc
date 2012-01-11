@@ -8,27 +8,35 @@
 #include <glog/vlog_is_on.h>
 #include <google/heap-profiler.h>
 #include <google/profiler.h>
+#include <server/TServer.h>
+#include <boost/thread/thread.hpp>
 
 #include "common/status.h"
 #include "exec/hbase-table-scanner.h"
 #include "testutil/query-executor.h"
-#include "service/plan-executor-adaptor.h"
+#include "testutil/test-env.h"
+#include "service/backend-service.h"
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
 #include "util/jni-util.h"
 #include "util/perf-counters.h"
 #include "util/stat-util.h"
+#include "runtime/data-stream-mgr.h"
 
 DEFINE_string(query, "", "query to execute");
 DEFINE_bool(init_hbase, true, "if true, call hbase jni initialization");
 DEFINE_string(profile_output_file, "pprof.out", "google pprof output file");
 DEFINE_int32(iterations, 1, "Number of times to run the query (for perf testing)");
 DEFINE_bool(enable_counters, true, "if false, disable using counters (so a profiler can use them");
+DECLARE_int32(num_backends);
+DECLARE_int32(backend_port);
 
 using namespace std;
 using namespace impala;
+using namespace boost;
+using namespace apache::thrift::server;
 
-static void Exec() {
+static void Exec(DataStreamMgr* stream_mgr, TestEnv* test_env) {
   bool enable_profiling = false;
   if (FLAGS_enable_counters && FLAGS_profile_output_file.size() != 0) {
     ProfilerStart(FLAGS_profile_output_file.c_str());
@@ -58,7 +66,7 @@ static void Exec() {
   }
 
   for (int i = 0; i < FLAGS_iterations; ++i) {
-    QueryExecutor executor;
+    QueryExecutor executor(stream_mgr, test_env);
     EXIT_IF_ERROR(executor.Setup());
 
     struct timeval start_time;
@@ -122,18 +130,31 @@ static void Exec() {
   }
 }
 
+static void RunServer(TServer* server) {
+  server->serve();
+}
+
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, true);
 
+  JniUtil::InitLibhdfs();
+  TestEnv* test_env = NULL;
+  DataStreamMgr* stream_mgr = NULL;
+  if (FLAGS_num_backends != 0) {
+    stream_mgr = new DataStreamMgr();
+    TServer* server = StartImpalaBackendService(stream_mgr, FLAGS_backend_port);
+    thread server_thread = thread(&RunServer, server);
+    test_env = new TestEnv(FLAGS_backend_port + 1);
+    test_env->StartBackends(FLAGS_num_backends);
+  }
   EXIT_IF_ERROR(JniUtil::Init());
   if (FLAGS_init_hbase) {
     EXIT_IF_ERROR(HBaseTableScanner::Init());
     EXIT_IF_ERROR(RuntimeState::InitHBaseConf());
   }
-  EXIT_IF_ERROR(PlanExecutorAdaptor::Init());
 
-  Exec();
+  Exec(stream_mgr, test_env);
 
   // Delete all global JNI references.
   JniUtil::Cleanup();

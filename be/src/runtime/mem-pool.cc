@@ -13,16 +13,14 @@ const int MemPool::DEFAULT_INITIAL_CHUNK_SIZE;
 const int MemPool::MAX_CHUNK_SIZE;
 
 MemPool::MemPool()
-  : owns_data_(true),
-    current_chunk_idx_(-1),
+  : current_chunk_idx_(-1),
     last_offset_conversion_chunk_idx_(-1),
     chunk_size_(0),
     total_allocated_bytes_(0) {
 }
 
 MemPool::MemPool(int chunk_size)
-  : owns_data_(true),
-    current_chunk_idx_(-1),
+  : current_chunk_idx_(-1),
     last_offset_conversion_chunk_idx_(-1),
     // round up chunk size to nearest 8 bytes
     chunk_size_(((chunk_size + 7) / 8) * 8),
@@ -31,8 +29,7 @@ MemPool::MemPool(int chunk_size)
 }
 
 MemPool::MemPool(vector<string>* chunks)
-  : owns_data_(false),
-    current_chunk_idx_(-1),
+  : current_chunk_idx_(-1),
     last_offset_conversion_chunk_idx_(-1),
     chunk_size_(0),
     total_allocated_bytes_(0) {
@@ -41,8 +38,10 @@ MemPool::MemPool(vector<string>* chunks)
   for (int i = 0; i < chunks->size(); ++i) {
     chunks_.push_back(ChunkInfo());
     ChunkInfo& chunk = chunks_.back();
+    chunk.owns_data = false;
     chunk.data = const_cast<char*>((*chunks)[i].data());
     chunk.size = (*chunks)[i].size();
+    VLOG(1) << "chunk: data=" << (void*)chunk.data << " size=" << chunk.size;
     chunk.allocated_bytes = chunk.size;
     chunk.cumulative_allocated_bytes = total_allocated_bytes_;
     total_allocated_bytes_ += chunk.size;
@@ -51,8 +50,10 @@ MemPool::MemPool(vector<string>* chunks)
 }
 
 MemPool::~MemPool() {
-  if (!owns_data_) return;
+  VLOG(1) << this << " ~mempool: deleting " << chunks_.size() << " chunks";
   for (size_t i = 0; i < chunks_.size(); ++i) {
+    if (!chunks_[i].owns_data) continue;
+    VLOG(1) << "deleting " << (void*)chunks_[i].data;
     delete [] chunks_[i].data;
   }
 }

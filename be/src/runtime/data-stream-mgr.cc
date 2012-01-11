@@ -36,7 +36,7 @@ RowBatch* DataStreamMgr::StreamControlBlock::GetBatch() {
   unique_lock<mutex> l(lock_);
   // wait until something shows up or we know we're done
   while (batch_queue_.empty() && num_remaining_senders_ > 0) {
-    VLOG(1) << "wait arrival\n";
+    VLOG(1) << "wait arrival query=" << query_id_ << " node=" << dest_node_id_;
     data_arrival_.wait(l);
   }
   if (batch_queue_.empty()) {
@@ -82,7 +82,7 @@ void DataStreamMgr::StreamControlBlock::DecrementSenders() {
   if (num_remaining_senders_ == 0) data_arrival_.notify_one();
 }
 
-inline size_t GetHashValue(const TUniqueId& query_id, PlanNodeId node_id) {
+inline size_t DataStreamMgr::GetHashValue(const TUniqueId& query_id, PlanNodeId node_id) {
   size_t value = hash<int64_t>().operator()(query_id.lo);
   hash_combine(value, hash<int64_t>().operator()(query_id.hi));
   hash_combine(value, hash<int32_t>().operator()(node_id));

@@ -4,6 +4,7 @@ package com.cloudera.impala.planner;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -107,7 +108,7 @@ public abstract class HdfsScanNode extends ScanNode {
 
   @Override
   public void getScanParams(
-      int numPartitions, List<TScanRange> scanRanges, List<String> hosts) {
+      int numPartitions, List<TScanRange> scanRanges, List<String> hostports) {
     if (numPartitions == 1) {
       TScanRange scanRange = new TScanRange(id);
       Preconditions.checkState(filePaths.size() == fileLengths.size());
@@ -119,7 +120,7 @@ public abstract class HdfsScanNode extends ScanNode {
       return;
     }
 
-    // map from host name to list of (file path, block location)
+    // map from "host:port" string to list of (file path, block location)
     Map<String, List<Pair<String, BlockLocation>>> locationMap = Maps.newHashMap();
     List<Pair<String, BlockLocation>> blockLocations =
         HdfsTable.getBlockLocations(filePaths);
@@ -130,6 +131,8 @@ public abstract class HdfsScanNode extends ScanNode {
       String[] blockHosts = null;
       try {
         blockHosts = location.second.getHosts();
+        // TODO: switch to blockHosts = location.second.getNames();
+        LOG.info(Arrays.toString(blockHosts));
       } catch (IOException e) {
         // this shouldn't happen, getHosts() doesn't throw anything
         String errorMsg = "BlockLocation.getHosts() failed:\n" + e.getMessage();
@@ -150,9 +153,10 @@ public abstract class HdfsScanNode extends ScanNode {
       // the other blocks to those
     }
 
-    if (hosts != null) {
-      hosts.clear();
+    if (hostports != null) {
+      hostports.clear();
     }
+    LOG.info(locationMap.toString());
     for (Map.Entry<String, List<Pair<String, BlockLocation>>> entry:
         locationMap.entrySet()) {
       TScanRange scanRange = new TScanRange(id);
@@ -163,10 +167,11 @@ public abstract class HdfsScanNode extends ScanNode {
                                blockLocation.getLength()));
       }
       scanRanges.add(scanRange);
-      if (hosts != null) {
-        hosts.add(entry.getKey());
+      if (hostports != null) {
+        hostports.add(entry.getKey());
       }
     }
+    LOG.info(hostports.toString());
   }
 
   @Override

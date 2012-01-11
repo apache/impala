@@ -18,7 +18,6 @@ STREAM DATA SINK
   EXCHANGE ID: 1
 SCAN HDFS table=default.testtbl
   FILES:
-  LIMIT: 1
 ====
 select zip, count(*)
 from testtbl
@@ -50,7 +49,6 @@ STREAM DATA SINK
 AGGREGATE
 OUTPUT: COUNT(*)
 GROUP BY: zip
-LIMIT: 10
   SCAN HDFS table=default.testtbl
     PREDICATES: name LIKE 'm%'
     FILES:
@@ -84,7 +82,6 @@ STREAM DATA SINK
 AGGREGATE
 OUTPUT: SUM(float_col)
 GROUP BY: int_col
-LIMIT: 4
   SCAN HBASE table=hbasealltypessmall
     PREDICATES: id < 5
 ====
@@ -115,6 +112,5 @@ STREAM DATA SINK
 AGGREGATE
 OUTPUT: SUM(float_col), MIN(float_col)
 GROUP BY: int_col
-LIMIT: 0
   SCAN HBASE table=hbasealltypessmall
 ====

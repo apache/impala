@@ -13,6 +13,7 @@
 #include "exec/hdfs-text-scan-node.h"
 #include "exec/hdfs-rcfile-scan-node.h"
 #include "exec/hbase-scan-node.h"
+#include "exec/exchange-node.h"
 #include "exec/topn-node.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
@@ -111,6 +112,9 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       return Status::OK;
     case TPlanNodeType::HASH_JOIN_NODE:
       *node = pool->Add(new HashJoinNode(pool, tnode, descs));
+      return Status::OK;
+    case TPlanNodeType::EXCHANGE_NODE:
+      *node = pool->Add(new ExchangeNode(pool, tnode, descs));
       return Status::OK;
     case TPlanNodeType::SORT_NODE:
       if (tnode.sort_node.use_top_n) {

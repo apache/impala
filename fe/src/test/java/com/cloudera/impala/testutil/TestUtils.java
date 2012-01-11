@@ -4,6 +4,7 @@ import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,7 +31,8 @@ public class TestUtils {
   private final static String expectedFilePrefix = "file:";
 
   // Maps from uppercase type name to PrimitiveType
-  private static Map<String, PrimitiveType> typeNameMap = new HashMap<String, PrimitiveType>();
+  private static Map<String, PrimitiveType> typeNameMap =
+      new HashMap<String, PrimitiveType>();
   static {
     for(PrimitiveType type: PrimitiveType.values()) {
       typeNameMap.put(type.toString(), type);
@@ -42,12 +45,17 @@ public class TestUtils {
    * If an expected line starts with expectedFilePrefix,
    * then the expected vs. actual comparison is successful if the actual string contains
    * the expected line (ignoring the expectedFilePrefix prefix).
+   * If orderMatters is false, we consider actual to match expected if they
+   * both contains the same output lines regardless of order.
    *
-   * @param actual
-   * @param expected
    * @return an error message if actual does not match expected, "" otherwise.
    */
-  public static String compareOutput(String[] actual, ArrayList<String> expected) {
+  public static String compareOutput(
+      String[] actual, ArrayList<String> expected, boolean orderMatters) {
+    if (!orderMatters) {
+      Arrays.sort(actual);
+      Collections.sort(expected);
+    }
     int mismatch = -1; // line in actual w/ mismatch
     int maxLen = Math.min(actual.length, expected.size());
     for (int i = 0; i < maxLen; ++i) {
@@ -140,7 +148,8 @@ public class TestUtils {
    * Do an element-by-element comparison of actual and expected types.
    * @return an error message if actual does not match expected, "" otherwise.
    */
-  public static String compareOutputTypes(List<PrimitiveType> actual, String[] expectedStrTypes) {
+  public static String compareOutputTypes(
+      List<PrimitiveType> actual, String[] expectedStrTypes) {
     if (actual.size() != expectedStrTypes.length) {
       return "Unequal number of output types.\nFound: " + actual.toString()
           + ".\nExpected: " + Arrays.toString(expectedStrTypes) + "\n";
@@ -169,9 +178,9 @@ public class TestUtils {
    *          Query to be executed.
    * @param abortOnError
    *          Indicates whether the query should abort if data errors are encountered.
-   *          If abortOnError is true and expectedErrors is not null, then an ImpalaException is
-   *          expected to occur during query execution. The actual and expected errors
-   *          will be compared in a catch clause.
+   *          If abortOnError is true and expectedErrors is not null, then an
+   *          ImpalaException is expected to occur during query execution. The actual
+   *          and expected errors will be compared in a catch clause.
    * @param maxErrors
    *          Indicates the maximum number of errors to gather.
    * @param expectedColLabels
@@ -185,28 +194,32 @@ public class TestUtils {
    * @param expectedFileErrors
    *          Expected number of errors per data file read from query. Ignored if null.
    * @param testErrorLog
-   *          Records error messages of failed tests to be reported at the very end of a test run.
+   *          Records error messages of failed tests to be reported at the very end of
+   *          a test run.
    * @return an error message if actual does not match expected, "" otherwise.
    */
   public static void runQuery(Executor executor, String query, int lineNum,
-      int batchSize, boolean abortOnError, int maxErrors,
+      int numNodes, int batchSize, boolean abortOnError, int maxErrors,
       ArrayList<String> expectedColLabels,
       ArrayList<String> expectedTypes, ArrayList<String> expectedResults,
       ArrayList<String> expectedErrors, ArrayList<String> expectedFileErrors,
       StringBuilder testErrorLog) {
-    String queryReportString = query + " (batch size=" + Integer.toString(batchSize) + ")";
+    String queryReportString =
+        query + " (batch size=" + Integer.toString(batchSize)
+          + ", #nodes=" + Integer.toString(numNodes) + ")";
     LOG.info("running query " + queryReportString);
-    TQueryRequest request = new TQueryRequest(query, true, 1);
+    TQueryRequest request = new TQueryRequest(query, true, numNodes);
     ArrayList<String> errors = new ArrayList<String>();
     SortedMap<String, Integer> fileErrors = new TreeMap<String, Integer>();
     ArrayList<PrimitiveType> colTypes = new ArrayList<PrimitiveType>();
     ArrayList<String> colLabels = new ArrayList<String>();
+    AtomicBoolean containsOrderBy = new AtomicBoolean();
     BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
     ArrayList<String> actualResults = new ArrayList<String>();
     try {
       executor.runQuery(
-          request, colTypes, colLabels, batchSize, abortOnError, maxErrors,
-          errors, fileErrors, resultQueue);
+          request, colTypes, colLabels, containsOrderBy, batchSize, abortOnError,
+          maxErrors, errors, fileErrors, resultQueue);
     } catch (ImpalaException e) {
       // Compare errors if we are expecting some.
       if (abortOnError && expectedErrors != null) {
@@ -224,7 +237,8 @@ public class TestUtils {
     if (expectedColLabels != null) {
       String[] actualColLabelsArr = new String[colLabels.size()];
       colLabels.toArray(actualColLabelsArr);
-      String typeResult = TestUtils.compareOutput(actualColLabelsArr, expectedColLabels);
+      String typeResult =
+          TestUtils.compareOutput(actualColLabelsArr, expectedColLabels, true);
       if (!typeResult.isEmpty()) {
         testErrorLog.append("query:\n" + query + "\n" + typeResult);
         return;
@@ -278,7 +292,8 @@ public class TestUtils {
     if (expectedResults != null) {
       String[] actualResultsArray = new String[actualResults.size()];
       actualResults.toArray(actualResultsArray);
-      String result = TestUtils.compareOutput(actualResultsArray, expectedResults);
+      String result =
+          TestUtils.compareOutput(actualResultsArray, expectedResults, containsOrderBy.get());
       if (!result.isEmpty()) {
         testErrorLog.append("query:\n" + queryReportString  + "\n" + result);
         return;
@@ -304,7 +319,7 @@ public class TestUtils {
       }
       String[] actualErrorsArray = new String[splitErrors.size()];
       splitErrors.toArray(actualErrorsArray);
-      String result = TestUtils.compareOutput(actualErrorsArray, expectedErrors);
+      String result = TestUtils.compareOutput(actualErrorsArray, expectedErrors, true);
       if (!result.isEmpty()) {
         testErrorLog.append("query:\n" + query + "\n" + result);
         return;
@@ -318,7 +333,8 @@ public class TestUtils {
         actualFileErrorsArray[ix] = "file: " + entry.getKey() + "," + entry.getValue();
         ++ix;
       }
-      String fileErrorsResult = TestUtils.compareOutput(actualFileErrorsArray, expectedFileErrors);
+      String fileErrorsResult =
+          TestUtils.compareOutput(actualFileErrorsArray, expectedFileErrors, true);
       if (!fileErrorsResult.isEmpty()) {
         fail("query:\n" + query + "\n" + fileErrorsResult);
       }

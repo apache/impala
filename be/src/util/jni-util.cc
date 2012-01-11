@@ -1,6 +1,7 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 #include "util/jni-util.h"
+#include <hdfs.h>
 #include "common/status.h"
 
 using namespace std;
@@ -60,6 +61,14 @@ Status JniUtil::Init() {
   }
 
   return Status::OK;
+}
+
+void JniUtil::InitLibhdfs() {
+  // make random libhdfs calls to make sure that the context class loader isn't
+  // null; see xxx for an explanation
+  hdfsFS fs = hdfsConnect("default", 0);
+  hdfsFile f = hdfsOpenFile(fs, "invalid/path", O_RDONLY, 0, 0, 0);
+  hdfsDisconnect(fs);
 }
 
 Status JniUtil::Cleanup() {

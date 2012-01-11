@@ -1,10 +1,11 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 #include <string>
-#include <tr1/unordered_map>
+#include <boost/unordered_map.hpp>
 #include <gtest/gtest.h>
 #include <boost/lexical_cast.hpp>
 #include <boost/random/mersenne_twister.hpp>
+
 #include "common/object-pool.h"
 #include "runtime/raw-value.h"
 #include "runtime/primitive-type.h"
@@ -24,7 +25,6 @@
 
 
 using namespace std;
-using namespace tr1;
 using namespace boost;
 
 namespace impala {

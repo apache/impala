@@ -12,11 +12,11 @@
 #include <protocol/TBinaryProtocol.h>
 #include <transport/TBufferTransports.h>
 #include "common/object-pool.h"
-#include "service/plan-executor.h"
 #include "gen-cpp/ImpalaBackendService_types.h"
 
 namespace impala {
 
+class Expr;
 class TupleRow;
 class Status;
 class PlanExecutor;
@@ -25,27 +25,30 @@ class ExecNode;
 class DescriptorTbl;
 class RowBatch;
 class TupleDescriptor;
+class DataStreamMgr;
+class Coordinator;
+class RuntimeState;
+class RowDescriptor;
+class TestEnv;
 
-// Shim class to adapt backend plan executor to jni.
-class PlanExecutorAdaptor {
+// Shim class to adapt backend coordinator to jni.
+class JniCoordinator {
  public:
-  PlanExecutorAdaptor(JNIEnv* env, jbyteArray thrift_query_exec_request,
-                      jobject error_log, jobject file_errors, jobject result_queue)
-  : env_(env),
-    thrift_query_exec_request_(thrift_query_exec_request),
-    error_log_(error_log),
-    file_errors_(file_errors),
-    result_queue_(result_queue) {
-  }
+  JniCoordinator(
+      JNIEnv* env, DataStreamMgr* stream_mgr, TestEnv* test_env, jobject error_log,
+      jobject file_errors, jobject result_queue);
+  ~JniCoordinator();
 
-  // Call before Exec() to deserialize query exec request passed into c'tor.
-  Status DeserializeRequest();
-
-  // Indicate error with Status.
+  // Create global jni structures.
   static Status Init();
 
   // Indicate error by throwing a new java exception.
-  void Exec();
+  void Exec(jbyteArray thrift_query_exec_request);
+
+  // Returns results from the coordinator fragment. Results are valid until
+  // the next GetNext() call. '*batch' == NULL implies that subsequent calls
+  // will not return any more rows.
+  Status GetNext(RowBatch** batch);
 
   // Indicate error by throwing a new java exception.
   void AddResultRow(TupleRow* row);
@@ -56,31 +59,28 @@ class PlanExecutorAdaptor {
   // Copy c++ runtime file error stats into Java file_errors.
   void WriteFileErrors();
 
-  PlanExecutor* executor() { return executor_.get(); }
+  Coordinator* coord() { return coord_.get(); }
 
   const std::vector<Expr*>& select_list_exprs() const { return select_list_exprs_; }
 
-  ExecNode* plan() { return plan_; }
-
   jclass impala_exc_cl() { return impala_exc_cl_; }
   const TQueryExecRequest& query_exec_request() const { return query_exec_request_; }
+  RuntimeState* runtime_state();
+  const RowDescriptor& row_desc();
+  bool is_constant_query() { return is_constant_query_; }
 
  private:
   JNIEnv* env_;
-  jbyteArray thrift_query_exec_request_;
   TQueryExecRequest query_exec_request_;
-  int batch_size_;
-  bool abort_on_error_;
-  int max_errors_;
   jobject error_log_;
   jobject file_errors_;
   bool as_ascii_;
+  bool is_constant_query_;
   jobject result_queue_;
   ObjectPool obj_pool_;
-  ExecNode* plan_;
-  DescriptorTbl* descs_;
   std::vector<Expr*> select_list_exprs_;
-  boost::scoped_ptr<PlanExecutor> executor_;
+  DataStreamMgr* stream_mgr_;  // not owned
+  boost::scoped_ptr<Coordinator> coord_;
 
   // Global class references created with JniUtil. Cleanup is done in JniUtil::Cleanup().
   static jclass impala_exc_cl_;
@@ -107,6 +107,9 @@ class PlanExecutorAdaptor {
   static jfieldID long_val_field_;
   static jfieldID double_val_field_;
   static jfieldID string_val_field_;
+
+  // Deserialize query exec request.
+  Status DeserializeRequest(jbyteArray thrift_query_exec_request);
 
 };
 

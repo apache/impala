@@ -74,7 +74,7 @@ class Tuple {
   }
 
   void* GetSlot(int offset) {
-    DCHECK(offset != -1);  // 0 offset indicates non-materialized slot
+    DCHECK(offset != -1); // -1 offset indicates non-materialized slot
     return reinterpret_cast<char*>(this) + offset;
   }
 

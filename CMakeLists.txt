@@ -12,15 +12,22 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake_modules")
 find_package(Thrift REQUIRED)
 include_directories(${Thrift_INCLUDE_DIR})
 set(LIBS ${LIBS} ${Thrift_LIBS})
+message(STATUS ${Thrift_INCLUDE_DIR})
+message(STATUS ${Thrift_LIBS})
 
 # find boost headers and libs
-set(Boost_DEBUG ON)
-set(Boost_USE_STATIC_LIBS ON)
+set(Boost_DEBUG TRUE)
+# in order to load libbackend.so into the jvm, we need to link against a shared
+# libboost_thread-mt.so
+#set(Boost_USE_STATIC_LIBS ON)
+set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
 find_package(Boost REQUIRED COMPONENTS thread regex-mt)
 include_directories(${Boost_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${Boost_LIBRARIES})
+message(STATUS ${Boost_INCLUDE_DIRS})
+message(STATUS ${Boost_LIBRARIES})
 
 # find jni headers and libs
 find_package(JNI REQUIRED)

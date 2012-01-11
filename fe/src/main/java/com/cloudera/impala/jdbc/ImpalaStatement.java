@@ -80,7 +80,7 @@ public class ImpalaStatement implements Statement {
     request.returnAsAscii = true;
     try {
       executor.runQuery(
-          request, colTypes, colLabels, Executor.DEFAULT_BATCH_SIZE,
+          request, colTypes, colLabels, null, Executor.DEFAULT_BATCH_SIZE,
           Executor.DEFAULT_ABORT_ON_ERROR, Executor.DEFAULT_MAX_ERRORS,
           errorLog, fileErrors, resultQueue);
     } catch (ImpalaException e) {

@@ -9,7 +9,6 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.thrift.TException;
 import org.apache.thrift.server.TServer;
-import org.apache.thrift.server.TServer.Args;
 import org.apache.thrift.server.TThreadPoolServer;
 import org.apache.thrift.transport.TServerSocket;
 import org.apache.thrift.transport.TServerTransport;
@@ -26,6 +25,7 @@ import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.planner.PlanNode;
 import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.thrift.ImpalaPlanService;
+import com.cloudera.impala.thrift.TPlanExecRequest;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TUniqueId;
 import com.google.common.base.Preconditions;
@@ -90,6 +90,10 @@ public class PlanService {
       request.setAbortOnError(false);
       request.setMaxErrors(100);
       request.setBatchSize(0);
+
+      for (TPlanExecRequest planRequest: request.fragmentRequests) {
+        planRequest.setQueryId(request.queryId);
+      }
 
       // Generate explain string and print it.
       Preconditions.checkState(planFragments.size() == dataSinks.size());

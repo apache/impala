@@ -5,6 +5,7 @@
 #include <sstream>
 #include <boost/algorithm/string.hpp>
 #include <glog/logging.h>
+#include <gflags/gflags.h>
 
 #include "exec/text-converter.h"
 #include "exprs/expr.h"
@@ -22,6 +23,9 @@
 #include "util/string-parser.h"
 #include "common/object-pool.h"
 #include "gen-cpp/PlanNodes_types.h"
+
+DEFINE_string(nn, "default", "");
+DEFINE_int32(nn_port, 0, "");
 
 using namespace std;
 using namespace boost;
@@ -85,7 +89,7 @@ Status HdfsTextScanNode::Prepare(RuntimeState* state) {
   // Initialize ptr to end, to initiate reading the first file block
   file_buffer_ptr_ = file_buffer_end_;
 
-  tuple_desc_ = state->descs().GetTupleDescriptor(tuple_id_);
+  tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   if (tuple_desc_ == NULL) {
     // TODO: make sure we print all available diagnostic output to our error log
     return Status("Failed to get tuple descriptor.");
@@ -163,7 +167,7 @@ Status HdfsTextScanNode::Prepare(RuntimeState* state) {
 }
 
 Status HdfsTextScanNode::Open(RuntimeState* state) {
-  hdfs_connection_ = hdfsConnect("default", 0);
+  hdfs_connection_ = hdfsConnect(FLAGS_nn.c_str(), FLAGS_nn_port);
   if (hdfs_connection_ == NULL) {
     return Status(AppendHdfsErrorMessage("Failed to connect to HDFS."));
   } else {

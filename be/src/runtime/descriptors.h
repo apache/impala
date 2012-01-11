@@ -214,6 +214,10 @@ class RowDescriptor {
   // Populate row_tuple_ids with our ids.
   void ToThrift(std::vector<TTupleId>* row_tuple_ids);
 
+  // Return true if the tuple ids of this descriptor are a prefix
+  // of the tuple ids of other_desc.
+  bool IsPrefixOf(const RowDescriptor& other_desc) const;
+
  private:
   // map from position of tuple w/in row to its descriptor
   std::vector<TupleDescriptor*> tuple_desc_map_;

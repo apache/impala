@@ -1,79 +1,92 @@
 // (c) 2011 Cloudera, Inc. All rights reserved.
 
-#include "service/plan-executor-adaptor.h"
+#include "service/jni-coordinator.h"
+
+#include <glog/logging.h>
+#include <gflags/gflags.h>
+
 #include "exec/exec-node.h"
 #include "exec/scan-node.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
+#include "runtime/runtime-state.h"
+#include "runtime/coordinator.h"
 #include "util/jni-util.h"
 #include "gen-cpp/ImpalaService_types.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
 
 using namespace std;
 
+DECLARE_int32(backend_port);
+
 namespace impala {
 
-Status PlanExecutorAdaptor::DeserializeRequest() {
-  descs_ = NULL;
-  plan_ = NULL;
-  // Deserialize request bytes into c++ request using memory transport.
-  DeserializeThriftMsg(env_, thrift_query_exec_request_, &query_exec_request_);
+JniCoordinator::JniCoordinator(
+    JNIEnv* env, DataStreamMgr* stream_mgr, TestEnv* test_env, jobject error_log,
+    jobject file_errors, jobject result_queue)
+  : env_(env),
+    error_log_(error_log),
+    file_errors_(file_errors),
+    result_queue_(result_queue),
+    stream_mgr_(stream_mgr),
+    coord_(new Coordinator("localhost", FLAGS_backend_port, stream_mgr_, test_env)) {
+}
 
-  batch_size_ = query_exec_request_.batchSize;
-  abort_on_error_ = query_exec_request_.abortOnError;
-  max_errors_ = query_exec_request_.maxErrors;
+JniCoordinator::~JniCoordinator() {
+}
+
+Status JniCoordinator::DeserializeRequest(jbyteArray thrift_query_exec_request) {
+  // Deserialize request bytes into c++ request using memory transport.
+  DeserializeThriftMsg(env_, thrift_query_exec_request, &query_exec_request_);
+  LOG(INFO) << "query=" << query_exec_request_.sqlStmt
+            << " #fragments=" << query_exec_request_.fragmentRequests.size()
+            << " batch_size=" << query_exec_request_.batchSize;
   as_ascii_ = query_exec_request_.asAscii;
 
   if (query_exec_request_.fragmentRequests.size() == 0) {
     return Status("query exec request contains no plan fragments");
   }
-  const TPlanExecRequest& plan_exec_request = query_exec_request_.fragmentRequests[0];
-  if (plan_exec_request.__isset.descTbl) {
-    RETURN_IF_ERROR(DescriptorTbl::Create(&obj_pool_, plan_exec_request.descTbl, &descs_));
+  const TPlanExecRequest& coord_request = query_exec_request_.fragmentRequests[0];
+  if (coord_request.__isset.descTbl != coord_request.__isset.planFragment) {
+      return Status("bad TPlanExecRequest: only one of {planFragment, descTbl} is set");
   }
-  if (plan_exec_request.__isset.planFragment) {
-    RETURN_IF_ERROR(
-        ExecNode::CreateTree(
-            &obj_pool_, plan_exec_request.planFragment, *descs_, &plan_));
+  is_constant_query_ = !coord_request.__isset.descTbl;
+  RETURN_IF_ERROR(
+      Expr::CreateExprTrees(
+          &obj_pool_, query_exec_request_.fragmentRequests[0].outputExprs,
+          &select_list_exprs_));
 
-    // set scan ranges
-    vector<ExecNode*> scan_nodes;
-    plan_->CollectScanNodes(&scan_nodes);
-    DCHECK_GT(query_exec_request_.nodeRequestParams.size(), 0);
-    // the first nodeRequestParams list contains exactly one TPlanExecParams
-    // (it's meant for the coordinator fragment)
-    DCHECK_EQ(query_exec_request_.nodeRequestParams[0].size(), 1);
-    vector<TScanRange>& local_scan_ranges =
-        query_exec_request_.nodeRequestParams[0][0].scanRanges;
-    for (int i = 0; i < scan_nodes.size(); ++i) {
-      for (int j = 0; j < local_scan_ranges.size(); ++j) {
-        if (scan_nodes[i]->id() == local_scan_ranges[j].nodeId) {
-           static_cast<ScanNode*>(scan_nodes[i])->SetScanRange(local_scan_ranges[j]);
-        }
-      }
+  if (query_exec_request_.fragmentRequests.size() > 1) {
+    // TODO: remove this when we have multi-phase plans
+    DCHECK_EQ(query_exec_request_.fragmentRequests.size(), 2);
+    // fix up coord ports
+    for (int i = 0; i < query_exec_request_.nodeRequestParams[1].size(); ++i) {
+      DCHECK_EQ(query_exec_request_.nodeRequestParams[1][i].destinations.size(), 1);
+      query_exec_request_.nodeRequestParams[1][i].destinations[0].port =
+          FLAGS_backend_port;
     }
   }
 
-  if ((descs_ == NULL) != (plan_ == NULL)) {
-    return Status("bad TPlanExecRequest: only one of {plan_fragment, desc_tbl} is set");
-  }
-  RETURN_IF_ERROR(
-      Expr::CreateExprTrees(&obj_pool_, plan_exec_request.outputExprs,
-                            &select_list_exprs_));
   return Status::OK;
 }
 
-void PlanExecutorAdaptor::Exec() {
-  THROW_IF_ERROR(DeserializeRequest(), env_, impala_exc_cl_);
-  if (plan_ == NULL) return;
-  executor_.reset(new PlanExecutor(plan_, *descs_, abort_on_error_, max_errors_));
-  if (batch_size_ != 0) {
-    executor_->runtime_state()->set_batch_size(batch_size_);
+void JniCoordinator::Exec(jbyteArray thrift_query_exec_request) {
+  THROW_IF_ERROR(DeserializeRequest(thrift_query_exec_request), env_, impala_exc_cl_);
+  // if this query is missing a FROM clause, don't hand it to the coordinator
+  if (is_constant_query_) return;
+  THROW_IF_ERROR(coord_->Exec(query_exec_request_), env_, impala_exc_cl_);
+  if (query_exec_request_.batchSize != 0) {
+    coord_->runtime_state()->set_batch_size(query_exec_request_.batchSize);
   }
-  THROW_IF_ERROR(executor_->Exec(), env_, impala_exc_cl_);
 }
 
-void PlanExecutorAdaptor::AddResultRow(TupleRow* row) {
+Status JniCoordinator::GetNext(RowBatch** batch) {
+  Status result = coord_->GetNext(batch);
+  VLOG(1) << "jnicoord.getnext";
+  return result;
+}
+
+void JniCoordinator::AddResultRow(TupleRow* row) {
   jobject result_row = env_->NewObject(result_row_cl_, result_row_ctor_);
   THROW_IF_EXC(env_, impala_exc_cl_, throwable_to_string_id_);
   for (size_t j = 0; j < select_list_exprs_.size(); ++j) {
@@ -108,17 +121,17 @@ void PlanExecutorAdaptor::AddResultRow(TupleRow* row) {
   THROW_IF_EXC(env_, impala_exc_cl_, throwable_to_string_id_);
 }
 
-void PlanExecutorAdaptor::WriteErrorLog() {
-  const vector<string>& runtime_error_log = executor_->runtime_state()->error_log();
+void JniCoordinator::WriteErrorLog() {
+  const vector<string>& runtime_error_log = coord_->runtime_state()->error_log();
   for (int i = 0; i < runtime_error_log.size(); ++i) {
     env_->CallObjectMethod(error_log_, list_add_id_,
         env_->NewStringUTF(runtime_error_log[i].c_str()));
   }
 }
 
-void PlanExecutorAdaptor::WriteFileErrors() {
+void JniCoordinator::WriteFileErrors() {
   const vector<pair<string, int> >& runtime_file_errors =
-      executor_->runtime_state()->file_errors();
+      coord_->runtime_state()->file_errors();
   for (int i = 0; i < runtime_file_errors.size(); ++i) {
     env_->CallObjectMethod(file_errors_, map_put_id_,
         env_->NewStringUTF(runtime_file_errors[i].first.c_str()),
@@ -126,29 +139,29 @@ void PlanExecutorAdaptor::WriteFileErrors() {
   }
 }
 
-jclass PlanExecutorAdaptor::impala_exc_cl_ = NULL;
-jclass PlanExecutorAdaptor::throwable_cl_ = NULL;
-jclass PlanExecutorAdaptor::blocking_queue_if_ = NULL;
-jclass PlanExecutorAdaptor::result_row_cl_ = NULL;
-jclass PlanExecutorAdaptor::column_value_cl_ = NULL;
-jclass PlanExecutorAdaptor::list_cl_ = NULL;
-jclass PlanExecutorAdaptor::map_cl_ = NULL;
-jclass PlanExecutorAdaptor::integer_cl_ = NULL;
-jmethodID PlanExecutorAdaptor::throwable_to_string_id_ = NULL;
-jmethodID PlanExecutorAdaptor::put_id_ = NULL;
-jmethodID PlanExecutorAdaptor::result_row_ctor_ = NULL;
-jmethodID PlanExecutorAdaptor::add_to_col_vals_id_ = NULL;
-jmethodID PlanExecutorAdaptor::column_value_ctor_ = NULL;
-jmethodID PlanExecutorAdaptor::list_add_id_ = NULL;
-jmethodID PlanExecutorAdaptor::map_put_id_ = NULL;
-jmethodID PlanExecutorAdaptor::integer_ctor_ = NULL;
-jfieldID PlanExecutorAdaptor::bool_val_field_ = NULL;
-jfieldID PlanExecutorAdaptor::int_val_field_ = NULL;
-jfieldID PlanExecutorAdaptor::long_val_field_ = NULL;
-jfieldID PlanExecutorAdaptor::double_val_field_ = NULL;
-jfieldID PlanExecutorAdaptor::string_val_field_ = NULL;
+jclass JniCoordinator::impala_exc_cl_ = NULL;
+jclass JniCoordinator::throwable_cl_ = NULL;
+jclass JniCoordinator::blocking_queue_if_ = NULL;
+jclass JniCoordinator::result_row_cl_ = NULL;
+jclass JniCoordinator::column_value_cl_ = NULL;
+jclass JniCoordinator::list_cl_ = NULL;
+jclass JniCoordinator::map_cl_ = NULL;
+jclass JniCoordinator::integer_cl_ = NULL;
+jmethodID JniCoordinator::throwable_to_string_id_ = NULL;
+jmethodID JniCoordinator::put_id_ = NULL;
+jmethodID JniCoordinator::result_row_ctor_ = NULL;
+jmethodID JniCoordinator::add_to_col_vals_id_ = NULL;
+jmethodID JniCoordinator::column_value_ctor_ = NULL;
+jmethodID JniCoordinator::list_add_id_ = NULL;
+jmethodID JniCoordinator::map_put_id_ = NULL;
+jmethodID JniCoordinator::integer_ctor_ = NULL;
+jfieldID JniCoordinator::bool_val_field_ = NULL;
+jfieldID JniCoordinator::int_val_field_ = NULL;
+jfieldID JniCoordinator::long_val_field_ = NULL;
+jfieldID JniCoordinator::double_val_field_ = NULL;
+jfieldID JniCoordinator::string_val_field_ = NULL;
 
-Status PlanExecutorAdaptor::Init() {
+Status JniCoordinator::Init() {
   JNIEnv* env = getJNIEnv();
   if (env == NULL) {
     return Status("Failed to get/create JVM");
@@ -210,6 +223,16 @@ Status PlanExecutorAdaptor::Init() {
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
 
   return Status::OK;
+}
+
+RuntimeState* JniCoordinator::runtime_state() {
+  DCHECK(coord_.get() != NULL);
+  return coord_->runtime_state();
+}
+
+const RowDescriptor& JniCoordinator::row_desc() {
+  DCHECK(coord_.get() != NULL);
+  return coord_->row_desc();
 }
 
 }

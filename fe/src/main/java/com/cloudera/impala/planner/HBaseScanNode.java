@@ -150,6 +150,7 @@ public class HBaseScanNode extends ScanNode {
       scanRange.setHbaseKeyRange(keyRange);
     }
     scanRanges.add(scanRange);
+    hosts.add("localhost");
   }
 
   @Override

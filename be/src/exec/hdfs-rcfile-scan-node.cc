@@ -56,7 +56,7 @@ Status HdfsRCFileScanNode::Init(ObjectPool* pool, const TPlanNode& tnode) {
 Status HdfsRCFileScanNode::Prepare(RuntimeState* state) {
   PrepareConjuncts(state);
 
-  tuple_desc_ = state->descs().GetTupleDescriptor(tuple_id_);
+  tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   if (tuple_desc_ == NULL) {
     // TODO: make sure we print all available diagnostic output to our error log
     return Status("Failed to get tuple descriptor.");

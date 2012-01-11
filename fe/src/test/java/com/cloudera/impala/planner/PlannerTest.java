@@ -61,7 +61,7 @@ public class PlannerTest {
         }
         LOG.info(explainString);
         ArrayList<String> expectedPlan = parser.getExpectedResult(sectionStartIdx + i);
-        String result = TestUtils.compareOutput(explainString.split("\n"), expectedPlan);
+        String result = TestUtils.compareOutput(explainString.split("\n"), expectedPlan, true);
         if (!result.isEmpty()) {
           errorLog.append(
               "section " + Integer.toString(sectionStartIdx + i) + " of query:\n"

@@ -206,6 +206,15 @@ void RowDescriptor::ToThrift(std::vector<TTupleId>* row_tuple_ids) {
   }
 }
 
+bool RowDescriptor::IsPrefixOf(const RowDescriptor& other_desc) const {
+  if (tuple_desc_map_.size() > other_desc.tuple_desc_map_.size()) return false;
+  for (int i = 0; i < tuple_desc_map_.size(); ++i) {
+    // pointer comparison okay, descriptors are unique
+    if (tuple_desc_map_[i] != other_desc.tuple_desc_map_[i]) return false;
+  }
+  return true;
+}
+
 Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tbl,
                              DescriptorTbl** tbl) {
   *tbl = pool->Add(new DescriptorTbl());

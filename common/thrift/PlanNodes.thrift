@@ -120,6 +120,10 @@ struct TSortNode {
   3: required bool use_top_n;
 }
 
+struct TExchangeNode {
+  1: required i32 num_senders
+}
+
 // This is essentially a union of all messages corresponding to subclasses
 // of PlanNode.
 struct TPlanNode {
@@ -137,6 +141,7 @@ struct TPlanNode {
   9: optional THashJoinNode hash_join_node
   10: optional TAggregationNode agg_node
   11: optional TSortNode sort_node
+  12: optional TExchangeNode exchange_node
 }
 
 // A flattened representation of a tree of PlanNodes, obtained by depth-first

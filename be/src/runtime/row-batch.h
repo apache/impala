@@ -90,7 +90,7 @@ class RowBatch {
   }
 
   // Transfer ownership of our tuple data to dest.
-  void TransferTupleDataOwnership(RowBatch* dest) {
+  void TransferTupleData(RowBatch* dest) {
     dest->tuple_data_pool_->AcquireData(tuple_data_pool_.get(), false);
     // make sure we can't access our tuples after we gave up the pools holding the
     // tuple data

@@ -16,6 +16,7 @@ class Expr;
 class RowBatch;
 class RowDescriptor;
 class TDataStreamSink;
+class THostPort;
 
 // Single sender of an m:n data stream.
 // Row batch data is routed to destinations based on the provided
@@ -29,7 +30,7 @@ class DataStreamSender {
   // and is specified in bytes.
   DataStreamSender(
     const RowDescriptor& row_desc, const TUniqueId& query_id,
-    const TDataStreamSink& sink, const std::vector<std::string>& hosts,
+    const TDataStreamSink& sink, const std::vector<THostPort>& destinations,
     int per_channel_buffer_size);
   ~DataStreamSender();
 

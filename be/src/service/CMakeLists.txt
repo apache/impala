@@ -7,14 +7,18 @@ set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/be/build/service")
 set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/be/build/service")
 
 add_library(Service
-  plan-executor.cc
-  plan-executor-adaptor.cc
+  backend-service.cc
+  jni-coordinator.cc
+)
+
+target_link_libraries(Service
+  Runtime
 )
 
 add_library(backend SHARED
   backend.cc
-  plan-executor.cc  
-  plan-executor-adaptor.cc
+  backend-service.cc
+  jni-coordinator.cc
 )
 
 # The order of link libararies matter.  
@@ -33,6 +37,7 @@ target_link_libraries(backend
   ${HDFS_LIBS}
   gflagsstatic
   glogstatic
+  gflagsstatic
   tcmallocstatic
   pprofstatic
 )
@@ -61,6 +66,7 @@ target_link_libraries(runquery
   Util
   thrift
   ImpalaThrift
+  Service
   ${Boost_LIBRARIES}  
   gflagsstatic
   tcmallocstatic

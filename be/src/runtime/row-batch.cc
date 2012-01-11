@@ -112,6 +112,7 @@ RowBatch::RowBatch(const DescriptorTbl& desc_tbl, TRowBatch* input_batch)
   }
 
   // check whether we have string slots
+  // TODO: do that during setup (part of RowDescriptor c'tor?)
   bool has_string_slots = false;
   const vector<TupleDescriptor*>& tuple_descs = row_desc_.tuple_descriptors();
   for (int i = 0; i < tuple_descs.size(); ++i) {
@@ -122,7 +123,7 @@ RowBatch::RowBatch(const DescriptorTbl& desc_tbl, TRowBatch* input_batch)
   }
   if (!has_string_slots) return;
 
-  // convert strings offsets contained in tuple data into pointers
+  // convert string offsets contained in tuple data into pointers
   for (int i = 0; i < num_rows_; ++i) {
     TupleRow* row = GetRow(i);
     vector<TupleDescriptor*>::const_iterator desc = tuple_descs.begin();

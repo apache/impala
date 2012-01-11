@@ -104,6 +104,10 @@ public class SelectStmt extends ParseNodeBase {
     return orderByElements;
   }
 
+  public boolean hasOrderByClause() {
+    return orderByElements != null;
+  }
+
   public long getLimit() {
     return limit;
   }

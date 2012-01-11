@@ -8,10 +8,12 @@ set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/be/build/runtime")
 
 # add .cc files and uncomment line
 add_library(Runtime STATIC
+  coordinator.cc
   data-stream-mgr.cc
   data-stream-sender.cc
   descriptors.cc
   mem-pool.cc
+  plan-executor.cc
   raw-value.cc
   row-batch.cc
   runtime-state.cc
@@ -19,8 +21,12 @@ add_library(Runtime STATIC
   tuple.cc
 )
 
+# TODO: remove TestUtil dependency as soon as we have our scheduler library in place
 target_link_libraries(Runtime
   Common
+  Exec
+  TestUtil
+  ${Boost_LIBRARIES}
 )
 
 add_executable(mem-pool-test

@@ -10,9 +10,12 @@ set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/be/build/testutil")
 
 add_library(TestUtil STATIC
   query-executor.cc  
+  test-env.cc
 )
 
 target_link_libraries(TestUtil
+  Service
+  ImpalaThrift
   glogstatic
   gflagsstatic  
 )

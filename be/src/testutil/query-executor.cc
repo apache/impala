@@ -26,22 +26,28 @@
 #include "exec/exec-node.h"
 #include "exec/scan-node.h"
 #include "exprs/expr.h"
+#include "runtime/coordinator.h"
 #include "runtime/descriptors.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
-#include "service/plan-executor.h"
+#include "runtime/plan-executor.h"
+#include "util/debug-util.h"
+#include "testutil/test-env.h"
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
+#include "gen-cpp/ImpalaBackendService.h"
 #include "gen-cpp/Data_types.h"
-#include "util/debug-util.h"
 
 DEFINE_int32(batch_size, 0,
-             "batch size to be used by backend; a batch size of 0 indicates the "
-             "backend's default batch size");
-DEFINE_int32(num_nodes, 1, "number of (local) nodes on which to run query");
+    "batch size to be used by backend; a batch size of 0 indicates the "
+    "backend's default batch size");
 DEFINE_bool(abort_on_error, false, "if true, abort query when encountering any error");
 DEFINE_int32(max_errors, 100, "number of errors to report");
+DEFINE_int32(num_backends, 0,
+    "Number of backend threads on which to run query; 0 = run only in main thread");
+DEFINE_int32(backend_port, 21000,
+    "start port for backend threads (assigned sequentially)");
 
 using namespace std;
 using namespace boost;
@@ -51,9 +57,10 @@ using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
 using namespace impala;
 
-QueryExecutor::QueryExecutor()
+QueryExecutor::QueryExecutor(DataStreamMgr* stream_mgr, TestEnv* test_env)
   : started_server_(false),
-    pool_(new ObjectPool()),
+    stream_mgr_(stream_mgr),
+    test_env_(test_env),
     row_batch_(NULL),
     next_row_(0) {
 }
@@ -148,70 +155,79 @@ Status QueryExecutor::Setup() {
 Status QueryExecutor::Exec(
     const std::string& query, vector<PrimitiveType>* col_types) {
   VLOG(1) << "query: " << query;
-  TQueryExecRequest query_request;
+  eos_ = false;
   try {
     CHECK(client_.get() != NULL) << "didn't call QueryExecutor::Setup()";
-    // TODO: use FLAGS_num_nodes here
-    client_->GetExecRequest(query_request, query.c_str(), 1);
+    client_->GetExecRequest(query_request_, query.c_str(), FLAGS_num_backends + 1);
   } catch (TException& e) {
     return Status(e.msg);
   }
-  VLOG(1) << "thrift request: " << ThriftDebugString(query_request);
+  VLOG(1) << "query request:\n" << ThriftDebugString(query_request_);
 
-  DCHECK_EQ(query_request.fragmentRequests.size(), 1);
-  TPlanExecRequest& request = query_request.fragmentRequests[0];
-  DescriptorTbl* descs = NULL;
-  if (request.__isset.descTbl) {
-    RETURN_IF_ERROR(DescriptorTbl::Create(pool_.get(), request.descTbl, &descs));
-    VLOG(1) << descs->DebugString();
-  }
-  ExecNode* plan_root = NULL;;
-  if (request.__isset.planFragment) {
+  // we always need at least one plan fragment
+  DCHECK_GT(query_request_.fragmentRequests.size(), 0);
+
+  if (!query_request_.fragmentRequests[0].__isset.descTbl) {
+    // query without a FROM clause: don't create a coordinator
+    DCHECK(!query_request_.fragmentRequests[0].__isset.planFragment);
+    local_state_.reset(
+        new RuntimeState(query_request_.queryId, FLAGS_abort_on_error,
+                         FLAGS_max_errors, NULL));
     RETURN_IF_ERROR(
-        ExecNode::CreateTree(pool_.get(), request.planFragment, *descs, &plan_root));
-    row_desc_ = &plan_root->row_desc();
-        
-    // set scan ranges
-    vector<ExecNode*> scan_nodes;
-    plan_root->CollectScanNodes(&scan_nodes);
-    DCHECK_GT(query_request.nodeRequestParams.size(), 0);
-    // the first nodeRequestParams list contains exactly one TPlanExecParams
-    // (it's meant for the coordinator fragment)
-    DCHECK_EQ(query_request.nodeRequestParams[0].size(), 1);
-    vector<TScanRange>& local_scan_ranges =
-        query_request.nodeRequestParams[0][0].scanRanges;
-    for (int i = 0; i < scan_nodes.size(); ++i) {
-      for (int j = 0; j < local_scan_ranges.size(); ++j) {
-        if (scan_nodes[i]->id() == local_scan_ranges[j].nodeId) {
-           static_cast<ScanNode*>(scan_nodes[i])->SetScanRange(local_scan_ranges[j]);
-        }
-      }
+        PrepareSelectListExprs(local_state_.get(), RowDescriptor(), col_types));
+    return Status::OK;
+  }
+
+  DCHECK_GT(query_request_.nodeRequestParams.size(), 0);
+  // the first nodeRequestParams list contains exactly one TPlanExecParams
+  // (it's meant for the coordinator fragment)
+  DCHECK_EQ(query_request_.nodeRequestParams[0].size(), 1);
+
+  if (FLAGS_num_backends > 0) {
+    // for distributed execution, we only expect one slave fragment which
+    // will be executed by FLAGS_num_backends nodes
+    DCHECK_EQ(query_request_.fragmentRequests.size(), 2);
+    DCHECK_EQ(query_request_.nodeRequestParams.size(), 2);
+    DCHECK_LE(query_request_.nodeRequestParams[1].size(), FLAGS_num_backends);
+
+    // set destinations to coord port
+    for (int i = 0; i < query_request_.nodeRequestParams[1].size(); ++i) {
+      DCHECK_EQ(query_request_.nodeRequestParams[1][i].destinations.size(), 1);
+      query_request_.nodeRequestParams[1][i].destinations[0].port =
+          FLAGS_backend_port;
     }
   }
+
+  coord_.reset(
+      new Coordinator("localhost", FLAGS_backend_port, stream_mgr_, test_env_));
+  RETURN_IF_ERROR(coord_->Exec(query_request_));
+  RETURN_IF_ERROR(PrepareSelectListExprs(
+      coord_->runtime_state(), coord_->row_desc(), col_types));
+
+  return Status::OK;
+}
+
+Status QueryExecutor::PrepareSelectListExprs(
+    RuntimeState* state, const RowDescriptor& row_desc,
+    vector<PrimitiveType>* col_types) {
   RETURN_IF_ERROR(
-      Expr::CreateExprTrees(pool_.get(), request.outputExprs, &select_list_exprs_));
-
-  // Prepare select list expressions.
-  RuntimeState local_runtime_state(*descs, FLAGS_abort_on_error, FLAGS_max_errors);
-  RuntimeState* runtime_state = &local_runtime_state;
-  if (plan_root != NULL) {
-    executor_.reset(
-        new PlanExecutor(plan_root, *descs, FLAGS_abort_on_error, FLAGS_max_errors));
-    runtime_state = executor_->runtime_state();
-  }
-  if (FLAGS_batch_size != 0) runtime_state->set_batch_size(FLAGS_batch_size);
-
+      Expr::CreateExprTrees(
+          state->obj_pool(), query_request_.fragmentRequests[0].outputExprs,
+          &select_list_exprs_));
+  if (FLAGS_batch_size != 0) state->set_batch_size(FLAGS_batch_size);
   for (int i = 0; i < select_list_exprs_.size(); ++i) {
-    select_list_exprs_[i]->Prepare(runtime_state, plan_root->row_desc());
+    select_list_exprs_[i]->Prepare(state, row_desc);
     if (col_types != NULL) col_types->push_back(select_list_exprs_[i]->type());
   }
-  if (plan_root != NULL) {
-    executor_->Exec();
-    VLOG(1) << plan_root->DebugString();
-  }
-  eos_ = false;
-  next_row_ = 0;
+  return Status::OK;
+}
 
+Status QueryExecutor::FetchResult(RowBatch** batch) {
+  if (coord_.get() == NULL) {
+    *batch = NULL;
+    return Status::OK;
+  }
+  RETURN_IF_ERROR(coord_->GetNext(batch));
   return Status::OK;
 }
 
@@ -229,20 +245,9 @@ Status QueryExecutor::FetchResult(std::string* result) {
   return Status::OK;
 }
 
-Status QueryExecutor::FetchResult(RowBatch** batch) {
-  DCHECK(executor_.get() != NULL);
-  RETURN_IF_ERROR(executor_->FetchResult(batch));
-  if (*batch != NULL) {
-    row_batch_.reset(*batch);
-  } else {
-    eos_ = true;
-  }
-  return Status::OK;
-}
-
 Status QueryExecutor::FetchResult(std::vector<void*>* select_list_values) {
   select_list_values->clear();
-  if (executor_.get() == NULL) {
+  if (coord_.get() == NULL) {
     // query without FROM clause: we return exactly one row
     if (!eos_) {
       for (int i = 0; i < select_list_exprs_.size(); ++i) {
@@ -253,22 +258,18 @@ Status QueryExecutor::FetchResult(std::vector<void*>* select_list_values) {
     return Status::OK;
   }
 
-  select_list_values->clear();
-  if (row_batch_.get() == NULL || row_batch_->num_rows() == next_row_) {
+  if (row_batch_ == NULL || row_batch_->num_rows() == next_row_) {
     if (eos_) {
       return Status::OK;
     }
 
     // we need a new row batch
-    RowBatch* batch_ptr;
-    RETURN_IF_ERROR(executor_->FetchResult(&batch_ptr));
-    if (batch_ptr == NULL) {
-      // we hit eos
+    RETURN_IF_ERROR(coord_->GetNext(&row_batch_));
+    if (row_batch_ == NULL) {
+      // no more rows to return
       eos_ = true;
       return Status::OK;
     }
-
-    row_batch_.reset(batch_ptr);
     next_row_ = 0;
   }
 
@@ -284,11 +285,16 @@ Status QueryExecutor::FetchResult(std::vector<void*>* select_list_values) {
 }
 
 RuntimeState* QueryExecutor::runtime_state() {
-  return executor_->runtime_state();
+  DCHECK(coord_.get() != NULL);
+  return coord_->runtime_state();
+}
+
+const RowDescriptor& QueryExecutor::row_desc() const {
+  DCHECK(coord_.get() != NULL);
+  return coord_->row_desc();
 }
 
 Status QueryExecutor::EndQuery() {
-  row_batch_.reset(NULL);
   next_row_ = 0;
   return Status::OK;
 }
@@ -306,15 +312,15 @@ void QueryExecutor::Shutdown() {
 }
 
 std::string QueryExecutor::ErrorString() const {
-  if (executor_.get() == NULL) {
+  if (coord_.get() == NULL) {
     return "";
   }
-  return executor_->runtime_state()->ErrorLog();
+  return coord_->runtime_state()->ErrorLog();
 }
 
 std::string QueryExecutor::FileErrors() const {
-  if (executor_.get() == NULL) {
+  if (coord_.get() == NULL) {
     return "";
   }
-  return executor_->runtime_state()->FileErrors();
+  return coord_->runtime_state()->FileErrors();
 }

@@ -44,7 +44,7 @@ class DataStreamMgr {
   // it unblocks when the stream consumer removed enough data to make space for
   // row_batch.
   // TODO: enforce per-sender quotas (something like 200% of buffer_size/#senders),
-  // so that a single sender can't floor the buffer and stall everybody else.
+  // so that a single sender can't flood the buffer and stall everybody else.
   // This call takes ownership of thrift_batch; do *not* deallocate it after the call.
   // Returns OK if successful, error status otherwise.
   Status AddData(const TUniqueId& query_id, PlanNodeId dest_node_id,
@@ -129,6 +129,8 @@ class DataStreamMgr {
 
   // Remove control block for query_id/node_id.
   Status DeregisterRecvr(const TUniqueId& query_id, PlanNodeId node_id);
+
+  size_t GetHashValue(const TUniqueId& query_id, PlanNodeId node_id);
 };
 
 }

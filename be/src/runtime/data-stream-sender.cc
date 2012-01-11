@@ -46,11 +46,11 @@ class DataStreamSender::Channel {
   // combination. buffer_size is specified in bytes and a soft limit on
   // how much tuple data is getting accumulated before being sent; it only applies
   // when data is added via AddRow() and not sent directly via SendBatch().
-  Channel(const RowDescriptor& row_desc, const string& host, int port,
+  Channel(const RowDescriptor& row_desc, const THostPort& destination,
           const TUniqueId& query_id, PlanNodeId dest_node_id, int buffer_size)
     : row_desc_(row_desc),
-      host_(host),
-      port_(port),
+      host_(destination.host),
+      port_(destination.port),
       query_id_(query_id),
       dest_node_id_(dest_node_id),
       num_data_bytes_sent_(0),
@@ -223,12 +223,12 @@ Status DataStreamSender::Channel::Close() {
 
 DataStreamSender::DataStreamSender(
     const RowDescriptor& row_desc, const TUniqueId& query_id,
-    const TDataStreamSink& sink, const std::vector<std::string>& hosts,
+    const TDataStreamSink& sink, const vector<THostPort>& destinations,
     int per_channel_buffer_size)
   : current_thrift_batch_(&thrift_batch1_) {
-  DCHECK_GT(hosts.size(), 0);
+  DCHECK_GT(destinations.size(), 0);
   // TODO: get rid of this when we re-enable the multiple-receiver case
-  DCHECK_EQ(hosts.size(), 1);
+  DCHECK_EQ(destinations.size(), 1);
   // broadcast on all channels if there's no partitioning
   broadcast_ = !sink.__isset.outputPartitionSpec;
   if (sink.__isset.outputPartitionSpec) {
@@ -240,15 +240,15 @@ DataStreamSender::DataStreamSender(
                    "ignoring";
     }
     // we need a partitioning expr if we send to more than one host
-    DCHECK(partition_spec.__isset.partitionExpr || hosts.size() == 1);
+    DCHECK(partition_spec.__isset.partitionExpr || destinations.size() == 1);
     // TODO: switch to Init() function that returns Status
     DCHECK(Expr::CreateExprTree(
         &pool_, partition_spec.partitionExpr, &partition_expr_).ok());
   }
   // TODO: use something like google3's linked_ptr here (scoped_ptr isn't copyable)
-  for (int i = 0; i < hosts.size(); ++i) {
+  for (int i = 0; i < destinations.size(); ++i) {
     channels_.push_back(
-        new Channel(row_desc, hosts[i], FLAGS_port, query_id, sink.destNodeId,
+        new Channel(row_desc, destinations[i], query_id, sink.destNodeId,
                     per_channel_buffer_size));
   }
 }

@@ -189,7 +189,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
         eos_ = true;
       } else {
         // pass on pools, out_batch might still need them
-        probe_batch_->TransferTupleDataOwnership(out_batch);
+        probe_batch_->TransferTupleData(out_batch);
         bool dummy;  // we ignore eos and use the # of returned rows instead
         RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &dummy));
         probe_batch_pos_ = 0;

@@ -10,22 +10,34 @@ include "PlanNodes.thrift"
 include "DataSinks.thrift"
 include "Data.thrift"
 
+struct THostPort {
+  1: required string host
+  2: required i32 port
+}
+
 // Parameters for the execution of a plan fragment on a particular node.
 struct TPlanExecParams {
   // scan ranges for each of the scan nodes
   1: list<PlanNodes.TScanRange> scanRanges
 
-  // host names of output destinations, one per output partition
-  2: list<string> destHosts
+  // (host, port) pairs of output destinations, one per output partition
+  2: list<THostPort> destinations
+
+  // global execution flags
+  3: required bool abortOnError
+  4: required i32 maxErrors
 }
 
 // TPlanExecRequest encapsulates info needed to execute a particular
 // plan fragment, including how to produce and how to partition its output.
 // It leaves out node-specific parameters (see TPlanExecParams).
 struct TPlanExecRequest {
+  // same as TQueryExecRequest.queryId
+  1: required Types.TUniqueId queryId
+
   // no plan or descriptor table: query without From clause
-  1: optional PlanNodes.TPlan planFragment
-  2: optional Descriptors.TDescriptorTable descTbl
+  2: optional PlanNodes.TPlan planFragment
+  3: optional Descriptors.TDescriptorTable descTbl
 
   // id of output tuple produced by this plan fragment
   // TODO: do we need this?
@@ -54,7 +66,7 @@ struct TQueryExecRequest {
   // fragmentRequests[0] contains the coordinator fragment
   2: list<TPlanExecRequest> fragmentRequests
 
-  // hosts on which to execute plan fragments;
+  // "host:port" on which to execute plan fragments;
   // execNodes.size() == fragmentRequests.size() - 1, and fragmentRequests[i+1] is
   // executed on execNodes[i] (fragmentRequests[0] is the coordinator fragment, which
   // is executed by the coordinator itself)
@@ -85,8 +97,7 @@ struct TQueryExecRequest {
 
 service ImpalaBackendService {
   // Synchronous execution of plan fragment. Returns completion status.
-  Types.TStatus ExecPlanFragment(
-      1:Types.TUniqueId queryId, 2:TPlanExecRequest request, 3:TPlanExecParams params);
+  Types.TStatus ExecPlanFragment(1:TPlanExecRequest request, 2:TPlanExecParams params);
 
   // Transmit single row batch. Returns error indication if queryId or destNodeId
   // are unknown or if data couldn't be read.

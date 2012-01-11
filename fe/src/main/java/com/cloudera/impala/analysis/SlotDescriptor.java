@@ -27,7 +27,7 @@ public class SlotDescriptor {
     this.id = new SlotId(id);
     this.parent = parent;
     this.byteOffset = -1;  // invalid
-    this.isMaterialized = true;
+    this.isMaterialized = false;
   }
 
   public int getNullIndicatorByte() {

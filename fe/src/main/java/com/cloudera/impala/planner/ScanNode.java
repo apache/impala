@@ -43,10 +43,10 @@ abstract public class ScanNode extends PlanNode {
    *     NUM_NODES_ALL_RACKS: as many partitions as there are racks that holds relevant
    *     data
    * @param scanRanges output parameter
-   * @param hosts output parameter
+   * @param "host:port" strings (output parameter)
    */
   abstract public void getScanParams(
-      int numPartitions, List<TScanRange> scanRanges, List<String> hosts);
+      int numPartitions, List<TScanRange> scanRanges, List<String> hostports);
 
   @Override
   protected String debugString() {

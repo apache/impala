@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
@@ -29,6 +30,7 @@ import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.planner.PlanNode;
 import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.thrift.TColumnValue;
+import com.cloudera.impala.thrift.TPlanExecRequest;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TQueryRequest;
 import com.cloudera.impala.thrift.TResultRow;
@@ -62,16 +64,22 @@ public class Executor {
   // Run the query synchronously (ie, this function blocks until the query
   // is finished) and place the results in resultQueue, followed by an empty
   // row that acts as an end-of-stream marker.
-  // Also populates 'colTypes' and 'colLabels'.
+  // Also populates 'colTypes' and 'colLabels' and sets 'containsOrderBy'.
   public void runQuery(TQueryRequest request, List<PrimitiveType> colTypes,
-      List<String> colLabels, int batchSize, boolean abortOnError, int maxErrors,
+      List<String> colLabels, AtomicBoolean containsOrderBy, int batchSize,
+      boolean abortOnError, int maxErrors,
       List<String> errorLog, Map<String, Integer> fileErrors,
       BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
     init();
     LOG.info("query: " + request.stmt);
-    AnalysisContext.AnalysisResult analysisResult = analyzeQuery(request, colTypes, colLabels);
-    execQuery(analysisResult, batchSize, abortOnError, maxErrors, errorLog, fileErrors,
-              request.returnAsAscii, resultQueue);
+    AnalysisContext.AnalysisResult analysisResult =
+        analyzeQuery(request, colTypes, colLabels);
+    if (containsOrderBy != null) {
+      containsOrderBy.set(analysisResult.isSelectStmt()
+          && analysisResult.getSelectStmt().hasOrderByClause());
+    }
+    execQuery(analysisResult, request.numNodes, batchSize, abortOnError, maxErrors,
+              errorLog, fileErrors, request.returnAsAscii, resultQueue);
     addSentinelRow(resultQueue);
   }
 
@@ -83,6 +91,7 @@ public class Executor {
   // null.
   public void asyncRunQuery(
       final TQueryRequest request, List<PrimitiveType> colTypes, List<String> colLabels,
+      AtomicBoolean containsOrderBy,
       final int batchSize, final boolean abortOnError, final int maxErrors,
       final List<String> errorLog, final Map<String, Integer> fileErrors,
       final BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
@@ -90,11 +99,16 @@ public class Executor {
     LOG.info("query: " + request.stmt);
     final AnalysisContext.AnalysisResult analysisResult =
         analyzeQuery(request, colTypes, colLabels);
+    if (containsOrderBy != null) {
+      containsOrderBy.set(analysisResult.isSelectStmt()
+          && analysisResult.getSelectStmt().hasOrderByClause());
+    }
     Runnable execCall = new Runnable() {
       public void run() {
         try {
-          execQuery(analysisResult, batchSize, abortOnError, maxErrors, errorLog,
-                    fileErrors, request.returnAsAscii, resultQueue);
+          execQuery(analysisResult, request.numNodes, batchSize, abortOnError,
+                    maxErrors, errorLog, fileErrors, request.returnAsAscii,
+                    resultQueue);
         } catch (ImpalaException e) {
           errorMsg = e.getMessage();
         }
@@ -158,7 +172,7 @@ public class Executor {
   // 'resultQueue'. If 'returnAsAscii' is true, returns results as printable
   // strings.
   private void execQuery(
-      AnalysisContext.AnalysisResult analysisResult,
+      AnalysisContext.AnalysisResult analysisResult, int numNodes,
       int batchSize, boolean abortOnError, int maxErrors, List<String> errorLog,
       Map<String, Integer> fileErrors, boolean returnAsAscii,
       BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
@@ -168,7 +182,7 @@ public class Executor {
     List<DataSink> dataSinks = Lists.newArrayList();
     // for now, only single-node execution
     TQueryExecRequest execRequest = planner.createPlanFragments(
-        analysisResult, 1, planFragments, dataSinks);
+        analysisResult, numNodes, planFragments, dataSinks);
     // Log explain string.
     // The i-th sink corresponds to the i-th plan fragment.
     Preconditions.checkState(planFragments.size() == dataSinks.size());
@@ -196,6 +210,10 @@ public class Executor {
     execRequest.setBatchSize(batchSize);
     execRequest.setSqlStmt(analysisResult.getStmt().toSql());
     LOG.info(execRequest.toString());
+
+    for (TPlanExecRequest planRequest: execRequest.fragmentRequests) {
+      planRequest.setQueryId(execRequest.queryId);
+    }
 
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     try {
@@ -243,17 +261,17 @@ public class Executor {
     TQueryRequest request = new TQueryRequest(query, true, 1);
     List<String> errorLog = new ArrayList<String>();
     Map<String, Integer> fileErrors = new HashMap<String, Integer>();
-    List<PrimitiveType> colTypes = Lists.newArrayList();
-    List<String> colLabels = Lists.newArrayList();
+    List<PrimitiveType> dummyColTypes = Lists.newArrayList();
+    List<String> dummyColLabels = Lists.newArrayList();
     BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
     Executor coordinator = new Executor(catalog);
     if (asyncExec) {
       coordinator.asyncRunQuery(
-          request, colTypes, colLabels, batchSize, DEFAULT_ABORT_ON_ERROR,
+          request, dummyColTypes, dummyColLabels, null, batchSize, DEFAULT_ABORT_ON_ERROR,
           DEFAULT_MAX_ERRORS, errorLog, fileErrors, resultQueue);
     } else {
       coordinator.runQuery(
-          request, colTypes, colLabels, batchSize, DEFAULT_ABORT_ON_ERROR,
+          request, dummyColTypes, dummyColLabels, null, batchSize, DEFAULT_ABORT_ON_ERROR,
           DEFAULT_MAX_ERRORS, errorLog, fileErrors, resultQueue);
     }
     while (true) {

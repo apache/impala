@@ -134,7 +134,7 @@ bool AggregationNode::GroupingExprEquals::operator()(
 
 Status AggregationNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
-  agg_tuple_desc_ = state->descs().GetTupleDescriptor(agg_tuple_id_);
+  agg_tuple_desc_ = state->desc_tbl().GetTupleDescriptor(agg_tuple_id_);
   Expr::Prepare(grouping_exprs_, state, child(0)->row_desc());
   Expr::Prepare(aggregate_exprs_, state, child(0)->row_desc());
   hash_fn_.Init(agg_tuple_desc_, grouping_exprs_);
@@ -162,9 +162,19 @@ Status AggregationNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(children_[0]->Open(state));
 
   RowBatch batch(children_[0]->row_desc(), state->batch_size());
+  int64_t num_input_rows = 0;
+  int64_t num_agg_rows = 0;
   while (true) {
     bool eos;
     RETURN_IF_ERROR(children_[0]->GetNext(state, &batch, &eos));
+
+    if (VLOG_IS_ON(2)) {
+      for (int i = 0; i < batch.num_rows(); ++i) {
+        TupleRow* row = batch.GetRow(i);
+        VLOG(2) << "input row: " << PrintRow(row, children_[0]->row_desc());
+      }
+    }
+
     if (singleton_output_tuple_ != NULL) {
       for (int i = 0; i < batch.num_rows(); ++i) {
         current_row_ = batch.GetRow(i);
@@ -182,19 +192,24 @@ Status AggregationNode::Open(RuntimeState* state) {
           // new entry
           agg_tuple = ConstructAggTuple();
           hash_tbl_->insert(agg_tuple->tuple());
+          ++num_agg_rows;
         } else {
           agg_tuple = reinterpret_cast<AggregationTuple*>(*entry);
         }
         UpdateAggTuple(agg_tuple, current_row_);
       }
     }
+    num_input_rows += batch.num_rows();
     if (eos) break;
     batch.Reset();
   }
   RETURN_IF_ERROR(children_[0]->Close(state));
   if (singleton_output_tuple_ != NULL) {
     hash_tbl_->insert(singleton_output_tuple_->tuple());
+    ++num_agg_rows;
   }
+  VLOG(1) << "aggregated " << num_input_rows << " input rows into "
+          << num_agg_rows << " output rows";
   output_iterator_ = hash_tbl_->begin();
   return Status::OK;
 }
@@ -209,6 +224,7 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
     TupleRow* row = row_batch->GetRow(row_idx);
     row->SetTuple(0, *output_iterator_);
     if (ExecNode::EvalConjuncts(row)) {
+      VLOG(1) << "output row: " << PrintRow(row, row_desc());
       row_batch->CommitLastRow();
       ++num_rows_returned_;
       if (ReachedLimit()) {

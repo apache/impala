@@ -97,6 +97,9 @@ class Status;
 //    to explicitly create a global reference to them.
 class JniUtil {
  public:
+  // Call this prior to any libhdfs calls.
+  static void InitLibhdfs();
+
   // Find Throwable class, and get Throwable toString() method id.
   static Status Init();
 

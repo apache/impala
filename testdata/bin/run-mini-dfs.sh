@@ -14,7 +14,7 @@ HDFS_DATA_DIR=/impala-dist-test
 rm -f ${CONF_FILE} > /dev/null 2>&1
 
 pushd ${HADOOP_HOME}
-CLASSPATH=./*:./lib/jsp-2.1/*:./lib/* java org.apache.hadoop.test.MiniHadoopClusterManager -nomr -writeConfig ${CONF_FILE} &
+CLASSPATH=./*:./lib/jsp-2.1/*:./lib/* java org.apache.hadoop.test.MiniHadoopClusterManager -datanodes 3 -nomr -writeConfig ${CONF_FILE} &
 
 for i in `seq 30`; do
   sleep 2
@@ -23,10 +23,10 @@ for i in `seq 30`; do
     echo "MiniDFSCluster started, loading data.";
     hadoop fs -conf ${CONF_FILE} -rmr ${HDFS_DATA_DIR}
     hadoop fs -conf ${CONF_FILE} -mkdir ${HDFS_DATA_DIR}
-    hadoop fs -conf ${CONF_FILE} -put ${IMPALA_HOME}/testdata/target/AllTypesAgg/* ${HDFS_DATA_DIR}
+    hadoop fs -conf ${CONF_FILE} -Ddfs.replication=3 -put ${IMPALA_HOME}/testdata/target/AllTypesAgg/* ${HDFS_DATA_DIR}
     echo "Data loaded. Config file written to: ${CONF_FILE}"
     popd
-    HADOOP_CONF_DIR=./ hive -v -f create-mini.sql
+    HADOOP_CONF_DIR=./ ${HIVE_HOME}/bin/hive -v -f ${IMPALA_HOME}/testdata/bin/create-mini.sql
     echo "Created table in hive"
     exit
   fi;

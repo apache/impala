@@ -70,13 +70,13 @@ public class DataErrorsTest {
       // and with batch size of 1, which should trigger a lot of corner cases
       // in the execution engine code
       TestUtils.runQuery(executor, queryFileParser.getQuery(),
-          queryFileParser.getLineNum(), 0, abortOnError, maxErrors, null, null, null,
+          queryFileParser.getLineNum(), 1, 0, abortOnError, maxErrors, null, null, null,
           expectedErrors, expectedFileErrors, testErrorLog);
       TestUtils.runQuery(executor, queryFileParser.getQuery(),
-          queryFileParser.getLineNum(), 16, abortOnError, maxErrors, null, null, null,
+          queryFileParser.getLineNum(), 1, 16, abortOnError, maxErrors, null, null, null,
           expectedErrors, expectedFileErrors, testErrorLog);
       TestUtils.runQuery(executor, queryFileParser.getQuery(),
-          queryFileParser.getLineNum(), 1, abortOnError, maxErrors, null, null, null,
+          queryFileParser.getLineNum(), 1, 1, abortOnError, maxErrors, null, null, null,
           expectedErrors, expectedFileErrors, testErrorLog);
     }
     queryFileParser.close();

@@ -35,14 +35,16 @@ Status TopNNode::Init(ObjectPool* pool, const TPlanNode& tnode) {
       Expr::CreateExprTrees(pool, tnode.sort_node.ordering_exprs, &lhs_ordering_exprs_));
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(pool, tnode.sort_node.ordering_exprs, &rhs_ordering_exprs_));
-  is_asc_order_.insert(is_asc_order_.begin(), 
-                       tnode.sort_node.is_asc_order.begin(), tnode.sort_node.is_asc_order.end());
+  is_asc_order_.insert(
+      is_asc_order_.begin(), tnode.sort_node.is_asc_order.begin(),
+      tnode.sort_node.is_asc_order.end());
   DCHECK_EQ(conjuncts_.size(), 0) << "TopNNode should never have predicates to evaluate.";
   return Status::OK;
 }
 
 // The stl::priority_queue is a MAX heap.
-bool TopNNode::TupleRowLessThan::operator()(TupleRow* const& lhs, TupleRow* const& rhs) const {
+bool TopNNode::TupleRowLessThan::operator()(TupleRow* const& lhs, TupleRow* const& rhs)
+    const {
   DCHECK(node_ != NULL);
 
   vector<Expr*>::const_iterator lhs_expr_iter = node_->lhs_ordering_exprs_.begin();

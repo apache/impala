@@ -3,8 +3,9 @@
 #include "service/backend.h"
 
 #include <boost/scoped_ptr.hpp>
-#include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <gflags/gflags.h>
+#include <server/TServer.h>
 
 #include "common/status.h"
 #include "exec/exec-node.h"
@@ -12,17 +13,33 @@
 #include "exprs/expr.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
-#include "service/plan-executor-adaptor.h"
+#include "runtime/data-stream-mgr.h"
+#include "service/jni-coordinator.h"
+#include "service/backend-service.h"
 #include "util/jni-util.h"
 #include "util/debug-util.h"
+#include "testutil/test-env.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
 #include "gen-cpp/Data_types.h"
 
 DECLARE_bool(serialize_batch);
+DEFINE_int32(backend_port, 21000, "port on which ImpalaBackendService is exported");
 
 using namespace impala;
 using namespace std;
 using namespace boost;
+using namespace apache::thrift::server;
+
+static DataStreamMgr* stream_mgr;
+
+// TODO: get rid of this reference to TestEnv when we have a generic scheduler interface
+// (which TestEnv would implement)
+static TestEnv* test_env;
+
+static void RunServer(TServer* server) {
+  VLOG(1) << "started backend server thread";
+  server->serve();
+}
 
 extern "C"
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
@@ -40,10 +57,26 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
     if (env->ExceptionOccurred()) env->ExceptionDescribe();
     return -1;
   }
+  JniUtil::InitLibhdfs();
   THROW_IF_ERROR_RET(JniUtil::Init(), env, impala_exc_cl, -1);
   THROW_IF_ERROR_RET(HBaseTableScanner::Init(), env, impala_exc_cl, -1);
   THROW_IF_ERROR_RET(RuntimeState::InitHBaseConf(), env, impala_exc_cl, -1);
-  THROW_IF_ERROR_RET(PlanExecutorAdaptor::Init(), env, impala_exc_cl, -1);
+  THROW_IF_ERROR_RET(JniCoordinator::Init(), env, impala_exc_cl, -1);
+
+  // one stream mgr per running backend process
+  VLOG(1) << "Create stream mgr";
+  stream_mgr = new DataStreamMgr();
+
+  // start one backend service for the coordinator on backend_port
+  TServer* server = StartImpalaBackendService(stream_mgr, FLAGS_backend_port);
+  thread server_thread = thread(&RunServer, server);
+
+  // start backends in process, listening on ports > backend_port
+  VLOG(1) << "creating test env";
+  test_env = new TestEnv(FLAGS_backend_port + 1);
+  VLOG(1) << "starting backends";
+  test_env->StartBackends(2);
+
   return JNI_VERSION_1_4;
 }
 
@@ -68,63 +101,41 @@ extern "C"
 JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecQuery(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_query_exec_request,
     jobject error_log, jobject file_errors, jobject result_queue) {
-  PlanExecutorAdaptor adaptor(
-      env, thrift_query_exec_request, error_log, file_errors, result_queue);
-
-  if (!adaptor.DeserializeRequest().ok()) {
-    LOG(ERROR) << "couldn't deserialize request";
-    env->ThrowNew(adaptor.impala_exc_cl(), "couldn't deserialize request");
-    return;
-  }
-
-  // at the moment, we can only do single-node queries
-  if (adaptor.query_exec_request().fragmentRequests.size() != 1) {
-    LOG(ERROR) << "received distributed query request";
-    env->ThrowNew(
-        adaptor.impala_exc_cl(), "not implemented: distributed query execution");
-    return;
-  }
-  LOG(INFO) << "query: " << adaptor.query_exec_request().sqlStmt;
-
-  adaptor.Exec();
+  JniCoordinator coord(env, stream_mgr, test_env, error_log, file_errors, result_queue);
+  coord.Exec(thrift_query_exec_request);
   RETURN_IF_EXC(env);
-  const vector<Expr*>& select_list_exprs = adaptor.select_list_exprs();
-  PlanExecutor* executor = adaptor.executor();
+  const vector<Expr*>& select_list_exprs = coord.select_list_exprs();
 
   // Prepare select list expressions.
   for (size_t i = 0; i < select_list_exprs.size(); ++i) {
-    select_list_exprs[i]->Prepare(executor->runtime_state(), adaptor.plan()->row_desc());
+    select_list_exprs[i]->Prepare(coord.runtime_state(), coord.row_desc());
   }
 
-  if (adaptor.plan() == NULL) {
+  if (coord.is_constant_query()) {
     // no FROM clause: the select list only contains constant exprs
-    // TODO: check this somewhere
-    adaptor.AddResultRow(NULL);
+    coord.AddResultRow(NULL);
     RETURN_IF_EXC(env);
     return;
   }
 
   // TODO: turn this into a flag in the TQueryExecRequest
   // FLAGS_serialize_batch = true;
-  scoped_ptr<RowBatch> batch;
-  scoped_ptr<TRowBatch> thrift_batch;
   while (true) {
-    RowBatch* batch_ptr;
-    THROW_IF_ERROR_WITH_LOGGING(executor->FetchResult(&batch_ptr), env, &adaptor);
-    if (batch_ptr == NULL) break;
-    batch.reset(batch_ptr);
-
+    RowBatch* batch;
+    THROW_IF_ERROR_WITH_LOGGING(coord.GetNext(&batch), env, &coord);
+    if (batch == NULL) break;
+    LOG(INFO) << "#rows=" << batch->num_rows();
     for (int i = 0; i < batch->num_rows(); ++i) {
       TupleRow* row = batch->GetRow(i);
-      LOG(INFO) << PrintRow(row, adaptor.plan()->row_desc());
-      adaptor.AddResultRow(row);
+      LOG(INFO) << PrintRow(row, coord.row_desc());
+      coord.AddResultRow(row);
       RETURN_IF_EXC(env);
     }
   }
 
   // Report error log and file error stats.
-  adaptor.WriteErrorLog();
-  adaptor.WriteFileErrors();
+  coord.WriteErrorLog();
+  coord.WriteFileErrors();
 }
 
 extern "C"

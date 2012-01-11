@@ -63,7 +63,6 @@ class MemPool {
   // of the the current chunk. Creates a new chunk if there aren't any chunks
   // with enough capacity.
   char* Allocate(int size) {
-    DCHECK(owns_data_);
     int num_bytes = ((size + 7) / 8) * 8;  // round up to nearest 8 bytes
     if (current_chunk_idx_ == -1
         || num_bytes + chunks_[current_chunk_idx_].allocated_bytes
@@ -71,6 +70,7 @@ class MemPool {
       FindChunk(num_bytes);
     }
     ChunkInfo& info = chunks_[current_chunk_idx_];
+    DCHECK(info.owns_data);
     char* result = info.data + info.allocated_bytes;
     DCHECK_LE(info.allocated_bytes + num_bytes, info.size);
     info.allocated_bytes += num_bytes;
@@ -128,6 +128,7 @@ class MemPool {
   static const int MAX_CHUNK_SIZE = 512 * 1024;
 
   struct ChunkInfo {
+    bool owns_data;  // true if we eventually need to dealloc data
     char* data;
     int size;  // in bytes
 
@@ -140,16 +141,19 @@ class MemPool {
     int allocated_bytes;
 
     explicit ChunkInfo(int size)
-        : data(new char[size]),
-          size(size),
-          cumulative_allocated_bytes(0),
-          allocated_bytes(0) {}
+      : owns_data(true),
+        data(new char[size]),
+        size(size),
+        cumulative_allocated_bytes(0),
+        allocated_bytes(0) {}
 
     ChunkInfo()
-        : data(NULL), size(0), cumulative_allocated_bytes(0), allocated_bytes(0) {}
+      : owns_data(true),
+        data(NULL),
+        size(0),
+        cumulative_allocated_bytes(0),
+        allocated_bytes(0) {}
   };
-
-  bool owns_data_;  // false if we were constructed with vector<string>*
 
   // chunk from which we served the last Allocate() call;
   // always points to the last chunk that contains allocated data;

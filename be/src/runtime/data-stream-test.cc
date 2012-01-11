@@ -2,8 +2,6 @@
 
 #include <boost/thread/thread.hpp>
 
-//#include <concurrency/ThreadManager.h>
-//#include <concurrency/PosixThreadFactory.h>
 #include <protocol/TBinaryProtocol.h>
 #include <server/TSimpleServer.h>
 //#include <server/TThreadPoolServer.h>
@@ -45,8 +43,7 @@ class ImpalaBackend : public ImpalaBackendServiceIf {
   virtual ~ImpalaBackend() {}
 
   virtual void ExecPlanFragment(
-      TStatus& _return, const TUniqueId& query_id, const TPlanExecRequest& request,
-      const TPlanExecParams& params) {
+      TStatus& _return, const TPlanExecRequest& request, const TPlanExecParams& params) {
   }
 
   virtual void TransmitData(
@@ -74,7 +71,9 @@ class DataStreamTest : public testing::Test {
     stream_mgr_ = new DataStreamMgr();
     EXPECT_TRUE(exec_.Setup().ok());
     sink_.destNodeId = DEST_NODE_ID;
-    hosts_.push_back("localhost");
+    dest_.push_back(THostPort());
+    dest_.back().host = "localhost";
+    dest_.back().port = FLAGS_port;
     backend_thread_ = thread(&DataStreamTest::StartBackend, this);
   }
 
@@ -94,7 +93,7 @@ class DataStreamTest : public testing::Test {
 
   // sending node(s)
   TDataStreamSink sink_;
-  vector<string> hosts_;
+  vector<THostPort> dest_;
 
   struct SenderInfo {
     thread* thread_handle;
@@ -109,7 +108,7 @@ class DataStreamTest : public testing::Test {
   void PrepareQuery(const string& stmt) {
     stmt_ = stmt;
     EXPECT_TRUE(exec_.Exec(stmt, NULL).ok());
-    desc_tbl_ = &exec_.runtime_state()->descs();
+    desc_tbl_ = &exec_.runtime_state()->desc_tbl();
   }
 
   // Start receiver (expecting given number of senders) in separate thread.
@@ -175,13 +174,14 @@ class DataStreamTest : public testing::Test {
     VLOG(1) << "exec::exec";
     EXPECT_TRUE(exec.Exec(stmt_, NULL).ok());
     VLOG(1) << "create sender";
-    DataStreamSender sender(exec.row_desc(), query_id_, sink_, hosts_, 1024);
+    DataStreamSender sender(exec.row_desc(), query_id_, sink_, dest_, 1024);
     EXPECT_TRUE(sender.Init().ok());
     RowBatch* batch = NULL;
     SenderInfo& info = sender_info_[sender_num];
     for (;;) {
       EXPECT_TRUE(exec.FetchResult(&batch).ok());
       if (batch == NULL) break;
+      VLOG(1) << "#rows=" << batch->num_rows();
       info.status = sender.Send(batch);
       if (!info.status.ok()) break;
     }
