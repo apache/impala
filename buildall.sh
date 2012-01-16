@@ -49,6 +49,9 @@ done
 # option to clean everything first
 if [ $clean_action -eq 1 ]
 then
+  # clean selected files from the root
+  rm -f CMakeCache.txt
+
   # clean thirdparty
   cd $IMPALA_HOME/thirdparty
   # remove everything that is not checked in
