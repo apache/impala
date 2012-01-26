@@ -12,6 +12,7 @@
 
 #include "exec/scan-node.h"
 #include "runtime/descriptors.h"
+#include "runtime/string-buffer.h"
 #include "util/sse-util.h"
 
 namespace impala {
@@ -198,10 +199,10 @@ class HdfsTextScanNode : public ScanNode {
   // Helper string for dealing with input rows that span file blocks.
   // We keep track of a whole line that spans file blocks to be able to report
   // the line as erroneous in case of parsing errors.
-  std::string boundary_row_;
+  StringBuffer boundary_row_;
 
   // Helper string for dealing with columns that span file blocks.
-  std::string boundary_column_;
+  StringBuffer boundary_column_;
 
   // Helper class for converting text to other types;
   boost::scoped_ptr<TextConverter> text_converter_;

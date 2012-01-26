@@ -50,15 +50,14 @@ class RowBatch {
 
   static const int INVALID_ROW_INDEX = -1;
 
-  // Add a row of NULL tuples after the last committed row and return its index.
+  // Add a row of tuple pointers after the last committed row and return its index.
+  // The row is uninitialized and each tuple of the row must be set.
   // Returns INVALID_ROW_INDEX if the row batch is full.
   // Two consecutive AddRow() calls without a CommitLastRow() between them
   // have the same effect as a single call.
   int AddRow() {
     if (num_rows_ == capacity_) return INVALID_ROW_INDEX;
     has_in_flight_row_ = true;
-    bzero(tuple_ptrs_ + num_rows_ * num_tuples_per_row_,
-          num_tuples_per_row_ * sizeof(Tuple*));
     return num_rows_;
   }
 

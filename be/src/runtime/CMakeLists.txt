@@ -58,6 +58,19 @@ target_link_libraries(free-list-test
   ${Boost_LIBRARIES}
 )
 
+add_executable(string-buffer-test
+  string-buffer-test.cc
+)
+
+target_link_libraries(string-buffer-test
+  Runtime
+  thrift
+  glogstatic
+  gflagsstatic
+  gtest
+  ${Boost_LIBRARIES}
+)
+
 add_executable(data-stream-test
   data-stream-test.cc
 )
@@ -80,4 +93,5 @@ target_link_libraries(data-stream-test
 
 add_test(mem-pool-test ${CMAKE_SOURCE_DIR}/be/build/runtime/mem-pool-test)
 add_test(free-list-test ${CMAKE_SOURCE_DIR}/be/build/runtime/free-list-test)
+add_test(string-buffer-test ${CMAKE_SOURCE_DIR}/be/build/runtime/string-buffer-test)
 add_test(data-stream-test ${CMAKE_SOURCE_DIR}/be/build/runtime/data-stream-test)

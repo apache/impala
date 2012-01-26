@@ -57,6 +57,8 @@ HdfsTextScanNode::HdfsTextScanNode(ObjectPool* pool, const TPlanNode& tnode,
       num_errors_in_file_(0),
       num_partition_keys_(0),
       num_materialized_slots_(0),
+      boundary_row_(partition_key_pool_.get()),
+      boundary_column_(partition_key_pool_.get()),
       text_converter_(NULL) {
   // Initialize partition key regex
   Status status = Init(pool, tnode);
@@ -252,8 +254,8 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
       }
       // Save contents that are split across files
       if (col_start != file_buffer_ptr_) {
-        boundary_column_.append(col_start, file_buffer_ptr_ - col_start);
-        boundary_row_.append(line_start, file_buffer_ptr_ - line_start);
+        boundary_column_.Append(col_start, file_buffer_ptr_ - col_start);
+        boundary_row_.Append(line_start, file_buffer_ptr_ - line_start);
       }
       
       // TODO: does it ever make sense to deep copy some of the tuples (string data) if the
@@ -433,13 +435,13 @@ Status HdfsTextScanNode::ParseFileBuffer(int max_tuples, int* num_tuples, int* n
               } else {
                 parse_data_[*num_fields].len = -len;
               }
-              if (!boundary_column_.empty()) {
+              if (!boundary_column_.Empty()) {
                 CopyBoundaryField(&parse_data_[*num_fields]);
               }
               ++(*num_fields);
             }
             current_column_has_escape_ = false;
-            boundary_column_.clear();
+            boundary_column_.Clear();
             *column_start = column_end + 1;
             ++column_idx_;
           }
@@ -490,12 +492,12 @@ Status HdfsTextScanNode::ParseFileBuffer(int max_tuples, int* num_tuples, int* n
         parse_data_[*num_fields].start = *column_start;
         parse_data_[*num_fields].len = file_buffer_ptr_ - *column_start;
         if (current_column_has_escape_) parse_data_[*num_fields].len *= -1;
-        if (!boundary_column_.empty()) {
+        if (!boundary_column_.Empty()) {
           CopyBoundaryField(&parse_data_[*num_fields]);
         }
         ++(*num_fields);
       }
-      boundary_column_.clear();
+      boundary_column_.Clear();
       current_column_has_escape_ = false;
       *column_start = file_buffer_ptr_ + 1;
       ++column_idx_;
@@ -525,7 +527,7 @@ Status HdfsTextScanNode::WriteTuples(RuntimeState* state, RowBatch* row_batch, i
   DCHECK_GT(num_tuples, 0);
 
   *line_start = file_buffer_ptr_;
-  boundary_row_.clear();
+  boundary_row_.Clear();
   
   // Make a row and evaluate the row
   if (*row_idx == RowBatch::INVALID_ROW_INDEX) {
@@ -577,7 +579,7 @@ Status HdfsTextScanNode::WriteFields(RuntimeState* state, RowBatch* row_batch, i
 
   // Loop through all the parsed_data and parse out the values to slots
   for (int n = 0; n < num_fields; ++n) {
-    boundary_row_.clear();
+    boundary_row_.Clear();
     SlotDescriptor* slot_desc = materialized_slots_[slot_idx_];
     char* data = parse_data_[n].start;
     int len = parse_data_[n].len;
@@ -705,10 +707,10 @@ Status HdfsTextScanNode::WriteFields(RuntimeState* state, RowBatch* row_batch, i
 }
 
 void HdfsTextScanNode::CopyBoundaryField(ParseData* data) {
-  const int total_len = data->len + boundary_column_.size();
+  const int total_len = data->len + boundary_column_.Size();
   char* str_data = reinterpret_cast<char*>(tuple_pool_->Allocate(total_len));
-  memcpy(str_data, boundary_column_.c_str(), boundary_column_.size());
-  memcpy(str_data + boundary_column_.size(), data->start, data->len);
+  memcpy(str_data, boundary_column_.str().ptr, boundary_column_.Size());
+  memcpy(str_data + boundary_column_.Size(), data->start, data->len);
   data->start = str_data;
   data->len = total_len;
 }
@@ -726,9 +728,9 @@ void HdfsTextScanNode::ReportRowParseError(RuntimeState* state, char* line_start
   if (state->LogHasSpace()) {
     state->error_stream() << "file: " << files_[file_idx_] << endl;
     state->error_stream() << "line: ";
-    if (!boundary_row_.empty()) {
+    if (!boundary_row_.Empty()) {
       // Log the beginning of the line from the previous file buffer(s)
-      state->error_stream() << boundary_row_;
+      state->error_stream() << boundary_row_.str();
     }
     // Log the erroneous line (or the suffix of a line if !boundary_line.empty()).
     state->error_stream() << string(line_start, len);
