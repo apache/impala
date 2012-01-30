@@ -485,6 +485,15 @@
                     <exec executable="${env.HBASE_HOME}/bin/stop-hbase.sh">
                     </exec>
                     -->
+                    <exec executable="${env.IMPALA_HOME}/testdata/bin/run-mini-dfs.sh">
+                    </exec>
+                    <!-- Similarly, we don't want to kill the mini-dfs cluster.
+                         Starting another mini-dfs cluster when one is running will
+                         make run-mini-dfs.sh hang for 2 minutes, so that script proactively tries
+                         to kill all running mini-dfs clusters when it starts
+                    <exec executable="${env.IMPALA_HOME}/testdata/bin/kill-mini-dfs.sh">
+                    </exec>
+                    -->
                   </target>
                 </configuration>
               </execution>
