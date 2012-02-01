@@ -12,6 +12,7 @@
 
 namespace impala {
 
+class HdfsFsCache;
 class ExecNode;
 class RowDescriptor;
 class RowBatch;
@@ -23,7 +24,7 @@ class TPlanExecParams;
 
 class PlanExecutor {
  public:
-  PlanExecutor(DataStreamMgr* stream_mgr);
+  PlanExecutor(DataStreamMgr* stream_mgr, HdfsFsCache* fs_cache);
   ~PlanExecutor();
 
   // Prepare for execution. Call this prior to Open().
@@ -43,6 +44,7 @@ class PlanExecutor {
 
  private:
   DataStreamMgr* stream_mgr_;
+  HdfsFsCache* fs_cache_;
   ExecNode* plan_;  // lives in runtime_state_->obj_pool()
   boost::scoped_ptr<RuntimeState> runtime_state_;
   bool done_;

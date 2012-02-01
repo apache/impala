@@ -11,6 +11,7 @@
 #include "common/status.h"
 #include "service/backend-service.h"
 #include "runtime/data-stream-mgr.h"
+#include "runtime/hdfs-fs-cache.h"
 #include "gen-cpp/ImpalaBackendService.h"
 
 using namespace boost;
@@ -68,6 +69,11 @@ struct TestEnv::BackendInfo {
   BackendInfo(): server(NULL) {}
 };
 
+TestEnv::TestEnv(int start_port)
+  : fs_cache_(new HdfsFsCache()),
+    start_port_(start_port) {
+}
+
 TestEnv::~TestEnv() {
   for (int i = 0; i < backend_info_.size(); ++i) {
     BackendInfo* info = backend_info_[i];
@@ -92,7 +98,7 @@ Status TestEnv::StartBackends(int num_backends) {
   for (int i = 0; i < num_backends; ++i) {
     client_cache_[make_pair("localhost", port)] = list<ClientInfo*>();
     BackendInfo* info = new BackendInfo();
-    info->server = StartImpalaBackendService(&info->stream_mgr, port++);
+    info->server = StartImpalaBackendService(&info->stream_mgr, fs_cache_.get(), port++);
     DCHECK(info->server != NULL);
     info->backend_thread = thread(&TestEnv::RunBackendServer, this, info->server);
     backend_info_.push_back(info);

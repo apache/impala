@@ -20,6 +20,7 @@
 #include "runtime/data-stream-recvr.h"
 #include "runtime/descriptors.h"
 #include "testutil/query-executor.h"
+#include "testutil/test-env.h"
 #include "util/debug-util.h"
 #include "gen-cpp/ImpalaBackendService.h"
 #include "gen-cpp/Types_types.h"
@@ -65,6 +66,11 @@ class ImpalaBackend : public ImpalaBackendServiceIf {
 
 class DataStreamTest : public testing::Test {
  protected:
+  DataStreamTest()
+    : test_env_(0),
+      exec_(NULL, &test_env_) {
+  }
+
   virtual void SetUp() {
     query_id_.lo = 0;
     query_id_.hi = 0;
@@ -80,6 +86,7 @@ class DataStreamTest : public testing::Test {
   static const PlanNodeId DEST_NODE_ID = 1;
 
   const DescriptorTbl* desc_tbl_;
+  TestEnv test_env_;
   QueryExecutor exec_;
   TUniqueId query_id_;
   string stmt_;
@@ -168,7 +175,7 @@ class DataStreamTest : public testing::Test {
   }
 
   void Sender(int sender_num) {
-    QueryExecutor exec;
+    QueryExecutor exec(NULL, &test_env_);
     VLOG(1) << "exec setup";
     EXPECT_TRUE(exec.Setup().ok());
     VLOG(1) << "exec::exec";

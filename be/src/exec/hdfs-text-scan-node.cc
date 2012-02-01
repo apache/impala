@@ -10,6 +10,7 @@
 #include "exec/text-converter.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
+#include "runtime/hdfs-fs-cache.h"
 #include "runtime/runtime-state.h"
 #include "runtime/mem-pool.h"
 #include "runtime/raw-value.h"
@@ -23,9 +24,6 @@
 #include "util/string-parser.h"
 #include "common/object-pool.h"
 #include "gen-cpp/PlanNodes_types.h"
-
-DEFINE_string(nn, "default", "");
-DEFINE_int32(nn_port, 0, "");
 
 using namespace std;
 using namespace boost;
@@ -167,7 +165,7 @@ Status HdfsTextScanNode::Prepare(RuntimeState* state) {
 }
 
 Status HdfsTextScanNode::Open(RuntimeState* state) {
-  hdfs_connection_ = hdfsConnect(FLAGS_nn.c_str(), FLAGS_nn_port);
+  hdfs_connection_ = state->fs_cache()->GetDefaultConnection();
   if (hdfs_connection_ == NULL) {
     return Status(AppendHdfsErrorMessage("Failed to connect to HDFS."));
   } else {
@@ -176,12 +174,7 @@ Status HdfsTextScanNode::Open(RuntimeState* state) {
 }
 
 Status HdfsTextScanNode::Close(RuntimeState* state) {
-  int hdfs_ret = hdfsDisconnect(hdfs_connection_);
-  if (hdfs_ret == 0) {
-    return Status::OK;
-  } else {
-    return Status(AppendHdfsErrorMessage("Failed to close HDFS connection."));
-  }
+  return Status::OK;
 }
 
 Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {

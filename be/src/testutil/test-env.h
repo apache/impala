@@ -16,51 +16,55 @@ namespace apache { namespace thrift { namespace server { class TServer; } } }
 
 namespace impala {
 
+class HdfsFsCache;
 class ImpalaBackendServiceClient;
 
 // Create environment for single-process distributed query execution.
 class TestEnv {
  public:
-   TestEnv(int start_port): start_port_(start_port) {}
+  TestEnv(int start_port);
 
-   // Stop backend threads.
-   ~TestEnv();
+  // Stop backend threads.
+  ~TestEnv();
 
-   // Start backends in separate threads; each one exports ImpalaBackendService
-   // Thrift service.
-   Status StartBackends(int num_backends);
+  // Start backends in separate threads; each one exports ImpalaBackendService
+  // Thrift service.
+  Status StartBackends(int num_backends);
 
-   // Return "num_backends" clients.
-   // Returned clients are owned by TestEnv and must not be deallocated.
-   void GetClients(
-       int num_backends, std::vector<ImpalaBackendServiceClient*>* clients);
+  // Return "num_backends" clients.
+  // Returned clients are owned by TestEnv and must not be deallocated.
+  void GetClients(
+      int num_backends, std::vector<ImpalaBackendServiceClient*>* clients);
 
-   // Hand clients back to TestEnv.
-   void ReleaseClients(const std::vector<ImpalaBackendServiceClient*>& clients);
+  // Hand clients back to TestEnv.
+  void ReleaseClients(const std::vector<ImpalaBackendServiceClient*>& clients);
 
-   std::string DebugString();
+  HdfsFsCache* fs_cache() { return fs_cache_.get(); }
 
-  private:
-   int start_port_;
+  std::string DebugString();
 
-   struct BackendInfo;
-   // owned by us
-   std::vector<BackendInfo*> backend_info_;
+ private:
+  boost::scoped_ptr<HdfsFsCache> fs_cache_;
+  int start_port_;
 
-   // TODO: move all of this into a separate BackendClientCache class
-   // that manages connections and shuts them down if they don't get used
-   // for a while, etc.
-   struct ClientInfo;
+  struct BackendInfo;
+  // owned by us
+  std::vector<BackendInfo*> backend_info_;
 
-   // map from (host, port) to list of clients;
-   // we own ClientInfo*
-   typedef boost::unordered_map<std::pair<std::string, int>, std::list<ClientInfo*> >
-       ClientCache;
-   ClientCache client_cache_;
+  // TODO: move all of this into a separate BackendClientCache class
+  // that manages connections and shuts them down if they don't get used
+  // for a while, etc.
+  struct ClientInfo;
 
-   // map from client back to its containing struct
-   typedef boost::unordered_map<ImpalaBackendServiceClient*, ClientInfo*> ClientMap;
-   ClientMap client_map_;
+  // map from (host, port) to list of clients;
+  // we own ClientInfo*
+  typedef boost::unordered_map<std::pair<std::string, int>, std::list<ClientInfo*> >
+      ClientCache;
+  ClientCache client_cache_;
+
+  // map from client back to its containing struct
+  typedef boost::unordered_map<ImpalaBackendServiceClient*, ClientInfo*> ClientMap;
+  ClientMap client_map_;
 
   void RunBackendServer(apache::thrift::server::TServer* server);
 };

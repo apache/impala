@@ -7,11 +7,12 @@ namespace apache { namespace thrift { namespace server { class TServer; } } }
 
 namespace impala {
 
+class HdfsFsCache;
 class DataStreamMgr;
 
 // Start a Thrift server exporting ImpalaBackendService on given port.
 apache::thrift::server::TServer* StartImpalaBackendService(
-    DataStreamMgr* stream_mgr, int port);
+    DataStreamMgr* stream_mgr, HdfsFsCache* fs_cache, int port);
 
 }
 

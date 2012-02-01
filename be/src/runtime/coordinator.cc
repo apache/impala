@@ -20,7 +20,7 @@ Coordinator::Coordinator(const string& host, int port, DataStreamMgr* stream_mgr
     port_(port),
     stream_mgr_(stream_mgr),
     test_env_(test_env),
-    executor_(new PlanExecutor(stream_mgr)) {
+    executor_(new PlanExecutor(stream_mgr, test_env_->fs_cache())) {
 }
 
 Coordinator::~Coordinator() {

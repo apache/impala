@@ -258,7 +258,7 @@ public class Executor {
       int batchSize, PrintStream targetStream) throws ImpalaException {
     Preconditions.checkNotNull(catalog);
     int numRows = 0;
-    TQueryRequest request = new TQueryRequest(query, true, 1);
+    TQueryRequest request = new TQueryRequest(query, true, 2);
     List<String> errorLog = new ArrayList<String>();
     Map<String, Integer> fileErrors = new HashMap<String, Integer>();
     List<PrimitiveType> dummyColTypes = Lists.newArrayList();

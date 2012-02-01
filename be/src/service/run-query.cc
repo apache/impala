@@ -28,7 +28,7 @@ DEFINE_bool(init_hbase, true, "if true, call hbase jni initialization");
 DEFINE_string(profile_output_file, "pprof.out", "google pprof output file");
 DEFINE_int32(iterations, 1, "Number of times to run the query (for perf testing)");
 DEFINE_bool(enable_counters, true, "if false, disable using counters (so a profiler can use them");
-DECLARE_int32(num_backends);
+DECLARE_int32(num_nodes);
 DECLARE_int32(backend_port);
 
 using namespace std;
@@ -139,14 +139,14 @@ int main(int argc, char** argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);
 
   JniUtil::InitLibhdfs();
-  TestEnv* test_env = NULL;
+  TestEnv* test_env = new TestEnv(FLAGS_backend_port + 1);
   DataStreamMgr* stream_mgr = NULL;
-  if (FLAGS_num_backends != 0) {
+  if (FLAGS_num_nodes != 1) {
     stream_mgr = new DataStreamMgr();
-    TServer* server = StartImpalaBackendService(stream_mgr, FLAGS_backend_port);
+    TServer* server = StartImpalaBackendService(
+        stream_mgr, test_env->fs_cache(), FLAGS_backend_port);
     thread server_thread = thread(&RunServer, server);
-    test_env = new TestEnv(FLAGS_backend_port + 1);
-    test_env->StartBackends(FLAGS_num_backends);
+    test_env->StartBackends(FLAGS_num_nodes > 0 ? FLAGS_num_nodes : 4);
   }
   EXIT_IF_ERROR(JniUtil::Init());
   if (FLAGS_init_hbase) {

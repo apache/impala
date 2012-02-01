@@ -36,11 +36,10 @@ public class QueryTest {
       queryFileParser.next();
       ArrayList<String> expectedTypes = queryFileParser.getExpectedResult(0);
       ArrayList<String> expectedResults = queryFileParser.getExpectedResult(1);
-      // run query 3 ways: with backend's default batch size, with small batch size,
-      // and with batch size of 1, which should trigger a lot of corner cases
-      // in the execution engine code
+      // run each test against all possible combinations of batch sizes and
+      // number of execution nodes
       int[] batchSizes = {0, 16, 1};
-      int[] numNodes = {1, 2};
+      int[] numNodes = {1, 2, 3, 0};
       for (int i = 0; i < batchSizes.length; ++i) {
         for (int j = 0; j < numNodes.length; ++j) {
           TestUtils.runQuery(
@@ -119,5 +118,10 @@ public class QueryTest {
   @Test
   public void TestTopN() {
     runQueryTestFile("top-n", false, 1000);
+  }
+
+  @Test
+  public void TestEmpty() {
+    runQueryTestFile("empty", false, 1000);
   }
 }

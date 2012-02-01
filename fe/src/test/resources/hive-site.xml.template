@@ -55,7 +55,7 @@
 <property>
   <!--  this should eventually be deprecated since the metastore should supply this -->
   <name>hive.metastore.warehouse.dir</name>
-  <value>${IMPALA_FE_DIR}/target/test-warehouse</value>
+  <value>/test-warehouse</value>
   <description></description>
 </property>
 
@@ -77,6 +77,14 @@
   <description>Name of the class that implements org.apache.hadoop.hive.metastore.rawstore interface. This class is used to store and retrieval of raw metadata objects such as table, database</description>
 </property>
 
+<property>
+  <name>dfs.replication</name>
+  <value>3</value>
+</property>
 
+<property>
+  <name>fs.default.name</name>
+  <value>hdfs://localhost:20500</value>
+</property>
 
 </configuration>

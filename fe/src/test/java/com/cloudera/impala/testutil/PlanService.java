@@ -47,7 +47,8 @@ public class PlanService {
     }
 
     public TQueryExecRequest GetExecRequest(String stmt, int numNodes) throws TException {
-      System.out.println("Executing '" + stmt + "'");
+      System.out.println(
+          "Executing '" + stmt + "' for " + Integer.toString(numNodes) + " nodes");
       AnalysisContext analysisCtxt = new AnalysisContext(catalog);
       AnalysisContext.AnalysisResult analysisResult = null;
       try {

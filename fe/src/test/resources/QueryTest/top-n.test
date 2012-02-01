@@ -305,62 +305,63 @@ smallint, int, tinyint, int, int, float, string
 ====
 # Order by a column that is not in the select list 
 # Query with ordering column in select list
-select int_col, tinyint_col, date_string_col
+# Don't include date_string_col, it comes back in random order.
+select int_col, tinyint_col
 from alltypessmall
 order by int_col desc
 limit 20
 ----
-int, tinyint, string
+int, tinyint
 ----
-9,9,'03/02/09'
-9,9,'04/02/09'
-9,9,'02/01/09'
-9,9,'01/02/09'
-9,9,'04/01/09'
-9,9,'01/01/09'
-9,9,'03/01/09'
-9,9,'02/02/09'
-8,8,'01/02/09'
-8,8,'02/01/09'
-8,8,'04/02/09'
-8,8,'01/01/09'
-8,8,'02/02/09'
-8,8,'03/02/09'
-8,8,'03/01/09'
-8,8,'04/01/09'
-7,7,'03/01/09'
-7,7,'02/02/09'
-7,7,'03/02/09'
-7,7,'01/01/09'
+9,9
+9,9
+9,9
+9,9
+9,9
+9,9
+9,9
+9,9
+8,8
+8,8
+8,8
+8,8
+8,8
+8,8
+8,8
+8,8
+7,7
+7,7
+7,7
+7,7
 ====
 # Same query with ordering col not in select list
-select tinyint_col, date_string_col
+select tinyint_col
 from alltypessmall
 order by int_col desc
 limit 20
 ----
-tinyint, string
+tinyint
 ----
-9,'03/02/09'
-9,'04/02/09'
-9,'02/01/09'
-9,'01/02/09'
-9,'04/01/09'
-9,'01/01/09'
-9,'03/01/09'
-9,'02/02/09'
-8,'01/02/09'
-8,'02/01/09'
-8,'04/02/09'
-8,'01/01/09'
-8,'02/02/09'
-8,'03/02/09'
-8,'03/01/09'
-8,'04/01/09'
-7,'03/01/09'
-7,'02/02/09'
-7,'03/02/09'
-7,'01/01/09'
+9
+9
+9
+9
+9
+9
+9
+9
+8
+8
+8
+8
+8
+8
+8
+8
+7
+7
+7
+7
 ====
 # Order by many exprs
 select year, month, count(*) 

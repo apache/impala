@@ -450,11 +450,22 @@
                 </goals>
                 <configuration>
                   <target>
+                    <exec executable="${env.IMPALA_HOME}/testdata/bin/kill-mini-dfs.sh">
+                    </exec>
                     <exec executable="${env.HBASE_HOME}/bin/start-hbase.sh">
                     </exec>
                     <exec executable="${env.HBASE_HOME}/bin/hbase">
 		      <arg value="shell"/>
 		      <arg value="${project.basedir}/../testdata/bin/create.hbase"/>
+                    </exec>
+                    <!-- We don't want to kill the mini-dfs cluster.
+                         Starting another mini-dfs cluster when one is running will
+                         make run-mini-dfs.sh hang for 2 minutes, so that script proactively tries
+                         to kill all running mini-dfs clusters when it starts
+                    <exec executable="${env.IMPALA_HOME}/testdata/bin/kill-mini-dfs.sh">
+                    </exec>
+                    -->
+                    <exec executable="${env.IMPALA_HOME}/testdata/bin/run-mini-dfs.sh">
                     </exec>
                     <exec executable="${env.HIVE_HOME}/bin/hive">
                       <arg value="-hiveconf"/>
@@ -483,15 +494,6 @@
                          Starting HBase when it is already running
                          will result in a negligible warning.
                     <exec executable="${env.HBASE_HOME}/bin/stop-hbase.sh">
-                    </exec>
-                    -->
-                    <exec executable="${env.IMPALA_HOME}/testdata/bin/run-mini-dfs.sh">
-                    </exec>
-                    <!-- Similarly, we don't want to kill the mini-dfs cluster.
-                         Starting another mini-dfs cluster when one is running will
-                         make run-mini-dfs.sh hang for 2 minutes, so that script proactively tries
-                         to kill all running mini-dfs clusters when it starts
-                    <exec executable="${env.IMPALA_HOME}/testdata/bin/kill-mini-dfs.sh">
                     </exec>
                     -->
                   </target>

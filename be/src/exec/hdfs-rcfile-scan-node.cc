@@ -12,6 +12,7 @@
 #include "runtime/row-batch.h"
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
+#include "runtime/hdfs-fs-cache.h"
 #include "runtime/string-value.h"
 #include "common/object-pool.h"
 #include "gen-cpp/PlanNodes_types.h"
@@ -113,7 +114,7 @@ Status HdfsRCFileScanNode::Prepare(RuntimeState* state) {
 }
 
 Status HdfsRCFileScanNode::Open(RuntimeState* state) {
-  hdfs_connection_ = hdfsConnect("default", 0);
+  hdfs_connection_ = state->fs_cache()->GetDefaultConnection();
   if (hdfs_connection_ == NULL) {
     // TODO: make sure we print all available diagnostic output to our error log
     return Status("Failed to connect to HDFS.");
@@ -129,12 +130,7 @@ Status HdfsRCFileScanNode::Open(RuntimeState* state) {
 }
 
 Status HdfsRCFileScanNode::Close(RuntimeState* state) {
-  if (hdfsDisconnect(hdfs_connection_) == 0) {
-    return Status::OK;
-  } else {
-    // TODO: make sure we print all available diagnostic output to our error log
-    return Status("Failed to close HDFS connection.");
-  }
+  return Status::OK;
 }
 
 Status HdfsRCFileScanNode::GetNext(

@@ -12,6 +12,7 @@ add_library(Runtime STATIC
   data-stream-mgr.cc
   data-stream-sender.cc
   descriptors.cc
+  hdfs-fs-cache.cc
   mem-pool.cc
   plan-executor.cc
   raw-value.cc

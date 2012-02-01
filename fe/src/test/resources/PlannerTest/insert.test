@@ -8,9 +8,9 @@ where year=2009 and month=05
 WRITE TO HDFS table=default.alltypesnopart
   OVERWRITE=false
 SCAN HDFS table=default.alltypes
-  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
   FILES:
-    file:fe/target/test-warehouse/alltypes/year=2009/month=5/090501.txt
+    hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt
 ----
 WRITE TO HDFS table=default.alltypesnopart
   OVERWRITE=false
@@ -19,9 +19,9 @@ EXCHANGE ID: 1
 STREAM DATA SINK
   EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
-  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
   FILES:
-    file:fe/target/test-warehouse/alltypes/year=2009/month=5/090501.txt
+    hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt
 ====
 # insert into a static partition
 insert into table alltypessmall
@@ -35,9 +35,9 @@ WRITE TO HDFS table=default.alltypessmall
   OVERWRITE=false
   PARTITIONS: 2009,4
 SCAN HDFS table=default.alltypes
-  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
   FILES:
-    file:fe/target/test-warehouse/alltypes/year=2009/month=5/090501.txt
+    hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt
 ----
 WRITE TO HDFS table=default.alltypessmall
   OVERWRITE=false
@@ -47,9 +47,9 @@ EXCHANGE ID: 1
 STREAM DATA SINK
   EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
-  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
   FILES:
-    file:fe/target/test-warehouse/alltypes/year=2009/month=5/090501.txt
+    hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt
 ====
 # overwrite a static partition
 insert overwrite table alltypessmall
@@ -63,9 +63,9 @@ WRITE TO HDFS table=default.alltypessmall
   OVERWRITE=true
   PARTITIONS: 2009,4
 SCAN HDFS table=default.alltypes
-  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
   FILES:
-    file:fe/target/test-warehouse/alltypes/year=2009/month=5/090501.txt
+    hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt
 ----
 WRITE TO HDFS table=default.alltypessmall
   OVERWRITE=true
@@ -75,9 +75,9 @@ EXCHANGE ID: 1
 STREAM DATA SINK
   EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
-  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
   FILES:
-    file:fe/target/test-warehouse/alltypes/year=2009/month=5/090501.txt
+    hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt
 ====
 # insert into a fully dynamic partition
 insert into table alltypessmall
@@ -91,10 +91,10 @@ WRITE TO HDFS table=default.alltypessmall
   OVERWRITE=false
   PARTITIONS: year,month
 SCAN HDFS table=default.alltypes
-  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
   FILES:
-    file:fe/target/test-warehouse/alltypes/year=2009/month=11/091101.txt
-    file:fe/target/test-warehouse/alltypes/year=2009/month=12/091201.txt
+    hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt
+    hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt
 ----
 WRITE TO HDFS table=default.alltypessmall
   OVERWRITE=false
@@ -104,10 +104,10 @@ EXCHANGE ID: 1
 STREAM DATA SINK
   EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
-  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
   FILES:
-    file:fe/target/test-warehouse/alltypes/year=2009/month=11/091101.txt
-    file:fe/target/test-warehouse/alltypes/year=2009/month=12/091201.txt
+    hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt
+    hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt
 ====
 # insert into a partially dynamic partition
 insert into table alltypessmall
@@ -121,10 +121,10 @@ WRITE TO HDFS table=default.alltypessmall
   OVERWRITE=false
   PARTITIONS: 2009,month
 SCAN HDFS table=default.alltypes
-  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
   FILES:
-    file:fe/target/test-warehouse/alltypes/year=2009/month=11/091101.txt
-    file:fe/target/test-warehouse/alltypes/year=2009/month=12/091201.txt
+    hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt
+    hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt
 ----
 WRITE TO HDFS table=default.alltypessmall
   OVERWRITE=false
@@ -134,10 +134,10 @@ EXCHANGE ID: 1
 STREAM DATA SINK
   EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
-  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
   FILES:
-    file:fe/target/test-warehouse/alltypes/year=2009/month=11/091101.txt
-    file:fe/target/test-warehouse/alltypes/year=2009/month=12/091201.txt
+    hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt
+    hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt
 ====
 # insert into a partially dynamic partition
 insert into table alltypessmall
@@ -151,9 +151,9 @@ WRITE TO HDFS table=default.alltypessmall
   OVERWRITE=false
   PARTITIONS: year,4
 SCAN HDFS table=default.alltypes
-  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
   FILES:
-    file:fe/target/test-warehouse/alltypes/year=2010/month=4/100401.txt
+    hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=4/100401.txt
 ----
 WRITE TO HDFS table=default.alltypessmall
   OVERWRITE=false
@@ -163,6 +163,6 @@ EXCHANGE ID: 1
 STREAM DATA SINK
   EXCHANGE ID: 1
 SCAN HDFS table=default.alltypes
-  REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
   FILES:
-    file:fe/target/test-warehouse/alltypes/year=2010/month=4/100401.txt
+    hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=4/100401.txt

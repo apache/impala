@@ -19,6 +19,7 @@
 #include "runtime/data-stream-sender.h"
 #include "runtime/row-batch.h"
 #include "runtime/plan-executor.h"
+#include "runtime/hdfs-fs-cache.h"
 #include "exec/exec-node.h"
 #include "exec/scan-node.h"
 #include "util/debug-util.h"
@@ -38,7 +39,9 @@ namespace impala {
 
 class ImpalaBackend : public ImpalaBackendServiceIf {
  public:
-  ImpalaBackend(DataStreamMgr* stream_mgr): stream_mgr_(stream_mgr) {}
+  ImpalaBackend(DataStreamMgr* stream_mgr, HdfsFsCache* fs_cache)
+    : stream_mgr_(stream_mgr),
+      fs_cache_(fs_cache) {}
 
   void ExecPlanFragment(
       TStatus& return_val, const TPlanExecRequest& request,
@@ -53,6 +56,7 @@ class ImpalaBackend : public ImpalaBackendServiceIf {
 
  private:
   DataStreamMgr* stream_mgr_;  // not owned
+  HdfsFsCache* fs_cache_;  // not owned
 
   Status ExecPlanFragment(
       const TPlanExecRequest& request, const TPlanExecParams& params);
@@ -77,7 +81,7 @@ Status ImpalaBackend::ExecPlanFragment(
     return status;
   }
 
-  PlanExecutor executor(stream_mgr_);
+  PlanExecutor executor(stream_mgr_, fs_cache_);
   RETURN_IF_ERROR(executor.Prepare(request, params));
 
   // TODO: figure out good buffer size based on size of output row
@@ -120,9 +124,10 @@ void ImpalaBackend::CloseChannel(
   stream_mgr_->CloseChannel(query_id, dest_node_id).ToThrift(&return_val);
 }
 
-TServer* StartImpalaBackendService(DataStreamMgr* stream_mgr, int port) {
+TServer* StartImpalaBackendService(
+    DataStreamMgr* stream_mgr, HdfsFsCache* fs_cache, int port) {
   shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
-  shared_ptr<ImpalaBackend> handler(new ImpalaBackend(stream_mgr));
+  shared_ptr<ImpalaBackend> handler(new ImpalaBackend(stream_mgr, fs_cache));
   shared_ptr<TProcessor> processor(new ImpalaBackendServiceProcessor(handler));
   shared_ptr<TServerTransport> server_transport(new TServerSocket(port));
   shared_ptr<TTransportFactory> transport_factory(new TBufferedTransportFactory());

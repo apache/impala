@@ -1,0 +1,12 @@
+# testtbl is empty
+select * from testtbl
+----
+bigint, string, int
+----
+====
+# month ends at 12
+select int_col from alltypessmall where month > 100
+----
+int
+----
+====

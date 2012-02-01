@@ -13,6 +13,7 @@
 
 namespace impala {
 
+class HdfsFsCache;
 class DescriptorTbl;
 class ObjectPool;
 class Status;
@@ -23,7 +24,7 @@ class DataStreamMgr;
 class RuntimeState {
  public:
   RuntimeState(const TUniqueId& query_id, bool abort_on_error, int max_errors,
-               DataStreamMgr* stream_mgr);
+               DataStreamMgr* stream_mgr, HdfsFsCache* fs_cache);
 
   ObjectPool* obj_pool() const { return obj_pool_.get(); }
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }
@@ -42,6 +43,7 @@ class RuntimeState {
   const TUniqueId& query_id() const { return query_id_; }
   static void* hbase_conf() { return hbase_conf_; }
   DataStreamMgr* stream_mgr() { return stream_mgr_; }
+  HdfsFsCache* fs_cache() { return fs_cache_; }
 
   // Creates a global reference to a new HBaseConfiguration object via JniUtil.
   // Cleanup is done in JniUtil::Cleanup().
@@ -92,6 +94,7 @@ class RuntimeState {
   static void* hbase_conf_;
   TUniqueId query_id_;
   DataStreamMgr* stream_mgr_;
+  HdfsFsCache* fs_cache_;
 
   // prohibit copies
   RuntimeState(const RuntimeState&);

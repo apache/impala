@@ -44,8 +44,9 @@ DEFINE_int32(batch_size, 0,
     "backend's default batch size");
 DEFINE_bool(abort_on_error, false, "if true, abort query when encountering any error");
 DEFINE_int32(max_errors, 100, "number of errors to report");
-DEFINE_int32(num_backends, 0,
-    "Number of backend threads on which to run query; 0 = run only in main thread");
+DEFINE_int32(num_nodes, 1,
+    "Number of threads in which to run query; 1 = run only in main thread;"
+    "0 = run in # of data nodes + 1 for coordinator");
 DEFINE_int32(backend_port, 21000,
     "start port for backend threads (assigned sequentially)");
 
@@ -158,7 +159,7 @@ Status QueryExecutor::Exec(
   eos_ = false;
   try {
     CHECK(client_.get() != NULL) << "didn't call QueryExecutor::Setup()";
-    client_->GetExecRequest(query_request_, query.c_str(), FLAGS_num_backends + 1);
+    client_->GetExecRequest(query_request_, query.c_str(), FLAGS_num_nodes);
   } catch (TException& e) {
     return Status(e.msg);
   }
@@ -172,7 +173,7 @@ Status QueryExecutor::Exec(
     DCHECK(!query_request_.fragmentRequests[0].__isset.planFragment);
     local_state_.reset(
         new RuntimeState(query_request_.queryId, FLAGS_abort_on_error,
-                         FLAGS_max_errors, NULL));
+                         FLAGS_max_errors, NULL, NULL));
     RETURN_IF_ERROR(
         PrepareSelectListExprs(local_state_.get(), RowDescriptor(), col_types));
     return Status::OK;
@@ -183,12 +184,12 @@ Status QueryExecutor::Exec(
   // (it's meant for the coordinator fragment)
   DCHECK_EQ(query_request_.nodeRequestParams[0].size(), 1);
 
-  if (FLAGS_num_backends > 0) {
+  if (FLAGS_num_nodes != 1) {
     // for distributed execution, we only expect one slave fragment which
-    // will be executed by FLAGS_num_backends nodes
+    // will be executed by FLAGS_num_nodes - 1 nodes
     DCHECK_EQ(query_request_.fragmentRequests.size(), 2);
     DCHECK_EQ(query_request_.nodeRequestParams.size(), 2);
-    DCHECK_LE(query_request_.nodeRequestParams[1].size(), FLAGS_num_backends);
+    DCHECK_LE(query_request_.nodeRequestParams[1].size(), FLAGS_num_nodes - 1);
 
     // set destinations to coord port
     for (int i = 0; i < query_request_.nodeRequestParams[1].size(); ++i) {

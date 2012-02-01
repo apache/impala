@@ -31,8 +31,9 @@ using namespace apache::thrift::transport;
 
 namespace impala {
 
-PlanExecutor::PlanExecutor(DataStreamMgr* stream_mgr)
+PlanExecutor::PlanExecutor(DataStreamMgr* stream_mgr, HdfsFsCache* fs_cache)
   : stream_mgr_(stream_mgr),
+    fs_cache_(fs_cache),
     done_(false) {
 }
 
@@ -45,7 +46,7 @@ Status PlanExecutor::Prepare(
   VLOG(1) << "params:\n" << ThriftDebugString(params);
   runtime_state_.reset(
       new RuntimeState(request.queryId, params.abortOnError, params.maxErrors,
-                       stream_mgr_));
+                       stream_mgr_, fs_cache_));
 
   // set up desc tbl
   DescriptorTbl* desc_tbl = NULL;

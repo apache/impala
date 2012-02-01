@@ -4,12 +4,13 @@ package com.cloudera.impala.planner;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.cloudera.impala.analysis.AggregateExpr;
+
 import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.Analyzer;
@@ -19,7 +20,6 @@ import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
-import com.cloudera.impala.analysis.SlotRef;
 import com.cloudera.impala.analysis.SortInfo;
 import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.analysis.TupleDescriptor;
@@ -27,10 +27,10 @@ import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.catalog.HdfsRCFileTable;
 import com.cloudera.impala.catalog.HdfsTextTable;
 import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.Pair;
+import com.cloudera.impala.thrift.Constants;
 import com.cloudera.impala.thrift.THostPort;
 import com.cloudera.impala.thrift.TPlanExecParams;
 import com.cloudera.impala.thrift.TPlanExecRequest;
@@ -504,11 +504,28 @@ public class Planner {
     Preconditions.checkState(leftmostScan != null);
     List<TScanRange> scanRanges = Lists.newArrayList();
     List<String> hosts = Lists.newArrayList();
-    leftmostScan.getScanParams(numNodes, scanRanges, hosts);
-    TQueryExecRequest request = new TQueryExecRequest();
-    request.addToExecNodes(hosts);
-    if (exchangeNode != null) exchangeNode.setNumSenders(hosts.size());
+    int numPartitions;
+    if (numNodes > 1) {
+      // if we asked for a specific number of nodes, partition into numNodes - 1
+      // fragments
+      numPartitions = numNodes - 1;
+    } else if (numNodes == Constants.NUM_NODES_ALL
+        || numNodes == Constants.NUM_NODES_ALL_RACKS) {
+      numPartitions = numNodes;
+    } else {
+      numPartitions = 1;
+    }
+    leftmostScan.getScanParams(numPartitions, scanRanges, hosts);
+    if (scanRanges.isEmpty() && hosts.isEmpty()) {
+      // if we're scanning an empty table we still need a single
+      // host to execute the scan
+      hosts.add("localhost");
+    }
+    if (exchangeNode != null) {
+      exchangeNode.setNumSenders(hosts.size());
+    }
 
+    TQueryExecRequest request = new TQueryExecRequest();
     TPlanExecRequest fragmentRequest = new TPlanExecRequest(
         new TUniqueId(), Expr.treesToThrift(selectStmt.getSelectListExprs()));
     if (coordPlan != null) {
@@ -557,20 +574,25 @@ public class Planner {
     fragmentRequest.setDescTbl(analyzer.getDescTbl().toThrift());
     request.addToFragmentRequests(fragmentRequest);
 
-    // one TPlanExecParams per fragment/scan range
+    // one TPlanExecParams per fragment/scan range;
+    // we need to add an "empty" range for empty tables (in which case
+    // scanRanges will be empty)
     List<TPlanExecParams> fragmentParamsList = Lists.newArrayList();
-    for (TScanRange scanRange: scanRanges) {
+    Iterator<TScanRange> scanRange = scanRanges.iterator();
+    do {
       TPlanExecParams fragmentParams = new TPlanExecParams();
-      fragmentParams.addToScanRanges(scanRange);
-      // all fragments sent to coordinator, which runs on localhost
+      if (scanRange.hasNext()) {
+        fragmentParams.addToScanRanges(scanRange.next());
+      }
       THostPort hostPort = new THostPort();
       hostPort.host = "localhost";
       hostPort.port = 0;  // set elsewhere
       fragmentParams.setDestinations(Lists.newArrayList(hostPort));
       fragmentParamsList.add(fragmentParams);
-    }
+    } while (scanRange.hasNext());
 
-    // add scan ranges for the non-partitioning scans to each of the fragment params
+    // add scan ranges for the non-partitioning scans to each of
+    // fragmentRequests[1]'s parameters
     List<ScanNode> scanNodes = Lists.newArrayList();
     slavePlan.collectSubclasses(ScanNode.class, scanNodes);
     for (ScanNode scan: scanNodes) {
@@ -579,12 +601,15 @@ public class Planner {
       }
       scanRanges = Lists.newArrayList();
       scan.getScanParams(1, scanRanges, null);
-      Preconditions.checkState(scanRanges.size() == 1);
-      for (TPlanExecParams fragmentParams: fragmentParamsList) {
-        fragmentParams.addToScanRanges(scanRanges.get(0));
+      Preconditions.checkState(scanRanges.size() <= 1);
+      if (!scanRanges.isEmpty()) {
+        for (TPlanExecParams fragmentParams: fragmentParamsList) {
+          fragmentParams.addToScanRanges(scanRanges.get(0));
+        }
       }
     }
 
+    request.addToExecNodes(hosts);
     request.addToNodeRequestParams(fragmentParamsList);
 
     return request;

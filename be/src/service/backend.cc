@@ -14,6 +14,7 @@
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/data-stream-mgr.h"
+#include "runtime/hdfs-fs-cache.h"
 #include "service/jni-coordinator.h"
 #include "service/backend-service.h"
 #include "util/jni-util.h"
@@ -31,6 +32,7 @@ using namespace boost;
 using namespace apache::thrift::server;
 
 static DataStreamMgr* stream_mgr;
+static scoped_ptr<HdfsFsCache> fs_cache;
 
 // TODO: get rid of this reference to TestEnv when we have a generic scheduler interface
 // (which TestEnv would implement)
@@ -66,9 +68,11 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
   // one stream mgr per running backend process
   VLOG(1) << "Create stream mgr";
   stream_mgr = new DataStreamMgr();
+  fs_cache.reset(new HdfsFsCache());
 
   // start one backend service for the coordinator on backend_port
-  TServer* server = StartImpalaBackendService(stream_mgr, FLAGS_backend_port);
+  TServer* server =
+      StartImpalaBackendService(stream_mgr, fs_cache.get(), FLAGS_backend_port);
   thread server_thread = thread(&RunServer, server);
 
   // start backends in process, listening on ports > backend_port

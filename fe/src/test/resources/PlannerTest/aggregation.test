@@ -7,18 +7,18 @@ AGGREGATE
 OUTPUT: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
 GROUP BY: 
   SCAN HDFS table=default.alltypesagg
-    REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
     FILES:
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt
 ----
 AGGREGATE
 OUTPUT: SUM(<slot 1>), SUM(<slot 2>), MIN(<slot 3>), MAX(<slot 4>), SUM(<slot 5>)
@@ -31,18 +31,18 @@ AGGREGATE
 OUTPUT: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
 GROUP BY: 
   SCAN HDFS table=default.alltypesagg
-    REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
     FILES:
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt
 ====
 # with grouping
 select tinyint_col, count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col),
@@ -54,18 +54,18 @@ AGGREGATE
 OUTPUT: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
 GROUP BY: tinyint_col
   SCAN HDFS table=default.alltypesagg
-    REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
     FILES:
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt
 ----
 AGGREGATE
 OUTPUT: SUM(<slot 2>), MIN(<slot 3>), MAX(<slot 4>), SUM(<slot 5>), SUM(<slot 6>)
@@ -78,16 +78,16 @@ AGGREGATE
 OUTPUT: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
 GROUP BY: tinyint_col
   SCAN HDFS table=default.alltypesagg
-    REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
     FILES:
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt
-      file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt
 ====

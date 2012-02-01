@@ -67,7 +67,7 @@ void JniUtil::InitLibhdfs() {
   // make random libhdfs calls to make sure that the context class loader isn't
   // null; see xxx for an explanation
   hdfsFS fs = hdfsConnect("default", 0);
-  hdfsFile f = hdfsOpenFile(fs, "invalid/path", O_RDONLY, 0, 0, 0);
+  (void) hdfsOpenFile(fs, "invalid/path", O_RDONLY, 0, 0, 0);
   hdfsDisconnect(fs);
 }
 

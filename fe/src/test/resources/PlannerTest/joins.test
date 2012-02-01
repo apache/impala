@@ -75,19 +75,19 @@ HASH PREDICATES:
 OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
   SCAN HDFS table=default.alltypesagg
     PREDICATES: a.tinyint_col = 15
-    REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
     FILES:
-      file:/fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt
-      file:/fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt
-      file:/fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt
-      file:/fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt
-      file:/fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt
   SCAN HDFS table=default.alltypessmall
     PREDICATES: b.string_col = '15'
-    REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
     FILES:
-      file:/fe/target/test-warehouse/alltypessmall/year=2009/month=3/090301.txt
-      file:/fe/target/test-warehouse/alltypessmall/year=2009/month=4/090401.txt
+      hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt
+      hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt
 ----
 EXCHANGE ID: 3
 ----
@@ -101,19 +101,19 @@ HASH PREDICATES:
 OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
   SCAN HDFS table=default.alltypesagg
     PREDICATES: a.tinyint_col = 15
-    REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
     FILES:
-      file:/fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt
-      file:/fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt
-      file:/fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt
-      file:/fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt
-      file:/fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt
+      hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt
   SCAN HDFS table=default.alltypessmall
     PREDICATES: b.string_col = '15'
-    REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
     FILES:
-      file:/fe/target/test-warehouse/alltypessmall/year=2009/month=3/090301.txt
-      file:/fe/target/test-warehouse/alltypessmall/year=2009/month=4/090401.txt
+      hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt
+      hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt
 ====
 # same as before, with 3 tables;
 # non-eq join predicates are evaluated at the correct join node
@@ -144,24 +144,24 @@ OTHER PREDICATES: a.float_col - c.double_col < 0.0, b.double_col * c.tinyint_col
   OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
     SCAN HDFS table=default.alltypesagg
       PREDICATES: a.tinyint_col = 15
-      REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+      REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
       FILES:
-        file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt
-        file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt
-        file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt
-        file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt
-        file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt
     SCAN HDFS table=default.alltypessmall
       PREDICATES: b.string_col = '15'
-      REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+      REGEX: .*/year=([^\/]*)/month=([^\/]*)/
       FILES:
-        file:fe/target/test-warehouse/alltypessmall/year=2009/month=3/090301.txt
-        file:fe/target/test-warehouse/alltypessmall/year=2009/month=4/090401.txt
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt
   SCAN HDFS table=default.alltypesaggnonulls
-    REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
     FILES:
-      file:fe/target/test-warehouse/alltypesaggnonulls/year=2010/month=1/day=1/100101.txt
-      file:fe/target/test-warehouse/alltypesaggnonulls/year=2010/month=1/day=2/100102.txt
+      hdfs://localhost:20500/test-warehouse/alltypesaggnonulls/year=2010/month=1/day=1/100101.txt
+      hdfs://localhost:20500/test-warehouse/alltypesaggnonulls/year=2010/month=1/day=2/100102.txt
 ----
 EXCHANGE ID: 5
 ----
@@ -181,24 +181,24 @@ OTHER PREDICATES: a.float_col - c.double_col < 0.0, b.double_col * c.tinyint_col
   OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
     SCAN HDFS table=default.alltypesagg
       PREDICATES: a.tinyint_col = 15
-      REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+      REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
       FILES:
-        file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt
-        file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt
-        file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt
-        file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt
-        file:fe/target/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt
     SCAN HDFS table=default.alltypessmall
       PREDICATES: b.string_col = '15'
-      REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/
+      REGEX: .*/year=([^\/]*)/month=([^\/]*)/
       FILES:
-        file:fe/target/test-warehouse/alltypessmall/year=2009/month=3/090301.txt
-        file:fe/target/test-warehouse/alltypessmall/year=2009/month=4/090401.txt
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt
   SCAN HDFS table=default.alltypesaggnonulls
-    REGEX: ^file:/.*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
     FILES:
-      file:fe/target/test-warehouse/alltypesaggnonulls/year=2010/month=1/day=1/100101.txt
-      file:fe/target/test-warehouse/alltypesaggnonulls/year=2010/month=1/day=2/100102.txt
+      hdfs://localhost:20500/test-warehouse/alltypesaggnonulls/year=2010/month=1/day=1/100101.txt
+      hdfs://localhost:20500/test-warehouse/alltypesaggnonulls/year=2010/month=1/day=2/100102.txt
 ====
 # non-equi join predicate not supported
 select *
