@@ -38,7 +38,7 @@ target_link_libraries(backend
   gflagsstatic
   glogstatic
   gflagsstatic
-  tcmallocstatic
+  #tcmallocstatic
   pprofstatic
 )
 
