@@ -51,10 +51,11 @@ class MemPool {
   // Chunk_size must be > 0.
   MemPool(int chunk_size);
 
-  // Construct a mempool by initializing the chunk data to the data backing the strings
-  // (each chunk's allocated_bytes == size). 'chunks' must not be deallocated during the
-  // lifetime of the pool and Allocate() must never be called on this pool.
-  MemPool(std::vector<std::string>* chunks);
+  // Construct a mempool by initializing the chunk data with a copy of the data
+  // backing the strings (each chunk's allocated_bytes == size).
+  // Allocate() must never be called on this pool.
+  // TODO: fix this so we don't need to make a copy
+  MemPool(const std::vector<std::string>& chunks);
 
   // Frees all chunks of memory.
   ~MemPool();

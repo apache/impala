@@ -24,6 +24,8 @@ add_library(backend SHARED
 # The order of link libararies matter.  
 #  - Util must come before ImpalaThrift
 #  - Exprs & Opcode have a circular dependency (Exprs is included twice)
+# Commenting out tcmalloc for now in order to get more meaningful stack
+# dumps in response to test failures on Jenkins.
 target_link_libraries(backend
   Common
   Exec

@@ -32,19 +32,16 @@ class RowBatch {
       num_tuples_per_row_(row_desc.tuple_descriptors().size()),
       row_desc_(row_desc),
       tuple_ptrs_(new Tuple*[capacity_ * num_tuples_per_row_]),
-      thrift_batch_(NULL),
       tuple_data_pool_(new MemPool()) {
     DCHECK_GT(capacity, 0);
   }
 
-  // Populate a row batch from input_batch by turning input_batch's
+  // Populate a row batch from input_batch by copying input_batch's
   // tuple_data into the row batch's mempool and converting all offsets
-  // in the data back into pointers. The row batch will be self-contained after the call
-  // and takes ownership of input_batch; input_batch must not be deallocated after
-  // calling this c'tor (it will be destroyed in ~RowBatch()).
+  // in the data back into pointers. The row batch will be self-contained after the call.
   // TODO: figure out how to transfer the data from input_batch to this RowBatch
-  // (so that we don't need to hang on to input_batch)
-  RowBatch(const DescriptorTbl& desc_tbl, TRowBatch* input_batch);
+  // (so that we don't need to make yet another copy)
+  RowBatch(const DescriptorTbl& desc_tbl, const TRowBatch& input_batch);
 
   ~RowBatch();
 
@@ -113,7 +110,7 @@ class RowBatch {
   void Serialize(TRowBatch* output_batch);
 
   // utility function: return total tuple data size of 'batch'.
-  static int GetBatchSize(TRowBatch* batch);
+  static int GetBatchSize(const TRowBatch& batch);
 
   int num_rows() const { return num_rows_; }
   int capacity() const { return capacity_; }
@@ -138,9 +135,6 @@ class RowBatch {
   // array of pointers (w/ capacity_ * num_tuples_per_row_ elements)
   // TODO: replace w/ tr1 array?
   Tuple** tuple_ptrs_;
-
-  // if set, contains data that we reference
-  boost::scoped_ptr<TRowBatch> thrift_batch_;
 
   // holding (some of the) data referenced by rows
   boost::scoped_ptr<MemPool> tuple_data_pool_;

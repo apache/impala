@@ -53,7 +53,7 @@ RowBatch* DataStreamMgr::StreamControlBlock::GetBatch() {
   }
 }
 
-void DataStreamMgr::StreamControlBlock::AddBatch(TRowBatch* thrift_batch) {
+void DataStreamMgr::StreamControlBlock::AddBatch(const TRowBatch& thrift_batch) {
   int batch_size = RowBatch::GetBatchSize(thrift_batch);
   RowBatch* batch = new RowBatch(desc_tbl_, thrift_batch);
   unique_lock<mutex> l(lock_);
@@ -116,7 +116,7 @@ DataStreamMgr::StreamMap::iterator DataStreamMgr::FindControlBlock(
 }
 
 Status DataStreamMgr::AddData(
-    const TUniqueId& query_id, PlanNodeId dest_node_id, TRowBatch* thrift_batch) {
+    const TUniqueId& query_id, PlanNodeId dest_node_id, const TRowBatch& thrift_batch) {
   VLOG(1) << "AddData(): " << RowBatch::GetBatchSize(thrift_batch) << "\n";
   StreamMap::iterator i = FindControlBlock(query_id, dest_node_id);
   if (i == stream_map_.end()) {

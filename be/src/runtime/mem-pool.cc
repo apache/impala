@@ -28,19 +28,20 @@ MemPool::MemPool(int chunk_size)
   DCHECK_GT(chunk_size_, 0);
 }
 
-MemPool::MemPool(vector<string>* chunks)
+MemPool::MemPool(const vector<string>& chunks)
   : current_chunk_idx_(-1),
     last_offset_conversion_chunk_idx_(-1),
     chunk_size_(0),
     total_allocated_bytes_(0) {
-  if (chunks->empty()) return;
-  chunks_.reserve(chunks->size());
-  for (int i = 0; i < chunks->size(); ++i) {
+  if (chunks.empty()) return;
+  chunks_.reserve(chunks.size());
+  for (int i = 0; i < chunks.size(); ++i) {
     chunks_.push_back(ChunkInfo());
     ChunkInfo& chunk = chunks_.back();
-    chunk.owns_data = false;
-    chunk.data = const_cast<char*>((*chunks)[i].data());
-    chunk.size = (*chunks)[i].size();
+    chunk.owns_data = true;
+    chunk.data = new char[chunks[i].size()];
+    memcpy(chunk.data, chunks[i].data(), chunks[i].size());
+    chunk.size = chunks[i].size();
     VLOG(1) << "chunk: data=" << (void*)chunk.data << " size=" << chunk.size;
     chunk.allocated_bytes = chunk.size;
     chunk.cumulative_allocated_bytes = total_allocated_bytes_;

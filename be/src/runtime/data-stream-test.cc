@@ -50,9 +50,7 @@ class ImpalaBackend : public ImpalaBackendServiceIf {
   virtual void TransmitData(
       TStatus& return_val, const TUniqueId& query_id, const TPlanNodeId dest_node_id,
       const TRowBatch& thrift_batch) {
-    // TODO: fix Thrift so it doesn't force me to make copies all over the place
-    TRowBatch* batch_copy = new TRowBatch(thrift_batch);
-    mgr_->AddData(query_id, dest_node_id, batch_copy).ToThrift(&return_val);
+    mgr_->AddData(query_id, dest_node_id, thrift_batch).ToThrift(&return_val);
   }
 
   virtual void CloseChannel(

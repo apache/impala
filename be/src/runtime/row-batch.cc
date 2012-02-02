@@ -89,20 +89,19 @@ void RowBatch::Serialize(TRowBatch* output_batch) {
 //              xfer += iprot->readString(this->tuple_data[_i9]);
 // to allocated string data in special mempool
 // (change via python script that runs over Data_types.cc)
-RowBatch::RowBatch(const DescriptorTbl& desc_tbl, TRowBatch* input_batch)
+RowBatch::RowBatch(const DescriptorTbl& desc_tbl, const TRowBatch& input_batch)
   : has_in_flight_row_(false),
     is_self_contained_(true),
-    num_rows_(input_batch->num_rows),
+    num_rows_(input_batch.num_rows),
     capacity_(num_rows_),
-    num_tuples_per_row_(input_batch->row_tuples.size()),
-    row_desc_(desc_tbl, input_batch->row_tuples),
-    tuple_ptrs_(new Tuple*[num_rows_ * input_batch->row_tuples.size()]),
-    thrift_batch_(input_batch),
-    tuple_data_pool_(new MemPool(&input_batch->tuple_data)) {
-  // convert input_batch->tuple_offsets into pointers
+    num_tuples_per_row_(input_batch.row_tuples.size()),
+    row_desc_(desc_tbl, input_batch.row_tuples),
+    tuple_ptrs_(new Tuple*[num_rows_ * input_batch.row_tuples.size()]),
+    tuple_data_pool_(new MemPool(input_batch.tuple_data)) {
+  // convert input_batch.tuple_offsets into pointers
   int tuple_idx = 0;
-  for (vector<int32_t>::iterator offset = input_batch->tuple_offsets.begin();
-       offset != input_batch->tuple_offsets.end(); ++offset) {
+  for (vector<int32_t>::const_iterator offset = input_batch.tuple_offsets.begin();
+       offset != input_batch.tuple_offsets.end(); ++offset) {
     if (*offset == -1) {
       tuple_ptrs_[tuple_idx++] = NULL;
     } else {
@@ -143,10 +142,10 @@ RowBatch::RowBatch(const DescriptorTbl& desc_tbl, TRowBatch* input_batch)
   }
 }
 
-int RowBatch::GetBatchSize(TRowBatch* batch) {
+int RowBatch::GetBatchSize(const TRowBatch& batch) {
   int result = 0;
-  for (int i = 0; i < batch->tuple_data.size(); ++i) {
-    result += batch->tuple_data[i].size();
+  for (int i = 0; i < batch.tuple_data.size(); ++i) {
+    result += batch.tuple_data[i].size();
   }
   return result;
 }

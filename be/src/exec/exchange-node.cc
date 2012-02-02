@@ -2,6 +2,7 @@
 
 #include "exec/exchange-node.h"
 
+#include <boost/scoped_ptr.hpp>
 #include <glog/logging.h>
 
 #include "runtime/data-stream-mgr.h"
@@ -11,6 +12,7 @@
 
 using namespace impala;
 using namespace std;
+using namespace boost;
 
 ExchangeNode::ExchangeNode(
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
@@ -32,9 +34,9 @@ Status ExchangeNode::Open(RuntimeState* state) {
 }
 
 Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* eos) {
-  RowBatch* input_batch = stream_recvr_->GetBatch();
+  scoped_ptr<RowBatch> input_batch(stream_recvr_->GetBatch());
   output_batch->Reset();
-  *eos = (input_batch == NULL);
+  *eos = (input_batch.get() == NULL);
   if (*eos) return Status::OK;
 
   // We assume that we can always move the entire input batch into the output batch

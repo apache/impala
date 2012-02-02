@@ -48,7 +48,7 @@ class DataStreamMgr {
   // This call takes ownership of thrift_batch; do *not* deallocate it after the call.
   // Returns OK if successful, error status otherwise.
   Status AddData(const TUniqueId& query_id, PlanNodeId dest_node_id,
-                 TRowBatch* thrift_batch);
+                 const TRowBatch& thrift_batch);
 
   // Decreases the #remaining_senders count for the stream identified by
   // query_id/dest_node_id.
@@ -74,7 +74,7 @@ class DataStreamMgr {
 
     // Adds a row batch to this stream's queue; blocks if this will
     // make the stream exceed its buffer limit.
-    void AddBatch(TRowBatch* batch);
+    void AddBatch(const TRowBatch& batch);
 
     // Decrement the number of remaining senders and signal eos ("new data")
     // if the count drops to 0.

@@ -92,7 +92,7 @@ TestEnv::~TestEnv() {
 }
 
 Status TestEnv::StartBackends(int num_backends) {
-  VLOG(1) << "starting " << num_backends << " backends";
+  LOG(INFO) << "starting " << num_backends << " backends";
   DCHECK_GT(num_backends, 0);
   int port = start_port_;
   for (int i = 0; i < num_backends; ++i) {

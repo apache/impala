@@ -154,7 +154,7 @@ void DataStreamSender::Channel::TransmitData() {
     if (rpc_status.status_code != 0) {
       rpc_status_ = rpc_status;
     } else {
-      num_data_bytes_sent_ += RowBatch::GetBatchSize(in_flight_batch_);
+      num_data_bytes_sent_ += RowBatch::GetBatchSize(*in_flight_batch_);
       VLOG(1) << "incremented #data_bytes_sent=" << num_data_bytes_sent_;
     }
   } catch (TException& e) {

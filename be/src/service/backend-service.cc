@@ -114,9 +114,9 @@ Status ImpalaBackend::ExecPlanFragment(
 void ImpalaBackend::TransmitData(
     TStatus& return_val, const TUniqueId& query_id, const TPlanNodeId dest_node_id,
     const TRowBatch& thrift_batch) {
-  // TODO: fix Thrift so it doesn't force me to make copies all over the place
-  TRowBatch* batch_copy = new TRowBatch(thrift_batch);
-  stream_mgr_->AddData(query_id, dest_node_id, batch_copy).ToThrift(&return_val);
+  // TODO: fix Thrift so we can simply take ownership of thrift_batch instead
+  // of having to copy its data
+  stream_mgr_->AddData(query_id, dest_node_id, thrift_batch).ToThrift(&return_val);
 }
 
 void ImpalaBackend::CloseChannel(
@@ -137,7 +137,7 @@ TServer* StartImpalaBackendService(
   thread_mgr->threadFactory(thread_factory);
   thread_mgr->start();
 
-  VLOG(1) << "ImpalaBackend listening on " << port;
+  LOG(INFO) << "ImpalaBackend listening on " << port;
   TThreadPoolServer* server = new TThreadPoolServer(
       processor, server_transport, transport_factory, protocol_factory,
       thread_mgr);
