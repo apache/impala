@@ -14,9 +14,9 @@
 #  1. Thrift enum for all the opcodes
 #  - impala/fe/src/thrift/Opcodes.thrift
 #  2. FE java operators (one per function, ignoring overloading)
-#  - impala/fe/target/generated-sources/gen-java/com/cloudera/impala/opcode/FunctionOperater.java
+#  - impala/fe/generated-sources/gen-java/com/cloudera/impala/opcode/FunctionOperater.java
 #  3  Java registry setup (registering all the functions with signatures)
-#  - impala/fe/target/generated-sources/gen-java/com/cloudera/impala/opcode/FunctionRegistry.java
+#  - impala/fe/generated-sources/gen-java/com/cloudera/impala/opcode/FunctionRegistry.java
 #  4. BE registry setup (mapping opcodes to ComputeFunctions)
 #  - impala/be/generated-sources/opcode/opcode-registry-init.cc
 #

@@ -585,6 +585,13 @@ TEST_F(ExprTest, StringFunctions) {
   TestValue("length('a')", TYPE_INT, 1);
   TestValue("length('abcdefg')", TYPE_INT, 7);
 
+  TestStringValue("reverse('abcdefg')", "gfedcba");
+  TestStringValue("reverse('')", "");
+  TestStringValue("strleft('abcdefg', 3)", "abc");
+  TestStringValue("strleft('abcdefg', 10)", "abcdefg");
+  TestStringValue("strright('abcdefg', 3)", "efg");
+  TestStringValue("strright('abcdefg', 10)", "abcdefg");
+
   // TODO: tests with NULL arguments, currently we can't parse them
   // inside function calls.
   // e.g.   TestValue("length(NULL)", TYPE_INT, NULL);

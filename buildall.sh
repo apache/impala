@@ -82,7 +82,7 @@ fi
 OLDCXXFLAGS=$(grep -w "CXXFLAGS =" Makefile)
 NEWCXXFLAGS=$OLDCXXFLAGS" -fPIC"
 sed -i "s/$OLDCXXFLAGS/$NEWCXXFLAGS/g" Makefile
-make
+make -j
 
 # Build pprof
 cd $IMPALA_HOME/thirdparty/google-perftools-1.8.3
@@ -126,7 +126,7 @@ make
 cd $IMPALA_HOME/common/thrift
 make
 cd $IMPALA_BE_DIR
-make -j4
+make -j
 
 # Generate hive-site.xml from template via env var substitution
 # TODO: Throw an error if the template references an undefined environment variable

@@ -37,6 +37,37 @@ void* StringFunctions::Substring(Expr* e, TupleRow* row) {
   return &e->result_.string_val;
 }
 
+// Implementation of Left.  The signature is
+//    string left(string input, int len)
+// This behaves identically to the mysql implementation.
+void* StringFunctions::Left(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 2);
+  Expr* op1 = e->children()[0];
+  Expr* op2 = e->children()[1];
+  StringValue* str = reinterpret_cast<StringValue*>(op1->GetValue(row));
+  int* len = reinterpret_cast<int*>(op2->GetValue(row));
+  if (str == NULL || len == NULL) return NULL;
+  e->result_.string_val.ptr = str->ptr;
+  e->result_.string_val.len = str->len <= *len ? str->len : *len;
+  return &e->result_.string_val;
+}
+
+// Implementation of Right.  The signature is
+//    string right(string input, int len)
+// This behaves identically to the mysql implementation.
+void* StringFunctions::Right(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 2);
+  Expr* op1 = e->children()[0];
+  Expr* op2 = e->children()[1];
+  StringValue* str = reinterpret_cast<StringValue*>(op1->GetValue(row));
+  int* len = reinterpret_cast<int*>(op2->GetValue(row));
+  if (str == NULL || len == NULL) return NULL;
+  e->result_.string_val.len = str->len <= *len ? str->len : *len;
+  e->result_.string_val.ptr = str->ptr;
+  if (str->len > *len) e->result_.string_val.ptr += str->len - *len;
+  return &e->result_.string_val;
+}
+
 // Implementation of LENGTH
 //   int length(string input)
 // Returns the length in bytes of input. If input == NULL, returns
@@ -48,7 +79,7 @@ void* StringFunctions::Length(Expr* e, TupleRow* row) {
   if (str == NULL) return NULL;
 
   e->result_.int_val = str->len;
-  return static_cast<void*>(&e->result_.int_val);
+  return &e->result_.int_val;
 }
 
 // Implementation of LOWER
@@ -74,7 +105,7 @@ void* StringFunctions::Lower(Expr* e, TupleRow* row) {
   std::transform(str->ptr, str->ptr + str->len,
                  e->result_.string_val.ptr, ::tolower);
 
-  return static_cast<void*>(&e->result_.string_val);
+  return &e->result_.string_val;
 }
 
 // Implementation of UPPER
@@ -97,7 +128,26 @@ void* StringFunctions::Upper(Expr* e, TupleRow* row) {
   std::transform(str->ptr, str->ptr + str->len,
                  e->result_.string_val.ptr, ::toupper);
 
-  return static_cast<void*>(&e->result_.string_val);
+  return &e->result_.string_val;
+}
+
+// Implementation of REVERSE
+//   string upper(string input)
+// Returns a string with caracters in reverse order to the input.
+// If input == NULL, returns NULL per MySQL
+void* StringFunctions::Reverse(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 1);
+  Expr* op = e->children()[0];
+  StringValue* str = reinterpret_cast<StringValue*>(op->GetValue(row));
+  if (str == NULL) return NULL;
+
+  e->result_.string_data.resize(str->len);
+  e->result_.SyncStringVal();
+
+  std::reverse_copy(str->ptr, str->ptr + str->len,
+                 e->result_.string_val.ptr);
+
+  return (&e->result_.string_val);
 }
 
 }
