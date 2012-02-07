@@ -29,7 +29,7 @@ functions = [
   ['String_Substring', 'STRING', ['STRING', 'INT', 'INT'], 'StringFunctions::Substring', ['substr', 'substring']],
 # left and right are key words, leave them out for now.
   ['String_Left', 'STRING', ['STRING', 'INT'], 'StringFunctions::Left', ['strleft']],
-  ['String_Rigth', 'STRING', ['STRING', 'INT'], 'StringFunctions::Right', ['strright']],
+  ['String_Right', 'STRING', ['STRING', 'INT'], 'StringFunctions::Right', ['strright']],
   ['String_Length', 'INT', ['STRING'], 'StringFunctions::Length', ['length']],
   ['String_Lower', 'STRING', ['STRING'], 'StringFunctions::Lower', ['lower', 'lcase']],
   ['String_Upper', 'STRING', ['STRING'], 'StringFunctions::Upper', ['upper', 'ucase']],
