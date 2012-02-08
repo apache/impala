@@ -4,6 +4,7 @@
 
 #include <boost/thread/locks.hpp>
 #include <glog/logging.h>
+#include <gflags/gflags.h>
 
 using namespace boost;
 
