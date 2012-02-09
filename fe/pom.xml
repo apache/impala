@@ -24,42 +24,44 @@
   </properties>
   
   <dependencies>
+    <!-- Until the local-read optimisations are available in a
+         published artifact, we grab the local hdfs jar. The downside
+         is that transitive dependencies are not handled by Maven with
+         a local jar. Note: not necessary for the Java-side, but must
+         be available for the NativeBackend. -->
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-hdfs</artifactId>
+      <version>0.24.0-cdh4b2-SNAPSHOT</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hadoop-0.23.0-cdh4b2-SNAPSHOT/share/hadoop/hdfs/hadoop-hdfs-0.23.0-cdh4b2-SNAPSHOT.jar</systemPath>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-common</artifactId>
+      <version>0.24.0-cdh4b2-SNAPSHOT</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hadoop-0.23.0-cdh4b2-SNAPSHOT/share/hadoop/common/hadoop-common-0.23.0-cdh4b2-SNAPSHOT.jar</systemPath>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-auth</artifactId>
+      <version>0.24.0-cdh4b2-SNAPSHOT</version>
+      <scope>system</scope>
+      <systemPath>${env.IMPALA_HOME}/thirdparty/hadoop-0.23.0-cdh4b2-SNAPSHOT/share/hadoop/common/lib/hadoop-auth-0.23.0-cdh4b2-SNAPSHOT.jar</systemPath>
+    </dependency>
+
     <dependency>
       <groupId>net.sf.squirrel-sql.thirdparty-non-maven</groupId>
       <artifactId>java-cup</artifactId>
       <version>0.11a</version>
     </dependency>
-    
-    <dependency>
-      <groupId>org.apache.hadoop.hive</groupId>
-      <artifactId>hive-metastore</artifactId>
-      <version>0.7.1-cdh3u1</version>
-    </dependency>    
-    <dependency>
-      <groupId>org.apache.hadoop.hive</groupId>
-      <artifactId>hive-common</artifactId>
-      <version>0.7.1-cdh3u1</version>
-    </dependency>           
-    <dependency>
-      <groupId>org.apache.hadoop.hive</groupId>
-      <artifactId>hive-serde</artifactId>
-      <version>0.7.1-cdh3u1</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop.hive</groupId>
-      <artifactId>hive-shims</artifactId>
-      <version>0.7.1-cdh3u1</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-core</artifactId>
-      <version>0.20.2-cdh3u1</version>
-    </dependency>
-    <dependency>
-      <groupId>beaver</groupId>
-      <artifactId>beaver</artifactId>
-      <version>0.9.7</version>
-    </dependency>
+
+    <!-- Moved above Hive, because Hive bundles its own Thrift version
+         which supercedes this one if it comes first in the dependency
+         tree -->
     <dependency>
       <groupId>org.apache.thrift</groupId>
       <artifactId>libthrift</artifactId>
@@ -69,6 +71,55 @@
       <groupId>org.apache.thrift</groupId>
       <artifactId>libfb303</artifactId>
       <version>0.6.1</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-hbase-handler</artifactId>
+      <version>0.8.1-cdh4b2-SNAPSHOT</version>
+    </dependency>    
+
+    <dependency>
+      <groupId>org.apache.hbase</groupId>
+      <artifactId>hbase</artifactId>
+      <version>0.92.0-cdh4b2-SNAPSHOT</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hadoop</groupId>
+      <artifactId>hadoop-mapreduce-client-core</artifactId>
+      <version>0.23.0-cdh4b2-SNAPSHOT</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-metastore</artifactId>
+      <version>0.8.1-cdh4b2-SNAPSHOT</version>
+    </dependency>    
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-common</artifactId>
+      <version>0.8.1-cdh4b2-SNAPSHOT</version>
+    </dependency>           
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-serde</artifactId>
+      <version>0.8.1-cdh4b2-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-shims</artifactId>
+      <version>0.8.1-cdh4b2-SNAPSHOT</version>
+    </dependency>
+    <!-- <dependency> -->
+    <!--   <groupId>org.apache.hadoop</groupId> -->
+    <!--   <artifactId>hadoop-common</artifactId> -->
+    <!--   <version>0.23.0-cdh4b2-SNAPSHOT</version>     -->
+    <!-- </dependency> -->
+    <dependency>
+      <groupId>beaver</groupId>
+      <artifactId>beaver</artifactId>
+      <version>0.9.7</version>
     </dependency>
     <dependency>
       <groupId>org.apache.derby</groupId>
@@ -140,19 +191,6 @@
       <version>4.8.2</version>
       <scope>test</scope>
     </dependency>
-
-    <dependency>
-      <groupId>org.apache.hadoop.hive</groupId>
-      <artifactId>hive-hbase-handler</artifactId>
-      <version>0.7.1-cdh3u2-SNAPSHOT</version>
-    </dependency>    
-
-    <dependency>
-      <groupId>org.apache.hbase</groupId>
-      <artifactId>hbase</artifactId>
-      <version>0.90.3-cdh3u1</version>
-    </dependency>
-
   </dependencies>
   
   <build>
@@ -378,6 +416,14 @@
   </build>
               
   <repositories>
+    <repository>
+      <id>cdh.rcs.releases.repo</id>
+      <url>https://repository.cloudera.com/content/groups/cdh-releases-rcs</url>
+      <name>CDH Releases Repository</name>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
     <repository>
       <id>cdh.releases.repo</id>
       <url>https://repository.cloudera.com/content/repositories/releases</url>

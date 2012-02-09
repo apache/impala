@@ -1,0 +1,25 @@
+<!-- Configuration for hdfs local reads only and NN location only -->
+<configuration>
+  <property>
+    <name>dfs.client.read.shortcircuit</name>
+    <value>true</value>
+  </property>
+
+  <!-- Our bespoke build of Hadoop has the security check for local
+       reads removed. We will need the following configuration
+       variable when that check gets readded. -->
+  <!--
+  <property>
+    <name>dfs.block.local-path-access.user</name>
+     <value>henry</value>
+  </property>
+  -->
+  <property>
+    <name>dfs.client.read.shortcircuit.skip.checksum</name>
+    <value>false</value>
+  </property>
+  <property>
+    <name>fs.default.name</name>
+    <value>hdfs://localhost:20500</value>
+  </property>
+</configuration>

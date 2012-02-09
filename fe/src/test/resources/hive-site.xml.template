@@ -82,9 +82,4 @@
   <value>3</value>
 </property>
 
-<property>
-  <name>fs.default.name</name>
-  <value>hdfs://localhost:20500</value>
-</property>
-
 </configuration>

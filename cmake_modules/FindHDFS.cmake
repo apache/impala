@@ -10,7 +10,7 @@ exec_program(hadoop ARGS version OUTPUT_VARIABLE Hadoop_VERSION
 
 # currently only looking in HADOOP_HOME
 find_path(HDFS_INCLUDE_DIR hdfs.h PATHS
-  $ENV{HADOOP_HOME}/src/c++/libhdfs
+  $ENV{HADOOP_HOME}/include/
 )
 
 if ("${CMAKE_SIZEOF_VOID_P}" STREQUAL "8")
@@ -24,9 +24,9 @@ endif()
 message(STATUS "Architecture: ${arch_hint}")
 
 if ("${arch_hint}" STREQUAL "x64")
-  set(HDFS_LIB_PATHS $ENV{HADOOP_HOME}/c++/Linux-amd64-64/lib)
+  set(HDFS_LIB_PATHS $ENV{HADOOP_HOME}/lib/native)
 else ()
-  set(HDFS_LIB_PATHS $ENV{HADOOP_HOME}/c++/Linux-i386-32/lib)
+  set(HDFS_LIB_PATHS $ENV{HADOOP_HOME}/lib/native)
 endif ()
 
 message(STATUS "HDFS_LIB_PATHS: ${HDFS_LIB_PATHS}")
