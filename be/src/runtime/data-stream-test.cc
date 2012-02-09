@@ -20,7 +20,7 @@
 #include "runtime/data-stream-sender.h"
 #include "runtime/data-stream-recvr.h"
 #include "runtime/descriptors.h"
-#include "testutil/query-executor.h"
+#include "testutil/in-process-query-executor.h"
 #include "testutil/test-exec-env.h"
 #include "util/debug-util.h"
 #include "gen-cpp/ImpalaBackendService.h"
@@ -87,7 +87,7 @@ class DataStreamTest : public testing::Test {
 
   const RowDescriptor* row_desc_;
   TestExecEnv test_env_;
-  QueryExecutor exec_;
+  InProcessQueryExecutor exec_;
   TUniqueId query_id_;
   string stmt_;
 
@@ -175,7 +175,7 @@ class DataStreamTest : public testing::Test {
   }
 
   void Sender(int sender_num) {
-    QueryExecutor exec(&test_env_);
+    InProcessQueryExecutor exec(&test_env_);
     VLOG(1) << "exec setup";
     EXPECT_TRUE(exec.Setup().ok());
     VLOG(1) << "exec::exec";

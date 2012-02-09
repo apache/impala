@@ -24,6 +24,7 @@
 #include "service/jni-coordinator.h"
 #include "service/backend-service.h"
 #include "util/jni-util.h"
+#include "util/thrift-util.h"
 #include "util/debug-util.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
 #include "gen-cpp/Data_types.h"
@@ -121,7 +122,8 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecQuery(
     if (!status.ok()) {
       string error_msg;
       status.GetErrorMsg(&error_msg);
-      jclass internal_exc_cl = env->FindClass("com/cloudera/impala/common/InternalException");
+      jclass internal_exc_cl =
+          env->FindClass("com/cloudera/impala/common/InternalException");
       if (internal_exc_cl == NULL) {
         if (env->ExceptionOccurred()) env->ExceptionDescribe();
         return;

@@ -11,6 +11,8 @@ namespace impala {
 // the correct operation of the query.
 class ExecStats {
 public:
+  ExecStats(): num_rows_(0), query_type_(SELECT) {}
+
   int num_rows() { return num_rows_; }
 
   enum QueryType { SELECT = 0, INSERT };
@@ -28,7 +30,7 @@ private:
   // Coordinators / executors can update these stats directly, this
   // saves writing accessor methods.
   friend class Coordinator;
-  friend class QueryExecutor;
+  friend class InProcessQueryExecutor;
 };
 
 }

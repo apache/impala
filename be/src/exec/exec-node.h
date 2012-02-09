@@ -31,7 +31,7 @@ class ExecNode {
   // Sets up internal structures, etc., without doing any actual work.
   // Must be called prior to Open(). Will only be called once in this
   // node's lifetime.
-  // Default implementation only calls Prepare() on the children.
+  // If overridden in subclass, must first call superclass's Prepare().
   virtual Status Prepare(RuntimeState* state);
 
   // Performs any preparatory work prior to calling GetNext().

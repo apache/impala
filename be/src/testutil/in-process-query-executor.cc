@@ -1,6 +1,6 @@
 // (c) 2011 Cloudera, Inc. All rights reserved.
 
-#include "testutil/query-executor.h"
+#include "testutil/in-process-query-executor.h"
 
 #include <stdlib.h>  // for system()
 #include <unistd.h>  // for sleep()
@@ -62,7 +62,7 @@ using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
 using namespace impala;
 
-QueryExecutor::QueryExecutor(ExecEnv* exec_env)
+InProcessQueryExecutor::InProcessQueryExecutor(ExecEnv* exec_env)
   : started_server_(false),
     exec_env_(exec_env),
     row_batch_(NULL),
@@ -71,7 +71,7 @@ QueryExecutor::QueryExecutor(ExecEnv* exec_env)
     exec_stats_(new ExecStats()) {
 }
 
-QueryExecutor::~QueryExecutor() {
+InProcessQueryExecutor::~InProcessQueryExecutor() {
 }
 
 #if 0
@@ -129,11 +129,11 @@ static void StartServer() {
   }
 }
 
-void QueryExecutor::DisableJit() {
+void InProcessQueryExecutor::DisableJit() {
   FLAGS_enable_expr_jit = false;
 }
 
-Status QueryExecutor::Setup() {
+Status InProcessQueryExecutor::Setup() {
   socket_.reset(new TSocket("localhost", 20000));
   transport_.reset(new TBufferedTransport(socket_));
   protocol_.reset(new TBinaryProtocol(transport_));
@@ -162,8 +162,8 @@ Status QueryExecutor::Setup() {
   return Status::OK;
 }
 
-Status QueryExecutor::Exec(const string& query, vector<PrimitiveType>* col_types) {
-  query_profile_.reset(new RuntimeProfile(obj_pool_.get(), "QueryExecutor"));
+Status InProcessQueryExecutor::Exec(const string& query, vector<PrimitiveType>* col_types) {
+  query_profile_.reset(new RuntimeProfile(obj_pool_.get(), "InProcessQueryExecutor"));
   RuntimeProfile::Counter* plan_gen_counter =
       ADD_COUNTER(query_profile_, "PlanGeneration", TCounterType::CPU_TICKS);
 
@@ -172,7 +172,7 @@ Status QueryExecutor::Exec(const string& query, vector<PrimitiveType>* col_types
   eos_ = false;
   try {
     COUNTER_SCOPED_TIMER(plan_gen_counter);
-    CHECK(client_.get() != NULL) << "didn't call QueryExecutor::Setup()";
+    CHECK(client_.get() != NULL) << "didn't call InProcessQueryExecutor::Setup()";
     client_->GetExecRequest(query_request_, query.c_str(), FLAGS_num_nodes);
   } catch (::apache::thrift::TException& e) {
     return Status(e.what());
@@ -234,7 +234,7 @@ Status QueryExecutor::Exec(const string& query, vector<PrimitiveType>* col_types
   return Status::OK;
 }
 
-Status QueryExecutor::PrepareSelectListExprs(
+Status InProcessQueryExecutor::PrepareSelectListExprs(
     RuntimeState* state, const RowDescriptor& row_desc,
     vector<PrimitiveType>* col_types) {
   RETURN_IF_ERROR(
@@ -249,7 +249,7 @@ Status QueryExecutor::PrepareSelectListExprs(
   return Status::OK;
 }
 
-Status QueryExecutor::FetchResult(RowBatch** batch) {
+Status InProcessQueryExecutor::FetchResult(RowBatch** batch) {
   if (coord_.get() == NULL) {
     *batch = NULL;
     return Status::OK;
@@ -258,7 +258,7 @@ Status QueryExecutor::FetchResult(RowBatch** batch) {
   return Status::OK;
 }
 
-Status QueryExecutor::FetchResult(string* result) {
+Status InProcessQueryExecutor::FetchResult(string* result) {
   COUNTER_SCOPED_TIMER(query_profile_->total_time_counter());
   vector<void*> row;
   RETURN_IF_ERROR(FetchResult(&row));
@@ -274,7 +274,7 @@ Status QueryExecutor::FetchResult(string* result) {
   return Status::OK;
 }
 
-Status QueryExecutor::FetchResult(vector<void*>* select_list_values) {
+Status InProcessQueryExecutor::FetchResult(vector<void*>* select_list_values) {
   COUNTER_SCOPED_TIMER(query_profile_->total_time_counter());
   select_list_values->clear();
   if (coord_.get() == NULL) {
@@ -318,22 +318,22 @@ Status QueryExecutor::FetchResult(vector<void*>* select_list_values) {
   return Status::OK;
 }
 
-RuntimeState* QueryExecutor::runtime_state() {
+RuntimeState* InProcessQueryExecutor::runtime_state() {
   DCHECK(coord_.get() != NULL);
   return coord_->runtime_state();
 }
 
-const RowDescriptor& QueryExecutor::row_desc() const {
+const RowDescriptor& InProcessQueryExecutor::row_desc() const {
   DCHECK(coord_.get() != NULL);
   return coord_->row_desc();
 }
 
-Status QueryExecutor::EndQuery() {
+Status InProcessQueryExecutor::EndQuery() {
   next_row_ = 0;
   return Status::OK;
 }
 
-void QueryExecutor::Shutdown() {
+void InProcessQueryExecutor::Shutdown() {
   if (started_server_) {
     // shut down server we started ourselves
     try {
@@ -345,20 +345,20 @@ void QueryExecutor::Shutdown() {
   transport_->close();
 }
 
-string QueryExecutor::ErrorString() const {
+string InProcessQueryExecutor::ErrorString() const {
   if (coord_.get() == NULL) {
     return "";
   }
   return coord_->runtime_state()->ErrorLog();
 }
 
-string QueryExecutor::FileErrors() const {
+string InProcessQueryExecutor::FileErrors() const {
   if (coord_.get() == NULL) {
     return "";
   }
   return coord_->runtime_state()->FileErrors();
 }
 
-RuntimeProfile* QueryExecutor::query_profile() {
+RuntimeProfile* InProcessQueryExecutor::query_profile() {
   return query_profile_.get();
 }

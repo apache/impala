@@ -30,13 +30,34 @@ RuntimeState::RuntimeState(
     max_errors_(max_errors),
     query_id_(query_id),
     exec_env_(exec_env) {
+  if (llvm_enabled) DCHECK(CreateCodegen().ok());  // TODO better error handling
+}
 
+RuntimeState::RuntimeState()
+  : obj_pool_(new ObjectPool()),
+    batch_size_(DEFAULT_BATCH_SIZE),
+    file_buffer_size_(DEFAULT_FILE_BUFFER_SIZE) {
+}
+
+Status RuntimeState::Init(
+    const TUniqueId& query_id, bool abort_on_error, int max_errors, bool llvm_enabled,
+    ExecEnv* exec_env) {
+  query_id_ = query_id;
+  abort_on_error_ = abort_on_error;
+  max_errors_ = max_errors_;
+  exec_env_ = exec_env;
   if (llvm_enabled) {
-    codegen_.reset(new LlvmCodeGen("QueryExecutor"));
-    codegen_->EnableOptimizations(true);
-    Status status = codegen_->Init();
-    DCHECK(status.ok());  // TODO better error handling
+    RETURN_IF_ERROR(CreateCodegen());
+  } else {
+    codegen_.reset(NULL);
   }
+  return Status::OK;
+}
+
+Status RuntimeState::CreateCodegen() {
+  codegen_.reset(new LlvmCodeGen("QueryExecutor"));
+  codegen_->EnableOptimizations(true);
+  return codegen_->Init();
 }
 
 string RuntimeState::ErrorLog() const {

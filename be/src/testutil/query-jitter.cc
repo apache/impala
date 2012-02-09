@@ -18,7 +18,7 @@
 #include "gen-cpp/ImpalaPlanService_types.h"
 #include "runtime/raw-value.h"
 #include "service/backend-service.h"
-#include "testutil/query-executor.h"
+#include "testutil/in-process-query-executor.h"
 #include "util/benchmark.h"
 #include "util/jni-util.h"
 #include "util/perf-counters.h"
@@ -56,7 +56,7 @@ class QueryJitter {
     vector<PrimitiveType> col_types;
 
     ExecEnv exec_env;
-    QueryExecutor exec(&exec_env);
+    InProcessQueryExecutor exec(&exec_env);
     exec.DisableJit();
     Status status = exec.Setup();
     DCHECK(status.ok());

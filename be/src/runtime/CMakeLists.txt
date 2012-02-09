@@ -19,6 +19,7 @@ add_library(Runtime STATIC
   hdfs-fs-cache.cc
   mem-pool.cc
   plan-executor.cc
+  primitive-type.cc
   raw-value.cc
   row-batch.cc
   runtime-state.cc

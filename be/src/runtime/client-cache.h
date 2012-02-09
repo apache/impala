@@ -15,6 +15,7 @@ namespace impala {
 class ImpalaBackendServiceClient;
 
 // Cache of Thrift clients for ImpalaBackendServices.
+// TODO: shut down clients in the background if they don't get used for a period of time
 class BackendClientCache {
  public:
   // Create cache with given upper limits for the total number of cached

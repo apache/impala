@@ -11,7 +11,7 @@
 #include "runtime/raw-value.h"
 #include "runtime/primitive-type.h"
 #include "runtime/string-value.h"
-#include "testutil/query-executor.h"
+#include "testutil/in-process-query-executor.h"
 #include "gen-cpp/ImpalaService_types.h"
 #include "gen-cpp/Exprs_types.h"
 #include "exprs/bool-literal.h"
@@ -57,7 +57,7 @@ class ExprTest : public testing::Test {
 
   virtual void SetUp() {
     exec_env_.reset(new ExecEnv());
-    executor_.reset(new QueryExecutor(exec_env_.get()));
+    executor_.reset(new InProcessQueryExecutor(exec_env_.get()));
     // Disable jitting so can exercise the non-jit path
     executor_->DisableJit();
     EXIT_IF_ERROR(executor_->Setup());
@@ -426,7 +426,7 @@ class ExprTest : public testing::Test {
   }
 
  private:
-  scoped_ptr<QueryExecutor> executor_;
+  scoped_ptr<InProcessQueryExecutor> executor_;
   scoped_ptr<ExecEnv> exec_env_;
   ObjectPool pool_;
   vector<Expr*> jit_expr_root_;         // stored in pool_

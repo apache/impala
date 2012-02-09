@@ -128,28 +128,6 @@ class JniCoordinator {
 
 };
 
-template <class T>
-void DeserializeThriftMsg(JNIEnv* env, jbyteArray serialized_msg, T* deserialized_msg) {
-  // TODO: Find out why using plan_buf directly does not work.
-  // Copy java byte array into native byte array.
-  jboolean is_copy = false;
-  int buf_size = env->GetArrayLength(serialized_msg);
-  jbyte* buf = env->GetByteArrayElements(serialized_msg, &is_copy);
-  uint8_t native_bytes[buf_size];
-  for (int i = 0; i < buf_size; i++) {
-    native_bytes[i] = buf[i];
-  }
-
-  // Deserialize msg bytes into c++ thrift msg using memory transport.
-  boost::shared_ptr<apache::thrift::transport::TTransport> tmem_transport(
-      new apache::thrift::transport::TMemoryBuffer(native_bytes, buf_size));
-  apache::thrift::protocol::
-    TBinaryProtocolFactoryT<apache::thrift::transport::TMemoryBuffer> tproto_factory;
-  boost::shared_ptr<apache::thrift::protocol::TProtocol> tproto =
-      tproto_factory.getProtocol(tmem_transport);
-  deserialized_msg->read(tproto.get());
-}
-
 }
 
 #endif

@@ -17,7 +17,9 @@
 #include "common/status.h"
 #include "exec/hbase-table-scanner.h"
 #include "runtime/hbase-table-cache.h"
-#include "testutil/query-executor.h"
+#include "testutil/query-executor-if.h"
+#include "testutil/in-process-query-executor.h"
+#include "testutil/impalad-query-executor.h"
 #include "runtime/exec-env.h"
 #include "exec/exec-stats.h"
 #include "testutil/test-exec-env.h"
@@ -39,6 +41,7 @@ DEFINE_bool(enable_counters, true, "if false, disable using counters (so a profi
 DECLARE_int32(num_nodes);
 DECLARE_int32(backend_port);
 DECLARE_string(backends);
+DECLARE_string(impalad);
 
 using namespace std;
 using namespace impala;
@@ -68,6 +71,13 @@ static void ConstructSummaryString(ExecStats::QueryType query_type, int num_rows
   summary->append(summary_stream.str());
 }
 
+static QueryExecutorIf* CreateExecutor(ExecEnv* exec_env) {
+  if (!FLAGS_impalad.empty()) {
+    return new ImpaladQueryExecutor();
+  } else {
+    return new InProcessQueryExecutor(exec_env);
+  }
+}
 
 static void Exec(ExecEnv* exec_env) {
   bool enable_profiling = false;
@@ -89,13 +99,13 @@ static void Exec(ExecEnv* exec_env) {
 
   // If the number of iterations is greater than 1, run once to Ignore JVM startup time.
   if (FLAGS_iterations > 1) {
-    QueryExecutor executor(exec_env);
-    EXIT_IF_ERROR(executor.Setup());
-    EXIT_IF_ERROR(executor.Exec(queries[0], NULL));
+    scoped_ptr<QueryExecutorIf> executor(CreateExecutor(exec_env));
+    EXIT_IF_ERROR(executor->Setup());
+    EXIT_IF_ERROR(executor->Exec(queries[0], NULL));
     while (true) {
       string row;
-      EXIT_IF_ERROR(executor.FetchResult(&row));
-      if (row.empty() || executor.eos()) break;
+      EXIT_IF_ERROR(executor->FetchResult(&row));
+      if (row.empty() || executor->eos()) break;
     }
   }
 
@@ -120,24 +130,23 @@ static void Exec(ExecEnv* exec_env) {
     ExecStats::QueryType query_type;
 
     for (int i = 0; i < FLAGS_iterations; ++i) {
-      QueryExecutor executor(exec_env);
-      EXIT_IF_ERROR(executor.Setup());
+      scoped_ptr<QueryExecutorIf> executor(CreateExecutor(exec_env));
+      EXIT_IF_ERROR(executor->Setup());
 
       struct timeval start_time;
       gettimeofday(&start_time, NULL);
 
-      EXIT_IF_ERROR(executor.Exec(*iter, NULL));
-
+      EXIT_IF_ERROR(executor->Exec(*iter, NULL));
       while (true) {
         string row;
-        EXIT_IF_ERROR(executor.FetchResult(&row));
+        EXIT_IF_ERROR(executor->FetchResult(&row));
+        if (row.empty()) break;
         // Only print results for first run
         if (!row.empty() && i == 0) cout << row << endl;
-        if (executor.eos()) break;
+        if (executor->eos()) break;
       }
-
-      num_rows += executor.exec_stats()->num_rows();
-      query_type = executor.exec_stats()->query_type();
+      num_rows += executor->exec_stats()->num_rows();
+      query_type = executor->exec_stats()->query_type();
 
       struct timeval end_time;
       gettimeofday(&end_time, NULL);
@@ -149,20 +158,22 @@ static void Exec(ExecEnv* exec_env) {
         hw_counters.Snapshot("Query");
       }
 
-      if (executor.ErrorString().size() > 0 || executor.FileErrors().size() > 0) {
+      if (executor->ErrorString().size() > 0 || executor->FileErrors().size() > 0) {
         // Print runtime errors, e.g., parsing errors.
-        cout << executor.ErrorString() << endl;
+        cout << executor->ErrorString() << endl;
         // Print file errors.
-        cout << executor.FileErrors() << endl;
+        cout << executor->FileErrors() << endl;
         break;
       }
 
-      RuntimeProfile* profile = executor.query_profile();
-      if (FLAGS_iterations > 1 && profile->children().size() == 1) {
-        // Rename the query to drop the query id so the results merge
-        profile->children()[0]->Rename("Query");
+      RuntimeProfile* profile = executor->query_profile();
+      if (profile != NULL) {
+        if (FLAGS_iterations > 1 && profile->children().size() == 1) {
+          // Rename the query to drop the query id so the results merge
+          profile->children()[0]->Rename("Query");
+        }
+        aggregate_profile.Merge(*profile);
       }
-      aggregate_profile.Merge(*profile);
     }
 
     num_rows /= FLAGS_iterations;

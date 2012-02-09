@@ -67,8 +67,10 @@ public class TupleDescriptor {
       slotStrings.add(slot.debugString());
     }
     return Objects.toStringHelper(this)
-        .add("tuple_id", id.asInt())
+        .add("id", id.asInt())
         .add("tbl", tblStr)
+        .add("byte_size", byteSize)
+        .add("is_materialized", isMaterialized)
         .add("slots", "[" + Joiner.on(", ").join(slotStrings) + "]")
         .toString();
   }

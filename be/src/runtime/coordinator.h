@@ -50,9 +50,9 @@ class Coordinator {
   // be for a query like 'SELECT 1').
   Status Exec(const TQueryExecRequest& request);
 
-  // Returns tuples from the coordinator fragment. Any returned tuples are valid until the
-  // next GetNext() call. If the coordinator has a sink, then no tuples will be returned
-  // via *batch, but will instead be sent to the sink.
+  // Returns tuples from the coordinator fragment. Any returned tuples are valid until
+  // the next GetNext() call. If the coordinator has a sink, then no tuples will be
+  // returned via *batch, but will instead be sent to the sink.
   // '*batch' is owned by the underlying PlanExecutor and must not be deleted.
   // *state is owned by the caller, and must not be deleted.
   Status GetNext(RowBatch** batch, RuntimeState* state);
@@ -111,7 +111,7 @@ class Coordinator {
   bool execution_completed_;
 
   // Repository for statistics gathered during the execution of a
-  // single query. Owned by enclosing query executor.
+  // single query. Not owned by us.
   ExecStats* exec_stats_;
 
   // Wrapper for ExecPlanFragment() rpc.

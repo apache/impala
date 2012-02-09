@@ -30,6 +30,13 @@ class RuntimeState {
   RuntimeState(const TUniqueId& query_id, bool abort_on_error, int max_errors,
                int batch_size, bool llvm_enabled, ExecEnv* exec_env);
 
+  // RuntimeState for executing queries w/o a from clause.
+  RuntimeState();
+
+  // Set per-query state.
+  Status Init(const TUniqueId& query_id, bool abort_on_error, int max_errors,
+              bool llvm_enabled, ExecEnv* exec_env);
+
   ObjectPool* obj_pool() const { return obj_pool_.get(); }
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }
   void set_desc_tbl(DescriptorTbl* desc_tbl) { desc_tbl_ = desc_tbl; }
@@ -38,7 +45,6 @@ class RuntimeState {
   bool abort_on_error() const { return abort_on_error_; }
   int max_errors() const { return max_errors_; }
   const std::vector<std::string>& error_log() const { return error_log_; }
-  // Get error stream for appending error message snippets.
   std::stringstream& error_stream() { return error_stream_; }
   const std::vector<std::pair<std::string, int> >& file_errors() const {
     return file_errors_;
@@ -91,9 +97,9 @@ class RuntimeState {
   // Stores the number of parse errors per file.
   std::vector<std::pair<std::string, int> > file_errors_;
   // Whether to abort if an error is encountered.
-  const bool abort_on_error_;
+  bool abort_on_error_;
   // Maximum number of errors to log.
-  const int max_errors_;
+  int max_errors_;
   TUniqueId query_id_;
   ExecEnv* exec_env_;
   boost::scoped_ptr<LlvmCodeGen> codegen_;
@@ -104,6 +110,9 @@ class RuntimeState {
 
   // prohibit copies
   RuntimeState(const RuntimeState&);
+
+  // set codegen_
+  Status CreateCodegen();
 };
 
 }

@@ -48,21 +48,21 @@ struct TQueryResult {
 
   // if true, there are no more results to be fetched
   2: bool eos
-
-  // specifies the data types of the columns of the result set
-  3: optional list<Types.TPrimitiveType> colTypes
 }
 
 // result of RunQuery() rpc
 struct TRunQueryResult {
   1: required Types.TStatus status
   2: optional Types.TUniqueId query_id
+
+  // specifies the data types of the columns of the result set
+  3: list<Types.TPrimitiveType> col_types
 }
 
 // result of FetchResults() rpc
 struct TFetchResultsResult {
   1: required Types.TStatus status
-  2: optional TQueryResult result
+  2: optional TQueryResult query_result
 }
 
 // For all rpc that return a TStatus as part of their result type,

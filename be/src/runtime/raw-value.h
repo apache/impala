@@ -58,7 +58,8 @@ inline bool RawValue::Eq(const void* v1, const void* v2, PrimitiveType type) {
     case TYPE_BOOLEAN:
       return *reinterpret_cast<const bool*>(v1) == *reinterpret_cast<const bool*>(v2);
     case TYPE_TINYINT:
-      return *reinterpret_cast<const int8_t*>(v1) == *reinterpret_cast<const int8_t*>(v2);
+      return *reinterpret_cast<const int8_t*>(v1)
+          == *reinterpret_cast<const int8_t*>(v2);
     case TYPE_SMALLINT:
       return *reinterpret_cast<const int16_t*>(v1) == *reinterpret_cast<const int16_t*>(v2);
     case TYPE_INT:

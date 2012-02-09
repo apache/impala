@@ -37,6 +37,7 @@ target_link_libraries(runquery
 
 add_executable(impalad
   impalad-main.cc
+  impala-service.cc
 )
 
 target_link_libraries(impalad ${IMPALA_LINK_LIBS})

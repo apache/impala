@@ -30,6 +30,16 @@
     } \
   } while (false)
 
+#define SET_TSTATUS_IF_ERROR(stmt, tstatus) \
+  do { \
+    Status status = (stmt); \
+    if (!status.ok()) { \
+      (tstatus)->status_code = TStatusCode::INTERNAL_ERROR; \
+      status.GetErrorMsgs(&(tstatus)->error_msgs); \
+      return; \
+    } \
+  } while (false)
+
 #define THROW_IF_ERROR_RET(stmt, env, impala_exc_cl, ret) \
   do { \
     Status status = (stmt); \
@@ -58,7 +68,17 @@
   do { \
     jthrowable exc = (env)->ExceptionOccurred(); \
     if (exc != NULL) { \
+      (env)->ExceptionDescribe(); \
      return; \
+    } \
+  } while (false)
+
+#define EXIT_IF_EXC(env) \
+  do { \
+    jthrowable exc = (env)->ExceptionOccurred(); \
+    if (exc != NULL) { \
+      (env)->ExceptionDescribe(); \
+     exit(1); \
     } \
   } while (false)
 
@@ -68,9 +88,27 @@
     if (exc != NULL) { \
      jstring msg = (jstring) env->CallObjectMethod(exc, (throwable_to_string_id_)); \
      jboolean is_copy; \
-     const char* c_msg = reinterpret_cast<const char*>((env)->GetStringUTFChars(msg, &is_copy)); \
+     const char* c_msg = \
+         reinterpret_cast<const char*>((env)->GetStringUTFChars(msg, &is_copy)); \
      (env)->ExceptionClear(); \
      return Status(c_msg); \
+    } \
+  } while (false)
+
+#define EXIT_IF_JNIERROR(stmt) \
+  do { \
+    if ((stmt) != JNI_OK) { \
+      cerr << #stmt << " resulted in a jni error"; \
+      exit(1); \
+    } \
+  } while (false)
+
+#define RETURN_IF_JNIERROR(stmt) \
+  do { \
+    if ((stmt) != JNI_OK) { \
+      stringstream out; \
+      out << #stmt << " resulted in a jni error";      \
+      return Status(out.str()); \
     } \
   } while (false)
 

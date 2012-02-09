@@ -1,7 +1,7 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
-#ifndef IMPALA_TESTUTIL_QUERY_EXECUTOR_H
-#define IMPALA_TESTUTIL_QUERY_EXECUTOR_H
+#ifndef IMPALA_TESTUTIL_QUERY_IN_PROCESS_EXECUTOR_H
+#define IMPALA_TESTUTIL_QUERY_IN_PROCESS_EXECUTOR_H
 
 #include <string>
 #include <vector>
@@ -9,6 +9,7 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
 
+#include "testutil/query-executor-if.h"
 #include "common/status.h"
 #include "runtime/coordinator.h"
 #include "runtime/primitive-type.h"
@@ -45,16 +46,16 @@ class TPlanExecParams;
 // fragment (FetchResult(RowBatch**)) or as individual rows
 // (FetchResult(string*)/FetchResult(vector<void*>*)). Do *not* mix calls to the
 // two types of FetchResult().
-class QueryExecutor {
+class InProcessQueryExecutor : public QueryExecutorIf {
  public:
-  QueryExecutor(ExecEnv* exec_env);
-  ~QueryExecutor();
+  InProcessQueryExecutor(ExecEnv* exec_env);
+  ~InProcessQueryExecutor();
 
-  Status Setup();
+  virtual Status Setup();
 
   // Start running query. Call this prior to FetchResult().
   // If 'col_types' is non-NULL, returns the types of the select list items.
-  Status Exec(
+  virtual Status Exec(
       const std::string& query, std::vector<PrimitiveType>* col_types);
 
   // Returns result batch in 'batch'. The returned rows are the output rows of
@@ -62,31 +63,31 @@ class QueryExecutor {
   // select list exprs, ie, don't call this if the query
   // doesn't have a FROM clause, this function will not return any result rows for
   // that case.
-  // Sets 'batch' to NULL if no more data. Batch is owned by QueryExecutor
+  // Sets 'batch' to NULL if no more data. Batch is owned by InProcessQueryExecutor
   // and must not be deallocated.
-  Status FetchResult(RowBatch** batch);
+  virtual Status FetchResult(RowBatch** batch);
 
   // Return single row as comma-separated list of values.
   // Indicates end-of-stream by setting 'row' to the empty string.
   // Returns OK if successful, otherwise error.
-  Status FetchResult(std::string* row);
+  virtual Status FetchResult(std::string* row);
 
   // Return single row as vector of raw values.
   // Indicates end-of-stream by returning empty 'row'.
   // Returns OK if successful, otherwise error.
-  Status FetchResult(std::vector<void*>* row);
+  virtual Status FetchResult(std::vector<void*>* row);
 
   RuntimeState* runtime_state();
   const RowDescriptor& row_desc() const;
 
   // Returns the error log lines in executor_'s runtime state as a string joined with '\n'.
-  std::string ErrorString() const;
+  virtual std::string ErrorString() const;
 
   // Returns a string representation of the file_errors_.
-  std::string FileErrors() const;
+  virtual std::string FileErrors() const;
 
   // Returns the counters for the entire query
-  RuntimeProfile* query_profile();
+  virtual RuntimeProfile* query_profile();
 
   // Returns query request
   const TQueryExecRequest& query_request() const { return query_request_; }
@@ -97,11 +98,11 @@ class QueryExecutor {
   // Disable Jitting.  This is only used by tests to exercise the non-jitted behavior
   void DisableJit();
 
-  bool eos() { return eos_; }
+  virtual bool eos() { return eos_; }
 
   // Returns any statistics gathered by the coordinator associated with the execution of
   // this query
-  ExecStats* exec_stats() { return exec_stats_.get(); }
+  virtual ExecStats* exec_stats() { return exec_stats_.get(); }
 
  private:
   // plan service-related
