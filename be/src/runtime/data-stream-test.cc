@@ -65,7 +65,7 @@ class ImpalaBackend : public ImpalaBackendServiceIf {
 class DataStreamTest : public testing::Test {
  protected:
   DataStreamTest()
-    : test_env_(0),
+    : test_env_(1, 0),
       exec_(NULL, &test_env_) {
   }
 

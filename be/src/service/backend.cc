@@ -77,9 +77,9 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
 
   // start backends in process, listening on ports > backend_port
   VLOG(1) << "creating test env";
-  test_env = new TestEnv(FLAGS_backend_port + 1);
+  test_env = new TestEnv(2, FLAGS_backend_port + 1);
   VLOG(1) << "starting backends";
-  test_env->StartBackends(2);
+  test_env->StartBackends();
 
   return JNI_VERSION_1_4;
 }

@@ -33,6 +33,8 @@ message(STATUS ${Boost_LIBRARIES})
 find_package(JNI REQUIRED)
 include_directories(${JNI_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${JNI_LIBRARIES})
+message(STATUS ${JNI_INCLUDE_DIRS})
+message(STATUS ${JNI_LIBRARIES})
 
 # find HDFS headers and libs
 find_package(HDFS REQUIRED)

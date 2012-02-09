@@ -47,6 +47,7 @@ target_link_libraries(backend
 add_executable(runquery 
   run-query.cc
 )
+
 # Make sure to specify link libraries in reverse order of dependency
 # (ie, if libA uses symbols from libB, libA must precede libB), otherwise
 # when linking statically the linker won't look for the needed symbols.
@@ -74,3 +75,31 @@ target_link_libraries(runquery
   tcmallocstatic
   pprofstatic
 )
+
+add_executable(impalad
+  impalad-main.cc
+)
+
+# multiple alternating includes of Opcode and Exprs libs necessary to get symbols resolve (why?)
+target_link_libraries(impalad
+  TestUtil
+  Service
+  Exec
+  Exprs
+  Opcode
+  Exprs
+  Runtime
+  Common
+  Util
+  thrift
+  ImpalaThrift
+  Service
+  Exprs
+  Opcode
+  Exprs
+  ${Boost_LIBRARIES}  
+  gflagsstatic
+  tcmallocstatic
+  pprofstatic
+)
+

@@ -139,14 +139,16 @@ int main(int argc, char** argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);
 
   JniUtil::InitLibhdfs();
-  TestEnv* test_env = new TestEnv(FLAGS_backend_port + 1);
+  TestEnv* test_env = new TestEnv(
+      FLAGS_num_nodes > 0 ? FLAGS_num_nodes : 4, FLAGS_backend_port + 1);
   DataStreamMgr* stream_mgr = NULL;
   if (FLAGS_num_nodes != 1) {
     stream_mgr = new DataStreamMgr();
+    // start backend service to feed stream_mgr
     TServer* server = StartImpalaBackendService(
         stream_mgr, test_env->fs_cache(), FLAGS_backend_port);
     thread server_thread = thread(&RunServer, server);
-    test_env->StartBackends(FLAGS_num_nodes > 0 ? FLAGS_num_nodes : 4);
+    test_env->StartBackends();
   }
   EXIT_IF_ERROR(JniUtil::Init());
   if (FLAGS_init_hbase) {

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-# Starts up a three-node single-process cluster; the NN listens on port 20000.
+# Starts up a three-node single-process cluster; the NN listens on port 20500.
 
 ./kill-mini-dfs.sh > /dev/null 2>&1
 

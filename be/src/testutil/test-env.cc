@@ -2,6 +2,7 @@
 
 #include "testutil/test-env.h"
 
+#include <boost/algorithm/string.hpp>
 #include <server/TServer.h>
 #include <protocol/TBinaryProtocol.h>
 #include <transport/TSocket.h>
@@ -20,6 +21,8 @@ using namespace apache::thrift;
 using namespace apache::thrift::server;
 using namespace apache::thrift::transport;
 using namespace apache::thrift::protocol;
+
+DEFINE_string(backends, "", "comma-separated list of <host:port> pairs");
 
 namespace impala {
 
@@ -69,9 +72,12 @@ struct TestEnv::BackendInfo {
   BackendInfo(): server(NULL) {}
 };
 
-TestEnv::TestEnv(int start_port)
+TestEnv::TestEnv(int num_backends, int start_port)
   : fs_cache_(new HdfsFsCache()),
+    num_backends_(num_backends),
     start_port_(start_port) {
+  DCHECK_GT(num_backends_, 0);
+  InitClientCache();
 }
 
 TestEnv::~TestEnv() {
@@ -91,12 +97,32 @@ TestEnv::~TestEnv() {
   }
 }
 
-Status TestEnv::StartBackends(int num_backends) {
-  LOG(INFO) << "starting " << num_backends << " backends";
-  DCHECK_GT(num_backends, 0);
+void TestEnv::InitClientCache() {
+  if (!FLAGS_backends.empty()) {
+    vector<string> hostports;
+    split(hostports, FLAGS_backends, is_any_of(","));
+    for (int i = 0; i < hostports.size(); ++i) {
+      int pos = hostports[i].find(':');
+      if (pos == string::npos) {
+        LOG(ERROR) << "ignore backend " << hostports[i] << ": missing ':'";
+        continue;
+      }
+      string host = hostports[i].substr(0, pos);
+      int port = atoi(hostports[i].substr(pos + 1).c_str());
+      client_cache_[make_pair(host, port)] = list<ClientInfo*>();
+    }
+  } else {
+    for (int i = 0; i < num_backends_; ++i) {
+      client_cache_[make_pair("localhost", start_port_ + i)] = list<ClientInfo*>();
+    }
+  }
+}
+
+Status TestEnv::StartBackends() {
+  if (!FLAGS_backends.empty()) return Status::OK;
+  LOG(INFO) << "starting " << num_backends_ << " backends";
   int port = start_port_;
-  for (int i = 0; i < num_backends; ++i) {
-    client_cache_[make_pair("localhost", port)] = list<ClientInfo*>();
+  for (int i = 0; i < num_backends_; ++i) {
     BackendInfo* info = new BackendInfo();
     info->server = StartImpalaBackendService(&info->stream_mgr, fs_cache_.get(), port++);
     DCHECK(info->server != NULL);

@@ -22,14 +22,15 @@ class ImpalaBackendServiceClient;
 // Create environment for single-process distributed query execution.
 class TestEnv {
  public:
-  TestEnv(int start_port);
+  TestEnv(int num_backends, int start_port);
 
   // Stop backend threads.
   ~TestEnv();
 
-  // Start backends in separate threads; each one exports ImpalaBackendService
-  // Thrift service.
-  Status StartBackends(int num_backends);
+  // If FLAGS_backends is not set, starts backends in separate threads; each one
+  // exports ImpalaBackendService Thrift service.
+  // If FLAGS_backends is set, does nothing.
+  Status StartBackends();
 
   // Return "num_backends" clients.
   // Returned clients are owned by TestEnv and must not be deallocated.
@@ -45,6 +46,7 @@ class TestEnv {
 
  private:
   boost::scoped_ptr<HdfsFsCache> fs_cache_;
+  int num_backends_;
   int start_port_;
 
   struct BackendInfo;
@@ -66,6 +68,10 @@ class TestEnv {
   typedef boost::unordered_map<ImpalaBackendServiceClient*, ClientInfo*> ClientMap;
   ClientMap client_map_;
 
+  // Initializes client_cache_ according to FLAGS_backends/num_backends_
+  void InitClientCache();
+
+  // Wrapper for server->serve().
   void RunBackendServer(apache::thrift::server::TServer* server);
 };
 

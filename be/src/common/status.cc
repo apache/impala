@@ -81,10 +81,10 @@ string Status::GetErrorMsg() const {
 void Status::ToThrift(TStatus* status) {
   status->error_msgs.clear();
   if (error_detail_ == NULL) {
-    status->status_code = 0;
+    status->status_code = TStatusCode::OK;
   } else {
-    // TODO: use codes in Status::ErrorDetail, similar to java exception types
-    status->status_code = 1;
+    // TODO: add a TStatusCode Status::ErrorDetail::status_code
+    status->status_code = TStatusCode::INTERNAL_ERROR;
     for (int i = 0; i < error_detail_->error_msgs.size(); ++i) {
       status->error_msgs.push_back(error_detail_->error_msgs[i]);
     }
