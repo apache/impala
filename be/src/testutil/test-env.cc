@@ -8,6 +8,7 @@
 #include <transport/TSocket.h>
 #include <transport/TTransportUtils.h>
 #include <glog/logging.h>
+#include <gflags/gflags.h>
 
 #include "common/status.h"
 #include "service/backend-service.h"
