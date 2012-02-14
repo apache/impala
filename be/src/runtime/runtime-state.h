@@ -19,7 +19,7 @@ class ObjectPool;
 class Status;
 class DataStreamMgr;
 
-// A collection of items that are part of the global state of a 
+// A collection of items that are part of the global state of a
 // query and potentially shared across execution nodes.
 class RuntimeState {
  public:
@@ -73,7 +73,7 @@ class RuntimeState {
 
  private:
   static const int DEFAULT_BATCH_SIZE = 1024;
-  static const int DEFAULT_FILE_BUFFER_SIZE = 128 * 1024;
+  static const int DEFAULT_FILE_BUFFER_SIZE = 1024 * 1024;
 
   DescriptorTbl* desc_tbl_;
   boost::scoped_ptr<ObjectPool> obj_pool_;
