@@ -59,7 +59,9 @@ HdfsTextScanNode::HdfsTextScanNode(ObjectPool* pool, const TPlanNode& tnode,
       num_materialized_slots_(0),
       boundary_row_(partition_key_pool_.get()),
       boundary_column_(partition_key_pool_.get()),
-      text_converter_(NULL) {
+      text_converter_(NULL),
+      column_idx_(0),
+      slot_idx_(0) {
   // Initialize partition key regex
   Status status = Init(pool, tnode);
   DCHECK(status.ok()) << "HdfsTextScanNode c'tor:Init failed: \n" << status.GetErrorMsg();
@@ -69,7 +71,7 @@ Status HdfsTextScanNode::Init(ObjectPool* pool, const TPlanNode& tnode) {
   try {
     partition_key_regex_ = regex(tnode.hdfs_scan_node.partition_key_regex);
   } catch(bad_expression&) {
-    std::stringstream ss;
+    stringstream ss;
     ss << "HdfsTextScanNode::Init(): "
        << "Invalid regex: " << tnode.hdfs_scan_node.partition_key_regex;
     return Status(ss.str());
@@ -79,8 +81,8 @@ Status HdfsTextScanNode::Init(ObjectPool* pool, const TPlanNode& tnode) {
 
 // HDFS will set errno on error.  Append this to message for better diagnostic messages.
 static string AppendHdfsErrorMessage(const string& message) {
-  std::stringstream ss;
-  ss << message << " Error(" << errno << "): " << strerror(errno);
+  stringstream ss;
+  ss << message << "\nError(" << errno << "): " << strerror(errno);
   return ss.str();
 }
 
@@ -120,7 +122,7 @@ Status HdfsTextScanNode::Prepare(RuntimeState* state) {
 
   // Next, set mapping from column index to slot index for all slots in the query.
   // We also set the key_idx_to_slot_idx_ to mapping for materializing partition keys.
-  const std::vector<SlotDescriptor*>& slots = tuple_desc_->slots();
+  const vector<SlotDescriptor*>& slots = tuple_desc_->slots();
   for (size_t i = 0; i < slots.size(); i++) {
     if (!slots[i]->is_materialized()) continue;
     if (hdfs_table->IsClusteringCol(slots[i])) {
@@ -163,6 +165,11 @@ Status HdfsTextScanNode::Prepare(RuntimeState* state) {
   tmp[0] = field_delim_;
   tmp[1] = collection_item_delim_;
   xmm_field_search_ = _mm_loadu_si128(reinterpret_cast<__m128i*>(tmp));
+
+  current_range_remaining_len_ = 0;
+  current_range_idx_ = -1;
+  current_file_scan_ranges_ = per_file_scan_ranges_.begin();
+
   return Status::OK;
 }
 
@@ -176,11 +183,96 @@ Status HdfsTextScanNode::Open(RuntimeState* state) {
 }
 
 Status HdfsTextScanNode::Close(RuntimeState* state) {
+  DCHECK(hdfs_file_ == NULL);
+  return Status::OK;
+}
+
+Status HdfsTextScanNode::CloseCurrentFile(RuntimeState* state) {
+  if (hdfs_file_ == NULL) return Status::OK;
+  int hdfs_ret = hdfsCloseFile(hdfs_connection_, hdfs_file_);
+  const string& path = current_file_scan_ranges_->first;
+  if (hdfs_ret != 0) {
+    return Status(AppendHdfsErrorMessage("Failed to close HDFS file " + path));
+  }
+  // Report number of errors encountered in the current file, if any.
+  if (num_errors_in_file_ > 0) {
+    state->ReportFileErrors(path, num_errors_in_file_);
+  }
+  hdfs_file_ = NULL;
+  return Status::OK;
+}
+
+Status HdfsTextScanNode::HdfsRead(RuntimeState* state, int size) {
+  DCHECK_GE(size, 0);
+  DCHECK(hdfs_file_ != NULL);
+  if (!reuse_file_buffer_) {
+    file_buffer_ = file_buffer_pool_->Allocate(state->file_buffer_size());
+    reuse_file_buffer_ = true;
+  } 
+  file_buffer_read_size_ = hdfsRead(hdfs_connection_, hdfs_file_, file_buffer_, size);
+  if (file_buffer_read_size_ == -1) {
+    return Status(AppendHdfsErrorMessage("Failed to read from hdfs."));
+  }
+  file_buffer_end_ = file_buffer_ + file_buffer_read_size_;
+  file_buffer_ptr_ = file_buffer_;
+  return Status::OK;
+}
+
+Status HdfsTextScanNode::InitCurrentFile(RuntimeState* state) {
+  DCHECK(hdfs_file_ == NULL);
+  DCHECK(current_file_scan_ranges_ != per_file_scan_ranges_.end());
+  const string& path = current_file_scan_ranges_->first;
+  hdfs_file_ = hdfsOpenFile(hdfs_connection_, path.c_str(), O_RDONLY, 0, 0, 0);
+  if (hdfs_file_ == NULL) {
+    return Status(AppendHdfsErrorMessage("Failed to open HDFS file " + path));
+  }
+
+  // Extract partition keys from this file path.
+  RETURN_IF_ERROR(ExtractPartitionKeyValues(state));
+  num_errors_in_file_ = 0;
+  current_range_idx_ = 0;
+  VLOG(1) << "HdfsTextScanNode: opened file " << path;
+  return Status::OK;
+}
+
+// Move onto next range, seeking to the offset.  Begin scanning the buffer until
+// we find the start of the first full tuple.
+Status HdfsTextScanNode::InitCurrentScanRange(RuntimeState* state) {
+  DCHECK_LT(current_range_idx_, current_file_scan_ranges_->second.size());
+  ScanRange& range = current_file_scan_ranges_->second[current_range_idx_];
+  current_range_remaining_len_ = range.length;
+
+  if (hdfsSeek(hdfs_connection_, hdfs_file_, range.offset) != 0) {
+    stringstream ss;
+    ss << "Failed to seek to " << range.offset << " for file " << current_file_scan_ranges_->first;
+    return Status(AppendHdfsErrorMessage(ss.str()));
+  }
+    
+  int read_size = min(state->file_buffer_size(), current_range_remaining_len_);
+  RETURN_IF_ERROR(HdfsRead(state, read_size));
+
+  if (range.offset != 0) {
+    int first_tuple_offset = FindFirstTupleStart(file_buffer_, file_buffer_read_size_);
+    DCHECK_LE(first_tuple_offset, read_size);
+    file_buffer_ptr_ += first_tuple_offset;
+    current_range_remaining_len_ -= first_tuple_offset;
+  }
+  
+  // These state fields cannot be split across ranges
+  column_idx_ = 0;
+  slot_idx_ = 0;
+  last_char_is_escape_ = false;
+  current_column_has_escape_ = false;
+  error_in_row_ = false;
+  
+  boundary_column_.Clear();
+  boundary_row_.Clear();
+
   return Status::OK;
 }
 
 Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
-  if (ReachedLimit()) {
+  if (ReachedLimit() || per_file_scan_ranges_.empty()) {
     *eos = true;
     return Status::OK;
   }
@@ -190,126 +282,148 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
   tuple_buffer_ = tuple_pool_->Allocate(tuple_buffer_size_);
   bzero(tuple_buffer_, tuple_buffer_size_);
   tuple_ = reinterpret_cast<Tuple*>(tuple_buffer_);
-
+  
   // Index into current row in row_batch.
   int row_idx = RowBatch::INVALID_ROW_INDEX;
-
-  while (file_idx_ < files_.size()) {
-    // Did we finish reading the previous file? if so, open next file
-    if (file_buffer_read_size_ == 0) {
-      hdfs_file_ =
-          hdfsOpenFile(hdfs_connection_, files_[file_idx_].c_str(), O_RDONLY, 0, 0, 0);
-      if (hdfs_file_ == NULL) {
-        return Status(AppendHdfsErrorMessage("Failed to open HDFS file " + files_[file_idx_]));
-      }
-      // Extract partition keys from this file path.
-      RETURN_IF_ERROR(ExtractPartitionKeyValues(state));
-      num_errors_in_file_ = 0;
-      VLOG(1) << "HdfsTextScanNode: opened file " << files_[file_idx_];
-
-      // These state fields cannot be split across files
-      column_idx_ = 0;
-      slot_idx_ = 0;
-      last_char_is_escape_ = false;
-      current_column_has_escape_ = false;
-      error_in_row_ = false;
-    }
-
-    do {
-      // Did we finish parsing the last file buffer? if so, read the next one
-      // Note: we set file_buffer_ptr_ == file_buffer_end_ in Prepare() to read the
-      // first file block
-      if (file_buffer_ptr_ == file_buffer_end_) {
-        if (!reuse_file_buffer_) {
-          file_buffer_ = file_buffer_pool_->Allocate(state->file_buffer_size());
-          reuse_file_buffer_ = true;
-        } 
-        file_buffer_read_size_ =
-            hdfsRead(hdfs_connection_, hdfs_file_, file_buffer_,
-                     state->file_buffer_size());
-        VLOG(1) << "HdfsTextScanNode: read " << file_buffer_read_size_
-                << " bytes in file " << files_[file_idx_];
-        file_buffer_ptr_ = file_buffer_;
-        file_buffer_end_ = file_buffer_ + file_buffer_read_size_;
-      }
-
-      // Parses (or resumes parsing) the current file buffer,
-      // appending tuples into the tuple buffer until:
-      // a) file buffer has been completely parsed or
-      // b) tuple buffer is full
-      // c) a parsing error was encountered and the user requested to abort on errors.
-      int previous_num_rows = num_rows_returned_;
-      // With two pass approach, we need to save some of the state before any of the file
-      // was parsed
-      char* col_start = NULL;
-      char* line_start = file_buffer_ptr_;
-      int num_tuples = 0;
-      int num_fields = 0;
-      int max_tuples = row_batch->capacity() - row_batch->num_rows();
-      RETURN_IF_ERROR(ParseFileBuffer(max_tuples, &num_tuples, &num_fields, &col_start));
-      if (num_fields != 0) {
-        RETURN_IF_ERROR(WriteFields(state, row_batch, num_fields, &row_idx, &line_start));
-      } else if (num_tuples != 0) {
-        RETURN_IF_ERROR(WriteTuples(state, row_batch, num_tuples, &row_idx, &line_start));
-      }
-      // Save contents that are split across files
-      if (col_start != file_buffer_ptr_) {
-        boundary_column_.Append(col_start, file_buffer_ptr_ - col_start);
-        boundary_row_.Append(line_start, file_buffer_ptr_ - line_start);
-      }
-      
-      // TODO: does it ever make sense to deep copy some of the tuples (string data) if the
-      // number of tuples in this batch is very small?
-      // Cannot reuse file buffer if there are non-copied string slots materialized
-      if (num_rows_returned_ > previous_num_rows &&
-          !tuple_desc_->string_slots().empty()) {
-        reuse_file_buffer_ = false;
-      } 
-      
-      if (!ReachedLimit() && row_batch->IsFull()) {
-        // If we've reached our limit, continue on to close the current file.
-        // Otherwise simply return, the next GetNext() call will pick up where we
-        // left off.
-        // Hang on to the last chunks, we'll continue from there in the next
-        // GetNext() call.
-        row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), true);
-        if (!reuse_file_buffer_) {
-          row_batch->tuple_data_pool()->AcquireData(file_buffer_pool_.get(), true);
-          file_buffer_ = NULL;
+  
+  // Loops until all the scan ranges are complete or batch is full
+  // This loop contains a small state machine:
+  //  1. file_buffer_ptr_ != file_buffer_end_: no need to read more, process what's in
+  //     the read buffer.
+  //  2. current_range_remaining_len_ > 0: keep reading from the current file location
+  //  3. current_range_remaining_len_ == 0: done with current range but might need more
+  //     to complete the last tuple.
+  //  4. current_range_remaining_len_ < 0: Reading past this scan range to finish tuple
+  while (true) {
+    if (file_buffer_ptr_ == file_buffer_end_) {
+      if (current_range_remaining_len_ < 0) {
+        // We want to minimize how much we read next.  It is past the end of this block
+        // and likely on another node.   
+        // TODO: Set it to be the average size of a row
+        RETURN_IF_ERROR(HdfsRead(state, NEXT_BLOCK_READ_SIZE));
+        if (file_buffer_read_size_ == 0) {
+          // TODO: log an error, we have an incomplete tuple at the end of the file
+          current_range_remaining_len_ = 0;
+          slot_idx_ = 0;
+          boundary_column_.Clear();
+          continue;
         }
-        *eos = false;
-        return Status::OK;
+      } else {
+        if (current_range_remaining_len_ == 0) {
+          // Check if a tuple is straddling this block and the next:
+          //  1. boundary_column_ is not empty
+          //  2. slot_idx_ != 0 (the block is split at a col break but not a tuple break).
+          // We need to continue scanning until the end of the tuple
+          if (!boundary_column_.Empty() || slot_idx_ != 0) {
+            current_range_remaining_len_ = -1;
+            continue;
+          }
+
+          // Current range is done, advance to the next range/next file
+          ++current_range_idx_;
+
+          // Move onto next file
+          if (current_range_idx_ == current_file_scan_ranges_->second.size()) {
+            RETURN_IF_ERROR(CloseCurrentFile(state));
+            ++current_file_scan_ranges_;
+            if (current_file_scan_ranges_ == per_file_scan_ranges_.end()) {
+              // Done with all files
+              break;
+            }
+            RETURN_IF_ERROR(InitCurrentFile(state));
+          } else if (hdfs_file_ == NULL) {
+            RETURN_IF_ERROR(InitCurrentFile(state));
+          }
+          // Initialize the scan range
+          InitCurrentScanRange(state);
+        } else {
+          // Continue reading from the current file location
+          DCHECK_GE(current_range_remaining_len_, 0);
+          int read_size = min(state->file_buffer_size(), current_range_remaining_len_);
+          RETURN_IF_ERROR(HdfsRead(state, read_size));
+        }
       }
-    } while (!ReachedLimit() && file_buffer_read_size_ > 0);
-    // Close current file.
-    int hdfs_ret = hdfsCloseFile(hdfs_connection_, hdfs_file_);
-    if (hdfs_ret != 0) {
-      return Status(AppendHdfsErrorMessage("Failed to close HDFS file " + files_[file_idx_]));
+    }
+      
+    // Parses (or resumes parsing) the current file buffer, appending tuples into 
+    // the tuple buffer until:
+    // a) file buffer has been completely parsed or
+    // b) tuple buffer is full
+    // c) a parsing error was encountered and the user requested to abort on errors.
+    int previous_num_rows = num_rows_returned_;
+    // With two pass approach, we need to save some of the state before any of the file
+    // was parsed
+    char* col_start = NULL;
+    char* line_start = file_buffer_ptr_;
+    int num_tuples = 0;
+    int num_fields = 0;
+    int max_tuples = row_batch->capacity() - row_batch->num_rows();
+    // We are done with the current scan range, just parse for one more tuple to finish
+    // it off
+    if (current_range_remaining_len_ < 0) {
+      max_tuples = 1;
+    }
+    RETURN_IF_ERROR(ParseFileBuffer(max_tuples, &num_tuples, &num_fields, &col_start));
+    int bytes_processed = file_buffer_ptr_ - line_start;
+    current_range_remaining_len_ -= bytes_processed;
+    DCHECK_GT(bytes_processed, 0);
+
+    if (num_fields != 0) {
+      RETURN_IF_ERROR(WriteFields(state, row_batch, num_fields, &row_idx, &line_start));
+    } else if (num_tuples != 0) {
+      RETURN_IF_ERROR(WriteTuples(state, row_batch, num_tuples, &row_idx, &line_start));
     }
 
-    // Report number of errors encountered in the current file, if any.
-    if (num_errors_in_file_ > 0) {
-      state->ReportFileErrors(files_[file_idx_], num_errors_in_file_);
-    }
-
-    // if we hit our limit, return now, after having closed the current file
-    // and cleaned up the pools
     if (ReachedLimit()) {
-      row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), false);
-      row_batch->tuple_data_pool()->AcquireData(file_buffer_pool_.get(), false);
-      *eos = true;
+      RETURN_IF_ERROR(CloseCurrentFile(state));
+      break;
+    }
+
+    // Save contents that are split across files
+    if (col_start != file_buffer_ptr_) {
+      boundary_column_.Append(col_start, file_buffer_ptr_ - col_start);
+      boundary_row_.Append(line_start, file_buffer_ptr_ - line_start);
+    }
+    
+    if (current_range_remaining_len_ < 0) {
+      DCHECK_LE(num_tuples, 1);
+      // Just finished off this scan range
+      if (num_tuples == 1) {
+        DCHECK(boundary_column_.Empty());
+        DCHECK(slot_idx_ == 0);
+        current_range_remaining_len_ = 0;
+        file_buffer_ptr_ = file_buffer_end_;
+      }
+    }
+
+    // TODO: does it ever make sense to deep copy some of the tuples (string data) if the
+    // number of tuples in this batch is very small?
+    // Cannot reuse file buffer if there are non-copied string slots materialized
+    if (num_rows_returned_ > previous_num_rows &&
+        !tuple_desc_->string_slots().empty()) {
+      reuse_file_buffer_ = false;
+    } 
+    
+    // If the batch is full, return and the next GetNext() call will pick up where we 
+    // left off. 
+    // Otherwise, continue parsing the current scan range.
+    // Hang on to the last chunks, we'll continue from there in the next
+    // GetNext() call.
+    if (row_batch->IsFull()) {
+      row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), true);
+      if (!reuse_file_buffer_) {
+        row_batch->tuple_data_pool()->AcquireData(file_buffer_pool_.get(), true);
+        file_buffer_ = NULL;
+      }
+      *eos = false;
       return Status::OK;
     }
-
-    // Move on to next file.
-    ++file_idx_;
-  }
+  } 
 
   // No more work to be done. Clean up all pools with the last row batch.
-  row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), false);
-  row_batch->tuple_data_pool()->AcquireData(file_buffer_pool_.get(), false);
+  row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), ReachedLimit());
+  row_batch->tuple_data_pool()->AcquireData(file_buffer_pool_.get(), ReachedLimit());
 
-  // We have read all partitions (tuple buffer not necessarily full).
   *eos = true;
   return Status::OK;
 }
@@ -659,7 +773,7 @@ Status HdfsTextScanNode::WriteFields(RuntimeState* state, RowBatch* row_batch, i
         ReportRowParseError(state, *line_start, next_line_offset - 1);
         error_in_row_ = false;
         if (state->abort_on_error()) {
-          state->ReportFileErrors(files_[file_idx_], 1);
+          state->ReportFileErrors(current_file_scan_ranges_->first, 1);
           return Status("Aborted HdfsScanNode due to parse errors.  View error log for details.");
         }
       }
@@ -715,18 +829,30 @@ void HdfsTextScanNode::CopyBoundaryField(ParseData* data) {
   data->len = total_len;
 }
 
-void HdfsTextScanNode::DebugString(int indentation_level, std::stringstream* out) const {
+void HdfsTextScanNode::DebugString(int indentation_level, stringstream* out) const {
+  vector<string> ranges;
+  map<string, vector<ScanRange> >::const_iterator file;
+  for (file = per_file_scan_ranges_.begin(); file != per_file_scan_ranges_.end(); ++file) {
+    for (int i = 0; i < file->second.size(); ++i) {
+      stringstream ss;
+      const ScanRange& range = file->second[i];
+      ss << file->first << "(" << range.offset << ", " << range.length << ")";
+      ranges.push_back(ss.str());
+    } 
+  }
+
   *out << string(indentation_level * 2, ' ')
-       << "HdfsTextScanNode(tupleid=" << tuple_id_ << " files[" << join(files_, ",")
+       << "HdfsTextScanNode(tupleid=" << tuple_id_ 
+       << " scan ranges[" << join(ranges, ",") << "]"
        << " regex=" << partition_key_regex_ << " ";
   ExecNode::DebugString(indentation_level, out);
-  *out << "])" << endl;
+  *out << ")" << endl;
 }
 
 void HdfsTextScanNode::ReportRowParseError(RuntimeState* state, char* line_start, int len) {
   ++num_errors_in_file_;
   if (state->LogHasSpace()) {
-    state->error_stream() << "file: " << files_[file_idx_] << endl;
+    state->error_stream() << "file: " << current_file_scan_ranges_->first << endl;
     state->error_stream() << "line: ";
     if (!boundary_row_.Empty()) {
       // Log the beginning of the line from the previous file buffer(s)
@@ -741,21 +867,27 @@ void HdfsTextScanNode::ReportRowParseError(RuntimeState* state, char* line_start
 void HdfsTextScanNode::SetScanRange(const TScanRange& scan_range) {
   DCHECK(scan_range.__isset.hdfsFileSplits);
   for (int i = 0; i < scan_range.hdfsFileSplits.size(); ++i) {
-    files_.push_back(scan_range.hdfsFileSplits[i].path);
-    // TODO: take into account offset and length 
+    const THdfsFileSplit& split = scan_range.hdfsFileSplits[i];
+    const string& path = split.path;
+    if (per_file_scan_ranges_.find(path) == per_file_scan_ranges_.end()) {
+      per_file_scan_ranges_[path] = vector<ScanRange>();
+    } 
+    // TODO: collapse adjacent blocks.  This makes the parsing a bit more
+    // efficient.
+    per_file_scan_ranges_[path].push_back(ScanRange(split.offset, split.length));
   }
 }
 
 Status HdfsTextScanNode::ExtractPartitionKeyValues(RuntimeState* state) {
-  DCHECK_LT(file_idx_, files_.size());
   if (key_idx_to_slot_idx_.size() == 0) return Status::OK;
+
+  const string& file = current_file_scan_ranges_->first;
 
   partition_key_template_tuple_ = 
       reinterpret_cast<Tuple*>(partition_key_pool_->Allocate(tuple_desc_->byte_size()));
   memset(partition_key_template_tuple_, 0, tuple_desc_->byte_size());
 
   smatch match;
-  const string& file = files_[file_idx_];
   if (boost::regex_search(file, match, partition_key_regex_)) {
     for (int i = 0; i < key_idx_to_slot_idx_.size(); ++i) {
       int regex_idx = key_idx_to_slot_idx_[i].first + 1; //match[0] is input string
@@ -776,7 +908,7 @@ Status HdfsTextScanNode::ExtractPartitionKeyValues(RuntimeState* state) {
         value = expr_value.TryParse(string_value, type);
       }
       if (value == NULL) {
-        std::stringstream ss;
+        stringstream ss;
         ss << "file name'" << file << "' does not have the correct format. "
            << "Partition key: " << string_value << " is not of type: "
            << TypeToString(type);
@@ -789,9 +921,79 @@ Status HdfsTextScanNode::ExtractPartitionKeyValues(RuntimeState* state) {
     return Status::OK;
   }
   
-  std::stringstream ss;
+  stringstream ss;
   ss << "file name '" << file << "' " 
      << "does not match partition key regex (" << partition_key_regex_ << ")";
   return Status(ss.str());
+}
+
+// Find the start of the first full tuple in buffer by looking for the end of
+// the previous tuple.
+// TODO: most of this is not tested.  We need some tailored data to exercise the boundary 
+// cases
+int HdfsTextScanNode::FindFirstTupleStart(char* buffer, int len) {
+  int tuple_start = 0;
+  char* buffer_start = buffer;
+  while (tuple_start < len) {
+    if (CpuInfo::Instance()->IsSupported(CpuInfo::SSE4_2)) {
+      __m128i xmm_buffer, xmm_tuple_mask;
+      while (len - tuple_start >= SSEUtil::CHARS_PER_128_BIT_REGISTER) {
+        // TODO: can we parallelize this as well?  Are there multiple sse execution units?
+        // Load the next 16 bytes into the xmm register and do strchr for the 
+        // tuple delimiter.
+        xmm_buffer = _mm_loadu_si128(reinterpret_cast<__m128i*>(buffer));
+        xmm_tuple_mask = _mm_cmpistrm(xmm_tuple_search_, xmm_buffer, SSEUtil::STRCHR_MODE);
+        int tuple_mask = _mm_extract_epi16(xmm_tuple_mask, 0);
+        if (tuple_mask != 0) {
+          for (int i = 0; i < SSEUtil::CHARS_PER_128_BIT_REGISTER; ++i) {
+            if ((tuple_mask & SSEUtil::SSE_BITMASK[i]) != 0) {
+              tuple_start += i + 1;
+              buffer += i + 1;
+              goto end;
+            }
+          }
+        }
+        tuple_start += SSEUtil::CHARS_PER_128_BIT_REGISTER;
+        buffer += SSEUtil::CHARS_PER_128_BIT_REGISTER;
+      }
+    } else {
+      for (int i = tuple_start; i < len; ++i) {
+        char c = *buffer++;
+        if (c == tuple_delim_) {
+          tuple_start = i + 1;
+          goto end;
+        }
+      }
+    }
+
+  end:
+    if (escape_char_ != '\0') {
+      // Scan backwards for escape characters.  We do this after finding the tuple break rather
+      // than during the (above) forward scan to make the forward scan faster.  This will 
+      // perform worse if there are many characters right before the tuple break that are all 
+      // escape characters, but that is unlikely.
+      int num_escape_chars = 0;
+      int before_tuple_end = tuple_start - 2;
+      for (; before_tuple_end >= 0; --before_tuple_end) {
+        if (buffer_start[before_tuple_end] == escape_char_) {
+          ++num_escape_chars;
+        } else {
+          break;
+        }
+      }
+      // TODO: This sucks.  All the preceding characters before the tuple delim were
+      // escape characters.  We need to read from the previous block to see what to do.
+      DCHECK_GT(before_tuple_end, 0);
+      
+      // An even number of escape characters means they cancel out and this tuple break
+      // is *not* escaped. 
+      if (num_escape_chars % 2 == 0) {
+        return tuple_start;
+      }
+    } else {
+      return tuple_start;
+    }
+  }
+  return tuple_start;
 }
 

@@ -94,6 +94,7 @@ target_link_libraries(impalad
   thrift
   ImpalaThrift
   Service
+  Exec
   Exprs
   Opcode
   Exprs

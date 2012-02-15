@@ -49,7 +49,7 @@ static void Exec(DataStreamMgr* stream_mgr, TestEnv* test_env) {
 
   // If the number of iterations is greater than 1, run once to Ignore JVM startup time.
   if (FLAGS_iterations > 1) {
-    QueryExecutor executor;
+    QueryExecutor executor(stream_mgr, test_env);
     EXIT_IF_ERROR(executor.Setup());
     EXIT_IF_ERROR(executor.Exec(FLAGS_query, NULL));
     while (true) {

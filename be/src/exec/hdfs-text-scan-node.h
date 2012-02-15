@@ -25,7 +25,6 @@ class TupleDescriptor;
 class MemPool;
 class Tuple;
 class SlotDescriptor;
-class stringstream;
 class Expr;
 class TextConverter;
 class TScanRange;
@@ -85,11 +84,34 @@ class HdfsTextScanNode : public ScanNode {
   const static int POOL_INIT_SIZE = 4096;
   const static char DELIM_INIT = -1;
   const static int SKIP_COLUMN = -1;
+  const static int NEXT_BLOCK_READ_SIZE = 1024; //bytes
 
   // Parser configuration parameters:
 
-  // List of HDFS paths to read.
-  std::vector<std::string> files_;
+  // HDFS file scan ranges. 
+  struct ScanRange {
+    int offset;
+    int length; 
+    ScanRange(int o, int l) {
+      offset = o;
+      length = l;
+    }
+  };
+
+  typedef std::map<std::string, std::vector<ScanRange> > ScanRanges;
+
+  // Map of <file, list of ranges> that needs to be read
+  ScanRanges per_file_scan_ranges_;
+
+  // Current file we're parsing
+  ScanRanges::iterator current_file_scan_ranges_;
+  
+  // Current range(block) index for the current file
+  int current_range_idx_;
+
+  // Bytes remaining to read for current range.  Will be < 0 if we are currently reading
+  // past the end to finish off a tuple
+  int current_range_remaining_len_;
 
   // Tuple id resolved in Prepare() to set tuple_desc_;
   TupleId tuple_id_;
@@ -292,11 +314,11 @@ class HdfsTextScanNode : public ScanNode {
   // Also, increments num_errors_in_file_.
   void ReportRowParseError(RuntimeState* state, char* line_start, int len);
 
-  // Prepends field data that is was from the previous file buffer (This field straddled two file
-  // buffers).  'data' already contains the pointer/len from the current file buffer, 
-  // boundary_column_ contains the beginning of the data from the previous file buffer.
-  // This function will allocate a new string from the tuple pool, concatenate the two pieces and
-  // update 'data' to contain the new pointer/len.
+  // Prepends field data that is was from the previous file buffer (This field 
+  // straddled two file buffers).  'data' already contains the pointer/len from the 
+  // current file buffer, boundary_column_ contains the beginning of the data from 
+  // the previous file buffer. This function will allocate a new string from the tuple 
+  // pool, concatenate the two pieces and update 'data' to contain the new pointer/len.
   void CopyBoundaryField(ParseData* data);
 
   // Initializes the scan node.  
@@ -308,6 +330,27 @@ class HdfsTextScanNode : public ScanNode {
   // The template tuple is valid for the current file.
   // Memory for tuple and tuple data comes from partition_key_pool_
   Status ExtractPartitionKeyValues(RuntimeState* state);
+
+  // Close the current file, reporting errors, if any, to the runtime state.
+  // Sets hdfs_file_ to NULL.
+  Status CloseCurrentFile(RuntimeState* state);
+
+  // Open and initialize the file at per_file_scan_ranges_.  Extracts the partition keys 
+  // for this file and resets per file counters.
+  Status InitCurrentFile(RuntimeState* state);
+
+  // Initializes the next scan range (block) for the current file.  This seeks to 
+  // the beginning of the block and advances to the start of the first full tuple.  
+  // Also, resets internal state for parsing the block.
+  Status InitCurrentScanRange(RuntimeState* state);
+
+  // Read 'size' bytes from the current hdfs file location to internal buffers. 
+  Status HdfsRead(RuntimeState* state, int size);
+
+  // Finds the start of the first tuple in buffer, scanning at most len chars ahead.
+  // Returns the number of bytes into buffer where the first tuple starts.
+  // Returns 'len' if there are no complete tuples in the buffer.
+  int FindFirstTupleStart(char* buffer, int len);
 };
 
 }
