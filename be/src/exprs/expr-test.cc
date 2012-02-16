@@ -521,22 +521,42 @@ TEST_F(ExprTest, CompoundPredicates) {
   TestValue("TRUE AND FALSE", TYPE_BOOLEAN, false);
   TestValue("FALSE AND TRUE", TYPE_BOOLEAN, false);
   TestValue("FALSE AND FALSE", TYPE_BOOLEAN, false);
+  TestValue("TRUE && TRUE", TYPE_BOOLEAN, true);
+  TestValue("TRUE && FALSE", TYPE_BOOLEAN, false);
+  TestValue("FALSE && TRUE", TYPE_BOOLEAN, false);
+  TestValue("FALSE && FALSE", TYPE_BOOLEAN, false);
   TestValue("TRUE OR TRUE", TYPE_BOOLEAN, true);
   TestValue("TRUE OR FALSE", TYPE_BOOLEAN, true);
   TestValue("FALSE OR TRUE", TYPE_BOOLEAN, true);
   TestValue("FALSE OR FALSE", TYPE_BOOLEAN, false);
+  TestValue("TRUE || TRUE", TYPE_BOOLEAN, true);
+  TestValue("TRUE || FALSE", TYPE_BOOLEAN, true);
+  TestValue("FALSE || TRUE", TYPE_BOOLEAN, true);
+  TestValue("FALSE || FALSE", TYPE_BOOLEAN, false);
   TestValue("NOT TRUE", TYPE_BOOLEAN, false);
   TestValue("NOT FALSE", TYPE_BOOLEAN, true);
+  TestValue("!TRUE", TYPE_BOOLEAN, false);
+  TestValue("!FALSE", TYPE_BOOLEAN, true);
   TestValue("TRUE AND (TRUE OR FALSE)", TYPE_BOOLEAN, true);
   TestValue("(TRUE AND TRUE) OR FALSE", TYPE_BOOLEAN, true);
   TestValue("(TRUE OR FALSE) AND TRUE", TYPE_BOOLEAN, true);
   TestValue("TRUE OR (FALSE AND TRUE)", TYPE_BOOLEAN, true);
   TestValue("TRUE AND TRUE OR FALSE", TYPE_BOOLEAN, true);
+  TestValue("TRUE && (TRUE || FALSE)", TYPE_BOOLEAN, true);
+  TestValue("(TRUE && TRUE) || FALSE", TYPE_BOOLEAN, true);
+  TestValue("(TRUE || FALSE) && TRUE", TYPE_BOOLEAN, true);
+  TestValue("TRUE || (FALSE && TRUE)", TYPE_BOOLEAN, true);
+  TestValue("TRUE && TRUE || FALSE", TYPE_BOOLEAN, true);
   TestIsNull("TRUE AND NULL", TYPE_BOOLEAN);
   TestValue("FALSE AND NULL", TYPE_BOOLEAN, false);
   TestValue("TRUE OR NULL", TYPE_BOOLEAN, true);
   TestIsNull("FALSE OR NULL", TYPE_BOOLEAN);
   TestIsNull("NOT NULL", TYPE_BOOLEAN);
+  TestIsNull("TRUE && NULL", TYPE_BOOLEAN);
+  TestValue("FALSE && NULL", TYPE_BOOLEAN, false);
+  TestValue("TRUE || NULL", TYPE_BOOLEAN, true);
+  TestIsNull("FALSE || NULL", TYPE_BOOLEAN);
+  TestIsNull("!NULL", TYPE_BOOLEAN);
 }
 
 TEST_F(ExprTest, IsNullPredicate) {

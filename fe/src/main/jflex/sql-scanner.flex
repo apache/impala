@@ -5,6 +5,7 @@ package com.cloudera.impala.analysis;
 import java_cup.runtime.Symbol;
 import java.lang.Integer;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Iterator;
 import java.util.List;
@@ -26,11 +27,14 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
 %column
 %{
   // map from keyword string to token id
+  // we use a linked hash map because the insertion order is important.
+  // for example, we want "and" to come after "&&" to make sure error reporting
+  // uses "and" as a display name and not "&&"
   private static final Map<String, Integer> keywordMap =
-      new HashMap<String, Integer>();
+      new LinkedHashMap<String, Integer>();
   static {
-    keywordMap.put("and", new Integer(SqlParserSymbols.KW_AND));
     keywordMap.put("&&", new Integer(SqlParserSymbols.KW_AND));
+    keywordMap.put("and", new Integer(SqlParserSymbols.KW_AND));    
     keywordMap.put("as", new Integer(SqlParserSymbols.KW_AS));
     keywordMap.put("asc", new Integer(SqlParserSymbols.KW_ASC));
     keywordMap.put("avg", new Integer(SqlParserSymbols.KW_AVG));
@@ -67,7 +71,8 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("max", new Integer(SqlParserSymbols.KW_MAX));
     keywordMap.put("not", new Integer(SqlParserSymbols.KW_NOT));
     keywordMap.put("null", new Integer(SqlParserSymbols.KW_NULL));
-    keywordMap.put("on", new Integer(SqlParserSymbols.KW_ON));
+    keywordMap.put("on", new Integer(SqlParserSymbols.KW_ON));    
+    keywordMap.put("||", new Integer(SqlParserSymbols.KW_OR));
     keywordMap.put("or", new Integer(SqlParserSymbols.KW_OR));    
     keywordMap.put("order", new Integer(SqlParserSymbols.KW_ORDER));
     keywordMap.put("outer", new Integer(SqlParserSymbols.KW_OUTER));
@@ -146,7 +151,7 @@ LineTerminator = \r|\n|\r\n
 NonTerminator = [^\r\n]
 Whitespace = {LineTerminator} | [ \t\f]
 
-IdentifierOrKw = [:jletter:][:jletterdigit:]*
+IdentifierOrKw = [:jletter:][:jletterdigit:]* | "&&" | "||"
 IntegerLiteral = [:digit:][:digit:]*
 SingleQuoteStringLiteral = \'([^\n\r\']|\\\\|\\\')*\'
 DoubleQuoteStringLiteral = \"([^\n\r\"]|\\\\|\\\")*\"

@@ -321,22 +321,43 @@ public class ParserTest {
     ParsesOk("select a, b, c from t where false and true");
   }
 
-  @Test public void TestCompoundPredicates() {
-    ParsesOk("select a, b, c from t where a = 5 and b = 6");
-    ParsesOk("select a, b, c from t where a = 5 or b = 6");
-    ParsesOk("select a, b, c from t where (a = 5 or b = 6) and c = 7");
-    ParsesOk("select a, b, c from t where not a = 5");
-    ParsesOk("select a, b, c from t where (not a = 5 or not b = 6) and not c = 7");
-    ParsesOk("select a, b, c from t where !a = 5");
-    ParsesOk("select a, b, c from t where (! a = 5 or ! b = 6) and ! c = 7");
-    ParsesOk("select a, b, c from t where (!(!a = 5))");
+  private void testCompoundPredicates(String andStr, String orStr, String notStr) {
+    // select a, b, c from t where a = 5 and b = 6
+    ParsesOk("select a, b, c from t where a = 5 " + andStr + " b = 6");
+    // select a, b, c from t where a = 5 or b = 6
+    ParsesOk("select a, b, c from t where a = 5 " + orStr + " b = 6");
+    // select a, b, c from t where (a = 5 or b = 6) and c = 7
+    ParsesOk("select a, b, c from t where (a = 5 " + orStr + " b = 6) " +
+        andStr + " c = 7");
+    // select a, b, c from t where not a = 5
+    ParsesOk("select a, b, c from t where " + notStr + "a = 5");
+    // select a, b, c from t where (not a = 5 or not b = 6) and not c = 7
+    ParsesOk("select a, b, c from t where (" + notStr + "a = 5 " + orStr + " " +
+        notStr + "b = 6) " + andStr + " " + notStr + "c = 7");
+    // select a, b, c from t where (!(!a = 5))
+    ParsesOk("select a, b, c from t where (" + notStr + "(" + notStr + "a = 5))");
     // unbalanced parentheses
-    ParserError("select a, b, c from t where (a = 5 or b = 6) and c = 7)");
-    ParserError("select a, b, c from t where ((a = 5 or b = 6) and c = 7");
+    ParserError("select a, b, c from t where (a = 5 " + orStr + " b = 6) " + andStr + " c = 7)");
+    ParserError("select a, b, c from t where ((a = 5 " + orStr + " b = 6) " + andStr + " c = 7");
     // incorrectly positioned negation (!)
-    ParserError("select a, b, c from t where a = !5");
-    ParserError("select a, b, c from t where a = 5 or !");
-    ParserError("select a, b, c from t where !(a = 5) or !");
+    ParserError("select a, b, c from t where a = " + notStr + "5");
+    ParserError("select a, b, c from t where a = 5 " + orStr + " " + notStr);
+    ParserError("select a, b, c from t where " + notStr + "(a = 5) " + orStr + " " + notStr);
+  }
+
+  @Test public void TestCompoundPredicates() {
+    String[] andStrs = { "and", "&&" };
+    String[] orStrs = { "or", "||" };
+    // Note the trailing space in "not ". We want to test "!" without a space.
+    String[] notStrs = { "!", "not " };
+    // Test all combinations of representations for 'or', 'and', and 'not'.
+    for (String andStr : andStrs) {
+      for (String orStr : orStrs) {
+        for (String notStr : notStrs) {
+          testCompoundPredicates(andStr, orStr, notStr);
+        }
+      }
+    }
   }
 
   @Test public void TestSlotRef() {
