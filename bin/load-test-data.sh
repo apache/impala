@@ -5,6 +5,10 @@ bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 . "$bin"/impala-config.sh
 
+pushd ${IMPALA_HOME}/testdata/bin
+./load-hive-builtins.sh
+popd
+
 set -e
 
 hive_args="-hiveconf hive.root.logger=WARN,console -v -f"
