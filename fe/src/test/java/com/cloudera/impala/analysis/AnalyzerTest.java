@@ -879,6 +879,13 @@ public class AnalyzerTest {
   }
 
   @Test
+  public void TestNestedFunctions() {
+    AnalyzesOk("select sin(pi())");
+    AnalyzesOk("select sin(cos(pi()))");
+    AnalyzesOk("select sin(cos(tan(e())))");
+  }
+
+  @Test
   public void TestInsert() {
     testInsertStatic(true);
     testInsertStatic(false);

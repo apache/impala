@@ -48,6 +48,7 @@ public class FunctionCallExpr extends Expr {
 
     PrimitiveType[] argTypes = new PrimitiveType[this.children.size()];
     for (int i = 0; i < this.children.size(); ++i) {
+      this.children.get(i).analyze(analyzer);
       argTypes[i] = this.children.get(i).getType();
     }
     OpcodeRegistry.Signature match =

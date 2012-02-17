@@ -1,6 +1,7 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 #include <string>
+#include <math.h>
 #include <boost/unordered_map.hpp>
 #include <gtest/gtest.h>
 #include <boost/lexical_cast.hpp>
@@ -22,7 +23,6 @@
 #include "exprs/literal-predicate.h"
 #include "exprs/null-literal.h"
 #include "exprs/string-literal.h"
-
 
 using namespace std;
 using namespace boost;
@@ -640,9 +640,224 @@ TEST_F(ExprTest, StringFunctions) {
   // e.g.   TestValue("length(NULL)", TYPE_INT, NULL);
 }
 
+TEST_F(ExprTest, MathTrigonometricFunctions) {
+  // It is important to calculate the expected values
+  // using math functions, and not simply use constants.
+  // Otherwise, floating point imprecisions may lead to failed tests.
+  TestValue("sin(0.0)", TYPE_DOUBLE, sin(0.0));
+  TestValue("sin(pi())", TYPE_DOUBLE, sin(M_PI));
+  TestValue("sin(pi() / 2.0)", TYPE_DOUBLE, sin(M_PI / 2.0));
+  TestValue("asin(-1.0)", TYPE_DOUBLE, asin(-1.0));
+  TestValue("asin(1.0)", TYPE_DOUBLE, asin(1.0));
+  TestValue("cos(0.0)", TYPE_DOUBLE, cos(0.0));
+  TestValue("cos(pi())", TYPE_DOUBLE, cos(M_PI));
+  TestValue("acos(-1.0)", TYPE_DOUBLE, acos(-1.0));
+  TestValue("acos(1.0)", TYPE_DOUBLE, acos(1.0));
+  TestValue("tan(pi() * -1.0)", TYPE_DOUBLE, tan(M_PI * -1.0));
+  TestValue("tan(pi())", TYPE_DOUBLE, tan(M_PI));
+  TestValue("atan(pi())", TYPE_DOUBLE, atan(M_PI));
+  TestValue("atan(pi() * - 1.0)", TYPE_DOUBLE, atan(M_PI * -1.0));
+  TestValue("radians(0)", TYPE_DOUBLE, 0);
+  TestValue("radians(180.0)", TYPE_DOUBLE, M_PI);
+  TestValue("degrees(0)", TYPE_DOUBLE, 0.0);
+  TestValue("degrees(pi())", TYPE_DOUBLE, 180.0);
+
+  // TODO: tests with NULL arguments, currently we can't parse them inside function calls.
+}
+
+TEST_F(ExprTest, MathConversionFunctions) {
+
+  TestStringValue("bin(0)", "0");
+  TestStringValue("bin(1)", "1");
+  TestStringValue("bin(12)", "1100");
+  TestStringValue("bin(1234567)", "100101101011010000111");
+  TestStringValue("bin(" + lexical_cast<string>(numeric_limits<int64_t>::max()) + ")",
+      "111111111111111111111111111111111111111111111111111111111111111");
+  TestStringValue("bin(" + lexical_cast<string>(numeric_limits<int64_t>::min()+1) + ")",
+      "1000000000000000000000000000000000000000000000000000000000000001");
+
+  TestStringValue("hex(0)", "0");
+  TestStringValue("hex(15)", "F");
+  TestStringValue("hex(16)", "10");
+  TestStringValue("hex(" + lexical_cast<string>(numeric_limits<int64_t>::max()) + ")",
+      "7FFFFFFFFFFFFFFF");
+  TestStringValue("hex(" + lexical_cast<string>(numeric_limits<int64_t>::min()+1) + ")",
+      "8000000000000001");
+  TestStringValue("hex('0')", "30");
+  TestStringValue("hex('aAzZ')", "61417A5A");
+  TestStringValue("hex('Impala')", "496D70616C61");
+  TestStringValue("hex('impalA')", "696D70616C41");
+  TestStringValue("unhex('30')", "0");
+  TestStringValue("unhex('61417A5A')", "aAzZ");
+  TestStringValue("unhex('496D70616C61')", "Impala");
+  TestStringValue("unhex('696D70616C41')", "impalA");
+  // Character not in hex alphabet results in empty string.
+  TestStringValue("unhex('30GA')", "");
+  // Uneven number of chars results in empty string.
+  TestStringValue("unhex('30A')", "");
+
+  // Run the test suite twice, once with a bigint parameter, and once with string parameters.
+  for (int i = 0; i < 2; ++i) {
+    // First iteration is with bigint, second with string parameter.
+    string q = (i == 0) ? "" : "'";
+    // Invalid input: Base below -36 or above 36.
+    TestIsNull("conv(" + q + "10" + q + ", 10, 37)", TYPE_STRING);
+    TestIsNull("conv(" + q + "10" + q + ", 37, 10)", TYPE_STRING);
+    TestIsNull("conv(" + q + "10" + q + ", 10, -37)", TYPE_STRING);
+    TestIsNull("conv(" + q + "10" + q + ", -37, 10)", TYPE_STRING);
+    // Invalid input: Base between -2 and 2.
+    TestIsNull("conv(" + q + "10" + q + ", 10, 1)", TYPE_STRING);
+    TestIsNull("conv(" + q + "10" + q + ", 1, 10)", TYPE_STRING);
+    TestIsNull("conv(" + q + "10" + q + ", 10, -1)", TYPE_STRING);
+    TestIsNull("conv(" + q + "10" + q + ", -1, 10)", TYPE_STRING);
+    // Invalid input: Positive number but negative src base.
+    TestIsNull("conv(" + q + "10" + q + ", -10, 10)", TYPE_STRING);
+    // Test positive numbers.
+    TestStringValue("conv(" + q + "10" + q + ", 10, 10)", "10");
+    TestStringValue("conv(" + q + "10" + q + ", 2, 10)", "2");
+    TestStringValue("conv(" + q + "11" + q + ", 36, 10)", "37");
+    TestStringValue("conv(" + q + "11" + q + ", 36, 2)", "100101");
+    TestStringValue("conv(" + q + "100101" + q + ", 2, 36)", "11");
+    TestStringValue("conv(" + q + "0" + q + ", 10, 2)", "0");
+    // Test negative numbers (tests from Hive).
+    // If to_base is positive, the number should be handled as a 2's complement (64-bit).
+    TestStringValue("conv(" + q + "-641" + q + ", 10, -10)", "-641");
+    TestStringValue("conv(" + q + "1011" + q + ", 2, -16)", "B");
+    TestStringValue("conv(" + q + "-1" + q + ", 10, 16)", "FFFFFFFFFFFFFFFF");
+    TestStringValue("conv(" + q + "-15" + q + ", 10, 16)", "FFFFFFFFFFFFFFF1");
+    // Test digits that are not available in srcbase. We expect those digits
+    // from left-to-right that can be interpreted in srcbase to form the result
+    // (i.e., the paring bails only when it encounters a digit not in srcbase).
+    TestStringValue("conv(" + q + "17" + q + ", 7, 10)", "1");
+    TestStringValue("conv(" + q + "371" + q + ", 7, 10)", "3");
+    TestStringValue("conv(" + q + "371" + q + ", 7, 10)", "3");
+    TestStringValue("conv(" + q + "445" + q + ", 5, 10)", "24");
+    // Test overflow (tests from Hive).
+    // If a number is two large, the result should be -1 (if signed),
+    // or MAX_LONG (if unsigned).
+    TestStringValue("conv(" + q + lexical_cast<string>(numeric_limits<int64_t>::max())
+        + q + ", 36, 16)", "FFFFFFFFFFFFFFFF");
+    TestStringValue("conv(" + q + lexical_cast<string>(numeric_limits<int64_t>::max())
+        + q + ", 36, -16)", "-1");
+    TestStringValue("conv(" + q + lexical_cast<string>(numeric_limits<int64_t>::min()+1)
+        + q + ", 36, 16)", "FFFFFFFFFFFFFFFF");
+    TestStringValue("conv(" + q + lexical_cast<string>(numeric_limits<int64_t>::min()+1)
+        + q + ", 36, -16)", "-1");
+  }
+  // Test invalid input strings that start with an invalid digit.
+  // Hive returns "0" in such cases.
+  TestStringValue("conv('@', 16, 10)", "0");
+  TestStringValue("conv('$123', 12, 2)", "0");
+  TestStringValue("conv('*12g', 32, 5)", "0");
+
+  // TODO: tests with NULL arguments, currently we can't parse them inside function calls.
+}
+
 TEST_F(ExprTest, MathFunctions) {
   TestValue("pi()", TYPE_DOUBLE, M_PI);
+  TestValue("e()", TYPE_DOUBLE, M_E);
+  TestValue("abs(-1.0)", TYPE_DOUBLE, 1.0);
+  TestValue("abs(1.0)", TYPE_DOUBLE, 1.0);
+  TestValue("sign(0.0)", TYPE_FLOAT, 1.0f);
+  TestValue("sign(10.0)", TYPE_FLOAT, 1.0f);
+  TestValue("sign(-10.0)", TYPE_FLOAT, -1.0f);
+
+  // It is important to calculate the expected values
+  // using math functions, and not simply use constants.
+  // Otherwise, floating point imprecisions may lead to failed tests.
+  TestValue("exp(2)", TYPE_DOUBLE, exp(2));
+  TestValue("exp(e())", TYPE_DOUBLE, exp(M_E));
+  TestValue("ln(e())", TYPE_DOUBLE, 1.0);
+  TestValue("ln(255.0)", TYPE_DOUBLE, log(255.0));
+  TestValue("log10(1000.0)", TYPE_DOUBLE, 3.0);
+  TestValue("log10(50.0)", TYPE_DOUBLE, log10(50.0));
+  TestValue("log2(64.0)", TYPE_DOUBLE, 6.0);
+  TestValue("log2(678.0)", TYPE_DOUBLE, log(678.0) / log(2.0));
+  TestValue("log(10.0, 1000.0)", TYPE_DOUBLE, log(1000.0) / log(10.0));
+  TestValue("log(2.0, 64.0)", TYPE_DOUBLE, 6.0);
+  TestValue("pow(2.0, 10.0)", TYPE_DOUBLE, pow(2.0, 10.0));
+  TestValue("pow(e(), 2.0)", TYPE_DOUBLE, M_E * M_E);
+  TestValue("power(2.0, 10.0)", TYPE_DOUBLE, pow(2.0, 10.0));
+  TestValue("power(e(), 2.0)", TYPE_DOUBLE, M_E * M_E);
+  TestValue("sqrt(121.0)", TYPE_DOUBLE, 11.0);
+  TestValue("sqrt(2.0)", TYPE_DOUBLE, sqrt(2.0));
+
+  // Run twice to test deterministic behavior.
+  uint32_t seed = 0;
+  double expected = static_cast<double>(rand_r(&seed)) / static_cast<double>(RAND_MAX);
+  TestValue("rand()", TYPE_DOUBLE, expected);
+  TestValue("rand()", TYPE_DOUBLE, expected);
+  seed = 1234;
+  expected = static_cast<double>(rand_r(&seed)) / static_cast<double>(RAND_MAX);
+  TestValue("rand(1234)", TYPE_DOUBLE, expected);
+  TestValue("rand(1234)", TYPE_DOUBLE, expected);
+
+  // Test bigint param.
+  TestValue("pmod(10, 3)", TYPE_BIGINT, 1);
+  TestValue("pmod(-10, 3)", TYPE_BIGINT, 2);
+  TestValue("pmod(10, -3)", TYPE_BIGINT, -2);
+  TestValue("pmod(-10, -3)", TYPE_BIGINT, -1);
+  TestValue("pmod(1234567890, 13)", TYPE_BIGINT, 10);
+  TestValue("pmod(-1234567890, 13)", TYPE_BIGINT, 3);
+  TestValue("pmod(1234567890, -13)", TYPE_BIGINT, -3);
+  TestValue("pmod(-1234567890, -13)", TYPE_BIGINT, -10);
+  // Test double param.
+  TestValue("pmod(12.3, 4.0)", TYPE_DOUBLE, fmod(fmod(12.3, 4.0) + 4.0, 4.0));
+  TestValue("pmod(-12.3, 4.0)", TYPE_DOUBLE, fmod(fmod(-12.3, 4.0) + 4.0, 4.0));
+  TestValue("pmod(12.3, -4.0)", TYPE_DOUBLE, fmod(fmod(12.3, -4.0) - 4.0, -4.0));
+  TestValue("pmod(-12.3, -4.0)", TYPE_DOUBLE, fmod(fmod(-12.3, -4.0) - 4.0, -4.0));
+  TestValue("pmod(123456.789, 13.456)", TYPE_DOUBLE,
+      fmod(fmod(123456.789, 13.456) + 13.456, 13.456));
+  TestValue("pmod(-123456.789, 13.456)", TYPE_DOUBLE,
+      fmod(fmod(-123456.789, 13.456) + 13.456, 13.456));
+  TestValue("pmod(123456.789, -13.456)", TYPE_DOUBLE,
+      fmod(fmod(123456.789, -13.456) - 13.456, -13.456));
+  TestValue("pmod(-123456.789, -13.456)", TYPE_DOUBLE,
+      fmod(fmod(-123456.789, -13.456) - 13.456, -13.456));
+
+  // Test bigint param.
+  TestValue("positive(1234567890)", TYPE_BIGINT, 1234567890);
+  TestValue("positive(-1234567890)", TYPE_BIGINT, -1234567890);
+  TestValue("negative(1234567890)", TYPE_BIGINT, -1234567890);
+  TestValue("negative(-1234567890)", TYPE_BIGINT, 1234567890);
+  // Test double param.
+  TestValue("positive(3.14159265)", TYPE_DOUBLE, 3.14159265);
+  TestValue("positive(-3.14159265)", TYPE_DOUBLE, -3.14159265);
+  TestValue("negative(3.14159265)", TYPE_DOUBLE, -3.14159265);
+  TestValue("negative(-3.14159265)", TYPE_DOUBLE, 3.14159265);
+
+  // TODO: tests with NULL arguments, currently we can't parse them inside function calls.
 }
+
+TEST_F(ExprTest, MathRoundingFunctions) {
+  TestValue("ceil(0.1)", TYPE_BIGINT, 1);
+  TestValue("ceil(-10.05)", TYPE_BIGINT, -10);
+  TestValue("ceiling(0.1)", TYPE_BIGINT, 1);
+  TestValue("ceiling(-10.05)", TYPE_BIGINT, -10);
+  TestValue("floor(0.1)", TYPE_BIGINT, 0);
+  TestValue("floor(-10.007)", TYPE_BIGINT, -11);
+
+  TestValue("round(1.499999)", TYPE_BIGINT, 1);
+  TestValue("round(1.5)", TYPE_BIGINT, 2);
+  TestValue("round(1.500001)", TYPE_BIGINT, 2);
+  TestValue("round(-1.499999)", TYPE_BIGINT, -1);
+  TestValue("round(-1.5)", TYPE_BIGINT, -2);
+  TestValue("round(-1.500001)", TYPE_BIGINT, -2);
+
+  TestValue("round(3.14159265, 0)", TYPE_DOUBLE, 3.0);
+  TestValue("round(3.14159265, 1)", TYPE_DOUBLE, 3.1);
+  TestValue("round(3.14159265, 2)", TYPE_DOUBLE, 3.14);
+  TestValue("round(3.14159265, 3)", TYPE_DOUBLE, 3.142);
+  TestValue("round(3.14159265, 4)", TYPE_DOUBLE, 3.1416);
+  TestValue("round(3.14159265, 5)", TYPE_DOUBLE, 3.14159);
+  TestValue("round(-3.14159265, 0)", TYPE_DOUBLE, -3.0);
+  TestValue("round(-3.14159265, 1)", TYPE_DOUBLE, -3.1);
+  TestValue("round(-3.14159265, 2)", TYPE_DOUBLE, -3.14);
+  TestValue("round(-3.14159265, 3)", TYPE_DOUBLE, -3.142);
+  TestValue("round(-3.14159265, 4)", TYPE_DOUBLE, -3.1416);
+  TestValue("round(-3.14159265, 5)", TYPE_DOUBLE, -3.14159);
+}
+
 }
 
 int main(int argc, char **argv) {

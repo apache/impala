@@ -30,6 +30,7 @@ class StringParser {
 
   // This is considerably faster than glibc's implementation (25x).  
   // In the case of overflow, the max/min value for the data type will be returned.
+  // Assumes s represents a decimal number.
   template <typename T>
   static inline T StringToInt(const char* s, int len, ParseResult* result) {
     T val = 0;
@@ -51,6 +52,43 @@ class StringParser {
       } else {
         *result = PARSE_FAILURE;
         return 0;
+      }
+    }
+    *result = PARSE_SUCCESS;
+    return (T)(negative ? -val : val);
+  }
+
+  // Convert a string s representing a number in given base into a decimal number.
+  template <typename T>
+  static inline T StringToInt(const char* s, int len, int base, ParseResult* result) {
+    T val = 0;
+    bool negative = false;
+    int i = 0;
+    switch (*s) {
+      case '-': negative = true;
+      case '+': i = 1;
+    }
+    for (; i < len; ++i) {
+      T digit;
+      if (LIKELY(s[i] >= '0' && s[i] <= '9')) {
+        digit = s[i] - '0';
+      } else if (s[i] >= 'a' && s[i] <= 'z') {
+        digit = (s[i] - 'a' + 10);
+      } else if (s[i] >= 'A' && s[i] <= 'Z') {
+        digit = (s[i] - 'A' + 10);
+      } else {
+        *result = PARSE_FAILURE;
+        return 0;
+      }
+      // Bail, if we encounter a digit that is not available in base.
+      if (digit >= base) {
+        break;
+      }
+      val = val * base + digit;
+      // Overflow
+      if (UNLIKELY(val < digit)) {
+        *result = PARSE_OVERFLOW;
+        return negative ? std::numeric_limits<T>::min() : std::numeric_limits<T>::max();
       }
     }
     *result = PARSE_SUCCESS;

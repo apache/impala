@@ -24,6 +24,10 @@ class TExpr;
 class TExprNode;
 
 // The materialized value returned by Expr::GetValue().
+// Some exprs may set multiple fields of this value at once
+// for maintaining state across evaluations.
+// For example, the rand() math function uses double_val as its return value,
+// and int_val as the state for the random number generator.
 struct ExprValue {
   bool bool_val;
   int8_t tinyint_val;
