@@ -46,7 +46,7 @@ export HIVE_HOME=$IMPALA_HOME/thirdparty/hive-0.8.0-cdh4b1
 export PATH=$HIVE_HOME/bin:$PATH
 export HIVE_CONF_DIR=$IMPALA_HOME/fe/src/test/resources
 
-export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-0.90.3-cdh3u1
+export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-0.92.0-cdh4b1
 export PATH=$HBASE_HOME/bin:$PATH
 export HBASE_CONF_DIR=$HIVE_CONF_DIR
 

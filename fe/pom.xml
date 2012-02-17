@@ -501,8 +501,8 @@
                     <exec executable="${env.HBASE_HOME}/bin/start-hbase.sh">
                     </exec>
                     <exec executable="${env.HBASE_HOME}/bin/hbase">
-		      <arg value="shell"/>
-		      <arg value="${project.basedir}/../testdata/bin/create.hbase"/>
+                      <arg value="shell"/>
+                            <arg value="${project.basedir}/../testdata/bin/create.hbase"/>
                     </exec>
                     <!-- We don't want to kill the mini-dfs cluster.
                          Starting another mini-dfs cluster when one is running will
