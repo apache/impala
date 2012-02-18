@@ -8,8 +8,8 @@ import os
 import re
 import sys
 
-query_cmd = 'build/service/runquery -profile_output_file=""'
-reference_result_file = 'bin/results.txt'
+query_cmd = 'build/release/service/runquery -profile_output_file=""'
+reference_result_file = 'hive_benchmark_results.txt'
 result_single_regex = 'returned (\d*) rows? in (\d*).(\d*) s'
 result_multiple_regex = 'returned (\d*) rows? in (\d*).(\d*) s with stddev (\d*).(\d*)'
 
@@ -39,7 +39,8 @@ def parse_reference_results():
   try:
     results = {}
     current_result = {}
-    f = open(reference_result_file)
+    full_path = os.environ['IMPALA_HOME'] + "/" + reference_result_file
+    f = open(full_path)
     for line in f:
       line = line.strip()
       if line.startswith("Query:"):
@@ -128,10 +129,10 @@ def run_query(reference_results, output, query, prime_buffer_cache, iterations):
   if reference_avg != 0:
     if avg_time < reference_avg:
       diff = (reference_avg - avg_time) / reference_avg * 100
-      print "  Avg Time: %fs (+%s%.2f%%%s)" % (avg_time, GREEN, diff, END)
+      print "  Avg Time: %fs (-%s%.2f%%%s)" % (avg_time, GREEN, diff, END)
     else:
       diff = (avg_time - reference_avg) / reference_avg * 100
-      print "  Avg Time: %fs (-%s%.2f%%%s)" % (avg_time, RED, diff, END)
+      print "  Avg Time: %fs (+%s%.2f%%%s)" % (avg_time, RED, diff, END)
   else:
     print "  Avg Time: %fs" % (avg_time)
 
@@ -151,9 +152,9 @@ reference_results = parse_reference_results()
 # flag regressions.  How do we reconcile the fact we are running on different machines?
 queries = [
   ["select count(field) from grep1gb where field like '%xyz%'", 5, 5],
-  ["select pageRank, pageURL from rankings where pageRank > 10 order by pageRank limit 100", 5, 5],
   ["select uv.sourceip, avg(r.pagerank), sum(uv.adrevenue) as totalrevenue from uservisits uv join rankings r on (r.pageurl = uv.desturl) where uv.visitdate > '1999-01-01' and uv.visitdate < '2000-01-01' group by uv.sourceip order by totalrevenue desc limit 1", 5, 5],
   ["select sourceIP, SUM(adRevenue) FROM uservisits GROUP by sourceIP order by SUM(adRevenue) desc limit 10", 5, 5],
+  ["select pageRank, pageURL from rankings where pageRank > 10 order by pageRank limit 100", 0, 5],
   ["select count(field) from grep10gb where field like '%xyz%'", 0, 1]
 ]
 
@@ -161,5 +162,5 @@ output = ""
 for query in queries:
   output = run_query(reference_results, output, query[0], query[1], query[2])
 
-print "\nCopy and paste below to %s/%s to update the reference results:" % (os.environ['IMPALA_BE_DIR'], reference_result_file)
+print "\nCopy and paste below to %s/%s to update the reference results:" % (os.environ['IMPALA_HOME'], reference_result_file)
 print output

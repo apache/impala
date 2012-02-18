@@ -4,6 +4,7 @@ thirdparty
 cscope.files
 cscope.out
 org.eclipse.jdt.core.prefs
+hive_benchmark_results.txt
 
 pprof.out
 

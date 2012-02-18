@@ -249,7 +249,7 @@
         <configuration>
           <redirectTestOutputToFile>true</redirectTestOutputToFile>
           <systemPropertyVariables>
-	    <java.library.path>${java.library.path}:${project.basedir}/../be/build/service</java.library.path>
+	    <java.library.path>${java.library.path}:${project.basedir}/../be/build/debug/service:${project.basedir}/../be/build/release/service</java.library.path>
           </systemPropertyVariables>
         </configuration>
       </plugin>

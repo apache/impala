@@ -1,10 +1,10 @@
 # Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 # where to put generated libraries
-set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/be/build/runtime")
+set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime")
 
 # where to put generated binaries
-set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/be/build/runtime")
+set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime")
 
 # add .cc files and uncomment line
 add_library(Runtime STATIC
@@ -91,7 +91,7 @@ target_link_libraries(data-stream-test
   ${Boost_LIBRARIES}
 )
 
-add_test(mem-pool-test ${CMAKE_SOURCE_DIR}/be/build/runtime/mem-pool-test)
-add_test(free-list-test ${CMAKE_SOURCE_DIR}/be/build/runtime/free-list-test)
-add_test(string-buffer-test ${CMAKE_SOURCE_DIR}/be/build/runtime/string-buffer-test)
-add_test(data-stream-test ${CMAKE_SOURCE_DIR}/be/build/runtime/data-stream-test)
+add_test(mem-pool-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/mem-pool-test)
+add_test(free-list-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/free-list-test)
+add_test(string-buffer-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/string-buffer-test)
+add_test(data-stream-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/data-stream-test)

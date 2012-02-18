@@ -1,10 +1,10 @@
 # Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 # where to put generated libraries
-set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/be/build/util")
+set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/util")
 
 # where to put generated binaries
-set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/be/build/util")
+set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/util")
 
 add_library(Util
   cpu-info.cc
@@ -31,5 +31,5 @@ target_link_libraries(perf-counters-test
   ${Boost_LIBRARIES}
 )
 
-add_test(perf-counters-test ${CMAKE_SOURCE_DIR}/be/build/util/perf-counters-test)
+add_test(perf-counters-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/util/perf-counters-test)
 

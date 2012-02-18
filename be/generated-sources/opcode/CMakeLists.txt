@@ -1,10 +1,10 @@
 # Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 # where to put generated libraries
-set(LIBRARY_OUTPUT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/build/opcode")
+set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/opcode")
 
 # where to put generated binaries
-set(EXECUTABLE_OUTPUT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/build/opcode")
+set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/opcode")
 
 set(SRC_FILES
   functions.cc

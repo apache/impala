@@ -1,10 +1,11 @@
 # Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
+message (STATUS "Common ${BUILD_OUTPUT_ROOT_DIRECTORY}")
 # where to put generated libraries
-set(LIBRARY_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/be/build/common")
+set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/common")
 
 # where to put generated binaries
-set(EXECUTABLE_OUTPUT_PATH "${CMAKE_SOURCE_DIR}/be/build/common")
+set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/common")
 
 add_library(Common
   status.cc

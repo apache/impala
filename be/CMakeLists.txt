@@ -5,6 +5,13 @@ cmake_minimum_required(VERSION 2.6)
 # generate CTest input files
 enable_testing()
 
+# Setting this enables compiling for assembly output.  To compile to assembly:
+#  1. cd into the directory containing the source file
+#  2. 'make help' will list the assembly file targets (i.e. <srcfile.s>
+#  3. 'make <srcfile>.s' to build the assembly for that file.  The file is built 
+#      to CMakeFiles/<currentdir>.dir/<srcfile>.s
+PROJECT(ASSEMBLER)
+
 # compiler flags for different build types (run 'cmake -DCMAKE_BUILD_TYPE=<type> .')
 # For all builds:
 #   -msse4.2: Enable sse4.2 compiler intrinsics.  
@@ -48,6 +55,11 @@ else()
   message(FATAL_ERROR "Unknown build type: ${CMAKE_BUILD_TYPE}")
 endif ()
 
+# Adding -fverboase-asm creates better annotated assembly.  This
+# doesn't seem to affect when building the binary.
+# TODO: is it possible to have specify different build flags for assembly?
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fverbose-asm")
+
 Message(${CMAKE_CXX_FLAGS})
 
 # setup doc generation with Doxygen
@@ -88,6 +100,13 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/generated-sources)
 # allow linking of static libs into dynamic lib
 add_definitions(-fPIC)
 
+# set compile output directory
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
+  set(BUILD_OUTPUT_ROOT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/debug/")
+else()
+  set(BUILD_OUTPUT_ROOT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/release/")
+endif()
+
 # compile these subdirs using their own CMakeLists.txt
 add_subdirectory(src/common)
 add_subdirectory(src/exec)
@@ -115,8 +134,8 @@ link_directories(
 set(BUILD_SHARED_LIBS OFF)
 
 # where to put generated libraries
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/")
-set(ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${BUILD_OUTPUT_ROOT_DIRECTORY}")
+set(ARCHIVE_OUTPUT_DIRECTORY "${BUILD_OUTPUT_ROOT_DIRECTORY}")
 
 # where to put generated binaries
-set(EXECUTABLE_OUTPUT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/build/")
+set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}")
