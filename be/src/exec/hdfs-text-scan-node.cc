@@ -75,7 +75,7 @@ Status HdfsTextScanNode::Init(ObjectPool* pool, const TPlanNode& tnode) {
     ss << "HdfsTextScanNode::Init(): "
        << "Invalid regex: " << tnode.hdfs_scan_node.partition_key_regex;
     return Status(ss.str());
-  }  
+  }
   return Status::OK;
 }
 
@@ -144,7 +144,7 @@ Status HdfsTextScanNode::Prepare(RuntimeState* state) {
       materialized_slots_.push_back(slots[column_idx_to_slot_idx_[i]]);
     }
   }
-  
+
   // TODO(marcel): add int tuple_idx_[] indexed by TupleId somewhere in runtime-state.h
   tuple_idx_ = 0;
 
@@ -155,7 +155,7 @@ Status HdfsTextScanNode::Prepare(RuntimeState* state) {
 
   // Initialize the sse search registers.
   // TODO: is this safe to do in prepare?  Not sure if the compiler/system
-  // will manage these registers for us.  
+  // will manage these registers for us.
   char tmp[SSEUtil::CHARS_PER_128_BIT_REGISTER];
   memset(tmp, 0, sizeof(tmp));
   tmp[0] = tuple_delim_;
@@ -208,8 +208,8 @@ Status HdfsTextScanNode::HdfsRead(RuntimeState* state, int size) {
   if (!reuse_file_buffer_) {
     file_buffer_ = file_buffer_pool_->Allocate(state->file_buffer_size());
     reuse_file_buffer_ = true;
-  } 
-  file_buffer_read_size_ = hdfsRead(hdfs_connection_, hdfs_file_, file_buffer_, size);
+  }
+  file_buffer_read_size_ = hdfsReadDirect(hdfs_connection_, hdfs_file_, file_buffer_, size);
   if (file_buffer_read_size_ == -1) {
     return Status(AppendHdfsErrorMessage("Failed to read from hdfs."));
   }
@@ -247,7 +247,7 @@ Status HdfsTextScanNode::InitCurrentScanRange(RuntimeState* state) {
     ss << "Failed to seek to " << range.offset << " for file " << current_file_scan_ranges_->first;
     return Status(AppendHdfsErrorMessage(ss.str()));
   }
-    
+
   int read_size = min(state->file_buffer_size(), current_range_remaining_len_);
   RETURN_IF_ERROR(HdfsRead(state, read_size));
 
@@ -257,14 +257,14 @@ Status HdfsTextScanNode::InitCurrentScanRange(RuntimeState* state) {
     file_buffer_ptr_ += first_tuple_offset;
     current_range_remaining_len_ -= first_tuple_offset;
   }
-  
+
   // These state fields cannot be split across ranges
   column_idx_ = 0;
   slot_idx_ = 0;
   last_char_is_escape_ = false;
   current_column_has_escape_ = false;
   error_in_row_ = false;
-  
+
   boundary_column_.Clear();
   boundary_row_.Clear();
 
@@ -282,10 +282,10 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
   tuple_buffer_ = tuple_pool_->Allocate(tuple_buffer_size_);
   bzero(tuple_buffer_, tuple_buffer_size_);
   tuple_ = reinterpret_cast<Tuple*>(tuple_buffer_);
-  
+
   // Index into current row in row_batch.
   int row_idx = RowBatch::INVALID_ROW_INDEX;
-  
+
   // Loops until all the scan ranges are complete or batch is full
   // This loop contains a small state machine:
   //  1. file_buffer_ptr_ != file_buffer_end_: no need to read more, process what's in
@@ -298,7 +298,7 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
     if (file_buffer_ptr_ == file_buffer_end_) {
       if (current_range_remaining_len_ < 0) {
         // We want to minimize how much we read next.  It is past the end of this block
-        // and likely on another node.   
+        // and likely on another node.
         // TODO: Set it to be the average size of a row
         RETURN_IF_ERROR(HdfsRead(state, NEXT_BLOCK_READ_SIZE));
         if (file_buffer_read_size_ == 0) {
@@ -344,8 +344,8 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
         }
       }
     }
-      
-    // Parses (or resumes parsing) the current file buffer, appending tuples into 
+
+    // Parses (or resumes parsing) the current file buffer, appending tuples into
     // the tuple buffer until:
     // a) file buffer has been completely parsed or
     // b) tuple buffer is full
@@ -384,7 +384,7 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
       boundary_column_.Append(col_start, file_buffer_ptr_ - col_start);
       boundary_row_.Append(line_start, file_buffer_ptr_ - line_start);
     }
-    
+
     if (current_range_remaining_len_ < 0) {
       DCHECK_LE(num_tuples, 1);
       // Just finished off this scan range
@@ -402,10 +402,10 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
     if (num_rows_returned_ > previous_num_rows &&
         !tuple_desc_->string_slots().empty()) {
       reuse_file_buffer_ = false;
-    } 
-    
-    // If the batch is full, return and the next GetNext() call will pick up where we 
-    // left off. 
+    }
+
+    // If the batch is full, return and the next GetNext() call will pick up where we
+    // left off.
     // Otherwise, continue parsing the current scan range.
     // Hang on to the last chunks, we'll continue from there in the next
     // GetNext() call.
@@ -418,7 +418,7 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
       *eos = false;
       return Status::OK;
     }
-  } 
+  }
 
   // No more work to be done. Clean up all pools with the last row batch.
   row_batch->tuple_data_pool()->AcquireData(tuple_pool_.get(), ReachedLimit());
@@ -431,9 +431,9 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
 // Updates the values in the field and tuple masks, escaping them if necessary.
 // If the character at n is an escape character, then delimiters(tuple/field/escape characters)
 // at n+1 don't count.
-inline void ProcessEscapeMask(int escape_mask, bool* last_char_is_escape, int* field_mask, 
+inline void ProcessEscapeMask(int escape_mask, bool* last_char_is_escape, int* field_mask,
     int* tuple_mask) {
-  // Escape characters can escape escape characters.  
+  // Escape characters can escape escape characters.
   bool first_char_is_escape = *last_char_is_escape;
   bool escape_next = first_char_is_escape;
   for (int i = 0; i < SSEUtil::CHARS_PER_128_BIT_REGISTER; ++i) {
@@ -444,7 +444,7 @@ inline void ProcessEscapeMask(int escape_mask, bool* last_char_is_escape, int* f
   }
 
   // Remember last character for the next iteration
-  *last_char_is_escape = escape_mask & 
+  *last_char_is_escape = escape_mask &
     SSEUtil::SSE_BITMASK[SSEUtil::CHARS_PER_128_BIT_REGISTER - 1];
 
   // Shift escape mask up one so they match at the same bit index as the tuple and field mask
@@ -469,12 +469,12 @@ inline void ProcessEscapeMask(int escape_mask, bool* last_char_is_escape, int* f
 //  Needle   = 'abcd000000000000' (we're searching for any a's, b's, c's d's)
 //  Haystack = 'asdfghjklhjbdwwc' (the raw string)
 //  Result   = '101000000001101'
-Status HdfsTextScanNode::ParseFileBuffer(int max_tuples, int* num_tuples, int* num_fields, 
+Status HdfsTextScanNode::ParseFileBuffer(int max_tuples, int* num_tuples, int* num_fields,
     char** column_start) {
 
   // Start of this batch.
   *column_start = file_buffer_ptr_;
-  
+
   // To parse using SSE, we:
   //  1. Load into different sse registers the different characters we need to search for
   //      - tuple breaks, field breaks, escape characters
@@ -487,14 +487,14 @@ Status HdfsTextScanNode::ParseFileBuffer(int max_tuples, int* num_tuples, int* n
   // xmm registers:
   //  - xmm_buffer: the register holding the current (16 chars) we're working on from the file
   //  - xmm_tuple_search_: the tuple search register.  Only contains the tuple_delim char.
-  //  - xmm_field_search_: the field search register.  Contains field delim and 
+  //  - xmm_field_search_: the field search register.  Contains field delim and
   //        collection_item delim_char
   //  - xmm_escape_search_: the escape search register. Only contains escape char
   //  - xmm_tuple_mask: the result of doing strchr for the tuple delim
   //  - xmm_field_mask: the result of doing strchr for the field delim
   //  - xmm_escape_mask: the result of doing strchr for the escape char
   __m128i xmm_buffer, xmm_tuple_mask, xmm_field_mask, xmm_escape_mask;
-  
+
   // Length remaining of buffer to process
   int remaining_len = file_buffer_end_ - file_buffer_ptr_;
 
@@ -531,7 +531,7 @@ Status HdfsTextScanNode::ParseFileBuffer(int max_tuples, int* num_tuples, int* n
         // Loop through the mask and find the tuple/column offsets
         for (int n = 0; n < SSEUtil::CHARS_PER_128_BIT_REGISTER; ++n) {
           if (escape_mask != 0) {
-            current_column_has_escape_ =  
+            current_column_has_escape_ =
                 current_column_has_escape_ || (escape_mask & SSEUtil::SSE_BITMASK[n]);
           }
 
@@ -583,7 +583,7 @@ Status HdfsTextScanNode::ParseFileBuffer(int max_tuples, int* num_tuples, int* n
   while (remaining_len > 0) {
     bool new_tuple = false;
     bool new_col = false;
-    
+
     if (!last_char_is_escape_) {
       if (*file_buffer_ptr_ == tuple_delim_) {
         new_tuple = true;
@@ -591,7 +591,7 @@ Status HdfsTextScanNode::ParseFileBuffer(int max_tuples, int* num_tuples, int* n
       } else if (*file_buffer_ptr_ == field_delim_ || *file_buffer_ptr_ == collection_item_delim_) {
         new_col = true;
       }
-    } 
+    }
     if (*file_buffer_ptr_ == escape_char_) {
       current_column_has_escape_ = true;
       last_char_is_escape_ = !last_char_is_escape_;
@@ -627,13 +627,13 @@ Status HdfsTextScanNode::ParseFileBuffer(int max_tuples, int* num_tuples, int* n
 
     if (*num_tuples == max_tuples) return Status::OK;
   }
-  
+
   return Status::OK;
 }
 
 // In this code path, no slots were materialized from the input files.  The only
 // slots are from partition keys.  This lets us simplify writing out the batches.
-//   1. partition_key_template_tuple_ is the complete tuple.  
+//   1. partition_key_template_tuple_ is the complete tuple.
 //   2. Eval conjuncts against the tuple.
 //   3. If it passes, stamp out 'num_tuples' copies of it into the row_batch.
 Status HdfsTextScanNode::WriteTuples(RuntimeState* state, RowBatch* row_batch, int num_tuples,
@@ -642,7 +642,7 @@ Status HdfsTextScanNode::WriteTuples(RuntimeState* state, RowBatch* row_batch, i
 
   *line_start = file_buffer_ptr_;
   boundary_row_.Clear();
-  
+
   // Make a row and evaluate the row
   if (*row_idx == RowBatch::INVALID_ROW_INDEX) {
     *row_idx = row_batch->AddRow();
@@ -658,8 +658,8 @@ Status HdfsTextScanNode::WriteTuples(RuntimeState* state, RowBatch* row_batch, i
   ++num_rows_returned_;
   --num_tuples;
 
-  // All the tuples in this batch are identical and can be stamped out 
-  // from partition_key_template_tuple_.  Write out tuples up to the limit_. 
+  // All the tuples in this batch are identical and can be stamped out
+  // from partition_key_template_tuple_.  Write out tuples up to the limit_.
   if (limit_ != -1) {
     num_tuples = min(num_tuples, static_cast<int>(limit_ - num_rows_returned_));
   }
@@ -679,7 +679,7 @@ Status HdfsTextScanNode::WriteTuples(RuntimeState* state, RowBatch* row_batch, i
 
 // TODO: apply conjuncts as slots get materialized and skip to the end of the row
 // if we determine it's not a match.
-Status HdfsTextScanNode::WriteFields(RuntimeState* state, RowBatch* row_batch, int num_fields, 
+Status HdfsTextScanNode::WriteFields(RuntimeState* state, RowBatch* row_batch, int num_fields,
     int* row_idx, char** line_start) {
   DCHECK_GT(num_fields, 0);
 
@@ -708,10 +708,10 @@ Status HdfsTextScanNode::WriteFields(RuntimeState* state, RowBatch* row_batch, i
     } else {
       StringParser::ParseResult parse_result = StringParser::PARSE_SUCCESS;
       void* slot = tuple_->GetSlot(slot_desc->tuple_offset());
-      
+
       // Parse the raw-text data.  At this point:
       switch (slot_desc->type()) {
-        case TYPE_STRING: 
+        case TYPE_STRING:
           reinterpret_cast<StringValue*>(slot)->ptr = data;
           reinterpret_cast<StringValue*>(slot)->len = len;
           if (need_escape) {
@@ -721,48 +721,48 @@ Status HdfsTextScanNode::WriteFields(RuntimeState* state, RowBatch* row_batch, i
         case TYPE_BOOLEAN:
           *reinterpret_cast<bool*>(slot) = StringParser::StringToBool(data, len, &parse_result);
           break;
-        case TYPE_TINYINT: 
-          *reinterpret_cast<int8_t*>(slot) = 
+        case TYPE_TINYINT:
+          *reinterpret_cast<int8_t*>(slot) =
               StringParser::StringToInt<int8_t>(data, len, &parse_result);
           break;
-        case TYPE_SMALLINT: 
-          *reinterpret_cast<int16_t*>(slot) = 
+        case TYPE_SMALLINT:
+          *reinterpret_cast<int16_t*>(slot) =
               StringParser::StringToInt<int16_t>(data, len, &parse_result);
           break;
-        case TYPE_INT: 
-          *reinterpret_cast<int32_t*>(slot) = 
+        case TYPE_INT:
+          *reinterpret_cast<int32_t*>(slot) =
               StringParser::StringToInt<int32_t>(data, len, &parse_result);
           break;
-        case TYPE_BIGINT: 
-          *reinterpret_cast<int64_t*>(slot) = 
+        case TYPE_BIGINT:
+          *reinterpret_cast<int64_t*>(slot) =
               StringParser::StringToInt<int64_t>(data, len, &parse_result);
           break;
-        case TYPE_FLOAT: 
-          *reinterpret_cast<float*>(slot) = 
+        case TYPE_FLOAT:
+          *reinterpret_cast<float*>(slot) =
               StringParser::StringToFloat<float>(data, len, &parse_result);
           break;
         case TYPE_DOUBLE:
-          *reinterpret_cast<double*>(slot) = 
+          *reinterpret_cast<double*>(slot) =
               StringParser::StringToFloat<double>(data, len, &parse_result);
           break;
         default:
           DCHECK(false) << "bad slot type: " << TypeToString(slot_desc->type());
           break;
       }
-      
+
       // TODO: add warning for overflow case
       if (parse_result == StringParser::PARSE_FAILURE) {
         error_in_row_ = true;
         tuple_->SetNull(slot_desc->null_indicator_offset());
         if (state->LogHasSpace()) {
-          state->error_stream() << "Error converting column: " 
+          state->error_stream() << "Error converting column: "
             << slot_desc->col_pos() - num_partition_keys_ << " TO "
             << TypeToString(slot_desc->type()) << endl;
         }
       }
     }
 
-    // If slot_idx_ equals the number of materialized slots, we have completed 
+    // If slot_idx_ equals the number of materialized slots, we have completed
     // parsing the tuple.  At this point we can:
     //  - Report errors if there are any
     //  - Reset line_start, materialized_slot_idx to be ready to parse the next row
@@ -782,7 +782,7 @@ Status HdfsTextScanNode::WriteFields(RuntimeState* state, RowBatch* row_batch, i
       *line_start += next_line_offset;
       next_line_offset = 0;
       slot_idx_ = 0;
-      
+
       // We now have a complete row, with everything materialized
       DCHECK(!row_batch->IsFull());
       if (*row_idx == RowBatch::INVALID_ROW_INDEX) {
@@ -790,7 +790,7 @@ Status HdfsTextScanNode::WriteFields(RuntimeState* state, RowBatch* row_batch, i
       }
       TupleRow* current_row = row_batch->GetRow(*row_idx);
       current_row->SetTuple(tuple_idx_, tuple_);
-      
+
       // Evaluate the conjuncts and add the row to the batch
       bool conjuncts_true = EvalConjuncts(current_row);
       if (conjuncts_true) {
@@ -801,8 +801,8 @@ Status HdfsTextScanNode::WriteFields(RuntimeState* state, RowBatch* row_batch, i
         char* new_tuple = reinterpret_cast<char*>(tuple_);
         new_tuple += tuple_desc_->byte_size();
         tuple_ = reinterpret_cast<Tuple*>(new_tuple);
-      }  
-      
+      }
+
       // Need to reset the tuple_ if
       //  1. eval failed (clear out null-indicator bits) OR
       //  2. there are partition keys that need to be copied
@@ -838,11 +838,11 @@ void HdfsTextScanNode::DebugString(int indentation_level, stringstream* out) con
       const ScanRange& range = file->second[i];
       ss << file->first << "(" << range.offset << ", " << range.length << ")";
       ranges.push_back(ss.str());
-    } 
+    }
   }
 
   *out << string(indentation_level * 2, ' ')
-       << "HdfsTextScanNode(tupleid=" << tuple_id_ 
+       << "HdfsTextScanNode(tupleid=" << tuple_id_
        << " scan ranges[" << join(ranges, ",") << "]"
        << " regex=" << partition_key_regex_ << " ";
   ExecNode::DebugString(indentation_level, out);
@@ -871,7 +871,7 @@ void HdfsTextScanNode::SetScanRange(const TScanRange& scan_range) {
     const string& path = split.path;
     if (per_file_scan_ranges_.find(path) == per_file_scan_ranges_.end()) {
       per_file_scan_ranges_[path] = vector<ScanRange>();
-    } 
+    }
     // TODO: collapse adjacent blocks.  This makes the parsing a bit more
     // efficient.
     per_file_scan_ranges_[path].push_back(ScanRange(split.offset, split.length));
@@ -883,7 +883,7 @@ Status HdfsTextScanNode::ExtractPartitionKeyValues(RuntimeState* state) {
 
   const string& file = current_file_scan_ranges_->first;
 
-  partition_key_template_tuple_ = 
+  partition_key_template_tuple_ =
       reinterpret_cast<Tuple*>(partition_key_pool_->Allocate(tuple_desc_->byte_size()));
   memset(partition_key_template_tuple_, 0, tuple_desc_->byte_size());
 
@@ -894,7 +894,7 @@ Status HdfsTextScanNode::ExtractPartitionKeyValues(RuntimeState* state) {
       int slot_idx = key_idx_to_slot_idx_[i].second;
       const SlotDescriptor* slot_desc = tuple_desc_->slots()[slot_idx];
       PrimitiveType type = slot_desc->type();
-      const string& string_value = match[regex_idx]; 
+      const string& string_value = match[regex_idx];
 
       // Populate a template tuple with just the partition key values.  Separate handling of
       // the string and other types saves an allocation and copy.
@@ -915,21 +915,21 @@ Status HdfsTextScanNode::ExtractPartitionKeyValues(RuntimeState* state) {
         return Status(ss.str());
       }
 
-      RawValue::Write(value, partition_key_template_tuple_, 
+      RawValue::Write(value, partition_key_template_tuple_,
           slot_desc, partition_key_pool_.get());
     }
     return Status::OK;
   }
-  
+
   stringstream ss;
-  ss << "file name '" << file << "' " 
+  ss << "file name '" << file << "' "
      << "does not match partition key regex (" << partition_key_regex_ << ")";
   return Status(ss.str());
 }
 
 // Find the start of the first full tuple in buffer by looking for the end of
 // the previous tuple.
-// TODO: most of this is not tested.  We need some tailored data to exercise the boundary 
+// TODO: most of this is not tested.  We need some tailored data to exercise the boundary
 // cases
 int HdfsTextScanNode::FindFirstTupleStart(char* buffer, int len) {
   int tuple_start = 0;
@@ -939,7 +939,7 @@ int HdfsTextScanNode::FindFirstTupleStart(char* buffer, int len) {
       __m128i xmm_buffer, xmm_tuple_mask;
       while (len - tuple_start >= SSEUtil::CHARS_PER_128_BIT_REGISTER) {
         // TODO: can we parallelize this as well?  Are there multiple sse execution units?
-        // Load the next 16 bytes into the xmm register and do strchr for the 
+        // Load the next 16 bytes into the xmm register and do strchr for the
         // tuple delimiter.
         xmm_buffer = _mm_loadu_si128(reinterpret_cast<__m128i*>(buffer));
         xmm_tuple_mask = _mm_cmpistrm(xmm_tuple_search_, xmm_buffer, SSEUtil::STRCHR_MODE);
@@ -969,8 +969,8 @@ int HdfsTextScanNode::FindFirstTupleStart(char* buffer, int len) {
   end:
     if (escape_char_ != '\0') {
       // Scan backwards for escape characters.  We do this after finding the tuple break rather
-      // than during the (above) forward scan to make the forward scan faster.  This will 
-      // perform worse if there are many characters right before the tuple break that are all 
+      // than during the (above) forward scan to make the forward scan faster.  This will
+      // perform worse if there are many characters right before the tuple break that are all
       // escape characters, but that is unlikely.
       int num_escape_chars = 0;
       int before_tuple_end = tuple_start - 2;
@@ -984,9 +984,9 @@ int HdfsTextScanNode::FindFirstTupleStart(char* buffer, int len) {
       // TODO: This sucks.  All the preceding characters before the tuple delim were
       // escape characters.  We need to read from the previous block to see what to do.
       DCHECK_GT(before_tuple_end, 0);
-      
+
       // An even number of escape characters means they cancel out and this tuple break
-      // is *not* escaped. 
+      // is *not* escaped.
       if (num_escape_chars % 2 == 0) {
         return tuple_start;
       }
@@ -996,4 +996,3 @@ int HdfsTextScanNode::FindFirstTupleStart(char* buffer, int len) {
   }
   return tuple_start;
 }
-
