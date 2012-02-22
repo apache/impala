@@ -4,6 +4,7 @@
 
 #include <glog/logging.h>
 
+#include "util/debug-util.h"
 #include "runtime/plan-executor.h"
 #include "testutil/test-env.h"
 #include "gen-cpp/ImpalaBackendService.h"
@@ -28,7 +29,7 @@ Coordinator::~Coordinator() {
   test_env_->ReleaseClients(clients_);
 }
 
-Status Coordinator::Exec(const TQueryExecRequest& request) {
+Status Coordinator::Exec(const TQueryExecRequest& request) { 
   // fragment 0 is the coordinator/"local" fragment that we're executing ourselves;
   // start this before starting any more plan fragments in backend threads, otherwise
   // they start sending data before the local exchange node had a chance to register
@@ -40,6 +41,11 @@ Status Coordinator::Exec(const TQueryExecRequest& request) {
   RETURN_IF_ERROR(executor_->Prepare(
       request.fragmentRequests[0], request.nodeRequestParams[0][0]));
   
+  query_profile_.reset(
+      new RuntimeProfile(obj_pool(), "Query(id=" + PrintId(request.queryId) + ")"));
+
+  COUNTER_SCOPED_TIMER(query_profile_->total_time_counter());
+
   // determine total number of fragments
   int num_threads = 0;
   // execNodes may contain empty list
@@ -47,7 +53,10 @@ Status Coordinator::Exec(const TQueryExecRequest& request) {
   for (int i = 1; i < request.fragmentRequests.size(); ++i) {
     num_threads += request.execNodes[i - 1].size();
   }
-  if (num_threads > 0) remote_exec_status_.resize(num_threads);
+  if (num_threads > 0) {
+    remote_exec_status_.resize(num_threads);
+    fragment_profiles_.resize(num_threads);
+  }
 
   // Start non-coord fragments on remote nodes;
   // fragmentRequests[i] can receive data from fragmentRequests[>i],
@@ -88,15 +97,29 @@ void Coordinator::ExecRemoteFragment(
     const TPlanExecRequest& request,
     const TPlanExecParams& params) {
   VLOG(1) << "making rpc: ExecPlanFragment";
-  TStatus thrift_status;
-  client->ExecPlanFragment(thrift_status, request, params);
+  TExecPlanFragmentResult thrift_result;
+  client->ExecPlanFragment(thrift_result, request, params);
   // TODO: abort query when we get an error status
-  remote_exec_status_[thread_num] = thrift_status;
+  remote_exec_status_[thread_num] = thrift_result.status;
+
+  // Grab the lock to gather fragment results
+  lock_guard<mutex> l(fragment_complete_lock_);
+
+  // Deserialize and set each fragment as a child of the coordinator profile.
+  fragment_profiles_[thread_num] = 
+      RuntimeProfile::CreateFromThrift(obj_pool(), thrift_result.profiles);
+  query_profile_->AddChild(fragment_profiles_[thread_num]);
 }
 
 Status Coordinator::GetNext(RowBatch** batch) {
+  COUNTER_SCOPED_TIMER(query_profile_->total_time_counter());
   Status result = executor_->GetNext(batch);
   VLOG(1) << "coord.getnext";
+  if (*batch == NULL) {
+    // Join the threads to collect all the perf counters
+    exec_thread_group_.join_all();
+    query_profile_->AddChild(executor_->query_profile());
+  }
   return result;
 }
 

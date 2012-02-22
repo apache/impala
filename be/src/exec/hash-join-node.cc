@@ -10,6 +10,7 @@
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
+#include "util/runtime-profile.h"
 
 #include "gen-cpp/PlanNodes_types.h"
 
@@ -53,7 +54,17 @@ Status HashJoinNode::Init(ObjectPool* pool, const TPlanNode& tnode) {
 }
 
 Status HashJoinNode::Prepare(RuntimeState* state) {
-  ExecNode::Prepare(state);
+  RETURN_IF_ERROR(ExecNode::Prepare(state));
+
+  build_time_counter_ = 
+      ADD_COUNTER(runtime_profile(), "BuildTime", TCounterType::CPU_TICKS);
+  probe_time_counter_ = 
+      ADD_COUNTER(runtime_profile(), "ProbeTime", TCounterType::CPU_TICKS);
+  build_size_counter_ = 
+      ADD_COUNTER(runtime_profile(), "BuildTuples", TCounterType::UNIT);
+  probe_size_counter_ =
+      ADD_COUNTER(runtime_profile(), "ProbeTuples", TCounterType::UNIT);
+
   // build and probe exprs are evaluated in the context of the rows produced by our
   // right and left children, respectively
   Expr::Prepare(build_exprs_, state, child(1)->row_desc());
@@ -69,12 +80,14 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
 }
 
 Status HashJoinNode::Open(RuntimeState* state) {
+  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   eos_ = false;
 
   // do a full scan of child(1) and store everything in hash_tbl_
   RowBatch build_batch(child(1)->row_desc(), state->batch_size());
   RETURN_IF_ERROR(child(1)->Open(state));
   while (true) {
+    COUNTER_SCOPED_TIMER(build_time_counter_);
     bool eos;
     RETURN_IF_ERROR(child(1)->GetNext(state, &build_batch, &eos));
     // take ownership of tuple data of build_batch
@@ -92,15 +105,18 @@ Status HashJoinNode::Open(RuntimeState* state) {
     if (eos) break;
     build_batch.Reset();
   }
+  COUNTER_UPDATE(build_size_counter_, hash_tbl_->size());
   RETURN_IF_ERROR(child(1)->Close(state));
 
   VLOG(1) << hash_tbl_->DebugString();
 
+  COUNTER_SCOPED_TIMER(probe_time_counter_);
   RETURN_IF_ERROR(child(0)->Open(state));
 
   // seed probe batch and current_probe_row_, etc.
   bool dummy;
   RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &dummy));
+  COUNTER_UPDATE(probe_size_counter_, probe_batch_->num_rows());
   probe_batch_pos_ = 0;
   if (probe_batch_->num_rows() == 0) {
     eos_ = true;
@@ -131,6 +147,8 @@ inline TupleRow* HashJoinNode::CreateOutputRow(
 }
 
 Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos) {
+  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
+  COUNTER_SCOPED_TIMER(probe_time_counter_);
   if (ReachedLimit()) {
     *eos = true;
     return Status::OK;
@@ -192,6 +210,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
         probe_batch_->TransferTupleData(out_batch);
         bool dummy;  // we ignore eos and use the # of returned rows instead
         RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &dummy));
+        COUNTER_UPDATE(probe_size_counter_, probe_batch_->num_rows());
         probe_batch_pos_ = 0;
         if (probe_batch_->num_rows() == 0) {
           // we're done; don't exit here, we might still need to finish up an outer join
@@ -236,6 +255,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
 
 Status HashJoinNode::Close(RuntimeState* state) {
   RETURN_IF_ERROR(child(0)->Close(state));
+  RETURN_IF_ERROR(ExecNode::Close(state));
   return Status::OK;
 }
 

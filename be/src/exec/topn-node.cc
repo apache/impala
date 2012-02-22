@@ -13,6 +13,7 @@
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
 #include "util/debug-util.h"
+#include "util/runtime-profile.h"
 
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/PlanNodes_types.h"
@@ -77,6 +78,7 @@ bool TopNNode::TupleRowLessThan::operator()(TupleRow* const& lhs, TupleRow* cons
 
 Status TopNNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
+  
   tuple_descs_ = child(0)->row_desc().tuple_descriptors();
   Expr::Prepare(lhs_ordering_exprs_, state, child(0)->row_desc());
   Expr::Prepare(rhs_ordering_exprs_, state, child(0)->row_desc());
@@ -84,6 +86,7 @@ Status TopNNode::Prepare(RuntimeState* state) {
 }
 
 Status TopNNode::Open(RuntimeState* state) {
+  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(child(0)->Open(state));
 
   RowBatch batch(child(0)->row_desc(), state->batch_size());
@@ -97,12 +100,13 @@ Status TopNNode::Open(RuntimeState* state) {
   } while (!eos);
   
   DCHECK_LE(priority_queue_.size(), limit_);
-  RETURN_IF_ERROR(children_[0]->Close(state));
+  RETURN_IF_ERROR(child(0)->Close(state));
   PrepareForOutput();
   return Status::OK;
 }
 
 Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   while (!row_batch->IsFull() && (get_next_iter_ != sorted_top_n_.end())) {
     int row_idx = row_batch->AddRow();
     TupleRow* dst_row = row_batch->GetRow(row_idx);
@@ -117,7 +121,7 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 }
 
 Status TopNNode::Close(RuntimeState* state) {
-  RETURN_IF_ERROR(child(0)->Close(state));
+  RETURN_IF_ERROR(ExecNode::Close(state));
   return Status::OK;
 }
 

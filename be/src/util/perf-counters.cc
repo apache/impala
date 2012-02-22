@@ -157,9 +157,9 @@ bool PerfCounters::InitSysCounter(Counter counter) {
   data.fd = fd;
 
   if (counter == PERF_COUNTER_SW_CPU_CLOCK) {
-    data.type = PrettyPrinter::TIME_MS;
+    data.type = TCounterType::TIME_MS;
   } else {
-    data.type = PrettyPrinter::UNIT;
+    data.type = TCounterType::UNIT;
   }
   counters_.push_back(data);
   return true;
@@ -169,7 +169,7 @@ bool PerfCounters::InitProcSelfIOCounter(Counter counter) {
   CounterData data;
   data.counter = counter;
   data.source = PerfCounters::PROC_SELF_IO;
-  data.type = PrettyPrinter::BYTES;
+  data.type = TCounterType::BYTES;
 
   switch (counter) {
     case PerfCounters::PERF_COUNTER_BYTES_READ:
@@ -196,7 +196,7 @@ bool PerfCounters::GetSysCounters(vector<int64_t>& buffer) {
     if (counters_[i].source == SYS_PERF_COUNTER) {
       int num_bytes = read(counters_[i].fd, &buffer[i], COUNTER_SIZE);
       if (num_bytes != COUNTER_SIZE) return false;
-      if (counters_[i].type == PrettyPrinter::TIME_MS) {
+      if (counters_[i].type == TCounterType::TIME_MS) {
         buffer[i] /= 1000000;
       }
     }

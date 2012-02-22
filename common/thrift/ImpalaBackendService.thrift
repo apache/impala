@@ -9,6 +9,7 @@ include "Descriptors.thrift"
 include "PlanNodes.thrift"
 include "DataSinks.thrift"
 include "Data.thrift"
+include "RuntimeProfile.thrift"
 
 struct THostPort {
   1: required string host
@@ -51,6 +52,13 @@ struct TPlanExecRequest {
   // the data to a remote plan fragment, 
   // or a sink which writes to a table (for insert stmts).
   5: optional DataSinks.TDataSink dataSink
+}
+
+// TExecPlanFragmentResult encapsulates the result of running a plan fragment.  It contains
+// the status result and performance counters.
+struct TExecPlanFragmentResult {
+  1: required Types.TStatus status
+  2: required RuntimeProfile.TRuntimeProfileTree profiles
 }
 
 // TQueryExecRequest encapsulates everything needed to execute all plan fragments
@@ -97,7 +105,7 @@ struct TQueryExecRequest {
 
 service ImpalaBackendService {
   // Synchronous execution of plan fragment. Returns completion status.
-  Types.TStatus ExecPlanFragment(1:TPlanExecRequest request, 2:TPlanExecParams params);
+  TExecPlanFragmentResult ExecPlanFragment(1:TPlanExecRequest request, 2:TPlanExecParams params);
 
   // Transmit single row batch. Returns error indication if queryId or destNodeId
   // are unknown or if data couldn't be read.

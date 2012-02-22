@@ -52,6 +52,8 @@ void CpuInfo::Init() {
   string name;
   string value;
   
+  float max_mhz = 0;
+
   // Read from /proc/cpuinfo
   ifstream cpuinfo("/proc/cpuinfo", ios::in);
   while (cpuinfo) {
@@ -64,6 +66,14 @@ void CpuInfo::Init() {
       if (name.compare("flags") == 0) {
         trim(value);
         hardware_flags_ |= ParseCPUFlags(value);
+      } else if (name.compare("cpu MHz") == 0) {
+        trim(value);
+        // Every core will report a different speed.  We'll take the max, assuming
+        // that when impala is running, the core will not be in a lower power state.
+        // TODO: is there a more robust way to do this, such as
+        // Window's QueryPerformanceFrequency()
+        float mhz = atof(value.c_str());
+        max_mhz = max(mhz, max_mhz);
       }
     }
   }
@@ -73,6 +83,12 @@ void CpuInfo::Init() {
   cache_sizes_[0] = sysconf(_SC_LEVEL1_DCACHE_SIZE);
   cache_sizes_[1] = sysconf(_SC_LEVEL2_CACHE_SIZE);
   cache_sizes_[2] = sysconf(_SC_LEVEL3_CACHE_SIZE);
+
+  if (max_mhz != 0) {
+    cycles_per_ms_ = max_mhz * 1000;
+  } else {
+    cycles_per_ms_ = 1000000;
+  }
 }
 
 ostream& operator<<(ostream& stream, const CpuInfo& info) {
@@ -80,9 +96,9 @@ ostream& operator<<(ostream& stream, const CpuInfo& info) {
   int64_t L2 = info.CacheSize(CpuInfo::L2_CACHE);
   int64_t L3 = info.CacheSize(CpuInfo::L3_CACHE);
   stream << "Cpu Info:" << endl;
-  stream << "  L1 Cache: " << PrettyPrinter::Print(L1, PrettyPrinter::BYTES) << endl;
-  stream << "  L2 Cache: " << PrettyPrinter::Print(L2, PrettyPrinter::BYTES) << endl;
-  stream << "  L3 Cache: " << PrettyPrinter::Print(L3, PrettyPrinter::BYTES) << endl;
+  stream << "  L1 Cache: " << PrettyPrinter::Print(L1, TCounterType::BYTES) << endl;
+  stream << "  L2 Cache: " << PrettyPrinter::Print(L2, TCounterType::BYTES) << endl;
+  stream << "  L3 Cache: " << PrettyPrinter::Print(L3, TCounterType::BYTES) << endl;
   stream << "  Hardware Supports:" << endl;
   for (int i = 0; i < num_flags; ++i) {
     if (info.IsSupported(flag_mappings[i].flag)) {

@@ -14,8 +14,6 @@ namespace impala {
 TEST(PerfCounterTest, Basic) { 
   PerfCounters counters;
   EXPECT_TRUE(counters.AddDefaultCounters());
-  EXPECT_TRUE(counters.AddCounter(PerfCounters::PERF_COUNTER_SW_CONTEXT_SWITCHES));
-  EXPECT_TRUE(counters.AddCounter(PerfCounters::PERF_COUNTER_SW_CPU_MIGRATIONS));
 
   counters.Snapshot("Before");
 

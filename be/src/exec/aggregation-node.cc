@@ -15,6 +15,7 @@
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
 #include "util/debug-util.h"
+#include "util/runtime-profile.h"
 
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/PlanNodes_types.h"
@@ -134,6 +135,7 @@ bool AggregationNode::GroupingExprEquals::operator()(
 
 Status AggregationNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
+
   agg_tuple_desc_ = state->desc_tbl().GetTupleDescriptor(agg_tuple_id_);
   Expr::Prepare(grouping_exprs_, state, child(0)->row_desc());
   Expr::Prepare(aggregate_exprs_, state, child(0)->row_desc());
@@ -159,6 +161,8 @@ Status AggregationNode::Prepare(RuntimeState* state) {
 }
 
 Status AggregationNode::Open(RuntimeState* state) {
+  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
+
   RETURN_IF_ERROR(children_[0]->Open(state));
 
   RowBatch batch(children_[0]->row_desc(), state->batch_size());
@@ -215,6 +219,7 @@ Status AggregationNode::Open(RuntimeState* state) {
 }
 
 Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   if (ReachedLimit()) {
     *eos = true;
     return Status::OK;
@@ -239,6 +244,7 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
 }
 
 Status AggregationNode::Close(RuntimeState* state) {
+  RETURN_IF_ERROR(ExecNode::Close(state));
   return Status::OK;
 }
 

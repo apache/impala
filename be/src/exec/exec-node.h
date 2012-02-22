@@ -8,11 +8,13 @@
 
 #include "common/status.h"
 #include "runtime/descriptors.h"  // for RowDescriptor
+#include "util/runtime-profile.h"
 
 namespace impala {
 
 class Expr;
 class ObjectPool;
+class Counters;
 class RowBatch;
 struct RuntimeState;
 class TPlan;
@@ -50,7 +52,9 @@ class ExecNode {
 
   // Releases all resources that were allocated in Open()/GetNext().
   // Must call Open() again prior to subsequent calls to GetNext().
-  virtual Status Close(RuntimeState* state) = 0;
+  // Close() should be called once for every call to Open()
+  // Default implementation updates runtime profile counters.
+  virtual Status Close(RuntimeState* state);
 
   // Creates exec node tree from list of nodes contained in plan via depth-first
   // traversal. All nodes are placed in pool.
@@ -75,6 +79,8 @@ class ExecNode {
   int id() const { return id_; }
   const RowDescriptor& row_desc() const { return row_descriptor_; }
 
+  RuntimeProfile* runtime_profile() { return runtime_profile_.get(); }
+
  protected:
   int id_;  // unique w/in single plan tree
   ObjectPool* pool_;
@@ -84,6 +90,9 @@ class ExecNode {
 
   int64_t limit_;  // -1: no limit
   int64_t num_rows_returned_;
+
+  boost::scoped_ptr<RuntimeProfile> runtime_profile_;
+  RuntimeProfile::Counter* rows_returned_counter_;
 
   ExecNode* child(int i) { return children_[i]; }
 
@@ -105,6 +114,8 @@ class ExecNode {
   bool ReachedLimit() { return limit_ != -1 && num_rows_returned_ == limit_; }
 
   virtual bool IsScanNode() const { return false; }
+
+  void InitRuntimeProfile(const std::string& name);
 };
 
 }

@@ -72,6 +72,11 @@ class HashJoinNode : public ExecNode {
   int probe_batch_pos_;  // current scan pos in probe_batch_
   TupleRow* current_probe_row_;
 
+  RuntimeProfile::Counter* build_time_counter_;   // time to build hash table
+  RuntimeProfile::Counter* probe_time_counter_;   // time to probe
+  RuntimeProfile::Counter* build_size_counter_;   // num build tuples
+  RuntimeProfile::Counter* probe_size_counter_;   // num probe tuples
+
   // set up build_- and probe_exprs_
   Status Init(ObjectPool* pool, const TPlanNode& tnode);
 

@@ -6,6 +6,7 @@
 #include "runtime/row-batch.h"
 #include "runtime/string-value.h"
 #include "util/jni-util.h"
+#include "util/runtime-profile.h"
 #include "gen-cpp/PlanNodes_types.h"
 
 using namespace std;
@@ -29,18 +30,20 @@ HBaseScanNode::HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode,
       text_converter_(new TextConverter('\\', tuple_pool_.get())) {
 }
 
+
 bool HBaseScanNode::CmpColPos(const SlotDescriptor* a, const SlotDescriptor* b) {
   return a->col_pos() < b->col_pos();
 }
 
 Status HBaseScanNode::Prepare(RuntimeState* state) {
+  RETURN_IF_ERROR(ExecNode::Prepare(state));
+
   JNIEnv* env = getJNIEnv();
   if (env == NULL) {
     return Status("Failed to get/create JVM");
   }
   hbase_scanner_.reset(new HBaseTableScanner(env));
 
-  PrepareConjuncts(state);
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   if (tuple_desc_ == NULL) {
     // TODO: make sure we print all available diagnostic output to our error log
@@ -80,6 +83,7 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
 }
 
 Status HBaseScanNode::Open(RuntimeState* state) {
+  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   return hbase_scanner_->StartScan(tuple_desc_, start_key_, stop_key_, filters_);
 }
 
@@ -100,6 +104,7 @@ void HBaseScanNode::WriteTextSlot(
 }
 
 Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   if (ReachedLimit()) {
     *eos = true;
     return Status::OK;
@@ -210,6 +215,7 @@ Status HBaseScanNode::Close(RuntimeState* state) {
   if (num_errors_ > 0) {
     state->ReportFileErrors(table_name_, num_errors_);
   }
+  RETURN_IF_ERROR(ExecNode::Close(state));
   return Status::OK;
 }
 

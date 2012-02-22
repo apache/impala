@@ -88,7 +88,7 @@ class PerfCounters {
   struct CounterData {
     Counter counter;
     DataSource source;
-    PrettyPrinter::DataType type;
+    TCounterType::type type;
     
     // DataSource specific data.  This is used to pull the counter values.
     union {

@@ -21,6 +21,7 @@
 #include "gen-cpp/ImpalaPlanService_types.h"
 #include "util/jni-util.h"
 #include "util/perf-counters.h"
+#include "util/runtime-profile.h"
 #include "util/stat-util.h"
 #include "runtime/data-stream-mgr.h"
 
@@ -68,19 +69,23 @@ static void Exec(DataStreamMgr* stream_mgr, TestEnv* test_env) {
     }
   }
   
-  PerfCounters counters;
+  PerfCounters hw_counters;
   if (FLAGS_enable_counters) {
-    counters.AddDefaultCounters();
-    counters.Snapshot("Setup");
+    hw_counters.AddDefaultCounters();
+    hw_counters.Snapshot("Setup");
   }
+
+  ObjectPool profile_pool;
 
   for (vector<string>::const_iterator iter = queries.begin(); 
       iter != queries.end(); ++iter) {
     if (iter->size() == 0) continue;
-
+  
     if (queries.size() > 0) {
       cout << "Running query: " << *iter << endl;
     }
+
+    RuntimeProfile aggregate_profile(&profile_pool, "RunQuery");
 
     for (int i = 0; i < FLAGS_iterations; ++i) {
       QueryExecutor executor(stream_mgr, test_env);
@@ -107,7 +112,7 @@ static void Exec(DataStreamMgr* stream_mgr, TestEnv* test_env) {
       elapsed_times[i] = elapsed_usec;
     
       if (FLAGS_enable_counters) {
-        counters.Snapshot("Query");
+        hw_counters.Snapshot("Query");
       }
 
       if (executor.ErrorString().size() > 0 || executor.FileErrors().size() > 0) {
@@ -117,10 +122,15 @@ static void Exec(DataStreamMgr* stream_mgr, TestEnv* test_env) {
         cout << executor.FileErrors() << endl;
         break;
       }
-    }
     
-    num_rows /= FLAGS_iterations;
-
+      RuntimeProfile* profile = executor.query_profile();
+      if (FLAGS_iterations > 1 && profile->children().size() == 1) {
+        // Rename the query to drop the query id so the results merge
+        profile->children()[0]->Rename("Query");
+      }
+      aggregate_profile.Merge(*profile);
+    }
+  
     if (FLAGS_iterations == 1) {
       cout << "returned " << num_rows << (num_rows == 1 ? " row" : " rows")
           << " in " << setiosflags(ios::fixed) << setprecision(3)
@@ -134,12 +144,15 @@ static void Exec(DataStreamMgr* stream_mgr, TestEnv* test_env) {
           << setiosflags(ios::fixed) << setprecision(3) << stddev/1000000.0
           << " s" << endl << endl;
     }
+  
+    aggregate_profile.PrettyPrint(&cout);
+    cout << endl;
   }
 
   if (FLAGS_enable_counters) {
-    counters.PrettyPrint(&cout);
+    hw_counters.PrettyPrint(&cout);
   }
-  
+    
   if (enable_profiling) {
     const char* profile = GetHeapProfile();
     fputs(profile, stdout);

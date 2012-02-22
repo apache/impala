@@ -20,6 +20,7 @@
 #include "runtime/string-value.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
+#include "util/runtime-profile.h"
 #include "util/sse-util.h"
 #include "util/string-parser.h"
 #include "common/object-pool.h"
@@ -87,7 +88,19 @@ static string AppendHdfsErrorMessage(const string& message) {
 }
 
 Status HdfsTextScanNode::Prepare(RuntimeState* state) {
-  PrepareConjuncts(state);
+  RETURN_IF_ERROR(ExecNode::Prepare(state));
+
+  hdfs_time_counter_ = 
+      ADD_COUNTER(runtime_profile(), "HdfsTime", TCounterType::CPU_TICKS);
+  bytes_read_counter_ =
+      ADD_COUNTER(runtime_profile(), "BytesRead", TCounterType::BYTES);
+  parse_time_counter_ =
+      ADD_COUNTER(runtime_profile(), "ParseTime", TCounterType::CPU_TICKS);
+  tuple_write_time_counter_ = 
+      ADD_COUNTER(runtime_profile(), "TupleWriteTime", TCounterType::CPU_TICKS);
+  rows_read_counter_ =
+      ADD_COUNTER(runtime_profile(), "RowsRead", TCounterType::UNIT);
+  
   // Initialize ptr to end, to initiate reading the first file block
   file_buffer_ptr_ = file_buffer_end_;
 
@@ -174,6 +187,8 @@ Status HdfsTextScanNode::Prepare(RuntimeState* state) {
 }
 
 Status HdfsTextScanNode::Open(RuntimeState* state) {
+  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
+  COUNTER_SCOPED_TIMER(hdfs_time_counter_);
   hdfs_connection_ = state->fs_cache()->GetDefaultConnection();
   if (hdfs_connection_ == NULL) {
     return Status(AppendHdfsErrorMessage("Failed to connect to HDFS."));
@@ -184,10 +199,12 @@ Status HdfsTextScanNode::Open(RuntimeState* state) {
 
 Status HdfsTextScanNode::Close(RuntimeState* state) {
   DCHECK(hdfs_file_ == NULL);
+  RETURN_IF_ERROR(ExecNode::Close(state));
   return Status::OK;
 }
 
 Status HdfsTextScanNode::CloseCurrentFile(RuntimeState* state) {
+  COUNTER_SCOPED_TIMER(hdfs_time_counter_);
   if (hdfs_file_ == NULL) return Status::OK;
   int hdfs_ret = hdfsCloseFile(hdfs_connection_, hdfs_file_);
   const string& path = current_file_scan_ranges_->first;
@@ -209,12 +226,17 @@ Status HdfsTextScanNode::HdfsRead(RuntimeState* state, int size) {
     file_buffer_ = file_buffer_pool_->Allocate(state->file_buffer_size());
     reuse_file_buffer_ = true;
   }
-  file_buffer_read_size_ = hdfsReadDirect(hdfs_connection_, hdfs_file_, file_buffer_, size);
-  if (file_buffer_read_size_ == -1) {
-    return Status(AppendHdfsErrorMessage("Failed to read from hdfs."));
+  {
+    COUNTER_SCOPED_TIMER(hdfs_time_counter_);
+    file_buffer_read_size_ = hdfsReadDirect(hdfs_connection_, hdfs_file_, 
+        file_buffer_, size);
+    if (file_buffer_read_size_ == -1) {
+      return Status(AppendHdfsErrorMessage("Failed to read from hdfs."));
+    }
   }
   file_buffer_end_ = file_buffer_ + file_buffer_read_size_;
   file_buffer_ptr_ = file_buffer_;
+  COUNTER_UPDATE(bytes_read_counter_, file_buffer_read_size_);
   return Status::OK;
 }
 
@@ -272,6 +294,7 @@ Status HdfsTextScanNode::InitCurrentScanRange(RuntimeState* state) {
 }
 
 Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   if (ReachedLimit() || per_file_scan_ranges_.empty()) {
     *eos = true;
     return Status::OK;
@@ -368,6 +391,7 @@ Status HdfsTextScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool*
     current_range_remaining_len_ -= bytes_processed;
     DCHECK_GT(bytes_processed, 0);
 
+    COUNTER_UPDATE(rows_read_counter_, num_tuples);
     if (num_fields != 0) {
       RETURN_IF_ERROR(WriteFields(state, row_batch, num_fields, &row_idx, &line_start));
     } else if (num_tuples != 0) {
@@ -471,6 +495,7 @@ inline void ProcessEscapeMask(int escape_mask, bool* last_char_is_escape, int* f
 //  Result   = '101000000001101'
 Status HdfsTextScanNode::ParseFileBuffer(int max_tuples, int* num_tuples, int* num_fields,
     char** column_start) {
+  COUNTER_SCOPED_TIMER(parse_time_counter_);
 
   // Start of this batch.
   *column_start = file_buffer_ptr_;
@@ -638,6 +663,8 @@ Status HdfsTextScanNode::ParseFileBuffer(int max_tuples, int* num_tuples, int* n
 //   3. If it passes, stamp out 'num_tuples' copies of it into the row_batch.
 Status HdfsTextScanNode::WriteTuples(RuntimeState* state, RowBatch* row_batch, int num_tuples,
     int* row_idx, char** line_start) {
+  COUNTER_SCOPED_TIMER(tuple_write_time_counter_);
+  
   DCHECK_GT(num_tuples, 0);
 
   *line_start = file_buffer_ptr_;
@@ -681,6 +708,7 @@ Status HdfsTextScanNode::WriteTuples(RuntimeState* state, RowBatch* row_batch, i
 // if we determine it's not a match.
 Status HdfsTextScanNode::WriteFields(RuntimeState* state, RowBatch* row_batch, int num_fields,
     int* row_idx, char** line_start) {
+  COUNTER_SCOPED_TIMER(tuple_write_time_counter_);
   DCHECK_GT(num_fields, 0);
 
   // Keep track of where lines begin as we write out fields for error reporting

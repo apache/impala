@@ -44,7 +44,7 @@ class ImpalaBackend : public ImpalaBackendServiceIf {
       fs_cache_(fs_cache) {}
 
   void ExecPlanFragment(
-      TStatus& return_val, const TPlanExecRequest& request,
+      TExecPlanFragmentResult& return_val, const TPlanExecRequest& request,
       const TPlanExecParams& params);
 
   void TransmitData(
@@ -59,18 +59,20 @@ class ImpalaBackend : public ImpalaBackendServiceIf {
   HdfsFsCache* fs_cache_;  // not owned
 
   Status ExecPlanFragment(
-      const TPlanExecRequest& request, const TPlanExecParams& params);
+      const TPlanExecRequest& request, const TPlanExecParams& params, 
+      vector<TRuntimeProfileNode>* profiles);
 };
 
 
 void ImpalaBackend::ExecPlanFragment(
-    TStatus& return_val, const TPlanExecRequest& request,
+    TExecPlanFragmentResult& return_val, const TPlanExecRequest& request,
     const TPlanExecParams& params) {
-  ExecPlanFragment(request, params).ToThrift(&return_val);
+  ExecPlanFragment(request, params, &return_val.profiles.nodes).ToThrift(&return_val.status);
 }
 
 Status ImpalaBackend::ExecPlanFragment(
-    const TPlanExecRequest& request, const TPlanExecParams& params) {
+    const TPlanExecRequest& request, const TPlanExecParams& params,
+    vector<TRuntimeProfileNode>* profiles) {
   VLOG(1) << "starting ExecPlanFragment";
   if (request.dataSink.dataSinkType != TDataSinkType::DATA_STREAM_SINK) {
     Status status("output type other than data stream not supported");
@@ -106,6 +108,8 @@ Status ImpalaBackend::ExecPlanFragment(
     batch = NULL;
   }
   RETURN_IF_ERROR(sender.Close());
+
+  executor.query_profile()->ToThrift(profiles);
 
   VLOG(1) << "finished ExecPlanFragment";
   return Status::OK;

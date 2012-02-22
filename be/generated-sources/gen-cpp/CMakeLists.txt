@@ -28,6 +28,8 @@ set(SRC_FILES
   Opcodes_types.cpp
   PlanNodes_constants.cpp
   PlanNodes_types.cpp
+  RuntimeProfile_constants.cpp
+  RuntimeProfile_types.cpp
   Types_constants.cpp
   Types_types.cpp
   )

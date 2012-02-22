@@ -23,7 +23,6 @@ class TupleDescriptor;
 class MemPool;
 class Tuple;
 class SlotDescriptor;
-class stringstream;
 class Expr;
 class TextConverter;
 

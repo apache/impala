@@ -54,6 +54,10 @@ target_link_libraries(expr-test
   Util
   thrift
   ImpalaThrift
+  Exec
+  Exprs
+  Opcode
+  Exprs
   gtest
   ${Boost_LIBRARIES}
 )

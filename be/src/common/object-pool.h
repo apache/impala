@@ -4,6 +4,7 @@
 #define IMPALA_COMMON_OBJECT_POOL_H
 
 #include <vector>
+#include <boost/thread/mutex.hpp>
 
 namespace impala {
 

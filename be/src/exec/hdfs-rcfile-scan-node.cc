@@ -14,6 +14,7 @@
 #include "runtime/tuple.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/string-value.h"
+#include "util/runtime-profile.h"
 #include "common/object-pool.h"
 #include "gen-cpp/PlanNodes_types.h"
 
@@ -55,7 +56,7 @@ Status HdfsRCFileScanNode::Init(ObjectPool* pool, const TPlanNode& tnode) {
 }
 
 Status HdfsRCFileScanNode::Prepare(RuntimeState* state) {
-  PrepareConjuncts(state);
+  RETURN_IF_ERROR(ExecNode::Prepare(state));
 
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   if (tuple_desc_ == NULL) {
@@ -114,6 +115,7 @@ Status HdfsRCFileScanNode::Prepare(RuntimeState* state) {
 }
 
 Status HdfsRCFileScanNode::Open(RuntimeState* state) {
+  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   hdfs_connection_ = state->fs_cache()->GetDefaultConnection();
   if (hdfs_connection_ == NULL) {
     // TODO: make sure we print all available diagnostic output to our error log
@@ -130,11 +132,14 @@ Status HdfsRCFileScanNode::Open(RuntimeState* state) {
 }
 
 Status HdfsRCFileScanNode::Close(RuntimeState* state) {
+  RETURN_IF_ERROR(ExecNode::Close(state));
   return Status::OK;
 }
 
 Status HdfsRCFileScanNode::GetNext(
     RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
+  
   // Indicates whether the current row has errors.
   bool error_in_row = false;
   

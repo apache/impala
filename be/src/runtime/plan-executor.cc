@@ -85,6 +85,7 @@ Status PlanExecutor::Open() {
 Status PlanExecutor::GetNext(RowBatch** batch) {
   if (done_) {
     *batch = NULL;
+    RETURN_IF_ERROR(plan_->Close(runtime_state_.get()));
     return Status::OK;
   }
 
@@ -114,6 +115,13 @@ Status PlanExecutor::GetNext(RowBatch** batch) {
 
 const RowDescriptor& PlanExecutor::row_desc() {
   return plan_->row_desc();
+}
+
+RuntimeProfile* PlanExecutor::query_profile() {
+  // TODO: allow printing the query profile while the query is running as a way
+  // to monitor the query status
+  DCHECK(done_);
+  return plan_->runtime_profile();
 }
 
 }

@@ -87,6 +87,10 @@ target_link_libraries(data-stream-test
   Util
   thrift
   ImpalaThrift
+  Exec
+  Exprs
+  Opcode
+  Exprs
   gtest
   ${Boost_LIBRARIES}
 )

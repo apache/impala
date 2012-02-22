@@ -44,6 +44,9 @@ class CpuInfo {
   // Returns the size of the cache in KB at this cache level
   long CacheSize(CacheLevel level) const { return cache_sizes_[level]; }
 
+  // Returns the number of cpu cycles per millisecond
+  int64_t cycles_per_ms() const { return cycles_per_ms_; }
+
  private:
   static CpuInfo* instance_;
 
@@ -52,6 +55,7 @@ class CpuInfo {
 
   int64_t hardware_flags_;
   long cache_sizes_[L3_CACHE + 1];
+  int64_t cycles_per_ms_;
 };
 
 // Prints the cpu information

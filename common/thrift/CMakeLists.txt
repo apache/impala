@@ -73,6 +73,7 @@ set (SRC_FILES
   ImpalaPlanService.thrift
   ImpalaService.thrift
   PlanNodes.thrift
+  RuntimeProfile.thrift
   Types.thrift
   ${GENERATES_SRC_FILES}
 )

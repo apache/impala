@@ -63,7 +63,8 @@ QueryExecutor::QueryExecutor(DataStreamMgr* stream_mgr, TestEnv* test_env)
     stream_mgr_(stream_mgr),
     test_env_(test_env),
     row_batch_(NULL),
-    next_row_(0) {
+    next_row_(0),
+    obj_pool_(new ObjectPool()) {
 }
 
 QueryExecutor::~QueryExecutor() {
@@ -155,9 +156,15 @@ Status QueryExecutor::Setup() {
 
 Status QueryExecutor::Exec(
     const std::string& query, vector<PrimitiveType>* col_types) {
+  query_profile_.reset(new RuntimeProfile(obj_pool_.get(), "QueryExecutor"));
+  RuntimeProfile::Counter* plan_gen_counter = 
+      ADD_COUNTER(query_profile_, "PlanGeneration", TCounterType::CPU_TICKS);
+
+  COUNTER_SCOPED_TIMER(query_profile_->total_time_counter());
   VLOG(1) << "query: " << query;
   eos_ = false;
   try {
+    COUNTER_SCOPED_TIMER(plan_gen_counter);
     CHECK(client_.get() != NULL) << "didn't call QueryExecutor::Setup()";
     client_->GetExecRequest(query_request_, query.c_str(), FLAGS_num_nodes);
   } catch (TException& e) {
@@ -205,6 +212,7 @@ Status QueryExecutor::Exec(
   RETURN_IF_ERROR(PrepareSelectListExprs(
       coord_->runtime_state(), coord_->row_desc(), col_types));
 
+  query_profile_->AddChild(coord_->query_profile());
   return Status::OK;
 }
 
@@ -233,6 +241,7 @@ Status QueryExecutor::FetchResult(RowBatch** batch) {
 }
 
 Status QueryExecutor::FetchResult(std::string* result) {
+  COUNTER_SCOPED_TIMER(query_profile_->total_time_counter());
   vector<void*> row;
   RETURN_IF_ERROR(FetchResult(&row));
   result->clear();
@@ -247,6 +256,7 @@ Status QueryExecutor::FetchResult(std::string* result) {
 }
 
 Status QueryExecutor::FetchResult(std::vector<void*>* select_list_values) {
+  COUNTER_SCOPED_TIMER(query_profile_->total_time_counter());
   select_list_values->clear();
   if (coord_.get() == NULL) {
     // query without FROM clause: we return exactly one row
@@ -324,4 +334,8 @@ std::string QueryExecutor::FileErrors() const {
     return "";
   }
   return coord_->runtime_state()->FileErrors();
+}
+
+RuntimeProfile* QueryExecutor::query_profile() {
+  return query_profile_.get();
 }

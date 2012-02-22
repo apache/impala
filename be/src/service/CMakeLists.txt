@@ -70,6 +70,10 @@ target_link_libraries(runquery
   thrift
   ImpalaThrift
   Service
+  Exec
+  Exprs
+  Opcode
+  Exprs
   ${Boost_LIBRARIES}  
   gflagsstatic
   tcmallocstatic

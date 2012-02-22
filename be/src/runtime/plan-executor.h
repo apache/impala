@@ -17,6 +17,7 @@ class ExecNode;
 class RowDescriptor;
 class RowBatch;
 class DataStreamMgr;
+class RuntimeProfile;
 class RuntimeState;
 class TRowBatch;
 class TPlanExecRequest;
@@ -37,10 +38,13 @@ class PlanExecutor {
 
   // Return results through 'batch'. Sets '*batch' to NULL if no more results.
   // '*batch' is owned by PlanExecutor and must not be deleted.
+  // GetNext should not be called after *batch == NULL.
   Status GetNext(RowBatch** batch);
 
   RuntimeState* runtime_state() { return runtime_state_.get(); }
   const RowDescriptor& row_desc();
+
+  RuntimeProfile* query_profile();
 
  private:
   DataStreamMgr* stream_mgr_;

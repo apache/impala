@@ -44,7 +44,8 @@ class ImpalaBackend : public ImpalaBackendServiceIf {
   virtual ~ImpalaBackend() {}
 
   virtual void ExecPlanFragment(
-      TStatus& _return, const TPlanExecRequest& request, const TPlanExecParams& params) {
+      TExecPlanFragmentResult& _return, const TPlanExecRequest& request, 
+      const TPlanExecParams& params) {
   }
 
   virtual void TransmitData(

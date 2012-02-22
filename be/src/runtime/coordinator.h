@@ -9,6 +9,7 @@
 #include <boost/thread/thread.hpp>
 
 #include "common/status.h"
+#include "util/runtime-profile.h"
 
 namespace impala {
 
@@ -62,6 +63,8 @@ class Coordinator {
   RuntimeState* runtime_state();
   const RowDescriptor& row_desc() const;
 
+  RuntimeProfile* query_profile() { return query_profile_.get(); }
+
  private:
   std::string host_;
   int port_;
@@ -82,6 +85,16 @@ class Coordinator {
 
   // group for exec threads
   boost::thread_group exec_thread_group_;
+
+  // Aggregate counters for the entire query.
+  boost::scoped_ptr<RuntimeProfile> query_profile_;
+
+  // Lock to synchronize state when fragments complete.  This lock protects access
+  // to the ObjectPool returned by obj_pool() and the query_profile_.
+  boost::mutex fragment_complete_lock_;
+
+  // Runtime profiles for fragments.  Profiles stored in profile_pool_
+  std::vector<RuntimeProfile*> fragment_profiles_;
 
   // Wrapper for ExecPlanFragment() rpc.
   void ExecRemoteFragment(

@@ -9,6 +9,7 @@
 #include "runtime/raw-value.h"
 #include "runtime/tuple-row.h"
 #include "runtime/row-batch.h"
+#include "util/cpu-info.h"
 #include "gen-cpp/Opcodes_types.h"
 
 #define PRECISION 2
@@ -43,6 +44,21 @@ ostream& operator<<(ostream& os, const TAggregationOp::type& op) {
     os << i->second;
   }
   return os;
+}
+
+string PrintId(const TUniqueId& id) {
+  stringstream out;
+  out << id.hi << "|" << id.lo;
+  return out.str();
+}
+
+string PrintPlanNodeType(const TPlanNodeType::type& type) {
+  map<int, const char*>::const_iterator i;
+  i = _TPlanNodeType_VALUES_TO_NAMES.find(type);
+  if (i != _TPlanNodeType_VALUES_TO_NAMES.end()) {
+    return i->second;
+  }
+  return "Invalid plan node type";
 }
 
 string PrintTuple(const Tuple* t, const TupleDescriptor& d) {
@@ -81,11 +97,11 @@ string PrintRow(TupleRow* row, const RowDescriptor& d) {
   return out.str();
 }
 
-string PrettyPrinter::Print(int64_t value, DataType type) {
+string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
   stringstream ss;
   ss.flags(ios::fixed);
   switch (type) {
-    case UNIT:
+    case TCounterType::UNIT:
       if (value >= MILLION) {
         ss << setprecision(PRECISION) << value / 1000000. << "M";
       } else if (value >= THOUSAND) {
@@ -95,7 +111,10 @@ string PrettyPrinter::Print(int64_t value, DataType type) {
       }
       break;
 
-    case TIME_MS:
+    case TCounterType::CPU_TICKS:
+      value /= CpuInfo::Instance()->cycles_per_ms();
+      // fall-through
+    case TCounterType::TIME_MS:
       if (value == 0 ) {
         ss << "0";
         break;
@@ -122,7 +141,7 @@ string PrettyPrinter::Print(int64_t value, DataType type) {
       }
       break;
 
-    case BYTES:
+    case TCounterType::BYTES:
       if (value == 0) {
         ss << value;
       } else if (value > GIGABYTE) {
@@ -135,7 +154,9 @@ string PrettyPrinter::Print(int64_t value, DataType type) {
         ss << value << " B";
       }
       break;
+
     default:
+      DCHECK(false);
       break;
   }
   return ss.str();

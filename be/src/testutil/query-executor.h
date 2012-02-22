@@ -30,6 +30,7 @@ class TRowBatch;
 class TestEnv;
 class ImpalaPlanServiceClient;
 class ImpalaBackendServiceClient;
+class RuntimeProfile;
 class TPlanExecRequest;
 class TScanRange;
 class TPlanExecParams;
@@ -83,6 +84,9 @@ class QueryExecutor {
   // Returns a string representation of the file_errors_.
   std::string FileErrors() const;
 
+  // Returns the counters for the entire query
+  RuntimeProfile* query_profile();
+
  private:
   // plan service-related
   boost::shared_ptr<apache::thrift::transport::TTransport> socket_;
@@ -94,6 +98,7 @@ class QueryExecutor {
   TQueryExecRequest query_request_;
   boost::scoped_ptr<Coordinator> coord_;
   boost::scoped_ptr<RuntimeState> local_state_;  // only for queries w/o FROM clause
+  boost::scoped_ptr<RuntimeProfile> query_profile_; 
   DataStreamMgr* stream_mgr_;
   TestEnv* test_env_;
   std::vector<Expr*> select_list_exprs_;
@@ -101,6 +106,7 @@ class QueryExecutor {
   int next_row_;  // to return from row batch
   int num_rows_;  // total # of rows returned for current query
   bool eos_;  // if true, no more rows/batches for current query
+  boost::scoped_ptr<ObjectPool> obj_pool_;
 
   // Prepare select list expressions of coord fragment.
   Status PrepareSelectListExprs(

@@ -8,6 +8,7 @@
 #include "runtime/data-stream-mgr.h"
 #include "runtime/runtime-state.h"
 #include "runtime/row-batch.h"
+#include "util/runtime-profile.h"
 #include "gen-cpp/PlanNodes_types.h"
 
 using namespace impala;
@@ -23,6 +24,7 @@ ExchangeNode::ExchangeNode(
 
 Status ExchangeNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
+  
   // TODO: figure out appropriate buffer size
   stream_recvr_.reset(state->stream_mgr()->CreateRecvr(
     state->desc_tbl(), state->query_id(), id_, num_senders_, 1024 * 1024));
@@ -30,10 +32,12 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
 }
 
 Status ExchangeNode::Open(RuntimeState* state) {
+  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   return Status::OK;
 }
 
 Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* eos) {
+  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   scoped_ptr<RowBatch> input_batch(stream_recvr_->GetBatch());
   output_batch->Reset();
   *eos = (input_batch.get() == NULL);
@@ -55,11 +59,13 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
     input_batch->CopyRow(src, dest);
     output_batch->CommitLastRow();
   }
+  num_rows_returned_ += input_batch->num_rows();
   input_batch->TransferTupleData(output_batch);
   return Status::OK;
 }
 
 Status ExchangeNode::Close(RuntimeState* state) {
+  RETURN_IF_ERROR(ExecNode::Close(state));
   return Status::OK;
 }
 

@@ -86,6 +86,13 @@ class HdfsTextScanNode : public ScanNode {
   const static int SKIP_COLUMN = -1;
   const static int NEXT_BLOCK_READ_SIZE = 1024; //bytes
 
+  // Counters
+  RuntimeProfile::Counter* hdfs_time_counter_;        // time spent in hdfs
+  RuntimeProfile::Counter* bytes_read_counter_;       // bytes read from hdfs
+  RuntimeProfile::Counter* parse_time_counter_;       // time parsing files
+  RuntimeProfile::Counter* tuple_write_time_counter_; // time writing tuple slots
+  RuntimeProfile::Counter* rows_read_counter_;        // time writing tuple slots
+
   // Parser configuration parameters:
 
   // HDFS file scan ranges. 

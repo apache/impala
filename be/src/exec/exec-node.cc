@@ -18,6 +18,9 @@
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
 #include "runtime/row-batch.h"
+#include "runtime/runtime-state.h"
+#include "util/debug-util.h"
+#include "util/runtime-profile.h"
 #include "gen-cpp/PlanNodes_types.h"
 
 using namespace std;
@@ -34,13 +37,23 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
   DCHECK(status.ok())
       << "ExecNode c'tor: deserialization of conjuncts failed:\n"
       << status.GetErrorMsg();
+  InitRuntimeProfile(PrintPlanNodeType(tnode.node_type));
 }
 
 Status ExecNode::Prepare(RuntimeState* state) {
+  DCHECK(runtime_profile_.get() != NULL);
+  rows_returned_counter_ = 
+    ADD_COUNTER(runtime_profile_, "RowsReturned", TCounterType::UNIT);
+
   PrepareConjuncts(state);
   for (int i = 0; i < children_.size(); ++i) {
     RETURN_IF_ERROR(children_[i]->Prepare(state));
   }
+  return Status::OK;
+}
+
+Status ExecNode::Close(RuntimeState* state) {
+  COUNTER_UPDATE(rows_returned_counter_, num_rows_returned_);
   return Status::OK;
 }
 
@@ -78,6 +91,7 @@ Status ExecNode::CreateTreeHelper(
   // assert(parent != NULL || (node_idx == 0 && root_expr != NULL));
   if (parent != NULL) {
     parent->children_.push_back(node);
+    parent->runtime_profile()->AddChild(node->runtime_profile());
   } else {
     *root = node;
   }
@@ -176,6 +190,12 @@ void ExecNode::CollectScanNodes(std::vector<ExecNode*>* scan_nodes) {
   for (int i = 0; i < children_.size(); ++i) {
     children_[i]->CollectScanNodes(scan_nodes);
   }
+}
+
+void ExecNode::InitRuntimeProfile(const string& name) {
+  stringstream ss;
+  ss << name << "(id=" << id_ << ")";
+  runtime_profile_.reset(new RuntimeProfile(pool_, ss.str()));
 }
 
 }
