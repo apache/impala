@@ -305,3 +305,7 @@ CREATE TABLE UserVisitsSmall (
   avgTimeOnSite int)
 row format delimited fields terminated by '|'  stored as textfile;
 
+DROP TABLE IF EXISTS EmptyTable;
+CREATE TABLE EmptyTable (
+  field string
+) partitioned by (f2 int);

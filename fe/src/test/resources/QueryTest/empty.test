@@ -10,3 +10,9 @@ select int_col from alltypessmall where month > 100
 int
 ----
 ====
+# Empty partitioned table test
+select field from emptytable
+----
+string
+----
+====

@@ -33,7 +33,7 @@ import com.cloudera.impala.thrift.TTableType;
 import com.google.common.collect.Lists;
 
 /**
- * Internal representation of table-related metadata of an hdfs-resident  table.
+ * Internal representation of table-related metadata of an hdfs-resident table.
  * Owned by Catalog instance.
  * The partition keys constitute the clustering columns.
  */
@@ -56,7 +56,8 @@ public abstract class HdfsTable extends Table {
    *
    */
   public static class Partition {
-    public List<LiteralExpr> keyValues;
+    public List<LiteralExpr> keyValues; // same size as
+                                        // org.apache.hadoop.hive.metastore.api.Table.getPartitionKeysSize()
     public List<String> filePaths;  // paths of hdfs data files
     public List<Long> fileLengths;  // length as returned by FileStatus.getLen()
 
@@ -67,7 +68,7 @@ public abstract class HdfsTable extends Table {
     }
   }
 
-  private final List<Partition> partitions;
+  private final List<Partition> partitions; // these are only non-empty partitions
 
   // Base Hdfs directory where files of this table are stored.
   // For unpartitioned tables it is simply the path where all files live.
@@ -125,8 +126,8 @@ public abstract class HdfsTable extends Table {
       org.apache.hadoop.hive.metastore.api.Table msTbl) {
     try {
       hdfsBaseDir = msTbl.getSd().getLocation();
-      // This table has no declared partitions, which means it consists of a single file.
-      if (msPartitions.isEmpty()) {
+      // This table has no partition key, which means it has no declared partitions.
+      if (msTbl.getPartitionKeysSize() == 0) {
         Partition p = new Partition();
         loadFilePaths(msTbl.getSd().getLocation(), p);
         return true;
@@ -169,7 +170,11 @@ public abstract class HdfsTable extends Table {
       p.filePaths.add(fileStatus[i].getPath().toString());
       p.fileLengths.add(fileStatus[i].getLen());
     }
-    partitions.add(p);
+
+    // Don't add empty partitions.
+    if (p.filePaths.size() > 0) {
+      partitions.add(p);
+    }
   }
 
   @Override
@@ -190,12 +195,18 @@ public abstract class HdfsTable extends Table {
       }
 
       // populate with both partition keys and regular columns
-      List<FieldSchema> fieldSchemas = msTbl.getPartitionKeys();
-      numClusteringCols = fieldSchemas.size();
-      fieldSchemas.addAll(client.getFields(db.getName(), name));
+      List<FieldSchema> partKeys = msTbl.getPartitionKeys();
+      List<FieldSchema> tblFields = client.getFields(db.getName(), name);
+      List<FieldSchema> fieldSchemas = new ArrayList<FieldSchema>(
+          partKeys.size() + tblFields.size());
+      fieldSchemas.addAll(partKeys);
+      fieldSchemas.addAll(tblFields);
       if (!loadColumns(fieldSchemas)) {
         return null;
       }
+
+      // The number of clustering columns is the number of partition keys.
+      numClusteringCols = partKeys.size();
 
       if (!loadPartitions(
           client.listPartitions(db.getName(), name, Short.MAX_VALUE), msTbl)) {
