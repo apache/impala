@@ -118,12 +118,21 @@ public class AggregateInfo {
     if (groupingExprs != null) {
       exprs.addAll(groupingExprs);
     }
+    int aggregateExprStartIndex = groupingExprs.size();
     exprs.addAll(aggregateExprs);
     for (int i = 0; i < exprs.size(); ++i) {
       Expr expr = exprs.get(i);
       SlotDescriptor slotD = descTbl.addSlotDescriptor(aggTupleDesc);
       Preconditions.checkArgument(expr.getType() != PrimitiveType.INVALID_TYPE);
       slotD.setType(expr.getType());
+      // count(*) is non-nullable.
+      if (i >= aggregateExprStartIndex) {
+        Preconditions.checkArgument(expr instanceof AggregateExpr);
+        AggregateExpr aggExpr = (AggregateExpr)expr;
+        if (aggExpr.getOp() == AggregateExpr.Operator.COUNT) {
+          slotD.setIsNullable(false);
+        }
+      }
       aggTupleSubstMap.lhs.add(expr.clone(null));
       aggTupleSubstMap.rhs.add(new SlotRef(slotD));
     }

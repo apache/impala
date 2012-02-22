@@ -29,7 +29,7 @@ namespace impala {
 
 ostream& operator<<(ostream& os, const TExprOpcode::type& op) {
   map<int, const char*>::const_iterator i;
-  i = _TExprOpcode_VALUES_TO_NAMES.find(0);
+  i = _TExprOpcode_VALUES_TO_NAMES.find(op);
   if (i != _TExprOpcode_VALUES_TO_NAMES.end()) {
     os << i->second;
   }
@@ -38,7 +38,7 @@ ostream& operator<<(ostream& os, const TExprOpcode::type& op) {
 
 ostream& operator<<(ostream& os, const TAggregationOp::type& op) {
   map<int, const char*>::const_iterator i;
-  i = _TAggregationOp_VALUES_TO_NAMES.find(0);
+  i = _TAggregationOp_VALUES_TO_NAMES.find(op);
   if (i != _TAggregationOp_VALUES_TO_NAMES.end()) {
     os << i->second;
   }

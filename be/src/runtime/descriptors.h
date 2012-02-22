@@ -33,13 +33,17 @@ typedef int PlanNodeId;
 std::string TypeToString(PrimitiveType t);
 
 // Location information for null indicator bit for particular slot.
+// For non-nullable slots, the byte_offset will be 0 and the bit_mask will be 0.
+// This allows us to do the NullIndicatorOffset operations (tuple + byte_offset &/|
+// bit_mask) regardless of whether the slot is nullable or not.
+// This is more efficient than branching to check if the slot is non-nullable.
 struct NullIndicatorOffset {
   int byte_offset;
   uint8_t bit_mask;  // to extract null indicator
 
   NullIndicatorOffset(int byte_offset, int bit_offset)
-    : byte_offset(byte_offset), bit_mask(1 << bit_offset) {
-    //assert(bit_offset >= 0 && bit_offset <= 7);
+    : byte_offset(byte_offset), 
+      bit_mask(bit_offset == -1 ? 0 : 1 << bit_offset) {
   }
 
   std::string DebugString() const;
@@ -60,6 +64,7 @@ class SlotDescriptor {
     return null_indicator_offset_;
   }
   bool is_materialized() const { return is_materialized_; }
+  bool is_nullable() const { return null_indicator_offset_.bit_mask != 0; }
 
   std::string DebugString() const;
 
@@ -104,8 +109,6 @@ class HdfsTableDescriptor : public TableDescriptor {
   char field_delim() const { return field_delim_; }
   char collection_delim() const { return collection_delim_; }
   char escape_char() const { return escape_char_; }
-  char quote_char() const { return quote_char_; }
-  bool strings_are_quoted() const { return strings_are_quoted_; }
 
   virtual std::string DebugString() const;
 
@@ -114,8 +117,6 @@ class HdfsTableDescriptor : public TableDescriptor {
   char field_delim_;
   char collection_delim_;
   char escape_char_;
-  char quote_char_;
-  bool strings_are_quoted_;
 };
 
 class HBaseTableDescriptor : public TableDescriptor {

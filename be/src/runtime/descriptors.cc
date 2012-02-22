@@ -111,9 +111,7 @@ string HdfsTableDescriptor::DebugString() const {
       << " line_delim='" << line_delim_ << "'"
       << " field_delim='" << field_delim_ << "'"
       << " coll_delim='" << collection_delim_ << "'"
-      << " escape_char='" << escape_char_ << "'"
-      << " quote_char='" << quote_char_ << "'"
-      << " quoted=" << strings_are_quoted_ << ")";
+      << " escape_char='" << escape_char_ << "')";
   return out.str();
 }
 

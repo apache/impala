@@ -58,6 +58,7 @@ class Tuple {
 
   // Turn null indicator bit on.
   void SetNull(const NullIndicatorOffset& offset) {
+    DCHECK(offset.bit_mask != 0);
     char* null_indicator_byte = reinterpret_cast<char*>(this) + offset.byte_offset;
     *null_indicator_byte |= offset.bit_mask;
   }
@@ -79,12 +80,12 @@ class Tuple {
   }
 
   const void* GetSlot(int offset) const {
-    DCHECK(offset != -1);  // 0 offset indicates non-materialized slot
+    DCHECK(offset != -1);  // -1 offset indicates non-materialized slot
     return reinterpret_cast<const char*>(this) + offset;
   }
 
   StringValue* GetStringSlot(int offset) {
-    DCHECK(offset != -1);  // 0 offset indicates non-materialized slot
+    DCHECK(offset != -1);  // -1 offset indicates non-materialized slot
     return reinterpret_cast<StringValue*>(reinterpret_cast<char*>(this) + offset);
   }
 

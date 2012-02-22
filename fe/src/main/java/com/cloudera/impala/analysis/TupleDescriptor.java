@@ -45,6 +45,10 @@ public class TupleDescriptor {
     table = tbl;
   }
 
+  public int getByteSize() {
+    return byteSize;
+  }
+
   public String debugString() {
     String tblStr = (table == null ? "null" : table.getFullName());
     List<String> slotStrings = Lists.newArrayList();
@@ -73,16 +77,21 @@ public class TupleDescriptor {
     for (int i = 0; i <= PrimitiveType.getMaxSlotSize(); ++i) {
       slotsBySize.add(new ArrayList<SlotDescriptor>());
     }
+
+    int numNullableSlots = 0;
     for (SlotDescriptor d: slots) {
       if (d.getIsMaterialized()) {
         slotsBySize.get(d.getType().getSlotSize()).add(d);
+        if (d.getIsNullable()) {
+          ++numNullableSlots;
+        }
       }
     }
     // we shouldn't have anything of size 0
     Preconditions.checkState(slotsBySize.get(0).isEmpty());
 
     // assign offsets to slots in order of ascending size
-    int numNullIndicatorBytes = (slots.size() + 7) / 8;
+    int numNullIndicatorBytes = (numNullableSlots + 7) / 8;
     int offset = numNullIndicatorBytes;
     int nullIndicatorByte = 0;
     int nullIndicatorBit = 0;
@@ -101,11 +110,17 @@ public class TupleDescriptor {
         offset += slotSize;
 
         // assign null indicator
-        d.setNullIndicatorByte(nullIndicatorByte);
-        d.setNullIndicatorBit(nullIndicatorBit);
-        nullIndicatorBit = (nullIndicatorBit + 1) % 8;
-        if (nullIndicatorBit == 0) {
-          ++nullIndicatorByte;
+        if (d.getIsNullable()) {
+          d.setNullIndicatorByte(nullIndicatorByte);
+          d.setNullIndicatorBit(nullIndicatorBit);
+          nullIndicatorBit = (nullIndicatorBit + 1) % 8;
+          if (nullIndicatorBit == 0) {
+            ++nullIndicatorByte;
+          }
+        } else {
+          // Non-nullable slots will have 0 for the byte offset and -1 for the bit mask
+          d.setNullIndicatorBit(-1);
+          d.setNullIndicatorByte(0);
         }
       }
     }

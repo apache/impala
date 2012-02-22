@@ -269,11 +269,15 @@ AggregationTuple* AggregationNode::ConstructAggTuple() {
   // (so that SUM(<col>) stays NULL if <col> only contains NULL values).
   for (int i = 0; i < aggregate_exprs_.size(); ++i, ++slot_d) {
     AggregateExpr* agg_expr = static_cast<AggregateExpr*>(aggregate_exprs_[i]);
-    if (agg_expr->agg_op() == TAggregationOp::COUNT) {
+    if ((*slot_d)->is_nullable()) {
+      DCHECK_NE(agg_expr->agg_op(), TAggregationOp::COUNT);
+      agg_tuple->SetNull((*slot_d)->null_indicator_offset());
+    } else {
+      // For distributed plans, some SUMs (distributed count(*) will be non-nullable)
+      DCHECK(agg_expr->agg_op() == TAggregationOp::COUNT ||
+             agg_expr->agg_op() == TAggregationOp::SUM);
       // we're only aggregating into bigint slots and never return NULL
       *reinterpret_cast<int64_t*>(agg_tuple->GetSlot((*slot_d)->tuple_offset())) = 0;
-    } else {
-      agg_tuple->SetNull((*slot_d)->null_indicator_offset());
     }
   }
 

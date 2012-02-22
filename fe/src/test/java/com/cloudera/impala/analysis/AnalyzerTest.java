@@ -193,6 +193,12 @@ public class AnalyzerTest {
 
   @Test
   public void TestMemLayout() {
+    TestSelectStar();
+    TestNonNullable();
+    TestMixedNullable();
+  }
+
+  private void TestSelectStar() {
     AnalyzesOk("select * from AllTypes");
     DescriptorTable descTbl = analyzer.getDescTbl();
     for (SlotDescriptor slotD: descTbl.getTupleDesc(new TupleId(0)).getSlots()) {
@@ -214,13 +220,54 @@ public class AnalyzerTest {
     checkLayoutParams("alltypes.string_col", strSlotSize, 48 + strSlotSize, 1, 3);
   }
 
-  private void checkLayoutParams(String colAlias, int byteSize, int byteOffset,
+  private void TestNonNullable() {
+    // both slots are non-nullable bigints.  The layout should look like:
+    // (byte range : data)
+    // 0 - 7:  count(int_col)
+    // 8 - 15: count(*)
+    AnalyzesOk("select count(int_col), count(*) from AllTypes");
+    DescriptorTable descTbl = analyzer.getDescTbl();
+    com.cloudera.impala.analysis.TupleDescriptor aggDesc = descTbl.getTupleDesc(new TupleId(1));
+    for (SlotDescriptor slotD: aggDesc.getSlots()) {
+      slotD.setIsMaterialized(true);
+    }
+    descTbl.computeMemLayout();
+    Assert.assertEquals(aggDesc.getByteSize(), 16);
+    checkLayoutParams(aggDesc.getSlots().get(0), 8, 0, 0, -1);
+    checkLayoutParams(aggDesc.getSlots().get(1), 8, 8, 0, -1);
+  }
+
+  private void TestMixedNullable() {
+    // one slot is nullable, one is not.  The layout should look like:
+    // (byte range : data)
+    // 0 : 1 nullable-byte (only 1 bit used)
+    // 1 - 7: padded bytes
+    // 8 - 15: sum(int_col)
+    // 16 - 23: count(*)
+    AnalyzesOk("select sum(int_col), count(*) from AllTypes");
+    DescriptorTable descTbl = analyzer.getDescTbl();
+    com.cloudera.impala.analysis.TupleDescriptor aggDesc = descTbl.getTupleDesc(new TupleId(1));
+    for (SlotDescriptor slotD: aggDesc.getSlots()) {
+      slotD.setIsMaterialized(true);
+    }
+    descTbl.computeMemLayout();
+    Assert.assertEquals(aggDesc.getByteSize(), 24);
+    checkLayoutParams(aggDesc.getSlots().get(0), 8, 8, 0, 0);
+    checkLayoutParams(aggDesc.getSlots().get(1), 8, 16, 0, -1);
+  }
+
+  private void checkLayoutParams(SlotDescriptor d, int byteSize, int byteOffset,
                                  int nullIndicatorByte, int nullIndicatorBit) {
-    SlotDescriptor d = analyzer.getSlotDescriptor(colAlias);
     Assert.assertEquals(byteSize, d.getByteSize());
     Assert.assertEquals(byteOffset, d.getByteOffset());
     Assert.assertEquals(nullIndicatorByte, d.getNullIndicatorByte());
     Assert.assertEquals(nullIndicatorBit, d.getNullIndicatorBit());
+  }
+
+  private void checkLayoutParams(String colAlias, int byteSize, int byteOffset,
+                                 int nullIndicatorByte, int nullIndicatorBit) {
+    SlotDescriptor d = analyzer.getSlotDescriptor(colAlias);
+    checkLayoutParams(d, byteSize, byteOffset, nullIndicatorByte, nullIndicatorBit);
   }
 
   @Test

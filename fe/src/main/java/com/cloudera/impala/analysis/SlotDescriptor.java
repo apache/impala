@@ -15,7 +15,10 @@ public class SlotDescriptor {
 
   // if false, this slot doesn't need to be materialized in parent tuple
   // (and physical layout parameters are invalid)
-  private boolean isMaterialized; 
+  private boolean isMaterialized;
+
+  // if false, this slot cannot be NULL
+  private boolean isNullable;
 
   // physical layout parameters
   private int byteSize;
@@ -28,6 +31,7 @@ public class SlotDescriptor {
     this.parent = parent;
     this.byteOffset = -1;  // invalid
     this.isMaterialized = false;
+    this.isNullable = true;
   }
 
   public int getNullIndicatorByte() {
@@ -77,6 +81,14 @@ public class SlotDescriptor {
 
   public void setIsMaterialized(boolean value) {
     isMaterialized = value;
+  }
+
+  public boolean getIsNullable() {
+    return isNullable;
+  }
+
+  public void setIsNullable(boolean value) {
+    isNullable = value;
   }
 
   public int getByteSize() {
