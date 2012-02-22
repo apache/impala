@@ -69,6 +69,22 @@ NULL,1000
 2,1000
 3,1000
 ====
+# grouping by different data types, with NULLs, grouping expr missing from select list
+select count(*) from alltypesagg group by tinyint_col
+----
+bigint
+----
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+====
 select smallint_col % 10, count(*) from alltypesagg group by 1
 ----
 smallint, bigint
@@ -84,6 +100,22 @@ NULL,100
 5,1000
 6,1000
 7,1000
+====
+select count(*) from alltypesagg group by smallint_col % 10
+----
+bigint
+----
+100
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+900
 ====
 select int_col % 10, count(*) from alltypesagg group by 1
 ----
@@ -101,6 +133,22 @@ NULL,10
 6,1000
 7,1000
 ====
+select count(*) from alltypesagg group by int_col % 10
+----
+bigint
+----
+10
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+990
+====
 select bigint_col % 100, count(*) from alltypesagg group by 1
 ----
 bigint, bigint
@@ -117,7 +165,22 @@ NULL,10
 90,1000
 40,1000
 ====
-# TODO: group by string col
+select count(*) from alltypesagg group by bigint_col % 100
+----
+bigint
+----
+10
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+990
+====
 select date_string_col, count(*) from alltypesagg group by 1
 ----
 string, bigint
@@ -133,8 +196,24 @@ string, bigint
 '01/03/10',1000
 '01/07/10',1000
 ====
+select count(*) from alltypesagg group by date_string_col
+----
+bigint
+----
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+1000
+====
 # grouping by multiple exprs, with nulls
-select tinyint_col % 3, smallint_col % 3, count(*) from alltypesagg where day = 1 group by 1, 2
+select tinyint_col % 3, smallint_col % 3, count(*) from alltypesagg
+where day = 1 group by 1, 2
 ----
 tinyint, smallint, bigint
 ----
@@ -151,6 +230,25 @@ NULL,2,30
 NULL,1,30
 0,1,90
 2,0,90
+====
+select count(*) from alltypesagg
+where day = 1 group by tinyint_col % 3, smallint_col % 3
+----
+bigint
+----
+10
+120
+120
+120
+30
+30
+30
+90
+90
+90
+90
+90
+90
 ====
 # same result as previous query
 select tinyint_col % 3, smallint_col % 3, count(*) from alltypesagg where day = 1 group by 2, 1
@@ -188,6 +286,24 @@ NULL,NULL,0,0,'01/01/10',9
 NULL,NULL,NULL,NULL,'01/01/10',1
 0,0,0,0,'01/01/10',400
 NULL,0,0,0,'01/01/10',90
+====
+select count(*)
+from alltypesagg
+where date_string_col = '01/01/10' or date_string_col = '01/02/10'
+group by tinyint_col % 2, smallint_col % 2, int_col % 2, bigint_col % 2, date_string_col
+----
+bigint
+----
+1
+1
+400
+400
+500
+500
+9
+9
+90
+90
 ====
 # no grouping cols, no matching rows
 select count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col), avg(tinyint_col)

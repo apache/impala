@@ -41,6 +41,12 @@ public class AggregateInfo {
     this.aggTupleSubstMap = new Expr.SubstitutionMap();
   }
 
+  public void getGroupingSlotIds(List<SlotId> ids) {
+    for (int i = 0; i < groupingExprs.size(); ++i) {
+      ids.add(aggTupleDesc.getSlots().get(i).getId());
+    }
+  }
+
   /**
    * Create the info for an aggregation node that merges its pre-aggregated inputs:
    * - tuple desc and subst map are the same as that of the input (we're materializing

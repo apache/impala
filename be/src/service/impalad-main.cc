@@ -18,10 +18,10 @@
 
 #include "common/status.h"
 #include "runtime/coordinator.h"
-#include "runtime/data-stream-mgr.h"
-#include "runtime/hdfs-fs-cache.h"
-#include "service/backend-service.h"
+#include "runtime/exec-env.h"
+#include "testutil/test-exec-env.h"
 #include "util/jni-util.h"
+#include "service/backend-service.h"
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaBackendService.h"
 
@@ -78,7 +78,8 @@ void ImpalaService::Init() {
 #endif
 }
 
-void ImpalaService::RunQuery(impala::TRunQueryResult& result, const TQueryRequest& request) {
+void ImpalaService::RunQuery(
+    impala::TRunQueryResult& result, const TQueryRequest& request) {
 #if 0
   result.status.status_code = OK;
   JNIEnv* jni_env;
@@ -167,9 +168,8 @@ int main(int argc, char** argv) {
   JavaVM* jvm = CreateJvm();
 
   // start backend service for the coordinator on backend_port
-  DataStreamMgr stream_mgr;
-  HdfsFsCache fs_cache;
-  TServer* be_server = StartImpalaBackendService(&stream_mgr, &fs_cache, FLAGS_be_port);
+  ExecEnv exec_env;
+  TServer* be_server = StartImpalaBackendService(&exec_env, FLAGS_be_port);
   be_server->serve();
   thread be_server_thread = thread(&RunServer, be_server);
 

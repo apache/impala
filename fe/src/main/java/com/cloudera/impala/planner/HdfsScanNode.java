@@ -9,7 +9,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
-import java.util.Random;
 
 import org.apache.hadoop.fs.BlockLocation;
 import org.slf4j.Logger;
@@ -108,22 +107,45 @@ public abstract class HdfsScanNode extends ScanNode {
     msg.hdfs_scan_node = new THdfsScanNode(desc.getId().asInt(), partitionKeyRegex);
   }
 
+  // block assignment data for a single host
+  static private class HostBlockInfo {
+    public String hostname;
+
+    public long assignedBytes;
+
+    // list of (file path, block location)
+    public List<Pair<String, BlockLocation>> blockLocations;
+
+    HostBlockInfo(String hostname) {
+      this.hostname = hostname;
+      this.assignedBytes = 0;
+      this.blockLocations = Lists.newArrayList();
+    }
+
+    public void AddLocation(Pair<String, BlockLocation> location) {
+      blockLocations.add(location);
+      assignedBytes += location.second.getLength();
+    }
+
+    public void Add(HostBlockInfo info) {
+      blockLocations.addAll(info.blockLocations);
+      assignedBytes += info.assignedBytes;
+    }
+  }
+
   @Override
   public void getScanParams(
       int numPartitions, List<TScanRange> scanRanges, List<String> hostports) {
     Preconditions.checkState(numPartitions != Constants.NUM_NODES_ALL_RACKS);
 
-    // map from "host:port" string to list of (file path, block location)
-    Map<String, List<Pair<String, BlockLocation>>> locationMap = Maps.newHashMap();
+    // map from host to list of (file path, block location)
+    Map<String, HostBlockInfo> locationMap = Maps.newHashMap();
     List<Pair<String, BlockLocation>> blockLocations =
         HdfsTable.getBlockLocations(filePaths);
-    // use pseudo-random number generator to get repeatable test results
-    Random rand = new Random(0);
     for (Pair<String, BlockLocation> location: blockLocations) {
-      // pick random host for this block
       String[] blockHosts = null;
       try {
-        blockHosts = location.second.getNames();
+        blockHosts = location.second.getHosts();
         LOG.info(Arrays.toString(blockHosts));
       } catch (IOException e) {
         // this shouldn't happen, getHosts() doesn't throw anything
@@ -131,12 +153,24 @@ public abstract class HdfsScanNode extends ScanNode {
         LOG.error(errorMsg);
         throw new IllegalStateException(errorMsg);
       }
-      String host = blockHosts[rand.nextInt(blockHosts.length)];
-      if (locationMap.containsKey(host)) {
-        locationMap.get(host).add(location);
-      } else {
-        locationMap.put(host, Lists.newArrayList(location));
+
+      // greedy block assignment: find host with fewest assigned bytes
+      Preconditions.checkState(blockHosts.length > 0);
+      HostBlockInfo minHost = locationMap.get(blockHosts[0]);
+      for (String host: blockHosts) {
+        if (locationMap.containsKey(host)) {
+          HostBlockInfo info = locationMap.get(host);
+          if (minHost.assignedBytes > info.assignedBytes) {
+            minHost = info;
+          }
+        } else {
+          // new host with 0 bytes so far
+          minHost = new HostBlockInfo(host);
+          locationMap.put(host, minHost);
+          break;
+        }
       }
+      minHost.AddLocation(location);
     }
 
     if (numPartitions != Constants.NUM_NODES_ALL) {
@@ -147,10 +181,9 @@ public abstract class HdfsScanNode extends ScanNode {
       hostports.clear();
     }
     LOG.info(locationMap.toString());
-    for (Map.Entry<String, List<Pair<String, BlockLocation>>> entry:
-        locationMap.entrySet()) {
+    for (Map.Entry<String, HostBlockInfo> entry: locationMap.entrySet()) {
       TScanRange scanRange = new TScanRange(id);
-      for (Pair<String, BlockLocation> location: entry.getValue()) {
+      for (Pair<String, BlockLocation> location: entry.getValue().blockLocations) {
         BlockLocation blockLocation = location.second;
         scanRange.addToHdfsFileSplits(
             new THdfsFileSplit(location.first, blockLocation.getOffset(),
@@ -161,68 +194,85 @@ public abstract class HdfsScanNode extends ScanNode {
         hostports.add(entry.getKey());
       }
     }
-    if (hostports != null) LOG.info(hostports.toString());
+    if (hostports != null) {
+      LOG.info(hostports.toString());
+    }
   }
 
-  // Pick numPartitions hosts with the most blocks, then assign
-  // the other blocks to those.
-  // locationMap: map from "host:port" string to list of (file path, block location)
-  // TODO: reassign blocks to even out total # of bytes assigned to nodes
+  // Pick numPartitions hosts with the most assigned bytes, then assign
+  // the other blocks to those, trying to even out total # of bytes assigned to nodes
+  // locationMap: map from host to list of (file path, block location)
   // TODO: reassign to optimize block locality (this will conflict with assignment
   // based on data size, so we need to figure out what a good compromise is;
   // this is probably a fruitful area for further experimentation)
   private void reassignBlocks(
-      int numPartitions,
-      Map<String, List<Pair<String, BlockLocation>>> locationMap) {
-    if (locationMap.isEmpty()) return;
-    // create a priority queue of map entries, ordered by # of blocks
-    PriorityQueue<Map.Entry<String, List<Pair<String, BlockLocation>>>> maxCountQueue =
-        new PriorityQueue<Map.Entry<String, List<Pair<String, BlockLocation>>>>(
+      int numPartitions, Map<String, HostBlockInfo> locationMap) {
+    if (locationMap.isEmpty()) {
+      return;
+    }
+    // create a priority queue of map entries, ordered by decreasing number of
+    // assigned bytes
+    PriorityQueue<Map.Entry<String, HostBlockInfo>> maxBytesQueue =
+        new PriorityQueue<Map.Entry<String, HostBlockInfo>>(
           locationMap.size(),
-          new Comparator<Map.Entry<String, List<Pair<String, BlockLocation>>>>() {
+          new Comparator<Map.Entry<String, HostBlockInfo>>() {
             public int compare(
-                Map.Entry<String, List<Pair<String, BlockLocation>>> entry1,
-                Map.Entry<String, List<Pair<String, BlockLocation>>> entry2) {
-              return entry1.getValue().size() - entry2.getValue().size();
+                Map.Entry<String, HostBlockInfo> entry1,
+                Map.Entry<String, HostBlockInfo> entry2) {
+              if (entry1.getValue().assignedBytes < entry2.getValue().assignedBytes) {
+                return -1;
+              } else if (entry1.getValue().assignedBytes
+                  > entry2.getValue().assignedBytes) {
+                return 1;
+              } else {
+                return 0;
+              }
             }
           });
-    for (Map.Entry<String, List<Pair<String, BlockLocation>>> entry:
-        locationMap.entrySet()) {
-      maxCountQueue.add(entry);
+    for (Map.Entry<String, HostBlockInfo> entry: locationMap.entrySet()) {
+      maxBytesQueue.add(entry);
     }
 
     // pull out the top 'numPartitions' elements and insert them into a queue
-    // that orders by increasing number of blocks
-    PriorityQueue<Map.Entry<String, List<Pair<String, BlockLocation>>>> minCountQueue =
-        new PriorityQueue<Map.Entry<String, List<Pair<String, BlockLocation>>>>(
+    // that orders by increasing number of assigned bytes
+    PriorityQueue<Map.Entry<String, HostBlockInfo>> minBytesQueue =
+        new PriorityQueue<Map.Entry<String, HostBlockInfo>>(
           locationMap.size(),
-          new Comparator<Map.Entry<String, List<Pair<String, BlockLocation>>>>() {
+          new Comparator<Map.Entry<String, HostBlockInfo>>() {
             public int compare(
-                Map.Entry<String, List<Pair<String, BlockLocation>>> entry1,
-                Map.Entry<String, List<Pair<String, BlockLocation>>> entry2) {
-              return entry2.getValue().size() - entry1.getValue().size();
+                Map.Entry<String, HostBlockInfo> entry1,
+                Map.Entry<String, HostBlockInfo> entry2) {
+              if (entry2.getValue().assignedBytes < entry1.getValue().assignedBytes) {
+                return -1;
+              } else if (entry2.getValue().assignedBytes
+                  > entry1.getValue().assignedBytes) {
+                return 1;
+              } else {
+                return 0;
+              }
             }
           });
     for (int i = 0; i < numPartitions; ++i) {
-      Map.Entry<String, List<Pair<String, BlockLocation>>> entry = maxCountQueue.poll();
-      if (entry == null) break;
-      minCountQueue.add(entry);
+      Map.Entry<String, HostBlockInfo> entry = maxBytesQueue.poll();
+      if (entry == null) {
+        break;
+      }
+      minBytesQueue.add(entry);
     }
 
     // assign the remaining hosts' blocks
     // TODO: spread these round-robin
-    while (!maxCountQueue.isEmpty()) {
-      Map.Entry<String, List<Pair<String, BlockLocation>>> source =
-          maxCountQueue.poll();
-      Map.Entry<String, List<Pair<String, BlockLocation>>> dest = minCountQueue.poll();
-      dest.getValue().addAll(source.getValue());
-      minCountQueue.add(dest);
+    while (!maxBytesQueue.isEmpty()) {
+      Map.Entry<String, HostBlockInfo> source = maxBytesQueue.poll();
+      Map.Entry<String, HostBlockInfo> dest = minBytesQueue.poll();
+      dest.getValue().Add(source.getValue());
+      minBytesQueue.add(dest);
     }
 
-    // re-create locationMap from minCountQueue
+    // re-create locationMap from minBytesQueue
     locationMap.clear();
     while (true) {
-      Map.Entry<String, List<Pair<String, BlockLocation>>> entry = minCountQueue.poll();
+      Map.Entry<String, HostBlockInfo> entry = minBytesQueue.poll();
       if (entry == null) {
         break;
       }

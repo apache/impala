@@ -3,30 +3,30 @@
 #include "runtime/coordinator.h"
 
 #include <glog/logging.h>
+#include <transport/TTransportUtils.h>
 
 #include "util/debug-util.h"
 #include "runtime/plan-executor.h"
-#include "testutil/test-env.h"
+#include "runtime/exec-env.h"
+#include "runtime/scheduler.h"
+#include "runtime/client-cache.h"
+#include "util/debug-util.h"
 #include "gen-cpp/ImpalaBackendService.h"
 #include "gen-cpp/ImpalaBackendService_types.h"
 
 using namespace std;
 using namespace boost;
+using namespace apache::thrift::transport;
 
 namespace impala {
 
-Coordinator::Coordinator(const string& host, int port, DataStreamMgr* stream_mgr,
-                         TestEnv* test_env)
-  : host_(host),
-    port_(port),
-    stream_mgr_(stream_mgr),
-    test_env_(test_env),
-    executor_(new PlanExecutor(stream_mgr, test_env_->fs_cache())) {
+Coordinator::Coordinator(ExecEnv* exec_env)
+  : exec_env_(exec_env),
+    executor_(new PlanExecutor(exec_env)) {
 }
 
 Coordinator::~Coordinator() {
   exec_thread_group_.join_all();
-  test_env_->ReleaseClients(clients_);
 }
 
 Status Coordinator::Exec(const TQueryExecRequest& request) { 
@@ -63,14 +63,17 @@ Status Coordinator::Exec(const TQueryExecRequest& request) {
   // so start fragments in ascending order.
   int thread_num = 0;
   for (int i = 1; i < request.fragmentRequests.size(); ++i) {
-    DCHECK(test_env_ != NULL);
-    int num_nodes = request.execNodes[i - 1].size();
-    // ignore actual nodes indicated by TQueryExecRequest::execNodes for now
-    test_env_->GetClients(num_nodes, &clients_);
-    DCHECK_EQ(num_nodes, clients_.size());
+    DCHECK(exec_env_ != NULL);
+    // TODO: change this in the following way:
+    // * add locations to request.nodeRequestParams.scanRanges
+    // * pass in request.nodeRequestParams and let the scheduler figure out where
+    // we should be doing those scans, rather than the frontend
+    vector<pair<string, int> > hosts;
+    RETURN_IF_ERROR(exec_env_->scheduler()->GetHosts(request.execNodes[i-1], &hosts));
+    DCHECK_EQ(hosts.size(), request.nodeRequestParams[i].size());
 
     // start individual plan exec requests
-    for (int j = 0; j < num_nodes; ++j) {
+    for (int j = 0; j < hosts.size(); ++j) {
       DCHECK_LT(thread_num, remote_exec_status_.size());
       // there's a race condition here for multi-phase plans (i.e., > 2 fragments):
       // phase i needs to have finished setup, including registration of data streams,
@@ -78,8 +81,12 @@ Status Coordinator::Exec(const TQueryExecRequest& request) {
       // TODO: fix this by breaking the ExecPlanFragment() rpc into 2 rpcs: one
       // for setup, the other one for execution; add a condvar to RemoteExecInfo
       // to capture that setup phase finished successfully
+      ImpalaBackendServiceClient* client;
+      RETURN_IF_ERROR(exec_env_->client_cache()->GetClient(hosts[j], &client));
+      DCHECK(client != NULL);
+      PrintClientInfo(hosts[j], request.nodeRequestParams[i][j]);
       exec_thread_group_.add_thread(new thread(
-          &Coordinator::ExecRemoteFragment, this, thread_num, clients_[j], 
+          &Coordinator::ExecRemoteFragment, this, thread_num, client, 
           request.fragmentRequests[i], request.nodeRequestParams[i][j]));
       ++thread_num;
     }
@@ -91,6 +98,17 @@ Status Coordinator::Exec(const TQueryExecRequest& request) {
   return Status::OK;
 }
 
+void Coordinator::PrintClientInfo(
+    const pair<string, int>& hostport, const TPlanExecParams& params) {
+  if (params.scanRanges.empty()) return;
+  int64_t total = 0;
+  for (int i = 0; i < params.scanRanges[0].hdfsFileSplits.size(); ++i) {
+    total += params.scanRanges[0].hdfsFileSplits[i].length;
+  }
+  VLOG(1) << "data volume for host " << hostport.first << ":" << hostport.second
+          << ": " << PrettyPrinter::Print(total, TCounterType::BYTES);
+}
+
 void Coordinator::ExecRemoteFragment(
     int thread_num,
     ImpalaBackendServiceClient* client,
@@ -98,9 +116,17 @@ void Coordinator::ExecRemoteFragment(
     const TPlanExecParams& params) {
   VLOG(1) << "making rpc: ExecPlanFragment";
   TExecPlanFragmentResult thrift_result;
-  client->ExecPlanFragment(thrift_result, request, params);
+  try {
+    client->ExecPlanFragment(thrift_result, request, params);
+  } catch (TTransportException& e) {
+    stringstream msg;
+    msg << "ExecPlanRequest rpc failed: " << e.what();
+    LOG(ERROR) << msg.str();
+    remote_exec_status_[thread_num] = Status(msg.str());
+  }
   // TODO: abort query when we get an error status
   remote_exec_status_[thread_num] = thrift_result.status;
+  exec_env_->client_cache()->ReleaseClient(client);
 
   // Grab the lock to gather fragment results
   lock_guard<mutex> l(fragment_complete_lock_);
@@ -138,6 +164,7 @@ RuntimeState* Coordinator::runtime_state() {
   DCHECK(executor_.get() != NULL);
   return executor_->runtime_state();
 }
+
 
 ObjectPool* Coordinator::obj_pool() {
   DCHECK(executor_.get() != NULL);

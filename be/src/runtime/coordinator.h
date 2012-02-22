@@ -21,7 +21,7 @@ class ObjectPool;
 class RuntimeState;
 class ImpalaBackendServiceClient;
 class Expr;
-class TestEnv;
+class ExecEnv;
 class TQueryExecRequest;
 class TRowBatch;
 class TPlanExecRequest;
@@ -36,12 +36,7 @@ class TPlanExecParams;
 // which can be invoked asynchronously to Exec()/GetNext().
 class Coordinator {
  public:
-  // host/port are where the node we're executing on is exporting its
-  // ImpalaBackendServiceIf; stream_mgr is this node's DataStreamMgr.
-  // TODO: get rid of TestEnv here and implement a ClientCache interface
-  // (that TestEnv implements)
-  Coordinator(const std::string& host, int port, DataStreamMgr* stream_mgr,
-              TestEnv* test_env);
+  Coordinator(ExecEnv* exec_env);
   ~Coordinator();
 
   // Initiate execution of query. Blocks until result rows can be retrieved
@@ -66,10 +61,7 @@ class Coordinator {
   RuntimeProfile* query_profile() { return query_profile_.get(); }
 
  private:
-  std::string host_;
-  int port_;
-  DataStreamMgr* stream_mgr_;
-  TestEnv* test_env_;
+  ExecEnv* exec_env_;
 
   // execution state of coordinator fragment
   boost::scoped_ptr<PlanExecutor> executor_;
@@ -96,12 +88,17 @@ class Coordinator {
   // Runtime profiles for fragments.  Profiles stored in profile_pool_
   std::vector<RuntimeProfile*> fragment_profiles_;
 
+  // Return executor_'s runtime state's obj pool
+  ObjectPool* obj_pool();
+
   // Wrapper for ExecPlanFragment() rpc.
   void ExecRemoteFragment(
       int thread_num, ImpalaBackendServiceClient* client,
       const TPlanExecRequest& request, const TPlanExecParams& params);
 
-  ObjectPool* obj_pool();
+  // Print total data volume contained in params to VLOG(1)
+  void PrintClientInfo(
+      const std::pair<std::string, int>& host, const TPlanExecParams& params);
 };
 
 }

@@ -20,6 +20,7 @@
 #include "runtime/row-batch.h"
 #include "runtime/plan-executor.h"
 #include "runtime/hdfs-fs-cache.h"
+#include "runtime/exec-env.h"
 #include "exec/exec-node.h"
 #include "exec/scan-node.h"
 #include "util/debug-util.h"
@@ -39,9 +40,8 @@ namespace impala {
 
 class ImpalaBackend : public ImpalaBackendServiceIf {
  public:
-  ImpalaBackend(DataStreamMgr* stream_mgr, HdfsFsCache* fs_cache)
-    : stream_mgr_(stream_mgr),
-      fs_cache_(fs_cache) {}
+  ImpalaBackend(ExecEnv* exec_env)
+    : exec_env_(exec_env) {}
 
   void ExecPlanFragment(
       TExecPlanFragmentResult& return_val, const TPlanExecRequest& request,
@@ -55,8 +55,7 @@ class ImpalaBackend : public ImpalaBackendServiceIf {
     TStatus& return_val, const TUniqueId& query_id, const TPlanNodeId dest_node_id);
 
  private:
-  DataStreamMgr* stream_mgr_;  // not owned
-  HdfsFsCache* fs_cache_;  // not owned
+  ExecEnv* exec_env_;  // not owned
 
   Status ExecPlanFragment(
       const TPlanExecRequest& request, const TPlanExecParams& params, 
@@ -83,7 +82,7 @@ Status ImpalaBackend::ExecPlanFragment(
     return status;
   }
 
-  PlanExecutor executor(stream_mgr_, fs_cache_);
+  PlanExecutor executor(exec_env_);
   RETURN_IF_ERROR(executor.Prepare(request, params));
 
   // TODO: figure out good buffer size based on size of output row
@@ -120,18 +119,19 @@ void ImpalaBackend::TransmitData(
     const TRowBatch& thrift_batch) {
   // TODO: fix Thrift so we can simply take ownership of thrift_batch instead
   // of having to copy its data
-  stream_mgr_->AddData(query_id, dest_node_id, thrift_batch).ToThrift(&return_val);
+  exec_env_->stream_mgr()->AddData(
+      query_id, dest_node_id, thrift_batch).ToThrift(&return_val);
 }
 
 void ImpalaBackend::CloseChannel(
     TStatus& return_val, const TUniqueId& query_id, const TPlanNodeId dest_node_id) {
-  stream_mgr_->CloseChannel(query_id, dest_node_id).ToThrift(&return_val);
+  exec_env_->stream_mgr()->CloseChannel(
+      query_id, dest_node_id).ToThrift(&return_val);
 }
 
-TServer* StartImpalaBackendService(
-    DataStreamMgr* stream_mgr, HdfsFsCache* fs_cache, int port) {
+TServer* StartImpalaBackendService(ExecEnv* exec_env, int port) {
   shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
-  shared_ptr<ImpalaBackend> handler(new ImpalaBackend(stream_mgr, fs_cache));
+  shared_ptr<ImpalaBackend> handler(new ImpalaBackend(exec_env));
   shared_ptr<TProcessor> processor(new ImpalaBackendServiceProcessor(handler));
   shared_ptr<TServerTransport> server_transport(new TServerSocket(port));
   shared_ptr<TTransportFactory> transport_factory(new TBufferedTransportFactory());

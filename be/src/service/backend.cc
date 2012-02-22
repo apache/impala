@@ -15,11 +15,13 @@
 #include "runtime/runtime-state.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/hdfs-fs-cache.h"
+#include "runtime/client-cache.h"
+#include "runtime/simple-scheduler.h"
+#include "testutil/test-exec-env.h"
 #include "service/jni-coordinator.h"
 #include "service/backend-service.h"
 #include "util/jni-util.h"
 #include "util/debug-util.h"
-#include "testutil/test-env.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
 #include "gen-cpp/Data_types.h"
 
@@ -31,12 +33,7 @@ using namespace std;
 using namespace boost;
 using namespace apache::thrift::server;
 
-static DataStreamMgr* stream_mgr;
-static scoped_ptr<HdfsFsCache> fs_cache;
-
-// TODO: get rid of this reference to TestEnv when we have a generic scheduler interface
-// (which TestEnv would implement)
-static TestEnv* test_env;
+static scoped_ptr<TestExecEnv> test_env;
 
 static void RunServer(TServer* server) {
   VLOG(1) << "started backend server thread";
@@ -65,21 +62,15 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
   THROW_IF_ERROR_RET(RuntimeState::InitHBaseConf(), env, impala_exc_cl, -1);
   THROW_IF_ERROR_RET(JniCoordinator::Init(), env, impala_exc_cl, -1);
 
-  // one stream mgr per running backend process
-  VLOG(1) << "Create stream mgr";
-  stream_mgr = new DataStreamMgr();
-  fs_cache.reset(new HdfsFsCache());
-
-  // start one backend service for the coordinator on backend_port
-  TServer* server =
-      StartImpalaBackendService(stream_mgr, fs_cache.get(), FLAGS_backend_port);
-  thread server_thread = thread(&RunServer, server);
-
   // start backends in process, listening on ports > backend_port
   VLOG(1) << "creating test env";
-  test_env = new TestEnv(2, FLAGS_backend_port + 1);
+  test_env.reset(new TestExecEnv(2, FLAGS_backend_port + 1));
   VLOG(1) << "starting backends";
   test_env->StartBackends();
+
+  // start one backend service for the coordinator on backend_port
+  TServer* server = StartImpalaBackendService(test_env.get(), FLAGS_backend_port);
+  thread server_thread = thread(&RunServer, server);
 
   return JNI_VERSION_1_4;
 }
@@ -105,7 +96,7 @@ extern "C"
 JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecQuery(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_query_exec_request,
     jobject error_log, jobject file_errors, jobject result_queue) {
-  JniCoordinator coord(env, stream_mgr, test_env, error_log, file_errors, result_queue);
+  JniCoordinator coord(env, test_env.get(), error_log, file_errors, result_queue);
   coord.Exec(thrift_query_exec_request);
   RETURN_IF_EXC(env);
   const vector<Expr*>& select_list_exprs = coord.select_list_exprs();

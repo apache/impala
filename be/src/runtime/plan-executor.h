@@ -25,7 +25,7 @@ class TPlanExecParams;
 
 class PlanExecutor {
  public:
-  PlanExecutor(DataStreamMgr* stream_mgr, HdfsFsCache* fs_cache);
+  PlanExecutor(ExecEnv* exec_env);
   ~PlanExecutor();
 
   // Prepare for execution. Call this prior to Open().
@@ -47,8 +47,7 @@ class PlanExecutor {
   RuntimeProfile* query_profile();
 
  private:
-  DataStreamMgr* stream_mgr_;
-  HdfsFsCache* fs_cache_;
+  ExecEnv* exec_env_;  // not owned
   ExecNode* plan_;  // lives in runtime_state_->obj_pool()
   boost::scoped_ptr<RuntimeState> runtime_state_;
   bool done_;

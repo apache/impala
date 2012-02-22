@@ -279,6 +279,8 @@ public class Planner {
         Expr.getIds(selectStmt.getAggInfo().getGroupingExprs(), null, refdIdList);
       }
       Expr.getIds(selectStmt.getAggInfo().getAggregateExprs(), null, refdIdList);
+      // we indirectly reference all grouping slots (because we write them)
+      selectStmt.getAggInfo().getGroupingSlotIds(refdIdList);
     }
     Expr.getIds(selectStmt.getSelectListExprs(), null, refdIdList);
 

@@ -10,11 +10,12 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/testutil")
 
 add_library(TestUtil STATIC
   query-executor.cc  
-  test-env.cc
+  test-exec-env.cc
 )
 
 target_link_libraries(TestUtil
   Service
+  Runtime
   ImpalaThrift
   glogstatic
   gflagsstatic  

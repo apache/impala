@@ -22,15 +22,14 @@ void* RuntimeState::hbase_conf_ = NULL;
 
 RuntimeState::RuntimeState(
     const TUniqueId& query_id, bool abort_on_error, int max_errors,
-    DataStreamMgr* stream_mgr, HdfsFsCache* fs_cache)
+    ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
     batch_size_(DEFAULT_BATCH_SIZE),
     file_buffer_size_(DEFAULT_FILE_BUFFER_SIZE),
     abort_on_error_(abort_on_error),
     max_errors_(max_errors),
     query_id_(query_id),
-    stream_mgr_(stream_mgr),
-    fs_cache_(fs_cache) {
+    exec_env_(exec_env) {
 }
 
 string RuntimeState::ErrorLog() const {

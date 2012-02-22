@@ -27,7 +27,7 @@ class PlanExecutor;
 class RowBatch;
 class RowDescriptor;
 class TRowBatch;
-class TestEnv;
+class ExecEnv;
 class ImpalaPlanServiceClient;
 class ImpalaBackendServiceClient;
 class RuntimeProfile;
@@ -45,8 +45,8 @@ class TPlanExecParams;
 // two types of FetchResult().
 class QueryExecutor {
  public:
-  // Non-NULL stream_mgr and test_env required for non-local execution.
-  QueryExecutor(DataStreamMgr* stream_mgr = NULL, TestEnv* test_env = NULL);
+  // Non-NULL exec_env required for non-local execution.
+  QueryExecutor(ExecEnv* exec_env = NULL);
   ~QueryExecutor();
 
   Status Setup();
@@ -99,8 +99,7 @@ class QueryExecutor {
   boost::scoped_ptr<Coordinator> coord_;
   boost::scoped_ptr<RuntimeState> local_state_;  // only for queries w/o FROM clause
   boost::scoped_ptr<RuntimeProfile> query_profile_; 
-  DataStreamMgr* stream_mgr_;
-  TestEnv* test_env_;
+  ExecEnv* exec_env_;
   std::vector<Expr*> select_list_exprs_;
   RowBatch* row_batch_;
   int next_row_;  // to return from row batch

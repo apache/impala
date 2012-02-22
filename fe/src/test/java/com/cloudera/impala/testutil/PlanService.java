@@ -2,7 +2,9 @@
 
 package com.cloudera.impala.testutil;
 
+import java.util.Enumeration;
 import java.util.List;
+import java.util.Properties;
 import java.util.UUID;
 
 import org.apache.hadoop.hive.conf.HiveConf;
@@ -138,6 +140,13 @@ public class PlanService {
     } catch (Exception e) {
       System.err.println(e.getMessage());
       System.exit(2);
+    }
+    Properties prop = System.getProperties();
+    Enumeration keys = prop.keys();
+    while (keys.hasMoreElements()) {
+      String key = (String)keys.nextElement();
+      String value = (String)prop.get(key);
+      System.out.println(key + ": " + value);
     }
   }
 

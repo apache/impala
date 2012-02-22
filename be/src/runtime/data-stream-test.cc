@@ -20,7 +20,7 @@
 #include "runtime/data-stream-recvr.h"
 #include "runtime/descriptors.h"
 #include "testutil/query-executor.h"
-#include "testutil/test-env.h"
+#include "testutil/test-exec-env.h"
 #include "util/debug-util.h"
 #include "gen-cpp/ImpalaBackendService.h"
 #include "gen-cpp/Types_types.h"
@@ -38,10 +38,10 @@ DECLARE_int32(port);
 
 namespace impala {
 
-class ImpalaBackend : public ImpalaBackendServiceIf {
+class ImpalaTestBackend : public ImpalaBackendServiceIf {
  public:
-  ImpalaBackend(DataStreamMgr* stream_mgr): mgr_(stream_mgr) {}
-  virtual ~ImpalaBackend() {}
+  ImpalaTestBackend(DataStreamMgr* stream_mgr): mgr_(stream_mgr) {}
+  virtual ~ImpalaTestBackend() {}
 
   virtual void ExecPlanFragment(
       TExecPlanFragmentResult& _return, const TPlanExecRequest& request, 
@@ -67,7 +67,7 @@ class DataStreamTest : public testing::Test {
  protected:
   DataStreamTest()
     : test_env_(1, 0),
-      exec_(NULL, &test_env_) {
+      exec_(&test_env_) {
   }
 
   virtual void SetUp() {
@@ -85,7 +85,7 @@ class DataStreamTest : public testing::Test {
   static const PlanNodeId DEST_NODE_ID = 1;
 
   const DescriptorTbl* desc_tbl_;
-  TestEnv test_env_;
+  TestExecEnv test_env_;
   QueryExecutor exec_;
   TUniqueId query_id_;
   string stmt_;
@@ -144,7 +144,7 @@ class DataStreamTest : public testing::Test {
   // Start backend in separate thread.
   void StartBackend() {
     shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
-    shared_ptr<ImpalaBackend> handler(new ImpalaBackend(stream_mgr_));
+    shared_ptr<ImpalaTestBackend> handler(new ImpalaTestBackend(stream_mgr_));
     shared_ptr<TProcessor> processor(new ImpalaBackendServiceProcessor(handler));
     shared_ptr<TServerTransport> server_transport(new TServerSocket(FLAGS_port));
     shared_ptr<TTransportFactory> transport_factory(new TBufferedTransportFactory());
@@ -174,7 +174,7 @@ class DataStreamTest : public testing::Test {
   }
 
   void Sender(int sender_num) {
-    QueryExecutor exec(NULL, &test_env_);
+    QueryExecutor exec(&test_env_);
     VLOG(1) << "exec setup";
     EXPECT_TRUE(exec.Setup().ok());
     VLOG(1) << "exec::exec";

@@ -9,22 +9,22 @@
 // stringstream is a typedef, so can't forward declare it.
 #include <sstream>
 
+#include "runtime/exec-env.h"
 #include "gen-cpp/Types_types.h"  // for TUniqueId
 
 namespace impala {
 
-class HdfsFsCache;
 class DescriptorTbl;
 class ObjectPool;
 class Status;
-class DataStreamMgr;
+class ExecEnv;
 
 // A collection of items that are part of the global state of a
 // query and potentially shared across execution nodes.
 class RuntimeState {
  public:
   RuntimeState(const TUniqueId& query_id, bool abort_on_error, int max_errors,
-               DataStreamMgr* stream_mgr, HdfsFsCache* fs_cache);
+               ExecEnv* exec_env);
 
   ObjectPool* obj_pool() const { return obj_pool_.get(); }
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }
@@ -42,8 +42,9 @@ class RuntimeState {
   }
   const TUniqueId& query_id() const { return query_id_; }
   static void* hbase_conf() { return hbase_conf_; }
-  DataStreamMgr* stream_mgr() { return stream_mgr_; }
-  HdfsFsCache* fs_cache() { return fs_cache_; }
+  ExecEnv* exec_env() { return exec_env_; }
+  DataStreamMgr* stream_mgr() { return exec_env_->stream_mgr(); }
+  HdfsFsCache* fs_cache() { return exec_env_->fs_cache(); }
 
   // Creates a global reference to a new HBaseConfiguration object via JniUtil.
   // Cleanup is done in JniUtil::Cleanup().
@@ -93,8 +94,7 @@ class RuntimeState {
   // HBaseConfiguration jobject. Initialized in InitHBaseConf().
   static void* hbase_conf_;
   TUniqueId query_id_;
-  DataStreamMgr* stream_mgr_;
-  HdfsFsCache* fs_cache_;
+  ExecEnv* exec_env_;
 
   // prohibit copies
   RuntimeState(const RuntimeState&);

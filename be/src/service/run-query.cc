@@ -11,11 +11,13 @@
 #include <server/TServer.h>
 #include <boost/thread/thread.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/scoped_ptr.hpp>
 
 #include "common/status.h"
 #include "exec/hbase-table-scanner.h"
 #include "testutil/query-executor.h"
-#include "testutil/test-env.h"
+#include "runtime/exec-env.h"
+#include "testutil/test-exec-env.h"
 #include "service/backend-service.h"
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
@@ -32,13 +34,14 @@ DEFINE_int32(iterations, 1, "Number of times to run the query (for perf testing)
 DEFINE_bool(enable_counters, true, "if false, disable using counters (so a profiler can use them");
 DECLARE_int32(num_nodes);
 DECLARE_int32(backend_port);
+DECLARE_string(backends);
 
 using namespace std;
 using namespace impala;
 using namespace boost;
 using namespace apache::thrift::server;
 
-static void Exec(DataStreamMgr* stream_mgr, TestEnv* test_env) {
+static void Exec(ExecEnv* exec_env) {
   bool enable_profiling = false;
   if (FLAGS_enable_counters && FLAGS_profile_output_file.size() != 0) {
     ProfilerStart(FLAGS_profile_output_file.c_str());
@@ -59,7 +62,7 @@ static void Exec(DataStreamMgr* stream_mgr, TestEnv* test_env) {
 
   // If the number of iterations is greater than 1, run once to Ignore JVM startup time.
   if (FLAGS_iterations > 1) {
-    QueryExecutor executor(stream_mgr, test_env);
+    QueryExecutor executor(exec_env);
     EXIT_IF_ERROR(executor.Setup());
     EXIT_IF_ERROR(executor.Exec(queries[0], NULL));
     while (true) {
@@ -76,7 +79,6 @@ static void Exec(DataStreamMgr* stream_mgr, TestEnv* test_env) {
   }
 
   ObjectPool profile_pool;
-
   for (vector<string>::const_iterator iter = queries.begin(); 
       iter != queries.end(); ++iter) {
     if (iter->size() == 0) continue;
@@ -88,7 +90,7 @@ static void Exec(DataStreamMgr* stream_mgr, TestEnv* test_env) {
     RuntimeProfile aggregate_profile(&profile_pool, "RunQuery");
 
     for (int i = 0; i < FLAGS_iterations; ++i) {
-      QueryExecutor executor(stream_mgr, test_env);
+      QueryExecutor executor(exec_env);
       EXIT_IF_ERROR(executor.Setup());
 
       struct timeval start_time;
@@ -170,16 +172,19 @@ int main(int argc, char** argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);
 
   JniUtil::InitLibhdfs();
-  TestEnv* test_env = new TestEnv(
-      FLAGS_num_nodes > 0 ? FLAGS_num_nodes : 4, FLAGS_backend_port + 1);
-  DataStreamMgr* stream_mgr = NULL;
+  scoped_ptr<ExecEnv> exec_env;
+  if (FLAGS_backends.empty()) {
+    TestExecEnv* test_exec_env = new TestExecEnv(
+        FLAGS_num_nodes > 0 ? FLAGS_num_nodes - 1 : 4, FLAGS_backend_port + 1);
+    test_exec_env->StartBackends();
+    exec_env.reset(test_exec_env);
+  } else {
+    exec_env.reset(new ExecEnv());
+  }
   if (FLAGS_num_nodes != 1) {
-    stream_mgr = new DataStreamMgr();
     // start backend service to feed stream_mgr
-    TServer* server = StartImpalaBackendService(
-        stream_mgr, test_env->fs_cache(), FLAGS_backend_port);
+    TServer* server = StartImpalaBackendService(exec_env.get(), FLAGS_backend_port);
     thread server_thread = thread(&RunServer, server);
-    test_env->StartBackends();
   }
   EXIT_IF_ERROR(JniUtil::Init());
   if (FLAGS_init_hbase) {
@@ -187,7 +192,7 @@ int main(int argc, char** argv) {
     EXIT_IF_ERROR(RuntimeState::InitHBaseConf());
   }
 
-  Exec(stream_mgr, test_env);
+  Exec(exec_env.get());
 
   // Delete all global JNI references.
   JniUtil::Cleanup();

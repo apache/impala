@@ -107,4 +107,3 @@ target_link_libraries(impalad
   tcmallocstatic
   pprofstatic
 )
-

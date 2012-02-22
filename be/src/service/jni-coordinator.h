@@ -29,14 +29,14 @@ class DataStreamMgr;
 class Coordinator;
 class RuntimeState;
 class RowDescriptor;
-class TestEnv;
+class ExecEnv;
 
 // Shim class to adapt backend coordinator to jni.
 class JniCoordinator {
  public:
   JniCoordinator(
-      JNIEnv* env, DataStreamMgr* stream_mgr, TestEnv* test_env, jobject error_log,
-      jobject file_errors, jobject result_queue);
+      JNIEnv* env, ExecEnv* exec_env, jobject error_log, jobject file_errors,
+      jobject result_queue);
   ~JniCoordinator();
 
   // Create global jni structures.
@@ -79,7 +79,6 @@ class JniCoordinator {
   jobject result_queue_;
   ObjectPool obj_pool_;
   std::vector<Expr*> select_list_exprs_;
-  DataStreamMgr* stream_mgr_;  // not owned
   boost::scoped_ptr<Coordinator> coord_;
 
   // Global class references created with JniUtil. Cleanup is done in JniUtil::Cleanup().

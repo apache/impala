@@ -32,8 +32,8 @@
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/plan-executor.h"
+#include "runtime/exec-env.h"
 #include "util/debug-util.h"
-#include "testutil/test-env.h"
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
 #include "gen-cpp/ImpalaBackendService.h"
@@ -49,6 +49,7 @@ DEFINE_int32(num_nodes, 1,
     "0 = run in # of data nodes + 1 for coordinator");
 DEFINE_int32(backend_port, 21000,
     "start port for backend threads (assigned sequentially)");
+DEFINE_string(coord_host, "localhost", "hostname of coordinator");
 
 using namespace std;
 using namespace boost;
@@ -58,10 +59,9 @@ using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
 using namespace impala;
 
-QueryExecutor::QueryExecutor(DataStreamMgr* stream_mgr, TestEnv* test_env)
+QueryExecutor::QueryExecutor(ExecEnv* exec_env)
   : started_server_(false),
-    stream_mgr_(stream_mgr),
-    test_env_(test_env),
+    exec_env_(exec_env),
     row_batch_(NULL),
     next_row_(0),
     obj_pool_(new ObjectPool()) {
@@ -180,7 +180,7 @@ Status QueryExecutor::Exec(
     DCHECK(!query_request_.fragmentRequests[0].__isset.planFragment);
     local_state_.reset(
         new RuntimeState(query_request_.queryId, FLAGS_abort_on_error,
-                         FLAGS_max_errors, NULL, NULL));
+                         FLAGS_max_errors, NULL));
     RETURN_IF_ERROR(
         PrepareSelectListExprs(local_state_.get(), RowDescriptor(), col_types));
     return Status::OK;
@@ -198,16 +198,17 @@ Status QueryExecutor::Exec(
     DCHECK_EQ(query_request_.nodeRequestParams.size(), 2);
     DCHECK_LE(query_request_.nodeRequestParams[1].size(), FLAGS_num_nodes - 1);
 
-    // set destinations to coord port
+    // set destinations to coord host/port
     for (int i = 0; i < query_request_.nodeRequestParams[1].size(); ++i) {
       DCHECK_EQ(query_request_.nodeRequestParams[1][i].destinations.size(), 1);
+      query_request_.nodeRequestParams[1][i].destinations[0].host =
+          FLAGS_coord_host;
       query_request_.nodeRequestParams[1][i].destinations[0].port =
           FLAGS_backend_port;
     }
   }
 
-  coord_.reset(
-      new Coordinator("localhost", FLAGS_backend_port, stream_mgr_, test_env_));
+  coord_.reset(new Coordinator(exec_env_));
   RETURN_IF_ERROR(coord_->Exec(query_request_));
   RETURN_IF_ERROR(PrepareSelectListExprs(
       coord_->runtime_state(), coord_->row_desc(), col_types));
