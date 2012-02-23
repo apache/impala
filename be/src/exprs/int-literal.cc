@@ -16,16 +16,16 @@ IntLiteral::IntLiteral(PrimitiveType type, void* value)
   DCHECK(value != NULL);
   switch (type_) {
     case TYPE_TINYINT:
-      result_.tinyint_val = *reinterpret_cast<bool*>(value);
+      result_.tinyint_val = *reinterpret_cast<int8_t*>(value);
       break;
     case TYPE_SMALLINT:
-      result_.smallint_val = *reinterpret_cast<char*>(value);
+      result_.smallint_val = *reinterpret_cast<int16_t*>(value);
       break;
     case TYPE_INT:
-      result_.int_val = *reinterpret_cast<int*>(value);
+      result_.int_val = *reinterpret_cast<int32_t*>(value);
       break;
     case TYPE_BIGINT:
-      result_.bigint_val = *reinterpret_cast<long*>(value);
+      result_.bigint_val = *reinterpret_cast<int64_t*>(value);
       break;
     default:
       DCHECK(false) << "IntLiteral ctor: bad type: " << TypeToString(type_);

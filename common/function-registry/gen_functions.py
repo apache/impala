@@ -82,6 +82,18 @@ native_types = {
   'DOUBLE'        : 'double',
   'STRING'        : 'StringValue',
 }
+
+# Portable type used in the function implementation
+implemented_types = {
+  'BOOLEAN'       : 'bool',
+  'TINYINT'       : 'int8_t',
+  'SMALLINT'      : 'int16_t',
+  'INT'           : 'int32_t',
+  'BIGINT'        : 'int64_t',
+  'FLOAT'         : 'float',
+  'DOUBLE'        : 'double',
+  'STRING'        : 'StringValue',
+}
 result_fields = {
   'BOOLEAN'       : 'bool_val',
   'TINYINT'       : 'tinyint_val',
@@ -281,7 +293,7 @@ def initialize_sub(op, return_type, arg_types):
   for idx in range(0, len(arg_types)):
     arg = arg_types[idx]
     sub["fn_signature"] += "_" + native_types[arg]
-    sub["native_type" + repr(idx + 1)] = native_types[arg]
+    sub["native_type" + repr(idx + 1)] = implemented_types[arg]
     sub["args"] += "'" + arg + "', "
   return sub
 

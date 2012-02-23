@@ -131,27 +131,27 @@ void RawValue::Write(const void* value, Tuple* tuple, const SlotDescriptor* slot
     }
     case TYPE_TINYINT: {
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<char*>(slot) = static_cast<char>(*reinterpret_cast<const long*>(value));
+      *reinterpret_cast<int8_t*>(slot) = *reinterpret_cast<const int8_t*>(value);
       break;
     }
     case TYPE_SMALLINT: {
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<short*>(slot) = static_cast<short>(*reinterpret_cast<const long*>(value));
+      *reinterpret_cast<int16_t*>(slot) = *reinterpret_cast<const int16_t*>(value);
       break;
     }
     case TYPE_INT: {
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<int*>(slot) = static_cast<int>(*reinterpret_cast<const long*>(value));
+      *reinterpret_cast<int32_t*>(slot) = *reinterpret_cast<const int32_t*>(value);
       break;
     }
     case TYPE_BIGINT: {
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<long*>(slot) = *reinterpret_cast<const long*>(value);
+      *reinterpret_cast<int64_t*>(slot) = *reinterpret_cast<const int64_t*>(value);
       break;
     }
     case TYPE_FLOAT: {
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<int*>(slot) = static_cast<float>(*reinterpret_cast<const double*>(value));
+      *reinterpret_cast<float*>(slot) = *reinterpret_cast<const float*>(value);
       break;
     }
     case TYPE_DOUBLE: {
@@ -176,7 +176,8 @@ void RawValue::Write(const void* value, Tuple* tuple, const SlotDescriptor* slot
       break;
     }
     default:
-      DCHECK(false) << "RawValue::Write(): bad type: " << TypeToString(slot_desc->type());
+      DCHECK(false) << "RawValue::Write(): bad type: "
+                    << TypeToString(slot_desc->type());
   }
 }
 

@@ -44,25 +44,25 @@ bool TextConverter::ConvertAndWriteSlotBytes(const char* begin, const char* end,
     }
     case TYPE_TINYINT: {
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<char*>(slot) =
-          static_cast<char>(strtol(begin, &end_ptr, 0));
+      *reinterpret_cast<int8_t*>(slot) =
+          static_cast<int8_t>(strtol(begin, &end_ptr, 0));
       break;
     }
     case TYPE_SMALLINT: {
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<short*>(slot) =
-          static_cast<short>(strtol(begin, &end_ptr, 0));
+      *reinterpret_cast<int16_t*>(slot) =
+          static_cast<int16_t>(strtol(begin, &end_ptr, 0));
       break;
     }
     case TYPE_INT: {
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<int*>(slot) =
-          static_cast<int>(strtol(begin, &end_ptr, 0));
+      *reinterpret_cast<int32_t*>(slot) =
+          static_cast<int32_t>(strtol(begin, &end_ptr, 0));
       break;
     }
     case TYPE_BIGINT: {
       void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<long*>(slot) = strtol(begin, &end_ptr, 0);
+      *reinterpret_cast<int64_t*>(slot) = strtol(begin, &end_ptr, 0);
       break;
     }
     case TYPE_FLOAT: {

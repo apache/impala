@@ -345,10 +345,10 @@ void TestSingleLiteralConstruction(PrimitiveType type, void* value, const string
 
 TEST_F(ExprTest, LiteralConstruction) {
   bool b_val = true;
-  char c_val = 'f';
-  short s_val = 123;
-  int i_val = 234;
-  long l_val = 345;
+  int8_t c_val = 'f';
+  int16_t s_val = 123;
+  int32_t i_val = 234;
+  int64_t l_val = 1234;
   float f_val = 3.14f;
   double d_val = 1.23;
   string str_input = "Hello";
@@ -358,10 +358,33 @@ TEST_F(ExprTest, LiteralConstruction) {
   TestSingleLiteralConstruction(TYPE_TINYINT, &c_val, "f");
   TestSingleLiteralConstruction(TYPE_SMALLINT, &s_val, "123");
   TestSingleLiteralConstruction(TYPE_INT, &i_val, "234");
-  TestSingleLiteralConstruction(TYPE_BIGINT, &l_val, "345");
+  TestSingleLiteralConstruction(TYPE_BIGINT, &l_val, "1234");
   TestSingleLiteralConstruction(TYPE_FLOAT, &f_val, "3.14");
   TestSingleLiteralConstruction(TYPE_DOUBLE, &d_val, "1.23");
   TestSingleLiteralConstruction(TYPE_STRING, &str_val, "Hello");
+
+  // Min/Max Boundary value test for tiny/small/int/long
+  c_val = 127;
+  const char c_array_max[] = {(const char)127}; // avoid implicit casting
+  string c_input_max(c_array_max);
+  s_val = 32767;
+  i_val = 2147483647;
+  l_val = 9223372036854775807l;
+  TestSingleLiteralConstruction(TYPE_TINYINT, &c_val, c_input_max);
+  TestSingleLiteralConstruction(TYPE_SMALLINT, &s_val, "32767");
+  TestSingleLiteralConstruction(TYPE_INT, &i_val, "2147483647");
+  TestSingleLiteralConstruction(TYPE_BIGINT, &l_val, "9223372036854775807");
+
+  const char c_array_min[] = {(const char)(-128)}; // avoid implicit casting
+  string c_input_min(c_array_min);
+  c_val = -128;
+  s_val = -32768;
+  i_val = -2147483648;
+  l_val = -9223372036854775807l-1;
+  TestSingleLiteralConstruction(TYPE_TINYINT, &c_val, c_input_min);
+  TestSingleLiteralConstruction(TYPE_SMALLINT, &s_val, "-32768");
+  TestSingleLiteralConstruction(TYPE_INT, &i_val, "-2147483648");
+  TestSingleLiteralConstruction(TYPE_BIGINT, &l_val, "-9223372036854775808");
 }
 
 

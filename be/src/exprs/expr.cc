@@ -341,19 +341,19 @@ void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
       col_val->__isset.boolVal = true;
       break;
     case TYPE_TINYINT:
-      col_val->intVal = *reinterpret_cast<char*>(value);
+      col_val->intVal = *reinterpret_cast<int8_t*>(value);
       col_val->__isset.intVal = true;
       break;
     case TYPE_SMALLINT:
-      col_val->intVal = *reinterpret_cast<short*>(value);
+      col_val->intVal = *reinterpret_cast<int16_t*>(value);
       col_val->__isset.intVal = true;
       break;
     case TYPE_INT:
-      col_val->intVal = *reinterpret_cast<int*>(value);
+      col_val->intVal = *reinterpret_cast<int32_t*>(value);
       col_val->__isset.intVal = true;
       break;
     case TYPE_BIGINT:
-      col_val->longVal = *reinterpret_cast<long*>(value);
+      col_val->longVal = *reinterpret_cast<int64_t*>(value);
       col_val->__isset.longVal = true;
       break;
     case TYPE_FLOAT:
