@@ -40,7 +40,7 @@ do
       echo "buildall.sh [-noclean] [-noconfig] [-notestdata]"
       echo "[-noclean] : omits cleaning all packages before building"
       echo "[-noconfig] : omits running configure script for third party packages"
-      echo "[-testdata] : omits recreating the metastore and loading test data"
+      echo "[-notestdata] : omits recreating the metastore and loading test data"
       exit
       ;;
   esac
@@ -97,7 +97,7 @@ fi
 OLDCXXFLAGS=$(grep -w "CXXFLAGS =" Makefile)
 NEWCXXFLAGS=$OLDCXXFLAGS" -fPIC"
 sed -i "s/$OLDCXXFLAGS/$NEWCXXFLAGS/g" Makefile
-make
+make -j
 
 # Build glog
 cd $IMPALA_HOME/thirdparty/glog-0.3.1
@@ -109,11 +109,11 @@ fi
 OLDCXXFLAGS=$(grep -w "CXXFLAGS =" Makefile)
 NEWCXXFLAGS=$OLDCXXFLAGS" -fPIC"
 sed -i "s/$OLDCXXFLAGS/$NEWCXXFLAGS/g" Makefile
-make
+make -j
 
 cd $IMPALA_HOME/thirdparty/gtest-1.6.0
 cmake .
-make
+make -j
 
 # cleanup FE process
 $IMPALA_HOME/bin/clean-fe-processes.py
