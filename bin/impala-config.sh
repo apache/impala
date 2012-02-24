@@ -51,7 +51,7 @@ export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-0.92.0-cdh4b1
 export PATH=$HBASE_HOME/bin:$PATH
 export HBASE_CONF_DIR=$HIVE_CONF_DIR
 
-export LIBHDFS_OPTS='-Djava.library.path=${HADOOP_HOME}/lib/native/'
+export LIBHDFS_OPTS="-Djava.library.path=${HADOOP_HOME}/lib/native/"
 
 export ARTISTIC_STYLE_OPTIONS=$IMPALA_BE_DIR/.astylerc
 
