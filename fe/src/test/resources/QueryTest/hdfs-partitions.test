@@ -125,3 +125,16 @@ bigint
 ----
 0
 ====
+# Test multi files partitioned table (hdfs)
+select count(*) from alltypesaggmultifiles
+----
+bigint
+----
+10000
+====
+# Test multi files partitioned table (text)
+select count(*) from alltypesaggmultifiles_text
+----
+bigint
+----
+10000

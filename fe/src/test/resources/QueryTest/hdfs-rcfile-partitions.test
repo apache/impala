@@ -125,3 +125,10 @@ bigint
 ----
 0
 ====
+# Test multi files partitioned table (rc)
+select count(*) from alltypesaggmultifiles_rc
+----
+bigint
+----
+10000
+====

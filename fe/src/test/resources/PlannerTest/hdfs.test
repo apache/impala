@@ -500,3 +500,56 @@ SCAN HDFS table=default.alltypes
     hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=8/100801.txt
     hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=9/100901.txt
 ====
+# multi files non-partitioned table test
+select * from alltypesaggmultifilesNoPart
+----
+SCAN HDFS table=default.alltypesaggmultifilesnopart
+  FILES:
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0_copy_1
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0_copy_2
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0_copy_3
+----
+EXCHANGE ID: 1
+----
+STREAM DATA SINK
+  EXCHANGE ID: 1
+SCAN HDFS table=default.alltypesaggmultifilesnopart
+  FILES:
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0_copy_1
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0_copy_2
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0_copy_3
+----
+====
+# multi files partitioned table test
+select * from alltypesaggmultifiles where day<=2
+----
+SCAN HDFS table=default.alltypesaggmultifiles
+  REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+  FILES:
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_1
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_2
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_3    
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_1
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_2
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_3    
+----
+EXCHANGE ID: 1
+----
+STREAM DATA SINK
+  EXCHANGE ID: 1
+SCAN HDFS table=default.alltypesaggmultifiles
+  REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+  FILES:
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_1
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_2
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_3    
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_1
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_2
+    hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_3    
+----

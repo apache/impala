@@ -500,3 +500,10 @@ int,boolean,tinyint,smallint,int,bigint,float,double,string,string
 28,true,8,8,8,80,8,80.8,'03/01/09','8'
 29,false,9,9,NULL,90,9,90.9,'03/01/09','9'
 ====
+# Test multi files non-partitioned table (rc)
+select count(*) from alltypesaggmultifilesnopart_rc
+----
+bigint
+----
+10000
+====

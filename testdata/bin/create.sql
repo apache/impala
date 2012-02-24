@@ -307,5 +307,90 @@ row format delimited fields terminated by '|'  stored as textfile;
 
 DROP TABLE IF EXISTS EmptyTable;
 CREATE TABLE EmptyTable (
-  field string
-) partitioned by (f2 int);
+  field string)
+partitioned by (f2 int);
+
+DROP TABLE IF EXISTS AllTypesAggMultiFiles;
+CREATE TABLE AllTypesAggMultiFiles (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string)
+partitioned by (year int, month int, day int);
+
+DROP TABLE IF EXISTS AllTypesAggMultiFiles_text;
+CREATE TABLE AllTypesAggMultiFiles_text (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string)
+partitioned by (year int, month int, day int)
+row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
+
+DROP TABLE IF EXISTS AllTypesAggMultiFiles_rc;
+CREATE TABLE AllTypesAggMultiFiles_rc (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string)
+partitioned by (year int, month int, day int)
+STORED AS RCFILE;
+
+DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart;
+CREATE TABLE AllTypesAggMultiFilesNoPart (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string);
+
+DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart_text;
+CREATE TABLE AllTypesAggMultiFilesNoPart_text (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string)
+row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
+
+DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart_rc;
+CREATE TABLE AllTypesAggMultiFilesNoPart_rc (
+  id int,
+  bool_col boolean,
+  tinyint_col tinyint,
+  smallint_col smallint,
+  int_col int,
+  bigint_col bigint,
+  float_col float,
+  double_col double,
+  date_string_col string,
+  string_col string)
+STORED AS RCFILE;

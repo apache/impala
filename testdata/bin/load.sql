@@ -224,3 +224,30 @@ LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/grepTiny/part
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/htmlTiny/Rankings.dat' OVERWRITE INTO TABLE RankingsSmall;
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/htmlTiny/UserVisits.dat' OVERWRITE INTO TABLE UserVisitsSmall;
 
+-- Create multiple (now, 4) files for AllTypesAggMultiFilesNoPart (hdfs/rc/text)
+insert into table alltypesaggmultifilesnopart      SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col FROM alltypesagg where id % 4 = 0;
+insert into table alltypesaggmultifilesnopart      SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col FROM alltypesagg where id % 4 = 1;
+insert into table alltypesaggmultifilesnopart      SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col FROM alltypesagg where id % 4 = 2;
+insert into table alltypesaggmultifilesnopart      SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col FROM alltypesagg where id % 4 = 3;
+insert into table alltypesaggmultifilesnopart_rc   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col FROM alltypesagg where id % 4 = 0;
+insert into table alltypesaggmultifilesnopart_rc   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col FROM alltypesagg where id % 4 = 1;
+insert into table alltypesaggmultifilesnopart_rc   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col FROM alltypesagg where id % 4 = 2;
+insert into table alltypesaggmultifilesnopart_rc   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col FROM alltypesagg where id % 4 = 3;
+insert into table alltypesaggmultifilesnopart_text SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col FROM alltypesagg where id % 4 = 0;
+insert into table alltypesaggmultifilesnopart_text SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col FROM alltypesagg where id % 4 = 1;
+insert into table alltypesaggmultifilesnopart_text SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col FROM alltypesagg where id % 4 = 2;
+insert into table alltypesaggmultifilesnopart_text SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col FROM alltypesagg where id % 4 = 3;
+
+-- Create multiple files for alltypesaggmultifiles (hdfs/rc/text)
+INSERT INTO TABLE alltypesaggmultifiles partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, year, month, day FROM alltypesagg where id % 4 = 0;
+INSERT INTO TABLE alltypesaggmultifiles partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, year, month, day FROM alltypesagg where id % 4 = 1;
+INSERT INTO TABLE alltypesaggmultifiles partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, year, month, day FROM alltypesagg where id % 4 = 2;
+INSERT INTO TABLE alltypesaggmultifiles partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, year, month, day FROM alltypesagg where id % 4 = 3;
+INSERT INTO TABLE alltypesaggmultifiles_rc partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, year, month, day FROM alltypesagg where id % 4 = 0;
+INSERT INTO TABLE alltypesaggmultifiles_rc partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, year, month, day FROM alltypesagg where id % 4 = 1;
+INSERT INTO TABLE alltypesaggmultifiles_rc partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, year, month, day FROM alltypesagg where id % 4 = 2;
+INSERT INTO TABLE alltypesaggmultifiles_rc partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, year, month, day FROM alltypesagg where id % 4 = 3;
+INSERT INTO TABLE alltypesaggmultifiles_text partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, year, month, day FROM alltypesagg where id % 4 = 0;
+INSERT INTO TABLE alltypesaggmultifiles_text partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, year, month, day FROM alltypesagg where id % 4 = 1;
+INSERT INTO TABLE alltypesaggmultifiles_text partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, year, month, day FROM alltypesagg where id % 4 = 2;
+INSERT INTO TABLE alltypesaggmultifiles_text partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, year, month, day FROM alltypesagg where id % 4 = 3;
