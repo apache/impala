@@ -8,7 +8,8 @@
 exec_program(thrift ARGS -version OUTPUT_VARIABLE Thrift_VERSION
              RETURN_VALUE Thrift_RETURN)
 
-find_path(Thrift_INCLUDE_DIR Thrift.h PATHS
+# prefer the thrift version supplied in THRIFT_HOME
+find_path(Thrift_INCLUDE_DIR Thrift.h HINTS
   $ENV{THRIFT_HOME}/include/thrift
   /usr/local/include/thrift
   /opt/local/include/thrift
@@ -19,7 +20,8 @@ set(Thrift_LIB_PATHS
   /usr/local/lib
   /opt/local/lib)
 
-find_library(Thrift_LIB NAMES thrift PATHS ${Thrift_LIB_PATHS})
+# prefer the thrift version supplied in THRIFT_HOME
+find_library(Thrift_LIB NAMES thrift HINTS ${Thrift_LIB_PATHS})
 
 if (Thrift_LIB)
   set(Thrift_FOUND TRUE)
