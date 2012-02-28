@@ -539,16 +539,16 @@ tinyint, smallint, int, bigint, float, double
 -128,-32768,-2147483648,-9223372036854775808,-inf,-inf
 ====
 # Test multi files non-partitioned table (hdfs)
-select count(*) from multifilestablenopart
+select count(*) from AllTypesAggMultiFilesNoPart
 ----
 bigint
 ----
-40000
+10000
 ====
 # Test multi files non-partitioned table (text)
-select count(*) from multifilestablenopart_text
+select count(*) from AllTypesAggMultiFilesNoPart_text
 ----
 bigint
 ----
-40000
+10000
 ====
