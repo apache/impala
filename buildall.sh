@@ -7,6 +7,7 @@ root=`dirname "$0"`
 root=`cd "$root"; pwd`
 
 export IMPALA_HOME=$root
+export IMPALA_ROOT=`basename $root | sed -e "s/\\./_/g"`
 
 . "$root"/bin/impala-config.sh
 

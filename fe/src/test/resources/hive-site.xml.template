@@ -26,24 +26,29 @@
 <!-- resource).                                                                                 -->
 
 <property>
-  <name>javax.jdo.option.ConnectionURL</name>
-  <!-- note: variable substituion not working here because it's loaded by jdo, not Hive -->
-  <value>jdbc:derby:;databaseName=${IMPALA_FE_DIR}/target/test_metastore_db;create=true;logDevice=${IMPALA_FE_DIR}/target/test_metastore_db</value>
+ <name>javax.jdo.option.ConnectionURL</name>
+ <value>jdbc:mysql://localhost:3306/hive_${IMPALA_ROOT}?createDatabaseIfNotExist=true</value>
 </property>
-
 <property>
-  <name>javax.jdo.option.ConnectionDriverName</name>
-  <value>org.apache.derby.jdbc.EmbeddedDriver</value>
+ <name>javax.jdo.option.ConnectionDriverName</name>
+ <value>com.mysql.jdbc.Driver</value>
 </property>
-
 <property>
-  <name>javax.jdo.option.ConnectionUserName</name>
-  <value>APP</value>
+ <name>javax.jdo.option.ConnectionUserName</name>
+ <value>hiveuser</value>
 </property>
-
 <property>
-  <name>javax.jdo.option.ConnectionPassword</name>
-  <value>mine</value>
+   <name>javax.jdo.option.ConnectionPassword</name>
+   <value>password</value>
+</property>
+<property>
+  <name>datanucleus.autoCreateSchema</name>
+  <value>true</value>
+</property>
+ 
+<property>
+  <name>datanucleus.fixedDatastore</name>
+  <value>false</value>
 </property>
 
 <property>
