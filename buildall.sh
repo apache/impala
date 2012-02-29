@@ -86,7 +86,7 @@ sed -i "s/$OLDCXXFLAGS/$NEWCXXFLAGS/g" Makefile
 make -j
 
 # Build pprof
-cd $IMPALA_HOME/thirdparty/google-perftools-1.8.3
+cd $IMPALA_HOME/thirdparty/gperftools-2.0
 if [ $config_action -eq 1 ]
 then
 # TODO: google perf tools indicates this might be necessary on 64 bit systems.

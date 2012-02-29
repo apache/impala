@@ -6,11 +6,11 @@
 #  PPROF_FOUND, whether pprof has been found
 
 set(PPROF_SEARCH_HEADER_PATHS
-  ${CMAKE_SOURCE_DIR}/thirdparty/google-perftools-1.8.3/src
+  ${CMAKE_SOURCE_DIR}/thirdparty/gperftools-2.0/src
 )
 
 set(PPROF_SEARCH_LIB_PATH
-  ${CMAKE_SOURCE_DIR}/thirdparty/google-perftools-1.8.3/.libs
+  ${CMAKE_SOURCE_DIR}/thirdparty/gperftools-2.0/.libs
 )
 
 find_path(PPROF_INCLUDE_DIR google/profiler.h PATHS
