@@ -10,6 +10,7 @@
 #include <google/profiler.h>
 #include <server/TServer.h>
 #include <boost/thread/thread.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include "common/status.h"
 #include "exec/hbase-table-scanner.h"
@@ -23,7 +24,7 @@
 #include "util/stat-util.h"
 #include "runtime/data-stream-mgr.h"
 
-DEFINE_string(query, "", "query to execute");
+DEFINE_string(query, "", "query to execute.  Multiple queries can be ; separated");
 DEFINE_bool(init_hbase, true, "if true, call hbase jni initialization");
 DEFINE_string(profile_output_file, "pprof.out", "google pprof output file");
 DEFINE_int32(iterations, 1, "Number of times to run the query (for perf testing)");
@@ -47,11 +48,19 @@ static void Exec(DataStreamMgr* stream_mgr, TestEnv* test_env) {
   elapsed_times.resize(FLAGS_iterations);
   int num_rows = 0;
 
+  vector<string> queries;
+  split(queries, FLAGS_query, is_any_of(";"), token_compress_on ); 
+  
+  if (queries.size() == 0) {
+    cout << "Invalid query: " << FLAGS_query << endl;
+    return;
+  }
+
   // If the number of iterations is greater than 1, run once to Ignore JVM startup time.
   if (FLAGS_iterations > 1) {
     QueryExecutor executor(stream_mgr, test_env);
     EXIT_IF_ERROR(executor.Setup());
-    EXIT_IF_ERROR(executor.Exec(FLAGS_query, NULL));
+    EXIT_IF_ERROR(executor.Exec(queries[0], NULL));
     while (true) {
       string row;
       EXIT_IF_ERROR(executor.FetchResult(&row));
@@ -65,57 +74,66 @@ static void Exec(DataStreamMgr* stream_mgr, TestEnv* test_env) {
     counters.Snapshot("Setup");
   }
 
-  for (int i = 0; i < FLAGS_iterations; ++i) {
-    QueryExecutor executor(stream_mgr, test_env);
-    EXIT_IF_ERROR(executor.Setup());
+  for (vector<string>::const_iterator iter = queries.begin(); 
+      iter != queries.end(); ++iter) {
+    if (iter->size() == 0) continue;
 
-    struct timeval start_time;
-    gettimeofday(&start_time, NULL);
-
-    EXIT_IF_ERROR(executor.Exec(FLAGS_query, NULL));
-
-    while (true) {
-      string row;
-      EXIT_IF_ERROR(executor.FetchResult(&row));
-      if (row.empty()) break;
-      // Only print results for first run
-      if (i == 0) cout << row << endl;
-      ++num_rows;
+    if (queries.size() > 0) {
+      cout << "Running query: " << *iter << endl;
     }
 
-    struct timeval end_time;
-    gettimeofday(&end_time, NULL);
-    double elapsed_usec = end_time.tv_sec * 1000000 + end_time.tv_usec;
-    elapsed_usec -= start_time.tv_sec * 1000000 + start_time.tv_usec;
-    elapsed_times[i] = elapsed_usec;
-  
-    if (FLAGS_enable_counters) {
-      counters.Snapshot("Query");
-    }
+    for (int i = 0; i < FLAGS_iterations; ++i) {
+      QueryExecutor executor(stream_mgr, test_env);
+      EXIT_IF_ERROR(executor.Setup());
 
-    if (executor.ErrorString().size() > 0 || executor.FileErrors().size() > 0) {
-      // Print runtime errors, e.g., parsing errors.
-      cout << executor.ErrorString() << endl;
-      // Print file errors.
-      cout << executor.FileErrors() << endl;
-      break;
-    }
-  }
-  
-  num_rows /= FLAGS_iterations;
+      struct timeval start_time;
+      gettimeofday(&start_time, NULL);
 
-  if (FLAGS_iterations == 1) {
-    cout << "returned " << num_rows << (num_rows == 1 ? " row" : " rows")
-         << " in " << setiosflags(ios::fixed) << setprecision(3)
-         << elapsed_times[0]/1000000.0 << " s" << endl << endl;
-  } else {
-    double mean, stddev;
-    StatUtil::ComputeMeanStddev<double>(&elapsed_times[0], elapsed_times.size(), &mean, &stddev);
-    cout << "returned " << num_rows << (num_rows == 1 ? " row" : " rows")
-         << " in " << setiosflags(ios::fixed) << setprecision(3)
-         << mean/1000000.0 << " s with stddev " 
-         << setiosflags(ios::fixed) << setprecision(3) << stddev/1000000.0
-         << " s" << endl << endl;
+      EXIT_IF_ERROR(executor.Exec(*iter, NULL));
+
+      while (true) {
+        string row;
+        EXIT_IF_ERROR(executor.FetchResult(&row));
+        if (row.empty()) break;
+        // Only print results for first run
+        if (i == 0) cout << row << endl;
+        ++num_rows;
+      }
+
+      struct timeval end_time;
+      gettimeofday(&end_time, NULL);
+      double elapsed_usec = end_time.tv_sec * 1000000 + end_time.tv_usec;
+      elapsed_usec -= start_time.tv_sec * 1000000 + start_time.tv_usec;
+      elapsed_times[i] = elapsed_usec;
+    
+      if (FLAGS_enable_counters) {
+        counters.Snapshot("Query");
+      }
+
+      if (executor.ErrorString().size() > 0 || executor.FileErrors().size() > 0) {
+        // Print runtime errors, e.g., parsing errors.
+        cout << executor.ErrorString() << endl;
+        // Print file errors.
+        cout << executor.FileErrors() << endl;
+        break;
+      }
+    }
+    
+    num_rows /= FLAGS_iterations;
+
+    if (FLAGS_iterations == 1) {
+      cout << "returned " << num_rows << (num_rows == 1 ? " row" : " rows")
+          << " in " << setiosflags(ios::fixed) << setprecision(3)
+          << elapsed_times[0]/1000000.0 << " s" << endl << endl;
+    } else {
+      double mean, stddev;
+      StatUtil::ComputeMeanStddev<double>(&elapsed_times[0], elapsed_times.size(), &mean, &stddev);
+      cout << "returned " << num_rows << (num_rows == 1 ? " row" : " rows")
+          << " in " << setiosflags(ios::fixed) << setprecision(3)
+          << mean/1000000.0 << " s with stddev " 
+          << setiosflags(ios::fixed) << setprecision(3) << stddev/1000000.0
+          << " s" << endl << endl;
+    }
   }
 
   if (FLAGS_enable_counters) {
