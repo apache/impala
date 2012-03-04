@@ -215,6 +215,12 @@ def generate_fe_registry_init(filename):
     for entry in entries:
       java_output = "FunctionOperator." + fn.upper()
       java_output += ", TExprOpcode." + entry["opcode"]
+      # Check the last entry for varargs indicator.      
+      if entry["args"] and entry["args"][-1] == "...":
+        entry["args"].pop()
+        java_output += ", true"
+      else:
+        java_output += ", false"
       java_output += ", PrimitiveType." + entry["ret_type"]
       for arg in entry["args"]:
         java_output += ", PrimitiveType." + arg

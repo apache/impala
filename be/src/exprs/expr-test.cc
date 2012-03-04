@@ -107,6 +107,13 @@ class ExprTest : public testing::Test {
     EXPECT_TRUE(result == NULL);
   }
 
+  void TestNonOkStatus(const string& expr) {
+    string stmt = "select " + expr;
+    vector<PrimitiveType> result_types;
+    Status status = executor_.Exec(stmt, &result_types);
+    ASSERT_FALSE(status.ok()) << "stmt: " << stmt << "\nunexpected Status::OK.";
+  }
+
   template <typename T> void TestFixedPointComparisons(bool test_boundaries) {
     int64_t t_min = numeric_limits<T>::min();
     int64_t t_max = numeric_limits<T>::max();
@@ -599,6 +606,11 @@ TEST_F(ExprTest, LikePredicate) {
   // make sure the 3rd \ counts toward the _
   TestValue("'\\_' LIKE '\\\\\\_'", TYPE_BOOLEAN, true);
   TestValue("'\\\\a' LIKE '\\\\\\_'", TYPE_BOOLEAN, false);
+  // Test invalid patterns, unmatched parenthesis.
+  TestNonOkStatus("'a' RLIKE '(./'");
+  TestNonOkStatus("'a' REGEXP '(./'");
+  // Pattern is converted for LIKE, and should not throw.
+  TestValue("'a' LIKE '(./'", TYPE_BOOLEAN, false);
 }
 
 TEST_F(ExprTest, StringFunctions) {
@@ -635,9 +647,159 @@ TEST_F(ExprTest, StringFunctions) {
   TestStringValue("strright('abcdefg', 3)", "efg");
   TestStringValue("strright('abcdefg', 10)", "abcdefg");
 
+  TestStringValue("trim('')", "");
+  TestStringValue("trim('      ')", "");
+  TestStringValue("trim('   abcdefg   ')", "abcdefg");
+  TestStringValue("trim('abcdefg   ')", "abcdefg");
+  TestStringValue("trim('   abcdefg')", "abcdefg");
+  TestStringValue("trim('abc  defg')", "abc  defg");
+  TestStringValue("ltrim('')", "");
+  TestStringValue("ltrim('      ')", "");
+  TestStringValue("ltrim('   abcdefg   ')", "abcdefg   ");
+  TestStringValue("ltrim('abcdefg   ')", "abcdefg   ");
+  TestStringValue("ltrim('   abcdefg')", "abcdefg");
+  TestStringValue("ltrim('abc  defg')", "abc  defg");
+  TestStringValue("rtrim('')", "");
+  TestStringValue("rtrim('      ')", "");
+  TestStringValue("rtrim('   abcdefg   ')", "   abcdefg");
+  TestStringValue("rtrim('abcdefg   ')", "abcdefg");
+  TestStringValue("rtrim('   abcdefg')", "   abcdefg");
+  TestStringValue("rtrim('abc  defg')", "abc  defg");
+
+  TestStringValue("space(0)", "");
+  TestStringValue("space(-1)", "");
+  TestStringValue("space(1)", " ");
+  TestStringValue("space(6)", "      ");
+
+  TestStringValue("repeat('', 0)", "");
+  TestStringValue("repeat('', 6)", "");
+  TestStringValue("repeat('ab', 0)", "");
+  TestStringValue("repeat('ab', -1)", "");
+  TestStringValue("repeat('ab', 1)", "ab");
+  TestStringValue("repeat('ab', 6)", "abababababab");
+
+  TestValue("ascii('')", TYPE_INT, 0);
+  TestValue("ascii('abcde')", TYPE_INT, 'a');
+  TestValue("ascii('Abcde')", TYPE_INT, 'A');
+  TestValue("ascii('dddd')", TYPE_INT, 'd');
+  TestValue("ascii(' ')", TYPE_INT, ' ');
+
+  TestStringValue("lpad('', 0, '')", "");
+  TestStringValue("lpad('abc', 0, '')", "");
+  TestStringValue("lpad('abc', 3, '')", "abc");
+  TestStringValue("lpad('abc', 2, 'xyz')", "ab");
+  TestStringValue("lpad('abc', 6, 'xyz')", "xyzabc");
+  TestStringValue("lpad('abc', 5, 'xyz')", "xyabc");
+  TestStringValue("lpad('abc', 10, 'xyz')", "xyzxyzxabc");
+  TestStringValue("rpad('', 0, '')", "");
+  TestStringValue("rpad('abc', 0, '')", "");
+  TestStringValue("rpad('abc', 3, '')", "abc");
+  TestStringValue("rpad('abc', 2, 'xyz')", "ab");
+  TestStringValue("rpad('abc', 6, 'xyz')", "abcxyz");
+  TestStringValue("rpad('abc', 5, 'xyz')", "abcxy");
+  TestStringValue("rpad('abc', 10, 'xyz')", "abcxyzxyzx");
+
+  // Note that Hive returns positions starting from 1.
+  // Hive returns 0 if substr was not found in str (or on other error coditions).
+  TestValue("instr('', '')", TYPE_INT, 0);
+  TestValue("instr('', 'abc')", TYPE_INT, 0);
+  TestValue("instr('abc', '')", TYPE_INT, 0);
+  TestValue("instr('abc', 'abc')", TYPE_INT, 1);
+  TestValue("instr('xyzabc', 'abc')", TYPE_INT, 4);
+  TestValue("instr('xyzabcxyz', 'bcx')", TYPE_INT, 5);
+  TestValue("locate('', '')", TYPE_INT, 0);
+  TestValue("locate('abc', '')", TYPE_INT, 0);
+  TestValue("locate('', 'abc')", TYPE_INT, 0);
+  TestValue("locate('abc', 'abc')", TYPE_INT, 1);
+  TestValue("locate('abc', 'xyzabc')", TYPE_INT, 4);
+  TestValue("locate('bcx', 'xyzabcxyz')", TYPE_INT, 5);
+  // Test locate with starting pos param.
+  // Note that Hive expects positions starting from 1 as input.
+  TestValue("locate('', '', 0)", TYPE_INT, 0);
+  TestValue("locate('abc', '', 0)", TYPE_INT, 0);
+  TestValue("locate('', 'abc', 0)", TYPE_INT, 0);
+  TestValue("locate('', 'abc', -1)", TYPE_INT, 0);
+  TestValue("locate('', '', 1)", TYPE_INT, 0);
+  TestValue("locate('', 'abcde', 10)", TYPE_INT, 0);
+  TestValue("locate('abcde', 'abcde', -1)", TYPE_INT, 0);
+  TestValue("locate('abcde', 'abcde', 10)", TYPE_INT, 0);
+  TestValue("locate('abc', 'abcdef', 0)", TYPE_INT, 0);
+  TestValue("locate('abc', 'abcdef', 1)", TYPE_INT, 1);
+  TestValue("locate('abc', 'xyzabcdef', 3)", TYPE_INT, 4);
+  TestValue("locate('abc', 'xyzabcdef', 4)", TYPE_INT, 4);
+  TestValue("locate('abc', 'abcabcabc', 5)", TYPE_INT, 7);
+
+  TestStringValue("concat('a')", "a");
+  TestStringValue("concat('a', 'b')", "ab");
+  TestStringValue("concat('a', 'b', 'cde')", "abcde");
+  TestStringValue("concat('a', 'b', 'cde', 'fg')", "abcdefg");
+  TestStringValue("concat('a', 'b', 'cde', '', 'fg', '')", "abcdefg");
+
+  TestStringValue("concat_ws(',', 'a')", "a");
+  TestStringValue("concat_ws(',', 'a', 'b')", "a,b");
+  TestStringValue("concat_ws(',', 'a', 'b', 'cde')", "a,b,cde");
+  TestStringValue("concat_ws('', 'a', '', 'b', 'cde')", "abcde");
+  TestStringValue("concat_ws('%%', 'a', 'b', 'cde', 'fg')", "a%%b%%cde%%fg");
+  TestStringValue("concat_ws('|','a', 'b', 'cde', '', 'fg', '')", "a|b|cde||fg|");
+  TestStringValue("concat_ws('', '', '', '')", "");
+
+  TestValue("find_in_set('ab', 'ab,ab,ab,ade,cde')", TYPE_INT, 1);
+  TestValue("find_in_set('ab', 'abc,xyz,abc,ade,ab')", TYPE_INT, 5);
+  TestValue("find_in_set('ab', 'abc,ad,ab,ade,cde')", TYPE_INT, 3);
+  TestValue("find_in_set('xyz', 'abc,ad,ab,ade,cde')", TYPE_INT, 0);
+  TestValue("find_in_set('ab', ',,,,ab,,,,')", TYPE_INT, 5);
+  TestValue("find_in_set('', ',ad,ab,ade,cde')", TYPE_INT, 1);
+  TestValue("find_in_set('', 'abc,ad,ab,ade,,')", TYPE_INT, 5);
+  TestValue("find_in_set('', 'abc,ad,,ade,cde,')", TYPE_INT, 3);
+  // First param contains comma.
+  TestValue("find_in_set('abc,def', 'abc,ad,,ade,cde,')", TYPE_INT, 0);
+
   // TODO: tests with NULL arguments, currently we can't parse them
   // inside function calls.
   // e.g.   TestValue("length(NULL)", TYPE_INT, NULL);
+}
+
+TEST_F(ExprTest, StringRegexpFunctions) {
+  // Single group.
+  TestStringValue("regexp_extract('abxcy1234a', 'a.x', 0)", "abx");
+  TestStringValue("regexp_extract('abxcy1234a', 'a.x.*a', 0)", "abxcy1234a");
+  TestStringValue("regexp_extract('abxcy1234a', 'a.x.y.*a', 0)", "abxcy1234a");
+  TestStringValue("regexp_extract('a.x.y.*a', 'a\\.x\\.y\\.\\*a', 0)", "a.x.y.*a");
+  TestStringValue("regexp_extract('abxcy1234a', 'abczy', 0)", "");
+  TestStringValue("regexp_extract('abxcy1234a', 'a\\.x\\.y\\.\\*a', 0)", "");
+  TestStringValue("regexp_extract('axcy1234a', 'a.x.y.*a', 0)","");
+  // Accessing non-existant group should return empty string.
+  TestStringValue("regexp_extract('abxcy1234a', 'a.x', 2)", "");
+  TestStringValue("regexp_extract('abxcy1234a', 'a.x.*a', 1)", "");
+  TestStringValue("regexp_extract('abxcy1234a', 'a.x.y.*a', 5)", "");
+  // Multiple groups enclosed in ().
+  TestStringValue("regexp_extract('abxcy1234a', '(a.x)(.y.*)(3.*a)', 0)", "abxcy1234a");
+  TestStringValue("regexp_extract('abxcy1234a', '(a.x)(.y.*)(3.*a)', 1)", "abx");
+  TestStringValue("regexp_extract('abxcy1234a', '(a.x)(.y.*)(3.*a)', 2)", "cy12");
+  TestStringValue("regexp_extract('abxcy1234a', '(a.x)(.y.*)(3.*a)', 3)", "34a");
+  TestStringValue("regexp_extract('abxcy1234a', '(a.x)(.y.*)(3.*a)', 4)", "");
+  // Empty strings.
+  TestStringValue("regexp_extract('', '', 0)", "");
+  TestStringValue("regexp_extract('abxcy1234a', '', 0)", "");
+  TestStringValue("regexp_extract('', 'abx', 0)", "");
+  // Invalid regex patter, unmatched parenthesis.
+  TestIsNull("regexp_extract('abxcy1234a', '(/.', 0)", TYPE_STRING);
+
+  TestStringValue("regexp_replace('axcaycazc', 'a.c', 'a')", "aaa");
+  TestStringValue("regexp_replace('axcaycazc', 'a.c', '')", "");
+  TestStringValue("regexp_replace('axcaycazc', 'a.*', 'abcde')", "abcde");
+  TestStringValue("regexp_replace('axcaycazc', 'a.*y.*z', 'xyz')", "xyzc");
+  // No match for pattern.
+  TestStringValue("regexp_replace('axcaycazc', 'a.z', 'xyz')", "axcaycazc");
+  TestStringValue("regexp_replace('axcaycazc', 'a.*y.z', 'xyz')", "axcaycazc");
+  // Empty strings.
+  TestStringValue("regexp_replace('', '', '')", "");
+  TestStringValue("regexp_replace('axcaycazc', '', '')", "axcaycazc");
+  TestStringValue("regexp_replace('', 'err', '')", "");
+  TestStringValue("regexp_replace('', '', 'abc')", "abc");
+  TestStringValue("regexp_replace('axcaycazc', '', 'r')", "rarxrcraryrcrarzrcr");
+  // Invalid regex patter, unmatched parenthesis.
+  TestIsNull("regexp_replace('abxcy1234a', '(/.', 'x')", TYPE_STRING);
 }
 
 TEST_F(ExprTest, MathTrigonometricFunctions) {

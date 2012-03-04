@@ -32,8 +32,8 @@ void* LikePredicate::ConstantRegexFn(Expr* e, TupleRow* row) {
   LikePredicate* p = static_cast<LikePredicate*>(e);
   DCHECK_EQ(p->GetNumChildren(), 2);
   StringValue* operand_val = static_cast<StringValue*>(e->GetChild(0)->GetValue(row));
-  string operand_str(operand_val->ptr, operand_val->len);
-  p->result_.bool_val = regex_match(operand_str, *p->regex_);
+  p->result_.bool_val = regex_match(operand_val->ptr,
+      operand_val->ptr + operand_val->len, *p->regex_);
   return &p->result_.bool_val;
 }
 
@@ -51,14 +51,13 @@ void* LikePredicate::RegexMatch(Expr* e, TupleRow* row, bool is_like_pattern) {
   }
   try {
     regex re(re_pattern, regex_constants::extended);
-    string operand_str(operand_value->ptr, operand_value->len);
-    // TODO: change this to use the BidirectionIterator form of regex_match(), so we
-    // don't need to construct strings
-    p->result_.bool_val = regex_match(operand_str, re);
+    p->result_.bool_val = regex_match(operand_value->ptr,
+        operand_value->ptr + operand_value->len, re);
     return &p->result_.bool_val;
-  } catch (bad_expression e) {
+  } catch (bad_expression& e) {
     // TODO: log error in runtime state
-    return NULL;
+    p->result_.bool_val = false;
+    return &p->result_.bool_val;
   }
 }
 
@@ -95,7 +94,7 @@ Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc
       }
       try {
         regex_.reset(new regex(re_pattern, regex_constants::extended));
-      } catch (bad_expression e) {
+      } catch (bad_expression& e) {
         return Status("Invalid regular expression: " + pattern_str);
       }
       compute_function_ = ConstantRegexFn;

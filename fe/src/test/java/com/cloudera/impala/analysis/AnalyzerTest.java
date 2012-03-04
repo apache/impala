@@ -886,6 +886,17 @@ public class AnalyzerTest {
   }
 
   @Test
+  public void TestVarArgFunctions() {
+    AnalyzesOk("select concat('a')");
+    AnalyzesOk("select concat('a', 'b')");
+    AnalyzesOk("select concat('a', 'b', 'c')");
+    AnalyzesOk("select concat('a', 'b', 'c', 'd')");
+    AnalyzesOk("select concat('a', 'b', 'c', 'd', 'e')");
+    // Need at least one argument.
+    AnalysisError("select concat()");
+  }
+
+  @Test
   public void TestInsert() {
     testInsertStatic(true);
     testInsertStatic(false);

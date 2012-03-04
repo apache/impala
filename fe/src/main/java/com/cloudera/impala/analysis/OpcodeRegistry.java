@@ -30,6 +30,7 @@ import com.google.common.collect.Maps;
  */
 public class OpcodeRegistry {
 
+  private final static int VAR_ARGS = -1;
   private final static Logger LOG = LoggerFactory.getLogger(OpcodeRegistry.class);
   private static OpcodeRegistry instance = new OpcodeRegistry();
 
@@ -39,6 +40,7 @@ public class OpcodeRegistry {
    * The map is structured this way to more efficiently look for signature matches.
    * Signatures that have the same number of arguments have a potential to be matches
    * by allowing types to be implicitly cast.
+   * Functions with a variable number of arguments are assigned #args=VAR_ARGS.
    */
   private final Map<Pair<FunctionOperator, Integer>, List<Signature>> operations;
 
@@ -72,6 +74,7 @@ public class OpcodeRegistry {
     public FunctionOperator operator;
     public PrimitiveType returnType;
     public PrimitiveType argTypes[];
+    public boolean varArgs;
 
     // Constructor for searching, specifying the op and arguments
     public Signature(FunctionOperator operator, PrimitiveType[] args) {
@@ -80,9 +83,10 @@ public class OpcodeRegistry {
     }
 
     private Signature(TExprOpcode opcode, FunctionOperator operator,
-        PrimitiveType ret, PrimitiveType[] args) {
+        boolean varArgs, PrimitiveType ret, PrimitiveType[] args) {
       this.operator = operator;
       this.opcode = opcode;
+      this.varArgs = varArgs;
       this.returnType = ret;
       this.argTypes = args;
     }
@@ -93,12 +97,24 @@ public class OpcodeRegistry {
      * each argument of this signature to the matching argument in 'other'
      */
     public boolean isCompatible(Signature other) {
-      if (other.argTypes.length != this.argTypes.length) {
+      if (!varArgs && other.argTypes.length != this.argTypes.length) {
         return false;
       }
-      for (int i = 0; i < this.argTypes.length; ++i) {
-        if (!PrimitiveType.isImplicitlyCastable(this.argTypes[i], other.argTypes[i])) {
+      if (varArgs && other.argTypes.length < this.argTypes.length) {
           return false;
+      }
+      for (int i = 0; i < this.argTypes.length; ++i) {
+        if (!PrimitiveType.isImplicitlyCastable(other.argTypes[i], this.argTypes[i])) {
+          return false;
+        }
+      }
+      // Check trailing varargs.
+      if (varArgs) {
+        for (int i = this.argTypes.length; i < other.argTypes.length; ++i) {
+          if (!PrimitiveType.isImplicitlyCastable(this.argTypes[this.argTypes.length - 1],
+              other.argTypes[i])) {
+            return false;
+          }
         }
       }
       return true;
@@ -151,36 +167,50 @@ public class OpcodeRegistry {
    */
   public Signature getFunctionInfo(FunctionOperator op, PrimitiveType ... argTypes) {
     Pair<FunctionOperator, Integer> lookup = Pair.create(op, argTypes.length);
+    Pair<FunctionOperator, Integer> varArgsLookup = Pair.create(op, VAR_ARGS);
+    List<Signature> signatures = null;
     if (operations.containsKey(lookup)) {
-      List<Signature> signatures = operations.get(lookup);
-      Signature compatibleMatch = null;
-      Signature search = new Signature(op, argTypes);
-      for (Signature signature : signatures) {
-        if (search.equals(signature)) {
-          return signature;
-        } else if (compatibleMatch == null && search.isCompatible(signature)) {
-          compatibleMatch = signature;
-        }
-      }
-      return compatibleMatch;
+      signatures = operations.get(lookup);
+    } else if(operations.containsKey(varArgsLookup)) {
+      signatures = operations.get(varArgsLookup);
     }
-    return null;
+    if (signatures == null) {
+      return null;
+    }
+    Signature compatibleMatch = null;
+    Signature search = new Signature(op, argTypes);
+    for (Signature signature : signatures) {
+      if (search.equals(signature)) {
+        return signature;
+      } else if (compatibleMatch == null && signature.isCompatible(search)) {
+        compatibleMatch = signature;
+      }
+    }
+    return compatibleMatch;
   }
 
   /**
    * Add a function with the specified opcode/signature to the registry.
    */
-  public boolean add(FunctionOperator op, TExprOpcode opcode, PrimitiveType retType, PrimitiveType ... args) {
+  public boolean add(FunctionOperator op, TExprOpcode opcode, boolean varArgs,
+      PrimitiveType retType, PrimitiveType ... args) {
     List<Signature> signatures;
     Pair<FunctionOperator, Integer> lookup = Pair.create(op, args.length);
+    Pair<FunctionOperator, Integer> varArgLookup = Pair.create(op, VAR_ARGS);
     if (operations.containsKey(lookup)) {
       signatures = operations.get(lookup);
+    } else if (operations.containsKey(varArgLookup)) {
+      signatures = operations.get(varArgLookup);
     } else {
       signatures = new ArrayList<Signature>();
-      operations.put(lookup, signatures);
+      if (varArgs) {
+        operations.put(varArgLookup, signatures);
+      } else {
+        operations.put(lookup, signatures);
+      }
     }
 
-    Signature signature = new Signature(opcode, op, retType, args);
+    Signature signature = new Signature(opcode, op, varArgs, retType, args);
     if (signatures.contains(signature)) {
       LOG.error("OpcodeRegistry: Function already exists: " + opcode);
       return false;

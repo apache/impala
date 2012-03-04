@@ -167,8 +167,8 @@ Status QueryExecutor::Exec(
     COUNTER_SCOPED_TIMER(plan_gen_counter);
     CHECK(client_.get() != NULL) << "didn't call QueryExecutor::Setup()";
     client_->GetExecRequest(query_request_, query.c_str(), FLAGS_num_nodes);
-  } catch (TException& e) {
-    return Status(e.msg);
+  } catch (::apache::thrift::TException& e) {
+    return Status(e.what());
   }
   VLOG(1) << "query request:\n" << ThriftDebugString(query_request_);
 

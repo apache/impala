@@ -95,7 +95,7 @@ class StringSearch {
   // Search for this pattern in str.  
   //   Returns the offset into str if the pattern exists
   //   Returns -1 if the pattern is not found
-  int Search(const StringValue* str) {
+  int Search(const StringValue* str) const {
     // Special cases
     if (!str || !pattern_ || pattern_->len == 0) {
       return -1;

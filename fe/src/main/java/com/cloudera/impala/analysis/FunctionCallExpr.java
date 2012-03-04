@@ -63,8 +63,10 @@ public class FunctionCallExpr extends Expr {
 
     // Implicitly cast all the children to match the function if necessary
     for (int i = 0; i < argTypes.length; ++i) {
-      if (argTypes[i] != match.argTypes[i]) {
-        castChild(match.argTypes[i], i);
+      // For varargs, we must compare with the last type in match.argTypes.
+      int ix = Math.min(match.argTypes.length - 1, i);
+      if (argTypes[i] != match.argTypes[ix]) {
+        castChild(match.argTypes[ix], i);
       }
     }
   }
