@@ -28,7 +28,7 @@ target_link_libraries(perf-counters-test
   Runtime
   Util
   Common
-  thrift
+  thriftstatic
   ImpalaThrift
   glogstatic
   gflagsstatic
@@ -42,7 +42,7 @@ target_link_libraries(runtime-profile-test
   Runtime
   Util
   Common
-  thrift
+  thriftstatic
   ImpalaThrift
   glogstatic
   gflagsstatic

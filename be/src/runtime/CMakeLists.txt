@@ -41,7 +41,7 @@ add_executable(mem-pool-test
 # errors; figure out what we actually need to link against here
 target_link_libraries(mem-pool-test
   Runtime
-  thrift
+  thriftstatic
   glogstatic
   gflagsstatic
   gtest
@@ -54,7 +54,7 @@ add_executable(free-list-test
 
 target_link_libraries(free-list-test
   Runtime
-  thrift
+  thriftstatic
   glogstatic
   gflagsstatic
   gtest
@@ -67,7 +67,7 @@ add_executable(string-buffer-test
 
 target_link_libraries(string-buffer-test
   Runtime
-  thrift
+  thriftstatic
   glogstatic
   gflagsstatic
   gtest
@@ -88,7 +88,7 @@ target_link_libraries(data-stream-test
   Runtime
   Common
   Util
-  thrift
+  thriftstatic
   ImpalaThrift
   Exec
   Exprs

@@ -52,7 +52,7 @@ target_link_libraries(expr-test
   Runtime
   Common
   Util
-  thrift
+  thriftstatic
   ImpalaThrift
   Exec
   Exprs

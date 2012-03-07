@@ -34,7 +34,7 @@ target_link_libraries(backend
   Exprs
   Runtime
   Util
-  thrift
+  thriftstatic
   ImpalaThrift
   ${HDFS_LIBS}
   gflagsstatic
@@ -67,7 +67,7 @@ target_link_libraries(runquery
   Runtime
   Common
   Util
-  thrift
+  thriftstatic
   ImpalaThrift
   Service
   Exec
@@ -95,7 +95,7 @@ target_link_libraries(impalad
   Runtime
   Common
   Util
-  thrift
+  thriftstatic
   ImpalaThrift
   Service
   Exec

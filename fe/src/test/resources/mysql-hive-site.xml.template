@@ -27,7 +27,7 @@
 
 <property>
  <name>javax.jdo.option.ConnectionURL</name>
- <value>jdbc:mysql://localhost:3306/hive_${IMPALA_ROOT}?createDatabaseIfNotExist=true</value>
+ <value>jdbc:mysql://localhost:3306/hive_${METASTORE_DB}?createDatabaseIfNotExist=true</value>
 </property>
 <property>
  <name>javax.jdo.option.ConnectionDriverName</name>

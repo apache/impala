@@ -12,8 +12,13 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake_modules")
 find_package(Thrift REQUIRED)
 include_directories(${Thrift_INCLUDE_DIR})
 set(LIBS ${LIBS} ${Thrift_LIBS})
-message(STATUS ${Thrift_INCLUDE_DIR})
-message(STATUS ${Thrift_LIBS})
+message(STATUS "Thrift include dir: ${Thrift_INCLUDE_DIR}")
+message(STATUS "Thrift library path: ${Thrift_LIBS}")
+message(STATUS "Thrift static library: ${Thrift_STATIC_LIB}")
+message(STATUS "Thrift compiler: ${Thrift_COMPILER}")
+# for static linking with Thrift, Thrift_STATIC_LIB is set in FindThrift.cmake
+add_library(thriftstatic STATIC IMPORTED)
+set_target_properties(thriftstatic PROPERTIES IMPORTED_LOCATION ${Thrift_STATIC_LIB})
 
 # find boost headers and libs
 set(Boost_DEBUG TRUE)

@@ -5,10 +5,9 @@
 #  Thrift_LIBS, Thrift libraries
 #  Thrift_FOUND, If false, do not try to use ant
 
-exec_program(thrift ARGS -version OUTPUT_VARIABLE Thrift_VERSION
-             RETURN_VALUE Thrift_RETURN)
 
 # prefer the thrift version supplied in THRIFT_HOME
+message(STATUS "$ENV{THRIFT_HOME}")
 find_path(Thrift_INCLUDE_DIR Thrift.h HINTS
   $ENV{THRIFT_HOME}/include/thrift
   /usr/local/include/thrift
@@ -20,12 +19,24 @@ set(Thrift_LIB_PATHS
   /usr/local/lib
   /opt/local/lib)
 
+find_path(Thrift_STATIC_LIB_PATH libthrift.a PATHS ${Thrift_LIB_PATHS})
+
 # prefer the thrift version supplied in THRIFT_HOME
 find_library(Thrift_LIB NAMES thrift HINTS ${Thrift_LIB_PATHS})
+
+find_path(THRIFT_COMPILER_PATH NAMES thrift PATHS
+  $ENV{THRIFT_HOME}/bin
+  /usr/local/bin
+  /usr/bin
+)
 
 if (Thrift_LIB)
   set(Thrift_FOUND TRUE)
   set(Thrift_LIBS ${Thrift_LIB})
+  set(Thrift_STATIC_LIB ${Thrift_STATIC_LIB_PATH}/libthrift.a)
+  set(Thrift_COMPILER ${THRIFT_COMPILER_PATH}/thrift)
+  exec_program(${Thrift_COMPILER}
+    ARGS -version OUTPUT_VARIABLE Thrift_VERSION RETURN_VALUE Thrift_RETURN)
 else ()
   set(Thrift_FOUND FALSE)
 endif ()
@@ -42,5 +53,6 @@ endif ()
 
 mark_as_advanced(
   Thrift_LIB
+  Thrift_COMPILER
   Thrift_INCLUDE_DIR
-  )
+)

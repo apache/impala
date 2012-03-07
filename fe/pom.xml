@@ -117,11 +117,6 @@
     <!--   <version>0.23.0-cdh4b2-SNAPSHOT</version>     -->
     <!-- </dependency> -->
     <dependency>
-      <groupId>beaver</groupId>
-      <artifactId>beaver</artifactId>
-      <version>0.9.7</version>
-    </dependency>
-    <dependency>
       <groupId>org.apache.derby</groupId>
       <artifactId>derby</artifactId>
       <version>10.4.2.0</version>

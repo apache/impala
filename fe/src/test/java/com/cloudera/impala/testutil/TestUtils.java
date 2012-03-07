@@ -28,7 +28,7 @@ import com.cloudera.impala.thrift.TResultRow;
 
 public class TestUtils {
   private final static Logger LOG = LoggerFactory.getLogger(TestUtils.class);
-  private final static String expectedFilePrefix = "file:";
+  private final static String expectedFilePrefix = "hdfs:";
 
   // Maps from uppercase type name to PrimitiveType
   private static Map<String, PrimitiveType> typeNameMap =

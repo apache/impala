@@ -7,9 +7,29 @@ root=`dirname "$0"`
 root=`cd "$root"; pwd`
 
 export IMPALA_HOME=$root
-export IMPALA_ROOT=`basename $root | sed -e "s/\\./_/g"`
+export METASTORE_DB=`basename $root | sed -e "s/\\./_/g" | sed -e "s/[.-]/_/g"`
 
 . "$root"/bin/impala-config.sh
+
+# Generate hive-site.xml from template via env var substitution
+# TODO: Throw an error if the template references an undefined environment variable
+cd ${IMPALA_FE_DIR}/src/test/resources
+if [[ ${METASTORE_IS_DERBY} ]]
+then
+  echo "using derby for metastore"
+  perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
+    derby-hive-site.xml.template > hive-site.xml
+else
+  echo "using mysql for metastore"
+  perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
+    mysql-hive-site.xml.template > hive-site.xml
+fi
+
+# Generate hbase-site.xml from template via env var substitution
+# TODO: Throw an error if the template references an undefined environment variable
+cd ${IMPALA_FE_DIR}/src/test/resources
+perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
+hbase-site.xml.template > hbase-site.xml
 
 # Exit on non-true return value
 set -e
@@ -77,12 +97,8 @@ fi
 cd $IMPALA_HOME/thirdparty/gflags-1.5
 if [ $config_action -eq 1 ]
 then
-  ./configure
+  ./configure --with-pic
 fi
-# add -fPIC to CXXFLAGS by finding and replacing the line that sets the CXXFLAGS in Makefile
-OLDCXXFLAGS=$(grep -w "CXXFLAGS =" Makefile)
-NEWCXXFLAGS=$OLDCXXFLAGS" -fPIC"
-sed -i "s/$OLDCXXFLAGS/$NEWCXXFLAGS/g" Makefile
 make -j
 
 # Build pprof
@@ -92,24 +108,16 @@ then
 # TODO: google perf tools indicates this might be necessary on 64 bit systems.
 # we're not compiling the rest of our code to not omit frame pointers but it 
 # still seems to generate useful profiling data.
-  ./configure --enable-frame-pointers
+  ./configure --enable-frame-pointers --with-pic
 fi
-# add -fPIC to CXXFLAGS by finding and replacing the line that sets the CXXFLAGS in Makefile
-OLDCXXFLAGS=$(grep -w "CXXFLAGS =" Makefile)
-NEWCXXFLAGS=$OLDCXXFLAGS" -fPIC"
-sed -i "s/$OLDCXXFLAGS/$NEWCXXFLAGS/g" Makefile
 make -j
 
 # Build glog
 cd $IMPALA_HOME/thirdparty/glog-0.3.1
 if [ $config_action -eq 1 ]
 then
-  ./configure
+  ./configure --with-pic
 fi
-# add -fPIC to CXXFLAGS by finding and replacing the line that sets the CXXFLAGS in Makefile
-OLDCXXFLAGS=$(grep -w "CXXFLAGS =" Makefile)
-NEWCXXFLAGS=$OLDCXXFLAGS" -fPIC"
-sed -i "s/$OLDCXXFLAGS/$NEWCXXFLAGS/g" Makefile
 make -j
 
 cd $IMPALA_HOME/thirdparty/gtest-1.6.0
@@ -129,18 +137,6 @@ make
 cd $IMPALA_BE_DIR
 make -j
 
-# Generate hive-site.xml from template via env var substitution
-# TODO: Throw an error if the template references an undefined environment variable
-cd ${IMPALA_FE_DIR}/src/test/resources
-perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
-hive-site.xml.template > hive-site.xml
-
-# Generate hbase-site.xml from template via env var substitution
-# TODO: Throw an error if the template references an undefined environment variable
-cd ${IMPALA_FE_DIR}/src/test/resources
-perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
-hbase-site.xml.template > hbase-site.xml
-
 if [ $testdata_action -eq 1 ]
 then
   # create test data
@@ -154,12 +150,12 @@ fi
 # skip tests since any failures will prevent the
 # package phase from completing.
 cd $IMPALA_FE_DIR
-mvn package -DskipTests=true
-
-# run frontend tests
 if [ $tests_action -eq 1 ]
 then
-    mvn test
+    # also run frontend tests
+    mvn package
+else
+    mvn package -DskipTests=true
 fi
 
 # run backend tests For some reason this does not work on Jenkins
