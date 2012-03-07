@@ -12,6 +12,7 @@
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
 #include "runtime/string-value.h"
+#include "runtime/timestamp-value.h"
 
 namespace impala {
 
@@ -38,6 +39,7 @@ struct ExprValue {
   double double_val;
   std::string string_data;
   StringValue string_val;
+  TimestampValue timestamp_val;
 
   ExprValue()
     : bool_val(false),
@@ -48,7 +50,8 @@ struct ExprValue {
       float_val(0.0),
       double_val(0.0),
       string_data(),
-      string_val(NULL, 0) {
+      string_val(NULL, 0),
+      timestamp_val() {
   }
 
   ExprValue(bool v): bool_val(v) {}
@@ -58,13 +61,14 @@ struct ExprValue {
   ExprValue(int64_t v): bigint_val(v) {}
   ExprValue(float v): float_val(v) {}
   ExprValue(double v): double_val(v) {}
+  ExprValue(int64_t t, int64_t n) : timestamp_val(t, n) {}
 
   // c'tor for string values
   ExprValue(const std::string& str)
     : string_data(str),
       string_val(const_cast<char*>(string_data.data()), string_data.size()) {
   }
-  
+
   // Update this ExprValue by parsing the string and return a pointer to the result.
   // NULL will be returned if the string and type are not compatible.
   void* TryParse(const std::string& string, PrimitiveType type);
@@ -168,6 +172,7 @@ class Expr {
   friend class ComputeFunctions;
   friend class MathFunctions;
   friend class StringFunctions;
+  friend class TimestampFunctions;
 
   Expr(PrimitiveType type);
   Expr(const TExprNode& node);

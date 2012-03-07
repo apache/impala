@@ -56,20 +56,15 @@ public class CastExpr extends Expr {
 
     // cast was asked for in the query, check for validity of cast
     PrimitiveType childType = getChild(0).getType();
-    PrimitiveType resultType =
-      PrimitiveType.getAssignmentCompatibleType(childType, targetType);
-
-    if (!resultType.isValid()) {
-      throw new AnalysisException("Invalid type cast of " + getChild(0).toSql() +
-          " from " + childType + " to " + targetType);
-    }
 
     // this cast may result in loss of precision, but the user requested it
     this.type = targetType;
     OpcodeRegistry.Signature match = OpcodeRegistry.instance().getFunctionInfo(
         FunctionOperator.CAST, getChild(0).getType(), type);
-    Preconditions.checkState(match != null);
-    Preconditions.checkState(match.returnType == type);
+    if (match == null)
+      throw new AnalysisException("Invalid type cast of " + getChild(0).toSql() +
+          " from " + childType + " to " + targetType);
+    Preconditions.checkState(match.returnType == targetType);
     this.opcode = match.opcode;
   }
 

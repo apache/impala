@@ -30,8 +30,8 @@ PROJECT(ASSEMBLER)
 #   2. Run the benchmarks (generates *.gcda profiling data).
 #   3. Build again with CMAKE_BUILD_TYPE_PROFILE_BUILD
 #     -fprofile-use: Compiler will use the profile outputs for optimizations
-SET(CXX_FLAGS_DEBUG "-ggdb -msse4.2 -Wall -Wno-sign-compare")
-SET(CXX_FLAGS_RELEASE "-O3 -DNDEBUG -Wall -msse4.2 -Wno-sign-compare -Wno-strict-aliasing")
+SET(CXX_FLAGS_DEBUG "-ggdb -msse4.2 -Wall -Wno-sign-compare -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
+SET(CXX_FLAGS_RELEASE "-O3 -DNDEBUG -Wall -msse4.2 -Wno-sign-compare -Wno-strict-aliasing -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
 SET(CXX_FLAGS_PROFILE_GEN "${CXX_FLAGS_RELEASE} -fprofile-generate")
 SET(CXX_FLAGS_PROFILE_BUILD "${CXX_FLAGS_RELEASE} -fprofile-use")
 

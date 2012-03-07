@@ -5,6 +5,7 @@
 #include <glog/logging.h>
 #include "runtime/primitive-type.h"
 #include "runtime/string-value.h"
+#include "runtime/timestamp-value.h"
 
 #ifndef IMPALA_RUNTIME_RAW_VALUE_H
 #define IMPALA_RUNTIME_RAW_VALUE_H
@@ -63,6 +64,9 @@ inline bool RawValue::Eq(const void* v1, const void* v2, PrimitiveType type) {
       string_value1 = reinterpret_cast<const StringValue*>(v1);
       string_value2 = reinterpret_cast<const StringValue*>(v2);
       return string_value1->Eq(*string_value2);
+    case TYPE_TIMESTAMP: 
+      return *reinterpret_cast<const TimestampValue*>(v1) ==
+          *reinterpret_cast<const TimestampValue*>(v2);
     default:
       DCHECK(false) << "invalid type: " << TypeToString(type);
       return 0;

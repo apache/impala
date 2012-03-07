@@ -15,17 +15,13 @@ public class FloatLiteral extends LiteralExpr {
 
   private void init(Double value) {
     this.value = value.doubleValue();
-    if ((this.value <= Float.MAX_VALUE && this.value >= Float.MIN_VALUE) ||
-        (this.value <= -Float.MIN_VALUE && this.value >= -Float.MAX_VALUE) ||
-        this.value == 0.0f) {
+    // Figure out if this will fit in a FLOAT without loosing precision.
+    float fvalue;
+    fvalue = value.floatValue();
+    if (fvalue == value.doubleValue())
       type = PrimitiveType.FLOAT;
-    } else {
-      Preconditions.checkState((this.value <= Double.MAX_VALUE
-          && this.value >= Double.MIN_VALUE) ||
-          (this.value <= -Double.MIN_VALUE && this.value >= -Double.MAX_VALUE) ||
-          this.value == 0.0);
+    else
       type = PrimitiveType.DOUBLE;
-    }
   }
 
   public FloatLiteral(Double value) {

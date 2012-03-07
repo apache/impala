@@ -421,25 +421,35 @@ void AggregationNode::UpdateAggTuple(AggregationTuple* agg_out_tuple, TupleRow* 
       case TAggregationOp::MIN:
         switch (agg_expr->type()) {
           case TYPE_BOOLEAN:
-            UpdateMinSlot<bool>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMinSlot<bool>(tuple,
+                                (*slot_d)->null_indicator_offset(), slot, value);
             break;
           case TYPE_TINYINT:
-            UpdateMinSlot<int8_t>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMinSlot<int8_t>(tuple,
+                                  (*slot_d)->null_indicator_offset(), slot, value);
             break;
           case TYPE_SMALLINT:
-            UpdateMinSlot<int16_t>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMinSlot<int16_t>(tuple,
+                                   (*slot_d)->null_indicator_offset(), slot, value);
             break;
           case TYPE_INT:
-            UpdateMinSlot<int32_t>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMinSlot<int32_t>(tuple,
+                                   (*slot_d)->null_indicator_offset(), slot, value);
             break;
           case TYPE_BIGINT:
-            UpdateMinSlot<int64_t>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMinSlot<int64_t>(tuple,
+                                   (*slot_d)->null_indicator_offset(), slot, value);
             break;
           case TYPE_FLOAT:
             UpdateMinSlot<float>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
             break;
           case TYPE_DOUBLE:
             UpdateMinSlot<double>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
+            break;
+          case TYPE_TIMESTAMP:
+            UpdateMinSlot<TimestampValue>(tuple,
+                                          (*slot_d)->null_indicator_offset(),
+                                          slot, value);
             break;
           case TYPE_STRING:
             UpdateMinStringSlot(agg_out_tuple, (*slot_d)->null_indicator_offset(), 
@@ -459,19 +469,27 @@ void AggregationNode::UpdateAggTuple(AggregationTuple* agg_out_tuple, TupleRow* 
             UpdateMaxSlot<int8_t>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
             break;
           case TYPE_SMALLINT:
-            UpdateMaxSlot<int16_t>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMaxSlot<int16_t>(tuple,
+                                   (*slot_d)->null_indicator_offset(), slot, value);
             break;
           case TYPE_INT:
-            UpdateMaxSlot<int32_t>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMaxSlot<int32_t>(tuple,
+                                   (*slot_d)->null_indicator_offset(), slot, value);
             break;
           case TYPE_BIGINT:
-            UpdateMaxSlot<int64_t>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMaxSlot<int64_t>(tuple,
+                                   (*slot_d)->null_indicator_offset(), slot, value);
             break;
           case TYPE_FLOAT:
             UpdateMaxSlot<float>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
             break;
           case TYPE_DOUBLE:
             UpdateMaxSlot<double>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
+            break;
+          case TYPE_TIMESTAMP:
+            UpdateMaxSlot<TimestampValue>(tuple,
+                                          (*slot_d)->null_indicator_offset(),
+                                          slot, value);
             break;
           case TYPE_STRING:
             UpdateMaxStringSlot(agg_out_tuple, (*slot_d)->null_indicator_offset(), 
@@ -484,23 +502,9 @@ void AggregationNode::UpdateAggTuple(AggregationTuple* agg_out_tuple, TupleRow* 
 
       case TAggregationOp::SUM:
         switch (agg_expr->type()) {
-          case TYPE_BOOLEAN:
-            UpdateSumSlot<bool>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
-            break;
-          case TYPE_TINYINT:
-            UpdateSumSlot<int8_t>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
-            break;
-          case TYPE_SMALLINT:
-            UpdateSumSlot<int16_t>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
-            break;
-          case TYPE_INT:
-            UpdateSumSlot<int32_t>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
-            break;
           case TYPE_BIGINT:
-            UpdateSumSlot<int64_t>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
-            break;
-          case TYPE_FLOAT:
-            UpdateSumSlot<float>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateSumSlot<int64_t>(tuple,
+                                   (*slot_d)->null_indicator_offset(), slot, value);
             break;
           case TYPE_DOUBLE:
             UpdateSumSlot<double>(tuple, (*slot_d)->null_indicator_offset(), slot, value);

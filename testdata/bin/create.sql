@@ -9,7 +9,8 @@ CREATE TABLE AllTypes (
   float_col float,
   double_col double,
   date_string_col string,
-  string_col string)
+  string_col string,
+  timestamp_col timestamp)
 partitioned by (year int, month int)
 row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
 
@@ -24,7 +25,8 @@ CREATE TABLE AllTypesNoPart (
   float_col float,
   double_col double,
   date_string_col string,
-  string_col string)
+  string_col string,
+  timestamp_col timestamp)
 row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
 
 DROP TABLE IF EXISTS AllTypes_rc;
@@ -38,7 +40,8 @@ CREATE TABLE AllTypes_rc (
   float_col float,
   double_col double,
   date_string_col string,
-  string_col string)
+  string_col string,
+  timestamp_col timestamp)
 partitioned by (year int, month int)
 STORED AS RCFILE;
 
@@ -71,7 +74,8 @@ CREATE TABLE AllTypesAgg (
   float_col float,
   double_col double,
   date_string_col string,
-  string_col string)
+  string_col string,
+  timestamp_col timestamp)
 partitioned by (year int, month int, day int)
 row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
 
@@ -86,7 +90,8 @@ CREATE TABLE AllTypesAgg_rc (
   float_col float,
   double_col double,
   date_string_col string,
-  string_col string)
+  string_col string,
+  timestamp_col timestamp)
 partitioned by (year int, month int, day int)
 STORED AS RCFILE;
 
@@ -149,7 +154,8 @@ CREATE TABLE testdb1.AllTypes (
   float_col float,
   double_col double,
   date_string_col string,
-  string_col string)
+  string_col string,
+  timestamp_col timestamp)
 row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
 
 DROP TABLE IF EXISTS testdb1.TestTbl;
@@ -179,11 +185,12 @@ CREATE EXTERNAL TABLE HbaseAllTypesSmall (
   float_col float,
   double_col double,
   date_string_col string,
-  string_col string)
+  string_col string,
+  timestamp_col timestamp)
 STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
 WITH SERDEPROPERTIES (
   "hbase.columns.mapping" =
-  ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col"
+  ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col,strings:timestamp_col"
 )
 TBLPROPERTIES("hbase.table.name" = "hbasealltypessmall");
 
@@ -198,11 +205,12 @@ CREATE EXTERNAL TABLE HbaseAllTypesError (
   float_col float,
   double_col double,
   date_string_col string,
-  string_col string)
+  string_col string,
+  timestamp_col timestamp)
 STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
 WITH SERDEPROPERTIES (
   "hbase.columns.mapping" =
-  ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col"
+  ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col,strings:timestamp_col"
 )
 TBLPROPERTIES("hbase.table.name" = "hbasealltypeserror");
 
@@ -217,11 +225,12 @@ CREATE EXTERNAL TABLE HbaseAllTypesErrorNoNulls (
   float_col float,
   double_col double,
   date_string_col string,
-  string_col string)
+  string_col string,
+  timestamp_col timestamp)
 STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
 WITH SERDEPROPERTIES (
   "hbase.columns.mapping" =
-  ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col"
+  ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col,strings:timestamp_col"
 )
 TBLPROPERTIES("hbase.table.name" = "hbasealltypeserrornonulls");
 
@@ -236,11 +245,12 @@ CREATE EXTERNAL TABLE HbaseAllTypesAgg (
   float_col float,
   double_col double,
   date_string_col string,
-  string_col string)
+  string_col string,
+  timestamp_col timestamp)
 STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
 WITH SERDEPROPERTIES (
   "hbase.columns.mapping" =
-  ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col"
+  ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col,strings:timestamp_col"
 )
 TBLPROPERTIES("hbase.table.name" = "hbasealltypesagg");
 
@@ -255,11 +265,12 @@ CREATE EXTERNAL TABLE HbaseStringIds (
   float_col float,
   double_col double,
   date_string_col string,
-  string_col string)
+  string_col string,
+  timestamp_col timestamp)
 STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
 WITH SERDEPROPERTIES (
   "hbase.columns.mapping" =
-  ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col"
+  ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col,strings:timestamp_col"
 )
 TBLPROPERTIES("hbase.table.name" = "hbasealltypesagg");
 
@@ -321,7 +332,8 @@ CREATE TABLE AllTypesAggMultiFiles (
   float_col float,
   double_col double,
   date_string_col string,
-  string_col string)
+  string_col string,
+  timestamp_col timestamp)
 partitioned by (year int, month int, day int);
 
 DROP TABLE IF EXISTS AllTypesAggMultiFiles_text;
@@ -335,7 +347,8 @@ CREATE TABLE AllTypesAggMultiFiles_text (
   float_col float,
   double_col double,
   date_string_col string,
-  string_col string)
+  string_col string,
+  timestamp_col timestamp)
 partitioned by (year int, month int, day int)
 row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
 
@@ -350,7 +363,8 @@ CREATE TABLE AllTypesAggMultiFiles_rc (
   float_col float,
   double_col double,
   date_string_col string,
-  string_col string)
+  string_col string,
+  timestamp_col timestamp)
 partitioned by (year int, month int, day int)
 STORED AS RCFILE;
 
@@ -365,7 +379,8 @@ CREATE TABLE AllTypesAggMultiFilesNoPart (
   float_col float,
   double_col double,
   date_string_col string,
-  string_col string);
+  string_col string,
+  timestamp_col timestamp);
 
 DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart_text;
 CREATE TABLE AllTypesAggMultiFilesNoPart_text (
@@ -378,7 +393,8 @@ CREATE TABLE AllTypesAggMultiFilesNoPart_text (
   float_col float,
   double_col double,
   date_string_col string,
-  string_col string)
+  string_col string,
+  timestamp_col timestamp)
 row format delimited fields terminated by ','  escaped by '\\' stored as textfile;
 
 DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart_rc;
@@ -392,5 +408,6 @@ CREATE TABLE AllTypesAggMultiFilesNoPart_rc (
   float_col float,
   double_col double,
   date_string_col string,
-  string_col string)
+  string_col string,
+  timestamp_col timestamp)
 STORED AS RCFILE;

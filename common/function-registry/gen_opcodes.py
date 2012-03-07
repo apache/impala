@@ -7,8 +7,8 @@
 # about type checking.
 #
 # This scripts pulls function metadata input from 
-#   - impala/common/impala_functions.py (manually maintained)
-#   - impala/common/generated_functions.py (auto-generated metadata)
+#   - impala/common/function-registry/impala_functions.py (manually maintained)
+#   - impala/common/function-registry/generated_functions.py (auto-generated metadata)
 #
 # This script will generate 4 outputs
 #  1. Thrift enum for all the opcodes
@@ -37,12 +37,13 @@ native_types = {
   'FLOAT'         : 'float',
   'DOUBLE'        : 'double',
   'STRING'        : 'StringValue',
+  'TIMESTAMP'     : 'TimestampValue',
 }
 
 thrift_preamble = '\
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.\n\
 // This is a generated file, DO NOT EDIT.\n\
-// To add new functions, see impala/common/gen_opcodes.py\n\
+// To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
 \n\
 namespace cpp impala\n\
 namespace java com.cloudera.impala.thrift\n\
@@ -56,7 +57,7 @@ thrift_epilogue = '\
 cc_registry_preamble = '\
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.\n\
 // This is a generated file, DO NOT EDIT.\n\
-// To add new functions, see impala/common/gen_opcodes.py\n\
+// To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
 \n\
 #include "exprs/opcode-registry.h"\n\
 #include "exprs/expr.h"\n\
@@ -64,6 +65,7 @@ cc_registry_preamble = '\
 #include "exprs/like-predicate.h"\n\
 #include "exprs/math-functions.h"\n\
 #include "exprs/string-functions.h"\n\
+#include "exprs/timestamp-functions.h"\n\
 #include "opcode/functions.h"\n\
 \n\
 namespace impala { \n\
@@ -78,7 +80,7 @@ cc_registry_epilogue = '\
 operator_file_preamble = '\
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.\n\
 // This is a generated file, DO NOT EDIT.\n\
-// To add new functions, see impala/common/gen_opcodes.py\n\
+// To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
 \n\
 package com.cloudera.impala.opcode;\n\
 \n\
@@ -90,7 +92,7 @@ operator_file_epilogue = '\
 java_registry_preamble = '\
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.\n\
 // This is a generated file, DO NOT EDIT.\n\
-// To add new functions, see impala/common/gen_opcodes.py\n\
+// To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
 \n\
 package com.cloudera.impala.opcode;\n\
 \n\

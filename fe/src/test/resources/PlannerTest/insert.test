@@ -1,7 +1,7 @@
 # insert into an unpartitioned table
 insert into table alltypesnopart
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
-float_col, double_col, date_string_col, string_col
+float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypes
 where year=2009 and month=05
 ----
@@ -14,7 +14,7 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
 ------------
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypesnopart
@@ -30,13 +30,13 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
 ====
 # insert into a static partition
 insert into table alltypessmall
 partition (year=2009, month=04) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
-float_col, double_col, date_string_col, string_col
+float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypes
 where year=2009 and month=05
 ----
@@ -50,7 +50,7 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
 ------------
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
@@ -67,13 +67,13 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
 ====
 # overwrite a static partition
 insert overwrite table alltypessmall
 partition (year=2009, month=04) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
-float_col, double_col, date_string_col, string_col
+float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypes
 where year=2009 and month=05
 ----
@@ -87,7 +87,7 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
 ------------
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
@@ -104,13 +104,13 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
 ====
 # insert into a fully dynamic partition
 insert into table alltypessmall
 partition (year, month) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
-float_col, double_col, date_string_col, string_col, year, month
+float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 from alltypes
 where year=2009 and month>10
 ----
@@ -124,8 +124,8 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
 ------------
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
@@ -142,14 +142,14 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
 ====
 # insert into a partially dynamic partition
 insert into table alltypessmall
 partition (year=2009, month) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
-float_col, double_col, date_string_col, string_col, month
+float_col, double_col, date_string_col, string_col, timestamp_col, month
 from alltypes
 where year=2009 and month>10
 ----
@@ -163,8 +163,8 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
 ------------
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
@@ -181,14 +181,14 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
 ====
 # insert into a partially dynamic partition
 insert into table alltypessmall
 partition (year, month=4) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
-float_col, double_col, date_string_col, string_col, year
+float_col, double_col, date_string_col, string_col, timestamp_col, year
 from alltypes
 where year>2009 and month=4
 ----
@@ -202,7 +202,7 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2010/month=4/100401.txt 0:13020
+        hdfs:alltypes/year=2010/month=4/100401.txt 0:20179
 ------------
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
@@ -219,5 +219,5 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2010/month=4/100401.txt 0:13020
+        hdfs:alltypes/year=2010/month=4/100401.txt 0:20179
 ====

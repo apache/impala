@@ -52,6 +52,9 @@ void RawValue::PrintValue(const void* value, PrimitiveType type, string* str) {
       tmp.assign(static_cast<char*>(string_val->ptr), string_val->len);
       str->swap(tmp);
       return;
+    case TYPE_TIMESTAMP:
+      out << *reinterpret_cast<const TimestampValue*>(value);
+      break;
     default:
       DCHECK(false) << "bad RawValue::PrintValue() type: " << TypeToString(type);
   }
@@ -78,6 +81,8 @@ size_t RawValue::GetHashValue(const void* value, PrimitiveType type) {
     case TYPE_STRING:
       string_value = reinterpret_cast<const StringValue*>(value);
       return hash_range<char*>(string_value->ptr, string_value->ptr + string_value->len);
+    case TYPE_TIMESTAMP:
+      return hash<double>().operator()(*reinterpret_cast<const TimestampValue*>(value));
     default:
       DCHECK(false) << "invalid type: " << TypeToString(type);
       return 0;
@@ -87,6 +92,8 @@ size_t RawValue::GetHashValue(const void* value, PrimitiveType type) {
 int RawValue::Compare(const void* v1, const void* v2, PrimitiveType type) {
   const StringValue* string_value1;
   const StringValue* string_value2;
+  const TimestampValue* ts_value1;
+  const TimestampValue* ts_value2;
   float f1, f2;
   double d1, d2;
   switch (type) {
@@ -115,6 +122,10 @@ int RawValue::Compare(const void* v1, const void* v2, PrimitiveType type) {
       string_value1 = reinterpret_cast<const StringValue*>(v1);
       string_value2 = reinterpret_cast<const StringValue*>(v2);
       return string_value1->Compare(*string_value2);
+    case TYPE_TIMESTAMP:
+      ts_value1 = reinterpret_cast<const TimestampValue*>(v1);
+      ts_value2 = reinterpret_cast<const TimestampValue*>(v2);
+      return ts_value1 > ts_value2 ? 1 : (ts_value1 < ts_value2 ? -1 : 0);
     default:
       DCHECK(false) << "invalid type: " << TypeToString(type);
       return 0;
@@ -170,6 +181,12 @@ void RawValue::Write(const void* value, Tuple* tuple, const SlotDescriptor* slot
       } else {
         dest->ptr = src->ptr;
       }
+      break;
+    }
+    case TYPE_TIMESTAMP: {
+      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
+      *reinterpret_cast<TimestampValue*>(slot) =
+          *reinterpret_cast<const TimestampValue*>(value);
       break;
     }
     case INVALID_TYPE: {

@@ -5,6 +5,7 @@
 #include "util/string-parser.h"
 #include "runtime/tuple.h"
 #include "runtime/row-batch.h"
+#include "runtime/timestamp-value.h"
 #include "exec/text-converter.h"
 #include "util/cpu-info.h"
 #include "exec/hdfs-scan-node.h"
@@ -487,6 +488,11 @@ Status HdfsTextScanner::WriteSlots(RuntimeState* state, int tuple_idx,
       *reinterpret_cast<double*>(slot) =
         StringParser::StringToFloat<double>(data, len, &parse_result);
       break;
+    case TYPE_TIMESTAMP: {
+      string strbuf(data, len);
+      *reinterpret_cast<TimestampValue*>(slot) = TimestampValue(strbuf);
+      break;
+    }
     default:
       DCHECK(false) << "bad slot type: " << TypeToString(slot_desc->type());
       break;

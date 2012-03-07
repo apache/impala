@@ -26,6 +26,7 @@ for i in $JARS; do
 done
 
 # run test data generator
+echo $DATALOC
 mkdir -p $DATALOC
 java -cp $CP com.cloudera.impala.datagenerator.TestDataGenerator $DATALOC
 java -cp $CP com.cloudera.impala.datagenerator.CsvToHBaseConverter

@@ -1,3 +1,4 @@
+// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 package com.cloudera.impala.datagenerator;
 
 import java.io.BufferedReader;
@@ -26,6 +27,8 @@ public class CsvToHBaseConverter {
       PrintWriter out = new PrintWriter(outFile);
       String[] children = inDirFile.list();
       for (String csvFile : children) {
+        if (!csvFile.endsWith(".txt")) continue;
+
         FileInputStream finstream = new FileInputStream(
             inDirFile.getAbsolutePath() + "/" + csvFile);
         DataInputStream in = new DataInputStream(finstream);
@@ -39,15 +42,17 @@ public class CsvToHBaseConverter {
       out.close();
     } catch (FileNotFoundException e) {
       e.printStackTrace();
+      System.exit(-1);
     } catch (IOException e) {
       e.printStackTrace();
+      System.exit(-1);
     }
   }
   
   public static void convertLine(String csvLine, PrintWriter out, String hbaseTableName) throws IOException {
     String[] parts = csvLine.split(",");
-    if (parts.length != 10) {
-      throw new IOException("Line does not have 10 columns.");
+    if (parts.length != 11) {
+      throw new IOException("Line does not have 11 columns: " + csvLine);
     }        
     
     out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "bools:bool_col", parts[1]);
@@ -59,6 +64,7 @@ public class CsvToHBaseConverter {
     out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "floats:double_col", parts[7]);
     out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "strings:date_string_col", parts[8]);
     out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "strings:string_col", parts[9]);
+    out.format("put '%s', '%s', '%s', '%s'\n", hbaseTableName, parts[0], "strings:timestamp_col", parts[10]);
   }
   
   
@@ -73,5 +79,6 @@ public class CsvToHBaseConverter {
   public static void main(String args[]) throws Exception {
     convertAllTypesTable("AllTypesError", "HBaseAllTypesError", "hbasealltypeserror");
     convertAllTypesTable("AllTypesErrorNoNulls", "HBaseAllTypesErrorNoNulls", "hbasealltypeserrornonulls");
+    System.exit(0);
   }
 }

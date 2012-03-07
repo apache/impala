@@ -1,5 +1,4 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
-
+// Copyright (c) 2011 Cloudera, Inc. All rights reserved.  
 package com.cloudera.impala.analysis;
 
 import static org.junit.Assert.fail;
@@ -55,12 +54,12 @@ public class ToSqlTest {
     testToSql("select null, 1234 < 5678, 1234.0 < 5678.0, 1234 < null from alltypes",
         "SELECT NULL, 1234 < 5678, 1234.0 < 5678.0, 1234 < NULL FROM alltypes");
     testToSql("select int_col + int_col, " +
-    		"tinyint_col + int_col, " +
-    		"float_col + double_col, " +
-    		"float_col + bigint_col, " +
-    		"cast(float_col as int), " +
-    		"bool_col " +
-    		"from alltypes",
+        "tinyint_col + int_col, " +
+        "float_col + double_col, " +
+        "float_col + bigint_col, " +
+        "cast(float_col as int), " +
+        "bool_col " +
+        "from alltypes",
         "SELECT int_col + int_col, " +
         "tinyint_col + int_col, " +
         "float_col + double_col, " +
@@ -86,12 +85,12 @@ public class ToSqlTest {
   @Test
   public void aggregationTest() {
     testToSql("select COUNT(*), count(id), COUNT(id), SUM(id), AVG(id) from alltypes " +
-    		"group by tinyint_col",
+        "group by tinyint_col",
         "SELECT COUNT(*), COUNT(id), COUNT(id), SUM(id), AVG(id) FROM alltypes " +
-    		"GROUP BY tinyint_col");
+        "GROUP BY tinyint_col");
     testToSql("select avg(float_col / id) from alltypes group by tinyint_col",
         "SELECT AVG(float_col / id) " +
-            "FROM alltypes GROUP BY tinyint_col");
+        "FROM alltypes GROUP BY tinyint_col");
     testToSql("select avg(double_col) from alltypes group by int_col, tinyint_col, bigint_col",
         "SELECT AVG(double_col) FROM alltypes GROUP BY int_col, tinyint_col, bigint_col");
     // Group by with having clause
@@ -100,7 +99,7 @@ public class ToSqlTest {
     testToSql("select sum(id) from alltypes group by tinyint_col " +
         "having avg(tinyint_col) > 10 AND count(tinyint_col) > 5",
         "SELECT SUM(id) FROM alltypes GROUP BY tinyint_col " +
-            "HAVING AVG(tinyint_col) > 10 AND COUNT(tinyint_col) > 5");
+        "HAVING AVG(tinyint_col) > 10 AND COUNT(tinyint_col) > 5");
   }
 
   // Test the toSql() output of the order by clause.
@@ -109,11 +108,11 @@ public class ToSqlTest {
     testToSql("select id, string_col from alltypes " +
         "order by string_col ASC, float_col DESC, int_col ASC",
         "SELECT id, string_col FROM alltypes " +
-            "ORDER BY string_col ASC, float_col DESC, int_col ASC");
+        "ORDER BY string_col ASC, float_col DESC, int_col ASC");
     testToSql("select id, string_col from alltypes " +
         "order by string_col DESC, float_col ASC, int_col DESC",
         "SELECT id, string_col FROM alltypes " +
-            "ORDER BY string_col DESC, float_col ASC, int_col DESC");
+        "ORDER BY string_col DESC, float_col ASC, int_col DESC");
   }
 
   // Test the toSql() output of queries with all clauses.
@@ -125,10 +124,10 @@ public class ToSqlTest {
         "having count(int_col) > 10 OR sum(bigint_col) > 20 " +
         "order by 2 DESC, 3 ASC",
         "SELECT bigint_col, AVG(double_col), SUM(tinyint_col) FROM alltypes " +
-            "WHERE double_col > 2.5 AND string_col != 'abc' " +
-            "GROUP BY bigint_col, int_col " +
-            "HAVING COUNT(int_col) > 10 OR SUM(bigint_col) > 20 " +
-            "ORDER BY 2 DESC, 3 ASC");
+        "WHERE double_col > 2.5 AND string_col != 'abc' " +
+        "GROUP BY bigint_col, int_col " +
+        "HAVING COUNT(int_col) > 10 OR SUM(bigint_col) > 20 " +
+        "ORDER BY 2 DESC, 3 ASC");
   }
 
   // Test the toSql() output of insert queries.
@@ -152,25 +151,25 @@ public class ToSqlTest {
     testToSql("insert into table alltypessmall " +
         "partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col from alltypes",
+        "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes",
         "INSERT INTO TABLE alltypessmall PARTITION (year=2009, month=4) SELECT id, " +
         "bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, " +
-        "double_col, date_string_col, string_col FROM alltypes");
+        "double_col, date_string_col, string_col, timestamp_col FROM alltypes");
     // Fully dynamic partitions.
     testToSql("insert into table alltypessmall " +
         "partition (year, month)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, year, month from alltypes",
+        "float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypes",
         "INSERT INTO TABLE alltypessmall PARTITION (year, month) SELECT id, bool_col, " +
         "tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, " +
-        "date_string_col, string_col, year, month FROM alltypes");
+        "date_string_col, string_col, timestamp_col, year, month FROM alltypes");
     // Partially dynamic partitions.
     testToSql("insert into table alltypessmall " +
         "partition (year=2009, month)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, month from alltypes",
+        "float_col, double_col, date_string_col, string_col, timestamp_col, month from alltypes",
         "INSERT INTO TABLE alltypessmall PARTITION (year=2009, month) SELECT id, " +
         "bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, " +
-        "double_col, date_string_col, string_col, month FROM alltypes");
+        "double_col, date_string_col, string_col, timestamp_col, month FROM alltypes");
   }
 }

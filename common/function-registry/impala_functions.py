@@ -86,4 +86,21 @@ functions = [
   ['String_Concat', 'STRING', ['STRING', '...'], 'StringFunctions::Concat', ['concat']],
   ['String_Concat_Ws', 'STRING', ['STRING', 'STRING', '...'], 'StringFunctions::ConcatWs', ['concat_ws']],
   ['String_Find_In_Set', 'INT', ['STRING', 'STRING'], 'StringFunctions::FindInSet', ['find_in_set']],
+
+# Timestamp Functions
+  ['Unix_Timestamp', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Unix', ['unix_timestamp']],
+  ['Timestamp_year', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Year', ['year']],
+  ['Timestamp_month', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Month', ['month']],
+  ['Timestamp_day', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Day', ['day']],
+  ['Timestamp_dayofmonth', 'INT', ['TIMESTAMP'], 'TimestampFunctions::DayOfMonth', ['dayofmonth']],
+  ['Timestamp_weekofyear', 'INT', ['TIMESTAMP'], 'TimestampFunctions::WeekOfYear', ['weekofyear']],
+  ['Timestamp_hour', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Hour', ['hour']],
+  ['Timestamp_minute', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Minute', ['minute']],
+  ['Timestamp_second', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Second', ['second']],
+  ['Timestamp_to_date', 'STRING', ['TIMESTAMP'], 'TimestampFunctions::ToDate', ['to_date']],
+  ['Timestamp_date_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], 'TimestampFunctions::DateAdd', ['date_add']],
+  ['Timestamp_date_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], 'TimestampFunctions::DateSub', ['date_sub']],
+  ['Timestamp_diff', 'INT', ['TIMESTAMP', 'TIMESTAMP'], 'TimestampFunctions::DateDiff', ['date_diff']],
+  ['From_utc_timestamp', 'TIMESTAMP', ['TIMESTAMP', 'STRING'], 'TimestampFunctions::FromUtc', ['from_utc_timestamp']],
+  ['To_utc_timestamp', 'TIMESTAMP', ['TIMESTAMP', 'STRING'], 'TimestampFunctions::ToUtc', ['to_utc_timestamp']],
 ]

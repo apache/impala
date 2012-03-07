@@ -150,9 +150,14 @@ public class AggregateExpr extends Expr {
     Expr arg = (Expr) getChild(0);
 
     // SUM and AVG cannot be applied to non-numeric types
-    if ((op == Operator.AVG || op == Operator.SUM) && !arg.type.isNumericType()) {
+    if (op == Operator.SUM && !arg.type.isNumericType()) {
+        throw new AnalysisException(
+                      "SUM requires a numeric parameter: " + this.toSql());
+    }
+    if (op == Operator.AVG &&
+        (!arg.type.isNumericType() && arg.type != PrimitiveType.TIMESTAMP)) {
       throw new AnalysisException(
-          op.toString() + " requires a numeric parameter: " + this.toSql());
+                    "AVG requires a numeric or timestamp parameter: " + this.toSql());
     }
 
     if (op == Operator.AVG) {

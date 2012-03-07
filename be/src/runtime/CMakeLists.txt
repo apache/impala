@@ -22,6 +22,7 @@ add_library(Runtime STATIC
   runtime-state.cc
   simple-scheduler.cc
   string-value.cc
+  timestamp-value.cc
   tuple.cc
 )
 

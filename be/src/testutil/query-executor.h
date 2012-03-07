@@ -45,8 +45,7 @@ class TPlanExecParams;
 // two types of FetchResult().
 class QueryExecutor {
  public:
-  // Non-NULL exec_env required for non-local execution.
-  QueryExecutor(ExecEnv* exec_env = NULL);
+  QueryExecutor(ExecEnv* exec_env);
   ~QueryExecutor();
 
   Status Setup();

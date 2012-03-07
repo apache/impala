@@ -147,15 +147,13 @@ then
 fi
 
 # build frontend
-# skip tests since any failures will prevent the
-# package phase from completing.
+# Package first since any test failure will prevent the package phase from completing.
 cd $IMPALA_FE_DIR
+mvn package -DskipTests=true
 if [ $tests_action -eq 1 ]
 then
     # also run frontend tests
-    mvn package
-else
-    mvn package -DskipTests=true
+    mvn test
 fi
 
 # run backend tests For some reason this does not work on Jenkins

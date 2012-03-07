@@ -9,6 +9,7 @@ import java.util.ListIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.Lists;
@@ -287,17 +288,32 @@ public class SelectStmt extends ParseNodeBase {
       if (aggExpr.getOp() != AggregateExpr.Operator.AVG) {
         continue;
       }
+      // Transform avg(TIMESTAMP) to cast(avg(cast(TIMESTAMP as DOUBLE as TIMESTAMP))
+      CastExpr inCastExpr = null;
+      if (aggExpr.getChild(0).type == PrimitiveType.TIMESTAMP) {
+        inCastExpr =
+          new CastExpr(PrimitiveType.DOUBLE, aggExpr.getChild(0).clone(), false);
+      }
+
       AggregateExpr sumExpr =
           new AggregateExpr(AggregateExpr.Operator.SUM, false, false,
-                            Lists.newArrayList(aggExpr.getChild(0).clone()));
+                Lists.newArrayList(aggExpr.getChild(0).type == PrimitiveType.TIMESTAMP ?
+                  inCastExpr : aggExpr.getChild(0).clone()));
       AggregateExpr countExpr =
           new AggregateExpr(AggregateExpr.Operator.COUNT, false, false,
                             Lists.newArrayList(aggExpr.getChild(0).clone()));
       ArithmeticExpr divExpr =
           new ArithmeticExpr(ArithmeticExpr.Operator.DIVIDE, sumExpr, countExpr);
-      divExpr.analyze(analyzer);
+
+      if (aggExpr.getChild(0).type == PrimitiveType.TIMESTAMP) {
+        CastExpr outCastExpr = new CastExpr(PrimitiveType.TIMESTAMP, divExpr, false);
+        outCastExpr.analyze(analyzer);
+        avgSubstMap.rhs.add(outCastExpr);
+      } else {
+        divExpr.analyze(analyzer);
+        avgSubstMap.rhs.add(divExpr);
+      }
       avgSubstMap.lhs.add(aggExpr);
-      avgSubstMap.rhs.add(divExpr);
     }
     LOG.debug("avg substmap: " + avgSubstMap.debugString());
 

@@ -4,6 +4,7 @@
 #define IMPALA_RUNTIME_EXEC_ENV_H
 
 #include <boost/scoped_ptr.hpp>
+#include "exprs/timestamp-functions.h"
 
 namespace impala {
 
@@ -35,6 +36,7 @@ class ExecEnv {
   boost::scoped_ptr<SimpleScheduler> scheduler_impl_;
   boost::scoped_ptr<BackendClientCache> client_cache_impl_;
   boost::scoped_ptr<HdfsFsCache> fs_cache_impl_;
+  TimezoneDatabase tz_database_;
 
  protected:
   // leave these protected so TestExecEnv can "override" them

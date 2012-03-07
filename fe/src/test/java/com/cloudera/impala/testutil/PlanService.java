@@ -53,7 +53,7 @@ public class PlanService {
       AnalysisContext.AnalysisResult analysisResult = null;
       try {
         analysisResult = analysisCtxt.analyze(stmt);
-      } catch (AnalysisException e) {
+      } catch (Exception e) {
         System.out.println(e.getMessage());
         throw new TException(e.getMessage());
       }
@@ -78,6 +78,9 @@ public class PlanService {
       } catch (NotImplementedException e) {
         throw new TException(e.getMessage());
       } catch (InternalException e) {
+        throw new TException(e.getMessage());
+      } catch (Exception e) {
+        System.out.println(e.getMessage());
         throw new TException(e.getMessage());
       }
 

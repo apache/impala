@@ -20,7 +20,8 @@ public enum PrimitiveType {
   DOUBLE("DOUBLE", 8, TPrimitiveType.DOUBLE),
   DATE("DATE", 4, TPrimitiveType.DATE),
   DATETIME("DATETIME", 8, TPrimitiveType.DATETIME),
-  TIMESTAMP("TIMESTAMP", 8, TPrimitiveType.TIMESTAMP),
+  // We use boost ptime which is 96 bits. Aligning to 8 bytes so 16 total
+  TIMESTAMP("TIMESTAMP", 16, TPrimitiveType.TIMESTAMP),
   // 8-byte pointer and 4-byte length indicator (12 bytes total). Aligning to 8 bytes so 16 total.
   STRING("STRING", 16, TPrimitiveType.STRING);
 
@@ -62,7 +63,8 @@ public enum PrimitiveType {
   public PrimitiveType getMaxResolutionType() {
     if (isFixedPointType()) {
       return BIGINT;
-    } else if (isFloatingPointType()) {
+    // Timestamps get summed as DOUBLE for AVG.
+    } else if (isFloatingPointType() || this == TIMESTAMP) {
       return DOUBLE;
     } else {
       return INVALID_TYPE;

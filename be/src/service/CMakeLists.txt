@@ -13,6 +13,7 @@ add_library(Service
 
 target_link_libraries(Service
   Runtime
+  -lboost_date_time
 )
 
 add_library(backend SHARED

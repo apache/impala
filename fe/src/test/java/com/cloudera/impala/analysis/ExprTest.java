@@ -30,6 +30,7 @@ public class ExprTest {
     testLiteralExprNegative("ABC", PrimitiveType.BIGINT);
     testLiteralExprNegative("ABC", PrimitiveType.FLOAT);
     testLiteralExprNegative("ABC", PrimitiveType.DOUBLE);
+    testLiteralExprNegative("ABC", PrimitiveType.TIMESTAMP);
 
     // Date types not implemented
     testLiteralExprNegative("2010-01-01", PrimitiveType.DATE);

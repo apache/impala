@@ -36,30 +36,30 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
-        hdfs:alltypes/year=2009/month=10/091001.txt 0:13454
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:11872
-        hdfs:alltypes/year=2009/month=3/090301.txt 0:13144
-        hdfs:alltypes/year=2009/month=4/090401.txt 0:12920
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
-        hdfs:alltypes/year=2009/month=6/090601.txt 0:13020
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2009/month=9/090901.txt 0:13020
-        hdfs:alltypes/year=2010/month=1/100101.txt 0:13454
-        hdfs:alltypes/year=2010/month=10/101001.txt 0:13454
-        hdfs:alltypes/year=2010/month=11/101101.txt 0:13020
-        hdfs:alltypes/year=2010/month=12/101201.txt 0:13454
-        hdfs:alltypes/year=2010/month=2/100201.txt 0:12152
-        hdfs:alltypes/year=2010/month=3/100301.txt 0:13454
-        hdfs:alltypes/year=2010/month=4/100401.txt 0:13020
-        hdfs:alltypes/year=2010/month=5/100501.txt 0:13454
-        hdfs:alltypes/year=2010/month=6/100601.txt 0:13020
-        hdfs:alltypes/year=2010/month=7/100701.txt 0:13454
-        hdfs:alltypes/year=2010/month=8/100801.txt 0:13454
-        hdfs:alltypes/year=2010/month=9/100901.txt 0:13020
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypes/year=2009/month=10/091001.txt 0:20853
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
+        hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+        hdfs:alltypes/year=2009/month=6/090601.txt 0:20179
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
+        hdfs:alltypes/year=2010/month=1/100101.txt 0:20853
+        hdfs:alltypes/year=2010/month=10/101001.txt 0:20853
+        hdfs:alltypes/year=2010/month=11/101101.txt 0:20179
+        hdfs:alltypes/year=2010/month=12/101201.txt 0:20853
+        hdfs:alltypes/year=2010/month=2/100201.txt 0:18835
+        hdfs:alltypes/year=2010/month=3/100301.txt 0:20853
+        hdfs:alltypes/year=2010/month=4/100401.txt 0:20179
+        hdfs:alltypes/year=2010/month=5/100501.txt 0:20853
+        hdfs:alltypes/year=2010/month=6/100601.txt 0:20179
+        hdfs:alltypes/year=2010/month=7/100701.txt 0:20853
+        hdfs:alltypes/year=2010/month=8/100801.txt 0:20853
+        hdfs:alltypes/year=2010/month=9/100901.txt 0:20179
 ------------
 Plan Fragment 0
   EXCHANGE (1)
@@ -73,30 +73,30 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
-        hdfs:alltypes/year=2009/month=10/091001.txt 0:13454
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:11872
-        hdfs:alltypes/year=2009/month=3/090301.txt 0:13144
-        hdfs:alltypes/year=2009/month=4/090401.txt 0:12920
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
-        hdfs:alltypes/year=2009/month=6/090601.txt 0:13020
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2009/month=9/090901.txt 0:13020
-        hdfs:alltypes/year=2010/month=1/100101.txt 0:13454
-        hdfs:alltypes/year=2010/month=10/101001.txt 0:13454
-        hdfs:alltypes/year=2010/month=11/101101.txt 0:13020
-        hdfs:alltypes/year=2010/month=12/101201.txt 0:13454
-        hdfs:alltypes/year=2010/month=2/100201.txt 0:12152
-        hdfs:alltypes/year=2010/month=3/100301.txt 0:13454
-        hdfs:alltypes/year=2010/month=4/100401.txt 0:13020
-        hdfs:alltypes/year=2010/month=5/100501.txt 0:13454
-        hdfs:alltypes/year=2010/month=6/100601.txt 0:13020
-        hdfs:alltypes/year=2010/month=7/100701.txt 0:13454
-        hdfs:alltypes/year=2010/month=8/100801.txt 0:13454
-        hdfs:alltypes/year=2010/month=9/100901.txt 0:13020
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypes/year=2009/month=10/091001.txt 0:20853
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
+        hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+        hdfs:alltypes/year=2009/month=6/090601.txt 0:20179
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
+        hdfs:alltypes/year=2010/month=1/100101.txt 0:20853
+        hdfs:alltypes/year=2010/month=10/101001.txt 0:20853
+        hdfs:alltypes/year=2010/month=11/101101.txt 0:20179
+        hdfs:alltypes/year=2010/month=12/101201.txt 0:20853
+        hdfs:alltypes/year=2010/month=2/100201.txt 0:18835
+        hdfs:alltypes/year=2010/month=3/100301.txt 0:20853
+        hdfs:alltypes/year=2010/month=4/100401.txt 0:20179
+        hdfs:alltypes/year=2010/month=5/100501.txt 0:20853
+        hdfs:alltypes/year=2010/month=6/100601.txt 0:20179
+        hdfs:alltypes/year=2010/month=7/100701.txt 0:20853
+        hdfs:alltypes/year=2010/month=8/100801.txt 0:20853
+        hdfs:alltypes/year=2010/month=9/100901.txt 0:20179
 ====
 # predicate on first partition key
 select * from alltypes where year = 2009
@@ -108,18 +108,18 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
-        hdfs:alltypes/year=2009/month=10/091001.txt 0:13454
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:11872
-        hdfs:alltypes/year=2009/month=3/090301.txt 0:13144
-        hdfs:alltypes/year=2009/month=4/090401.txt 0:12920
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
-        hdfs:alltypes/year=2009/month=6/090601.txt 0:13020
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2009/month=9/090901.txt 0:13020
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypes/year=2009/month=10/091001.txt 0:20853
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
+        hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+        hdfs:alltypes/year=2009/month=6/090601.txt 0:20179
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
 ------------
 Plan Fragment 0
   EXCHANGE (1)
@@ -133,18 +133,18 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
-        hdfs:alltypes/year=2009/month=10/091001.txt 0:13454
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:11872
-        hdfs:alltypes/year=2009/month=3/090301.txt 0:13144
-        hdfs:alltypes/year=2009/month=4/090401.txt 0:12920
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
-        hdfs:alltypes/year=2009/month=6/090601.txt 0:13020
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2009/month=9/090901.txt 0:13020
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypes/year=2009/month=10/091001.txt 0:20853
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
+        hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+        hdfs:alltypes/year=2009/month=6/090601.txt 0:20179
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
 ====
 # same predicate, phrased differently
 select * from alltypes where year = 2009.0
@@ -156,18 +156,18 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
-        hdfs:alltypes/year=2009/month=10/091001.txt 0:13454
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:11872
-        hdfs:alltypes/year=2009/month=3/090301.txt 0:13144
-        hdfs:alltypes/year=2009/month=4/090401.txt 0:12920
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
-        hdfs:alltypes/year=2009/month=6/090601.txt 0:13020
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2009/month=9/090901.txt 0:13020
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypes/year=2009/month=10/091001.txt 0:20853
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
+        hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+        hdfs:alltypes/year=2009/month=6/090601.txt 0:20179
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
 ------------
 Plan Fragment 0
   EXCHANGE (1)
@@ -181,18 +181,18 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
-        hdfs:alltypes/year=2009/month=10/091001.txt 0:13454
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:11872
-        hdfs:alltypes/year=2009/month=3/090301.txt 0:13144
-        hdfs:alltypes/year=2009/month=4/090401.txt 0:12920
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
-        hdfs:alltypes/year=2009/month=6/090601.txt 0:13020
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2009/month=9/090901.txt 0:13020
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypes/year=2009/month=10/091001.txt 0:20853
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
+        hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+        hdfs:alltypes/year=2009/month=6/090601.txt 0:20179
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
 ====
 select * from alltypes where 2009 = year
 ----
@@ -203,18 +203,18 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
-        hdfs:alltypes/year=2009/month=10/091001.txt 0:13454
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:11872
-        hdfs:alltypes/year=2009/month=3/090301.txt 0:13144
-        hdfs:alltypes/year=2009/month=4/090401.txt 0:12920
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
-        hdfs:alltypes/year=2009/month=6/090601.txt 0:13020
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2009/month=9/090901.txt 0:13020
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypes/year=2009/month=10/091001.txt 0:20853
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
+        hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+        hdfs:alltypes/year=2009/month=6/090601.txt 0:20179
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
 ------------
 Plan Fragment 0
   EXCHANGE (1)
@@ -228,18 +228,18 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
-        hdfs:alltypes/year=2009/month=10/091001.txt 0:13454
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:11872
-        hdfs:alltypes/year=2009/month=3/090301.txt 0:13144
-        hdfs:alltypes/year=2009/month=4/090401.txt 0:12920
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
-        hdfs:alltypes/year=2009/month=6/090601.txt 0:13020
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2009/month=9/090901.txt 0:13020
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypes/year=2009/month=10/091001.txt 0:20853
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
+        hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+        hdfs:alltypes/year=2009/month=6/090601.txt 0:20179
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
 ====
 select * from alltypes where 2009.0 = year
 ----
@@ -250,18 +250,18 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
-        hdfs:alltypes/year=2009/month=10/091001.txt 0:13454
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:11872
-        hdfs:alltypes/year=2009/month=3/090301.txt 0:13144
-        hdfs:alltypes/year=2009/month=4/090401.txt 0:12920
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
-        hdfs:alltypes/year=2009/month=6/090601.txt 0:13020
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2009/month=9/090901.txt 0:13020
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypes/year=2009/month=10/091001.txt 0:20853
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
+        hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+        hdfs:alltypes/year=2009/month=6/090601.txt 0:20179
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
 ------------
 Plan Fragment 0
   EXCHANGE (1)
@@ -275,18 +275,18 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
-        hdfs:alltypes/year=2009/month=10/091001.txt 0:13454
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:11872
-        hdfs:alltypes/year=2009/month=3/090301.txt 0:13144
-        hdfs:alltypes/year=2009/month=4/090401.txt 0:12920
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
-        hdfs:alltypes/year=2009/month=6/090601.txt 0:13020
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2009/month=9/090901.txt 0:13020
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypes/year=2009/month=10/091001.txt 0:20853
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
+        hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+        hdfs:alltypes/year=2009/month=6/090601.txt 0:20179
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
 ====
 # predicate on second partition key
 select * from alltypes where month=1
@@ -298,8 +298,8 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
-        hdfs:alltypes/year=2010/month=1/100101.txt 0:13454
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypes/year=2010/month=1/100101.txt 0:20853
 ------------
 Plan Fragment 0
   EXCHANGE (1)
@@ -313,8 +313,8 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
-        hdfs:alltypes/year=2010/month=1/100101.txt 0:13454
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypes/year=2010/month=1/100101.txt 0:20853
 ====
 # predicate on both partition keys
 select * from alltypes where year=2009 and month=1
@@ -326,7 +326,7 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
 ------------
 Plan Fragment 0
   EXCHANGE (1)
@@ -340,7 +340,7 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
 ====
 # single-sided range on 2nd key
 select * from alltypes where year=2009 and month > 6
@@ -352,12 +352,12 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=10/091001.txt 0:13454
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2009/month=9/090901.txt 0:13020
+        hdfs:alltypes/year=2009/month=10/091001.txt 0:20853
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
 ------------
 Plan Fragment 0
   EXCHANGE (1)
@@ -371,12 +371,12 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=10/091001.txt 0:13454
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2009/month=9/090901.txt 0:13020
+        hdfs:alltypes/year=2009/month=10/091001.txt 0:20853
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
 ====
 select * from alltypes where year=2009 and month < 6
 ----
@@ -387,11 +387,11 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:11872
-        hdfs:alltypes/year=2009/month=3/090301.txt 0:13144
-        hdfs:alltypes/year=2009/month=4/090401.txt 0:12920
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
+        hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
 ------------
 Plan Fragment 0
   EXCHANGE (1)
@@ -405,11 +405,11 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:11872
-        hdfs:alltypes/year=2009/month=3/090301.txt 0:13144
-        hdfs:alltypes/year=2009/month=4/090401.txt 0:12920
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
+        hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
 ====
 # single-sided ranges on both keys
 select * from alltypes where year<=2009 and month < 6
@@ -421,11 +421,11 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:11872
-        hdfs:alltypes/year=2009/month=3/090301.txt 0:13144
-        hdfs:alltypes/year=2009/month=4/090401.txt 0:12920
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
+        hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
 ------------
 Plan Fragment 0
   EXCHANGE (1)
@@ -439,11 +439,11 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:11872
-        hdfs:alltypes/year=2009/month=3/090301.txt 0:13144
-        hdfs:alltypes/year=2009/month=4/090401.txt 0:12920
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
+        hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
 ====
 # range on 2nd key
 select * from alltypes where month < 9 and month > 6
@@ -455,10 +455,10 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2010/month=7/100701.txt 0:13454
-        hdfs:alltypes/year=2010/month=8/100801.txt 0:13454
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2010/month=7/100701.txt 0:20853
+        hdfs:alltypes/year=2010/month=8/100801.txt 0:20853
 ------------
 Plan Fragment 0
   EXCHANGE (1)
@@ -472,10 +472,10 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2010/month=7/100701.txt 0:13454
-        hdfs:alltypes/year=2010/month=8/100801.txt 0:13454
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2010/month=7/100701.txt 0:20853
+        hdfs:alltypes/year=2010/month=8/100801.txt 0:20853
 ====
 # multiple predicates on first key; 2nd one applied as predicate
 select * from alltypes where year < 2010 and year < 2009 and month > 6
@@ -488,12 +488,12 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=10/091001.txt 0:13454
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2009/month=9/090901.txt 0:13020
+        hdfs:alltypes/year=2009/month=10/091001.txt 0:20853
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
 ------------
 Plan Fragment 0
   EXCHANGE (1)
@@ -508,12 +508,12 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=10/091001.txt 0:13454
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2009/month=9/090901.txt 0:13020
+        hdfs:alltypes/year=2009/month=10/091001.txt 0:20853
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
 ====
 # multiple predicates on second key; 2nd one applied as predicate
 select * from alltypes where year < 2010 and month > 6 and month > 8
@@ -526,12 +526,12 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=10/091001.txt 0:13454
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2009/month=9/090901.txt 0:13020
+        hdfs:alltypes/year=2009/month=10/091001.txt 0:20853
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
 ------------
 Plan Fragment 0
   EXCHANGE (1)
@@ -546,12 +546,12 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=10/091001.txt 0:13454
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2009/month=9/090901.txt 0:13020
+        hdfs:alltypes/year=2009/month=10/091001.txt 0:20853
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
 ====
 # slot binding can't be determined
 select * from alltypes where year - 1 = 2009
@@ -564,30 +564,30 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
-        hdfs:alltypes/year=2009/month=10/091001.txt 0:13454
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:11872
-        hdfs:alltypes/year=2009/month=3/090301.txt 0:13144
-        hdfs:alltypes/year=2009/month=4/090401.txt 0:12920
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
-        hdfs:alltypes/year=2009/month=6/090601.txt 0:13020
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2009/month=9/090901.txt 0:13020
-        hdfs:alltypes/year=2010/month=1/100101.txt 0:13454
-        hdfs:alltypes/year=2010/month=10/101001.txt 0:13454
-        hdfs:alltypes/year=2010/month=11/101101.txt 0:13020
-        hdfs:alltypes/year=2010/month=12/101201.txt 0:13454
-        hdfs:alltypes/year=2010/month=2/100201.txt 0:12152
-        hdfs:alltypes/year=2010/month=3/100301.txt 0:13454
-        hdfs:alltypes/year=2010/month=4/100401.txt 0:13020
-        hdfs:alltypes/year=2010/month=5/100501.txt 0:13454
-        hdfs:alltypes/year=2010/month=6/100601.txt 0:13020
-        hdfs:alltypes/year=2010/month=7/100701.txt 0:13454
-        hdfs:alltypes/year=2010/month=8/100801.txt 0:13454
-        hdfs:alltypes/year=2010/month=9/100901.txt 0:13020
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypes/year=2009/month=10/091001.txt 0:20853
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
+        hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+        hdfs:alltypes/year=2009/month=6/090601.txt 0:20179
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
+        hdfs:alltypes/year=2010/month=1/100101.txt 0:20853
+        hdfs:alltypes/year=2010/month=10/101001.txt 0:20853
+        hdfs:alltypes/year=2010/month=11/101101.txt 0:20179
+        hdfs:alltypes/year=2010/month=12/101201.txt 0:20853
+        hdfs:alltypes/year=2010/month=2/100201.txt 0:18835
+        hdfs:alltypes/year=2010/month=3/100301.txt 0:20853
+        hdfs:alltypes/year=2010/month=4/100401.txt 0:20179
+        hdfs:alltypes/year=2010/month=5/100501.txt 0:20853
+        hdfs:alltypes/year=2010/month=6/100601.txt 0:20179
+        hdfs:alltypes/year=2010/month=7/100701.txt 0:20853
+        hdfs:alltypes/year=2010/month=8/100801.txt 0:20853
+        hdfs:alltypes/year=2010/month=9/100901.txt 0:20179
 ------------
 Plan Fragment 0
   EXCHANGE (1)
@@ -602,30 +602,30 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:13034
-        hdfs:alltypes/year=2009/month=10/091001.txt 0:13454
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:11872
-        hdfs:alltypes/year=2009/month=3/090301.txt 0:13144
-        hdfs:alltypes/year=2009/month=4/090401.txt 0:12920
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
-        hdfs:alltypes/year=2009/month=6/090601.txt 0:13020
-        hdfs:alltypes/year=2009/month=7/090701.txt 0:13454
-        hdfs:alltypes/year=2009/month=8/090801.txt 0:13454
-        hdfs:alltypes/year=2009/month=9/090901.txt 0:13020
-        hdfs:alltypes/year=2010/month=1/100101.txt 0:13454
-        hdfs:alltypes/year=2010/month=10/101001.txt 0:13454
-        hdfs:alltypes/year=2010/month=11/101101.txt 0:13020
-        hdfs:alltypes/year=2010/month=12/101201.txt 0:13454
-        hdfs:alltypes/year=2010/month=2/100201.txt 0:12152
-        hdfs:alltypes/year=2010/month=3/100301.txt 0:13454
-        hdfs:alltypes/year=2010/month=4/100401.txt 0:13020
-        hdfs:alltypes/year=2010/month=5/100501.txt 0:13454
-        hdfs:alltypes/year=2010/month=6/100601.txt 0:13020
-        hdfs:alltypes/year=2010/month=7/100701.txt 0:13454
-        hdfs:alltypes/year=2010/month=8/100801.txt 0:13454
-        hdfs:alltypes/year=2010/month=9/100901.txt 0:13020
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypes/year=2009/month=10/091001.txt 0:20853
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
+        hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+        hdfs:alltypes/year=2009/month=6/090601.txt 0:20179
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+        hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
+        hdfs:alltypes/year=2010/month=1/100101.txt 0:20853
+        hdfs:alltypes/year=2010/month=10/101001.txt 0:20853
+        hdfs:alltypes/year=2010/month=11/101101.txt 0:20179
+        hdfs:alltypes/year=2010/month=12/101201.txt 0:20853
+        hdfs:alltypes/year=2010/month=2/100201.txt 0:18835
+        hdfs:alltypes/year=2010/month=3/100301.txt 0:20853
+        hdfs:alltypes/year=2010/month=4/100401.txt 0:20179
+        hdfs:alltypes/year=2010/month=5/100501.txt 0:20853
+        hdfs:alltypes/year=2010/month=6/100601.txt 0:20179
+        hdfs:alltypes/year=2010/month=7/100701.txt 0:20853
+        hdfs:alltypes/year=2010/month=8/100801.txt 0:20853
+        hdfs:alltypes/year=2010/month=9/100901.txt 0:20179
 ====
 # multi files non-partitioned table test
 select * from alltypesaggmultifilesNoPart
@@ -636,10 +636,10 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesaggmultifilesnopart/000000_0 0:130652
-        hdfs:alltypesaggmultifilesnopart/000000_0_copy_1 0:132212
-        hdfs:alltypesaggmultifilesnopart/000000_0_copy_2 0:130273
-        hdfs:alltypesaggmultifilesnopart/000000_0_copy_3 0:132163
+        hdfs:alltypesaggmultifilesnopart/000000_0 0:186852
+        hdfs:alltypesaggmultifilesnopart/000000_0_copy_1 0:188412
+        hdfs:alltypesaggmultifilesnopart/000000_0_copy_2 0:187323
+        hdfs:alltypesaggmultifilesnopart/000000_0_copy_3 0:189213
 ------------
 Plan Fragment 0
   EXCHANGE (1)
@@ -652,10 +652,10 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesaggmultifilesnopart/000000_0 0:130652
-        hdfs:alltypesaggmultifilesnopart/000000_0_copy_1 0:132212
-        hdfs:alltypesaggmultifilesnopart/000000_0_copy_2 0:130273
-        hdfs:alltypesaggmultifilesnopart/000000_0_copy_3 0:132163
+        hdfs:alltypesaggmultifilesnopart/000000_0 0:186852
+        hdfs:alltypesaggmultifilesnopart/000000_0_copy_1 0:188412
+        hdfs:alltypesaggmultifilesnopart/000000_0_copy_2 0:187323
+        hdfs:alltypesaggmultifilesnopart/000000_0_copy_3 0:189213
 ====
 # multi files partitioned table test
 select * from alltypesaggmultifiles where day<=2
@@ -667,14 +667,14 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesaggmultifiles/year=2010/month=1/day=1/000000_0 0:12815
-        hdfs:alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_1 0:12971
-        hdfs:alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_2 0:12778
-        hdfs:alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_3 0:12967
-        hdfs:alltypesaggmultifiles/year=2010/month=1/day=2/000000_0 0:13093
-        hdfs:alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_1 0:13249
-        hdfs:alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_2 0:13055
-        hdfs:alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_3 0:13244
+        hdfs:alltypesaggmultifiles/year=2010/month=1/day=1/000000_0 0:18435
+        hdfs:alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_1 0:18591
+        hdfs:alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_2 0:18483
+        hdfs:alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_3 0:18672
+        hdfs:alltypesaggmultifiles/year=2010/month=1/day=2/000000_0 0:18713
+        hdfs:alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_1 0:18869
+        hdfs:alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_2 0:18760
+        hdfs:alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_3 0:18949
 ------------
 Plan Fragment 0
   EXCHANGE (1)
@@ -688,12 +688,12 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesaggmultifiles/year=2010/month=1/day=1/000000_0 0:12815
-        hdfs:alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_1 0:12971
-        hdfs:alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_2 0:12778
-        hdfs:alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_3 0:12967
-        hdfs:alltypesaggmultifiles/year=2010/month=1/day=2/000000_0 0:13093
-        hdfs:alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_1 0:13249
-        hdfs:alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_2 0:13055
-        hdfs:alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_3 0:13244
+        hdfs:alltypesaggmultifiles/year=2010/month=1/day=1/000000_0 0:18435
+        hdfs:alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_1 0:18591
+        hdfs:alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_2 0:18483
+        hdfs:alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_3 0:18672
+        hdfs:alltypesaggmultifiles/year=2010/month=1/day=2/000000_0 0:18713
+        hdfs:alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_1 0:18869
+        hdfs:alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_2 0:18760
+        hdfs:alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_3 0:18949
 ====

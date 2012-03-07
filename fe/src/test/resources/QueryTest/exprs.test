@@ -42,7 +42,7 @@ bigint
 ----
 10
 ====
-select count(*) from alltypesagg where float_col = 1.1
+select count(*) from alltypesagg where float_col = cast(1.1 as float)
 ----
 bigint
 ----
@@ -85,7 +85,7 @@ bigint
 ----
 9990
 ====
-select count(*) from alltypesagg where float_col <> 1.1
+select count(*) from alltypesagg where float_col <> cast(1.1 as float)
 ----
 bigint
 ----
@@ -159,7 +159,7 @@ bigint
 ----
 9980
 ====
-select count(*) from alltypesagg where float_col > 1.1
+select count(*) from alltypesagg where float_col > cast(1.1 as float) 
 ----
 bigint
 ----
@@ -196,7 +196,7 @@ bigint
 ----
 10
 ====
-select count(*) from alltypesagg where float_col <= 1.1
+select count(*) from alltypesagg where float_col <= cast(1.1 as float)
 ----
 bigint
 ----

@@ -122,20 +122,22 @@ public class CatalogTest {
         new String[]
           {"year", "month", "id", "bool_col", "tinyint_col", "smallint_col",
            "int_col", "bigint_col", "float_col", "double_col", "date_string_col",
-           "string_col"},
+           "string_col", "timestamp_col"},
         new PrimitiveType[]
           {PrimitiveType.INT, PrimitiveType.INT, PrimitiveType.INT,
            PrimitiveType.BOOLEAN, PrimitiveType.TINYINT, PrimitiveType.SMALLINT,
            PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.FLOAT,
-           PrimitiveType.DOUBLE, PrimitiveType.STRING, PrimitiveType.STRING});
+           PrimitiveType.DOUBLE, PrimitiveType.STRING, PrimitiveType.STRING,
+           PrimitiveType.TIMESTAMP});
     checkTableCols(testDb, "alltypes", 0,
         new String[]
           {"id", "bool_col", "tinyint_col", "smallint_col", "int_col", "bigint_col",
-           "float_col", "double_col", "date_string_col", "string_col"},
+           "float_col", "double_col", "date_string_col", "string_col", "timestamp_col"},
         new PrimitiveType[]
           {PrimitiveType.INT, PrimitiveType.BOOLEAN, PrimitiveType.TINYINT, PrimitiveType.SMALLINT,
            PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.FLOAT,
-           PrimitiveType.DOUBLE, PrimitiveType.STRING, PrimitiveType.STRING});
+           PrimitiveType.DOUBLE, PrimitiveType.STRING, PrimitiveType.STRING,
+           PrimitiveType.TIMESTAMP});
     checkTableCols(defaultDb, "testtbl", 0,
         new String[] {"id", "name", "zip"},
         new PrimitiveType[]
@@ -164,82 +166,82 @@ public class CatalogTest {
     checkHBaseTableCols(defaultDb, "hbasealltypessmall", "hbasealltypessmall",
         new String[]
           {"id", "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
         new String[]
           {":key", "bools", "floats", "floats", "ints", "ints", "ints", "ints",
-           "strings", "strings"},
+           "strings", "strings", "strings"},
         new String[]
           {null, "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
         new PrimitiveType[]
           {PrimitiveType.INT,PrimitiveType.BOOLEAN, PrimitiveType.DOUBLE,
            PrimitiveType.FLOAT, PrimitiveType.BIGINT, PrimitiveType.INT,
            PrimitiveType.SMALLINT, PrimitiveType.TINYINT, PrimitiveType.STRING,
-           PrimitiveType.STRING});
+           PrimitiveType.STRING, PrimitiveType.TIMESTAMP});
 
     checkHBaseTableCols(defaultDb, "hbasealltypeserror", "hbasealltypeserror",
         new String[]
           {"id", "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
         new String[]
           {":key", "bools", "floats", "floats", "ints", "ints", "ints", "ints",
-           "strings", "strings"},
+           "strings", "strings", "strings"},
         new String[]
           {null, "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
         new PrimitiveType[]
           {PrimitiveType.INT,PrimitiveType.BOOLEAN, PrimitiveType.DOUBLE,
            PrimitiveType.FLOAT, PrimitiveType.BIGINT, PrimitiveType.INT,
            PrimitiveType.SMALLINT, PrimitiveType.TINYINT, PrimitiveType.STRING,
-           PrimitiveType.STRING});
+           PrimitiveType.STRING, PrimitiveType.TIMESTAMP});
 
     checkHBaseTableCols(defaultDb, "hbasealltypeserrornonulls", "hbasealltypeserrornonulls",
         new String[]
           {"id", "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
         new String[]
           {":key", "bools", "floats", "floats", "ints", "ints", "ints", "ints",
-           "strings", "strings"},
+           "strings", "strings", "strings"},
         new String[]
           {null, "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
         new PrimitiveType[]
           {PrimitiveType.INT,PrimitiveType.BOOLEAN, PrimitiveType.DOUBLE,
            PrimitiveType.FLOAT, PrimitiveType.BIGINT, PrimitiveType.INT,
            PrimitiveType.SMALLINT, PrimitiveType.TINYINT, PrimitiveType.STRING,
-           PrimitiveType.STRING});
+           PrimitiveType.STRING, PrimitiveType.TIMESTAMP});
 
     checkHBaseTableCols(defaultDb, "hbasealltypesagg", "hbasealltypesagg",
         new String[]
           {"id", "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
         new String[]
           {":key", "bools", "floats", "floats", "ints", "ints", "ints", "ints",
-           "strings", "strings"},
+           "strings", "strings", "strings"},
         new String[]
           {null, "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
         new PrimitiveType[]
           {PrimitiveType.INT,PrimitiveType.BOOLEAN, PrimitiveType.DOUBLE,
            PrimitiveType.FLOAT, PrimitiveType.BIGINT, PrimitiveType.INT,
            PrimitiveType.SMALLINT, PrimitiveType.TINYINT, PrimitiveType.STRING,
-           PrimitiveType.STRING});
+           PrimitiveType.STRING, PrimitiveType.TIMESTAMP});
 
     checkHBaseTableCols(defaultDb, "hbasestringids", "hbasealltypesagg",
         new String[]
           {"id", "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
         new String[]
           {":key", "bools", "floats", "floats", "ints", "ints", "ints", "ints",
-           "strings", "strings"},
+           "strings", "strings", "strings"},
         new String[]
           {null, "bool_col", "double_col", "float_col", "bigint_col", "int_col",
-           "smallint_col", "tinyint_col", "date_string_col", "string_col"},
+           "smallint_col", "tinyint_col", "date_string_col", "string_col", "timestamp_col"},
         new PrimitiveType[]
           {PrimitiveType.STRING,PrimitiveType.BOOLEAN, PrimitiveType.DOUBLE,
            PrimitiveType.FLOAT, PrimitiveType.BIGINT, PrimitiveType.INT,
            PrimitiveType.SMALLINT, PrimitiveType.TINYINT, PrimitiveType.STRING,
-           PrimitiveType.STRING});
+           PrimitiveType.STRING, PrimitiveType.TIMESTAMP});
 
     checkTableCols(defaultDb, "greptiny", 0,
         new String[]

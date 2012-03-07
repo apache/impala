@@ -6,6 +6,7 @@
 #include "runtime/descriptors.h"
 #include "runtime/tuple.h"
 #include "runtime/string-value.h"
+#include "runtime/timestamp-value.h"
 #include "runtime/mem-pool.h"
 
 using namespace boost;
@@ -94,6 +95,12 @@ bool TextConverter::ConvertAndWriteSlotBytes(const char* begin, const char* end,
         }
         slot->ptr = slot_data;
       }
+      break;
+    }
+    case TYPE_TIMESTAMP : {
+      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
+      string strbuf(begin, end - begin);
+      *reinterpret_cast<TimestampValue*>(slot) = TimestampValue(strbuf);
       break;
     }
     default:

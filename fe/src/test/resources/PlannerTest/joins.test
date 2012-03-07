@@ -82,14 +82,14 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1027
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1028
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
 ------------
 Plan Fragment 0
   EXCHANGE (3)
@@ -113,14 +113,14 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1027
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1028
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
 ====
 # same as before, with 3 tables;
 # non-eq join predicates are evaluated at the correct join node
@@ -162,17 +162,17 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1027
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1028
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypesaggnonulls/year=2010/month=1/day=1/100101.txt 0:51421
-        hdfs:alltypesaggnonulls/year=2010/month=1/day=2/100102.txt 0:52531
+        hdfs:alltypesaggnonulls/year=2010/month=1/day=1/100101.txt 0:75271
+        hdfs:alltypesaggnonulls/year=2010/month=1/day=2/100102.txt 0:76381
 ------------
 Plan Fragment 0
   EXCHANGE (5)
@@ -204,17 +204,17 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1027
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1028
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypesaggnonulls/year=2010/month=1/day=1/100101.txt 0:51421
-        hdfs:alltypesaggnonulls/year=2010/month=1/day=2/100102.txt 0:52531
+        hdfs:alltypesaggnonulls/year=2010/month=1/day=1/100101.txt 0:75271
+        hdfs:alltypesaggnonulls/year=2010/month=1/day=2/100102.txt 0:76381
 ====
 # non-equi join predicate not supported
 select *
@@ -240,16 +240,16 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:51303
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
       HBASE KEY RANGES NODE ID: 1
         <unbounded>:<unbounded>
 ------------
@@ -271,16 +271,16 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:51303
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
       HBASE KEY RANGES NODE ID: 1
         <unbounded>:<unbounded>
 ====
@@ -312,11 +312,11 @@ Plan Fragment 0
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
       HBASE KEY RANGES NODE ID: 1
         5:5\0
 ------------
@@ -343,11 +343,11 @@ Plan Fragment 1
   EXEC PARAMS
     HOST: 
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
       HBASE KEY RANGES NODE ID: 1
         5:5\0
 ====

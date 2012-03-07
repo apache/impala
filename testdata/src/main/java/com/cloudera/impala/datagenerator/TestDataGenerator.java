@@ -60,6 +60,8 @@ class TestDataGenerator {
         filenameFormat.format(startDate.getTime()) + ".txt")));
     Calendar date = (Calendar) startDate.clone();
     SimpleDateFormat df = new SimpleDateFormat("MM/dd/yy");
+    SimpleDateFormat tsf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.S");
+    
     int count = 0;
     while (date.before(endDate) && count < maxTuplesPerPartition) {
       for (int int_col = 0; int_col < intsPerDay && count < maxTuplesPerPartition;
@@ -72,17 +74,20 @@ class TestDataGenerator {
         double double_col = 10.1 * int_col;
         String date_string_col = df.format(date.getTime());
         String string_col = String.valueOf(int_col);
+        String timestamp_col = tsf.format(date.getTime());
         writer.format("%d,%b,%s,%s,%s,%s,", id, bool_col,
             (writeNulls && tinyint_col == 0 ? "" : Byte.toString(tinyint_col)),
             (writeNulls && smallint_col == 0 ? "" : Short.toString(smallint_col)),
             (writeNulls && int_col == 0 ? "" : Integer.toString(int_col)),
             (writeNulls && bigint_col == 0 ? "" : Long.toString(bigint_col)));
-        writer.format("%s,%s,%s,%s\n",
+        writer.format("%s,%s,%s,%s,%s\n",
             (writeNulls && int_col == 0 ? "" : Float.toString(float_col)),
             (writeNulls && int_col == 0 ? "" : Double.toString(double_col)),
-            date_string_col, string_col);
+            date_string_col, string_col, timestamp_col);
         ++id;
         ++count;
+        date.add(Calendar.MINUTE, 1);
+        date.add(Calendar.MILLISECOND, (int)bigint_col);
       }
       date.add(Calendar.DAY_OF_MONTH, 1);
     }

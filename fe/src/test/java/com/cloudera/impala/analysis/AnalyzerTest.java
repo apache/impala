@@ -281,6 +281,12 @@ public class AnalyzerTest {
     AnalyzesOk("select * from alltypes, testdb1.alltypes");
   }
 
+  @Test public void TestTimestampValueExprs() {
+   AnalyzesOk("select cast (0 as timestamp)");
+   AnalyzesOk("select cast (0.1 as timestamp)");
+   AnalyzesOk("select cast ('1970-10-10 10:00:00.123' as timestamp)");
+  }
+
   @Test public void TestBooleanValueExprs() {
     // Test predicates in where clause.
     AnalyzesOk("select * from AllTypes where true");
@@ -492,15 +498,12 @@ public class AnalyzerTest {
         "aggregate function cannot contain aggregate parameters");
 
     // wrong type
-    // TODO: uncomment tests as soon as we have date-related types
-    //AnalysisError("select sum(date_col) from alltypes", "SUM requires a numeric parameter");
-    //AnalysisError("select avg(date_col) from alltypes", "AVG requires a numeric parameter");
-    //AnalysisError("select sum(datetime_col) from alltypes", "SUM requires a numeric parameter");
-    //AnalysisError("select avg(datetime_col) from alltypes", "AVG requires a numeric parameter");
-    //AnalysisError("select sum(timestamp_col) from alltypes", "SUM requires a numeric parameter");
-    //AnalysisError("select avg(timestamp_col) from alltypes", "AVG requires a numeric parameter");
-    AnalysisError("select sum(string_col) from alltypes", "SUM requires a numeric parameter");
-    AnalysisError("select avg(string_col) from alltypes", "AVG requires a numeric parameter");
+    AnalysisError("select sum(timestamp_col) from alltypes",
+                  "SUM requires a numeric parameter: SUM(timestamp_col)");
+    AnalysisError("select sum(string_col) from alltypes",
+                  "SUM requires a numeric parameter: SUM(string_col)");
+    AnalysisError("select avg(string_col) from alltypes",
+                  "AVG requires a numeric or timestamp parameter: AVG(string_col)");
   }
 
   @Test
@@ -658,7 +661,7 @@ public class AnalyzerTest {
     AnalyzesOk("select 1 | '" + Long.toString(Long.MAX_VALUE) + "'");
     // Numeric overflow
     AnalysisError("select * from alltypes where tinyint_col = " +
-    		"'" + Long.toString(Long.MIN_VALUE) + "1'");
+                "'" + Long.toString(Long.MIN_VALUE) + "1'");
     AnalysisError("select * from alltypes where tinyint_col = " +
         "'" + Long.toString(Long.MAX_VALUE) + "1'");
     AnalysisError("select * from alltypes where tinyint_col = " +
@@ -845,7 +848,7 @@ public class AnalyzerTest {
   }
 
   // TODO: re-enable tests as soon as we have date-related types
-  //@Test
+  // @Test
   public void DoNotTestStringLiteralToDateCasts() {
     // positive tests are included in TestComparisonTypeCasts
     AnalysisError("select int_col from alltypes where date_col = 'ABCD'",
@@ -921,28 +924,28 @@ public class AnalyzerTest {
     AnalyzesOk("insert " + qualifier + " table alltypessmall " +
         "partition (year, month)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, year, month from alltypes");
+        "float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypes");
     // Fully dynamic partitions. Order of corresponding select list items doesn't matter, as long as
     // they appear at the very end of the select list.
     AnalyzesOk("insert " + qualifier + " table alltypessmall " +
         "partition (year, month)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, month, year from alltypes");
+        "float_col, double_col, date_string_col, string_col, timestamp_col, month, year from alltypes");
     // Partially dynamic partitions.
     AnalyzesOk("insert " + qualifier + " table alltypessmall " +
         "partition (year=2009, month)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, month from alltypes");
+        "float_col, double_col, date_string_col, string_col, timestamp_col, month from alltypes");
     // Partially dynamic partitions.
     AnalyzesOk("insert " + qualifier + " table alltypessmall " +
         "partition (year, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, year from alltypes");
+        "float_col, double_col, date_string_col, string_col, timestamp_col, year from alltypes");
     // No corresponding select list items of fully dynamic partitions.
     AnalysisError("insert " + qualifier + " table alltypessmall " +
         "partition (year, month)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col from alltypes",
+        "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes",
         "No matching select list item found for dynamic partition 'year'.\n" +
         "The select list items corresponding to dynamic partition keys " +
         "must be at the end of the select list.");
@@ -950,7 +953,7 @@ public class AnalyzerTest {
     AnalysisError("insert " + qualifier + " table alltypessmall " +
         "partition (year=2009, month)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col from alltypes",
+        "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes",
         "No matching select list item found for dynamic partition 'month'.\n" +
         "The select list items corresponding to dynamic partition keys " +
         "must be at the end of the select list.");
@@ -958,7 +961,7 @@ public class AnalyzerTest {
     AnalysisError("insert " + qualifier + " table alltypessmall " +
         "partition (year, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col from alltypes",
+        "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes",
         "No matching select list item found for dynamic partition 'year'.\n" +
         "The select list items corresponding to dynamic partition keys " +
         "must be at the end of the select list.");
@@ -966,13 +969,13 @@ public class AnalyzerTest {
     AnalysisError("insert " + qualifier + " table alltypessmall partition (year=2009, month=4)" +
         "select * from alltypes",
         "Target table 'alltypessmall' and result of select statement are not union compatible.\n" +
-        "Target table expects 10 columns but the select statement returns 12.");
+        "Target table expects 11 columns but the select statement returns 13.");
     // Select '*' includes partitioning columns
     // but they don't appear at the end of the select list.
     AnalysisError("insert " + qualifier + " table alltypessmall partition (year, month)" +
         "select * from alltypes",
-        "Inserting into target table 'alltypessmall' may result in loss of precision.\n" +
-        "Would need to cast 'alltypes.month' to 'BOOLEAN'.");
+        "Target table 'alltypessmall' and result of select statement are not union compatible.\n" +
+        "Incompatible types 'INT' and 'TIMESTAMP' in column 'alltypes.timestamp_col'.");
   }
 
   /**
@@ -996,74 +999,74 @@ public class AnalyzerTest {
     AnalyzesOk("insert " + qualifier + " table alltypessmall " +
         "partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col from alltypes");
+        "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes");
     // Union compatibility requires cast of select list expr in column 5 (int_col -> bigint).
     AnalyzesOk("insert " + qualifier + " table alltypessmall " +
         "partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, int_col, " +
-        "float_col, float_col, date_string_col, string_col from alltypes");
+        "float_col, float_col, date_string_col, string_col, timestamp_col from alltypes");
     // No partition clause given for partitioned table.
     AnalysisError("insert " + qualifier + " table alltypessmall " +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col from alltypes",
+        "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes",
         "No PARTITION clause given for insertion into partitioned table 'alltypessmall'.");
     // Not union compatible, unequal number of columns.
     AnalysisError("insert " + qualifier + " table alltypessmall " +
         "partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col from alltypes",
+        "float_col, double_col, date_string_col, timestamp_col from alltypes",
         "Target table 'alltypessmall' and result of select statement are not union compatible.\n" +
-        "Target table expects 10 columns but the select statement returns 9.");
+        "Target table expects 11 columns but the select statement returns 10.");
     // Not union compatible, incompatible type in last column (bool_col -> string).
     AnalysisError("insert " + qualifier + " table alltypessmall " +
         "partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, bool_col from alltypes",
+        "float_col, double_col, date_string_col, bool_col, timestamp_col from alltypes",
         "Target table 'alltypessmall' and result of select statement are not union compatible.\n" +
         "Incompatible types 'STRING' and 'BOOLEAN' in column 'bool_col'.");
     // Too many partitioning columns.
     AnalysisError("insert " + qualifier + " table alltypessmall " +
         "partition (year=2009, month=4, year=10)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col from alltypes",
+        "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes",
         "Superfluous columns in PARTITION clause: year.");
     // Too few partitioning columns.
     AnalysisError("insert " + qualifier + " table alltypessmall " +
         "partition (year=2009)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col from alltypes",
+        "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes",
         "Missing partition column 'month' from PARTITION clause.");
     // Non-partitioning column in partition clause.
     AnalysisError("insert " + qualifier + " table alltypessmall " +
         "partition (year=2009, bigint_col=10)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col from alltypes",
+        "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes",
         "Missing partition column 'month' from PARTITION clause.");
     // Overwrite a non-existent partition.
     // TODO: Eventually, we want to allow adding new partitions, but not for now.
     AnalysisError("insert " + qualifier + " table alltypessmall " +
         "partition (year=2009, month=10)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col from alltypes",
+        "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes",
         "PARTITION clause specifies a non-existent partition.\n" +
         "Can only insert or overwrite an existing partition.");
     // Partition clause given for insertion into HBase table.
     AnalysisError("insert " + qualifier + " table hbasealltypessmall " +
         "partition (year=2009, bigint_col=10)" +
         "select bool_col, double_col, float_col, bigint_col, int_col, " +
-        "smallint_col, tinyint_col, date_string_col, string_col from alltypes",
+        "smallint_col, tinyint_col, date_string_col, string_col, timestamp_col from alltypes",
         "PARTITION clause is not allowed for HBase tables.");
     // Loss of precision when casting in column 6 (double_col -> float).
     AnalysisError("insert " + qualifier + " table alltypessmall partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "double_col, double_col, date_string_col, string_col from alltypes",
+        "double_col, double_col, date_string_col, string_col, timestamp_col from alltypes",
         "Inserting into target table 'alltypessmall' may result in loss of precision.\n" +
         "Would need to cast 'double_col' to 'FLOAT'.");
     // Select '*' includes partitioning columns, and hence, is not union compatible.
     AnalysisError("insert " + qualifier + " table alltypessmall partition (year=2009, month=4)" +
         "select * from alltypes",
         "Target table 'alltypessmall' and result of select statement are not union compatible.\n" +
-        "Target table expects 10 columns but the select statement returns 12.");
+        "Target table expects 11 columns but the select statement returns 13.");
   }
 
   /**
