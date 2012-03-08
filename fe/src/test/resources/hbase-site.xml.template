@@ -23,7 +23,23 @@
 -->
 <configuration>
   <property>
-      <name>hbase.rootdir</name>
-      <value>file:///${IMPALA_FE_DIR}/target/test-hbase</value>
+    <name>hbase.rootdir</name>
+    <value>hdfs://localhost:20500/hbase</value>
+    <description>The directory shared by RegionServers.
+    </description>
+  </property>
+  <property>
+    <name>dfs.replication</name>
+    <value>1</value>
+    <description>The replication count for HLog and HFile storage. Should not be greater than HDFS datanode count.
+    </description>
+  </property>
+  <property>
+    <name>hbase.cluster.distributed</name>
+    <value>true</value>
+    <description>The mode the cluster will be in. Possible values are
+      false: standalone and pseudo-distributed setups with managed Zookeeper
+      true: fully-distributed with unmanaged Zookeeper Quorum (see hbase-env.sh)
+    </description>
   </property>
 </configuration>

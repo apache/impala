@@ -502,23 +502,13 @@
                 </goals>
                 <configuration>
                   <target>
-                    <exec executable="${env.IMPALA_HOME}/testdata/bin/kill-mini-dfs.sh">
+                    <!-- start HDFS and HBase clean -->
+                    <exec executable="${env.IMPALA_HOME}/testdata/bin/run-all.sh">
                     </exec>
-                    <exec executable="${env.HBASE_HOME}/bin/start-hbase.sh">
+                    <!-- create HBase tables, load some hbase table data -->
+                    <exec executable="${env.IMPALA_HOME}/testdata/bin/create-hbase.sh">
                     </exec>
-                    <exec executable="${env.HBASE_HOME}/bin/hbase">
-                      <arg value="shell"/>
-                            <arg value="${project.basedir}/../testdata/bin/create.hbase"/>
-                    </exec>
-                    <!-- We don't want to kill the mini-dfs cluster.
-                         Starting another mini-dfs cluster when one is running will
-                         make run-mini-dfs.sh hang for 2 minutes, so that script proactively tries
-                         to kill all running mini-dfs clusters when it starts
-                    <exec executable="${env.IMPALA_HOME}/testdata/bin/kill-mini-dfs.sh">
-                    </exec>
-                    -->
-                    <exec executable="${env.IMPALA_HOME}/testdata/bin/run-mini-dfs.sh">
-                    </exec>
+                    <!-- load Hive build in, create Hive table and load Hive data -->
                     <exec executable="${env.IMPALA_HOME}/testdata/bin/load-hive-builtins.sh">
                     </exec>
                     <exec executable="${env.HIVE_HOME}/bin/hive">
@@ -535,19 +525,10 @@
                       <arg value="-f"/>
                       <arg value="${project.basedir}/../testdata/bin/load.sql"/>
                     </exec>
-                    <exec executable="${env.HBASE_HOME}/bin/hbase">
-                      <arg value="shell"/>
-                      <arg value="${project.basedir}/../testdata/HBaseAllTypesError/hbasealltypeserror.hbase"/>
-                    </exec>
-                    <exec executable="${env.HBASE_HOME}/bin/hbase">
-                      <arg value="shell"/>
-                      <arg value="${project.basedir}/../testdata/HBaseAllTypesErrorNoNulls/hbasealltypeserrornonulls.hbase"/>
-                    </exec>
-                    <!-- We do not want to stop HBase, 
-                         so the tests that need a running HBase can pass.
-                         Starting HBase when it is already running
-                         will result in a negligible warning.
-                    <exec executable="${env.HBASE_HOME}/bin/stop-hbase.sh">
+                    <!-- split HBase tables -->
+                    <!-- CDH-4771: splitting HBase table might crash region servers. 
+                                   skip this until the issue is resolved.
+                    <exec executable="${env.IMPALA_HOME}/testdata/bin/split-hbase.sh">
                     </exec>
                     -->
                   </target>
