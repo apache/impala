@@ -13,9 +13,12 @@ add_library(Exec STATIC
   exec-node.cc
   exchange-node.cc
   hash-join-node.cc
+  hdfs-byte-stream.cc
+  hdfs-scan-node.cc
+  hdfs-scanner.cc
   hash-table.cc
-  hdfs-text-scan-node.cc
-  hdfs-rcfile-scan-node.cc
+  hdfs-rcfile-scanner.cc
+  hdfs-text-scanner.cc
   hbase-scan-node.cc
   hbase-table-scanner.cc
   text-converter.cc
@@ -28,7 +31,7 @@ target_link_libraries(Exec
   Runtime
 )
 
-target_link_libraries(Exec 
+target_link_libraries(Exec
   ${JAVA_JVM_LIBRARY}
   ${HDFS_LIBS}
 )

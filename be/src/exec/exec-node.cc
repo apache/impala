@@ -10,8 +10,7 @@
 #include "exprs/expr.h"
 #include "exec/aggregation-node.h"
 #include "exec/hash-join-node.h"
-#include "exec/hdfs-text-scan-node.h"
-#include "exec/hdfs-rcfile-scan-node.h"
+#include "exec/hdfs-scan-node.h"
 #include "exec/hbase-scan-node.h"
 #include "exec/exchange-node.h"
 #include "exec/topn-node.h"
@@ -42,7 +41,7 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
 
 Status ExecNode::Prepare(RuntimeState* state) {
   DCHECK(runtime_profile_.get() != NULL);
-  rows_returned_counter_ = 
+  rows_returned_counter_ =
     ADD_COUNTER(runtime_profile_, "RowsReturned", TCounterType::UNIT);
 
   PrepareConjuncts(state);
@@ -113,10 +112,8 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
   std::stringstream error_msg;
   switch (tnode.node_type) {
     case TPlanNodeType::HDFS_TEXT_SCAN_NODE:
-      *node = pool->Add(new HdfsTextScanNode(pool, tnode, descs));
-      return Status::OK;
     case TPlanNodeType::HDFS_RCFILE_SCAN_NODE:
-      *node = pool->Add(new HdfsRCFileScanNode(pool, tnode, descs));
+      *node = pool->Add(new HdfsScanNode(pool, tnode, descs));
       return Status::OK;
     case TPlanNodeType::HBASE_SCAN_NODE:
       *node = pool->Add(new HBaseScanNode(pool, tnode, descs));

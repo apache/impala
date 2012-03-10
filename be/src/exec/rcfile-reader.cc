@@ -10,9 +10,9 @@
 #include <sstream>
 #include <stdint.h>
 #include <glog/logging.h>
-#include <hdfs.h>
 
 #include "common/status.h"
+#include "exec/hdfs-scan-node.h"
 
 using namespace std;
 using namespace impala;
@@ -58,21 +58,22 @@ void RCFileRowGroup::SetSyncHash(const std::vector<char>* sync_hash) {
   sync_hash_ = sync_hash;
 }
 
-Status RCFileRowGroup::ReadHeader(hdfsFS fs, hdfsFile file) {
-  RETURN_IF_ERROR(SerDeUtils::ReadInt(fs, file, &record_length_));
+Status RCFileRowGroup::ReadHeader(ByteStream* byte_stream) {
+  RETURN_IF_ERROR(SerDeUtils::ReadInt(byte_stream, &record_length_));
   if (record_length_ == RCFileReader::SYNC_MARKER) {
-    RETURN_IF_ERROR(ReadSync(fs, file));
-    RETURN_IF_ERROR(SerDeUtils::ReadInt(fs, file, &record_length_));
+    RETURN_IF_ERROR(ReadSync(byte_stream));
+    RETURN_IF_ERROR(SerDeUtils::ReadInt(byte_stream, &record_length_));
   }
-  RETURN_IF_ERROR(SerDeUtils::ReadInt(fs, file, &key_length_));
-  RETURN_IF_ERROR(SerDeUtils::ReadInt(fs, file, &compressed_key_length_));
-  RETURN_IF_ERROR(SerDeUtils::ReadVInt(fs, file, &num_rows_));
+  RETURN_IF_ERROR(SerDeUtils::ReadInt(byte_stream, &key_length_));
+  RETURN_IF_ERROR(SerDeUtils::ReadInt(byte_stream, &compressed_key_length_));
+  RETURN_IF_ERROR(SerDeUtils::ReadVInt(byte_stream, &num_rows_));
   return Status::OK;
 }
 
-Status RCFileRowGroup::ReadSync(hdfsFS fs, hdfsFile file) {
+Status RCFileRowGroup::ReadSync(ByteStream* byte_stream) {
   vector<char> hash;
-  RETURN_IF_ERROR(SerDeUtils::ReadBytes(fs, file, RCFileReader::SYNC_HASH_SIZE, &hash));
+  RETURN_IF_ERROR(SerDeUtils::ReadBytes(byte_stream, RCFileReader::SYNC_HASH_SIZE,
+                                        &hash));
   if (sync_hash_ == NULL) {
     return Status("Sync hash has not been set for this RowGroup!");
   }
@@ -91,55 +92,61 @@ Status RCFileRowGroup::ReadSync(hdfsFS fs, hdfsFile file) {
   return Status::OK;
 }
 
-Status RCFileRowGroup::ReadKeyBuffers(hdfsFS fs, hdfsFile file) {
+Status RCFileRowGroup::ReadKeyBuffers(ByteStream* byte_stream) {
   for (int col_idx = 0; col_idx < num_cols_; ++col_idx) {
-    RETURN_IF_ERROR(ReadCurrentKeyBuffer(fs, file, col_idx, !column_read_mask_[col_idx]));
+    RETURN_IF_ERROR(ReadCurrentKeyBuffer(byte_stream, col_idx,
+                                         !column_read_mask_[col_idx]));
   }
   return Status::OK;
 }
 
-Status RCFileRowGroup::ReadCurrentKeyBuffer(hdfsFS fs, hdfsFile file, int col_idx,
+Status RCFileRowGroup::ReadCurrentKeyBuffer(ByteStream* byte_stream, int col_idx,
                                             bool skip_col_data) {
   int col_key_buf_len;
-  RETURN_IF_ERROR(SerDeUtils::ReadVInt(fs, file, &(col_buf_len_[col_idx])));
-  RETURN_IF_ERROR(SerDeUtils::ReadVInt(fs, file, &(col_buf_uncompressed_len_[col_idx])));
-  RETURN_IF_ERROR(SerDeUtils::ReadVInt(fs, file, &col_key_buf_len));
+  RETURN_IF_ERROR(SerDeUtils::ReadVInt(byte_stream, &(col_buf_len_[col_idx])));
+  RETURN_IF_ERROR(SerDeUtils::ReadVInt(byte_stream,
+                                       &(col_buf_uncompressed_len_[col_idx])));
+  RETURN_IF_ERROR(SerDeUtils::ReadVInt(byte_stream, &col_key_buf_len));
   if (skip_col_data) {
     // TODO: Figure out why this call to SkipBytes is causing a SIGSEGV in JNI
-    //RETURN_IF_ERROR(SerDeUtils::SkipBytes(fs, file, col_key_buf_len));
+    //RETURN_IF_ERROR(SerDeUtils::SkipBytes(byte_stream, col_key_buf_len));
     col_key_bufs_[col_idx].resize(col_key_buf_len);
-    RETURN_IF_ERROR(SerDeUtils::ReadBytes(fs, file, col_key_buf_len, &(col_key_bufs_[col_idx])));    
+    RETURN_IF_ERROR(SerDeUtils::ReadBytes(byte_stream, col_key_buf_len,
+                                          &(col_key_bufs_[col_idx])));
   } else {
     // TODO: Stream through these key buffers instead of reading everything in at once.
     col_key_bufs_[col_idx].resize(col_key_buf_len);
-    RETURN_IF_ERROR(SerDeUtils::ReadBytes(fs, file, col_key_buf_len, &(col_key_bufs_[col_idx])));    
+    RETURN_IF_ERROR(SerDeUtils::ReadBytes(byte_stream, col_key_buf_len,
+                                          &(col_key_bufs_[col_idx])));
   }
   return Status::OK;
 }
 
-Status RCFileRowGroup::ReadColumnBuffers(hdfsFS fs, hdfsFile file) {
+Status RCFileRowGroup::ReadColumnBuffers(ByteStream* byte_stream) {
   for (int col_idx = 0; col_idx < num_cols_; ++col_idx) {
-    RETURN_IF_ERROR(ReadCurrentColumnBuffer(fs, file, col_idx, !column_read_mask_[col_idx]));
+    RETURN_IF_ERROR(ReadCurrentColumnBuffer(byte_stream, col_idx,
+                                            !column_read_mask_[col_idx]));
   }
   return Status::OK;
 }
 
-Status RCFileRowGroup::ReadCurrentColumnBuffer(hdfsFS fs, hdfsFile file, int col_idx,
+Status RCFileRowGroup::ReadCurrentColumnBuffer(ByteStream* byte_stream, int col_idx,
                                                bool skip_col_data) {
   if (skip_col_data) {
-    return SerDeUtils::SkipBytes(fs, file, col_buf_len_[col_idx]);
+    return SerDeUtils::SkipBytes(byte_stream, col_buf_len_[col_idx]);
   } else {
     // TODO: Stream through these column buffers instead of reading everything in at once.
-    return SerDeUtils::ReadBytes(fs, file, col_buf_len_[col_idx], &(col_bufs_[col_idx]));
+    return SerDeUtils::ReadBytes(byte_stream, col_buf_len_[col_idx],
+                                 &(col_bufs_[col_idx]));
   }
 }
 
-Status RCFileRowGroup::ReadNext(hdfsFS fs, hdfsFile file) {
+Status RCFileRowGroup::ReadNext(ByteStream* byte_stream) {
   num_rows_ = 0;
   row_pos_ = 0;
-  RETURN_IF_ERROR(ReadHeader(fs, file));
-  RETURN_IF_ERROR(ReadKeyBuffers(fs, file));
-  RETURN_IF_ERROR(ReadColumnBuffers(fs, file));
+  RETURN_IF_ERROR(ReadHeader(byte_stream));
+  RETURN_IF_ERROR(ReadKeyBuffers(byte_stream));
+  RETURN_IF_ERROR(ReadColumnBuffers(byte_stream));
   return Status::OK;
 }
 
@@ -227,69 +234,23 @@ const char* const RCFileReader::RCFILE_METADATA_KEY_NUM_COLS =
 const uint8_t RCFileReader::RCFILE_VERSION_HEADER[4] = {'S', 'E', 'Q', 6};
 
 
-RCFileReader::RCFileReader(hdfsFS fs, std::vector<std::string> files,
-                           const std::vector<bool>& column_read_mask)
-  : fs_(fs),
-    files_(files),
+RCFileReader::RCFileReader(const std::vector<bool>& column_read_mask,
+                           ByteStream* byte_stream)
+  : byte_stream_(byte_stream),
     column_read_mask_(column_read_mask),
-    cur_file_idx_(-1),
     row_group_idx_(-1),
-    file_(NULL),
     num_cols_(column_read_mask.size()) {
-}
-
-RCFileReader::~RCFileReader() {
-  if (file_ != NULL) {
-    hdfsCloseFile(fs_, file_);
-  }
 }
 
 RCFileRowGroup* RCFileReader::NewRCFileRowGroup() {
   return new RCFileRowGroup(column_read_mask_);
 }
 
-Status RCFileReader::OpenNextFile() {
-  if (file_ != NULL) {
-    hdfsCloseFile(fs_, file_);
-    file_ = NULL;
-  }
-  ++cur_file_idx_;
-  row_group_idx_ = -1;
-
-  if (cur_file_idx_ >= files_.size()) return Status::OK;
-
-  file_ = hdfsOpenFile(fs_, files_[cur_file_idx_].c_str(), O_RDONLY, 0, 0, 0);
-  if (file_ == NULL) {
-    std::stringstream ss;
-    ss << "Unable to open file '" << files_[cur_file_idx_] << "'";
-    return Status(ss.str());
-  }
-
-  RETURN_IF_ERROR(GetFileLength(&file_len_));
-  RETURN_IF_ERROR(ReadFileHeader());
-  return Status::OK;
-}
-
-Status RCFileReader::GetFileLength(int* length) {
-  hdfsFileInfo* f_info = hdfsGetPathInfo(fs_, files_[cur_file_idx_].c_str());
-  if (f_info == NULL) {
-    std::stringstream ss;
-    ss << "Unable to determine length of file '" << files_[cur_file_idx_] << "'";
-    return Status(ss.str());
-  }
-  *length = f_info->mSize;
-  hdfsFreeFileInfo(f_info, 1);
-  return Status::OK;
-}
-
-long RCFileReader::GetPosition() {
-  return hdfsTell(fs_, file_);
-}
-
 Status RCFileReader::ReadFileHeader() {
   vector<char> buf;
-  
-  RETURN_IF_ERROR(SerDeUtils::ReadBytes(fs_, file_, sizeof(RCFILE_VERSION_HEADER), &buf));
+
+  RETURN_IF_ERROR(SerDeUtils::ReadBytes(byte_stream_, sizeof(RCFILE_VERSION_HEADER),
+                                        &buf));
   if (memcmp(&buf[0], RCFILE_VERSION_HEADER, sizeof(RCFILE_VERSION_HEADER))) {
     std::stringstream ss;
     ss << "Invalid RCFILE_VERSION_HEADER: '"
@@ -297,7 +258,7 @@ Status RCFileReader::ReadFileHeader() {
     return Status(ss.str());
   }
 
-  RETURN_IF_ERROR(SerDeUtils::ReadText(fs_, file_, &buf));
+  RETURN_IF_ERROR(SerDeUtils::ReadText(byte_stream_, &buf));
   if (strncmp(&buf[0], RCFileReader::RCFILE_KEY_CLASS_NAME,
               strlen(RCFileReader::RCFILE_KEY_CLASS_NAME))) {
     std::stringstream ss;
@@ -307,7 +268,7 @@ Status RCFileReader::ReadFileHeader() {
     return Status(ss.str());
   }
 
-  RETURN_IF_ERROR(SerDeUtils::ReadText(fs_, file_, &buf));
+  RETURN_IF_ERROR(SerDeUtils::ReadText(byte_stream_, &buf));
   if (strncmp(&buf[0], RCFileReader::RCFILE_VALUE_CLASS_NAME,
               strlen(RCFileReader::RCFILE_VALUE_CLASS_NAME))) {
     std::stringstream ss;
@@ -317,25 +278,25 @@ Status RCFileReader::ReadFileHeader() {
     return Status(ss.str());
   }
 
-  RETURN_IF_ERROR(SerDeUtils::ReadBoolean(fs_, file_, &is_compressed_));
+  RETURN_IF_ERROR(SerDeUtils::ReadBoolean(byte_stream_, &is_compressed_));
 
   // Read the is_blk_compressed header field. This field should *always*
   // be FALSE, and is the result of a defect in the original RCFile
   // implementation contained in Hive.
   bool is_blk_compressed;
-  RETURN_IF_ERROR(SerDeUtils::ReadBoolean(fs_, file_, &is_blk_compressed));
+  RETURN_IF_ERROR(SerDeUtils::ReadBoolean(byte_stream_, &is_blk_compressed));
   if (is_blk_compressed) {
     std::stringstream ss;
     ss << "Encountered is_blk_compressed=TRUE in file '"
-       << files_[cur_file_idx_] << "'";
+       << byte_stream_->GetLocation() << "'";
     return Status(ss.str());
   }
 
   if (is_compressed_) {
-    RETURN_IF_ERROR(SerDeUtils::ReadText(fs_, file_, &compression_codec_));
+    RETURN_IF_ERROR(SerDeUtils::ReadText(byte_stream_, &compression_codec_));
     return Status("Compressed RCFiles are not currently supported!");
   }
-  
+
   RETURN_IF_ERROR(ReadFileHeaderMetadata());
   RETURN_IF_ERROR(ReadSync());
   return Status::OK;
@@ -346,11 +307,11 @@ Status RCFileReader::ReadFileHeaderMetadata() {
   vector<char> key;
   vector<char> value;
 
-  RETURN_IF_ERROR(SerDeUtils::ReadInt(fs_, file_, &map_size));
+  RETURN_IF_ERROR(SerDeUtils::ReadInt(byte_stream_, &map_size));
 
   for (int i = 0; i < map_size; ++i) {
-    RETURN_IF_ERROR(SerDeUtils::ReadText(fs_, file_, &key));
-    RETURN_IF_ERROR(SerDeUtils::ReadText(fs_, file_, &value));
+    RETURN_IF_ERROR(SerDeUtils::ReadText(byte_stream_, &key));
+    RETURN_IF_ERROR(SerDeUtils::ReadText(byte_stream_, &value));
 
     if (!strncmp(&key[0], RCFileReader::RCFILE_METADATA_KEY_NUM_COLS,
                  strlen(RCFileReader::RCFILE_METADATA_KEY_NUM_COLS))) {
@@ -365,23 +326,34 @@ Status RCFileReader::ReadFileHeaderMetadata() {
 }
 
 Status RCFileReader::ReadSync() {
-  RETURN_IF_ERROR(SerDeUtils::ReadBytes(fs_, file_, SYNC_HASH_SIZE, &sync_));
+  RETURN_IF_ERROR(SerDeUtils::ReadBytes(byte_stream_, SYNC_HASH_SIZE, &sync_));
   return Status::OK;
 }
 
-Status RCFileReader::ReadNextRowGroup(RCFileRowGroup* row_group) {
+Status RCFileReader::InitCurrentScanRange(HdfsScanRange* scan_range) {
+  byte_stream_->Seek(0L);
+  RETURN_IF_ERROR(ReadFileHeader());
+  // TODO: Respect scan range start / end?
+  //  RETURN_IF_ERROR(byte_stream_->Seek(scan_range->offset));
+  return Status::OK;
+}
+
+RCFileReader::~RCFileReader() {
+}
+
+Status RCFileReader::ReadRowGroup(RCFileRowGroup* row_group, HdfsScanRange* scan_range,
+                                  bool* eosr) {
   row_group->Reset();
   row_group->SetSyncHash(&sync_);
 
+  row_group_idx_ = -1;
   while (row_group->num_rows() == 0) {
-    if (file_ == NULL) {
-      RETURN_IF_ERROR(OpenNextFile());
-      if (file_ == NULL) break;
-    }
-    RETURN_IF_ERROR(row_group->ReadNext(fs_, file_));
-    if (GetPosition() >= file_len_) {
-      hdfsCloseFile(fs_, file_);
-      file_ = NULL;
+    RETURN_IF_ERROR(row_group->ReadNext(byte_stream_));
+    int64_t position;
+    RETURN_IF_ERROR(byte_stream_->GetPosition(&position));
+    if (position >= scan_range->length) {
+      *eosr = true;
+      return Status::OK;
     }
   }
   return Status::OK;

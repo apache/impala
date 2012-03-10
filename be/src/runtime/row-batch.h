@@ -16,7 +16,7 @@ namespace impala {
 
 class TupleDescriptor;
 
-// A RowBatch encapsulates a batch of rows, each composed of a number of tuples. 
+// A RowBatch encapsulates a batch of rows, each composed of a number of tuples.
 // The maximum number of rows is fixed at the time of construction, and the caller
 // can add rows up to that capacity.
 // TODO: stick tuple_ptrs_ into a pool?

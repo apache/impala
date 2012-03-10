@@ -17,6 +17,8 @@
 
 namespace impala {
 
+struct HdfsScanRange;
+
 // org.apache.hadoop.hive.ql.io.RCFile is the original RCFile implementation
 // and should be viewed as the canonical definition of this format. If
 // anything is unclear in this file you should consult the code in
@@ -28,7 +30,7 @@ namespace impala {
 // rcfile ::=
 //   <file-header>
 //   <rcfile-rowgroup>+
-// 
+//
 // file-header ::=
 //   <file-version-header>
 //   <file-key-class-name>
@@ -106,7 +108,7 @@ namespace impala {
 //   <rowgroup-header>
 //   <rowgroup-key-buffers>
 //   <rowgroup-column-buffers>
-// 
+//
 // rowgroup-header ::=
 //   [<rowgroup-sync-marker>, <rowgroup-sync-hash>]
 //   <rowgroup-record-length>
@@ -183,7 +185,7 @@ namespace impala {
 // -- repetitions, so 1,1,1,2 becomes 1,~2,2.
 //
 // column-key-buffer ::= Byte[column-key-buffer-length]
-// 
+//
 // rowgroup-column-buffers ::= <rowgroup-value-buffer>+
 //
 // -- RCFile stores all column data as strings regardless of the
@@ -193,16 +195,16 @@ namespace impala {
 // -- column-key-buffer.
 //
 // rowgroup-column-buffer ::= Byte[column-buffer-length]
-// 
+//
 // Byte ::= An eight-bit byte
-// 
+//
 // VInt ::= Variable length integer. The high-order bit of each byte
 // indicates whether more bytes remain to be read. The low-order seven
 // bits are appended as increasingly more significant bits in the
 // resulting integer value.
-// 
+//
 // Int ::= A four-byte integer in big-endian format.
-// 
+//
 // Text ::= VInt, Chars (Length prefixed UTF-8 characters)
 
 
@@ -223,7 +225,7 @@ public:
   void SetSyncHash(const std::vector<char>* sync_hash);
 
   // Read the next rowgroup from file
-  Status ReadNext(hdfsFS fs, hdfsFile file);
+  Status ReadNext(ByteStream* byte_stream);
 
   // Reset the underlying key and value buffers in this rowgroup object
   void Reset();
@@ -285,7 +287,7 @@ private:
 
   // Current position in the key buffer, by column
   std::vector<int> key_buf_pos_;
-  
+
   // RLE: Length of the current field, by column
   std::vector<int> cur_field_length_;
 
@@ -299,22 +301,23 @@ private:
   std::vector<int> col_buf_pos_;
 
   // Read the rowgroup header
-  Status ReadHeader(hdfsFS fs, hdfsFile file);
+  Status ReadHeader(ByteStream* byte_stream);
 
   // Read and validate the rowgroup sync field
-  Status ReadSync(hdfsFS fs, hdfsFile file);
+  Status ReadSync(ByteStream* byte_stream);
 
   // Read the rowgroup key buffers
-  Status ReadKeyBuffers(hdfsFS fs, hdfsFile file);
+  Status ReadKeyBuffers(ByteStream* byte_stream);
 
   // Read the current key buffer
-  Status ReadCurrentKeyBuffer(hdfsFS fs, hdfsFile file, int col_idx, bool skip_col_data);
+  Status ReadCurrentKeyBuffer(ByteStream* byte_stream, int col_idx, bool skip_col_data);
 
   // Read the rowgroup column buffers
-  Status ReadColumnBuffers(hdfsFS fs, hdfsFile file);
+  Status ReadColumnBuffers(ByteStream* byte_stream);
 
   // Read the current rowgroup buffer
-  Status ReadCurrentColumnBuffer(hdfsFS fs, hdfsFile file, int col_idx, bool skip_col_data);
+  Status ReadCurrentColumnBuffer(ByteStream* byte_stream, int col_idx,
+                                 bool skip_col_data);
 
   // Look at the next field in the specified column buffer
   void NextField(int col_idx);
@@ -326,25 +329,21 @@ class RCFileReader {
 public:
   // C'tor for RCFileReader. Column i is read iff
   // column_read_mask[i-1] == true.
-  RCFileReader(hdfsFS hdfs_fs, std::vector<std::string> files,
-               const std::vector<bool>& column_read_mask);
+  RCFileReader(const std::vector<bool>& column_read_mask, ByteStream* byte_stream);
 
   ~RCFileReader();
 
   // Creates and initializes an empty RCFileRowGroup object
   // for use with this RCFileReader instance.
   RCFileRowGroup* NewRCFileRowGroup();
-  
+
   // Read the next RowGroup out of the current file and copy
   // the column values into the supplied RowGroup object.
   // If no more row groups are available for reading, then the
   // resulting RowGroup object will have zero rows.
-  Status ReadNextRowGroup(RCFileRowGroup* row_group);
+  Status ReadRowGroup(RCFileRowGroup* row_group, HdfsScanRange* scan_range, bool* eosr);
 
-  // Get the index of the file that is currently being read.
-  // Returns -1 if the first file on the input list has not yet
-  // been opened.
-  int file_idx() const { return cur_file_idx_; }
+  Status InitCurrentScanRange(HdfsScanRange* scan_range);
 
   // Get the index of the current row group in the current file.
   int row_group_idx() const { return row_group_idx_; }
@@ -353,7 +352,7 @@ public:
   int num_cols() const { return num_cols_; }
 
   friend class RCFileRowGroup;
-  
+
 private:
   // Sync indicator
   const static int SYNC_MARKER = -1;
@@ -379,32 +378,20 @@ private:
   // this is actually the same version header used by SequenceFile.
   static const uint8_t RCFILE_VERSION_HEADER[4];
 
-  // Connection to hdfs
-  hdfsFS fs_;
-
-  // List of HDFS paths to read.
-  const std::vector<std::string> files_;
+  // The byte stream from which to read raw rcfile data
+  ByteStream* byte_stream_;
 
   // The sync hash read in from the file header
   std::vector<char> sync_;
-  
+
   // The column read mask. Column i is read iff column_read_mask_[i] == true.
   const std::vector<bool>& column_read_mask_;
 
   // Compression codec specified in the RCFile Header.
   std::vector<char> compression_codec_;
-  
-  // current file index in files_
-  int cur_file_idx_;
 
   // index of the current row group in the current file
   int row_group_idx_;
-
-  // current file
-  hdfsFile file_;
-
-  // length of the current file
-  int file_len_;
 
   // true if the current RCFile is compressed
   bool is_compressed_;

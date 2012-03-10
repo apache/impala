@@ -9,6 +9,7 @@
 #include <hdfs.h>
 
 #include "common/status.h"
+#include "exec/byte-stream.h"
 
 namespace impala {
 
@@ -26,15 +27,15 @@ class SerDeUtils {
 public:
   // Read a Boolean primitive value written using Java serialization.
   // Equivalent to java.io.DataInput.readBoolean()
-  static Status ReadBoolean(hdfsFS fs, hdfsFile file, bool* boolean);
+  static Status ReadBoolean(ByteStream* byte_stream, bool* boolean);
 
   // Read an Integer primitive value written using Java serialization.
   // Equivalent to java.io.DataInput.readInt()
-  static Status ReadInt(hdfsFS fs, hdfsFile file, int32_t* integer);
+  static Status ReadInt(ByteStream* byte_stream, int32_t* integer);
 
   // Read a variable-length Long value written using Writable serialization.
   // Ref: org.apache.hadoop.io.WritableUtils.readVLong()
-  static Status ReadVLong(hdfsFS fs, hdfsFile file, int64_t* vlong);
+  static Status ReadVLong(ByteStream* byte_stream, int64_t* vlong);
 
   // Read a variable-length Long value from a byte buffer.
   static int ReadVLong(char* buf, int64_t* vlong);
@@ -45,21 +46,24 @@ public:
 
   // Read a variable length Integer value written using Writable serialization.
   // Ref: org.apache.hadoop.io.WritableUtils.readVInt()
-  static Status ReadVInt(hdfsFS fs, hdfsFile file, int32_t* vint);
+  static Status ReadVInt(ByteStream* byte_stream, int32_t* vint);
 
   // Read length bytes from an HDFS file into the supplied buffer.
-  static Status ReadBytes(hdfsFS fs, hdfsFile file, int32_t length,
+  static Status ReadBytes(ByteStream* byte_stream, int64_t length,
                           std::vector<char>* buf);
 
+  static Status ReadBytes(ByteStream* byte_stream, int64_t length,
+                         char* buf);
+
   // Skip over the next length bytes in the specified HDFS file.
-  static Status SkipBytes(hdfsFS fs, hdfsFile file, int32_t length);
+  static Status SkipBytes(ByteStream* byte_stream, int64_t length);
 
   // Read a Writable Text value from the supplied file.
   // Ref: org.apache.hadoop.io.WritableUtils.readString()
-  static Status ReadText(hdfsFS fs, hdfsFile file, std::vector<char>* text);
+  static Status ReadText(ByteStream* byte_stream, std::vector<char>* text);
 
   // Dump the first length bytes of buf to a Hex string.
-  static std::string HexDump(const char* buf, int32_t length);
+  static std::string HexDump(const char* buf, int64_t length);
 
 private:
   // Determines the sign of a VInt/VLong from the first byte.
