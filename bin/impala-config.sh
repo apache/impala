@@ -61,13 +61,11 @@ CLASSPATH=$IMPALA_FE_DIR/src/test/resources:$CLASSPATH
 
 export CLASSPATH
 
-if [[ $interactive -eq 1 || -n $IMPALA_DEBUG ]]; then
-    echo "IMPALA_HOME     = $IMPALA_HOME"
-    echo "HADOOP_HOME     = $HADOOP_HOME"
-    echo "HADOOP_CONF_DIR = $HADOOP_CONF_DIR"
-    echo "HIVE_HOME       = $HIVE_HOME"
-    echo "HIVE_CONF_DIR   = $HIVE_CONF_DIR"
-    echo "HBASE_HOME      = $HBASE_HOME"
-    echo "HBASE_CONF_DIR  = $HBASE_CONF_DIR"
-    echo "CLASSPATH       = $CLASSPATH"
-fi
+echo "IMPALA_HOME     = $IMPALA_HOME"
+echo "HADOOP_HOME     = $HADOOP_HOME"
+echo "HADOOP_CONF_DIR = $HADOOP_CONF_DIR"
+echo "HIVE_HOME       = $HIVE_HOME"
+echo "HIVE_CONF_DIR   = $HIVE_CONF_DIR"
+echo "HBASE_HOME      = $HBASE_HOME"
+echo "HBASE_CONF_DIR  = $HBASE_CONF_DIR"
+echo "CLASSPATH       = $CLASSPATH"

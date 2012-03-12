@@ -33,7 +33,10 @@ using namespace std;
 using namespace boost;
 using namespace apache::thrift::server;
 
-static scoped_ptr<TestExecEnv> test_env;
+static TestExecEnv* test_env;
+// calling the c'tor of the contained HdfsFsCache crashes
+// TODO(marcel): figure out why and fix it
+//static scoped_ptr<TestExecEnv> test_env;
 
 static void RunServer(TServer* server) {
   VLOG(1) << "started backend server thread";
@@ -64,12 +67,14 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
 
   // start backends in process, listening on ports > backend_port
   VLOG(1) << "creating test env";
-  test_env.reset(new TestExecEnv(2, FLAGS_backend_port + 1));
+  test_env = new TestExecEnv(2, FLAGS_backend_port + 1);
+  //test_env.reset(new TestExecEnv(2, FLAGS_backend_port + 1));
   VLOG(1) << "starting backends";
   test_env->StartBackends();
 
   // start one backend service for the coordinator on backend_port
-  TServer* server = StartImpalaBackendService(test_env.get(), FLAGS_backend_port);
+  TServer* server = StartImpalaBackendService(test_env, FLAGS_backend_port);
+  //TServer* server = StartImpalaBackendService(test_env.get(), FLAGS_backend_port);
   thread server_thread = thread(&RunServer, server);
 
   return JNI_VERSION_1_4;
@@ -88,6 +93,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM* vm, void* pvt) {
     return;
   }
 
+  //test_env.reset(NULL);
   // Delete all global JNI references.
   THROW_IF_ERROR(JniUtil::Cleanup(), env, impala_exc_cl);
 }
@@ -96,7 +102,8 @@ extern "C"
 JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecQuery(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_query_exec_request,
     jobject error_log, jobject file_errors, jobject result_queue) {
-  JniCoordinator coord(env, test_env.get(), error_log, file_errors, result_queue);
+  JniCoordinator coord(env, test_env, error_log, file_errors, result_queue);
+  //JniCoordinator coord(env, test_env.get(), error_log, file_errors, result_queue);
   coord.Exec(thrift_query_exec_request);
   RETURN_IF_EXC(env);
   const vector<Expr*>& select_list_exprs = coord.select_list_exprs();

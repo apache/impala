@@ -94,7 +94,6 @@ Status HdfsRCFileScanNode::Prepare(RuntimeState* state) {
   // We also set the key_idx_to_slot_idx_ to mapping for materializing partition keys.
   const std::vector<SlotDescriptor*>& slots = tuple_desc_->slots();
   for (size_t i = 0; i < slots.size(); ++i) {
-    cout << slots[i]->DebugString() << endl;
     if (!slots[i]->is_materialized()) continue;
     if (hdfs_table->IsClusteringCol(slots[i])) {
       key_idx_to_slot_idx_.push_back(make_pair(slots[i]->col_pos(), i));
