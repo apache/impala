@@ -56,7 +56,7 @@ struct TScanRange {
   2: optional list<THdfsFileSplit> hdfsFileSplits
 
   // THBaseScanNode
-  3: optional THBaseKeyRange hbaseKeyRange
+  3: optional list<THBaseKeyRange> hbaseKeyRanges
 }
 
 struct THdfsScanNode {

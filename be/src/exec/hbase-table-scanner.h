@@ -5,6 +5,7 @@
 
 #include <jni.h>
 #include <string>
+#include <sstream>
 #include <boost/scoped_ptr.hpp>
 #include "gen-cpp/PlanNodes_types.h"
 
@@ -32,10 +33,34 @@ class HBaseTableScanner {
   // and find method ids.
   static Status Init();
 
+  // HBase scan range; "" means unbounded
+  class ScanRange {
+   public:
+    ScanRange()
+      : start_key_(),
+        stop_key_() {
+    }
+
+    const std::string& start_key() const { return start_key_; }
+    const std::string& stop_key() const {return stop_key_; }
+    void set_start_key(const std::string& key) { start_key_ = key; }
+    void set_stop_key(const std::string& key) { stop_key_ = key; }
+
+    // Write debug string of this ScanRange into out.
+    void DebugString(int indentation_level, std::stringstream* out);
+
+   private:
+    std::string start_key_;
+    std::string stop_key_;
+  };
+
+  typedef std::vector<ScanRange> ScanRangeVector;
+
   // Perform a table scan, retrieving the families/qualifiers referenced in tuple_desc.
   // If start_/stop_key is not empty, is used for the corresponding role in the scan.
+  // Note: scan_range_vector cannot be modified for the duration of the scan.
   Status StartScan(const TupleDescriptor* tuple_desc,
-                   const std::string& start_key, const std::string& stop_key,
+                   const ScanRangeVector& scan_range_vector,
                    const std::vector<THBaseFilter>& filters);
 
   // Position cursor to next row. Sets has_next to true if more rows exist, false otherwise.
@@ -89,6 +114,8 @@ class HBaseTableScanner {
   static jmethodID scan_set_caching_id_;
   static jmethodID scan_add_column_id_;
   static jmethodID scan_set_filter_id_;
+  static jmethodID scan_set_start_row_id_;
+  static jmethodID scan_set_stop_row_id_;
   static jmethodID resultscanner_next_id_;
   static jmethodID resultscanner_close_id_;
   static jmethodID result_get_bytes_id_;
@@ -113,6 +140,10 @@ class HBaseTableScanner {
 
   // HBaseConfiguration instance from runtime state.
   jobject hbase_conf_;
+
+  // Vector of ScanRange
+  const ScanRangeVector* scan_range_vector_;
+  int current_scan_range_idx_; // the index of the current scan range
 
   // Instances related to scanning a table. Set in StartScan().
   jobject htable_;        // Java type HTable
@@ -162,6 +193,13 @@ class HBaseTableScanner {
 
   // Turn string s into java byte array.
   Status CreateByteArray(const std::string& s, jbyteArray* bytes);
+
+  // First time scanning the table, do some setup
+  Status ScanSetup(const TupleDescriptor* tuple_desc,
+                   const std::vector<THBaseFilter>& filters);
+
+  // Initialize the scan to the given range
+  Status InitScanRange(const ScanRange& scan_range);
 };
 
 }

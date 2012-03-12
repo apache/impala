@@ -20,8 +20,6 @@ HBaseScanNode::HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode,
       tuple_id_(tnode.hbase_scan_node.tuple_id),
       tuple_desc_(NULL),
       tuple_idx_(0),
-      start_key_(),
-      stop_key_(),
       filters_(tnode.hbase_scan_node.filters),
       num_errors_(0),
       tuple_pool_(new MemPool()),
@@ -84,7 +82,7 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
 
 Status HBaseScanNode::Open(RuntimeState* state) {
   COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
-  return hbase_scanner_->StartScan(tuple_desc_, start_key_, stop_key_, filters_);
+  return hbase_scanner_->StartScan(tuple_desc_, scan_range_vector_, filters_);
 }
 
 void HBaseScanNode::WriteTextSlot(
@@ -222,11 +220,10 @@ Status HBaseScanNode::Close(RuntimeState* state) {
 void HBaseScanNode::DebugString(int indentation_level, stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
   *out << "HBaseScanNode(tupleid=" << tuple_id_ << " table=" << table_name_;
-  if (!start_key_.empty()) {
-    *out << " start_key=" << start_key_;
-  }
-  if (!stop_key_.empty()) {
-    *out << " stop_key=" << stop_key_;
+  for(int i = 0; i < scan_range_vector_.size(); i++) {
+    *out << " region(" << i << "):";
+    HBaseTableScanner::ScanRange scan_range = scan_range_vector_[i];
+    scan_range.DebugString(0, out);
   }
   *out << ")" << endl;
   for (int i = 0; i < children_.size(); ++i) {
@@ -235,12 +232,16 @@ void HBaseScanNode::DebugString(int indentation_level, stringstream* out) const 
 }
 
 void HBaseScanNode::SetScanRange(const TScanRange& scan_range) {
-  if (!scan_range.__isset.hbaseKeyRange) return;
-  const THBaseKeyRange& key_range = scan_range.hbaseKeyRange;
-  if (key_range.__isset.startKey) {
-    start_key_ = key_range.startKey;
-  }
-  if (key_range.__isset.stopKey) {
-    stop_key_ = key_range.stopKey;
+  DCHECK(scan_range.__isset.hbaseKeyRanges);
+  for(int i = 0; i < scan_range.hbaseKeyRanges.size(); i++) {
+    const THBaseKeyRange& key_range = scan_range.hbaseKeyRanges[i];
+    scan_range_vector_.push_back(HBaseTableScanner::ScanRange());
+    HBaseTableScanner::ScanRange& sr = scan_range_vector_.back();
+    if (key_range.__isset.startKey) {
+      sr.set_start_key(key_range.startKey);
+    }
+    if (key_range.__isset.stopKey) {
+      sr.set_stop_key(key_range.stopKey);
+    }
   }
 }

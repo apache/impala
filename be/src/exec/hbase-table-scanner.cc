@@ -29,6 +29,8 @@ jmethodID HBaseTableScanner::scan_set_max_versions_id_ = NULL;
 jmethodID HBaseTableScanner::scan_set_caching_id_ = NULL;
 jmethodID HBaseTableScanner::scan_add_column_id_ = NULL;
 jmethodID HBaseTableScanner::scan_set_filter_id_ = NULL;
+jmethodID HBaseTableScanner::scan_set_start_row_id_ = NULL;
+jmethodID HBaseTableScanner::scan_set_stop_row_id_ = NULL;
 jmethodID HBaseTableScanner::resultscanner_next_id_ = NULL;
 jmethodID HBaseTableScanner::resultscanner_close_id_ = NULL;
 jmethodID HBaseTableScanner::result_get_bytes_id_ = NULL;
@@ -49,6 +51,16 @@ jmethodID HBaseTableScanner::single_column_value_filter_ctor_ = NULL;
 jobject HBaseTableScanner::empty_row_ = NULL;
 jobject HBaseTableScanner::must_pass_all_op_ = NULL;
 jobjectArray HBaseTableScanner::compare_ops_ = NULL;
+
+void HBaseTableScanner::ScanRange::DebugString(int indentation_level, stringstream* out) {
+  *out << string(indentation_level * 2, ' ');
+  if (!start_key_.empty()) {
+    *out << " start_key=" << start_key_;
+  }
+  if (!stop_key_.empty()) {
+    *out << " stop_key=" << stop_key_;
+  }
+}
 
 HBaseTableScanner::HBaseTableScanner(JNIEnv* env)
   : env_(env),
@@ -115,7 +127,7 @@ Status HBaseTableScanner::Init() {
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
 
   // Scan method ids.
-  scan_ctor_ = env->GetMethodID(scan_cl_, "<init>", "([B[B)V");
+  scan_ctor_ = env->GetMethodID(scan_cl_, "<init>", "()V");
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
   scan_set_max_versions_id_ = env->GetMethodID(scan_cl_, "setMaxVersions",
       "(I)Lorg/apache/hadoop/hbase/client/Scan;");
@@ -127,6 +139,12 @@ Status HBaseTableScanner::Init() {
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
   scan_set_filter_id_ = env->GetMethodID(scan_cl_, "setFilter",
       "(Lorg/apache/hadoop/hbase/filter/Filter;)Lorg/apache/hadoop/hbase/client/Scan;");
+  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  scan_set_start_row_id_ = env->GetMethodID(scan_cl_, "setStartRow",
+      "([B)Lorg/apache/hadoop/hbase/client/Scan;");
+  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  scan_set_stop_row_id_ = env->GetMethodID(scan_cl_, "setStopRow",
+      "([B)Lorg/apache/hadoop/hbase/client/Scan;");
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
 
   // ResultScanner method ids.
@@ -206,8 +224,7 @@ Status HBaseTableScanner::Init() {
   return Status::OK;
 }
 
-Status HBaseTableScanner::StartScan(
-    const TupleDescriptor* tuple_desc, const string& start_key, const string& end_key,
+Status HBaseTableScanner::ScanSetup(const TupleDescriptor* tuple_desc,
     const vector<THBaseFilter>& filters) {
 
   const HBaseTableDescriptor* hbase_table =
@@ -218,12 +235,9 @@ Status HBaseTableScanner::StartScan(
   htable_ = env_->NewObject(htable_cl_, htable_ctor_, hbase_conf_, jtable_name);
   RETURN_ERROR_IF_EXC(env_, JniUtil::throwable_to_string_id());
 
-  // scan_ = new Scan(start_key, stop_key);
-  jbyteArray start_bytes;
-  CreateByteArray(start_key, &start_bytes);
-  jbyteArray end_bytes;
-  CreateByteArray(end_key, &end_bytes);
-  scan_ = env_->NewObject(scan_cl_, scan_ctor_, start_bytes, end_bytes);
+  // Setup an Scan object without the range
+  // scan_ = new Scan();
+  scan_ = env_->NewObject(scan_cl_, scan_ctor_);
   RETURN_ERROR_IF_EXC(env_, JniUtil::throwable_to_string_id());
 
   // scan_.setMaxVersions(1);
@@ -306,9 +320,42 @@ Status HBaseTableScanner::StartScan(
     scan_ = env_->CallObjectMethod(scan_, scan_set_filter_id_, filter_list);
     RETURN_ERROR_IF_EXC(env_, JniUtil::throwable_to_string_id());
   }
+
+  return Status::OK;
+}
+
+Status HBaseTableScanner::InitScanRange(const ScanRange& scan_range) {
+  jbyteArray start_bytes;
+  CreateByteArray(scan_range.start_key(), &start_bytes);
+  jbyteArray end_bytes;
+  CreateByteArray(scan_range.stop_key(), &end_bytes);
+
+  // scan_ = scan_.setStartRow(start_bytes);
+  scan_ = env_->CallObjectMethod(scan_, scan_set_start_row_id_, start_bytes);
+  RETURN_ERROR_IF_EXC(env_, JniUtil::throwable_to_string_id());
+
+  // scan_ = scan_.setStopRow(end_bytes);
+  scan_ = env_->CallObjectMethod(scan_, scan_set_stop_row_id_, end_bytes);
+  RETURN_ERROR_IF_EXC(env_, JniUtil::throwable_to_string_id());
+
+  // resultscanner_ = htable_.getScanner(scan_);
   resultscanner_ = env_->CallObjectMethod(htable_, htable_get_scanner_id_, scan_);
   RETURN_ERROR_IF_EXC(env_, JniUtil::throwable_to_string_id());
   return Status::OK;
+
+}
+
+Status HBaseTableScanner::StartScan(const TupleDescriptor* tuple_desc,
+    const ScanRangeVector& scan_range_vector, const vector<THBaseFilter>& filters) {
+  // Setup the scan without ranges first
+  RETURN_IF_ERROR(ScanSetup(tuple_desc, filters));
+
+  // Record the ranges
+  scan_range_vector_ = &scan_range_vector;
+  current_scan_range_idx_ = 0;
+
+  // Now, scan the first range (we should have at least one range.)
+  return InitScanRange(scan_range_vector_->at(current_scan_range_idx_));
 }
 
 Status HBaseTableScanner::CreateByteArray(const std::string& s, jbyteArray* bytes) {
@@ -325,12 +372,25 @@ Status HBaseTableScanner::CreateByteArray(const std::string& s, jbyteArray* byte
 }
 
 Status HBaseTableScanner::Next(bool* has_next) {
-  // result_ = resultscanner_.next();
-  result_ = env_->CallObjectMethod(resultscanner_, resultscanner_next_id_);
+  while(true) {
+    // result_ = resultscanner_.next();
+    result_ = env_->CallObjectMethod(resultscanner_, resultscanner_next_id_);
+
+    // jump to the next region when finished with the current region.
+    if (result_ == NULL &&
+        current_scan_range_idx_ + 1 < scan_range_vector_->size()) {
+      ++current_scan_range_idx_;
+      RETURN_IF_ERROR(InitScanRange(scan_range_vector_->at(current_scan_range_idx_)));
+      continue;
+    }
+    break;
+  }
+
   if (result_ == NULL) {
     *has_next = false;
     return Status::OK;
   }
+
   // keyvalues_ = result_.raw();
   keyvalues_ = reinterpret_cast<jobjectArray>(env_->CallObjectMethod(result_, result_raw_id_));
   num_keyvalues_ = env_->GetArrayLength(keyvalues_);

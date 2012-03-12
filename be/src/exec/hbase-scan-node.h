@@ -56,9 +56,8 @@ class HBaseScanNode : public ScanNode {
   // Tuple index in tuple row.
   int tuple_idx_;
 
-  // scan range; "" means bound is not set
-  std::string start_key_;
-  std::string stop_key_;
+  // scan ranges of a region server
+  HBaseTableScanner::ScanRangeVector scan_range_vector_;
 
   // HBase Filters to be set in HBaseTableScanner.
   std::vector<THBaseFilter> filters_;
