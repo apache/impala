@@ -30,6 +30,12 @@
          a local jar. Note: not necessary for the Java-side, but must
          be available for the NativeBackend. -->
     <dependency>
+      <groupId>org.hsqldb</groupId>
+      <artifactId>hsqldb</artifactId>
+      <version>2.2.8</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.apache.hadoop</groupId>
       <artifactId>hadoop-hdfs</artifactId>
       <version>0.24.0-cdh4b2-SNAPSHOT</version>
@@ -184,12 +190,6 @@
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>4.8.2</version>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.hsqldb</groupId>
-      <artifactId>hsqldb</artifactId>
-      <version>2.2.8</version>
       <scope>test</scope>
     </dependency>
   </dependencies>

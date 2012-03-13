@@ -11,31 +11,6 @@ export METASTORE_DB=`basename $root | sed -e "s/\\./_/g" | sed -e "s/[.-]/_/g"`
 
 . "$root"/bin/impala-config.sh
 
-# Generate hive-site.xml from template via env var substitution
-# TODO: Throw an error if the template references an undefined environment variable
-cd ${IMPALA_FE_DIR}/src/test/resources
-if [[ ${METASTORE_IS_DERBY} ]]
-then
-  echo "using derby for metastore"
-  perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
-    derby-hive-site.xml.template > hive-site.xml
-else
-  echo "using mysql for metastore"
-  perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
-    mysql-hive-site.xml.template > hive-site.xml
-fi
-
-# Generate hbase-site.xml from template via env var substitution
-# TODO: Throw an error if the template references an undefined environment variable
-cd ${IMPALA_FE_DIR}/src/test/resources
-perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
-hbase-site.xml.template > hbase-site.xml
-
-# Exit on non-true return value
-set -e
-# Exit on reference to unitialized variable
-set -u
-
 clean_action=1
 config_action=1
 testdata_action=1
@@ -92,6 +67,31 @@ then
   git clean -Xdf
 
 fi
+
+# Generate hive-site.xml from template via env var substitution
+# TODO: Throw an error if the template references an undefined environment variable
+cd ${IMPALA_FE_DIR}/src/test/resources
+if [[ ${METASTORE_IS_DERBY} ]]
+then
+  echo "using derby for metastore"
+  perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
+    derby-hive-site.xml.template > hive-site.xml
+else
+  echo "using mysql for metastore"
+  perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
+    mysql-hive-site.xml.template > hive-site.xml
+fi
+
+# Generate hbase-site.xml from template via env var substitution
+# TODO: Throw an error if the template references an undefined environment variable
+cd ${IMPALA_FE_DIR}/src/test/resources
+perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
+hbase-site.xml.template > hbase-site.xml
+
+# Exit on non-true return value
+set -e
+# Exit on reference to unitialized variable
+set -u
 
 # build thirdparty
 cd $IMPALA_HOME/thirdparty/gflags-1.5
