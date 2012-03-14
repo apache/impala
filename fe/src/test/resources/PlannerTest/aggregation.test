@@ -3,46 +3,55 @@ select count(*), count(tinyint_col), min(tinyint_col), max(tinyint_col), sum(tin
 avg(tinyint_col)
 from alltypesagg
 ----
-AGGREGATE
-OUTPUT: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
-GROUP BY: 
-  SCAN HDFS table=default.alltypesagg
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
-    FILES:
-      hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt
-      hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt
-      hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt
-      hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt
-      hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt
-      hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt
-      hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt
-      hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt
-      hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt
-      hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt
-----
-AGGREGATE
-OUTPUT: SUM(<slot 1>), SUM(<slot 2>), MIN(<slot 3>), MAX(<slot 4>), SUM(<slot 5>)
-GROUP BY: 
-  EXCHANGE ID: 2
-----
-STREAM DATA SINK
-  EXCHANGE ID: 2
-AGGREGATE
-OUTPUT: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
-GROUP BY: 
-  SCAN HDFS table=default.alltypesagg
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
-    FILES:
-      hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt
-      hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt
-      hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt
-      hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt
-      hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt
-      hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt
-      hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt
-      hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt
-      hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt
-      hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
+  GROUP BY: 
+    SCAN HDFS table=default.alltypesagg (0)
+      REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:51303
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
+------------
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: SUM(<slot 1>), SUM(<slot 2>), MIN(<slot 3>), MAX(<slot 4>), SUM(<slot 5>)
+  GROUP BY: 
+    EXCHANGE (2)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 2
+  AGGREGATE
+  OUTPUT: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
+  GROUP BY: 
+    SCAN HDFS table=default.alltypesagg (0)
+      REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:51303
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
 ====
 # with grouping
 select tinyint_col, count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col),
@@ -50,44 +59,53 @@ avg(tinyint_col)
 from alltypesagg
 group by 1
 ----
-AGGREGATE
-OUTPUT: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
-GROUP BY: tinyint_col
-  SCAN HDFS table=default.alltypesagg
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
-    FILES:
-      hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt
-      hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt
-      hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt
-      hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt
-      hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt
-      hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt
-      hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt
-      hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt
-      hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt
-      hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt
-----
-AGGREGATE
-OUTPUT: SUM(<slot 2>), MIN(<slot 3>), MAX(<slot 4>), SUM(<slot 5>), SUM(<slot 6>)
-GROUP BY: <slot 1>
-  EXCHANGE ID: 2
-----
-STREAM DATA SINK
-  EXCHANGE ID: 2
-AGGREGATE
-OUTPUT: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
-GROUP BY: tinyint_col
-  SCAN HDFS table=default.alltypesagg
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
-    FILES:
-      hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt
-      hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt
-      hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt
-      hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt
-      hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt
-      hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt
-      hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt
-      hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt
-      hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt
-      hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
+  GROUP BY: tinyint_col
+    SCAN HDFS table=default.alltypesagg (0)
+      REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:51303
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
+------------
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: SUM(<slot 2>), MIN(<slot 3>), MAX(<slot 4>), SUM(<slot 5>), SUM(<slot 6>)
+  GROUP BY: <slot 1>
+    EXCHANGE (2)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 2
+  AGGREGATE
+  OUTPUT: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
+  GROUP BY: tinyint_col
+    SCAN HDFS table=default.alltypesagg (0)
+      REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:51303
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
 ====

@@ -59,7 +59,7 @@ public class HBaseScanNode extends ScanNode {
 
   // HBase config; Common across all object instance.
   private static Configuration hbaseConf = HBaseConfiguration.create();
-  
+
   public HBaseScanNode(TupleDescriptor desc) {
     super(desc);
     this.desc = desc;
@@ -152,7 +152,7 @@ public class HBaseScanNode extends ScanNode {
 
   /**
    * Get the corresponding regions for an arbitrary range of keys.
-   * TODO: this function will be implemented inside HTable in Dave's patch. 
+   * TODO: this function will be implemented inside HTable in Dave's patch.
    *       use HTable's implementation when the patch published.
    * <p>
    * @param startRow Starting row in range, inclusive
@@ -241,7 +241,7 @@ public class HBaseScanNode extends ScanNode {
     // We try to create a TScanRange for each region server that contains at least one
     // relevant region, and the created TScanRange will contain all the relevant regions
     // of the region server.
-    // 
+    //
     // If numPartition < number of region servers with relevant partitions and also
     // numPartition != NUM_NODES_ALL, the first numPartition TScanRanges
     // will be created as said for the first numPartition region servers. For each
@@ -301,7 +301,7 @@ public class HBaseScanNode extends ScanNode {
   protected String getExplainString(String prefix) {
     HBaseTable tbl = (HBaseTable) desc.getTable();
     StringBuilder output = new StringBuilder()
-        .append(prefix + "SCAN HBASE table=" + tbl.getName() + "\n");
+        .append(prefix + "SCAN HBASE table=" + tbl.getName() + " (" + id + ")\n");
     if (!Bytes.equals(startKey, HConstants.EMPTY_START_ROW)) {
       output.append(prefix + "  START KEY: " + printKey(startKey) + "\n");
     }
@@ -326,7 +326,7 @@ public class HBaseScanNode extends ScanNode {
       output.append('\n');
     }
     if (!conjuncts.isEmpty()) {
-      output.append(prefix + "  PREDICATES: " + getExplainString(conjuncts));
+      output.append(prefix + "  PREDICATES: " + getExplainString(conjuncts) + "\n");
     }
     output.append(super.getExplainString(prefix));
     return output.toString();
@@ -349,7 +349,7 @@ public class HBaseScanNode extends ScanNode {
    * Prints non-printable characters in escaped octal, otherwise outputs
    * the characters.
    */
-  private String printKey(byte[] key) {
+  public static String printKey(byte[] key) {
     StringBuilder result = new StringBuilder();
     for (int i = 0; i < key.length; ++i) {
       if (!Character.isISOControl(key[i])) {

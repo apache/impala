@@ -2,29 +2,28 @@ select *
 from testtbl t1 join testtbl t2 using(id)
 where t1.zip = 94611
 ----
-HASH JOIN
-JOIN OP: INNER JOIN
-HASH PREDICATES:
-  t1.id = t2.id
-  SCAN HDFS table=default.testtbl
-    PREDICATES: t1.zip = 94611
-    FILES:
-  SCAN HDFS table=default.testtbl
-    FILES:
-----
-EXCHANGE ID: 3
-----
-STREAM DATA SINK
-  EXCHANGE ID: 3
-HASH JOIN
-JOIN OP: INNER JOIN
-HASH PREDICATES:
-  t1.id = t2.id
-  SCAN HDFS table=default.testtbl
-    PREDICATES: t1.zip = 94611
-    FILES:
-  SCAN HDFS table=default.testtbl
-    FILES:
+Plan Fragment 0
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      t1.id = t2.id
+      SCAN HDFS table=default.testtbl (0)
+        PREDICATES: t1.zip = 94611
+      SCAN HDFS table=default.testtbl (1)
+------------
+Plan Fragment 0
+  EXCHANGE (3)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      t1.id = t2.id
+      SCAN HDFS table=default.testtbl (0)
+        PREDICATES: t1.zip = 94611
+      SCAN HDFS table=default.testtbl (1)
 ====
 # general exprs on both sides of equi-join predicates
 select *
@@ -32,29 +31,28 @@ from testtbl t1 left outer join testtbl t2
 on (t1.id - 1 = t2.id + 1)
 where t1.zip = 94611
 ----
-HASH JOIN
-JOIN OP: LEFT OUTER JOIN
-HASH PREDICATES:
-  t1.id - 1 = t2.id + 1
-  SCAN HDFS table=default.testtbl
-    PREDICATES: t1.zip = 94611
-    FILES:
-  SCAN HDFS table=default.testtbl
-    FILES:
-----
-EXCHANGE ID: 3
-----
-STREAM DATA SINK
-  EXCHANGE ID: 3
-HASH JOIN
-JOIN OP: LEFT OUTER JOIN
-HASH PREDICATES:
-  t1.id - 1 = t2.id + 1
-  SCAN HDFS table=default.testtbl
-    PREDICATES: t1.zip = 94611
-    FILES:
-  SCAN HDFS table=default.testtbl
-    FILES:
+Plan Fragment 0
+  HASH JOIN
+    JOIN OP: LEFT OUTER JOIN
+    HASH PREDICATES:
+      t1.id - 1 = t2.id + 1
+      SCAN HDFS table=default.testtbl (0)
+        PREDICATES: t1.zip = 94611
+      SCAN HDFS table=default.testtbl (1)
+------------
+Plan Fragment 0
+  EXCHANGE (3)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+  HASH JOIN
+    JOIN OP: LEFT OUTER JOIN
+    HASH PREDICATES:
+      t1.id - 1 = t2.id + 1
+      SCAN HDFS table=default.testtbl (0)
+        PREDICATES: t1.zip = 94611
+      SCAN HDFS table=default.testtbl (1)
 ====
 # multiple join predicates;
 # scan predicates get propagated correctly;
@@ -67,53 +65,62 @@ and a.tinyint_col = 15
 and b.string_col = '15'
 and a.tinyint_col + b.tinyint_col < 15
 ----
-HASH JOIN
-JOIN OP: RIGHT OUTER JOIN
-HASH PREDICATES:
-  a.id = b.id
-  a.int_col = b.int_col
-OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
-  SCAN HDFS table=default.alltypesagg
-    PREDICATES: a.tinyint_col = 15
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
-    FILES:
-      hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt
-      hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt
-      hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt
-      hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt
-      hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt
-  SCAN HDFS table=default.alltypessmall
-    PREDICATES: b.string_col = '15'
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
-    FILES:
-      hdfs:alltypessmall/year=2009/month=3/090301.txt
-      hdfs:alltypessmall/year=2009/month=4/090401.txt
-----
-EXCHANGE ID: 3
-----
-STREAM DATA SINK
-  EXCHANGE ID: 3
-HASH JOIN
-JOIN OP: RIGHT OUTER JOIN
-HASH PREDICATES:
-  a.id = b.id
-  a.int_col = b.int_col
-OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
-  SCAN HDFS table=default.alltypesagg
-    PREDICATES: a.tinyint_col = 15
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
-    FILES:
-      hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt
-      hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt
-      hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt
-      hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt
-      hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt
-  SCAN HDFS table=default.alltypessmall
-    PREDICATES: b.string_col = '15'
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
-    FILES:
-      hdfs:alltypessmall/year=2009/month=3/090301.txt
-      hdfs:alltypessmall/year=2009/month=4/090401.txt
+Plan Fragment 0
+  HASH JOIN
+    JOIN OP: RIGHT OUTER JOIN
+    HASH PREDICATES:
+      a.id = b.id
+      a.int_col = b.int_col
+    OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
+      SCAN HDFS table=default.alltypesagg (0)
+        PREDICATES: a.tinyint_col = 15
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+      SCAN HDFS table=default.alltypessmall (1)
+        PREDICATES: b.string_col = '15'
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1027
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1028
+------------
+Plan Fragment 0
+  EXCHANGE (3)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+  HASH JOIN
+    JOIN OP: RIGHT OUTER JOIN
+    HASH PREDICATES:
+      a.id = b.id
+      a.int_col = b.int_col
+    OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
+      SCAN HDFS table=default.alltypesagg (0)
+        PREDICATES: a.tinyint_col = 15
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+      SCAN HDFS table=default.alltypessmall (1)
+        PREDICATES: b.string_col = '15'
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1027
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1028
 ====
 # same as before, with 3 tables;
 # non-eq join predicates are evaluated at the correct join node
@@ -130,75 +137,84 @@ and a.tinyint_col + b.tinyint_col < 15
 and a.float_col - c.double_col < 0
 and (b.double_col * c.tinyint_col > 1000 or c.tinyint_col < 1000)
 ----
-HASH JOIN
-JOIN OP: RIGHT OUTER  JOIN
-HASH PREDICATES:
-  a.id = c.id
-  b.string_col = c.string_col
-OTHER PREDICATES: a.float_col - c.double_col < 0.0, b.double_col * c.tinyint_col > 1000.0 OR c.tinyint_col < 1000
+Plan Fragment 0
   HASH JOIN
-  JOIN OP: FULL OUTER JOIN
-  HASH PREDICATES:
-    a.id = b.id
-    a.int_col = b.int_col
-  OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
-    SCAN HDFS table=default.alltypesagg
-      PREDICATES: a.tinyint_col = 15
-      REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
-      FILES:
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt
-    SCAN HDFS table=default.alltypessmall
-      PREDICATES: b.string_col = '15'
-      REGEX: .*/year=([^\/]*)/month=([^\/]*)/
-      FILES:
-        hdfs:alltypessmall/year=2009/month=3/090301.txt
-        hdfs:alltypessmall/year=2009/month=4/090401.txt
-  SCAN HDFS table=default.alltypesaggnonulls
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
-    FILES:
-      hdfs:alltypesaggnonulls/year=2010/month=1/day=1/100101.txt
-      hdfs:alltypesaggnonulls/year=2010/month=1/day=2/100102.txt
-----
-EXCHANGE ID: 5
-----
-STREAM DATA SINK
-  EXCHANGE ID: 5
-HASH JOIN
-JOIN OP: RIGHT OUTER  JOIN
-HASH PREDICATES:
-  a.id = c.id
-  b.string_col = c.string_col
-OTHER PREDICATES: a.float_col - c.double_col < 0.0, b.double_col * c.tinyint_col > 1000.0 OR c.tinyint_col < 1000
+    JOIN OP: RIGHT OUTER JOIN
+    HASH PREDICATES:
+      a.id = c.id
+      b.string_col = c.string_col
+    OTHER PREDICATES: a.float_col - c.double_col < 0.0, b.double_col * c.tinyint_col > 1000.0 OR c.tinyint_col < 1000
+      HASH JOIN
+        JOIN OP: FULL OUTER JOIN
+        HASH PREDICATES:
+          a.id = b.id
+          a.int_col = b.int_col
+        OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
+          SCAN HDFS table=default.alltypesagg (0)
+            PREDICATES: a.tinyint_col = 15
+            REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+          SCAN HDFS table=default.alltypessmall (1)
+            PREDICATES: b.string_col = '15'
+            REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+      SCAN HDFS table=default.alltypesaggnonulls (3)
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1027
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1028
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypesaggnonulls/year=2010/month=1/day=1/100101.txt 0:51421
+        hdfs:alltypesaggnonulls/year=2010/month=1/day=2/100102.txt 0:52531
+------------
+Plan Fragment 0
+  EXCHANGE (5)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 5
   HASH JOIN
-  JOIN OP: FULL OUTER JOIN
-  HASH PREDICATES:
-    a.id = b.id
-    a.int_col = b.int_col
-  OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
-    SCAN HDFS table=default.alltypesagg
-      PREDICATES: a.tinyint_col = 15
-      REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
-      FILES:
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt
-    SCAN HDFS table=default.alltypessmall
-      PREDICATES: b.string_col = '15'
-      REGEX: .*/year=([^\/]*)/month=([^\/]*)/
-      FILES:
-        hdfs:alltypessmall/year=2009/month=3/090301.txt
-        hdfs:alltypessmall/year=2009/month=4/090401.txt
-  SCAN HDFS table=default.alltypesaggnonulls
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
-    FILES:
-      hdfs:alltypesaggnonulls/year=2010/month=1/day=1/100101.txt
-      hdfs:alltypesaggnonulls/year=2010/month=1/day=2/100102.txt
+    JOIN OP: RIGHT OUTER JOIN
+    HASH PREDICATES:
+      a.id = c.id
+      b.string_col = c.string_col
+    OTHER PREDICATES: a.float_col - c.double_col < 0.0, b.double_col * c.tinyint_col > 1000.0 OR c.tinyint_col < 1000
+      HASH JOIN
+        JOIN OP: FULL OUTER JOIN
+        HASH PREDICATES:
+          a.id = b.id
+          a.int_col = b.int_col
+        OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
+          SCAN HDFS table=default.alltypesagg (0)
+            PREDICATES: a.tinyint_col = 15
+            REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+          SCAN HDFS table=default.alltypessmall (1)
+            PREDICATES: b.string_col = '15'
+            REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+      SCAN HDFS table=default.alltypesaggnonulls (3)
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1027
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1028
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypesaggnonulls/year=2010/month=1/day=1/100101.txt 0:51421
+        hdfs:alltypesaggnonulls/year=2010/month=1/day=2/100102.txt 0:52531
 ====
 # non-equi join predicate not supported
 select *
@@ -206,4 +222,132 @@ from testtbl t1 join testtbl t2
 where t1.zip < t2.zip
 ----
 not implemented
+====
+# hbas-hdfs join
+select *
+from alltypesagg join hbasealltypessmall using (id, int_col)
+----
+Plan Fragment 0
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      alltypesagg.id = hbasealltypessmall.id
+      alltypesagg.int_col = hbasealltypessmall.int_col
+      SCAN HDFS table=default.alltypesagg (0)
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+      SCAN HBASE table=hbasealltypessmall (1)
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:51303
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
+      HBASE KEY RANGES NODE ID: 1
+        <unbounded>:<unbounded>
+------------
+Plan Fragment 0
+  EXCHANGE (3)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      alltypesagg.id = hbasealltypessmall.id
+      alltypesagg.int_col = hbasealltypessmall.int_col
+      SCAN HDFS table=default.alltypesagg (0)
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+      SCAN HBASE table=hbasealltypessmall (1)
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:51303
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
+      HBASE KEY RANGES NODE ID: 1
+        <unbounded>:<unbounded>
+====
+# hbase-hdfs join with scan filtering
+select *
+from alltypesagg a join hbasestringids b using (id, int_col)
+where a.day >= 6
+and a.tinyint_col = 15
+and b.id = '5'
+and b.tinyint_col = 5
+and b.tinyint_col > 123
+and a.tinyint_col + b.tinyint_col < 15
+----
+Plan Fragment 0
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      a.id = b.id
+      a.int_col = b.int_col
+    OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
+      SCAN HDFS table=default.alltypesagg (0)
+        PREDICATES: a.tinyint_col = 15
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+      SCAN HBASE table=hbasestringids (1)
+        START KEY: 5
+        STOP KEY: 5\0
+        PREDICATES: b.tinyint_col = 5, b.tinyint_col > 123
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
+      HBASE KEY RANGES NODE ID: 1
+        5:5\0
+------------
+Plan Fragment 0
+  EXCHANGE (3)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      a.id = b.id
+      a.int_col = b.int_col
+    OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
+      SCAN HDFS table=default.alltypesagg (0)
+        PREDICATES: a.tinyint_col = 15
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+      SCAN HBASE table=hbasestringids (1)
+        START KEY: 5
+        STOP KEY: 5\0
+        PREDICATES: b.tinyint_col = 5, b.tinyint_col > 123
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:52413
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:52413
+      HBASE KEY RANGES NODE ID: 1
+        5:5\0
 ====

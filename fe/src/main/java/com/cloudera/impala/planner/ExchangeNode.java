@@ -3,12 +3,13 @@
 package com.cloudera.impala.planner;
 
 import java.util.ArrayList;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.TupleId;
-import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TExchangeNode;
+import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.google.common.base.Objects;
 
@@ -39,7 +40,7 @@ public class ExchangeNode extends PlanNode {
   @Override
   protected String getExplainString(String prefix) {
     StringBuilder output = new StringBuilder();
-    output.append(prefix + "EXCHANGE ID: " + Integer.toString(id));
+    output.append(prefix + "EXCHANGE (" + Integer.toString(id) + ")");
     output.append(super.getExplainString(prefix));
     output.append("\n");
     return output.toString();

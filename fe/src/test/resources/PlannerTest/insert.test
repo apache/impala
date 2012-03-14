@@ -5,23 +5,32 @@ float_col, double_col, date_string_col, string_col
 from alltypes
 where year=2009 and month=05
 ----
-WRITE TO HDFS table=default.alltypesnopart
-  OVERWRITE=false
-SCAN HDFS table=default.alltypes
-  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
-  FILES:
-    hdfs:alltypes/year=2009/month=5/090501.txt
-----
-WRITE TO HDFS table=default.alltypesnopart
-  OVERWRITE=false
-EXCHANGE ID: 1
-----
-STREAM DATA SINK
-  EXCHANGE ID: 1
-SCAN HDFS table=default.alltypes
-  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
-  FILES:
-    hdfs:alltypes/year=2009/month=5/090501.txt
+Plan Fragment 0
+  WRITE TO HDFS table=default.alltypesnopart
+    OVERWRITE=false
+  SCAN HDFS table=default.alltypes (0)
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
+------------
+Plan Fragment 0
+  WRITE TO HDFS table=default.alltypesnopart
+    OVERWRITE=false
+  EXCHANGE (1)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+  SCAN HDFS table=default.alltypes (0)
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
 ====
 # insert into a static partition
 insert into table alltypessmall
@@ -31,25 +40,34 @@ float_col, double_col, date_string_col, string_col
 from alltypes
 where year=2009 and month=05
 ----
-WRITE TO HDFS table=default.alltypessmall
-  OVERWRITE=false
-  PARTITIONS: 2009,4
-SCAN HDFS table=default.alltypes
-  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
-  FILES:
-    hdfs:alltypes/year=2009/month=5/090501.txt
-----
-WRITE TO HDFS table=default.alltypessmall
-  OVERWRITE=false
-  PARTITIONS: 2009,4
-EXCHANGE ID: 1
-----
-STREAM DATA SINK
-  EXCHANGE ID: 1
-SCAN HDFS table=default.alltypes
-  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
-  FILES:
-    hdfs:alltypes/year=2009/month=5/090501.txt
+Plan Fragment 0
+  WRITE TO HDFS table=default.alltypessmall
+    OVERWRITE=false
+    PARTITIONS: 2009,4
+  SCAN HDFS table=default.alltypes (0)
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
+------------
+Plan Fragment 0
+  WRITE TO HDFS table=default.alltypessmall
+    OVERWRITE=false
+    PARTITIONS: 2009,4
+  EXCHANGE (1)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+  SCAN HDFS table=default.alltypes (0)
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
 ====
 # overwrite a static partition
 insert overwrite table alltypessmall
@@ -59,25 +77,34 @@ float_col, double_col, date_string_col, string_col
 from alltypes
 where year=2009 and month=05
 ----
-WRITE TO HDFS table=default.alltypessmall
-  OVERWRITE=true
-  PARTITIONS: 2009,4
-SCAN HDFS table=default.alltypes
-  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
-  FILES:
-    hdfs:alltypes/year=2009/month=5/090501.txt
-----
-WRITE TO HDFS table=default.alltypessmall
-  OVERWRITE=true
-  PARTITIONS: 2009,4
-EXCHANGE ID: 1
-----
-STREAM DATA SINK
-  EXCHANGE ID: 1
-SCAN HDFS table=default.alltypes
-  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
-  FILES:
-    hdfs:alltypes/year=2009/month=5/090501.txt
+Plan Fragment 0
+  WRITE TO HDFS table=default.alltypessmall
+    OVERWRITE=true
+    PARTITIONS: 2009,4
+  SCAN HDFS table=default.alltypes (0)
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
+------------
+Plan Fragment 0
+  WRITE TO HDFS table=default.alltypessmall
+    OVERWRITE=true
+    PARTITIONS: 2009,4
+  EXCHANGE (1)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+  SCAN HDFS table=default.alltypes (0)
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:13454
 ====
 # insert into a fully dynamic partition
 insert into table alltypessmall
@@ -87,27 +114,36 @@ float_col, double_col, date_string_col, string_col, year, month
 from alltypes
 where year=2009 and month>10
 ----
-WRITE TO HDFS table=default.alltypessmall
-  OVERWRITE=false
-  PARTITIONS: year,month
-SCAN HDFS table=default.alltypes
-  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
-  FILES:
-    hdfs:alltypes/year=2009/month=11/091101.txt
-    hdfs:alltypes/year=2009/month=12/091201.txt
-----
-WRITE TO HDFS table=default.alltypessmall
-  OVERWRITE=false
-  PARTITIONS: year,month
-EXCHANGE ID: 1
-----
-STREAM DATA SINK
-  EXCHANGE ID: 1
-SCAN HDFS table=default.alltypes
-  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
-  FILES:
-    hdfs:alltypes/year=2009/month=11/091101.txt
-    hdfs:alltypes/year=2009/month=12/091201.txt
+Plan Fragment 0
+  WRITE TO HDFS table=default.alltypessmall
+    OVERWRITE=false
+    PARTITIONS: year,month
+  SCAN HDFS table=default.alltypes (0)
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
+------------
+Plan Fragment 0
+  WRITE TO HDFS table=default.alltypessmall
+    OVERWRITE=false
+    PARTITIONS: year,month
+  EXCHANGE (1)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+  SCAN HDFS table=default.alltypes (0)
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
 ====
 # insert into a partially dynamic partition
 insert into table alltypessmall
@@ -117,27 +153,36 @@ float_col, double_col, date_string_col, string_col, month
 from alltypes
 where year=2009 and month>10
 ----
-WRITE TO HDFS table=default.alltypessmall
-  OVERWRITE=false
-  PARTITIONS: 2009,month
-SCAN HDFS table=default.alltypes
-  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
-  FILES:
-    hdfs:alltypes/year=2009/month=11/091101.txt
-    hdfs:alltypes/year=2009/month=12/091201.txt
-----
-WRITE TO HDFS table=default.alltypessmall
-  OVERWRITE=false
-  PARTITIONS: 2009,month
-EXCHANGE ID: 1
-----
-STREAM DATA SINK
-  EXCHANGE ID: 1
-SCAN HDFS table=default.alltypes
-  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
-  FILES:
-    hdfs:alltypes/year=2009/month=11/091101.txt
-    hdfs:alltypes/year=2009/month=12/091201.txt
+Plan Fragment 0
+  WRITE TO HDFS table=default.alltypessmall
+    OVERWRITE=false
+    PARTITIONS: 2009,month
+  SCAN HDFS table=default.alltypes (0)
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
+------------
+Plan Fragment 0
+  WRITE TO HDFS table=default.alltypessmall
+    OVERWRITE=false
+    PARTITIONS: 2009,month
+  EXCHANGE (1)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+  SCAN HDFS table=default.alltypes (0)
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypes/year=2009/month=11/091101.txt 0:13020
+        hdfs:alltypes/year=2009/month=12/091201.txt 0:13454
 ====
 # insert into a partially dynamic partition
 insert into table alltypessmall
@@ -147,22 +192,32 @@ float_col, double_col, date_string_col, string_col, year
 from alltypes
 where year>2009 and month=4
 ----
-WRITE TO HDFS table=default.alltypessmall
-  OVERWRITE=false
-  PARTITIONS: year,4
-SCAN HDFS table=default.alltypes
-  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
-  FILES:
-    hdfs:alltypes/year=2010/month=4/100401.txt
-----
-WRITE TO HDFS table=default.alltypessmall
-  OVERWRITE=false
-  PARTITIONS: year,4
-EXCHANGE ID: 1
-----
-STREAM DATA SINK
-  EXCHANGE ID: 1
-SCAN HDFS table=default.alltypes
-  REGEX: .*/year=([^\/]*)/month=([^\/]*)/
-  FILES:
-    hdfs:alltypes/year=2010/month=4/100401.txt
+Plan Fragment 0
+  WRITE TO HDFS table=default.alltypessmall
+    OVERWRITE=false
+    PARTITIONS: year,4
+  SCAN HDFS table=default.alltypes (0)
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypes/year=2010/month=4/100401.txt 0:13020
+------------
+Plan Fragment 0
+  WRITE TO HDFS table=default.alltypessmall
+    OVERWRITE=false
+    PARTITIONS: year,4
+  EXCHANGE (1)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+  SCAN HDFS table=default.alltypes (0)
+    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypes/year=2010/month=4/100401.txt 0:13020
+====

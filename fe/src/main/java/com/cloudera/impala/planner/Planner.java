@@ -31,6 +31,8 @@ import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.Constants;
+import com.cloudera.impala.thrift.THBaseKeyRange;
+import com.cloudera.impala.thrift.THdfsFileSplit;
 import com.cloudera.impala.thrift.THostPort;
 import com.cloudera.impala.thrift.TPlanExecParams;
 import com.cloudera.impala.thrift.TPlanExecRequest;
@@ -367,17 +369,113 @@ public class Planner {
   }
 
   /**
+   * Return the execution parameter explain string for the given plan fragment index
+   * @param request
+   * @param planFragIdx
+   * @return
+   */
+  private String getExecParamExplainString(TQueryExecRequest request, int planFragIdx) {
+    StringBuilder execParamExplain = new StringBuilder();
+    String prefix = "  ";
+
+    List<TPlanExecParams> execHostsParams = request.getNodeRequestParams().get(planFragIdx);
+    for (int nodeIdx = 0; nodeIdx < execHostsParams.size(); nodeIdx++) {
+      // If the host has no parameter set, don't print anything
+      TPlanExecParams hostExecParams = execHostsParams.get(nodeIdx);
+      if (hostExecParams == null || !hostExecParams.isSetScanRanges()) {
+        continue;
+      }
+
+      if (planFragIdx == 0) {
+        // plan fragment 0 is the coordinator
+        execParamExplain.append(prefix + "  HOST: coordinator\n");
+      } else {
+        String hostnode = request.getExecNodes().get(planFragIdx - 1).get(nodeIdx);
+        execParamExplain.append(prefix + "  HOST: " + hostnode + "\n");
+      }
+
+      for (TScanRange scanRange: hostExecParams.getScanRanges()) {
+        int nodeid = scanRange.getNodeId();
+        if (scanRange.isSetHbaseKeyRanges()) {
+          // HBase scan range is printed as "startKey:stopKey"
+          execParamExplain.append(prefix + "    HBASE KEY RANGES NODE ID: " + nodeid + "\n");
+          for (THBaseKeyRange kr: scanRange.getHbaseKeyRanges()) {
+            execParamExplain.append(prefix + "      ");
+            if (kr.isSetStartKey()) {
+              execParamExplain.append(HBaseScanNode.printKey(kr.getStartKey().getBytes()));
+            } else {
+              execParamExplain.append("<unbounded>");
+            }
+            execParamExplain.append(":");
+            if (kr.isSetStopKey()) {
+              execParamExplain.append(HBaseScanNode.printKey(kr.getStopKey().getBytes()));
+            } else {
+              execParamExplain.append("<unbounded>");
+            }
+            execParamExplain.append("\n");
+          }
+        } else if (scanRange.isSetHdfsFileSplits()) {
+          // HDFS splits is printed as "<path> <offset>:<length>"
+          execParamExplain.append(prefix + "    HDFS SPLITS NODE ID: " + nodeid + "\n");
+          for (THdfsFileSplit fs: scanRange.getHdfsFileSplits() ) {
+            execParamExplain.append(prefix + "      ");
+            execParamExplain.append(fs.getPath() + " ");
+            execParamExplain.append(fs.getOffset() + ":");
+            execParamExplain.append(fs.getLength() + "\n");
+          }
+        }
+      }
+    }
+    if (execParamExplain.length() > 0) {
+      execParamExplain.insert(0, "\n" + prefix + "EXEC PARAMS\n");
+    }
+
+     return execParamExplain.toString();
+  }
+
+  /**
+   * Build an explain plan string for plan fragments and execution parameters.
+   * @param explainString output parameter that contains the explain plan string
+   * @param planFragments
+   * @param dataSinks
+   * @param request
+   */
+  private void buildExplainString(
+      StringBuilder explainStr, List<PlanNode> planFragments,
+      List<DataSink> dataSinks, TQueryExecRequest request) {
+    Preconditions.checkState(planFragments.size() == dataSinks.size());
+
+    for (int planFragIdx = 0; planFragIdx < planFragments.size(); ++planFragIdx) {
+      // An extra line after each plan fragment
+      if (planFragIdx != 0) {
+        explainStr.append("\n");
+      }
+
+      explainStr.append("Plan Fragment " + planFragIdx + "\n");
+      DataSink dataSink = dataSinks.get(planFragIdx);
+      PlanNode fragment = planFragments.get(planFragIdx);
+      String expString;
+      // Coordinator (can only be the first) fragment might not have an associated sink.
+      if (dataSink == null) {
+        Preconditions.checkState(planFragIdx == 0);
+        expString = fragment.getExplainString("  ");
+      } else {
+        expString = dataSink.getExplainString("  ") + fragment.getExplainString("  ");
+      }
+      explainStr.append(expString);
+
+      // Execution parameters of the current plan fragment
+      String execParamExplain = getExecParamExplainString(request, planFragIdx);
+      explainStr.append(execParamExplain);
+    }
+
+  }
+
+  /**
    * Given an analysisResult, creates a sequence of plan fragments that implement the query.
    *
    * @param analysisResult
    *          result of query analysis
-   * @param planFragments
-   *          non-thrift plan fragments for testing/debugging
-   * @param dataSinks
-   *          non-thrift data sinks for testing/debugging.
-   *          the i-th sink corresponds to the i-th plan fragment.
-   *          the 0-th sink could possibly be null,
-   *          if the last fragment does not feed into anything.
    * @param numNodes
    *          number of nodes on which to execute fragments; same semantics as
    *          TQueryRequest.numNodes;
@@ -388,12 +486,16 @@ public class Planner {
    *          > 1: executes on at most that many nodes at any point in time (ie, there can be
    *          more nodes than numNodes with plan fragments for this query, but at most
    *          numNodes would be active at any point in time)
+   * @param explainString output parameter of the explain plan string, if not null
    * @return query exec request containing plan fragments and all execution parameters
    */
   public TQueryExecRequest createPlanFragments(
       AnalysisContext.AnalysisResult analysisResult, int numNodes,
-      List<PlanNode> planFragments, List<DataSink> dataSinks)
+      StringBuilder explainString)
       throws NotImplementedException, InternalException {
+    // local var to help build the explain plan string
+    List<PlanNode> planFragments = Lists.newArrayList();
+    List<DataSink> dataSinks = Lists.newArrayList();
 
     // Set selectStmt from analyzed SELECT or INSERT query.
     SelectStmt selectStmt = null;
@@ -613,6 +715,11 @@ public class Planner {
 
     request.addToExecNodes(hosts);
     request.addToNodeRequestParams(fragmentParamsList);
+
+    // Build the explain plan string, if requested
+    if (explainString != null) {
+      buildExplainString(explainString, planFragments, dataSinks, request);
+    }
 
     return request;
   }

@@ -28,7 +28,8 @@ import com.cloudera.impala.thrift.TResultRow;
 
 public class TestUtils {
   private final static Logger LOG = LoggerFactory.getLogger(TestUtils.class);
-  private final static String expectedFilePrefix = "hdfs:";
+  private final static String[] expectedFilePrefix = { "hdfs:" };
+  private final static String[] ignoreContentAfter = { "HOST:" };
 
   // Maps from uppercase type name to PrimitiveType
   private static Map<String, PrimitiveType> typeNameMap =
@@ -62,11 +63,21 @@ public class TestUtils {
       String expectedStr = expected.get(i);
       String actualStr = actual[i];
       // Look for special prefixes in containsPrefixes.
-      boolean containsPrefix = expectedStr.trim().startsWith(expectedFilePrefix);
-      if (containsPrefix) {
-        expectedStr = expectedStr.replaceFirst(expectedFilePrefix, "");
-        actualStr = actualStr.replaceFirst(expectedFilePrefix, "");
+      boolean containsPrefix = false;
+      for (int prefixIdx = 0; prefixIdx < expectedFilePrefix.length; ++prefixIdx) {
+        containsPrefix = expectedStr.trim().startsWith(expectedFilePrefix[prefixIdx]);
+        if (containsPrefix) {
+          expectedStr = expectedStr.replaceFirst(expectedFilePrefix[prefixIdx], "");
+          actualStr = actualStr.replaceFirst(expectedFilePrefix[prefixIdx], "");
+          break;
+        }
       }
+
+      boolean ignoreAfter = false;
+      for (int icIdx = 0; icIdx < ignoreContentAfter.length; ++icIdx) {
+        ignoreAfter |= expectedStr.trim().startsWith(ignoreContentAfter[icIdx]);
+      }
+
       // do a whitespace-insensitive comparison
       Scanner e = new Scanner(expectedStr);
       Scanner a = new Scanner(actualStr);
@@ -86,7 +97,13 @@ public class TestUtils {
       if (mismatch != -1) {
         break;
       }
-      if (a.hasNext() != e.hasNext()) {
+
+      if (ignoreAfter) {
+        if (e.hasNext() && !a.hasNext()) {
+          mismatch = i;
+          break;
+        }
+      } else if (a.hasNext() != e.hasNext()) {
         mismatch = i;
         break;
       }

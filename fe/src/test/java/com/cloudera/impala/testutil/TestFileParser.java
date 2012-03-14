@@ -32,6 +32,9 @@ import com.google.common.collect.Lists;
 // Note that <QUERY STRING> and <EXPECTED RESULT SECTIONS> can consist of multiple lines.
 public class TestFileParser {
   private final StringBuilder query = new StringBuilder();
+
+  // the whole <QUERY STRING>, including comment and new line
+  private final StringBuilder querySection = new StringBuilder();
   private int lineNum = 0;
   private final StringBuilder confString = new StringBuilder();
   private final ArrayList<ArrayList<String>> expectedResultSections = Lists.newArrayList();
@@ -66,6 +69,7 @@ public class TestFileParser {
     expectedResultSections.clear();
     confString.setLength(0);
     query.setLength(0);
+    querySection.setLength(0);
     ParserState state = ParserState.QUERY;
     ArrayList<String> resultSection = null;
     while (scanner.hasNextLine()) {
@@ -73,6 +77,9 @@ public class TestFileParser {
       ++lineNum;
       // ignore comments
       if (line.startsWith("//") || line.startsWith("#")) {
+        if (state == ParserState.QUERY) {
+          querySection.append(line + "\n");
+        }
         continue;
       }
       if (line.startsWith("====")) {
@@ -89,6 +96,7 @@ public class TestFileParser {
         case QUERY: {
           query.append(line);
           query.append(" ");
+          querySection.append(line + "\n");
           break;
         }
         case EXPECTED_RESULT: {
@@ -124,8 +132,20 @@ public class TestFileParser {
     return confString.toString();
   }
 
+  /**
+   * Return the query string, stripping out comments and newline.
+   * @return
+   */
   public String getQuery() {
     return query.toString();
+  }
+
+  /**
+   * Return the query section from the testfile, including comments and newline
+   * @return
+   */
+  public String getQuerySection() {
+    return querySection.toString();
   }
 
   public int getLineNum() {

@@ -12,7 +12,13 @@ import com.cloudera.impala.thrift.TDataSink;
  *
  */
 public abstract class DataSink {
-  public abstract String getExplainString();
+  /**
+   * Return an explain string for the DataSink. Each line of the explain will be prefixed
+   * by "prefix"
+   * @param prefix each explain line will be started with the given prefix
+   * @return
+   */
+  public abstract String getExplainString(String prefix);
 
   protected abstract TDataSink toThrift();
 }

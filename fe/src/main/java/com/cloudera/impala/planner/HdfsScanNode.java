@@ -283,19 +283,15 @@ public abstract class HdfsScanNode extends ScanNode {
   @Override
   protected String getExplainString(String prefix) {
     StringBuilder output = new StringBuilder();
-    output.append(prefix + "SCAN HDFS table=" + desc.getTable().getFullName() + "\n");
+    output.append(prefix + "SCAN HDFS table=" + desc.getTable().getFullName());
+    output.append(" (" + id + ")\n");
     if (!conjuncts.isEmpty()) {
       output.append(prefix + "  PREDICATES: " + getExplainString(conjuncts) + "\n");
     }
     if (partitionKeyRegex != "") {
       output.append(prefix + "  REGEX: " + partitionKeyRegex + "\n");
     }
-    output.append(prefix + "  FILES:");
-    if (!filePaths.isEmpty()) {
-      output.append("\n    " + prefix);
-      output.append(Joiner.on("\n    " + prefix).join(filePaths));
-    }
-    output.append("\n" + super.getExplainString(prefix));
+    output.append(super.getExplainString(prefix));
     return output.toString();
   }
 }

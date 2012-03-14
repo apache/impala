@@ -26,8 +26,6 @@ import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.planner.DataSink;
-import com.cloudera.impala.planner.PlanNode;
 import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TPlanExecRequest;
@@ -178,26 +176,12 @@ public class Executor {
       BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
     // create plan fragments
     Planner planner = new Planner();
-    List<PlanNode> planFragments = Lists.newArrayList();
-    List<DataSink> dataSinks = Lists.newArrayList();
+    StringBuilder explainString = new StringBuilder();
     // for now, only single-node execution
     TQueryExecRequest execRequest = planner.createPlanFragments(
-        analysisResult, numNodes, planFragments, dataSinks);
+        analysisResult, numNodes, explainString);
     // Log explain string.
-    // The i-th sink corresponds to the i-th plan fragment.
-    Preconditions.checkState(planFragments.size() == dataSinks.size());
-    for (int i = 0; i < planFragments.size(); ++i) {
-      String explainStr = null;
-      // First data sink may be null.
-      if (dataSinks.get(i) == null) {
-        Preconditions.checkState(i == 0);
-        explainStr = planFragments.get(i).getExplainString();
-      } else {
-        explainStr = dataSinks.get(i).getExplainString()
-            + planFragments.get(i).getExplainString();
-      }
-      LOG.info(explainStr);
-    }
+    LOG.info(explainString.toString());
 
     // set remaining execution parameters
     UUID queryId = UUID.randomUUID();

@@ -98,7 +98,7 @@ public class HashJoinNode extends PlanNode {
         .append(prefix + "  HASH PREDICATES:");
     for (Pair<Expr, Expr> entry: eqJoinConjuncts) {
       output.append(
-          "\n" + prefix + "  " + entry.first.toSql() + " = " + entry.second.toSql());
+          "\n" + prefix + "    " + entry.first.toSql() + " = " + entry.second.toSql());
     }
     output.append("\n");
     if (!otherJoinConjuncts.isEmpty()) {

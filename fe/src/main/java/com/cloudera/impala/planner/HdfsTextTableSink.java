@@ -22,12 +22,12 @@ public class HdfsTextTableSink extends HdfsTableSink {
   }
 
   @Override
-  public String getExplainString() {
+  public String getExplainString(String prefix) {
     StringBuilder output = new StringBuilder();
-    output.append("WRITE TO HDFS table=" + targetTable.getFullName() + "\n");
-    output.append("  OVERWRITE=" + (overwrite ? "true" : "false") + "\n");
+    output.append(prefix + "WRITE TO HDFS table=" + targetTable.getFullName() + "\n");
+    output.append(prefix + "  OVERWRITE=" + (overwrite ? "true" : "false") + "\n");
     if (!partitionKeyExprs.isEmpty()) {
-      output.append("  PARTITIONS: ");
+      output.append(prefix + "  PARTITIONS: ");
       for (Expr expr : partitionKeyExprs) {
         output.append(expr.toSql() + ",");
       }

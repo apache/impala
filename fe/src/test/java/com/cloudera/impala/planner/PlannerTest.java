@@ -4,8 +4,10 @@ package com.cloudera.impala.planner;
 
 import static org.junit.Assert.fail;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.junit.BeforeClass;
@@ -22,15 +24,17 @@ import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.testutil.TestFileParser;
 import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.Constants;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
 
 public class PlannerTest {
   private final static Logger LOG = LoggerFactory.getLogger(PlannerTest.class);
+  private final static boolean GENERATE_OUTPUT_FILE = false;
 
   private static Catalog catalog;
   private static AnalysisContext analysisCtxt;
   private final String testDir = "PlannerTest";
+  private final String outDir = "/tmp/PlannerTest/";
+
+  private final StringBuilder explainStringBuilder = new StringBuilder();
 
   @BeforeClass
   public static void setUp() throws Exception {
@@ -40,33 +44,24 @@ public class PlannerTest {
   }
 
   private void RunQuery(String query, int numNodes, TestFileParser parser,
-                        int sectionStartIdx, StringBuilder errorLog) {
+                        int sectionStartIdx, StringBuilder errorLog,
+                        StringBuilder actualOutput) {
     try {
       LOG.info("running query " + query);
       AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
       Planner planner = new Planner();
-      List<PlanNode> planFragments = Lists.newArrayList();
-      List<DataSink> dataSinks = Lists.newArrayList();
-      planner.createPlanFragments(analysisResult, numNodes, planFragments, dataSinks);
-      Preconditions.checkState(planFragments.size() == dataSinks.size());
-      for (int i = 0; i < planFragments.size(); ++i) {
-        DataSink dataSink = dataSinks.get(i);
-        PlanNode fragment = planFragments.get(i);
-        String explainString;
-        // Coordinator fragment might not have an associated sink.
-        if (dataSink == null) {
-          explainString = fragment.getExplainString();
-        } else {
-          explainString = dataSink.getExplainString() + fragment.getExplainString();
-        }
-        LOG.info(explainString);
-        ArrayList<String> expectedPlan = parser.getExpectedResult(sectionStartIdx + i);
-        String result = TestUtils.compareOutput(explainString.split("\n"), expectedPlan, true);
-        if (!result.isEmpty()) {
-          errorLog.append(
-              "section " + Integer.toString(sectionStartIdx + i) + " of query:\n"
-              + query + "\n" + result);
-        }
+      explainStringBuilder.setLength(0);
+      planner.createPlanFragments(analysisResult, numNodes, explainStringBuilder);
+
+      String explainStr = explainStringBuilder.toString();
+      actualOutput.append(explainStr);
+      LOG.info(explainStr);
+      ArrayList<String> expectedPlan = parser.getExpectedResult(sectionStartIdx);
+      String result = TestUtils.compareOutput(explainStr.split("\n"), expectedPlan, true);
+      if (!result.isEmpty()) {
+        errorLog.append(
+            "section " + Integer.toString(sectionStartIdx) + " of query:\n"
+            + query + "\n" + result);
       }
     } catch (AnalysisException e) {
       errorLog.append("query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
@@ -82,20 +77,13 @@ public class PlannerTest {
     try {
       AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
       Planner planner = new Planner();
-      List<PlanNode> planFragments = Lists.newArrayList();
-      List<DataSink> dataSinks = Lists.newArrayList();
-      planner.createPlanFragments(analysisResult, 1, planFragments, dataSinks);
-      String explainString = null;
-      PlanNode plan = planFragments.get(0);
-      if (analysisResult.isInsertStmt()) {
-        DataSink dataSink = dataSinks.get(0);
-        explainString = dataSink.getExplainString() + plan.getExplainString("  ");
-      } else {
-        explainString = plan.getExplainString();
-      }
+      explainStringBuilder.setLength(0);
+
+      planner.createPlanFragments(analysisResult, 1, explainStringBuilder);
+
       errorLog.append(
           "query produced a plan\nquery=" + query + "\nplan=\n"
-          + explainString);
+          + explainStringBuilder.toString());
     } catch (AnalysisException e) {
       errorLog.append("query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
     } catch (InternalException e) {
@@ -108,11 +96,15 @@ public class PlannerTest {
   private void runPlannerTestFile(String testCase) {
     String fileName = testDir + "/" + testCase + ".test";
     TestFileParser queryFileParser = new TestFileParser(fileName);
+    StringBuilder actualOutput = new StringBuilder();
+
     queryFileParser.open();
     StringBuilder errorLog = new StringBuilder();
     while (queryFileParser.hasNext()) {
       queryFileParser.next();
       String query = queryFileParser.getQuery();
+      actualOutput.append(queryFileParser.getQuerySection());
+      actualOutput.append("----\n");
       // each planner test case contains multiple result sections:
       // - the first one is for the single-node plan
       // - the subsequent ones are for distributed plans; there is one
@@ -120,11 +112,28 @@ public class PlannerTest {
       ArrayList<String> plan = queryFileParser.getExpectedResult(0);
       if (plan.size() > 0 && plan.get(0).toLowerCase().startsWith("not implemented")) {
         RunUnimplementedQuery(query, errorLog);
+        actualOutput.append("not implemented\n");
       } else {
-        RunQuery(query, 1, queryFileParser, 0, errorLog);
-        RunQuery(query, Constants.NUM_NODES_ALL, queryFileParser, 1, errorLog);
+        RunQuery(query, 1, queryFileParser, 0, errorLog, actualOutput);
+        actualOutput.append("------------\n");
+        RunQuery(query, Constants.NUM_NODES_ALL, queryFileParser, 1, errorLog, actualOutput);
+      }
+      actualOutput.append("====\n");
+    }
+
+    // Create the actual output file
+    if (GENERATE_OUTPUT_FILE) {
+      try {
+        File outDirFile = new File(outDir);
+        outDirFile.mkdirs();
+        FileWriter fw = new FileWriter(outDir + testCase + ".test");
+        fw.write(actualOutput.toString());
+        fw.close();
+      } catch (IOException e) {
+        errorLog.append("Unable to create output file: " + e.getMessage());
       }
     }
+
     queryFileParser.close();
     if (errorLog.length() != 0) {
       fail(errorLog.toString());

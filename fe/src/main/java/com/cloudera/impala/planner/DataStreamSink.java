@@ -18,10 +18,10 @@ public class DataStreamSink extends DataSink {
   }
 
   @Override
-  public String getExplainString() {
+  public String getExplainString(String prefix) {
     StringBuilder strBuilder = new StringBuilder();
-    strBuilder.append("STREAM DATA SINK\n");
-    strBuilder.append("  EXCHANGE ID: " + exchNodeId + "\n");
+    strBuilder.append(prefix + "STREAM DATA SINK\n");
+    strBuilder.append(prefix + "  EXCHANGE ID: " + exchNodeId + "\n");
     return strBuilder.toString();
   }
 

@@ -23,8 +23,6 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
-import com.cloudera.impala.planner.DataSink;
-import com.cloudera.impala.planner.PlanNode;
 import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.thrift.ImpalaPlanService;
 import com.cloudera.impala.thrift.TPlanExecRequest;
@@ -72,13 +70,11 @@ public class PlanService {
 
       // create plan
       Planner planner = new Planner();
+      StringBuilder explainString = new StringBuilder();
 
-      List<PlanNode> planFragments = Lists.newArrayList();
-      List<DataSink> dataSinks = Lists.newArrayList();
       TQueryExecRequest request;
       try {
-        request = planner.createPlanFragments(
-            analysisResult, numNodes, planFragments, dataSinks);
+        request = planner.createPlanFragments(analysisResult, numNodes, explainString);
       } catch (NotImplementedException e) {
         throw new TException(e.getMessage());
       } catch (InternalException e) {
@@ -98,23 +94,8 @@ public class PlanService {
         planRequest.setQueryId(request.queryId);
       }
 
-      // Generate explain string and print it.
-      Preconditions.checkState(planFragments.size() == dataSinks.size());
-      for (int i = 0; i < planFragments.size(); ++i) {
-        if (i > 0) {
-          System.out.println("----");
-        }
-        String explainStr = null;
-        // First data sink may be null.
-        if (dataSinks.get(i) == null) {
-          Preconditions.checkState(i == 0);
-          explainStr = planFragments.get(i).getExplainString();
-        } else {
-          explainStr = dataSinks.get(i).getExplainString()
-              + planFragments.get(i).getExplainString();
-        }
-        System.out.println(explainStr);
-      }
+      // Print explain string.
+      System.out.println(explainString.toString());
 
       System.out.println("returned exec request: " + request.toString());
       return request;
