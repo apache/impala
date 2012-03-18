@@ -807,6 +807,264 @@ TEST_F(ExprTest, StringRegexpFunctions) {
   TestIsNull("regexp_replace('abxcy1234a', '(/.', 'x')", TYPE_STRING);
 }
 
+TEST_F(ExprTest, StringParseUrlFunction) {
+  // TODO: For now, our parse_url my not behave exactly like Hive
+  // when given malformed URLs.
+  // If necessary, we can closely follow Java's URL implementation
+  // to behave exactly like Hive.
+
+  // AUTHORITY part.
+  TestStringValue("parse_url('http://user:pass@example.com:80/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'AUTHORITY')", "user:pass@example.com:80");
+  TestStringValue("parse_url('http://user:pass@example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'AUTHORITY')", "user:pass@example.com");
+  // Without user and pass.
+  TestStringValue("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'AUTHORITY')", "example.com:80");
+  TestStringValue("parse_url('http://example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'AUTHORITY')", "example.com");
+  // Exactly what Hive returns as well.
+  TestStringValue("parse_url('http://example.com_xyzabc^&*', 'AUTHORITY')",
+      "example.com_xyzabc^&*");
+  // Missing protocol.
+  TestIsNull("parse_url('example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'HOST')", TYPE_STRING);
+
+  // FILE part.
+  TestStringValue("parse_url('http://user:pass@example.com:80/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'FILE')",
+      "/docs/books/tutorial/index.html?name=networking");
+  TestStringValue("parse_url('http://user:pass@example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'FILE')",
+      "/docs/books/tutorial/index.html?name=networking");
+  // Without user and pass.
+  TestStringValue("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'FILE')",
+      "/docs/books/tutorial/index.html?name=networking");
+  TestStringValue("parse_url('http://example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'FILE')",
+      "/docs/books/tutorial/index.html?name=networking");
+  // With trimming.
+  TestStringValue("parse_url('http://example.com/docs/books/tutorial/"
+      "index.html?name=networking   ', 'FILE')",
+      "/docs/books/tutorial/index.html?name=networking");
+  // No question mark but a hash (consistent with Hive).
+  TestStringValue("parse_url('http://example.com/docs/books/tutorial/"
+      "index.html#something', 'FILE')",
+      "/docs/books/tutorial/index.html");
+  // No hash or question mark (consistent with Hive).
+  TestStringValue("parse_url('http://example.com/docs/books/tutorial/"
+      "index.htmlsomething', 'FILE')",
+      "/docs/books/tutorial/index.htmlsomething");
+  // Missing protocol.
+  TestIsNull("parse_url('example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'FILE')", TYPE_STRING);
+
+  // HOST part.
+  TestStringValue("parse_url('http://user:pass@example.com:80/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'HOST')", "example.com");
+  TestStringValue("parse_url('http://user:pass@example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'HOST')", "example.com");
+  // Without user and pass.
+  TestStringValue("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'HOST')", "example.com");
+  TestStringValue("parse_url('http://example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'HOST')", "example.com");
+  // Exactly what Hive returns as well.
+  TestStringValue("parse_url('http://example.com_xyzabc^&*', 'HOST')",
+      "example.com_xyzabc^&*");
+  // Missing protocol.
+  TestIsNull("parse_url('example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'HOST')", TYPE_STRING);
+
+  // PATH part.
+  TestStringValue("parse_url('http://user:pass@example.com:80/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'PATH')",
+      "/docs/books/tutorial/index.html");
+  TestStringValue("parse_url('http://user:pass@example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'PATH')",
+      "/docs/books/tutorial/index.html");
+  // Without user and pass.
+  TestStringValue("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'PATH')",
+      "/docs/books/tutorial/index.html");
+  TestStringValue("parse_url('http://example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'PATH')",
+      "/docs/books/tutorial/index.html");
+  // With trimming.
+  TestStringValue("parse_url('http://user:pass@example.com/docs/books/tutorial/"
+      "index.html   ', 'PATH')",
+      "/docs/books/tutorial/index.html");
+  // No question mark but a hash (consistent with Hive).
+  TestStringValue("parse_url('http://example.com/docs/books/tutorial/"
+      "index.html#something', 'PATH')",
+      "/docs/books/tutorial/index.html");
+  // No hash or question mark (consistent with Hive).
+  TestStringValue("parse_url('http://example.com/docs/books/tutorial/"
+      "index.htmlsomething', 'PATH')",
+      "/docs/books/tutorial/index.htmlsomething");
+  // Missing protocol.
+  TestIsNull("parse_url('example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'PATH')", TYPE_STRING);
+
+  // PROTOCOL part.
+  TestStringValue("parse_url('http://user:pass@example.com:80/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'PROTOCOL')", "http");
+  TestStringValue("parse_url('https://user:pass@example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'PROTOCOL')", "https");
+  // Without user and pass.
+  TestStringValue("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'PROTOCOL')", "http");
+  TestStringValue("parse_url('https://example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'PROTOCOL')", "https");
+  // With trimming.
+  TestStringValue("parse_url('   https://user:pass@example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'PROTOCOL')", "https");
+  // Missing protocol.
+  TestIsNull("parse_url('user:pass@example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'PROTOCOL')", TYPE_STRING);
+
+  // QUERY part.
+  TestStringValue("parse_url('http://user:pass@example.com:80/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'QUERY')", "name=networking");
+  TestStringValue("parse_url('http://user:pass@example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'QUERY')", "name=networking");
+  // Without user and pass.
+  TestStringValue("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'QUERY')", "name=networking");
+  TestStringValue("parse_url('http://example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'QUERY')", "name=networking");
+  // With trimming.
+  TestStringValue("parse_url('http://example.com/docs/books/tutorial/"
+      "index.html?name=networking   ', 'QUERY')", "name=networking");
+  // No '?'. Hive also returns NULL.
+  TestIsNull("parse_url('http://example.com_xyzabc^&*', 'QUERY')", TYPE_STRING);
+  // Missing protocol.
+  TestIsNull("parse_url('example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'QUERY')", TYPE_STRING);
+
+  // PATH part.
+  TestStringValue("parse_url('http://user:pass@example.com:80/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'PATH')",
+      "/docs/books/tutorial/index.html");
+  TestStringValue("parse_url('http://user:pass@example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'PATH')",
+      "/docs/books/tutorial/index.html");
+  // Without user and pass.
+  TestStringValue("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'PATH')",
+      "/docs/books/tutorial/index.html");
+  TestStringValue("parse_url('http://example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'PATH')",
+      "/docs/books/tutorial/index.html");
+  // With trimming.
+  TestStringValue("parse_url('http://user:pass@example.com/docs/books/tutorial/"
+      "index.html   ', 'PATH')",
+      "/docs/books/tutorial/index.html");
+  // No question mark but a hash (consistent with Hive).
+  TestStringValue("parse_url('http://example.com/docs/books/tutorial/"
+      "index.html#something', 'PATH')",
+      "/docs/books/tutorial/index.html");
+  // No hash or question mark (consistent with Hive).
+  TestStringValue("parse_url('http://example.com/docs/books/tutorial/"
+      "index.htmlsomething', 'PATH')",
+      "/docs/books/tutorial/index.htmlsomething");
+  // Missing protocol.
+  TestIsNull("parse_url('example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'PATH')", TYPE_STRING);
+
+  // USERINFO part.
+  TestStringValue("parse_url('http://user:pass@example.com:80/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'USERINFO')", "user:pass");
+  TestStringValue("parse_url('http://user:pass@example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'USERINFO')", "user:pass");
+  // Only user given.
+  TestStringValue("parse_url('http://user@example.com/docs/books/tutorial/"
+        "index.html?name=networking#DOWNLOADING', 'USERINFO')", "user");
+  // No user or pass. Hive also returns NULL.
+  TestIsNull("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'USERINFO')", TYPE_STRING);
+  // Missing protocol.
+  TestIsNull("parse_url('example.com/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'USERINFO')", TYPE_STRING);
+
+  // Invalid part parameters.
+  // All characters in the part parameter must be uppercase (conistent with Hive).
+  TestIsNull("parse_url('http://example.com', 'authority')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'Authority')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'AUTHORITYXYZ')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'file')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'File')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'FILEXYZ')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'host')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'Host')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'HOSTXYZ')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'path')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'Path')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'PATHXYZ')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'protocol')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'Protocol')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'PROTOCOLXYZ')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'query')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'Query')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'QUERYXYZ')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'ref')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'Ref')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'REFXYZ')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'userinfo')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'Userinfo')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com', 'USERINFOXYZ')", TYPE_STRING);
+
+  // Key's value is terminated by '#'.
+  TestStringValue("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?name=networking#DOWNLOADING', 'QUERY', 'name')", "networking");
+  // Key's value is terminated by end of string.
+  TestStringValue("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?name=networking', 'QUERY', 'name')", "networking");
+  // Key's value is terminated by end of string, with trimming.
+  TestStringValue("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?name=networking   ', 'QUERY', 'name')", "networking");
+  // Key's value is terminated by '&'.
+  TestStringValue("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?name=networking&test=true', 'QUERY', 'name')", "networking");
+  // Key's value is some query param in the middle.
+  TestStringValue("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?test=true&name=networking&op=true', 'QUERY', 'name')", "networking");
+  // Key string appears in various parts of the url.
+  TestStringValue("parse_url('http://name.name:80/name/books/tutorial/"
+      "name.html?name_fake=true&name=networking&op=true#name', 'QUERY', 'name')", "networking");
+  // We can still match this even though no '?' was given.
+  TestStringValue("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.htmltest=true&name=networking&op=true', 'QUERY', 'name')", "networking");
+  // Requested key doesn't exist.
+  TestIsNull("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?test=true&name=networking&op=true', 'QUERY', 'error')", TYPE_STRING);
+  // Requested key doesn't exist in query part.
+  TestIsNull("parse_url('http://example.com:80/docs/books/tutorial/"
+      "name.html?test=true&op=true', 'QUERY', 'name')", TYPE_STRING);
+  // Requested key doesn't exist in query part, but matches at end of string.
+  TestIsNull("parse_url('http://example.com:80/docs/books/tutorial/"
+      "name.html?test=true&op=name', 'QUERY', 'name')", TYPE_STRING);
+  // Malformed urls with incorrectly positioned '?' or '='.
+  TestStringValue("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?test=true&name=net?working&op=true', 'QUERY', 'name')", "net?working");
+  TestStringValue("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?test=true&name=net=working&op=true', 'QUERY', 'name')", "net=working");
+  // Key paremeter given without QUERY part.
+  TestIsNull("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?test=true&name=networking&op=true', 'AUTHORITY', 'name')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?test=true&name=networking&op=true', 'FILE', 'name')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?test=true&name=networking&op=true', 'PATH', 'name')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?test=true&name=networking&op=true', 'PROTOCOL', 'name')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?test=true&name=networking&op=true', 'REF', 'name')", TYPE_STRING);
+  TestIsNull("parse_url('http://example.com:80/docs/books/tutorial/"
+      "index.html?test=true&name=networking&op=true', 'XYZ', 'name')", TYPE_STRING);
+}
+
 TEST_F(ExprTest, MathTrigonometricFunctions) {
   // It is important to calculate the expected values
   // using math functions, and not simply use constants.

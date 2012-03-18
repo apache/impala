@@ -86,6 +86,8 @@ functions = [
   ['String_Concat', 'STRING', ['STRING', '...'], 'StringFunctions::Concat', ['concat']],
   ['String_Concat_Ws', 'STRING', ['STRING', 'STRING', '...'], 'StringFunctions::ConcatWs', ['concat_ws']],
   ['String_Find_In_Set', 'INT', ['STRING', 'STRING'], 'StringFunctions::FindInSet', ['find_in_set']],
+  ['String_Parse_Url', 'STRING', ['STRING', 'STRING'], 'StringFunctions::ParseUrl', ['parse_url']],
+  ['String_Parse_Url', 'STRING', ['STRING', 'STRING', 'STRING'], 'StringFunctions::ParseUrlKey', ['parse_url']],
 
 # Timestamp Functions
   ['Unix_Timestamp', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Unix', ['unix_timestamp']],

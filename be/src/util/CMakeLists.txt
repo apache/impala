@@ -12,6 +12,7 @@ add_library(Util
   jni-util.cc
   perf-counters.cc
   runtime-profile.cc
+  url-parser.cc
 )
 
 add_executable(perf-counters-test

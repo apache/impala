@@ -5,6 +5,7 @@
 #include "exprs/expr.h"
 #include "runtime/tuple-row.h"
 #include <boost/regex.hpp>
+#include "util/url-parser.h"
 
 using namespace std;
 using namespace boost;
@@ -495,6 +496,47 @@ void* StringFunctions::FindInSet(Expr* e, TupleRow* row) {
   } while (start < str_set->len);
   e->result_.int_val = 0;
   return &e->result_.int_val;
+}
+
+void* StringFunctions::ParseUrl(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 2);
+  StringValue* url = reinterpret_cast<StringValue*>(e->children()[0]->GetValue(row));
+  StringValue* part = reinterpret_cast<StringValue*>(e->children()[1]->GetValue(row));
+  if (url == NULL || part == NULL) return NULL;
+  // We use e->result_.bool_val to indicate whether this is the first invocation.
+  // Use e->result_.int_val to hold the URL part enum.
+  if (!e->children()[1]->IsConstant() ||
+      (e->children()[1]->IsConstant() && !e->result_.bool_val)) {
+    e->result_.int_val = UrlParser::GetUrlPart(part);
+    e->result_.bool_val = true;
+  }
+  UrlParser::UrlPart url_part = static_cast<UrlParser::UrlPart>(e->result_.int_val);
+  if (!UrlParser::ParseUrl(url, url_part, &e->result_.string_val)) {
+    // url is malformed, or url_part is invalid.
+    return NULL;
+  }
+  return &e->result_.string_val;
+}
+
+void* StringFunctions::ParseUrlKey(Expr* e, TupleRow* row) {
+  DCHECK_EQ(e->GetNumChildren(), 3);
+  StringValue* url = reinterpret_cast<StringValue*>(e->children()[0]->GetValue(row));
+  StringValue* part = reinterpret_cast<StringValue*>(e->children()[1]->GetValue(row));
+  StringValue* key = reinterpret_cast<StringValue*>(e->children()[2]->GetValue(row));
+  if (url == NULL || part == NULL || key == NULL) return NULL;
+  // We use e->result_.bool_val to indicate whether this is the first invocation.
+  // Use e->result_.int_val to hold the URL part.
+  if (!e->children()[1]->IsConstant() ||
+      (e->children()[1]->IsConstant() && !e->result_.bool_val)) {
+    e->result_.int_val = UrlParser::GetUrlPart(part);
+    e->result_.bool_val = true;
+  }
+  UrlParser::UrlPart url_part = static_cast<UrlParser::UrlPart>(e->result_.int_val);
+  if (!UrlParser::ParseUrlKey(url, url_part, key, &e->result_.string_val)) {
+    // url is malformed, or url_part is not QUERY.
+    return NULL;
+  }
+  return &e->result_.string_val;
 }
 
 }
