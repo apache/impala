@@ -24,5 +24,13 @@ public class SortInfo {
   public List<Boolean> getIsAscOrder() {
     return isAscOrder;
   }
+
+  /**
+   * Substitute all the ordering expression according to the substitution map.
+   * @param sMap
+   */
+  public void substitute(Expr.SubstitutionMap sMap) {
+    Expr.substituteList(orderingExprs, sMap);
+  }
 }
 

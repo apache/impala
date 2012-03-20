@@ -180,4 +180,9 @@ public class PlannerTest {
   public void testTopN() {
     runPlannerTestFile("topn");
   }
+
+  @Test
+  public void testSubquery() {
+    runPlannerTestFile("subquery");
+  }
 }

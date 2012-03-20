@@ -77,10 +77,20 @@ public class AggregateInfo {
       Expr.getIds(groupingExprs, null, ids);
     }
     Expr.getIds(aggregateExprs, null, ids);
-    // we reference all grouping slots (because we write them)
-    for (int i = 0; i < groupingExprs.size(); ++i) {
+    // The backend assumes that the entire aggTupleDesc is materialized
+    for (int i = 0; i < aggTupleDesc.getSlots().size(); ++i) {
       ids.add(aggTupleDesc.getSlots().get(i).getId());
     }
+  }
+
+  /**
+   * Substitute all the expressions (grouping expr, aggregate expr) and update our
+   * substitution map according to the given substitution map.
+   */
+  public void substitute(Expr.SubstitutionMap sMap) {
+    Expr.substituteList(groupingExprs, sMap);
+    Expr.substituteList(aggregateExprs, sMap);
+    aggTupleSMap = Expr.SubstitutionMap.combine(aggTupleSMap, sMap);
   }
 
   /**

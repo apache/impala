@@ -63,12 +63,17 @@ public class DescriptorTable {
     TDescriptorTable result = new TDescriptorTable();
     HashSet<Table> referencedTbls = Sets.newHashSet();
     for (TupleDescriptor tupleD: tupleDescs.values()) {
-      result.addToTupleDescriptors(tupleD.toThrift());
-      if (tupleD.getTable() != null) {
-        referencedTbls.add(tupleD.getTable());
-      }
-      for (SlotDescriptor slotD: tupleD.getSlots()) {
-        result.addToSlotDescriptors(slotD.toThrift());
+      // inline view has a non-materialized tuple descriptor in the descriptor table
+      // just for type checking. So, skip it when generating Thrift. Further, inline view
+      // doesn't have required Thrift attribute.
+      if (tupleD.getIsMaterialized()) {
+        result.addToTupleDescriptors(tupleD.toThrift());
+        if (tupleD.getTable() != null) {
+          referencedTbls.add(tupleD.getTable());
+        }
+        for (SlotDescriptor slotD: tupleD.getSlots()) {
+          result.addToSlotDescriptors(slotD.toThrift());
+        }
       }
     }
     for (Table tbl: referencedTbls) {

@@ -1,0 +1,780 @@
+# simple full scan subquery
+select * from (select y x from (select id y from hbasealltypessmall) a) b
+----
+Plan Fragment 0
+  SCAN HBASE table=hbasealltypessmall (0)
+
+  EXEC PARAMS
+    HOST: coordinator
+      HBASE KEY RANGES NODE ID: 0
+        <unbounded>:<unbounded>
+------------
+Plan Fragment 0
+  EXCHANGE (1)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+  SCAN HBASE table=hbasealltypessmall (0)
+
+  EXEC PARAMS
+    HOST:
+      HBASE KEY RANGES NODE ID: 0
+        <unbounded>:<unbounded>
+====
+# subquery doing join
+select * from (select t2.*
+from testtbl t1 join testtbl t2 using(id)
+where t1.zip = 94611) x
+----
+Plan Fragment 0
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      t1.id = t2.id
+      SCAN HDFS table=default.testtbl (0)
+        PREDICATES: t1.zip = 94611
+      SCAN HDFS table=default.testtbl (1)
+------------
+Plan Fragment 0
+  EXCHANGE (3)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      t1.id = t2.id
+      SCAN HDFS table=default.testtbl (0)
+        PREDICATES: t1.zip = 94611
+      SCAN HDFS table=default.testtbl (1)
+====
+# subquery doing join
+# multiple join predicates;
+# scan predicates get propagated correctly;
+# non-eq join predicates are evaluated as extra conjuncts by the join node
+select * from (select a.*
+from alltypesagg a right outer join alltypessmall b using (id, int_col)
+where a.day >= 6
+and b.month > 2
+and a.tinyint_col = 15
+and b.string_col = '15'
+and a.tinyint_col + b.tinyint_col < 15) x
+----
+Plan Fragment 0
+  HASH JOIN
+    JOIN OP: RIGHT OUTER JOIN
+    HASH PREDICATES:
+      a.id = b.id
+      a.int_col = b.int_col
+    OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
+      SCAN HDFS table=default.alltypesagg (0)
+        PREDICATES: a.tinyint_col = 15
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+      SCAN HDFS table=default.alltypessmall (1)
+        PREDICATES: b.string_col = '15'
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+------------
+Plan Fragment 0
+  EXCHANGE (3)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+  HASH JOIN
+    JOIN OP: RIGHT OUTER JOIN
+    HASH PREDICATES:
+      a.id = b.id
+      a.int_col = b.int_col
+    OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
+      SCAN HDFS table=default.alltypesagg (0)
+        PREDICATES: a.tinyint_col = 15
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+      SCAN HDFS table=default.alltypessmall (1)
+        PREDICATES: b.string_col = '15'
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST:
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+====
+# predicate pushdown
+select * from (select * from hbasealltypessmall) a where id < 5
+----
+Plan Fragment 0
+  SCAN HBASE table=hbasealltypessmall (0)
+    PREDICATES: hbasealltypessmall.id < 5
+
+  EXEC PARAMS
+    HOST: coordinator
+      HBASE KEY RANGES NODE ID: 0
+        <unbounded>:<unbounded>
+------------
+Plan Fragment 0
+  EXCHANGE (1)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+  SCAN HBASE table=hbasealltypessmall (0)
+    PREDICATES: hbasealltypessmall.id < 5
+
+  EXEC PARAMS
+    HOST:
+      HBASE KEY RANGES NODE ID: 0
+        <unbounded>:<unbounded>
+====
+# subquery join
+# multiple join predicates;
+# scan predicates get propagated correctly;
+# non-eq join predicates are evaluated as extra conjuncts by the join node
+select *
+from (select id, int_col, day, tinyint_col from alltypesagg) a right outer join 
+     (select id, int_col, month, string_col, tinyint_col from alltypessmall) b using (id, int_col)
+where a.day >= 6
+and b.month > 2
+and a.tinyint_col = 15
+and b.string_col = '15'
+and a.tinyint_col + b.tinyint_col < 15
+----
+Plan Fragment 0
+  HASH JOIN
+    JOIN OP: RIGHT OUTER JOIN
+    HASH PREDICATES:
+      id = id
+      int_col = int_col
+    OTHER PREDICATES: tinyint_col + tinyint_col < 15
+      SCAN HDFS table=default.alltypesagg (0)
+        PREDICATES: tinyint_col = 15
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+      SCAN HDFS table=default.alltypessmall (1)
+        PREDICATES: string_col = '15'
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+------------
+Plan Fragment 0
+  EXCHANGE (3)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+  HASH JOIN
+    JOIN OP: RIGHT OUTER JOIN
+    HASH PREDICATES:
+      id = id
+      int_col = int_col
+    OTHER PREDICATES: tinyint_col + tinyint_col < 15
+      SCAN HDFS table=default.alltypesagg (0)
+        PREDICATES: tinyint_col = 15
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+      SCAN HDFS table=default.alltypessmall (1)
+        PREDICATES: string_col = '15'
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST:
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+====
+# subquery join
+# multiple join predicates;
+# scan predicates get propagated correctly;
+# non-eq join predicates are evaluated as extra conjuncts by the join node
+select *
+from (select id, int_col, day, tinyint_col
+      from (select id, int_col, day, tinyint_col from alltypesagg) a0
+      where a0.day >= 6) a
+     right outer join 
+     (select id, int_col, month, string_col, tinyint_col from alltypessmall) b using (id, int_col)
+where b.month > 2
+and a.tinyint_col = 15
+and b.string_col = '15'
+and a.tinyint_col + b.tinyint_col < 15
+----
+Plan Fragment 0
+  HASH JOIN
+    JOIN OP: RIGHT OUTER JOIN
+    HASH PREDICATES:
+      id = id
+      int_col = int_col
+    OTHER PREDICATES: tinyint_col + tinyint_col < 15
+      SCAN HDFS table=default.alltypesagg (0)
+        PREDICATES: tinyint_col = 15
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+      SCAN HDFS table=default.alltypessmall (1)
+        PREDICATES: string_col = '15'
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+------------
+Plan Fragment 0
+  EXCHANGE (3)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+  HASH JOIN
+    JOIN OP: RIGHT OUTER JOIN
+    HASH PREDICATES:
+      id = id
+      int_col = int_col
+    OTHER PREDICATES: tinyint_col + tinyint_col < 15
+      SCAN HDFS table=default.alltypesagg (0)
+        PREDICATES: tinyint_col = 15
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+      SCAN HDFS table=default.alltypessmall (1)
+        PREDICATES: string_col = '15'
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST:
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+====
+# complex join, having joined subquery on the rhs, and predicate
+# at multiple subquery level
+select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col
+from alltypessmall c
+     join
+     (
+       select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,
+               a.int_col int_col, a.month month, b.float_col float_col, b.id id
+        from (
+                select *
+                from alltypesagg a
+                where month=1
+             ) a
+             join
+             alltypessmall b
+             on (a.smallint_col = b.id)
+     ) x
+     on (x.tinyint_col = c.id)
+where x.day=1
+and x.int_col > 899
+and x.float_col > 4.5
+and c.string_col < '7'
+and x.int_col + x.float_col + c.string_col < 1000
+----
+Plan Fragment 0
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      c.id = a.tinyint_col
+    OTHER PREDICATES: a.int_col + b.float_col + c.string_col < 1000.0
+      SCAN HDFS table=default.alltypessmall (0)
+        PREDICATES: c.string_col < '7'
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+      HASH JOIN
+        JOIN OP: INNER JOIN
+        HASH PREDICATES:
+          a.smallint_col = b.id
+          SCAN HDFS table=default.alltypesagg (1)
+            PREDICATES: a.int_col > 899
+            REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+          SCAN HDFS table=default.alltypessmall (2)
+            PREDICATES: b.float_col > 4.5
+            REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+------------
+Plan Fragment 0
+  EXCHANGE (5)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      c.id = a.tinyint_col
+    OTHER PREDICATES: a.int_col + b.float_col + c.string_col < 1000.0
+      SCAN HDFS table=default.alltypessmall (0)
+        PREDICATES: c.string_col < '7'
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+      HASH JOIN
+        JOIN OP: INNER JOIN
+        HASH PREDICATES:
+          a.smallint_col = b.id
+          SCAN HDFS table=default.alltypesagg (1)
+            PREDICATES: a.int_col > 899
+            REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+          SCAN HDFS table=default.alltypessmall (2)
+            PREDICATES: b.float_col > 4.5
+            REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+
+  EXEC PARAMS
+    HOST:
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+====
+# with grouping
+select tinyint_col, count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col),
+avg(tinyint_col)
+from (select * from alltypesagg) a
+group by 1
+----
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: COUNT(*), MIN(alltypesagg.tinyint_col), MAX(alltypesagg.tinyint_col), SUM(alltypesagg.tinyint_col), COUNT(alltypesagg.tinyint_col)
+  GROUP BY: alltypesagg.tinyint_col
+    SCAN HDFS table=default.alltypesagg (0)
+      REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+------------
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: SUM(<slot 29>), MIN(<slot 30>), MAX(<slot 31>), SUM(<slot 32>), SUM(<slot 33>)
+  GROUP BY: <slot 28>
+    EXCHANGE (2)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 2
+  AGGREGATE
+  OUTPUT: COUNT(*), MIN(alltypesagg.tinyint_col), MAX(alltypesagg.tinyint_col), SUM(alltypesagg.tinyint_col), COUNT(alltypesagg.tinyint_col)
+  GROUP BY: alltypesagg.tinyint_col
+    SCAN HDFS table=default.alltypesagg (0)
+      REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+
+  EXEC PARAMS
+    HOST:
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+====
+# with grouping
+select * from (
+select tinyint_col, count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col),
+avg(tinyint_col)
+from alltypesagg
+group by 1
+) a
+----
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
+  GROUP BY: tinyint_col
+    SCAN HDFS table=default.alltypesagg (0)
+      REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+------------
+Plan Fragment 0
+  EXCHANGE (2)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 2
+  AGGREGATE
+  OUTPUT: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
+  GROUP BY: tinyint_col
+    SCAN HDFS table=default.alltypesagg (0)
+      REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+
+  EXEC PARAMS
+    HOST:
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+====
+select c1, c2, c3
+from (
+       select c1, c2, c3
+       from (
+              select int_col c1, sum(float_col) c2, min(float_col) c3 
+              from hbasealltypessmall
+              group by 1
+            ) x
+        order by 2,3 desc
+        limit 5
+     ) y
+----
+Plan Fragment 0
+  TOP-N
+  ORDER BY: <slot 3> ASC, <slot 4> DESC
+  LIMIT: 5
+    AGGREGATE
+    OUTPUT: SUM(float_col), MIN(float_col)
+    GROUP BY: int_col
+      SCAN HBASE table=hbasealltypessmall (0)
+
+  EXEC PARAMS
+    HOST: coordinator
+      HBASE KEY RANGES NODE ID: 0
+        <unbounded>:<unbounded>
+------------
+Plan Fragment 0
+  EXCHANGE (3)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+  TOP-N
+  ORDER BY: <slot 3> ASC, <slot 4> DESC
+  LIMIT: 5
+    AGGREGATE
+    OUTPUT: SUM(float_col), MIN(float_col)
+    GROUP BY: int_col
+      SCAN HBASE table=hbasealltypessmall (0)
+
+  EXEC PARAMS
+    HOST:
+      HBASE KEY RANGES NODE ID: 0
+        <unbounded>:<unbounded>
+====
+select c1, x2
+from (
+       select c1, min(c2) x2
+       from (
+              select c1, c2, c3
+              from (
+                     select int_col c1, tinyint_col c2, min(float_col) c3 
+                     from hbasealltypessmall
+                     group by 1, 2
+                     order by 1,2
+                     limit 1
+                   ) x
+             ) x2
+       group by c1
+     ) y
+order by 2,1 desc
+limit 0
+----
+Plan Fragment 0
+  TOP-N
+  ORDER BY: <slot 13> ASC, <slot 12> DESC
+  LIMIT: 0
+    AGGREGATE
+    OUTPUT: MIN(<slot 4>)
+    GROUP BY: <slot 3>
+      TOP-N
+      ORDER BY: <slot 3> ASC, <slot 4> ASC
+      LIMIT: 1
+        AGGREGATE
+        OUTPUT: MIN(float_col)
+        GROUP BY: int_col, tinyint_col
+          SCAN HBASE table=hbasealltypessmall (0)
+
+  EXEC PARAMS
+    HOST: coordinator
+      HBASE KEY RANGES NODE ID: 0
+        <unbounded>:<unbounded>
+------------
+Plan Fragment 0
+  TOP-N
+  ORDER BY: <slot 13> ASC, <slot 12> DESC
+  LIMIT: 0
+    EXCHANGE (4)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+  AGGREGATE
+  OUTPUT: MIN(<slot 4>)
+  GROUP BY: <slot 3>
+    TOP-N
+    ORDER BY: <slot 3> ASC, <slot 4> ASC
+    LIMIT: 1
+      AGGREGATE
+      OUTPUT: MIN(float_col)
+      GROUP BY: int_col, tinyint_col
+        SCAN HBASE table=hbasealltypessmall (0)
+
+  EXEC PARAMS
+    HOST:
+      HBASE KEY RANGES NODE ID: 0
+        <unbounded>:<unbounded>
+====
+# distinct *
+select distinct *
+from (select distinct * from testtbl) x
+----
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 3>, <slot 4>, <slot 5>
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: testtbl.id, testtbl.name, testtbl.zip
+      SCAN HDFS table=default.testtbl (0)
+------------
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 9>, <slot 10>, <slot 11>
+    EXCHANGE (3)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 3>, <slot 4>, <slot 5>
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: testtbl.id, testtbl.name, testtbl.zip
+      SCAN HDFS table=default.testtbl (0)
+====
+# distinct w/ explicit select list
+select distinct id, zip
+from (select distinct * from testtbl) x
+----
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 3>, <slot 5>
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: testtbl.id, testtbl.name, testtbl.zip
+      SCAN HDFS table=default.testtbl (0)
+------------
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 9>, <slot 10>
+    EXCHANGE (3)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 3>, <slot 5>
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: testtbl.id, testtbl.name, testtbl.zip
+      SCAN HDFS table=default.testtbl (0)
+====
+# aggregate with group-by, having
+select *
+from ( 
+       select int_col % 7 c1, count(*) c2, avg(int_col) c3
+       from (
+              select * from alltypesagg
+            ) a
+       group by 1
+       having avg(int_col) > 500 or count(*) = 10
+     ) b
+where c1 is not null
+and   c2 > 10
+----
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: COUNT(*), SUM(alltypesagg.int_col), COUNT(alltypesagg.int_col)
+  GROUP BY: alltypesagg.int_col % 7
+  HAVING: <slot 30> / <slot 31> > 500.0 OR <slot 29> = 10, <slot 28> IS NOT NULL, <slot 29> > 10
+    SCAN HDFS table=default.alltypesagg (0)
+      REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+------------
+Plan Fragment 0
+  EXCHANGE (2)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 2
+  AGGREGATE
+  OUTPUT: COUNT(*), SUM(alltypesagg.int_col), COUNT(alltypesagg.int_col)
+  GROUP BY: alltypesagg.int_col % 7
+  HAVING: <slot 30> / <slot 31> > 500.0 OR <slot 29> = 10, <slot 28> IS NOT NULL, <slot 29> > 10
+    SCAN HDFS table=default.alltypesagg (0)
+      REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+
+  EXEC PARAMS
+    HOST:
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+====
+# subquery with left outer join
+select j.*, d.*
+from (
+       select *
+       from JoinTbl a
+     ) j
+     left outer join
+     (
+       select *
+       from DimTbl b
+     ) d
+     on (j.test_name = d.name)
+where j.test_id <= 1006     
+----
+Plan Fragment 0
+  HASH JOIN
+    JOIN OP: LEFT OUTER JOIN
+    HASH PREDICATES:
+      a.test_name = b.name
+      SCAN HDFS table=default.jointbl (0)
+        PREDICATES: a.test_id <= 1006
+      SCAN HDFS table=default.dimtbl (1)
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 0
+        hdfs:jointbl/data.csv 0:433
+      HDFS SPLITS NODE ID: 1
+        hdfs:dimtbl/data.csv 0:171
+------------
+Plan Fragment 0
+  EXCHANGE (3)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+  HASH JOIN
+    JOIN OP: LEFT OUTER JOIN
+    HASH PREDICATES:
+      a.test_name = b.name
+      SCAN HDFS table=default.jointbl (0)
+        PREDICATES: a.test_id <= 1006
+      SCAN HDFS table=default.dimtbl (1)
+
+  EXEC PARAMS
+    HOST:
+      HDFS SPLITS NODE ID: 0
+        hdfs:jointbl/data.csv 0:433
+      HDFS SPLITS NODE ID: 1
+        hdfs:dimtbl/data.csv 0:171
+====

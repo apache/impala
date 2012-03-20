@@ -10,31 +10,39 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
-public class TableRef extends ParseNodeBase {
-  private final TableName name;
-  private final String alias;
+/**
+ * An abstract representation of a table reference. The actual table reference could be
+ * an inline view, or a base table, such as Hive table or HBase table. This abstract
+ * representation of table also contains the JOIN specification.
+ */
+public abstract class TableRef extends ParseNodeBase {
+  // Table alias
+  protected final String alias;
 
-  private JoinOperator joinOp;
-  private Predicate onClause;
-  private List<String> usingColNames;
+  protected JoinOperator joinOp;
+  protected Predicate onClause;
+  protected List<String> usingColNames;
 
   // the ref to the left of us, if we're part of a JOIN clause
-  private TableRef leftTblRef;
+  protected TableRef leftTblRef;
 
-  private TupleDescriptor desc;  // analysis output
+  // true if this TableRef has been analyzed; implementing subclass should set it to true
+  // at the end of analyze() call.
+  protected boolean isAnalyzed;
+
+  // analysis output
+  protected TupleDescriptor desc;
 
   // conjuncts from the JOIN clause:
   // 1. equi-join predicates
-  private List<Predicate> eqJoinConjuncts;
+  protected List<Predicate> eqJoinConjuncts;
   // 2. the rest
-  private List<Predicate> otherJoinConjuncts;
+  protected List<Predicate> otherJoinConjuncts;
 
-  public TableRef(TableName name, String alias) {
+  public TableRef(String alias) {
     super();
-    Preconditions.checkArgument(!name.toString().isEmpty());
-    this.name = name;
-    Preconditions.checkArgument(alias == null || !alias.isEmpty());
     this.alias = alias;
+    isAnalyzed = false;
   }
 
   public JoinOperator getJoinOp() {
@@ -46,17 +54,31 @@ public class TableRef extends ParseNodeBase {
     return onClause;
   }
 
+  /**
+   * This method should only be called after the TableRef has been analyzed.
+   */
   public TupleDescriptor getDesc() {
+    Preconditions.checkState(isAnalyzed);
+    // after analyze(), desc should be set.
+    Preconditions.checkState(desc != null);
     return desc;
   }
 
+  /**
+   * This method should only be called after the TableRef has been analyzed.
+   */
   public TupleId getId() {
+    Preconditions.checkState(isAnalyzed);
+    // after analyze(), desc should be set.
+    Preconditions.checkState(desc != null);
     return desc.getId();
   }
 
-  public TableName getName() {
-    return name;
-  }
+  /**
+   * Return the list of of materialized tuple ids from the TableRef.
+   * This method should only be called after the TableRef has been analyzed.
+   */
+  abstract public List<TupleId> getIdList();
 
   public String getExplicitAlias() {
     return alias;
@@ -91,12 +113,11 @@ public class TableRef extends ParseNodeBase {
   }
 
   /**
-   * Register this table ref and its ON conjuncts.
-   * Call this after calling expandUsingClause().
+   * Analyze the join clause
+   * The join clause can only be analyzed after the left table has been analyzed
+   * and the TupleDescriptor (desc) of this table has been created.
    */
-  @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
-    desc = analyzer.registerTableRef(this);
+  public void analyzeJoin(Analyzer analyzer) throws AnalysisException {
     Preconditions.checkState(desc != null);
 
     if (usingColNames != null) {
@@ -148,6 +169,16 @@ public class TableRef extends ParseNodeBase {
     }
   }
 
+  /**
+   * Substitute the JOIN expressions according to the substitution map
+   * @param subtsMap
+   */
+  public void substitute(Expr.SubstitutionMap subtsMap) {
+    // Substitute eqJoin and otherJoinConjuncts
+    Expr.substituteList(eqJoinConjuncts, subtsMap);
+    Expr.substituteList(otherJoinConjuncts, subtsMap);
+  }
+
   private String joinOpToSql() {
     Preconditions.checkState(joinOp != null);
     switch (joinOp) {
@@ -166,18 +197,22 @@ public class TableRef extends ParseNodeBase {
     }
   }
 
+  /**
+   * Return the table ref presentation to be used in the toSql string
+   */
+  abstract protected String tableRefToSql();
+
 
   @Override
   public String toSql() {
     if (joinOp == null) {
       // prepend "," if we're part of a sequence of table refs w/o an
       // explicit JOIN clause
-      return (leftTblRef != null ? ", " : "")
-          + name.toString() + (alias != null ? " " + alias : "");
+      return (leftTblRef != null ? ", " : "") + tableRefToSql();
     }
 
     StringBuilder output = new StringBuilder(joinOpToSql() + " ");
-    output.append(name.toString()).append(" ");
+    output.append(tableRefToSql()).append(" ");
     if (alias != null) {
       output.append(alias).append(" ");
     }
@@ -189,21 +224,11 @@ public class TableRef extends ParseNodeBase {
     return output.toString();
   }
 
-  // Return alias by which this table is referenced in select block.
-  public String getAlias() {
-    if (alias == null) {
-      return name.toString().toLowerCase();
-    } else {
-      return alias;
-    }
-  }
+  /**
+   * Return alias by which table is referenced in select block.
+   * @return
+   */
+  abstract public String getAlias();
 
-  public TableName getAliasAsName() {
-    if (alias != null) {
-      return new TableName(null, alias);
-    } else {
-      return name;
-    }
-  }
-
+  abstract public TableName getAliasAsName();
 }

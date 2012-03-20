@@ -3,6 +3,8 @@
 package com.cloudera.impala.analysis;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -10,6 +12,7 @@ import java.util.Set;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.catalog.InlineView;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.Lists;
@@ -23,17 +26,24 @@ public class Analyzer {
   private final DescriptorTable descTbl;
   private final Catalog catalog;
 
+  // An analyzer is a repository for a single select block. A select block can be a top
+  // level select statement, or a inline view select block. An inline
+  // view has its own Analyzer. parentAnalyzer is the analyzer of the enclosing
+  // (or parent) select block analyzer. For top level select statement, parentAnalyzer is
+  // null.
+  private final Analyzer parentAnalyzer;
+
   // map from lowercase table alias to descriptor
-  private final Map<String, TupleDescriptor> aliasMap;
+  private final Map<String, TupleDescriptor> aliasMap = Maps.newHashMap();
 
   // map from lowercase qualified column name ("alias.col") to descriptor
-  private final Map<String, SlotDescriptor> slotRefMap;
+  private final Map<String, SlotDescriptor> slotRefMap = Maps.newHashMap();
 
   // map from tuple id to list of predicates referencing tuple
-  private final Map<TupleId, List<Predicate> > tuplePredicates;
+  private final Map<TupleId, List<Predicate> > tuplePredicates = Maps.newHashMap();
 
   // map from slot id to list of predicates referencing slot
-  private final Map<SlotId, List<Predicate> > slotPredicates;
+  private final Map<SlotId, List<Predicate> > slotPredicates = Maps.newHashMap();
 
   // eqJoinPredicates[tid] contains all predicates of the form
   // "<lhs> = <rhs>" in which either lhs or rhs is fully bound by tid
@@ -41,20 +51,48 @@ public class Analyzer {
   // conditions between two tablerefs).
   // A predicate such as "t1.a = t2.b" has two entries, one for 't1' and
   // another one for 't2'.
-  private final Map<TupleId, List<Predicate> > eqJoinPredicates;
+  private final Map<TupleId, List<Predicate> > eqJoinPredicates = Maps.newHashMap();
 
   // list of all registered conjuncts
-  private final List<Predicate> conjuncts;
+  private final List<Predicate> conjuncts = Lists.newArrayList();
 
+  // set of conjuncts that have been assigned to some PlanNode
+  private final Set<Predicate> assignedConjuncts =
+      Collections.newSetFromMap(new IdentityHashMap<Predicate, Boolean>());
+
+  /**
+   * Analyzer constructor for top level statement.
+   * @param catalog
+   */
   public Analyzer(Catalog catalog) {
+    this.parentAnalyzer = null;
     this.catalog = catalog;
     this.descTbl = new DescriptorTable();
-    this.aliasMap = Maps.newHashMap();
-    this.slotRefMap = Maps.newHashMap();
-    this.tuplePredicates = Maps.newHashMap();
-    this.slotPredicates = Maps.newHashMap();
-    this.eqJoinPredicates = Maps.newHashMap();
-    this.conjuncts = Lists.newArrayList();
+  }
+
+  /**
+   * Analyzer constructor for nested select block. Catalog and DescriptorTable is
+   * inherited from the parentAnalyzer.
+   * @param parentAnalyzer the analyzer of the enclosing select block
+   */
+  public Analyzer(Analyzer parentAnalyzer) {
+    this.parentAnalyzer = parentAnalyzer;
+    this.catalog = parentAnalyzer.catalog;
+    this.descTbl = parentAnalyzer.descTbl;
+  }
+
+  /**
+   * Substitute analyzer's internal expressions (eqJoinPredicates and conjuncts) with the
+   * given substitution map
+   */
+  public void substitute(Expr.SubstitutionMap sMap) {
+    Expr.substituteList(conjuncts, sMap);
+
+    // conjuncts list is substituted, but the original list element might not be.
+    // so, we need to substitute eqJoinPredicates.
+    for (List<Predicate> eqJoinPred: eqJoinPredicates.values()) {
+      Expr.substituteList(eqJoinPred, sMap);
+    }
   }
 
   /**
@@ -62,11 +100,11 @@ public class Analyzer {
    * isn't already registered. Creates and returns an empty TupleDescriptor
    * and registers it against alias. If alias is empty, register
    * "name.tbl" and "name.db.tbl" as aliases.
-   * @param ref
+   * @param ref the BaseTableRef to be registered
    * @return newly created TupleDescriptor
    * @throws AnalysisException
    */
-  public TupleDescriptor registerTableRef(TableRef ref) throws AnalysisException {
+  public TupleDescriptor registerBaseTableRef(BaseTableRef ref) throws AnalysisException {
     String lookupAlias = ref.getAlias();
     if (aliasMap.containsKey(lookupAlias)) {
       throw new AnalysisException("duplicate table alias: '" + lookupAlias + "'");
@@ -86,6 +124,53 @@ public class Analyzer {
   }
 
   /**
+   * Register an inline view. The enclosing select block of the inline view should have
+   * been analyzed.
+   * Checks that the alias isn't already registered. Checks the inline view doesn't have
+   * duplicate column names.
+   * Creates and returns an empty, non-materialized TupleDescriptor for the inline view
+   * and registers it against alias.
+   * An InlineView object is created and is used as the underlying table of the tuple
+   * descriptor.
+   *
+   * @param ref the InlineView to be registered
+   */
+  public TupleDescriptor registerInlineViewRef(InlineViewRef ref)
+      throws AnalysisException {
+    String lookupAlias = ref.getAlias();
+    if (aliasMap.containsKey(lookupAlias)) {
+      throw new AnalysisException("duplicate table alias: '" + lookupAlias + "'");
+    }
+
+    // Create a fake catalog table for the inline view
+    SelectStmt viewSelectStmt = ref.getViewSelectStmt();
+    InlineView inlineView = new InlineView(ref.getAlias());
+    for (int i = 0; i < viewSelectStmt.getColLabels().size(); ++i) {
+      // inline view select statement has been analyzed. Col label should be filled.
+      Expr selectItemExpr = viewSelectStmt.getSelectListExprs().get(i);
+      String colAlias = viewSelectStmt.getColLabels().get(i);
+
+      // inline view col cannot have duplicate name
+      if (inlineView.getColumn(colAlias) != null) {
+        throw new AnalysisException("duplicated inline view column alias: '" +
+            colAlias + "'" + " in inline view " + "'" + ref.getAlias() + "'");
+      }
+
+      // create a column and add it to the inline view
+      Column col = new Column(colAlias, selectItemExpr.getType(), i);
+      inlineView.addColumn(col);
+    }
+
+    // Register the inline view
+    TupleDescriptor result = descTbl.createTupleDescriptor();
+    result.setIsMaterialized(false);
+    result.setTable(inlineView);
+    aliasMap.put(lookupAlias, result);
+
+    return result;
+  }
+
+  /**
    * Return descriptor of registered table/alias.
    * @param name
    * @return  null if not registered.
@@ -94,8 +179,12 @@ public class Analyzer {
     return aliasMap.get(name.toString().toLowerCase());
   }
 
-  public SlotDescriptor getSlotDescriptor(String colAlias) {
-    return slotRefMap.get(colAlias);
+  /**
+   * Given a "table alias"."column alias", return the SlotDescriptor
+   * @param qualifiedColumnName table qualified column name
+   */
+  public SlotDescriptor getSlotDescriptor(String qualifiedColumnName) {
+    return slotRefMap.get(qualifiedColumnName);
   }
 
   /**
@@ -106,7 +195,6 @@ public class Analyzer {
    * descriptor.
    * @param tblName
    * @param colName
-   * @return
    * @throws AnalysisException
    */
   public SlotDescriptor registerColumnRef(TableName tblName, String colName)
@@ -115,7 +203,8 @@ public class Analyzer {
     if (tblName == null) {
       alias = resolveColumnRef(colName);
       if (alias == null) {
-        throw new AnalysisException("couldn't resolve column reference: '" + colName + "'");
+        throw new AnalysisException("couldn't resolve column reference: '" +
+            colName + "'");
       }
     } else {
       alias = tblName.toString().toLowerCase();
@@ -127,7 +216,8 @@ public class Analyzer {
 
     Column col = d.getTable().getColumn(colName);
     if (col == null) {
-      throw new AnalysisException("unknown column '" + colName + "' (table alias '" + alias + "')");
+      throw new AnalysisException("unknown column '" + colName +
+          "' (table alias '" + alias + "')");
     }
 
     String key = alias + "." + col.getName();
@@ -144,7 +234,7 @@ public class Analyzer {
   /**
    * Resolves column name in context of any of the registered table aliases.
    * Returns null if not found or multiple bindings exist, otherwise returns
-   * the alias.
+   * the table alias.
    * @param colName
    * @return
    * @throws AnalysisException
@@ -155,7 +245,7 @@ public class Analyzer {
     for (String alias: aliasMap.keySet()) {
       Column col = aliasMap.get(alias).getTable().getColumn(colName);
       if (col != null) {
-    	result = alias;
+        result = alias;
         ++numMatches;
         if (numMatches > 1) {
           throw new AnalysisException(
@@ -239,15 +329,16 @@ public class Analyzer {
   }
 
   /**
-   * Return all registered conjuncts that are fully bound by given
+   * Return all unassigned registered conjuncts that are fully bound by given
    * list of tuple ids.
    * @param tupleIds
    * @return possibly empty list of Predicates
    */
   public List<Predicate> getConjuncts(List<TupleId> tupleIds) {
     List<Predicate> result = Lists.newArrayList();
-    for (Predicate pred: conjuncts) {
-      if (pred.isBound(tupleIds)) {
+    for (int i = 0; i < conjuncts.size(); ++i) {
+      Predicate pred = conjuncts.get(i);
+      if (pred.isBound(tupleIds) && !assignedConjuncts.contains(pred)) {
         result.add(pred);
       }
     }
@@ -281,5 +372,21 @@ public class Analyzer {
 
   public List<Predicate> getEqJoinPredicates(TupleId id) {
     return eqJoinPredicates.get(id);
+  }
+
+  /**
+   * Mark those predicates as assigned.
+   * @param predicates mark the given list of predicate as assigned
+   */
+  public void markConjunctsAssigned(List<Predicate> predicates) {
+    assignedConjuncts.addAll(predicates);
+  }
+
+  /**
+   * Return true if there's at least one unassigned conjunct.
+   * @return true if there's at least one unassigned conjunct
+   */
+  public boolean hasUnassignedConjuncts() {
+    return !assignedConjuncts.containsAll(conjuncts);
   }
 }

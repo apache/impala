@@ -14,9 +14,11 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.Analyzer;
+import com.cloudera.impala.analysis.BaseTableRef;
 import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.DescriptorTable;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.InlineViewRef;
 import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.analysis.SlotDescriptor;
@@ -117,10 +119,48 @@ public class Planner {
   }
 
   /**
+   * Create a tree of nodes for the inline view ref
+   * @param analyzer
+   * @param inlineViewRef the inline view ref
+   * @return a tree of nodes for the inline view
+   */
+  private PlanNode createInlineViewPlan(Analyzer analyzer, InlineViewRef inlineViewRef)
+      throws NotImplementedException, InternalException {
+    // Get the list of fully bound predicates
+    List<Predicate> boundConjuncts = analyzer.getConjuncts(inlineViewRef.getIdList());
+
+    // TODO (alan): this is incorrect for left outer join. Predicate should not be
+    // evaluated after the join.
+
+    // If the view select statement does not compute aggregates, predicates are
+    // registered with the inline view's analyzer for predicate pushdown.
+    if (inlineViewRef.getViewSelectStmt().getAggInfo() == null) {
+      for (Predicate boundedConjunct: boundConjuncts) {
+        inlineViewRef.getAnalyzer().registerConjuncts(boundedConjunct);
+      }
+      analyzer.markConjunctsAssigned(boundConjuncts);
+    }
+
+    // Create a tree of plan node for the inline view, using inline view's analyzer.
+    PlanNode result = createSelectPlan(inlineViewRef.getViewSelectStmt(),
+        inlineViewRef.getAnalyzer());
+
+    // If the view select statement has aggregates, predicates aren't pushed into the
+    // inline view. The predicates have to be evaluated at the root of the plan node
+    // for the inline view (which should be an aggregate node).
+    if (inlineViewRef.getViewSelectStmt().getAggInfo() != null) {
+      result.getConjuncts().addAll(boundConjuncts);
+      analyzer.markConjunctsAssigned(boundConjuncts);
+    }
+
+    return result;
+  }
+
+  /**
    * Create node for scanning all data files of a particular table.
    * @param analyzer
    * @param tblRef
-   * @return
+   * @return a scan node
    * @throws NotImplementedException
    */
   private PlanNode createScanNode(Analyzer analyzer, TableRef tblRef) {
@@ -138,7 +178,11 @@ public class Planner {
       scanNode = new HBaseScanNode(getNextNodeId(), tblRef.getDesc());
     }
 
+    // TODO (alan): this is incorrect for left outer joins. Predicate should not be
+    // evaluated after the join.
+
     List<Predicate> conjuncts = analyzer.getConjuncts(tblRef.getId().asList());
+    analyzer.markConjunctsAssigned(conjuncts);
     ArrayList<ValueRange> keyRanges = Lists.newArrayList();
     boolean addedRange = false;  // added non-null range
     // determine scan predicates for clustering cols
@@ -181,11 +225,12 @@ public class Planner {
   private void getHashLookupJoinConjuncts(
       Analyzer analyzer,
       List<TupleId> lhsIds, TableRef rhs,
-      List<Pair<Expr, Expr> > joinConjuncts,
+      List<Pair<Expr, Expr>> joinConjuncts,
       List<Predicate> joinPredicates) {
     joinConjuncts.clear();
     joinPredicates.clear();
     TupleId rhsId = rhs.getId();
+    List<TupleId> rhsIds = rhs.getIdList();
     List<Predicate> candidates;
     if (rhs.getJoinOp().isOuterJoin()) {
       // TODO: create test for this
@@ -200,10 +245,10 @@ public class Planner {
     }
     for (Predicate p: candidates) {
       Expr rhsExpr = null;
-      if (p.getChild(0).isBound(rhsId.asList())) {
+      if (p.getChild(0).isBound(rhsIds)) {
         rhsExpr = p.getChild(0);
       } else {
-        Preconditions.checkState(p.getChild(1).isBound(rhsId.asList()));
+        Preconditions.checkState(p.getChild(1).isBound(rhsIds));
         rhsExpr = p.getChild(1);
       }
 
@@ -229,13 +274,13 @@ public class Planner {
    */
   private PlanNode createHashJoinNode(
       Analyzer analyzer, PlanNode outer, TableRef innerRef)
-      throws NotImplementedException {
+      throws NotImplementedException, InternalException {
     // the rows coming from the build node only need to have space for the tuple
     // materialized by that node
-    PlanNode inner = createScanNode(analyzer, innerRef);
-    inner.rowTupleIds = Lists.newArrayList(innerRef.getId());
+    PlanNode inner = createTableRefNode(analyzer, innerRef);
+    inner.rowTupleIds = Lists.newArrayList(innerRef.getIdList());
 
-    List<Pair<Expr, Expr> > eqJoinConjuncts = Lists.newArrayList();
+    List<Pair<Expr, Expr>> eqJoinConjuncts = Lists.newArrayList();
     List<Predicate> eqJoinPredicates = Lists.newArrayList();
     getHashLookupJoinConjuncts(
         analyzer, outer.getTupleIds(), innerRef, eqJoinConjuncts, eqJoinPredicates);
@@ -246,47 +291,26 @@ public class Planner {
     HashJoinNode result =
         new HashJoinNode(getNextNodeId(), outer, inner, innerRef.getJoinOp(),
                          eqJoinConjuncts, innerRef.getOtherJoinConjuncts());
+    analyzer.markConjunctsAssigned(eqJoinPredicates);
 
-    // conjuncts evaluated by this node:
-    // - equi-join conjuncts are evaluated as part of the hash table lookup
-    // - other join conjuncts are evaluated before establishing a match
-    // - all conjuncts that are bound by outer.getTupleIds() are evaluated by outer
-    //   (or one of its children)
-    // - the remaining conjuncts that are bound by result.getTupleIds()
-    //   need to be evaluated explicitly by the hash join
+    // The remaining conjuncts that are bound by result.getTupleIds()
+    // need to be evaluated explicitly by the hash join.
     ArrayList<Predicate> conjuncts =
       new ArrayList<Predicate>(analyzer.getConjuncts(result.getTupleIds()));
-    conjuncts.removeAll(eqJoinPredicates);
-    if (innerRef.getOtherJoinConjuncts() != null) {
-      conjuncts.removeAll(innerRef.getOtherJoinConjuncts());
-    }
-    conjuncts.removeAll(analyzer.getConjuncts(outer.getTupleIds()));
-    conjuncts.removeAll(analyzer.getConjuncts(inner.getTupleIds()));
     result.setConjuncts(conjuncts);
+    analyzer.markConjunctsAssigned(conjuncts);
     return result;
   }
 
   /**
-   * Mark slots that are being referenced by any conjuncts or select list
-   * exprs as materialized.
+   * Mark slots that are being referenced by any conjuncts, order-by exprs, or select list
+   * exprs as materialized. All aggregate slots are materialized.
    */
   private void markRefdSlots(PlanNode root, SelectStmt selectStmt, Analyzer analyzer) {
-    PlanNode node = root;
+    Preconditions.checkArgument(root != null);
     List<SlotId> refdIdList = Lists.newArrayList();
-    while (node != null) {
-      node.getMaterializedIds(refdIdList);
-      if (node.hasChild(1)) {
-        Expr.getIds(node.getChild(1).getConjuncts(), null, refdIdList);
-      }
-      // traverse down the leftmost path
-      node = node.getChild(0);
-    }
-    if (selectStmt.getAggInfo() != null) {
-      selectStmt.getAggInfo().getRefdSlots(refdIdList);
-      if (selectStmt.getMergeAggInfo() != null) {
-        selectStmt.getMergeAggInfo().getRefdSlots(refdIdList);
-      }
-    }
+    root.getMaterializedIds(refdIdList);
+
     Expr.getIds(selectStmt.getSelectListExprs(), null, refdIdList);
 
     HashSet<SlotId> refdIds = Sets.newHashSet();
@@ -298,6 +322,23 @@ public class Planner {
         }
       }
     }
+  }
+
+  /**
+   * Create a tree of PlanNodes for the given tblRef, which can be a BaseTableRef or a
+   * InlineViewRef
+   * @param analyzer
+   * @param tblRef
+   */
+  private PlanNode createTableRefNode(Analyzer analyzer, TableRef tblRef)
+      throws NotImplementedException, InternalException {
+    if (tblRef instanceof BaseTableRef) {
+      return createScanNode(analyzer, tblRef);
+    }
+    if (tblRef instanceof InlineViewRef) {
+      return createInlineViewPlan(analyzer, (InlineViewRef)tblRef);
+    }
+    throw new NotImplementedException("unknown Table Ref Node");
   }
 
   /**
@@ -319,12 +360,12 @@ public class Planner {
     // and scans
     ArrayList<TupleId> rowTuples = Lists.newArrayList();
     for (TableRef tblRef: selectStmt.getTableRefs()) {
-      rowTuples.add(tblRef.getId());
+      rowTuples.addAll(tblRef.getIdList());
     }
 
     // create left-deep sequence of binary hash joins; assign node ids as we go along
     TableRef tblRef = selectStmt.getTableRefs().get(0);
-    PlanNode root = createScanNode(analyzer, tblRef);
+    PlanNode root = createTableRefNode(analyzer, tblRef);
     root.rowTupleIds = rowTuples;
     for (int i = 1; i < selectStmt.getTableRefs().size(); ++i) {
       TableRef innerRef = selectStmt.getTableRefs().get(i);
@@ -340,6 +381,43 @@ public class Planner {
     }
 
     return root;
+  }
+
+  /**
+   * Create tree of PlanNodes that implements the Select/Project/Join/Group by/Having
+   * of the selectStmt query block.
+   *
+   * @param selectStmt
+   * @param analyzer
+   * @return return a tree of PlanNodes for the selectStmt
+   */
+  private PlanNode createSelectPlan(SelectStmt selectStmt, Analyzer analyzer)
+      throws NotImplementedException, InternalException {
+    PlanNode result = createSpjPlan(selectStmt, analyzer);
+    // add aggregation, if required
+    AggregateInfo aggInfo = selectStmt.getAggInfo();
+    if (aggInfo != null) {
+      result = new AggregationNode(getNextNodeId(), result, aggInfo);
+    }
+    // add having clause, if required
+    if (selectStmt.getHavingPred() != null) {
+      Preconditions.checkState(result instanceof AggregationNode);
+      result.setConjuncts(selectStmt.getHavingPred().getConjuncts());
+      analyzer.markConjunctsAssigned(selectStmt.getHavingPred().getConjuncts());
+    }
+
+    // add order by and limit
+    SortInfo sortInfo = selectStmt.getSortInfo();
+    if (sortInfo != null) {
+      Preconditions.checkState(selectStmt.getLimit() != -1);
+      result = new SortNode(getNextNodeId(), result, sortInfo, true);
+      result.setLimit(selectStmt.getLimit());
+    }
+
+    // All the conjuncts in the inline view analyzer should be assigned
+    Preconditions.checkState(!analyzer.hasUnassignedConjuncts());
+
+    return result;
   }
 
   private ScanNode getLeftmostScan(PlanNode root) {
@@ -417,7 +495,7 @@ public class Planner {
       execParamExplain.insert(0, "\n" + prefix + "EXEC PARAMS\n");
     }
 
-     return execParamExplain.toString();
+    return execParamExplain.toString();
   }
 
   /**
@@ -461,7 +539,8 @@ public class Planner {
   /**
    * Add aggregation, HAVING predicate and sort node for single-node execution.
    */
-  private PlanNode createSingleNodePlan(PlanNode spjPlan, SelectStmt selectStmt) {
+  private PlanNode createSingleNodePlan(
+      Analyzer analyzer, PlanNode spjPlan, SelectStmt selectStmt) {
     // add aggregation, if required, but without having predicate
     PlanNode root = spjPlan;
     if (selectStmt.getAggInfo() != null) {
@@ -479,6 +558,7 @@ public class Planner {
       // only enforce having predicate after the final aggregation step
       // TODO: substitute having pred
       root.setConjuncts(selectStmt.getHavingPred().getConjuncts());
+      analyzer.markConjunctsAssigned(selectStmt.getHavingPred().getConjuncts());
     }
 
     SortInfo sortInfo = selectStmt.getSortInfo();
@@ -534,6 +614,7 @@ public class Planner {
       // only enforce having predicate after the final aggregation step
       // TODO: substitute having pred
       coord.setConjuncts(selectStmt.getHavingPred().getConjuncts());
+      analyzer.markConjunctsAssigned(selectStmt.getHavingPred().getConjuncts());
     }
 
     // top-n is always applied at the very end
@@ -599,7 +680,7 @@ public class Planner {
     // slave: only set for distrib. execution; plan feeding into coord
     PlanNode slave = null;
     if (numNodes == 1) {
-      root = createSingleNodePlan(spjPlan, selectStmt);
+      root = createSingleNodePlan(analyzer, spjPlan, selectStmt);
     } else {
       Reference<PlanNode> rootRef = new Reference<PlanNode>();
       Reference<PlanNode> slaveRef = new Reference<PlanNode>();
@@ -695,6 +776,9 @@ public class Planner {
       }
       buildExplainString(explainString, planFragments, dataSinks, request);
     }
+
+    // All the conjuncts in the analyzer should be assigned
+    Preconditions.checkState(!analyzer.hasUnassignedConjuncts());
 
     return request;
   }

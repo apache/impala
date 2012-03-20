@@ -72,8 +72,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     return limit;
   }
 
+  /**
+   * Set the limit to the given limit only if the limit hasn't been set, or the new limit
+   * is lower.
+   * @param limit
+   */
   public void setLimit(long limit) {
-    this.limit = limit;
+    if (this.limit == -1 || (limit != -1 && this.limit > limit)) {
+      this.limit = limit;
+    }
   }
 
   public ArrayList<TupleId> getTupleIds() {
@@ -146,12 +153,15 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   /**
-   * Appends ids of slots that need to be materialized for this node.
+   * Appends ids of slots that need to be materialized for this tree of nodes.
    * By default, only slots referenced by conjuncts need to be materialized
    * (the rationale being that only conjuncts need to be evaluated explicitly;
    * exprs that are turned into scan predicates, etc., are evaluated implicitly).
    */
   public void getMaterializedIds(List<SlotId> ids) {
+    for (PlanNode childNode: children) {
+      childNode.getMaterializedIds(ids);
+    }
     Expr.getIds(getConjuncts(), null, ids);
   }
 

@@ -14,7 +14,6 @@ import com.cloudera.impala.thrift.THashJoinNode;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.google.common.base.Objects;
-import com.google.common.base.Preconditions;
 
 /**
  * Hash join between left child and right child.
@@ -36,8 +35,7 @@ public class HashJoinNode extends PlanNode {
       List<Predicate> otherJoinConjuncts) {
     super(id);
     tupleIds.addAll(outer.getTupleIds());
-    Preconditions.checkState(inner.getTupleIds().size() == 1);
-    tupleIds.add(inner.getTupleIds().get(0));
+    tupleIds.addAll(inner.getTupleIds());
     this.joinOp = joinOp;
     this.eqJoinConjuncts = eqJoinConjuncts;
     this.otherJoinConjuncts = otherJoinConjuncts;

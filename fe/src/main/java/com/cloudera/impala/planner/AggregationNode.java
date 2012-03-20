@@ -6,6 +6,7 @@ import java.util.List;
 
 import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.thrift.TAggregationNode;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
@@ -64,5 +65,14 @@ public class AggregationNode extends PlanNode {
     output.append(super.getExplainString(prefix))
         .append(getChild(0).getExplainString(prefix + "  "));
     return output.toString();
+  }
+
+  @Override
+  public void getMaterializedIds(List<SlotId> ids) {
+    super.getMaterializedIds(ids);
+
+    // we indirectly reference all grouping slots (because we write them)
+    // so they're all materialized.
+    aggInfo.getRefdSlots(ids);
   }
 }

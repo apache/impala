@@ -276,6 +276,104 @@ public class AnalyzerTest {
   }
 
   @Test
+  public void TestSubquery() {
+    AnalyzesOk("select y x from (select id y from hbasealltypessmall) a");
+    AnalyzesOk("select id from (select id from hbasealltypessmall) a");
+    AnalyzesOk("select * from (select id+2 from hbasealltypessmall) a");
+    AnalyzesOk("select t1 c from " +
+        "(select c t1 from (select id c from hbasealltypessmall) t1) a");
+    AnalysisError("select id from (select id+2 from hbasealltypessmall) a",
+        "couldn't resolve column reference: 'id'");
+    AnalyzesOk("select a.* from (select id+2 from hbasealltypessmall) a");
+
+    // join test
+    AnalyzesOk("select * from (select id+2 id from hbasealltypessmall) a " +
+        "join (select * from AllTypes where true) b");
+    AnalyzesOk("select a.x from (select count(id) x from AllTypes) a");
+    AnalyzesOk("select a.* from (select count(id) from AllTypes) a");
+    AnalysisError("select a.id from (select id y from hbasealltypessmall) a",
+        "unknown column 'id' (table alias 'a')");
+    AnalyzesOk("select * from (select * from AllTypes) a where year = 2009");
+    AnalyzesOk("select * from (select * from alltypesagg) a right outer join " +
+        "                    (select * from alltypessmall) b using (id, int_col) " +
+        "       where a.day >= 6 and b.month > 2 and a.tinyint_col = 15 and " +
+        "             b.string_col = '15' and a.tinyint_col + b.tinyint_col < 15");
+    AnalyzesOk("select * from (select a.smallint_col+b.smallint_col  c1" +
+        "                      from alltypesagg a join alltypessmall b " +
+        "                           using (id, int_col)) x " +
+        "       where x.c1 > 100");
+    AnalyzesOk("select a.* from" +
+        " (select * from (select id+2 from hbasealltypessmall) b) a");
+    AnalysisError("select * from " +
+        "(select * from alltypes a join alltypes b on (a.int_col = b.int_col)) x",
+        "duplicated inline view column alias: 'year' in inline view 'x'");
+
+    // subquery on the rhs of the join
+    AnalyzesOk("select x.float_col "+
+        "       from alltypessmall c join " +
+        "            (select a.smallint_col smallint_col, a.tinyint_col tinyint_col, " +
+        "                   a.int_col int_col, b.float_col float_col" +
+        "             from (select * from alltypesagg a where month=1) a join " +
+        "                  alltypessmall b on (a.smallint_col = b.id)) x " +
+        "            on (x.tinyint_col = c.id)");
+
+    // aggregate test
+    AnalyzesOk("select count(*) from (select count(id) from AllTypes group by id) a");
+    AnalyzesOk("select count(a.x) from (select id+2 x from hbasealltypessmall) a");
+    AnalyzesOk("select * from (select id, zip from (select * from testtbl) x " +
+        "       group by zip, id having count(*) > 0) x");
+
+    AnalysisError("select zip + count(*) from testtbl",
+        "select list expression not produced by aggregation output " +
+        "(missing from GROUP BY clause?)");
+
+    // negative aggregate test
+    AnalysisError("select * from " +
+        "(select id, zip from testtbl group by id having count(*) > 0) x",
+        "select list expression not produced by aggregation output " +
+        "(missing from GROUP BY clause?)");
+    AnalysisError("select * from " +
+        "(select id from testtbl group by id having zip + count(*) > 0) x",
+        "HAVING clause not produced by aggregation output " +
+        "(missing from GROUP BY clause?)");
+    AnalysisError("select * from " +
+        "(select zip, count(*) from testtbl group by 3) x",
+        "GROUP BY: ordinal exceeds number of items in select list");
+    AnalysisError("select * from " +
+        "(select * from alltypes group by 1) x",
+        "cannot combine '*' in select list with GROUP BY");
+    AnalysisError("select * from " +
+        "(select zip, count(*) from testtbl group by count(*)) x",
+        "GROUP BY expression must not contain aggregate functions");
+    AnalysisError("select * from " +
+        "(select zip, count(*) from testtbl group by count(*) + min(zip)) x",
+        "GROUP BY expression must not contain aggregate functions");
+    AnalysisError("select * from " +
+        "(select zip, count(*) from testtbl group by 2) x",
+        "GROUP BY expression must not contain aggregate functions");
+
+    // multiple grouping cols
+    AnalyzesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
+        "group by string_col, int_col, bigint_col");
+    AnalyzesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
+        "group by 2, 1, 3");
+    AnalysisError("select int_col, string_col, bigint_col, count(*) from alltypes " +
+        "group by 2, 1, 4", "GROUP BY expression must not contain aggregate functions");
+    // can't group by floating-point exprs
+    AnalysisError("select float_col, count(*) from alltypes group by 1",
+        "GROUP BY expression must have a discrete (non-floating point) type");
+    AnalysisError("select int_col + 0.5, count(*) from alltypes group by 1",
+        "GROUP BY expression must have a discrete (non-floating point) type");
+
+    // order by, top-n
+    AnalyzesOk("select * from (select zip, count(*) from (select * from testtbl) x " +
+        "       group by 1 order by count(*) + min(zip) limit 5) x");
+    AnalyzesOk("select c1, c2 from (select zip c1 , count(*) c2 " +
+        "                           from (select * from testtbl) x group by 1) x "+
+        "        order by 2, 1 limit 5");
+  }
+
+  @Test
   public void TestStar() {
     AnalyzesOk("select * from AllTypes");
     AnalyzesOk("select alltypes.* from AllTypes");
@@ -534,6 +632,57 @@ public class AnalyzerTest {
     AnalyzesOk("select tinyint_col, count(distinct int_col),"
         + "min(distinct smallint_col), max(distinct string_col) "
         + "from alltypesagg group by 1");
+  }
+
+  @Test
+  public void TestDistinctInlineView() {
+    // DISTINCT
+    AnalyzesOk("select distinct id from " +
+        "(select distinct id, zip from (select * from testtbl) x) y");
+    AnalyzesOk("select distinct * from " +
+        "(select distinct * from (Select * from testtbl) x) y");
+    AnalyzesOk("select distinct * from (select count(*) from testtbl) x");
+    AnalyzesOk("select count(distinct id, zip) from (select * from testtbl) x");
+    AnalyzesOk("select * from (select tinyint_col, count(distinct int_col, bigint_col) "
+        + "from (select * from alltypesagg) x group by 1) y");
+    AnalyzesOk("select tinyint_col, count(distinct int_col),"
+        + "sum(distinct int_col) from (select * from alltypesagg) x group by 1");
+
+    // Error case when distinct is inside an inline view
+    AnalysisError("select * from " + "(select distinct count(*) from testtbl) x",
+        "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
+    AnalysisError("select * from " +
+        "(select distinct id, zip from testtbl group by 1, 2) x",
+        "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
+    AnalysisError("select * from " +
+        "(select distinct id, zip, count(*) from testtbl group by 1, 2) x",
+        "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
+    AnalysisError("select * from " +
+        "(select count(distinct id, zip), count(distinct zip) from testtbl) x",
+        "all DISTINCT aggregate functions need to have the same set of parameters");
+    AnalysisError("select * from " + "(select tinyint_col, count(distinct int_col),"
+        + "sum(distinct bigint_col) from alltypesagg group by 1) x",
+        "all DISTINCT aggregate functions need to have the same set of parameters");
+
+    // Error case when inline view is in the from clause
+    AnalysisError("select distinct count(*) from (select * from testtbl) x",
+        "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
+    AnalysisError("select distinct id, zip from (select * from testtbl) x group by 1, 2",
+        "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
+    AnalysisError("select distinct id, zip, count(*) from " +
+        "(select * from testtbl) x group by 1, 2",
+        "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
+    AnalyzesOk("select count(distinct id, zip) from (select * from testtbl) x");
+    AnalysisError("select count(distinct id, zip), count(distinct zip) " +
+        " from (select * from testtbl) x",
+        "all DISTINCT aggregate functions need to have the same set of parameters");
+    AnalyzesOk("select tinyint_col, count(distinct int_col, bigint_col) "
+        + "from (select * from alltypesagg) x group by 1");
+    AnalyzesOk("select tinyint_col, count(distinct int_col),"
+        + "sum(distinct int_col) from (select * from alltypesagg) x group by 1");
+    AnalysisError("select tinyint_col, count(distinct int_col),"
+        + "sum(distinct bigint_col) from (select * from alltypesagg) x group by 1",
+        "all DISTINCT aggregate functions need to have the same set of parameters");
   }
 
   @Test

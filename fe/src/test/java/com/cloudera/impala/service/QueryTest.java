@@ -129,4 +129,10 @@ public class QueryTest {
   public void TestEmpty() {
     runQueryTestFile("empty", false, 1000);
   }
+
+  @Test
+  public void TestSubquery() {
+    runQueryTestFile("subquery", false, 1000);
+  }
+
 }

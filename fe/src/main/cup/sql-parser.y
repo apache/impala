@@ -178,6 +178,8 @@ nonterminal AggregateExpr.Operator aggregate_operator;
 nonterminal SlotRef column_ref;
 nonterminal ArrayList<TableRef> from_clause, table_ref_list;
 nonterminal TableRef table_ref;
+nonterminal BaseTableRef base_table_ref;
+nonterminal InlineViewRef inline_view_ref;
 nonterminal JoinOperator join_operator;
 nonterminal opt_inner, opt_outer;
 nonterminal PrimitiveType primitive_type;
@@ -370,10 +372,22 @@ table_ref_list ::=
   ;
 
 table_ref ::=
+  base_table_ref:b
+  {: RESULT = b; :}
+  | inline_view_ref:s
+  {: RESULT = s; :}
+  ;
+  
+inline_view_ref ::=
+  LPAREN select_stmt:select RPAREN IDENT:alias
+  {: RESULT = new InlineViewRef(alias, select); :}
+  ;
+  
+base_table_ref ::=
   table_name:name IDENT:alias
-  {: RESULT = new TableRef(name, alias); :}
+  {: RESULT = new BaseTableRef(name, alias); :}
   | table_name:name
-  {: RESULT = new TableRef(name, null); :}
+  {: RESULT = new BaseTableRef(name, null); :}
   ;
 
 join_operator ::=

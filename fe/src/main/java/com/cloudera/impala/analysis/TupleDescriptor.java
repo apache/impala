@@ -18,6 +18,9 @@ public class TupleDescriptor {
   private final ArrayList<SlotDescriptor> slots;
   private Table table;  // underlying table, if there is one
 
+  // if false, this tuple doesn't need to be materialized
+  private boolean isMaterialized = true;
+
   private int byteSize;  // of all slots plus null indicators
 
   TupleDescriptor(int id) {
@@ -41,12 +44,20 @@ public class TupleDescriptor {
     return table;
   }
 
+  public void setIsMaterialized(boolean value) {
+    isMaterialized = value;
+  }
+
   public void setTable(Table tbl) {
     table = tbl;
   }
 
   public int getByteSize() {
     return byteSize;
+  }
+
+  public boolean getIsMaterialized() {
+    return isMaterialized;
   }
 
   public String debugString() {

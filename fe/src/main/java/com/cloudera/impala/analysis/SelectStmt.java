@@ -181,6 +181,62 @@ public class SelectStmt extends ParseNodeBase {
 
     createSortInfo(analyzer);
     analyzeAggregation(analyzer);
+
+    // Substitute expressions to the underlying inline view expressions
+    substituteInlineViewExpressions(analyzer);
+  }
+
+  /**
+   * This select block might contain inline views.
+   * Substitute all exprs (result of the analysis) of this select block referencing any
+   * of our inlined views, including everything registered with the analyzer.
+   * Expressions created during parsing (such as whereClause) are not touched.
+   * @param analyzer The analyzer of the current select block.
+   * @throws AnalysisException
+   */
+  protected void substituteInlineViewExpressions(Analyzer analyzer) {
+    // Gather all the inline view substitution map from all the enclosed inline views
+    Expr.SubstitutionMap sMap = new Expr.SubstitutionMap();
+    for (TableRef tblRef: tableRefs) {
+      if (tblRef instanceof InlineViewRef) {
+        InlineViewRef inlineViewRef = (InlineViewRef) tblRef;
+        sMap = Expr.SubstitutionMap.combine(sMap, inlineViewRef.getSelectListExprSMap());
+      }
+    }
+
+    // we might not have anything to substitute
+    if (sMap.lhs.size() == 0) {
+      return;
+    }
+
+    // Substitute select list, join clause, where clause, aggregate, order by
+    // and this select block's analyzer expressions
+
+    // select
+    Expr.substituteList(selectListExprs, sMap);
+
+    // join clause
+    for (TableRef tblRef: tableRefs) {
+      tblRef.substitute(sMap);
+    }
+
+    // aggregation (group by and aggregation expr)
+    if (aggInfo != null) {
+      aggInfo.substitute(sMap);
+    }
+
+    // having
+    if (havingPred != null) {
+      havingPred.substitute(sMap);
+    }
+
+    // ordering
+    if (sortInfo != null) {
+      sortInfo.substitute(sMap);
+    }
+
+    // expressions registered inside the analyzer
+    analyzer.substitute(sMap);
   }
 
   /**
