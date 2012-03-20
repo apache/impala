@@ -45,7 +45,7 @@ Status PlanExecutor::Prepare(
   VLOG(1) << "params:\n" << ThriftDebugString(params);
   runtime_state_.reset(
       new RuntimeState(request.queryId, params.abortOnError, params.maxErrors,
-                       exec_env_));
+                       params.batchSize, exec_env_));
 
   // set up desc tbl
   DescriptorTbl* desc_tbl = NULL;

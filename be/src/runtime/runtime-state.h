@@ -24,13 +24,12 @@ class ExecEnv;
 class RuntimeState {
  public:
   RuntimeState(const TUniqueId& query_id, bool abort_on_error, int max_errors,
-               ExecEnv* exec_env);
+               int batch_size, ExecEnv* exec_env);
 
   ObjectPool* obj_pool() const { return obj_pool_.get(); }
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }
   void set_desc_tbl(DescriptorTbl* desc_tbl) { desc_tbl_ = desc_tbl; }
   int batch_size() const { return batch_size_; }
-  void set_batch_size(int batch_size) { batch_size_ = batch_size; }
   int file_buffer_size() const { return file_buffer_size_; }
   bool abort_on_error() const { return abort_on_error_; }
   int max_errors() const { return max_errors_; }

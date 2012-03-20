@@ -157,7 +157,7 @@ Status QueryExecutor::Setup() {
 Status QueryExecutor::Exec(
     const std::string& query, vector<PrimitiveType>* col_types) {
   query_profile_.reset(new RuntimeProfile(obj_pool_.get(), "QueryExecutor"));
-  RuntimeProfile::Counter* plan_gen_counter = 
+  RuntimeProfile::Counter* plan_gen_counter =
       ADD_COUNTER(query_profile_, "PlanGeneration", TCounterType::CPU_TICKS);
 
   COUNTER_SCOPED_TIMER(query_profile_->total_time_counter());
@@ -180,7 +180,7 @@ Status QueryExecutor::Exec(
     DCHECK(!query_request_.fragmentRequests[0].__isset.planFragment);
     local_state_.reset(
         new RuntimeState(query_request_.queryId, FLAGS_abort_on_error,
-                         FLAGS_max_errors, NULL));
+                         FLAGS_max_errors, FLAGS_batch_size, NULL));
     RETURN_IF_ERROR(
         PrepareSelectListExprs(local_state_.get(), RowDescriptor(), col_types));
     return Status::OK;
@@ -190,6 +190,15 @@ Status QueryExecutor::Exec(
   // the first nodeRequestParams list contains exactly one TPlanExecParams
   // (it's meant for the coordinator fragment)
   DCHECK_EQ(query_request_.nodeRequestParams[0].size(), 1);
+
+  if (FLAGS_batch_size != 0) {
+    query_request_.batchSize = FLAGS_batch_size;
+    for (int i = 0; i < query_request_.nodeRequestParams.size(); ++i) {
+      for (int j = 0; j < query_request_.nodeRequestParams[i].size(); ++j) {
+        query_request_.nodeRequestParams[i][j].batchSize = FLAGS_batch_size;
+      }
+    }
+  }
 
   if (FLAGS_num_nodes != 1) {
     // for distributed execution, we only expect one slave fragment which
@@ -224,7 +233,6 @@ Status QueryExecutor::PrepareSelectListExprs(
       Expr::CreateExprTrees(
           state->obj_pool(), query_request_.fragmentRequests[0].outputExprs,
           &select_list_exprs_));
-  if (FLAGS_batch_size != 0) state->set_batch_size(FLAGS_batch_size);
   for (int i = 0; i < select_list_exprs_.size(); ++i) {
     select_list_exprs_[i]->Prepare(state, row_desc);
     if (col_types != NULL) col_types->push_back(select_list_exprs_[i]->type());

@@ -74,9 +74,6 @@ void JniCoordinator::Exec(jbyteArray thrift_query_exec_request) {
   // if this query is missing a FROM clause, don't hand it to the coordinator
   if (is_constant_query_) return;
   THROW_IF_ERROR(coord_->Exec(query_exec_request_), env_, impala_exc_cl_);
-  if (query_exec_request_.batchSize != 0) {
-    coord_->runtime_state()->set_batch_size(query_exec_request_.batchSize);
-  }
 }
 
 Status JniCoordinator::GetNext(RowBatch** batch) {

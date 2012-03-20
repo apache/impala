@@ -21,10 +21,10 @@ namespace impala {
 void* RuntimeState::hbase_conf_ = NULL;
 
 RuntimeState::RuntimeState(
-    const TUniqueId& query_id, bool abort_on_error, int max_errors,
+    const TUniqueId& query_id, bool abort_on_error, int max_errors, int batchSize,
     ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
-    batch_size_(DEFAULT_BATCH_SIZE),
+    batch_size_(batchSize > 0 ? batchSize : DEFAULT_BATCH_SIZE),
     file_buffer_size_(DEFAULT_FILE_BUFFER_SIZE),
     abort_on_error_(abort_on_error),
     max_errors_(max_errors),

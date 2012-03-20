@@ -90,17 +90,17 @@ static string AppendHdfsErrorMessage(const string& message) {
 Status HdfsTextScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
-  hdfs_time_counter_ = 
+  hdfs_time_counter_ =
       ADD_COUNTER(runtime_profile(), "HdfsTime", TCounterType::CPU_TICKS);
   bytes_read_counter_ =
       ADD_COUNTER(runtime_profile(), "BytesRead", TCounterType::BYTES);
   parse_time_counter_ =
       ADD_COUNTER(runtime_profile(), "ParseTime", TCounterType::CPU_TICKS);
-  tuple_write_time_counter_ = 
+  tuple_write_time_counter_ =
       ADD_COUNTER(runtime_profile(), "TupleWriteTime", TCounterType::CPU_TICKS);
   rows_read_counter_ =
       ADD_COUNTER(runtime_profile(), "RowsRead", TCounterType::UNIT);
-  
+
   // Initialize ptr to end, to initiate reading the first file block
   file_buffer_ptr_ = file_buffer_end_;
 
@@ -198,7 +198,7 @@ Status HdfsTextScanNode::Open(RuntimeState* state) {
 }
 
 Status HdfsTextScanNode::Close(RuntimeState* state) {
-  DCHECK(hdfs_file_ == NULL);
+  RETURN_IF_ERROR(CloseCurrentFile(state));
   RETURN_IF_ERROR(ExecNode::Close(state));
   return Status::OK;
 }
@@ -228,7 +228,7 @@ Status HdfsTextScanNode::HdfsRead(RuntimeState* state, int size) {
   }
   {
     COUNTER_SCOPED_TIMER(hdfs_time_counter_);
-    file_buffer_read_size_ = hdfsReadDirect(hdfs_connection_, hdfs_file_, 
+    file_buffer_read_size_ = hdfsReadDirect(hdfs_connection_, hdfs_file_,
         file_buffer_, size);
     if (file_buffer_read_size_ == -1) {
       return Status(AppendHdfsErrorMessage("Failed to read from hdfs."));
@@ -664,7 +664,7 @@ Status HdfsTextScanNode::ParseFileBuffer(int max_tuples, int* num_tuples, int* n
 Status HdfsTextScanNode::WriteTuples(RuntimeState* state, RowBatch* row_batch, int num_tuples,
     int* row_idx, char** line_start) {
   COUNTER_SCOPED_TIMER(tuple_write_time_counter_);
-  
+
   DCHECK_GT(num_tuples, 0);
 
   *line_start = file_buffer_ptr_;

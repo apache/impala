@@ -27,6 +27,9 @@ struct TPlanExecParams {
   // global execution flags
   3: required bool abortOnError
   4: required i32 maxErrors
+
+  // 0 means use default
+  5: required i32 batchSize
 }
 
 // TPlanExecRequest encapsulates info needed to execute a particular

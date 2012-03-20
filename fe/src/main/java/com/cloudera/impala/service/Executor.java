@@ -28,6 +28,7 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.thrift.TColumnValue;
+import com.cloudera.impala.thrift.TPlanExecParams;
 import com.cloudera.impala.thrift.TPlanExecRequest;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TQueryRequest;
@@ -193,6 +194,13 @@ public class Executor {
     execRequest.setMaxErrors(maxErrors);
     execRequest.setBatchSize(batchSize);
     execRequest.setSqlStmt(analysisResult.getStmt().toSql());
+
+    for (List<TPlanExecParams> planParamsList : execRequest.getNodeRequestParams()) {
+      for (TPlanExecParams params : planParamsList) {
+        params.setBatchSize(batchSize);
+      }
+    }
+
     LOG.info(execRequest.toString());
 
     for (TPlanExecRequest planRequest: execRequest.fragmentRequests) {
