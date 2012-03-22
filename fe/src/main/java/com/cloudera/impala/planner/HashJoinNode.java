@@ -31,10 +31,10 @@ public class HashJoinNode extends PlanNode {
   private final List<Predicate> otherJoinConjuncts;
 
   public HashJoinNode(
-      PlanNode outer, PlanNode inner, JoinOperator joinOp,
+      int id, PlanNode outer, PlanNode inner, JoinOperator joinOp,
       List<Pair<Expr, Expr> > eqJoinConjuncts,
       List<Predicate> otherJoinConjuncts) {
-    super();
+    super(id);
     tupleIds.addAll(outer.getTupleIds());
     Preconditions.checkState(inner.getTupleIds().size() == 1);
     tupleIds.add(inner.getTupleIds().get(0));

@@ -77,7 +77,7 @@ struct TQueryExecRequest {
   // fragmentRequests[0] contains the coordinator fragment
   2: list<TPlanExecRequest> fragmentRequests
 
-  // "host:port" on which to execute plan fragments;
+  // hosts on which to execute plan fragments;
   // execNodes.size() == fragmentRequests.size() - 1, and fragmentRequests[i+1] is
   // executed on execNodes[i] (fragmentRequests[0] is the coordinator fragment, which
   // is executed by the coordinator itself)
@@ -108,7 +108,8 @@ struct TQueryExecRequest {
 
 service ImpalaBackendService {
   // Synchronous execution of plan fragment. Returns completion status.
-  TExecPlanFragmentResult ExecPlanFragment(1:TPlanExecRequest request, 2:TPlanExecParams params);
+  TExecPlanFragmentResult ExecPlanFragment(
+      1:TPlanExecRequest request, 2:TPlanExecParams params);
 
   // Transmit single row batch. Returns error indication if queryId or destNodeId
   // are unknown or if data couldn't be read.

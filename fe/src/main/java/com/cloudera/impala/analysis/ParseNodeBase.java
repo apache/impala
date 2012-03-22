@@ -3,9 +3,10 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.InternalException;
 
 abstract class ParseNodeBase implements ParseNode {
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
     throw new AnalysisException("not implemented");
   }
 

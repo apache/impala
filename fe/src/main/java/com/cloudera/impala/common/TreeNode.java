@@ -81,4 +81,22 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
     }
     return false;
   }
+
+  /**
+   * Return 'this' or first child that is exactly of class 'cl'.
+   * Looks for matching children via depth-first, left-to-right traversal.
+   */
+  public <C extends NodeType> C findFirstOf(Class<C> cl) {
+    if (this.getClass().equals(cl)) {
+      return (C) this;
+    }
+    for (NodeType child: children) {
+      NodeType result = child.findFirstOf(cl);
+      if (result != null) {
+        return (C) result;
+      }
+    }
+    return null;
+  }
+
 }

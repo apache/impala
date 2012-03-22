@@ -46,6 +46,10 @@ public class CastExpr extends Expr {
     msg.setOpcode(opcode);
   }
 
+  public boolean isImplicit() {
+    return isImplicit;
+  }
+
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
@@ -76,4 +80,20 @@ public class CastExpr extends Expr {
     CastExpr expr = (CastExpr) obj;
     return this.opcode == expr.opcode;
   }
+
+  /**
+   * Returns child expr if this expr is an implicit cast, otherwise returns 'this'.
+   */
+  @Override
+  public Expr ignoreImplicitCast() {
+    if (isImplicit) {
+      // we don't expect to see to consecutive implicit casts
+      Preconditions.checkState(
+          !(getChild(0) instanceof CastExpr) || !((CastExpr) getChild(0)).isImplicit());
+      return getChild(0);
+    } else {
+      return this;
+    }
+  }
+
 }

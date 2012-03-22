@@ -99,7 +99,7 @@ if [ $config_action -eq 1 ]
 then
   ./configure --with-pic
 fi
-make -j
+make -j4
 
 # Build pprof
 cd $IMPALA_HOME/thirdparty/gperftools-2.0
@@ -110,7 +110,7 @@ then
 # still seems to generate useful profiling data.
   ./configure --enable-frame-pointers --with-pic
 fi
-make -j
+make -j4
 
 # Build glog
 cd $IMPALA_HOME/thirdparty/glog-0.3.1
@@ -118,11 +118,11 @@ if [ $config_action -eq 1 ]
 then
   ./configure --with-pic
 fi
-make -j
+make -j4
 
 cd $IMPALA_HOME/thirdparty/gtest-1.6.0
 cmake .
-make -j
+make -j4
 
 # cleanup FE process
 $IMPALA_HOME/bin/clean-fe-processes.py
@@ -135,7 +135,7 @@ make
 cd $IMPALA_HOME/common/thrift
 make
 cd $IMPALA_BE_DIR
-make -j
+make -j4
 
 # Get Hadoop dependencies onto the classpath
 cd $IMPALA_HOME/fe

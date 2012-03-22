@@ -22,8 +22,8 @@ abstract public class ScanNode extends PlanNode {
    */
   protected List<ValueRange> keyRanges;
 
-  public ScanNode(TupleDescriptor desc) {
-    super(desc.getId().asList());
+  public ScanNode(int id, TupleDescriptor desc) {
+    super(id, desc.getId().asList());
     this.desc = desc;
   }
 

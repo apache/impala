@@ -40,7 +40,7 @@ public class AggregateExpr extends Expr {
   }
   private final Operator op;
   private final boolean isStar;
-  private final boolean isDistinct;
+  private boolean isDistinct;
 
   public AggregateExpr(Operator op, boolean isStar,
                        boolean isDistinct, List<Expr> exprs) {
@@ -117,10 +117,6 @@ public class AggregateExpr extends Expr {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     super.analyze(analyzer);
-    if (isDistinct) {
-      throw new AnalysisException(
-          "DISTINCT not implemented: " + this.toSql());
-    }
 
     if (isStar && op != Operator.COUNT) {
       throw new AnalysisException(
@@ -172,6 +168,7 @@ public class AggregateExpr extends Expr {
       }
     } else if (op == Operator.MIN || op == Operator.MAX) {
       type = arg.type;
+      isDistinct = false;  // DISTINCT is meaningless here
     }
   }
 }

@@ -9,9 +9,11 @@ import java.util.ListIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.InternalException;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
@@ -21,7 +23,7 @@ import com.google.common.collect.Lists;
 public class SelectStmt extends ParseNodeBase {
   private final static Logger LOG = LoggerFactory.getLogger(SelectStmt.class);
 
-  private final ArrayList<SelectListItem> selectList;
+  private final SelectList selectList;
   private final ArrayList<String> colLabels; // lower case column labels
   private final List<TableRef> tableRefs;
   private final Predicate whereClause;
@@ -31,7 +33,7 @@ public class SelectStmt extends ParseNodeBase {
   private final long limit;
 
   /**  map from SlotRef(alias) to corresp. select list expr */
-  private final Expr.SubstitutionMap aliasSubstMap;
+  private final Expr.SubstitutionMap aliasSMap;
 
   /**
    * list of executable exprs in select clause (star-expanded, ordinals and
@@ -42,11 +44,15 @@ public class SelectStmt extends ParseNodeBase {
   /**  havingClause with aliases and agg output resolved */
   private Predicate havingPred;
 
+  /** set if we have any kind of aggregation operation, include SELECT DISTINCT */
   private AggregateInfo aggInfo;
+
+  /** set if we have DISTINCT aggregate functions */
+  private AggregateInfo mergeAggInfo;
 
   private SortInfo sortInfo;
 
-  SelectStmt(ArrayList<SelectListItem> selectList,
+  SelectStmt(SelectList selectList,
              List<TableRef> tableRefList,
              Predicate wherePredicate, ArrayList<Expr> groupingExprs,
              Predicate havingPredicate, ArrayList<OrderByElement> orderByElements,
@@ -63,7 +69,7 @@ public class SelectStmt extends ParseNodeBase {
     this.orderByElements = orderByElements;
     this.limit = limit;
 
-    this.aliasSubstMap = new Expr.SubstitutionMap();
+    this.aliasSMap = new Expr.SubstitutionMap();
     this.selectListExprs = Lists.newArrayList();
     this.colLabels = Lists.newArrayList();
     this.havingPred = null;
@@ -74,7 +80,7 @@ public class SelectStmt extends ParseNodeBase {
   /**
    * @return the original select list items from the query
    */
-  public ArrayList<SelectListItem> getSelectList() {
+  public SelectList getSelectList() {
     return selectList;
   }
 
@@ -117,6 +123,10 @@ public class SelectStmt extends ParseNodeBase {
     return aggInfo;
   }
 
+  public AggregateInfo getMergeAggInfo() {
+    return mergeAggInfo;
+  }
+
   public SortInfo getSortInfo() {
     return sortInfo;
   }
@@ -126,7 +136,7 @@ public class SelectStmt extends ParseNodeBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
     // start out with table refs to establish aliases
     TableRef leftTblRef = null;  // the one to the left of tblRef
     for (TableRef tblRef: tableRefs) {
@@ -135,8 +145,8 @@ public class SelectStmt extends ParseNodeBase {
       leftTblRef = tblRef;
     }
 
-    // populate selectListExprs, aliasSubstMap, and colNames
-    for (SelectListItem item: selectList) {
+    // populate selectListExprs, aliasSMap, and colNames
+    for (SelectListItem item: selectList.getItems()) {
       if (item.isStar()) {
         TableName tblName = item.getTblName();
         if (tblName == null) {
@@ -147,9 +157,9 @@ public class SelectStmt extends ParseNodeBase {
       } else {
         selectListExprs.add(item.getExpr());
         if (item.getAlias() != null) {
-          aliasSubstMap.lhs.add(
+          aliasSMap.lhs.add(
               new SlotRef(null, item.getAlias().toLowerCase()));
-          aliasSubstMap.rhs.add(item.getExpr().clone(null));
+          aliasSMap.rhs.add(item.getExpr().clone(null));
           colLabels.add(item.getAlias().toLowerCase());
         } else {
           colLabels.add(item.toSql().toLowerCase());
@@ -170,7 +180,7 @@ public class SelectStmt extends ParseNodeBase {
     }
 
     createSortInfo(analyzer);
-    createAggInfo(analyzer);
+    analyzeAggregation(analyzer);
   }
 
   /**
@@ -221,36 +231,46 @@ public class SelectStmt extends ParseNodeBase {
   /**
    * Analyze aggregation-relevant components of the select block (Group By clause,
    * select list, Order By clause), substitute AVG with SUM/COUNT, create the
-   * AggregationInfo, including the agg output tuple, and transform all post-agg exprs given
-   * AggregationInfo's substmap.
+   * AggregationInfo, including the agg output tuple, and transform all post-agg exprs
+   * given AggregationInfo's smap.
    *
    * @param analyzer
    * @throws AnalysisException
    */
-  private void createAggInfo(Analyzer analyzer) throws AnalysisException {
-    if (groupingExprs == null && !Expr.contains(selectListExprs, AggregateExpr.class)) {
+  private void analyzeAggregation(Analyzer analyzer)
+      throws AnalysisException, InternalException {
+    if (groupingExprs == null && !selectList.isDistinct()
+        && !Expr.contains(selectListExprs, AggregateExpr.class)) {
       // we're not computing aggregates
       return;
     }
 
-    // disallow '*' and aggregation (we can't group by '*', and if you need to
+    if ((groupingExprs != null || Expr.contains(selectListExprs, AggregateExpr.class))
+        && selectList.isDistinct()) {
+      throw new AnalysisException(
+        "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
+    }
+
+    // disallow '*' and explicit GROUP BY (we can't group by '*', and if you need to
     // name all star-expanded cols in the group by clause you might as well do it
     // in the select list)
-    for (SelectListItem item : selectList) {
-      if (item.isStar()) {
-        throw new AnalysisException(
-            "cannot combine '*' in select list with aggregation: " + item.toSql());
+    if (groupingExprs != null) {
+      for (SelectListItem item : selectList.getItems()) {
+        if (item.isStar()) {
+          throw new AnalysisException(
+              "cannot combine '*' in select list with GROUP BY: " + item.toSql());
+        }
       }
     }
 
     // analyze grouping exprs
-    ArrayList<Expr> groupingExprsCopy = null;
+    ArrayList<Expr> groupingExprsCopy = Lists.newArrayList();
     if (groupingExprs != null) {
       // make a deep copy here, we don't want to modify the original
-      // exprs during analysis (in case we need to print them)
+      // exprs during analysis (in case we need to print them later)
       groupingExprsCopy = Expr.cloneList(groupingExprs, null);
       substituteOrdinals(groupingExprsCopy, "GROUP BY");
-      Expr.substituteList(groupingExprsCopy, aliasSubstMap);
+      Expr.substituteList(groupingExprsCopy, aliasSMap);
       for (int i = 0; i < groupingExprsCopy.size(); ++i) {
         groupingExprsCopy.get(i).analyze(analyzer);
         if (groupingExprsCopy.get(i).contains(AggregateExpr.class)) {
@@ -270,7 +290,7 @@ public class SelectStmt extends ParseNodeBase {
     // analyze having clause
     if (havingClause != null) {
       // substitute aliases in place (ordinals not allowed in having clause)
-      havingPred = (Predicate) havingClause.clone(aliasSubstMap);
+      havingPred = (Predicate) havingClause.clone(aliasSMap);
       havingPred.analyze(analyzer);
     }
 
@@ -279,80 +299,46 @@ public class SelectStmt extends ParseNodeBase {
       orderingExprs = sortInfo.getOrderingExprs();
     }
 
-    // build substmap AVG -> SUM/COUNT;
-    // assumes that select list and having clause have been analyzed
     ArrayList<AggregateExpr> aggExprs = collectAggExprs();
-
-    Expr.SubstitutionMap avgSubstMap = new Expr.SubstitutionMap();
-    for (AggregateExpr aggExpr : aggExprs) {
-      if (aggExpr.getOp() != AggregateExpr.Operator.AVG) {
-        continue;
-      }
-      // Transform avg(TIMESTAMP) to cast(avg(cast(TIMESTAMP as DOUBLE as TIMESTAMP))
-      CastExpr inCastExpr = null;
-      if (aggExpr.getChild(0).type == PrimitiveType.TIMESTAMP) {
-        inCastExpr =
-          new CastExpr(PrimitiveType.DOUBLE, aggExpr.getChild(0).clone(), false);
-      }
-
-      AggregateExpr sumExpr =
-          new AggregateExpr(AggregateExpr.Operator.SUM, false, false,
-                Lists.newArrayList(aggExpr.getChild(0).type == PrimitiveType.TIMESTAMP ?
-                  inCastExpr : aggExpr.getChild(0).clone()));
-      AggregateExpr countExpr =
-          new AggregateExpr(AggregateExpr.Operator.COUNT, false, false,
-                            Lists.newArrayList(aggExpr.getChild(0).clone()));
-      ArithmeticExpr divExpr =
-          new ArithmeticExpr(ArithmeticExpr.Operator.DIVIDE, sumExpr, countExpr);
-
-      if (aggExpr.getChild(0).type == PrimitiveType.TIMESTAMP) {
-        CastExpr outCastExpr = new CastExpr(PrimitiveType.TIMESTAMP, divExpr, false);
-        outCastExpr.analyze(analyzer);
-        avgSubstMap.rhs.add(outCastExpr);
-      } else {
-        divExpr.analyze(analyzer);
-        avgSubstMap.rhs.add(divExpr);
-      }
-      avgSubstMap.lhs.add(aggExpr);
-    }
-    LOG.debug("avg substmap: " + avgSubstMap.debugString());
+    Expr.SubstitutionMap avgSMap = createAvgSMap(aggExprs, analyzer);
 
     // substitute AVG before constructing AggregateInfo
-    Expr.substituteList(aggExprs, avgSubstMap);
+    Expr.substituteList(aggExprs, avgSMap);
     ArrayList<AggregateExpr> nonAvgAggExprs = Lists.newArrayList();
     Expr.collectList(aggExprs, AggregateExpr.class, nonAvgAggExprs);
     aggExprs = nonAvgAggExprs;
-    LOG.debug("aggExprs=" + Expr.debugString(aggExprs));
-    aggInfo = new AggregateInfo(groupingExprsCopy, aggExprs);
-    aggInfo.createAggTuple(analyzer.getDescTbl());
-    LOG.debug("agg substmap: " + aggInfo.getAggTupleSubstMap().debugString());
+    LOG.info("aggExprs=" + Expr.debugString(aggExprs));
+    createAggInfo(groupingExprsCopy, aggExprs, analyzer);
+    LOG.info("agg smap: " + aggInfo.getSMap().debugString());
 
-    Expr.SubstitutionMap combinedSubstMap =
-        Expr.SubstitutionMap.combine(avgSubstMap, aggInfo.getAggTupleSubstMap());
-    LOG.debug("combined substmap: " + combinedSubstMap.debugString());
+    // combine avg smap with the one that produces the final agg output
+    AggregateInfo finalAggInfo = mergeAggInfo != null ? mergeAggInfo : aggInfo;
+    Expr.SubstitutionMap combinedSMap =
+        Expr.SubstitutionMap.combine(avgSMap, finalAggInfo.getSMap());
+    LOG.info("combined smap: " + combinedSMap.debugString());
 
     // change select list, having and ordering exprs to point to agg output
-    Expr.substituteList(selectListExprs, combinedSubstMap);
-    LOG.debug("post-agg selectListExprs: " + Expr.debugString(selectListExprs));
+    Expr.substituteList(selectListExprs, combinedSMap);
+    LOG.info("post-agg selectListExprs: " + Expr.debugString(selectListExprs));
     if (havingPred != null) {
-      havingPred = (Predicate) havingPred.substitute(combinedSubstMap);
-      LOG.debug("post-agg havingPred: " + havingPred.debugString());
+      havingPred = (Predicate) havingPred.substitute(combinedSMap);
+      LOG.info("post-agg havingPred: " + havingPred.debugString());
     }
-    Expr.substituteList(orderingExprs, combinedSubstMap);
-    LOG.debug("post-agg orderingExprs: " + Expr.debugString(orderingExprs));
+    Expr.substituteList(orderingExprs, combinedSMap);
+    LOG.info("post-agg orderingExprs: " + Expr.debugString(orderingExprs));
 
     // check that all post-agg exprs point to agg output
-    for (int i = 0; i < selectList.size(); ++i) {
-      if (!selectListExprs.get(i).isBound(aggInfo.getAggTupleId())) {
+    for (int i = 0; i < selectList.getItems().size(); ++i) {
+      if (!selectListExprs.get(i).isBound(finalAggInfo.getAggTupleId())) {
         throw new AnalysisException(
             "select list expression not produced by aggregation output "
             + "(missing from GROUP BY clause?): "
-            + selectList.get(i).getExpr().toSql());
+            + selectList.getItems().get(i).getExpr().toSql());
       }
     }
     if (orderByElements != null) {
       for (int i = 0; i < orderByElements.size(); ++i) {
-        if (!orderingExprs.get(i).isBound(aggInfo.getAggTupleId())) {
+        if (!orderingExprs.get(i).isBound(finalAggInfo.getAggTupleId())) {
           throw new AnalysisException(
               "ORDER BY expression not produced by aggregation output "
               + "(missing from GROUP BY clause?): "
@@ -361,7 +347,7 @@ public class SelectStmt extends ParseNodeBase {
       }
     }
     if (havingPred != null) {
-      if (!havingPred.isBound(aggInfo.getAggTupleId())) {
+      if (!havingPred.isBound(finalAggInfo.getAggTupleId())) {
         throw new AnalysisException(
             "HAVING clause not produced by aggregation output "
             + "(missing from GROUP BY clause?): "
@@ -382,6 +368,154 @@ public class SelectStmt extends ParseNodeBase {
     return result;
   }
 
+  /**
+   * Build smap AVG -> SUM/COUNT;
+   * assumes that select list and having clause have been analyzed.
+   */
+  private Expr.SubstitutionMap createAvgSMap(
+      ArrayList<AggregateExpr> aggExprs, Analyzer analyzer) throws AnalysisException {
+    Expr.SubstitutionMap result = new Expr.SubstitutionMap();
+    for (AggregateExpr aggExpr : aggExprs) {
+      if (aggExpr.getOp() != AggregateExpr.Operator.AVG) {
+        continue;
+      }
+      // Transform avg(TIMESTAMP) to cast(avg(cast(TIMESTAMP as DOUBLE)) as TIMESTAMP)
+      CastExpr inCastExpr = null;
+      if (aggExpr.getChild(0).type == PrimitiveType.TIMESTAMP) {
+        inCastExpr =
+            new CastExpr(PrimitiveType.DOUBLE, aggExpr.getChild(0).clone(), false);
+      }
+
+      AggregateExpr sumExpr =
+          new AggregateExpr(AggregateExpr.Operator.SUM, false, aggExpr.isDistinct(),
+                Lists.newArrayList(aggExpr.getChild(0).type == PrimitiveType.TIMESTAMP ?
+                  inCastExpr : aggExpr.getChild(0).clone()));
+      AggregateExpr countExpr =
+          new AggregateExpr(AggregateExpr.Operator.COUNT, false, aggExpr.isDistinct(),
+                            Lists.newArrayList(aggExpr.getChild(0).clone()));
+      ArithmeticExpr divExpr =
+          new ArithmeticExpr(ArithmeticExpr.Operator.DIVIDE, sumExpr, countExpr);
+
+      if (aggExpr.getChild(0).type == PrimitiveType.TIMESTAMP) {
+        CastExpr outCastExpr = new CastExpr(PrimitiveType.TIMESTAMP, divExpr, false);
+        outCastExpr.analyze(analyzer);
+        result.rhs.add(outCastExpr);
+      } else {
+        divExpr.analyze(analyzer);
+        result.rhs.add(divExpr);
+      }
+      result.lhs.add(aggExpr);
+    }
+    LOG.info("avg smap: " + result.debugString());
+    return result;
+  }
+
+  /**
+   * Create aggInfo and possibly mergeAggInfo for the given grouping and agg exprs.
+   */
+  private void createAggInfo(ArrayList<Expr> groupingExprs,
+      ArrayList<AggregateExpr> aggExprs, Analyzer analyzer)
+      throws AnalysisException, InternalException {
+    if (selectList.isDistinct()) {
+      Preconditions.checkState(groupingExprs.isEmpty());
+      Preconditions.checkState(aggExprs.isEmpty());
+      createSelectDistinctInfo(analyzer.getDescTbl());
+    } else {
+      Preconditions.checkState(!aggExprs.isEmpty());
+      // collect agg exprs with DISTINCT clause
+      ArrayList<AggregateExpr> distinctAggExprs = Lists.newArrayList();
+      for (AggregateExpr aggExpr: aggExprs) {
+        if (aggExpr.isDistinct()) {
+          distinctAggExprs.add(aggExpr);
+        }
+      }
+
+      if (distinctAggExprs.isEmpty()) {
+        aggInfo = new AggregateInfo(groupingExprs, aggExprs);
+        aggInfo.createAggTuple(analyzer.getDescTbl());
+      } else {
+        createDistinctAggInfo(groupingExprs, distinctAggExprs, aggExprs, analyzer);
+      }
+    }
+  }
+
+  /**
+   * Create aggInfo for SELECT DISTINCT ... stmt:
+   * - all select list items turn into grouping exprs
+   * - there are no aggregate exprs
+   */
+  private void createSelectDistinctInfo(DescriptorTable descTbl) {
+    ArrayList<Expr> groupingExprs = Expr.cloneList(selectListExprs, null);
+    aggInfo = new AggregateInfo(groupingExprs, null);
+    aggInfo.createAggTuple(descTbl);
+  }
+
+  /**
+   * Create aggregate info for select block containing aggregate exprs with
+   * DISTINCT clause. At the moment, we require that all distinct aggregate
+   * functions be applied to the same set of exprs (ie, we can't do something
+   * like SELECT COUNT(DISTINCT id), COUNT(DISTINCT address)).
+   * Aggregation happens in two successive phases:
+   * - the first phase aggregates by all grouping exprs plus all parameter exprs
+   *   of DISTINCT aggregate functions
+   * - the second phase re-aggregates the output of the first phase by
+   *   grouping by the original grouping exprs and performing a merge aggregation
+   *   (ie, COUNT turns into SUM)
+   *
+   * Example:
+   *   SELECT a, COUNT(DISTINCT b, c), MIN(d), COUNT(*) FROM T GROUP BY a
+   * - 1st phase grouping exprs: a, b, c
+   * - 1st phase agg exprs: MIN(d), COUNT(*)
+   * - 2nd phase grouping exprs: a
+   * - 2nd phase agg exprs: COUNT(*), MIN(<MIN(d) from 1st phase>),
+   *     SUM(<COUNT(*) from 1st phase>)
+   *
+   * TODO: expand implementation to cover the general case; this will require
+   * a different execution strategy
+   */
+  private void createDistinctAggInfo(ArrayList<Expr> groupingExprs,
+      ArrayList<AggregateExpr> distinctAggExprs, ArrayList<AggregateExpr> aggExprs,
+      Analyzer analyzer) throws AnalysisException, InternalException {
+    Preconditions.checkState(!distinctAggExprs.isEmpty());
+    // make sure that all DISTINCT params are the same;
+    // ignore top-level implicit casts in the comparison, we might have inserted
+    // those during analysis
+    ArrayList<Expr> expr0Children = Lists.newArrayList();
+    for (Expr expr: distinctAggExprs.get(0).getChildren()) {
+      expr0Children.add(expr.ignoreImplicitCast());
+    }
+    for (int i = 1; i < distinctAggExprs.size(); ++i) {
+      ArrayList<Expr> exprIChildren = Lists.newArrayList();
+      for (Expr expr: distinctAggExprs.get(i).getChildren()) {
+        exprIChildren.add(expr.ignoreImplicitCast());
+      }
+      if (!Expr.equalLists(expr0Children, exprIChildren)) {
+        throw new AnalysisException(
+            "all DISTINCT aggregate functions need to have the same set of parameters: "
+            + distinctAggExprs.get(1).toSql());
+      }
+    }
+
+    // add DISTINCT parameters to grouping exprs
+    ArrayList<Expr> phase1GroupingExprs = Lists.newArrayList();
+    phase1GroupingExprs.addAll(groupingExprs);
+    phase1GroupingExprs.addAll(distinctAggExprs.get(0).getChildren());
+
+    // remove DISTINCT aggregate functions from aggExprs
+    ArrayList<AggregateExpr> phase1AggExprs = Lists.newArrayList();
+    phase1AggExprs.addAll(aggExprs);
+    phase1AggExprs.removeAll(distinctAggExprs);
+
+    aggInfo = new AggregateInfo(phase1GroupingExprs, phase1AggExprs);
+    aggInfo.createAggTuple(analyzer.getDescTbl());
+    LOG.info("distinct agg smap, phase 1: " + aggInfo.getSMap().debugString());
+
+    // create merge agg info
+    mergeAggInfo =
+        AggregateInfo.createDistinctMergeAggInfo(aggInfo, distinctAggExprs, analyzer);
+    LOG.info("distinct agg smap, phase 2: " + mergeAggInfo.getSMap().debugString());
+  }
+
   private void createSortInfo(Analyzer analyzer) throws AnalysisException {
     if (orderByElements == null) {
       // not computing order by
@@ -399,7 +533,7 @@ public class SelectStmt extends ParseNodeBase {
       isAscOrder.add(Boolean.valueOf(orderByElement.getIsAsc()));
     }
     substituteOrdinals(orderingExprs, "ORDER BY");
-    Expr.substituteList(orderingExprs, aliasSubstMap);
+    Expr.substituteList(orderingExprs, aliasSMap);
     Expr.analyze(orderingExprs, analyzer);
 
     sortInfo = new SortInfo(orderingExprs, isAscOrder);
@@ -426,18 +560,18 @@ public class SelectStmt extends ParseNodeBase {
         throw new AnalysisException(
             errorPrefix + ": ordinal must be >= 1: " + expr.toSql());
       }
-      if (pos > selectList.size()) {
+      if (pos > selectList.getItems().size()) {
         throw new AnalysisException(
             errorPrefix + ": ordinal exceeds number of items in select list: "
             + expr.toSql());
       }
-      if (selectList.get((int) pos - 1).isStar()) {
+      if (selectList.getItems().get((int) pos - 1).isStar()) {
         throw new AnalysisException(
             errorPrefix + ": ordinal refers to '*' in select list: "
             + expr.toSql());
       }
       // create copy to protect against accidentally shared state
-      i.set(selectList.get((int)pos - 1).getExpr().clone(null));
+      i.set(selectList.getItems().get((int)pos - 1).getExpr().clone(null));
     }
   }
 
@@ -446,9 +580,12 @@ public class SelectStmt extends ParseNodeBase {
     StringBuilder strBuilder = new StringBuilder();
     // Select list
     strBuilder.append("SELECT ");
-    for (int i = 0; i < selectList.size(); ++i) {
-      strBuilder.append(selectList.get(i).toSql());
-      strBuilder.append((i+1 != selectList.size()) ? ", " : "");
+    if (selectList.isDistinct()) {
+      strBuilder.append("DISTINCT ");
+    }
+    for (int i = 0; i < selectList.getItems().size(); ++i) {
+      strBuilder.append(selectList.getItems().get(i).toSql());
+      strBuilder.append((i+1 != selectList.getItems().size()) ? ", " : "");
     }
     // From clause
     strBuilder.append(" FROM ");

@@ -15,6 +15,7 @@ import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.BinaryPredicate;
+import com.cloudera.impala.analysis.DescriptorTable;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SelectStmt;
@@ -30,6 +31,7 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.Pair;
+import com.cloudera.impala.common.Reference;
 import com.cloudera.impala.thrift.Constants;
 import com.cloudera.impala.thrift.THBaseKeyRange;
 import com.cloudera.impala.thrift.THdfsFileSplit;
@@ -125,13 +127,15 @@ public class Planner {
     ScanNode scanNode = null;
     if (tblRef.getTable() instanceof HdfsTextTable) {
       // Hive Text table
-      scanNode = new HdfsTextScanNode(tblRef.getDesc(), (HdfsTextTable) tblRef.getTable());
+      scanNode = new HdfsTextScanNode(
+          getNextNodeId(), tblRef.getDesc(), (HdfsTextTable) tblRef.getTable());
     } else if (tblRef.getTable() instanceof HdfsRCFileTable) {
       // Hive RCFile table
-      scanNode = new HdfsRCFileScanNode(tblRef.getDesc(), (HdfsRCFileTable) tblRef.getTable());
+      scanNode = new HdfsRCFileScanNode(
+          getNextNodeId(), tblRef.getDesc(), (HdfsRCFileTable) tblRef.getTable());
     } else {
       // HBase table
-      scanNode = new HBaseScanNode(tblRef.getDesc());
+      scanNode = new HBaseScanNode(getNextNodeId(), tblRef.getDesc());
     }
 
     List<Predicate> conjuncts = analyzer.getConjuncts(tblRef.getId().asList());
@@ -140,7 +144,8 @@ public class Planner {
     // determine scan predicates for clustering cols
     for (int i = 0; i < tblRef.getTable().getNumClusteringCols(); ++i) {
       SlotDescriptor slotDesc =
-          analyzer.getColumnSlot(tblRef.getDesc(), tblRef.getTable().getColumns().get(i));
+          analyzer.getColumnSlot(tblRef.getDesc(),
+                                 tblRef.getTable().getColumns().get(i));
       if (slotDesc == null
           || (scanNode instanceof HBaseScanNode
               && slotDesc.getType() != PrimitiveType.STRING)) {
@@ -239,8 +244,8 @@ public class Planner {
           "Join requires at least one equality predicate between the two tables.");
     }
     HashJoinNode result =
-        new HashJoinNode(outer, inner, innerRef.getJoinOp(), eqJoinConjuncts,
-                         innerRef.getOtherJoinConjuncts());
+        new HashJoinNode(getNextNodeId(), outer, inner, innerRef.getJoinOp(),
+                         eqJoinConjuncts, innerRef.getOtherJoinConjuncts());
 
     // conjuncts evaluated by this node:
     // - equi-join conjuncts are evaluated as part of the hash table lookup
@@ -277,12 +282,10 @@ public class Planner {
       node = node.getChild(0);
     }
     if (selectStmt.getAggInfo() != null) {
-      if (selectStmt.getAggInfo().getGroupingExprs() != null) {
-        Expr.getIds(selectStmt.getAggInfo().getGroupingExprs(), null, refdIdList);
+      selectStmt.getAggInfo().getRefdSlots(refdIdList);
+      if (selectStmt.getMergeAggInfo() != null) {
+        selectStmt.getMergeAggInfo().getRefdSlots(refdIdList);
       }
-      Expr.getIds(selectStmt.getAggInfo().getAggregateExprs(), null, refdIdList);
-      // we indirectly reference all grouping slots (because we write them)
-      selectStmt.getAggInfo().getGroupingSlotIds(refdIdList);
     }
     Expr.getIds(selectStmt.getSelectListExprs(), null, refdIdList);
 
@@ -322,13 +325,10 @@ public class Planner {
     // create left-deep sequence of binary hash joins; assign node ids as we go along
     TableRef tblRef = selectStmt.getTableRefs().get(0);
     PlanNode root = createScanNode(analyzer, tblRef);
-    root.id = getNextNodeId();
     root.rowTupleIds = rowTuples;
     for (int i = 1; i < selectStmt.getTableRefs().size(); ++i) {
       TableRef innerRef = selectStmt.getTableRefs().get(i);
       root = createHashJoinNode(analyzer, root, innerRef);
-      root.getChild(1).id = getNextNodeId();
-      root.id = getNextNodeId();
       root.rowTupleIds = rowTuples;
     }
 
@@ -340,22 +340,6 @@ public class Planner {
     }
 
     return root;
-  }
-
-  /**
-   * Create AggregationNode as parent of inputNode that merges the aggregation
-   * output described by inputAggInfo:
-   * - grouping exprs: slotrefs to inputAggInfo's grouping slots
-   * - aggregate exprs: aggregation of inputAggInfo's aggregateExprs slots
-   *   (count is mapped to sum, everything else stays the same)
-   */
-  private PlanNode createMergeAggNode(
-      Analyzer analyzer, PlanNode inputNode, AggregateInfo inputAggInfo)
-      throws InternalException {
-    AggregateInfo mergeAggInfo =
-        AggregateInfo.createMergeAggInfo(inputAggInfo, analyzer);
-    AggregationNode result = new AggregationNode(inputNode, mergeAggInfo);
-    return result;
   }
 
   private ScanNode getLeftmostScan(PlanNode root) {
@@ -378,7 +362,8 @@ public class Planner {
     StringBuilder execParamExplain = new StringBuilder();
     String prefix = "  ";
 
-    List<TPlanExecParams> execHostsParams = request.getNodeRequestParams().get(planFragIdx);
+    List<TPlanExecParams> execHostsParams =
+        request.getNodeRequestParams().get(planFragIdx);
     for (int nodeIdx = 0; nodeIdx < execHostsParams.size(); nodeIdx++) {
       // If the host has no parameter set, don't print anything
       TPlanExecParams hostExecParams = execHostsParams.get(nodeIdx);
@@ -395,14 +380,16 @@ public class Planner {
       }
 
       for (TScanRange scanRange: hostExecParams.getScanRanges()) {
-        int nodeid = scanRange.getNodeId();
+        int nodeId = scanRange.getNodeId();
         if (scanRange.isSetHbaseKeyRanges()) {
           // HBase scan range is printed as "startKey:stopKey"
-          execParamExplain.append(prefix + "    HBASE KEY RANGES NODE ID: " + nodeid + "\n");
+          execParamExplain.append(
+              prefix + "    HBASE KEY RANGES NODE ID: " + nodeId + "\n");
           for (THBaseKeyRange kr: scanRange.getHbaseKeyRanges()) {
             execParamExplain.append(prefix + "      ");
             if (kr.isSetStartKey()) {
-              execParamExplain.append(HBaseScanNode.printKey(kr.getStartKey().getBytes()));
+              execParamExplain.append(
+                  HBaseScanNode.printKey(kr.getStartKey().getBytes()));
             } else {
               execParamExplain.append("<unbounded>");
             }
@@ -416,7 +403,7 @@ public class Planner {
           }
         } else if (scanRange.isSetHdfsFileSplits()) {
           // HDFS splits is printed as "<path> <offset>:<length>"
-          execParamExplain.append(prefix + "    HDFS SPLITS NODE ID: " + nodeid + "\n");
+          execParamExplain.append(prefix + "    HDFS SPLITS NODE ID: " + nodeId + "\n");
           for (THdfsFileSplit fs: scanRange.getHdfsFileSplits() ) {
             execParamExplain.append(prefix + "      ");
             execParamExplain.append(fs.getPath() + " ");
@@ -472,6 +459,99 @@ public class Planner {
   }
 
   /**
+   * Add aggregation, HAVING predicate and sort node for single-node execution.
+   */
+  private PlanNode createSingleNodePlan(PlanNode spjPlan, SelectStmt selectStmt) {
+    // add aggregation, if required, but without having predicate
+    PlanNode root = spjPlan;
+    if (selectStmt.getAggInfo() != null) {
+      root = new AggregationNode(getNextNodeId(), root, selectStmt.getAggInfo());
+
+      // if we're computing DISTINCT agg fns, the analyzer already created the
+      // merge agginfo
+      if (selectStmt.getMergeAggInfo() != null) {
+        root = new AggregationNode(getNextNodeId(), root, selectStmt.getMergeAggInfo());
+      }
+    }
+
+    if (selectStmt.getHavingPred() != null) {
+      Preconditions.checkState(root instanceof AggregationNode);
+      // only enforce having predicate after the final aggregation step
+      // TODO: substitute having pred
+      root.setConjuncts(selectStmt.getHavingPred().getConjuncts());
+    }
+
+    SortInfo sortInfo = selectStmt.getSortInfo();
+    if (sortInfo != null) {
+      Preconditions.checkState(selectStmt.getLimit() != -1);
+      root = new SortNode(getNextNodeId(), root, sortInfo, true);
+    }
+
+    return root;
+  }
+
+  /**
+   * Add aggregation, HAVING predicate and sort node for multi-node execution.
+   */
+  private void createMultiNodePlans(
+      Analyzer analyzer, PlanNode spjPlan, SelectStmt selectStmt,
+      int numNodes, Reference<PlanNode> coordRef, Reference<PlanNode> slaveRef)
+      throws InternalException {
+    // plan fragment executed by the coordinator, which does merging and
+    // post-aggregation, if applicable
+    PlanNode coord = null;
+
+    // plan fragment executed by slave that feeds into coordinator;
+    // does everything aside from application of Having predicate and final
+    // sorting/top-n step
+    PlanNode slave = spjPlan;
+
+    // add aggregation to slave, if required, but without having predicate
+    AggregateInfo aggInfo = selectStmt.getAggInfo();
+    if (aggInfo != null) {
+      slave = new AggregationNode(getNextNodeId(), slave, aggInfo);
+    }
+
+    // create coordinator plan fragment (single ExchangeNode, possibly
+    // followed by a merge aggregation step and a top-n node)
+    coord = new ExchangeNode(getNextNodeId(), slave.getTupleIds());
+    coord.rowTupleIds = slave.rowTupleIds;
+
+    if (aggInfo != null) {
+      if (selectStmt.getMergeAggInfo() != null) {
+        // if we're computing DISTINCT agg fns, the analyzer already created the
+        // merge agginfo
+        coord = new AggregationNode(getNextNodeId(), coord, selectStmt.getMergeAggInfo());
+      } else {
+        AggregateInfo mergeAggInfo =
+            AggregateInfo.createMergeAggInfo(aggInfo, analyzer);
+        coord = new AggregationNode(getNextNodeId(), coord, mergeAggInfo);
+      }
+    }
+
+    if (selectStmt.getHavingPred() != null) {
+      Preconditions.checkState(coord instanceof AggregationNode);
+      // only enforce having predicate after the final aggregation step
+      // TODO: substitute having pred
+      coord.setConjuncts(selectStmt.getHavingPred().getConjuncts());
+    }
+
+    // top-n is always applied at the very end
+    // (if we wanted to apply top-n to the slave plan fragments, they would need to be
+    // fragmented by the grouping exprs of the GROUP BY, which would only be possible
+    // if we grouped by the table's partitioning exprs, and even then do we want
+    // to use HDFS file splits for plan fragmentation)
+    SortInfo sortInfo = selectStmt.getSortInfo();
+    if (sortInfo != null) {
+      Preconditions.checkState(selectStmt.getLimit() != -1);
+      coord = new SortNode(getNextNodeId(), coord, sortInfo, true);
+    }
+
+    coordRef.setRef(coord);
+    slaveRef.setRef(slave);
+  }
+
+  /**
    * Given an analysisResult, creates a sequence of plan fragments that implement the query.
    *
    * @param analysisResult
@@ -483,9 +563,9 @@ public class Planner {
    *          1: single-node execution
    *          NUM_NODES_ALL: executes on all nodes that contain relevant data
    *          NUM_NODES_ALL_RACKS: executes on one node per rack that holds relevant data
-   *          > 1: executes on at most that many nodes at any point in time (ie, there can be
-   *          more nodes than numNodes with plan fragments for this query, but at most
-   *          numNodes would be active at any point in time)
+   *          > 1: executes on at most that many nodes at any point in time (ie, there
+   *          can be more nodes than numNodes with plan fragments for this query, but
+   *          at most numNodes would be active at any point in time)
    * @param explainString output parameter of the explain plan string, if not null
    * @return query exec request containing plan fragments and all execution parameters
    */
@@ -493,10 +573,6 @@ public class Planner {
       AnalysisContext.AnalysisResult analysisResult, int numNodes,
       StringBuilder explainString)
       throws NotImplementedException, InternalException {
-    // local var to help build the explain plan string
-    List<PlanNode> planFragments = Lists.newArrayList();
-    List<DataSink> dataSinks = Lists.newArrayList();
-
     // Set selectStmt from analyzed SELECT or INSERT query.
     SelectStmt selectStmt = null;
     if (analysisResult.isInsertStmt()) {
@@ -506,93 +582,42 @@ public class Planner {
       selectStmt = analysisResult.getSelectStmt();
     }
     Analyzer analyzer = analysisResult.getAnalyzer();
+    PlanNode spjPlan = createSpjPlan(selectStmt, analyzer);
 
-    // distributed execution: plan that does the bulk of the execution
-    // (select-project-join; pre-aggregation is added later) and sends results back to
-    // the coordinator;
-    // single-node execution: the single plan
-    PlanNode slavePlan = createSpjPlan(selectStmt, analyzer);
-
-    if (slavePlan == null) {
+    TQueryExecRequest request = new TQueryExecRequest();
+    if (spjPlan == null) {
       // SELECT without FROM clause
-      TQueryExecRequest request = new TQueryExecRequest();
       TPlanExecRequest fragmentRequest = new TPlanExecRequest(
           new TUniqueId(), Expr.treesToThrift(selectStmt.getSelectListExprs()));
       request.addToFragmentRequests(fragmentRequest);
       return request;
     }
 
-    // distributed execution: plan fragment executed by the coordinator, which
-    // does merging and post-aggregation, if applicable
-    // single-node execution: always null
-    PlanNode coordPlan = null;
-
-    // add aggregation, if required, but without having predicate
-    AggregateInfo aggInfo = selectStmt.getAggInfo();
-    if (aggInfo != null) {
-      slavePlan = new AggregationNode(slavePlan, aggInfo);
-      slavePlan.id = getNextNodeId();
-    }
-
-    int exchNodeId = -1;
-    // node that is currently the root of the PlanNode tree(s)
-    PlanNode currentPlanRoot = null;
-    ExchangeNode exchangeNode = null;
-    if (numNodes != 1) {
-      // create coordinator plan fragment (single ExchangeNode, possibly
-      // followed by a merge aggregation step and a top-n node)
-      coordPlan = exchangeNode = new ExchangeNode(slavePlan.getTupleIds());
-      coordPlan.id = exchNodeId = getNextNodeId();
-      coordPlan.rowTupleIds = slavePlan.rowTupleIds;
-
-      if (aggInfo != null) {
-        coordPlan = currentPlanRoot =
-          createMergeAggNode(analyzer, coordPlan, aggInfo);
-        coordPlan.id = getNextNodeId();
-      }
+    // add aggregation/sort/etc. nodes;
+    // root: the node producing the final output (ie, coord plan for distrib. execution)
+    PlanNode root = null;
+    // slave: only set for distrib. execution; plan feeding into coord
+    PlanNode slave = null;
+    if (numNodes == 1) {
+      root = createSingleNodePlan(spjPlan, selectStmt);
     } else {
-      currentPlanRoot = slavePlan;
-    }
-
-    if (selectStmt.getHavingPred() != null) {
-      Preconditions.checkState(currentPlanRoot instanceof AggregationNode);
-      // only enforce having predicate after the final aggregation step
-      // TODO: substitute having pred
-      currentPlanRoot.setConjuncts(selectStmt.getHavingPred().getConjuncts());
-    }
-
-    // top-n is always applied at the very end
-    // (if we wanted to apply top-n to the slave plan fragments, they would need to be
-    // fragmented by the grouping exprs of the GROUP BY, which would only be possible
-    // if we grouped by the table's partitioning exprs, and even then do we want
-    // to use HDFS file splits for plan fragmentation)
-    SortInfo sortInfo = selectStmt.getSortInfo();
-    if (sortInfo != null) {
-      Preconditions.checkState(selectStmt.getLimit() != -1);
-      if (coordPlan != null) {
-        coordPlan = new SortNode(coordPlan, sortInfo, true);
-        currentPlanRoot = coordPlan;
-      } else {
-        slavePlan = new SortNode(slavePlan, sortInfo, true);
-        currentPlanRoot = slavePlan;
-      }
-      currentPlanRoot.id = getNextNodeId();
-    }
-
-    slavePlan.finalize(analyzer);
-    markRefdSlots(slavePlan, selectStmt, analyzer);
-    if (coordPlan != null) {
-      coordPlan.setLimit(selectStmt.getLimit());
-      coordPlan.finalize(analyzer);
-      markRefdSlots(coordPlan, selectStmt, analyzer);
-      if (coordPlan instanceof ExchangeNode) {
+      Reference<PlanNode> rootRef = new Reference<PlanNode>();
+      Reference<PlanNode> slaveRef = new Reference<PlanNode>();
+      createMultiNodePlans(analyzer, spjPlan, selectStmt, numNodes, rootRef, slaveRef);
+      root = rootRef.getRef();
+      slave = slaveRef.getRef();
+      slave.finalize(analyzer);
+      markRefdSlots(slave, selectStmt, analyzer);
+      if (root instanceof ExchangeNode) {
         // if all we're doing is merging results from the slaves, we can
         // also set the limit in the slaves
-        slavePlan.setLimit(selectStmt.getLimit());
+        slave.setLimit(selectStmt.getLimit());
       }
-    } else {
-      slavePlan.setLimit(selectStmt.getLimit());
     }
+
+    root.setLimit(selectStmt.getLimit());
+    root.finalize(analyzer);
+    markRefdSlots(root, selectStmt, analyzer);
     // don't compute mem layout before marking slots that aren't being referenced
     analyzer.getDescTbl().computeMemLayout();
 
@@ -601,13 +626,86 @@ public class Planner {
     // output
     // TODO: substitute select list exprs against output of currentPlanRoot
     // probably best to add PlanNode.substMap
+    // create plan fragments
 
-    // partition fragment by partitioning leftmost scan;
-    // do this now, so we set the correct number of senders for the exchange node
-    ScanNode leftmostScan = getLeftmostScan(slavePlan);
-    Preconditions.checkState(leftmostScan != null);
+    // create scan ranges and determine hosts; do this before serializing the
+    // plan trees, otherwise we won't pick up on numSenders for exchange nodes
+    ArrayList<ScanNode> scans = Lists.newArrayList();  // leftmost scan is first in list
     List<TScanRange> scanRanges = Lists.newArrayList();
     List<String> hosts = Lists.newArrayList();
+    if (numNodes == 1) {
+      createPartitionParams(root, 1, scanRanges, hosts);
+      root.collectSubclasses(ScanNode.class, scans);
+    } else {
+      createPartitionParams(slave, numNodes, scanRanges, hosts);
+      slave.collectSubclasses(ScanNode.class, scans);
+      ExchangeNode exchangeNode = root.findFirstOf(ExchangeNode.class);
+      exchangeNode.setNumSenders(hosts.size());
+    }
+
+    // collect data sinks for explain string; dataSinks.size() == # of plan fragments
+    List<DataSink> dataSinks = Lists.newArrayList();
+    // create TPlanExecRequests and set up data sinks
+    if (numNodes == 1) {
+      TPlanExecRequest planRequest =
+          createPlanExecRequest(root, analyzer.getDescTbl(), request);
+      planRequest.setOutputExprs(
+          Expr.treesToThrift(selectStmt.getSelectListExprs()));
+    } else {
+      // coordinator fragment comes first
+      TPlanExecRequest coordRequest =
+          createPlanExecRequest(root, analyzer.getDescTbl(), request);
+      coordRequest.setOutputExprs(
+          Expr.treesToThrift(selectStmt.getSelectListExprs()));
+      // create TPlanExecRequest for slave plan
+      createPlanExecRequest(slave, analyzer.getDescTbl(), request);
+
+      // Slaves write to stream data sink for an exchange node.
+      ExchangeNode exchNode = root.findFirstOf(ExchangeNode.class);
+      DataSink dataSink = new DataStreamSink(exchNode.getId());
+      request.fragmentRequests.get(1).setDataSink(dataSink.toThrift());
+      dataSinks.add(dataSink);
+    }
+
+    // create table data sink for insert stmt
+    if (analysisResult.isInsertStmt()) {
+      DataSink dataSink = analysisResult.getInsertStmt().createDataSink();
+      request.fragmentRequests.get(0).setDataSink(dataSink.toThrift());
+      // this is the fragment producing the output; always add in first position
+      dataSinks.add(0, dataSink);
+    } else {
+      // record the fact that coord doesn't have a sink
+      dataSinks.add(0, null);
+    }
+
+    // set request.execNodes and request.nodeRequestParams
+    if (numNodes != 1) {
+      // add one empty exec param (coord fragment doesn't scan any tables
+      // and doesn't send the output anywhere)
+      request.addToNodeRequestParams(Lists.newArrayList(new TPlanExecParams()));
+    }
+    createExecParams(request, scans, scanRanges, hosts);
+
+    // Build the explain plan string, if requested
+    if (explainString != null) {
+      List<PlanNode> planFragments = Lists.newArrayList();
+      planFragments.add(root);
+      if (slave != null) {
+        planFragments.add(slave);
+      }
+      buildExplainString(explainString, planFragments, dataSinks, request);
+    }
+
+    return request;
+  }
+
+  /**
+   * Compute partitioning parameters (scan ranges and hosts) for leftmost scan of plan.
+   */
+  private void createPartitionParams(PlanNode plan, int numNodes,
+      List<TScanRange> scanRanges, List<String> hosts) {
+    ScanNode leftmostScan = getLeftmostScan(plan);
+    Preconditions.checkState(leftmostScan != null);
     int numPartitions;
     if (numNodes > 1) {
       // if we asked for a specific number of nodes, partition into numNodes - 1
@@ -625,59 +723,27 @@ public class Planner {
       // host to execute the scan
       hosts.add("localhost");
     }
-    if (exchangeNode != null) {
-      exchangeNode.setNumSenders(hosts.size());
-    }
+  }
 
-    TQueryExecRequest request = new TQueryExecRequest();
-    TPlanExecRequest fragmentRequest = new TPlanExecRequest(
-        new TUniqueId(), Expr.treesToThrift(selectStmt.getSelectListExprs()));
-    if (coordPlan != null) {
-      // coordinator fragment comes first
-      planFragments.add(coordPlan);
-      fragmentRequest.setPlanFragment(coordPlan.treeToThrift());
-      fragmentRequest.setDescTbl(analyzer.getDescTbl().toThrift());
-      request.addToFragmentRequests(fragmentRequest);
+  /**
+   * Create TPlanExecRequest for root and add it to queryRequest.
+   */
+  private TPlanExecRequest createPlanExecRequest(PlanNode root,
+      DescriptorTable descTbl, TQueryExecRequest queryRequest) {
+    TPlanExecRequest planRequest = new TPlanExecRequest();
+    planRequest.setPlanFragment(root.treeToThrift());
+    planRequest.setDescTbl(descTbl.toThrift());
+    queryRequest.addToFragmentRequests(planRequest);
+    return planRequest;
+  }
 
-      // add one empty exec param (coord fragment doesn't scan any tables
-      // and doesn't send the output anywhere)
-      request.addToNodeRequestParams(Lists.newArrayList(new TPlanExecParams()));
-
-      // Coordinator performs insert into a table.
-      if (analysisResult.isInsertStmt()) {
-        // Data sink to a table. For insert statements.
-        DataSink dataSink = analysisResult.getInsertStmt().createDataSink();
-        fragmentRequest.setDataSink(dataSink.toThrift());
-        dataSinks.add(dataSink);
-      } else {
-        // Coordinator does not feed into any sink.
-        dataSinks.add(null);
-      }
-
-      fragmentRequest = new TPlanExecRequest();
-    }
-
-    // Set data sink that slavePlan writes to.
-    DataSink dataSink = null;
-    if (coordPlan == null) {
-      if (analysisResult.isInsertStmt()) {
-        // Single node insert execution.
-        dataSink = analysisResult.getInsertStmt().createDataSink();
-      }
-    } else {
-      // Stream data sink that writes to an exchange node.
-      dataSink = new DataStreamSink(exchNodeId);
-    }
-    if (dataSink != null) {
-      fragmentRequest.setDataSink(dataSink.toThrift());
-    }
-    dataSinks.add(dataSink);
-
-    planFragments.add(slavePlan);
-    fragmentRequest.setPlanFragment(slavePlan.treeToThrift());
-    fragmentRequest.setDescTbl(analyzer.getDescTbl().toThrift());
-    request.addToFragmentRequests(fragmentRequest);
-
+  /**
+   * Set request.execNodes and request.nodeRequestParams based on
+   * scanRanges and hosts.
+   */
+  private void createExecParams(
+      TQueryExecRequest request, ArrayList<ScanNode> scans,
+      List<TScanRange> scanRanges, List<String> hosts) {
     // one TPlanExecParams per fragment/scan range;
     // we need to add an "empty" range for empty tables (in which case
     // scanRanges will be empty)
@@ -697,12 +763,8 @@ public class Planner {
 
     // add scan ranges for the non-partitioning scans to each of
     // fragmentRequests[1]'s parameters
-    List<ScanNode> scanNodes = Lists.newArrayList();
-    slavePlan.collectSubclasses(ScanNode.class, scanNodes);
-    for (ScanNode scan: scanNodes) {
-      if (scan == leftmostScan) {
-        continue;
-      }
+    for (int i = 1; i < scans.size(); ++i) {
+      ScanNode scan = scans.get(i);
       scanRanges = Lists.newArrayList();
       scan.getScanParams(1, scanRanges, null);
       Preconditions.checkState(scanRanges.size() <= 1);
@@ -715,12 +777,6 @@ public class Planner {
 
     request.addToExecNodes(hosts);
     request.addToNodeRequestParams(fragmentParamsList);
-
-    // Build the explain plan string, if requested
-    if (explainString != null) {
-      buildExplainString(explainString, planFragments, dataSinks, request);
-    }
-
-    return request;
   }
+
 }

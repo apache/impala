@@ -151,8 +151,8 @@ terminal String UNMATCHED_STRING_LITERAL;
 
 nonterminal ParseNodeBase insert_or_select_stmt;
 nonterminal SelectStmt select_stmt;
-nonterminal ArrayList<SelectListItem> select_clause;
-nonterminal ArrayList<SelectListItem> select_list;
+nonterminal SelectList select_clause;
+nonterminal SelectList select_list;
 nonterminal SelectListItem select_list_item;
 nonterminal SelectListItem star_expr ;
 nonterminal Expr expr, arithmetic_expr;
@@ -266,18 +266,23 @@ select_stmt ::=
 select_clause ::=
   KW_SELECT select_list:l
   {: RESULT = l; :}  
+  | KW_SELECT KW_DISTINCT select_list:l
+  {:
+    l.setIsDistinct(true);
+    RESULT = l;
+  :}  
   ;
 
 select_list ::=
   select_list_item:item
   {:
-    ArrayList<SelectListItem> list = new ArrayList<SelectListItem>();
-    list.add(item);
+    SelectList list = new SelectList();
+    list.getItems().add(item);
     RESULT = list;
   :}
   | select_list:list COMMA select_list_item:item
   {:
-    list.add(item);
+    list.getItems().add(item);
     RESULT = list;
   :}    
   ;

@@ -3,6 +3,7 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.InternalException;
 
 public interface ParseNode {
 
@@ -10,9 +11,9 @@ public interface ParseNode {
    * Perform semantic analysis of node and all of its children.
    * Throws exception if any errors found.
    * @param analyzer
-   * @throws AnalysisException
+   * @throws AnalysisException, InternalException
    */
-  public void analyze(Analyzer analyzer) throws AnalysisException;
+  public void analyze(Analyzer analyzer) throws AnalysisException, InternalException;
 
   /**
    * @return SQL syntax corresponding to this node.

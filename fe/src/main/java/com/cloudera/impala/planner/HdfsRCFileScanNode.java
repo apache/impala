@@ -12,8 +12,8 @@ import com.cloudera.impala.thrift.TPlanNodeType;
  */
 public class HdfsRCFileScanNode extends HdfsScanNode {
 
-  public HdfsRCFileScanNode(TupleDescriptor desc, HdfsTable tbl) {
-    super(desc, tbl);
+  public HdfsRCFileScanNode(int id, TupleDescriptor desc, HdfsTable tbl) {
+    super(id, desc, tbl);
   }
 
   @Override

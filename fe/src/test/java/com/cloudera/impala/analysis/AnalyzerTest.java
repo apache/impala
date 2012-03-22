@@ -24,6 +24,7 @@ import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.TestSchemaUtils;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExpr;
 import com.google.common.base.Preconditions;
 
@@ -122,6 +123,8 @@ public class AnalyzerTest {
       node.analyze(analyzer);
     } catch (AnalysisException e) {
       fail("Analysis error:\n" + e.toString());
+    } catch (InternalException e) {
+      fail("Internal exception:\n" + e.toString());
     }
     if(node instanceof SelectStmt) {
       CheckSelectToThrift((SelectStmt)node);
@@ -162,6 +165,8 @@ public class AnalyzerTest {
             errorString.startsWith(expectedErrorString));
       }
       return;
+    } catch (InternalException e) {
+      fail("Internal exception:\n" + e.toString());
     }
 
     fail("Stmt didn't result in analysis error: " + stmt);
@@ -308,7 +313,7 @@ public class AnalyzerTest {
   public void TestOrdinals() {
     // can't group or order on *
     AnalysisError("select * from alltypes group by 1",
-        "cannot combine '*' in select list with aggregation");
+        "cannot combine '*' in select list with GROUP BY");
     AnalysisError("select * from alltypes order by 1",
         "ORDER BY: ordinal refers to '*' in select list");
   }
@@ -482,8 +487,6 @@ public class AnalyzerTest {
 
     // multiple args
     AnalyzesOk("select count(id, zip) from testtbl");
-    AnalysisError("select count(distinct id, zip) from testtbl",
-        "DISTINCT not implemented: COUNT(DISTINCT id, zip)");
     AnalysisError("select min(id, zip) from testtbl",
         "MIN requires exactly one parameter");
     AnalysisError("select max(id, zip) from testtbl",
@@ -499,11 +502,38 @@ public class AnalyzerTest {
 
     // wrong type
     AnalysisError("select sum(timestamp_col) from alltypes",
-                  "SUM requires a numeric parameter: SUM(timestamp_col)");
+        "SUM requires a numeric parameter: SUM(timestamp_col)");
     AnalysisError("select sum(string_col) from alltypes",
-                  "SUM requires a numeric parameter: SUM(string_col)");
+        "SUM requires a numeric parameter: SUM(string_col)");
     AnalysisError("select avg(string_col) from alltypes",
-                  "AVG requires a numeric or timestamp parameter: AVG(string_col)");
+        "AVG requires a numeric or timestamp parameter: AVG(string_col)");
+  }
+
+  @Test
+  public void TestDistinct() {
+    // DISTINCT
+    AnalyzesOk("select distinct id, zip from testtbl");
+    AnalyzesOk("select distinct * from testtbl");
+    AnalysisError("select distinct count(*) from testtbl",
+        "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
+    AnalysisError("select distinct id, zip from testtbl group by 1, 2",
+        "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
+    AnalysisError("select distinct id, zip, count(*) from testtbl group by 1, 2",
+        "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
+    AnalyzesOk("select count(distinct id, zip) from testtbl");
+    AnalysisError("select count(distinct id, zip), count(distinct zip) from testtbl",
+        "all DISTINCT aggregate functions need to have the same set of parameters");
+    AnalyzesOk("select tinyint_col, count(distinct int_col, bigint_col) "
+        + "from alltypesagg group by 1");
+    AnalyzesOk("select tinyint_col, count(distinct int_col),"
+        + "sum(distinct int_col) from alltypesagg group by 1");
+    AnalysisError("select tinyint_col, count(distinct int_col),"
+        + "sum(distinct bigint_col) from alltypesagg group by 1",
+        "all DISTINCT aggregate functions need to have the same set of parameters");
+    // min and max are ignored in terms of DISTINCT
+    AnalyzesOk("select tinyint_col, count(distinct int_col),"
+        + "min(distinct smallint_col), max(distinct string_col) "
+        + "from alltypesagg group by 1");
   }
 
   @Test
@@ -512,22 +542,26 @@ public class AnalyzerTest {
     AnalyzesOk("select zip + count(*) from testtbl group by zip");
     // doesn't group by all non-agg select list items
     AnalysisError("select zip, count(*) from testtbl",
-        "select list expression not produced by aggregation output (missing from GROUP BY clause?)");
+        "select list expression not produced by aggregation output " +
+        "(missing from GROUP BY clause?)");
     AnalysisError("select zip + count(*) from testtbl",
-        "select list expression not produced by aggregation output (missing from GROUP BY clause?)");
+        "select list expression not produced by aggregation output " +
+        "(missing from GROUP BY clause?)");
 
     AnalyzesOk("select id, zip from testtbl group by zip, id having count(*) > 0");
     AnalysisError("select id, zip from testtbl group by id having count(*) > 0",
-        "select list expression not produced by aggregation output (missing from GROUP BY clause?)");
+        "select list expression not produced by aggregation output " +
+        "(missing from GROUP BY clause?)");
     AnalysisError("select id from testtbl group by id having zip + count(*) > 0",
-        "HAVING clause not produced by aggregation output (missing from GROUP BY clause?)");
+        "HAVING clause not produced by aggregation output " +
+        "(missing from GROUP BY clause?)");
     // resolves ordinals
     AnalyzesOk("select zip, count(*) from testtbl group by 1");
     AnalyzesOk("select count(*), zip from testtbl group by 2");
     AnalysisError("select zip, count(*) from testtbl group by 3",
         "GROUP BY: ordinal exceeds number of items in select list");
     AnalysisError("select * from alltypes group by 1",
-        "cannot combine '*' in select list with aggregation");
+        "cannot combine '*' in select list with GROUP BY");
     // picks up select item alias
     AnalyzesOk("select zip z, count(*) from testtbl group by z");
 
@@ -541,11 +575,11 @@ public class AnalyzerTest {
 
     // multiple grouping cols
     AnalyzesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
-               "group by string_col, int_col, bigint_col");
+        "group by string_col, int_col, bigint_col");
     AnalyzesOk("select int_col, string_col, bigint_col, count(*) from alltypes " +
-               "group by 2, 1, 3");
+        "group by 2, 1, 3");
     AnalysisError("select int_col, string_col, bigint_col, count(*) from alltypes " +
-                   "group by 2, 1, 4", "GROUP BY expression must not contain aggregate functions");
+        "group by 2, 1, 4", "GROUP BY expression must not contain aggregate functions");
     // can't group by floating-point exprs
     AnalysisError("select float_col, count(*) from alltypes group by 1",
         "GROUP BY expression must have a discrete (non-floating point) type");

@@ -24,8 +24,8 @@ public class SortNode extends PlanNode {
   private final SortInfo info;
   private final boolean useTopN;
 
-  public SortNode(PlanNode input, SortInfo info, boolean useTopN) {
-    super();
+  public SortNode(int id, PlanNode input, SortInfo info, boolean useTopN) {
+    super(id);
     this.info = info;
     this.useTopN = useTopN;
     this.tupleIds.addAll(input.getTupleIds());

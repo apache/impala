@@ -15,6 +15,7 @@ import com.cloudera.impala.catalog.HdfsTable.Partition;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.planner.DataSink;
 import com.google.common.base.Preconditions;
 
@@ -49,7 +50,7 @@ public class InsertStmt extends ParseNodeBase {
   }
 
   @Override
-  public void analyze(Analyzer analyzer) throws AnalysisException {
+  public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
     selectStmt.analyze(analyzer);
     List<Expr> selectListExprs = selectStmt.getSelectListExprs();
     Catalog catalog = analyzer.getCatalog();

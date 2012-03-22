@@ -60,8 +60,8 @@ public class HBaseScanNode extends ScanNode {
   // HBase config; Common across all object instance.
   private static Configuration hbaseConf = HBaseConfiguration.create();
 
-  public HBaseScanNode(TupleDescriptor desc) {
-    super(desc);
+  public HBaseScanNode(int id, TupleDescriptor desc) {
+    super(id, desc);
     this.desc = desc;
   }
 

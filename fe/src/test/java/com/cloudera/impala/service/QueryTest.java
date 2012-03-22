@@ -56,6 +56,11 @@ public class QueryTest {
   }
 
   @Test
+  public void TestDistinct() {
+    runQueryTestFile("distinct", false, 1000);
+  }
+
+  @Test
   public void TestAggregation() {
     runQueryTestFile("aggregation", false, 1000);
   }

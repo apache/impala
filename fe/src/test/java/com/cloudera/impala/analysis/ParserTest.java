@@ -309,6 +309,7 @@ public class ParserTest {
     ParserError("select sum() from t");
     ParsesOk("select avg(a), avg(distinct a) from t");
     ParserError("select avg() from t");
+    ParsesOk("select distinct a, b, c from t");
   }
 
   @Test public void TestPredicates() {
@@ -457,7 +458,7 @@ public class ParserTest {
         "select from t\n" +
         "       ^\n" +
         "Encountered: FROM\n" +
-        "Expected: AVG, CASE, CAST, COUNT, FALSE, MIN, MAX, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
+        "Expected: AVG, CASE, CAST, COUNT, DISTINCT, FALSE, MIN, MAX, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
 
     // missing from
     ParserError("select c, b, c where a = 5",

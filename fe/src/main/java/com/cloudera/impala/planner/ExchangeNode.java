@@ -27,8 +27,8 @@ public class ExchangeNode extends PlanNode {
     this.numSenders = numSenders;
   }
 
-  public ExchangeNode(ArrayList<TupleId> tupleIds) {
-    super(tupleIds);
+  public ExchangeNode(int id, ArrayList<TupleId> tupleIds) {
+    super(id, tupleIds);
   }
 
   @Override

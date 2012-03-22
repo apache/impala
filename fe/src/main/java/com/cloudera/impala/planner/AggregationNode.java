@@ -18,8 +18,8 @@ import com.google.common.base.Objects;
 public class AggregationNode extends PlanNode {
   private final AggregateInfo aggInfo;
 
-  public AggregationNode(PlanNode input, AggregateInfo aggInfo) {
-    super(aggInfo.getAggTupleId().asList());
+  public AggregationNode(int id, PlanNode input, AggregateInfo aggInfo) {
+    super(id, aggInfo.getAggTupleId().asList());
     this.aggInfo = aggInfo;
     this.children.add(input);
     this.rowTupleIds.add(aggInfo.getAggTupleId());

@@ -116,7 +116,8 @@ public class PlannerTest {
       } else {
         RunQuery(query, 1, queryFileParser, 0, errorLog, actualOutput);
         actualOutput.append("------------\n");
-        RunQuery(query, Constants.NUM_NODES_ALL, queryFileParser, 1, errorLog, actualOutput);
+        RunQuery(query, Constants.NUM_NODES_ALL, queryFileParser, 1, errorLog,
+                 actualOutput);
       }
       actualOutput.append("====\n");
     }
@@ -138,6 +139,11 @@ public class PlannerTest {
     if (errorLog.length() != 0) {
       fail(errorLog.toString());
     }
+  }
+
+  @Test
+  public void testDistinct() {
+    runPlannerTestFile("distinct");
   }
 
   @Test

@@ -48,8 +48,8 @@ public abstract class HdfsScanNode extends ScanNode {
   /**
    * Constructs node to scan given data files of table 'tbl'.
    */
-  public HdfsScanNode(TupleDescriptor desc, HdfsTable tbl) {
-    super(desc);
+  public HdfsScanNode(int id, TupleDescriptor desc, HdfsTable tbl) {
+    super(id, desc);
     this.tbl = tbl;
   }
 

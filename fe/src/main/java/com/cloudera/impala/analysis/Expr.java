@@ -6,6 +6,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 
@@ -162,6 +163,23 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return true;
   }
 
+  /**
+   * Return true if l1[i].equals(l2[i]) for all i.
+   */
+  public static <C extends Expr> boolean equalLists(List<C> l1, List<C> l2) {
+    if (l1.size() != l2.size()) {
+      return false;
+    }
+    Iterator<C> l1Iter = l1.iterator();
+    Iterator<C> l2Iter = l2.iterator();
+    while (l1Iter.hasNext()) {
+      if (!l1Iter.next().equals(l2Iter.next())) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   @Override
   public int hashCode() {
     throw new UnsupportedOperationException("Expr.hashCode() is not implemented");
@@ -186,7 +204,7 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       for (int i = 0; i < lhs.size(); ++i) {
         output.add(lhs.get(i).debugString() + ":" + rhs.get(i).debugString());
       }
-      return "substmap(" + Joiner.on(" ").join(output) + ")";
+      return "smap(" + Joiner.on(" ").join(output) + ")";
     }
 
     /**
@@ -203,44 +221,47 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       result.rhs.addAll(Expr.cloneList(g.rhs, null));
       return result;
     }
+
+    public void clear() {
+      lhs.clear();
+      rhs.clear();
+    }
   }
 
   /**
-   * Create a deep copy of 'this'. If substMap is non-null,
+   * Create a deep copy of 'this'. If sMap is non-null,
    * use it to substitute 'this' or its subnodes.
-   * @param substMap
+   *
+   * Expr subclasses that add non-value-type members must override this.
+   * @param smap
    * @return
    */
-  public Expr clone(SubstitutionMap substMap) {
-    if (substMap != null) {
-      for (int i = 0; i < substMap.lhs.size(); ++i) {
-        if (this.equals(substMap.lhs.get(i))) {
-          return substMap.rhs.get(i).clone(null);
+  public Expr clone(SubstitutionMap sMap) {
+    if (sMap != null) {
+      for (int i = 0; i < sMap.lhs.size(); ++i) {
+        if (this.equals(sMap.lhs.get(i))) {
+          return sMap.rhs.get(i).clone(null);
         }
       }
     }
     Expr result = (Expr) this.clone();
     result.children = Lists.newArrayList();
     for (Expr child: children) {
-      result.children.add(((Expr) child).clone(substMap));
+      result.children.add(((Expr) child).clone(sMap));
     }
     return result;
   }
 
   /**
-   * Create a deep copy of 'l'. If substMap is non-null, use it to substitute the
+   * Create a deep copy of 'l'. If sMap is non-null, use it to substitute the
    * elements of l.
-   * @param <C>
-   * @param l
-   * @param substMap
-   * @return
    */
   public static <C extends Expr> ArrayList<C> cloneList(
-      List<C> l, SubstitutionMap substMap) {
+      List<C> l, SubstitutionMap sMap) {
     Preconditions.checkNotNull(l);
     ArrayList<C> result = new ArrayList<C>();
     for (C element: l) {
-      result.add((C) element.clone(substMap));
+      result.add((C) element.clone(sMap));
     }
     return result;
   }
@@ -249,10 +270,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
    * Collect all Expr nodes of type 'cl' present in 'input'.
    * This can't go into TreeNode<>, because we'd be using the template param
    * NodeType.
-   * @param <C>
-   * @param input
-   * @param cl
-   * @param output
    */
   public static <C extends Expr> void collectList(
       List<? extends Expr> input, Class<C> cl, List<C> output) {
@@ -265,8 +282,6 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   /**
    * Return true if the list contains a node of type C in any of
    * its elements or their children, otherwise return false.
-   * @param input
-   * @return
    */
   public static <C extends Expr> boolean contains(
       List<? extends Expr> input, Class<C> cl) {
@@ -281,37 +296,32 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   /**
    * Return 'this' with all sub-exprs substituted according to
-   * substMap.
-   * @param substMap
-   * @return
+   * sMap.
    */
-  public Expr substitute(SubstitutionMap substMap) {
-    Preconditions.checkNotNull(substMap);
-    for (int i = 0; i < substMap.lhs.size(); ++i) {
-      if (this.equals(substMap.lhs.get(i))) {
-        return substMap.rhs.get(i).clone(null);
+  public Expr substitute(SubstitutionMap sMap) {
+    Preconditions.checkNotNull(sMap);
+    for (int i = 0; i < sMap.lhs.size(); ++i) {
+      if (this.equals(sMap.lhs.get(i))) {
+        return sMap.rhs.get(i).clone(null);
       }
     }
     for (int i = 0; i < children.size(); ++i) {
-      children.set(i, ((Expr) children.get(i)).substitute(substMap));
+      children.set(i, children.get(i).substitute(sMap));
     }
     return this;
   }
 
   /**
-   * Substitute sub-exprs in the input list according to substMap.
-   * @param <C>
-   * @param l
-   * @param substMap
+   * Substitute sub-exprs in the input list according to sMap.
    */
   public static <C extends Expr> void substituteList(
-      List<C> l, SubstitutionMap substMap) {
+      List<C> l, SubstitutionMap sMap) {
     if (l == null) {
       return;
     }
     ListIterator<C> it = l.listIterator();
     while (it.hasNext()) {
-      it.set((C) it.next().substitute(substMap));
+      it.set((C) it.next().substitute(sMap));
     }
   }
 
@@ -459,6 +469,13 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     Expr child = getChild(childIndex);
     Expr newChild = child.castTo(targetType);
     setChild(childIndex, newChild);
+  }
+
+  /**
+   * Returns child expr if this expr is an implicit cast, otherwise returns 'this'.
+   */
+  public Expr ignoreImplicitCast() {
+    return this;
   }
 
   /**

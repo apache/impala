@@ -12,8 +12,8 @@ import com.cloudera.impala.thrift.TPlanNodeType;
  */
 public class HdfsTextScanNode extends HdfsScanNode {
 
-  public HdfsTextScanNode(TupleDescriptor desc, HdfsTable tbl) {
-    super(desc, tbl);
+  public HdfsTextScanNode(int id, TupleDescriptor desc, HdfsTable tbl) {
+    super(id, desc, tbl);
   }
 
   @Override
