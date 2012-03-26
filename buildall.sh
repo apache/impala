@@ -137,6 +137,10 @@ make
 cd $IMPALA_BE_DIR
 make -j
 
+# Get Hadoop dependencies onto the classpath
+cd $IMPALA_HOME/fe
+mvn dependency:unpack-dependencies
+
 if [ $testdata_action -eq 1 ]
 then
   # create test data
