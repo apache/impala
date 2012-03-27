@@ -173,6 +173,8 @@ class Expr {
   friend class MathFunctions;
   friend class StringFunctions;
   friend class TimestampFunctions;
+  friend class ConditionalFunctions;
+  friend class CaseExpr;
 
   Expr(PrimitiveType type);
   Expr(const TExprNode& node);

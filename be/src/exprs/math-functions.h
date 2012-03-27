@@ -11,14 +11,10 @@ namespace impala {
 
 class Expr;
 class ExprValue;
-class OpcodeRegistry;
 class TupleRow;
 
-// Math functions that were not auto-generated.
 class MathFunctions {
  public:
-  static void Init(OpcodeRegistry*);
-
   static void* Pi(Expr* e, TupleRow* row);
   static void* E(Expr* e, TupleRow* row);
   static void* Abs(Expr* e, TupleRow* row);

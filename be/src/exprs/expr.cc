@@ -244,7 +244,7 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
       if (!texpr_node.__isset.case_expr) {
         return Status("Case expression not set in thrift node");
       }
-      *expr = pool->Add(new BoolLiteral(texpr_node));
+      *expr = pool->Add(new CaseExpr(texpr_node));
       return Status::OK;
     }
     case TExprNodeType::CAST_EXPR: {

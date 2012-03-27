@@ -13,6 +13,7 @@ import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.opcode.FunctionOperator;
 import com.cloudera.impala.opcode.FunctionRegistry;
 import com.cloudera.impala.thrift.TExprOpcode;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 
 /**
@@ -30,19 +31,32 @@ import com.google.common.collect.Maps;
  */
 public class OpcodeRegistry {
 
-  private final static int VAR_ARGS = -1;
   private final static Logger LOG = LoggerFactory.getLogger(OpcodeRegistry.class);
   private static OpcodeRegistry instance = new OpcodeRegistry();
 
   /**
-   * This is a mapping of Operator,#args to signatures.  The signature is defined by
-   * the operator enum and the arguments and is a one to one mapping to opcodes.
+   * This is a mapping of Operator,#args to signatures with a fixed number of arguments.
+   * The signature is defined by the operator enum and the arguments
+   * and is a one to one mapping to opcodes.
    * The map is structured this way to more efficiently look for signature matches.
    * Signatures that have the same number of arguments have a potential to be matches
    * by allowing types to be implicitly cast.
-   * Functions with a variable number of arguments are assigned #args=VAR_ARGS.
+   * Functions with a variable number of arguments are put into the varArgOperations map.
    */
   private final Map<Pair<FunctionOperator, Integer>, List<Signature>> operations;
+
+  /**
+   * This is a mapping of Operator,varArgType to signatures of vararg functions only.
+   * varArgType must be a maximum-resolution type.
+   * We use a separate map to be able to support multiple vararg signatures for the same
+   * FunctionOperator.
+   * Limitations: Since we do not consider the number of arguments, each FunctionOperator
+   * is limited to having one vararg signature per maximum-resolution PrimitiveType.
+   * For example, one can have two signatures func(float, int ...) and func(string ...),
+   * but not func(float, int ...) and func (int ...).
+   */
+  private final Map<Pair<FunctionOperator, PrimitiveType>, List<Signature>>
+      varArgOperations;
 
   /**
    * This contains a mapping of function names to a FunctionOperator enum.  This is used
@@ -111,8 +125,8 @@ public class OpcodeRegistry {
       // Check trailing varargs.
       if (varArgs) {
         for (int i = this.argTypes.length; i < other.argTypes.length; ++i) {
-          if (!PrimitiveType.isImplicitlyCastable(this.argTypes[this.argTypes.length - 1],
-              other.argTypes[i])) {
+          if (!PrimitiveType.isImplicitlyCastable(other.argTypes[i],
+              this.argTypes[this.argTypes.length - 1])) {
             return false;
           }
         }
@@ -167,12 +181,17 @@ public class OpcodeRegistry {
    */
   public Signature getFunctionInfo(FunctionOperator op, PrimitiveType ... argTypes) {
     Pair<FunctionOperator, Integer> lookup = Pair.create(op, argTypes.length);
-    Pair<FunctionOperator, Integer> varArgsLookup = Pair.create(op, VAR_ARGS);
+    // Take the last argument's type as the vararg type.
+    Pair<FunctionOperator, PrimitiveType> varArgsLookup = null;
+    if (argTypes.length > 0) {
+      varArgsLookup =
+          Pair.create(op, argTypes[argTypes.length - 1].getMaxResolutionType());
+    }
     List<Signature> signatures = null;
     if (operations.containsKey(lookup)) {
       signatures = operations.get(lookup);
-    } else if(operations.containsKey(varArgsLookup)) {
-      signatures = operations.get(varArgsLookup);
+    } else if(varArgsLookup != null && varArgOperations.containsKey(varArgsLookup)) {
+      signatures = varArgOperations.get(varArgsLookup);
     }
     if (signatures == null) {
       return null;
@@ -196,15 +215,20 @@ public class OpcodeRegistry {
       PrimitiveType retType, PrimitiveType ... args) {
     List<Signature> signatures;
     Pair<FunctionOperator, Integer> lookup = Pair.create(op, args.length);
-    Pair<FunctionOperator, Integer> varArgLookup = Pair.create(op, VAR_ARGS);
+    // Take the last argument's type as the vararg type.
+    Pair<FunctionOperator, PrimitiveType> varArgsLookup = null;
+    Preconditions.checkArgument((varArgs) ? args.length > 0 : true);
+    if (varArgs && args.length > 0) {
+      varArgsLookup = Pair.create(op, args[args.length - 1].getMaxResolutionType());
+    }
     if (operations.containsKey(lookup)) {
       signatures = operations.get(lookup);
-    } else if (operations.containsKey(varArgLookup)) {
-      signatures = operations.get(varArgLookup);
+    } else if (varArgsLookup != null && varArgOperations.containsKey(varArgsLookup)) {
+      signatures = varArgOperations.get(varArgsLookup);
     } else {
       signatures = new ArrayList<Signature>();
       if (varArgs) {
-        operations.put(varArgLookup, signatures);
+        varArgOperations.put(varArgsLookup, signatures);
       } else {
         operations.put(lookup, signatures);
       }
@@ -232,6 +256,7 @@ public class OpcodeRegistry {
   // Singleton interface, don't call the constructor
   private OpcodeRegistry() {
     operations = Maps.newHashMap();
+    varArgOperations = Maps.newHashMap();
     functionNameMap = Maps.newHashMap();
 
     // Add all the function signatures to the registry and the function name(string)

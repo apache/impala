@@ -28,6 +28,7 @@ struct StringValue {
 
   // ==
   bool Eq(const StringValue& other) const;
+  bool operator==(const StringValue& other) const { return Eq(other); }
   // !=
   bool Ne(const StringValue& other) const { return Compare(other) != 0; }
   // <=

@@ -105,4 +105,16 @@ functions = [
   ['Timestamp_diff', 'INT', ['TIMESTAMP', 'TIMESTAMP'], 'TimestampFunctions::DateDiff', ['date_diff']],
   ['From_utc_timestamp', 'TIMESTAMP', ['TIMESTAMP', 'STRING'], 'TimestampFunctions::FromUtc', ['from_utc_timestamp']],
   ['To_utc_timestamp', 'TIMESTAMP', ['TIMESTAMP', 'STRING'], 'TimestampFunctions::ToUtc', ['to_utc_timestamp']],
+
+# Conditional Functions
+  ['Conditional_If', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN', 'BOOLEAN'], 'ConditionalFunctions::IfBool', ['if']],
+  ['Conditional_If', 'BIGINT', ['BOOLEAN', 'BIGINT', 'BIGINT'], 'ConditionalFunctions::IfInt', ['if']],
+  ['Conditional_If', 'DOUBLE', ['BOOLEAN', 'DOUBLE', 'DOUBLE'], 'ConditionalFunctions::IfFloat', ['if']],
+  ['Conditional_If', 'STRING', ['BOOLEAN', 'STRING', 'STRING'], 'ConditionalFunctions::IfString', ['if']],
+  ['Conditional_If', 'TIMESTAMP', ['BOOLEAN', 'TIMESTAMP', 'TIMESTAMP'], 'ConditionalFunctions::IfTimestamp', ['if']],
+  ['Conditional_Coalesce', 'BOOLEAN', ['BOOLEAN', '...'], 'ConditionalFunctions::CoalesceBool', ['coalesce']],
+  ['Conditional_Coalesce', 'BIGINT', ['BIGINT', '...'], 'ConditionalFunctions::CoalesceInt', ['coalesce']],
+  ['Conditional_Coalesce', 'DOUBLE', ['DOUBLE', '...'], 'ConditionalFunctions::CoalesceFloat', ['coalesce']],
+  ['Conditional_Coalesce', 'STRING', ['STRING', '...'], 'ConditionalFunctions::CoalesceString', ['coalesce']],
+  ['Conditional_Coalesce', 'TIMESTAMP', ['TIMESTAMP', '...'], 'ConditionalFunctions::CoalesceTimestamp', ['coalesce']],
 ]

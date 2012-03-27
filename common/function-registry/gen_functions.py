@@ -78,6 +78,41 @@ void* ComputeFunctions::${fn_signature}(Expr* e, TupleRow* row) {\n\
   return &e->result_.${result_field};\n\
 }\n\n")
 
+case = Template("\
+void* ComputeFunctions::${fn_signature}(Expr* e, TupleRow* row) {\n\
+  CaseExpr* expr = static_cast<CaseExpr*>(e);\n\
+  int num_children = e->GetNumChildren();\n\
+  int loop_end = (expr->has_else_expr()) ? num_children - 1 : num_children;\n\
+  // Make sure we set the right compute function.\n\
+  DCHECK_EQ(expr->has_case_expr(), true);\n\
+  // Need at least case, when and then expr, and optionally an else.\n\
+  DCHECK_GE(num_children, (expr->has_else_expr()) ? 4 : 3);\n\
+  // All case and when exprs return the same type (we guaranteed that during analysis).\n\
+  void* case_val = e->children()[0]->GetValue(row);\n\
+  if (case_val == NULL) {\n\
+    if (expr->has_else_expr()) {\n\
+      // Return else value.\n\
+      return e->children()[num_children - 1]->GetValue(row);\n\
+    } else {\n\
+      return NULL;\n\
+    }\n\
+  }\n\
+  for (int i = 1; i < loop_end; i += 2) {\n\
+    ${native_type1}* when_val =\n\
+        reinterpret_cast<${native_type1}*>(e->children()[i]->GetValue(row));\n\
+    if (when_val == NULL) continue;\n\
+    if (*reinterpret_cast<${native_type1}*>(case_val) == *when_val) {\n\
+      // Return then value.\n\
+      return e->children()[i + 1]->GetValue(row);\n\
+    }\n\
+  }\n\
+  if (expr->has_else_expr()) {\n\
+    // Return else value.\n\
+    return e->children()[num_children - 1]->GetValue(row);\n\
+  }\n\
+  return NULL;\n\
+}\n\n")
+
 python_template = Template("\
   ['${fn_name}', '${return_type}', [${args}], 'ComputeFunctions::${fn_signature}', []], \n")
 
@@ -116,7 +151,7 @@ types = {
   'INT_TYPES'     : ['TINYINT', 'SMALLINT', 'INT', 'BIGINT'],
   'NUMERIC_TYPES' : ['TINYINT', 'SMALLINT', 'INT', 'BIGINT', 'FLOAT', 'DOUBLE'],
   'NATIVE_TYPES'  : ['BOOLEAN', 'TINYINT', 'SMALLINT', 'INT', 'BIGINT', 'FLOAT', 'DOUBLE'],
-  'ALL_TYPES'     : ['BOOLEAN', 'TINYINT', 'SMALLINT', 'INT', 'BIGINT', 'FLOAT', 'DOUBLE', 'STRING'],
+  'ALL_TYPES'     : ['BOOLEAN', 'TINYINT', 'SMALLINT', 'INT', 'BIGINT', 'FLOAT', 'DOUBLE', 'STRING', 'TIMESTAMP'],
   'MAX_TYPES'     : ['BIGINT', 'DOUBLE'],
 }
 
@@ -168,6 +203,14 @@ functions = [
   ['Cast', ['STRING'], [['TIMESTAMP'], ['STRING']], numeric_to_string ],
   ['Cast', ['TIMESTAMP'], [['STRING'], ['TIMESTAMP']], string_to_numeric],
   ['Cast', ['TIMESTAMP'], [['NATIVE_TYPES'], ['TIMESTAMP']], ],
+
+  # Case
+  # The case expr is special because it has a variable number of function args,
+  # but we guarantee that all of them are of the same type during query analysis,
+  # so we just list exactly one here.
+  # In addition, the return type given here is a dummy, because it is 
+  # not necessarily the same as the function args type.
+  ['Case', ['ALL_TYPES'], [['ALL_TYPES']], case],
 ]
 
 native_types = {
@@ -241,6 +284,7 @@ cc_preamble = '\
 \n\
 #include "opcode/functions.h"\n\
 #include "exprs/expr.h"\n\
+#include "exprs/case-expr.h"\n\
 #include "runtime/tuple-row.h"\n\
 #include <boost/lexical_cast.hpp>\n\
 \n\

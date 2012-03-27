@@ -895,8 +895,72 @@ public class AnalyzerTest {
     AnalyzesOk("select concat('a', 'b', 'c')");
     AnalyzesOk("select concat('a', 'b', 'c', 'd')");
     AnalyzesOk("select concat('a', 'b', 'c', 'd', 'e')");
+    // Test different vararg type signatures for same function name.
+    AnalyzesOk("select coalesce(true)");
+    AnalyzesOk("select coalesce(true, false, true)");
+    AnalyzesOk("select coalesce(5)");
+    AnalyzesOk("select coalesce(5, 6, 7)");
+    AnalyzesOk("select coalesce('a')");
+    AnalyzesOk("select coalesce('a', 'b', 'c')");
     // Need at least one argument.
     AnalysisError("select concat()");
+    AnalysisError("select coalesce()");
+  }
+
+  @Test
+  public void TestCaseExpr() {
+    // No case expr.
+    AnalyzesOk("select case when 20 > 10 then 20 else 15 end");
+    // No else.
+    AnalyzesOk("select case when 20 > 10 then 20 end");
+    // First when condition is a boolean slotref.
+    AnalyzesOk("select case when bool_col then 20 else 15 end from alltypes");
+    // Requires casting then exprs.
+    AnalyzesOk("select case when 20 > 10 then 20 when 1 > 2 then 1.0 else 15 end");
+    // Requires casting then exprs.
+    AnalyzesOk("select case when 20 > 10 then 20 when 1 > 2 then 1.0 " +
+    		"when 4 < 5 then 2 else 15 end");
+    // First when expr doesn't return boolean.
+    AnalysisError("select case when 20 then 20 when 1 > 2 then timestamp_col " +
+        "when 4 < 5 then 2 else 15 end from alltypes",
+        "When expr '20' is not of type boolean and not castable to type boolean.");
+    // Then exprs return incompatible types.
+    AnalysisError("select case when 20 > 10 then 20 when 1 > 2 then timestamp_col " +
+        "when 4 < 5 then 2 else 15 end from alltypes",
+        "Incompatible return types 'TINYINT' and 'TIMESTAMP' " +
+        "of exprs '20' and 'timestamp_col'.");
+
+    // With case expr.
+    AnalyzesOk("select case int_col when 20 then 30 else 15 end " +
+    		"from alltypes");
+    // No else.
+    AnalyzesOk("select case int_col when 20 then 30 end " +
+        "from alltypes");
+    // Requires casting case expr.
+    AnalyzesOk("select case int_col when bigint_col then 30 else 15 end " +
+        "from alltypes");
+    // Requires casting when expr.
+    AnalyzesOk("select case bigint_col when int_col then 30 else 15 end " +
+        "from alltypes");
+    // Requires multiple casts.
+    AnalyzesOk("select case bigint_col when int_col then 30 " +
+    		"when double_col then 1.0 else 15 end from alltypes");
+    // Type of case expr is incompatible with first when expr.
+    AnalysisError("select case bigint_col when timestamp_col then 30 " +
+        "when double_col then 1.0 else 15 end from alltypes",
+        "Incompatible return types 'BIGINT' and 'TIMESTAMP' " +
+        "of exprs 'bigint_col' and 'timestamp_col'.");
+    // Then exprs return incompatible types.
+    AnalysisError("select case bigint_col when int_col then 30 " +
+        "when double_col then timestamp_col else 15 end from alltypes",
+        "Incompatible return types 'TINYINT' and 'TIMESTAMP' " +
+        "of exprs '30' and 'timestamp_col'.");
+
+    // Test different type classes (all types are tested in BE tests).
+    AnalyzesOk("select case when true then 1 end");
+    AnalyzesOk("select case when true then 1.0 end");
+    AnalyzesOk("select case when true then 'abc' end");
+    AnalyzesOk("select case when true then cast('2011-01-01 09:01:01' as timestamp) end");
   }
 
   @Test

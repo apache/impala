@@ -35,9 +35,24 @@ class ExprTest : public testing::Test {
   // the minimum value that is outside of the next smaller-resolution type.
   // For example the value for type TYPE_SMALLINT is numeric_limits<int8_t>::max()+1.
   unordered_map<int, int64_t> min_int_values_;
+
   // Maps from primitive float type to smallest positive value that is larger
   // than the largest value of the next smaller-resolution type.
   unordered_map<int, double> min_float_values_;
+
+  // Maps from enum value of primitive type to
+  // a string representation of a default value for testing.
+  // For int and float types the strings represent
+  // the corresponding min values (in the maps above).
+  // For non-numeric types the default values are listed below.
+  unordered_map<int, string> default_type_strs_;
+  string default_bool_str_;
+  string default_string_str_;
+  string default_timestamp_str_;
+  // Corresponding default values.
+  bool default_bool_val_;
+  string default_string_val_;
+  TimestampValue default_timestamp_val_;
 
   virtual void SetUp() {
     exec_env_.reset(new ExecEnv());
@@ -51,6 +66,31 @@ class ExprTest : public testing::Test {
 
     min_float_values_[TYPE_FLOAT] = 1.1;
     min_float_values_[TYPE_DOUBLE] = static_cast<double>(numeric_limits<float>::max()) + 1.1;
+
+    // Set up default test types, values, and strings.
+    default_bool_str_ = "false";
+    default_string_str_ = "'abc'";
+    default_timestamp_str_ = "cast('2011-01-01 09:01:01' as timestamp)";
+    default_bool_val_ = false;
+    default_string_val_ = "abc";
+    default_timestamp_val_ = TimestampValue(1293872461);
+    default_type_strs_[TYPE_TINYINT] =
+        lexical_cast<string>(min_int_values_[TYPE_TINYINT]);
+    default_type_strs_[TYPE_SMALLINT] =
+        lexical_cast<string>(min_int_values_[TYPE_SMALLINT]);
+    default_type_strs_[TYPE_INT] =
+        lexical_cast<string>(min_int_values_[TYPE_INT]);
+    default_type_strs_[TYPE_BIGINT] =
+        lexical_cast<string>(min_int_values_[TYPE_BIGINT]);
+    // Don't use lexical case here because it results
+    // in a string 1.1000000000000001 that messes up the tests.
+    default_type_strs_[TYPE_FLOAT] =
+        lexical_cast<string>(min_float_values_[TYPE_FLOAT]);
+    default_type_strs_[TYPE_DOUBLE] =
+        lexical_cast<string>(min_float_values_[TYPE_DOUBLE]);
+    default_type_strs_[TYPE_BOOLEAN] = default_bool_str_;
+    default_type_strs_[TYPE_STRING] = default_string_str_;
+    default_type_strs_[TYPE_TIMESTAMP] = default_timestamp_str_;
   }
 
   void GetValue(const string& expr, PrimitiveType expr_type, void** value) {
@@ -70,6 +110,14 @@ class ExprTest : public testing::Test {
     GetValue(expr, TYPE_STRING, reinterpret_cast<void**>(&result));
     string tmp(result->ptr, result->len);
     EXPECT_EQ(tmp, expected_result);
+  }
+
+  // We can't put this into TestValue() because GTest can't resolve
+  // the ambiguity in TimestampValue::operator==, even with the appropriate casts.
+  void TestTimestampValue(const string& expr, const TimestampValue& expected_result) {
+    TimestampValue* result;
+    GetValue(expr, TYPE_TIMESTAMP, reinterpret_cast<void**>(&result));
+    EXPECT_EQ(*result, expected_result);
   }
 
   template <class T> void TestValue(const string& expr, PrimitiveType expr_type,
@@ -1353,6 +1401,165 @@ TEST_F(ExprTest, TimestampFunctions) {
 
   // There is a boost bug converting from string we need to compensate for, test it
   TestStringValue("cast(cast('1999-01-10' as timestamp) as string)", "not-a-date-time");
+}
+
+// TODO: Since we currently can't analyze NULL literals as function parameters,
+// we instead use a function which we know will return NULL as a workaround.
+// This only works sometimes though, because the NULL-returning function
+// must also have the correct return type that we are looking for.
+// The commented (#if 0) tests should be enabled once we can analyze NULL literals
+// as function arguments.
+TEST_F(ExprTest, ConditionalFunctions) {
+  // If first param evaluates to true, should return second parameter,
+  // false or NULL should return the third.
+  TestValue("if(TRUE, FALSE, TRUE)", TYPE_BOOLEAN, false);
+  TestValue("if(FALSE, FALSE, TRUE)", TYPE_BOOLEAN, true);
+  TestValue("if(TRUE, 10, 20)", TYPE_BIGINT, 10);
+  TestValue("if(FALSE, 10, 20)", TYPE_BIGINT, 20);
+  TestValue("if(TRUE, 5.5, 8.8)", TYPE_DOUBLE, 5.5);
+  TestValue("if(FALSE, 5.5, 8.8)", TYPE_DOUBLE, 8.8);
+  TestStringValue("if(TRUE, 'abc', 'defgh')", "abc");
+  TestStringValue("if(FALSE, 'abc', 'defgh')", "defgh");
+  TimestampValue then_val(1293872461);
+  TimestampValue else_val(929387245);
+  TestTimestampValue("if(TRUE, cast('2011-01-01 09:01:01' as timestamp), "
+      "cast('1999-06-14 19:07:25' as timestamp))", then_val);
+  TestTimestampValue("if(FALSE, cast('2011-01-01 09:01:01' as timestamp), "
+      "cast('1999-06-14 19:07:25' as timestamp))", else_val);
+
+  // Workaround: if(true, NULL, NULL) returns NULL of type BOOLEAN.
+  // coalesce(NULL)
+  TestIsNull("coalesce(if(true, NULL, NULL))", TYPE_BOOLEAN);
+  // coalesce(NULL, NULL)
+  TestIsNull("coalesce(if(true, NULL, NULL), if(true, NULL, NULL))", TYPE_BOOLEAN);
+  TestValue("coalesce(TRUE)", TYPE_BOOLEAN, true);
+  // coalesce(NULL, TRUE, NULL)
+  TestValue("coalesce(if(true, NULL, NULL), TRUE, if(true, NULL, NULL))",
+      TYPE_BOOLEAN, true);
+  // coalesce(FALSE, NULL, TRUE, NULL)
+  TestValue("coalesce(FALSE, if(true, NULL, NULL), TRUE, if(true, NULL, NULL))",
+      TYPE_BOOLEAN, false);
+  // coalesce(NULL, NULL, NULL TRUE, NULL, NULL)
+  TestValue("coalesce(if(true, NULL, NULL), if(true, NULL, NULL), if(true, NULL, NULL),"
+      "TRUE, if(true, NULL, NULL), if(true, NULL, NULL))", TYPE_BOOLEAN, true);
+  TestValue("coalesce(10)", TYPE_BIGINT, 10);
+#if 0
+  TestValue("coalesce(NULL, 10, NULL)", TYPE_BIGINT, 10);
+  TestValue("coalesce(20, NULL, 10, NULL)", TYPE_BIGINT, 20);
+  TestValue("coalesce(NULL, NULL, NULL, 10, NULL, NULL)", TYPE_BIGINT, 10);
+#endif
+  TestValue("coalesce(5.5)", TYPE_DOUBLE, 5.5);
+#if 0
+  TestValue("coalesce(NULL, 5.5, NULL)", TYPE_DOUBLE, 5.5);
+  TestValue("coalesce(8.8, NULL, 5.5, NULL)", TYPE_DOUBLE, 8.8);
+  TestValue("coalesce(NULL, NULL, NULL, 5.5, NULL, NULL)", TYPE_DOUBLE, 5.5);
+#endif
+  TestStringValue("coalesce('abc')", "abc");
+#if 0
+  TestStringValue("coalesce(NULL, 'abc', NULL)", "abc");
+  TestStringValue("coalesce('defgh', NULL, 'abc', NULL)", "defgh");
+  TestStringValue("coalesce(NULL, NULL, NULL, 'abc', NULL, NULL)", "abc");
+#endif
+  TimestampValue ats(1293872461);
+#if 0
+  TimestampValue bts(929387245);
+#endif
+  TestTimestampValue("coalesce(cast('2011-01-01 09:01:01' as timestamp))", ats);
+#if 0
+  TestTimestampValue("coalesce(NULL, cast('2011-01-01 09:01:01' as timestamp),"
+      "NULL)", ats);
+  TestTimestampValue("coalesce(cast('1999-06-14 19:07:25' as timestamp), NULL,"
+      "cast('2011-01-01 09:01:01' as timestamp), NULL)", bts);
+  TestTimestampValue("coalesce(NULL, NULL, NULL,"
+      "cast('2011-01-01 09:01:01' as timestamp), NULL, NULL)", ats);
+#endif
+
+  // Test logic of case expr using int types.
+  // The different types and casting are tested below.
+  TestValue("case when true then 1 end", TYPE_TINYINT, 1);
+  TestValue("case when false then 1 when true then 2 end", TYPE_TINYINT, 2);
+  TestValue("case when false then 1 when false then 2 when true then 3 end",
+      TYPE_TINYINT, 3);
+  // Test else expr.
+  TestValue("case when false then 1 else 10 end", TYPE_TINYINT, 10);
+  TestValue("case when false then 1 when false then 2 else 10 end", TYPE_TINYINT, 10);
+  TestValue("case when false then 1 when false then 2 when false then 3 else 10 end",
+      TYPE_TINYINT, 10);
+  TestIsNull("case when false then 1 end", TYPE_TINYINT);
+  // Test with case expr.
+  TestValue("case 21 when 21 then 1 end", TYPE_TINYINT, 1);
+  TestValue("case 21 when 20 then 1 when 21 then 2 end", TYPE_TINYINT, 2);
+  TestValue("case 21 when 20 then 1 when 19 then 2 when 21 then 3 end", TYPE_TINYINT, 3);
+  // Should skip when-exprs that are NULL
+#if 0
+  TestIsNull("case when NULL then 1 end", TYPE_TINYINT);
+  TestIsNull("case when NULL then 1 end else NULL end", TYPE_TINYINT);
+  TestValue("case when NULL then 1 else 2 end", TYPE_TINYINT, 2);
+  TestValue("case when NULL then 1 when true then 2 else 3 end", TYPE_TINYINT, 2);
+#endif
+  // Should return else expr, if case-expr is NULL.
+#if 0
+  TestIsNull("case NULL when 1 then 1 end", TYPE_TINYINT);
+  TestIsNull("case NULL when 1 then 1 else NULL end", TYPE_TINYINT);
+  TestValue("case NULL when 1 then 1 else 2 end", TYPE_TINYINT, 2);
+  TestValue("case 10 when NULL then 1 else 2 end", TYPE_TINYINT, 2);
+  TestValue("case 10 when NULL then 1 when 10 then 2 else 3 end", TYPE_TINYINT, 2);
+#endif
+
+  // Test all types in case/when exprs, without casts.
+  unordered_map<int, string>::iterator def_iter;
+  for(def_iter = default_type_strs_.begin(); def_iter != default_type_strs_.end();
+      ++def_iter) {
+    TestValue("case " + def_iter->second + " when " + def_iter->second +
+        " then true end", TYPE_BOOLEAN, true);
+  }
+
+  // Test all int types in then and else exprs.
+  // Also tests implicit casting in all exprs.
+  unordered_map<int, int64_t>::iterator int_iter;
+  for (int_iter = min_int_values_.begin(); int_iter != min_int_values_.end();
+      ++int_iter) {
+    PrimitiveType t = static_cast<PrimitiveType>(int_iter->first);
+    string& s = default_type_strs_[t];
+    TestValue("case when true then " + s + " end", t, int_iter->second);
+    TestValue("case when false then 1 else " + s + " end", t, int_iter->second);
+    TestValue("case when true then 1 else " + s + " end", t, 1);
+    TestValue("case 0 when " + s + " then true else false end", TYPE_BOOLEAN, false);
+  }
+
+  // Test all float types in then and else exprs.
+  // Also tests implicit casting in all exprs.
+  // TODO: Something with our float literals is broken:
+  // 1.1 gets recognized as a DOUBLE, but numeric_limits<float>::max()) + 1.1 as a FLOAT.
+#if 0
+  unordered_map<int, double>::iterator float_iter;
+  for (float_iter = min_float_values_.begin(); float_iter != min_float_values_.end();
+      ++float_iter) {
+    PrimitiveType t = static_cast<PrimitiveType>(float_iter->first);
+    string& s = default_type_strs_[t];
+    TestValue("case when true then " + s + " end", t, float_iter->second);
+    TestValue("case when false then 1 else " + s + " end", t, float_iter->second);
+    TestValue("case when true then 1 else " + s + " end", t, 1.0);
+    TestValue("case 0 when " + s + " then true else false end", TYPE_BOOLEAN, false);
+  }
+#endif
+
+  // Test all other types.
+  // We don't tests casts because these types don't allow casting up to them.
+  TestValue("case when true then " + default_bool_str_ + " end", TYPE_BOOLEAN,
+      default_bool_val_);
+  TestValue("case when false then true else " + default_bool_str_ + " end", TYPE_BOOLEAN,
+      default_bool_val_);
+  // String type.
+  TestStringValue("case when true then " + default_string_str_ + " end",
+      default_string_val_);
+  TestStringValue("case when false then '1' else " + default_string_str_ + " end",
+      default_string_val_);
+  // Timestamp type.
+  TestTimestampValue("case when true then " + default_timestamp_str_ + " end",
+      default_timestamp_val_);
+  TestTimestampValue("case when false then cast('1999-06-14 19:07:25' as timestamp) "
+      "else " + default_timestamp_str_ + " end", default_timestamp_val_);
 }
 
 }

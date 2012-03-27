@@ -14,6 +14,7 @@ add_library(Exprs
   case-expr.cc
   cast-expr.cc
   compound-predicate.cc
+  conditional-functions.cc
   date-literal.cc
   expr.cc
   float-literal.cc
@@ -28,7 +29,7 @@ add_library(Exprs
   slot-ref.cc
   string-literal.cc
   string-functions.cc
-  timestamp-functions.cc
+  timestamp-functions.cc  
 )
 
 target_link_libraries(Exprs

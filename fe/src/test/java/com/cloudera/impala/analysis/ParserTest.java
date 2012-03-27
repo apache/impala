@@ -256,6 +256,7 @@ public class ParserTest {
 
   @Test public void TestFunctionCallExprs() {
     ParsesOk("select f1(5), f2('five'), f3(5.0, i + 5) from t");
+    ParsesOk("select f1(true), f2(true and false), f3(null) from t");
     ParserError("select f( from t");
     ParserError("select f(5.0 5.0) from t");
   }
@@ -276,11 +277,19 @@ public class ParserTest {
   }
 
   @Test public void TestCaseExprs() {
+    // Test regular exps.
     ParsesOk("select case a when '5' then x when '6' then y else z end from t");
-    ParsesOk("select case when '5' then x when '6' then y else z end from t");
-    ParserError("select case a when '5' then x when '6' then y else z from t");
-    ParserError("select case a when '5' when '6' then y else z end from t");
-    ParserError("select case a when '5', '6' then y else z end from t");
+    ParsesOk("select case when 'a' then x when false then y else z end from t");
+    // Test predicates in case, when, then, and else exprs.
+    ParsesOk("select case when a > 2 then x when false then false else true end from t");
+    ParsesOk("select case false when a > 2 then x when '6' then false else true end " +
+        "from t");
+    // Missing end.
+    ParserError("select case a when true then x when false then y else z from t");
+    // Missing else after first when.
+    ParserError("select case a when true when false then y else z end from t");
+    // Incorrectly placed comma.
+    ParserError("select case a when true, false then y else z end from t");
   }
 
   @Test public void TestCastExprs() {

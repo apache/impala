@@ -66,6 +66,7 @@ cc_registry_preamble = '\
 #include "exprs/math-functions.h"\n\
 #include "exprs/string-functions.h"\n\
 #include "exprs/timestamp-functions.h"\n\
+#include "exprs/conditional-functions.h"\n\
 #include "opcode/functions.h"\n\
 \n\
 namespace impala { \n\
@@ -179,7 +180,10 @@ def generate_opcodes():
       for entry in entries:
         opcode = fn.upper()
         for arg in entry["args"]:
-          opcode += "_" + native_types[arg].upper()
+          if arg == "...":
+            opcode += "_" + 'VARARGS'
+          else:
+            opcode += "_" + native_types[arg].upper()
         opcodes.append(opcode)
         entry["opcode"] = opcode
     else:

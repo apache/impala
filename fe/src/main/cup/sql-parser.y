@@ -157,6 +157,7 @@ nonterminal SelectListItem select_list_item;
 nonterminal SelectListItem star_expr ;
 nonterminal Expr expr, arithmetic_expr;
 nonterminal ArrayList<Expr> expr_list;
+nonterminal ArrayList<Expr> func_arg_list;
 nonterminal String alias_clause;
 nonterminal ArrayList<String> ident_list;
 nonterminal TableName table_name;
@@ -186,6 +187,7 @@ nonterminal InsertStmt insert_stmt;
 nonterminal ArrayList<PartitionKeyValue> partition_clause;
 nonterminal ArrayList<PartitionKeyValue> partition_key_value_list;
 nonterminal PartitionKeyValue partition_key_value;
+nonterminal Expr expr_or_predicate;
 
 precedence left KW_OR;
 precedence left KW_AND;
@@ -484,7 +486,7 @@ cast_expr ::=
   ;
 
 case_expr ::=
-  KW_CASE expr:caseExpr
+  KW_CASE expr_or_predicate:caseExpr
     case_when_clause_list:whenClauseList
     case_else_clause:elseExpr
     KW_END
@@ -497,24 +499,32 @@ case_expr ::=
   ;
 
 case_when_clause_list ::=
-  KW_WHEN expr:whenExpr KW_THEN expr:thenExpr
+  KW_WHEN expr_or_predicate:whenExpr KW_THEN expr_or_predicate:thenExpr
   {:
     ArrayList<CaseWhenClause> list = new ArrayList<CaseWhenClause>();
     list.add(new CaseWhenClause(whenExpr, thenExpr));
     RESULT = list;
   :}
-  | case_when_clause_list:list KW_WHEN expr:whenExpr KW_THEN expr:thenExpr
+  | case_when_clause_list:list KW_WHEN expr_or_predicate:whenExpr 
+    KW_THEN expr_or_predicate:thenExpr
   {:
     list.add(new CaseWhenClause(whenExpr, thenExpr));
     RESULT = list;
   :}
   ;
-
+  
 case_else_clause ::=
-  KW_ELSE expr:e
+  KW_ELSE expr_or_predicate:e
   {: RESULT = e; :}
   | /* emtpy */
   {: RESULT = null; :}
+  ;
+
+expr_or_predicate ::=
+  expr:e
+  {: RESULT = e; :}
+  | predicate:p
+  {: RESULT = p; :}
   ;
 
 subtract_chain_expr ::=    
@@ -537,7 +547,7 @@ expr ::=
   {: RESULT = l; :}
   | IDENT:functionName LPAREN RPAREN
   {: RESULT = new FunctionCallExpr(functionName, new ArrayList<Expr>()); :}
-  | IDENT:functionName LPAREN expr_list:exprs RPAREN
+  | IDENT:functionName LPAREN func_arg_list:exprs RPAREN
   {: RESULT = new FunctionCallExpr(functionName, exprs); :}
   | cast_expr:c
   {: RESULT = c; :}
@@ -551,6 +561,21 @@ expr ::=
   {: RESULT = e; :}
   | LPAREN expr:e RPAREN
   {: RESULT = e; :}
+  ;
+
+func_arg_list ::=
+  // Function arguments can be exprs as well as predicates.
+  expr_or_predicate:item
+  {:
+    ArrayList<Expr> list = new ArrayList<Expr>();
+    list.add(item);
+    RESULT = list;
+  :}
+  | func_arg_list:list COMMA expr_or_predicate:item
+  {:
+    list.add(item);
+    RESULT = list;
+  :}
   ;
 
 arithmetic_expr ::=
