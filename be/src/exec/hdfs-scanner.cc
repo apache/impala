@@ -47,6 +47,9 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, const TupleDescriptor* tuple_d
       current_scan_range_(NULL) {
 }
 
+HdfsScanner::~HdfsScanner() {
+}
+
 Status HdfsScanner::Prepare(RuntimeState* state, ByteStream* byte_stream) {
   DCHECK(byte_stream != NULL);
   current_byte_stream_ = byte_stream;

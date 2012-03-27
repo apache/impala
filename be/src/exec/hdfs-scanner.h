@@ -59,6 +59,8 @@ class HdfsScanner {
   HdfsScanner(HdfsScanNode* scan_node, const TupleDescriptor* tuple_desc,
               Tuple* template_tuple, MemPool* tuple_pool);
 
+  virtual ~HdfsScanner();
+
   // Writes parsed tuples into tuple buffer,
   // and sets pointers in row_batch to point to them.
   // row_batch may be non-full when all scan ranges have been read
