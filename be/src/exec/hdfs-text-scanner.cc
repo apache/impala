@@ -234,10 +234,8 @@ Status HdfsTextScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
             current_range_remaining_len_ = -1;
             continue;
           }
-
           *eosr = true;
-          return Status::OK;
-
+          break;
         } else {
           // Continue reading from the current file location
           DCHECK_GE(current_range_remaining_len_, 0);
@@ -267,6 +265,7 @@ Status HdfsTextScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
       max_tuples = 1;
     }
     RETURN_IF_ERROR(ParseFileBuffer(max_tuples, &num_tuples, &num_fields, &col_start));
+
     int bytes_processed = byte_buffer_ptr_ - line_start;
     current_range_remaining_len_ -= bytes_processed;
     DCHECK_GT(bytes_processed, 0);
@@ -278,6 +277,13 @@ Status HdfsTextScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
       boundary_row_.Clear();
       line_start = byte_buffer_ptr_;
       RETURN_IF_ERROR(WriteTuples(state, row_batch, num_tuples, &row_idx));
+    }
+
+    // TODO: does it ever make sense to deep copy some of the tuples (string data) if the
+    // number of tuples in this batch is very small?
+    // Cannot reuse file buffer if there are non-copied string slots materialized
+    if (num_rows_returned_ > previous_num_rows && has_string_slots_) {
+      reuse_byte_buffer_ = false;
     }
 
     if (scan_node_->ReachedLimit()) {
@@ -300,14 +306,7 @@ Status HdfsTextScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
         byte_buffer_ptr_ = byte_buffer_end_;
       }
       *eosr = true;
-      return Status::OK;
-    }
-
-    // TODO: does it ever make sense to deep copy some of the tuples (string data) if the
-    // number of tuples in this batch is very small?
-    // Cannot reuse file buffer if there are non-copied string slots materialized
-    if (num_rows_returned_ > previous_num_rows || has_string_slots_) {
-      reuse_byte_buffer_ = false;
+      break;
     }
 
     // If the batch is full, return and the next GetNext() call will
@@ -327,6 +326,13 @@ Status HdfsTextScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
       *eosr = false;
       return Status::OK;
     }
+  }
+
+  // At EOS (or when we reach the scan node's limit), we don't expect
+  // to get called again, so we must yield ownership of all byte
+  // buffer data that might be part of a materialised tuple
+  if (!reuse_byte_buffer_) {
+    row_batch->tuple_data_pool()->AcquireData(byte_buffer_pool_.get(), false);
   }
 
   return Status::OK;
