@@ -45,6 +45,13 @@ Status HdfsTextScanner::InitCurrentScanRange(RuntimeState* state,
   current_range_remaining_len_ = scan_range->length;
   error_in_row_ = false;
 
+  // Note - this initialisation relies on the assumption that N partition keys will occupy
+  // entries 0 through N-1 in column_idx_to_slot_idx. If this changes, we will need
+  // another layer of indirection to map text-file column indexes onto the
+  // column_idx_to_slot_idx table used below.
+  column_idx_ = scan_node_->GetNumPartitionKeys();
+  slot_idx_ = 0;
+
   // Pre-load byte buffer with size of entire range, if possible
   RETURN_IF_ERROR(current_byte_stream_->Seek(scan_range->offset));
   byte_buffer_ptr_ = byte_buffer_end_;
@@ -93,15 +100,6 @@ Status HdfsTextScanner::Prepare(RuntimeState* state, ByteStream* byte_stream) {
   RETURN_IF_ERROR(HdfsScanner::Prepare(state, byte_stream));
 
   current_range_remaining_len_ = 0;
-
-  // These state fields cannot be split across ranges
-
-  // Note - this initialisation relies on the assumption that N
-  // partition keys will occupy slots 0 through N-1. If this changes,
-  // we will need another layer of indirection to map text-file column
-  // indexes onto the column_idx_to_slot_idx table used below.
-  column_idx_ = scan_node_->GetNumPartitionKeys();
-  slot_idx_ = 0;
 
   text_converter_.reset(new TextConverter(escape_char_, tuple_pool_));
 
@@ -202,6 +200,7 @@ Status HdfsTextScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
   AllocateTupleBuffer(row_batch);
   // Index into current row in row_batch.
   int row_idx = RowBatch::INVALID_ROW_INDEX;
+  int first_materialised_col_idx = scan_node_->GetNumPartitionKeys();
 
   // This loop contains a small state machine:
   //  1. byte_buffer_ptr_ != byte_buffer_end_: no need to read more, process what's in
@@ -221,6 +220,7 @@ Status HdfsTextScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
           // TODO: log an error, we have an incomplete tuple at the end of the file
           current_range_remaining_len_ = 0;
           slot_idx_ = 0;
+          column_idx_ = first_materialised_col_idx;
           boundary_column_.Clear();
           continue;
         }
@@ -228,9 +228,17 @@ Status HdfsTextScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
         if (current_range_remaining_len_ == 0) {
           // Check if a tuple is straddling this block and the next:
           //  1. boundary_column_ is not empty
-          //  2. slot_idx_ != 0 (the block is split at a col break but not a tuple break).
-          // We need to continue scanning until the end of the tuple
-          if (!boundary_column_.Empty() || slot_idx_ != 0) {
+          //  2. column_idx_ != first_materialised_col_idx if we are halfway through
+          //  reading a tuple
+          // We need to continue scanning until the end of the tuple.  Note that
+          // boundary_column_ will be empty if we are on a column boundary, but could still
+          // be inside a tuple. Similarly column_idx_ could be first_materialised_col_idx
+          // if we are in the middle of reading the first column. Therefore we need both
+          // checks.
+          // We cannot use slot_idx, since that is incremented only if we are
+          // materialising slots, which is not true for e.g. count(*)
+          // TODO: test that hits this condition.
+          if (!boundary_column_.Empty() || column_idx_ != first_materialised_col_idx) {
             current_range_remaining_len_ = -1;
             continue;
           }
@@ -268,6 +276,7 @@ Status HdfsTextScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
 
     int bytes_processed = byte_buffer_ptr_ - line_start;
     current_range_remaining_len_ -= bytes_processed;
+
     DCHECK_GT(bytes_processed, 0);
 
     COUNTER_UPDATE(scan_node_->rows_read_counter(), num_tuples);
@@ -324,9 +333,12 @@ Status HdfsTextScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
     if (row_batch->IsFull()) {
       row_batch->tuple_data_pool()->AcquireData(tuple_pool_, true);
       *eosr = false;
+      DCHECK_EQ(column_idx_, first_materialised_col_idx);
       return Status::OK;
     }
   }
+
+  DCHECK_EQ(column_idx_, first_materialised_col_idx);
 
   // At EOS (or when we reach the scan node's limit), we don't expect
   // to get called again, so we must yield ownership of all byte
