@@ -4,9 +4,11 @@
 
 #include <sstream>
 
+#include "codegen/llvm-codegen.h"
 #include "gen-cpp/Exprs_types.h"
 
 using namespace std;
+using namespace llvm;
 
 namespace impala {
 
@@ -30,6 +32,35 @@ string LiteralPredicate::DebugString() const {
   stringstream out;
   out << "LiteralPredicate(value=" << result_.bool_val << ")";
   return out.str();
+}
+
+// Llvm codegen for literal predicate.  The resulting IR looks like:
+//
+// define i1 @LiteralPredicate(i8** %row, i8* %state_data, i1* %is_null) {
+// entry:
+//   store i1 false, i1* %is_null
+//   ret i1 true
+// }
+Function* LiteralPredicate::Codegen(LlvmCodeGen* codegen) {
+  DCHECK_EQ(GetNumChildren(), 0);
+  
+  LLVMContext& context = codegen->context();
+  LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
+
+  Function* function = CreateComputeFnPrototype(codegen, "LiteralPredicate");
+
+  BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
+  codegen->builder()->SetInsertPoint(entry_block);
+  
+  SetIsNullReturnArg(codegen, function, is_null_);
+  if (is_null_) {
+    builder->CreateRet(GetNullReturnValue(codegen));
+  } else {
+    builder->CreateRet(ConstantInt::get(context, APInt(1, result_.bool_val, true)));
+  }
+  
+  if (!codegen->VerifyFunction(function)) return NULL;
+  return function;
 }
 
 }

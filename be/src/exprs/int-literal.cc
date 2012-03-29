@@ -5,9 +5,11 @@
 #include <glog/logging.h>
 #include <sstream>
 
+#include "codegen/llvm-codegen.h"
 #include "gen-cpp/Exprs_types.h"
 
 using namespace std;
+using namespace llvm;
 
 namespace impala {
 
@@ -95,8 +97,67 @@ Status IntLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
 
 string IntLiteral::DebugString() const {
   stringstream out;
-  out << "IntLiteral(value=" << result_.bigint_val << ")";
+  out << "IntLiteral(value=";
+  switch (type_) {
+    case TYPE_TINYINT:
+      out << static_cast<int>(result_.tinyint_val); // don't print it out as a char
+      break;
+    case TYPE_SMALLINT:
+      out << result_.smallint_val;
+      break;
+    case TYPE_INT:
+      out << result_.int_val;
+      break;
+    case TYPE_BIGINT:
+      out << result_.bigint_val;
+      break;
+    default:
+      DCHECK(false) << "IntLiteral::Prepare(): bad type: " << TypeToString(type_);
+  }
+  out << ")";
   return out.str();
+}
+
+// LLVM IR generation for int literals.  Resulting IR looks like:
+//
+// define i8 @IntLiteral1(i8** %row, i8* %state_data, i1* %is_null) {
+// entry:
+//   store i1 false, i1* %is_null
+//   ret i8 2
+// }
+Function* IntLiteral::Codegen(LlvmCodeGen* codegen) {
+  DCHECK_EQ(GetNumChildren(), 0);
+  LLVMContext& context = codegen->context();
+  LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
+
+  Function* function = CreateComputeFnPrototype(codegen, "IntLiteral");
+  BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
+  
+  builder->SetInsertPoint(entry_block);
+  Value* result = NULL;
+  switch (type()) {
+    case TYPE_TINYINT:
+      result = ConstantInt::get(context, APInt(8, result_.tinyint_val, true));
+      break;
+    case TYPE_SMALLINT:
+      result = ConstantInt::get(context, APInt(16, result_.smallint_val, true));
+      break;
+    case TYPE_INT:
+      result = ConstantInt::get(context, APInt(32, result_.int_val, true));
+      break;
+    case TYPE_BIGINT:
+      result = ConstantInt::get(context, APInt(64, result_.bigint_val, true));
+      break;
+    default:
+      DCHECK(false) << "Invalid type.";
+      return NULL;
+  }
+  
+  SetIsNullReturnArg(codegen, function, false);
+  builder->CreateRet(result);
+
+  if (!codegen->VerifyFunction(function)) return NULL;
+  return function;
 }
 
 }

@@ -3,10 +3,12 @@
 #include <sstream>
 #include <glog/logging.h>
 
+#include "codegen/llvm-codegen.h"
 #include "exprs/compound-predicate.h"
 #include "util/debug-util.h"
 
 using namespace std;
+using namespace llvm;
 
 namespace impala {
 
@@ -78,4 +80,191 @@ string CompoundPredicate::DebugString() const {
   return out.str();
 }
 
+// IR codegen for compound predicate.  Compound predicate has non trivial null handling
+// as well as many branches so this is pretty complicated.  The IR for x && y is:
+//
+// define i1 @CompoundPredicate(i8** %row, i8* %state_data, i1* %is_null) {
+// entry:
+//   %rhs_null = alloca i1
+//   %lhs_null = alloca i1
+//   %lhs_call = call i1 @LiteralPredicate(i8** %row, i8* %state_data, i1* %lhs_null)
+//   %rhs_call = call i1 @LiteralPredicate1(i8** %row, i8* %state_data, i1* %rhs_null)
+//   %lhs_null2 = load i1* %lhs_null
+//   %rhs_null3 = load i1* %rhs_null
+//   %tmp_and = and i1 %lhs_call, %rhs_call
+//   br i1 %lhs_null2, label %lhs_null1, label %lhs_not_null
+// 
+// lhs_null1:                                        ; preds = %entry
+//   br i1 %rhs_null3, label %null_block, label %lhs_null_rhs_not_null
+// 
+// lhs_not_null:                                     ; preds = %entry
+//   br i1 %rhs_null3, label %lhs_not_null_rhs_null, label %not_null_block
+// 
+// lhs_null_rhs_not_null:                            ; preds = %lhs_null1
+//   br i1 %rhs_call, label %null_block, label %not_null_block
+// 
+// lhs_not_null_rhs_null:                            ; preds = %lhs_not_null
+//   br i1 %lhs_call, label %null_block, label %not_null_block
+// 
+// null_block:                                       
+//   store i1 true, i1* %is_null
+//   br label %ret
+// 
+// not_null_block:                                   
+//   %0 = phi i1 [ false, %lhs_null_rhs_not_null ], 
+//               [ false, %lhs_not_null_rhs_null ], 
+//               [ %tmp_and, %lhs_not_null ]
+//   store i1 false, i1* %is_null
+//   br label %ret
+// 
+// ret:                                           ; preds = %not_null_block, %null_block
+//   %tmp_phi = phi i1 [ false, %null_block ], [ %0, %not_null_block ]
+//   ret i1 %tmp_phi
+// }
+Function* CompoundPredicate::Codegen(LlvmCodeGen* codegen) {
+  DCHECK_LE(GetNumChildren(), 2);
+  DCHECK_GE(GetNumChildren(), 1);
+
+  Function* lhs_function = children()[0]->Codegen(codegen);
+  if (lhs_function == NULL) return NULL;
+  Function* rhs_function = NULL;
+  if (GetNumChildren() == 2) {
+    rhs_function = children()[1]->Codegen(codegen);
+    if (rhs_function == NULL) return NULL;
+  }
+  
+  LLVMContext& context = codegen->context();
+  LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
+  Type* return_type = codegen->GetType(type());
+  Function* function = CreateComputeFnPrototype(codegen, "CompoundPredicate");
+
+  BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
+  builder->SetInsertPoint(entry_block);
+
+  if (GetNumChildren() == 1) {
+    DCHECK_EQ(op(), TExprOpcode::COMPOUND_NOT);
+    BasicBlock* child_not_null_block = 
+        BasicBlock::Create(context, "child_not_null", function);
+    BasicBlock* ret_block = BasicBlock::Create(context, "ret", function);
+
+    // Get child value
+    Value* child_value = CallFunction(codegen, function, lhs_function, 
+        ret_block, child_not_null_block);
+
+    // Child not NULL
+    builder->SetInsertPoint(child_not_null_block);
+    child_value = builder->CreateTrunc(child_value, codegen->boolean_type());
+    Value* result = builder->CreateNot(child_value);
+    builder->CreateBr(ret_block);
+
+    // Ret/merge block
+    builder->SetInsertPoint(ret_block);
+    PHINode* phi_node = builder->CreatePHI(return_type, 2, "tmp_phi");
+    phi_node->addIncoming(GetNullReturnValue(codegen), entry_block);
+    phi_node->addIncoming(result, child_not_null_block);
+    builder->CreateRet(phi_node);
+  } else {
+    LlvmCodeGen::NamedVariable lhs_null_var("lhs_null_ptr", codegen->boolean_type());
+    LlvmCodeGen::NamedVariable rhs_null_var("rhs_null_ptr", codegen->boolean_type());
+    
+    // Create stack variables for lhs is_null result and rhs is_null result
+    Value* lhs_is_null = codegen->CreateEntryBlockAlloca(function, lhs_null_var);
+    Value* rhs_is_null = codegen->CreateEntryBlockAlloca(function, rhs_null_var);
+
+    // Control blocks for aggregating results
+    BasicBlock* lhs_null_block = BasicBlock::Create(context, "lhs_null", function);
+    BasicBlock* lhs_not_null_block = 
+        BasicBlock::Create(context, "lhs_not_null", function);
+    BasicBlock* lhs_null_rhs_not_null_block = 
+        BasicBlock::Create(context, "lhs_null_rhs_not_null", function);
+    BasicBlock* lhs_not_null_rhs_null_block = 
+        BasicBlock::Create(context, "lhs_not_null_rhs_null", function);
+    BasicBlock* null_block = BasicBlock::Create(context, "null_block", function);
+    BasicBlock* not_null_block = BasicBlock::Create(context, "not_null_block", function);
+    BasicBlock* ret_block = BasicBlock::Create(context, "ret", function);
+
+    // Initialize the function arguments to the child functions
+    Function::arg_iterator func_args = function->arg_begin();
+    Value* row_ptr = func_args++;
+    Value* state_data_ptr = func_args++;
+    Value* is_null_ptr = func_args;
+    Value* args[3] = { row_ptr, state_data_ptr, lhs_is_null };
+
+    // Call lhs
+    Value* lhs_value = builder->CreateCall(lhs_function, args, "lhs_call");
+    // Call rhs
+    args[2] = rhs_is_null;
+    Value* rhs_value = builder->CreateCall(rhs_function, args, "rhs_call");
+    
+    Value* lhs_is_null_val = builder->CreateLoad(lhs_is_null, "lhs_null");
+    Value* rhs_is_null_val = builder->CreateLoad(rhs_is_null, "rhs_null");
+    Value* compare = NULL;
+    if (op() == TExprOpcode::COMPOUND_AND) {
+      compare = builder->CreateAnd(lhs_value, rhs_value, "tmp_and");
+    } else {
+      compare = builder->CreateOr(lhs_value, rhs_value, "tmp_or");
+    }
+
+    // Branch if lhs is null
+    builder->CreateCondBr(lhs_is_null_val, lhs_null_block, lhs_not_null_block);
+
+    // lhs_is_null block
+    builder->SetInsertPoint(lhs_null_block);
+    builder->CreateCondBr(rhs_is_null_val, null_block, lhs_null_rhs_not_null_block);
+
+    // lhs_is_not_null block
+    builder->SetInsertPoint(lhs_not_null_block);
+    builder->CreateCondBr(rhs_is_null_val, lhs_not_null_rhs_null_block, not_null_block);
+
+    // lhs_not_null rhs_null block
+    builder->SetInsertPoint(lhs_not_null_rhs_null_block);
+    if (op() == TExprOpcode::COMPOUND_AND) {
+      // false && null -> false; true && null -> null
+      builder->CreateCondBr(lhs_value, null_block, not_null_block);
+    } else {
+      // true || null -> true; false || null -> null
+      builder->CreateCondBr(lhs_value, not_null_block, null_block);
+    }
+
+    // lhs_null rhs_not_null block
+    builder->SetInsertPoint(lhs_null_rhs_not_null_block);
+    if (op() == TExprOpcode::COMPOUND_AND) {
+      // null && false -> false; null && true -> null
+      builder->CreateCondBr(rhs_value, null_block, not_null_block);
+    } else {
+      // null || true -> true; null || false -> null
+      builder->CreateCondBr(rhs_value, not_null_block, null_block);
+    }
+
+    // NULL block
+    builder->SetInsertPoint(null_block);
+    builder->CreateStore(codegen->true_value(), is_null_ptr);
+    builder->CreateBr(ret_block);
+
+    // not-NULL block
+    builder->SetInsertPoint(not_null_block);
+    PHINode* not_null_phi = builder->CreatePHI(codegen->boolean_type(), 3);
+    if (op() == TExprOpcode::COMPOUND_AND) {
+      not_null_phi->addIncoming(codegen->false_value(), lhs_null_rhs_not_null_block);
+      not_null_phi->addIncoming(codegen->false_value(), lhs_not_null_rhs_null_block);
+      not_null_phi->addIncoming(compare, lhs_not_null_block);
+    } else {
+      not_null_phi->addIncoming(codegen->true_value(), lhs_null_rhs_not_null_block);
+      not_null_phi->addIncoming(codegen->true_value(), lhs_not_null_rhs_null_block);
+      not_null_phi->addIncoming(compare, lhs_not_null_block);
+    }
+    builder->CreateStore(codegen->false_value(), is_null_ptr);
+    builder->CreateBr(ret_block);
+
+    // Ret/merge block
+    builder->SetInsertPoint(ret_block);
+    PHINode* phi_node = builder->CreatePHI(return_type, 2, "tmp_phi");
+    phi_node->addIncoming(codegen->false_value(), null_block);
+    phi_node->addIncoming(not_null_phi, not_null_block);
+    builder->CreateRet(phi_node);
+  }
+  
+  if (!codegen->VerifyFunction(function)) return NULL;
+  return function;
+}
 }

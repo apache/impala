@@ -174,7 +174,7 @@ int64_t MemPool::GetTotalChunkSizes() const {
 
 bool MemPool::CheckIntegrity(bool current_chunk_empty) {
   // check that current_chunk_idx_ points to the last chunk with allocated data
-  int total_allocated = 0;
+  int64_t total_allocated = 0;
   for (int i = 0; i < chunks_.size(); ++i) {
     DCHECK_GT(chunks_[i].size, 0);
     if (i < current_chunk_idx_) {

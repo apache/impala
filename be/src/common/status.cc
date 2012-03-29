@@ -2,6 +2,7 @@
 
 #include <boost/algorithm/string/join.hpp>
 
+#include <glog/logging.h>
 #include "common/status.h"
 
 using namespace std;
@@ -20,6 +21,7 @@ const Status Status::OK;
 
 Status::Status(const string& error_msg)
   : error_detail_(new ErrorDetail(error_msg)) {
+  LOG(ERROR) << "Error Status: " << error_msg;
 }
 
 Status::Status(const Status& status)

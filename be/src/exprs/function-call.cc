@@ -4,7 +4,10 @@
 #include <string>
 #include <glog/logging.h>
 
+#include "codegen/llvm-codegen.h"
 #include "exprs/function-call.h"
+
+using namespace llvm;
 
 using namespace std;
 using namespace boost;
@@ -32,6 +35,89 @@ bool FunctionCall::SetRegex(const string& pattern) {
 
 void FunctionCall::SetReplaceStr(const StringValue* str_val) {
   replace_str_.reset(new string(str_val->ptr, str_val->len));
+}
+
+// IR generation for generic function calls.
+// for sqrt, the IR looks like:
+//
+// define double @FunctionCall(i8** %row, i8* %state_data, i1* %is_null) {
+// entry:
+//   %child_result = call double @FloatLiteral(i8** %row, i8* %state_data, i1* %is_null)
+//   %child_null = load i1* %is_null
+//   br i1 %child_null, label %ret_block, label %not_null_block
+// 
+// not_null_block:                                   ; preds = %entry
+//   %tmp_sqrt = call double @sqrt(double %child_result)
+//   br label %ret_block
+// 
+// ret_block:                                        ; preds = %not_null_block, %entry
+//   %tmp_phi = phi double [ 0.000000e+00, %entry ], [ %tmp_sqrt, %not_null_block ]
+//   ret double %tmp_phi
+// }
+//
+// TODO: this is still prototypey and needs to be made more generic to handle
+// other functions with different signatures.
+Function* FunctionCall::Codegen(LlvmCodeGen* codegen) {
+  LLVMContext& context = codegen->context();
+  LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
+
+  // Generate child functions
+  vector<Function*> child_functions;
+  child_functions.resize(GetNumChildren());
+  for (int i = 0; i < GetNumChildren(); ++i) {
+    Function* child = children()[i]->Codegen(codegen);
+    if (child == NULL) return NULL;
+    child_functions[i] = child;
+  }
+
+
+  Type* return_type = codegen->GetType(type());
+  Function* function = CreateComputeFnPrototype(codegen, "FunctionCall");
+  BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
+
+  BasicBlock* not_null_block = BasicBlock::Create(context, "not_null_block", function);
+  BasicBlock* ret_block = BasicBlock::Create(context, "ret_block", function);
+
+  builder->SetInsertPoint(entry_block);
+  scoped_ptr<LlvmCodeGen::FunctionPrototype> prototype;
+  Type* ret_type = NULL;
+  Value* result = NULL;
+  switch (op()) {
+    case TExprOpcode::MATH_SQRT: {
+      ret_type = codegen->double_type();
+      prototype.reset(new LlvmCodeGen::FunctionPrototype(codegen, "sqrt", ret_type));
+      prototype->AddArgument(LlvmCodeGen::NamedVariable("x", codegen->double_type()));
+      break;
+    }
+    default:
+      LOG(ERROR) << "Unsupported function: " << op();
+      return NULL;
+  }
+
+  Function* external_function = codegen->GetLibCFunction(prototype.get());
+
+  // Call child functions.  TODO: this needs to be an IR loop over all children
+  DCHECK_EQ(GetNumChildren(), 1);
+  vector<Value*> args;
+  args.resize(GetNumChildren());
+  for (int i = 0; i < GetNumChildren(); ++i) {
+    Function* child = child_functions[i];
+    Value* child_value = CallFunction(codegen, function, child, ret_block, not_null_block);
+    args[i] = child_value;
+  }
+
+  builder->SetInsertPoint(not_null_block);
+  result = builder->CreateCall(external_function, args, "tmp_" + prototype->name());
+  builder->CreateBr(ret_block);
+
+  builder->SetInsertPoint(ret_block);
+  PHINode* phi_node = builder->CreatePHI(return_type, 2, "tmp_phi");
+  phi_node->addIncoming(GetNullReturnValue(codegen), entry_block);
+  phi_node->addIncoming(result, not_null_block);
+  builder->CreateRet(phi_node);
+
+  if (!codegen->VerifyFunction(function)) return NULL;
+  return function;
 }
 
 }

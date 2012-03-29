@@ -13,6 +13,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/scoped_ptr.hpp>
 
+#include "codegen/llvm-codegen.h"
 #include "common/status.h"
 #include "exec/hbase-table-scanner.h"
 #include "testutil/query-executor.h"
@@ -133,6 +134,8 @@ static void Exec(ExecEnv* exec_env) {
       }
       aggregate_profile.Merge(*profile);
     }
+  
+    num_rows /= FLAGS_iterations;
 
     if (FLAGS_iterations == 1) {
       cout << "returned " << num_rows << (num_rows == 1 ? " row" : " rows")
@@ -174,6 +177,7 @@ int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, true);
 
+  LlvmCodeGen::InitializeLlvm();
   JniUtil::InitLibhdfs();
   scoped_ptr<ExecEnv> exec_env;
   if (FLAGS_backends.empty()) {

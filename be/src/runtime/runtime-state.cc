@@ -4,6 +4,8 @@
 #include <sstream>
 
 #include <boost/algorithm/string/join.hpp>
+
+#include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
 #include "runtime/descriptors.h"
 #include "common/status.h"
@@ -22,7 +24,7 @@ void* RuntimeState::hbase_conf_ = NULL;
 
 RuntimeState::RuntimeState(
     const TUniqueId& query_id, bool abort_on_error, int max_errors, int batchSize,
-    ExecEnv* exec_env)
+    bool llvm_enabled, ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
     batch_size_(batchSize > 0 ? batchSize : DEFAULT_BATCH_SIZE),
     file_buffer_size_(DEFAULT_FILE_BUFFER_SIZE),
@@ -30,6 +32,13 @@ RuntimeState::RuntimeState(
     max_errors_(max_errors),
     query_id_(query_id),
     exec_env_(exec_env) {
+
+  if (llvm_enabled) {
+    codegen_.reset(new LlvmCodeGen("QueryExecutor"));
+    codegen_->EnableOptimizations(true);
+    Status status = codegen_->Init();
+    DCHECK(status.ok());  // TODO better error handling
+  }
 }
 
 string RuntimeState::ErrorLog() const {

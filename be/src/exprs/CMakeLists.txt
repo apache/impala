@@ -46,6 +46,7 @@ add_executable(expr-test
 #  - Exprs & Opcode have a circular dependency (Exprs is included twice)
 target_link_libraries(expr-test
   TestUtil
+  CodeGen
   Service
   Exec
   Exprs
@@ -62,6 +63,7 @@ target_link_libraries(expr-test
   Exprs
   gtest
   ${Boost_LIBRARIES}
+  ${LLVM_MODULE_LIBS}
 )
 
 add_test(expr-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/exprs/expr-test)

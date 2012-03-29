@@ -20,3 +20,28 @@ target_link_libraries(TestUtil
   glogstatic
   gflagsstatic  
 )
+
+add_executable(query-jitter
+  query-jitter.cc
+)
+
+target_link_libraries(query-jitter
+  TestUtil
+  CodeGen
+  Exprs
+  Opcode
+  Exprs
+  Util
+  Runtime
+  Util
+  Common
+  ImpalaThrift
+  glogstatic
+  gflagsstatic
+  gtest
+  ${Boost_LIBRARIES}
+  ${LLVM_MODULE_LIBS}
+)
+
+  
+

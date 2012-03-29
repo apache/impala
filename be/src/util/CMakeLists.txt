@@ -7,6 +7,7 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/util")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/util")
 
 add_library(Util
+  benchmark.cc
   cpu-info.cc
   debug-util.cc
   jni-util.cc
@@ -23,7 +24,11 @@ add_executable(runtime-profile-test
   runtime-profile-test.cc
 )
 
-target_link_libraries(perf-counters-test
+add_executable(benchmark-test
+  benchmark-test.cc
+)
+
+set (UTIL_TEST_LINK_LIBS
   TestUtil
   Util
   Runtime
@@ -37,20 +42,11 @@ target_link_libraries(perf-counters-test
   ${Boost_LIBRARIES}
 )
 
-target_link_libraries(runtime-profile-test
-  TestUtil
-  Util
-  Runtime
-  Util
-  Common
-  thriftstatic
-  ImpalaThrift
-  glogstatic
-  gflagsstatic
-  gtest
-  ${Boost_LIBRARIES}
-)
+target_link_libraries(perf-counters-test ${UTIL_TEST_LINK_LIBS})
+target_link_libraries(runtime-profile-test ${UTIL_TEST_LINK_LIBS})
+target_link_libraries(benchmark-test ${UTIL_TEST_LINK_LIBS})
 
 add_test(perf-counters-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/util/perf-counters-test)
 add_test(runtime-profile-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/util/runtime-profile-test)
+add_test(benchmark-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/util/benchmark-test)
 

@@ -23,6 +23,7 @@
 #include "exprs/literal-predicate.h"
 #include "exprs/null-literal.h"
 #include "exprs/string-literal.h"
+#include "codegen/llvm-codegen.h"
 
 using namespace std;
 using namespace boost;
@@ -57,6 +58,8 @@ class ExprTest : public testing::Test {
   virtual void SetUp() {
     exec_env_.reset(new ExecEnv());
     executor_.reset(new QueryExecutor(exec_env_.get()));
+    // Disable jitting so can exercise the non-jit path
+    executor_->DisableJit();
     EXIT_IF_ERROR(executor_->Setup());
 
     min_int_values_[TYPE_TINYINT] = 1;
@@ -91,9 +94,20 @@ class ExprTest : public testing::Test {
     default_type_strs_[TYPE_BOOLEAN] = default_bool_str_;
     default_type_strs_[TYPE_STRING] = default_string_str_;
     default_type_strs_[TYPE_TIMESTAMP] = default_timestamp_str_;
+    // Initialize dummy expr nodes for hosting jitted functions
+
+    jit_expr_root_.resize(TYPE_STRING + 1);
+    jit_expr_root_[TYPE_BOOLEAN] = Expr::CreateLiteral(&pool_, TYPE_BOOLEAN, "0");
+    jit_expr_root_[TYPE_TINYINT] = Expr::CreateLiteral(&pool_, TYPE_TINYINT, "0");
+    jit_expr_root_[TYPE_SMALLINT] = Expr::CreateLiteral(&pool_, TYPE_SMALLINT, "0");
+    jit_expr_root_[TYPE_INT] = Expr::CreateLiteral(&pool_, TYPE_INT, "0");
+    jit_expr_root_[TYPE_BIGINT] = Expr::CreateLiteral(&pool_, TYPE_BIGINT, "0");
+    jit_expr_root_[TYPE_FLOAT] = Expr::CreateLiteral(&pool_, TYPE_FLOAT, "0");
+    jit_expr_root_[TYPE_DOUBLE] = Expr::CreateLiteral(&pool_, TYPE_DOUBLE, "0");
   }
 
-  void GetValue(const string& expr, PrimitiveType expr_type, void** value) {
+  void GetValue(const string& expr, PrimitiveType expr_type, 
+      void** interpreted_value, void** jitted_value = NULL) {
     string stmt = "select " + expr;
     vector<PrimitiveType> result_types;
     Status status = executor_->Exec(stmt, &result_types);
@@ -102,7 +116,23 @@ class ExprTest : public testing::Test {
     ASSERT_TRUE(executor_->FetchResult(&result_row).ok());
     ASSERT_EQ(1, result_row.size());
     EXPECT_EQ(TypeToString(expr_type), TypeToString(result_types[0]));
-    *value = result_row[0];
+    *interpreted_value = result_row[0];
+
+    if (jitted_value != NULL) {
+      LlvmCodeGen code_gen("Expr Jit");
+      int scratch_size = 0;
+      status = code_gen.Init();
+      ASSERT_TRUE(status.ok());
+    
+      Expr* root = executor_->select_list_exprs()[0];
+      ASSERT_TRUE(jit_expr_root_[root->type()] != NULL);
+
+      void* func = root->CodegenExprTree(&code_gen, &scratch_size);
+      EXPECT_EQ(scratch_size, 0);
+      EXPECT_TRUE(func != NULL);
+      jit_expr_root_[root->type()]->SetComputeFunction(func, scratch_size);
+      *jitted_value = jit_expr_root_[root->type()]->GetValue(NULL);
+    }
   }
 
   void TestStringValue(const string& expr, const string& expected_result) {
@@ -121,40 +151,75 @@ class ExprTest : public testing::Test {
   }
 
   template <class T> void TestValue(const string& expr, PrimitiveType expr_type,
-                                    const T& expected_result) {
+                                    const T& expected_result, bool test_codegen = false) {
     void* result;
-    GetValue(expr, expr_type, &result);
+    void* result_codegen;
+    void** result_codegen_ptr = NULL;
+    if (test_codegen) {
+      result_codegen_ptr = &result_codegen;
+    }
+    GetValue(expr, expr_type, &result, result_codegen_ptr);
+
     switch (expr_type) {
       case TYPE_BOOLEAN:
         EXPECT_EQ(*reinterpret_cast<bool*>(result), expected_result) << expr;
+        if (test_codegen) {
+          EXPECT_EQ(*reinterpret_cast<bool*>(result_codegen), expected_result) << expr;
+        }
         break;
       case TYPE_TINYINT:
         EXPECT_EQ(*reinterpret_cast<int8_t*>(result), expected_result) << expr;
+        if (test_codegen) {
+          EXPECT_EQ(*reinterpret_cast<int8_t*>(result_codegen), expected_result) << expr;
+        }
         break;
       case TYPE_SMALLINT:
         EXPECT_EQ(*reinterpret_cast<int16_t*>(result), expected_result) << expr;
+        if (test_codegen) {
+          EXPECT_EQ(*reinterpret_cast<int16_t*>(result_codegen), expected_result) << expr;
+        }
         break;
       case TYPE_INT:
         EXPECT_EQ(*reinterpret_cast<int32_t*>(result), expected_result) << expr;
+        if (test_codegen) {
+          EXPECT_EQ(*reinterpret_cast<int32_t*>(result_codegen), expected_result) << expr;
+        }
         break;
       case TYPE_BIGINT:
         EXPECT_EQ(*reinterpret_cast<int64_t*>(result), expected_result) << expr;
+        if (test_codegen) {
+          EXPECT_EQ(*reinterpret_cast<int64_t*>(result_codegen), expected_result) << expr;
+        }
         break;
       case TYPE_FLOAT:
         EXPECT_EQ(*reinterpret_cast<float*>(result), expected_result) << expr;
+        if (test_codegen) {
+          EXPECT_EQ(*reinterpret_cast<float*>(result_codegen), expected_result) << expr;
+        }
         break;
       case TYPE_DOUBLE:
         EXPECT_EQ(*reinterpret_cast<double*>(result), expected_result) << expr;
+        if (test_codegen) {
+          EXPECT_EQ(*reinterpret_cast<double*>(result_codegen), expected_result) << expr;
+        }
         break;
       default:
         ASSERT_TRUE(false) << "invalid TestValue() type: " << TypeToString(expr_type);
     }
   }
-
-  void TestIsNull(const string& expr, PrimitiveType expr_type) {
+  
+  void TestIsNull(const string& expr, PrimitiveType expr_type, bool test_codegen = false) {
     void* result;
-    GetValue(expr, expr_type, &result);
+    void* result_codegen;
+    void** result_codegen_ptr = NULL;
+    if (test_codegen) {
+      result_codegen_ptr = &result_codegen;
+    }
+    GetValue(expr, expr_type, &result, result_codegen_ptr);
     EXPECT_TRUE(result == NULL);
+    if (test_codegen) {
+      EXPECT_TRUE(result_codegen == NULL);
+    }
   }
 
   void TestNonOkStatus(const string& expr) {
@@ -167,15 +232,15 @@ class ExprTest : public testing::Test {
   template <typename T> void TestFixedPointComparisons(bool test_boundaries) {
     int64_t t_min = numeric_limits<T>::min();
     int64_t t_max = numeric_limits<T>::max();
-    TestLessThan(lexical_cast<string>(t_min), lexical_cast<string>(t_max), true);
+    TestComparison(lexical_cast<string>(t_min), lexical_cast<string>(t_max), true);
     TestEqual(lexical_cast<string>(t_min), true);
     TestEqual(lexical_cast<string>(t_max), true);
     if (test_boundaries) {
       // this requires a cast of the second operand to a higher-resolution type
-      TestLessThan(lexical_cast<string>(t_min - 1),
+      TestComparison(lexical_cast<string>(t_min - 1),
                    lexical_cast<string>(t_max), true);
       // this requires a cast of the first operand to a higher-resolution type
-      TestLessThan(lexical_cast<string>(t_min),
+      TestComparison(lexical_cast<string>(t_min),
                    lexical_cast<string>(t_max + 1), true);
     }
   }
@@ -184,65 +249,65 @@ class ExprTest : public testing::Test {
     // t_min is the smallest positive value
     T t_min = numeric_limits<T>::min();
     T t_max = numeric_limits<T>::max();
-    TestLessThan(lexical_cast<string>(t_min), lexical_cast<string>(t_max), true);
-    TestLessThan(lexical_cast<string>(-1.0 * t_max), lexical_cast<string>(t_max), true);
+    TestComparison(lexical_cast<string>(t_min), lexical_cast<string>(t_max), true);
+    TestComparison(lexical_cast<string>(-1.0 * t_max), lexical_cast<string>(t_max), true);
     TestEqual(lexical_cast<string>(t_min), true);
     TestEqual(lexical_cast<string>(t_max), true);
     if (test_boundaries) {
       // this requires a cast of the second operand to a higher-resolution type
-      TestLessThan(lexical_cast<string>(numeric_limits<T>::min() - 1),
+      TestComparison(lexical_cast<string>(numeric_limits<T>::min() - 1),
                    lexical_cast<string>(numeric_limits<T>::max()), true);
       // this requires a cast of the first operand to a higher-resolution type
-      TestLessThan(lexical_cast<string>(numeric_limits<T>::min()),
+      TestComparison(lexical_cast<string>(numeric_limits<T>::min()),
                    lexical_cast<string>(numeric_limits<T>::max() + 1), true);
     }
   }
 
   // Generate all possible tests for combinations of <smaller> <op> <larger>.
   // Also test conversions from strings.
-  void TestLessThan(const string& smaller, const string& larger, bool compare_strings) {
+  void TestComparison(const string& smaller, const string& larger, bool compare_strings) {
     // disabled for now, because our implicit casts from strings are broken
     // and might return analysis errors when they shouldn't
     // TODO: fix and re-enable tests
     compare_strings = false;
     string eq_pred = smaller + " = " + larger;
-    TestValue(eq_pred, TYPE_BOOLEAN, false);
+    TestValue(eq_pred, TYPE_BOOLEAN, false, true);
     if (compare_strings) {
       eq_pred = smaller + " = '" + larger + "'";
       TestValue(eq_pred, TYPE_BOOLEAN, false);
     }
     string ne_pred = smaller + " != " + larger;
-    TestValue(ne_pred, TYPE_BOOLEAN, true);
+    TestValue(ne_pred, TYPE_BOOLEAN, true, true);
     if (compare_strings) {
       ne_pred = smaller + " != '" + larger + "'";
       TestValue(ne_pred, TYPE_BOOLEAN, true);
     }
     string ne2_pred = smaller + " <> " + larger;
-    TestValue(ne2_pred, TYPE_BOOLEAN, true);
+    TestValue(ne2_pred, TYPE_BOOLEAN, true, true);
     if (compare_strings) {
       ne2_pred = smaller + " <> '" + larger + "'";
       TestValue(ne2_pred, TYPE_BOOLEAN, true);
     }
     string lt_pred = smaller + " < " + larger;
-    TestValue(lt_pred, TYPE_BOOLEAN, true);
+    TestValue(lt_pred, TYPE_BOOLEAN, true, true);
     if (compare_strings) {
       lt_pred = smaller + " < '" + larger + "'";
       TestValue(lt_pred, TYPE_BOOLEAN, true);
     }
     string le_pred = smaller + " <= " + larger;
-    TestValue(le_pred, TYPE_BOOLEAN, true);
+    TestValue(le_pred, TYPE_BOOLEAN, true, true);
     if (compare_strings) {
       le_pred = smaller + " <= '" + larger + "'";
       TestValue(le_pred, TYPE_BOOLEAN, true);
     }
     string gt_pred = smaller + " > " + larger;
-    TestValue(gt_pred, TYPE_BOOLEAN, false);
+    TestValue(gt_pred, TYPE_BOOLEAN, false, true);
     if (compare_strings) {
       gt_pred = smaller + " > '" + larger + "'";
-      TestValue(gt_pred, TYPE_BOOLEAN, false);
+      TestValue(gt_pred, TYPE_BOOLEAN, false, true);
     }
     string ge_pred = smaller + " >= " + larger;
-    TestValue(ge_pred, TYPE_BOOLEAN, false);
+    TestValue(ge_pred, TYPE_BOOLEAN, false, true);
     if (compare_strings) {
       ge_pred = smaller + " >= '" + larger + "'";
       TestValue(ge_pred, TYPE_BOOLEAN, false);
@@ -257,43 +322,43 @@ class ExprTest : public testing::Test {
     // TODO: fix and re-enable tests
     compare_strings = false;
     string eq_pred = value + " = " + value;
-    TestValue(eq_pred, TYPE_BOOLEAN, true);
+    TestValue(eq_pred, TYPE_BOOLEAN, true, true);
     if (compare_strings) {
       eq_pred = value + " = '" + value + "'";
       TestValue(eq_pred, TYPE_BOOLEAN, true);
     }
     string ne_pred = value + " != " + value;
-    TestValue(ne_pred, TYPE_BOOLEAN, false);
+    TestValue(ne_pred, TYPE_BOOLEAN, false, true);
     if (compare_strings)  {
       ne_pred = value + " != '" + value + "'";
       TestValue(ne_pred, TYPE_BOOLEAN, false);
     }
     string ne2_pred = value + " <> " + value;
-    TestValue(ne2_pred, TYPE_BOOLEAN, false);
+    TestValue(ne2_pred, TYPE_BOOLEAN, false, true);
     if (compare_strings)  {
       ne2_pred = value + " <> '" + value + "'";
       TestValue(ne2_pred, TYPE_BOOLEAN, false);
     }
     string lt_pred = value + " < " + value;
-    TestValue(lt_pred, TYPE_BOOLEAN, false);
+    TestValue(lt_pred, TYPE_BOOLEAN, false, true);
     if (compare_strings)  {
       lt_pred = value + " < '" + value + "'";
       TestValue(lt_pred, TYPE_BOOLEAN, false);
     }
     string le_pred = value + " <= " + value;
-    TestValue(le_pred, TYPE_BOOLEAN, true);
+    TestValue(le_pred, TYPE_BOOLEAN, true, true);
     if (compare_strings)  {
       le_pred = value + " <= '" + value + "'";
       TestValue(le_pred, TYPE_BOOLEAN, true);
     }
     string gt_pred = value + " > " + value;
-    TestValue(gt_pred, TYPE_BOOLEAN, false);
+    TestValue(gt_pred, TYPE_BOOLEAN, false, true);
     if (compare_strings)  {
       gt_pred = value + " > '" + value + "'";
       TestValue(gt_pred, TYPE_BOOLEAN, false);
     }
     string ge_pred = value + " >= " + value;
-    TestValue(ge_pred, TYPE_BOOLEAN, true);
+    TestValue(ge_pred, TYPE_BOOLEAN, true, true);
     if (compare_strings)  {
       ge_pred = value + " >= '" + value + "'";
       TestValue(ge_pred, TYPE_BOOLEAN, true);
@@ -308,24 +373,24 @@ class ExprTest : public testing::Test {
     // arithmetic expr or a literal must be decided by the parser, not the lexer.
     int64_t t_min = numeric_limits<T>::min() + 1;
     int64_t t_max = numeric_limits<T>::max();
-    TestValue(lexical_cast<string>(t_min), type, numeric_limits<T>::min() + 1);
-    TestValue(lexical_cast<string>(t_max), type, numeric_limits<T>::max());
+    TestValue(lexical_cast<string>(t_min), type, numeric_limits<T>::min() + 1, true);
+    TestValue(lexical_cast<string>(t_max), type, numeric_limits<T>::max(), true);
   }
 
   template <typename T> void TestFloatingPointLimits(PrimitiveType type) {
     // numeric_limits<>::min() is the smallest positive value
     TestValue(lexical_cast<string>(numeric_limits<T>::min()), type,
-              numeric_limits<T>::min());
+              numeric_limits<T>::min(), true);
     TestValue(lexical_cast<string>(-1.0 * numeric_limits<T>::min()), type,
-              -1.0 * numeric_limits<T>::min());
+              -1.0 * numeric_limits<T>::min(), true);
     TestValue(lexical_cast<string>(-1.0 * numeric_limits<T>::max()), type,
-              -1.0 * numeric_limits<T>::max());
+              -1.0 * numeric_limits<T>::max(), true);
     TestValue(lexical_cast<string>(numeric_limits<T>::max() - 1.0), type,
-              numeric_limits<T>::max());
+              numeric_limits<T>::max(), true);
   }
 
   // Test ops that that always promote to a fixed type (e.g., max resolution type):
-  // PLUS, MINUS, MULTIPLY, DIVIDE.
+  // ADD, SUBTRACT, MULTIPLY, DIVIDE.
   // Note that adding the " " when generating the expression is not just cosmetic.
   // We have "--" as a comment element in our lexer,
   // so subtraction of a negative value will be ignored without " ".
@@ -335,11 +400,11 @@ class ExprTest : public testing::Test {
     Result cast_b = static_cast<Result>(b);
     string a_str = lexical_cast<string>(cast_a);
     string b_str = lexical_cast<string>(cast_b);
-    TestValue(a_str + " + " + b_str, expected_type, cast_a + cast_b);
-    TestValue(a_str + " - " + b_str, expected_type, cast_a - cast_b);
-    TestValue(a_str + " * " + b_str, expected_type, cast_a * cast_b);
+    TestValue(a_str + " + " + b_str, expected_type, cast_a + cast_b, true);
+    TestValue(a_str + " - " + b_str, expected_type, cast_a - cast_b, true);
+    TestValue(a_str + " * " + b_str, expected_type, cast_a * cast_b, true);
     TestValue(a_str + " / " + b_str, TYPE_DOUBLE,
-        static_cast<double>(a) / static_cast<double>(b));
+        static_cast<double>(a) / static_cast<double>(b), true);
   }
 
   // Test int ops that promote to assignment compatible type: BITAND, BITOR, BITXOR,
@@ -351,18 +416,20 @@ class ExprTest : public testing::Test {
     RightOp cast_b = static_cast<RightOp>(b);
     string a_str = lexical_cast<string>(static_cast<int64_t>(a));
     string b_str = lexical_cast<string>(static_cast<int64_t>(b));
-    TestValue(a_str + " & " + b_str, expected_type, cast_a & cast_b);
-    TestValue(a_str + " | " + b_str, expected_type, cast_a | cast_b);
-    TestValue(a_str + " ^ " + b_str, expected_type, cast_a ^ cast_b);
+    TestValue(a_str + " & " + b_str, expected_type, cast_a & cast_b, true);
+    TestValue(a_str + " | " + b_str, expected_type, cast_a | cast_b, true);
+    TestValue(a_str + " ^ " + b_str, expected_type, cast_a ^ cast_b, true);
     // Exclusively use b of type RightOp for unary op BITNOT.
-    TestValue("~" + b_str, expected_type, ~cast_b);
-    TestValue(a_str + " DIV " + b_str, expected_type, cast_a / cast_b);
-    TestValue(a_str + " % " + b_str, expected_type, cast_a % cast_b);
+    TestValue("~" + b_str, expected_type, ~cast_b, true);
+    TestValue(a_str + " DIV " + b_str, expected_type, cast_a / cast_b, true);
+    TestValue(a_str + " % " + b_str, expected_type, cast_a % cast_b, true);
   }
 
  private:
   scoped_ptr<QueryExecutor> executor_;
   scoped_ptr<ExecEnv> exec_env_;
+  ObjectPool pool_;
+  vector<Expr*> jit_expr_root_;         // stored in pool_
 };
 
 // TODO: Remove this specialization once the parser supports
@@ -373,15 +440,15 @@ template <>
 void ExprTest::TestFixedPointComparisons<int64_t>(bool test_boundaries) {
   int64_t t_min = numeric_limits<int64_t>::min() + 1;
   int64_t t_max = numeric_limits<int64_t>::max();
-  TestLessThan(lexical_cast<string>(t_min), lexical_cast<string>(t_max), true);
+  TestComparison(lexical_cast<string>(t_min), lexical_cast<string>(t_max), true);
   TestEqual(lexical_cast<string>(t_min), true);
   TestEqual(lexical_cast<string>(t_max), true);
   if (test_boundaries) {
     // this requires a cast of the second operand to a higher-resolution type
-    TestLessThan(lexical_cast<string>(t_min - 1),
+    TestComparison(lexical_cast<string>(t_min - 1),
                  lexical_cast<string>(t_max), true);
     // this requires a cast of the first operand to a higher-resolution type
-    TestLessThan(lexical_cast<string>(t_min),
+    TestComparison(lexical_cast<string>(t_min),
                  lexical_cast<string>(t_max + 1), true);
   }
 }
@@ -392,12 +459,12 @@ void TestSingleLiteralConstruction(PrimitiveType type, void* value, const string
 
   Expr* expr = Expr::CreateLiteral(&pool, type, value);
   EXPECT_TRUE(expr != NULL);
-  expr->Prepare(NULL, desc);
+  Expr::Prepare(expr, NULL, desc);
   EXPECT_EQ(RawValue::Compare(expr->GetValue(NULL), value, type), 0);
 
   expr = Expr::CreateLiteral(&pool, type, string_val);
   EXPECT_TRUE(expr != NULL);
-  expr->Prepare(NULL, desc);
+  Expr::Prepare(expr, NULL, desc);
   EXPECT_EQ(RawValue::Compare(expr->GetValue(NULL), value, type), 0);
 }
 
@@ -456,10 +523,10 @@ TEST_F(ExprTest, LiteralExprs) {
   // TestFloatingPointLimits<float>(TYPE_FLOAT);
   TestFloatingPointLimits<double>(TYPE_DOUBLE);
 
-  TestValue("true", TYPE_BOOLEAN, true);
-  TestValue("false", TYPE_BOOLEAN, false);
+  TestValue("true", TYPE_BOOLEAN, true, true);
+  TestValue("false", TYPE_BOOLEAN, false, true);
   TestStringValue("'test'", "test");
-  TestIsNull("null", TYPE_BOOLEAN);
+  TestIsNull("null", TYPE_BOOLEAN, true);
 }
 
 TEST_F(ExprTest, ArithmeticExprs) {
@@ -551,21 +618,21 @@ TEST_F(ExprTest, ArithmeticExprs) {
       min_int_values_[TYPE_BIGINT], TYPE_BIGINT);
 
   // Tests for dealing with '-'.
-  TestValue("-1", TYPE_TINYINT, -1);
-  TestValue("1 - 1", TYPE_BIGINT, 0);
-  TestValue("1 - - 1", TYPE_BIGINT, 2);
-  TestValue("1 - - - 1", TYPE_BIGINT, 0);
-  TestValue("- 1 - 1", TYPE_BIGINT, -2);
-  TestValue("- 1 - - 1", TYPE_BIGINT, 0);
+  TestValue("-1", TYPE_TINYINT, -1, true);
+  TestValue("1 - 1", TYPE_BIGINT, 0, true);
+  TestValue("1 - - 1", TYPE_BIGINT, 2, true);
+  TestValue("1 - - - 1", TYPE_BIGINT, 0, true);
+  TestValue("- 1 - 1", TYPE_BIGINT, -2, true);
+  TestValue("- 1 - - 1", TYPE_BIGINT, 0, true);
   // The "--" indicates a comment to be ignored.
   // Therefore, the result should be -1.
-  TestValue("- 1 --1", TYPE_TINYINT, -1);
+  TestValue("- 1 --1", TYPE_TINYINT, -1, true);
 }
 
 // There are two tests of ranges, the second of which requires a cast
 // of the second operand to a higher-resolution type.
 TEST_F(ExprTest, BinaryPredicates) {
-  TestLessThan("false", "true", false);
+  TestComparison("false", "true", false);
   TestEqual("false", false);
   TestEqual("true", false);
   TestFixedPointComparisons<int8_t>(true);
@@ -577,51 +644,51 @@ TEST_F(ExprTest, BinaryPredicates) {
 }
 
 TEST_F(ExprTest, CompoundPredicates) {
-  TestValue("TRUE AND TRUE", TYPE_BOOLEAN, true);
-  TestValue("TRUE AND FALSE", TYPE_BOOLEAN, false);
-  TestValue("FALSE AND TRUE", TYPE_BOOLEAN, false);
-  TestValue("FALSE AND FALSE", TYPE_BOOLEAN, false);
-  TestValue("TRUE && TRUE", TYPE_BOOLEAN, true);
-  TestValue("TRUE && FALSE", TYPE_BOOLEAN, false);
-  TestValue("FALSE && TRUE", TYPE_BOOLEAN, false);
-  TestValue("FALSE && FALSE", TYPE_BOOLEAN, false);
-  TestValue("TRUE OR TRUE", TYPE_BOOLEAN, true);
-  TestValue("TRUE OR FALSE", TYPE_BOOLEAN, true);
-  TestValue("FALSE OR TRUE", TYPE_BOOLEAN, true);
-  TestValue("FALSE OR FALSE", TYPE_BOOLEAN, false);
-  TestValue("TRUE || TRUE", TYPE_BOOLEAN, true);
-  TestValue("TRUE || FALSE", TYPE_BOOLEAN, true);
-  TestValue("FALSE || TRUE", TYPE_BOOLEAN, true);
-  TestValue("FALSE || FALSE", TYPE_BOOLEAN, false);
-  TestValue("NOT TRUE", TYPE_BOOLEAN, false);
-  TestValue("NOT FALSE", TYPE_BOOLEAN, true);
-  TestValue("!TRUE", TYPE_BOOLEAN, false);
-  TestValue("!FALSE", TYPE_BOOLEAN, true);
-  TestValue("TRUE AND (TRUE OR FALSE)", TYPE_BOOLEAN, true);
-  TestValue("(TRUE AND TRUE) OR FALSE", TYPE_BOOLEAN, true);
-  TestValue("(TRUE OR FALSE) AND TRUE", TYPE_BOOLEAN, true);
-  TestValue("TRUE OR (FALSE AND TRUE)", TYPE_BOOLEAN, true);
-  TestValue("TRUE AND TRUE OR FALSE", TYPE_BOOLEAN, true);
-  TestValue("TRUE && (TRUE || FALSE)", TYPE_BOOLEAN, true);
-  TestValue("(TRUE && TRUE) || FALSE", TYPE_BOOLEAN, true);
-  TestValue("(TRUE || FALSE) && TRUE", TYPE_BOOLEAN, true);
-  TestValue("TRUE || (FALSE && TRUE)", TYPE_BOOLEAN, true);
-  TestValue("TRUE && TRUE || FALSE", TYPE_BOOLEAN, true);
-  TestIsNull("TRUE AND NULL", TYPE_BOOLEAN);
-  TestValue("FALSE AND NULL", TYPE_BOOLEAN, false);
-  TestValue("TRUE OR NULL", TYPE_BOOLEAN, true);
-  TestIsNull("FALSE OR NULL", TYPE_BOOLEAN);
-  TestIsNull("NOT NULL", TYPE_BOOLEAN);
-  TestIsNull("TRUE && NULL", TYPE_BOOLEAN);
-  TestValue("FALSE && NULL", TYPE_BOOLEAN, false);
-  TestValue("TRUE || NULL", TYPE_BOOLEAN, true);
-  TestIsNull("FALSE || NULL", TYPE_BOOLEAN);
-  TestIsNull("!NULL", TYPE_BOOLEAN);
+  TestValue("TRUE AND TRUE", TYPE_BOOLEAN, true, true);
+  TestValue("TRUE AND FALSE", TYPE_BOOLEAN, false, true);
+  TestValue("FALSE AND TRUE", TYPE_BOOLEAN, false, true);
+  TestValue("FALSE AND FALSE", TYPE_BOOLEAN, false, true);
+  TestValue("TRUE && TRUE", TYPE_BOOLEAN, true, true);
+  TestValue("TRUE && FALSE", TYPE_BOOLEAN, false, true);
+  TestValue("FALSE && TRUE", TYPE_BOOLEAN, false, true);
+  TestValue("FALSE && FALSE", TYPE_BOOLEAN, false, true);
+  TestValue("TRUE OR TRUE", TYPE_BOOLEAN, true, true);
+  TestValue("TRUE OR FALSE", TYPE_BOOLEAN, true, true);
+  TestValue("FALSE OR TRUE", TYPE_BOOLEAN, true, true);
+  TestValue("FALSE OR FALSE", TYPE_BOOLEAN, false, true);
+  TestValue("TRUE || TRUE", TYPE_BOOLEAN, true, true);
+  TestValue("TRUE || FALSE", TYPE_BOOLEAN, true, true);
+  TestValue("FALSE || TRUE", TYPE_BOOLEAN, true, true);
+  TestValue("FALSE || FALSE", TYPE_BOOLEAN, false, true);
+  TestValue("NOT TRUE", TYPE_BOOLEAN, false, true);
+  TestValue("NOT FALSE", TYPE_BOOLEAN, true, true);
+  TestValue("!TRUE", TYPE_BOOLEAN, false, true);
+  TestValue("!FALSE", TYPE_BOOLEAN, true, true);
+  TestValue("TRUE AND (TRUE OR FALSE)", TYPE_BOOLEAN, true, true);
+  TestValue("(TRUE AND TRUE) OR FALSE", TYPE_BOOLEAN, true, true);
+  TestValue("(TRUE OR FALSE) AND TRUE", TYPE_BOOLEAN, true, true);
+  TestValue("TRUE OR (FALSE AND TRUE)", TYPE_BOOLEAN, true, true);
+  TestValue("TRUE AND TRUE OR FALSE", TYPE_BOOLEAN, true, true);
+  TestValue("TRUE && (TRUE || FALSE)", TYPE_BOOLEAN, true, true);
+  TestValue("(TRUE && TRUE) || FALSE", TYPE_BOOLEAN, true, true);
+  TestValue("(TRUE || FALSE) && TRUE", TYPE_BOOLEAN, true, true);
+  TestValue("TRUE || (FALSE && TRUE)", TYPE_BOOLEAN, true, true);
+  TestValue("TRUE && TRUE || FALSE", TYPE_BOOLEAN, true, true);
+  TestIsNull("TRUE AND NULL", TYPE_BOOLEAN, true);
+  TestValue("FALSE AND NULL", TYPE_BOOLEAN, false, true);
+  TestValue("TRUE OR NULL", TYPE_BOOLEAN, true, true);
+  TestIsNull("FALSE OR NULL", TYPE_BOOLEAN, true);
+  TestIsNull("NOT NULL", TYPE_BOOLEAN, true);
+  TestIsNull("TRUE && NULL", TYPE_BOOLEAN, true);
+  TestValue("FALSE && NULL", TYPE_BOOLEAN, false, true);
+  TestValue("TRUE || NULL", TYPE_BOOLEAN, true, true);
+  TestIsNull("FALSE || NULL", TYPE_BOOLEAN, true);
+  TestIsNull("!NULL", TYPE_BOOLEAN, true);
 }
 
 TEST_F(ExprTest, IsNullPredicate) {
-  TestValue("5 IS NULL", TYPE_BOOLEAN, false);
-  TestValue("5 IS NOT NULL", TYPE_BOOLEAN, true);
+  TestValue("5 IS NULL", TYPE_BOOLEAN, false, true);
+  TestValue("5 IS NOT NULL", TYPE_BOOLEAN, true, true);
 }
 
 TEST_F(ExprTest, LikePredicate) {
@@ -1252,8 +1319,8 @@ TEST_F(ExprTest, MathFunctions) {
   TestValue("pow(e(), 2.0)", TYPE_DOUBLE, M_E * M_E);
   TestValue("power(2.0, 10.0)", TYPE_DOUBLE, pow(2.0, 10.0));
   TestValue("power(e(), 2.0)", TYPE_DOUBLE, M_E * M_E);
-  TestValue("sqrt(121.0)", TYPE_DOUBLE, 11.0);
-  TestValue("sqrt(2.0)", TYPE_DOUBLE, sqrt(2.0));
+  TestValue("sqrt(121.0)", TYPE_DOUBLE, 11.0, true);
+  TestValue("sqrt(2.0)", TYPE_DOUBLE, sqrt(2.0), true);
 
   // Run twice to test deterministic behavior.
   uint32_t seed = 0;
@@ -1565,6 +1632,8 @@ TEST_F(ExprTest, ConditionalFunctions) {
 }
 
 int main(int argc, char **argv) {
+  google::InitGoogleLogging(argv[0]);
   ::testing::InitGoogleTest(&argc, argv);
+  impala::LlvmCodeGen::InitializeLlvm();
   return RUN_ALL_TESTS();
 }

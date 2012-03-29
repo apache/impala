@@ -11,6 +11,9 @@ namespace impala {
 class TExprNode;
 
 class IntLiteral: public Expr {
+ public:
+  virtual llvm::Function* Codegen(LlvmCodeGen* code_gen);
+
  protected:
   friend class Expr;
 

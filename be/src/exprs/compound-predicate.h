@@ -10,6 +10,9 @@
 namespace impala {
 
 class CompoundPredicate: public Predicate {
+ public:
+  virtual llvm::Function* Codegen(LlvmCodeGen* codegen);
+
  protected:
   friend class Expr;
 

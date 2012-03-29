@@ -34,6 +34,12 @@ public abstract class Predicate extends Expr {
     List<Predicate> list = Lists.newArrayList();
     if (this instanceof CompoundPredicate
         && ((CompoundPredicate) this).getOp() == CompoundPredicate.Operator.AND) {
+      // TODO: we have to convert CompoundPredicate.AND to two expr trees for 
+      // conjuncts because NULLs are handled differently for CompoundPredicate.AND
+      // and conjunct evaluation.  This is not optimal for jitted exprs because it
+      // will result in two functions instead of one. Create a new CompoundPredicate
+      // Operator (i.e. CONJUNCT_AND) with the right NULL semantics and use that
+      // instead
       list.addAll(((Predicate) getChild(0)).getConjuncts());
       list.addAll(((Predicate) getChild(1)).getConjuncts());
     } else {

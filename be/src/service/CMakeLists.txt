@@ -29,6 +29,7 @@ add_library(backend SHARED
 # dumps in response to test failures on Jenkins.
 target_link_libraries(backend
   Common
+  CodeGen
   Exec
   Exprs
   Opcode
@@ -37,11 +38,13 @@ target_link_libraries(backend
   Util
   thriftstatic
   ImpalaThrift
+  CodeGen
   ${HDFS_LIBS}
+  ${LLVM_MODULE_LIBS}
   gflagsstatic
   glogstatic
   gflagsstatic
-  #tcmallocstatic
+#  tcmallocstatic
   pprofstatic
 )
 
@@ -60,6 +63,7 @@ add_executable(runquery
 #  - Exprs & Opcode have a circular dependency (Exprs is included twice)
 target_link_libraries(runquery
   TestUtil
+  CodeGen
   Service
   Exec
   Exprs
@@ -76,6 +80,7 @@ target_link_libraries(runquery
   Opcode
   Exprs
   ${Boost_LIBRARIES}  
+  ${LLVM_MODULE_LIBS}
   gflagsstatic
   tcmallocstatic
   pprofstatic
@@ -88,6 +93,7 @@ add_executable(impalad
 # multiple alternating includes of Opcode and Exprs libs necessary to get symbols resolve (why?)
 target_link_libraries(impalad
   TestUtil
+  CodeGen
   Service
   Exec
   Exprs
@@ -103,7 +109,9 @@ target_link_libraries(impalad
   Exprs
   Opcode
   Exprs
+  CodeGen
   ${Boost_LIBRARIES}  
+  ${LLVM_MODULE_LIBS}
   gflagsstatic
   tcmallocstatic
   pprofstatic

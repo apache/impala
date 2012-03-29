@@ -78,9 +78,9 @@ target_link_libraries(string-buffer-test
 add_executable(data-stream-test
   data-stream-test.cc
 )
-
 target_link_libraries(data-stream-test
   TestUtil
+  CodeGen
   Service
   Exec
   Exprs
@@ -97,6 +97,7 @@ target_link_libraries(data-stream-test
   Exprs
   gtest
   ${Boost_LIBRARIES}
+  ${LLVM_MODULE_LIBS}
 )
 
 add_test(mem-pool-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/mem-pool-test)

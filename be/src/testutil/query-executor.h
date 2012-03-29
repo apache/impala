@@ -13,6 +13,7 @@
 #include "runtime/primitive-type.h"
 #include "runtime/runtime-state.h"
 #include "gen-cpp/ImpalaBackendService_types.h"  // for TQueryExecRequest
+#include "util/runtime-profile.h"
 
 namespace apache { namespace thrift { namespace transport { class TTransport; } } }
 namespace apache { namespace thrift { namespace protocol { class TProtocol; } } }
@@ -85,6 +86,15 @@ class QueryExecutor {
 
   // Returns the counters for the entire query
   RuntimeProfile* query_profile();
+
+  // Returns query request
+  const TQueryExecRequest& query_request() const { return query_request_; }
+
+  // Returns select list expr
+  std::vector<Expr*>& select_list_exprs() { return select_list_exprs_; }
+
+  // Disable Jitting.  This is only used by tests to exercise the non-jitted behavior
+  void DisableJit();
 
  private:
   // plan service-related

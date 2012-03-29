@@ -3,6 +3,7 @@
 #include <sstream>
 #include <glog/logging.h>
 
+#include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exprs/expr.h"
@@ -25,10 +26,12 @@
 #include "exprs/string-literal.h"
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/ImpalaService_types.h"
+#include "runtime/runtime-state.h"
 #include "runtime/raw-value.h"
 
 using namespace std;
 using namespace impala;
+using namespace llvm;
 
 template<class T> 
 bool ParseString(const string& str, T* val) {
@@ -72,19 +75,22 @@ void* ExprValue::TryParse(const string& str, PrimitiveType type) {
 Expr::Expr(PrimitiveType type)
     : opcode_(TExprOpcode::INVALID_OPCODE),
       is_slotref_(false),
-      type_(type) {
+      type_(type),
+      jitted_compute_function_(NULL) {
 }
 
 Expr::Expr(const TExprNode& node)
     : opcode_(node.__isset.opcode ? node.opcode : TExprOpcode::INVALID_OPCODE),
       is_slotref_(false),
-      type_(ThriftToType(node.type)) {
+      type_(ThriftToType(node.type)),
+      jitted_compute_function_(NULL) {
 }
 
 Expr::Expr(const TExprNode& node, bool is_slotref)
     : opcode_(node.__isset.opcode ? node.opcode : TExprOpcode::INVALID_OPCODE),
       is_slotref_(is_slotref),
-      type_(ThriftToType(node.type)) {
+      type_(ThriftToType(node.type)),
+      jitted_compute_function_(NULL) {
 }
 
 Status Expr::CreateExprTree(ObjectPool* pool, const TExpr& texpr, Expr** root_expr) {
@@ -327,7 +333,7 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
 void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
   void* value = GetValue(row);
   if (as_ascii) {
-    PrintValue(value, &col_val->stringVal);
+    RawValue::PrintValue(value, type(), &col_val->stringVal);
     col_val->__isset.stringVal = true;
     return;
   }
@@ -376,17 +382,34 @@ void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
 }
 
 void Expr::PrintValue(TupleRow* row, string* str) {
-  PrintValue(GetValue(row), str);
-}
-
-void Expr::PrintValue(void* value, string* str) {
-  RawValue::PrintValue(value, type_, str);
+  RawValue::PrintValue(GetValue(row), type(), str);
 }
 
 Status Expr::PrepareChildren(RuntimeState* state, const RowDescriptor& row_desc) {
   DCHECK(type_ != INVALID_TYPE);
   for (int i = 0; i < children_.size(); ++i) {
     RETURN_IF_ERROR(children_[i]->Prepare(state, row_desc));
+  }
+  return Status::OK;
+}
+
+Status Expr::Prepare(Expr* root, RuntimeState* state, const RowDescriptor& row_desc) {
+  RETURN_IF_ERROR(root->Prepare(state, row_desc));
+  LlvmCodeGen* codegen = NULL;
+  // state might be NULL when called from Expr-test
+  if (state != NULL) codegen = state->llvm_codegen();
+
+  // codegen == NULL means jitting is disabled.
+  if (codegen != NULL && root->IsJittable(codegen)) {
+    int scratch_size = 0;
+    void* codegen_fn = root->CodegenExprTree(codegen, &scratch_size);
+    // TODO: This will be NULL for AggExpr.  We need to make this logic more
+    // sophisticated and be able to swap out the compute function with the
+    // jitted one for subtrees (and not just entire trees).
+    if (codegen_fn != NULL) {
+      // Replace the compute function with the jitted function
+      root->SetComputeFunction(codegen_fn, scratch_size);
+    } 
   }
   return Status::OK;
 }
@@ -407,7 +430,7 @@ Status Expr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
 Status Expr::Prepare(const std::vector<Expr*>& exprs, RuntimeState* state,
                      const RowDescriptor& row_desc) {
   for (int i = 0; i < exprs.size(); ++i) {
-    RETURN_IF_ERROR(exprs[i]->Prepare(state, row_desc));
+    RETURN_IF_ERROR(Prepare(exprs[i], state, row_desc));
   }
   return Status::OK;
 }
@@ -415,10 +438,11 @@ Status Expr::Prepare(const std::vector<Expr*>& exprs, RuntimeState* state,
 string Expr::DebugString() const {
   // TODO: implement partial debug string for member vars
   stringstream out;
-  out << "type=" << TypeToString(type_);
+  out << " type=" << TypeToString(type_);
   if (opcode_ != TExprOpcode::INVALID_OPCODE) {
     out << " opcode=" << opcode_;
   }
+  out << " jitted=" << (jitted_compute_function_ == NULL ? "false" : "true");
   if (!children_.empty()) {
     out << " children=" << DebugString(children_);
   }
@@ -442,3 +466,148 @@ bool Expr::IsConstant() const {
   return true;
 }
 
+Function* Expr::CreateComputeFnPrototype(LlvmCodeGen* codegen, const string& name) {
+  Type* ret_type = codegen->GetType(type());
+  Type* ptr_type = codegen->ptr_type();
+  
+  LlvmCodeGen::FunctionPrototype prototype(codegen, name, ret_type);
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("row", PointerType::get(ptr_type, 0)));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("state_data", ptr_type));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("is_null", codegen->bool_ptr_type()));
+
+  Function* function = prototype.GeneratePrototype();
+  codegen->AddInlineFunction(function);
+  return function;
+}
+
+Value* Expr::GetNullReturnValue(LlvmCodeGen* codegen) {
+  switch (type()) {
+    case TYPE_BOOLEAN:
+      return ConstantInt::get(codegen->context(), APInt(1, 0, true));
+    case TYPE_TINYINT:
+      return ConstantInt::get(codegen->context(), APInt(8, 0, true));
+    case TYPE_SMALLINT:
+      return ConstantInt::get(codegen->context(), APInt(16, 0, true));
+    case TYPE_INT:
+      return ConstantInt::get(codegen->context(), APInt(32, 0, true));
+    case TYPE_BIGINT:
+      return ConstantInt::get(codegen->context(), APInt(64, 0, true));
+    case TYPE_FLOAT:
+      return ConstantFP::get(codegen->context(), APFloat((float)0));
+    case TYPE_DOUBLE:
+      return ConstantFP::get(codegen->context(), APFloat((double)0));
+    default:
+      // Add timestamp and stringvalue pointers
+      DCHECK(false) << "Not yet implemented.";
+      return NULL;
+  }
+}
+
+void Expr::SetIsNullReturnArg(LlvmCodeGen* codegen, Function* function, bool val) {
+  Function::arg_iterator func_args = function->arg_begin();
+  ++func_args;
+  ++func_args;
+  Value* is_null_ptr = func_args;
+  Value* value = val ? codegen->true_value() : codegen->false_value();
+  codegen->builder()->CreateStore(value, is_null_ptr);
+}
+
+Value* Expr::CallFunction(LlvmCodeGen* codegen, Function* parent, Function* child,
+    BasicBlock* null_block, BasicBlock* not_null_block) {
+  Function::arg_iterator func_args = parent->arg_begin();
+  Value* row_ptr = func_args++;
+  Value* state_data_ptr = func_args++;
+  Value* is_null_ptr = func_args;
+  Value* args[3] = { row_ptr, state_data_ptr, is_null_ptr };
+  Value* result = codegen->builder()->CreateCall(child, args, "child_result");
+  Value* is_null_val = codegen->builder()->CreateLoad(is_null_ptr, "child_null");
+  codegen->builder()->CreateCondBr(is_null_val, null_block, not_null_block);
+  return result;
+}
+  
+// typedefs for jitted compute functions  
+typedef bool (*BoolComputeFunction)(TupleRow*, char* , bool*);
+typedef int8_t (*TinyIntComputeFunction)(TupleRow*, char*, bool*);
+typedef int16_t (*SmallIntComputeFunction)(TupleRow*, char*, bool*);
+typedef int32_t (*IntComputeFunction)(TupleRow*, char*, bool*);
+typedef int64_t (*BigintComputeFunction)(TupleRow*, char*, bool*);
+typedef float (*FloatComputeFunction)(TupleRow*, char*, bool*);
+typedef double (*DoubleComputeFunction)(TupleRow*, char*, bool*);
+
+void* Expr::JittedComputeFunction(Expr* expr, TupleRow* row) {
+  DCHECK(expr->jitted_compute_function_ != NULL);
+  void* func = expr->jitted_compute_function_;
+  void* result = NULL;
+  bool is_null = false;
+  switch (expr->type()) {
+    case TYPE_BOOLEAN: {
+      BoolComputeFunction new_func = reinterpret_cast<BoolComputeFunction>(func);
+      expr->result_.bool_val = new_func(row, NULL, &is_null);
+      result = &(expr->result_.bool_val);
+      break;
+    }
+    case TYPE_TINYINT: {
+      TinyIntComputeFunction new_func = reinterpret_cast<TinyIntComputeFunction>(func);
+      expr->result_.tinyint_val = new_func(row, NULL, &is_null);
+      result = &(expr->result_.tinyint_val);
+      break;
+    }
+    case TYPE_SMALLINT: {
+      SmallIntComputeFunction new_func = reinterpret_cast<SmallIntComputeFunction>(func);
+      expr->result_.smallint_val = new_func(row, NULL, &is_null);
+      result = &(expr->result_.smallint_val);
+      break;
+    }
+    case TYPE_INT: {
+      IntComputeFunction new_func = reinterpret_cast<IntComputeFunction>(func);
+      expr->result_.int_val = new_func(row, NULL, &is_null);
+      result = &(expr->result_.int_val);
+      break;
+    }
+    case TYPE_BIGINT: {
+      BigintComputeFunction new_func = reinterpret_cast<BigintComputeFunction>(func);
+      expr->result_.bigint_val = new_func(row, NULL, &is_null);
+      result = &(expr->result_.bigint_val);
+      break;
+    }
+    case TYPE_FLOAT: {
+      FloatComputeFunction new_func = reinterpret_cast<FloatComputeFunction>(func);
+      expr->result_.float_val = new_func(row, NULL, &is_null);
+      result = &(expr->result_.float_val);
+      break;
+    }
+    case TYPE_DOUBLE: {
+      DoubleComputeFunction new_func = reinterpret_cast<DoubleComputeFunction>(func);
+      expr->result_.double_val = new_func(row, NULL, &is_null);
+      result = &(expr->result_.double_val);
+      break;
+    }
+    default:
+      DCHECK(false) << expr->type();
+      break;
+  }
+  if (is_null) return NULL;
+  return result;
+}
+
+void Expr::SetComputeFunction(void* jitted_function, int scratch_size) {
+  DCHECK_EQ(scratch_size, 0);
+  jitted_compute_function_ = jitted_function;
+  compute_function_ = Expr::JittedComputeFunction;
+}
+
+bool Expr::IsJittable(LlvmCodeGen* codegen) const {
+  if (codegen->GetType(type()) == NULL) return false;
+  for (int i = 0; i < GetNumChildren(); ++i) {
+    if (!children()[i]->IsJittable(codegen)) return false;
+  }
+  return true;
+}
+
+void* Expr::CodegenExprTree(LlvmCodeGen* codegen, int* scratch_size) {
+  Function* function = this->Codegen(codegen);
+  if (function == NULL) {
+    return NULL;
+  }
+  return codegen->JitFunction(function, scratch_size);
+}

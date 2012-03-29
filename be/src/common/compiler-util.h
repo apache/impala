@@ -11,5 +11,7 @@
 #define LIKELY(expr) __builtin_expect(!!(expr), 0)
 #define UNLIKELY(expr) __builtin_expect(!!(expr), 1)
 
+#define PREFETCH(addr) __builtin_prefetch(addr)
+
 #endif
 

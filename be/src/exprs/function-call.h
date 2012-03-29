@@ -14,12 +14,14 @@ namespace impala {
 class TExprNode;
 
 class FunctionCall: public Expr {
+ public:
+  virtual llvm::Function* Codegen(LlvmCodeGen* codegen);
+
  protected:
   friend class Expr;
   friend class StringFunctions;
 
   FunctionCall(const TExprNode& node);
-
   virtual std::string DebugString() const;
 
   // Returns false if the pattern is invalid, true otherwise.

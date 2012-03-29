@@ -14,9 +14,16 @@
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
 
+namespace llvm {
+  class BasicBlock;
+  class Function;
+  class Value;
+};
+
 namespace impala {
 
 class Expr;
+class LlvmCodeGen;
 class ObjectPool;
 class RowDescriptor;
 class RuntimeState;
@@ -99,11 +106,6 @@ class Expr {
   // typedef for compute functions.
   typedef void* (*ComputeFunction)(Expr*, TupleRow*);
 
-  // Prepare expr tree for evaluation. In particular, set compute_function_.
-  // Prepare should be invoked recurisvely on the expr tree.
-  // Return OK if successful, otherwise return error status.
-  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
-
   // Evaluate expr and return pointer to result. The result is
   // valid as long as 'row' doesn't change.
   void* GetValue(TupleRow* row);
@@ -151,6 +153,11 @@ class Expr {
   static Status CreateExprTrees(ObjectPool* pool, const std::vector<TExpr>& texprs,
                                 std::vector<Expr*>* exprs);
 
+  // Prepare expr tree for evaluation, setting the compute_function_ for each node
+  // in the tree. If the expr tree can be jit compiled, it will set the jitted function 
+  // as the compute function for the root. 
+  static Status Prepare(Expr* root, RuntimeState* state, const RowDescriptor& row_desc);
+
   // Prepare all exprs.
   static Status Prepare(const std::vector<Expr*>& exprs, RuntimeState* state,
                         const RowDescriptor& row_desc);
@@ -164,6 +171,18 @@ class Expr {
   // NULL will be returned if the string and type are not compatible.
   // The new Expr will be allocated from the pool.
   static Expr* CreateLiteral(ObjectPool* pool, PrimitiveType type, const std::string&);
+
+  // Jit the expr tree rooted at this node.  This does a post order traversal
+  // and then jit's this expr's compute function.  Returns NULL if the subtree
+  // cannot be jitted.  
+  // Subclasses should override this function if it supports jitting.
+  virtual llvm::Function* Codegen(LlvmCodeGen* code_gen) {
+    return NULL;
+  }
+
+  // Returns whether the subtree at this node is jittable.  This is temporary 
+  // until more expr types are supported.
+  bool IsJittable(LlvmCodeGen*) const;
 
   virtual std::string DebugString() const;
   static std::string DebugString(const std::vector<Expr*>& exprs);
@@ -179,6 +198,10 @@ class Expr {
   Expr(PrimitiveType type);
   Expr(const TExprNode& node);
   Expr(const TExprNode& node, bool is_slotref);
+
+  // Prepare should be invoked recurisvely on the expr tree.
+  // Return OK if successful, otherwise return error status.
+  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
 
   // Helper function that just calls prepare on all the children
   // Does not do anything on the this expr.
@@ -198,7 +221,32 @@ class Expr {
   std::vector<Expr*> children_;
   ExprValue result_;
 
+  // Create a compute function prototype.
+  // The signature is:
+  // <expr ret type> ComputeFunction(TupleRow* row, char* state_data, bool* is_null)
+  llvm::Function* CreateComputeFnPrototype(LlvmCodeGen* codegen, const std::string& name);
+
+  // Create dummy ret value for NULL result for this expr's return type
+  llvm::Value* GetNullReturnValue(LlvmCodeGen* codegen);
+
+  // Sets the is_null return arg to 'val'
+  void SetIsNullReturnArg(LlvmCodeGen* codegen, llvm::Function* function, bool val);
+
+  // Call a child compute function, passing the arguments from this compute function.
+  // Checks NULL return from child and will conditionally branch to the 
+  // null/not_null block of the parent function
+  // - parent: the calling function.  A call instruction will be added to this function.
+  // - child: the child function to call 
+  // - null_block: block in parent function to jump to if the child is null
+  // - not_null_block: block in parent function to jump to if the child is not null
+  llvm::Value* CallFunction(LlvmCodeGen* codegen, llvm::Function* parent, 
+      llvm::Function* child, llvm::BasicBlock* null_block, 
+      llvm::BasicBlock* not_null_block);
+
  private:
+  friend class ExprTest;
+  friend class QueryJitter;
+
   // Create a new Expr based on texpr_node.node_type within 'pool'.
   static Status CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** expr);
 
@@ -217,7 +265,29 @@ class Expr {
       const std::vector<TExprNode>& nodes, Expr* parent, int* node_idx,
       Expr** root_expr);
 
-  void PrintValue(void* value, std::string* str);
+  // Update the compute function with the jitted function.  
+  void SetComputeFunction(void* jitted_function, int scratch_size);
+
+  // Jit compile expr tree.  Returns a function pointer to the jitted function.
+  // scratch_size is an out parameter for the required size of the scratch buffer
+  // to call the jitted function.
+  // Returns NULL if the function is not jittable.
+  void* CodegenExprTree(LlvmCodeGen* codegen, int* scratch_size);
+
+  // Compute function wrapper for jitted Expr trees.  This is temporary until 
+  // we are generating loops to evaluate batches of tuples.
+  // This is a shim to convert the old ComputeFunction signature to the code-
+  // generated signature.  It will call the underlying jitted function and
+  // stuff the result back in expr->result_.
+  static void* JittedComputeFunction(Expr* expr, TupleRow* row);
+
+  // This is a function pointer to the compute function.  The return type
+  // for jitted functions depends on the Expr so we need to store it as
+  // a void* and then cast it on invocation.
+  void* jitted_compute_function_;
+
+  // Size of scratch buffer necessary to call jitted compute function.
+  int scratch_buffer_size_;
 };
 
 // Reference to a single slot of a tuple.
@@ -232,6 +302,8 @@ class SlotRef : public Expr {
   static void* ComputeFunction(Expr* expr, TupleRow* row);
   virtual std::string DebugString() const;
   virtual bool IsConstant() const { return false; }
+
+  virtual llvm::Function* Codegen(LlvmCodeGen* codegen);
 
  protected:
   int tuple_idx_;  // within row

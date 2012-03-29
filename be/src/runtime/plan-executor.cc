@@ -9,6 +9,7 @@
 #include <glog/logging.h>
 #include <gflags/gflags.h>
 
+#include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
 #include "exec/exec-node.h"
 #include "exec/scan-node.h"
@@ -22,6 +23,7 @@
 #include "gen-cpp/Data_types.h"
 
 DEFINE_bool(serialize_batch, false, "serialize and deserialize each returned row batch");
+DECLARE_bool(enable_expr_jit);
 
 using namespace std;
 using namespace boost;
@@ -41,11 +43,12 @@ PlanExecutor::~PlanExecutor() {
 
 Status PlanExecutor::Prepare(
     const TPlanExecRequest& request, const TPlanExecParams& params) {
+  
   //VLOG(1) << "plan exec request:\n" << ThriftDebugString(request);
   VLOG(1) << "params:\n" << ThriftDebugString(params);
   runtime_state_.reset(
       new RuntimeState(request.queryId, params.abortOnError, params.maxErrors,
-                       params.batchSize, exec_env_));
+                       params.batchSize, FLAGS_enable_expr_jit, exec_env_));
 
   // set up desc tbl
   DescriptorTbl* desc_tbl = NULL;

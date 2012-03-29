@@ -12,6 +12,9 @@ namespace impala {
 class TExprNode;
 
 class ArithmeticExpr: public Expr {
+ public:
+  virtual llvm::Function* Codegen(LlvmCodeGen* code_gen);
+
  protected:
   friend class Expr;
 

@@ -21,6 +21,7 @@
 #include <transport/TSocket.h>
 #include <transport/TTransportUtils.h>
 
+#include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exec/exec-node.h"
@@ -50,6 +51,7 @@ DEFINE_int32(num_nodes, 1,
 DEFINE_int32(backend_port, 21000,
     "start port for backend threads (assigned sequentially)");
 DEFINE_string(coord_host, "localhost", "hostname of coordinator");
+DEFINE_bool(enable_expr_jit, true, "if true, jit expr trees if possible");
 
 using namespace std;
 using namespace boost;
@@ -125,6 +127,10 @@ static void StartServer() {
   }
 }
 
+void QueryExecutor::DisableJit() {
+  FLAGS_enable_expr_jit = false;
+}
+
 Status QueryExecutor::Setup() {
   socket_.reset(new TSocket("localhost", 20000));
   transport_.reset(new TBufferedTransport(socket_));
@@ -150,12 +156,11 @@ Status QueryExecutor::Setup() {
       }
     }
   }
-
+  
   return Status::OK;
 }
 
-Status QueryExecutor::Exec(
-    const std::string& query, vector<PrimitiveType>* col_types) {
+Status QueryExecutor::Exec(const string& query, vector<PrimitiveType>* col_types) {
   query_profile_.reset(new RuntimeProfile(obj_pool_.get(), "QueryExecutor"));
   RuntimeProfile::Counter* plan_gen_counter =
       ADD_COUNTER(query_profile_, "PlanGeneration", TCounterType::CPU_TICKS);
@@ -180,7 +185,8 @@ Status QueryExecutor::Exec(
     DCHECK(!query_request_.fragmentRequests[0].__isset.planFragment);
     local_state_.reset(
         new RuntimeState(query_request_.queryId, FLAGS_abort_on_error,
-                         FLAGS_max_errors, FLAGS_batch_size, NULL));
+                         FLAGS_max_errors, FLAGS_batch_size, 
+                         FLAGS_enable_expr_jit, NULL));
     RETURN_IF_ERROR(
         PrepareSelectListExprs(local_state_.get(), RowDescriptor(), col_types));
     return Status::OK;
@@ -234,9 +240,10 @@ Status QueryExecutor::PrepareSelectListExprs(
           state->obj_pool(), query_request_.fragmentRequests[0].outputExprs,
           &select_list_exprs_));
   for (int i = 0; i < select_list_exprs_.size(); ++i) {
-    select_list_exprs_[i]->Prepare(state, row_desc);
+    Expr::Prepare(select_list_exprs_[i], state, row_desc);
     if (col_types != NULL) col_types->push_back(select_list_exprs_[i]->type());
   }
+
   return Status::OK;
 }
 
@@ -249,7 +256,7 @@ Status QueryExecutor::FetchResult(RowBatch** batch) {
   return Status::OK;
 }
 
-Status QueryExecutor::FetchResult(std::string* result) {
+Status QueryExecutor::FetchResult(string* result) {
   COUNTER_SCOPED_TIMER(query_profile_->total_time_counter());
   vector<void*> row;
   RETURN_IF_ERROR(FetchResult(&row));
@@ -264,7 +271,7 @@ Status QueryExecutor::FetchResult(std::string* result) {
   return Status::OK;
 }
 
-Status QueryExecutor::FetchResult(std::vector<void*>* select_list_values) {
+Status QueryExecutor::FetchResult(vector<void*>* select_list_values) {
   COUNTER_SCOPED_TIMER(query_profile_->total_time_counter());
   select_list_values->clear();
   if (coord_.get() == NULL) {
@@ -331,14 +338,14 @@ void QueryExecutor::Shutdown() {
   transport_->close();
 }
 
-std::string QueryExecutor::ErrorString() const {
+string QueryExecutor::ErrorString() const {
   if (coord_.get() == NULL) {
     return "";
   }
   return coord_->runtime_state()->ErrorLog();
 }
 
-std::string QueryExecutor::FileErrors() const {
+string QueryExecutor::FileErrors() const {
   if (coord_.get() == NULL) {
     return "";
   }

@@ -7,6 +7,7 @@
 #include <gflags/gflags.h>
 #include <server/TServer.h>
 
+#include "codegen/llvm-codegen.h"
 #include "common/status.h"
 #include "exec/exec-node.h"
 #include "exec/hbase-table-scanner.h"
@@ -26,7 +27,7 @@
 #include "gen-cpp/Data_types.h"
 
 DECLARE_bool(serialize_batch);
-DEFINE_int32(backend_port, 21000, "port on which ImpalaBackendService is exported");
+DECLARE_int32(backend_port);
 
 using namespace impala;
 using namespace std;
@@ -46,6 +47,7 @@ static void RunServer(TServer* server) {
 extern "C"
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
   google::InitGoogleLogging("impala-backend");
+  LlvmCodeGen::InitializeLlvm();
   // install libunwind before activating this on 64-bit systems:
   //google::InstallFailureSignalHandler();
 
@@ -103,14 +105,25 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecQuery(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_query_exec_request,
     jobject error_log, jobject file_errors, jobject result_queue) {
   JniCoordinator coord(env, test_env, error_log, file_errors, result_queue);
-  //JniCoordinator coord(env, test_env.get(), error_log, file_errors, result_queue);
   coord.Exec(thrift_query_exec_request);
   RETURN_IF_EXC(env);
   const vector<Expr*>& select_list_exprs = coord.select_list_exprs();
 
   // Prepare select list expressions.
   for (size_t i = 0; i < select_list_exprs.size(); ++i) {
-    select_list_exprs[i]->Prepare(coord.runtime_state(), coord.row_desc());
+    Status status = 
+        Expr::Prepare(select_list_exprs[i], coord.runtime_state(), coord.row_desc());
+    if (!status.ok()) {
+      string error_msg;
+      status.GetErrorMsg(&error_msg);
+      jclass internal_exc_cl = env->FindClass("com/cloudera/impala/common/InternalException");
+      if (internal_exc_cl == NULL) {
+        if (env->ExceptionOccurred()) env->ExceptionDescribe();
+        return;
+      }
+      env->ThrowNew(internal_exc_cl, error_msg.c_str());
+      return;
+    }
   }
 
   if (coord.is_constant_query()) {
@@ -148,6 +161,9 @@ JNIEXPORT jboolean JNICALL Java_com_cloudera_impala_service_NativeBackend_EvalPr
   DeserializeThriftMsg(env, thrift_predicate_bytes, &thrift_predicate);
   Expr* e;
   Status status = Expr::CreateExprTree(&obj_pool, thrift_predicate, &e);
+  if (status.ok()) {
+    status = Expr::Prepare(e, NULL, RowDescriptor());
+  }
   if (!status.ok()) {
     string error_msg;
     status.GetErrorMsg(&error_msg);
@@ -160,7 +176,6 @@ JNIEXPORT jboolean JNICALL Java_com_cloudera_impala_service_NativeBackend_EvalPr
     return false;
   }
 
-  e->Prepare(NULL, RowDescriptor());
   bool* v = static_cast<bool*>(e->GetValue(NULL));
   return *v;
 }

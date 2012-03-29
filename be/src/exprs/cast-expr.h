@@ -12,6 +12,8 @@ class TExprNode;
 
 class CastExpr: public Expr {
  public:
+  virtual llvm::Function* Codegen(LlvmCodeGen* codegen);
+
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& desc);
   virtual std::string DebugString() const;
 

@@ -16,6 +16,7 @@
 #include <transport/TTransportUtils.h>
 #include <concurrency/PosixThreadFactory.h>
 
+#include "codegen/llvm-codegen.h"
 #include "common/status.h"
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
@@ -163,6 +164,7 @@ static void StartImpalaService(JavaVM* jvm, int port) {
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, true);
+  LlvmCodeGen::InitializeLlvm();
   JniUtil::InitLibhdfs();
 
   JavaVM* jvm = CreateJvm();

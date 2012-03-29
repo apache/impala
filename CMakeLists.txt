@@ -87,6 +87,11 @@ set_target_properties(gtest PROPERTIES IMPORTED_LOCATION "${GTEST_LIBRARY}")
 message(STATUS ${GTEST_INCLUDE_DIR})
 message(STATUS ${GTEST_LIBRARY})
 
+# find LLVM
+find_package(Llvm REQUIRED)
+include_directories($LLVM_INCLUDE_DIR})
+set(LIBS ${LIBS} {LLVM_MODULE_LIBS})
+
 # compile these subdirs using their own CMakeLists.txt
 add_subdirectory(common/function-registry)
 add_subdirectory(common/thrift)

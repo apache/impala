@@ -4,10 +4,12 @@
 
 #include <sstream>
 
+#include "codegen/llvm-codegen.h"
 #include "gen-cpp/Exprs_types.h"
 #include "runtime/runtime-state.h"
 
 using namespace std;
+using namespace llvm;
 
 namespace impala {
 
@@ -48,6 +50,127 @@ string SlotRef::DebugString() const {
       << " null_indicator=" << null_indicator_offset_
       << " " << Expr::DebugString() << ")";
   return out.str();
+}
+
+// IR Generation for SlotRef.  The resulting IR looks like:
+// TODO: TupleRow is rarely null (outer join), add some state in slotref to not
+// generate the null check in most paths.
+// TODO: We could generate a typed struct (and not a char*) for Tuple for llvm.
+// We know the types from the TupleDesc.  It will likey make this code simpler
+// to reason about.
+//
+// Note: some of the casts that look like no-ops are because certain offsets are 0
+// is this slot descriptor.
+// define i8 @SlotRef1(i8** %row, i8* %state_data, i1* %is_null) {
+// entry:
+//   %tuple_addr1 = bitcast i8** %row to i8**
+//   %tuple_ptr = load i8** %tuple_addr1
+//   %tuple_is_null = icmp eq i8* %tuple_ptr, null
+//   br i1 %tuple_is_null, label %null_ret, label %tuple_not_null
+// 
+// tuple_not_null:                                   ; preds = %entry
+//   %null_ptr2 = bitcast i8* %tuple_ptr to i8*
+//   %null_byte = load i8* %null_ptr2
+//   %null_byte_set = and i8 %null_byte, 1
+//   %slot_is_null = icmp ne i8 %null_byte_set, 0
+//   br i1 %slot_is_null, label %null_ret, label %get_slot
+// 
+// get_slot:                                         ; preds = %tuple_not_null
+//   %slot_addr = getelementptr i8* %tuple_ptr, i32 1
+//   %slot_value = load i8* %slot_addr
+//   store i1 false, i1* %is_null
+//   br label %ret
+// 
+// null_ret:                                         ; preds = %tuple_not_null, %entry
+//   store i1 true, i1* %is_null
+//   br label %ret
+// 
+// ret:                                              ; preds = %null_ret, %get_slot
+//   %tmp_phi = phi i8 [ 0, %null_ret ], [ %slot_value, %get_slot ]
+//   ret i8 %tmp_phi
+// }
+Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
+  DCHECK_EQ(GetNumChildren(), 0);
+  
+  LLVMContext& context = codegen->context();
+  LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
+  
+  Type* return_type = codegen->GetType(type());
+  Function* function = CreateComputeFnPrototype(codegen, "SlotRef");
+
+  Function::arg_iterator func_args = function->arg_begin();
+  Value* row_ptr = func_args;
+
+  Type* int_type = codegen->GetType(TYPE_INT);
+  Value* tuple_offset[] = { 
+    ConstantInt::get(int_type, tuple_idx_)
+  };
+  Value* null_byte_offset[] = { 
+    ConstantInt::get(int_type, null_indicator_offset_.byte_offset)
+  };
+  Value* slot_offset[] = { 
+    ConstantInt::get(int_type, slot_offset_)
+  };
+  Value* null_mask = 
+      ConstantInt::get(context, APInt(8, null_indicator_offset_.bit_mask, true));
+  Value* zero = ConstantInt::get(codegen->GetType(TYPE_TINYINT), 0);
+  Type* result_type = codegen->GetType(type());
+  PointerType* result_ptr_type = PointerType::get(result_type, 0);
+
+  BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
+  BasicBlock* check_null_indicator_block = NULL;
+  if (null_indicator_offset_.bit_mask != 0) {
+    check_null_indicator_block = BasicBlock::Create(context, "tuple_not_null", function);
+  }
+  BasicBlock* get_slot_block = BasicBlock::Create(context, "get_slot", function);
+  BasicBlock* null_ret_block = BasicBlock::Create(context, "null_ret", function);
+  BasicBlock* ret_block = BasicBlock::Create(context, "ret", function);
+
+  builder->SetInsertPoint(entry_block);
+  // Get the tuple offset addr from the row
+  Value* tuple_addr = builder->CreateGEP(row_ptr, tuple_offset, "tuple_addr"); 
+  // Load the tuple*
+  Value* tuple_ptr = builder->CreateLoad(tuple_addr, "tuple_ptr");
+  // Check if tuple* is null
+  Value* tuple_is_null = builder->CreateIsNull(tuple_ptr, "tuple_is_null");
+  if (null_indicator_offset_.bit_mask == 0) {
+    builder->CreateCondBr(tuple_is_null, null_ret_block, get_slot_block);
+  } else {
+    builder->CreateCondBr(tuple_is_null, null_ret_block, check_null_indicator_block);
+  }
+
+  // Branch for tuple* != NULL.  Need to check if null-indicator is set
+  if (null_indicator_offset_.bit_mask != 0) {
+    builder->SetInsertPoint(check_null_indicator_block);
+    Value* null_addr = builder->CreateGEP(tuple_ptr, null_byte_offset, "null_ptr");
+    Value* null_val = builder->CreateLoad(null_addr, "null_byte");
+    Value* slot_null_mask = builder->CreateAnd(null_val, null_mask, "null_byte_set");
+    Value* is_slot_null = builder->CreateICmpNE(slot_null_mask, zero, "slot_is_null");
+    builder->CreateCondBr(is_slot_null, null_ret_block, get_slot_block);
+  }
+
+  // Branch for slot != NULL
+  builder->SetInsertPoint(get_slot_block);
+  Value* slot_ptr = builder->CreateGEP(tuple_ptr, slot_offset, "slot_addr");
+  Value* slot_cast = builder->CreatePointerCast(slot_ptr, result_ptr_type);
+  Value* result = builder->CreateLoad(slot_cast, "slot_value");
+  SetIsNullReturnArg(codegen, function, false);
+  builder->CreateBr(ret_block);
+
+  // Branch to set is_null to true
+  builder->SetInsertPoint(null_ret_block);
+  SetIsNullReturnArg(codegen, function, true);
+  builder->CreateBr(ret_block);
+
+  // Ret block
+  builder->SetInsertPoint(ret_block);
+  PHINode* phi_node = builder->CreatePHI(return_type, 2, "tmp_phi");
+  phi_node->addIncoming(GetNullReturnValue(codegen), null_ret_block);
+  phi_node->addIncoming(result, get_slot_block);
+  builder->CreateRet(phi_node);
+
+  if (!codegen->VerifyFunction(function)) return NULL;
+  return function;
 }
 
 }

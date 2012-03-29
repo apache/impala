@@ -103,7 +103,7 @@ class ExecNode {
   static Status CreateTreeHelper(ObjectPool* pool, const std::vector<TPlanNode>& tnodes,
       const DescriptorTbl& descs, ExecNode* parent, int* node_idx, ExecNode** root);
 
-  void PrepareConjuncts(RuntimeState* state);
+  Status PrepareConjuncts(RuntimeState* state);
 
   // Evaluate conjuncts. Return true if all conjuncts return true, otherwise false.
   bool EvalConjuncts(const std::vector<Expr*>& conjuncts, TupleRow* row);

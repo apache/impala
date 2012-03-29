@@ -4,9 +4,11 @@
 
 #include <sstream>
 
+#include "codegen/llvm-codegen.h"
 #include "gen-cpp/Exprs_types.h"
 
 using namespace std;
+using namespace llvm;
 
 namespace impala {
 
@@ -35,5 +37,60 @@ string IsNullPredicate::DebugString() const {
   out << "IsNullPredicate(not_null=" << is_not_null_ << Expr::DebugString() << ")";
   return out.str();
 }
+
+// IR Generation for IsNullPredicate.  The generated IR looks like:
+// define i1 @IsNullPredicate(i8** %row, i8* %state_data, i1* %is_null) {
+// entry:
+//   %child_result = call i8 @IntLiteral(i8** %row, i8* %state_data, i1* %is_null)
+//   %child_null = load i1* %is_null
+//   br i1 %child_null, label %ret, label %not_null
+// 
+// not_null:                                         ; preds = %entry
+//   br label %ret
+// 
+// ret:                                              ; preds = %not_null, %entry
+//   %tmp_phi = phi i1 [ true, %entry ], [ false, %not_null ]
+//   store i1 false, i1* %is_null
+//   ret i1 %tmp_phi
+// }
+Function* IsNullPredicate::Codegen(LlvmCodeGen* codegen) {
+  DCHECK_EQ(GetNumChildren(), 1);
+  
+  Function* child_function = children()[0]->Codegen(codegen);
+  if (child_function == NULL) return NULL;
+
+  LLVMContext& context = codegen->context();
+  LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
+  Type* return_type = codegen->GetType(type());
+  Function* function = CreateComputeFnPrototype(codegen, "IsNullPredicate");
+
+  BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
+  BasicBlock* not_null_block = BasicBlock::Create(context, "not_null", function);
+  BasicBlock* ret_block = BasicBlock::Create(context, "ret", function);
+  builder->SetInsertPoint(entry_block);
+  
+  // Call child function
+  CallFunction(codegen, function, child_function, ret_block, not_null_block);
+
+  builder->SetInsertPoint(not_null_block);
+  builder->CreateBr(ret_block);
+
+  // Return block.  
+  builder->SetInsertPoint(ret_block);
+  PHINode* phi_node = builder->CreatePHI(return_type, 2, "tmp_phi");
+  if (is_not_null_) {
+    phi_node->addIncoming(codegen->false_value(), entry_block);
+    phi_node->addIncoming(codegen->true_value(), not_null_block);
+  } else {
+    phi_node->addIncoming(codegen->true_value(), entry_block);
+    phi_node->addIncoming(codegen->false_value(), not_null_block);
+  }
+  SetIsNullReturnArg(codegen, function, false);
+  builder->CreateRet(phi_node);
+
+  if (!codegen->VerifyFunction(function)) return NULL;
+  return function;
+}
+
 
 }

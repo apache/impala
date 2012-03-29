@@ -3,9 +3,12 @@
 #include "bool-literal.h"
 
 #include <sstream>
+
+#include "codegen/llvm-codegen.h"
 #include "gen-cpp/Exprs_types.h"
 
 using namespace std;
+using namespace llvm;
 
 namespace impala {
 
@@ -35,6 +38,28 @@ string BoolLiteral::DebugString() const {
   stringstream out;
   out << "BoolLiteral(value=" << result_.bool_val << ")";
   return out.str();
+}
+
+// IR generation for BoolLiteral.  Resulting IR looks like:
+// define i1 @BoolLiteral(i8** %row, i8* %state_data, i1* %is_null) {
+// entry:
+//   store i1 false, i1* %is_null
+//   ret i1 true
+// }
+Function* BoolLiteral::Codegen(LlvmCodeGen* codegen) {
+  DCHECK_EQ(GetNumChildren(), 0);
+  LLVMContext& context = codegen->context();
+  LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
+
+  Function* function = CreateComputeFnPrototype(codegen, "BoolLiteral");
+  BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
+
+  builder->SetInsertPoint(entry_block);
+  SetIsNullReturnArg(codegen, function, false);
+  builder->CreateRet(ConstantInt::get(context, APInt(1, result_.bool_val, true)));
+  
+  if (!codegen->VerifyFunction(function)) return NULL;
+  return function;
 }
 
 }

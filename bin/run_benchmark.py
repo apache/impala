@@ -24,22 +24,23 @@
 import os
 import re
 import sys
+import subprocess
+import tempfile
 from optparse import OptionParser
 
 # Options
 parser = OptionParser()
-parser.add_option("-p", "--profiler", dest="profiler", default = 0,
-                  help="If true, also run google pprof for sample profiling.")
-parser.add_option("-v", "--verbose", dest="verbose", default = 0,
-                  help="If true, outputs all benchmark diagnostics.")
+parser.add_option("-p", "--profiler", dest="profiler", 
+                  action="store_true", default = False, 
+                  help="If set, also run google pprof for sample profiling.")
+parser.add_option("-v", "--verbose", dest="verbose", action="store_true", 
+                  default = False, help="If set, outputs all benchmark diagnostics.")
 parser.add_option("-q", "--query", dest="query", default = "",
                   help="Query to run.  If none specified, runs all queries.")
 parser.add_option("--iterations", dest="iterations", default="3",
                   help="Number of times to run the query.  Only to be used with -q")
 parser.add_option("--prime_cache", dest="prime_cache", default="3",
                   help="Number of times to prime buffer cache.  Only to be used with -q")
-parser.add_option("-i", "--iteractive", dest="interactive", default = 1,
-                  help="If true, outputs the results as they are generated.")
 
 (options, args) = parser.parse_args()
 
@@ -55,6 +56,8 @@ GREEN = '\033[92m'
 YELLOW = '\033[93m'
 RED = '\033[91m'
 END = '\033[0m'
+
+dev_null = open('/dev/null')
 
 # Parse for the tables used in this query
 def parse_tables(query):
@@ -126,8 +129,9 @@ def run_query(reference_results, query, prime_buffer_cache, iterations):
     # and run a count(*) query on the tables
     tables = parse_tables(query)
     for i in range (0, len(tables)):
-      count_cmd = '%s -query="select count(*) from %s" --iterations=%d -profile_output_file=""' % (query_cmd, tables[i], prime_buffer_cache)
-      os.popen3(count_cmd, "r")
+      count_cmd = '%s -query="select count(*) from %s" --iterations=%d ' \
+                  '-profile_output_file=""' % (query_cmd, tables[i], prime_buffer_cache)
+      subprocess.call(count_cmd, shell=True, stderr=dev_null, stdout=dev_null)
 
   avg_time = 0
   stddev = ""
@@ -138,10 +142,13 @@ def run_query(reference_results, query, prime_buffer_cache, iterations):
   if options.profiler:
     gprof_tmp_file = profile_output_file
 
-  cmd = '%s -query="%s" -iterations=%d -enable_counters=%d -profile_output_file=%s' % (query_cmd, query, iterations, enable_counters, gprof_tmp_file)
+  cmd = '%s -query="%s" -iterations=%d -enable_counters=%d -profile_output_file=%s' %\
+         (query_cmd, query, iterations, enable_counters, gprof_tmp_file)
 
   # Run query
-  query_output = os.popen3(cmd, "r")[1]
+  query_output = tempfile.TemporaryFile("w+")
+  subprocess.call(cmd, shell=True, stderr=dev_null, stdout=query_output)
+  query_output.seek(0)
   while 1:
     line = query_output.readline()
     if not line: break
@@ -160,13 +167,15 @@ def run_query(reference_results, query, prime_buffer_cache, iterations):
         avg_time = ('%s.%s') % (match.group(2), match.group(3))
         stddev = ('%s.%s') % (match.group(4), match.group(5))
         run_success = 1
+  query_output.close()
 
   if run_success == 0:
+    print "Query: " + query
     print "Query did not run succesfully"
     sys.exit(1)
 
   if options.profiler:
-    os.system(gprof_cmd % gprof_tmp_file)
+    subprocess.call(gprof_cmd % gprof_tmp_file, shell=True)
   
   avg_time = float(avg_time)
   
@@ -187,27 +196,36 @@ def run_query(reference_results, query, prime_buffer_cache, iterations):
     if len(stddev) != 0:
       compare_output += "  Std Dev:  " + stddev + "s\n"
 
+  output.rstrip()
+  compare_output.rstrip()
   return [output, compare_output]
 
 os.chdir(os.environ['IMPALA_BE_DIR'])
 
 reference_results = parse_reference_results()
 
-# This table contains [query, numbers of times to prime buffer cache, number of iterations]
-# Queries should be grouped by the data they touch.  This eliminates the need for the buffer
-# cache priming iterations.
-# TODO: it would be good if this table also contained the expected numbers and automatically 
-# flag regressions.  How do we reconcile the fact we are running on different machines?
+# This table contains [query, numbers of times to prime buffer cache, 
+# number of iterations].  Queries should be grouped by the data they touch.  This 
+# eliminates the need for the buffer cache priming iterations.
+# TODO: it would be good if this table also contained the expected numbers and 
+# automatically flag regressions.  How do we reconcile the fact we are running on 
+# different machines?
 queries = [
   ["select count(*) from grep1gb", 5, 5],
   ["select count(field) from grep1gb", 0, 5],
   ["select count(field) from grep1gb where field like '%xyz%'", 0, 5],
-  ["select uv.sourceip, avg(r.pagerank), sum(uv.adrevenue) as totalrevenue from uservisits uv join rankings r on (r.pageurl = uv.desturl) where uv.visitdate > '1999-01-01' and uv.visitdate < '2000-01-01' group by uv.sourceip order by totalrevenue desc limit 1", 5, 5],
-  ["select sourceIP, SUM(adRevenue) FROM uservisits GROUP by sourceIP order by SUM(adRevenue) desc limit 10", 5, 5],
-  ["select pageRank, pageURL from rankings where pageRank > 10 order by pageRank limit 100", 0, 5],
+  ["select uv.sourceip, avg(r.pagerank), sum(uv.adrevenue) as totalrevenue "\
+   "from uservisits uv join rankings r on (r.pageurl = uv.desturl) "\
+   "where uv.visitdate > '1999-01-01' and uv.visitdate < '2000-01-01' "\
+   "group by uv.sourceip order by totalrevenue desc limit 1", 5, 5],
+  ["select sourceIP, SUM(adRevenue) FROM uservisits GROUP by sourceIP "\
+   "order by SUM(adRevenue) desc limit 10", 5, 5],
+  ["select pageRank, pageURL from rankings where pageRank > 10 "\
+   "order by pageRank limit 100", 0, 5],
   ["select count(field) from grep10gb where field like '%xyz%'", 0, 1]
 ]
 
+# Run all queries
 if (len(options.query) == 0):
   output = ""
   compare_output = ""
@@ -215,16 +233,22 @@ if (len(options.query) == 0):
     result = run_query(reference_results, query[0], query[1], query[2])
     output += result[0]
     compare_output += result[1]
-    if options.interactive:
-      if len(result[1]) != 0:
-        print result[1]
-      else:
-        print result[0]
+    if len(result[1]) != 0:
+      print result[1]
+    else:
+      print result[0]
+    if options.verbose != 0:
+      print "---------------------------------------------------------------------------"
+
   print compare_output
-  print "\nCopy and paste below to %s/%s to update the reference results:" % (os.environ['IMPALA_HOME'], reference_result_file)
+  print "\nCopy and paste below to %s/%s to update the reference results:" % \
+        (os.environ['IMPALA_HOME'], reference_result_file)
   print output
+
+# Run query from command line
 else:
-  result = run_query(reference_results, options.query, int(options.prime_cache), int(options.iterations))
+  result = run_query(reference_results, options.query, int(options.prime_cache), 
+                    int(options.iterations))
   if len(result[1]) != 0:
     print result[1]
   else:

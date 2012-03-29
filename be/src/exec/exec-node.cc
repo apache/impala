@@ -5,6 +5,7 @@
 #include <sstream>
 #include <glog/logging.h>
 
+#include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exprs/expr.h"
@@ -44,7 +45,7 @@ Status ExecNode::Prepare(RuntimeState* state) {
   rows_returned_counter_ =
     ADD_COUNTER(runtime_profile_, "RowsReturned", TCounterType::UNIT);
 
-  PrepareConjuncts(state);
+  RETURN_IF_ERROR(PrepareConjuncts(state));
   for (int i = 0; i < children_.size(); ++i) {
     RETURN_IF_ERROR(children_[i]->Prepare(state));
   }
@@ -164,10 +165,11 @@ void ExecNode::DebugString(int indentation_level, std::stringstream* out) const 
   }
 }
 
-void ExecNode::PrepareConjuncts(RuntimeState* state) {
+Status ExecNode::PrepareConjuncts(RuntimeState* state) {
   for (vector<Expr*>::iterator i = conjuncts_.begin(); i != conjuncts_.end(); ++i) {
-    (*i)->Prepare(state, row_desc());
+    RETURN_IF_ERROR(Expr::Prepare(*i, state, row_desc()));
   }
+  return Status::OK;
 }
 
 bool ExecNode::EvalConjuncts(TupleRow* row) {
