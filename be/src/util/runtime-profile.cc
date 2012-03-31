@@ -19,7 +19,7 @@ RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name) :
 }
 
 RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
-    const TRuntimeProfileTree& profiles) { 
+    const TRuntimeProfileTree& profiles) {
   if (profiles.nodes.size() == 0) return NULL;
   int idx = 0;
   return RuntimeProfile::CreateFromThrift(pool, profiles.nodes, &idx);
@@ -33,7 +33,7 @@ RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
   RuntimeProfile* profile = pool->Add(new RuntimeProfile(pool, node.name));
   for (int i = 0; i < node.counters.size(); ++i) {
     const TCounter& counter = node.counters[i];
-    profile->counter_map_[counter.name] = 
+    profile->counter_map_[counter.name] =
       pool->Add(new Counter(counter.type, counter.value));
   }
   ++*idx;
@@ -47,11 +47,11 @@ void RuntimeProfile::Merge(const RuntimeProfile& other) {
   // Merge this level
   map<string, Counter*>::iterator dst_iter;
   map<string, Counter*>::const_iterator src_iter;
-  for (src_iter = other.counter_map_.begin(); 
+  for (src_iter = other.counter_map_.begin();
        src_iter != other.counter_map_.end(); ++src_iter) {
     dst_iter = counter_map_.find(src_iter->first);
     if (dst_iter == counter_map_.end()) {
-      counter_map_[src_iter->first] = 
+      counter_map_[src_iter->first] =
         pool_->Add(new Counter(src_iter->second->type(), src_iter->second->value()));
     } else {
       if (dst_iter->second->type() != src_iter->second->type()) {
@@ -115,17 +115,24 @@ RuntimeProfile::Counter* RuntimeProfile::GetCounter(const string& name) {
   return NULL;
 }
 
+RuntimeProfile::Counter* RuntimeProfile::AddCounterIfAbsent(
+    const string& name, TCounterType::type type) {
+  Counter* existing = GetCounter(name);
+  if (existing != NULL) return existing;
+  return AddCounter(name, type);
+}
+
 void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
   ostream& stream = *s;
   map<string, Counter*>::const_iterator total_time = counter_map_.find("TotalTime");
   DCHECK(total_time != counter_map_.end());
-  stream << prefix << name_ << ": (" 
+  stream << prefix << name_ << ": ("
          << PrettyPrinter::Print(total_time->second->value(), TCounterType::CPU_TICKS)
          << ")" << endl;
   for (map<string, Counter*>::const_iterator iter = counter_map_.begin();
        iter != counter_map_.end(); ++iter) {
     if (iter == total_time) continue;
-    stream << prefix << "   - " << iter->first << ": "  
+    stream << prefix << "   - " << iter->first << ": "
            << PrettyPrinter::Print(iter->second->value(), iter->second->type())
            << endl;
   }
@@ -136,7 +143,7 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
 
 void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
   nodes->reserve(nodes->size() + children_.size());
-  
+
   int index = nodes->size();
   nodes->push_back(TRuntimeProfileNode());
   TRuntimeProfileNode& node = (*nodes)[index];
@@ -158,4 +165,3 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
 }
 
 }
-

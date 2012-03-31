@@ -29,9 +29,9 @@ namespace impala {
   #define COUNTER_SET(c, v) c->Set(v)
 #else
   #define ADD_COUNTER(profile, name, type) NULL
-  #define COUNTER_SCOPED_TIMER(c) 
-  #define COUNTER_UPDATE(c, v) 
-  #define COUNTER_SET(c, v) 
+  #define COUNTER_SCOPED_TIMER(c)
+  #define COUNTER_UPDATE(c, v)
+  #define COUNTER_SET(c, v)
 #endif
 
 class ObjectPool;
@@ -54,9 +54,9 @@ class RuntimeProfile {
 
    private:
     friend class RuntimeProfile;
-    
+
     Counter(TCounterType::type type, int64_t value = 0) :
-      value_(value), 
+      value_(value),
       type_(type) {
     }
 
@@ -69,14 +69,14 @@ class RuntimeProfile {
   RuntimeProfile(ObjectPool* pool, const std::string& name);
 
   // Deserialize from thrift.  Runtime profiles are allocated from the pool.
-  static RuntimeProfile* CreateFromThrift(ObjectPool* pool, 
+  static RuntimeProfile* CreateFromThrift(ObjectPool* pool,
       const TRuntimeProfileTree& profiles);
 
   // Adds a child profile
   void AddChild(RuntimeProfile* child);
 
   // Merges the src profile into this one, combining counters that have an identical
-  // path.  
+  // path.
   void Merge(const RuntimeProfile& src);
 
   // Add a counter with 'name'/'type'.  Returns a counter object that the caller can
@@ -86,6 +86,10 @@ class RuntimeProfile {
   // Gets the counter object with 'name'.  Returns NULL if there is no counter with
   // that name.
   Counter* GetCounter(const std::string& name);
+
+  // Add a counter with 'name'/'type' if one does not already exist. Returns the counter
+  // object, which is owned by the RuntimeProfile.
+  Counter* AddCounterIfAbsent(const std::string& name, TCounterType::type type);
 
   // Returns the counter for the total elapsed time.
   Counter* total_time_counter() { return &counter_total_time_; }
@@ -105,7 +109,7 @@ class RuntimeProfile {
   // Returns name of this profile
   const std::string& name() const { return name_; }
 
-  // Renames the profile 
+  // Renames the profile
   void Rename(const std::string& name) { name_ = name; }
 
   // Returns the children
@@ -161,4 +165,3 @@ class ScopedTimer {
 }
 
 #endif
-

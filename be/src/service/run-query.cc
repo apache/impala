@@ -24,6 +24,7 @@
 #include "util/jni-util.h"
 #include "util/perf-counters.h"
 #include "util/runtime-profile.h"
+#include "util/debug-counters.h"
 #include "util/stat-util.h"
 #include "runtime/data-stream-mgr.h"
 
@@ -53,8 +54,8 @@ static void Exec(ExecEnv* exec_env) {
   int num_rows = 0;
 
   vector<string> queries;
-  split(queries, FLAGS_query, is_any_of(";"), token_compress_on ); 
-  
+  split(queries, FLAGS_query, is_any_of(";"), token_compress_on );
+
   if (queries.size() == 0) {
     cout << "Invalid query: " << FLAGS_query << endl;
     return;
@@ -71,7 +72,7 @@ static void Exec(ExecEnv* exec_env) {
       if (row.empty()) break;
     }
   }
-  
+
   PerfCounters hw_counters;
   if (FLAGS_enable_counters) {
     hw_counters.AddDefaultCounters();
@@ -79,10 +80,10 @@ static void Exec(ExecEnv* exec_env) {
   }
 
   ObjectPool profile_pool;
-  for (vector<string>::const_iterator iter = queries.begin(); 
+  for (vector<string>::const_iterator iter = queries.begin();
       iter != queries.end(); ++iter) {
     if (iter->size() == 0) continue;
-  
+
     if (queries.size() > 0) {
       cout << "Running query: " << *iter << endl;
     }
@@ -112,7 +113,7 @@ static void Exec(ExecEnv* exec_env) {
       double elapsed_usec = end_time.tv_sec * 1000000 + end_time.tv_usec;
       elapsed_usec -= start_time.tv_sec * 1000000 + start_time.tv_usec;
       elapsed_times[i] = elapsed_usec;
-    
+
       if (FLAGS_enable_counters) {
         hw_counters.Snapshot("Query");
       }
@@ -124,7 +125,7 @@ static void Exec(ExecEnv* exec_env) {
         cout << executor.FileErrors() << endl;
         break;
       }
-    
+
       RuntimeProfile* profile = executor.query_profile();
       if (FLAGS_iterations > 1 && profile->children().size() == 1) {
         // Rename the query to drop the query id so the results merge
@@ -132,7 +133,7 @@ static void Exec(ExecEnv* exec_env) {
       }
       aggregate_profile.Merge(*profile);
     }
-  
+
     if (FLAGS_iterations == 1) {
       cout << "returned " << num_rows << (num_rows == 1 ? " row" : " rows")
           << " in " << setiosflags(ios::fixed) << setprecision(3)
@@ -142,20 +143,21 @@ static void Exec(ExecEnv* exec_env) {
       StatUtil::ComputeMeanStddev<double>(&elapsed_times[0], elapsed_times.size(), &mean, &stddev);
       cout << "returned " << num_rows << (num_rows == 1 ? " row" : " rows")
           << " in " << setiosflags(ios::fixed) << setprecision(3)
-          << mean/1000000.0 << " s with stddev " 
+          << mean/1000000.0 << " s with stddev "
           << setiosflags(ios::fixed) << setprecision(3) << stddev/1000000.0
           << " s" << endl << endl;
       aggregate_profile.Divide(FLAGS_iterations);
     }
-  
+
     aggregate_profile.PrettyPrint(&cout);
+    PRETTY_PRINT_DEBUG_COUNTERS(&cout);
     cout << endl;
   }
 
   if (FLAGS_enable_counters) {
     hw_counters.PrettyPrint(&cout);
   }
-    
+
   if (enable_profiling) {
     const char* profile = GetHeapProfile();
     fputs(profile, stdout);
@@ -198,4 +200,3 @@ int main(int argc, char** argv) {
   // Delete all global JNI references.
   JniUtil::Cleanup();
 }
-
