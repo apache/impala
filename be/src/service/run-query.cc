@@ -145,6 +145,7 @@ static void Exec(ExecEnv* exec_env) {
           << mean/1000000.0 << " s with stddev " 
           << setiosflags(ios::fixed) << setprecision(3) << stddev/1000000.0
           << " s" << endl << endl;
+      aggregate_profile.Divide(FLAGS_iterations);
     }
   
     aggregate_profile.PrettyPrint(&cout);

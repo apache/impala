@@ -96,6 +96,9 @@ class RuntimeProfile {
   // Serializes the counters to thrift
   void ToThrift(std::vector<TRuntimeProfileNode>* nodes) const;
 
+  // Divides all counters by n
+  void Divide(int n);
+
   // Returns the number of counters in this profile
   int num_counters() const { return counter_map_.size(); }
 

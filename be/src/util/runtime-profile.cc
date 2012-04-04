@@ -83,6 +83,16 @@ void RuntimeProfile::Merge(const RuntimeProfile& other) {
   }
 }
 
+void RuntimeProfile::Divide(int n) {
+  map<string, Counter*>::iterator iter;
+  for (iter = counter_map_.begin(); iter != counter_map_.end(); ++iter) {
+    iter->second->value_ /= n;
+  }
+  for (int i = 0; i < children_.size(); ++i) {
+    children_[i]->Divide(n);
+  }
+}
+
 void RuntimeProfile::AddChild(RuntimeProfile* parent) {
   children_.push_back(parent);
 }

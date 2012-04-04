@@ -288,9 +288,10 @@ Status HdfsTextScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
       RETURN_IF_ERROR(WriteTuples(state, row_batch, num_tuples, &row_idx));
     }
 
-    // TODO: does it ever make sense to deep copy some of the tuples (string data) if the
-    // number of tuples in this batch is very small?
     // Cannot reuse file buffer if there are non-copied string slots materialized
+    // TODO: If the tuple data contains very sparse string slots, we waste a lot of memory.
+    // Instead, we should consider copying the tuples to a compact new buffer in this
+    // case.
     if (num_rows_returned_ > previous_num_rows && has_string_slots_) {
       reuse_byte_buffer_ = false;
     }
@@ -318,34 +319,26 @@ Status HdfsTextScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
       break;
     }
 
-    // If the batch is full, return and the next GetNext() call will
-    // pick up where we left off.  Otherwise, continue parsing the
-    // current scan range.  Hang on to the last chunks, we'll continue
-    // from there in the next GetNext() call. Alternatively, this
-    // scanner may be deleted before the string data allocated in the
-    // byte buffer pool is finished with, so transfer ownership to the
-    // row_batch.
-    if (!reuse_byte_buffer_) {
-      row_batch->tuple_data_pool()->AcquireData(byte_buffer_pool_.get(), true);
-      byte_buffer_ = NULL;
-    }
-
+    // The row batch is full. We'll pick up where we left off in the next
+    // GetNext() call.
     if (row_batch->IsFull()) {
-      row_batch->tuple_data_pool()->AcquireData(tuple_pool_, true);
       *eosr = false;
-      DCHECK_EQ(column_idx_, first_materialised_col_idx);
-      return Status::OK;
+      break;
     }
   }
 
   DCHECK_EQ(column_idx_, first_materialised_col_idx);
 
-  // At EOS (or when we reach the scan node's limit), we don't expect
-  // to get called again, so we must yield ownership of all byte
-  // buffer data that might be part of a materialised tuple
+  // This is the only non-error return path for this function.  There are
+  // two return paths:
+  // 1. EOS: limit is reached or scan range is complete
+  // 2. row batch is full.
+  // In either case, we must hand over ownership of all tuple data to the
+  // row batch.  If it is not EOS, we'll need to keep the current buffers.
   if (!reuse_byte_buffer_) {
-    row_batch->tuple_data_pool()->AcquireData(byte_buffer_pool_.get(), false);
+    row_batch->tuple_data_pool()->AcquireData(byte_buffer_pool_.get(), !*eosr);
   }
+  row_batch->tuple_data_pool()->AcquireData(tuple_pool_, !*eosr);
 
   return Status::OK;
 }

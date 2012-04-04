@@ -73,7 +73,7 @@ class StringSearch {
   StringSearch() : pattern_(NULL), mask_(0) {}
 
   // Initialize/Precompute a StringSearch object from the pattern
-  StringSearch(const StringValue* pattern) : pattern_(pattern), mask_(0) {
+  StringSearch(const StringValue* pattern) : pattern_(pattern), mask_(0), skip_(0) {
     // Special cases
     if (pattern_->len <= 1) {
       return;
@@ -82,7 +82,6 @@ class StringSearch {
     // Build compressed lookup table
     int mlast = pattern_->len - 1;
     skip_ = mlast - 1;
-    mask_ = 0;
 
     for (int i = 0; i < mlast; ++i) {
       BloomAdd(pattern_->ptr[i]);
