@@ -15,6 +15,9 @@ import com.google.common.collect.Maps;
 /**
  * Interface to metadata stored in MetaStore instance.
  * Caches all db-, table- and column-related md during construction.
+ *
+ * TODO: Selective refresh of individual tables, for tests that require refreshing
+ * metadata between runs.
  */
 public class Catalog {
   private int nextTableId;
@@ -60,4 +63,7 @@ public class Catalog {
     }
   }
 
+  public HiveMetaStoreClient getMetaStoreClient() {
+    return msClient;
+  }
 }

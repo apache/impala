@@ -6,6 +6,7 @@
 #include <vector>
 #include <string>
 
+#include "exec/data-sink.h"
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "gen-cpp/Data_types.h"  // for TRowBatch
@@ -22,20 +23,20 @@ class THostPort;
 // Row batch data is routed to destinations based on the provided
 // partitioning specification.
 // *Not* thread-safe.
-class DataStreamSender {
+class DataStreamSender : public DataSink {
  public:
   // Construct a sender according to the output specification (sink),
-  // sending to the given hosts. 
+  // sending to the given hosts.
   // Per_channel_buffer_size is the buffer size allocated to each channel
   // and is specified in bytes.
   DataStreamSender(
     const RowDescriptor& row_desc, const TUniqueId& query_id,
     const TDataStreamSink& sink, const std::vector<THostPort>& destinations,
     int per_channel_buffer_size);
-  ~DataStreamSender();
+  virtual ~DataStreamSender();
 
   // Setup. Call before Send() or Close().
-  Status Init();
+  virtual Status Init(RuntimeState* state);
 
   // Send data in 'batch' to destination nodes according to partitioning
   // specification provided in c'tor.
@@ -43,11 +44,11 @@ class DataStreamSender {
   // buffers (ie, blocks if there are still in-flight rpcs from the last
   // Send() call).
   // TODO: do we need reuse_batch?
-  Status Send(RowBatch* batch);
+  virtual Status Send(RuntimeState* state, RowBatch* batch);
 
   // Flush all buffered data and close all existing channels to destination
   // hosts. Further Send() calls are illegal after calling Close().
-  Status Close();
+  virtual Status Close(RuntimeState* state);
 
   // Return total number of bytes sent in TRowBatch.data. If batches are
   // broadcast to multiple receivers, they are counted once per receiver.

@@ -1,0 +1,428 @@
+# insert overwrite unpartitioned table
+insert overwrite table alltypesnopart
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+float_col, double_col, date_string_col, string_col, timestamp_col
+from alltypessmall
+where year=2009 and month=04
+---- SETUP
+RESET alltypesnopart
+RELOAD
+---- NUMROWS
+25
+====
+# search the overwritten table to verify the results
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
+double_col, date_string_col, string_col
+from alltypesnopart
+---- SETUP
+RELOAD
+---- TYPES
+int,boolean,tinyint,smallint,int,bigint,float,double,string,string
+---- RESULTS
+75,false,0,0,0,0,0,0,'04/01/09','0'
+76,true,1,1,1,10,1.1,10.1,'04/01/09','1'
+77,false,2,2,2,20,2.2,20.2,'04/01/09','2'
+78,true,3,3,3,30,3.3,30.3,'04/01/09','3'
+79,false,4,4,4,40,4.4,40.4,'04/01/09','4'
+80,true,5,5,5,50,5.5,50.5,'04/01/09','5'
+81,false,6,6,6,60,6.6,60.6,'04/01/09','6'
+82,true,7,7,7,70,7.7,70.7,'04/01/09','7'
+83,false,8,8,8,80,8.8,80.8,'04/01/09','8'
+84,true,9,9,9,90,9.9,90.9,'04/01/09','9'
+85,false,0,0,0,0,0,0,'04/02/09','0'
+86,true,1,1,1,10,1.1,10.1,'04/02/09','1'
+87,false,2,2,2,20,2.2,20.2,'04/02/09','2'
+88,true,3,3,3,30,3.3,30.3,'04/02/09','3'
+89,false,4,4,4,40,4.4,40.4,'04/02/09','4'
+90,true,5,5,5,50,5.5,50.5,'04/02/09','5'
+91,false,6,6,6,60,6.6,60.6,'04/02/09','6'
+92,true,7,7,7,70,7.7,70.7,'04/02/09','7'
+93,false,8,8,8,80,8.8,80.8,'04/02/09','8'
+94,true,9,9,9,90,9.9,90.9,'04/02/09','9'
+95,false,0,0,0,0,0,0,'04/03/09','0'
+96,true,1,1,1,10,1.1,10.1,'04/03/09','1'
+97,false,2,2,2,20,2.2,20.2,'04/03/09','2'
+98,true,3,3,3,30,3.3,30.3,'04/03/09','3'
+99,false,4,4,4,40,4.4,40.4,'04/03/09','4'
+====
+# insert into unpartitioned table
+insert into table alltypesnopart
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+float_col, double_col, date_string_col, string_col, timestamp_col
+from alltypessmall
+where year=2009 and month=04
+---- SETUP
+RESET alltypesnopart
+---- PARTITIONS
+hdfs: alltypesnopart/
+---- NUMROWS
+25
+====
+# search the table to verify it contains 25 rows
+select count(*) from alltypesnopart
+---- SETUP
+RELOAD
+---- TYPES
+bigint
+---- RESULTS
+25
+====
+# static partition overwrite
+insert overwrite table alltypesinsert
+partition (year=2009, month=4) 
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+float_col, double_col, date_string_col, string_col, timestamp_col
+from alltypessmall
+where year=2009 and month=4
+---- PARTITIONS
+hdfs: alltypesinsert/year=2009/month=4/
+---- NUMROWS
+25
+====
+# search the overwritten partition to verify the results
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
+double_col, date_string_col, string_col
+from alltypesinsert
+where year=2009 and month=4
+---- SETUP
+RELOAD
+---- TYPES
+int,boolean,tinyint,smallint,int,bigint,float,double,string,string
+---- RESULTS
+75,false,0,0,0,0,0,0,'04/01/09','0'
+76,true,1,1,1,10,1.1,10.1,'04/01/09','1'
+77,false,2,2,2,20,2.2,20.2,'04/01/09','2'
+78,true,3,3,3,30,3.3,30.3,'04/01/09','3'
+79,false,4,4,4,40,4.4,40.4,'04/01/09','4'
+80,true,5,5,5,50,5.5,50.5,'04/01/09','5'
+81,false,6,6,6,60,6.6,60.6,'04/01/09','6'
+82,true,7,7,7,70,7.7,70.7,'04/01/09','7'
+83,false,8,8,8,80,8.8,80.8,'04/01/09','8'
+84,true,9,9,9,90,9.9,90.9,'04/01/09','9'
+85,false,0,0,0,0,0,0,'04/02/09','0'
+86,true,1,1,1,10,1.1,10.1,'04/02/09','1'
+87,false,2,2,2,20,2.2,20.2,'04/02/09','2'
+88,true,3,3,3,30,3.3,30.3,'04/02/09','3'
+89,false,4,4,4,40,4.4,40.4,'04/02/09','4'
+90,true,5,5,5,50,5.5,50.5,'04/02/09','5'
+91,false,6,6,6,60,6.6,60.6,'04/02/09','6'
+92,true,7,7,7,70,7.7,70.7,'04/02/09','7'
+93,false,8,8,8,80,8.8,80.8,'04/02/09','8'
+94,true,9,9,9,90,9.9,90.9,'04/02/09','9'
+95,false,0,0,0,0,0,0,'04/03/09','0'
+96,true,1,1,1,10,1.1,10.1,'04/03/09','1'
+97,false,2,2,2,20,2.2,20.2,'04/03/09','2'
+98,true,3,3,3,30,3.3,30.3,'04/03/09','3'
+99,false,4,4,4,40,4.4,40.4,'04/03/09','4'
+====
+# static partition insert
+insert into table alltypesinsert
+partition (year=2009, month=4) 
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+float_col, double_col, date_string_col, string_col, timestamp_col
+from alltypessmall
+where year=2009 and month=4
+---- SETUP
+DROP PARTITIONS alltypesinsert
+---- PARTITIONS
+hdfs: alltypesinsert/year=2009/month=4/
+---- NUMROWS
+25
+====
+# search the partition to verify it contains all 25 rows
+select count(*) from alltypesinsert
+where year=2009 and month=4
+---- SETUP
+RELOAD
+---- TYPES
+bigint
+---- RESULTS
+25
+====
+# partially dynamic partition overwrite
+insert overwrite table alltypesinsert
+partition (year=2009, month) 
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+float_col, double_col, date_string_col, string_col, timestamp_col, month
+from alltypessmall
+where year=2009 and month>1 and month<=4
+---- PARTITIONS
+hdfs: alltypesinsert/year=2009/month=2/
+hdfs: alltypesinsert/year=2009/month=3/
+hdfs: alltypesinsert/year=2009/month=4/
+---- NUMROWS
+25
+25
+25
+====
+# search the overwritten partition to verify the results
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
+double_col, date_string_col, string_col
+from alltypesinsert
+where year=2009 and month>1 and month<=4
+---- SETUP
+RELOAD
+---- TYPES
+int,boolean,tinyint,smallint,int,bigint,float,double,string,string
+---- RESULTS
+75,false,0,0,0,0,0,0,'04/01/09','0'
+76,true,1,1,1,10,1.1,10.1,'04/01/09','1'
+77,false,2,2,2,20,2.2,20.2,'04/01/09','2'
+78,true,3,3,3,30,3.3,30.3,'04/01/09','3'
+79,false,4,4,4,40,4.4,40.4,'04/01/09','4'
+80,true,5,5,5,50,5.5,50.5,'04/01/09','5'
+81,false,6,6,6,60,6.6,60.6,'04/01/09','6'
+82,true,7,7,7,70,7.7,70.7,'04/01/09','7'
+83,false,8,8,8,80,8.8,80.8,'04/01/09','8'
+84,true,9,9,9,90,9.9,90.9,'04/01/09','9'
+85,false,0,0,0,0,0,0,'04/02/09','0'
+86,true,1,1,1,10,1.1,10.1,'04/02/09','1'
+87,false,2,2,2,20,2.2,20.2,'04/02/09','2'
+88,true,3,3,3,30,3.3,30.3,'04/02/09','3'
+89,false,4,4,4,40,4.4,40.4,'04/02/09','4'
+90,true,5,5,5,50,5.5,50.5,'04/02/09','5'
+91,false,6,6,6,60,6.6,60.6,'04/02/09','6'
+92,true,7,7,7,70,7.7,70.7,'04/02/09','7'
+93,false,8,8,8,80,8.8,80.8,'04/02/09','8'
+94,true,9,9,9,90,9.9,90.9,'04/02/09','9'
+95,false,0,0,0,0,0,0,'04/03/09','0'
+96,true,1,1,1,10,1.1,10.1,'04/03/09','1'
+97,false,2,2,2,20,2.2,20.2,'04/03/09','2'
+98,true,3,3,3,30,3.3,30.3,'04/03/09','3'
+99,false,4,4,4,40,4.4,40.4,'04/03/09','4'
+50,true,0,0,0,0,0,0,'03/01/09','0'
+51,false,1,1,1,10,1.1,10.1,'03/01/09','1'
+52,true,2,2,2,20,2.2,20.2,'03/01/09','2'
+53,false,3,3,3,30,3.3,30.3,'03/01/09','3'
+54,true,4,4,4,40,4.4,40.4,'03/01/09','4'
+55,false,5,5,5,50,5.5,50.5,'03/01/09','5'
+56,true,6,6,6,60,6.6,60.6,'03/01/09','6'
+57,false,7,7,7,70,7.7,70.7,'03/01/09','7'
+58,true,8,8,8,80,8.8,80.8,'03/01/09','8'
+59,false,9,9,9,90,9.9,90.9,'03/01/09','9'
+60,true,0,0,0,0,0,0,'03/02/09','0'
+61,false,1,1,1,10,1.1,10.1,'03/02/09','1'
+62,true,2,2,2,20,2.2,20.2,'03/02/09','2'
+63,false,3,3,3,30,3.3,30.3,'03/02/09','3'
+64,true,4,4,4,40,4.4,40.4,'03/02/09','4'
+65,false,5,5,5,50,5.5,50.5,'03/02/09','5'
+66,true,6,6,6,60,6.6,60.6,'03/02/09','6'
+67,false,7,7,7,70,7.7,70.7,'03/02/09','7'
+68,true,8,8,8,80,8.8,80.8,'03/02/09','8'
+69,false,9,9,9,90,9.9,90.9,'03/02/09','9'
+70,true,0,0,0,0,0,0,'03/03/09','0'
+71,false,1,1,1,10,1.1,10.1,'03/03/09','1'
+72,true,2,2,2,20,2.2,20.2,'03/03/09','2'
+73,false,3,3,3,30,3.3,30.3,'03/03/09','3'
+74,true,4,4,4,40,4.4,40.4,'03/03/09','4'
+25,false,0,0,0,0,0,0,'02/01/09','0'
+26,true,1,1,1,10,1.1,10.1,'02/01/09','1'
+27,false,2,2,2,20,2.2,20.2,'02/01/09','2'
+28,true,3,3,3,30,3.3,30.3,'02/01/09','3'
+29,false,4,4,4,40,4.4,40.4,'02/01/09','4'
+30,true,5,5,5,50,5.5,50.5,'02/01/09','5'
+31,false,6,6,6,60,6.6,60.6,'02/01/09','6'
+32,true,7,7,7,70,7.7,70.7,'02/01/09','7'
+33,false,8,8,8,80,8.8,80.8,'02/01/09','8'
+34,true,9,9,9,90,9.9,90.9,'02/01/09','9'
+35,false,0,0,0,0,0,0,'02/02/09','0'
+36,true,1,1,1,10,1.1,10.1,'02/02/09','1'
+37,false,2,2,2,20,2.2,20.2,'02/02/09','2'
+38,true,3,3,3,30,3.3,30.3,'02/02/09','3'
+39,false,4,4,4,40,4.4,40.4,'02/02/09','4'
+40,true,5,5,5,50,5.5,50.5,'02/02/09','5'
+41,false,6,6,6,60,6.6,60.6,'02/02/09','6'
+42,true,7,7,7,70,7.7,70.7,'02/02/09','7'
+43,false,8,8,8,80,8.8,80.8,'02/02/09','8'
+44,true,9,9,9,90,9.9,90.9,'02/02/09','9'
+45,false,0,0,0,0,0,0,'02/03/09','0'
+46,true,1,1,1,10,1.1,10.1,'02/03/09','1'
+47,false,2,2,2,20,2.2,20.2,'02/03/09','2'
+48,true,3,3,3,30,3.3,30.3,'02/03/09','3'
+49,false,4,4,4,40,4.4,40.4,'02/03/09','4'
+====
+# partially dynamic partition insert
+insert into table alltypesinsert
+partition (year=2009, month) 
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+float_col, double_col, date_string_col, string_col, timestamp_col, month
+from alltypessmall
+where year=2009 and month>=1 and month<4
+---- SETUP
+DROP PARTITIONS alltypesinsert
+---- PARTITIONS
+hdfs: alltypesinsert/year=2009/month=1/
+hdfs: alltypesinsert/year=2009/month=2/
+hdfs: alltypesinsert/year=2009/month=3/
+---- NUMROWS
+25
+25
+25
+====
+# search the partitions to verify they contain all 75 rows
+select count(id) from alltypesinsert
+where year=2009 and month>=1 and month<4
+---- SETUP
+RELOAD
+---- TYPES
+bigint
+---- RESULTS
+75
+====
+# fully dynamic partition overwrite
+insert overwrite table alltypesinsert
+partition (year, month) 
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+from alltypessmall
+---- PARTITIONS
+hdfs: alltypesinsert/year=2009/month=1/
+hdfs: alltypesinsert/year=2009/month=2/
+hdfs: alltypesinsert/year=2009/month=3/
+hdfs: alltypesinsert/year=2009/month=4/
+---- NUMROWS
+25
+25
+25
+25
+====
+# search the overwritten partition to verify the results
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
+double_col, date_string_col, string_col
+from alltypesinsert
+where year=2009 and month>=1 and month<=4
+---- SETUP
+RELOAD
+---- TYPES
+int,boolean,tinyint,smallint,int,bigint,float,double,string,string
+---- RESULTS
+75,false,0,0,0,0,0,0,'04/01/09','0'
+76,true,1,1,1,10,1.1,10.1,'04/01/09','1'
+77,false,2,2,2,20,2.2,20.2,'04/01/09','2'
+78,true,3,3,3,30,3.3,30.3,'04/01/09','3'
+79,false,4,4,4,40,4.4,40.4,'04/01/09','4'
+80,true,5,5,5,50,5.5,50.5,'04/01/09','5'
+81,false,6,6,6,60,6.6,60.6,'04/01/09','6'
+82,true,7,7,7,70,7.7,70.7,'04/01/09','7'
+83,false,8,8,8,80,8.8,80.8,'04/01/09','8'
+84,true,9,9,9,90,9.9,90.9,'04/01/09','9'
+85,false,0,0,0,0,0,0,'04/02/09','0'
+86,true,1,1,1,10,1.1,10.1,'04/02/09','1'
+87,false,2,2,2,20,2.2,20.2,'04/02/09','2'
+88,true,3,3,3,30,3.3,30.3,'04/02/09','3'
+89,false,4,4,4,40,4.4,40.4,'04/02/09','4'
+90,true,5,5,5,50,5.5,50.5,'04/02/09','5'
+91,false,6,6,6,60,6.6,60.6,'04/02/09','6'
+92,true,7,7,7,70,7.7,70.7,'04/02/09','7'
+93,false,8,8,8,80,8.8,80.8,'04/02/09','8'
+94,true,9,9,9,90,9.9,90.9,'04/02/09','9'
+95,false,0,0,0,0,0,0,'04/03/09','0'
+96,true,1,1,1,10,1.1,10.1,'04/03/09','1'
+97,false,2,2,2,20,2.2,20.2,'04/03/09','2'
+98,true,3,3,3,30,3.3,30.3,'04/03/09','3'
+99,false,4,4,4,40,4.4,40.4,'04/03/09','4'
+50,true,0,0,0,0,0,0,'03/01/09','0'
+51,false,1,1,1,10,1.1,10.1,'03/01/09','1'
+52,true,2,2,2,20,2.2,20.2,'03/01/09','2'
+53,false,3,3,3,30,3.3,30.3,'03/01/09','3'
+54,true,4,4,4,40,4.4,40.4,'03/01/09','4'
+55,false,5,5,5,50,5.5,50.5,'03/01/09','5'
+56,true,6,6,6,60,6.6,60.6,'03/01/09','6'
+57,false,7,7,7,70,7.7,70.7,'03/01/09','7'
+58,true,8,8,8,80,8.8,80.8,'03/01/09','8'
+59,false,9,9,9,90,9.9,90.9,'03/01/09','9'
+60,true,0,0,0,0,0,0,'03/02/09','0'
+61,false,1,1,1,10,1.1,10.1,'03/02/09','1'
+62,true,2,2,2,20,2.2,20.2,'03/02/09','2'
+63,false,3,3,3,30,3.3,30.3,'03/02/09','3'
+64,true,4,4,4,40,4.4,40.4,'03/02/09','4'
+65,false,5,5,5,50,5.5,50.5,'03/02/09','5'
+66,true,6,6,6,60,6.6,60.6,'03/02/09','6'
+67,false,7,7,7,70,7.7,70.7,'03/02/09','7'
+68,true,8,8,8,80,8.8,80.8,'03/02/09','8'
+69,false,9,9,9,90,9.9,90.9,'03/02/09','9'
+70,true,0,0,0,0,0,0,'03/03/09','0'
+71,false,1,1,1,10,1.1,10.1,'03/03/09','1'
+72,true,2,2,2,20,2.2,20.2,'03/03/09','2'
+73,false,3,3,3,30,3.3,30.3,'03/03/09','3'
+74,true,4,4,4,40,4.4,40.4,'03/03/09','4'
+25,false,0,0,0,0,0,0,'02/01/09','0'
+26,true,1,1,1,10,1.1,10.1,'02/01/09','1'
+27,false,2,2,2,20,2.2,20.2,'02/01/09','2'
+28,true,3,3,3,30,3.3,30.3,'02/01/09','3'
+29,false,4,4,4,40,4.4,40.4,'02/01/09','4'
+30,true,5,5,5,50,5.5,50.5,'02/01/09','5'
+31,false,6,6,6,60,6.6,60.6,'02/01/09','6'
+32,true,7,7,7,70,7.7,70.7,'02/01/09','7'
+33,false,8,8,8,80,8.8,80.8,'02/01/09','8'
+34,true,9,9,9,90,9.9,90.9,'02/01/09','9'
+35,false,0,0,0,0,0,0,'02/02/09','0'
+36,true,1,1,1,10,1.1,10.1,'02/02/09','1'
+37,false,2,2,2,20,2.2,20.2,'02/02/09','2'
+38,true,3,3,3,30,3.3,30.3,'02/02/09','3'
+39,false,4,4,4,40,4.4,40.4,'02/02/09','4'
+40,true,5,5,5,50,5.5,50.5,'02/02/09','5'
+41,false,6,6,6,60,6.6,60.6,'02/02/09','6'
+42,true,7,7,7,70,7.7,70.7,'02/02/09','7'
+43,false,8,8,8,80,8.8,80.8,'02/02/09','8'
+44,true,9,9,9,90,9.9,90.9,'02/02/09','9'
+45,false,0,0,0,0,0,0,'02/03/09','0'
+46,true,1,1,1,10,1.1,10.1,'02/03/09','1'
+47,false,2,2,2,20,2.2,20.2,'02/03/09','2'
+48,true,3,3,3,30,3.3,30.3,'02/03/09','3'
+49,false,4,4,4,40,4.4,40.4,'02/03/09','4'
+0,true,0,0,0,0,0,0,'01/01/09','0'
+1,false,1,1,1,10,1.1,10.1,'01/01/09','1'
+2,true,2,2,2,20,2.2,20.2,'01/01/09','2'
+3,false,3,3,3,30,3.3,30.3,'01/01/09','3'
+4,true,4,4,4,40,4.4,40.4,'01/01/09','4'
+5,false,5,5,5,50,5.5,50.5,'01/01/09','5'
+6,true,6,6,6,60,6.6,60.6,'01/01/09','6'
+7,false,7,7,7,70,7.7,70.7,'01/01/09','7'
+8,true,8,8,8,80,8.8,80.8,'01/01/09','8'
+9,false,9,9,9,90,9.9,90.9,'01/01/09','9'
+10,true,0,0,0,0,0,0,'01/02/09','0'
+11,false,1,1,1,10,1.1,10.1,'01/02/09','1'
+12,true,2,2,2,20,2.2,20.2,'01/02/09','2'
+13,false,3,3,3,30,3.3,30.3,'01/02/09','3'
+14,true,4,4,4,40,4.4,40.4,'01/02/09','4'
+15,false,5,5,5,50,5.5,50.5,'01/02/09','5'
+16,true,6,6,6,60,6.6,60.6,'01/02/09','6'
+17,false,7,7,7,70,7.7,70.7,'01/02/09','7'
+18,true,8,8,8,80,8.8,80.8,'01/02/09','8'
+19,false,9,9,9,90,9.9,90.9,'01/02/09','9'
+20,true,0,0,0,0,0,0,'01/03/09','0'
+21,false,1,1,1,10,1.1,10.1,'01/03/09','1'
+22,true,2,2,2,20,2.2,20.2,'01/03/09','2'
+23,false,3,3,3,30,3.3,30.3,'01/03/09','3'
+24,true,4,4,4,40,4.4,40.4,'01/03/09','4'
+====
+# fully dynamic partition insert
+insert into table alltypesinsert
+partition (year, month) 
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+from alltypessmall
+---- SETUP
+DROP PARTITIONS alltypesinsert
+---- PARTITIONS
+hdfs: alltypesinsert/year=2009/month=1/
+hdfs: alltypesinsert/year=2009/month=2/
+hdfs: alltypesinsert/year=2009/month=3/
+hdfs: alltypesinsert/year=2009/month=4/
+---- NUMROWS
+25
+25
+25
+25
+====
+# search the partitions to verify they contain all 100 rows
+select count(timestamp_col) from alltypesinsert
+where year=2009 and month>=1 and month<=4
+---- SETUP
+RELOAD
+---- TYPES
+bigint
+---- RESULTS
+100
+====

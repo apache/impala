@@ -19,6 +19,7 @@ void* NullLiteral::ReturnValue(Expr* e, TupleRow* row) {
 
 Status NullLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   DCHECK_EQ(children_.size(), 0);
+  compute_fn_ = ReturnValue;
   return Status::OK;
 }
 
@@ -31,17 +32,16 @@ Status NullLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) 
 Function* NullLiteral::Codegen(LlvmCodeGen* codegen) {
   DCHECK_EQ(GetNumChildren(), 0);
   LLVMContext& context = codegen->context();
-  
+
   Function* function = CreateComputeFnPrototype(codegen, "NullLiteral");
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
 
   codegen->builder()->SetInsertPoint(entry_block);
   CodegenSetIsNullArg(codegen, function, true);
   codegen->builder()->CreateRet(GetNullReturnValue(codegen));
-  
+
   if (!codegen->VerifyFunction(function)) return NULL;
   return function;
 }
 
 }
-

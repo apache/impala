@@ -10,6 +10,11 @@
 #include "runtime/exec-env.h"
 #include "runtime/scheduler.h"
 #include "runtime/client-cache.h"
+#include "runtime/data-stream-sender.h"
+#include "runtime/row-batch.h"
+#include "exec/hdfs-text-table-sink.h"
+#include "exec/exec-stats.h"
+#include "exec/data-sink.h"
 #include "util/debug-util.h"
 #include "gen-cpp/ImpalaBackendService.h"
 #include "gen-cpp/ImpalaBackendService_types.h"
@@ -22,14 +27,17 @@ namespace impala {
 
 Coordinator::Coordinator(ExecEnv* exec_env)
   : exec_env_(exec_env),
-    executor_(new PlanExecutor(exec_env)) {
+    executor_(new PlanExecutor(exec_env)),
+    sink_(NULL),
+    execution_completed_(false),
+    exec_stats_(new ExecStats()) {
 }
 
 Coordinator::~Coordinator() {
   exec_thread_group_.join_all();
 }
 
-Status Coordinator::Exec(const TQueryExecRequest& request) { 
+Status Coordinator::Exec(const TQueryExecRequest& request) {
   // fragment 0 is the coordinator/"local" fragment that we're executing ourselves;
   // start this before starting any more plan fragments in backend threads, otherwise
   // they start sending data before the local exchange node had a chance to register
@@ -40,7 +48,17 @@ Status Coordinator::Exec(const TQueryExecRequest& request) {
   DCHECK_EQ(request.nodeRequestParams[0].size(), 1);
   RETURN_IF_ERROR(executor_->Prepare(
       request.fragmentRequests[0], request.nodeRequestParams[0][0]));
-  
+
+  // Only table sinks are valid sinks for coordinator fragments
+  if (request.fragmentRequests[0].dataSink.__isset.tableSink) {
+    RETURN_IF_ERROR(DataSink::CreateDataSink(request.fragmentRequests[0],
+        request.nodeRequestParams[0][0], executor_->row_desc(), &sink_));
+    exec_stats_->query_type_ = ExecStats::INSERT;
+    RETURN_IF_ERROR(sink_->Init(executor_->runtime_state()));
+  } else {
+    sink_.reset(NULL);
+  }
+
   query_profile_.reset(
       new RuntimeProfile(obj_pool(), "Query(id=" + PrintId(request.queryId) + ")"));
 
@@ -86,7 +104,7 @@ Status Coordinator::Exec(const TQueryExecRequest& request) {
       DCHECK(client != NULL);
       PrintClientInfo(hosts[j], request.nodeRequestParams[i][j]);
       exec_thread_group_.add_thread(new thread(
-          &Coordinator::ExecRemoteFragment, this, thread_num, client, 
+          &Coordinator::ExecRemoteFragment, this, thread_num, client,
           request.fragmentRequests[i], request.nodeRequestParams[i][j]));
       ++thread_num;
     }
@@ -132,19 +150,32 @@ void Coordinator::ExecRemoteFragment(
   lock_guard<mutex> l(fragment_complete_lock_);
 
   // Deserialize and set each fragment as a child of the coordinator profile.
-  fragment_profiles_[thread_num] = 
+  fragment_profiles_[thread_num] =
       RuntimeProfile::CreateFromThrift(obj_pool(), thrift_result.profiles);
   query_profile_->AddChild(fragment_profiles_[thread_num]);
 }
 
-Status Coordinator::GetNext(RowBatch** batch) {
+Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
   COUNTER_SCOPED_TIMER(query_profile_->total_time_counter());
   Status result = executor_->GetNext(batch);
   VLOG(1) << "coord.getnext";
   if (*batch == NULL) {
+    execution_completed_ = true;
     // Join the threads to collect all the perf counters
     exec_thread_group_.join_all();
+    if (sink_.get() != NULL) RETURN_IF_ERROR(sink_->Close(state));
     query_profile_->AddChild(executor_->query_profile());
+  } else {
+    if (sink_.get() != NULL) {
+      RETURN_IF_ERROR(sink_->Send(state, *batch));
+      // Only update stats once we've done all the work intended for a batch
+      exec_stats_->num_rows_ += (*batch)->num_rows();
+      // Callers of this method should not use batch == NULL to detect
+      // if there is no more work to be done
+      *batch = NULL;
+    } else {
+      exec_stats_->num_rows_ += (*batch)->num_rows();
+    }
   }
   return result;
 }

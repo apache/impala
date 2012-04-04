@@ -12,9 +12,9 @@ import org.junit.Test;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.service.Executor;
 import com.cloudera.impala.testutil.TestFileParser;
-import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.testutil.TestFileParser.Section;
 import com.cloudera.impala.testutil.TestFileParser.TestCase;
+import com.cloudera.impala.testutil.TestUtils;
 
 public class DataErrorsTest {
   private static Catalog catalog;
@@ -86,13 +86,13 @@ public class DataErrorsTest {
           String query = testCase.getQuery();
           TestUtils.runQuery(executor, query, 1, 0,
               abortOnError, maxErrors, testCase.getStartingLineNum(), null, null, null,
-              expectedErrors, expectedFileErrors, testErrorLog);
+              null, null, expectedErrors, expectedFileErrors, testErrorLog);
           TestUtils.runQuery(executor, query, 1, 16,
               abortOnError, maxErrors, testCase.getStartingLineNum(), null, null, null,
-              expectedErrors, expectedFileErrors, testErrorLog);
+              null, null, expectedErrors, expectedFileErrors, testErrorLog);
           TestUtils.runQuery(executor, query, 1, 1,
               abortOnError, maxErrors, testCase.getStartingLineNum(), null, null, null,
-              expectedErrors, expectedFileErrors, testErrorLog);
+              null, null, expectedErrors, expectedFileErrors, testErrorLog);
         }
       }
 

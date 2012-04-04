@@ -25,6 +25,7 @@
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exec/exec-node.h"
+#include "exec/exec-stats.h"
 #include "exec/scan-node.h"
 #include "exprs/expr.h"
 #include "runtime/coordinator.h"
@@ -156,7 +157,7 @@ Status QueryExecutor::Setup() {
       }
     }
   }
-  
+
   return Status::OK;
 }
 
@@ -185,7 +186,7 @@ Status QueryExecutor::Exec(const string& query, vector<PrimitiveType>* col_types
     DCHECK(!query_request_.fragmentRequests[0].__isset.planFragment);
     local_state_.reset(
         new RuntimeState(query_request_.queryId, FLAGS_abort_on_error,
-                         FLAGS_max_errors, FLAGS_batch_size, 
+                         FLAGS_max_errors, FLAGS_batch_size,
                          FLAGS_enable_expr_jit, NULL));
     RETURN_IF_ERROR(
         PrepareSelectListExprs(local_state_.get(), RowDescriptor(), col_types));
@@ -252,7 +253,7 @@ Status QueryExecutor::FetchResult(RowBatch** batch) {
     *batch = NULL;
     return Status::OK;
   }
-  RETURN_IF_ERROR(coord_->GetNext(batch));
+  RETURN_IF_ERROR(coord_->GetNext(batch, runtime_state()));
   return Status::OK;
 }
 
@@ -262,6 +263,7 @@ Status QueryExecutor::FetchResult(string* result) {
   RETURN_IF_ERROR(FetchResult(&row));
   result->clear();
   if (row.empty()) return Status::OK;
+
   string str;
   for (int i = 0; i < select_list_exprs_.size(); ++i) {
     RawValue::PrintValue(row[i], select_list_exprs_[i]->type(), &str);
@@ -291,23 +293,26 @@ Status QueryExecutor::FetchResult(vector<void*>* select_list_values) {
     }
 
     // we need a new row batch
-    RETURN_IF_ERROR(coord_->GetNext(&row_batch_));
-    if (row_batch_ == NULL) {
+    RETURN_IF_ERROR(coord_->GetNext(&row_batch_, runtime_state()));
+    if (coord_->execution_completed()) {
       // no more rows to return
       eos_ = true;
-      return Status::OK;
     }
     next_row_ = 0;
   }
 
-  DCHECK(next_row_ < row_batch_->num_rows());
-  TupleRow* row = row_batch_->GetRow(next_row_);
-  for (int i = 0; i < select_list_exprs_.size(); ++i) {
-    select_list_values->push_back(select_list_exprs_[i]->GetValue(row));
+  // Might be an INSERT
+  if (row_batch_ != NULL && !coord_->exec_stats()->is_insert()) {
+    DCHECK(next_row_ < row_batch_->num_rows());
+    TupleRow* row = row_batch_->GetRow(next_row_);
+    for (int i = 0; i < select_list_exprs_.size(); ++i) {
+      select_list_values->push_back(select_list_exprs_[i]->GetValue(row));
+    }
+
+    ++num_rows_;
+    ++next_row_;
   }
 
-  ++num_rows_;
-  ++next_row_;
   return Status::OK;
 }
 

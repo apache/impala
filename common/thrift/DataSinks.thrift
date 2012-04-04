@@ -42,8 +42,8 @@ struct TDataStreamSink {
   2: required Types.TPlanNodeId destNodeId
 }
 
-// Creates a new Hdfs file at given path, and materializes
-// all its input RowBatches as delimited text.
+// Creates a new Hdfs files according to the evaluation of the partitionKeyExprs,
+// and materializes all its input RowBatches as delimited text.
 struct THdfsTextTableSink {
   1: required list<Exprs.TExpr> partitionKeyExprs
   2: required bool overwrite

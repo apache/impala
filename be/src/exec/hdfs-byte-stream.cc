@@ -1,6 +1,7 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #include "exec/hdfs-byte-stream.h"
+#include "util/hdfs-util.h"
 #include "common/status.h"
 #include <glog/logging.h>
 #include <sstream>
@@ -9,7 +10,7 @@ using namespace impala;
 using namespace std;
 
 // HDFS will set errno on error.  Append this to message for better diagnostic messages.
-static string AppendHdfsErrorMessage(const string& message) {
+string impala::AppendHdfsErrorMessage(const string& message) {
   stringstream ss;
   ss << message << "\nError(" << errno << "): " << strerror(errno);
   return ss.str();

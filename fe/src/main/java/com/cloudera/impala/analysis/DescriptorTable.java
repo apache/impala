@@ -2,9 +2,11 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.thrift.TDescriptorTable;
@@ -18,11 +20,15 @@ import com.google.common.collect.Sets;
  */
 public class DescriptorTable {
   private final HashMap<TupleId, TupleDescriptor> tupleDescs;
+  // List of referenced tables with no associated TupleDescriptor to ship to the BE.
+  // For example, the output table of an insert query.
+  private final List<Table> referencedTables;
   private int nextTupleId;
   private int nextSlotId;
 
   public DescriptorTable() {
     tupleDescs = new HashMap<TupleId, TupleDescriptor>();
+    referencedTables = new ArrayList<Table>();
     nextTupleId = 0;
     nextSlotId = 0;
   }
@@ -51,6 +57,10 @@ public class DescriptorTable {
     return new TupleId(nextTupleId - 1);
   }
 
+  public void addReferencedTable(Table table) {
+    referencedTables.add(table);
+  }
+
   // Computes physical layout parameters of all descriptors.
   // Call this only after the last descriptor was added.
   public void computeMemLayout() {
@@ -75,6 +85,9 @@ public class DescriptorTable {
           result.addToSlotDescriptors(slotD.toThrift());
         }
       }
+    }
+    for (Table table : referencedTables) {
+      referencedTbls.add(table);
     }
     for (Table tbl: referencedTbls) {
       result.addToTableDescriptors(tbl.toThrift());

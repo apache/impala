@@ -244,7 +244,7 @@ Status HdfsTextScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
       // Just finished off this scan range
       if (num_tuples == 1) {
         DCHECK(boundary_column_.Empty());
-        DCHECK_EQ(slot_idx_, 0);  
+        DCHECK_EQ(slot_idx_, 0);
         current_range_remaining_len_ = 0;
         byte_buffer_ptr_ = byte_buffer_end_;
       }

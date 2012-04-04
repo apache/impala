@@ -18,6 +18,7 @@
 #include "exec/hbase-table-scanner.h"
 #include "testutil/query-executor.h"
 #include "runtime/exec-env.h"
+#include "exec/exec-stats.h"
 #include "testutil/test-exec-env.h"
 #include "service/backend-service.h"
 #include "gen-cpp/ImpalaPlanService.h"
@@ -43,6 +44,30 @@ using namespace impala;
 using namespace boost;
 using namespace apache::thrift::server;
 
+// Creates a summary string for output to stdout once a query has finished
+static void ConstructSummaryString(ExecStats::QueryType query_type, int num_rows,
+                                   const vector<double>& elapsed_times, string* summary) {
+  string verb(query_type == ExecStats::INSERT ? "inserted " : "returned ");
+  stringstream summary_stream;
+  if (FLAGS_iterations == 1) {
+    summary_stream << verb << num_rows << (num_rows == 1 ? " row" : " rows")
+                   << " in " << setiosflags(ios::fixed) << setprecision(3)
+                   << elapsed_times[0]/1000000.0 << " s" << endl << endl;
+  } else {
+    double mean, stddev;
+    StatUtil::ComputeMeanStddev<double>(&elapsed_times[0],
+                                        elapsed_times.size(), &mean, &stddev);
+    summary_stream << verb << num_rows << (num_rows == 1 ? " row" : " rows")
+                   << " in " << setiosflags(ios::fixed) << setprecision(3)
+                   << mean/1000000.0 << " s with stddev "
+                   << setiosflags(ios::fixed) << setprecision(3) << stddev/1000000.0
+                   << " s" << endl << endl;
+  }
+
+  summary->append(summary_stream.str());
+}
+
+
 static void Exec(ExecEnv* exec_env) {
   bool enable_profiling = false;
   if (FLAGS_enable_counters && FLAGS_profile_output_file.size() != 0) {
@@ -52,7 +77,6 @@ static void Exec(ExecEnv* exec_env) {
 
   vector<double> elapsed_times;
   elapsed_times.resize(FLAGS_iterations);
-  int num_rows = 0;
 
   vector<string> queries;
   split(queries, FLAGS_query, is_any_of(";"), token_compress_on );
@@ -70,7 +94,7 @@ static void Exec(ExecEnv* exec_env) {
     while (true) {
       string row;
       EXIT_IF_ERROR(executor.FetchResult(&row));
-      if (row.empty()) break;
+      if (row.empty() || executor.eos()) break;
     }
   }
 
@@ -90,6 +114,8 @@ static void Exec(ExecEnv* exec_env) {
     }
 
     RuntimeProfile aggregate_profile(&profile_pool, "RunQuery");
+    int num_rows = 0;
+    ExecStats::QueryType query_type;
 
     for (int i = 0; i < FLAGS_iterations; ++i) {
       QueryExecutor executor(exec_env);
@@ -100,14 +126,16 @@ static void Exec(ExecEnv* exec_env) {
 
       EXIT_IF_ERROR(executor.Exec(*iter, NULL));
 
+      query_type = executor.exec_stats()->query_type();
+
       while (true) {
         string row;
         EXIT_IF_ERROR(executor.FetchResult(&row));
-        if (row.empty()) break;
         // Only print results for first run
-        if (i == 0) cout << row << endl;
-        ++num_rows;
+        if (!row.empty() && i == 0) cout << row << endl;
+        if (executor.eos()) break;
       }
+      num_rows += executor.exec_stats()->num_rows();
 
       struct timeval end_time;
       gettimeofday(&end_time, NULL);
@@ -134,23 +162,14 @@ static void Exec(ExecEnv* exec_env) {
       }
       aggregate_profile.Merge(*profile);
     }
-  
+
     num_rows /= FLAGS_iterations;
 
-    if (FLAGS_iterations == 1) {
-      cout << "returned " << num_rows << (num_rows == 1 ? " row" : " rows")
-          << " in " << setiosflags(ios::fixed) << setprecision(3)
-          << elapsed_times[0]/1000000.0 << " s" << endl << endl;
-    } else {
-      double mean, stddev;
-      StatUtil::ComputeMeanStddev<double>(&elapsed_times[0], elapsed_times.size(), &mean, &stddev);
-      cout << "returned " << num_rows << (num_rows == 1 ? " row" : " rows")
-          << " in " << setiosflags(ios::fixed) << setprecision(3)
-          << mean/1000000.0 << " s with stddev "
-          << setiosflags(ios::fixed) << setprecision(3) << stddev/1000000.0
-          << " s" << endl << endl;
-      aggregate_profile.Divide(FLAGS_iterations);
-    }
+    string summary;
+    ConstructSummaryString(query_type, num_rows, elapsed_times, &summary);
+    cout << summary;
+
+    if (FLAGS_iterations > 1) aggregate_profile.Divide(FLAGS_iterations);
 
     aggregate_profile.PrettyPrint(&cout);
     PRETTY_PRINT_DEBUG_COUNTERS(&cout);

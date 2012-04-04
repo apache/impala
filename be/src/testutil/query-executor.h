@@ -10,6 +10,7 @@
 #include <boost/thread/thread.hpp>
 
 #include "common/status.h"
+#include "runtime/coordinator.h"
 #include "runtime/primitive-type.h"
 #include "runtime/runtime-state.h"
 #include "gen-cpp/ImpalaBackendService_types.h"  // for TQueryExecRequest
@@ -20,8 +21,8 @@ namespace apache { namespace thrift { namespace protocol { class TProtocol; } } 
 
 namespace impala {
 
-class Coordinator;
 class DataStreamMgr;
+class ExecStats;
 class Expr;
 class ObjectPool;
 class PlanExecutor;
@@ -96,6 +97,10 @@ class QueryExecutor {
   // Disable Jitting.  This is only used by tests to exercise the non-jitted behavior
   void DisableJit();
 
+  bool eos() { return eos_; }
+
+  ExecStats* exec_stats() { return coord_->exec_stats(); }
+
  private:
   // plan service-related
   boost::shared_ptr<apache::thrift::transport::TTransport> socket_;
@@ -107,7 +112,7 @@ class QueryExecutor {
   TQueryExecRequest query_request_;
   boost::scoped_ptr<Coordinator> coord_;
   boost::scoped_ptr<RuntimeState> local_state_;  // only for queries w/o FROM clause
-  boost::scoped_ptr<RuntimeProfile> query_profile_; 
+  boost::scoped_ptr<RuntimeProfile> query_profile_;
   ExecEnv* exec_env_;
   std::vector<Expr*> select_list_exprs_;
   RowBatch* row_batch_;

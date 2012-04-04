@@ -43,8 +43,8 @@ struct TResultRow {
 
 struct TQueryResult {
   // a set of result rows; if the request specified returnAsAscii,
-  // all column values are strings
-  1: list<TResultRow> rows
+  // all column values are strings; optional because it is only set for select queries.
+  1: optional list<TResultRow> rows
 
   // if true, there are no more results to be fetched
   2: bool eos

@@ -30,4 +30,3 @@ std::string TypeToString(PrimitiveType t);
 }
 
 #endif
-

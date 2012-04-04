@@ -261,14 +261,14 @@ DataStreamSender::~DataStreamSender() {
   }
 }
 
-Status DataStreamSender::Init() {
+Status DataStreamSender::Init(RuntimeState* state) {
   for (int i = 0; i < channels_.size(); ++i) {
     RETURN_IF_ERROR(channels_[i]->Init());
   }
   return Status::OK;
 }
 
-Status DataStreamSender::Send(RowBatch* batch) {
+Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
   if (broadcast_ || channels_.size() == 1) {
     // current_thrift_batch_ is *not* the one that was written by the last call
     // to Serialize()
@@ -294,7 +294,7 @@ Status DataStreamSender::Send(RowBatch* batch) {
   return Status::OK;
 }
 
-Status DataStreamSender::Close() {
+Status DataStreamSender::Close(RuntimeState* state) {
   // TODO: only close channels that didn't have any errors
   for (int i = 0; i < channels_.size(); ++i) {
     RETURN_IF_ERROR(channels_[i]->Close());

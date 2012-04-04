@@ -5,9 +5,6 @@ package com.cloudera.impala.catalog;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
-
 public class TestSchemaUtils {
   // maps from PrimitiveType to column name
   // in alltypes table
@@ -25,12 +22,6 @@ public class TestSchemaUtils {
     typeToColumnNameMap.put(PrimitiveType.DATETIME, "datetime_col");
     typeToColumnNameMap.put(PrimitiveType.TIMESTAMP, "timestamp_col");
     typeToColumnNameMap.put(PrimitiveType.STRING, "string_col");
-  }
-
-  // Create client for test schema.
-  public static HiveMetaStoreClient createClient() throws Exception {
-    HiveMetaStoreClient client = new HiveMetaStoreClient(new HiveConf(TestSchemaUtils.class));
-    return client;
   }
 
   public static String getComplexTypeTableName(String type) {

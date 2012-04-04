@@ -101,6 +101,9 @@ CREATE TABLE AllTypes_seq_record_snap LIKE AllTypes_seq;
 DROP TABLE IF EXISTS AllTypesSmall;
 CREATE TABLE AllTypesSmall LIKE AllTypes;
 
+DROP TABLE IF EXISTS AllTypesInsert;
+CREATE TABLE AllTypesInsert LIKE AllTypes;
+
 DROP TABLE IF EXISTS AllTypesSmall_rc;
 CREATE TABLE AllTypesSmall_rc LIKE AllTypes_rc;
 

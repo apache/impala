@@ -95,6 +95,7 @@ public class CatalogTest {
     assertNotNull(defaultDb.getTable("alltypesaggnonulls"));
     assertNotNull(defaultDb.getTable("alltypesaggnonulls_rc"));
     assertNotNull(defaultDb.getTable("alltypesnopart"));
+    assertNotNull(defaultDb.getTable("alltypesinsert"));
     assertNotNull(defaultDb.getTable("testtbl"));
     assertNotNull(defaultDb.getTable("testtbl_rc"));
     assertNotNull(defaultDb.getTable("dimtbl"));

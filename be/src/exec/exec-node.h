@@ -20,6 +20,7 @@ struct RuntimeState;
 class TPlan;
 class TPlanNode;
 class TupleRow;
+class DataSink;
 
 // Superclass of all executor nodes.
 class ExecNode {
@@ -116,6 +117,8 @@ class ExecNode {
   virtual bool IsScanNode() const { return false; }
 
   void InitRuntimeProfile(const std::string& name);
+
+  friend class DataSink;
 };
 
 }

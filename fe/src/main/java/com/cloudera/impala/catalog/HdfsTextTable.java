@@ -4,8 +4,8 @@ package com.cloudera.impala.catalog;
 import java.util.List;
 
 import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.planner.HdfsTextTableSink;
 import com.cloudera.impala.planner.DataSink;
+import com.cloudera.impala.planner.HdfsTextTableSink;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
 

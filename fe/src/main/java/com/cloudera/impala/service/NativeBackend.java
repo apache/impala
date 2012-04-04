@@ -17,9 +17,11 @@ import com.cloudera.impala.thrift.TResultRow;
 public class NativeBackend {
   private final static Logger LOG = LoggerFactory.getLogger(NativeBackend.class);
 
+  // Select queries return a queue of tuples.
   protected native static void ExecQuery(byte[] thriftQueryExecRequest,
       List<String> errorLog, Map<String, Integer> fileErrors,
-      BlockingQueue<TResultRow> resultQueue) throws ImpalaException;
+      BlockingQueue<TResultRow> resultQueue,
+      InsertResult insertResult) throws ImpalaException;
 
   public native static boolean EvalPredicate(byte[] thriftPredicate);
 
@@ -47,7 +49,8 @@ public class NativeBackend {
       }
     }
     if (!found) {
-      LOG.error("Failed to load libbackend.so from given java.library.paths (" + libPath + ").");
+      LOG.error("Failed to load libbackend.so from given java.library.paths ("
+          + libPath + ").");
     }
   }
 }

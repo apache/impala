@@ -45,7 +45,7 @@ class ImpalaTestBackend : public ImpalaBackendServiceIf {
   virtual ~ImpalaTestBackend() {}
 
   virtual void ExecPlanFragment(
-      TExecPlanFragmentResult& _return, const TPlanExecRequest& request, 
+      TExecPlanFragmentResult& _return, const TPlanExecRequest& request,
       const TPlanExecParams& params) {
   }
 
@@ -182,18 +182,18 @@ class DataStreamTest : public testing::Test {
     EXPECT_TRUE(exec.Exec(stmt_, NULL).ok());
     VLOG(1) << "create sender";
     DataStreamSender sender(exec.row_desc(), query_id_, sink_, dest_, 1024);
-    EXPECT_TRUE(sender.Init().ok());
+    EXPECT_TRUE(sender.Init(exec.runtime_state()).ok());
     RowBatch* batch = NULL;
     SenderInfo& info = sender_info_[sender_num];
     for (;;) {
       EXPECT_TRUE(exec.FetchResult(&batch).ok());
       if (batch == NULL) break;
       VLOG(1) << "#rows=" << batch->num_rows();
-      info.status = sender.Send(batch);
+      info.status = sender.Send(exec.runtime_state(), batch);
       if (!info.status.ok()) break;
     }
     VLOG(1) << "closing sender\n";
-    info.status = sender.Close();
+    info.status = sender.Close(exec.runtime_state());
     info.num_bytes_sent = sender.GetNumDataBytesSent();
   }
 

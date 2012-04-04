@@ -12,6 +12,7 @@
 #include "exec/exec-node.h"
 #include "exec/hbase-table-scanner.h"
 #include "exprs/expr.h"
+#include "runtime/coordinator.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/data-stream-mgr.h"
@@ -103,15 +104,15 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM* vm, void* pvt) {
 extern "C"
 JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecQuery(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_query_exec_request,
-    jobject error_log, jobject file_errors, jobject result_queue) {
-  JniCoordinator coord(env, test_env, error_log, file_errors, result_queue);
+    jobject error_log, jobject file_errors, jobject result_queue, jobject insert_result) {
+  JniCoordinator coord(env, test_env, error_log, file_errors, result_queue, insert_result);
   coord.Exec(thrift_query_exec_request);
   RETURN_IF_EXC(env);
-  const vector<Expr*>& select_list_exprs = coord.select_list_exprs();
 
   // Prepare select list expressions.
+  const vector<Expr*>& select_list_exprs = coord.select_list_exprs();
   for (size_t i = 0; i < select_list_exprs.size(); ++i) {
-    Status status = 
+    Status status =
         Expr::Prepare(select_list_exprs[i], coord.runtime_state(), coord.row_desc());
     if (!status.ok()) {
       string error_msg;
@@ -138,19 +139,23 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecQuery(
   while (true) {
     RowBatch* batch;
     THROW_IF_ERROR_WITH_LOGGING(coord.GetNext(&batch), env, &coord);
-    if (batch == NULL) break;
-    LOG(INFO) << "#rows=" << batch->num_rows();
-    for (int i = 0; i < batch->num_rows(); ++i) {
-      TupleRow* row = batch->GetRow(i);
-      LOG(INFO) << PrintRow(row, coord.row_desc());
-      coord.AddResultRow(row);
-      RETURN_IF_EXC(env);
+
+    if (coord.coord()->execution_completed()) break;
+    if (batch != NULL) {
+      LOG(INFO) << "#rows=" << batch->num_rows();
+      for (int i = 0; i < batch->num_rows(); ++i) {
+        TupleRow* row = batch->GetRow(i);
+        LOG(INFO) << PrintRow(row, coord.row_desc());
+        coord.AddResultRow(row);
+      }
     }
+    RETURN_IF_EXC(env);
   }
 
   // Report error log and file error stats.
   coord.WriteErrorLog();
   coord.WriteFileErrors();
+  coord.WriteInsertResult();
 }
 
 extern "C"
@@ -176,6 +181,11 @@ JNIEXPORT jboolean JNICALL Java_com_cloudera_impala_service_NativeBackend_EvalPr
     return false;
   }
 
-  bool* v = static_cast<bool*>(e->GetValue(NULL));
+  void* value = e->GetValue(NULL);
+  // This can happen if a table has partitions with NULL key values.
+  if (value == NULL) {
+    return false;
+  }
+  bool* v = static_cast<bool*>(value);
   return *v;
 }

@@ -6,6 +6,7 @@
 #include <gflags/gflags.h>
 
 #include "exec/exec-node.h"
+#include "exec/data-sink.h"
 #include "exec/scan-node.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
@@ -22,13 +23,14 @@ DECLARE_int32(backend_port);
 namespace impala {
 
 JniCoordinator::JniCoordinator(
-    JNIEnv* env, ExecEnv* exec_env, jobject error_log, jobject file_errors,
-    jobject result_queue)
+    JNIEnv* env, ExecEnv* exec_env, jobject error_log,
+    jobject file_errors, jobject result_queue, jobject insert_result)
   : env_(env),
     error_log_(error_log),
     file_errors_(file_errors),
+    coord_(new Coordinator(exec_env)),
     result_queue_(result_queue),
-    coord_(new Coordinator(exec_env)) {
+    insert_result_(insert_result) {
 }
 
 JniCoordinator::~JniCoordinator() {
@@ -77,7 +79,7 @@ void JniCoordinator::Exec(jbyteArray thrift_query_exec_request) {
 }
 
 Status JniCoordinator::GetNext(RowBatch** batch) {
-  Status result = coord_->GetNext(batch);
+  Status result = coord_->GetNext(batch, runtime_state());
   VLOG(1) << "jnicoord.getnext";
   return result;
 }
@@ -135,6 +137,20 @@ void JniCoordinator::WriteFileErrors() {
   }
 }
 
+void JniCoordinator::WriteInsertResult() {
+  const vector<string>& created_hdfs_files =
+      coord_->runtime_state()->created_hdfs_files();
+  const vector<int64_t>& num_appended_rows =
+        coord_->runtime_state()->num_appended_rows();
+  DCHECK_EQ(created_hdfs_files.size(), num_appended_rows.size());
+  for (int i = 0; i < created_hdfs_files.size(); ++i) {
+    env_->CallVoidMethod(insert_result_, add_modified_partition_id_,
+        env_->NewStringUTF(created_hdfs_files[i].c_str()));
+    env_->CallObjectMethod(insert_result_, add_to_rows_appended_id_,
+        env_->NewObject(long_cl_, long_ctor_, num_appended_rows[i]));
+  }
+}
+
 jclass JniCoordinator::impala_exc_cl_ = NULL;
 jclass JniCoordinator::throwable_cl_ = NULL;
 jclass JniCoordinator::blocking_queue_if_ = NULL;
@@ -143,6 +159,8 @@ jclass JniCoordinator::column_value_cl_ = NULL;
 jclass JniCoordinator::list_cl_ = NULL;
 jclass JniCoordinator::map_cl_ = NULL;
 jclass JniCoordinator::integer_cl_ = NULL;
+jclass JniCoordinator::long_cl_ = NULL;
+jclass JniCoordinator::insert_result_cl_ = NULL;
 jmethodID JniCoordinator::throwable_to_string_id_ = NULL;
 jmethodID JniCoordinator::put_id_ = NULL;
 jmethodID JniCoordinator::result_row_ctor_ = NULL;
@@ -151,6 +169,9 @@ jmethodID JniCoordinator::column_value_ctor_ = NULL;
 jmethodID JniCoordinator::list_add_id_ = NULL;
 jmethodID JniCoordinator::map_put_id_ = NULL;
 jmethodID JniCoordinator::integer_ctor_ = NULL;
+jmethodID JniCoordinator::long_ctor_ = NULL;
+jmethodID JniCoordinator::add_modified_partition_id_ = NULL;
+jmethodID JniCoordinator::add_to_rows_appended_id_ = NULL;
 jfieldID JniCoordinator::bool_val_field_ = NULL;
 jfieldID JniCoordinator::int_val_field_ = NULL;
 jfieldID JniCoordinator::long_val_field_ = NULL;
@@ -178,6 +199,9 @@ Status JniCoordinator::Init() {
   RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/util/List", &list_cl_));
   RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/util/Map", &map_cl_));
   RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/lang/Integer", &integer_cl_));
+  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "java/lang/Long", &long_cl_));
+  RETURN_IF_ERROR(JniUtil::GetGlobalClassRef(env, "com/cloudera/impala/service/InsertResult",
+          &insert_result_cl_));
 
   // BlockingQueue method ids.
   put_id_ = env->GetMethodID(blocking_queue_if_, "put", "(Ljava/lang/Object;)V");
@@ -216,6 +240,18 @@ Status JniCoordinator::Init() {
 
   // Integer method ids.
   integer_ctor_ = env->GetMethodID(integer_cl_, "<init>", "(I)V");
+  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+
+  // Long method ids.
+  long_ctor_ = env->GetMethodID(long_cl_, "<init>", "(J)V");
+  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+
+  // InsertResult method ids.
+  add_modified_partition_id_ = env->GetMethodID(insert_result_cl_, "addModifiedPartition",
+      "(Ljava/lang/String;)V");
+  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  add_to_rows_appended_id_ = env->GetMethodID(insert_result_cl_, "addToRowsAppended",
+      "(Ljava/lang/Long;)V");
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
 
   return Status::OK;

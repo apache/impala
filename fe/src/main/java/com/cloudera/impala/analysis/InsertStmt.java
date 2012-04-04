@@ -10,8 +10,6 @@ import java.util.List;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HBaseTable;
-import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.HdfsTable.Partition;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
@@ -56,6 +54,12 @@ public class InsertStmt extends ParseNodeBase {
     Catalog catalog = analyzer.getCatalog();
     table = catalog.getDb(targetTableName.getDb()).getTable(
         targetTableName.getTbl());
+    if (table == null) {
+      throw new AnalysisException("Unknown table: '" + targetTableName.toString() +
+          "' in db: '" + targetTableName.getDb() + "'.");
+    }
+    // Add target table to descriptor table.
+    analyzer.getDescTbl().addReferencedTable(table);
 
     // Deal with unpartitioned tables. We expect no partition clause.
     int numClusteringCols = table.getNumClusteringCols();
@@ -75,12 +79,9 @@ public class InsertStmt extends ParseNodeBase {
     }
 
     // Check that the partition clause mentions all the table's partitioning columns.
-    PartitionKeyValue[] orderedPartKeyValues = checkPartitionClauseCompleteness();
+    checkPartitionClauseCompleteness();
     // Check that all dynamic partition keys are at the end of the selectListExprs.
     int numDynamicPartKeys = fillPartitionKeyExprs();
-    // Check that the static partition key values refer to an existing partition.
-    int numStaticPartKeys = partitionKeyValues.size() - numDynamicPartKeys;
-    checkPartitionExists(orderedPartKeyValues, numStaticPartKeys);
 
     // Check union compatibility, ignoring partitioning columns for dynamic partitions.
     checkUnionCompatibility(table, selectListExprs, numDynamicPartKeys);
@@ -90,14 +91,11 @@ public class InsertStmt extends ParseNodeBase {
    * Checks whether all partitioning columns in table are mentioned in
    * partitionKeyValues, and that all partitionKeyValues have a match in table.
    *
-   * @return
-   *         A list of partition key values, ordered the same was as the
-   *         corresponding partitioning columns in the table.
    * @throws AnalysisException
    *           If the partitionKeyValues don't mention all partitioning columns in
    *           table, or if they mention extra columns.
    */
-  private PartitionKeyValue[] checkPartitionClauseCompleteness()
+  private void checkPartitionClauseCompleteness()
       throws AnalysisException {
     List<Column> columns = table.getColumns();
     int numClusteringCols = table.getNumClusteringCols();
@@ -108,9 +106,6 @@ public class InsertStmt extends ParseNodeBase {
     // Check that all partitioning columns were mentioned in the partition clause.
     // Remove matching items from unmatchedPartKeyVals
     // to detect superfluous columns in the partition clause.
-    int partKeyIndex = 0;
-    PartitionKeyValue[] orderedPartKeyValues =
-        new PartitionKeyValue[partitionKeyValues.size()];
     for (int i = 0; i < numClusteringCols; ++i) {
       PartitionKeyValue matchingPartKeyVal = null;
       Iterator<PartitionKeyValue> clauseIter = unmatchedPartKeyVals.iterator();
@@ -118,7 +113,6 @@ public class InsertStmt extends ParseNodeBase {
         PartitionKeyValue pkv = clauseIter.next();
         if (pkv.getColName().equals(columns.get(i).getName())) {
           matchingPartKeyVal = pkv;
-          orderedPartKeyValues[partKeyIndex++] = pkv;
           clauseIter.remove();
           break;
         }
@@ -139,7 +133,6 @@ public class InsertStmt extends ParseNodeBase {
       throw new AnalysisException("Superfluous columns in PARTITION clause: "
           + strBuilder.toString() + ".");
     }
-    return orderedPartKeyValues;
   }
 
   /**
@@ -164,9 +157,13 @@ public class InsertStmt extends ParseNodeBase {
     List<Expr> selectListExprs = selectStmt.getSelectListExprs();
     // Position of selectListExpr corresponding to the next dynamic partition column.
     int exprMatchPos = table.getColumns().size() - table.getNumClusteringCols();
+    // Temporary lists of partition key exprs and names in an arbitrary order.
+    List<Expr> tmpPartitionKeyExprs = new ArrayList<Expr>();
+    List<String> tmpPartitionKeyNames = new ArrayList<String>();
     for (PartitionKeyValue pkv : partitionKeyValues) {
       if (pkv.isStatic()) {
-        partitionKeyExprs.add(pkv.getValue());
+        tmpPartitionKeyExprs.add(pkv.getValue());
+        tmpPartitionKeyNames.add(pkv.getColName());
         continue;
       }
       if (exprMatchPos >= selectListExprs.size()) {
@@ -178,60 +175,28 @@ public class InsertStmt extends ParseNodeBase {
       Column tableColumn = table.getColumn(pkv.getColName());
       Expr expr = selectListExprs.get(exprMatchPos);
       Expr compatibleExpr = checkTypeCompatibility(tableColumn, expr);
-      partitionKeyExprs.add(compatibleExpr);
+      tmpPartitionKeyExprs.add(compatibleExpr);
+      tmpPartitionKeyNames.add(pkv.getColName());
       ++exprMatchPos;
     }
-    return numDynamicPartKeys;
-  }
+    // Reorder the partition key exprs and names to be consistent
+    // with the target table declaration.
+    // We need those exprs in the original order to create the
+    // corresponding Hdfs folder structure correctly.
 
-  /**
-   * Check that the static partition key values refer to an existing partition.
-   * TODO: Eventually we want to support adding new partitions. This will require
-   * changing the table metadata in the metastore.
-   *
-   * @param orderedPartKeyValues
-   *          Array of PartitionKeyValues ordered the same way as in the table metadata.
-   * @param numStaticPartKeys
-   *          Number of static partition key values which should
-   *          match an existing partition.
-   * @throws AnalysisException
-   *           If no existing partition that matches
-   *           all static partition key values was found.
-   */
-  private void checkPartitionExists(PartitionKeyValue[] orderedPartKeyValues,
-      int numStaticPartKeys) throws AnalysisException {
-    // Check that the static partition keys values refer to an existing partition.
-    // TODO: Eventually we want to support adding new partitions. This will require
-    // changing the table metadata in the metastore.
-    Preconditions.checkState(table instanceof HdfsTable);
-    HdfsTable hdfsTable = (HdfsTable) table;
     int numClusteringCols = table.getNumClusteringCols();
-    List<Partition> partitions = hdfsTable.getPartitions();
-    boolean partitionExists = false;
-    for (int i = 0; i < partitions.size(); ++i) {
-      Partition p = partitions.get(i);
-      Preconditions.checkState(p.keyValues.size() == numClusteringCols);
-      // Recall that orderedPartKeyValues has a compatible ordering.
-      int matchingStaticPartKeys = 0;
-      for (int j = 0; j < numClusteringCols; ++j) {
-        PartitionKeyValue pkv = orderedPartKeyValues[j];
-        if (pkv.isDynamic()) {
-          continue;
-        }
-        if (p.keyValues.get(j).equals(pkv.getValue())) {
-          ++matchingStaticPartKeys;
+    for (int i = 0; i < numClusteringCols; ++i) {
+      Column c = table.getColumns().get(i);
+      for (int j = 0; j < tmpPartitionKeyNames.size(); ++j) {
+        if (c.getName().equals(tmpPartitionKeyNames.get(j))) {
+          partitionKeyExprs.add(tmpPartitionKeyExprs.get(j));
+          break;
         }
       }
-      if (matchingStaticPartKeys == numStaticPartKeys) {
-        partitionExists = true;
-        break;
-      }
     }
-    if (!partitionExists) {
-      throw new AnalysisException("PARTITION clause specifies a " +
-      		"non-existent partition.\n" +
-          "Can only insert or overwrite an existing partition.");
-    }
+
+    Preconditions.checkState(partitionKeyExprs.size() == numClusteringCols);
+    return numDynamicPartKeys;
   }
 
   /**
@@ -263,7 +228,7 @@ public class InsertStmt extends ParseNodeBase {
           + "' and result of select statement are not union compatible.\n"
           + "Target table expects "
           + numNonClusteringCols + " columns but the select statement returns "
-          + selectListExprs.size() + ".");
+          + (selectListExprs.size() - numDynamicPartKeys) + ".");
     }
     for (int i = numClusteringCols; i < columns.size(); ++i) {
       int selectListIndex = i - numClusteringCols;

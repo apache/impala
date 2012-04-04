@@ -59,7 +59,10 @@ public class TestFileParser {
     PLAN,
     DISTRIBUTEDPLAN,
     ERRORS,
-    FILEERRORS
+    FILEERRORS,
+    NUMROWS,
+    PARTITIONS,
+    SETUP
   }
 
   /**

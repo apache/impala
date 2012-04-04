@@ -17,7 +17,8 @@ public abstract class HdfsTableSink extends TableSink {
   // Whether to overwrite the existing partition(s).
   protected final boolean overwrite;
 
-  public HdfsTableSink(Table targetTable, List<Expr> partitionKeyExprs, boolean overwrite) {
+  public HdfsTableSink(Table targetTable, List<Expr> partitionKeyExprs,
+      boolean overwrite) {
     super(targetTable);
     this.partitionKeyExprs = partitionKeyExprs;
     this.overwrite = overwrite;

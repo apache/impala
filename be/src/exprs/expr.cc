@@ -33,7 +33,7 @@ using namespace std;
 using namespace impala;
 using namespace llvm;
 
-template<class T> 
+template<class T>
 bool ParseString(const string& str, T* val) {
   istringstream stream(str);
   stream >> *val;
@@ -42,7 +42,7 @@ bool ParseString(const string& str, T* val) {
 
 void* ExprValue::TryParse(const string& str, PrimitiveType type) {
   switch(type) {
-    case TYPE_BOOLEAN: 
+    case TYPE_BOOLEAN:
       if (ParseString<bool>(str, &bool_val)) return &bool_val;
       break;
     case TYPE_TINYINT:
@@ -144,11 +144,11 @@ Expr* Expr::CreateLiteral(ObjectPool* pool, PrimitiveType type, const string& st
 
   switch (type) {
     case TYPE_BOOLEAN:
-      if (ParseString<bool>(str, &val.bool_val)) 
+      if (ParseString<bool>(str, &val.bool_val))
         result = new BoolLiteral(&val.bool_val);
       break;
     case TYPE_TINYINT:
-      if (ParseString<int8_t>(str, &val.tinyint_val)) 
+      if (ParseString<int8_t>(str, &val.tinyint_val))
         result = new IntLiteral(type, &val.tinyint_val);
       break;
     case TYPE_SMALLINT:
@@ -160,15 +160,15 @@ Expr* Expr::CreateLiteral(ObjectPool* pool, PrimitiveType type, const string& st
         result = new IntLiteral(type, &val.int_val);
       break;
     case TYPE_BIGINT:
-      if (ParseString<int64_t>(str, &val.bigint_val)) 
+      if (ParseString<int64_t>(str, &val.bigint_val))
         result = new IntLiteral(type, &val.bigint_val);
       break;
     case TYPE_FLOAT:
-      if (ParseString<float>(str, &val.float_val)) 
+      if (ParseString<float>(str, &val.float_val))
         result = new FloatLiteral(type, &val.float_val);
       break;
     case TYPE_DOUBLE:
-      if (ParseString<double>(str, &val.double_val)) 
+      if (ParseString<double>(str, &val.double_val))
         result = new FloatLiteral(type, &val.double_val);
       break;
     case TYPE_STRING:
@@ -385,6 +385,18 @@ void Expr::PrintValue(TupleRow* row, string* str) {
   RawValue::PrintValue(GetValue(row), type(), str);
 }
 
+void Expr::PrintValue(void* value, string* str) {
+  RawValue::PrintValue(value, type(), str);
+}
+
+void Expr::PrintValue(void* value, stringstream* stream) {
+  RawValue::PrintValue(value, type(), stream);
+}
+
+void Expr::PrintValue(TupleRow* row, stringstream* stream) {
+  RawValue::PrintValue(GetValue(row), type(), stream);
+}
+
 Status Expr::PrepareChildren(RuntimeState* state, const RowDescriptor& row_desc) {
   DCHECK(type_ != INVALID_TYPE);
   for (int i = 0; i < children_.size(); ++i) {
@@ -409,7 +421,7 @@ Status Expr::Prepare(Expr* root, RuntimeState* state, const RowDescriptor& row_d
     if (codegen_fn != NULL) {
       // Replace the compute function with the jitted function
       root->SetComputeFn(codegen_fn, scratch_size);
-    } 
+    }
   }
   return Status::OK;
 }
@@ -469,7 +481,7 @@ bool Expr::IsConstant() const {
 Function* Expr::CreateComputeFnPrototype(LlvmCodeGen* codegen, const string& name) {
   Type* ret_type = codegen->GetType(type());
   Type* ptr_type = codegen->ptr_type();
-  
+
   LlvmCodeGen::FnPrototype prototype(codegen, name, ret_type);
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", PointerType::get(ptr_type, 0)));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("state_data", ptr_type));
@@ -524,8 +536,8 @@ Value* Expr::CodegenCallFn(LlvmCodeGen* codegen, Function* parent, Function* chi
   codegen->builder()->CreateCondBr(is_null_val, null_block, not_null_block);
   return result;
 }
-  
-// typedefs for jitted compute functions  
+
+// typedefs for jitted compute functions
 typedef bool (*BoolComputeFn)(TupleRow*, char* , bool*);
 typedef int8_t (*TinyIntComputeFn)(TupleRow*, char*, bool*);
 typedef int16_t (*SmallIntComputeFn)(TupleRow*, char*, bool*);
@@ -611,4 +623,3 @@ void* Expr::CodegenExprTree(LlvmCodeGen* codegen, int* scratch_size) {
   }
   return codegen->JitFunction(function, scratch_size);
 }
-

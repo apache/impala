@@ -3,6 +3,9 @@
 #ifndef IMPALA_RUNTIME_RUNTIME_STATE_H
 #define IMPALA_RUNTIME_RUNTIME_STATE_H
 
+// needed for scoped_ptr to work on ObjectPool
+#include "common/object-pool.h"
+
 #include <boost/scoped_ptr.hpp>
 #include <vector>
 #include <string>
@@ -45,6 +48,8 @@ class RuntimeState {
   ExecEnv* exec_env() { return exec_env_; }
   DataStreamMgr* stream_mgr() { return exec_env_->stream_mgr(); }
   HdfsFsCache* fs_cache() { return exec_env_->fs_cache(); }
+  std::vector<std::string>& created_hdfs_files() { return created_hdfs_files_; }
+  std::vector<int64_t>& num_appended_rows() { return num_appended_rows_; }
 
   // Returns CodeGen object.  Returns NULL if codegen is disabled.
   LlvmCodeGen* llvm_codegen() { return codegen_.get(); }
@@ -99,6 +104,10 @@ class RuntimeState {
   TUniqueId query_id_;
   ExecEnv* exec_env_;
   boost::scoped_ptr<LlvmCodeGen> codegen_;
+  // Lists the Hdfs files created by this query (e.g., for inserts).
+  std::vector<std::string> created_hdfs_files_;
+  // Records the total number of appended rows per created Hdfs file.
+  std::vector<int64_t> num_appended_rows_;
 
   // prohibit copies
   RuntimeState(const RuntimeState&);

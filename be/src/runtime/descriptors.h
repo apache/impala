@@ -109,6 +109,13 @@ class HdfsTableDescriptor : public TableDescriptor {
   char field_delim() const { return field_delim_; }
   char collection_delim() const { return collection_delim_; }
   char escape_char() const { return escape_char_; }
+  const std::string& hdfs_base_dir() const { return hdfs_base_dir_; }
+  const std::vector<std::string>& partition_key_names() const {
+    return partition_key_names_;
+  }
+  const std::string& null_partition_key_value() const {
+    return null_partition_key_value_;
+  }
 
   virtual std::string DebugString() const;
 
@@ -117,6 +124,9 @@ class HdfsTableDescriptor : public TableDescriptor {
   char field_delim_;
   char collection_delim_;
   char escape_char_;
+  std::string hdfs_base_dir_;
+  std::vector<std::string> partition_key_names_;
+  std::string null_partition_key_value_;
 };
 
 class HBaseTableDescriptor : public TableDescriptor {

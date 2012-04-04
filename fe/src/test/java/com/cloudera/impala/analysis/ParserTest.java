@@ -408,6 +408,9 @@ public class ParserTest {
     // Partially dynamic partition with two partitioning keys.
     ParsesOk("insert " + qualifier + " table t partition (pk1, pk2=20) " +
         "select a from src where b > 5");
+    // Static partition with two NULL partitioning keys.
+    ParsesOk("insert " + qualifier + " table t partition (pk1=NULL, pk2=NULL) " +
+        "select a from src where b > 5");
   }
 
   @Test public void TestInsert() {

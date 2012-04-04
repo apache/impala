@@ -12,6 +12,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.api.ConfigValSecurityException;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
@@ -25,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
+import com.cloudera.impala.analysis.NullLiteral;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.THdfsTable;
@@ -50,6 +52,9 @@ public abstract class HdfsTable extends Table {
   private String collectionDelim;
   private String mapKeyDelim;
   private String escapeChar;
+
+  // Hive uses this string for NULL partition keys. Set in load().
+  private String nullPartitionKeyValue;
 
   /**
    * Query-relevant information for one table partition.
@@ -121,9 +126,10 @@ public abstract class HdfsTable extends Table {
    * @param msTbl
    * @return true if successful, false otherwise.
    */
-  private boolean loadPartitions(
+  public boolean loadPartitions(
       List<org.apache.hadoop.hive.metastore.api.Partition> msPartitions,
       org.apache.hadoop.hive.metastore.api.Table msTbl) {
+    partitions.clear();
     try {
       hdfsBaseDir = msTbl.getSd().getLocation();
       // This table has no partition key, which means it has no declared partitions.
@@ -137,11 +143,16 @@ public abstract class HdfsTable extends Table {
         // load key values
         int numPartitionKey = 0;
         for (String partitionKey: msPartition.getValues()) {
-          PrimitiveType type = colsByPos.get(numPartitionKey).getType();
-          Expr expr = LiteralExpr.create(partitionKey, type);
-          // Force the literal to be of type declared in the metadata.
-          expr = expr.castTo(type);
-          p.keyValues.add((LiteralExpr)expr);
+          // Deal with Hive's special NULL partition key.
+          if (partitionKey.equals(nullPartitionKeyValue)) {
+            p.keyValues.add(new NullLiteral());
+          } else {
+            PrimitiveType type = colsByPos.get(numPartitionKey).getType();
+            Expr expr = LiteralExpr.create(partitionKey, type);
+            // Force the literal to be of type declared in the metadata.
+            expr = expr.castTo(type);
+            p.keyValues.add((LiteralExpr)expr);
+          }
           ++numPartitionKey;
         }
 
@@ -182,6 +193,10 @@ public abstract class HdfsTable extends Table {
       org.apache.hadoop.hive.metastore.api.Table msTbl) {
     // turn all exceptions into unchecked exception
     try {
+      // set nullPartitionKeyValue from the hive conf.
+      nullPartitionKeyValue =
+          client.getConfigValue("hive.exec.default.partition.name",
+          "__HIVE_DEFAULT_PARTITION__");
 
       // we only support single-character delimiters,
       // ignore this table if we find a multi-character delimiter
@@ -221,6 +236,8 @@ public abstract class HdfsTable extends Table {
     } catch (MetaException e) {
       throw new UnsupportedOperationException(e.toString());
     } catch (UnknownTableException e) {
+      throw new UnsupportedOperationException(e.toString());
+    } catch (ConfigValSecurityException e) {
       throw new UnsupportedOperationException(e.toString());
     }
 
@@ -302,8 +319,13 @@ public abstract class HdfsTable extends Table {
     TTableDescriptor TTableDescriptor =
         new TTableDescriptor(
             id.asInt(), TTableType.HBASE_TABLE, colsByPos.size(), numClusteringCols);
+    List<String> partitionKeyNames = new ArrayList<String>();
+    for (int i = 0; i < numClusteringCols; ++i) {
+      partitionKeyNames.add(colsByPos.get(i).getName());
+    }
     // We only support single-byte characters as delimiters.
     THdfsTable tHdfsTable = new THdfsTable(hdfsBaseDir,
+        partitionKeyNames, nullPartitionKeyValue,
         (byte) lineDelim.charAt(0), (byte) fieldDelim.charAt(0),
         (byte) collectionDelim.charAt(0), (byte) mapKeyDelim.charAt(0),
         (byte) escapeChar.charAt(0));

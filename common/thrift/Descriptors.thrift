@@ -25,11 +25,17 @@ enum TTableType {
 
 struct THdfsTable {
   1: required string hdfsBaseDir
-  2: required byte lineDelim
-  3: required byte fieldDelim
-  4: required byte collectionDelim
-  5: required byte mapKeyDelim
-  6: required byte escapeChar
+
+  // Partition keys are the same as clustering columns in
+  // TTableDescriptor, so there should be an equal number of each.
+  2: required list<string> partitionKeyNames
+  3: required string nullPartitionKeyValue
+  4: required byte lineDelim
+  5: required byte fieldDelim
+  6: required byte collectionDelim
+  7: required byte mapKeyDelim
+  8: required byte escapeChar
+  9: optional byte quoteChar
 }
 
 struct THBaseTable {

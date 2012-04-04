@@ -24,7 +24,7 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_InitThread
 extern "C"
 JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecQuery(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_query_exec_request,
-    jobject error_log, jobject file_errors, jobject result_queue);
+    jobject error_log, jobject file_errors, jobject result_queue, jobject insert_result);
 
 extern "C"
 JNIEXPORT jboolean JNICALL Java_com_cloudera_impala_service_NativeBackend_EvalPredicate(

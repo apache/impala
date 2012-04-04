@@ -30,13 +30,14 @@ class Coordinator;
 class RuntimeState;
 class RowDescriptor;
 class ExecEnv;
+class DataSink;
 
 // Shim class to adapt backend coordinator to jni.
 class JniCoordinator {
  public:
   JniCoordinator(
-      JNIEnv* env, ExecEnv* exec_env, jobject error_log, jobject file_errors,
-      jobject result_queue);
+      JNIEnv* env, ExecEnv* exec_env, jobject error_log,
+      jobject file_errors, jobject result_queue, jobject insert_result);
   ~JniCoordinator();
 
   // Create global jni structures.
@@ -59,6 +60,10 @@ class JniCoordinator {
   // Copy c++ runtime file error stats into Java file_errors.
   void WriteFileErrors();
 
+  // Copy c++ runtime Hdfs files created from an insert into Java insert_results.
+  // TODO: Serialise this via Thrift to Java, and have the metastore updated there.
+  void WriteInsertResult();
+
   Coordinator* coord() { return coord_.get(); }
 
   const std::vector<Expr*>& select_list_exprs() const { return select_list_exprs_; }
@@ -74,12 +79,17 @@ class JniCoordinator {
   TQueryExecRequest query_exec_request_;
   jobject error_log_;
   jobject file_errors_;
-  bool as_ascii_;
-  bool is_constant_query_;
-  jobject result_queue_;
   ObjectPool obj_pool_;
   std::vector<Expr*> select_list_exprs_;
   boost::scoped_ptr<Coordinator> coord_;
+
+  // Specific to select queries.
+  bool as_ascii_;
+  bool is_constant_query_;
+  jobject result_queue_;
+
+  // Specific to insert queries.
+  jobject insert_result_;
 
   // Global class references created with JniUtil. Cleanup is done in JniUtil::Cleanup().
   static jclass impala_exc_cl_;
@@ -90,6 +100,8 @@ class JniCoordinator {
   static jclass list_cl_;
   static jclass map_cl_;
   static jclass integer_cl_;
+  static jclass long_cl_;
+  static jclass insert_result_cl_;
 
   // methods
   static jmethodID throwable_to_string_id_;
@@ -99,6 +111,9 @@ class JniCoordinator {
   static jmethodID list_add_id_;
   static jmethodID map_put_id_;
   static jmethodID integer_ctor_;
+  static jmethodID long_ctor_;
+  static jmethodID add_modified_partition_id_;
+  static jmethodID add_to_rows_appended_id_;
 
   // fields
   static jfieldID bool_val_field_;

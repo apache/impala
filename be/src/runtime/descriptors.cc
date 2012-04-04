@@ -2,6 +2,7 @@
 
 #include "runtime/descriptors.h"
 
+#include <boost/algorithm/string/join.hpp>
 #include <glog/logging.h>
 #include <ios>
 #include <sstream>
@@ -11,6 +12,7 @@
 #include "gen-cpp/PlanNodes_types.h"
 
 using namespace std;
+using namespace boost::algorithm;
 
 namespace impala {
 
@@ -102,12 +104,22 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc)
     line_delim_(tdesc.hdfsTable.lineDelim),
     field_delim_(tdesc.hdfsTable.fieldDelim),
     collection_delim_(tdesc.hdfsTable.collectionDelim),
-    escape_char_(tdesc.hdfsTable.escapeChar) {
+    escape_char_(tdesc.hdfsTable.escapeChar),
+    hdfs_base_dir_(tdesc.hdfsTable.hdfsBaseDir),
+    partition_key_names_(tdesc.hdfsTable.partitionKeyNames),
+    null_partition_key_value_(tdesc.hdfsTable.nullPartitionKeyValue) {
 }
 
 string HdfsTableDescriptor::DebugString() const {
   stringstream out;
   out << "HdfsTable(" << TableDescriptor::DebugString()
+      << " hdfs_base_dir='" << hdfs_base_dir_ << "'"
+      << " partition_key_names=[";
+
+  out << join(partition_key_names_, ":");
+
+  out << "]";
+  out << "null_partition_key_value='" << null_partition_key_value_ << "'"
       << " line_delim='" << line_delim_ << "'"
       << " field_delim='" << field_delim_ << "'"
       << " coll_delim='" << collection_delim_ << "'"

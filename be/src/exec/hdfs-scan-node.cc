@@ -241,6 +241,8 @@ Status HdfsScanNode::ExtractPartitionKeyValues(RuntimeState* state,
         expr_value.string_val.len = string_value.size();
         value = reinterpret_cast<void*>(&expr_value.string_val);
       } else {
+        // TODO: Check if string_value == hive null partition key
+        // Waiting on completion of NullLiteral to do this.
         value = expr_value.TryParse(string_value, type);
       }
       if (value == NULL) {

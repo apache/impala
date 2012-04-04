@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.service.Executor;
+import com.cloudera.impala.service.InsertResult;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TQueryRequest;
 import com.cloudera.impala.thrift.TResultRow;
@@ -189,6 +190,7 @@ public class TestUtils {
    * 1. Actual and expected types of exprs in the query's select list.
    * 2. Actual and expected query results if expectedResults is non-null.
    * 3. Actual and expected errors if expectedErrors and expectedFileErrors are non-null.
+   * 4. Actual and expected partitions and number of appended rows if they are non-null.
    *
    * @param executor
    *          Coordinator to run query with.
@@ -213,6 +215,10 @@ public class TestUtils {
    *          Expected messages in error log. Ignored if null.
    * @param expectedFileErrors
    *          Expected number of errors per data file read from query. Ignored if null.
+   * @param expectedPartitions
+   *          Expected partitions created by an insert.
+   * @param expectedNumAppendedRows
+   *          Expected number of rows per partition file.
    * @param testErrorLog
    *          Records error messages of failed tests to be reported at the very end of
    *          a test run.
@@ -223,6 +229,7 @@ public class TestUtils {
       ArrayList<String> expectedColLabels,
       ArrayList<String> expectedTypes, ArrayList<String> expectedResults,
       ArrayList<String> expectedErrors, ArrayList<String> expectedFileErrors,
+      ArrayList<String> expectedPartitions, ArrayList<String> expectedNumAppendedRows,
       StringBuilder testErrorLog) {
     String queryReportString =
         query + " (batch size=" + Integer.toString(batchSize)
@@ -235,11 +242,12 @@ public class TestUtils {
     ArrayList<String> colLabels = new ArrayList<String>();
     AtomicBoolean containsOrderBy = new AtomicBoolean();
     BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
+    InsertResult insertResult = new InsertResult();
     ArrayList<String> actualResults = new ArrayList<String>();
     try {
       executor.runQuery(
           request, colTypes, colLabels, containsOrderBy, batchSize, abortOnError,
-          maxErrors, errors, fileErrors, resultQueue);
+          maxErrors, errors, fileErrors, resultQueue, insertResult);
     } catch (ImpalaException e) {
       // Compare errors if we are expecting some.
       if (abortOnError && expectedErrors != null) {
@@ -250,6 +258,37 @@ public class TestUtils {
             "Error executing query '" + query + "' on line " + lineNum
             + ":\n" + e.getMessage());
       }
+      return;
+    }
+
+    // Check insert results for insert statements.
+    // We check the num rows and the partitions independently,
+    // because not all table types create new partition files (e.g., HBase tables).
+    if (expectedNumAppendedRows != null) {
+      ArrayList<String> actualResultsArray = Lists.newArrayList();
+      for (int i = 0; i < insertResult.getRowsAppended().size(); ++i) {
+        actualResultsArray.add(insertResult.getRowsAppended().get(i).toString());
+      }
+      String result =
+        TestUtils.compareOutput(actualResultsArray, expectedNumAppendedRows, true);
+      if (!result.isEmpty()) {
+        testErrorLog.append("query:\n" + queryReportString  + "\n" + result);
+        return;
+      }
+    }
+    if (expectedPartitions != null) {
+      ArrayList<String> modifiedPartitions =
+        Lists.newArrayList(insertResult.getModifiedPartitions());
+      String result =
+        TestUtils.compareOutput(modifiedPartitions, expectedPartitions, false);
+      if (!result.isEmpty()) {
+        testErrorLog.append("query:\n" + queryReportString  + "\n" + result);
+        return;
+      }
+    }
+    // We only expect partitions and num rows for insert statements,
+    // and we compared them above.
+    if (expectedNumAppendedRows != null || expectedPartitions != null) {
       return;
     }
 

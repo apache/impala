@@ -17,7 +17,7 @@ class NullLiteral: public Expr {
   friend class Expr;
 
   NullLiteral(const TExprNode& node);
-  
+
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
 
  private:

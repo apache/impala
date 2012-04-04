@@ -14,6 +14,7 @@
 // undefined references to FLAGS_v
 //#include <gflags/gflags.h>
 
+#include "exec/hdfs-text-table-sink.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/descriptors.h"
 #include "runtime/data-stream-sender.h"
@@ -38,6 +39,8 @@ using namespace apache::thrift::concurrency;
 
 namespace impala {
 
+class DataSink;
+
 class ImpalaBackend : public ImpalaBackendServiceIf {
  public:
   ImpalaBackend(ExecEnv* exec_env)
@@ -58,8 +61,12 @@ class ImpalaBackend : public ImpalaBackendServiceIf {
   ExecEnv* exec_env_;  // not owned
 
   Status ExecPlanFragment(
-      const TPlanExecRequest& request, const TPlanExecParams& params, 
+      const TPlanExecRequest& request, const TPlanExecParams& params,
       vector<TRuntimeProfileNode>* profiles);
+
+  Status CreateDataSink(
+      const TPlanExecRequest& request, const TPlanExecParams& params,
+      const RowDescriptor& row_desc, DataSink** sink);
 };
 
 
@@ -73,10 +80,6 @@ Status ImpalaBackend::ExecPlanFragment(
     const TPlanExecRequest& request, const TPlanExecParams& params,
     vector<TRuntimeProfileNode>* profiles) {
   VLOG(1) << "starting ExecPlanFragment";
-  if (request.dataSink.dataSinkType != TDataSinkType::DATA_STREAM_SINK) {
-    Status status("output type other than data stream not supported");
-    return status;
-  }
   if (!request.dataSink.__isset.dataStreamSink) {
     Status status("missing data stream sink");
     return status;
@@ -85,11 +88,12 @@ Status ImpalaBackend::ExecPlanFragment(
   PlanExecutor executor(exec_env_);
   RETURN_IF_ERROR(executor.Prepare(request, params));
 
-  // TODO: figure out good buffer size based on size of output row
-  DataStreamSender sender(
-      executor.row_desc(), request.queryId, request.dataSink.dataStreamSink,
-      params.destinations, 16 * 1024);
-  RETURN_IF_ERROR(sender.Init());
+  scoped_ptr<DataSink> sink;
+
+  RETURN_IF_ERROR(DataSink::CreateDataSink(request,
+      params, executor.row_desc(), &sink));
+
+  RETURN_IF_ERROR(sink->Init(executor.runtime_state()));
 
   RETURN_IF_ERROR(executor.Open());
   RowBatch* batch;
@@ -103,10 +107,10 @@ Status ImpalaBackend::ExecPlanFragment(
         VLOG(2) << PrintRow(row, executor.row_desc());
       }
     }
-    RETURN_IF_ERROR(sender.Send(batch));
+    RETURN_IF_ERROR(sink->Send(executor.runtime_state(), batch));
     batch = NULL;
   }
-  RETURN_IF_ERROR(sender.Close());
+  RETURN_IF_ERROR(sink->Close(executor.runtime_state()));
 
   executor.query_profile()->ToThrift(profiles);
 

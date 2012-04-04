@@ -245,6 +245,9 @@ partition_key_value ::=
     // Static partition key values.
     | IDENT:column EQUAL literal:value
     {: RESULT = new PartitionKeyValue(column, (LiteralExpr)value); :}
+    // Static partition key value with NULL.
+    | IDENT:column EQUAL KW_NULL
+    {: RESULT = new PartitionKeyValue(column, new NullLiteral()); :}
     ;
 
 select_stmt ::=

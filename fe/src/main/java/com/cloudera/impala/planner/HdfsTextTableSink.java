@@ -41,8 +41,9 @@ public class HdfsTextTableSink extends HdfsTableSink {
   protected TDataSink toThrift() {
     TDataSink dataSink = new TDataSink(TDataSinkType.TABLE_SINK);
     THdfsTextTableSink hdfsTextTableSink =
-      new THdfsTextTableSink(Expr.treesToThrift(partitionKeyExprs), overwrite);
-    dataSink.tableSink = new TTableSink(targetTable.getId().asInt(), hdfsTextTableSink);
+        new THdfsTextTableSink(Expr.treesToThrift(partitionKeyExprs), overwrite);
+    dataSink.tableSink = new TTableSink(targetTable.getId().asInt(),
+        hdfsTextTableSink);
     return dataSink;
   }
 }

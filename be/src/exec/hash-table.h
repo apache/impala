@@ -43,7 +43,7 @@ class HashTable {
   void DebugString(int indentation_level, std::stringstream* out) const;
 
   int size() const { return hash_tbl_->size(); }
-  
+
  private:
   class HashFn : public std::unary_function<TupleRow*, std::size_t> {
    public:

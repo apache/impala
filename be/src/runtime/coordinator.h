@@ -14,6 +14,8 @@
 namespace impala {
 
 class DataStreamMgr;
+class DataSink;
+class ExecStats;
 class RowBatch;
 class RowDescriptor;
 class PlanExecutor;
@@ -32,6 +34,9 @@ class TPlanExecParams;
 // thread, all other fragments are sent to remote nodes. The coordinator also monitors
 // the execution status of the remote fragments and aborts the entire query if an error
 // occurs.
+// Once a query has finished executing and all results have been returned either to the
+// caller of GetNext or a data sink, execution_completed() will return true. If the query
+// is aborted, execution_completed should also be set to true. (TODO: query abort)
 // Coordinator is *not* thread-safe; the only exception is Coordinator::Cancel(),
 // which can be invoked asynchronously to Exec()/GetNext().
 class Coordinator {
@@ -45,11 +50,12 @@ class Coordinator {
   // be for a query like 'SELECT 1').
   Status Exec(const TQueryExecRequest& request);
 
-  // Returns results from the coordinator fragment. Results are valid until
-  // the next GetNext() call. '*batch' == NULL implies that subsequent calls
-  // will not return any more rows.
+  // Returns tuples from the coordinator fragment. Any returned tuples are valid until the
+  // next GetNext() call. If the coordinator has a sink, then no tuples will be returned
+  // via *batch, but will instead be sent to the sink.
   // '*batch' is owned by the underlying PlanExecutor and must not be deleted.
-  Status GetNext(RowBatch** batch);
+  // *state is owned by the caller, and must not be deleted.
+  Status GetNext(RowBatch** batch, RuntimeState* state);
 
   // Cancel execution of query. Also cancels the execution of all plan fragments
   // on remote nodes.
@@ -59,6 +65,12 @@ class Coordinator {
   const RowDescriptor& row_desc() const;
 
   RuntimeProfile* query_profile() { return query_profile_.get(); }
+
+  // True iff either a) all rows have been returned or sent to a table sink or b) the
+  // query has been aborted
+  bool execution_completed() { return execution_completed_; }
+
+  ExecStats* exec_stats() { return exec_stats_.get(); }
 
  private:
   ExecEnv* exec_env_;
@@ -88,8 +100,17 @@ class Coordinator {
   // Runtime profiles for fragments.  Profiles stored in profile_pool_
   std::vector<RuntimeProfile*> fragment_profiles_;
 
+  // Output sink for rows sent to this fragment. May not be set, in which case rows are
+  // returned via GetNext's row batch
+  boost::scoped_ptr<DataSink> sink_;
+
   // Return executor_'s runtime state's obj pool
   ObjectPool* obj_pool();
+
+  // True if the query this coordinates has completed, false otherwise.
+  bool execution_completed_;
+
+  boost::scoped_ptr<ExecStats> exec_stats_;
 
   // Wrapper for ExecPlanFragment() rpc.
   void ExecRemoteFragment(

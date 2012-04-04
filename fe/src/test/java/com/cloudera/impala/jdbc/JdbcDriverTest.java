@@ -196,7 +196,8 @@ public class JdbcDriverTest {
     StringBuilder errorLog = new StringBuilder();
     TestUtils.runQuery(
         executor, query, 0, 1,
-        false, 1000, 0, expectedColLabels, null, expectedResults, null, null, errorLog);
+        false, 1000, 0, expectedColLabels, null, expectedResults, null, null, null, null,
+        errorLog);
   }
 
   private void queryFailure(Connection conn, String query) throws ImpalaException {

@@ -17,6 +17,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.service.Executor;
+import com.cloudera.impala.service.InsertResult;
 import com.cloudera.impala.thrift.TQueryRequest;
 import com.cloudera.impala.thrift.TResultRow;
 
@@ -49,6 +50,8 @@ public class ImpalaStatement implements Statement {
   private final Map<String, Integer> fileErrors = new HashMap<String, Integer>();
   // Queue where results are placed in.
   private final BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
+  // Object holding insert result.
+  private final InsertResult insertResult = new InsertResult();
 
   public ImpalaStatement(Executor executor, Connection connection) {
     this.executor = executor;
@@ -74,6 +77,7 @@ public class ImpalaStatement implements Statement {
     errorLog.clear();
     fileErrors.clear();
     resultQueue.clear();
+    insertResult.clear();
     colTypes.clear();
     colLabels.clear();
     request.stmt = sql;
@@ -82,7 +86,7 @@ public class ImpalaStatement implements Statement {
       executor.runQuery(
           request, colTypes, colLabels, null, Executor.DEFAULT_BATCH_SIZE,
           Executor.DEFAULT_ABORT_ON_ERROR, Executor.DEFAULT_MAX_ERRORS,
-          errorLog, fileErrors, resultQueue);
+          errorLog, fileErrors, resultQueue, insertResult);
     } catch (ImpalaException e) {
       throw new SQLException(e);
     }

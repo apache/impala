@@ -12,6 +12,12 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
+import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
+import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
@@ -20,9 +26,13 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.thrift.TColumnValue;
@@ -75,7 +85,8 @@ public class Executor {
       List<String> colLabels, AtomicBoolean containsOrderBy, int batchSize,
       boolean abortOnError, int maxErrors,
       List<String> errorLog, Map<String, Integer> fileErrors,
-      BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
+      BlockingQueue<TResultRow> resultQueue,
+      InsertResult insertResult) throws ImpalaException {
     init();
     LOG.info("query: " + request.stmt);
     AnalysisContext.AnalysisResult analysisResult =
@@ -85,7 +96,7 @@ public class Executor {
           && analysisResult.getSelectStmt().hasOrderByClause());
     }
     execQuery(analysisResult, request.numNodes, batchSize, abortOnError, maxErrors,
-              errorLog, fileErrors, request.returnAsAscii, resultQueue);
+              errorLog, fileErrors, request.returnAsAscii, resultQueue, insertResult);
     addSentinelRow(resultQueue);
   }
 
@@ -100,7 +111,8 @@ public class Executor {
       AtomicBoolean containsOrderBy,
       final int batchSize, final boolean abortOnError, final int maxErrors,
       final List<String> errorLog, final Map<String, Integer> fileErrors,
-      final BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
+      final BlockingQueue<TResultRow> resultQueue, final InsertResult insertResult)
+  throws ImpalaException {
     init();
     LOG.info("query: " + request.stmt);
     final AnalysisContext.AnalysisResult analysisResult =
@@ -114,7 +126,7 @@ public class Executor {
         try {
           execQuery(analysisResult, request.numNodes, batchSize, abortOnError,
                     maxErrors, errorLog, fileErrors, request.returnAsAscii,
-                    resultQueue);
+                    resultQueue, insertResult);
         } catch (ImpalaException e) {
           errorMsg = e.getMessage();
         }
@@ -175,13 +187,15 @@ public class Executor {
   }
 
   // Execute query contained in 'analysisResult' and return result in
-  // 'resultQueue'. If 'returnAsAscii' is true, returns results as printable
+  // 'resultQueue' for select statements and in 'insertResults' for insert statements.
+  // If 'returnAsAscii' is true, returns results in 'resultQueue' as printable
   // strings.
   private void execQuery(
       AnalysisContext.AnalysisResult analysisResult, int numNodes,
       int batchSize, boolean abortOnError, int maxErrors, List<String> errorLog,
       Map<String, Integer> fileErrors, boolean returnAsAscii,
-      BlockingQueue<TResultRow> resultQueue) throws ImpalaException {
+      BlockingQueue<TResultRow> resultQueue, InsertResult insertResult)
+  throws ImpalaException {
     // create plan fragments
     Planner planner = new Planner();
     StringBuilder explainString = new StringBuilder();
@@ -217,10 +231,68 @@ public class Executor {
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     try {
       NativeBackend.ExecQuery(
-          serializer.serialize(execRequest), errorLog, fileErrors, resultQueue);
+          serializer.serialize(execRequest), errorLog, fileErrors, resultQueue,
+          insertResult);
     } catch (TException e) {
       throw new RuntimeException(e.getMessage());
     }
+
+    // Update the metastore if necessary.
+    if (analysisResult.isInsertStmt()) {
+      try {
+        updateMetastore(insertResult, analysisResult.getInsertStmt());
+      } catch (Exception e) {
+        throw new RuntimeException(e);
+      }
+    }
+  }
+
+  /**
+   * Update partition metadata with those written to by insert statement. New partitions
+   * are created in the metastore; existing partitions are not affected.
+   */
+  private void updateMetastore(InsertResult insertResult, InsertStmt insertStmt)
+      throws MetaException, TException, NoSuchObjectException, InvalidObjectException {
+    // Only update Metastore for Hdfs tables.
+    if (!(insertStmt.getTargetTable() instanceof HdfsTable)) {
+      LOG.warn("Unexpected table type in updateMetastore: "
+          + insertStmt.getTargetTable().getClass());
+      return;
+    }
+    HdfsTable table = (HdfsTable) insertStmt.getTargetTable();
+    String dbName = table.getDb().getName();
+    String tblName = table.getName();
+    HiveMetaStoreClient msClient = catalog.getMetaStoreClient();
+    if (table.getNumClusteringCols() > 0) {
+      // Add all partitions to metastore.
+      for (String hdfsPath : insertResult.getModifiedPartitions()) {
+        String partName = getPartitionName(table, hdfsPath);
+        try {
+          // TODO: Replace with appendPartition
+          msClient.appendPartitionByName(dbName, tblName, partName);
+        } catch (AlreadyExistsException e) {
+          // Ignore since partition already exists.
+        }
+      }
+    }
+    org.apache.hadoop.hive.metastore.api.Table msTbl = msClient.getTable(dbName, tblName);
+    // Reload the partition files from the Metastore into the Impala Catalog.
+    table.loadPartitions(msClient.listPartitions(dbName, tblName, Short.MAX_VALUE), msTbl);
+  }
+
+  /**
+   * Return a partition name formed from concatenating partition keys and their values,
+   * compatible with the way Hive names partitions.
+   */
+  private String getPartitionName(Table table, String hdfsPath) {
+    List<Column> cols = table.getColumns();
+    int firstPartColPos = hdfsPath.indexOf(cols.get(0).getName() + "=");
+    int lastPartColPos =
+      hdfsPath.indexOf(cols.get(table.getNumClusteringCols() - 1).getName() + "=");
+    // Find the first '/' after the last partitioning-column folder.
+    lastPartColPos = hdfsPath.indexOf('/', lastPartColPos);
+    String partitionName = hdfsPath.substring(firstPartColPos, lastPartColPos);
+    return partitionName;
   }
 
   public static Catalog createCatalog() {
@@ -256,15 +328,16 @@ public class Executor {
     List<PrimitiveType> dummyColTypes = Lists.newArrayList();
     List<String> dummyColLabels = Lists.newArrayList();
     BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
+    InsertResult insertResult = new InsertResult();
     Executor coordinator = new Executor(catalog);
     if (asyncExec) {
       coordinator.asyncRunQuery(
           request, dummyColTypes, dummyColLabels, null, batchSize, DEFAULT_ABORT_ON_ERROR,
-          DEFAULT_MAX_ERRORS, errorLog, fileErrors, resultQueue);
+          DEFAULT_MAX_ERRORS, errorLog, fileErrors, resultQueue, insertResult);
     } else {
       coordinator.runQuery(
           request, dummyColTypes, dummyColLabels, null, batchSize, DEFAULT_ABORT_ON_ERROR,
-          DEFAULT_MAX_ERRORS, errorLog, fileErrors, resultQueue);
+          DEFAULT_MAX_ERRORS, errorLog, fileErrors, resultQueue, insertResult);
     }
     while (true) {
       TResultRow resultRow = null;

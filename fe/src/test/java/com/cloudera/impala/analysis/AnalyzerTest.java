@@ -103,8 +103,9 @@ public class AnalyzerTest {
    *
    * @param stmt
    * @return
+   * @throws AnalysisException
    */
-  public ParseNode AnalyzesOk(String stmt) {
+  public ParseNode AnalyzesOk(String stmt) throws AnalysisException {
     LOG.info("analyzing " + stmt);
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
@@ -195,13 +196,13 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestMemLayout() {
+  public void TestMemLayout() throws AnalysisException {
     TestSelectStar();
     TestNonNullable();
     TestMixedNullable();
   }
 
-  private void TestSelectStar() {
+  private void TestSelectStar() throws AnalysisException {
     AnalyzesOk("select * from AllTypes");
     DescriptorTable descTbl = analyzer.getDescTbl();
     for (SlotDescriptor slotD: descTbl.getTupleDesc(new TupleId(0)).getSlots()) {
@@ -223,14 +224,15 @@ public class AnalyzerTest {
     checkLayoutParams("alltypes.string_col", strSlotSize, 48 + strSlotSize, 1, 3);
   }
 
-  private void TestNonNullable() {
+  private void TestNonNullable() throws AnalysisException {
     // both slots are non-nullable bigints.  The layout should look like:
     // (byte range : data)
     // 0 - 7:  count(int_col)
     // 8 - 15: count(*)
     AnalyzesOk("select count(int_col), count(*) from AllTypes");
     DescriptorTable descTbl = analyzer.getDescTbl();
-    com.cloudera.impala.analysis.TupleDescriptor aggDesc = descTbl.getTupleDesc(new TupleId(1));
+    com.cloudera.impala.analysis.TupleDescriptor aggDesc =
+        descTbl.getTupleDesc(new TupleId(1));
     for (SlotDescriptor slotD: aggDesc.getSlots()) {
       slotD.setIsMaterialized(true);
     }
@@ -240,7 +242,7 @@ public class AnalyzerTest {
     checkLayoutParams(aggDesc.getSlots().get(1), 8, 8, 0, -1);
   }
 
-  private void TestMixedNullable() {
+  private void TestMixedNullable() throws AnalysisException {
     // one slot is nullable, one is not.  The layout should look like:
     // (byte range : data)
     // 0 : 1 nullable-byte (only 1 bit used)
@@ -249,7 +251,8 @@ public class AnalyzerTest {
     // 16 - 23: count(*)
     AnalyzesOk("select sum(int_col), count(*) from AllTypes");
     DescriptorTable descTbl = analyzer.getDescTbl();
-    com.cloudera.impala.analysis.TupleDescriptor aggDesc = descTbl.getTupleDesc(new TupleId(1));
+    com.cloudera.impala.analysis.TupleDescriptor aggDesc =
+        descTbl.getTupleDesc(new TupleId(1));
     for (SlotDescriptor slotD: aggDesc.getSlots()) {
       slotD.setIsMaterialized(true);
     }
@@ -274,7 +277,7 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestSubquery() {
+  public void TestSubquery() throws AnalysisException {
     AnalyzesOk("select y x from (select id y from hbasealltypessmall) a");
     AnalyzesOk("select id from (select id from hbasealltypessmall) a");
     AnalyzesOk("select * from (select id+2 from hbasealltypessmall) a");
@@ -372,7 +375,7 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestStar() {
+  public void TestStar() throws AnalysisException {
     AnalyzesOk("select * from AllTypes");
     AnalyzesOk("select alltypes.* from AllTypes");
     // different db
@@ -382,13 +385,15 @@ public class AnalyzerTest {
     AnalyzesOk("select * from alltypes, testdb1.alltypes");
   }
 
-  @Test public void TestTimestampValueExprs() {
+  @Test
+  public void TestTimestampValueExprs() throws AnalysisException {
    AnalyzesOk("select cast (0 as timestamp)");
    AnalyzesOk("select cast (0.1 as timestamp)");
    AnalyzesOk("select cast ('1970-10-10 10:00:00.123' as timestamp)");
   }
 
-  @Test public void TestBooleanValueExprs() {
+  @Test
+  public void TestBooleanValueExprs() throws AnalysisException {
     // Test predicates in where clause.
     AnalyzesOk("select * from AllTypes where true");
     AnalyzesOk("select * from AllTypes where false");
@@ -406,7 +411,7 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestOrdinals() {
+  public void TestOrdinals() throws AnalysisException {
     // can't group or order on *
     AnalysisError("select * from alltypes group by 1",
         "cannot combine '*' in select list with GROUP BY");
@@ -415,7 +420,7 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestFromClause() {
+  public void TestFromClause() throws AnalysisException {
     AnalyzesOk("select int_col from alltypes");
     AnalysisError("select int_col from badtbl", "unknown table");
     // case-insensitive
@@ -426,7 +431,8 @@ public class AnalyzerTest {
     // implicit aliases
     AnalyzesOk("select int_col, zip from alltypes, testtbl");
     // duplicate alias
-    AnalysisError("select a.int_col, a.id from alltypes a, testtbl a", "duplicate table alias");
+    AnalysisError("select a.int_col, a.id from alltypes a, testtbl a",
+        "duplicate table alias");
     // duplicate implicit alias
     AnalysisError("select int_col from alltypes, alltypes", "duplicate table alias");
 
@@ -436,7 +442,7 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestNoFromClause() {
+  public void TestNoFromClause() throws AnalysisException {
     AnalyzesOk("select 'test'");
     AnalyzesOk("select 1 + 1, -128, 'two', 1.28");
     AnalyzesOk("select -1, 1 - 1, 10 - -1, 1 - - - 1");
@@ -453,8 +459,9 @@ public class AnalyzerTest {
     AnalyzesOk("select null or null");
   }
 
-  @Test public void TestOnClause() {
-    AnalyzesOk("select a.int_col from alltypes a join alltypes b on (a.int_col = b.int_col)");
+  @Test public void TestOnClause() throws AnalysisException {
+    AnalyzesOk(
+        "select a.int_col from alltypes a join alltypes b on (a.int_col = b.int_col)");
     AnalyzesOk(
         "select a.int_col " +
         "from alltypes a join alltypes b on " +
@@ -462,14 +469,17 @@ public class AnalyzerTest {
     // ON or USING clause not required for inner join
     AnalyzesOk("select a.int_col from alltypes a join alltypes b");
     // unknown column
-    AnalysisError("select a.int_col from alltypes a join alltypes b on (a.int_col = b.badcol)",
+    AnalysisError(
+        "select a.int_col from alltypes a join alltypes b on (a.int_col = b.badcol)",
         "unknown column 'badcol'");
     // ambiguous col ref
-    AnalysisError("select a.int_col from alltypes a join alltypes b on (int_col = int_col)",
+    AnalysisError(
+        "select a.int_col from alltypes a join alltypes b on (int_col = int_col)",
         "Unqualified column reference 'int_col' is ambiguous");
     // unknown alias
     AnalysisError(
-        "select a.int_col from alltypes a join alltypes b on (a.int_col = badalias.int_col)",
+        "select a.int_col from alltypes a join alltypes b on " +
+        "(a.int_col = badalias.int_col)",
         "unknown table alias: 'badalias'");
     // incompatible comparison
     AnalysisError(
@@ -480,14 +490,16 @@ public class AnalyzerTest {
         "from alltypes a join alltypes b on " +
         "(a.int_col = b.int_col and a.string_col = b.string_col)" +
         "join alltypes c on " +
-        "(b.int_col = c.int_col and b.string_col = c.string_col and b.bool_col = c.bool_col)");
+        "(b.int_col = c.int_col and b.string_col = c.string_col " +
+        "and b.bool_col = c.bool_col)");
     // can't reference an alias that gets declared afterwards
     AnalysisError(
         "select a.int_col, b.int_col, c.int_col " +
         "from alltypes a join alltypes b on " +
         "(c.int_col = b.int_col and a.string_col = b.string_col)" +
         "join alltypes c on " +
-        "(b.int_col = c.int_col and b.string_col = c.string_col and b.bool_col = c.bool_col)",
+        "(b.int_col = c.int_col and b.string_col = c.string_col " +
+        "and b.bool_col = c.bool_col)",
         "unknown table alias: 'c'");
 
     // outer joins require ON/USING clause
@@ -516,9 +528,10 @@ public class AnalyzerTest {
         //"x");
   }
 
-  @Test public void TestUsingClause() {
+  @Test public void TestUsingClause() throws AnalysisException {
     AnalyzesOk("select a.int_col, b.int_col from alltypes a join alltypes b using (int_col)");
-    AnalyzesOk("select a.int_col, b.int_col from alltypes a join alltypes b using (int_col, string_col)");
+    AnalyzesOk("select a.int_col, b.int_col from alltypes a join alltypes b " +
+        "using (int_col, string_col)");
     AnalyzesOk(
         "select a.int_col, b.int_col, c.int_col " +
         "from alltypes a join alltypes b using (int_col, string_col) " +
@@ -526,12 +539,13 @@ public class AnalyzerTest {
     // unknown column
     AnalysisError("select a.int_col from alltypes a join alltypes b using (badcol)",
         "unknown column badcol for alias a");
-    AnalysisError("select a.int_col from alltypes a join alltypes b using (int_col, badcol)",
+    AnalysisError(
+        "select a.int_col from alltypes a join alltypes b using (int_col, badcol)",
         "unknown column badcol for alias a ");
   }
 
   @Test
-  public void TestWhereClause() {
+  public void TestWhereClause() throws AnalysisException {
     AnalyzesOk("select zip, name from testtbl where id > 15");
     AnalysisError("select zip, name from testtbl where badcol > 15",
         "couldn't resolve column reference");
@@ -565,7 +579,7 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestAggregates() {
+  public void TestAggregates() throws AnalysisException {
     AnalyzesOk("select count(*), min(id), max(id), sum(id), avg(id) from testtbl");
     AnalyzesOk("select count(id, zip) from testtbl");
     AnalysisError("select id, zip from testtbl where count(*) > 0",
@@ -606,7 +620,7 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestDistinct() {
+  public void TestDistinct() throws AnalysisException {
     // DISTINCT
     AnalyzesOk("select distinct id, zip from testtbl");
     AnalyzesOk("select distinct * from testtbl");
@@ -633,7 +647,7 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestDistinctInlineView() {
+  public void TestDistinctInlineView() throws AnalysisException {
     // DISTINCT
     AnalyzesOk("select distinct id from " +
         "(select distinct id, zip from (select * from testtbl) x) y");
@@ -684,7 +698,7 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestGroupBy() {
+  public void TestGroupBy() throws AnalysisException {
     AnalyzesOk("select zip, count(*) from testtbl group by zip");
     AnalyzesOk("select zip + count(*) from testtbl group by zip");
     // doesn't group by all non-agg select list items
@@ -734,7 +748,7 @@ public class AnalyzerTest {
         "GROUP BY expression must have a discrete (non-floating point) type");
   }
 
-  @Test public void TestAvgSubstitution() {
+  @Test public void TestAvgSubstitution() throws AnalysisException {
     SelectStmt select = (SelectStmt) AnalyzesOk(
         "select avg(id) from testtbl having count(id) > 0 order by avg(zip)");
     ArrayList<Expr> selectListExprs = select.getSelectListExprs();
@@ -752,7 +766,7 @@ public class AnalyzerTest {
     assertEquals("<slot 4> / <slot 5>", orderingExpr.toSql());
   }
 
-  @Test public void TestOrderBy() {
+  @Test public void TestOrderBy() throws AnalysisException {
     AnalyzesOk("select zip, id from testtbl order by zip");
     AnalyzesOk("select zip, id from testtbl order by zip asc");
     AnalyzesOk("select zip, id from testtbl order by zip desc");
@@ -761,7 +775,8 @@ public class AnalyzerTest {
     AnalyzesOk("select zip, id from testtbl order by 1");
     AnalyzesOk("select zip, id from testtbl order by 2 desc, 1 asc");
     // ordinal out of range
-    AnalysisError("select zip, id from testtbl order by 0", "ORDER BY: ordinal must be >= 1");
+    AnalysisError("select zip, id from testtbl order by 0",
+        "ORDER BY: ordinal must be >= 1");
     AnalysisError("select zip, id from testtbl order by 3",
         "ORDER BY: ordinal exceeds number of items in select list");
     // can't order by '*'
@@ -772,9 +787,11 @@ public class AnalyzerTest {
 
     // can introduce additional aggregates in order by clause
     AnalyzesOk("select zip, count(*) from testtbl group by 1 order by count(*)");
-    AnalyzesOk("select zip, count(*) from testtbl group by 1 order by count(*) + min(zip)");
+    AnalyzesOk("select zip, count(*) from testtbl group by 1 order by count(*) " +
+        "+ min(zip)");
     AnalysisError("select zip, count(*) from testtbl group by 1 order by id",
-        "ORDER BY expression not produced by aggregation output (missing from GROUP BY clause?)");
+        "ORDER BY expression not produced by aggregation output " +
+        "(missing from GROUP BY clause?)");
 
     // multiple ordering exprs
     AnalyzesOk("select int_col, string_col, bigint_col from alltypes " +
@@ -788,7 +805,7 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestBinaryPredicates() {
+  public void TestBinaryPredicates() throws AnalysisException {
     // AnalyzesOk("select * from alltypes where bool_col != true");
     AnalyzesOk("select * from alltypes where tinyint_col <> 1");
     AnalyzesOk("select * from alltypes where smallint_col <= 23");
@@ -813,7 +830,7 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestStringCasts() {
+  public void TestStringCasts() throws AnalysisException {
     AnalyzesOk("select * from alltypes where tinyint_col = '0.5'");
     AnalyzesOk("select * from alltypes where tinyint_col = '0.5'");
     AnalyzesOk("select * from alltypes where smallint_col = '0.5'");
@@ -857,7 +874,7 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestLikePredicates() {
+  public void TestLikePredicates() throws AnalysisException {
     AnalyzesOk("select * from alltypes where string_col like 'test%'");
     AnalyzesOk("select * from alltypes where string_col like string_col");
     AnalyzesOk("select * from alltypes where 'test' like string_col");
@@ -874,7 +891,7 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestCompoundPredicates() {
+  public void TestCompoundPredicates() throws AnalysisException {
     AnalyzesOk("select * from alltypes where string_col = '5' and int_col = 5");
     AnalyzesOk("select * from alltypes where string_col = '5' or int_col = 5");
     AnalyzesOk("select * from alltypes where (string_col = '5' " +
@@ -884,7 +901,7 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestIsNullPredicates() {
+  public void TestIsNullPredicates() throws AnalysisException {
     AnalyzesOk("select * from alltypes where int_col is null");
     AnalyzesOk("select * from alltypes where string_col is not null");
     // TODO: add null literals (i think this would require a null type, which is
@@ -894,9 +911,10 @@ public class AnalyzerTest {
 
   /**
    * Test of all arithmetic type casts following mysql's casting policy.
+   * @throws AnalysisException
    */
   @Test
-  public void TestArithmeticTypeCasts() {
+  public void TestArithmeticTypeCasts() throws AnalysisException {
     List<PrimitiveType> numericPlusString =
         (List<PrimitiveType>) PrimitiveType.getNumericTypes().clone();
     numericPlusString.add(PrimitiveType.STRING);
@@ -961,9 +979,10 @@ public class AnalyzerTest {
 
   /**
    * Test of all type casts in comparisons following mysql's casting policy.
+   * @throws AnalysisException
    */
   @Test
-  public void TestComparisonTypeCasts() {
+  public void TestComparisonTypeCasts() throws AnalysisException {
     // test on all comparison ops
     for (BinaryPredicate.Operator cmpOp : BinaryPredicate.Operator.values()) {
       // test all numeric
@@ -982,10 +1001,11 @@ public class AnalyzerTest {
    * Generate an expr of the form "<type1> <arithmeticOp | cmpOp> <type2>"
    * and make sure that the expr has the correct type (opType for arithmetic
    * ops or bool for comparisons) and that both operands are of type 'opType'.
+   * @throws AnalysisException
    */
   private void typeCastTest(PrimitiveType type1, PrimitiveType type2,
       boolean op1IsLiteral, ArithmeticExpr.Operator arithmeticOp,
-      BinaryPredicate.Operator cmpOp, PrimitiveType opType) {
+      BinaryPredicate.Operator cmpOp, PrimitiveType opType) throws AnalysisException {
     Preconditions.checkState((arithmeticOp == null) != (cmpOp == null));
     boolean arithmeticMode = arithmeticOp != null;
     String op1 = "";
@@ -1030,7 +1050,7 @@ public class AnalyzerTest {
 
   // TODO: re-enable tests as soon as we have date-related types
   // @Test
-  public void DoNotTestStringLiteralToDateCasts() {
+  public void DoNotTestStringLiteralToDateCasts() throws AnalysisException {
     // positive tests are included in TestComparisonTypeCasts
     AnalysisError("select int_col from alltypes where date_col = 'ABCD'",
         "Unable to parse string 'ABCD' to date");
@@ -1048,7 +1068,7 @@ public class AnalyzerTest {
 
   // TODO: generate all possible error combinations of types and operands
   @Test
-  public void TestFixedPointArithmeticOps() {
+  public void TestFixedPointArithmeticOps() throws AnalysisException {
     // negative tests, no floating point types allowed
     AnalysisError("select ~float_col from alltypes",
         "Bitwise operations only allowed on fixed-point types");
@@ -1063,14 +1083,14 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestNestedFunctions() {
+  public void TestNestedFunctions() throws AnalysisException {
     AnalyzesOk("select sin(pi())");
     AnalyzesOk("select sin(cos(pi()))");
     AnalyzesOk("select sin(cos(tan(e())))");
   }
 
   @Test
-  public void TestVarArgFunctions() {
+  public void TestVarArgFunctions() throws AnalysisException {
     AnalyzesOk("select concat('a')");
     AnalyzesOk("select concat('a', 'b')");
     AnalyzesOk("select concat('a', 'b', 'c')");
@@ -1089,7 +1109,7 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestCaseExpr() {
+  public void TestCaseExpr() throws AnalysisException {
     // No case expr.
     AnalyzesOk("select case when 20 > 10 then 20 else 15 end");
     // No else.
@@ -1145,7 +1165,7 @@ public class AnalyzerTest {
   }
 
   @Test
-  public void TestInsert() {
+  public void TestInsert() throws AnalysisException {
     testInsertStatic(true);
     testInsertStatic(false);
     testInsertDynamic(true);
@@ -1157,8 +1177,9 @@ public class AnalyzerTest {
    *
    * @param overwrite
    *          If true, tests INSERT OVERWRITE, else tests INSERT INTO.
+   * @throws AnalysisException
    */
-  private void testInsertDynamic(boolean overwrite) {
+  private void testInsertDynamic(boolean overwrite) throws AnalysisException {
     String qualifier = null;
     if (overwrite) {
       qualifier = "overwrite";
@@ -1169,23 +1190,55 @@ public class AnalyzerTest {
     AnalyzesOk("insert " + qualifier + " table alltypessmall " +
         "partition (year, month)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col, year, month from alltypes");
+        "float_col, double_col, date_string_col, string_col, timestamp_col, year, " +
+        "month from alltypes");
+    // Fully dynamic partitions with NULL literals as partitioning columns.
+    AnalyzesOk("insert " + qualifier + " table alltypessmall " +
+        "partition (year, month)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col, NULL, NULL " +
+        "from alltypes");
     // Fully dynamic partitions. Order of corresponding select list items doesn't matter, as long as
     // they appear at the very end of the select list.
     AnalyzesOk("insert " + qualifier + " table alltypessmall " +
         "partition (year, month)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col, month, year from alltypes");
+        "float_col, double_col, date_string_col, string_col, timestamp_col, month, " +
+        "year from alltypes");
     // Partially dynamic partitions.
     AnalyzesOk("insert " + qualifier + " table alltypessmall " +
         "partition (year=2009, month)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col, month from alltypes");
+        "float_col, double_col, date_string_col, string_col, timestamp_col, month from " +
+        "alltypes");
     // Partially dynamic partitions.
     AnalyzesOk("insert " + qualifier + " table alltypessmall " +
         "partition (year, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col, year from alltypes");
+        "float_col, double_col, date_string_col, string_col, timestamp_col, year from " +
+        "alltypes");
+    // Partially dynamic partitions with NULL literal as column.
+    AnalyzesOk("insert " + qualifier + " table alltypessmall " +
+        "partition (year=2009, month)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col, NULL from " +
+        "alltypes");
+    // Partially dynamic partitions with NULL literal as column.
+    AnalyzesOk("insert " + qualifier + " table alltypessmall " +
+        "partition (year, month=4)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col, NULL from " +
+        "alltypes");
+    // Partially dynamic partitions with NULL literal in partition clause.
+    AnalyzesOk("insert " + qualifier + " table alltypessmall " +
+        "partition (year=2009, month=NULL)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes");
+    // Partially dynamic partitions with NULL literal in partition clause.
+    AnalyzesOk("insert " + qualifier + " table alltypessmall " +
+        "partition (year=NULL, month=4)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes");
     // No corresponding select list items of fully dynamic partitions.
     AnalysisError("insert " + qualifier + " table alltypessmall " +
         "partition (year, month)" +
@@ -1211,15 +1264,18 @@ public class AnalyzerTest {
         "The select list items corresponding to dynamic partition keys " +
         "must be at the end of the select list.");
     // Select '*' includes partitioning columns, and hence, is not union compatible.
-    AnalysisError("insert " + qualifier + " table alltypessmall partition (year=2009, month=4)" +
+    AnalysisError("insert " + qualifier + " table alltypessmall " +
+    		"partition (year=2009, month=4)" +
         "select * from alltypes",
-        "Target table 'alltypessmall' and result of select statement are not union compatible.\n" +
+        "Target table 'alltypessmall' and result of select statement are not union " +
+        "compatible.\n" +
         "Target table expects 11 columns but the select statement returns 13.");
     // Select '*' includes partitioning columns
     // but they don't appear at the end of the select list.
     AnalysisError("insert " + qualifier + " table alltypessmall partition (year, month)" +
         "select * from alltypes",
-        "Target table 'alltypessmall' and result of select statement are not union compatible.\n" +
+        "Target table 'alltypessmall' and result of select statement are not union " +
+        "compatible.\n" +
         "Incompatible types 'INT' and 'TIMESTAMP' in column 'alltypes.timestamp_col'.");
   }
 
@@ -1228,8 +1284,9 @@ public class AnalyzerTest {
    *
    * @param overwrite
    *          If true, tests INSERT OVERWRITE, else tests INSERT INTO.
+   * @throws AnalysisException
    */
-  private void testInsertStatic(boolean overwrite) {
+  private void testInsertStatic(boolean overwrite) throws AnalysisException {
     String qualifier = null;
     if (overwrite) {
       qualifier = "overwrite";
@@ -1243,6 +1300,21 @@ public class AnalyzerTest {
     // Static partition.
     AnalyzesOk("insert " + qualifier + " table alltypessmall " +
         "partition (year=2009, month=4)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes");
+    // Static partition with NULL partition keys.
+    AnalyzesOk("insert " + qualifier + " table alltypessmall " +
+        "partition (year=NULL, month=NULL)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes");
+    // Static partition with partial NULL partition keys.
+    AnalyzesOk("insert " + qualifier + " table alltypessmall " +
+        "partition (year=2009, month=NULL)" +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes");
+    // Static partition with partial NULL partition keys.
+    AnalyzesOk("insert " + qualifier + " table alltypessmall " +
+        "partition (year=NULL, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes");
     // Union compatibility requires cast of select list expr in column 5 (int_col -> bigint).
@@ -1260,14 +1332,16 @@ public class AnalyzerTest {
         "partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, timestamp_col from alltypes",
-        "Target table 'alltypessmall' and result of select statement are not union compatible.\n" +
+        "Target table 'alltypessmall' and result of select statement are not union " +
+        "compatible.\n" +
         "Target table expects 11 columns but the select statement returns 10.");
     // Not union compatible, incompatible type in last column (bool_col -> string).
     AnalysisError("insert " + qualifier + " table alltypessmall " +
         "partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, bool_col, timestamp_col from alltypes",
-        "Target table 'alltypessmall' and result of select statement are not union compatible.\n" +
+        "Target table 'alltypessmall' and result of select statement are not union " +
+        "compatible.\n" +
         "Incompatible types 'STRING' and 'BOOLEAN' in column 'bool_col'.");
     // Too many partitioning columns.
     AnalysisError("insert " + qualifier + " table alltypessmall " +
@@ -1287,30 +1361,26 @@ public class AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes",
         "Missing partition column 'month' from PARTITION clause.");
-    // Overwrite a non-existent partition.
-    // TODO: Eventually, we want to allow adding new partitions, but not for now.
-    AnalysisError("insert " + qualifier + " table alltypessmall " +
-        "partition (year=2009, month=10)" +
-        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes",
-        "PARTITION clause specifies a non-existent partition.\n" +
-        "Can only insert or overwrite an existing partition.");
     // Partition clause given for insertion into HBase table.
     AnalysisError("insert " + qualifier + " table hbasealltypessmall " +
         "partition (year=2009, bigint_col=10)" +
         "select bool_col, double_col, float_col, bigint_col, int_col, " +
-        "smallint_col, tinyint_col, date_string_col, string_col, timestamp_col from alltypes",
+        "smallint_col, tinyint_col, date_string_col, string_col, timestamp_col from " +
+        "alltypes",
         "PARTITION clause is not allowed for HBase tables.");
     // Loss of precision when casting in column 6 (double_col -> float).
-    AnalysisError("insert " + qualifier + " table alltypessmall partition (year=2009, month=4)" +
+    AnalysisError("insert " + qualifier + " table alltypessmall " +
+    		"partition (year=2009, month=4)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "double_col, double_col, date_string_col, string_col, timestamp_col from alltypes",
         "Inserting into target table 'alltypessmall' may result in loss of precision.\n" +
         "Would need to cast 'double_col' to 'FLOAT'.");
     // Select '*' includes partitioning columns, and hence, is not union compatible.
-    AnalysisError("insert " + qualifier + " table alltypessmall partition (year=2009, month=4)" +
+    AnalysisError("insert " + qualifier + " table alltypessmall " +
+    		"partition (year=2009, month=4)" +
         "select * from alltypes",
-        "Target table 'alltypessmall' and result of select statement are not union compatible.\n" +
+        "Target table 'alltypessmall' and result of select statement are not union " +
+        "compatible.\n" +
         "Target table expects 11 columns but the select statement returns 13.");
   }
 
