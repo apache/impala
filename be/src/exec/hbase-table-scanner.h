@@ -8,6 +8,7 @@
 #include <sstream>
 #include <boost/scoped_ptr.hpp>
 #include "gen-cpp/PlanNodes_types.h"
+#include "exec/scan-node.h"
 
 namespace impala {
 
@@ -19,15 +20,19 @@ class Status;
 // JNI wrapper class implementing minimal functionality for scanning an HBase table.
 // Note: When none of the requested family/qualifiers exist in a particular row,
 // HBase will not return the row at all, leading to "missing" NULL values.
-// TODO: Related to filtering, there is a special filter that allows only selecting the keyvalues.
+// TODO: Related to filtering, there is a special filter that allows only selecting the
+//       keyvalues.
 //       Currently, if only the row key is requested
-//       all keyvalues are fetched from HBase (since there is no family/qualifier restriction).
+//       all keyvalues are fetched from HBase (since there is no family/qualifier
+//       restriction).
 // TODO: Enable time travel.
 class HBaseTableScanner {
  public:
 
-  // Initialize all members to NULL and set JNIEnv.
-  HBaseTableScanner(JNIEnv* env);
+  // Initialize all members to NULL, except JNIEnv and ScanNode.
+  // scan_node is the enclosing hbase scan node and its performance counter will be
+  // updated.
+  HBaseTableScanner(JNIEnv* env, ScanNode* scan_node);
 
   // JNI setup. Create global references to classes,
   // and find method ids.
@@ -63,12 +68,10 @@ class HBaseTableScanner {
                    const ScanRangeVector& scan_range_vector,
                    const std::vector<THBaseFilter>& filters);
 
-  // Position cursor to next row. Sets has_next to true if more rows exist, false otherwise.
+  // Position cursor to next row. Sets has_next to true if more rows exist, false
+  // otherwise.
   // Returns non-ok status if an error occurred.
   Status Next(bool* has_next);
-
-  // Release the native byte array backing the current KeyValue[] created by JNI.
-  void ReleaseBuffer();
 
   // Get the current HBase row key.
   void GetRowKey(void** key, int* key_length);
@@ -92,6 +95,9 @@ class HBaseTableScanner {
   static const int DEFAULT_ROWS_CACHED = 1024;
 
   JNIEnv* env_;
+
+  // The enclosing ScanNode; it is used to update performance counters.
+  ScanNode* scan_node_;
 
   // Global class references created with JniUtil. Cleanup is done in JniUtil::Cleanup().
   static jclass htable_cl_;
@@ -121,6 +127,8 @@ class HBaseTableScanner {
   static jmethodID result_get_bytes_id_;
   static jmethodID result_raw_id_;
   static jmethodID immutable_bytes_writable_get_id_;
+  static jmethodID immutable_bytes_writable_get_length_id_;
+  static jmethodID immutable_bytes_writable_get_offset_id_;
   static jmethodID keyvalue_get_buffer_id_;
   static jmethodID keyvalue_get_family_offset_id_;
   static jmethodID keyvalue_get_family_length_id_;
@@ -155,8 +163,13 @@ class HBaseTableScanner {
   jobject result_;  // Java type Result
   jobjectArray keyvalues_;  // Java type KeyValue[]. Result of result_.raw();
   jobject keyvalue_; // Java type KeyValue
-  jbyteArray byte_array_;  // Byte array backing the KeyValues[] created in one call to Next().
+  // Byte array backing the KeyValues[] created in one call to Next().
+  jbyteArray byte_array_;
   void* buffer_;  // C version of byte_array_.
+  int buffer_length_; // size of buffer
+
+  // The offset of the ImmutableByteWritable (returned by result_.getBytes()).
+  int result_bytes_offset_;
 
   // Current position in keyvalues_. Incremented in NextValue(). Reset in Next().
   int keyvalue_index_;
@@ -182,11 +195,18 @@ class HBaseTableScanner {
   // Memory allocated from this pool is valid until the following Next().
   boost::scoped_ptr<MemPool> value_pool_;
 
+  // Pool for allocating buffer_
+  boost::scoped_ptr<MemPool> buffer_pool_;
+
   // Number of rows for caching that will be passed to scanners.
   // Set in the HBase call Scan.setCaching();
   int rows_cached_;
 
-  // Lexicographically compares s with the string at offset in buffer_ having given length.
+  // HBase specific counter
+  RuntimeProfile::Counter* scan_setup_timer_;
+
+  // Lexicographically compares s with the string at offset in buffer_ having given
+  // length.
   // Returns a value > 0 if s is greater, a value < 0 if s is smaller,
   // and 0 if they are equal.
   int CompareStrings(const std::string& s, int offset, int length);

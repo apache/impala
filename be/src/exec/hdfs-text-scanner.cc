@@ -86,7 +86,7 @@ Status HdfsTextScanner::FillByteBuffer(RuntimeState* state, int64_t size) {
     reuse_byte_buffer_ = true;
   }
   {
-    COUNTER_SCOPED_TIMER(scan_node_->hdfs_time_counter());
+    COUNTER_SCOPED_TIMER(scan_node_->scanner_timer());
     RETURN_IF_ERROR(current_byte_stream_->Read(byte_buffer_, read_size,
                                                &byte_buffer_read_size_));
   }
@@ -279,7 +279,6 @@ Status HdfsTextScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
 
     DCHECK_GT(bytes_processed, 0);
 
-    COUNTER_UPDATE(scan_node_->rows_read_counter(), num_tuples);
     if (num_fields != 0) {
       RETURN_IF_ERROR(WriteFields(state, row_batch, num_fields, &row_idx, &line_start));
     } else if (num_tuples != 0) {
@@ -363,7 +362,7 @@ void HdfsTextScanner::ReportRowParseError(RuntimeState* state, char* line_start,
 // if we determine it's not a match.
 Status HdfsTextScanner::WriteFields(RuntimeState* state, RowBatch* row_batch,
                                     int num_fields, int* row_idx, char** line_start) {
-  COUNTER_SCOPED_TIMER(scan_node_->tuple_write_time_counter());
+  COUNTER_SCOPED_TIMER(scan_node_->tuple_write_timer());
   DCHECK_GT(num_fields, 0);
 
   // Keep track of where lines begin as we write out fields for error reporting

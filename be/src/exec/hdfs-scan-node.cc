@@ -152,7 +152,7 @@ Status HdfsScanNode::InitCurrentScanRange(RuntimeState* state) {
 }
 
 Status HdfsScanNode::Prepare(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecNode::Prepare(state));
+  RETURN_IF_ERROR(ScanNode::Prepare(state));
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   DCHECK(tuple_desc_ != NULL);
   current_range_idx_ = 0;
@@ -161,17 +161,9 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   // One-time initialisation of state that is constant across scan ranges
   DCHECK(tuple_desc_->table_desc() != NULL);
 
-  hdfs_time_counter_ =
-      ADD_COUNTER(runtime_profile(), "HdfsTime", TCounterType::CPU_TICKS);
-  bytes_read_counter_ =
-      ADD_COUNTER(runtime_profile(), "BytesRead", TCounterType::BYTES);
+  // setup Hdfs specific counter
   parse_time_counter_ =
       ADD_COUNTER(runtime_profile(), "ParseTime", TCounterType::CPU_TICKS);
-  tuple_write_time_counter_ =
-      ADD_COUNTER(runtime_profile(), "TupleWriteTime", TCounterType::CPU_TICKS);
-  rows_read_counter_ =
-      ADD_COUNTER(runtime_profile(), "RowsRead", TCounterType::UNIT);
-
 
   const HdfsTableDescriptor* hdfs_table =
     static_cast<const HdfsTableDescriptor*>(tuple_desc_->table_desc());

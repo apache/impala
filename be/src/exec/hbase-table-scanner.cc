@@ -36,6 +36,8 @@ jmethodID HBaseTableScanner::resultscanner_close_id_ = NULL;
 jmethodID HBaseTableScanner::result_get_bytes_id_ = NULL;
 jmethodID HBaseTableScanner::result_raw_id_ = NULL;
 jmethodID HBaseTableScanner::immutable_bytes_writable_get_id_ = NULL;
+jmethodID HBaseTableScanner::immutable_bytes_writable_get_length_id_ = NULL;
+jmethodID HBaseTableScanner::immutable_bytes_writable_get_offset_id_ = NULL;
 jmethodID HBaseTableScanner::keyvalue_get_buffer_id_ = NULL;
 jmethodID HBaseTableScanner::keyvalue_get_family_offset_id_ = NULL;
 jmethodID HBaseTableScanner::keyvalue_get_family_length_id_ = NULL;
@@ -52,7 +54,8 @@ jobject HBaseTableScanner::empty_row_ = NULL;
 jobject HBaseTableScanner::must_pass_all_op_ = NULL;
 jobjectArray HBaseTableScanner::compare_ops_ = NULL;
 
-void HBaseTableScanner::ScanRange::DebugString(int indentation_level, stringstream* out) {
+void HBaseTableScanner::ScanRange::DebugString(int indentation_level,
+    stringstream* out) {
   *out << string(indentation_level * 2, ' ');
   if (!start_key_.empty()) {
     *out << " start_key=" << start_key_;
@@ -62,8 +65,9 @@ void HBaseTableScanner::ScanRange::DebugString(int indentation_level, stringstre
   }
 }
 
-HBaseTableScanner::HBaseTableScanner(JNIEnv* env)
+HBaseTableScanner::HBaseTableScanner(JNIEnv* env, ScanNode* scan_node)
   : env_(env),
+    scan_node_(scan_node),
     hbase_conf_(NULL),
     htable_(NULL),
     scan_(NULL),
@@ -73,12 +77,14 @@ HBaseTableScanner::HBaseTableScanner(JNIEnv* env)
     keyvalue_(NULL),
     byte_array_(NULL),
     buffer_(NULL),
+    buffer_length_(0),
     keyvalue_index_(0),
     num_requested_keyvalues_(0),
     num_addl_requested_cols_(0),
     num_keyvalues_(0),
     all_keyvalues_present_(false),
     value_pool_(new MemPool()),
+    buffer_pool_(new MemPool()),
     rows_cached_(DEFAULT_ROWS_CACHED) {
 }
 
@@ -92,36 +98,46 @@ Status HBaseTableScanner::Init() {
   // Global class references:
   // HTable, Scan, ResultScanner, Result, ImmutableBytesWritable, KeyValue, HConstants.
   RETURN_IF_ERROR(
-      JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/client/HTable", &htable_cl_));
+      JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/client/HTable",
+          &htable_cl_));
   RETURN_IF_ERROR(
       JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/client/Scan", &scan_cl_));
   RETURN_IF_ERROR(
       JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/client/ResultScanner",
           &resultscanner_cl_));
   RETURN_IF_ERROR(
-      JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/client/Result", &result_cl_));
+      JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/client/Result",
+          &result_cl_));
   RETURN_IF_ERROR(
       JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/io/ImmutableBytesWritable",
           &immutable_bytes_writable_cl_));
   RETURN_IF_ERROR(
       JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/KeyValue", &keyvalue_cl_));
   RETURN_IF_ERROR(
-      JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/HConstants", &hconstants_cl_));
+      JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/HConstants",
+          &hconstants_cl_));
   RETURN_IF_ERROR(
-      JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/filter/FilterList", &filter_list_cl_));
+      JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/filter/FilterList",
+          &filter_list_cl_));
   RETURN_IF_ERROR(
-      JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/filter/FilterList$Operator", &filter_list_op_cl_));
+      JniUtil::GetGlobalClassRef(env,
+          "org/apache/hadoop/hbase/filter/FilterList$Operator", &filter_list_op_cl_));
   RETURN_IF_ERROR(
-      JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/filter/SingleColumnValueFilter", &single_column_value_filter_cl_));
+      JniUtil::GetGlobalClassRef(env,
+          "org/apache/hadoop/hbase/filter/SingleColumnValueFilter",
+          &single_column_value_filter_cl_));
   RETURN_IF_ERROR(
-      JniUtil::GetGlobalClassRef(env, "org/apache/hadoop/hbase/filter/CompareFilter$CompareOp", &compare_op_cl_));
+      JniUtil::GetGlobalClassRef(env,
+          "org/apache/hadoop/hbase/filter/CompareFilter$CompareOp",
+          &compare_op_cl_));
 
   // HTable method ids.
   htable_ctor_ = env->GetMethodID(htable_cl_, "<init>",
       "(Lorg/apache/hadoop/conf/Configuration;Ljava/lang/String;)V");
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
   htable_get_scanner_id_ = env->GetMethodID(htable_cl_, "getScanner",
-      "(Lorg/apache/hadoop/hbase/client/Scan;)Lorg/apache/hadoop/hbase/client/ResultScanner;");
+      "(Lorg/apache/hadoop/hbase/client/Scan;)"
+      "Lorg/apache/hadoop/hbase/client/ResultScanner;");
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
   htable_close_id_ = env->GetMethodID(htable_cl_, "close", "()V");
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
@@ -155,7 +171,8 @@ Status HBaseTableScanner::Init() {
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
 
   // Result method ids.
-  result_raw_id_ = env->GetMethodID(result_cl_, "raw", "()[Lorg/apache/hadoop/hbase/KeyValue;");
+  result_raw_id_ = env->GetMethodID(result_cl_, "raw",
+      "()[Lorg/apache/hadoop/hbase/KeyValue;");
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
   result_get_bytes_id_ = env->GetMethodID(result_cl_, "getBytes",
       "()Lorg/apache/hadoop/hbase/io/ImmutableBytesWritable;");
@@ -165,17 +182,27 @@ Status HBaseTableScanner::Init() {
   immutable_bytes_writable_get_id_ =
       env->GetMethodID(immutable_bytes_writable_cl_, "get", "()[B");
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  immutable_bytes_writable_get_length_id_ =
+      env->GetMethodID(immutable_bytes_writable_cl_, "getLength", "()I");
+  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  immutable_bytes_writable_get_offset_id_ =
+      env->GetMethodID(immutable_bytes_writable_cl_, "getOffset", "()I");
+  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
 
   // KeyValue method ids.
   keyvalue_get_buffer_id_ = env->GetMethodID(keyvalue_cl_, "getBuffer", "()[B");
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
-  keyvalue_get_family_offset_id_ = env->GetMethodID(keyvalue_cl_, "getFamilyOffset", "()I");
+  keyvalue_get_family_offset_id_ =
+      env->GetMethodID(keyvalue_cl_, "getFamilyOffset", "()I");
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
-  keyvalue_get_family_length_id_ = env->GetMethodID(keyvalue_cl_, "getFamilyLength", "()B");
+  keyvalue_get_family_length_id_ =
+      env->GetMethodID(keyvalue_cl_, "getFamilyLength", "()B");
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
-  keyvalue_get_qualifier_offset_id_ = env->GetMethodID(keyvalue_cl_, "getQualifierOffset", "()I");
+  keyvalue_get_qualifier_offset_id_ =
+      env->GetMethodID(keyvalue_cl_, "getQualifierOffset", "()I");
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
-  keyvalue_get_qualifier_length_id_ = env->GetMethodID(keyvalue_cl_, "getQualifierLength", "()I");
+  keyvalue_get_qualifier_length_id_ =
+      env->GetMethodID(keyvalue_cl_, "getQualifierLength", "()I");
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
   keyvalue_get_row_offset_id_ = env->GetMethodID(keyvalue_cl_, "getRowOffset", "()I");
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
@@ -209,15 +236,17 @@ Status HBaseTableScanner::Init() {
   RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, must_pass_all_op_, &must_pass_all_op_));
 
   // SingleColumnValueFilter method ids.
-  single_column_value_filter_ctor_ = env->GetMethodID(single_column_value_filter_cl_, "<init>",
-      "([B[BLorg/apache/hadoop/hbase/filter/CompareFilter$CompareOp;[B)V");
+  single_column_value_filter_ctor_ =
+      env->GetMethodID(single_column_value_filter_cl_, "<init>",
+          "([B[BLorg/apache/hadoop/hbase/filter/CompareFilter$CompareOp;[B)V");
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
 
   // Get op array from CompareFilter.CompareOp.
   jmethodID compare_op_values = env->GetStaticMethodID(compare_op_cl_, "values",
       "()[Lorg/apache/hadoop/hbase/filter/CompareFilter$CompareOp;");
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
-  compare_ops_ = (jobjectArray) env->CallStaticObjectMethod(compare_op_cl_, compare_op_values);
+  compare_ops_ =
+      (jobjectArray) env->CallStaticObjectMethod(compare_op_cl_, compare_op_values);
   RETURN_IF_ERROR(JniUtil::LocalToGlobalRef(env, reinterpret_cast<jobject>(compare_ops_),
       reinterpret_cast<jobject*>(&compare_ops_)));
 
@@ -226,10 +255,15 @@ Status HBaseTableScanner::Init() {
 
 Status HBaseTableScanner::ScanSetup(const TupleDescriptor* tuple_desc,
     const vector<THBaseFilter>& filters) {
+  // set up HBase specific counter
+  scan_setup_timer_  = ADD_COUNTER(scan_node_->runtime_profile(),
+      "HBaseTableScanner.ScanSetup", TCounterType::CPU_TICKS);
+  COUNTER_SCOPED_TIMER(scan_setup_timer_);
 
   const HBaseTableDescriptor* hbase_table =
       static_cast<const HBaseTableDescriptor*>(tuple_desc->table_desc());
   // htable_ = new HTable(hbase_conf_, hbase_table->table_name());
+  // The entire scansetup is spent on The HTable constructor.
   // TODO: Create and use global cache of HTables.
   jstring jtable_name = env_->NewStringUTF(hbase_table->table_name().c_str());
   htable_ = env_->NewObject(htable_cl_, htable_ctor_, hbase_conf_, jtable_name);
@@ -295,7 +329,8 @@ Status HBaseTableScanner::ScanSetup(const TupleDescriptor* tuple_desc,
   // Add HBase Filters.
   if (!filters.empty()) {
     // filter_list = new FilterList(Operator.MUST_PASS_ALL);
-    jobject filter_list = env_->NewObject(filter_list_cl_, filter_list_ctor_, must_pass_all_op_);
+    jobject filter_list =
+        env_->NewObject(filter_list_cl_, filter_list_ctor_, must_pass_all_op_);
     RETURN_ERROR_IF_EXC(env_, JniUtil::throwable_to_string_id());
     vector<THBaseFilter>::const_iterator it;
     for (it = filters.begin(); it != filters.end(); ++it) {
@@ -308,9 +343,11 @@ Status HBaseTableScanner::ScanSetup(const TupleDescriptor* tuple_desc,
       RETURN_IF_ERROR(CreateByteArray(it->qualifier, &qualifier_bytes));
       jbyteArray value_bytes;
       RETURN_IF_ERROR(CreateByteArray(it->filter_constant, &value_bytes));
-      // filter = new SingleColumnValueFilter(family_bytes, qualifier_bytes, hbase_op, value_bytes);
+      // filter = new SingleColumnValueFilter(family_bytes, qualifier_bytes, hbase_op,
+      //     value_bytes);
       jobject filter = env_->NewObject(single_column_value_filter_cl_,
-          single_column_value_filter_ctor_, family_bytes, qualifier_bytes, hbase_op, value_bytes);
+          single_column_value_filter_ctor_, family_bytes, qualifier_bytes, hbase_op,
+          value_bytes);
       RETURN_ERROR_IF_EXC(env_, JniUtil::throwable_to_string_id());
       // filter_list.add(filter);
       env_->CallBooleanMethod(filter_list, filter_list_add_filter_id_, filter);
@@ -364,7 +401,8 @@ Status HBaseTableScanner::CreateByteArray(const std::string& s, jbyteArray* byte
     if (*bytes == NULL) {
       return Status("Couldn't construct java byte array for key " + s);
     }
-    env_->SetByteArrayRegion(*bytes, 0, s.size(), reinterpret_cast<const jbyte*>(s.data()));
+    env_->SetByteArrayRegion(*bytes, 0, s.size(),
+        reinterpret_cast<const jbyte*>(s.data()));
   } else {
     *bytes = reinterpret_cast<jbyteArray>(empty_row_);
   }
@@ -374,7 +412,10 @@ Status HBaseTableScanner::CreateByteArray(const std::string& s, jbyteArray* byte
 Status HBaseTableScanner::Next(bool* has_next) {
   while(true) {
     // result_ = resultscanner_.next();
-    result_ = env_->CallObjectMethod(resultscanner_, resultscanner_next_id_);
+    {
+     COUNTER_SCOPED_TIMER(scan_node_->scanner_timer());
+     result_ = env_->CallObjectMethod(resultscanner_, resultscanner_next_id_);
+    }
 
     // jump to the next region when finished with the current region.
     if (result_ == NULL &&
@@ -392,10 +433,12 @@ Status HBaseTableScanner::Next(bool* has_next) {
   }
 
   // keyvalues_ = result_.raw();
-  keyvalues_ = reinterpret_cast<jobjectArray>(env_->CallObjectMethod(result_, result_raw_id_));
+  keyvalues_ =
+      reinterpret_cast<jobjectArray>(env_->CallObjectMethod(result_, result_raw_id_));
   num_keyvalues_ = env_->GetArrayLength(keyvalues_);
   // Check that raw() didn't return more keyvalues than expected.
-  // If num_requested_keyvalues_ is 0 then only row key is asked for and this check should pass.
+  // If num_requested_keyvalues_ is 0 then only row key is asked for and this check
+  // should pass.
   if (num_keyvalues_ > num_requested_keyvalues_ + num_addl_requested_cols_
       && num_requested_keyvalues_ + num_addl_requested_cols_ != 0) {
     *has_next = false;
@@ -410,24 +453,37 @@ Status HBaseTableScanner::Next(bool* has_next) {
   }
   keyvalue_index_ = 0;
   // All KeyValues are backed by the same buffer. Place it into the C byffer_.
-  jobject immutable_bytes_writable = env_->CallObjectMethod(result_, result_get_bytes_id_);
+  jobject immutable_bytes_writable =
+      env_->CallObjectMethod(result_, result_get_bytes_id_);
   byte_array_ = (jbyteArray)
       env_->CallObjectMethod(immutable_bytes_writable, immutable_bytes_writable_get_id_);
-  jboolean is_copy = false;
-  buffer_ = env_->GetByteArrayElements(byte_array_, &is_copy);
+
+  int bytes_array_length = env_->CallIntMethod(immutable_bytes_writable,
+      immutable_bytes_writable_get_length_id_);
+  result_bytes_offset_ = env_->CallIntMethod(immutable_bytes_writable,
+      immutable_bytes_writable_get_offset_id_);
+  COUNTER_UPDATE(scan_node_->bytes_read_counter(), bytes_array_length);
+
+  // Copy the data from the java byte array to our buffer_.
+  // Re-allocate buffer_ if necessary.
+  if (buffer_length_ < bytes_array_length) {
+    buffer_pool_->Clear();
+    buffer_ = buffer_pool_->Allocate(bytes_array_length);
+    buffer_length_ = bytes_array_length;
+  }
+  env_->GetByteArrayRegion(byte_array_, result_bytes_offset_, bytes_array_length,
+      reinterpret_cast<jbyte*>(buffer_));
+
   value_pool_->Clear();
   *has_next = true;
   return Status::OK;
 }
 
-void HBaseTableScanner::ReleaseBuffer() {
-  env_->ReleaseByteArrayElements(byte_array_, reinterpret_cast<jbyte*>(buffer_), 0);
-}
-
 void HBaseTableScanner::GetRowKey(void** key, int* key_length) {
   keyvalue_ = env_->GetObjectArrayElement(keyvalues_, 0);
   *key_length = env_->CallShortMethod(keyvalue_, keyvalue_get_row_length_id_);
-  int key_offset = env_->CallIntMethod(keyvalue_, keyvalue_get_row_offset_id_);
+  int key_offset =
+      env_->CallIntMethod(keyvalue_, keyvalue_get_row_offset_id_) - result_bytes_offset_;
   // Allocate one extra byte for null-terminator.
   *key = value_pool_->Allocate(*key_length + 1);
   memcpy(*key, reinterpret_cast<char*>(buffer_) + key_offset, *key_length);
@@ -445,7 +501,8 @@ void HBaseTableScanner::GetValue(const string& family, const string& qualifier,
   keyvalue_ = env_->GetObjectArrayElement(keyvalues_, keyvalue_index_);
   if (!all_keyvalues_present_) {
     // Check family. If it doesn't match, we have a NULL value.
-    int family_offset = env_->CallIntMethod(keyvalue_, keyvalue_get_family_offset_id_);
+    int family_offset = env_->CallIntMethod(keyvalue_, keyvalue_get_family_offset_id_) -
+        result_bytes_offset_;
     int family_length = env_->CallByteMethod(keyvalue_, keyvalue_get_family_length_id_);
     if (CompareStrings(family, family_offset, family_length) != 0) {
       *value = NULL;
@@ -453,17 +510,22 @@ void HBaseTableScanner::GetValue(const string& family, const string& qualifier,
       return;
     }
     // Check qualifier. If it doesn't match, we have a NULL value.
-    int qualifier_offset = env_->CallIntMethod(keyvalue_, keyvalue_get_qualifier_offset_id_);
-    int qualifier_length = env_->CallIntMethod(keyvalue_, keyvalue_get_qualifier_length_id_);
+    int qualifier_offset =
+        env_->CallIntMethod(keyvalue_, keyvalue_get_qualifier_offset_id_) -
+        result_bytes_offset_;
+    int qualifier_length =
+        env_->CallIntMethod(keyvalue_, keyvalue_get_qualifier_length_id_);
     if (CompareStrings(qualifier, qualifier_offset, qualifier_length) != 0) {
       *value = NULL;
       *value_length = 0;
       return;
     }
   }
-  // The requested family/qualifier matches the keyvalue at keyvalue_index_. Copy the cell.
+  // The requested family/qualifier matches the keyvalue at keyvalue_index_.
+  // Copy the cell.
   *value_length = env_->CallIntMethod(keyvalue_, keyvalue_get_value_length_id_);
-  int value_offset = env_->CallIntMethod(keyvalue_, keyvalue_get_value_offset_id_);
+  int value_offset = env_->CallIntMethod(keyvalue_, keyvalue_get_value_offset_id_) -
+                     result_bytes_offset_;
   // Allocate one extra byte for null-terminator.
   *value = value_pool_->Allocate(*value_length + 1);
   memcpy(*value, reinterpret_cast<char*>(buffer_) + value_offset, *value_length);

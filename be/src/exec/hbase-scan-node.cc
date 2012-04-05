@@ -34,13 +34,13 @@ bool HBaseScanNode::CmpColPos(const SlotDescriptor* a, const SlotDescriptor* b) 
 }
 
 Status HBaseScanNode::Prepare(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecNode::Prepare(state));
+  RETURN_IF_ERROR(ScanNode::Prepare(state));
 
   JNIEnv* env = getJNIEnv();
   if (env == NULL) {
     return Status("Failed to get/create JVM");
   }
-  hbase_scanner_.reset(new HBaseTableScanner(env));
+  hbase_scanner_.reset(new HBaseTableScanner(env, this));
 
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   if (tuple_desc_ == NULL) {
@@ -89,6 +89,7 @@ void HBaseScanNode::WriteTextSlot(
     const string& family, const string& qualifier,
     void* value, int value_length, SlotDescriptor* slot,
     RuntimeState* state, bool* error_in_row) {
+  COUNTER_SCOPED_TIMER(tuple_write_timer());
   bool parsed_ok = text_converter_->ConvertAndWriteSlotBytes(reinterpret_cast<char*>(value),
       reinterpret_cast<char*>(value) + value_length, tuple_, slot, true, false);
   if (!parsed_ok) {
@@ -102,6 +103,9 @@ void HBaseScanNode::WriteTextSlot(
 }
 
 Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  // For GetNext, most of the time is spent in HBaseTableScanner::ResultScanner_next,
+  // but there's still some considerable time inside here.
+  // TODO: need to understand how the time is spent inside this function.
   COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   if (ReachedLimit()) {
     *eos = true;
@@ -185,7 +189,6 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
       }
       if (state->abort_on_error()) {
         state->ReportFileErrors(table_name_, 1);
-        hbase_scanner_->ReleaseBuffer();
         return Status(
             "Aborted HBaseScanNode due to conversion errors. View error log "
             "for details.");
@@ -203,11 +206,12 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
       // the tuple assembled for the previous row
       tuple_->Init(tuple_desc_->byte_size());
     }
-    hbase_scanner_->ReleaseBuffer();
   }
 }
 
 Status HBaseScanNode::Close(RuntimeState* state) {
+  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
+
   hbase_scanner_->Close();
   // Report total number of errors.
   if (num_errors_ > 0) {

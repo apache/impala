@@ -82,15 +82,10 @@ class HdfsScanNode : public ScanNode {
   // Scanners check the scan-node every row to see if the limit clause
   // has been satisfied. Therefore they need to update the total
   // number of rows seen directly in the scan node.
-  void IncrNumRowsReturned() { ++num_rows_returned_; }
+  void IncrNumRowsReturned(int num_rows = 1) { num_rows_returned_ += num_rows; }
 
-  // Counter accessors so that scanners can increment them
-  RuntimeProfile::Counter* hdfs_time_counter() const { return hdfs_time_counter_; }
-  RuntimeProfile::Counter* bytes_read_counter() const { return bytes_read_counter_; }
   RuntimeProfile::Counter* parse_time_counter() const { return parse_time_counter_; }
-  RuntimeProfile::Counter* tuple_write_time_counter() const
-    { return tuple_write_time_counter_; }
-  RuntimeProfile::Counter* rows_read_counter() const { return rows_read_counter_; }
+
 
  private:
   // Tuple id resolved in Prepare() to set tuple_desc_;
@@ -168,12 +163,8 @@ class HdfsScanNode : public ScanNode {
   // Used for initialising template_tuple_ with partition key values.
   std::vector<std::pair<int, int> > key_idx_to_slot_idx_;
 
-  // Counters
-  RuntimeProfile::Counter* hdfs_time_counter_;        // time spent in hdfs
-  RuntimeProfile::Counter* bytes_read_counter_;       // bytes read from hdfs
+  // Hdfs specific counter
   RuntimeProfile::Counter* parse_time_counter_;       // time parsing files
-  RuntimeProfile::Counter* tuple_write_time_counter_; // time writing tuple slots
-  RuntimeProfile::Counter* rows_read_counter_;        // time writing tuple slots
 
   // Called once per scan-range to initialise (potentially) a new byte
   // stream and to call the same method on the current scanner.

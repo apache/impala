@@ -82,7 +82,7 @@ Status HdfsScanner::InitCurrentScanRange(RuntimeState* state, HdfsScanRange* ran
 //   3. If it passes, stamp out 'num_tuples' copies of it into the row_batch.
 Status HdfsScanner::WriteTuples(RuntimeState* state, RowBatch* row_batch, int num_tuples,
     int* row_idx) {
-  COUNTER_SCOPED_TIMER(scan_node_->tuple_write_time_counter());
+  COUNTER_SCOPED_TIMER(scan_node_->tuple_write_timer());
 
   DCHECK_GT(num_tuples, 0);
 
@@ -98,6 +98,7 @@ Status HdfsScanner::WriteTuples(RuntimeState* state, RowBatch* row_batch, int nu
   // Add first tuple
   row_batch->CommitLastRow();
   *row_idx = RowBatch::INVALID_ROW_INDEX;
+  scan_node_->IncrNumRowsReturned();
   ++num_rows_returned_;
   --num_tuples;
 
@@ -117,6 +118,7 @@ Status HdfsScanner::WriteTuples(RuntimeState* state, RowBatch* row_batch, int nu
     row_batch->CommitLastRow();
   }
   num_rows_returned_ += num_tuples;
+  scan_node_->IncrNumRowsReturned(num_tuples);
   *row_idx = RowBatch::INVALID_ROW_INDEX;
   return Status::OK;
 }
