@@ -12,11 +12,11 @@ import com.google.common.collect.Lists;
 
 
 /**
- * Inline view is a select statement with an alias
+ * Inline view is a query statement with an alias
  */
 public class InlineViewRef extends TableRef {
-  // The select statement of the inline view
-  private final SelectStmt viewSelectStmt;
+  // The select or union statement of the inline view
+  private final QueryStmt queryStmt;
 
   // Inner query block has its own analysis context
   private Analyzer inlineViewAnalyzer;
@@ -36,9 +36,9 @@ public class InlineViewRef extends TableRef {
    * @param alias inline view alias
    * @param inlineViewStmt the select statement of the inline view
    */
-  public InlineViewRef(String alias, SelectStmt inlineViewStmt) {
+  public InlineViewRef(String alias, QueryStmt inlineViewStmt) {
     super(alias);
-    this.viewSelectStmt = inlineViewStmt;
+    this.queryStmt = inlineViewStmt;
   }
 
   /**
@@ -54,30 +54,22 @@ public class InlineViewRef extends TableRef {
   public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
     // Analyze the inline view select statement with its own Analyzer
     inlineViewAnalyzer = new Analyzer(analyzer);
-    viewSelectStmt.analyze(inlineViewAnalyzer);
+    queryStmt.analyze(inlineViewAnalyzer);
 
     // Register the inline view
     desc = analyzer.registerInlineViewRef(this);
 
     // Update the tupleIdList
-    // If select statement has an aggregate, then the aggregate tuple id is materialized.
-    // Otherwise, all the tables referenced by the inline view are materialized.
-    if (viewSelectStmt.getAggInfo() != null) {
-      tupleIdList.add(viewSelectStmt.getAggInfo().getAggTupleId());
-    } else {
-      for (TableRef tblRef: viewSelectStmt.getTableRefs()) {
-        tupleIdList.addAll(tblRef.getIdList());
-      }
-    }
+    queryStmt.getMaterializedTupleIds(tupleIdList);
 
     // Now do the remaining join analysis
     analyzeJoin(analyzer);
 
     // SlotRef of this inline view is mapped to the underlying expression
-    for (int i = 0; i < viewSelectStmt.getColLabels().size(); ++i) {
-      String colName = viewSelectStmt.getColLabels().get(i);
+    for (int i = 0; i < queryStmt.getColLabels().size(); ++i) {
+      String colName = queryStmt.getColLabels().get(i);
       SlotDescriptor slotD = analyzer.registerColumnRef(getAliasAsName(), colName);
-      Expr colexpr = viewSelectStmt.getSelectListExprs().get(i);
+      Expr colexpr = queryStmt.getResultExprs().get(i);
       sMap.lhs.add(new SlotRef(slotD));
       sMap.rhs.add(colexpr);
     }
@@ -92,8 +84,8 @@ public class InlineViewRef extends TableRef {
     return tupleIdList;
   }
 
-  public SelectStmt getViewSelectStmt() {
-    return viewSelectStmt;
+  public QueryStmt getViewStmt() {
+    return queryStmt;
   }
 
   public Analyzer getAnalyzer() {
@@ -118,6 +110,6 @@ public class InlineViewRef extends TableRef {
 
   @Override
   protected String tableRefToSql() {
-    return "(" + viewSelectStmt.toSql() + ") " + alias;
+    return "(" + queryStmt.toSql() + ") " + alias;
   }
 }

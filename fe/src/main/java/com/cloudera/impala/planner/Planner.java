@@ -20,6 +20,7 @@ import com.cloudera.impala.analysis.DescriptorTable;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.InlineViewRef;
 import com.cloudera.impala.analysis.Predicate;
+import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.SelectStmt;
 import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
@@ -27,6 +28,7 @@ import com.cloudera.impala.analysis.SortInfo;
 import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
+import com.cloudera.impala.analysis.UnionStmt;
 import com.cloudera.impala.catalog.HdfsRCFileTable;
 import com.cloudera.impala.catalog.HdfsSeqFileTable;
 import com.cloudera.impala.catalog.HdfsTextTable;
@@ -144,9 +146,14 @@ public class Planner {
     // TODO (alan): this is incorrect for left outer join. Predicate should not be
     // evaluated after the join.
 
+    if (inlineViewRef.getViewStmt() instanceof UnionStmt) {
+      throw new NotImplementedException("Planning of UNION not implemented yet.");
+    }
+    SelectStmt selectStmt = (SelectStmt) inlineViewRef.getViewStmt();
+
     // If the view select statement does not compute aggregates, predicates are
     // registered with the inline view's analyzer for predicate pushdown.
-    if (inlineViewRef.getViewSelectStmt().getAggInfo() == null) {
+    if (selectStmt.getAggInfo() == null) {
       for (Predicate boundedConjunct: boundConjuncts) {
         inlineViewRef.getAnalyzer().registerConjuncts(boundedConjunct);
       }
@@ -154,13 +161,12 @@ public class Planner {
     }
 
     // Create a tree of plan node for the inline view, using inline view's analyzer.
-    PlanNode result = createSelectPlan(inlineViewRef.getViewSelectStmt(),
-        inlineViewRef.getAnalyzer());
+    PlanNode result = createSelectPlan(selectStmt, inlineViewRef.getAnalyzer());
 
     // If the view select statement has aggregates, predicates aren't pushed into the
     // inline view. The predicates have to be evaluated at the root of the plan node
     // for the inline view (which should be an aggregate node).
-    if (inlineViewRef.getViewSelectStmt().getAggInfo() != null) {
+    if (selectStmt.getAggInfo() != null) {
       result.getConjuncts().addAll(boundConjuncts);
       analyzer.markConjunctsAssigned(boundConjuncts);
     }
@@ -327,7 +333,7 @@ public class Planner {
     List<SlotId> refdIdList = Lists.newArrayList();
     root.getMaterializedIds(refdIdList);
 
-    Expr.getIds(selectStmt.getSelectListExprs(), null, refdIdList);
+    Expr.getIds(selectStmt.getResultExprs(), null, refdIdList);
 
     HashSet<SlotId> refdIds = Sets.newHashSet();
     refdIds.addAll(refdIdList);
@@ -677,11 +683,20 @@ public class Planner {
       throws NotImplementedException, InternalException {
     // Set selectStmt from analyzed SELECT or INSERT query.
     SelectStmt selectStmt = null;
+    if (analysisResult.isQueryStmt() &&
+        analysisResult.getQueryStmt() instanceof UnionStmt) {
+      throw new NotImplementedException("Planning of UNION not implemented.");
+    }
     if (analysisResult.isInsertStmt()) {
-      selectStmt = analysisResult.getInsertStmt().getSelectStmt();
+      QueryStmt queryStmt = analysisResult.getInsertStmt().getQueryStmt();
+      if (queryStmt instanceof UnionStmt) {
+        throw new NotImplementedException("Planning of UNION not implemented.");
+      }
+      selectStmt = (SelectStmt) queryStmt;
     } else {
-      Preconditions.checkState(analysisResult.isSelectStmt());
-      selectStmt = analysisResult.getSelectStmt();
+      Preconditions.checkState(analysisResult.isQueryStmt());
+      Preconditions.checkState(analysisResult.getQueryStmt() instanceof SelectStmt);
+      selectStmt = (SelectStmt) analysisResult.getQueryStmt();
     }
     Analyzer analyzer = analysisResult.getAnalyzer();
     PlanNode spjPlan = createSpjPlan(selectStmt, analyzer);
@@ -690,7 +705,7 @@ public class Planner {
     if (spjPlan == null) {
       // SELECT without FROM clause
       TPlanExecRequest fragmentRequest = new TPlanExecRequest(
-          new TUniqueId(), Expr.treesToThrift(selectStmt.getSelectListExprs()));
+          new TUniqueId(), Expr.treesToThrift(selectStmt.getResultExprs()));
       request.addToFragmentRequests(fragmentRequest);
       return request;
     }
@@ -752,13 +767,13 @@ public class Planner {
       TPlanExecRequest planRequest =
           createPlanExecRequest(root, analyzer.getDescTbl(), request);
       planRequest.setOutputExprs(
-          Expr.treesToThrift(selectStmt.getSelectListExprs()));
+          Expr.treesToThrift(selectStmt.getResultExprs()));
     } else {
       // coordinator fragment comes first
       TPlanExecRequest coordRequest =
           createPlanExecRequest(root, analyzer.getDescTbl(), request);
       coordRequest.setOutputExprs(
-          Expr.treesToThrift(selectStmt.getSelectListExprs()));
+          Expr.treesToThrift(selectStmt.getResultExprs()));
       // create TPlanExecRequest for slave plan
       createPlanExecRequest(slave, analyzer.getDescTbl(), request);
 

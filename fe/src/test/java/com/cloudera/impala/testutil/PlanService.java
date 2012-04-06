@@ -18,7 +18,7 @@ import org.apache.thrift.transport.TTransportException;
 
 import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.SelectStmt;
+import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
@@ -68,9 +68,9 @@ public class PlanService {
 
       // populate colTypes
       List<PrimitiveType> colTypes = Lists.newArrayList();
-      if (analysisResult.isSelectStmt()) {
-        SelectStmt selectStmt = analysisResult.getSelectStmt();
-        for (Expr expr : selectStmt.getSelectListExprs()) {
+      if (analysisResult.isQueryStmt()) {
+        QueryStmt queryStmt = analysisResult.getQueryStmt();
+        for (Expr expr : queryStmt.getResultExprs()) {
           colTypes.add(expr.getType());
         }
       }

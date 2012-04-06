@@ -84,9 +84,9 @@ public class CaseExpr extends Expr {
     PrimitiveType whenType = null;
     // Keep track of maximum compatible type of else expr and all then exprs.
     PrimitiveType returnType = null;
-    // Remember last index of these exprs for error reporting.
-    int lastThenExprIndex = -1;
-    int lastWhenExprIndex = -1;
+    // Remember last of these exprs for error reporting.
+    Expr lastCompatibleThenExpr = null;
+    Expr lastCompatibleWhenExpr = null;
     int loopEnd = children.size();
     if (hasElseExpr) {
       --loopEnd;
@@ -99,7 +99,7 @@ public class CaseExpr extends Expr {
       caseExpr = children.get(0);
       caseExpr.analyze(analyzer);
       whenType = caseExpr.getType();
-      lastWhenExprIndex = 0;
+      lastCompatibleWhenExpr = children.get(0);
     } else {
       whenType = PrimitiveType.BOOLEAN;
       loopStart = 0;
@@ -112,9 +112,9 @@ public class CaseExpr extends Expr {
         // Determine maximum compatible type of the case expr,
         // and all when expr seen so far.
         // We will add casts to them at the very end.
-        whenType = getCompatibleType(analyzer, whenType, whenExpr,
-            lastWhenExprIndex);
-        lastWhenExprIndex = i;
+        whenType = analyzer.getCompatibleType(whenType,
+            lastCompatibleWhenExpr, whenExpr);
+        lastCompatibleWhenExpr = whenExpr;
       } else {
         // If no case expr was given, then the when exprs should always return
         // boolean or be castable to boolean.
@@ -131,14 +131,14 @@ public class CaseExpr extends Expr {
       // Determine maximum compatible type of the then exprs seen so far.
       // We will add casts to them at the very end.
       Expr thenExpr = children.get(i + 1);
-      returnType = getCompatibleType(analyzer, returnType, thenExpr,
-          lastThenExprIndex);
-      lastThenExprIndex = i + 1;
+      returnType = analyzer.getCompatibleType(returnType,
+          lastCompatibleThenExpr, thenExpr);
+      lastCompatibleThenExpr = thenExpr;
     }
     if (hasElseExpr) {
       Expr elseExpr = children.get(children.size() - 1);
-      returnType = getCompatibleType(analyzer, returnType, elseExpr,
-          lastThenExprIndex);
+      returnType = analyzer.getCompatibleType(returnType,
+          lastCompatibleThenExpr, elseExpr);
     }
 
     // Add casts to case expr to compatible type.
@@ -177,41 +177,5 @@ public class CaseExpr extends Expr {
     opcode = match.opcode;
     type = returnType;
     isAnalyzed = true;
-  }
-
-  /**
-   * Returns assignment-compatible type of expr.getType() and lastCompatibleType.
-   * If lastCompatibleType is null, returns expr.getType() (if valid).
-   * If types are not compatible throws an exception reporting
-   * the incompatible types and their expr.toSql().
-   *
-   * @param analyzer
-   * @param lastCompatibleType
-   * @param expr
-   * @param lastExprIndex
-   * @return
-   * @throws AnalysisException
-   */
-  private PrimitiveType getCompatibleType(Analyzer analyzer,
-      PrimitiveType lastCompatibleType, Expr expr, int lastExprIndex)
-      throws AnalysisException {
-    // Analyze then or else expr. They must all return compatible types, otherwise
-    // we cannot statically determine the return type of this case expr.
-    PrimitiveType newCompatibleType;
-    if (lastCompatibleType == null) {
-      newCompatibleType = expr.getType();
-    } else {
-      newCompatibleType =
-          PrimitiveType.getAssignmentCompatibleType(lastCompatibleType, expr.getType());
-    }
-    // We assume this can only happen if lastExprIndex > 0,
-    // since if a child expr already returns INVALID_TYPE, then
-    // an AnalysisException would already have been thrown.
-    if (newCompatibleType == PrimitiveType.INVALID_TYPE) {
-      throw new AnalysisException("Incompatible return types '" + lastCompatibleType +
-          "' and '" + expr.getType() + "' of exprs '" +
-          children.get(lastExprIndex).toSql() + "' and '" + expr.toSql() + "'.");
-    }
-    return newCompatibleType;
   }
 }

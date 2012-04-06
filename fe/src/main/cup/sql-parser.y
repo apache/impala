@@ -3,6 +3,8 @@
 package com.cloudera.impala.analysis;
 
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
+import com.cloudera.impala.analysis.UnionStmt.Qualifier;
 import java.util.ArrayList;
 import java.util.List;
 import java_cup.runtime.Symbol;
@@ -130,13 +132,13 @@ parser code {:
   }
 :};
 
-terminal KW_AND, KW_AS, KW_ASC, KW_AVG, KW_BIGINT, KW_BOOLEAN, KW_BY,
+terminal KW_AND, KW_ALL, KW_AS, KW_ASC, KW_AVG, KW_BIGINT, KW_BOOLEAN, KW_BY,
   KW_CASE, KW_CAST, KW_COUNT, KW_DATE, KW_DATETIME, KW_DESC, KW_DISTINCT,
   KW_DIV, KW_DOUBLE, KW_ELSE, KW_END, KW_FALSE, KW_FLOAT, KW_FROM, KW_FULL, KW_GROUP,
   KW_HAVING, KW_IS, KW_INNER, KW_JOIN, KW_INT, KW_LEFT, KW_LIKE, KW_LIMIT, KW_MIN,
   KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_REGEXP,
   KW_RLIKE, KW_RIGHT, KW_SELECT, KW_SEMI, KW_SMALLINT, KW_STRING, KW_SUM,
-  KW_TINYINT, KW_TRUE, KW_USING, KW_WHEN, KW_WHERE, KW_THEN, KW_TIMESTAMP,
+  KW_TINYINT, KW_TRUE, KW_UNION, KW_USING, KW_WHEN, KW_WHERE, KW_THEN, KW_TIMESTAMP,
   KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION;
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
@@ -149,8 +151,15 @@ terminal Double FLOATINGPOINT_LITERAL;
 terminal String STRING_LITERAL;
 terminal String UNMATCHED_STRING_LITERAL;
 
-nonterminal ParseNodeBase insert_or_select_stmt;
+nonterminal ParseNodeBase insert_or_query_stmt;
+// Single select statement.
 nonterminal SelectStmt select_stmt;
+// Select or union statement.
+nonterminal QueryStmt query_stmt;
+// List of select or union blocks connected by UNION operators or a single select block.
+nonterminal List<UnionOperand> union_operands;
+// List of select blocks connected by UNION operators, with order by or limit.
+nonterminal QueryStmt union_with_order_by_or_limit;
 nonterminal SelectList select_clause;
 nonterminal SelectList select_list;
 nonterminal SelectListItem select_list_item;
@@ -190,6 +199,7 @@ nonterminal ArrayList<PartitionKeyValue> partition_clause;
 nonterminal ArrayList<PartitionKeyValue> partition_key_value_list;
 nonterminal PartitionKeyValue partition_key_value;
 nonterminal Expr expr_or_predicate;
+nonterminal Qualifier union_op;
 
 precedence left KW_OR;
 precedence left KW_AND;
@@ -199,22 +209,25 @@ precedence left EQUAL, LESSTHAN, GREATERTHAN;
 precedence left ADD, SUBTRACT;
 precedence left STAR, DIVIDE, MOD, KW_DIV;
 precedence left BITAND, BITOR, BITXOR, BITNOT;
+precedence left KW_ORDER, KW_BY, KW_LIMIT;
 precedence left RPAREN;
 
-start with insert_or_select_stmt;
+start with insert_or_query_stmt;
 
-insert_or_select_stmt ::= 
-    select_stmt:select
-    {: RESULT = select; :}
+insert_or_query_stmt ::= 
+    query_stmt:query
+    {: RESULT = query; :}
     | insert_stmt:insert
     {: RESULT = insert; :}
     ;
 
 insert_stmt ::=
-    KW_INSERT KW_OVERWRITE KW_TABLE table_name:table partition_clause:list select_stmt:select
-    {: RESULT = new InsertStmt(table, true, list, select); :}
-    | KW_INSERT KW_INTO KW_TABLE table_name:table partition_clause:list select_stmt:select
-    {: RESULT = new InsertStmt(table, false, list, select); :}
+    KW_INSERT KW_OVERWRITE KW_TABLE table_name:table
+    partition_clause:list query_stmt:query
+    {: RESULT = new InsertStmt(table, true, list, query); :}
+    | KW_INSERT KW_INTO KW_TABLE table_name:table
+    partition_clause:list query_stmt:query
+    {: RESULT = new InsertStmt(table, false, list, query); :}
     ;
     
 partition_clause ::=
@@ -249,6 +262,103 @@ partition_key_value ::=
     | IDENT:column EQUAL KW_NULL
     {: RESULT = new PartitionKeyValue(column, new NullLiteral()); :}
     ;
+
+
+// Our parsing of UNION is slightly different from MySQL's:
+// http://dev.mysql.com/doc/refman/5.5/en/union.html
+//
+// Imo, MySQL's parsing of union is not very clear.
+// For example, MySQL cannot parse this query:
+// select 3 order by 1 limit 1 union all select 1;
+//
+// On the other hand, MySQL does parse this query, but associates
+// the order by and limit with the union, not the select:
+// select 3 as g union all select 1 order by 1 limit 2;
+//
+// MySQL also allows some combinations of select blocks
+// with and without parenthesis, but also disallows others.
+//
+// Our parsing:
+// Select blocks may or may not be in parenthesis, 
+// even if the union has order by and limit.
+// ORDER BY and LIMIT bind to the preceding select statement by default.
+query_stmt ::=  
+  union_operands:operands
+  {:
+    QueryStmt queryStmt = null;
+    if (operands.size() == 1) {
+      queryStmt = operands.get(0).getQueryStmt();        
+    } else {
+      queryStmt = new UnionStmt(operands, null, -1);
+    }
+    RESULT = queryStmt;
+  :}
+  | union_with_order_by_or_limit:union
+  {: RESULT = union; :}
+  ;
+
+// We must have a non-empty order by or limit for them to bind to the union.
+// We cannot reuse the existing order_by_clause or 
+// limit_clause because they would introduce conflicts with EOF,
+// which, unfortunately, cannot be accessed in the parser as a nonterminal
+// making this issue unresolvable.
+// We rely on the left precedence of KW_ORDER, KW_BY, and KW_LIMIT,
+// to resolve the ambiguity with select_stmt in favor of select_stmt
+// (i.e., ORDER BY and LIMIT bind to the select_stmt by default, and not the union).
+union_with_order_by_or_limit ::=
+    union_operands:operands
+    KW_ORDER KW_BY order_by_elements:orderByClause
+  {:
+    RESULT = new UnionStmt(operands, orderByClause, -1);
+  :}
+  | 
+    union_operands:operands
+    KW_LIMIT INTEGER_LITERAL:limitClause
+  {:
+    RESULT = new UnionStmt(operands, null, limitClause.longValue());
+  :}
+  |
+    union_operands:operands
+    KW_ORDER KW_BY order_by_elements:orderByClause
+    KW_LIMIT INTEGER_LITERAL:limitClause
+  {:
+    RESULT = new UnionStmt(operands, orderByClause, limitClause.longValue());
+  :}
+  ;
+
+union_operands ::=
+  select_stmt:select
+  {:
+    List<UnionOperand> operands = new ArrayList<UnionOperand>();
+    operands.add(new UnionOperand(select, null));
+    RESULT = operands;
+  :}
+  | LPAREN query_stmt:query RPAREN
+  {:
+    List<UnionOperand> operands = new ArrayList<UnionOperand>();
+    operands.add(new UnionOperand(query, null));
+    RESULT = operands;
+  :}
+  | union_operands:operands union_op:op select_stmt:select
+  {:
+    operands.add(new UnionOperand(select, op));
+    RESULT = operands;
+  :}
+  | union_operands:operands union_op:op LPAREN query_stmt:query RPAREN
+  {:
+    operands.add(new UnionOperand(query, op));
+    RESULT = operands;
+  :}
+  ;
+
+union_op ::=
+  KW_UNION
+  {: RESULT = Qualifier.DISTINCT; :}
+  | KW_UNION KW_DISTINCT
+  {: RESULT = Qualifier.DISTINCT; :}
+  | KW_UNION KW_ALL
+  {: RESULT = Qualifier.ALL; :}
+  ;
 
 select_stmt ::=
     select_clause:selectList
@@ -382,8 +492,8 @@ table_ref ::=
   ;
   
 inline_view_ref ::=
-  LPAREN select_stmt:select RPAREN IDENT:alias
-  {: RESULT = new InlineViewRef(alias, select); :}
+  LPAREN query_stmt:query RPAREN IDENT:alias
+  {: RESULT = new InlineViewRef(alias, query); :}
   ;
   
 base_table_ref ::=

@@ -1,0 +1,124 @@
+// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+
+package com.cloudera.impala.analysis;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import com.cloudera.impala.common.AnalysisException;
+import com.google.common.collect.Lists;
+
+/**
+ * Abstract base class for any statement that returns results
+ * via a list of result expressions, for example a
+ * SelectStmt or UnionStmt. Also maintains a map of expression substitutions
+ * for replacing expressions from ORDER BY or GROUP BY clauses with
+ * their corresponding result expressions.
+ * Used for sharing members/methods and some of the analysis code, in particular the
+ * analysis of the ORDER BY and LIMIT clauses.
+ *
+ */
+public abstract class QueryStmt extends ParseNodeBase {
+  protected ArrayList<OrderByElement> orderByElements;
+  protected final long limit;
+
+  /**
+   * For a select statment:
+   * List of executable exprs in select clause (star-expanded, ordinals and
+   * aliases substituted, agg output substituted
+   * For a union statement:
+   * List of slotrefs into the tuple materialized by the union.
+   */
+  protected final ArrayList<Expr> resultExprs = Lists.newArrayList();
+
+  /**
+   * Map of expression substitutions for replacing aliases
+   * in "order by" or "group by" clauses with their corresponding result expr.
+   */
+  protected final Expr.SubstitutionMap aliasSMap = new Expr.SubstitutionMap();
+
+  protected SortInfo sortInfo;
+
+  QueryStmt(ArrayList<OrderByElement> orderByElements, long limit) {
+    this.orderByElements = orderByElements;
+    this.limit = limit;
+    this.sortInfo = null;
+  }
+
+  /**
+   * Creates sortInfo by resolving aliases and ordinals in the orderingExprs.
+   */
+  protected void createSortInfo(Analyzer analyzer) throws AnalysisException {
+    if (orderByElements == null) {
+      // not computing order by
+      return;
+    }
+
+    ArrayList<Expr> orderingExprs = Lists.newArrayList();
+    ArrayList<Boolean> isAscOrder = Lists.newArrayList();
+
+    // extract exprs
+    for (OrderByElement orderByElement: orderByElements) {
+      // create copies, we don't want to modify the original parse node, in case
+      // we need to print it
+      orderingExprs.add(orderByElement.getExpr().clone());
+      isAscOrder.add(Boolean.valueOf(orderByElement.getIsAsc()));
+    }
+    substituteOrdinals(orderingExprs, "ORDER BY");
+    Expr.substituteList(orderingExprs, aliasSMap);
+    Expr.analyze(orderingExprs, analyzer);
+
+    sortInfo = new SortInfo(orderingExprs, isAscOrder);
+  }
+
+  /**
+   * Substitute exprs of the form "<number>"  with the corresponding
+   * expressions.
+   * @param exprs
+   * @param errorPrefix
+   * @throws AnalysisException
+   */
+  protected abstract void substituteOrdinals(List<Expr> exprs, String errorPrefix)
+      throws AnalysisException;
+
+  /**
+   * UnionStmt and SelectStmt have different implementations.
+   */
+  public abstract ArrayList<String> getColLabels();
+
+  /**
+   * Returns the materialized tuple ids of the output of this stmt.
+   * Used in case this stmt is part of an @InlineViewRef,
+   * since we need to know the materialized tupls ids of a TableRef.
+   */
+  public abstract void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList);
+
+  public ArrayList<OrderByElement> getOrderByElements() {
+    return orderByElements;
+  }
+
+  public void removeOrderByElements() {
+    orderByElements = null;
+  }
+
+  public boolean hasOrderByClause() {
+    return orderByElements != null;
+  }
+
+  public long getLimit() {
+    return limit;
+  }
+
+  public boolean hasLimitClause() {
+    return limit != -1;
+  }
+
+  public SortInfo getSortInfo() {
+    return sortInfo;
+  }
+
+  public ArrayList<Expr> getResultExprs() {
+    return resultExprs;
+  }
+}
+

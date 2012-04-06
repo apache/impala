@@ -30,6 +30,7 @@ public class ToSqlTest {
       ArrayList<String> colLabels = new ArrayList<String>();
       return executor.analyzeQuery(tqueryRequest, colTypes, colLabels);
     } catch (Exception e) {
+      e.printStackTrace();
       fail("Failed to analyze query: " + query + "\n" + e.getMessage());
     }
     return null;
@@ -125,6 +126,49 @@ public class ToSqlTest {
         "GROUP BY bigint_col, int_col " +
         "HAVING COUNT(int_col) > 10 OR SUM(bigint_col) > 20 " +
         "ORDER BY 2 DESC, 3 ASC");
+  }
+
+  @Test
+  public void unionTest() {
+    testToSql("select bool_col, int_col from alltypes " +
+        "union select bool_col, int_col from alltypessmall " +
+        "union select bool_col, bigint_col from alltypes",
+        "SELECT bool_col, int_col FROM alltypes " +
+        "UNION SELECT bool_col, int_col FROM alltypessmall " +
+        "UNION SELECT bool_col, bigint_col FROM alltypes");
+    testToSql("select bool_col, int_col from alltypes " +
+        "union all select bool_col, int_col from alltypessmall " +
+        "union all select bool_col, bigint_col from alltypes",
+        "SELECT bool_col, int_col FROM alltypes " +
+        "UNION ALL SELECT bool_col, int_col FROM alltypessmall " +
+        "UNION ALL SELECT bool_col, bigint_col FROM alltypes");
+    // With 'order by' and 'limit' on union, and also on last select.
+    testToSql("(select bool_col, int_col from alltypes) " +
+        "union all (select bool_col, int_col from alltypessmall) " +
+        "union all (select bool_col, bigint_col from alltypes order by 1 limit 1) " +
+        "order by int_col, bool_col limit 10",
+        "SELECT bool_col, int_col FROM alltypes " +
+        "UNION ALL SELECT bool_col, int_col FROM alltypessmall " +
+        "UNION ALL SELECT bool_col, bigint_col FROM alltypes ORDER BY 1 ASC LIMIT 1 " +
+        "ORDER BY int_col ASC, bool_col ASC LIMIT 10");
+    // With 'order by' and 'limit' on union but not on last select.
+    testToSql("select bool_col, int_col from alltypes " +
+        "union all select bool_col, int_col from alltypessmall " +
+        "union all (select bool_col, bigint_col from alltypes) " +
+        "order by int_col, bool_col limit 10",
+        "SELECT bool_col, int_col FROM alltypes " +
+        "UNION ALL SELECT bool_col, int_col FROM alltypessmall " +
+        "UNION ALL (SELECT bool_col, bigint_col FROM alltypes) " +
+        "ORDER BY int_col ASC, bool_col ASC LIMIT 10");
+    // Nested unions require parenthesis.
+    testToSql("select bool_col, int_col from alltypes " +
+        "union all (select bool_col, int_col from alltypessmall " +
+        "union distinct (select bool_col, bigint_col from alltypes)) " +
+        "order by int_col, bool_col limit 10",
+        "SELECT bool_col, int_col FROM alltypes UNION ALL " +
+        "(SELECT bool_col, int_col FROM alltypessmall " +
+        "UNION SELECT bool_col, bigint_col FROM alltypes) " +
+        "ORDER BY int_col ASC, bool_col ASC LIMIT 10");
   }
 
   // Test the toSql() output of insert queries.

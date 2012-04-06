@@ -31,26 +31,26 @@ public class InsertStmt extends ParseNodeBase {
   // List of column:value elements from the PARTITION (...) clause.
   // Set to null if no partition was given.
   private final List<PartitionKeyValue> partitionKeyValues;
-  // Select statement whose results are to be inserted.
-  private final SelectStmt selectStmt;
+  // Select or union whose results are to be inserted.
+  private final QueryStmt queryStmt;
   // Set in analyze(). Contains metadata of target table to determine type of sink.
   private Table table;
   // Set in analyze(). Exprs corresponding to the partitionKeyValues,
   private final List<Expr> partitionKeyExprs = new ArrayList<Expr>();
 
   public InsertStmt(TableName targetTable, boolean overwrite,
-      List<PartitionKeyValue> partitionKeyValues, SelectStmt selectStmt) {
+      List<PartitionKeyValue> partitionKeyValues, QueryStmt queryStmt) {
     this.targetTableName = targetTable;
     this.overwrite = overwrite;
     this.partitionKeyValues = partitionKeyValues;
-    this.selectStmt = selectStmt;
+    this.queryStmt = queryStmt;
     table = null;
   }
 
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
-    selectStmt.analyze(analyzer);
-    List<Expr> selectListExprs = selectStmt.getSelectListExprs();
+    queryStmt.analyze(analyzer);
+    List<Expr> selectListExprs = queryStmt.getResultExprs();
     Catalog catalog = analyzer.getCatalog();
     table = catalog.getDb(targetTableName.getDb()).getTable(
         targetTableName.getTbl());
@@ -154,7 +154,7 @@ public class InsertStmt extends ParseNodeBase {
         ++numDynamicPartKeys;
       }
     }
-    List<Expr> selectListExprs = selectStmt.getSelectListExprs();
+    List<Expr> selectListExprs = queryStmt.getResultExprs();
     // Position of selectListExpr corresponding to the next dynamic partition column.
     int exprMatchPos = table.getColumns().size() - table.getNumClusteringCols();
     // Temporary lists of partition key exprs and names in an arbitrary order.
@@ -297,8 +297,8 @@ public class InsertStmt extends ParseNodeBase {
     return overwrite;
   }
 
-  public SelectStmt getSelectStmt() {
-    return selectStmt;
+  public QueryStmt getQueryStmt() {
+    return queryStmt;
   }
 
   public List<PartitionKeyValue> getPartitionList() {
@@ -337,7 +337,7 @@ public class InsertStmt extends ParseNodeBase {
       }
       strBuilder.append(") ");
     }
-    strBuilder.append(selectStmt.toSql());
+    strBuilder.append(queryStmt.toSql());
     return strBuilder.toString();
   }
 }

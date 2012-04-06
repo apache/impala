@@ -20,7 +20,7 @@ import com.google.common.collect.Lists;
  * Representation of a single select block, including GROUP BY, ORDERY BY and HAVING clauses.
  *
  */
-public class SelectStmt extends ParseNodeBase {
+public class SelectStmt extends QueryStmt {
   private final static Logger LOG = LoggerFactory.getLogger(SelectStmt.class);
 
   private final SelectList selectList;
@@ -29,17 +29,6 @@ public class SelectStmt extends ParseNodeBase {
   private final Predicate whereClause;
   private final ArrayList<Expr> groupingExprs;
   private final Predicate havingClause;  // original having clause
-  private final ArrayList<OrderByElement> orderByElements;
-  private final long limit;
-
-  /**  map from SlotRef(alias) to corresp. select list expr */
-  private final Expr.SubstitutionMap aliasSMap;
-
-  /**
-   * list of executable exprs in select clause (star-expanded, ordinals and
-   * aliases substituted, agg output substituted
-   */
-  private final ArrayList<Expr> selectListExprs;
 
   /**  havingClause with aliases and agg output resolved */
   private Predicate havingPred;
@@ -50,13 +39,12 @@ public class SelectStmt extends ParseNodeBase {
   /** set if we have DISTINCT aggregate functions */
   private AggregateInfo mergeAggInfo;
 
-  private SortInfo sortInfo;
-
   SelectStmt(SelectList selectList,
              List<TableRef> tableRefList,
              Predicate wherePredicate, ArrayList<Expr> groupingExprs,
              Predicate havingPredicate, ArrayList<OrderByElement> orderByElements,
              long limit) {
+    super(orderByElements, limit);
     this.selectList = selectList;
     if (tableRefList == null) {
       this.tableRefs = Lists.newArrayList();
@@ -66,11 +54,7 @@ public class SelectStmt extends ParseNodeBase {
     this.whereClause = wherePredicate;
     this.groupingExprs = groupingExprs;
     this.havingClause = havingPredicate;
-    this.orderByElements = orderByElements;
-    this.limit = limit;
 
-    this.aliasSMap = new Expr.SubstitutionMap();
-    this.selectListExprs = Lists.newArrayList();
     this.colLabels = Lists.newArrayList();
     this.havingPred = null;
     this.aggInfo = null;
@@ -82,14 +66,6 @@ public class SelectStmt extends ParseNodeBase {
    */
   public SelectList getSelectList() {
     return selectList;
-  }
-
-  /**
-   * @return the list of post-analysis exprs corresponding to the
-   * select list from the original query ('*'-expanded)
-   */
-  public ArrayList<Expr> getSelectListExprs() {
-    return selectListExprs;
   }
 
   /**
@@ -107,18 +83,6 @@ public class SelectStmt extends ParseNodeBase {
     return whereClause;
   }
 
-  public ArrayList<OrderByElement> getOrderByElements() {
-    return orderByElements;
-  }
-
-  public boolean hasOrderByClause() {
-    return orderByElements != null;
-  }
-
-  public long getLimit() {
-    return limit;
-  }
-
   public AggregateInfo getAggInfo() {
     return aggInfo;
   }
@@ -127,10 +91,12 @@ public class SelectStmt extends ParseNodeBase {
     return mergeAggInfo;
   }
 
+  @Override
   public SortInfo getSortInfo() {
     return sortInfo;
   }
 
+  @Override
   public ArrayList<String> getColLabels() {
     return colLabels;
   }
@@ -155,7 +121,7 @@ public class SelectStmt extends ParseNodeBase {
           expandStar(analyzer, tblName);
         }
       } else {
-        selectListExprs.add(item.getExpr());
+        resultExprs.add(item.getExpr());
         if (item.getAlias() != null) {
           aliasSMap.lhs.add(
               new SlotRef(null, item.getAlias().toLowerCase()));
@@ -168,7 +134,7 @@ public class SelectStmt extends ParseNodeBase {
     }
 
     // analyze selectListExprs
-    Expr.analyze(selectListExprs, analyzer);
+    Expr.analyze(resultExprs, analyzer);
 
     if (whereClause != null) {
       whereClause.analyze(analyzer);
@@ -213,7 +179,7 @@ public class SelectStmt extends ParseNodeBase {
     // and this select block's analyzer expressions
 
     // select
-    Expr.substituteList(selectListExprs, sMap);
+    Expr.substituteList(resultExprs, sMap);
 
     // join clause
     for (TableRef tblRef: tableRefs) {
@@ -278,7 +244,7 @@ public class SelectStmt extends ParseNodeBase {
                           TupleDescriptor desc)
       throws AnalysisException {
     for (Column col: desc.getTable().getColumns()) {
-      selectListExprs.add(
+      resultExprs.add(
           new SlotRef(new TableName(null, alias), col.getName()));
       colLabels.add(col.getName().toLowerCase());
     }
@@ -296,12 +262,12 @@ public class SelectStmt extends ParseNodeBase {
   private void analyzeAggregation(Analyzer analyzer)
       throws AnalysisException, InternalException {
     if (groupingExprs == null && !selectList.isDistinct()
-        && !Expr.contains(selectListExprs, AggregateExpr.class)) {
+        && !Expr.contains(resultExprs, AggregateExpr.class)) {
       // we're not computing aggregates
       return;
     }
 
-    if ((groupingExprs != null || Expr.contains(selectListExprs, AggregateExpr.class))
+    if ((groupingExprs != null || Expr.contains(resultExprs, AggregateExpr.class))
         && selectList.isDistinct()) {
       throw new AnalysisException(
         "cannot combine SELECT DISTINCT with aggregate functions or GROUP BY");
@@ -374,8 +340,8 @@ public class SelectStmt extends ParseNodeBase {
     LOG.info("combined smap: " + combinedSMap.debugString());
 
     // change select list, having and ordering exprs to point to agg output
-    Expr.substituteList(selectListExprs, combinedSMap);
-    LOG.info("post-agg selectListExprs: " + Expr.debugString(selectListExprs));
+    Expr.substituteList(resultExprs, combinedSMap);
+    LOG.info("post-agg selectListExprs: " + Expr.debugString(resultExprs));
     if (havingPred != null) {
       havingPred = (Predicate) havingPred.substitute(combinedSMap);
       LOG.info("post-agg havingPred: " + havingPred.debugString());
@@ -385,7 +351,7 @@ public class SelectStmt extends ParseNodeBase {
 
     // check that all post-agg exprs point to agg output
     for (int i = 0; i < selectList.getItems().size(); ++i) {
-      if (!selectListExprs.get(i).isBound(finalAggInfo.getAggTupleId())) {
+      if (!resultExprs.get(i).isBound(finalAggInfo.getAggTupleId())) {
         throw new AnalysisException(
             "select list expression not produced by aggregation output "
             + "(missing from GROUP BY clause?): "
@@ -414,7 +380,7 @@ public class SelectStmt extends ParseNodeBase {
 
   private ArrayList<AggregateExpr> collectAggExprs() {
     ArrayList<AggregateExpr> result = Lists.newArrayList();
-    Expr.collectList(selectListExprs, AggregateExpr.class, result);
+    Expr.collectList(resultExprs, AggregateExpr.class, result);
     if (havingPred != null) {
       havingPred.collect(AggregateExpr.class, result);
     }
@@ -501,7 +467,7 @@ public class SelectStmt extends ParseNodeBase {
    * - there are no aggregate exprs
    */
   private void createSelectDistinctInfo(DescriptorTable descTbl) {
-    ArrayList<Expr> groupingExprs = Expr.cloneList(selectListExprs, null);
+    ArrayList<Expr> groupingExprs = Expr.cloneList(resultExprs, null);
     aggInfo = new AggregateInfo(groupingExprs, null);
     aggInfo.createAggTuple(descTbl);
   }
@@ -572,29 +538,6 @@ public class SelectStmt extends ParseNodeBase {
     LOG.info("distinct agg smap, phase 2: " + mergeAggInfo.getSMap().debugString());
   }
 
-  private void createSortInfo(Analyzer analyzer) throws AnalysisException {
-    if (orderByElements == null) {
-      // not computing order by
-      return;
-    }
-
-    ArrayList<Expr> orderingExprs = Lists.newArrayList();
-    ArrayList<Boolean> isAscOrder = Lists.newArrayList();
-
-    // extract exprs
-    for (OrderByElement orderByElement: orderByElements) {
-      // create copies, we don't want to modify the original parse node, in case
-      // we need to print it
-      orderingExprs.add(orderByElement.getExpr().clone());
-      isAscOrder.add(Boolean.valueOf(orderByElement.getIsAsc()));
-    }
-    substituteOrdinals(orderingExprs, "ORDER BY");
-    Expr.substituteList(orderingExprs, aliasSMap);
-    Expr.analyze(orderingExprs, analyzer);
-
-    sortInfo = new SortInfo(orderingExprs, isAscOrder);
-  }
-
   /**
    * Substitute exprs of the form "<number>"  with the corresponding
    * expressions from select list
@@ -602,7 +545,8 @@ public class SelectStmt extends ParseNodeBase {
    * @param errorPrefix
    * @throws AnalysisException
    */
-  private void substituteOrdinals(List<Expr> exprs, String errorPrefix)
+  @Override
+  protected void substituteOrdinals(List<Expr> exprs, String errorPrefix)
       throws AnalysisException {
     // substitute ordinals
     ListIterator<Expr> i = exprs.listIterator();
@@ -675,6 +619,24 @@ public class SelectStmt extends ParseNodeBase {
         strBuilder.append((i+1 != orderByElements.size()) ? ", " : "");
       }
     }
+    // Limit clause.
+    if (hasLimitClause()) {
+      strBuilder.append(" LIMIT ");
+      strBuilder.append(limit);
+    }
     return strBuilder.toString();
+  }
+
+  @Override
+  public void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList) {
+    // If select statement has an aggregate, then the aggregate tuple id is materialized.
+    // Otherwise, all the tables referenced by the inline view are materialized.
+    if (aggInfo != null) {
+      tupleIdList.add(aggInfo.getAggTupleId());
+    } else {
+      for (TableRef tblRef: tableRefs) {
+        tupleIdList.addAll(tblRef.getIdList());
+      }
+    }
   }
 }

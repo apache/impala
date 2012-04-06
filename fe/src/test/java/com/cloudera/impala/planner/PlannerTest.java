@@ -8,7 +8,6 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.List;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -72,7 +71,8 @@ public class PlannerTest {
     } catch (InternalException e) {
       errorLog.append("query:\n" + query + "\ninternal error: " + e.getMessage() + "\n");
     } catch (NotImplementedException e) {
-      errorLog.append("query:\n" + query + "\nplan not implemented");
+      errorLog.append("query:\n" + query + "\nplan not implemented: " +
+          e.getMessage() + "\n");
     }
   }
 
@@ -111,17 +111,31 @@ public class PlannerTest {
       actualOutput.append("---- PLAN\n");
       // each planner test case contains multiple result sections:
       // - the first one is for the single-node plan
-      // - the subsequent one is for distributed plans; there is one
-      //   section for all plan fragments produced by the planner
-      List<String> plan = testCase.getSectionContents(Section.PLAN);
-      if (plan.size() > 0 && plan.get(0).toLowerCase().startsWith("not implemented")) {
+      // - the subsequent ones are for distributed plans; there is one
+      //   section per plan fragment produced by the planner
+      // only execute the multi-node plan if the single-node plan is implemented.
+      // the multi-node plan may not be implemented.
+      ArrayList<String> singleNodePlan = testCase.getSectionContents(Section.PLAN);
+      if (singleNodePlan.size() > 0 &&
+          singleNodePlan.get(0).toLowerCase().startsWith("not implemented")) {
         RunUnimplementedQuery(query, errorLog);
         actualOutput.append("not implemented\n");
       } else {
+        // Run single-node query,
         RunQuery(query, 1, testCase, Section.PLAN, errorLog, actualOutput, level);
-        actualOutput.append("------------ DISTRIBUTEDPLAN\n");
-        RunQuery(query, Constants.NUM_NODES_ALL, testCase, Section.DISTRIBUTEDPLAN,
-                 errorLog, actualOutput, level);
+        // Check if multi-node query is implemented.
+        ArrayList<String> multiNodePlan = testCase.getSectionContents(Section.DISTRIBUTEDPLAN);
+        if (multiNodePlan.size() > 0 &&
+            multiNodePlan.get(0).toLowerCase().startsWith("not implemented")) {
+          RunUnimplementedQuery(query, errorLog);
+          actualOutput.append("not implemented\n");
+        } else {
+          actualOutput.append("------------ DISTRIBUTEDPLAN\n");
+          // Run multi-node query.
+          actualOutput.append("------------\n");
+          RunQuery(query, Constants.NUM_NODES_ALL, testCase, Section.DISTRIBUTEDPLAN, errorLog,
+                   actualOutput, level);
+        }
       }
       actualOutput.append("====\n");
     }

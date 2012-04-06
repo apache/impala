@@ -62,7 +62,7 @@ public class AnalyzerTest {
    */
   private void CheckSelectToThrift(SelectStmt node) {
     // convert select list exprs and where clause to thrift
-    List<Expr> selectListExprs = node.getSelectListExprs();
+    List<Expr> selectListExprs = node.getResultExprs();
     List<TExpr> thriftExprs = Expr.treesToThrift(selectListExprs);
     LOG.info("select list:\n");
     for (TExpr expr: thriftExprs) {
@@ -98,15 +98,11 @@ public class AnalyzerTest {
     }
   }
 
+
   /**
-   * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
-   *
-   * @param stmt
-   * @return
-   * @throws AnalysisException
+   * Parse 'stmt' and return the root ParseNode.
    */
-  public ParseNode AnalyzesOk(String stmt) throws AnalysisException {
-    LOG.info("analyzing " + stmt);
+  public ParseNode ParsesOk(String stmt) {
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
     ParseNode node = null;
@@ -116,6 +112,19 @@ public class AnalyzerTest {
       System.err.println(e.toString());
       fail("\nParser error:\n" + parser.getErrorMsg(stmt));
     }
+    assertNotNull(node);
+    return node;
+  }
+
+  /**
+   * Analyze 'stmt', expecting it to pass. Asserts in case of analysis error.
+   *
+   * @param stmt
+   * @return
+   */
+  public ParseNode AnalyzesOk(String stmt) {
+    LOG.info("analyzing " + stmt);
+    ParseNode node = ParsesOk(stmt);
     assertNotNull(node);
     analyzer = new Analyzer(catalog);
     try {
@@ -129,7 +138,11 @@ public class AnalyzerTest {
       CheckSelectToThrift((SelectStmt)node);
     } else if (node instanceof InsertStmt) {
       InsertStmt insertStmt = (InsertStmt) node;
-      CheckSelectToThrift(insertStmt.getSelectStmt());
+      if (insertStmt.getQueryStmt() instanceof SelectStmt) {
+        CheckSelectToThrift((SelectStmt) insertStmt.getQueryStmt());
+      } else {
+        fail("toThrift() of UnionStmt not implemented.");
+      }
     }
     return node;
   }
@@ -327,6 +340,31 @@ public class AnalyzerTest {
     AnalysisError("select zip + count(*) from testtbl",
         "select list expression not produced by aggregation output " +
         "(missing from GROUP BY clause?)");
+
+    // union test
+    AnalyzesOk("select a.* from " +
+        "(select int_col from alltypes " +
+        " union all " +
+        " select tinyint_col from alltypessmall) a");
+    AnalyzesOk("select a.* from " +
+        "(select int_col from alltypes " +
+        " union all " +
+        " select tinyint_col from alltypessmall) a " +
+        "union all " +
+        "select smallint_col from alltypes");
+    AnalyzesOk("select a.* from " +
+        "(select int_col from alltypes " +
+        " union all " +
+        " select b.smallint_col from " +
+        "  (select smallint_col from alltypessmall" +
+        "   union all" +
+        "   select tinyint_col from alltypes) b) a");
+    // negative union test, column labels are inherited from first select block
+    AnalysisError("select tinyint_col from " +
+        "(select int_col from alltypes " +
+        " union all " +
+        " select tinyint_col from alltypessmall) a",
+        "couldn't resolve column reference: 'tinyint_col'");
 
     // negative aggregate test
     AnalysisError("select * from " +
@@ -751,7 +789,7 @@ public class AnalyzerTest {
   @Test public void TestAvgSubstitution() throws AnalysisException {
     SelectStmt select = (SelectStmt) AnalyzesOk(
         "select avg(id) from testtbl having count(id) > 0 order by avg(zip)");
-    ArrayList<Expr> selectListExprs = select.getSelectListExprs();
+    ArrayList<Expr> selectListExprs = select.getResultExprs();
     assertNotNull(selectListExprs);
     assertEquals(selectListExprs.size(), 1);
     // all agg exprs are replaced with refs to agg output slots
@@ -1029,7 +1067,7 @@ public class AnalyzerTest {
     SelectStmt select = (SelectStmt) AnalyzesOk(queryStr);
     Expr expr = null;
     if (arithmeticMode) {
-      ArrayList<Expr> selectListExprs = select.getSelectListExprs();
+      ArrayList<Expr> selectListExprs = select.getResultExprs();
       assertNotNull(selectListExprs);
       assertEquals(selectListExprs.size(), 1);
       // check the first expr in select list
@@ -1162,6 +1200,104 @@ public class AnalyzerTest {
     AnalyzesOk("select case when true then 1.0 end");
     AnalyzesOk("select case when true then 'abc' end");
     AnalyzesOk("select case when true then cast('2011-01-01 09:01:01' as timestamp) end");
+  }
+
+  @Test
+  public void TestUnion() {
+    // Selects on different tables.
+    AnalyzesOk("select int_col from alltypes union select int_col from alltypessmall");
+    // Selects on same table without aliases.
+    AnalyzesOk("select int_col from alltypes union select int_col from alltypes");
+    // Longer union chain.
+    AnalyzesOk("select int_col from alltypes union select int_col from alltypes " +
+        "union select int_col from alltypes union select int_col from alltypes");
+    // All columns, perfectly compatible.
+    AnalyzesOk("select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col, year," +
+        "month from alltypes union " +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col, timestamp_col, year," +
+        "month from alltypes");
+    // Make sure table aliases aren't visible across union operands.
+    AnalyzesOk("select a.smallint_col from alltypes a " +
+        "union select a.int_col from alltypessmall a");
+
+    // No from clause. Has literals and NULLs. Requires implicit casts.
+    AnalyzesOk("select 1, 2, 3 " +
+        "union select NULL, NULL, NULL " +
+        "union select 1.0, NULL, 3 " +
+        "union select NULL, 10, NULL");
+    // Implicit casts on integer types.
+    AnalyzesOk("select tinyint_col from alltypes " +
+        "union select smallint_col from alltypes " +
+        "union select int_col from alltypes " +
+        "union select bigint_col from alltypes");
+    // Implicit casts on float types.
+    AnalyzesOk("select float_col from alltypes union select double_col from alltypes");
+    // Implicit casts on all numeric types with two columns from each select.
+    AnalyzesOk("select tinyint_col, double_col from alltypes " +
+        "union select smallint_col, float_col from alltypes " +
+        "union select int_col, bigint_col from alltypes " +
+        "union select bigint_col, int_col from alltypes " +
+        "union select float_col, smallint_col from alltypes " +
+        "union select double_col, tinyint_col from alltypes");
+
+    // With order by and limit.
+    AnalyzesOk("(select int_col from alltypes) " +
+        "union (select tinyint_col from alltypessmall) " +
+        "order by int_col limit 1");
+    // Bigger order by.
+    AnalyzesOk("(select tinyint_col, double_col from alltypes) " +
+        "union (select smallint_col, float_col from alltypes) " +
+        "union (select int_col, bigint_col from alltypes) " +
+        "union (select bigint_col, int_col from alltypes) " +
+        "order by double_col, tinyint_col");
+    // Bigger order by with ordinals.
+    AnalyzesOk("(select tinyint_col, double_col from alltypes) " +
+        "union (select smallint_col, float_col from alltypes) " +
+        "union (select int_col, bigint_col from alltypes) " +
+        "union (select bigint_col, int_col from alltypes) " +
+        "order by 2, 1");
+
+    // Unequal number of columns.
+    AnalysisError("select int_col from alltypes " +
+        "union select int_col, float_col from alltypes",
+        "Select blocks have unequal number of columns:\n" +
+        "'SELECT int_col FROM alltypes' has 1 column(s)\n" +
+        "'SELECT int_col, float_col FROM alltypes' has 2 column(s)");
+    // Unequal number of columns, longer union chain.
+    AnalysisError("select int_col from alltypes " +
+        "union select tinyint_col from alltypes " +
+        "union select smallint_col from alltypes " +
+        "union select smallint_col, bigint_col from alltypes",
+        "Select blocks have unequal number of columns:\n" +
+        "'SELECT int_col FROM alltypes' has 1 column(s)\n" +
+        "'SELECT smallint_col, bigint_col FROM alltypes' has 2 column(s)");
+    // Incompatible types.
+    AnalysisError("select bool_col from alltypes " +
+        "union select string_col from alltypes",
+        "Incompatible return types 'BOOLEAN' and 'STRING' " +
+        "of exprs 'bool_col' and 'string_col'.");
+    // Incompatible types, longer union chain.
+    AnalysisError("select int_col, string_col from alltypes " +
+        "union select tinyint_col, bool_col from alltypes " +
+        "union select smallint_col, int_col from alltypes " +
+        "union select smallint_col, bool_col from alltypes",
+        "Incompatible return types 'STRING' and 'BOOLEAN' of " +
+        "exprs 'string_col' and 'bool_col'.");
+    // Invalid ordinal in order by.
+    AnalysisError("(select int_col from alltypes) " +
+        "union (select int_col from alltypessmall) order by 2",
+        "ORDER BY: ordinal exceeds number of items in select list: 2");
+    // Column labels are inherited from first select block.
+    // Order by references an invalid column
+    AnalysisError("(select smallint_col from alltypes) " +
+        "union (select int_col from alltypessmall) order by int_col",
+        "couldn't resolve column reference: 'int_col'");
+    // Make sure table aliases aren't visible across union operands.
+    AnalysisError("select a.smallint_col from alltypes a " +
+        "union select a.int_col from alltypessmall",
+        "unknown table alias: 'a'");
   }
 
   @Test
@@ -1399,5 +1535,4 @@ public class AnalyzerTest {
       checkCasts(child);
     }
   }
-
 }

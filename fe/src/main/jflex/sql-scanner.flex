@@ -34,6 +34,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
       new LinkedHashMap<String, Integer>();
   static {
     keywordMap.put("&&", new Integer(SqlParserSymbols.KW_AND));
+    keywordMap.put("all", new Integer(SqlParserSymbols.KW_ALL));
     keywordMap.put("and", new Integer(SqlParserSymbols.KW_AND));    
     keywordMap.put("as", new Integer(SqlParserSymbols.KW_AS));
     keywordMap.put("asc", new Integer(SqlParserSymbols.KW_ASC));
@@ -89,6 +90,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("table", new Integer(SqlParserSymbols.KW_TABLE));
     keywordMap.put("tinyint", new Integer(SqlParserSymbols.KW_TINYINT));
     keywordMap.put("using", new Integer(SqlParserSymbols.KW_USING));
+    keywordMap.put("union", new Integer(SqlParserSymbols.KW_UNION));
     keywordMap.put("when", new Integer(SqlParserSymbols.KW_WHEN));
     keywordMap.put("where", new Integer(SqlParserSymbols.KW_WHERE));
     keywordMap.put("then", new Integer(SqlParserSymbols.KW_THEN));

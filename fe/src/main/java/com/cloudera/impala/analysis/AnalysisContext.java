@@ -19,20 +19,20 @@ public class AnalysisContext {
   }
 
   static public class AnalysisResult {
-    // SelectStmt or InsertStmt.
+    // SelectStmt, InsertStmt or UnionStmt.
     private ParseNode stmt;
     private Analyzer analyzer;
 
-    public boolean isSelectStmt() {
-      return stmt instanceof SelectStmt;
+    public boolean isQueryStmt() {
+      return stmt instanceof QueryStmt;
     }
 
     public boolean isInsertStmt() {
       return stmt instanceof InsertStmt;
     }
 
-    public SelectStmt getSelectStmt() {
-      return (SelectStmt) stmt;
+    public QueryStmt getQueryStmt() {
+      return (QueryStmt) stmt;
     }
 
     public InsertStmt getInsertStmt() {

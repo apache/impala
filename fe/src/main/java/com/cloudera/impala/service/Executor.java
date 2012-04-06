@@ -26,7 +26,7 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.InsertStmt;
-import com.cloudera.impala.analysis.SelectStmt;
+import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HdfsTable;
@@ -92,8 +92,8 @@ public class Executor {
     AnalysisContext.AnalysisResult analysisResult =
         analyzeQuery(request, colTypes, colLabels);
     if (containsOrderBy != null) {
-      containsOrderBy.set(analysisResult.isSelectStmt()
-          && analysisResult.getSelectStmt().hasOrderByClause());
+      containsOrderBy.set(analysisResult.isQueryStmt()
+          && analysisResult.getQueryStmt().hasOrderByClause());
     }
     execQuery(analysisResult, request.numNodes, batchSize, abortOnError, maxErrors,
               disableCodegen, errorLog, fileErrors, request.returnAsAscii, resultQueue,
@@ -120,8 +120,8 @@ public class Executor {
     final AnalysisContext.AnalysisResult analysisResult =
         analyzeQuery(request, colTypes, colLabels);
     if (containsOrderBy != null) {
-      containsOrderBy.set(analysisResult.isSelectStmt()
-          && analysisResult.getSelectStmt().hasOrderByClause());
+      containsOrderBy.set(analysisResult.isQueryStmt()
+          && analysisResult.getQueryStmt().hasOrderByClause());
     }
     Runnable execCall = new Runnable() {
       public void run() {
@@ -172,17 +172,17 @@ public class Executor {
     Preconditions.checkNotNull(analysisResult.getStmt());
 
     // TODO: handle EXPLAIN
-    if (analysisResult.isSelectStmt()) {
-      SelectStmt selectStmt = analysisResult.getSelectStmt();
+    if (analysisResult.isQueryStmt()) {
+      QueryStmt queryStmt = analysisResult.getQueryStmt();
       // populate colTypes
       colTypes.clear();
-      for (Expr expr : selectStmt.getSelectListExprs()) {
+      for (Expr expr : queryStmt.getResultExprs()) {
         colTypes.add(expr.getType());
       }
 
       // populate column labels for display purposes (e.g., via the CLI).
       colLabels.clear();
-      colLabels.addAll(selectStmt.getColLabels());
+      colLabels.addAll(queryStmt.getColLabels());
     }
 
     return analysisResult;

@@ -13,6 +13,7 @@ import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.InlineView;
+import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.google.common.collect.Lists;
@@ -143,12 +144,12 @@ public class Analyzer {
     }
 
     // Create a fake catalog table for the inline view
-    SelectStmt viewSelectStmt = ref.getViewSelectStmt();
+    QueryStmt viewStmt = ref.getViewStmt();
     InlineView inlineView = new InlineView(ref.getAlias());
-    for (int i = 0; i < viewSelectStmt.getColLabels().size(); ++i) {
+    for (int i = 0; i < viewStmt.getColLabels().size(); ++i) {
       // inline view select statement has been analyzed. Col label should be filled.
-      Expr selectItemExpr = viewSelectStmt.getSelectListExprs().get(i);
-      String colAlias = viewSelectStmt.getColLabels().get(i);
+      Expr selectItemExpr = viewStmt.getResultExprs().get(i);
+      String colAlias = viewStmt.getColLabels().get(i);
 
       // inline view col cannot have duplicate name
       if (inlineView.getColumn(colAlias) != null) {
@@ -388,5 +389,39 @@ public class Analyzer {
    */
   public boolean hasUnassignedConjuncts() {
     return !assignedConjuncts.containsAll(conjuncts);
+  }
+
+  /**
+   * Returns assignment-compatible type of expr.getType() and lastCompatibleType.
+   * If lastCompatibleType is null, returns expr.getType() (if valid).
+   * If types are not compatible throws an exception reporting
+   * the incompatible types and their expr.toSql().
+   *
+   * lastCompatibleExpr is passed for error reporting purposes,
+   * but note that lastCompatibleExpr may not yet have lastCompatibleType,
+   * because it was not cast yet.
+   *
+   * @param lastCompatibleType
+   * @param expr
+   * @param lastExprIndex
+   * @return
+   * @throws AnalysisException
+   */
+  public PrimitiveType getCompatibleType(PrimitiveType lastCompatibleType,
+      Expr lastCompatibleExpr, Expr expr)
+      throws AnalysisException {
+    PrimitiveType newCompatibleType;
+    if (lastCompatibleType == null) {
+      newCompatibleType = expr.getType();
+    } else {
+      newCompatibleType =
+          PrimitiveType.getAssignmentCompatibleType(lastCompatibleType, expr.getType());
+    }
+    if (newCompatibleType == PrimitiveType.INVALID_TYPE) {
+      throw new AnalysisException("Incompatible return types '" + lastCompatibleType +
+          "' and '" + expr.getType() + "' of exprs '" +
+          lastCompatibleExpr.toSql() + "' and '" + expr.toSql() + "'.");
+    }
+    return newCompatibleType;
   }
 }

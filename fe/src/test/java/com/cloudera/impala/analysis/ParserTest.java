@@ -179,6 +179,83 @@ public class ParserTest {
         "where a > 10");
   }
 
+  @Test public void TestUnion() {
+    // Single union test.
+    ParsesOk("select a from test union select a from test");
+    ParsesOk("select a from test union all select a from test");
+    ParsesOk("select a from test union distinct select a from test");
+    // Chained union test.
+    ParsesOk("select a from test union select a from test " +
+        "union select a from test union select a from test");
+    ParsesOk("select a from test union all select a from test " +
+        "union all select a from test union all select a from test");
+    ParsesOk("select a from test union distinct select a from test " +
+        "union distinct select a from test union distinct select a from test ");
+    // Mixed union with all and distinct.
+    ParsesOk("select a from test union select a from test " +
+        "union all select a from test union distinct select a from test");
+    // No from clause.
+    ParsesOk("select sin() union select cos()");
+    ParsesOk("select sin() union all select cos()");
+    ParsesOk("select sin() union distinct select cos()");
+
+    // All select blocks in parenthesis.
+    ParsesOk("(select a from test) union (select a from test) " +
+        "union (select a from test) union (select a from test)");
+    // Union with order by,
+    ParsesOk("(select a from test) union (select a from test) " +
+        "union (select a from test) union (select a from test) order by a");
+    // Union with limit.
+    ParsesOk("(select a from test) union (select a from test) " +
+        "union (select a from test) union (select a from test) limit 10");
+    // Union with order by and limit.
+    ParsesOk("(select a from test) union (select a from test) " +
+        "union (select a from test) union (select a from test) order by a limit 10");
+    // Union with some select blocks in parenthesis, and others not.
+    ParsesOk("(select a from test) union select a from test " +
+        "union (select a from test) union select a from test");
+    ParsesOk("select a from test union (select a from test) " +
+        "union select a from test union (select a from test)");
+    // Union with order by and limit binding to last select.
+    ParsesOk("(select a from test) union (select a from test) " +
+        "union select a from test union select a from test order by a limit 10");
+    // Union with order by and limit.
+    // Last select with order by and limit is in parenthesis.
+    ParsesOk("select a from test union (select a from test) " +
+        "union select a from test union (select a from test order by a limit 10) " +
+        "order by a limit 1");
+    // Union with order by and limit.
+    // Last select with order by and limit is not in parenthesis.
+    ParsesOk("select a from test union select a from test " +
+        "union select a from test union select a from test order by a limit 10 " +
+        "order by a limit 1");
+
+    // Nested unions with order by and limit.
+    ParsesOk("select a union " +
+        "((select b) union (select c) order by 1 limit 1)");
+    ParsesOk("select a union " +
+    		"((select b) union " +
+    		"  ((select c) union (select d) " +
+    		"   order by 1 limit 1) " +
+    		" order by 1 limit 1)");
+
+    // Union in insert query.
+    ParsesOk("insert into table t select a from test union select a from test");
+    ParsesOk("insert into table t select a from test union select a from test " +
+        "union select a from test union select a from test");
+    ParsesOk("insert overwrite table t select a from test union select a from test");
+    ParsesOk("insert overwrite table t select a from test union select a from test " +
+        "union select a from test union select a from test");
+
+    // No complete select statement on lhs.
+    ParserError("a from test union select a from test");
+    // No complete select statement on rhs.
+    ParserError("select a from test union a from test");
+    // Union cannot be a column or table since it's a keyword.
+    ParserError("select union from test");
+    ParserError("select a from union");
+  }
+
   @Test public void TestOverflow() {
     ParsesOk("select " + Long.toString(Long.MAX_VALUE) + " from test");
     // We need to add 1 to MIN_VALUE because there are no negative integer literals.
@@ -461,7 +538,8 @@ public class ParserTest {
         "select from t\n" +
         "       ^\n" +
         "Encountered: FROM\n" +
-        "Expected: AVG, CASE, CAST, COUNT, DISTINCT, FALSE, MIN, MAX, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
+        "Expected: AVG, CASE, CAST, COUNT, DISTINCT, FALSE, " +
+        "MIN, MAX, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
 
     // missing from
     ParserError("select c, b, c where a = 5",
@@ -469,7 +547,8 @@ public class ParserTest {
         "select c, b, c where a = 5\n" +
         "               ^\n" +
         "Encountered: WHERE\n" +
-        "Expected: AS, DIV, FROM, IS, LIKE, REGEXP, RLIKE, COMMA, IDENTIFIER\n");
+        "Expected: AS, DIV, FROM, IS, LIKE, LIMIT, ORDER, " +
+        "REGEXP, RLIKE, UNION, COMMA, IDENTIFIER\n");
 
     // missing table list
     ParserError("select c, b, c from where a = 5",
@@ -523,7 +602,7 @@ public class ParserTest {
         "Encountered: (\n" +
         "Expected: AND, AS, ASC, DESC, DIV, ELSE, END, FROM, FULL, " +
         "GROUP, HAVING, IS, INNER, JOIN, LEFT, LIKE, LIMIT, OR, ORDER, " +
-        "REGEXP, RLIKE, RIGHT, WHEN, WHERE, THEN, COMMA, " +
+        "REGEXP, RLIKE, RIGHT, UNION, WHEN, WHERE, THEN, COMMA, " +
         "IDENTIFIER\n");
 
     ParserError("select (i + 5)\n(1 - i) from t",
@@ -534,7 +613,7 @@ public class ParserTest {
         "Encountered: (\n" +
         "Expected: AND, AS, ASC, DESC, DIV, ELSE, END, FROM, FULL, " +
         "GROUP, HAVING, IS, INNER, JOIN, LEFT, LIKE, LIMIT, OR, ORDER, " +
-        "REGEXP, RLIKE, RIGHT, WHEN, WHERE, THEN, COMMA, " +
+        "REGEXP, RLIKE, RIGHT, UNION, WHEN, WHERE, THEN, COMMA, " +
         "IDENTIFIER\n");
 
     ParserError("select (i + 5)\n(1 - i)\nfrom t",
@@ -546,7 +625,7 @@ public class ParserTest {
         "Encountered: (\n" +
         "Expected: AND, AS, ASC, DESC, DIV, ELSE, END, FROM, FULL, " +
         "GROUP, HAVING, IS, INNER, JOIN, LEFT, LIKE, LIMIT, OR, ORDER, " +
-        "REGEXP, RLIKE, RIGHT, WHEN, WHERE, THEN, COMMA, " +
+        "REGEXP, RLIKE, RIGHT, UNION, WHEN, WHERE, THEN, COMMA, " +
         "IDENTIFIER\n");
   }
 }
