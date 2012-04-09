@@ -21,8 +21,9 @@
 #define MINUTE (1000 * 60)
 #define HOUR (1000 * 60 * 60)
 
-#define MILLION (1000000)
 #define THOUSAND (1000)
+#define MILLION (THOUSAND * 1000)
+#define BILLION (MILLION * 1000)
 
 using namespace std;
 
@@ -102,7 +103,9 @@ string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
   ss.flags(ios::fixed);
   switch (type) {
     case TCounterType::UNIT:
-      if (value >= MILLION) {
+      if (value >= BILLION) {
+        ss << setprecision(PRECISION) << value / 1000000000. << "B";
+      } else if (value >= MILLION) {
         ss << setprecision(PRECISION) << value / 1000000. << "M";
       } else if (value >= THOUSAND) {
         ss << setprecision(PRECISION) << value / 1000. << "K";

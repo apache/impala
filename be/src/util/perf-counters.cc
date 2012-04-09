@@ -25,14 +25,14 @@ namespace impala {
 
 // This is the order of the counters in /proc/self/io
 enum PERF_IO_IDX {
-  PERF_IO_READ = 0,
-  PERF_IO_WRITE,
-  PERF_IO_SYS_RREAD,
-  PERF_IO_SYS_WRITE,
-  PERF_IO_DISK_READ,
-  PERF_IO_DISK_WRITE,
-  PERF_IO_CANCELLED_WRITE,
-  PERF_IO_LAST_COUNTER,
+  PROC_IO_READ = 0,
+  PROC_IO_WRITE,
+  PROC_IO_SYS_RREAD,
+  PROC_IO_SYS_WRITE,
+  PROC_IO_DISK_READ,
+  PROC_IO_DISK_WRITE,
+  PROC_IO_CANCELLED_WRITE,
+  PROC_IO_LAST_COUNTER,
 };
 
 // Wrapper around sys call.  This syscall is hard to use and this is how it is recommended
@@ -125,6 +125,12 @@ static string GetCounterName(PerfCounters::Counter counter) {
       return "BranchMiss";
     case PerfCounters::PERF_COUNTER_HW_BUS_CYCLES:
       return "BusCycles";
+    case PerfCounters::PERF_COUNTER_VM_USAGE:
+      return "VmUsage";
+    case PerfCounters::PERF_COUNTER_VM_PEAK_USAGE:
+      return "PeakVmUsage";
+    case PerfCounters::PERF_COUNTER_RESIDENT_SET_SIZE:
+      return "WorkingSet";
     case PerfCounters::PERF_COUNTER_BYTES_READ:
       return "BytesRead";
     case PerfCounters::PERF_COUNTER_BYTES_WRITE:
@@ -173,16 +179,39 @@ bool PerfCounters::InitProcSelfIOCounter(Counter counter) {
 
   switch (counter) {
     case PerfCounters::PERF_COUNTER_BYTES_READ:
-      data.perf_io_line_number = PERF_IO_READ;
+      data.proc_io_line_number = PROC_IO_READ;
       break;
     case PerfCounters::PERF_COUNTER_BYTES_WRITE:
-      data.perf_io_line_number = PERF_IO_WRITE;
+      data.proc_io_line_number = PROC_IO_WRITE;
       break;
     case PerfCounters::PERF_COUNTER_DISK_READ:
-      data.perf_io_line_number = PERF_IO_DISK_READ;
+      data.proc_io_line_number = PROC_IO_DISK_READ;
       break;
     case PerfCounters::PERF_COUNTER_DISK_WRITE:
-      data.perf_io_line_number = PERF_IO_DISK_WRITE;
+      data.proc_io_line_number = PROC_IO_DISK_WRITE;
+      break;
+    default:
+      return false;
+  }
+  counters_.push_back(data);
+  return true;
+}
+
+bool PerfCounters::InitProcSelfStatusCounter(Counter counter) {
+  CounterData data;
+  data.counter = counter;
+  data.source = PerfCounters::PROC_SELF_STATUS;
+  data.type = TCounterType::BYTES;
+
+  switch (counter) {
+    case PerfCounters::PERF_COUNTER_VM_USAGE:
+      data.proc_status_field = "VmSize";
+      break;
+    case PerfCounters::PERF_COUNTER_VM_PEAK_USAGE:
+      data.proc_status_field = "VmPeak";
+      break;
+    case PerfCounters::PERF_COUNTER_RESIDENT_SET_SIZE:
+      data.proc_status_field = "VmRS";
       break;
     default:
       return false;
@@ -204,7 +233,8 @@ bool PerfCounters::GetSysCounters(vector<int64_t>& buffer) {
   return true;
 }
 
-// Parse out IO counters from /proc/self/io.  The file contains a list of (name,byte) pairs.
+// Parse out IO counters from /proc/self/io.  The file contains a list of 
+// (name,byte) pairs.
 // For example:
 //    rchar: 210212
 //    wchar: 94
@@ -216,9 +246,9 @@ bool PerfCounters::GetSysCounters(vector<int64_t>& buffer) {
 bool PerfCounters::GetProcSelfIOCounters(vector<int64_t>& buffer) {
   ifstream file("/proc/self/io", ios::in);
   string buf;
-  int64_t values[PERF_IO_LAST_COUNTER];
+  int64_t values[PROC_IO_LAST_COUNTER];
 
-  for (int i = 0; i < PERF_IO_LAST_COUNTER; ++i) {
+  for (int i = 0; i < PROC_IO_LAST_COUNTER; ++i) {
     if (!file) goto end;
     getline(file, buf);
     size_t colon = buf.find(':');
@@ -228,12 +258,35 @@ bool PerfCounters::GetProcSelfIOCounters(vector<int64_t>& buffer) {
     stream >> values[i];
   }
 
-  for (int i = 0; i < counters_.size(); i++) {
+  for (int i = 0; i < counters_.size(); ++i) {
     if (counters_[i].source == PROC_SELF_IO) {
-      buffer[i] = values[counters_[i].perf_io_line_number];
+      buffer[i] = values[counters_[i].proc_io_line_number];
     }
   }
 end:
+  if (file.is_open()) file.close();
+  return true;
+}
+
+bool PerfCounters::GetProcSelfStatusCounters(vector<int64_t>& buffer) {
+  ifstream file("/proc/self/status", ios::in);
+  string buf;
+  
+  while (file) {
+    getline(file, buf);
+    for (int i = 0; i < counters_.size(); ++i) {
+      if (counters_[i].source == PROC_SELF_STATUS) {
+        size_t field = buf.find(counters_[i].proc_status_field);
+        if (field == string::npos) continue;
+        size_t colon = field + counters_[i].proc_status_field.size() + 1;
+        buf = buf.substr(colon + 1);
+        istringstream stream(buf);
+        int64_t value;
+        stream >> value;
+        buffer[i] = value * 1024;  // values in file are in kb
+      }
+    }
+  }
   if (file.is_open()) file.close();
   return true;
 }
@@ -255,11 +308,15 @@ bool PerfCounters::AddDefaultCounters() {
   bool result = true;
   result &= AddCounter(PERF_COUNTER_SW_CPU_CLOCK); 
   // These hardware ones don't work on a vm, just ignore if they fail
-  AddCounter(PERF_COUNTER_HW_INSTRUCTIONS);
-  AddCounter(PERF_COUNTER_HW_CPU_CYCLES);
-  AddCounter(PERF_COUNTER_HW_BRANCHES);
-  AddCounter(PERF_COUNTER_HW_BRANCH_MISSES);
-  AddCounter(PERF_COUNTER_HW_CACHE_MISSES);
+  // TODO: these don't work reliably and aren't that useful.  Turn them off.
+  //AddCounter(PERF_COUNTER_HW_INSTRUCTIONS);
+  //AddCounter(PERF_COUNTER_HW_CPU_CYCLES);
+  //AddCounter(PERF_COUNTER_HW_BRANCHES);
+  //AddCounter(PERF_COUNTER_HW_BRANCH_MISSES);
+  //AddCounter(PERF_COUNTER_HW_CACHE_MISSES);
+  AddCounter(PERF_COUNTER_VM_USAGE);
+  AddCounter(PERF_COUNTER_VM_PEAK_USAGE);
+  AddCounter(PERF_COUNTER_RESIDENT_SET_SIZE);
   result &= AddCounter(PERF_COUNTER_DISK_READ);
   return result;
 }
@@ -293,6 +350,11 @@ bool PerfCounters::AddCounter(Counter counter) {
     case PerfCounters::PERF_COUNTER_DISK_WRITE:
       result = InitProcSelfIOCounter(counter);
       break;
+    case PerfCounters::PERF_COUNTER_VM_USAGE:
+    case PerfCounters::PERF_COUNTER_VM_PEAK_USAGE:
+    case PerfCounters::PERF_COUNTER_RESIDENT_SET_SIZE:
+      result = InitProcSelfStatusCounter(counter);
+      break;
     default:
       return false;
   }
@@ -317,6 +379,7 @@ void PerfCounters::Snapshot(const string& name) {
 
   GetSysCounters(buffer);
   GetProcSelfIOCounters(buffer);
+  GetProcSelfStatusCounters(buffer);
 
   snapshots_.push_back(buffer);
   snapshot_names_.push_back(fixed_name);

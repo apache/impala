@@ -9,9 +9,13 @@
 
 #include "util/debug-util.h"
 
-// This is a utility class that wraps the perf counter syscall (/usr/include/linux/perf_event.h)
-// and abstracts away some common basic profiling operations.
-// The syscall is very low level and not easy to use.  This calls it with the most basic arguments.
+// This is a utility class that aggregates counters from the kernel.  These counters
+// come from different sources.  
+//   - perf counter syscall (/usr/include/linux/perf_event.h")
+//   - /proc/self/io: io stats
+//   - /proc/self/status: memory stats
+// The complexity here is that all these sources have data in a different and not
+// easy to get at format.
 // 
 // A typical usage pattern would be:
 //  PerfCounters counters;
@@ -38,6 +42,10 @@ class PerfCounters {
     PERF_COUNTER_HW_BRANCHES,
     PERF_COUNTER_HW_BRANCH_MISSES,
     PERF_COUNTER_HW_BUS_CYCLES,
+
+    PERF_COUNTER_VM_USAGE,
+    PERF_COUNTER_VM_PEAK_USAGE,
+    PERF_COUNTER_RESIDENT_SET_SIZE,
 
     PERF_COUNTER_BYTES_READ,
     PERF_COUNTER_BYTES_WRITE,
@@ -77,12 +85,16 @@ class PerfCounters {
 
   bool InitSysCounter(Counter counter);
   bool InitProcSelfIOCounter(Counter counter);
+  bool InitProcSelfStatusCounter(Counter counter);
+
   bool GetSysCounters(std::vector<int64_t>& snapshot);
   bool GetProcSelfIOCounters(std::vector<int64_t>& snapshot);
+  bool GetProcSelfStatusCounters(std::vector<int64_t>& snapshot);
 
   enum DataSource {
     SYS_PERF_COUNTER, 
     PROC_SELF_IO,
+    PROC_SELF_STATUS,
   };
   
   struct CounterData {
@@ -95,8 +107,10 @@ class PerfCounters {
       // For SYS_PERF_COUNTER. File descriptor where the counter value is stored.
       int fd;
       // For PROC_SELF_IO.  Line number from /proc/self/io file with this counter's value
-      int perf_io_line_number;
+      int proc_io_line_number;
     };
+    // For PROC_SELF_STATUS.  Field name for counter
+    std::string proc_status_field;
   };
 
   std::vector<CounterData> counters_;
