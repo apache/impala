@@ -21,6 +21,7 @@
 
   <properties>
     <test.hive.testdata>${project.basedir}/../testdata/target/AllTypes.txt</test.hive.testdata>
+    <backend.library.path>${env.IMPALA_HOME}/be/build/debug/service:${env.IMPALA_HOME}/be/build/release/service</backend.library.path>
   </properties>
   
   <dependencies>
@@ -83,7 +84,7 @@
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-hbase-handler</artifactId>
       <version>0.8.1-cdh4b2-SNAPSHOT</version>
-    </dependency>    
+    </dependency>
 
     <dependency>
       <groupId>org.apache.hbase</groupId>
@@ -101,12 +102,12 @@
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-metastore</artifactId>
       <version>0.8.1-cdh4b2-SNAPSHOT</version>
-    </dependency>    
+    </dependency>
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-common</artifactId>
       <version>0.8.1-cdh4b2-SNAPSHOT</version>
-    </dependency>           
+    </dependency>
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-serde</artifactId>
@@ -192,6 +193,24 @@
       <version>4.8.2</version>
       <scope>test</scope>
     </dependency>
+
+    <dependency>
+      <groupId>ant-contrib</groupId>
+      <artifactId>ant-contrib</artifactId>
+      <version>1.0b3</version>
+      <exclusions>
+        <exclusion>
+          <groupId>ant</groupId>
+          <artifactId>ant</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    
+    <dependency>
+      <groupId>org.apache.ant</groupId>
+      <artifactId>ant-nodeps</artifactId>
+      <version>1.8.1</version>
+    </dependency>
   </dependencies>
   
   <build>
@@ -221,7 +240,7 @@
               <extension>y</extension>
               <parserOutput>SqlParser</parserOutput>
               <symbolOutput>SqlParserSymbols</symbolOutput>
-	      <outputDirectory>${project.build.directory}/generated-sources/cup</outputDirectory>
+              <outputDirectory>${project.build.directory}/generated-sources/cup</outputDirectory>
             </configuration>
           </execution>
         </executions>
@@ -287,7 +306,7 @@
         <version>2.12</version>
         <configuration>
           <redirectTestOutputToFile>true</redirectTestOutputToFile>
-          <argLine>-Djava.library.path=${java.library.path}:${project.basedir}/../be/build/debug/service:${project.basedir}/../be/build/release/service</argLine>
+          <argLine>-Djava.library.path=${java.library.path}:${backend.library.path}</argLine>
         </configuration>
       </plugin>
 
@@ -298,9 +317,9 @@
         <configuration>
           <generateHtml>true</generateHtml>
           <generateXml>true</generateXml>
-	  <excludes>
-	    <exclude>**/jdbc/*.java</exclude>
-	  </excludes>
+          <excludes>
+            <exclude>**/jdbc/*.java</exclude>
+          </excludes>
         </configuration>
       </plugin>
 
@@ -330,33 +349,30 @@
         </executions>
       </plugin>
 
-         <plugin> 
-             <groupId>org.codehaus.mojo</groupId> 
-             <artifactId>exec-maven-plugin</artifactId> 
-             <executions> 
-                 <execution> 
-                     <goals> 
-                         <goal>java</goal> 
-                     </goals> 
-                 </execution> 
-             </executions> 
-             <configuration> 
-<!--
-                 <mainClass>com.cloudera.impala.service.Coordinator</mainClass> 
--->
-                 <systemProperties> 
-		    <systemProperty>
-		       <key>java.library.path</key>
-		       <value>${java.library.path}:${project.basedir}/../be/build/service</value>
-		    </systemProperty>
-                     <systemProperty> 
-                       <key>test.hive.testdata</key>
-		       <value>${project.basedir}/../testdata/target/AllTypes.txt</value> 
-		     </systemProperty>
-                 </systemProperties> 
-             </configuration> 
-         </plugin> 
-    </plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>java</goal>
+            </goals>
+          </execution>
+        </executions>
+          <configuration>
+            <systemProperties>
+              <systemProperty>
+                <key>java.library.path</key>
+                <value>${java.library.path}:${backend.library.path}</value>
+              </systemProperty>
+              <systemProperty>
+                <key>test.hive.testdata</key>
+                <value>${project.basedir}/../testdata/target/AllTypes.txt</value>
+              </systemProperty>
+            </systemProperties>
+          </configuration>
+      </plugin> 
+  </plugins>
     <pluginManagement>
       <plugins>
         <!--This plugin's configuration is used to store Eclipse m2e settings only. It has no influence on the Maven build itself.-->
@@ -413,7 +429,7 @@
       </plugins>
     </pluginManagement>
   </build>
-              
+
   <repositories>
     <repository>
       <id>cdh.rcs.releases.repo</id>
@@ -489,21 +505,41 @@
             <version>1.6</version>
             <executions>
               <execution>
+                <id>start-cluster</id>
                 <phase>process-test-resources</phase>
                 <goals>
                   <goal>run</goal>
                 </goals>
                 <configuration>
-                  <target>
-                    <!-- start HDFS and HBase clean -->
+                  <target name="start-cluster" unless="cluster.format">
+                    <!-- start HDFS and HBase without formatting -->
                     <exec executable="${env.IMPALA_HOME}/testdata/bin/run-all.sh">
                     </exec>
+                    <!-- load Hive built in -->
+                    <exec executable="${env.IMPALA_HOME}/testdata/bin/load-hive-builtins.sh">
+                    </exec>                      
+                  </target>
+                </configuration>
+              </execution>
+              <execution>
+                <id>load-data</id>
+                <phase>process-test-resources</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <configuration>
+                  <target name="load-data" if="cluster.format">
+                    <!-- start HDFS and HBase clean -->
+                    <exec executable="${env.IMPALA_HOME}/testdata/bin/run-all.sh">
+                      <arg value="-format"/>
+                    </exec>
+                    <!-- load Hive built in -->
+                    <exec executable="${env.IMPALA_HOME}/testdata/bin/load-hive-builtins.sh">
+                    </exec>                      
                     <!-- create HBase tables, load some hbase table data -->
                     <exec executable="${env.IMPALA_HOME}/testdata/bin/create-hbase.sh">
                     </exec>
-                    <!-- load Hive build in, create Hive table and load Hive data -->
-                    <exec executable="${env.IMPALA_HOME}/testdata/bin/load-hive-builtins.sh">
-                    </exec>
+                    <!-- create Hive table and load Hive data -->
                     <exec executable="${env.HIVE_HOME}/bin/hive">
                       <arg value="-hiveconf"/>
                       <arg value="hive.root.logger=WARN,console"/>
@@ -517,14 +553,14 @@
                       <arg value="-v"/>
                       <arg value="-f"/>
                       <arg value="${project.basedir}/../testdata/bin/load.sql"/>
-                    </exec>
+                    </exec>                    
+                  </target>
                     <!-- split HBase tables -->
-                    <!-- CDH-4771: splitting HBase table might crash region servers. 
+                    <!-- CDH-4771: splitting HBase table might crash region servers.
                                    skip this until the issue is resolved.
                     <exec executable="${env.IMPALA_HOME}/testdata/bin/split-hbase.sh">
                     </exec>
                     -->
-                  </target>
                 </configuration>
               </execution>
             </executions>
@@ -555,9 +591,9 @@
                       <arg value="-f"/>
                       <arg value="${project.basedir}/../testdata/data/mstr/eatwh1/EATWH1-DDL.sql"/>
                     </exec>
-		    <exec executable="${env.HIVE_HOME}/bin/hive">
+                    <exec executable="${env.HIVE_HOME}/bin/hive">
                       <arg value="-hiveconf"/>
-		      <arg value="mstr.eatwh1.data.dir=${project.basedir}/../testdata/data/mstr/eatwh1/csv"/>
+                      <arg value="mstr.eatwh1.data.dir=${project.basedir}/../testdata/data/mstr/eatwh1/csv"/>
                       <arg value="hive.root.logger=WARN,console"/>
                       <arg value="-v"/>
                       <arg value="-f"/>

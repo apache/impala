@@ -10,6 +10,6 @@ for jar in `find ${IMPALA_HOME}/thirdparty/hadoop-0.23.0-cdh4b2-SNAPSHOT/ -name 
   CLASSPATH=${CLASSPATH}:${jar}
 done;
 pushd ${HADOOP_HOME}
-java org.apache.hadoop.test.MiniHadoopClusterManager -datanodes 3 -nomr -nnport=20500  &
+java org.apache.hadoop.test.MiniHadoopClusterManager -datanodes 3 -nomr -nnport=20500 $@ &
 popd
 sleep 10

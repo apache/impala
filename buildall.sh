@@ -16,6 +16,8 @@ config_action=1
 testdata_action=1
 tests_action=1
 
+FORMAT_CLUSTER=1
+
 # parse command line options
 for ARG in $*
 do
@@ -32,11 +34,15 @@ do
     -skiptests)
       tests_action=0
       ;;
+    -noformat)
+      FORMAT_CLUSTER=0
+      ;;
     -help)
-      echo "buildall.sh [-noclean] [-noconfig] [-notestdata]"
+      echo "buildall.sh [-noclean] [-noconfig] [-notestdata] [-noformat]"
       echo "[-noclean] : omits cleaning all packages before building"
       echo "[-noconfig] : omits running configure script for third party packages"
       echo "[-notestdata] : omits recreating the metastore and loading test data"
+      echo "[-noformat] : prevents the minicluster from formatting its data directories, and skips the data load step"
       exit
       ;;
   esac
@@ -156,7 +162,11 @@ then
   cd $IMPALA_HOME/testdata
   $IMPALA_HOME/bin/create_testdata.sh
   cd $IMPALA_HOME/fe
-  mvn -Pload-testdata process-test-resources
+  if [ $FORMAT_CLUSTER -eq 1 ]; then    
+    mvn -Pload-testdata process-test-resources -Dcluster.format
+  else
+    mvn -Pload-testdata process-test-resources
+  fi
 fi
 
 # build frontend
