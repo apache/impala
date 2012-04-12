@@ -120,8 +120,17 @@ then
 fi
 make -j4
 
+# Build gtest
 cd $IMPALA_HOME/thirdparty/gtest-1.6.0
 cmake .
+make -j4
+
+# Build llvm
+cd $IMPALA_HOME/thirdparty/llvm-3.0.src
+if [ $config_action -eq 1 ]
+then
+  ./configure --with-pic
+fi
 make -j4
 
 # cleanup FE process
