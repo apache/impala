@@ -2,7 +2,6 @@
 
 #include <boost/algorithm/string/join.hpp>
 
-#include <glog/logging.h>
 #include "common/status.h"
 
 using namespace std;
@@ -10,26 +9,7 @@ using namespace boost::algorithm;
 
 namespace impala {
 
-struct Status::ErrorDetail {
-  vector<string> error_msgs;
-
-  ErrorDetail(const string& msg): error_msgs(1, msg) {}
-  ErrorDetail(const vector<string>& msgs): error_msgs(msgs) {}
-};
-
 const Status Status::OK;
-
-Status::Status(const string& error_msg)
-  : error_detail_(new ErrorDetail(error_msg)) {
-  LOG(ERROR) << "Error Status: " << error_msg;
-}
-
-Status::Status(const Status& status)
-  : error_detail_(
-      status.error_detail_ != NULL
-        ? new ErrorDetail(*status.error_detail_)
-        : NULL) {
-}
 
 Status& Status::operator=(const Status& status) {
   delete error_detail_;
@@ -54,10 +34,6 @@ Status& Status::operator=(const TStatus& status) {
     error_detail_ = new ErrorDetail(status.error_msgs);
   }
   return *this;
-}
-
-Status::~Status() {
-  if (error_detail_ != NULL) delete error_detail_;
 }
 
 void Status::GetErrorMsgs(vector<string>* msgs) const {

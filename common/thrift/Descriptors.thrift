@@ -19,6 +19,7 @@ struct TSlotDescriptor {
 enum TTableType {
   HDFS_TEXT_TABLE,
   HDFS_RCFILE_TABLE,
+  HDFS_SEQFILE_TABLE,
   HBASE_TABLE
 }
 

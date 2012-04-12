@@ -28,3 +28,21 @@ CREATE TABLE UserVisits (
   avgTimeOnSite int)
 row format delimited fields terminated by '|'  stored as textfile;
 
+DROP TABLE IF EXISTS UserVisits_seq;
+CREATE TABLE UserVisits_seq (
+  sourceIP string,
+  destURL string,
+  visitDate string,
+  adRevenue float,
+  userAgent string,
+  cCode string,
+  lCode string,
+  sKeyword string,
+  avgTimeOnSite int)
+STORED AS SEQUENCEFILE;
+
+DROP TABLE IF EXISTS Grep1GB_seq_snap;
+CREATE TABLE Grep1GB_seq_snap (
+  field string)
+partitioned by (chunk int)
+STORED AS SEQUENCEFILE;

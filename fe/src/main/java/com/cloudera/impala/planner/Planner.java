@@ -28,6 +28,7 @@ import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.catalog.HdfsRCFileTable;
+import com.cloudera.impala.catalog.HdfsSeqFileTable;
 import com.cloudera.impala.catalog.HdfsTextTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
@@ -184,6 +185,10 @@ public class Planner {
       // Hive RCFile table
       scanNode = new HdfsRCFileScanNode(
           getNextNodeId(), tblRef.getDesc(), (HdfsRCFileTable) tblRef.getTable());
+    } else if (tblRef.getTable() instanceof HdfsSeqFileTable) {
+      // Hive Sequence table
+      scanNode = new HdfsSeqFileScanNode(
+          getNextNodeId(), tblRef.getDesc(), (HdfsSeqFileTable) tblRef.getTable());
     } else {
       // HBase table
       scanNode = new HBaseScanNode(getNextNodeId(), tblRef.getDesc());

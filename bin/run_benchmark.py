@@ -214,8 +214,15 @@ queries = [
   ["select count(*) from grep1gb", 5, 5],
   ["select count(field) from grep1gb", 0, 5],
   ["select count(field) from grep1gb where field like '%xyz%'", 0, 5],
+  ["select count(*) from grep1gb_seq_snap", 5, 5],
+  ["select count(field) from grep1gb_seq_snap", 0, 5],
+  ["select count(field) from grep1gb_seq_snap where field like '%xyz%'", 0, 5],
   ["select uv.sourceip, avg(r.pagerank), sum(uv.adrevenue) as totalrevenue "\
    "from uservisits uv join rankings r on (r.pageurl = uv.desturl) "\
+   "where uv.visitdate > '1999-01-01' and uv.visitdate < '2000-01-01' "\
+   "group by uv.sourceip order by totalrevenue desc limit 1", 5, 5],
+  ["select uv.sourceip, avg(r.pagerank), sum(uv.adrevenue) as totalrevenue "\
+   "from uservisits_seq uv join rankings r on (r.pageurl = uv.desturl) "\
    "where uv.visitdate > '1999-01-01' and uv.visitdate < '2000-01-01' "\
    "group by uv.sourceip order by totalrevenue desc limit 1", 5, 5],
   ["select sourceIP, SUM(adRevenue) FROM uservisits GROUP by sourceIP "\

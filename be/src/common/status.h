@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include <glog/logging.h>
 #include "common/compiler-util.h"
 #include "gen-cpp/Types_types.h"  // for TStatus
 
@@ -34,11 +35,24 @@ class Status {
 
   static const Status OK;
 
-  // c'tor for error case
-  Status(const std::string& error_msg);
-
   // copy c'tor makes copy of error detail so Status can be returned by value
-  Status(const Status& status);
+  Status(const Status& status)
+    : error_detail_(
+        status.error_detail_ != NULL
+          ? new ErrorDetail(*status.error_detail_)
+          : NULL) {
+  }
+
+  // c'tor for error case
+  Status(const std::string& error_msg)
+    : error_detail_(new ErrorDetail(error_msg)) {
+    LOG(WARNING) << "Error Status: " << error_msg;
+  }
+
+  ~Status() {
+    if (error_detail_ != NULL) delete error_detail_;
+  }
+
 
   // same as copy c'tor
   Status& operator=(const Status& status);
@@ -52,8 +66,6 @@ class Status {
 
   // assign from stringstream
   Status& operator=(const std::stringstream& stream);
-
-  ~Status();
 
   bool ok() const { return error_detail_ == NULL; }
 
@@ -71,7 +83,13 @@ class Status {
   std::string GetErrorMsg() const;
 
  private:
-  struct ErrorDetail;
+  struct ErrorDetail {
+    std::vector<std::string> error_msgs;
+
+    ErrorDetail(const std::string& msg): error_msgs(1, msg) {}
+    ErrorDetail(const std::vector<std::string>& msgs): error_msgs(msgs) {}
+  };
+
   ErrorDetail* error_detail_;
 };
 

@@ -8,6 +8,7 @@
 #include "util/jni-util.h"
 #include "util/runtime-profile.h"
 #include "gen-cpp/PlanNodes_types.h"
+#include "exec/text-converter.inline.h"
 
 using namespace std;
 using namespace boost;
@@ -90,12 +91,12 @@ void HBaseScanNode::WriteTextSlot(
     void* value, int value_length, SlotDescriptor* slot,
     RuntimeState* state, bool* error_in_row) {
   COUNTER_SCOPED_TIMER(tuple_write_timer());
-  bool parsed_ok = text_converter_->ConvertAndWriteSlotBytes(reinterpret_cast<char*>(value),
-      reinterpret_cast<char*>(value) + value_length, tuple_, slot, true, false);
-  if (!parsed_ok) {
+  if (!text_converter_->WriteSlot(state, 
+      slot, tuple_, reinterpret_cast<char*>(value), value_length, true, false).ok()) {
     *error_in_row = true;
     if (state->LogHasSpace()) {
-      state->error_stream() << "Error converting column " << family << ":" << qualifier << ": "
+      state->error_stream() << "Error converting column " << family
+          << ":" << qualifier << ": "
           << "'" << reinterpret_cast<char*>(value) << "' TO "
           << TypeToString(slot->type()) << endl;
     }

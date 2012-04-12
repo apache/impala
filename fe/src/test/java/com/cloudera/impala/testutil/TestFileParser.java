@@ -141,6 +141,7 @@ public class TestFileParser {
   private final String fileName;
   private InputStream stream;
   private Scanner scanner;
+  private String table;
 
   /**
    * For backwards compatibility, if no title is found this is the order in which
@@ -160,7 +161,8 @@ public class TestFileParser {
   /**
    * Initialises the scanner and the input stream corresponding to the test file name
    */
-  private void open() {
+  private void open(String table) {
+    this.table = table;
     try {
       ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
       stream = classLoader.getResourceAsStream(fileName);
@@ -218,6 +220,9 @@ public class TestFileParser {
 
         sectionContents = Lists.newArrayList();
       } else {
+          if (table != null && currentSection == Section.QUERY) {
+            line = line.replaceAll("\\$TABLE", table);
+          }
         sectionContents.add(line);
       }
     }
@@ -229,7 +234,11 @@ public class TestFileParser {
    * Parses a test file in its entirety and constructs a list of TestCases.
    */
   public void parseFile() {
-    open();
+    parseFile(null);
+  }
+
+  public void parseFile(String table) {
+    open(table);
     while (scanner.hasNextLine()) {
       testCases.add(parseOneTestCase());
     }

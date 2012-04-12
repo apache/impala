@@ -79,3 +79,14 @@ Status HdfsByteStream::Seek(int64_t offset) {
 
   return Status::OK;
 }
+
+Status HdfsByteStream::Eof(bool* eof) {
+  hdfsFileInfo* hdfsInfo = hdfsGetPathInfo(hdfs_connection_, &location_[0]);
+  if (hdfsInfo == NULL) {
+    return Status("Error getting Info for HDFS file: " + location_);
+  }
+  *eof = hdfsTell(hdfs_connection_, hdfs_file_) >= hdfsInfo->mSize;
+
+  hdfsFreeFileInfo(hdfsInfo, 1);
+  return Status::OK;
+}

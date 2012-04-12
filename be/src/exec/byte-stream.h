@@ -13,6 +13,8 @@ class Status;
 // A simple wrapper around sources of byte data
 class ByteStream {
  public:
+  virtual ~ByteStream() { }
+
   // Opens a resource from supplied location, ready for reading
   virtual Status Open(const std::string& location) = 0;
 
@@ -28,6 +30,9 @@ class ByteStream {
 
   // Returns the position of the stream cursor
   virtual Status GetPosition(int64_t* position) = 0;
+
+  // Returns if the stream is at EOF
+  virtual Status Eof(bool* eof) = 0;
 
   // Returns the name of the resource backing this stream
   const std::string& GetLocation() { return location_; };

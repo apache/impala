@@ -22,6 +22,7 @@ class HdfsByteStream : public ByteStream {
   virtual Status Read(char *buf, int64_t req_length, int64_t* actual_length);
   virtual Status Seek(int64_t offset);
   virtual Status GetPosition(int64_t* position);
+  virtual Status Eof(bool* eof);
 
  private:
   hdfsFS hdfs_connection_;

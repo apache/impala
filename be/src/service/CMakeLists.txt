@@ -46,6 +46,7 @@ target_link_libraries(backend
   gflagsstatic
 #  tcmallocstatic
   pprofstatic
+  -lz -lbz2 -lsnappy
 )
 
 add_executable(runquery 
@@ -84,6 +85,7 @@ target_link_libraries(runquery
   gflagsstatic
   tcmallocstatic
   pprofstatic
+  -lz
 )
 
 add_executable(impalad

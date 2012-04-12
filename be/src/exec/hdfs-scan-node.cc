@@ -2,6 +2,7 @@
 
 #include "exec/hdfs-scan-node.h"
 #include "exec/hdfs-text-scanner.h"
+#include "exec/hdfs-sequence-scanner.h"
 #include "exec/hdfs-rcfile-scanner.h"
 #include "exec/hdfs-byte-stream.h"
 
@@ -63,7 +64,7 @@ Status HdfsScanNode::InitRegex(ObjectPool* pool, const TPlanNode& tnode) {
   return Status::OK;
 }
 
-Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool *eos) {
+Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
 
   // Guard against trying to read an empty set of scan ranges
@@ -134,6 +135,9 @@ Status HdfsScanNode::InitCurrentScanRange(RuntimeState* state) {
         current_scanner_.reset(new HdfsTextScanner(this, tuple_desc_, template_tuple_,
                                                    tuple_pool_.get()));
         break;
+      case TPlanNodeType::HDFS_SEQFILE_SCAN_NODE:
+        current_scanner_.reset(new HdfsSequenceScanner(this, tuple_desc_, template_tuple_,
+                                                       tuple_pool_.get())); break;
       case TPlanNodeType::HDFS_RCFILE_SCAN_NODE:
         current_scanner_.reset(new HdfsRCFileScanner(this, tuple_desc_, template_tuple_,
                                                      tuple_pool_.get()));

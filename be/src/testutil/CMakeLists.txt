@@ -19,6 +19,7 @@ target_link_libraries(TestUtil
   ImpalaThrift
   glogstatic
   gflagsstatic  
+  -lz -lbz2 -lsnappy
 )
 
 add_executable(query-jitter

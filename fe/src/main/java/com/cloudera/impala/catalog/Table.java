@@ -25,9 +25,6 @@ import com.google.common.collect.Maps;
  * for the clustering columns, those two rows are most likely colocated. Note that this
  * is more general than Hive's CLUSTER BY ... INTO BUCKETS clause (which partitions
  * a key range into a fixed number of buckets).
- *
- * Current subclasses are HdfsTextTable, HdfsRCFileTable, and HBaseTable.
- *
  */
 public abstract class Table {
   protected final TableId id;
@@ -81,7 +78,7 @@ public abstract class Table {
    * @param db
    * @param tblName
    * @return
-   *         new instance of Hdfs[Text|RCFile]Table or HBaseTable
+   *         new instance of Hdfs[Text|RCFile|Seq]Table or HBaseTable
    *         null if loading table failed
    */
   public static Table load(TableId id, HiveMetaStoreClient client, Db db,
@@ -98,6 +95,8 @@ public abstract class Table {
         table = new HdfsTextTable(id, db, tblName, msTbl.getOwner());
       } else if (HdfsRCFileTable.isRCFileTable(msTbl)) {
         table = new HdfsRCFileTable(id, db, tblName, msTbl.getOwner());
+      } else if (HdfsSeqFileTable.isSeqFileTable(msTbl)) {
+        table = new HdfsSeqFileTable(id, db, tblName, msTbl.getOwner());
       } else {
         throw new UnsupportedOperationException("Unrecognized table type");
       }

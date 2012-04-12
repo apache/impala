@@ -3,29 +3,32 @@
 #ifndef IMPALA_EXEC_TEXT_CONVERTER_H
 #define IMPALA_EXEC_TEXT_CONVERTER_H
 
+#include "runtime/runtime-state.h"
 namespace impala {
 
 class Tuple;
 class SlotDescriptor;
 class MemPool;
 class StringValue;
+class Status;
 
-// Helper class for dealing with text data, e.g., converting text data to numeric types, etc.
+// Helper class for dealing with text data, e.g., converting text data to
+// numeric types, etc.
 class TextConverter {
  public:
   TextConverter(char escape_char, MemPool* var_len_pool);
 
-  // Converts slot data (begin, end) into type of slot_desc,
+  // Converts slot data, of length 'len',  into type of slot_desc,
   // and writes the result into the tuples's slot.
   // copy_string indicates whether we need to make a separate copy of the string data:
   // For regular unescaped strings, we point to the original data in the file_buf_.
   // For regular escaped strings,
   // we copy an its unescaped string into a separate buffer and point to it.
   // Unsuccessful conversions are turned into NULLs.
-  // Returns true if value was converted and written successfully, false otherwise.
-  bool ConvertAndWriteSlotBytes(const char* begin,
-      const char* end, Tuple* tuple, const SlotDescriptor* slot_desc,
-      bool copy_string, bool unescape_string);
+  // Returns Status::OK if the value was written successfully, error otherwise
+  Status WriteSlot(RuntimeState* state, const SlotDescriptor* slot_desc,
+                    Tuple* tuple, const char* data, int len,
+                    bool copy_string, bool need_escape);
 
   // Removes escape characters from len characters of the null-terminated string src,
   // and copies the unescaped string into dest, changing *len to the unescaped length.

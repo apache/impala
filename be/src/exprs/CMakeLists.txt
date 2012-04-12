@@ -64,6 +64,7 @@ target_link_libraries(expr-test
   gtest
   ${Boost_LIBRARIES}
   ${LLVM_MODULE_LIBS}
+  -lz -lbz2 -lsnappy
 )
 
 add_test(expr-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/exprs/expr-test)

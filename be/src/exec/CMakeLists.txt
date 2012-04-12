@@ -10,6 +10,8 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec")
 
 add_library(Exec STATIC
   aggregation-node.cc
+  buffered-byte-stream.cc
+  delimited-text-parser.cc
   exec-node.cc
   exchange-node.cc
   hash-join-node.cc
@@ -18,6 +20,7 @@ add_library(Exec STATIC
   hdfs-scanner.cc
   hash-table.cc
   hdfs-rcfile-scanner.cc
+  hdfs-sequence-scanner.cc
   hdfs-text-scanner.cc
   hbase-scan-node.cc
   hbase-table-scanner.cc
@@ -34,4 +37,5 @@ target_link_libraries(Exec
 target_link_libraries(Exec
   ${JAVA_JVM_LIBRARY}
   ${HDFS_LIBS}
+  -lz -lbz2 -lsnappy
 )

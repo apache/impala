@@ -33,6 +33,18 @@ public:
   // Equivalent to java.io.DataInput.readInt()
   static Status ReadInt(ByteStream* byte_stream, int32_t* integer);
 
+  // Read an Integer from a buffer.
+  static Status ReadInt(char* in_buf, int32_t* integer) {
+    // TODO: all buffers should be typed to uint8_t*
+    uint8_t* buf = reinterpret_cast<uint8_t*>(in_buf);
+    *integer =
+        (buf[0] << 24)
+        | (buf[1] << 16)
+        | (buf[2] << 8)
+        |  buf[3];
+    return Status::OK;
+  }
+
   // Read a variable-length Long value written using Writable serialization.
   // Ref: org.apache.hadoop.io.WritableUtils.readVLong()
   static Status ReadVLong(ByteStream* byte_stream, int64_t* vlong);
@@ -61,6 +73,9 @@ public:
   // Read a Writable Text value from the supplied file.
   // Ref: org.apache.hadoop.io.WritableUtils.readString()
   static Status ReadText(ByteStream* byte_stream, std::vector<char>* text);
+
+  // Skip this text object.
+  static Status SkipText(ByteStream* byte_stream);
 
   // Dump the first length bytes of buf to a Hex string.
   static std::string HexDump(const char* buf, int64_t length);

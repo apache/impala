@@ -1,4 +1,5 @@
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col from alltypeserror
+<<<<<<< HEAD
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col timestamp_col from alltypeserror$TABLE
 ---- ERRORS
 Error converting column: 1 TO BOOL
 file: alltypeserror/year=2009/month=1/0901.txt
@@ -58,7 +59,7 @@ file: alltypeserror/year=2009/month=1/0901.txt,8
 file: alltypeserror/year=2009/month=2/0902.txt,3
 file: alltypeserror/year=2009/month=3/0903.txt,4
 ====
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col from alltypeserrornonulls
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col from alltypeserrornonulls$TABLE
 ---- ERRORS
 Error converting column: 1 TO BOOL
 file: alltypeserrornonulls/year=2009/month=1/0901.txt

@@ -21,42 +21,63 @@ public class QueryTest {
   private static Catalog catalog;
   private static Executor executor;
   private final String testDir = "QueryTest";
+  private static ArrayList<String> tableSubsitutionList;
 
   @BeforeClass
   public static void setUp() throws Exception {
     HiveMetaStoreClient client = TestSchemaUtils.createClient();
     catalog = new Catalog(client);
     executor = new Executor(catalog);
+    tableSubsitutionList = new ArrayList<String>();
+    tableSubsitutionList.add("");
+    tableSubsitutionList.add("_rc");
+    tableSubsitutionList.add("_seq");
+    tableSubsitutionList.add("_seq_def");
+    tableSubsitutionList.add("_seq_gzip");
+    tableSubsitutionList.add("_seq_bzip");
+    tableSubsitutionList.add("_seq_snap");
+    tableSubsitutionList.add("_seq_record_def");
+    tableSubsitutionList.add("_seq_record_gzip");
+    tableSubsitutionList.add("_seq_record_bzip");
+    tableSubsitutionList.add("_seq_record_snap");
   }
 
   private void runQueryTestFile(String testFile, boolean abortOnError, int maxErrors) {
+    runQueryTestFile(testFile, abortOnError, maxErrors, null);
+  }
+
+  private void runQueryTestFile(String testFile, boolean abortOnError, int maxErrors,
+      ArrayList<String> tables) {
     String fileName = testDir + "/" + testFile + ".test";
     TestFileParser queryFileParser = new TestFileParser(fileName);
-    queryFileParser.parseFile();
-    StringBuilder errorLog = new StringBuilder();
-    for (TestCase testCase : queryFileParser.getTestCases()) {
-      ArrayList<String> expectedTypes =
-        testCase.getSectionContents(Section.TYPES);
-      ArrayList<String> expectedResults =
-        testCase.getSectionContents(Section.RESULTS);
-      // run each test against all possible combinations of batch sizes and
-      // number of execution nodes
-      int[] batchSizes = {0, 16, 1};
-      int[] numNodes = {1, 2, 3, 0};
-      for (int i = 0; i < batchSizes.length; ++i) {
-        for (int j = 0; j < numNodes.length; ++j) {
-          TestUtils.runQuery(
-              executor, testCase.getSectionAsString(Section.QUERY, false, " "),
-              numNodes[j], batchSizes[i], abortOnError, maxErrors,
-              testCase.getStartingLineNum(), null, expectedTypes,
-              expectedResults, null, null, errorLog);
+    for (int f = 0; f < (tables == null ? 1 : tables.size()); f++) {
+        queryFileParser.parseFile(tables == null ? null : tables.get(f));
+      StringBuilder errorLog = new StringBuilder();
+      for (TestCase testCase : queryFileParser.getTestCases()) {
+        ArrayList<String> expectedTypes =
+          testCase.getSectionContents(Section.TYPES);
+        ArrayList<String> expectedResults =
+          testCase.getSectionContents(Section.RESULTS);
+        // run each test against all possible combinations of batch sizes and
+        // number of execution nodes
+        int[] batchSizes = {0, 16, 1};
+        int[] numNodes = {1, 2, 3, 0};
+        for (int i = 0; i < batchSizes.length; ++i) {
+          for (int j = 0; j < numNodes.length; ++j) {
+            TestUtils.runQuery(
+                executor, testCase.getSectionAsString(Section.QUERY, false, " "),
+                numNodes[j], batchSizes[i], abortOnError, maxErrors,
+                testCase.getStartingLineNum(), null, expectedTypes,
+                expectedResults, null, null, errorLog);
+          }
         }
       }
-    }
-    if (errorLog.length() != 0) {
-      fail(errorLog.toString());
+      if (errorLog.length() != 0) {
+        fail(errorLog.toString());
+      }
     }
   }
+
 
   @Test
   public void TestDistinct() {
@@ -74,23 +95,13 @@ public class QueryTest {
   }
 
   @Test
-  public void TestHdfsTextScanNode() {
-    runQueryTestFile("hdfs-scan-node", false, 1000);
+  public void TestHdfsScanNode() {
+    runQueryTestFile("hdfs-scan-node", false, 1000, tableSubsitutionList);
   }
 
   @Test
-  public void TestHdfsTextPartitions() {
-    runQueryTestFile("hdfs-partitions", false, 1000);
-  }
-
-  @Test
-  public void TestHdfsRCFileScanNode() {
-    runQueryTestFile("hdfs-rcfile-scan-node", false, 1000);
-  }
-
-  @Test
-  public void TestHdfsRCFilePartitions() {
-    runQueryTestFile("hdfs-rcfile-partitions", false, 1000);
+  public void TestFilePartions() {
+    runQueryTestFile("hdfs-partitions", false, 1000, tableSubsitutionList);
   }
 
   @Test

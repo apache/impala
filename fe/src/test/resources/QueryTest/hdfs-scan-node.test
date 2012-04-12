@@ -1,6 +1,6 @@
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col, timestamp_col
-from alltypessmall
+from alltypessmall$TABLE
 -----
 int,boolean,tinyint,smallint,int,bigint,float,double,string,string,timestamp
 -----
@@ -105,7 +105,7 @@ int,boolean,tinyint,smallint,int,bigint,float,double,string,string,timestamp
 98,true,3,3,3,30,3.3,30.3,'04/03/09','3',2009-04-03 00:23:00.930000000
 99,false,4,4,4,40,4.4,40.4,'04/03/09','4',2009-04-03 00:24:00.960000000
 =====
-select id from alltypessmall
+select id from alltypessmall$TABLE
 -----
 int
 -----
@@ -210,7 +210,7 @@ int
 98
 99
 =====
-select * from alltypessmall
+select * from alltypessmall$TABLE
 -----
 int,int,int,boolean,tinyint,smallint,int,bigint,float,double,string,string,timestamp
 -----
@@ -315,7 +315,7 @@ int,int,int,boolean,tinyint,smallint,int,bigint,float,double,string,string,times
 2009,4,98,true,3,3,3,30,3.3,30.3,'04/03/09','3',2009-04-03 00:23:00.930000000
 2009,4,99,false,4,4,4,40,4.4,40.4,'04/03/09','4',2009-04-03 00:24:00.960000000
 =====
-select month, date_string_col, year from alltypessmall
+select month, date_string_col, year from alltypessmall$TABLE
 -----
 int,string,int
 -----
@@ -420,7 +420,7 @@ int,string,int
 4,'04/03/09',2009
 4,'04/03/09',2009
 ========
-select id from alltypessmall where id = 10
+select id from alltypessmall$TABLE where id = 10
 ----
 int
 ----
@@ -428,7 +428,7 @@ int
 ====
 # We expect that conversion errors are turned into NULLs
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col 
-from alltypeserror
+from alltypeserror$TABLE
 -----
 int,boolean,tinyint,smallint,int,bigint,float,double,string,string
 -----
@@ -465,7 +465,7 @@ int,boolean,tinyint,smallint,int,bigint,float,double,string,string
 ====
 # We expect that conversion errors are turned into NULLs
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col 
-from alltypeserrornonulls
+from alltypeserrornonulls$TABLE
 -----
 int,boolean,tinyint,smallint,int,bigint,float,double,string,string
 -----
@@ -502,7 +502,7 @@ int,boolean,tinyint,smallint,int,bigint,float,double,string,string
 ====
 # partition key values are materialized correctly across file boundaries
 select day, month, year, string_col
-from alltypesagg
+from alltypesagg$TABLE
 where string_col = '0'
 -----
 int, int, int, string
@@ -539,7 +539,7 @@ tinyint, smallint, int, bigint, float, double
 -128,-32768,-2147483648,-9223372036854775808,-inf,-inf
 ====
 # Test multi files non-partitioned table (hdfs)
-select count(*) from AllTypesAggMultiFilesNoPart
+select count(*) from AllTypesAggMultiFilesNoPart$TABLE
 ----
 bigint
 ----

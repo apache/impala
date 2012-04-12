@@ -17,6 +17,7 @@
 #include "gen-cpp/PlanNodes_types.h"
 #include "exec/hdfs-rcfile-scanner.h"
 #include "exec/hdfs-scan-node.h"
+#include "exec/text-converter.inline.h"
 
 using namespace std;
 using namespace boost;
@@ -130,30 +131,30 @@ Status HdfsRCFileScanner::GetNext(
 
         const char* col_start = row_group_->GetFieldPtr(rc_column_idx);
         int field_len = row_group_->GetFieldLength(rc_column_idx);
-        bool parse_ok = true;
+        Status parse_status;
 
         switch (slot_desc->type()) {
           case TYPE_STRING:
             // TODO: Eliminate the unnecessary copy operation from the RCFileRowGroup
             // buffers to the tuple buffers by pushing the tuple buffer down into the
             // RowGroup class.
-            parse_ok = text_converter_->ConvertAndWriteSlotBytes(col_start,
-                col_start + field_len, tuple_, slot_desc, true, false);
+            parse_status = text_converter_->WriteSlot(state, slot_desc, tuple_,
+                                                      col_start, field_len, true, false);
             break;
           default:
             // RCFile stores all fields as strings regardless of type, but these
             // strings are not NULL terminated. The strto* functions that TextConverter
             // uses require NULL terminated strings, so we have to manually NULL terminate
-            // the strings before passing them to ConvertAndWriteSlotBytes.
+            // the strings before passing them to WriteSlot
             // TODO: Devise a way to avoid this unecessary copy-and-terminate operation.
             string terminated_field(col_start, field_len);
             const char* c_str = terminated_field.c_str();
-            parse_ok = text_converter_->ConvertAndWriteSlotBytes(c_str,
-                 c_str + field_len, tuple_, slot_desc, false, false);
+            parse_status = text_converter_->WriteSlot(state, slot_desc, tuple_,
+                                                      c_str, field_len, false, false);
             break;
         }
 
-        if (!parse_ok) {
+        if (!parse_status.ok()) {
           error_in_row = true;
           if (state->LogHasSpace()) {
             state->error_stream() << "Error converting column: " << rc_column_idx <<

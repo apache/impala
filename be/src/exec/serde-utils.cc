@@ -23,16 +23,10 @@ Status SerDeUtils::ReadBoolean(ByteStream* byte_stream, bool* boolean) {
 }
 
 Status SerDeUtils::ReadInt(ByteStream* byte_stream, int32_t* integer) {
-  uint8_t buf[sizeof(int)];
+  char buf[sizeof(int32_t)];
   RETURN_IF_ERROR(SerDeUtils::ReadBytes(byte_stream, sizeof(int32_t),
     reinterpret_cast<char*>(&buf)));
-
-  *integer =
-      ((buf[0] & 0xff) << 24)
-      | ((buf[1] & 0xff) << 16)
-      | ((buf[2] & 0xff) << 8)
-      |  (buf[3] & 0xff);
-  return Status::OK;
+  return SerDeUtils::ReadInt(buf, integer);
 }
 
 Status SerDeUtils::ReadVLong(ByteStream* byte_stream, int64_t* vlong) {
@@ -142,6 +136,13 @@ Status SerDeUtils::ReadText(ByteStream* byte_stream, std::vector<char>* text) {
   RETURN_IF_ERROR(ReadVInt(byte_stream, &length));
   text->resize(length);
   RETURN_IF_ERROR(ReadBytes(byte_stream, length, text));
+  return Status::OK;
+}
+
+Status SerDeUtils::SkipText(ByteStream* byte_stream) {
+  int32_t length;
+  RETURN_IF_ERROR(ReadVInt(byte_stream, &length));
+  RETURN_IF_ERROR(SkipBytes(byte_stream, length));
   return Status::OK;
 }
 

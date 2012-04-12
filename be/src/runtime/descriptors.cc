@@ -231,6 +231,7 @@ Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tb
     switch (tdesc.tableType) {
       case TTableType::HDFS_TEXT_TABLE:
       case TTableType::HDFS_RCFILE_TABLE:
+      case TTableType::HDFS_SEQFILE_TABLE:
         desc = pool->Add(new HdfsTableDescriptor(tdesc));
         break;
       case TTableType::HBASE_TABLE:
