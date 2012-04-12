@@ -345,14 +345,20 @@ public abstract class HdfsTable extends Table {
       try {
         FileSystem fs = p.getFileSystem(conf);
         FileStatus fileStatus = fs.getFileStatus(p);
-        locations = fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
+        // Ignore directories (and files in them) - if a directory is erroneously created
+        // as a subdirectory of a partition dir we should ignore it and move on
+        // (getFileBlockLocations will throw when
+        // called on a directory). Hive will not recurse into directories.
+        if (!fileStatus.isDirectory()) {
+          locations = fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
+          for (int i = 0; i < locations.length; ++i) {
+            result.add(Pair.create(path, locations[i]));
+          }
+        }
       } catch (IOException e) {
         throw new RuntimeException(
             "couldn't determine block locations for path '" + path + "':\n"
             + e.getMessage());
-      }
-      for (int i = 0; i < locations.length; ++i) {
-        result.add(Pair.create(path, locations[i]));
       }
     }
     return result;
