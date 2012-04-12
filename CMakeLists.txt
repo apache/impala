@@ -89,8 +89,8 @@ message(STATUS ${GTEST_LIBRARY})
 
 # find LLVM
 find_package(Llvm REQUIRED)
-include_directories($LLVM_INCLUDE_DIR})
-set(LIBS ${LIBS} {LLVM_MODULE_LIBS})
+include_directories(${LLVM_INCLUDE_DIR})
+set(LIBS ${LIBS} ${LLVM_MODULE_LIBS})
 
 # compile these subdirs using their own CMakeLists.txt
 add_subdirectory(common/function-registry)

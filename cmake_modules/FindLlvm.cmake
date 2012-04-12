@@ -7,7 +7,11 @@
 #  LLVM_MODULE_LIBS - list of llvm libs for working with modules.
 #  LLVM_FOUND       - True if llvm found.
 
-find_program(LLVM_CONFIG_EXECUTABLE NAMES llvm-config DOC "llvm-config executable")
+find_program(LLVM_CONFIG_EXECUTABLE 
+  NAMES llvm-config 
+  PATHS ${CMAKE_SOURCE_DIR}/thirdparty/llvm-3.0.src/Release/bin/
+  DOC "llvm-config executable"
+)
 
 if (LLVM_CONFIG_EXECUTABLE)
   message(STATUS "LLVM llvm-config found at: ${LLVM_CONFIG_EXECUTABLE}")
@@ -45,11 +49,21 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
+# Get the link libs we need.  llvm has many and we don't want to link all of the libs
+# if we don't need them.   
 execute_process(
-  COMMAND ${LLVM_CONFIG_EXECUTABLE} --libs core jit native ipo
+  COMMAND ${LLVM_CONFIG_EXECUTABLE} --libnames core jit native ipo
   OUTPUT_VARIABLE LLVM_MODULE_LIBS
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
+
+# CMake really doesn't like adding link directories and wants absolute paths
+# Reconstruct it with LLVM_MODULE_LIBS and LLVM_LIBRARY_DIR
+string(REPLACE " " ";" LIBS_LIST ${LLVM_MODULE_LIBS})
+set (LLVM_MODULE_LIBS "")
+foreach (LIB ${LIBS_LIST})
+  set(LLVM_MODULE_LIBS ${LLVM_MODULE_LIBS} "${LLVM_LIBRARY_DIR}/${LIB}")
+endforeach(LIB)
 
 message(STATUS "LLVM include dir: ${LLVM_INCLUDE_DIR}")
 message(STATUS "LLVM lib dir: ${LLVM_LIBRARY_DIR}")
