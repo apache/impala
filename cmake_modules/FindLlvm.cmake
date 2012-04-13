@@ -60,7 +60,7 @@ execute_process(
 # CMake really doesn't like adding link directories and wants absolute paths
 # Reconstruct it with LLVM_MODULE_LIBS and LLVM_LIBRARY_DIR
 string(REPLACE " " ";" LIBS_LIST ${LLVM_MODULE_LIBS})
-set (LLVM_MODULE_LIBS "")
+set (LLVM_MODULE_LIBS "-ldl")
 foreach (LIB ${LIBS_LIST})
   set(LLVM_MODULE_LIBS ${LLVM_MODULE_LIBS} "${LLVM_LIBRARY_DIR}/${LIB}")
 endforeach(LIB)
