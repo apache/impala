@@ -92,6 +92,18 @@ CREATE TABLE AllTypesSmall LIKE AllTypes;
 DROP TABLE IF EXISTS AllTypesSmall_rc;
 CREATE TABLE AllTypesSmall_rc LIKE AllTypes_rc;
 
+DROP TABLE IF EXISTS AllTypesSmall_rc_def;
+CREATE TABLE AllTypesSmall_rc_def LIKE AllTypes_rc;
+
+DROP TABLE IF EXISTS AllTypesSmall_rc_gzip;
+CREATE TABLE AllTypesSmall_rc_gzip LIKE AllTypes_rc;
+
+DROP TABLE IF EXISTS AllTypesSmall_rc_bzip;
+CREATE TABLE AllTypesSmall_rc_bzip LIKE AllTypes_rc;
+
+DROP TABLE IF EXISTS AllTypesSmall_rc_snap;
+CREATE TABLE AllTypesSmall_rc_snap LIKE AllTypes_rc;
+
 DROP TABLE IF EXISTS AllTypesSmall_seq;
 CREATE TABLE AllTypesSmall_seq LIKE AllTypes_seq;
 
@@ -125,6 +137,18 @@ CREATE TABLE AllTypesError LIKE AllTypes;
 DROP TABLE IF EXISTS AlltypesError_rc;
 CREATE TABLE AllTypesError_rc LIKE AllTypes_rc;
 
+DROP TABLE IF EXISTS AlltypesError_rc_def;
+CREATE TABLE AllTypesError_rc_def LIKE AllTypes_rc;
+
+DROP TABLE IF EXISTS AlltypesError_rc_gzip;
+CREATE TABLE AllTypesError_rc_gzip LIKE AllTypes_rc;
+
+DROP TABLE IF EXISTS AlltypesError_rc_bzip;
+CREATE TABLE AllTypesError_rc_bzip LIKE AllTypes_rc;
+
+DROP TABLE IF EXISTS AlltypesError_rc_snap;
+CREATE TABLE AllTypesError_rc_snap LIKE AllTypes_rc;
+
 DROP TABLE IF EXISTS AlltypesError_seq;
 CREATE TABLE AllTypesError_seq LIKE AllTypes_seq;
 
@@ -157,6 +181,18 @@ CREATE TABLE AllTypesErrorNoNulls LIKE AllTypes;
 
 DROP TABLE IF EXISTS AlltypesErrorNoNulls_rc;
 CREATE TABLE AllTypesErrorNoNulls_rc LIKE AllTypes_rc;
+
+DROP TABLE IF EXISTS AlltypesErrorNoNulls_rc_def;
+CREATE TABLE AllTypesErrorNoNulls_rc_def LIKE AllTypes_rc;
+
+DROP TABLE IF EXISTS AlltypesErrorNoNulls_rc_gzip;
+CREATE TABLE AllTypesErrorNoNulls_rc_gzip LIKE AllTypes_rc;
+
+DROP TABLE IF EXISTS AlltypesErrorNoNulls_rc_bzip;
+CREATE TABLE AllTypesErrorNoNulls_rc_bzip LIKE AllTypes_rc;
+
+DROP TABLE IF EXISTS AlltypesErrorNoNulls_rc_snap;
+CREATE TABLE AllTypesErrorNoNulls_rc_snap LIKE AllTypes_rc;
 
 DROP TABLE IF EXISTS AlltypesErrorNoNulls_seq;
 CREATE TABLE AllTypesErrorNoNulls_seq LIKE AllTypes_seq;
@@ -217,6 +253,18 @@ CREATE TABLE AllTypesAgg_rc (
 partitioned by (year int, month int, day int)
 STORED AS RCFILE;
 
+DROP TABLE IF EXISTS AllTypesAgg_rc_def;
+CREATE TABLE AllTypesAgg_rc_def LIKE AllTypesAgg_rc;
+
+DROP TABLE IF EXISTS AllTypesAgg_rc_gzip;
+CREATE TABLE AllTypesAgg_rc_gzip LIKE AllTypesAgg_rc;
+
+DROP TABLE IF EXISTS AllTypesAgg_rc_bzip;
+CREATE TABLE AllTypesAgg_rc_bzip LIKE AllTypesAgg_rc;
+
+DROP TABLE IF EXISTS AllTypesAgg_rc_snap;
+CREATE TABLE AllTypesAgg_rc_snap LIKE AllTypesAgg_rc;
+
 DROP TABLE IF EXISTS AllTypesAgg_seq;
 CREATE TABLE AllTypesAgg_seq (
   id int,
@@ -262,6 +310,18 @@ CREATE TABLE AllTypesAggNoNulls LIKE AllTypesAgg;
 
 DROP TABLE IF EXISTS AllTypesAggNoNulls_rc;
 CREATE TABLE AllTypesAggNoNulls_rc LIKE AllTypesAgg_rc;
+
+DROP TABLE IF EXISTS AllTypesAggNoNulls_rc_def;
+CREATE TABLE AllTypesAggNoNulls_rc_def LIKE AllTypesAgg_rc;
+
+DROP TABLE IF EXISTS AllTypesAggNoNulls_rc_gzip;
+CREATE TABLE AllTypesAggNoNulls_rc_gzip LIKE AllTypesAgg_rc;
+
+DROP TABLE IF EXISTS AllTypesAggNoNulls_rc_bzip;
+CREATE TABLE AllTypesAggNoNulls_rc_bzip LIKE AllTypesAgg_rc;
+
+DROP TABLE IF EXISTS AllTypesAggNoNulls_rc_snap;
+CREATE TABLE AllTypesAggNoNulls_rc_snap LIKE AllTypesAgg_rc;
 
 DROP TABLE IF EXISTS AllTypesAggNoNulls_seq;
 CREATE TABLE AllTypesAggNoNulls_seq LIKE AllTypesAgg_seq;
@@ -314,6 +374,18 @@ CREATE TABLE TestTbl_rc (
   name string,
   zip int)
 STORED AS RCFILE;
+
+DROP TABLE IF EXISTS TestTbl_rc_def;
+CREATE TABLE TestTbl_rc_def LIKE TestTbl_rc;
+
+DROP TABLE IF EXISTS TestTbl_rc_gzip;
+CREATE TABLE TestTbl_rc_gzip LIKE TestTbl_rc;
+
+DROP TABLE IF EXISTS TestTbl_rc_bzip;
+CREATE TABLE TestTbl_rc_bzip LIKE TestTbl_rc;
+
+DROP TABLE IF EXISTS TestTbl_rc_snap;
+CREATE TABLE TestTbl_rc_snap LIKE TestTbl_rc;
 
 DROP TABLE IF EXISTS TestTbl_seq;
 CREATE TABLE TestTbl_seq (
@@ -588,6 +660,18 @@ CREATE TABLE AllTypesAggMultiFiles_rc (
 partitioned by (year int, month int, day int)
 STORED AS RCFILE;
 
+DROP TABLE IF EXISTS AllTypesAggMultiFiles_rc_def;
+CREATE TABLE AllTypesAggMultiFiles_rc_def LIKE AllTypesAggMultiFiles_rc;
+
+DROP TABLE IF EXISTS AllTypesAggMultiFiles_rc_gzip;
+CREATE TABLE AllTypesAggMultiFiles_rc_gzip LIKE AllTypesAggMultiFiles_rc;
+
+DROP TABLE IF EXISTS AllTypesAggMultiFiles_rc_bzip;
+CREATE TABLE AllTypesAggMultiFiles_rc_bzip LIKE AllTypesAggMultiFiles_rc;
+
+DROP TABLE IF EXISTS AllTypesAggMultiFiles_rc_snap;
+CREATE TABLE AllTypesAggMultiFiles_rc_snap LIKE AllTypesAggMultiFiles_rc;
+
 DROP TABLE IF EXISTS AllTypesAggMultiFiles_seq;
 CREATE TABLE AllTypesAggMultiFiles_seq (
   id int,
@@ -605,132 +689,28 @@ partitioned by (year int, month int, day int)
 STORED AS SEQUENCEFILE;
 
 DROP TABLE IF EXISTS AllTypesAggMultiFiles_seq_def;
-CREATE TABLE AllTypesAggMultiFiles_seq_def (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-partitioned by (year int, month int, day int)
-STORED AS SEQUENCEFILE;
+CREATE TABLE AllTypesAggMultiFiles_seq_def LIKE AllTypesAggMultiFiles_seq;
 
 DROP TABLE IF EXISTS AllTypesAggMultiFiles_seq_gzip;
-CREATE TABLE AllTypesAggMultiFiles_seq_gzip (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-partitioned by (year int, month int, day int)
-STORED AS SEQUENCEFILE;
+CREATE TABLE AllTypesAggMultiFiles_seq_gzip LIKE AllTypesAggMultiFiles_seq;
 
 DROP TABLE IF EXISTS AllTypesAggMultiFiles_seq_bzip;
-CREATE TABLE AllTypesAggMultiFiles_seq_bzip (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-partitioned by (year int, month int, day int)
-STORED AS SEQUENCEFILE;
+CREATE TABLE AllTypesAggMultiFiles_seq_bzip LIKE AllTypesAggMultiFiles_seq;
 
 DROP TABLE IF EXISTS AllTypesAggMultiFiles_seq_snap;
-CREATE TABLE AllTypesAggMultiFiles_seq_snap (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-partitioned by (year int, month int, day int)
-STORED AS SEQUENCEFILE;
+CREATE TABLE AllTypesAggMultiFiles_seq_snap LIKE AllTypesAggMultiFiles_seq;
 
 DROP TABLE IF EXISTS AllTypesAggMultiFiles_seq_record_def;
-CREATE TABLE AllTypesAggMultiFiles_seq_record_def (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-partitioned by (year int, month int, day int)
-STORED AS SEQUENCEFILE;
+CREATE TABLE AllTypesAggMultiFiles_seq_record_def LIKE AllTypesAggMultiFiles_seq;
 
 DROP TABLE IF EXISTS AllTypesAggMultiFiles_seq_record_gzip;
-CREATE TABLE AllTypesAggMultiFiles_seq_record_gzip (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-partitioned by (year int, month int, day int)
-STORED AS SEQUENCEFILE;
+CREATE TABLE AllTypesAggMultiFiles_seq_record_gzip LIKE AllTypesAggMultiFiles_seq;
 
 DROP TABLE IF EXISTS AllTypesAggMultiFiles_seq_record_bzip;
-CREATE TABLE AllTypesAggMultiFiles_seq_record_bzip (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-partitioned by (year int, month int, day int)
-STORED AS SEQUENCEFILE;
+CREATE TABLE AllTypesAggMultiFiles_seq_record_bzip LIKE AllTypesAggMultiFiles_seq;
 
 DROP TABLE IF EXISTS AllTypesAggMultiFiles_seq_record_snap;
-CREATE TABLE AllTypesAggMultiFiles_seq_record_snap (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-partitioned by (year int, month int, day int)
-STORED AS SEQUENCEFILE;
+CREATE TABLE AllTypesAggMultiFiles_seq_record_snap LIKE AllTypesAggMultiFiles_seq;
 
 DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart;
 CREATE TABLE AllTypesAggMultiFilesNoPart (
@@ -776,6 +756,18 @@ CREATE TABLE AllTypesAggMultiFilesNoPart_rc (
   timestamp_col timestamp)
 STORED AS RCFILE;
 
+DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart_rc_def;
+CREATE TABLE AllTypesAggMultiFilesNoPart_rc_def LIKE AllTypesAggMultiFilesNoPart_rc;
+
+DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart_rc_gzip;
+CREATE TABLE AllTypesAggMultiFilesNoPart_rc_gzip LIKE AllTypesAggMultiFilesNoPart_rc;
+
+DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart_rc_bzip;
+CREATE TABLE AllTypesAggMultiFilesNoPart_rc_bzip LIKE AllTypesAggMultiFilesNoPart_rc;
+
+DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart_rc_snap;
+CREATE TABLE AllTypesAggMultiFilesNoPart_rc_snap LIKE AllTypesAggMultiFilesNoPart_rc;
+
 DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart_seq;
 CREATE TABLE AllTypesAggMultiFilesNoPart_seq (
   id int,
@@ -792,121 +784,29 @@ CREATE TABLE AllTypesAggMultiFilesNoPart_seq (
 STORED AS SEQUENCEFILE;
 
 DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart_seq_def;
-CREATE TABLE AllTypesAggMultiFilesNoPart_seq_def (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-STORED AS SEQUENCEFILE;
+CREATE TABLE AllTypesAggMultiFilesNoPart_seq_def LIKE AllTypesAggMultiFilesNoPart_seq;
 
 DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart_seq_gzip;
-CREATE TABLE AllTypesAggMultiFilesNoPart_seq_gzip (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-STORED AS SEQUENCEFILE;
+CREATE TABLE AllTypesAggMultiFilesNoPart_seq_gzip LIKE AllTypesAggMultiFilesNoPart_seq;
 
 DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart_seq_bzip;
-CREATE TABLE AllTypesAggMultiFilesNoPart_seq_bzip (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-STORED AS SEQUENCEFILE;
+CREATE TABLE AllTypesAggMultiFilesNoPart_seq_bzip LIKE AllTypesAggMultiFilesNoPart_seq;
 
 DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart_seq_snap;
-CREATE TABLE AllTypesAggMultiFilesNoPart_seq_snap (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-STORED AS SEQUENCEFILE;
+CREATE TABLE AllTypesAggMultiFilesNoPart_seq_snap LIKE AllTypesAggMultiFilesNoPart_seq;
 
 DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart_seq_record_def;
-CREATE TABLE AllTypesAggMultiFilesNoPart_seq_record_def (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-STORED AS SEQUENCEFILE;
+CREATE TABLE AllTypesAggMultiFilesNoPart_seq_record_def
+LIKE AllTypesAggMultiFilesNoPart_seq;
 
 DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart_seq_record_gzip;
-CREATE TABLE AllTypesAggMultiFilesNoPart_seq_record_gzip (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-STORED AS SEQUENCEFILE;
+CREATE TABLE AllTypesAggMultiFilesNoPart_seq_record_gzip
+LIKE AllTypesAggMultiFilesNoPart_seq;
 
 DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart_seq_record_bzip;
-CREATE TABLE AllTypesAggMultiFilesNoPart_seq_record_bzip (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-STORED AS SEQUENCEFILE;
+CREATE TABLE AllTypesAggMultiFilesNoPart_seq_record_bzip
+LIKE AllTypesAggMultiFilesNoPart_seq;
 
 DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart_seq_record_snap;
-CREATE TABLE AllTypesAggMultiFilesNoPart_seq_record_snap (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-STORED AS SEQUENCEFILE;
+CREATE TABLE AllTypesAggMultiFilesNoPart_seq_record_snap
+LIKE AllTypesAggMultiFilesNoPart_seq;

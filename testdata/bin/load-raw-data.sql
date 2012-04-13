@@ -138,6 +138,25 @@ SET hive.exec.compress.output=true;
 set mapred.output.compression.type=BLOCK;
 SET mapred.output.compression.codec=org.apache.hadoop.io.compress.DefaultCodec;
 
+DROP TABLE IF EXISTS alltypeserror_rc_tmp;
+CREATE EXTERNAL TABLE alltypeserror_rc_tmp (
+  id STRING,
+  bool_col STRING,
+  tinyint_col STRING,
+  smallint_col STRING,
+  int_col STRING,
+  bigint_col STRING,
+  float_col STRING,
+  double_col STRING,
+  date_string_col STRING,
+  string_col STRING,
+  timestamp_col STRING)
+PARTITIONED BY (year INT, month INT)
+STORED AS RCFILE
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/alltypeserror_rc_def';
+INSERT OVERWRITE TABLE alltypeserror_rc_tmp PARTITION (year, month)
+SELECT * FROM alltypeserror_tmp;
+
 DROP TABLE IF EXISTS alltypeserror_seq_tmp;
 CREATE EXTERNAL TABLE alltypeserror_seq_tmp (
   id STRING,
@@ -181,6 +200,25 @@ INSERT OVERWRITE TABLE alltypeserror_seq_tmp PARTITION (year, month)
 SELECT * FROM alltypeserror_tmp;
 
 SET mapred.output.compression.codec=org.apache.hadoop.io.compress.GzipCodec;
+DROP TABLE IF EXISTS alltypeserror_rc_tmp;
+CREATE EXTERNAL TABLE alltypeserror_rc_tmp (
+  id STRING,
+  bool_col STRING,
+  tinyint_col STRING,
+  smallint_col STRING,
+  int_col STRING,
+  bigint_col STRING,
+  float_col STRING,
+  double_col STRING,
+  date_string_col STRING,
+  string_col STRING,
+  timestamp_col STRING)
+PARTITIONED BY (year INT, month INT)
+STORED AS RCFILE
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/alltypeserror_rc_gzip';
+INSERT OVERWRITE TABLE alltypeserror_rc_tmp PARTITION (year, month)
+SELECT * FROM alltypeserror_tmp;
+
 DROP TABLE IF EXISTS alltypeserror_seq_tmp;
 CREATE EXTERNAL TABLE alltypeserror_seq_tmp (
   id STRING,
@@ -224,6 +262,25 @@ INSERT OVERWRITE TABLE alltypeserror_seq_tmp PARTITION (year, month)
 SELECT * FROM alltypeserror_tmp;
 
 SET mapred.output.compression.codec=org.apache.hadoop.io.compress.BZip2Codec;
+DROP TABLE IF EXISTS alltypeserror_rc_tmp;
+CREATE EXTERNAL TABLE alltypeserror_rc_tmp (
+  id STRING,
+  bool_col STRING,
+  tinyint_col STRING,
+  smallint_col STRING,
+  int_col STRING,
+  bigint_col STRING,
+  float_col STRING,
+  double_col STRING,
+  date_string_col STRING,
+  string_col STRING,
+  timestamp_col STRING)
+PARTITIONED BY (year INT, month INT)
+STORED AS RCFILE
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/alltypeserror_rc_bzip';
+INSERT OVERWRITE TABLE alltypeserror_rc_tmp PARTITION (year, month)
+SELECT * FROM alltypeserror_tmp;
+
 DROP TABLE IF EXISTS alltypeserror_seq_tmp;
 CREATE EXTERNAL TABLE alltypeserror_seq_tmp (
   id STRING,
@@ -267,6 +324,25 @@ INSERT OVERWRITE TABLE alltypeserror_seq_tmp PARTITION (year, month)
 SELECT * FROM alltypeserror_tmp;
 
 SET mapred.output.compression.codec=org.apache.hadoop.io.compress.SnappyCodec;
+DROP TABLE IF EXISTS alltypeserror_rc_tmp;
+CREATE EXTERNAL TABLE alltypeserror_rc_tmp (
+  id STRING,
+  bool_col STRING,
+  tinyint_col STRING,
+  smallint_col STRING,
+  int_col STRING,
+  bigint_col STRING,
+  float_col STRING,
+  double_col STRING,
+  date_string_col STRING,
+  string_col STRING,
+  timestamp_col STRING)
+PARTITIONED BY (year INT, month INT)
+STORED AS RCFILE
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/alltypeserror_rc_snap';
+INSERT OVERWRITE TABLE alltypeserror_rc_tmp PARTITION (year, month)
+SELECT * FROM alltypeserror_tmp;
+
 DROP TABLE IF EXISTS alltypeserror_seq_tmp;
 CREATE EXTERNAL TABLE alltypeserror_seq_tmp (
   id STRING,
@@ -316,6 +392,26 @@ SET mapred.output.compression.codec=NONE;
 -- Step 5: Make the Metastore aware of the new partition directories under the
 -- AllTypesError_rc table:
 ALTER TABLE AllTypesError_rc ADD
+PARTITION (year=2009, month=1)
+PARTITION (year=2009, month=2)
+PARTITION (year=2009, month=3);
+
+ALTER TABLE AllTypesError_rc_def ADD
+PARTITION (year=2009, month=1)
+PARTITION (year=2009, month=2)
+PARTITION (year=2009, month=3);
+
+ALTER TABLE AllTypesError_rc_gzip ADD
+PARTITION (year=2009, month=1)
+PARTITION (year=2009, month=2)
+PARTITION (year=2009, month=3);
+
+ALTER TABLE AllTypesError_rc_bzip ADD
+PARTITION (year=2009, month=1)
+PARTITION (year=2009, month=2)
+PARTITION (year=2009, month=3);
+
+ALTER TABLE AllTypesError_rc_snap ADD
 PARTITION (year=2009, month=1)
 PARTITION (year=2009, month=2)
 PARTITION (year=2009, month=3);
@@ -489,6 +585,33 @@ SET hive.exec.compress.output=true;
 set mapred.output.compression.type=BLOCK;
 SET mapred.output.compression.codec=org.apache.hadoop.io.compress.DefaultCodec;
 
+DROP TABLE IF EXISTS alltypeserrornonulls_rc_tmp;
+CREATE EXTERNAL TABLE alltypeserrornonulls_rc_tmp (
+  id STRING,
+  bool_col STRING,
+  tinyint_col STRING,
+  smallint_col STRING,
+  int_col STRING,
+  bigint_col STRING,
+  float_col STRING,
+  double_col STRING,
+  date_string_col STRING,
+  string_col STRING,
+  timestamp_col STRING)
+PARTITIONED BY (year INT, month INT)
+STORED AS RCFILE
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/alltypeserrornonulls_rc_def';
+
+set hive.exec.dynamic.partition=true;
+set hive.exec.dynamic.partition.mode=nonstrict;
+INSERT OVERWRITE TABLE alltypeserrornonulls_rc_tmp PARTITION (year, month)
+SELECT * FROM alltypeserrornonulls_tmp;
+
+ALTER TABLE AllTypesErrorNoNulls_rc_def ADD
+PARTITION (year=2009, month=1)
+PARTITION (year=2009, month=2)
+PARTITION (year=2009, month=3);
+
 DROP TABLE AllTypesErrorNoNulls_seq_tmp;
 CREATE EXTERNAL TABLE alltypeserrornonulls_seq_tmp (
   id STRING,
@@ -517,6 +640,33 @@ PARTITION (year=2009, month=2)
 PARTITION (year=2009, month=3);
 
 SET mapred.output.compression.codec=org.apache.hadoop.io.compress.GzipCodec;
+DROP TABLE IF EXISTS alltypeserrornonulls_rc_tmp;
+CREATE EXTERNAL TABLE alltypeserrornonulls_rc_tmp (
+  id STRING,
+  bool_col STRING,
+  tinyint_col STRING,
+  smallint_col STRING,
+  int_col STRING,
+  bigint_col STRING,
+  float_col STRING,
+  double_col STRING,
+  date_string_col STRING,
+  string_col STRING,
+  timestamp_col STRING)
+PARTITIONED BY (year INT, month INT)
+STORED AS RCFILE
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/alltypeserrornonulls_rc_gzip';
+
+set hive.exec.dynamic.partition=true;
+set hive.exec.dynamic.partition.mode=nonstrict;
+INSERT OVERWRITE TABLE alltypeserrornonulls_rc_tmp PARTITION (year, month)
+SELECT * FROM alltypeserrornonulls_tmp;
+
+ALTER TABLE AllTypesErrorNoNulls_rc_gzip ADD
+PARTITION (year=2009, month=1)
+PARTITION (year=2009, month=2)
+PARTITION (year=2009, month=3);
+
 DROP TABLE AllTypesErrorNoNulls_seq_tmp;
 CREATE EXTERNAL TABLE alltypeserrornonulls_seq_tmp (
   id STRING,
@@ -545,6 +695,33 @@ PARTITION (year=2009, month=2)
 PARTITION (year=2009, month=3);
 
 SET mapred.output.compression.codec=org.apache.hadoop.io.compress.BZip2Codec;
+DROP TABLE IF EXISTS alltypeserrornonulls_rc_tmp;
+CREATE EXTERNAL TABLE alltypeserrornonulls_rc_tmp (
+  id STRING,
+  bool_col STRING,
+  tinyint_col STRING,
+  smallint_col STRING,
+  int_col STRING,
+  bigint_col STRING,
+  float_col STRING,
+  double_col STRING,
+  date_string_col STRING,
+  string_col STRING,
+  timestamp_col STRING)
+PARTITIONED BY (year INT, month INT)
+STORED AS RCFILE
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/alltypeserrornonulls_rc_bzip';
+
+set hive.exec.dynamic.partition=true;
+set hive.exec.dynamic.partition.mode=nonstrict;
+INSERT OVERWRITE TABLE alltypeserrornonulls_rc_tmp PARTITION (year, month)
+SELECT * FROM alltypeserrornonulls_tmp;
+
+ALTER TABLE AllTypesErrorNoNulls_rc_bzip ADD
+PARTITION (year=2009, month=1)
+PARTITION (year=2009, month=2)
+PARTITION (year=2009, month=3);
+
 DROP TABLE AllTypesErrorNoNulls_seq_tmp;
 CREATE EXTERNAL TABLE alltypeserrornonulls_seq_tmp (
   id STRING,
@@ -573,6 +750,33 @@ PARTITION (year=2009, month=2)
 PARTITION (year=2009, month=3);
 
 SET mapred.output.compression.codec=org.apache.hadoop.io.compress.SnappyCodec;
+DROP TABLE IF EXISTS alltypeserrornonulls_rc_tmp;
+CREATE EXTERNAL TABLE alltypeserrornonulls_rc_tmp (
+  id STRING,
+  bool_col STRING,
+  tinyint_col STRING,
+  smallint_col STRING,
+  int_col STRING,
+  bigint_col STRING,
+  float_col STRING,
+  double_col STRING,
+  date_string_col STRING,
+  string_col STRING,
+  timestamp_col STRING)
+PARTITIONED BY (year INT, month INT)
+STORED AS RCFILE
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/alltypeserrornonulls_rc_snap';
+
+set hive.exec.dynamic.partition=true;
+set hive.exec.dynamic.partition.mode=nonstrict;
+INSERT OVERWRITE TABLE alltypeserrornonulls_rc_tmp PARTITION (year, month)
+SELECT * FROM alltypeserrornonulls_tmp;
+
+ALTER TABLE AllTypesErrorNoNulls_rc_snap ADD
+PARTITION (year=2009, month=1)
+PARTITION (year=2009, month=2)
+PARTITION (year=2009, month=3);
+
 DROP TABLE AllTypesErrorNoNulls_seq_tmp;
 CREATE EXTERNAL TABLE alltypeserrornonulls_seq_tmp (
   id STRING,
@@ -763,6 +967,22 @@ SET hive.exec.compress.output=true;
 set mapred.output.compression.type=BLOCK;
 SET mapred.output.compression.codec=org.apache.hadoop.io.compress.DefaultCodec;
 
+INSERT OVERWRITE TABLE alltypes_rc_def partition (year, month)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+FROM alltypes;
+
+INSERT OVERWRITE TABLE alltypessmall_rc_def partition (year, month)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+FROM alltypessmall;
+
+INSERT OVERWRITE TABLE alltypesagg_rc_def partition (year, month, day)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day
+FROM alltypesagg;
+
+INSERT OVERWRITE TABLE alltypesaggnonulls_rc_def partition (year, month, day)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day
+FROM alltypesaggnonulls;
+
 INSERT OVERWRITE TABLE alltypes_seq_def partition (year, month)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 FROM alltypes;
@@ -780,6 +1000,22 @@ SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, 
 FROM alltypesaggnonulls;
 
 SET mapred.output.compression.codec=org.apache.hadoop.io.compress.GzipCodec;
+INSERT OVERWRITE TABLE alltypes_rc_gzip partition (year, month)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+FROM alltypes;
+
+INSERT OVERWRITE TABLE alltypessmall_rc_gzip partition (year, month)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+FROM alltypessmall;
+
+INSERT OVERWRITE TABLE alltypesagg_rc_gzip partition (year, month, day)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day
+FROM alltypesagg;
+
+INSERT OVERWRITE TABLE alltypesaggnonulls_rc_gzip partition (year, month, day)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day
+FROM alltypesaggnonulls;
+
 INSERT OVERWRITE TABLE alltypes_seq_gzip partition (year, month)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 FROM alltypes;
@@ -797,6 +1033,22 @@ SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, 
 FROM alltypesaggnonulls;
 
 SET mapred.output.compression.codec=org.apache.hadoop.io.compress.BZip2Codec;
+INSERT OVERWRITE TABLE alltypes_rc_bzip partition (year, month)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+FROM alltypes;
+
+INSERT OVERWRITE TABLE alltypessmall_rc_bzip partition (year, month)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+FROM alltypessmall;
+
+INSERT OVERWRITE TABLE alltypesagg_rc_bzip partition (year, month, day)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day
+FROM alltypesagg;
+
+INSERT OVERWRITE TABLE alltypesaggnonulls_rc_bzip partition (year, month, day)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day
+FROM alltypesaggnonulls;
+
 INSERT OVERWRITE TABLE alltypes_seq_bzip partition (year, month)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 FROM alltypes;
@@ -814,6 +1066,22 @@ SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, 
 FROM alltypesaggnonulls;
 
 SET mapred.output.compression.codec=org.apache.hadoop.io.compress.SnappyCodec;
+INSERT OVERWRITE TABLE alltypes_rc_snap partition (year, month)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+FROM alltypes;
+
+INSERT OVERWRITE TABLE alltypessmall_rc_snap partition (year, month)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+FROM alltypessmall;
+
+INSERT OVERWRITE TABLE alltypesagg_rc_snap partition (year, month, day)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day
+FROM alltypesagg;
+
+INSERT OVERWRITE TABLE alltypesaggnonulls_rc_snap partition (year, month, day)
+SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day
+FROM alltypesaggnonulls;
+
 INSERT OVERWRITE TABLE alltypes_seq_snap partition (year, month)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 FROM alltypes;
@@ -944,49 +1212,93 @@ insert into table alltypesaggmultifilesnopart_seq   SELECT id, bool_col, tinyint
 insert into table alltypesaggmultifilesnopart_seq   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 1;
 insert into table alltypesaggmultifilesnopart_seq   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 2;
 insert into table alltypesaggmultifilesnopart_seq   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 3;
+
+SET hive.exec.compress.output=true; 
+set mapred.output.compression.type=BLOCK;
+SET mapred.output.compression.codec=org.apache.hadoop.io.compress.DefaultCodec;
+
+insert into table alltypesaggmultifilesnopart_rc_def   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 0;
+insert into table alltypesaggmultifilesnopart_rc_def   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 1;
+insert into table alltypesaggmultifilesnopart_rc_def   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 2;
+insert into table alltypesaggmultifilesnopart_rc_def   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 3;
+
 insert into table alltypesaggmultifilesnopart_seq_def   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 0;
 insert into table alltypesaggmultifilesnopart_seq_def   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 1;
 insert into table alltypesaggmultifilesnopart_seq_def   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 2;
 insert into table alltypesaggmultifilesnopart_seq_def   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 3;
+
+SET mapred.output.compression.codec=org.apache.hadoop.io.compress.GzipCodec;
+insert into table alltypesaggmultifilesnopart_rc_gzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 0;
+insert into table alltypesaggmultifilesnopart_rc_gzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 1;
+insert into table alltypesaggmultifilesnopart_rc_gzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 2;
+insert into table alltypesaggmultifilesnopart_rc_gzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 3;
+
 insert into table alltypesaggmultifilesnopart_seq_gzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 0;
 insert into table alltypesaggmultifilesnopart_seq_gzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 1;
 insert into table alltypesaggmultifilesnopart_seq_gzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 2;
 insert into table alltypesaggmultifilesnopart_seq_gzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 3;
+
+SET mapred.output.compression.codec=org.apache.hadoop.io.compress.BZip2Codec;
+insert into table alltypesaggmultifilesnopart_rc_bzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 0;
+insert into table alltypesaggmultifilesnopart_rc_bzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 1;
+insert into table alltypesaggmultifilesnopart_rc_bzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 2;
+insert into table alltypesaggmultifilesnopart_rc_bzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 3;
+
 insert into table alltypesaggmultifilesnopart_seq_bzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 0;
 insert into table alltypesaggmultifilesnopart_seq_bzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 1;
 insert into table alltypesaggmultifilesnopart_seq_bzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 2;
 insert into table alltypesaggmultifilesnopart_seq_bzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 3;
+
+SET mapred.output.compression.codec=org.apache.hadoop.io.compress.SnappyCodec;
+insert into table alltypesaggmultifilesnopart_rc_snap   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 0;
+insert into table alltypesaggmultifilesnopart_rc_snap   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 1;
+insert into table alltypesaggmultifilesnopart_rc_snap   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 2;
+insert into table alltypesaggmultifilesnopart_rc_snap   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 3;
+
 insert into table alltypesaggmultifilesnopart_seq_snap   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 0;
 insert into table alltypesaggmultifilesnopart_seq_snap   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 1;
 insert into table alltypesaggmultifilesnopart_seq_snap   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 2;
 insert into table alltypesaggmultifilesnopart_seq_snap   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 3;
 
+set mapred.output.compression.type=RECORD;
+SET mapred.output.compression.codec=org.apache.hadoop.io.compress.DefaultCodec;
 insert into table alltypesaggmultifilesnopart_seq_record_def   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 0;
 insert into table alltypesaggmultifilesnopart_seq_record_def   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 1;
 insert into table alltypesaggmultifilesnopart_seq_record_def   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 2;
 insert into table alltypesaggmultifilesnopart_seq_record_def   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 3;
+
+SET mapred.output.compression.codec=org.apache.hadoop.io.compress.GzipCodec;
 insert into table alltypesaggmultifilesnopart_seq_record_gzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 0;
 insert into table alltypesaggmultifilesnopart_seq_record_gzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 1;
 insert into table alltypesaggmultifilesnopart_seq_record_gzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 2;
 insert into table alltypesaggmultifilesnopart_seq_record_gzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 3;
+
+SET mapred.output.compression.codec=org.apache.hadoop.io.compress.BZip2Codec;
 insert into table alltypesaggmultifilesnopart_seq_record_bzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 0;
 insert into table alltypesaggmultifilesnopart_seq_record_bzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 1;
 insert into table alltypesaggmultifilesnopart_seq_record_bzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 2;
 insert into table alltypesaggmultifilesnopart_seq_record_bzip   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 3;
+
+SET mapred.output.compression.codec=org.apache.hadoop.io.compress.SnappyCodec;
 insert into table alltypesaggmultifilesnopart_seq_record_snap   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 0;
 insert into table alltypesaggmultifilesnopart_seq_record_snap   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 1;
 insert into table alltypesaggmultifilesnopart_seq_record_snap   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 2;
 insert into table alltypesaggmultifilesnopart_seq_record_snap   SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 3;
 
+SET hive.exec.compress.output=false; 
+set mapred.output.compression.type=NONE;
+SET mapred.output.compression.codec=NONE;
 -- Create multiple files for alltypesaggmultifiles (hdfs/rc/text)
 INSERT INTO TABLE alltypesaggmultifiles partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 0;
 INSERT INTO TABLE alltypesaggmultifiles partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 1;
 INSERT INTO TABLE alltypesaggmultifiles partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 2;
 INSERT INTO TABLE alltypesaggmultifiles partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 3;
+
 INSERT INTO TABLE alltypesaggmultifiles_rc partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 0;
 INSERT INTO TABLE alltypesaggmultifiles_rc partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 1;
 INSERT INTO TABLE alltypesaggmultifiles_rc partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 2;
 INSERT INTO TABLE alltypesaggmultifiles_rc partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 3;
+
 INSERT INTO TABLE alltypesaggmultifiles_text partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 0;
 INSERT INTO TABLE alltypesaggmultifiles_text partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 1;
 INSERT INTO TABLE alltypesaggmultifiles_text partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 2;
@@ -996,34 +1308,73 @@ INSERT INTO TABLE alltypesaggmultifiles_seq partition (year, month, day) SELECT 
 INSERT INTO TABLE alltypesaggmultifiles_seq partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 1;
 INSERT INTO TABLE alltypesaggmultifiles_seq partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 2;
 INSERT INTO TABLE alltypesaggmultifiles_seq partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 3;
+
+SET hive.exec.compress.output=true; 
+set mapred.output.compression.type=BLOCK;
+SET mapred.output.compression.codec=org.apache.hadoop.io.compress.DefaultCodec;
+INSERT INTO TABLE alltypesaggmultifiles_rc_def partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 0;
+INSERT INTO TABLE alltypesaggmultifiles_rc_def partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 1;
+INSERT INTO TABLE alltypesaggmultifiles_rc_def partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 2;
+INSERT INTO TABLE alltypesaggmultifiles_rc_def partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 3;
+
 INSERT INTO TABLE alltypesaggmultifiles_seq_def partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 0;
 INSERT INTO TABLE alltypesaggmultifiles_seq_def partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 1;
 INSERT INTO TABLE alltypesaggmultifiles_seq_def partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 2;
 INSERT INTO TABLE alltypesaggmultifiles_seq_def partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 3;
+
+SET mapred.output.compression.codec=org.apache.hadoop.io.compress.GzipCodec;
+INSERT INTO TABLE alltypesaggmultifiles_rc_gzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 0;
+INSERT INTO TABLE alltypesaggmultifiles_rc_gzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 1;
+INSERT INTO TABLE alltypesaggmultifiles_rc_gzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 2;
+INSERT INTO TABLE alltypesaggmultifiles_rc_gzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 3;
+
 INSERT INTO TABLE alltypesaggmultifiles_seq_gzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 0;
 INSERT INTO TABLE alltypesaggmultifiles_seq_gzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 1;
 INSERT INTO TABLE alltypesaggmultifiles_seq_gzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 2;
 INSERT INTO TABLE alltypesaggmultifiles_seq_gzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 3;
+
+SET mapred.output.compression.codec=org.apache.hadoop.io.compress.BZip2Codec;
+INSERT INTO TABLE alltypesaggmultifiles_rc_bzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 0;
+INSERT INTO TABLE alltypesaggmultifiles_rc_bzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 1;
+INSERT INTO TABLE alltypesaggmultifiles_rc_bzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 2;
+INSERT INTO TABLE alltypesaggmultifiles_rc_bzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 3;
+
 INSERT INTO TABLE alltypesaggmultifiles_seq_bzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 0;
 INSERT INTO TABLE alltypesaggmultifiles_seq_bzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 1;
 INSERT INTO TABLE alltypesaggmultifiles_seq_bzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 2;
 INSERT INTO TABLE alltypesaggmultifiles_seq_bzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 3;
+
+SET mapred.output.compression.codec=org.apache.hadoop.io.compress.SnappyCodec;
+INSERT INTO TABLE alltypesaggmultifiles_rc_snap partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 0;
+INSERT INTO TABLE alltypesaggmultifiles_rc_snap partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 1;
+INSERT INTO TABLE alltypesaggmultifiles_rc_snap partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 2;
+INSERT INTO TABLE alltypesaggmultifiles_rc_snap partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 3;
+
 INSERT INTO TABLE alltypesaggmultifiles_seq_snap partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 0;
 INSERT INTO TABLE alltypesaggmultifiles_seq_snap partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 1;
 INSERT INTO TABLE alltypesaggmultifiles_seq_snap partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 2;
 INSERT INTO TABLE alltypesaggmultifiles_seq_snap partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 3;
+
+set mapred.output.compression.type=RECORD;
+SET mapred.output.compression.codec=org.apache.hadoop.io.compress.DefaultCodec;
 INSERT INTO TABLE alltypesaggmultifiles_seq_record_def partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 0;
 INSERT INTO TABLE alltypesaggmultifiles_seq_record_def partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 1;
 INSERT INTO TABLE alltypesaggmultifiles_seq_record_def partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 2;
 INSERT INTO TABLE alltypesaggmultifiles_seq_record_def partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 3;
+
+SET mapred.output.compression.codec=org.apache.hadoop.io.compress.GzipCodec;
 INSERT INTO TABLE alltypesaggmultifiles_seq_record_gzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 0;
 INSERT INTO TABLE alltypesaggmultifiles_seq_record_gzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 1;
 INSERT INTO TABLE alltypesaggmultifiles_seq_record_gzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 2;
 INSERT INTO TABLE alltypesaggmultifiles_seq_record_gzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 3;
+
+SET mapred.output.compression.codec=org.apache.hadoop.io.compress.BZip2Codec;
 INSERT INTO TABLE alltypesaggmultifiles_seq_record_bzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 0;
 INSERT INTO TABLE alltypesaggmultifiles_seq_record_bzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 1;
 INSERT INTO TABLE alltypesaggmultifiles_seq_record_bzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 2;
 INSERT INTO TABLE alltypesaggmultifiles_seq_record_bzip partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 3;
+
+SET mapred.output.compression.codec=org.apache.hadoop.io.compress.SnappyCodec;
 INSERT INTO TABLE alltypesaggmultifiles_seq_record_snap partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 0;
 INSERT INTO TABLE alltypesaggmultifiles_seq_record_snap partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 1;
 INSERT INTO TABLE alltypesaggmultifiles_seq_record_snap partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 2;

@@ -540,19 +540,7 @@
                     <exec executable="${env.IMPALA_HOME}/testdata/bin/create-hbase.sh">
                     </exec>
                     <!-- create Hive table and load Hive data -->
-                    <exec executable="${env.HIVE_HOME}/bin/hive">
-                      <arg value="-hiveconf"/>
-                      <arg value="hive.root.logger=WARN,console"/>
-                      <arg value="-v"/>
-                      <arg value="-f"/>
-                      <arg value="${project.basedir}/../testdata/bin/create.sql"/>
-                    </exec>
-                    <exec executable="${env.HIVE_HOME}/bin/hive">
-                      <arg value="-hiveconf"/>
-                      <arg value="hive.root.logger=WARN,console"/>
-                      <arg value="-v"/>
-                      <arg value="-f"/>
-                      <arg value="${project.basedir}/../testdata/bin/load.sql"/>
+                    <exec executable="${env.IMPALA_HOME}/testdata/bin/create-load-data.sh">
                     </exec>                    
                   </target>
                     <!-- split HBase tables -->

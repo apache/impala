@@ -1,10 +1,12 @@
 *~
+.*.swp
 derby.log
 thirdparty
 cscope.files
 cscope.out
 org.eclipse.jdt.core.prefs
 hive_benchmark_results.txt
+testdata/data/test-warehouse
 
 pprof.out
 

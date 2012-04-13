@@ -139,6 +139,14 @@ then
 fi
 make -j4
 
+# Build Snappy
+cd $IMPALA_HOME/thirdparty/snappy-1.0.5
+if [ $config_action -eq 1 ]
+then
+  ./configure --with-pic --prefix=$IMPALA_HOME/thirdparty/snappy-1.0.5/build
+fi
+make install
+
 # cleanup FE process
 $IMPALA_HOME/bin/clean-fe-processes.py
 

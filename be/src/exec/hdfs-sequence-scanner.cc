@@ -14,7 +14,7 @@
 // Compression libraries
 #include <zlib.h>
 #include <bzlib.h>
-#include <snappy.h>
+#include "snappy.h"
 
 using namespace std;
 using namespace boost;
@@ -226,9 +226,9 @@ Status HdfsSequenceScanner::InitCurrentScanRange(RuntimeState* state,
   end_of_scan_range_ = scan_range->length + scan_range->offset;
   unbuffered_byte_stream_ = byte_stream;
 
-  // If the file is blocked compressed then we don't want to double buffer
+  // If the file is blocked-compressed then we don't want to double buffer
   // the compressed blocks.  In that case we read meta information in
-  // filesystem block sizes (4kb) otherwise we read large chunks (1Mb)
+  // filesystem block sizes (4KB) otherwise we read large chunks (1MB)
   // and pick meta data and data from that buffer.
   buffered_byte_stream_.reset(new BufferedByteStream(
       unbuffered_byte_stream_,

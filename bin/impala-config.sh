@@ -55,6 +55,8 @@ export LIBHDFS_OPTS="-Djava.library.path=${HADOOP_HOME}/lib/native/"
 
 export ARTISTIC_STYLE_OPTIONS=$IMPALA_BE_DIR/.astylerc
 
+export JAVA_LIBRARY_PATH=${IMPALA_HOME}/thirdparty/snappy-1.0.5/build/lib
+
 CLASSPATH=$IMPALA_FE_DIR/target/dependency:$CLASSPATH
 CLASSPATH=$IMPALA_FE_DIR/target/classes:$CLASSPATH
 CLASSPATH=$IMPALA_FE_DIR/src/test/resources:$CLASSPATH

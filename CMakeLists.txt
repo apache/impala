@@ -92,6 +92,16 @@ find_package(Llvm REQUIRED)
 include_directories(${LLVM_INCLUDE_DIR})
 set(LIBS ${LIBS} ${LLVM_MODULE_LIBS})
 
+# find Snappy headers and libs
+find_package(Snappy REQUIRED)
+include_directories(${SNAPPY_INCLUDE_DIR})
+set(LIBS ${LIBS} ${SNAPPY_LIBRARIES})
+add_library(snappy STATIC IMPORTED)
+set_target_properties(snappy PROPERTIES IMPORTED_LOCATION "${SNAPPY_LIBRARY}")
+
+message(STATUS ${SNAPPY_INCLUDE_DIR})
+message(STATUS ${SNAPPY_LIBRARY})
+
 # compile these subdirs using their own CMakeLists.txt
 add_subdirectory(common/function-registry)
 add_subdirectory(common/thrift)

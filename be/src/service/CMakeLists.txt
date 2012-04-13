@@ -46,7 +46,7 @@ target_link_libraries(backend
   gflagsstatic
 #  tcmallocstatic
   pprofstatic
-  -lz -lbz2 -lsnappy
+  -lz -lbz2
 )
 
 add_executable(runquery 
@@ -80,12 +80,13 @@ target_link_libraries(runquery
   Exprs
   Opcode
   Exprs
+  snappy
   ${Boost_LIBRARIES}  
   ${LLVM_MODULE_LIBS}
   gflagsstatic
   tcmallocstatic
   pprofstatic
-  -lz
+  -lz -lbz2
 )
 
 add_executable(impalad
@@ -112,6 +113,7 @@ target_link_libraries(impalad
   Opcode
   Exprs
   CodeGen
+  snappy
   ${Boost_LIBRARIES}  
   ${LLVM_MODULE_LIBS}
   gflagsstatic

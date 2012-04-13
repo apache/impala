@@ -46,3 +46,35 @@ CREATE TABLE Grep1GB_seq_snap (
   field string)
 partitioned by (chunk int)
 STORED AS SEQUENCEFILE;
+
+DROP TABLE IF EXISTS UserVisits_rc;
+CREATE TABLE UserVisits_rc (
+  sourceIP string,
+  destURL string,
+  visitDate string,
+  adRevenue float,
+  userAgent string,
+  cCode string,
+  lCode string,
+  sKeyword string,
+  avgTimeOnSite int)
+STORED AS RCFILE;
+
+DROP TABLE IF EXISTS UserVisits_rc_bzip;
+CREATE TABLE UserVisits_rc_bzip (
+  sourceIP string,
+  destURL string,
+  visitDate string,
+  adRevenue float,
+  userAgent string,
+  cCode string,
+  lCode string,
+  sKeyword string,
+  avgTimeOnSite int)
+STORED AS RCFILE;
+
+DROP TABLE IF EXISTS Grep1GB_rc;
+CREATE TABLE Grep1GB_rc (
+  field string)
+partitioned by (chunk int)
+STORED AS RCFILE;

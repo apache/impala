@@ -117,6 +117,34 @@ LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypes
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserror_rc/year=2009/month=2/000000_0' OVERWRITE INTO TABLE alltypeserror_rc PARTITION(year=2009, month=2);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserror_rc/year=2009/month=3/000000_0' OVERWRITE INTO TABLE alltypeserror_rc PARTITION(year=2009, month=3);
 
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserrornonulls_rc_def/year=2009/month=1/000000_0' OVERWRITE INTO TABLE alltypeserrornonulls_rc_def PARTITION(year=2009, month=1);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserrornonulls_rc_def/year=2009/month=2/000000_0' OVERWRITE INTO TABLE alltypeserrornonulls_rc_def PARTITION(year=2009, month=2);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserrornonulls_rc_def/year=2009/month=3/000000_0' OVERWRITE INTO TABLE alltypeserrornonulls_rc_def PARTITION(year=2009, month=3);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserror_rc_def/year=2009/month=1/000000_0' OVERWRITE INTO TABLE alltypeserror_rc_def PARTITION(year=2009, month=1);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserror_rc_def/year=2009/month=2/000000_0' OVERWRITE INTO TABLE alltypeserror_rc_def PARTITION(year=2009, month=2);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserror_rc_def/year=2009/month=3/000000_0' OVERWRITE INTO TABLE alltypeserror_rc_def PARTITION(year=2009, month=3);
+
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserrornonulls_rc_gzip/year=2009/month=1/000000_0' OVERWRITE INTO TABLE alltypeserrornonulls_rc_gzip PARTITION(year=2009, month=1);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserrornonulls_rc_gzip/year=2009/month=2/000000_0' OVERWRITE INTO TABLE alltypeserrornonulls_rc_gzip PARTITION(year=2009, month=2);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserrornonulls_rc_gzip/year=2009/month=3/000000_0' OVERWRITE INTO TABLE alltypeserrornonulls_rc_gzip PARTITION(year=2009, month=3);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserror_rc_gzip/year=2009/month=1/000000_0' OVERWRITE INTO TABLE alltypeserror_rc_gzip PARTITION(year=2009, month=1);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserror_rc_gzip/year=2009/month=2/000000_0' OVERWRITE INTO TABLE alltypeserror_rc_gzip PARTITION(year=2009, month=2);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserror_rc_gzip/year=2009/month=3/000000_0' OVERWRITE INTO TABLE alltypeserror_rc_gzip PARTITION(year=2009, month=3);
+
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserrornonulls_rc_bzip/year=2009/month=1/000000_0' OVERWRITE INTO TABLE alltypeserrornonulls_rc_bzip PARTITION(year=2009, month=1);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserrornonulls_rc_bzip/year=2009/month=2/000000_0' OVERWRITE INTO TABLE alltypeserrornonulls_rc_bzip PARTITION(year=2009, month=2);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserrornonulls_rc_bzip/year=2009/month=3/000000_0' OVERWRITE INTO TABLE alltypeserrornonulls_rc_bzip PARTITION(year=2009, month=3);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserror_rc_bzip/year=2009/month=1/000000_0' OVERWRITE INTO TABLE alltypeserror_rc_bzip PARTITION(year=2009, month=1);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserror_rc_bzip/year=2009/month=2/000000_0' OVERWRITE INTO TABLE alltypeserror_rc_bzip PARTITION(year=2009, month=2);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserror_rc_bzip/year=2009/month=3/000000_0' OVERWRITE INTO TABLE alltypeserror_rc_bzip PARTITION(year=2009, month=3);
+
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserrornonulls_rc_snap/year=2009/month=1/000000_0' OVERWRITE INTO TABLE alltypeserrornonulls_rc_snap PARTITION(year=2009, month=1);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserrornonulls_rc_snap/year=2009/month=2/000000_0' OVERWRITE INTO TABLE alltypeserrornonulls_rc_snap PARTITION(year=2009, month=2);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserrornonulls_rc_snap/year=2009/month=3/000000_0' OVERWRITE INTO TABLE alltypeserrornonulls_rc_snap PARTITION(year=2009, month=3);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserror_rc_snap/year=2009/month=1/000000_0' OVERWRITE INTO TABLE alltypeserror_rc_snap PARTITION(year=2009, month=1);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserror_rc_snap/year=2009/month=2/000000_0' OVERWRITE INTO TABLE alltypeserror_rc_snap PARTITION(year=2009, month=2);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypeserror_rc_snap/year=2009/month=3/000000_0' OVERWRITE INTO TABLE alltypeserror_rc_snap PARTITION(year=2009, month=3);
+
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc/year=2010/month=1/day=1/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc PARTITION(year=2010, month=1, day=1);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc/year=2010/month=1/day=10/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc PARTITION(year=2010, month=1, day=10);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc/year=2010/month=1/day=2/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc PARTITION(year=2010, month=1, day=2);
@@ -138,6 +166,94 @@ LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypes
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc/year=2010/month=1/day=7/000000_0' OVERWRITE INTO TABLE alltypesagg_rc PARTITION(year=2010, month=1, day=7);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc/year=2010/month=1/day=8/000000_0' OVERWRITE INTO TABLE alltypesagg_rc PARTITION(year=2010, month=1, day=8);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc/year=2010/month=1/day=9/000000_0' OVERWRITE INTO TABLE alltypesagg_rc PARTITION(year=2010, month=1, day=9);
+
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_def/year=2010/month=1/day=1/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_def PARTITION(year=2010, month=1, day=1);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_def/year=2010/month=1/day=10/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_def PARTITION(year=2010, month=1, day=10);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_def/year=2010/month=1/day=2/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_def PARTITION(year=2010, month=1, day=2);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_def/year=2010/month=1/day=3/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_def PARTITION(year=2010, month=1, day=3);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_def/year=2010/month=1/day=4/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_def PARTITION(year=2010, month=1, day=4);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_def/year=2010/month=1/day=5/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_def PARTITION(year=2010, month=1, day=5);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_def/year=2010/month=1/day=6/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_def PARTITION(year=2010, month=1, day=6);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_def/year=2010/month=1/day=7/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_def PARTITION(year=2010, month=1, day=7);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_def/year=2010/month=1/day=8/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_def PARTITION(year=2010, month=1, day=8);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_def/year=2010/month=1/day=9/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_def PARTITION(year=2010, month=1, day=9);
+
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_def/year=2010/month=1/day=1/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_def PARTITION(year=2010, month=1, day=1);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_def/year=2010/month=1/day=10/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_def PARTITION(year=2010, month=1, day=10);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_def/year=2010/month=1/day=2/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_def PARTITION(year=2010, month=1, day=2);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_def/year=2010/month=1/day=3/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_def PARTITION(year=2010, month=1, day=3);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_def/year=2010/month=1/day=4/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_def PARTITION(year=2010, month=1, day=4);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_def/year=2010/month=1/day=5/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_def PARTITION(year=2010, month=1, day=5);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_def/year=2010/month=1/day=6/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_def PARTITION(year=2010, month=1, day=6);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_def/year=2010/month=1/day=7/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_def PARTITION(year=2010, month=1, day=7);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_def/year=2010/month=1/day=8/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_def PARTITION(year=2010, month=1, day=8);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_def/year=2010/month=1/day=9/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_def PARTITION(year=2010, month=1, day=9);
+
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_bzip/year=2010/month=1/day=1/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_bzip PARTITION(year=2010, month=1, day=1);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_bzip/year=2010/month=1/day=10/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_bzip PARTITION(year=2010, month=1, day=10);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_bzip/year=2010/month=1/day=2/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_bzip PARTITION(year=2010, month=1, day=2);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_bzip/year=2010/month=1/day=3/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_bzip PARTITION(year=2010, month=1, day=3);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_bzip/year=2010/month=1/day=4/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_bzip PARTITION(year=2010, month=1, day=4);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_bzip/year=2010/month=1/day=5/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_bzip PARTITION(year=2010, month=1, day=5);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_bzip/year=2010/month=1/day=6/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_bzip PARTITION(year=2010, month=1, day=6);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_bzip/year=2010/month=1/day=7/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_bzip PARTITION(year=2010, month=1, day=7);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_bzip/year=2010/month=1/day=8/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_bzip PARTITION(year=2010, month=1, day=8);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_bzip/year=2010/month=1/day=9/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_bzip PARTITION(year=2010, month=1, day=9);
+
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_bzip/year=2010/month=1/day=1/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_bzip PARTITION(year=2010, month=1, day=1);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_bzip/year=2010/month=1/day=10/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_bzip PARTITION(year=2010, month=1, day=10);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_bzip/year=2010/month=1/day=2/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_bzip PARTITION(year=2010, month=1, day=2);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_bzip/year=2010/month=1/day=3/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_bzip PARTITION(year=2010, month=1, day=3);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_bzip/year=2010/month=1/day=4/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_bzip PARTITION(year=2010, month=1, day=4);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_bzip/year=2010/month=1/day=5/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_bzip PARTITION(year=2010, month=1, day=5);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_bzip/year=2010/month=1/day=6/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_bzip PARTITION(year=2010, month=1, day=6);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_bzip/year=2010/month=1/day=7/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_bzip PARTITION(year=2010, month=1, day=7);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_bzip/year=2010/month=1/day=8/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_bzip PARTITION(year=2010, month=1, day=8);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_bzip/year=2010/month=1/day=9/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_bzip PARTITION(year=2010, month=1, day=9);
+
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_snap/year=2010/month=1/day=1/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_snap PARTITION(year=2010, month=1, day=1);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_snap/year=2010/month=1/day=10/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_snap PARTITION(year=2010, month=1, day=10);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_snap/year=2010/month=1/day=2/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_snap PARTITION(year=2010, month=1, day=2);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_snap/year=2010/month=1/day=3/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_snap PARTITION(year=2010, month=1, day=3);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_snap/year=2010/month=1/day=4/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_snap PARTITION(year=2010, month=1, day=4);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_snap/year=2010/month=1/day=5/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_snap PARTITION(year=2010, month=1, day=5);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_snap/year=2010/month=1/day=6/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_snap PARTITION(year=2010, month=1, day=6);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_snap/year=2010/month=1/day=7/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_snap PARTITION(year=2010, month=1, day=7);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_snap/year=2010/month=1/day=8/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_snap PARTITION(year=2010, month=1, day=8);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_snap/year=2010/month=1/day=9/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_snap PARTITION(year=2010, month=1, day=9);
+
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_snap/year=2010/month=1/day=1/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_snap PARTITION(year=2010, month=1, day=1);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_snap/year=2010/month=1/day=10/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_snap PARTITION(year=2010, month=1, day=10);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_snap/year=2010/month=1/day=2/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_snap PARTITION(year=2010, month=1, day=2);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_snap/year=2010/month=1/day=3/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_snap PARTITION(year=2010, month=1, day=3);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_snap/year=2010/month=1/day=4/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_snap PARTITION(year=2010, month=1, day=4);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_snap/year=2010/month=1/day=5/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_snap PARTITION(year=2010, month=1, day=5);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_snap/year=2010/month=1/day=6/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_snap PARTITION(year=2010, month=1, day=6);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_snap/year=2010/month=1/day=7/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_snap PARTITION(year=2010, month=1, day=7);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_snap/year=2010/month=1/day=8/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_snap PARTITION(year=2010, month=1, day=8);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_snap/year=2010/month=1/day=9/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_snap PARTITION(year=2010, month=1, day=9);
+
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_gzip/year=2010/month=1/day=1/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_gzip PARTITION(year=2010, month=1, day=1);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_gzip/year=2010/month=1/day=10/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_gzip PARTITION(year=2010, month=1, day=10);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_gzip/year=2010/month=1/day=2/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_gzip PARTITION(year=2010, month=1, day=2);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_gzip/year=2010/month=1/day=3/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_gzip PARTITION(year=2010, month=1, day=3);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_gzip/year=2010/month=1/day=4/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_gzip PARTITION(year=2010, month=1, day=4);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_gzip/year=2010/month=1/day=5/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_gzip PARTITION(year=2010, month=1, day=5);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_gzip/year=2010/month=1/day=6/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_gzip PARTITION(year=2010, month=1, day=6);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_gzip/year=2010/month=1/day=7/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_gzip PARTITION(year=2010, month=1, day=7);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_gzip/year=2010/month=1/day=8/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_gzip PARTITION(year=2010, month=1, day=8);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_rc_gzip/year=2010/month=1/day=9/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_rc_gzip PARTITION(year=2010, month=1, day=9);
+
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_gzip/year=2010/month=1/day=1/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_gzip PARTITION(year=2010, month=1, day=1);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_gzip/year=2010/month=1/day=10/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_gzip PARTITION(year=2010, month=1, day=10);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_gzip/year=2010/month=1/day=2/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_gzip PARTITION(year=2010, month=1, day=2);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_gzip/year=2010/month=1/day=3/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_gzip PARTITION(year=2010, month=1, day=3);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_gzip/year=2010/month=1/day=4/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_gzip PARTITION(year=2010, month=1, day=4);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_gzip/year=2010/month=1/day=5/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_gzip PARTITION(year=2010, month=1, day=5);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_gzip/year=2010/month=1/day=6/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_gzip PARTITION(year=2010, month=1, day=6);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_gzip/year=2010/month=1/day=7/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_gzip PARTITION(year=2010, month=1, day=7);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_gzip/year=2010/month=1/day=8/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_gzip PARTITION(year=2010, month=1, day=8);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesagg_rc_gzip/year=2010/month=1/day=9/000000_0' OVERWRITE INTO TABLE alltypesagg_rc_gzip PARTITION(year=2010, month=1, day=9);
 
 -- Load all the sequence databases form saved files
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/test-warehouse/alltypesaggnonulls_seq_bzip/year=2010/month=1/day=10/000000_0' OVERWRITE INTO TABLE alltypesaggnonulls_seq_bzip PARTITION(year=2010, month=1, day=10);

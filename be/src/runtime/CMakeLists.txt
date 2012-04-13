@@ -32,7 +32,7 @@ target_link_libraries(Runtime
   Exec
   TestUtil
   ${Boost_LIBRARIES}
-  -lz -lbz2 -lsnappy
+  -lz -lbz2
 )
 
 add_executable(mem-pool-test
