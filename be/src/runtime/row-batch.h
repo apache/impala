@@ -27,6 +27,7 @@ class RowBatch {
   RowBatch(const RowDescriptor& row_desc, int capacity)
     : has_in_flight_row_(false),
       is_self_contained_(false),
+      own_tuple_ptrs_mem_(true),
       num_rows_(0),
       capacity_(capacity),
       num_tuples_per_row_(row_desc.tuple_descriptors().size()),
@@ -34,6 +35,22 @@ class RowBatch {
       tuple_ptrs_(new Tuple*[capacity_ * num_tuples_per_row_]),
       tuple_data_pool_(new MemPool()) {
     DCHECK_GT(capacity, 0);
+  }
+
+  // Create RowBatch for a maximum of 'capacity' rows of tuples specified
+  // by 'row_desc' using memory for the tuple_ptrs_ from the given mem pool
+  RowBatch(const RowDescriptor& row_desc, int capacity, MemPool* mem_pool)
+    : has_in_flight_row_(false),
+      is_self_contained_(false),
+      own_tuple_ptrs_mem_(false),
+      num_rows_(0),
+      capacity_(capacity),
+      num_tuples_per_row_(row_desc.tuple_descriptors().size()),
+      row_desc_(row_desc),
+      tuple_data_pool_(new MemPool()) {
+    DCHECK_GT(capacity, 0);
+    tuple_ptrs_size_ = capacity_ * num_tuples_per_row_ * sizeof(Tuple*);
+    tuple_ptrs_ = reinterpret_cast<Tuple**>(mem_pool->Allocate(tuple_ptrs_size_));
   }
 
   // Populate a row batch from input_batch by copying input_batch's
@@ -79,6 +96,18 @@ class RowBatch {
     num_rows_ = 0;
     has_in_flight_row_ = false;
     tuple_data_pool_.reset(new MemPool());
+  }
+
+  // Reset the row batch.
+  // tuple_ptrs will be release if this object owns the memory. It will then use
+  // the memory allocated from mem_pool.
+  void Reset(MemPool* mem_pool) {
+    Reset();
+    if (own_tuple_ptrs_mem_) {
+      delete [] tuple_ptrs_;
+      own_tuple_ptrs_mem_ = false;
+    }
+    tuple_ptrs_ = reinterpret_cast<Tuple**>(mem_pool->Allocate(tuple_ptrs_size_));
   }
 
   MemPool* tuple_data_pool() {
@@ -127,6 +156,7 @@ class RowBatch {
  private:
   bool has_in_flight_row_;  // if true, last row hasn't been committed yet
   bool is_self_contained_;  // if true, contains all ref'd data in tuple_data_pool_
+  bool own_tuple_ptrs_mem_; // if true, tuple_ptrs_ memory is owned by this object.
   int num_rows_;  // # of committed rows
   int capacity_;  // maximum # of rows
   int num_tuples_per_row_;
@@ -135,6 +165,7 @@ class RowBatch {
   // array of pointers (w/ capacity_ * num_tuples_per_row_ elements)
   // TODO: replace w/ tr1 array?
   Tuple** tuple_ptrs_;
+  int tuple_ptrs_size_;
 
   // holding (some of the) data referenced by rows
   boost::scoped_ptr<MemPool> tuple_data_pool_;

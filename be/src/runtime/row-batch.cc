@@ -12,7 +12,9 @@ using namespace std;
 namespace impala {
 
 RowBatch::~RowBatch() {
-  delete [] tuple_ptrs_;
+  if (own_tuple_ptrs_mem_) {
+    delete [] tuple_ptrs_;
+  }
 }
 
 void RowBatch::Serialize(TRowBatch* output_batch) {
@@ -92,6 +94,7 @@ void RowBatch::Serialize(TRowBatch* output_batch) {
 RowBatch::RowBatch(const DescriptorTbl& desc_tbl, const TRowBatch& input_batch)
   : has_in_flight_row_(false),
     is_self_contained_(true),
+    own_tuple_ptrs_mem_(true),
     num_rows_(input_batch.num_rows),
     capacity_(num_rows_),
     num_tuples_per_row_(input_batch.row_tuples.size()),

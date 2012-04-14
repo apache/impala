@@ -56,25 +56,29 @@ Status HashJoinNode::Init(ObjectPool* pool, const TPlanNode& tnode) {
 Status HashJoinNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
-  build_time_counter_ = 
+  build_timer_ = 
       ADD_COUNTER(runtime_profile(), "BuildTime", TCounterType::CPU_TICKS);
-  probe_time_counter_ = 
+  probe_timer_ = 
       ADD_COUNTER(runtime_profile(), "ProbeTime", TCounterType::CPU_TICKS);
-  build_size_counter_ = 
-      ADD_COUNTER(runtime_profile(), "BuildTuples", TCounterType::UNIT);
-  probe_size_counter_ =
-      ADD_COUNTER(runtime_profile(), "ProbeTuples", TCounterType::UNIT);
+  build_row_counter_ = 
+      ADD_COUNTER(runtime_profile(), "BuildRows", TCounterType::UNIT);
+  probe_row_counter_ =
+      ADD_COUNTER(runtime_profile(), "ProbeRows", TCounterType::UNIT);
 
   // build and probe exprs are evaluated in the context of the rows produced by our
   // right and left children, respectively
   Expr::Prepare(build_exprs_, state, child(1)->row_desc());
   Expr::Prepare(probe_exprs_, state, child(0)->row_desc());
-  // our right child/build input materializes exactly one tuple
-  DCHECK_EQ(child(1)->row_desc().tuple_descriptors().size(), 1);
-  hash_tbl_.reset(
-      new HashTable(build_exprs_, probe_exprs_, child(1)->row_desc(), 0, false));
-  TupleDescriptor* build_tuple_desc = child(1)->row_desc().tuple_descriptors()[0];
-  build_tuple_idx_ = row_descriptor_.GetTupleIdx(build_tuple_desc->id());
+
+  // pre-compute the tuple index of build tuples in the output row
+  build_tuple_size_ = child(1)->row_desc().tuple_descriptors().size();
+  build_tuple_idx_.reserve(build_tuple_size_);
+  for (int i = 0; i < build_tuple_size_; ++i) {
+    TupleDescriptor* build_tuple_desc = child(1)->row_desc().tuple_descriptors()[i];
+    build_tuple_idx_.push_back(row_descriptor_.GetTupleIdx(build_tuple_desc->id()));
+  }
+
+  hash_tbl_.reset(new HashTable(build_exprs_, probe_exprs_, child(1)->row_desc(), false));
   probe_batch_.reset(new RowBatch(row_descriptor_, state->batch_size()));
   return Status::OK;
 }
@@ -83,40 +87,44 @@ Status HashJoinNode::Open(RuntimeState* state) {
   COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   eos_ = false;
 
-  // do a full scan of child(1) and store everything in hash_tbl_
-  RowBatch build_batch(child(1)->row_desc(), state->batch_size());
+  // Do a full scan of child(1) and store everything in hash_tbl_
+  // The hash join node needs to keep in memory all build tuples, including the tuple
+  // row ptrs.  Create a new row batch, passing it the build_tuple_pool from which the
+  // tuple ptrs array will be allocated.
+  RowBatch build_batch(child(1)->row_desc(), state->batch_size(), build_pool_.get());
   RETURN_IF_ERROR(child(1)->Open(state));
   while (true) {
-    COUNTER_SCOPED_TIMER(build_time_counter_);
+    COUNTER_SCOPED_TIMER(build_timer_);
     bool eos;
     RETURN_IF_ERROR(child(1)->GetNext(state, &build_batch, &eos));
     // take ownership of tuple data of build_batch
     build_pool_->AcquireData(build_batch.tuple_data_pool(), false);
 
-    // insert build tuples into our hash table
+    // insert build row into our hash table
     for (int i = 0; i < build_batch.num_rows(); ++i) {
-      Tuple* t = build_batch.GetRow(i)->GetTuple(0);
-      VLOG(1) << "build tuple " << t << ": "
-              << PrintTuple(t, *child(1)->row_desc().tuple_descriptors()[0]);
+      TupleRow* t = build_batch.GetRow(i);
+      VLOG(1) << "build row " << t << ": " << PrintRow(t, child(1)->row_desc());
       hash_tbl_->Insert(t);
       VLOG(1) << hash_tbl_->DebugString();
     }
 
     if (eos) break;
-    build_batch.Reset();
+
+    // allocate TupleRow memory for the next batch from buld_pool_
+    build_batch.Reset(build_pool_.get());
   }
-  COUNTER_UPDATE(build_size_counter_, hash_tbl_->size());
+  COUNTER_UPDATE(build_row_counter_, hash_tbl_->size());
   RETURN_IF_ERROR(child(1)->Close(state));
 
   VLOG(1) << hash_tbl_->DebugString();
 
-  COUNTER_SCOPED_TIMER(probe_time_counter_);
+  COUNTER_SCOPED_TIMER(probe_timer_);
   RETURN_IF_ERROR(child(0)->Open(state));
 
   // seed probe batch and current_probe_row_, etc.
   bool dummy;
   RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &dummy));
-  COUNTER_UPDATE(probe_size_counter_, probe_batch_->num_rows());
+  COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
   probe_batch_pos_ = 0;
   if (probe_batch_->num_rows() == 0) {
     eos_ = true;
@@ -132,7 +140,7 @@ Status HashJoinNode::Open(RuntimeState* state) {
 }
 
 inline TupleRow* HashJoinNode::CreateOutputRow(
-    RowBatch* out_batch, TupleRow* probe_row, Tuple* build_tuple) {
+    RowBatch* out_batch, TupleRow* probe_row, TupleRow* build_row) {
   DCHECK(!out_batch->IsFull());
   // copy probe row to output
   int row_idx = out_batch->AddRow();
@@ -142,35 +150,50 @@ inline TupleRow* HashJoinNode::CreateOutputRow(
   } else {
     out_batch->ClearRow(out_row);
   }
-  out_row->SetTuple(build_tuple_idx_, build_tuple);
+
+  // TODO : we can eventually codegen these copies, which means we can get rid of the
+  // loop and all indices are hardwired, ie, it would pipeline perfectly
+
+  // copy the build row to out_row at build_tuple_idx
+  if (build_row != NULL) {
+    for (int i = 0; i < build_tuple_size_; ++i) {
+      out_row->SetTuple(build_tuple_idx_[i], build_row->GetTuple(i));
+    }
+  } else {
+    for (int i = 0; i < build_tuple_size_; ++i) {
+      out_row->SetTuple(build_tuple_idx_[i], NULL);
+    }
+  }
+
   return out_row;
 }
 
 Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos) {
   COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
-  COUNTER_SCOPED_TIMER(probe_time_counter_);
+  COUNTER_SCOPED_TIMER(probe_timer_);
   if (ReachedLimit()) {
     *eos = true;
     return Status::OK;
   }
 
   while (!eos_) {
-    Tuple* tuple;
+    TupleRow* matched_build_row;
     // create output rows as long as:
     // 1) we haven't already created an output row for the probe row and are doing
     //    a semi-join;
     // 2) there are more matching build rows
     while (!(matched_probe_ && match_one_build_)
-           && (tuple = hash_tbl_iterator_.GetNext()) != NULL) {
-      TupleRow* out_row = CreateOutputRow(out_batch, current_probe_row_, tuple);
+           && (matched_build_row = hash_tbl_iterator_.GetNext()) != NULL) {
+      TupleRow* out_row = CreateOutputRow(out_batch, current_probe_row_,
+                                          matched_build_row);
      if (!EvalConjuncts(other_join_conjuncts_, out_row)) continue;
       // we have a match for the purpose of the (outer?) join as soon as we
       // satisfy the JOIN clause conjuncts
       matched_probe_ = true;
       if (match_all_build_) {
-        // remember that we matched this build tuple
-        joined_build_tuples_.insert(tuple);
-        VLOG(1) << "joined build tuple: " << tuple;
+        // remember that we matched this build row
+        joined_build_rows_.insert(matched_build_row);
+        VLOG(1) << "joined build row: " << matched_build_row;
       }
       if (EvalConjuncts(conjuncts_, out_row)) {
         out_batch->CommitLastRow();
@@ -210,7 +233,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
         probe_batch_->TransferTupleData(out_batch);
         bool dummy;  // we ignore eos and use the # of returned rows instead
         RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &dummy));
-        COUNTER_UPDATE(probe_size_counter_, probe_batch_->num_rows());
+        COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
         probe_batch_pos_ = 0;
         if (probe_batch_->num_rows() == 0) {
           // we're done; don't exit here, we might still need to finish up an outer join
@@ -233,10 +256,12 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
   *eos = true;
   if (match_all_build_) {
     // output remaining unmatched build rows
-    Tuple* tuple = NULL;
-    while (!out_batch->IsFull() && (tuple = hash_tbl_iterator_.GetNext()) != NULL) {
-      if (joined_build_tuples_.find(tuple) != joined_build_tuples_.end()) continue;
-      TupleRow* out_row = CreateOutputRow(out_batch, NULL, tuple);
+    TupleRow* build_row = NULL;
+    while (!out_batch->IsFull() && (build_row = hash_tbl_iterator_.GetNext()) != NULL) {
+      if (joined_build_rows_.find(build_row) != joined_build_rows_.end()) {
+        continue;
+      }
+      TupleRow* out_row = CreateOutputRow(out_batch, NULL, build_row);
       if (EvalConjuncts(conjuncts_, out_row)) {
         out_batch->CommitLastRow();
         VLOG(1) << "match row: " << PrintRow(out_row, row_desc());
@@ -247,8 +272,8 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
         }
       }
     }
-    // we're done if there are no more tuples left to check
-    *eos = tuple == NULL;
+    // we're done if there are no more rows left to check
+    *eos = build_row == NULL;
   }
   return Status::OK;
 }

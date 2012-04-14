@@ -18,14 +18,14 @@ class RowBatch;
 class TupleRow;
 
 // Node for in-memory hash joins:
-// - builds up a hash table with the tuples produced by our right input
+// - builds up a hash table with the rows produced by our right input
 //   (child(1)); build exprs are the rhs exprs of our equi-join predicates
 // - for each row from our left input, probes the hash table to retrieve
 //   matching entries; the probe exprs are the lhs exprs of our equi-join predicates
 //
 // Row batches:
-// - In general, we are not able to pass our output row batch on to our left child (when we're
-//   fetching the probe tuples): if we have a 1xn join, our output will contain
+// - In general, we are not able to pass our output row batch on to our left child (when
+//   we're fetching the probe rows): if we have a 1xn join, our output will contain
 //   multiple rows per left input row
 // - TODO: fix this, so in the case of 1x1/nx1 joins (for instance, fact to dimension tbl)
 //   we don't do these extra copies
@@ -46,8 +46,8 @@ class HashJoinNode : public ExecNode {
   HashTable::Iterator hash_tbl_iterator_;
 
   // for right outer joins, keep track of what's been joined
-  typedef boost::unordered_set<Tuple*> BuildTupleSet;
-  BuildTupleSet joined_build_tuples_;
+  typedef boost::unordered_set<TupleRow*> BuildTupleRowSet;
+  BuildTupleRowSet joined_build_rows_;
 
   TJoinOp::type join_op_;
 
@@ -60,29 +60,33 @@ class HashJoinNode : public ExecNode {
   std::vector<Expr*> other_join_conjuncts_;
 
   // derived from join_op_
-  bool match_all_probe_;  // output all tuples coming from the probe input
-  bool match_one_build_;  // match at most one build tuple to each probe tuple
-  bool match_all_build_;  // output all tuples coming from the build input
+  bool match_all_probe_;  // output all rows coming from the probe input
+  bool match_one_build_;  // match at most one build row to each probe row
+  bool match_all_build_;  // output all rows coming from the build input
 
-  bool matched_probe_;  // if true, we have matched the current probe tuple
+  bool matched_probe_;  // if true, we have matched the current probe row
   bool eos_;  // if true, nothing left to return in GetNext()
-  int build_tuple_idx_;  // w/in our output row
   boost::scoped_ptr<MemPool> build_pool_;  // holds everything referenced in hash_tbl_
   boost::scoped_ptr<RowBatch> probe_batch_;
   int probe_batch_pos_;  // current scan pos in probe_batch_
   TupleRow* current_probe_row_;
 
-  RuntimeProfile::Counter* build_time_counter_;   // time to build hash table
-  RuntimeProfile::Counter* probe_time_counter_;   // time to probe
-  RuntimeProfile::Counter* build_size_counter_;   // num build tuples
-  RuntimeProfile::Counter* probe_size_counter_;   // num probe tuples
+  // build_tuple_idx_[i] is the tuple index of child(1)'s tuple[i] in the output row
+  std::vector<int> build_tuple_idx_;
+  int build_tuple_size_;
+
+  RuntimeProfile::Counter* build_timer_;   // time to build hash table
+  RuntimeProfile::Counter* probe_timer_;   // time to probe
+  RuntimeProfile::Counter* build_row_counter_;   // num build rows
+  RuntimeProfile::Counter* probe_row_counter_;   // num probe rows
 
   // set up build_- and probe_exprs_
   Status Init(ObjectPool* pool, const TPlanNode& tnode);
 
-  // Write combined row, consisting of probe_row and build_tuple, to out_batch
-  // and return row.
-  TupleRow* CreateOutputRow(RowBatch* out_batch, TupleRow* probe_row, Tuple* build_tuple);
+  // Write combined row, consisting of probe_row and build_row, to out_batch
+  // and return the combined row.
+  TupleRow* CreateOutputRow(RowBatch* out_batch, TupleRow* probe_row,
+      TupleRow* build_row);
 };
 
 }

@@ -20,7 +20,6 @@ namespace impala {
 HashTable::HashTable(const std::vector<Expr*>& build_exprs,
                      const std::vector<Expr*>& probe_exprs,
                      const RowDescriptor& build_row_desc,
-                     int build_tuple_idx,
                      bool stores_nulls)
   : hash_fn_(this),
     equals_fn_(this),
@@ -31,35 +30,22 @@ HashTable::HashTable(const std::vector<Expr*>& build_exprs,
     hash_tbl_(new HashSet(1031, hash_fn_, equals_fn_)),
     build_exprs_(build_exprs),
     probe_exprs_(probe_exprs),
-    build_tuple_desc_(build_row_desc.tuple_descriptors()[build_tuple_idx]),
-    current_build_row_(NULL),
+    build_row_desc_(build_row_desc),
     current_probe_row_(NULL),
-    build_row_data_(new Tuple*[build_row_desc.tuple_descriptors().size()]),
-    build_row_(reinterpret_cast<TupleRow*>(build_row_data_.get())),
-    build_tuple_idx_(build_tuple_idx),
     stores_nulls_(stores_nulls) {
 }
 
-size_t HashTable::HashFn::operator()(Tuple* const& t) const {
+size_t HashTable::HashFn::operator()(TupleRow* const& r) const {
   const vector<Expr*>* exprs = NULL;
   TupleRow* row = NULL;
-  if (t == NULL) {
-    if (hash_tbl_->current_build_row_ != NULL) {
-      DCHECK(hash_tbl_->current_probe_row_ == NULL);
-      // compute hash value from build_exprs_ and current_build_row_
-      row = hash_tbl_->current_build_row_;
-      exprs = &hash_tbl_->build_exprs_;
-    } else {
-      DCHECK(hash_tbl_->current_probe_row_ != NULL);
-      // compute hash value from probe_exprs_ and current_probe_row_
-      row = hash_tbl_->current_probe_row_;
-      exprs = &hash_tbl_->probe_exprs_;
-    }
+  if (r == NULL) {
+    DCHECK(hash_tbl_->current_probe_row_ != NULL);
+    // compute hash value from probe_exprs_ and current_probe_row_
+    row = hash_tbl_->current_probe_row_;
+    exprs = &hash_tbl_->probe_exprs_;
   } else {
-    // evaluate build_exprs_ against t in context of build_row_
-    // (not current_build_row_, which isn't set)
-    hash_tbl_->build_row_->SetTuple(hash_tbl_->build_tuple_idx_, t);
-    row = hash_tbl_->build_row_;
+    // evaluate build_exprs_ against r
+    row = r;
     exprs = &hash_tbl_->build_exprs_;
   }
 
@@ -68,7 +54,7 @@ size_t HashTable::HashFn::operator()(Tuple* const& t) const {
     const void* value;
     Expr* expr = (*exprs)[i];
     value = expr->GetValue(row);
-    DCHECK(hash_tbl_->stores_nulls_ || t == NULL || value != NULL);
+    DCHECK(hash_tbl_->stores_nulls_ || r == NULL || value != NULL);
     // don't ignore NULLs; we want (1, NULL) to return a different hash
     // value than (NULL, 1)
     size_t hash_value =
@@ -79,68 +65,56 @@ size_t HashTable::HashFn::operator()(Tuple* const& t) const {
 }
 
 bool HashTable::EqualsFn::operator()(
-    Tuple* const& t1, Tuple* const& t2) const {
-  const vector<Expr*>* t1_exprs = NULL;
-  TupleRow* t1_row = NULL;
-  if (t1 == NULL) {
-    if (hash_tbl_->current_build_row_ != NULL) {
-      DCHECK(hash_tbl_->current_probe_row_ == NULL);
-      // compute t1's value from build_exprs_ and current_build_row_
-      t1_row = hash_tbl_->current_build_row_;
-      t1_exprs = &hash_tbl_->build_exprs_;
-    } else {
-      DCHECK(hash_tbl_->current_probe_row_ != NULL);
-      // compute t1's value from probe_exprs_ and current_probe_row_
-      t1_row = hash_tbl_->current_probe_row_;
-      t1_exprs = &hash_tbl_->probe_exprs_;
-    }
+    TupleRow* const& r1, TupleRow* const& r2) const {
+  const vector<Expr*>* r1_exprs = NULL;
+  TupleRow* r1_row = NULL;
+  if (r1 == NULL) {
+    DCHECK(hash_tbl_->current_probe_row_ != NULL);
+    // compute r1's value from probe_exprs_ and current_probe_row_
+    r1_row = hash_tbl_->current_probe_row_;
+    r1_exprs = &hash_tbl_->probe_exprs_;
   } else {
-    // evaluate build_exprs_ against t1 in context of build_row_
-    hash_tbl_->build_row_->SetTuple(hash_tbl_->build_tuple_idx_, t1);
-    t1_row = hash_tbl_->build_row_;
-    t1_exprs = &hash_tbl_->build_exprs_;
+    // evaluate build_exprs_ against r1
+    r1_row = r1;
+    r1_exprs = &hash_tbl_->build_exprs_;
   }
-  DCHECK(t2 != NULL);
+
+  // r2 is always non-NULL and is a resident row.
+  DCHECK(r2 != NULL);
 
   for (int i = 0; i < hash_tbl_->build_exprs_.size(); ++i) {
-    const void* value1;
-    value1 = (*t1_exprs)[i]->GetValue(t1_row);
+    const void* value1 = (*r1_exprs)[i]->GetValue(r1_row);
+    const void* value2 = hash_tbl_->build_exprs_[i]->GetValue(r2);
 
-    // t2 is always non-NULL and a resident tuple (ie, needs to be evaluated
-    // in the context of build exprs)
-    const void* value2;
-    hash_tbl_->build_row_->SetTuple(hash_tbl_->build_tuple_idx_, t2);
-    value2 = hash_tbl_->build_exprs_[i]->GetValue(hash_tbl_->build_row_);
-
-    DCHECK_EQ((*t1_exprs)[i]->type(), hash_tbl_->build_exprs_[i]->type());
+    DCHECK_EQ((*r1_exprs)[i]->type(), hash_tbl_->build_exprs_[i]->type());
     if (value1 == NULL || value2 == NULL) {
       // if nulls are stored, they are always considered not-equal;
       // if they are stored, we pretend NULL == NULL
       if (!hash_tbl_->stores_nulls_ || value1 != NULL || value2 != NULL) return false;
     } else {
-      if (RawValue::Compare(value1, value2, (*t1_exprs)[i]->type()) != 0) return false;
+      if (RawValue::Compare(value1, value2, (*r1_exprs)[i]->type()) != 0) return false;
     }
   }
   return true;
 } 
 
-void HashTable::Insert(Tuple* t) {
+void HashTable::Insert(TupleRow* r) {
   if (!stores_nulls_) {
     // check for nulls
-    build_row_->SetTuple(build_tuple_idx_, t);
     for (int i = 0; i < build_exprs_.size(); ++i) {
-      if (build_exprs_[i]->GetValue(build_row_) == NULL) return;
+      if (build_exprs_[i]->GetValue(r) == NULL) return;
     }
   }
-  hash_tbl_->insert(t);
+  hash_tbl_->insert(r);
 }
 
 void HashTable::Scan(TupleRow* probe_row, Iterator* it) {
   current_probe_row_ = probe_row;
-  current_build_row_ = NULL;
   if (probe_row != NULL) {
+    // returns rows that are equal to current_probe_row_.
     it->Reset(hash_tbl_->equal_range(NULL));
   } else {
+    // return all rows
     it->Reset(make_pair(hash_tbl_->begin(), hash_tbl_->end()));
   }
 }
@@ -148,7 +122,6 @@ void HashTable::Scan(TupleRow* probe_row, Iterator* it) {
 void HashTable::DebugString(int indentation_level, std::stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
   *out << "HashTbl(stores_nulls=" << (stores_nulls_ ? "true" : "false")
-       << " build_tuple_idx=" << build_tuple_idx_
        << " build_exprs=" << Expr::DebugString(build_exprs_)
        << " probe_exprs=" << Expr::DebugString(probe_exprs_);
   *out << ")";
@@ -159,9 +132,9 @@ string HashTable::DebugString() {
   out << "size=" << hash_tbl_->size() << "\n";
   Iterator i;
   Scan(NULL, &i);
-  Tuple* t;
-  while ((t = i.GetNext()) != NULL) {
-    out << "tuple " << t << ": " << PrintTuple(t, *build_tuple_desc_) << "\n";
+  TupleRow* r;
+  while ((r = i.GetNext()) != NULL) {
+    out << "row " << r << ": " << PrintRow(r, build_row_desc_) << "\n";
   }
   return out.str();
 }

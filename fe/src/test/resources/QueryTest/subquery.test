@@ -202,6 +202,54 @@ smallint, int, tinyint, int, int, float, string
 84,84,4,4,984,9.9,'4'
 91,91,1,1,991,6.6,'1'
 ====
+# Same join as above, but subquery on the RHS
+select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col
+from alltypessmall c
+     join  
+     (
+       select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,
+              a.int_col int_col, a.month month,
+              b.float_col float_col, b.id id
+       from alltypessmall b
+            join
+            (
+              select *
+              from alltypesagg a
+              where month=1
+            ) a
+            on (a.smallint_col = b.id)
+     ) x
+     on (x.tinyint_col = c.id)
+where x.day=1
+and   x.int_col > 899
+and   x.float_col > 4.5
+and   c.string_col < '7'
+and   x.int_col + x.float_col + c.string_col < 1000
+----
+smallint, int, tinyint, int, int, float, string
+----
+5,5,5,5,905,5.5,'5'
+6,6,6,6,906,6.6,'6'
+15,15,5,5,915,5.5,'5'
+16,16,6,6,916,6.6,'6'
+31,31,1,1,931,6.6,'1'
+32,32,2,2,932,7.7,'2'
+33,33,3,3,933,8.8,'3'
+34,34,4,4,934,9.9,'4'
+41,41,1,1,941,6.6,'1'
+42,42,2,2,942,7.7,'2'
+43,43,3,3,943,8.8,'3'
+44,44,4,4,944,9.9,'4'
+55,55,5,5,955,5.5,'5'
+56,56,6,6,956,6.6,'6'
+65,65,5,5,965,5.5,'5'
+66,66,6,6,966,6.6,'6'
+81,81,1,1,981,6.6,'1'
+82,82,2,2,982,7.7,'2'
+83,83,3,3,983,8.8,'3'
+84,84,4,4,984,9.9,'4'
+91,91,1,1,991,6.6,'1'
+====
 # aggregate without group by
 select *
 from (
