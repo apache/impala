@@ -2,13 +2,13 @@ select name, zip
 from testtbl
 order by name
 limit 1
-----
+---- PLAN
 Plan Fragment 0
   TOP-N
   ORDER BY: name ASC
   LIMIT: 1
     SCAN HDFS table=default.testtbl (0)
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   TOP-N
   ORDER BY: name ASC
@@ -26,7 +26,7 @@ where name like 'm%'
 group by 1
 order by 2 desc
 limit 10
-----
+---- PLAN
 Plan Fragment 0
   TOP-N
   ORDER BY: <slot 3> DESC
@@ -36,7 +36,7 @@ Plan Fragment 0
     GROUP BY: zip
       SCAN HDFS table=default.testtbl (0)
         PREDICATES: name LIKE 'm%'
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   TOP-N
   ORDER BY: <slot 3> DESC
@@ -61,7 +61,7 @@ where id < 5
 group by 1
 order by 2
 limit 4
-----
+---- PLAN
 Plan Fragment 0
   TOP-N
   ORDER BY: <slot 4> ASC
@@ -76,7 +76,7 @@ Plan Fragment 0
     HOST: 
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   TOP-N
   ORDER BY: <slot 4> ASC
@@ -105,7 +105,7 @@ from hbasealltypessmall
 group by 1
 order by 2,3 desc
 limit 0
-----
+---- PLAN
 Plan Fragment 0
   TOP-N
   ORDER BY: <slot 3> ASC, <slot 4> DESC
@@ -119,7 +119,7 @@ Plan Fragment 0
     HOST: 
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   TOP-N
   ORDER BY: <slot 3> ASC, <slot 4> DESC

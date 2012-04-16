@@ -13,6 +13,8 @@ import org.junit.Test;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.TestSchemaUtils;
 import com.cloudera.impala.testutil.TestFileParser;
+import com.cloudera.impala.testutil.TestFileParser.Section;
+import com.cloudera.impala.testutil.TestFileParser.TestCase;
 import com.cloudera.impala.testutil.TestUtils;
 
 public class QueryTest {
@@ -27,15 +29,16 @@ public class QueryTest {
     executor = new Executor(catalog);
   }
 
-  private void runQueryTestFile(String testCase, boolean abortOnError, int maxErrors) {
-    String fileName = testDir + "/" + testCase + ".test";
+  private void runQueryTestFile(String testFile, boolean abortOnError, int maxErrors) {
+    String fileName = testDir + "/" + testFile + ".test";
     TestFileParser queryFileParser = new TestFileParser(fileName);
-    queryFileParser.open();
+    queryFileParser.parseFile();
     StringBuilder errorLog = new StringBuilder();
-    while (queryFileParser.hasNext()) {
-      queryFileParser.next();
-      ArrayList<String> expectedTypes = queryFileParser.getExpectedResult(0);
-      ArrayList<String> expectedResults = queryFileParser.getExpectedResult(1);
+    for (TestCase testCase : queryFileParser.getTestCases()) {
+      ArrayList<String> expectedTypes =
+        testCase.getSectionContents(Section.TYPES);
+      ArrayList<String> expectedResults =
+        testCase.getSectionContents(Section.RESULTS);
       // run each test against all possible combinations of batch sizes and
       // number of execution nodes
       int[] batchSizes = {0, 16, 1};
@@ -43,13 +46,13 @@ public class QueryTest {
       for (int i = 0; i < batchSizes.length; ++i) {
         for (int j = 0; j < numNodes.length; ++j) {
           TestUtils.runQuery(
-              executor, queryFileParser.getQuery(), queryFileParser.getLineNum(),
-              numNodes[j], batchSizes[i], abortOnError, maxErrors, null, expectedTypes,
+              executor, testCase.getSectionAsString(Section.QUERY, false, " "),
+              numNodes[j], batchSizes[i], abortOnError, maxErrors,
+              testCase.getStartingLineNum(), null, expectedTypes,
               expectedResults, null, null, errorLog);
         }
       }
     }
-    queryFileParser.close();
     if (errorLog.length() != 0) {
       fail(errorLog.toString());
     }

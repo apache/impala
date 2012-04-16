@@ -4,7 +4,7 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypes
 where year=2009 and month=05
-----
+---- PLAN
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypesnopart
     OVERWRITE=false
@@ -15,7 +15,7 @@ Plan Fragment 0
     HOST: 
       HDFS SPLITS NODE ID: 0
         hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypesnopart
     OVERWRITE=false
@@ -39,7 +39,7 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypes
 where year=2009 and month=05
-----
+---- PLAN
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
@@ -51,7 +51,7 @@ Plan Fragment 0
     HOST: 
       HDFS SPLITS NODE ID: 0
         hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
@@ -76,7 +76,7 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypes
 where year=2009 and month=05
-----
+---- PLAN
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=true
@@ -88,7 +88,7 @@ Plan Fragment 0
     HOST: 
       HDFS SPLITS NODE ID: 0
         hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=true
@@ -113,7 +113,7 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 from alltypes
 where year=2009 and month>10
-----
+---- PLAN
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
@@ -126,7 +126,7 @@ Plan Fragment 0
       HDFS SPLITS NODE ID: 0
         hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
         hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
@@ -152,7 +152,7 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col, month
 from alltypes
 where year=2009 and month>10
-----
+---- PLAN
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
@@ -165,7 +165,7 @@ Plan Fragment 0
       HDFS SPLITS NODE ID: 0
         hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
         hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
@@ -191,7 +191,7 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col,
 float_col, double_col, date_string_col, string_col, timestamp_col, year
 from alltypes
 where year>2009 and month=4
-----
+---- PLAN
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
@@ -203,7 +203,7 @@ Plan Fragment 0
     HOST: 
       HDFS SPLITS NODE ID: 0
         hdfs:alltypes/year=2010/month=4/100401.txt 0:20179
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false

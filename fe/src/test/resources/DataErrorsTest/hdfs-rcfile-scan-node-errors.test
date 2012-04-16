@@ -1,5 +1,5 @@
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col from alltypeserror_rc
-----
+---- ERRORS
 Error converting column: 1 TO BOOL
 file: alltypeserror_rc/year=2009/month=1/000001_0
 line: 1,errfalse,,1,1,10,1.000000,10.100000,01/01/09,1
@@ -52,14 +52,14 @@ line: 27,false,abc7,7,7,70,7.000000,70.700000,03/01/09,7
 Error converting column: 4 TO INT
 file: alltypeserror_rc/year=2009/month=3/000000_0
 line: 29,false,9,9,abc9,90,9.000000,90.900000,03/01/09,9
-----
+---- FILEERRORS
 # expected errors per file
 file: alltypeserror_rc/year=2009/month=1/000001_0,8
 file: alltypeserror_rc/year=2009/month=2/000002_0,3
 file: alltypeserror_rc/year=2009/month=3/000000_0,4
 ====
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col from alltypeserrornonulls_rc
-----
+---- ERRORS
 Error converting column: 1 TO BOOL
 file: alltypeserrornonulls_rc/year=2009/month=1/000001_0
 line: 1,errfalse,1,1,1,10,1.000000,10.100000,01/01/09,1
@@ -112,7 +112,7 @@ line: 27,false,abc7,7,7,70,7.000000,70.700000,03/01/09,7
 Error converting column: 4 TO INT
 file: alltypeserrornonulls_rc/year=2009/month=3/000000_0
 line: 29,false,9,9,abc9,90,9.000000,90.900000,03/01/09,9
-----
+---- FILEERRORS
 # expected errors per file
 file: alltypeserrornonulls_rc/year=2009/month=1/000001_0,8
 file: alltypeserrornonulls_rc/year=2009/month=2/000002_0,3

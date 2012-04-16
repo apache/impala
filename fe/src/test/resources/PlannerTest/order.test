@@ -1,7 +1,7 @@
 select name, zip
 from testtbl
 order by name
-----
+---- PLAN
 not implemented
 ====
 select zip, count(*)
@@ -9,7 +9,7 @@ from testtbl
 where name like 'm%'
 group by 1
 order by 2 desc
-----
+---- PLAN
 not implemented
 ====
 select int_col, sum(float_col) 
@@ -17,13 +17,13 @@ from hbasealltypessmall
 where id < 5
 group by 1
 order by 2
-----
+---- PLAN
 not implemented
 ====
 select int_col, sum(float_col), min(float_col) 
 from hbasealltypessmall
 group by 1
 order by 2,3 desc
-----
+---- PLAN
 not implemented
 ====

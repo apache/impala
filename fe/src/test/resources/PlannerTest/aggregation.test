@@ -2,7 +2,7 @@
 select count(*), count(tinyint_col), min(tinyint_col), max(tinyint_col), sum(tinyint_col),
 avg(tinyint_col)
 from alltypesagg
-----
+---- PLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
@@ -23,7 +23,7 @@ Plan Fragment 0
         hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
         hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
         hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: SUM(<slot 1>), SUM(<slot 2>), MIN(<slot 3>), MAX(<slot 4>), SUM(<slot 5>)
@@ -58,7 +58,7 @@ select tinyint_col, count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_co
 avg(tinyint_col)
 from alltypesagg
 group by 1
-----
+---- PLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
@@ -79,7 +79,7 @@ Plan Fragment 0
         hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
         hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
         hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: SUM(<slot 2>), MIN(<slot 3>), MAX(<slot 4>), SUM(<slot 5>), SUM(<slot 6>)

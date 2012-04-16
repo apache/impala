@@ -1,5 +1,5 @@
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col from hbasealltypeserror
-----
+---- ERRORS
 Error converting column bools:bool_col: 'errfalse' TO BOOL
 hbase table: hbasealltypeserror
 row key: 1
@@ -52,11 +52,11 @@ Error converting column ints:smallint_col: 'err9' TO SMALLINT
 Error converting column ints:tinyint_col: 'err9' TO TINYINT
 hbase table: hbasealltypeserror
 row key: 9
-----
+---- FILEERRORS
 file: hbasealltypeserror,15
 ====
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col from hbasealltypeserrornonulls
-----
+---- ERRORS
 Error converting column bools:bool_col: 'errfalse' TO BOOL
 hbase table: hbasealltypeserrornonulls
 row key: 1
@@ -109,6 +109,6 @@ Error converting column ints:smallint_col: 'err9' TO SMALLINT
 Error converting column ints:tinyint_col: 'err9' TO TINYINT
 hbase table: hbasealltypeserrornonulls
 row key: 9
-----
+---- FILEERRORS
 file: hbasealltypeserrornonulls,15
 ====

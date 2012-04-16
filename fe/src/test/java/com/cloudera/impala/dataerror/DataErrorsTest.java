@@ -14,6 +14,8 @@ import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.TestSchemaUtils;
 import com.cloudera.impala.service.Executor;
 import com.cloudera.impala.testutil.TestFileParser;
+import com.cloudera.impala.testutil.TestFileParser.Section;
+import com.cloudera.impala.testutil.TestFileParser.TestCase;
 import com.cloudera.impala.testutil.TestUtils;
 
 public class DataErrorsTest {
@@ -30,14 +32,13 @@ public class DataErrorsTest {
     testErrorLog = new StringBuilder();
   }
 
-  private void runErrorTestFile(String testCase, boolean abortOnError, int maxErrors) {
+  private void runErrorTestFile(String testFile, boolean abortOnError, int maxErrors) {
     StringBuilder errorLog = new StringBuilder();
-    String fileName = testDir + "/" + testCase + ".test";
+    String fileName = testDir + "/" + testFile + ".test";
     TestFileParser queryFileParser = new TestFileParser(fileName);
-    queryFileParser.open();
-    while (queryFileParser.hasNext()) {
-      queryFileParser.next();
-      ArrayList<String> expectedErrors = queryFileParser.getExpectedResult(0);
+    queryFileParser.parseFile();
+    for (TestCase testCase : queryFileParser.getTestCases()) {
+      ArrayList<String> expectedErrors = testCase.getSectionContents(Section.ERRORS);
       // The test file is assumed to contain all errors. We may only want to compare a few of them.
       int errorsToCompare = Math.min(expectedErrors.size(), maxErrors);
       int lastLine = 0;
@@ -58,7 +59,7 @@ public class DataErrorsTest {
         expectedErrors.remove(expectedErrors.size() - 1);
       }
       // File error entries must be sorted by filename within .test file.
-      ArrayList<String> expectedFileErrors = queryFileParser.getExpectedResult(1);
+      ArrayList<String> expectedFileErrors = testCase.getSectionContents(Section.FILEERRORS);
       if (abortOnError && !expectedFileErrors.isEmpty()) {
         String[] fileErrSplits = expectedFileErrors.get(0).split(",");
         // We are expecting only a single file with a single error.
@@ -69,17 +70,17 @@ public class DataErrorsTest {
       // run query 3 ways: with backend's default batch size, with small batch size,
       // and with batch size of 1, which should trigger a lot of corner cases
       // in the execution engine code
-      TestUtils.runQuery(executor, queryFileParser.getQuery(),
-          queryFileParser.getLineNum(), 1, 0, abortOnError, maxErrors, null, null, null,
+      String query = testCase.getQuery();
+      TestUtils.runQuery(executor, query,
+          1, 0, abortOnError, maxErrors, testCase.getStartingLineNum(), null, null, null,
           expectedErrors, expectedFileErrors, testErrorLog);
-      TestUtils.runQuery(executor, queryFileParser.getQuery(),
-          queryFileParser.getLineNum(), 1, 16, abortOnError, maxErrors, null, null, null,
+      TestUtils.runQuery(executor, query,
+          1, 16, abortOnError, maxErrors, testCase.getStartingLineNum(), null, null, null,
           expectedErrors, expectedFileErrors, testErrorLog);
-      TestUtils.runQuery(executor, queryFileParser.getQuery(),
-          queryFileParser.getLineNum(), 1, 1, abortOnError, maxErrors, null, null, null,
+      TestUtils.runQuery(executor, query,
+          1, 1, abortOnError, maxErrors, testCase.getStartingLineNum(), null, null, null,
           expectedErrors, expectedFileErrors, testErrorLog);
     }
-    queryFileParser.close();
 
     if (errorLog.length() != 0) {
       fail(errorLog.toString());
@@ -99,7 +100,7 @@ public class DataErrorsTest {
     runErrorTestFile("hdfs-rcfile-scan-node-errors", false, 5);
     runErrorTestFile("hdfs-rcfile-scan-node-errors", true, 1);
   }
-  
+
   @Test
   public void TestHBaseScanNodeErrors() {
     runErrorTestFile("hbase-scan-node-errors", false, 100);

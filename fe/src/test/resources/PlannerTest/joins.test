@@ -1,7 +1,7 @@
 select *
 from testtbl t1 join testtbl t2 using(id)
 where t1.zip = 94611
-----
+---- PLAN
 Plan Fragment 0
   HASH JOIN
     JOIN OP: INNER JOIN
@@ -10,7 +10,7 @@ Plan Fragment 0
       SCAN HDFS table=default.testtbl (0)
         PREDICATES: t1.zip = 94611
       SCAN HDFS table=default.testtbl (1)
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (3)
 
@@ -30,7 +30,7 @@ select *
 from testtbl t1 left outer join testtbl t2 
 on (t1.id - 1 = t2.id + 1)
 where t1.zip = 94611
-----
+---- PLAN
 Plan Fragment 0
   HASH JOIN
     JOIN OP: LEFT OUTER JOIN
@@ -39,7 +39,7 @@ Plan Fragment 0
       SCAN HDFS table=default.testtbl (0)
         PREDICATES: t1.zip = 94611
       SCAN HDFS table=default.testtbl (1)
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (3)
 
@@ -64,7 +64,7 @@ and b.month > 2
 and a.tinyint_col = 15
 and b.string_col = '15'
 and a.tinyint_col + b.tinyint_col < 15
-----
+---- PLAN
 Plan Fragment 0
   HASH JOIN
     JOIN OP: RIGHT OUTER JOIN
@@ -90,7 +90,7 @@ Plan Fragment 0
       HDFS SPLITS NODE ID: 1
         hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
         hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (3)
 
@@ -136,7 +136,7 @@ and b.string_col = '15'
 and a.tinyint_col + b.tinyint_col < 15
 and a.float_col - c.double_col < 0
 and (b.double_col * c.tinyint_col > 1000 or c.tinyint_col < 1000)
-----
+---- PLAN
 Plan Fragment 0
   HASH JOIN
     JOIN OP: RIGHT OUTER JOIN
@@ -173,7 +173,7 @@ Plan Fragment 0
       HDFS SPLITS NODE ID: 3
         hdfs:alltypesaggnonulls/year=2010/month=1/day=1/100101.txt 0:75271
         hdfs:alltypesaggnonulls/year=2010/month=1/day=2/100102.txt 0:76381
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (5)
 
@@ -220,13 +220,13 @@ Plan Fragment 1
 select *
 from testtbl t1 join testtbl t2
 where t1.zip < t2.zip
-----
+---- PLAN
 not implemented
 ====
 # hbas-hdfs join
 select *
 from alltypesagg join hbasealltypessmall using (id, int_col)
-----
+---- PLAN
 Plan Fragment 0
   HASH JOIN
     JOIN OP: INNER JOIN
@@ -252,7 +252,7 @@ Plan Fragment 0
         hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
       HBASE KEY RANGES NODE ID: 1
         <unbounded>:<unbounded>
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (3)
 
@@ -293,7 +293,7 @@ and b.id = '5'
 and b.tinyint_col = 5
 and b.tinyint_col > 123
 and a.tinyint_col + b.tinyint_col < 15
-----
+---- PLAN
 Plan Fragment 0
   HASH JOIN
     JOIN OP: INNER JOIN
@@ -319,7 +319,7 @@ Plan Fragment 0
         hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
       HBASE KEY RANGES NODE ID: 1
         5:5\0
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (3)
 

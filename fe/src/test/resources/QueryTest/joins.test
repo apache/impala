@@ -8,9 +8,7 @@ and a.day=1
 and a.tinyint_col + b.tinyint_col < 5
 and a.string_col > '88'
 and b.bool_col = false
-----
-tinyint, int, string
-----
+---- RESULTS
 1,1,'91'
 1,1,'881'
 1,1,'891'
@@ -24,6 +22,8 @@ tinyint, int, string
 1,1,'971'
 1,1,'981'
 1,1,'991'
+---- TYPES
+tinyint, int, string
 ====
 
 # join between two tables, extra join predicate, extra scan predicates, nulls in joins cols
@@ -35,9 +35,7 @@ and a.day=1
 and a.tinyint_col + b.tinyint_col < 5
 and a.string_col > '88'
 and b.bool_col = false
-----
-tinyint, int, string
-----
+---- RESULTS
 1,1,'91'
 1,1,'881'
 1,1,'891'
@@ -51,6 +49,8 @@ tinyint, int, string
 1,1,'971'
 1,1,'981'
 1,1,'991'
+---- TYPES
+tinyint, int, string
 ====
 # reversing the order of the tables produces the same result
 select a.tinyint_col, b.id, a.string_col

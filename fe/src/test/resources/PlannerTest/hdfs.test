@@ -3,14 +3,14 @@ select zip, count(*)
 from testtbl
 where name like 'm%'
 group by 1
-----
+---- PLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: COUNT(*)
   GROUP BY: zip
     SCAN HDFS table=default.testtbl (0)
       PREDICATES: name LIKE 'm%'
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: SUM(<slot 3>)
@@ -28,7 +28,7 @@ Plan Fragment 1
 ====
 # all partitions are selected
 select * from alltypes
-----
+---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
     REGEX: .*/year=([^\/]*)/month=([^\/]*)/
@@ -60,7 +60,7 @@ Plan Fragment 0
         hdfs:alltypes/year=2010/month=7/100701.txt 0:20853
         hdfs:alltypes/year=2010/month=8/100801.txt 0:20853
         hdfs:alltypes/year=2010/month=9/100901.txt 0:20179
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
 
@@ -100,7 +100,7 @@ Plan Fragment 1
 ====
 # predicate on first partition key
 select * from alltypes where year = 2009
-----
+---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
     REGEX: .*/year=([^\/]*)/month=([^\/]*)/
@@ -120,7 +120,7 @@ Plan Fragment 0
         hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
         hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
         hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
 
@@ -148,7 +148,7 @@ Plan Fragment 1
 ====
 # same predicate, phrased differently
 select * from alltypes where year = 2009.0
-----
+---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
     REGEX: .*/year=([^\/]*)/month=([^\/]*)/
@@ -168,7 +168,7 @@ Plan Fragment 0
         hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
         hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
         hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
 
@@ -195,7 +195,7 @@ Plan Fragment 1
         hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
 ====
 select * from alltypes where 2009 = year
-----
+---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
     REGEX: .*/year=([^\/]*)/month=([^\/]*)/
@@ -215,7 +215,7 @@ Plan Fragment 0
         hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
         hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
         hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
 
@@ -242,7 +242,7 @@ Plan Fragment 1
         hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
 ====
 select * from alltypes where 2009.0 = year
-----
+---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
     REGEX: .*/year=([^\/]*)/month=([^\/]*)/
@@ -262,7 +262,7 @@ Plan Fragment 0
         hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
         hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
         hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
 
@@ -290,7 +290,7 @@ Plan Fragment 1
 ====
 # predicate on second partition key
 select * from alltypes where month=1
-----
+---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
     REGEX: .*/year=([^\/]*)/month=([^\/]*)/
@@ -300,7 +300,7 @@ Plan Fragment 0
       HDFS SPLITS NODE ID: 0
         hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
         hdfs:alltypes/year=2010/month=1/100101.txt 0:20853
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
 
@@ -318,7 +318,7 @@ Plan Fragment 1
 ====
 # predicate on both partition keys
 select * from alltypes where year=2009 and month=1
-----
+---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
     REGEX: .*/year=([^\/]*)/month=([^\/]*)/
@@ -327,7 +327,7 @@ Plan Fragment 0
     HOST: 
       HDFS SPLITS NODE ID: 0
         hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
 
@@ -344,7 +344,7 @@ Plan Fragment 1
 ====
 # single-sided range on 2nd key
 select * from alltypes where year=2009 and month > 6
-----
+---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
     REGEX: .*/year=([^\/]*)/month=([^\/]*)/
@@ -358,7 +358,7 @@ Plan Fragment 0
         hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
         hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
         hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
 
@@ -379,7 +379,7 @@ Plan Fragment 1
         hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
 ====
 select * from alltypes where year=2009 and month < 6
-----
+---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
     REGEX: .*/year=([^\/]*)/month=([^\/]*)/
@@ -392,7 +392,7 @@ Plan Fragment 0
         hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
         hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
         hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
 
@@ -413,7 +413,7 @@ Plan Fragment 1
 ====
 # single-sided ranges on both keys
 select * from alltypes where year<=2009 and month < 6
-----
+---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
     REGEX: .*/year=([^\/]*)/month=([^\/]*)/
@@ -426,7 +426,7 @@ Plan Fragment 0
         hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
         hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
         hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
 
@@ -447,7 +447,7 @@ Plan Fragment 1
 ====
 # range on 2nd key
 select * from alltypes where month < 9 and month > 6
-----
+---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
     REGEX: .*/year=([^\/]*)/month=([^\/]*)/
@@ -459,7 +459,7 @@ Plan Fragment 0
         hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
         hdfs:alltypes/year=2010/month=7/100701.txt 0:20853
         hdfs:alltypes/year=2010/month=8/100801.txt 0:20853
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
 
@@ -479,7 +479,7 @@ Plan Fragment 1
 ====
 # multiple predicates on first key; 2nd one applied as predicate
 select * from alltypes where year < 2010 and year < 2009 and month > 6
-----
+---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
     PREDICATES: year < 2009
@@ -494,7 +494,7 @@ Plan Fragment 0
         hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
         hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
         hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
 
@@ -517,7 +517,7 @@ Plan Fragment 1
 ====
 # multiple predicates on second key; 2nd one applied as predicate
 select * from alltypes where year < 2010 and month > 6 and month > 8
-----
+---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
     PREDICATES: month > 8
@@ -532,7 +532,7 @@ Plan Fragment 0
         hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
         hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
         hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
 
@@ -555,7 +555,7 @@ Plan Fragment 1
 ====
 # slot binding can't be determined
 select * from alltypes where year - 1 = 2009
-----
+---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
     PREDICATES: year - 1 = 2009
@@ -588,7 +588,7 @@ Plan Fragment 0
         hdfs:alltypes/year=2010/month=7/100701.txt 0:20853
         hdfs:alltypes/year=2010/month=8/100801.txt 0:20853
         hdfs:alltypes/year=2010/month=9/100901.txt 0:20179
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
 
@@ -629,7 +629,7 @@ Plan Fragment 1
 ====
 # multi files non-partitioned table test
 select * from alltypesaggmultifilesNoPart
-----
+---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypesaggmultifilesnopart (0)
 
@@ -640,7 +640,7 @@ Plan Fragment 0
         hdfs:alltypesaggmultifilesnopart/000000_0_copy_1 0:188412
         hdfs:alltypesaggmultifilesnopart/000000_0_copy_2 0:187323
         hdfs:alltypesaggmultifilesnopart/000000_0_copy_3 0:189213
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
 
@@ -659,7 +659,7 @@ Plan Fragment 1
 ====
 # multi files partitioned table test
 select * from alltypesaggmultifiles where day<=2
-----
+---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypesaggmultifiles (0)
     REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
@@ -675,7 +675,7 @@ Plan Fragment 0
         hdfs:alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_1 0:18869
         hdfs:alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_2 0:18760
         hdfs:alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_3 0:18949
-------------
+------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
 

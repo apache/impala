@@ -7,51 +7,160 @@ import static org.junit.Assert.fail;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
 import java.util.Scanner;
 
+import org.apache.log4j.Logger;
+
+import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
-// Parses and provides an iterator-like interface to a text file with the following format:
-// <QUERY STRING>
-// ----
-// <EXPECTED RESULT SECTION 1>
-// ----
-// <EXPECTED RESULT SECTION 2>
-// ----
-// <EXPECTED RESULT SECTION 3>
-// ====
-// <QUERY STRING>
-// ----
-// <EXPECTED RESULT SECTION 1>
-// ----
-// <EXPECTED RESULT SECTION 2>
-// ----
-// <EXPECTED RESULT SECTION 3>
-// ====
-// ...
-// Note that <QUERY STRING> and <EXPECTED RESULT SECTIONS> can consist of multiple lines.
+/**
+ * Parses a file containing one or more test case descriptions into a list of TestCase
+ * objects.
+ * A test file has the following format:
+ *
+ * <QUERY STRING>
+ * ---- <SECTION NAME 1>
+ * <EXPECTED CONTENTS 1>
+ * ---- <SECTION NAME 2>
+ * <EXPECTED CONTENTS 2>
+ * ---- <SECTION NAME 3>
+ * <EXPECTED CONTENTS 3>
+ * ====
+ * <QUERY STRING>
+ * ---- <SECTION NAME 1>
+ * <EXPECTED CONTENTS 1>
+ * ---- <SECTION NAME 2>
+ * <EXPECTED CONTENTS 2>
+ * ---- <SECTION NAME 3>
+ * <EXPECTED CONTENTS 3>
+ * ====
+ * Acceptable section names are ONLY those contained in TestFileParser.Section.
+ *
+ * Lines beginning with # or // are comments. Clients can retrieve sections with or
+ * without these lines included.
+ *
+ * Note that <QUERY STRING> and <EXPECTED CONTENTS> sections can consist of multiple
+ * lines.
+ */
 public class TestFileParser {
-  private final StringBuilder query = new StringBuilder();
+  private static final Logger LOG = Logger.getLogger(TestCase.class);
 
-  // the whole <QUERY STRING>, including comment and new line
-  private final StringBuilder querySection = new StringBuilder();
+  /**
+   * Valid section titles.
+   */
+  public enum Section {
+    QUERY,
+    TYPES,
+    RESULTS,
+    PLAN,
+    DISTRIBUTEDPLAN,
+    ERRORS,
+    FILEERRORS
+  }
+
+  /**
+   * A container class for a single test case's sections.
+   * A section is a list of strings.
+   */
+  public static class TestCase {
+
+    private final EnumMap<Section, ArrayList<String>> expectedResultSections =
+      Maps.newEnumMap(Section.class);
+
+    // Line number in the test case file where this case started
+    private final int startLineNum;
+
+    public TestCase(int lineNum) {
+      startLineNum = lineNum;
+    }
+
+    public int getStartingLineNum() {
+      return startLineNum;
+    }
+
+    protected void addSection(Section section, ArrayList<String> contents) {
+      expectedResultSections.put(section, contents);
+    }
+
+    /**
+     * Returns a section corresponding to the given key, or null if one does not exist.
+     * Comments are not included.
+     */
+    public ArrayList<String> getSectionContents(Section section) {
+      return getSectionContents(section, false);
+    }
+
+    /**
+     * Returns a section corresponding to the given key, or null if one does not exist.
+     * If withComments is set, all comment lines are included.
+     */
+    public ArrayList<String> getSectionContents(Section section, boolean withComments) {
+      ArrayList<String> ret = expectedResultSections.get(section);
+      if (ret == null || withComments) {
+        return ret;
+      }
+
+      ArrayList<String> retList = Lists.newArrayList();
+      for (String s : ret) {
+        if (!(s.startsWith("#") || s.startsWith("//"))) {
+          retList.add(s);
+        }
+      }
+
+      return retList;
+    }
+
+    /**
+     * Returns a section concatenated into a single string, with the supplied delimiter
+     * used to separate each line.
+     */
+    public String getSectionAsString(Section section, boolean withComments,
+        String delimiter) {
+      List<String> sectionList = getSectionContents(section, withComments);
+      if (sectionList == null) {
+        return null;
+      }
+      return Joiner.on(delimiter).join(sectionList);
+    }
+
+    /**
+     * Returns the QUERY section as a string, with each line separated by a " ".
+     */
+    public String getQuery() {
+      return getSectionAsString(Section.QUERY, false, " ");
+    }
+  }
+
+  private final List<TestCase> testCases = Lists.newArrayList();
+
   private int lineNum = 0;
-  private final StringBuilder confString = new StringBuilder();
-  private final ArrayList<ArrayList<String>> expectedResultSections = Lists.newArrayList();
   private final String fileName;
   private InputStream stream;
   private Scanner scanner;
 
-  enum ParserState {
-    QUERY,
-    EXPECTED_RESULT
-  }
+  /**
+   * For backwards compatibility, if no title is found this is the order in which
+   * sections are labelled.
+   */
+  static private final ArrayList<Section> defaultSectionOrder =
+    Lists.newArrayList(Section.QUERY, Section.TYPES, Section.RESULTS);
 
   public TestFileParser(String fileName) {
     this.fileName = fileName;
   }
 
-  public void open() {
+  public List<TestCase> getTestCases() {
+    return testCases;
+  }
+
+  /**
+   * Initialises the scanner and the input stream corresponding to the test file name
+   */
+  private void open() {
     try {
       ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
       stream = classLoader.getResourceAsStream(fileName);
@@ -61,94 +170,77 @@ public class TestFileParser {
     }
   }
 
-  public boolean hasNext() {
-    return scanner.hasNextLine();
-  }
+  /**
+   * Consumes input from the test file until a single test case has been parsed.
+   */
+  private TestCase parseOneTestCase() {
+    Section currentSection = Section.QUERY;
+    ArrayList<String> sectionContents = Lists.newArrayList();
+    TestCase currentTestCase = new TestCase(lineNum);
+    int sectionCount = 0;
 
-  public void next() {
-    expectedResultSections.clear();
-    confString.setLength(0);
-    query.setLength(0);
-    querySection.setLength(0);
-    ParserState state = ParserState.QUERY;
-    ArrayList<String> resultSection = null;
     while (scanner.hasNextLine()) {
       String line = scanner.nextLine();
       ++lineNum;
-      // ignore comments
-      if (line.startsWith("//") || line.startsWith("#")) {
-        if (state == ParserState.QUERY) {
-          querySection.append(line + "\n");
-        }
-        continue;
-      }
       if (line.startsWith("====")) {
-        break; // done w/ this query
+        currentTestCase.addSection(currentSection, sectionContents);
+        return currentTestCase; // done with this test case
       }
       if (line.startsWith("----")) {
-        // start of plan output section
-        state = ParserState.EXPECTED_RESULT;
-        resultSection = new ArrayList<String>();
-        expectedResultSections.add(resultSection);
+        sectionCount++;
+        // New section
+        currentTestCase.addSection(currentSection, sectionContents);
+        boolean found = false;
+        line = line.trim().toLowerCase();
+
+        // Check for section header - a missing header probably means an old test file.
+        if (!line.endsWith("----")) {
+          for (Section s : Section.values()) {
+            if (line.endsWith(" " + s.toString().toLowerCase())) {
+              currentSection = s;
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            throw new IllegalStateException("Unknown section name: " + line);
+          }
+        } else {
+          // Backwards compatibility only - TODO remove once all test files have section
+          // headers.
+          if (sectionCount >= defaultSectionOrder.size()) {
+            throw new IllegalStateException("Unexpected number of untitled sections: "
+                + sectionCount);
+          }
+          currentSection = defaultSectionOrder.get(sectionCount);
+          LOG.warn("No section header found. Guessing: " + currentSection);
+        }
+
+        sectionContents = Lists.newArrayList();
       } else {
-        // Line is not a section indicator.
-        switch(state) {
-        case QUERY: {
-          query.append(line);
-          query.append(" ");
-          querySection.append(line + "\n");
-          break;
-        }
-        case EXPECTED_RESULT: {
-          resultSection.add(line);
-          break;
-        }
-        }
+        sectionContents.add(line);
       }
     }
+
+    return currentTestCase;
   }
 
-  public void close() {
+  /**
+   * Parses a test file in its entirety and constructs a list of TestCases.
+   */
+  public void parseFile() {
+    open();
+    while (scanner.hasNextLine()) {
+      testCases.add(parseOneTestCase());
+    }
+    close();
+  }
+
+  private void close() {
     try {
       stream.close();
     } catch (IOException e) {
       // ignore
     }
-  }
-
-  public ArrayList<ArrayList<String>> getExpectedResultSections() {
-    return expectedResultSections;
-  }
-
-  public ArrayList<String> getExpectedResult(int sectionIndex) {
-    if (sectionIndex < expectedResultSections.size()) {
-      return expectedResultSections.get(sectionIndex);
-    } else {
-      return new ArrayList<String>();
-    }
-  }
-
-  public String getConfString() {
-    return confString.toString();
-  }
-
-  /**
-   * Return the query string, stripping out comments and newline.
-   * @return
-   */
-  public String getQuery() {
-    return query.toString();
-  }
-
-  /**
-   * Return the query section from the testfile, including comments and newline
-   * @return
-   */
-  public String getQuerySection() {
-    return querySection.toString();
-  }
-
-  public int getLineNum() {
-    return lineNum;
   }
 }
