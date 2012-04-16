@@ -78,16 +78,16 @@ Status IntLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   DCHECK_EQ(children_.size(), 0);
   switch (type_) {
     case TYPE_TINYINT:
-      compute_function_ = ReturnTinyintValue;
+      compute_fn_ = ReturnTinyintValue;
       break;
     case TYPE_SMALLINT:
-      compute_function_ = ReturnSmallintValue;
+      compute_fn_ = ReturnSmallintValue;
       break;
     case TYPE_INT:
-      compute_function_ = ReturnIntValue;
+      compute_fn_ = ReturnIntValue;
       break;
     case TYPE_BIGINT:
-      compute_function_ = ReturnBigintValue;
+      compute_fn_ = ReturnBigintValue;
       break;
     default:
       DCHECK(false) << "IntLiteral::Prepare(): bad type: " << TypeToString(type_);
@@ -153,7 +153,7 @@ Function* IntLiteral::Codegen(LlvmCodeGen* codegen) {
       return NULL;
   }
   
-  SetIsNullReturnArg(codegen, function, false);
+  CodegenSetIsNullArg(codegen, function, false);
   builder->CreateRet(result);
 
   if (!codegen->VerifyFunction(function)) return NULL;

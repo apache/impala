@@ -96,12 +96,12 @@ class QueryJitter {
     if (!request.fragmentRequests[0].__isset.descTbl) {
       if (FLAGS_benchmark) {
         double interpreted_rate = Benchmark::Measure(ExprBenchmark, root);
-        root->SetComputeFunction(func, scratch_size);
+        root->SetComputeFn(func, scratch_size);
         double jitted_rate = Benchmark::Measure(ExprBenchmark, root);
         cout << "Interpreted Expr Eval Rate: " << interpreted_rate << endl;
         cout << "Jitted Expr Eval Rate: " << jitted_rate << endl;
       } else {
-        root->SetComputeFunction(func, scratch_size);
+        root->SetComputeFn(func, scratch_size);
         void* result = root->GetValue(NULL);
         string result_string;
         RawValue::PrintValue(result, root->type(), &result_string);

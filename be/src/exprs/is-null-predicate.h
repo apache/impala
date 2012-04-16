@@ -24,7 +24,7 @@ class IsNullPredicate: public Predicate {
 
  private:
   const bool is_not_null_;
-  static void* ComputeFunction(Expr* e, TupleRow* row);
+  static void* ComputeFn(Expr* e, TupleRow* row);
 };
 
 }

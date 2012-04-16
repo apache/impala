@@ -25,14 +25,14 @@ StringLiteral::StringLiteral(const TExprNode& node)
   result_.SetStringVal(node.string_literal.value);
 }
 
-void* StringLiteral::ComputeFunction(Expr* e, TupleRow* row) {
+void* StringLiteral::ComputeFn(Expr* e, TupleRow* row) {
   StringLiteral* l = static_cast<StringLiteral*>(e);
   return &l->result_.string_val;
 }
 
 Status StringLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   DCHECK_EQ(children_.size(), 0);
-  compute_function_ = ComputeFunction;
+  compute_fn_ = ComputeFn;
   return Status::OK;
 }
 

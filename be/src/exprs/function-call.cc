@@ -70,7 +70,6 @@ Function* FunctionCall::Codegen(LlvmCodeGen* codegen) {
     child_functions[i] = child;
   }
 
-
   Type* return_type = codegen->GetType(type());
   Function* function = CreateComputeFnPrototype(codegen, "FunctionCall");
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
@@ -102,8 +101,7 @@ Function* FunctionCall::Codegen(LlvmCodeGen* codegen) {
   args.resize(GetNumChildren());
   for (int i = 0; i < GetNumChildren(); ++i) {
     Function* child = child_functions[i];
-    Value* child_value = CallFunction(codegen, function, child, ret_block, not_null_block);
-    args[i] = child_value;
+    args[i] = CodegenCallFn(codegen, function, child, ret_block, not_null_block);
   }
 
   builder->SetInsertPoint(not_null_block);

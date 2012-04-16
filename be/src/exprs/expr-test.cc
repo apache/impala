@@ -130,7 +130,7 @@ class ExprTest : public testing::Test {
       void* func = root->CodegenExprTree(&code_gen, &scratch_size);
       EXPECT_EQ(scratch_size, 0);
       EXPECT_TRUE(func != NULL);
-      jit_expr_root_[root->type()]->SetComputeFunction(func, scratch_size);
+      jit_expr_root_[root->type()]->SetComputeFn(func, scratch_size);
       *jitted_value = jit_expr_root_[root->type()]->GetValue(NULL);
     }
   }

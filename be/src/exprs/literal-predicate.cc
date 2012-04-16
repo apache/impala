@@ -12,7 +12,7 @@ using namespace llvm;
 
 namespace impala {
 
-void* LiteralPredicate::ComputeFunction(Expr* e, TupleRow* row) {
+void* LiteralPredicate::ComputeFn(Expr* e, TupleRow* row) {
   LiteralPredicate* p = static_cast<LiteralPredicate*>(e);
   return (p->is_null_) ? NULL : &p->result_.bool_val;
 }
@@ -24,7 +24,7 @@ LiteralPredicate::LiteralPredicate(const TExprNode& node)
 
 Status LiteralPredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   RETURN_IF_ERROR(Expr::PrepareChildren(state, row_desc));
-  compute_function_ = ComputeFunction;
+  compute_fn_ = ComputeFn;
   return Status::OK;
 }
 
@@ -52,7 +52,7 @@ Function* LiteralPredicate::Codegen(LlvmCodeGen* codegen) {
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
   codegen->builder()->SetInsertPoint(entry_block);
   
-  SetIsNullReturnArg(codegen, function, is_null_);
+  CodegenSetIsNullArg(codegen, function, is_null_);
   if (is_null_) {
     builder->CreateRet(GetNullReturnValue(codegen));
   } else {

@@ -91,7 +91,6 @@ string SlotRef::DebugString() const {
 // }
 Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
   DCHECK_EQ(GetNumChildren(), 0);
-  
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
   
@@ -131,16 +130,17 @@ Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
   Value* tuple_addr = builder->CreateGEP(row_ptr, tuple_offset, "tuple_addr"); 
   // Load the tuple*
   Value* tuple_ptr = builder->CreateLoad(tuple_addr, "tuple_ptr");
+
   // Check if tuple* is null
   Value* tuple_is_null = builder->CreateIsNull(tuple_ptr, "tuple_is_null");
   if (null_indicator_offset_.bit_mask == 0) {
     builder->CreateCondBr(tuple_is_null, null_ret_block, get_slot_block);
   } else {
     builder->CreateCondBr(tuple_is_null, null_ret_block, check_null_indicator_block);
-  }
+  } 
 
   // Branch for tuple* != NULL.  Need to check if null-indicator is set
-  if (null_indicator_offset_.bit_mask != 0) {
+  if (check_null_indicator_block != NULL) {
     builder->SetInsertPoint(check_null_indicator_block);
     Value* null_addr = builder->CreateGEP(tuple_ptr, null_byte_offset, "null_ptr");
     Value* null_val = builder->CreateLoad(null_addr, "null_byte");
@@ -154,12 +154,12 @@ Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
   Value* slot_ptr = builder->CreateGEP(tuple_ptr, slot_offset, "slot_addr");
   Value* slot_cast = builder->CreatePointerCast(slot_ptr, result_ptr_type);
   Value* result = builder->CreateLoad(slot_cast, "slot_value");
-  SetIsNullReturnArg(codegen, function, false);
+  CodegenSetIsNullArg(codegen, function, false);
   builder->CreateBr(ret_block);
 
   // Branch to set is_null to true
   builder->SetInsertPoint(null_ret_block);
-  SetIsNullReturnArg(codegen, function, true);
+  CodegenSetIsNullArg(codegen, function, true);
   builder->CreateBr(ret_block);
 
   // Ret block

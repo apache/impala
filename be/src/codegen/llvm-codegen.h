@@ -31,6 +31,7 @@ namespace llvm {
   class LLVMContext;
   class Module;
   class NoFolder;
+  class PassManager;
   class PointerType;
   class StructType;
   class TargetData;
@@ -226,8 +227,11 @@ class LlvmCodeGen {
   // Execution/Jitting engine.  
   boost::scoped_ptr<llvm::ExecutionEngine> execution_engine_;
 
-  // Contains multiple optimization passes to optimize the IR
+  // Contains multiple optimization passes to optimize functions
   boost::scoped_ptr<llvm::FunctionPassManager> function_pass_mgr_;
+
+  // Contains multiple optimization passes to optimize modules
+  boost::scoped_ptr<llvm::PassManager> module_pass_mgr_;
 
   // Object to build IR
   boost::scoped_ptr<LlvmBuilder> builder_;

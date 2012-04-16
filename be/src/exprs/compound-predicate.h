@@ -24,9 +24,12 @@ class CompoundPredicate: public Predicate {
  private:
   friend class OpcodeRegistry;
 
-  static void* AndComputeFunction(Expr* e, TupleRow* row);
-  static void* OrComputeFunction(Expr* e, TupleRow* row);
-  static void* NotComputeFunction(Expr* e, TupleRow* row);
+  llvm::Function* CodegenNot(LlvmCodeGen* codegen);
+  llvm::Function* CodegenBinary(LlvmCodeGen* codegen);
+
+  static void* AndComputeFn(Expr* e, TupleRow* row);
+  static void* OrComputeFn(Expr* e, TupleRow* row);
+  static void* NotComputeFn(Expr* e, TupleRow* row);
 };
 
 }

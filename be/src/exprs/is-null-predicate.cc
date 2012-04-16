@@ -12,7 +12,7 @@ using namespace llvm;
 
 namespace impala {
 
-void* IsNullPredicate::ComputeFunction(Expr* e, TupleRow* row) {
+void* IsNullPredicate::ComputeFn(Expr* e, TupleRow* row) {
   IsNullPredicate* p = static_cast<IsNullPredicate*>(e);
   // assert(p->children_.size() == 1);
   Expr* op = e->children()[0];
@@ -28,7 +28,7 @@ IsNullPredicate::IsNullPredicate(const TExprNode& node)
 
 Status IsNullPredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   RETURN_IF_ERROR(Expr::PrepareChildren(state, row_desc));
-  compute_function_ = ComputeFunction;
+  compute_fn_ = ComputeFn;
   return Status::OK;
 }
 
@@ -70,7 +70,7 @@ Function* IsNullPredicate::Codegen(LlvmCodeGen* codegen) {
   builder->SetInsertPoint(entry_block);
   
   // Call child function
-  CallFunction(codegen, function, child_function, ret_block, not_null_block);
+  CodegenCallFn(codegen, function, child_function, ret_block, not_null_block);
 
   builder->SetInsertPoint(not_null_block);
   builder->CreateBr(ret_block);
@@ -85,7 +85,7 @@ Function* IsNullPredicate::Codegen(LlvmCodeGen* codegen) {
     phi_node->addIncoming(codegen->true_value(), entry_block);
     phi_node->addIncoming(codegen->false_value(), not_null_block);
   }
-  SetIsNullReturnArg(codegen, function, false);
+  CodegenSetIsNullArg(codegen, function, false);
   builder->CreateRet(phi_node);
 
   if (!codegen->VerifyFunction(function)) return NULL;

@@ -76,21 +76,21 @@ Expr::Expr(PrimitiveType type)
     : opcode_(TExprOpcode::INVALID_OPCODE),
       is_slotref_(false),
       type_(type),
-      jitted_compute_function_(NULL) {
+      jitted_compute_fn_(NULL) {
 }
 
 Expr::Expr(const TExprNode& node)
     : opcode_(node.__isset.opcode ? node.opcode : TExprOpcode::INVALID_OPCODE),
       is_slotref_(false),
       type_(ThriftToType(node.type)),
-      jitted_compute_function_(NULL) {
+      jitted_compute_fn_(NULL) {
 }
 
 Expr::Expr(const TExprNode& node, bool is_slotref)
     : opcode_(node.__isset.opcode ? node.opcode : TExprOpcode::INVALID_OPCODE),
       is_slotref_(is_slotref),
       type_(ThriftToType(node.type)),
-      jitted_compute_function_(NULL) {
+      jitted_compute_fn_(NULL) {
 }
 
 Status Expr::CreateExprTree(ObjectPool* pool, const TExpr& texpr, Expr** root_expr) {
@@ -408,7 +408,7 @@ Status Expr::Prepare(Expr* root, RuntimeState* state, const RowDescriptor& row_d
     // jitted one for subtrees (and not just entire trees).
     if (codegen_fn != NULL) {
       // Replace the compute function with the jitted function
-      root->SetComputeFunction(codegen_fn, scratch_size);
+      root->SetComputeFn(codegen_fn, scratch_size);
     } 
   }
   return Status::OK;
@@ -418,8 +418,8 @@ Status Expr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   PrepareChildren(state, row_desc);
   // Not all exprs have opcodes (i.e. literals, agg-exprs)
   DCHECK(opcode_ != TExprOpcode::INVALID_OPCODE);
-  compute_function_ = OpcodeRegistry::Instance()->GetFunction(opcode_);
-  if (compute_function_ == NULL) {
+  compute_fn_ = OpcodeRegistry::Instance()->GetFunction(opcode_);
+  if (compute_fn_ == NULL) {
     stringstream out;
     out << "Expr::Prepare(): Opcode: " << opcode_ << " does not have a registry entry. ";
     return Status(out.str());
@@ -442,7 +442,7 @@ string Expr::DebugString() const {
   if (opcode_ != TExprOpcode::INVALID_OPCODE) {
     out << " opcode=" << opcode_;
   }
-  out << " jitted=" << (jitted_compute_function_ == NULL ? "false" : "true");
+  out << " jitted=" << (jitted_compute_fn_ == NULL ? "false" : "true");
   if (!children_.empty()) {
     out << " children=" << DebugString(children_);
   }
@@ -503,7 +503,7 @@ Value* Expr::GetNullReturnValue(LlvmCodeGen* codegen) {
   }
 }
 
-void Expr::SetIsNullReturnArg(LlvmCodeGen* codegen, Function* function, bool val) {
+void Expr::CodegenSetIsNullArg(LlvmCodeGen* codegen, Function* function, bool val) {
   Function::arg_iterator func_args = function->arg_begin();
   ++func_args;
   ++func_args;
@@ -512,7 +512,7 @@ void Expr::SetIsNullReturnArg(LlvmCodeGen* codegen, Function* function, bool val
   codegen->builder()->CreateStore(value, is_null_ptr);
 }
 
-Value* Expr::CallFunction(LlvmCodeGen* codegen, Function* parent, Function* child,
+Value* Expr::CodegenCallFn(LlvmCodeGen* codegen, Function* parent, Function* child,
     BasicBlock* null_block, BasicBlock* not_null_block) {
   Function::arg_iterator func_args = parent->arg_begin();
   Value* row_ptr = func_args++;
@@ -526,58 +526,58 @@ Value* Expr::CallFunction(LlvmCodeGen* codegen, Function* parent, Function* chil
 }
   
 // typedefs for jitted compute functions  
-typedef bool (*BoolComputeFunction)(TupleRow*, char* , bool*);
-typedef int8_t (*TinyIntComputeFunction)(TupleRow*, char*, bool*);
-typedef int16_t (*SmallIntComputeFunction)(TupleRow*, char*, bool*);
-typedef int32_t (*IntComputeFunction)(TupleRow*, char*, bool*);
-typedef int64_t (*BigintComputeFunction)(TupleRow*, char*, bool*);
-typedef float (*FloatComputeFunction)(TupleRow*, char*, bool*);
-typedef double (*DoubleComputeFunction)(TupleRow*, char*, bool*);
+typedef bool (*BoolComputeFn)(TupleRow*, char* , bool*);
+typedef int8_t (*TinyIntComputeFn)(TupleRow*, char*, bool*);
+typedef int16_t (*SmallIntComputeFn)(TupleRow*, char*, bool*);
+typedef int32_t (*IntComputeFn)(TupleRow*, char*, bool*);
+typedef int64_t (*BigintComputeFn)(TupleRow*, char*, bool*);
+typedef float (*FloatComputeFn)(TupleRow*, char*, bool*);
+typedef double (*DoubleComputeFn)(TupleRow*, char*, bool*);
 
-void* Expr::JittedComputeFunction(Expr* expr, TupleRow* row) {
-  DCHECK(expr->jitted_compute_function_ != NULL);
-  void* func = expr->jitted_compute_function_;
+void* Expr::JittedComputeFn(Expr* expr, TupleRow* row) {
+  DCHECK(expr->jitted_compute_fn_ != NULL);
+  void* func = expr->jitted_compute_fn_;
   void* result = NULL;
   bool is_null = false;
   switch (expr->type()) {
     case TYPE_BOOLEAN: {
-      BoolComputeFunction new_func = reinterpret_cast<BoolComputeFunction>(func);
+      BoolComputeFn new_func = reinterpret_cast<BoolComputeFn>(func);
       expr->result_.bool_val = new_func(row, NULL, &is_null);
       result = &(expr->result_.bool_val);
       break;
     }
     case TYPE_TINYINT: {
-      TinyIntComputeFunction new_func = reinterpret_cast<TinyIntComputeFunction>(func);
+      TinyIntComputeFn new_func = reinterpret_cast<TinyIntComputeFn>(func);
       expr->result_.tinyint_val = new_func(row, NULL, &is_null);
       result = &(expr->result_.tinyint_val);
       break;
     }
     case TYPE_SMALLINT: {
-      SmallIntComputeFunction new_func = reinterpret_cast<SmallIntComputeFunction>(func);
+      SmallIntComputeFn new_func = reinterpret_cast<SmallIntComputeFn>(func);
       expr->result_.smallint_val = new_func(row, NULL, &is_null);
       result = &(expr->result_.smallint_val);
       break;
     }
     case TYPE_INT: {
-      IntComputeFunction new_func = reinterpret_cast<IntComputeFunction>(func);
+      IntComputeFn new_func = reinterpret_cast<IntComputeFn>(func);
       expr->result_.int_val = new_func(row, NULL, &is_null);
       result = &(expr->result_.int_val);
       break;
     }
     case TYPE_BIGINT: {
-      BigintComputeFunction new_func = reinterpret_cast<BigintComputeFunction>(func);
+      BigintComputeFn new_func = reinterpret_cast<BigintComputeFn>(func);
       expr->result_.bigint_val = new_func(row, NULL, &is_null);
       result = &(expr->result_.bigint_val);
       break;
     }
     case TYPE_FLOAT: {
-      FloatComputeFunction new_func = reinterpret_cast<FloatComputeFunction>(func);
+      FloatComputeFn new_func = reinterpret_cast<FloatComputeFn>(func);
       expr->result_.float_val = new_func(row, NULL, &is_null);
       result = &(expr->result_.float_val);
       break;
     }
     case TYPE_DOUBLE: {
-      DoubleComputeFunction new_func = reinterpret_cast<DoubleComputeFunction>(func);
+      DoubleComputeFn new_func = reinterpret_cast<DoubleComputeFn>(func);
       expr->result_.double_val = new_func(row, NULL, &is_null);
       result = &(expr->result_.double_val);
       break;
@@ -590,10 +590,10 @@ void* Expr::JittedComputeFunction(Expr* expr, TupleRow* row) {
   return result;
 }
 
-void Expr::SetComputeFunction(void* jitted_function, int scratch_size) {
+void Expr::SetComputeFn(void* jitted_function, int scratch_size) {
   DCHECK_EQ(scratch_size, 0);
-  jitted_compute_function_ = jitted_function;
-  compute_function_ = Expr::JittedComputeFunction;
+  jitted_compute_fn_ = jitted_function;
+  compute_fn_ = Expr::JittedComputeFn;
 }
 
 bool Expr::IsJittable(LlvmCodeGen* codegen) const {
@@ -611,3 +611,4 @@ void* Expr::CodegenExprTree(LlvmCodeGen* codegen, int* scratch_size) {
   }
   return codegen->JitFunction(function, scratch_size);
 }
+

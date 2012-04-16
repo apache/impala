@@ -104,7 +104,7 @@ struct ExprValue {
 class Expr {
  public:
   // typedef for compute functions.
-  typedef void* (*ComputeFunction)(Expr*, TupleRow*);
+  typedef void* (*ComputeFn)(Expr*, TupleRow*);
 
   // Evaluate expr and return pointer to result. The result is
   // valid as long as 'row' doesn't change.
@@ -153,7 +153,7 @@ class Expr {
   static Status CreateExprTrees(ObjectPool* pool, const std::vector<TExpr>& texprs,
                                 std::vector<Expr*>* exprs);
 
-  // Prepare expr tree for evaluation, setting the compute_function_ for each node
+  // Prepare expr tree for evaluation, setting the compute_fn_ for each node
   // in the tree. If the expr tree can be jit compiled, it will set the jitted function 
   // as the compute function for the root. 
   static Status Prepare(Expr* root, RuntimeState* state, const RowDescriptor& row_desc);
@@ -209,7 +209,7 @@ class Expr {
   Status PrepareChildren(RuntimeState* state, const RowDescriptor& row_desc);
 
   // function to evaluate expr; typically set in Prepare()
-  ComputeFunction compute_function_;
+  ComputeFn compute_fn_;
 
   // function opcode
   TExprOpcode::type opcode_;
@@ -223,23 +223,24 @@ class Expr {
 
   // Create a compute function prototype.
   // The signature is:
-  // <expr ret type> ComputeFunction(TupleRow* row, char* state_data, bool* is_null)
+  // <expr ret type> ComputeFn(TupleRow* row, char* state_data, bool* is_null)
   llvm::Function* CreateComputeFnPrototype(LlvmCodeGen* codegen, const std::string& name);
 
   // Create dummy ret value for NULL result for this expr's return type
   llvm::Value* GetNullReturnValue(LlvmCodeGen* codegen);
 
-  // Sets the is_null return arg to 'val'
-  void SetIsNullReturnArg(LlvmCodeGen* codegen, llvm::Function* function, bool val);
+  // Codegen IR to set the out is_null return arg to 'val'
+  void CodegenSetIsNullArg(LlvmCodeGen* codegen, llvm::Function* function, bool val);
 
-  // Call a child compute function, passing the arguments from this compute function.
+  // Codegen call to child compute function, passing the arguments from this 
+  // compute function.
   // Checks NULL return from child and will conditionally branch to the 
   // null/not_null block of the parent function
   // - parent: the calling function.  A call instruction will be added to this function.
   // - child: the child function to call 
   // - null_block: block in parent function to jump to if the child is null
   // - not_null_block: block in parent function to jump to if the child is not null
-  llvm::Value* CallFunction(LlvmCodeGen* codegen, llvm::Function* parent, 
+  llvm::Value* CodegenCallFn(LlvmCodeGen* codegen, llvm::Function* parent, 
       llvm::Function* child, llvm::BasicBlock* null_block, 
       llvm::BasicBlock* not_null_block);
 
@@ -266,7 +267,7 @@ class Expr {
       Expr** root_expr);
 
   // Update the compute function with the jitted function.  
-  void SetComputeFunction(void* jitted_function, int scratch_size);
+  void SetComputeFn(void* jitted_function, int scratch_size);
 
   // Jit compile expr tree.  Returns a function pointer to the jitted function.
   // scratch_size is an out parameter for the required size of the scratch buffer
@@ -276,15 +277,15 @@ class Expr {
 
   // Compute function wrapper for jitted Expr trees.  This is temporary until 
   // we are generating loops to evaluate batches of tuples.
-  // This is a shim to convert the old ComputeFunction signature to the code-
+  // This is a shim to convert the old ComputeFn signature to the code-
   // generated signature.  It will call the underlying jitted function and
   // stuff the result back in expr->result_.
-  static void* JittedComputeFunction(Expr* expr, TupleRow* row);
+  static void* JittedComputeFn(Expr* expr, TupleRow* row);
 
   // This is a function pointer to the compute function.  The return type
   // for jitted functions depends on the Expr so we need to store it as
   // a void* and then cast it on invocation.
-  void* jitted_compute_function_;
+  void* jitted_compute_fn_;
 
   // Size of scratch buffer necessary to call jitted compute function.
   int scratch_buffer_size_;
@@ -292,14 +293,14 @@ class Expr {
 
 // Reference to a single slot of a tuple.
 // We inline this here in order for Expr::GetValue() to be able
-// to reference SlotRef::ComputeFunction() directly.
+// to reference SlotRef::ComputeFn() directly.
 // Splitting it up into separate .h files would require circular #includes.
 class SlotRef : public Expr {
  public:
   SlotRef(const TExprNode& node);
 
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
-  static void* ComputeFunction(Expr* expr, TupleRow* row);
+  static void* ComputeFn(Expr* expr, TupleRow* row);
   virtual std::string DebugString() const;
   virtual bool IsConstant() const { return false; }
 
@@ -312,7 +313,7 @@ class SlotRef : public Expr {
   const SlotId slot_id_;
 };
 
-inline void* SlotRef::ComputeFunction(Expr* expr, TupleRow* row) {
+inline void* SlotRef::ComputeFn(Expr* expr, TupleRow* row) {
   SlotRef* ref = static_cast<SlotRef*>(expr);
   Tuple* t = row->GetTuple(ref->tuple_idx_);
   if (t == NULL || t->IsNull(ref->null_indicator_offset_)) return NULL;
@@ -322,9 +323,9 @@ inline void* SlotRef::ComputeFunction(Expr* expr, TupleRow* row) {
 inline void* Expr::GetValue(TupleRow* row) {
   DCHECK(type_ != INVALID_TYPE);
   if (is_slotref_) {
-    return SlotRef::ComputeFunction(this, row);
+    return SlotRef::ComputeFn(this, row);
   } else {
-    return compute_function_(this, row);
+    return compute_fn_(this, row);
   }
 }
 

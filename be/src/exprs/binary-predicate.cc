@@ -69,12 +69,12 @@ Function* BinaryPredicate::Codegen(LlvmCodeGen* codegen) {
 
   builder->SetInsertPoint(entry_block);
   // Call lhs function
-  Value* lhs_value = CallFunction(codegen, function, lhs_function, 
+  Value* lhs_value = CodegenCallFn(codegen, function, lhs_function, 
       ret_block, lhs_not_null_block);
 
   // Lhs not null, eval rhs
   builder->SetInsertPoint(lhs_not_null_block);
-  Value* rhs_value = CallFunction(codegen, function, rhs_function,
+  Value* rhs_value = CodegenCallFn(codegen, function, rhs_function,
       ret_block, rhs_not_null_block);
 
   // rhs not null, do arithmetic op

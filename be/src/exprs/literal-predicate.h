@@ -23,7 +23,7 @@ class LiteralPredicate: public Predicate {
   virtual std::string DebugString() const;
 
  private:
-  static void* ComputeFunction(Expr* e, TupleRow* row);
+  static void* ComputeFn(Expr* e, TupleRow* row);
   bool is_null_;
 };
 

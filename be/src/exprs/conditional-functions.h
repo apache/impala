@@ -23,7 +23,7 @@ class ConditionalFunctions {
   static void* CoalesceString(Expr* e, TupleRow* row);
   static void* CoalesceTimestamp(Expr* e, TupleRow* row);
   // Compute function of case expr if its has_case_expr_ is false.
-  static void* NoCaseComputeFunction(Expr* e, TupleRow* row);
+  static void* NoCaseComputeFn(Expr* e, TupleRow* row);
 };
 
 }

@@ -30,7 +30,7 @@ void* BoolLiteral::ReturnValue(Expr* e, TupleRow* row) {
 
 Status BoolLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   DCHECK_EQ(children_.size(), 0);
-  compute_function_ = ReturnValue;
+  compute_fn_ = ReturnValue;
   return Status::OK;
 }
 
@@ -55,7 +55,7 @@ Function* BoolLiteral::Codegen(LlvmCodeGen* codegen) {
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
 
   builder->SetInsertPoint(entry_block);
-  SetIsNullReturnArg(codegen, function, false);
+  CodegenSetIsNullArg(codegen, function, false);
   builder->CreateRet(ConstantInt::get(context, APInt(1, result_.bool_val, true)));
   
   if (!codegen->VerifyFunction(function)) return NULL;

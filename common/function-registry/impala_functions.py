@@ -2,24 +2,29 @@
 
 # This is a list of all the functions that are not auto-generated.
 # It contains all the meta data that describes the function.  The format is:
-# <function name>, <return_type>, [<args>], <backend function name>, [<sql function aliases>]
+# <function name>, <return_type>, [<args>], <backend function name>, [<sql aliases>]
 #
 # 'function name' is the base of what the opcode enum will be generated from.  It does not
 # have to be unique, the script will mangle the name with the signature if necessary.
 #
-# 'sql function aliases' are the function names that can be used from sql.  They are optional
-# and there can be multiple aliases for a function.
+# 'sql aliases' are the function names that can be used from sql.  They are 
+# optional and there can be multiple aliases for a function.
 #
 # This is combined with the list in generated_functions to code-gen the opcode
 # registry in the FE and BE.
 
 functions = [
-  ['Compound_And', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], 'CompoundPredicate::AndComputeFunction', []],
-  ['Compound_Or', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], 'CompoundPredicate::OrComputeFunction', []],
-  ['Compound_Not', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], 'CompoundPredicate::NotComputeFunction', []],
+  ['Compound_And', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], \
+        'CompoundPredicate::AndComputeFn', []],
+  ['Compound_Or', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], \
+        'CompoundPredicate::OrComputeFn', []],
+  ['Compound_Not', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], \
+        'CompoundPredicate::NotComputeFn', []],
 
-  ['Constant_Regex', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], 'LikePredicate::ConstantRegexFn', []],
-  ['Constant_Substring', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], 'LikePredicate::ConstantSubstringFn', []],
+  ['Constant_Regex', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], \
+        'LikePredicate::ConstantRegexFn', []],
+  ['Constant_Substring', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN'], \
+        'LikePredicate::ConstantSubstringFn', []],
   ['Like', 'BOOLEAN', ['STRING', 'STRING'], 'LikePredicate::LikeFn', []],
   ['Regex', 'BOOLEAN', ['STRING', 'STRING'], 'LikePredicate::RegexFn', []],
 
@@ -52,8 +57,10 @@ functions = [
   ['Math_Hex', 'STRING', ['BIGINT'], 'MathFunctions::HexInt', ['hex']],
   ['Math_Hex', 'STRING', ['STRING'], 'MathFunctions::HexString', ['hex']],
   ['Math_Unhex', 'STRING', ['STRING'], 'MathFunctions::Unhex', ['unhex']],
-  ['Math_Conv', 'STRING', ['BIGINT', 'TINYINT', 'TINYINT'], 'MathFunctions::ConvInt', ['conv']],
-  ['Math_Conv', 'STRING', ['STRING', 'TINYINT', 'TINYINT'], 'MathFunctions::ConvString', ['conv']],
+  ['Math_Conv', 'STRING', ['BIGINT', 'TINYINT', 'TINYINT'], \
+        'MathFunctions::ConvInt', ['conv']],
+  ['Math_Conv', 'STRING', ['STRING', 'TINYINT', 'TINYINT'], \
+        'MathFunctions::ConvString', ['conv']],
   ['Math_Pmod', 'BIGINT', ['BIGINT', 'BIGINT'], 'MathFunctions::PmodBigInt', ['pmod']],
   ['Math_Pmod', 'DOUBLE', ['DOUBLE', 'DOUBLE'], 'MathFunctions::PmodDouble', ['pmod']],
   ['Math_Positive', 'BIGINT', ['BIGINT'], 'MathFunctions::PositiveBigInt', ['positive']],
@@ -61,8 +68,10 @@ functions = [
   ['Math_Negative', 'BIGINT', ['BIGINT'], 'MathFunctions::NegativeBigInt', ['negative']],
   ['Math_Negative', 'DOUBLE', ['DOUBLE'], 'MathFunctions::NegativeDouble', ['negative']],
 
-  ['String_Substring', 'STRING', ['STRING', 'INT'], 'StringFunctions::Substring', ['substr', 'substring']],
-  ['String_Substring', 'STRING', ['STRING', 'INT', 'INT'], 'StringFunctions::Substring', ['substr', 'substring']],
+  ['String_Substring', 'STRING', ['STRING', 'INT'], \
+        'StringFunctions::Substring', ['substr', 'substring']],
+  ['String_Substring', 'STRING', ['STRING', 'INT', 'INT'], \
+        'StringFunctions::Substring', ['substr', 'substring']],
 # left and right are key words, leave them out for now.
   ['String_Left', 'STRING', ['STRING', 'INT'], 'StringFunctions::Left', ['strleft']],
   ['String_Right', 'STRING', ['STRING', 'INT'], 'StringFunctions::Right', ['strright']],
@@ -76,45 +85,73 @@ functions = [
   ['String_Space', 'STRING', ['INT'], 'StringFunctions::Space', ['space']],
   ['String_Repeat', 'STRING', ['STRING', 'INT'], 'StringFunctions::Repeat', ['repeat']],
   ['String_Ascii', 'INT', ['STRING'], 'StringFunctions::Ascii', ['ascii']],
-  ['String_Lpad', 'STRING', ['STRING', 'INT', 'STRING'], 'StringFunctions::Lpad', ['lpad']],
-  ['String_Rpad', 'STRING', ['STRING', 'INT', 'STRING'], 'StringFunctions::Rpad', ['rpad']],
+  ['String_Lpad', 'STRING', ['STRING', 'INT', 'STRING'], \
+        'StringFunctions::Lpad', ['lpad']],
+  ['String_Rpad', 'STRING', ['STRING', 'INT', 'STRING'], \
+        'StringFunctions::Rpad', ['rpad']],
   ['String_Instr', 'INT', ['STRING', 'STRING'], 'StringFunctions::Instr', ['instr']],
   ['String_Locate', 'INT', ['STRING', 'STRING'], 'StringFunctions::Locate', ['locate']],
-  ['String_Locate', 'INT', ['STRING', 'STRING', 'INT'], 'StringFunctions::LocatePos', ['locate']],
-  ['String_Regexp_Extract', 'STRING', ['STRING', 'STRING', 'INT'], 'StringFunctions::RegexpExtract', ['regexp_extract']],
-  ['String_Regexp_Replace', 'STRING', ['STRING', 'STRING', 'STRING'], 'StringFunctions::RegexpReplace', ['regexp_replace']],
+  ['String_Locate', 'INT', ['STRING', 'STRING', 'INT'], \
+        'StringFunctions::LocatePos', ['locate']],
+  ['String_Regexp_Extract', 'STRING', ['STRING', 'STRING', 'INT'], \
+        'StringFunctions::RegexpExtract', ['regexp_extract']],
+  ['String_Regexp_Replace', 'STRING', ['STRING', 'STRING', 'STRING'], \
+        'StringFunctions::RegexpReplace', ['regexp_replace']],
   ['String_Concat', 'STRING', ['STRING', '...'], 'StringFunctions::Concat', ['concat']],
-  ['String_Concat_Ws', 'STRING', ['STRING', 'STRING', '...'], 'StringFunctions::ConcatWs', ['concat_ws']],
-  ['String_Find_In_Set', 'INT', ['STRING', 'STRING'], 'StringFunctions::FindInSet', ['find_in_set']],
-  ['String_Parse_Url', 'STRING', ['STRING', 'STRING'], 'StringFunctions::ParseUrl', ['parse_url']],
-  ['String_Parse_Url', 'STRING', ['STRING', 'STRING', 'STRING'], 'StringFunctions::ParseUrlKey', ['parse_url']],
+  ['String_Concat_Ws', 'STRING', ['STRING', 'STRING', '...'], \
+        'StringFunctions::ConcatWs', ['concat_ws']],
+  ['String_Find_In_Set', 'INT', ['STRING', 'STRING'], \
+        'StringFunctions::FindInSet', ['find_in_set']],
+  ['String_Parse_Url', 'STRING', ['STRING', 'STRING'], \
+        'StringFunctions::ParseUrl', ['parse_url']],
+  ['String_Parse_Url', 'STRING', ['STRING', 'STRING', 'STRING'], \
+        'StringFunctions::ParseUrlKey', ['parse_url']],
 
 # Timestamp Functions
-  ['Unix_Timestamp', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Unix', ['unix_timestamp']],
+  ['Unix_Timestamp', 'INT', ['TIMESTAMP'], \
+        'TimestampFunctions::Unix', ['unix_timestamp']],
   ['Timestamp_year', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Year', ['year']],
   ['Timestamp_month', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Month', ['month']],
   ['Timestamp_day', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Day', ['day']],
-  ['Timestamp_dayofmonth', 'INT', ['TIMESTAMP'], 'TimestampFunctions::DayOfMonth', ['dayofmonth']],
-  ['Timestamp_weekofyear', 'INT', ['TIMESTAMP'], 'TimestampFunctions::WeekOfYear', ['weekofyear']],
+  ['Timestamp_dayofmonth', 'INT', ['TIMESTAMP'], \
+        'TimestampFunctions::DayOfMonth', ['dayofmonth']],
+  ['Timestamp_weekofyear', 'INT', ['TIMESTAMP'], \
+        'TimestampFunctions::WeekOfYear', ['weekofyear']],
   ['Timestamp_hour', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Hour', ['hour']],
   ['Timestamp_minute', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Minute', ['minute']],
   ['Timestamp_second', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Second', ['second']],
-  ['Timestamp_to_date', 'STRING', ['TIMESTAMP'], 'TimestampFunctions::ToDate', ['to_date']],
-  ['Timestamp_date_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], 'TimestampFunctions::DateAdd', ['date_add']],
-  ['Timestamp_date_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], 'TimestampFunctions::DateSub', ['date_sub']],
-  ['Timestamp_diff', 'INT', ['TIMESTAMP', 'TIMESTAMP'], 'TimestampFunctions::DateDiff', ['date_diff']],
-  ['From_utc_timestamp', 'TIMESTAMP', ['TIMESTAMP', 'STRING'], 'TimestampFunctions::FromUtc', ['from_utc_timestamp']],
-  ['To_utc_timestamp', 'TIMESTAMP', ['TIMESTAMP', 'STRING'], 'TimestampFunctions::ToUtc', ['to_utc_timestamp']],
+  ['Timestamp_to_date', 'STRING', ['TIMESTAMP'], \
+        'TimestampFunctions::ToDate', ['to_date']],
+  ['Timestamp_date_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::DateAdd', ['date_add']],
+  ['Timestamp_date_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::DateSub', ['date_sub']],
+  ['Timestamp_diff', 'INT', ['TIMESTAMP', 'TIMESTAMP'], \
+        'TimestampFunctions::DateDiff', ['date_diff']],
+  ['From_utc_timestamp', 'TIMESTAMP', ['TIMESTAMP', 'STRING'], \
+        'TimestampFunctions::FromUtc', ['from_utc_timestamp']],
+  ['To_utc_timestamp', 'TIMESTAMP', ['TIMESTAMP', 'STRING'], \
+        'TimestampFunctions::ToUtc', ['to_utc_timestamp']],
 
 # Conditional Functions
-  ['Conditional_If', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN', 'BOOLEAN'], 'ConditionalFunctions::IfBool', ['if']],
-  ['Conditional_If', 'BIGINT', ['BOOLEAN', 'BIGINT', 'BIGINT'], 'ConditionalFunctions::IfInt', ['if']],
-  ['Conditional_If', 'DOUBLE', ['BOOLEAN', 'DOUBLE', 'DOUBLE'], 'ConditionalFunctions::IfFloat', ['if']],
-  ['Conditional_If', 'STRING', ['BOOLEAN', 'STRING', 'STRING'], 'ConditionalFunctions::IfString', ['if']],
-  ['Conditional_If', 'TIMESTAMP', ['BOOLEAN', 'TIMESTAMP', 'TIMESTAMP'], 'ConditionalFunctions::IfTimestamp', ['if']],
-  ['Conditional_Coalesce', 'BOOLEAN', ['BOOLEAN', '...'], 'ConditionalFunctions::CoalesceBool', ['coalesce']],
-  ['Conditional_Coalesce', 'BIGINT', ['BIGINT', '...'], 'ConditionalFunctions::CoalesceInt', ['coalesce']],
-  ['Conditional_Coalesce', 'DOUBLE', ['DOUBLE', '...'], 'ConditionalFunctions::CoalesceFloat', ['coalesce']],
-  ['Conditional_Coalesce', 'STRING', ['STRING', '...'], 'ConditionalFunctions::CoalesceString', ['coalesce']],
-  ['Conditional_Coalesce', 'TIMESTAMP', ['TIMESTAMP', '...'], 'ConditionalFunctions::CoalesceTimestamp', ['coalesce']],
+  ['Conditional_If', 'BOOLEAN', ['BOOLEAN', 'BOOLEAN', 'BOOLEAN'], \
+        'ConditionalFunctions::IfBool', ['if']],
+  ['Conditional_If', 'BIGINT', ['BOOLEAN', 'BIGINT', 'BIGINT'], \
+        'ConditionalFunctions::IfInt', ['if']],
+  ['Conditional_If', 'DOUBLE', ['BOOLEAN', 'DOUBLE', 'DOUBLE'], \
+        'ConditionalFunctions::IfFloat', ['if']],
+  ['Conditional_If', 'STRING', ['BOOLEAN', 'STRING', 'STRING'], \
+        'ConditionalFunctions::IfString', ['if']],
+  ['Conditional_If', 'TIMESTAMP', ['BOOLEAN', 'TIMESTAMP', 'TIMESTAMP'], \
+        'ConditionalFunctions::IfTimestamp', ['if']],
+  ['Conditional_Coalesce', 'BOOLEAN', ['BOOLEAN', '...'], \
+        'ConditionalFunctions::CoalesceBool', ['coalesce']],
+  ['Conditional_Coalesce', 'BIGINT', ['BIGINT', '...'], \
+        'ConditionalFunctions::CoalesceInt', ['coalesce']],
+  ['Conditional_Coalesce', 'DOUBLE', ['DOUBLE', '...'], \
+        'ConditionalFunctions::CoalesceFloat', ['coalesce']],
+  ['Conditional_Coalesce', 'STRING', ['STRING', '...'], \
+        'ConditionalFunctions::CoalesceString', ['coalesce']],
+  ['Conditional_Coalesce', 'TIMESTAMP', ['TIMESTAMP', '...'], \
+        'ConditionalFunctions::CoalesceTimestamp', ['coalesce']],
 ]

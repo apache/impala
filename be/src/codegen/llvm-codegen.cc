@@ -67,29 +67,104 @@ Status LlvmCodeGen::Init() {
   }
   
   function_pass_mgr_.reset(new FunctionPassManager(module_));
+  module_pass_mgr_.reset(new PassManager());
 
   // The creates below are just wrappers for calling new on the optimization pass object.
   // The function_pass_mgr_ will take ownership of the object for add, which is
   // why we don't delete them
+  module_pass_mgr_->add(new TargetData(*execution_engine_->getTargetData()));
   TargetData* target_data_pass = new TargetData(*execution_engine_->getTargetData());
   function_pass_mgr_->add(target_data_pass);
 
   inliner_.reset(new BasicInliner(target_data_pass));
-  // TODO: what optimization passes do we want to use? 
+  // These optimizations are based on the passes that clang uses with -O3.
+  // More details about the passes are here: http://llvm.org/docs/Passes.html
+  // Some passes are repeated since it is very possible that after some passes,
+  // the IR will benefit from running the same pass again.  The order of the passes
+  // is *very* important.  
+  // TODO: Loop optimizations are turned off until we have code that uses them.
   if (optimizations_enabled_) {
     // Provide basic AliasAnalysis support for GVN.
     function_pass_mgr_->add(createBasicAliasAnalysisPass());
-    // Promote allocas to registers.
-    function_pass_mgr_->add(createPromoteMemoryToRegisterPass());
-    // Do simple "peephole" optimizations and bit-twiddling optzns.
-    function_pass_mgr_->add(createInstructionCombiningPass());
-    // Reassociate expressions.
-    function_pass_mgr_->add(createReassociatePass());
-    // Eliminate Common SubExpressions.
-    function_pass_mgr_->add(createGVNPass());
     // Simplify the control flow graph (deleting unreachable blocks, etc).
     function_pass_mgr_->add(createCFGSimplificationPass());
+    // Break up struct stack allocas
+    function_pass_mgr_->add(createScalarReplAggregatesPass());
+    // Removes trivially redudant instructions
+    function_pass_mgr_->add(createEarlyCSEPass());
+
+    // Provide basic AliasAnalysis support for GVN.
+    module_pass_mgr_->add(createBasicAliasAnalysisPass());
+    // Optimize out global vars
+    module_pass_mgr_->add(createGlobalOptimizerPass());     
+    // Sparse Conditional Constant Propagation
+    module_pass_mgr_->add(createIPSCCPPass()); 
+    // Dead args elimination
+    module_pass_mgr_->add(createDeadArgEliminationPass());
+    // Do simple "peephole" optimizations and bit-twiddling optzns.
+    module_pass_mgr_->add(createInstructionCombiningPass());
+    // Simplify the control flow graph (deleting unreachable blocks, etc).
+    module_pass_mgr_->add(createCFGSimplificationPass());
+    // Set readonly/readnone attrs
+    module_pass_mgr_->add(createFunctionAttrsPass());
+    // Promote by reference arguments to by value if possible
+    module_pass_mgr_->add(createArgumentPromotionPass());
+    // Removes trivially redundant instructions
+    module_pass_mgr_->add(createEarlyCSEPass());
+    // Collapse dependent blocks based on condition propagation
+    module_pass_mgr_->add(createJumpThreadingPass());
+    module_pass_mgr_->add(createCorrelatedValuePropagationPass()); 
+    // Simplify the control flow graph (deleting unreachable blocks, etc).
+    module_pass_mgr_->add(createCFGSimplificationPass());
+    // Do simple "peephole" optimizations and bit-twiddling optzns.
+    module_pass_mgr_->add(createInstructionCombiningPass());
+    // Rearrange expressions for better constant propagation
+    module_pass_mgr_->add(createReassociatePass());
+    module_pass_mgr_->add(createLowerExpectIntrinsicPass());
+#if 0 // Loop optimizations
+    // Loop rotation
+    module_pass_mgr_->add(createLoopUnrollPass());
+    // Hoist loop invariants
+    module_pass_mgr_->add(createLICMPass());
+    // Loop unswitch optimization
+    module_pass_mgr_->add(createLoopUnswitchPass());
+    // Do simple "peephole" optimizations and bit-twiddling optzns.
+    module_pass_mgr_->add(createInstructionCombiningPass());
+    // Induction var optimization
+    module_pass_mgr_->add(createIndVarSimplifyPass());
+    // Rewrite loop idioms like memset.
+    module_pass_mgr_->add(createLoopIdiomPass());
+    // Remove dead loops
+    module_pass_mgr_->add(createLoopDeletionPass());
+    // Unroll loops
+    module_pass_mgr_->add(createLoopUnrollPass());
+    // Remove redundant instructions
+    module_pass_mgr_->add(createGVNPass());
+    // Remove unnecessary memcpys or collapse stores to memcpy/memset
+    module_pass_mgr_->add(createMemCpyOptPass());
+    // Sparse conditional constant propagation
+    module_pass_mgr_->add(createSCCPPass());
+    // Do simple "peephole" optimizations and bit-twiddling optzns.
+    module_pass_mgr_->add(createInstructionCombiningPass());
+    // Collapse dependent blocks based on condition propagation
+    module_pass_mgr_->add(createJumpThreadingPass());
+    module_pass_mgr_->add(createCorrelatedValuePropagationPass()); 
+#endif
+    // Dead store elimination
+    module_pass_mgr_->add(createDeadStoreEliminationPass());
+
+    // Delete dead instructions
+    module_pass_mgr_->add(createAggressiveDCEPass());
+    // Simplify the control flow graph (deleting unreachable blocks, etc).
+    module_pass_mgr_->add(createCFGSimplificationPass());
+    // Do simple "peephole" optimizations and bit-twiddling optzns.
+    module_pass_mgr_->add(createInstructionCombiningPass());
+    // Remove dead functions and globals
+    module_pass_mgr_->add(createGlobalDCEPass());
+    // Merge duplicate global constants
+    module_pass_mgr_->add(createConstantMergePass());
   }
+
   function_pass_mgr_->doInitialization();
 
   void_type_ = Type::getVoidTy(context());
@@ -207,8 +282,9 @@ void LlvmCodeGen::ClearModule() {
 
 void* LlvmCodeGen::JitFunction(Function* function, int* scratch_size) {
   if (optimizations_enabled_) {
-    inliner_->inlineFunctions();
     function_pass_mgr_->run(*function);
+    inliner_->inlineFunctions();
+    module_pass_mgr_->run(*module_);
   }
 
   if (verifier_enabled_) {

@@ -56,10 +56,10 @@ Status FloatLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc)
   DCHECK_EQ(children_.size(), 0);
   switch (type_) {
     case TYPE_FLOAT:
-      compute_function_ = ReturnFloatValue;
+      compute_fn_ = ReturnFloatValue;
       break;
     case TYPE_DOUBLE:
-      compute_function_ = ReturnDoubleValue;
+      compute_fn_ = ReturnDoubleValue;
       break;
     default:
       DCHECK(false) << "FloatLiteral::Prepare(): bad type: " << TypeToString(type_);
@@ -113,7 +113,7 @@ Function* FloatLiteral::Codegen(LlvmCodeGen* codegen) {
   }
 
   codegen->builder()->SetInsertPoint(entry_block);
-  SetIsNullReturnArg(codegen, function, false);
+  CodegenSetIsNullArg(codegen, function, false);
   builder->CreateRet(result);
   
   if (!codegen->VerifyFunction(function)) return NULL;

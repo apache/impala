@@ -159,7 +159,7 @@ void* ConditionalFunctions::CoalesceTimestamp(Expr* e, TupleRow* row) {
   return NULL;
 }
 
-void* ConditionalFunctions::NoCaseComputeFunction(Expr* e, TupleRow* row) {
+void* ConditionalFunctions::NoCaseComputeFn(Expr* e, TupleRow* row) {
   CaseExpr* expr = static_cast<CaseExpr*>(e);
   // Make sure we set the right compute function.
   DCHECK_EQ(expr->has_case_expr(), false);

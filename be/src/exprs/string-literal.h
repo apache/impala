@@ -24,7 +24,7 @@ class StringLiteral: public Expr {
   virtual std::string DebugString() const;
 
  private:
-  static void* ComputeFunction(Expr* e, TupleRow* row);
+  static void* ComputeFn(Expr* e, TupleRow* row);
 };
 
 }

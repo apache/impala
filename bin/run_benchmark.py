@@ -222,6 +222,7 @@ queries = [
    "order by SUM(adRevenue) desc limit 10", 5, 5],
   ["select pageRank, pageURL from rankings where pageRank > 10 "\
    "order by pageRank limit 100", 0, 5],
+  ["select count(*) from rankings where pageRank > 10 && pageRank < 25", 0, 5],
   ["select count(field) from grep10gb where field like '%xyz%'", 0, 1]
 ]
 

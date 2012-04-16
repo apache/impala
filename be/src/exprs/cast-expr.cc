@@ -61,7 +61,7 @@ Function* CastExpr::Codegen(LlvmCodeGen* codegen) {
   
   builder->SetInsertPoint(entry_block);
   // Call child function
-  Value* child_value = CallFunction(codegen, function, child_function, 
+  Value* child_value = CodegenCallFn(codegen, function, child_function, 
       ret_block, child_not_null_block);
   
   // Do the cast

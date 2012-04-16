@@ -80,13 +80,13 @@ Function* ArithmeticExpr::Codegen(LlvmCodeGen* codegen) {
   BasicBlock* ret_block = BasicBlock::Create(context, "ret", function);
 
   // Call lhs function
-  lhs_value = CallFunction(codegen, function, lhs_function, 
+  lhs_value = CodegenCallFn(codegen, function, lhs_function, 
       ret_block, GetNumChildren() == 2 ? compute_rhs_block : compute_arith_block);
 
   // Lhs not null, eval rhs
   if (GetNumChildren() == 2) {
     builder->SetInsertPoint(compute_rhs_block);
-    rhs_value = CallFunction(codegen, function, rhs_function,
+    rhs_value = CodegenCallFn(codegen, function, rhs_function,
         ret_block, compute_arith_block);
   }
 
@@ -167,7 +167,7 @@ Function* ArithmeticExpr::Codegen(LlvmCodeGen* codegen) {
   // Return block.  is_null return does not have to set explicitly, propagated from child
   // Use a phi node to coalesce results.
   builder->SetInsertPoint(ret_block);
-  int num_paths = GetNumChildren() == 1 ? 2 : 3;
+  int num_paths = 1 + GetNumChildren();
   PHINode* phi_node = builder->CreatePHI(return_type, num_paths, "tmp_phi");
   phi_node->addIncoming(GetNullReturnValue(codegen), entry_block);
   if (GetNumChildren() == 2) {

@@ -20,7 +20,7 @@ Status CaseExpr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   // Override compute function for this special case.
   // Otherwise keep the one provided by the OpCodeRegistry set in the parent's c'tor.
   if (!has_case_expr_) {
-    compute_function_ = ConditionalFunctions::NoCaseComputeFunction;
+    compute_fn_ = ConditionalFunctions::NoCaseComputeFn;
   }
   return Status::OK;
 }

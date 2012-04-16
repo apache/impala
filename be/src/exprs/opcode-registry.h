@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 #include <glog/logging.h>
-#include "exprs/expr.h"   // For ComputeFunction typedef
+#include "exprs/expr.h"   // For ComputeFn typedef
 #include "gen-cpp/Opcodes_types.h"
 
 namespace impala {
@@ -18,7 +18,7 @@ class OpcodeRegistry {
  public:
   // Returns the function for this opcode.  If the opcdoe is not valid,
   // this function returns NULL
-   Expr::ComputeFunction GetFunction(TExprOpcode::type opcode) {
+   Expr::ComputeFn GetFunction(TExprOpcode::type opcode) {
     int index = static_cast<int>(opcode);
     DCHECK_GE(index, 0);
     DCHECK_LT(index, functions_.size());
@@ -46,7 +46,7 @@ class OpcodeRegistry {
   void Init();
 
   // Add a function to the registry.
-  void Add(TExprOpcode::type opcode, const Expr::ComputeFunction& function) {
+  void Add(TExprOpcode::type opcode, const Expr::ComputeFn& function) {
     int index = static_cast<int>(opcode);
     DCHECK_LT(index, functions_.size());
     DCHECK_GE(index, 0);
@@ -54,7 +54,7 @@ class OpcodeRegistry {
   }
 
   static OpcodeRegistry* instance_;
-  std::vector<Expr::ComputeFunction> functions_;
+  std::vector<Expr::ComputeFn> functions_;
 };
 
 }

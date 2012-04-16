@@ -84,7 +84,7 @@ Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc
       substring_ = match_res.str(2);
       substring_sv_ = StringValue(const_cast<char*>(substring_.c_str()), substring_.size());
       substring_pattern_ = StringSearch(&substring_sv_);
-      compute_function_ = ConstantSubstringFn;
+      compute_fn_ = ConstantSubstringFn;
     } else {
       string re_pattern;
       if (opcode_ == TExprOpcode::LIKE) {
@@ -97,15 +97,15 @@ Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc
       } catch (bad_expression& e) {
         return Status("Invalid regular expression: " + pattern_str);
       }
-      compute_function_ = ConstantRegexFn;
+      compute_fn_ = ConstantRegexFn;
     }
   } else {
     switch (opcode_) {
       case TExprOpcode::LIKE:
-        compute_function_ = LikeFn;
+        compute_fn_ = LikeFn;
         break;
       case TExprOpcode::REGEX:
-        compute_function_ = RegexFn;
+        compute_fn_ = RegexFn;
         break;
       default:
         stringstream error;

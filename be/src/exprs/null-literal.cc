@@ -36,7 +36,7 @@ Function* NullLiteral::Codegen(LlvmCodeGen* codegen) {
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
 
   codegen->builder()->SetInsertPoint(entry_block);
-  SetIsNullReturnArg(codegen, function, true);
+  CodegenSetIsNullArg(codegen, function, true);
   codegen->builder()->CreateRet(GetNullReturnValue(codegen));
   
   if (!codegen->VerifyFunction(function)) return NULL;
