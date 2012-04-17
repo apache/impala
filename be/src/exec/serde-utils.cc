@@ -25,7 +25,7 @@ Status SerDeUtils::ReadInt(ByteStream* byte_stream, int32_t* integer) {
   uint8_t buf[sizeof(int32_t)];
   RETURN_IF_ERROR(SerDeUtils::ReadBytes(byte_stream, sizeof(int32_t),
     reinterpret_cast<uint8_t*>(&buf)));
-  *integer =  SerDeUtils::GetInt(buf);
+  *integer = SerDeUtils::GetInt(buf);
   return Status::OK;
 }
 
@@ -47,7 +47,7 @@ Status SerDeUtils::ReadVLong(ByteStream* byte_stream, int64_t* vlong) {
 
   int len = DecodeVIntSize(firstbyte);
   if (len == 1) {
-    *vlong = (int64_t) firstbyte;
+    *vlong = static_cast<int64_t>(firstbyte);
     return Status::OK;
   }
   --len;
@@ -62,7 +62,7 @@ Status SerDeUtils::ReadVLong(ByteStream* byte_stream, int64_t* vlong) {
   }
 
   if (IsNegativeVInt(firstbyte)) {
-    *vlong = *vlong ^ ((int64_t) - 1);
+    *vlong = *vlong ^ (static_cast<int64_t>(-1));
   }
   return Status::OK;
 }
@@ -76,7 +76,7 @@ int SerDeUtils::GetVLong(uint8_t* buf, int64_t offset, int64_t* vlong) {
 
   int len = DecodeVIntSize(firstbyte);
   if (len == 1) {
-    *vlong = (int64_t) firstbyte;
+    *vlong = static_cast<int64_t>(firstbyte);
     return len;
   }
 
@@ -156,11 +156,11 @@ std::string SerDeUtils::HexDump(const uint8_t* buf, int64_t length) {
   return ss.str();
 }
 
-bool SerDeUtils::IsNegativeVInt(int8_t byte) {
+inline bool SerDeUtils::IsNegativeVInt(int8_t byte) {
   return byte < -120 || (byte >= -112 && byte < 0);
 }
 
-int SerDeUtils::DecodeVIntSize(int8_t byte) {
+inline int SerDeUtils::DecodeVIntSize(int8_t byte) {
   if (byte >= -112) {
     return 1;
   } else if (byte < -120) {

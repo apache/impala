@@ -132,7 +132,7 @@ Status HdfsScanNode::InitNextScanRange(RuntimeState* state, bool* scan_ranges_fi
   RETURN_IF_ERROR(ExtractPartitionKeyValues(state, key_idx_to_slot_idx_));
 
   if (current_byte_stream_ == NULL) {
-    current_byte_stream_.reset(new HdfsByteStream(hdfs_connection_));
+    current_byte_stream_.reset(new HdfsByteStream(hdfs_connection_, this));
     RETURN_IF_ERROR(current_byte_stream_->Open(current_file_scan_ranges_->first));
 
     switch (plan_node_type_) {
@@ -170,9 +170,11 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   // One-time initialisation of state that is constant across scan ranges
   DCHECK(tuple_desc_->table_desc() != NULL);
 
-  // setup Hdfs specific counter
+  // set up Hdfs specific counters
   parse_time_counter_ =
-      ADD_COUNTER(runtime_profile(), "ParseTime", TCounterType::CPU_TICKS);
+      ADD_COUNTER(runtime_profile_, "ParseTime", TCounterType::CPU_TICKS);
+  memory_used_counter_ =
+      ADD_COUNTER(runtime_profile_, "MemoryUsed", TCounterType::BYTES);
 
   const HdfsTableDescriptor* hdfs_table =
     static_cast<const HdfsTableDescriptor*>(tuple_desc_->table_desc());
@@ -284,6 +286,8 @@ Status HdfsScanNode::Close(RuntimeState* state) {
   if (current_byte_stream_ != NULL) {
     RETURN_IF_ERROR(current_byte_stream_->Close());
   }
+  COUNTER_UPDATE(memory_used_counter_, tuple_pool_->peak_allocated_bytes());
+  current_scanner_.reset();
   RETURN_IF_ERROR(ExecNode::Close(state));
   return Status::OK;
 }

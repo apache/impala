@@ -101,7 +101,7 @@ Status GzipDecompressor::ProcessBlock(int input_length, uint8_t* input,
         // Not enough output space.
         DCHECK_EQ(output_length, 0);
         if (output_length != 0) {
-          return Status("Too small buffer passed to GzipDecompressor");
+          return Status("Too small a buffer passed to GzipDecompressor");
         }
         temp_memory_pool_->Clear();
         buffer_length_ *= 2;
@@ -159,7 +159,7 @@ Status BzipDecompressor::ProcessBlock(int input_length, uint8_t* input,
       // If the output_length was passed we must have enough room.
       DCHECK_EQ(output_length, 0);
       if (output_length != 0) {
-        return Status("Too small buffer passed to BzipDecompressor");
+        return Status("Too small a buffer passed to BzipDecompressor");
       }
       out_buffer_ = NULL;
     }

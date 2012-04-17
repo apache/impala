@@ -52,6 +52,11 @@ HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNode* scan_node,
       scan_node->GetNumPartitionKeys(), static_cast<char>(0xff)));
 }
 
+HdfsSequenceScanner::~HdfsSequenceScanner() {
+  COUNTER_UPDATE(scan_node_->memory_used_counter(),
+      unparsed_data_buffer_pool_->peak_allocated_bytes());
+}
+
 Status HdfsSequenceScanner::InitCurrentScanRange(RuntimeState* state,
                                                  HdfsScanRange* scan_range,
                                                  ByteStream* byte_stream) {
@@ -66,7 +71,7 @@ Status HdfsSequenceScanner::InitCurrentScanRange(RuntimeState* state,
   buffered_byte_stream_.reset(new BufferedByteStream(
       unbuffered_byte_stream_,
       is_blk_compressed_ ? FILE_BLOCK_SIZE : state->file_buffer_size(),
-      scan_node_->scanner_timer()));
+      scan_node_));
 
   // Check the Location (file name) to see if we have changed files.
   // If this a new file then we need to read and process the header.
@@ -162,9 +167,8 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
     RETURN_IF_ERROR(
         SerDeUtils::ReadBytes(buffered_byte_stream_.get(), in_size, &scratch_buf_));
 
-    RETURN_IF_ERROR(
-        decompressor_->ProcessBlock(in_size, &scratch_buf_[0],
-            0, &unparsed_data_buffer_));
+    RETURN_IF_ERROR(decompressor_->ProcessBlock(in_size,
+        &scratch_buf_[0], 0, &unparsed_data_buffer_));
     *record_ptr = unparsed_data_buffer_;
     // Read the length of the record.
     int size = SerDeUtils::GetVLong(*record_ptr, record_len);
@@ -382,18 +386,23 @@ Status HdfsSequenceScanner::ReadFileHeader() {
   RETURN_IF_ERROR(
       SerDeUtils::ReadBoolean(buffered_byte_stream_.get(), &is_blk_compressed_));
 
+  vector<char> codec;
   if (is_compressed_) {
     vector<char> codec;
     // For record-comrpessed data we always want to copy since they tend to be
     // small and occupy a bigger mempool chunk.
     if (!is_blk_compressed_) {
-        has_noncompact_strings_ = false;
+      has_noncompact_strings_ = false;
     }
     RETURN_IF_ERROR(SerDeUtils::ReadText(buffered_byte_stream_.get(), &codec));
     RETURN_IF_ERROR(Decompressor::CreateDecompressor(runtime_state_,
         unparsed_data_buffer_pool_.get(),
         !has_noncompact_strings_, codec, &decompressor_));
   }
+  VLOG(1) << unbuffered_byte_stream_->GetLocation() << ": "
+      << (is_compressed_ ?
+      (is_blk_compressed_ ?  "block compressed" : "record compresed") : "not compressed");
+  if (is_compressed_) VLOG(1) << string(&codec[0], codec.size());
 
   RETURN_IF_ERROR(ReadFileHeaderMetadata());
   RETURN_IF_ERROR(ReadSync());

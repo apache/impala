@@ -41,3 +41,26 @@ CREATE TABLE UserVisits_web_sequence_file_none (
   avgTimeOnSite int)
 row format delimited fields terminated by '|'  stored as sequencefile;
 
+DROP TABLE IF EXISTS grep1GB_rc_file_none;
+CREATE TABLE grep1GB_rc_file_none (field string) partitioned by (chunk int) stored as rcfile;
+
+DROP TABLE IF EXISTS Rankings_web_rc_file_none;
+CREATE TABLE Rankings_web_rc_file_none (
+  pageRank int,
+  pageURL string,
+  avgDuration int)
+row format delimited fields terminated by '|' stored as rcfile;
+
+DROP TABLE IF EXISTS UserVisits_web_rc_file_none;
+CREATE TABLE UserVisits_web_rc_file_none (
+  sourceIP string,
+  destURL string,
+  visitDate string,
+  adRevenue float,
+  userAgent string,
+  cCode string,
+  lCode string,
+  sKeyword string,
+  avgTimeOnSite int)
+row format delimited fields terminated by '|'  stored as rcfile;
+

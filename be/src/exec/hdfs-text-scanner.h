@@ -14,6 +14,7 @@ class HdfsTextScanner : public HdfsScanner {
  public:
   HdfsTextScanner(HdfsScanNode* scan_node, const TupleDescriptor* tuple_desc,
                   Tuple* template_tuple, MemPool* mem_pool);
+  virtual ~HdfsTextScanner();
   virtual Status Prepare(RuntimeState* state, ByteStream* byte_stream);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eosr);
 

@@ -19,4 +19,12 @@ SET hive.exec.dynamic.partition.mode=nonstrict;
 SET hive.exec.dynamic.partition=true;
 FROM UserVisits_web_text_none INSERT OVERWRITE TABLE UserVisits_web_sequence_file_none SELECT *;
 FROM Rankings_web_text_none INSERT OVERWRITE TABLE Rankings_web_sequence_file_none SELECT *;
+FROM grep1GB_text_none INSERT OVERWRITE TABLE grep1GB_rc_file_none PARTITION(chunk) SELECT *;
+
+SET hive.exec.compress.output=false;
+
+SET hive.exec.dynamic.partition.mode=nonstrict;
+SET hive.exec.dynamic.partition=true;
+FROM UserVisits_web_text_none INSERT OVERWRITE TABLE UserVisits_web_rc_file_none SELECT *;
+FROM Rankings_web_text_none INSERT OVERWRITE TABLE Rankings_web_rc_file_none SELECT *;
 

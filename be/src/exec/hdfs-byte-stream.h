@@ -4,6 +4,7 @@
 #define IMPALA_EXEC_HDFS_BYTE_STREAM_H_
 
 #include "exec/byte-stream.h"
+#include "exec/hdfs-scan-node.h"
 
 #include <string>
 #include <hdfs.h>
@@ -15,7 +16,9 @@ class Status;
 // A ByteStream implementation that is backed by an HDFS file
 class HdfsByteStream : public ByteStream {
  public:
-  HdfsByteStream(hdfsFS hdfs_connection);
+  // hdfs_connection: connection to the hadoop file system
+  // scan_node: scan node which uses this byte stream, passed to record statistics.
+  HdfsByteStream(hdfsFS hdfs_connection, HdfsScanNode* scan_node);
 
   virtual Status Open(const std::string& location);
   virtual Status Close();
@@ -27,6 +30,7 @@ class HdfsByteStream : public ByteStream {
  private:
   hdfsFS hdfs_connection_;
   hdfsFile hdfs_file_;
+  HdfsScanNode* scan_node_;
 };
 
 }

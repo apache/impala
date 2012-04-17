@@ -140,6 +140,7 @@ class HdfsSequenceScanner : public HdfsScanner {
   HdfsSequenceScanner(HdfsScanNode* scan_node, const TupleDescriptor* tuple_desc,
                       Tuple* template_tuple, MemPool* tuple_pool);
 
+  virtual ~HdfsSequenceScanner();
   virtual Status Prepare(RuntimeState* state, ByteStream* byte_stream);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eosr);
 

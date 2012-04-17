@@ -13,6 +13,9 @@ class Status;
 // A simple wrapper around sources of byte data
 class ByteStream {
  public:
+  ByteStream() 
+    : total_bytes_read_(0) {
+  }
   virtual ~ByteStream() { }
 
   // Opens a resource from supplied location, ready for reading
@@ -42,6 +45,8 @@ class ByteStream {
  protected:
   // Local copy of the resource location, for error-reporting
   std::string location_;
+
+  int64_t total_bytes_read_;
 };
 
 }

@@ -16,15 +16,18 @@ string impala::AppendHdfsErrorMessage(const string& message) {
   return ss.str();
 }
 
-HdfsByteStream::HdfsByteStream(hdfsFS hdfs_connection)
-    : hdfs_connection_(hdfs_connection),
-      hdfs_file_(NULL) {
+HdfsByteStream::HdfsByteStream(hdfsFS hdfs_connection, HdfsScanNode* scan_node)
+    : ByteStream(),
+      hdfs_connection_(hdfs_connection),
+      hdfs_file_(NULL),
+      scan_node_(scan_node) {
 }
 
 Status HdfsByteStream::GetPosition(int64_t* position) {
   // TODO: Deal with error codes from hdfsTell
   DCHECK(hdfs_file_ != NULL);
   *position = hdfsTell(hdfs_connection_, hdfs_file_);
+  DCHECK_NE(*position, -1);
   return Status::OK;
 }
 
@@ -58,6 +61,7 @@ Status HdfsByteStream::Read(uint8_t* buf, int64_t req_length, int64_t* actual_le
     n_read += last_read;
   }
 
+  total_bytes_read_ += n_read;
   *actual_length = n_read;
   return Status::OK;
 }
@@ -69,6 +73,7 @@ Status HdfsByteStream::Close() {
     return Status(AppendHdfsErrorMessage("Error closing HDFS file:" + location_));
   }
   hdfs_file_ = NULL;
+  COUNTER_UPDATE(scan_node_->bytes_read_counter(), total_bytes_read_);
   return Status::OK;
 }
 

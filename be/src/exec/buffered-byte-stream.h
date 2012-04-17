@@ -9,6 +9,7 @@
 
 #include "util/runtime-profile.h"
 #include "exec/byte-stream.h"
+#include "exec/hdfs-scan-node.h"
 #include "runtime/mem-pool.h"
 #include "common/status.h"
 
@@ -19,9 +20,14 @@ namespace impala {
 // TODO: This is needed because of the way SerDeUtils work, we should revisit this.
 class BufferedByteStream : public ByteStream {
  public:
+  // Inputs:
+  //   parent: byte stream the actually reads the data.
+  //   buffer_size: size of buffer to allocate.
+  //   scan_node: scan node using this byte stream, used for statistics.
   BufferedByteStream(ByteStream* parent,
-      int64_t buffer_size, RuntimeProfile::Counter* timer = NULL);
+      int64_t buffer_size, HdfsScanNode* scan_node);
 
+  virtual ~BufferedByteStream();
   virtual Status Open(const std::string& location);
   virtual Status Close();
   virtual Status Read(uint8_t* buf, int64_t req_len, int64_t* actual_len);
@@ -65,8 +71,8 @@ class BufferedByteStream : public ByteStream {
   // Amount of data in buffer.
   int64_t byte_buffer_len_;
 
-  RuntimeProfile::Counter* scanner_timer_;
-
+  // Scan node from caller so we can record counters.
+  HdfsScanNode* scan_node_;
 };
 
 }

@@ -125,7 +125,7 @@ public class QueryTest {
   private static final List<Boolean> ALL_LLVM_OPTIONS = ImmutableList.of(true, false);
 
   private static final Set<TableFormat> NON_COMPRESSED_TYPES =
-    Sets.newHashSet(TableFormat.TEXT, TableFormat.RCFILE);
+    Sets.newHashSet(TableFormat.TEXT);
   private static final List<CompressionFormat> ALL_COMPRESSION_FORMATS =
     ImmutableList.of(CompressionFormat.DEFAULT, CompressionFormat.GZIP,
         CompressionFormat.BZIP, CompressionFormat.SNAPPY);

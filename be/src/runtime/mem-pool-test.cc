@@ -38,21 +38,25 @@ TEST(MemPoolTest, Basic) {
   // size of the next allocated chunk (64K)
   p.Allocate(65 * 1024);
   EXPECT_EQ(p.total_allocated_bytes(), (12 + 8 + 65) * 1024);
+  EXPECT_EQ(p.peak_allocated_bytes(), (12 + 8 + 65) * 1024);
   EXPECT_EQ(p.GetTotalChunkSizes(), (16 + 32 + 65) * 1024);
 
   // Clear() resets allocated data, but doesn't remove any chunks
   p.Clear();
   EXPECT_EQ(p.total_allocated_bytes(), 0);
+  EXPECT_EQ(p.peak_allocated_bytes(), (12 + 8 + 65) * 1024);
   EXPECT_EQ(p.GetTotalChunkSizes(), (16 + 32 + 65) * 1024);
 
   // next allocation reuses existing chunks
   p.Allocate(1024);
   EXPECT_EQ(p.total_allocated_bytes(), 1024);
+  EXPECT_EQ(p.peak_allocated_bytes(), (12 + 8 + 65) * 1024);
   EXPECT_EQ(p.GetTotalChunkSizes(), (16 + 32 + 65) * 1024);
 
   // ... unless it doesn't fit into any available chunk
   p.Allocate(120 * 1024);
   EXPECT_EQ(p.total_allocated_bytes(), (1 + 120) * 1024);
+  EXPECT_EQ(p.peak_allocated_bytes(), (1 + 120) * 1024);
   EXPECT_EQ(p.GetTotalChunkSizes(), (130 + 16 + 32 + 65) * 1024);
 
   // ... Try another chunk that fits into an existing chunk
@@ -63,6 +67,7 @@ TEST(MemPoolTest, Basic) {
   // we're releasing 3 chunks, which get added to p2
   p2.AcquireData(&p, false);
   EXPECT_EQ(p.total_allocated_bytes(), 0);
+  EXPECT_EQ(p.peak_allocated_bytes(), (1 + 120 + 33) * 1024);
   EXPECT_EQ(p.GetTotalChunkSizes(), 32 * 1024);
 
   MemPool p3;

@@ -16,7 +16,8 @@ MemPool::MemPool()
   : current_chunk_idx_(-1),
     last_offset_conversion_chunk_idx_(-1),
     chunk_size_(0),
-    total_allocated_bytes_(0) {
+    total_allocated_bytes_(0),
+    peak_allocated_bytes_(0) {
 }
 
 MemPool::MemPool(int chunk_size)
@@ -24,7 +25,8 @@ MemPool::MemPool(int chunk_size)
     last_offset_conversion_chunk_idx_(-1),
     // round up chunk size to nearest 8 bytes
     chunk_size_(((chunk_size + 7) / 8) * 8),
-    total_allocated_bytes_(0) {
+    total_allocated_bytes_(0),
+    peak_allocated_bytes_(0) {
   DCHECK_GT(chunk_size_, 0);
 }
 
@@ -32,7 +34,8 @@ MemPool::MemPool(const vector<string>& chunks)
   : current_chunk_idx_(-1),
     last_offset_conversion_chunk_idx_(-1),
     chunk_size_(0),
-    total_allocated_bytes_(0) {
+    total_allocated_bytes_(0),
+    peak_allocated_bytes_(0) {
   if (chunks.empty()) return;
   chunks_.reserve(chunks.size());
   for (int i = 0; i < chunks.size(); ++i) {
@@ -143,6 +146,7 @@ void MemPool::AcquireData(MemPool* src, bool keep_current) {
     total_allocated_bytes_ += src->total_allocated_bytes_;
     src->total_allocated_bytes_ = 0;
   }
+  peak_allocated_bytes_ = std::max(total_allocated_bytes_, peak_allocated_bytes_);
 
   // recompute cumulative_allocated_bytes
   int start_idx = chunks_.size() - num_acquired_chunks;

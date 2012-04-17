@@ -8,9 +8,8 @@
 using namespace impala;
 using namespace std;
 
-BufferedByteStream::BufferedByteStream(ByteStream* parent,
-                                       int64_t buffer_size,
-                                       RuntimeProfile::Counter* timer)
+BufferedByteStream::BufferedByteStream(ByteStream* parent, int64_t buffer_size,
+                                       HdfsScanNode* scan_node)
     : parent_byte_stream_(parent),
       mem_pool_(new MemPool()),
       byte_buffer_size_(buffer_size),
@@ -18,7 +17,11 @@ BufferedByteStream::BufferedByteStream(ByteStream* parent,
       byte_offset_(0),
       byte_buffer_start_(0),
       byte_buffer_len_(0),
-      scanner_timer_(timer) {
+      scan_node_(scan_node) {
+}
+
+BufferedByteStream::~BufferedByteStream() {
+  COUNTER_UPDATE(scan_node_->memory_used_counter(), mem_pool_->peak_allocated_bytes());
 }
 
 Status BufferedByteStream::GetPosition(int64_t* position) {
@@ -48,9 +51,7 @@ Status BufferedByteStream::Read(uint8_t* buf, int64_t req_len, int64_t* actual_l
       if (byte_offset_ == byte_buffer_len_) {
         byte_buffer_start_ += byte_buffer_len_;
         {
-          if (scanner_timer_ != NULL) {
-            COUNTER_SCOPED_TIMER(scanner_timer_);
-          }
+          COUNTER_SCOPED_TIMER(scan_node_->scanner_timer());
           RETURN_IF_ERROR(parent_byte_stream_->Read(
               byte_buffer_, byte_buffer_size_, &byte_buffer_len_));
         }

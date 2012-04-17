@@ -29,7 +29,6 @@ add_library(Exec STATIC
   hbase-table-scanner.cc
   text-converter.cc
   topn-node.cc
-  rcfile-reader.cc
   serde-utils.cc
 )
 

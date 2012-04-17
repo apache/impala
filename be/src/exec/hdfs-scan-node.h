@@ -37,7 +37,6 @@ struct HdfsScanRange {
   }
 };
 
-
 // A ScanNode implementation that is used for all tables read directly
 // from HDFS-serialised data. An HdfsScanNode iterates over a set of
 // scan ranges, and constructs an appropriate HdfsScanner for each
@@ -87,6 +86,7 @@ class HdfsScanNode : public ScanNode {
   void IncrNumRowsReturned(int num_rows = 1) { num_rows_returned_ += num_rows; }
 
   RuntimeProfile::Counter* parse_time_counter() const { return parse_time_counter_; }
+  RuntimeProfile::Counter* memory_used_counter() const { return memory_used_counter_; }
 
  private:
   // Tuple id resolved in Prepare() to set tuple_desc_;
@@ -171,6 +171,9 @@ class HdfsScanNode : public ScanNode {
 
   // Hdfs specific counter
   RuntimeProfile::Counter* parse_time_counter_;       // time parsing files
+
+  // Account for peak memory used in the Hdfs scanner.
+  RuntimeProfile::Counter* memory_used_counter_;
 
   // Called once per scan-range to initialise (potentially) a new byte
   // stream and to call the same method on the current scanner.

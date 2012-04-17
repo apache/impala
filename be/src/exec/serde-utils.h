@@ -33,7 +33,7 @@ public:
   // Equivalent to java.io.DataInput.readInt()
   static Status ReadInt(ByteStream* byte_stream, int32_t* integer);
 
-  // Read an Integer from a buffer.
+  // Get an Integer from a buffer.
   static int32_t GetInt(uint8_t* buf) {
     return (buf[0] << 24)
         | (buf[1] << 16)
@@ -54,8 +54,15 @@ public:
   // Ref: org.apache.hadoop.io.WritableUtils.readVLong()
   static Status ReadVLong(ByteStream* byte_stream, int64_t* vlong);
 
-  // Read a variable-length Long value from a byte buffer.
+  // Get a variable-length Long value from a byte buffer.
   static int GetVLong(uint8_t* buf, int64_t* vlong);
+  static int GetVInt(uint8_t* buf, int32_t* vint) {
+    int64_t vlong;
+    int len = GetVLong(buf, &vlong);
+    *vint = static_cast<int32_t>(vlong);
+    return len;
+  }
+
 
   // Read a variable-length Long value from a byte buffer
   // starting at the specified byte offset.

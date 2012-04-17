@@ -81,6 +81,9 @@ then
     derby-hive-site.xml.template > hive-site.xml
 else
   echo "using mysql for metastore"
+  if [ $FORMAT_CLUSTER -eq 1 ]; then    
+    echo "drop database hive_$METASTORE_DB;" | mysql --user=hiveuser --password=password
+  fi
   perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
     mysql-hive-site.xml.template > hive-site.xml
 fi

@@ -52,7 +52,7 @@ parser.add_option("--reference_result_file_name", dest="reference_result_file",
 
 profile_output_file = 'build/release/service/profile.tmp'
 query_cmd = 'build/release/service/runquery -profile_output_file=""'
-gprof_cmd = 'google-pprof --text build/release/service/runquery %s | head -n 30'
+gprof_cmd = 'google-pprof --text build/release/service/runquery %s | head -n 60'
 result_single_regex = 'returned (\d*) rows? in (\d*).(\d*) s'
 result_multiple_regex = 'returned (\d*) rows? in (\d*).(\d*) s with stddev (\d*).(\d*)'
 

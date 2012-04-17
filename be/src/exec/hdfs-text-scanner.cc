@@ -46,6 +46,13 @@ HdfsTextScanner::HdfsTextScanner(HdfsScanNode* scan_node,
       field_delim, collection_delim, hdfs_table->escape_char()));
 }
 
+HdfsTextScanner::~HdfsTextScanner() {
+  COUNTER_UPDATE(scan_node_->memory_used_counter(),
+      byte_buffer_pool_->peak_allocated_bytes());
+  COUNTER_UPDATE(scan_node_->memory_used_counter(),
+      boundary_mem_pool_->peak_allocated_bytes());
+}
+
 Status HdfsTextScanner::InitCurrentScanRange(RuntimeState* state,
                                              HdfsScanRange* scan_range,
                                              ByteStream* byte_stream) {
@@ -101,7 +108,6 @@ Status HdfsTextScanner::FillByteBuffer(RuntimeState* state, int64_t size) {
   }
   byte_buffer_end_ = byte_buffer_ + byte_buffer_read_size_;
   byte_buffer_ptr_ = byte_buffer_;
-  COUNTER_UPDATE(scan_node_->bytes_read_counter(), byte_buffer_read_size_);
   return Status::OK;
 }
 

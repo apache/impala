@@ -98,6 +98,18 @@ CREATE TABLE AllTypes_seq_record_bzip LIKE AllTypes_seq;
 DROP TABLE IF EXISTS AllTypes_seq_record_snap;
 CREATE TABLE AllTypes_seq_record_snap LIKE AllTypes_seq;
 
+DROP TABLE IF EXISTS AllTypes_rc_def;
+CREATE TABLE AllTypes_rc_def LIKE AllTypes_rc;
+
+DROP TABLE IF EXISTS AllTypes_rc_gzip;
+CREATE TABLE AllTypes_rc_gzip LIKE AllTypes_rc;
+
+DROP TABLE IF EXISTS AllTypes_rc_bzip;
+CREATE TABLE AllTypes_rc_bzip LIKE AllTypes_rc;
+
+DROP TABLE IF EXISTS AllTypes_rc_snap;
+CREATE TABLE AllTypes_rc_snap LIKE AllTypes_rc;
+
 DROP TABLE IF EXISTS AllTypesSmall;
 CREATE TABLE AllTypesSmall LIKE AllTypes;
 
