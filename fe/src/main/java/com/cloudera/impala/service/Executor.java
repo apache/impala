@@ -12,8 +12,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
 import org.apache.thrift.protocol.TBinaryProtocol;
@@ -44,7 +42,7 @@ public class Executor {
   public static final int DEFAULT_MAX_ERRORS = 100;
   public static final int DEFAULT_BATCH_SIZE = 0;  // backend's default
 
-  private final Catalog catalog;
+  private Catalog catalog;
 
   // for async execution
   private Thread execThread;
@@ -53,6 +51,15 @@ public class Executor {
   public Executor(Catalog catalog) {
     this.catalog = catalog;
     init();
+  }
+
+  /**
+   * Updates the metadata catalog. Note: if using Executor from multiple
+   * threads the updated catalog is not guaranteed to be visible to other threads without
+   * a synchronisation point.
+   */
+  public void setCatalog(Catalog catalog) {
+    this.catalog = catalog;
   }
 
   private void init() {
@@ -217,14 +224,7 @@ public class Executor {
   }
 
   public static Catalog createCatalog() {
-    HiveMetaStoreClient client = null;
-    try {
-      client = new HiveMetaStoreClient(new HiveConf(Executor.class));
-    } catch (Exception e) {
-      System.err.println(e.getMessage());
-      throw new AssertionError("couldn't create HiveMetaStoreClient");
-    }
-    return new Catalog(client);
+    return new Catalog();
   }
 
   /**

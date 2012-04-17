@@ -6,17 +6,15 @@ import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
 
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.TestSchemaUtils;
 import com.cloudera.impala.service.Executor;
 import com.cloudera.impala.testutil.TestFileParser;
+import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.testutil.TestFileParser.Section;
 import com.cloudera.impala.testutil.TestFileParser.TestCase;
-import com.cloudera.impala.testutil.TestUtils;
 
 public class DataErrorsTest {
   private static Catalog catalog;
@@ -27,8 +25,7 @@ public class DataErrorsTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    HiveMetaStoreClient client = TestSchemaUtils.createClient();
-    catalog = new Catalog(client);
+    catalog = new Catalog();
     executor = new Executor(catalog);
     testErrorLog = new StringBuilder();
     tableList = new ArrayList<String>();

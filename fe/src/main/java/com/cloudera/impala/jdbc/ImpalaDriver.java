@@ -7,9 +7,6 @@ import java.sql.DriverPropertyInfo;
 import java.sql.SQLException;
 import java.util.Properties;
 
-import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
-
 import com.cloudera.impala.catalog.Catalog;
 
 /**
@@ -40,8 +37,7 @@ public class ImpalaDriver implements java.sql.Driver {
   private final Catalog catalog;
 
   protected ImpalaDriver() throws Exception {
-    HiveMetaStoreClient client = new HiveMetaStoreClient(new HiveConf(ImpalaDriver.class));
-    catalog = new Catalog(client);
+    catalog = new Catalog();
   }
 
   @Override

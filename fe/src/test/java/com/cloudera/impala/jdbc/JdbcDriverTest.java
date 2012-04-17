@@ -14,7 +14,6 @@ import java.util.Map;
 
 import junit.framework.Assert;
 
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.hsqldb.lib.HashSet;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -24,7 +23,6 @@ import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.TestSchemaUtils;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.service.Executor;
 import com.cloudera.impala.testutil.TestUtils;
@@ -40,8 +38,7 @@ public class JdbcDriverTest {
   @BeforeClass
   public static void setUp() throws Exception {
     Class.forName("com.cloudera.impala.jdbc.ImpalaDriver");
-    HiveMetaStoreClient client = TestSchemaUtils.createClient();
-    catalog = new Catalog(client);
+    catalog = new Catalog();
     executor = new Executor(catalog);
   }
 

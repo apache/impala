@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 
@@ -21,10 +22,13 @@ public class Catalog {
   // map from db name to DB
   private final Map<String, Db> dbs;
 
-  public Catalog(HiveMetaStoreClient msClient) {
+  private final HiveMetaStoreClient msClient;
+
+  public Catalog() {
     this.nextTableId = 0;
     this.dbs = Maps.newHashMap();
     try {
+      this.msClient = new HiveMetaStoreClient(new HiveConf(Catalog.class));
       List<String> msDbs = msClient.getAllDatabases();
       for (String dbName: msDbs) {
         Db db = Db.loadDb(this, msClient, dbName);

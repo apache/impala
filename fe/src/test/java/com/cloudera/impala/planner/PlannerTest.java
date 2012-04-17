@@ -10,7 +10,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -18,14 +17,13 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.TestSchemaUtils;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.testutil.TestFileParser;
+import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.testutil.TestFileParser.Section;
 import com.cloudera.impala.testutil.TestFileParser.TestCase;
-import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.Constants;
 import com.google.common.collect.Lists;
 
@@ -42,8 +40,7 @@ public class PlannerTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    HiveMetaStoreClient client = TestSchemaUtils.createClient();
-    catalog = new Catalog(client);
+    catalog = new Catalog();
     analysisCtxt = new AnalysisContext(catalog);
   }
 

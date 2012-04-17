@@ -14,7 +14,6 @@ import java.util.Map;
 
 import junit.framework.Assert;
 
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -52,8 +51,7 @@ public class AnalyzerTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    HiveMetaStoreClient client = TestSchemaUtils.createClient();
-    catalog = new Catalog(client);
+    catalog = new Catalog();
   }
 
   /**

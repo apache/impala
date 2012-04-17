@@ -12,7 +12,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.serde.Constants;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -24,9 +23,9 @@ import com.google.common.collect.Sets;
 public class CatalogTest {
   private static Catalog catalog;
 
-  @BeforeClass public static void setUp() throws Exception {
-    HiveMetaStoreClient client = TestSchemaUtils.createClient();
-    catalog = new Catalog(client);
+  @BeforeClass
+  public static void setUp() throws Exception {
+    catalog = new Catalog();
   }
 
   private void checkTableCols(Db db, String tblName, int numClusteringCols,

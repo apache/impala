@@ -5,13 +5,11 @@ import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
 
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.catalog.TestSchemaUtils;
 import com.cloudera.impala.service.Executor;
 import com.cloudera.impala.thrift.TQueryRequest;
 
@@ -21,8 +19,7 @@ public class ToSqlTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    HiveMetaStoreClient client = TestSchemaUtils.createClient();
-    Catalog catalog = new Catalog(client);
+    Catalog catalog = new Catalog();
     executor = new Executor(catalog);
   }
 

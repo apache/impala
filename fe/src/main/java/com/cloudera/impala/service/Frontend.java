@@ -4,8 +4,6 @@ package com.cloudera.impala.service;
 
 import java.util.UUID;
 
-import org.apache.hadoop.hive.conf.HiveConf;
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,8 +28,7 @@ public class Frontend {
   private int nextQueryId;
 
   public Frontend() throws MetaException {
-    HiveMetaStoreClient client = new HiveMetaStoreClient(new HiveConf(Frontend.class));
-    this.catalog = new Catalog(client);
+    this.catalog = new Catalog();
     this.nextQueryId = 0;
   }
 

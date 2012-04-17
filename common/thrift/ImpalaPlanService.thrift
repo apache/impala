@@ -15,5 +15,9 @@ service ImpalaPlanService {
   ImpalaBackendService.TQueryExecRequest
       GetExecRequest(1:string query, 2:i32 numNodes) throws (1:TException e);
 
+  // Force planservice to reload table metadata, in case it has changed due to e.g. an 
+  // insert
+  void RefreshMetadata();
+
   void ShutdownServer();
 }
