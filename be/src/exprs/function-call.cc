@@ -78,13 +78,13 @@ Function* FunctionCall::Codegen(LlvmCodeGen* codegen) {
   BasicBlock* ret_block = BasicBlock::Create(context, "ret_block", function);
 
   builder->SetInsertPoint(entry_block);
-  scoped_ptr<LlvmCodeGen::FunctionPrototype> prototype;
+  scoped_ptr<LlvmCodeGen::FnPrototype> prototype;
   Type* ret_type = NULL;
   Value* result = NULL;
   switch (op()) {
     case TExprOpcode::MATH_SQRT: {
       ret_type = codegen->double_type();
-      prototype.reset(new LlvmCodeGen::FunctionPrototype(codegen, "sqrt", ret_type));
+      prototype.reset(new LlvmCodeGen::FnPrototype(codegen, "sqrt", ret_type));
       prototype->AddArgument(LlvmCodeGen::NamedVariable("x", codegen->double_type()));
       break;
     }

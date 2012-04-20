@@ -89,7 +89,7 @@ class QueryJitter {
       return;
     }
 
-    string llvm_ir = code_gen.GetLlvmIR();
+    string llvm_ir = code_gen.GetIR();
     cout << llvm_ir << endl;
 
     // No FROM clause, run the jitted expr tree.

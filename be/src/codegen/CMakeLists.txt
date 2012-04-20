@@ -10,9 +10,9 @@ add_library(CodeGen
   llvm-codegen.cc
 )
 
-add_executable(llvm-lifetime-test llvm-lifetime-test.cc)
+add_executable(llvm-codegen-test llvm-codegen-test.cc)
 
-target_link_libraries(llvm-lifetime-test
+set(LINK_LIBS
   CodeGen
   Common
   gtest
@@ -21,4 +21,6 @@ target_link_libraries(llvm-lifetime-test
   ${LLVM_MODULE_LIBS}
 )
 
-add_test(llvm-lifetime-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/codegen/llvm-lifetime-test)
+target_link_libraries(llvm-codegen-test ${LINK_LIBS})
+
+add_test(llvm-codegen-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/codegen/llvm-codegen-test)

@@ -72,9 +72,12 @@ class LlvmCodeGen {
   // to enable dynamic linking of jitted code.
   static void InitializeLlvm();
 
-  // Top level codegen object.  'name' is the only used for debugging when
-  // outputting the IR
-  LlvmCodeGen(const std::string& name);
+  static LlvmCodeGen* LoadFromFile(const std::string& file);
+
+  // Top level codegen object.  'module_name' is only used for debugging when
+  // outputting the IR.  module's loaded from disk will be named as the file
+  // path.
+  LlvmCodeGen(const std::string& module_name);
 
   ~LlvmCodeGen();
 
@@ -88,7 +91,7 @@ class LlvmCodeGen {
   void EnableVerifier(bool enable);
 
   // For debugging. Returns the IR that was generated.
-  std::string GetLlvmIR() const;
+  std::string GetIR() const;
 
   // Utility struct that wraps a variable name and llvm type.
   struct NamedVariable {
@@ -103,11 +106,11 @@ class LlvmCodeGen {
   
   // Abstraction over function prototypes.  Contains helpers to build prototypes and
   // generate IR for the types.  
-  class FunctionPrototype {
+  class FnPrototype {
    public:
     // Create a function prototype object, specifying the name of the function and
     // the return type.
-    FunctionPrototype(LlvmCodeGen*, const std::string& name, llvm::Type* ret_type);
+    FnPrototype(LlvmCodeGen*, const std::string& name, llvm::Type* ret_type);
 
     // Returns name of function
     const std::string& name() const { return name_; }
@@ -117,7 +120,7 @@ class LlvmCodeGen {
       args_.push_back(var);
     }
 
-    // Generate LLVM function prototype.
+    // Generate LLVM function prototype.  
     llvm::Function* GeneratePrototype();
 
    private:
@@ -144,6 +147,28 @@ class LlvmCodeGen {
 
   // Returns whether functions should be verfified
   bool verifier_enabled() { return verifier_enabled_; }
+
+  // Replaces all instructions that call 'replacee_name' with a call instruction
+  // to the new_fn.  Returns the modified function.
+  // - target_name is the unmangled function name that should be replaced.
+  //   The name is assumed to be unmangled so all call sites that contain the
+  //   replace_name substring will be replaced. target_name is case-sensitive
+  //   TODO: be more strict than substring? work out the mangling rules? 
+  // - If update_in_place is true, the caller function will be modified in place.
+  //   Otherwise, the caller function will be cloned and the original function
+  //   is unmodified.  If update_in_place is false and the function is already
+  //   been dynamically linked, the existing function will be unlinked. Note that
+  //   this is very unthread-safe, if there are threads in the function to be unlinked,
+  //   bad things will happen.
+  // - 'num_replaced' returns the number of call sites updated
+  //
+  // Most of our use cases will likley not be in place.  We will have one 'template'
+  // version of the function loaded for each type of Node (e.g. AggregationNode).
+  // Each instance of the node will clone the function, replacing the inner loop
+  // body with the codegened version.  The codegened bodies differ from instance
+  // to instance since they are specific to the node's tuple desc.
+  llvm::Function* ReplaceCallSites(llvm::Function* caller, bool update_in_place,
+      llvm::Function* new_fn, const std::string& target_name, int* num_replaced);
 
   // Jit compile the function.  This will run optimization passes and verify 
   // the function.  The result is a function pointer that is dynamically linked
@@ -172,7 +197,7 @@ class LlvmCodeGen {
   void CodegenDebugTrace(const char* message);
 
   // Returns the libc function, adding it to the module if it has not already been.
-  llvm::Function* GetLibCFunction(FunctionPrototype* prototype);
+  llvm::Function* GetLibCFunction(FnPrototype* prototype);
 
   // Allocate stack storage for local variables.  This is similar to traditional c, where
   // all the variables must be declared at the top of the function.  This helper can be
@@ -202,6 +227,12 @@ class LlvmCodeGen {
   llvm::Type* bigint_type() { return GetType(TYPE_BIGINT); }
   llvm::Type* ptr_type() { return ptr_type_; }
   llvm::Type* bool_ptr_type() { return bool_ptr_type_; }
+  llvm::Type* int64_ptr_type() { return int64_ptr_type_; }
+  llvm::Type* void_type() {return void_type_; }
+
+  // Fills 'functions' with all the functions that are defined in the module.
+  // Note: this does not include functions that are just declared
+  void GetFunctions(std::vector<llvm::Function*>* functions);
 
  private:
   // Name of the JIT module.  Useful for debugging.
@@ -242,9 +273,14 @@ class LlvmCodeGen {
   // current offset into scratch buffer 
   int scratch_buffer_offset_;
 
+  // Keeps track of all the functions that have been jit compiled and linked into
+  // the process. Special care needs to be taken if we need to modify these functions.
+  // bool is unused.
+  std::map<llvm::Function*, bool> jitted_functions_;
+
   // Keeps track of the external functions that have been included in this module
   // e.g libc functions or non-jitted impala functions.
-  // TODO: this should probably be FunctionPrototype->Functions mapping
+  // TODO: this should probably be FnPrototype->Functions mapping
   std::map<std::string, llvm::Function*> external_functions_;
 
   // Debug utility that will insert a printf-like function into the generated
@@ -255,10 +291,11 @@ class LlvmCodeGen {
   // strings passed to CodegenDebugTrace.
   std::vector<std::string> debug_strings_;
 
-  // llvm representation of void*.  Owned by module_
-  llvm::PointerType* ptr_type_; // int8_t*
-  llvm::PointerType* bool_ptr_type_;
-  llvm::Type* void_type_;
+  // llvm representation of a few common types.  Owned by context.
+  llvm::PointerType* ptr_type_;           // int8_t*
+  llvm::PointerType* bool_ptr_type_;      // bool*
+  llvm::PointerType* int64_ptr_type_;     // int64_t*
+  llvm::Type* void_type_;                 // void
 
   // llvm constants to help with code gen verbosity
   llvm::Value* true_value_;

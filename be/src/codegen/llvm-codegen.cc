@@ -9,14 +9,17 @@
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/JIT.h>
 #include <llvm/PassManager.h>
+#include <llvm/Support/IRReader.h>
+#include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/NoFolder.h>
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Support/system_error.h>
 #include <llvm/Target/TargetData.h>
 #include "llvm/Transforms/IPO.h"
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Transforms/Utils/BasicInliner.h>
-
+#include <llvm/Transforms/Utils/Cloning.h>
 #include "codegen/llvm-codegen.h"
 
 using namespace llvm;
@@ -43,18 +46,39 @@ LlvmCodeGen::LlvmCodeGen(const string& name) :
   name_(name),
   optimizations_enabled_(false),
   verifier_enabled_(true),
+  context_(new llvm::LLVMContext()),
+  module_(NULL),
   execution_engine_(NULL),
+  builder_(new llvm::IRBuilder<>(context())),
   scratch_buffer_offset_(0),
   debug_trace_fn_(NULL) {
+  
+  DCHECK(llvm_intialized) << "Must call LlvmCodeGen::InitializeLlvm first.";
+}
+
+LlvmCodeGen* LlvmCodeGen::LoadFromFile(const string& file) {
+  LlvmCodeGen* codegen = new LlvmCodeGen("");
+  OwningPtr<MemoryBuffer> file_buffer;
+  llvm::error_code err = MemoryBuffer::getFile(file, file_buffer);
+  if (err) {
+    LOG(ERROR) << "Could not load module " << file << ": " << err.message();
+    return NULL;
+  }
+  string error;
+  Module* loaded_module = ParseBitcodeFile(file_buffer.get(), codegen->context(), &error);
+  if (loaded_module == NULL) {
+    LOG(ERROR) << "Could not parse module " << file << ": " << error;
+    return NULL;
+  }
+  codegen->module_ = loaded_module;
+  return codegen;
 }
 
 
 Status LlvmCodeGen::Init() {
-  DCHECK(llvm_intialized) << "Must call LlvmCodeGen::InitializeLlvm first.";
-  context_.reset(new LLVMContext());
-  builder_.reset(new IRBuilder<>(context()));
-
-  module_ = new Module(name_, context());
+  if (module_ == NULL) {
+    module_ = new Module(name_, context());
+  }
 
   execution_engine_.reset(ExecutionEngine::createJIT(module_, &error_string_));
   if (execution_engine_ == NULL) {
@@ -170,6 +194,7 @@ Status LlvmCodeGen::Init() {
   void_type_ = Type::getVoidTy(context());
   ptr_type_ = PointerType::get(GetType(TYPE_TINYINT), 0);
   bool_ptr_type_ = PointerType::get(GetType(TYPE_BOOLEAN), 0);
+  int64_ptr_type_ = PointerType::get(GetType(TYPE_BIGINT), 0);
   true_value_ = ConstantInt::get(context(), APInt(1, true, true));
   false_value_ = ConstantInt::get(context(), APInt(1, false, true));
 
@@ -188,7 +213,7 @@ void LlvmCodeGen::EnableVerifier(bool enable) {
   verifier_enabled_ = enable;
 }
 
-string LlvmCodeGen::GetLlvmIR() const {
+string LlvmCodeGen::GetIR() const {
   string str;
   raw_string_ostream stream(str);
   module_->print(stream, NULL);
@@ -222,7 +247,7 @@ AllocaInst* LlvmCodeGen::CreateEntryBlockAlloca(Function* f, const NamedVariable
   return tmp.CreateAlloca(var.type, 0, var.name.c_str());
 }
 
-Function* LlvmCodeGen::GetLibCFunction(FunctionPrototype* prototype) {
+Function* LlvmCodeGen::GetLibCFunction(FnPrototype* prototype) {
   if (external_functions_.find(prototype->name()) != external_functions_.end()) {
     return external_functions_[prototype->name()];
   }
@@ -248,12 +273,12 @@ bool LlvmCodeGen::VerifyFunction(Function* function) {
   return true;
 }
 
-LlvmCodeGen::FunctionPrototype::FunctionPrototype(
+LlvmCodeGen::FnPrototype::FnPrototype(
     LlvmCodeGen* gen, const string& name, Type* ret_type) :
   codegen_(gen), name_(name), ret_type_(ret_type) {
 }
 
-Function* LlvmCodeGen::FunctionPrototype::GeneratePrototype() {
+Function* LlvmCodeGen::FnPrototype::GeneratePrototype() {
   vector<Type*> arguments;
   for (int i = 0; i < args_.size(); ++i) {
     arguments.push_back(args_[i].type);
@@ -261,7 +286,7 @@ Function* LlvmCodeGen::FunctionPrototype::GeneratePrototype() {
   FunctionType* prototype = FunctionType::get(ret_type_, arguments, false);
   
   Function* func = Function::Create(
-        prototype, Function::ExternalLinkage, name_, codegen_->module_);
+      prototype, Function::ExternalLinkage, name_, codegen_->module_);
   DCHECK(func != NULL);
 
   // Name the arguments
@@ -276,8 +301,53 @@ Function* LlvmCodeGen::FunctionPrototype::GeneratePrototype() {
 void LlvmCodeGen::ClearModule() {
   if (module_ != NULL) module_->getFunctionList().clear();
   external_functions_.clear();
+  jitted_functions_.clear();
   debug_trace_fn_ = NULL;
   debug_strings_.clear();
+}
+ 
+Function* LlvmCodeGen::ReplaceCallSites(Function* caller, bool update_in_place,
+    Function* new_fn, const string& replacee_name, int* replaced) {
+  DCHECK(caller->getParent() == module_);
+
+  if (!update_in_place) {
+    // Clone the function and add it to the module
+    caller = llvm::CloneFunction(caller);
+    module_->getFunctionList().push_back(caller);
+  } else if (jitted_functions_.find(caller) != jitted_functions_.end()) {
+    // This function is already dynamically linked, unlink it.
+    execution_engine_->freeMachineCodeForFunction(caller);
+    jitted_functions_.erase(caller);
+  }
+
+  *replaced = 0;
+  // loop over all blocks
+  Function::iterator block_iter = caller->begin();
+  while (block_iter != caller->end()) {
+    BasicBlock* block = block_iter++;
+    // loop over instructions in the block
+    BasicBlock::iterator instr_iter = block->begin();
+    while (instr_iter != block->end()) {
+      Instruction* instr = instr_iter++;
+      // look for call instructions
+      if (CallInst::classof(instr)) {
+        CallInst* call_instr = reinterpret_cast<CallInst*>(instr);
+        Function* old_fn = call_instr->getCalledFunction();
+        // look for call instruction that matches the name
+        if (old_fn->getName().find(replacee_name) != string::npos) {
+          // Insert a new call instruction to the new function
+          IRBuilder<> builder(block, instr_iter);
+          vector<Value*> calling_args;
+          builder.CreateCall(new_fn, calling_args);
+          // remove the old call instruction
+          call_instr->removeFromParent();
+          ++*replaced;
+        }
+      }
+    }
+  }
+
+  return caller;
 }
 
 void* LlvmCodeGen::JitFunction(Function* function, int* scratch_size) {
@@ -291,6 +361,7 @@ void* LlvmCodeGen::JitFunction(Function* function, int* scratch_size) {
     // Verify the module is valid;  
     bool corrupt = verifyModule(*module_, ReturnStatusAction);
     if (corrupt) {
+      verifyModule(*module_);
       LOG(ERROR) << "Module corrupt.";
       module_->dump();
       DCHECK(false);
@@ -298,7 +369,11 @@ void* LlvmCodeGen::JitFunction(Function* function, int* scratch_size) {
     }
   }
   *scratch_size = scratch_buffer_offset_;
-  return execution_engine_->getPointerToFunction(function);
+  void* jitted_function = execution_engine_->getPointerToFunction(function);
+  if (jitted_function != NULL) { 
+    jitted_functions_[function] = true;
+  }
+  return jitted_function;
 }
 
 int LlvmCodeGen::GetScratchBuffer(int byte_size) {
@@ -350,6 +425,16 @@ void LlvmCodeGen::CodegenDebugTrace(const char* str) {
   vector<Value*> calling_args;
   calling_args.push_back(const_ptr);
   builder_->CreateCall(debug_trace_fn_, calling_args);
+}
+
+void LlvmCodeGen::GetFunctions(vector<Function*>* functions) {
+  Module::iterator fn_iter = module_->begin();
+  while (fn_iter != module_->end()) {
+    Function* fn = fn_iter++;
+    if (!fn->empty()) {
+      functions->push_back(fn);
+    }
+  }
 }
 
 }

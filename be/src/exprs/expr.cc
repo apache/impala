@@ -470,7 +470,7 @@ Function* Expr::CreateComputeFnPrototype(LlvmCodeGen* codegen, const string& nam
   Type* ret_type = codegen->GetType(type());
   Type* ptr_type = codegen->ptr_type();
   
-  LlvmCodeGen::FunctionPrototype prototype(codegen, name, ret_type);
+  LlvmCodeGen::FnPrototype prototype(codegen, name, ret_type);
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", PointerType::get(ptr_type, 0)));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("state_data", ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("is_null", codegen->bool_ptr_type()));
