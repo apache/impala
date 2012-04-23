@@ -4,7 +4,7 @@
 #define IMPALA_RUNTIME_TUPLE_H
 
 #include <cstring>
-#include <glog/logging.h>
+#include "common/logging.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
 

@@ -33,6 +33,7 @@ DEFINE_bool(benchmark, false, "if true, benchmarks the expr jitting");
 using namespace std;
 using namespace boost;
 using namespace impala;
+using namespace llvm;
 
 static const int NUM_NODES = 1;
 static const bool ABORT_ON_ERROR = true;
@@ -71,7 +72,8 @@ class QueryJitter {
     vector<Expr*> output_exprs = exec.select_list_exprs();
     cout << "Exprs: " << Expr::DebugString(output_exprs) << endl;
 
-    LlvmCodeGen code_gen("Expr Jit");
+    ObjectPool pool;
+    LlvmCodeGen code_gen(&pool, "Expr Jit");
     code_gen.EnableOptimizations(FLAGS_enable_optimizations);
     code_gen.EnableVerifier(FLAGS_verify_jit);
     status = code_gen.Init();
@@ -83,11 +85,13 @@ class QueryJitter {
     cout << "Generating IR..." << endl;
     Expr* root = output_exprs[0];
     int scratch_size;
-    void* func = root->CodegenExprTree(&code_gen, &scratch_size);
-    if (func == NULL) {
+    Function* fn = root->CodegenExprTree(&code_gen);
+    if (fn == NULL) {
       cout << "Could not jit expression tree." << endl;
       return;
     }
+    void* func = code_gen.JitFunction(fn, &scratch_size);
+    DCHECK(func != NULL);
 
     string llvm_ir = code_gen.GetIR();
     cout << llvm_ir << endl;
@@ -113,6 +117,9 @@ class QueryJitter {
         cout << "Cannot benchmark statements with FROM clause." << endl;
       }
     }
+
+    RuntimeProfile* profile = code_gen.runtime_profile();
+    profile->PrettyPrint(&cout);
   }
 };
 }

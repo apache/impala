@@ -13,6 +13,7 @@ add_library(Util
   debug-util.cc
   decompress.cc
   jni-util.cc
+  path-builder.cc
   perf-counters.cc
   runtime-profile.cc
   url-parser.cc

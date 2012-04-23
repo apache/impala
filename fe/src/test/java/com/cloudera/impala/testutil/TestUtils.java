@@ -225,7 +225,8 @@ public class TestUtils {
    * @return an error message if actual does not match expected, "" otherwise.
    */
   public static void runQuery(Executor executor, String query,
-      int numNodes, int batchSize, boolean abortOnError, int maxErrors, int lineNum,
+      int numNodes, int batchSize, boolean abortOnError, int maxErrors,
+      boolean disableCodegen, int lineNum,
       ArrayList<String> expectedColLabels,
       ArrayList<String> expectedTypes, ArrayList<String> expectedResults,
       ArrayList<String> expectedErrors, ArrayList<String> expectedFileErrors,
@@ -247,7 +248,7 @@ public class TestUtils {
     try {
       executor.runQuery(
           request, colTypes, colLabels, containsOrderBy, batchSize, abortOnError,
-          maxErrors, errors, fileErrors, resultQueue, insertResult);
+          maxErrors, disableCodegen, errors, fileErrors, resultQueue, insertResult);
     } catch (ImpalaException e) {
       // Compare errors if we are expecting some.
       if (abortOnError && expectedErrors != null) {

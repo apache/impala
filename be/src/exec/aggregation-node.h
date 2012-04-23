@@ -13,10 +13,15 @@
 #include "runtime/free-list.h"
 #include "runtime/mem-pool.h"
 
+namespace llvm {
+  class Function;
+}
+
 namespace impala {
 
 class AggregateExpr;
 class AggregationTuple;
+class LlvmCodeGen;
 class RowBatch;
 struct RuntimeState;
 struct StringValue;
@@ -101,11 +106,14 @@ class AggregationNode : public ExecNode {
   std::vector<void*> grouping_values_cache_;
   boost::scoped_ptr<MemPool> tuple_pool_;
 
+  typedef void (*ProcessRowBatchFn)(AggregationNode*, RowBatch*);
+  // Jitted ProcessRowBatch function pointer.  Null if codegen is disabled.
+  ProcessRowBatchFn process_row_batch_fn_;
+
   // Constructs a new aggregation output tuple (allocated from tuple_pool_),
   // initialized to grouping values computed over 'current_row_'.
   // Aggregation expr slots are set to their initial values.
   AggregationTuple* ConstructAggTuple();
-
 
   // Allocates a string buffer that is at least the new_size.  The actual size of 
   // the allocated buffer is returned in allocated_size.  
@@ -136,6 +144,24 @@ class AggregationNode : public ExecNode {
   // Eval grouping exprs over 'current_row_' and store the results in 
   // 'grouping_exprs_cache_'.  
   void ComputeGroupingValues();
+
+  // Do the aggregation for all tuple rows in the batch
+  void ProcessRowBatchNoGrouping(RowBatch* batch);
+  void ProcessRowBatchWithGrouping(RowBatch* batch);
+
+  // Codegen the process row batch loop.  The loop has already been compiled to
+  // IR and loaded into the codegen object.  UpdateAggTuple has also been 
+  // codegen'd to IR.  This function will modify the loop subsituting the 
+  // UpdateAggTuple function call with the (inlined) codegen'd 'update_tuple_fn'.
+  llvm::Function* CodegenProcessRowBatch(
+      LlvmCodeGen* codegen, llvm::Function* update_tuple_fn);
+
+  // Codegen for updating aggregate_exprs at slot_idx. Returns NULL if unsuccessful.
+  // slot_idx is the idx into aggregate_exprs_ (does not include grouping exprs).
+  llvm::Function* CodegenUpdateSlot(LlvmCodeGen* codegen, int slot_idx);
+
+  // Codegen UpdateAggTuple.  Returns NULL if codegen is unsuccessful.
+  llvm::Function* CodegenUpdateAggTuple(LlvmCodeGen* codegen);
 };
 
 }

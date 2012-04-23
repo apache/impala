@@ -45,18 +45,18 @@ Function* LiteralPredicate::Codegen(LlvmCodeGen* codegen) {
   DCHECK_EQ(GetNumChildren(), 0);
   
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
+  LlvmCodeGen::LlvmBuilder builder(context);
 
   Function* function = CreateComputeFnPrototype(codegen, "LiteralPredicate");
 
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
-  codegen->builder()->SetInsertPoint(entry_block);
+  builder.SetInsertPoint(entry_block);
   
-  CodegenSetIsNullArg(codegen, function, is_null_);
+  CodegenSetIsNullArg(codegen, entry_block, is_null_);
   if (is_null_) {
-    builder->CreateRet(GetNullReturnValue(codegen));
+    builder.CreateRet(GetNullReturnValue(codegen));
   } else {
-    builder->CreateRet(ConstantInt::get(context, APInt(1, result_.bool_val, true)));
+    builder.CreateRet(ConstantInt::get(context, APInt(1, result_.bool_val, true)));
   }
   
   if (!codegen->VerifyFunction(function)) return NULL;

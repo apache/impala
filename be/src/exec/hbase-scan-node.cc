@@ -5,6 +5,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/string-value.h"
+#include "runtime/tuple-row.h"
 #include "util/jni-util.h"
 #include "util/runtime-profile.h"
 #include "gen-cpp/PlanNodes_types.h"

@@ -196,7 +196,8 @@ public class JdbcDriverTest {
     StringBuilder errorLog = new StringBuilder();
     TestUtils.runQuery(
         executor, query, 0, 1,
-        false, 1000, 0, expectedColLabels, null, expectedResults, null, null, null, null,
+        false, 1000, Executor.DEFAULT_DISABLE_CODEGEN,
+        0, expectedColLabels, null, expectedResults, null, null, null, null,
         errorLog);
   }
 

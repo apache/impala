@@ -17,9 +17,9 @@ import org.junit.Test;
 
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.testutil.TestFileParser;
-import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.testutil.TestFileParser.Section;
 import com.cloudera.impala.testutil.TestFileParser.TestCase;
+import com.cloudera.impala.testutil.TestUtils;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Splitter;
@@ -122,6 +122,7 @@ public class QueryTest {
   private static final List<Integer> ALL_CLUSTER_SIZES = ImmutableList.of(1, 2, 3, 0);
   private static final List<Integer> SMALL_CLUSTER_SIZES = ImmutableList.of(1, 2, 3);
   private static final List<Integer> ALL_NODES_ONLY = ImmutableList.of(0);
+  private static final List<Boolean> ALL_LLVM_OPTIONS = ImmutableList.of(true, false);
 
   private static final Set<TableFormat> NON_COMPRESSED_TYPES =
     Sets.newHashSet(TableFormat.TEXT, TableFormat.RCFILE);
@@ -160,7 +161,7 @@ public class QueryTest {
 
     List<TestConfiguration> testConfigs =
       generateAllConfigurationPermutations(tableFormats, UNCOMPRESSED_ONLY,
-          batchSizes, numNodes);
+          batchSizes, numNodes, ALL_LLVM_OPTIONS);
     runQueryWithTestConfigs(testConfigs, testFile, abortOnError, maxErrors);
   }
 
@@ -169,13 +170,15 @@ public class QueryTest {
     private final CompressionFormat compressionType;
     private final TableFormat tableFormat;
     private final int batchSize;
+    private final boolean disableLlvm;
 
     public TestConfiguration(int nodes, int batchSize, CompressionFormat compression,
-        TableFormat tableFormat) {
+        TableFormat tableFormat, boolean disableLlvm) {
       this.numNodes = nodes;
       this.batchSize = batchSize;
       this.compressionType = compression;
       this.tableFormat = tableFormat;
+      this.disableLlvm = disableLlvm;
     }
 
     public String getTableSuffix() {
@@ -184,6 +187,7 @@ public class QueryTest {
 
     public int getClusterSize() { return numNodes; }
     public int getBatchSize() { return batchSize; }
+    public boolean getDisableLlvm() { return disableLlvm; }
 
     @Override
     public String toString() {
@@ -191,6 +195,7 @@ public class QueryTest {
                                          .add("Batch size", batchSize)
                                          .add("Compression type", compressionType)
                                          .add("Table format", tableFormat)
+                                         .add("Disable llvm", disableLlvm)
                                          .toString();
     }
   }
@@ -204,9 +209,9 @@ public class QueryTest {
    * compression or b) the table format is SEQUENCEFILE_RECORD, in which case *only* the
    * compressed form is generated.
    *
-   * Compression types and cluster sizes are assigned in a round-robin fashion, and
-   * therefore the set of configurations generated is dependent on the order of all the
-   * list arguments.
+   * Compression types, cluster sizes and using llvm are assigned in a round-robin
+   * fashion, and therefore the set of configurations generated is dependent on the
+   * order of all the list arguments.
    */
   private List<TestConfiguration> generateRoundRobinConfigurations(
       List<TableFormat> baseFormats, List<CompressionFormat> compressionSuffixes,
@@ -214,13 +219,15 @@ public class QueryTest {
     List<TestConfiguration> configs = Lists.newArrayList();
     int compressionIdx = 0;
     int clusterSizesIdx = 0;
+    boolean disableLlvm = true;
     for (TableFormat tableFormat: baseFormats) {
       for (int batchSize: batchSizes) {
         int clusterSize = clusterSizes.get(clusterSizesIdx++ % clusterSizes.size());
+        disableLlvm = !disableLlvm;
 
         if (tableFormat != TableFormat.SEQUENCEFILE_RECORD) {
           configs.add(new TestConfiguration(clusterSize, batchSize,
-              CompressionFormat.NONE, tableFormat));
+              CompressionFormat.NONE, tableFormat, disableLlvm));
           clusterSize = clusterSizes.get(clusterSizesIdx++ % clusterSizes.size());
         }
 
@@ -228,7 +235,7 @@ public class QueryTest {
           CompressionFormat compression =
             compressionSuffixes.get(compressionIdx++ % compressionSuffixes.size());
           configs.add(new TestConfiguration(clusterSize, batchSize, compression,
-              tableFormat));
+              tableFormat, disableLlvm));
         }
       }
     }
@@ -243,14 +250,16 @@ public class QueryTest {
    */
   private List<TestConfiguration> generateAllConfigurationPermutations(
       List<TableFormat> tableFormats, List<CompressionFormat> compressionFormats,
-      List<Integer> batchSizes, List<Integer> clusterSizes) {
+      List<Integer> batchSizes, List<Integer> clusterSizes, List<Boolean> llvmOptions) {
     List<TestConfiguration> configs = Lists.newArrayList();
     for (TableFormat tableFormat: tableFormats) {
       for (CompressionFormat compressionFormat: compressionFormats) {
         for (int batchSize: batchSizes) {
           for (int clusterSize: clusterSizes) {
-           configs.add(new TestConfiguration(clusterSize, batchSize, compressionFormat,
-               tableFormat));
+            for (boolean disableLlvm: llvmOptions) {
+              configs.add(new TestConfiguration(clusterSize, batchSize, compressionFormat,
+               tableFormat, disableLlvm));
+            }
           }
         }
       }
@@ -269,7 +278,7 @@ public class QueryTest {
     for (TestConfiguration config: testConfigs) {
       queryFileParser.parseFile(config.getTableSuffix());
       runOneQueryTest(queryFileParser, abortOnError, maxErrors, config.getBatchSize(),
-          config.getClusterSize(), new StringBuilder());
+          config.getClusterSize(), config.getDisableLlvm(), new StringBuilder());
     }
   }
 
@@ -307,7 +316,7 @@ public class QueryTest {
    */
   private void runOneQueryTest(TestFileParser queryFileParser,
       boolean abortOnError, int maxErrors,
-      int batchSize, int numNodes, StringBuilder errorLog) {
+      int batchSize, int numNodes, boolean disableLlvm, StringBuilder errorLog) {
     for (TestCase testCase: queryFileParser.getTestCases()) {
       List<String> setupSection = testCase.getSectionContents(Section.SETUP);
       ArrayList<String> expectedTypes = testCase.getSectionContents(Section.TYPES);
@@ -327,7 +336,7 @@ public class QueryTest {
       }
       TestUtils.runQuery(
           executor, testCase.getSectionAsString(Section.QUERY, false, " "),
-          numNodes, batchSize, abortOnError, maxErrors,
+          numNodes, batchSize, abortOnError, maxErrors, disableLlvm,
           testCase.getStartingLineNum(), null, expectedTypes,
           expectedResults, null, null, expectedPartitions, expectedNumAppendedRows,
           errorLog);
@@ -360,7 +369,6 @@ public class QueryTest {
     // Run other node numbers with small batch sizes on text
     runQueryInAllBatchAndClusterPerms("hdfs-scan-node", false, 1000, TEXT_FORMAT_ONLY,
         SMALL_BATCH_SIZES, SMALL_CLUSTER_SIZES);
-
   }
 
   @Test

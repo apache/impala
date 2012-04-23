@@ -32,6 +32,10 @@ class TupleRow {
     return result;
   }
  
+  // TODO: make a macro for doing this
+  // For C++/IR interop, we need to be able to look up types by name.
+  static const char* LLVM_CLASS_NAME;
+
  private:
   Tuple* tuples_[1];
 };

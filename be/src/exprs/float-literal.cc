@@ -94,7 +94,7 @@ string FloatLiteral::DebugString() const {
 Function* FloatLiteral::Codegen(LlvmCodeGen* codegen) {
   DCHECK_EQ(GetNumChildren(), 0);
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
+  LlvmCodeGen::LlvmBuilder builder(context);
   
   Function* function = CreateComputeFnPrototype(codegen, "FloatLiteral");
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
@@ -112,9 +112,9 @@ Function* FloatLiteral::Codegen(LlvmCodeGen* codegen) {
       return NULL;
   }
 
-  codegen->builder()->SetInsertPoint(entry_block);
-  CodegenSetIsNullArg(codegen, function, false);
-  builder->CreateRet(result);
+  builder.SetInsertPoint(entry_block);
+  CodegenSetIsNullArg(codegen, entry_block, false);
+  builder.CreateRet(result);
   
   if (!codegen->VerifyFunction(function)) return NULL;
   return function;

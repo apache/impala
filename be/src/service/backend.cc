@@ -51,7 +51,7 @@ static void RunServer(TServer* server) {
 extern "C"
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
   google::InitGoogleLogging("impala-backend");
-  LlvmCodeGen::InitializeLlvm();
+  LlvmCodeGen::InitializeLlvm(true);
   // install libunwind before activating this on 64-bit systems:
   //google::InstallFailureSignalHandler();
 

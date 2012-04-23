@@ -25,6 +25,7 @@
 #include "exprs/string-literal.h"
 #include "codegen/llvm-codegen.h"
 
+using namespace llvm;
 using namespace std;
 using namespace boost;
 
@@ -119,7 +120,7 @@ class ExprTest : public testing::Test {
     *interpreted_value = result_row[0];
 
     if (jitted_value != NULL) {
-      LlvmCodeGen code_gen("Expr Jit");
+      LlvmCodeGen code_gen(&pool_, "Expr Jit");
       int scratch_size = 0;
       status = code_gen.Init();
       ASSERT_TRUE(status.ok());
@@ -127,9 +128,11 @@ class ExprTest : public testing::Test {
       Expr* root = executor_->select_list_exprs()[0];
       ASSERT_TRUE(jit_expr_root_[root->type()] != NULL);
 
-      void* func = root->CodegenExprTree(&code_gen, &scratch_size);
-      EXPECT_EQ(scratch_size, 0);
+      Function* fn = root->CodegenExprTree(&code_gen);
+      EXPECT_TRUE(fn != NULL);
+      void* func = code_gen.JitFunction(fn, &scratch_size);
       EXPECT_TRUE(func != NULL);
+      EXPECT_EQ(scratch_size, 0);
       jit_expr_root_[root->type()]->SetComputeFn(func, scratch_size);
       *jitted_value = jit_expr_root_[root->type()]->GetValue(NULL);
     }

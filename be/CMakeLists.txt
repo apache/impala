@@ -36,7 +36,6 @@ SET(CXX_FLAGS_RELEASE "-O3 -g -DNDEBUG -Wall -msse4.2 -Wno-sign-compare -Wno-str
 SET(CXX_FLAGS_PROFILE_GEN "${CXX_FLAGS_RELEASE} -fprofile-generate")
 SET(CXX_FLAGS_PROFILE_BUILD "${CXX_FLAGS_RELEASE} -fprofile-use")
 
-
 # if no build build type is specified, default to debug builds
 if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Debug)
@@ -66,6 +65,10 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fverbose-asm")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LLVM_CFLAGS}")
 
 Message(${CMAKE_CXX_FLAGS})
+
+# Set clang to IR cross compile flags
+# IR_COMPILE is #defined for the cross compile to remove code that bloats the IR
+set(CLANG_IR_CXX_FLAGS "-emit-llvm" "-O3" "-c" "-DIR_COMPILE" "-DNDEBUG")
 
 # setup doc generation with Doxygen
 find_package(Doxygen)
@@ -102,6 +105,12 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 # resolve includes of generated code
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/generated-sources)
 
+set(CLANG_INCLUDE_FLAGS 
+  "-I${CMAKE_CURRENT_SOURCE_DIR}/src"
+  "-I${CMAKE_CURRENT_SOURCE_DIR}/generated-sources"
+  "-I${Thrift_INCLUDE_DIR}"
+)
+
 # allow linking of static libs into dynamic lib
 add_definitions(-fPIC)
 
@@ -136,6 +145,7 @@ set (IMPALA_LINK_LIBS
   Exprs
   Util
   Runtime
+  CodeGen
   Common
   Util
   thriftstatic
@@ -159,6 +169,9 @@ set (IMPALA_LINK_LIBS
 # Link libs for test executables.  Although not all tests need all libs,
 # the build time for the tests is rather small and not worth the trouble.
 set (IMPALA_TEST_LINK_LIBS ${IMPALA_LINK_LIBS} gtest)
+
+set(LLVM_IR_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/llvm-ir")
+file(MAKE_DIRECTORY ${LLVM_IR_OUTPUT_DIRECTORY})
 
 # compile these subdirs using their own CMakeLists.txt
 add_subdirectory(src/codegen)

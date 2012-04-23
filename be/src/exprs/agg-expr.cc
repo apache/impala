@@ -4,8 +4,10 @@
 #include "exprs/agg-expr.h"
 #include "util/debug-util.h"
 #include "gen-cpp/Exprs_types.h"
+#include "codegen/llvm-codegen.h"
 
 using namespace std;
+using namespace llvm;
 
 namespace impala {
 
@@ -28,9 +30,23 @@ Status AggregateExpr::Prepare(RuntimeState* state, const RowDescriptor& desc) {
 
 string AggregateExpr::DebugString() const {
   stringstream out;
-  out << "AggExpr(star=" << is_star_ << " distinct=" << is_distinct_
+  out << "AggExpr(op= " << agg_op_ << " star=" << is_star_ 
+      << " distinct=" << is_distinct_
       << " " << Expr::DebugString() << ")";
   return out.str();
+}
+
+// AggregateExpr doesn't have a compute function.  Just return the child function.
+Function* AggregateExpr::Codegen(LlvmCodeGen* codegen) {
+  DCHECK_LE(GetNumChildren(), 1); // count(*) has no children
+  if (GetNumChildren() == 0) {
+    scratch_buffer_size_ = 0;
+    return NULL;
+  } else {
+    codegen_fn_ = children()[0]->Codegen(codegen);
+    scratch_buffer_size_ = children()[0]->scratch_buffer_size();
+    return codegen_fn_;
+  }
 }
 
 }

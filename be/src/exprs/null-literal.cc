@@ -32,14 +32,14 @@ Status NullLiteral::Prepare(RuntimeState* state, const RowDescriptor& row_desc) 
 Function* NullLiteral::Codegen(LlvmCodeGen* codegen) {
   DCHECK_EQ(GetNumChildren(), 0);
   LLVMContext& context = codegen->context();
-
+  LlvmCodeGen::LlvmBuilder builder(context);
+  
   Function* function = CreateComputeFnPrototype(codegen, "NullLiteral");
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
 
-  codegen->builder()->SetInsertPoint(entry_block);
-  CodegenSetIsNullArg(codegen, function, true);
-  codegen->builder()->CreateRet(GetNullReturnValue(codegen));
-
+  CodegenSetIsNullArg(codegen, entry_block, true);
+  builder.CreateRet(GetNullReturnValue(codegen));
+  
   if (!codegen->VerifyFunction(function)) return NULL;
   return function;
 }

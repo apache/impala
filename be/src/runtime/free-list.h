@@ -4,10 +4,11 @@
 #define IMPALA_RUNTIME_FREE_LIST_H
 
 #include <stdio.h>
+#include <string.h>
 #include <algorithm>
 #include <vector>
 #include <string>
-#include <glog/logging.h>
+#include "common/logging.h"
  
 namespace impala {
 

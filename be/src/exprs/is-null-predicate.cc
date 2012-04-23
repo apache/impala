@@ -60,24 +60,24 @@ Function* IsNullPredicate::Codegen(LlvmCodeGen* codegen) {
   if (child_function == NULL) return NULL;
 
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
+  LlvmCodeGen::LlvmBuilder builder(context);
   Type* return_type = codegen->GetType(type());
   Function* function = CreateComputeFnPrototype(codegen, "IsNullPredicate");
 
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
   BasicBlock* not_null_block = BasicBlock::Create(context, "not_null", function);
   BasicBlock* ret_block = BasicBlock::Create(context, "ret", function);
-  builder->SetInsertPoint(entry_block);
+  builder.SetInsertPoint(entry_block);
   
   // Call child function
-  CodegenCallFn(codegen, function, child_function, ret_block, not_null_block);
+  children()[0]->CodegenGetValue(codegen, entry_block, ret_block, not_null_block);
 
-  builder->SetInsertPoint(not_null_block);
-  builder->CreateBr(ret_block);
+  builder.SetInsertPoint(not_null_block);
+  builder.CreateBr(ret_block);
 
   // Return block.  
-  builder->SetInsertPoint(ret_block);
-  PHINode* phi_node = builder->CreatePHI(return_type, 2, "tmp_phi");
+  builder.SetInsertPoint(ret_block);
+  PHINode* phi_node = builder.CreatePHI(return_type, 2, "tmp_phi");
   if (is_not_null_) {
     phi_node->addIncoming(codegen->false_value(), entry_block);
     phi_node->addIncoming(codegen->true_value(), not_null_block);
@@ -85,8 +85,8 @@ Function* IsNullPredicate::Codegen(LlvmCodeGen* codegen) {
     phi_node->addIncoming(codegen->true_value(), entry_block);
     phi_node->addIncoming(codegen->false_value(), not_null_block);
   }
-  CodegenSetIsNullArg(codegen, function, false);
-  builder->CreateRet(phi_node);
+  CodegenSetIsNullArg(codegen, ret_block, false);
+  builder.CreateRet(phi_node);
 
   if (!codegen->VerifyFunction(function)) return NULL;
   return function;

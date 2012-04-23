@@ -44,7 +44,7 @@ using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
 using namespace apache::thrift::concurrency;
 
-DECLARE_bool(enable_expr_jit);
+DECLARE_bool(enable_jit);
 
 namespace impala {
 
@@ -100,7 +100,7 @@ void ImpalaService::RunQuery(
     DCHECK(!exec_request.fragmentRequests[0].__isset.planFragment);
     exec_state->local_runtime_state()->Init(
         exec_request.queryId, exec_request.abortOnError, exec_request.maxErrors,
-        FLAGS_enable_expr_jit,
+        FLAGS_enable_jit,
         NULL /* = we don't expect to be executing anything here */);
     result.__isset.col_types = true;
     SET_TSTATUS_IF_ERROR(

@@ -101,7 +101,7 @@ string SlotRef::DebugString() const {
 Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
   DCHECK_EQ(GetNumChildren(), 0);
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
+  LlvmCodeGen::LlvmBuilder builder(context);
   
   Type* return_type = codegen->GetType(type());
   Function* function = CreateComputeFnPrototype(codegen, "SlotRef");
@@ -135,59 +135,59 @@ Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
   BasicBlock* null_ret_block = BasicBlock::Create(context, "null_ret", function);
   BasicBlock* ret_block = BasicBlock::Create(context, "ret", function);
 
-  builder->SetInsertPoint(entry_block);
+  builder.SetInsertPoint(entry_block);
   // Get the tuple offset addr from the row
-  Value* tuple_addr = builder->CreateGEP(row_ptr, tuple_offset, "tuple_addr"); 
+  Value* tuple_addr = builder.CreateGEP(row_ptr, tuple_offset, "tuple_addr"); 
   // Load the tuple*
-  Value* tuple_ptr = builder->CreateLoad(tuple_addr, "tuple_ptr");
+  Value* tuple_ptr = builder.CreateLoad(tuple_addr, "tuple_ptr");
 
   // Check if tuple* is null only if the tuple is nullable
   if (tuple_is_nullable_) {
-    Value* tuple_is_null = builder->CreateIsNull(tuple_ptr, "tuple_is_null");
+    Value* tuple_is_null = builder.CreateIsNull(tuple_ptr, "tuple_is_null");
     // Check slot is null only if the null indicator bit is set
     if (null_indicator_offset_.bit_mask == 0) {
-      builder->CreateCondBr(tuple_is_null, null_ret_block, get_slot_block);
+      builder.CreateCondBr(tuple_is_null, null_ret_block, get_slot_block);
     } else {
-      builder->CreateCondBr(tuple_is_null, null_ret_block,
+      builder.CreateCondBr(tuple_is_null, null_ret_block, 
           check_slot_null_indicator_block);
-    }
+    } 
   } else {
     if (null_indicator_offset_.bit_mask == 0) {
-      builder->CreateBr(get_slot_block);
+      builder.CreateBr(get_slot_block);
     } else {
-      builder->CreateBr(check_slot_null_indicator_block);
+      builder.CreateBr(check_slot_null_indicator_block);
     }
   }
 
   // Branch for tuple* != NULL.  Need to check if null-indicator is set
   if (check_slot_null_indicator_block != NULL) {
-    builder->SetInsertPoint(check_slot_null_indicator_block);
-    Value* null_addr = builder->CreateGEP(tuple_ptr, null_byte_offset, "null_ptr");
-    Value* null_val = builder->CreateLoad(null_addr, "null_byte");
-    Value* slot_null_mask = builder->CreateAnd(null_val, null_mask, "null_byte_set");
-    Value* is_slot_null = builder->CreateICmpNE(slot_null_mask, zero, "slot_is_null");
-    builder->CreateCondBr(is_slot_null, null_ret_block, get_slot_block);
+    builder.SetInsertPoint(check_slot_null_indicator_block);
+    Value* null_addr = builder.CreateGEP(tuple_ptr, null_byte_offset, "null_ptr");
+    Value* null_val = builder.CreateLoad(null_addr, "null_byte");
+    Value* slot_null_mask = builder.CreateAnd(null_val, null_mask, "null_byte_set");
+    Value* is_slot_null = builder.CreateICmpNE(slot_null_mask, zero, "slot_is_null");
+    builder.CreateCondBr(is_slot_null, null_ret_block, get_slot_block);
   }
 
   // Branch for slot != NULL
-  builder->SetInsertPoint(get_slot_block);
-  Value* slot_ptr = builder->CreateGEP(tuple_ptr, slot_offset, "slot_addr");
-  Value* slot_cast = builder->CreatePointerCast(slot_ptr, result_ptr_type);
-  Value* result = builder->CreateLoad(slot_cast, "slot_value");
-  CodegenSetIsNullArg(codegen, function, false);
-  builder->CreateBr(ret_block);
+  builder.SetInsertPoint(get_slot_block);
+  Value* slot_ptr = builder.CreateGEP(tuple_ptr, slot_offset, "slot_addr");
+  Value* slot_cast = builder.CreatePointerCast(slot_ptr, result_ptr_type);
+  Value* result = builder.CreateLoad(slot_cast, "slot_value");
+  CodegenSetIsNullArg(codegen, get_slot_block, false);
+  builder.CreateBr(ret_block);
 
   // Branch to set is_null to true
-  builder->SetInsertPoint(null_ret_block);
-  CodegenSetIsNullArg(codegen, function, true);
-  builder->CreateBr(ret_block);
+  builder.SetInsertPoint(null_ret_block);
+  CodegenSetIsNullArg(codegen, null_ret_block, true);
+  builder.CreateBr(ret_block);
 
   // Ret block
-  builder->SetInsertPoint(ret_block);
-  PHINode* phi_node = builder->CreatePHI(return_type, 2, "tmp_phi");
+  builder.SetInsertPoint(ret_block);
+  PHINode* phi_node = builder.CreatePHI(return_type, 2, "tmp_phi");
   phi_node->addIncoming(GetNullReturnValue(codegen), null_ret_block);
   phi_node->addIncoming(result, get_slot_block);
-  builder->CreateRet(phi_node);
+  builder.CreateRet(phi_node);
 
   if (!codegen->VerifyFunction(function)) return NULL;
   return function;

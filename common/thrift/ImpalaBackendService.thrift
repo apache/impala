@@ -27,9 +27,10 @@ struct TPlanExecParams {
   // global execution flags
   3: required bool abortOnError
   4: required i32 maxErrors
+  5: required bool disableCodegen
 
   // 0 means use default
-  5: required i32 batchSize
+  6: required i32 batchSize
 }
 
 // TPlanExecRequest encapsulates info needed to execute a particular
@@ -98,12 +99,15 @@ struct TQueryExecRequest {
   // maximum # of errors to be reported
   7: required i32 maxErrors
 
+  // if true, BE will disable llvm codegen
+  8: required bool disableCodegen
+
   // for debugging: set batch size used by backend internally;
   // a size of 0 indicates backend default
-  8: required i32 batchSize
+  9: required i32 batchSize
 
   // for debugging purposes (to allow backend to log the query string)
-  9: optional string sqlStmt;
+  10: optional string sqlStmt;
 }
 
 service ImpalaBackendService {

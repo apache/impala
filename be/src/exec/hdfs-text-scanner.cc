@@ -3,6 +3,7 @@
 #include "runtime/runtime-state.h"
 #include "exec/hdfs-text-scanner.h"
 #include "runtime/tuple.h"
+#include "runtime/tuple-row.h"
 #include "runtime/row-batch.h"
 #include "exec/text-converter.h"
 #include "util/cpu-info.h"

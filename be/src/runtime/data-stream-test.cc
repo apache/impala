@@ -114,7 +114,8 @@ class DataStreamTest : public testing::Test {
 
   void PrepareQuery(const string& stmt) {
     stmt_ = stmt;
-    EXPECT_TRUE(exec_.Exec(stmt, NULL).ok());
+    Status status = exec_.Exec(stmt, NULL);
+    EXPECT_TRUE(status.ok()) << status.GetErrorMsg();
     row_desc_ = &exec_.row_desc();
   }
 

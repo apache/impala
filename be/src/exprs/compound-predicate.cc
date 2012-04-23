@@ -103,33 +103,33 @@ Function* CompoundPredicate::CodegenNot(LlvmCodeGen* codegen) {
   if (child_function == NULL) return NULL;
 
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
+  LlvmCodeGen::LlvmBuilder builder(context);
   Type* return_type = codegen->GetType(type());
   Function* function = CreateComputeFnPrototype(codegen, "CompoundPredicate");
 
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
-  builder->SetInsertPoint(entry_block);
+  builder.SetInsertPoint(entry_block);
 
   BasicBlock* child_not_null_block = 
       BasicBlock::Create(context, "child_not_null", function);
   BasicBlock* ret_block = BasicBlock::Create(context, "ret", function);
 
   // Get child value
-  Value* child_value = CodegenCallFn(codegen, function, child_function, 
+  Value* child_value = children()[0]->CodegenGetValue(codegen, entry_block,
       ret_block, child_not_null_block);
 
   // Child not NULL
-  builder->SetInsertPoint(child_not_null_block);
-  child_value = builder->CreateTrunc(child_value, codegen->boolean_type());
-  Value* result = builder->CreateNot(child_value);
-  builder->CreateBr(ret_block);
+  builder.SetInsertPoint(child_not_null_block);
+  child_value = builder.CreateTrunc(child_value, codegen->boolean_type());
+  Value* result = builder.CreateNot(child_value);
+  builder.CreateBr(ret_block);
 
   // Ret/merge block
-  builder->SetInsertPoint(ret_block);
-  PHINode* phi_node = builder->CreatePHI(return_type, 2, "tmp_phi");
+  builder.SetInsertPoint(ret_block);
+  PHINode* phi_node = builder.CreatePHI(return_type, 2, "tmp_phi");
   phi_node->addIncoming(GetNullReturnValue(codegen), entry_block);
   phi_node->addIncoming(result, child_not_null_block);
-  builder->CreateRet(phi_node);
+  builder.CreateRet(phi_node);
 
   return function;
 }
@@ -185,12 +185,12 @@ Function* CompoundPredicate::CodegenBinary(LlvmCodeGen* codegen) {
   if (rhs_function == NULL) return NULL;
   
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
+  LlvmCodeGen::LlvmBuilder builder(context);
   Type* return_type = codegen->GetType(type());
   Function* function = CreateComputeFnPrototype(codegen, "CompoundPredicate");
 
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
-  builder->SetInsertPoint(entry_block);
+  builder.SetInsertPoint(entry_block);
 
   LlvmCodeGen::NamedVariable lhs_null_var("lhs_null_ptr", codegen->boolean_type());
   LlvmCodeGen::NamedVariable rhs_null_var("rhs_null_ptr", codegen->boolean_type());
@@ -219,59 +219,59 @@ Function* CompoundPredicate::CodegenBinary(LlvmCodeGen* codegen) {
   Value* args[3] = { row_ptr, state_data_ptr, lhs_is_null };
 
   // Call lhs
-  Value* lhs_value = builder->CreateCall(lhs_function, args, "lhs_call");
+  Value* lhs_value = builder.CreateCall(lhs_function, args, "lhs_call");
   // Call rhs
   args[2] = rhs_is_null;
-  Value* rhs_value = builder->CreateCall(rhs_function, args, "rhs_call");
+  Value* rhs_value = builder.CreateCall(rhs_function, args, "rhs_call");
   
-  Value* lhs_is_null_val = builder->CreateLoad(lhs_is_null, "lhs_null");
-  Value* rhs_is_null_val = builder->CreateLoad(rhs_is_null, "rhs_null");
+  Value* lhs_is_null_val = builder.CreateLoad(lhs_is_null, "lhs_null");
+  Value* rhs_is_null_val = builder.CreateLoad(rhs_is_null, "rhs_null");
   Value* compare = NULL;
   if (op() == TExprOpcode::COMPOUND_AND) {
-    compare = builder->CreateAnd(lhs_value, rhs_value, "tmp_and");
+    compare = builder.CreateAnd(lhs_value, rhs_value, "tmp_and");
   } else {
-    compare = builder->CreateOr(lhs_value, rhs_value, "tmp_or");
+    compare = builder.CreateOr(lhs_value, rhs_value, "tmp_or");
   }
 
   // Branch if lhs is null
-  builder->CreateCondBr(lhs_is_null_val, lhs_null_block, lhs_not_null_block);
+  builder.CreateCondBr(lhs_is_null_val, lhs_null_block, lhs_not_null_block);
 
   // lhs_is_null block
-  builder->SetInsertPoint(lhs_null_block);
-  builder->CreateCondBr(rhs_is_null_val, null_block, lhs_null_rhs_not_null_block);
+  builder.SetInsertPoint(lhs_null_block);
+  builder.CreateCondBr(rhs_is_null_val, null_block, lhs_null_rhs_not_null_block);
 
   // lhs_is_not_null block
-  builder->SetInsertPoint(lhs_not_null_block);
-  builder->CreateCondBr(rhs_is_null_val, lhs_not_null_rhs_null_block, not_null_block);
+  builder.SetInsertPoint(lhs_not_null_block);
+  builder.CreateCondBr(rhs_is_null_val, lhs_not_null_rhs_null_block, not_null_block);
 
   // lhs_not_null rhs_null block
-  builder->SetInsertPoint(lhs_not_null_rhs_null_block);
+  builder.SetInsertPoint(lhs_not_null_rhs_null_block);
   if (op() == TExprOpcode::COMPOUND_AND) {
     // false && null -> false; true && null -> null
-    builder->CreateCondBr(lhs_value, null_block, not_null_block);
+    builder.CreateCondBr(lhs_value, null_block, not_null_block);
   } else {
     // true || null -> true; false || null -> null
-    builder->CreateCondBr(lhs_value, not_null_block, null_block);
+    builder.CreateCondBr(lhs_value, not_null_block, null_block);
   }
 
   // lhs_null rhs_not_null block
-  builder->SetInsertPoint(lhs_null_rhs_not_null_block);
+  builder.SetInsertPoint(lhs_null_rhs_not_null_block);
   if (op() == TExprOpcode::COMPOUND_AND) {
     // null && false -> false; null && true -> null
-    builder->CreateCondBr(rhs_value, null_block, not_null_block);
+    builder.CreateCondBr(rhs_value, null_block, not_null_block);
   } else {
     // null || true -> true; null || false -> null
-    builder->CreateCondBr(rhs_value, not_null_block, null_block);
+    builder.CreateCondBr(rhs_value, not_null_block, null_block);
   }
 
   // NULL block
-  builder->SetInsertPoint(null_block);
-  builder->CreateStore(codegen->true_value(), is_null_ptr);
-  builder->CreateBr(ret_block);
+  builder.SetInsertPoint(null_block);
+  builder.CreateStore(codegen->true_value(), is_null_ptr);
+  builder.CreateBr(ret_block);
 
   // not-NULL block
-  builder->SetInsertPoint(not_null_block);
-  PHINode* not_null_phi = builder->CreatePHI(codegen->boolean_type(), 3);
+  builder.SetInsertPoint(not_null_block);
+  PHINode* not_null_phi = builder.CreatePHI(codegen->boolean_type(), 3);
   if (op() == TExprOpcode::COMPOUND_AND) {
     not_null_phi->addIncoming(codegen->false_value(), lhs_null_rhs_not_null_block);
     not_null_phi->addIncoming(codegen->false_value(), lhs_not_null_rhs_null_block);
@@ -281,15 +281,15 @@ Function* CompoundPredicate::CodegenBinary(LlvmCodeGen* codegen) {
     not_null_phi->addIncoming(codegen->true_value(), lhs_not_null_rhs_null_block);
     not_null_phi->addIncoming(compare, lhs_not_null_block);
   }
-  builder->CreateStore(codegen->false_value(), is_null_ptr);
-  builder->CreateBr(ret_block);
+  builder.CreateStore(codegen->false_value(), is_null_ptr);
+  builder.CreateBr(ret_block);
 
   // Ret/merge block
-  builder->SetInsertPoint(ret_block);
-  PHINode* phi_node = builder->CreatePHI(return_type, 2, "tmp_phi");
+  builder.SetInsertPoint(ret_block);
+  PHINode* phi_node = builder.CreatePHI(return_type, 2, "tmp_phi");
   phi_node->addIncoming(codegen->false_value(), null_block);
   phi_node->addIncoming(not_null_phi, not_null_block);
-  builder->CreateRet(phi_node);
+  builder.CreateRet(phi_node);
 
   return function;
 }

@@ -7,7 +7,8 @@
 #include <algorithm>
 #include <vector>
 #include <string>
-#include <glog/logging.h>
+
+#include "common/logging.h"
 
 namespace impala {
 

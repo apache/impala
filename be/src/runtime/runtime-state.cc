@@ -7,36 +7,40 @@
 
 #include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
-#include "runtime/descriptors.h"
 #include "common/status.h"
+#include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
 #include "util/jni-util.h"
+#include "util/path-builder.h"
 
 #include <jni.h>
 #include <iostream>
 
+using namespace llvm;
 using namespace std;
 using namespace boost::algorithm;
 
 namespace impala {
 
 RuntimeState::RuntimeState(
-    const TUniqueId& query_id, bool abort_on_error, int max_errors, int batchSize,
+    const TUniqueId& query_id, bool abort_on_error, int max_errors, int batch_size,
     bool llvm_enabled, ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
-    batch_size_(batchSize > 0 ? batchSize : DEFAULT_BATCH_SIZE),
+    batch_size_(batch_size > 0 ? batch_size : DEFAULT_BATCH_SIZE),
     file_buffer_size_(DEFAULT_FILE_BUFFER_SIZE),
     abort_on_error_(abort_on_error),
     max_errors_(max_errors),
     query_id_(query_id),
-    exec_env_(exec_env) {
+    exec_env_(exec_env),
+    profile_(obj_pool_.get(), "RuntimeState") {
   if (llvm_enabled) DCHECK(CreateCodegen().ok());  // TODO better error handling
 }
 
 RuntimeState::RuntimeState()
   : obj_pool_(new ObjectPool()),
     batch_size_(DEFAULT_BATCH_SIZE),
-    file_buffer_size_(DEFAULT_FILE_BUFFER_SIZE) {
+    file_buffer_size_(DEFAULT_FILE_BUFFER_SIZE),
+    profile_(obj_pool_.get(), "RuntimeState") {
 }
 
 Status RuntimeState::Init(
@@ -55,9 +59,14 @@ Status RuntimeState::Init(
 }
 
 Status RuntimeState::CreateCodegen() {
-  codegen_.reset(new LlvmCodeGen("QueryExecutor"));
+  // TODO: this is not production ready.  need to do something better.
+  string module_file;
+  PathBuilder::GetFullPath("be/build/llvm-ir/exec.ll", &module_file);
+  codegen_.reset(LlvmCodeGen::LoadFromFile(obj_pool_.get(), module_file.c_str()));
   codegen_->EnableOptimizations(true);
-  return codegen_->Init();
+  RETURN_IF_ERROR(codegen_->Init());
+  profile_.AddChild(codegen_->runtime_profile());
+  return Status::OK;
 }
 
 string RuntimeState::ErrorLog() const {

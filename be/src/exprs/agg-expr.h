@@ -13,6 +13,9 @@ class TExprNode;
 
 class AggregateExpr: public Expr {
  public:
+  // Returns the IR function for getting the agg expr input value
+  // Returns null if is_star_ is true.
+  virtual llvm::Function* Codegen(LlvmCodeGen* code_gen);
   TAggregationOp::type agg_op() const { return agg_op_; }
   bool is_star() const { return is_star_; }
   bool is_distinct() const { return is_distinct_; }

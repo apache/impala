@@ -5,15 +5,17 @@
 
 #include <vector>
 #include <cstring>
-#include <glog/logging.h>
 #include <boost/scoped_ptr.hpp>
 
-#include "runtime/tuple.h"
-#include "runtime/tuple-row.h"
-#include "gen-cpp/Data_types.h"  // scoped_ptr wants to see TRowBatch
+#include "common/logging.h"
+#include "runtime/descriptors.h"
+#include "runtime/mem-pool.h"
 
 namespace impala {
 
+class TRowBatch;
+class Tuple;
+class TupleRow;
 class TupleDescriptor;
 
 // A RowBatch encapsulates a batch of rows, each composed of a number of tuples.

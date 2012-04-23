@@ -243,7 +243,8 @@ queries = {'grep1GB': [
   ["select pageRank, pageURL from rankings_%(table_name)s where pageRank > 10 "\
    "order by pageRank limit 100", 0, 5],
   ["select count(*) from rankings_%(table_name)s where "\
-   "pageRank > 10 && pageRank < 25", 0, 5]
+   "pageRank > 10 && pageRank < 25", 0, 5],
+  ["select avg(adRevenue) from uservisits_%(table_name)s", 0, 5],
   ],
 
   'grep10GB': [

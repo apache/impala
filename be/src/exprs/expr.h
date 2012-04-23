@@ -157,8 +157,8 @@ class Expr {
                                 std::vector<Expr*>* exprs);
 
   // Prepare expr tree for evaluation, setting the compute_fn_ for each node
-  // in the tree. If the expr tree can be jit compiled, it will set the jitted function
-  // as the compute function for the root.
+  // in the tree. If codegen is enabled, this function will also codegen each node
+  // in the expr tree.  
   static Status Prepare(Expr* root, RuntimeState* state, const RowDescriptor& row_desc);
 
   // Prepare all exprs.
@@ -179,6 +179,7 @@ class Expr {
   // and then jit's this expr's compute function.  Returns NULL if the subtree
   // cannot be jitted.
   // Subclasses should override this function if it supports jitting.
+  // This function needs to set scratch_buffer_size_.
   virtual llvm::Function* Codegen(LlvmCodeGen* code_gen) {
     return NULL;
   }
@@ -186,6 +187,29 @@ class Expr {
   // Returns whether the subtree at this node is jittable.  This is temporary
   // until more expr types are supported.
   bool IsJittable(LlvmCodeGen*) const;
+
+  // Returns codegen function for the expr tree rooted at this expr.
+  llvm::Function* codegen_fn() { return codegen_fn_; }
+
+  // Returns the scratch buffer size needed to call codegen_fn
+  int scratch_buffer_size() { return scratch_buffer_size_; }
+
+  // Utility function to codegen a call to this expr (tree)'s codegen'd compute function.
+  // This function will codegen a call instruction, a branch to check for null and a
+  // jump to either the null or non-null block.
+  // Returns the result of the compute function (only valid in non-null branch).
+  // - caller: the code block from the calling function.  A call instruction will be 
+  //   added to the end of the block.
+  // - args: args to call this compute function with
+  // - null_block: block in caller function to jump to if the child is null
+  // - not_null_block: block in caller function to jump to if the child is not null
+  llvm::Value* CodegenGetValue(LlvmCodeGen* codegen, llvm::BasicBlock* caller,
+      llvm::Value** args, llvm::BasicBlock* null_block, llvm::BasicBlock* not_null_block);
+  
+  // This is a wrapper around CodegenGetValue() that is used by a parent Expr node to 
+  // call a child.  The parent args are used to call the child function.
+  llvm::Value* CodegenGetValue(LlvmCodeGen* codegen, llvm::BasicBlock* parent, 
+      llvm::BasicBlock* null_block, llvm::BasicBlock* not_null_block);
 
   virtual std::string DebugString() const;
   static std::string DebugString(const std::vector<Expr*>& exprs);
@@ -224,7 +248,14 @@ class Expr {
   std::vector<Expr*> children_;
   ExprValue result_;
 
-  // Create a compute function prototype.
+  // Codegened IR function.  Will be NULL if this expr was not codegen'd.
+  llvm::Function* codegen_fn_;
+
+  // Size of scratch buffer necessary to call codegen'd compute function.
+  // TODO: not implemented, always 0
+  int scratch_buffer_size_;
+
+  // Create a compute function prototype.  
   // The signature is:
   // <expr ret type> ComputeFn(TupleRow* row, char* state_data, bool* is_null)
   llvm::Function* CreateComputeFnPrototype(LlvmCodeGen* codegen, const std::string& name);
@@ -233,7 +264,7 @@ class Expr {
   llvm::Value* GetNullReturnValue(LlvmCodeGen* codegen);
 
   // Codegen IR to set the out is_null return arg to 'val'
-  void CodegenSetIsNullArg(LlvmCodeGen* codegen, llvm::Function* function, bool val);
+  void CodegenSetIsNullArg(LlvmCodeGen* codegen, llvm::BasicBlock* block, bool val);
 
   // Codegen call to child compute function, passing the arguments from this
   // compute function.
@@ -276,7 +307,7 @@ class Expr {
   // scratch_size is an out parameter for the required size of the scratch buffer
   // to call the jitted function.
   // Returns NULL if the function is not jittable.
-  void* CodegenExprTree(LlvmCodeGen* codegen, int* scratch_size);
+  llvm::Function* CodegenExprTree(LlvmCodeGen* codegen);
 
   // Compute function wrapper for jitted Expr trees.  This is temporary until
   // we are generating loops to evaluate batches of tuples.
@@ -289,9 +320,6 @@ class Expr {
   // for jitted functions depends on the Expr so we need to store it as
   // a void* and then cast it on invocation.
   void* jitted_compute_fn_;
-
-  // Size of scratch buffer necessary to call jitted compute function.
-  int scratch_buffer_size_;
 };
 
 // Reference to a single slot of a tuple.

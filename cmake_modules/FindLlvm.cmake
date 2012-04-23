@@ -7,17 +7,25 @@
 #  LLVM_MODULE_LIBS - list of llvm libs for working with modules.
 #  LLVM_FOUND       - True if llvm found.
 
-find_program(LLVM_CONFIG_EXECUTABLE 
-  NAMES llvm-config 
-  PATHS /usr/bin
-  DOC "llvm-config executable"
-)
+find_program(LLVM_CONFIG_EXECUTABLE llvm-config)
+find_program(LLVM_CLANG_EXECUTABLE clang++)
+find_program(LLVM_OPT_EXECUTABLE opt)
 
-if (LLVM_CONFIG_EXECUTABLE)
-  message(STATUS "LLVM llvm-config found at: ${LLVM_CONFIG_EXECUTABLE}")
-else (LLVM_CONFIG_EXECUTABLE)
-  message(FATAL_ERROR "Could NOT find LLVM executable")
-endif (LLVM_CONFIG_EXECUTABLE)
+if (NOT LLVM_CONFIG_EXECUTABLE)
+  message(FATAL_ERROR "Could not find llvm-config")
+endif (NOT LLVM_CONFIG_EXECUTABLE)
+
+if (NOT LLVM_CLANG_EXECUTABLE)
+  message(FATAL_ERROR "Could not find clang++")
+endif (NOT LLVM_CLANG_EXECUTABLE)
+
+if (NOT LLVM_OPT_EXECUTABLE)
+  message(FATAL_ERROR "Could not find llvm opt")
+endif (NOT LLVM_OPT_EXECUTABLE)
+
+message(STATUS "LLVM llvm-config found at: ${LLVM_CONFIG_EXECUTABLE}")
+message(STATUS "LLVM clang++ found at: ${CLANG_EXECUTABLE}")
+message(STATUS "LLVM opt found at: ${LLVM_OPT_EXECUTABLE}")
 
 execute_process(
   COMMAND ${LLVM_CONFIG_EXECUTABLE} --includedir
@@ -69,3 +77,4 @@ message(STATUS "LLVM include dir: ${LLVM_INCLUDE_DIR}")
 message(STATUS "LLVM lib dir: ${LLVM_LIBRARY_DIR}")
 message(STATUS "LLVM libs: ${LLVM_MODULE_LIBS}")
 message(STATUS "LLVM compile flags: ${LLVM_CFLAGS}")
+

@@ -43,7 +43,7 @@ public class DataErrorsTest {
   }
 
   private void runErrorTestFile(String testFile, boolean abortOnError, int maxErrors,
-      ArrayList<String> tables) {
+      boolean disableCodegen, ArrayList<String> tables) {
     StringBuilder errorLog = new StringBuilder();
     String fileName = testDir + "/" + testFile + ".test";
     TestFileParser queryFileParser = new TestFileParser(fileName);
@@ -85,14 +85,17 @@ public class DataErrorsTest {
           // in the execution engine code
           String query = testCase.getQuery();
           TestUtils.runQuery(executor, query, 1, 0,
-              abortOnError, maxErrors, testCase.getStartingLineNum(), null, null, null,
-              null, null, expectedErrors, expectedFileErrors, testErrorLog);
+              abortOnError, maxErrors, disableCodegen, testCase.getStartingLineNum(),
+              null, null, null, null, null, expectedErrors, expectedFileErrors,
+              testErrorLog);
           TestUtils.runQuery(executor, query, 1, 16,
-              abortOnError, maxErrors, testCase.getStartingLineNum(), null, null, null,
-              null, null, expectedErrors, expectedFileErrors, testErrorLog);
+              abortOnError, maxErrors, disableCodegen, testCase.getStartingLineNum(),
+              null, null, null, null, null, expectedErrors, expectedFileErrors,
+              testErrorLog);
           TestUtils.runQuery(executor, query, 1, 1,
-              abortOnError, maxErrors, testCase.getStartingLineNum(), null, null, null,
-              null, null, expectedErrors, expectedFileErrors, testErrorLog);
+              abortOnError, maxErrors, disableCodegen, testCase.getStartingLineNum(),
+              null, null, null, null, null, expectedErrors, expectedFileErrors,
+              testErrorLog);
         }
       }
 
@@ -104,15 +107,15 @@ public class DataErrorsTest {
 
   @Test
   public void TestHdfsScanNodeErrors() {
-    runErrorTestFile("hdfs-scan-node-errors", false, 100, tableList);
-    runErrorTestFile("hdfs-scan-node-errors", false, 5, tableList);
-    runErrorTestFile("hdfs-scan-node-errors", true, 1, tableList);
+    runErrorTestFile("hdfs-scan-node-errors", false, 100, true, tableList);
+    runErrorTestFile("hdfs-scan-node-errors", false, 5, true, tableList);
+    runErrorTestFile("hdfs-scan-node-errors", true, 1, true, tableList);
   }
 
   @Test
   public void TestHBaseScanNodeErrors() {
-    runErrorTestFile("hbase-scan-node-errors", false, 100, null);
-    runErrorTestFile("hbase-scan-node-errors", false, 5, null);
-    runErrorTestFile("hbase-scan-node-errors", true, 1, null);
+    runErrorTestFile("hbase-scan-node-errors", false, 100, true, null);
+    runErrorTestFile("hbase-scan-node-errors", false, 5, true, null);
+    runErrorTestFile("hbase-scan-node-errors", true, 1, true, null);
   }
 }

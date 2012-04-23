@@ -52,7 +52,8 @@ DEFINE_int32(num_nodes, 1,
 DEFINE_int32(backend_port, 21000,
     "start port for backend threads (assigned sequentially)");
 DEFINE_string(coord_host, "localhost", "hostname of coordinator");
-DEFINE_bool(enable_expr_jit, true, "if true, jit expr trees if possible");
+// TODO: we probably want to add finer grain control of what is codegen'd
+DEFINE_bool(enable_jit, true, "if true, enable codegen for query execution");
 
 using namespace std;
 using namespace boost;
@@ -130,7 +131,7 @@ static void StartServer() {
 }
 
 void InProcessQueryExecutor::DisableJit() {
-  FLAGS_enable_expr_jit = false;
+  FLAGS_enable_jit = false;
 }
 
 Status InProcessQueryExecutor::Setup() {
@@ -187,8 +188,9 @@ Status InProcessQueryExecutor::Exec(const string& query, vector<PrimitiveType>* 
     DCHECK(!query_request_.fragmentRequests[0].__isset.planFragment);
     local_state_.reset(
         new RuntimeState(query_request_.queryId, FLAGS_abort_on_error,
-                         FLAGS_max_errors, FLAGS_batch_size,
-                         FLAGS_enable_expr_jit, NULL));
+                         FLAGS_max_errors, FLAGS_batch_size, 
+                         FLAGS_enable_jit, NULL));
+    query_profile_->AddChild(local_state_->runtime_profile());
     RETURN_IF_ERROR(
         PrepareSelectListExprs(local_state_.get(), RowDescriptor(), col_types));
     return Status::OK;

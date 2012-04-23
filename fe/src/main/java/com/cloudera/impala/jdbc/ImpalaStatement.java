@@ -86,7 +86,8 @@ public class ImpalaStatement implements Statement {
       executor.runQuery(
           request, colTypes, colLabels, null, Executor.DEFAULT_BATCH_SIZE,
           Executor.DEFAULT_ABORT_ON_ERROR, Executor.DEFAULT_MAX_ERRORS,
-          errorLog, fileErrors, resultQueue, insertResult);
+          Executor.DEFAULT_DISABLE_CODEGEN, errorLog, fileErrors, resultQueue,
+          insertResult);
     } catch (ImpalaException e) {
       throw new SQLException(e);
     }

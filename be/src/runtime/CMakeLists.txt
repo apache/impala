@@ -27,6 +27,7 @@ add_library(Runtime STATIC
   string-value.cc
   timestamp-value.cc
   tuple.cc
+  tuple-row.cc
 )
 
 add_executable(mem-pool-test mem-pool-test.cc)

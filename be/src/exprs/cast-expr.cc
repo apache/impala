@@ -50,7 +50,7 @@ Function* CastExpr::Codegen(LlvmCodeGen* codegen) {
   if (child_function == NULL) return NULL;
 
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
+  LlvmCodeGen::LlvmBuilder builder(context);
   Type* return_type = codegen->GetType(type());
   Function* function = CreateComputeFnPrototype(codegen, "CastExpr");
   
@@ -59,13 +59,13 @@ Function* CastExpr::Codegen(LlvmCodeGen* codegen) {
     BasicBlock::Create(context, "child_not_null", function);
   BasicBlock* ret_block = BasicBlock::Create(context, "ret_block", function);
   
-  builder->SetInsertPoint(entry_block);
+  builder.SetInsertPoint(entry_block);
   // Call child function
-  Value* child_value = CodegenCallFn(codegen, function, child_function, 
+  Value* child_value = children()[0]->CodegenGetValue(codegen, entry_block,
       ret_block, child_not_null_block);
   
   // Do the cast
-  builder->SetInsertPoint(child_not_null_block);
+  builder.SetInsertPoint(child_not_null_block);
   Value* result = NULL;
   switch (op()) {
     case TExprOpcode::CAST_BOOL_CHAR:
@@ -78,7 +78,7 @@ Function* CastExpr::Codegen(LlvmCodeGen* codegen) {
     case TExprOpcode::CAST_SHORT_INT:
     case TExprOpcode::CAST_SHORT_LONG:
     case TExprOpcode::CAST_INT_LONG:
-      result = builder->CreateSExt(child_value, return_type, "tmp_cast");
+      result = builder.CreateSExt(child_value, return_type, "tmp_cast");
       break;
  
     case TExprOpcode::CAST_CHAR_BOOL:
@@ -91,7 +91,7 @@ Function* CastExpr::Codegen(LlvmCodeGen* codegen) {
     case TExprOpcode::CAST_INT_SHORT:
     case TExprOpcode::CAST_LONG_SHORT:
     case TExprOpcode::CAST_LONG_INT:
-      result = builder->CreateTrunc(child_value, return_type, "tmp_cast");
+      result = builder.CreateTrunc(child_value, return_type, "tmp_cast");
       break;
 
     case TExprOpcode::CAST_BOOL_FLOAT:
@@ -104,7 +104,7 @@ Function* CastExpr::Codegen(LlvmCodeGen* codegen) {
     case TExprOpcode::CAST_SHORT_DOUBLE:
     case TExprOpcode::CAST_INT_DOUBLE:
     case TExprOpcode::CAST_LONG_DOUBLE:
-      result = builder->CreateSIToFP(child_value, return_type, "tmp_cast");
+      result = builder.CreateSIToFP(child_value, return_type, "tmp_cast");
       break;
 
     case TExprOpcode::CAST_FLOAT_BOOL:
@@ -117,29 +117,29 @@ Function* CastExpr::Codegen(LlvmCodeGen* codegen) {
     case TExprOpcode::CAST_DOUBLE_SHORT:
     case TExprOpcode::CAST_DOUBLE_INT:
     case TExprOpcode::CAST_DOUBLE_LONG:
-      result = builder->CreateFPToSI(child_value, return_type, "tmp_cast");
+      result = builder.CreateFPToSI(child_value, return_type, "tmp_cast");
 
     case TExprOpcode::CAST_FLOAT_DOUBLE:
-      result = builder->CreateFPExt(child_value, return_type, "tmp_cast");
+      result = builder.CreateFPExt(child_value, return_type, "tmp_cast");
       break;
 
     case TExprOpcode::CAST_DOUBLE_FLOAT:
-      result = builder->CreateFPTrunc(child_value, return_type, "tmp_cast");
+      result = builder.CreateFPTrunc(child_value, return_type, "tmp_cast");
       break;
 
     default:
       DCHECK(false) << "Unknown op: " << op();
       return NULL;
   }
-  builder->CreateBr(ret_block);
+  builder.CreateBr(ret_block);
 
   // Return block.  is_null return does not have to set explicitly, propagated from child
   // Use a phi node to coalesce results.
-  builder->SetInsertPoint(ret_block);
-  PHINode* phi_node = builder->CreatePHI(return_type, 2, "tmp_phi");
+  builder.SetInsertPoint(ret_block);
+  PHINode* phi_node = builder.CreatePHI(return_type, 2, "tmp_phi");
   phi_node->addIncoming(GetNullReturnValue(codegen), entry_block);
   phi_node->addIncoming(result, child_not_null_block);
-  builder->CreateRet(phi_node);
+  builder.CreateRet(phi_node);
 
   if (!codegen->VerifyFunction(function)) return NULL;
   return function;

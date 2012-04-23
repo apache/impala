@@ -1,13 +1,15 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
-#include "exprs/timestamp-functions.h"
-#include "exprs/expr.h"
-#include "runtime/tuple-row.h"
-#include "runtime/timestamp-value.h"
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/date_time/time_zone_base.hpp>
 #include <boost/date_time/local_time/local_time.hpp>
+
+#include "exprs/timestamp-functions.h"
+#include "exprs/expr.h"
+#include "runtime/tuple-row.h"
+#include "runtime/timestamp-value.h"
+#include "util/path-builder.h"
 
 #define TIMEZONE_DATABASE "be/files/date_time_zonespec.csv"
 
@@ -211,10 +213,9 @@ void* TimestampFunctions::ToUtc(Expr* e, TupleRow* row) {
 }
 
 TimezoneDatabase::TimezoneDatabase() {
-  char* home = getenv("IMPALA_HOME");
-  char buf[strlen(TIMEZONE_DATABASE) + strlen(home) + 2];
-  sprintf(buf, "%s/%s", home, TIMEZONE_DATABASE);
-  tz_database_.load_from_file(buf);
+  string file;
+  PathBuilder::GetFullPath(TIMEZONE_DATABASE, &file);
+  tz_database_.load_from_file(file);
   tz_region_list_ = tz_database_.region_list();
 }
 

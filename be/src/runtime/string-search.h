@@ -5,9 +5,9 @@
 
 #include <vector>
 #include <cstring>
-#include <glog/logging.h>
 #include <boost/cstdint.hpp>
 
+#include "common/logging.h"
 #include "runtime/string-value.h"
 
 namespace impala {

@@ -13,7 +13,8 @@ struct TSlotDescriptor {
   5: required i32 byteOffset  // into tuple
   6: required i32 nullIndicatorByte
   7: required i32 nullIndicatorBit
-  8: required bool isMaterialized
+  9: required i32 slotIdx
+  10: required bool isMaterialized
 }
 
 enum TTableType {
@@ -57,7 +58,8 @@ struct TTableDescriptor {
 struct TTupleDescriptor {
   1: required Types.TTupleId id
   2: required i32 byteSize
-  3: optional Types.TTableId tableId
+  3: required i32 numNullBytes
+  4: optional Types.TTableId tableId
 }
 
 struct TDescriptorTable {

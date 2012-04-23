@@ -76,6 +76,8 @@ Expr::Expr(PrimitiveType type)
     : opcode_(TExprOpcode::INVALID_OPCODE),
       is_slotref_(false),
       type_(type),
+      codegen_fn_(NULL),
+      scratch_buffer_size_(0),
       jitted_compute_fn_(NULL) {
 }
 
@@ -83,6 +85,8 @@ Expr::Expr(const TExprNode& node)
     : opcode_(node.__isset.opcode ? node.opcode : TExprOpcode::INVALID_OPCODE),
       is_slotref_(false),
       type_(ThriftToType(node.type)),
+      codegen_fn_(NULL),
+      scratch_buffer_size_(0),
       jitted_compute_fn_(NULL) {
 }
 
@@ -90,6 +94,8 @@ Expr::Expr(const TExprNode& node, bool is_slotref)
     : opcode_(node.__isset.opcode ? node.opcode : TExprOpcode::INVALID_OPCODE),
       is_slotref_(is_slotref),
       type_(ThriftToType(node.type)),
+      codegen_fn_(NULL),
+      scratch_buffer_size_(0),
       jitted_compute_fn_(NULL) {
 }
 
@@ -413,14 +419,11 @@ Status Expr::Prepare(Expr* root, RuntimeState* state, const RowDescriptor& row_d
 
   // codegen == NULL means jitting is disabled.
   if (codegen != NULL && root->IsJittable(codegen)) {
-    int scratch_size = 0;
-    void* codegen_fn = root->CodegenExprTree(codegen, &scratch_size);
-    // TODO: This will be NULL for AggExpr.  We need to make this logic more
-    // sophisticated and be able to swap out the compute function with the
-    // jitted one for subtrees (and not just entire trees).
-    if (codegen_fn != NULL) {
-      // Replace the compute function with the jitted function
-      root->SetComputeFn(codegen_fn, scratch_size);
+    Function* fn = root->CodegenExprTree(codegen);
+    if (fn != NULL) {
+      void* jitted_fn = codegen->JitFunction(fn);
+      DCHECK(jitted_fn != NULL);
+      root->SetComputeFn(jitted_fn, 0);
     }
   }
   return Status::OK;
@@ -454,7 +457,7 @@ string Expr::DebugString() const {
   if (opcode_ != TExprOpcode::INVALID_OPCODE) {
     out << " opcode=" << opcode_;
   }
-  out << " jitted=" << (jitted_compute_fn_ == NULL ? "false" : "true");
+  out << " codegen=" << (codegen_fn_ == NULL ? "false" : "true");
   if (!children_.empty()) {
     out << " children=" << DebugString(children_);
   }
@@ -479,6 +482,7 @@ bool Expr::IsConstant() const {
 }
 
 Function* Expr::CreateComputeFnPrototype(LlvmCodeGen* codegen, const string& name) {
+  DCHECK(codegen_fn_ == NULL);
   Type* ret_type = codegen->GetType(type());
   Type* ptr_type = codegen->ptr_type();
 
@@ -488,7 +492,9 @@ Function* Expr::CreateComputeFnPrototype(LlvmCodeGen* codegen, const string& nam
   prototype.AddArgument(LlvmCodeGen::NamedVariable("is_null", codegen->bool_ptr_type()));
 
   Function* function = prototype.GeneratePrototype();
+  DCHECK(function != NULL);
   codegen->AddInlineFunction(function);
+  codegen_fn_ = function;
   return function;
 }
 
@@ -515,29 +521,35 @@ Value* Expr::GetNullReturnValue(LlvmCodeGen* codegen) {
   }
 }
 
-void Expr::CodegenSetIsNullArg(LlvmCodeGen* codegen, Function* function, bool val) {
-  Function::arg_iterator func_args = function->arg_begin();
+void Expr::CodegenSetIsNullArg(LlvmCodeGen* codegen, BasicBlock* block, bool val) {
+  LlvmCodeGen::LlvmBuilder builder(block);
+  Function::arg_iterator func_args = block->getParent()->arg_begin();
   ++func_args;
   ++func_args;
   Value* is_null_ptr = func_args;
   Value* value = val ? codegen->true_value() : codegen->false_value();
-  codegen->builder()->CreateStore(value, is_null_ptr);
+  builder.CreateStore(value, is_null_ptr);
 }
 
-Value* Expr::CodegenCallFn(LlvmCodeGen* codegen, Function* parent, Function* child,
-    BasicBlock* null_block, BasicBlock* not_null_block) {
-  Function::arg_iterator func_args = parent->arg_begin();
-  Value* row_ptr = func_args++;
-  Value* state_data_ptr = func_args++;
-  Value* is_null_ptr = func_args;
-  Value* args[3] = { row_ptr, state_data_ptr, is_null_ptr };
-  Value* result = codegen->builder()->CreateCall(child, args, "child_result");
-  Value* is_null_val = codegen->builder()->CreateLoad(is_null_ptr, "child_null");
-  codegen->builder()->CreateCondBr(is_null_val, null_block, not_null_block);
+Value* Expr::CodegenGetValue(LlvmCodeGen* codegen, BasicBlock* caller, 
+    Value* args[3], BasicBlock* null_block, BasicBlock* not_null_block) {
+  DCHECK(codegen_fn() != NULL);
+  LlvmCodeGen::LlvmBuilder builder(caller);
+  Value* result = builder.CreateCall3(
+      codegen_fn(), args[0], args[1], args[2], "child_result");
+  Value* is_null_val = builder.CreateLoad(args[2], "child_null");
+  builder.CreateCondBr(is_null_val, null_block, not_null_block);
   return result;
 }
 
-// typedefs for jitted compute functions
+Value* Expr::CodegenGetValue(LlvmCodeGen* codegen, BasicBlock* parent, 
+    BasicBlock* null_block, BasicBlock* not_null_block) {
+  Function::arg_iterator parent_args = parent->getParent()->arg_begin();
+  Value* args[3] = { parent_args++, parent_args++, parent_args };
+  return CodegenGetValue(codegen, parent, args, null_block, not_null_block);
+}
+
+// typedefs for jitted compute functions  
 typedef bool (*BoolComputeFn)(TupleRow*, char* , bool*);
 typedef int8_t (*TinyIntComputeFn)(TupleRow*, char*, bool*);
 typedef int16_t (*SmallIntComputeFn)(TupleRow*, char*, bool*);
@@ -609,17 +621,14 @@ void Expr::SetComputeFn(void* jitted_function, int scratch_size) {
 }
 
 bool Expr::IsJittable(LlvmCodeGen* codegen) const {
-  if (codegen->GetType(type()) == NULL) return false;
+  if (type() == TYPE_STRING || type() == TYPE_TIMESTAMP) return false;
   for (int i = 0; i < GetNumChildren(); ++i) {
     if (!children()[i]->IsJittable(codegen)) return false;
   }
   return true;
 }
 
-void* Expr::CodegenExprTree(LlvmCodeGen* codegen, int* scratch_size) {
-  Function* function = this->Codegen(codegen);
-  if (function == NULL) {
-    return NULL;
-  }
-  return codegen->JitFunction(function, scratch_size);
+Function* Expr::CodegenExprTree(LlvmCodeGen* codegen) {
+  COUNTER_SCOPED_TIMER(codegen->codegen_timer());
+  return this->Codegen(codegen);
 }

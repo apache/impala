@@ -25,6 +25,7 @@ public class SlotDescriptor {
   private int byteOffset;  // within tuple
   private int nullIndicatorByte;  // index into byte array
   private int nullIndicatorBit; // index within byte
+  private int slotIdx;          // index within tuple struct
 
   SlotDescriptor(int id, TupleDescriptor parent) {
     this.id = new SlotId(id);
@@ -107,11 +108,16 @@ public class SlotDescriptor {
     this.byteOffset = byteOffset;
   }
 
+  public void setSlotIdx(int slotIdx) {
+    this.slotIdx = slotIdx;
+  }
+
   public TSlotDescriptor toThrift() {
     return new TSlotDescriptor(
         id.asInt(), parent.getId().asInt(), type.toThrift(),
         ((column != null) ? column.getPosition() : -1),
-        byteOffset, nullIndicatorByte, nullIndicatorBit, isMaterialized);
+        byteOffset, nullIndicatorByte, nullIndicatorBit,
+        slotIdx, isMaterialized);
   }
 
   public String debugString() {
@@ -126,6 +132,7 @@ public class SlotDescriptor {
         .add("byteOffset", byteOffset)
         .add("nullIndicatorByte", nullIndicatorByte)
         .add("nullIndicatorBit", nullIndicatorBit)
+        .add("slotIdx", slotIdx)
         .toString();
   }
 }

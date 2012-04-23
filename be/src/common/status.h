@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-#include <glog/logging.h>
+#include "common/logging.h"
 #include "common/compiler-util.h"
 #include "gen-cpp/Types_types.h"  // for TStatus
 

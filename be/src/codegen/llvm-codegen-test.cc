@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include "codegen/llvm-codegen.h"
+#include "util/path-builder.h"
 
 #include <boost/thread/thread.hpp>
 
@@ -14,11 +15,12 @@ using namespace llvm;
 namespace impala {
 
 void LifetimeTest() {
+  ObjectPool pool;
   Status status;
   for (int i = 0; i < 10; ++i) {
-    LlvmCodeGen object1("Test");
-    LlvmCodeGen object2("Test");
-    LlvmCodeGen object3("Test");
+    LlvmCodeGen object1(&pool, "Test");
+    LlvmCodeGen object2(&pool, "Test");
+    LlvmCodeGen object3(&pool, "Test");
     
     status = object1.Init();
     ASSERT_TRUE(status.ok());
@@ -50,33 +52,31 @@ TEST(LlvmMultithreadedLifetimeTest, Basic) {
 // IR for the generated linner loop
 // define void @JittedInnerLoop() {
 // entry:
-//   call void @DebugTrace(i8* inttoptr (i64 29347384 to i8*))
-//   %0 = load i64* bitcast (i64 140736121079224 to i64*)
+//   call void @DebugTrace(i8* inttoptr (i64 18970856 to i8*))
+//   %0 = load i64* inttoptr (i64 140735197627800 to i64*)
 //   %1 = add i64 %0, <delta>
-//   store i64 %1, i64* bitcast (i64 140736121079224 to i64*)
+//   store i64 %1, i64* inttoptr (i64 140735197627800 to i64*)
 //   ret void
 // }
 // The random int in there is the address of jitted_counter
 Function* CodegenInnerLoop(LlvmCodeGen* codegen, int64_t* jitted_counter, int delta) {
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
+  LlvmCodeGen::LlvmBuilder builder(context);
 
   LlvmCodeGen::FnPrototype fn_prototype(codegen, "JittedInnerLoop", codegen->void_type());
   Function* jitted_loop_call = fn_prototype.GeneratePrototype();
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", jitted_loop_call);
-  builder->SetInsertPoint(entry_block);
-  codegen->CodegenDebugTrace("Jitted");
+  builder.SetInsertPoint(entry_block);
+  codegen->CodegenDebugTrace(&builder, "Jitted");
 
   // Store &jitted_counter as a constant.
-  // TODO: there is probably a better way to pass a random pointer to llvm
-  Value* const_one = ConstantInt::get(context, APInt(64, delta));
-  Constant* ptr_as_int = ConstantInt::get(codegen->GetType(TYPE_BIGINT),
-      reinterpret_cast<int64_t>(jitted_counter));
-  Value* cast_ptr = builder->CreateBitCast(ptr_as_int, codegen->int64_ptr_type());
-  Value* loaded_counter = builder->CreateLoad(cast_ptr);
-  Value* incremented_value = builder->CreateAdd(loaded_counter, const_one);
-  builder->CreateStore(incremented_value, cast_ptr);
-  builder->CreateRetVoid();
+  Value* const_delta = ConstantInt::get(context, APInt(64, delta));
+  Value* counter_ptr = codegen->CastPtrToLlvmPtr(codegen->int64_ptr_type(), 
+      jitted_counter);
+  Value* loaded_counter = builder.CreateLoad(counter_ptr);
+  Value* incremented_value = builder.CreateAdd(loaded_counter, const_delta);
+  builder.CreateStore(incremented_value, counter_ptr);
+  builder.CreateRetVoid();
 
   return jitted_loop_call;
 }
@@ -94,17 +94,16 @@ Function* CodegenInnerLoop(LlvmCodeGen* codegen, int64_t* jitted_counter, int de
 //   5. Updated the jitted loop in place with another jitted inner loop function
 //   6. Run the loop and make sure the updated is called.
 TEST(LlvmUpdateModuleTest, Basic) {
-  const char* test_ir_file = "testdata/llvm/test-loop.ir";
+  ObjectPool pool;
   const char* loop_call_name = "DefaultImplementation";
   const char* loop_name = "TestLoop";
   typedef void (*TestLoopFn)(int);
   
-  char* home = getenv("IMPALA_HOME");
-  char module_file[strlen(test_ir_file) + strlen(home) + 2];
-  sprintf(module_file, "%s/%s", home, test_ir_file);
+  string module_file;
+  PathBuilder::GetFullPath("testdata/llvm/test-loop.ir", &module_file);
 
   // Part 1: Load the module and make sure everything is loaded correctly.
-  LlvmCodeGen* codegen = LlvmCodeGen::LoadFromFile(module_file);
+  LlvmCodeGen* codegen = LlvmCodeGen::LoadFromFile(&pool, module_file.c_str());
   EXPECT_TRUE(codegen != NULL);
   Status status = codegen->Init();
   EXPECT_TRUE(status.ok());
@@ -145,7 +144,7 @@ TEST(LlvmUpdateModuleTest, Basic) {
   // jitted one
   int num_replaced;
   Function* jitted_loop = codegen->ReplaceCallSites(
-      loop, false, jitted_loop_call, loop_call_name, &num_replaced);
+      loop, false, jitted_loop_call, loop_call_name, false, &num_replaced);
   EXPECT_EQ(num_replaced, 1);
   EXPECT_TRUE(codegen->VerifyFunction(jitted_loop));
 
@@ -164,7 +163,7 @@ TEST(LlvmUpdateModuleTest, Basic) {
   // Part5: Generate a new inner loop function and a new loop function in place
   Function* jitted_loop_call2 = CodegenInnerLoop(codegen, &jitted_counter, -2);
   Function* jitted_loop2 = codegen->ReplaceCallSites(loop, true, jitted_loop_call2, 
-      loop_call_name, &num_replaced);
+      loop_call_name, false, &num_replaced);
   EXPECT_EQ(num_replaced, 1);
   EXPECT_TRUE(codegen->VerifyFunction(jitted_loop2));
 

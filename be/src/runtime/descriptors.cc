@@ -7,10 +7,15 @@
 #include <ios>
 #include <sstream>
 
+#include <llvm/ExecutionEngine/ExecutionEngine.h>
+#include <llvm/Target/TargetData.h>
+
+#include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
 #include "gen-cpp/Descriptors_types.h"
 #include "gen-cpp/PlanNodes_types.h"
 
+using namespace llvm;
 using namespace std;
 using namespace boost::algorithm;
 
@@ -40,7 +45,11 @@ SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc)
     col_pos_(tdesc.columnPos),
     tuple_offset_(tdesc.byteOffset),
     null_indicator_offset_(tdesc.nullIndicatorByte, tdesc.nullIndicatorBit),
-    is_materialized_(tdesc.isMaterialized) {
+    slot_idx_(tdesc.slotIdx),
+    field_idx_(-1),
+    is_materialized_(tdesc.isMaterialized),
+    is_null_fn_(NULL),
+    set_not_null_fn_(NULL) {
 }
 
 std::string SlotDescriptor::DebugString() const {
@@ -115,7 +124,9 @@ TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
   : id_(tdesc.id),
     table_desc_(NULL),
     byte_size_(tdesc.byteSize),
-    slots_() {
+    num_null_bytes_(tdesc.numNullBytes),
+    slots_(),
+    llvm_struct_(NULL) {
 }
 
 void TupleDescriptor::AddSlot(SlotDescriptor* slot) {
@@ -282,6 +293,133 @@ void DescriptorTbl::GetTupleDescs(vector<TupleDescriptor*>* descs) const {
        i != tuple_desc_map_.end(); ++i) {
     descs->push_back(i->second);
   }
+}
+
+// Generate function to check if a slot is null.  The resulting IR looks like:
+// (in this case the tuple contains only a nullable double)
+// define i1 @IsNull({ i8, double }* %tuple) {
+// entry:
+//   %null_byte_ptr = getelementptr inbounds { i8, double }* %tuple, i32 0, i32 0
+//   %null_byte = load i8* %null_byte_ptr
+//   %null_mask = and i8 %null_byte, 1
+//   %is_null = icmp ne i8 %null_mask, 0
+//   ret i1 %is_null
+// }
+Function* SlotDescriptor::CodegenIsNull(LlvmCodeGen* codegen, StructType* tuple) {
+  if (is_null_fn_ != NULL) return is_null_fn_;
+  PointerType* tuple_ptr_type = PointerType::get(tuple, 0);
+  LlvmCodeGen::FnPrototype prototype(codegen, "IsNull", codegen->GetType(TYPE_BOOLEAN));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("tuple", tuple_ptr_type));
+  
+  Value* mask = codegen->GetIntConstant(TYPE_TINYINT, null_indicator_offset_.bit_mask);
+  Value* zero = codegen->GetIntConstant(TYPE_TINYINT, 0);
+  int byte_offset = null_indicator_offset_.byte_offset;
+  
+  LlvmCodeGen::LlvmBuilder builder(codegen->context());
+  Value* tuple_ptr;
+  Function* fn = prototype.GeneratePrototype(&builder, &tuple_ptr);
+
+  Value* null_byte_ptr = builder.CreateStructGEP(tuple_ptr, byte_offset, "null_byte_ptr");
+  Value* null_byte = builder.CreateLoad(null_byte_ptr, "null_byte");
+  Value* null_mask = builder.CreateAnd(null_byte, mask, "null_mask");
+  Value* is_null = builder.CreateICmpNE(null_mask, zero, "is_null");
+  builder.CreateRet(is_null);
+
+  if (!codegen->VerifyFunction(fn)) return NULL;
+  codegen->AddInlineFunction(fn);
+  is_null_fn_ = fn;
+  return fn;
+}
+
+// Generate function to set a slot to be non-null.  The resulting IR looks like:
+// (in this case the tuple contains only a nullable double)
+// define void @SetNotNull({ i8, double }* %tuple) {
+// entry:
+//   %null_byte_ptr = getelementptr inbounds { i8, double }* %tuple, i32 0, i32 0
+//   %null_byte = load i8* %null_byte_ptr
+//   %0 = and i8 %null_byte, -2
+//   store i8 %0, i8* %null_byte_ptr
+//   ret void
+// }
+Function* SlotDescriptor::CodegenSetNotNull(LlvmCodeGen* codegen, StructType* tuple) {
+  if (set_not_null_fn_ != NULL) return set_not_null_fn_;
+  PointerType* tuple_ptr_type = PointerType::get(tuple, 0);
+  LlvmCodeGen::FnPrototype prototype(codegen, "SetNotNull", codegen->void_type());
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("tuple", tuple_ptr_type));
+  
+  LlvmCodeGen::LlvmBuilder builder(codegen->context());
+  Value* tuple_ptr;
+  Function* fn = prototype.GeneratePrototype(&builder, &tuple_ptr);
+  
+  Value* null_clear_val = 
+      codegen->GetIntConstant(TYPE_TINYINT, ~null_indicator_offset_.bit_mask);
+  Value* null_byte_ptr = 
+      builder.CreateStructGEP(
+          tuple_ptr, null_indicator_offset_.byte_offset, "null_byte_ptr");
+  Value* null_byte = builder.CreateLoad(null_byte_ptr, "null_byte");
+  Value* null_cleared = builder.CreateAnd(null_byte, null_clear_val);
+  builder.CreateStore(null_cleared, null_byte_ptr);
+  builder.CreateRetVoid();
+
+  if (!codegen->VerifyFunction(fn)) return NULL;
+  codegen->AddInlineFunction(fn);
+  set_not_null_fn_ = fn;
+  return fn;
+}
+
+// The default llvm packing is identical to what we do in the FE.  Each field is aligned
+// to begin on the size for that type.
+// TODO: Understand llvm::SetTargetData which allows you to explicitly define the packing
+// rules.
+StructType* TupleDescriptor::GenerateLlvmStruct(LlvmCodeGen* codegen) {
+  // If we already generated the llvm type, just return it.
+  if (llvm_struct_ != NULL) return llvm_struct_;
+
+  // For each null byte, add a byte to the struct
+  vector<Type*> struct_fields;
+  struct_fields.resize(num_null_bytes_ + slots().size());
+  for (int i = 0; i < num_null_bytes_; ++i) {
+    struct_fields[i] = codegen->GetType(TYPE_TINYINT);
+  }
+
+  // Add the slot types to the struct description.  
+  for (int i = 0; i < slots().size(); ++i) {
+    SlotDescriptor* slot_desc = slots()[i];
+    if (slot_desc->is_materialized()) {
+      slot_desc->field_idx_ = slot_desc->slot_idx_ + num_null_bytes_;
+      DCHECK_LT(slot_desc->field_idx(), struct_fields.size());
+      struct_fields[slot_desc->field_idx()] = codegen->GetType(slot_desc->type());
+    }
+  }
+
+  // Construct the struct type.
+  StructType* tuple_struct = StructType::get(codegen->context(), 
+      ArrayRef<Type*>(struct_fields));
+
+  // Verify the alignment is correct.  It is essential that the layout matches 
+  // identically.  If the layout does not match, return NULL indicating the
+  // struct could not be codegen'd.  This will trigger codegen for anything using
+  // the tuple to be disabled.
+  const TargetData* target_data = codegen->execution_engine()->getTargetData();
+  const StructLayout* layout = target_data->getStructLayout(tuple_struct);
+  if (layout->getSizeInBytes() != byte_size()) {
+    DCHECK_EQ(layout->getSizeInBytes(), byte_size());
+    return NULL;
+  }
+  for (int i = 0; i < slots().size(); ++i) {
+    SlotDescriptor* slot_desc = slots()[i];
+    if (slot_desc->is_materialized()) {
+      int field_idx = slot_desc->field_idx();
+      // Verify that the byte offset in the llvm struct matches the tuple offset
+      // computed in the FE
+      if (layout->getElementOffset(field_idx) != slot_desc->tuple_offset()) {
+        DCHECK_EQ(layout->getElementOffset(field_idx), slot_desc->tuple_offset());
+        return NULL;
+      }
+    }
+  }
+  llvm_struct_ = tuple_struct;
+  return tuple_struct;
 }
 
 string DescriptorTbl::DebugString() const {

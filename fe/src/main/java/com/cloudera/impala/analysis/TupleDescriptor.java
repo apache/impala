@@ -22,6 +22,7 @@ public class TupleDescriptor {
   private boolean isMaterialized = true;
 
   private int byteSize;  // of all slots plus null indicators
+  private int numNullBytes;
 
   TupleDescriptor(int id) {
     this.id = new TupleId(id);
@@ -76,7 +77,8 @@ public class TupleDescriptor {
   }
 
   public TTupleDescriptor toThrift() {
-    TTupleDescriptor ttupleDesc = new TTupleDescriptor(id.asInt(), byteSize);
+    TTupleDescriptor ttupleDesc =
+        new TTupleDescriptor(id.asInt(), byteSize, numNullBytes);
     if (table != null) {
       ttupleDesc.setTableId(table.getId().asInt());
     }
@@ -104,10 +106,13 @@ public class TupleDescriptor {
     Preconditions.checkState(slotsBySize.get(0).isEmpty());
 
     // assign offsets to slots in order of ascending size
-    int numNullIndicatorBytes = (numNullableSlots + 7) / 8;
-    int offset = numNullIndicatorBytes;
+    numNullBytes = (numNullableSlots + 7) / 8;
+    int offset = numNullBytes;
     int nullIndicatorByte = 0;
     int nullIndicatorBit = 0;
+    // slotIdx is the index into the resulting tuple struct.  The first (smallest) field
+    // is 0, next is 1, etc.
+    int slotIdx = 0;
     for (int slotSize = 1; slotSize <= PrimitiveType.getMaxSlotSize(); ++slotSize) {
       if (slotsBySize.get(slotSize).isEmpty()) {
         continue;
@@ -120,6 +125,7 @@ public class TupleDescriptor {
       for (SlotDescriptor d: slotsBySize.get(slotSize)) {
         d.setByteSize(slotSize);
         d.setByteOffset(offset);
+        d.setSlotIdx(slotIdx++);
         offset += slotSize;
 
         // assign null indicator

@@ -128,12 +128,12 @@ string IntLiteral::DebugString() const {
 Function* IntLiteral::Codegen(LlvmCodeGen* codegen) {
   DCHECK_EQ(GetNumChildren(), 0);
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
+  LlvmCodeGen::LlvmBuilder builder(context);
 
   Function* function = CreateComputeFnPrototype(codegen, "IntLiteral");
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
   
-  builder->SetInsertPoint(entry_block);
+  builder.SetInsertPoint(entry_block);
   Value* result = NULL;
   switch (type()) {
     case TYPE_TINYINT:
@@ -153,8 +153,8 @@ Function* IntLiteral::Codegen(LlvmCodeGen* codegen) {
       return NULL;
   }
   
-  CodegenSetIsNullArg(codegen, function, false);
-  builder->CreateRet(result);
+  CodegenSetIsNullArg(codegen, entry_block, false);
+  builder.CreateRet(result);
 
   if (!codegen->VerifyFunction(function)) return NULL;
   return function;

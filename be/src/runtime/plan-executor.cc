@@ -23,7 +23,7 @@
 #include "gen-cpp/Data_types.h"
 
 DEFINE_bool(serialize_batch, false, "serialize and deserialize each returned row batch");
-DECLARE_bool(enable_expr_jit);
+DECLARE_bool(enable_jit);
 
 using namespace std;
 using namespace boost;
@@ -46,9 +46,17 @@ Status PlanExecutor::Prepare(
   
   //VLOG(1) << "plan exec request:\n" << ThriftDebugString(request);
   VLOG(1) << "params:\n" << ThriftDebugString(params);
+
+  // If FE disables it, turn it off, otherwise, use the BE setting
+  bool enable_llvm;
+  if (params.disableCodegen) {
+    enable_llvm = false;
+  } else {
+    enable_llvm = FLAGS_enable_jit;
+  }
   runtime_state_.reset(
       new RuntimeState(request.queryId, params.abortOnError, params.maxErrors,
-                       params.batchSize, FLAGS_enable_expr_jit, exec_env_));
+                       params.batchSize, enable_llvm, exec_env_));
 
   // set up desc tbl
   DescriptorTbl* desc_tbl = NULL;
@@ -61,6 +69,7 @@ Status PlanExecutor::Prepare(
   DCHECK(request.__isset.planFragment);
   RETURN_IF_ERROR(
       ExecNode::CreateTree(obj_pool(), request.planFragment, *desc_tbl, &plan_));
+  runtime_state_->runtime_profile()->AddChild(plan_->runtime_profile());
 
   // set scan ranges
   vector<ExecNode*> scan_nodes;
@@ -123,7 +132,7 @@ RuntimeProfile* PlanExecutor::query_profile() {
   // TODO: allow printing the query profile while the query is running as a way
   // to monitor the query status
   DCHECK(done_);
-  return plan_->runtime_profile();
+  return runtime_state_->runtime_profile();
 }
 
 }

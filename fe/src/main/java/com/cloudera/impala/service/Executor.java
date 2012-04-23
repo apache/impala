@@ -50,6 +50,7 @@ public class Executor {
   public static final boolean DEFAULT_ABORT_ON_ERROR = false;
   public static final int DEFAULT_MAX_ERRORS = 100;
   public static final int DEFAULT_BATCH_SIZE = 0;  // backend's default
+  public static final boolean DEFAULT_DISABLE_CODEGEN = false;
 
   private Catalog catalog;
 
@@ -82,7 +83,7 @@ public class Executor {
   // Also populates 'colTypes' and 'colLabels' and sets 'containsOrderBy'.
   public void runQuery(TQueryRequest request, List<PrimitiveType> colTypes,
       List<String> colLabels, AtomicBoolean containsOrderBy, int batchSize,
-      boolean abortOnError, int maxErrors,
+      boolean abortOnError, int maxErrors, boolean disableCodegen,
       List<String> errorLog, Map<String, Integer> fileErrors,
       BlockingQueue<TResultRow> resultQueue,
       InsertResult insertResult) throws ImpalaException {
@@ -95,7 +96,8 @@ public class Executor {
           && analysisResult.getSelectStmt().hasOrderByClause());
     }
     execQuery(analysisResult, request.numNodes, batchSize, abortOnError, maxErrors,
-              errorLog, fileErrors, request.returnAsAscii, resultQueue, insertResult);
+              disableCodegen, errorLog, fileErrors, request.returnAsAscii, resultQueue,
+              insertResult);
     addSentinelRow(resultQueue);
   }
 
@@ -109,6 +111,7 @@ public class Executor {
       final TQueryRequest request, List<PrimitiveType> colTypes, List<String> colLabels,
       AtomicBoolean containsOrderBy,
       final int batchSize, final boolean abortOnError, final int maxErrors,
+      final boolean disableCodegen,
       final List<String> errorLog, final Map<String, Integer> fileErrors,
       final BlockingQueue<TResultRow> resultQueue, final InsertResult insertResult)
   throws ImpalaException {
@@ -124,7 +127,7 @@ public class Executor {
       public void run() {
         try {
           execQuery(analysisResult, request.numNodes, batchSize, abortOnError,
-                    maxErrors, errorLog, fileErrors, request.returnAsAscii,
+                    maxErrors, disableCodegen, errorLog, fileErrors, request.returnAsAscii,
                     resultQueue, insertResult);
         } catch (ImpalaException e) {
           errorMsg = e.getMessage();
@@ -191,8 +194,8 @@ public class Executor {
   // strings.
   private void execQuery(
       AnalysisContext.AnalysisResult analysisResult, int numNodes,
-      int batchSize, boolean abortOnError, int maxErrors, List<String> errorLog,
-      Map<String, Integer> fileErrors, boolean returnAsAscii,
+      int batchSize, boolean abortOnError, int maxErrors, boolean disableCodegen,
+      List<String> errorLog, Map<String, Integer> fileErrors, boolean returnAsAscii,
       BlockingQueue<TResultRow> resultQueue, InsertResult insertResult)
   throws ImpalaException {
     // create plan fragments
@@ -212,6 +215,7 @@ public class Executor {
     execRequest.setAsAscii(returnAsAscii);
     execRequest.setAbortOnError(abortOnError);
     execRequest.setMaxErrors(maxErrors);
+    execRequest.setDisableCodegen(disableCodegen);
     execRequest.setBatchSize(batchSize);
     execRequest.setSqlStmt(analysisResult.getStmt().toSql());
 
@@ -220,6 +224,7 @@ public class Executor {
       for (List<TPlanExecParams> planParamsList : execRequest.getNodeRequestParams()) {
         for (TPlanExecParams params : planParamsList) {
           params.setBatchSize(batchSize);
+          params.setDisableCodegen(disableCodegen);
         }
       }
     }
@@ -334,12 +339,14 @@ public class Executor {
     Executor coordinator = new Executor(catalog);
     if (asyncExec) {
       coordinator.asyncRunQuery(
-          request, dummyColTypes, dummyColLabels, null, batchSize, DEFAULT_ABORT_ON_ERROR,
-          DEFAULT_MAX_ERRORS, errorLog, fileErrors, resultQueue, insertResult);
+          request, dummyColTypes, dummyColLabels, null, batchSize,
+          DEFAULT_ABORT_ON_ERROR, DEFAULT_MAX_ERRORS, DEFAULT_DISABLE_CODEGEN, errorLog,
+          fileErrors, resultQueue, insertResult);
     } else {
       coordinator.runQuery(
-          request, dummyColTypes, dummyColLabels, null, batchSize, DEFAULT_ABORT_ON_ERROR,
-          DEFAULT_MAX_ERRORS, errorLog, fileErrors, resultQueue, insertResult);
+          request, dummyColTypes, dummyColLabels, null, batchSize,
+          DEFAULT_ABORT_ON_ERROR, DEFAULT_MAX_ERRORS, DEFAULT_DISABLE_CODEGEN, errorLog,
+          fileErrors, resultQueue, insertResult);
     }
     while (true) {
       TResultRow resultRow = null;

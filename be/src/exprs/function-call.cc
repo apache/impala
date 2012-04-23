@@ -59,15 +59,12 @@ void FunctionCall::SetReplaceStr(const StringValue* str_val) {
 // other functions with different signatures.
 Function* FunctionCall::Codegen(LlvmCodeGen* codegen) {
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
+  LlvmCodeGen::LlvmBuilder builder(context);
 
   // Generate child functions
-  vector<Function*> child_functions;
-  child_functions.resize(GetNumChildren());
   for (int i = 0; i < GetNumChildren(); ++i) {
     Function* child = children()[i]->Codegen(codegen);
     if (child == NULL) return NULL;
-    child_functions[i] = child;
   }
 
   Type* return_type = codegen->GetType(type());
@@ -77,7 +74,7 @@ Function* FunctionCall::Codegen(LlvmCodeGen* codegen) {
   BasicBlock* not_null_block = BasicBlock::Create(context, "not_null_block", function);
   BasicBlock* ret_block = BasicBlock::Create(context, "ret_block", function);
 
-  builder->SetInsertPoint(entry_block);
+  builder.SetInsertPoint(entry_block);
   scoped_ptr<LlvmCodeGen::FnPrototype> prototype;
   Type* ret_type = NULL;
   Value* result = NULL;
@@ -100,19 +97,19 @@ Function* FunctionCall::Codegen(LlvmCodeGen* codegen) {
   vector<Value*> args;
   args.resize(GetNumChildren());
   for (int i = 0; i < GetNumChildren(); ++i) {
-    Function* child = child_functions[i];
-    args[i] = CodegenCallFn(codegen, function, child, ret_block, not_null_block);
+    args[i] = children()[i]->CodegenGetValue(
+        codegen, entry_block, ret_block, not_null_block);
   }
 
-  builder->SetInsertPoint(not_null_block);
-  result = builder->CreateCall(external_function, args, "tmp_" + prototype->name());
-  builder->CreateBr(ret_block);
+  builder.SetInsertPoint(not_null_block);
+  result = builder.CreateCall(external_function, args, "tmp_" + prototype->name());
+  builder.CreateBr(ret_block);
 
-  builder->SetInsertPoint(ret_block);
-  PHINode* phi_node = builder->CreatePHI(return_type, 2, "tmp_phi");
+  builder.SetInsertPoint(ret_block);
+  PHINode* phi_node = builder.CreatePHI(return_type, 2, "tmp_phi");
   phi_node->addIncoming(GetNullReturnValue(codegen), entry_block);
   phi_node->addIncoming(result, not_null_block);
-  builder->CreateRet(phi_node);
+  builder.CreateRet(phi_node);
 
   if (!codegen->VerifyFunction(function)) return NULL;
   return function;

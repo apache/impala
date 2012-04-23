@@ -14,6 +14,7 @@
 
 #include "runtime/exec-env.h"
 #include "gen-cpp/Types_types.h"  // for TUniqueId
+#include "util/runtime-profile.h"
 
 namespace impala {
 
@@ -56,6 +57,9 @@ class RuntimeState {
   HBaseTableCache* htable_cache() { return exec_env_->htable_cache(); }
   std::vector<std::string>& created_hdfs_files() { return created_hdfs_files_; }
   std::vector<int64_t>& num_appended_rows() { return num_appended_rows_; }
+
+  // Returns runtime state profile
+  RuntimeProfile* runtime_profile() { return &profile_; }
 
   // Returns CodeGen object.  Returns NULL if codegen is disabled.
   LlvmCodeGen* llvm_codegen() { return codegen_.get(); }
@@ -107,6 +111,8 @@ class RuntimeState {
   std::vector<std::string> created_hdfs_files_;
   // Records the total number of appended rows per created Hdfs file.
   std::vector<int64_t> num_appended_rows_;
+  
+  RuntimeProfile profile_;
 
   // prohibit copies
   RuntimeState(const RuntimeState&);

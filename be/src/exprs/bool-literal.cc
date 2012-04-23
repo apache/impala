@@ -49,14 +49,14 @@ string BoolLiteral::DebugString() const {
 Function* BoolLiteral::Codegen(LlvmCodeGen* codegen) {
   DCHECK_EQ(GetNumChildren(), 0);
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
+  LlvmCodeGen::LlvmBuilder builder(context);
 
   Function* function = CreateComputeFnPrototype(codegen, "BoolLiteral");
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
 
-  builder->SetInsertPoint(entry_block);
-  CodegenSetIsNullArg(codegen, function, false);
-  builder->CreateRet(ConstantInt::get(context, APInt(1, result_.bool_val, true)));
+  builder.SetInsertPoint(entry_block);
+  CodegenSetIsNullArg(codegen, entry_block, false);
+  builder.CreateRet(ConstantInt::get(context, APInt(1, result_.bool_val, true)));
   
   if (!codegen->VerifyFunction(function)) return NULL;
   return function;

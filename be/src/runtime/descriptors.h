@@ -14,8 +14,15 @@
 #include "gen-cpp/Types_types.h"
 #include "runtime/primitive-type.h"
 
+namespace llvm {
+  class Function;
+  class PointerType;
+  class StructType;
+};
+
 namespace impala {
 
+class LlvmCodeGen;
 class ObjectPool;
 class TDescriptorTable;
 class TSlotDescriptor;
@@ -32,6 +39,12 @@ typedef int PlanNodeId;
 
 std::string TypeToString(PrimitiveType t);
 
+struct LlvmTupleStruct {
+  llvm::StructType* tuple_struct;
+  llvm::PointerType* tuple_ptr;
+  std::vector<int> indices;
+};
+  
 // Location information for null indicator bit for particular slot.
 // For non-nullable slots, the byte_offset will be 0 and the bit_mask will be 0.
 // This allows us to do the NullIndicatorOffset operations (tuple + byte_offset &/|
@@ -59,6 +72,8 @@ class SlotDescriptor {
   PrimitiveType type() const { return type_; }
   TupleId parent() const { return parent_; }
   int col_pos() const { return col_pos_; }
+  // Returns the field index in the generated llvm struct for this slot's tuple
+  int field_idx() const { return field_idx_; }
   int tuple_offset() const { return tuple_offset_; }
   const NullIndicatorOffset& null_indicator_offset() const {
     return null_indicator_offset_;
@@ -68,8 +83,17 @@ class SlotDescriptor {
 
   std::string DebugString() const;
 
+  // Codegen for: bool IsNull(Tuple* tuple)
+  // The codegen function is cached.
+  llvm::Function* CodegenIsNull(LlvmCodeGen*, llvm::StructType* tuple);
+
+  // Codegen for: void SetNotNull(Tuple* tuple)
+  // The codegen function is cached.
+  llvm::Function* CodegenSetNotNull(LlvmCodeGen*, llvm::StructType* tuple);
+
  protected:
   friend class DescriptorTbl;
+  friend class TupleDescriptor;
 
   const SlotId id_;
   const PrimitiveType type_;
@@ -77,7 +101,19 @@ class SlotDescriptor {
   const int col_pos_;
   const int tuple_offset_;
   const NullIndicatorOffset null_indicator_offset_;
+  
+  // the idx of the slot in the tuple descriptor (0-based).
+  // this is provided by the FE
+  const int slot_idx_;
+
+  // the idx of the slot in the llvm codegen'd tuple struct
+  // this is set by TupleDescriptor during codegen and takes into account
+  // leading null bytes.
+  int field_idx_;  
+
   const bool is_materialized_;
+  llvm::Function* is_null_fn_;
+  llvm::Function* set_not_null_fn_;
 
   SlotDescriptor(const TSlotDescriptor& tdesc);
 };
@@ -153,6 +189,19 @@ class TupleDescriptor {
 
   TupleId id() const { return id_; }
   std::string DebugString() const;
+  
+  // Creates a typed struct description for llvm.  The layout of the struct is computed
+  // by the FE which includes the order of the fields in the resulting struct.
+  // Returns the struct type or NULL if the type could not be created.
+  // For example, the aggregation tuple for this query: select count(*), min(int_col_a) 
+  // would map to:
+  // struct Tuple {
+  //   int8_t   null_byte;
+  //   int32_t  min_a;
+  //   int64_t  count_val;
+  // };
+  // The resulting struct definition is cached.
+  llvm::StructType* GenerateLlvmStruct(LlvmCodeGen* codegen);
 
  protected:
   friend class DescriptorTbl;
@@ -160,8 +209,10 @@ class TupleDescriptor {
   const TupleId id_;
   TableDescriptor* table_desc_;
   const int byte_size_;
+  const int num_null_bytes_;
   std::vector<SlotDescriptor*> slots_;  // contains all slots
   std::vector<SlotDescriptor*> string_slots_;  // contains only materialized string slots
+  llvm::StructType* llvm_struct_; // cache for the llvm struct type for this tuple desc
 
   TupleDescriptor(const TTupleDescriptor& tdesc);
   void AddSlot(SlotDescriptor* slot);

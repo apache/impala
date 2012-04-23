@@ -61,12 +61,12 @@ Function* ArithmeticExpr::Codegen(LlvmCodeGen* codegen) {
   }
   
   LLVMContext& context = codegen->context();
-  LlvmCodeGen::LlvmBuilder* builder = codegen->builder();
+  LlvmCodeGen::LlvmBuilder builder(context);
   Type* return_type = codegen->GetType(type());
   Function* function = CreateComputeFnPrototype(codegen, "ArithmeticExpr");
 
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
-  builder->SetInsertPoint(entry_block);
+  builder.SetInsertPoint(entry_block);
   
   BasicBlock* compute_rhs_block = NULL;
   BasicBlock* compute_arith_block = NULL;
@@ -80,18 +80,18 @@ Function* ArithmeticExpr::Codegen(LlvmCodeGen* codegen) {
   BasicBlock* ret_block = BasicBlock::Create(context, "ret", function);
 
   // Call lhs function
-  lhs_value = CodegenCallFn(codegen, function, lhs_function, 
-      ret_block, GetNumChildren() == 2 ? compute_rhs_block : compute_arith_block);
+  lhs_value = children()[0]->CodegenGetValue(codegen, entry_block, ret_block,
+      GetNumChildren() == 2 ? compute_rhs_block : compute_arith_block);
 
   // Lhs not null, eval rhs
   if (GetNumChildren() == 2) {
-    builder->SetInsertPoint(compute_rhs_block);
-    rhs_value = CodegenCallFn(codegen, function, rhs_function,
+    builder.SetInsertPoint(compute_rhs_block);
+    rhs_value = children()[1]->CodegenGetValue(codegen, compute_rhs_block, 
         ret_block, compute_arith_block);
   }
 
   // rhs not null, do arithmetic op
-  builder->SetInsertPoint(compute_arith_block);
+  builder.SetInsertPoint(compute_arith_block);
 
   Value* result = NULL;
   switch (op()) {
@@ -99,82 +99,82 @@ Function* ArithmeticExpr::Codegen(LlvmCodeGen* codegen) {
     case TExprOpcode::BITNOT_SHORT:
     case TExprOpcode::BITNOT_INT:
     case TExprOpcode::BITNOT_LONG:
-      result = builder->CreateNot(lhs_value, "tmp_not");
+      result = builder.CreateNot(lhs_value, "tmp_not");
       break;
     case TExprOpcode::ADD_LONG_LONG:
-      result = builder->CreateAdd(lhs_value, rhs_value, "tmp_add");
+      result = builder.CreateAdd(lhs_value, rhs_value, "tmp_add");
       break;
     case TExprOpcode::ADD_DOUBLE_DOUBLE:
-      result = builder->CreateFAdd(lhs_value, rhs_value, "tmp_add");
+      result = builder.CreateFAdd(lhs_value, rhs_value, "tmp_add");
       break;
     case TExprOpcode::SUBTRACT_LONG_LONG:
-      result = builder->CreateSub(lhs_value, rhs_value, "tmp_sub");
+      result = builder.CreateSub(lhs_value, rhs_value, "tmp_sub");
       break;
     case TExprOpcode::SUBTRACT_DOUBLE_DOUBLE:
-      result = builder->CreateFSub(lhs_value, rhs_value, "tmp_sub");
+      result = builder.CreateFSub(lhs_value, rhs_value, "tmp_sub");
       break;
     case TExprOpcode::MULTIPLY_LONG_LONG:
-      result = builder->CreateMul(lhs_value, rhs_value, "tmp_mul");
+      result = builder.CreateMul(lhs_value, rhs_value, "tmp_mul");
       break;
     case TExprOpcode::MULTIPLY_DOUBLE_DOUBLE:
-      result = builder->CreateFMul(lhs_value, rhs_value, "tmp_mul");
+      result = builder.CreateFMul(lhs_value, rhs_value, "tmp_mul");
       break;
     case TExprOpcode::DIVIDE:
-      result = builder->CreateFDiv(lhs_value, rhs_value, "tmp_div");
+      result = builder.CreateFDiv(lhs_value, rhs_value, "tmp_div");
       break;
 
     case TExprOpcode::INT_DIVIDE_CHAR_CHAR:
     case TExprOpcode::INT_DIVIDE_SHORT_SHORT:
     case TExprOpcode::INT_DIVIDE_INT_INT:
     case TExprOpcode::INT_DIVIDE_LONG_LONG:
-      result = builder->CreateSDiv(lhs_value, rhs_value, "tmp_div");
+      result = builder.CreateSDiv(lhs_value, rhs_value, "tmp_div");
       break;
 
     case TExprOpcode::MOD_CHAR_CHAR:
     case TExprOpcode::MOD_SHORT_SHORT:
     case TExprOpcode::MOD_INT_INT:
     case TExprOpcode::MOD_LONG_LONG:
-      result = builder->CreateSRem(lhs_value, rhs_value, "tmp_mod");
+      result = builder.CreateSRem(lhs_value, rhs_value, "tmp_mod");
       break;
 
     case TExprOpcode::BITAND_CHAR_CHAR:
     case TExprOpcode::BITAND_SHORT_SHORT:
     case TExprOpcode::BITAND_INT_INT:
     case TExprOpcode::BITAND_LONG_LONG:
-      result = builder->CreateAnd(lhs_value, rhs_value, "tmp_and");
+      result = builder.CreateAnd(lhs_value, rhs_value, "tmp_and");
       break;
 
     case TExprOpcode::BITOR_CHAR_CHAR:
     case TExprOpcode::BITOR_SHORT_SHORT:
     case TExprOpcode::BITOR_INT_INT:
     case TExprOpcode::BITOR_LONG_LONG:
-      result = builder->CreateOr(lhs_value, rhs_value, "tmp_or");
+      result = builder.CreateOr(lhs_value, rhs_value, "tmp_or");
       break;
 
     case TExprOpcode::BITXOR_CHAR_CHAR:
     case TExprOpcode::BITXOR_SHORT_SHORT:
     case TExprOpcode::BITXOR_INT_INT:
     case TExprOpcode::BITXOR_LONG_LONG:
-      result = builder->CreateXor(lhs_value, rhs_value, "tmp_xor");
+      result = builder.CreateXor(lhs_value, rhs_value, "tmp_xor");
       break;
 
     default:
       DCHECK(false) << "Unknown op: " << op();
       return NULL;
   }
-  builder->CreateBr(ret_block);
+  builder.CreateBr(ret_block);
 
   // Return block.  is_null return does not have to set explicitly, propagated from child
   // Use a phi node to coalesce results.
-  builder->SetInsertPoint(ret_block);
+  builder.SetInsertPoint(ret_block);
   int num_paths = 1 + GetNumChildren();
-  PHINode* phi_node = builder->CreatePHI(return_type, num_paths, "tmp_phi");
+  PHINode* phi_node = builder.CreatePHI(return_type, num_paths, "tmp_phi");
   phi_node->addIncoming(GetNullReturnValue(codegen), entry_block);
   if (GetNumChildren() == 2) {
     phi_node->addIncoming(GetNullReturnValue(codegen), compute_rhs_block);
   }
   phi_node->addIncoming(result, compute_arith_block);
-  builder->CreateRet(phi_node);
+  builder.CreateRet(phi_node);
 
   if (!codegen->VerifyFunction(function)) return NULL;
   return function;

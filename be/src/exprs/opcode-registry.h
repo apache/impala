@@ -5,7 +5,7 @@
 
 #include <string>
 #include <vector>
-#include <glog/logging.h>
+#include "common/logging.h"
 #include "exprs/expr.h"   // For ComputeFn typedef
 #include "gen-cpp/Opcodes_types.h"
 

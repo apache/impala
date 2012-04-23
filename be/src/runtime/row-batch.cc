@@ -4,8 +4,9 @@
 
 #include <stdint.h>  // for intptr_t
 
-#include "runtime/mem-pool.h"
 #include "runtime/string-value.h"
+#include "runtime/tuple-row.h"
+#include "gen-cpp/Data_types.h"
 
 using namespace std;
 

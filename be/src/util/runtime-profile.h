@@ -7,7 +7,7 @@
 #include "util/stopwatch.h"
 
 #include "gen-cpp/RuntimeProfile_types.h"
-#include "glog/logging.h"
+#include "common/logging.h"
 
 #include <iostream>
 
@@ -23,10 +23,10 @@ namespace impala {
 #define MACRO_CONCAT(x, y) CONCAT_IMPL(x, y)
 
 #if ENABLE_COUNTERS
-  #define ADD_COUNTER(profile, name, type) profile->AddCounter(name, type)
+  #define ADD_COUNTER(profile, name, type) (profile)->AddCounter(name, type)
   #define COUNTER_SCOPED_TIMER(c) ScopedTimer MACRO_CONCAT(SCOPED_TIMER, __COUNTER__)(c)
-  #define COUNTER_UPDATE(c, v) c->Update(v)
-  #define COUNTER_SET(c, v) c->Set(v)
+  #define COUNTER_UPDATE(c, v) (c)->Update(v)
+  #define COUNTER_SET(c, v) (c)->Set(v)
 #else
   #define ADD_COUNTER(profile, name, type) NULL
   #define COUNTER_SCOPED_TIMER(c)
