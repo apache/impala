@@ -60,24 +60,27 @@ MemPool::~MemPool() {
 }
 
 void MemPool::FindChunk(int min_size) {
-  // skip past the last occupied chunk
+  // Try to allocate from a free chunk. The first free chunk, if any, will be immediately
+  // after the current chunk.
+  int first_free_idx = current_chunk_idx_ + 1;
   // (cast size() to signed int in order to avoid everything else being cast to
   // unsigned long, in particular -1)
-  while (current_chunk_idx_ < static_cast<int>(chunks_.size())
-      && (current_chunk_idx_ == -1 || chunks_[current_chunk_idx_].allocated_bytes > 0)) {
-    ++current_chunk_idx_;
-  }
-
-  if (current_chunk_idx_ < static_cast<int>(chunks_.size())) {
+  while (++current_chunk_idx_  < static_cast<int>(chunks_.size())) {
     // we found a free chunk
     DCHECK_EQ(chunks_[current_chunk_idx_].allocated_bytes, 0);
-    if (chunks_[current_chunk_idx_].size < min_size) {
-      // still not big enough, insert a new min_size chunk
-      chunks_.insert(chunks_.begin() + current_chunk_idx_, ChunkInfo(min_size));
+
+    if (chunks_[current_chunk_idx_].size >= min_size) {
+      // This chunk is big enough.  Move it before the other free chunks.
+      if (current_chunk_idx_ != first_free_idx) {
+        swap(chunks_[current_chunk_idx_], chunks_[first_free_idx]);
+        current_chunk_idx_ = first_free_idx;
+      }
+      break;
     }
-  } else {
-    // need to allocate new chunk; we append it to the existing list
-    DCHECK_EQ(current_chunk_idx_, static_cast<int>(chunks_.size()));
+  }
+
+  if (current_chunk_idx_ == static_cast<int>(chunks_.size())) {
+    // need to allocate new chunk.
     int chunk_size = chunk_size_;
     if (chunk_size == 0) {
       if (current_chunk_idx_ == 0) {
@@ -89,7 +92,14 @@ void MemPool::FindChunk(int min_size) {
       }
     }
     chunk_size = ::max(min_size, chunk_size);
-    chunks_.push_back(ChunkInfo(chunk_size));
+    // If there are no free chunks put it at the end, otherwise before the first free.
+    if (first_free_idx == static_cast<int>(chunks_.size())) {
+      chunks_.push_back(ChunkInfo(chunk_size));
+    } else {
+      current_chunk_idx_ = first_free_idx;
+      vector<ChunkInfo>::iterator insert_chunk = chunks_.begin() + current_chunk_idx_;
+      chunks_.insert(insert_chunk, ChunkInfo(chunk_size));
+    }
   }
 
   if (current_chunk_idx_ > 0) {
@@ -124,7 +134,7 @@ void MemPool::AcquireData(MemPool* src, bool keep_current) {
 
   if (keep_current) {
     src->current_chunk_idx_ = 0;
-    DCHECK_EQ(src->chunks_.size(), 1);
+    DCHECK(src->chunks_.size() == 1 || src->chunks_[1].allocated_bytes == 0);
     total_allocated_bytes_ += src->total_allocated_bytes_ - src->GetFreeOffset();
     src->chunks_[0].cumulative_allocated_bytes = 0;
     src->total_allocated_bytes_ = src->GetFreeOffset();
@@ -148,11 +158,30 @@ void MemPool::AcquireData(MemPool* src, bool keep_current) {
   DCHECK(CheckIntegrity(false));
 }
 
+bool MemPool::Contains(uint8_t* ptr, int size) {
+  for (int i = 0; i < chunks_.size(); ++i) {
+    const ChunkInfo& info = chunks_[i];
+    if (ptr >= info.data && ptr < info.data + info.allocated_bytes) {
+      if (ptr + size > info.data + info.allocated_bytes) {
+        LOG(ERROR) << DebugString();
+        DCHECK_LE(reinterpret_cast<size_t>(ptr + size),
+                  reinterpret_cast<size_t>(info.data + info.allocated_bytes));
+        return false;
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
 string MemPool::DebugString() {
   stringstream out;
+  char str[16];
   out << "MemPool(#chunks=" << chunks_.size() << " [";
   for (int i = 0; i < chunks_.size(); ++i) {
+    sprintf(str, "0x%lx=", reinterpret_cast<size_t>(chunks_[i].data));
     out << (i > 0 ? " " : "")
+        << str
         << chunks_[i].size
         << "/" << chunks_[i].cumulative_allocated_bytes
         << "/" << chunks_[i].allocated_bytes;
@@ -179,8 +208,12 @@ bool MemPool::CheckIntegrity(bool current_chunk_empty) {
     DCHECK_GT(chunks_[i].size, 0);
     if (i < current_chunk_idx_) {
       DCHECK_GT(chunks_[i].allocated_bytes, 0);
-    } else if (i == current_chunk_idx_ && !current_chunk_empty) {
-      DCHECK_GT(chunks_[i].allocated_bytes, 0);
+    } else if (i == current_chunk_idx_) {
+      if (current_chunk_empty) {
+        DCHECK_EQ(chunks_[i].allocated_bytes, 0);
+      } else {
+        DCHECK_GT(chunks_[i].allocated_bytes, 0);
+      }
     } else {
       DCHECK_EQ(chunks_[i].allocated_bytes, 0);
     }
@@ -231,7 +264,7 @@ void MemPool::GetChunkInfo(vector<pair<uint8_t*, int> >* chunk_info) {
   }
 }
 
-std::string MemPool::DebugPrint() {
+string MemPool::DebugPrint() {
   char str[3];
   stringstream out;
   for (int i = 0; i < chunks_.size(); ++i) {

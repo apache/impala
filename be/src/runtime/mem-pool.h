@@ -16,11 +16,13 @@ namespace impala {
 // Chunks stay around for the lifetime of the mempool or until they are passed on to
 // another mempool.
 // An Allocate() call will attempt to allocate memory from the chunk that was most
-// recently added (to the first list); if that chunk doesn't have enough memory to
-// satisfy the allocation request, a new chunk is added to the list.
+// recently added; if that chunk doesn't have enough memory to
+// satisfy the allocation request, the free chunks are searched for one that is
+// big enough otherwise a new chunk is added to the list.
+// The current_chunk_idx_ always points to the last chunk with allocated memory.
 // In order to keep allocation overhead low, chunk sizes double with each new one
 // added, until they hit a maximum size.
-// 
+//
 //     Example:
 //     MemPool* p = new MemPool();
 //     for (int i = 0; i < 1024; ++i) {
@@ -64,6 +66,8 @@ class MemPool {
   // of the the current chunk. Creates a new chunk if there aren't any chunks
   // with enough capacity.
   uint8_t* Allocate(int size) {
+    if (size == 0) return NULL;
+
     int num_bytes = ((size + 7) / 8) * 8;  // round up to nearest 8 bytes
     if (current_chunk_idx_ == -1
         || num_bytes + chunks_[current_chunk_idx_].allocated_bytes
@@ -76,7 +80,7 @@ class MemPool {
     DCHECK_LE(info.allocated_bytes + num_bytes, info.size);
     info.allocated_bytes += num_bytes;
     total_allocated_bytes_ += num_bytes;
-    // TODO: need to update something for GetCurrentOffset() to return
+    DCHECK_LE(current_chunk_idx_, chunks_.size() - 1);
     return result;
   }
 
@@ -97,6 +101,13 @@ class MemPool {
   // All offsets handed out by calls to GetOffset()/GetCurrentOffset() for 'src'
   // become invalid.
   void AcquireData(MemPool* src, bool keep_current);
+
+  // Diagnostic to check if memory is allocated from this mempool.
+  // Inputs:
+  //   ptr: start of memory block.
+  //   size: size of memory block.
+  // Returns true if memory block is in one of the chunks in this mempool.
+  bool Contains(uint8_t* ptr, int size);
 
   std::string DebugString();
 

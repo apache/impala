@@ -29,7 +29,7 @@ add_library(Exprs
   slot-ref.cc
   string-literal.cc
   string-functions.cc
-  timestamp-functions.cc  
+  timestamp-functions.cc
 )
 
 target_link_libraries(Exprs

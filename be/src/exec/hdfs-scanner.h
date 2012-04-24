@@ -30,6 +30,7 @@ class TextConverter;
 class TScanRange;
 class ByteStream;
 class HdfsScanNode;
+class Decompressor;
 struct HdfsScanRange;
 
 // HdfsScanners are instantiated by an HdfsScanNode to parse file data in a particular
@@ -51,6 +52,10 @@ struct HdfsScanRange;
 //   5. Repeat from 2., if there are more scan ranges in the current file.
 class HdfsScanner {
  public:
+  // Assumed size of a OS file block.  Used mostly when reading file format headers, etc.
+  // This probably ought to be a derived number from the environment.
+  const static int FILE_BLOCK_SIZE = 4096;
+
   // tuple_desc - the descriptor of the output tuple
   // template_tuple - the default (i.e. partition key) tuple before
   // filling materialized slots
@@ -74,6 +79,12 @@ class HdfsScanner {
                                       ByteStream* byte_stream);
 
  protected:
+  // Utility method to write out tuples when there are no materialized
+  // fields e.g. select count(*) or only slots from partition keys.
+  //   num_tuples - Total number of tuples to write out.
+  Status WriteTuples(RuntimeState* state, RowBatch* row_batch, int num_tuples,
+      int* row_idx);
+
   // For EvalConjunctsForScanner
   HdfsScanNode* scan_node_;
 
@@ -131,13 +142,6 @@ class HdfsScanner {
   // Allocates a buffer from tuple_pool_ large enough to hold one
   // tuple for every remaining row in row_batch.
   void AllocateTupleBuffer(RowBatch* row_batch);
-
-  // Utility method to write out tuples when there are no materialized
-  // fields (e.g. select count(*)).
-  //   num_tuples - Total number of tuples to write out.
-  Status WriteTuples(RuntimeState* state, RowBatch* row_batch, int num_tuples,
-      int* row_idx);
-
 };
 
 }

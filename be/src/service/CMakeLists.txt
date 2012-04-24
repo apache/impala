@@ -12,7 +12,7 @@ add_library(Service
 )
 
 # TODO: why do we need this
-target_link_libraries(Service 
+target_link_libraries(Service
   TestUtil
 )
 
@@ -24,15 +24,15 @@ add_library(backend SHARED
 
 target_link_libraries(backend ${IMPALA_LINK_LIBS})
 
-add_executable(runquery 
-  run-query.cc 
+add_executable(runquery
+  run-query.cc
 )
 
-target_link_libraries(runquery 
+target_link_libraries(runquery
   ${IMPALA_LINK_LIBS}
   # this is commented out from IMPALA_LINK_LIBS because it causes crashes in libbackend.so
   # see Imp-39
-  tcmallocstatic      
+  tcmallocstatic
 )
 
 add_executable(impalad

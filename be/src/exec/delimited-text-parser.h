@@ -35,10 +35,8 @@ class DelimitedTextParser {
   //   timer: timer to use to time the parsing operation, or NULL.
   //
   // The main method is ParseData which fills in a vector of
-  // pointers and lengths to the fields.  It also can handle an excape character 
+  // pointers and lengths to the fields.  It also can handle an excape character
   // which masks a tuple or field delimiter that occurs in the data.
-  // FindFirstTupleStart returns the position after the first non-escaped tuple
-  // delimiter from the starting offset.
   DelimitedTextParser(const std::vector<int>& map_column_to_slot, int start_column,
                       char tuple_delim, char field_delim_ = '\0',
                       char collection_item_delim = '\0', char escape_char = '\0');
@@ -72,9 +70,24 @@ class DelimitedTextParser {
       char** byte_buffer_ptr, std::vector<FieldLocation>* field_locations,
       int* num_tuples, int* num_fields, char** next_column_start);
 
-  // Find the start of a tuple if jumping into the middle of a file.
-  // Returns the offset in the buffer of the tuple.
-  int FindFirstTupleStart(char* buffer, int len);
+  // FindFirstInstance returns the position after the first non-escaped tuple
+  // delimiter from the starting offset.
+  // Used to find the start of a tuple if jumping into the middle of a text file.
+  // Also used to find the sync marker for Sequenced and RC files.
+  int FindFirstInstance(char* buffer, int len);
+
+  // Find a sync block if jumping into the middle of a Sequence or RC file.
+  // The sync block is always proceeded by an indicator of 4 bytes of -1 (0xff).
+  // This will move the Bytestream to the begining of the sync indicator (the -1).
+  // If no sync block is found we will be at or beyond the end of the
+  // scan range.
+  // Inputs:
+  //   end_of_range: the end of the scan range we are searching.
+  //   sync_size: the size of the sync block.
+  //   sync: the sync bytes to look for.
+  //   byte_stream: the byte stream to read.
+  Status FindSyncBlock(int end_of_range, int sync_size, uint8_t*
+                       sync, ByteStream*  byte_stream);
 
   // Will we return the current column to the query?
   bool ReturnCurrentColumn() {
@@ -86,7 +99,7 @@ class DelimitedTextParser {
   void ParserInit(HdfsScanNode* scan_node);
 
   // Helper routine to add a column to the field_locations vector.
-  // Input: 
+  // Input:
   //   len: lenght of the current column.
   // Input/Output:
   //   next_column_start: Start of the current column, moved to the start of the next.

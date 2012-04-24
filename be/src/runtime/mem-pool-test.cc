@@ -37,8 +37,8 @@ TEST(MemPoolTest, Basic) {
   // we allocate 65K, which doesn't fit into the current chunk or the default
   // size of the next allocated chunk (64K)
   p.Allocate(65 * 1024);
-  EXPECT_EQ(p.GetTotalChunkSizes(), (16 + 32 + 65) * 1024);
   EXPECT_EQ(p.total_allocated_bytes(), (12 + 8 + 65) * 1024);
+  EXPECT_EQ(p.GetTotalChunkSizes(), (16 + 32 + 65) * 1024);
 
   // Clear() resets allocated data, but doesn't remove any chunks
   p.Clear();
@@ -50,20 +50,25 @@ TEST(MemPoolTest, Basic) {
   EXPECT_EQ(p.total_allocated_bytes(), 1024);
   EXPECT_EQ(p.GetTotalChunkSizes(), (16 + 32 + 65) * 1024);
 
-  // ... unless it doesn't fit into the next available chunk
-  p.Allocate(33 * 1024);
-  EXPECT_EQ(p.total_allocated_bytes(), 34 * 1024);
-  EXPECT_EQ(p.GetTotalChunkSizes(), (33 + 16 + 32 + 65) * 1024);
+  // ... unless it doesn't fit into any available chunk
+  p.Allocate(120 * 1024);
+  EXPECT_EQ(p.total_allocated_bytes(), (1 + 120) * 1024);
+  EXPECT_EQ(p.GetTotalChunkSizes(), (130 + 16 + 32 + 65) * 1024);
 
-  // we're releasing the first 2 chunks, which get added to p2
+  // ... Try another chunk that fits into an existing chunk
+  p.Allocate(33 * 1024);
+  EXPECT_EQ(p.total_allocated_bytes(), (1 + 120 + 33) * 1024);
+  EXPECT_EQ(p.GetTotalChunkSizes(), (130 + 16 + 32 + 65) * 1024);
+
+  // we're releasing 3 chunks, which get added to p2
   p2.AcquireData(&p, false);
   EXPECT_EQ(p.total_allocated_bytes(), 0);
-  EXPECT_EQ(p.GetTotalChunkSizes(), (32 + 65) * 1024);
+  EXPECT_EQ(p.GetTotalChunkSizes(), 32 * 1024);
 
   MemPool p3;
-  p3.AcquireData(&p2, true);  // we're keeping the last 33K chunk
+  p3.AcquireData(&p2, true);  // we're keeping the 65k chunk
   EXPECT_EQ(p2.total_allocated_bytes(), 33 * 1024);
-  EXPECT_EQ(p2.GetTotalChunkSizes(), 33 * 1024);
+  EXPECT_EQ(p2.GetTotalChunkSizes(), 65 * 1024);
 }
 
 TEST(MemPoolTest, Offsets) {
@@ -92,6 +97,32 @@ TEST(MemPoolTest, Offsets) {
   }
 }
 
+// Test that we can keep an allocted chunk and a free chunk.
+// This case verifies that when chunks are acquired by another memory pool the
+// remaining chunks are consistent if there were more than one used chunk and some
+// free chunks.
+TEST(MemPoolTest, Keep) {
+  MemPool p;
+  p.Allocate(4*1024);
+  p.Allocate(8*1024);
+  p.Allocate(16*1024);
+  EXPECT_EQ(p.total_allocated_bytes(), (4 + 8 + 16) * 1024);
+  EXPECT_EQ(p.GetTotalChunkSizes(), (4 + 8 + 16) * 1024);
+  p.Clear();
+  EXPECT_EQ(p.total_allocated_bytes(), 0);
+  EXPECT_EQ(p.GetTotalChunkSizes(), (4 + 8 + 16) * 1024);
+  p.Allocate(1*1024);
+  p.Allocate(4*1024);
+  EXPECT_EQ(p.total_allocated_bytes(), (1 + 4) * 1024);
+  EXPECT_EQ(p.GetTotalChunkSizes(), (4 + 8 + 16) * 1024);
+  MemPool p2;
+  p2.AcquireData(&p, true);
+  EXPECT_EQ(p.total_allocated_bytes(), 4 * 1024);
+  EXPECT_EQ(p.GetTotalChunkSizes(), (8 + 16) * 1024);
+  EXPECT_EQ(p2.total_allocated_bytes(), 1 * 1024);
+  EXPECT_EQ(p2.GetTotalChunkSizes(), 4 * 1024);
+
+}
 }
 
 int main(int argc, char **argv) {

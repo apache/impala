@@ -9,12 +9,9 @@
 #include "exec/delimited-text-parser.h"
 #include "exec/serde-utils.h"
 #include "exec/buffered-byte-stream.h"
+#include "util/decompress.h"
 #include "exec/text-converter.inline.h"
-
-// Compression libraries
-#include <zlib.h>
-#include <bzlib.h>
-#include "snappy.h"
+#include <glog/logging.h>
 
 using namespace std;
 using namespace boost;
@@ -26,172 +23,9 @@ const char* const HdfsSequenceScanner::SEQFILE_KEY_CLASS_NAME =
 const char* const HdfsSequenceScanner::SEQFILE_VALUE_CLASS_NAME =
   "org.apache.hadoop.io.Text";
 
-const char* const HdfsSequenceScanner::SEQFILE_DEFAULT_COMPRESSION =
-  "org.apache.hadoop.io.compress.DefaultCodec";
-
-const char* const HdfsSequenceScanner::SEQFILE_GZIP_COMPRESSION =
-  "org.apache.hadoop.io.compress.GzipCodec";
-
-const char* const HdfsSequenceScanner::SEQFILE_BZIP2_COMPRESSION =
-  "org.apache.hadoop.io.compress.BZip2Codec";
-
-const char* const HdfsSequenceScanner::SEQFILE_SNAPPY_COMPRESSION =
-  "org.apache.hadoop.io.compress.SnappyCodec";
-
 const uint8_t HdfsSequenceScanner::SEQFILE_VERSION_HEADER[4] = {'S', 'E', 'Q', 6};
 
 const int HdfsSequenceScanner::SEQFILE_KEY_LENGTH = 4;
-
-// These are magic numbers from zlib.h.  Not clear why they are not defined there.
-// 15 == window size, 32 == figure out if libz or gzip.
-#define WINDOW_BITS 15
-#define DETECT_CODEC 32
-
-// Decompress a block encoded by gzip or lzip.
-// Inputs:
-//     input_length: length of input buffer.
-//     in: input buffer, contains compressed data
-//     output_length: length of output buffer.
-// In/Out:
-//     out: output buffer, place to put decompressed data.
-// Output:
-//     too_small: set to true if the output_length is too small.
-static Status DecompressGzipBlock(int input_length, uint8_t* in,
-                                  int output_length, uint8_t* out, bool* too_small) {
-  z_stream stream;
-  bzero(&stream, sizeof(stream));
-  stream.next_in = reinterpret_cast<Bytef*>(in);
-  stream.avail_in = input_length;
-  stream.next_out = reinterpret_cast<Bytef*>(out);
-  stream.avail_out = output_length;
- 
-  *too_small = false;
-  int ret;
-  // Initialize and run either zlib or gzib inflate. 
-  if ((ret = inflateInit2(&stream, WINDOW_BITS | DETECT_CODEC)) != Z_OK) {
-    stringstream ss;
-    ss << "zlib inflateInit failed: " << stream.msg;
-    return Status(ss.str());
-  }
-  if ((ret = inflate(&stream, 1)) != Z_STREAM_END) {
-    (void)inflateEnd(&stream);
-    if (ret == Z_OK) {
-      *too_small = true;
-      return Status::OK;
-    }
-
-    stringstream ss;
-    ss << "zlib inflate failed: " << stream.msg;
-    return Status(ss.str());
-  }
-  if (inflateEnd(&stream) != Z_OK) {
-    stringstream ss;
-    ss << "zlib inflateEnd failed: " << stream.msg;
-    return Status(ss.str());
-  }
-
-  return Status::OK;
-}
-
-// Decompress a block encoded by bzip2.
-// Inputs:
-//     input_length: length of input buffer.
-//     in: input buffer, contains compressed data
-//     output_length: length of output buffer.
-// In/Out:
-//     out: output buffer, place to put decompressed data.
-// Output:
-//     too_small: set to true if the output_length is too small.
-static Status DecompressBzip2Block(int input_length, uint8_t* in,
-                                   int output_length, uint8_t* out, bool* too_small) {
-  bz_stream stream;
-  bzero(&stream, sizeof(stream));
-  stream.next_in = reinterpret_cast<char*>(in);
-  stream.avail_in = input_length;
-  stream.next_out = reinterpret_cast<char*>(out);
-  stream.avail_out = output_length;
- 
-  *too_small = false;
-  int ret;
-  if ((ret = BZ2_bzDecompressInit(&stream, 0, 0)) != BZ_OK) {
-    stringstream ss;
-    ss << "bzlib BZ2_bzDecompressInit failed: " << ret;
-    return Status(ss.str());
-  }
-  if ((ret = BZ2_bzDecompress(&stream)) != BZ_STREAM_END) {
-    (void)BZ2_bzDecompressEnd(&stream);
-    if (ret == BZ_OK) {
-      *too_small = true;
-      return Status::OK;
-    }
-    stringstream ss;
-    ss << "bzlib BZ2_bzDecompress failed: " << ret;
-    return Status(ss.str());
-  }
-  if ((ret = BZ2_bzDecompressEnd(&stream)) != BZ_OK) {
-    stringstream ss;
-    ss << "bzlib BZ2_bzDecompressEnd failed: " << ret;
-    return Status(ss.str());
-  }
-
-  return Status::OK;
-}
-
-// Decompress a block encoded by Snappy.
-// Inputs:
-//     input_length: length of input buffer.
-//     in: input buffer, contains compressed data
-//     output_length: length of output buffer.
-// In/Out:
-//     out: output buffer, place to put decompressed data.
-// Output:
-//     too_small: set to true if the output_length is too small.
-static Status DecompressSnappyBlock(int input_length, uint8_t* in,
-                                    int output_length, uint8_t* out, bool* too_small) {
-  *too_small = false;
-
-  // Hadoop uses a block compression scheme on top of snappy.  First there is
-  // an integer which is the size of the decompressed data followed by a
-  // sequence of compressed blocks each preceded with an integer size.
-  int32_t len = SerDeUtils::GetInt(in);
-
-  // TODO: Snappy knows how big the output is, we should just use that.
-  if (output_length < len) {
-    *too_small = true;
-    return Status::OK;
-  }
-  in += sizeof(len);
-  input_length -= sizeof(len);
- 
-  do {
-    // Read the length of the next block.
-    len = SerDeUtils::GetInt(in);
-
-    if (len == 0) break;
-
-    in += sizeof(len);
-    input_length -= sizeof(len);
-
-    // Read how big the output will be.
-    size_t uncompressed_len;
-    if (!snappy::GetUncompressedLength(reinterpret_cast<const char*>(in),
-        input_length, &uncompressed_len)) {
-      return Status("Snappy: GetUncompressedLength failed");
-    }
-
-    DCHECK_GT(output_length, 0);
-    if (!snappy::RawUncompress(reinterpret_cast<char*>(in),
-        static_cast<size_t>(len), reinterpret_cast<char*>(out))) {
-      return Status("Snappy: RawUncompress failed");
-    }
-    in += len;
-    input_length -= len;
-    out += uncompressed_len;
-    output_length -= uncompressed_len;
-  } while (input_length > 0);
-
-  return Status::OK;
-}
 
 HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNode* scan_node,
                                          const TupleDescriptor* tuple_desc,
@@ -205,7 +39,7 @@ HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNode* scan_node,
       num_buffered_records_in_compressed_block_(0) {
   const HdfsTableDescriptor* hdfs_table =
     reinterpret_cast<const HdfsTableDescriptor*>(tuple_desc->table_desc());
-  
+
   text_converter_.reset(new TextConverter(hdfs_table->escape_char(), tuple_pool_));
 
   delimited_text_parser_.reset(new DelimitedTextParser(scan_node->column_to_slot_index(),
@@ -249,109 +83,14 @@ Status HdfsSequenceScanner::InitCurrentScanRange(RuntimeState* state,
   // Offset may not point to record boundary
   if (scan_range->offset != 0) {
     RETURN_IF_ERROR(unbuffered_byte_stream_->Seek(scan_range->offset));
-    RETURN_IF_ERROR(FindFirstRecord(state));
+    RETURN_IF_ERROR(find_first_parser_->FindSyncBlock(end_of_scan_range_,
+        SYNC_HASH_SIZE, sync_, unbuffered_byte_stream_));
     buffered_byte_stream_->SeekToParent();
-  } 
-
-
-  return Status::OK;
-}
-
-// The start of the sync block is specified by an integer of -1.  We search
-// bytes till we find a -1 and then look for 3 more -1 bytes which will make up
-// the integer.  This is followed by the 16 byte sync block which was specified in
-// the file header.
-Status HdfsSequenceScanner::FindFirstRecord(RuntimeState* state) {
-  // A sync block is preceeded by 4 bytes of -1 (0xff).
-  int sync_flag_counter = 0;
-  // Starting offset of the buffer we are scanning
-  int64_t buf_start = 0;
-  // Number of bytes read from stream
-  int64_t num_bytes_read = 0;
-  // Current offset into buffer.
-  int64_t off = 0;
-  // Bytes left to process in buffer.
-  int64_t bytes_left = 0;
-  // Size of buffer to read.
-  int64_t read_size = FILE_BLOCK_SIZE;
-  // Buffer to scan.
-  uint8_t buf[read_size];
-
-  // Loop until we find a Sync block or get to the end of the range.
-  while (buf_start + off < end_of_scan_range_ || sync_flag_counter != 0) {
-    // If there are no bytes left to process in the buffer get some more.
-    // We may make bytes_left < 0 while looping for 0xff bytes below.
-    if (bytes_left <= 0) {
-      if (buf_start == 0) {
-        RETURN_IF_ERROR(unbuffered_byte_stream_->GetPosition(&buf_start));
-      } else {
-        // Seek to the next buffer, in case we read the byte stream below.
-        buf_start += num_bytes_read;
-#ifndef NDEBUG
-        int64_t position;
-        RETURN_IF_ERROR(unbuffered_byte_stream_->GetPosition(&position));
-        DCHECK_EQ(buf_start, position);
-#endif
-      }
-      // Do not read past the end of range, unless we stopped at a -1 byte.
-      // This could be the start of a sync block and we must process the
-      // following data.
-      if (buf_start + read_size >= end_of_scan_range_) {
-        read_size = (end_of_scan_range_ - buf_start);
-        if (sync_flag_counter != 0 && read_size < 4 - sync_flag_counter) {
-          read_size = 4 - sync_flag_counter;
-        }
-      }
-      if (read_size == 0) {
-        return Status::OK;
-      }
-      RETURN_IF_ERROR(unbuffered_byte_stream_->Read(buf, read_size, &num_bytes_read));
-      off = 0;
-      if (num_bytes_read == 0) {
-        RETURN_IF_ERROR(buffered_byte_stream_->SeekToParent());
-        return Status::OK;
-      }
-      bytes_left = num_bytes_read;
-    }
-
-    if (sync_flag_counter == 0) {
-      COUNTER_SCOPED_TIMER(scan_node_->parse_time_counter());
-      off += find_first_parser_->FindFirstTupleStart(
-          reinterpret_cast<char*>(buf) + off, bytes_left);
-      bytes_left = num_bytes_read - off;
-
-      if (bytes_left == 0) continue;
-
-      sync_flag_counter = 1;
-    }
-    
-    // We found a -1 see if there are 3 more
-    while (bytes_left != 0) {
-      --bytes_left;
-      if (buf[off++] != static_cast<uint8_t>(0xff)) {
-        sync_flag_counter = 0;
-        break;
-      }
-
-      if (++sync_flag_counter == 4) {
-        RETURN_IF_ERROR(buffered_byte_stream_->Seek(buf_start + off));
-        bool verified;
-        RETURN_IF_ERROR(CheckSync(false, &verified));
-        if (verified) {
-          // Seek back to the beginning of the sync so the protocol readers are right.
-          RETURN_IF_ERROR(buffered_byte_stream_->Seek(buf_start + off - 4));
-          return Status::OK;
-        }
-        sync_flag_counter = 0;
-        break;
-      }
-    }
   }
-  RETURN_IF_ERROR(buffered_byte_stream_->SeekToParent());
+
   return Status::OK;
-    
 }
-  
+
 Status HdfsSequenceScanner::Prepare(RuntimeState* state, ByteStream* byte_stream) {
   RETURN_IF_ERROR(HdfsScanner::Prepare(state, byte_stream));
 
@@ -417,26 +156,14 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
   RETURN_IF_ERROR(
       SerDeUtils::SkipBytes(buffered_byte_stream_.get(), current_key_length_));
 
-  // Reading a compressed record, we don't know how big the output is.
-  // If we are told our output buffer is too small, double it and try again.
   if (is_compressed_) {
     int in_size = current_block_length_ - current_key_length_;
     RETURN_IF_ERROR(
         SerDeUtils::ReadBytes(buffered_byte_stream_.get(), in_size, &scratch_buf_));
 
-    int out_size = in_size;
-    bool too_small = false;
-    do {
-      out_size *= 2;
-      if (has_string_slots_ || unparsed_data_buffer_size_ < out_size) {
-        unparsed_data_buffer_ = unparsed_data_buffer_pool_->Allocate(out_size);
-        unparsed_data_buffer_size_ = out_size;
-      }
-      
-      RETURN_IF_ERROR(decompress_block_function_(in_size, &scratch_buf_[0],
-          out_size, unparsed_data_buffer_, &too_small));
-    } while (too_small);
-
+    RETURN_IF_ERROR(
+        decompressor_->ProcessBlock(in_size, &scratch_buf_[0],
+            0, &unparsed_data_buffer_));
     *record_ptr = unparsed_data_buffer_;
     // Read the length of the record.
     int size = SerDeUtils::GetVLong(*record_ptr, record_len);
@@ -494,13 +221,13 @@ Status HdfsSequenceScanner::GetNext(RuntimeState* state,
       uint8_t* record_start = record;
       int num_tuples = 0;
       int num_fields = 0;
-      
+
       RETURN_IF_ERROR(delimited_text_parser_->ParseFieldLocations(
           row_batch->capacity() - row_batch->num_rows(), record_len,
-          reinterpret_cast<char**>(&record), 
+          reinterpret_cast<char**>(&record),
           &field_locations_, &num_tuples, &num_fields, &col_start));
       DCHECK(num_tuples == 1);
-    
+
       if (num_fields != 0) {
         if (!WriteFields(state, row_batch, num_fields, &row_idx).ok()) {
           // Report all the fields that have errors.
@@ -515,7 +242,7 @@ Status HdfsSequenceScanner::GetNext(RuntimeState* state,
           }
           if (state->abort_on_error()) {
             state->ReportFileErrors(buffered_byte_stream_->GetLocation(), 1);
-            return Status("Aborted HdfsSequenceScanner due to parse errors." 
+            return Status("Aborted HdfsSequenceScanner due to parse errors."
                           "View error log for details.");
           }
         }
@@ -559,7 +286,7 @@ Status HdfsSequenceScanner::WriteFields(RuntimeState* state, RowBatch* row_batch
     int need_escape = false;
     int len = field_locations_[n].len;
     if (len < 0) {
-      len = -len; 
+      len = -len;
       need_escape = true;
     }
     next_line_offset += (len + 1);
@@ -655,38 +382,14 @@ Status HdfsSequenceScanner::ReadFileHeader() {
       SerDeUtils::ReadBoolean(buffered_byte_stream_.get(), &is_blk_compressed_));
 
   if (is_compressed_) {
-    RETURN_IF_ERROR(
-        SerDeUtils::ReadText(buffered_byte_stream_.get(), &compression_codec_));
-    RETURN_IF_ERROR(SetCompression());
+    vector<char> codec;
+    RETURN_IF_ERROR(SerDeUtils::ReadText(buffered_byte_stream_.get(), &codec));
+    RETURN_IF_ERROR(Decompressor::CreateDecompressor(runtime_state_,
+        unparsed_data_buffer_pool_.get(), !has_string_slots_, codec, &decompressor_));
   }
-  
+
   RETURN_IF_ERROR(ReadFileHeaderMetadata());
   RETURN_IF_ERROR(ReadSync());
-  return Status::OK;
-}
-
-Status HdfsSequenceScanner::SetCompression() {
-  if (strncmp(&compression_codec_[0], HdfsSequenceScanner::SEQFILE_DEFAULT_COMPRESSION,
-      compression_codec_.size()) == 0 ||
-      strncmp(&compression_codec_[0], HdfsSequenceScanner::SEQFILE_GZIP_COMPRESSION,
-      compression_codec_.size()) == 0) {
-    decompress_block_function_ = DecompressGzipBlock;
-
-  } else if (strncmp(&compression_codec_[0],
-      HdfsSequenceScanner::SEQFILE_BZIP2_COMPRESSION, compression_codec_.size()) == 0) {
-    decompress_block_function_ = DecompressBzip2Block;
-
-  } else if (strncmp(&compression_codec_[0],
-      HdfsSequenceScanner::SEQFILE_SNAPPY_COMPRESSION, compression_codec_.size()) == 0) {
-    decompress_block_function_ = DecompressSnappyBlock;
-  } else {
-    if (runtime_state_->LogHasSpace()) {
-      runtime_state_->error_stream() << "Unknown Codec: " 
-         << string(&compression_codec_[0], compression_codec_.size());
-    }
-    return Status("Unknown Codec");
-  }
-
   return Status::OK;
 }
 
@@ -713,24 +416,24 @@ Status HdfsSequenceScanner::ReadBlockHeader(bool* sync) {
       SerDeUtils::ReadInt(buffered_byte_stream_.get(), &current_block_length_));
   *sync = false;
   if (current_block_length_ == HdfsSequenceScanner::SYNC_MARKER) {
-    RETURN_IF_ERROR(CheckSync(true, NULL));
+    RETURN_IF_ERROR(CheckSync());
     RETURN_IF_ERROR(
         SerDeUtils::ReadInt(buffered_byte_stream_.get(), &current_block_length_));
     *sync = true;
   }
   RETURN_IF_ERROR(SerDeUtils::ReadInt(buffered_byte_stream_.get(), &current_key_length_));
-  DCHECK_EQ(current_key_length_, SEQFILE_KEY_LENGTH); 
+  DCHECK_EQ(current_key_length_, SEQFILE_KEY_LENGTH);
   return Status::OK;
 }
 
-Status HdfsSequenceScanner::CheckSync(bool report_error, bool* verified) {
+Status HdfsSequenceScanner::CheckSync() {
   uint8_t hash[SYNC_HASH_SIZE];
   RETURN_IF_ERROR(SerDeUtils::ReadBytes(buffered_byte_stream_.get(),
       HdfsSequenceScanner::SYNC_HASH_SIZE, hash));
 
   bool sync_compares_equal = memcmp(static_cast<void*>(hash),
       static_cast<void*>(sync_), HdfsSequenceScanner::SYNC_HASH_SIZE) == 0;
-  if (report_error && !sync_compares_equal) {
+  if (!sync_compares_equal) {
     if (runtime_state_->LogHasSpace()) {
       runtime_state_->error_stream() << "Bad sync hash in current HdfsSequenceScanner: "
            << buffered_byte_stream_->GetLocation() << "." << endl
@@ -743,7 +446,6 @@ Status HdfsSequenceScanner::CheckSync(bool report_error, bool* verified) {
     }
     return Status("Bad sync hash");
   }
-  if (verified != NULL) *verified = sync_compares_equal;
   return Status::OK;
 }
 
@@ -751,11 +453,11 @@ Status HdfsSequenceScanner::CheckSync(bool report_error, bool* verified) {
 Status HdfsSequenceScanner::ReadCompressedBlock(RuntimeState* state) {
   // Read the sync indicator and check the sync block.
   RETURN_IF_ERROR(SerDeUtils::SkipBytes(buffered_byte_stream_.get(), sizeof (uint32_t)));
-  RETURN_IF_ERROR(CheckSync(true, NULL));
-  
+  RETURN_IF_ERROR(CheckSync());
+
   RETURN_IF_ERROR(SerDeUtils::ReadVLong(buffered_byte_stream_.get(),
       &num_buffered_records_in_compressed_block_));
-  
+
   // Read the compressed key length and key buffers, we don't need them.
   RETURN_IF_ERROR(SerDeUtils::SkipText(buffered_byte_stream_.get()));
   RETURN_IF_ERROR(SerDeUtils::SkipText(buffered_byte_stream_.get()));
@@ -775,21 +477,8 @@ Status HdfsSequenceScanner::ReadCompressedBlock(RuntimeState* state) {
   }
   RETURN_IF_ERROR(buffered_byte_stream_->SeekToParent());
 
-  bool too_small = false;
-  do {
-    if (too_small || has_string_slots_ || unparsed_data_buffer_ == NULL) {
-      unparsed_data_buffer_ =
-          unparsed_data_buffer_pool_->Allocate(unparsed_data_buffer_size_);
-    }
-
-    RETURN_IF_ERROR(decompress_block_function_(block_size,
-        &scratch_buf_[0], unparsed_data_buffer_size_, unparsed_data_buffer_, &too_small));
-
-    if (too_small) {
-      unparsed_data_buffer_size_ *= 2;
-    }
-  } while (too_small);
-
+  RETURN_IF_ERROR(decompressor_->ProcessBlock(block_size, &scratch_buf_[0],
+      0, &unparsed_data_buffer_));
   next_record_in_compressed_block_ = unparsed_data_buffer_;
   return Status::OK;
 }

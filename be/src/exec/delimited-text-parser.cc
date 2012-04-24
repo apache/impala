@@ -1,6 +1,7 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #include "util/cpu-info.h"
+#include "exec/hdfs-scanner.h"
 #include "exec/delimited-text-parser.h"
 
 using namespace impala;
@@ -37,7 +38,7 @@ DelimitedTextParser::DelimitedTextParser(const vector<int>& map_column_to_slot,
     // a bit mask for 16 bits so we need to mask off the bits below col_start
     // and after col_end.
     // TODO: processing escapes still takes a while (up to 20%).  For tables that
-    // don't have an escape character set, this can be avoided. Consider duplicating 
+    // don't have an escape character set, this can be avoided. Consider duplicating
     // ParseFieldLocations to have a version that doesn't deal with escapes.
     low_mask_[0] = 0xffff;
     high_mask_[15] = 0xffff;
@@ -91,7 +92,7 @@ inline void ProcessEscapeMask(uint16_t escape_mask, bool* last_char_is_escape,
   *last_char_is_escape = escape_mask &
     SSEUtil::SSE_BITMASK[SSEUtil::CHARS_PER_128_BIT_REGISTER - 1];
 
-  // Shift escape mask up one so they match at the same bit index as the tuple and 
+  // Shift escape mask up one so they match at the same bit index as the tuple and
   // field mask (instead of being the character before) and set the correct first bit
   escape_mask = escape_mask << 1 | (first_char_is_escape ? 1 : 0);
 
@@ -166,7 +167,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
       // can contain non-zero values.
       // _mm_extract_epi16 will extract 16 bits out of the xmm register.  The second
       // parameter specifies which 16 bits to extract (0 for the lowest 16 bits).
-      xmm_delim_mask = 
+      xmm_delim_mask =
           _mm_cmpistrm(xmm_delim_search_, xmm_buffer, SSEUtil::STRCHR_MODE);
       uint16_t delim_mask = _mm_extract_epi16(xmm_delim_mask, 0);
 
@@ -188,8 +189,8 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
         DCHECK_GE(n, 0);
         DCHECK_LT(n, 16);
         // clear current bit
-        delim_mask &= ~(SSEUtil::SSE_BITMASK[n]); 
-        
+        delim_mask &= ~(SSEUtil::SSE_BITMASK[n]);
+
         // Determine if there was an escape character between [last_col_idx, n]
         bool escaped = (escape_mask & low_mask_[last_col_idx] & high_mask_[n]) != 0;
         current_column_has_escape_ |= escaped;
@@ -271,9 +272,12 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
   return Status::OK;
 }
 
-// Find the start of the first full tuple in buffer by looking for the end of
+// Find the first intance of the tuple delimiter.  This will
+// find the start of the first full tuple in buffer by looking for the end of
 // the previous tuple.
-int DelimitedTextParser::FindFirstTupleStart(char* buffer, int len) {
+// TODO: most of this is not tested.  We need some tailored data to exercise the boundary
+// cases
+int DelimitedTextParser::FindFirstInstance(char* buffer, int len) {
   int tuple_start = 0;
   char* buffer_start = buffer;
 restart:
@@ -342,4 +346,97 @@ restart:
   }
 
   return tuple_start;
+}
+
+// The start of the sync block is specified by an integer of -1.
+// By setting the tuple deimiter to 0xff we can do a fast search of the
+// bytes till we find a -1 and then look for 3 more -1 bytes which will make up
+// the integer.  This is followed by the 16 byte sync block which was specified in
+// the file header.
+// TODO: Can we user strstr see mode?
+Status DelimitedTextParser::FindSyncBlock(int end_of_range, int sync_size,
+                                          uint8_t* sync, ByteStream*  byte_stream) {
+  // A sync block is preceeded by 4 bytes of -1 (tuple_delim_).
+  int sync_flag_counter = 0;
+  // Starting offset of the buffer we are scanning
+  int64_t buf_start = 0;
+  // Number of bytes read from stream
+  int64_t num_bytes_read = 0;
+  // Current offset into buffer.
+  int64_t off = 0;
+  // Bytes left to process in buffer.
+  int64_t bytes_left = 0;
+  // Size of buffer to read.
+  int64_t read_size = HdfsScanner::FILE_BLOCK_SIZE;
+  // Buffer to scan.
+  uint8_t buf[read_size];
+
+  // Loop until we find a Sync block or get to the end of the range.
+  while (buf_start + off < end_of_range && sync_flag_counter == 0) {
+    // If there are no bytes left to process in the buffer get some more.
+    if (bytes_left == 0) {
+      if (buf_start == 0) {
+        RETURN_IF_ERROR(byte_stream->GetPosition(&buf_start));
+      } else {
+        // Seek to the next buffer, in case we read the byte stream below.
+        buf_start += num_bytes_read;
+        RETURN_IF_ERROR(byte_stream->Seek(buf_start));
+      }
+      // Do not to read past the end of range, unless we stopped at a -1 byte.
+      // This could be the start of a sync marker and we need to process the data
+      // after this point.
+      if (buf_start + read_size >= end_of_range) {
+        read_size = (end_of_range - buf_start);
+        if (sync_flag_counter != 0 && read_size < 4 - sync_flag_counter) {
+          read_size = 4 - sync_flag_counter;
+        }
+      }
+      if (read_size == 0) {
+        return Status::OK;
+      }
+      RETURN_IF_ERROR(byte_stream->Read(buf, read_size, &num_bytes_read));
+      off = 0;
+      if (num_bytes_read == 0) {
+        return Status::OK;
+      }
+      bytes_left = num_bytes_read;
+    }
+
+    if (sync_flag_counter == 0) {
+      off += FindFirstInstance(reinterpret_cast<char*>(buf + off), bytes_left);
+      bytes_left = num_bytes_read - off;
+
+      // If we read to the end of the buffer, we did not find a -1.
+      if (bytes_left == 0) continue;
+
+      sync_flag_counter = 1;
+    }
+
+    // We found a -1 see if there are 3 more
+    while (bytes_left != 0) {
+      --bytes_left;
+      if (buf[off++] != static_cast<uint8_t>(tuple_delim_)) {
+        sync_flag_counter = 0;
+        break;
+      }
+      if (++sync_flag_counter == 4) {
+        if (bytes_left < sync_size) {
+          // Reset the buffer to contain the whole sync block.
+          buf_start = buf_start + off;
+          RETURN_IF_ERROR(byte_stream->Seek(buf_start));
+          RETURN_IF_ERROR(byte_stream->Read(buf, sync_size, &num_bytes_read));
+          off = 0;
+        }
+        if (!memcmp(static_cast<void*>(&buf[off]), static_cast<void*>(sync), sync_size)) {
+          // Seek to the beginning of the sync so the protocol readers are right.
+          RETURN_IF_ERROR(byte_stream->Seek(buf_start + off - 4));
+          return Status::OK;
+        }
+        sync_flag_counter = 0;
+        break;
+      }
+    }
+  }
+  return Status::OK;
+
 }

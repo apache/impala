@@ -60,7 +60,9 @@ Status HdfsScanner::Prepare(RuntimeState* state, ByteStream* byte_stream) {
 }
 
 void HdfsScanner::AllocateTupleBuffer(RowBatch* row_batch) {
-  if (tuple_ == NULL) {
+  if (tuple_byte_size_ == 0) {
+    tuple_buffer_size_ = 0;
+  } else if (tuple_ == NULL) {
     // create new tuple buffer for row_batch
     tuple_buffer_size_ = row_batch->capacity() * tuple_byte_size_;
     tuple_buffer_ = tuple_pool_->Allocate(tuple_buffer_size_);

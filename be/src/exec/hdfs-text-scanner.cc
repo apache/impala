@@ -70,7 +70,7 @@ Status HdfsTextScanner::InitCurrentScanRange(RuntimeState* state,
   // Offset may not point to tuple boundary
   if (scan_range->offset != 0) {
     COUNTER_SCOPED_TIMER(scan_node_->parse_time_counter());
-    int first_tuple_offset = delimited_text_parser_->FindFirstTupleStart(
+    int first_tuple_offset = delimited_text_parser_->FindFirstInstance(
         byte_buffer_, byte_buffer_read_size_);
     DCHECK_LE(first_tuple_offset, min(state->file_buffer_size(),
          current_range_remaining_len_));

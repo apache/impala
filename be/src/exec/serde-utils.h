@@ -41,6 +41,15 @@ public:
         |  buf[3];
   }
 
+  // Put an Integer into a buffer in "Hadoop format"
+  static void PutInt(uint8_t* buf, int32_t integer) {
+    buf[0] = integer >> 24;
+    buf[1] = integer >> 16;
+    buf[2] = integer >> 8;
+    buf[3] = integer;
+  }
+
+
   // Read a variable-length Long value written using Writable serialization.
   // Ref: org.apache.hadoop.io.WritableUtils.readVLong()
   static Status ReadVLong(ByteStream* byte_stream, int64_t* vlong);

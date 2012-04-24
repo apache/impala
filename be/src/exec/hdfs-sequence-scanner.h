@@ -27,7 +27,7 @@ namespace impala {
 // record-block ::=
 //   <record>+
 //   <file-sync-hash>
-// 
+//
 // file-header ::=
 //   <file-version-header>
 //   <file-key-class-name>
@@ -85,7 +85,7 @@ namespace impala {
 // record ::=
 //   <uncompressed-record>     |
 //   <block-compressed-record> |
-//   <record-compressed-record> 
+//   <record-compressed-record>
 //
 // uncompressed-record ::=
 //   <record-length>
@@ -120,19 +120,19 @@ namespace impala {
 //
 // -- The key-lengths and value-lengths blocks are are a sequence of lengths encoded
 // -- in ZeroCompressedInteger (VInt) format.
-// 
+//
 // key-lengths-block :: = Byte[key-lengths-block-size]
 // value-lengths-block :: = Byte[value-lengths-block-size]
 //
 // Byte ::= An eight-bit byte
-// 
+//
 // VInt ::= Variable length integer. The high-order bit of each byte
 // indicates whether more bytes remain to be read. The low-order seven
 // bits are appended as increasingly more significant bits in the
 // resulting integer value.
-// 
+//
 // Int ::= A four-byte integer in big-endian format.
-// 
+//
 // Text ::= VInt, Chars (Length prefixed UTF-8 characters)
 
 class HdfsSequenceScanner : public HdfsScanner {
@@ -165,17 +165,7 @@ class HdfsSequenceScanner : public HdfsScanner {
   // The key should always be 4 bytes.
   static const int SEQFILE_KEY_LENGTH;
 
-  // The names of the Codecs we support.
-  static const char* const SEQFILE_DEFAULT_COMPRESSION;
-  static const char* const SEQFILE_GZIP_COMPRESSION;
-  static const char* const SEQFILE_BZIP2_COMPRESSION;
-  static const char* const SEQFILE_SNAPPY_COMPRESSION;
-
-  // Size to read when searching for the first record in a split
-  // This probably ought to be a derived number from the environment.
-  const static int FILE_BLOCK_SIZE = 4096;
-
-  // Initialises any state required at the beginning of a new scan range. 
+  // Initialises any state required at the beginning of a new scan range.
   // If not at the begining of the file it will trigger a search for the
   // next sync block, where the scan will start.
   virtual Status InitCurrentScanRange(RuntimeState* state,
@@ -246,14 +236,8 @@ class HdfsSequenceScanner : public HdfsScanner {
   // Decompress to unparsed_data_buffer_ allocated from unparsed_data_buffer_pool_.
   Status ReadCompressedBlock(RuntimeState *state);
 
-  // sets decompress_block_function_ by reading the compression_codec_.
-  Status SetCompression();
-
   // read and verify a sync block.
-  // report_error:if false we are scanning for the begining of a range and
-  //              we don't want to report errors.
-  // verified: output true if there was a correct sync hash.
-  Status CheckSync(bool report_error, bool *verified);
+  Status CheckSync();
 
   // a buffered byte stream to wrap the stream we are passed.
   boost::scoped_ptr<BufferedByteStream> buffered_byte_stream_;
@@ -268,13 +252,6 @@ class HdfsSequenceScanner : public HdfsScanner {
   // Helper class for converting text fields to internal types.
   boost::scoped_ptr<TextConverter> text_converter_;
 
-  // Function pointer to the decompression code for the selected codec.
-  // Uncompresses data from 'in' to 'out'.  
-  // Sets too_small to true if output_length is not big enought to hold uncompress the
-  // data.
-  Status (*decompress_block_function_) (int input_length, uint8_t* in,
-                                        int output_length, uint8_t* out, bool* too_small);
-
   // Runtime state for reporting file parsing errors.
   RuntimeState* runtime_state_;
 
@@ -288,10 +265,10 @@ class HdfsSequenceScanner : public HdfsScanner {
   bool is_compressed_;
   // Block compression or not.
   bool is_blk_compressed_;
-  
-  // Compression codec specified in the Sequence file Header as a SerDe Text.
-  std::vector<char> compression_codec_;
-  
+
+  // The decompressor class to use.
+  boost::scoped_ptr<Decompressor> decompressor_;
+
   // Location (file name) of previous scan range.
   std::string previous_location_;
 
@@ -304,7 +281,7 @@ class HdfsSequenceScanner : public HdfsScanner {
   // Length of the current key.  This should always be SEQFILE_KEY_LENGTH.
   int current_key_length_;
 
-  // Pool for allocating the unparsed_data_buffer_pool_
+  // Pool for allocating the unparsed_data_buffer_.
   boost::scoped_ptr<MemPool> unparsed_data_buffer_pool_;
 
   // Buffer for data read from HDFS or from decompressing the HDFS data.

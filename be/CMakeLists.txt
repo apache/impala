@@ -8,13 +8,13 @@ enable_testing()
 # Setting this enables compiling for assembly output.  To compile to assembly:
 #  1. cd into the directory containing the source file
 #  2. 'make help' will list the assembly file targets (i.e. <srcfile.s>
-#  3. 'make <srcfile>.s' to build the assembly for that file.  The file is built 
+#  3. 'make <srcfile>.s' to build the assembly for that file.  The file is built
 #      to CMakeFiles/<currentdir>.dir/<srcfile>.s
 PROJECT(ASSEMBLER)
 
 # compiler flags for different build types (run 'cmake -DCMAKE_BUILD_TYPE=<type> .')
 # For all builds:
-#   -msse4.2: Enable sse4.2 compiler intrinsics.  
+#   -msse4.2: Enable sse4.2 compiler intrinsics.
 #   -Wall: Enable all warnings.
 #   -Wno-sign-compare: suppress warnings for comparison between signed and unsigned integers
 # For CMAKE_BUILD_TYPE=Debug
@@ -41,7 +41,7 @@ SET(CXX_FLAGS_PROFILE_BUILD "${CXX_FLAGS_RELEASE} -fprofile-use")
 if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Debug)
 endif(NOT CMAKE_BUILD_TYPE)
-   
+
 STRING (TOUPPER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE)
 
 # Set compile flags based on the build type.
@@ -72,7 +72,7 @@ find_package(Doxygen)
 if (DOXYGEN_FOUND)
   set(DOXYGEN_OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/build/docs)
   # Possible to not input the subdirs one by one?
-  set(CMAKE_DOXYGEN_INPUT 
+  set(CMAKE_DOXYGEN_INPUT
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/common/
     ${CMAKE_SOURCE_DIR}/src/exec/
@@ -85,7 +85,7 @@ if (DOXYGEN_FOUND)
     )
   # CMake appends using ';'. doxygen wants spaces
   string(REPLACE ";" " " DOXYGEN_INPUT "${CMAKE_DOXYGEN_INPUT}")
-  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/.impala.doxy 
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/.impala.doxy
                  ${CMAKE_CURRENT_SOURCE_DIR}/build/config/.impala.doxy)
   file(MAKE_DIRECTORY ${DOXYGEN_OUTPUT_DIR})
   add_custom_target(docs
@@ -117,11 +117,11 @@ endif()
 # when linking statically the linker won't look for the needed symbols.
 # TODO: is there a better way to specify link dependencies without having to
 # list all included libs for each specific binary? any gcc flags to help with this?
-# multiple alternating includes of Opcode and Exprs libs necessary to get symbols 
+# multiple alternating includes of Opcode and Exprs libs necessary to get symbols
 # resolve (why?)
 # TODO: remove TestUtil dependency as soon as we have our scheduler library in place
 #
-# The order of link libararies matter.  
+# The order of link libararies matter.
 #  - Util must come before ImpalaThrift
 #  - Exprs & Opcode have a circular dependency (Exprs is included twice)
 set (IMPALA_LINK_LIBS
@@ -145,12 +145,13 @@ set (IMPALA_LINK_LIBS
   Exprs
   Opcode
   Exprs
+  Util
   ${SNAPPY_STATIC_LIB}
-  ${Boost_LIBRARIES}  
+  ${Boost_LIBRARIES}
   ${LLVM_MODULE_LIBS}
   gflagsstatic
   glogstatic
-#  tcmallocstatic  This crashes the FE tests.  
+#  tcmallocstatic  This crashes the FE tests.
   pprofstatic
   -lz -lbz2 -lboost_date_time
 )
