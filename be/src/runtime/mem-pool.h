@@ -63,7 +63,7 @@ class MemPool {
   // Allocates 8-byte aligned section of memory of 'size' bytes at the end
   // of the the current chunk. Creates a new chunk if there aren't any chunks
   // with enough capacity.
-  char* Allocate(int size) {
+  uint8_t* Allocate(int size) {
     int num_bytes = ((size + 7) / 8) * 8;  // round up to nearest 8 bytes
     if (current_chunk_idx_ == -1
         || num_bytes + chunks_[current_chunk_idx_].allocated_bytes
@@ -72,7 +72,7 @@ class MemPool {
     }
     ChunkInfo& info = chunks_[current_chunk_idx_];
     DCHECK(info.owns_data);
-    char* result = info.data + info.allocated_bytes;
+    uint8_t* result = info.data + info.allocated_bytes;
     DCHECK_LE(info.allocated_bytes + num_bytes, info.size);
     info.allocated_bytes += num_bytes;
     total_allocated_bytes_ += num_bytes;
@@ -108,7 +108,7 @@ class MemPool {
   // Return logical offset of data ptr into allocated data (interval
   // [0, total_allocated_bytes()) ).
   // Returns -1 if 'data' doesn't belong to this mempool.
-  int GetOffset(char* data);
+  int GetOffset(uint8_t* data);
 
   // Return logical offset of memory returned by next call to Allocate()
   // into allocated data.
@@ -116,10 +116,10 @@ class MemPool {
 
   // Given a logical offset into the allocated data (allowed values:
   // 0 - total_allocated_bytes() - 1), return a pointer to that offset.
-  char* GetDataPtr(int offset);
+  uint8_t* GetDataPtr(int offset);
 
   // Return (data ptr, allocated bytes) pairs for all chunks owned by this mempool.
-  void GetChunkInfo(std::vector<std::pair<char*, int> >* chunk_info);
+  void GetChunkInfo(std::vector<std::pair<uint8_t*, int> >* chunk_info);
 
   // Print allocated bytes from all chunks.
   std::string DebugPrint();
@@ -130,7 +130,7 @@ class MemPool {
 
   struct ChunkInfo {
     bool owns_data;  // true if we eventually need to dealloc data
-    char* data;
+    uint8_t* data;
     int size;  // in bytes
 
     // number of bytes allocated via Allocate() up to but excluding this chunk;
@@ -143,7 +143,7 @@ class MemPool {
 
     explicit ChunkInfo(int size)
       : owns_data(true),
-        data(new char[size]),
+        data(new uint8_t[size]),
         size(size),
         cumulative_allocated_bytes(0),
         allocated_bytes(0) {}
@@ -184,8 +184,8 @@ class MemPool {
   // If 'current_chunk_empty' is false, checks that the current chunk contains data.
   bool CheckIntegrity(bool current_chunk_empty);
 
-  int GetOffsetHelper(char* data);
-  char* GetDataPtrHelper(int offset);
+  int GetOffsetHelper(uint8_t* data);
+  uint8_t* GetDataPtrHelper(int offset);
 
   // Return offset to unoccpied space in current chunk.
   int GetFreeOffset() const {
@@ -195,7 +195,7 @@ class MemPool {
 };
 
 inline
-int MemPool::GetOffset(char* data) {
+int MemPool::GetOffset(uint8_t* data) {
   if (last_offset_conversion_chunk_idx_ != -1) {
     const ChunkInfo& info = chunks_[last_offset_conversion_chunk_idx_];
     if (info.data <= data && info.data + info.allocated_bytes > data) {
@@ -206,7 +206,7 @@ int MemPool::GetOffset(char* data) {
 }
 
 inline
-char* MemPool::GetDataPtr(int offset) {
+uint8_t* MemPool::GetDataPtr(int offset) {
   if (last_offset_conversion_chunk_idx_ != -1) {
     const ChunkInfo& info = chunks_[last_offset_conversion_chunk_idx_];
     if (info.cumulative_allocated_bytes <= offset

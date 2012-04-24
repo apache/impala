@@ -68,7 +68,7 @@ TEST(MemPoolTest, Basic) {
 
 TEST(MemPoolTest, Offsets) {
   MemPool p;
-  char* data[1024];
+  uint8_t* data[1024];
   int offset = 0;
   // test GetCurrentOffset()
   for (int i = 0; i < 1024; ++i) {

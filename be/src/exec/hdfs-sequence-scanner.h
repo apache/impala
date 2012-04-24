@@ -232,7 +232,7 @@ class HdfsSequenceScanner : public HdfsScanner {
   //   record_len: length of the record
   //   eors: set to true if we are at the end of the scan range.
   Status GetRecordFromCompressedBlock(RuntimeState *state,
-                                      char** record_ptr, int64_t* record_len, bool* eors);
+                                      uint8_t** record_ptr, int64_t *record_len, bool *eors);
 
   // Read compressed or uncompressed records from the byte stream into memory
   // in unparsed_data_buffer_pool_.
@@ -240,7 +240,7 @@ class HdfsSequenceScanner : public HdfsScanner {
   //   record_ptr: ponter to the record.
   //   record_len: length of the record
   //   eors: set to true if we are at the end of the scan range.
-  Status GetRecord(char** record_ptr, int64_t* record_len, bool* eosr);
+  Status GetRecord(uint8_t** record_ptr, int64_t *record_len, bool *eosr);
 
   // Read a compressed block.
   // Decompress to unparsed_data_buffer_ allocated from unparsed_data_buffer_pool_.
@@ -272,8 +272,8 @@ class HdfsSequenceScanner : public HdfsScanner {
   // Uncompresses data from 'in' to 'out'.  
   // Sets too_small to true if output_length is not big enought to hold uncompress the
   // data.
-  Status (*decompress_block_function_) (int input_length, char* in,
-                                        int output_length, char* out, bool* too_small);
+  Status (*decompress_block_function_) (int input_length, uint8_t* in,
+                                        int output_length, uint8_t* out, bool* too_small);
 
   // Runtime state for reporting file parsing errors.
   RuntimeState* runtime_state_;
@@ -282,7 +282,7 @@ class HdfsSequenceScanner : public HdfsScanner {
   ByteStream* unbuffered_byte_stream_;
 
   // The sync hash read in from the file header.
-  char sync_[SYNC_HASH_SIZE];
+  uint8_t sync_[SYNC_HASH_SIZE];
 
   // File compression or not.
   bool is_compressed_;
@@ -308,7 +308,7 @@ class HdfsSequenceScanner : public HdfsScanner {
   boost::scoped_ptr<MemPool> unparsed_data_buffer_pool_;
 
   // Buffer for data read from HDFS or from decompressing the HDFS data.
-  char* unparsed_data_buffer_;
+  uint8_t* unparsed_data_buffer_;
 
   // Size of the unparsed_data_buffer_.
   int64_t unparsed_data_buffer_size_;
@@ -317,11 +317,11 @@ class HdfsSequenceScanner : public HdfsScanner {
   int64_t num_buffered_records_in_compressed_block_;
 
   // Next record from block compressed data.
-  char* next_record_in_compressed_block_;
+  uint8_t* next_record_in_compressed_block_;
 
   // Temporary buffer used for reading headers and compressed data.
   // It will grow to be big enough for the largest compressed record or block.
-  std::vector<char> scratch_buf_;
+  std::vector<uint8_t> scratch_buf_;
 };
 
 } // namespace impala

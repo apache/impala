@@ -54,7 +54,7 @@ RCFileRowGroup::RCFileRowGroup(const std::vector<bool>& column_read_mask)
   col_buf_pos_.resize(num_cols_);
 }
 
-void RCFileRowGroup::SetSyncHash(const std::vector<char>* sync_hash) {
+void RCFileRowGroup::SetSyncHash(const std::vector<uint8_t>* sync_hash) {
   sync_hash_ = sync_hash;
 }
 
@@ -71,7 +71,7 @@ Status RCFileRowGroup::ReadHeader(ByteStream* byte_stream) {
 }
 
 Status RCFileRowGroup::ReadSync(ByteStream* byte_stream) {
-  vector<char> hash;
+  vector<uint8_t> hash;
   RETURN_IF_ERROR(SerDeUtils::ReadBytes(byte_stream, RCFileReader::SYNC_HASH_SIZE,
                                         &hash));
   if (sync_hash_ == NULL) {
@@ -187,8 +187,8 @@ void RCFileRowGroup::NextField(int col_idx) {
     DCHECK_GE(cur_field_length_rep_[col_idx], 0);
     // Get the next column length or repeat count
     int64_t length = 0;
-    vector<char>* col_key_buf = &col_key_bufs_[col_idx];
-    int bytes_read = SerDeUtils::ReadVLong(&(*col_key_buf)[0],
+    vector<uint8_t>* col_key_buf = &col_key_bufs_[col_idx];
+    int bytes_read = SerDeUtils::GetVLong(&(*col_key_buf)[0],
                                            key_buf_pos_[col_idx],
                                            &length);
     key_buf_pos_[col_idx] += bytes_read;
@@ -218,7 +218,7 @@ int RCFileRowGroup::GetFieldLength(int col_id) {
   return cur_field_length_[col_id];
 }
 
-const char* RCFileRowGroup::GetFieldPtr(int col_id) {
+const uint8_t* RCFileRowGroup::GetFieldPtr(int col_id) {
   return &col_bufs_[col_id][col_buf_pos_[col_id]];
 }
 
@@ -247,7 +247,7 @@ RCFileRowGroup* RCFileReader::NewRCFileRowGroup() {
 }
 
 Status RCFileReader::ReadFileHeader() {
-  vector<char> buf;
+  vector<uint8_t> buf;
 
   RETURN_IF_ERROR(SerDeUtils::ReadBytes(byte_stream_, sizeof(RCFILE_VERSION_HEADER),
                                         &buf));
@@ -258,22 +258,23 @@ Status RCFileReader::ReadFileHeader() {
     return Status(ss.str());
   }
 
-  RETURN_IF_ERROR(SerDeUtils::ReadText(byte_stream_, &buf));
-  if (strncmp(&buf[0], RCFileReader::RCFILE_KEY_CLASS_NAME,
+  vector<char> name;
+  RETURN_IF_ERROR(SerDeUtils::ReadText(byte_stream_, &name));
+  if (strncmp(&name[0], RCFileReader::RCFILE_KEY_CLASS_NAME,
               strlen(RCFileReader::RCFILE_KEY_CLASS_NAME))) {
     std::stringstream ss;
     ss << "Invalid RCFILE_KEY_CLASS_NAME: '"
-       << std::string(&buf[0], strlen(RCFileReader::RCFILE_KEY_CLASS_NAME))
+       << std::string(&name[0], strlen(RCFileReader::RCFILE_KEY_CLASS_NAME))
        << "'";
     return Status(ss.str());
   }
 
-  RETURN_IF_ERROR(SerDeUtils::ReadText(byte_stream_, &buf));
-  if (strncmp(&buf[0], RCFileReader::RCFILE_VALUE_CLASS_NAME,
+  RETURN_IF_ERROR(SerDeUtils::ReadText(byte_stream_, &name));
+  if (strncmp(&name[0], RCFileReader::RCFILE_VALUE_CLASS_NAME,
               strlen(RCFileReader::RCFILE_VALUE_CLASS_NAME))) {
     std::stringstream ss;
     ss << "Invalid RCFILE_VALUE_CLASS_NAME: '"
-       << std::string(&buf[0], strlen(RCFileReader::RCFILE_VALUE_CLASS_NAME))
+       << std::string(&name[0], strlen(RCFileReader::RCFILE_VALUE_CLASS_NAME))
        << "'";
     return Status(ss.str());
   }

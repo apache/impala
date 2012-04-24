@@ -30,7 +30,7 @@ Status BufferedByteStream::Open(const string& location) {
   return Status::OK;
 }
 
-Status BufferedByteStream::Read(char* buf, int64_t req_len, int64_t* actual_len) {
+Status BufferedByteStream::Read(uint8_t* buf, int64_t req_len, int64_t* actual_len) {
   DCHECK(buf != NULL);
   DCHECK_GE(req_len, 0);
 

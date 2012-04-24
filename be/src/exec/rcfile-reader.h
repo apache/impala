@@ -222,7 +222,7 @@ public:
   RCFileRowGroup(const std::vector<bool>& column_read_mask);
 
   // The sync hash field to verify rowgroup sync fields against.
-  void SetSyncHash(const std::vector<char>* sync_hash);
+  void SetSyncHash(const std::vector<uint8_t>* sync_hash);
 
   // Read the next rowgroup from file
   Status ReadNext(ByteStream* byte_stream);
@@ -242,7 +242,7 @@ public:
   int GetFieldLength(int col_id);
 
   // Get a pointer to the current column field
-  const char* GetFieldPtr(int col_id);
+  const uint8_t* GetFieldPtr(int col_id);
 
   int num_rows() const { return num_rows_; }
   int num_cols() const { return num_cols_; }
@@ -253,7 +253,7 @@ private:
   const std::vector<bool>& column_read_mask_;
 
   // Pointer to the sync hash read out of the file header by RCFileReader
-  const std::vector<char>* sync_hash_;
+  const std::vector<uint8_t>* sync_hash_;
 
   // number of columns in this rowgroup object
   int num_cols_;
@@ -283,7 +283,7 @@ private:
   // Row Group Key Buffer data, indexed by column number
   std::vector<int> col_buf_len_;
   std::vector<int> col_buf_uncompressed_len_;
-  std::vector<std::vector<char> > col_key_bufs_;
+  std::vector<std::vector<uint8_t> > col_key_bufs_;
 
   // Current position in the key buffer, by column
   std::vector<int> key_buf_pos_;
@@ -295,7 +295,7 @@ private:
   std::vector<int> cur_field_length_rep_;
 
   // Column data buffers, by column
-  std::vector<std::vector<char> > col_bufs_;
+  std::vector<std::vector<uint8_t> > col_bufs_;
 
   // Column buffer byte offset, by column
   std::vector<int> col_buf_pos_;
@@ -382,7 +382,7 @@ private:
   ByteStream* byte_stream_;
 
   // The sync hash read in from the file header
-  std::vector<char> sync_;
+  std::vector<uint8_t> sync_;
 
   // The column read mask. Column i is read iff column_read_mask_[i] == true.
   const std::vector<bool>& column_read_mask_;

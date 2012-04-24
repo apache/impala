@@ -48,15 +48,15 @@ void RowBatch::Serialize(TRowBatch* output_batch) {
       if (is_self_contained_) {
         t = row->GetTuple(j);
         output_batch->tuple_offsets.push_back(
-            tuple_data_pool_->GetOffset(reinterpret_cast<char*>(t)));
+            tuple_data_pool_->GetOffset(reinterpret_cast<uint8_t*>(t)));
 
         // convert string pointers to offsets
         vector<SlotDescriptor*>::const_iterator slot = (*desc)->string_slots().begin();
         for (; slot != (*desc)->string_slots().end(); ++slot) {
           DCHECK_EQ((*slot)->type(), TYPE_STRING);
           StringValue* string_val = t->GetStringSlot((*slot)->tuple_offset());
-          string_val->ptr =
-              reinterpret_cast<char*>(tuple_data_pool_->GetOffset(string_val->ptr));
+          string_val->ptr = reinterpret_cast<char*>(tuple_data_pool_->GetOffset(
+                  reinterpret_cast<uint8_t*>(string_val->ptr)));
         }
       } else  {
         // record offset before creating copy
@@ -71,14 +71,14 @@ void RowBatch::Serialize(TRowBatch* output_batch) {
     Reset();  // we passed on all data
   }
 
-  vector<pair<char*, int> > chunk_info;
+  vector<pair<uint8_t*, int> > chunk_info;
   output_pool.GetChunkInfo(&chunk_info);
   output_batch->tuple_data.reserve(chunk_info.size());
   for (int i = 0; i < chunk_info.size(); ++i) {
     // TODO: this creates yet another data copy, figure out how to avoid that
     // (Thrift should introduce something like StringPieces, that can hold
     // references to data/length pairs)
-    string data(chunk_info[i].first, chunk_info[i].second);
+    string data(reinterpret_cast<char*>(chunk_info[i].first), chunk_info[i].second);
     output_batch->tuple_data.push_back(string());
     output_batch->tuple_data.back().swap(data);
     DCHECK(data.empty());
@@ -138,8 +138,8 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch)
       for (; slot != (*desc)->string_slots().end(); ++slot) {
         DCHECK_EQ((*slot)->type(), TYPE_STRING);
         StringValue* string_val = t->GetStringSlot((*slot)->tuple_offset());
-        string_val->ptr =
-            tuple_data_pool_->GetDataPtr(reinterpret_cast<intptr_t>(string_val->ptr));
+        string_val->ptr = reinterpret_cast<char*>(
+            tuple_data_pool_->GetDataPtr(reinterpret_cast<intptr_t>(string_val->ptr)));
       }
     }
   }

@@ -43,7 +43,7 @@ void RandString(MemPool* pool, StringValue* result,
   int min_len = min.len;
   int max_len = max.len;
   int len = r * (max_len - min_len) + min_len;
-  char* ptr = pool->Allocate(len);
+  char* ptr = reinterpret_cast<char*>(pool->Allocate(len));
   result->len = len;
   result->ptr = ptr;
   

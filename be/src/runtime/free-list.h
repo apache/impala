@@ -39,7 +39,7 @@ class FreeList {
   // from the free list.  
   // Returns the size of the entire buffer in *buffer_size.
   // Returns NULL if there is no matching free list size.
-  char* Allocate(int size, int* buffer_size) {
+  uint8_t* Allocate(int size, int* buffer_size) {
     DCHECK(buffer_size != NULL);
     FreeListNode* prev = &head_;
     FreeListNode* node = head_.next;
@@ -47,7 +47,7 @@ class FreeList {
       if (node->size >= size) {
         prev->next = node->next; 
         *buffer_size = node->size;
-        return reinterpret_cast<char*>(node);
+        return reinterpret_cast<uint8_t*>(node);
       }
       prev = node;
       node = node->next;
@@ -59,7 +59,7 @@ class FreeList {
   // Add a block to the free list.  The caller can no longer touch
   // the memory.  If the size is too small, the free list ignores
   // the memory.
-  void Add(char* memory, int size) {
+  void Add(uint8_t* memory, int size) {
     if (size < FreeList::MinSize()) return;
     FreeListNode* node = reinterpret_cast<FreeListNode*>(memory);
     node->next = head_.next;

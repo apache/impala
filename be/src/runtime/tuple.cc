@@ -28,7 +28,7 @@ void Tuple::DeepCopy(Tuple* dst, const TupleDescriptor& desc, MemPool* pool,
     DCHECK_EQ((*i)->type(), TYPE_STRING);
     StringValue* string_v = dst->GetStringSlot((*i)->tuple_offset());
     int offset = pool->GetCurrentOffset();
-    char* string_copy = pool->Allocate(string_v->len);
+    char* string_copy = reinterpret_cast<char*>(pool->Allocate(string_v->len));
     memcpy(string_copy, string_v->ptr, string_v->len);
     string_v->ptr = (convert_ptrs ? reinterpret_cast<char*>(offset) : string_copy);
   }

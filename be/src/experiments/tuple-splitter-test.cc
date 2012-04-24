@@ -26,7 +26,7 @@ using namespace boost;
 using namespace std;
 using namespace impala;
 
-inline void Memcpy16(char* dst, char* src) {
+inline void Memcpy16(uint8_t* dst, uint8_t* src) {
   reinterpret_cast<uint64_t*>(dst)[0] = reinterpret_cast<uint64_t*>(src)[0];
   reinterpret_cast<uint64_t*>(dst)[1] = reinterpret_cast<uint64_t*>(src)[1];
 }
@@ -34,7 +34,7 @@ inline void Memcpy16(char* dst, char* src) {
 struct PointerValue {
   union {
     uint64_t val;
-    char* ptr;
+    uint8_t* ptr;
   };
 
   template<typename T>
@@ -123,21 +123,21 @@ class DataPartitioner {
     }
   }
 
-  void AddData(int n, char* data);
+  void AddData(int n, uint8_t* data);
 
   int size_per_block() const {
     return tuples_per_partition_;
   }
 
   struct Partition {
-    vector<char*> blocks;
+    vector<uint8_t*> blocks;
     int num_last_block;
 
     Partition() {
       num_last_block = 0;
     }
 
-    Partition(const vector<char*>& blocks, int num) {
+    Partition(const vector<uint8_t*>& blocks, int num) {
       this->blocks = blocks;
       this->num_last_block = num;
     }
@@ -200,18 +200,18 @@ class DataPartitioner {
   vector<int> partitions_at_level_;
 
   struct BuildPartition {
-    vector<char*> blocks;
+    vector<uint8_t*> blocks;
     int num_last_block;
     int level;
   };
   vector<BuildPartition> build_partitions_;
   vector<BuildPartition> child_partitions_;
 
-  char* Allocate(BuildPartition* partition, int p, int size = 0) {
+  uint8_t* Allocate(BuildPartition* partition, int p, int size = 0) {
     if (size == 0) size = tuples_per_partition_ * size_;
     else size = size * size_;
     COUNTER_UPDATE(bytes_allocated_, size);
-    char* out_mem = pool_->Allocate(size);
+    uint8_t* out_mem = pool_->Allocate(size);
     partition->blocks.push_back(out_mem);
     outputs_[p].Update(out_mem, 0);
     return out_mem;
@@ -237,14 +237,14 @@ class DataPartitioner {
   bool Split(const BuildPartition& build_partition);
 };
 
-void DataPartitioner::AddData(int n, char* data) {
+void DataPartitioner::AddData(int n, uint8_t* data) {
   COUNTER_SCOPED_TIMER(add_time_);
   COUNTER_UPDATE(bytes_copied_, n * size_);
 
   for (int i = 0; i < n; ++i) {
     int32_t hash = *reinterpret_cast<int32_t*>(data + hash_offset_);
     hash &= partition_idx_mask_;
-    char* out_mem = outputs_[hash].GetPointer<char*>();
+    uint8_t* out_mem = outputs_[hash].GetPointer<uint8_t*>();
     uint16_t size = outputs_[hash].GetValue();
     if (size == tuples_per_partition_) {
       out_mem = Allocate(&build_partitions_[hash], hash);
@@ -272,7 +272,7 @@ bool DataPartitioner::Split(const BuildPartition& build_partition) {
 
   for (int i = 0; i < num_blocks; ++i) {
     int tuples = NumTuples(build_partition, i);
-    char* hash_slot = build_partition.blocks[i] + hash_offset_;
+    uint8_t* hash_slot = build_partition.blocks[i] + hash_offset_;
     for (int j = 0; j < tuples; ++j) {
       int32_t hash = *reinterpret_cast<int32_t*>(hash_slot);
       hash >>= HASH_BIT_SHIFT;
@@ -288,7 +288,7 @@ bool DataPartitioner::Split(const BuildPartition& build_partition) {
   for (int i = 0; i < partitions; ++i) {
     if (split_counts_[i] > 0) {
       COUNTER_UPDATE(bytes_allocated_, split_counts_[i] * size_);
-      char* mem = pool_->Allocate(split_counts_[i] * size_);
+      uint8_t* mem = pool_->Allocate(split_counts_[i] * size_);
       child_partitions_[i].blocks.clear();
       child_partitions_[i].level = next_level;
       child_partitions_[i].blocks.push_back(mem);
@@ -298,7 +298,7 @@ bool DataPartitioner::Split(const BuildPartition& build_partition) {
   COUNTER_UPDATE(bytes_copied_, TotalTuples(build_partition) * size_);
 
   for (int i = 0; i < num_blocks; ++i) {
-    char* data = build_partition.blocks[i];
+    uint8_t* data = build_partition.blocks[i];
     int tuples = NumTuples(build_partition, i);
 
     const int offset1 = 0;
@@ -312,10 +312,10 @@ bool DataPartitioner::Split(const BuildPartition& build_partition) {
       int32_t hash3 = *reinterpret_cast<int32_t*>(data + hash_offset_ + offset3) & partition_mask;
       int32_t hash4 = *reinterpret_cast<int32_t*>(data + hash_offset_ + offset4) & partition_mask;
 
-      char** out_mem1 = &outputs_[hash1].ptr;
-      char** out_mem2 = &outputs_[hash2].ptr;
-      char** out_mem3 = &outputs_[hash3].ptr;
-      char** out_mem4 = &outputs_[hash4].ptr;
+      uint8_t** out_mem1 = &outputs_[hash1].ptr;
+      uint8_t** out_mem2 = &outputs_[hash2].ptr;
+      uint8_t** out_mem3 = &outputs_[hash3].ptr;
+      uint8_t** out_mem4 = &outputs_[hash4].ptr;
 
       Memcpy16(*out_mem1, data + offset1);
       *out_mem1 += size_;
@@ -332,7 +332,7 @@ bool DataPartitioner::Split(const BuildPartition& build_partition) {
 
     for (int j = 0; j < tuples; ++j) {
       int32_t hash = *reinterpret_cast<int32_t*>(data + hash_offset_) & partition_mask;
-      char* out_mem = outputs_[hash].ptr;
+      uint8_t* out_mem = outputs_[hash].ptr;
       Memcpy16(out_mem, data);
       data += size_;
       outputs_[hash].ptr = out_mem + size_;
@@ -379,7 +379,7 @@ int main(int argc, char **argv) {
   int rows;
   void* data;
   while ( (data = provider.NextBatch(&rows)) != NULL) {
-    char* next_row = reinterpret_cast<char*>(data);
+    uint8_t* next_row = reinterpret_cast<uint8_t*>(data);
     // Compute hash values and store them
     for (int i = 0; i < rows; ++i) {
       int32_t* hash = reinterpret_cast<int32_t*>(next_row);
@@ -387,7 +387,7 @@ int main(int argc, char **argv) {
       *hash = *col;
       next_row += provider.row_size();
     }
-    partitioner.AddData(rows, reinterpret_cast<char*>(data));
+    partitioner.AddData(rows, reinterpret_cast<uint8_t*>(data));
   }
   cout << endl;
 

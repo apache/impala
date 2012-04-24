@@ -22,7 +22,7 @@ class ByteStream {
   virtual Status Close() = 0;
 
   // Reads up to length bytes into buf, returning fewer if there is an error or EOF
-  virtual Status Read(char *buf, int64_t req_length, int64_t* actual_length) = 0;
+  virtual Status Read(uint8_t* buf, int64_t req_length, int64_t* actual_length) = 0;
 
   // Positions the next read at offset bytes from the beginning of the
   // stream

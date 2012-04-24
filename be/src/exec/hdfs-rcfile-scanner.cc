@@ -129,7 +129,8 @@ Status HdfsRCFileScanner::GetNext(
         int rc_column_idx = it->first;
         const SlotDescriptor* slot_desc = it->second;
 
-        const char* col_start = row_group_->GetFieldPtr(rc_column_idx);
+        const char* col_start =
+            reinterpret_cast<const char*>(row_group_->GetFieldPtr(rc_column_idx));
         int field_len = row_group_->GetFieldLength(rc_column_idx);
         Status parse_status;
 
@@ -185,7 +186,7 @@ Status HdfsRCFileScanner::GetNext(
         scan_node_->IncrNumRowsReturned();
         ++num_rows_returned_;
         if (scan_node_->ReachedLimit()) break;
-        char* new_tuple = reinterpret_cast<char*>(tuple_);
+        uint8_t* new_tuple = reinterpret_cast<uint8_t*>(tuple_);
         new_tuple += tuple_byte_size_;
         tuple_ = reinterpret_cast<Tuple*>(new_tuple);
         row_idx = RowBatch::INVALID_ROW_INDEX;

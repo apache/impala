@@ -16,11 +16,11 @@ TEST(FreeListTest, Basic) {
   FreeList list;
 
   int allocated_size;
-  char* free_list_mem = list.Allocate(FreeList::MinSize(), &allocated_size);
+  uint8_t* free_list_mem = list.Allocate(FreeList::MinSize(), &allocated_size);
   EXPECT_EQ(NULL, free_list_mem);
   EXPECT_EQ(allocated_size, 0);
   
-  char* mem = pool.Allocate(FreeList::MinSize());
+  uint8_t* mem = pool.Allocate(FreeList::MinSize());
   EXPECT_TRUE(mem != NULL);
 
   list.Add(mem, FreeList::MinSize()); 
@@ -38,7 +38,7 @@ TEST(FreeListTest, Basic) {
   // Attempt a 4th allocation from the free list and make sure
   // we get NULL.
   // Repeat with the same memory blocks.
-  char* free_list_mem1, *free_list_mem2, *free_list_mem3;
+  uint8_t* free_list_mem1, *free_list_mem2, *free_list_mem3;
 
   mem = pool.Allocate(FreeList::MinSize());
   list.Add(mem, FreeList::MinSize());
@@ -95,9 +95,9 @@ TEST(FreeListTest, Basic) {
   int size2 = FreeList::MinSize() * 2;
   int size4 = FreeList::MinSize() * 4;
 
-  char* mem1 = pool.Allocate(size1);
-  char* mem2 = pool.Allocate(size2);
-  char* mem4 = pool.Allocate(size4);
+  uint8_t* mem1 = pool.Allocate(size1);
+  uint8_t* mem2 = pool.Allocate(size2);
+  uint8_t* mem4 = pool.Allocate(size4);
 
   list.Add(mem2, size2);
   free_list_mem = list.Allocate(size4, &allocated_size);

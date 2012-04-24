@@ -84,7 +84,7 @@ class HdfsScanner {
   // from tuple_pool_. We don't allocate individual tuples from tuple_pool_ directly,
   // because MemPool::Allocate() always rounds up to the next 8 bytes
   // (ie, would be wasteful if we had 2-byte tuples).
-  char* tuple_buffer_;
+  uint8_t* tuple_buffer_;
 
   // Size of tuple_buffer_.
   int tuple_buffer_size_;

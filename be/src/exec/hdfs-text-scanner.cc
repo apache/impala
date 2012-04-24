@@ -70,8 +70,8 @@ Status HdfsTextScanner::InitCurrentScanRange(RuntimeState* state,
 
   // Offset may not point to tuple boundary
   if (scan_range->offset != 0) {
-    int first_tuple_offset =
-      delimited_text_parser_->FindFirstTupleStart(byte_buffer_, byte_buffer_read_size_);
+    int first_tuple_offset = delimited_text_parser_->FindFirstTupleStart(
+        byte_buffer_, byte_buffer_read_size_);
     DCHECK_LE(first_tuple_offset, min(state->file_buffer_size(),
          current_range_remaining_len_));
     byte_buffer_ptr_ += first_tuple_offset;
@@ -89,13 +89,14 @@ Status HdfsTextScanner::FillByteBuffer(RuntimeState* state, int64_t size) {
   int read_size = min(file_buffer_size, size);
 
   if (!reuse_byte_buffer_) {
-    byte_buffer_ = byte_buffer_pool_->Allocate(state->file_buffer_size());
+    byte_buffer_ =
+        reinterpret_cast<char*>(byte_buffer_pool_->Allocate(state->file_buffer_size()));
     reuse_byte_buffer_ = true;
   }
   {
     COUNTER_SCOPED_TIMER(scan_node_->scanner_timer());
-    RETURN_IF_ERROR(current_byte_stream_->Read(byte_buffer_, read_size,
-         &byte_buffer_read_size_));
+    RETURN_IF_ERROR(current_byte_stream_->Read(reinterpret_cast<uint8_t*>(byte_buffer_),
+       read_size, &byte_buffer_read_size_));
   }
   byte_buffer_end_ = byte_buffer_ + byte_buffer_read_size_;
   byte_buffer_ptr_ = byte_buffer_;

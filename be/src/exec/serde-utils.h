@@ -34,15 +34,11 @@ public:
   static Status ReadInt(ByteStream* byte_stream, int32_t* integer);
 
   // Read an Integer from a buffer.
-  static Status ReadInt(char* in_buf, int32_t* integer) {
-    // TODO: all buffers should be typed to uint8_t*
-    uint8_t* buf = reinterpret_cast<uint8_t*>(in_buf);
-    *integer =
-        (buf[0] << 24)
+  static int32_t GetInt(uint8_t* buf) {
+    return (buf[0] << 24)
         | (buf[1] << 16)
         | (buf[2] << 8)
         |  buf[3];
-    return Status::OK;
   }
 
   // Read a variable-length Long value written using Writable serialization.
@@ -50,11 +46,11 @@ public:
   static Status ReadVLong(ByteStream* byte_stream, int64_t* vlong);
 
   // Read a variable-length Long value from a byte buffer.
-  static int ReadVLong(char* buf, int64_t* vlong);
+  static int GetVLong(uint8_t* buf, int64_t* vlong);
 
   // Read a variable-length Long value from a byte buffer
   // starting at the specified byte offset.
-  static int ReadVLong(char* buf, int64_t offset, int64_t* vlong);
+  static int GetVLong(uint8_t* buf, int64_t offset, int64_t* vlong);
 
   // Read a variable length Integer value written using Writable serialization.
   // Ref: org.apache.hadoop.io.WritableUtils.readVInt()
@@ -62,10 +58,10 @@ public:
 
   // Read length bytes from an HDFS file into the supplied buffer.
   static Status ReadBytes(ByteStream* byte_stream, int64_t length,
-                          std::vector<char>* buf);
+                          std::vector<uint8_t>* buf);
 
   static Status ReadBytes(ByteStream* byte_stream, int64_t length,
-                         char* buf);
+                         uint8_t* buf);
 
   // Skip over the next length bytes in the specified HDFS file.
   static Status SkipBytes(ByteStream* byte_stream, int64_t length);
@@ -78,7 +74,7 @@ public:
   static Status SkipText(ByteStream* byte_stream);
 
   // Dump the first length bytes of buf to a Hex string.
-  static std::string HexDump(const char* buf, int64_t length);
+  static std::string HexDump(const uint8_t* buf, int64_t length);
 
 private:
   // Determines the sign of a VInt/VLong from the first byte.

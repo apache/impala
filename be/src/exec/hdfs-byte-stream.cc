@@ -38,7 +38,7 @@ Status HdfsByteStream::Open(const string& location) {
   return Status::OK;
 }
 
-Status HdfsByteStream::Read(char* buf, int64_t req_length, int64_t* actual_length) {
+Status HdfsByteStream::Read(uint8_t* buf, int64_t req_length, int64_t* actual_length) {
   DCHECK(buf != NULL);
   DCHECK(req_length >= 0);
 

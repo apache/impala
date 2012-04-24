@@ -56,8 +56,8 @@ const int HdfsSequenceScanner::SEQFILE_KEY_LENGTH = 4;
 //     out: output buffer, place to put decompressed data.
 // Output:
 //     too_small: set to true if the output_length is too small.
-static Status DecompressGzipBlock(int input_length, char* in,
-                                  int output_length, char* out, bool* too_small) {
+static Status DecompressGzipBlock(int input_length, uint8_t* in,
+                                  int output_length, uint8_t* out, bool* too_small) {
   z_stream stream;
   bzero(&stream, sizeof(stream));
   stream.next_in = reinterpret_cast<Bytef*>(in);
@@ -102,13 +102,13 @@ static Status DecompressGzipBlock(int input_length, char* in,
 //     out: output buffer, place to put decompressed data.
 // Output:
 //     too_small: set to true if the output_length is too small.
-static Status DecompressBzip2Block(int input_length, char* in,
-                                   int output_length, char* out, bool* too_small) {
+static Status DecompressBzip2Block(int input_length, uint8_t* in,
+                                   int output_length, uint8_t* out, bool* too_small) {
   bz_stream stream;
   bzero(&stream, sizeof(stream));
-  stream.next_in = in;
+  stream.next_in = reinterpret_cast<char*>(in);
   stream.avail_in = input_length;
-  stream.next_out = out;
+  stream.next_out = reinterpret_cast<char*>(out);
   stream.avail_out = output_length;
  
   *too_small = false;
@@ -146,15 +146,14 @@ static Status DecompressBzip2Block(int input_length, char* in,
 //     out: output buffer, place to put decompressed data.
 // Output:
 //     too_small: set to true if the output_length is too small.
-static Status DecompressSnappyBlock(int input_length, char* in,
-                                    int output_length, char* out, bool* too_small) {
+static Status DecompressSnappyBlock(int input_length, uint8_t* in,
+                                    int output_length, uint8_t* out, bool* too_small) {
   *too_small = false;
 
   // Hadoop uses a block compression scheme on top of snappy.  First there is
   // an integer which is the size of the decompressed data followed by a
   // sequence of compressed blocks each preceded with an integer size.
-  int32_t len;
-  RETURN_IF_ERROR(SerDeUtils::ReadInt(in, &len));
+  int32_t len = SerDeUtils::GetInt(in);
 
   // TODO: Snappy knows how big the output is, we should just use that.
   if (output_length < len) {
@@ -166,7 +165,7 @@ static Status DecompressSnappyBlock(int input_length, char* in,
  
   do {
     // Read the length of the next block.
-    RETURN_IF_ERROR(SerDeUtils::ReadInt(in, &len));
+    len = SerDeUtils::GetInt(in);
 
     if (len == 0) break;
 
@@ -175,14 +174,14 @@ static Status DecompressSnappyBlock(int input_length, char* in,
 
     // Read how big the output will be.
     size_t uncompressed_len;
-    if (!snappy::GetUncompressedLength(static_cast<const char*>(in),
+    if (!snappy::GetUncompressedLength(reinterpret_cast<const char*>(in),
         input_length, &uncompressed_len)) {
       return Status("Snappy: GetUncompressedLength failed");
     }
 
     DCHECK_GT(output_length, 0);
-    if (!snappy::RawUncompress(static_cast<const char*>(in),
-                               static_cast<size_t>(len), out)) {
+    if (!snappy::RawUncompress(reinterpret_cast<char*>(in),
+        static_cast<size_t>(len), reinterpret_cast<char*>(out))) {
       return Status("Snappy: RawUncompress failed");
     }
     in += len;
@@ -205,7 +204,7 @@ HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNode* scan_node,
       unparsed_data_buffer_size_(0),
       num_buffered_records_in_compressed_block_(0) {
   const HdfsTableDescriptor* hdfs_table =
-    static_cast<const HdfsTableDescriptor*>(tuple_desc->table_desc());
+    reinterpret_cast<const HdfsTableDescriptor*>(tuple_desc->table_desc());
   
   text_converter_.reset(new TextConverter(hdfs_table->escape_char(), tuple_pool_));
 
@@ -276,7 +275,7 @@ Status HdfsSequenceScanner::FindFirstRecord(RuntimeState* state) {
   // Size of buffer to read.
   int64_t read_size = FILE_BLOCK_SIZE;
   // Buffer to scan.
-  char buf[read_size];
+  uint8_t buf[read_size];
 
   // Loop until we find a Sync block or get to the end of the range.
   while (buf_start + off < end_of_scan_range_ || sync_flag_counter != 0) {
@@ -316,7 +315,8 @@ Status HdfsSequenceScanner::FindFirstRecord(RuntimeState* state) {
     }
 
     if (sync_flag_counter == 0) {
-      off += find_first_parser_->FindFirstTupleStart(buf + off, bytes_left);
+      off += find_first_parser_->FindFirstTupleStart(
+          reinterpret_cast<char*>(buf) + off, bytes_left);
       bytes_left = num_bytes_read - off;
 
       if (bytes_left == 0) continue;
@@ -327,7 +327,7 @@ Status HdfsSequenceScanner::FindFirstRecord(RuntimeState* state) {
     // We found a -1 see if there are 3 more
     while (bytes_left != 0) {
       --bytes_left;
-      if (buf[off++] != static_cast<char>(0xff)) {
+      if (buf[off++] != static_cast<uint8_t>(0xff)) {
         sync_flag_counter = 0;
         break;
       }
@@ -362,8 +362,8 @@ Status HdfsSequenceScanner::Prepare(RuntimeState* state, ByteStream* byte_stream
   return Status::OK;
 }
 
-inline Status HdfsSequenceScanner::GetRecordFromCompressedBlock(RuntimeState *state,
-                                                                char** record_ptr,
+inline Status HdfsSequenceScanner::GetRecordFromCompressedBlock(RuntimeState* state,
+                                                                uint8_t** record_ptr,
                                                                 int64_t* record_len,
                                                                 bool* eosr) {
   if (num_buffered_records_in_compressed_block_ == 0) {
@@ -376,7 +376,7 @@ inline Status HdfsSequenceScanner::GetRecordFromCompressedBlock(RuntimeState *st
     RETURN_IF_ERROR(ReadCompressedBlock(state));
   }
   // Adjust next_record_ to move past the size of the length indicator.
-  int size = SerDeUtils::ReadVLong(next_record_in_compressed_block_, record_len);
+  int size = SerDeUtils::GetVLong(next_record_in_compressed_block_, record_len);
   next_record_in_compressed_block_ += size;
   *record_ptr = next_record_in_compressed_block_;
   // Point to the length of the next record.
@@ -385,7 +385,7 @@ inline Status HdfsSequenceScanner::GetRecordFromCompressedBlock(RuntimeState *st
   return Status::OK;
 }
 
-inline Status HdfsSequenceScanner::GetRecord(char** record_ptr,
+inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
                                              int64_t* record_len, bool* eosr) {
   int64_t position;
   RETURN_IF_ERROR(buffered_byte_stream_->GetPosition(&position));
@@ -438,7 +438,7 @@ inline Status HdfsSequenceScanner::GetRecord(char** record_ptr,
 
     *record_ptr = unparsed_data_buffer_;
     // Read the length of the record.
-    int size = SerDeUtils::ReadVLong(*record_ptr, record_len);
+    int size = SerDeUtils::GetVLong(*record_ptr, record_len);
     *record_ptr += size;
   } else {
     // Uncompressed records
@@ -471,7 +471,7 @@ Status HdfsSequenceScanner::GetNext(RuntimeState* state,
   // the row batch is full or we are off the end of the range.
   while (true) {
     // Current record to process and its length.
-    char* record = NULL;
+    uint8_t* record = NULL;
     int64_t record_len;
     // Get the next record and record length.
     // There are 3 cases:
@@ -490,12 +490,13 @@ Status HdfsSequenceScanner::GetNext(RuntimeState* state,
     // Parse the current record.
     if (scan_node_->materialized_slots().size() != 0) {
       char* col_start;
-      char* record_start = record;
+      uint8_t* record_start = record;
       int num_tuples = 0;
       int num_fields = 0;
       
       RETURN_IF_ERROR(delimited_text_parser_->ParseFieldLocations(
-          row_batch->capacity() - row_batch->num_rows(), record_len, &record, 
+          row_batch->capacity() - row_batch->num_rows(), record_len,
+          reinterpret_cast<char**>(&record), 
           &field_locations_, &num_tuples, &num_fields, &col_start));
       DCHECK(num_tuples == 1);
     
@@ -507,7 +508,8 @@ Status HdfsSequenceScanner::GetNext(RuntimeState* state,
             state->error_stream() << "file: "
                 << buffered_byte_stream_->GetLocation() << endl;
             state->error_stream() << "record: ";
-            state->error_stream() << string(record_start, record_len);
+            state->error_stream()
+                << string(reinterpret_cast<char*>(record_start), record_len);
             state->LogErrorStream();
           }
           if (state->abort_on_error()) {
@@ -562,7 +564,8 @@ Status HdfsSequenceScanner::WriteFields(RuntimeState* state, RowBatch* row_batch
     next_line_offset += (len + 1);
 
     if (!text_converter_->WriteSlot(state, scan_node_->materialized_slots()[n].second,
-        tuple_, field_locations_[n].start, len, false, need_escape).ok()) {
+        tuple_, reinterpret_cast<char*>(field_locations_[n].start),
+        len, false, need_escape).ok()) {
       error_in_row = true;
     }
   }
@@ -589,7 +592,7 @@ Status HdfsSequenceScanner::WriteFields(RuntimeState* state, RowBatch* row_batch
       tuple_ = NULL;
       return Status::OK;
     }
-    char* new_tuple = reinterpret_cast<char*>(tuple_);
+    uint8_t* new_tuple = reinterpret_cast<uint8_t*>(tuple_);
     new_tuple += tuple_byte_size_;
     tuple_ = reinterpret_cast<Tuple*>(new_tuple);
   }
@@ -622,24 +625,25 @@ Status HdfsSequenceScanner::ReadFileHeader() {
     return Status("Invalid SEQFILE_VERSION_HEADER");
   }
 
-  RETURN_IF_ERROR(SerDeUtils::ReadText(buffered_byte_stream_.get(), &scratch_buf_));
-  if (strncmp(&scratch_buf_[0],
-      HdfsSequenceScanner::SEQFILE_KEY_CLASS_NAME, scratch_buf_.size())) {
+  std::vector<char> scratch_text;
+  RETURN_IF_ERROR(SerDeUtils::ReadText(buffered_byte_stream_.get(), &scratch_text));
+  if (strncmp(&scratch_text[0],
+      HdfsSequenceScanner::SEQFILE_KEY_CLASS_NAME, scratch_text.size())) {
     if (runtime_state_->LogHasSpace()) {
       runtime_state_->error_stream() << "Invalid SEQFILE_KEY_CLASS_NAME: '"
-         << string(&scratch_buf_[0], strlen(HdfsSequenceScanner::SEQFILE_KEY_CLASS_NAME))
+         << string(&scratch_text[0], strlen(HdfsSequenceScanner::SEQFILE_KEY_CLASS_NAME))
          << "'";
     }
     return Status("Invalid SEQFILE_KEY_CLASS_NAME");
   }
 
-  RETURN_IF_ERROR(SerDeUtils::ReadText(buffered_byte_stream_.get(), &scratch_buf_));
-  if (strncmp(&scratch_buf_[0], HdfsSequenceScanner::SEQFILE_VALUE_CLASS_NAME,
-      scratch_buf_.size())) {
+  RETURN_IF_ERROR(SerDeUtils::ReadText(buffered_byte_stream_.get(), &scratch_text));
+  if (strncmp(&scratch_text[0], HdfsSequenceScanner::SEQFILE_VALUE_CLASS_NAME,
+      scratch_text.size())) {
     if (runtime_state_->LogHasSpace()) {
       runtime_state_->error_stream() << "Invalid SEQFILE_VALUE_CLASS_NAME: '"
          << string(
-             scratch_buf_[0], strlen(HdfsSequenceScanner::SEQFILE_VALUE_CLASS_NAME))
+             scratch_text[0], strlen(HdfsSequenceScanner::SEQFILE_VALUE_CLASS_NAME))
          << "'";
     }
     return Status("Invalid SEQFILE_VALUE_CLASS_NAME");
@@ -719,7 +723,7 @@ Status HdfsSequenceScanner::ReadBlockHeader(bool* sync) {
 }
 
 Status HdfsSequenceScanner::CheckSync(bool report_error, bool* verified) {
-  char hash[SYNC_HASH_SIZE];
+  uint8_t hash[SYNC_HASH_SIZE];
   RETURN_IF_ERROR(SerDeUtils::ReadBytes(buffered_byte_stream_.get(),
       HdfsSequenceScanner::SYNC_HASH_SIZE, hash));
 
@@ -744,9 +748,8 @@ Status HdfsSequenceScanner::CheckSync(bool report_error, bool* verified) {
 
 
 Status HdfsSequenceScanner::ReadCompressedBlock(RuntimeState* state) {
-  int dummy;
   // Read the sync indicator and check the sync block.
-  RETURN_IF_ERROR(SerDeUtils::ReadInt(buffered_byte_stream_.get(), &dummy));
+  RETURN_IF_ERROR(SerDeUtils::SkipBytes(current_byte_stream_, sizeof (uint32_t)));
   RETURN_IF_ERROR(CheckSync(true, NULL));
   
   RETURN_IF_ERROR(SerDeUtils::ReadVLong(buffered_byte_stream_.get(),

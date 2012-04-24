@@ -39,7 +39,7 @@ MemPool::MemPool(const vector<string>& chunks)
     chunks_.push_back(ChunkInfo());
     ChunkInfo& chunk = chunks_.back();
     chunk.owns_data = true;
-    chunk.data = new char[chunks[i].size()];
+    chunk.data = new uint8_t[chunks[i].size()];
     memcpy(chunk.data, chunks[i].data(), chunks[i].size());
     chunk.size = chunks[i].size();
     VLOG(1) << "chunk: data=" << (void*)chunk.data << " size=" << chunk.size;
@@ -195,7 +195,7 @@ bool MemPool::CheckIntegrity(bool current_chunk_empty) {
   return true;
 }
 
-int MemPool::GetOffsetHelper(char* data) {
+int MemPool::GetOffsetHelper(uint8_t* data) {
   if (chunks_.empty()) return -1;
   // try to locate chunk containing 'data', starting with chunk following
   // the last one we looked at
@@ -210,7 +210,7 @@ int MemPool::GetOffsetHelper(char* data) {
   return -1;
 }
 
-char* MemPool::GetDataPtrHelper(int offset) {
+uint8_t* MemPool::GetDataPtrHelper(int offset) {
   if (offset > total_allocated_bytes_) return NULL;
   for (int i = 0; i < chunks_.size(); ++i) {
     int idx = (last_offset_conversion_chunk_idx_ + i + 1) % chunks_.size();
@@ -224,7 +224,7 @@ char* MemPool::GetDataPtrHelper(int offset) {
   return NULL;
 }
 
-void MemPool::GetChunkInfo(vector<pair<char*, int> >* chunk_info) {
+void MemPool::GetChunkInfo(vector<pair<uint8_t*, int> >* chunk_info) {
   chunk_info->clear();
   for (vector<ChunkInfo>::iterator info = chunks_.begin(); info != chunks_.end(); ++info) {
     chunk_info->push_back(make_pair(info->data, info->allocated_bytes));
@@ -239,7 +239,7 @@ std::string MemPool::DebugPrint() {
     if (info.allocated_bytes == 0) return out.str();
 
     for (int j = 0; j < info.allocated_bytes; ++j) {
-      sprintf(str, "%x ", (unsigned char)info.data[j]);
+      sprintf(str, "%x ", info.data[j]);
       out << str;
     }
   }

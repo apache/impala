@@ -292,9 +292,10 @@ AggregationTuple* AggregationNode::ConstructAggTuple() {
 
 char* AggregationNode::AllocateStringBuffer(int new_size, int* allocated_size) {
   new_size = ::max(new_size, FreeList::MinSize());
-  char* buffer = string_buffer_free_list_.Allocate(new_size, allocated_size);
+  char* buffer = reinterpret_cast<char*>(
+      string_buffer_free_list_.Allocate(new_size, allocated_size));
   if (buffer == NULL)  {
-    buffer = tuple_pool_->Allocate(new_size);
+    buffer = reinterpret_cast<char*>(tuple_pool_->Allocate(new_size));
     *allocated_size = new_size;
   }
   return buffer;
@@ -305,7 +306,7 @@ inline void AggregationNode::UpdateStringSlot(AggregationTuple* tuple, int strin
   int32_t* string_buffer_lengths = tuple->BufferLengths(agg_tuple_desc_->byte_size());
   int curr_size = string_buffer_lengths[string_slot_idx];
   if (curr_size < src->len) {
-    string_buffer_free_list_.Add(dst->ptr, curr_size);
+    string_buffer_free_list_.Add(reinterpret_cast<uint8_t*>(dst->ptr), curr_size);
     dst->ptr = AllocateStringBuffer(src->len, &(string_buffer_lengths[string_slot_idx]));
   }
   strncpy(dst->ptr, src->ptr, src->len);
