@@ -30,7 +30,7 @@ namespace impala {
 ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : id_(tnode.node_id),
     pool_(pool),
-    row_descriptor_(descs, tnode.row_tuples),
+    row_descriptor_(descs, tnode.row_tuples, tnode.nullable_tuples),
     limit_(tnode.limit),
     num_rows_returned_(0) {
   Status status = Expr::CreateExprTrees(pool, tnode.conjuncts, &conjuncts_);

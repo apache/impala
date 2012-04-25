@@ -133,15 +133,18 @@ struct TPlanNode {
   3: required i32 num_children
   4: required i64 limit
   5: required list<Types.TTupleId> row_tuples
-  6: optional list<Exprs.TExpr> conjuncts
+  
+  // nullable_tuples[i] is true if row_tuples[i] is nullable
+  6: required list<bool> nullable_tuples
+  7: optional list<Exprs.TExpr> conjuncts
 
   // one field per PlanNode subclass
-  7: optional THdfsScanNode hdfs_scan_node
-  8: optional THBaseScanNode hbase_scan_node
-  9: optional THashJoinNode hash_join_node
-  10: optional TAggregationNode agg_node
-  11: optional TSortNode sort_node
-  12: optional TExchangeNode exchange_node
+  8: optional THdfsScanNode hdfs_scan_node
+  9: optional THBaseScanNode hbase_scan_node
+  10: optional THashJoinNode hash_join_node
+  11: optional TAggregationNode agg_node
+  12: optional TSortNode sort_node
+  13: optional TExchangeNode exchange_node
 }
 
 // A flattened representation of a tree of PlanNodes, obtained by depth-first

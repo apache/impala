@@ -7,12 +7,16 @@ Plan Fragment 0
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       t1.id = t2.id
+    TUPLE IDS: 0 1 
       SCAN HDFS table=default.testtbl (0)
         PREDICATES: t1.zip = 94611
+        TUPLE IDS: 0 
       SCAN HDFS table=default.testtbl (1)
+        TUPLE IDS: 1 
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (3)
+    TUPLE IDS: 0 1 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -21,9 +25,12 @@ Plan Fragment 1
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       t1.id = t2.id
+    TUPLE IDS: 0 1 
       SCAN HDFS table=default.testtbl (0)
         PREDICATES: t1.zip = 94611
+        TUPLE IDS: 0 
       SCAN HDFS table=default.testtbl (1)
+        TUPLE IDS: 1 
 ====
 # general exprs on both sides of equi-join predicates
 select *
@@ -36,12 +43,16 @@ Plan Fragment 0
     JOIN OP: LEFT OUTER JOIN
     HASH PREDICATES:
       t1.id - 1 = t2.id + 1
+    TUPLE IDS: 0 1N 
       SCAN HDFS table=default.testtbl (0)
         PREDICATES: t1.zip = 94611
+        TUPLE IDS: 0 
       SCAN HDFS table=default.testtbl (1)
+        TUPLE IDS: 1 
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (3)
+    TUPLE IDS: 0 1N 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -50,9 +61,12 @@ Plan Fragment 1
     JOIN OP: LEFT OUTER JOIN
     HASH PREDICATES:
       t1.id - 1 = t2.id + 1
+    TUPLE IDS: 0 1N 
       SCAN HDFS table=default.testtbl (0)
         PREDICATES: t1.zip = 94611
+        TUPLE IDS: 0 
       SCAN HDFS table=default.testtbl (1)
+        TUPLE IDS: 1 
 ====
 # multiple join predicates;
 # scan predicates get propagated correctly;
@@ -72,15 +86,18 @@ Plan Fragment 0
       a.id = b.id
       a.int_col = b.int_col
     OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
+    TUPLE IDS: 0N 1 
       SCAN HDFS table=default.alltypesagg (0)
         PREDICATES: a.tinyint_col = 15
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+        TUPLE IDS: 0 
       SCAN HDFS table=default.alltypessmall (1)
         PREDICATES: b.string_col = '15'
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+        TUPLE IDS: 1 
 
   EXEC PARAMS
-    HOST: 
+    HOST: coordinator
       HDFS SPLITS NODE ID: 0
         hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
         hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
@@ -93,6 +110,7 @@ Plan Fragment 0
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (3)
+    TUPLE IDS: 0N 1 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -103,12 +121,15 @@ Plan Fragment 1
       a.id = b.id
       a.int_col = b.int_col
     OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
+    TUPLE IDS: 0N 1 
       SCAN HDFS table=default.alltypesagg (0)
         PREDICATES: a.tinyint_col = 15
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+        TUPLE IDS: 0 
       SCAN HDFS table=default.alltypessmall (1)
         PREDICATES: b.string_col = '15'
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+        TUPLE IDS: 1 
 
   EXEC PARAMS
     HOST: 
@@ -144,23 +165,28 @@ Plan Fragment 0
       a.id = c.id
       b.string_col = c.string_col
     OTHER PREDICATES: a.float_col - c.double_col < 0.0, b.double_col * c.tinyint_col > 1000.0 OR c.tinyint_col < 1000
+    TUPLE IDS: 0N 1N 2 
       HASH JOIN
         JOIN OP: FULL OUTER JOIN
         HASH PREDICATES:
           a.id = b.id
           a.int_col = b.int_col
         OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
+        TUPLE IDS: 0N 1N 
           SCAN HDFS table=default.alltypesagg (0)
             PREDICATES: a.tinyint_col = 15
             REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+            TUPLE IDS: 0 
           SCAN HDFS table=default.alltypessmall (1)
             PREDICATES: b.string_col = '15'
             REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+            TUPLE IDS: 1 
       SCAN HDFS table=default.alltypesaggnonulls (3)
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+        TUPLE IDS: 2 
 
   EXEC PARAMS
-    HOST: 
+    HOST: coordinator
       HDFS SPLITS NODE ID: 0
         hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
         hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
@@ -176,6 +202,7 @@ Plan Fragment 0
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (5)
+    TUPLE IDS: 0N 1N 2 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -186,20 +213,25 @@ Plan Fragment 1
       a.id = c.id
       b.string_col = c.string_col
     OTHER PREDICATES: a.float_col - c.double_col < 0.0, b.double_col * c.tinyint_col > 1000.0 OR c.tinyint_col < 1000
+    TUPLE IDS: 0N 1N 2 
       HASH JOIN
         JOIN OP: FULL OUTER JOIN
         HASH PREDICATES:
           a.id = b.id
           a.int_col = b.int_col
         OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
+        TUPLE IDS: 0N 1N 
           SCAN HDFS table=default.alltypesagg (0)
             PREDICATES: a.tinyint_col = 15
             REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+            TUPLE IDS: 0 
           SCAN HDFS table=default.alltypessmall (1)
             PREDICATES: b.string_col = '15'
             REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+            TUPLE IDS: 1 
       SCAN HDFS table=default.alltypesaggnonulls (3)
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+        TUPLE IDS: 2 
 
   EXEC PARAMS
     HOST: 
@@ -233,12 +265,15 @@ Plan Fragment 0
     HASH PREDICATES:
       alltypesagg.id = hbasealltypessmall.id
       alltypesagg.int_col = hbasealltypessmall.int_col
+    TUPLE IDS: 0 1 
       SCAN HDFS table=default.alltypesagg (0)
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+        TUPLE IDS: 0 
       SCAN HBASE table=hbasealltypessmall (1)
+        TUPLE IDS: 1 
 
   EXEC PARAMS
-    HOST: 
+    HOST: coordinator
       HDFS SPLITS NODE ID: 0
         hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
         hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
@@ -255,6 +290,7 @@ Plan Fragment 0
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (3)
+    TUPLE IDS: 0 1 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -264,9 +300,12 @@ Plan Fragment 1
     HASH PREDICATES:
       alltypesagg.id = hbasealltypessmall.id
       alltypesagg.int_col = hbasealltypessmall.int_col
+    TUPLE IDS: 0 1 
       SCAN HDFS table=default.alltypesagg (0)
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+        TUPLE IDS: 0 
       SCAN HBASE table=hbasealltypessmall (1)
+        TUPLE IDS: 1 
 
   EXEC PARAMS
     HOST: 
@@ -301,16 +340,19 @@ Plan Fragment 0
       a.id = b.id
       a.int_col = b.int_col
     OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
+    TUPLE IDS: 0 1 
       SCAN HDFS table=default.alltypesagg (0)
         PREDICATES: a.tinyint_col = 15
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+        TUPLE IDS: 0 
       SCAN HBASE table=hbasestringids (1)
         START KEY: 5
         STOP KEY: 5\0
         PREDICATES: b.tinyint_col = 5, b.tinyint_col > 123
+        TUPLE IDS: 1 
 
   EXEC PARAMS
-    HOST: 
+    HOST: coordinator
       HDFS SPLITS NODE ID: 0
         hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
         hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
@@ -322,6 +364,7 @@ Plan Fragment 0
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (3)
+    TUPLE IDS: 0 1 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -332,13 +375,16 @@ Plan Fragment 1
       a.id = b.id
       a.int_col = b.int_col
     OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
+    TUPLE IDS: 0 1 
       SCAN HDFS table=default.alltypesagg (0)
         PREDICATES: a.tinyint_col = 15
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+        TUPLE IDS: 0 
       SCAN HBASE table=hbasestringids (1)
         START KEY: 5
         STOP KEY: 5\0
         PREDICATES: b.tinyint_col = 5, b.tinyint_col > 123
+        TUPLE IDS: 1 
 
   EXEC PARAMS
     HOST: 
@@ -350,4 +396,162 @@ Plan Fragment 1
         hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
       HBASE KEY RANGES NODE ID: 1
         5:5\0
+====
+# left join followed by right join and then aggregate 
+select x.tinyint_col, count(x.day)
+from (
+       select a.day day, c.tinyint_col tinyint_col
+       from alltypesagg a 
+            join alltypessmall b using (id, int_col)
+            right outer join alltypesnopart c on (b.id = c.id)
+            join alltypesagg d on (a.id = d.id)
+       order by 1,2
+       limit 10
+     ) x 
+where x.day >= 6
+group by x.tinyint_col
+order by 2
+limit 5
+---- PLAN
+Plan Fragment 0
+  TOP-N
+  ORDER BY: <slot 11> ASC
+  LIMIT: 5
+  TUPLE IDS: 5 
+    AGGREGATE
+    OUTPUT: COUNT(a.day)
+    GROUP BY: c.tinyint_col
+    TUPLE IDS: 5 
+      TOP-N
+      ORDER BY: a.day ASC, c.tinyint_col ASC
+      LIMIT: 10
+      TUPLE IDS: 0N 1N 2 3 
+        HASH JOIN
+          JOIN OP: INNER JOIN
+          HASH PREDICATES:
+            a.id = d.id
+          TUPLE IDS: 0N 1N 2 3 
+            HASH JOIN
+              JOIN OP: RIGHT OUTER JOIN
+              HASH PREDICATES:
+                b.id = c.id
+              TUPLE IDS: 0N 1N 2 
+                HASH JOIN
+                  JOIN OP: INNER JOIN
+                  HASH PREDICATES:
+                    a.id = b.id
+                    a.int_col = b.int_col
+                  TUPLE IDS: 0 1 
+                    SCAN HDFS table=default.alltypesagg (0)
+                      REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+                      TUPLE IDS: 0 
+                    SCAN HDFS table=default.alltypessmall (1)
+                      REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+                      TUPLE IDS: 1 
+                SCAN HDFS table=default.alltypesnopart (3)
+                  TUPLE IDS: 2 
+            SCAN HDFS table=default.alltypesagg (5)
+              REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+              TUPLE IDS: 3 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+      HDFS SPLITS NODE ID: 5
+        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+------------ DISTRIBUTEDPLAN
+Plan Fragment 0
+  TOP-N
+  ORDER BY: <slot 11> ASC
+  LIMIT: 5
+  TUPLE IDS: 5 
+    AGGREGATE
+    OUTPUT: SUM(<slot 11>)
+    GROUP BY: <slot 10>
+    TUPLE IDS: 5 
+      EXCHANGE (9)
+        TUPLE IDS: 5 
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+  AGGREGATE
+  OUTPUT: COUNT(a.day)
+  GROUP BY: c.tinyint_col
+  TUPLE IDS: 5 
+    TOP-N
+    ORDER BY: a.day ASC, c.tinyint_col ASC
+    LIMIT: 10
+    TUPLE IDS: 0N 1N 2 3 
+      HASH JOIN
+        JOIN OP: INNER JOIN
+        HASH PREDICATES:
+          a.id = d.id
+        TUPLE IDS: 0N 1N 2 3 
+          HASH JOIN
+            JOIN OP: RIGHT OUTER JOIN
+            HASH PREDICATES:
+              b.id = c.id
+            TUPLE IDS: 0N 1N 2 
+              HASH JOIN
+                JOIN OP: INNER JOIN
+                HASH PREDICATES:
+                  a.id = b.id
+                  a.int_col = b.int_col
+                TUPLE IDS: 0 1 
+                  SCAN HDFS table=default.alltypesagg (0)
+                    REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+                    TUPLE IDS: 0 
+                  SCAN HDFS table=default.alltypessmall (1)
+                    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+                    TUPLE IDS: 1 
+              SCAN HDFS table=default.alltypesnopart (3)
+                TUPLE IDS: 2 
+          SCAN HDFS table=default.alltypesagg (5)
+            REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
+            TUPLE IDS: 3 
+
+  EXEC PARAMS
+    HOST: 
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+      HDFS SPLITS NODE ID: 5
+        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ====

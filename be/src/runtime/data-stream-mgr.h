@@ -36,7 +36,7 @@ class DataStreamMgr {
   // The caller is responsible for deleting the returned DataStreamRecvr.
   // TODO: create receivers in someone's pool
   DataStreamRecvr* CreateRecvr(
-      const DescriptorTbl& desc_tbl, const TUniqueId& query_id, PlanNodeId dest_node_id,
+      const RowDescriptor& row_desc, const TUniqueId& query_id, PlanNodeId dest_node_id,
       int num_senders, int buffer_size);
   
   // Adds a row batch to the stream identified by query_id/dest_node_id.
@@ -61,7 +61,7 @@ class DataStreamMgr {
   class StreamControlBlock {
    public:
     StreamControlBlock(
-        const DescriptorTbl& desc_tbl, const TUniqueId& query_id, PlanNodeId dest_node_id,
+        const RowDescriptor& row_desc, const TUniqueId& query_id, PlanNodeId dest_node_id,
         int num_senders, int buffer_size);
 
     // Returns next available batch or NULL if end-of-stream.
@@ -86,7 +86,7 @@ class DataStreamMgr {
    private:
     TUniqueId query_id_;
     PlanNodeId dest_node_id_;
-    const DescriptorTbl& desc_tbl_;
+    const RowDescriptor& row_desc_;
 
     // protects all subsequent data in this block
     boost::mutex lock_;

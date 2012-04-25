@@ -58,11 +58,22 @@ public class Planner {
   // counter to assign sequential node ids
   private int nextNodeId = 0;
 
+  // Control how much info explain plan outputs
+  private PlanNode.ExplainPlanLevel explainPlanLevel = PlanNode.ExplainPlanLevel.NORMAL;
+
   private int getNextNodeId() {
     return nextNodeId++;
   }
 
   public Planner() {
+  }
+
+  /**
+   * Sets how much details the explain plan the planner will generate.
+   * @param level
+   */
+  public void setExplainPlanDetailLevel(PlanNode.ExplainPlanLevel level) {
+    explainPlanLevel = level;
   }
 
   /**
@@ -523,9 +534,10 @@ public class Planner {
       // Coordinator (can only be the first) fragment might not have an associated sink.
       if (dataSink == null) {
         Preconditions.checkState(planFragIdx == 0);
-        expString = fragment.getExplainString("  ");
+        expString = fragment.getExplainString("  ", explainPlanLevel);
       } else {
-        expString = dataSink.getExplainString("  ") + fragment.getExplainString("  ");
+        expString = dataSink.getExplainString("  ") +
+            fragment.getExplainString("  ", explainPlanLevel);
       }
       explainStr.append(expString);
 
@@ -596,6 +608,7 @@ public class Planner {
     // followed by a merge aggregation step and a top-n node)
     coord = new ExchangeNode(getNextNodeId(), slave.getTupleIds());
     coord.rowTupleIds = slave.rowTupleIds;
+    coord.nullableTupleIds = slave.nullableTupleIds;
 
     if (aggInfo != null) {
       if (selectStmt.getMergeAggInfo() != null) {

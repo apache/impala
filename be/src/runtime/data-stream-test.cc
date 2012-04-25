@@ -85,7 +85,7 @@ class DataStreamTest : public testing::Test {
 
   static const PlanNodeId DEST_NODE_ID = 1;
 
-  const DescriptorTbl* desc_tbl_;
+  const RowDescriptor* row_desc_;
   TestExecEnv test_env_;
   QueryExecutor exec_;
   TUniqueId query_id_;
@@ -115,13 +115,13 @@ class DataStreamTest : public testing::Test {
   void PrepareQuery(const string& stmt) {
     stmt_ = stmt;
     EXPECT_TRUE(exec_.Exec(stmt, NULL).ok());
-    desc_tbl_ = &exec_.runtime_state()->desc_tbl();
+    row_desc_ = &exec_.row_desc();
   }
 
   // Start receiver (expecting given number of senders) in separate thread.
   void StartReceiver(int num_senders, int buffer_size) {
     stream_recvr_ =
-        stream_mgr_->CreateRecvr(*desc_tbl_, query_id_, DEST_NODE_ID, num_senders,
+        stream_mgr_->CreateRecvr(*row_desc_, query_id_, DEST_NODE_ID, num_senders,
                                  buffer_size);
     recvr_thread_ = thread(&DataStreamTest::ReadStream, this);
   }

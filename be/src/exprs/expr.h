@@ -311,6 +311,7 @@ class SlotRef : public Expr {
   int slot_offset_;  // within tuple
   NullIndicatorOffset null_indicator_offset_;  // within tuple
   const SlotId slot_id_;
+  bool tuple_is_nullable_; // true if the tuple is nullable.
 };
 
 inline void* SlotRef::ComputeFn(Expr* expr, TupleRow* row) {

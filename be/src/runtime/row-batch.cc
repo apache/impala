@@ -91,14 +91,14 @@ void RowBatch::Serialize(TRowBatch* output_batch) {
 //              xfer += iprot->readString(this->tuple_data[_i9]);
 // to allocated string data in special mempool
 // (change via python script that runs over Data_types.cc)
-RowBatch::RowBatch(const DescriptorTbl& desc_tbl, const TRowBatch& input_batch)
+RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch)
   : has_in_flight_row_(false),
     is_self_contained_(true),
     own_tuple_ptrs_mem_(true),
     num_rows_(input_batch.num_rows),
     capacity_(num_rows_),
     num_tuples_per_row_(input_batch.row_tuples.size()),
-    row_desc_(desc_tbl, input_batch.row_tuples),
+    row_desc_(row_desc),
     tuple_ptrs_(new Tuple*[num_rows_ * input_batch.row_tuples.size()]),
     tuple_data_pool_(new MemPool(input_batch.tuple_data)) {
   // convert input_batch.tuple_offsets into pointers

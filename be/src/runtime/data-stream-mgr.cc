@@ -22,11 +22,11 @@ using namespace apache::thrift::transport;
 namespace impala {
 
 DataStreamMgr::StreamControlBlock::StreamControlBlock(
-    const DescriptorTbl& desc_tbl, const TUniqueId& query_id, PlanNodeId dest_node_id,
+    const RowDescriptor& row_desc, const TUniqueId& query_id, PlanNodeId dest_node_id,
     int num_senders, int buffer_size)
   : query_id_(query_id),
     dest_node_id_(dest_node_id),
-    desc_tbl_(desc_tbl),
+    row_desc_(row_desc),
     buffer_limit_(buffer_size),
     num_buffered_bytes_(0),
     num_remaining_senders_(num_senders) {
@@ -55,7 +55,7 @@ RowBatch* DataStreamMgr::StreamControlBlock::GetBatch() {
 
 void DataStreamMgr::StreamControlBlock::AddBatch(const TRowBatch& thrift_batch) {
   int batch_size = RowBatch::GetBatchSize(thrift_batch);
-  RowBatch* batch = new RowBatch(desc_tbl_, thrift_batch);
+  RowBatch* batch = new RowBatch(row_desc_, thrift_batch);
   unique_lock<mutex> l(lock_);
   DCHECK_GT(num_remaining_senders_, 0);
   // if there's something in the queue and this batch will push us over the
@@ -90,10 +90,10 @@ inline size_t DataStreamMgr::GetHashValue(const TUniqueId& query_id, PlanNodeId 
 }
 
 DataStreamRecvr* DataStreamMgr::CreateRecvr(
-    const DescriptorTbl& desc_tbl, const TUniqueId& query_id, PlanNodeId dest_node_id,
+    const RowDescriptor& row_desc, const TUniqueId& query_id, PlanNodeId dest_node_id,
     int num_senders, int buffer_size) {
   StreamControlBlock* cb = pool_.Add(
-      new StreamControlBlock(desc_tbl, query_id, dest_node_id, num_senders,
+      new StreamControlBlock(row_desc, query_id, dest_node_id, num_senders,
                              buffer_size));
   size_t hash_value = GetHashValue(query_id, dest_node_id);
   lock_guard<mutex> l(stream_map_lock_);

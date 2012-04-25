@@ -298,7 +298,7 @@ public class HBaseScanNode extends ScanNode {
   }
 
   @Override
-  protected String getExplainString(String prefix) {
+  protected String getExplainString(String prefix, ExplainPlanLevel detailLevel) {
     HBaseTable tbl = (HBaseTable) desc.getTable();
     StringBuilder output = new StringBuilder()
         .append(prefix + "SCAN HBASE table=" + tbl.getName() + " (" + id + ")\n");
@@ -328,7 +328,7 @@ public class HBaseScanNode extends ScanNode {
     if (!conjuncts.isEmpty()) {
       output.append(prefix + "  PREDICATES: " + getExplainString(conjuncts) + "\n");
     }
-    output.append(super.getExplainString(prefix));
+    output.append(super.getExplainString(prefix + "  ", detailLevel));
     return output.toString();
   }
 

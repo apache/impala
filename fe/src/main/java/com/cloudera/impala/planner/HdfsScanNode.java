@@ -281,7 +281,7 @@ public abstract class HdfsScanNode extends ScanNode {
   }
 
   @Override
-  protected String getExplainString(String prefix) {
+  protected String getExplainString(String prefix, ExplainPlanLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     output.append(prefix + "SCAN HDFS table=" + desc.getTable().getFullName());
     output.append(" (" + id + ")\n");
@@ -291,7 +291,7 @@ public abstract class HdfsScanNode extends ScanNode {
     if (partitionKeyRegex != "") {
       output.append(prefix + "  REGEX: " + partitionKeyRegex + "\n");
     }
-    output.append(super.getExplainString(prefix));
+    output.append(super.getExplainString(prefix + "  ", detailLevel));
     return output.toString();
   }
 }

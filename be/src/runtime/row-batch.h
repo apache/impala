@@ -58,7 +58,7 @@ class RowBatch {
   // in the data back into pointers. The row batch will be self-contained after the call.
   // TODO: figure out how to transfer the data from input_batch to this RowBatch
   // (so that we don't need to make yet another copy)
-  RowBatch(const DescriptorTbl& desc_tbl, const TRowBatch& input_batch);
+  RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch);
 
   ~RowBatch();
 

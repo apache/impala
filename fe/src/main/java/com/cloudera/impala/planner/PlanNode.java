@@ -4,6 +4,7 @@ package com.cloudera.impala.planner;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
@@ -16,6 +17,7 @@ import com.cloudera.impala.thrift.TPlan;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 /**
  * Each PlanNode represents a single relational operator
@@ -45,7 +47,18 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // rowTupleIds[0] is the first tuple in the row, rowTupleIds[1] the second, etc.
   protected ArrayList<TupleId> rowTupleIds;
 
+  // A set of nullable TupleId produced by this node. It is a subset of tupleIds.
+  // A tuple is nullable if it's the "nullable" side of an outer join, and it has nothing
+  // to do with the schema.
+  protected Set<TupleId> nullableTupleIds;
+
   protected List<Predicate> conjuncts;
+
+  // Control how much info explain plan will output
+  public enum ExplainPlanLevel {
+    NORMAL,
+    HIGH
+  }
 
   protected PlanNode(int id, ArrayList<TupleId> tupleIds) {
     this.id = id;
@@ -54,6 +67,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     this.tupleIds = Lists.newArrayList(tupleIds);
     this.conjuncts = Lists.newArrayList();
     this.rowTupleIds = Lists.newArrayList();
+    this.nullableTupleIds = Sets.newHashSet();
   }
 
   protected PlanNode(int id) {
@@ -62,6 +76,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     this.tupleIds = Lists.newArrayList();
     this.conjuncts = Lists.newArrayList();
     this.rowTupleIds = Lists.newArrayList();
+    this.nullableTupleIds = Sets.newHashSet();
   }
 
   public int getId() {
@@ -93,6 +108,11 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     return rowTupleIds;
   }
 
+  public Set<TupleId> getNullableTupleIds() {
+    Preconditions.checkState(nullableTupleIds != null);
+    return nullableTupleIds;
+  }
+
   public List<Predicate> getConjuncts() {
     return conjuncts;
   }
@@ -104,15 +124,26 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   public String getExplainString() {
-    return getExplainString("");
+    return getExplainString("", ExplainPlanLevel.NORMAL);
   }
 
-  protected String getExplainString(String prefix) {
+  protected String getExplainString(String prefix, ExplainPlanLevel detailLevel) {
+    String expStr = "";
     if (limit != -1) {
-      return prefix + "LIMIT: " + limit + "\n";
-    } else {
-      return "";
+      expStr =  prefix + "LIMIT: " + limit + "\n";
     }
+
+    // Output Tuple Ids only when explain plan level is set to high
+    if (detailLevel.equals(ExplainPlanLevel.HIGH)) {
+      expStr += prefix + "TUPLE IDS: ";
+      for (TupleId tupleId: tupleIds) {
+        String nullIndicator = nullableTupleIds.contains(tupleId) ? "N" : "";
+        expStr += tupleId.asInt() + nullIndicator + " ";
+      }
+      expStr += "\n";
+    }
+
+    return expStr;
   }
 
   // Convert this plan node, including all children, to its Thrift representation.
@@ -130,6 +161,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     msg.limit = limit;
     for (TupleId tid: rowTupleIds) {
       msg.addToRow_tuples(tid.asInt());
+      msg.addToNullable_tuples(nullableTupleIds.contains(tid));
     }
     for (Predicate p: conjuncts) {
       msg.addToConjuncts(p.treeToThrift());

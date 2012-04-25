@@ -166,10 +166,13 @@ string TupleDescriptor::DebugString() const {
 }
 
 RowDescriptor::RowDescriptor(const DescriptorTbl& desc_tbl,
-                             const std::vector<TTupleId>& row_tuples) {
+                             const std::vector<TTupleId>& row_tuples,
+                             const std::vector<bool>& nullable_tuples) {
+  DCHECK(nullable_tuples.size() == row_tuples.size());
   for (int i = 0; i < row_tuples.size(); ++i) {
     tuple_desc_map_.push_back(desc_tbl.GetTupleDescriptor(row_tuples[i]));
     DCHECK(tuple_desc_map_.back() != NULL);
+    tuple_idx_nullable_map_.push_back(nullable_tuples[i]);
   }
 
   // find max id
@@ -195,6 +198,11 @@ int RowDescriptor::GetRowSize() const {
 int RowDescriptor::GetTupleIdx(TupleId id) const {
   DCHECK_LT(id, tuple_idx_map_.size());
   return tuple_idx_map_[id];
+}
+
+bool RowDescriptor::TupleIsNullable(int tuple_idx) const {
+  DCHECK_LT(tuple_idx, tuple_idx_nullable_map_.size());
+  return tuple_idx_nullable_map_[tuple_idx];
 }
 
 void RowDescriptor::ToThrift(std::vector<TTupleId>* row_tuple_ids) {

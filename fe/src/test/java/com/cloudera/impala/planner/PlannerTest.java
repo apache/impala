@@ -49,11 +49,12 @@ public class PlannerTest {
 
   private void RunQuery(String query, int numNodes, TestCase testCase,
                         Section section, StringBuilder errorLog,
-                        StringBuilder actualOutput) {
+                        StringBuilder actualOutput, PlanNode.ExplainPlanLevel level) {
     try {
       LOG.info("running query " + query);
       AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
       Planner planner = new Planner();
+      planner.setExplainPlanDetailLevel(level);
       explainStringBuilder.setLength(0);
       planner.createPlanFragments(analysisResult, numNodes, explainStringBuilder);
 
@@ -99,7 +100,7 @@ public class PlannerTest {
     }
   }
 
-  private void runPlannerTestFile(String testFile) {
+  private void runPlannerTestFile(String testFile, PlanNode.ExplainPlanLevel level) {
     String fileName = testDir + "/" + testFile + ".test";
     TestFileParser queryFileParser = new TestFileParser(fileName);
     StringBuilder actualOutput = new StringBuilder();
@@ -109,7 +110,8 @@ public class PlannerTest {
     for (TestCase testCase : queryFileParser.getTestCases()) {
       String query = testCase.getQuery();
       actualOutput.append(testCase.getSectionAsString(Section.QUERY, true, "\n"));
-      actualOutput.append("----\n");
+      actualOutput.append("\n");
+      actualOutput.append("---- PLAN\n");
       // each planner test case contains multiple result sections:
       // - the first one is for the single-node plan
       // - the subsequent one is for distributed plans; there is one
@@ -119,10 +121,10 @@ public class PlannerTest {
         RunUnimplementedQuery(query, errorLog);
         actualOutput.append("not implemented\n");
       } else {
-        RunQuery(query, 1, testCase, Section.PLAN, errorLog, actualOutput);
-        actualOutput.append("------------\n");
+        RunQuery(query, 1, testCase, Section.PLAN, errorLog, actualOutput, level);
+        actualOutput.append("------------ DISTRIBUTEDPLAN\n");
         RunQuery(query, Constants.NUM_NODES_ALL, testCase, Section.DISTRIBUTEDPLAN,
-                 errorLog, actualOutput);
+                 errorLog, actualOutput, level);
       }
       actualOutput.append("====\n");
     }
@@ -147,46 +149,46 @@ public class PlannerTest {
 
   @Test
   public void testDistinct() {
-    runPlannerTestFile("distinct");
+    runPlannerTestFile("distinct", PlanNode.ExplainPlanLevel.NORMAL);
   }
 
   @Test
   public void testAggregation() {
-    runPlannerTestFile("aggregation");
+    runPlannerTestFile("aggregation", PlanNode.ExplainPlanLevel.NORMAL);
   }
 
   @Test
   public void testHBase() {
-    runPlannerTestFile("hbase");
+    runPlannerTestFile("hbase", PlanNode.ExplainPlanLevel.NORMAL);
   }
 
   @Test
   public void testInsert() {
-    runPlannerTestFile("insert");
+    runPlannerTestFile("insert", PlanNode.ExplainPlanLevel.NORMAL);
   }
 
   @Test
   public void testHdfs() {
-    runPlannerTestFile("hdfs");
+    runPlannerTestFile("hdfs", PlanNode.ExplainPlanLevel.NORMAL);
   }
 
   @Test
   public void testJoins() {
-    runPlannerTestFile("joins");
+    runPlannerTestFile("joins", PlanNode.ExplainPlanLevel.HIGH);
   }
 
   @Test
   public void testOrder() {
-    runPlannerTestFile("order");
+    runPlannerTestFile("order", PlanNode.ExplainPlanLevel.NORMAL);
   }
 
   @Test
   public void testTopN() {
-    runPlannerTestFile("topn");
+    runPlannerTestFile("topn", PlanNode.ExplainPlanLevel.NORMAL);
   }
 
   @Test
   public void testSubquery() {
-    runPlannerTestFile("subquery");
+    runPlannerTestFile("subquery", PlanNode.ExplainPlanLevel.HIGH);
   }
 }

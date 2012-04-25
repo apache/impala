@@ -188,7 +188,8 @@ class DescriptorTbl {
 // Records positions of tuples within row produced by ExecNode.
 class RowDescriptor {
  public:
-  RowDescriptor(const DescriptorTbl& desc_tbl, const std::vector<TTupleId>& row_tuples);
+  RowDescriptor(const DescriptorTbl& desc_tbl, const std::vector<TTupleId>& row_tuples,
+      const std::vector<bool>& nullable_tuples);
 
   // standard copy c'tor, made explicit here
   RowDescriptor(const RowDescriptor& desc)
@@ -207,6 +208,9 @@ class RowDescriptor {
   // Returns INVALID_IDX if id not part of this row.
   int GetTupleIdx(TupleId id) const;
 
+  // Return true if the Tuple of the given Tuple index is nullable.
+  bool TupleIsNullable(int tuple_idx) const;
+
   // Return descriptors for all tuples in this row, in order of appearance.
   const std::vector<TupleDescriptor*>& tuple_descriptors() const {
     return tuple_desc_map_;
@@ -222,6 +226,9 @@ class RowDescriptor {
  private:
   // map from position of tuple w/in row to its descriptor
   std::vector<TupleDescriptor*> tuple_desc_map_;
+
+  // tuple_idx_nullable_map_[i] is true if tuple i can be null
+  std::vector<bool> tuple_idx_nullable_map_;
 
   // map from TupleId to position of tuple w/in row
   std::vector<int> tuple_idx_map_;

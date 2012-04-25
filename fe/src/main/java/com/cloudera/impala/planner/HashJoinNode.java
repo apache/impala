@@ -41,6 +41,19 @@ public class HashJoinNode extends PlanNode {
     this.otherJoinConjuncts = otherJoinConjuncts;
     children.add(outer);
     children.add(inner);
+
+    // Inherits all the nullable tuple from the children
+    // Mark tuples that form the "nullable" side of the outer join as nullable.
+    nullableTupleIds.addAll(inner.getNullableTupleIds());
+    nullableTupleIds.addAll(outer.getNullableTupleIds());
+    if (joinOp.equals(JoinOperator.FULL_OUTER_JOIN)) {
+      nullableTupleIds.addAll(outer.getTupleIds());
+      nullableTupleIds.addAll(inner.getTupleIds());
+    } else if (joinOp.equals(JoinOperator.LEFT_OUTER_JOIN)) {
+      nullableTupleIds.addAll(inner.getTupleIds());
+    } else if (joinOp.equals(JoinOperator.RIGHT_OUTER_JOIN)) {
+      nullableTupleIds.addAll(outer.getTupleIds());
+    }
   }
 
   @Override
@@ -89,7 +102,7 @@ public class HashJoinNode extends PlanNode {
   }
 
   @Override
-  protected String getExplainString(String prefix) {
+  protected String getExplainString(String prefix, ExplainPlanLevel detailLevel) {
     StringBuilder output = new StringBuilder()
         .append(prefix + "HASH JOIN\n")
         .append(prefix + "  JOIN OP: " + joinOp.toString() + "\n")
@@ -107,9 +120,9 @@ public class HashJoinNode extends PlanNode {
       output.append(prefix + "  OTHER PREDICATES: ")
           .append(getExplainString(conjuncts) + "\n");
     }
-    output.append(super.getExplainString(prefix))
-        .append(getChild(0).getExplainString(prefix + "    "))
-        .append(getChild(1).getExplainString(prefix + "    "));
+    output.append(super.getExplainString(prefix + "  ", detailLevel))
+        .append(getChild(0).getExplainString(prefix + "    ", detailLevel))
+        .append(getChild(1).getExplainString(prefix + "    ", detailLevel));
     return output.toString();
   }
 }

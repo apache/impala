@@ -51,7 +51,7 @@ public class AggregationNode extends PlanNode {
   }
 
   @Override
-  protected String getExplainString(String prefix) {
+  protected String getExplainString(String prefix, ExplainPlanLevel detailLevel) {
     StringBuilder output = new StringBuilder()
         .append(prefix + "AGGREGATE\n")
         .append(prefix + "OUTPUT: ")
@@ -62,8 +62,8 @@ public class AggregationNode extends PlanNode {
       output.append(prefix + "HAVING: ")
           .append(getExplainString(conjuncts) + "\n");
     }
-    output.append(super.getExplainString(prefix))
-        .append(getChild(0).getExplainString(prefix + "  "));
+    output.append(super.getExplainString(prefix, detailLevel))
+        .append(getChild(0).getExplainString(prefix + "  ", detailLevel));
     return output.toString();
   }
 

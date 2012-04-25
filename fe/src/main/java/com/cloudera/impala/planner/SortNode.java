@@ -29,6 +29,7 @@ public class SortNode extends PlanNode {
     this.info = info;
     this.useTopN = useTopN;
     this.tupleIds.addAll(input.getTupleIds());
+    this.nullableTupleIds.addAll(input.getNullableTupleIds());
     this.children.add(input);
     this.rowTupleIds.addAll(input.getRowTupleIds());
     Preconditions.checkArgument(info.getOrderingExprs().size() == info.getIsAscOrder().size());
@@ -61,7 +62,7 @@ public class SortNode extends PlanNode {
   }
 
   @Override
-  protected String getExplainString(String prefix) {
+  protected String getExplainString(String prefix, ExplainPlanLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     if (useTopN) {
       output.append(prefix + "TOP-N\n");
@@ -81,8 +82,8 @@ public class SortNode extends PlanNode {
       output.append(expr.next().toSql() + " ");
       output.append(isAsc.next() ? "ASC" : "DESC");
     }
-    output.append("\n" + super.getExplainString(prefix));
-    output.append(getChild(0).getExplainString(prefix + "  "));
+    output.append("\n" + super.getExplainString(prefix, detailLevel));
+    output.append(getChild(0).getExplainString(prefix + "  ", detailLevel));
     return output.toString();
   }
 }

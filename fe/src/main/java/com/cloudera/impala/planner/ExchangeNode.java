@@ -38,11 +38,11 @@ public class ExchangeNode extends PlanNode {
   }
 
   @Override
-  protected String getExplainString(String prefix) {
+  protected String getExplainString(String prefix, ExplainPlanLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     output.append(prefix + "EXCHANGE (" + Integer.toString(id) + ")");
-    output.append(super.getExplainString(prefix));
     output.append("\n");
+    output.append(super.getExplainString(prefix + "  ", detailLevel));
     return output.toString();
   }
 
