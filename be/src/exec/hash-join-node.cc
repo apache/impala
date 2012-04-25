@@ -70,6 +70,9 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
   Expr::Prepare(build_exprs_, state, child(1)->row_desc());
   Expr::Prepare(probe_exprs_, state, child(0)->row_desc());
 
+  // other_join_conjuncts_ are evaluated in the context of the rows produced by this node
+  Expr::Prepare(other_join_conjuncts_, state, row_descriptor_);
+
   // pre-compute the tuple index of build tuples in the output row
   build_tuple_size_ = child(1)->row_desc().tuple_descriptors().size();
   build_tuple_idx_.reserve(build_tuple_size_);

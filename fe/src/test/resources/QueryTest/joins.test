@@ -1,3 +1,31 @@
+# join between hdfs and hbase, extra join predicate, extra scan predicates, nulls in
+# joins cols and non-equality join predicate
+# (alltypesagg.tinyint_col contains nulls instead of 0s)
+# Should be same result as the test below
+select a.tinyint_col, b.id, a.string_col, a.tinyint_col + b.tinyint_col
+from alltypesagg a join hbasealltypessmall b
+     on (a.tinyint_col = b.id and a.tinyint_col + b.tinyint_col < 5)
+where a.month=1
+and a.day=1
+and a.string_col > '88'
+and b.bool_col = false
+---- RESULTS
+1,1,'91',2
+1,1,'881',2
+1,1,'891',2
+1,1,'901',2
+1,1,'911',2
+1,1,'921',2
+1,1,'931',2
+1,1,'941',2
+1,1,'951',2
+1,1,'961',2
+1,1,'971',2
+1,1,'981',2
+1,1,'991',2
+---- TYPES
+tinyint, int, string, bigint
+====
 # join between hdfs and hbase, extra join predicate, extra scan predicates, nulls in joins cols
 # (alltypesagg.tinyint_col contains nulls instead of 0s)
 # Should be same result as the test below
