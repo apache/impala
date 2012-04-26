@@ -279,8 +279,10 @@ Status HdfsTextScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
 
     DCHECK_GT(bytes_processed, 0);
 
-    if (num_fields != 0) {
-      RETURN_IF_ERROR(WriteFields(state, row_batch, num_fields, &row_idx, &line_start));
+    if (scan_node_->materialized_slots().size() != 0) {
+      if (num_fields != 0) {
+        RETURN_IF_ERROR(WriteFields(state, row_batch, num_fields, &row_idx, &line_start));
+      } 
     } else if (num_tuples != 0) {
       boundary_row_.Clear();
       line_start = byte_buffer_ptr_;
