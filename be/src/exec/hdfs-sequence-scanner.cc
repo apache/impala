@@ -251,6 +251,7 @@ Status HdfsSequenceScanner::InitCurrentScanRange(RuntimeState* state,
   if (scan_range->offset != 0) {
     RETURN_IF_ERROR(unbuffered_byte_stream_->Seek(scan_range->offset));
     RETURN_IF_ERROR(FindFirstRecord(state));
+    buffered_byte_stream_->SeekToParent();
   } 
 
 
@@ -749,7 +750,7 @@ Status HdfsSequenceScanner::CheckSync(bool report_error, bool* verified) {
 
 Status HdfsSequenceScanner::ReadCompressedBlock(RuntimeState* state) {
   // Read the sync indicator and check the sync block.
-  RETURN_IF_ERROR(SerDeUtils::SkipBytes(current_byte_stream_, sizeof (uint32_t)));
+  RETURN_IF_ERROR(SerDeUtils::SkipBytes(buffered_byte_stream_.get(), sizeof (uint32_t)));
   RETURN_IF_ERROR(CheckSync(true, NULL));
   
   RETURN_IF_ERROR(SerDeUtils::ReadVLong(buffered_byte_stream_.get(),
