@@ -32,7 +32,7 @@ target_link_libraries(Runtime
   Exec
   TestUtil
   ${Boost_LIBRARIES}
-  snappy
+  ${SNAPPY_STATIC_LIB}
   -lz -lbz2
 )
 

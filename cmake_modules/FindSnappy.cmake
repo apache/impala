@@ -2,7 +2,7 @@
 # This module defines
 #  SNAPPY_INCLUDE_DIR, directory containing headers
 #  SNAPPY_LIBS, directory containing gflag libraries
-#  SNAPPY_STATIC_LIB, path to libgflags.a
+#  SNAPPY_STATIC_LIB, path to libsnappy.a
 #  SNAPPY_FOUND, whether gflags has been found
 
 set(SNAPPY_SEARCH_HEADER_PATHS  
@@ -17,12 +17,7 @@ set(SNAPPY_INCLUDE_DIR
   ${CMAKE_SOURCE_DIR}/thirdparty/snappy-1.0.5/build/include
 )
 
-find_library(GTEST_LIBRARY NAMES gtest
-  PATHS ${CMAKE_SOURCE_DIR}/thirdparty/gtest-1.6.0
-        NO_DEFAULT_PATH
-  DOC   "Google's framework for writing C++ tests (gtest)"
-)
-find_library(SNAPPY_LIBRARY NAMES snappy
+find_library(SNAPPY_LIB_PATH NAMES snappy
   PATHS ${SNAPPY_SEARCH_LIB_PATH}
         NO_DEFAULT_PATH
   DOC   "Google's snappy compression library"
@@ -31,7 +26,7 @@ find_library(SNAPPY_LIBRARY NAMES snappy
 if (SNAPPY_LIB_PATH)
   set(SNAPPY_FOUND TRUE)
   set(SNAPPY_LIBS ${SNAPPY_SEARCH_LIB_PATH})
-  set(SNAPPY_STATIC_LIB ${SNAPPY_SEARCH_LIB_PATH}/libgflags.a)
+  set(SNAPPY_STATIC_LIB ${SNAPPY_SEARCH_LIB_PATH}/libsnappy.a)
 else ()
   set(SNAPPY_FOUND FALSE)
 endif ()

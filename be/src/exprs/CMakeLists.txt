@@ -62,7 +62,7 @@ target_link_libraries(expr-test
   Opcode
   Exprs
   gtest
-  snappy
+  ${SNAPPY_STATIC_LIB}
   ${Boost_LIBRARIES}
   ${LLVM_MODULE_LIBS}
   -lz -lbz2 

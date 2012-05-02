@@ -37,6 +37,6 @@ target_link_libraries(Exec
 target_link_libraries(Exec
   ${JAVA_JVM_LIBRARY}
   ${HDFS_LIBS}
-  snappy
+  ${SNAPPY_STATIC_LIB}
   -lz -lbz2
 )

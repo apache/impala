@@ -80,7 +80,7 @@ target_link_libraries(runquery
   Exprs
   Opcode
   Exprs
-  snappy
+  ${SNAPPY_STATIC_LIB}
   ${Boost_LIBRARIES}  
   ${LLVM_MODULE_LIBS}
   gflagsstatic
@@ -113,7 +113,7 @@ target_link_libraries(impalad
   Opcode
   Exprs
   CodeGen
-  snappy
+  ${SNAPPY_STATIC_LIB}
   ${Boost_LIBRARIES}  
   ${LLVM_MODULE_LIBS}
   gflagsstatic
