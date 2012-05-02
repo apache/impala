@@ -1,7 +1,7 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
-#ifndef IMPALA_RUNTIME_PATTERN_H
-#define IMPALA_RUNTIME_PATTERN_H
+#ifndef IMPALA_RUNTIME_STRING_SEARCH_H
+#define IMPALA_RUNTIME_STRING_SEARCH_H
 
 #include <vector>
 #include <cstring>
