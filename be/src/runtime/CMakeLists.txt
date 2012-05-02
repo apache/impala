@@ -32,6 +32,7 @@ target_link_libraries(Runtime
   Exec
   TestUtil
   ${Boost_LIBRARIES}
+  snappy
   -lz -lbz2
 )
 
@@ -99,7 +100,7 @@ target_link_libraries(data-stream-test
   gtest
   ${Boost_LIBRARIES}
   ${LLVM_MODULE_LIBS}
-  -lz -lbz2 -lsnappy
+  -lz -lbz2
 )
 
 add_test(mem-pool-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/mem-pool-test)
