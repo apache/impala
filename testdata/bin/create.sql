@@ -104,6 +104,9 @@ CREATE TABLE AllTypesSmall LIKE AllTypes;
 DROP TABLE IF EXISTS AllTypesInsert;
 CREATE TABLE AllTypesInsert LIKE AllTypes;
 
+DROP TABLE IF EXISTS AllTypesNoPart_insert;
+CREATE TABLE AllTypesNoPart_insert like AllTypesNoPart;
+
 DROP TABLE IF EXISTS AllTypesSmall_rc;
 CREATE TABLE AllTypesSmall_rc LIKE AllTypes_rc;
 

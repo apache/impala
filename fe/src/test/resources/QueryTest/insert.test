@@ -1,11 +1,11 @@
 # insert overwrite unpartitioned table
-insert overwrite table alltypesnopart
+insert overwrite table alltypesnopart_insert
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypessmall
 where year=2009 and month=04
 ---- SETUP
-RESET alltypesnopart
+RESET alltypesnopart_insert
 RELOAD
 ---- NUMROWS
 25
@@ -13,7 +13,7 @@ RELOAD
 # search the overwritten table to verify the results
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
-from alltypesnopart
+from alltypesnopart_insert
 ---- SETUP
 RELOAD
 ---- TYPES
@@ -46,20 +46,20 @@ int,boolean,tinyint,smallint,int,bigint,float,double,string,string
 99,false,4,4,4,40,4.4,40.4,'04/03/09','4'
 ====
 # insert into unpartitioned table
-insert into table alltypesnopart
+insert into table alltypesnopart_insert
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypessmall
 where year=2009 and month=04
 ---- SETUP
-RESET alltypesnopart
+RESET alltypesnopart_insert
 ---- PARTITIONS
-hdfs: alltypesnopart/
+hdfs: alltypesnopart_insert/
 ---- NUMROWS
 25
 ====
 # search the table to verify it contains 25 rows
-select count(*) from alltypesnopart
+select count(*) from alltypesnopart_insert
 ---- SETUP
 RELOAD
 ---- TYPES
