@@ -34,11 +34,6 @@ add_library(Exec STATIC
 
 target_link_libraries(Exec
   Runtime
-)
-
-target_link_libraries(Exec
   ${JAVA_JVM_LIBRARY}
   ${HDFS_LIBS}
-  ${SNAPPY_STATIC_LIB}
-  -lz -lbz2
 )

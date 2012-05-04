@@ -112,6 +112,53 @@ else()
   set(BUILD_OUTPUT_ROOT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/release/")
 endif()
 
+# Make sure to specify link libraries in reverse order of dependency
+# (ie, if libA uses symbols from libB, libA must precede libB), otherwise
+# when linking statically the linker won't look for the needed symbols.
+# TODO: is there a better way to specify link dependencies without having to
+# list all included libs for each specific binary? any gcc flags to help with this?
+# multiple alternating includes of Opcode and Exprs libs necessary to get symbols 
+# resolve (why?)
+# TODO: remove TestUtil dependency as soon as we have our scheduler library in place
+#
+# The order of link libararies matter.  
+#  - Util must come before ImpalaThrift
+#  - Exprs & Opcode have a circular dependency (Exprs is included twice)
+set (IMPALA_LINK_LIBS
+  TestUtil
+  Service
+  TestUtil
+  CodeGen
+  Service
+  Exec
+  Exprs
+  Opcode
+  Exprs
+  Util
+  Runtime
+  Common
+  Util
+  thriftstatic
+  ImpalaThrift
+  Service
+  Exec
+  Exprs
+  Opcode
+  Exprs
+  ${SNAPPY_STATIC_LIB}
+  ${Boost_LIBRARIES}  
+  ${LLVM_MODULE_LIBS}
+  gflagsstatic
+  glogstatic
+#  tcmallocstatic  This crashes the FE tests.  
+  pprofstatic
+  -lz -lbz2 -lboost_date_time
+)
+
+# Link libs for test executables.  Although not all tests need all libs,
+# the build time for the tests is rather small and not worth the trouble.
+set (IMPALA_TEST_LINK_LIBS ${IMPALA_LINK_LIBS} gtest)
+
 # compile these subdirs using their own CMakeLists.txt
 add_subdirectory(src/codegen)
 add_subdirectory(src/common)

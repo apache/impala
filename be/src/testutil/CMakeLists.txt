@@ -13,36 +13,14 @@ add_library(TestUtil STATIC
   test-exec-env.cc
 )
 
+# TODO why do we need this
 target_link_libraries(TestUtil
-  Service
-  Runtime
   ImpalaThrift
-  glogstatic
-  gflagsstatic  
-  -lz -lbz2
 )
 
 add_executable(query-jitter
   query-jitter.cc
 )
 
-target_link_libraries(query-jitter
-  TestUtil
-  CodeGen
-  Exprs
-  Opcode
-  Exprs
-  Util
-  Runtime
-  Util
-  Common
-  ImpalaThrift
-  glogstatic
-  gflagsstatic
-  gtest
-  ${Boost_LIBRARIES}
-  ${LLVM_MODULE_LIBS}
-)
-
-  
+target_link_libraries(query-jitter ${IMPALA_LINK_LIBS})
 

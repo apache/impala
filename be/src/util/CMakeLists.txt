@@ -16,35 +16,13 @@ add_library(Util
   url-parser.cc
 )
 
-add_executable(perf-counters-test
-  perf-counters-test.cc
-)
+add_executable(perf-counters-test perf-counters-test.cc)
+add_executable(runtime-profile-test runtime-profile-test.cc)
+add_executable(benchmark-test benchmark-test.cc)
 
-add_executable(runtime-profile-test
-  runtime-profile-test.cc
-)
-
-add_executable(benchmark-test
-  benchmark-test.cc
-)
-
-set (UTIL_TEST_LINK_LIBS
-  TestUtil
-  Util
-  Runtime
-  Util
-  Common
-  thriftstatic
-  ImpalaThrift
-  glogstatic
-  gflagsstatic
-  gtest
-  ${Boost_LIBRARIES}
-)
-
-target_link_libraries(perf-counters-test ${UTIL_TEST_LINK_LIBS})
-target_link_libraries(runtime-profile-test ${UTIL_TEST_LINK_LIBS})
-target_link_libraries(benchmark-test ${UTIL_TEST_LINK_LIBS})
+target_link_libraries(perf-counters-test ${IMPALA_TEST_LINK_LIBS})
+target_link_libraries(runtime-profile-test ${IMPALA_TEST_LINK_LIBS})
+target_link_libraries(benchmark-test ${IMPALA_TEST_LINK_LIBS})
 
 add_test(perf-counters-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/util/perf-counters-test)
 add_test(runtime-profile-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/util/runtime-profile-test)

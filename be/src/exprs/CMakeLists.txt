@@ -37,35 +37,6 @@ target_link_libraries(Exprs
   boost_regex-mt
 )
 
-add_executable(expr-test
-  expr-test.cc
-)
-
-# The order of link libaries matters.  Specifically:
-#  - Util must come before ImpalaThrift
-#  - Exprs & Opcode have a circular dependency (Exprs is included twice)
-target_link_libraries(expr-test
-  TestUtil
-  CodeGen
-  Service
-  Exec
-  Exprs
-  Opcode
-  Exprs
-  Runtime
-  Common
-  Util
-  thriftstatic
-  ImpalaThrift
-  Exec
-  Exprs
-  Opcode
-  Exprs
-  gtest
-  ${SNAPPY_STATIC_LIB}
-  ${Boost_LIBRARIES}
-  ${LLVM_MODULE_LIBS}
-  -lz -lbz2 
-)
-
+add_executable(expr-test expr-test.cc)
+target_link_libraries(expr-test ${IMPALA_TEST_LINK_LIBS})
 add_test(expr-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/exprs/expr-test)

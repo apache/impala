@@ -11,9 +11,9 @@ add_library(Service
   jni-coordinator.cc
 )
 
-target_link_libraries(Service
-  Runtime
-  -lboost_date_time
+# TODO: why do we need this
+target_link_libraries(Service 
+  TestUtil
 )
 
 add_library(backend SHARED
@@ -22,101 +22,21 @@ add_library(backend SHARED
   jni-coordinator.cc
 )
 
-# The order of link libararies matter.  
-#  - Util must come before ImpalaThrift
-#  - Exprs & Opcode have a circular dependency (Exprs is included twice)
-# Commenting out tcmalloc for now in order to get more meaningful stack
-# dumps in response to test failures on Jenkins.
-target_link_libraries(backend
-  Common
-  CodeGen
-  Exec
-  Exprs
-  Opcode
-  Exprs
-  Runtime
-  Util
-  thriftstatic
-  ImpalaThrift
-  CodeGen
-  ${HDFS_LIBS}
-  ${LLVM_MODULE_LIBS}
-  gflagsstatic
-  glogstatic
-  gflagsstatic
-#  tcmallocstatic
-  pprofstatic
-  -lz -lbz2
-)
+target_link_libraries(backend ${IMPALA_LINK_LIBS})
 
 add_executable(runquery 
-  run-query.cc
+  run-query.cc 
 )
 
-# Make sure to specify link libraries in reverse order of dependency
-# (ie, if libA uses symbols from libB, libA must precede libB), otherwise
-# when linking statically the linker won't look for the needed symbols.
-# TODO: is there a better way to specify link dependencies without having to
-# list all included libs for each specific binary? any gcc flags to help with this?
-#
-# The order of link libararies matter.  
-#  - Util must come before ImpalaThrift
-#  - Exprs & Opcode have a circular dependency (Exprs is included twice)
-target_link_libraries(runquery
-  TestUtil
-  CodeGen
-  Service
-  Exec
-  Exprs
-  Opcode
-  Exprs
-  Runtime
-  Common
-  Util
-  thriftstatic
-  ImpalaThrift
-  Service
-  Exec
-  Exprs
-  Opcode
-  Exprs
-  ${SNAPPY_STATIC_LIB}
-  ${Boost_LIBRARIES}  
-  ${LLVM_MODULE_LIBS}
-  gflagsstatic
-  tcmallocstatic
-  pprofstatic
-  -lz -lbz2
+target_link_libraries(runquery 
+  ${IMPALA_LINK_LIBS}
+  # this is commented out from IMPALA_LINK_LIBS because it causes crashes in libbackend.so
+  # see Imp-39
+  tcmallocstatic      
 )
 
 add_executable(impalad
   impalad-main.cc
 )
 
-# multiple alternating includes of Opcode and Exprs libs necessary to get symbols resolve (why?)
-target_link_libraries(impalad
-  TestUtil
-  CodeGen
-  Service
-  Exec
-  Exprs
-  Opcode
-  Exprs
-  Runtime
-  Common
-  Util
-  thriftstatic
-  ImpalaThrift
-  Service
-  Exec
-  Exprs
-  Opcode
-  Exprs
-  CodeGen
-  ${SNAPPY_STATIC_LIB}
-  ${Boost_LIBRARIES}  
-  ${LLVM_MODULE_LIBS}
-  gflagsstatic
-  tcmallocstatic
-  pprofstatic
-)
+target_link_libraries(impalad ${IMPALA_LINK_LIBS})

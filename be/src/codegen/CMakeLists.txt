@@ -11,16 +11,6 @@ add_library(CodeGen
 )
 
 add_executable(llvm-codegen-test llvm-codegen-test.cc)
-
-set(LINK_LIBS
-  CodeGen
-  Common
-  gtest
-  glogstatic
-  ${Boost_LIBRARIES}
-  ${LLVM_MODULE_LIBS}
-)
-
-target_link_libraries(llvm-codegen-test ${LINK_LIBS})
-
+target_link_libraries(llvm-codegen-test ${IMPALA_TEST_LINK_LIBS})
 add_test(llvm-codegen-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/codegen/llvm-codegen-test)
+
