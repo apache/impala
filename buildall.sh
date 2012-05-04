@@ -12,7 +12,6 @@ export METASTORE_DB=`basename $root | sed -e "s/\\./_/g" | sed -e "s/[.-]/_/g"`
 . "$root"/bin/impala-config.sh
 
 clean_action=1
-config_action=1
 testdata_action=1
 tests_action=1
 
@@ -24,9 +23,6 @@ do
   case "$ARG" in
     -noclean)
       clean_action=0
-      ;;
-    -noconfig)
-      config_action=0
       ;;
     -notestdata)
       testdata_action=0
@@ -40,7 +36,6 @@ do
     -help)
       echo "buildall.sh [-noclean] [-noconfig] [-notestdata] [-noformat]"
       echo "[-noclean] : omits cleaning all packages before building"
-      echo "[-noconfig] : omits running configure script for third party packages"
       echo "[-notestdata] : omits recreating the metastore and loading test data"
       echo "[-noformat] : prevents the minicluster from formatting its data directories, and skips the data load step"
       exit
@@ -48,16 +43,18 @@ do
   esac
 done
 
+# Sanity check that thirdparty is built.
+if [ ! -e $IMPALA_HOME/thirdparty/gflags-1.5/libgflags.la ]
+then
+  echo "Couldn't find thirdparty build files.  Building thirdparty."
+  $IMPALA_HOME/bin/build_thirdparty.sh $*
+fi
+
 # option to clean everything first
 if [ $clean_action -eq 1 ]
 then
   # clean selected files from the root
   rm -f CMakeCache.txt
-
-  # clean thirdparty
-  cd $IMPALA_HOME/thirdparty
-  # remove everything that is not checked in
-  git clean -dfx
 
   # clean fe
   # don't use git clean because we need to retain Eclipse conf files
@@ -98,54 +95,6 @@ hbase-site.xml.template > hbase-site.xml
 set -e
 # Exit on reference to unitialized variable
 set -u
-
-# build thirdparty
-cd $IMPALA_HOME/thirdparty/gflags-1.5
-if [ $config_action -eq 1 ]
-then
-  ./configure --with-pic
-fi
-make -j4
-
-# Build pprof
-cd $IMPALA_HOME/thirdparty/gperftools-2.0
-if [ $config_action -eq 1 ]
-then
-# TODO: google perf tools indicates this might be necessary on 64 bit systems.
-# we're not compiling the rest of our code to not omit frame pointers but it 
-# still seems to generate useful profiling data.
-  ./configure --enable-frame-pointers --with-pic
-fi
-make -j4
-
-# Build glog
-cd $IMPALA_HOME/thirdparty/glog-0.3.1
-if [ $config_action -eq 1 ]
-then
-  ./configure --with-pic
-fi
-make -j4
-
-# Build gtest
-cd $IMPALA_HOME/thirdparty/gtest-1.6.0
-cmake .
-make -j4
-
-# Build llvm
-cd $IMPALA_HOME/thirdparty/llvm-3.0.src
-if [ $config_action -eq 1 ]
-then
-  ./configure --with-pic
-fi
-make -j4
-
-# Build Snappy
-cd $IMPALA_HOME/thirdparty/snappy-1.0.5
-if [ $config_action -eq 1 ]
-then
-  ./configure --with-pic --prefix=$IMPALA_HOME/thirdparty/snappy-1.0.5/build
-fi
-make install
 
 # cleanup FE process
 $IMPALA_HOME/bin/clean-fe-processes.py
