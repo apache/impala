@@ -41,9 +41,8 @@ HdfsTextScanner::HdfsTextScanner(HdfsScanNode* scan_node,
     collection_delim = '\0';
   }
   delimited_text_parser_.reset(new DelimitedTextParser(scan_node->column_to_slot_index(),
-      scan_node->GetNumPartitionKeys(), scan_node->parse_time_counter(),
-      hdfs_table->line_delim(), field_delim, collection_delim,
-      hdfs_table->escape_char()));
+      scan_node->GetNumPartitionKeys(), hdfs_table->line_delim(), 
+      field_delim, collection_delim, hdfs_table->escape_char()));
 }
 
 Status HdfsTextScanner::InitCurrentScanRange(RuntimeState* state,
@@ -70,6 +69,7 @@ Status HdfsTextScanner::InitCurrentScanRange(RuntimeState* state,
 
   // Offset may not point to tuple boundary
   if (scan_range->offset != 0) {
+    COUNTER_SCOPED_TIMER(scan_node_->parse_time_counter());
     int first_tuple_offset = delimited_text_parser_->FindFirstTupleStart(
         byte_buffer_, byte_buffer_read_size_);
     DCHECK_LE(first_tuple_offset, min(state->file_buffer_size(),
@@ -193,9 +193,12 @@ Status HdfsTextScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
       max_tuples = 1;
     }
     char* previous_buffer_ptr = byte_buffer_ptr_;
-    RETURN_IF_ERROR(delimited_text_parser_->ParseFieldLocations(max_tuples,
-         byte_buffer_end_ - byte_buffer_ptr_, &byte_buffer_ptr_,
-         &field_locations_, &num_tuples, &num_fields, &col_start));
+    {
+      COUNTER_SCOPED_TIMER(scan_node_->parse_time_counter());
+      RETURN_IF_ERROR(delimited_text_parser_->ParseFieldLocations(max_tuples,
+          byte_buffer_end_ - byte_buffer_ptr_, &byte_buffer_ptr_,
+          &field_locations_, &num_tuples, &num_fields, &col_start));
+    }
     int bytes_processed = byte_buffer_ptr_ - line_start;
     current_range_remaining_len_ -= bytes_processed;
 

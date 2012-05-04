@@ -14,14 +14,12 @@ void DelimitedTextParser::ParserReset() {
 
 DelimitedTextParser::DelimitedTextParser(const vector<int>& map_column_to_slot,
                                          int start_column,
-                                         RuntimeProfile::Counter* timer,
                                          char tuple_delim,
                                          char field_delim,
                                          char collection_item_delim,
                                          char escape_char)
     : map_column_to_slot_(map_column_to_slot),
       start_column_(start_column),
-      parse_time_counter_(timer),
       field_delim_(field_delim),
       escape_char_(escape_char),
       collection_item_delim_(collection_item_delim),
@@ -110,9 +108,6 @@ inline void DelimitedTextParser::AddColumn(int len,
 Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remaining_len,
     char** byte_buffer_ptr, std::vector<FieldLocation>* field_locations,
     int* num_tuples, int* num_fields, char** next_column_start) {
-  if (parse_time_counter_ != NULL)
-    COUNTER_SCOPED_TIMER(parse_time_counter_);
-
   // Start of this batch.
   *next_column_start = *byte_buffer_ptr;
 
@@ -149,20 +144,20 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
       // register.  Since we only process 16 characters at a time, only the lower 16 bits
       // can contain non-zero values.
       // _mm_extract_epi16 will extract 16 bits out of the xmm register.  The second
-      int tuple_mask = 0;
+      // parameter specifies which 16 bits to extract (0 for the lowest 16 bits).
+      int32_t tuple_mask = 0;
       if (tuple_delim_ != '\0') {
-        xmm_tuple_mask =
-            _mm_cmpistrm(xmm_tuple_search_, xmm_buffer, SSEUtil::STRCHR_MODE);
+        xmm_tuple_mask = 
+          _mm_cmpistrm(xmm_tuple_search_, xmm_buffer, SSEUtil::STRCHR_MODE);
         tuple_mask = _mm_extract_epi16(xmm_tuple_mask, 0);
       }
-      int field_mask = 0;
+      int32_t field_mask = 0;
       if (field_delim_ != '\0' || collection_item_delim_ != 0) {
-        xmm_field_mask =
-            _mm_cmpistrm(xmm_field_search_, xmm_buffer, SSEUtil::STRCHR_MODE);
+        xmm_field_mask = 
+          _mm_cmpistrm(xmm_field_search_, xmm_buffer, SSEUtil::STRCHR_MODE);
         field_mask = _mm_extract_epi16(xmm_field_mask, 0);
       }
 
-      // parameter specifies which 16 bits to extract (0 for the lowest 16 bits).
       int escape_mask = 0;
 
       // If the table does not use escape characters, skip processing for it.

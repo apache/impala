@@ -40,7 +40,6 @@ class DelimitedTextParser {
   // FindFirstTupleStart returns the position after the first non-escaped tuple
   // delimiter from the starting offset.
   DelimitedTextParser(const std::vector<int>& map_column_to_slot, int start_column,
-                      RuntimeProfile::Counter* timer,
                       char tuple_delim, char field_delim_ = '\0',
                       char collection_item_delim = '\0', char escape_char = '\0');
 
@@ -102,9 +101,6 @@ class DelimitedTextParser {
 
   // First non-partition column that will be extracted from parsed data.
   int start_column_;
-
-  // Pointer to scan node parse time counter.
-  RuntimeProfile::Counter* parse_time_counter_;
 
   // SSE(xmm) register containing the tuple search character.
   __m128i xmm_tuple_search_;

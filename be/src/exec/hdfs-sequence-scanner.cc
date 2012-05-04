@@ -209,13 +209,12 @@ HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNode* scan_node,
   text_converter_.reset(new TextConverter(hdfs_table->escape_char(), tuple_pool_));
 
   delimited_text_parser_.reset(new DelimitedTextParser(scan_node->column_to_slot_index(),
-      scan_node->GetNumPartitionKeys(), NULL, '\0',
+      scan_node->GetNumPartitionKeys(), '\0',
       hdfs_table->field_delim(), hdfs_table->collection_delim(),
       hdfs_table->escape_char()));
   // use the parser to find bytes that are -1
   find_first_parser_.reset(new DelimitedTextParser(scan_node->column_to_slot_index(),
-      scan_node->GetNumPartitionKeys(), scan_node->parse_time_counter(),
-      static_cast<char>(0xff)));
+      scan_node->GetNumPartitionKeys(), static_cast<char>(0xff)));
 }
 
 Status HdfsSequenceScanner::InitCurrentScanRange(RuntimeState* state,
@@ -316,6 +315,7 @@ Status HdfsSequenceScanner::FindFirstRecord(RuntimeState* state) {
     }
 
     if (sync_flag_counter == 0) {
+      COUNTER_SCOPED_TIMER(scan_node_->parse_time_counter());
       off += find_first_parser_->FindFirstTupleStart(
           reinterpret_cast<char*>(buf) + off, bytes_left);
       bytes_left = num_bytes_read - off;
