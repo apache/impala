@@ -1,0 +1,20 @@
+To run the benchmark tests you first need to load the benchmark data. This can be done
+via the 'load-benchmark-data.sh' script. There are currently 3 different classes of
+benchmark tests and data sets:
+
+   core - All data sets, all use text file format, no compression.
+
+   exhaustive - All combinations of data sets, file formats, and compression.
+
+   pairwise - This contains a subset of the exhaustive test cases. Providing
+   good test coverage but taking less time (and machine resources) to run than
+   the exhaustive tests.
+
+Load the data matching the test scenario you want to run by passing either
+'core', 'exhaustive', or 'pairwise' parameter to load-benchmark-data.sh. The
+default is to load only 'core'.
+
+Once the data is loading run the benchmark suite using the 'run_benchmark.py'
+script. This script takes a parameter '--exploration_strategy' that can be
+set to either 'core', 'exhaustive', or 'pairwise' depending on which test
+cases should be run. The default is to run the 'core' test cases.

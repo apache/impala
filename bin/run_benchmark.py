@@ -3,7 +3,7 @@
 # This script should be used to benchmark queries.  It can either run in batch mode, in
 # which case it will run the set of hive benchmark queries or to run a single query.  In
 # either case, it will first try to warm the buffer cache before running the query
-# multiple times.  There are command line options to control how many times to prerun the 
+# multiple times.  There are command line options to control how many times to prerun the
 # query for the buffer cache as well as the number of iterations.
 #
 # By default, the script will have minimal output.  Verbose output can be turned on with
@@ -11,9 +11,9 @@
 # can be passed which will enable gprof instrumentation and output the sampled call
 # stacks.  The -v and -p option are used by the perf regression tests.
 #
-# The script can also compare results against existing results.  The file that it looks 
-# for is in $IMPALA_HOME/hive_benchmark_results.txt.  If the query is in that file, it 
-# will compare against the mean from that file.  The output of this script can be copy and 
+# The script can also compare results against existing results.  The file that it looks
+# for is in $IMPALA_HOME/hive_benchmark_results.txt.  If the query is in that file, it
+# will compare against the mean from that file.  The output of this script can be copy and
 # pasted into that file. TODO: make this better.
 #
 # The script parses for output in the specific format in the regex below (result_regex).
@@ -30,10 +30,10 @@ from optparse import OptionParser
 
 # Options
 parser = OptionParser()
-parser.add_option("-p", "--profiler", dest="profiler", 
-                  action="store_true", default = False, 
+parser.add_option("-p", "--profiler", dest="profiler",
+                  action="store_true", default = False,
                   help="If set, also run google pprof for sample profiling.")
-parser.add_option("-v", "--verbose", dest="verbose", action="store_true", 
+parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
                   default = False, help="If set, outputs all benchmark diagnostics.")
 parser.add_option("-q", "--query", dest="query", default = "",
                   help="Query to run.  If none specified, runs all queries.")
@@ -41,13 +41,18 @@ parser.add_option("--iterations", dest="iterations", default="3",
                   help="Number of times to run the query.  Only to be used with -q")
 parser.add_option("--prime_cache", dest="prime_cache", default="3",
                   help="Number of times to prime buffer cache.  Only to be used with -q")
+parser.add_option("--exploration_strategy", dest="exploration_strategy", default="core",
+                  help="The exploration strategy to use for running benchmark: 'core', "\
+                  "'pairwise', or 'exhaustive'")
+parser.add_option("--reference_result_file_name", dest="reference_result_file",
+                  default='hive_benchmark_results.txt',
+                  help="The reference result file to use for comparison.")
 
 (options, args) = parser.parse_args()
 
 profile_output_file = 'build/release/service/profile.tmp'
 query_cmd = 'build/release/service/runquery -profile_output_file=""'
 gprof_cmd = 'google-pprof --text build/release/service/runquery %s | head -n 30'
-reference_result_file = 'hive_benchmark_results.txt'
 result_single_regex = 'returned (\d*) rows? in (\d*).(\d*) s'
 result_multiple_regex = 'returned (\d*) rows? in (\d*).(\d*) s with stddev (\d*).(\d*)'
 
@@ -75,11 +80,11 @@ def parse_tables(query):
   return tables
 
 # Parse out the reference results so far
-def parse_reference_results():
+def parse_reference_results(reference_result_file_name):
   try:
     results = {}
     current_result = {}
-    full_path = os.environ['IMPALA_HOME'] + "/" + reference_result_file
+    full_path = os.environ['IMPALA_HOME'] + "/" + reference_result_file_name
     f = open(full_path)
     for line in f:
       line = line.strip()
@@ -88,11 +93,11 @@ def parse_reference_results():
         query = line[line.find(":") + 1:].strip()
         results[query] = current_result
       elif line.startswith("Avg Time:"):
-        time = line[line.find(":") + 1:].strip() 
+        time = line[line.find(":") + 1:].strip()
         time = time[0:len(time) - 1]
         current_result["avg"] = time
       elif line.startswith("Std Dev:"):
-        time = line[line.find(":") + 1:].strip() 
+        time = line[line.find(":") + 1:].strip()
         time = time[0:len(time) - 1]
         current_result["stddev"] = time
     return results
@@ -110,7 +115,6 @@ def parse_reference_results():
 # The second is the comparison output against reference results if there are any.
 def run_query(reference_results, query, prime_buffer_cache, iterations):
   query = query.strip()
-
   compare_output = ""
   output = ""
 
@@ -122,7 +126,7 @@ def run_query(reference_results, query, prime_buffer_cache, iterations):
       reference_avg = float(reference_result["avg"])
     if "stddev" in reference_result:
       reference_stddev = float(reference_result["stddev"])
-  
+
   if prime_buffer_cache > 0:
     # Run the query to prime the buffer cache.  It would be great to just get the files
     # and cat them to /dev/null but that is not trivial.  Instead, parse for the table
@@ -176,9 +180,9 @@ def run_query(reference_results, query, prime_buffer_cache, iterations):
 
   if options.profiler:
     subprocess.call(gprof_cmd % gprof_tmp_file, shell=True)
-  
+
   avg_time = float(avg_time)
-  
+
   output = "Query: %s\n" % (query)
   output += "  Avg Time: %fs\n" % (avg_time)
   if len(stddev) != 0:
@@ -200,65 +204,80 @@ def run_query(reference_results, query, prime_buffer_cache, iterations):
   compare_output.rstrip()
   return [output, compare_output]
 
+def choose_input_vector_file_name(exploration_strategy):
+  if exploration_strategy == "exhaustive":
+    return "benchmark_exhaustive.vector"
+  elif exploration_strategy == "pairwise":
+    return "benchmark_exhaustive.vector"
+  else:
+    return "benchmark_core.vector"
+
+def build_query(
+    query_format_string, exploration_strategy, data_set, file_format, compression):
+  table_name = "%s_%s_%s" % (data_set, file_format, compression)
+  return query_format_string % {'table_name': table_name}
+
 os.chdir(os.environ['IMPALA_BE_DIR'])
 
-reference_results = parse_reference_results()
+reference_results = parse_reference_results(options.reference_result_file)
 
-# This table contains [query, numbers of times to prime buffer cache, 
-# number of iterations].  Queries should be grouped by the data they touch.  This 
+# This table contains a hash of dataset -> [query, numbers of times to prime buffer cache,
+# number of iterations].  Queries should be grouped by the data they touch.  This
 # eliminates the need for the buffer cache priming iterations.
-# TODO: it would be good if this table also contained the expected numbers and 
-# automatically flag regressions.  How do we reconcile the fact we are running on 
+# TODO: it would be good if this table also contained the expected numbers and
+# automatically flag regressions.  How do we reconcile the fact we are running on
 # different machines?
-queries = [
-  ["select count(*) from grep1gb", 5, 5],
-  ["select count(field) from grep1gb", 0, 5],
-  ["select count(field) from grep1gb where field like '%xyz%'", 0, 5],
-  ["select count(*) from grep1gb_seq_snap", 5, 5],
-  ["select count(field) from grep1gb_seq_snap", 0, 5],
-  ["select count(field) from grep1gb_seq_snap where field like '%xyz%'", 0, 5],
+queries = {'grep1GB': [
+  ["select count(*) from %(table_name)s", 5, 5],
+  ["select count(field) from %(table_name)s", 0, 5],
+  ["select count(field) from %(table_name)s where field like '%%xyz%%'", 0, 5]
+  ],
+
+  'web': [
   ["select uv.sourceip, avg(r.pagerank), sum(uv.adrevenue) as totalrevenue "\
-   "from uservisits uv join rankings r on (r.pageurl = uv.desturl) "\
-   "where uv.visitdate > '1999-01-01' and uv.visitdate < '2000-01-01' "\
-   "group by uv.sourceip order by totalrevenue desc limit 1", 5, 5],
-  ["select uv.sourceip, avg(r.pagerank), sum(uv.adrevenue) as totalrevenue "\
-   "from uservisits_seq uv join rankings r on (r.pageurl = uv.desturl) "\
-   "where uv.visitdate > '1999-01-01' and uv.visitdate < '2000-01-01' "\
-   "group by uv.sourceip order by totalrevenue desc limit 1", 5, 5],
-  ["select sourceIP, SUM(adRevenue) FROM uservisits GROUP by sourceIP "\
+   "from uservisits_%(table_name)s uv join rankings_%(table_name)s r on "\
+   "(r.pageurl = uv.desturl) where uv.visitdate > '1999-01-01' and uv.visitdate "\
+   "< '2000-01-01' group by uv.sourceip order by totalrevenue desc limit 1", 5, 5],
+  ["select sourceIP, SUM(adRevenue) FROM uservisits_%(table_name)s GROUP by sourceIP "\
    "order by SUM(adRevenue) desc limit 10", 5, 5],
-  ["select pageRank, pageURL from rankings where pageRank > 10 "\
+  ["select pageRank, pageURL from rankings_%(table_name)s where pageRank > 10 "\
    "order by pageRank limit 100", 0, 5],
-  ["select count(*) from rankings where pageRank > 10 && pageRank < 25", 0, 5],
-  ["select count(field) from grep10gb where field like '%xyz%'", 0, 1]
-]
+  ["select count(*) from rankings_%(table_name)s where "\
+   "pageRank > 10 && pageRank < 25", 0, 5]
+  ],
+
+  'grep10GB': [
+  ["select count(field) from %(table_name)s where field like 'xyz'", 0, 1]
+  ]
+}
 
 # Run all queries
 if (len(options.query) == 0):
+  vector_file = open(
+    '../testdata/bin/' + choose_input_vector_file_name(options.exploration_strategy))
   output = ""
   compare_output = ""
-  for query in queries:
-    result = run_query(reference_results, query[0], query[1], query[2])
-    output += result[0]
-    compare_output += result[1]
-    if len(result[1]) != 0:
-      print result[1]
-    else:
-      print result[0]
-    if options.verbose != 0:
-      print "---------------------------------------------------------------------------"
+
+  for line in vector_file:
+    file_format, data_set, compression = line.split()[:3]
+    for query in queries[data_set]:
+      result = run_query(reference_results, build_query(query[0],
+                options.exploration_strategy, data_set, file_format, compression),
+                query[1], query[2])
+      output += result[0]
+      compare_output += result[1]
+      print result[1] or result[0]
+      if options.verbose != 0:
+        print "---------------------------------------------------------------------------"
+  vector_file.close()
 
   print compare_output
   print "\nCopy and paste below to %s/%s to update the reference results:" % \
-        (os.environ['IMPALA_HOME'], reference_result_file)
+        (os.environ['IMPALA_HOME'], options.reference_result_file)
   print output
 
 # Run query from command line
 else:
-  result = run_query(reference_results, options.query, int(options.prime_cache), 
+  result = run_query(reference_results, options.query, int(options.prime_cache),
                     int(options.iterations))
-  if len(result[1]) != 0:
-    print result[1]
-  else:
-    print result[0]
-
+  print result[1] or result[0]

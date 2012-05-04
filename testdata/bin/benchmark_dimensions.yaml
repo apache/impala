@@ -1,0 +1,3 @@
+file_format: [text, sequence_file, rc_file]
+data_set: [grep1GB, grep10GB, web]
+compression: [none, lzip, gzip, bzip2, snappy]

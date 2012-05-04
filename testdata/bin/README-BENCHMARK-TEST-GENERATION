@@ -1,0 +1,22 @@
+This is a overview of the benchmark workflow and the scripts involved. The workflow is as follows:
+
+1) Create base benchmark schema and load data into these tables.
+2) Create extended benchmark schema (different file formats, compression, etc)
+   and load data by copying from tables created in 1) using INSERT statements.
+3) Run the benchmarks using $IMPALA_HOME/bin/run_benchmark.py
+
+The *.sql scripts to create the extended benchmarks schema and data loading are dynamically generated
+using the generate_benchmark_statements.rb script. This script reads in files that describe what
+combinations of data set, file format, compression algorithm to be used and outputs the query
+files.
+
+The input to the generate_benchmark_statements.rb script is generated using the
+generate_test_vectors.rb script. This script looks at the different dimension values (defined
+in benchmark_dimensions.yaml) such as file format = rcfile, sequence file, text and outputs
+a set of test vectors. It outputs both an exhaustive and reduced set of combinations.
+
+Currently, a pre-generated set of vectors is checked in along with the *.sql files so these
+scripts don't need to be run unless there is a new dimension added/removed. These can be viewed
+at: benchmark_*.vector and create-benchmark*-generated.sql.
+
+For more information about these scripts please view the comments within the scripts themselves.
