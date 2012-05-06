@@ -55,12 +55,14 @@
   do { \
     jthrowable exc = (env)->ExceptionOccurred(); \
     if (exc != NULL) { \
-     jstring msg = (jstring) env->CallObjectMethod(exc, (throwable_to_string_id_)); \
-     jboolean is_copy; \
-     const char* c_msg = reinterpret_cast<const char*>((env)->GetStringUTFChars(msg, &is_copy)); \
-     (env)->ExceptionClear(); \
-     (env)->ThrowNew((exc_class), c_msg); \
-     return; \
+      DCHECK((throwable_to_string_id_) != NULL); \
+      jstring msg = (jstring) env->CallObjectMethod(exc, (throwable_to_string_id_)); \
+      jboolean is_copy; \
+      const char* c_msg = \
+          reinterpret_cast<const char*>((env)->GetStringUTFChars(msg, &is_copy)); \
+      (env)->ExceptionClear(); \
+      (env)->ThrowNew((exc_class), c_msg); \
+      return; \
     } \
   } while (false)
 
@@ -86,12 +88,13 @@
   do { \
     jthrowable exc = (env)->ExceptionOccurred(); \
     if (exc != NULL) { \
-     jstring msg = (jstring) env->CallObjectMethod(exc, (throwable_to_string_id_)); \
-     jboolean is_copy; \
-     const char* c_msg = \
-         reinterpret_cast<const char*>((env)->GetStringUTFChars(msg, &is_copy)); \
-     (env)->ExceptionClear(); \
-     return Status(c_msg); \
+      DCHECK((throwable_to_string_id_) != NULL); \
+      jstring msg = (jstring) env->CallObjectMethod(exc, (throwable_to_string_id_)); \
+      jboolean is_copy; \
+      const char* c_msg = \
+          reinterpret_cast<const char*>((env)->GetStringUTFChars(msg, &is_copy)); \
+      (env)->ExceptionClear(); \
+      return Status(c_msg); \
     } \
   } while (false)
 

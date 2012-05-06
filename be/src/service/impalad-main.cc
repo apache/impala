@@ -16,6 +16,8 @@
 #include <transport/TTransportUtils.h>
 #include <concurrency/PosixThreadFactory.h>
 
+#include "exec/hbase-table-scanner.h"
+#include "runtime/hbase-table-cache.h"
 #include "codegen/llvm-codegen.h"
 #include "common/status.h"
 #include "runtime/coordinator.h"
@@ -77,6 +79,9 @@ int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, true);
   LlvmCodeGen::InitializeLlvm();
+  EXIT_IF_ERROR(JniUtil::Init());
+  EXIT_IF_ERROR(HBaseTableScanner::Init());
+  EXIT_IF_ERROR(HBaseTableCache::Init());
 
   // start backend service for the coordinator on backend_port
   ExecEnv exec_env;

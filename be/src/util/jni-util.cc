@@ -54,7 +54,8 @@ Status JniUtil::Init() {
   }
 
   // Throwable toString()
-  throwable_to_string_id_ = env->GetMethodID(throwable_cl_, "toString", "()Ljava/lang/String;");
+  throwable_to_string_id_ =
+      env->GetMethodID(throwable_cl_, "toString", "()Ljava/lang/String;");
   if (throwable_to_string_id_ == NULL) {
     if (env->ExceptionOccurred()) env->ExceptionDescribe();
     return Status("Failed to find Java Throwable toString() method.");
