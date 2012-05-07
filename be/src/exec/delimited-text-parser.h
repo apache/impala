@@ -105,8 +105,8 @@ class DelimitedTextParser {
   // SSE(xmm) register containing the tuple search character.
   __m128i xmm_tuple_search_;
 
-  // SSE(xmm) register containing the field search character.
-  __m128i xmm_field_search_;
+  // SSE(xmm) register containing the delimiter search character.
+  __m128i xmm_delim_search_;
 
   // SSE(xmm) register containing the escape search character.
   __m128i xmm_escape_search_;
@@ -129,6 +129,10 @@ class DelimitedTextParser {
 
   // Whether or not the previous character was the escape character
   bool last_char_is_escape_;
+  
+  // Precomputed masks to process escape characters
+  uint16_t low_mask_[16];
+  uint16_t high_mask_[16];
 
   // Index to keep track of the current current column in the current file
   int column_idx_;
