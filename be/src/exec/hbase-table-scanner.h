@@ -9,6 +9,7 @@
 #include <boost/scoped_ptr.hpp>
 #include "gen-cpp/PlanNodes_types.h"
 #include "exec/scan-node.h"
+#include "runtime/hbase-table-cache.h"
 
 namespace impala {
 
@@ -29,10 +30,10 @@ class Status;
 class HBaseTableScanner {
  public:
 
-  // Initialize all members to NULL, except JNIEnv and ScanNode.
+  // Initialize all members to NULL, except JNIEnv, ScanNode and HTable cache
   // scan_node is the enclosing hbase scan node and its performance counter will be
   // updated.
-  HBaseTableScanner(JNIEnv* env, ScanNode* scan_node);
+  HBaseTableScanner(JNIEnv* env, ScanNode* scan_node, HBaseTableCache* htable_cache);
 
   // JNI setup. Create global references to classes,
   // and find method ids.
@@ -84,8 +85,6 @@ class HBaseTableScanner {
 
   // Close HTable and ResultScanner.
   void Close();
-
-  void set_hbase_conf(jobject hbase_conf) { hbase_conf_ = hbase_conf; }
 
   void set_num_requested_keyvalues(int num_requested_keyvalues) {
     num_requested_keyvalues_ = num_requested_keyvalues;
@@ -146,8 +145,8 @@ class HBaseTableScanner {
   static jobject must_pass_all_op_;
   static jobjectArray compare_ops_;
 
-  // HBaseConfiguration instance from runtime state.
-  jobject hbase_conf_;
+  // HBase Table cache from runtime state.
+  HBaseTableCache* htable_cache_;
 
   // Vector of ScanRange
   const ScanRangeVector* scan_range_vector_;

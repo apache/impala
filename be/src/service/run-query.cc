@@ -16,6 +16,7 @@
 #include "codegen/llvm-codegen.h"
 #include "common/status.h"
 #include "exec/hbase-table-scanner.h"
+#include "runtime/hbase-table-cache.h"
 #include "testutil/query-executor.h"
 #include "runtime/exec-env.h"
 #include "exec/exec-stats.h"
@@ -215,7 +216,7 @@ int main(int argc, char** argv) {
   EXIT_IF_ERROR(JniUtil::Init());
   if (FLAGS_init_hbase) {
     EXIT_IF_ERROR(HBaseTableScanner::Init());
-    EXIT_IF_ERROR(RuntimeState::InitHBaseConf());
+    EXIT_IF_ERROR(HBaseTableCache::Init());
   }
 
   Exec(exec_env.get());

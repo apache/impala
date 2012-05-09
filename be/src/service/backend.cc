@@ -65,7 +65,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
   JniUtil::InitLibhdfs();
   THROW_IF_ERROR_RET(JniUtil::Init(), env, impala_exc_cl, -1);
   THROW_IF_ERROR_RET(HBaseTableScanner::Init(), env, impala_exc_cl, -1);
-  THROW_IF_ERROR_RET(RuntimeState::InitHBaseConf(), env, impala_exc_cl, -1);
+  THROW_IF_ERROR_RET(HBaseTableCache::Init(), env, impala_exc_cl, -1);
   THROW_IF_ERROR_RET(JniCoordinator::Init(), env, impala_exc_cl, -1);
 
   // start backends in process, listening on ports > backend_port

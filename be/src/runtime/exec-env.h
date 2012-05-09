@@ -5,6 +5,7 @@
 
 #include <boost/scoped_ptr.hpp>
 #include "exprs/timestamp-functions.h"
+#include "common/status.h"
 
 namespace impala {
 
@@ -13,6 +14,7 @@ class Scheduler;
 class SimpleScheduler;
 class BackendClientCache;
 class HdfsFsCache;
+class HBaseTableCache;
 class TestExecEnv;
 
 // Execution environment for queries/plan fragments.
@@ -30,12 +32,15 @@ class ExecEnv {
   Scheduler* scheduler() { return scheduler_; }
   BackendClientCache* client_cache() { return client_cache_; }
   HdfsFsCache* fs_cache() { return fs_cache_; }
+  HBaseTableCache* htable_cache() { return htable_cache_; }
 
  private:
   boost::scoped_ptr<DataStreamMgr> stream_mgr_impl_;
   boost::scoped_ptr<SimpleScheduler> scheduler_impl_;
   boost::scoped_ptr<BackendClientCache> client_cache_impl_;
   boost::scoped_ptr<HdfsFsCache> fs_cache_impl_;
+  boost::scoped_ptr<HBaseTableCache> htable_cache_impl_;
+
   TimezoneDatabase tz_database_;
 
  protected:
@@ -45,6 +50,8 @@ class ExecEnv {
   Scheduler* scheduler_;
   BackendClientCache* client_cache_;
   HdfsFsCache* fs_cache_;
+  HBaseTableCache* htable_cache_;
+
 };
 
 }

@@ -15,6 +15,7 @@ add_library(Runtime STATIC
   data-stream-sender.cc
   descriptors.cc
   exec-env.cc
+  hbase-table-cache.cc
   hdfs-fs-cache.cc
   mem-pool.cc
   plan-executor.cc

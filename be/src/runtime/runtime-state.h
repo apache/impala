@@ -44,20 +44,15 @@ class RuntimeState {
     return file_errors_;
   }
   const TUniqueId& query_id() const { return query_id_; }
-  static void* hbase_conf() { return hbase_conf_; }
   ExecEnv* exec_env() { return exec_env_; }
   DataStreamMgr* stream_mgr() { return exec_env_->stream_mgr(); }
   HdfsFsCache* fs_cache() { return exec_env_->fs_cache(); }
+  HBaseTableCache* htable_cache() { return exec_env_->htable_cache(); }
   std::vector<std::string>& created_hdfs_files() { return created_hdfs_files_; }
   std::vector<int64_t>& num_appended_rows() { return num_appended_rows_; }
 
   // Returns CodeGen object.  Returns NULL if codegen is disabled.
   LlvmCodeGen* llvm_codegen() { return codegen_.get(); }
-
-  // Creates a global reference to a new HBaseConfiguration object via JniUtil.
-  // Cleanup is done in JniUtil::Cleanup().
-  // Returns Status::OK if created successfully, non-ok status otherwise.
-  static Status InitHBaseConf();
 
   // Append contents of error_stream_ as one message to error_log_. Clears error_stream_.
   void LogErrorStream();
@@ -99,8 +94,6 @@ class RuntimeState {
   const bool abort_on_error_;
   // Maximum number of errors to log.
   const int max_errors_;
-  // HBaseConfiguration jobject. Initialized in InitHBaseConf().
-  static void* hbase_conf_;
   TUniqueId query_id_;
   ExecEnv* exec_env_;
   boost::scoped_ptr<LlvmCodeGen> codegen_;

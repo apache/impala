@@ -41,7 +41,7 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
   if (env == NULL) {
     return Status("Failed to get/create JVM");
   }
-  hbase_scanner_.reset(new HBaseTableScanner(env, this));
+  hbase_scanner_.reset(new HBaseTableScanner(env, this, state->htable_cache()));
 
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   if (tuple_desc_ == NULL) {
@@ -49,9 +49,11 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
     return Status("Failed to get tuple descriptor.");
   }
   // The data retrieved from HBase via result_.raw() is sorted by family/qualifier.
-  // The corresponding HBase columns in the Impala metadata are also sorted by family/qualifier.
+  // The corresponding HBase columns in the Impala metadata are also sorted by
+  // family/qualifier.
   // Here, we re-order the slots from the query by family/qualifier, exploiting the
-  // know sort order of the columns retrieved from HBase, to avoid family/qualifier comparisons.
+  // know sort order of the columns retrieved from HBase, to avoid family/qualifier
+  // comparisons.
   const vector<SlotDescriptor*>& slots = tuple_desc_->slots();
   sorted_non_key_slots_.reserve(slots.size());
   for (int i = 0; i < slots.size(); ++i) {
@@ -75,7 +77,6 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
   // TODO(marcel): add int tuple_idx_[] indexed by TupleId somewhere in runtime-state.h
   tuple_idx_ = 0;
 
-  hbase_scanner_->set_hbase_conf(reinterpret_cast<jobject>(RuntimeState::hbase_conf()));
   hbase_scanner_->set_num_requested_keyvalues(sorted_non_key_slots_.size());
 
   return Status::OK;

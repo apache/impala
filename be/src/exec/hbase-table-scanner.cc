@@ -65,10 +65,11 @@ void HBaseTableScanner::ScanRange::DebugString(int indentation_level,
   }
 }
 
-HBaseTableScanner::HBaseTableScanner(JNIEnv* env, ScanNode* scan_node)
+HBaseTableScanner::HBaseTableScanner(JNIEnv* env, ScanNode* scan_node,
+    HBaseTableCache* htable_cache)
   : env_(env),
     scan_node_(scan_node),
-    hbase_conf_(NULL),
+    htable_cache_(htable_cache),
     htable_(NULL),
     scan_(NULL),
     resultscanner_(NULL),
@@ -262,11 +263,8 @@ Status HBaseTableScanner::ScanSetup(const TupleDescriptor* tuple_desc,
 
   const HBaseTableDescriptor* hbase_table =
       static_cast<const HBaseTableDescriptor*>(tuple_desc->table_desc());
-  // htable_ = new HTable(hbase_conf_, hbase_table->table_name());
-  // The entire scansetup is spent on The HTable constructor.
-  // TODO: Create and use global cache of HTables.
-  jstring jtable_name = env_->NewStringUTF(hbase_table->table_name().c_str());
-  htable_ = env_->NewObject(htable_cl_, htable_ctor_, hbase_conf_, jtable_name);
+  // Use global cache of HTables.
+  htable_ = htable_cache_->GetHBaseTable(env_, hbase_table->table_name());
   RETURN_ERROR_IF_EXC(env_, JniUtil::throwable_to_string_id());
 
   // Setup an Scan object without the range
@@ -551,9 +549,5 @@ void HBaseTableScanner::Close() {
   if (resultscanner_ != NULL) {
     // resultscanner_.close();
     env_->CallObjectMethod(resultscanner_, resultscanner_close_id_);
-  }
-  if (htable_ != NULL) {
-    // htable_.close();
-    env_->CallObjectMethod(htable_, htable_close_id_);
   }
 }
