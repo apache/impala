@@ -14,6 +14,7 @@
 #include "common/object-pool.h"
 #include "gen-cpp/Descriptors_types.h"
 #include "gen-cpp/PlanNodes_types.h"
+#include "exprs/expr.h"
 
 using namespace llvm;
 using namespace std;
@@ -73,15 +74,59 @@ string TableDescriptor::DebugString() const {
   return out.str();
 }
 
-HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc)
+HdfsPartitionDescriptor::HdfsPartitionDescriptor(const THdfsPartition& thrift_partition,
+    ObjectPool* pool)
+  : line_delim_(thrift_partition.lineDelim),
+    field_delim_(thrift_partition.fieldDelim),
+    collection_delim_(thrift_partition.collectionDelim),
+    escape_char_(thrift_partition.escapeChar),
+    exprs_prepared_(false),
+    file_format_(thrift_partition.fileFormat),
+    object_pool_(pool)  {
+
+  for (int i = 0; i < thrift_partition.partitionKeyExprs.size(); ++i) {
+    Expr* expr;
+    // TODO: Move to dedicated Init method and treat Status return correctly
+    DCHECK(Expr::CreateExprTree(object_pool_,
+        thrift_partition.partitionKeyExprs[i], &expr).ok());
+    partition_key_values_.push_back(expr);
+  }
+}
+
+Status HdfsPartitionDescriptor::PrepareExprs(RuntimeState* state) {
+  if (exprs_prepared_ == false) {
+    // TODO: RowDescriptor should arguably be optional in Prepare for known literals
+    exprs_prepared_ = true;
+    RETURN_IF_ERROR(Expr::Prepare(partition_key_values_, state, RowDescriptor()));
+  }
+  return Status::OK;
+}
+
+string HdfsPartitionDescriptor::DebugString() const {
+  stringstream out;
+  out << " file_format=" << file_format_ << "'"
+      << " line_delim='" << line_delim_ << "'"
+      << " field_delim='" << field_delim_ << "'"
+      << " coll_delim='" << collection_delim_ << "'"
+      << " escape_char='" << escape_char_ << "')";
+  return out.str();
+}
+
+HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc,
+    ObjectPool* pool)
   : TableDescriptor(tdesc),
-    line_delim_(tdesc.hdfsTable.lineDelim),
-    field_delim_(tdesc.hdfsTable.fieldDelim),
-    collection_delim_(tdesc.hdfsTable.collectionDelim),
-    escape_char_(tdesc.hdfsTable.escapeChar),
     hdfs_base_dir_(tdesc.hdfsTable.hdfsBaseDir),
     partition_key_names_(tdesc.hdfsTable.partitionKeyNames),
-    null_partition_key_value_(tdesc.hdfsTable.nullPartitionKeyValue) {
+    null_partition_key_value_(tdesc.hdfsTable.nullPartitionKeyValue),
+    object_pool_(pool) {
+  map<int64_t, THdfsPartition>::const_iterator it;
+  for (it = tdesc.hdfsTable.partitions.begin(); it != tdesc.hdfsTable.partitions.end();
+       ++it) {
+    HdfsPartitionDescriptor* partition = new HdfsPartitionDescriptor(it->second, pool);
+    object_pool_->Add(partition);
+    partition_descriptors_[it->first] =  partition;
+  }
+
 }
 
 string HdfsTableDescriptor::DebugString() const {
@@ -93,11 +138,17 @@ string HdfsTableDescriptor::DebugString() const {
   out << join(partition_key_names_, ":");
 
   out << "]";
-  out << "null_partition_key_value='" << null_partition_key_value_ << "'"
-      << " line_delim='" << line_delim_ << "'"
-      << " field_delim='" << field_delim_ << "'"
-      << " coll_delim='" << collection_delim_ << "'"
-      << " escape_char='" << escape_char_ << "')";
+  out << " partitions=[";
+  vector<string> partition_strings;
+  map<int64_t, HdfsPartitionDescriptor*>::const_iterator it;
+  for (it = partition_descriptors_.begin(); it != partition_descriptors_.end(); ++it) {
+    stringstream s;
+    s << " (id: " << it->first << ", partition: " << it->second->DebugString() << ")";
+    partition_strings.push_back(s.str());
+  }
+  out << join(partition_strings, ",") << "]";
+
+  out << "null_partition_key_value='" << null_partition_key_value_ << "'";
   return out.str();
 }
 
@@ -219,10 +270,8 @@ Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tb
     const TTableDescriptor& tdesc = thrift_tbl.tableDescriptors[i];
     TableDescriptor* desc = NULL;
     switch (tdesc.tableType) {
-      case TTableType::HDFS_TEXT_TABLE:
-      case TTableType::HDFS_RCFILE_TABLE:
-      case TTableType::HDFS_SEQFILE_TABLE:
-        desc = pool->Add(new HdfsTableDescriptor(tdesc));
+      case TTableType::HDFS_TABLE:
+        desc = pool->Add(new HdfsTableDescriptor(tdesc, pool));
         break;
       case TTableType::HBASE_TABLE:
         desc = pool->Add(new HBaseTableDescriptor(tdesc));
@@ -313,11 +362,11 @@ Function* SlotDescriptor::CodegenIsNull(LlvmCodeGen* codegen, StructType* tuple)
   PointerType* tuple_ptr_type = PointerType::get(tuple, 0);
   LlvmCodeGen::FnPrototype prototype(codegen, "IsNull", codegen->GetType(TYPE_BOOLEAN));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("tuple", tuple_ptr_type));
-  
+
   Value* mask = codegen->GetIntConstant(TYPE_TINYINT, null_indicator_offset_.bit_mask);
   Value* zero = codegen->GetIntConstant(TYPE_TINYINT, 0);
   int byte_offset = null_indicator_offset_.byte_offset;
-  
+
   LlvmCodeGen::LlvmBuilder builder(codegen->context());
   Value* tuple_ptr;
   Function* fn = prototype.GeneratePrototype(&builder, &tuple_ptr);
@@ -342,32 +391,32 @@ Function* SlotDescriptor::CodegenIsNull(LlvmCodeGen* codegen, StructType* tuple)
 //   store i8 %0, i8* %null_byte_ptr
 //   ret void
 // }
-Function* SlotDescriptor::CodegenUpdateNull(LlvmCodeGen* codegen, 
+Function* SlotDescriptor::CodegenUpdateNull(LlvmCodeGen* codegen,
     StructType* tuple, bool set_null) {
   if (set_null && set_null_fn_ != NULL) return set_null_fn_;
   if (!set_null && set_not_null_fn_ != NULL) return set_not_null_fn_;
 
   PointerType* tuple_ptr_type = PointerType::get(tuple, 0);
-  LlvmCodeGen::FnPrototype prototype(codegen, (set_null) ? "SetNull" :"SetNotNull", 
+  LlvmCodeGen::FnPrototype prototype(codegen, (set_null) ? "SetNull" :"SetNotNull",
       codegen->void_type());
   prototype.AddArgument(LlvmCodeGen::NamedVariable("tuple", tuple_ptr_type));
-  
+
   LlvmCodeGen::LlvmBuilder builder(codegen->context());
   Value* tuple_ptr;
   Function* fn = prototype.GeneratePrototype(&builder, &tuple_ptr);
-  
-  Value* null_byte_ptr = 
+
+  Value* null_byte_ptr =
       builder.CreateStructGEP(
           tuple_ptr, null_indicator_offset_.byte_offset, "null_byte_ptr");
   Value* null_byte = builder.CreateLoad(null_byte_ptr, "null_byte");
   Value* result = NULL;
-  
+
   if (set_null) {
     Value* null_set = codegen->GetIntConstant(
         TYPE_TINYINT, null_indicator_offset_.bit_mask);
     result = builder.CreateOr(null_byte, null_set);
   } else {
-    Value* null_clear_val = 
+    Value* null_clear_val =
         codegen->GetIntConstant(TYPE_TINYINT, ~null_indicator_offset_.bit_mask);
     result = builder.CreateAnd(null_byte, null_clear_val);
   }
@@ -399,21 +448,21 @@ StructType* TupleDescriptor::GenerateLlvmStruct(LlvmCodeGen* codegen) {
     struct_fields[i] = codegen->GetType(TYPE_TINYINT);
   }
 
-  // Add the slot types to the struct description.  
+  // Add the slot types to the struct description.
   for (int i = 0; i < slots().size(); ++i) {
     SlotDescriptor* slot_desc = slots()[i];
     if (slot_desc->is_materialized()) {
       slot_desc->field_idx_ = slot_desc->slot_idx_ + num_null_bytes_;
       DCHECK_LT(slot_desc->field_idx(), struct_fields.size());
       struct_fields[slot_desc->field_idx()] = codegen->GetType(slot_desc->type());
-    } 
+    }
   }
 
   // Construct the struct type.
-  StructType* tuple_struct = StructType::get(codegen->context(), 
+  StructType* tuple_struct = StructType::get(codegen->context(),
       ArrayRef<Type*>(struct_fields));
 
-  // Verify the alignment is correct.  It is essential that the layout matches 
+  // Verify the alignment is correct.  It is essential that the layout matches
   // identically.  If the layout does not match, return NULL indicating the
   // struct could not be codegen'd.  This will trigger codegen for anything using
   // the tuple to be disabled.

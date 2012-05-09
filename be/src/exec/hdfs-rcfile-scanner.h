@@ -220,8 +220,8 @@ class HdfsRCFileScanner : public HdfsScanner {
   virtual ~HdfsRCFileScanner();
   virtual Status GetNext(RowBatch* row_batch, bool* eos);
   virtual Status Prepare();
-  virtual Status InitCurrentScanRange(HdfsScanRange* scan_range, Tuple* template_tuple,
-                                      ByteStream* byte_stream);
+  virtual Status InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
+      HdfsScanRange* scan_range, Tuple* template_tuple, ByteStream* byte_stream);
 
   void DebugString(int indentation_level, std::stringstream* out) const;
 

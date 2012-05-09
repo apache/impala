@@ -47,21 +47,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       current_byte_stream_(NULL),
       template_tuple_(NULL),
       partition_key_pool_(new MemPool()),
-      plan_node_type_(tnode.node_type) {
-  Status status = InitRegex(pool, tnode);
-  DCHECK(status.ok()) << "HdfsScanNode c'tor:Init failed: \n" << status.GetErrorMsg();
-}
-
-Status HdfsScanNode::InitRegex(ObjectPool* pool, const TPlanNode& tnode) {
-  try {
-    partition_key_regex_ = regex(tnode.hdfs_scan_node.partition_key_regex);
-  } catch(bad_expression&) {
-    stringstream ss;
-    ss << "HdfsScanNode::Init(): "
-       << "Invalid regex: " << tnode.hdfs_scan_node.partition_key_regex;
-    return Status(ss.str());
-  }
-  return Status::OK;
+      num_partition_keys_(0) {
 }
 
 Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
@@ -102,7 +88,7 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   return Status::OK;
 }
 
-void HdfsScanNode::SetScanRange(const TScanRange& scan_range) {
+Status HdfsScanNode::SetScanRange(const TScanRange& scan_range) {
   DCHECK(scan_range.__isset.hdfsFileSplits);
   for (int i = 0; i < scan_range.hdfsFileSplits.size(); ++i) {
     const THdfsFileSplit& split = scan_range.hdfsFileSplits[i];
@@ -110,8 +96,11 @@ void HdfsScanNode::SetScanRange(const TScanRange& scan_range) {
     if (per_file_scan_ranges_.find(path) == per_file_scan_ranges_.end()) {
       per_file_scan_ranges_[path] = vector<HdfsScanRange>();
     }
-    per_file_scan_ranges_[path].push_back(HdfsScanRange(split.offset, split.length));
+
+    per_file_scan_ranges_[path].push_back(HdfsScanRange(split));
   }
+
+  return Status::OK;
 }
 
 Status HdfsScanNode::InitNextScanRange(RuntimeState* state, bool* scan_ranges_finished) {
@@ -130,43 +119,53 @@ Status HdfsScanNode::InitNextScanRange(RuntimeState* state, bool* scan_ranges_fi
       return Status::OK; // We're done; caller will check for this condition and exit
     }
   }
-  RETURN_IF_ERROR(ExtractPartitionKeyValues(state));
+
+  HdfsScanRange& range = current_file_scan_ranges_->second[current_range_idx_];
+  HdfsPartitionDescriptor* partition = hdfs_table_->GetPartition(range.partition_id_);
+
+  if (partition == NULL) {
+    stringstream ss;
+    ss << "Could not find partition with id: " << range.partition_id_;
+    return Status(ss.str());
+  }
+
+
+  RETURN_IF_ERROR(partition->PrepareExprs(state));
+  InitTemplateTuple(state, partition->partition_key_values());
 
   if (current_byte_stream_ == NULL) {
     current_byte_stream_.reset(new HdfsByteStream(hdfs_connection_, this));
     RETURN_IF_ERROR(current_byte_stream_->Open(current_file_scan_ranges_->first));
 
-    ScannerMap::const_iterator iter = scanner_map_.find(plan_node_type_);
+    ScannerMap::const_iterator iter = scanner_map_.find(partition->file_format());
     if (iter == scanner_map_.end()) {
-      switch (plan_node_type_) {
-        case TPlanNodeType::HDFS_TEXT_SCAN_NODE:
-          current_scanner_ = new HdfsTextScanner(this, state, 
-                                                 template_tuple_, tuple_pool_.get());
+      switch (partition->file_format()) {
+        case THdfsFileFormat::TEXT:
+          current_scanner_ = new HdfsTextScanner(this, state, template_tuple_, 
+              tuple_pool_.get());
           break;
-        case TPlanNodeType::HDFS_SEQFILE_SCAN_NODE:
-          current_scanner_ = new HdfsSequenceScanner(this, state, 
-                                                     template_tuple_, tuple_pool_.get()); 
+        case THdfsFileFormat::SEQUENCE_FILE:
+          current_scanner_ = new HdfsSequenceScanner(this, state, template_tuple_, 
+              tuple_pool_.get());
           break;
-        case TPlanNodeType::HDFS_RCFILE_SCAN_NODE:
-          current_scanner_ = new HdfsRCFileScanner(this, state, 
-                                                   template_tuple_, tuple_pool_.get());
+        case THdfsFileFormat::RC_FILE:
+          current_scanner_ = new HdfsRCFileScanner(this, state, template_tuple_, 
+              tuple_pool_.get());
           break;
-        default:
-          return Status("Unknown plan node type");
-      }
+      default:
+        return Status("Unknown Hdfs file format type");
+     }
       scanner_pool_->Add(current_scanner_);
       RETURN_IF_ERROR(current_scanner_->Prepare());
-      scanner_map_[plan_node_type_] = current_scanner_;
+      scanner_map_[partition->file_format()] = current_scanner_;
     } else {
       current_scanner_ = iter->second;
     }
     DCHECK(current_scanner_ != NULL);
   }
 
-  HdfsScanRange& range = current_file_scan_ranges_->second[current_range_idx_];
-  RETURN_IF_ERROR(
-      current_scanner_->InitCurrentScanRange(&range, template_tuple_, 
-          current_byte_stream_.get()));
+  RETURN_IF_ERROR(current_scanner_->InitCurrentScanRange(partition, &range, 
+      template_tuple_, current_byte_stream_.get()));
   return Status::OK;
 }
 
@@ -186,19 +185,17 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   memory_used_counter_ =
       ADD_COUNTER(runtime_profile_, "MemoryUsed", TCounterType::BYTES);
 
-  const HdfsTableDescriptor* hdfs_table =
-    static_cast<const HdfsTableDescriptor*>(tuple_desc_->table_desc());
+  hdfs_table_ = static_cast<const HdfsTableDescriptor*>(tuple_desc_->table_desc());
 
   // Create mapping from column index in table to slot index in output tuple.
   // First, initialize all columns to SKIP_COLUMN.
-  int num_cols = hdfs_table->num_cols();
+  int num_cols = hdfs_table_->num_cols();
   column_idx_to_materialized_slot_idx_.resize(num_cols);
   for (int i = 0; i < num_cols; ++i) {
     column_idx_to_materialized_slot_idx_[i] = SKIP_COLUMN;
   }
 
-  num_partition_keys_ = hdfs_table->num_clustering_cols();
-
+  num_partition_keys_ = hdfs_table_->num_clustering_cols();
 
   // Next, collect all materialized (partition key and not) slots
   vector<SlotDescriptor*> all_materialized_slots;
@@ -216,7 +213,7 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   for (int i = 0; i < num_cols; ++i) {
     SlotDescriptor* slot_desc = all_materialized_slots[i];
     if (slot_desc == NULL) continue;
-    if (hdfs_table->IsClusteringCol(slot_desc)) {
+    if (hdfs_table_->IsClusteringCol(slot_desc)) {
       partition_key_slots_.push_back(slot_desc);
     } else {
       DCHECK_GE(i, num_partition_keys_);
@@ -228,58 +225,21 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   return Status::OK;
 }
 
-Status HdfsScanNode::ExtractPartitionKeyValues(RuntimeState* state) {
-  if (num_partition_keys() == 0) return Status::OK;
-
-  const string& file = current_file_scan_ranges_->first;
-  
-  // If there are partition keys we need to materialize, allocate a template 
-  // partition key tuple
+void HdfsScanNode::InitTemplateTuple(RuntimeState* state,
+    const vector<Expr*>& expr_values) {
   if (materialized_slots().empty() || template_tuple_ == NULL) {
     template_tuple_ =
-        reinterpret_cast<Tuple*>(partition_key_pool_->Allocate(tuple_desc_->byte_size()));
+      reinterpret_cast<Tuple*>(partition_key_pool_->Allocate(tuple_desc_->byte_size()));
+    memset(template_tuple_, 0, tuple_desc_->byte_size());
   }
 
-  memset(template_tuple_, 0, tuple_desc_->byte_size());
+  for (int i = 0; i < partition_key_slots_.size(); ++i) {
+    const SlotDescriptor* slot_desc = partition_key_slots_[i];
 
-  smatch match;
-  if (boost::regex_search(file, match, partition_key_regex_)) {
-    for (int i = 0; i < partition_key_slots_.size(); ++i) {
-      const SlotDescriptor* slot_desc = partition_key_slots_[i];
-      int regex_idx = slot_desc->col_pos() + 1; // match[0] is input string
-      PrimitiveType type = slot_desc->type();
-      const string& string_value = match[regex_idx];
-
-      // Populate a template tuple with just the partition key values. Separate handling
-      // of the string and other types saves an allocation and copy.
-      const void* value = NULL;
-      ExprValue expr_value;
-      if (type == TYPE_STRING) {
-        expr_value.string_val.ptr = const_cast<char*>(string_value.c_str());
-        expr_value.string_val.len = string_value.size();
-        value = reinterpret_cast<void*>(&expr_value.string_val);
-      } else {
-        // TODO: Check if string_value == hive null partition key
-        // Waiting on completion of NullLiteral to do this.
-        value = expr_value.TryParse(string_value, type);
-      }
-      if (value == NULL) {
-        stringstream ss;
-        ss << "file name'" << file << "' does not have the correct format. "
-           << "Partition key: " << string_value << " is not of type: "
-           << TypeToString(type);
-        return Status(ss.str());
-      }
-
-      RawValue::Write(value, template_tuple_, slot_desc, partition_key_pool_.get());
-    }
-    return Status::OK;
+    // Exprs guaranteed to be literals, so can safely be evaluated without a row context
+    void* value = expr_values[slot_desc->col_pos()]->GetValue(NULL);
+    RawValue::Write(value, template_tuple_, slot_desc, NULL);
   }
-
-  stringstream ss;
-  ss << "file name '" << file << "' "
-     << "does not match partition key regex (" << partition_key_regex_ << ")";
-  return Status(ss.str());
 }
 
 Status HdfsScanNode::Open(RuntimeState* state) {

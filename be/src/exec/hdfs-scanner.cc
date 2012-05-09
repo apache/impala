@@ -71,9 +71,8 @@ void HdfsScanner::AllocateTupleBuffer(RowBatch* row_batch) {
   }
 }
 
-Status HdfsScanner::InitCurrentScanRange(HdfsScanRange* range,
-                                         Tuple* template_tuple,
-                                         ByteStream* byte_stream) {
+Status HdfsScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
+    HdfsScanRange* range, Tuple* template_tuple, ByteStream* byte_stream) {
   // There is only one case where the scanner would get a new template_tuple
   // memory location.  Most of the time, the template_tuple is copied into
   // the tuple being materialized so the template tuple memory can be reused.  

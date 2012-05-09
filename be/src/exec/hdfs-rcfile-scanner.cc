@@ -99,10 +99,11 @@ Status HdfsRCFileScanner::Prepare() {
   return Status::OK;
 }
 
-Status HdfsRCFileScanner::InitCurrentScanRange(HdfsScanRange* scan_range, 
-    Tuple* template_tuple, ByteStream* current_byte_stream_) {
-  HdfsScanner::InitCurrentScanRange(scan_range, template_tuple, current_byte_stream_);
-  end_of_scan_range_ = scan_range->length + scan_range->offset;
+Status HdfsRCFileScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
+    HdfsScanRange* scan_range, Tuple* template_tuple, ByteStream* current_byte_stream_) {
+  RETURN_IF_ERROR(HdfsScanner::InitCurrentScanRange(hdfs_partition, scan_range, 
+      template_tuple, current_byte_stream_));
+  end_of_scan_range_ = scan_range->length_ + scan_range->offset_;
 
   // Check the Location (file name) to see if we have changed files.
   // If this a new file then we need to read and process the header.
@@ -114,8 +115,8 @@ Status HdfsRCFileScanner::InitCurrentScanRange(HdfsScanRange* scan_range,
 
   // Offset may not point to row group boundary so we need to search for the next
   // sync block.
-  if (scan_range->offset != 0) {
-    RETURN_IF_ERROR(current_byte_stream_->Seek(scan_range->offset));
+  if (scan_range->offset_ != 0) {
+    RETURN_IF_ERROR(current_byte_stream_->Seek(scan_range->offset_));
     {
       COUNTER_SCOPED_TIMER(scan_node_->parse_time_counter());
       RETURN_IF_ERROR(find_first_parser_->FindSyncBlock(end_of_scan_range_,

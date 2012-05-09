@@ -840,3 +840,7 @@ LIKE AllTypesAggMultiFilesNoPart_seq;
 DROP TABLE IF EXISTS AllTypesAggMultiFilesNoPart_seq_record_snap;
 CREATE TABLE AllTypesAggMultiFilesNoPart_seq_record_snap
 LIKE AllTypesAggMultiFilesNoPart_seq;
+
+DROP TABLE IF EXISTS AllTypesMixedFormat;
+CREATE TABLE AllTypesMixedFormat
+LIKE AllTypes;

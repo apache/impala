@@ -113,9 +113,7 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
                             const DescriptorTbl& descs, ExecNode** node) {
   std::stringstream error_msg;
   switch (tnode.node_type) {
-    case TPlanNodeType::HDFS_TEXT_SCAN_NODE:
-    case TPlanNodeType::HDFS_RCFILE_SCAN_NODE:
-    case TPlanNodeType::HDFS_SEQFILE_SCAN_NODE:
+    case TPlanNodeType::HDFS_SCAN_NODE:
       *node = pool->Add(new HdfsScanNode(pool, tnode, descs));
       return Status::OK;
     case TPlanNodeType::HBASE_SCAN_NODE:

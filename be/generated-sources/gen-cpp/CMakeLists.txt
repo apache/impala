@@ -32,6 +32,7 @@ set(SRC_FILES
   RuntimeProfile_types.cpp
   Types_constants.cpp
   Types_types.cpp
+  JavaConstants_constants.cpp
   )
 
 # keep everything in one library, the object files reference 

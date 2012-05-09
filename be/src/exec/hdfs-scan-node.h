@@ -27,12 +27,17 @@ class DescriptorTbl;
 class ByteStream;
 
 struct HdfsScanRange {
-  int offset;
-  int length;
+  int offset_;
+  int length_;
 
-  HdfsScanRange(int o, int l) {
-    offset = o;
-    length = l;
+  // Index into map of partitions in the related HdfsTableDescriptor
+  // May not be unique across tables.
+  int64_t partition_id_;
+
+  HdfsScanRange(const THdfsFileSplit& file_split)
+    : offset_(file_split.offset),
+      length_(file_split.length),
+      partition_id_(file_split.partitionId) {
   }
 };
 
@@ -58,7 +63,7 @@ class HdfsScanNode : public ScanNode {
 
   // ScanNode methods
 
-  virtual void SetScanRange(const TScanRange& scan_range);
+  virtual Status SetScanRange(const TScanRange& scan_range);
 
   // Public so the scanner can call this.
   bool EvalConjunctsForScanner(TupleRow* row) { return EvalConjuncts(row); }
@@ -104,6 +109,10 @@ class HdfsScanNode : public ScanNode {
   // Descriptor for tuples this scan node constructs
   const TupleDescriptor* tuple_desc_;
 
+  // Descriptor for the hdfs table, including partition and format metadata.
+  // Set in Prepare, owned by RuntimeState
+  const HdfsTableDescriptor* hdfs_table_;
+
   // Mem pool for tuple buffer data. Used by scanners for allocation,
   // but owned here.
   boost::scoped_ptr<MemPool> tuple_pool_;
@@ -125,7 +134,7 @@ class HdfsScanNode : public ScanNode {
 
   // Map of HdfsScanner objects to file types.  Only one scanner object will be
   // created for each file type.  Objects stored in scanner_pool_.
-  typedef std::map<TPlanNodeType::type, HdfsScanner*> ScannerMap;
+  typedef std::map<THdfsFileFormat::type, HdfsScanner*> ScannerMap;
   ScannerMap scanner_map_;
 
   // Pool for storing allocated scanner objects.  We don't want to use the 
@@ -167,13 +176,6 @@ class HdfsScanNode : public ScanNode {
   // These descriptors are sorted in order of increasing col_pos
   std::vector<SlotDescriptor*> partition_key_slots_;
 
-  // Used to determine what kind of scanner to create. Will be
-  // replaced by per-partition metadata.
-  TPlanNodeType::type plan_node_type_;
-
-  // Regular expressions to evaluate over file paths to extract partition key values
-  boost::regex partition_key_regex_;
-
   // Hdfs specific counter
   RuntimeProfile::Counter* parse_time_counter_;       // time parsing files
 
@@ -184,9 +186,10 @@ class HdfsScanNode : public ScanNode {
   // stream and to call the same method on the current scanner.
   Status InitNextScanRange(RuntimeState* state, bool* scan_ranges_finished);
 
-  Status ExtractPartitionKeyValues(RuntimeState* state);
+  // Allocates and initialises template_tuple_ with any values from
+  // the partition columns for the current scan range
+  void InitTemplateTuple(RuntimeState* state, const std::vector<Expr*>& expr_values);
 
-  Status InitRegex(ObjectPool* pool, const TPlanNode& tnode);
 };
 
 }

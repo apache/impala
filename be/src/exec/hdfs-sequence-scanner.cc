@@ -12,6 +12,7 @@
 #include "exec/buffered-byte-stream.h"
 #include "util/decompress.h"
 #include "exec/text-converter.inline.h"
+#include "runtime/descriptors.h"
 #include <glog/logging.h>
 
 using namespace std;
@@ -30,8 +31,8 @@ const int HdfsSequenceScanner::SEQFILE_KEY_LENGTH = 4;
 
 static const uint8_t SEQUENCE_FILE_RECORD_DELIMITER = 0xff;
 
-HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state,
-                                         Tuple* template_tuple, MemPool* tuple_pool)
+HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state, 
+    Tuple* template_tuple, MemPool* tuple_pool) 
     : HdfsScanner(scan_node, state, template_tuple, tuple_pool),
       delimited_text_parser_(NULL),
       text_converter_(NULL),
@@ -39,14 +40,6 @@ HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* 
       unparsed_data_buffer_(NULL),
       unparsed_data_buffer_size_(0),
       num_buffered_records_in_compressed_block_(0) {
-  const HdfsTableDescriptor* hdfs_table =
-    reinterpret_cast<const HdfsTableDescriptor*>(scan_node->tuple_desc()->table_desc());
-
-  text_converter_.reset(new TextConverter(hdfs_table->escape_char(), tuple_pool_));
-
-  delimited_text_parser_.reset(new DelimitedTextParser(scan_node, '\0',
-      hdfs_table->field_delim(), hdfs_table->collection_delim(),
-      hdfs_table->escape_char()));
   // use the parser to find bytes that are -1
   find_first_parser_.reset(new DelimitedTextParser(scan_node, 
       SEQUENCE_FILE_RECORD_DELIMITER));
@@ -68,12 +61,18 @@ Status HdfsSequenceScanner::Prepare() {
   return Status::OK;
 }
 
-Status HdfsSequenceScanner::InitCurrentScanRange(HdfsScanRange* scan_range,
-                                                 Tuple* template_tuple,
-                                                 ByteStream* byte_stream) {
-  RETURN_IF_ERROR(
-      HdfsScanner::InitCurrentScanRange(scan_range, template_tuple, byte_stream));
-  end_of_scan_range_ = scan_range->length + scan_range->offset;
+Status HdfsSequenceScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
+    HdfsScanRange* scan_range, Tuple* template_tuple, ByteStream* byte_stream) {                       
+  RETURN_IF_ERROR(HdfsScanner::InitCurrentScanRange(hdfs_partition, scan_range, 
+      template_tuple, byte_stream));
+
+  text_converter_.reset(new TextConverter(hdfs_partition->escape_char(), tuple_pool_));
+
+  delimited_text_parser_.reset(new DelimitedTextParser(scan_node_, '\0',
+      hdfs_partition->field_delim(), hdfs_partition->collection_delim(),
+      hdfs_partition->escape_char()));
+
+  end_of_scan_range_ = scan_range->length_ + scan_range->offset_;
   unbuffered_byte_stream_ = byte_stream;
 
   // If the file is blocked-compressed then we don't want to double buffer
@@ -99,8 +98,8 @@ Status HdfsSequenceScanner::InitCurrentScanRange(HdfsScanRange* scan_range,
   delimited_text_parser_->ParserReset();
 
   // Offset may not point to record boundary
-  if (scan_range->offset != 0) {
-    RETURN_IF_ERROR(unbuffered_byte_stream_->Seek(scan_range->offset));
+  if (scan_range->offset_ != 0) {
+    RETURN_IF_ERROR(unbuffered_byte_stream_->Seek(scan_range->offset_));
     RETURN_IF_ERROR(find_first_parser_->FindSyncBlock(end_of_scan_range_,
         SYNC_HASH_SIZE, sync_, unbuffered_byte_stream_));
     buffered_byte_stream_->SeekToParent();

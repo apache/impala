@@ -2,6 +2,7 @@
 
 package com.cloudera.impala.catalog;
 
+import static com.cloudera.impala.thrift.Constants.DEFAULT_PARTITION_ID;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
@@ -276,28 +277,32 @@ public class CatalogTest {
 
   @Test public void TestPartitions() {
     HdfsTable table = (HdfsTable) catalog.getDb("default").getTable("AllTypes");
-    List<HdfsTable.Partition> partitions = table.getPartitions();
+    List<HdfsPartition> partitions = table.getPartitions();
 
     // check that partition keys cover the date range 1/1/2009-12/31/2010
-    // and that we have one file per partition
-    assertEquals(partitions.size(), 24);
+    // and that we have one file per partition, plus the default partition
+    assertEquals(25, partitions.size());
     Set<Long> months = Sets.newHashSet();
-    for (HdfsTable.Partition p: partitions) {
-      assertEquals(p.keyValues.size(), 2);
+    for (HdfsPartition p: partitions) {
+      if (p.getId() == DEFAULT_PARTITION_ID) {
+        continue;
+      }
 
-      LiteralExpr key1Expr = p.keyValues.get(0);
+      assertEquals(2, p.getPartitionValues().size());
+
+      LiteralExpr key1Expr = p.getPartitionValues().get(0);
       assertTrue(key1Expr instanceof IntLiteral);
       long key1 = ((IntLiteral) key1Expr).getValue();
       assertTrue(key1 == 2009 || key1 == 2010);
 
-      LiteralExpr key2Expr = p.keyValues.get(1);
+      LiteralExpr key2Expr = p.getPartitionValues().get(1);
       assertTrue(key2Expr instanceof IntLiteral);
       long key2 = ((IntLiteral) key2Expr).getValue();
       assertTrue(key2 >= 1 && key2 <= 12);
 
       months.add(key1 * 100 + key2);
 
-      assertEquals(p.filePaths.size(), 1);
+      assertEquals(p.getFileDescriptors().size(), 1);
     }
     assertEquals(months.size(), 24);
   }

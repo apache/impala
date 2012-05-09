@@ -2,6 +2,7 @@
 
 package com.cloudera.impala.service;
 
+import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -32,6 +33,7 @@ import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.thrift.TColumnValue;
@@ -259,7 +261,8 @@ public class Executor {
    * are created in the metastore; existing partitions are not affected.
    */
   private void updateMetastore(InsertResult insertResult, InsertStmt insertStmt)
-      throws MetaException, TException, NoSuchObjectException, InvalidObjectException {
+      throws MetaException, TException, NoSuchObjectException, InvalidObjectException,
+      IOException, InvalidStorageDescriptorException {
     // Only update Metastore for Hdfs tables.
     if (!(insertStmt.getTargetTable() instanceof HdfsTable)) {
       LOG.warn("Unexpected table type in updateMetastore: "

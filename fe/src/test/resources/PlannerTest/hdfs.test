@@ -31,7 +31,6 @@ select * from alltypes
 ---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -68,7 +67,6 @@ Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -103,7 +101,6 @@ select * from alltypes where year = 2009
 ---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -128,7 +125,6 @@ Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -151,7 +147,6 @@ select * from alltypes where year = 2009.0
 ---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -176,7 +171,6 @@ Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -198,7 +192,6 @@ select * from alltypes where 2009 = year
 ---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -223,7 +216,6 @@ Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -245,7 +237,6 @@ select * from alltypes where 2009.0 = year
 ---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -270,7 +261,6 @@ Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -293,7 +283,6 @@ select * from alltypes where month=1
 ---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -308,7 +297,6 @@ Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -321,7 +309,6 @@ select * from alltypes where year=2009 and month=1
 ---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -335,7 +322,6 @@ Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -347,7 +333,6 @@ select * from alltypes where year=2009 and month > 6
 ---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -366,7 +351,6 @@ Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -382,7 +366,6 @@ select * from alltypes where year=2009 and month < 6
 ---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -400,7 +383,6 @@ Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -416,7 +398,6 @@ select * from alltypes where year<=2009 and month < 6
 ---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -434,7 +415,6 @@ Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -450,7 +430,6 @@ select * from alltypes where month < 9 and month > 6
 ---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -467,7 +446,6 @@ Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -483,7 +461,6 @@ select * from alltypes where year < 2010 and year < 2009 and month > 6
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
     PREDICATES: year < 2009
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -503,7 +480,6 @@ Plan Fragment 1
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
     PREDICATES: year < 2009
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -521,7 +497,6 @@ select * from alltypes where year < 2010 and month > 6 and month > 8
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
     PREDICATES: month > 8
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -541,7 +516,6 @@ Plan Fragment 1
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
     PREDICATES: month > 8
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -559,7 +533,6 @@ select * from alltypes where year - 1 = 2009
 Plan Fragment 0
   SCAN HDFS table=default.alltypes (0)
     PREDICATES: year - 1 = 2009
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -597,7 +570,6 @@ Plan Fragment 1
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
     PREDICATES: year - 1 = 2009
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -662,7 +634,6 @@ select * from alltypesaggmultifiles where day<=2
 ---- PLAN
 Plan Fragment 0
   SCAN HDFS table=default.alltypesaggmultifiles (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -683,7 +654,6 @@ Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypesaggmultifiles (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
 
   EXEC PARAMS
     HOST: 

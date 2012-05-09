@@ -238,7 +238,7 @@ void HBaseScanNode::DebugString(int indentation_level, stringstream* out) const 
   }
 }
 
-void HBaseScanNode::SetScanRange(const TScanRange& scan_range) {
+Status HBaseScanNode::SetScanRange(const TScanRange& scan_range) {
   DCHECK(scan_range.__isset.hbaseKeyRanges);
   for(int i = 0; i < scan_range.hbaseKeyRanges.size(); i++) {
     const THBaseKeyRange& key_range = scan_range.hbaseKeyRanges[i];
@@ -251,4 +251,6 @@ void HBaseScanNode::SetScanRange(const TScanRange& scan_range) {
       sr.set_stop_key(key_range.stopKey);
     }
   }
+
+  return Status::OK;
 }

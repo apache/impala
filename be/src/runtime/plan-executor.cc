@@ -43,7 +43,7 @@ PlanExecutor::~PlanExecutor() {
 
 Status PlanExecutor::Prepare(
     const TPlanExecRequest& request, const TPlanExecParams& params) {
-  
+
   //VLOG(1) << "plan exec request:\n" << ThriftDebugString(request);
   VLOG(1) << "params:\n" << ThriftDebugString(params);
 
@@ -77,7 +77,8 @@ Status PlanExecutor::Prepare(
   for (int i = 0; i < scan_nodes.size(); ++i) {
     for (int j = 0; j < params.scanRanges.size(); ++j) {
       if (scan_nodes[i]->id() == params.scanRanges[j].nodeId) {
-         static_cast<ScanNode*>(scan_nodes[i])->SetScanRange(params.scanRanges[j]);
+        RETURN_IF_ERROR(static_cast<ScanNode*>(
+            scan_nodes[i])->SetScanRange(params.scanRanges[j]));
       }
     }
   }

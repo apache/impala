@@ -6,10 +6,8 @@ namespace java com.cloudera.impala.thrift
 include "Exprs.thrift"
 include "Types.thrift"
 
-enum TPlanNodeType {
-  HDFS_TEXT_SCAN_NODE,
-  HDFS_RCFILE_SCAN_NODE,
-  HDFS_SEQFILE_SCAN_NODE,
+enum TPlanNodeType {  
+  HDFS_SCAN_NODE,
   HBASE_SCAN_NODE,
   HASH_JOIN_NODE,
   AGGREGATION_NODE,
@@ -25,7 +23,6 @@ enum TPlanNodeType {
 //   all plan fragments
 
 // Specification of subsection of a single hdfs file.
-// TODO: also specify file format, to support multi-format table partitions
 struct THdfsFileSplit {
   // file path
   1: required string path
@@ -35,6 +32,10 @@ struct THdfsFileSplit {
 
   // length of split
   3: required i64 length
+
+  // ID of partition in parentTHdfsScanNode. Meaningful only
+  // in the context of a single THdfsScanNode, may not be unique elsewhere.
+  4: required i64 partitionId
 }
 
 // key range for single THBaseScanNode
@@ -62,8 +63,6 @@ struct TScanRange {
 
 struct THdfsScanNode {
   1: required Types.TTupleId tuple_id
-  // Regex to be evaluated over filepath to extract partition key values
-  2: required string partition_key_regex
 }
 
 struct THBaseFilter {

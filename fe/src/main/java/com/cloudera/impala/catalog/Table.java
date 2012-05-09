@@ -85,18 +85,15 @@ public abstract class Table {
                            String tblName) {
     // turn all exceptions into unchecked exception
     try {
-      org.apache.hadoop.hive.metastore.api.Table msTbl = client.getTable(db.getName(), tblName);
+      org.apache.hadoop.hive.metastore.api.Table msTbl =
+          client.getTable(db.getName(), tblName);
 
       // Determine the table type
       Table table = null;
       if (HBaseTable.isHBaseTable(msTbl)) {
         table = new HBaseTable(id, db, tblName, msTbl.getOwner());
-      } else if (HdfsTextTable.isTextTable(msTbl)) {
-        table = new HdfsTextTable(id, db, tblName, msTbl.getOwner());
-      } else if (HdfsRCFileTable.isRCFileTable(msTbl)) {
-        table = new HdfsRCFileTable(id, db, tblName, msTbl.getOwner());
-      } else if (HdfsSeqFileTable.isSeqFileTable(msTbl)) {
-        table = new HdfsSeqFileTable(id, db, tblName, msTbl.getOwner());
+      } else if (HdfsTable.isHdfsTable(msTbl)) {
+        table = new HdfsTable(id, db, tblName, msTbl.getOwner());
       } else {
         throw new UnsupportedOperationException("Unrecognized table type");
       }

@@ -4,6 +4,7 @@ namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
 include "Types.thrift"
+include "Exprs.thrift"
 
 struct TSlotDescriptor {
   1: required Types.TSlotId id
@@ -18,10 +19,24 @@ struct TSlotDescriptor {
 }
 
 enum TTableType {
-  HDFS_TEXT_TABLE,
-  HDFS_RCFILE_TABLE,
-  HDFS_SEQFILE_TABLE,
+  HDFS_TABLE,
   HBASE_TABLE
+}
+
+enum THdfsFileFormat {
+  TEXT,
+  RC_FILE,
+  SEQUENCE_FILE
+}
+
+struct THdfsPartition {
+  1: required byte lineDelim
+  2: required byte fieldDelim
+  3: required byte collectionDelim
+  4: required byte mapKeyDelim
+  5: required byte escapeChar
+  6: required THdfsFileFormat fileFormat
+  7: list<Exprs.TExpr> partitionKeyExprs 
 }
 
 struct THdfsTable {
@@ -31,12 +46,9 @@ struct THdfsTable {
   // TTableDescriptor, so there should be an equal number of each.
   2: required list<string> partitionKeyNames
   3: required string nullPartitionKeyValue
-  4: required byte lineDelim
-  5: required byte fieldDelim
-  6: required byte collectionDelim
-  7: required byte mapKeyDelim
-  8: required byte escapeChar
-  9: optional byte quoteChar
+
+  // map from partition id to partition metadata
+  4: required map<i64, THdfsPartition> partitions
 }
 
 struct THBaseTable {

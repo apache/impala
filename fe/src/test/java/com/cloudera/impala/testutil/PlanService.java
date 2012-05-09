@@ -86,12 +86,12 @@ public class PlanService {
       try {
         request = planner.createPlanFragments(analysisResult, numNodes, explainString);
       } catch (NotImplementedException e) {
-        throw new TException(e.getMessage());
+        throw new TException(e);
       } catch (InternalException e) {
-        throw new TException(e.getMessage());
+        throw new TException(e);
       } catch (Exception e) {
         System.out.println(e.getMessage());
-        throw new TException(e.getMessage());
+        throw new TException(e);
       }
 
       UUID queryId = new UUID(nextQueryId++, 0);

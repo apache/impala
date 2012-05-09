@@ -163,7 +163,7 @@ class Expr {
 
   // Prepare expr tree for evaluation, setting the compute_fn_ for each node
   // in the tree. If codegen is enabled, this function will also codegen each node
-  // in the expr tree.  
+  // in the expr tree.
   static Status Prepare(Expr* root, RuntimeState* state, const RowDescriptor& row_desc);
 
   // Prepare all exprs.
@@ -205,17 +205,17 @@ class Expr {
   // This function will codegen a call instruction, a branch to check for null and a
   // jump to either the null or non-null block.
   // Returns the result of the compute function (only valid in non-null branch).
-  // - caller: the code block from the calling function.  A call instruction will be 
+  // - caller: the code block from the calling function.  A call instruction will be
   //   added to the end of the block.
   // - args: args to call this compute function with
   // - null_block: block in caller function to jump to if the child is null
   // - not_null_block: block in caller function to jump to if the child is not null
   llvm::Value* CodegenGetValue(LlvmCodeGen* codegen, llvm::BasicBlock* caller,
       llvm::Value** args, llvm::BasicBlock* null_block, llvm::BasicBlock* not_null_block);
-  
-  // This is a wrapper around CodegenGetValue() that is used by a parent Expr node to 
+
+  // This is a wrapper around CodegenGetValue() that is used by a parent Expr node to
   // call a child.  The parent args are used to call the child function.
-  llvm::Value* CodegenGetValue(LlvmCodeGen* codegen, llvm::BasicBlock* parent, 
+  llvm::Value* CodegenGetValue(LlvmCodeGen* codegen, llvm::BasicBlock* parent,
       llvm::BasicBlock* null_block, llvm::BasicBlock* not_null_block);
 
   // Returns the llvm return type for this expr
@@ -265,7 +265,7 @@ class Expr {
   // TODO: not implemented, always 0
   int scratch_buffer_size_;
 
-  // Create a compute function prototype.  
+  // Create a compute function prototype.
   // The signature is:
   // <expr ret type> ComputeFn(TupleRow* row, char* state_data, bool* is_null)
   llvm::Function* CreateComputeFnPrototype(LlvmCodeGen* codegen, const std::string& name);

@@ -137,8 +137,8 @@ namespace impala {
 
 class HdfsSequenceScanner : public HdfsScanner {
  public:
-  HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state,
-                      Tuple* template_tuple, MemPool* tuple_pool);
+  HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state, 
+      Tuple* template_tuple, MemPool* tuple_pool);
 
   virtual ~HdfsSequenceScanner();
   virtual Status Prepare();
@@ -169,8 +169,8 @@ class HdfsSequenceScanner : public HdfsScanner {
   // Initialises any state required at the beginning of a new scan range.
   // If not at the begining of the file it will trigger a search for the
   // next sync block, where the scan will start.
-  virtual Status InitCurrentScanRange(HdfsScanRange* scan_range, Tuple* template_tuple,
-      ByteStream* byte_stream);
+  virtual Status InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
+      HdfsScanRange* scan_range, Tuple* template_tuple, ByteStream* byte_stream);
 
   // Writes the intermediate parsed data in to slots, outputting
   // tuples to row_batch as they complete.

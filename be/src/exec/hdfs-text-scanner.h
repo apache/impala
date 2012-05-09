@@ -14,8 +14,8 @@ class DelimitedTextParser;
 // records. Uses SSE instructions, if available, for performance.
 class HdfsTextScanner : public HdfsScanner {
  public:
-  HdfsTextScanner(HdfsScanNode* scan_node, RuntimeState* state,
-                  Tuple* template_tuple, MemPool* mem_pool);
+  HdfsTextScanner(HdfsScanNode* scan_node, RuntimeState* state, Tuple* template_tuple,
+      MemPool* mem_pool);
   virtual ~HdfsTextScanner();
   virtual Status Prepare();
   virtual Status GetNext(RowBatch* row_batch, bool* eosr);
@@ -37,9 +37,8 @@ class HdfsTextScanner : public HdfsScanner {
 
   // Initialises any state required at the beginning of a new scan
   // range. Here this means resetting escaping state.
-  virtual Status InitCurrentScanRange(HdfsScanRange* scan_range,
-                                      Tuple* template_tuple,
-                                      ByteStream* byte_stream);
+  virtual Status InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
+      HdfsScanRange* scan_range, Tuple* template_tuple, ByteStream* byte_stream);
 
   // Writes the intermediate parsed data in to slots, outputting
   // tuples to row_batch as they complete.
@@ -53,7 +52,7 @@ class HdfsTextScanner : public HdfsScanner {
   int WriteFields(RowBatch* row_batch, int num_fields, char** line_start);
 
   // Writes out all slots for 'tuple' from 'fields'. 'fields' must be aligned
-  // to the start of the tuple (e.g. fields[0] maps to slots[0]).  
+  // to the start of the tuple (e.g. fields[0] maps to slots[0]).
   // After writing the tuple, it will be evaluated against the conjuncts.
   //  - error_fields is an out array.  error_fields[i] will be set to true if the ith
   //    field had a parse error
@@ -64,56 +63,56 @@ class HdfsTextScanner : public HdfsScanner {
   // The parsing of the fields and evaluating against conjuncts is combined in this
   // function.  This is done so it can be possible to evaluate conjuncts as slots
   // are materialized (on partial tuples).  TODO: do this
-  // 
+  //
   // This function is replaced by a codegen'd function at runtime.  This is
   // the reason that the out error parameters are typed uint8_t instead of bool. We need
   // to be able to match this function's signature identically for the codegen'd function.
-  // Bool's as out parameters can get converted to bytes by the compiler and rather than 
+  // Bool's as out parameters can get converted to bytes by the compiler and rather than
   // implicitly depending on that to happen, we will explicitly type them to bytes.
   // TODO: revisit this
-  bool WriteCompleteTuple(FieldLocation* fields, 
+  bool WriteCompleteTuple(FieldLocation* fields,
       Tuple* tuple, TupleRow* tuple_row,
       uint8_t* error_fields, uint8_t* error_in_row, int* bytes_processed);
-  
+
   // Codegen function to replace WriteCompleteTuple. Should behave identically
   // to WriteCompleteTuple.
   llvm::Function* CodegenWriteCompleteTuple(LlvmCodeGen* codegen);
 
-  // Processes batches of fields and writes them out to the row batch. 
-  // - 'fields' must start at the beginning of a tuple. 
+  // Processes batches of fields and writes them out to the row batch.
+  // - 'fields' must start at the beginning of a tuple.
   // - num_tuples: number of tuples to process
   // - max_added_tuples: the maximum number of tuples that should be added to the batch.
   // - line_start is in/out parameter.  Caller must pass the start of the first tuple.
   //   on return, will contain the start of the next tuple
-  // Returns the number of tuples added to the row batch.  This can be less than 
+  // Returns the number of tuples added to the row batch.  This can be less than
   // num_tuples/tuples_till_limit because of failed conjuncts.
   // Returns -1 if parsing should be aborted due to parse errors.
-  int WriteAlignedTuples(RowBatch* row_batch, FieldLocation* fields, int num_tuples, 
+  int WriteAlignedTuples(RowBatch* row_batch, FieldLocation* fields, int num_tuples,
       int max_added_tuples, int slots_per_tuple, char** line_start);
 
   // Codegen function to replace WriteAlignedTuples.  WriteAlignedTuples is cross compiled
   // to IR.  This function loads the precompiled IR function, modifies it and returns the
-  // resulting function.  
+  // resulting function.
   llvm::Function* CodegenWriteAlignedTuples(LlvmCodeGen*, llvm::Function* write_tuple_fn);
 
   // Utility function to write out 'num_fields' to 'tuple_'.  This is used to parse
   // partial tuples.  Returns bytes processed.  If copy_strings is true, strings
   // from fields will be copied into the tuple_pool_.
   int WritePartialTuple(FieldLocation* fields, int num_fields, bool copy_strings);
-  
+
   // Utility function to compute the order to materialize slots to allow  for
   // computing conjuncts as slots get materialized (on partial tuples).
   // 'order' will contain for each slot, the first conjunct it is associated with.
-  // e.g. order[2] = 1 indicates materialized_slots[2] must be materialized before 
-  // evaluating conjuncts[1].  Slots that are not referenced by any conjuncts will have 
+  // e.g. order[2] = 1 indicates materialized_slots[2] must be materialized before
+  // evaluating conjuncts[1].  Slots that are not referenced by any conjuncts will have
   // order set to conjuncts.size()
   void ComputeSlotMaterializationOrder(std::vector<int>* order);
 
-  // Utility function to report parse errors for each field. 
+  // Utility function to report parse errors for each field.
   // If errors[i] is nonzero, fields[i] had a parse error.
   // row_start/len should the complete row containing fields.
   // Returns false if parsing should be aborted.
-  bool ReportTupleParseError(FieldLocation* fields, uint8_t* errors, 
+  bool ReportTupleParseError(FieldLocation* fields, uint8_t* errors,
       char* row_start, int row_len);
 
   // Appends the current file and line to the RuntimeState's error log (if there's space).
@@ -191,6 +190,11 @@ class HdfsTextScanner : public HdfsScanner {
       int, char**);
   // Jitted write tuples function pointer.  Null if codegen is disabled.
   WriteTuplesFn write_tuples_fn_;
+
+  // Keep track of the current escape char to decide whether or not to use codegen for
+  // tuple writes.
+  // TODO(henry / nong): Remove this once we support codegen for escape characters.
+  char escape_char_;
 };
 
 }

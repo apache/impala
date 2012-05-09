@@ -5,10 +5,6 @@ namespace java com.cloudera.impala.thrift
 
 include "Types.thrift"
 
-// constants for TQueryRequest.numNodes
-const i32 NUM_NODES_ALL = 0
-const i32 NUM_NODES_ALL_RACKS = -1
-
 struct TQueryRequest {
   // select stmt to be executed
   1: string stmt

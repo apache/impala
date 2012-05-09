@@ -2,6 +2,7 @@
 
 #include "exec/hdfs-text-table-sink.h"
 #include "exec/exec-node.h"
+#include "gen-cpp/JavaConstants_constants.h"
 #include "util/hdfs-util.h"
 #include "exprs/expr.h"
 #include "runtime/raw-value.h"
@@ -102,10 +103,21 @@ Status HdfsTextTableSink::Init(RuntimeState* state) {
     error_msg << table_id_;
     return Status(error_msg.str());
   }
-  // Set delimiters from table descriptor.
-  tuple_delim_ = table_desc_->line_delim();
-  field_delim_ = table_desc_->field_delim();
-  escape_char_ = table_desc_->escape_char();
+
+  // Set delimiters from default partition in table descriptor.
+  // TODO: Make insert partition (and therefore format) aware
+  map<int64_t, HdfsPartitionDescriptor*>::const_iterator it =
+      table_desc_->partition_descriptors().find(
+      g_JavaConstants_constants.DEFAULT_PARTITION_ID);
+  if (it == table_desc_->partition_descriptors().end()) {
+    return Status("No default partition found for HdfsTextTableSink");
+  }
+
+  HdfsPartitionDescriptor* partition = it->second;
+
+  tuple_delim_ = partition->line_delim();
+  field_delim_ = partition->field_delim();
+  escape_char_ = partition->escape_char();
   null_partition_key_value_ = table_desc_->null_partition_key_value();
 
   PrepareExprs(state);

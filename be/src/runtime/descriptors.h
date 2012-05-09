@@ -28,6 +28,8 @@ class TDescriptorTable;
 class TSlotDescriptor;
 class TTable;
 class TTupleDescriptor;
+class Expr;
+class RuntimeState;
 
 // for now, these are simply ints; if we find we need to generate ids in the
 // backend, we can also introduce separate classes for these to make them
@@ -44,7 +46,7 @@ struct LlvmTupleStruct {
   llvm::PointerType* tuple_ptr;
   std::vector<int> indices;
 };
-  
+
 // Location information for null indicator bit for particular slot.
 // For non-nullable slots, the byte_offset will be 0 and the bit_mask will be 0.
 // This allows us to do the NullIndicatorOffset operations (tuple + byte_offset &/|
@@ -55,7 +57,7 @@ struct NullIndicatorOffset {
   uint8_t bit_mask;  // to extract null indicator
 
   NullIndicatorOffset(int byte_offset, int bit_offset)
-    : byte_offset(byte_offset), 
+    : byte_offset(byte_offset),
       bit_mask(bit_offset == -1 ? 0 : 1 << bit_offset) {
   }
 
@@ -101,7 +103,7 @@ class SlotDescriptor {
   const int col_pos_;
   const int tuple_offset_;
   const NullIndicatorOffset null_indicator_offset_;
-  
+
   // the idx of the slot in the tuple descriptor (0-based).
   // this is provided by the FE
   const int slot_idx_;
@@ -109,7 +111,7 @@ class SlotDescriptor {
   // the idx of the slot in the llvm codegen'd tuple struct
   // this is set by TupleDescriptor during codegen and takes into account
   // leading null bytes.
-  int field_idx_;  
+  int field_idx_;
 
   const bool is_materialized_;
 
@@ -141,13 +143,46 @@ class TableDescriptor {
   int num_clustering_cols_;
 };
 
-class HdfsTableDescriptor : public TableDescriptor {
+// Metadata for a single partition inside an Hdfs table.
+class HdfsPartitionDescriptor {
  public:
-  HdfsTableDescriptor(const TTableDescriptor& tdesc);
+  HdfsPartitionDescriptor(const THdfsPartition& thrift_partition, ObjectPool* pool);
   char line_delim() const { return line_delim_; }
   char field_delim() const { return field_delim_; }
   char collection_delim() const { return collection_delim_; }
   char escape_char() const { return escape_char_; }
+  THdfsFileFormat::type file_format() const { return file_format_; }
+  const std::vector<Expr*>& partition_key_values() const { return partition_key_values_; }
+
+  // Calls 'Prepare' on all partition key exprs. Calls after the first are no-ops
+  Status PrepareExprs(RuntimeState* state);
+
+  std::string DebugString() const;
+
+ private:
+  char line_delim_;
+  char field_delim_;
+  char collection_delim_;
+  char escape_char_;
+
+  // True if PrepareExprs has been called, to prevent repeating expensive codegen
+  bool exprs_prepared_;
+
+  // List of literal expressions for each partition key. The Expr objects are owned by the
+  // local object pool.
+  std::vector<Expr*> partition_key_values_;
+
+  // The format (e.g. text, sequence file etc.) of data in the files in this partition
+  THdfsFileFormat::type file_format_;
+
+  // For allocating expression objects in partition_key_values_
+  // Owned by DescriptorTbl, supplied in constructor.
+  ObjectPool* object_pool_;
+};
+
+class HdfsTableDescriptor : public TableDescriptor {
+ public:
+  HdfsTableDescriptor(const TTableDescriptor& tdesc, ObjectPool* pool);
   const std::string& hdfs_base_dir() const { return hdfs_base_dir_; }
   const std::vector<std::string>& partition_key_names() const {
     return partition_key_names_;
@@ -156,16 +191,26 @@ class HdfsTableDescriptor : public TableDescriptor {
     return null_partition_key_value_;
   }
 
+  HdfsPartitionDescriptor* GetPartition(int64_t partition_id) const {
+    std::map<int64_t, HdfsPartitionDescriptor*>::const_iterator it =
+        partition_descriptors_.find(partition_id);
+    if (it == partition_descriptors_.end()) return NULL;
+    return it->second;
+  }
+
+  const std::map<int64_t, HdfsPartitionDescriptor*>& partition_descriptors() const {
+    return partition_descriptors_;
+  }
+
   virtual std::string DebugString() const;
 
  protected:
-  char line_delim_;
-  char field_delim_;
-  char collection_delim_;
-  char escape_char_;
   std::string hdfs_base_dir_;
   std::vector<std::string> partition_key_names_;
   std::string null_partition_key_value_;
+  std::map<int64_t, HdfsPartitionDescriptor*> partition_descriptors_;
+  // Owned by DescriptorTbl
+  ObjectPool* object_pool_;
 };
 
 class HBaseTableDescriptor : public TableDescriptor {
@@ -193,11 +238,11 @@ class TupleDescriptor {
 
   TupleId id() const { return id_; }
   std::string DebugString() const;
-  
+
   // Creates a typed struct description for llvm.  The layout of the struct is computed
   // by the FE which includes the order of the fields in the resulting struct.
   // Returns the struct type or NULL if the type could not be created.
-  // For example, the aggregation tuple for this query: select count(*), min(int_col_a) 
+  // For example, the aggregation tuple for this query: select count(*), min(int_col_a)
   // would map to:
   // struct Tuple {
   //   int8_t   null_byte;
@@ -303,4 +348,3 @@ class RowDescriptor {
 }
 
 #endif
-

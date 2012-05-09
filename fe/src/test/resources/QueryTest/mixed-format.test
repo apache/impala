@@ -1,0 +1,22 @@
+# Check that data from mixed format partitions can be read
+# transparently. Compute sum in order to force deserialisation
+select count(*), sum(int_col) from alltypesmixedformat
+---- TYPES
+bigint, bigint
+---- RESULTS
+900,4050
+====
+# Restrict set of partitions (still multi-format)
+select count(*), sum(int_col) from alltypesmixedformat where month = 1 or month = 3
+---- TYPES
+bigint, bigint
+---- RESULTS
+620,2790
+====
+# Read single partition alone
+select count(*), sum(int_col) from alltypesmixedformat where month = 2
+---- TYPES
+bigint, bigint
+---- RESULTS
+280,1260
+====

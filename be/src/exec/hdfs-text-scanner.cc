@@ -33,21 +33,8 @@ HdfsTextScanner::HdfsTextScanner(HdfsScanNode* scan_node, RuntimeState* state,
       reuse_byte_buffer_(false),
       byte_buffer_read_size_(0),
       error_in_row_(false),
-      write_tuples_fn_(NULL) {
-  const HdfsTableDescriptor* hdfs_table =
-    static_cast<const HdfsTableDescriptor*>(scan_node->tuple_desc()->table_desc());
-
-  text_converter_.reset(new TextConverter(hdfs_table->escape_char(), tuple_pool_));
-
-  char field_delim = hdfs_table->field_delim();
-  char collection_delim = hdfs_table->collection_delim();
-  if (scan_node_->materialized_slots().size() == 0) {
-    field_delim = '\0';
-    collection_delim = '\0';
-  }
-  delimited_text_parser_.reset(new DelimitedTextParser(scan_node, 
-      hdfs_table->line_delim(), field_delim, collection_delim, 
-      hdfs_table->escape_char()));
+      write_tuples_fn_(NULL),
+      escape_char_('\0'){
 }
 
 HdfsTextScanner::~HdfsTextScanner() {
@@ -57,12 +44,30 @@ HdfsTextScanner::~HdfsTextScanner() {
       boundary_mem_pool_->peak_allocated_bytes());
 }
 
-Status HdfsTextScanner::InitCurrentScanRange(HdfsScanRange* scan_range,
-                                             Tuple* template_tuple,
-                                             ByteStream* byte_stream) {
+
+Status HdfsTextScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
+    HdfsScanRange* scan_range, Tuple* template_tuple, ByteStream* byte_stream) {
   RETURN_IF_ERROR(
-      HdfsScanner::InitCurrentScanRange(scan_range, template_tuple, byte_stream));
-  current_range_remaining_len_ = scan_range->length;
+      HdfsScanner::InitCurrentScanRange(hdfs_partition, scan_range, template_tuple,
+      byte_stream));
+
+  // Cache escape char to detect whether or not to use the generated tuple writer for this
+  // scan range
+  escape_char_ = hdfs_partition->escape_char();
+
+  text_converter_.reset(new TextConverter(escape_char_, tuple_pool_));
+
+  char field_delim = hdfs_partition->field_delim();
+  char collection_delim = hdfs_partition->collection_delim();
+  if (scan_node_->materialized_slots().size() == 0) {
+    field_delim = '\0';
+    collection_delim = '\0';
+  }
+  delimited_text_parser_.reset(new DelimitedTextParser(scan_node_,
+      hdfs_partition->line_delim(), field_delim, collection_delim,
+      hdfs_partition->escape_char()));
+
+  current_range_remaining_len_ = scan_range->length_;
   error_in_row_ = false;
 
   // Note - this initialisation relies on the assumption that N partition keys will occupy
@@ -72,7 +77,7 @@ Status HdfsTextScanner::InitCurrentScanRange(HdfsScanRange* scan_range,
   slot_idx_ = 0;
 
   // Pre-load byte buffer with size of entire range, if possible
-  RETURN_IF_ERROR(current_byte_stream_->Seek(scan_range->offset));
+  RETURN_IF_ERROR(current_byte_stream_->Seek(scan_range->offset_));
   byte_buffer_ptr_ = byte_buffer_end_;
   RETURN_IF_ERROR(FillByteBuffer(current_range_remaining_len_));
 
@@ -81,7 +86,7 @@ Status HdfsTextScanner::InitCurrentScanRange(HdfsScanRange* scan_range,
   delimited_text_parser_->ParserReset();
 
   // Offset may not point to tuple boundary
-  if (scan_range->offset != 0) {
+  if (scan_range->offset_ != 0) {
     COUNTER_SCOPED_TIMER(scan_node_->parse_time_counter());
     int first_tuple_offset = delimited_text_parser_->FindFirstInstance(
         byte_buffer_, byte_buffer_read_size_);
@@ -125,6 +130,11 @@ Status HdfsTextScanner::Prepare() {
   // TODO: This should probably be based on L2/L3 cache sizes (as should the batch size)
   field_locations_.resize(state_->batch_size() * scan_node_->materialized_slots().size());
 
+  // Text converter will, in the future, rely on the current escape char. For now, we only
+  // codegen for unescaped data, so it's ok to prepare the codegen once. Eventually, the
+  // codegen will need to be cached per partition or per delimiter combination
+  text_converter_.reset(new TextConverter('\0', tuple_pool_));
+
   // Codegen for materialized parsed data into tuples.  The WriteCompleteTuple is
   // codegen'd using the IRBuilder for the specific tuple description.  This function
   // is then injected into the cross-compiled driving function, WriteAlignedTuples().
@@ -132,16 +142,17 @@ Status HdfsTextScanner::Prepare() {
   if (codegen != NULL) {
     Function* write_complete_tuple_fn = CodegenWriteCompleteTuple(codegen);
     if (write_complete_tuple_fn != NULL) {
-      Function* write_tuples_fn = CodegenWriteAlignedTuples(codegen, 
+      Function* write_tuples_fn = CodegenWriteAlignedTuples(codegen,
           write_complete_tuple_fn);
       if (write_tuples_fn != NULL) {
         write_tuples_fn_ = reinterpret_cast<WriteTuplesFn>(
             codegen->JitFunction(write_tuples_fn));
-        LOG(INFO) << "HdfsTextScanner(node_id=" << scan_node_->id() 
+        LOG(INFO) << "HdfsTextScanner(node_id=" << scan_node_->id()
                   << ") using llvm codegend functions.";
       }
     }
   }
+
   return Status::OK;
 }
 
@@ -251,7 +262,7 @@ Status HdfsTextScanner::GetNext(RowBatch* row_batch, bool* eosr) {
       line_start = byte_buffer_ptr_;
       num_tuples_materialized = WriteEmptyTuples(row_batch, num_tuples);
     }
-    
+
     RETURN_IF_ERROR(parse_status_);
 
     // Cannot reuse file buffer if there are non-copied string slots materialized
@@ -307,8 +318,8 @@ Status HdfsTextScanner::GetNext(RowBatch* row_batch, bool* eosr) {
   DCHECK(delimited_text_parser_->AtTupleStart());
   return Status::OK;
 }
-  
-bool HdfsTextScanner::ReportTupleParseError(FieldLocation* fields, uint8_t* errors, 
+
+bool HdfsTextScanner::ReportTupleParseError(FieldLocation* fields, uint8_t* errors,
     char* line, int len) {
   for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
     if (errors[i]) {
@@ -334,7 +345,7 @@ Status HdfsTextScanner::ReportRowParseError(char* line_start, int len) {
     state_->error_stream() << string(line_start, len);
     state_->LogErrorStream();
   }
-  
+
   if (state_->abort_on_error()) {
     state_->ReportFileErrors(current_byte_stream_->GetLocation(), 1);
     return Status(
@@ -348,7 +359,7 @@ int HdfsTextScanner::WriteFields(RowBatch* row_batch, int num_fields, char** lin
   DCHECK_GT(num_fields, 0);
 
   FieldLocation* fields = &field_locations_[0];
-  
+
   int num_tuples_materialized = 0;
   // Write remaining fields, if any, from the previous partial tuple.
   if (slot_idx_ != 0) {
@@ -364,6 +375,7 @@ int HdfsTextScanner::WriteFields(RowBatch* row_batch, int num_fields, char** lin
       if (UNLIKELY(error_in_row_)) {
         parse_status_ = ReportRowParseError(*line_start, next_line_offset - 1);
         if (!parse_status_.ok()) return -1;
+
         error_in_row_ = false;
       }
       boundary_row_.Clear();
@@ -381,11 +393,11 @@ int HdfsTextScanner::WriteFields(RowBatch* row_batch, int num_fields, char** lin
         if (scan_node_->ReachedLimit() || row_batch->IsFull()) {
           return num_tuples_materialized;
         }
-        
+
         uint8_t* new_tuple = reinterpret_cast<uint8_t*>(tuple_) + tuple_byte_size_;
         tuple_ = reinterpret_cast<Tuple*>(new_tuple);
       }
-      
+
       *line_start += next_line_offset;
       slot_idx_ = 0;
     }
@@ -397,15 +409,15 @@ int HdfsTextScanner::WriteFields(RowBatch* row_batch, int num_fields, char** lin
   // Write complete tuples.  The current field, if any, is at the start of a tuple.
   int num_tuples = num_fields / scan_node_->materialized_slots().size();
   if (num_tuples > 0) {
-    int max_added_tuples = (scan_node_->limit() == -1) ? 
+    int max_added_tuples = (scan_node_->limit() == -1) ?
           num_tuples : scan_node_->limit() - scan_node_->rows_returned();
     int tuples_returned = 0;
     // Call jitted function if possible
-    if (write_tuples_fn_ != NULL) {
+    if (write_tuples_fn_ != NULL && escape_char_ == '\0') {
       tuples_returned = write_tuples_fn_(this, row_batch, fields, num_tuples,
             max_added_tuples, scan_node_->materialized_slots().size(), line_start);
     } else {
-      tuples_returned = WriteAlignedTuples(row_batch, fields, num_tuples, 
+      tuples_returned = WriteAlignedTuples(row_batch, fields, num_tuples,
             max_added_tuples, scan_node_->materialized_slots().size(), line_start);
     }
     if (tuples_returned == -1) return -1;
@@ -415,7 +427,7 @@ int HdfsTextScanner::WriteFields(RowBatch* row_batch, int num_fields, char** lin
 
     num_tuples_materialized += tuples_returned;
     fields += num_tuples * scan_node_->materialized_slots().size();
-    num_fields = num_fields % scan_node_->materialized_slots().size(); 
+    num_fields = num_fields % scan_node_->materialized_slots().size();
   }
 
 
@@ -441,7 +453,7 @@ void HdfsTextScanner::CopyBoundaryField(FieldLocation* data) {
   data->len = total_len;
 }
 
-int HdfsTextScanner::WritePartialTuple(FieldLocation* fields, int num_fields, 
+int HdfsTextScanner::WritePartialTuple(FieldLocation* fields, int num_fields,
     bool copy_strings) {
   copy_strings |= scan_node_->compact_data();
   int next_line_offset = 0;
@@ -449,11 +461,11 @@ int HdfsTextScanner::WritePartialTuple(FieldLocation* fields, int num_fields,
     int need_escape = false;
     int len = fields[i].len;
     if (len < 0) {
-      len = -len; 
+      len = -len;
       need_escape = true;
     }
     next_line_offset += (len + 1);
-      
+
     const SlotDescriptor* desc = scan_node_->materialized_slots()[slot_idx_];
     if (!text_converter_->WriteSlot(desc, tuple_,
         fields[i].start, len, copy_strings, need_escape)) {
@@ -472,7 +484,7 @@ void HdfsTextScanner::ComputeSlotMaterializationOrder(vector<int>* order) {
   for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
     (*order)[i] = conjuncts.size();
   }
-  
+
   const DescriptorTbl& desc_tbl = state_->desc_tbl();
 
   vector<SlotId> slot_ids;
@@ -494,7 +506,7 @@ void HdfsTextScanner::ComputeSlotMaterializationOrder(vector<int>* order) {
   }
 }
 
-bool HdfsTextScanner::WriteCompleteTuple(FieldLocation* fields, Tuple* tuple, 
+bool HdfsTextScanner::WriteCompleteTuple(FieldLocation* fields, Tuple* tuple,
     TupleRow* tuple_row, uint8_t* error_fields, uint8_t* error_in_row, int* bytes) {
   int bytes_parsed = 0;
 
@@ -505,11 +517,11 @@ bool HdfsTextScanner::WriteCompleteTuple(FieldLocation* fields, Tuple* tuple,
     int need_escape = false;
     int len = fields[i].len;
     if (UNLIKELY(len < 0)) {
-      len = -len; 
+      len = -len;
       need_escape = true;
     }
     *bytes += len + 1;
-    
+
     SlotDescriptor* desc = scan_node_->materialized_slots()[i];
     bool error = !text_converter_->WriteSlot(desc, tuple,
         fields[i].start, len, scan_node_->compact_data(), need_escape);
@@ -524,20 +536,20 @@ bool HdfsTextScanner::WriteCompleteTuple(FieldLocation* fields, Tuple* tuple,
 
 // Codegen for WriteTuple(above).  The signature matches WriteTuple (except for the
 // this* first argument).  For writing out and evaluating a single string slot:
-// define i1 @WriteCompleteTuple(%"class.impala::HdfsTextScanner"* %this_ptr, 
-//                               %"struct.impala::FieldLocation"* %fields, 
-//                               %"class.impala::Tuple"* %tuple, 
-//                               %"class.impala::TupleRow"* %tuple_row, i8* 
+// define i1 @WriteCompleteTuple(%"class.impala::HdfsTextScanner"* %this_ptr,
+//                               %"struct.impala::FieldLocation"* %fields,
+//                               %"class.impala::Tuple"* %tuple,
+//                               %"class.impala::TupleRow"* %tuple_row, i8*
 //                               %error_fields, i8* %error_in_row, i32* %row_len) {
 // entry:
-//   %tuple_ptr = bitcast %"class.impala::Tuple"* %tuple to 
+//   %tuple_ptr = bitcast %"class.impala::Tuple"* %tuple to
 //                                       { i8, %"struct.impala::StringValue" }*
-//   %null_byte = getelementptr inbounds 
-//                                    { i8, %"struct.impala::StringValue" }* %tuple_ptr, 
+//   %null_byte = getelementptr inbounds
+//                                    { i8, %"struct.impala::StringValue" }* %tuple_ptr,
 //                                      i32 0, i32 0
 //   store i8 0, i8* %null_byte
 //   br label %parse
-// 
+//
 // parse:                                            ; preds = %entry
 //   %data_ptr = getelementptr %"struct.impala::FieldLocation"* %fields, i32 0, i32 0
 //   %len_ptr = getelementptr %"struct.impala::FieldLocation"* %fields, i32 0, i32 1
@@ -545,22 +557,22 @@ bool HdfsTextScanner::WriteCompleteTuple(FieldLocation* fields, Tuple* tuple,
 //   %data = load i8** %data_ptr
 //   %len = load i32* %len_ptr
 //   %bytes_parsed = add i32 0, %len
-//   %0 = call i1 @WriteSlot({ i8, %"struct.impala::StringValue" }* %tuple_ptr, 
+//   %0 = call i1 @WriteSlot({ i8, %"struct.impala::StringValue" }* %tuple_ptr,
 //                           i8* %data, i32 %len)
 //   %slot_parse_error = xor i1 %0, true
 //   %error_in_row1 = or i1 false, %slot_parse_error
 //   %1 = zext i1 %slot_parse_error to i8
 //   store i8 %1, i8* %slot_error_ptr
 //   br label %parse_done
-// 
+//
 // parse_done:                                       ; preds = %parse
 //   store i32 %bytes_parsed, i32* %row_len
 //   %2 = zext i1 %error_in_row1 to i8
 //   store i8 %2, i8* %error_in_row
-//   %3 = bitcast %"class.impala::TupleRow"* %tuple_row to 
+//   %3 = bitcast %"class.impala::TupleRow"* %tuple_row to
 //                                        { i8, %"struct.impala::StringValue" }**
 //   %4 = getelementptr { i8, %"struct.impala::StringValue" }** %3, i32 0
-//   store { i8, %"struct.impala::StringValue" }* %tuple_ptr, 
+//   store { i8, %"struct.impala::StringValue" }* %tuple_ptr,
 //                                        { i8, %"struct.impala::StringValue" }** %4
 //   %eval = call i1 @EvalConjuncts(%"class.impala::TupleRow"* %tuple_row)
 //   ret i1 %eval
@@ -571,7 +583,7 @@ Function* HdfsTextScanner::CodegenWriteCompleteTuple(LlvmCodeGen* codegen) {
   for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
     SlotDescriptor* slot_desc = scan_node_->materialized_slots()[i];
     if (slot_desc->type() == TYPE_TIMESTAMP) {
-      LOG(WARNING) << "Could not codegen for HdfsTestScanner because timestamp "
+      LOG(WARNING) << "Could not codegen for HdfsTextScanner because timestamp "
                    << "slots are not supported.";
       return NULL;
     }
@@ -597,7 +609,7 @@ Function* HdfsTextScanner::CodegenWriteCompleteTuple(LlvmCodeGen* codegen) {
     if (fn == NULL) return NULL;
     slot_fns.push_back(fn);
   }
-  
+
   // Compute order to materialize slots.  BE assumes that conjuncts should
   // be evaluated in the order specified (optimization is already done by FE)
   vector<int> materialize_order;
@@ -606,13 +618,13 @@ Function* HdfsTextScanner::CodegenWriteCompleteTuple(LlvmCodeGen* codegen) {
   // Get types to construct matching function signature to WriteCompleteTuple
   PointerType* uint8_ptr_type = PointerType::get(codegen->GetType(TYPE_TINYINT), 0);
   PointerType* int_ptr_type = PointerType::get(codegen->GetType(TYPE_INT), 0);
-  
+
   StructType* field_loc_type = reinterpret_cast<StructType*>(
       codegen->GetType(FieldLocation::LLVM_CLASS_NAME));
   Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
   Type* tuple_opaque_type = codegen->GetType(Tuple::LLVM_CLASS_NAME);
   Type* hdfs_text_scanner_type = codegen->GetType(HdfsTextScanner::LLVM_CLASS_NAME);
-  
+
   DCHECK(tuple_opaque_type != NULL);
   DCHECK(tuple_row_type != NULL);
   DCHECK(field_loc_type != NULL);
@@ -628,7 +640,7 @@ Function* HdfsTextScanner::CodegenWriteCompleteTuple(LlvmCodeGen* codegen) {
   if (tuple_type == NULL) return NULL;
   PointerType* tuple_ptr_type = PointerType::get(tuple_type, 0);
 
-  // Initialize the function prototype.  This needs to match 
+  // Initialize the function prototype.  This needs to match
   // HdfsTextScanner::WriteCompleteTuple's signature identically.
   LlvmCodeGen::FnPrototype prototype(
       codegen, "WriteCompleteTuple", codegen->GetType(TYPE_BOOLEAN));
@@ -644,14 +656,14 @@ Function* HdfsTextScanner::CodegenWriteCompleteTuple(LlvmCodeGen* codegen) {
   LlvmCodeGen::LlvmBuilder builder(context);
   Value* args[7];
   Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
-  
+
   BasicBlock* parse_block = BasicBlock::Create(context, "parse", fn);
   BasicBlock* eval_fail_block = BasicBlock::Create(context, "eval_fail", fn);
 
   // Extract the input args
   Value* fields_arg = args[1];
   Value* tuple_arg = builder.CreateBitCast(args[2], tuple_ptr_type, "tuple_ptr");
-  Value* tuple_row_arg = builder.CreateBitCast(args[3], 
+  Value* tuple_row_arg = builder.CreateBitCast(args[3],
       PointerType::get(codegen->ptr_type(), 0), "tuple_row_ptr");
   Value* errors_arg = args[4];
   Value* error_in_row_arg = args[5];
@@ -668,16 +680,16 @@ Function* HdfsTextScanner::CodegenWriteCompleteTuple(LlvmCodeGen* codegen) {
       builder.CreateStore(codegen->GetIntConstant(TYPE_TINYINT, 0), null_byte);
     }
   } else {
-    // Copy template tuple.  
+    // Copy template tuple.
     // TODO: only copy what's necessary from the template tuple.
-    Value* template_tuple_ptr = 
+    Value* template_tuple_ptr =
         codegen->CastPtrToLlvmPtr(codegen->ptr_type(), template_tuple_);
-    codegen->CodegenMemcpy(&builder, tuple_arg, template_tuple_ptr, 
+    codegen->CodegenMemcpy(&builder, tuple_arg, template_tuple_ptr,
         codegen->GetIntConstant(TYPE_INT, tuple_byte_size_));
   }
-  
+
   // Put tuple in tuple_row
-  Value* tuple_row_typed = 
+  Value* tuple_row_typed =
       builder.CreateBitCast(tuple_row_arg, PointerType::get(tuple_ptr_type, 0));
   Value* tuple_row_idxs[] = { codegen->GetIntConstant(TYPE_INT, tuple_idx_) };
   Value* tuple_in_row_addr = builder.CreateGEP(tuple_row_typed, tuple_row_idxs);
@@ -687,7 +699,7 @@ Function* HdfsTextScanner::CodegenWriteCompleteTuple(LlvmCodeGen* codegen) {
   // Loop through all the conjuncts in order and materialize slots as necessary
   // to evaluate the conjuncts (e.g. conjuncts[0] will have the slots it references
   // first).
-  // materialized_order[slot_idx] represents the first conjunct which needs that slot. 
+  // materialized_order[slot_idx] represents the first conjunct which needs that slot.
   // Slots are only materialized if its order matches the current conjunct being
   // processed.  This guarantees that each slot is materialized once when it is first
   // needed and that at the end of the materialize loop, the conjunct has everything
@@ -704,17 +716,17 @@ Function* HdfsTextScanner::CodegenWriteCompleteTuple(LlvmCodeGen* codegen) {
       if (materialize_order[slot_idx] != conjunct_idx) continue;
 
       // Materialize slots[slot_idx] to evaluate conjuncts[conjunct_idx]
-      // All slots[i] with materialized_order[i] < conjunct_idx have already been 
+      // All slots[i] with materialized_order[i] < conjunct_idx have already been
       // materialized by prior iterations through the outer loop
 
       // Extract ptr/len from fields
-      Value* data_idxs[] = { 
-        codegen->GetIntConstant(TYPE_INT, slot_idx), 
-        codegen->GetIntConstant(TYPE_INT, 0), 
+      Value* data_idxs[] = {
+        codegen->GetIntConstant(TYPE_INT, slot_idx),
+        codegen->GetIntConstant(TYPE_INT, 0),
       };
-      Value* len_idxs[] = { 
-        codegen->GetIntConstant(TYPE_INT, slot_idx), 
-        codegen->GetIntConstant(TYPE_INT, 1), 
+      Value* len_idxs[] = {
+        codegen->GetIntConstant(TYPE_INT, slot_idx),
+        codegen->GetIntConstant(TYPE_INT, 1),
       };
       Value* error_idxs[] = {
         codegen->GetIntConstant(TYPE_INT, slot_idx),
@@ -750,11 +762,11 @@ Function* HdfsTextScanner::CodegenWriteCompleteTuple(LlvmCodeGen* codegen) {
       // tuple against that conjunct and start a new parse_block for the next conjunct
       parse_block = BasicBlock::Create(context, "parse", fn, eval_fail_block);
       Function* conjunct_fn = conjuncts[conjunct_idx]->codegen_fn();
-      
-      Value* conjunct_args[] = { 
+
+      Value* conjunct_args[] = {
         tuple_row_arg,
-        ConstantPointerNull::get(codegen->ptr_type()), 
-        is_null_ptr 
+        ConstantPointerNull::get(codegen->ptr_type()),
+        is_null_ptr
       };
       Value* result = builder.CreateCall(conjunct_fn, conjunct_args, "conjunct_eval");
 
@@ -771,19 +783,19 @@ Function* HdfsTextScanner::CodegenWriteCompleteTuple(LlvmCodeGen* codegen) {
   return codegen->FinalizeFunction(fn);
 }
 
-Function* HdfsTextScanner::CodegenWriteAlignedTuples(LlvmCodeGen* codegen, 
+Function* HdfsTextScanner::CodegenWriteAlignedTuples(LlvmCodeGen* codegen,
     Function* write_complete_tuple_fn) {
   COUNTER_SCOPED_TIMER(codegen->codegen_timer());
   DCHECK(write_complete_tuple_fn != NULL);
 
-  Function* write_tuples_fn = 
+  Function* write_tuples_fn =
       codegen->GetFunction(IRFunction::HDFS_TEXT_SCANNER_WRITE_ALIGNED_TUPLES);
   DCHECK(write_tuples_fn != NULL);
 
   int replaced = 0;
-  write_tuples_fn = codegen->ReplaceCallSites(write_tuples_fn, false, 
-      write_complete_tuple_fn, "WriteCompleteTuple", &replaced); 
-  DCHECK_EQ(replaced, 1) << "One call site should be replaced."; 
+  write_tuples_fn = codegen->ReplaceCallSites(write_tuples_fn, false,
+      write_complete_tuple_fn, "WriteCompleteTuple", &replaced);
+  DCHECK_EQ(replaced, 1) << "One call site should be replaced.";
   DCHECK(write_tuples_fn != NULL);
 
   return codegen->FinalizeFunction(write_tuples_fn);

@@ -26,6 +26,7 @@ class TextConverter;
 class TScanRange;
 class ByteStream;
 class HdfsScanNode;
+class HdfsPartitionDescriptor;
 class Decompressor;
 struct HdfsScanRange;
 
@@ -86,9 +87,8 @@ class HdfsScanner {
 
   // One-time initialisation of per-scan-range state.  The scanner objects are
   // reused for different scan ranges so this function must reset all state.
-  virtual Status InitCurrentScanRange(HdfsScanRange* scan_range,
-                                      Tuple* template_tuple,
-                                      ByteStream* byte_stream);
+  virtual Status InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
+      HdfsScanRange* scan_range, Tuple* template_tuple, ByteStream* byte_stream);
 
  protected:
   // For EvalConjunctsForScanner

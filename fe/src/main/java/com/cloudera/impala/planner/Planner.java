@@ -29,9 +29,7 @@ import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.analysis.UnionStmt;
-import com.cloudera.impala.catalog.HdfsRCFileTable;
-import com.cloudera.impala.catalog.HdfsSeqFileTable;
-import com.cloudera.impala.catalog.HdfsTextTable;
+import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
@@ -183,18 +181,10 @@ public class Planner {
    */
   private PlanNode createScanNode(Analyzer analyzer, TableRef tblRef) {
     ScanNode scanNode = null;
-    if (tblRef.getTable() instanceof HdfsTextTable) {
-      // Hive Text table
-      scanNode = new HdfsTextScanNode(
-          getNextNodeId(), tblRef.getDesc(), (HdfsTextTable) tblRef.getTable());
-    } else if (tblRef.getTable() instanceof HdfsRCFileTable) {
-      // Hive RCFile table
-      scanNode = new HdfsRCFileScanNode(
-          getNextNodeId(), tblRef.getDesc(), (HdfsRCFileTable) tblRef.getTable());
-    } else if (tblRef.getTable() instanceof HdfsSeqFileTable) {
-      // Hive Sequence table
-      scanNode = new HdfsSeqFileScanNode(
-          getNextNodeId(), tblRef.getDesc(), (HdfsSeqFileTable) tblRef.getTable());
+
+    if (tblRef.getTable() instanceof HdfsTable) {
+      scanNode = new HdfsScanNode(getNextNodeId(), tblRef.getDesc(),
+          (HdfsTable)tblRef.getTable());
     } else {
       // HBase table
       scanNode = new HBaseScanNode(getNextNodeId(), tblRef.getDesc());

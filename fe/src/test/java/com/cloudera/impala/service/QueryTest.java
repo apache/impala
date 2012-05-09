@@ -20,9 +20,9 @@ import org.junit.Test;
 
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.testutil.TestFileParser;
+import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.testutil.TestFileParser.Section;
 import com.cloudera.impala.testutil.TestFileParser.TestCase;
-import com.cloudera.impala.testutil.TestUtils;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Splitter;
@@ -518,4 +518,9 @@ public class QueryTest {
 //  public void TestInsertNulls() {
 //    runQueryTestFile("insert-nulls", false, 1000);
 //  }
+
+  @Test
+  public void TestMixedFormat() {
+    runTestInExecutionMode(EXECUTION_MODE, "mixed-format", false, 1000);
+  }
 }

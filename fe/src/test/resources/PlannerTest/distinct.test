@@ -86,7 +86,6 @@ Plan Fragment 0
     OUTPUT: 
     GROUP BY: tinyint_col, int_col, bigint_col
       SCAN HDFS table=default.alltypesagg (0)
-        REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
 
   EXEC PARAMS
     HOST: coordinator
@@ -115,7 +114,6 @@ Plan Fragment 1
   OUTPUT: 
   GROUP BY: tinyint_col, int_col, bigint_col
     SCAN HDFS table=default.alltypesagg (0)
-      REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
 
   EXEC PARAMS
     HOST: 127.0.0.1
@@ -144,7 +142,6 @@ Plan Fragment 0
     OUTPUT: 
     GROUP BY: tinyint_col, int_col
       SCAN HDFS table=default.alltypesagg (0)
-        REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
 
   EXEC PARAMS
     HOST: coordinator
@@ -173,7 +170,6 @@ Plan Fragment 1
   OUTPUT: 
   GROUP BY: tinyint_col, int_col
     SCAN HDFS table=default.alltypesagg (0)
-      REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
 
   EXEC PARAMS
     HOST: 127.0.0.1
@@ -203,7 +199,6 @@ Plan Fragment 0
     OUTPUT: MIN(smallint_col), MAX(string_col)
     GROUP BY: tinyint_col, int_col
       SCAN HDFS table=default.alltypesagg (0)
-        REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
 
   EXEC PARAMS
     HOST: coordinator
@@ -232,7 +227,6 @@ Plan Fragment 1
   OUTPUT: MIN(smallint_col), MAX(string_col)
   GROUP BY: tinyint_col, int_col
     SCAN HDFS table=default.alltypesagg (0)
-      REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
 
   EXEC PARAMS
     HOST: 127.0.0.1
@@ -261,7 +255,6 @@ Plan Fragment 0
     OUTPUT: COUNT(*), SUM(int_col), MIN(smallint_col), MAX(bigint_col)
     GROUP BY: tinyint_col, int_col
       SCAN HDFS table=default.alltypesagg (0)
-        REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
 
   EXEC PARAMS
     HOST: coordinator
@@ -290,7 +283,6 @@ Plan Fragment 1
   OUTPUT: COUNT(*), SUM(int_col), MIN(smallint_col), MAX(bigint_col)
   GROUP BY: tinyint_col, int_col
     SCAN HDFS table=default.alltypesagg (0)
-      REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
 
   EXEC PARAMS
     HOST: 127.0.0.1

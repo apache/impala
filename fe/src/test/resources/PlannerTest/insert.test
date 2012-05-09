@@ -9,7 +9,6 @@ Plan Fragment 0
   WRITE TO HDFS table=default.alltypesnopart
     OVERWRITE=false
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -25,7 +24,6 @@ Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -45,7 +43,6 @@ Plan Fragment 0
     OVERWRITE=false
     PARTITIONS: 2009,4
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -62,7 +59,6 @@ Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -82,7 +78,6 @@ Plan Fragment 0
     OVERWRITE=true
     PARTITIONS: 2009,4
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -99,7 +94,6 @@ Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -119,7 +113,6 @@ Plan Fragment 0
     OVERWRITE=false
     PARTITIONS: year,month
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -137,7 +130,6 @@ Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -158,7 +150,6 @@ Plan Fragment 0
     OVERWRITE=false
     PARTITIONS: 2009,month
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -176,7 +167,6 @@ Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -197,7 +187,6 @@ Plan Fragment 0
     OVERWRITE=false
     PARTITIONS: year,4
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 
@@ -214,7 +203,6 @@ Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
-    REGEX: .*/year=([^\/]*)/month=([^\/]*)/
 
   EXEC PARAMS
     HOST: 

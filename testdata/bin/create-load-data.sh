@@ -34,3 +34,11 @@ else
     exit -1
   fi
 fi
+
+# For tables that rely on loading data from local fs test-warehouse
+${HIVE_HOME}/bin/hive -hiveconf hive.root.logger=WARN,console -v \
+  -f ${IMPALA_HOME}/testdata/bin/load-dependent-tables.sql 
+if [ $? != 0 ]; then
+  echo DEPENDENT LOAD FAILED
+  exit -1
+fi

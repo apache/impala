@@ -68,6 +68,7 @@ set (SRC_FILES
   DataSinks.thrift
   Data.thrift
   Descriptors.thrift
+  JavaConstants.thrift
   Exprs.thrift
   ImpalaBackendService.thrift
   ImpalaPlanService.thrift
