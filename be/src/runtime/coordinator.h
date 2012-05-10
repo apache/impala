@@ -41,7 +41,7 @@ class TPlanExecParams;
 // which can be invoked asynchronously to Exec()/GetNext().
 class Coordinator {
  public:
-  Coordinator(ExecEnv* exec_env);
+  Coordinator(ExecEnv* exec_env, ExecStats* exec_stats);
   ~Coordinator();
 
   // Initiate execution of query. Blocks until result rows can be retrieved
@@ -70,7 +70,7 @@ class Coordinator {
   // query has been aborted
   bool execution_completed() { return execution_completed_; }
 
-  ExecStats* exec_stats() { return exec_stats_.get(); }
+  ExecStats* exec_stats() { return exec_stats_; }
 
  private:
   ExecEnv* exec_env_;
@@ -110,7 +110,9 @@ class Coordinator {
   // True if the query this coordinates has completed, false otherwise.
   bool execution_completed_;
 
-  boost::scoped_ptr<ExecStats> exec_stats_;
+  // Repository for statistics gathered during the execution of a
+  // single query. Owned by enclosing query executor.
+  ExecStats* exec_stats_;
 
   // Wrapper for ExecPlanFragment() rpc.
   void ExecRemoteFragment(

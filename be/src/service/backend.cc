@@ -10,6 +10,7 @@
 #include "codegen/llvm-codegen.h"
 #include "common/status.h"
 #include "exec/exec-node.h"
+#include "exec/exec-stats.h"
 #include "exec/hbase-table-scanner.h"
 #include "exprs/expr.h"
 #include "runtime/coordinator.h"
@@ -36,6 +37,7 @@ using namespace boost;
 using namespace apache::thrift::server;
 
 static TestExecEnv* test_env;
+static scoped_ptr<ExecStats> exec_stats;
 // calling the c'tor of the contained HdfsFsCache crashes
 // TODO(marcel): figure out why and fix it
 //static scoped_ptr<TestExecEnv> test_env;
@@ -72,6 +74,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
   VLOG(1) << "creating test env";
   test_env = new TestExecEnv(2, FLAGS_backend_port + 1);
   //test_env.reset(new TestExecEnv(2, FLAGS_backend_port + 1));
+  exec_stats.reset(new ExecStats());
   VLOG(1) << "starting backends";
   test_env->StartBackends();
 
@@ -105,7 +108,8 @@ extern "C"
 JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecQuery(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_query_exec_request,
     jobject error_log, jobject file_errors, jobject result_queue, jobject insert_result) {
-  JniCoordinator coord(env, test_env, error_log, file_errors, result_queue, insert_result);
+  JniCoordinator coord(env, test_env, exec_stats.get(), error_log, file_errors,
+                       result_queue, insert_result);
   coord.Exec(thrift_query_exec_request);
   RETURN_IF_EXC(env);
 

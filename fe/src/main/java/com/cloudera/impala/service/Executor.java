@@ -12,7 +12,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.apache.hadoop.hive.metastore.api.InvalidObjectException;
@@ -216,9 +215,12 @@ public class Executor {
     execRequest.setBatchSize(batchSize);
     execRequest.setSqlStmt(analysisResult.getStmt().toSql());
 
-    for (List<TPlanExecParams> planParamsList : execRequest.getNodeRequestParams()) {
-      for (TPlanExecParams params : planParamsList) {
-        params.setBatchSize(batchSize);
+    // Node request params may not be set for queries w/o a coordinator
+    if (execRequest.getNodeRequestParams() != null) {
+      for (List<TPlanExecParams> planParamsList : execRequest.getNodeRequestParams()) {
+        for (TPlanExecParams params : planParamsList) {
+          params.setBatchSize(batchSize);
+        }
       }
     }
 

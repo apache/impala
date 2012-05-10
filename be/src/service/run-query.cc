@@ -116,6 +116,7 @@ static void Exec(ExecEnv* exec_env) {
 
     RuntimeProfile aggregate_profile(&profile_pool, "RunQuery");
     int num_rows = 0;
+
     ExecStats::QueryType query_type;
 
     for (int i = 0; i < FLAGS_iterations; ++i) {
@@ -127,8 +128,6 @@ static void Exec(ExecEnv* exec_env) {
 
       EXIT_IF_ERROR(executor.Exec(*iter, NULL));
 
-      query_type = executor.exec_stats()->query_type();
-
       while (true) {
         string row;
         EXIT_IF_ERROR(executor.FetchResult(&row));
@@ -136,7 +135,9 @@ static void Exec(ExecEnv* exec_env) {
         if (!row.empty() && i == 0) cout << row << endl;
         if (executor.eos()) break;
       }
+
       num_rows += executor.exec_stats()->num_rows();
+      query_type = executor.exec_stats()->query_type();
 
       struct timeval end_time;
       gettimeofday(&end_time, NULL);

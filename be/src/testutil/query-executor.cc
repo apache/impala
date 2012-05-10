@@ -67,7 +67,8 @@ QueryExecutor::QueryExecutor(ExecEnv* exec_env)
     exec_env_(exec_env),
     row_batch_(NULL),
     next_row_(0),
-    obj_pool_(new ObjectPool()) {
+    obj_pool_(new ObjectPool()),
+    exec_stats_(new ExecStats()) {
 }
 
 QueryExecutor::~QueryExecutor() {
@@ -224,7 +225,7 @@ Status QueryExecutor::Exec(const string& query, vector<PrimitiveType>* col_types
     }
   }
 
-  coord_.reset(new Coordinator(exec_env_));
+  coord_.reset(new Coordinator(exec_env_, exec_stats_.get()));
   RETURN_IF_ERROR(coord_->Exec(query_request_));
   RETURN_IF_ERROR(PrepareSelectListExprs(
       coord_->runtime_state(), coord_->row_desc(), col_types));
@@ -283,6 +284,7 @@ Status QueryExecutor::FetchResult(vector<void*>* select_list_values) {
         select_list_values->push_back(select_list_exprs_[i]->GetValue(NULL));
       }
     }
+    exec_stats_->num_rows_ = 1;
     eos_ = true;
     return Status::OK;
   }
@@ -302,7 +304,7 @@ Status QueryExecutor::FetchResult(vector<void*>* select_list_values) {
   }
 
   // Might be an INSERT
-  if (row_batch_ != NULL && !coord_->exec_stats()->is_insert()) {
+  if (row_batch_ != NULL && !exec_stats_->is_insert()) {
     DCHECK(next_row_ < row_batch_->num_rows());
     TupleRow* row = row_batch_->GetRow(next_row_);
     for (int i = 0; i < select_list_exprs_.size(); ++i) {

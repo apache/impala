@@ -23,12 +23,12 @@ DECLARE_int32(backend_port);
 namespace impala {
 
 JniCoordinator::JniCoordinator(
-    JNIEnv* env, ExecEnv* exec_env, jobject error_log,
+    JNIEnv* env, ExecEnv* exec_env, ExecStats* exec_stats, jobject error_log,
     jobject file_errors, jobject result_queue, jobject insert_result)
   : env_(env),
     error_log_(error_log),
     file_errors_(file_errors),
-    coord_(new Coordinator(exec_env)),
+    coord_(new Coordinator(exec_env, exec_stats)),
     result_queue_(result_queue),
     insert_result_(insert_result) {
 }

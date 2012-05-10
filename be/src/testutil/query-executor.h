@@ -99,7 +99,9 @@ class QueryExecutor {
 
   bool eos() { return eos_; }
 
-  ExecStats* exec_stats() { return coord_->exec_stats(); }
+  // Returns any statistics gathered by the coordinator associated with the execution of
+  // this query
+  ExecStats* exec_stats() { return exec_stats_.get(); }
 
  private:
   // plan service-related
@@ -120,6 +122,8 @@ class QueryExecutor {
   int num_rows_;  // total # of rows returned for current query
   bool eos_;  // if true, no more rows/batches for current query
   boost::scoped_ptr<ObjectPool> obj_pool_;
+
+  boost::scoped_ptr<ExecStats> exec_stats_;
 
   // Prepare select list expressions of coord fragment.
   Status PrepareSelectListExprs(

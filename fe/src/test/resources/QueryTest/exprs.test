@@ -379,3 +379,9 @@ where str_col REGEXP no_match_regex_col
 string, string
 ----
 ====
+select 1+2
+---- TYPES
+bigint
+---- RESULTS
+3
+====

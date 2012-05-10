@@ -25,12 +25,12 @@ using namespace apache::thrift::transport;
 
 namespace impala {
 
-Coordinator::Coordinator(ExecEnv* exec_env)
+Coordinator::Coordinator(ExecEnv* exec_env, ExecStats* exec_stats)
   : exec_env_(exec_env),
     executor_(new PlanExecutor(exec_env)),
     sink_(NULL),
     execution_completed_(false),
-    exec_stats_(new ExecStats()) {
+    exec_stats_(exec_stats) {
 }
 
 Coordinator::~Coordinator() {

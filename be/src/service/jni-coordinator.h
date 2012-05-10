@@ -30,13 +30,14 @@ class Coordinator;
 class RuntimeState;
 class RowDescriptor;
 class ExecEnv;
+class ExecStats;
 class DataSink;
 
 // Shim class to adapt backend coordinator to jni.
 class JniCoordinator {
  public:
   JniCoordinator(
-      JNIEnv* env, ExecEnv* exec_env, jobject error_log,
+      JNIEnv* env, ExecEnv* exec_env, ExecStats* exec_stats, jobject error_log,
       jobject file_errors, jobject result_queue, jobject insert_result);
   ~JniCoordinator();
 

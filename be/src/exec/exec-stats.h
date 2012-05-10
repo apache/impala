@@ -25,8 +25,10 @@ private:
   // Whether this query is an INSERT or a SELECT
   QueryType query_type_;
 
-  // Coordinators can update these stats directly, this saves writing accessor methods.
+  // Coordinators / executors can update these stats directly, this
+  // saves writing accessor methods.
   friend class Coordinator;
+  friend class QueryExecutor;
 };
 
 }
