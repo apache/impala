@@ -250,7 +250,7 @@ Status HdfsSequenceScanner::GetNext(RuntimeState* state,
     } else {
       RETURN_IF_ERROR(WriteTuples(state, row_batch, 1, &row_idx));
     }
-    if (row_batch->IsFull()) {
+    if (scan_node_->ReachedLimit() || row_batch->IsFull()) {
       row_batch->tuple_data_pool()->AcquireData(tuple_pool_, true);
       *eosr = false;
       break;
