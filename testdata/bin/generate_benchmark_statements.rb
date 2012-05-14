@@ -59,9 +59,10 @@ GREP_INSERT_STATEMENT =
     "FROM %s_text_none INSERT OVERWRITE TABLE %s PARTITION(chunk) SELECT *;"
 
 # Compression type will be another dimension in the future.
-COMPRESSION_TYPE = "set mapreduce.output.compression.type=BLOCK;"
+COMPRESSION_TYPE = "SET mapred.output.compression.type=BLOCK;"
 COMPRESSION_ENABLED = "SET hive.exec.compress.output=%s;"
-COMPRESSION_CODEC = "SET mapreduce.output.compression.codec=com.hadoop.compression.%s;"
+COMPRESSION_CODEC =
+                   "SET mapred.output.compression.codec=org.apache.hadoop.io.compress.%s;"
 SET_DYNAMIC_PARTITION_STATEMENT = "SET hive.exec.dynamic.partition=true;"
 SET_PARTITION_MODE_NONSTRICT_STATEMENT = "SET hive.exec.dynamic.partition.mode=nonstrict;"
 ###
@@ -99,7 +100,7 @@ def generate_compression_codec_statement(compression)
     if compression == "none" then return "" end
 
     codec = case compression
-                when 'lzip' then "lzo.LzoCodec"
+                when 'default' then "DefaultCodec"
                 when 'gzip' then "GzipCodec"
                 when 'bzip2' then "BZip2Codec"
                 when 'snappy' then "SnappyCodec"
@@ -135,9 +136,8 @@ def build_table_name(file_format, data_set, compression)
 end
 
 def write_statements_to_file_based_on_input_vector(output_name, input_file_name)
-    output_create =
-        "-- Generated file - It is not recommended to edit this file directly.\n"
-    output_load = "--Generated file - It is not recommended to edit this file directly.\n"
+    output_create = ""
+    output_load = ""
 
     # Expected Input Format: <file format> <data set> <compression>
     File.open(input_file_name, 'r') do |file|

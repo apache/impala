@@ -1,4 +1,3 @@
--- Generated file - It is not recommended to edit this file directly.
 DROP TABLE IF EXISTS grep1GB_sequence_file_none;
 CREATE TABLE grep1GB_sequence_file_none (field string) partitioned by (chunk int) stored as sequencefile;
 
@@ -25,21 +24,21 @@ CREATE TABLE UserVisits_web_sequence_file_none (
   avgTimeOnSite int)
 row format delimited fields terminated by '|'  stored as sequencefile;
 
-DROP TABLE IF EXISTS grep1GB_sequence_file_lzip;
-CREATE TABLE grep1GB_sequence_file_lzip (field string) partitioned by (chunk int) stored as sequencefile;
+DROP TABLE IF EXISTS grep1GB_sequence_file_default;
+CREATE TABLE grep1GB_sequence_file_default (field string) partitioned by (chunk int) stored as sequencefile;
 
-DROP TABLE IF EXISTS grep10GB_sequence_file_lzip;
-CREATE TABLE grep10GB_sequence_file_lzip (field string) partitioned by (chunk int) stored as sequencefile;
+DROP TABLE IF EXISTS grep10GB_sequence_file_default;
+CREATE TABLE grep10GB_sequence_file_default (field string) partitioned by (chunk int) stored as sequencefile;
 
-DROP TABLE IF EXISTS Rankings_web_sequence_file_lzip;
-CREATE TABLE Rankings_web_sequence_file_lzip (
+DROP TABLE IF EXISTS Rankings_web_sequence_file_default;
+CREATE TABLE Rankings_web_sequence_file_default (
   pageRank int,
   pageURL string,
   avgDuration int)
 row format delimited fields terminated by '|' stored as sequencefile;
 
-DROP TABLE IF EXISTS UserVisits_web_sequence_file_lzip;
-CREATE TABLE UserVisits_web_sequence_file_lzip (
+DROP TABLE IF EXISTS UserVisits_web_sequence_file_default;
+CREATE TABLE UserVisits_web_sequence_file_default (
   sourceIP string,
   destURL string,
   visitDate string,

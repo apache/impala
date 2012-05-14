@@ -4,9 +4,9 @@ text grep10GB none
 sequence_file grep10GB none
 text web none
 sequence_file web none
-sequence_file grep1GB lzip
-sequence_file grep10GB lzip
-sequence_file web lzip
+sequence_file grep1GB default
+sequence_file grep10GB default
+sequence_file web default
 sequence_file grep1GB gzip
 sequence_file grep10GB gzip
 sequence_file web gzip
