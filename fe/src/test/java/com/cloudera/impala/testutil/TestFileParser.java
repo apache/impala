@@ -242,6 +242,7 @@ public class TestFileParser {
 
   public void parseFile(String table) {
     open(table);
+    testCases.clear();
     while (scanner.hasNextLine()) {
       testCases.add(parseOneTestCase());
     }
