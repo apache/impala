@@ -1,14 +1,17 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
+#ifndef IMPALA_RUNTIME_RAW_VALUE_H
+#define IMPALA_RUNTIME_RAW_VALUE_H
+
 #include <string>
+
+#include <boost/functional/hash.hpp>
 
 #include "common/logging.h"
 #include "runtime/primitive-type.h"
 #include "runtime/string-value.h"
 #include "runtime/timestamp-value.h"
-
-#ifndef IMPALA_RUNTIME_RAW_VALUE_H
-#define IMPALA_RUNTIME_RAW_VALUE_H
+#include "util/hash-util.h"
 
 namespace impala {
 
@@ -32,8 +35,9 @@ class RawValue {
   static void PrintValueAsBytes(const void* value, PrimitiveType type,
                                 std::stringstream* stream);
 
-  // Returns hash value for 'value' interpreted as 'type'.
-  static size_t GetHashValue(const void* value, PrimitiveType type);
+  // Returns hash value for 'value' interpreted as 'type'.  The resulting hash value
+  // is combined with the seed value.
+  static uint32_t GetHashValue(const void* value, PrimitiveType type, uint32_t seed = 0);
 
   // Compares both values.
   // Return value is < 0  if v1 < v2, 0 if v1 == v2, > 0 if v1 > v2.
@@ -56,20 +60,26 @@ inline bool RawValue::Eq(const void* v1, const void* v2, PrimitiveType type) {
   const StringValue* string_value2;
   switch (type) {
     case TYPE_BOOLEAN:
-      return *reinterpret_cast<const bool*>(v1) == *reinterpret_cast<const bool*>(v2);
+      return *reinterpret_cast<const bool*>(v1) 
+          == *reinterpret_cast<const bool*>(v2);
     case TYPE_TINYINT:
       return *reinterpret_cast<const int8_t*>(v1)
           == *reinterpret_cast<const int8_t*>(v2);
     case TYPE_SMALLINT:
-      return *reinterpret_cast<const int16_t*>(v1) == *reinterpret_cast<const int16_t*>(v2);
+      return *reinterpret_cast<const int16_t*>(v1) 
+          == *reinterpret_cast<const int16_t*>(v2);
     case TYPE_INT:
-      return *reinterpret_cast<const int32_t*>(v1) == *reinterpret_cast<const int32_t*>(v2);
+      return *reinterpret_cast<const int32_t*>(v1) 
+          == *reinterpret_cast<const int32_t*>(v2);
     case TYPE_BIGINT:
-      return *reinterpret_cast<const int64_t*>(v1) == *reinterpret_cast<const int64_t*>(v2);
+      return *reinterpret_cast<const int64_t*>(v1) 
+          == *reinterpret_cast<const int64_t*>(v2);
     case TYPE_FLOAT:
-      return *reinterpret_cast<const float*>(v1) == *reinterpret_cast<const float*>(v2);
+      return *reinterpret_cast<const float*>(v1) 
+          == *reinterpret_cast<const float*>(v2);
     case TYPE_DOUBLE:
-      return *reinterpret_cast<const double*>(v1) == *reinterpret_cast<const double*>(v2);
+      return *reinterpret_cast<const double*>(v1) 
+          == *reinterpret_cast<const double*>(v2);
     case TYPE_STRING:
       string_value1 = reinterpret_cast<const StringValue*>(v1);
       string_value2 = reinterpret_cast<const StringValue*>(v2);
@@ -82,6 +92,40 @@ inline bool RawValue::Eq(const void* v1, const void* v2, PrimitiveType type) {
       return 0;
   };
 }
+
+inline uint32_t RawValue::GetHashValue(const void* v, PrimitiveType type, uint32_t seed) {
+  switch (type) {
+    case TYPE_STRING: {
+      const StringValue* string_value = reinterpret_cast<const StringValue*>(v);
+      return HashUtil::Hash(string_value->ptr, string_value->len, seed);
+    }
+    case TYPE_BOOLEAN: {
+      bool value = *reinterpret_cast<const bool*>(v);
+      size_t seed_size_t = static_cast<size_t>(seed);
+      size_t hash_value = boost::hash<bool>().operator()(value);
+      boost::hash_combine(seed_size_t, hash_value);
+      return static_cast<uint32_t>(seed_size_t);
+    }
+    case TYPE_TINYINT:
+      return HashUtil::Hash(v, 1, seed);
+    case TYPE_SMALLINT:
+      return HashUtil::Hash(v, 2, seed);
+    case TYPE_INT:
+      return HashUtil::Hash(v, 4, seed);
+    case TYPE_BIGINT:
+      return HashUtil::Hash(v, 8, seed);
+    case TYPE_FLOAT:
+      return HashUtil::Hash(v, 4, seed);
+    case TYPE_DOUBLE:
+      return HashUtil::Hash(v, 8, seed);
+    case TYPE_TIMESTAMP:
+      return HashUtil::Hash(v, 8, seed);
+    default:
+      DCHECK(false) << "invalid type: " << TypeToString(type);
+      return 0;
+  }
+}
+
 }
 
 #endif

@@ -92,7 +92,8 @@ string PrintRow(TupleRow* row, const RowDescriptor& d) {
   stringstream out;
   out << "[";
   for (int i = 0; i < d.tuple_descriptors().size(); ++i) {
-     out << PrintTuple(row->GetTuple(i), *d.tuple_descriptors()[i]);
+    if (i != 0) out << " ";
+    out << PrintTuple(row->GetTuple(i), *d.tuple_descriptors()[i]);
   }
   out << "]";
   return out.str();

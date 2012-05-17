@@ -329,13 +329,6 @@ Status HdfsSequenceScanner::WriteFields(RowBatch* row_batch,
     tuple_ = reinterpret_cast<Tuple*>(new_tuple);
   }
 
-  // Need to reset the tuple_ if
-  //  1. eval failed (clear out null-indicator bits) OR
-  //  2. there are partition keys that need to be copied
-  if (!conjuncts_true || template_tuple_ != NULL) {
-    InitTuple(tuple_);
-  }
-
   if (error_in_row) return Status("Conversion from string failed");
   return Status::OK;
 }

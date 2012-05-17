@@ -12,6 +12,15 @@
 using namespace impala;
 using namespace std;
 
+// Benchmark for computing atof.  This benchmarks tests converting from
+// strings into floats on what we expect to be typical data.  The data
+// is mostly positive numbers with just a couple of them in scientific
+// notation.  
+// Results:
+//   Strtod Rate (per ms): 8.30189
+//   Atof Rate (per ms): 8.33333
+//   Impala Rate (per ms): 58.9649
+
 #define VALIDATE 1
 
 #if VALIDATE

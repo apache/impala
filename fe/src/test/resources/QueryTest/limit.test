@@ -49,22 +49,22 @@ select tinyint_col, count(*) from alltypesagg$TABLE group by 1 limit 5
 ----
 tinyint, bigint
 ----
+1,1000
+2,1000
+3,1000
 4,1000
 5,1000
-6,1000
-7,1000
-8,1000
 ====
 # limit and where clause don't interact
 select tinyint_col, count(*) from alltypesagg$TABLE where smallint_col > 49 group by 1 limit 5
 ----
 tinyint, bigint
 ----
+1,500
+2,500
+3,500
 4,500
 5,500
-6,500
-7,500
-8,500
 ====
 # limit is applied after having
 select tinyint_col, count(*) from alltypesagg$TABLE group by 1 having tinyint_col > 5 limit 5

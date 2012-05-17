@@ -448,10 +448,6 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
     return Status::OK;
   }
 
-  // Index into current row in row_batch.
-  int row_idx = RowBatch::INVALID_ROW_INDEX;
-
-  TupleRow* current_row = NULL;
 
   // HdfsRCFileScanner effectively does buffered IO, in that it reads the
   // rcfile into a column buffer, and sets an eof marker at that
@@ -475,14 +471,14 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
 
     // Copy rows out of the current row group into the row_batch
     while (!scan_node_->ReachedLimit() && !row_batch->IsFull() && NextRow()) {
-      if (row_idx == RowBatch::INVALID_ROW_INDEX) {
-        row_idx = row_batch->AddRow();
-        current_row = row_batch->GetRow(row_idx);
-        current_row->SetTuple(0, tuple_);
-        // Initialize tuple_ from the partition key template tuple before writing the
-        // slots
-        InitTuple(tuple_);
-      }
+      // Index into current row in row_batch.
+      int row_idx = row_batch->AddRow();
+      DCHECK(row_idx != RowBatch::INVALID_ROW_INDEX);
+      TupleRow* current_row = row_batch->GetRow(row_idx);
+      current_row->SetTuple(tuple_idx_, tuple_);
+      // Initialize tuple_ from the partition key template tuple before writing the
+      // slots
+      InitTuple(tuple_);
 
       const vector<SlotDescriptor*>& materialized_slots = 
           scan_node_->materialized_slots();
@@ -530,7 +526,6 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
 
       if (conjuncts_true) {
         row_batch->CommitLastRow();
-        row_idx = RowBatch::INVALID_ROW_INDEX;
         scan_node_->IncrNumRowsReturned();
         if (scan_node_->ReachedLimit() || row_batch->IsFull()) {
           tuple_ = NULL;
@@ -539,15 +534,6 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
         char* new_tuple = reinterpret_cast<char*>(tuple_);
         new_tuple += tuple_byte_size_;
         tuple_ = reinterpret_cast<Tuple*>(new_tuple);
-      }
-
-      // Need to reset the tuple_ if
-      //  1. eval failed (clear out null-indicator bits) OR
-      //  2. there are partition keys that need to be copied
-      // TODO: if the slots that need to be updated are very sparse (very few NULL slots
-      // or very few partition keys), updating all the tuple memory is probably bad
-      if (!conjuncts_true || template_tuple_ != NULL) {
-        InitTuple(tuple_);
       }
     }
   }

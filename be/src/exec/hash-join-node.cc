@@ -45,7 +45,9 @@ Status HashJoinNode::Init(ObjectPool* pool, const TPlanNode& tnode) {
     RETURN_IF_ERROR(Expr::CreateExprTree(pool, eq_join_conjuncts[i].left, &expr));
     probe_exprs_.push_back(expr);
     RETURN_IF_ERROR(Expr::CreateExprTree(pool, eq_join_conjuncts[i].right, &expr));
-    build_exprs_.push_back(expr);
+    build_exprs1_.push_back(expr);
+    RETURN_IF_ERROR(Expr::CreateExprTree(pool, eq_join_conjuncts[i].right, &expr));
+    build_exprs2_.push_back(expr);
   }
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(pool, tnode.hash_join_node.other_join_conjuncts,
@@ -67,7 +69,8 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
 
   // build and probe exprs are evaluated in the context of the rows produced by our
   // right and left children, respectively
-  Expr::Prepare(build_exprs_, state, child(1)->row_desc());
+  Expr::Prepare(build_exprs1_, state, child(1)->row_desc());
+  Expr::Prepare(build_exprs2_, state, child(1)->row_desc());
   Expr::Prepare(probe_exprs_, state, child(0)->row_desc());
 
   // other_join_conjuncts_ are evaluated in the context of the rows produced by this node
@@ -81,7 +84,8 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
     build_tuple_idx_.push_back(row_descriptor_.GetTupleIdx(build_tuple_desc->id()));
   }
 
-  hash_tbl_.reset(new HashTable(build_exprs_, probe_exprs_, child(1)->row_desc(), false));
+  hash_tbl_.reset(new HashTable(build_exprs1_, build_exprs2_, 
+        probe_exprs_, child(1)->row_desc(), false));
   probe_batch_.reset(new RowBatch(row_descriptor_, state->batch_size()));
   return Status::OK;
 }
@@ -125,6 +129,12 @@ Status HashJoinNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(child(0)->Open(state));
 
   // seed probe batch and current_probe_row_, etc.
+  // The child node will only assign tuples to the tuple row for the tuples it
+  // computes.  The other tuple ptrs must be set to NULL.
+  // TODO: we only need this for debugging (printing out the rows).  Any
+  // operation we do only touches the tuples that have been assigned.  Doesn't
+  // show up as a perf hit.
+  probe_batch_->ClearBatch();
   bool dummy;
   RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &dummy));
   COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
@@ -235,6 +245,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
         // pass on pools, out_batch might still need them
         probe_batch_->TransferTupleData(out_batch);
         bool dummy;  // we ignore eos and use the # of returned rows instead
+        probe_batch_->ClearBatch();
         RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &dummy));
         COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
         probe_batch_pos_ = 0;

@@ -128,34 +128,6 @@ void RawValue::PrintValue(const void* value, PrimitiveType type, string* str) {
   *str = out.str();
 }
 
-size_t RawValue::GetHashValue(const void* value, PrimitiveType type) {
-  const StringValue* string_value;
-  switch (type) {
-    case TYPE_BOOLEAN:
-      return hash<bool>().operator()(*reinterpret_cast<const bool*>(value));
-    case TYPE_TINYINT:
-      return hash<int8_t>().operator()(*reinterpret_cast<const int8_t*>(value));
-    case TYPE_SMALLINT:
-      return hash<int16_t>().operator()(*reinterpret_cast<const int16_t*>(value));
-    case TYPE_INT:
-      return hash<int32_t>().operator()(*reinterpret_cast<const int32_t*>(value));
-    case TYPE_BIGINT:
-      return hash<int64_t>().operator()(*reinterpret_cast<const int64_t*>(value));
-    case TYPE_FLOAT:
-      return hash<float>().operator()(*reinterpret_cast<const float*>(value));
-    case TYPE_DOUBLE:
-      return hash<double>().operator()(*reinterpret_cast<const double*>(value));
-    case TYPE_STRING:
-      string_value = reinterpret_cast<const StringValue*>(value);
-      return hash_range<char*>(string_value->ptr, string_value->ptr + string_value->len);
-    case TYPE_TIMESTAMP:
-      return hash<double>().operator()(*reinterpret_cast<const TimestampValue*>(value));
-    default:
-      DCHECK(false) << "invalid type: " << TypeToString(type);
-      return 0;
-  };
-}
-
 int RawValue::Compare(const void* v1, const void* v2, PrimitiveType type) {
   const StringValue* string_value1;
   const StringValue* string_value2;

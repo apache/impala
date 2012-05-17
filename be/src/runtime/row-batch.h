@@ -140,6 +140,10 @@ class RowBatch {
     memset(row, 0, num_tuples_per_row_ * sizeof(Tuple*));
   }
 
+  void ClearBatch() {
+    memset(tuple_ptrs_, 0, capacity_ * num_tuples_per_row_);
+  }
+
   // Create a serialized version of this row batch in output_batch, attaching
   // all of the data it references (TRowBatch::tuple_data) to output_batch.tuple_data.
   // If an in-flight row is present in this row batch, it is ignored.

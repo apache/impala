@@ -12,6 +12,16 @@
 using namespace impala;
 using namespace std;
 
+// Benchmark for doing atoi.  This benchmark compares various implementations
+// to convert string to int32s.  The data is mostly positive, relatively small
+// numbers.
+// Results:
+//   Strtol Rate (per ms): 57.4257
+//   Atoi Rate (per ms): 57.7821
+//   Impala Rate (per ms): 147.268
+//   Impala Unsafe Rate (per ms): 200.182
+//   Impala Unrolled Rate (per ms): 167.628
+//   Impala Cased Rate (per ms): 169.307
 #define VALIDATE 1
 
 #if VALIDATE
@@ -52,7 +62,7 @@ void AddTestData(TestData* data, int n, int32_t min = -10, int32_t max = 10) {
 
 #define DIGIT(c) (c -'0')
 
-int32_t AtoiUnsafe(char* s, int len) {
+inline int32_t AtoiUnsafe(char* s, int len) {
   int32_t val = 0;
   bool negative = false;
   int i = 0;
@@ -68,7 +78,7 @@ int32_t AtoiUnsafe(char* s, int len) {
   return negative ? -val : val;
 }
 
-int32_t AtoiUnrolled(char* s, int len) {
+inline int32_t AtoiUnrolled(char* s, int len) {
   if (LIKELY(len <= 8)) {
     int32_t val = 0;
     bool negative = false;
@@ -101,7 +111,7 @@ int32_t AtoiUnrolled(char* s, int len) {
   }
 }
 
-int32_t AtoiCased(char* s, int len) {
+inline int32_t AtoiCased(char* s, int len) {
   if (LIKELY(len <= 5)) {
     int32_t val = 0;
     bool negative = false;
@@ -112,7 +122,8 @@ int32_t AtoiCased(char* s, int len) {
 
     switch(len) {
       case 5:
-        val = DIGIT(s[0])*10000 + DIGIT(s[1])*1000 + DIGIT(s[2])*100 + DIGIT(s[3])*10 + DIGIT(s[4]);
+        val = DIGIT(s[0])*10000 + DIGIT(s[1])*1000 + DIGIT(s[2])*100 + 
+              DIGIT(s[3])*10 + DIGIT(s[4]);
         break;
       case 4:
         val = DIGIT(s[0])*1000 + DIGIT(s[1])*100 + DIGIT(s[2])*10 + DIGIT(s[3]);

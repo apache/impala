@@ -54,7 +54,12 @@ class HashJoinNode : public ExecNode {
   // our equi-join predicates "<lhs> = <rhs>" are separated into
   // build_exprs_ (over child(1)) and probe_exprs_ (over child(0))
   std::vector<Expr*> probe_exprs_;
-  std::vector<Expr*> build_exprs_;
+
+  // we need two sets of build exprs to evaluate TupleRow equality
+  // when constructing the build table.  The exprs is where expr results
+  // are stored and we need separate locations for the two build tuples.
+  std::vector<Expr*> build_exprs1_;
+  std::vector<Expr*> build_exprs2_;
 
   // non-equi-join conjuncts from the JOIN clause
   std::vector<Expr*> other_join_conjuncts_;
@@ -67,6 +72,10 @@ class HashJoinNode : public ExecNode {
   bool matched_probe_;  // if true, we have matched the current probe row
   bool eos_;  // if true, nothing left to return in GetNext()
   boost::scoped_ptr<MemPool> build_pool_;  // holds everything referenced in hash_tbl_
+
+  // probe_batch_ must be cleared before calling GetNext().  The child node
+  // does not initialize all tuple ptrs in the row, only the ones that it
+  // is responsible for.
   boost::scoped_ptr<RowBatch> probe_batch_;
   int probe_batch_pos_;  // current scan pos in probe_batch_
   TupleRow* current_probe_row_;
@@ -74,7 +83,7 @@ class HashJoinNode : public ExecNode {
   // build_tuple_idx_[i] is the tuple index of child(1)'s tuple[i] in the output row
   std::vector<int> build_tuple_idx_;
   int build_tuple_size_;
-
+  
   RuntimeProfile::Counter* build_timer_;   // time to build hash table
   RuntimeProfile::Counter* probe_timer_;   // time to probe
   RuntimeProfile::Counter* build_row_counter_;   // num build rows

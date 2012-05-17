@@ -129,9 +129,12 @@ Status HdfsScanNode::InitNextScanRange(RuntimeState* state, bool* scan_ranges_fi
     return Status(ss.str());
   }
 
-
   RETURN_IF_ERROR(partition->PrepareExprs(state));
-  InitTemplateTuple(state, partition->partition_key_values());
+  // Only allocate template_tuple_ if there are partition keys.  The scanners
+  // use template_tuple == NULL to determine if partition keys are necessary
+  if (!partition->partition_key_values().empty()) {
+    InitTemplateTuple(state, partition->partition_key_values());
+  } 
 
   if (current_byte_stream_ == NULL) {
     current_byte_stream_.reset(new HdfsByteStream(hdfs_connection_, this));

@@ -31,7 +31,12 @@ class HashTable {
   // NULL == NULL when doing a scan.
   // If stores_nulls is false, the hash table will (silently) reject
   // rows for which build_exprs return NULLs.
-  HashTable(const std::vector<Expr*>& build_exprs,
+  // build_exprs contain the Exprs used to evaluate the build rows.
+  // Two copies are needed to evaluate both build rows during build phase.
+  // probe_exprs contain the Exprs used to evaluate the probe rows.
+  // TODO: this is a hack.  Fix this.
+  HashTable(const std::vector<Expr*>& build_exprs1,
+            const std::vector<Expr*>& build_exprs2,
             const std::vector<Expr*>& probe_exprs,
             const RowDescriptor& build_row_desc,
             bool stores_nulls);
@@ -84,7 +89,8 @@ class HashTable {
   HashFn hash_fn_;
   EqualsFn equals_fn_;
   boost::scoped_ptr<HashSet> hash_tbl_;
-  const std::vector<Expr*> build_exprs_;
+  const std::vector<Expr*> build_exprs1_;
+  const std::vector<Expr*> build_exprs2_;
   const std::vector<Expr*> probe_exprs_;
   const RowDescriptor& build_row_desc_;
 

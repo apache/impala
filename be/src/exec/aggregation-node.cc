@@ -106,9 +106,11 @@ size_t AggregationNode::GroupingExprHash::operator()(Tuple* const& t) const {
     }
     // don't ignore NULLs; we want (1, NULL) to return a different hash
     // value than (NULL, 1)
-    size_t hash_value =
-        (value == NULL ? 0 : RawValue::GetHashValue(value, slot_d->type()));
-    hash_combine(seed, hash_value);
+    if (value == NULL) {
+      hash_combine(seed, 0);
+    } else {
+      seed = RawValue::GetHashValue(value, slot_d->type(), seed);
+    }
   }
   return seed;
 }

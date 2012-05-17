@@ -87,8 +87,9 @@ HdfsPartitionDescriptor::HdfsPartitionDescriptor(const THdfsPartition& thrift_pa
   for (int i = 0; i < thrift_partition.partitionKeyExprs.size(); ++i) {
     Expr* expr;
     // TODO: Move to dedicated Init method and treat Status return correctly
-    DCHECK(Expr::CreateExprTree(object_pool_,
-        thrift_partition.partitionKeyExprs[i], &expr).ok());
+    Status status = Expr::CreateExprTree(object_pool_,
+        thrift_partition.partitionKeyExprs[i], &expr);
+    DCHECK(status.ok());
     partition_key_values_.push_back(expr);
   }
 }

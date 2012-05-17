@@ -109,6 +109,7 @@ class Expr {
 
   // Evaluate expr and return pointer to result. The result is
   // valid as long as 'row' doesn't change.
+  // TODO: stop having the result cached in this Expr object 
   void* GetValue(TupleRow* row);
 
   // Convenience function: extract value into col_val and sets the
