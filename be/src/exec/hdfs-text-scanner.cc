@@ -229,7 +229,7 @@ Status HdfsTextScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
     // TODO: If the tuple data contains very sparse string slots, we waste a lot of
     // memory.  Instead, we should consider copying the tuples to a compact new buffer
     // in this case.
-    if (num_rows_returned_ > previous_num_rows && has_string_slots_) {
+    if (num_rows_returned_ > previous_num_rows && has_noncompact_strings_) {
       reuse_byte_buffer_ = false;
     }
 
@@ -325,7 +325,7 @@ Status HdfsTextScanner::WriteFields(RuntimeState* state, RowBatch* row_batch,
     boundary_row_.Clear();
     if (!text_converter_->WriteSlot(state,
         scan_node_->materialized_slots()[slot_idx_].second, tuple_,
-        field_locations_[n].start, len, false, need_escape).ok()) {
+        field_locations_[n].start, len, scan_node_->compact_data(), need_escape).ok()) {
       error_in_row_ = true;
     }
 

@@ -387,6 +387,9 @@ public class Planner {
       TableRef innerRef = selectStmt.getTableRefs().get(i);
       root = createHashJoinNode(analyzer, root, innerRef);
       root.rowTupleIds = rowTuples;
+      // Have the build side of a join copy data to a compact representation
+      // in the tuple buffer.
+      root.getChildren().get(1).setCompactData(true);
     }
 
     if (selectStmt.getSortInfo() != null && selectStmt.getLimit() == -1) {

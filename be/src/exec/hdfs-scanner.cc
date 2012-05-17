@@ -43,7 +43,8 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, const TupleDescriptor* tuple_d
       num_errors_in_file_(0),
       current_byte_stream_(NULL),
       template_tuple_(template_tuple),
-      has_string_slots_(!tuple_desc->string_slots().empty()),
+      has_noncompact_strings_(!scan_node->compact_data() &&
+                              !tuple_desc->string_slots().empty()),
       current_scan_range_(NULL) {
 }
 

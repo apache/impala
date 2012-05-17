@@ -172,7 +172,7 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
   } else {
     // Uncompressed records
     RETURN_IF_ERROR(SerDeUtils::ReadVLong(buffered_byte_stream_.get(), record_len));
-    if (has_string_slots_ || *record_len > unparsed_data_buffer_size_) {
+    if (has_noncompact_strings_ || *record_len > unparsed_data_buffer_size_) {
       unparsed_data_buffer_ = unparsed_data_buffer_pool_->Allocate(*record_len);
       unparsed_data_buffer_size_ = *record_len;
     }
@@ -204,8 +204,8 @@ Status HdfsSequenceScanner::GetNext(RuntimeState* state,
     int64_t record_len;
     // Get the next record and record length.
     // There are 3 cases:
-    //  Block compressed -- each block contains several records.
-    //  Record compressed -- like a regular record, but the data is compressed.
+    //  Block-compressed -- each block contains several records.
+    //  Record-compressed -- like a regular record, but the data is compressed.
     //  Uncompressed.
     if (is_blk_compressed_) {
       RETURN_IF_ERROR(GetRecordFromCompressedBlock(state, &record, &record_len, eosr));
@@ -257,7 +257,7 @@ Status HdfsSequenceScanner::GetNext(RuntimeState* state,
       break;
     }
   }
-  if (has_string_slots_) {
+  if (has_noncompact_strings_) {
     // Pass the buffer data to the row_batch.
     // If we are at the end of a scan range then release the ownership
     row_batch->tuple_data_pool()->AcquireData(unparsed_data_buffer_pool_.get(), !*eosr);
@@ -294,7 +294,7 @@ Status HdfsSequenceScanner::WriteFields(RuntimeState* state, RowBatch* row_batch
 
     if (!text_converter_->WriteSlot(state, scan_node_->materialized_slots()[n].second,
         tuple_, reinterpret_cast<char*>(field_locations_[n].start),
-        len, false, need_escape).ok()) {
+        len, !has_noncompact_strings_, need_escape).ok()) {
       error_in_row = true;
     }
   }
@@ -384,9 +384,15 @@ Status HdfsSequenceScanner::ReadFileHeader() {
 
   if (is_compressed_) {
     vector<char> codec;
+    // For record-comrpessed data we always want to copy since they tend to be
+    // small and occupy a bigger mempool chunk.
+    if (!is_blk_compressed_) {
+        has_noncompact_strings_ = false;
+    }
     RETURN_IF_ERROR(SerDeUtils::ReadText(buffered_byte_stream_.get(), &codec));
     RETURN_IF_ERROR(Decompressor::CreateDecompressor(runtime_state_,
-        unparsed_data_buffer_pool_.get(), !has_string_slots_, codec, &decompressor_));
+        unparsed_data_buffer_pool_.get(),
+        !has_noncompact_strings_, codec, &decompressor_));
   }
 
   RETURN_IF_ERROR(ReadFileHeaderMetadata());

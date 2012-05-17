@@ -54,6 +54,9 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   protected List<Predicate> conjuncts;
 
+  //  Node should compact data.
+  protected boolean compactData;
+
   // Control how much info explain plan will output
   public enum ExplainPlanLevel {
     NORMAL,
@@ -85,6 +88,14 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
 
   public long getLimit() {
     return limit;
+  }
+
+  /** Set the value of compactData in all children. */
+  public void setCompactData(boolean on) {
+    this.compactData = on;
+    for (PlanNode child: this.getChildren()) {
+      child.setCompactData(on);
+    }
   }
 
   /**
@@ -166,6 +177,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     for (Predicate p: conjuncts) {
       msg.addToConjuncts(p.treeToThrift());
     }
+    msg.compact_data = compactData;
     toThrift(msg);
     container.addToNodes(msg);
     for (PlanNode child: children) {

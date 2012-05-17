@@ -132,9 +132,9 @@ class HdfsScanner {
   Tuple* template_tuple_;
 
   // True if the descriptor of the tuple the scanner is writing has
-  // string slots; used to decide how to treat buffer memory that
-  // contains slot data.
-  bool has_string_slots_;
+  // string slots and we are not compacting data. This is used to decide
+  // how to treat buffer memory that contains slot data.
+  bool has_noncompact_strings_;
 
   // The scan range currently being read
   HdfsScanRange* current_scan_range_;

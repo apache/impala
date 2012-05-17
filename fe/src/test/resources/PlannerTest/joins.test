@@ -11,7 +11,7 @@ Plan Fragment 0
       SCAN HDFS table=default.testtbl (0)
         PREDICATES: t1.zip = 94611
         TUPLE IDS: 0 
-      SCAN HDFS table=default.testtbl (1)
+      SCAN HDFS table=default.testtbl (1) compact
         TUPLE IDS: 1 
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -29,7 +29,7 @@ Plan Fragment 1
       SCAN HDFS table=default.testtbl (0)
         PREDICATES: t1.zip = 94611
         TUPLE IDS: 0 
-      SCAN HDFS table=default.testtbl (1)
+      SCAN HDFS table=default.testtbl (1) compact
         TUPLE IDS: 1 
 ====
 # general exprs on both sides of equi-join predicates
@@ -47,7 +47,7 @@ Plan Fragment 0
       SCAN HDFS table=default.testtbl (0)
         PREDICATES: t1.zip = 94611
         TUPLE IDS: 0 
-      SCAN HDFS table=default.testtbl (1)
+      SCAN HDFS table=default.testtbl (1) compact
         TUPLE IDS: 1 
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -65,7 +65,7 @@ Plan Fragment 1
       SCAN HDFS table=default.testtbl (0)
         PREDICATES: t1.zip = 94611
         TUPLE IDS: 0 
-      SCAN HDFS table=default.testtbl (1)
+      SCAN HDFS table=default.testtbl (1) compact
         TUPLE IDS: 1 
 ====
 # multiple join predicates;
@@ -91,7 +91,7 @@ Plan Fragment 0
         PREDICATES: a.tinyint_col = 15
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypessmall (1)
+      SCAN HDFS table=default.alltypessmall (1) compact
         PREDICATES: b.string_col = '15'
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/
         TUPLE IDS: 1 
@@ -126,7 +126,7 @@ Plan Fragment 1
         PREDICATES: a.tinyint_col = 15
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypessmall (1)
+      SCAN HDFS table=default.alltypessmall (1) compact
         PREDICATES: b.string_col = '15'
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/
         TUPLE IDS: 1 
@@ -177,11 +177,11 @@ Plan Fragment 0
             PREDICATES: a.tinyint_col = 15
             REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
             TUPLE IDS: 0 
-          SCAN HDFS table=default.alltypessmall (1)
+          SCAN HDFS table=default.alltypessmall (1) compact
             PREDICATES: b.string_col = '15'
             REGEX: .*/year=([^\/]*)/month=([^\/]*)/
             TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypesaggnonulls (3)
+      SCAN HDFS table=default.alltypesaggnonulls (3) compact
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
         TUPLE IDS: 2 
 
@@ -225,11 +225,11 @@ Plan Fragment 1
             PREDICATES: a.tinyint_col = 15
             REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
             TUPLE IDS: 0 
-          SCAN HDFS table=default.alltypessmall (1)
+          SCAN HDFS table=default.alltypessmall (1) compact
             PREDICATES: b.string_col = '15'
             REGEX: .*/year=([^\/]*)/month=([^\/]*)/
             TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypesaggnonulls (3)
+      SCAN HDFS table=default.alltypesaggnonulls (3) compact
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
         TUPLE IDS: 2 
 
@@ -445,12 +445,12 @@ Plan Fragment 0
                     SCAN HDFS table=default.alltypesagg (0)
                       REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
                       TUPLE IDS: 0 
-                    SCAN HDFS table=default.alltypessmall (1)
+                    SCAN HDFS table=default.alltypessmall (1) compact
                       REGEX: .*/year=([^\/]*)/month=([^\/]*)/
                       TUPLE IDS: 1 
-                SCAN HDFS table=default.alltypesnopart (3)
+                SCAN HDFS table=default.alltypesnopart (3) compact
                   TUPLE IDS: 2 
-            SCAN HDFS table=default.alltypesagg (5)
+            SCAN HDFS table=default.alltypesagg (5) compact
               REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
               TUPLE IDS: 3 
 
@@ -521,12 +521,12 @@ Plan Fragment 1
                   SCAN HDFS table=default.alltypesagg (0)
                     REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
                     TUPLE IDS: 0 
-                  SCAN HDFS table=default.alltypessmall (1)
+                  SCAN HDFS table=default.alltypessmall (1) compact
                     REGEX: .*/year=([^\/]*)/month=([^\/]*)/
                     TUPLE IDS: 1 
-              SCAN HDFS table=default.alltypesnopart (3)
+              SCAN HDFS table=default.alltypesnopart (3) compact
                 TUPLE IDS: 2 
-          SCAN HDFS table=default.alltypesagg (5)
+          SCAN HDFS table=default.alltypesagg (5) compact
             REGEX: .*/year=([^\/]*)/month=([^\/]*)/day=([^\/]*)/
             TUPLE IDS: 3 
 
@@ -568,7 +568,7 @@ Plan Fragment 0
       SCAN HDFS table=default.alltypessmall (0)
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypessmall (1)
+      SCAN HDFS table=default.alltypessmall (1) compact
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/
         TUPLE IDS: 1 
 
@@ -602,7 +602,7 @@ Plan Fragment 1
       SCAN HDFS table=default.alltypessmall (0)
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypessmall (1)
+      SCAN HDFS table=default.alltypessmall (1) compact
         REGEX: .*/year=([^\/]*)/month=([^\/]*)/
         TUPLE IDS: 1 
 

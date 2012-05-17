@@ -31,6 +31,11 @@ public class AggregationNode extends PlanNode {
   }
 
   @Override
+  public void setCompactData(boolean on) {
+    this.compactData = on;
+  }
+
+  @Override
   protected String debugString() {
     return Objects.toStringHelper(this)
         .add("aggInfo", aggInfo.debugString())

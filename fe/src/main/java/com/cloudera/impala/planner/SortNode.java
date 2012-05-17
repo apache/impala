@@ -42,6 +42,11 @@ public class SortNode extends PlanNode {
   }
 
   @Override
+  public void setCompactData(boolean on) {
+    this.compactData = on;
+  }
+
+  @Override
   protected String debugString() {
     List<String> strings = Lists.newArrayList();
     for (Boolean isAsc : info.getIsAscOrder()) {

@@ -6,7 +6,7 @@ namespace java com.cloudera.impala.thrift
 include "Exprs.thrift"
 include "Types.thrift"
 
-enum TPlanNodeType {  
+enum TPlanNodeType {
   HDFS_TEXT_SCAN_NODE,
   HDFS_RCFILE_SCAN_NODE,
   HDFS_SEQFILE_SCAN_NODE,
@@ -69,7 +69,7 @@ struct THdfsScanNode {
 struct THBaseFilter {
   1: required string family
   2: required string qualifier
-  // Ordinal number into enum HBase CompareFilter.CompareOp. 
+  // Ordinal number into enum HBase CompareFilter.CompareOp.
   // We don't use TExprOperator because the op is interpreted by an HBase Filter, and
   // not the c++ expr eval.
   3: required i32 op_ordinal
@@ -134,18 +134,21 @@ struct TPlanNode {
   3: required i32 num_children
   4: required i64 limit
   5: required list<Types.TTupleId> row_tuples
-  
+
   // nullable_tuples[i] is true if row_tuples[i] is nullable
   6: required list<bool> nullable_tuples
   7: optional list<Exprs.TExpr> conjuncts
 
+  // Produce data in compact format.
+  8: required bool compact_data
+
   // one field per PlanNode subclass
-  8: optional THdfsScanNode hdfs_scan_node
-  9: optional THBaseScanNode hbase_scan_node
-  10: optional THashJoinNode hash_join_node
-  11: optional TAggregationNode agg_node
-  12: optional TSortNode sort_node
-  13: optional TExchangeNode exchange_node
+  9: optional THdfsScanNode hdfs_scan_node
+  10: optional THBaseScanNode hbase_scan_node
+  11: optional THashJoinNode hash_join_node
+  12: optional TAggregationNode agg_node
+  13: optional TSortNode sort_node
+  14: optional TExchangeNode exchange_node
 }
 
 // A flattened representation of a tree of PlanNodes, obtained by depth-first

@@ -284,7 +284,12 @@ public abstract class HdfsScanNode extends ScanNode {
   protected String getExplainString(String prefix, ExplainPlanLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     output.append(prefix + "SCAN HDFS table=" + desc.getTable().getFullName());
-    output.append(" (" + id + ")\n");
+    output.append(" (" + id + ")");
+    if (compactData) {
+      output.append(" compact\n");
+    } else {
+      output.append("\n");
+    }
     if (!conjuncts.isEmpty()) {
       output.append(prefix + "  PREDICATES: " + getExplainString(conjuncts) + "\n");
     }

@@ -71,6 +71,8 @@ class HdfsScanNode : public ScanNode {
 
   int limit() const { return limit_; }
 
+  bool compact_data() const { return compact_data_; }
+
   const static int SKIP_COLUMN = -1;
 
   const std::vector<std::pair<int, SlotDescriptor*> >& materialized_slots()
@@ -86,10 +88,14 @@ class HdfsScanNode : public ScanNode {
 
   RuntimeProfile::Counter* parse_time_counter() const { return parse_time_counter_; }
 
-
  private:
   // Tuple id resolved in Prepare() to set tuple_desc_;
   int tuple_id_;
+
+  // Copy strings to tuple memory pool if true.
+  // We try to avoid the overhead copying strings if the data will just
+  // stream to another node that will release the memory.
+  bool compact_data_;
 
   // Descriptor for tuples this scan node constructs
   const TupleDescriptor* tuple_desc_;

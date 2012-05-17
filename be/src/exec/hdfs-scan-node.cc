@@ -40,6 +40,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
                            const DescriptorTbl& descs)
     : ScanNode(pool, tnode, descs),
       tuple_id_(tnode.hdfs_scan_node.tuple_id),
+      compact_data_(tnode.compact_data),
       tuple_desc_(NULL),
       tuple_pool_(new MemPool()),
       current_scanner_(NULL),

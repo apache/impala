@@ -103,9 +103,11 @@ public class HBaseScanNode extends ScanNode {
         .toString();
   }
 
-  // We convert predicates of the form <slotref> op <constant> where slotref is of type string
-  // to HBase filters. We remove the corresponding predicate from the conjuncts.
-  // TODO: expand this to generate nested filter lists for arbitrary conjunctions and disjunctions.
+  // We convert predicates of the form <slotref> op <constant> where slotref is of
+  // type string to HBase filters. We remove the corresponding predicate from the
+  // conjuncts.
+  // TODO: expand this to generate nested filter lists for arbitrary conjunctions
+  // and disjunctions.
   private void createHBaseFilters(Analyzer analyzer) {
     for (SlotDescriptor slot: desc.getSlots()) {
       // TODO: Currently we can only push down predicates on string columns.
@@ -144,7 +146,8 @@ public class HBaseScanNode extends ScanNode {
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.HBASE_SCAN_NODE;
     HBaseTable tbl = (HBaseTable) desc.getTable();
-    msg.hbase_scan_node = new THBaseScanNode(desc.getId().asInt(), tbl.getHBaseTableName());
+    msg.hbase_scan_node =
+      new THBaseScanNode(desc.getId().asInt(), tbl.getHBaseTableName());
     if (!filters.isEmpty()) {
       msg.hbase_scan_node.setFilters(filters);
     }
