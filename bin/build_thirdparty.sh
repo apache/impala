@@ -55,11 +55,6 @@ cd $IMPALA_HOME/thirdparty/gtest-1.6.0
 cmake .
 make -j4
 
-# Build llvm
-cd $IMPALA_HOME/thirdparty/llvm-3.0.src
-./configure --with-pic
-make -j4
-
 # Build Snappy
 cd $IMPALA_HOME/thirdparty/snappy-1.0.5
 ./configure --with-pic --prefix=$IMPALA_HOME/thirdparty/snappy-1.0.5/build

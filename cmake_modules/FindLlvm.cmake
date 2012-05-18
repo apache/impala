@@ -9,7 +9,7 @@
 
 find_program(LLVM_CONFIG_EXECUTABLE 
   NAMES llvm-config 
-  PATHS ${CMAKE_SOURCE_DIR}/thirdparty/llvm-3.0.src/Release/bin/
+  PATHS /usr/bin
   DOC "llvm-config executable"
 )
 
