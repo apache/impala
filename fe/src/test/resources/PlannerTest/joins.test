@@ -555,3 +555,67 @@ Plan Fragment 1
         hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
         hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ====
+# join without "other join conjuncts"
+select * from alltypessmall a, alltypessmall b where a.id = b.id limit 1
+---- PLAN
+Plan Fragment 0
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      a.id = b.id
+    LIMIT: 1
+    TUPLE IDS: 0 1 
+      SCAN HDFS table=default.alltypessmall (0)
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+        TUPLE IDS: 0 
+      SCAN HDFS table=default.alltypessmall (1)
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+        TUPLE IDS: 1 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+------------ DISTRIBUTEDPLAN
+Plan Fragment 0
+  EXCHANGE (3)
+    LIMIT: 1
+    TUPLE IDS: 0 1 
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      a.id = b.id
+    LIMIT: 1
+    TUPLE IDS: 0 1 
+      SCAN HDFS table=default.alltypessmall (0)
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+        TUPLE IDS: 0 
+      SCAN HDFS table=default.alltypessmall (1)
+        REGEX: .*/year=([^\/]*)/month=([^\/]*)/
+        TUPLE IDS: 1 
+
+  EXEC PARAMS
+    HOST: 127.0.0.1
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+====

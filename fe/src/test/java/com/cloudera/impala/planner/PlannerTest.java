@@ -21,9 +21,9 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.testutil.TestFileParser;
-import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.testutil.TestFileParser.Section;
 import com.cloudera.impala.testutil.TestFileParser.TestCase;
+import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.Constants;
 import com.google.common.collect.Lists;
 

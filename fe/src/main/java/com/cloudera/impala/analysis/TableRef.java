@@ -35,9 +35,9 @@ public abstract class TableRef extends ParseNodeBase {
 
   // conjuncts from the JOIN clause:
   // 1. equi-join predicates
-  protected List<Predicate> eqJoinConjuncts;
+  final protected List<Predicate> eqJoinConjuncts = Lists.newArrayList();;
   // 2. the rest
-  protected List<Predicate> otherJoinConjuncts;
+  final protected List<Predicate> otherJoinConjuncts = Lists.newArrayList();;
 
   public TableRef(String alias) {
     super();
@@ -155,8 +155,6 @@ public abstract class TableRef extends ParseNodeBase {
       onClause.analyze(analyzer);
       // need to register conjuncts before being able to call isEqJoinConjunct()
       analyzer.registerConjuncts(onClause);
-      eqJoinConjuncts = Lists.newArrayList();
-      otherJoinConjuncts = Lists.newArrayList();
       for (Predicate p: onClause.getConjuncts()) {
         if (p.isEqJoinConjunct()) {
           eqJoinConjuncts.add(p);
@@ -211,11 +209,8 @@ public abstract class TableRef extends ParseNodeBase {
       return (leftTblRef != null ? ", " : "") + tableRefToSql();
     }
 
-    StringBuilder output = new StringBuilder(joinOpToSql() + " ");
+    StringBuilder output = new StringBuilder(" " + joinOpToSql() + " ");
     output.append(tableRefToSql()).append(" ");
-    if (alias != null) {
-      output.append(alias).append(" ");
-    }
     if (usingColNames != null) {
       output.append("USING (").append(Joiner.on(", ").join(usingColNames)).append(")");
     } else if (onClause != null) {
