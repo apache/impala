@@ -6,7 +6,7 @@ from alltypessmall
 where year=2009 and month=04
 ---- SETUP
 RESET alltypesnopart_insert
-RELOAD
+RELOAD alltypesnopart_insert
 ---- NUMROWS
 25
 ====
@@ -15,7 +15,7 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
 from alltypesnopart_insert
 ---- SETUP
-RELOAD
+RELOAD alltypesnopart_insert
 ---- TYPES
 int,boolean,tinyint,smallint,int,bigint,float,double,string,string
 ---- RESULTS
@@ -60,8 +60,6 @@ hdfs: alltypesnopart_insert/
 ====
 # search the table to verify it contains 25 rows
 select count(*) from alltypesnopart_insert
----- SETUP
-RELOAD
 ---- TYPES
 bigint
 ---- RESULTS
@@ -84,8 +82,6 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
 from alltypesinsert
 where year=2009 and month=4
----- SETUP
-RELOAD
 ---- TYPES
 int,boolean,tinyint,smallint,int,bigint,float,double,string,string
 ---- RESULTS
@@ -132,8 +128,6 @@ hdfs: alltypesinsert/year=2009/month=4/
 # search the partition to verify it contains all 25 rows
 select count(*) from alltypesinsert
 where year=2009 and month=4
----- SETUP
-RELOAD
 ---- TYPES
 bigint
 ---- RESULTS
@@ -160,8 +154,6 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
 from alltypesinsert
 where year=2009 and month>1 and month<=4
----- SETUP
-RELOAD
 ---- TYPES
 int,boolean,tinyint,smallint,int,bigint,float,double,string,string
 ---- RESULTS
@@ -262,8 +254,6 @@ hdfs: alltypesinsert/year=2009/month=3/
 # search the partitions to verify they contain all 75 rows
 select count(id) from alltypesinsert
 where year=2009 and month>=1 and month<4
----- SETUP
-RELOAD
 ---- TYPES
 bigint
 ---- RESULTS
@@ -291,8 +281,6 @@ select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
 from alltypesinsert
 where year=2009 and month>=1 and month<=4
----- SETUP
-RELOAD
 ---- TYPES
 int,boolean,tinyint,smallint,int,bigint,float,double,string,string
 ---- RESULTS
@@ -419,8 +407,6 @@ hdfs: alltypesinsert/year=2009/month=4/
 # search the partitions to verify they contain all 100 rows
 select count(timestamp_col) from alltypesinsert
 where year=2009 and month>=1 and month<=4
----- SETUP
-RELOAD
 ---- TYPES
 bigint
 ---- RESULTS

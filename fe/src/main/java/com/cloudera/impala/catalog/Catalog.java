@@ -16,10 +16,10 @@ import com.google.common.collect.Maps;
  * Interface to metadata stored in MetaStore instance.
  * Caches all db-, table- and column-related md during construction.
  *
- * TODO: Selective refresh of individual tables, for tests that require refreshing
- * metadata between runs.
  */
 public class Catalog {
+  public static final String DEFAULT_DB = "default";
+
   private int nextTableId;
 
   // map from db name to DB
@@ -28,18 +28,26 @@ public class Catalog {
   private final HiveMetaStoreClient msClient;
 
   public Catalog() {
+    this(false);
+  }
+
+  /**
+   * If lazy is true, tables are loaded on read, otherwise they are loaded eagerly in
+   * the constructor.
+   */
+  public Catalog(boolean lazy) {
     this.nextTableId = 0;
     this.dbs = Maps.newHashMap();
     try {
       this.msClient = new HiveMetaStoreClient(new HiveConf(Catalog.class));
       List<String> msDbs = msClient.getAllDatabases();
       for (String dbName: msDbs) {
-        Db db = Db.loadDb(this, msClient, dbName);
+        Db db = Db.loadDb(this, msClient, dbName, lazy);
         dbs.put(dbName, db);
       }
     } catch (MetaException e) {
       // turn into unchecked exception
-      throw new UnsupportedOperationException(e.toString());
+      throw new UnsupportedOperationException(e);
     }
   }
 
@@ -57,7 +65,7 @@ public class Catalog {
    */
   public Db getDb(String db) {
     if (db == null || db.isEmpty()) {
-      return dbs.get("default");
+      return dbs.get(DEFAULT_DB);
     } else {
       return dbs.get(db.toLowerCase());
     }
@@ -65,5 +73,30 @@ public class Catalog {
 
   public HiveMetaStoreClient getMetaStoreClient() {
     return msClient;
+  }
+
+  /**
+   * Marks a table metadata as invalid, to be reloaded
+   * the next time it is read.
+   */
+  public void invalidateTable(String tableName) throws TableNotFoundException {
+    invalidateTable(DEFAULT_DB, tableName);
+  }
+
+  public static class TableNotFoundException extends Exception {
+    private static final long serialVersionUID = -2203080667446640542L;
+
+    public TableNotFoundException(String s) { super(s); }
+  }
+
+  public void invalidateTable(String dbName, String tableName)
+      throws TableNotFoundException {
+    Db db = getDb(dbName);
+    // If no db known by that name, silently do nothing.
+    if (db == null) {
+      return;
+    }
+
+    db.invalidateTable(tableName);
   }
 }

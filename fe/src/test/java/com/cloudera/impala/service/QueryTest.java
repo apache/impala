@@ -35,7 +35,7 @@ public class QueryTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    catalog = new Catalog();
+    catalog = new Catalog(true);
     executor = new Executor(catalog);
   }
 
@@ -88,7 +88,15 @@ public class QueryTest {
         List<String> tableNames = getCmdArguments(DROP_PARTITIONS_CMD, cmd);
         dropPartitions(tableNames);
       } else if (cmd.startsWith(RELOAD_CATALOG_CMD)) {
-        executor.setCatalog(new Catalog());
+        List<String> tableNames = getCmdArguments(RELOAD_CATALOG_CMD, cmd);
+        if (tableNames.size() == 0) {
+          catalog = new Catalog(true);
+          executor.setCatalog(catalog);
+        } else {
+          for (String table: tableNames) {
+            catalog.invalidateTable(table.trim());
+          }
+        }
       }
     }
 
