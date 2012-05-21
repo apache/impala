@@ -74,8 +74,10 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   }
 
   if (current_scanner_ == NULL) {
-    RETURN_IF_ERROR(InitCurrentScanRange(state));
+    RETURN_IF_ERROR(InitNextScanRange(state, eos));
+    if (*eos) return Status::OK;
   }
+
   // Loops until all the scan ranges are complete or batch is full
   *eos = false;
   do {
@@ -85,12 +87,9 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
       ++current_range_idx_;
 
       // Will update file and current_file_scan_ranges_ so that subsequent check passes
-      RETURN_IF_ERROR(InitCurrentScanRange(state));
-      if (current_file_scan_ranges_ == per_file_scan_ranges_.end()) {
-        // Done with all files
-        *eos = true;
-        break;
-      }
+      RETURN_IF_ERROR(InitNextScanRange(state, eos));
+      // Done with all files
+      if (*eos) break;
     }
   } while (!row_batch->IsFull() && !ReachedLimit());
 
@@ -113,17 +112,22 @@ void HdfsScanNode::SetScanRange(const TScanRange& scan_range) {
   }
 }
 
-Status HdfsScanNode::InitCurrentScanRange(RuntimeState* state) {
-  if (current_range_idx_ == current_file_scan_ranges_->second.size()) {
+Status HdfsScanNode::InitNextScanRange(RuntimeState* state, bool* scan_ranges_finished) {
+  *scan_ranges_finished = false;
+  if (current_file_scan_ranges_ == per_file_scan_ranges_.end()) {
+    // Defensively return if this gets called after all scan ranges are exhausted.
+    *scan_ranges_finished = true;
+    return Status::OK;
+  } else if (current_range_idx_ == current_file_scan_ranges_->second.size()) {
     RETURN_IF_ERROR(current_byte_stream_->Close());
     current_byte_stream_.reset(NULL);
     ++current_file_scan_ranges_;
     current_range_idx_ = 0;
     if (current_file_scan_ranges_ == per_file_scan_ranges_.end()) {
+      *scan_ranges_finished = true;
       return Status::OK; // We're done; caller will check for this condition and exit
     }
   }
-
   RETURN_IF_ERROR(ExtractPartitionKeyValues(state, key_idx_to_slot_idx_));
 
   if (current_byte_stream_ == NULL) {

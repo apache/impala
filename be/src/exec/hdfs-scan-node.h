@@ -168,7 +168,7 @@ class HdfsScanNode : public ScanNode {
 
   // Called once per scan-range to initialise (potentially) a new byte
   // stream and to call the same method on the current scanner.
-  Status InitCurrentScanRange(RuntimeState* state);
+  Status InitNextScanRange(RuntimeState* state, bool* scan_ranges_finished);
 
   Status ExtractPartitionKeyValues(
       RuntimeState* state,
