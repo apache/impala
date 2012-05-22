@@ -481,9 +481,20 @@ bool Expr::IsConstant() const {
   return true;
 }
 
+Type* Expr::GetLlvmReturnType(LlvmCodeGen* codegen) const {
+  if (type() == TYPE_STRING) {
+    return codegen->string_val_ptr_type();
+  } else  if (type() == TYPE_TIMESTAMP) {
+    // TODO
+    return NULL;
+  } else {
+    return codegen->GetType(type());
+  }
+}
+
 Function* Expr::CreateComputeFnPrototype(LlvmCodeGen* codegen, const string& name) {
   DCHECK(codegen_fn_ == NULL);
-  Type* ret_type = codegen->GetType(type());
+  Type* ret_type = GetLlvmReturnType(codegen);
   Type* ptr_type = codegen->ptr_type();
 
   LlvmCodeGen::FnPrototype prototype(codegen, name, ret_type);
@@ -514,8 +525,10 @@ Value* Expr::GetNullReturnValue(LlvmCodeGen* codegen) {
       return ConstantFP::get(codegen->context(), APFloat((float)0));
     case TYPE_DOUBLE:
       return ConstantFP::get(codegen->context(), APFloat((double)0));
+    case TYPE_STRING:
+      return llvm::ConstantPointerNull::get(codegen->string_val_ptr_type());
     default:
-      // Add timestamp and stringvalue pointers
+      // Add stringvalue pointers
       DCHECK(false) << "Not yet implemented.";
       return NULL;
   }
@@ -557,8 +570,9 @@ typedef int32_t (*IntComputeFn)(TupleRow*, char*, bool*);
 typedef int64_t (*BigintComputeFn)(TupleRow*, char*, bool*);
 typedef float (*FloatComputeFn)(TupleRow*, char*, bool*);
 typedef double (*DoubleComputeFn)(TupleRow*, char*, bool*);
+typedef StringValue* (*StringValueComputeFn)(TupleRow*, char*, bool*);
 
-void* Expr::JittedComputeFn(Expr* expr, TupleRow* row) {
+void* Expr::EvalJittedComputeFn(Expr* expr, TupleRow* row) {
   DCHECK(expr->jitted_compute_fn_ != NULL);
   void* func = expr->jitted_compute_fn_;
   void* result = NULL;
@@ -606,6 +620,11 @@ void* Expr::JittedComputeFn(Expr* expr, TupleRow* row) {
       result = &(expr->result_.double_val);
       break;
     }
+    case TYPE_STRING: {
+      StringValueComputeFn new_func = reinterpret_cast<StringValueComputeFn>(func);
+      result = new_func(row, NULL, &is_null);
+      break;
+    }
     default:
       DCHECK(false) << expr->type();
       break;
@@ -617,11 +636,11 @@ void* Expr::JittedComputeFn(Expr* expr, TupleRow* row) {
 void Expr::SetComputeFn(void* jitted_function, int scratch_size) {
   DCHECK_EQ(scratch_size, 0);
   jitted_compute_fn_ = jitted_function;
-  compute_fn_ = Expr::JittedComputeFn;
+  compute_fn_ = Expr::EvalJittedComputeFn;
 }
 
 bool Expr::IsJittable(LlvmCodeGen* codegen) const {
-  if (type() == TYPE_STRING || type() == TYPE_TIMESTAMP) return false;
+  if (type() == TYPE_TIMESTAMP) return false;
   for (int i = 0; i < GetNumChildren(); ++i) {
     if (!children()[i]->IsJittable(codegen)) return false;
   }

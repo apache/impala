@@ -73,27 +73,27 @@ class QueryJitter {
     cout << "Exprs: " << Expr::DebugString(output_exprs) << endl;
 
     ObjectPool pool;
-    LlvmCodeGen code_gen(&pool, "Expr Jit");
-    code_gen.EnableOptimizations(FLAGS_enable_optimizations);
-    code_gen.EnableVerifier(FLAGS_verify_jit);
-    status = code_gen.Init();
+    scoped_ptr<LlvmCodeGen> codegen;
+    status = LlvmCodeGen::LoadImpalaIR(&pool, &codegen);
     if (!status.ok()) {
       cerr << "Could not initialize code gen: " << status.GetErrorMsg() << endl;
       return;
     }
+    codegen->EnableOptimizations(FLAGS_enable_optimizations);
+    codegen->EnableVerifier(FLAGS_verify_jit);
 
     cout << "Generating IR..." << endl;
     Expr* root = output_exprs[0];
     int scratch_size;
-    Function* fn = root->CodegenExprTree(&code_gen);
+    Function* fn = root->CodegenExprTree(codegen.get());
     if (fn == NULL) {
       cout << "Could not jit expression tree." << endl;
       return;
     }
-    void* func = code_gen.JitFunction(fn, &scratch_size);
+    void* func = codegen->JitFunction(fn, &scratch_size);
     DCHECK(func != NULL);
 
-    string llvm_ir = code_gen.GetIR();
+    string llvm_ir = codegen->GetIR(false);
     cout << llvm_ir << endl;
 
     // No FROM clause, run the jitted expr tree.
@@ -118,7 +118,7 @@ class QueryJitter {
       }
     }
 
-    RuntimeProfile* profile = code_gen.runtime_profile();
+    RuntimeProfile* profile = codegen->runtime_profile();
     profile->PrettyPrint(&cout);
   }
 };

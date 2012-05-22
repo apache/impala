@@ -27,6 +27,14 @@ string CastExpr::DebugString() const {
   return out.str();
 }
 
+bool CastExpr::IsJittable(LlvmCodeGen* codegen) const {
+  // TODO: casts to and from StringValue are not yet done.
+  if (type() == TYPE_STRING || children()[0]->type() == TYPE_STRING) {
+    return false;
+  }
+  return Expr::IsJittable(codegen);
+}
+
 // IR Generation for Cast Exprs.  For a cast from long to double, the IR
 // looks like:
 //
@@ -48,6 +56,22 @@ Function* CastExpr::Codegen(LlvmCodeGen* codegen) {
   DCHECK_EQ(GetNumChildren(), 1);
   Function* child_function = children()[0]->Codegen(codegen);
   if (child_function == NULL) return NULL;
+
+  // No op cast.  Just return the child function.
+  switch (op()) {
+    case TExprOpcode::CAST_BOOL_BOOL:
+    case TExprOpcode::CAST_CHAR_CHAR:
+    case TExprOpcode::CAST_SHORT_SHORT:
+    case TExprOpcode::CAST_INT_INT:
+    case TExprOpcode::CAST_LONG_LONG:
+    case TExprOpcode::CAST_FLOAT_FLOAT:
+    case TExprOpcode::CAST_DOUBLE_DOUBLE:
+      codegen_fn_ = child_function;
+      scratch_buffer_size_ = children()[0]->scratch_buffer_size();
+      return codegen_fn_;
+    default:
+      break;
+  }
 
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
@@ -72,6 +96,9 @@ Function* CastExpr::Codegen(LlvmCodeGen* codegen) {
     case TExprOpcode::CAST_BOOL_SHORT:
     case TExprOpcode::CAST_BOOL_INT:
     case TExprOpcode::CAST_BOOL_LONG:
+      result = builder.CreateZExt(child_value, return_type, "tmp_cast");
+      break;
+
     case TExprOpcode::CAST_CHAR_SHORT:
     case TExprOpcode::CAST_CHAR_INT:
     case TExprOpcode::CAST_CHAR_LONG:
@@ -81,10 +108,6 @@ Function* CastExpr::Codegen(LlvmCodeGen* codegen) {
       result = builder.CreateSExt(child_value, return_type, "tmp_cast");
       break;
  
-    case TExprOpcode::CAST_CHAR_BOOL:
-    case TExprOpcode::CAST_SHORT_BOOL:
-    case TExprOpcode::CAST_INT_BOOL:
-    case TExprOpcode::CAST_LONG_BOOL:
     case TExprOpcode::CAST_SHORT_CHAR:
     case TExprOpcode::CAST_INT_CHAR:
     case TExprOpcode::CAST_LONG_CHAR:
@@ -95,11 +118,14 @@ Function* CastExpr::Codegen(LlvmCodeGen* codegen) {
       break;
 
     case TExprOpcode::CAST_BOOL_FLOAT:
+    case TExprOpcode::CAST_BOOL_DOUBLE:
+      result = builder.CreateUIToFP(child_value, return_type, "tmp_cast");
+      break;
+
     case TExprOpcode::CAST_CHAR_FLOAT:
     case TExprOpcode::CAST_SHORT_FLOAT:
     case TExprOpcode::CAST_INT_FLOAT:
     case TExprOpcode::CAST_LONG_FLOAT:
-    case TExprOpcode::CAST_BOOL_DOUBLE:
     case TExprOpcode::CAST_CHAR_DOUBLE:
     case TExprOpcode::CAST_SHORT_DOUBLE:
     case TExprOpcode::CAST_INT_DOUBLE:
@@ -107,17 +133,32 @@ Function* CastExpr::Codegen(LlvmCodeGen* codegen) {
       result = builder.CreateSIToFP(child_value, return_type, "tmp_cast");
       break;
 
+    // llvm will treat bool types like tinyint types.  true is any non-zero value,
+    // not 'one'.  We'll fix this by explicitly checking against 0.
+    // TODO: is this a problem? How should we deal with this?
+    case TExprOpcode::CAST_CHAR_BOOL:
+    case TExprOpcode::CAST_SHORT_BOOL:
+    case TExprOpcode::CAST_INT_BOOL:
+    case TExprOpcode::CAST_LONG_BOOL:
+      result = builder.CreateICmpNE(child_value, 
+          codegen->GetIntConstant(children()[0]->type(), 0));
+      break;
+    case TExprOpcode::CAST_DOUBLE_BOOL:
     case TExprOpcode::CAST_FLOAT_BOOL:
+      result = builder.CreateFPToSI(child_value, codegen->GetType(TYPE_INT), "tmp_cast");
+      result = builder.CreateICmpNE(result, codegen->GetIntConstant(TYPE_INT, 0));
+      break;
+
     case TExprOpcode::CAST_FLOAT_CHAR:
     case TExprOpcode::CAST_FLOAT_SHORT:
     case TExprOpcode::CAST_FLOAT_INT:
     case TExprOpcode::CAST_FLOAT_LONG:
-    case TExprOpcode::CAST_DOUBLE_BOOL:
     case TExprOpcode::CAST_DOUBLE_CHAR:
     case TExprOpcode::CAST_DOUBLE_SHORT:
     case TExprOpcode::CAST_DOUBLE_INT:
     case TExprOpcode::CAST_DOUBLE_LONG:
       result = builder.CreateFPToSI(child_value, return_type, "tmp_cast");
+      break;
 
     case TExprOpcode::CAST_FLOAT_DOUBLE:
       result = builder.CreateFPExt(child_value, return_type, "tmp_cast");

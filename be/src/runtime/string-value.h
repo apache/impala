@@ -30,7 +30,7 @@ struct StringValue {
   bool Eq(const StringValue& other) const;
   bool operator==(const StringValue& other) const { return Eq(other); }
   // !=
-  bool Ne(const StringValue& other) const { return Compare(other) != 0; }
+  bool Ne(const StringValue& other) const { return !Eq(other); }
   // <=
   bool Le(const StringValue& other) const { return Compare(other) <= 0; }
   // >=
@@ -51,6 +51,9 @@ struct StringValue {
 
   // Trims leading and trailing spaces.
   StringValue Trim() const;
+
+  // For C++/IR interop, we need to be able to look up types by name.
+  static const char* LLVM_CLASS_NAME;
 };
 
 std::ostream& operator<<(std::ostream& os, const StringValue& string_value);

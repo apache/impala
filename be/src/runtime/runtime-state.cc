@@ -11,7 +11,6 @@
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
 #include "util/jni-util.h"
-#include "util/path-builder.h"
 
 #include <jni.h>
 #include <iostream>
@@ -59,12 +58,8 @@ Status RuntimeState::Init(
 }
 
 Status RuntimeState::CreateCodegen() {
-  // TODO: this is not production ready.  need to do something better.
-  string module_file;
-  PathBuilder::GetFullPath("be/build/llvm-ir/exec.ll", &module_file);
-  codegen_.reset(LlvmCodeGen::LoadFromFile(obj_pool_.get(), module_file.c_str()));
+  RETURN_IF_ERROR(LlvmCodeGen::LoadImpalaIR(obj_pool_.get(), &codegen_));
   codegen_->EnableOptimizations(true);
-  RETURN_IF_ERROR(codegen_->Init());
   profile_.AddChild(codegen_->runtime_profile());
   return Status::OK;
 }

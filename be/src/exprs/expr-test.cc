@@ -70,7 +70,7 @@ class ExprTest : public testing::Test {
 
     min_float_values_[TYPE_FLOAT] = 1.1;
     min_float_values_[TYPE_DOUBLE] = static_cast<double>(numeric_limits<float>::max()) + 1.1;
-
+ 
     // Set up default test types, values, and strings.
     default_bool_str_ = "false";
     default_string_str_ = "'abc'";
@@ -105,6 +105,8 @@ class ExprTest : public testing::Test {
     jit_expr_root_[TYPE_BIGINT] = Expr::CreateLiteral(&pool_, TYPE_BIGINT, "0");
     jit_expr_root_[TYPE_FLOAT] = Expr::CreateLiteral(&pool_, TYPE_FLOAT, "0");
     jit_expr_root_[TYPE_DOUBLE] = Expr::CreateLiteral(&pool_, TYPE_DOUBLE, "0");
+    StringValue dummy_val(NULL, 0);
+    jit_expr_root_[TYPE_STRING] = Expr::CreateLiteral(&pool_, TYPE_STRING, &dummy_val);
   }
 
   void GetValue(const string& expr, PrimitiveType expr_type, 
@@ -120,17 +122,17 @@ class ExprTest : public testing::Test {
     *interpreted_value = result_row[0];
 
     if (jitted_value != NULL) {
-      LlvmCodeGen code_gen(&pool_, "Expr Jit");
-      int scratch_size = 0;
-      status = code_gen.Init();
+      scoped_ptr<LlvmCodeGen> codegen;
+      Status status = LlvmCodeGen::LoadImpalaIR(&pool_, &codegen);
       ASSERT_TRUE(status.ok());
+      int scratch_size = 0;
     
       Expr* root = executor_->select_list_exprs()[0];
       ASSERT_TRUE(jit_expr_root_[root->type()] != NULL);
 
-      Function* fn = root->CodegenExprTree(&code_gen);
+      Function* fn = root->CodegenExprTree(codegen.get());
       EXPECT_TRUE(fn != NULL);
-      void* func = code_gen.JitFunction(fn, &scratch_size);
+      void* func = codegen->JitFunction(fn, &scratch_size);
       EXPECT_TRUE(func != NULL);
       EXPECT_EQ(scratch_size, 0);
       jit_expr_root_[root->type()]->SetComputeFn(func, scratch_size);
@@ -142,7 +144,7 @@ class ExprTest : public testing::Test {
     StringValue* result;
     GetValue(expr, TYPE_STRING, reinterpret_cast<void**>(&result));
     string tmp(result->ptr, result->len);
-    EXPECT_EQ(tmp, expected_result);
+    EXPECT_EQ(tmp, expected_result) << expr;
   }
 
   // We can't put this into TestValue() because GTest can't resolve
@@ -264,6 +266,30 @@ class ExprTest : public testing::Test {
       TestComparison(lexical_cast<string>(numeric_limits<T>::min()),
                    lexical_cast<string>(numeric_limits<T>::max() + 1), true);
     }
+  }
+
+  void TestStringComparisons() {
+    TestValue<bool>("'abc' = 'abc'", TYPE_BOOLEAN, true, true);
+    TestValue<bool>("'abc' = 'abcd'", TYPE_BOOLEAN, false, true);
+    TestValue<bool>("'abc' != 'abcd'", TYPE_BOOLEAN, true, true);
+    TestValue<bool>("'abc' != 'abc'", TYPE_BOOLEAN, false, true);
+    TestValue<bool>("'abc' < 'abcd'", TYPE_BOOLEAN, true, true);
+    TestValue<bool>("'abcd' < 'abc'", TYPE_BOOLEAN, false, true);
+    TestValue<bool>("'abcd' < 'abcd'", TYPE_BOOLEAN, false, true);
+    TestValue<bool>("'abc' > 'abcd'", TYPE_BOOLEAN, false, true);
+    TestValue<bool>("'abcd' > 'abc'", TYPE_BOOLEAN, true, true);
+    TestValue<bool>("'abcd' > 'abcd'", TYPE_BOOLEAN, false, true);
+    TestValue<bool>("'abc' <= 'abcd'", TYPE_BOOLEAN, true, true);
+    TestValue<bool>("'abcd' <= 'abc'", TYPE_BOOLEAN, false, true);
+    TestValue<bool>("'abcd' <= 'abcd'", TYPE_BOOLEAN, true, true);
+    TestValue<bool>("'abc' >= 'abcd'", TYPE_BOOLEAN, false, true);
+    TestValue<bool>("'abcd' >= 'abc'", TYPE_BOOLEAN, true, true);
+    TestValue<bool>("'abcd' >= 'abcd'", TYPE_BOOLEAN, true, true);
+    
+    // Test some empty strings
+    TestValue<bool>("'abcd' >= ''", TYPE_BOOLEAN, true, true);
+    TestValue<bool>("'' > ''", TYPE_BOOLEAN, false, true);
+    TestValue<bool>("'' = ''", TYPE_BOOLEAN, true, true);
   }
 
   // Generate all possible tests for combinations of <smaller> <op> <larger>.
@@ -428,6 +454,28 @@ class ExprTest : public testing::Test {
     TestValue(a_str + " % " + b_str, expected_type, cast_a % cast_b, true);
   }
 
+  // Test casting stmt to all types.  Expected result is val.
+  template<typename T>
+  void TestCast(const string& stmt, T val) {
+    TestValue("cast(" + stmt + " as boolean)", 
+        TYPE_BOOLEAN, static_cast<bool>(val), true);
+    TestValue("cast(" + stmt + " as tinyint)", 
+        TYPE_TINYINT, static_cast<int8_t>(val), true);
+    TestValue("cast(" + stmt + " as smallint)", 
+        TYPE_SMALLINT, static_cast<int16_t>(val), true);
+    TestValue("cast(" + stmt + " as int)", 
+        TYPE_INT, static_cast<int32_t>(val), true);
+    TestValue("cast(" + stmt + " as bigint)", 
+        TYPE_BIGINT, static_cast<int64_t>(val), true);
+    TestValue("cast(" + stmt + " as float)", 
+        TYPE_FLOAT, static_cast<float>(val), true);
+    TestValue("cast(" + stmt + " as double)", 
+        TYPE_DOUBLE, static_cast<double>(val), true);
+    TestStringValue("cast(" + stmt + " as string)", 
+        lexical_cast<string>(val));
+  }
+
+
  private:
   scoped_ptr<InProcessQueryExecutor> executor_;
   scoped_ptr<ExecEnv> exec_env_;
@@ -453,6 +501,32 @@ void ExprTest::TestFixedPointComparisons<int64_t>(bool test_boundaries) {
     // this requires a cast of the first operand to a higher-resolution type
     TestComparison(lexical_cast<string>(t_min),
                  lexical_cast<string>(t_max + 1), true);
+  }
+}
+
+// Test casting 'stmt' to each of the native types.  The result should be 'val'
+// 'stmt' is a partial stmt that could be of any valid type.
+template<>
+void ExprTest::TestCast(const string& stmt, const char* val) {
+  try {
+    int8_t val8 = static_cast<int8_t>(lexical_cast<int16_t>(val));
+#if 0
+    // Hive has weird semantics.  What do we want to do?
+    TestValue(stmt + " as boolean)", TYPE_BOOLEAN, lexical_cast<bool>(val), false);
+#endif
+    TestValue("cast(" + stmt + " as tinyint)", TYPE_TINYINT, val8, false);
+    TestValue("cast(" + stmt + " as smallint)", TYPE_SMALLINT, 
+        lexical_cast<int16_t>(val), false);
+    TestValue("cast(" + stmt + " as int)", TYPE_INT, 
+        lexical_cast<int32_t>(val), false);
+    TestValue("cast(" + stmt + " as bigint)", TYPE_BIGINT, 
+        lexical_cast<int64_t>(val), false);
+    TestValue("cast(" + stmt + " as float)", TYPE_FLOAT, 
+        lexical_cast<float>(val), false);
+    TestValue("cast(" + stmt + " as double)", TYPE_DOUBLE, 
+        lexical_cast<double>(val), false);
+  } catch (bad_lexical_cast& e) {
+    EXPECT_TRUE(false) << e.what();
   }
 }
 
@@ -644,6 +718,61 @@ TEST_F(ExprTest, BinaryPredicates) {
   TestFixedPointComparisons<int64_t>(false);
   TestFloatingPointComparisons<float>(true);
   TestFloatingPointComparisons<double>(false);
+  TestStringComparisons();
+}
+
+// Test casting from all types to all other types
+TEST_F(ExprTest, CastExprs) {
+  // From tinyint
+  TestCast("cast(0 as tinyint)", 0);
+  TestCast("cast(5 as tinyint)", 5);
+  TestCast("cast(-5 as tinyint)", -5);
+
+  // From smallint
+  TestCast("cast(0 as smallint)", 0);
+  TestCast("cast(5 as smallint)", 5);
+  TestCast("cast(-5 as smallint)", -5);
+
+  // From int
+  TestCast("cast(0 as int)", 0);
+  TestCast("cast(5 as int)", 5);
+  TestCast("cast(-5 as int)", -5);
+
+  // From bigint
+  TestCast("cast(0 as bigint)", 0);
+  TestCast("cast(5 as bigint)", 5);
+  TestCast("cast(-5 as bigint)", -5);
+
+  // From boolean
+  TestCast("cast(0 as boolean)", 0);
+  TestCast("cast(5 as boolean)", 1);
+  TestCast("cast(-5 as boolean)", 1);
+  
+  // From Float
+  TestCast("cast(0.0 as float)", 0.0f);
+  TestCast("cast(5.0 as float)", 5.0f);
+  TestCast("cast(-5.0 as float)", -5.0f);
+
+  // From Double
+  TestCast("cast(0.0 as double)", 0.0);
+  TestCast("cast(5.0 as double)", 5.0);
+  TestCast("cast(-5.0 as double)", -5.0);
+  
+  // From String
+  TestCast("'0'", "0");
+  TestCast("'5'", "5");
+  TestCast("'-5'", "-5");
+
+#if 0
+  // Test overflow.  TODO: Hive casting rules are very weird here also.  It seems for
+  // types < TYPE_INT, it will just overflow and keep the low order bits.  For TYPE_INT,
+  // it caps it and int_max/int_min.  Is this what we want to do?
+  int val = 10000000;
+  TestValue<int8_t>("cast(10000000 as tinyint)", TYPE_TINYINT, val & 0xff, true);
+  TestValue<int8_t>("cast(-10000000 as tinyint)", TYPE_TINYINT, -val & 0xff, true);
+  TestValue<int16_t>("cast(10000000 as smallint)", TYPE_SMALLINT, val & 0xffff, true);
+  TestValue<int16_t>("cast(-10000000 as smallint)", TYPE_SMALLINT, -val & 0xffff, true);
+#endif
 }
 
 TEST_F(ExprTest, CompoundPredicates) {

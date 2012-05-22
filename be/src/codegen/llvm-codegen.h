@@ -17,6 +17,7 @@
 #include <llvm/Analysis/Verifier.h>
 
 #include "exprs/expr.h"
+#include "impala-ir/impala-ir-functions.h"
 #include "runtime/primitive-type.h"
 #include "util/runtime-profile.h"
 
@@ -52,7 +53,7 @@ namespace impala {
 //
 // LLVM provides a c++ IR builder interface so IR does not need to be written
 // manually.  The interface is very low level so each line of IR that needs to
-// be outputted maps 1:1 with calls to the interface.
+// be output maps 1:1 with calls to the interface.
 // The llvm documentation is not fantastic and a lot of this was figured out
 // by experimenting.  Thankfully, their API is pretty well designed so it's
 // possible to get by without great documentation.  The llvm tutorial is very
@@ -60,6 +61,18 @@ namespace impala {
 // go over how to JIT an AST for a toy language they create.
 // It is also helpful to use their online app that lets you compile c/c++ to IR.
 // http://llvm.org/demo/index.cgi.  
+//
+// This class provides two interfaces, one for testing and one for the query
+// engine.  The interface for the query engine will load the cross-compiled
+// IR module (output during the build) and extract all of functions that will
+// be called directly.  The test interface can be used to load any precompiled 
+// module or none at all (but this class will not validate the module).
+//
+// This class is not threadsafe and intended to be used during the Prepare phase
+// of the BE.  Currently, each query will create and initialize one of these 
+// objects.  This requires loading and parsing the cross compiled modules.
+// TODO: we should be able to do this once per process and let llvm compile
+// functions from across modules.
 //
 // LLVM has a nontrivial memory management scheme and objects will take
 // ownership of others.  The document is pretty good about being explicit with this
@@ -78,13 +91,9 @@ class LlvmCodeGen {
   // side is not loading the be explicitly anymore.
   static void InitializeLlvm(bool load_backend = false);
 
-  // Load a pre-compiled IR module from 'file'
-  static LlvmCodeGen* LoadFromFile(ObjectPool* pool, const std::string& file);
-
-  // Top level codegen object.  'module_name' is only used for debugging when
-  // outputting the IR.  module's loaded from disk will be named as the file
-  // path.
-  LlvmCodeGen(ObjectPool* pool, const std::string& module_name);
+  // Loads and parses the precompiled impala IR module
+  // codegen will contain the created object on success.  
+  static Status LoadImpalaIR(ObjectPool*, boost::scoped_ptr<LlvmCodeGen>* codegen);
 
   // Removes all jit compiled dynamically linked functions from the process.
   ~LlvmCodeGen();
@@ -92,17 +101,16 @@ class LlvmCodeGen {
   RuntimeProfile* runtime_profile() { return &profile_; }
   RuntimeProfile::Counter* codegen_timer() { return codegen_timer_; }
 
-  // Initializes the jitter and execution engine.
-  Status Init();
-
   // Turns on/off optimization passes
   void EnableOptimizations(bool enable);
 
   // Turns on/off verifying IR
   void EnableVerifier(bool enable);
 
-  // For debugging. Returns the IR that was generated.
-  std::string GetIR() const;
+  // For debugging. Returns the IR that was generated.  If full_module, the
+  // entire module is dumped, including what was loaded from precompiled IR.
+  // If false, only output IR for functions which were generated.
+  std::string GetIR(bool full_module) const;
 
   // Typedef builder in case we want to change the template arguments later
   typedef llvm::IRBuilder<> LlvmBuilder;
@@ -215,7 +223,7 @@ class LlvmCodeGen {
   // is invalid.
   bool VerifyFunction(llvm::Function* function);
 
-  // Add function to inliner
+  // Add function to the list of functions that should be inlined by the optimizer
   void AddInlineFunction(llvm::Function* function);
   
   // This will generate a printf call instructin to output 'message' at the 
@@ -224,6 +232,10 @@ class LlvmCodeGen {
 
   // Returns the libc function, adding it to the module if it has not already been.
   llvm::Function* GetLibCFunction(FnPrototype* prototype);
+
+  // Returns the cross compiled function. IRFunction::Type is an enum which is
+  // defined in 'impala-ir/impala-ir-functions.h'
+  llvm::Function* GetFunction(IRFunction::Type);
 
   // Allocate stack storage for local variables.  This is similar to traditional c, where
   // all the variables must be declared at the top of the function.  This helper can be
@@ -271,6 +283,7 @@ class LlvmCodeGen {
   llvm::PointerType* ptr_type() { return ptr_type_; }
   llvm::PointerType* bool_ptr_type() { return bool_ptr_type_; }
   llvm::PointerType* int64_ptr_type() { return int64_ptr_type_; }
+  llvm::PointerType* string_val_ptr_type() { return string_val_ptr_type_; }
   llvm::Type* void_type() { return void_type_; }
 
   // Fills 'functions' with all the functions that are defined in the module.
@@ -281,6 +294,22 @@ class LlvmCodeGen {
   llvm::Function* CodegenMinMax(PrimitiveType type, bool min);
 
  private:
+  friend class LlvmCodeGenTest;
+
+  // Top level codegen object.  'module_name' is only used for debugging when
+  // outputting the IR.  module's loaded from disk will be named as the file
+  // path.  
+  LlvmCodeGen(ObjectPool* pool, const std::string& module_name);
+
+  // Initializes the jitter and execution engine.  
+  Status Init();
+
+  // Load a pre-compiled IR module from 'file'.  This creates a top level
+  // codegen object.  This is used by tests to load custom modules.
+  // codegen will contain the created object on success.  
+  static Status LoadFromFile(ObjectPool*, const std::string& file, 
+      boost::scoped_ptr<LlvmCodeGen>* codegen);
+
   // Name of the JIT module.  Useful for debugging.
   std::string name_;
 
@@ -301,7 +330,7 @@ class LlvmCodeGen {
   std::string error_string_;
 
   // Top level llvm object.  Objects from different contexts do not share anything.
-  // We can have multiple instances of the LlvmCodegen object in different threads
+  // We can have multiple instances of the LlvmCodeGen object in different threads
   boost::scoped_ptr<llvm::LLVMContext> context_;
 
   // Top level codegen object.  Contains everything to jit one 'unit' of code.
@@ -330,6 +359,14 @@ class LlvmCodeGen {
   // TODO: this should probably be FnPrototype->Functions mapping
   std::map<std::string, llvm::Function*> external_functions_;
 
+  // Functions parsed from pre-compiled module.  Indexed by ImpalaIR::Function enum
+  std::vector<llvm::Function*> loaded_functions_;
+
+  // Stores functions codegen'd by impala.  This does not contain cross compiled 
+  // functions, only function that were generated at runtime.  Does not overlap
+  // with loaded_functions_.
+  std::vector<llvm::Function*> codegend_functions_;
+
   // Debug utility that will insert a printf-like function into the generated
   // IR.  Useful for debugging the IR.  This is lazily created.
   llvm::Function* debug_trace_fn_;
@@ -339,10 +376,12 @@ class LlvmCodeGen {
   std::vector<std::string> debug_strings_;
 
   // llvm representation of a few common types.  Owned by context.
-  llvm::PointerType* ptr_type_;           // int8_t*
-  llvm::PointerType* bool_ptr_type_;      // bool*
-  llvm::PointerType* int64_ptr_type_;     // int64_t*
-  llvm::Type* void_type_;                 // void
+  llvm::PointerType* ptr_type_;             // int8_t*
+  llvm::PointerType* bool_ptr_type_;        // bool*
+  llvm::PointerType* int64_ptr_type_;       // int64_t*
+  llvm::Type* void_type_;                   // void
+  llvm::Type* string_val_type_;             // StringVal
+  llvm::PointerType* string_val_ptr_type_;  // StringVal*
 
   // llvm constants to help with code gen verbosity
   llvm::Value* true_value_;

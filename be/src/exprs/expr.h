@@ -17,6 +17,7 @@
 namespace llvm {
   class BasicBlock;
   class Function;
+  class Type;
   class Value;
 };
 
@@ -186,7 +187,7 @@ class Expr {
 
   // Returns whether the subtree at this node is jittable.  This is temporary
   // until more expr types are supported.
-  bool IsJittable(LlvmCodeGen*) const;
+  virtual bool IsJittable(LlvmCodeGen*) const;
 
   // Returns codegen function for the expr tree rooted at this expr.
   llvm::Function* codegen_fn() { return codegen_fn_; }
@@ -210,6 +211,9 @@ class Expr {
   // call a child.  The parent args are used to call the child function.
   llvm::Value* CodegenGetValue(LlvmCodeGen* codegen, llvm::BasicBlock* parent, 
       llvm::BasicBlock* null_block, llvm::BasicBlock* not_null_block);
+
+  // Returns the llvm return type for this expr
+  llvm::Type* GetLlvmReturnType(LlvmCodeGen* codegen) const;
 
   virtual std::string DebugString() const;
   static std::string DebugString(const std::vector<Expr*>& exprs);
@@ -314,7 +318,7 @@ class Expr {
   // This is a shim to convert the old ComputeFn signature to the code-
   // generated signature.  It will call the underlying jitted function and
   // stuff the result back in expr->result_.
-  static void* JittedComputeFn(Expr* expr, TupleRow* row);
+  static void* EvalJittedComputeFn(Expr* expr, TupleRow* row);
 
   // This is a function pointer to the compute function.  The return type
   // for jitted functions depends on the Expr so we need to store it as

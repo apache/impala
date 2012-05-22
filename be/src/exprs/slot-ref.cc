@@ -54,8 +54,6 @@ string SlotRef::DebugString() const {
 }
 
 // IR Generation for SlotRef.  The resulting IR looks like:
-// TODO: TupleRow is rarely null (outer join), add some state in slotref to not
-// generate the null check in most paths.
 // TODO: We could generate a typed struct (and not a char*) for Tuple for llvm.
 // We know the types from the TupleDesc.  It will likey make this code simpler
 // to reason about.
@@ -103,7 +101,7 @@ Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
   
-  Type* return_type = codegen->GetType(type());
+  Type* return_type = GetLlvmReturnType(codegen);
   Function* function = CreateComputeFnPrototype(codegen, "SlotRef");
 
   Function::arg_iterator func_args = function->arg_begin();
@@ -172,8 +170,14 @@ Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
   // Branch for slot != NULL
   builder.SetInsertPoint(get_slot_block);
   Value* slot_ptr = builder.CreateGEP(tuple_ptr, slot_offset, "slot_addr");
+  Value* result = NULL;
   Value* slot_cast = builder.CreatePointerCast(slot_ptr, result_ptr_type);
-  Value* result = builder.CreateLoad(slot_cast, "slot_value");
+  // For non-native types, we return a pointer to the struct
+  if (type() == TYPE_STRING || type() == TYPE_TIMESTAMP) {
+    result = slot_cast;
+  } else {
+    result = builder.CreateLoad(slot_cast, "slot_value");
+  }
   CodegenSetIsNullArg(codegen, get_slot_block, false);
   builder.CreateBr(ret_block);
 

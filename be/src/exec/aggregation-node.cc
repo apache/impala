@@ -393,6 +393,7 @@ void UpdateSumSlot(Tuple* tuple, const NullIndicatorOffset& null_indicator_offse
 }
 
 void AggregationNode::UpdateAggTuple(AggregationTuple* agg_out_tuple, TupleRow* row) {
+  DCHECK(agg_out_tuple != NULL);
   Tuple* tuple = agg_out_tuple->tuple();
   int string_slot_idx = -1;
   vector<SlotDescriptor*>::const_iterator slot_d = 
@@ -707,7 +708,7 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
     // If the agg_expr can't be generated, bail generating this function
     if (!agg_expr->is_star() && agg_expr->codegen_fn() == NULL) {
       VLOG(1) << "Could not codegen UpdateAggTuple because the "
-        << "underlying exprs cannot be codegened.";
+              << "underlying exprs cannot be codegened.";
       return NULL;
     }
   }
@@ -778,26 +779,13 @@ Function* AggregationNode::CodegenProcessRowBatch(
     LlvmCodeGen* codegen, Function* update_tuple_fn) {
   COUNTER_SCOPED_TIMER(codegen->codegen_timer());
   DCHECK(update_tuple_fn != NULL);
-  Function* process_batch_fn = NULL;
-  vector<Function*> functions;
-  codegen->GetFunctions(&functions);
-  // TODO: need to figure out how to name these things consistently/use regex
-  // to search the mangled names, this is not unique enough
-  // TODO: maybe move this logic into LlvmCodeGen.  It can parse all the precompiled
-  // functions once and store a enum->llvm::Function* that the exec nodes query for
-  const char* grouping_fn_name = "ProcessRowBatchWithGrouping";
-  const char* no_grouping_fn_name = "ProcessRowBatchNoGrouping";
-  const char* process_batch_fn_name = 
-    singleton_output_tuple_ == NULL ? grouping_fn_name : no_grouping_fn_name;
-  const char* update_tuple_name = "UpdateAggTuple";
+
+  // Get the cross compiled update row batch function
+  IRFunction::Type ir_fn = (singleton_output_tuple_ == NULL ?
+      IRFunction::AGG_NODE_PROCESS_ROW_BATCH_WITH_GROUPING :
+      IRFunction::AGG_NODE_PROCESS_ROW_BATCH_NO_GROUPING);
+  Function* process_batch_fn = codegen->GetFunction(ir_fn);
   
-  for (int i = 0; i < functions.size(); ++i) {
-    string fn_name = functions[i]->getName();
-    if (fn_name.find(process_batch_fn_name) != string::npos) {
-      process_batch_fn = functions[i];
-      break;
-    }
-  }
   if (process_batch_fn == NULL) {
     LOG(ERROR) << "Could not find AggregationNode::ProcessRowBatch in module.";
     return NULL;
@@ -805,7 +793,7 @@ Function* AggregationNode::CodegenProcessRowBatch(
 
   int replaced = 0;
   process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false, 
-      update_tuple_fn, update_tuple_name, true, &replaced); 
+      update_tuple_fn, "UpdateAggTuple", true, &replaced); 
   DCHECK_EQ(replaced, 1) << "One call site should be replaced."; 
   DCHECK(process_batch_fn != NULL);
   if (!codegen->VerifyFunction(process_batch_fn)) return NULL;

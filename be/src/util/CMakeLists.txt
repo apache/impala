@@ -16,6 +16,7 @@ add_library(Util
   path-builder.cc
   perf-counters.cc
   runtime-profile.cc
+  static-asserts.cc
   url-parser.cc
 )
 

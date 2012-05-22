@@ -17,6 +17,8 @@ class CastExpr: public Expr {
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& desc);
   virtual std::string DebugString() const;
 
+  virtual bool IsJittable(LlvmCodeGen* codegen) const;
+
  protected:
   friend class Expr;
   CastExpr(const TExprNode& node);

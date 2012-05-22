@@ -78,6 +78,32 @@ void* ComputeFunctions::${fn_signature}(Expr* e, TupleRow* row) {\n\
   return &e->result_.${result_field};\n\
 }\n\n")
 
+# Need to special case tinyint.  boost thinks it is a char and handles it differently.
+# e.g. '0' is written as an empty string.
+string_to_tinyint = Template("\
+void* ComputeFunctions::${fn_signature}(Expr* e, TupleRow* row) {\n\
+  Expr* op = e->children()[0];\n\
+  ${native_type1}* val = reinterpret_cast<${native_type1}*>(op->GetValue(row));\n\
+  if (val == NULL) return NULL;\n\
+  string tmp(val->ptr, val->len);\n\
+  try {\n\
+    e->result_.${result_field} = static_cast<int8_t>(lexical_cast<int16_t>(tmp));\n\
+  } catch (bad_lexical_cast &) {\n\
+    return NULL;\n\
+  }\n\
+  return &e->result_.${result_field};\n\
+}\n\n")
+
+tinyint_to_string = Template("\
+void* ComputeFunctions::${fn_signature}(Expr* e, TupleRow* row) {\n\
+  Expr* op = e->children()[0];\n\
+  ${native_type1}* val = reinterpret_cast<${native_type1}*>(op->GetValue(row));\n\
+  if (val == NULL) return NULL;\n\
+  int64_t tmp_val = *val;\n\
+  e->result_.SetStringVal(lexical_cast<string>(tmp_val));\n\
+  return &e->result_.${result_field};\n\
+}\n\n")
+
 case = Template("\
 void* ComputeFunctions::${fn_signature}(Expr* e, TupleRow* row) {\n\
   CaseExpr* expr = static_cast<CaseExpr*>(e);\n\
@@ -151,7 +177,9 @@ types = {
   'INT_TYPES'     : ['TINYINT', 'SMALLINT', 'INT', 'BIGINT'],
   'NUMERIC_TYPES' : ['TINYINT', 'SMALLINT', 'INT', 'BIGINT', 'FLOAT', 'DOUBLE'],
   'NATIVE_TYPES'  : ['BOOLEAN', 'TINYINT', 'SMALLINT', 'INT', 'BIGINT', 'FLOAT', 'DOUBLE'],
-  'ALL_TYPES'     : ['BOOLEAN', 'TINYINT', 'SMALLINT', 'INT', 'BIGINT', 'FLOAT', 'DOUBLE', 'STRING', 'TIMESTAMP'],
+  'STRCAST_TYPES' : ['BOOLEAN', 'SMALLINT', 'INT', 'BIGINT', 'FLOAT', 'DOUBLE'],
+  'ALL_TYPES'     : ['BOOLEAN', 'TINYINT', 'SMALLINT', 'INT', 'BIGINT', 'FLOAT',\
+                     'DOUBLE', 'STRING', 'TIMESTAMP'],
   'MAX_TYPES'     : ['BIGINT', 'DOUBLE'],
 }
 
@@ -197,8 +225,10 @@ functions = [
   ['Cast', ['BIGINT'], [['NATIVE_TYPES'], ['BIGINT']] ],
   ['Cast', ['FLOAT'], [['NATIVE_TYPES'], ['FLOAT']] ],
   ['Cast', ['DOUBLE'], [['NATIVE_TYPES'], ['DOUBLE']] ],
-  ['Cast', ['NATIVE_TYPES'], [['STRING'], ['NATIVE_TYPES']], string_to_numeric ],
-  ['Cast', ['STRING'], [['NATIVE_TYPES'], ['STRING']], numeric_to_string ],
+  ['Cast', ['STRCAST_TYPES'], [['STRING'], ['STRCAST_TYPES']], string_to_numeric ],
+  ['Cast', ['TINYINT'], [['STRING'], ['TINYINT']], string_to_tinyint ],
+  ['Cast', ['STRING'], [['STRCAST_TYPES'], ['STRING']], numeric_to_string ],
+  ['Cast', ['STRING'], [['TINYINT'], ['STRING']], tinyint_to_string ],
   ['Cast', ['NATIVE_TYPES'], [['TIMESTAMP'], ['NATIVE_TYPES']]],
   ['Cast', ['STRING'], [['TIMESTAMP'], ['STRING']], numeric_to_string ],
   ['Cast', ['TIMESTAMP'], [['STRING'], ['TIMESTAMP']], string_to_numeric],

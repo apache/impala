@@ -1,5 +1,6 @@
 // Copyright (c) 2012 Cloudera, Inc.  All right reserved.
 
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <glog/logging.h>
@@ -21,13 +22,17 @@
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Transforms/Utils/BasicInliner.h>
 #include <llvm/Transforms/Utils/Cloning.h>
+
 #include "codegen/llvm-codegen.h"
+#include "impala-ir/impala-ir-names.h"
 #include "util/path-builder.h"
 
+using namespace boost;
 using namespace llvm;
 using namespace std;
 
 DEFINE_bool(dump_ir, false, "if true, output IR after optimization passes");
+DEFINE_string(module_output, "", "if set, saves the generated IR to the output file.");
 
 namespace impala {
 
@@ -72,26 +77,101 @@ LlvmCodeGen::LlvmCodeGen(ObjectPool* pool, const string& name) :
   module_file_size_ = ADD_COUNTER(&profile_, "ModuleFileSize", TCounterType::BYTES);
   compile_timer_ = ADD_COUNTER(&profile_, "CompileTime", TCounterType::CPU_TICKS);
   codegen_timer_ = ADD_COUNTER(&profile_, "CodegenTime", TCounterType::CPU_TICKS);
+
+  loaded_functions_.resize(IRFunction::FN_END);
 }
 
-LlvmCodeGen* LlvmCodeGen::LoadFromFile(ObjectPool* pool, const string& file) {
-  LlvmCodeGen* codegen = new LlvmCodeGen(pool, "");
-  COUNTER_SCOPED_TIMER(codegen->load_module_timer_);
+Status LlvmCodeGen::LoadFromFile(ObjectPool* pool, 
+    const string& file, scoped_ptr<LlvmCodeGen>* codegen) {
+  codegen->reset(new LlvmCodeGen(pool, ""));
+  
+  COUNTER_SCOPED_TIMER((*codegen)->load_module_timer_);
   OwningPtr<MemoryBuffer> file_buffer;
   llvm::error_code err = MemoryBuffer::getFile(file, file_buffer);
-  COUNTER_UPDATE(codegen->module_file_size_, file_buffer->getBufferSize());
   if (err) {
-    LOG(ERROR) << "Could not load module " << file << ": " << err.message();
-    return NULL;
+    stringstream ss;
+    ss << "Could not load module " << file << ": " << err.message();
+    return Status(ss.str());
   }
+  
+  COUNTER_UPDATE((*codegen)->module_file_size_, file_buffer->getBufferSize());
   string error;
-  Module* loaded_module = ParseBitcodeFile(file_buffer.get(), codegen->context(), &error);
+  Module* loaded_module = ParseBitcodeFile(file_buffer.get(), 
+      (*codegen)->context(), &error);
+  
   if (loaded_module == NULL) {
-    LOG(ERROR) << "Could not parse module " << file << ": " << error;
-    return NULL;
+    stringstream ss;
+    ss << "Could not parse module " << file << ": " << error;
+    return Status(ss.str());
   }
-  codegen->module_ = loaded_module;
-  return codegen;
+  (*codegen)->module_ = loaded_module;
+
+  return (*codegen)->Init();
+}
+
+Status LlvmCodeGen::LoadImpalaIR(ObjectPool* pool, scoped_ptr<LlvmCodeGen>* codegen_ret) {
+  // TODO: is this how we want to pick up external files?  Do we need better configuration
+  // support?
+  string module_file;
+  PathBuilder::GetFullPath("be/build/llvm-ir/impala.ll", &module_file);
+  RETURN_IF_ERROR(LoadFromFile(pool, module_file, codegen_ret));
+  LlvmCodeGen* codegen = codegen_ret->get();
+
+  // Parse module for cross compiled functions and types
+  COUNTER_SCOPED_TIMER(codegen->load_module_timer_);
+
+  // Get type for StringValue
+  codegen->string_val_type_ = codegen->GetType(StringValue::LLVM_CLASS_NAME);
+  codegen->string_val_ptr_type_ = PointerType::get(codegen->string_val_type_, 0);
+
+  // TODO: get type for Timestamp
+
+  // Verify size is correct
+  const TargetData* target_data = codegen->execution_engine()->getTargetData();
+  const StructLayout* layout = 
+      target_data->getStructLayout(static_cast<StructType*>(codegen->string_val_type_));
+  if (layout->getSizeInBytes() != sizeof(StringValue)) {
+    DCHECK_EQ(layout->getSizeInBytes(), sizeof(StringValue));
+    return Status("Could not create llvm struct type for StringVal");
+  }
+
+  // Parse functions from module
+  vector<Function*> functions;
+  codegen->GetFunctions(&functions);
+  int parsed_functions = 0;
+  for (int i = 0; i < functions.size(); ++i) {
+    string fn_name = functions[i]->getName();
+    for (int j = IRFunction::FN_START; j < IRFunction::FN_END; ++j) {
+      // Substring match to match precompiled functions.  The compiled function names
+      // will be mangled.
+      // TODO: reconsider this.  Substring match is probably not strict enough but
+      // undoing the mangling is no fun either.
+      if (fn_name.find(FN_MAPPINGS[j].fn_name) != string::npos) {
+        if (codegen->loaded_functions_[FN_MAPPINGS[j].fn] != NULL) {
+          return Status("Duplicate definition found for function: " + fn_name);
+        }
+        codegen->loaded_functions_[FN_MAPPINGS[j].fn] = functions[i];
+        codegen->AddInlineFunction(functions[i]);
+        ++parsed_functions;
+      }
+    }
+  }
+
+  if (parsed_functions != IRFunction::FN_END) {
+    stringstream ss;
+    ss << "Unable to find these precompiled functions: ";
+    bool first = true;
+    for (int i = IRFunction::FN_START; i != IRFunction::FN_END; ++i) {
+      if (codegen->loaded_functions_[i] == NULL) {
+        if (!first) ss << ", ";
+        ss << FN_MAPPINGS[i].fn_name;
+        first = false;
+      }
+    }
+    return Status(ss.str());
+  }
+
+  return Status::OK;
 }
 
 Status LlvmCodeGen::Init() {
@@ -134,24 +214,23 @@ Status LlvmCodeGen::Init() {
   // some benefit with running previous passes again. The order of the passes
   // is *very* important.  
   // TODO: Loop optimizations are turned off until we have code that uses them.
-  if (optimizations_enabled_) {
-    // Provide basic AliasAnalysis support for GVN.
-    function_pass_mgr_->add(createBasicAliasAnalysisPass());
-    // Rearrange expressions for better constant propagation
-    function_pass_mgr_->add(createReassociatePass());
-    // Remove redundant instructions
-    function_pass_mgr_->add(createGVNPass());
-    // Simplify the control flow graph (deleting unreachable blocks, etc).
-    function_pass_mgr_->add(createCFGSimplificationPass());
-    // Delete dead instructions
-    function_pass_mgr_->add(createAggressiveDCEPass());
-    // Simplify the control flow graph (deleting unreachable blocks, etc).
-    function_pass_mgr_->add(createCFGSimplificationPass());
-    // Collapse dependent blocks based on condition propagation
-    function_pass_mgr_->add(createJumpThreadingPass());
-    function_pass_mgr_->add(createCorrelatedValuePropagationPass()); 
-    // Simplify the control flow graph (deleting unreachable blocks, etc).
-    function_pass_mgr_->add(createCFGSimplificationPass());
+  // Provide basic AliasAnalysis support for GVN.
+  function_pass_mgr_->add(createBasicAliasAnalysisPass());
+  // Rearrange expressions for better constant propagation
+  function_pass_mgr_->add(createReassociatePass());
+  // Remove redundant instructions
+  function_pass_mgr_->add(createGVNPass());
+  // Simplify the control flow graph (deleting unreachable blocks, etc).
+  function_pass_mgr_->add(createCFGSimplificationPass());
+  // Delete dead instructions
+  function_pass_mgr_->add(createAggressiveDCEPass());
+  // Simplify the control flow graph (deleting unreachable blocks, etc).
+  function_pass_mgr_->add(createCFGSimplificationPass());
+  // Collapse dependent blocks based on condition propagation
+  function_pass_mgr_->add(createJumpThreadingPass());
+  function_pass_mgr_->add(createCorrelatedValuePropagationPass()); 
+  // Simplify the control flow graph (deleting unreachable blocks, etc).
+  function_pass_mgr_->add(createCFGSimplificationPass());
 
 #if 0 // Loop optimizations
     // Loop rotation
@@ -183,17 +262,16 @@ Status LlvmCodeGen::Init() {
     function_pass_mgr_->add(createCorrelatedValuePropagationPass()); 
 #endif
 
-    // Dead store elimination
-    function_pass_mgr_->add(createDeadStoreEliminationPass());
-    // Simplify the control flow graph (deleting unreachable blocks, etc).
-    function_pass_mgr_->add(createCFGSimplificationPass());
-    // Delete dead instructions
-    function_pass_mgr_->add(createAggressiveDCEPass());
-    // Simplify the control flow graph (deleting unreachable blocks, etc).
-    function_pass_mgr_->add(createCFGSimplificationPass());
-    // Do simple "peephole" optimizations and bit-twiddling optzns.
-    function_pass_mgr_->add(createInstructionCombiningPass());
-  }
+  // Dead store elimination
+  function_pass_mgr_->add(createDeadStoreEliminationPass());
+  // Simplify the control flow graph (deleting unreachable blocks, etc).
+  function_pass_mgr_->add(createCFGSimplificationPass());
+  // Delete dead instructions
+  function_pass_mgr_->add(createAggressiveDCEPass());
+  // Simplify the control flow graph (deleting unreachable blocks, etc).
+  function_pass_mgr_->add(createCFGSimplificationPass());
+  // Do simple "peephole" optimizations and bit-twiddling optzns.
+  function_pass_mgr_->add(createInstructionCombiningPass());
 
   function_pass_mgr_->doInitialization();
 
@@ -208,6 +286,15 @@ Status LlvmCodeGen::Init() {
 }
 
 LlvmCodeGen::~LlvmCodeGen() {
+  if (FLAGS_module_output.size() != 0) {
+    fstream f(FLAGS_module_output.c_str(), fstream::out | fstream::trunc);
+    if (f.fail()) {
+      LOG(ERROR) << "Could not save IR to: " << FLAGS_module_output;
+    } else {
+      f << GetIR(true); 
+      f.close();
+    }
+  }
   for (map<Function*, bool>::iterator iter = jitted_functions_.begin();
       iter != jitted_functions_.end(); ++iter) {
     execution_engine_->freeMachineCodeForFunction(iter->first);
@@ -222,10 +309,16 @@ void LlvmCodeGen::EnableVerifier(bool enable) {
   verifier_enabled_ = enable;
 }
 
-string LlvmCodeGen::GetIR() const {
+string LlvmCodeGen::GetIR(bool full_module) const {
   string str;
   raw_string_ostream stream(str);
-  module_->print(stream, NULL);
+  if (full_module) {
+    module_->print(stream, NULL);
+  } else {
+    for (int i = 0; i < codegend_functions_.size(); ++i) {
+      codegend_functions_[i]->print(stream, NULL);
+    }
+  }
   return str;
 }
 
@@ -245,6 +338,8 @@ Type* LlvmCodeGen::GetType(PrimitiveType type) {
       return Type::getFloatTy(context());
     case TYPE_DOUBLE:
       return Type::getDoubleTy(context());
+    case TYPE_STRING:
+      return string_val_type_;
     default:
       DCHECK(false) << "Invalid type.";
       return NULL;
@@ -299,6 +394,11 @@ Function* LlvmCodeGen::GetLibCFunction(FnPrototype* prototype) {
   return func;
 }
 
+Function* LlvmCodeGen::GetFunction(IRFunction::Type function) {
+  DCHECK(loaded_functions_[function] != NULL);
+  return loaded_functions_[function];
+}
+
 void LlvmCodeGen::AddInlineFunction(Function* function) {
   inliner_->addFunction(function);
 }
@@ -345,6 +445,8 @@ Function* LlvmCodeGen::FnPrototype::GeneratePrototype(
     BasicBlock* entry_block = BasicBlock::Create(codegen_->context(), "entry", fn);
     builder->SetInsertPoint(entry_block);
   }
+
+  codegen_->codegend_functions_.push_back(fn);
 
   return fn;
 }
@@ -410,8 +512,6 @@ void LlvmCodeGen::OptimizeFunction(Function* function) {
 }
 
 void* LlvmCodeGen::JitFunction(Function* function, int* scratch_size) {
-  OptimizeFunction(function);
-
   COUNTER_SCOPED_TIMER(compile_timer_);
   if (optimizations_enabled_) {
     inliner_->inlineFunctions();

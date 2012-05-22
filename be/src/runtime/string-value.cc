@@ -10,6 +10,8 @@ using namespace std;
 
 namespace impala {
 
+const char* StringValue::LLVM_CLASS_NAME = "struct.impala::StringValue";
+
 // Compare two strings using sse4.2 intrinsics if they are available. This code assumes
 // that the trivial cases are already handled (i.e. one string is empty). 
 // Returns:
@@ -38,7 +40,8 @@ static inline int StringCompare(const char* s1, int n1, const char* s2, int n2, 
       // Load 64 bits at a time, the upper 64 bits of the xmm register is set to 0
       __m128i xmm0 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(s1));
       __m128i xmm1 = _mm_loadl_epi64(reinterpret_cast<const __m128i*>(s2));
-      // The upper bits always match (always 0), hence the comparison to CHAR_PER_128_REGISTER
+      // The upper bits always match (always 0), hence the comparison to 
+      // CHAR_PER_128_REGISTER
       int chars_match = _mm_cmpistri(xmm0, xmm1, SSEUtil::STRCMP_MODE);
       if (chars_match != SSEUtil::CHARS_PER_128_BIT_REGISTER) {
         return s1[chars_match] - s2[chars_match];

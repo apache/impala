@@ -155,6 +155,38 @@ Function* BinaryPredicate::Codegen(LlvmCodeGen* codegen) {
       result = builder.CreateFCmpULT(lhs_value, rhs_value, "tmp_lt");
       break;
 
+    // String comparison functions
+    case TExprOpcode::EQ_STRINGVALUE_STRINGVALUE: {
+      Function* str_fn = codegen->GetFunction(IRFunction::STRING_VALUE_EQ);
+      result = builder.CreateCall2(str_fn, lhs_value, rhs_value, "tmp_eq");
+      break;
+    }
+    case TExprOpcode::NE_STRINGVALUE_STRINGVALUE: {
+      Function* str_fn = codegen->GetFunction(IRFunction::STRING_VALUE_NE);
+      result = builder.CreateCall2(str_fn, lhs_value, rhs_value, "tmp_ne");
+      break;
+    }
+    case TExprOpcode::GE_STRINGVALUE_STRINGVALUE: {
+      Function* str_fn = codegen->GetFunction(IRFunction::STRING_VALUE_GE);
+      result = builder.CreateCall2(str_fn, lhs_value, rhs_value, "tmp_ge");
+      break;
+    }
+    case TExprOpcode::GT_STRINGVALUE_STRINGVALUE: {
+      Function* str_fn = codegen->GetFunction(IRFunction::STRING_VALUE_GT);
+      result = builder.CreateCall2(str_fn, lhs_value, rhs_value, "tmp_gt");
+      break;
+    }
+    case TExprOpcode::LE_STRINGVALUE_STRINGVALUE: {
+      Function* str_fn = codegen->GetFunction(IRFunction::STRING_VALUE_LE);
+      result = builder.CreateCall2(str_fn, lhs_value, rhs_value, "tmp_le");
+      break;
+    }
+    case TExprOpcode::LT_STRINGVALUE_STRINGVALUE: {
+      Function* call_fn = codegen->GetFunction(IRFunction::STRING_VALUE_LT);
+      result = builder.CreateCall2(call_fn, lhs_value, rhs_value, "tmp_lt");
+      break;
+    }
+
     default:
       DCHECK(false) << "Unknown op: " << op();
       return NULL;
