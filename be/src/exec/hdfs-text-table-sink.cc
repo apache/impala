@@ -171,15 +171,15 @@ Status HdfsTextTableSink::InitOutputPartition(OutputPartition* output) {
   // Check if tmp_hdfs_file_name exists.
   const char* tmp_hdfs_file_name_cstr = output->tmp_hdfs_file_name.c_str();
   if (hdfsExists(hdfs_connection_, tmp_hdfs_file_name_cstr) == 0) {
-    return Status(AppendHdfsErrorMessage("Temporary HDFS file already exists: "
-                                         + output->tmp_hdfs_file_name));
+    return Status(AppendHdfsErrorMessage("Temporary HDFS file already exists: ",
+          output->tmp_hdfs_file_name));
   }
   // Open tmp_hdfs_file_name.
   output->tmp_hdfs_file = hdfsOpenFile(hdfs_connection_,
       tmp_hdfs_file_name_cstr, O_WRONLY, 0, 0, 0);
   if (output->tmp_hdfs_file == NULL) {
-    return Status(AppendHdfsErrorMessage("Failed to open HDFS file for writing: "
-                                         +  output->tmp_hdfs_file_name));
+    return Status(AppendHdfsErrorMessage("Failed to open HDFS file for writing: ",
+          output->tmp_hdfs_file_name));
   }
   output->num_rows = 0;
   return Status::OK;
@@ -269,8 +269,8 @@ Status HdfsTextTableSink::FinalizePartition(RuntimeState* state,
   // Close file.
   int hdfs_ret = hdfsCloseFile(hdfs_connection_, partition->tmp_hdfs_file);
   if (hdfs_ret != 0) {
-    return Status(AppendHdfsErrorMessage("Failed to close HDFS file: "
-                                         + partition->tmp_hdfs_file_name));
+    return Status(AppendHdfsErrorMessage("Failed to close HDFS file: ", 
+          partition->tmp_hdfs_file_name));
   }
 
   return Status::OK;
@@ -321,9 +321,8 @@ Status HdfsTextTableSink::MoveTmpHdfsFiles() {
     if (hdfsDelete(hdfs_connection_, tmp_dir.c_str(), 1) == -1) {
       // For unpartitioned tables, the dir will be deleted as part of the file move.
       if (!dynamic_partition_key_exprs_.empty()) {
-        stringstream error;
-        error << "Failed to delete temporary HDFS dir: " << tmp_dir << endl;
-        return Status(AppendHdfsErrorMessage(error.str()));
+        return Status(AppendHdfsErrorMessage("Failed to delete temporary HDFS dir: ",
+              tmp_dir));
       }
     }
   }
@@ -347,9 +346,10 @@ Status HdfsTextTableSink::DeleteOriginalFiles(OutputPartition* output) {
     }
     VLOG(1) << "Overwrite INSERT - deleting: " <<  orig_files[i].mName << endl;
     if (hdfsDelete(hdfs_connection_, orig_files[i].mName, -1)) {
+      string error = AppendHdfsErrorMessage("Failed to delete existing HDFS file "
+          "as part of overwriting: ", orig_files[i].mName);
       hdfsFreeFileInfo(orig_files, num_orig_files);
-      return Status(AppendHdfsErrorMessage("Failed to delete existing Hdfs file"
-          " as part of overwriting:" + string(orig_files[i].mName)));
+      return Status(error);
     }
   }
   hdfsFreeFileInfo(orig_files, num_orig_files);
@@ -360,8 +360,8 @@ Status HdfsTextTableSink::MoveTmpHdfsFile(OutputPartition* output) {
   const char* src = output->tmp_hdfs_file_name.c_str();
   const char* dest = output->hdfs_file_name.c_str();
   if (!overwrite_ && hdfsExists(hdfs_connection_, dest) == 0) {
-    return Status(AppendHdfsErrorMessage("Target HDFS file already exists: "
-                                         + output->hdfs_file_name));
+    return Status(AppendHdfsErrorMessage("Target HDFS file already exists: ",
+                                         output->hdfs_file_name));
   }
   // Move the file/dir. Note that it is not necessary to create the target first.
   if (hdfsMove(hdfs_connection_, src, hdfs_connection_, dest)) {

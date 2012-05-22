@@ -9,13 +9,6 @@
 using namespace impala;
 using namespace std;
 
-// HDFS will set errno on error.  Append this to message for better diagnostic messages.
-string impala::AppendHdfsErrorMessage(const string& message) {
-  stringstream ss;
-  ss << message << "\nError(" << errno << "): " << strerror(errno);
-  return ss.str();
-}
-
 HdfsByteStream::HdfsByteStream(hdfsFS hdfs_connection, HdfsScanNode* scan_node)
     : ByteStream(),
       hdfs_connection_(hdfs_connection),
@@ -36,7 +29,7 @@ Status HdfsByteStream::Open(const string& location) {
   location_ = location;
   hdfs_file_ = hdfsOpenFile(hdfs_connection_, location_.c_str(), O_RDONLY, 0, 0, 0);
   if (hdfs_file_ == NULL) {
-    return Status(AppendHdfsErrorMessage("Failed to open HDFS file " + location_));
+    return Status(AppendHdfsErrorMessage("Failed to open HDFS file ", location_));
   }
   VLOG(1) << "HdfsByteStream: opened file " << location_;
   return Status::OK;
@@ -55,7 +48,7 @@ Status HdfsByteStream::Read(uint8_t* buf, int64_t req_length, int64_t* actual_le
       return Status::OK;
     } else if (last_read == -1) {
       // In case of error, *actual_length is not updated
-      return Status(AppendHdfsErrorMessage("Error reading from HDFS file: " + location_));
+      return Status(AppendHdfsErrorMessage("Error reading from HDFS file: ", location_));
     }
 
     n_read += last_read;
@@ -70,7 +63,7 @@ Status HdfsByteStream::Close() {
   if (hdfs_file_ == NULL) return Status::OK;
   int hdfs_ret = hdfsCloseFile(hdfs_connection_, hdfs_file_);
   if (hdfs_ret != 0) {
-    return Status(AppendHdfsErrorMessage("Error closing HDFS file:" + location_));
+    return Status(AppendHdfsErrorMessage("Error closing HDFS file: ", location_));
   }
   hdfs_file_ = NULL;
   COUNTER_UPDATE(scan_node_->bytes_read_counter(), total_bytes_read_);

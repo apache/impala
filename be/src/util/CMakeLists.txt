@@ -12,6 +12,7 @@ add_library(Util
   cpu-info.cc
   debug-util.cc
   decompress.cc
+  hdfs-util.cc
   jni-util.cc
   path-builder.cc
   perf-counters.cc

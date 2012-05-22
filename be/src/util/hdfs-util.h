@@ -8,7 +8,9 @@
 namespace impala {
 
 // HDFS will set errno on error.  Append this to message for better diagnostic messages.
-std::string AppendHdfsErrorMessage(const std::string& message);
+// The optional 'file' argument is appended to the returned message.
+std::string AppendHdfsErrorMessage(const std::string& message, 
+    const std::string& file = "");
 
 }
 
