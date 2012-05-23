@@ -6,6 +6,7 @@ import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
 
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -40,6 +41,11 @@ public class DataErrorsTest {
     tableList.add("_seq_record_gzip");
     tableList.add("_seq_record_bzip");
     tableList.add("_seq_record_snap");
+  }
+
+  @AfterClass
+  public static void cleanUp() {
+    catalog.close();
   }
 
   private void runErrorTestFile(String testFile, boolean abortOnError, int maxErrors,

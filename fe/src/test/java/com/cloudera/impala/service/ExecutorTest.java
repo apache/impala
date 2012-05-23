@@ -7,6 +7,7 @@ import static org.junit.Assert.fail;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 
+import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -18,7 +19,12 @@ public class ExecutorTest {
   // For buffering query results.
   private final ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
   private final PrintStream printStream = new PrintStream(outputStream);
-  private final Catalog catalog = Executor.createCatalog();
+  private static final Catalog catalog = Executor.createCatalog();
+
+  @AfterClass
+  public static void cleanUp() {
+    catalog.close();
+  }
 
   private void runTestSuccess(String query, int expectedRows)
       throws ImpalaException {

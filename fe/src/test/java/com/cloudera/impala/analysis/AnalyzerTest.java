@@ -14,6 +14,7 @@ import java.util.Map;
 
 import junit.framework.Assert;
 
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -52,6 +53,11 @@ public class AnalyzerTest {
   @BeforeClass
   public static void setUp() throws Exception {
     catalog = new Catalog();
+  }
+
+  @AfterClass
+  public static void cleanUp() {
+    catalog.close();
   }
 
   /**

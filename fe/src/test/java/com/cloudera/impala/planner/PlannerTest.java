@@ -9,6 +9,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -41,6 +42,11 @@ public class PlannerTest {
   public static void setUp() throws Exception {
     catalog = new Catalog();
     analysisCtxt = new AnalysisContext(catalog);
+  }
+
+  @AfterClass
+  public static void cleanUp() {
+    catalog.close();
   }
 
   private void RunQuery(String query, int numNodes, TestCase testCase,

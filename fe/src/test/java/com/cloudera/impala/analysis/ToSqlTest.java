@@ -5,6 +5,7 @@ import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
 
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -16,11 +17,16 @@ import com.cloudera.impala.thrift.TQueryRequest;
 public class ToSqlTest {
 
   private static Executor executor;
-
+  private static Catalog catalog;
   @BeforeClass
   public static void setUp() throws Exception {
-    Catalog catalog = new Catalog();
+    catalog = new Catalog();
     executor = new Executor(catalog);
+  }
+
+  @AfterClass
+  public static void cleanUp() {
+    catalog.close();
   }
 
   private static AnalysisContext.AnalysisResult analyze(String query) {

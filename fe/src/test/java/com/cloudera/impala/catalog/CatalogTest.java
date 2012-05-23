@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Set;
 
 import org.apache.hadoop.hive.serde.Constants;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -26,6 +27,11 @@ public class CatalogTest {
   @BeforeClass
   public static void setUp() throws Exception {
     catalog = new Catalog();
+  }
+
+  @AfterClass
+  public static void cleanUp() {
+    catalog.close();
   }
 
   private void checkTableCols(Db db, String tblName, int numClusteringCols,

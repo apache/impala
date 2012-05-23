@@ -162,7 +162,7 @@ public class TestFileParser {
   }
 
   /**
-   * Initialises the scanner and the input stream corresponding to the test file name
+   * Initializes the scanner and the input stream corresponding to the test file name
    */
   private void open(String table) {
     this.table = table;

@@ -50,6 +50,9 @@ public class PlanService {
     }
 
     protected void setCatalog(Catalog catalog) {
+      if (this.catalog.get() != null) {
+        this.catalog.get().close();
+      }
       this.catalog.set(catalog);
     }
 
@@ -112,6 +115,7 @@ public class PlanService {
     }
 
     public void ShutdownServer() {
+      this.catalog.get().close();
       System.exit(0);
     }
 

@@ -15,6 +15,7 @@ import java.util.Map;
 import junit.framework.Assert;
 
 import org.hsqldb.lib.HashSet;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -40,6 +41,11 @@ public class JdbcDriverTest {
     Class.forName("com.cloudera.impala.jdbc.ImpalaDriver");
     catalog = new Catalog();
     executor = new Executor(catalog);
+  }
+
+  @AfterClass
+  public static void cleanUp() {
+    catalog.close();
   }
 
   // Expected success when connecting to connSting.

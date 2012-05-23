@@ -12,6 +12,7 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.log4j.Logger;
+import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -39,7 +40,12 @@ public class QueryTest {
     executor = new Executor(catalog);
   }
 
-  // Commands recognised as part of the SETUP section
+  @AfterClass
+  public static void cleanUp() {
+    catalog.close();
+  }
+
+  // Commands recognized as part of the SETUP section
   private static final String RESET_CMD = "RESET";
   private static final String DROP_PARTITIONS_CMD = "DROP PARTITIONS";
   private static final String RELOAD_CATALOG_CMD = "RELOAD";
@@ -90,6 +96,7 @@ public class QueryTest {
       } else if (cmd.startsWith(RELOAD_CATALOG_CMD)) {
         List<String> tableNames = getCmdArguments(RELOAD_CATALOG_CMD, cmd);
         if (tableNames.size() == 0) {
+          catalog.close();
           catalog = new Catalog(true);
           executor.setCatalog(catalog);
         } else {
@@ -313,7 +320,6 @@ public class QueryTest {
     List<TestConfiguration> testConfigs =
       generateRoundRobinConfigurations(baseFormats, compressionSuffixes, batchSizes,
           numNodes);
-
     runQueryWithTestConfigs(testConfigs, testFile, abortOnError, maxErrors);
 
   }
@@ -342,6 +348,7 @@ public class QueryTest {
           fail(e.getMessage());
         }
       }
+
       TestUtils.runQuery(
           executor, testCase.getSectionAsString(Section.QUERY, false, " "),
           numNodes, batchSize, abortOnError, maxErrors, disableLlvm,
@@ -371,7 +378,7 @@ public class QueryTest {
 
   @Test
   public void TestHdfsScanNode() {
-    // Run fully destributed (nodes = 0) with all batch sizes.
+    // Run fully distributed (nodes = 0) with all batch sizes.
     runPairTestFile("hdfs-scan-node", false, 1000,
         ALL_TABLE_FORMATS, ALL_COMPRESSION_FORMATS, ALL_BATCH_SIZES, ALL_NODES_ONLY);
     // Run other node numbers with small batch sizes on text
@@ -381,7 +388,7 @@ public class QueryTest {
 
   @Test
   public void TestFilePartitions() {
-    // Run fully destributed with all batch sizes.
+    // Run fully distributed with all batch sizes.
     runPairTestFile("hdfs-partitions", false, 1000,
         ALL_TABLE_FORMATS, ALL_COMPRESSION_FORMATS, ALL_BATCH_SIZES, ALL_NODES_ONLY);
 

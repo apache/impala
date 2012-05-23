@@ -443,7 +443,12 @@ public class Executor {
     }
 
     Catalog catalog = createCatalog();
-    int numRows = runQuery(queryString, catalog, true, batchSize, System.out);
-    System.out.println("TOTAL ROWS: " + numRows);
+    try {
+      int numRows = runQuery(queryString, catalog, true, batchSize, System.out);
+      System.out.println("TOTAL ROWS: " + numRows);
+    }
+    finally {
+      catalog.close();
+    }
   }
 }

@@ -20,6 +20,7 @@ import com.google.common.collect.Maps;
 public class Catalog {
   public static final String DEFAULT_DB = "default";
 
+  private boolean closed = false;
   private int nextTableId;
 
   // map from db name to DB
@@ -48,6 +49,17 @@ public class Catalog {
     } catch (MetaException e) {
       // turn into unchecked exception
       throw new UnsupportedOperationException(e);
+    }
+  }
+
+  /**
+   * Releases the Hive Metastore Client resources. This method can be called
+   * multiple times. Additional calls will be no-ops.
+   */
+  public void close() {
+    if (this.msClient != null && !closed) {
+      this.msClient.close();
+      closed = true;
     }
   }
 

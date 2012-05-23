@@ -14,8 +14,16 @@ export METASTORE_DB=`basename $root | sed -e "s/\\./_/g" | sed -e "s/[.-]/_/g"`
 clean_action=1
 testdata_action=1
 tests_action=1
+metastore_is_derby=0
 
 FORMAT_CLUSTER=1
+
+if [[ ${METASTORE_IS_DERBY} ]]; then
+  metastore_is_derby=1
+fi
+
+# Exit on reference to uninitialized variable
+set -u
 
 # parse command line options
 for ARG in $*
@@ -74,14 +82,14 @@ fi
 # Generate hive-site.xml from template via env var substitution
 # TODO: Throw an error if the template references an undefined environment variable
 cd ${IMPALA_FE_DIR}/src/test/resources
-if [[ ${METASTORE_IS_DERBY} ]]
+if [ $metastore_is_derby -eq 1 ]
 then
   echo "using derby for metastore"
   perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
     derby-hive-site.xml.template > hive-site.xml
 else
   echo "using mysql for metastore"
-  if [ $FORMAT_CLUSTER -eq 1 ]; then    
+  if [ $FORMAT_CLUSTER -eq 1 ]; then
     echo "drop database hive_$METASTORE_DB;" | mysql --user=hiveuser --password=password
   fi
   perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
@@ -96,8 +104,6 @@ hbase-site.xml.template > hbase-site.xml
 
 # Exit on non-true return value
 set -e
-# Exit on reference to unitialized variable
-set -u
 
 # cleanup FE process
 $IMPALA_HOME/bin/clean-fe-processes.py
@@ -122,7 +128,7 @@ then
   cd $IMPALA_HOME/testdata
   $IMPALA_HOME/bin/create_testdata.sh
   cd $IMPALA_HOME/fe
-  if [ $FORMAT_CLUSTER -eq 1 ]; then    
+  if [ $FORMAT_CLUSTER -eq 1 ]; then
     mvn -Pload-testdata process-test-resources -Dcluster.format
   else
     mvn -Pload-testdata process-test-resources
@@ -140,11 +146,17 @@ then
 fi
 
 # run backend tests For some reason this does not work on Jenkins
-if [ $tests_action -eq 1 ] 
+if [ $tests_action -eq 1 ]
 then
   cd $IMPALA_FE_DIR
+  if [ $metastore_is_derby -eq 1 ]
+  then
+    echo "Cleaning up locks from previous test runs for derby for metastore"
+    ls target/test_metastore_db/*.lck
+    rm -f target/test_metastore_db/{db,dbex}.lck
+  fi
   mvn exec:java -Dexec.mainClass=com.cloudera.impala.testutil.PlanService \
-              -Dexec.classpathScope=test & 
+              -Dexec.classpathScope=test &
   PID=$!
   # Wait for planner to startup TODO: can we do something better than wait arbitrarily for
   # 3 seconds.  Not a huge deal if it's not long enough, BE tests will just wait a bit
