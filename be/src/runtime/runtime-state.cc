@@ -32,7 +32,10 @@ RuntimeState::RuntimeState(
     query_id_(query_id),
     exec_env_(exec_env),
     profile_(obj_pool_.get(), "RuntimeState") {
-  if (llvm_enabled) DCHECK(CreateCodegen().ok());  // TODO better error handling
+  if (llvm_enabled) {
+    Status status = CreateCodegen();
+    DCHECK(status.ok()); // TODO better error handling
+  }
 }
 
 RuntimeState::RuntimeState()

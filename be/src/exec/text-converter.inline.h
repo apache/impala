@@ -11,9 +11,7 @@
 #include "runtime/timestamp-value.h"
 #include "runtime/mem-pool.h"
 
-using namespace boost;
-using namespace impala;
-using namespace std;
+namespace impala {
 
 // TODO: Needs to be codegen rather than inline.
 inline Status TextConverter::WriteSlot(RuntimeState* state,
@@ -75,7 +73,7 @@ inline Status TextConverter::WriteSlot(RuntimeState* state,
           StringParser::StringToFloat<double>(data, len, &parse_result);
         break;
       case TYPE_TIMESTAMP: {
-        string strbuf(data, len);
+        std::string strbuf(data, len);
         *reinterpret_cast<TimestampValue*>(slot) = TimestampValue(strbuf);
         break;
       }
@@ -93,12 +91,15 @@ inline Status TextConverter::WriteSlot(RuntimeState* state,
             << "Error converting column: " << slot_desc->col_pos() << " TO "
             // TODO: num_partition_keys_ no longer visible to scanner.
             // << slot_desc->col_pos() - num_partition_keys_ << " TO "
-            << TypeToString(slot_desc->type()) << "Data is: " << string(data,len) << endl;
+            << TypeToString(slot_desc->type()) << "Data is: " 
+            << std::string(data, len) << std::endl;
       }
     }
   }
 
   if (fail) return Status("Conversion from text failed");
   return Status::OK;
+}
+
 }
 

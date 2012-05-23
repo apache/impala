@@ -106,8 +106,20 @@ class DelimitedTextParser {
   //   num_fields: current number of fileds processed, updated to next field.
   // Output:
   //   field_locations: updated with start and length of current field.
+  template <bool process_escapes>
   void AddColumn(int len, char** next_column_start, int* num_fields,
                  std::vector<FieldLocation>* field_locations);
+
+  // Helper routine to parse delimited text using SSE instructions.  
+  // Identical arguments as ParseFieldLocations. 
+  // If the template argument, 'process_escapes' is true, this function will handle
+  // escapes, otherwise, it will assume the text is unescaped.  By using templates,
+  // we can special case the un-escaped path for better performance.  The unescaped
+  // path is optimized away by the compiler.
+  template <bool process_escapes>
+  void ParseSse(int max_tuples, int64_t* remaining_len,
+      char** byte_buffer_ptr, std::vector<FieldLocation>* field_locations,
+      int* num_tuples, int* num_fields, char** next_column_start);
 
   // Map columns in the data to slots in the tuples.
   const std::vector<int>& map_column_to_slot_;
