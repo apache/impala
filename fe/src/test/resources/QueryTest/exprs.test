@@ -1,245 +1,245 @@
 # IS NULL predicate
-select count(*) from alltypesagg
+select count(*) from alltypesagg$TABLE
 ----
 bigint
 ----
 10000
 ====
-select count(*) from alltypesagg where tinyint_col is null
+select count(*) from alltypesagg$TABLE where tinyint_col is null
 ----
 bigint
 ----
 1000
 ====
-select count(*) from alltypesagg where tinyint_col is not null
+select count(*) from alltypesagg$TABLE where tinyint_col is not null
 ----
 bigint
 ----
 9000
 ====
 # =
-select count(*) from alltypesagg where tinyint_col = 1
+select count(*) from alltypesagg$TABLE where tinyint_col = 1
 ----
 bigint
 ----
 1000
 ====
-select count(*) from alltypesagg where smallint_col = 1
+select count(*) from alltypesagg$TABLE where smallint_col = 1
 ----
 bigint
 ----
 100
 ====
-select count(*) from alltypesagg where int_col = 1
+select count(*) from alltypesagg$TABLE where int_col = 1
 ----
 bigint
 ----
 10
 ====
-select count(*) from alltypesagg where bigint_col = 10
+select count(*) from alltypesagg$TABLE where bigint_col = 10
 ----
 bigint
 ----
 10
 ====
-select count(*) from alltypesagg where float_col = cast(1.1 as float)
+select count(*) from alltypesagg$TABLE where float_col = cast(1.1 as float)
 ----
 bigint
 ----
 10
 ====
-select count(*) from alltypesagg where double_col = 10.1
+select count(*) from alltypesagg$TABLE where double_col = 10.1
 ----
 bigint
 ----
 10
 ====
-select count(*) from alltypesagg where date_string_col = '01/01/10'
+select count(*) from alltypesagg$TABLE where date_string_col = '01/01/10'
 ----
 bigint
 ----
 1000
 ====
 # <>
-select count(*) from alltypesagg where tinyint_col <> 1
+select count(*) from alltypesagg$TABLE where tinyint_col <> 1
 ----
 bigint
 ----
 8000
 ====
-select count(*) from alltypesagg where smallint_col <> 1
+select count(*) from alltypesagg$TABLE where smallint_col <> 1
 ----
 bigint
 ----
 9800
 ====
-select count(*) from alltypesagg where int_col <> 1
+select count(*) from alltypesagg$TABLE where int_col <> 1
 ----
 bigint
 ----
 9980
 ====
-select count(*) from alltypesagg where bigint_col <> 1
+select count(*) from alltypesagg$TABLE where bigint_col <> 1
 ----
 bigint
 ----
 9990
 ====
-select count(*) from alltypesagg where float_col <> cast(1.1 as float)
+select count(*) from alltypesagg$TABLE where float_col <> cast(1.1 as float)
 ----
 bigint
 ----
 9980
 ====
-select count(*) from alltypesagg where double_col <> 10.1
+select count(*) from alltypesagg$TABLE where double_col <> 10.1
 ----
 bigint
 ----
 9980
 ====
 # <
-select count(*) from alltypesagg where tinyint_col < 2
+select count(*) from alltypesagg$TABLE where tinyint_col < 2
 ----
 bigint
 ----
 1000
 ====
-select count(*) from alltypesagg where smallint_col < 2
+select count(*) from alltypesagg$TABLE where smallint_col < 2
 ----
 bigint
 ----
 100
 ====
-select count(*) from alltypesagg where int_col < 2
+select count(*) from alltypesagg$TABLE where int_col < 2
 ----
 bigint
 ----
 10
 ====
-select count(*) from alltypesagg where bigint_col < 20
+select count(*) from alltypesagg$TABLE where bigint_col < 20
 ----
 bigint
 ----
 10
 ====
-select count(*) from alltypesagg where float_col < 2.2
+select count(*) from alltypesagg$TABLE where float_col < 2.2
 ----
 bigint
 ----
 10
 ====
-select count(*) from alltypesagg where double_col < 20.2
+select count(*) from alltypesagg$TABLE where double_col < 20.2
 ----
 bigint
 ----
 10
 ====
 # >
-select count(*) from alltypesagg where tinyint_col > 1
+select count(*) from alltypesagg$TABLE where tinyint_col > 1
 ----
 bigint
 ----
 8000
 ====
-select count(*) from alltypesagg where smallint_col > 1
+select count(*) from alltypesagg$TABLE where smallint_col > 1
 ----
 bigint
 ----
 9800
 ====
-select count(*) from alltypesagg where int_col > 1
+select count(*) from alltypesagg$TABLE where int_col > 1
 ----
 bigint
 ----
 9980
 ====
-select count(*) from alltypesagg where bigint_col > 10
+select count(*) from alltypesagg$TABLE where bigint_col > 10
 ----
 bigint
 ----
 9980
 ====
-select count(*) from alltypesagg where float_col > cast(1.1 as float) 
+select count(*) from alltypesagg$TABLE where float_col > cast(1.1 as float) 
 ----
 bigint
 ----
 9980
 ====
-select count(*) from alltypesagg where double_col > 10.1
+select count(*) from alltypesagg$TABLE where double_col > 10.1
 ----
 bigint
 ----
 9980
 ====
 # <=
-select count(*) from alltypesagg where tinyint_col <= 1
+select count(*) from alltypesagg$TABLE where tinyint_col <= 1
 ----
 bigint
 ----
 1000
 ====
-select count(*) from alltypesagg where smallint_col <= 1
+select count(*) from alltypesagg$TABLE where smallint_col <= 1
 ----
 bigint
 ----
 100
 ====
-select count(*) from alltypesagg where int_col <= 1
+select count(*) from alltypesagg$TABLE where int_col <= 1
 ----
 bigint
 ----
 10
 ====
-select count(*) from alltypesagg where bigint_col <= 10
+select count(*) from alltypesagg$TABLE where bigint_col <= 10
 ----
 bigint
 ----
 10
 ====
-select count(*) from alltypesagg where float_col <= cast(1.1 as float)
+select count(*) from alltypesagg$TABLE where float_col <= cast(1.1 as float)
 ----
 bigint
 ----
 10
 ====
-select count(*) from alltypesagg where double_col <= 10.1
+select count(*) from alltypesagg$TABLE where double_col <= 10.1
 ----
 bigint
 ----
 10
 ====
 # >=
-select count(*) from alltypesagg where tinyint_col >= 2
+select count(*) from alltypesagg$TABLE where tinyint_col >= 2
 ----
 bigint
 ----
 8000
 ====
-select count(*) from alltypesagg where smallint_col >= 2
+select count(*) from alltypesagg$TABLE where smallint_col >= 2
 ----
 bigint
 ----
 9800
 ====
-select count(*) from alltypesagg where int_col >= 2
+select count(*) from alltypesagg$TABLE where int_col >= 2
 ----
 bigint
 ----
 9980
 ====
-select count(*) from alltypesagg where bigint_col >= 20
+select count(*) from alltypesagg$TABLE where bigint_col >= 20
 ----
 bigint
 ----
 9980
 ====
-select count(*) from alltypesagg where float_col >= 2.2
+select count(*) from alltypesagg$TABLE where float_col >= 2.2
 ----
 bigint
 ----
 9980
 ====
-select count(*) from alltypesagg where double_col >= 20.2
+select count(*) from alltypesagg$TABLE where double_col >= 20.2
 ----
 bigint
 ----
@@ -257,7 +257,7 @@ SUM(tinyint_col) + SUM(smallint_col) + SUM(int_col) + SUM(bigint_col) + SUM(floa
 SUM(tinyint_col + smallint_col + int_col + bigint_col + float_col),
 SUM(tinyint_col) + SUM(smallint_col) + SUM(int_col) + SUM(bigint_col) + SUM(float_col) + SUM(double_col),
 SUM(tinyint_col + smallint_col + int_col + bigint_col + float_col + double_col)
-from alltypesaggnonulls
+from alltypesaggnonulls$TABLE
 ----
 bigint, bigint, bigint, bigint, bigint, bigint, double, double, double, double
 ----
@@ -275,7 +275,7 @@ SUM(-1 * tinyint_col - smallint_col - int_col - bigint_col),
 SUM(-1 * tinyint_col - smallint_col - int_col - bigint_col - float_col),
 -1 * SUM(tinyint_col) - SUM(smallint_col) - SUM(int_col) - SUM(bigint_col) - SUM(float_col) - SUM(double_col),
 SUM(-1 * tinyint_col - smallint_col - int_col - bigint_col - float_col - double_col)
-from alltypesaggnonulls
+from alltypesaggnonulls$TABLE
 ----
 bigint, bigint, bigint, bigint, bigint, bigint, double, double, double, double
 ----
@@ -293,7 +293,7 @@ MAX(tinyint_col) * MAX(smallint_col) * MAX(int_col) * MAX(bigint_col) * MAX(floa
 MAX(tinyint_col * smallint_col * int_col * bigint_col * float_col),
 MAX(tinyint_col) * MAX(smallint_col) * MAX(int_col) * MAX(bigint_col) * MAX(float_col) * MAX(double_col),
 MAX(tinyint_col * smallint_col * int_col * bigint_col * float_col * double_col)
-from alltypesaggnonulls
+from alltypesaggnonulls$TABLE
 ----
 bigint, bigint, bigint, bigint, bigint, bigint, double, double, double, double
 ----
@@ -313,7 +313,7 @@ bigint, bigint, bigint, bigint, bigint, bigint, double, double, double, double
 #MAX(tinyint_col / smallint_col / int_col / bigint_col / float_col),
 #MAX(tinyint_col) / MAX(smallint_col) / MAX(int_col) / MAX(bigint_col) / MAX(float_col) / MAX(double_col),
 #MAX(tinyint_col / smallint_col / int_col / bigint_col / float_col / double_col)
-#from alltypesaggnonulls
+#from alltypesaggnonulls$TABLE
 #----
 #double, double, double, double, double, double, double, double, double, double
 #----

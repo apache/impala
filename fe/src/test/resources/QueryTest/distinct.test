@@ -1,6 +1,6 @@
 # distinct *
 select distinct *
-from alltypesagg
+from alltypesagg$TABLE
 where id < 20
 ----
 int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
@@ -28,7 +28,7 @@ int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, stri
 ====
 # distinct w/ explicit select list
 select distinct bool_col, tinyint_col
-from alltypesagg
+from alltypesagg$TABLE
 ----
 boolean, tinyint
 ----
@@ -45,7 +45,7 @@ true,NULL
 ====
 # count(distinct)
 select count(distinct smallint_col, tinyint_col)
-from alltypesagg
+from alltypesagg$TABLE
 ----
 bigint
 ----
@@ -53,7 +53,7 @@ bigint
 ====
 # count(distinct) w/ grouping and non-distinct count()
 select tinyint_col, count(distinct smallint_col), count(smallint_col)
-from alltypesagg group by 1
+from alltypesagg$TABLE group by 1
 ----
 tinyint, bigint, bigint
 ----
@@ -70,7 +70,7 @@ NULL,10,900
 ====
 # count(distinct) w/ grouping and non-distinct count()
 select tinyint_col, count(distinct int_col, smallint_col), count(smallint_col)
-from alltypesagg group by 1
+from alltypesagg$TABLE group by 1
 ----
 tinyint, bigint, bigint
 ----
@@ -88,7 +88,7 @@ NULL,100,900
 # count(distinct) and sum(distinct) w/ grouping and non-distinct count()
 select tinyint_col, count(distinct smallint_col), sum(distinct smallint_col),
 count(smallint_col)
-from alltypesagg group by 1
+from alltypesagg$TABLE group by 1
 ----
 tinyint, bigint, bigint, bigint
 ----
@@ -107,7 +107,7 @@ NULL,10,450,900
 # ignored
 select tinyint_col, count(distinct smallint_col), sum(distinct smallint_col),
 count(smallint_col), min(distinct int_col), max(distinct float_col)
-from alltypesagg group by 1
+from alltypesagg$TABLE group by 1
 ----
 tinyint, bigint, bigint, bigint, int, float
 ----

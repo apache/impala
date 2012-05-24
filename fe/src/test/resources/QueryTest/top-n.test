@@ -14,7 +14,7 @@ int,double
 =====
 # Run query without order by
 select tinyint_col, count(*) 
-from alltypesagg 
+from alltypesagg$TABLE 
 group by 1 
 limit 10
 ----
@@ -33,7 +33,7 @@ NULL,1000
 =====
 # Same query order by asc first col
 select tinyint_col, count(*) 
-from alltypesagg 
+from alltypesagg$TABLE 
 group by 1 
 order by 1
 limit 10
@@ -53,7 +53,7 @@ NULL,1000
 =====
 # Same query order by asc first desc
 select tinyint_col, count(*) 
-from alltypesagg 
+from alltypesagg$TABLE 
 group by 1 
 order by 1 desc
 limit 20
@@ -72,7 +72,7 @@ tinyint, bigint
 NULL,1000
 =====
 select date_string_col,int_col
-from alltypesagg
+from alltypesagg$TABLE
 order by date_string_col, int_col desc
 limit 10
 ----
@@ -91,7 +91,7 @@ string,int
 =====
 # order by multiple cols with nulls 
 select tinyint_col % 3, smallint_col % 3, count(*) 
-from alltypesagg 
+from alltypesagg$TABLE 
 where day = 1 
 group by 1, 2
 order by 1, 2
@@ -114,7 +114,7 @@ NULL,2,30
 NULL,NULL,10
 =====
 select tinyint_col % 3, smallint_col % 3, count(*) 
-from alltypesagg 
+from alltypesagg$TABLE 
 where day = 1 
 group by 1, 2
 order by 1, 2 desc
@@ -137,7 +137,7 @@ NULL,0,30
 NULL,NULL,10
 =====
 select tinyint_col % 3, smallint_col % 3, count(*) 
-from alltypesagg 
+from alltypesagg$TABLE 
 where day = 1 
 group by 1, 2
 order by 1 desc, 2
@@ -160,7 +160,7 @@ NULL,2,30
 NULL,NULL,10
 ====
 select tinyint_col % 3, smallint_col % 3, count(*) 
-from alltypesagg 
+from alltypesagg$TABLE 
 where day = 1 
 group by 1, 2
 order by 1 desc, 2 desc
@@ -183,7 +183,7 @@ NULL,0,30
 NULL,NULL,10
 ====
 select date_string_col
-from alltypessmall
+from alltypessmall$TABLE
 order by date_string_col desc
 limit 50
 ----
@@ -242,7 +242,7 @@ string
 =====
 # Based on join queries
 select a.tinyint_col, b.id, a.string_col
-from alltypesagg a join alltypessmall b on (a.tinyint_col = b.id)
+from alltypesagg$TABLE a join alltypessmall$TABLE b on (a.tinyint_col = b.id)
 where a.month=1
 and a.day=1
 and a.tinyint_col + b.tinyint_col < 5
@@ -260,7 +260,7 @@ tinyint, int, string
 1,1,'911'
 ====
 select a.tinyint_col, b.id, a.string_col
-from alltypesagg a join alltypessmall b on (a.tinyint_col = b.id)
+from alltypesagg$TABLE a join alltypessmall$TABLE b on (a.tinyint_col = b.id)
 where a.month=1
 and a.day=1
 and a.tinyint_col + b.tinyint_col < 5
@@ -278,9 +278,9 @@ tinyint, int, string
 1,1,'951'
 ====
 select a.smallint_col, b.id, a.tinyint_col, c.id, a.int_col, b.float_col, c.string_col
-from alltypesagg a
-join alltypessmall b on (a.smallint_col = b.id)
-join alltypessmall c on (a.tinyint_col = c.id)
+from alltypesagg$TABLE a
+join alltypessmall$TABLE b on (a.smallint_col = b.id)
+join alltypessmall$TABLE c on (a.tinyint_col = c.id)
 where a.month=1
 and a.day=1
 and a.int_col > 899
@@ -307,7 +307,7 @@ smallint, int, tinyint, int, int, float, string
 # Query with ordering column in select list
 # Don't include date_string_col, it comes back in random order.
 select int_col, tinyint_col
-from alltypessmall
+from alltypessmall$TABLE
 order by int_col desc
 limit 20
 ----
@@ -336,7 +336,7 @@ int, tinyint
 ====
 # Same query with ordering col not in select list
 select tinyint_col
-from alltypessmall
+from alltypessmall$TABLE
 order by int_col desc
 limit 20
 ----
@@ -399,7 +399,7 @@ int, int, bigint
 ====
 # More Complex Ordering Exprs
 select int_col % 7, count(*), avg(tinyint_col)
-from alltypesagg
+from alltypesagg$TABLE
 group by 1
 order by avg(tinyint_col)
 limit 10
@@ -416,7 +416,7 @@ int, bigint, double
 NULL,10,NULL
 ====
 select int_col % 7, count(*), max(int_col)
-from alltypesagg
+from alltypesagg$TABLE
 group by 1
 order by max(int_col)
 limit 10
@@ -433,7 +433,7 @@ int, bigint, int
 NULL,10,NULL
 ====
 select int_col % 5, count(*), avg(tinyint_col) - avg(float_col)
-from alltypesagg
+from alltypesagg$TABLE
 group by 1
 order by avg(tinyint_col) - avg(float_col) desc
 limit 10
@@ -448,7 +448,7 @@ int, bigint, double
 NULL,10,NULL
 ====
 select int_col
-from alltypessmall
+from alltypessmall$TABLE
 order by int_col % 5
 limit 100
 ----

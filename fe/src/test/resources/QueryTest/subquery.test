@@ -165,13 +165,13 @@ from (
               b.float_col float_col, b.id id
        from (
               select *
-              from alltypesagg a
+              from alltypesagg$TABLE a
               where month=1
             ) a
-            join alltypessmall b
+            join alltypessmall$TABLE b
             on (a.smallint_col = b.id)
      ) x
-join alltypessmall c on (x.tinyint_col = c.id)
+join alltypessmall$TABLE c on (x.tinyint_col = c.id)
 where x.day=1
 and   x.int_col > 899
 and   x.float_col > 4.5
@@ -204,17 +204,17 @@ smallint, int, tinyint, int, int, float, string
 ====
 # Same join as above, but subquery on the RHS
 select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col
-from alltypessmall c
+from alltypessmall$TABLE c
      join  
      (
        select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,
               a.int_col int_col, a.month month,
               b.float_col float_col, b.id id
-       from alltypessmall b
+       from alltypessmall$TABLE b
             join
             (
               select *
-              from alltypesagg a
+              from alltypesagg$TABLE a
               where month=1
             ) a
             on (a.smallint_col = b.id)
@@ -256,7 +256,7 @@ from (
        select count(*), count(tinyint_col), min(tinyint_col), max(tinyint_col),
               sum(tinyint_col), avg(tinyint_col)
        from (
-              select * from alltypesagg
+              select * from alltypesagg$TABLE
             ) a
      ) b
 ----
@@ -269,7 +269,7 @@ select *
 from ( 
        select int_col % 7 c1, count(*) c2, avg(int_col) c3
        from (
-              select * from alltypesagg
+              select * from alltypesagg$TABLE
             ) a
        group by 1
        having avg(int_col) > 500 or count(*) = 10
@@ -335,7 +335,7 @@ INT, TINYINT
 select distinct *
 from (
        select bool_col, tinyint_col, count(*)
-       from alltypesagg 
+       from alltypesagg$TABLE 
        group by bool_col, tinyint_col
        having bool_col = true
      ) x
@@ -351,7 +351,7 @@ select *
 from (
        select distinct bool_col, tinyint_col
        from (
-              select * from alltypesagg where tinyint_col < 7
+              select * from alltypesagg$TABLE where tinyint_col < 7
             ) y
      ) x
 where bool_col = true

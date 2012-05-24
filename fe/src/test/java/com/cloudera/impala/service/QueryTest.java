@@ -8,6 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import junit.framework.Assert;
+
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -33,9 +35,12 @@ public class QueryTest {
   private static Catalog catalog;
   private static Executor executor;
   private final String testDir = "QueryTest";
+  private final static TestExecMode EXECUTION_MODE = TestExecMode.valueOf(
+      System.getProperty("testExecutionMode", "reduced").toUpperCase());
 
   @BeforeClass
   public static void setUp() throws Exception {
+    LOG.info(String.format("Executing tests in mode: %s", EXECUTION_MODE));
     catalog = new Catalog(true);
     executor = new Executor(catalog);
   }
@@ -107,6 +112,15 @@ public class QueryTest {
       }
     }
 
+  }
+
+  /**
+   * The different test execution modes that are supported. These modes control which
+   * combination of test configurations to during test execution.
+   */
+  private enum TestExecMode {
+    REDUCED,
+    EXHAUSTIVE;
   }
 
   private enum CompressionFormat {
@@ -182,7 +196,7 @@ public class QueryTest {
 
   static private class TestConfiguration {
     private final int numNodes;
-    private final CompressionFormat compressionType;
+    private final CompressionFormat compressionFormat;
     private final TableFormat tableFormat;
     private final int batchSize;
     private final boolean disableLlvm;
@@ -191,15 +205,17 @@ public class QueryTest {
         TableFormat tableFormat, boolean disableLlvm) {
       this.numNodes = nodes;
       this.batchSize = batchSize;
-      this.compressionType = compression;
+      this.compressionFormat = compression;
       this.tableFormat = tableFormat;
       this.disableLlvm = disableLlvm;
     }
 
     public String getTableSuffix() {
-      return tableFormat.getTableSuffix() + compressionType.getTableSuffix();
+      return tableFormat.getTableSuffix() + compressionFormat.getTableSuffix();
     }
 
+    public CompressionFormat getCompressionFormat() { return compressionFormat; }
+    public TableFormat getTableFormat() { return tableFormat; }
     public int getClusterSize() { return numNodes; }
     public int getBatchSize() { return batchSize; }
     public boolean getDisableLlvm() { return disableLlvm; }
@@ -208,7 +224,7 @@ public class QueryTest {
     public String toString() {
       return Objects.toStringHelper(this).add("Cluster size", numNodes)
                                          .add("Batch size", batchSize)
-                                         .add("Compression type", compressionType)
+                                         .add("Compression type", compressionFormat)
                                          .add("Table format", tableFormat)
                                          .add("Disable llvm", disableLlvm)
                                          .toString();
@@ -259,11 +275,10 @@ public class QueryTest {
   }
 
   /**
-   * Generates a list of *all* permutations of table format, compression format, batch
-   * size and cluster size. No care is taken to filter out permutations which don't
-   * make sense. TODO: Add filtering for safety's sake.
+   * Generates a list of all valid permutations of table format, compression format,
+   * batch size and cluster size. Permutations which don't make sense are filtered out.
    */
-  private List<TestConfiguration> generateAllConfigurationPermutations(
+  private static List<TestConfiguration> generateAllConfigurationPermutations(
       List<TableFormat> tableFormats, List<CompressionFormat> compressionFormats,
       List<Integer> batchSizes, List<Integer> clusterSizes, List<Boolean> llvmOptions) {
     List<TestConfiguration> configs = Lists.newArrayList();
@@ -272,14 +287,30 @@ public class QueryTest {
         for (int batchSize: batchSizes) {
           for (int clusterSize: clusterSizes) {
             for (boolean disableLlvm: llvmOptions) {
-              configs.add(new TestConfiguration(clusterSize, batchSize, compressionFormat,
-               tableFormat, disableLlvm));
+              TestConfiguration config = new TestConfiguration(clusterSize, batchSize,
+                  compressionFormat, tableFormat, disableLlvm);
+
+              if (isValidTestConfiguration(config)) {
+                configs.add(new TestConfiguration(clusterSize, batchSize, compressionFormat,
+                 tableFormat, disableLlvm));
+              }
             }
           }
         }
       }
     }
     return configs;
+  }
+
+  /**
+   * Returns true if the given test configuration is valid and false if it is invalid.
+   */
+  private static boolean isValidTestConfiguration(TestConfiguration testConfiguration) {
+    // Currently, compression of the 'text' file format is not supported.
+    if (testConfiguration.getTableFormat() == TableFormat.TEXT) {
+      return testConfiguration.getCompressionFormat() == CompressionFormat.NONE;
+    }
+    return true;
   }
 
   private void runQueryWithTestConfigs(List<TestConfiguration> testConfigs,
@@ -361,19 +392,52 @@ public class QueryTest {
     }
   }
 
+  /**
+   * Runs test with different configurations based on the current test execution mode.
+   * For example, with EXHAUSTIVE execution mode we run all combinations of file formats
+   * compression formats, batch sizes, etc.. If the test execution mode is REDUCED
+   * we will run with a reduced set of test configurations.
+   */
+  private void runTestInExecutionMode(TestExecMode executionMode, String testFile,
+      boolean abortOnError, int maxErrors) {
+    switch (executionMode) {
+      case REDUCED:
+        // TODO: Consider running with the fastest format to cut down on execution time.
+        runQueryUncompressedTextOnly(testFile, abortOnError, maxErrors);
+        break;
+      case EXHAUSTIVE:
+        runQueryWithAllConfigurationPermutations(testFile, abortOnError, maxErrors);
+        break;
+      default:
+        Assert.fail("Unexpected test execution mode: " + EXECUTION_MODE);
+    }
+  }
+
+  /**
+   * Runs the query with all valid permutations of table format, batch size,
+   * cluster size, and llvm options.
+   */
+  private void runQueryWithAllConfigurationPermutations(String testFile,
+      boolean abortOnError, int maxErrors) {
+    List<TestConfiguration> testConfigs = generateAllConfigurationPermutations(
+        ALL_TABLE_FORMATS, ALL_COMPRESSION_FORMATS, ALL_BATCH_SIZES,
+        ALL_CLUSTER_SIZES, ALL_LLVM_OPTIONS);
+    runQueryWithTestConfigs(testConfigs, testFile, abortOnError, maxErrors);
+  }
+
   @Test
   public void TestDistinct() {
-    runQueryUncompressedTextOnly("distinct", false, 1000);
+    runTestInExecutionMode(EXECUTION_MODE, "distinct", false, 1000);
   }
 
   @Test
   public void TestAggregation() {
-    runQueryUncompressedTextOnly("aggregation", false, 1000);
+    runTestInExecutionMode(EXECUTION_MODE, "aggregation", false, 1000);
   }
 
   @Test
   public void TestExprs() {
-    runQueryUncompressedTextOnly("exprs", false, 1000);
+    runTestInExecutionMode(EXECUTION_MODE, "exprs", false, 1000);
   }
 
   @Test
@@ -414,7 +478,7 @@ public class QueryTest {
 
   @Test
   public void TestJoins() {
-    runQueryUncompressedTextOnly("joins", false, 1000);
+    runTestInExecutionMode(EXECUTION_MODE, "joins", false, 1000);
   }
 
   @Test
@@ -424,24 +488,23 @@ public class QueryTest {
 
   @Test
   public void TestLimit() {
-    runQueryUncompressedTextOnly("limit", false, 1000);
+    runTestInExecutionMode(EXECUTION_MODE, "limit", false, 1000);
   }
 
   @Test
   public void TestTopN() {
-    runQueryUncompressedTextOnly("top-n", false, 1000);
+    runTestInExecutionMode(EXECUTION_MODE, "top-n", false, 1000);
   }
 
   @Test
   public void TestEmpty() {
-    runQueryUncompressedTextOnly("empty", false, 1000);
+    runTestInExecutionMode(EXECUTION_MODE, "empty", false, 1000);
   }
 
   @Test
   public void TestSubquery() {
-    runQueryUncompressedTextOnly("subquery", false, 1000);
+    runTestInExecutionMode(EXECUTION_MODE, "subquery", false, 1000);
   }
-
 
   @Test
   public void TestInsert() {

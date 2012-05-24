@@ -1,5 +1,5 @@
 # We need to specify the day here, otherwise files get opened in random order
-select * from alltypesagg where day = 1 limit 10
+select * from alltypesagg$TABLE where day = 1 limit 10
 ----
 int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
 ----
@@ -15,7 +15,7 @@ int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, stri
 2010,1,1,9,false,9,9,9,90,9.9,90.9,'01/01/10','9',2010-01-01 00:09:00.360000000
 ====
 # limit is applied after where clause
-select * from alltypesagg where tinyint_col is null and day = 1 limit 10
+select * from alltypesagg$TABLE where tinyint_col is null and day = 1 limit 10
 ----
 int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
 ----
@@ -30,7 +30,7 @@ int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, stri
 2010,1,1,80,true,NULL,80,80,800,88,808,'01/01/10','80',2010-01-01 01:20:31.600000000
 2010,1,1,90,true,NULL,90,90,900,99,909,'01/01/10','90',2010-01-01 01:30:40.500000000
 ====
-select tinyint_col, count(*) from alltypesagg group by 1
+select tinyint_col, count(*) from alltypesagg$TABLE group by 1
 ----
 tinyint, bigint
 ----
@@ -45,7 +45,7 @@ NULL,1000
 2,1000
 3,1000
 ====
-select tinyint_col, count(*) from alltypesagg group by 1 limit 5
+select tinyint_col, count(*) from alltypesagg$TABLE group by 1 limit 5
 ----
 tinyint, bigint
 ----
@@ -56,7 +56,7 @@ tinyint, bigint
 8,1000
 ====
 # limit and where clause don't interact
-select tinyint_col, count(*) from alltypesagg where smallint_col > 49 group by 1 limit 5
+select tinyint_col, count(*) from alltypesagg$TABLE where smallint_col > 49 group by 1 limit 5
 ----
 tinyint, bigint
 ----
@@ -67,7 +67,7 @@ tinyint, bigint
 8,500
 ====
 # limit is applied after having
-select tinyint_col, count(*) from alltypesagg group by 1 having tinyint_col > 5 limit 5
+select tinyint_col, count(*) from alltypesagg$TABLE group by 1 having tinyint_col > 5 limit 5
 ----
 tinyint, bigint
 ----
@@ -76,7 +76,7 @@ tinyint, bigint
 8,1000
 9,1000
 ====
-select tinyint_col, count(*) from alltypesagg group by 1 having tinyint_col > 5 limit 2
+select tinyint_col, count(*) from alltypesagg$TABLE group by 1 having tinyint_col > 5 limit 2
 ----
 tinyint, bigint
 ----
@@ -150,3 +150,11 @@ bigint, string, int, int, bigint, string, int
 1004,'Name4',94611,5000,1004,'Name4',94612
 1005,'Name5',94611,5000,1005,'Name5',94613
 ====
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
+double_col, date_string_col, string_col, timestamp_col
+from alltypessmall$TABLE limit 1
+-----
+int,boolean,tinyint,smallint,int,bigint,float,double,string,string,timestamp
+-----
+0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
+=====

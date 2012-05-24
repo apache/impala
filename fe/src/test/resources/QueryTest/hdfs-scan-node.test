@@ -318,14 +318,6 @@ int,boolean,tinyint,smallint,int,bigint,float,double,string,string,timestamp
 98,true,3,3,3,30,3.3,30.3,'04/03/09','3',2009-04-03 00:23:00.930000000
 99,false,4,4,4,40,4.4,40.4,'04/03/09','4',2009-04-03 00:24:00.960000000
 =====
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
-double_col, date_string_col, string_col, timestamp_col
-from alltypessmall$TABLE limit 1
------
-int,boolean,tinyint,smallint,int,bigint,float,double,string,string,timestamp
------
-0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
-=====
 select id from alltypessmall$TABLE
 -----
 int
