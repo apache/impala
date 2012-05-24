@@ -138,7 +138,7 @@ make -j4
 
 # Get Hadoop dependencies onto the classpath
 cd $IMPALA_HOME/fe
-mvn dependency:unpack-dependencies
+mvn dependency:copy-dependencies
 
 if [ $testdata_action -eq 1 ]
 then

@@ -39,15 +39,15 @@ export IMPALA_BE_DIR=$IMPALA_HOME/be
 export IMPALA_COMMON_DIR=$IMPALA_HOME/common
 export PATH=$IMPALA_HOME/bin:$PATH
 
-export HADOOP_HOME=$IMPALA_HOME/thirdparty/hadoop-0.23.0-cdh4b2-SNAPSHOT
+export HADOOP_HOME=$IMPALA_HOME/thirdparty/hadoop-2.0.0-cdh4.1.0-SNAPSHOT/
 export HADOOP_CONF_DIR=${IMPALA_HOME}/fe/src/test/resources
 export PATH=$HADOOP_HOME/bin:$PATH
 
-export HIVE_HOME=$IMPALA_HOME/thirdparty/hive-0.8.0-cdh4b1
+export HIVE_HOME=$IMPALA_HOME/thirdparty/hive-0.8.1-cdh4.0.0-SNAPSHOT/
 export PATH=$HIVE_HOME/bin:$PATH
 export HIVE_CONF_DIR=$IMPALA_HOME/fe/src/test/resources
 
-export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-0.92.0-cdh4b1
+export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-0.92.1-cdh4.0.0-SNAPSHOT/
 export PATH=$HBASE_HOME/bin:$PATH
 export HBASE_CONF_DIR=$HIVE_CONF_DIR
 

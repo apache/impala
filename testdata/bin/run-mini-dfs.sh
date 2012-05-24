@@ -6,10 +6,10 @@ $IMPALA_HOME/testdata/bin/kill-mini-dfs.sh
 
 # Starts up a three-node single-process cluster; the NN listens on port 20500.
 CLASSPATH=
-for jar in `find ${IMPALA_HOME}/thirdparty/hadoop-0.23.0-cdh4b2-SNAPSHOT/ -name "*.jar"`; do
+for jar in `find ${IMPALA_HOME}/thirdparty/hadoop-2.0.0-cdh4.1.0-SNAPSHOT/ -name "*.jar"`; do
   CLASSPATH=${CLASSPATH}:${jar}
 done;
 pushd ${HADOOP_HOME}
-java org.apache.hadoop.test.MiniHadoopClusterManager -datanodes 3 -nomr -nnport=20500 $@ &
+java org.apache.hadoop.test.MiniDFSClusterManager -datanodes 3 -nnport=20500 $@ &
 popd
 sleep 10

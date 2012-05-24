@@ -43,7 +43,7 @@ Status HdfsByteStream::Read(uint8_t* buf, int64_t req_length, int64_t* actual_le
   while (n_read < req_length) {
     COUNTER_SCOPED_TIMER(scan_node_->hdfs_read_timer());
     int last_read =
-      hdfsReadDirect(hdfs_connection_, hdfs_file_, buf + n_read, req_length - n_read);
+      hdfsRead(hdfs_connection_, hdfs_file_, buf + n_read, req_length - n_read);
     if (last_read == 0) {
       *actual_length = n_read;
       return Status::OK;
