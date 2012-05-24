@@ -40,6 +40,15 @@ class LlvmCodeGenTest : public testing:: Test {
       scoped_ptr<LlvmCodeGen>* codegen) {
     return LlvmCodeGen::LoadFromFile(pool, filename, codegen);
   }
+
+  static LlvmCodeGen* CreateCodegen(ObjectPool* pool) {
+    LlvmCodeGen* codegen = pool->Add(new LlvmCodeGen(pool, "Test"));
+    if (codegen != NULL) {
+      Status status = codegen->Init();
+      if (!status.ok()) return NULL;
+    }
+    return codegen;
+  }
 };
 
 // Simple test to just make and destroy llvmcodegen objects.  LLVM 
@@ -162,7 +171,7 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
   // jitted one
   int num_replaced;
   Function* jitted_loop = codegen->ReplaceCallSites(
-      loop, false, jitted_loop_call, loop_call_name, false, &num_replaced);
+      loop, false, jitted_loop_call, loop_call_name, &num_replaced);
   EXPECT_EQ(num_replaced, 1);
   EXPECT_TRUE(codegen->VerifyFunction(jitted_loop));
 
@@ -181,7 +190,7 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
   // Part5: Generate a new inner loop function and a new loop function in place
   Function* jitted_loop_call2 = CodegenInnerLoop(codegen.get(), &jitted_counter, -2);
   Function* jitted_loop2 = codegen->ReplaceCallSites(loop, true, jitted_loop_call2, 
-      loop_call_name, false, &num_replaced);
+      loop_call_name, &num_replaced);
   EXPECT_EQ(num_replaced, 1);
   EXPECT_TRUE(codegen->VerifyFunction(jitted_loop2));
 
@@ -283,6 +292,43 @@ TEST_F(LlvmCodeGenTest, StringValue) {
   int32_t* bytes = reinterpret_cast<int32_t*>(&str_val);
   EXPECT_EQ(1, bytes[2]);   // str_val.len
   EXPECT_EQ(0, bytes[3]);   // padding
+}
+
+// Test calling memcpy intrinsic
+TEST_F(LlvmCodeGenTest, IntrinsicTest) {
+  ObjectPool pool;
+  Status status;
+  
+  LlvmCodeGen* codegen = LlvmCodeGenTest::CreateCodegen(&pool);
+  ASSERT_TRUE(codegen != NULL);
+
+  LlvmCodeGen::FnPrototype prototype(codegen, "MemcpyTest", codegen->void_type());
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("dest", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("src", codegen->ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("n", codegen->GetType(TYPE_BIGINT)));
+
+  LlvmCodeGen::LlvmBuilder builder(codegen->context());
+
+  Value* args[3];
+  Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
+  codegen->CodegenMemcpy(&builder, args[0], args[1], args[2]);
+  builder.CreateRetVoid();
+
+  fn = codegen->FinalizeFunction(fn);
+  ASSERT_TRUE(fn != NULL);
+
+  void* jitted_fn = codegen->JitFunction(fn);
+  ASSERT_TRUE(jitted_fn != NULL);
+  
+  typedef void (*TestMemcpyFn)(char*, char*, int64_t);
+  TestMemcpyFn test_fn = reinterpret_cast<TestMemcpyFn>(jitted_fn);
+
+  char src[] = "abcd";
+  char dst[] = "aaaa";
+
+  test_fn(dst, src, 4);
+
+  EXPECT_EQ(memcmp(src, dst, 4), 0);
 }
 
 }

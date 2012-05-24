@@ -176,8 +176,7 @@ Function* ArithmeticExpr::Codegen(LlvmCodeGen* codegen) {
   phi_node->addIncoming(result, compute_arith_block);
   builder.CreateRet(phi_node);
 
-  if (!codegen->VerifyFunction(function)) return NULL;
-  return function;
+  return codegen->FinalizeFunction(function);
 }
 
 }

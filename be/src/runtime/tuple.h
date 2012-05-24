@@ -88,6 +88,9 @@ class Tuple {
     DCHECK(offset != -1);  // -1 offset indicates non-materialized slot
     return reinterpret_cast<StringValue*>(reinterpret_cast<char*>(this) + offset);
   }
+  
+  // For C++/IR interop, we need to be able to look up types by name.
+  static const char* LLVM_CLASS_NAME;
 
  private:
   void* data_;

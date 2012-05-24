@@ -6,16 +6,15 @@
 #include <vector>
 #include <memory>
 #include <stdint.h>
-#include <hdfs.h>
 #include <boost/regex.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <hdfs.h>
 
 #include "exec/scan-node.h"
 #include "exec/byte-stream.h"
 #include "exec/hdfs-scanner.h"
 #include "runtime/descriptors.h"
 #include "runtime/string-buffer.h"
-#include "util/sse-util.h"
 #include "gen-cpp/PlanNodes_types.h"
 
 namespace impala {
@@ -64,21 +63,20 @@ class HdfsScanNode : public ScanNode {
   // Public so the scanner can call this.
   bool EvalConjunctsForScanner(TupleRow* row) { return EvalConjuncts(row); }
 
-  // Made public so that scanner can call this to decide whether a
-  // limit has been reached. TODO: revisit.
-  int ReachedLimit() { return ExecNode::ReachedLimit(); }
-
   int limit() const { return limit_; }
 
   bool compact_data() const { return compact_data_; }
-
+  
   const static int SKIP_COLUMN = -1;
 
-  const std::vector<std::pair<int, SlotDescriptor*> >& materialized_slots()
-    const { return materialized_slots_; }
-  const std::vector<int>& column_to_slot_index() const { return column_idx_to_slot_idx_; }
+  const std::vector<SlotDescriptor*>& materialized_slots()
+      const { return materialized_slots_; }
 
-  int GetNumPartitionKeys() { return num_partition_keys_; }
+  int num_partition_keys() const { return num_partition_keys_; }
+
+  int num_cols() const { return column_idx_to_materialized_slot_idx_.size(); }
+  
+  const TupleDescriptor* tuple_desc() { return tuple_desc_; }
 
   // Scanners check the scan-node every row to see if the limit clause
   // has been satisfied. Therefore they need to update the total
@@ -87,6 +85,12 @@ class HdfsScanNode : public ScanNode {
 
   RuntimeProfile::Counter* parse_time_counter() const { return parse_time_counter_; }
   RuntimeProfile::Counter* memory_used_counter() const { return memory_used_counter_; }
+
+  // Returns index into materialized_slots with 'col_idx'.  Returns SKIP_COLUMN if
+  // that column is not materialized.
+  int GetMaterializedSlotIdx(int col_idx) const {
+    return column_idx_to_materialized_slot_idx_[col_idx];
+  }
 
  private:
   // Tuple id resolved in Prepare() to set tuple_desc_;
@@ -119,41 +123,49 @@ class HdfsScanNode : public ScanNode {
   // Connection to hdfs, established in Open() and closed in Close().
   hdfsFS hdfs_connection_;
 
+  // Map of HdfsScanner objects to file types.  Only one scanner object will be
+  // created for each file type.  Objects stored in scanner_pool_.
+  typedef std::map<TPlanNodeType::type, HdfsScanner*> ScannerMap;
+  ScannerMap scanner_map_;
+
+  // Pool for storing allocated scanner objects.  We don't want to use the 
+  // runtime pool to ensure that the scanner objects are deleted before this
+  // object is.
+  boost::scoped_ptr<ObjectPool> scanner_pool_;
+
   // The scanner in use for the current file / scan-range
   // combination.
-  boost::scoped_ptr<HdfsScanner> current_scanner_;
+  HdfsScanner* current_scanner_;
 
   // The source of byte data for consumption by the scanner for the
   // current file / scan-range combination.
   boost::scoped_ptr<ByteStream> current_byte_stream_;
 
-  // Tuple containing only materialized partition keys
+  // Tuple containing only materialized partition keys.  In the case where there
+  // are only partition key slots, this tuple ptr is directly stored in tuple rows.
+  // In the case where there are other slots, this template is copied into a new tuple
+  // before the other slots are written.  In this case, the address of template_tuple_
+  // can not change as the value is baked into the codegen'd functions.
   Tuple* template_tuple_;
 
   // Pool for allocating partition key tuple and string buffers
   boost::scoped_ptr<MemPool> partition_key_pool_;
 
-  // Vector of positions in output slot list, indexed by table column
-  // number. The first num_partition_keys_ entries are the partition
-  // keys, followed by columns that are actually serialised in the
-  // table itself.
-  // If a column is not to be written to the output tuples, its entry
-  // in this vector is SKIP_COLUMN.
-  std::vector<int> column_idx_to_slot_idx_;
-
   // Total number of partition slot descriptors, including non-materialized ones.
   int num_partition_keys_;
 
-  // Vector containing pairs of all
-  // a) index into all non-partition 'columns' (including non-materialized ones)
-  //    Scanners that maintain a sparse array of columns can use this
-  //    index to select the correct column for an output slot.
-  // b) the materialized, non-partition-key slot descriptor for that column
-  //
-  // The vector is indexed by the number of the output tuple slot, such that
-  // materialized_slots_[j] corresponds to output slot j + num_partition_keys_
-  // TODO: this could stand some simplification; it's rather confusing.
-  std::vector<std::pair<int, SlotDescriptor*> > materialized_slots_;
+  // Vector containing indices into materialized_slots_.  The vector is indexed by
+  // the slot_desc's col_pos.  Non-materialized slots and partition key slots will 
+  // have SKIP_COLUMN as its entry.
+  std::vector<int> column_idx_to_materialized_slot_idx_;
+  
+  // Vector containing slot descriptors for all materialized non-partition key
+  // slots.  These descriptors are sorted in order of increasing col_pos
+  std::vector<SlotDescriptor*> materialized_slots_;
+
+  // Vector containing slot descriptors for all materialized partition key slots  
+  // These descriptors are sorted in order of increasing col_pos
+  std::vector<SlotDescriptor*> partition_key_slots_;
 
   // Used to determine what kind of scanner to create. Will be
   // replaced by per-partition metadata.
@@ -161,13 +173,6 @@ class HdfsScanNode : public ScanNode {
 
   // Regular expressions to evaluate over file paths to extract partition key values
   boost::regex partition_key_regex_;
-
-  // Mapping from partition key index to slot index
-  // for materializing the virtual partition keys (if any) into Tuples.
-  // pair.first refers to the number of the partition key index.
-  // pair.second refers to the target slot index in the output Tuple.
-  // Used for initialising template_tuple_ with partition key values.
-  std::vector<std::pair<int, int> > key_idx_to_slot_idx_;
 
   // Hdfs specific counter
   RuntimeProfile::Counter* parse_time_counter_;       // time parsing files
@@ -179,9 +184,7 @@ class HdfsScanNode : public ScanNode {
   // stream and to call the same method on the current scanner.
   Status InitNextScanRange(RuntimeState* state, bool* scan_ranges_finished);
 
-  Status ExtractPartitionKeyValues(
-      RuntimeState* state,
-      const std::vector<std::pair<int, int> >& key_idx_to_slot_idx);
+  Status ExtractPartitionKeyValues(RuntimeState* state);
 
   Status InitRegex(ObjectPool* pool, const TPlanNode& tnode);
 };

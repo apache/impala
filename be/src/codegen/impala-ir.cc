@@ -6,9 +6,9 @@
 
 #ifdef IR_COMPILE
 #include "exec/aggregation-node-ir.cc"
+#include "exec/hdfs-text-scanner-ir.cc"
 #include "runtime/string-value-ir.cc"
 #else
 #error "This file should only be used for cross compiling to IR."
 #endif
-
 

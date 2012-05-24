@@ -13,14 +13,9 @@
 
 namespace impala {
 
-// TODO: Needs to be codegen rather than inline.
-inline Status TextConverter::WriteSlot(RuntimeState* state,
-                                       const SlotDescriptor* slot_desc, Tuple* tuple,
-                                       const char* data, int len,
-                                       bool copy_string, bool need_escape) {
-
-  bool fail = false;
-
+inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tuple,
+                              const char* data, int len,
+                              bool copy_string, bool need_escape) {
   if (len == 0) {
     tuple->SetNull(slot_desc->null_indicator_offset());
   } else {
@@ -84,21 +79,12 @@ inline Status TextConverter::WriteSlot(RuntimeState* state,
 
     // TODO: add warning for overflow case
     if (parse_result == StringParser::PARSE_FAILURE) {
-      fail = true;
       tuple->SetNull(slot_desc->null_indicator_offset());
-      if (state->LogHasSpace()) {
-        state->error_stream()
-            << "Error converting column: " << slot_desc->col_pos() << " TO "
-            // TODO: num_partition_keys_ no longer visible to scanner.
-            // << slot_desc->col_pos() - num_partition_keys_ << " TO "
-            << TypeToString(slot_desc->type()) << "Data is: " 
-            << std::string(data, len) << std::endl;
-      }
+      return false;
     }
   }
 
-  if (fail) return Status("Conversion from text failed");
-  return Status::OK;
+  return true;
 }
 
 }

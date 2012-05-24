@@ -215,12 +215,12 @@ class Tuple;
 // A scanner for reading RCFiles into tuples. 
 class HdfsRCFileScanner : public HdfsScanner {
  public:
-  HdfsRCFileScanner(HdfsScanNode* scan_node, const TupleDescriptor* tuple_desc,
+  HdfsRCFileScanner(HdfsScanNode* scan_node, RuntimeState* state,
                     Tuple* template_tuple, MemPool* tuple_pool);
   virtual ~HdfsRCFileScanner();
-  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
-  virtual Status Prepare(RuntimeState* state, ByteStream* byte_stream);
-  virtual Status InitCurrentScanRange(RuntimeState* state, HdfsScanRange* scan_range,
+  virtual Status GetNext(RowBatch* row_batch, bool* eos);
+  virtual Status Prepare();
+  virtual Status InitCurrentScanRange(HdfsScanRange* scan_range, Tuple* template_tuple,
                                       ByteStream* byte_stream);
 
   void DebugString(int indentation_level, std::stringstream* out) const;
@@ -331,8 +331,11 @@ class HdfsRCFileScanner : public HdfsScanner {
   // Reset the Row Group information.
   void ResetRowGroup();
 
-  // Runtime state for reporting file parsing errors.
-  RuntimeState* runtime_state_;
+  // Returns whether or not column at col_idx should be read
+  bool ReadColumn(int col_idx) {
+    col_idx += scan_node_->num_partition_keys();
+    return scan_node_->GetMaterializedSlotIdx(col_idx) != HdfsScanNode::SKIP_COLUMN;
+  }
 
   // Helper class for converting text to other types;
   boost::scoped_ptr<TextConverter> text_converter_;
@@ -354,11 +357,6 @@ class HdfsRCFileScanner : public HdfsScanner {
 
   // true if the current RCFile is compressed
   bool is_compressed_;
-
-  // Maps column index to a boolean indicating whether or not the column
-  // needs to be read. The index is the order of the columns in the
-  // file. Created in Prepare().  Allocated from key buffer mem-pool.
-  bool* column_idx_read_mask_;
 
   // The sync_hash_ from the file header.
   uint8_t sync_hash_[SYNC_HASH_SIZE];

@@ -481,6 +481,14 @@ bool Expr::IsConstant() const {
   return true;
 }
 
+int Expr::GetSlotIds(vector<SlotId>* slot_ids) const {
+  int n = 0;
+  for (int i = 0; i < children_.size(); ++i) {
+    n += children_[i]->GetSlotIds(slot_ids);
+  }
+  return n;
+}
+
 Type* Expr::GetLlvmReturnType(LlvmCodeGen* codegen) const {
   if (type() == TYPE_STRING) {
     return codegen->string_val_ptr_type();
@@ -504,7 +512,6 @@ Function* Expr::CreateComputeFnPrototype(LlvmCodeGen* codegen, const string& nam
 
   Function* function = prototype.GeneratePrototype();
   DCHECK(function != NULL);
-  codegen->AddInlineFunction(function);
   codegen_fn_ = function;
   return function;
 }
@@ -528,7 +535,7 @@ Value* Expr::GetNullReturnValue(LlvmCodeGen* codegen) {
     case TYPE_STRING:
       return llvm::ConstantPointerNull::get(codegen->string_val_ptr_type());
     default:
-      // Add stringvalue pointers
+      // Add timestamp pointers
       DCHECK(false) << "Not yet implemented.";
       return NULL;
   }

@@ -189,7 +189,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
            && (matched_build_row = hash_tbl_iterator_.GetNext()) != NULL) {
       TupleRow* out_row = CreateOutputRow(out_batch, current_probe_row_,
                                           matched_build_row);
-     if (!EvalConjuncts(other_join_conjuncts_, out_row)) continue;
+      if (!EvalConjuncts(other_join_conjuncts_, out_row)) continue;
       // we have a match for the purpose of the (outer?) join as soon as we
       // satisfy the JOIN clause conjuncts
       matched_probe_ = true;

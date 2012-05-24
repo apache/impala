@@ -111,8 +111,7 @@ Function* FunctionCall::Codegen(LlvmCodeGen* codegen) {
   phi_node->addIncoming(result, not_null_block);
   builder.CreateRet(phi_node);
 
-  if (!codegen->VerifyFunction(function)) return NULL;
-  return function;
+  return codegen->FinalizeFunction(function);
 }
 
 }

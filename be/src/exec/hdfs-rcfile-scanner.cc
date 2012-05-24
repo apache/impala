@@ -36,19 +36,18 @@ const char* const HdfsRCFileScanner::RCFILE_METADATA_KEY_NUM_COLS =
 
 const uint8_t HdfsRCFileScanner::RCFILE_VERSION_HEADER[4] = {'S', 'E', 'Q', 6};
 
-long TotalRows;
+static const uint8_t RC_FILE_RECORD_DELIMITER = 0xff;
 
-HdfsRCFileScanner::HdfsRCFileScanner(HdfsScanNode* scan_node,
-    const TupleDescriptor* tuple_desc, Tuple* template_tuple, MemPool* mem_pool)
-    : HdfsScanner(scan_node, tuple_desc, template_tuple, mem_pool),
+HdfsRCFileScanner::HdfsRCFileScanner(HdfsScanNode* scan_node, RuntimeState* state,
+    Tuple* template_tuple, MemPool* mem_pool)
+    : HdfsScanner(scan_node, state, template_tuple, mem_pool),
       scan_range_fully_buffered_(false),
       key_buffer_pool_(new MemPool()),
       key_buffer_length_(0),
       compressed_data_buffer_length_(0),
       column_buffer_pool_(new MemPool()) {
-  // Intialize the parser to find bytes that are 0xff.
-  find_first_parser_.reset(new DelimitedTextParser(scan_node->column_to_slot_index(),
-      scan_node->GetNumPartitionKeys(), static_cast<char>(0xff)));
+  // Initialize the parser to find bytes that are 0xff.
+  find_first_parser_.reset(new DelimitedTextParser(scan_node, RC_FILE_RECORD_DELIMITER));
 }
 
 HdfsRCFileScanner::~HdfsRCFileScanner() {
@@ -59,21 +58,16 @@ HdfsRCFileScanner::~HdfsRCFileScanner() {
       key_buffer_pool_->peak_allocated_bytes());
 }
 
-Status HdfsRCFileScanner::Prepare(RuntimeState* state, ByteStream* current_byte_stream_) {
-  RETURN_IF_ERROR(HdfsScanner::Prepare(state, current_byte_stream_));
+Status HdfsRCFileScanner::Prepare() {
+  RETURN_IF_ERROR(HdfsScanner::Prepare());
 
-  runtime_state_ = state;
   text_converter_.reset(new TextConverter(0, tuple_pool_));
 
-  // Initialize the column read mask
-  const vector<int>& column_idx_to_slot_idx = scan_node_->column_to_slot_index();
 
   // Allocate the buffers for the key information that is used to read and decode
   // the column data from its run length encoding.
-  int num_part_keys = scan_node_->GetNumPartitionKeys();
-  num_cols_ = column_idx_to_slot_idx.size() - num_part_keys;
-  column_idx_read_mask_ =
-      reinterpret_cast<bool*>(key_buffer_pool_->Allocate(sizeof(bool) * num_cols_));
+  int num_part_keys = scan_node_->num_partition_keys();
+  num_cols_ = scan_node_->num_cols() - num_part_keys;
 
   col_buf_len_ = reinterpret_cast<int32_t*>(
       key_buffer_pool_->Allocate(sizeof(int32_t) * num_cols_));
@@ -102,21 +96,12 @@ Status HdfsRCFileScanner::Prepare(RuntimeState* state, ByteStream* current_byte_
   col_buf_pos_ = reinterpret_cast<int32_t*>(
       key_buffer_pool_->Allocate(sizeof(int32_t) * num_cols_));
 
-  for (int i = 0; i < num_cols_; ++i) {
-    column_idx_read_mask_[i] =
-        column_idx_to_slot_idx[i + num_part_keys] != HdfsScanNode::SKIP_COLUMN;
-  }
-
-  tuple_ = NULL;
-  previous_total_length_ = 0;
-  ResetRowGroup();
-
   return Status::OK;
 }
 
-Status HdfsRCFileScanner::InitCurrentScanRange(RuntimeState* state,
-    HdfsScanRange* scan_range, ByteStream* current_byte_stream_) {
-  HdfsScanner::InitCurrentScanRange(state, scan_range, current_byte_stream_);
+Status HdfsRCFileScanner::InitCurrentScanRange(HdfsScanRange* scan_range, 
+    Tuple* template_tuple, ByteStream* current_byte_stream_) {
+  HdfsScanner::InitCurrentScanRange(scan_range, template_tuple, current_byte_stream_);
   end_of_scan_range_ = scan_range->length + scan_range->offset;
 
   // Check the Location (file name) to see if we have changed files.
@@ -141,7 +126,11 @@ Status HdfsRCFileScanner::InitCurrentScanRange(RuntimeState* state,
   RETURN_IF_ERROR(current_byte_stream_->GetPosition(&position));
   row_group_idx_ = -1;
 
+  ResetRowGroup();
+
   scan_range_fully_buffered_ = false;
+  previous_total_length_ = 0;
+  tuple_ = NULL;
 
   return Status::OK;
 }
@@ -196,7 +185,7 @@ Status HdfsRCFileScanner::ReadFileHeader() {
   if (is_compressed_) {
     // Read the codec and get the right decompressor class.
     RETURN_IF_ERROR(SerDeUtils::ReadText(current_byte_stream_, &codec));
-    RETURN_IF_ERROR(Decompressor::CreateDecompressor(runtime_state_,
+    RETURN_IF_ERROR(Decompressor::CreateDecompressor(state_,
         column_buffer_pool_.get(), !has_noncompact_strings_, codec, &decompressor_));
   }
 
@@ -239,8 +228,8 @@ Status HdfsRCFileScanner::ReadSync() {
   RETURN_IF_ERROR(SerDeUtils::ReadBytes(current_byte_stream_,
       HdfsRCFileScanner::SYNC_HASH_SIZE, &hash[0]));
   if (memcmp(&hash[0], &sync_hash_[0], HdfsRCFileScanner::SYNC_HASH_SIZE)) {
-    if (runtime_state_->LogHasSpace()) {
-      runtime_state_->error_stream() << "Bad sync hash in current HdfsRCFileScanner: "
+    if (state_->LogHasSpace()) {
+      state_->error_stream() << "Bad sync hash in current HdfsRCFileScanner: "
            << current_byte_stream_->GetLocation() << "." << endl
            << "Expected: '"
            << SerDeUtils::HexDump(sync_hash_, HdfsRCFileScanner::SYNC_HASH_SIZE)
@@ -349,7 +338,7 @@ Status HdfsRCFileScanner::ReadKeyBuffers() {
   key_buf_ptr += bytes_read;
 
   for (int col_idx = 0; col_idx < num_cols_; ++col_idx) {
-    GetCurrentKeyBuffer(col_idx, !column_idx_read_mask_[col_idx], &key_buf_ptr);
+    GetCurrentKeyBuffer(col_idx, !ReadColumn(col_idx), &key_buf_ptr);
     DCHECK_LE(key_buf_ptr, key_buffer_ + key_length_);
   }
   DCHECK_EQ(key_buf_ptr, key_buffer_ + key_length_);
@@ -408,7 +397,7 @@ inline bool HdfsRCFileScanner::NextRow() {
   // calls to NextField()/NextRow()
   if (row_pos_ >= num_rows_) return false;
   for (int col_idx = 0; col_idx < num_cols_; ++col_idx) {
-    if (column_idx_read_mask_[col_idx]) {
+    if (ReadColumn(col_idx)) {
       NextField(col_idx);
     }
   }
@@ -418,7 +407,7 @@ inline bool HdfsRCFileScanner::NextRow() {
 
 Status HdfsRCFileScanner::ReadColumnBuffers() {
   for (int col_idx = 0; col_idx < num_cols_; ++col_idx) {
-    if (!column_idx_read_mask_[col_idx]) {
+    if (!ReadColumn(col_idx)) {
       RETURN_IF_ERROR(SerDeUtils::SkipBytes(current_byte_stream_, col_buf_len_[col_idx]));
     } else {
       // TODO: Stream through these column buffers instead of reading everything
@@ -447,7 +436,7 @@ Status HdfsRCFileScanner::ReadColumnBuffers() {
 
 // TODO: We should be able to skip over badly fomrated data and move to the
 //       next sync block to restart the scan.
-Status HdfsRCFileScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eosr) {
+Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
   AllocateTupleBuffer(row_batch);
   // Indicates whether the current row has errors.
   bool error_in_row = false;
@@ -496,13 +485,13 @@ Status HdfsRCFileScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool
         }
       }
 
-      const vector<pair<int, SlotDescriptor*> >& materialized_slots
-        = scan_node_->materialized_slots();
-      vector<pair<int, SlotDescriptor*> >::const_iterator it;
+      const vector<SlotDescriptor*>& materialized_slots = 
+          scan_node_->materialized_slots();
+      vector<SlotDescriptor*>::const_iterator it;
 
       for (it = materialized_slots.begin(); it != materialized_slots.end(); ++it) {
-        int rc_column_idx = it->first;
-        const SlotDescriptor* slot_desc = it->second;
+        const SlotDescriptor* slot_desc = *it;
+        int rc_column_idx = slot_desc->col_pos() - scan_node_->num_partition_keys();
 
         const char* col_start = reinterpret_cast<const char*>(&((column_buffer_ +
             col_bufs_off_[rc_column_idx])[col_buf_pos_[rc_column_idx]]));
@@ -510,27 +499,27 @@ Status HdfsRCFileScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool
         DCHECK_LE(col_start + field_len,
             reinterpret_cast<const char*>(column_buffer_ + total_col_length_));
 
-        if (!text_converter_->WriteSlot(state, slot_desc,
-            tuple_, col_start, field_len, !has_noncompact_strings_, false).ok()) {
-          error_in_row = true;
-          if (state->LogHasSpace()) {
-            state->error_stream() << "Error converting column: " << rc_column_idx <<
+        if (!text_converter_->WriteSlot(slot_desc, tuple_, 
+              col_start, field_len, !has_noncompact_strings_, false)) {
+          if (state_->LogHasSpace()) {
+            state_->error_stream() << "Error converting column: " << rc_column_idx <<
                 " TO " << TypeToString(slot_desc->type()) << endl;
           }
+          error_in_row = true;
         }
       }
 
       if (error_in_row) {
         error_in_row = false;
-        if (state->LogHasSpace()) {
-          state->error_stream() << "file: " <<
-              current_byte_stream_->GetLocation() << endl;
-          state->error_stream() << "row group: " << row_group_idx_ << endl;
-          state->error_stream() << "row index: " << row_idx;
-          state->LogErrorStream();
+        if (state_->LogHasSpace()) {
+          state_->error_stream() << "file: " <<
+            current_byte_stream_->GetLocation() << endl;
+          state_->error_stream() << "row group: " << row_group_idx_ << endl;
+          state_->error_stream() << "row index: " << row_idx;
+          state_->LogErrorStream();
         }
-        if (state->abort_on_error()) {
-          state->ReportFileErrors(current_byte_stream_->GetLocation(), 1);
+        if (state_->abort_on_error()) {
+          state_->ReportFileErrors(current_byte_stream_->GetLocation(), 1);
           return Status(
               "Aborted HdfsRCFileScanner due to parse errors. View error log for "
               "details.");
@@ -544,8 +533,6 @@ Status HdfsRCFileScanner::GetNext(RuntimeState* state, RowBatch* row_batch, bool
         row_batch->CommitLastRow();
         row_idx = RowBatch::INVALID_ROW_INDEX;
         scan_node_->IncrNumRowsReturned();
-        ++num_rows_returned_;
-        ++TotalRows;
         if (scan_node_->ReachedLimit() || row_batch->IsFull()) {
           tuple_ = NULL;
           return Status::OK;

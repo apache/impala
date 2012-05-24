@@ -35,7 +35,6 @@ using namespace std;
 using namespace boost;
 using namespace impala;
 
-
 HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
                            const DescriptorTbl& descs)
     : ScanNode(pool, tnode, descs),
@@ -43,11 +42,11 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       compact_data_(tnode.compact_data),
       tuple_desc_(NULL),
       tuple_pool_(new MemPool()),
+      scanner_pool_(new ObjectPool()),
       current_scanner_(NULL),
       current_byte_stream_(NULL),
       template_tuple_(NULL),
       partition_key_pool_(new MemPool()),
-      num_partition_keys_(0),
       plan_node_type_(tnode.node_type) {
   Status status = InitRegex(pool, tnode);
   DCHECK(status.ok()) << "HdfsScanNode c'tor:Init failed: \n" << status.GetErrorMsg();
@@ -83,7 +82,13 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   *eos = false;
   do {
     bool eosr = false;
-    RETURN_IF_ERROR(current_scanner_->GetNext(state, row_batch, &eosr));
+    RETURN_IF_ERROR(current_scanner_->GetNext(row_batch, &eosr));
+
+    if (ReachedLimit()) {
+      *eos = true;
+      return Status::OK;
+    }
+
     if (eosr) { // Current scan range is finished
       ++current_range_idx_;
 
@@ -92,11 +97,7 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
       // Done with all files
       if (*eos) break;
     }
-  } while (!row_batch->IsFull() && !ReachedLimit());
-
-  if (ReachedLimit()) {
-    *eos = true;
-  }
+  } while (!row_batch->IsFull());
 
   return Status::OK;
 }
@@ -129,34 +130,43 @@ Status HdfsScanNode::InitNextScanRange(RuntimeState* state, bool* scan_ranges_fi
       return Status::OK; // We're done; caller will check for this condition and exit
     }
   }
-  RETURN_IF_ERROR(ExtractPartitionKeyValues(state, key_idx_to_slot_idx_));
+  RETURN_IF_ERROR(ExtractPartitionKeyValues(state));
 
   if (current_byte_stream_ == NULL) {
     current_byte_stream_.reset(new HdfsByteStream(hdfs_connection_, this));
     RETURN_IF_ERROR(current_byte_stream_->Open(current_file_scan_ranges_->first));
 
-    switch (plan_node_type_) {
-      case TPlanNodeType::HDFS_TEXT_SCAN_NODE:
-        current_scanner_.reset(new HdfsTextScanner(this, tuple_desc_, template_tuple_,
-                                                   tuple_pool_.get()));
-        break;
-      case TPlanNodeType::HDFS_SEQFILE_SCAN_NODE:
-        current_scanner_.reset(new HdfsSequenceScanner(this, tuple_desc_, template_tuple_,
-                                                       tuple_pool_.get())); break;
-      case TPlanNodeType::HDFS_RCFILE_SCAN_NODE:
-        current_scanner_.reset(new HdfsRCFileScanner(this, tuple_desc_, template_tuple_,
-                                                     tuple_pool_.get()));
-        break;
-      default:
-        return Status("Unknown plan node type");
+    ScannerMap::const_iterator iter = scanner_map_.find(plan_node_type_);
+    if (iter == scanner_map_.end()) {
+      switch (plan_node_type_) {
+        case TPlanNodeType::HDFS_TEXT_SCAN_NODE:
+          current_scanner_ = new HdfsTextScanner(this, state, 
+                                                 template_tuple_, tuple_pool_.get());
+          break;
+        case TPlanNodeType::HDFS_SEQFILE_SCAN_NODE:
+          current_scanner_ = new HdfsSequenceScanner(this, state, 
+                                                     template_tuple_, tuple_pool_.get()); 
+          break;
+        case TPlanNodeType::HDFS_RCFILE_SCAN_NODE:
+          current_scanner_ = new HdfsRCFileScanner(this, state, 
+                                                   template_tuple_, tuple_pool_.get());
+          break;
+        default:
+          return Status("Unknown plan node type");
+      }
+      scanner_pool_->Add(current_scanner_);
+      RETURN_IF_ERROR(current_scanner_->Prepare());
+      scanner_map_[plan_node_type_] = current_scanner_;
+    } else {
+      current_scanner_ = iter->second;
     }
-    RETURN_IF_ERROR(current_scanner_->Prepare(state, current_byte_stream_.get()));
+    DCHECK(current_scanner_ != NULL);
   }
 
   HdfsScanRange& range = current_file_scan_ranges_->second[current_range_idx_];
-  RETURN_IF_ERROR(current_scanner_->InitCurrentScanRange(state,
-                                                         &range,
-                                                         current_byte_stream_.get()));
+  RETURN_IF_ERROR(
+      current_scanner_->InitCurrentScanRange(&range, template_tuple_, 
+          current_byte_stream_.get()));
   return Status::OK;
 }
 
@@ -182,60 +192,61 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   // Create mapping from column index in table to slot index in output tuple.
   // First, initialize all columns to SKIP_COLUMN.
   int num_cols = hdfs_table->num_cols();
-  column_idx_to_slot_idx_.reserve(num_cols);
-  column_idx_to_slot_idx_.resize(num_cols);
-  for (int i = 0; i < num_cols; i++) {
-    column_idx_to_slot_idx_[i] = SKIP_COLUMN;
+  column_idx_to_materialized_slot_idx_.resize(num_cols);
+  for (int i = 0; i < num_cols; ++i) {
+    column_idx_to_materialized_slot_idx_[i] = SKIP_COLUMN;
   }
 
   num_partition_keys_ = hdfs_table->num_clustering_cols();
 
-  // Next, set mapping from column index to slot index for all slots in the query.
-  // We also set the key_idx_to_slot_idx__ to mapping for materializing partition keys.
+
+  // Next, collect all materialized (partition key and not) slots
+  vector<SlotDescriptor*> all_materialized_slots;
+  all_materialized_slots.resize(num_cols);
   const vector<SlotDescriptor*>& slots = tuple_desc_->slots();
-  for (size_t i = 0; i < slots.size(); i++) {
+  for (size_t i = 0; i < slots.size(); ++i) {
     if (!slots[i]->is_materialized()) continue;
-    if (hdfs_table->IsClusteringCol(slots[i])) {
-      // Set partition-key index to slot mapping.
-      key_idx_to_slot_idx_.push_back(make_pair(slots[i]->col_pos(), i));
-    } else {
-      // Set column to slot mapping.
-      // assert(slots[i]->col_pos() - num_partition_keys_ >= 0);
-      column_idx_to_slot_idx_[slots[i]->col_pos()] = i;
-    }
+    int col_idx = slots[i]->col_pos();
+    DCHECK_EQ(column_idx_to_materialized_slot_idx_[col_idx], SKIP_COLUMN);
+    all_materialized_slots[col_idx] = slots[i];
   }
 
-  // Find all the materialized non-partition key slots.
+  // Finally, populate materialized_slots_ and partition_key_slots_ in the order that 
+  // the slots appear in the file.  
   for (int i = 0; i < num_cols; ++i) {
-    if (column_idx_to_slot_idx_[i] != SKIP_COLUMN) {
-      // Each entry contains the index of table column i, ignoring
-      // partition keys (for scanners to index their internal data
-      // structures), and the slot descriptor for that column.
-      pair<int, SlotDescriptor*> entry =
-        make_pair(i - num_partition_keys_, slots[column_idx_to_slot_idx_[i]]);
-      materialized_slots_.push_back(entry);
+    SlotDescriptor* slot_desc = all_materialized_slots[i];
+    if (slot_desc == NULL) continue;
+    if (hdfs_table->IsClusteringCol(slot_desc)) {
+      partition_key_slots_.push_back(slot_desc);
+    } else {
+      DCHECK_GE(i, num_partition_keys_);
+      column_idx_to_materialized_slot_idx_[i] = materialized_slots_.size();
+      materialized_slots_.push_back(slot_desc);
     }
   }
 
   return Status::OK;
 }
 
-Status HdfsScanNode::ExtractPartitionKeyValues(RuntimeState* state,
-    const vector<pair<int, int> >& key_idx_to_slot_idx) {
-  if (key_idx_to_slot_idx.size() == 0) return Status::OK;
+Status HdfsScanNode::ExtractPartitionKeyValues(RuntimeState* state) {
+  if (num_partition_keys() == 0) return Status::OK;
 
   const string& file = current_file_scan_ranges_->first;
+  
+  // If there are partition keys we need to materialize, allocate a template 
+  // partition key tuple
+  if (materialized_slots().empty() || template_tuple_ == NULL) {
+    template_tuple_ =
+        reinterpret_cast<Tuple*>(partition_key_pool_->Allocate(tuple_desc_->byte_size()));
+  }
 
-  template_tuple_ =
-      reinterpret_cast<Tuple*>(partition_key_pool_->Allocate(tuple_desc_->byte_size()));
   memset(template_tuple_, 0, tuple_desc_->byte_size());
 
   smatch match;
   if (boost::regex_search(file, match, partition_key_regex_)) {
-    for (int i = 0; i < key_idx_to_slot_idx.size(); ++i) {
-      int regex_idx = key_idx_to_slot_idx[i].first + 1; //match[0] is input string
-      int slot_idx = key_idx_to_slot_idx[i].second;
-      const SlotDescriptor* slot_desc = tuple_desc_->slots()[slot_idx];
+    for (int i = 0; i < partition_key_slots_.size(); ++i) {
+      const SlotDescriptor* slot_desc = partition_key_slots_[i];
+      int regex_idx = slot_desc->col_pos() + 1; // match[0] is input string
       PrimitiveType type = slot_desc->type();
       const string& string_value = match[regex_idx];
 
@@ -286,8 +297,8 @@ Status HdfsScanNode::Close(RuntimeState* state) {
   if (current_byte_stream_ != NULL) {
     RETURN_IF_ERROR(current_byte_stream_->Close());
   }
+  scanner_pool_.reset(NULL);
   COUNTER_UPDATE(memory_used_counter_, tuple_pool_->peak_allocated_bytes());
-  current_scanner_.reset();
   RETURN_IF_ERROR(ExecNode::Close(state));
   return Status::OK;
 }

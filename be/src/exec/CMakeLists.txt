@@ -24,6 +24,7 @@ add_library(Exec STATIC
   hdfs-rcfile-scanner.cc
   hdfs-sequence-scanner.cc
   hdfs-text-scanner.cc
+  hdfs-text-scanner-ir.cc
   hdfs-text-table-sink.cc
   hbase-scan-node.cc
   hbase-table-scanner.cc

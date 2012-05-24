@@ -33,7 +33,7 @@ inline void ProcessEscapeMask(uint16_t escape_mask, bool* last_char_is_escape,
 
 template <bool process_escapes>
 inline void DelimitedTextParser::AddColumn(int len, char** next_column_start, 
-    int* num_fields, std::vector<DelimitedTextParser::FieldLocation>* field_locations) {
+    int* num_fields, std::vector<FieldLocation>* field_locations) {
   if (ReturnCurrentColumn()) {
     DCHECK_LT(*num_fields, field_locations->size());
     // Found a column that needs to be parsed, write the start/len to 'field_locations'
@@ -136,7 +136,7 @@ inline void DelimitedTextParser::ParseSse(int max_tuples,
           next_column_start, num_fields, field_locations);
 
       if ((*byte_buffer_ptr)[n] == tuple_delim_) {
-        column_idx_ = start_column_;
+        column_idx_ = scan_node_->num_partition_keys();
         ++(*num_tuples);
         if (UNLIKELY(*num_tuples == max_tuples)) {
           (*byte_buffer_ptr) += (n + 1);

@@ -66,26 +66,34 @@ class RowBatch {
 
   static const int INVALID_ROW_INDEX = -1;
 
-  // Add a row of tuple pointers after the last committed row and return its index.
-  // The row is uninitialized and each tuple of the row must be set.
-  // Returns INVALID_ROW_INDEX if the row batch is full.
+  // Add n rows of tuple pointers after the last committed row and return its index.
+  // The rows are uninitialized and each tuple of the row must be set.
+  // Returns INVALID_ROW_INDEX if the row batch cannot fit n rows.
   // Two consecutive AddRow() calls without a CommitLastRow() between them
   // have the same effect as a single call.
-  int AddRow() {
-    if (num_rows_ == capacity_) return INVALID_ROW_INDEX;
+  int AddRows(int n) {
+    if (num_rows_ + n > capacity_) return INVALID_ROW_INDEX;
     has_in_flight_row_ = true;
     return num_rows_;
   }
 
-  void CommitLastRow() {
-    DCHECK(num_rows_ < capacity_);
-    ++num_rows_;
+  int AddRow() { return AddRows(1); }
+
+  void CommitRows(int n) {
+    DCHECK_LE(num_rows_ + n, capacity_);
+    num_rows_ += n;
     has_in_flight_row_ = false;
   }
+  
+  void CommitLastRow() { CommitRows(1); }
 
   // Returns true if row_batch has reached capacity, false otherwise
   bool IsFull() {
     return num_rows_ == capacity_;
+  }
+
+  int row_byte_size() {
+    return num_tuples_per_row_ * sizeof(Tuple*);
   }
 
   TupleRow* GetRow(int row_idx) {

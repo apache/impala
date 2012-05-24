@@ -309,8 +309,7 @@ Function* CompoundPredicate::Codegen(LlvmCodeGen* codegen) {
       break;
   }
   if (function == NULL) return NULL;
-  if (!codegen->VerifyFunction(function)) return NULL;
-  return function;
+  return codegen->FinalizeFunction(function);
 }
 
 }

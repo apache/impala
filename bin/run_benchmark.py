@@ -245,6 +245,8 @@ queries = {'grep1GB': [
   ["select count(*) from rankings_%(table_name)s where "\
    "pageRank > 10 && pageRank < 25", 0, 5],
   ["select avg(adRevenue) from uservisits_%(table_name)s", 0, 5],
+  ["select avg(adRevenue) from uservisits_%(table_name)s "\
+   "where visitdate > '1999-07-01' and visitdate < '1999-12-31'", 0, 5],
   ],
 
   'grep10GB': [

@@ -23,7 +23,7 @@ namespace impala {
 class StringParser {
  public:
   enum ParseResult {
-    PARSE_SUCCESS,
+    PARSE_SUCCESS = 0,
     PARSE_FAILURE,
     PARSE_OVERFLOW
   };

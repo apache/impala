@@ -40,8 +40,7 @@ Function* NullLiteral::Codegen(LlvmCodeGen* codegen) {
   CodegenSetIsNullArg(codegen, entry_block, true);
   builder.CreateRet(GetNullReturnValue(codegen));
   
-  if (!codegen->VerifyFunction(function)) return NULL;
-  return function;
+  return codegen->FinalizeFunction(function);
 }
 
 }

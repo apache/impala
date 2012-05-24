@@ -119,7 +119,8 @@ public class TupleDescriptor {
       }
       if (slotSize > 1) {
         // insert padding
-        offset = (offset + slotSize - 1) / slotSize * slotSize;
+        int alignTo = Math.min(slotSize, 8);
+        offset = (offset + alignTo - 1) / alignTo * alignTo;
       }
 
       for (SlotDescriptor d: slotsBySize.get(slotSize)) {

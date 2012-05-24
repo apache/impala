@@ -58,8 +58,7 @@ Function* BoolLiteral::Codegen(LlvmCodeGen* codegen) {
   CodegenSetIsNullArg(codegen, entry_block, false);
   builder.CreateRet(ConstantInt::get(context, APInt(1, result_.bool_val, true)));
   
-  if (!codegen->VerifyFunction(function)) return NULL;
-  return function;
+  return codegen->FinalizeFunction(function);
 }
 
 }

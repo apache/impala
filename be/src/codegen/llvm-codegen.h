@@ -11,6 +11,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include <llvm/DerivedTypes.h>
+#include <llvm/Intrinsics.h>
 #include <llvm/LLVMContext.h>
 #include <llvm/Module.h>
 #include <llvm/Support/IRBuilder.h>
@@ -177,6 +178,9 @@ class LlvmCodeGen {
   // Returns execution engine interface
   llvm::ExecutionEngine* execution_engine() { return execution_engine_.get(); }
 
+  // Returns the underlying llvm module
+  llvm::Module* module() { return module_; }
+
   // Returns whether functions should be verfified
   bool verifier_enabled() { return verifier_enabled_; }
 
@@ -192,9 +196,6 @@ class LlvmCodeGen {
   //   been dynamically linked, the existing function will be unlinked. Note that
   //   this is very unthread-safe, if there are threads in the function to be unlinked,
   //   bad things will happen.
-  // - drop_first_arg: The arguments from the replaced function will be passed to the
-  //   new function.  If drop_first_arg is true, the first argument will be skipped.
-  //   This is useful for many of the use cases to drop the 'this' argument.
   // - 'num_replaced' returns the number of call sites updated
   //
   // Most of our use cases will likley not be in place.  We will have one 'template'
@@ -203,12 +204,17 @@ class LlvmCodeGen {
   // body with the codegened version.  The codegened bodies differ from instance
   // to instance since they are specific to the node's tuple desc.
   llvm::Function* ReplaceCallSites(llvm::Function* caller, bool update_in_place,
-      llvm::Function* new_fn, const std::string& target_name, bool drop_first_arg,
-      int* num_replaced);
+      llvm::Function* new_fn, const std::string& target_name, int* num_replaced);
 
   // If optimization is enabled, this will run the optimization passes over the
   // function.  The function is updated in place.
   void OptimizeFunction(llvm::Function* function);
+
+  // Verify and optimize function.  This should be called at the end for each
+  // codegen'd function.  If the function does not verify, it will return NULL,
+  // otherwise, it will optimize, mark the function for inlining and return the
+  // function object.
+  llvm::Function* FinalizeFunction(llvm::Function* function);
 
   // Jit compile the function.  This will run optimization passes and verify 
   // the function.  The result is a function pointer that is dynamically linked
@@ -292,6 +298,10 @@ class LlvmCodeGen {
 
   // Generates function to return min/max(v1, v2)
   llvm::Function* CodegenMinMax(PrimitiveType type, bool min);
+
+  // Codegen to call llvm memcpy intrinsic at the current builder location
+  // dst & src must be pointer types.  n must be an int type.
+  void CodegenMemcpy(LlvmBuilder*, llvm::Value* dst, llvm::Value* src, llvm::Value* n);
 
  private:
   friend class LlvmCodeGenTest;

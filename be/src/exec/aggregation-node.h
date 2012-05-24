@@ -48,6 +48,8 @@ class AggregationNode : public ExecNode {
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
   virtual Status Close(RuntimeState* state);
 
+  static const char* LLVM_CLASS_NAME;
+
  protected:
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
   

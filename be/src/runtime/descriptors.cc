@@ -49,7 +49,8 @@ SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc)
     field_idx_(-1),
     is_materialized_(tdesc.isMaterialized),
     is_null_fn_(NULL),
-    set_not_null_fn_(NULL) {
+    set_not_null_fn_(NULL),
+    set_null_fn_(NULL) {
 }
 
 std::string SlotDescriptor::DebugString() const {
@@ -125,6 +126,7 @@ TupleDescriptor::TupleDescriptor(const TTupleDescriptor& tdesc)
     table_desc_(NULL),
     byte_size_(tdesc.byteSize),
     num_null_bytes_(tdesc.numNullBytes),
+    num_materialized_slots_(0),
     slots_(),
     llvm_struct_(NULL) {
 }
@@ -134,6 +136,7 @@ void TupleDescriptor::AddSlot(SlotDescriptor* slot) {
   if (slot->type() == TYPE_STRING && slot->is_materialized()) {
     string_slots_.push_back(slot);
   }
+  if (slot->is_materialized()) ++num_materialized_slots_;
 }
 
 string TupleDescriptor::DebugString() const {
@@ -325,13 +328,11 @@ Function* SlotDescriptor::CodegenIsNull(LlvmCodeGen* codegen, StructType* tuple)
   Value* is_null = builder.CreateICmpNE(null_mask, zero, "is_null");
   builder.CreateRet(is_null);
 
-  if (!codegen->VerifyFunction(fn)) return NULL;
-  codegen->AddInlineFunction(fn);
-  is_null_fn_ = fn;
-  return fn;
+  return is_null_fn_ = codegen->FinalizeFunction(fn);
 }
 
-// Generate function to set a slot to be non-null.  The resulting IR looks like:
+// Generate function to set a slot to be null or not-null.  The resulting IR
+// for SetNotNull looks like:
 // (in this case the tuple contains only a nullable double)
 // define void @SetNotNull({ i8, double }* %tuple) {
 // entry:
@@ -341,29 +342,45 @@ Function* SlotDescriptor::CodegenIsNull(LlvmCodeGen* codegen, StructType* tuple)
 //   store i8 %0, i8* %null_byte_ptr
 //   ret void
 // }
-Function* SlotDescriptor::CodegenSetNotNull(LlvmCodeGen* codegen, StructType* tuple) {
-  if (set_not_null_fn_ != NULL) return set_not_null_fn_;
+Function* SlotDescriptor::CodegenUpdateNull(LlvmCodeGen* codegen, 
+    StructType* tuple, bool set_null) {
+  if (set_null && set_null_fn_ != NULL) return set_null_fn_;
+  if (!set_null && set_not_null_fn_ != NULL) return set_not_null_fn_;
+
   PointerType* tuple_ptr_type = PointerType::get(tuple, 0);
-  LlvmCodeGen::FnPrototype prototype(codegen, "SetNotNull", codegen->void_type());
+  LlvmCodeGen::FnPrototype prototype(codegen, (set_null) ? "SetNull" :"SetNotNull", 
+      codegen->void_type());
   prototype.AddArgument(LlvmCodeGen::NamedVariable("tuple", tuple_ptr_type));
   
   LlvmCodeGen::LlvmBuilder builder(codegen->context());
   Value* tuple_ptr;
   Function* fn = prototype.GeneratePrototype(&builder, &tuple_ptr);
   
-  Value* null_clear_val = 
-      codegen->GetIntConstant(TYPE_TINYINT, ~null_indicator_offset_.bit_mask);
   Value* null_byte_ptr = 
       builder.CreateStructGEP(
           tuple_ptr, null_indicator_offset_.byte_offset, "null_byte_ptr");
   Value* null_byte = builder.CreateLoad(null_byte_ptr, "null_byte");
-  Value* null_cleared = builder.CreateAnd(null_byte, null_clear_val);
-  builder.CreateStore(null_cleared, null_byte_ptr);
+  Value* result = NULL;
+  
+  if (set_null) {
+    Value* null_set = codegen->GetIntConstant(
+        TYPE_TINYINT, null_indicator_offset_.bit_mask);
+    result = builder.CreateOr(null_byte, null_set);
+  } else {
+    Value* null_clear_val = 
+        codegen->GetIntConstant(TYPE_TINYINT, ~null_indicator_offset_.bit_mask);
+    result = builder.CreateAnd(null_byte, null_clear_val);
+  }
+
+  builder.CreateStore(result, null_byte_ptr);
   builder.CreateRetVoid();
 
-  if (!codegen->VerifyFunction(fn)) return NULL;
-  codegen->AddInlineFunction(fn);
-  set_not_null_fn_ = fn;
+  fn = codegen->FinalizeFunction(fn);
+  if (set_null) {
+    set_null_fn_ = fn;
+  } else {
+    set_not_null_fn_ = fn;
+  }
   return fn;
 }
 
@@ -377,7 +394,7 @@ StructType* TupleDescriptor::GenerateLlvmStruct(LlvmCodeGen* codegen) {
 
   // For each null byte, add a byte to the struct
   vector<Type*> struct_fields;
-  struct_fields.resize(num_null_bytes_ + slots().size());
+  struct_fields.resize(num_null_bytes_ + num_materialized_slots_);
   for (int i = 0; i < num_null_bytes_; ++i) {
     struct_fields[i] = codegen->GetType(TYPE_TINYINT);
   }
@@ -389,7 +406,7 @@ StructType* TupleDescriptor::GenerateLlvmStruct(LlvmCodeGen* codegen) {
       slot_desc->field_idx_ = slot_desc->slot_idx_ + num_null_bytes_;
       DCHECK_LT(slot_desc->field_idx(), struct_fields.size());
       struct_fields[slot_desc->field_idx()] = codegen->GetType(slot_desc->type());
-    }
+    } 
   }
 
   // Construct the struct type.

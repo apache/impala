@@ -17,12 +17,20 @@ import os
 ir_functions = [
   ["AGG_NODE_PROCESS_ROW_BATCH_WITH_GROUPING", "ProcessRowBatchWithGrouping"],
   ["AGG_NODE_PROCESS_ROW_BATCH_NO_GROUPING", "ProcessRowBatchNoGrouping"],
+  ["HDFS_TEXT_SCANNER_WRITE_ALIGNED_TUPLES", "WriteAlignedTuples"],
   ["STRING_VALUE_EQ", "StringValueEQ"],
   ["STRING_VALUE_NE", "StringValueNE"],
   ["STRING_VALUE_GE", "StringValueGE"],
   ["STRING_VALUE_GT", "StringValueGT"],
   ["STRING_VALUE_LT", "StringValueLT"],
   ["STRING_VALUE_LE", "StringValueLE"],
+  ["STRING_TO_BOOL", "IrStringToBool"],
+  ["STRING_TO_INT8", "IrStringToInt8"],
+  ["STRING_TO_INT16", "IrStringToInt16"],
+  ["STRING_TO_INT32", "IrStringToInt32"],
+  ["STRING_TO_INT64", "IrStringToInt64"],
+  ["STRING_TO_FLOAT", "IrStringToFloat"],
+  ["STRING_TO_DOUBLE", "IrStringToDouble"],
 ]
 
 enums_preamble = '\

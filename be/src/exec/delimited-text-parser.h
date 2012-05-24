@@ -5,22 +5,12 @@
 
 #include "exec/hdfs-scanner.h"
 #include "exec/hdfs-scan-node.h"
+#include "util/sse-util.h"
 
 namespace impala {
 
 class DelimitedTextParser {
  public:
-  // Intermediate structure used for two pass parsing approach. In the first pass,
-  // the FieldLocation structs are filled out and contain where all the fields start and
-  // their lengths.  In the second pass, the FieldLocation is used to write out the
-  // slots. We want to keep this struct as small as possible.
-  struct FieldLocation {
-    //start of field
-    char* start;
-    // Encodes the length and whether or not this fields needs to be unescaped.
-    // If len < 0, then the field needs to be unescaped.
-    int len;
-  };
 
   // The Delimited Text Parser parses text rows that are delimited by specific
   // characters:
@@ -37,7 +27,7 @@ class DelimitedTextParser {
   // The main method is ParseData which fills in a vector of
   // pointers and lengths to the fields.  It also can handle an excape character
   // which masks a tuple or field delimiter that occurs in the data.
-  DelimitedTextParser(const std::vector<int>& map_column_to_slot, int start_column,
+  DelimitedTextParser(HdfsScanNode* scan_node,
                       char tuple_delim, char field_delim_ = '\0',
                       char collection_item_delim = '\0', char escape_char = '\0');
 
@@ -45,7 +35,7 @@ class DelimitedTextParser {
   void ParserReset();
 
   // Check if we are at the start of a tuple.
-  bool AtTupleStart() { return column_idx_ == start_column_; }
+  bool AtTupleStart() { return column_idx_ == scan_node_->num_partition_keys(); }
 
   // Parses a byte buffer for the field and tuple breaks.
   // This function will write the field start & len to field_locations
@@ -91,7 +81,7 @@ class DelimitedTextParser {
 
   // Will we return the current column to the query?
   bool ReturnCurrentColumn() {
-    return map_column_to_slot_[column_idx_] != HdfsScanNode::SKIP_COLUMN;
+    return scan_node_->GetMaterializedSlotIdx(column_idx_) != HdfsScanNode::SKIP_COLUMN;
   }
 
  private:
@@ -121,11 +111,8 @@ class DelimitedTextParser {
       char** byte_buffer_ptr, std::vector<FieldLocation>* field_locations,
       int* num_tuples, int* num_fields, char** next_column_start);
 
-  // Map columns in the data to slots in the tuples.
-  const std::vector<int>& map_column_to_slot_;
-
-  // First non-partition column that will be extracted from parsed data.
-  int start_column_;
+  // ScanNode reference to map columns in the data to slots in the tuples.
+  HdfsScanNode* scan_node_;
 
   // SSE(xmm) register containing the tuple search character.
   __m128i xmm_tuple_search_;

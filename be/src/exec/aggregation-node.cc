@@ -62,6 +62,8 @@ const char* AggregationTuple::LLVM_CLASS_NAME = "class.impala::AggregationTuple"
 
 }
 
+const char* AggregationNode::LLVM_CLASS_NAME = "class.impala::AggregationNode";
+
 // TODO: pass in maximum size; enforce by setting limit in mempool
 // TODO: have a Status ExecNode::Init(const TPlanNode&) member function
 // that does initialization outside of c'tor, so we can indicate errors
@@ -177,6 +179,8 @@ Status AggregationNode::Prepare(RuntimeState* state) {
         void* jitted_process_row_batch = codegen->JitFunction(process_row_batch);
         process_row_batch_fn_ = 
             reinterpret_cast<ProcessRowBatchFn>(jitted_process_row_batch);
+        LOG(INFO) << "AggregationNode(node_id=" << id() 
+                  << ") using llvm codegend functions.";
       }
     }
   }
@@ -625,7 +629,7 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen, int slo
     
     // Dst is NULL, just update dst slot to src slot and clear null bit
     builder.SetInsertPoint(dst_null_block);
-    Function* clear_null_fn = slot_desc->CodegenSetNotNull(codegen, tuple_struct);
+    Function* clear_null_fn = slot_desc->CodegenUpdateNull(codegen, tuple_struct, false);
     builder.CreateCall(clear_null_fn, args[0]);
     builder.CreateStore(src_value, dst_ptr);
 
@@ -669,17 +673,17 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen, int slo
   builder.SetInsertPoint(ret_block);
   builder.CreateRetVoid();
 
-  if (!codegen->VerifyFunction(fn)) return NULL;
-  codegen->AddInlineFunction(fn);
-  codegen->OptimizeFunction(fn);
-  return fn;
+  return codegen->FinalizeFunction(fn);
 }
 
 // IR codegen for the UpdateAggTuple loop.  This loop is query specific and
-// based on the aggregate exprs.  For the query:
+// based on the aggregate exprs.  The function signature must match the non-
+// codegen'd UpdateAggTuple exactly.
+// For the query:
 // select count(*), count(int_col), sum(double_col) the IR looks like:
 //
-// define void @UpdateAggTuple(%"class.impala::AggregationNode"* %agg_tuple, 
+// define void @UpdateAggTuple(%"class.impala::AggregationNode"* %this_ptr,
+//                             %"class.impala::AggregationTuple"* %agg_tuple, 
 //                             %"class.impala::TupleRow"* %tuple_row) {
 // entry:
 //   %tuple = bitcast %"class.impala::AggregationNode"* %agg_tuple to { i8, i64, i64, double }*
@@ -720,11 +724,15 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
   }
 
   // Get the types to match the UpdateAggTuple signature
+  Type* agg_node_type = codegen->GetType(AggregationNode::LLVM_CLASS_NAME);
   Type* agg_tuple_type = codegen->GetType(AggregationTuple::LLVM_CLASS_NAME);
-  if (agg_tuple_type == NULL) return NULL;
   Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
-  if (tuple_row_type == NULL) return NULL;
-
+  
+  DCHECK(agg_node_type != NULL);
+  DCHECK(agg_tuple_type != NULL);
+  DCHECK(tuple_row_type != NULL);
+  
+  PointerType* agg_node_ptr_type = PointerType::get(agg_node_type, 0);
   PointerType* agg_tuple_ptr_type = PointerType::get(agg_tuple_type, 0);
   PointerType* tuple_row_ptr_type = PointerType::get(tuple_row_type, 0);
 
@@ -735,16 +743,17 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
   StructType* tuple_struct = agg_tuple_desc_->GenerateLlvmStruct(codegen);
   PointerType* tuple_ptr = PointerType::get(tuple_struct, 0);
   LlvmCodeGen::FnPrototype prototype(codegen, "UpdateAggTuple", codegen->void_type());
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("this_ptr", agg_node_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("agg_tuple", agg_tuple_ptr_type));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("tuple_row", tuple_row_ptr_type));
 
   LlvmCodeGen::LlvmBuilder builder(codegen->context());
-  Value* args[2];
+  Value* args[3];
   Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
 
   // Cast the parameter types to the internal llvm runtime types.
-  args[0] = builder.CreateBitCast(args[0], tuple_ptr, "tuple");
-  args[1] = builder.CreateBitCast(args[1], PointerType::get(ptr_type, 0), "row");
+  args[1] = builder.CreateBitCast(args[1], tuple_ptr, "tuple");
+  args[2] = builder.CreateBitCast(args[2], PointerType::get(ptr_type, 0), "row");
 
   // Loop over each expr and generate the IR for that slot.  If the expr is not
   // count(*), generate a helper IR function to update the slot and call that.
@@ -757,22 +766,19 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
       DCHECK_EQ(agg_expr->agg_op(), TAggregationOp::COUNT);
       int field_idx = slot_desc->field_idx();
       Value* const_one = codegen->GetIntConstant(TYPE_BIGINT, 1);
-      Value* slot_ptr = builder.CreateStructGEP(args[0], field_idx, "src_slot");
+      Value* slot_ptr = builder.CreateStructGEP(args[1], field_idx, "src_slot");
       Value* slot_loaded = builder.CreateLoad(slot_ptr, "count_star_val");
       Value* count_inc = builder.CreateAdd(slot_loaded, const_one, "count_star_inc");
       builder.CreateStore(count_inc, slot_ptr);
     } else {
       Function* update_slot_fn = CodegenUpdateSlot(codegen, i);
       if (update_slot_fn == NULL) return NULL;
-      builder.CreateCall(update_slot_fn, args);
+      builder.CreateCall2(update_slot_fn, args[1], args[2]);
     }
   }
   builder.CreateRetVoid();
 
-  if (!codegen->VerifyFunction(fn)) return NULL;
-  codegen->AddInlineFunction(fn);
-  codegen->OptimizeFunction(fn);
-  return fn;
+  return codegen->FinalizeFunction(fn);
 }
 
 Function* AggregationNode::CodegenProcessRowBatch(
@@ -793,12 +799,10 @@ Function* AggregationNode::CodegenProcessRowBatch(
 
   int replaced = 0;
   process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false, 
-      update_tuple_fn, "UpdateAggTuple", true, &replaced); 
+      update_tuple_fn, "UpdateAggTuple", &replaced); 
   DCHECK_EQ(replaced, 1) << "One call site should be replaced."; 
   DCHECK(process_batch_fn != NULL);
-  if (!codegen->VerifyFunction(process_batch_fn)) return NULL;
-  codegen->AddInlineFunction(process_batch_fn);
-  codegen->OptimizeFunction(process_batch_fn);
-  return process_batch_fn;
+
+  return codegen->FinalizeFunction(process_batch_fn);
 }
 

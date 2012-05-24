@@ -44,6 +44,11 @@ Status SlotRef::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   return Status::OK;
 }
 
+int SlotRef::GetSlotIds(vector<SlotId>* slot_ids) const {
+  slot_ids->push_back(slot_id_);
+  return 1;
+}
+
 string SlotRef::DebugString() const {
   stringstream out;
   out << "SlotRef(slot_id=" << slot_id_
@@ -193,8 +198,7 @@ Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
   phi_node->addIncoming(result, get_slot_block);
   builder.CreateRet(phi_node);
 
-  if (!codegen->VerifyFunction(function)) return NULL;
-  return function;
+  return codegen->FinalizeFunction(function);
 }
 
 }

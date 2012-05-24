@@ -87,9 +87,9 @@ class SlotDescriptor {
   // The codegen function is cached.
   llvm::Function* CodegenIsNull(LlvmCodeGen*, llvm::StructType* tuple);
 
-  // Codegen for: void SetNotNull(Tuple* tuple)
+  // Codegen for: void SetNull(Tuple* tuple) / SetNotNull
   // The codegen function is cached.
-  llvm::Function* CodegenSetNotNull(LlvmCodeGen*, llvm::StructType* tuple);
+  llvm::Function* CodegenUpdateNull(LlvmCodeGen*, llvm::StructType* tuple, bool set_null);
 
  protected:
   friend class DescriptorTbl;
@@ -112,8 +112,11 @@ class SlotDescriptor {
   int field_idx_;  
 
   const bool is_materialized_;
+
+  // Cached codegen'd functions
   llvm::Function* is_null_fn_;
   llvm::Function* set_not_null_fn_;
+  llvm::Function* set_null_fn_;
 
   SlotDescriptor(const TSlotDescriptor& tdesc);
 };
@@ -183,6 +186,7 @@ class HBaseTableDescriptor : public TableDescriptor {
 class TupleDescriptor {
  public:
   int byte_size() const { return byte_size_; }
+  int num_null_bytes() const { return num_null_bytes_; }
   const std::vector<SlotDescriptor*>& slots() const { return slots_; }
   const std::vector<SlotDescriptor*>& string_slots() const { return string_slots_; }
   const TableDescriptor* table_desc() const { return table_desc_; }
@@ -210,6 +214,7 @@ class TupleDescriptor {
   TableDescriptor* table_desc_;
   const int byte_size_;
   const int num_null_bytes_;
+  int num_materialized_slots_;
   std::vector<SlotDescriptor*> slots_;  // contains all slots
   std::vector<SlotDescriptor*> string_slots_;  // contains only materialized string slots
   llvm::StructType* llvm_struct_; // cache for the llvm struct type for this tuple desc

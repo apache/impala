@@ -66,6 +66,10 @@ class ExecNode {
   // Collect all scan nodes that are part of this subtree, and return in 'scan_nodes'.
   void CollectScanNodes(std::vector<ExecNode*>* scan_nodes);
 
+  // Codegen function to evaluate the conjuncts.  Returns NULL if codegen was
+  // not supported for the conjunct exprs.
+  llvm::Function* CodegenEvalConjuncts(LlvmCodeGen* codegen);
+
   // Returns a string representation in DFS order of the plan rooted at this.
   std::string DebugString() const;
 
@@ -77,8 +81,13 @@ class ExecNode {
   //   out: Stream to accumulate debug string.
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
 
+  const std::vector<Expr*>& conjuncts() const { return conjuncts_; }
+
   int id() const { return id_; }
   const RowDescriptor& row_desc() const { return row_descriptor_; }
+  int rows_returned() const { return num_rows_returned_; }
+  int limit() const { return limit_; }
+  bool ReachedLimit() { return limit_ != -1 && num_rows_returned_ == limit_; }
 
   RuntimeProfile* runtime_profile() { return runtime_profile_.get(); }
 
@@ -111,8 +120,6 @@ class ExecNode {
 
   // Evaluate conjuncts_. Return true if all conjuncts return true, otherwise false.
   bool EvalConjuncts(TupleRow* row);
-
-  bool ReachedLimit() { return limit_ != -1 && num_rows_returned_ == limit_; }
 
   virtual bool IsScanNode() const { return false; }
 

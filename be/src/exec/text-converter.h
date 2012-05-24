@@ -4,13 +4,20 @@
 #define IMPALA_EXEC_TEXT_CONVERTER_H
 
 #include "runtime/runtime-state.h"
+
+namespace llvm {
+  class Function;
+}
+
 namespace impala {
 
-class Tuple;
-class SlotDescriptor;
+class LlvmCodeGen;
 class MemPool;
-class StringValue;
+class SlotDescriptor;
 class Status;
+class StringValue;
+class Tuple;
+class TupleDescriptor;
 
 // Helper class for dealing with text data, e.g., converting text data to
 // numeric types, etc.
@@ -25,10 +32,9 @@ class TextConverter {
   // For regular escaped strings,
   // we copy an its unescaped string into a separate buffer and point to it.
   // Unsuccessful conversions are turned into NULLs.
-  // Returns Status::OK if the value was written successfully, error otherwise
-  Status WriteSlot(RuntimeState* state, const SlotDescriptor* slot_desc,
-                    Tuple* tuple, const char* data, int len,
-                    bool copy_string, bool need_escape);
+  // Returns true if the value was written successfully.
+  bool WriteSlot(const SlotDescriptor* slot_desc, Tuple* tuple, 
+      const char* data, int len, bool copy_string, bool need_escape);
 
   // Removes escape characters from len characters of the null-terminated string src,
   // and copies the unescaped string into dest, changing *len to the unescaped length.
@@ -38,6 +44,15 @@ class TextConverter {
   // Removes escape characters from 'str', allocating a new string from var_len_pool_.
   // 'str' is updated with the new ptr and length.
   void UnescapeString(StringValue* str);
+
+  // Codegen the function to write a slot for slot_desc.
+  // Returns NULL if codegen was not succesful. 
+  // The signature of the generated function is:
+  // bool WriteSlot(Tuple* tuple, const char* data, int len);
+  // The codegen function returns true if the slot could be written and false
+  // otherwise.
+  llvm::Function* CodegenWriteSlot(LlvmCodeGen*, 
+      TupleDescriptor* tuple_desc, SlotDescriptor* slot_desc);
 
  private:
   char escape_char_;

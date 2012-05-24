@@ -137,12 +137,12 @@ namespace impala {
 
 class HdfsSequenceScanner : public HdfsScanner {
  public:
-  HdfsSequenceScanner(HdfsScanNode* scan_node, const TupleDescriptor* tuple_desc,
+  HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state,
                       Tuple* template_tuple, MemPool* tuple_pool);
 
   virtual ~HdfsSequenceScanner();
-  virtual Status Prepare(RuntimeState* state, ByteStream* byte_stream);
-  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eosr);
+  virtual Status Prepare();
+  virtual Status GetNext(RowBatch* row_batch, bool* eosr);
 
  private:
   // Sync indicator
@@ -169,8 +169,8 @@ class HdfsSequenceScanner : public HdfsScanner {
   // Initialises any state required at the beginning of a new scan range.
   // If not at the begining of the file it will trigger a search for the
   // next sync block, where the scan will start.
-  virtual Status InitCurrentScanRange(RuntimeState* state,
-                                      HdfsScanRange* scan_range, ByteStream* byte_stream);
+  virtual Status InitCurrentScanRange(HdfsScanRange* scan_range, Tuple* template_tuple,
+      ByteStream* byte_stream);
 
   // Writes the intermediate parsed data in to slots, outputting
   // tuples to row_batch as they complete.
@@ -180,15 +180,14 @@ class HdfsSequenceScanner : public HdfsScanner {
   //  num_fields: Total number of fields contained in parsed_data_
   // Input/Output Parameters
   //  row_idx: Index of current row in row_batch.
-  Status WriteFields(RuntimeState* state, RowBatch*
-                     row_batch, int num_fields, int* row_idx);
+  Status WriteFields(RowBatch* row_batch, int num_fields, int* row_idx);
 
   // Find the first record of a scan range.
   // If the scan range is not at the beginning of the file then this is called to
   // move the buffered_byte_stream_ seek point to before the next sync field.
   // If there is none present then the buffered_byte_stream_ will be beyond the
   // end of the scan range and the scan will end.
-  Status FindFirstRecord(RuntimeState *state);
+  Status FindFirstRecord();
 
   // Read the current Sequence file header from the begining of the file.
   // Verifies:
@@ -213,17 +212,13 @@ class HdfsSequenceScanner : public HdfsScanner {
   //   current_block_length_
   Status ReadBlockHeader(bool* sync);
 
-  // Find first record in a scan range.
-  // Sets the current_byte_stream_ to this record.
-  Status FindFirstRecord();
-
   // Read compressed blocks and iterate through the records in each block.
   // Output:
   //   record_ptr: ponter to the record.
   //   record_len: length of the record
   //   eors: set to true if we are at the end of the scan range.
-  Status GetRecordFromCompressedBlock(RuntimeState *state,
-                                      uint8_t** record_ptr, int64_t *record_len, bool *eors);
+  Status GetRecordFromCompressedBlock(uint8_t** record_ptr, int64_t *record_len, 
+                                      bool *eors);
 
   // Read compressed or uncompressed records from the byte stream into memory
   // in unparsed_data_buffer_pool_.
@@ -235,7 +230,7 @@ class HdfsSequenceScanner : public HdfsScanner {
 
   // Read a compressed block.
   // Decompress to unparsed_data_buffer_ allocated from unparsed_data_buffer_pool_.
-  Status ReadCompressedBlock(RuntimeState *state);
+  Status ReadCompressedBlock();
 
   // read and verify a sync block.
   Status CheckSync();
@@ -245,16 +240,13 @@ class HdfsSequenceScanner : public HdfsScanner {
 
   // Helper class for picking fields and rows from delimited text.
   boost::scoped_ptr<DelimitedTextParser> delimited_text_parser_;
-  std::vector<DelimitedTextParser::FieldLocation> field_locations_;
+  std::vector<FieldLocation> field_locations_;
 
   // Parser to find the first record. This uses different delimiters.
   boost::scoped_ptr<DelimitedTextParser> find_first_parser_;
 
   // Helper class for converting text fields to internal types.
   boost::scoped_ptr<TextConverter> text_converter_;
-
-  // Runtime state for reporting file parsing errors.
-  RuntimeState* runtime_state_;
 
   // The original byte stream we are passed.
   ByteStream* unbuffered_byte_stream_;

@@ -156,8 +156,7 @@ Function* IntLiteral::Codegen(LlvmCodeGen* codegen) {
   CodegenSetIsNullArg(codegen, entry_block, false);
   builder.CreateRet(result);
 
-  if (!codegen->VerifyFunction(function)) return NULL;
-  return function;
+  return codegen->FinalizeFunction(function);
 }
 
 }

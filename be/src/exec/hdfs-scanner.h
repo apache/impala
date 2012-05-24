@@ -6,14 +6,10 @@
 #include <vector>
 #include <memory>
 #include <stdint.h>
-#include <hdfs.h>
 #include <boost/regex.hpp>
 #include <boost/scoped_ptr.hpp>
 
 #include "exec/scan-node.h"
-#include "runtime/descriptors.h"
-#include "runtime/string-buffer.h"
-#include "util/sse-util.h"
 
 namespace impala {
 
@@ -32,6 +28,20 @@ class ByteStream;
 class HdfsScanNode;
 class Decompressor;
 struct HdfsScanRange;
+
+// Intermediate structure used for two pass parsing approach. In the first pass,
+// the FieldLocation structs are filled out and contain where all the fields start and
+// their lengths.  In the second pass, the FieldLocation is used to write out the
+// slots. We want to keep this struct as small as possible.
+struct FieldLocation {
+  //start of field
+  char* start;
+  // Encodes the length and whether or not this fields needs to be unescaped.
+  // If len < 0, then the field needs to be unescaped.
+  int len;
+
+  static const char* LLVM_CLASS_NAME;
+};
 
 // HdfsScanners are instantiated by an HdfsScanNode to parse file data in a particular
 // format into Impala's Tuple structures. They are an abstract class; the actual mechanism
@@ -56,12 +66,12 @@ class HdfsScanner {
   // This probably ought to be a derived number from the environment.
   const static int FILE_BLOCK_SIZE = 4096;
 
-  // tuple_desc - the descriptor of the output tuple
+  // scan_node - parent scan node
   // template_tuple - the default (i.e. partition key) tuple before
   // filling materialized slots
   // tuple_pool - mem pool owned by parent scan node for allocation
   // of tuple buffer data
-  HdfsScanner(HdfsScanNode* scan_node, const TupleDescriptor* tuple_desc,
+  HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state, 
               Tuple* template_tuple, MemPool* tuple_pool);
 
   virtual ~HdfsScanner();
@@ -69,27 +79,23 @@ class HdfsScanner {
   // Writes parsed tuples into tuple buffer,
   // and sets pointers in row_batch to point to them.
   // row_batch may be non-full when all scan ranges have been read
-  virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) = 0;
+  virtual Status GetNext(RowBatch* row_batch, bool* eos) = 0;
 
   // One-time initialisation of state that is constant across scan ranges.
-  virtual Status Prepare(RuntimeState* state, ByteStream* byte_stream);
+  virtual Status Prepare();
 
-  // One-time initialisation of per-scan-range state.
-  virtual Status InitCurrentScanRange(RuntimeState* state, HdfsScanRange* scan_range,
+  // One-time initialisation of per-scan-range state.  The scanner objects are
+  // reused for different scan ranges so this function must reset all state.
+  virtual Status InitCurrentScanRange(HdfsScanRange* scan_range,
+                                      Tuple* template_tuple,
                                       ByteStream* byte_stream);
 
  protected:
-  // Utility method to write out tuples when there are no materialized
-  // fields e.g. select count(*) or only slots from partition keys.
-  //   num_tuples - Total number of tuples to write out.
-  Status WriteTuples(RuntimeState* state, RowBatch* row_batch, int num_tuples,
-      int* row_idx);
-
   // For EvalConjunctsForScanner
   HdfsScanNode* scan_node_;
 
-  // Number of rows returned during the lifetime of this scanner
-  int num_rows_returned_;
+  // RuntimeState for error reporting
+  RuntimeState* state_;
 
   // Contiguous block of memory into which tuples are written, allocated
   // from tuple_pool_. We don't allocate individual tuples from tuple_pool_ directly,
@@ -140,8 +146,18 @@ class HdfsScanner {
   HdfsScanRange* current_scan_range_;
 
   // Allocates a buffer from tuple_pool_ large enough to hold one
-  // tuple for every remaining row in row_batch.
+  // tuple for every remaining row in row_batch.  The tuple memory
+  // is uninitialized.
   void AllocateTupleBuffer(RowBatch* row_batch);
+
+  // Utility method to write out tuples when there are no materialized
+  // fields (e.g. select count(*) or only partition keys).
+  //   num_tuples - Total number of tuples to write out.
+  // Returns the number of tuples added to the row batch.
+  int WriteEmptyTuples(RowBatch* row_batch, int num_tuples);
+
+  // Report parse error for column @ desc
+  void ReportColumnParseError(const SlotDescriptor* desc, const char* data, int len);
 };
 
 }

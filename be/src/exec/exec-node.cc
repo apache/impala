@@ -23,6 +23,7 @@
 #include "util/runtime-profile.h"
 #include "gen-cpp/PlanNodes_types.h"
 
+using namespace llvm;
 using namespace std;
 
 namespace impala {
@@ -183,6 +184,88 @@ bool ExecNode::EvalConjuncts(const vector<Expr*>& conjuncts, TupleRow* row) {
     if (value == NULL || *reinterpret_cast<bool*>(value) == false) return false;
   }
   return true;
+}
+
+// Codegen for EvalConjuncts.  The generated signature is
+// bool EvalConjuncts(TupleRow* row);
+// For a node with two conjunct predicates
+// define i1 @EvalConjuncts(%"class.impala::TupleRow"* %row) {
+// entry:
+//   %null_ptr = alloca i1
+//   %0 = bitcast %"class.impala::TupleRow"* %row to i8**
+//   %eval = call i1 @BinaryPredicate(i8** %0, i8* null, i1* %null_ptr)
+//   br i1 %eval, label %continue, label %false
+// 
+// continue:                                         ; preds = %entry
+//   %eval2 = call i1 @BinaryPredicate3(i8** %0, i8* null, i1* %null_ptr)
+//   br i1 %eval2, label %continue1, label %false
+// 
+// continue1:                                        ; preds = %continue
+//   ret i1 true
+// 
+// false:                                            ; preds = %continue, %entry
+//   ret i1 false
+// }
+Function* ExecNode::CodegenEvalConjuncts(LlvmCodeGen* codegen) {
+  for (int i = 0; i < conjuncts_.size(); ++i) {
+    if (conjuncts_[i]->codegen_fn() == NULL) {
+      VLOG(1) << "Could not codegen EvalConjuncts because one of the conjuncts "
+              << "could not be codegen'd.";
+      return NULL;
+    }
+  }
+  
+  Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
+  if (tuple_row_type == NULL) return NULL;
+  PointerType* tuple_row_ptr_type = PointerType::get(tuple_row_type, 0);
+
+  LlvmCodeGen::FnPrototype prototype(
+      codegen, "EvalConjuncts", codegen->GetType(TYPE_BOOLEAN));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
+  
+  LlvmCodeGen::LlvmBuilder builder(codegen->context());
+  Value* tuple_row_arg;
+  Function* fn = prototype.GeneratePrototype(&builder, &tuple_row_arg);
+
+  if (conjuncts_.size() > 0) {
+    LLVMContext& context = codegen->context();
+    // The exprs type TupleRows as char** (instead of TupleRow* or Tuple**).  We
+    // could plumb the expr codegen to know the tuples it will operate on.
+    // TODO: think about doing that
+    Type* tuple_row_llvm_type = PointerType::get(codegen->ptr_type(), 0);
+    tuple_row_arg = builder.CreateBitCast(tuple_row_arg, tuple_row_llvm_type);
+    BasicBlock* false_block = BasicBlock::Create(context, "false", fn);
+  
+    LlvmCodeGen::NamedVariable null_var("null_ptr", codegen->boolean_type());
+    Value* is_null_ptr = codegen->CreateEntryBlockAlloca(fn, null_var);
+
+    for (int i = 0; i < conjuncts_.size(); ++i) {
+      BasicBlock* true_block = BasicBlock::Create(context, "continue", fn, false_block);
+      Function* conjunct_fn = conjuncts_[i]->codegen_fn();
+      DCHECK_EQ(conjuncts_[i]->scratch_buffer_size(), 0);
+      Value* expr_args[] = { 
+        tuple_row_arg,
+        ConstantPointerNull::get(codegen->ptr_type()), 
+        is_null_ptr 
+      };
+
+      // Ignore null result.  If null, expr's will return false which
+      // is exactly the semantics for conjuncts
+      Value* eval = builder.CreateCall(conjunct_fn, expr_args, "eval");
+      builder.CreateCondBr(eval, true_block, false_block);
+
+      // Set insertion point for continue/end
+      builder.SetInsertPoint(true_block);
+    }
+    builder.CreateRet(codegen->true_value());
+
+    builder.SetInsertPoint(false_block);
+    builder.CreateRet(codegen->false_value());
+  } else {
+    builder.CreateRet(codegen->true_value());
+  }
+  
+  return codegen->FinalizeFunction(fn);
 }
 
 void ExecNode::CollectScanNodes(std::vector<ExecNode*>* scan_nodes) {

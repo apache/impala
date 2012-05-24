@@ -452,7 +452,7 @@ Function* LlvmCodeGen::FnPrototype::GeneratePrototype(
 }
 
 Function* LlvmCodeGen::ReplaceCallSites(Function* caller, bool update_in_place,
-    Function* new_fn, const string& replacee_name, bool drop_first_arg, int* replaced) {
+    Function* new_fn, const string& replacee_name, int* replaced) {
   DCHECK(caller->getParent() == module_);
 
   if (!update_in_place) {
@@ -482,19 +482,8 @@ Function* LlvmCodeGen::ReplaceCallSites(Function* caller, bool update_in_place,
         Function* old_fn = call_instr->getCalledFunction();
         // look for call instruction that matches the name
         if (old_fn->getName().find(replacee_name) != string::npos) {
-          DCHECK(!drop_first_arg || call_instr->getNumArgOperands() > 0);
-          // Insert a new call instruction to the new function, using the 
-          // identical arguments.
-          LlvmBuilder builder(block, instr_iter);
-          vector<Value*> calling_args;
-          for (int i = static_cast<int>(drop_first_arg); 
-              i < call_instr->getNumArgOperands(); ++i) {
-            calling_args.push_back(call_instr->getArgOperand(i));
-          }
-          builder.CreateCall(new_fn, calling_args);
-          // remove the old call instruction
-          // Note: removeFromParent does not do the right thing.
-          call_instr->eraseFromParent();
+          // Replace the called function
+          call_instr->setCalledFunction(new_fn);
           ++*replaced;
         }
       }
@@ -502,6 +491,13 @@ Function* LlvmCodeGen::ReplaceCallSites(Function* caller, bool update_in_place,
   }
 
   return caller;
+}
+
+Function* LlvmCodeGen::FinalizeFunction(Function* function) {
+  if (!VerifyFunction(function)) return NULL;
+  OptimizeFunction(function);
+  AddInlineFunction(function);
+  return function;
 }
 
 void LlvmCodeGen::OptimizeFunction(Function* function) {
@@ -653,6 +649,27 @@ Function* LlvmCodeGen::CodegenMinMax(PrimitiveType type, bool min) {
   if (!VerifyFunction(fn)) return NULL;
   AddInlineFunction(fn);
   return fn;
+}
+
+void LlvmCodeGen::CodegenMemcpy(LlvmCodeGen::LlvmBuilder* builder, 
+    Value* dst, Value* src, Value* n) {
+  // Cast src/dst to int8_t*.  If they already are, this will get optimized away
+  DCHECK(PointerType::classof(dst->getType()));
+  DCHECK(PointerType::classof(src->getType()));
+  dst = builder->CreateBitCast(dst, ptr_type());
+  src = builder->CreateBitCast(src, ptr_type());
+
+  // Get intrinsic function.  TODO: cache this?
+  Type* types[] = { ptr_type(), ptr_type(), n->getType() };
+  Function* memcpy_fn = Intrinsic::getDeclaration(module(), Intrinsic::memcpy, types);
+  DCHECK(memcpy_fn != NULL);
+
+  Value* args[] = {
+    dst, src, n,
+    GetIntConstant(TYPE_INT, 16),       // alignment.  16 is recommended. Not sure why
+    false_value()                       // is_volatile.
+  };
+  builder->CreateCall(memcpy_fn, args);
 }
 
 }

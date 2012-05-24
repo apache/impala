@@ -7,20 +7,12 @@
 using namespace impala;
 using namespace std;
 
-void DelimitedTextParser::ParserReset() {
-  current_column_has_escape_ = false;
-  last_char_is_escape_ = false;
-  column_idx_ = start_column_;
-}
-
-DelimitedTextParser::DelimitedTextParser(const vector<int>& map_column_to_slot,
-                                         int start_column,
+DelimitedTextParser::DelimitedTextParser(HdfsScanNode* scan_node,
                                          char tuple_delim,
                                          char field_delim,
                                          char collection_item_delim,
                                          char escape_char)
-    : map_column_to_slot_(map_column_to_slot),
-      start_column_(start_column),
+    : scan_node_(scan_node),
       field_delim_(field_delim),
       escape_char_(escape_char),
       collection_item_delim_(collection_item_delim),
@@ -37,9 +29,6 @@ DelimitedTextParser::DelimitedTextParser(const vector<int>& map_column_to_slot,
     // character between (col_start,col_end).  The SSE instructions return
     // a bit mask for 16 bits so we need to mask off the bits below col_start
     // and after col_end.
-    // TODO: processing escapes still takes a while (up to 20%).  For tables that
-    // don't have an escape character set, this can be avoided. Consider duplicating
-    // ParseFieldLocations to have a version that doesn't deal with escapes.
     low_mask_[0] = 0xffff;
     high_mask_[15] = 0xffff;
     for (int i = 1; i < 16; ++i) {
@@ -67,9 +56,13 @@ DelimitedTextParser::DelimitedTextParser(const vector<int>& map_column_to_slot,
   DCHECK_GT(num_delims, 0);
   xmm_delim_search_ = _mm_loadu_si128(reinterpret_cast<__m128i*>(search_chars));
 
-  column_idx_ = start_column_;
+  ParserReset();
+}
+
+void DelimitedTextParser::ParserReset() {
   current_column_has_escape_ = false;
   last_char_is_escape_ = false;
+  column_idx_ = scan_node_->num_partition_keys();
 }
 
 // Parsing raw csv data into FieldLocation descriptors.
@@ -119,7 +112,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
     }
 
     if (new_tuple) {
-      column_idx_ = start_column_;
+      column_idx_ = scan_node_->num_partition_keys();
       ++(*num_tuples);
       if (*num_tuples == max_tuples) {
         ++*byte_buffer_ptr;
@@ -137,7 +130,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
     DCHECK(remaining_len == 0);
     AddColumn<true>(*byte_buffer_ptr - *next_column_start,
         next_column_start, num_fields, field_locations);
-    column_idx_ = start_column_;
+    column_idx_ = scan_node_->num_partition_keys();
     ++(*num_tuples);
   }
 

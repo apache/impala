@@ -88,8 +88,7 @@ Function* IsNullPredicate::Codegen(LlvmCodeGen* codegen) {
   CodegenSetIsNullArg(codegen, ret_block, false);
   builder.CreateRet(phi_node);
 
-  if (!codegen->VerifyFunction(function)) return NULL;
-  return function;
+  return codegen->FinalizeFunction(function);
 }
 
 

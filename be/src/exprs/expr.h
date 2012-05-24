@@ -146,6 +146,10 @@ class Expr {
   // the children are constant.
   virtual bool IsConstant() const;
 
+  // Returns the slots that are referenced by this expr tree in 'slot_ids'.
+  // Returns the number of slots added to the vector 
+  virtual int GetSlotIds(std::vector<SlotId>* slot_ids) const;
+
   // Create expression tree from the list of nodes contained in texpr
   // within 'pool'. Returns root of expression tree in 'root_expr'.
   // Returns OK if successful, otherwise an error.
@@ -176,11 +180,13 @@ class Expr {
   // The new Expr will be allocated from the pool.
   static Expr* CreateLiteral(ObjectPool* pool, PrimitiveType type, const std::string&);
 
-  // Jit the expr tree rooted at this node.  This does a post order traversal
-  // and then jit's this expr's compute function.  Returns NULL if the subtree
-  // cannot be jitted.
+  // Codegen the expr tree rooted at this node.  This does a post order traversal
+  // of the expr tree and codegen's each node.  Returns NULL if the subtree cannot
+  // be codegen'd.
   // Subclasses should override this function if it supports jitting.
   // This function needs to set scratch_buffer_size_.
+  // All expr codegen'd functions have this signature:
+  // <expr ret type> ComputeFn(int8_t** tuple_row, int8_t* scratch_buffer, bool* is_null) 
   virtual llvm::Function* Codegen(LlvmCodeGen* code_gen) {
     return NULL;
   }
@@ -338,6 +344,7 @@ class SlotRef : public Expr {
   static void* ComputeFn(Expr* expr, TupleRow* row);
   virtual std::string DebugString() const;
   virtual bool IsConstant() const { return false; }
+  virtual int GetSlotIds(std::vector<SlotId>* slot_ids) const;
 
   virtual llvm::Function* Codegen(LlvmCodeGen* codegen);
 
