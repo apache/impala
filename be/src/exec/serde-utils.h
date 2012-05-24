@@ -49,7 +49,6 @@ public:
     buf[3] = integer;
   }
 
-
   // Read a variable-length Long value written using Writable serialization.
   // Ref: org.apache.hadoop.io.WritableUtils.readVLong()
   static Status ReadVLong(ByteStream* byte_stream, int64_t* vlong);

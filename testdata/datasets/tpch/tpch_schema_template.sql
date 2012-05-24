@@ -28,6 +28,10 @@ LOCATION '/test-warehouse/%(table_name)s';
 ----
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
 ----
+${IMPALA_HOME}/bin/run-query.sh --query=" \
+  INSERT OVERWRITE TABLE %(table_name)s \
+  select * FROM %(base_table_name)s"
+----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch/lineitem.tbl'
 OVERWRITE INTO TABLE %(table_name)s;
 ====
@@ -52,6 +56,10 @@ LOCATION '/test-warehouse/%(table_name)s';
 ----
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
 ----
+${IMPALA_HOME}/bin/run-query.sh --query=" \
+  INSERT OVERWRITE TABLE %(table_name)s \
+  select * FROM %(base_table_name)s"
+----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch/part.tbl'
 OVERWRITE INTO TABLE %(table_name)s;
 ====
@@ -70,6 +78,10 @@ STORED AS %(file_format)s
 LOCATION '/test-warehouse/%(table_name)s';
 ----
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
+----
+${IMPALA_HOME}/bin/run-query.sh --query=" \
+  INSERT OVERWRITE TABLE %(table_name)s \
+  select * FROM %(base_table_name)s"
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch/partsupp.tbl'
 OVERWRITE INTO TABLE %(table_name)s;
@@ -92,6 +104,10 @@ LOCATION '/test-warehouse/%(table_name)s';
 ----
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
 ----
+${IMPALA_HOME}/bin/run-query.sh --query=" \
+  INSERT OVERWRITE TABLE %(table_name)s \
+  select * FROM %(base_table_name)s"
+----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch/supplier.tbl'
 OVERWRITE INTO TABLE %(table_name)s;
 ====
@@ -110,6 +126,10 @@ LOCATION '/test-warehouse/%(table_name)s';
 ----
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
 ----
+${IMPALA_HOME}/bin/run-query.sh --query=" \
+  INSERT OVERWRITE TABLE %(table_name)s \
+  select * FROM %(base_table_name)s"
+----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch/nation.tbl'
 OVERWRITE INTO TABLE %(table_name)s;
 ====
@@ -126,6 +146,10 @@ STORED AS %(file_format)s
 LOCATION '/test-warehouse/%(table_name)s';
 ----
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
+----
+${IMPALA_HOME}/bin/run-query.sh --query=" \
+  INSERT OVERWRITE TABLE %(table_name)s \
+  select * FROM %(base_table_name)s"
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch/region.tbl'
 OVERWRITE INTO TABLE %(table_name)s;
@@ -150,6 +174,10 @@ LOCATION '/test-warehouse/%(table_name)s';
 ----
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
 ----
+${IMPALA_HOME}/bin/run-query.sh --query=" \
+  INSERT OVERWRITE TABLE %(table_name)s \
+  select * FROM %(base_table_name)s"
+----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch/orders.tbl'
 OVERWRITE INTO TABLE %(table_name)s;
 ====
@@ -172,6 +200,10 @@ LOCATION '/test-warehouse/%(table_name)s';
 ----
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
 ----
+${IMPALA_HOME}/bin/run-query.sh --query=" \
+  INSERT OVERWRITE TABLE %(table_name)s \
+  select * FROM %(base_table_name)s"
+----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch/customer.tbl'
 OVERWRITE INTO TABLE %(table_name)s;
 ====
@@ -193,6 +225,7 @@ STORED AS %(file_format)s
 LOCATION '/test-warehouse/%(table_name)s';
 ----
 ----
+----
 ====
 tpch
 ----
@@ -205,8 +238,10 @@ STORED AS %(file_format)s
 LOCATION '/test-warehouse/%(table_name)s';
 ----
 ----
+----
 ====
 tpch
+----
 q7_volume_shipping_tmp
 ----
 CREATE EXTERNAL TABLE %(table_name)s (
@@ -216,6 +251,7 @@ s_nationkey int,
 c_nationkey int)
 STORED AS %(file_format)s
 LOCATION '/test-warehouse/%(table_name)s';
+----
 ----
 ----
 ====
@@ -230,6 +266,7 @@ STORED AS %(file_format)s
 LOCATION '/test-warehouse/%(table_name)s';
 ----
 ----
+----
 ====
 tpch
 ----
@@ -238,6 +275,7 @@ q11_sum_tmp
 CREATE EXTERNAL TABLE %(table_name)s (total_value double)
 STORED AS %(file_format)s
 LOCATION '/test-warehouse/%(table_name)s';
+----
 ----
 ----
 ====
@@ -252,6 +290,7 @@ STORED AS %(file_format)s
 LOCATION '/test-warehouse/%(table_name)s';
 ----
 ----
+----
 ====
 tpch
 ----
@@ -262,6 +301,7 @@ STORED AS %(file_format)s
 LOCATION '/test-warehouse/%(table_name)s';
 ----
 ----
+----
 ====
 tpch
 ----
@@ -270,6 +310,7 @@ supplier_tmp
 CREATE EXTERNAL TABLE %(table_name)s (s_suppkey int)
 STORED AS %(file_format)s
 LOCATION '/test-warehouse/%(table_name)s';
+----
 ----
 ----
 ====
@@ -286,6 +327,7 @@ STORED AS %(file_format)s
 LOCATION '/test-warehouse/%(table_name)s';
 ----
 ----
+----
 ====
 tpch
 ----
@@ -296,6 +338,7 @@ t_partkey int,
 t_avg_quantity double)
 STORED AS %(file_format)s
 LOCATION '/test-warehouse/%(table_name)s';
+----
 ----
 ----
 ====
@@ -310,6 +353,7 @@ STORED AS %(file_format)s
 LOCATION '/test-warehouse/%(table_name)s';
 ----
 ----
+----
 ====
 tpch
 ----
@@ -318,6 +362,7 @@ q20_tmp1
 CREATE EXTERNAL TABLE %(table_name)s (p_partkey int)
 STORED AS %(file_format)s
 LOCATION '/test-warehouse/%(table_name)s';
+----
 ----
 ----
 ====
@@ -333,6 +378,7 @@ STORED AS %(file_format)s
 LOCATION '/test-warehouse/%(table_name)s';
 ----
 ----
+----
 ====
 tpch
 ----
@@ -346,6 +392,7 @@ STORED AS %(file_format)s
 LOCATION '/test-warehouse/%(table_name)s';
 ----
 ----
+----
 ====
 tpch
 ----
@@ -356,6 +403,7 @@ STORED AS %(file_format)s
 LOCATION '/test-warehouse/%(table_name)s';
 ----
 ----
+----
 ====
 tpch
 ----
@@ -364,6 +412,7 @@ q22_customer_tmp1
 CREATE EXTERNAL TABLE %(table_name)s (avg_acctbal double, cust_name_char string)
 STORED AS %(file_format)s
 LOCATION '/test-warehouse/%(table_name)s';
+----
 ----
 ----
 ====

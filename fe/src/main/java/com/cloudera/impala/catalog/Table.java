@@ -78,7 +78,7 @@ public abstract class Table {
    * @param db
    * @param tblName
    * @return
-   *         new instance of Hdfs[Text|RCFile|Seq]Table or HBaseTable
+   *         new instance of HdfsTable or HBaseTable
    *         null if loading table failed
    */
   public static Table load(TableId id, HiveMetaStoreClient client, Db db,

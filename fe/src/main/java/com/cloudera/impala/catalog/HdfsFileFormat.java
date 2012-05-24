@@ -13,25 +13,30 @@ import com.google.common.collect.ImmutableMap;
 public enum HdfsFileFormat {
   RC_FILE,
   TEXT,
-  SEQUENCE_FILE;
+  SEQUENCE_FILE,
+  TREVNI;
 
   // Input format class for RCFile tables read by Hive.
-  private static final String rcfileInputFormat =
+  private static final String RCFILE_INPUT_FORMAT =
       "org.apache.hadoop.hive.ql.io.RCFileInputFormat";
 
   // Input format class for Text tables read by Hive.
-  private static final String textInputFormat =
+  private static final String TEXT_INPUT_FORMAT =
       "org.apache.hadoop.mapred.TextInputFormat";
 
   //Input format class for Text tables read by Hive.
-  private static final String sequenceInputFormat =
+  private static final String SEQUENCE_INPUT_FORMAT =
       "org.apache.hadoop.mapred.SequenceFileInputFormat";
 
+  // Input format class for Trevni tables read by Hive.
+  private static final String TREVNI_INPUT_FORMAT =
+      "org.apache.hadoop.hive.ql.io.TrevniInputFormat";
 
   private static final Map<String, HdfsFileFormat> VALID_FORMATS =
-      ImmutableMap.of(rcfileInputFormat, RC_FILE,
-                      textInputFormat, TEXT,
-                      sequenceInputFormat, SEQUENCE_FILE);
+      ImmutableMap.of(RCFILE_INPUT_FORMAT, RC_FILE,
+                      TEXT_INPUT_FORMAT, TEXT,
+                      SEQUENCE_INPUT_FORMAT, SEQUENCE_FILE,
+                      TREVNI_INPUT_FORMAT, TREVNI);
 
   /**
    * Returns true if the string describes an input format class that we support.
@@ -60,6 +65,8 @@ public enum HdfsFileFormat {
       return THdfsFileFormat.TEXT;
     case SEQUENCE_FILE:
       return THdfsFileFormat.SEQUENCE_FILE;
+    case TREVNI:
+      return THdfsFileFormat.TREVNI;
     default:
       throw new RuntimeException("Unknown HdfsFormat: "
           + this + " - should never happen!");

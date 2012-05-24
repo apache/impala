@@ -67,8 +67,8 @@ public abstract class BaseQueryTest {
   // caused by multi-node planning/execution, use the commented out lists. Cluster size
   // of 2 is a special case which "distributed execution" works because all the work are
   // performed between a single slave node and a coordinator.
-  //protected  static final List<Integer> ALL_CLUSTER_SIZES = ImmutableList.of(1, 2, 3, 0);
-  //protected  static final List<Integer> SMALL_CLUSTER_SIZES = ImmutableList.of(1, 2, 3);
+  //protected static final List<Integer> ALL_CLUSTER_SIZES = ImmutableList.of(1, 2, 3, 0);
+  //protected static final List<Integer> SMALL_CLUSTER_SIZES = ImmutableList.of(1, 2, 3);
   //protected static final List<Integer> ALL_NODES_ONLY = ImmutableList.of(0);
   protected static final List<Integer> ALL_CLUSTER_SIZES = ImmutableList.of(1, 2);
   protected static final List<Integer> SMALL_CLUSTER_SIZES = ImmutableList.of(1, 2);
@@ -79,12 +79,16 @@ public abstract class BaseQueryTest {
   protected static final List<CompressionFormat> ALL_COMPRESSION_FORMATS =
       ImmutableList.of(CompressionFormat.DEFAULT, CompressionFormat.GZIP,
                        CompressionFormat.BZIP, CompressionFormat.SNAPPY);
+  private static final List<CompressionFormat> TREVNI_COMPRESSION_FORMATS =
+      ImmutableList.of(CompressionFormat.DEFAULT, CompressionFormat.SNAPPY);
   protected static final List<CompressionFormat> UNCOMPRESSED_ONLY =
       ImmutableList.of(CompressionFormat.NONE);
   protected static final List<TableFormat> ALL_TABLE_FORMATS =
       ImmutableList.copyOf(TableFormat.values());
   protected static final List<TableFormat> TEXT_FORMAT_ONLY =
       ImmutableList.of(TableFormat.TEXT);
+  protected static final List<TableFormat> INSERT_FORMATS =
+        ImmutableList.of(TableFormat.TEXT, TableFormat.TREVNI);
 
   protected final static TestExecMode EXECUTION_MODE = TestExecMode.valueOf(
       System.getProperty("testExecutionMode", "reduced").toUpperCase());
@@ -123,7 +127,8 @@ public abstract class BaseQueryTest {
     TEXT(""),
     RCFILE("_rc"),
     SEQUENCEFILE("_seq"),
-    SEQUENCEFILE_RECORD("_seq_record");
+    SEQUENCEFILE_RECORD("_seq_record"),
+    TREVNI("_trevni");
 
     final String tableSuffix;
     private TableFormat(String tableSuffix) { this.tableSuffix = tableSuffix; }
@@ -357,8 +362,11 @@ public abstract class BaseQueryTest {
         if (!NON_COMPRESSED_TYPES.contains(tableFormat)) {
           CompressionFormat compression =
             compressionSuffixes.get(compressionIdx++ % compressionSuffixes.size());
-          configs.add(new TestConfiguration(clusterSize, batchSize, compression,
-              tableFormat, disableLlvm));
+          TestConfiguration config = new TestConfiguration(clusterSize, batchSize,
+            compression, tableFormat, disableLlvm);
+          if (isValidTestConfiguration(config)) {
+            configs.add(config);
+          }
         }
       }
     }
@@ -383,9 +391,7 @@ public abstract class BaseQueryTest {
                   compressionFormat, tableFormat, disableLlvm);
 
               if (isValidTestConfiguration(config)) {
-                configs.add(
-                    new TestConfiguration(clusterSize, batchSize, compressionFormat,
-                                          tableFormat, disableLlvm));
+                configs.add(config);
               }
             }
           }
@@ -402,6 +408,10 @@ public abstract class BaseQueryTest {
     // Currently, compression of the 'text' file format is not supported.
     if (testConfiguration.getTableFormat() == TableFormat.TEXT) {
       return testConfiguration.getCompressionFormat() == CompressionFormat.NONE;
+    }
+    if (testConfiguration.getTableFormat() == TableFormat.TREVNI){
+      return testConfiguration.getCompressionFormat() == CompressionFormat.NONE ||
+          TREVNI_COMPRESSION_FORMATS.contains(testConfiguration.getCompressionFormat());
     }
     return true;
   }
@@ -441,6 +451,8 @@ public abstract class BaseQueryTest {
    *   sequence with block compression
    *   rcfile (uncompressed)
    *   rcfile with (block) compression (when supported)
+   *   trevni (uncompressed)
+   *   trevni compressed with either default or snappy.
    * For each loop over the batch sizes we run the uncompressed case and the
    * block compression case.  Sequence record compression is special cased
    * with a pseudo base tableFormat type so we do not run the uncompressed case.
@@ -464,7 +476,8 @@ public abstract class BaseQueryTest {
     List<QueryExecTestResult> results = Lists.newArrayList();
     for (TestCase testCase: queryFileParser.getTestCases()) {
 
-      QueryExecTestResult expectedResult = testCase.getQueryExecTestResult();
+      QueryExecTestResult expectedResult =
+          testCase.getQueryExecTestResult(config.getTableSuffix());
 
       // We have to run the setup section once per query, not once per test. Therefore
       // they can be very expensive.

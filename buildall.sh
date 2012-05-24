@@ -81,7 +81,7 @@ then
 
   # clean fe
   # don't use git clean because we need to retain Eclipse conf files
-  cd $IMPALA_HOME/fe
+  cd $IMPALA_FE_DIR
   rm -rf target
   rm -f src/test/resources/hbase-site.xml
   rm -f src/test/resources/hive-site.xml
@@ -137,15 +137,21 @@ cd $IMPALA_BE_DIR
 make -j4
 
 # Get Hadoop dependencies onto the classpath
-cd $IMPALA_HOME/fe
+cd $IMPALA_FE_DIR
 mvn dependency:copy-dependencies
+
+# build frontend
+# Package first since any test failure will prevent the package phase from completing.
+# We need to do this before loading data so that hive can see the trevni input/output
+# classes.
+mvn package -DskipTests=true
 
 if [ $testdata_action -eq 1 ]
 then
   # create test data
   cd $IMPALA_HOME/testdata
   $IMPALA_HOME/bin/create_testdata.sh
-  cd $IMPALA_HOME/fe
+  cd $IMPALA_FE_DIR
   if [ $FORMAT_CLUSTER -eq 1 ]; then
     mvn -Pload-testdata process-test-resources -Dcluster.format
   else
@@ -153,10 +159,6 @@ then
   fi
 fi
 
-# build frontend
-# Package first since any test failure will prevent the package phase from completing.
-cd $IMPALA_FE_DIR
-mvn package -DskipTests=true
 if [ $tests_action -eq 1 ]
 then
     # also run frontend tests

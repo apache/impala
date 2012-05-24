@@ -9,7 +9,7 @@ import com.google.common.collect.ImmutableList;
 public class InsertQueryTest extends BaseQueryTest {
   @Test
   public void TestInsert() {
-    runQueryInAllBatchAndClusterPerms("insert", false, 1000, null,
+    runQueryInAllBatchAndClusterPerms("insert", false, 1000, INSERT_FORMATS,
         ImmutableList.of(0), ImmutableList.of(1));
   }
 

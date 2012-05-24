@@ -2,7 +2,9 @@
 text,grep1gb,none,none
 seq,grep10gb,def,block
 rc,web,gzip,block
-rc,grep10gb,bzip,block
-seq,grep1gb,snap,record
-text,web,none,none
+trevni,web,snap,block
+trevni,grep10gb,none,none
+rc,grep1gb,bzip,block
+seq,web,none,none
 text,grep10gb,none,none
+text,web,none,none

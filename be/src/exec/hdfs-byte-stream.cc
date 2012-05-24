@@ -74,7 +74,19 @@ Status HdfsByteStream::Close() {
 Status HdfsByteStream::Seek(int64_t offset) {
   DCHECK(hdfs_file_ != NULL);
   if (hdfsSeek(hdfs_connection_, hdfs_file_, offset) != 0) {
-    return Status("Error seeking HDFS file: " + location_);
+    return Status(AppendHdfsErrorMessage("Error seeking HDFS file: " + location_));
+  }
+
+  return Status::OK;
+}
+
+Status HdfsByteStream::SeekRelative(int64_t offset) {
+  DCHECK(hdfs_file_ != NULL);
+  int64_t position = hdfsTell(hdfs_connection_, hdfs_file_);
+  DCHECK_NE(position, -1);
+
+  if (hdfsSeek(hdfs_connection_, hdfs_file_, position + offset) != 0) {
+    return Status(AppendHdfsErrorMessage("Error seeking HDFS file: " + location_));
   }
 
   return Status::OK;
@@ -83,7 +95,7 @@ Status HdfsByteStream::Seek(int64_t offset) {
 Status HdfsByteStream::Eof(bool* eof) {
   hdfsFileInfo* hdfsInfo = hdfsGetPathInfo(hdfs_connection_, &location_[0]);
   if (hdfsInfo == NULL) {
-    return Status("Error getting Info for HDFS file: " + location_);
+    return Status(AppendHdfsErrorMessage("Error getting Info for HDFS file: " + location_));
   }
   *eof = hdfsTell(hdfs_connection_, hdfs_file_) >= hdfsInfo->mSize;
 

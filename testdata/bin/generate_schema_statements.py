@@ -73,23 +73,50 @@ COMPRESSION_MAP = {'def': 'DefaultCodec',
                    'none': ''
                   }
 
+TREVNI_COMPRESSION_MAP = {'def': 'deflate',
+                          'snap': 'snappy',
+                          'none': 'none'
+                         }
+
 FILE_FORMAT_MAP = {'text': 'TEXTFILE',
                    'seq': 'SEQUENCEFILE',
-                   'rc': 'RCFILE'
+                   'rc': 'RCFILE',
+                   'trevni': '\n' +
+                     'INPUTFORMAT \'org.apache.hadoop.hive.ql.io.TrevniInputFormat\'\n' +
+                     'OUTPUTFORMAT \'org.apache.hadoop.hive.ql.io.TrevniOutputFormat\''
+
                   }
 
+TREVNI_ALTER_STATEMENT = "ALTER TABLE %(table_name)s SET\n\
+     SERDEPROPERTIES ('blocksize' = '1073741824', 'compression' = '%(compression)s');"
+
+
 class SqlGenerationStatement:
-  def __init__(self, base_table_name, create, insert, load_local):
+  def __init__(self, base_table_name, create, insert, trevni, load_local):
     self.base_table_name = base_table_name.strip()
     self.create = create.strip()
     self.insert = insert.strip()
+    self.trevni = trevni.strip()
     self.load_local = load_local.strip()
 
-def build_create_statement(table_template, table_name, file_format):
+def build_create_statement(table_template, table_name, file_format, compression):
   create_statement = 'DROP TABLE IF EXISTS %s;\n' % table_name
   create_statement += table_template % {'table_name': table_name,
                                         'file_format': FILE_FORMAT_MAP[file_format] }
-  return create_statement
+  if file_format != 'trevni':
+    return create_statement
+
+  # Hive does not support a two part name in ALTER statements.
+  parts = table_name.split('.')
+  if len(parts) == 1:
+    return create_statement + '\n\n' + \
+                      (TREVNI_ALTER_STATEMENT % {'table_name': table_name,
+                      'compression': TREVNI_COMPRESSION_MAP[compression]})
+  else:
+    return create_statement + '\n\n' + 'use ' + parts[0] + ';\n' + \
+                      (TREVNI_ALTER_STATEMENT % {'table_name': parts[1],
+                      'compression': TREVNI_COMPRESSION_MAP[compression]}) + \
+                      'use default;\n'
 
 def build_compression_codec_statement(codec, compression_type):
   compression_codec = COMPRESSION_MAP[codec]
@@ -128,6 +155,9 @@ def build_load_statement(load_template, table_name):
   tmp_load_template = load_template.replace(' % ', ' *** ')
   return (tmp_load_template % {'table_name': table_name}).replace(' *** ', ' % ')
 
+def build_trevni(trevni_template, table_name, base_table_name):
+  return trevni_template % {'table_name': table_name, 'base_table_name': base_table_name}
+
 def build_table_suffix(file_format, codec, compression_type):
   if file_format == 'text' and codec != 'none':
     print 'Unsupported combination of file_format (text) and compression codec.'
@@ -162,11 +192,20 @@ def list_hdfs_subdir_names(path):
   # So to get subdirectory names just return everything after the last '/'
   return [line[line.rfind('/') + 1:].strip() for line in tmp_file.readlines()]
 
+def write_trevni_file(file_name, array):
+  with open(file_name, "w") as f:
+    if len(array) != 0:
+      f.write("${IMPALA_HOME}/bin/runplanservice >& /tmp/planservice.out&\n")
+      f.write("${IMPALA_HOME}/be/build/debug/util/refresh-catalog\n")
+      f.write('\n\n'.join(array))
+      f.write("\n${IMPALA_HOME}/be/build/debug/util/refresh-catalog\n")
+
 def write_statements_to_file_based_on_input_vector(output_name, input_file_name,
                                                    statements):
   output_create = []
   output_load = []
   output_load_base = []
+  output_trevni = []
   results = read_vector_file(input_file_name)
   existing_tables = list_hdfs_subdir_names(options.hive_warehouse_dir)
   for row in results:
@@ -174,6 +213,7 @@ def write_statements_to_file_based_on_input_vector(output_name, input_file_name,
     for s in statements[data_set.strip()]:
       create = s.create
       insert = s.insert
+      trevni = s.trevni
       load_local = s.load_local
       table_name = s.base_table_name +\
                    build_table_suffix(file_format, codec, compression_type)
@@ -185,7 +225,7 @@ def write_statements_to_file_based_on_input_vector(output_name, input_file_name,
           "text" not in file_format):
         continue
 
-      output_create.append(build_create_statement(create, table_name, file_format))
+      output_create.append(build_create_statement(create, table_name, file_format, codec))
 
       # If the directory already exists in HDFS, assume that data files already exist
       # and skip loading the data. Otherwise, the data is generated using either an
@@ -200,15 +240,23 @@ def write_statements_to_file_based_on_input_vector(output_name, input_file_name,
             output_load_base.append(build_load_statement(load_local, table_name))
           else:
             print 'Empty base table load for %s. Skipping load generation' % table_name
-        elif insert:
-          output_load.append(build_insert(insert, table_name, s.base_table_name,
-                                          codec, compression_type))
+        elif file_format == 'trevni':
+          if trevni:
+            output_trevni.append(build_trevni(trevni, table_name, s.base_table_name))
+          else:
+            print \
+                'Empty trevni load for table %s. Skipping insert generation' % table_name
         else:
-            print 'Empty insert for table %s. Skipping insert generation' % table_name
+          if insert:
+            output_load.append(build_insert(insert, table_name, s.base_table_name,
+                                          codec, compression_type))
+          else:
+              print 'Empty insert for table %s. Skipping insert generation' % table_name
 
   # Make sure we create the base tables before the remaining tables
   output_load = output_create + output_load_base + output_load
   write_array_to_file('load-' + output_name + '-generated.sql', output_load)
+  write_trevni_file('load-trevni-' + output_name + '-generated.sh', output_trevni);
 
 def parse_benchmark_file(file_name):
   template = open(file_name, 'rb')
@@ -216,11 +264,11 @@ def parse_benchmark_file(file_name):
 
   for section in template.read().split('===='):
     sub_section = section.split('----')
-    if len(sub_section) == 5:
+    if len(sub_section) == 6:
       data_set = sub_section[0]
-      gen_statement = SqlGenerationStatement(*sub_section[1:5])
+      gen_statement = SqlGenerationStatement(*sub_section[1:6])
       statements[data_set.strip()].append(gen_statement)
-    elif options.verbose:
+    else:
       print 'Skipping invalid subsection:', sub_section
   return statements
 

@@ -14,6 +14,7 @@ add_library(Util
   debug-util.cc
   decompress.cc
   hdfs-util.cc
+  integer-array.cc
   jni-util.cc
   logging.cc
   path-builder.cc
@@ -32,18 +33,21 @@ add_library(Webserver STATIC
 
 target_link_libraries(Webserver pthread dl)
 
+add_executable(integer-array-test integer-array-test.cc)
 add_executable(perf-counters-test perf-counters-test.cc)
 add_executable(runtime-profile-test runtime-profile-test.cc)
 add_executable(benchmark-test benchmark-test.cc)
 add_executable(decompress-test decompress-test.cc)
 add_executable(refresh-catalog refresh-catalog.cc)
 
+target_link_libraries(integer-array-test ${IMPALA_TEST_LINK_LIBS})
 target_link_libraries(perf-counters-test ${IMPALA_TEST_LINK_LIBS})
 target_link_libraries(runtime-profile-test ${IMPALA_TEST_LINK_LIBS})
 target_link_libraries(benchmark-test ${IMPALA_TEST_LINK_LIBS})
 target_link_libraries(decompress-test ${IMPALA_TEST_LINK_LIBS})
 target_link_libraries(refresh-catalog ${IMPALA_LINK_LIBS})
 
+add_test(integer-array-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/util/integer-array-test)
 add_test(perf-counters-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/util/perf-counters-test)
 add_test(runtime-profile-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/util/runtime-profile-test)
 add_test(benchmark-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/util/benchmark-test)

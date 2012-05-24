@@ -37,6 +37,7 @@ ALTER TABLE alltypesmixedformat SET FILEFORMAT RCFILE;
 LOAD DATA INPATH '/tmp/alltypes_rc/year=2009/month=3/'
 OVERWRITE INTO TABLE alltypesmixedformat PARTITION (year=2009, month=3);
 
+
 ALTER TABLE alltypesmixedformat PARTITION (year=2009, month=1)
   SET SERDEPROPERTIES('field.delim'=',', 'escape.delim'='\\');
 ALTER TABLE alltypesmixedformat PARTITION (year=2009, month=1)

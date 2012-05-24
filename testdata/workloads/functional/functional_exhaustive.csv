@@ -14,3 +14,6 @@ rc,functional,def,block
 rc,functional,gzip,block
 rc,functional,bzip,block
 rc,functional,snap,block
+trevni,functional,none,none
+trevni,functional,def,block
+trevni,functional,snap,block

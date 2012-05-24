@@ -31,6 +31,9 @@ class ByteStream {
   // stream
   virtual Status Seek(int64_t offset) = 0;
 
+  // Position the next read at offset relative to the current position.
+  virtual Status SeekRelative(int64_t offset) = 0;
+
   // Returns the position of the stream cursor
   virtual Status GetPosition(int64_t* position) = 0;
 

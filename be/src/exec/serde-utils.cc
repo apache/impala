@@ -125,9 +125,7 @@ Status SerDeUtils::ReadBytes(ByteStream* byte_stream, int64_t length,
 
 
 Status SerDeUtils::SkipBytes(ByteStream* byte_stream, int64_t length) {
-  int64_t offset = 0;
-  RETURN_IF_ERROR(byte_stream->GetPosition(&offset));
-  RETURN_IF_ERROR(byte_stream->Seek(offset + length));
+  RETURN_IF_ERROR(byte_stream->SeekRelative(length));
   return Status::OK;
 }
 

@@ -2,6 +2,7 @@
 
 #include "exec/hdfs-table-sink.h"
 #include "exec/hdfs-text-table-writer.h"
+#include "exec/hdfs-trevni-table-writer.h"
 #include "exec/exec-node.h"
 #include "gen-cpp/JavaConstants_constants.h"
 #include "util/hdfs-util.h"
@@ -214,7 +215,7 @@ Status HdfsTableSink::CreateNewTmpFile(OutputPartition* output_partition) {
   return Status::OK;
 }
 
-Status HdfsTableSink::InitOutputPartition(
+Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
     const HdfsPartitionDescriptor& partition_descriptor,
     OutputPartition* output_partition) {
   output_partition->hdfs_connection = hdfs_connection_;
@@ -222,8 +223,14 @@ Status HdfsTableSink::InitOutputPartition(
   switch (partition_descriptor.file_format()) {
     case THdfsFileFormat::TEXT: {
       output_partition->writer.reset(
-          new HdfsTextTableWriter(output_partition, &partition_descriptor, table_desc_,
-                                  output_exprs_));
+          new HdfsTextTableWriter(state, output_partition,
+                                  &partition_descriptor, table_desc_, output_exprs_));
+      break;
+    }
+    case THdfsFileFormat::TREVNI: {
+      output_partition->writer.reset(
+          new HdfsTrevniTableWriter(state, output_partition,
+                                    &partition_descriptor, table_desc_, output_exprs_));
       break;
     }
     default:
@@ -237,6 +244,7 @@ Status HdfsTableSink::InitOutputPartition(
       error_msg << str << " not implemented.";
       return Status(error_msg.str());
   }
+  RETURN_IF_ERROR(output_partition->writer->Init());
   output_partition->partition_descriptor = &partition_descriptor;
   return CreateNewTmpFile(output_partition);
 }
@@ -268,7 +276,7 @@ inline Status HdfsTableSink::GetOutputPartition(
 
     OutputPartition* partition = state->obj_pool()->Add(new OutputPartition());
     BuildHdfsFileNames(partition);
-    RETURN_IF_ERROR(InitOutputPartition(*partition_descriptor, partition));
+    RETURN_IF_ERROR(InitOutputPartition(state, *partition_descriptor, partition));
     partition_keys_to_output_partitions_[key].first = partition;
     *partition_pair = &partition_keys_to_output_partitions_[key];
   } else {
@@ -303,7 +311,7 @@ Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch) {
 
       string key;
       GetHashTblKey(dynamic_partition_key_exprs_, &key);
-      PartitionPair* partition_pair;
+      PartitionPair* partition_pair = NULL;
       RETURN_IF_ERROR(GetOutputPartition(state, key, &partition_pair));
       partition_pair->second.push_back(i);
     }

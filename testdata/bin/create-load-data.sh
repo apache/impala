@@ -34,6 +34,8 @@ hadoop fs -mkdir -p /tmp/alltypes_seq/year=2009
 hadoop fs -mkdir -p /tmp/alltypes_rc/year=2009
 hadoop fs -cp  /test-warehouse/alltypes_seq/year=2009/month=2/ /tmp/alltypes_seq/year=2009
 hadoop fs -cp  /test-warehouse/alltypes_rc/year=2009/month=3/ /tmp/alltypes_rc/year=2009
+hadoop fs -cp  /test-warehouse/alltypes_trevni/year=2009/month=4/ \
+  /tmp/alltypes_rc/year=2009
 
 # For tables that rely on loading data from local fs test-warehouse
 # TODO: Find a good way to integrate this with the normal data loading scripts

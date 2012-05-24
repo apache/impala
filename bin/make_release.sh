@@ -19,7 +19,6 @@ do
   esac
 done
 
-
 cd $IMPALA_HOME
 
 if [ $USE_PGO -eq 1 ]
@@ -39,18 +38,26 @@ then
   # Run sample queries - outputs .gcda files
   be/build/release/service/runquery -query="\
     select count(field) from grep1gb where field like '%xyz%';\
-    select count(field) from grep1gb_rc_file where field like '%xyz%';\
-    select count(field) from grep1gb_seq_snap where field like '%xyz%';\
-    select sourceIP, SUM(adRevenue) FROM uservisits_web_seq \
+    select count(field) from grep1gb_rc_def where field like '%xyz%';\
+    select count(field) from grep1gb_seq_bzip where field like '%xyz%';\
+    select count(field) from grep1gb_trevni_snap where field like '%xyz%';\
+    select sourceIP, SUM(adRevenue) FROM uservisits_seq \
+      GROUP by sourceIP order by SUM(adRevenue) desc limit 10;\
+    select sourceIP, SUM(adRevenue) FROM uservisits_trevni \
       GROUP by sourceIP order by SUM(adRevenue) desc limit 10;\
     select sourceIP, SUM(adRevenue) FROM uservisits \
       GROUP by sourceIP order by SUM(adRevenue) desc limit 10;\
-    select sourceIP, SUM(adRevenue) FROM uservisits_web_rc GROUP by sourceIP \
+    select sourceIP, SUM(adRevenue) FROM uservisits_rc GROUP by sourceIP \
       order by SUM(adRevenue) desc limit 10;select sourceIP, SUM(adRevenue) \
       FROM uservisits \
       GROUP by sourceIP order by SUM(adRevenue) desc limit 10;\
     select uv.sourceip, avg(r.pagerank), sum(uv.adrevenue) as totalrevenue \
       from uservisits uv join rankings r on \
+      (r.pageurl = uv.desturl) \
+      where uv.visitdate > '1999-01-01' and uv.visitdate < '2000-01-01' \
+      group by uv.sourceip order by totalrevenue desc limit 1; \
+    select uv.sourceip, avg(r.pagerank), sum(uv.adrevenue) as totalrevenue \
+      from uservisits_trevni_def  uv join rankings_trevni_def  r on \
       (r.pageurl = uv.desturl) \
       where uv.visitdate > '1999-01-01' and uv.visitdate < '2000-01-01' \
       group by uv.sourceip order by totalrevenue desc limit 1"\

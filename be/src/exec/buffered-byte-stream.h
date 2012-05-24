@@ -32,6 +32,9 @@ class BufferedByteStream : public ByteStream {
   virtual Status Close();
   virtual Status Read(uint8_t* buf, int64_t req_len, int64_t* actual_len);
   virtual Status Seek(int64_t offset);
+  virtual Status SeekRelative(int64_t offset) {
+    return Seek(byte_buffer_start_ + byte_offset_ + offset);
+  }
   virtual Status GetPosition(int64_t* position);
   virtual Status Eof(bool* eof);
 
@@ -65,7 +68,7 @@ class BufferedByteStream : public ByteStream {
   // Current offset within buffer.
   int64_t byte_offset_;
 
-  // Posistion of start of buffer in parent byte stream.
+  // Position of start of buffer in parent byte stream.
   int64_t byte_buffer_start_;
 
   // Amount of data in buffer.

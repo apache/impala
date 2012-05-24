@@ -1,12 +1,12 @@
 # insert overwrite unpartitioned table
-insert overwrite table alltypesnopart_insert
+insert overwrite table alltypesnopart_insert$TABLE
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypessmall
 where year=2009 and month=04
 ---- SETUP
-RESET alltypesnopart_insert
-RELOAD alltypesnopart_insert
+RESET alltypesnopart_insert$TABLE
+RELOAD alltypesnopart_insert$TABLE
 ---- RESULTS
 ---- NUMROWS
 25
@@ -14,9 +14,9 @@ RELOAD alltypesnopart_insert
 # search the overwritten table to verify the results
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
-from alltypesnopart_insert
+from alltypesnopart_insert$TABLE
 ---- SETUP
-RELOAD alltypesnopart_insert
+RELOAD alltypesnopart_insert$TABLE
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 ---- RESULTS
@@ -47,28 +47,28 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4'
 ====
 # insert into unpartitioned table
-insert into table alltypesnopart_insert
+insert into table alltypesnopart_insert$TABLE
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypessmall
 where year=2009 and month=04
 ---- SETUP
-RESET alltypesnopart_insert
+RESET alltypesnopart_insert$TABLE
 ---- RESULTS
 ---- PARTITIONS
-hdfs: test-warehouse/alltypesnopart_insert/
+hdfs: alltypesnopart_insert$TABLE/
 ---- NUMROWS
 25
 ====
 # search the table to verify it contains 25 rows
-select count(*) from alltypesnopart_insert
+select count(*) from alltypesnopart_insert$TABLE
 ---- TYPES
 bigint
 ---- RESULTS
 25
 ====
 # static partition overwrite
-insert overwrite table alltypesinsert
+insert overwrite table alltypesinsert$TABLE
 partition (year=2009, month=4) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col
@@ -76,14 +76,14 @@ from alltypessmall
 where year=2009 and month=4
 ---- RESULTS
 ---- PARTITIONS
-hdfs: test-warehouse/alltypesinsert/year=2009/month=4/
+hdfs: alltypesinsert$TABLE/year=2009/month=4/
 ---- NUMROWS
 25
 ====
 # search the overwritten partition to verify the results
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
-from alltypesinsert
+from alltypesinsert$TABLE
 where year=2009 and month=4
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string
@@ -114,23 +114,23 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 98,true,3,3,3,30,3.299999952316284,30.3,'04/03/09','3'
 99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4'
 ====
-# static partition insert
-insert into table alltypesinsert
+# static partition insert$TABLE
+insert into table alltypesinsert$TABLE
 partition (year=2009, month=4) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypessmall
 where year=2009 and month=4
 ---- SETUP
-DROP PARTITIONS alltypesinsert
+DROP PARTITIONS alltypesinsert$TABLE
 ---- RESULTS
 ---- PARTITIONS
-hdfs: test-warehouse/alltypesinsert/year=2009/month=4/
+hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=4/
 ---- NUMROWS
 25
 ====
 # search the partition to verify it contains all 25 rows
-select count(*) from alltypesinsert
+select count(*) from alltypesinsert$TABLE
 where year=2009 and month=4
 ---- TYPES
 bigint
@@ -138,7 +138,7 @@ bigint
 25
 ====
 # partially dynamic partition overwrite
-insert overwrite table alltypesinsert
+insert overwrite table alltypesinsert$TABLE
 partition (year=2009, month) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col, month
@@ -146,9 +146,9 @@ from alltypessmall
 where year=2009 and month>1 and month<=4
 ---- RESULTS
 ---- PARTITIONS
-hdfs: test-warehouse/alltypesinsert/year=2009/month=2/
-hdfs: test-warehouse/alltypesinsert/year=2009/month=3/
-hdfs: test-warehouse/alltypesinsert/year=2009/month=4/
+hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=2/
+hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=3/
+hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=4/
 ---- NUMROWS
 25
 25
@@ -157,7 +157,7 @@ hdfs: test-warehouse/alltypesinsert/year=2009/month=4/
 # search the overwritten partition to verify the results
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
-from alltypesinsert
+from alltypesinsert$TABLE
 where year=2009 and month>1 and month<=4
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string
@@ -238,27 +238,27 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 98,true,3,3,3,30,3.299999952316284,30.3,'04/03/09','3'
 99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4'
 ====
-# partially dynamic partition insert
-insert into table alltypesinsert
+# partially dynamic partition insert$TABLE
+insert into table alltypesinsert$TABLE
 partition (year=2009, month) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col, month
 from alltypessmall
 where year=2009 and month>=1 and month<4
 ---- SETUP
-DROP PARTITIONS alltypesinsert
----- RESULTS
+DROP PARTITIONS alltypesinsert$TABLE
 ---- PARTITIONS
-hdfs: test-warehouse/alltypesinsert/year=2009/month=1/
-hdfs: test-warehouse/alltypesinsert/year=2009/month=2/
-hdfs: test-warehouse/alltypesinsert/year=2009/month=3/
+---- RESULTS
+hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=1/
+hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=2/
+hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=3/
 ---- NUMROWS
 25
 25
 25
 ====
 # search the partitions to verify they contain all 75 rows
-select count(id) from alltypesinsert
+select count(id) from alltypesinsert$TABLE
 where year=2009 and month>=1 and month<4
 ---- TYPES
 bigint
@@ -266,17 +266,17 @@ bigint
 75
 ====
 # fully dynamic partition overwrite
-insert overwrite table alltypesinsert
+insert overwrite table alltypesinsert$TABLE
 partition (year, month) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 from alltypessmall
 ---- RESULTS
 ---- PARTITIONS
-hdfs: test-warehouse/alltypesinsert/year=2009/month=1/
-hdfs: test-warehouse/alltypesinsert/year=2009/month=2/
-hdfs: test-warehouse/alltypesinsert/year=2009/month=3/
-hdfs: test-warehouse/alltypesinsert/year=2009/month=4/
+hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=1/
+hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=2/
+hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=3/
+hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=4/
 ---- NUMROWS
 25
 25
@@ -286,7 +286,7 @@ hdfs: test-warehouse/alltypesinsert/year=2009/month=4/
 # search the overwritten partition to verify the results
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
-from alltypesinsert
+from alltypesinsert$TABLE
 where year=2009 and month>=1 and month<=4
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string
@@ -392,20 +392,20 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 98,true,3,3,3,30,3.299999952316284,30.3,'04/03/09','3'
 99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4'
 ====
-# fully dynamic partition insert
-insert into table alltypesinsert
+# fully dynamic partition insert$TABLE
+insert into table alltypesinsert$TABLE
 partition (year, month) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 from alltypessmall
 ---- SETUP
-DROP PARTITIONS alltypesinsert
+DROP PARTITIONS alltypesinsert$TABLE
 ---- RESULTS
 ---- PARTITIONS
-hdfs: test-warehouse/alltypesinsert/year=2009/month=1/
-hdfs: test-warehouse/alltypesinsert/year=2009/month=2/
-hdfs: test-warehouse/alltypesinsert/year=2009/month=3/
-hdfs: test-warehouse/alltypesinsert/year=2009/month=4/
+hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=1/
+hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=2/
+hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=3/
+hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=4/
 ---- NUMROWS
 25
 25
@@ -413,7 +413,7 @@ hdfs: test-warehouse/alltypesinsert/year=2009/month=4/
 25
 ====
 # search the partitions to verify they contain all 100 rows
-select count(timestamp_col) from alltypesinsert
+select count(timestamp_col) from alltypesinsert$TABLE
 where year=2009 and month>=1 and month<=4
 ---- TYPES
 bigint

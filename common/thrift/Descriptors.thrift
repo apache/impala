@@ -26,7 +26,8 @@ enum TTableType {
 enum THdfsFileFormat {
   TEXT,
   RC_FILE,
-  SEQUENCE_FILE
+  SEQUENCE_FILE,
+  TREVNI
 }
 
 enum THdfsCompression {

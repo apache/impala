@@ -27,7 +27,7 @@ class TScanRange;
 class ByteStream;
 class HdfsScanNode;
 class HdfsPartitionDescriptor;
-class Decompressor;
+class Compression;
 struct HdfsScanRange;
 
 // Intermediate structure used for two pass parsing approach. In the first pass,

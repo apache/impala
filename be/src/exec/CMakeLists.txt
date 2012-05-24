@@ -30,8 +30,11 @@ add_library(Exec STATIC
   hdfs-text-scanner-ir.cc
   hdfs-text-table-writer.cc
   merge-node.cc
+  hdfs-trevni-scanner.cc
+  hdfs-trevni-table-writer.cc
   hbase-scan-node.cc
   hbase-table-scanner.cc
+  read-write-util.cc
   text-converter.cc
   topn-node.cc
   serde-utils.cc

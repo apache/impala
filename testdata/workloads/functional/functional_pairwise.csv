@@ -2,5 +2,7 @@
 text,functional,none,none
 seq,functional,def,block
 rc,functional,gzip,block
+trevni,functional,snap,block
+trevni,functional,def,block
 rc,functional,bzip,block
-seq,functional,snap,record
+seq,functional,bzip,record

@@ -45,9 +45,9 @@ bin=`cd "$bin"; pwd`
 
 set -e
 
-SCRIPT_DIR=$IMPALA_HOME/testdata/bin
 WORKLOAD_DIR=$IMPALA_HOME/testdata/workloads
 DATASET_DIR=$IMPALA_HOME/testdata/datasets
+BIN_DIR=$IMPALA_HOME/testdata/bin
 
 function execute_hive_query_from_file {
   hive_args="-hiveconf hive.root.logger=WARN,console -v -f"
@@ -58,15 +58,17 @@ function execute_hive_query_from_file {
   fi
 }
 
-pushd "$IMPALA_HOME/testdata/bin";
 for ds in $data_set_type
 do
-  ./generate_schema_statements.py --exploration_strategy ${exploration_strategy}\
+  SCRIPT_DIR=$DATASET_DIR/$ds
+  pushd $SCRIPT_DIR
+  $BIN_DIR/generate_schema_statements.py --exploration_strategy ${exploration_strategy}\
                                   --workload=${ds} --verbose
   execute_hive_query_from_file \
       "$SCRIPT_DIR/load-${ds}-${exploration_strategy}-generated.sql"
+  bash $SCRIPT_DIR/load-trevni-${ds}-${exploration_strategy}-generated.sh
+  popd
 done
-popd
 
 # TODO: Temporarily disable block id generation for everything except benchmark runs
 # due to IMP-134

@@ -21,7 +21,7 @@ class OutputPartition;
 // as delimited text into Hdfs files.
 class HdfsTextTableWriter : public HdfsTableWriter {
  public:
-  HdfsTextTableWriter(OutputPartition* output,
+  HdfsTextTableWriter(RuntimeState* state, OutputPartition* output,
                       const HdfsPartitionDescriptor* partition,
                       const HdfsTableDescriptor* table_desc,
                       const std::vector<Expr*>& output_exprs);
@@ -29,6 +29,7 @@ class HdfsTextTableWriter : public HdfsTableWriter {
   ~HdfsTextTableWriter() { }
 
   // There is nothing to do for text.
+  virtual Status Init() { return Status::OK; }
   virtual Status Finalize() { return Status::OK; }
 
   // Appends delimited string representation of the rows in the batch to output partition.

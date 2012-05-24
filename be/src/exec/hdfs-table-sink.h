@@ -115,7 +115,8 @@ class HdfsTableSink : public DataSink {
 
  private:
   // Initialises the filenames of a given output partition, and opens the temporary file.
-  Status InitOutputPartition(const HdfsPartitionDescriptor& partition_descriptor,
+  Status InitOutputPartition(RuntimeState* state,
+                             const HdfsPartitionDescriptor& partition_descriptor,
                              OutputPartition* output_partition);
 
   // Add a temporary file to an output partition.

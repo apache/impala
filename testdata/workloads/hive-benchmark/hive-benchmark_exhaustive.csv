@@ -44,3 +44,12 @@ rc,web,def,block
 rc,web,gzip,block
 rc,web,bzip,block
 rc,web,snap,block
+trevni,grep1gb,none,none
+trevni,grep1gb,def,block
+trevni,grep1gb,snap,block
+trevni,grep10gb,none,none
+trevni,grep10gb,def,block
+trevni,grep10gb,snap,block
+trevni,web,none,none
+trevni,web,def,block
+trevni,web,snap,block

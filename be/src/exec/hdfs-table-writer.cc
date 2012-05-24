@@ -6,11 +6,12 @@ using namespace std;
 
 namespace impala {
 
-HdfsTableWriter::HdfsTableWriter(OutputPartition* output,
+HdfsTableWriter::HdfsTableWriter(RuntimeState* state, OutputPartition* output,
                                  const HdfsPartitionDescriptor* partition_desc,
                                  const HdfsTableDescriptor* table_desc,
                                  const vector<Expr*>& output_exprs)
-  : output_(output),
+  : state_(state),
+    output_(output),
     table_desc_(table_desc),
     output_exprs_(output_exprs) {
 }

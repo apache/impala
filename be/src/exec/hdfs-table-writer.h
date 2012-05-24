@@ -21,16 +21,19 @@ class HdfsTableWriter {
  public:
   // The implementation of a writer may reference the parameters to the constructor
   // during the lifetime of the object.
-  // output -- Information on the output partition file.
+  // output_partition -- Information on the output partition file.
   // partition -- the descriptor for the partition being written
   // table_desc -- the descriptor for the table being written.
   // output_exprs -- expressions which generate the output values.
-  HdfsTableWriter(OutputPartition* output,
+  HdfsTableWriter(RuntimeState* state, OutputPartition* output_partition,
                   const HdfsPartitionDescriptor* partition_desc,
                   const HdfsTableDescriptor* table_desc,
                   const std::vector<Expr*>& output_exprs);
 
   virtual ~HdfsTableWriter() { }
+
+  // Do initialization of writer.
+  virtual Status Init() = 0;
 
   // Appends the current batch of rows to the partition.  If there are multiple
   // partitions then row_group_indices will contain the rows that are for this
@@ -54,6 +57,9 @@ class HdfsTableWriter {
     return Write(reinterpret_cast<const uint8_t*>(data), len);
   }
   Status Write(const uint8_t* data, int32_t len);
+
+  // Runtime state.
+  RuntimeState* state_;
 
   // Structure describing partition written to by this writer.
   OutputPartition* output_;

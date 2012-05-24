@@ -118,19 +118,21 @@ public class TestFileParser {
       ArrayList<String> ret = expectedResultSections.get(section);
       if (ret == null) {
         return Lists.newArrayList();
-      } else if (withComments) {
+      } else if (withComments && tableSuffix == null) {
         return ret;
       }
 
       ArrayList<String> retList = Lists.newArrayList();
       for (String s : ret) {
         if (!(s.startsWith("#") || s.startsWith("//"))) {
-          if (tableSuffix != null &&
-             (section == Section.QUERY || section == Section.SETUP)) {
+          if (tableSuffix != null && (section == Section.PARTITIONS ||
+                section == Section.SETUP || section == Section.QUERY)) {
             retList.add(s.replaceAll("\\$TABLE", tableSuffix));
           } else {
             retList.add(s);
           }
+        } else if (withComments) {
+          retList.add(s);
         }
       }
 
@@ -164,13 +166,14 @@ public class TestFileParser {
     }
 
 
-    public QueryExecTestResult getQueryExecTestResult() {
+    public QueryExecTestResult getQueryExecTestResult(String tableSuffix) {
       QueryExecTestResult result = new QueryExecTestResult();
       result.getColTypes().addAll(getSectionContents(Section.TYPES));
-      result.getSetup().addAll(getSectionContents(Section.SETUP, true));
+      result.getSetup().addAll(getSectionContents(Section.SETUP, true, tableSuffix));
       result.getQuery().addAll(getSectionContents(Section.QUERY, true));
       result.getResultSet().addAll(getSectionContents(Section.RESULTS));
-      result.getModifiedPartitions().addAll(getSectionContents(Section.PARTITIONS));
+      result.getModifiedPartitions().addAll(
+          getSectionContents(Section.PARTITIONS, false, tableSuffix));
       result.getNumAppendedRows().addAll(getSectionContents(Section.NUMROWS));
       return result;
     }

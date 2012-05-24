@@ -4,6 +4,7 @@
 #include "exec/hdfs-text-scanner.h"
 #include "exec/hdfs-sequence-scanner.h"
 #include "exec/hdfs-rcfile-scanner.h"
+#include "exec/hdfs-trevni-scanner.h"
 #include "exec/hdfs-byte-stream.h"
 
 #include <sstream>
@@ -160,9 +161,13 @@ Status HdfsScanNode::InitNextScanRange(RuntimeState* state, bool* scan_ranges_fi
           current_scanner_ = new HdfsRCFileScanner(this, state, template_tuple_, 
               tuple_pool_.get());
           break;
-      default:
-        return Status("Unknown Hdfs file format type");
-     }
+        case THdfsFileFormat::TREVNI:
+          current_scanner_ = new HdfsTrevniScanner(this, state, template_tuple_,
+              tuple_pool_.get());
+          break;
+        default:
+          return Status("Unknown Hdfs file format type");
+      }
       scanner_pool_->Add(current_scanner_);
       RETURN_IF_ERROR(current_scanner_->Prepare());
       scanner_map_[partition->file_format()] = current_scanner_;
