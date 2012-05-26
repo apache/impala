@@ -58,6 +58,15 @@ TEST_F(LlvmCodeGenTest, MultithreadedLifetime) {
   thread_group.join_all();
 }
 
+// Test loading a non-existent file
+TEST_F(LlvmCodeGenTest, BadIRFile) {
+  ObjectPool pool;
+  string module_file = "NonExistentFile.ir";
+  scoped_ptr<LlvmCodeGen> codegen;
+  Status status = LlvmCodeGenTest::LoadFromFile(&pool, module_file.c_str(), &codegen);
+  EXPECT_TRUE(!status.ok());
+}
+
 // IR for the generated linner loop
 // define void @JittedInnerLoop() {
 // entry:

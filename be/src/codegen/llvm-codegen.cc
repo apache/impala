@@ -88,7 +88,7 @@ Status LlvmCodeGen::LoadFromFile(ObjectPool* pool,
   COUNTER_SCOPED_TIMER((*codegen)->load_module_timer_);
   OwningPtr<MemoryBuffer> file_buffer;
   llvm::error_code err = MemoryBuffer::getFile(file, file_buffer);
-  if (err) {
+  if (err.value() != 0) {
     stringstream ss;
     ss << "Could not load module " << file << ": " << err.message();
     return Status(ss.str());
