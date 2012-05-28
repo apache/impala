@@ -35,6 +35,7 @@ SET(CXX_FLAGS_DEBUG "-ggdb -msse4.2 -Wall -Wno-sign-compare -DBOOST_DATE_TIME_PO
 SET(CXX_FLAGS_RELEASE "-O3 -g -DNDEBUG -Wall -msse4.2 -Wno-sign-compare -Wno-strict-aliasing -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
 SET(CXX_FLAGS_PROFILE_GEN "${CXX_FLAGS_RELEASE} -fprofile-generate")
 SET(CXX_FLAGS_PROFILE_BUILD "${CXX_FLAGS_RELEASE} -fprofile-use")
+SET(CXX_FLAGS_CODE_COVERAGE "${CXX_FLAGS_DEBUG}  -fprofile-arcs -ftest-coverage")
 
 # if no build build type is specified, default to debug builds
 if (NOT CMAKE_BUILD_TYPE)
@@ -52,6 +53,8 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "PROFILE_GEN")
   SET(CMAKE_CXX_FLAGS ${CXX_FLAGS_PROFILE_GEN})
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "PROFILE_BUILD")
   SET(CMAKE_CXX_FLAGS ${CXX_FLAGS_PROFILE_BUILD})
+elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE")
+  SET(CMAKE_CXX_FLAGS ${CXX_FLAGS_CODE_COVERAGE})
 else()
   message(FATAL_ERROR "Unknown build type: ${CMAKE_BUILD_TYPE}")
 endif ()
@@ -106,7 +109,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 # resolve includes of generated code
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/generated-sources)
 
-set(CLANG_INCLUDE_FLAGS 
+set(CLANG_INCLUDE_FLAGS
   "-I${CMAKE_CURRENT_SOURCE_DIR}/src"
   "-I${CMAKE_CURRENT_SOURCE_DIR}/generated-sources"
   "-I${Thrift_INCLUDE_DIR}"
@@ -116,7 +119,8 @@ set(CLANG_INCLUDE_FLAGS
 add_definitions(-fPIC)
 
 # set compile output directory
-if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG")
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "DEBUG" OR
+    "${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE")
   set(BUILD_OUTPUT_ROOT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/debug/")
 else()
   set(BUILD_OUTPUT_ROOT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/release/")
@@ -167,6 +171,10 @@ set (IMPALA_LINK_LIBS
   pprofstatic
   -lz -lbz2 -lboost_date_time
 )
+
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE")
+  set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} -lgcov)
+endif ()
 
 # Link libs for test executables.  Although not all tests need all libs,
 # the build time for the tests is rather small and not worth the trouble.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+# Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 # run buildall.sh -help to see options
 
@@ -17,6 +17,7 @@ tests_action=1
 metastore_is_derby=0
 
 FORMAT_CLUSTER=1
+TARGET_BUILD_TYPE=Debug
 
 if [[ ${METASTORE_IS_DERBY} ]]; then
   metastore_is_derby=1
@@ -41,11 +42,15 @@ do
     -noformat)
       FORMAT_CLUSTER=0
       ;;
+    -codecoverage)
+      TARGET_BUILD_TYPE=CODE_COVERAGE
+      ;;
     -help)
       echo "buildall.sh [-noclean] [-noconfig] [-notestdata] [-noformat]"
       echo "[-noclean] : omits cleaning all packages before building"
       echo "[-notestdata] : omits recreating the metastore and loading test data"
       echo "[-noformat] : prevents the minicluster from formatting its data directories, and skips the data load step"
+      echo "[-codecoverage] : build with 'gcov' code coverage instrumentation at the cost of performance"
       exit
       ;;
   esac
@@ -110,7 +115,7 @@ $IMPALA_HOME/bin/clean-fe-processes.py
 
 # build common and backend
 cd $IMPALA_HOME
-cmake -DCMAKE_BUILD_TYPE=Debug .
+cmake -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE .
 cd $IMPALA_HOME/common/function-registry
 make
 cd $IMPALA_HOME/common/thrift
