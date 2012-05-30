@@ -39,7 +39,6 @@ class TimestampFunctions {
   // Convert a timestamp to or from a particular timezone based time.
   static void* FromUtc(Expr* e, TupleRow* row);
   static void* ToUtc(Expr* e, TupleRow* row);
- 
 };
 
 // Functions to load and access the timestamp database.
@@ -51,9 +50,9 @@ class TimezoneDatabase {
   static boost::local_time::time_zone_ptr FindTimezone(const std::string& tz);
 
  private:
+  static const char* TIMEZONE_DATABASE_STR;
   static boost::local_time::tz_database tz_database_;
   static std::vector<std::string> tz_region_list_;
-
 };
 }
 

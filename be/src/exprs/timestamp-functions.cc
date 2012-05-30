@@ -213,10 +213,35 @@ void* TimestampFunctions::ToUtc(Expr* e, TupleRow* row) {
 }
 
 TimezoneDatabase::TimezoneDatabase() {
-  string file;
-  PathBuilder::GetFullPath(TIMEZONE_DATABASE, &file);
-  tz_database_.load_from_file(file);
+  // Create a temporary file and write the timezone information.  The boost
+  // interface only loads this format from a file.  We don't want to raise
+  // an error here since this is done when the backend is created and this
+  // information might not actually get used by any queries.
+  char filestr[] = "/tmp/impala.tzdb.XXXXXXX";
+  FILE* file;
+  int fd;
+  if ((fd = mkstemp(filestr)) == -1) {
+    LOG(ERROR) << "Could not create temporary timezone file: " << filestr;
+    return;
+  }
+  if ((file = fopen(filestr, "w")) == NULL) {
+    unlink(filestr);
+    close(fd);
+    LOG(ERROR) << "Could not open temporary timezone file: " << filestr;
+    return;
+  }
+  if (fputs(TIMEZONE_DATABASE_STR, file) == EOF) {
+    unlink(filestr);
+    close(fd);
+    fclose(file);
+    LOG(ERROR) << "Could not load temporary timezone file: " << filestr;
+    return;
+  }
+  fclose(file);
+  tz_database_.load_from_file(string(filestr));
   tz_region_list_ = tz_database_.region_list();
+  unlink(filestr);
+  close(fd);
 }
 
 TimezoneDatabase::~TimezoneDatabase() { }

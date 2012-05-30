@@ -30,6 +30,7 @@ add_library(Exprs
   string-literal.cc
   string-functions.cc
   timestamp-functions.cc
+  timezone_db.cc
 )
 
 target_link_libraries(Exprs
