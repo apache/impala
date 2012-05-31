@@ -113,7 +113,7 @@ Status LlvmCodeGen::LoadImpalaIR(ObjectPool* pool, scoped_ptr<LlvmCodeGen>* code
   // TODO: is this how we want to pick up external files?  Do we need better configuration
   // support?
   string module_file;
-  PathBuilder::GetFullPath("be/build/llvm-ir/impala.ll", &module_file);
+  PathBuilder::GetFullPath("llvm-ir/impala.ll", &module_file);
   RETURN_IF_ERROR(LoadFromFile(pool, module_file, codegen_ret));
   LlvmCodeGen* codegen = codegen_ret->get();
 

@@ -118,7 +118,7 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
   typedef void (*TestLoopFn)(int);
   
   string module_file;
-  PathBuilder::GetFullPath("testdata/llvm/test-loop.ir", &module_file);
+  PathBuilder::GetFullPath("llvm-ir/test-loop.ir", &module_file);
 
   // Part 1: Load the module and make sure everything is loaded correctly.
   scoped_ptr<LlvmCodeGen> codegen;

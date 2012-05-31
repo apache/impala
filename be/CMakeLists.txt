@@ -172,7 +172,7 @@ set (IMPALA_LINK_LIBS
 # the build time for the tests is rather small and not worth the trouble.
 set (IMPALA_TEST_LINK_LIBS ${IMPALA_LINK_LIBS} gtest)
 
-set(LLVM_IR_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/llvm-ir")
+set(LLVM_IR_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/llvm-ir")
 file(MAKE_DIRECTORY ${LLVM_IR_OUTPUT_DIRECTORY})
 
 # compile these subdirs using their own CMakeLists.txt
