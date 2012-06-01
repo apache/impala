@@ -17,9 +17,9 @@ using namespace boost;
 
 namespace impala {
 
-HashTable::HashTable(const std::vector<Expr*>& build_exprs1,
-                     const std::vector<Expr*>& build_exprs2,
-                     const std::vector<Expr*>& probe_exprs,
+HashTable::HashTable(const vector<Expr*>& build_exprs1,
+                     const vector<Expr*>& build_exprs2,
+                     const vector<Expr*>& probe_exprs,
                      const RowDescriptor& build_row_desc,
                      bool stores_nulls)
   : hash_fn_(this),
@@ -102,28 +102,15 @@ bool HashTable::EqualsFn::operator()(
   return true;
 } 
 
-void HashTable::Insert(TupleRow* r) {
-  if (!stores_nulls_) {
-    // check for nulls
-    for (int i = 0; i < build_exprs1_.size(); ++i) {
-      if (build_exprs1_[i]->GetValue(r) == NULL) return;
-    }
+bool HashTable::HasNulls(TupleRow* r) {
+  // check for nulls
+  for (int i = 0; i < build_exprs1_.size(); ++i) {
+    if (build_exprs1_[i]->GetValue(r) == NULL) return true;
   }
-  hash_tbl_->insert(r);
+  return false;
 }
 
-void HashTable::Scan(TupleRow* probe_row, Iterator* it) {
-  current_probe_row_ = probe_row;
-  if (probe_row != NULL) {
-    // returns rows that are equal to current_probe_row_.
-    it->Reset(hash_tbl_->equal_range(NULL));
-  } else {
-    // return all rows
-    it->Reset(make_pair(hash_tbl_->begin(), hash_tbl_->end()));
-  }
-}
-
-void HashTable::DebugString(int indentation_level, std::stringstream* out) const {
+void HashTable::DebugString(int indentation_level, stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
   *out << "HashTbl(stores_nulls=" << (stores_nulls_ ? "true" : "false")
        << " build_exprs=" << Expr::DebugString(build_exprs1_)

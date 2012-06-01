@@ -43,7 +43,14 @@ class HashTable {
 
   // Inserts r by evaluating build exprs. If !stores_nulls and one of the
   // build exprs return a NULL, returns w/o inserting t.
-  void Insert(TupleRow* r);
+  // always_inline is set to force clang to inline the hash and equals function
+  // TODO: remove once we have our own hash table
+  void __attribute__((always_inline)) Insert(TupleRow* r) {
+    if (!stores_nulls_ && HasNulls(r)) {
+      return;
+    }
+    hash_tbl_->insert(r);
+  }
 
   void DebugString(int indentation_level, std::stringstream* out) const;
 
@@ -99,13 +106,25 @@ class HashTable {
 
   bool stores_nulls_;
 
+  // Returns true if any of the build_exprs returns NULL
+  // TODO: this should be codegend.
+  bool HasNulls(TupleRow* build_row);
+
  public:
   class Iterator {
    public:
     // Returns next matching element or NULL;
     TupleRow* GetNext() {
-      if (i_ == end_) return NULL;
+      if (!HasNext()) return NULL;
       return *i_++;
+    }
+
+    bool HasNext() const {
+      return i_ != end_;
+    }
+
+    void SkipToEnd() {
+      i_ = end_;
     }
 
    private:
@@ -122,7 +141,19 @@ class HashTable {
   // Starts as a scan of rows based on values of probe_exprs in the context
   // of probe_row. Scans entire table if probe_row is NULL.
   // Returns the scan through 'it'.
-  void Scan(TupleRow* probe_row, Iterator* it);
+  // Always inline to make sure the underlying hash functions (HashFn and EqualsFn)
+  // get inlined and can be replaced by codegen.
+  // TODO: switch to our own hashtable that inlines things better by default
+  void __attribute__((always_inline)) Scan(TupleRow* probe_row, Iterator* it) {
+    current_probe_row_ = probe_row;
+    if (probe_row != NULL) {
+      // returns rows that are equal to current_probe_row_.
+      it->Reset(hash_tbl_->equal_range(NULL));
+    } else {
+      // return all rows
+      it->Reset(make_pair(hash_tbl_->begin(), hash_tbl_->end()));
+    }
+  }
 
   std::string DebugString();
 

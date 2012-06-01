@@ -27,7 +27,11 @@ class TupleRow {
     int size = descs.size() * sizeof(Tuple*);
     TupleRow* result = reinterpret_cast<TupleRow*>(pool->Allocate(size));
     for (int i = 0; i < descs.size(); ++i) {
-      result->SetTuple(i, this->GetTuple(i)->DeepCopy(*descs[i], pool));
+      if (this->GetTuple(i) != NULL) {
+        result->SetTuple(i, this->GetTuple(i)->DeepCopy(*descs[i], pool));
+      } else {
+        result->SetTuple(i, NULL);
+      }
     }
     return result;
   }

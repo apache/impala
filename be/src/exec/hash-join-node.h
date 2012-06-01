@@ -78,11 +78,16 @@ class HashJoinNode : public ExecNode {
   // is responsible for.
   boost::scoped_ptr<RowBatch> probe_batch_;
   int probe_batch_pos_;  // current scan pos in probe_batch_
+  bool probe_eos_;  // if true, probe child has no more rows to process
   TupleRow* current_probe_row_;
 
   // build_tuple_idx_[i] is the tuple index of child(1)'s tuple[i] in the output row
   std::vector<int> build_tuple_idx_;
   int build_tuple_size_;
+
+  // byte size of result tuple row (sum of the tuple ptrs, not the tuple data).  
+  // This should be the same size as the probe tuple row.
+  int result_tuple_row_size_;
   
   RuntimeProfile::Counter* build_timer_;   // time to build hash table
   RuntimeProfile::Counter* probe_timer_;   // time to probe
@@ -92,10 +97,27 @@ class HashJoinNode : public ExecNode {
   // set up build_- and probe_exprs_
   Status Init(ObjectPool* pool, const TPlanNode& tnode);
 
-  // Write combined row, consisting of probe_row and build_row, to out_batch
-  // and return the combined row.
-  TupleRow* CreateOutputRow(RowBatch* out_batch, TupleRow* probe_row,
-      TupleRow* build_row);
+  // GetNext helper function for the common join cases: Inner join, left semi and left 
+  // outer
+  Status LeftJoinGetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
+
+  // Processes a probe batch for the common (non right-outer join) cases.
+  //  out_batch: the batch for resulting tuple rows
+  //  probe_batch: the probe batch to process.  This function can be called to
+  //    continue processing a batch in the middle
+  //  max_added_rows: maximum rows that can be added to out_batch
+  // return the number of rows added to out_batch
+  int ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch, int max_added_rows); 
+
+  // Construct the build hash table, adding all the rows in 'build_batch'
+  void ProcessBuildBatch(RowBatch* build_batch);
+
+  // Write combined row, consisting of probe_row and build_row, to out_row.
+  // This is replaced by codegen.
+  void CreateOutputRow(TupleRow* out_row, TupleRow* probe_row, TupleRow* build_row);
+
+  // Eval conjuncts for the other join predicates.  This is replaced by codegen.
+  bool EvalOtherJoinConjuncts(TupleRow* row);
 };
 
 }

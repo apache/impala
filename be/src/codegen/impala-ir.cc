@@ -6,6 +6,7 @@
 
 #ifdef IR_COMPILE
 #include "exec/aggregation-node-ir.cc"
+#include "exec/hash-join-node-ir.cc"
 #include "exec/hdfs-text-scanner-ir.cc"
 #include "runtime/string-value-ir.cc"
 #else

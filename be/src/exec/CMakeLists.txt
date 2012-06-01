@@ -17,6 +17,7 @@ add_library(Exec STATIC
   exec-node.cc
   exchange-node.cc
   hash-join-node.cc
+  hash-join-node-ir.cc
   hdfs-byte-stream.cc
   hdfs-scan-node.cc
   hdfs-scanner.cc
