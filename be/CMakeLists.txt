@@ -81,6 +81,7 @@ if (DOXYGEN_FOUND)
     ${CMAKE_SOURCE_DIR}/src/exec/
     ${CMAKE_SOURCE_DIR}/src/exprs/
     ${CMAKE_SOURCE_DIR}/src/runtime/
+    ${CMAKE_SOURCE_DIR}/src/scheduler/
     ${CMAKE_SOURCE_DIR}/src/service/
     ${CMAKE_SOURCE_DIR}/src/testutil/
     ${CMAKE_SOURCE_DIR}/src/thrift/
@@ -145,6 +146,7 @@ set (IMPALA_LINK_LIBS
   Exprs
   Util
   Runtime
+  Scheduler
   CodeGen
   Common
   Util
@@ -179,6 +181,7 @@ add_subdirectory(src/common)
 add_subdirectory(src/exec)
 add_subdirectory(src/exprs)
 add_subdirectory(src/runtime)
+add_subdirectory(src/scheduler)
 add_subdirectory(src/service)
 add_subdirectory(src/testutil)
 add_subdirectory(src/util)
@@ -194,6 +197,7 @@ link_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/build/exec
   ${CMAKE_CURRENT_SOURCE_DIR}/build/exprs
   ${CMAKE_CURRENT_SOURCE_DIR}/build/runtime
+  ${CMAKE_CURRENT_SOURCE_DIR}/build/scheduler
   ${CMAKE_CURRENT_SOURCE_DIR}/build/service
   ${CMAKE_CURRENT_SOURCE_DIR}/build/testutil
   ${CMAKE_CURRENT_SOURCE_DIR}/build/thrift

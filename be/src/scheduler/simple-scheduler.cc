@@ -5,7 +5,7 @@
 
 #include <boost/algorithm/string.hpp>
 
-#include "runtime/simple-scheduler.h"
+#include "scheduler/simple-scheduler.h"
 
 using namespace std;
 using namespace boost;

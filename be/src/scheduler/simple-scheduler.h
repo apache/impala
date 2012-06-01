@@ -8,8 +8,8 @@
 #include <list>
 #include <boost/unordered_map.hpp>
 
-#include "runtime/scheduler.h"
 #include "common/status.h"
+#include "scheduler/scheduler.h"
 
 namespace impala {
 

@@ -5,16 +5,15 @@
 #include <glog/logging.h>
 #include <transport/TTransportUtils.h>
 
-#include "util/debug-util.h"
-#include "runtime/plan-executor.h"
-#include "runtime/exec-env.h"
-#include "runtime/scheduler.h"
+#include "exec/data-sink.h"
+#include "exec/exec-stats.h"
+#include "exec/hdfs-text-table-sink.h"
 #include "runtime/client-cache.h"
 #include "runtime/data-stream-sender.h"
+#include "runtime/exec-env.h"
+#include "runtime/plan-executor.h"
 #include "runtime/row-batch.h"
-#include "exec/hdfs-text-table-sink.h"
-#include "exec/exec-stats.h"
-#include "exec/data-sink.h"
+#include "scheduler/scheduler.h"
 #include "util/debug-util.h"
 #include "gen-cpp/ImpalaBackendService.h"
 #include "gen-cpp/ImpalaBackendService_types.h"

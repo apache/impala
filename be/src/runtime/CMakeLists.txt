@@ -6,8 +6,6 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime")
 
-
-# add .cc files and uncomment line
 add_library(Runtime STATIC
   client-cache.cc
   coordinator.cc
@@ -23,7 +21,6 @@ add_library(Runtime STATIC
   raw-value.cc
   row-batch.cc
   runtime-state.cc
-  simple-scheduler.cc
   string-value.cc
   timestamp-value.cc
   tuple.cc

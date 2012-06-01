@@ -19,15 +19,15 @@
 #include "runtime/data-stream-mgr.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/client-cache.h"
-#include "runtime/simple-scheduler.h"
-#include "testutil/test-exec-env.h"
+#include "scheduler/simple-scheduler.h"
 #include "service/jni-coordinator.h"
 #include "service/backend-service.h"
+#include "testutil/test-exec-env.h"
 #include "util/jni-util.h"
 #include "util/thrift-util.h"
 #include "util/debug-util.h"
-#include "gen-cpp/ImpalaPlanService_types.h"
 #include "gen-cpp/Data_types.h"
+#include "gen-cpp/ImpalaPlanService_types.h"
 
 DECLARE_bool(serialize_batch);
 DECLARE_int32(backend_port);

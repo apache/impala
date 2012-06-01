@@ -2,11 +2,11 @@
 
 #include "runtime/exec-env.h"
 
-#include "runtime/data-stream-mgr.h"
-#include "runtime/hdfs-fs-cache.h"
-#include "runtime/hbase-table-cache.h"
 #include "runtime/client-cache.h"
-#include "runtime/simple-scheduler.h"
+#include "runtime/data-stream-mgr.h"
+#include "runtime/hbase-table-cache.h"
+#include "runtime/hdfs-fs-cache.h"
+#include "scheduler/simple-scheduler.h"
 
 namespace impala {
 

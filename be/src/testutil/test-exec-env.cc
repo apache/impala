@@ -9,10 +9,10 @@
 
 #include "common/status.h"
 #include "service/backend-service.h"
-#include "runtime/data-stream-mgr.h"
 #include "runtime/client-cache.h"
-#include "runtime/scheduler.h"
+#include "runtime/data-stream-mgr.h"
 #include "runtime/hdfs-fs-cache.h"
+#include "scheduler/scheduler.h"
 #include "gen-cpp/ImpalaBackendService.h"
 
 using namespace boost;
