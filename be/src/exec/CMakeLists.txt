@@ -18,15 +18,17 @@ add_library(Exec STATIC
   exchange-node.cc
   hash-join-node.cc
   hash-join-node-ir.cc
+  hash-table.cc
   hdfs-byte-stream.cc
   hdfs-scan-node.cc
   hdfs-scanner.cc
-  hash-table.cc
+  hdfs-table-sink.cc
+  hdfs-table-writer.cc
   hdfs-rcfile-scanner.cc
   hdfs-sequence-scanner.cc
   hdfs-text-scanner.cc
   hdfs-text-scanner-ir.cc
-  hdfs-text-table-sink.cc
+  hdfs-text-table-writer.cc
   hbase-scan-node.cc
   hbase-table-scanner.cc
   text-converter.cc

@@ -149,7 +149,6 @@ static void Exec(ExecEnv* exec_env) {
       while (true) {
         string row;
         EXIT_IF_ERROR(executor->FetchResult(&row));
-        if (row.empty()) break;
         // Only print results for first run
         if (!row.empty() && i == 0) cout << row << endl;
         if (executor->eos()) break;

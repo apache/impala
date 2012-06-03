@@ -31,7 +31,7 @@ import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
 import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.planner.DataSink;
-import com.cloudera.impala.planner.HdfsTextTableSink;
+import com.cloudera.impala.planner.HdfsTableSink;
 import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.THdfsTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
@@ -297,9 +297,7 @@ public class HdfsTable extends Table {
 
   @Override
   public DataSink createDataSink(List<Expr> partitionKeyExprs, boolean overwrite) {
-    // Return only text table sink for now.
-    // TODO: Format independent table sink
-    return new HdfsTextTableSink(this, partitionKeyExprs, overwrite);
+    return new HdfsTableSink(this, partitionKeyExprs, overwrite);
   }
 
   /**

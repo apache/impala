@@ -7,7 +7,7 @@
 
 #include "exec/data-sink.h"
 #include "exec/exec-stats.h"
-#include "exec/hdfs-text-table-sink.h"
+#include "exec/hdfs-table-sink.h"
 #include "runtime/client-cache.h"
 #include "runtime/data-stream-sender.h"
 #include "runtime/exec-env.h"

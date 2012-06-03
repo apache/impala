@@ -14,7 +14,7 @@
 // undefined references to FLAGS_v
 //#include <gflags/gflags.h>
 
-#include "exec/hdfs-text-table-sink.h"
+#include "exec/hdfs-table-sink.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/descriptors.h"
 #include "runtime/data-stream-sender.h"

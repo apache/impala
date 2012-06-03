@@ -43,18 +43,18 @@ struct TDataStreamSink {
 }
 
 // Creates a new Hdfs files according to the evaluation of the partitionKeyExprs,
-// and materializes all its input RowBatches as delimited text.
-struct THdfsTextTableSink {
+// and materializes all its input RowBatches as a Hdfs file.
+struct THdfsTableSink {
   1: required list<Exprs.TExpr> partitionKeyExprs
   2: required bool overwrite
 }
 
 // Union type of all table sinks.
-// Currently, only THdfsTextTableSink is supported, so we don't have a separate
+// Currently, only THdfsTableSink is supported, so we don't have a separate
 // TTableSinkType yet.
 struct TTableSink {
   1: required Types.TTableId targetTableId
-  2: required THdfsTextTableSink hdfsTextTableSink
+  2: required THdfsTableSink hdfsTableSink
 }
 
 // This is essentially a union of all messages corresponding to subclasses

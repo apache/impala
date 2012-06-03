@@ -1,8 +1,8 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 #include "exec/data-sink.h"
+#include "exec/hdfs-table-sink.h"
 #include "exec/exec-node.h"
-#include "exec/hdfs-text-table-sink.h"
 #include "exprs/expr.h"
 #include "gen-cpp/ImpalaBackendService_types.h"
 #include "runtime/data-stream-sender.h"
@@ -34,9 +34,8 @@ Status DataSink::CreateDataSink(
       if (!request.dataSink.__isset.tableSink) {
         return Status("Missing table sink.");
       }
-      // Currently, only Hdfs text table sink is implemented.
-      tmp_sink = new HdfsTextTableSink(row_desc, request.queryId, request.outputExprs,
-                                       request.dataSink);
+      tmp_sink = new HdfsTableSink(row_desc,
+          request.queryId, request.outputExprs, request.dataSink);
       sink->reset(tmp_sink);
       break;
 
