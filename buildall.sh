@@ -18,6 +18,7 @@ metastore_is_derby=0
 
 FORMAT_CLUSTER=1
 TARGET_BUILD_TYPE=Debug
+TEST_EXECUTION_MODE=reduced
 
 if [[ ${METASTORE_IS_DERBY} ]]; then
   metastore_is_derby=1
@@ -45,13 +46,22 @@ do
     -codecoverage)
       TARGET_BUILD_TYPE=CODE_COVERAGE
       ;;
-    -help)
-      echo "buildall.sh [-noclean] [-noconfig] [-notestdata] [-noformat]"
+    -testexhaustive)
+      TEST_EXCUTION_MODE=exhaustive
+      ;;
+    -help|*)
+      echo "buildall.sh [-noclean] [-notestdata] [-noformat] [-codecoverage]"\
+           "[-skiptests] [-testexhaustive]"
       echo "[-noclean] : omits cleaning all packages before building"
       echo "[-notestdata] : omits recreating the metastore and loading test data"
-      echo "[-noformat] : prevents the minicluster from formatting its data directories, and skips the data load step"
-      echo "[-codecoverage] : build with 'gcov' code coverage instrumentation at the cost of performance"
-      exit
+      echo "[-noformat] : prevents the minicluster from formatting its data directories,"\
+           "and skips the data load step"
+      echo "[-codecoverage] : build with 'gcov' code coverage instrumentation at the"\
+           "cost of performance"
+      echo "[-skiptests] : skips execution of all tests"
+      echo "[-testexhaustive] : run tests in 'exhaustive' mode (significantly increases"\
+           "test execution time)"
+      exit 1
       ;;
   esac
 done
@@ -147,7 +157,7 @@ mvn package -DskipTests=true
 if [ $tests_action -eq 1 ]
 then
     # also run frontend tests
-    mvn test
+    mvn test -DtestExecutionMode=$TEST_EXECUTION_MODE
 fi
 
 # run backend tests For some reason this does not work on Jenkins
