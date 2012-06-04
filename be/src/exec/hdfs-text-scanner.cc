@@ -422,11 +422,7 @@ int HdfsTextScanner::WriteFields(RowBatch* row_batch, int num_fields, char** lin
   // Write out the remaining slots (resulting in a partially materialized tuple)
   if (num_fields != 0) {
     DCHECK(tuple_ != NULL);
-    if (template_tuple_ != NULL) {
-      memcpy(tuple_, template_tuple_, tuple_byte_size_);
-    } else {
-      memset(tuple_, 0, sizeof(uint8_t) * scan_node_->tuple_desc()->num_null_bytes());
-    }
+    InitTuple(tuple_);
     // If there have been no materialized tuples at this point, copy string data
     // out of byte_buffer and reuse the byte_buffer.  The copied data can be at
     // most one tuple's worth.
@@ -503,12 +499,7 @@ bool HdfsTextScanner::WriteCompleteTuple(FieldLocation* fields, Tuple* tuple,
   int bytes_parsed = 0;
 
   // Initialize tuple before materializing slots
-  // TODO: only copy over non-null slots.
-  if (template_tuple_ != NULL) {
-    memcpy(tuple, template_tuple_, tuple_byte_size_);
-  } else {
-    memset(tuple, 0, sizeof(uint8_t) * scan_node_->tuple_desc()->num_null_bytes());
-  }
+  InitTuple(tuple);
 
   for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
     int need_escape = false;

@@ -480,9 +480,7 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
         current_row->SetTuple(0, tuple_);
         // Initialize tuple_ from the partition key template tuple before writing the
         // slots
-        if (template_tuple_ != NULL) {
-          memcpy(tuple_, template_tuple_, tuple_byte_size_);
-        }
+        InitTuple(tuple_);
       }
 
       const vector<SlotDescriptor*>& materialized_slots = 
@@ -548,11 +546,7 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
       // TODO: if the slots that need to be updated are very sparse (very few NULL slots
       // or very few partition keys), updating all the tuple memory is probably bad
       if (!conjuncts_true || template_tuple_ != NULL) {
-        if (template_tuple_ != NULL) {
-          memcpy(tuple_, template_tuple_, tuple_byte_size_);
-        } else {
-          tuple_->Init(tuple_byte_size_);
-        }
+        InitTuple(tuple_);
       }
     }
   }

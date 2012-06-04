@@ -158,6 +158,19 @@ class HdfsScanner {
 
   // Report parse error for column @ desc
   void ReportColumnParseError(const SlotDescriptor* desc, const char* data, int len);
+
+  // Number of null bytes in the tuple.
+  int32_t num_null_bytes_;
+
+  // Initialize a tuple.
+  // TODO: only copy over non-null slots.
+  void InitTuple(Tuple* tuple) {
+    if (template_tuple_ != NULL) {
+      memcpy(tuple, template_tuple_, tuple_byte_size_);
+    } else {
+      memset(tuple, 0, sizeof(uint8_t) * num_null_bytes_);
+    }
+  }
 };
 
 }

@@ -281,9 +281,7 @@ Status HdfsSequenceScanner::WriteFields(RowBatch* row_batch,
   int next_line_offset = 0;
 
   // Initialize tuple_ from the partition key template tuple before writing the slots
-  if (template_tuple_ != NULL) {
-    memcpy(tuple_, template_tuple_, tuple_byte_size_);
-  }
+  InitTuple(tuple_);
 
   // Loop through all the parsed_data and parse out the values to slots
   bool error_in_row = false;
@@ -335,14 +333,8 @@ Status HdfsSequenceScanner::WriteFields(RowBatch* row_batch,
   // Need to reset the tuple_ if
   //  1. eval failed (clear out null-indicator bits) OR
   //  2. there are partition keys that need to be copied
-  // TODO: if the slots that need to be updated are very sparse (very few NULL slots
-  // or very few partition keys), updating all the tuple memory is probably bad
   if (!conjuncts_true || template_tuple_ != NULL) {
-    if (template_tuple_ != NULL) {
-      memcpy(tuple_, template_tuple_, tuple_byte_size_);
-    } else {
-      tuple_->Init(tuple_byte_size_);
-    }
+    InitTuple(tuple_);
   }
 
   if (error_in_row) return Status("Conversion from string failed");
