@@ -1149,7 +1149,7 @@ FROM alltypesagg;
 
 INSERT OVERWRITE TABLE alltypesaggnonulls_seq_record_bzip partition (year, month, day)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day
-FROM alltypesagg;
+FROM alltypesaggnonulls;
 
 SET mapred.output.compression.codec=org.apache.hadoop.io.compress.SnappyCodec;
 INSERT OVERWRITE TABLE alltypes_seq_record_snap partition (year, month)
@@ -1166,7 +1166,7 @@ FROM alltypesagg;
 
 INSERT OVERWRITE TABLE alltypesaggnonulls_seq_record_snap partition (year, month, day)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day
-FROM alltypesagg;
+FROM alltypesaggnonulls;
 
 SET hive.exec.compress.output=false; 
 set mapred.output.compression.type=NONE;
