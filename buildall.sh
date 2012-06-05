@@ -160,7 +160,6 @@ then
     mvn test -DtestExecutionMode=$TEST_EXECUTION_MODE
 fi
 
-# run backend tests For some reason this does not work on Jenkins
 if [ $tests_action -eq 1 ]
 then
   cd $IMPALA_FE_DIR
@@ -173,9 +172,6 @@ then
   mvn exec:java -Dexec.mainClass=com.cloudera.impala.testutil.PlanService \
               -Dexec.classpathScope=test &
   PID=$!
-  # Wait for planner to startup TODO: can we do something better than wait arbitrarily for
-  # 3 seconds.  Not a huge deal if it's not long enough, BE tests will just wait a bit
-  sleep 3
   cd $IMPALA_BE_DIR
   make test
   kill $PID

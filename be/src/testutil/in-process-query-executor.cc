@@ -75,61 +75,6 @@ InProcessQueryExecutor::InProcessQueryExecutor(ExecEnv* exec_env)
 InProcessQueryExecutor::~InProcessQueryExecutor() {
 }
 
-#if 0
-// I can't get this to compile.
-static void FindRunplanservice(string* path) {
-  // first, look for directory 'be' on current path
-  filesystem::path wd = filesystem::current_path();
-  filesystem::path::iterator i = wd.end();
-  do {
-    --i;
-    if (*i == "be") {
-      filesystem::path be_path(wd.begin(), i);
-      filesystem::path script_path = be_path.parent_path();
-      script_path /= "fe/bin/runplanservice";
-      *path = script_path.string();
-    }
-  } while (i != wd.begin());
-}
-#else
-static void FindRunplanservice(string* path) {
-  path->clear();
-  string wd(getcwd(NULL, 0));
-  vector<string> elems;
-  split(elems, wd, is_any_of("/"));
-  int i;
-  for (i = elems.size() - 1; i >= 0; --i) {
-    if (elems[i] == "be") break;
-  }
-  if (i < 0) return;
-  elems.erase(elems.begin() + i, elems.end());
-  elems.push_back("bin");
-  elems.push_back("runplanservice");
-  *path = join(elems, "/");
-
-  struct stat dummy;
-  if (stat(path->c_str(), &dummy) != 0) {
-    // the path doesn't exist
-    path->clear();
-  }
-}
-#endif
-
-static void StartServer() {
-  string cmdline;
-  FindRunplanservice(&cmdline);
-  if (cmdline.empty()) {
-    cerr << "couldn't find runplanservice";
-    exit(1);
-  }
-  //cmdline.append(" > /dev/null 2> /dev/null");
-  int ret = ::system(cmdline.c_str());
-  if (ret == -1) {
-    cerr << "couldn't execute command: " << cmdline;
-    exit(1);
-  }
-}
-
 void InProcessQueryExecutor::DisableJit() {
   FLAGS_enable_jit = false;
 }
@@ -140,23 +85,14 @@ Status InProcessQueryExecutor::Setup() {
   protocol_.reset(new TBinaryProtocol(transport_));
   client_.reset(new ImpalaPlanServiceClient(protocol_));
 
-  try {
-    transport_->open();
-  } catch (TTransportException& e) {
-    // this probably means that the service isn't running;
-    // let's start it ourselves
-    thread s_thread(StartServer);
-    started_server_ = true;
-
-    // loop until we get a connection
-    while (true) {
-      try {
-        transport_->open();
-        break;
-      } catch (TTransportException& e) {
-        cout << "waiting for plan service to start up..." << endl;
-        sleep(5);
-      }
+  // loop until we get a connection
+  while (true) {
+    try {
+      transport_->open();
+      break;
+    } catch (TTransportException& e) {
+      cout << "waiting for plan service to start up..." << endl;
+      sleep(5);
     }
   }
 
