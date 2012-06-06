@@ -47,7 +47,7 @@ do
       TARGET_BUILD_TYPE=CODE_COVERAGE
       ;;
     -testexhaustive)
-      TEST_EXCUTION_MODE=exhaustive
+      TEST_EXECUTION_MODE=exhaustive
       ;;
     -help|*)
       echo "buildall.sh [-noclean] [-notestdata] [-noformat] [-codecoverage]"\
