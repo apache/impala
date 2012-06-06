@@ -12,7 +12,8 @@ enum TPlanNodeType {
   HASH_JOIN_NODE,
   AGGREGATION_NODE,
   SORT_NODE,
-  EXCHANGE_NODE
+  EXCHANGE_NODE,
+  MERGE_NODE
 }
 
 // The information contained in subclasses of ScanNode captured in two separate
@@ -124,6 +125,14 @@ struct TExchangeNode {
   1: required i32 num_senders
 }
 
+struct TMergeNode {
+  // List or expr lists materialized by this node.
+  // There is one list of exprs per query stmt feeding into this merge node.
+  1: required list<list<Exprs.TExpr>> result_expr_lists
+  // Separate list of expr lists coming from a constant select stmts.
+  2: required list<list<Exprs.TExpr>> const_expr_lists
+}
+
 // This is essentially a union of all messages corresponding to subclasses
 // of PlanNode.
 struct TPlanNode {
@@ -148,6 +157,7 @@ struct TPlanNode {
   12: optional TAggregationNode agg_node
   13: optional TSortNode sort_node
   14: optional TExchangeNode exchange_node
+  15: optional TMergeNode merge_node
 }
 
 // A flattened representation of a tree of PlanNodes, obtained by depth-first

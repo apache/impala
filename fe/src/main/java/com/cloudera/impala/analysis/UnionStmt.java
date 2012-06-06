@@ -32,9 +32,18 @@ public class UnionStmt extends QueryStmt {
     // Null for the first operand.
     private Qualifier qualifier;
 
+    // Analyzer used for this operand. Set in analyze().
+    // We must preserve the conjuncts registered in the analyzer for partition pruning.
+    private Analyzer analyzer;
+
     public UnionOperand(QueryStmt queryStmt, Qualifier qualifier) {
       this.queryStmt = queryStmt;
       this.qualifier = qualifier;
+    }
+
+    public void analyze(Analyzer parent) throws AnalysisException, InternalException {
+      analyzer = new Analyzer(parent);
+      queryStmt.analyze(analyzer);
     }
 
     public QueryStmt getQueryStmt() {
@@ -48,6 +57,10 @@ public class UnionStmt extends QueryStmt {
     // Used for propagating DISTINCT.
     public void setQualifier(Qualifier qualifier) {
       this.qualifier = qualifier;
+    }
+
+    public Analyzer getAnalyzer() {
+      return analyzer;
     }
   }
 
@@ -80,11 +93,11 @@ public class UnionStmt extends QueryStmt {
 
     // Make sure all operands return an equal number of exprs.
     QueryStmt firstQuery = operands.get(0).getQueryStmt();
-    firstQuery.analyze(new Analyzer(analyzer));
+    operands.get(0).analyze(analyzer);
     List<Expr> firstQueryExprs = firstQuery.getResultExprs();
     for (int i = 1; i < operands.size(); ++i) {
       QueryStmt query = operands.get(i).getQueryStmt();
-      query.analyze(new Analyzer(analyzer));
+      operands.get(i).analyze(analyzer);
       List<Expr> exprs = query.getResultExprs();
       if (firstQueryExprs.size() != exprs.size()) {
         throw new AnalysisException("Select blocks have unequal number of columns:\n" +

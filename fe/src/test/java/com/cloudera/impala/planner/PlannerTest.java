@@ -82,14 +82,14 @@ public class PlannerTest {
     }
   }
 
-  private void RunUnimplementedQuery(String query,
+  private void RunUnimplementedQuery(String query, int numNodes,
                                      StringBuilder errorLog) {
     try {
       AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
       Planner planner = new Planner();
       explainStringBuilder.setLength(0);
 
-      planner.createPlanFragments(analysisResult, 1, explainStringBuilder);
+      planner.createPlanFragments(analysisResult, numNodes, explainStringBuilder);
 
       errorLog.append(
           "query produced a plan\nquery=" + query + "\nplan=\n"
@@ -124,7 +124,7 @@ public class PlannerTest {
       ArrayList<String> singleNodePlan = testCase.getSectionContents(Section.PLAN);
       if (singleNodePlan.size() > 0 &&
           singleNodePlan.get(0).toLowerCase().startsWith("not implemented")) {
-        RunUnimplementedQuery(query, errorLog);
+        RunUnimplementedQuery(query, 1, errorLog);
         actualOutput.append("not implemented\n");
       } else {
         // Run single-node query,
@@ -133,7 +133,7 @@ public class PlannerTest {
         ArrayList<String> multiNodePlan = testCase.getSectionContents(Section.DISTRIBUTEDPLAN);
         if (multiNodePlan.size() > 0 &&
             multiNodePlan.get(0).toLowerCase().startsWith("not implemented")) {
-          RunUnimplementedQuery(query, errorLog);
+          RunUnimplementedQuery(query, Constants.NUM_NODES_ALL, errorLog);
           actualOutput.append("not implemented\n");
         } else {
           actualOutput.append("------------ DISTRIBUTEDPLAN\n");
@@ -207,5 +207,10 @@ public class PlannerTest {
   @Test
   public void testSubquery() {
     runPlannerTestFile("subquery", PlanNode.ExplainPlanLevel.HIGH);
+  }
+
+  @Test
+  public void testUnion() {
+    runPlannerTestFile("union", PlanNode.ExplainPlanLevel.HIGH);
   }
 }

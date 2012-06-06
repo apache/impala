@@ -29,6 +29,8 @@ import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.analysis.UnionStmt;
+import com.cloudera.impala.analysis.UnionStmt.Qualifier;
+import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
@@ -146,8 +148,15 @@ public class Planner {
     // evaluated after the join.
 
     if (inlineViewRef.getViewStmt() instanceof UnionStmt) {
-      throw new NotImplementedException("Planning of UNION not implemented yet.");
+      // Register predicates with the inline view's analyzer
+      // such that the topmost merge node evaluates them.
+      inlineViewRef.getAnalyzer().registerConjuncts(boundConjuncts);
+      analyzer.markConjunctsAssigned(boundConjuncts);
+      return createUnionPlan((UnionStmt) inlineViewRef.getViewStmt(),
+          inlineViewRef.getAnalyzer());
     }
+
+    Preconditions.checkState(inlineViewRef.getViewStmt() instanceof SelectStmt);
     SelectStmt selectStmt = (SelectStmt) inlineViewRef.getViewStmt();
 
     // If the view select statement does not compute aggregates, predicates are
@@ -317,12 +326,12 @@ public class Planner {
    * Mark slots that are being referenced by any conjuncts, order-by exprs, or select list
    * exprs as materialized. All aggregate slots are materialized.
    */
-  private void markRefdSlots(PlanNode root, SelectStmt selectStmt, Analyzer analyzer) {
+  private void markRefdSlots(PlanNode root, QueryStmt queryStmt, Analyzer analyzer) {
     Preconditions.checkArgument(root != null);
     List<SlotId> refdIdList = Lists.newArrayList();
     root.getMaterializedIds(refdIdList);
 
-    Expr.getIds(selectStmt.getResultExprs(), null, refdIdList);
+    Expr.getIds(queryStmt.getResultExprs(), null, refdIdList);
 
     HashSet<SlotId> refdIds = Sets.newHashSet();
     refdIds.addAll(refdIdList);
@@ -408,10 +417,20 @@ public class Planner {
   private PlanNode createSelectPlan(SelectStmt selectStmt, Analyzer analyzer)
       throws NotImplementedException, InternalException {
     PlanNode result = createSpjPlan(selectStmt, analyzer);
+    if (result == null) {
+      // No FROM clause.
+      return null;
+    }
     // add aggregation, if required
     AggregateInfo aggInfo = selectStmt.getAggInfo();
     if (aggInfo != null) {
       result = new AggregationNode(getNextNodeId(), result, aggInfo);
+      // if we're computing DISTINCT agg fns, the analyzer already created the
+      // merge agginfo
+      if (selectStmt.getMergeAggInfo() != null) {
+        result = new AggregationNode(getNextNodeId(), result,
+            selectStmt.getMergeAggInfo());
+      }
     }
     // add having clause, if required
     if (selectStmt.getHavingPred() != null) {
@@ -670,60 +689,63 @@ public class Planner {
       AnalysisContext.AnalysisResult analysisResult, int numNodes,
       StringBuilder explainString)
       throws NotImplementedException, InternalException {
-    // Set selectStmt from analyzed SELECT or INSERT query.
-    SelectStmt selectStmt = null;
-    if (analysisResult.isQueryStmt() &&
-        analysisResult.getQueryStmt() instanceof UnionStmt) {
-      throw new NotImplementedException("Planning of UNION not implemented.");
-    }
+    // Set queryStmt from analyzed SELECT or INSERT query.
+    QueryStmt queryStmt = null;
     if (analysisResult.isInsertStmt()) {
-      QueryStmt queryStmt = analysisResult.getInsertStmt().getQueryStmt();
-      if (queryStmt instanceof UnionStmt) {
-        throw new NotImplementedException("Planning of UNION not implemented.");
-      }
-      selectStmt = (SelectStmt) queryStmt;
+      queryStmt = analysisResult.getInsertStmt().getQueryStmt();
     } else {
-      Preconditions.checkState(analysisResult.isQueryStmt());
-      Preconditions.checkState(analysisResult.getQueryStmt() instanceof SelectStmt);
-      selectStmt = (SelectStmt) analysisResult.getQueryStmt();
+      queryStmt = analysisResult.getQueryStmt();
     }
+
     Analyzer analyzer = analysisResult.getAnalyzer();
-    PlanNode spjPlan = createSpjPlan(selectStmt, analyzer);
-
     TQueryExecRequest request = new TQueryExecRequest();
-    if (spjPlan == null) {
-      // SELECT without FROM clause
-      TPlanExecRequest fragmentRequest = new TPlanExecRequest(
-          new TUniqueId(), Expr.treesToThrift(selectStmt.getResultExprs()));
-      request.addToFragmentRequests(fragmentRequest);
-      return request;
-    }
-
-    // add aggregation/sort/etc. nodes;
     // root: the node producing the final output (ie, coord plan for distrib. execution)
     PlanNode root = null;
     // slave: only set for distrib. execution; plan feeding into coord
     PlanNode slave = null;
-    if (numNodes == 1) {
-      root = createSingleNodePlan(analyzer, spjPlan, selectStmt);
-    } else {
-      Reference<PlanNode> rootRef = new Reference<PlanNode>();
-      Reference<PlanNode> slaveRef = new Reference<PlanNode>();
-      createMultiNodePlans(analyzer, spjPlan, selectStmt, numNodes, rootRef, slaveRef);
-      root = rootRef.getRef();
-      slave = slaveRef.getRef();
-      slave.finalize(analyzer);
-      markRefdSlots(slave, selectStmt, analyzer);
-      if (root instanceof ExchangeNode) {
-        // if all we're doing is merging results from the slaves, we can
-        // also set the limit in the slaves
-        slave.setLimit(selectStmt.getLimit());
+    if (queryStmt instanceof SelectStmt) {
+      SelectStmt selectStmt = (SelectStmt) queryStmt;
+
+      PlanNode spjPlan = createSpjPlan(selectStmt, analyzer);
+      if (spjPlan == null) {
+        // SELECT without FROM clause
+        TPlanExecRequest fragmentRequest = new TPlanExecRequest(
+            new TUniqueId(), Expr.treesToThrift(selectStmt.getResultExprs()));
+        request.addToFragmentRequests(fragmentRequest);
+        explainString.append("Plan Fragment " + 0 + "\n");
+        explainString.append("  SELECT CONSTANT\n");
+        return request;
       }
+
+      // add aggregation/sort/etc. nodes;
+      if (numNodes == 1) {
+        root = createSingleNodePlan(analyzer, spjPlan, selectStmt);
+      } else {
+        Reference<PlanNode> rootRef = new Reference<PlanNode>();
+        Reference<PlanNode> slaveRef = new Reference<PlanNode>();
+        createMultiNodePlans(analyzer, spjPlan, selectStmt, numNodes, rootRef, slaveRef);
+        root = rootRef.getRef();
+        slave = slaveRef.getRef();
+        slave.finalize(analyzer);
+        markRefdSlots(slave, selectStmt, analyzer);
+        if (root instanceof ExchangeNode) {
+          // if all we're doing is merging results from the slaves, we can
+          // also set the limit in the slaves
+          slave.setLimit(selectStmt.getLimit());
+        }
+      }
+    } else {
+      Preconditions.checkState(queryStmt instanceof UnionStmt);
+      // TODO: Implement multinode planning of UNION.
+      if (numNodes != 1) {
+        throw new NotImplementedException("Multinode planning of UNION not implemented.");
+      }
+      root = createUnionPlan((UnionStmt) queryStmt, analyzer);
     }
 
-    root.setLimit(selectStmt.getLimit());
+    root.setLimit(queryStmt.getLimit());
     root.finalize(analyzer);
-    markRefdSlots(root, selectStmt, analyzer);
+    markRefdSlots(root, queryStmt, analyzer);
     // don't compute mem layout before marking slots that aren't being referenced
     analyzer.getDescTbl().computeMemLayout();
 
@@ -756,13 +778,13 @@ public class Planner {
       TPlanExecRequest planRequest =
           createPlanExecRequest(root, analyzer.getDescTbl(), request);
       planRequest.setOutputExprs(
-          Expr.treesToThrift(selectStmt.getResultExprs()));
+          Expr.treesToThrift(queryStmt.getResultExprs()));
     } else {
       // coordinator fragment comes first
       TPlanExecRequest coordRequest =
           createPlanExecRequest(root, analyzer.getDescTbl(), request);
       coordRequest.setOutputExprs(
-          Expr.treesToThrift(selectStmt.getResultExprs()));
+          Expr.treesToThrift(queryStmt.getResultExprs()));
       // create TPlanExecRequest for slave plan
       createPlanExecRequest(slave, analyzer.getDescTbl(), request);
 
@@ -809,12 +831,161 @@ public class Planner {
   }
 
   /**
+   * Creates the plan for a union stmt in three phases:
+   * 1. If present, absorbs all DISTINCT-qualified operands into a single merge node,
+   *    and adds an aggregation node on top to remove duplicates.
+   * 2. If present, absorbs all ALL-qualified operands into a single merge node,
+   *    also adding the subplan generated in 1 (if applicable).
+   * 3. Set conjuncts if necessary, and add order by and limit.
+   * The absorption of operands applies unnesting rules.
+   */
+  private PlanNode createUnionPlan(UnionStmt unionStmt, Analyzer analyzer)
+      throws NotImplementedException, InternalException {
+    List<UnionOperand> operands = unionStmt.getUnionOperands();
+    Preconditions.checkState(operands.size() > 1);
+    TupleDescriptor tupleDesc =
+        analyzer.getDescTbl().getTupleDesc(unionStmt.getTupleId());
+
+    MergeNode mergeNode = new MergeNode(getNextNodeId(), tupleDesc);
+    PlanNode result = mergeNode;
+    absorbUnionOperand(operands.get(0), mergeNode, operands.get(1).getQualifier());
+
+    // Put DISTINCT operands into a single mergeNode.
+    // Later, we'll put an agg node on top for duplicate removal.
+    boolean hasDistinct = false;
+    int opIx = 1;
+    while (opIx < operands.size()) {
+      UnionOperand operand = operands.get(opIx);
+      if (operand.getQualifier() != Qualifier.DISTINCT) {
+        break;
+      }
+      hasDistinct = true;
+      absorbUnionOperand(operand, mergeNode, Qualifier.DISTINCT);
+      ++opIx;
+    }
+
+    // If we generated a merge node for DISTINCT-qualified operands,
+    // add an agg node on top to remove duplicates.
+    AggregateInfo aggInfo = null;
+    if (hasDistinct) {
+      ArrayList<Expr> groupingExprs = Expr.cloneList(unionStmt.getResultExprs(), null);
+      aggInfo = new AggregateInfo(groupingExprs, null);
+      aggInfo.createAggTuple(analyzer.getDescTbl());
+      Expr.substituteList(unionStmt.getResultExprs(), aggInfo.getSMap());
+      result = new AggregationNode(getNextNodeId(), mergeNode, aggInfo);
+      // If there are more operands, then add the distinct subplan as a child
+      // of a new merge node which also merges the remaining ALL-qualified operands.
+      if (opIx < operands.size()) {
+        mergeNode = new MergeNode(getNextNodeId(), tupleDesc);
+        mergeNode.addChild(result, unionStmt.getResultExprs());
+        result = mergeNode;
+      }
+    }
+
+    // Put all ALL-qualified operands into a single mergeNode.
+    // During analysis we propagated DISTINCT to the left. Therefore,
+    // we should only encounter ALL qualifiers at this point.
+    while (opIx < operands.size()) {
+      UnionOperand operand = operands.get(opIx);
+      Preconditions.checkState(operand.getQualifier() == Qualifier.ALL);
+      absorbUnionOperand(operand, mergeNode, Qualifier.ALL);
+      ++opIx;
+    }
+
+    // A MergeNode may have predicates if a union is used inside an inline view,
+    // and the enclosing select stmt has predicates on its columns.
+    List<Predicate> conjuncts =
+        analyzer.getBoundConjuncts(unionStmt.getTupleId().asList());
+    // If the topmost node is an agg node, then set the conjuncts on its first child
+    // (which must be a MergeNode), to evaluate the conjuncts as early as possible.
+    if (!conjuncts.isEmpty() && result instanceof AggregationNode) {
+      Preconditions.checkState(result.getChild(0) instanceof MergeNode);
+      result.getChild(0).setConjuncts(conjuncts);
+    } else {
+      result.setConjuncts(conjuncts);
+    }
+
+    // Add order by and limit if present.
+    SortInfo sortInfo = unionStmt.getSortInfo();
+    if (sortInfo != null) {
+      if (unionStmt.getLimit() == -1) {
+        throw new NotImplementedException(
+            "ORDER BY without LIMIT currently not supported");
+      }
+      result = new SortNode(getNextNodeId(), result, sortInfo, true);
+    }
+    result.setLimit(unionStmt.getLimit());
+
+    return result;
+  }
+
+  /**
+   * Absorbs the given operand into the topMergeNode, as follows:
+   * 1. Operand's query stmt is a select stmt: Generate its plan
+   *    and add it into topMergeNode.
+   * 2. Operand's query stmt is a union stmt:
+   *    Apply unnesting rules, i.e., check if the union stmt's operands
+   *    can be directly added into the topMergeNode
+   *    If unnesting is possible then absorb the union stmt's operands into topMergeNode,
+   *    otherwise generate the union stmt's subplan and add it into the topMergeNode.
+   * topQualifier refers to the qualifier of original operand which
+   * was passed to absordUnionOperand() (i.e., at the root of the recursion)
+   */
+  private void absorbUnionOperand(UnionOperand operand, MergeNode topMergeNode,
+      Qualifier topQualifier) throws NotImplementedException, InternalException {
+    QueryStmt queryStmt = operand.getQueryStmt();
+    Analyzer analyzer = operand.getAnalyzer();
+    if (queryStmt instanceof SelectStmt) {
+      SelectStmt selectStmt = (SelectStmt) queryStmt;
+      PlanNode selectPlan = createSelectPlan(selectStmt, analyzer);
+      if (selectPlan == null) {
+        // Select with no FROM clause.
+        topMergeNode.addConstExprList(selectStmt.getResultExprs());
+      } else {
+        topMergeNode.addChild(selectPlan, selectStmt.getResultExprs());
+      }
+      return;
+    }
+
+    Preconditions.checkState(queryStmt instanceof UnionStmt);
+    UnionStmt unionStmt = (UnionStmt) queryStmt;
+    List<UnionOperand> unionOperands = unionStmt.getUnionOperands();
+    // We cannot recursively absorb this union stmt's operands if either:
+    // 1. The union stmt has a limit.
+    // 2. Or the top qualifier is ALL and the first operand qualifier is not ALL.
+    // Note that the first qualifier is ALL iff all operand qualifiers are ALL,
+    // because DISTINCT is propagated to the left during analysis.
+    if (unionStmt.hasLimitClause() || (topQualifier == Qualifier.ALL &&
+        unionOperands.get(1).getQualifier() != Qualifier.ALL)) {
+      PlanNode node = createUnionPlan(unionStmt, analyzer);
+      // If node is a MergeNode then it means it's operands are mixed ALL/DISTINCT.
+      // We cannot directly absorb it's operands, but we can safely add
+      // the MergeNode's children to topMergeNode if the UnionStmt has no limit.
+      if (node instanceof MergeNode && !unionStmt.hasLimitClause()) {
+        MergeNode mergeNode = (MergeNode) node;
+        topMergeNode.getChildren().addAll(mergeNode.getChildren());
+        topMergeNode.getResultExprLists().addAll(mergeNode.getResultExprLists());
+        topMergeNode.getConstExprLists().addAll(mergeNode.getConstExprLists());
+      } else {
+        topMergeNode.addChild(node, unionStmt.getResultExprs());
+      }
+    } else {
+      for (UnionOperand nestedOperand : unionStmt.getUnionOperands()) {
+        absorbUnionOperand(nestedOperand, topMergeNode, topQualifier);
+      }
+    }
+  }
+
+  /**
    * Compute partitioning parameters (scan ranges and hosts) for leftmost scan of plan.
    */
   private void createPartitionParams(PlanNode plan, int numNodes,
       List<TScanRange> scanRanges, List<String> hosts) {
     ScanNode leftmostScan = getLeftmostScan(plan);
-    Preconditions.checkState(leftmostScan != null);
+    if (leftmostScan == null) {
+      // No scans in this plan.
+      return;
+    }
     int numPartitions;
     if (numNodes > 1) {
       // if we asked for a specific number of nodes, partition into numNodes - 1

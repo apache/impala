@@ -1,0 +1,1325 @@
+// Only UNION ALL, no nested unions
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union all
+select int_col, bool_col from alltypes where year=2009 and month=1
+union all
+select int_col, bool_col from alltypessmall where year=2009 and month=2
+---- PLAN
+Plan Fragment 0
+  MERGE (0)
+    TUPLE IDS: 3 
+    SCAN HDFS table=default.alltypessmall (1)
+      TUPLE IDS: 0 
+    SCAN HDFS table=default.alltypes (2)
+      TUPLE IDS: 1 
+    SCAN HDFS table=default.alltypessmall (3)
+      TUPLE IDS: 2 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Only UNION DISTINCT, no nested unions
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union distinct
+select int_col, bool_col from alltypes where year=2009 and month=1
+union distinct
+select int_col, bool_col from alltypessmall where year=2009 and month=2
+---- PLAN
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 0>, <slot 1>
+  TUPLE IDS: 4 
+    MERGE (0)
+      TUPLE IDS: 3 
+      SCAN HDFS table=default.alltypessmall (1)
+        TUPLE IDS: 0 
+      SCAN HDFS table=default.alltypes (2)
+        TUPLE IDS: 1 
+      SCAN HDFS table=default.alltypessmall (3)
+        TUPLE IDS: 2 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Only UNION ALL, mixed selects with and without from clauses, no nested unions
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union all
+select 1, false
+union all
+select int_col, bool_col from alltypes where year=2009 and month=1
+union all
+select 2, true
+---- PLAN
+Plan Fragment 0
+  MERGE (0)
+    TUPLE IDS: 2 
+    SELECT CONSTANT
+    SELECT CONSTANT
+    SCAN HDFS table=default.alltypessmall (1)
+      TUPLE IDS: 0 
+    SCAN HDFS table=default.alltypes (2)
+      TUPLE IDS: 1 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Only UNION DISTINCT, mixed selects with and without from clauses, no nested unions
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union distinct
+select 1, false
+union distinct
+select int_col, bool_col from alltypes where year=2009 and month=1
+union distinct
+select 2, true
+---- PLAN
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 0>, <slot 1>
+  TUPLE IDS: 3 
+    MERGE (0)
+      TUPLE IDS: 2 
+      SELECT CONSTANT
+      SELECT CONSTANT
+      SCAN HDFS table=default.alltypessmall (1)
+        TUPLE IDS: 0 
+      SCAN HDFS table=default.alltypes (2)
+        TUPLE IDS: 1 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Mixed UNION ALL/DISTINCT but effectively only UNION DISTINCT, no nested unions,
+// with order by and limit
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union all
+select int_col, bool_col from alltypes where year=2009 and month=1
+union all
+select int_col, bool_col from alltypessmall where year=2009 and month=2
+union distinct
+(select int_col, bool_col from alltypes where year=2009 and month=2)
+order by 1 limit 10 
+---- PLAN
+Plan Fragment 0
+  TOP-N
+  ORDER BY: <slot 0> ASC
+  LIMIT: 10
+  TUPLE IDS: 5 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 0>, <slot 1>
+    TUPLE IDS: 5 
+      MERGE (0)
+        TUPLE IDS: 4 
+        SCAN HDFS table=default.alltypessmall (1)
+          TUPLE IDS: 0 
+        SCAN HDFS table=default.alltypes (2)
+          TUPLE IDS: 1 
+        SCAN HDFS table=default.alltypessmall (3)
+          TUPLE IDS: 2 
+        SCAN HDFS table=default.alltypes (4)
+          TUPLE IDS: 3 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+      HDFS SPLITS NODE ID: 4
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Mixed UNION ALL/DISTINCT, no nested unions, with order by and limit
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union distinct
+select int_col, bool_col from alltypes where year=2009 and month=1
+union all
+select int_col, bool_col from alltypessmall where year=2009 and month=2
+union all
+(select int_col, bool_col from alltypes where year=2009 and month=2)
+order by 1 limit 10
+---- PLAN
+Plan Fragment 0
+  TOP-N
+  ORDER BY: <slot 0> ASC
+  LIMIT: 10
+  TUPLE IDS: 4 
+    MERGE (4)
+      TUPLE IDS: 4 
+      AGGREGATE
+      OUTPUT: 
+      GROUP BY: <slot 0>, <slot 1>
+      TUPLE IDS: 5 
+        MERGE (0)
+          TUPLE IDS: 4 
+          SCAN HDFS table=default.alltypessmall (1)
+            TUPLE IDS: 0 
+          SCAN HDFS table=default.alltypes (2)
+            TUPLE IDS: 1 
+      SCAN HDFS table=default.alltypessmall (5)
+        TUPLE IDS: 2 
+      SCAN HDFS table=default.alltypes (6)
+        TUPLE IDS: 3 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 5
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+      HDFS SPLITS NODE ID: 6
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Mixed UNION ALL/DISTINCT, no nested unions, with order by and limit
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union all
+select int_col, bool_col from alltypes where year=2009 and month=1
+union distinct
+select int_col, bool_col from alltypessmall where year=2009 and month=2
+union all
+(select int_col, bool_col from alltypes where year=2009 and month=2)
+order by 1 limit 10
+---- PLAN
+Plan Fragment 0
+  TOP-N
+  ORDER BY: <slot 0> ASC
+  LIMIT: 10
+  TUPLE IDS: 4 
+    MERGE (5)
+      TUPLE IDS: 4 
+      AGGREGATE
+      OUTPUT: 
+      GROUP BY: <slot 0>, <slot 1>
+      TUPLE IDS: 5 
+        MERGE (0)
+          TUPLE IDS: 4 
+          SCAN HDFS table=default.alltypessmall (1)
+            TUPLE IDS: 0 
+          SCAN HDFS table=default.alltypes (2)
+            TUPLE IDS: 1 
+          SCAN HDFS table=default.alltypessmall (3)
+            TUPLE IDS: 2 
+      SCAN HDFS table=default.alltypes (6)
+        TUPLE IDS: 3 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+      HDFS SPLITS NODE ID: 6
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Union unnesting: Only UNION ALL, first operand is nested
+(select int_col, bool_col from alltypes where year=2009 and month=1
+ union all
+ select int_col, bool_col from alltypessmall where year=2009 and month=2)
+union all
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+---- PLAN
+Plan Fragment 0
+  MERGE (0)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypes (1)
+      TUPLE IDS: 0 
+    SCAN HDFS table=default.alltypessmall (2)
+      TUPLE IDS: 1 
+    SCAN HDFS table=default.alltypessmall (3)
+      TUPLE IDS: 3 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Union unnesting: Only UNION ALL, second operand is nested
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union all
+  (select int_col, bool_col from alltypes where year=2009 and month=1
+   union all
+   select int_col, bool_col from alltypessmall where year=2009 and month=2)
+---- PLAN
+Plan Fragment 0
+  MERGE (0)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypessmall (1)
+      TUPLE IDS: 0 
+    SCAN HDFS table=default.alltypes (2)
+      TUPLE IDS: 1 
+    SCAN HDFS table=default.alltypessmall (3)
+      TUPLE IDS: 2 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Union unnesting: Only UNION DISTINCT, first operand is nested
+(select int_col, bool_col from alltypes where year=2009 and month=1
+ union distinct
+ select int_col, bool_col from alltypessmall where year=2009 and month=2)
+union distinct
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+---- PLAN
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 0>, <slot 1>
+  TUPLE IDS: 5 
+    MERGE (0)
+      TUPLE IDS: 4 
+      SCAN HDFS table=default.alltypes (1)
+        TUPLE IDS: 0 
+      SCAN HDFS table=default.alltypessmall (2)
+        TUPLE IDS: 1 
+      SCAN HDFS table=default.alltypessmall (3)
+        TUPLE IDS: 3 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Union unnesting: Only UNION DISTINCT, second operand is nested
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union distinct
+  (select int_col, bool_col from alltypes where year=2009 and month=1
+   union distinct
+   select int_col, bool_col from alltypessmall where year=2009 and month=2)
+---- PLAN
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 0>, <slot 1>
+  TUPLE IDS: 5 
+    MERGE (0)
+      TUPLE IDS: 4 
+      SCAN HDFS table=default.alltypessmall (1)
+        TUPLE IDS: 0 
+      SCAN HDFS table=default.alltypes (2)
+        TUPLE IDS: 1 
+      SCAN HDFS table=default.alltypessmall (3)
+        TUPLE IDS: 2 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Union unnesting: UNION ALL doesn't absorb nested union with DISTINCT, 
+// first operand is nested
+(select int_col, bool_col from alltypes where year=2009 and month=1
+ union distinct
+ select int_col, bool_col from alltypessmall where year=2009 and month=2)
+union all
+select int_col, bool_col from alltypessmall where year=2009 and month=1  
+---- PLAN
+Plan Fragment 0
+  MERGE (0)
+    TUPLE IDS: 4 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 0>, <slot 1>
+    TUPLE IDS: 5 
+      MERGE (1)
+        TUPLE IDS: 2 
+        SCAN HDFS table=default.alltypes (2)
+          TUPLE IDS: 0 
+        SCAN HDFS table=default.alltypessmall (3)
+          TUPLE IDS: 1 
+    SCAN HDFS table=default.alltypessmall (5)
+      TUPLE IDS: 3 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+      HDFS SPLITS NODE ID: 5
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Union unnesting: UNION ALL doesn't absorb nested union with DISTINCT,
+// second operand is nested
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union all
+  (select int_col, bool_col from alltypes where year=2009 and month=1
+   union distinct
+   select int_col, bool_col from alltypessmall where year=2009 and month=2)
+---- PLAN
+Plan Fragment 0
+  MERGE (0)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypessmall (1)
+      TUPLE IDS: 0 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 0>, <slot 1>
+    TUPLE IDS: 5 
+      MERGE (2)
+        TUPLE IDS: 3 
+        SCAN HDFS table=default.alltypes (3)
+          TUPLE IDS: 1 
+        SCAN HDFS table=default.alltypessmall (4)
+          TUPLE IDS: 2 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 4
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Union unnesting: UNION ALL absorbs the children but not directly the operands 
+// of a nested union with mixed ALL/DISTINCT, first operand is nested
+(select int_col, bool_col from alltypes where year=2009 and month=1
+ union distinct
+ select int_col, bool_col from alltypessmall where year=2009 and month=2
+ union all
+ select int_col, bool_col from alltypes where year=2009 and month=2)
+union all
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+---- PLAN
+Plan Fragment 0
+  MERGE (0)
+    TUPLE IDS: 5 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 0>, <slot 1>
+    TUPLE IDS: 6 
+      MERGE (1)
+        TUPLE IDS: 3 
+        SCAN HDFS table=default.alltypes (2)
+          TUPLE IDS: 0 
+        SCAN HDFS table=default.alltypessmall (3)
+          TUPLE IDS: 1 
+    SCAN HDFS table=default.alltypes (6)
+      TUPLE IDS: 2 
+    SCAN HDFS table=default.alltypessmall (7)
+      TUPLE IDS: 4 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+      HDFS SPLITS NODE ID: 6
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+      HDFS SPLITS NODE ID: 7
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Union unnesting: UNION ALL absorbs the children but not directly the operands 
+// of a nested union with mixed ALL/DISTINCT, second operand is nested
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union all
+  (select int_col, bool_col from alltypes where year=2009 and month=1
+   union distinct
+   select int_col, bool_col from alltypessmall where year=2009 and month=2
+   union all
+   select int_col, bool_col from alltypes where year=2009 and month=2)
+---- PLAN
+Plan Fragment 0
+  MERGE (0)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypessmall (1)
+      TUPLE IDS: 0 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 0>, <slot 1>
+    TUPLE IDS: 6 
+      MERGE (2)
+        TUPLE IDS: 4 
+        SCAN HDFS table=default.alltypes (3)
+          TUPLE IDS: 1 
+        SCAN HDFS table=default.alltypessmall (4)
+          TUPLE IDS: 2 
+    SCAN HDFS table=default.alltypes (7)
+      TUPLE IDS: 3 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 4
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+      HDFS SPLITS NODE ID: 7
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Union unnesting: UNION ALL doesn't absorb the children of a nested union  
+// with mixed ALL/DISTINCT and limit, second operand is nested
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union all
+  (select int_col, bool_col from alltypes where year=2009 and month=1
+   union distinct
+   select int_col, bool_col from alltypessmall where year=2009 and month=2
+   union all
+   (select int_col, bool_col from alltypes where year=2009 and month=2)
+   limit 10)
+---- PLAN
+Plan Fragment 0
+  MERGE (0)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypessmall (1)
+      TUPLE IDS: 0 
+    MERGE (6)
+      LIMIT: 10
+      TUPLE IDS: 4 
+      AGGREGATE
+      OUTPUT: 
+      GROUP BY: <slot 0>, <slot 1>
+      TUPLE IDS: 6 
+        MERGE (2)
+          TUPLE IDS: 4 
+          SCAN HDFS table=default.alltypes (3)
+            TUPLE IDS: 1 
+          SCAN HDFS table=default.alltypessmall (4)
+            TUPLE IDS: 2 
+      SCAN HDFS table=default.alltypes (7)
+        TUPLE IDS: 3 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 4
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+      HDFS SPLITS NODE ID: 7
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Union unnesting: UNION ALL doesn't absorb nested union with order by and limit,
+// first operand is nested
+(select int_col, bool_col from alltypes where year=2009 and month=1
+ union all
+ (select int_col, bool_col from alltypessmall where year=2009 and month=2)
+ order by 1 limit 10)
+union all
+select int_col, bool_col from alltypessmall where year=2009 and month=1  
+---- PLAN
+Plan Fragment 0
+  MERGE (0)
+    TUPLE IDS: 4 
+    TOP-N
+    ORDER BY: <slot 0> ASC
+    LIMIT: 10
+    TUPLE IDS: 2 
+      MERGE (1)
+        TUPLE IDS: 2 
+        SCAN HDFS table=default.alltypes (2)
+          TUPLE IDS: 0 
+        SCAN HDFS table=default.alltypessmall (3)
+          TUPLE IDS: 1 
+    SCAN HDFS table=default.alltypessmall (5)
+      TUPLE IDS: 3 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+      HDFS SPLITS NODE ID: 5
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Union unnesting: UNION ALL doesn't absorb nested union with order by and limit,
+// second operand is nested
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union all
+  (select int_col, bool_col from alltypes where year=2009 and month=1
+   union all
+   (select int_col, bool_col from alltypessmall where year=2009 and month=2)
+   order by 1 limit 10)
+---- PLAN
+Plan Fragment 0
+  MERGE (0)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypessmall (1)
+      TUPLE IDS: 0 
+    TOP-N
+    ORDER BY: <slot 0> ASC
+    LIMIT: 10
+    TUPLE IDS: 3 
+      MERGE (2)
+        TUPLE IDS: 3 
+        SCAN HDFS table=default.alltypes (3)
+          TUPLE IDS: 1 
+        SCAN HDFS table=default.alltypessmall (4)
+          TUPLE IDS: 2 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 4
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Union unnesting: UNION DISTINCT absorbs nested union with ALL
+// first operand is nested
+(select int_col, bool_col from alltypes where year=2009 and month=1
+ union all
+ select int_col, bool_col from alltypessmall where year=2009 and month=2)
+union distinct
+select int_col, bool_col from alltypessmall where year=2009 and month=1  
+---- PLAN
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 0>, <slot 1>
+  TUPLE IDS: 5 
+    MERGE (0)
+      TUPLE IDS: 4 
+      SCAN HDFS table=default.alltypes (1)
+        TUPLE IDS: 0 
+      SCAN HDFS table=default.alltypessmall (2)
+        TUPLE IDS: 1 
+      SCAN HDFS table=default.alltypessmall (3)
+        TUPLE IDS: 3 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Union unnesting: UNION DISTINCT absorbs nested union with ALL,
+// second operand is nested
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union distinct
+  (select int_col, bool_col from alltypes where year=2009 and month=1
+   union all
+   select int_col, bool_col from alltypessmall where year=2009 and month=2)
+---- PLAN
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 0>, <slot 1>
+  TUPLE IDS: 5 
+    MERGE (0)
+      TUPLE IDS: 4 
+      SCAN HDFS table=default.alltypessmall (1)
+        TUPLE IDS: 0 
+      SCAN HDFS table=default.alltypes (2)
+        TUPLE IDS: 1 
+      SCAN HDFS table=default.alltypessmall (3)
+        TUPLE IDS: 2 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Union unnesting: UNION DISTINCT absorbs nested union with mixed ALL/DISTINCT,
+// first operand is nested
+(select int_col, bool_col from alltypes where year=2009 and month=1
+ union distinct
+ select int_col, bool_col from alltypessmall where year=2009 and month=2
+ union all
+ select int_col, bool_col from alltypes where year=2009 and month=2)
+union distinct
+select int_col, bool_col from alltypessmall where year=2009 and month=1  
+---- PLAN
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 0>, <slot 1>
+  TUPLE IDS: 6 
+    MERGE (0)
+      TUPLE IDS: 5 
+      SCAN HDFS table=default.alltypes (1)
+        TUPLE IDS: 0 
+      SCAN HDFS table=default.alltypessmall (2)
+        TUPLE IDS: 1 
+      SCAN HDFS table=default.alltypes (3)
+        TUPLE IDS: 2 
+      SCAN HDFS table=default.alltypessmall (4)
+        TUPLE IDS: 4 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+      HDFS SPLITS NODE ID: 4
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Union unnesting: UNION DISTINCT absorbs nested union with mixed ALL/DISTINCT,
+// second operand is nested
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union distinct
+  (select int_col, bool_col from alltypes where year=2009 and month=1
+   union distinct
+   select int_col, bool_col from alltypessmall where year=2009 and month=2
+   union all
+   select int_col, bool_col from alltypes where year=2009 and month=2)
+---- PLAN
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 0>, <slot 1>
+  TUPLE IDS: 6 
+    MERGE (0)
+      TUPLE IDS: 5 
+      SCAN HDFS table=default.alltypessmall (1)
+        TUPLE IDS: 0 
+      SCAN HDFS table=default.alltypes (2)
+        TUPLE IDS: 1 
+      SCAN HDFS table=default.alltypessmall (3)
+        TUPLE IDS: 2 
+      SCAN HDFS table=default.alltypes (4)
+        TUPLE IDS: 3 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+      HDFS SPLITS NODE ID: 4
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Union unnesting: UNION DISTINCT doesn't absorb nested union with order by and limit,
+// first operand is nested
+(select int_col, bool_col from alltypes where year=2009 and month=1
+ union all
+ (select int_col, bool_col from alltypessmall where year=2009 and month=2)
+ order by 1 limit 10)
+union distinct
+select int_col, bool_col from alltypessmall where year=2009 and month=1  
+---- PLAN
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 0>, <slot 1>
+  TUPLE IDS: 5 
+    MERGE (0)
+      TUPLE IDS: 4 
+      TOP-N
+      ORDER BY: <slot 0> ASC
+      LIMIT: 10
+      TUPLE IDS: 2 
+        MERGE (1)
+          TUPLE IDS: 2 
+          SCAN HDFS table=default.alltypes (2)
+            TUPLE IDS: 0 
+          SCAN HDFS table=default.alltypessmall (3)
+            TUPLE IDS: 1 
+      SCAN HDFS table=default.alltypessmall (5)
+        TUPLE IDS: 3 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+      HDFS SPLITS NODE ID: 5
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Union unnesting: UNION DISTINCT doesn't absorb nested union with order by and limit
+// second operand is nested
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union distinct
+  (select int_col, bool_col from alltypes where year=2009 and month=1
+   union all
+   (select int_col, bool_col from alltypessmall where year=2009 and month=2)
+   order by 1 limit 10)
+---- PLAN
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 0>, <slot 1>
+  TUPLE IDS: 5 
+    MERGE (0)
+      TUPLE IDS: 4 
+      SCAN HDFS table=default.alltypessmall (1)
+        TUPLE IDS: 0 
+      TOP-N
+      ORDER BY: <slot 0> ASC
+      LIMIT: 10
+      TUPLE IDS: 3 
+        MERGE (2)
+          TUPLE IDS: 3 
+          SCAN HDFS table=default.alltypes (3)
+            TUPLE IDS: 1 
+          SCAN HDFS table=default.alltypessmall (4)
+            TUPLE IDS: 2 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 4
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Complex union unnesting: Multiple levels of UNION ALL, fully unnestable
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union all
+  (select int_col, bool_col from alltypes where year=2009 and month=1
+   union all
+     (select int_col, bool_col from alltypessmall where year=2009 and month=2
+      union all
+        (select int_col, bool_col from alltypes where year=2009 and month=2
+         union all
+         select int_col, bool_col from alltypessmall where year=2009 and month=3)))
+---- PLAN
+Plan Fragment 0
+  MERGE (0)
+    TUPLE IDS: 8 
+    SCAN HDFS table=default.alltypessmall (1)
+      TUPLE IDS: 0 
+    SCAN HDFS table=default.alltypes (2)
+      TUPLE IDS: 1 
+    SCAN HDFS table=default.alltypessmall (3)
+      TUPLE IDS: 2 
+    SCAN HDFS table=default.alltypes (4)
+      TUPLE IDS: 3 
+    SCAN HDFS table=default.alltypessmall (5)
+      TUPLE IDS: 4 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+      HDFS SPLITS NODE ID: 4
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+      HDFS SPLITS NODE ID: 5
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Complex union unnesting: Multiple levels of UNION DISTINCT, fully unnestable
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union distinct
+  (select int_col, bool_col from alltypes where year=2009 and month=1
+   union distinct
+     (select int_col, bool_col from alltypessmall where year=2009 and month=2
+      union distinct
+        (select int_col, bool_col from alltypes where year=2009 and month=2
+         union distinct
+         select int_col, bool_col from alltypessmall where year=2009 and month=3)))
+---- PLAN
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 0>, <slot 1>
+  TUPLE IDS: 9 
+    MERGE (0)
+      TUPLE IDS: 8 
+      SCAN HDFS table=default.alltypessmall (1)
+        TUPLE IDS: 0 
+      SCAN HDFS table=default.alltypes (2)
+        TUPLE IDS: 1 
+      SCAN HDFS table=default.alltypessmall (3)
+        TUPLE IDS: 2 
+      SCAN HDFS table=default.alltypes (4)
+        TUPLE IDS: 3 
+      SCAN HDFS table=default.alltypessmall (5)
+        TUPLE IDS: 4 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+      HDFS SPLITS NODE ID: 4
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+      HDFS SPLITS NODE ID: 5
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Complex union unnesting: Partially unnestable up to 2nd level
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union all
+  (select int_col, bool_col from alltypes where year=2009 and month=1
+   union distinct
+     (select int_col, bool_col from alltypessmall where year=2009 and month=2
+      union all
+        (select int_col, bool_col from alltypes where year=2009 and month=2
+         union distinct
+         (select int_col, bool_col from alltypessmall where year=2009 and month=3)
+         order by 1 limit 10)))
+---- PLAN
+Plan Fragment 0
+  MERGE (0)
+    TUPLE IDS: 8 
+    SCAN HDFS table=default.alltypessmall (1)
+      TUPLE IDS: 0 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 0>, <slot 1>
+    TUPLE IDS: 10 
+      MERGE (2)
+        TUPLE IDS: 7 
+        SCAN HDFS table=default.alltypes (3)
+          TUPLE IDS: 1 
+        SCAN HDFS table=default.alltypessmall (4)
+          TUPLE IDS: 2 
+        TOP-N
+        ORDER BY: <slot 0> ASC
+        LIMIT: 10
+        TUPLE IDS: 9 
+          AGGREGATE
+          OUTPUT: 
+          GROUP BY: <slot 0>, <slot 1>
+          TUPLE IDS: 9 
+            MERGE (5)
+              TUPLE IDS: 5 
+              SCAN HDFS table=default.alltypes (6)
+                TUPLE IDS: 3 
+              SCAN HDFS table=default.alltypessmall (7)
+                TUPLE IDS: 4 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 4
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+      HDFS SPLITS NODE ID: 6
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+      HDFS SPLITS NODE ID: 7
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Complex union unnesting: Partially unnestable up to 1st level
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union distinct
+  (select int_col, bool_col from alltypes where year=2009 and month=1
+   union distinct
+     (select int_col, bool_col from alltypessmall where year=2009 and month=2
+      union all
+        (select int_col, bool_col from alltypes where year=2009 and month=2
+         union distinct
+         (select int_col, bool_col from alltypessmall where year=2009 and month=3)
+         order by 1 limit 10)))
+---- PLAN
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 0>, <slot 1>
+  TUPLE IDS: 10 
+    MERGE (0)
+      TUPLE IDS: 8 
+      SCAN HDFS table=default.alltypessmall (1)
+        TUPLE IDS: 0 
+      SCAN HDFS table=default.alltypes (2)
+        TUPLE IDS: 1 
+      SCAN HDFS table=default.alltypessmall (3)
+        TUPLE IDS: 2 
+      TOP-N
+      ORDER BY: <slot 0> ASC
+      LIMIT: 10
+      TUPLE IDS: 9 
+        AGGREGATE
+        OUTPUT: 
+        GROUP BY: <slot 0>, <slot 1>
+        TUPLE IDS: 9 
+          MERGE (4)
+            TUPLE IDS: 5 
+            SCAN HDFS table=default.alltypes (5)
+              TUPLE IDS: 3 
+            SCAN HDFS table=default.alltypessmall (6)
+              TUPLE IDS: 4 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+      HDFS SPLITS NODE ID: 5
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+      HDFS SPLITS NODE ID: 6
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Complex union unnesting: Multiple nested unions to test all rules in a single query
+select int_col, bool_col from alltypessmall where year=2009 and month=1
+union distinct
+  (select int_col, bool_col from alltypes where year=2009 and month=1
+   union all
+   select int_col, bool_col from alltypessmall where year=2009 and month=2)
+union distinct
+  (select int_col, bool_col from alltypes where year=2009 and month=2
+   union all
+   (select int_col, bool_col from alltypessmall where year=2009 and month=3)
+   order by 1 limit 10)
+union all
+  (select int_col, bool_col from alltypes where year=2009 and month=3
+   union all
+   select int_col, bool_col from alltypessmall where year=2009 and month=4)
+union all
+  (select int_col, bool_col from alltypes where year=2009 and month=4
+   union all
+   (select int_col, bool_col from alltypes where year=2009 and month=5)
+   order by 1 limit 10)        
+---- PLAN
+Plan Fragment 0
+  MERGE (9)
+    TUPLE IDS: 13 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 0>, <slot 1>
+    TUPLE IDS: 14 
+      MERGE (0)
+        TUPLE IDS: 13 
+        SCAN HDFS table=default.alltypessmall (1)
+          TUPLE IDS: 0 
+        SCAN HDFS table=default.alltypes (2)
+          TUPLE IDS: 1 
+        SCAN HDFS table=default.alltypessmall (3)
+          TUPLE IDS: 2 
+        TOP-N
+        ORDER BY: <slot 0> ASC
+        LIMIT: 10
+        TUPLE IDS: 6 
+          MERGE (4)
+            TUPLE IDS: 6 
+            SCAN HDFS table=default.alltypes (5)
+              TUPLE IDS: 4 
+            SCAN HDFS table=default.alltypessmall (6)
+              TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypes (10)
+      TUPLE IDS: 7 
+    SCAN HDFS table=default.alltypessmall (11)
+      TUPLE IDS: 8 
+    TOP-N
+    ORDER BY: <slot 0> ASC
+    LIMIT: 10
+    TUPLE IDS: 12 
+      MERGE (12)
+        TUPLE IDS: 12 
+        SCAN HDFS table=default.alltypes (13)
+          TUPLE IDS: 10 
+        SCAN HDFS table=default.alltypes (14)
+          TUPLE IDS: 11 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+      HDFS SPLITS NODE ID: 5
+        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+      HDFS SPLITS NODE ID: 6
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+      HDFS SPLITS NODE ID: 10
+        hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
+      HDFS SPLITS NODE ID: 11
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+      HDFS SPLITS NODE ID: 13
+        hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
+      HDFS SPLITS NODE ID: 14
+        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// UNION ALL in subquery
+select x.int_col, x.bool_col from
+  (select int_col, bool_col from alltypessmall where year=2009 and month=1
+   union all
+   select int_col, bool_col from alltypes where year=2009 and month=1) x
+union all
+(select int_col, bool_col from alltypessmall where year=2009 and month=2)
+order by 1 limit 10
+---- PLAN
+Plan Fragment 0
+  TOP-N
+  ORDER BY: <slot 0> ASC
+  LIMIT: 10
+  TUPLE IDS: 5 
+    MERGE (0)
+      TUPLE IDS: 5 
+      MERGE (1)
+        TUPLE IDS: 2 
+        SCAN HDFS table=default.alltypessmall (2)
+          TUPLE IDS: 0 
+        SCAN HDFS table=default.alltypes (3)
+          TUPLE IDS: 1 
+      SCAN HDFS table=default.alltypessmall (4)
+        TUPLE IDS: 4 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 4
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// UNION DISTINCT in subquery
+select x.int_col, x.bool_col from
+  (select int_col, bool_col from alltypessmall where year=2009 and month=1
+   union distinct
+   select int_col, bool_col from alltypes where year=2009 and month=1) x
+union distinct
+(select int_col, bool_col from alltypessmall where year=2009 and month=2)
+order by 1 limit 10
+---- PLAN
+Plan Fragment 0
+  TOP-N
+  ORDER BY: <slot 0> ASC
+  LIMIT: 10
+  TUPLE IDS: 7 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 0>, <slot 1>
+    TUPLE IDS: 7 
+      MERGE (0)
+        TUPLE IDS: 5 
+        AGGREGATE
+        OUTPUT: 
+        GROUP BY: <slot 0>, <slot 1>
+        TUPLE IDS: 6 
+          MERGE (1)
+            TUPLE IDS: 2 
+            SCAN HDFS table=default.alltypessmall (2)
+              TUPLE IDS: 0 
+            SCAN HDFS table=default.alltypes (3)
+              TUPLE IDS: 1 
+        SCAN HDFS table=default.alltypessmall (5)
+          TUPLE IDS: 4 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 3
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+      HDFS SPLITS NODE ID: 5
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// UNION ALL in subquery with a WHERE condition in the outer select.
+select x.int_col, x.bool_col from
+  (select int_col, bool_col from alltypessmall where year=2009 and month=1
+   union all
+   select int_col, bool_col from alltypes where year=2009 and month=1) x
+where x.int_col < 5 and x.bool_col = false
+---- PLAN
+Plan Fragment 0
+  MERGE (0)
+    TUPLE IDS: 2 
+    PREDICATES: <slot 0> < 5, <slot 1> = FALSE
+    SCAN HDFS table=default.alltypessmall (1)
+      TUPLE IDS: 0 
+    SCAN HDFS table=default.alltypes (2)
+      TUPLE IDS: 1     
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+------------ DISTRIBUTEDPLAN
+Plan Fragment 0
+  EXCHANGE (3)
+    TUPLE IDS: 2 
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+  MERGE (0)
+    TUPLE IDS: 2 
+    PREDICATES: <slot 0> < 5, <slot 1> = FALSE
+    SCAN HDFS table=default.alltypessmall (1)
+      TUPLE IDS: 0 
+    SCAN HDFS table=default.alltypes (2)
+      TUPLE IDS: 1     
+
+  EXEC PARAMS
+    HOST: 127.0.0.1
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+====
+// UNION DISTINCT in subquery with a WHERE condition in the outer select.
+select x.int_col, x.bool_col from
+  (select int_col, bool_col from alltypessmall where year=2009 and month=1
+   union distinct
+   select int_col, bool_col from alltypes where year=2009 and month=1) x
+where x.int_col < 5 and x.bool_col = false
+---- PLAN
+Plan Fragment 0
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 0>, <slot 1>
+  TUPLE IDS: 4 
+    MERGE (0)
+      TUPLE IDS: 2 
+      PREDICATES: <slot 0> < 5, <slot 1> = FALSE
+      SCAN HDFS table=default.alltypessmall (1)
+        TUPLE IDS: 0 
+      SCAN HDFS table=default.alltypes (2)
+        TUPLE IDS: 1       
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+------------ DISTRIBUTEDPLAN
+Plan Fragment 0
+  EXCHANGE (4)
+    TUPLE IDS: 4 
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 0>, <slot 1>
+  TUPLE IDS: 4 
+    MERGE (0)
+      TUPLE IDS: 2 
+      PREDICATES: <slot 0> < 5, <slot 1> = FALSE
+      SCAN HDFS table=default.alltypessmall (1)
+        TUPLE IDS: 0 
+      SCAN HDFS table=default.alltypes (2)
+        TUPLE IDS: 1       
+
+  EXEC PARAMS
+    HOST: 127.0.0.1
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+====
