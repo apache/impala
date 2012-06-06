@@ -36,6 +36,9 @@ class QueryExecutorIf {
   virtual Status Exec(
       const std::string& query, std::vector<PrimitiveType>* col_types) = 0;
 
+  // Return the explain plan for the query
+  virtual Status Explain(const std::string& query, std::string* explain_plan) = 0;
+
   // Returns result batch in 'batch'. The returned rows are the output rows of
   // the execution tree. In other words, they do *not* reflect the query's
   // select list exprs, ie, don't call this if the query

@@ -38,6 +38,7 @@ DEFINE_bool(init_hbase, true, "if true, call hbase jni initialization");
 DEFINE_string(profile_output_file, "pprof.out", "google pprof output file");
 DEFINE_int32(iterations, 1, "Number of times to run the query (for perf testing)");
 DEFINE_bool(enable_counters, true, "if false, disable using counters (so a profiler can use them");
+DEFINE_bool(explain_plan, false, "if true, print the explain plan only");
 DECLARE_int32(num_nodes);
 DECLARE_int32(backend_port);
 DECLARE_string(backends);
@@ -77,6 +78,14 @@ static QueryExecutorIf* CreateExecutor(ExecEnv* exec_env) {
   } else {
     return new InProcessQueryExecutor(exec_env);
   }
+}
+
+static void Explain(ExecEnv* exec_env) {
+  scoped_ptr<QueryExecutorIf> executor(CreateExecutor(exec_env));
+  EXIT_IF_ERROR(executor->Setup());
+  string explain_plan;
+  EXIT_IF_ERROR(executor->Explain(FLAGS_query, &explain_plan));
+  cout << "Explan Plan:" << endl << explain_plan << endl;
 }
 
 static void Exec(ExecEnv* exec_env) {
@@ -231,7 +240,11 @@ int main(int argc, char** argv) {
     EXIT_IF_ERROR(HBaseTableCache::Init());
   }
 
-  Exec(exec_env.get());
+  if (FLAGS_explain_plan) {
+    Explain(exec_env.get());
+  } else {
+    Exec(exec_env.get());
+  }
 
   // Delete all global JNI references.
   JniUtil::Cleanup();

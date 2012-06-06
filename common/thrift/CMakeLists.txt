@@ -65,6 +65,7 @@ set (GENERATES_SRC_FILES
 )
 
 set (SRC_FILES
+  beeswax.thrift
   DataSinks.thrift
   Data.thrift
   Descriptors.thrift

@@ -31,6 +31,7 @@ private:
   // saves writing accessor methods.
   friend class Coordinator;
   friend class InProcessQueryExecutor;
+  friend class ImpaladQueryExecutor;
 };
 
 }

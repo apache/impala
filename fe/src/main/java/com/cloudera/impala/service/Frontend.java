@@ -17,8 +17,6 @@ import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.planner.DataSink;
-import com.cloudera.impala.planner.PlanNode;
 import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.thrift.TPlanExecRequest;
 import com.cloudera.impala.thrift.TQueryExecRequest;
@@ -35,6 +33,8 @@ public class Frontend {
   private final static Logger LOG = LoggerFactory.getLogger(Frontend.class);
   private final Catalog catalog;
   private int nextQueryId;
+  private final static TBinaryProtocol.Factory protocolFactory =
+      new TBinaryProtocol.Factory();
 
   public Frontend() throws MetaException {
     this.catalog = new Catalog();
@@ -42,23 +42,14 @@ public class Frontend {
   }
 
   /**
-   * Create the serialized form of a TQueryExecRequest based on thriftQueryRequest,
-   * a serialized TQueryRequest.
-   * This call is thread-safe.
-   * TODO: make updates to nextQueryId thread-safe
+   * Run parsing, semantic analysis and plan generation for the given query request and
+   * return the TQueryExecRequest and optionally, an explain plan string.
+   * @param request query request
+   * @param explainString if not null, it will contain the explain plan string
+   * @return the serialized form of a TQueryExecRequest based on thriftQueryRequest
    */
-  public byte[] GetExecRequest(byte[] thriftQueryRequest) throws ImpalaException {
-    // TODO: avoid creating factory and deserializer for each query?
-    TBinaryProtocol.Factory protocolFactory = new TBinaryProtocol.Factory();
-    TDeserializer deserializer = new TDeserializer(protocolFactory);
-
-    TQueryRequest request = new TQueryRequest();
-    try {
-      deserializer.deserialize(request, thriftQueryRequest);
-    } catch (TException e) {
-      throw new InternalException(e.getMessage());
-    }
-    LOG.info("creating TQueryExecRequest for " + request.toString());
+  private TQueryExecRequest createExecRequest(TQueryRequest request,
+      StringBuilder explainString) throws ImpalaException {
     AnalysisContext analysisCtxt = new AnalysisContext(catalog);
     AnalysisContext.AnalysisResult analysisResult = null;
     try {
@@ -71,11 +62,43 @@ public class Frontend {
 
     // create plan
     Planner planner = new Planner();
-    StringBuilder explainString = new StringBuilder();
     TQueryExecRequest result;
-    result = planner.createPlanFragments(
-        analysisResult, request.numNodes, explainString);
+    result = planner.createPlanFragments(analysisResult, request.numNodes, explainString);
+    return result;
+  }
 
+  /**
+   * Deserialized a serialized form of thriftQueryRequest to TQueryRequest
+   */
+  private TQueryRequest deserializeTQueryRequest(byte[] thriftQueryRequest)
+      throws ImpalaException {
+    // TODO: avoid creating deserializer for each query?
+    TDeserializer deserializer = new TDeserializer(protocolFactory);
+
+    TQueryRequest request = new TQueryRequest();
+    try {
+      deserializer.deserialize(request, thriftQueryRequest);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+    LOG.info("creating TQueryExecRequest for " + request.toString());
+    return request;
+  }
+
+  /**
+   * Create the serialized form of a TQueryExecRequest based on thriftQueryRequest,
+   * a serialized TQueryRequest.
+   * This call is thread-safe.
+   * TODO: make updates to nextQueryId thread-safe
+   */
+  public byte[] GetExecRequest(byte[] thriftQueryRequest) throws ImpalaException {
+    TQueryRequest request = deserializeTQueryRequest(thriftQueryRequest);
+
+    // process front end
+    StringBuilder explainString = new StringBuilder();
+    TQueryExecRequest result = createExecRequest(request, explainString);
+
+    // Set query id
     UUID queryId = new UUID(nextQueryId++, 0);
     result.setQueryId(
         new TUniqueId(queryId.getMostSignificantBits(),
@@ -95,5 +118,19 @@ public class Frontend {
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }
+  }
+
+  /**
+   * Return an explain plan based on thriftQueryRequest, a serialized TQueryRequest.
+   * This call is thread-safe.
+   */
+  public String GetExplainPlan(byte[] thriftQueryRequest) throws ImpalaException {
+    TQueryRequest request = deserializeTQueryRequest(thriftQueryRequest);
+
+    // process front end and return the explain plan
+    StringBuilder explainString = new StringBuilder();
+    createExecRequest(request, explainString);
+    LOG.info("Explain plan: " + request.toString());
+    return explainString.toString();
   }
 }

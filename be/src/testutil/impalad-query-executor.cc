@@ -22,6 +22,7 @@ using namespace boost::algorithm;
 using namespace apache::thrift;
 using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
+using namespace beeswax;
 
 namespace impala {
 
@@ -53,25 +54,14 @@ Status ImpaladQueryExecutor::Setup() {
 }
 
 Status ImpaladQueryExecutor::Exec(
-    const string& query, vector<PrimitiveType>* col_types) {
-  TQueryRequest request;
-  request.stmt = query;
-  request.returnAsAscii = true;
-  request.numNodes = FLAGS_num_nodes;
-  TRunQueryResult run_query_result;
-  client_->RunQuery(run_query_result, request);
-  if (run_query_result.status.status_code != TStatusCode::OK) {
-    return Status(run_query_result.status);
-  }
-  query_id_ = run_query_result.query_id;
+    const string& query_string, vector<PrimitiveType>* col_types) {
+  Query query;
+  query.query = query_string;
 
-  // prime query_result_
-  TFetchResultsResult fetch_result;
-  client_->FetchResults(fetch_result, query_id_);
-  if (fetch_result.status.status_code != TStatusCode::OK) {
-    return Status(fetch_result.status);
-  }
-  query_result_ = fetch_result.query_result;
+  // TODO: catch exception and return error code
+  // LogContextId of "" will ask the Beeswax service to assign a new id but Beeswax
+  // does not provide a constant for it.
+  client_->executeAndWait(query_handle_, query, "");
   current_row_ = 0;
   return Status::OK;
 }
@@ -81,39 +71,18 @@ Status ImpaladQueryExecutor::FetchResult(RowBatch** batch) {
 }
 
 Status ImpaladQueryExecutor::FetchResult(string* row) {
-  if (current_row_ == query_result_.rows.size()) {
-    if (query_result_.eos) {
-      *row = "";
-      eos_ = true;
-      return Status::OK;
-    }
+  client_->fetch(query_results_, query_handle_, false, 1);
 
-    TFetchResultsResult fetch_result;
-    client_->FetchResults(fetch_result, query_id_);
-    VLOG(2) << ThriftDebugString(fetch_result);
-    if (fetch_result.status.status_code != TStatusCode::OK) {
-      return Status(fetch_result.status);
-    }
-    query_result_ = fetch_result.query_result;
-    // if we get back an empty batch, we must have hit eos
-    DCHECK(!query_result_.rows.empty() || query_result_.eos);
-    if (query_result_.rows.empty()) {
-      *row = "";
-      eos_ = true;
-      return Status::OK;
-    }
-    current_row_ = 0;
+  // We've implemented fetch as sync. So, it always returns with result.
+  DCHECK(query_results_.ready);
+  if (query_results_.data.size() > 0) {
+    *row = query_results_.data.at(0);
+    ++exec_stats_.num_rows_;
+  } else {
+    *row = "";
   }
 
-  row->clear();
-  DCHECK_LT(current_row_, query_result_.rows.size());
-  vector<TColumnValue>& col_vals = query_result_.rows[current_row_].colVals;
-  for (vector<TColumnValue>::iterator val = col_vals.begin(); val != col_vals.end();
-       ++val) {
-    if (val != col_vals.begin()) row->append(", ");
-    row->append(val->stringVal);
-  }
-  ++current_row_;
+  eos_ = !query_results_.has_more;
   return Status::OK;
 }
 
@@ -127,6 +96,17 @@ string ImpaladQueryExecutor::ErrorString() const {
 
 string ImpaladQueryExecutor::FileErrors() const {
   return "";
+}
+
+// Return the explain plan for the query
+Status ImpaladQueryExecutor::Explain(const string& query_string, string* explain_plan) {
+  Query query;
+  query.query = query_string;
+
+  // TODO: catch exception and return error code
+  client_->explain(query_explanation_, query);
+  *explain_plan = query_explanation_.textual;
+  return Status::OK;
 }
 
 RuntimeProfile* ImpaladQueryExecutor::query_profile() {

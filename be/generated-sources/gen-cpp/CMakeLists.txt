@@ -16,6 +16,9 @@ set(SRC_FILES
   ImpalaService.cpp
   ImpalaService_constants.cpp
   ImpalaService_types.cpp
+  beeswax_constants.cpp
+  beeswax_types.cpp
+  BeeswaxService.cpp
   Data_constants.cpp
   Data_types.cpp
   DataSinks_constants.cpp

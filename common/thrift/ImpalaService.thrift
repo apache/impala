@@ -4,6 +4,7 @@ namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
 include "Types.thrift"
+include "beeswax.thrift"
 
 struct TQueryRequest {
   // select stmt to be executed
@@ -64,19 +65,10 @@ struct TFetchResultsResult {
 // For all rpc that return a TStatus as part of their result type,
 // if the status_code field is set to anything other than OK, the contents
 // of the remainder of the result type is undefined (typically not set)
-service ImpalaService {
-  // Starts asynchronous query execution and returns a handle to the
-  // query.
-  TRunQueryResult RunQuery(1:TQueryRequest request);
-
-  // Returns a batch of result rows. Call this repeatedly until 'eos'
-  // is set in order to retrieve all result rows.
-  // The first batch has 'colTypes' set.
-  TFetchResultsResult FetchResults(1:Types.TUniqueId query_id);
-
+service ImpalaService extends beeswax.BeeswaxService {
   // Cancel execution of query. Returns RUNTIME_ERROR if query_id
   // unknown.
   // This terminates all threads running on behalf of this query at
   // all nodes that were involved in the execution.
-  Types.TStatus CancelQuery(1:Types.TUniqueId query_id);
+  Types.TStatus cancel(1:beeswax.QueryHandle query_id);
 }

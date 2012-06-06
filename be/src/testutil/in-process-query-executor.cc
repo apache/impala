@@ -297,6 +297,11 @@ string InProcessQueryExecutor::FileErrors() const {
   return coord_->runtime_state()->FileErrors();
 }
 
+Status InProcessQueryExecutor::Explain(const string& query, string* explain_plan) {
+  // TODO: finish this
+  return Status("InProcessQueryExecutor::Explain not supported");
+}
+
 RuntimeProfile* InProcessQueryExecutor::query_profile() {
   return query_profile_.get();
 }

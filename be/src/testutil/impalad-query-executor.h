@@ -34,7 +34,10 @@ class ImpaladQueryExecutor : public QueryExecutorIf {
   // Start running query. Call this prior to FetchResult().
   // If 'col_types' is non-NULL, returns the types of the select list items.
   virtual Status Exec(
-      const std::string& query, std::vector<PrimitiveType>* col_types);
+      const std::string& query_string, std::vector<PrimitiveType>* col_types);
+
+  // Return the explain plan for the query
+  virtual Status Explain(const std::string& query_string, std::string* explain_plan);
 
   // Returns result batch in 'batch'. The returned rows are the output rows of
   // the execution tree. In other words, they do *not* reflect the query's
@@ -76,8 +79,11 @@ class ImpaladQueryExecutor : public QueryExecutorIf {
   boost::shared_ptr<apache::thrift::protocol::TProtocol> protocol_;
   boost::scoped_ptr<ImpalaServiceClient> client_;
 
-  TUniqueId query_id_;
-  TQueryResult query_result_;
+  // Beeswax query handle and result
+  beeswax::QueryHandle query_handle_;
+  beeswax::Results query_results_;
+  beeswax::QueryExplanation query_explanation_;
+
   int current_row_;
   bool eos_;
   ExecStats exec_stats_;  // not set right now
