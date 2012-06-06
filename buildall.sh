@@ -85,6 +85,7 @@ then
   rm -rf target
   rm -f src/test/resources/hbase-site.xml
   rm -f src/test/resources/hive-site.xml
+  rm -rf src/generated-sources/*
   rm -f derby.log
 
   # clean be

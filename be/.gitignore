@@ -1,5 +1,5 @@
 *~
 
 build
-generated-sources
+generated-sources/**/*
 

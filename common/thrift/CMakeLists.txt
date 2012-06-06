@@ -14,7 +14,7 @@ cmake_minimum_required(VERSION 2.6)
 # To call this function, pass it the output file list followed by the input thrift files:
 #    i.e. THRIFT_GEN(OUTPUT_FILES, ${THRIFT_FILES}) 
 #
-# cmake seems to be case sensitive for some keywords.  Changing the first IF check to lower
+# cmake seems to be case sensitive for some keywords. Changing the first IF check to lower
 # case makes it not work.  TODO: investigate this 
 function(THRIFT_GEN VAR)
   IF (NOT ARGN)
@@ -38,6 +38,15 @@ function(THRIFT_GEN VAR)
     set(OUTPUT_BE_FILE ${OUTPUT_BE_FILE} "${BE_OUTPUT_DIR}/gen-cpp/${FIL_WE}_constants.h")
     list(APPEND ${VAR} ${OUTPUT_BE_FILE})
 
+    # BeeswaxService thrift generation
+    # It depends on hive_meta_store, which in turn depends on fb303.
+    # The java dependency is handled by maven. 
+    # We need to generate C++ src file for the parent dependencies using the "-r" option.
+    set(CPP_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen cpp -o ${BE_OUTPUT_DIR})
+    IF (FIL STREQUAL "beeswax.thrift")
+      set(CPP_ARGS -r ${THRIFT_INCLUDE_DIR_OPTION} --gen cpp -o ${BE_OUTPUT_DIR})
+    ENDIF(FIL STREQUAL "beeswax.thrift")
+    
     add_custom_command(
       OUTPUT ${OUTPUT_BE_FILE}
       COMMAND thrift ${CPP_ARGS} ${FIL}
@@ -51,14 +60,14 @@ function(THRIFT_GEN VAR)
   set(${VAR} ${${VAR}} PARENT_SCOPE)
 endfunction(THRIFT_GEN)
 
+set(THRIFT_INCLUDE_DIR_OPTION -I ${Thrift_CONTRIB_DIR} -I $ENV{HIVE_HOME}/src/metastore/if)
 set(BE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/be/generated-sources)
 set(FE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/fe/generated-sources)
 file(MAKE_DIRECTORY ${BE_OUTPUT_DIR})
 file(MAKE_DIRECTORY ${FE_OUTPUT_DIR})
 
-# Args passed to thrift for java/c++ gen
-set(CPP_ARGS --gen cpp -o ${BE_OUTPUT_DIR})
-set(JAVA_ARGS --gen java:hashcode -o ${FE_OUTPUT_DIR})
+# Args passed to thrift for Java gen
+set(JAVA_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen java:hashcode -o ${FE_OUTPUT_DIR})
 
 set (GENERATES_SRC_FILES 
   Opcodes.thrift

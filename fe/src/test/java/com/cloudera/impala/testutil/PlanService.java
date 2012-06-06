@@ -8,7 +8,6 @@ import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.log4j.Logger;
-import org.apache.thrift.TException;
 import org.apache.thrift.server.TServer;
 import org.apache.thrift.server.TThreadPoolServer;
 import org.apache.thrift.transport.TServerSocket;
@@ -18,6 +17,7 @@ import org.apache.thrift.transport.TTransportException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.service.Frontend;
 import com.cloudera.impala.thrift.ImpalaPlanService;
+import com.cloudera.impala.thrift.TImpalaPlanServiceException;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TQueryRequest;
 import com.google.common.collect.Sets;
@@ -44,7 +44,8 @@ public class PlanService {
       frontend = new Frontend(lazy);
     }
 
-    public TQueryExecRequest GetExecRequest(String stmt, int numNodes) throws TException {
+    public TQueryExecRequest GetExecRequest(String stmt, int numNodes)
+        throws TImpalaPlanServiceException {
       LOG.info(
           "Executing '" + stmt + "' for " + Integer.toString(numNodes) + " nodes");
       TQueryRequest tRequest = new TQueryRequest(stmt, false, numNodes);
@@ -54,7 +55,7 @@ public class PlanService {
         request = frontend.createExecRequest(tRequest, explainStringBuilder);
       } catch (ImpalaException e) {
         LOG.warn("Error creating exec request", e);
-        throw new TException(e);
+        throw new TImpalaPlanServiceException(e.getMessage());
       }
 
       request.setAsAscii(false);
@@ -78,18 +79,18 @@ public class PlanService {
      * Loads an updated catalog from the metastore. Is thread-safe.
      */
     @Override
-    public void RefreshMetadata() throws TException {
+    public void RefreshMetadata() {
       frontend.resetCatalog();
     }
 
     @Override
     public String GetExplainString(String query, int numNodes)
-        throws com.cloudera.impala.thrift.TException, TException {
+        throws TImpalaPlanServiceException {
       try {
         return frontend.getExplainString(new TQueryRequest(query, false, numNodes));
       } catch (ImpalaException e) {
         LOG.warn("Error getting explain string", e);
-        throw new TException(e);
+        throw new TImpalaPlanServiceException(e.getMessage());
       }
     }
   }

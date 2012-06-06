@@ -2,6 +2,7 @@
 # This module defines
 #  Thrift_VERSION, version string of ant if found
 #  Thrift_INCLUDE_DIR, where to find Thrift headers
+#  Thrift_CONTRIB_DIR, where contrib thrift files (e.g. fb303.thrift) are installed
 #  Thrift_LIBS, Thrift libraries
 #  Thrift_FOUND, If false, do not try to use ant
 
@@ -13,6 +14,13 @@ find_path(Thrift_INCLUDE_DIR Thrift.h HINTS
   /usr/local/include/thrift
   /opt/local/include/thrift
 )
+
+# Use the default install dir of thrift contrib (/usr/local)
+# if env var THRIFT_CONTRIB_DIR is not set
+set(Thrift_CONTRIB_DIR $ENV{THRIFT_CONTRIB_DIR})
+IF (NOT Thrift_CONTRIB_DIR)
+  set(Thrift_CONTRIB_DIR /usr/local)
+ENDIF (NOT Thrift_CONTRIB_DIR)
 
 set(Thrift_LIB_PATHS
   $ENV{THRIFT_HOME}/lib
@@ -50,6 +58,7 @@ else ()
           "Thrift support will be disabled (${Thrift_RETURN}, "
           "${Thrift_INCLUDE_DIR}, ${Thrift_LIB})")
 endif ()
+
 
 mark_as_advanced(
   Thrift_LIB

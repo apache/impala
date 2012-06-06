@@ -27,6 +27,8 @@ set(SRC_FILES
   Descriptors_types.cpp
   Exprs_constants.cpp
   Exprs_types.cpp
+  hive_metastore_constants.cpp
+  hive_metastore_types.cpp
   Opcodes_constants.cpp
   Opcodes_types.cpp
   PlanNodes_constants.cpp

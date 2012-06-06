@@ -22,8 +22,7 @@ namespace java com.cloudera.beeswax.api
 namespace py beeswaxd
 namespace cpp beeswax
 
-// TODO: for now, we get rid of the hive dependency as a temp hack
-//include "hive_metastore.thrift"
+include "hive_metastore.thrift"
 
 // A Query
 struct Query {
@@ -75,10 +74,7 @@ struct Results {
  */
 struct ResultsMetadata {
   /** The schema of the results */
-  /** TODO: The original beeswax schema is hive_metastore.Schema, but to get rid of the
-      Hive dependency, we're using string for now. Change it back to Hive.  
-  1: hive_metastore.Schema schema, */
-  1: string schema,
+  1: hive_metastore.Schema schema,
   /** The directory containing the results. Not applicable for partition table. */
   2: string table_dir,
   /** If the results are straight from an existing table, the table name. */

@@ -110,7 +110,7 @@ Status InProcessQueryExecutor::Exec(const string& query, vector<PrimitiveType>* 
     COUNTER_SCOPED_TIMER(plan_gen_counter);
     CHECK(client_.get() != NULL) << "didn't call InProcessQueryExecutor::Setup()";
     client_->GetExecRequest(query_request_, query.c_str(), FLAGS_num_nodes);
-  } catch (::apache::thrift::TException& e) {
+  } catch (TImpalaPlanServiceException& e) {
     return Status(e.what());
   }
   VLOG(1) << "query request:\n" << ThriftDebugString(query_request_);
@@ -273,7 +273,7 @@ void InProcessQueryExecutor::Shutdown() {
     // shut down server we started ourselves
     try {
       client_->ShutdownServer();
-    } catch (TException& e) {
+    } catch (TImpalaPlanServiceException& e) {
       // ignore; the server just quit, so won't respond to the rpc
     }
   }
@@ -298,7 +298,7 @@ Status InProcessQueryExecutor::Explain(const string& query, string* explain_plan
   try {
     client_->GetExplainString(*explain_plan, query, 0);
     return Status::OK;
-  } catch (TException& e) {
+  } catch (TImpalaPlanServiceException& e) {
     return Status(e.what());
   }
 }
