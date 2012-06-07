@@ -114,7 +114,7 @@ Status ExecNode::CreateTreeHelper(
 
 Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
                             const DescriptorTbl& descs, ExecNode** node) {
-  std::stringstream error_msg;
+  stringstream error_msg;
   switch (tnode.node_type) {
     case TPlanNodeType::HDFS_SCAN_NODE:
       *node = pool->Add(new HdfsScanNode(pool, tnode, descs));
@@ -158,12 +158,12 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
 }
 
 string ExecNode::DebugString() const {
-  std::stringstream out;
+  stringstream out;
   this->DebugString(0, &out);
   return out.str();
 }
 
-void ExecNode::DebugString(int indentation_level, std::stringstream* out) const {
+void ExecNode::DebugString(int indentation_level, stringstream* out) const {
   *out << " conjuncts=" << Expr::DebugString(conjuncts_);
   for (int i = 0; i < children_.size(); ++i) {
     *out << "\n";
@@ -178,22 +178,18 @@ Status ExecNode::PrepareConjuncts(RuntimeState* state) {
   return Status::OK;
 }
 
-bool ExecNode::EvalConjuncts(TupleRow* row) {
-  return EvalConjuncts(conjuncts_, row);
-}
-
-bool ExecNode::EvalConjuncts(const vector<Expr*>& conjuncts, TupleRow* row) {
-  for (vector<Expr*>::const_iterator i = conjuncts.begin(); i != conjuncts.end(); ++i) {
-    void* value = (*i)->GetValue(row);
+bool ExecNode::EvalConjuncts(Expr* const* exprs, int num_exprs, TupleRow* row) {
+  for (int i = 0; i < num_exprs; ++i) {
+    void* value = exprs[i]->GetValue(row);
     if (value == NULL || *reinterpret_cast<bool*>(value) == false) return false;
   }
   return true;
 }
 
 // Codegen for EvalConjuncts.  The generated signature is
-// bool EvalConjuncts(TupleRow* row);
 // For a node with two conjunct predicates
-// define i1 @EvalConjuncts(%"class.impala::TupleRow"* %row) {
+// define i1 @EvalConjuncts(%"class.impala::Expr"** %exprs, i32 %num_exprs, 
+//                          %"class.impala::TupleRow"* %row) {
 // entry:
 //   %null_ptr = alloca i1
 //   %0 = bitcast %"class.impala::TupleRow"* %row to i8**
@@ -210,28 +206,42 @@ bool ExecNode::EvalConjuncts(const vector<Expr*>& conjuncts, TupleRow* row) {
 // false:                                            ; preds = %continue, %entry
 //   ret i1 false
 // }
-Function* ExecNode::CodegenEvalConjuncts(LlvmCodeGen* codegen) {
-  for (int i = 0; i < conjuncts_.size(); ++i) {
-    if (conjuncts_[i]->codegen_fn() == NULL) {
+Function* ExecNode::CodegenEvalConjuncts(LlvmCodeGen* codegen,
+    const vector<Expr*>& conjuncts) {
+  for (int i = 0; i < conjuncts.size(); ++i) {
+    if (conjuncts[i]->codegen_fn() == NULL) {
       VLOG(1) << "Could not codegen EvalConjuncts because one of the conjuncts "
               << "could not be codegen'd.";
       return NULL;
     }
   }
-  
+
+  // Construct function signature to match
+  // bool EvalConjuncts(Expr** exprs, int num_exprs, TupleRow* row)
   Type* tuple_row_type = codegen->GetType(TupleRow::LLVM_CLASS_NAME);
-  if (tuple_row_type == NULL) return NULL;
+  Type* expr_type = codegen->GetType(Expr::LLVM_CLASS_NAME);
+
+  DCHECK(tuple_row_type != NULL);
+  DCHECK(expr_type != NULL);
+  
   PointerType* tuple_row_ptr_type = PointerType::get(tuple_row_type, 0);
+  PointerType* expr_ptr_type = PointerType::get(expr_type, 0);
 
   LlvmCodeGen::FnPrototype prototype(
       codegen, "EvalConjuncts", codegen->GetType(TYPE_BOOLEAN));
+  prototype.AddArgument(
+      LlvmCodeGen::NamedVariable("exprs", PointerType::get(expr_ptr_type, 0)));
+  prototype.AddArgument(
+      LlvmCodeGen::NamedVariable("num_exprs", codegen->GetType(TYPE_INT)));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", tuple_row_ptr_type));
   
   LlvmCodeGen::LlvmBuilder builder(codegen->context());
-  Value* tuple_row_arg;
-  Function* fn = prototype.GeneratePrototype(&builder, &tuple_row_arg);
+  Value* args[3];
+  Function* fn = prototype.GeneratePrototype(&builder, args);
+  // Other args are unused. 
+  Value* tuple_row_arg = args[2];
 
-  if (conjuncts_.size() > 0) {
+  if (conjuncts.size() > 0) {
     LLVMContext& context = codegen->context();
     // The exprs type TupleRows as char** (instead of TupleRow* or Tuple**).  We
     // could plumb the expr codegen to know the tuples it will operate on.
@@ -243,15 +253,11 @@ Function* ExecNode::CodegenEvalConjuncts(LlvmCodeGen* codegen) {
     LlvmCodeGen::NamedVariable null_var("null_ptr", codegen->boolean_type());
     Value* is_null_ptr = codegen->CreateEntryBlockAlloca(fn, null_var);
 
-    for (int i = 0; i < conjuncts_.size(); ++i) {
+    for (int i = 0; i < conjuncts.size(); ++i) {
       BasicBlock* true_block = BasicBlock::Create(context, "continue", fn, false_block);
-      Function* conjunct_fn = conjuncts_[i]->codegen_fn();
-      DCHECK_EQ(conjuncts_[i]->scratch_buffer_size(), 0);
-      Value* expr_args[] = { 
-        tuple_row_arg,
-        ConstantPointerNull::get(codegen->ptr_type()), 
-        is_null_ptr 
-      };
+      Function* conjunct_fn = conjuncts[i]->codegen_fn();
+      DCHECK_EQ(conjuncts[i]->scratch_buffer_size(), 0);
+      Value* expr_args[] = { tuple_row_arg, codegen->null_ptr_value(), is_null_ptr };
 
       // Ignore null result.  If null, expr's will return false which
       // is exactly the semantics for conjuncts
@@ -268,11 +274,11 @@ Function* ExecNode::CodegenEvalConjuncts(LlvmCodeGen* codegen) {
   } else {
     builder.CreateRet(codegen->true_value());
   }
-  
+
   return codegen->FinalizeFunction(fn);
 }
 
-void ExecNode::CollectScanNodes(std::vector<ExecNode*>* scan_nodes) {
+void ExecNode::CollectScanNodes(vector<ExecNode*>* scan_nodes) {
   if (IsScanNode()) scan_nodes->push_back(this);
   for (int i = 0; i < children_.size(); ++i) {
     children_[i]->CollectScanNodes(scan_nodes);

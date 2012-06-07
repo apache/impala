@@ -41,6 +41,10 @@ class CpuInfo {
   // Returns whether of not the cpu supports this flag
   bool IsSupported(long flag) const { return (hardware_flags_ & flag) != 0; }
 
+  // Toggle a hardware feature on and off.  It is not valid to turn on a feature
+  // that the underlying hardware cannot support. This is useful for testing.
+  void EnableFeature(long flag, bool enable);
+
   // Returns the size of the cache in KB at this cache level
   long CacheSize(CacheLevel level) const { return cache_sizes_[level]; }
 
@@ -54,6 +58,7 @@ class CpuInfo {
   void Init();
 
   int64_t hardware_flags_;
+  int64_t original_hardware_flags_;
   long cache_sizes_[L3_CACHE + 1];
   int64_t cycles_per_ms_;
 };

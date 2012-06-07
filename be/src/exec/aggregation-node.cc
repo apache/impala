@@ -190,11 +190,14 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
     *eos = true;
     return Status::OK;
   }
+  Expr** conjuncts = &conjuncts_[0];
+  int num_conjuncts = conjuncts_.size();
+
   while (output_iterator_.HasNext() && !row_batch->IsFull()) {
     int row_idx = row_batch->AddRow();
     TupleRow* row = row_batch->GetRow(row_idx);
     row->SetTuple(0, output_iterator_.GetRow()->GetTuple(0));
-    if (ExecNode::EvalConjuncts(row)) {
+    if (ExecNode::EvalConjuncts(conjuncts, num_conjuncts, row)) {
       VLOG(1) << "output row: " << PrintRow(row, row_desc());
       row_batch->CommitLastRow();
       ++num_rows_returned_;
@@ -203,7 +206,7 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
         return Status::OK;
       }
     }
-    output_iterator_.Next();
+    output_iterator_.Next<false>();
   }
   *eos = !output_iterator_.HasNext();
   return Status::OK;
@@ -219,8 +222,8 @@ Status AggregationNode::Close(RuntimeState* state) {
 
 AggregationTuple* AggregationNode::ConstructAggTuple() {
   AggregationTuple* agg_out_tuple = 
-      AggregationTuple::Create(agg_tuple_desc_->byte_size(), num_string_slots_, 
-          tuple_pool_.get());
+      AggregationTuple::Create(agg_tuple_desc_->byte_size(), 
+          num_string_slots_, tuple_pool_.get());
   Tuple* agg_tuple = agg_out_tuple->tuple();
 
   vector<SlotDescriptor*>::const_iterator slot_d = agg_tuple_desc_->slots().begin();
@@ -638,7 +641,8 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen, int slo
 //                             %"class.impala::AggregationTuple"* %agg_tuple, 
 //                             %"class.impala::TupleRow"* %tuple_row) {
 // entry:
-//   %tuple = bitcast %"class.impala::AggregationNode"* %agg_tuple to { i8, i64, i64, double }*
+//   %tuple = bitcast %"class.impala::AggregationNode"* %agg_tuple to 
+//                                              { i8, i64, i64, double }*
 //   %row = bitcast %"class.impala::TupleRow"* %tuple_row to i8**
 //   %src_slot = getelementptr inbounds { i8, i64, i64, double }* %tuple, i32 0, i32 2
 //   %count_star_val = load i64* %src_slot

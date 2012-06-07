@@ -60,7 +60,7 @@ Function* StringLiteral::Codegen(LlvmCodeGen* codegen) {
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
   builder.SetInsertPoint(entry_block);
   
-  Type* ptr_type = codegen->string_val_ptr_type();
+  Type* ptr_type = codegen->GetPtrType(TYPE_STRING);
   Value* str_val_ptr = codegen->CastPtrToLlvmPtr(ptr_type, &result_.string_val);
   CodegenSetIsNullArg(codegen, entry_block, false);
   builder.CreateRet(str_val_ptr);

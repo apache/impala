@@ -201,7 +201,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
       }
     }
 
-    if (EvalConjuncts(row)) {
+    if (EvalConjuncts(&conjuncts_[0], conjuncts_.size(), row)) {
       row_batch->CommitLastRow();
       ++num_rows_returned_;
       char* new_tuple = reinterpret_cast<char*>(tuple_);

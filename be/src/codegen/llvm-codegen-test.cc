@@ -2,11 +2,12 @@
 
 #include <string>
 #include <gtest/gtest.h>
+#include <boost/thread/thread.hpp>
 
 #include "codegen/llvm-codegen.h"
+#include "runtime/raw-value.h"
+#include "util/hash-util.h"
 #include "util/path-builder.h"
-
-#include <boost/thread/thread.hpp>
 
 using namespace std;
 using namespace boost;
@@ -48,6 +49,10 @@ class LlvmCodeGenTest : public testing:: Test {
       if (!status.ok()) return NULL;
     }
     return codegen;
+  }
+
+  static void ClearHashFns(LlvmCodeGen* codegen) {
+    codegen->ClearHashFns();
   }
 };
 
@@ -98,7 +103,7 @@ Function* CodegenInnerLoop(LlvmCodeGen* codegen, int64_t* jitted_counter, int de
 
   // Store &jitted_counter as a constant.
   Value* const_delta = ConstantInt::get(context, APInt(64, delta));
-  Value* counter_ptr = codegen->CastPtrToLlvmPtr(codegen->int64_ptr_type(), 
+  Value* counter_ptr = codegen->CastPtrToLlvmPtr(codegen->GetPtrType(TYPE_BIGINT),
       jitted_counter);
   Value* loaded_counter = builder.CreateLoad(counter_ptr);
   Value* incremented_value = builder.CreateAdd(loaded_counter, const_delta);
@@ -224,7 +229,7 @@ TEST_F(LlvmCodeGenTest, ReplaceFnCall) {
 //   ret i32 %len
 // }
 Function* CodegenStringTest(LlvmCodeGen* codegen) {
-  PointerType* string_val_ptr_type = codegen->string_val_ptr_type();
+  PointerType* string_val_ptr_type = codegen->GetPtrType(TYPE_STRING);
   EXPECT_TRUE(string_val_ptr_type != NULL);
 
   LlvmCodeGen::FnPrototype prototype(codegen, "StringTest", codegen->GetType(TYPE_INT));
@@ -295,17 +300,18 @@ TEST_F(LlvmCodeGenTest, StringValue) {
 }
 
 // Test calling memcpy intrinsic
-TEST_F(LlvmCodeGenTest, IntrinsicTest) {
+TEST_F(LlvmCodeGenTest, MemcpyTest) {
   ObjectPool pool;
-  Status status;
   
-  LlvmCodeGen* codegen = LlvmCodeGenTest::CreateCodegen(&pool);
-  ASSERT_TRUE(codegen != NULL);
+  scoped_ptr<LlvmCodeGen> codegen;
+  Status status = LlvmCodeGen::LoadImpalaIR(&pool, &codegen);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(codegen.get() != NULL);
 
-  LlvmCodeGen::FnPrototype prototype(codegen, "MemcpyTest", codegen->void_type());
+  LlvmCodeGen::FnPrototype prototype(codegen.get(), "MemcpyTest", codegen->void_type());
   prototype.AddArgument(LlvmCodeGen::NamedVariable("dest", codegen->ptr_type()));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("src", codegen->ptr_type()));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("n", codegen->GetType(TYPE_BIGINT)));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("n", codegen->GetType(TYPE_INT)));
 
   LlvmCodeGen::LlvmBuilder builder(codegen->context());
 
@@ -329,6 +335,85 @@ TEST_F(LlvmCodeGenTest, IntrinsicTest) {
   test_fn(dst, src, 4);
 
   EXPECT_EQ(memcmp(src, dst, 4), 0);
+}
+
+// Test codegen for hash
+TEST_F(LlvmCodeGenTest, HashTest) {
+  ObjectPool pool;
+
+  // Values to compute hash on
+  const char* data1 = "test string";
+  const char* data2 = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+  scoped_ptr<LlvmCodeGen> codegen;
+  Status status = LlvmCodeGen::LoadImpalaIR(&pool, &codegen);
+  ASSERT_TRUE(status.ok());
+  ASSERT_TRUE(codegen.get() != NULL);
+  
+  bool restore_sse_support = false;
+
+  Value* llvm_data1 = codegen->CastPtrToLlvmPtr(codegen->ptr_type(), 
+      const_cast<char*>(data1));
+  Value* llvm_data2 = codegen->CastPtrToLlvmPtr(codegen->ptr_type(), 
+      const_cast<char*>(data2));
+  Value* llvm_len1 = codegen->GetIntConstant(TYPE_INT, strlen(data1));
+  Value* llvm_len2 = codegen->GetIntConstant(TYPE_INT, strlen(data2));
+
+  // Loop to test both the sse4 on/off paths
+  for (int i = 0; i < 2; ++i) {
+    uint32_t expected_hash = 0;
+    expected_hash = HashUtil::Hash(data1, strlen(data1), expected_hash);
+    expected_hash = HashUtil::Hash(data2, strlen(data2), expected_hash);
+    expected_hash = HashUtil::Hash(data1, strlen(data1), expected_hash);
+
+    // Create a codegen'd function that hashes all the types and returns the results.
+    // The tuple/values to hash are baked into the codegen for simplicity.
+    LlvmCodeGen::FnPrototype prototype(codegen.get(), "HashTest", 
+        codegen->GetType(TYPE_INT));
+    LlvmCodeGen::LlvmBuilder builder(codegen->context());
+
+    // Test both byte-size specific hash functions and the generic loop hash function
+    Function* fn_fixed = prototype.GeneratePrototype(&builder, NULL);
+    Function* data1_hash_fn = codegen->GetHashFunction(strlen(data1));
+    Function* data2_hash_fn = codegen->GetHashFunction(strlen(data2));
+    Function* generic_hash_fn = codegen->GetHashFunction();
+      
+    ASSERT_TRUE(data1_hash_fn != NULL);
+    ASSERT_TRUE(data2_hash_fn != NULL);
+    ASSERT_TRUE(generic_hash_fn != NULL);
+
+    Value* seed = codegen->GetIntConstant(TYPE_INT, 0);
+    seed = builder.CreateCall3(data1_hash_fn, llvm_data1, llvm_len1, seed);
+    seed = builder.CreateCall3(data2_hash_fn, llvm_data2, llvm_len2, seed);
+    seed = builder.CreateCall3(generic_hash_fn, llvm_data1, llvm_len1, seed);
+    builder.CreateRet(seed);
+
+    fn_fixed = codegen->FinalizeFunction(fn_fixed);
+    ASSERT_TRUE(fn_fixed != NULL);
+
+    void* jitted_fn = codegen->JitFunction(fn_fixed);
+    ASSERT_TRUE(jitted_fn != NULL);
+
+    typedef uint32_t (*TestHashFn)();
+    TestHashFn test_fn = reinterpret_cast<TestHashFn>(jitted_fn);
+
+    uint32_t result = test_fn();
+
+    // Validate that the hashes are identical
+    EXPECT_EQ(result, expected_hash);
+
+    if (i == 0 && CpuInfo::Instance()->IsSupported(CpuInfo::SSE4_2)) {
+      CpuInfo::Instance()->EnableFeature(CpuInfo::SSE4_2, false);
+      restore_sse_support = true;
+      LlvmCodeGenTest::ClearHashFns(codegen.get());
+    } else {
+      // System doesn't have sse, no reason to test non-sse path again.
+      break;
+    }
+  }
+
+  // Restore hardware feature for next test
+  CpuInfo::Instance()->EnableFeature(CpuInfo::SSE4_2, restore_sse_support);
 }
 
 }

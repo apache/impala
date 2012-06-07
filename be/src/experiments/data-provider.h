@@ -96,6 +96,7 @@ class DataProvider {
   // Reset the generator with the column description.
   //  - num_rows: total rows to generate
   //  - batch_size: size of generated batches from NextBatch
+  // Data returned via previous NextBatch calls is no longer valid
   void Reset(int num_rows, int batch_size, const std::vector<ColDesc>& columns);
 
   // Sets the seed to use for randomly generated data.  The default generator will

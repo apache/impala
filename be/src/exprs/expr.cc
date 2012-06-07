@@ -37,6 +37,8 @@ using namespace std;
 using namespace impala;
 using namespace llvm;
 
+const char* Expr::LLVM_CLASS_NAME = "class.impala::Expr";
+
 template<class T>
 bool ParseString(const string& str, T* val) {
   istringstream stream(str);
@@ -187,8 +189,8 @@ Expr* Expr::CreateLiteral(ObjectPool* pool, PrimitiveType type, const string& st
   return result;
 }
 
-Status Expr::CreateExprTrees(ObjectPool* pool, const std::vector<TExpr>& texprs,
-                             std::vector<Expr*>* exprs) {
+Status Expr::CreateExprTrees(ObjectPool* pool, const vector<TExpr>& texprs,
+                             vector<Expr*>* exprs) {
   exprs->clear();
   for (int i = 0; i < texprs.size(); ++i) {
     Expr* expr;
@@ -506,12 +508,19 @@ Status Expr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   return Status::OK;
 }
 
-Status Expr::Prepare(const std::vector<Expr*>& exprs, RuntimeState* state,
+Status Expr::Prepare(const vector<Expr*>& exprs, RuntimeState* state,
                      const RowDescriptor& row_desc) {
   for (int i = 0; i < exprs.size(); ++i) {
     RETURN_IF_ERROR(Prepare(exprs[i], state, row_desc));
   }
   return Status::OK;
+}
+
+bool Expr::IsCodegenAvailable(const vector<Expr*>& exprs) {
+  for (int i = 0; i < exprs.size(); ++i) {
+    if (exprs[i]->codegen_fn() == NULL) return false;
+  }
+  return true;
 }
 
 string Expr::DebugString() const {
@@ -528,7 +537,7 @@ string Expr::DebugString() const {
   return out.str();
 }
 
-string Expr::DebugString(const std::vector<Expr*>& exprs) {
+string Expr::DebugString(const vector<Expr*>& exprs) {
   stringstream out;
   out << "[";
   for (int i = 0; i < exprs.size(); ++i) {
@@ -555,7 +564,7 @@ int Expr::GetSlotIds(vector<SlotId>* slot_ids) const {
 
 Type* Expr::GetLlvmReturnType(LlvmCodeGen* codegen) const {
   if (type() == TYPE_STRING) {
-    return codegen->string_val_ptr_type();
+    return codegen->GetPtrType(TYPE_STRING);
   } else  if (type() == TYPE_TIMESTAMP) {
     // TODO
     return NULL;
@@ -572,7 +581,8 @@ Function* Expr::CreateComputeFnPrototype(LlvmCodeGen* codegen, const string& nam
   LlvmCodeGen::FnPrototype prototype(codegen, name, ret_type);
   prototype.AddArgument(LlvmCodeGen::NamedVariable("row", PointerType::get(ptr_type, 0)));
   prototype.AddArgument(LlvmCodeGen::NamedVariable("state_data", ptr_type));
-  prototype.AddArgument(LlvmCodeGen::NamedVariable("is_null", codegen->bool_ptr_type()));
+  prototype.AddArgument(LlvmCodeGen::NamedVariable("is_null", 
+        codegen->GetPtrType(TYPE_BOOLEAN)));
 
   Function* function = prototype.GeneratePrototype();
   DCHECK(function != NULL);
@@ -597,7 +607,7 @@ Value* Expr::GetNullReturnValue(LlvmCodeGen* codegen) {
     case TYPE_DOUBLE:
       return ConstantFP::get(codegen->context(), APFloat((double)0));
     case TYPE_STRING:
-      return llvm::ConstantPointerNull::get(codegen->string_val_ptr_type());
+      return llvm::ConstantPointerNull::get(codegen->GetPtrType(TYPE_STRING));
     default:
       // Add timestamp pointers
       DCHECK(false) << "Not yet implemented.";
@@ -643,7 +653,7 @@ typedef float (*FloatComputeFn)(TupleRow*, char*, bool*);
 typedef double (*DoubleComputeFn)(TupleRow*, char*, bool*);
 typedef StringValue* (*StringValueComputeFn)(TupleRow*, char*, bool*);
 
-void* Expr::EvalJittedComputeFn(Expr* expr, TupleRow* row) {
+void* Expr::EvalCodegendComputeFn(Expr* expr, TupleRow* row) {
   DCHECK(expr->jitted_compute_fn_ != NULL);
   void* func = expr->jitted_compute_fn_;
   void* result = NULL;
@@ -707,7 +717,7 @@ void* Expr::EvalJittedComputeFn(Expr* expr, TupleRow* row) {
 void Expr::SetComputeFn(void* jitted_function, int scratch_size) {
   DCHECK_EQ(scratch_size, 0);
   jitted_compute_fn_ = jitted_function;
-  compute_fn_ = Expr::EvalJittedComputeFn;
+  compute_fn_ = Expr::EvalCodegendComputeFn;
 }
 
 bool Expr::IsJittable(LlvmCodeGen* codegen) const {

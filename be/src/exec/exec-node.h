@@ -66,9 +66,18 @@ class ExecNode {
   // Collect all scan nodes that are part of this subtree, and return in 'scan_nodes'.
   void CollectScanNodes(std::vector<ExecNode*>* scan_nodes);
 
+  // Evaluate exprs over row.  Returns true if all exprs return true.
+  // TODO: This doesn't use the vector<Expr*> signature because I haven't figured
+  // out how to deal with declaring a templated std:vector type in IR
+  static bool EvalConjuncts(Expr* const* exprs, int num_exprs, TupleRow* row);
+
   // Codegen function to evaluate the conjuncts.  Returns NULL if codegen was
   // not supported for the conjunct exprs.
-  llvm::Function* CodegenEvalConjuncts(LlvmCodeGen* codegen);
+  // Codegen'd signature is bool EvalConjuncts(Expr** exprs, int num_exprs, TupleRow*);
+  // The first two arguments are ignored (the Expr's are baked into the codegen)
+  // but it is included so the signature can match EvalConjuncts.
+  llvm::Function* CodegenEvalConjuncts(LlvmCodeGen* codegen, 
+      const std::vector<Expr*>& conjuncts);
 
   // Returns a string representation in DFS order of the plan rooted at this.
   std::string DebugString() const;
@@ -117,12 +126,6 @@ class ExecNode {
       const DescriptorTbl& descs, ExecNode* parent, int* node_idx, ExecNode** root);
 
   Status PrepareConjuncts(RuntimeState* state);
-
-  // Evaluate conjuncts. Return true if all conjuncts return true, otherwise false.
-  bool EvalConjuncts(const std::vector<Expr*>& conjuncts, TupleRow* row);
-
-  // Evaluate conjuncts_. Return true if all conjuncts return true, otherwise false.
-  bool EvalConjuncts(TupleRow* row);
 
   virtual bool IsScanNode() const { return false; }
 

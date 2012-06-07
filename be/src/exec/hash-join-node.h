@@ -38,6 +38,8 @@ class HashJoinNode : public ExecNode {
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
   virtual Status Close(RuntimeState* state);
 
+  static const char* LLVM_CLASS_NAME;
+
  protected:
   void DebugString(int indentation_level, std::stringstream* out) const;
   
@@ -84,6 +86,16 @@ class HashJoinNode : public ExecNode {
   // This should be the same size as the probe tuple row.
   int result_tuple_row_size_;
   
+  // Function declaration for codegen'd function.  Signature must match
+  // HashJoinNode::ProcessBuildBatch
+  typedef void (*ProcessBuildBatchFn)(HashJoinNode*, RowBatch*);
+  ProcessBuildBatchFn process_build_batch_fn_;
+
+  // HashJoinNode::ProcessProbeBatch() exactly
+  typedef int (*ProcessProbeBatchFn)(HashJoinNode*, RowBatch*, RowBatch*, int);
+  // Jitted ProcessProbeBatch function pointer.  Null if codegen is disabled.
+  ProcessProbeBatchFn process_probe_batch_fn_;
+  
   RuntimeProfile::Counter* build_timer_;   // time to build hash table
   RuntimeProfile::Counter* probe_timer_;   // time to probe
   RuntimeProfile::Counter* build_row_counter_;   // num build rows
@@ -112,8 +124,20 @@ class HashJoinNode : public ExecNode {
   // This is replaced by codegen.
   void CreateOutputRow(TupleRow* out_row, TupleRow* probe_row, TupleRow* build_row);
 
-  // Eval conjuncts for the other join predicates.  This is replaced by codegen.
-  bool EvalOtherJoinConjuncts(TupleRow* row);
+  // Codegen function to create output row
+  llvm::Function* CodegenCreateOutputRow(LlvmCodeGen* codegen);
+
+  // Codegen processing build batches.  Identical signature to ProcessBuildBatch.
+  // hash_fn is the codegen'd function for computing hashes over tuple rows in the
+  // hash table.
+  // Returns NULL if codegen was not possible.
+  llvm::Function* CodegenProcessBuildBatch(LlvmCodeGen*, llvm::Function* hash_fn);
+  
+  // Codegen processing probe batches.  Identical signature to ProcessProbeBatch.
+  // hash_fn is the codegen'd function for computing hashes over tuple rows in the
+  // hash table.
+  // Returns NULL if codegen was not possible.
+  llvm::Function* CodegenProcessProbeBatch(LlvmCodeGen*, llvm::Function* hash_fn);
 };
 
 }

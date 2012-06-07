@@ -27,6 +27,17 @@ add_custom_target(gen_ir_functions ALL DEPENDS ${IR_DESC_GEN_OUTPUT})
 
 # impala-ir.cc is the central place for all cross-compiled code.  All of
 # this code gets cross compiled to a single IR module, impala.ll.  
+# Custom build commands don't seem to propagate dependencies correctly
+# list all the ir files 
+set(IR_DEPENDENT_FILES
+  impala-ir.cc
+  ../exec/aggregation-node-ir.cc
+  ../exec/hash-join-node-ir.cc
+  ../exec/hdfs-text-scanner-ir.cc
+  ../runtime/string-value-ir.cc
+  ../util/hash-util-ir.cc
+)
+
 set(IR_INPUT_FILES impala-ir.cc)
 set(IR_SSE_TMP_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/impala-sse-tmp.ll")
 set(IR_NO_SSE_TMP_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/impala-no-sse-tmp.ll")
@@ -42,7 +53,7 @@ add_custom_command(
   COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} "-msse4.2" ${CLANG_INCLUDE_FLAGS} ${IR_INPUT_FILES} -o ${IR_SSE_TMP_OUTPUT_FILE}
   COMMAND ${LLVM_OPT_EXECUTABLE} --instnamer < ${IR_SSE_TMP_OUTPUT_FILE} > ${IR_SSE_OUTPUT_FILE}
   COMMAND rm ${IR_SSE_TMP_OUTPUT_FILE}
-  DEPENDS ${IR_INPUT_FILES}
+  DEPENDS ${IR_DEPENDENT_FILES}
 )
 
 # Compile without sse enabled.
@@ -51,7 +62,7 @@ add_custom_command(
   COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} ${CLANG_INCLUDE_FLAGS} ${IR_INPUT_FILES} -o ${IR_NO_SSE_TMP_OUTPUT_FILE}
   COMMAND ${LLVM_OPT_EXECUTABLE} --instnamer < ${IR_NO_SSE_TMP_OUTPUT_FILE} > ${IR_NO_SSE_OUTPUT_FILE}
   COMMAND rm ${IR_NO_SSE_TMP_OUTPUT_FILE}
-  DEPENDS ${IR_INPUT_FILES}
+  DEPENDS ${IR_DEPENDENT_FILES}
 )
 
 add_custom_target(compile_to_ir_sse ALL DEPENDS ${IR_SSE_OUTPUT_FILE})

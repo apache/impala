@@ -67,14 +67,14 @@ class HashTableTest : public testing::Test {
       TupleRow** results, TupleRow** expected) {
     HashTable::Iterator iter = table->Begin();
     while (iter != table->End()) {
-      TupleRow* row = *iter;
+      TupleRow* row = iter.GetRow();
       int32_t val = *reinterpret_cast<int32_t*>(build_expr_[0]->GetValue(row));
       EXPECT_GE(val, min);
       EXPECT_LT(val, max);
       if (all_unique) EXPECT_TRUE(results[val] == NULL);
       EXPECT_EQ(row->GetTuple(0), expected[val]->GetTuple(0));
       results[val] = row;
-      ++iter;
+      iter.Next<false>();
     }
   }
 
@@ -105,9 +105,9 @@ class HashTableTest : public testing::Test {
         if (scan) {
           map<TupleRow*, bool> matched;
           while (iter != table->End()) {
-            EXPECT_TRUE(matched.find(*iter) == matched.end());
-            matched[*iter] = true;
-            ++iter;
+            EXPECT_TRUE(matched.find(iter.GetRow()) == matched.end());
+            matched[iter.GetRow()] = true;
+            iter.Next<true>();
           }
           EXPECT_EQ(matched.size(), data[i].expected_build_rows.size());
           for (int j = 0; i < data[j].expected_build_rows.size(); ++j) {
@@ -116,8 +116,8 @@ class HashTableTest : public testing::Test {
         } else {
           EXPECT_EQ(data[i].expected_build_rows.size(), 1);
           EXPECT_TRUE(
-              data[i].expected_build_rows[0]->GetTuple(0) == (*iter)->GetTuple(0));
-          ValidateMatch(row, *iter);
+              data[i].expected_build_rows[0]->GetTuple(0) == iter.GetRow()->GetTuple(0));
+          ValidateMatch(row, iter.GetRow());
         }
       }
     }
@@ -258,7 +258,7 @@ TEST_F(HashTableTest, GrowTableTest) {
     HashTable::Iterator iter = hash_table.Find(probe_row);
     if (i < expected_size) {
       EXPECT_TRUE(iter != hash_table.End());
-      ValidateMatch(probe_row, *iter);
+      ValidateMatch(probe_row, iter.GetRow());
     } else {
       EXPECT_TRUE(iter == hash_table.End());
     }

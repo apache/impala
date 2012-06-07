@@ -87,12 +87,11 @@ Function* BinaryPredicate::Codegen(LlvmCodeGen* codegen) {
     case TExprOpcode::EQ_SHORT_SHORT:
     case TExprOpcode::EQ_INT_INT:
     case TExprOpcode::EQ_LONG_LONG:
-    case TExprOpcode::ADD_LONG_LONG:
-      result = builder.CreateICmpEQ(lhs_value, rhs_value, "tmp_eq");
-      break;
     case TExprOpcode::EQ_FLOAT_FLOAT:
     case TExprOpcode::EQ_DOUBLE_DOUBLE:
-      result = builder.CreateFCmpUEQ(lhs_value, rhs_value, "tmp_eq");
+    case TExprOpcode::EQ_STRINGVALUE_STRINGVALUE: 
+      result = codegen->CodegenEquals(&builder, lhs_value, rhs_value,
+          children()[0]->type());
       break;
 
     case TExprOpcode::NE_BOOL_BOOL:
@@ -156,11 +155,6 @@ Function* BinaryPredicate::Codegen(LlvmCodeGen* codegen) {
       break;
 
     // String comparison functions
-    case TExprOpcode::EQ_STRINGVALUE_STRINGVALUE: {
-      Function* str_fn = codegen->GetFunction(IRFunction::STRING_VALUE_EQ);
-      result = builder.CreateCall2(str_fn, lhs_value, rhs_value, "tmp_eq");
-      break;
-    }
     case TExprOpcode::NE_STRINGVALUE_STRINGVALUE: {
       Function* str_fn = codegen->GetFunction(IRFunction::STRING_VALUE_NE);
       result = builder.CreateCall2(str_fn, lhs_value, rhs_value, "tmp_ne");

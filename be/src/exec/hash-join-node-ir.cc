@@ -1,5 +1,6 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
+#include "codegen/impala-ir.h"
 #include "exec/hash-join-node.h"
 #include "exec/hash-table.inline.h"
 #include "runtime/row-batch.h"
@@ -9,8 +10,20 @@ using namespace impala;
 
 // Functions in this file are cross compiled to IR with clang.  
 
-// TODO: CreateOutputRow, HashFn, EqualsFn, EvalConjuncts, EvalOtherJoinConjuncts
-// should be codegen'd for this function
+// Wrapper around ExecNode's eval conjuncts with a different function name.
+// This lets us distinguish between the join conjuncts vs. non-join conjuncts
+// for codegen.
+// Note: don't declare this static.  LLVM will pick the fastcc calling convention and
+// we will not be able to replace the funcitons with codegen'd versions.
+// TODO: explicitly set the calling convention?
+// TODO: investigate using fastcc for all codegen internal functions?
+bool IR_NO_INLINE EvalOtherJoinConjuncts(Expr* const* exprs, int num_exprs,
+    TupleRow* row) {
+  return ExecNode::EvalConjuncts(exprs, num_exprs, row);
+}
+
+// CreateOutputRow, EvalOtherJoinConjuncts, and EvalConjuncts are replaced by
+// codegen.
 int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch, 
     int max_added_rows) {
   // This path does not handle full outer or right outer joins
@@ -24,17 +37,26 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
   int rows_returned = 0;
   int probe_rows = probe_batch->num_rows();
 
+  Expr* const* other_conjuncts = &other_join_conjuncts_[0];
+  int num_other_conjuncts = other_join_conjuncts_.size();
+
+  Expr* const* conjuncts = &conjuncts_[0];
+  int num_conjuncts = conjuncts_.size();
+
   while (true) {
     // Create output row for each matching build row
     while (hash_tbl_iterator_.HasNext()) {
       TupleRow* matched_build_row = hash_tbl_iterator_.GetRow();
-      hash_tbl_iterator_.Next();
+      hash_tbl_iterator_.Next<true>();
       CreateOutputRow(out_row, current_probe_row_, matched_build_row);
 
-      if (!EvalOtherJoinConjuncts(out_row)) continue;
+      if (!EvalOtherJoinConjuncts(other_conjuncts, num_other_conjuncts, out_row)) {
+        continue;
+      }
+
       matched_probe_ = true;
 
-      if (EvalConjuncts(conjuncts_, out_row)) {
+      if (EvalConjuncts(conjuncts, num_conjuncts, out_row)) {
         ++rows_returned;
         // Filled up out batch or hit limit
         if (UNLIKELY(rows_returned == max_added_rows)) goto end;
@@ -54,7 +76,7 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
     if (!matched_probe_ && match_all_probe_) {
       CreateOutputRow(out_row, current_probe_row_, NULL);
       matched_probe_ = true;
-      if (EvalConjuncts(conjuncts_, out_row)) {
+      if (EvalConjuncts(conjuncts, num_conjuncts, out_row)) {
         ++rows_returned;
         if (UNLIKELY(rows_returned == max_added_rows)) goto end;
         // Advance to next out row
@@ -78,7 +100,6 @@ end:
   return rows_returned;
 }
 
-// TODO: HashFn and EqualsFn should be codegen'd for this function
 void HashJoinNode::ProcessBuildBatch(RowBatch* build_batch) {
   // insert build row into our hash table
   for (int i = 0; i < build_batch->num_rows(); ++i) {

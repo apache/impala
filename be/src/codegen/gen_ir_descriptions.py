@@ -17,6 +17,10 @@ import os
 ir_functions = [
   ["AGG_NODE_PROCESS_ROW_BATCH_WITH_GROUPING", "ProcessRowBatchWithGrouping"],
   ["AGG_NODE_PROCESS_ROW_BATCH_NO_GROUPING", "ProcessRowBatchNoGrouping"],
+  ["HASH_CRC", "IrCrcHash"],
+  ["HASH_FVN", "IrFvnHash"],
+  ["HASH_JOIN_PROCESS_BUILD_BATCH", "ProcessBuildBatch"],
+  ["HASH_JOIN_PROCESS_PROBE_BATCH", "ProcessProbeBatch"],
   ["HDFS_TEXT_SCANNER_WRITE_ALIGNED_TUPLES", "WriteAlignedTuples"],
   ["STRING_VALUE_EQ", "StringValueEQ"],
   ["STRING_VALUE_NE", "StringValueNE"],

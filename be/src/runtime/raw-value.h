@@ -98,18 +98,24 @@ inline bool RawValue::Eq(const void* v1, const void* v2, PrimitiveType type) {
   };
 }
 
+// Use boost::hash_combine for corner cases.  boost::hash_combine is reimplemented 
+// here to use int32t's (instead of size_t)
+// boost::hash_combine does:
+//  seed ^= v + 0x9e3779b9 + (seed << 6) + (seed >> 2);
 inline uint32_t RawValue::GetHashValue(const void* v, PrimitiveType type, uint32_t seed) {
+  // Hash_combine with v = 0
+  if (v == NULL) {
+    uint32_t value = 0x9e3779b9;
+    return seed ^ (value + (seed << 6) + (seed >> 2));
+  }
   switch (type) {
     case TYPE_STRING: {
       const StringValue* string_value = reinterpret_cast<const StringValue*>(v);
       return HashUtil::Hash(string_value->ptr, string_value->len, seed);
     }
     case TYPE_BOOLEAN: {
-      bool value = *reinterpret_cast<const bool*>(v);
-      size_t seed_size_t = static_cast<size_t>(seed);
-      size_t hash_value = boost::hash<bool>().operator()(value);
-      boost::hash_combine(seed_size_t, hash_value);
-      return static_cast<uint32_t>(seed_size_t);
+      uint32_t value = *reinterpret_cast<const bool*>(v) + 0x9e3779b9;
+      return seed ^ (value + (seed << 6) + (seed >> 2));
     }
     case TYPE_TINYINT:
       return HashUtil::Hash(v, 1, seed);

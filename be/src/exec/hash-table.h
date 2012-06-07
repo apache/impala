@@ -5,12 +5,18 @@
 
 #include <vector>
 #include <boost/cstdint.hpp>
+#include "codegen/impala-ir.h"
 #include "common/logging.h"
 #include "util/hash-util.h"
+
+namespace llvm {
+  class Function;
+}
 
 namespace impala {
 
 class Expr;
+class LlvmCodeGen;
 class RowDescriptor;
 class Tuple;
 class TupleRow;
@@ -67,10 +73,10 @@ class HashTable {
 
   // Insert row into the hash table.  Row will be evaluated over build_exprs_
   // This will grow the hash table if necessary
-  void Insert(TupleRow* row) {
-    if (num_filled_buckets_ > buckets_.size() * MAX_BUCKET_OCCUPANCY_FRACTION) {
+  void IR_ALWAYS_INLINE Insert(TupleRow* row) {
+    if (num_filled_buckets_ > num_buckets_till_resize_) {
       // TODO: next prime instead of double?
-      ResizeBuckets(num_buckets() * 2);
+      ResizeBuckets(num_buckets_ * 2);
     }
     InsertImpl(row);
   }
@@ -99,7 +105,7 @@ class HashTable {
   
   // Returns the number of bytes allocated to the hash table
   int64_t byte_size() const { 
-    return node_byte_size() * nodes_capacity_ + sizeof(Bucket) * buckets_.size();
+    return node_byte_size_ * nodes_capacity_ + sizeof(Bucket) * buckets_.size();
   }
 
   // Returns the results of the exprs at 'expr_idx' evaluated over the last row
@@ -125,6 +131,21 @@ class HashTable {
     return Iterator();
   }
 
+  // Codegen for evaluating a tuple row.  Codegen'd function matches the signature 
+  // for EvalBuildRow and EvalTupleRow.  
+  // if build_row is true, the codegen uses the build_exprs, otherwise the probe_exprs
+  llvm::Function* CodegenEvalTupleRow(LlvmCodeGen* codegen, bool build_row);
+
+  // Codegen for hashing the expr values in 'expr_values_buffer_'.  Function
+  // prototype matches HashCurrentRow identically.
+  llvm::Function* CodegenHashCurrentRow(LlvmCodeGen* codegen);
+
+  // Codegen for evaluating a TupleRow and comparing equality against 
+  // 'expr_values_buffer_'.  Function signature matches HashTable::Equals()
+  llvm::Function* CodegenEquals(LlvmCodeGen* codegen);
+
+  static const char* LLVM_CLASS_NAME;
+
   // Dump out the entire hash table to string.  If skip_empty, empty buckets are
   // skipped.  If build_desc is non-null, the build rows will be output.  Otherwise
   // just the build row addresses.
@@ -133,13 +154,13 @@ class HashTable {
   // stl-like iterator interface.
   class Iterator {
    public:
-    Iterator() : table_(NULL), bucket_idx_(-1), node_idx_(-1), 
-        is_scan_all_iterator_(false) {
+    Iterator() : table_(NULL), bucket_idx_(-1), node_idx_(-1) {
     }
 
     // Iterates to the next element.  In the case where the iterator was
     // from a Find, this will lazily evaluate that bucket, only returning
     // TupleRows that match the current scan row.
+    template<bool check_match>
     void Next();
 
     // Returns the current row or NULL if at end.
@@ -153,15 +174,6 @@ class HashTable {
       return node_idx_ != -1;
     }
 
-    TupleRow* operator*() {
-      return GetRow();
-    }
-
-    Iterator& operator++() {
-      Next();
-      return *this;
-    }
-
     bool operator==(const Iterator& rhs) {
       return bucket_idx_ == rhs.bucket_idx_ && node_idx_ == rhs.node_idx_;
     }
@@ -173,12 +185,10 @@ class HashTable {
    private:
     friend class HashTable;
 
-    Iterator(HashTable* table, bool is_scan_all, int bucket_idx, 
-        int node, uint32_t hash) :
+    Iterator(HashTable* table, int bucket_idx, int64_t node, uint32_t hash) :
       table_(table),
       bucket_idx_(bucket_idx),
       node_idx_(node),
-      is_scan_all_iterator_(is_scan_all),
       scan_hash_(hash) {
     }
 
@@ -186,9 +196,7 @@ class HashTable {
     // Current bucket idx
     int bucket_idx_;        
     // Current node idx (within current bucket)
-    int node_idx_;          
-    // whether or not this iterator is from a Begin() call
-    bool is_scan_all_iterator_; 
+    int64_t node_idx_;          
     // cached hash value for the row passed to Find()()
     uint32_t scan_hash_;    
   };
@@ -224,20 +232,20 @@ class HashTable {
 
   // Returns node at idx.  Tracking structures do not use pointers since they will
   // change as the HashTable grows.
-  Node* GetNode(int idx) {
+  Node* GetNode(int64_t idx) {
     DCHECK_NE(idx, -1);
-    return reinterpret_cast<Node*>(nodes_ + node_byte_size() * idx);
+    return reinterpret_cast<Node*>(nodes_ + node_byte_size_ * idx);
   }
   
   // Resize the hash table to 'num_buckets'
   void ResizeBuckets(int64_t num_buckets);
 
   // Insert row into the hash table
-  void InsertImpl(TupleRow* row);
+  void IR_ALWAYS_INLINE InsertImpl(TupleRow* row);
 
   // Chains the node at 'node_idx' to 'bucket'.  Nodes in a bucket are chained
   // as a linked list; this places the new node at the beginning of the list.
-  void AddToBucket(Bucket* bucket, int node_idx);
+  void AddToBucket(Bucket* bucket, int64_t node_idx, Node* node);
 
   // Evaluate the exprs over row and cache the results in 'expr_values_buffer_'.
   // Returns whether any expr evaluated to NULL
@@ -245,20 +253,24 @@ class HashTable {
   bool EvalRow(TupleRow* row, const std::vector<Expr*>& exprs);
 
   // Evaluate 'row' over build_exprs_ caching the results in 'expr_values_buffer_'
-  // This will be replaced by codegen.
-  bool EvalBuildRow(TupleRow* row) {
+  // This will be replaced by codegen.  We do not want this function inlined when
+  // cross compiled because we need to be able to differentiate between EvalBuildRow
+  // and EvalProbeRow by name and the build_exprs_/probe_exprs_ are baked into
+  // the codegen'd function.
+  bool IR_NO_INLINE EvalBuildRow(TupleRow* row) {
     return EvalRow(row, build_exprs_);
   }
 
   // Evaluate 'row' over probe_exprs_ caching the results in 'expr_values_buffer_'
   // This will be replaced by codegen.
-  bool EvalProbeRow(TupleRow* row) {
+  bool IR_NO_INLINE EvalProbeRow(TupleRow* row) {
     return EvalRow(row, probe_exprs_);
   }
 
   // Compute the hash of the values in expr_values_buffer_.
-  // This will be replaced by codegen.
-  uint32_t HashCurrentRow() {
+  // This will be replaced by codegen.  We don't want this inlined for replacing
+  // with codegen'd functions so the function name does not change.  
+  uint32_t IR_NO_INLINE HashCurrentRow() {
     if (var_result_begin_ == -1) {
       // This handles NULLs implicitly since a constant seed value was put
       // into results buffer for nulls.
@@ -277,12 +289,6 @@ class HashTable {
   // This will be replaced by codegen.
   bool Equals(TupleRow* build_row);
 
-  // The byte size of a Node.  This includes the fixed sized header (sizeof(Node))
-  // as well as the Tuple*'s that immediately follow
-  uint32_t node_byte_size() const {
-    return sizeof(Node) + sizeof(Tuple*) * num_build_tuples_;
-  }
-
   // Grow the node array.
   void GrowNodeArray();
 
@@ -294,11 +300,15 @@ class HashTable {
   const std::vector<Expr*>& probe_exprs_;
 
   // Number of Tuple* in the build tuple row
-  int num_build_tuples_;
-  bool stores_nulls_;
+  const int num_build_tuples_;
+  const bool stores_nulls_;
+
+  // Size of hash table nodes.  This includes a fixed size header and the Tuple*'s that
+  // follow.
+  const int node_byte_size_;
 
   // Number of non-empty buckets.  Used to determine when to grow and rehash
-  int num_filled_buckets_;
+  int64_t num_filled_buckets_;
   // Memory to store node data.  This is not allocated from a pool to take advantage
   // of realloc.
   // TODO: integrate with mem pools
@@ -307,15 +317,32 @@ class HashTable {
   int64_t num_nodes_;
   // max number of nodes that can be stored in 'nodes_' before realloc
   int64_t nodes_capacity_;
+
   std::vector<Bucket> buckets_;
+  
+  // equal to buckets_.size() but more efficient than the size function
+  int64_t num_buckets_;
+  
+  // The number of filled buckets to trigger a resize.  This is cached for efficiency
+  int64_t num_buckets_till_resize_;
 
   // Cache of exprs values for the current row being evaluated.  This can either
   // be a build row (during Insert()) or probe row (during Find()).
   std::vector<int> expr_values_buffer_offsets_;
-  int results_buffer_size_;
+
+  // byte offset into expr_values_buffer_ that begins the variable length results
   int var_result_begin_;
+
+  // byte size of 'expr_values_buffer_'
+  int results_buffer_size_;
+
+  // buffer to store evaluated expr results.  This address must not change once 
+  // allocated since the address is baked into the codegen
   uint8_t* expr_values_buffer_;
-  bool* expr_value_null_bits_;
+
+  // Use bytes instead of bools to be compatible with llvm.  This address must
+  // not change once allocated.
+  uint8_t* expr_value_null_bits_;
 };
 
 }

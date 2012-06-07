@@ -4,6 +4,7 @@
 #include "util/debug-util.h"
 
 #include <boost/algorithm/string.hpp>
+#include <glog/logging.h>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -88,6 +89,17 @@ void CpuInfo::Init() {
     cycles_per_ms_ = max_mhz * 1000;
   } else {
     cycles_per_ms_ = 1000000;
+  }
+  original_hardware_flags_ = hardware_flags_;
+}
+
+void CpuInfo::EnableFeature(long flag, bool enable) {
+  if (!enable) {
+    hardware_flags_ &= ~flag;
+  } else {
+    // Can't turn something on that can't be supported
+    DCHECK((original_hardware_flags_ & flag) != 0);
+    hardware_flags_ |= flag;
   }
 }
 

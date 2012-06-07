@@ -21,7 +21,6 @@
 #include <llvm/Target/TargetData.h>
 #include "llvm/Transforms/IPO.h"
 #include <llvm/Transforms/Scalar.h>
-#include <llvm/Transforms/Utils/BasicInliner.h>
 #include <llvm/Transforms/Utils/Cloning.h>
 
 #include "codegen/llvm-codegen.h"
@@ -130,7 +129,6 @@ Status LlvmCodeGen::LoadImpalaIR(ObjectPool* pool, scoped_ptr<LlvmCodeGen>* code
 
   // Get type for StringValue
   codegen->string_val_type_ = codegen->GetType(StringValue::LLVM_CLASS_NAME);
-  codegen->string_val_ptr_type_ = PointerType::get(codegen->string_val_type_, 0);
 
   // TODO: get type for Timestamp
 
@@ -159,7 +157,6 @@ Status LlvmCodeGen::LoadImpalaIR(ObjectPool* pool, scoped_ptr<LlvmCodeGen>* code
           return Status("Duplicate definition found for function: " + fn_name);
         }
         codegen->loaded_functions_[FN_MAPPINGS[j].fn] = functions[i];
-        codegen->AddInlineFunction(functions[i]);
         ++parsed_functions;
       }
     }
@@ -212,7 +209,6 @@ Status LlvmCodeGen::Init() {
   TargetData* target_data_pass = new TargetData(*target_data);
   function_pass_mgr_->add(target_data_pass);
 
-  inliner_.reset(new BasicInliner(target_data_pass));
   // These optimizations are based on the passes that clang uses with -O3.
   // clang will set these passes up as module passes to try to optimize the entire
   // module.  This is not suitable to how we use llvm.  We have "function trees"
@@ -221,7 +217,7 @@ Status LlvmCodeGen::Init() {
   // Some passes are repeated since after running some passes, there will be
   // some benefit with running previous passes again. The order of the passes
   // is *very* important.
-  // TODO: Loop optimizations are turned off until we have code that uses them.
+
   // Provide basic AliasAnalysis support for GVN.
   function_pass_mgr_->add(createBasicAliasAnalysisPass());
   // Rearrange expressions for better constant propagation
@@ -240,35 +236,31 @@ Status LlvmCodeGen::Init() {
   // Simplify the control flow graph (deleting unreachable blocks, etc).
   function_pass_mgr_->add(createCFGSimplificationPass());
 
-#if 0 // Loop optimizations
-    // Loop rotation
-    function_pass_mgr_->add(createLoopUnrollPass());
-    // Hoist loop invariants
-    function_pass_mgr_->add(createLICMPass());
-    // Loop unswitch optimization
-    function_pass_mgr_->add(createLoopUnswitchPass());
-    // Do simple "peephole" optimizations and bit-twiddling optzns.
-    function_pass_mgr_->add(createInstructionCombiningPass());
-    // Induction var optimization
-    function_pass_mgr_->add(createIndVarSimplifyPass());
-    // Rewrite loop idioms like memset.
-    function_pass_mgr_->add(createLoopIdiomPass());
-    // Remove dead loops
-    function_pass_mgr_->add(createLoopDeletionPass());
-    // Unroll loops
-    function_pass_mgr_->add(createLoopUnrollPass());
-    // Remove redundant instructions
-    function_pass_mgr_->add(createGVNPass());
-    // Remove unnecessary memcpys or collapse stores to memcpy/memset
-    function_pass_mgr_->add(createMemCpyOptPass());
-    // Sparse conditional constant propagation
-    function_pass_mgr_->add(createSCCPPass());
-    // Do simple "peephole" optimizations and bit-twiddling optzns.
-    function_pass_mgr_->add(createInstructionCombiningPass());
-    // Collapse dependent blocks based on condition propagation
-    function_pass_mgr_->add(createJumpThreadingPass());
-    function_pass_mgr_->add(createCorrelatedValuePropagationPass());
-#endif
+  // Hoist loop invariants
+  function_pass_mgr_->add(createLICMPass());
+  // Loop unswitch optimization
+  function_pass_mgr_->add(createLoopUnswitchPass());
+  // Do simple "peephole" optimizations and bit-twiddling optzns.
+  function_pass_mgr_->add(createInstructionCombiningPass());
+  // Induction var optimization
+  function_pass_mgr_->add(createIndVarSimplifyPass());
+  // Rewrite loop idioms like memset.
+  function_pass_mgr_->add(createLoopIdiomPass());
+  // Remove dead loops
+  function_pass_mgr_->add(createLoopDeletionPass());
+  // Unroll loops
+  function_pass_mgr_->add(createLoopUnrollPass());
+  // Remove redundant instructions
+  function_pass_mgr_->add(createGVNPass());
+  // Remove unnecessary memcpys or collapse stores to memcpy/memset
+  function_pass_mgr_->add(createMemCpyOptPass());
+  // Sparse conditional constant propagation
+  function_pass_mgr_->add(createSCCPPass());
+  // Do simple "peephole" optimizations and bit-twiddling optzns.
+  function_pass_mgr_->add(createInstructionCombiningPass());
+  // Collapse dependent blocks based on condition propagation
+  function_pass_mgr_->add(createJumpThreadingPass());
+  function_pass_mgr_->add(createCorrelatedValuePropagationPass());
 
   // Dead store elimination
   function_pass_mgr_->add(createDeadStoreEliminationPass());
@@ -285,10 +277,10 @@ Status LlvmCodeGen::Init() {
 
   void_type_ = Type::getVoidTy(context());
   ptr_type_ = PointerType::get(GetType(TYPE_TINYINT), 0);
-  bool_ptr_type_ = PointerType::get(GetType(TYPE_BOOLEAN), 0);
-  int64_ptr_type_ = PointerType::get(GetType(TYPE_BIGINT), 0);
   true_value_ = ConstantInt::get(context(), APInt(1, true, true));
   false_value_ = ConstantInt::get(context(), APInt(1, false, true));
+
+  RETURN_IF_ERROR(LoadIntrinsics());
 
   return Status::OK;
 }
@@ -354,6 +346,10 @@ Type* LlvmCodeGen::GetType(PrimitiveType type) {
   }
 }
 
+PointerType* LlvmCodeGen::GetPtrType(PrimitiveType type) {
+  return PointerType::get(GetType(type), 0);
+}
+
 Type* LlvmCodeGen::GetType(const string& name) {
   return module_->getTypeByName(name);
 }
@@ -405,10 +401,6 @@ Function* LlvmCodeGen::GetLibCFunction(FnPrototype* prototype) {
 Function* LlvmCodeGen::GetFunction(IRFunction::Type function) {
   DCHECK(loaded_functions_[function] != NULL);
   return loaded_functions_[function];
-}
-
-void LlvmCodeGen::AddInlineFunction(Function* function) {
-  inliner_->addFunction(function);
 }
 
 bool LlvmCodeGen::VerifyFunction(Function* function) {
@@ -501,10 +493,45 @@ Function* LlvmCodeGen::ReplaceCallSites(Function* caller, bool update_in_place,
   return caller;
 }
 
+// TODO: revisit this.  Inlining all call sites might not be the right call.  We
+// probably need to make this more complicated and somewhat cost based or write
+// our own optimization passes.
+int LlvmCodeGen::InlineAllCallSites(Function* fn) {
+  int functions_inlined = 0;
+  // Collect all call sites
+  vector<CallInst*> call_sites;
+
+  // loop over all blocks
+  Function::iterator block_iter = fn->begin();
+  while (block_iter != fn->end()) {
+    BasicBlock* block = block_iter++;
+    // loop over instructions in the block
+    BasicBlock::iterator instr_iter = block->begin();
+    while (instr_iter != block->end()) {
+      Instruction* instr = instr_iter++;
+      // look for call instructions
+      if (CallInst::classof(instr)) {
+        call_sites.push_back(reinterpret_cast<CallInst*>(instr));
+      }
+    }
+  }
+
+  // Inline all call sites.  InlineFunction can still fail (function is recursive, etc)
+  // but that always leaves the original function in a consistent state
+  for (int i = 0; i < call_sites.size(); ++i) {
+    llvm::InlineFunctionInfo info;
+    if (llvm::InlineFunction(call_sites[i], info)) {
+      ++functions_inlined;
+    }
+  }
+  return functions_inlined;
+}
+
+
 Function* LlvmCodeGen::FinalizeFunction(Function* function) {
   if (!VerifyFunction(function)) return NULL;
   OptimizeFunction(function);
-  AddInlineFunction(function);
+  InlineAllCallSites(function);
   return function;
 }
 
@@ -518,7 +545,6 @@ void LlvmCodeGen::OptimizeFunction(Function* function) {
 void* LlvmCodeGen::JitFunction(Function* function, int* scratch_size) {
   COUNTER_SCOPED_TIMER(compile_timer_);
   if (optimizations_enabled_) {
-    inliner_->inlineFunctions();
     function_pass_mgr_->run(*function);
   }
 
@@ -655,21 +681,85 @@ Function* LlvmCodeGen::CodegenMinMax(PrimitiveType type, bool min) {
   builder.CreateRet(params[1]);
 
   if (!VerifyFunction(fn)) return NULL;
-  AddInlineFunction(fn);
   return fn;
 }
 
-void LlvmCodeGen::CodegenMemcpy(LlvmCodeGen::LlvmBuilder* builder,
-    Value* dst, Value* src, Value* n) {
+Value* LlvmCodeGen::CodegenEquals(LlvmBuilder* builder, Value* v1, Value* v2, 
+    PrimitiveType type) {
+  if (type == TYPE_TIMESTAMP) {
+    DCHECK(false) << "Timestamp codegen NYI";
+    return NULL;
+  }
+  switch (type) {
+    case TYPE_BOOLEAN:
+    case TYPE_TINYINT:
+    case TYPE_SMALLINT:
+    case TYPE_INT:
+    case TYPE_BIGINT:
+      return builder->CreateICmpEQ(v1, v2, "tmp_eq");
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE:
+      return builder->CreateFCmpUEQ(v1, v2, "tmp_eq");
+    case TYPE_STRING: {
+      Function* str_fn = GetFunction(IRFunction::STRING_VALUE_EQ);
+      return builder->CreateCall2(str_fn, v1, v2, "tmp_eq");
+    }
+    default:
+      DCHECK(false);
+      return NULL;
+  }
+}
+
+// Intrinsics are loaded one by one.  Some are overloaded (e.g. memcpy) and the types must
+// be specified.  
+// TODO: is there a better way to do this?
+Status LlvmCodeGen::LoadIntrinsics() {
+  // Load memcpy
+  {
+    Type* types[] = { ptr_type(), ptr_type(), GetType(TYPE_INT) };
+    Function* fn = Intrinsic::getDeclaration(module(), Intrinsic::memcpy, types);
+    if (fn == NULL) {
+      return Status("Could not find memcpy intrinsic.");
+    }
+    llvm_intrinsics_[Intrinsic::memcpy] = fn;
+  }
+
+  // TODO: where is the best place to put this?
+  struct {
+    Intrinsic::ID id;
+    const char* error;
+  } non_overloaded_intrinsics[] = {
+    { Intrinsic::x86_sse42_crc32_32_8, "sse4.2 crc32_u8" },
+    { Intrinsic::x86_sse42_crc32_32_16, "sse4.2 crc32_u16" },
+    { Intrinsic::x86_sse42_crc32_32_32, "sse4.2 crc32_u32" },
+    { Intrinsic::x86_sse42_crc32_64_64, "sse4.2 crc32_u64" },
+  };
+  const int num_intrinsics = 
+      sizeof(non_overloaded_intrinsics) / sizeof(non_overloaded_intrinsics[0]);
+
+  for (int i = 0; i < num_intrinsics; ++i) {
+    Intrinsic::ID id = non_overloaded_intrinsics[i].id;
+    Function* fn = Intrinsic::getDeclaration(module(), id);
+    if (fn == NULL) {
+      stringstream ss;
+      ss << "Could not find " << non_overloaded_intrinsics[i].error << " intrinsic";
+      return Status(ss.str());
+    }
+    llvm_intrinsics_[id] = fn;
+  }
+
+  return Status::OK;
+}
+
+void LlvmCodeGen::CodegenMemcpy(LlvmBuilder* builder, Value* dst, Value* src, Value* n) {
   // Cast src/dst to int8_t*.  If they already are, this will get optimized away
   DCHECK(PointerType::classof(dst->getType()));
   DCHECK(PointerType::classof(src->getType()));
   dst = builder->CreateBitCast(dst, ptr_type());
   src = builder->CreateBitCast(src, ptr_type());
 
-  // Get intrinsic function.  TODO: cache this?
-  Type* types[] = { ptr_type(), ptr_type(), n->getType() };
-  Function* memcpy_fn = Intrinsic::getDeclaration(module(), Intrinsic::memcpy, types);
+  // Get intrinsic function.  
+  Function* memcpy_fn = llvm_intrinsics_[Intrinsic::memcpy];
   DCHECK(memcpy_fn != NULL);
 
   Value* args[] = {
@@ -678,6 +768,153 @@ void LlvmCodeGen::CodegenMemcpy(LlvmCodeGen::LlvmBuilder* builder,
     false_value()                       // is_volatile.
   };
   builder->CreateCall(memcpy_fn, args);
+}
+
+void LlvmCodeGen::CodegenAssign(LlvmBuilder* builder, 
+    Value* dst, Value* src, PrimitiveType type) {
+  switch (type) {
+    case TYPE_STRING:  {
+#if 0
+TODO: why does the memcpy not work???  On release, this segfaults.
+      CodegenMemcpy(builder, dst, src, GetIntConstant(TYPE_INT, sizeof(StringValue)));
+#endif
+      Value* src_ptr = builder->CreateStructGEP(src, 0, "string_ptr");
+      Value* src_len = builder->CreateStructGEP(src, 1, "string_len");
+
+      src_ptr = builder->CreateLoad(src_ptr);
+      src_len = builder->CreateLoad(src_len);
+
+      Value* dst_ptr = builder->CreateStructGEP(dst, 0, "string_ptr");
+      Value* dst_len = builder->CreateStructGEP(dst, 1, "string_len");
+
+      builder->CreateStore(src_ptr, dst_ptr);
+      builder->CreateStore(src_len, dst_len);
+      break;
+    }
+    case TYPE_TIMESTAMP:
+      DCHECK(false) << "Timestamp NYI"; // TODO
+      break;
+    default:
+      builder->CreateStore(src, dst);
+      break;
+  }
+}
+
+void LlvmCodeGen::ClearHashFns() {
+  hash_fns_.clear();
+}
+
+// Codegen to compute hash for a particular byte size.  Loops are unrolled in this
+// process.  For the case where num_bytes == 11, we'd do this by calling
+//   1. crc64 (for first 8 bytes)
+//   2. crc16 (for bytes 9, 10)
+//   3. crc8 (for byte 11)  
+// The resulting IR looks like:
+// define i32 @CrcHash11(i8* %data, i32 %len, i32 %seed) {
+// entry:
+//   %0 = zext i32 %seed to i64
+//   %1 = bitcast i8* %data to i64*
+//   %2 = getelementptr i64* %1, i32 0
+//   %3 = load i64* %2
+//   %4 = call i64 @llvm.x86.sse42.crc32.64.64(i64 %0, i64 %3)
+//   %5 = trunc i64 %4 to i32
+//   %6 = getelementptr i8* %data, i32 8
+//   %7 = bitcast i8* %6 to i16*
+//   %8 = load i16* %7
+//   %9 = call i32 @llvm.x86.sse42.crc32.32.16(i32 %5, i16 %8)
+//   %10 = getelementptr i8* %6, i32 2
+//   %11 = load i8* %10
+//   %12 = call i32 @llvm.x86.sse42.crc32.32.8(i32 %9, i8 %11)
+//   ret i32 %12
+// }
+Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
+  if (CpuInfo::Instance()->IsSupported(CpuInfo::SSE4_2)) {
+    if (num_bytes == -1) {
+      // -1 indicates variable length, just return the generic loop based
+      // hash fn.
+      return GetFunction(IRFunction::HASH_CRC);
+    }
+    
+    map<int, Function*>::iterator cached_fn = hash_fns_.find(num_bytes);
+    if (cached_fn != hash_fns_.end()) {
+      return cached_fn->second;
+    }
+
+    // Generate a function to hash these bytes
+    stringstream ss;
+    ss << "CrcHash" << num_bytes;
+    FnPrototype prototype(this, ss.str(), GetType(TYPE_INT));
+    prototype.AddArgument(LlvmCodeGen::NamedVariable("data", ptr_type()));
+    prototype.AddArgument(LlvmCodeGen::NamedVariable("len", GetType(TYPE_INT)));
+    prototype.AddArgument(LlvmCodeGen::NamedVariable("seed", GetType(TYPE_INT)));
+  
+    Value* args[3];
+    LlvmBuilder builder(context());
+    Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
+    Value* data = args[0];
+    Value* result = args[2];
+
+    Function* crc8_fn = llvm_intrinsics_[Intrinsic::x86_sse42_crc32_32_8];
+    Function* crc16_fn = llvm_intrinsics_[Intrinsic::x86_sse42_crc32_32_16];
+    Function* crc32_fn = llvm_intrinsics_[Intrinsic::x86_sse42_crc32_32_32];
+    Function* crc64_fn = llvm_intrinsics_[Intrinsic::x86_sse42_crc32_64_64];
+
+    // Generate the crc instructions starting with the highest number of bytes
+    if (num_bytes >= 8) {
+      Value* result_64 = builder.CreateZExt(result, GetType(TYPE_BIGINT));
+      Value* ptr = builder.CreateBitCast(data, GetPtrType(TYPE_BIGINT));
+      int i = 0;
+      while (num_bytes >= 8) {
+        Value* index[] = { GetIntConstant(TYPE_INT, i++) };
+        Value* d = builder.CreateLoad(builder.CreateGEP(ptr, index));
+        result_64 = builder.CreateCall2(crc64_fn, result_64, d);
+        num_bytes -= 8;
+      }
+      result = builder.CreateTrunc(result_64, GetType(TYPE_INT));
+      Value* index[] = { GetIntConstant(TYPE_INT, i * 8) };
+      // Update data to past the 8-byte chunks
+      data = builder.CreateGEP(data, index);
+    }
+    
+    if (num_bytes >= 4) {
+      DCHECK_LT(num_bytes, 8);
+      Value* ptr = builder.CreateBitCast(data, GetPtrType(TYPE_INT));
+      Value* d = builder.CreateLoad(ptr);
+      result = builder.CreateCall2(crc32_fn, result, d);
+      Value* index[] = { GetIntConstant(TYPE_INT, 4) };
+      data = builder.CreateGEP(data, index);
+      num_bytes -= 4;
+    }
+    
+    if (num_bytes >= 2) {
+      DCHECK_LT(num_bytes, 4);
+      Value* ptr = builder.CreateBitCast(data, GetPtrType(TYPE_SMALLINT));
+      Value* d = builder.CreateLoad(ptr);
+      result = builder.CreateCall2(crc16_fn, result, d);
+      Value* index[] = { GetIntConstant(TYPE_INT, 2) };
+      data = builder.CreateGEP(data, index);
+      num_bytes -= 2;
+    }
+    
+    if (num_bytes > 0) {
+      DCHECK_EQ(num_bytes, 1);
+      Value* d = builder.CreateLoad(data);
+      result = builder.CreateCall2(crc8_fn, result, d);
+      --num_bytes;
+    }
+    DCHECK_EQ(num_bytes, 0);
+
+    builder.CreateRet(result);
+
+    fn = FinalizeFunction(fn);
+    if (fn != NULL) {
+      hash_fns_[num_bytes] = fn;
+    }
+    return fn;
+  } else {
+    // Don't bother with optimizations without crc hash instruction
+    return GetFunction(IRFunction::HASH_FVN);
+  }
 }
 
 }

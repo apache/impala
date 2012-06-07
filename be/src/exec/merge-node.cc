@@ -147,6 +147,9 @@ bool MergeNode::EvalAndMaterializeExprs(const vector<Expr*>& exprs,
   }
   // Execute the body at least once.
   bool done = true;
+  Expr* const* conjuncts = &conjuncts_[0];
+  int num_conjuncts = conjuncts_.size();
+
   do {
     TupleRow* child_row = NULL;
     if (!const_exprs) {
@@ -170,7 +173,7 @@ bool MergeNode::EvalAndMaterializeExprs(const vector<Expr*>& exprs,
           row_batch->tuple_data_pool());
     }
 
-    if (EvalConjuncts(row)) {
+    if (EvalConjuncts(conjuncts, num_conjuncts, row)) {
       row_batch->CommitLastRow();
       ++num_rows_returned_;
       char* new_tuple = reinterpret_cast<char*>(*tuple);

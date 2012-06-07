@@ -66,7 +66,9 @@ class HdfsScanNode : public ScanNode {
   virtual Status SetScanRange(const TScanRange& scan_range);
 
   // Public so the scanner can call this.
-  bool EvalConjunctsForScanner(TupleRow* row) { return EvalConjuncts(row); }
+  bool EvalConjunctsForScanner(TupleRow* row) { 
+    return EvalConjuncts(&conjuncts_[0], conjuncts_.size(), row); 
+  }
 
   int limit() const { return limit_; }
 

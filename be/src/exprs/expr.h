@@ -190,6 +190,9 @@ class Expr {
   static int ComputeResultsLayout(const std::vector<Expr*>& exprs, 
       std::vector<int>* offsets, int* var_result_begin);
 
+  // Returns if codegen on each of the exprs is available.
+  static bool IsCodegenAvailable(const std::vector<Expr*>& exprs);
+
   // Codegen the expr tree rooted at this node.  This does a post order traversal
   // of the expr tree and codegen's each node.  Returns NULL if the subtree cannot
   // be codegen'd.
@@ -233,6 +236,8 @@ class Expr {
 
   virtual std::string DebugString() const;
   static std::string DebugString(const std::vector<Expr*>& exprs);
+  
+  static const char* LLVM_CLASS_NAME;
 
  protected:
   friend class ComputeFunctions;
@@ -333,7 +338,7 @@ class Expr {
   // This is a shim to convert the old ComputeFn signature to the code-
   // generated signature.  It will call the underlying jitted function and
   // stuff the result back in expr->result_.
-  static void* EvalJittedComputeFn(Expr* expr, TupleRow* row);
+  static void* EvalCodegendComputeFn(Expr* expr, TupleRow* row);
 
   // This is a function pointer to the compute function.  The return type
   // for jitted functions depends on the Expr so we need to store it as
