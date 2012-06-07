@@ -24,14 +24,6 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
   int probe_rows = probe_batch->num_rows();
 
   while (true) {
-    if (!hash_tbl_iterator_.HasNext()) {
-      // Advance to the next probe row
-      if (UNLIKELY(probe_batch_pos_ == probe_rows)) goto end;
-      current_probe_row_ = probe_batch->GetRow(probe_batch_pos_++);
-      hash_tbl_->Scan(current_probe_row_, &hash_tbl_iterator_);
-      matched_probe_ = false;
-    }
-
     TupleRow* matched_build_row = NULL;
     // Create output row for each matching build row
     while ((matched_build_row = hash_tbl_iterator_.GetNext()) != NULL) {
@@ -59,6 +51,7 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
     // Handle left outer-join
     if (!matched_probe_ && match_all_probe_) {
       CreateOutputRow(out_row, current_probe_row_, NULL);
+      matched_probe_ = true;
       if (EvalConjuncts(conjuncts_, out_row)) {
         ++rows_returned;
         if (UNLIKELY(rows_returned == max_added_rows)) goto end;
@@ -66,6 +59,14 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
         out_row_mem += out_batch->row_byte_size();
         out_row = reinterpret_cast<TupleRow*>(out_row_mem);
       }
+    }
+    
+    if (!hash_tbl_iterator_.HasNext()) {
+      // Advance to the next probe row
+      if (UNLIKELY(probe_batch_pos_ == probe_rows)) goto end;
+      current_probe_row_ = probe_batch->GetRow(probe_batch_pos_++);
+      hash_tbl_->Scan(current_probe_row_, &hash_tbl_iterator_);
+      matched_probe_ = false;
     }
   }
 

@@ -14,9 +14,9 @@
 
 #include "gen-cpp/PlanNodes_types.h"
 
+using namespace boost;
 using namespace impala;
 using namespace std;
-using namespace boost;
 
 HashJoinNode::HashJoinNode(
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
@@ -142,10 +142,15 @@ Status HashJoinNode::Open(RuntimeState* state) {
   
   COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
   probe_batch_pos_ = 0;
-  current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
-  VLOG(2) << "probe row: " << PrintRow(current_probe_row_, child(0)->row_desc());
-  matched_probe_ = false;
-  hash_tbl_->Scan(current_probe_row_, &hash_tbl_iterator_);
+  if (probe_batch_->num_rows() == 0) {
+    DCHECK(probe_eos_);
+    eos_ = true;
+  } else {
+    current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
+    VLOG(2) << "probe row: " << PrintRow(current_probe_row_, child(0)->row_desc());
+    matched_probe_ = false;
+    hash_tbl_->Scan(current_probe_row_, &hash_tbl_iterator_);
+  }
 
   return Status::OK;
 }
@@ -185,6 +190,10 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
   // These cases are simpler and use a more efficient processing loop
   if (join_op_ == TJoinOp::INNER_JOIN || join_op_ == TJoinOp::LEFT_SEMI_JOIN ||
       join_op_ == TJoinOp::LEFT_OUTER_JOIN) {
+    if (eos_) {
+      *eos = true;
+      return Status::OK;
+    }
     return LeftJoinGetNext(state, out_batch, eos);
   }
 
@@ -338,3 +347,4 @@ void HashJoinNode::DebugString(int indentation_level, stringstream* out) const {
   ExecNode::DebugString(indentation_level, out);
   *out << ")";
 }
+

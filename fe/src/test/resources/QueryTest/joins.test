@@ -178,3 +178,19 @@ smallint, int, tinyint, int, int, float, string
 84,84,4,4,984,9.9,'4'
 91,91,1,1,991,6.6,'1'
 ====
+# joins on empty tables
+select * from emptytable t1 join emptytable t2 on (t1.field=t2.field)
+----
+int, string, int, string
+----
+====
+select * from emptytable t1 join greptiny t2 on (t1.field=t2.field)
+----
+int, string, string
+----
+====
+select * from greptiny t1 join emptytable t2 on (t1.field=t2.field)
+----
+string, int, string
+----
+====

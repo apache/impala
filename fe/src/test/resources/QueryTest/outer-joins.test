@@ -380,3 +380,20 @@ bigint, string, int
 1003,'Name3',94612
 1004,'Name4',94612
 ====
+# joins on empty tables
+select * from emptytable t1 full outer join emptytable t2 on (t1.field=t2.field)
+----
+int, string, int, string
+----
+====
+select * from emptytable t1 right outer join greptiny t2 on (t1.field=t2.field)
+----
+int, string, string
+----
+====
+select count(*) from greptiny t1 left outer join emptytable t2 on (t1.field=t2.field)
+----
+bigint
+----
+100
+====
