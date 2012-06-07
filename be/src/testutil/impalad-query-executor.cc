@@ -61,7 +61,13 @@ Status ImpaladQueryExecutor::Exec(
   // TODO: catch exception and return error code
   // LogContextId of "" will ask the Beeswax service to assign a new id but Beeswax
   // does not provide a constant for it.
-  client_->executeAndWait(query_handle_, query, "");
+  try {
+    client_->executeAndWait(query_handle_, query, "");
+  } catch (BeeswaxException& e) {
+    stringstream ss;
+    ss << e.SQLState << ": " << e.message;
+    return Status(ss.str());
+  }
   current_row_ = 0;
   return Status::OK;
 }
@@ -103,9 +109,14 @@ Status ImpaladQueryExecutor::Explain(const string& query_string, string* explain
   Query query;
   query.query = query_string;
 
-  // TODO: catch exception and return error code
-  client_->explain(query_explanation_, query);
-  *explain_plan = query_explanation_.textual;
+  try {
+    client_->explain(query_explanation_, query);
+    *explain_plan = query_explanation_.textual;
+  } catch (BeeswaxException& e) {
+    stringstream ss;
+    ss << e.SQLState << ": " << e.message;
+    return Status(ss.str());
+  }
   return Status::OK;
 }
 

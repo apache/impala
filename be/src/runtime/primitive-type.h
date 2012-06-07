@@ -27,7 +27,7 @@ enum PrimitiveType {
 PrimitiveType ThriftToType(TPrimitiveType::type ttype);
 TPrimitiveType::type ToThrift(PrimitiveType ptype);
 std::string TypeToString(PrimitiveType t);
-
+std::string TypeToOdbcString(PrimitiveType t);
 }
 
 #endif

@@ -14,7 +14,7 @@
 #include "runtime/coordinator.h"
 #include "util/jni-util.h"
 #include "util/thrift-util.h"
-#include "gen-cpp/ImpalaService_types.h"
+#include "gen-cpp/Data_types.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
 
 using namespace std;

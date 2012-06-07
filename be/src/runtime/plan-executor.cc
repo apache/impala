@@ -18,9 +18,7 @@
 #include "runtime/descriptors.h"
 #include "runtime/row-batch.h"
 #include "util/jni-util.h"
-#include "gen-cpp/ImpalaService_types.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
-#include "gen-cpp/Data_types.h"
 
 DEFINE_bool(serialize_batch, false, "serialize and deserialize each returned row batch");
 DECLARE_bool(enable_jit);

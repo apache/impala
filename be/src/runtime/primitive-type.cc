@@ -60,4 +60,23 @@ string TypeToString(PrimitiveType t) {
   return "";
 }
 
+string TypeToOdbcString(PrimitiveType t) {
+  // ODBC driver requires types in lower case
+  switch (t) {
+    case INVALID_TYPE: return "invalid";
+    case TYPE_BOOLEAN: return "boolean";
+    case TYPE_TINYINT: return "tinyint";
+    case TYPE_SMALLINT: return "smallint";
+    case TYPE_INT: return "int";
+    case TYPE_BIGINT: return "bigint";
+    case TYPE_FLOAT: return "float";
+    case TYPE_DOUBLE: return "double";
+    case TYPE_DATE: return "date";
+    case TYPE_DATETIME: return "datetime";
+    case TYPE_TIMESTAMP: return "timestamp";
+    case TYPE_STRING: return "string";
+  };
+  return "unknown";
+}
+
 }

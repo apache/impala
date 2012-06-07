@@ -12,7 +12,6 @@
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
 #include "runtime/row-batch.h"
-#include "gen-cpp/ImpalaService_types.h"
 #include "gen-cpp/LocalExecutor_types.h"
 
 using namespace boost;

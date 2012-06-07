@@ -16,8 +16,6 @@
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <stdlib.h>
 
-#include "gen-cpp/ImpalaService_types.h"
-
 using namespace std;
 using namespace boost::posix_time;
 

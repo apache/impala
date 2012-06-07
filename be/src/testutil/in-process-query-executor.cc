@@ -39,7 +39,6 @@
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
 #include "gen-cpp/ImpalaBackendService.h"
-#include "gen-cpp/Data_types.h"
 
 DEFINE_int32(batch_size, 0,
     "batch size to be used by backend; a batch size of 0 indicates the "
@@ -109,7 +108,9 @@ Status InProcessQueryExecutor::Exec(const string& query, vector<PrimitiveType>* 
   try {
     COUNTER_SCOPED_TIMER(plan_gen_counter);
     CHECK(client_.get() != NULL) << "didn't call InProcessQueryExecutor::Setup()";
-    client_->GetExecRequest(query_request_, query.c_str(), FLAGS_num_nodes);
+    TQueryRequestResult query_request_result;
+    client_->GetQueryRequestResult(query_request_result, query.c_str(), FLAGS_num_nodes);
+    query_request_ = query_request_result.queryExecRequest;
   } catch (TImpalaPlanServiceException& e) {
     return Status(e.what());
   }

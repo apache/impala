@@ -8,13 +8,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.AnalysisContext;
+import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.planner.Planner;
+import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TPlanExecRequest;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TQueryRequest;
+import com.cloudera.impala.thrift.TQueryRequestResult;
+import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TUniqueId;
 import com.google.common.base.Preconditions;
 
@@ -54,15 +58,25 @@ public class Frontend {
     this.catalog.close();
   }
 
+  private void assignQueryId(TQueryExecRequest request) {
+    // Set query id
+    UUID queryId = new UUID(nextQueryId++, 0);
+    request.setQueryId(
+        new TUniqueId(queryId.getMostSignificantBits(),
+                      queryId.getLeastSignificantBits()));
+    for (TPlanExecRequest planRequest: request.fragmentRequests) {
+      planRequest.setQueryId(request.queryId);
+    }
+  }
+
   /**
-   * Run parsing, semantic analysis and plan generation for the given query request and
-   * return the TQueryExecRequest and optionally, an explain plan string.
-   * TODO: make updates to nextQueryId thread-safe
+   * Create a populated TQueryRequestResult corresponding to the supplied TQueryRequest.
    * @param request query request
    * @param explainString if not null, it will contain the explain plan string
-   * @return the serialized form of a TQueryExecRequest based on thriftQueryRequest
+   * @return a TQueryRequestResult based on request
+   * TODO: make updates to nextQueryId thread-safe
    */
-  private TQueryExecRequest generateExecRequest(TQueryRequest request,
+  public TQueryRequestResult createQueryExecRequest(TQueryRequest request,
       StringBuilder explainString) throws ImpalaException {
     AnalysisContext analysisCtxt = new AnalysisContext(catalog);
     AnalysisContext.AnalysisResult analysisResult = null;
@@ -76,30 +90,27 @@ public class Frontend {
 
     // create plan
     Planner planner = new Planner();
-    TQueryExecRequest result;
-    result = planner.createPlanFragments(analysisResult, request.numNodes, explainString);
-    return result;
-  }
+    TQueryRequestResult result = new TQueryRequestResult();
+    result.queryExecRequest =
+        planner.createPlanFragments(analysisResult, request.numNodes, explainString);
 
-  private void assignQueryId(TQueryExecRequest request) {
-    // Set query id
-    UUID queryId = new UUID(nextQueryId++, 0);
-    request.setQueryId(
-        new TUniqueId(queryId.getMostSignificantBits(),
-                      queryId.getLeastSignificantBits()));
-    for (TPlanExecRequest planRequest: request.fragmentRequests) {
-      planRequest.setQueryId(request.queryId);
+    // fill the metadata (for query statement)
+    if (analysisResult.isQueryStmt()) {
+      TResultSetMetadata metadata = new TResultSetMetadata();
+      QueryStmt queryStmt = analysisResult.getQueryStmt();
+      int colCnt = queryStmt.getColLabels().size();
+      for (int i = 0; i < colCnt; ++i) {
+        TColumnDesc colDesc = new TColumnDesc();
+        colDesc.columnName = queryStmt.getColLabels().get(i);
+        colDesc.columnType = queryStmt.getResultExprs().get(i).getType().toThrift();
+        metadata.addToColumnDescs(colDesc);
+      }
+      result.resultSetMetadata = metadata;
     }
-  }
 
-  /**
-   * Create a populated TQueryExecRequest corresponding to the supplied TQueryRequest.
-   */
-  public TQueryExecRequest createExecRequest(TQueryRequest request,
-      StringBuilder explainString) throws ImpalaException {
-    TQueryExecRequest execRequest = generateExecRequest(request, explainString);
-    assignQueryId(execRequest);
-    return execRequest;
+    // assing query id
+    assignQueryId(result.queryExecRequest);
+    return result;
   }
 
   /**
@@ -108,7 +119,7 @@ public class Frontend {
    */
   public String getExplainString(TQueryRequest request) throws ImpalaException {
     StringBuilder stringBuilder = new StringBuilder();
-    generateExecRequest(request, stringBuilder);
+    createQueryExecRequest(request, stringBuilder);
     return stringBuilder.toString();
   }
 }

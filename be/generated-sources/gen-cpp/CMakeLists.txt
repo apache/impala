@@ -27,6 +27,8 @@ set(SRC_FILES
   Descriptors_types.cpp
   Exprs_constants.cpp
   Exprs_types.cpp
+  Frontend_types.cpp
+  Frontend_constants.cpp
   hive_metastore_constants.cpp
   hive_metastore_types.cpp
   Opcodes_constants.cpp
@@ -44,7 +46,8 @@ set(SRC_FILES
 # each other
 add_library(ImpalaThrift ${SRC_FILES})
 
-# Setting these files as code-generated lets make clean and incremental builds work correctly
+# Setting these files as code-generated lets make clean and incremental builds work
+# correctly
 set_source_files_properties(${SRC_FILES} PROPERTIES GENERATED TRUE)
 
 add_dependencies(ImpalaThrift thrift-cpp)

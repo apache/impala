@@ -25,7 +25,7 @@
 #include "exprs/opcode-registry.h"
 #include "exprs/string-literal.h"
 #include "gen-cpp/Exprs_types.h"
-#include "gen-cpp/ImpalaService_types.h"
+#include "gen-cpp/Data_types.h"
 #include "runtime/runtime-state.h"
 #include "runtime/raw-value.h"
 

@@ -16,21 +16,19 @@
 #include "util/uid-util.h"
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/Types_types.h"
+#include "gen-cpp/Frontend_types.h"
 
 namespace impala {
 
 class RowBatch;
-class TQueryResult;
 class Expr;
 class RowDescriptor;
 class ExecEnv;
 class Coordinator;
 class TExpr;
 class TQueryRequest;
-class TQueryExecRequest;
 class ImpalaPlanServiceClient;
 
-// TODO: Beeswax implementation is only partial.
 // An Impala implementation of the Beeswax Service that only implements API used by the
 // Beeswax+ ODBC driver.
 // An impalad server process needs to create a single object of this
@@ -44,13 +42,12 @@ class ImpalaService : public ImpalaServiceIf {
   void Init(JNIEnv* env);
 
     // Beeswax API
-  // TODO: only partially implemented (or not implemented at all)
   virtual void executeAndWait(beeswax::QueryHandle& query_handle,
       const beeswax::Query& query, const beeswax::LogContextId& client_ctx);
   virtual void explain(beeswax::QueryExplanation& query_explanation,
       const beeswax::Query& query);
   virtual void fetch(beeswax::Results& query_results,
-      const beeswax::QueryHandle& query_id, const bool start_over,
+      const beeswax::QueryHandle& query_handle, const bool start_over,
       const int32_t fetch_size);
   virtual void get_results_metadata(beeswax::ResultsMetadata& results_metadata,
       const beeswax::QueryHandle& handle);
@@ -73,14 +70,23 @@ class ImpalaService : public ImpalaServiceIf {
   virtual void Cancel(impala::TStatus& status, const beeswax::QueryHandle& query_id);
   virtual void ResetCatalog(impala::TStatus& status);
 
+  // Relevant ODBC SQL State code; for more info,
+  // goto http://msdn.microsoft.com/en-us/library/ms714687.aspx
+  static const char* SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION;
+  static const char* SQLSTATE_GENERAL_ERROR;
+  static const char* SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED;
+
+  // Ascii output precision for double/float
+  static const int ASCII_PRECISION;
+
  private:
   int port_;
 
   // global, per-server state
-  jobject fe_;  // instance of com.cloudera.impala.service.Frontend
-  jmethodID get_exec_request_id_;  // FrontEnd.GetExecRequest()
-  jmethodID get_explain_plan_id_;  // FrontEnd.GetExplainPlan()
-  jmethodID reset_catalog_id_; // FrontEnd.resetCatalog
+  jobject fe_;  // instance of com.cloudera.impala.service.JniFrontend
+  jmethodID get_query_request_result_id_;  // JniFrontend.getQueryRequestResult()
+  jmethodID get_explain_plan_id_;  // JniFrontend.getExplainPlan()
+  jmethodID reset_catalog_id_; // JniFrontend.resetCatalog()
   ExecEnv* exec_env_;  // not owned
 
   // plan service-related - impalad optionally uses a standalone
@@ -94,11 +100,13 @@ class ImpalaService : public ImpalaServiceIf {
   // TODO: keep cache of pre-formatted ExecStates
   class ExecState {
    public:
-    ExecState(const TQueryRequest& request, ExecEnv* exec_env)
+    ExecState(const TQueryRequest& request, ExecEnv* exec_env,
+        const TResultSetMetadata& metadata)
       : request_(request), exec_env_(exec_env), coord_(NULL), eos_(false),
-        current_batch_(NULL), current_batch_row_(0), current_row_(0) {}
+        result_metadata_(metadata), current_batch_(NULL), current_batch_row_(0),
+        current_row_(0) {}
 
-    // Set output_exprs_ and col_types, based on exprs.
+    // Set output_exprs_, based on exprs.
     Status PrepareSelectListExprs(RuntimeState* runtime_state,
         const std::vector<TExpr>& exprs, const RowDescriptor& row_desc);
 
@@ -107,14 +115,16 @@ class ImpalaService : public ImpalaServiceIf {
 
     // Return at most max_rows from the current batch. If the entire current batch has
     // been returned, fetch another batch first.
-    // Returns the number of converted rows.
     // Caller should verify that EOS has not be reached before calling.
-    void FetchRowsAsAscii(const int32_t max_rows, std::vector<std::string>* fetched_rows);
+    Status FetchRowsAsAscii(const int32_t max_rows,
+        std::vector<std::string>* fetched_rows);
 
     bool eos() { return eos_; }
     Coordinator* coord() const { return coord_.get(); }
     int current_row() const { return current_row_; }
     RuntimeState* local_runtime_state() { return &local_runtime_state_; }
+    const TResultSetMetadata* result_metadata() { return &result_metadata_; }
+    const TUniqueId& query_id();
 
    private:
     TQueryRequest request_;  // the original request
@@ -126,45 +136,52 @@ class ImpalaService : public ImpalaServiceIf {
     std::vector<Expr*> output_exprs_;
     bool eos_;  // if true, there are no more rows to return
 
-    std::vector<PrimitiveType> col_types_; // column types of the query
+    TResultSetMetadata result_metadata_; // metadata for select query
     RowBatch* current_batch_; // the current row batch; only applicable if coord is set
     int current_batch_row_; // num of rows fetched within the current batch
     int current_row_; // num of rows that has been fetched for the entire query
 
     // Fetch the next row batch and store the results in current_batch_
-    void FetchNextBatch();
+    Status FetchNextBatch();
 
     // Evaluates output_exprs_ against at most max_rows in the current_batch_ starting
     // from current_batch_row_ and output the evaluated rows in Ascii form in
     // fetched_rows.
-    void ConvertRowBatchToAscii(const int32_t max_rows,
+    Status ConvertRowBatchToAscii(const int32_t max_rows,
         std::vector<std::string>* fetched_rows);
 
     // Creates single result row in query_result by evaluating output_exprs_ without
     // a row (ie, the expressions are constants) and put it in query_results_;
-    void CreateConstantRowAsAscii(std::vector<std::string>* fetched_rows);
+    Status CreateConstantRowAsAscii(std::vector<std::string>* fetched_rows);
 
+    // Creates a single string out of the ascii expr values and appends that string
+    // to converted_rows.
+    Status ConvertSingleRowToAscii(TupleRow* row,
+        std::vector<std::string>* converted_rows);
   };
 
   // map from query id to ExecState for that query
   typedef boost::unordered_map<TUniqueId, ExecState*> ExecStateMap;
   ExecStateMap exec_state_map_;
   boost::mutex exec_state_map_lock_;  // protects exec_state_map_;
-  ExecState* GetExecState(const TUniqueId& unique_id); // return null if not found
 
-  // Call FE to get TQueryExecRequest.
-  Status GetExecRequest(const TQueryRequest& query_request,
-      TQueryExecRequest* exec_request);
+  // Return the exec state for the given unique_id; return null if not found.
+  ExecState* GetExecState(const TUniqueId& unique_id);
+
+  // Call FE to get TQueryRequestResult.
+  Status GetQueryRequestResult(const TQueryRequest& request,
+      TQueryRequestResult* request_result);
 
   // Call FE to get explain plan
   Status GetExplainPlan(const TQueryRequest& query_request, std::string* explain_string);
 
   // Helper function to translate between Beeswax and Impala thrift
-  // TODO: remove these helper once we've merged the old Imapala service API into
-  //       Beeswax or HiveServer2.
   void QueryToTQueryRequest(const beeswax::Query& query, TQueryRequest* request);
   void TUniqueIdToQueryHandle(const TUniqueId& query_id, beeswax::QueryHandle* handle);
   void QueryHandleToTUniqueId(const beeswax::QueryHandle& handle, TUniqueId* query_id);
+
+  // Helper function to raise Beexwas "hanlde not found exception"
+  void RaiseBeeswaxHandleNotFoundException();
 
   Status executeAndWaitInternal(const TQueryRequest& request, TUniqueId* query_id);
 };

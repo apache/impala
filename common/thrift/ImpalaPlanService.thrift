@@ -3,7 +3,7 @@
 namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
-include "ImpalaBackendService.thrift"
+include "Frontend.thrift"
 
 exception TImpalaPlanServiceException {
   1: string msg;
@@ -12,7 +12,7 @@ exception TImpalaPlanServiceException {
 // We're running the Impala frontend as a service from which the backend
 // test driver can get plans to run.
 service ImpalaPlanService {
-  ImpalaBackendService.TQueryExecRequest GetExecRequest(1:string query, 2:i32 numNodes)
+  Frontend.TQueryRequestResult GetQueryRequestResult(1:string query, 2:i32 numNodes)
       throws (1:TImpalaPlanServiceException e);
 
   // Force planservice to reload table metadata, in case it has changed due to e.g. an 

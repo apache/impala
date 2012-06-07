@@ -71,6 +71,13 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return "";
   }
 
+  /**
+   * Return a column label for the expression
+   */
+  public String toColumnLabel() {
+    return toSql();
+  }
+
   // Convert this expr, including all children, to its Thrift representation.
   public TExpr treeToThrift() {
     TExpr result = new TExpr();

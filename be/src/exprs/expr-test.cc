@@ -12,7 +12,6 @@
 #include "runtime/primitive-type.h"
 #include "runtime/string-value.h"
 #include "testutil/in-process-query-executor.h"
-#include "gen-cpp/ImpalaService_types.h"
 #include "gen-cpp/Exprs_types.h"
 #include "exprs/bool-literal.h"
 #include "exprs/float-literal.h"

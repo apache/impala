@@ -78,6 +78,7 @@ set (SRC_FILES
   DataSinks.thrift
   Data.thrift
   Descriptors.thrift
+  Frontend.thrift
   JavaConstants.thrift
   Exprs.thrift
   ImpalaBackendService.thrift

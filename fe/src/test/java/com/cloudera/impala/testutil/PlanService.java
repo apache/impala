@@ -20,6 +20,7 @@ import com.cloudera.impala.thrift.ImpalaPlanService;
 import com.cloudera.impala.thrift.TImpalaPlanServiceException;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TQueryRequest;
+import com.cloudera.impala.thrift.TQueryRequestResult;
 import com.google.common.collect.Sets;
 
 /**
@@ -44,30 +45,30 @@ public class PlanService {
       frontend = new Frontend(lazy);
     }
 
-    public TQueryExecRequest GetExecRequest(String stmt, int numNodes)
+    public TQueryRequestResult GetQueryRequestResult(String stmt, int numNodes)
         throws TImpalaPlanServiceException {
       LOG.info(
           "Executing '" + stmt + "' for " + Integer.toString(numNodes) + " nodes");
       TQueryRequest tRequest = new TQueryRequest(stmt, false, numNodes);
       StringBuilder explainStringBuilder = new StringBuilder();
-      TQueryExecRequest request;
+      TQueryRequestResult result;
       try {
-        request = frontend.createExecRequest(tRequest, explainStringBuilder);
+        result = frontend.createQueryExecRequest(tRequest, explainStringBuilder);
       } catch (ImpalaException e) {
-        LOG.warn("Error creating exec request", e);
+        LOG.warn("Error creating query request result", e);
         throw new TImpalaPlanServiceException(e.getMessage());
       }
 
-      request.setAsAscii(false);
-      request.setAbortOnError(false);
-      request.setMaxErrors(100);
-      request.setBatchSize(0);
+      result.queryExecRequest.setAsAscii(false);
+      result.queryExecRequest.setAbortOnError(false);
+      result.queryExecRequest.setMaxErrors(100);
+      result.queryExecRequest.setBatchSize(0);
 
       // Print explain string.
       LOG.info(explainStringBuilder.toString());
 
-      LOG.info("returned exec request: " + request.toString());
-      return request;
+      LOG.info("returned TQueryRequestResult: " + result.toString());
+      return result;
     }
 
     public void ShutdownServer() {

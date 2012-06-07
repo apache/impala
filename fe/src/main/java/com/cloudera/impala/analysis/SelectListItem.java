@@ -59,4 +59,13 @@ class SelectListItem {
       return "*";
     }
   }
+
+  /**
+   * Return a column label for the select list item.
+   */
+  public String toColumnLabel() {
+    Preconditions.checkState(!isStar());
+    return expr.toColumnLabel();
+  }
+
 }

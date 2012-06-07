@@ -128,7 +128,7 @@ public class SelectStmt extends QueryStmt {
           aliasSMap.rhs.add(item.getExpr().clone(null));
           colLabels.add(item.getAlias().toLowerCase());
         } else {
-          colLabels.add(item.toSql().toLowerCase());
+          colLabels.add(item.toColumnLabel().toLowerCase());
         }
       }
     }

@@ -22,3 +22,17 @@ struct TRowBatch {
   // TODO: figure out how we can avoid copying the data during TRowBatch construction
   4: list<string> tuple_data
 }
+
+// this is a union over all possible return types
+struct TColumnValue {
+  // TODO: use <type>_val instead of camelcase
+  1: optional bool boolVal
+  2: optional i32 intVal
+  3: optional i64 longVal
+  4: optional double doubleVal
+  5: optional string stringVal
+}
+
+struct TResultRow {
+  1: list<TColumnValue> colVals
+}

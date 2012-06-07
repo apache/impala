@@ -70,6 +70,12 @@ public class SlotRef extends Expr {
   }
 
   @Override
+  public String toColumnLabel() {
+    return col.toLowerCase();
+  }
+
+
+  @Override
   protected void toThrift(TExprNode msg) {
     msg.node_type = TExprNodeType.SLOT_REF;
     msg.slot_ref = new TSlotRef(desc.getId().asInt());
