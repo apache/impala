@@ -70,5 +70,8 @@ service ImpalaService extends beeswax.BeeswaxService {
   // unknown.
   // This terminates all threads running on behalf of this query at
   // all nodes that were involved in the execution.
-  Types.TStatus cancel(1:beeswax.QueryHandle query_id);
+  Types.TStatus Cancel(1:beeswax.QueryHandle query_id);
+
+  // Invalidates all catalog metadata, forcing a reload
+  Types.TStatus ResetCatalog();
 }

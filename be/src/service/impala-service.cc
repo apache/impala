@@ -14,7 +14,7 @@
 #include <gflags/gflags.h>
 
 #include <protocol/TBinaryProtocol.h>
-#include <protocol/TDebugProtocol.h>
+#include <transport/TSocket.h>
 #include <server/TThreadPoolServer.h>
 #include <transport/TServerSocket.h>
 #include <server/TServer.h>
@@ -35,6 +35,8 @@
 #include "service/backend-service.h"
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaBackendService.h"
+#include "gen-cpp/ImpalaPlanService.h"
+#include "gen-cpp/ImpalaPlanService_types.h"
 #include "gen-cpp/Types_types.h"
 
 using namespace impala;
@@ -48,6 +50,9 @@ using namespace apache::thrift::concurrency;
 using namespace beeswax;
 
 DECLARE_bool(enable_jit);
+DECLARE_bool(use_planservice);
+DECLARE_string(planservice_host);
+DECLARE_int32(planservice_port);
 
 namespace impala {
 
@@ -56,19 +61,32 @@ ImpalaService::ImpalaService(int port)
     exec_env_(new ExecEnv()) {
 }
 
+ImpalaService::~ImpalaService() {}
+
 void ImpalaService::Init(JNIEnv* env) {
-  // create instance of java class Frontend
-  jclass fe_class = env->FindClass("com/cloudera/impala/service/Frontend");
-  jmethodID fe_ctor = env->GetMethodID(fe_class, "<init>", "()V");
-  EXIT_IF_EXC(env);
-  get_exec_request_id_ = env->GetMethodID(fe_class, "GetExecRequest", "([B)[B");
-  EXIT_IF_EXC(env);
-  get_explain_plan_id_ = env->GetMethodID(fe_class, "GetExplainPlan",
-      "([B)Ljava/lang/String;");
-  EXIT_IF_EXC(env);
-  jobject fe = env->NewObject(fe_class, fe_ctor);
-  EXIT_IF_EXC(env);
-  EXIT_IF_ERROR(JniUtil::LocalToGlobalRef(env, fe, &fe_));
+  if (!FLAGS_use_planservice) {
+    // create instance of java class Frontend
+    jclass fe_class = env->FindClass("com/cloudera/impala/service/JNIFrontend");
+    jmethodID fe_ctor = env->GetMethodID(fe_class, "<init>", "()V");
+    EXIT_IF_EXC(env);
+    get_exec_request_id_ = env->GetMethodID(fe_class, "getExecRequest", "([B)[B");
+    EXIT_IF_EXC(env);
+    get_explain_plan_id_ = env->GetMethodID(fe_class, "getExplainPlan",
+        "([B)Ljava/lang/String;");
+    EXIT_IF_EXC(env);
+    reset_catalog_id_ = env->GetMethodID(fe_class, "resetCatalog", "()V");
+    EXIT_IF_EXC(env);
+    jobject fe = env->NewObject(fe_class, fe_ctor);
+    EXIT_IF_EXC(env);
+    EXIT_IF_ERROR(JniUtil::LocalToGlobalRef(env, fe, &fe_));
+  } else {
+    planservice_socket_.reset(new TSocket(FLAGS_planservice_host,
+        FLAGS_planservice_port));
+    planservice_transport_.reset(new TBufferedTransport(planservice_socket_));
+    planservice_protocol_.reset(new TBinaryProtocol(planservice_transport_));
+    planservice_client_.reset(new ImpalaPlanServiceClient(planservice_protocol_));
+    planservice_transport_->open();
+  }
 }
 
 Status ImpalaService::executeAndWaitInternal(const TQueryRequest& request,
@@ -231,41 +249,69 @@ void ImpalaService::ExecState::CreateConstantRowAsAscii(vector<string>* fetched_
 
 Status ImpalaService::GetExecRequest(
     const TQueryRequest& query_request, TQueryExecRequest* exec_request) {
-  // TODO: figure out if repeated calls to JNI_GetCreatedJavaVMs()/AttachCurrentThread()
-  // are too expensive
-  JNIEnv* jni_env = getJNIEnv();
-  jbyteArray query_request_bytes;
-  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &query_request, &query_request_bytes));
-  jbyteArray exec_request_bytes = static_cast<jbyteArray>(
-      jni_env->CallObjectMethod(fe_, get_exec_request_id_, query_request_bytes));
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
-  DeserializeThriftMsg(jni_env, exec_request_bytes, exec_request);
+
+  if (!FLAGS_use_planservice) {
+    // TODO: figure out if repeated calls to JNI_GetCreatedJavaVMs()/AttachCurrentThread()
+    // are too expensive
+    JNIEnv* jni_env = getJNIEnv();
+    jbyteArray query_request_bytes;
+    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &query_request, &query_request_bytes));
+    jbyteArray exec_request_bytes = static_cast<jbyteArray>(
+        jni_env->CallObjectMethod(fe_, get_exec_request_id_, query_request_bytes));
+    RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+    DeserializeThriftMsg(jni_env, exec_request_bytes, exec_request);
   // TODO: dealloc exec_request_bytes?
   // TODO: figure out if we should detach here
   //RETURN_IF_JNIERROR(jvm_->DetachCurrentThread());
   return Status::OK;
+  } else {
+    // TODO: hardcode number of nodes to 1 for now
+    planservice_client_->GetExecRequest(*exec_request, query_request.stmt, 1);
+    return Status::OK;
+  }
 }
 
 Status ImpalaService::GetExplainPlan(
     const TQueryRequest& query_request, string* explain_string) {
-  // TODO: figure out if repeated calls to JNI_GetCreatedJavaVMs()/AttachCurrentThread()
-  // are too expensive
-  JNIEnv* jni_env = getJNIEnv();
-  jbyteArray query_request_bytes;
-  RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &query_request, &query_request_bytes));
-  jstring java_explain_string = static_cast<jstring>(
-      jni_env->CallObjectMethod(fe_, get_explain_plan_id_, query_request_bytes));
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
-  jboolean is_copy;
-  const char *str = jni_env->GetStringUTFChars(java_explain_string, &is_copy);
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
-  *explain_string = str;
-  jni_env->ReleaseStringUTFChars(java_explain_string, str);
-  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
-  return Status::OK;
+  if (!FLAGS_use_planservice) {
+    // TODO: figure out if repeated calls to JNI_GetCreatedJavaVMs()/AttachCurrentThread()
+    // are too expensive
+    JNIEnv* jni_env = getJNIEnv();
+    jbyteArray query_request_bytes;
+    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &query_request, &query_request_bytes));
+    jstring java_explain_string = static_cast<jstring>(
+        jni_env->CallObjectMethod(fe_, get_explain_plan_id_, query_request_bytes));
+    RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+    jboolean is_copy;
+    const char *str = jni_env->GetStringUTFChars(java_explain_string, &is_copy);
+    RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+    *explain_string = str;
+    jni_env->ReleaseStringUTFChars(java_explain_string, str);
+    RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+    return Status::OK;
+  } else {
+    try {
+      planservice_client_->GetExplainString(*explain_string, query_request.stmt, 0);
+    } catch (TException& e) {
+      return Status(e.what());
+    }
+    return Status::OK;
+  }
 }
 
-void ImpalaService::cancel(impala::TStatus& status,
+void ImpalaService::ResetCatalog(impala::TStatus& status) {
+  status.status_code = TStatusCode::INTERNAL_ERROR;
+  if (!FLAGS_use_planservice) {
+    JNIEnv* jni_env = getJNIEnv();
+    jni_env->CallObjectMethod(fe_, reset_catalog_id_);
+    RETURN_IF_EXC(jni_env);
+  } else {
+    planservice_client_->RefreshMetadata();
+  }
+  status.status_code = TStatusCode::OK;
+}
+
+void ImpalaService::Cancel(impala::TStatus& status,
     const beeswax::QueryHandle& query_id) {
   // TODO: implement cancellation in a follow-on cl
 #if 0

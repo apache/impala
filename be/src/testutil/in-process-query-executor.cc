@@ -124,7 +124,7 @@ Status InProcessQueryExecutor::Exec(const string& query, vector<PrimitiveType>* 
     DCHECK(!query_request_.fragmentRequests[0].__isset.planFragment);
     local_state_.reset(
         new RuntimeState(query_request_.queryId, FLAGS_abort_on_error,
-                         FLAGS_max_errors, FLAGS_batch_size, 
+                         FLAGS_max_errors, FLAGS_batch_size,
                          FLAGS_enable_jit, NULL));
     query_profile_->AddChild(local_state_->runtime_profile());
     RETURN_IF_ERROR(
@@ -298,8 +298,12 @@ string InProcessQueryExecutor::FileErrors() const {
 }
 
 Status InProcessQueryExecutor::Explain(const string& query, string* explain_plan) {
-  // TODO: finish this
-  return Status("InProcessQueryExecutor::Explain not supported");
+  try {
+    client_->GetExplainString(*explain_plan, query, 0);
+    return Status::OK;
+  } catch (TException& e) {
+    return Status(e.what());
+  }
 }
 
 RuntimeProfile* InProcessQueryExecutor::query_profile() {

@@ -19,5 +19,7 @@ service ImpalaPlanService {
   // insert
   void RefreshMetadata();
 
+  string GetExplainString(1:string query, 2:i32 numNodes) throws (1:TException e);
+
   void ShutdownServer();
 }

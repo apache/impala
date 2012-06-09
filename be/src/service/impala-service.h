@@ -28,6 +28,7 @@ class Coordinator;
 class TExpr;
 class TQueryRequest;
 class TQueryExecRequest;
+class ImpalaPlanServiceClient;
 
 // TODO: Beeswax implementation is only partial.
 // An Impala implementation of the Beeswax Service that only implements API used by the
@@ -37,7 +38,7 @@ class TQueryExecRequest;
 class ImpalaService : public ImpalaServiceIf {
  public:
   ImpalaService(int port);
-  virtual ~ImpalaService() {}
+  virtual ~ImpalaService();
 
   // Initialize state. Terminates process on error.
   void Init(JNIEnv* env);
@@ -69,7 +70,8 @@ class ImpalaService : public ImpalaServiceIf {
       const bool include_hadoop);
 
   // Impala service extension API
-  virtual void cancel(impala::TStatus& status, const beeswax::QueryHandle& query_id);
+  virtual void Cancel(impala::TStatus& status, const beeswax::QueryHandle& query_id);
+  virtual void ResetCatalog(impala::TStatus& status);
 
  private:
   int port_;
@@ -78,7 +80,15 @@ class ImpalaService : public ImpalaServiceIf {
   jobject fe_;  // instance of com.cloudera.impala.service.Frontend
   jmethodID get_exec_request_id_;  // FrontEnd.GetExecRequest()
   jmethodID get_explain_plan_id_;  // FrontEnd.GetExplainPlan()
+  jmethodID reset_catalog_id_; // FrontEnd.resetCatalog
   boost::scoped_ptr<ExecEnv> exec_env_;
+
+  // plan service-related - impalad optionally uses a standalone
+  // plan service (see FLAGS_use_planservice etc)
+  boost::shared_ptr<apache::thrift::transport::TTransport> planservice_socket_;
+  boost::shared_ptr<apache::thrift::transport::TTransport> planservice_transport_;
+  boost::shared_ptr<apache::thrift::protocol::TProtocol> planservice_protocol_;
+  boost::scoped_ptr<ImpalaPlanServiceClient> planservice_client_;
 
   // execution state of a single query
   // TODO: keep cache of pre-formatted ExecStates

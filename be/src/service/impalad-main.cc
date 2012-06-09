@@ -41,6 +41,12 @@ DEFINE_int32(fe_port, 21000, "port on which ImpalaService is exported");
 DEFINE_int32(be_port, 22000, "port on which ImpalaBackendService is exported");
 DEFINE_string(classpath, "", "java classpath");
 
+DEFINE_bool(use_planservice, false, "Use external planservice if true");
+DEFINE_string(planservice_host, "localhost",
+    "Host on which external planservice is running");
+DEFINE_int32(planservice_port, 20000, "Port on which external planservice is running");
+
+
 namespace impala {
 
 static void RunServer(TServer* server) {

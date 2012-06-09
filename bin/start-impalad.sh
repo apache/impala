@@ -10,4 +10,4 @@ $IMPALA_HOME/thirdparty/hive-0.8.0-cdh4b1/lib/datanucleus-rdbms-2.0.3.jar:\
 $IMPALA_HOME/thirdparty/hive-0.8.0-cdh4b1/lib/datanucleus-connectionpool-2.0.3.jar
 
 export CLASSPATH
-$IMPALA_HOME/be/build/debug/service/impalad
+$IMPALA_HOME/be/build/debug/service/impalad $@

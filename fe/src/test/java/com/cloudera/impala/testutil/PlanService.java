@@ -3,12 +3,11 @@
 package com.cloudera.impala.testutil;
 
 import java.util.Enumeration;
-import java.util.List;
 import java.util.Properties;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.log4j.Logger;
 import org.apache.thrift.TException;
 import org.apache.thrift.server.TServer;
 import org.apache.thrift.server.TThreadPoolServer;
@@ -16,20 +15,12 @@ import org.apache.thrift.transport.TServerSocket;
 import org.apache.thrift.transport.TServerTransport;
 import org.apache.thrift.transport.TTransportException;
 
-import com.cloudera.impala.analysis.AnalysisContext;
-import com.cloudera.impala.analysis.Expr;
-import com.cloudera.impala.analysis.QueryStmt;
-import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.common.NotImplementedException;
-import com.cloudera.impala.planner.Planner;
+import com.cloudera.impala.common.ImpalaException;
+import com.cloudera.impala.service.Frontend;
 import com.cloudera.impala.thrift.ImpalaPlanService;
-import com.cloudera.impala.thrift.TPlanExecRequest;
 import com.cloudera.impala.thrift.TQueryExecRequest;
-import com.cloudera.impala.thrift.TUniqueId;
-import com.google.common.base.Preconditions;
-import com.google.common.collect.Lists;
+import com.cloudera.impala.thrift.TQueryRequest;
+import com.google.common.collect.Sets;
 
 /**
  * Service to construct a TPlanExecRequest for a given query string.
@@ -39,83 +30,47 @@ import com.google.common.collect.Lists;
  * under gdb.
  */
 public class PlanService {
+  // Note: query-executor.cc has a hardcoded port of 20000, be cautious if overriding this
+  // value
+  public static final int DEFAULT_PORT = 20000;
+  final PlanServiceHandler handler;
+  final TServer server;
+
   private static class PlanServiceHandler implements ImpalaPlanService.Iface {
-    private final AtomicReference<Catalog> catalog = new AtomicReference<Catalog>();
-    private int nextQueryId;
+    private static final Logger LOG = Logger.getLogger(PlanService.class);
+    private final Frontend frontend;
 
-    public PlanServiceHandler(Catalog catalog) {
-      Preconditions.checkNotNull(catalog);
-      setCatalog(catalog);
-      this.nextQueryId = 0;
-    }
-
-    protected void setCatalog(Catalog catalog) {
-      if (this.catalog.get() != null) {
-        this.catalog.get().close();
-      }
-      this.catalog.set(catalog);
+    public PlanServiceHandler(boolean lazy) {
+      frontend = new Frontend(lazy);
     }
 
     public TQueryExecRequest GetExecRequest(String stmt, int numNodes) throws TException {
-      System.out.println(
+      LOG.info(
           "Executing '" + stmt + "' for " + Integer.toString(numNodes) + " nodes");
-      AnalysisContext analysisCtxt = new AnalysisContext(catalog.get());
-      AnalysisContext.AnalysisResult analysisResult = null;
-      try {
-        analysisResult = analysisCtxt.analyze(stmt);
-      } catch (Exception e) {
-        System.out.println(e.getMessage());
-        throw new TException(e.getMessage());
-      }
-      Preconditions.checkNotNull(analysisResult.getStmt());
-
-      // populate colTypes
-      List<PrimitiveType> colTypes = Lists.newArrayList();
-      if (analysisResult.isQueryStmt()) {
-        QueryStmt queryStmt = analysisResult.getQueryStmt();
-        for (Expr expr : queryStmt.getResultExprs()) {
-          colTypes.add(expr.getType());
-        }
-      }
-
-      // create plan
-      Planner planner = new Planner();
-      StringBuilder explainString = new StringBuilder();
-
+      TQueryRequest tRequest = new TQueryRequest(stmt, false, numNodes);
+      StringBuilder explainStringBuilder = new StringBuilder();
       TQueryExecRequest request;
       try {
-        request = planner.createPlanFragments(analysisResult, numNodes, explainString);
-      } catch (NotImplementedException e) {
-        throw new TException(e);
-      } catch (InternalException e) {
-        throw new TException(e);
-      } catch (Exception e) {
-        System.out.println(e.getMessage());
+        request = frontend.createExecRequest(tRequest, explainStringBuilder);
+      } catch (ImpalaException e) {
+        LOG.warn("Error creating exec request", e);
         throw new TException(e);
       }
 
-      UUID queryId = new UUID(nextQueryId++, 0);
-      request.setQueryId(
-          new TUniqueId(queryId.getMostSignificantBits(),
-                        queryId.getLeastSignificantBits()));
       request.setAsAscii(false);
       request.setAbortOnError(false);
       request.setMaxErrors(100);
       request.setBatchSize(0);
 
-      for (TPlanExecRequest planRequest: request.fragmentRequests) {
-        planRequest.setQueryId(request.queryId);
-      }
-
       // Print explain string.
-      System.out.println(explainString.toString());
+      LOG.info(explainStringBuilder.toString());
 
-      System.out.println("returned exec request: " + request.toString());
+      LOG.info("returned exec request: " + request.toString());
       return request;
     }
 
     public void ShutdownServer() {
-      this.catalog.get().close();
+      frontend.close();
       System.exit(0);
     }
 
@@ -124,26 +79,34 @@ public class PlanService {
      */
     @Override
     public void RefreshMetadata() throws TException {
-      setCatalog(new Catalog());
+      frontend.resetCatalog();
+    }
+
+    @Override
+    public String GetExplainString(String query, int numNodes)
+        throws com.cloudera.impala.thrift.TException, TException {
+      try {
+        return frontend.getExplainString(new TQueryRequest(query, false, numNodes));
+      } catch (ImpalaException e) {
+        LOG.warn("Error getting explain string", e);
+        throw new TException(e);
+      }
     }
   }
 
-  // Note: query-executor.cc has a hardcoded port of 20000, be cautious if overriding this
-  // value
-  public static final int DEFAULT_PORT = 20000;
-  final PlanServiceHandler handler;
-  final TServer server;
-
-  public PlanService(Catalog catalog, int port) throws TTransportException {
-    handler = new PlanServiceHandler(catalog);
+  public PlanService(int port, boolean lazy) throws TTransportException {
+    handler = new PlanServiceHandler(lazy);
     ImpalaPlanService.Processor proc = new ImpalaPlanService.Processor(handler);
     TServerTransport transport = new TServerSocket(port);
     server =
       new TThreadPoolServer(new TThreadPoolServer.Args(transport).processor(proc));
   }
 
-  public PlanService() throws TTransportException, MetaException {
-    this(new Catalog(), DEFAULT_PORT);
+  /**
+   * If lazy is true, load the catalog lazily rather than eagerly at start-up
+   */
+  public PlanService(boolean lazy) throws TTransportException, MetaException {
+    this(DEFAULT_PORT, lazy);
   }
 
   /**
@@ -174,8 +137,11 @@ public class PlanService {
     server.stop();
   }
 
+  private static final String NON_LAZY_ARG = "-nonlazy";
+
   public static void main(String[] args) throws TTransportException, MetaException {
-    PlanService service = new PlanService();
+    Set<String> argSet = Sets.newHashSet(args);
+    PlanService service = new PlanService(!argSet.contains(NON_LAZY_ARG));
     try {
       service.serve();
     } catch (Exception e) {
