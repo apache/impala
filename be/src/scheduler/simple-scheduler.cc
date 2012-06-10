@@ -40,20 +40,19 @@ Status SimpleScheduler::GetHosts(
   hostports->clear();
   for (int i = 0; i < data_locations.size(); ++i) {
     HostMap::iterator entry = host_map_.find(data_locations[i]);
-    if (entry != host_map_.end()) {
-      DCHECK(entry->second.begin() != entry->second.end());
-      // TODO: return a randomly selected backend for this host?
-      // Will we ever have multiple backends on the same host, other
-      // than in a test setup?
-      hostports->push_back(make_pair(entry->first, entry->second.front()));
-    } else { 
+    if (entry == host_map_.end()) {
       // TODO: should we make an effort to pick a random host?
       entry = host_map_.begin();
     }
+    DCHECK(!entry->second.empty());
+    // TODO: return a randomly selected backend for this host?
+    // Will we ever have multiple backends on the same host, other
+    // than in a test setup?
     hostports->push_back(make_pair(entry->first, entry->second.front()));
     VLOG(1) << "SimpleScheduler: selecting "
             << entry->first << ":" << entry->second.front();
   }
+  DCHECK_EQ(data_locations.size(), hostports->size());
   return Status::OK;
 }
 
