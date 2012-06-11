@@ -80,6 +80,8 @@ HdfsPartitionDescriptor::HdfsPartitionDescriptor(const THdfsPartition& thrift_pa
     field_delim_(thrift_partition.fieldDelim),
     collection_delim_(thrift_partition.collectionDelim),
     escape_char_(thrift_partition.escapeChar),
+    block_size_(thrift_partition.blockSize),
+    compression_(thrift_partition.compression),
     exprs_prepared_(false),
     file_format_(thrift_partition.fileFormat),
     object_pool_(pool)  {

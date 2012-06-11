@@ -120,6 +120,7 @@ public class HdfsPartition {
         (byte)fileFormatDescriptor.getCollectionDelim(),
         (byte)fileFormatDescriptor.getMapKeyDelim(),
         (byte)fileFormatDescriptor.getEscapeChar(),
-        fileFormatDescriptor.getFileFormat().toThrift(), thriftExprs);
+        fileFormatDescriptor.getFileFormat().toThrift(), thriftExprs,
+        fileFormatDescriptor.getBlockSize(), fileFormatDescriptor.getCompression());
   }
 }

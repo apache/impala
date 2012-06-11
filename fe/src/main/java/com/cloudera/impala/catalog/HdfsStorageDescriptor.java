@@ -2,15 +2,20 @@
 
 package com.cloudera.impala.catalog;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.serde.Constants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.thrift.THdfsCompression;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
+import com.google.common.collect.ImmutableMap;
 
 /**
  * Represents the file format metadata for files stored in a table or partition.
@@ -30,6 +35,24 @@ public class HdfsStorageDescriptor {
   private final char mapKeyDelim;
   private final char escapeChar;
   private final char quoteChar;
+  private final int blockSize;
+  private final THdfsCompression compression;
+
+  // Serde parameters that are recognized by table writers.
+  private static final String BLOCK_SIZE = "blocksize";
+  private static final String COMPRESSION = "compression";
+
+  // Mapping from compression names to enum values.
+  private static final Map<String, THdfsCompression> COMPRESSION_MAP =
+    new ImmutableMap.Builder<String, THdfsCompression>()
+        .put("none", THdfsCompression.NONE)
+        .put("default", THdfsCompression.DEFAULT)
+        .put("gzip", THdfsCompression.GZIP)
+        .put("bzip2", THdfsCompression.BZIP2)
+        .put("snappy", THdfsCompression.SNAPPY)
+        // This name is defined by Trevni.
+        .put("deflate", THdfsCompression.DEFAULT)
+        .build();
 
   // Important: don't change the ordering of these keys - if e.g. FIELD_DELIM is not
   // found, the value of LINE_DELIM is used, so LINE_DELIM must be found first.
@@ -37,6 +60,8 @@ public class HdfsStorageDescriptor {
       ImmutableList.of(Constants.LINE_DELIM, Constants.FIELD_DELIM,
         Constants.COLLECTION_DELIM, Constants.MAPKEY_DELIM, Constants.ESCAPE_CHAR,
         Constants.QUOTE_CHAR);
+
+  private final static Logger LOG = LoggerFactory.getLogger(HdfsStorageDescriptor.class);
 
   /**
    * Returns a map from delimiter key to a single delimiter character,
@@ -107,9 +132,17 @@ public class HdfsStorageDescriptor {
     return fileFormat;
   }
 
+  public int getBlockSize(){
+    return blockSize;
+  }
+
+  public THdfsCompression getCompression() {
+    return compression;
+  }
+
   public HdfsStorageDescriptor(HdfsFileFormat fileFormat, char lineDelim,
       char fieldDelim, char collectionDelim, char mapKeyDelim, char escapeChar,
-      char quoteChar) {
+      char quoteChar, int blockSize, THdfsCompression compression) {
     this.fileFormat = fileFormat;
     this.lineDelim = lineDelim;
     this.fieldDelim = fieldDelim;
@@ -117,6 +150,8 @@ public class HdfsStorageDescriptor {
     this.mapKeyDelim = mapKeyDelim;
     this.escapeChar = escapeChar;
     this.quoteChar = quoteChar;
+    this.blockSize = blockSize;
+    this.compression = compression;
   }
 
   /**
@@ -140,12 +175,32 @@ public class HdfsStorageDescriptor {
   public static HdfsStorageDescriptor fromStorageDescriptor(StorageDescriptor sd)
       throws InvalidStorageDescriptorException {
     Map<String, Character> delimMap = extractDelimiters(sd.getSerdeInfo());
+
+    // Extract the blocksize and compression specification from the SerDe parameters,
+    // if present.
+    Map<String, String> parameters = sd.getSerdeInfo().getParameters();
+    int blockSize = 0;
+    String blockValue = parameters.get(BLOCK_SIZE);
+    if (blockValue != null) {
+      blockSize = Integer.parseInt(blockValue);
+    }
+    THdfsCompression compression = THdfsCompression.NONE;
+    String compressionValue = parameters.get(COMPRESSION);
+    if (compressionValue != null) {
+      if (COMPRESSION_MAP.containsKey(compressionValue)) {
+        compression = COMPRESSION_MAP.get(compressionValue);
+      } else {
+        LOG.warn("Unknown compression type: " + compressionValue);
+      }
+    }
+
     try {
       return new HdfsStorageDescriptor(
           HdfsFileFormat.fromJavaClassName(sd.getInputFormat()),
           delimMap.get(Constants.LINE_DELIM), delimMap.get(Constants.FIELD_DELIM),
           delimMap.get(Constants.COLLECTION_DELIM), delimMap.get(Constants.MAPKEY_DELIM),
-          delimMap.get(Constants.ESCAPE_CHAR), delimMap.get(Constants.QUOTE_CHAR));
+          delimMap.get(Constants.ESCAPE_CHAR), delimMap.get(Constants.QUOTE_CHAR),
+          blockSize, compression);
     } catch (IllegalArgumentException ex) {
       // Thrown by fromJavaClassName
       throw new InvalidStorageDescriptorException(ex);

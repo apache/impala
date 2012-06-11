@@ -29,6 +29,14 @@ enum THdfsFileFormat {
   SEQUENCE_FILE
 }
 
+enum THdfsCompression {
+   NONE,
+   DEFAULT,
+   GZIP,
+   BZIP2,
+   SNAPPY
+}
+
 struct THdfsPartition {
   1: required byte lineDelim
   2: required byte fieldDelim
@@ -37,6 +45,8 @@ struct THdfsPartition {
   5: required byte escapeChar
   6: required THdfsFileFormat fileFormat
   7: list<Exprs.TExpr> partitionKeyExprs 
+  8: required i32 blockSize
+  9: required THdfsCompression compression
 }
 
 struct THdfsTable {

@@ -154,7 +154,7 @@ Status HdfsTableSink::InitOutputPartition(OutputPartition* output) {
   }
   // Open tmp_hdfs_file_name.
   output->tmp_hdfs_file = hdfsOpenFile(hdfs_connection_,
-      tmp_hdfs_file_name_cstr, O_WRONLY, 0, 0, 0);
+      tmp_hdfs_file_name_cstr, O_WRONLY, 0, 0, default_partition_->block_size());
   if (output->tmp_hdfs_file == NULL) {
     return Status(AppendHdfsErrorMessage("Failed to open HDFS file for writing: ",
                                          output->tmp_hdfs_file_name));
