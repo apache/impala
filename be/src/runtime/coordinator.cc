@@ -3,6 +3,7 @@
 #include "runtime/coordinator.h"
 
 #include <glog/logging.h>
+#include <gflags/gflags.h>
 #include <transport/TTransportUtils.h>
 
 #include "exec/data-sink.h"
@@ -22,6 +23,9 @@ using namespace std;
 using namespace boost;
 using namespace apache::thrift::transport;
 
+DEFINE_string(coord_host, "localhost", "hostname of coordinator");
+DEFINE_int32(be_port, 22000, "port on which ImpalaBackendService is exported");
+
 namespace impala {
 
 Coordinator::Coordinator(ExecEnv* exec_env, ExecStats* exec_stats)
@@ -36,39 +40,48 @@ Coordinator::~Coordinator() {
   exec_thread_group_.join_all();
 }
 
-Status Coordinator::Exec(const TQueryExecRequest& request) {
+Status Coordinator::Exec(TQueryExecRequest* request) {
   // fragment 0 is the coordinator/"local" fragment that we're executing ourselves;
   // start this before starting any more plan fragments in backend threads, otherwise
   // they start sending data before the local exchange node had a chance to register
   // with the stream mgr
-  DCHECK_GT(request.nodeRequestParams.size(), 0);
+  DCHECK_GT(request->nodeRequestParams.size(), 0);
   // the first nodeRequestParams list contains exactly one TPlanExecParams
   // (it's meant for the coordinator fragment)
-  DCHECK_EQ(request.nodeRequestParams[0].size(), 1);
+  DCHECK_EQ(request->nodeRequestParams[0].size(), 1);
   RETURN_IF_ERROR(executor_->Prepare(
-      request.fragmentRequests[0], request.nodeRequestParams[0][0]));
+      request->fragmentRequests[0], request->nodeRequestParams[0][0]));
 
   // Only table sinks are valid sinks for coordinator fragments
-  if (request.fragmentRequests[0].dataSink.__isset.tableSink) {
-    RETURN_IF_ERROR(DataSink::CreateDataSink(request.fragmentRequests[0],
-        request.nodeRequestParams[0][0], executor_->row_desc(), &sink_));
+  if (request->fragmentRequests[0].dataSink.__isset.tableSink) {
+    RETURN_IF_ERROR(DataSink::CreateDataSink(request->fragmentRequests[0],
+        request->nodeRequestParams[0][0], executor_->row_desc(), &sink_));
     exec_stats_->query_type_ = ExecStats::INSERT;
     RETURN_IF_ERROR(sink_->Init(executor_->runtime_state()));
   } else {
     sink_.reset(NULL);
   }
 
+  if (request->nodeRequestParams.size() > 1) {
+    // set destinations of 2nd fragment to coord host/port
+    for (int i = 0; i < request->nodeRequestParams[1].size(); ++i) {
+      DCHECK_EQ(request->nodeRequestParams[1][i].destinations.size(), 1);
+      request->nodeRequestParams[1][i].destinations[0].host = FLAGS_coord_host;
+      request->nodeRequestParams[1][i].destinations[0].port = FLAGS_be_port;
+    }
+  }
+
   query_profile_.reset(
-      new RuntimeProfile(obj_pool(), "Query(id=" + PrintId(request.queryId) + ")"));
+      new RuntimeProfile(obj_pool(), "Query(id=" + PrintId(request->queryId) + ")"));
 
   COUNTER_SCOPED_TIMER(query_profile_->total_time_counter());
 
   // determine total number of fragments
   int num_threads = 0;
   // execNodes may contain empty list
-  DCHECK_GE(request.execNodes.size(), request.fragmentRequests.size() - 1);
-  for (int i = 1; i < request.fragmentRequests.size(); ++i) {
-    num_threads += request.execNodes[i - 1].size();
+  DCHECK_GE(request->execNodes.size(), request->fragmentRequests.size() - 1);
+  for (int i = 1; i < request->fragmentRequests.size(); ++i) {
+    num_threads += request->execNodes[i - 1].size();
   }
   if (num_threads > 0) {
     remote_exec_status_.resize(num_threads);
@@ -79,15 +92,15 @@ Status Coordinator::Exec(const TQueryExecRequest& request) {
   // fragmentRequests[i] can receive data from fragmentRequests[>i],
   // so start fragments in ascending order.
   int thread_num = 0;
-  for (int i = 1; i < request.fragmentRequests.size(); ++i) {
+  for (int i = 1; i < request->fragmentRequests.size(); ++i) {
     DCHECK(exec_env_ != NULL);
     // TODO: change this in the following way:
-    // * add locations to request.nodeRequestParams.scanRanges
-    // * pass in request.nodeRequestParams and let the scheduler figure out where
+    // * add locations to request->nodeRequestParams.scanRanges
+    // * pass in request->nodeRequestParams and let the scheduler figure out where
     // we should be doing those scans, rather than the frontend
     vector<pair<string, int> > hosts;
-    RETURN_IF_ERROR(exec_env_->scheduler()->GetHosts(request.execNodes[i-1], &hosts));
-    DCHECK_EQ(hosts.size(), request.nodeRequestParams[i].size());
+    RETURN_IF_ERROR(exec_env_->scheduler()->GetHosts(request->execNodes[i-1], &hosts));
+    DCHECK_EQ(hosts.size(), request->nodeRequestParams[i].size());
 
     // start individual plan exec requests
     for (int j = 0; j < hosts.size(); ++j) {
@@ -101,10 +114,10 @@ Status Coordinator::Exec(const TQueryExecRequest& request) {
       ImpalaBackendServiceClient* client;
       RETURN_IF_ERROR(exec_env_->client_cache()->GetClient(hosts[j], &client));
       DCHECK(client != NULL);
-      PrintClientInfo(hosts[j], request.nodeRequestParams[i][j]);
+      PrintClientInfo(hosts[j], request->nodeRequestParams[i][j]);
       exec_thread_group_.add_thread(new thread(
           &Coordinator::ExecRemoteFragment, this, thread_num, client,
-          request.fragmentRequests[i], request.nodeRequestParams[i][j]));
+          request->fragmentRequests[i], request->nodeRequestParams[i][j]));
       ++thread_num;
     }
   }

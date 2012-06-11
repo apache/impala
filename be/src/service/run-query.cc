@@ -40,7 +40,7 @@ DEFINE_int32(iterations, 1, "Number of times to run the query (for perf testing)
 DEFINE_bool(enable_counters, true, "if false, disable using counters (so a profiler can use them");
 DEFINE_bool(explain_plan, false, "if true, print the explain plan only");
 DECLARE_int32(num_nodes);
-DECLARE_int32(backend_port);
+DECLARE_int32(be_port);
 DECLARE_string(backends);
 DECLARE_string(impalad);
 
@@ -220,9 +220,11 @@ int main(int argc, char** argv) {
   LlvmCodeGen::InitializeLlvm();
   JniUtil::InitLibhdfs();
   scoped_ptr<ExecEnv> exec_env;
-  if (FLAGS_backends.empty()) {
+  if (FLAGS_impalad.empty() && FLAGS_backends.empty()) {
+    // if we're not running against an existing impalad and don't have
+    // backends specified explicitly, start them up
     TestExecEnv* test_exec_env = new TestExecEnv(
-        FLAGS_num_nodes > 0 ? FLAGS_num_nodes - 1 : 4, FLAGS_backend_port + 1);
+        FLAGS_num_nodes > 0 ? FLAGS_num_nodes - 1 : 4, FLAGS_be_port + 1);
     test_exec_env->StartBackends();
     exec_env.reset(test_exec_env);
   } else {
@@ -230,7 +232,7 @@ int main(int argc, char** argv) {
   }
   if (FLAGS_num_nodes != 1) {
     // start backend service to feed stream_mgr
-    TServer* server = StartImpalaBackendService(exec_env.get(), FLAGS_backend_port);
+    TServer* server = StartImpalaBackendService(exec_env.get(), FLAGS_be_port);
     thread server_thread = thread(&RunServer, server);
   }
   EXIT_IF_ERROR(JniUtil::Init());

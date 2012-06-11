@@ -53,12 +53,13 @@ DECLARE_bool(enable_jit);
 DECLARE_bool(use_planservice);
 DECLARE_string(planservice_host);
 DECLARE_int32(planservice_port);
+DECLARE_int32(num_nodes);
 
 namespace impala {
 
-ImpalaService::ImpalaService(int port)
+ImpalaService::ImpalaService(ExecEnv* exec_env, int port)
   : port_(port),
-    exec_env_(new ExecEnv()) {
+    exec_env_(exec_env) {
 }
 
 ImpalaService::~ImpalaService() {}
@@ -111,7 +112,7 @@ Status ImpalaService::executeAndWaitInternal(const TQueryRequest& request,
 
     *query_id = exec_request.queryId;
 
-    exec_state = new ExecState(request, exec_env_.get());
+    exec_state = new ExecState(request, exec_env_);
     exec_state_map_.insert(make_pair(exec_request.queryId, exec_state));
   }
 
@@ -149,7 +150,7 @@ Status ImpalaService::executeAndWaitInternal(const TQueryRequest& request,
     }
   }
 
-  RETURN_IF_ERROR(exec_state->coord()->Exec(exec_request));
+  RETURN_IF_ERROR(exec_state->coord()->Exec(&exec_request));
   RETURN_IF_ERROR(exec_state->PrepareSelectListExprs(exec_state->coord()->runtime_state(),
         exec_request.fragmentRequests[0].outputExprs, exec_state->coord()->row_desc()));
 
@@ -485,8 +486,7 @@ void ImpalaService::get_default_configuration(
 }
 
 void ImpalaService::QueryToTQueryRequest(const Query& query, TQueryRequest* request) {
-  // TODO: hard code the number of nodes to 1 for now.
-  request->numNodes = 1;
+  request->numNodes = FLAGS_num_nodes;
   request->returnAsAscii = true;
   request->stmt = query.query;
 }

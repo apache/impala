@@ -92,6 +92,7 @@ inline size_t DataStreamMgr::GetHashValue(const TUniqueId& query_id, PlanNodeId 
 DataStreamRecvr* DataStreamMgr::CreateRecvr(
     const RowDescriptor& row_desc, const TUniqueId& query_id, PlanNodeId dest_node_id,
     int num_senders, int buffer_size) {
+  VLOG(2) << "creating receiver for query=" << query_id << ", node=" << dest_node_id;
   StreamControlBlock* cb = pool_.Add(
       new StreamControlBlock(row_desc, query_id, dest_node_id, num_senders,
                              buffer_size));
@@ -103,6 +104,7 @@ DataStreamRecvr* DataStreamMgr::CreateRecvr(
 
 DataStreamMgr::StreamMap::iterator DataStreamMgr::FindControlBlock(
     const TUniqueId& query_id, PlanNodeId node_id) {
+  VLOG(2) << "looking up query=" << query_id << ", node=" << node_id;
   size_t hash_value = GetHashValue(query_id, node_id);
   lock_guard<mutex> l(stream_map_lock_);
   pair<StreamMap::iterator, StreamMap::iterator> range =
@@ -117,13 +119,13 @@ DataStreamMgr::StreamMap::iterator DataStreamMgr::FindControlBlock(
 
 Status DataStreamMgr::AddData(
     const TUniqueId& query_id, PlanNodeId dest_node_id, const TRowBatch& thrift_batch) {
-  VLOG(1) << "AddData(): " << RowBatch::GetBatchSize(thrift_batch) << "\n";
+  VLOG(2) << "AddData(): " << RowBatch::GetBatchSize(thrift_batch);
   StreamMap::iterator i = FindControlBlock(query_id, dest_node_id);
   if (i == stream_map_.end()) {
     stringstream err;
     err << "unknown row batch destination: query_id=" << query_id
         << " node_id=" << dest_node_id;
-    VLOG(1) << err.str();
+    LOG(ERROR) << err.str();
     return Status(err.str());
   }
   i->second->AddBatch(thrift_batch);
@@ -136,6 +138,7 @@ Status DataStreamMgr::CloseChannel(const TUniqueId& query_id, PlanNodeId dest_no
     stringstream err;
     err << "unknown row batch destination: query_id=" << query_id
         << " node_id=" << dest_node_id;
+    LOG(ERROR) << err.str();
     return Status(err.str());
   }
   i->second->DecrementSenders();
@@ -143,11 +146,13 @@ Status DataStreamMgr::CloseChannel(const TUniqueId& query_id, PlanNodeId dest_no
 }
 
 Status DataStreamMgr::DeregisterRecvr(const TUniqueId& query_id, PlanNodeId node_id) {
+  VLOG(2) << "DeregisterRecvr(): query=" << query_id << ", node=" << node_id;
   StreamMap::iterator i = FindControlBlock(query_id, node_id);
   if (i == stream_map_.end()) {
     stringstream err;
     err << "unknown row receiver id: query_id=" << query_id
         << " node_id=" << node_id;
+    LOG(ERROR) << err.str();
     return Status(err.str());
   }
   lock_guard<mutex> l(stream_map_lock_);

@@ -37,7 +37,7 @@ class ImpalaPlanServiceClient;
 // class in order to handle incoming rpcs.
 class ImpalaService : public ImpalaServiceIf {
  public:
-  ImpalaService(int port);
+  ImpalaService(ExecEnv* exec_env, int port);
   virtual ~ImpalaService();
 
   // Initialize state. Terminates process on error.
@@ -81,7 +81,7 @@ class ImpalaService : public ImpalaServiceIf {
   jmethodID get_exec_request_id_;  // FrontEnd.GetExecRequest()
   jmethodID get_explain_plan_id_;  // FrontEnd.GetExplainPlan()
   jmethodID reset_catalog_id_; // FrontEnd.resetCatalog
-  boost::scoped_ptr<ExecEnv> exec_env_;
+  ExecEnv* exec_env_;  // not owned
 
   // plan service-related - impalad optionally uses a standalone
   // plan service (see FLAGS_use_planservice etc)

@@ -48,7 +48,9 @@ class Coordinator {
   // from the coordinator fragment.
   // 'Request' must contain at least a coordinator plan fragment (ie, can't
   // be for a query like 'SELECT 1').
-  Status Exec(const TQueryExecRequest& request);
+  // The destination host/port of the 2nd fragment (the one sending to the coordinator)
+  // is set to FLAGS_coord_host/FLAGS_backend_port.
+  Status Exec(TQueryExecRequest* request);
 
   // Returns tuples from the coordinator fragment. Any returned tuples are valid until
   // the next GetNext() call. If the coordinator has a sink, then no tuples will be

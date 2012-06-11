@@ -49,11 +49,10 @@ DEFINE_int32(max_errors, 100, "number of errors to report");
 DEFINE_int32(num_nodes, 1,
     "Number of threads in which to run query; 1 = run only in main thread;"
     "0 = run in # of data nodes + 1 for coordinator");
-DEFINE_int32(backend_port, 21000,
-    "start port for backend threads (assigned sequentially)");
-DEFINE_string(coord_host, "localhost", "hostname of coordinator");
+DECLARE_int32(be_port);
 // TODO: we probably want to add finer grain control of what is codegen'd
 DEFINE_bool(enable_jit, true, "if true, enable codegen for query execution");
+DECLARE_string(coord_host);
 
 using namespace std;
 using namespace boost;
@@ -156,15 +155,13 @@ Status InProcessQueryExecutor::Exec(const string& query, vector<PrimitiveType>* 
     // set destinations to coord host/port
     for (int i = 0; i < query_request_.nodeRequestParams[1].size(); ++i) {
       DCHECK_EQ(query_request_.nodeRequestParams[1][i].destinations.size(), 1);
-      query_request_.nodeRequestParams[1][i].destinations[0].host =
-          FLAGS_coord_host;
-      query_request_.nodeRequestParams[1][i].destinations[0].port =
-          FLAGS_backend_port;
+      query_request_.nodeRequestParams[1][i].destinations[0].host = FLAGS_coord_host;
+      query_request_.nodeRequestParams[1][i].destinations[0].port = FLAGS_be_port;
     }
   }
 
   coord_.reset(new Coordinator(exec_env_, exec_stats_.get()));
-  RETURN_IF_ERROR(coord_->Exec(query_request_));
+  RETURN_IF_ERROR(coord_->Exec(&query_request_));
   RETURN_IF_ERROR(PrepareSelectListExprs(
       coord_->runtime_state(), coord_->row_desc(), col_types));
 

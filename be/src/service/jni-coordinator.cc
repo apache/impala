@@ -19,7 +19,7 @@
 
 using namespace std;
 
-DECLARE_int32(backend_port);
+DECLARE_int32(be_port);
 
 namespace impala {
 
@@ -64,8 +64,7 @@ Status JniCoordinator::DeserializeRequest(jbyteArray thrift_query_exec_request) 
     // fix up coord ports
     for (int i = 0; i < query_exec_request_.nodeRequestParams[1].size(); ++i) {
       DCHECK_EQ(query_exec_request_.nodeRequestParams[1][i].destinations.size(), 1);
-      query_exec_request_.nodeRequestParams[1][i].destinations[0].port =
-          FLAGS_backend_port;
+      query_exec_request_.nodeRequestParams[1][i].destinations[0].port = FLAGS_be_port;
     }
   }
 
@@ -76,7 +75,7 @@ void JniCoordinator::Exec(jbyteArray thrift_query_exec_request) {
   THROW_IF_ERROR(DeserializeRequest(thrift_query_exec_request), env_, impala_exc_cl_);
   // if this query is missing a FROM clause, don't hand it to the coordinator
   if (is_constant_query_) return;
-  THROW_IF_ERROR(coord_->Exec(query_exec_request_), env_, impala_exc_cl_);
+  THROW_IF_ERROR(coord_->Exec(&query_exec_request_), env_, impala_exc_cl_);
 }
 
 Status JniCoordinator::GetNext(RowBatch** batch) {

@@ -30,7 +30,7 @@
 #include "gen-cpp/ImpalaPlanService_types.h"
 
 DECLARE_bool(serialize_batch);
-DECLARE_int32(backend_port);
+DECLARE_int32(be_port);
 
 using namespace impala;
 using namespace std;
@@ -71,17 +71,15 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
   THROW_IF_ERROR_RET(HBaseTableCache::Init(), env, impala_exc_cl, -1);
   THROW_IF_ERROR_RET(JniCoordinator::Init(), env, impala_exc_cl, -1);
 
-  // start backends in process, listening on ports > backend_port
+  // start backends in process, listening on ports > be_port
   VLOG(1) << "creating test env";
-  test_env = new TestExecEnv(2, FLAGS_backend_port + 1);
-  //test_env.reset(new TestExecEnv(2, FLAGS_backend_port + 1));
+  test_env = new TestExecEnv(2, FLAGS_be_port + 1);
   exec_stats.reset(new ExecStats());
   VLOG(1) << "starting backends";
   test_env->StartBackends();
 
-  // start one backend service for the coordinator on backend_port
-  TServer* server = StartImpalaBackendService(test_env, FLAGS_backend_port);
-  //TServer* server = StartImpalaBackendService(test_env.get(), FLAGS_backend_port);
+  // start one backend service for the coordinator on be_port
+  TServer* server = StartImpalaBackendService(test_env, FLAGS_be_port);
   thread server_thread = thread(&RunServer, server);
 
   return JNI_VERSION_1_4;

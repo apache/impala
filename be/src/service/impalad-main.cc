@@ -38,7 +38,7 @@ using namespace apache::thrift::transport;
 using namespace apache::thrift::concurrency;
 
 DEFINE_int32(fe_port, 21000, "port on which ImpalaService is exported");
-DEFINE_int32(be_port, 22000, "port on which ImpalaBackendService is exported");
+DECLARE_int32(be_port);
 DEFINE_string(classpath, "", "java classpath");
 
 DEFINE_bool(use_planservice, false, "Use external planservice if true");
@@ -55,11 +55,11 @@ static void RunServer(TServer* server) {
 }
 
 // Start jvm and backend service.
-static void StartImpalaService(int port) {
+static void StartImpalaService(ExecEnv* exec_env, int port) {
   shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
   LOG(INFO) << "ImpalaService trying to listen on " << port;
 
-  shared_ptr<ImpalaService> handler(new ImpalaService(FLAGS_fe_port));
+  shared_ptr<ImpalaService> handler(new ImpalaService(exec_env, FLAGS_fe_port));
   // this first call to getJNIEnv() (which should be this one) creates a jvm
   JNIEnv* env = getJNIEnv();
   handler->Init(env);
@@ -89,11 +89,11 @@ int main(int argc, char** argv) {
   EXIT_IF_ERROR(HBaseTableScanner::Init());
   EXIT_IF_ERROR(HBaseTableCache::Init());
 
-  // start backend service for the coordinator on backend_port
+  // start backend service for the coordinator on be_port
   ExecEnv exec_env;
   TServer* be_server = StartImpalaBackendService(&exec_env, FLAGS_be_port);
   thread be_server_thread = thread(&RunServer, be_server);
 
   // this blocks until the fe server terminates
-  StartImpalaService(FLAGS_fe_port);
+  StartImpalaService(&exec_env, FLAGS_fe_port);
 }
