@@ -630,12 +630,12 @@ public class SelectStmt extends QueryStmt {
   @Override
   public void getMaterializedTupleIds(ArrayList<TupleId> tupleIdList) {
     // If select statement has an aggregate, then the aggregate tuple id is materialized.
-    // Otherwise, all the tables referenced by the inline view are materialized.
+    // Otherwise, all referenced tables are materialized.
     if (aggInfo != null) {
       tupleIdList.add(aggInfo.getAggTupleId());
     } else {
       for (TableRef tblRef: tableRefs) {
-        tupleIdList.addAll(tblRef.getIdList());
+        tupleIdList.addAll(tblRef.getMaterializedTupleIds());
       }
     }
   }

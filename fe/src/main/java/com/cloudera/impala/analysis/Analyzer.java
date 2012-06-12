@@ -258,6 +258,15 @@ public class Analyzer {
   }
 
   /**
+   * Register all conjuncts in a list of predicates.
+   */
+  public void registerConjuncts(List<Predicate> l) {
+    for (Predicate p: l) {
+      registerConjuncts(p);
+    }
+  }
+
+  /**
    * Register all conjuncts that make up the predicate.
    */
   public void registerConjuncts(Predicate p) {
@@ -332,10 +341,9 @@ public class Analyzer {
   /**
    * Return all unassigned registered conjuncts that are fully bound by given
    * list of tuple ids.
-   * @param tupleIds
    * @return possibly empty list of Predicates
    */
-  public List<Predicate> getConjuncts(List<TupleId> tupleIds) {
+  public List<Predicate> getBoundConjuncts(List<TupleId> tupleIds) {
     List<Predicate> result = Lists.newArrayList();
     for (int i = 0; i < conjuncts.size(); ++i) {
       Predicate pred = conjuncts.get(i);

@@ -139,7 +139,8 @@ public class Planner {
   private PlanNode createInlineViewPlan(Analyzer analyzer, InlineViewRef inlineViewRef)
       throws NotImplementedException, InternalException {
     // Get the list of fully bound predicates
-    List<Predicate> boundConjuncts = analyzer.getConjuncts(inlineViewRef.getIdList());
+    List<Predicate> boundConjuncts =
+        analyzer.getBoundConjuncts(inlineViewRef.getMaterializedTupleIds());
 
     // TODO (alan): this is incorrect for left outer join. Predicate should not be
     // evaluated after the join.
@@ -152,9 +153,7 @@ public class Planner {
     // If the view select statement does not compute aggregates, predicates are
     // registered with the inline view's analyzer for predicate pushdown.
     if (selectStmt.getAggInfo() == null) {
-      for (Predicate boundedConjunct: boundConjuncts) {
-        inlineViewRef.getAnalyzer().registerConjuncts(boundedConjunct);
-      }
+      inlineViewRef.getAnalyzer().registerConjuncts(boundConjuncts);
       analyzer.markConjunctsAssigned(boundConjuncts);
     }
 
@@ -193,7 +192,7 @@ public class Planner {
     // TODO (alan): this is incorrect for left outer joins. Predicate should not be
     // evaluated after the join.
 
-    List<Predicate> conjuncts = analyzer.getConjuncts(tblRef.getId().asList());
+    List<Predicate> conjuncts = analyzer.getBoundConjuncts(tblRef.getId().asList());
     analyzer.markConjunctsAssigned(conjuncts);
     ArrayList<ValueRange> keyRanges = Lists.newArrayList();
     boolean addedRange = false;  // added non-null range
@@ -242,7 +241,7 @@ public class Planner {
     joinConjuncts.clear();
     joinPredicates.clear();
     TupleId rhsId = rhs.getId();
-    List<TupleId> rhsIds = rhs.getIdList();
+    List<TupleId> rhsIds = rhs.getMaterializedTupleIds();
     List<Predicate> candidates;
     if (rhs.getJoinOp().isOuterJoin()) {
       // TODO: create test for this
@@ -290,7 +289,7 @@ public class Planner {
     // the rows coming from the build node only need to have space for the tuple
     // materialized by that node
     PlanNode inner = createTableRefNode(analyzer, innerRef);
-    inner.rowTupleIds = Lists.newArrayList(innerRef.getIdList());
+    inner.rowTupleIds = Lists.newArrayList(innerRef.getMaterializedTupleIds());
 
     List<Pair<Expr, Expr>> eqJoinConjuncts = Lists.newArrayList();
     List<Predicate> eqJoinPredicates = Lists.newArrayList();
@@ -308,7 +307,7 @@ public class Planner {
     // The remaining conjuncts that are bound by result.getTupleIds()
     // need to be evaluated explicitly by the hash join.
     ArrayList<Predicate> conjuncts =
-      new ArrayList<Predicate>(analyzer.getConjuncts(result.getTupleIds()));
+      new ArrayList<Predicate>(analyzer.getBoundConjuncts(result.getTupleIds()));
     result.setConjuncts(conjuncts);
     analyzer.markConjunctsAssigned(conjuncts);
     return result;
@@ -372,7 +371,7 @@ public class Planner {
     // and scans
     ArrayList<TupleId> rowTuples = Lists.newArrayList();
     for (TableRef tblRef: selectStmt.getTableRefs()) {
-      rowTuples.addAll(tblRef.getIdList());
+      rowTuples.addAll(tblRef.getMaterializedTupleIds());
     }
 
     // create left-deep sequence of binary hash joins; assign node ids as we go along

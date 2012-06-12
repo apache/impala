@@ -78,7 +78,7 @@ public abstract class TableRef extends ParseNodeBase {
    * Return the list of of materialized tuple ids from the TableRef.
    * This method should only be called after the TableRef has been analyzed.
    */
-  abstract public List<TupleId> getIdList();
+  abstract public List<TupleId> getMaterializedTupleIds();
 
   public String getExplicitAlias() {
     return alias;

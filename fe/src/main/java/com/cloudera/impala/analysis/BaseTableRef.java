@@ -36,7 +36,7 @@ public class BaseTableRef extends TableRef {
   }
 
   @Override
-  public List<TupleId> getIdList() {
+  public List<TupleId> getMaterializedTupleIds() {
     // This function should only be called after analyze().
     Preconditions.checkState(isAnalyzed);
     Preconditions.checkState(desc != null);

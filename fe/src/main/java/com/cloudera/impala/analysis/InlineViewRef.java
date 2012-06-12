@@ -18,11 +18,11 @@ public class InlineViewRef extends TableRef {
   // The select or union statement of the inline view
   private final QueryStmt queryStmt;
 
-  // Inner query block has its own analysis context
+  // queryStmt has its own analysis context
   private Analyzer inlineViewAnalyzer;
 
-  // list of tuple ids from this inline view
-  private final ArrayList<TupleId> tupleIdList = Lists.newArrayList();
+  // list of tuple ids materialized by queryStmt
+  private final ArrayList<TupleId> materializedTupleIds = Lists.newArrayList();
 
   // Map inline view colname to the underlying, fully substituted expression.
   // This map is built bottom-up, by recursively applying the substitution
@@ -36,9 +36,9 @@ public class InlineViewRef extends TableRef {
    * @param alias inline view alias
    * @param inlineViewStmt the select statement of the inline view
    */
-  public InlineViewRef(String alias, QueryStmt inlineViewStmt) {
+  public InlineViewRef(String alias, QueryStmt queryStmt) {
     super(alias);
-    this.queryStmt = inlineViewStmt;
+    this.queryStmt = queryStmt;
   }
 
   /**
@@ -52,15 +52,11 @@ public class InlineViewRef extends TableRef {
    */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
-    // Analyze the inline view select statement with its own Analyzer
+    // Analyze the inline view query statement with its own Analyzer
     inlineViewAnalyzer = new Analyzer(analyzer);
     queryStmt.analyze(inlineViewAnalyzer);
-
-    // Register the inline view
     desc = analyzer.registerInlineViewRef(this);
-
-    // Update the tupleIdList
-    queryStmt.getMaterializedTupleIds(tupleIdList);
+    queryStmt.getMaterializedTupleIds(materializedTupleIds);
 
     // Now do the remaining join analysis
     analyzeJoin(analyzer);
@@ -78,10 +74,10 @@ public class InlineViewRef extends TableRef {
   }
 
   @Override
-  public List<TupleId> getIdList() {
+  public List<TupleId> getMaterializedTupleIds() {
     Preconditions.checkState(isAnalyzed);
-    Preconditions.checkState(tupleIdList.size() > 0);
-    return tupleIdList;
+    Preconditions.checkState(materializedTupleIds.size() > 0);
+    return materializedTupleIds;
   }
 
   public QueryStmt getViewStmt() {
