@@ -181,6 +181,15 @@ class Expr {
   // The new Expr will be allocated from the pool.
   static Expr* CreateLiteral(ObjectPool* pool, PrimitiveType type, const std::string&);
 
+  // Computes a memory efficient layout for storing the results of evaluating 'exprs'
+  // Returns the number of bytes necessary to store all the results and offsets 
+  // where the result for each expr should be stored.
+  // Variable length types are guaranteed to be at the end and 'var_result_begin'
+  // will be set the beginning byte offset where variable length results begin.
+  // 'var_result_begin' will be set to -1 if there are no variable len types.
+  static int ComputeResultsLayout(const std::vector<Expr*>& exprs, 
+      std::vector<int>* offsets, int* var_result_begin);
+
   // Codegen the expr tree rooted at this node.  This does a post order traversal
   // of the expr tree and codegen's each node.  Returns NULL if the subtree cannot
   // be codegen'd.
@@ -233,9 +242,8 @@ class Expr {
   friend class ConditionalFunctions;
   friend class CaseExpr;
 
-  Expr(PrimitiveType type);
-  Expr(const TExprNode& node);
-  Expr(const TExprNode& node, bool is_slotref);
+  Expr(PrimitiveType type, bool is_slotref = false);
+  Expr(const TExprNode& node, bool is_slotref = false);
 
   // Prepare should be invoked recurisvely on the expr tree.
   // Return OK if successful, otherwise return error status.
@@ -340,6 +348,9 @@ class Expr {
 class SlotRef : public Expr {
  public:
   SlotRef(const TExprNode& node);
+
+  // Used for testing.  GetValue will return tuple + offset interpreted as 'type'
+  SlotRef(PrimitiveType type, int offset);
 
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
   static void* ComputeFn(Expr* expr, TupleRow* row);

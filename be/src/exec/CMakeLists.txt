@@ -42,3 +42,7 @@ target_link_libraries(Exec
   ${HDFS_LIBS}
 )
 
+add_executable(hash-table-test hash-table-test.cc)
+target_link_libraries(hash-table-test ${IMPALA_TEST_LINK_LIBS})
+add_test(hash-table-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/hash-table-test)
+

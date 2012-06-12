@@ -10,6 +10,7 @@
 #include <iostream>
   #define DCHECK(condition) 
   #define DCHECK_EQ(a, b)
+  #define DCHECK_NE(a, b)
   #define DCHECK_GT(a, b)
   #define DCHECK_LT(a, b)
   #define DCHECK_GE(a, b)

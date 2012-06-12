@@ -51,7 +51,6 @@ void RawValue::PrintValueAsBytes(const void* value, PrimitiveType type,
     default:
       DCHECK(false) << "bad RawValue::PrintValue() type: " << TypeToString(type);
   }
-
 }
 
 void RawValue::PrintValue(const void* value, PrimitiveType type, stringstream* stream) {
@@ -171,52 +170,45 @@ int RawValue::Compare(const void* v1, const void* v2, PrimitiveType type) {
   };
 }
 
-void RawValue::Write(const void* value, Tuple* tuple, const SlotDescriptor* slot_desc,
-                     MemPool* pool) {
-  if (value == NULL) {
-    tuple->SetNull(slot_desc->null_indicator_offset());
-    return;
-  }
-  switch (slot_desc->type()) {
+void RawValue::Write(const void* value, void* dst, PrimitiveType type, MemPool* pool) {
+  DCHECK(value != NULL);
+  
+  switch (type) {
     case TYPE_BOOLEAN: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<bool*>(slot) = *reinterpret_cast<const bool*>(value);
+      *reinterpret_cast<bool*>(dst) = *reinterpret_cast<const bool*>(value);
       break;
     }
     case TYPE_TINYINT: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<int8_t*>(slot) = *reinterpret_cast<const int8_t*>(value);
+      *reinterpret_cast<int8_t*>(dst) = *reinterpret_cast<const int8_t*>(value);
       break;
     }
     case TYPE_SMALLINT: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<int16_t*>(slot) = *reinterpret_cast<const int16_t*>(value);
+      *reinterpret_cast<int16_t*>(dst) = *reinterpret_cast<const int16_t*>(value);
       break;
     }
     case TYPE_INT: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<int32_t*>(slot) = *reinterpret_cast<const int32_t*>(value);
+      *reinterpret_cast<int32_t*>(dst) = *reinterpret_cast<const int32_t*>(value);
       break;
     }
     case TYPE_BIGINT: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<int64_t*>(slot) = *reinterpret_cast<const int64_t*>(value);
+      *reinterpret_cast<int64_t*>(dst) = *reinterpret_cast<const int64_t*>(value);
       break;
     }
     case TYPE_FLOAT: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<float*>(slot) = *reinterpret_cast<const float*>(value);
+      *reinterpret_cast<float*>(dst) = *reinterpret_cast<const float*>(value);
       break;
     }
     case TYPE_DOUBLE: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<double*>(slot) = *reinterpret_cast<const double*>(value);
+      *reinterpret_cast<double*>(dst) = *reinterpret_cast<const double*>(value);
       break;
     }
+    case TYPE_TIMESTAMP: 
+      *reinterpret_cast<TimestampValue*>(dst) =
+          *reinterpret_cast<const TimestampValue*>(value);
+      break;
     case TYPE_STRING: {
-      // Copy the string value.
       const StringValue* src = reinterpret_cast<const StringValue*>(value);
-      StringValue* dest = tuple->GetStringSlot(slot_desc->tuple_offset());
+      StringValue* dest = reinterpret_cast<StringValue*>(dst);
       dest->len = src->len;
       if (pool != NULL) {
         dest->ptr = reinterpret_cast<char*>(pool->Allocate(dest->len));
@@ -226,18 +218,19 @@ void RawValue::Write(const void* value, Tuple* tuple, const SlotDescriptor* slot
       }
       break;
     }
-    case TYPE_TIMESTAMP: {
-      void* slot = tuple->GetSlot(slot_desc->tuple_offset());
-      *reinterpret_cast<TimestampValue*>(slot) =
-          *reinterpret_cast<const TimestampValue*>(value);
-      break;
-    }
-    case INVALID_TYPE: {
-      break;
-    }
     default:
-      DCHECK(false) << "RawValue::Write(): bad type: "
-                    << TypeToString(slot_desc->type());
+      DCHECK(false) << "RawValue::Write(): bad type: " << TypeToString(type);
+      break;
+  }
+}
+
+void RawValue::Write(const void* value, Tuple* tuple, const SlotDescriptor* slot_desc,
+                     MemPool* pool) {
+  if (value == NULL) {
+    tuple->SetNull(slot_desc->null_indicator_offset());
+  } else {
+    void* slot = tuple->GetSlot(slot_desc->tuple_offset());
+    RawValue::Write(value, slot, slot_desc->type(), pool);
   }
 }
 

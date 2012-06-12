@@ -71,7 +71,7 @@ Message(${CMAKE_CXX_FLAGS})
 
 # Set clang to IR cross compile flags
 # IR_COMPILE is #defined for the cross compile to remove code that bloats the IR
-set(CLANG_IR_CXX_FLAGS "-emit-llvm" "-O3" "-c" "-DIR_COMPILE" "-DNDEBUG")
+set(CLANG_IR_CXX_FLAGS "-emit-llvm" "-O3" "-c""-msse4.2"  "-DIR_COMPILE" "-DNDEBUG")
 
 # setup doc generation with Doxygen
 find_package(Doxygen)

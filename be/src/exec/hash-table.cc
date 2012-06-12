@@ -1,133 +1,151 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-#include "exec/hash-table.h"
-
-#include <boost/functional/hash.hpp>
-#include <glog/logging.h>
-#include <sstream>
-
+#include "exec/hash-table.inline.h"
 #include "exprs/expr.h"
-#include "runtime/descriptors.h"
 #include "runtime/raw-value.h"
-#include "runtime/tuple-row.h"
 #include "util/debug-util.h"
 
+using namespace impala;
 using namespace std;
-using namespace boost;
 
-namespace impala {
+const float HashTable::MAX_BUCKET_OCCUPANCY_FRACTION = 0.75f;
 
-HashTable::HashTable(const vector<Expr*>& build_exprs1,
-                     const vector<Expr*>& build_exprs2,
-                     const vector<Expr*>& probe_exprs,
-                     const RowDescriptor& build_row_desc,
-                     bool stores_nulls)
-  : hash_fn_(this),
-    equals_fn_(this),
-    // TODO: how many buckets?
-    // for now, we just pick some arbitrary prime number, but this should
-    // ideally be informed by the estimated size of the final table
-    // (but our planner isn't good enough yet to produce that estimate)
-    hash_tbl_(new HashSet(1031, hash_fn_, equals_fn_)),
-    build_exprs1_(build_exprs1),
-    build_exprs2_(build_exprs2),
+HashTable::HashTable(const vector<Expr*>& build_exprs, const vector<Expr*>& probe_exprs,
+    int num_build_tuples, bool stores_nulls, int64_t num_buckets) :
+    build_exprs_(build_exprs),
     probe_exprs_(probe_exprs),
-    build_row_desc_(build_row_desc),
-    current_probe_row_(NULL),
-    stores_nulls_(stores_nulls) {
+    num_build_tuples_(num_build_tuples),
+    stores_nulls_(stores_nulls),
+    num_filled_buckets_(0),
+    nodes_(NULL),
+    num_nodes_(0) {
+  DCHECK_GT(build_exprs_.size(), 0);
+  DCHECK_EQ(build_exprs_.size(), probe_exprs_.size());
+  buckets_.resize(num_buckets);
+
+  // Compute the layout and buffer size to store the evaluated expr results
+  results_buffer_size_ = Expr::ComputeResultsLayout(build_exprs_, 
+      &expr_values_buffer_offsets_, &var_result_begin_);
+  expr_values_buffer_= new uint8_t[results_buffer_size_];
+  result_null_bits_ = new bool[build_exprs_.size()];
+
+  nodes_capacity_ = 1024;
+  nodes_ = reinterpret_cast<uint8_t*>(malloc(node_byte_size() * nodes_capacity_));
 }
 
-size_t HashTable::HashFn::operator()(TupleRow* const& r) const {
-  const vector<Expr*>* exprs = NULL;
-  TupleRow* row = NULL;
-  if (r == NULL) {
-    DCHECK(hash_tbl_->current_probe_row_ != NULL);
-    // compute hash value from probe_exprs_ and current_probe_row_
-    row = hash_tbl_->current_probe_row_;
-    exprs = &hash_tbl_->probe_exprs_;
-  } else {
-    // evaluate build_exprs_ against r
-    row = r;
-    exprs = &hash_tbl_->build_exprs1_;
-  }
-
-  size_t seed = 0;
-  for (int i = 0; i < exprs->size(); ++i) {
-    const void* value;
-    Expr* expr = (*exprs)[i];
-    value = expr->GetValue(row);
-    DCHECK(hash_tbl_->stores_nulls_ || r == NULL || value != NULL);
-    // don't ignore NULLs; we want (1, NULL) to return a different hash
-    // value than (NULL, 1)
-    if (value == NULL) {
-      hash_combine(seed, 0);
+bool HashTable::EvalRow(TupleRow* row, const vector<Expr*>& exprs) {
+  // TODO: this memset is only needed for string and timestamp types, otherwise
+  // the entire buffer gets written over below.
+  memset(expr_values_buffer_, 0, results_buffer_size_);
+  
+  // Put a non-zero constant in the result location for NULL.
+  // We don't want(NULL, 1) to hash to the same as (0, 1).
+  int64_t null_value = HashUtil::FVN_SEED;
+  
+  bool has_null = false;
+  for (int i = 0; i < exprs.size(); ++i) {
+    void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];
+    void* val = exprs[i]->GetValue(row);
+    if (val == NULL) {
+      result_null_bits_[i] = true;
+      val = &null_value;
+      has_null = true;
     } else {
-      seed = RawValue::GetHashValue(value, expr->type(), seed);
+      result_null_bits_[i] = false;
+    }
+    RawValue::Write(val, loc, build_exprs_[i]->type(), NULL);
+  }
+  return has_null;
+}
+
+uint32_t HashTable::HashVariableLenRow() {
+  uint32_t hash = 0;
+  // Hash the non-var length portions
+  hash = HashUtil::Hash(expr_values_buffer_, var_result_begin_, 0);
+  for (int i = 0; i < build_exprs_.size(); ++i) {
+    if (build_exprs_[i]->type() != TYPE_STRING) continue;
+    void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];
+    if (result_null_bits_[i]) {
+      // Hash with the seed value put into results_buffer_
+      hash = HashUtil::Hash(loc, sizeof(StringValue), hash);
+    } else {
+      // Hash the string
+      StringValue* str = reinterpret_cast<StringValue*>(loc);
+      hash = HashUtil::Hash(str->ptr, str->len, hash);
     }
   }
-  return seed;
+  return hash;
 }
 
-bool HashTable::EqualsFn::operator()(
-    TupleRow* const& r1, TupleRow* const& r2) const {
-  const vector<Expr*>* r1_exprs = NULL;
-  TupleRow* r1_row = NULL;
-  if (r1 == NULL) {
-    DCHECK(hash_tbl_->current_probe_row_ != NULL);
-    // compute r1's value from probe_exprs_ and current_probe_row_
-    r1_row = hash_tbl_->current_probe_row_;
-    r1_exprs = &hash_tbl_->probe_exprs_;
-  } else {
-    // evaluate build_exprs_ against r1
-    r1_row = r1;
-    r1_exprs = &hash_tbl_->build_exprs1_;
-  }
-
-  // r2 is always non-NULL and is a resident row.
-  DCHECK(r2 != NULL);
-
-  for (int i = 0; i < hash_tbl_->build_exprs2_.size(); ++i) {
-    const void* value1 = (*r1_exprs)[i]->GetValue(r1_row);
-    const void* value2 = hash_tbl_->build_exprs2_[i]->GetValue(r2);
-
-    DCHECK_EQ((*r1_exprs)[i]->type(), hash_tbl_->build_exprs2_[i]->type());
-    if (value1 == NULL || value2 == NULL) {
-      // if nulls are stored, they are always considered not-equal;
-      // if they are stored, we pretend NULL == NULL
-      if (!hash_tbl_->stores_nulls_ || value1 != NULL || value2 != NULL) return false;
-    } else {
-      if (!RawValue::Eq(value1, value2, (*r1_exprs)[i]->type())) return false;
+bool HashTable::Equals(TupleRow* build_row) {
+  for (int i = 0; i < build_exprs_.size(); ++i) {
+    void* val = build_exprs_[i]->GetValue(build_row);
+    if (val == NULL) {
+      if (!stores_nulls_) return false;
+      if (!result_null_bits_[i]) return false;
+      continue;
+    }
+    
+    void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];
+    if (!RawValue::Eq(loc, val, build_exprs_[i]->type())) {
+      return false;
     }
   }
   return true;
-} 
+}
+  
+void HashTable::ResizeBuckets(int64_t num_buckets) {
+  vector<Bucket> new_buckets;
 
-bool HashTable::HasNulls(TupleRow* r) {
-  // check for nulls
-  for (int i = 0; i < build_exprs1_.size(); ++i) {
-    if (build_exprs1_[i]->GetValue(r) == NULL) return true;
+  new_buckets.resize(num_buckets);
+  num_filled_buckets_ = 0;
+
+  Iterator iter = Begin();
+  while (iter.HasNext()) {
+    int node_idx = iter.node_idx_;
+    // Advance to next node before modifying the node's next link
+    ++iter;
+
+    Node* node = GetNode(node_idx);
+
+    // Assign it to a new bucket
+    uint32_t hash = node->hash_;
+    int bucket_idx = hash % num_buckets;
+    AddToBucket(&new_buckets[bucket_idx], node_idx);
   }
-  return false;
+
+  buckets_.swap(new_buckets);
+}
+  
+void HashTable::GrowNodeArray() {
+  nodes_capacity_ = nodes_capacity_ + nodes_capacity_ / 2;
+  int64_t new_size = nodes_capacity_ * node_byte_size();
+  nodes_ = reinterpret_cast<uint8_t*>(realloc(nodes_, new_size));
 }
 
-void HashTable::DebugString(int indentation_level, stringstream* out) const {
-  *out << string(indentation_level * 2, ' ');
-  *out << "HashTbl(stores_nulls=" << (stores_nulls_ ? "true" : "false")
-       << " build_exprs=" << Expr::DebugString(build_exprs1_)
-       << " probe_exprs=" << Expr::DebugString(probe_exprs_);
-  *out << ")";
-}
-
-string HashTable::DebugString() {
-  stringstream out;
-  out << "size=" << hash_tbl_->size() << "\n";
-  Iterator i;
-  Scan(NULL, &i);
-  TupleRow* r;
-  while ((r = i.GetNext()) != NULL) {
-    out << "row " << r << ": " << PrintRow(r, build_row_desc_) << "\n";
+string HashTable::DebugString(bool skip_empty, const RowDescriptor* desc) {
+  stringstream ss;
+  ss << endl;
+  for (int i = 0; i < buckets_.size(); ++i) {
+    int node_idx = buckets_[i].node_idx_;
+    bool first = true;
+    if (skip_empty && node_idx == -1) continue;
+    ss << i << ": ";
+    while (node_idx != -1) {
+      Node* node = GetNode(node_idx);
+      if (!first) {
+        ss << ",";
+      }
+      if (desc == NULL) {
+        ss << node_idx << "(" << (void*)node->data() << ")";
+      } else {
+        ss << (void*)node->data() << " " << PrintRow(node->data(), *desc);
+      }
+      node_idx = node->next_idx_;
+      first = false;
+    }
+    ss << endl;
   }
-  return out.str();
+  return ss.str();
 }
 
-}

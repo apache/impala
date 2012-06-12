@@ -1,162 +1,302 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #ifndef IMPALA_EXEC_HASH_TABLE_H
 #define IMPALA_EXEC_HASH_TABLE_H
 
 #include <vector>
-#include <functional>
-#include <boost/scoped_array.hpp>
-#include <boost/scoped_ptr.hpp>
-#include <boost/unordered_set.hpp>
-#include <boost/functional/hash.hpp>
+#include <boost/cstdint.hpp>
+#include "common/logging.h"
+#include "util/hash-util.h"
 
 namespace impala {
 
 class Expr;
 class RowDescriptor;
 class Tuple;
-class TupleDescriptor;
 class TupleRow;
 
-// A hash table (a multi-set) that indexes TupleRow* by a set of expressions over the
-// element tuples (ie, the hash value computation and equality test is done on the
-// values returned by those exprs).
-// There are two separate sets of expressions:
-// - build exprs: these are evaluated when rows are inserted into the table
-// - probe exprs: these are evaluated when trying to look up particular values
+// Hash table implementation designed for hash aggregation and hash joins.  This is not
+// templatized and is tailored to the usage pattern for aggregation and joins.  The
+// hash table store TupleRows and allows for different exprs for insertions and finds.
+// This is the pattern we use for joins and aggregation where the input/build tuple
+// row descriptor is different from the find/probe descriptor.
+// The table is optimized for the query engine's use case as much as possible and is not
+// intended to be a generic hash table implementation.  The API loosely mimics the 
+// std::hashset API.
+// 
+// The hash table stores evaluated expr results for the current row being processed
+// when possible into a contiguous memory buffer. This allows for very efficient 
+// computation for hashing.  The implementation is also designed to allow codegen 
+// for some paths.
+//
+// The hash table does not support removes. The hash table is not thread safe.
+//
+// The implementation is based on the boost multiset.  The hashtable is implemented by
+// two data structures: a vector of buckets and a vector of nodes.  Inserted values
+// are stored as nodes (in the order they are inserted).  The buckets (indexed by the
+// mod of the hash) contain pointers to the node vector.  Nodes that fall in the same
+// bucket are linked together (the bucket pointer gets you the head of that linked list).
+// For growing the hash table, new buckets are allocated but the node vector is modified
+// in place.
+//
+// TODO: this is not a fancy hash table in terms of memory access patterns (cuckoo-hashing
+// or something that spills to disk). We will likely want to invest more time into this.
+// TODO: hash-join and aggregation have very different access patterns.  Joins insert
+// all the rows and then calls scan to find them.  Aggregation interleaves Find() and 
+// Inserts().  We can want to optimize joins more heavily for Inserts() (in particular
+// growing).
 class HashTable {
  public:
-  // Construct a new hash table. If stores_nulls is true, the hash table
-  // stores rows for which build_exprs return NULLs and will consider
-  // NULL == NULL when doing a scan.
-  // If stores_nulls is false, the hash table will (silently) reject
-  // rows for which build_exprs return NULLs.
-  // build_exprs contain the Exprs used to evaluate the build rows.
-  // Two copies are needed to evaluate both build rows during build phase.
-  // probe_exprs contain the Exprs used to evaluate the probe rows.
-  // TODO: this is a hack.  Fix this.
-  HashTable(const std::vector<Expr*>& build_exprs1,
-            const std::vector<Expr*>& build_exprs2,
-            const std::vector<Expr*>& probe_exprs,
-            const RowDescriptor& build_row_desc,
-            bool stores_nulls);
+  class Iterator;
 
-  // Inserts r by evaluating build exprs. If !stores_nulls and one of the
-  // build exprs return a NULL, returns w/o inserting t.
-  // always_inline is set to force clang to inline the hash and equals function
-  // TODO: remove once we have our own hash table
-  void __attribute__((always_inline)) Insert(TupleRow* r) {
-    if (!stores_nulls_ && HasNulls(r)) {
-      return;
-    }
-    hash_tbl_->insert(r);
+  // Create a hash table.  
+  //  - build_exprs are the exprs that should be used to evaluate rows during Insert().  
+  //  - probe_exprs are used during Find()
+  //  - num_build_tuples: number of Tuples in the build tuple row
+  //  - stores_nulls: if false, TupleRows with nulls are ignored during Insert
+  //  - num_buckets: number of buckets that the hash table should be initialized to
+  HashTable(const std::vector<Expr*>& build_exprs, const std::vector<Expr*>& probe_exprs,
+      int num_build_tuples, bool stores_nulls, int64_t num_buckets = 1024);
+
+  ~HashTable() {
+    // TODO: use tr1::array?
+    delete[] expr_values_buffer_;
+    delete[] result_null_bits_;
+    free(nodes_);
   }
 
-  void DebugString(int indentation_level, std::stringstream* out) const;
+  // Insert row into the hash table.  Row will be evaluated over build_exprs_
+  // This will grow the hash table if necessary
+  void Insert(TupleRow* row) {
+    if (num_filled_buckets_ > buckets_.size() * MAX_BUCKET_OCCUPANCY_FRACTION) {
+      // TODO: next prime instead of double?
+      ResizeBuckets(num_buckets() * 2);
+    }
+    InsertImpl(row);
+  }
+  
+  // Returns the start iterator for all rows that match 'probe_row'.  'probe_row' is
+  // evaluated with probe_exprs_.  The iterator can be iterated until HashTable::End() 
+  // to find all the matching rows.
+  // Only one scan be in progress at any time (i.e. it is not legal to call
+  // Find(), begin iterating through all the matches, call another Find(),
+  // and continuing iterator from the first scan iterator).  
+  // Advancing the returned iterator will go to the next matching row.  The matching 
+  // rows are evaluated lazily (i.e. computed as the Iterator is moved).   
+  // Returns HashTable::End() if there is no match.
+  Iterator Find(TupleRow* probe_row);
+  
+  // Returns number of elements in the hash table
+  int64_t size() { return num_nodes_; }
 
-  int size() const { return hash_tbl_->size(); }
+  // Returns the number of buckets
+  int64_t num_buckets() { return buckets_.size(); }
 
- private:
-  class HashFn : public std::unary_function<TupleRow*, std::size_t> {
-   public:
-    HashFn(HashTable* ht): hash_tbl_(ht) {}
+  // Returns the load factor (the number of non-empty buckets)
+  float load_factor() { 
+    return num_filled_buckets_ / static_cast<float>(buckets_.size()); 
+  }
 
-    // Compute a combined hash value for the values returned by the build
-    // or probe exprs.
-    // If r is non-NULL, hash values are always computed from build exprs.
-    // If r is NULL, hash values are always computed from probe exprs over
-    // current_probe_row_.
-    std::size_t operator()(TupleRow* const& r) const;
+  // Return beginning of hash table.  Advancing this iterator will traverse all
+  // elements.
+  Iterator Begin();
 
-   private:
-    HashTable* hash_tbl_;
-  };
+  // Returns end marker
+  Iterator End() {
+    return Iterator();
+  }
 
-  class EqualsFn : public std::binary_function<TupleRow*, TupleRow*, bool> {
-   public:
-    EqualsFn(HashTable* ht): hash_tbl_(ht) {}
+  // Dump out the entire hash table to string.  If skip_empty, empty buckets are
+  // skipped.  If build_desc is non-null, the build rows will be output.  Otherwise
+  // just the build row addresses.
+  std::string DebugString(bool skip_empty, const RowDescriptor* build_desc);
 
-    // Return true if values of build or probe exprs in the context of a
-    // are the same as the values of build exprs in the context of b, otherwise false.
-    // If a is NULL, computes the 'a' values used for comparison by evaluating
-    // probe_exprs_ over current_probe_row_.
-    // If a is not NULL, computes the 'a' values used for comparison by evaluating
-    // probe exprs over 'a'.
-    bool operator()(TupleRow* const& a, TupleRow* const& b) const;
-
-   private:
-    HashTable* hash_tbl_;
-  };
-
-  friend class HashFn;
-  friend class EqualsFn;
-
-  typedef boost::unordered_multiset<TupleRow*, HashFn, EqualsFn> HashSet;
-
-  HashFn hash_fn_;
-  EqualsFn equals_fn_;
-  boost::scoped_ptr<HashSet> hash_tbl_;
-  const std::vector<Expr*> build_exprs1_;
-  const std::vector<Expr*> build_exprs2_;
-  const std::vector<Expr*> probe_exprs_;
-  const RowDescriptor& build_row_desc_;
-
-  // The probe_row given in Scan
-  TupleRow* current_probe_row_;
-
-  bool stores_nulls_;
-
-  // Returns true if any of the build_exprs returns NULL
-  // TODO: this should be codegend.
-  bool HasNulls(TupleRow* build_row);
-
- public:
+  // stl-like iterator interface.
   class Iterator {
    public:
-    // Returns next matching element or NULL;
-    TupleRow* GetNext() {
-      if (!HasNext()) return NULL;
-      return *i_++;
+    Iterator() : table_(NULL), bucket_idx_(-1), node_idx_(-1), 
+        is_scan_all_iterator_(false) {
     }
 
-    bool HasNext() const {
-      return i_ != end_;
+    // Iterates to the next element.  In the case where the iterator was
+    // from a Find, this will lazily evaluate that bucket, only returning
+    // TupleRows that match the current scan row.
+    void Next();
+
+    // Returns the current row or NULL if at end.
+    TupleRow* GetRow() {
+      if (node_idx_ == -1) return NULL;
+      return table_->GetNode(node_idx_)->data();
     }
 
-    void SkipToEnd() {
-      i_ = end_;
+    // Returns if the iterator is at the end
+    bool HasNext() {
+      return node_idx_ != -1;
+    }
+
+    TupleRow* operator*() {
+      return GetRow();
+    }
+
+    Iterator& operator++() {
+      Next();
+      return *this;
+    }
+
+    bool operator==(const Iterator& rhs) {
+      return bucket_idx_ == rhs.bucket_idx_ && node_idx_ == rhs.node_idx_;
+    }
+
+    bool operator!=(const Iterator& rhs) {
+      return bucket_idx_ != rhs.bucket_idx_ || node_idx_ != rhs.node_idx_;
     }
 
    private:
     friend class HashTable;
-    HashSet::iterator i_;
-    HashSet::iterator end_;
 
-    void Reset(const std::pair<HashSet::iterator, HashSet::iterator>& range) {
-      i_ = range.first;
-      end_ = range.second;
+    Iterator(HashTable* table, bool is_scan_all, int bucket_idx, 
+        int node, uint32_t hash) :
+      table_(table),
+      bucket_idx_(bucket_idx),
+      node_idx_(node),
+      is_scan_all_iterator_(is_scan_all),
+      scan_hash_(hash) {
+    }
+
+    HashTable* table_;
+    // Current bucket idx
+    int bucket_idx_;        
+    // Current node idx (within current bucket)
+    int node_idx_;          
+    // whether or not this iterator is from a Begin() call
+    bool is_scan_all_iterator_; 
+    // cached hash value for the row passed to Find()()
+    uint32_t scan_hash_;    
+  };
+
+ private:
+  friend class Iterator;
+  friend class HashTableTest;
+
+  // Header portion of a Node.  The node data (TupleRow) is right after the 
+  // node memory to maximize cache hits.
+  struct Node {
+    int next_idx_;    // chain to next node for collisions
+    uint32_t hash_;   // Cache of the hash for data_
+
+    TupleRow* data() {
+      uint8_t* mem = reinterpret_cast<uint8_t*>(this);
+      DCHECK_EQ(reinterpret_cast<uint64_t>(mem) % 8, 0);
+      return reinterpret_cast<TupleRow*>(mem + sizeof(Node));
     }
   };
 
-  // Starts as a scan of rows based on values of probe_exprs in the context
-  // of probe_row. Scans entire table if probe_row is NULL.
-  // Returns the scan through 'it'.
-  // Always inline to make sure the underlying hash functions (HashFn and EqualsFn)
-  // get inlined and can be replaced by codegen.
-  // TODO: switch to our own hashtable that inlines things better by default
-  void __attribute__((always_inline)) Scan(TupleRow* probe_row, Iterator* it) {
-    current_probe_row_ = probe_row;
-    if (probe_row != NULL) {
-      // returns rows that are equal to current_probe_row_.
-      it->Reset(hash_tbl_->equal_range(NULL));
+  struct Bucket {
+    int node_idx_;
+
+    Bucket() {
+      node_idx_ = -1;
+    }
+  };
+
+  // Returns the next non-empty bucket and updates idx to be the index of that bucket.
+  // If there are no more buckets, returns NULL and sets idx to -1
+  Bucket* NextBucket(int* bucket_idx);
+
+  // Returns node at idx.  Tracking structures do not use pointers since they will
+  // change as the HashTable grows.
+  Node* GetNode(int idx) {
+    DCHECK_NE(idx, -1);
+    return reinterpret_cast<Node*>(nodes_ + node_byte_size() * idx);
+  }
+  
+  // Resize the hash table to 'num_buckets'
+  void ResizeBuckets(int64_t num_buckets);
+
+  // Insert row into the hash table
+  void InsertImpl(TupleRow* row);
+
+  // Chains the node at 'node_idx' to 'bucket'.  Nodes in a bucket are chained
+  // as a linked list; this places the new node at the beginning of the list.
+  void AddToBucket(Bucket* bucket, int node_idx);
+
+  // Evaluate the exprs over row and cache the results in 'expr_values_buffer_'.
+  // Returns whether any expr evaluated to NULL
+  // This will be replaced by codegen
+  bool EvalRow(TupleRow* row, const std::vector<Expr*>& exprs);
+
+  // Evaluate 'row' over build_exprs_ caching the results in 'expr_values_buffer_'
+  // This will be replaced by codegen.
+  bool EvalBuildRow(TupleRow* row) {
+    return EvalRow(row, build_exprs_);
+  }
+
+  // Evaluate 'row' over probe_exprs_ caching the results in 'expr_values_buffer_'
+  // This will be replaced by codegen.
+  bool EvalProbeRow(TupleRow* row) {
+    return EvalRow(row, probe_exprs_);
+  }
+
+  // Compute the hash of the values in expr_values_buffer_.
+  // This will be replaced by codegen.
+  uint32_t HashCurrentRow() {
+    if (var_result_begin_ == -1) {
+      // This handles NULLs implicitly since a constant seed value was put
+      // into results buffer for nulls.
+      return HashUtil::Hash(expr_values_buffer_, results_buffer_size_, 0);
     } else {
-      // return all rows
-      it->Reset(make_pair(hash_tbl_->begin(), hash_tbl_->end()));
+      return HashVariableLenRow();
     }
   }
 
-  std::string DebugString();
+  // Compute the hash of the values in expr_values_buffer_ for rows with variable length
+  // fields (e.g. strings)
+  uint32_t HashVariableLenRow();
 
+  // Returns true if the values of build_exprs evaluated over 'build_row' equal 
+  // the values cached in expr_values_buffer_
+  // This will be replaced by codegen.
+  bool Equals(TupleRow* build_row);
+
+  // The byte size of a Node.  This includes the fixed sized header (sizeof(Node))
+  // as well as the Tuple*'s that immediately follow
+  uint32_t node_byte_size() const {
+    return sizeof(Node) + sizeof(Tuple*) * num_build_tuples_;
+  }
+
+  // Grow the node array.
+  void GrowNodeArray();
+
+  // Load factor that will trigger growing the hash table on insert.  This is 
+  // defined as the number of non-empty buckets / total_buckets
+  static const float MAX_BUCKET_OCCUPANCY_FRACTION;
+
+  const std::vector<Expr*>& build_exprs_;
+  const std::vector<Expr*>& probe_exprs_;
+
+  // Number of Tuple* in the build tuple row
+  int num_build_tuples_;
+  bool stores_nulls_;
+
+  // Number of non-empty buckets.  Used to determine when to grow and rehash
+  int num_filled_buckets_;
+  // Memory to store node data.  This is not allocated from a pool to take advantage
+  // of realloc.
+  // TODO: integrate with mem pools
+  uint8_t* nodes_;
+  // number of nodes stored (i.e. size of hash table)
+  int64_t num_nodes_;
+  // max number of nodes that can be stored in 'nodes_' before realloc
+  int64_t nodes_capacity_;
+  std::vector<Bucket> buckets_;
+
+  // Cache of exprs values for the current row being evaluated.  This can either
+  // be a build row (during Insert()) or probe row (during Find()).
+  std::vector<int> expr_values_buffer_offsets_;
+  int results_buffer_size_;
+  int var_result_begin_;
+  uint8_t* expr_values_buffer_;
+  bool* result_null_bits_;
 };
 
 }

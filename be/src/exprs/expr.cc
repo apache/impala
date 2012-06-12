@@ -24,10 +24,14 @@
 #include "exprs/null-literal.h"
 #include "exprs/opcode-registry.h"
 #include "exprs/string-literal.h"
+#include "exprs/timestamp-literal.h"
 #include "gen-cpp/Exprs_types.h"
 #include "gen-cpp/Data_types.h"
 #include "runtime/runtime-state.h"
 #include "runtime/raw-value.h"
+
+#include "gen-cpp/Exprs_types.h"
+#include "gen-cpp/ImpalaService_types.h"
 
 using namespace std;
 using namespace impala;
@@ -72,19 +76,10 @@ void* ExprValue::TryParse(const string& str, PrimitiveType type) {
   return NULL;
 }
 
-Expr::Expr(PrimitiveType type)
+Expr::Expr(PrimitiveType type, bool is_slotref)
     : opcode_(TExprOpcode::INVALID_OPCODE),
-      is_slotref_(false),
+      is_slotref_(is_slotref),
       type_(type),
-      codegen_fn_(NULL),
-      scratch_buffer_size_(0),
-      jitted_compute_fn_(NULL) {
-}
-
-Expr::Expr(const TExprNode& node)
-    : opcode_(node.__isset.opcode ? node.opcode : TExprOpcode::INVALID_OPCODE),
-      is_slotref_(false),
-      type_(ThriftToType(node.type)),
       codegen_fn_(NULL),
       scratch_buffer_size_(0),
       jitted_compute_fn_(NULL) {
@@ -176,6 +171,10 @@ Expr* Expr::CreateLiteral(ObjectPool* pool, PrimitiveType type, const string& st
     case TYPE_DOUBLE:
       if (ParseString<double>(str, &val.double_val))
         result = new FloatLiteral(type, &val.double_val);
+      break;
+    case TYPE_TIMESTAMP:
+      if (ParseString<double>(str, &val.double_val))
+        result = new TimestampLiteral(val.double_val);
       break;
     case TYPE_STRING:
       result = new StringLiteral(str);
@@ -335,7 +334,67 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
   }
 }
 
-// TODO: create machine-independent typedefs for 1/2/4/8-byte ints
+struct MemLayoutData {
+  int expr_idx;
+  int byte_size;  
+  bool variable_length;
+
+  // TODO: sort by type as well?  Any reason to do this?
+  bool operator<(const MemLayoutData& rhs) const {
+    // variable_len go at end
+    if (this->variable_length && !rhs.variable_length) return false;
+    if (!this->variable_length && rhs.variable_length) return true;
+    return this->byte_size < rhs.byte_size;
+  }
+};
+
+int Expr::ComputeResultsLayout(const vector<Expr*>& exprs, vector<int>* offsets,
+    int* var_result_begin) {
+  vector<MemLayoutData> data;
+  data.resize(exprs.size());
+  
+  // Collect all the byte sizes and sort them
+  for (int i = 0; i < exprs.size(); ++i) {
+    data[i].expr_idx = i;
+    if (exprs[i]->type() == TYPE_STRING) {
+      data[i].byte_size = 16;
+      data[i].variable_length = true;
+    } else {
+      data[i].byte_size = GetByteSize(exprs[i]->type());
+      data[i].variable_length = false;
+    }
+    DCHECK_NE(data[i].byte_size, 0);
+  }
+
+  sort(data.begin(), data.end());
+
+  // Walk the types and store in a packed aligned layout
+  int max_alignment = sizeof(int64_t);
+  int current_alignment = data[0].byte_size;
+  int byte_offset = 0;
+  
+  offsets->resize(exprs.size());
+  offsets->clear();
+  *var_result_begin = -1;
+
+  for (int i = 0; i < data.size(); ++i) {
+    DCHECK_GE(data[i].byte_size, current_alignment);
+    // Don't align more than word (8-byte) size.  This is consistent with what compilers
+    // do.
+    if (data[i].byte_size != current_alignment && current_alignment != max_alignment) {
+      byte_offset += data[i].byte_size - current_alignment;
+      current_alignment = min(data[i].byte_size, max_alignment);
+    }
+    (*offsets)[data[i].expr_idx] = byte_offset;
+    if (data[i].variable_length && *var_result_begin == -1) {
+      *var_result_begin = byte_offset;
+    }
+    byte_offset += data[i].byte_size;
+  }
+
+  return byte_offset;
+}
+
 void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
   void* value = GetValue(row);
   if (as_ascii) {

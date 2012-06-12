@@ -1,6 +1,7 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #include "exec/hash-join-node.h"
+#include "exec/hash-table.inline.h"
 #include "runtime/row-batch.h"
 
 using namespace std;
@@ -24,9 +25,10 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
   int probe_rows = probe_batch->num_rows();
 
   while (true) {
-    TupleRow* matched_build_row = NULL;
     // Create output row for each matching build row
-    while ((matched_build_row = hash_tbl_iterator_.GetNext()) != NULL) {
+    while (hash_tbl_iterator_.HasNext()) {
+      TupleRow* matched_build_row = hash_tbl_iterator_.GetRow();
+      hash_tbl_iterator_.Next();
       CreateOutputRow(out_row, current_probe_row_, matched_build_row);
 
       if (!EvalOtherJoinConjuncts(out_row)) continue;
@@ -43,7 +45,7 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
 
       // Handle left semi-join
       if (match_one_build_) {
-        hash_tbl_iterator_.SkipToEnd();
+        hash_tbl_iterator_ = hash_tbl_->End();
         break;
       }
     }
@@ -65,13 +67,13 @@ int HashJoinNode::ProcessProbeBatch(RowBatch* out_batch, RowBatch* probe_batch,
       // Advance to the next probe row
       if (UNLIKELY(probe_batch_pos_ == probe_rows)) goto end;
       current_probe_row_ = probe_batch->GetRow(probe_batch_pos_++);
-      hash_tbl_->Scan(current_probe_row_, &hash_tbl_iterator_);
+      hash_tbl_iterator_ = hash_tbl_->Find(current_probe_row_);
       matched_probe_ = false;
     }
   }
 
 end:
-  if (match_one_build_ && matched_probe_) hash_tbl_iterator_.SkipToEnd();
+  if (match_one_build_ && matched_probe_) hash_tbl_iterator_ = hash_tbl_->End();
   out_batch->CommitRows(rows_returned);
   return rows_returned;
 }

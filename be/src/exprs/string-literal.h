@@ -5,7 +5,7 @@
 
 #include <string>
 #include "exprs/expr.h"
-#include "runtime/tuple.h"  // for StringValue
+#include "runtime/string-value.h"
 
 namespace impala {
 

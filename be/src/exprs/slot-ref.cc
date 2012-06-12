@@ -21,8 +21,18 @@ SlotRef::SlotRef(const TExprNode& node)
     // slot_/null_indicator_offset_ are set in Prepare()
 }
 
+SlotRef::SlotRef(PrimitiveType type, int offset) 
+  : Expr(type, true),
+  tuple_idx_(0),
+  slot_offset_(offset),
+  null_indicator_offset_(0, -1),
+  slot_id_(-1) {
+}
+
 Status SlotRef::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   DCHECK_EQ(children_.size(), 0);
+  if (slot_id_ == -1) return Status::OK;
+
   const SlotDescriptor* slot_desc  = state->desc_tbl().GetSlotDescriptor(slot_id_);
   if (slot_desc == NULL) {
     // TODO: create macro MAKE_ERROR() that returns a stream

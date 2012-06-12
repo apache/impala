@@ -54,12 +54,7 @@ class HashJoinNode : public ExecNode {
   // our equi-join predicates "<lhs> = <rhs>" are separated into
   // build_exprs_ (over child(1)) and probe_exprs_ (over child(0))
   std::vector<Expr*> probe_exprs_;
-
-  // we need two sets of build exprs to evaluate TupleRow equality
-  // when constructing the build table.  The exprs is where expr results
-  // are stored and we need separate locations for the two build tuples.
-  std::vector<Expr*> build_exprs1_;
-  std::vector<Expr*> build_exprs2_;
+  std::vector<Expr*> build_exprs_;
 
   // non-equi-join conjuncts from the JOIN clause
   std::vector<Expr*> other_join_conjuncts_;
@@ -93,6 +88,7 @@ class HashJoinNode : public ExecNode {
   RuntimeProfile::Counter* probe_timer_;   // time to probe
   RuntimeProfile::Counter* build_row_counter_;   // num build rows
   RuntimeProfile::Counter* probe_row_counter_;   // num probe rows
+  RuntimeProfile::Counter* build_buckets_counter_;   // num buckets in hash table
 
   // set up build_- and probe_exprs_
   Status Init(ObjectPool* pool, const TPlanNode& tnode);

@@ -49,6 +49,11 @@ class RawValue {
   static void Write(const void* value, Tuple* tuple, const SlotDescriptor* slot_desc,
                     MemPool* pool);
 
+  // Writes 'src' into 'dst' for type.  
+  // For string values, the string data is copied into 'pool' if pool is non-NULL.
+  // src must be non-NULL.
+  static void Write(const void* src, void* dst, PrimitiveType type, MemPool* pool);
+
   // Returns true if v1 == v2.
   // This is more performant than Compare() == 0 for string equality, mostly because of
   // the length comparison check.

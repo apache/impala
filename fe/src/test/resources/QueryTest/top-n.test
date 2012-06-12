@@ -92,7 +92,7 @@ string,int
 # order by with null tuples in tuple row
 select j.*, d.* from JoinTbl j full outer join DimTbl d
 on (j.test_id = d.id) 
-order by j.test_id 
+order by j.test_id, d.name
 limit 100
 ----
 bigint, string, int, int, bigint, string, int
@@ -116,9 +116,9 @@ bigint, string, int, int, bigint, string, int
 1106,'Name6',94612,15000,NULL,'NULL',NULL
 1106,'Name16',94612,5000,NULL,'NULL',NULL
 1106,'Name16',94612,15000,NULL,'NULL',NULL
-NULL,'NULL',NULL,NULL,1008,'Name8',94614
-NULL,'NULL',NULL,NULL,1007,'Name7',94614
 NULL,'NULL',NULL,NULL,1010,'Name10',94615
+NULL,'NULL',NULL,NULL,1007,'Name7',94614
+NULL,'NULL',NULL,NULL,1008,'Name8',94614
 NULL,'NULL',NULL,NULL,1009,'Name9',94615
 =====
 # order by multiple cols with nulls 

@@ -1,3 +1,20 @@
+# Joins with multiple exprs
+select j.*, d.* from JoinTbl j inner join DimTbl d on 
+(j.test_name = d.name AND j.test_zip = d.zip) 
+---- RESULTS
+1001,'Name1',94611,5000,1001,'Name1',94611
+1002,'Name2',94611,5000,1002,'Name2',94611
+---- TYPES
+bigint, string, int, int, bigint, string, int
+====
+select j.*, d.* from JoinTbl j inner join DimTbl d on 
+(j.test_zip = d.zip AND j.test_name = d.name) 
+---- RESULTS
+1001,'Name1',94611,5000,1001,'Name1',94611
+1002,'Name2',94611,5000,1002,'Name2',94611
+---- TYPES
+bigint, string, int, int, bigint, string, int
+====
 # join between hdfs and hbase, extra join predicate, extra scan predicates, nulls in
 # joins cols and non-equality join predicate
 # (alltypesagg.tinyint_col contains nulls instead of 0s)

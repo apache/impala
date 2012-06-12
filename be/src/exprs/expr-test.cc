@@ -2,10 +2,11 @@
 
 #include <string>
 #include <math.h>
-#include <boost/unordered_map.hpp>
 #include <gtest/gtest.h>
+#include <boost/assign/list_of.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/random/mersenne_twister.hpp>
+#include <boost/unordered_map.hpp>
 
 #include "common/object-pool.h"
 #include "runtime/raw-value.h"
@@ -27,6 +28,7 @@
 using namespace llvm;
 using namespace std;
 using namespace boost;
+using namespace boost::assign;
 
 namespace impala {
 
@@ -1758,6 +1760,126 @@ TEST_F(ExprTest, ConditionalFunctions) {
       default_timestamp_val_);
   TestTimestampValue("case when false then cast('1999-06-14 19:07:25' as timestamp) "
       "else " + default_timestamp_str_ + " end", default_timestamp_val_);
+}
+
+// Validates that Expr::ComputeResultsLayout() for 'exprs' is correct.  
+//   - expected_byte_size: total byte size to store all results for exprs
+//   - expected_var_begin: byte offset where variable length types begin
+//   - expected_offsets: mapping of byte sizes to a set valid offsets
+//     exprs that have the same byte size can end up in a number of locations
+void ValidateLayout(const vector<Expr*>& exprs, int expected_byte_size, 
+    int expected_var_begin, const map<int, set<int> >& expected_offsets) {
+
+  vector<int> offsets;
+  set<int> offsets_found;
+
+  int var_begin;
+  int byte_size = Expr::ComputeResultsLayout(exprs, &offsets, &var_begin);
+
+  EXPECT_EQ(byte_size, expected_byte_size);
+  EXPECT_EQ(var_begin, expected_var_begin);
+
+  // Walk the computed offsets and make sure the resulting sets match expected_offsets
+  for (int i = 0; i < exprs.size(); ++i) {
+    int expr_byte_size = GetByteSize(exprs[i]->type());
+    map<int, set<int> >::const_iterator iter = expected_offsets.find(expr_byte_size);
+    EXPECT_TRUE(iter != expected_offsets.end());
+
+    const set<int>& possible_offsets = iter->second;
+    int computed_offset = offsets[i];
+    // The computed offset has to be one of the possible.  Exprs types with the
+    // same size are not ordered wrt each other.
+    EXPECT_TRUE(possible_offsets.find(computed_offset) != possible_offsets.end());
+    // The offset should not have been found before
+    EXPECT_TRUE(offsets_found.find(computed_offset) == offsets_found.end());
+    offsets_found.insert(computed_offset);
+  }
+}
+
+TEST_F(ExprTest, ResultsLayoutTest) {
+  ObjectPool pool;
+
+  vector<Expr*> exprs;
+  map<int, set<int> > expected_offsets;
+
+  // Test single Expr case
+  expected_offsets.clear();
+  for (int type = TYPE_BOOLEAN; type <= TYPE_STRING; ++type) {
+    PrimitiveType t = static_cast<PrimitiveType>(type);
+    exprs.clear();
+    expected_offsets.clear();
+    // With one expr, all offsets shoudl be 0.
+    expected_offsets[GetByteSize(t)] = list_of(0);
+    exprs.push_back(Expr::CreateLiteral(&pool, t, "0"));
+    if (t == TYPE_STRING) {
+      ValidateLayout(exprs, 16, 0, expected_offsets);
+    } else {
+      ValidateLayout(exprs, GetByteSize(t), -1, expected_offsets);
+    }
+  }
+
+  int expected_byte_size = 0;
+  int expected_var_begin = 0;
+  expected_offsets.clear();
+  exprs.clear();
+
+  // Test layout adding a bunch of exprs.  This is designed to trigger padding.  
+  // The expected result is computed along the way
+  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_BOOLEAN, "0"));
+  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_TINYINT, "0"));
+  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_TINYINT, "0"));
+  expected_offsets[1].insert(expected_byte_size);
+  expected_offsets[1].insert(expected_byte_size + 1);
+  expected_offsets[1].insert(expected_byte_size + 2);
+  expected_byte_size += 3 * 1 + 1;  // 1 byte of paddding
+
+  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_SMALLINT, "0"));
+  expected_offsets[2].insert(expected_byte_size);
+  expected_byte_size += 1 * 2 + 2;  // 2 bytes of padding
+
+  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_INT, "0"));
+  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_FLOAT, "0"));
+  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_FLOAT, "0"));
+  expected_offsets[4].insert(expected_byte_size);
+  expected_offsets[4].insert(expected_byte_size + 4);
+  expected_offsets[4].insert(expected_byte_size + 8);
+  expected_byte_size += 3 * 4 + 4;  // 4 bytes of padding
+
+  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_BIGINT, "0"));
+  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_BIGINT, "0"));
+  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_BIGINT, "0"));
+  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_DOUBLE, "0"));
+  expected_offsets[8].insert(expected_byte_size);
+  expected_offsets[8].insert(expected_byte_size + 8);
+  expected_offsets[8].insert(expected_byte_size + 16);
+  expected_offsets[8].insert(expected_byte_size + 24);
+  expected_byte_size += 4 * 8;      // No more padding
+
+  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_TIMESTAMP, "0"));
+  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_TIMESTAMP, "0"));
+  expected_offsets[16].insert(expected_byte_size);
+  expected_offsets[16].insert(expected_byte_size + 16);
+  expected_byte_size += 2 * 16;
+
+  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_STRING, "0"));
+  exprs.push_back(Expr::CreateLiteral(&pool, TYPE_STRING, "0"));
+  expected_offsets[0].insert(expected_byte_size);
+  expected_offsets[0].insert(expected_byte_size + 16);
+  expected_var_begin = expected_byte_size;
+  expected_byte_size += 2 * 16;
+
+  // Validate computed layout
+  ValidateLayout(exprs, expected_byte_size, expected_var_begin, expected_offsets);
+
+  // Randomize the expr order and validate again.  This is implemented by a 
+  // sort when the layout is computed so it shouldn't be very sensitive to
+  // a particular order.
+
+  srand(0);   // Seed rand to get repeatable results
+  for (int i = 0; i < 10; ++i) {
+    std::random_shuffle(exprs.begin(), exprs.end());
+    ValidateLayout(exprs, expected_byte_size, expected_var_begin, expected_offsets);
+  }
 }
 
 }
