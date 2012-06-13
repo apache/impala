@@ -22,6 +22,7 @@
 
 DEFINE_bool(serialize_batch, false, "serialize and deserialize each returned row batch");
 DECLARE_bool(enable_jit);
+DECLARE_int32(max_errors);
 
 using namespace std;
 using namespace boost;
@@ -52,8 +53,12 @@ Status PlanExecutor::Prepare(
   } else {
     enable_llvm = FLAGS_enable_jit;
   }
+
+  int max_errors = params.maxErrors;
+  if (max_errors == 0) max_errors = FLAGS_max_errors;
+
   runtime_state_.reset(
-      new RuntimeState(request.queryId, params.abortOnError, params.maxErrors,
+      new RuntimeState(request.queryId, params.abortOnError, max_errors,
                        params.batchSize, enable_llvm, exec_env_));
 
   // set up desc tbl

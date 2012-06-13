@@ -236,10 +236,11 @@ Status HdfsSequenceScanner::GetNext(RowBatch* row_batch, bool* eosr) {
       uint8_t* record_start = record;
       int num_tuples = 0;
       int num_fields = 0;
+      char* row_end_loc;
 
       RETURN_IF_ERROR(delimited_text_parser_->ParseFieldLocations(
           row_batch->capacity() - row_batch->num_rows(), record_len,
-          reinterpret_cast<char**>(&record),
+          reinterpret_cast<char**>(&record), &row_end_loc,
           &field_locations_, &num_tuples, &num_fields, &col_start));
       DCHECK(num_tuples == 1);
 
@@ -384,7 +385,7 @@ Status HdfsSequenceScanner::ReadFileHeader() {
   vector<char> codec;
   if (is_compressed_) {
     vector<char> codec;
-    // For record-comrpessed data we always want to copy since they tend to be
+    // For record-compressed data we always want to copy since they tend to be
     // small and occupy a bigger mempool chunk.
     if (!is_blk_compressed_) {
       has_noncompact_strings_ = false;

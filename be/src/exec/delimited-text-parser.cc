@@ -67,18 +67,19 @@ void DelimitedTextParser::ParserReset() {
 
 // Parsing raw csv data into FieldLocation descriptors.
 Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remaining_len,
-    char** byte_buffer_ptr, vector<FieldLocation>* field_locations,
+    char** byte_buffer_ptr, char** row_end_locations, 
+    vector<FieldLocation>* field_locations,
     int* num_tuples, int* num_fields, char** next_column_start) {
   // Start of this batch.
   *next_column_start = *byte_buffer_ptr;
 
   if (CpuInfo::Instance()->IsSupported(CpuInfo::SSE4_2)) {
     if (escape_char_ == '\0') {
-      ParseSse<false>(max_tuples, &remaining_len, byte_buffer_ptr, field_locations,
-          num_tuples, num_fields, next_column_start);
+      ParseSse<false>(max_tuples, &remaining_len, byte_buffer_ptr, row_end_locations,
+          field_locations, num_tuples, num_fields, next_column_start);
     } else {
-      ParseSse<true>(max_tuples, &remaining_len, byte_buffer_ptr, field_locations,
-          num_tuples, num_fields, next_column_start);
+      ParseSse<true>(max_tuples, &remaining_len, byte_buffer_ptr, row_end_locations,
+          field_locations, num_tuples, num_fields, next_column_start);
     }
   }
 
@@ -113,6 +114,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
 
     if (new_tuple) {
       column_idx_ = scan_node_->num_partition_keys();
+      row_end_locations[*num_tuples] = *byte_buffer_ptr;
       ++(*num_tuples);
       if (*num_tuples == max_tuples) {
         ++*byte_buffer_ptr;
@@ -137,7 +139,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
   return Status::OK;
 }
 
-// Find the first intance of the tuple delimiter.  This will
+// Find the first instance of the tuple delimiter.  This will
 // find the start of the first full tuple in buffer by looking for the end of
 // the previous tuple.
 // TODO: most of this is not tested.  We need some tailored data to exercise the boundary
@@ -214,14 +216,14 @@ restart:
 }
 
 // The start of the sync block is specified by an integer of -1.
-// By setting the tuple deimiter to 0xff we can do a fast search of the
+// By setting the tuple delimiter to 0xff we can do a fast search of the
 // bytes till we find a -1 and then look for 3 more -1 bytes which will make up
 // the integer.  This is followed by the 16 byte sync block which was specified in
 // the file header.
 // TODO: Can we user strstr see mode?
 Status DelimitedTextParser::FindSyncBlock(int end_of_range, int sync_size,
                                           uint8_t* sync, ByteStream*  byte_stream) {
-  // A sync block is preceeded by 4 bytes of -1 (tuple_delim_).
+  // A sync block is preceded by 4 bytes of -1 (tuple_delim_).
   int sync_flag_counter = 0;
   // Starting offset of the buffer we are scanning
   int64_t buf_start = 0;

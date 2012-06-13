@@ -254,12 +254,7 @@ def run_query(reference_results, query, prime_buffer_cache, iterations):
   return [output, compare_output]
 
 def choose_input_vector_file_name(exploration_strategy):
-  if exploration_strategy == "exhaustive":
-    return "benchmark_exhaustive.vector"
-  elif exploration_strategy == "pairwise":
-    return "benchmark_exhaustive.vector"
-  else:
-    return "benchmark_core.vector"
+  return "benchmark_%s.vector" % exploration_strategy
 
 def build_query(
     query_format_string, exploration_strategy, data_set, file_format, compression):

@@ -44,7 +44,7 @@ inline void DelimitedTextParser::AddColumn(int len, char** next_column_start,
       (*field_locations)[*num_fields].len = len;
     }
     ++(*num_fields);
-  }
+  } 
   if (process_escapes) current_column_has_escape_ = false;
   *next_column_start += len + 1;
   ++column_idx_;
@@ -62,10 +62,11 @@ inline void DelimitedTextParser::AddColumn(int len, char** next_column_start,
 // For example:
 //  Needle   = 'abcd000000000000' (we're searching for any a's, b's, c's or d's)
 //  Haystack = 'asdfghjklhjbdwwc' (the raw string)
-//  Result   = '101000000001101'
+//  Result   = '1010000000011001'
 template <bool process_escapes>
 inline void DelimitedTextParser::ParseSse(int max_tuples, 
     int64_t* remaining_len, char** byte_buffer_ptr, 
+    char** row_end_locations, 
     std::vector<FieldLocation>* field_locations,
     int* num_tuples, int* num_fields, char** next_column_start) {
   DCHECK(CpuInfo::Instance()->IsSupported(CpuInfo::SSE4_2));
@@ -132,11 +133,14 @@ inline void DelimitedTextParser::ParseSse(int max_tuples,
         last_col_idx = n;
       }
 
-      AddColumn<process_escapes>((*byte_buffer_ptr + n) - *next_column_start,
+      char* delim_ptr = *byte_buffer_ptr + n;
+
+      AddColumn<process_escapes>(delim_ptr - *next_column_start,
           next_column_start, num_fields, field_locations);
 
       if ((*byte_buffer_ptr)[n] == tuple_delim_) {
         column_idx_ = scan_node_->num_partition_keys();
+        row_end_locations[*num_tuples] = delim_ptr;
         ++(*num_tuples);
         if (UNLIKELY(*num_tuples == max_tuples)) {
           (*byte_buffer_ptr) += (n + 1);

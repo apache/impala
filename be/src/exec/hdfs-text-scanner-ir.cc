@@ -17,7 +17,7 @@ using namespace impala;
 // computed inside this function) but this is done to minimize the clang dependencies,
 // specifically, calling function on the scan node.
 int HdfsTextScanner::WriteAlignedTuples(RowBatch* row_batch, FieldLocation* fields,
-    int num_tuples, int max_added_tuples, int slots_per_tuple, char** line_start) {
+    int num_tuples, int max_added_tuples, int slots_per_tuple, int row_idx_start) {
   
   DCHECK(tuple_ != NULL);
   // Reserve tuple rows from the batch.  num_tuples will never overflow the
@@ -37,11 +37,10 @@ int HdfsTextScanner::WriteAlignedTuples(RowBatch* row_batch, FieldLocation* fiel
 
   // Loop through the fields and materialize all the tuples
   for (int i = 0; i < num_tuples; ++i) {
-    int row_len;
     uint8_t error_in_row = false;
     // Materialize a single tuple.  This function will be replaced by a codegen'd
     // function.
-    if (WriteCompleteTuple(fields, tuple, tuple_row, error, &error_in_row, &row_len)) {
+    if (WriteCompleteTuple(fields, tuple, tuple_row, error, &error_in_row)) {
       ++tuples_returned;
       tuple_mem += tuple_byte_size_;
       tuple_row_mem += row_batch->row_byte_size();
@@ -51,19 +50,18 @@ int HdfsTextScanner::WriteAlignedTuples(RowBatch* row_batch, FieldLocation* fiel
 
     // Report parse errors
     if (UNLIKELY(error_in_row)) {
-      if (!ReportTupleParseError(fields, error, *line_start, row_len - 1)) {
+      if (!ReportTupleParseError(fields, error, i + row_idx_start)) {
         return -1;
       }
     }
     boundary_row_.Clear();
     
+    // Advance to the start of the next tuple
+    fields += slots_per_tuple;
+
     if (tuples_returned == max_added_tuples) {
       break;
     }
-
-    // Advance to the start of the next tuple
-    fields += slots_per_tuple;
-    *line_start += row_len;
   }
 
   // Commit all the tuples that were materialized to the row batch

@@ -144,8 +144,9 @@ void HdfsScanner::ReportColumnParseError(const SlotDescriptor* desc,
     const char* data, int len) {
   if (state_->LogHasSpace()) {
     state_->error_stream()
-      << "Error converting column: " << desc->col_pos() << " TO "
-      << desc->col_pos() - scan_node_->num_partition_keys() << " TO "
-      << TypeToString(desc->type()) << "Data is: " << string(data,len) << endl;
+      << "Error converting column: " 
+      << desc->col_pos() - scan_node_->num_partition_keys()
+      << " TO " << TypeToString(desc->type()) 
+      << " (Data is: " << string(data,len) << ")" << endl;
   }
 }

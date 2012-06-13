@@ -57,7 +57,8 @@ class DelimitedTextParser {
   //   next_column_start: pointer within file_buffer_ where the next field starts
   //                      after the return from the call to ParseData
   Status ParseFieldLocations(int max_tuples, int64_t remaining_len,
-      char** byte_buffer_ptr, std::vector<FieldLocation>* field_locations,
+      char** byte_buffer_ptr, char** row_end_locations,
+      std::vector<FieldLocation>* field_locations,
       int* num_tuples, int* num_fields, char** next_column_start);
 
   // FindFirstInstance returns the position after the first non-escaped tuple
@@ -108,7 +109,8 @@ class DelimitedTextParser {
   // path is optimized away by the compiler.
   template <bool process_escapes>
   void ParseSse(int max_tuples, int64_t* remaining_len,
-      char** byte_buffer_ptr, std::vector<FieldLocation>* field_locations,
+      char** byte_buffer_ptr, char** row_end_locations_,
+      std::vector<FieldLocation>* field_locations,
       int* num_tuples, int* num_fields, char** next_column_start);
 
   // ScanNode reference to map columns in the data to slots in the tuples.

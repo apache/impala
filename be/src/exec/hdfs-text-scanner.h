@@ -40,16 +40,15 @@ class HdfsTextScanner : public HdfsScanner {
   virtual Status InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
       HdfsScanRange* scan_range, Tuple* template_tuple, ByteStream* byte_stream);
 
-  // Writes the intermediate parsed data in to slots, outputting
+  // Writes the intermediate parsed data into slots, outputting
   // tuples to row_batch as they complete.
   // Input Parameters:
   //  row_batch: Row batch into which to write new tuples
   //  num_fields: Total number of fields contained in parsed_data_
-  // Input/Output Parameters
-  //  line_start: pointer to within byte_buffer where the current line starts.  This is
-  //              used for better error reporting
+  //  num_tuples: Number of tuples in parsed_data_. This includes the potential
+  //    partial tuple at the beginning of 'field_locations_'. 
   // Returns the number of tuples added to the row batch.
-  int WriteFields(RowBatch* row_batch, int num_fields, char** line_start);
+  int WriteFields(RowBatch* row_batch, int num_fields, int num_tuples);
 
   // Writes out all slots for 'tuple' from 'fields'. 'fields' must be aligned
   // to the start of the tuple (e.g. fields[0] maps to slots[0]).
@@ -57,7 +56,6 @@ class HdfsTextScanner : public HdfsScanner {
   //  - error_fields is an out array.  error_fields[i] will be set to true if the ith
   //    field had a parse error
   //  - error_in_row is an out bool.  It is set to true if any field had parse errors
-  //  - bytes_processed returns the number of bytes for the entire tuple
   // Returns whether the resulting tuplerow passed the conjuncts.
   //
   // The parsing of the fields and evaluating against conjuncts is combined in this
@@ -72,7 +70,7 @@ class HdfsTextScanner : public HdfsScanner {
   // TODO: revisit this
   bool WriteCompleteTuple(FieldLocation* fields,
       Tuple* tuple, TupleRow* tuple_row,
-      uint8_t* error_fields, uint8_t* error_in_row, int* bytes_processed);
+      uint8_t* error_fields, uint8_t* error_in_row);
 
   // Codegen function to replace WriteCompleteTuple. Should behave identically
   // to WriteCompleteTuple.
@@ -82,13 +80,13 @@ class HdfsTextScanner : public HdfsScanner {
   // - 'fields' must start at the beginning of a tuple.
   // - num_tuples: number of tuples to process
   // - max_added_tuples: the maximum number of tuples that should be added to the batch.
-  // - line_start is in/out parameter.  Caller must pass the start of the first tuple.
-  //   on return, will contain the start of the next tuple
+  // - row_start_index is the number of rows that have already been processed
+  //   as part of WritePartialTuple.  
   // Returns the number of tuples added to the row batch.  This can be less than
   // num_tuples/tuples_till_limit because of failed conjuncts.
   // Returns -1 if parsing should be aborted due to parse errors.
   int WriteAlignedTuples(RowBatch* row_batch, FieldLocation* fields, int num_tuples,
-      int max_added_tuples, int slots_per_tuple, char** line_start);
+      int max_added_tuples, int slots_per_tuple, int row_start_indx);
 
   // Codegen function to replace WriteAlignedTuples.  WriteAlignedTuples is cross compiled
   // to IR.  This function loads the precompiled IR function, modifies it and returns the
@@ -110,14 +108,14 @@ class HdfsTextScanner : public HdfsScanner {
 
   // Utility function to report parse errors for each field.
   // If errors[i] is nonzero, fields[i] had a parse error.
-  // row_start/len should the complete row containing fields.
+  // row_idx is the idx of the row in the current batch that had the parse error
   // Returns false if parsing should be aborted.
-  bool ReportTupleParseError(FieldLocation* fields, uint8_t* errors,
-      char* row_start, int row_len);
+  bool ReportTupleParseError(FieldLocation* fields, uint8_t* errors, int row_idx);
 
   // Appends the current file and line to the RuntimeState's error log (if there's space).
   // Also, increments num_errors_in_file_.
-  Status ReportRowParseError(char* line_start, int len);
+  // row_idx is 0-based (in current batch) where the parse error occured.
+  Status ReportRowParseError(int row_idx);
 
   // Reads up to size bytes from byte_stream into byte_buffer_, and
   // updates byte_buffer_read_size_
@@ -143,6 +141,10 @@ class HdfsTextScanner : public HdfsScanner {
   // Return field locations from the Delimited Text Parser.
   std::vector<FieldLocation> field_locations_;
 
+  // Pointers into 'byte_buffer_' for the end ptr locations for each row
+  // processed in the current batch.  Used to report row errors.
+  std::vector<char*> row_end_locations_;
+
   // Helper class for converting text to other types;
   boost::scoped_ptr<TextConverter> text_converter_;
 
@@ -153,6 +155,10 @@ class HdfsTextScanner : public HdfsScanner {
 
   // Current position in byte buffer.
   char* byte_buffer_ptr_;
+
+  // Pointer into byte_buffer that is the start of the current batch being
+  // processed.
+  char* batch_start_ptr_;
 
   // Buffer for data read from HDFS
   char* byte_buffer_;
@@ -187,7 +193,7 @@ class HdfsTextScanner : public HdfsScanner {
   // Matching typedef for WriteAlignedTuples for codegen.  Refer to comments for
   // that function.
   typedef int (*WriteTuplesFn)(HdfsTextScanner*, RowBatch*, FieldLocation*, int, int,
-      int, char**);
+      int, int);
   // Jitted write tuples function pointer.  Null if codegen is disabled.
   WriteTuplesFn write_tuples_fn_;
 
