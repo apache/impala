@@ -9,6 +9,7 @@
 #include <gflags/gflags.h>
 #include <server/TServer.h>
 
+#include "util/uid-util.h"  // for some reasoon needed right here for hash<TUniqueId>
 #include "codegen/llvm-codegen.h"
 #include "common/status.h"
 #include "exec/exec-node.h"
@@ -22,7 +23,7 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/client-cache.h"
 #include "service/jni-coordinator.h"
-#include "service/backend-service.h"
+#include "service/impala-server.h"
 #include "testutil/test-exec-env.h"
 #include "util/jni-util.h"
 #include "util/logging.h"
@@ -81,9 +82,10 @@ jint JNI_OnLoadImpl(JavaVM* vm, void* pvt) {
   VLOG_CONNECTION << "starting backends";
   test_env->StartBackends();
 
-  // start one backend service for the coordinator on be_port
-  TServer* server = StartImpalaBackendService(test_env, FLAGS_be_port);
-  thread server_thread = thread(&RunServer, server);
+  // start one ImpalaInternalService for the coordinator on be_port
+  TServer* be_server;
+  CreateImpalaServer(test_env, 0, FLAGS_be_port, NULL, &be_server);
+  thread server_thread = thread(&RunServer, be_server);
 
   return JNI_VERSION_1_4;
 }

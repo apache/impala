@@ -27,7 +27,7 @@ class TestExecEnv : public ExecEnv {
   // Stop backend threads.
   virtual ~TestExecEnv();
 
-  // Starts 'num_backends' threads, each one exporting ImpalaBackendService,
+  // Starts 'num_backends' threads, each one exporting ImpalaInternalService,
   // starting on start_port.
   Status StartBackends();
 

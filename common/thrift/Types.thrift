@@ -34,17 +34,3 @@ struct TUniqueId {
   1: required i64 hi
   2: required i64 lo
 }
-
-enum TStatusCode {
-  OK,
-  ANALYSIS_ERROR,
-  NOT_IMPLEMENTED_ERROR,
-  RUNTIME_ERROR,
-  INTERNAL_ERROR
-}
-
-struct TStatus {
-  1: required TStatusCode status_code
-  2: list<string> error_msgs
-}
-

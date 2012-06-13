@@ -14,7 +14,7 @@
 #include "runtime/coordinator.h"
 #include "runtime/primitive-type.h"
 #include "runtime/runtime-state.h"
-#include "gen-cpp/ImpalaBackendService_types.h"  // for TQueryExecRequest
+#include "gen-cpp/ImpalaInternalService_types.h"  // for TQueryExecRequest
 #include "util/runtime-profile.h"
 
 namespace apache { namespace thrift { namespace transport { class TTransport; } } }
@@ -26,13 +26,13 @@ class DataStreamMgr;
 class ExecStats;
 class Expr;
 class ObjectPool;
-class PlanExecutor;
+class PlanFragmentExecutor;
 class RowBatch;
 class RowDescriptor;
 class TRowBatch;
 class ExecEnv;
 class ImpalaPlanServiceClient;
-class ImpalaBackendServiceClient;
+class ImpalaInternalServiceClient;
 class RuntimeProfile;
 class TPlanExecRequest;
 class TScanRange;

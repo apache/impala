@@ -67,7 +67,7 @@ void HBaseTableScanner::ScanRange::DebugString(int indentation_level,
 
 HBaseTableScanner::HBaseTableScanner(JNIEnv* env, ScanNode* scan_node,
     HBaseTableCache* htable_cache)
-  : env_(env),
+  : env_(NULL),
     scan_node_(scan_node),
     htable_cache_(htable_cache),
     htable_(NULL),
@@ -92,6 +92,7 @@ HBaseTableScanner::HBaseTableScanner(JNIEnv* env, ScanNode* scan_node,
 Status HBaseTableScanner::Init() {
   // Get the JNIEnv* corresponding to current thread.
   JNIEnv* env = getJNIEnv();
+  LOG(INFO) << "tablescanner jnienv=" << env;
   if (env == NULL) {
     return Status("Failed to get/create JVM");
   }
@@ -264,7 +265,7 @@ Status HBaseTableScanner::ScanSetup(const TupleDescriptor* tuple_desc,
   const HBaseTableDescriptor* hbase_table =
       static_cast<const HBaseTableDescriptor*>(tuple_desc->table_desc());
   // Use global cache of HTables.
-  htable_ = htable_cache_->GetHBaseTable(env_, hbase_table->table_name());
+  htable_ = htable_cache_->GetHBaseTable(hbase_table->table_name());
   RETURN_ERROR_IF_EXC(env_, JniUtil::throwable_to_string_id());
 
   // Setup an Scan object without the range
@@ -382,6 +383,8 @@ Status HBaseTableScanner::InitScanRange(const ScanRange& scan_range) {
 
 Status HBaseTableScanner::StartScan(const TupleDescriptor* tuple_desc,
     const ScanRangeVector& scan_range_vector, const vector<THBaseFilter>& filters) {
+  env_ = getJNIEnv();
+
   // Setup the scan without ranges first
   RETURN_IF_ERROR(ScanSetup(tuple_desc, filters));
 

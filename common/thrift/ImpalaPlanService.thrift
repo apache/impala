@@ -12,8 +12,8 @@ exception TImpalaPlanServiceException {
 // We're running the Impala frontend as a service from which the backend
 // test driver can get plans to run.
 service ImpalaPlanService {
-  Frontend.TQueryRequestResult GetQueryRequestResult(1:string query, 2:i32 numNodes)
-      throws (1:TImpalaPlanServiceException e);
+  Frontend.TCreateQueryExecRequestResult CreateQueryExecRequest(
+      1:string query, 2:i32 numNodes) throws (1:TImpalaPlanServiceException e);
 
   // Force planservice to reload table metadata, in case it has changed due to e.g. an 
   // insert

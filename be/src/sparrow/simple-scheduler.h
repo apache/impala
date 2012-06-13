@@ -13,6 +13,7 @@
 #include "sparrow/scheduler.h"
 #include "sparrow/util.h"
 #include "sparrow/state-store-service.h"
+#include "gen-cpp/Types_types.h"  // for THostPort
 
 namespace sparrow {
 

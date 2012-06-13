@@ -95,6 +95,7 @@ class RuntimeProfile {
   void PrettyPrint(std::ostream* s, const std::string& prefix="") const;
 
   // Serializes the counters to thrift
+  void ToThrift(TRuntimeProfileTree* tree) const;
   void ToThrift(std::vector<TRuntimeProfileNode>* nodes) const;
 
   // Divides all counters by n

@@ -23,10 +23,14 @@ class TRowBatch;
 class TPlanExecRequest;
 class TPlanExecParams;
 
-class PlanExecutor {
+// PlanFragmentExecutor handles all aspects of the execution of a single plan fragment,
+// including setup and tear-down, both in the success and error case.
+// Tear-down is accomplished by calling the d'tor, which frees all memory allocated for
+// this plan fragment and closes all data streams.
+class PlanFragmentExecutor {
  public:
-  PlanExecutor(ExecEnv* exec_env);
-  ~PlanExecutor();
+  PlanFragmentExecutor(ExecEnv* exec_env);
+  ~PlanFragmentExecutor();
 
   // Prepare for execution. Call this prior to Open().
   // This call won't block.
@@ -37,8 +41,9 @@ class PlanExecutor {
   Status Open();
 
   // Return results through 'batch'. Sets '*batch' to NULL if no more results.
-  // '*batch' is owned by PlanExecutor and must not be deleted.
-  // GetNext should not be called after *batch == NULL.
+  // '*batch' is owned by PlanFragmentExecutor and must not be deleted.
+  // When *batch == NULL, the underlying plan tree will have been closed and
+  // GetNext() should not be called anymore.
   Status GetNext(RowBatch** batch);
 
   RuntimeState* runtime_state() { return runtime_state_.get(); }

@@ -8,7 +8,7 @@
 
 #include "common/logging.h"
 #include "common/compiler-util.h"
-#include "gen-cpp/Types_types.h"  // for TStatus
+#include "gen-cpp/Status_types.h"  // for TStatus
 
 namespace impala {
 
@@ -44,9 +44,15 @@ class Status {
   }
 
   // c'tor for error case
+  Status(TStatusCode::type code, const std::string& error_msg)
+    : error_detail_(new ErrorDetail(code, error_msg)) {
+    VLOG(1) << error_msg;
+  }
+
+  // c'tor for internal error
   Status(const std::string& error_msg)
-    : error_detail_(new ErrorDetail(error_msg)) {
-    LOG(WARNING) << "Error Status: " << error_msg;
+    : error_detail_(new ErrorDetail(TStatusCode::INTERNAL_ERROR, error_msg)) {
+    VLOG(1) << error_msg;
   }
 
   ~Status() {
@@ -58,7 +64,6 @@ class Status {
   Status& operator=(const Status& status);
 
   // "Copy" c'tor from TStatus.
-  // TODO: adopt the status code
   Status(const TStatus& status);
 
   // same as previous c'tor
@@ -69,13 +74,31 @@ class Status {
 
   bool ok() const { return error_detail_ == NULL; }
 
+  bool IsCancelled() const {
+    return error_detail_ != NULL
+        && error_detail_->error_code == TStatusCode::CANCELLED;
+  }
+
+  // Add an error message and set the code if no code has been set yet.
+  // If a code has already been set, 'code' is ignored.
+  void AddErrorMsg(TStatusCode::type code, const std::string& msg);
+
+  // Add an error message and set the code to INTERNAL_ERROR if no code has been
+  // set yet. If a code has already been set, it is left unchanged.
   void AddErrorMsg(const std::string& msg);
 
   // Return all accumulated error msgs.
   void GetErrorMsgs(std::vector<std::string>* msgs) const;
 
+  // Convert into TStatus. Call this if 'status_container' contains an optional
+  // TStatus field named 'status'. This also sets __isset.status.
+  template <typename T> void SetTStatus(T* status_container) const {
+    ToThrift(&status_container->status);
+    status_container->__isset.status = true;
+  }
+
   // Convert into TStatus.
-  void ToThrift(TStatus* status);
+  void ToThrift(TStatus* status) const;
 
   // Return all accumulated error msgs in a single string.
   void GetErrorMsg(std::string* msg) const;
@@ -84,10 +107,12 @@ class Status {
 
  private:
   struct ErrorDetail {
+    TStatusCode::type error_code;  // anything other than OK
     std::vector<std::string> error_msgs;
 
-    ErrorDetail(const std::string& msg): error_msgs(1, msg) {}
-    ErrorDetail(const std::vector<std::string>& msgs): error_msgs(msgs) {}
+    ErrorDetail(const TStatus& status);
+    ErrorDetail(TStatusCode::type code, const std::string& msg)
+      : error_code(code), error_msgs(1, msg) {}
   };
 
   ErrorDetail* error_detail_;

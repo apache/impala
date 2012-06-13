@@ -12,14 +12,13 @@
 #include <protocol/TBinaryProtocol.h>
 #include <transport/TBufferTransports.h>
 #include "common/object-pool.h"
-#include "gen-cpp/ImpalaBackendService_types.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
 
 namespace impala {
 
 class Expr;
 class TupleRow;
 class Status;
-class PlanExecutor;
 class Expr;
 class ExecNode;
 class DescriptorTbl;

@@ -22,14 +22,14 @@ using namespace boost::algorithm;
 namespace impala {
 
 RuntimeState::RuntimeState(
-    const TUniqueId& query_id, bool abort_on_error, int max_errors, int batch_size,
+    const TUniqueId& fragment_id, bool abort_on_error, int max_errors, int batch_size,
     bool llvm_enabled, ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
     batch_size_(batch_size > 0 ? batch_size : DEFAULT_BATCH_SIZE),
     file_buffer_size_(DEFAULT_FILE_BUFFER_SIZE),
     abort_on_error_(abort_on_error),
     max_errors_(max_errors),
-    query_id_(query_id),
+    fragment_id_(fragment_id),
     exec_env_(exec_env),
     profile_(obj_pool_.get(), "RuntimeState") {
   if (llvm_enabled) {
@@ -46,9 +46,9 @@ RuntimeState::RuntimeState()
 }
 
 Status RuntimeState::Init(
-    const TUniqueId& query_id, bool abort_on_error, int max_errors, bool llvm_enabled,
+    const TUniqueId& fragment_id, bool abort_on_error, int max_errors, bool llvm_enabled,
     ExecEnv* exec_env) {
-  query_id_ = query_id;
+  fragment_id_ = fragment_id;
   abort_on_error_ = abort_on_error;
   max_errors_ = max_errors_;
   exec_env_ = exec_env;

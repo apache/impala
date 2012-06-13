@@ -11,6 +11,7 @@ namespace impala {
 
 // Receiver node for data streams. This simply feeds row batches received from the
 // data stream into the execution tree.
+// The data stream is created in Prepare() and closed in the d'tor.
 class ExchangeNode : public ExecNode {
  public:
   ExchangeNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);

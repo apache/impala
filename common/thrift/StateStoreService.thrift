@@ -4,6 +4,7 @@ namespace cpp sparrow
 namespace java com.cloudera.sparrow.thrift
 
 include "SparrowTypes.thrift"
+include "Status.thrift"
 include "Types.thrift"
 
 enum StateStoreServiceVersion {
@@ -27,7 +28,7 @@ struct TRegisterServiceRequest {
 
 struct TRegisterServiceResponse {
   // Required in V1.
-  1: optional Types.TStatus status
+  1: optional Status.TStatus status
 }
 
 struct TUnregisterServiceRequest {
@@ -43,7 +44,7 @@ struct TUnregisterServiceRequest {
 
 struct TUnregisterServiceResponse {
   // Required in V1.
-  1: optional Types.TStatus status
+  1: optional Status.TStatus status
 }
 
 struct TRegisterSubscriptionRequest {
@@ -59,7 +60,7 @@ struct TRegisterSubscriptionRequest {
 
 struct TRegisterSubscriptionResponse {
   // Required in V1.
-  1: optional Types.TStatus status
+  1: optional Status.TStatus status
 
   // Unique identifier for the subscription, which is needed to unsubscribe.
   // Required in V1.
@@ -79,7 +80,7 @@ struct TUnregisterSubscriptionRequest {
 
 struct TUnregisterSubscriptionResponse {
   // Required in V1.
-  1: optional Types.TStatus status
+  1: optional Status.TStatus status
 }
 
 // A repository and distribution mechanism for global system state. Stored state is not

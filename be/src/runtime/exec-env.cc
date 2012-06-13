@@ -15,7 +15,7 @@
 #include "sparrow/simple-scheduler.h"
 #include "sparrow/subscription-manager.h"
 #include "util/webserver.h"
-#include "gen-cpp/ImpalaBackendService.h"
+#include "gen-cpp/ImpalaInternalService.h"
 
 using namespace std;
 using namespace boost;

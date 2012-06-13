@@ -7,9 +7,9 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/thrift")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/thrift")
 
 set(SRC_FILES
-  ImpalaBackendService.cpp
-  ImpalaBackendService_constants.cpp
-  ImpalaBackendService_types.cpp
+  ImpalaInternalService.cpp
+  ImpalaInternalService_constants.cpp
+  ImpalaInternalService_types.cpp
   ImpalaPlanService.cpp
   ImpalaPlanService_constants.cpp
   ImpalaPlanService_types.cpp
@@ -45,10 +45,12 @@ set(SRC_FILES
   StateStoreSubscriberService.cpp
   StateStoreSubscriberService_constants.cpp
   StateStoreSubscriberService_types.cpp
+  Status_constants.cpp
+  Status_types.cpp
   Types_constants.cpp
   Types_types.cpp
   JavaConstants_constants.cpp
-  )
+)
 
 # keep everything in one library, the object files reference 
 # each other

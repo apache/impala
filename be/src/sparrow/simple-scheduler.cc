@@ -13,15 +13,13 @@
 #include "runtime/exec-env.h"
 
 #include "sparrow/simple-scheduler.h"
-#include "service/impala-service.h"
-#include "gen-cpp/ImpalaBackendService.h"
+#include "gen-cpp/Types_types.h"
 
 using namespace std;
 using namespace boost;
 using impala::Status;
 using impala::THostPort;
 using impala::ExecEnv;
-using impala::ImpalaService;
 
 namespace sparrow {
 

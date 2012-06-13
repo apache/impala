@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TQueryRequest;
-import com.cloudera.impala.thrift.TQueryRequestResult;
+import com.cloudera.impala.thrift.TCreateQueryExecRequestResult;
 
 /**
  * JNI-callable interface onto a wrapped Frontend instance. The main point is to serialise
@@ -28,6 +28,10 @@ public class JniFrontend {
 
   public JniFrontend() {
     frontend = new Frontend();
+  }
+
+  public JniFrontend(boolean lazy) {
+    frontend = new Frontend(lazy);
   }
 
   /**
@@ -49,22 +53,23 @@ public class JniFrontend {
   }
 
   /**
-   * Create the serialized form of a TQueryRequestResult based on thriftQueryRequest,
-   * a serialized TQueryRequest.
+   * Create a TQueryExecRequest as well as TResultSetMetadata for a given
+   * serialized TQueryRequest. The result is returned as a serialized
+   * TCreateQueryExecRequestResult.
    * This call is thread-safe.
    */
-  public byte[] getQueryRequestResult(byte[] thriftQueryRequest) throws ImpalaException {
+  public byte[] createQueryExecRequest(byte[] thriftQueryRequest) throws ImpalaException {
     TQueryRequest request = deserializeTQueryRequest(thriftQueryRequest);
 
     // process front end
     StringBuilder explainString = new StringBuilder();
-    TQueryRequestResult result =
+    TCreateQueryExecRequestResult result =
         frontend.createQueryExecRequest(request, explainString);
 
     // Print explain string.
     LOG.info(explainString.toString());
 
-    LOG.info("returned TQueryRequestResult: " + result.toString());
+    LOG.info("returned TCreateQueryExecRequestResult: " + result.toString());
     // TODO: avoid creating serializer for each query?
     TSerializer serializer = new TSerializer(protocolFactory);
     try {

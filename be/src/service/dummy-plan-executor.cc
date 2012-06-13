@@ -1,6 +1,6 @@
 // (c) 2011 Cloudera, Inc. All rights reserved.
 
-#include "service/plan-executor.h"
+#include "service/plan-fragment-executor.h"
 
 #include <boost/shared_ptr.hpp>
 #include <thrift/protocol/TBinaryProtocol.h>

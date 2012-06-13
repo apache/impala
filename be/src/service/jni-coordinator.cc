@@ -40,31 +40,31 @@ JniCoordinator::~JniCoordinator() {
 Status JniCoordinator::DeserializeRequest(jbyteArray thrift_query_exec_request) {
   // Deserialize request bytes into c++ request using memory transport.
   DeserializeThriftMsg(env_, thrift_query_exec_request, &query_exec_request_);
-  LOG(INFO) << "query=" << query_exec_request_.sqlStmt
-            << " #fragments=" << query_exec_request_.fragmentRequests.size()
-            << " batch_size=" << query_exec_request_.batchSize;
-  as_ascii_ = query_exec_request_.asAscii;
+  LOG(INFO) << "query=" << query_exec_request_.sql_stmt
+            << " #fragments=" << query_exec_request_.fragment_requests.size()
+            << " batch_size=" << query_exec_request_.batch_size;
+  as_ascii_ = query_exec_request_.as_ascii;
 
-  if (query_exec_request_.fragmentRequests.size() == 0) {
+  if (query_exec_request_.fragment_requests.size() == 0) {
     return Status("query exec request contains no plan fragments");
   }
-  const TPlanExecRequest& coord_request = query_exec_request_.fragmentRequests[0];
-  if (coord_request.__isset.descTbl != coord_request.__isset.planFragment) {
-      return Status("bad TPlanExecRequest: only one of {planFragment, descTbl} is set");
+  const TPlanExecRequest& coord_request = query_exec_request_.fragment_requests[0];
+  if (coord_request.__isset.desc_tbl != coord_request.__isset.plan_fragment) {
+      return Status("bad TPlanExecRequest: only one of {plan_fragment, desc_tbl} is set");
   }
-  is_constant_query_ = !coord_request.__isset.descTbl;
+  is_constant_query_ = !coord_request.__isset.desc_tbl;
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(
-          &obj_pool_, query_exec_request_.fragmentRequests[0].outputExprs,
+          &obj_pool_, query_exec_request_.fragment_requests[0].output_exprs,
           &select_list_exprs_));
 
-  if (query_exec_request_.fragmentRequests.size() > 1) {
+  if (query_exec_request_.fragment_requests.size() > 1) {
     // TODO: remove this when we have multi-phase plans
-    DCHECK_EQ(query_exec_request_.fragmentRequests.size(), 2);
+    DCHECK_EQ(query_exec_request_.fragment_requests.size(), 2);
     // fix up coord ports
-    for (int i = 0; i < query_exec_request_.nodeRequestParams[1].size(); ++i) {
-      DCHECK_EQ(query_exec_request_.nodeRequestParams[1][i].destinations.size(), 1);
-      query_exec_request_.nodeRequestParams[1][i].destinations[0].port = FLAGS_be_port;
+    for (int i = 0; i < query_exec_request_.node_request_params[1].size(); ++i) {
+      DCHECK_EQ(query_exec_request_.node_request_params[1][i].destinations.size(), 1);
+      query_exec_request_.node_request_params[1][i].destinations[0].port = FLAGS_be_port;
     }
   }
 
@@ -76,6 +76,7 @@ void JniCoordinator::Exec(jbyteArray thrift_query_exec_request) {
   // if this query is missing a FROM clause, don't hand it to the coordinator
   if (is_constant_query_) return;
   THROW_IF_ERROR(coord_->Exec(&query_exec_request_), env_, impala_exc_cl_);
+  THROW_IF_ERROR(coord_->Wait(), env_, impala_exc_cl_);
 }
 
 Status JniCoordinator::GetNext(RowBatch** batch) {

@@ -2,9 +2,10 @@
 
 #include <iostream>
 #include <iomanip>
+#include <jni.h>
 #include <sys/time.h>
-#include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <gflags/gflags.h>
 #include <glog/vlog_is_on.h>
 #include <google/heap-profiler.h>
 #include <google/profiler.h>
@@ -18,12 +19,15 @@
 #include "exec/hbase-table-scanner.h"
 #include "runtime/hbase-table-cache.h"
 #include "testutil/query-executor-if.h"
+// TODO: fix this: we need to include uid-util.h apparently right before
+// in-process-query-executor.h, it's not clear why
+#include "util/uid-util.h"
 #include "testutil/in-process-query-executor.h"
 #include "testutil/impalad-query-executor.h"
 #include "runtime/exec-env.h"
 #include "exec/exec-stats.h"
 #include "testutil/test-exec-env.h"
-#include "service/backend-service.h"
+#include "service/impala-server.h"
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
 #include "util/jni-util.h"
@@ -42,6 +46,7 @@ DEFINE_int32(iterations, 1, "Number of times to run the query (for perf testing)
 DEFINE_bool(enable_counters, true, "if false, disable using counters (so a profiler can use them");
 DEFINE_bool(explain_plan, false, "if true, print the explain plan only");
 DECLARE_int32(num_nodes);
+DECLARE_int32(fe_port);
 DECLARE_int32(be_port);
 DECLARE_string(backends);
 DECLARE_string(impalad);
@@ -252,13 +257,19 @@ int main(int argc, char** argv) {
     test_exec_env->StartBackends();
     exec_env.reset(test_exec_env);
   } else {
+    // TODO: ignore backends flag? It was introduced to let us run run_query
+    // against distributed backends, but we can do that via impalad now.
     exec_env.reset(new ExecEnv());
     EXIT_IF_ERROR(exec_env->StartServices());
   }
   if (FLAGS_num_nodes != 1) {
     // start backend service to feed stream_mgr
-    TServer* server = StartImpalaBackendService(exec_env.get(), FLAGS_be_port);
-    thread server_thread = thread(&RunServer, server);
+    ImpalaServer* impala_server;
+    TServer* fe_server;
+    TServer* be_server;
+    impala_server = CreateImpalaServer(exec_env.get(), FLAGS_fe_port, FLAGS_be_port,
+        &fe_server, &be_server);
+    thread server_thread = thread(&RunServer, be_server);
   }
   EXIT_IF_ERROR(JniUtil::Init());
   if (FLAGS_init_hbase) {

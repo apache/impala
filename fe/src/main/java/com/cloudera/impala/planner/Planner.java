@@ -475,11 +475,11 @@ public class Planner {
     String prefix = "  ";
 
     List<TPlanExecParams> execHostsParams =
-        request.getNodeRequestParams().get(planFragIdx);
+        request.getNode_request_params().get(planFragIdx);
     for (int nodeIdx = 0; nodeIdx < execHostsParams.size(); nodeIdx++) {
       // If the host has no parameter set, don't print anything
       TPlanExecParams hostExecParams = execHostsParams.get(nodeIdx);
-      if (hostExecParams == null || !hostExecParams.isSetScanRanges()) {
+      if (hostExecParams == null || !hostExecParams.isSetScan_ranges()) {
         continue;
       }
 
@@ -487,12 +487,13 @@ public class Planner {
         // plan fragment 0 is the coordinator
         execParamExplain.append(prefix + "  HOST: coordinator\n");
       } else {
-        THostPort hostport = request.getDataLocations().get(planFragIdx - 1).get(nodeIdx);
+        THostPort hostport =
+            request.getData_locations().get(planFragIdx - 1).get(nodeIdx);
         String hostnode = hostport.getHost() + ":" + hostport.getPort();
         execParamExplain.append(prefix + "  HOST: " + hostnode + "\n");
       }
 
-      for (TScanRange scanRange: hostExecParams.getScanRanges()) {
+      for (TScanRange scanRange: hostExecParams.getScan_ranges()) {
         int nodeId = scanRange.getNodeId();
         if (scanRange.isSetHbaseKeyRanges()) {
           // HBase scan ranges are sorted and are printed as "startKey:stopKey"
@@ -716,8 +717,9 @@ public class Planner {
       if (spjPlan == null) {
         // SELECT without FROM clause
         TPlanExecRequest fragmentRequest = new TPlanExecRequest(
-            new TUniqueId(), Expr.treesToThrift(selectStmt.getResultExprs()));
-        request.addToFragmentRequests(fragmentRequest);
+            new TUniqueId(), new TUniqueId(),
+            Expr.treesToThrift(selectStmt.getResultExprs()));
+        request.addToFragment_requests(fragmentRequest);
         explainString.append("Plan Fragment " + 0 + "\n");
         explainString.append("  SELECT CONSTANT\n");
         return request;
@@ -783,13 +785,13 @@ public class Planner {
     if (numNodes == 1) {
       TPlanExecRequest planRequest =
           createPlanExecRequest(root, analyzer.getDescTbl(), request);
-      planRequest.setOutputExprs(
+      planRequest.setOutput_exprs(
           Expr.treesToThrift(queryStmt.getResultExprs()));
     } else {
       // coordinator fragment comes first
       TPlanExecRequest coordRequest =
           createPlanExecRequest(root, analyzer.getDescTbl(), request);
-      coordRequest.setOutputExprs(
+      coordRequest.setOutput_exprs(
           Expr.treesToThrift(queryStmt.getResultExprs()));
       // create TPlanExecRequest for slave plan
       createPlanExecRequest(slave, analyzer.getDescTbl(), request);
@@ -797,14 +799,14 @@ public class Planner {
       // Slaves write to stream data sink for an exchange node.
       ExchangeNode exchNode = root.findFirstOf(ExchangeNode.class);
       DataSink dataSink = new DataStreamSink(exchNode.getId());
-      request.fragmentRequests.get(1).setDataSink(dataSink.toThrift());
+      request.fragment_requests.get(1).setData_sink(dataSink.toThrift());
       dataSinks.add(dataSink);
     }
 
     // create table data sink for insert stmt
     if (analysisResult.isInsertStmt()) {
       DataSink dataSink = analysisResult.getInsertStmt().createDataSink();
-      request.fragmentRequests.get(0).setDataSink(dataSink.toThrift());
+      request.fragment_requests.get(0).setData_sink(dataSink.toThrift());
       // this is the fragment producing the output; always add in first position
       dataSinks.add(0, dataSink);
     } else {
@@ -816,7 +818,7 @@ public class Planner {
     if (numNodes != 1) {
       // add one empty exec param (coord fragment doesn't scan any tables
       // and doesn't send the output anywhere)
-      request.addToNodeRequestParams(Lists.newArrayList(new TPlanExecParams()));
+      request.addToNode_request_params(Lists.newArrayList(new TPlanExecParams()));
     }
     createExecParams(request, scans, scanRanges, dataLocations);
 
@@ -1023,9 +1025,9 @@ public class Planner {
   private TPlanExecRequest createPlanExecRequest(PlanNode root,
       DescriptorTable descTbl, TQueryExecRequest queryRequest) {
     TPlanExecRequest planRequest = new TPlanExecRequest();
-    planRequest.setPlanFragment(root.treeToThrift());
-    planRequest.setDescTbl(descTbl.toThrift());
-    queryRequest.addToFragmentRequests(planRequest);
+    planRequest.setPlan_fragment(root.treeToThrift());
+    planRequest.setDesc_tbl(descTbl.toThrift());
+    queryRequest.addToFragment_requests(planRequest);
     return planRequest;
   }
 
@@ -1044,7 +1046,7 @@ public class Planner {
     do {
       TPlanExecParams fragmentParams = new TPlanExecParams();
       if (scanRange.hasNext()) {
-        fragmentParams.addToScanRanges(scanRange.next());
+        fragmentParams.addToScan_ranges(scanRange.next());
       }
       THostPort address = new THostPort();
       address.host = "localhost";
@@ -1062,13 +1064,13 @@ public class Planner {
       Preconditions.checkState(scanRanges.size() <= 1);
       if (!scanRanges.isEmpty()) {
         for (TPlanExecParams fragmentParams: fragmentParamsList) {
-          fragmentParams.addToScanRanges(scanRanges.get(0));
+          fragmentParams.addToScan_ranges(scanRanges.get(0));
         }
       }
     }
 
-    request.addToDataLocations(dataLocations);
-    request.addToNodeRequestParams(fragmentParamsList);
+    request.addToData_locations(dataLocations);
+    request.addToNode_request_params(fragmentParamsList);
   }
 
 }

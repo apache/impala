@@ -31,29 +31,28 @@ class DataStreamMgr {
  public:
   DataStreamMgr() {}
 
-  // Create a receiver for a specific query_id/node_id destination; desc_tbl
+  // Create a receiver for a specific fragment_id/node_id destination; desc_tbl
   // is the query's descriptor table and is needed to decode incoming TRowBatches.
   // The caller is responsible for deleting the returned DataStreamRecvr.
   // TODO: create receivers in someone's pool
   DataStreamRecvr* CreateRecvr(
-      const RowDescriptor& row_desc, const TUniqueId& query_id, PlanNodeId dest_node_id,
-      int num_senders, int buffer_size);
+      const RowDescriptor& row_desc, const TUniqueId& fragment_id,
+      PlanNodeId dest_node_id, int num_senders, int buffer_size);
   
-  // Adds a row batch to the stream identified by query_id/dest_node_id.
+  // Adds a row batch to the stream identified by fragment_id/dest_node_id.
   // The call blocks if this ends up pushing the stream over its buffering limit;
   // it unblocks when the stream consumer removed enough data to make space for
   // row_batch.
   // TODO: enforce per-sender quotas (something like 200% of buffer_size/#senders),
   // so that a single sender can't flood the buffer and stall everybody else.
-  // This call takes ownership of thrift_batch; do *not* deallocate it after the call.
   // Returns OK if successful, error status otherwise.
-  Status AddData(const TUniqueId& query_id, PlanNodeId dest_node_id,
+  Status AddData(const TUniqueId& fragment_id, PlanNodeId dest_node_id,
                  const TRowBatch& thrift_batch);
 
   // Decreases the #remaining_senders count for the stream identified by
-  // query_id/dest_node_id.
+  // fragment_id/dest_node_id.
   // Returns OK if successful, error status otherwise.
-  Status CloseChannel(const TUniqueId& query_id, PlanNodeId dest_node_id);
+  Status CloseStream(const TUniqueId& fragment_id, PlanNodeId dest_node_id);
 
  private:
   friend class DataStreamRecvr;
@@ -61,8 +60,8 @@ class DataStreamMgr {
   class StreamControlBlock {
    public:
     StreamControlBlock(
-        const RowDescriptor& row_desc, const TUniqueId& query_id, PlanNodeId dest_node_id,
-        int num_senders, int buffer_size);
+        const RowDescriptor& row_desc, const TUniqueId& fragment_id,
+        PlanNodeId dest_node_id, int num_senders, int buffer_size);
 
     // Returns next available batch or NULL if end-of-stream.
     // A returned batch that is not filled to capacity does *not* indicate
@@ -80,11 +79,11 @@ class DataStreamMgr {
     // if the count drops to 0.
     void DecrementSenders();
 
-    const TUniqueId& query_id() const { return query_id_; }
+    const TUniqueId& fragment_id() const { return fragment_id_; }
     PlanNodeId dest_node_id() const { return dest_node_id_; }
 
    private:
-    TUniqueId query_id_;
+    TUniqueId fragment_id_;
     PlanNodeId dest_node_id_;
     const RowDescriptor& row_desc_;
 
@@ -116,21 +115,21 @@ class DataStreamMgr {
 
   ObjectPool pool_;  // holds control blocks
 
-  // map from hash value of query id/node id pair to control blocks;
+  // map from hash value of fragment id/node id pair to control blocks;
   // we don't want to create a map<pair<TUniqueId, PlanNodeId>, StreamControlBlock*>,
   // because that requires a bunch of copying of ids for lookup
   typedef boost::unordered_multimap<size_t, StreamControlBlock*> StreamMap;
   StreamMap stream_map_;
   boost::mutex stream_map_lock_;
 
-  // Return iterator into stream_map_ for given query_id/node_id, or stream_map_.end()
+  // Return iterator into stream_map_ for given fragment_id/node_id, or stream_map_.end()
   // if not found.
-  StreamMap::iterator FindControlBlock(const TUniqueId& query_id, PlanNodeId node_id);
+  StreamMap::iterator FindControlBlock(const TUniqueId& fragment_id, PlanNodeId node_id);
 
-  // Remove control block for query_id/node_id.
-  Status DeregisterRecvr(const TUniqueId& query_id, PlanNodeId node_id);
+  // Remove control block for fragment_id/node_id.
+  Status DeregisterRecvr(const TUniqueId& fragment_id, PlanNodeId node_id);
 
-  size_t GetHashValue(const TUniqueId& query_id, PlanNodeId node_id);
+  size_t GetHashValue(const TUniqueId& fragment_id, PlanNodeId node_id);
 };
 
 }

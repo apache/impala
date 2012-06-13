@@ -30,7 +30,7 @@ class DataStreamSender : public DataSink {
   // Per_channel_buffer_size is the buffer size allocated to each channel
   // and is specified in bytes.
   DataStreamSender(
-    const RowDescriptor& row_desc, const TUniqueId& query_id,
+    const RowDescriptor& row_desc, const TUniqueId& fragment_id,
     const TDataStreamSink& sink, const std::vector<THostPort>& destinations,
     int per_channel_buffer_size);
   virtual ~DataStreamSender();

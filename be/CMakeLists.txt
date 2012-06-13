@@ -163,6 +163,7 @@ set (IMPALA_LINK_LIBS
   Exprs
   Util
   Webserver
+  GlobalFlags
   ${SNAPPY_STATIC_LIB}
   ${Boost_LIBRARIES}
   ${LLVM_MODULE_LIBS}

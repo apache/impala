@@ -8,14 +8,14 @@
 
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
-#include "gen-cpp/ImpalaBackendService.h"
+#include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/Data_types.h"
 
 #include <iostream>
 
-DEFINE_string(host, "localhost", "Hostname of planservice");
-DEFINE_int32(port, 20000, "Port number of planservice");
+DEFINE_string(planservice_host, "localhost", "Hostname of planservice");
+DEFINE_int32(planservice_port, 20000, "Port number of planservice");
 DEFINE_bool(impalad, false, "Refresh via impalad instead of planservice");
 
 using namespace apache::thrift;
@@ -29,10 +29,12 @@ using namespace std;
 int main(int argc, char** argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);
 
-  shared_ptr<TSocket> socket(new TSocket(FLAGS_host, FLAGS_port));
+  shared_ptr<TSocket> socket(
+      new TSocket(FLAGS_planservice_host, FLAGS_planservice_port));
   shared_ptr<TBufferedTransport> transport(new TBufferedTransport(socket));
   shared_ptr<TBinaryProtocol> protocol(new TBinaryProtocol(transport));
-  cout << "Connecting to " << FLAGS_host << ":" << FLAGS_port << endl;
+  cout << "Connecting to " << FLAGS_planservice_host << ":"
+       << FLAGS_planservice_port << endl;
 
   try {
     transport->open();

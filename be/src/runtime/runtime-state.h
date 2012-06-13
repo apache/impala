@@ -25,17 +25,17 @@ class ExecEnv;
 class LlvmCodeGen;
 
 // A collection of items that are part of the global state of a
-// query and potentially shared across execution nodes.
+// query and shared across all execution nodes of that query.
 class RuntimeState {
  public:
-  RuntimeState(const TUniqueId& query_id, bool abort_on_error, int max_errors,
+  RuntimeState(const TUniqueId& fragment_id, bool abort_on_error, int max_errors,
                int batch_size, bool llvm_enabled, ExecEnv* exec_env);
 
   // RuntimeState for executing queries w/o a from clause.
   RuntimeState();
 
   // Set per-query state.
-  Status Init(const TUniqueId& query_id, bool abort_on_error, int max_errors,
+  Status Init(const TUniqueId& fragment_id, bool abort_on_error, int max_errors,
               bool llvm_enabled, ExecEnv* exec_env);
 
   ObjectPool* obj_pool() const { return obj_pool_.get(); }
@@ -50,7 +50,7 @@ class RuntimeState {
   const std::vector<std::pair<std::string, int> >& file_errors() const {
     return file_errors_;
   }
-  const TUniqueId& query_id() const { return query_id_; }
+  const TUniqueId& fragment_id() const { return fragment_id_; }
   ExecEnv* exec_env() { return exec_env_; }
   DataStreamMgr* stream_mgr() { return exec_env_->stream_mgr(); }
   HdfsFsCache* fs_cache() { return exec_env_->fs_cache(); }
@@ -85,6 +85,9 @@ class RuntimeState {
   // Returns a string representation of the file_errors_.
   std::string FileErrors() const;
 
+  bool is_cancelled() const { return is_cancelled_; }
+  void set_is_cancelled(bool v) { is_cancelled_ = v; }
+
  private:
   static const int DEFAULT_BATCH_SIZE = 1024;
   static const int DEFAULT_FILE_BUFFER_SIZE = 1024 * 1024;
@@ -93,26 +96,37 @@ class RuntimeState {
   boost::scoped_ptr<ObjectPool> obj_pool_;
   int batch_size_;
   int file_buffer_size_;
+
   // A buffer for error messages.
   // The entire error stream is written to the error_log_ in log_error_stream().
   std::stringstream error_stream_;
+
   // Logs error messages.
   std::vector<std::string> error_log_;
+
   // Stores the number of parse errors per file.
   std::vector<std::pair<std::string, int> > file_errors_;
+
   // Whether to abort if an error is encountered.
   bool abort_on_error_;
+
   // Maximum number of errors to log.
   int max_errors_;
-  TUniqueId query_id_;
+
+  TUniqueId fragment_id_;
   ExecEnv* exec_env_;
   boost::scoped_ptr<LlvmCodeGen> codegen_;
+
   // Lists the Hdfs files created by this query (e.g., for inserts).
   std::vector<std::string> created_hdfs_files_;
+
   // Records the total number of appended rows per created Hdfs file.
   std::vector<int64_t> num_appended_rows_;
   
   RuntimeProfile profile_;
+
+  // if true, execution should stop with a CANCELLED status
+  bool is_cancelled_;
 
   // prohibit copies
   RuntimeState(const RuntimeState&);

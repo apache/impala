@@ -17,7 +17,6 @@
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
 #include "runtime/raw-value.h"
-#include "service/backend-service.h"
 #include "testutil/in-process-query-executor.h"
 #include "util/benchmark.h"
 #include "util/jni-util.h"
@@ -67,7 +66,7 @@ class QueryJitter {
     const TQueryExecRequest& request = exec.query_request();
 
     // we always need at least one plan fragment
-    DCHECK_GT(request.fragmentRequests.size(), 0);
+    DCHECK_GT(request.fragment_requests.size(), 0);
 
     vector<Expr*> output_exprs = exec.select_list_exprs();
     cout << "Exprs: " << Expr::DebugString(output_exprs) << endl;
@@ -97,7 +96,7 @@ class QueryJitter {
     cout << llvm_ir << endl;
 
     // No FROM clause, run the jitted expr tree.
-    if (!request.fragmentRequests[0].__isset.descTbl) {
+    if (!request.fragment_requests[0].__isset.desc_tbl) {
       if (FLAGS_benchmark) {
         double interpreted_rate = Benchmark::Measure(ExprBenchmark, root);
         root->SetComputeFn(func, scratch_size);

@@ -12,5 +12,9 @@ add_library(Common
   status.cc
 )
 
+add_library(GlobalFlags
+  global-flags.cc
+)
+
 add_library(glog STATIC IMPORTED)
 add_library(gflags STATIC IMPORTED)

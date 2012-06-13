@@ -81,7 +81,7 @@ set (SRC_FILES
   Frontend.thrift
   JavaConstants.thrift
   Exprs.thrift
-  ImpalaBackendService.thrift
+  ImpalaInternalService.thrift
   ImpalaPlanService.thrift
   ImpalaService.thrift
   PlanNodes.thrift
@@ -89,6 +89,7 @@ set (SRC_FILES
   SparrowTypes.thrift
   StateStoreService.thrift
   StateStoreSubscriberService.thrift
+  Status.thrift
   Types.thrift
   ${GENERATES_SRC_FILES}
 )

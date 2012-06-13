@@ -3,7 +3,7 @@
 namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
-include "Types.thrift"
+include "Status.thrift"
 include "beeswax.thrift"
 
 
@@ -15,8 +15,8 @@ service ImpalaService extends beeswax.BeeswaxService {
   // unknown.
   // This terminates all threads running on behalf of this query at
   // all nodes that were involved in the execution.
-  Types.TStatus Cancel(1:beeswax.QueryHandle query_id);
+  Status.TStatus Cancel(1:beeswax.QueryHandle query_id);
 
   // Invalidates all catalog metadata, forcing a reload
-  Types.TStatus ResetCatalog();
+  Status.TStatus ResetCatalog();
 }

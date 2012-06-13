@@ -9,12 +9,12 @@
 
 #include "common/status.h"
 #include "common/service-ids.h"
-#include "service/backend-service.h"
+#include "service/impala-server.h"
 #include "runtime/client-cache.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "sparrow/simple-scheduler.h"
-#include "gen-cpp/ImpalaBackendService.h"
+#include "gen-cpp/ImpalaInternalService.h"
 
 using namespace boost;
 using namespace std;
@@ -92,7 +92,7 @@ Status TestExecEnv::StartBackends() {
     BackendInfo* info = new BackendInfo(fs_cache_.get(), next_free_port++,
         state_store_port_);
     int backend_port = next_free_port++;
-    info->server = StartImpalaBackendService(&info->exec_env, backend_port);
+    CreateImpalaServer(&info->exec_env, 0, backend_port, NULL, &info->server);
     DCHECK(info->server != NULL);
     info->backend_thread = thread(&TestExecEnv::RunBackendServer, this, info->server);
     backend_info_.push_back(info);

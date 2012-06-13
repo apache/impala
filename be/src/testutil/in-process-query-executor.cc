@@ -33,12 +33,12 @@
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
-#include "runtime/plan-executor.h"
+#include "runtime/plan-fragment-executor.h"
 #include "runtime/exec-env.h"
 #include "util/debug-util.h"
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
-#include "gen-cpp/ImpalaBackendService.h"
+#include "gen-cpp/ImpalaInternalService.h"
 
 DEFINE_int32(batch_size, 0,
     "batch size to be used by backend; a batch size of 0 indicates the "
@@ -51,7 +51,7 @@ DEFINE_int32(num_nodes, 1,
 DECLARE_int32(be_port);
 // TODO: we probably want to add finer grain control of what is codegen'd
 DEFINE_bool(enable_jit, true, "if true, enable codegen for query execution");
-DECLARE_string(coord_host);
+DECLARE_string(host);
 
 using namespace std;
 using namespace boost;
@@ -108,22 +108,22 @@ Status InProcessQueryExecutor::Exec(const string& query, vector<PrimitiveType>* 
   try {
     COUNTER_SCOPED_TIMER(plan_gen_counter);
     CHECK(client_.get() != NULL) << "didn't call InProcessQueryExecutor::Setup()";
-    TQueryRequestResult query_request_result;
-    client_->GetQueryRequestResult(query_request_result, query.c_str(), FLAGS_num_nodes);
-    query_request_ = query_request_result.queryExecRequest;
+    TCreateQueryExecRequestResult result;
+    client_->CreateQueryExecRequest(result, query.c_str(), FLAGS_num_nodes);
+    query_request_ = result.queryExecRequest;
   } catch (TImpalaPlanServiceException& e) {
     return Status(e.what());
   }
   VLOG_QUERY << "query request:\n" << ThriftDebugString(query_request_);
 
   // we always need at least one plan fragment
-  DCHECK_GT(query_request_.fragmentRequests.size(), 0);
+  DCHECK_GT(query_request_.fragment_requests.size(), 0);
 
-  if (!query_request_.fragmentRequests[0].__isset.descTbl) {
+  if (!query_request_.fragment_requests[0].__isset.desc_tbl) {
     // query without a FROM clause: don't create a coordinator
-    DCHECK(!query_request_.fragmentRequests[0].__isset.planFragment);
+    DCHECK(!query_request_.fragment_requests[0].__isset.plan_fragment);
     local_state_.reset(
-        new RuntimeState(query_request_.queryId, FLAGS_abort_on_error,
+        new RuntimeState(query_request_.query_id, FLAGS_abort_on_error,
                          FLAGS_max_errors, FLAGS_batch_size,
                          FLAGS_enable_jit, NULL));
     query_profile_->AddChild(local_state_->runtime_profile());
@@ -132,16 +132,16 @@ Status InProcessQueryExecutor::Exec(const string& query, vector<PrimitiveType>* 
     return Status::OK;
   }
 
-  DCHECK_GT(query_request_.nodeRequestParams.size(), 0);
-  // the first nodeRequestParams list contains exactly one TPlanExecParams
+  DCHECK_GT(query_request_.node_request_params.size(), 0);
+  // the first node_request_params list contains exactly one TPlanExecParams
   // (it's meant for the coordinator fragment)
-  DCHECK_EQ(query_request_.nodeRequestParams[0].size(), 1);
+  DCHECK_EQ(query_request_.node_request_params[0].size(), 1);
 
   if (FLAGS_batch_size != 0) {
-    query_request_.batchSize = FLAGS_batch_size;
-    for (int i = 0; i < query_request_.nodeRequestParams.size(); ++i) {
-      for (int j = 0; j < query_request_.nodeRequestParams[i].size(); ++j) {
-        query_request_.nodeRequestParams[i][j].batchSize = FLAGS_batch_size;
+    query_request_.batch_size = FLAGS_batch_size;
+    for (int i = 0; i < query_request_.node_request_params.size(); ++i) {
+      for (int j = 0; j < query_request_.node_request_params[i].size(); ++j) {
+        query_request_.node_request_params[i][j].batch_size = FLAGS_batch_size;
       }
     }
   }
@@ -149,24 +149,26 @@ Status InProcessQueryExecutor::Exec(const string& query, vector<PrimitiveType>* 
   if (FLAGS_num_nodes != 1) {
     // for distributed execution, we only expect one slave fragment which
     // will be executed by FLAGS_num_nodes - 1 nodes
-    DCHECK_EQ(query_request_.fragmentRequests.size(), 2);
-    DCHECK_EQ(query_request_.nodeRequestParams.size(), 2);
-    DCHECK_LE(query_request_.nodeRequestParams[1].size(), FLAGS_num_nodes - 1);
+    DCHECK_EQ(query_request_.fragment_requests.size(), 2);
+    DCHECK_EQ(query_request_.node_request_params.size(), 2);
+    DCHECK_LE(query_request_.node_request_params[1].size(), FLAGS_num_nodes - 1);
 
     // set destinations to coord host/port
-    for (int i = 0; i < query_request_.nodeRequestParams[1].size(); ++i) {
-      DCHECK_EQ(query_request_.nodeRequestParams[1][i].destinations.size(), 1);
-      query_request_.nodeRequestParams[1][i].destinations[0].host = FLAGS_coord_host;
-      query_request_.nodeRequestParams[1][i].destinations[0].port = FLAGS_be_port;
+    for (int i = 0; i < query_request_.node_request_params[1].size(); ++i) {
+      DCHECK_EQ(query_request_.node_request_params[1][i].destinations.size(), 1);
+      query_request_.node_request_params[1][i].destinations[0].host = FLAGS_host;
+      query_request_.node_request_params[1][i].destinations[0].port = FLAGS_be_port;
     }
   }
 
   coord_.reset(new Coordinator(exec_env_, exec_stats_.get()));
   RETURN_IF_ERROR(coord_->Exec(&query_request_));
+  RETURN_IF_ERROR(coord_->Wait());
   RETURN_IF_ERROR(PrepareSelectListExprs(
       coord_->runtime_state(), coord_->row_desc(), col_types));
 
-  query_profile_->AddChild(coord_->query_profile());
+  // TODO: fix
+  //query_profile_->AddChild(coord_->query_profile());
   return Status::OK;
 }
 
@@ -175,7 +177,7 @@ Status InProcessQueryExecutor::PrepareSelectListExprs(
     vector<PrimitiveType>* col_types) {
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(
-          state->obj_pool(), query_request_.fragmentRequests[0].outputExprs,
+          state->obj_pool(), query_request_.fragment_requests[0].output_exprs,
           &select_list_exprs_));
   for (int i = 0; i < select_list_exprs_.size(); ++i) {
     Expr::Prepare(select_list_exprs_[i], state, row_desc);

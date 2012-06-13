@@ -12,7 +12,7 @@
 #include "common/status.h"
 #include "runtime/primitive-type.h"
 #include "runtime/runtime-state.h"
-#include "gen-cpp/ImpalaBackendService_types.h"  // for TQueryExecRequest
+#include "gen-cpp/ImpalaInternalService_types.h"  // for TQueryExecRequest
 #include "util/runtime-profile.h"
 
 namespace impala {

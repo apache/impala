@@ -30,10 +30,10 @@ import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
-import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.thrift.TColumnValue;
@@ -211,31 +211,48 @@ public class Executor {
 
     // set remaining execution parameters
     UUID queryId = UUID.randomUUID();
-    execRequest.setQueryId(
+    execRequest.setQuery_id(
         new TUniqueId(queryId.getMostSignificantBits(),
                       queryId.getLeastSignificantBits()));
-    execRequest.setAsAscii(returnAsAscii);
-    execRequest.setAbortOnError(abortOnError);
-    execRequest.setMaxErrors(maxErrors);
-    execRequest.setDisableCodegen(disableCodegen);
-    execRequest.setBatchSize(batchSize);
-    execRequest.setSqlStmt(analysisResult.getStmt().toSql());
+    execRequest.setAs_ascii(returnAsAscii);
+    execRequest.setAbort_on_error(abortOnError);
+    execRequest.setMax_errors(maxErrors);
+    execRequest.setDisable_codegen(disableCodegen);
+    execRequest.setBatch_size(batchSize);
+    execRequest.setSql_stmt(analysisResult.getStmt().toSql());
+
+    // assign fragment ids
+    for (int fragmentNum = 0; fragmentNum < execRequest.fragment_requests.size();
+         ++fragmentNum) {
+      TPlanExecRequest planRequest = execRequest.fragment_requests.get(fragmentNum);
+      planRequest.setQuery_id(execRequest.query_id);
+      TUniqueId fragmentId =
+          new TUniqueId(queryId.getMostSignificantBits(),
+                        queryId.getLeastSignificantBits() + fragmentNum);
+      planRequest.setFragment_id(fragmentId);
+    }
 
     // Node request params may not be set for queries w/o a coordinator
-    if (execRequest.getNodeRequestParams() != null) {
-      for (List<TPlanExecParams> planParamsList : execRequest.getNodeRequestParams()) {
+    if (execRequest.getNode_request_params() != null) {
+      for (List<TPlanExecParams> planParamsList : execRequest.getNode_request_params()) {
         for (TPlanExecParams params : planParamsList) {
-          params.setBatchSize(batchSize);
-          params.setDisableCodegen(disableCodegen);
+          params.setBatch_size(batchSize);
+          params.setDisable_codegen(disableCodegen);
+        }
+      }
+
+      // set dest_fragment_ids of non-coord fragment
+      if (execRequest.node_request_params.size() == 2) {
+        // we only have two fragments (1st one: coord); the destination
+        // of the 2nd fragment is the coordinator fragment
+        TUniqueId coordFragmentId = execRequest.fragment_requests.get(0).fragment_id;
+        for (TPlanExecParams execParams: execRequest.node_request_params.get(1)) {
+          execParams.setDest_fragment_id(coordFragmentId);
         }
       }
     }
 
     LOG.info(execRequest.toString());
-
-    for (TPlanExecRequest planRequest: execRequest.fragmentRequests) {
-      planRequest.setQueryId(execRequest.queryId);
-    }
 
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     try {

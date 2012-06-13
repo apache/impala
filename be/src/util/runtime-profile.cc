@@ -133,6 +133,10 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
   }
 }
 
+void RuntimeProfile::ToThrift(TRuntimeProfileTree* tree) const {
+  ToThrift(&tree->nodes);
+}
+
 void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) const {
   nodes->reserve(nodes->size() + children_.size());
 

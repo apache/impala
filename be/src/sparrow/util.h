@@ -11,7 +11,7 @@
 
 #include "common/compiler-util.h"
 #include "common/logging.h"
-#include "gen-cpp/Types_types.h"
+#include "gen-cpp/Status_types.h"
 #include "gen-cpp/SparrowTypes_types.h"
 
 namespace sparrow {

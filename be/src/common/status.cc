@@ -11,6 +11,12 @@ namespace impala {
 
 const Status Status::OK;
 
+Status::ErrorDetail::ErrorDetail(const TStatus& status)
+  : error_code(status.status_code),
+    error_msgs(status.error_msgs) {
+  DCHECK_NE(error_code, TStatusCode::OK);
+}
+
 Status& Status::operator=(const Status& status) {
   delete error_detail_;
   if (status.error_detail_ == NULL) {
@@ -23,26 +29,32 @@ Status& Status::operator=(const Status& status) {
 
 Status::Status(const TStatus& status)
   : error_detail_(
-      status.error_msgs.empty() ? NULL : new ErrorDetail(status.error_msgs)) {
+      status.status_code == TStatusCode::OK
+        ? NULL
+        : new ErrorDetail(status)) {
 }
 
 Status& Status::operator=(const TStatus& status) {
   delete error_detail_;
-  if (status.status_code == 0) {
+  if (status.status_code == TStatusCode::OK) {
     error_detail_ = NULL;
   } else {
-    error_detail_ = new ErrorDetail(status.error_msgs);
+    error_detail_ = new ErrorDetail(status);
   }
   return *this;
 }
 
-void Status::AddErrorMsg(const std::string& msg) {
+void Status::AddErrorMsg(TStatusCode::type code, const std::string& msg) {
   if (error_detail_ == NULL) {
-    error_detail_ = new ErrorDetail(msg);
+    error_detail_ = new ErrorDetail(code, msg);
   } else {
-    error_detail_->error_msgs.insert(error_detail_->error_msgs.begin(), msg);
+    error_detail_->error_msgs.push_back(msg);
   }
-  LOG(WARNING) << "Error Status: " << msg;
+  VLOG(1) << msg;
+}
+
+void Status::AddErrorMsg(const std::string& msg) {
+  AddErrorMsg(TStatusCode::INTERNAL_ERROR, msg);
 }
 
 void Status::GetErrorMsgs(vector<string>* msgs) const {
@@ -65,16 +77,16 @@ string Status::GetErrorMsg() const {
   return msg;
 }
 
-void Status::ToThrift(TStatus* status) {
+void Status::ToThrift(TStatus* status) const {
   status->error_msgs.clear();
   if (error_detail_ == NULL) {
     status->status_code = TStatusCode::OK;
   } else {
-    // TODO: add a TStatusCode Status::ErrorDetail::status_code
-    status->status_code = TStatusCode::INTERNAL_ERROR;
+    status->status_code = error_detail_->error_code;
     for (int i = 0; i < error_detail_->error_msgs.size(); ++i) {
       status->error_msgs.push_back(error_detail_->error_msgs[i]);
     }
+    status->__isset.error_msgs = !error_detail_->error_msgs.empty();
   }
 }
 

@@ -11,7 +11,7 @@
 #include <gflags/gflags.h>
 #include <memory>
 
-#include "gen-cpp/ImpalaBackendService.h"
+#include "gen-cpp/ImpalaInternalService.h"
 
 using namespace std;
 using namespace boost;
@@ -28,7 +28,7 @@ struct BackendClientCache::ClientInfo {
   shared_ptr<TTransport> socket;
   shared_ptr<TTransport> transport;
   shared_ptr<TProtocol> protocol;
-  scoped_ptr<ImpalaBackendServiceClient> client;
+  scoped_ptr<ImpalaInternalServiceClient> client;
 
   ClientInfo(const string& host, int port);
   ~ClientInfo();
@@ -41,7 +41,7 @@ BackendClientCache::ClientInfo::ClientInfo(const string& host, int port)
     socket(new TSocket(host, port)),
     transport(new TBufferedTransport(socket)),
     protocol(new TBinaryProtocol(transport)),
-    client(new ImpalaBackendServiceClient(protocol)) {
+    client(new ImpalaInternalServiceClient(protocol)) {
 }
 
 BackendClientCache::ClientInfo::~ClientInfo() {
@@ -66,9 +66,10 @@ BackendClientCache::BackendClientCache(int max_clients, int max_clients_per_back
 }
 
 Status BackendClientCache::GetClient(
-    const pair<string, int>& hostport, ImpalaBackendServiceClient** client) {
+    const pair<string, int>& hostport, ImpalaInternalServiceClient** client) {
   VLOG_CONNECTION << "GetClient("
       << hostport.first << ":" << hostport.second << ")";
+  lock_guard<mutex> l(lock_);
   ClientCache::iterator cache_entry = client_cache_.find(hostport);
   if (cache_entry == client_cache_.end()) {
     cache_entry =
@@ -95,7 +96,8 @@ Status BackendClientCache::GetClient(
   return Status::OK;
 }
 
-void BackendClientCache::ReleaseClient(ImpalaBackendServiceClient* client) {
+void BackendClientCache::ReleaseClient(ImpalaInternalServiceClient* client) {
+  lock_guard<mutex> l(lock_);
   ClientMap::iterator i = client_map_.find(client);
   DCHECK(i != client_map_.end());
   ClientInfo* info = i->second;
@@ -106,6 +108,7 @@ void BackendClientCache::ReleaseClient(ImpalaBackendServiceClient* client) {
 }
 
 string BackendClientCache::DebugString() {
+  lock_guard<mutex> l(lock_);
   stringstream out;
   out << "BackendClientCache(#hosts=" << client_cache_.size()
       << " [";

@@ -66,11 +66,19 @@ HBaseTableCache::~HBaseTableCache() {
   }
 }
 
-jobject HBaseTableCache::GetHBaseTable(JNIEnv* env, string table_name) {
+jobject HBaseTableCache::GetHBaseTable(const string& table_name) {
+  JNIEnv* env = getJNIEnv();
+  if (env == NULL) return NULL;
+
   lock_guard<mutex> l(lock_);
   HTableMap::iterator i = table_map_.find(table_name);
   if (i == table_map_.end()) {
+    LOG(INFO) << "gethbasetable: name=" << table_name;
     jstring jtable_name = env->NewStringUTF(table_name.c_str());
+    LOG(INFO) << "env=" << env << " htable_cl=" << htable_cl_
+              << " htable_ctor_=" << htable_ctor_
+              << " hbase_conf=" << hbase_conf_
+              << " jtable=" << jtable_name;
     jobject htable = env->NewObject(htable_cl_, htable_ctor_, hbase_conf_, jtable_name);
     jobject global_htable = env->NewGlobalRef(htable);
     table_map_.insert(make_pair(table_name, global_htable));

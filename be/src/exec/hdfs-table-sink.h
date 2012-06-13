@@ -27,19 +27,19 @@ struct OutputPartition {
   // Full path to root of the group of files that will be created for this
   // partition.  Each file will have a sequence number appended.
   // A table writer may produce multiple files per partition.
-  // Path: <hdfs_base_dir>/<partition_values>/<query_id_str>
+  // Path: <hdfs_base_dir>/<partition_values>/<unique_id_str>
   std::string hdfs_file_name_template;
 
   // File name for current output -- with sequence number appended.
   // This is a temporary file that will get moved to the permanent file location
   // when we commit the insert.
-  // Path: <hdfs_base_dir>/<partition_values>/<query_id_str>.<sequence number>
+  // Path: <hdfs_base_dir>/<partition_values>/<unique_id_str>.<sequence number>
   std::string current_file_name;
 
   // Base name for temporary files: queryId/hdfs_file_name
   // The file is moved to hdfs_file_name in Close().
   // If overwrite is true, then we move the directory instead of the file.
-  // Path: <hdfs_base_dir>/<query_id>_dir/<partition_values>/<query_id_str>
+  // Path: <hdfs_base_dir>/<unique_id>_dir/<partition_values>/<unique_id_str>
   std::string tmp_hdfs_file_name_template;
 
   // Connection to hdfs.
@@ -70,8 +70,9 @@ struct OutputPartition {
 // Files and partitions:
 // This sink writes a single Hdfs file per output partition,
 // corresponding to an Hdfs directory.
-// The Hdfs file name is the queryId, and therefore,
-// we rely on the uniqueness of queryIds.
+// The Hdfs file name is the unique_id, and therefore, we rely on the *global*
+// uniqueness of unique_id, ie, no two HdfsTableSinks must be constructed with
+// the same unique_id.
 // For each row, its target partition is computed based on the
 // partition_key_exprs from tsink.
 // A map of opened Hdfs files (corresponding to partitions) is maintained.
@@ -86,12 +87,12 @@ struct OutputPartition {
 //    we delete the original files if overwrite was specified.
 // There is a possibility of data inconsistency,
 // e.g., if a failure occurs while moving the Hdfs files.
-// The temporary directory is <table base dir>/<query_id.hi>-<query_id.lo>_data
+// The temporary directory is <table base dir>/<unique_id.hi>-<unique_id.lo>_data
 // such that an external tool can easily clean up incomplete inserts.
 // This is consistent with Hive's behavior.
 class HdfsTableSink : public DataSink {
  public:
-  HdfsTableSink(const RowDescriptor& row_desc, const TUniqueId& query_id,
+  HdfsTableSink(const RowDescriptor& row_desc, const TUniqueId& unique_id,
       const std::vector<TExpr>& select_list_texprs, const TDataSink& tsink);
 
   // Prepares output_exprs and partition_key_exprs.
@@ -147,7 +148,7 @@ class HdfsTableSink : public DataSink {
   // Sets hdfs_file_name and tmp_hdfs_file_name of given output partition.
   // The Hdfs directory is created from the target table's base Hdfs dir,
   // the partition_key_names_ and the evaluated partition_key_exprs_.
-  // The Hdfs file name is the query_id_.
+  // The Hdfs file name is the unique_id_str_.
   void BuildHdfsFileNames(OutputPartition* output);
 
   // Move tmp Hdfs files from output partitions to their final destinations.
@@ -203,9 +204,9 @@ class HdfsTableSink : public DataSink {
   // Indicates whether the existing partitions should be overwritten.
   bool overwrite_;
 
-  // string representation of query_id_. Used for per-partition Hdfs file names,
+  // string representation of c'tors unique_id. Used for per-partition Hdfs file names,
   // and for tmp Hdfs directories. Set in Prepare();
-  std::string query_id_str_;
+  std::string unique_id_str_;
 
   // Special value for NULL partition keys to be compatible with Hive.
   std::string null_partition_key_value_;

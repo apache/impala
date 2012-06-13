@@ -26,16 +26,16 @@ using namespace boost::posix_time;
 namespace impala {
 
 HdfsTableSink::HdfsTableSink(const RowDescriptor& row_desc,
-    const TUniqueId& query_id, const vector<TExpr>& select_list_texprs,
+    const TUniqueId& unique_id, const vector<TExpr>& select_list_texprs,
     const TDataSink& tsink)
     :  row_desc_(row_desc),
        table_id_(tsink.tableSink.targetTableId),
        select_list_texprs_(select_list_texprs),
        partition_key_texprs_(tsink.tableSink.hdfsTableSink.partitionKeyExprs),
        overwrite_(tsink.tableSink.hdfsTableSink.overwrite) {
-  stringstream query_id_ss;
-  query_id_ss << query_id.hi << "-" << query_id.lo;
-  query_id_str_ = query_id_ss.str();
+  stringstream unique_id_ss;
+  unique_id_ss << unique_id.hi << "-" << unique_id.lo;
+  unique_id_str_ = unique_id_ss.str();
 }
 
 Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
@@ -145,23 +145,23 @@ Status HdfsTableSink::Init(RuntimeState* state) {
 
 // Note - this injects a random value into the directory name, so cannot be called
 // repeatedly to give the same answer.
-static void MakeTmpHdfsDirectoryName(const string& base_dir, const string& query_id,
+static void MakeTmpHdfsDirectoryName(const string& base_dir, const string& unique_id,
                                      stringstream* ss) {
   // Append "_dir" at the end of directory to avoid name clashes for unpartitioned tables.
-  (*ss) << base_dir << "/" << query_id << "_" << rand() << "_dir/";
+  (*ss) << base_dir << "/" << unique_id << "_" << rand() << "_dir/";
 }
 
 void HdfsTableSink::BuildHdfsFileNames(OutputPartition* output_partition) {
   // Create hdfs_file_name_template and tmp_hdfs_file_name_template.
-  // Path: <hdfs_base_dir>/<partition_values>/<query_id_str>
+  // Path: <hdfs_base_dir>/<partition_values>/<unique_id_str>
   stringstream hdfs_file_name_template;
   hdfs_file_name_template << table_desc_->hdfs_base_dir() << "/";
 
-  // Path: <hdfs_base_dir>/<query_id>_dir/<partition_values>/<query_id_str>
+  // Path: <hdfs_base_dir>/<unique_id>_dir/<partition_values>/<unique_id_str>
   // Both the temporary directory and the file name, when moved to the
   // real partition directory must be unique.
   stringstream tmp_hdfs_file_name_template;
-  MakeTmpHdfsDirectoryName(table_desc_->hdfs_base_dir(), query_id_str_,
+  MakeTmpHdfsDirectoryName(table_desc_->hdfs_base_dir(), unique_id_str_,
                            &tmp_hdfs_file_name_template);
 
   stringstream common_suffix;
@@ -180,7 +180,7 @@ void HdfsTableSink::BuildHdfsFileNames(OutputPartition* output_partition) {
     common_suffix << "/";
   }
   // Use the query id as filename.
-  common_suffix << query_id_str_ << "_" << rand();
+  common_suffix << unique_id_str_ << "_" << rand();
   hdfs_file_name_template << common_suffix.str() << "_data";
   tmp_hdfs_file_name_template << common_suffix.str() << "_data";
   output_partition->hdfs_file_name_template = hdfs_file_name_template.str();

@@ -7,7 +7,7 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/service")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/service")
 
 add_library(Service
-  backend-service.cc
+  impala-server.cc
   jni-coordinator.cc
 )
 
@@ -18,7 +18,7 @@ target_link_libraries(Service
 
 add_library(backend SHARED
   backend.cc
-  backend-service.cc
+  impala-server.cc
   jni-coordinator.cc
 )
 
@@ -44,10 +44,11 @@ target_link_libraries(runquery
 
 add_executable(impalad
   impalad-main.cc
-  impala-service.cc
-  backend.cc
-  backend-service.cc
-  jni-coordinator.cc
+  impala-server.cc
 )
 
-target_link_libraries(impalad ${IMPALA_LINK_LIBS})
+target_link_libraries(impalad
+  ${IMPALA_LINK_LIBS}
+# does this crash the FE tests?
+#tcmallocstatic
+)

@@ -7,15 +7,20 @@
 #include <list>
 #include <string>
 #include <boost/unordered_map.hpp>
+#include <boost/thread/mutex.hpp>
 
 #include "common/status.h"
 
 namespace impala {
 
-class ImpalaBackendServiceClient;
+class ImpalaInternalServiceClient;
 
-// Cache of Thrift clients for ImpalaBackendServices.
+// Cache of Thrift clients for ImpalaInternalServices.
+// This class is thread-safe.
 // TODO: shut down clients in the background if they don't get used for a period of time
+// TODO: in order to reduce locking overhead when getting/releasing clients,
+// add call to hand back pointer to list stored in ClientCache and add separate lock
+// to list (or change to lock-free list)
 class BackendClientCache {
  public:
   // Create cache with given upper limits for the total number of cached
@@ -27,16 +32,21 @@ class BackendClientCache {
   // Return client for specific host/port in 'client'.
   Status GetClient(
       const std::pair<std::string, int>& hostport,
-      ImpalaBackendServiceClient** client);
+      ImpalaInternalServiceClient** client);
 
   // Hand client back.
-  void ReleaseClient(ImpalaBackendServiceClient* client);
+  void ReleaseClient(ImpalaInternalServiceClient* client);
 
   std::string DebugString();
 
  private:
   int max_clients_;
   int max_clients_per_backend_;
+
+  // protects all fields below
+  // TODO: have more fine-grained locks or use lock-free data structures,
+  // this isn't going to scale for a high request rate
+  boost::mutex lock_;
 
   struct ClientInfo;
   // map from (host, port) to list of clients;
@@ -46,7 +56,7 @@ class BackendClientCache {
   ClientCache client_cache_;
 
   // map from client back to its containing struct
-  typedef boost::unordered_map<ImpalaBackendServiceClient*, ClientInfo*> ClientMap;
+  typedef boost::unordered_map<ImpalaInternalServiceClient*, ClientInfo*> ClientMap;
   ClientMap client_map_;
 };
 

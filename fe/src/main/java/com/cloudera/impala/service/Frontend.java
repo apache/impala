@@ -14,10 +14,10 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.thrift.TColumnDesc;
-import com.cloudera.impala.thrift.TPlanExecRequest;
+import com.cloudera.impala.thrift.TCreateQueryExecRequestResult;
+import com.cloudera.impala.thrift.TPlanExecParams;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TQueryRequest;
-import com.cloudera.impala.thrift.TQueryRequestResult;
 import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TUniqueId;
 import com.google.common.base.Preconditions;
@@ -58,25 +58,45 @@ public class Frontend {
     this.catalog.close();
   }
 
-  private void assignQueryId(TQueryExecRequest request) {
-    // Set query id
+  /**
+   * Assigns query and fragment ids. Fragment ids are derived from the
+   * query id by adding the fragment number to query_id.lo.
+   * Also sets TPlanExecParams.dest_fragment_id.
+   */
+  private void assignIds(TQueryExecRequest request) {
     UUID queryId = new UUID(nextQueryId++, 0);
-    request.setQueryId(
+    request.setQuery_id(
         new TUniqueId(queryId.getMostSignificantBits(),
                       queryId.getLeastSignificantBits()));
-    for (TPlanExecRequest planRequest: request.fragmentRequests) {
-      planRequest.setQueryId(request.queryId);
+
+    for (int fragmentNum = 0; fragmentNum < request.fragment_requests.size();
+         ++fragmentNum) {
+      request.fragment_requests.get(fragmentNum).setQuery_id(request.query_id);
+      Preconditions.checkState(request.query_id.lo < Long.MAX_VALUE - fragmentNum);
+      TUniqueId fragmentId =
+          new TUniqueId(request.query_id.hi, request.query_id.lo + fragmentNum);
+      request.fragment_requests.get(fragmentNum).setFragment_id(fragmentId);
+    }
+
+    if (request.node_request_params != null && request.node_request_params.size() == 2) {
+      // we only have two fragments (1st one: coord); the destination
+      // of the 2nd fragment is the coordinator fragment
+      TUniqueId coordFragmentId = request.fragment_requests.get(0).fragment_id;
+      for (TPlanExecParams execParams: request.node_request_params.get(1)) {
+        execParams.setDest_fragment_id(coordFragmentId);
+      }
     }
   }
 
   /**
-   * Create a populated TQueryRequestResult corresponding to the supplied TQueryRequest.
+   * Create a populated TCreateQueryExecRequestResult corresponding to the supplied
+   * TQueryRequest.
    * @param request query request
    * @param explainString if not null, it will contain the explain plan string
-   * @return a TQueryRequestResult based on request
+   * @return a TCreateQueryExecRequestResult based on request
    * TODO: make updates to nextQueryId thread-safe
    */
-  public TQueryRequestResult createQueryExecRequest(TQueryRequest request,
+  public TCreateQueryExecRequestResult createQueryExecRequest(TQueryRequest request,
       StringBuilder explainString) throws ImpalaException {
     AnalysisContext analysisCtxt = new AnalysisContext(catalog);
     AnalysisContext.AnalysisResult analysisResult = null;
@@ -90,9 +110,9 @@ public class Frontend {
 
     // create plan
     Planner planner = new Planner();
-    TQueryRequestResult result = new TQueryRequestResult();
-    result.queryExecRequest =
-        planner.createPlanFragments(analysisResult, request.numNodes, explainString);
+    TCreateQueryExecRequestResult result = new TCreateQueryExecRequestResult();
+    result.setQueryExecRequest(
+        planner.createPlanFragments(analysisResult, request.numNodes, explainString));
 
     // fill the metadata (for query statement)
     if (analysisResult.isQueryStmt()) {
@@ -108,8 +128,7 @@ public class Frontend {
       result.resultSetMetadata = metadata;
     }
 
-    // assing query id
-    assignQueryId(result.queryExecRequest);
+    assignIds(result.queryExecRequest);
     return result;
   }
 

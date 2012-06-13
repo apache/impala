@@ -7,7 +7,7 @@
 #include <string>
 
 #include "common/status.h"
-#include "gen-cpp/ImpalaBackendService.h"
+#include "gen-cpp/Types_types.h"  // for THostPort
 
 namespace sparrow {
 
@@ -19,7 +19,7 @@ namespace sparrow {
 class Scheduler {
  public:
   // Given a list of host / port pairs that represent data locations,
-  // fills in hostports with host/port pairs of known ImpalaBackendServices
+  // fills in hostports with host/port pairs of known ImpalaInternalServices
   // (that are running on those hosts or nearby).
   virtual impala::Status GetHosts(
       const std::vector<impala::THostPort>& data_locations,

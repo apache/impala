@@ -23,7 +23,7 @@
 #include "testutil/in-process-query-executor.h"
 #include "testutil/test-exec-env.h"
 #include "util/debug-util.h"
-#include "gen-cpp/ImpalaBackendService.h"
+#include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/Types_types.h"
 
 using namespace std;
@@ -39,25 +39,29 @@ DECLARE_int32(port);
 
 namespace impala {
 
-class ImpalaTestBackend : public ImpalaBackendServiceIf {
+class ImpalaTestBackend : public ImpalaInternalServiceIf {
  public:
   ImpalaTestBackend(DataStreamMgr* stream_mgr): mgr_(stream_mgr) {}
   virtual ~ImpalaTestBackend() {}
 
   virtual void ExecPlanFragment(
-      TExecPlanFragmentResult& _return, const TPlanExecRequest& request,
-      const TPlanExecParams& params) {
-  }
+      TExecPlanFragmentResult& return_val, const TExecPlanFragmentParams& params) {}
+
+  virtual void ReportExecStatus(
+      TReportExecStatusResult& return_val, const TReportExecStatusParams& params) {}
+
+  virtual void CancelPlanFragment(
+      TCancelPlanFragmentResult& return_val, const TCancelPlanFragmentParams& params) {}
 
   virtual void TransmitData(
-      TStatus& return_val, const TUniqueId& query_id, const TPlanNodeId dest_node_id,
-      const TRowBatch& thrift_batch) {
-    mgr_->AddData(query_id, dest_node_id, thrift_batch).ToThrift(&return_val);
-  }
-
-  virtual void CloseChannel(
-    TStatus& return_val, const TUniqueId& query_id, const TPlanNodeId dest_node_id) {
-    mgr_->CloseChannel(query_id, dest_node_id).ToThrift(&return_val);
+      TTransmitDataResult& return_val, const TTransmitDataParams& params) {
+    if (!params.eos) {
+      mgr_->AddData(params.dest_fragment_id, params.dest_node_id, params.row_batch)
+          .SetTStatus(&return_val);
+    } else {
+      mgr_->CloseStream(params.dest_fragment_id, params.dest_node_id)
+          .SetTStatus(&return_val);
+    }
   }
 
  private:
@@ -147,7 +151,7 @@ class DataStreamTest : public testing::Test {
   void StartBackend() {
     shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
     shared_ptr<ImpalaTestBackend> handler(new ImpalaTestBackend(stream_mgr_));
-    shared_ptr<TProcessor> processor(new ImpalaBackendServiceProcessor(handler));
+    shared_ptr<TProcessor> processor(new ImpalaInternalServiceProcessor(handler));
     shared_ptr<TServerTransport> server_transport(new TServerSocket(FLAGS_port));
     shared_ptr<TTransportFactory> transport_factory(new TBufferedTransportFactory());
 

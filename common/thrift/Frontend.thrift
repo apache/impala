@@ -4,10 +4,10 @@ namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
 include "Types.thrift"
-include "ImpalaBackendService.thrift"
+include "ImpalaInternalService.thrift"
 
-// These are supporting structs for Frontend.java, which itself doesn't have a Thrift
-// service interface.
+// These are supporting structs for JniFrontend.java, which serves as the glue
+// between our C++ execution environment and the Java frontend.
 
 struct TQueryRequest {
   // select stmt to be executed
@@ -37,9 +37,10 @@ struct TResultSetMetadata {
   1: required list<TColumnDesc> columnDescs
 }
 
-struct TQueryRequestResult {
+// Result of call to createQueryExecRequest()
+struct TCreateQueryExecRequestResult {
   // TQueryExecRequest for the backend
-  1: required ImpalaBackendService.TQueryExecRequest queryExecRequest
+  1: required ImpalaInternalService.TQueryExecRequest queryExecRequest
 
   // Metadata of the query result set (only for select)
   2: optional TResultSetMetadata resultSetMetadata

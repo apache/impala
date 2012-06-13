@@ -4,6 +4,7 @@ namespace cpp sparrow
 namespace java com.cloudera.sparrow.thrift
 
 include "SparrowTypes.thrift"
+include "Status.thrift"
 include "Types.thrift"
 
 enum StateStoreSubscriberServiceVersion {
@@ -28,7 +29,7 @@ struct TUpdateStateRequest {
 
 struct TUpdateStateResponse {
   // Required in V1.
-  1: optional Types.TStatus status
+  1: optional Status.TStatus status
 
   // For each service running on the subscriber, the object updates.  Required in V1,
   // but not yet implemented.

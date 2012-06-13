@@ -28,7 +28,7 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
   // TODO: figure out appropriate buffer size
   // row descriptor of this node and the incoming stream should be the same.
   stream_recvr_.reset(state->stream_mgr()->CreateRecvr(
-    row_descriptor_, state->query_id(), id_, num_senders_, 1024 * 1024));
+    row_descriptor_, state->fragment_id(), id_, num_senders_, 1024 * 1024));
   return Status::OK;
 }
 

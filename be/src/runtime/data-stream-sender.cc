@@ -18,9 +18,9 @@
 #include "runtime/row-batch.h"
 #include "runtime/raw-value.h"
 
-#include "gen-cpp/ImpalaBackendService.h"
-#include "gen-cpp/ImpalaBackendService_types.h"
 #include "gen-cpp/Types_types.h"
+#include "gen-cpp/ImpalaInternalService.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
 
 using namespace std;
 using namespace boost;
@@ -48,11 +48,11 @@ class DataStreamSender::Channel {
   // how much tuple data is getting accumulated before being sent; it only applies
   // when data is added via AddRow() and not sent directly via SendBatch().
   Channel(const RowDescriptor& row_desc, const THostPort& destination,
-          const TUniqueId& query_id, PlanNodeId dest_node_id, int buffer_size)
+          const TUniqueId& fragment_id, PlanNodeId dest_node_id, int buffer_size)
     : row_desc_(row_desc),
       host_(destination.host),
       port_(destination.port),
-      query_id_(query_id),
+      fragment_id_(fragment_id),
       dest_node_id_(dest_node_id),
       num_data_bytes_sent_(0),
       in_flight_batch_(NULL) {
@@ -89,12 +89,12 @@ class DataStreamSender::Channel {
   shared_ptr<TTransport> socket_;
   shared_ptr<TTransport> transport_;
   shared_ptr<TProtocol> protocol_;
-  scoped_ptr<ImpalaBackendServiceClient> client_;
+  scoped_ptr<ImpalaInternalServiceClient> client_;
 
   const RowDescriptor& row_desc_;
   string host_;
   int port_;
-  TUniqueId query_id_;
+  TUniqueId fragment_id_;
   PlanNodeId dest_node_id_;
 
   // the number of TRowBatch.data bytes sent successfully
@@ -123,13 +123,13 @@ Status DataStreamSender::Channel::Init() {
   socket_.reset(new TSocket(host_, port_));
   transport_.reset(new TBufferedTransport(socket_));
   protocol_.reset(new TBinaryProtocol(transport_));
-  client_.reset(new ImpalaBackendServiceClient(protocol_));
+  client_.reset(new ImpalaInternalServiceClient(protocol_));
 
   try {
     transport_->open();
   } catch (TTransportException& e) {
     stringstream msg;
-    msg << "couldn't create ImpalaBackendService client for " << host_ << ":"
+    msg << "couldn't create ImpalaInternalService client for " << host_ << ":"
         << port_ << ":\n" << e.what();
     return Status(msg.str());
   }
@@ -138,7 +138,8 @@ Status DataStreamSender::Channel::Init() {
 }
 
 Status DataStreamSender::Channel::SendBatch(TRowBatch* batch) {
-  VLOG_ROW << "Channel::SendBatch(" << batch << ")\n";
+  VLOG_ROW << "Channel::SendBatch() fragment_id=" << fragment_id_
+           << " dest_node=" << dest_node_id_ << " #rows=" << batch->num_rows;
   // return if the previous batch saw an error
   RETURN_IF_ERROR(GetSendStatus());
   DCHECK(in_flight_batch_ == NULL);
@@ -150,14 +151,23 @@ Status DataStreamSender::Channel::SendBatch(TRowBatch* batch) {
 void DataStreamSender::Channel::TransmitData() {
   DCHECK(in_flight_batch_ != NULL);
   try {
-    VLOG_ROW << "calling transmitdata(" << in_flight_batch_ << ")\n";
-    TStatus rpc_status;
-    client_->TransmitData(rpc_status, query_id_, dest_node_id_, *in_flight_batch_);
-    if (rpc_status.status_code != 0) {
-      rpc_status_ = rpc_status;
+    VLOG_ROW << "Channel::TransmitData() fragment_id=" << fragment_id_
+             << " dest_node=" << dest_node_id_
+             << " #rows=" << in_flight_batch_->num_rows;
+    TTransmitDataParams params;
+    params.protocol_version = ImpalaInternalServiceVersion::V1;
+    params.__set_dest_fragment_id(fragment_id_);
+    params.__set_dest_node_id(dest_node_id_);
+    params.__set_row_batch(*in_flight_batch_);  // yet another copy
+    params.__set_eos(false);
+    TTransmitDataResult res;
+    client_->TransmitData(res, params);
+    if (res.status.status_code != TStatusCode::OK) {
+      rpc_status_ = res.status;
     } else {
       num_data_bytes_sent_ += RowBatch::GetBatchSize(*in_flight_batch_);
-      VLOG_ROW << "incremented #data_bytes_sent=" << num_data_bytes_sent_;
+      VLOG_ROW << "incremented #data_bytes_sent="
+               << num_data_bytes_sent_;
     }
   } catch (TException& e) {
     stringstream msg;
@@ -199,11 +209,16 @@ Status DataStreamSender::Channel::SendCurrentBatch() {
 
 Status DataStreamSender::Channel::GetSendStatus() {
   rpc_thread_.join();
+  if (!rpc_status_.ok()) {
+    LOG(ERROR) << "channel send status: " << rpc_status_.GetErrorMsg();
+  }
   return rpc_status_;
 }
 
 Status DataStreamSender::Channel::Close() {
-  VLOG_QUERY << "Channel::Close()\n";
+  VLOG_QUERY << "Channel::Close() fragment_id=" << fragment_id_
+             << " dest_node=" << dest_node_id_
+             << " #rows= " << batch_->num_rows();
   if (batch_->num_rows() > 0) {
     // flush
     RETURN_IF_ERROR(SendCurrentBatch());
@@ -211,10 +226,15 @@ Status DataStreamSender::Channel::Close() {
   // if the last transmitted batch resulted in a error, return that error
   RETURN_IF_ERROR(GetSendStatus());
   try {
-    TStatus rpc_status;
-    VLOG_QUERY << "calling closechannel()\n";
-    client_->CloseChannel(rpc_status, query_id_, dest_node_id_);
-    return Status(rpc_status);
+    TTransmitDataParams params;
+    params.protocol_version = ImpalaInternalServiceVersion::V1;
+    params.__set_dest_fragment_id(fragment_id_);
+    params.__set_dest_node_id(dest_node_id_);
+    params.__set_eos(true);
+    TTransmitDataResult res;
+    VLOG_QUERY << "calling TransmitData to close channel";
+    client_->TransmitData(res, params);
+    return Status(res.status);
   } catch (TException& e) {
     stringstream msg;
     msg << "CloseChannel() to " << host_ << ":" << port_ << " failed:\n" << e.what();
@@ -224,7 +244,7 @@ Status DataStreamSender::Channel::Close() {
 }
 
 DataStreamSender::DataStreamSender(
-    const RowDescriptor& row_desc, const TUniqueId& query_id,
+    const RowDescriptor& row_desc, const TUniqueId& fragment_id,
     const TDataStreamSink& sink, const vector<THostPort>& destinations,
     int per_channel_buffer_size)
   : current_thrift_batch_(&thrift_batch1_) {
@@ -250,7 +270,7 @@ DataStreamSender::DataStreamSender(
   // TODO: use something like google3's linked_ptr here (scoped_ptr isn't copyable)
   for (int i = 0; i < destinations.size(); ++i) {
     channels_.push_back(
-        new Channel(row_desc, destinations[i], query_id, sink.destNodeId,
+        new Channel(row_desc, destinations[i], fragment_id, sink.destNodeId,
                     per_channel_buffer_size));
   }
 }
@@ -274,7 +294,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
   if (broadcast_ || channels_.size() == 1) {
     // current_thrift_batch_ is *not* the one that was written by the last call
     // to Serialize()
-    VLOG_ROW << "serializing into " << current_thrift_batch_ << "\n";
+    VLOG_ROW << "serializing " << batch->num_rows() << " rows";
     batch->Serialize(current_thrift_batch_);
     // SendBatch() will block if there are still in-flight rpcs (and those will
     // reference the previously written thrift batch)

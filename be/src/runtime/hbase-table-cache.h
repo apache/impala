@@ -22,7 +22,7 @@ class HBaseTableCache {
 
   // Return the HTable java object for the given table name. If the HTable does not exist
   // in the cache, it'll be constructed and added to the cache.
-  jobject GetHBaseTable(JNIEnv* env, std::string table_name);
+  jobject GetHBaseTable(const std::string& table_name);
 
  private:
   boost::mutex lock_;  // protects table_map
