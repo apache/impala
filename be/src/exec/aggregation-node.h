@@ -112,6 +112,11 @@ class AggregationNode : public ExecNode {
   // Jitted ProcessRowBatch function pointer.  Null if codegen is disabled.
   ProcessRowBatchFn process_row_batch_fn_;
 
+  // Time spent processing the child rows
+  RuntimeProfile::Counter* build_timer_;
+  // Time spent returning the aggregated rows
+  RuntimeProfile::Counter* get_results_timer_;
+
   // Constructs a new aggregation output tuple (allocated from tuple_pool_),
   // initialized to grouping values computed over 'current_row_'.
   // Aggregation expr slots are set to their initial values.

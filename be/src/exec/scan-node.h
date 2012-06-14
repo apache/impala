@@ -18,12 +18,10 @@ class ScanNode : public ExecNode {
 
   virtual Status Prepare(RuntimeState* state) {
     RETURN_IF_ERROR(ExecNode::Prepare(state));
-    scanner_timer_ =
-        ADD_COUNTER(runtime_profile(), "ScannerTime", TCounterType::CPU_TICKS);
     bytes_read_counter_ =
         ADD_COUNTER(runtime_profile(), "BytesRead", TCounterType::BYTES);
-    tuple_write_timer_ =
-        ADD_COUNTER(runtime_profile(), "TupleWriteTime", TCounterType::CPU_TICKS);
+    materialize_tuple_timer_ =
+        ADD_COUNTER(runtime_profile(), "MaterializeTupleTime", TCounterType::CPU_TICKS);
     return Status::OK;
   }
 
@@ -32,14 +30,14 @@ class ScanNode : public ExecNode {
 
   virtual bool IsScanNode() const { return true; }
 
-  RuntimeProfile::Counter* scanner_timer() const { return scanner_timer_; }
   RuntimeProfile::Counter* bytes_read_counter() const { return bytes_read_counter_; }
-  RuntimeProfile::Counter* tuple_write_timer() const { return tuple_write_timer_; }
+  RuntimeProfile::Counter* materialize_tuple_timer() const { 
+    return materialize_tuple_timer_; 
+  }
 
  private:
-  RuntimeProfile::Counter* scanner_timer_;      // time spent in underlying scanners
   RuntimeProfile::Counter* bytes_read_counter_; // bytes read from the scanner
-  RuntimeProfile::Counter* tuple_write_timer_;  // time writing tuple slots
+  RuntimeProfile::Counter* materialize_tuple_timer_;  // time writing tuple slots
 };
 
 }

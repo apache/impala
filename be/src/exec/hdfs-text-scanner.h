@@ -195,6 +195,9 @@ class HdfsTextScanner : public HdfsScanner {
   // tuple writes.
   // TODO(henry / nong): Remove this once we support codegen for escape characters.
   char escape_char_;
+
+  // Time parsing text files
+  RuntimeProfile::Counter* parse_delimiter_timer_;
 };
 
 }

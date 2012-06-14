@@ -196,7 +196,7 @@ Status HdfsSequenceScanner::GetNext(RowBatch* row_batch, bool* eosr) {
 
   // We count the time here since there is too much overhead to do
   // this on each record.
-  COUNTER_SCOPED_TIMER(scan_node_->parse_time_counter());
+  COUNTER_SCOPED_TIMER(scan_node_->materialize_tuple_timer());
 
   // Read records from the sequence file and parse the data for each record into
   // columns.  These are added to the row_batch.  The loop continues until either
@@ -272,8 +272,6 @@ Status HdfsSequenceScanner::GetNext(RowBatch* row_batch, bool* eosr) {
 // if we determine it's not a match.
 Status HdfsSequenceScanner::WriteFields(RowBatch* row_batch,
                                         int num_fields, int* row_idx) {
-  // This has too much overhead to do it per-tuple
-  // COUNTER_SCOPED_TIMER(scan_node_->tuple_write_timer());
   DCHECK_EQ(num_fields, scan_node_->materialized_slots().size());
 
   // Keep track of where lines begin as we write out fields for error reporting
@@ -402,7 +400,6 @@ Status HdfsSequenceScanner::ReadFileHeaderMetadata() {
   for (int i = 0; i < map_size; ++i) {
     RETURN_IF_ERROR(SerDeUtils::SkipText(buffered_byte_stream_.get()));
     RETURN_IF_ERROR(SerDeUtils::SkipText(buffered_byte_stream_.get()));
-
   }
   return Status::OK;
 }
@@ -451,7 +448,6 @@ Status HdfsSequenceScanner::CheckSync() {
   return Status::OK;
 }
 
-
 Status HdfsSequenceScanner::ReadCompressedBlock() {
   // Read the sync indicator and check the sync block.
   RETURN_IF_ERROR(SerDeUtils::SkipBytes(buffered_byte_stream_.get(), sizeof (uint32_t)));
@@ -472,11 +468,8 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
   int block_size;
   RETURN_IF_ERROR(SerDeUtils::ReadVInt(buffered_byte_stream_.get(), &block_size));
   RETURN_IF_ERROR(buffered_byte_stream_->SyncParent());
-  {
-    COUNTER_SCOPED_TIMER(scan_node_->scanner_timer());
-    RETURN_IF_ERROR(
-        SerDeUtils::ReadBytes(unbuffered_byte_stream_, block_size, &scratch_buf_));
-  }
+  RETURN_IF_ERROR(
+      SerDeUtils::ReadBytes(unbuffered_byte_stream_, block_size, &scratch_buf_));
   RETURN_IF_ERROR(buffered_byte_stream_->SeekToParent());
 
   RETURN_IF_ERROR(decompressor_->ProcessBlock(block_size, &scratch_buf_[0],

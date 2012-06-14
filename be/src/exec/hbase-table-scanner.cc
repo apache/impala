@@ -409,11 +409,8 @@ Status HBaseTableScanner::CreateByteArray(const std::string& s, jbyteArray* byte
 
 Status HBaseTableScanner::Next(bool* has_next) {
   while(true) {
-    // result_ = resultscanner_.next();
-    {
-     COUNTER_SCOPED_TIMER(scan_node_->scanner_timer());
-     result_ = env_->CallObjectMethod(resultscanner_, resultscanner_next_id_);
-    }
+    //result_ = resultscanner_.next();
+    result_ = env_->CallObjectMethod(resultscanner_, resultscanner_next_id_);
 
     // jump to the next region when finished with the current region.
     if (result_ == NULL &&

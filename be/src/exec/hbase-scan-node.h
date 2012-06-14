@@ -5,16 +5,19 @@
 
 #include <boost/scoped_ptr.hpp>
 #include "runtime/descriptors.h"
-// TODO: Why can't we forward declare hbase-table-scanner and text-converter?
 #include "exec/hbase-table-scanner.h"
-#include "exec/text-converter.h"
 #include "exec/scan-node.h"
 
 namespace impala {
 
+class TextConverter;
+class Tuple;
+
 class HBaseScanNode : public ScanNode {
  public:
   HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+
+  ~HBaseScanNode();
 
   // Prepare conjuncts, create HBase columns to slots mapping,
   // initialize hbase_scanner_, and create text_converter_.
@@ -75,7 +78,8 @@ class HBaseScanNode : public ScanNode {
   std::vector<SlotDescriptor*> sorted_non_key_slots_;
 
   // List of pointers to family/qualifier in same sort order as sorted_non_key_slots_.
-  // The memory pointed to by the list-elements is owned by the corresponding HBaseTableDescriptor.
+  // The memory pointed to by the list-elements is owned by the corresponding 
+  // HBaseTableDescriptor.
   std::vector<const std::pair<std::string, std::string>* > sorted_cols_;
 
   // Slot into which the HBase row key is written.

@@ -88,8 +88,7 @@ class HdfsScanNode : public ScanNode {
   // number of rows seen directly in the scan node.
   void IncrNumRowsReturned(int num_rows = 1) { num_rows_returned_ += num_rows; }
 
-  RuntimeProfile::Counter* parse_time_counter() const { return parse_time_counter_; }
-  RuntimeProfile::Counter* memory_used_counter() const { return memory_used_counter_; }
+  RuntimeProfile::Counter* hdfs_read_timer() const { return hdfs_read_timer_; }
 
   // Returns index into materialized_slots with 'col_idx'.  Returns SKIP_COLUMN if
   // that column is not materialized.
@@ -176,11 +175,8 @@ class HdfsScanNode : public ScanNode {
   // These descriptors are sorted in order of increasing col_pos
   std::vector<SlotDescriptor*> partition_key_slots_;
 
-  // Hdfs specific counter
-  RuntimeProfile::Counter* parse_time_counter_;       // time parsing files
-
-  // Account for peak memory used in the Hdfs scanner.
-  RuntimeProfile::Counter* memory_used_counter_;
+  // Time spent reading from hdfs
+  RuntimeProfile::Counter* hdfs_read_timer_;      
 
   // Called once per scan-range to initialise (potentially) a new byte
   // stream and to call the same method on the current scanner.

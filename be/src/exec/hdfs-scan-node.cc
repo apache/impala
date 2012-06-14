@@ -183,10 +183,8 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
   DCHECK(tuple_desc_->table_desc() != NULL);
 
   // set up Hdfs specific counters
-  parse_time_counter_ =
-      ADD_COUNTER(runtime_profile_, "ParseTime", TCounterType::CPU_TICKS);
-  memory_used_counter_ =
-      ADD_COUNTER(runtime_profile_, "MemoryUsed", TCounterType::BYTES);
+  hdfs_read_timer_ =
+      ADD_COUNTER(runtime_profile(), "HdfsReadTime", TCounterType::CPU_TICKS);
 
   hdfs_table_ = static_cast<const HdfsTableDescriptor*>(tuple_desc_->table_desc());
 

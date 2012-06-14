@@ -99,8 +99,6 @@ Status HdfsScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition
 //   2. Eval conjuncts against the tuple.
 //   3. If it passes, stamp out 'num_tuples' copies of it into the row_batch.
 int HdfsScanner::WriteEmptyTuples(RowBatch* row_batch, int num_tuples) {
-  COUNTER_SCOPED_TIMER(scan_node_->tuple_write_timer());
-
   // Cap the number of result tuples up at the limit
   if (scan_node_->limit() != -1) {
     num_tuples = min(num_tuples,

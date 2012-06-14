@@ -41,6 +41,7 @@ Status HdfsByteStream::Read(uint8_t* buf, int64_t req_length, int64_t* actual_le
 
   int n_read = 0;
   while (n_read < req_length) {
+    COUNTER_SCOPED_TIMER(scan_node_->hdfs_read_timer());
     int last_read =
       hdfsReadDirect(hdfs_connection_, hdfs_file_, buf + n_read, req_length - n_read);
     if (last_read == 0) {
@@ -54,6 +55,7 @@ Status HdfsByteStream::Read(uint8_t* buf, int64_t req_length, int64_t* actual_le
     n_read += last_read;
   }
 
+  COUNTER_UPDATE(scan_node_->bytes_read_counter(), n_read);
   total_bytes_read_ += n_read;
   *actual_length = n_read;
   return Status::OK;
@@ -66,7 +68,6 @@ Status HdfsByteStream::Close() {
     return Status(AppendHdfsErrorMessage("Error closing HDFS file: ", location_));
   }
   hdfs_file_ = NULL;
-  COUNTER_UPDATE(scan_node_->bytes_read_counter(), total_bytes_read_);
   return Status::OK;
 }
 

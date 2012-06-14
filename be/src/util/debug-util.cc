@@ -125,6 +125,7 @@ string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
       } else {
         bool hour = false;
         bool minute = false;
+        bool second = false;
         if (value >= HOUR) {
           ss << value / HOUR << "h";
           value %= HOUR;
@@ -138,8 +139,10 @@ string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
         if (!hour && value >= SECOND) {
           ss << value / SECOND << "s";
           value %= SECOND;
+          second = true;
         }
         if (!hour && !minute) {
+          if (second) ss << setw(3) << setfill('0');
           ss << value << "ms";
         }
       }

@@ -63,7 +63,6 @@ Status HdfsRCFileScanner::Prepare() {
 
   text_converter_.reset(new TextConverter(0, tuple_pool_));
 
-
   // Allocate the buffers for the key information that is used to read and decode
   // the column data from its run length encoding.
   int num_part_keys = scan_node_->num_partition_keys();
@@ -117,11 +116,8 @@ Status HdfsRCFileScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_par
   // sync block.
   if (scan_range->offset_ != 0) {
     RETURN_IF_ERROR(current_byte_stream_->Seek(scan_range->offset_));
-    {
-      COUNTER_SCOPED_TIMER(scan_node_->parse_time_counter());
-      RETURN_IF_ERROR(find_first_parser_->FindSyncBlock(end_of_scan_range_,
-            SYNC_HASH_SIZE, &(sync_hash_[0]), current_byte_stream_));
-    }
+    RETURN_IF_ERROR(find_first_parser_->FindSyncBlock(end_of_scan_range_,
+          SYNC_HASH_SIZE, &(sync_hash_[0]), current_byte_stream_));
   }
   int64_t position;
   RETURN_IF_ERROR(current_byte_stream_->GetPosition(&position));
@@ -266,7 +262,6 @@ Status HdfsRCFileScanner::ReadRowGroup() {
   int64_t position;
   bool eof;
 
-  COUNTER_SCOPED_TIMER(scan_node_->scanner_timer());
   row_group_idx_ = -1;
   while (num_rows_ == 0) {
     RETURN_IF_ERROR(ReadHeader());
@@ -469,6 +464,7 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
       if (num_rows_ == 0) break;
     }
 
+    COUNTER_SCOPED_TIMER(scan_node_->materialize_tuple_timer());
     // Copy rows out of the current row group into the row_batch
     while (!scan_node_->ReachedLimit() && !row_batch->IsFull() && NextRow()) {
       // Index into current row in row_batch.

@@ -81,15 +81,12 @@ class RuntimeProfile {
 
   // Add a counter with 'name'/'type'.  Returns a counter object that the caller can
   // update.  The counter is owned by the RuntimeProfile object.
+  // If the counter already exists, the existing counter object is returned.
   Counter* AddCounter(const std::string& name, TCounterType::type type);
 
   // Gets the counter object with 'name'.  Returns NULL if there is no counter with
   // that name.
   Counter* GetCounter(const std::string& name);
-
-  // Add a counter with 'name'/'type' if one does not already exist. Returns the counter
-  // object, which is owned by the RuntimeProfile.
-  Counter* AddCounterIfAbsent(const std::string& name, TCounterType::type type);
 
   // Returns the counter for the total elapsed time.
   Counter* total_time_counter() { return &counter_total_time_; }

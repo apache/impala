@@ -100,8 +100,7 @@ void RuntimeProfile::AddChild(RuntimeProfile* parent) {
 RuntimeProfile::Counter* RuntimeProfile::AddCounter(
     const string& name, TCounterType::type type) {
   if (counter_map_.find(name) != counter_map_.end()) {
-    LOG(ERROR) << "Trying to add a counter that already exists: " << name;
-    return NULL;
+    return counter_map_[name];
   }
   Counter* counter = pool_->Add(new Counter(type));
   counter_map_[name] = counter;
@@ -113,13 +112,6 @@ RuntimeProfile::Counter* RuntimeProfile::GetCounter(const string& name) {
     return counter_map_[name];
   }
   return NULL;
-}
-
-RuntimeProfile::Counter* RuntimeProfile::AddCounterIfAbsent(
-    const string& name, TCounterType::type type) {
-  Counter* existing = GetCounter(name);
-  if (existing != NULL) return existing;
-  return AddCounter(name, type);
 }
 
 void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {

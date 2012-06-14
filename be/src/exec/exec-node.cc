@@ -44,7 +44,9 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
 Status ExecNode::Prepare(RuntimeState* state) {
   DCHECK(runtime_profile_.get() != NULL);
   rows_returned_counter_ =
-    ADD_COUNTER(runtime_profile_, "RowsReturned", TCounterType::UNIT);
+      ADD_COUNTER(runtime_profile_, "RowsReturned", TCounterType::UNIT);
+  memory_used_counter_ =
+      ADD_COUNTER(runtime_profile_, "MemoryUsed", TCounterType::BYTES);
 
   RETURN_IF_ERROR(PrepareConjuncts(state));
   for (int i = 0; i < children_.size(); ++i) {

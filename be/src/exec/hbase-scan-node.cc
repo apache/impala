@@ -30,6 +30,8 @@ HBaseScanNode::HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode,
       text_converter_(new TextConverter('\\', tuple_pool_.get())) {
 }
 
+HBaseScanNode::~HBaseScanNode() {
+}
 
 bool HBaseScanNode::CmpColPos(const SlotDescriptor* a, const SlotDescriptor* b) {
   return a->col_pos() < b->col_pos();
@@ -92,7 +94,7 @@ void HBaseScanNode::WriteTextSlot(
     const string& family, const string& qualifier,
     void* value, int value_length, SlotDescriptor* slot,
     RuntimeState* state, bool* error_in_row) {
-  COUNTER_SCOPED_TIMER(tuple_write_timer());
+  COUNTER_SCOPED_TIMER(materialize_tuple_timer());
   if (text_converter_->WriteSlot(slot, tuple_,
       reinterpret_cast<char*>(value), value_length, true, false)) {
     *error_in_row = true;
@@ -110,6 +112,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
   // but there's still some considerable time inside here.
   // TODO: need to understand how the time is spent inside this function.
   COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
+  COUNTER_SCOPED_TIMER(materialize_tuple_timer());
   if (ReachedLimit()) {
     *eos = true;
     return Status::OK;
@@ -214,6 +217,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
 
 Status HBaseScanNode::Close(RuntimeState* state) {
   COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
+  COUNTER_UPDATE(memory_used_counter(), tuple_pool_->peak_allocated_bytes());
 
   hbase_scanner_->Close();
   // Report total number of errors.

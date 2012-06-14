@@ -44,7 +44,6 @@ HdfsTextScanner::~HdfsTextScanner() {
       boundary_mem_pool_->peak_allocated_bytes());
 }
 
-
 Status HdfsTextScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
     HdfsScanRange* scan_range, Tuple* template_tuple, ByteStream* byte_stream) {
   RETURN_IF_ERROR(
@@ -87,7 +86,7 @@ Status HdfsTextScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_parti
 
   // Offset may not point to tuple boundary
   if (scan_range->offset_ != 0) {
-    COUNTER_SCOPED_TIMER(scan_node_->parse_time_counter());
+    COUNTER_SCOPED_TIMER(parse_delimiter_timer_);
     int first_tuple_offset = delimited_text_parser_->FindFirstInstance(
         byte_buffer_, byte_buffer_read_size_);
     DCHECK_LE(first_tuple_offset, min(state_->file_buffer_size(),
@@ -110,11 +109,8 @@ Status HdfsTextScanner::FillByteBuffer(int64_t size) {
         reinterpret_cast<char*>(byte_buffer_pool_->Allocate(state_->file_buffer_size()));
     reuse_byte_buffer_ = true;
   }
-  {
-    COUNTER_SCOPED_TIMER(scan_node_->scanner_timer());
-    RETURN_IF_ERROR(current_byte_stream_->Read(reinterpret_cast<uint8_t*>(byte_buffer_),
-       read_size, &byte_buffer_read_size_));
-  }
+  RETURN_IF_ERROR(current_byte_stream_->Read(reinterpret_cast<uint8_t*>(byte_buffer_),
+      read_size, &byte_buffer_read_size_));
   byte_buffer_end_ = byte_buffer_ + byte_buffer_read_size_;
   byte_buffer_ptr_ = byte_buffer_;
   return Status::OK;
@@ -122,6 +118,9 @@ Status HdfsTextScanner::FillByteBuffer(int64_t size) {
 
 Status HdfsTextScanner::Prepare() {
   RETURN_IF_ERROR(HdfsScanner::Prepare());
+  
+  parse_delimiter_timer_ = ADD_COUNTER(
+      scan_node_->runtime_profile(), "DelimiterParseTime", TCounterType::CPU_TICKS);
 
   current_range_remaining_len_ = 0;
 
@@ -232,7 +231,7 @@ Status HdfsTextScanner::GetNext(RowBatch* row_batch, bool* eosr) {
     }
     char* previous_buffer_ptr = byte_buffer_ptr_;
     {
-      COUNTER_SCOPED_TIMER(scan_node_->parse_time_counter());
+      COUNTER_SCOPED_TIMER(parse_delimiter_timer_);
       RETURN_IF_ERROR(delimited_text_parser_->ParseFieldLocations(max_tuples,
           byte_buffer_end_ - byte_buffer_ptr_, &byte_buffer_ptr_,
           &field_locations_, &num_tuples, &num_fields, &col_start));
@@ -257,6 +256,7 @@ Status HdfsTextScanner::GetNext(RowBatch* row_batch, bool* eosr) {
         boundary_row_.Clear();
       }
     } else if (num_tuples != 0) {
+      COUNTER_SCOPED_TIMER(scan_node_->materialize_tuple_timer());
       // If we are doing count(*) then we return tuples only containing partition keys
       boundary_row_.Clear();
       line_start = byte_buffer_ptr_;
@@ -355,7 +355,7 @@ Status HdfsTextScanner::ReportRowParseError(char* line_start, int len) {
 }
 
 int HdfsTextScanner::WriteFields(RowBatch* row_batch, int num_fields, char** line_start) {
-  COUNTER_SCOPED_TIMER(scan_node_->tuple_write_timer());
+  COUNTER_SCOPED_TIMER(scan_node_->materialize_tuple_timer());
   DCHECK_GT(num_fields, 0);
 
   FieldLocation* fields = &field_locations_[0];

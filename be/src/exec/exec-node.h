@@ -90,6 +90,7 @@ class ExecNode {
   bool ReachedLimit() { return limit_ != -1 && num_rows_returned_ == limit_; }
 
   RuntimeProfile* runtime_profile() { return runtime_profile_.get(); }
+  RuntimeProfile::Counter* memory_used_counter() const { return memory_used_counter_; }
 
  protected:
   int id_;  // unique w/in single plan tree
@@ -103,6 +104,8 @@ class ExecNode {
 
   boost::scoped_ptr<RuntimeProfile> runtime_profile_;
   RuntimeProfile::Counter* rows_returned_counter_;
+  // Account for peak memory used by this node
+  RuntimeProfile::Counter* memory_used_counter_;
 
   ExecNode* child(int i) { return children_[i]; }
 

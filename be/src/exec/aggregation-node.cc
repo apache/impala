@@ -150,6 +150,11 @@ bool AggregationNode::GroupingExprEquals::operator()(
 Status AggregationNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
+  build_timer_ =
+      ADD_COUNTER(runtime_profile(), "BuildTimer", TCounterType::CPU_TICKS);
+  get_results_timer_ =
+      ADD_COUNTER(runtime_profile(), "GetResultsTimer", TCounterType::CPU_TICKS);
+
   agg_tuple_desc_ = state->desc_tbl().GetTupleDescriptor(agg_tuple_id_);
   RETURN_IF_ERROR(Expr::Prepare(grouping_exprs_, state, child(0)->row_desc()));
   RETURN_IF_ERROR(Expr::Prepare(aggregate_exprs_, state, child(0)->row_desc()));
@@ -200,6 +205,7 @@ Status AggregationNode::Open(RuntimeState* state) {
   while (true) {
     bool eos;
     RETURN_IF_ERROR(children_[0]->GetNext(state, &batch, &eos));
+    COUNTER_SCOPED_TIMER(build_timer_);
 
     if (VLOG_IS_ON(2)) {
       for (int i = 0; i < batch.num_rows(); ++i) {
@@ -234,6 +240,8 @@ Status AggregationNode::Open(RuntimeState* state) {
 
 Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
+  COUNTER_SCOPED_TIMER(get_results_timer_);
+
   if (ReachedLimit()) {
     *eos = true;
     return Status::OK;
@@ -258,6 +266,7 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
 }
 
 Status AggregationNode::Close(RuntimeState* state) {
+  COUNTER_UPDATE(memory_used_counter(), tuple_pool_->peak_allocated_bytes());
   RETURN_IF_ERROR(ExecNode::Close(state));
   return Status::OK;
 }

@@ -50,11 +50,8 @@ Status BufferedByteStream::Read(uint8_t* buf, int64_t req_len, int64_t* actual_l
       byte_offset_ += copy_len;
       if (byte_offset_ == byte_buffer_len_) {
         byte_buffer_start_ += byte_buffer_len_;
-        {
-          COUNTER_SCOPED_TIMER(scan_node_->scanner_timer());
-          RETURN_IF_ERROR(parent_byte_stream_->Read(
-              byte_buffer_, byte_buffer_size_, &byte_buffer_len_));
-        }
+        RETURN_IF_ERROR(parent_byte_stream_->Read(
+            byte_buffer_, byte_buffer_size_, &byte_buffer_len_));
         byte_offset_ = 0;
 
         if (byte_buffer_len_ == 0) break;
