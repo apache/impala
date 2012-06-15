@@ -255,6 +255,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
       probe_batch_->TransferTupleData(out_batch);
       // get new probe batch
       if (!probe_eos_) {
+        probe_batch_->ClearBatch();
         RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_eos_));
         COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
         probe_batch_pos_ = 0;
@@ -307,19 +308,6 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
   *eos = eos_;
 
   while (!eos_) {
-    // Check to see if we're done processing the current probe batch
-    if (!hash_tbl_iterator_.HasNext() && probe_batch_pos_ == probe_batch_->num_rows()) {
-      probe_batch_->TransferTupleData(out_batch);
-      if (probe_eos_) {
-        *eos = eos_ = true;
-        break;
-      } else {
-        RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_eos_));
-        COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
-        probe_batch_pos_ = 0;
-      }
-    }
-
     // Compute max rows that should be added to out_batch
     int max_added_rows = out_batch->capacity() - out_batch->num_rows();
     if (limit() != -1) {
@@ -333,6 +321,20 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
     if (ReachedLimit() || out_batch->IsFull()) {
       *eos = ReachedLimit();
       break;
+    }
+    
+    // Check to see if we're done processing the current probe batch
+    if (!hash_tbl_iterator_.HasNext() && probe_batch_pos_ == probe_batch_->num_rows()) {
+      probe_batch_->TransferTupleData(out_batch);
+      if (probe_eos_) {
+        *eos = eos_ = true;
+        break;
+      } else {
+        probe_batch_->ClearBatch();
+        RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_eos_));
+        COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
+        probe_batch_pos_ = 0;
+      }
     }
   }
 

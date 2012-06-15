@@ -141,7 +141,7 @@ class RowBatch {
   }
 
   void ClearBatch() {
-    memset(tuple_ptrs_, 0, capacity_ * num_tuples_per_row_);
+    memset(tuple_ptrs_, 0, capacity_ * num_tuples_per_row_ * sizeof(Tuple*));
   }
 
   // Create a serialized version of this row batch in output_batch, attaching

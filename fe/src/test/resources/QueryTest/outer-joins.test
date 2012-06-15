@@ -397,3 +397,24 @@ bigint
 ----
 100
 ====
+# test nested joins
+select a.id, b.id, c.id, a.day, b.day, c.month, a.month, b.month 
+from alltypesagg a join alltypesagg b on 
+(a.id = b.id and a.month = b.day and b.month = 1 and b.month = b.day and a.day = b.day) 
+left outer join alltypessmall c on 
+(c.id = a.id and a.month = c.id and a.month=c.month) 
+where a.id < 10
+----
+int, int, int, int, int, int , int, int
+----
+0,0,NULL,1,1,NULL,1,1
+1,1,1,1,1,1,1,1
+2,2,NULL,1,1,NULL,1,1
+3,3,NULL,1,1,NULL,1,1
+4,4,NULL,1,1,NULL,1,1
+5,5,NULL,1,1,NULL,1,1
+6,6,NULL,1,1,NULL,1,1
+7,7,NULL,1,1,NULL,1,1
+8,8,NULL,1,1,NULL,1,1
+9,9,NULL,1,1,NULL,1,1
+====
