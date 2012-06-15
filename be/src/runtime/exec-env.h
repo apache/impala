@@ -4,7 +4,11 @@
 #define IMPALA_RUNTIME_EXEC_ENV_H
 
 #include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/thread/thread.hpp>
+
 #include "exprs/timestamp-functions.h"
+#include "sparrow/state-store-subscriber-service.h"
 #include "common/status.h"
 
 namespace sparrow {
@@ -16,10 +20,10 @@ class SimpleScheduler;
 
 namespace impala {
 
-class DataStreamMgr;
 class BackendClientCache;
-class HdfsFsCache;
+class DataStreamMgr;
 class HBaseTableCache;
+class HdfsFsCache;
 class TestExecEnv;
 
 // Execution environment for queries/plan fragments.
@@ -32,6 +36,14 @@ class ExecEnv {
   // special c'tor for TestExecEnv::BackendInfo so that multiple in-process backends
   // can share a single fs cache
   ExecEnv(HdfsFsCache* fs_cache);
+
+  // Starts the StateStoreSubscriberService in its own thread, listening on the
+  // port specified by FLAGS_state_store_subscriber_port.
+  void StartStateStoreSubscriberService();
+
+  sparrow::SubscriptionManager* subscription_manager() {
+    return subscription_manager_;
+  }
 
   DataStreamMgr* stream_mgr() { return stream_mgr_; }
   BackendClientCache* client_cache() { return client_cache_; }
@@ -46,6 +58,7 @@ class ExecEnv {
  private:
   boost::scoped_ptr<DataStreamMgr> stream_mgr_impl_;
   boost::scoped_ptr<sparrow::SimpleScheduler> scheduler_impl_;
+  boost::scoped_ptr<sparrow::SubscriptionManager> subscription_manager_impl_;
   boost::scoped_ptr<BackendClientCache> client_cache_impl_;
   boost::scoped_ptr<HdfsFsCache> fs_cache_impl_;
   boost::scoped_ptr<HBaseTableCache> htable_cache_impl_;
@@ -57,6 +70,7 @@ class ExecEnv {
   // w/o having to resort to virtual getters
   DataStreamMgr* stream_mgr_;
   sparrow::Scheduler* scheduler_;
+  sparrow::SubscriptionManager* subscription_manager_;
   BackendClientCache* client_cache_;
   HdfsFsCache* fs_cache_;
   HBaseTableCache* htable_cache_;

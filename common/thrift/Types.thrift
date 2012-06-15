@@ -24,6 +24,11 @@ enum TPrimitiveType {
   STRING
 }
 
+struct THostPort {
+  1: required string host
+  2: required i32 port
+}
+
 // Wire format for UniqueId
 struct TUniqueId {
   1: required i64 hi

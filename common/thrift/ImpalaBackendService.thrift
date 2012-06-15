@@ -11,18 +11,13 @@ include "DataSinks.thrift"
 include "Data.thrift"
 include "RuntimeProfile.thrift"
 
-struct THostPort {
-  1: required string host
-  2: required i32 port
-}
-
 // Parameters for the execution of a plan fragment on a particular node.
 struct TPlanExecParams {
   // scan ranges for each of the scan nodes
   1: list<PlanNodes.TScanRange> scanRanges
 
   // (host, port) pairs of output destinations, one per output partition
-  2: list<THostPort> destinations
+  2: list<Types.THostPort> destinations
 
   // global execution flags
   3: required bool abortOnError
@@ -82,7 +77,7 @@ struct TQueryExecRequest {
   // dataLocations.size() == fragmentRequests.size() - 1, and fragmentRequests[i+1] is
   // executed on dataLocations[i] (fragmentRequests[0] is the coordinator fragment, which
   // is executed by the coordinator itself)	
-  3: list<list<THostPort>> dataLocations
+  3: list<list<Types.THostPort>> dataLocations
 
   // node-specific request parameters;
   // nodeRequestParams[i][j] is the parameter for fragmentRequests[i] executed on 

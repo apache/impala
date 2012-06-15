@@ -86,6 +86,9 @@ set (SRC_FILES
   ImpalaService.thrift
   PlanNodes.thrift
   RuntimeProfile.thrift
+  SparrowTypes.thrift
+  StateStoreService.thrift
+  StateStoreSubscriberService.thrift
   Types.thrift
   ${GENERATES_SRC_FILES}
 )

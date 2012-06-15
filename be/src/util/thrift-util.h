@@ -4,13 +4,23 @@
 #define IMPALA_UTIL_THRIFT_UTIL_H
 
 #include <sstream>
-#include <jni.h>
+
 #include <boost/shared_ptr.hpp>
+#include <jni.h>
+#include <protocol/TBinaryProtocol.h>
+#include <transport/TBufferTransports.h>
 #include <TApplicationException.h>
 
+#include "common/status.h"
 #include "util/jni-util.h"
 
 namespace impala {
+
+class THostPort;
+
+// Hash function for THostPort. This function must be called hash_value to be picked
+// up properly by boost.
+std::size_t hash_value(const THostPort& host_port);
 
 template <class T>
 Status SerializeThriftMsg(JNIEnv* env, T* msg, jbyteArray* serialized_msg) {

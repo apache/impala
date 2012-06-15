@@ -37,6 +37,14 @@ set(SRC_FILES
   PlanNodes_types.cpp
   RuntimeProfile_constants.cpp
   RuntimeProfile_types.cpp
+  SparrowTypes_constants.cpp
+  SparrowTypes_types.cpp
+  StateStoreService.cpp
+  StateStoreService_constants.cpp
+  StateStoreService_types.cpp
+  StateStoreSubscriberService.cpp
+  StateStoreSubscriberService_constants.cpp
+  StateStoreSubscriberService_types.cpp
   Types_constants.cpp
   Types_types.cpp
   JavaConstants_constants.cpp

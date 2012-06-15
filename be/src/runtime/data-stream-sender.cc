@@ -20,6 +20,7 @@
 
 #include "gen-cpp/ImpalaBackendService.h"
 #include "gen-cpp/ImpalaBackendService_types.h"
+#include "gen-cpp/Types_types.h"
 
 using namespace std;
 using namespace boost;

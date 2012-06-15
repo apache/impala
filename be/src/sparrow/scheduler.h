@@ -1,7 +1,7 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-#ifndef IMPALA_SPARROW_SCHEDULER_H
-#define IMPALA_SPARROW_SCHEDULER_H
+#ifndef SPARROW_SCHEDULER_H
+#define SPARROW_SCHEDULER_H
 
 #include <vector>
 #include <string>
