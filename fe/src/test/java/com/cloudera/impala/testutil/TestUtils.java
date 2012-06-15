@@ -1,5 +1,6 @@
-package com.cloudera.impala.testutil;
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
+package com.cloudera.impala.testutil;
 import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
@@ -16,6 +17,8 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import junit.framework.Assert;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,6 +29,7 @@ import com.cloudera.impala.service.InsertResult;
 import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TQueryRequest;
 import com.cloudera.impala.thrift.TResultRow;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 public class TestUtils {
@@ -167,7 +171,7 @@ public class TestUtils {
    * Do an element-by-element comparison of actual and expected types.
    * @return an error message if actual does not match expected, "" otherwise.
    */
-  public static String compareOutputTypes(
+  private static String compareOutputTypes(
       List<PrimitiveType> actual, String[] expectedStrTypes) {
     if (actual.size() != expectedStrTypes.length) {
       return "Unequal number of output types.\nFound: " + actual.toString()
@@ -177,8 +181,8 @@ public class TestUtils {
       String upperCaseTypeStr = expectedStrTypes[i].toUpperCase();
       PrimitiveType expectedType = typeNameMap.get(upperCaseTypeStr.trim());
       if (actual.get(i) != expectedType) {
-        return "Mismatched output types.\nFound: " + actual.toString()
-            + ".\nExpected: " + Arrays.toString(expectedStrTypes) + "\n";
+        return "Mismatched output types.\nFound: " + actual.toString() +
+               ".\nExpected: " + Arrays.toString(expectedStrTypes) + "\n";
       }
     }
     return "";
@@ -196,6 +200,9 @@ public class TestUtils {
    *          Coordinator to run query with.
    * @param query
    *          Query to be executed.
+   * @param context
+   *          The context of how to execute the query. Contains details such as the
+   *          number of execution nodes, if codegen is enabled, etc...
    * @param abortOnError
    *          Indicates whether the query should abort if data errors are encountered.
    *          If abortOnError is true and expectedErrors is not null, then an
@@ -224,19 +231,94 @@ public class TestUtils {
    *          a test run.
    * @return an error message if actual does not match expected, "" otherwise.
    */
-  public static void runQuery(Executor executor, String query,
-      int numNodes, int batchSize, boolean abortOnError, int maxErrors,
-      boolean disableCodegen, int lineNum,
-      ArrayList<String> expectedColLabels,
-      ArrayList<String> expectedTypes, ArrayList<String> expectedResults,
-      ArrayList<String> expectedErrors, ArrayList<String> expectedFileErrors,
-      ArrayList<String> expectedPartitions, ArrayList<String> expectedNumAppendedRows,
+  public static void runQueryUsingExecutor(Object executor, String query,
+      TestExecContext context, int lineNum,
+      ArrayList<String> expectedColLabels, ArrayList<String> expectedTypes,
+      ArrayList<String> expectedResults, ArrayList<String> expectedErrors,
+      ArrayList<String> expectedFileErrors, ArrayList<String> expectedPartitions,
+      ArrayList<String> expectedNumAppendedRows,
       StringBuilder testErrorLog) {
-    String queryReportString =
-        query + " (batch size=" + Integer.toString(batchSize)
-          + ", #nodes=" + Integer.toString(numNodes) + ")";
+
+    Preconditions.checkNotNull(executor);
+    if (executor instanceof ImpaladClientExecutor) {
+      runImpaladQuery(
+          (ImpaladClientExecutor) executor, query, context, lineNum, expectedColLabels,
+          expectedTypes, expectedResults, expectedErrors, expectedFileErrors,
+          expectedPartitions, expectedNumAppendedRows, testErrorLog);
+    } else if (executor instanceof Executor) {
+      runInProcessQuery(
+          (Executor) executor, query, context, lineNum, expectedColLabels, expectedTypes,
+          expectedResults, expectedErrors, expectedFileErrors, expectedPartitions,
+          expectedNumAppendedRows, testErrorLog);
+    } else {
+      fail(String.format("Unknown executor type: '%s'", executor.getClass().getName()));
+    }
+  }
+
+  /**
+   * Runs the given query against an Impalad instance and validates expected results.
+   */
+  private static void runImpaladQuery(ImpaladClientExecutor executor, String query,
+      TestExecContext context, int lineNum,
+      ArrayList<String> expectedColLabels, ArrayList<String> expectedTypes,
+      ArrayList<String> expectedResults, ArrayList<String> expectedErrors,
+      ArrayList<String> expectedFileErrors, ArrayList<String> expectedPartitions,
+      ArrayList<String> expectedNumAppendedRows, StringBuilder testErrorLog) {
+    String queryReportString = buildQueryDetailString(query, context);
+    LOG.info("running query targeting impalad " + queryReportString);
+
+    BlockingQueue<String> resultQueue = new LinkedBlockingQueue<String>();
+    ArrayList<String> colLabels = new ArrayList<String>();
+    ArrayList<String> colTypes = new ArrayList<String>();
+
+    try {
+      executor.runQuery(query, resultQueue, colTypes, colLabels);
+    } catch(Exception e) {
+      e.printStackTrace();
+      if (context.getAbortOnError()) {
+        fail(String.format("Query failed. Message: %s", e.getMessage()));
+      } else {
+        testErrorLog.append("Error executing query '" +
+                            query + "' on line " + lineNum + ":\n" + e.getMessage());
+      }
+      return;
+    }
+
+    ArrayList<String> actualResults = Lists.newArrayList();
+
+    while (!resultQueue.isEmpty()) {
+      String resultRow = null;
+      try {
+        resultRow = resultQueue.take();
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+        testErrorLog.append("unexpected interrupt");
+        return;
+      }
+
+      parseResultRow(resultRow, actualResults, colTypes);
+    }
+
+    verifyTypesLabelsAndResults(queryReportString, testErrorLog, colLabels,
+        expectedColLabels, stringTypeToPrimitiveType(colTypes),
+        expectedTypes, actualResults, expectedResults);
+  }
+
+
+
+  /**
+   * Executes the given query using the given in-process Executor.
+   */
+  private static void runInProcessQuery(
+      Executor inProcessExecutor, String query, TestExecContext context, int lineNum,
+      ArrayList<String> expectedColLabels, ArrayList<String> expectedTypes,
+      ArrayList<String> expectedResults, ArrayList<String> expectedErrors,
+      ArrayList<String> expectedFileErrors, ArrayList<String> expectedPartitions,
+      ArrayList<String> expectedNumAppendedRows, StringBuilder testErrorLog) {
+
+    String queryReportString = buildQueryDetailString(query, context);
     LOG.info("running query " + queryReportString);
-    TQueryRequest request = new TQueryRequest(query, true, numNodes);
+    TQueryRequest request = new TQueryRequest(query, true, context.getNumNodes());
     ArrayList<String> errors = new ArrayList<String>();
     SortedMap<String, Integer> fileErrors = new TreeMap<String, Integer>();
     ArrayList<PrimitiveType> colTypes = new ArrayList<PrimitiveType>();
@@ -246,12 +328,13 @@ public class TestUtils {
     InsertResult insertResult = new InsertResult();
     ArrayList<String> actualResults = new ArrayList<String>();
     try {
-      executor.runQuery(
-          request, colTypes, colLabels, containsOrderBy, batchSize, abortOnError,
-          maxErrors, disableCodegen, errors, fileErrors, resultQueue, insertResult);
+      inProcessExecutor.runQuery(request, colTypes, colLabels, containsOrderBy,
+          context.getBatchSize(), context.getAbortOnError(), context.getMaxErrors(),
+          context.isCodegenDisabled(), errors, fileErrors, resultQueue,
+          insertResult);
     } catch (ImpalaException e) {
       // Compare errors if we are expecting some.
-      if (abortOnError && expectedErrors != null) {
+      if (context.getAbortOnError() && expectedErrors != null) {
         compareErrors(queryReportString, errors, fileErrors, expectedErrors,
                       expectedFileErrors, testErrorLog);
       } else {
@@ -293,31 +376,6 @@ public class TestUtils {
       return;
     }
 
-    // Check expected column labels.
-    if (expectedColLabels != null) {
-      String typeResult =
-          TestUtils.compareOutput(colLabels, expectedColLabels, true);
-      if (!typeResult.isEmpty()) {
-        testErrorLog.append("query:\n" + query + "\n" + typeResult);
-        return;
-      }
-    }
-
-    // Check types filled in by RunQuery()
-    if (expectedTypes != null) {
-      String[] expectedTypesArr;
-      if (expectedTypes.isEmpty()) {
-        expectedTypesArr = new String[0];
-      } else {
-        expectedTypesArr = expectedTypes.get(0).split(",");
-      }
-      String typeResult = TestUtils.compareOutputTypes(colTypes, expectedTypesArr);
-      if (!typeResult.isEmpty()) {
-        testErrorLog.append("query:\n" + query + "\n" + typeResult);
-        return;
-      }
-    }
-
     while (true) {
       TResultRow resultRow = null;
       try {
@@ -338,26 +396,134 @@ public class TestUtils {
         if (i > 0) {
           line.append(',');
         }
-        if (colTypes.get(i) == PrimitiveType.STRING) {
-          line.append("'" + colVal.next().stringVal + "'");
-        } else {
-          line.append(colVal.next().stringVal);
-        }
+
+        line.append(parseColumnValue(colVal.next().stringVal, colTypes.get(i)));
       }
       actualResults.add(line.toString());
     }
-    // Compare expected results.
-    if (expectedResults != null) {
 
-      String result =
-          TestUtils.compareOutput(actualResults, expectedResults, containsOrderBy.get());
-      if (!result.isEmpty()) {
-        testErrorLog.append("query:\n" + queryReportString  + "\n" + result);
-        return;
-      }
-    }
+    verifyTypesLabelsAndResults(queryReportString, testErrorLog, colLabels,
+        expectedColLabels, colTypes, expectedTypes, actualResults, expectedResults);
+
     compareErrors(queryReportString, errors, fileErrors, expectedErrors,
                   expectedFileErrors, testErrorLog);
+  }
+
+  private static void parseResultRow(String rawResultRow, List<String> results,
+      List<String> colTypes) {
+    // Concatenate columns separated by ","
+    String[] resultColumns = rawResultRow.split("\t");
+    Assert.assertEquals(resultColumns.length, colTypes.size());
+    StringBuilder line = new StringBuilder();
+    for (int i = 0; i < colTypes.size(); ++i) {
+      if (i > 0) {
+        line.append(',');
+      }
+
+      PrimitiveType columnType = typeNameMap.get(colTypes.get(i).toUpperCase().trim());
+      line.append(parseColumnValue(resultColumns[i], columnType));
+    }
+
+    results.add(line.toString());
+  }
+
+  /**
+   * Parses column value and returns the result in the format used by the results
+   * file.
+   */
+  private static String parseColumnValue(String columnValue, PrimitiveType columnType) {
+    switch(columnType) {
+      case STRING:
+        return String.format("'%s'", columnValue);
+      default:
+        return columnValue;
+    }
+  }
+
+  private static String buildQueryDetailString(String queryString,
+                                               TestExecContext context) {
+    return String.format("%s (%s)", queryString, context.toString());
+  }
+
+  /**
+   * Performs common verification between different types of Executors.
+   */
+  private static void verifyTypesLabelsAndResults(
+      String queryReportString, StringBuilder testErrorLog,
+      ArrayList<String> actualColLabels, ArrayList<String> expectedColLabels,
+      ArrayList<PrimitiveType> actualColTypes, ArrayList<String> expectedColTypes,
+      ArrayList<String> actualResults, ArrayList<String> expectedResults) {
+
+    String result = compareColumnLabels(actualColLabels, expectedColLabels);
+    if (!result.isEmpty()) {
+      testErrorLog.append("query:\n" + queryReportString + "\n" + result);
+      return;
+    }
+
+    result = compareExpectedTypes(actualColTypes, expectedColTypes);
+    if (!result.isEmpty()) {
+      testErrorLog.append("query:\n" + queryReportString + "\n" + result);
+      return;
+    }
+
+    result = compareExpectedResults(actualResults, expectedResults, false);
+    if (!result.isEmpty()) {
+      testErrorLog.append("query:\n" + queryReportString  + "\n" + result);
+    }
+  }
+
+  /**
+   * Compares the actual and expected column labels, returning an error string
+   * if they do not match.
+   */
+  private static String compareColumnLabels(ArrayList<String> actualColLabels,
+                                            ArrayList<String> expectedColLabels) {
+    return (expectedColLabels != null) ?
+        TestUtils.compareOutput(actualColLabels, expectedColLabels, true) : "";
+  }
+
+  private static String compareExpectedTypes(ArrayList<PrimitiveType> actualTypes,
+      ArrayList<String> expectedTypes) {
+    // Check types filled in by RunQuery()
+    if (expectedTypes != null) {
+      String[] expectedTypesArr;
+      if (expectedTypes.isEmpty()) {
+        expectedTypesArr = new String[0];
+      } else {
+        expectedTypesArr = expectedTypes.get(0).split(",");
+      }
+
+      return TestUtils.compareOutputTypes(actualTypes, expectedTypesArr);
+    }
+    return "";
+  }
+
+  private static ArrayList<PrimitiveType> stringTypeToPrimitiveType(List<String> types) {
+    ArrayList<PrimitiveType> typeList = new ArrayList<PrimitiveType>();
+    for (String typeString : types) {
+      typeList.add(typeNameMap.get(typeString.toUpperCase().trim()));
+    }
+    return typeList;
+  }
+
+  /**
+   * Compares actual and expected results of a query execution.
+   *
+   * @param actualResults
+   *        The actual results of executing the query
+   * @param expectedResults
+   *        The expected results of executing the query
+   * @param containsOrderBy
+   *        Whether the query contains an ORDER BY clause. If it does not then
+   *        the results are sorted before comparison.
+   * @return
+   *        Returns an empty string if the results are the same, otherwise a string
+   *        describing how the results differ.
+   */
+  private static String compareExpectedResults(ArrayList<String> actualResults,
+      ArrayList<String> expectedResults, boolean containsOrderBy) {
+    return (expectedResults != null) ?
+        TestUtils.compareOutput(actualResults, expectedResults, containsOrderBy) : "";
   }
 
   private static void compareErrors(String query,

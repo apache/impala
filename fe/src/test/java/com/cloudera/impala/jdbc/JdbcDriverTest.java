@@ -26,6 +26,7 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.service.Executor;
+import com.cloudera.impala.testutil.TestExecContext;
 import com.cloudera.impala.testutil.TestUtils;
 
 public class JdbcDriverTest {
@@ -200,11 +201,10 @@ public class JdbcDriverTest {
     }
     // Execute query via the coordinator and compare column labels, and query results.
     StringBuilder errorLog = new StringBuilder();
-    TestUtils.runQuery(
-        executor, query, 0, 1,
-        false, 1000, Executor.DEFAULT_DISABLE_CODEGEN,
-        0, expectedColLabels, null, expectedResults, null, null, null, null,
-        errorLog);
+    TestExecContext context = new TestExecContext(0, 1, Executor.DEFAULT_DISABLE_CODEGEN,
+                                                  false, 1000);
+    TestUtils.runQueryUsingExecutor(executor, query, context, 0, expectedColLabels, null,
+        expectedResults, null, null, null, null, errorLog);
   }
 
   private void queryFailure(Connection conn, String query) throws ImpalaException {
