@@ -5,6 +5,7 @@
 #include <sstream>
 #include <glog/logging.h>
 #include <gflags/gflags.h>
+#include <boost/thread/mutex.hpp>
 
 #include <llvm/Analysis/Passes.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
@@ -36,19 +37,20 @@ DEFINE_string(module_output, "", "if set, saves the generated IR to the output f
 
 namespace impala {
 
-// Not thread safe, used for debugging
-static bool llvm_intialized = false;
+static mutex llvm_initialization_lock;
+static bool llvm_initialized = false;
 
 void LlvmCodeGen::InitializeLlvm(bool load_backend) {
-  DCHECK(!llvm_intialized);
+  mutex::scoped_lock initialization_lock(llvm_initialization_lock);
+  if (llvm_initialized) return;
   // This allocates a global llvm struct and enables multithreading.
   // There is no real good time to clean this up but we only make it once.
   bool result = llvm::llvm_start_multithreaded();
   DCHECK(result);
-  // This can *only* be called once per process and is used to setup 
+  // This can *only* be called once per process and is used to setup
   // dynamically linking jitted code.
   llvm::InitializeNativeTarget();
-  llvm_intialized = true;
+  llvm_initialized = true;
 
   if (load_backend) {
     string path;
@@ -70,9 +72,9 @@ LlvmCodeGen::LlvmCodeGen(ObjectPool* pool, const string& name) :
   execution_engine_(NULL),
   scratch_buffer_offset_(0),
   debug_trace_fn_(NULL) {
-  
-  DCHECK(llvm_intialized) << "Must call LlvmCodeGen::InitializeLlvm first.";
-  
+
+  DCHECK(llvm_initialized) << "Must call LlvmCodeGen::InitializeLlvm first.";
+
   load_module_timer_ = ADD_COUNTER(&profile_, "LoadTime", TCounterType::CPU_TICKS);
   module_file_size_ = ADD_COUNTER(&profile_, "ModuleFileSize", TCounterType::BYTES);
   compile_timer_ = ADD_COUNTER(&profile_, "CompileTime", TCounterType::CPU_TICKS);
@@ -81,10 +83,10 @@ LlvmCodeGen::LlvmCodeGen(ObjectPool* pool, const string& name) :
   loaded_functions_.resize(IRFunction::FN_END);
 }
 
-Status LlvmCodeGen::LoadFromFile(ObjectPool* pool, 
+Status LlvmCodeGen::LoadFromFile(ObjectPool* pool,
     const string& file, scoped_ptr<LlvmCodeGen>* codegen) {
   codegen->reset(new LlvmCodeGen(pool, ""));
-  
+
   COUNTER_SCOPED_TIMER((*codegen)->load_module_timer_);
   OwningPtr<MemoryBuffer> file_buffer;
   llvm::error_code err = MemoryBuffer::getFile(file, file_buffer);
@@ -93,12 +95,12 @@ Status LlvmCodeGen::LoadFromFile(ObjectPool* pool,
     ss << "Could not load module " << file << ": " << err.message();
     return Status(ss.str());
   }
-  
+
   COUNTER_UPDATE((*codegen)->module_file_size_, file_buffer->getBufferSize());
   string error;
-  Module* loaded_module = ParseBitcodeFile(file_buffer.get(), 
+  Module* loaded_module = ParseBitcodeFile(file_buffer.get(),
       (*codegen)->context(), &error);
-  
+
   if (loaded_module == NULL) {
     stringstream ss;
     ss << "Could not parse module " << file << ": " << error;
@@ -128,7 +130,7 @@ Status LlvmCodeGen::LoadImpalaIR(ObjectPool* pool, scoped_ptr<LlvmCodeGen>* code
 
   // Verify size is correct
   const TargetData* target_data = codegen->execution_engine()->getTargetData();
-  const StructLayout* layout = 
+  const StructLayout* layout =
       target_data->getStructLayout(static_cast<StructType*>(codegen->string_val_type_));
   if (layout->getSizeInBytes() != sizeof(StringValue)) {
     DCHECK_EQ(layout->getSizeInBytes(), sizeof(StringValue));
@@ -194,7 +196,7 @@ Status LlvmCodeGen::Init() {
     ss << "Could not create ExecutionEngine: " << error_string_;
     return Status(ss.str());
   }
-  
+
   function_pass_mgr_.reset(new FunctionPassManager(module_));
 
   const TargetData* target_data = execution_engine_->getTargetData();
@@ -207,12 +209,12 @@ Status LlvmCodeGen::Init() {
   inliner_.reset(new BasicInliner(target_data_pass));
   // These optimizations are based on the passes that clang uses with -O3.
   // clang will set these passes up as module passes to try to optimize the entire
-  // module.  This is not suitable to how we use llvm.  We have "function trees" 
+  // module.  This is not suitable to how we use llvm.  We have "function trees"
   // (inlined tree of functions) and we can optimize each tree individually.
   // More details about the passes are here: http://llvm.org/docs/Passes.html
-  // Some passes are repeated since after running some passes, there will be 
+  // Some passes are repeated since after running some passes, there will be
   // some benefit with running previous passes again. The order of the passes
-  // is *very* important.  
+  // is *very* important.
   // TODO: Loop optimizations are turned off until we have code that uses them.
   // Provide basic AliasAnalysis support for GVN.
   function_pass_mgr_->add(createBasicAliasAnalysisPass());
@@ -228,7 +230,7 @@ Status LlvmCodeGen::Init() {
   function_pass_mgr_->add(createCFGSimplificationPass());
   // Collapse dependent blocks based on condition propagation
   function_pass_mgr_->add(createJumpThreadingPass());
-  function_pass_mgr_->add(createCorrelatedValuePropagationPass()); 
+  function_pass_mgr_->add(createCorrelatedValuePropagationPass());
   // Simplify the control flow graph (deleting unreachable blocks, etc).
   function_pass_mgr_->add(createCFGSimplificationPass());
 
@@ -259,7 +261,7 @@ Status LlvmCodeGen::Init() {
     function_pass_mgr_->add(createInstructionCombiningPass());
     // Collapse dependent blocks based on condition propagation
     function_pass_mgr_->add(createJumpThreadingPass());
-    function_pass_mgr_->add(createCorrelatedValuePropagationPass()); 
+    function_pass_mgr_->add(createCorrelatedValuePropagationPass());
 #endif
 
   // Dead store elimination
@@ -291,7 +293,7 @@ LlvmCodeGen::~LlvmCodeGen() {
     if (f.fail()) {
       LOG(ERROR) << "Could not save IR to: " << FLAGS_module_output;
     } else {
-      f << GetIR(true); 
+      f << GetIR(true);
       f.close();
     }
   }
@@ -378,8 +380,8 @@ AllocaInst* LlvmCodeGen::CreateEntryBlockAlloca(Function* f, const NamedVariable
   return tmp.CreateAlloca(var.type, 0, var.name.c_str());
 }
 
-void LlvmCodeGen::CreateIfElseBlocks(Function* fn, const string& if_name, 
-    const string& else_name, BasicBlock** if_block, BasicBlock** else_block, 
+void LlvmCodeGen::CreateIfElseBlocks(Function* fn, const string& if_name,
+    const string& else_name, BasicBlock** if_block, BasicBlock** else_block,
     BasicBlock* insert_before) {
   *if_block = BasicBlock::Create(context(), if_name, fn, insert_before);
   *else_block = BasicBlock::Create(context(), else_name, fn, insert_before);
@@ -405,7 +407,7 @@ void LlvmCodeGen::AddInlineFunction(Function* function) {
 
 bool LlvmCodeGen::VerifyFunction(Function* function) {
   if (verifier_enabled()) {
-    // Verify the function is valid;  
+    // Verify the function is valid;
     bool corrupt = llvm::verifyFunction(*function, ReturnStatusAction);
     if (corrupt) {
       LOG(ERROR) << "Function corrupt.";
@@ -428,19 +430,19 @@ Function* LlvmCodeGen::FnPrototype::GeneratePrototype(
     arguments.push_back(args_[i].type);
   }
   FunctionType* prototype = FunctionType::get(ret_type_, arguments, false);
-  
+
   Function* fn = Function::Create(
       prototype, Function::ExternalLinkage, name_, codegen_->module_);
   DCHECK(fn != NULL);
 
   // Name the arguments
   int idx = 0;
-  for (Function::arg_iterator iter = fn->arg_begin(); 
+  for (Function::arg_iterator iter = fn->arg_begin();
       iter != fn->arg_end(); ++iter, ++idx) {
     iter->setName(args_[idx].name);
     if (params != NULL) params[idx] = iter;
   }
-  
+
   if (builder != NULL) {
     BasicBlock* entry_block = BasicBlock::Create(codegen_->context(), "entry", fn);
     builder->SetInsertPoint(entry_block);
@@ -525,7 +527,7 @@ void* LlvmCodeGen::JitFunction(Function* function, int* scratch_size) {
   }
   // TODO: log a warning if the jitted function is too big (larger than I cache)
   void* jitted_function = execution_engine_->getPointerToFunction(function);
-  if (jitted_function != NULL) { 
+  if (jitted_function != NULL) {
     jitted_functions_[function] = true;
   }
   return jitted_function;
@@ -535,7 +537,7 @@ int LlvmCodeGen::GetScratchBuffer(int byte_size) {
   // TODO: this is not yet implemented/tested
   DCHECK(false);
   int result = scratch_buffer_offset_;
-  // TODO: alignment? 
+  // TODO: alignment?
   result += byte_size;
   return result;
 }
@@ -555,20 +557,20 @@ void LlvmCodeGen::CodegenDebugTrace(LlvmBuilder* builder, const char* str) {
     FunctionType* fn_type = FunctionType::get(void_type_, args, false);
     debug_trace_fn_ = Function::Create(fn_type, GlobalValue::ExternalLinkage,
         "DebugTrace", module_);
-    
+
     DCHECK(debug_trace_fn_ != NULL);
     // DebugTrace shouldn't already exist (llvm mangles function names if there
     // are duplicates)
     DCHECK(debug_trace_fn_->getName() ==  "DebugTrace");
-    
+
     debug_trace_fn_->setCallingConv(CallingConv::C);
 
     // Add a mapping to the execution engine so it can link the DebugTrace function
-    execution_engine_->addGlobalMapping(debug_trace_fn_, 
+    execution_engine_->addGlobalMapping(debug_trace_fn_,
         reinterpret_cast<void*>(&DebugTrace));
   }
 
-  // Make a copy of str into memory owned by this object.  This is no guarantee that str is 
+  // Make a copy of str into memory owned by this object.  This is no guarantee that str is
   // still around when the debug printf is executed.
   debug_strings_.push_back(str);
   str = debug_strings_[debug_strings_.size() - 1].c_str();
@@ -597,10 +599,10 @@ void LlvmCodeGen::GetFunctions(vector<Function*>* functions) {
 // entry:
 //   %0 = icmp slt i32 %v1, %v2
 //   br i1 %0, label %ret_v1, label %ret_v2
-// 
+//
 // ret_v1:                                           ; preds = %entry
 //   ret i32 %v1
-// 
+//
 // ret_v2:                                           ; preds = %entry
 //   ret i32 %v2
 // }
@@ -612,7 +614,7 @@ Function* LlvmCodeGen::CodegenMinMax(PrimitiveType type, bool min) {
   Value* params[2];
   LlvmBuilder builder(context());
   Function* fn = prototype.GeneratePrototype(&builder, &params[0]);
-  
+
   Value* compare = NULL;
   switch (type) {
     case TYPE_TINYINT:
@@ -639,7 +641,7 @@ Function* LlvmCodeGen::CodegenMinMax(PrimitiveType type, bool min) {
 
   BasicBlock* ret_v1, *ret_v2;
   CreateIfElseBlocks(fn, "ret_v1", "ret_v2", &ret_v1, &ret_v2);
-  
+
   builder.CreateCondBr(compare, ret_v1, ret_v2);
   builder.SetInsertPoint(ret_v1);
   builder.CreateRet(params[0]);
@@ -651,7 +653,7 @@ Function* LlvmCodeGen::CodegenMinMax(PrimitiveType type, bool min) {
   return fn;
 }
 
-void LlvmCodeGen::CodegenMemcpy(LlvmCodeGen::LlvmBuilder* builder, 
+void LlvmCodeGen::CodegenMemcpy(LlvmCodeGen::LlvmBuilder* builder,
     Value* dst, Value* src, Value* n) {
   // Cast src/dst to int8_t*.  If they already are, this will get optimized away
   DCHECK(PointerType::classof(dst->getType()));
@@ -673,4 +675,3 @@ void LlvmCodeGen::CodegenMemcpy(LlvmCodeGen::LlvmBuilder* builder,
 }
 
 }
-

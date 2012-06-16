@@ -51,11 +51,21 @@ export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-0.92.0-cdh4b1
 export PATH=$HBASE_HOME/bin:$PATH
 export HBASE_CONF_DIR=$HIVE_CONF_DIR
 
-export LIBHDFS_OPTS="-Djava.library.path=${HADOOP_HOME}/lib/native/"
+# These arguments are, despite the name, passed to every JVM created
+# by an impalad. So they must point to the location of
+# libbackend.so. 
+LIBHDFS_OPTS="-Djava.library.path=${HADOOP_HOME}/lib/native/"
+# READER BEWARE: This always points to the debug build. 
+# TODO: Consider having cmake scripts change this value depending on
+# the build type.
+export LIBHDFS_OPTS="${LIBHDFS_OPTS}:${IMPALA_HOME}/be/build/debug/service"
 
 export ARTISTIC_STYLE_OPTIONS=$IMPALA_BE_DIR/.astylerc
 
 export JAVA_LIBRARY_PATH=${IMPALA_HOME}/thirdparty/snappy-1.0.5/build/lib
+
+# So that the frontend tests and PlanService can pick up libbackend.so
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/be/build/debug/service"
 
 CLASSPATH=$IMPALA_FE_DIR/target/dependency:$CLASSPATH
 CLASSPATH=$IMPALA_FE_DIR/target/classes:$CLASSPATH

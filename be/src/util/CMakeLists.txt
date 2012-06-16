@@ -14,6 +14,7 @@ add_library(Util
   decompress.cc
   hdfs-util.cc
   jni-util.cc
+  logging.cc
   path-builder.cc
   perf-counters.cc
   runtime-profile.cc

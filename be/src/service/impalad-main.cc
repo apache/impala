@@ -24,6 +24,7 @@
 #include "runtime/exec-env.h"
 #include "testutil/test-exec-env.h"
 #include "util/jni-util.h"
+#include "util/logging.h"
 #include "service/backend-service.h"
 #include "service/impala-service.h"
 #include "gen-cpp/ImpalaService.h"
@@ -82,7 +83,7 @@ static void StartImpalaService(ExecEnv* exec_env, int port) {
 }
 
 int main(int argc, char** argv) {
-  google::InitGoogleLogging(argv[0]);
+  InitGoogleLoggingSafe(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, true);
   LlvmCodeGen::InitializeLlvm();
   EXIT_IF_ERROR(JniUtil::Init());

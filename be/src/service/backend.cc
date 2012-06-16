@@ -1,6 +1,8 @@
 // (c) 2011 Cloudera, Inc. All rights reserved.
-
-#include "service/backend.h"
+//
+// This file contains implementations for the JNI backend interface. To avoid calling
+// initialisation functions twice by loading this code multiple times, these functions are
+// called through libshimbackend - see shim-backend.cc for details.
 
 #include <boost/scoped_ptr.hpp>
 #include <glog/logging.h>
@@ -24,6 +26,7 @@
 #include "service/backend-service.h"
 #include "testutil/test-exec-env.h"
 #include "util/jni-util.h"
+#include "util/logging.h"
 #include "util/thrift-util.h"
 #include "util/debug-util.h"
 #include "gen-cpp/Data_types.h"
@@ -49,8 +52,8 @@ static void RunServer(TServer* server) {
 }
 
 extern "C"
-JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
-  google::InitGoogleLogging("impala-backend");
+jint JNI_OnLoadImpl(JavaVM* vm, void* pvt) {
+  InitGoogleLoggingSafe("impala-backend");
   LlvmCodeGen::InitializeLlvm(true);
   // install libunwind before activating this on 64-bit systems:
   //google::InstallFailureSignalHandler();
@@ -86,7 +89,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
 }
 
 extern "C"
-JNIEXPORT void JNICALL JNI_OnUnload(JavaVM* vm, void* pvt) {
+void JNI_OnUnloadImpl(JavaVM* vm, void* pvt) {
   // Get the JNIEnv* corresponding to current thread.
   JNIEnv* env = getJNIEnv();
   if (env == NULL) {
@@ -104,7 +107,7 @@ JNIEXPORT void JNICALL JNI_OnUnload(JavaVM* vm, void* pvt) {
 }
 
 extern "C"
-JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecQuery(
+void NativeBackend_ExecQueryImpl(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_query_exec_request,
     jobject error_log, jobject file_errors, jobject result_queue, jobject insert_result) {
   JniCoordinator coord(env, test_env, exec_stats.get(), error_log, file_errors,
@@ -163,7 +166,7 @@ JNIEXPORT void JNICALL Java_com_cloudera_impala_service_NativeBackend_ExecQuery(
 }
 
 extern "C"
-JNIEXPORT jboolean JNICALL Java_com_cloudera_impala_service_NativeBackend_EvalPredicate(
+jboolean NativeBackend_EvalPredicateImpl(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_predicate_bytes) {
   ObjectPool obj_pool;
   TExpr thrift_predicate;

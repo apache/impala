@@ -35,11 +35,11 @@ public class NativeBackend {
 
     // Search for libbackend.so in all library paths.
     String libPath = System.getProperty("java.library.path");
-    LOG.info("trying to load libbackend.so from " + libPath);
+    LOG.info("trying to load libshimbackend.so from " + libPath);
     String[] paths = libPath.split(":");
     boolean found = false;
     for (String path : paths) {
-      String filePath = path + File.separator + "libbackend.so";
+      String filePath = path + File.separator + "libshimbackend.so";
       File libFile = new File(filePath);
       if (libFile.exists()) {
         LOG.info("loading " + filePath);
@@ -49,7 +49,7 @@ public class NativeBackend {
       }
     }
     if (!found) {
-      LOG.error("Failed to load libbackend.so from given java.library.paths ("
+      LOG.error("Failed to load libshimbackend.so from given java.library.paths ("
           + libPath + ").");
     }
   }

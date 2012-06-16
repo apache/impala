@@ -6,6 +6,5 @@ bin=`cd "$bin"; pwd`
 . "$bin"/impala-config.sh
 
 cd $IMPALA_FE_DIR
-
 mvn -e exec:java -Dexec.mainClass=com.cloudera.impala.testutil.PlanService \
               -Dexec.classpathScope=test -Dexec.args="$@"
