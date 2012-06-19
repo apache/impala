@@ -21,6 +21,7 @@
 #
 # The planservice needs to be running before this script.
 # Run with the --help option to see the arguments.
+import math
 import os
 import re
 import sys
@@ -47,14 +48,19 @@ parser.add_option("--exploration_strategy", dest="exploration_strategy", default
 parser.add_option("--reference_result_file_name", dest="reference_result_file",
                   default='hive_benchmark_results.txt',
                   help="The reference result file to use for comparison.")
+parser.add_option("--query_cmd", dest="query_cmd",
+                  default='build/release/service/runquery -profile_output_file=""',
+                  help="The command to use for executing queries")
+parser.add_option("--compare_with_hive", dest="compare_with_hive", action="store_true",
+                  default= False, help="Run all queries using Hive as well as Impala")
 
 (options, args) = parser.parse_args()
 
 profile_output_file = 'build/release/service/profile.tmp'
-query_cmd = 'build/release/service/runquery -profile_output_file=""'
 gprof_cmd = 'google-pprof --text build/release/service/runquery %s | head -n 60'
 result_single_regex = 'returned (\d*) rows? in (\d*).(\d*) s'
 result_multiple_regex = 'returned (\d*) rows? in (\d*).(\d*) s with stddev (\d*).(\d*)'
+hive_result_regex = 'Time taken: (\d*).(\d*) seconds'
 
 # Console color format strings
 GREEN = '\033[92m'
@@ -105,6 +111,34 @@ def parse_reference_results(reference_result_file_name):
     print "Could not find previous run results."
     return {}
 
+def calculate_avg(values):
+  return sum(values) / float(len(values))
+
+def calculate_stddev(values):
+  avg = calculate_avg(values)
+  return math.sqrt(calculate_avg([(val - avg)**2 for val in values]))
+
+def run_query_using_hive(query, iterations):
+  queryString = (query.strip() + ';') * iterations
+  query_output = tempfile.TemporaryFile("w+")
+  subprocess.call("hive -e \"%s\"" % queryString, shell=True,
+                  stderr=query_output, stdout=dev_null)
+  query_output.seek(0)
+  execution_times = []
+  for line in query_output.readlines():
+    match = re.search(hive_result_regex, line)
+    if match:
+      if options.verbose != 0:
+        print line
+      execution_times.append(float(('%s.%s') % (match.group(1), match.group(2))))
+
+  if len(execution_times) == iterations:
+    output =  "  Avg Time: %fs\n" % calculate_avg(execution_times)
+    output += "  Std Dev: %fs\n" % calculate_stddev(execution_times)
+    return output
+  else:
+    return "Error parsing Hive execution results. Check Hive logs."
+
 # Function which will run the query and report the average time and standard deviation
 #   - reference_results: a dictionary with <query string,reference result> values
 #   - query: the query to run
@@ -134,7 +168,8 @@ def run_query(reference_results, query, prime_buffer_cache, iterations):
     tables = parse_tables(query)
     for i in range (0, len(tables)):
       count_cmd = '%s -query="select count(*) from %s" --iterations=%d ' \
-                  '-profile_output_file=""' % (query_cmd, tables[i], prime_buffer_cache)
+                  '-profile_output_file=""' % (options.query_cmd, tables[i],
+                  prime_buffer_cache)
       subprocess.call(count_cmd, shell=True, stderr=dev_null, stdout=dev_null)
 
   avg_time = 0
@@ -147,16 +182,13 @@ def run_query(reference_results, query, prime_buffer_cache, iterations):
     gprof_tmp_file = profile_output_file
 
   cmd = '%s -query="%s" -iterations=%d -enable_counters=%d -profile_output_file=%s' %\
-         (query_cmd, query, iterations, enable_counters, gprof_tmp_file)
+         (options.query_cmd, query, iterations, enable_counters, gprof_tmp_file)
 
   # Run query
   query_output = tempfile.TemporaryFile("w+")
   subprocess.call(cmd, shell=True, stderr=dev_null, stdout=query_output)
   query_output.seek(0)
-  while 1:
-    line = query_output.readline()
-    if not line: break
-
+  for line in query_output.readlines():
     if options.verbose != 0:
       print line.rstrip()
 
@@ -264,12 +296,15 @@ if (len(options.query) == 0):
   for line in vector_file:
     file_format, data_set, compression = line.split()[:3]
     for query in queries[data_set]:
-      result = run_query(reference_results, build_query(query[0],
-                options.exploration_strategy, data_set, file_format, compression),
-                query[1], query[2])
+      query_string = build_query(query[0], options.exploration_strategy, data_set,
+                      file_format, compression)
+      result = run_query(reference_results, query_string, query[1], query[2])
       output += result[0]
       compare_output += result[1]
       print result[1] or result[0]
+      if options.compare_with_hive:
+        print "Hive Results:"
+        print run_query_using_hive(query_string, query[2])
       if options.verbose != 0:
         print "---------------------------------------------------------------------------"
   vector_file.close()
