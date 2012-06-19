@@ -6,6 +6,7 @@
 #include <boost/functional/hash.hpp>
 
 #include "codegen/llvm-codegen.h"
+#include "exec/hash-table.inline.h"
 #include "exprs/agg-expr.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
@@ -70,98 +71,42 @@ const char* AggregationNode::LLVM_CLASS_NAME = "class.impala::AggregationNode";
 AggregationNode::AggregationNode(ObjectPool* pool, const TPlanNode& tnode,
                                  const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
-    hash_fn_(this),
-    equals_fn_(this),
     agg_tuple_id_(tnode.agg_node.agg_tuple_id),
     agg_tuple_desc_(NULL),
     singleton_output_tuple_(NULL),
-    current_row_(NULL),
     num_string_slots_(0),
     tuple_pool_(new MemPool()),
     process_row_batch_fn_(NULL) {
   // ignore return status for now
-  Expr::CreateExprTrees(pool, tnode.agg_node.grouping_exprs, &grouping_exprs_);
+  Expr::CreateExprTrees(pool, tnode.agg_node.grouping_exprs, &probe_exprs_);
   Expr::CreateExprTrees(pool, tnode.agg_node.aggregate_exprs, &aggregate_exprs_);
 }
-
-void AggregationNode::GroupingExprHash::Init(
-    TupleDescriptor* agg_tuple_d, const vector<Expr*>& grouping_exprs) {
-  agg_tuple_desc_ = agg_tuple_d;
-  grouping_exprs_ = &grouping_exprs;
-}
-
-size_t AggregationNode::GroupingExprHash::operator()(Tuple* const& t) const {
-  size_t seed = 0;
-  for (int i = 0; i < grouping_exprs_->size(); ++i) {
-    SlotDescriptor* slot_d = agg_tuple_desc_->slots()[i];
-    const void* value;
-    if (t != NULL) {
-      if (t->IsNull(slot_d->null_indicator_offset())) {
-        value = NULL;
-      } else {
-        value = t->GetSlot(slot_d->tuple_offset());
-      }
-    } else {
-      value = node_->grouping_values_cache_[i];
-    }
-    // don't ignore NULLs; we want (1, NULL) to return a different hash
-    // value than (NULL, 1)
-    if (value == NULL) {
-      hash_combine(seed, 0);
-    } else {
-      seed = RawValue::GetHashValue(value, slot_d->type(), seed);
-    }
-  }
-  return seed;
-}
-
-void AggregationNode::GroupingExprEquals::Init(
-    TupleDescriptor* agg_tuple_d, const vector<Expr*>& grouping_exprs) {
-  agg_tuple_desc_ = agg_tuple_d;
-  grouping_exprs_ = &grouping_exprs;
-}
-
-bool AggregationNode::GroupingExprEquals::operator()( 
-    Tuple* const& t1, Tuple* const& t2) const {
-  for (int i = 0; i < grouping_exprs_->size(); ++i) {
-    SlotDescriptor* slot_d = agg_tuple_desc_->slots()[i];
-    const void* value1 = NULL;
-    const void* value2 = NULL;
-
-    if (t1 == NULL) {
-      value1 = node_->grouping_values_cache_[i];
-    } else if (!t1->IsNull(slot_d->null_indicator_offset())) {
-      value1 = t1->GetSlot(slot_d->tuple_offset());
-    }
-    if (!t2->IsNull(slot_d->null_indicator_offset())) {
-      value2 = t2->GetSlot(slot_d->tuple_offset());
-    }
-    
-    if (value1 == NULL || value2 == NULL) {
-      // nulls are considered equal for the purpose of grouping
-      if (value1 != NULL || value2 != NULL) return false;
-    } else {
-      if (!RawValue::Eq(value1, value2, slot_d->type())) return false;
-    }
-  }
-  return true;
-} 
 
 Status AggregationNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
   build_timer_ =
-      ADD_COUNTER(runtime_profile(), "BuildTimer", TCounterType::CPU_TICKS);
+      ADD_COUNTER(runtime_profile(), "BuildTime", TCounterType::CPU_TICKS);
   get_results_timer_ =
-      ADD_COUNTER(runtime_profile(), "GetResultsTimer", TCounterType::CPU_TICKS);
+      ADD_COUNTER(runtime_profile(), "GetResultsTime", TCounterType::CPU_TICKS);
+  hash_table_buckets_counter_ = 
+      ADD_COUNTER(runtime_profile(), "BuildBuckets", TCounterType::UNIT);
 
   agg_tuple_desc_ = state->desc_tbl().GetTupleDescriptor(agg_tuple_id_);
-  RETURN_IF_ERROR(Expr::Prepare(grouping_exprs_, state, child(0)->row_desc()));
+  RETURN_IF_ERROR(Expr::Prepare(probe_exprs_, state, child(0)->row_desc()));
   RETURN_IF_ERROR(Expr::Prepare(aggregate_exprs_, state, child(0)->row_desc()));
-  hash_fn_.Init(agg_tuple_desc_, grouping_exprs_);
-  equals_fn_.Init(agg_tuple_desc_, grouping_exprs_);
+
+  // Construct build exprs from agg_tuple_desc_
+  for (int i = 0; i < probe_exprs_.size(); ++i) {
+    SlotDescriptor* desc = agg_tuple_desc_->slots()[i];
+    Expr* expr = new SlotRef(desc);      
+    state->obj_pool()->Add(expr);
+    build_exprs_.push_back(expr);
+  }
+  RETURN_IF_ERROR(Expr::Prepare(build_exprs_, state, row_desc()));
+
   // TODO: how many buckets?
-  hash_tbl_.reset(new HashTable(5, hash_fn_, equals_fn_));
+  hash_tbl_.reset(new HashTable(build_exprs_, probe_exprs_, 1, true));
   
   // Determine the number of string slots in the output
   for (vector<Expr*>::const_iterator expr = aggregate_exprs_.begin();
@@ -170,8 +115,7 @@ Status AggregationNode::Prepare(RuntimeState* state) {
     if (agg_expr->type() == TYPE_STRING) ++num_string_slots_;
   }
   
-  grouping_values_cache_.resize(grouping_exprs_.size());
-  if (grouping_exprs_.empty()) {
+  if (probe_exprs_.empty()) {
     // create single output tuple now; we need to output something
     // even if our input is empty
     singleton_output_tuple_ = ConstructAggTuple();
@@ -229,12 +173,12 @@ Status AggregationNode::Open(RuntimeState* state) {
   }
   RETURN_IF_ERROR(children_[0]->Close(state));
   if (singleton_output_tuple_ != NULL) {
-    hash_tbl_->insert(singleton_output_tuple_->tuple());
+    hash_tbl_->Insert(reinterpret_cast<TupleRow*>(&singleton_output_tuple_));
     ++num_agg_rows;
   }
   VLOG(1) << "aggregated " << num_input_rows << " input rows into "
           << num_agg_rows << " output rows";
-  output_iterator_ = hash_tbl_->begin();
+  output_iterator_ = hash_tbl_->Begin();
   return Status::OK;
 }
 
@@ -246,10 +190,10 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
     *eos = true;
     return Status::OK;
   }
-  while (output_iterator_ != hash_tbl_->end() && !row_batch->IsFull()) {
+  while (output_iterator_.HasNext() && !row_batch->IsFull()) {
     int row_idx = row_batch->AddRow();
     TupleRow* row = row_batch->GetRow(row_idx);
-    row->SetTuple(0, *output_iterator_);
+    row->SetTuple(0, output_iterator_.GetRow()->GetTuple(0));
     if (ExecNode::EvalConjuncts(row)) {
       VLOG(1) << "output row: " << PrintRow(row, row_desc());
       row_batch->CommitLastRow();
@@ -259,38 +203,35 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
         return Status::OK;
       }
     }
-    ++output_iterator_;
+    output_iterator_.Next();
   }
-  *eos = output_iterator_ == hash_tbl_->end();
+  *eos = !output_iterator_.HasNext();
   return Status::OK;
 }
 
 Status AggregationNode::Close(RuntimeState* state) {
   COUNTER_UPDATE(memory_used_counter(), tuple_pool_->peak_allocated_bytes());
+  COUNTER_UPDATE(memory_used_counter(), hash_tbl_->byte_size());
+  COUNTER_UPDATE(hash_table_buckets_counter_, hash_tbl_->num_buckets());
   RETURN_IF_ERROR(ExecNode::Close(state));
   return Status::OK;
 }
 
-void AggregationNode::ComputeGroupingValues() {
-  DCHECK(current_row_ != NULL);
-  for (int i = 0; i < grouping_exprs_.size(); ++i) {
-    grouping_values_cache_[i] = grouping_exprs_[i]->GetValue(current_row_);
-  }
-}
-
 AggregationTuple* AggregationNode::ConstructAggTuple() {
   AggregationTuple* agg_out_tuple = 
-      AggregationTuple::Create(agg_tuple_desc_->byte_size(), num_string_slots_, tuple_pool_.get());
+      AggregationTuple::Create(agg_tuple_desc_->byte_size(), num_string_slots_, 
+          tuple_pool_.get());
   Tuple* agg_tuple = agg_out_tuple->tuple();
 
   vector<SlotDescriptor*>::const_iterator slot_d = agg_tuple_desc_->slots().begin();
   // copy grouping values
-  for (int i = 0; i < grouping_exprs_.size(); ++i, ++slot_d) {
-    void* grouping_val = grouping_values_cache_[i];
-    if (grouping_val == NULL) {
+  for (int i = 0; i < probe_exprs_.size(); ++i, ++slot_d) {
+    if (hash_tbl_->last_expr_value_null(i)) {
       agg_tuple->SetNull((*slot_d)->null_indicator_offset());
     } else {
-      RawValue::Write(grouping_val, agg_tuple, *slot_d, tuple_pool_.get());
+      void* src = hash_tbl_->last_expr_value(i);
+      void* dst = agg_tuple->GetSlot((*slot_d)->tuple_offset());
+      RawValue::Write(src, dst, (*slot_d)->type(), tuple_pool_.get());
     }
   }
 
@@ -412,7 +353,7 @@ void AggregationNode::UpdateAggTuple(AggregationTuple* agg_out_tuple, TupleRow* 
   Tuple* tuple = agg_out_tuple->tuple();
   int string_slot_idx = -1;
   vector<SlotDescriptor*>::const_iterator slot_d = 
-      agg_tuple_desc_->slots().begin() + grouping_exprs_.size();
+      agg_tuple_desc_->slots().begin() + probe_exprs_.size();
   for (vector<Expr*>::iterator expr = aggregate_exprs_.begin();
         expr != aggregate_exprs_.end(); ++expr, ++slot_d) {
     void* slot = tuple->GetSlot((*slot_d)->tuple_offset());
@@ -549,7 +490,7 @@ void AggregationNode::UpdateAggTuple(AggregationTuple* agg_out_tuple, TupleRow* 
 void AggregationNode::DebugString(int indentation_level, stringstream* out) const {
   *out << string(indentation_level * 2, ' ');
   *out << "AggregationNode(tuple_id=" << agg_tuple_id_
-       << " grouping_exprs=" << Expr::DebugString(grouping_exprs_)
+       << " probe_exprs=" << Expr::DebugString(probe_exprs_)
        << " agg_exprs=" << Expr::DebugString(aggregate_exprs_);
   ExecNode::DebugString(indentation_level, out);
   *out << ")";
@@ -586,7 +527,7 @@ void AggregationNode::DebugString(int indentation_level, stringstream* out) cons
 //  }
 llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen, int slot_idx) {
   AggregateExpr* agg_expr = static_cast<AggregateExpr*>(aggregate_exprs_[slot_idx]);
-  SlotDescriptor* slot_desc = agg_tuple_desc_->slots()[grouping_exprs_.size() + slot_idx];
+  SlotDescriptor* slot_desc = agg_tuple_desc_->slots()[probe_exprs_.size() + slot_idx];
   int field_idx = slot_desc->field_idx();
 
   LLVMContext& context = codegen->context();
@@ -770,7 +711,7 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
   // count(*), generate a helper IR function to update the slot and call that.
   for (int i = 0; i < aggregate_exprs_.size(); ++i) {
     AggregateExpr* agg_expr = static_cast<AggregateExpr*>(aggregate_exprs_[i]);
-    SlotDescriptor* slot_desc = agg_tuple_desc_->slots()[grouping_exprs_.size() + i];
+    SlotDescriptor* slot_desc = agg_tuple_desc_->slots()[probe_exprs_.size() + i];
     if (agg_expr->is_star()) {
       // TODO: we should be able to hoist this up to the loop over the batch and just
       // increment the slot by the number of rows in the batch.

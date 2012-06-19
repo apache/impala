@@ -21,12 +21,20 @@ SlotRef::SlotRef(const TExprNode& node)
     // slot_/null_indicator_offset_ are set in Prepare()
 }
 
+SlotRef::SlotRef(const SlotDescriptor* desc) 
+  : Expr(desc->type(), true),
+    slot_offset_(-1),
+    null_indicator_offset_(0, 0),
+    slot_id_(desc->id()) {
+    // slot_/null_indicator_offset_ are set in Prepare()
+}
+
 SlotRef::SlotRef(PrimitiveType type, int offset) 
   : Expr(type, true),
-  tuple_idx_(0),
-  slot_offset_(offset),
-  null_indicator_offset_(0, -1),
-  slot_id_(-1) {
+    tuple_idx_(0),
+    slot_offset_(offset),
+    null_indicator_offset_(0, -1),
+    slot_id_(-1) {
 }
 
 Status SlotRef::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {

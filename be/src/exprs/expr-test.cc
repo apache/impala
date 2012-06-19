@@ -1802,6 +1802,9 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   vector<Expr*> exprs;
   map<int, set<int> > expected_offsets;
 
+  // Test empty exprs
+  ValidateLayout(exprs, 0, -1, expected_offsets);
+
   // Test single Expr case
   expected_offsets.clear();
   for (int type = TYPE_BOOLEAN; type <= TYPE_STRING; ++type) {

@@ -61,7 +61,7 @@ class HashTable {
   ~HashTable() {
     // TODO: use tr1::array?
     delete[] expr_values_buffer_;
-    delete[] result_null_bits_;
+    delete[] expr_value_null_bits_;
     free(nodes_);
   }
 
@@ -95,6 +95,25 @@ class HashTable {
   // Returns the load factor (the number of non-empty buckets)
   float load_factor() { 
     return num_filled_buckets_ / static_cast<float>(buckets_.size()); 
+  }
+  
+  // Returns the number of bytes allocated to the hash table
+  int64_t byte_size() const { 
+    return node_byte_size() * nodes_capacity_ + sizeof(Bucket) * buckets_.size();
+  }
+
+  // Returns the results of the exprs at 'expr_idx' evaluated over the last row
+  // processed by the HashTable.
+  // This value is invalid if the expr evaluated to NULL.
+  // TODO: this is an awkward abstraction but aggregation node can take advantage of
+  // it and save some expr evaluation calls.
+  void* last_expr_value(int expr_idx) const { 
+    return expr_values_buffer_ + expr_values_buffer_offsets_[expr_idx]; 
+  }
+  
+  // Returns if the expr at 'expr_idx' evaluated to NULL for the last row.
+  bool last_expr_value_null(int expr_idx) const { 
+    return expr_value_null_bits_[expr_idx]; 
   }
 
   // Return beginning of hash table.  Advancing this iterator will traverse all
@@ -296,7 +315,7 @@ class HashTable {
   int results_buffer_size_;
   int var_result_begin_;
   uint8_t* expr_values_buffer_;
-  bool* result_null_bits_;
+  bool* expr_value_null_bits_;
 };
 
 }

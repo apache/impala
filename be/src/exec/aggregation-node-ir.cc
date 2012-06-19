@@ -2,6 +2,7 @@
 
 #include "exec/aggregation-node.h"
 
+#include "exec/hash-table.inline.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/tuple.h"
@@ -14,27 +15,22 @@ using namespace impala;
 
 void AggregationNode::ProcessRowBatchNoGrouping(RowBatch* batch) {
   for (int i = 0; i < batch->num_rows(); ++i) {
-    current_row_ = batch->GetRow(i);
-    UpdateAggTuple(singleton_output_tuple_, current_row_);
+    UpdateAggTuple(singleton_output_tuple_, batch->GetRow(i));
   }
 }
 
 void AggregationNode::ProcessRowBatchWithGrouping(RowBatch* batch) {
   for (int i = 0; i < batch->num_rows(); ++i) {
-    current_row_ = batch->GetRow(i);
-    // Compute and cache the grouping exprs for current_row_
-    ComputeGroupingValues();
+    TupleRow* row = batch->GetRow(i);
     AggregationTuple* agg_tuple = NULL; 
-    // find(NULL) finds the entry for current_row_
-    HashTable::iterator entry = hash_tbl_->find(NULL);
-    if (entry == hash_tbl_->end()) {
-      // new entry
+    HashTable::Iterator entry = hash_tbl_->Find(row);
+    if (!entry.HasNext()) {
       agg_tuple = ConstructAggTuple();
-      hash_tbl_->insert(reinterpret_cast<Tuple*>(agg_tuple));
+      hash_tbl_->Insert(reinterpret_cast<TupleRow*>(&agg_tuple));
     } else {
-      agg_tuple = reinterpret_cast<AggregationTuple*>(*entry);
+      agg_tuple = reinterpret_cast<AggregationTuple*>(entry.GetRow()->GetTuple(0));
     }
-    UpdateAggTuple(agg_tuple, current_row_);
+    UpdateAggTuple(agg_tuple, row);
   }
 }
 

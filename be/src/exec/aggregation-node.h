@@ -5,10 +5,9 @@
 
 #include <functional>
 #include <boost/scoped_ptr.hpp>
-#include <boost/unordered_set.hpp>
-#include <boost/functional/hash.hpp>
 
 #include "exec/exec-node.h"
+#include "exec/hash-table.h"
 #include "runtime/descriptors.h"  // for TupleId
 #include "runtime/free-list.h"
 #include "runtime/mem-pool.h"
@@ -54,58 +53,21 @@ class AggregationNode : public ExecNode {
   virtual void DebugString(int indentation_level, std::stringstream* out) const;
   
  private:
-  class GroupingExprHash : public std::unary_function<Tuple*, std::size_t> {
-   public:
-    GroupingExprHash(AggregationNode* node): node_(node) {}
-    void Init(TupleDescriptor* agg_tuple_d, const std::vector<Expr*>& grouping_exprs);
-
-    // Compute a combined hash value for the values stored in t's
-    // grouping slots. If t is NULL, compute grouping hash values
-    // from AggregationNode::current_row_ and grouping_exprs.
-    std::size_t operator()(Tuple* const& t) const;
-
-   private:
-    AggregationNode* node_;
-    const TupleDescriptor* agg_tuple_desc_;
-    const std::vector<Expr*>* grouping_exprs_;
-  };
-
-  class GroupingExprEquals : public std::binary_function<Tuple*, Tuple*, bool> {
-   public:
-    GroupingExprEquals(AggregationNode* node): node_(node) {}
-    void Init(TupleDescriptor* agg_tuple_d, const std::vector<Expr*>& grouping_exprs);
-
-    // Return true if grouping slots of a and b are equal, otherwise false.
-    // If a is NULL, compares b with computed grouping exprs of
-    // AggregationNode::current_row_.
-    bool operator()(Tuple* const& a, Tuple* const& b) const;
-
-   private:
-    AggregationNode* node_;
-    const TupleDescriptor* agg_tuple_desc_;
-    const std::vector<Expr*>* grouping_exprs_;
-  };
-
-  friend class GroupingExprHash;
-  friend class GroupingExprEquals;
-
-  typedef boost::unordered_set<Tuple*, GroupingExprHash, GroupingExprEquals> HashTable;
-
   boost::scoped_ptr<HashTable> hash_tbl_;
-  GroupingExprHash hash_fn_;
-  GroupingExprEquals equals_fn_;
-  HashTable::iterator output_iterator_;
+  HashTable::Iterator output_iterator_;
 
-  std::vector<Expr*> grouping_exprs_;
   std::vector<Expr*> aggregate_exprs_;
+  // Exprs used to evaluate input rows
+  std::vector<Expr*> probe_exprs_;
+  // Exprs used to insert constructed aggregation tuple into the hash table.
+  // All the exprs are simply SlotRefs for the agg tuple.
+  std::vector<Expr*> build_exprs_;
   TupleId agg_tuple_id_;
   TupleDescriptor* agg_tuple_desc_;
   AggregationTuple* singleton_output_tuple_;  // result of aggregation w/o GROUP BY
-  TupleRow* current_row_;  // needed for GroupingExprHash/-Equals
   FreeList string_buffer_free_list_;
   int num_string_slots_; // number of string slots in the output tuple
 
-  std::vector<void*> grouping_values_cache_;
   boost::scoped_ptr<MemPool> tuple_pool_;
 
   typedef void (*ProcessRowBatchFn)(AggregationNode*, RowBatch*);
@@ -116,6 +78,8 @@ class AggregationNode : public ExecNode {
   RuntimeProfile::Counter* build_timer_;
   // Time spent returning the aggregated rows
   RuntimeProfile::Counter* get_results_timer_;
+  // Num buckets in hash table
+  RuntimeProfile::Counter* hash_table_buckets_counter_;   
 
   // Constructs a new aggregation output tuple (allocated from tuple_pool_),
   // initialized to grouping values computed over 'current_row_'.
@@ -147,10 +111,6 @@ class AggregationNode : public ExecNode {
   // Updates the aggregation output tuple 'tuple' with aggregation values
   // computed over 'row'.
   void UpdateAggTuple(AggregationTuple* tuple, TupleRow* row);
-
-  // Eval grouping exprs over 'current_row_' and store the results in 
-  // 'grouping_exprs_cache_'.  
-  void ComputeGroupingValues();
 
   // Do the aggregation for all tuple rows in the batch
   void ProcessRowBatchNoGrouping(RowBatch* batch);

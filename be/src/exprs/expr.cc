@@ -350,6 +350,11 @@ struct MemLayoutData {
 
 int Expr::ComputeResultsLayout(const vector<Expr*>& exprs, vector<int>* offsets,
     int* var_result_begin) {
+  if (exprs.size() == 0) {
+    *var_result_begin = -1;
+    return 0;
+  }
+
   vector<MemLayoutData> data;
   data.resize(exprs.size());
   

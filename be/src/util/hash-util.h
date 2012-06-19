@@ -57,7 +57,6 @@ class HashUtil {
   // Computes the hash value for data.  Will call either CrcHash or FvnHash
   // depending on hardware capabilities.
   static uint32_t Hash(const void* data, size_t bytes, uint32_t hash) {
-    return FvnHash(data, bytes, hash);
     if (CpuInfo::Instance()->IsSupported(CpuInfo::SSE4_2)) {
       return CrcHash(data, bytes, hash);
     } else {

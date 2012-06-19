@@ -19,7 +19,6 @@ HashTable::HashTable(const vector<Expr*>& build_exprs, const vector<Expr*>& prob
     num_filled_buckets_(0),
     nodes_(NULL),
     num_nodes_(0) {
-  DCHECK_GT(build_exprs_.size(), 0);
   DCHECK_EQ(build_exprs_.size(), probe_exprs_.size());
   buckets_.resize(num_buckets);
 
@@ -27,7 +26,7 @@ HashTable::HashTable(const vector<Expr*>& build_exprs, const vector<Expr*>& prob
   results_buffer_size_ = Expr::ComputeResultsLayout(build_exprs_, 
       &expr_values_buffer_offsets_, &var_result_begin_);
   expr_values_buffer_= new uint8_t[results_buffer_size_];
-  result_null_bits_ = new bool[build_exprs_.size()];
+  expr_value_null_bits_ = new bool[build_exprs_.size()];
 
   nodes_capacity_ = 1024;
   nodes_ = reinterpret_cast<uint8_t*>(malloc(node_byte_size() * nodes_capacity_));
@@ -47,11 +46,11 @@ bool HashTable::EvalRow(TupleRow* row, const vector<Expr*>& exprs) {
     void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];
     void* val = exprs[i]->GetValue(row);
     if (val == NULL) {
-      result_null_bits_[i] = true;
+      expr_value_null_bits_[i] = true;
       val = &null_value;
       has_null = true;
     } else {
-      result_null_bits_[i] = false;
+      expr_value_null_bits_[i] = false;
     }
     RawValue::Write(val, loc, build_exprs_[i]->type(), NULL);
   }
@@ -65,7 +64,7 @@ uint32_t HashTable::HashVariableLenRow() {
   for (int i = 0; i < build_exprs_.size(); ++i) {
     if (build_exprs_[i]->type() != TYPE_STRING) continue;
     void* loc = expr_values_buffer_ + expr_values_buffer_offsets_[i];
-    if (result_null_bits_[i]) {
+    if (expr_value_null_bits_[i]) {
       // Hash with the seed value put into results_buffer_
       hash = HashUtil::Hash(loc, sizeof(StringValue), hash);
     } else {
@@ -82,7 +81,7 @@ bool HashTable::Equals(TupleRow* build_row) {
     void* val = build_exprs_[i]->GetValue(build_row);
     if (val == NULL) {
       if (!stores_nulls_) return false;
-      if (!result_null_bits_[i]) return false;
+      if (!expr_value_null_bits_[i]) return false;
       continue;
     }
     

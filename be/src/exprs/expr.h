@@ -348,6 +348,7 @@ class Expr {
 class SlotRef : public Expr {
  public:
   SlotRef(const TExprNode& node);
+  SlotRef(const SlotDescriptor* desc);
 
   // Used for testing.  GetValue will return tuple + offset interpreted as 'type'
   SlotRef(PrimitiveType type, int offset);

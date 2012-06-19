@@ -94,6 +94,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
 Status HashJoinNode::Close(RuntimeState* state) {
   RETURN_IF_ERROR(child(0)->Close(state));
   COUNTER_UPDATE(memory_used_counter_, build_pool_->peak_allocated_bytes());
+  COUNTER_UPDATE(memory_used_counter_, hash_tbl_->byte_size());
   RETURN_IF_ERROR(ExecNode::Close(state));
   return Status::OK;
 }
