@@ -12,12 +12,13 @@
 #include "runtime/client-cache.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/hdfs-fs-cache.h"
-#include "scheduler/scheduler.h"
+#include "sparrow/scheduler.h"
 #include "gen-cpp/ImpalaBackendService.h"
 
 using namespace boost;
 using namespace std;
 using namespace apache::thrift::server;
+using sparrow::Scheduler;
 
 namespace impala {
 

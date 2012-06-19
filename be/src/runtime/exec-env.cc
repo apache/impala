@@ -6,7 +6,9 @@
 #include "runtime/data-stream-mgr.h"
 #include "runtime/hbase-table-cache.h"
 #include "runtime/hdfs-fs-cache.h"
-#include "scheduler/simple-scheduler.h"
+#include "sparrow/simple-scheduler.h"
+
+using sparrow::SimpleScheduler;
 
 namespace impala {
 

@@ -5,14 +5,15 @@
 
 #include <boost/algorithm/string.hpp>
 
-#include "scheduler/simple-scheduler.h"
+#include "sparrow/simple-scheduler.h"
 
 using namespace std;
 using namespace boost;
+using impala::Status;
 
 DEFINE_string(backends, "", "comma-separated list of <host:port> pairs");
 
-namespace impala {
+namespace sparrow {
 
 SimpleScheduler::SimpleScheduler() {
   if (FLAGS_backends.empty()) return;

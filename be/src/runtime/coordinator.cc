@@ -14,7 +14,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/plan-executor.h"
 #include "runtime/row-batch.h"
-#include "scheduler/scheduler.h"
+#include "sparrow/scheduler.h"
 #include "util/debug-util.h"
 #include "gen-cpp/ImpalaBackendService.h"
 #include "gen-cpp/ImpalaBackendService_types.h"

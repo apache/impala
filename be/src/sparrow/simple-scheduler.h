@@ -1,7 +1,7 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-#ifndef IMPALA_RUNTIME_SIMPLE_SCHEDULER_H
-#define IMPALA_RUNTIME_SIMPLE_SCHEDULER_H
+#ifndef IMPALA_SPARROW_SIMPLE_SCHEDULER_H
+#define IMPALA_SPARROW_SIMPLE_SCHEDULER_H
 
 #include <vector>
 #include <string>
@@ -9,9 +9,9 @@
 #include <boost/unordered_map.hpp>
 
 #include "common/status.h"
-#include "scheduler/scheduler.h"
+#include "sparrow/scheduler.h"
 
-namespace impala {
+namespace sparrow {
 
 // Temporary stand-in for a scheduler, while we're waiting for the Sparrow
 // client library.
@@ -24,7 +24,7 @@ class SimpleScheduler : public Scheduler {
   // Returns backends from FLAGS_backends; if an element of data_locations
   // matches a registered host exactly, it returns that host/port, otherwise
   // a random one.
-  virtual Status GetHosts(
+  virtual impala::Status GetHosts(
       const std::vector<std::string>& data_locations,
       std::vector<std::pair<std::string, int> >* hostports);
 

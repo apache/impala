@@ -21,7 +21,6 @@
 #include "runtime/data-stream-mgr.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/client-cache.h"
-#include "scheduler/simple-scheduler.h"
 #include "service/jni-coordinator.h"
 #include "service/backend-service.h"
 #include "testutil/test-exec-env.h"
