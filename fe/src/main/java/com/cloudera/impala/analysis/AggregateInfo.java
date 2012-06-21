@@ -59,6 +59,10 @@ public class AggregateInfo {
     return aggTupleDesc;
   }
 
+  public void setAggTupleDesc(TupleDescriptor aggTupleDesc) {
+    this.aggTupleDesc = aggTupleDesc;
+  }
+
   public TupleId getAggTupleId() {
     return aggTupleDesc.getId();
   }

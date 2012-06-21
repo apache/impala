@@ -445,8 +445,8 @@ public class Planner {
     if (sortInfo != null) {
       Preconditions.checkState(selectStmt.getLimit() != -1);
       result = new SortNode(getNextNodeId(), result, sortInfo, true);
-      result.setLimit(selectStmt.getLimit());
     }
+    result.setLimit(selectStmt.getLimit());
 
     // All the conjuncts in the inline view analyzer should be assigned
     Preconditions.checkState(!analyzer.hasUnassignedConjuncts());
@@ -876,8 +876,8 @@ public class Planner {
     if (hasDistinct) {
       ArrayList<Expr> groupingExprs = Expr.cloneList(unionStmt.getResultExprs(), null);
       aggInfo = new AggregateInfo(groupingExprs, null);
-      aggInfo.createAggTuple(analyzer.getDescTbl());
-      Expr.substituteList(unionStmt.getResultExprs(), aggInfo.getSMap());
+      // Aggregate produces exactly the same tuple as the original union stmt.
+      aggInfo.setAggTupleDesc(analyzer.getDescTbl().getTupleDesc(unionStmt.getTupleId()));
       result = new AggregationNode(getNextNodeId(), mergeNode, aggInfo);
       // If there are more operands, then add the distinct subplan as a child
       // of a new merge node which also merges the remaining ALL-qualified operands.
@@ -922,6 +922,9 @@ public class Planner {
     }
     result.setLimit(unionStmt.getLimit());
 
+    // Mark slots as materialized.
+    markRefdSlots(result, unionStmt, analyzer);
+
     return result;
   }
 
@@ -949,6 +952,7 @@ public class Planner {
         topMergeNode.addConstExprList(selectStmt.getResultExprs());
       } else {
         topMergeNode.addChild(selectPlan, selectStmt.getResultExprs());
+        markRefdSlots(selectPlan, selectStmt, analyzer);
       }
       return;
     }
@@ -964,6 +968,8 @@ public class Planner {
     if (unionStmt.hasLimitClause() || (topQualifier == Qualifier.ALL &&
         unionOperands.get(1).getQualifier() != Qualifier.ALL)) {
       PlanNode node = createUnionPlan(unionStmt, analyzer);
+      markRefdSlots(node, queryStmt, analyzer);
+
       // If node is a MergeNode then it means it's operands are mixed ALL/DISTINCT.
       // We cannot directly absorb it's operands, but we can safely add
       // the MergeNode's children to topMergeNode if the UnionStmt has no limit.

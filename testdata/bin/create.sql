@@ -113,6 +113,9 @@ CREATE TABLE AllTypes_rc_snap LIKE AllTypes_rc;
 DROP TABLE IF EXISTS AllTypesSmall;
 CREATE TABLE AllTypesSmall LIKE AllTypes;
 
+DROP TABLE IF EXISTS AllTypesTiny;
+CREATE TABLE AllTypesTiny LIKE AllTypes;
+
 DROP TABLE IF EXISTS AllTypesInsert;
 CREATE TABLE AllTypesInsert LIKE AllTypes;
 

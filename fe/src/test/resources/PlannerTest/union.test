@@ -1,1252 +1,1284 @@
 // Only UNION ALL, no nested unions
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union all
-select int_col, bool_col from alltypes where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union all
-select int_col, bool_col from alltypessmall where year=2009 and month=2
+select * from alltypestiny where year=2009 and month=2
 ---- PLAN
 Plan Fragment 0
   MERGE (0)
     TUPLE IDS: 3 
-    SCAN HDFS table=default.alltypessmall (1)
+    SCAN HDFS table=default.alltypestiny (1)
       TUPLE IDS: 0 
-    SCAN HDFS table=default.alltypes (2)
+    SCAN HDFS table=default.alltypestiny (2)
       TUPLE IDS: 1 
-    SCAN HDFS table=default.alltypessmall (3)
+    SCAN HDFS table=default.alltypestiny (3)
       TUPLE IDS: 2 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
+------------ DISTRIBUTEDPLAN
+not implemented
+====
+// Only UNION ALL with limit inside operands. One of the operands also has an order by.
+select * from alltypestiny where year=2009 and month=1 limit 1
+union all
+select * from alltypestiny where year=2009 and month=1 order by int_col limit 1
+union all
+select * from alltypestiny where year=2009 and month=2 limit 1
+---- PLAN
+Plan Fragment 0
+  MERGE (0)
+    TUPLE IDS: 3 
+    SCAN HDFS table=default.alltypestiny (1)
+      LIMIT: 1
+      TUPLE IDS: 0 
+    TOP-N
+    ORDER BY: int_col ASC
+    LIMIT: 1
+    TUPLE IDS: 1 
+      SCAN HDFS table=default.alltypestiny (2)
+        TUPLE IDS: 1 
+    SCAN HDFS table=default.alltypestiny (4)
+      LIMIT: 1
+      TUPLE IDS: 2 
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
+      HDFS SPLITS NODE ID: 2
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
+      HDFS SPLITS NODE ID: 4
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Only UNION DISTINCT, no nested unions
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union distinct
-select int_col, bool_col from alltypes where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union distinct
-select int_col, bool_col from alltypessmall where year=2009 and month=2
+select * from alltypestiny where year=2009 and month=2
 ---- PLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: 
-  GROUP BY: <slot 0>, <slot 1>
-  TUPLE IDS: 4 
+  GROUP BY: <slot 39>, <slot 40>, <slot 41>, <slot 42>, <slot 43>, <slot 44>, <slot 45>, <slot 46>, <slot 47>, <slot 48>, <slot 49>, <slot 50>, <slot 51>
+  TUPLE IDS: 3 
     MERGE (0)
       TUPLE IDS: 3 
-      SCAN HDFS table=default.alltypessmall (1)
+      SCAN HDFS table=default.alltypestiny (1)
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypes (2)
+      SCAN HDFS table=default.alltypestiny (2)
         TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypessmall (3)
+      SCAN HDFS table=default.alltypestiny (3)
         TUPLE IDS: 2 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Only UNION ALL, mixed selects with and without from clauses, no nested unions
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union all
-select 1, false
+select 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',cast('2009-01-01 00:00:00' as timestamp)
 union all
-select int_col, bool_col from alltypes where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union all
-select 2, true
+select 2009,1,1,false,1,1,1,10,1.1,10.1,'01/01/09','1',cast('2009-01-01 00:01:00' as timestamp)
 ---- PLAN
 Plan Fragment 0
   MERGE (0)
     TUPLE IDS: 2 
     SELECT CONSTANT
     SELECT CONSTANT
-    SCAN HDFS table=default.alltypessmall (1)
+    SCAN HDFS table=default.alltypestiny (1)
       TUPLE IDS: 0 
-    SCAN HDFS table=default.alltypes (2)
+    SCAN HDFS table=default.alltypestiny (2)
       TUPLE IDS: 1 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Only UNION DISTINCT, mixed selects with and without from clauses, no nested unions
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union distinct
-select 1, false
+select 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',cast('2009-01-01 00:00:00' as timestamp)
 union distinct
-select int_col, bool_col from alltypes where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union distinct
-select 2, true
+select 2009,1,1,false,1,1,1,10,1.1,10.1,'01/01/09','1',cast('2009-01-01 00:01:00' as timestamp)
 ---- PLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: 
-  GROUP BY: <slot 0>, <slot 1>
-  TUPLE IDS: 3 
+  GROUP BY: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
+  TUPLE IDS: 2 
     MERGE (0)
       TUPLE IDS: 2 
       SELECT CONSTANT
       SELECT CONSTANT
-      SCAN HDFS table=default.alltypessmall (1)
+      SCAN HDFS table=default.alltypestiny (1)
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypes (2)
+      SCAN HDFS table=default.alltypestiny (2)
         TUPLE IDS: 1 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Mixed UNION ALL/DISTINCT but effectively only UNION DISTINCT, no nested unions,
 // with order by and limit
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union all
-select int_col, bool_col from alltypes where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union all
-select int_col, bool_col from alltypessmall where year=2009 and month=2
+select * from alltypestiny where year=2009 and month=2
 union distinct
-(select int_col, bool_col from alltypes where year=2009 and month=2)
-order by 1 limit 10 
+(select * from alltypestiny where year=2009 and month=2)
+order by 3 limit 3 
 ---- PLAN
 Plan Fragment 0
   TOP-N
-  ORDER BY: <slot 0> ASC
-  LIMIT: 10
-  TUPLE IDS: 5 
+  ORDER BY: <slot 54> ASC
+  LIMIT: 3
+  TUPLE IDS: 4 
     AGGREGATE
     OUTPUT: 
-    GROUP BY: <slot 0>, <slot 1>
-    TUPLE IDS: 5 
+    GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+    TUPLE IDS: 4 
       MERGE (0)
         TUPLE IDS: 4 
-        SCAN HDFS table=default.alltypessmall (1)
+        SCAN HDFS table=default.alltypestiny (1)
           TUPLE IDS: 0 
-        SCAN HDFS table=default.alltypes (2)
+        SCAN HDFS table=default.alltypestiny (2)
           TUPLE IDS: 1 
-        SCAN HDFS table=default.alltypessmall (3)
+        SCAN HDFS table=default.alltypestiny (3)
           TUPLE IDS: 2 
-        SCAN HDFS table=default.alltypes (4)
+        SCAN HDFS table=default.alltypestiny (4)
           TUPLE IDS: 3 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 4
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Mixed UNION ALL/DISTINCT, no nested unions, with order by and limit
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union distinct
-select int_col, bool_col from alltypes where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union all
-select int_col, bool_col from alltypessmall where year=2009 and month=2
+select * from alltypestiny where year=2009 and month=2
 union all
-(select int_col, bool_col from alltypes where year=2009 and month=2)
-order by 1 limit 10
+(select * from alltypestiny where year=2009 and month=2)
+order by 3,4 limit 3
 ---- PLAN
 Plan Fragment 0
   TOP-N
-  ORDER BY: <slot 0> ASC
-  LIMIT: 10
+  ORDER BY: <slot 54> ASC, <slot 55> ASC
+  LIMIT: 3
   TUPLE IDS: 4 
     MERGE (4)
       TUPLE IDS: 4 
       AGGREGATE
       OUTPUT: 
-      GROUP BY: <slot 0>, <slot 1>
-      TUPLE IDS: 5 
+      GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+      TUPLE IDS: 4 
         MERGE (0)
           TUPLE IDS: 4 
-          SCAN HDFS table=default.alltypessmall (1)
+          SCAN HDFS table=default.alltypestiny (1)
             TUPLE IDS: 0 
-          SCAN HDFS table=default.alltypes (2)
+          SCAN HDFS table=default.alltypestiny (2)
             TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypessmall (5)
+      SCAN HDFS table=default.alltypestiny (5)
         TUPLE IDS: 2 
-      SCAN HDFS table=default.alltypes (6)
+      SCAN HDFS table=default.alltypestiny (6)
         TUPLE IDS: 3 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 5
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 6
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Mixed UNION ALL/DISTINCT, no nested unions, with order by and limit
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union all
-select int_col, bool_col from alltypes where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union distinct
-select int_col, bool_col from alltypessmall where year=2009 and month=2
+select * from alltypestiny where year=2009 and month=2
 union all
-(select int_col, bool_col from alltypes where year=2009 and month=2)
-order by 1 limit 10
+(select * from alltypestiny where year=2009 and month=2)
+order by 3,4 limit 4
 ---- PLAN
 Plan Fragment 0
   TOP-N
-  ORDER BY: <slot 0> ASC
-  LIMIT: 10
+  ORDER BY: <slot 54> ASC, <slot 55> ASC
+  LIMIT: 4
   TUPLE IDS: 4 
     MERGE (5)
       TUPLE IDS: 4 
       AGGREGATE
       OUTPUT: 
-      GROUP BY: <slot 0>, <slot 1>
-      TUPLE IDS: 5 
+      GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+      TUPLE IDS: 4 
         MERGE (0)
           TUPLE IDS: 4 
-          SCAN HDFS table=default.alltypessmall (1)
+          SCAN HDFS table=default.alltypestiny (1)
             TUPLE IDS: 0 
-          SCAN HDFS table=default.alltypes (2)
+          SCAN HDFS table=default.alltypestiny (2)
             TUPLE IDS: 1 
-          SCAN HDFS table=default.alltypessmall (3)
+          SCAN HDFS table=default.alltypestiny (3)
             TUPLE IDS: 2 
-      SCAN HDFS table=default.alltypes (6)
+      SCAN HDFS table=default.alltypestiny (6)
         TUPLE IDS: 3 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 6
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Union unnesting: Only UNION ALL, first operand is nested
-(select int_col, bool_col from alltypes where year=2009 and month=1
+(select * from alltypestiny where year=2009 and month=1
  union all
- select int_col, bool_col from alltypessmall where year=2009 and month=2)
+ select * from alltypestiny where year=2009 and month=2)
 union all
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 ---- PLAN
 Plan Fragment 0
   MERGE (0)
     TUPLE IDS: 4 
-    SCAN HDFS table=default.alltypes (1)
+    SCAN HDFS table=default.alltypestiny (1)
       TUPLE IDS: 0 
-    SCAN HDFS table=default.alltypessmall (2)
+    SCAN HDFS table=default.alltypestiny (2)
       TUPLE IDS: 1 
-    SCAN HDFS table=default.alltypessmall (3)
+    SCAN HDFS table=default.alltypestiny (3)
       TUPLE IDS: 3 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Union unnesting: Only UNION ALL, second operand is nested
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union all
-  (select int_col, bool_col from alltypes where year=2009 and month=1
+  (select * from alltypestiny where year=2009 and month=1
    union all
-   select int_col, bool_col from alltypessmall where year=2009 and month=2)
+   select * from alltypestiny where year=2009 and month=2)
 ---- PLAN
 Plan Fragment 0
   MERGE (0)
     TUPLE IDS: 4 
-    SCAN HDFS table=default.alltypessmall (1)
+    SCAN HDFS table=default.alltypestiny (1)
       TUPLE IDS: 0 
-    SCAN HDFS table=default.alltypes (2)
+    SCAN HDFS table=default.alltypestiny (2)
       TUPLE IDS: 1 
-    SCAN HDFS table=default.alltypessmall (3)
+    SCAN HDFS table=default.alltypestiny (3)
       TUPLE IDS: 2 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Union unnesting: Only UNION DISTINCT, first operand is nested
-(select int_col, bool_col from alltypes where year=2009 and month=1
+(select * from alltypestiny where year=2009 and month=1
  union distinct
- select int_col, bool_col from alltypessmall where year=2009 and month=2)
+ select * from alltypestiny where year=2009 and month=2)
 union distinct
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 ---- PLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: 
-  GROUP BY: <slot 0>, <slot 1>
-  TUPLE IDS: 5 
+  GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  TUPLE IDS: 4 
     MERGE (0)
       TUPLE IDS: 4 
-      SCAN HDFS table=default.alltypes (1)
+      SCAN HDFS table=default.alltypestiny (1)
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypessmall (2)
+      SCAN HDFS table=default.alltypestiny (2)
         TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypessmall (3)
+      SCAN HDFS table=default.alltypestiny (3)
         TUPLE IDS: 3 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Union unnesting: Only UNION DISTINCT, second operand is nested
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union distinct
-  (select int_col, bool_col from alltypes where year=2009 and month=1
+  (select * from alltypestiny where year=2009 and month=1
    union distinct
-   select int_col, bool_col from alltypessmall where year=2009 and month=2)
+   select * from alltypestiny where year=2009 and month=2)
 ---- PLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: 
-  GROUP BY: <slot 0>, <slot 1>
-  TUPLE IDS: 5 
+  GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  TUPLE IDS: 4 
     MERGE (0)
       TUPLE IDS: 4 
-      SCAN HDFS table=default.alltypessmall (1)
+      SCAN HDFS table=default.alltypestiny (1)
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypes (2)
+      SCAN HDFS table=default.alltypestiny (2)
         TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypessmall (3)
+      SCAN HDFS table=default.alltypestiny (3)
         TUPLE IDS: 2 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Union unnesting: UNION ALL doesn't absorb nested union with DISTINCT, 
 // first operand is nested
-(select int_col, bool_col from alltypes where year=2009 and month=1
+(select * from alltypestiny where year=2009 and month=1
  union distinct
- select int_col, bool_col from alltypessmall where year=2009 and month=2)
+ select * from alltypestiny where year=2009 and month=2)
 union all
-select int_col, bool_col from alltypessmall where year=2009 and month=1  
+select * from alltypestiny where year=2009 and month=1  
 ---- PLAN
 Plan Fragment 0
   MERGE (0)
     TUPLE IDS: 4 
     AGGREGATE
     OUTPUT: 
-    GROUP BY: <slot 0>, <slot 1>
-    TUPLE IDS: 5 
+    GROUP BY: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
+    TUPLE IDS: 2 
       MERGE (1)
         TUPLE IDS: 2 
-        SCAN HDFS table=default.alltypes (2)
+        SCAN HDFS table=default.alltypestiny (2)
           TUPLE IDS: 0 
-        SCAN HDFS table=default.alltypessmall (3)
+        SCAN HDFS table=default.alltypestiny (3)
           TUPLE IDS: 1 
-    SCAN HDFS table=default.alltypessmall (5)
+    SCAN HDFS table=default.alltypestiny (5)
       TUPLE IDS: 3 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 5
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Union unnesting: UNION ALL doesn't absorb nested union with DISTINCT,
 // second operand is nested
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union all
-  (select int_col, bool_col from alltypes where year=2009 and month=1
+  (select * from alltypestiny where year=2009 and month=1
    union distinct
-   select int_col, bool_col from alltypessmall where year=2009 and month=2)
+   select * from alltypestiny where year=2009 and month=2)
 ---- PLAN
 Plan Fragment 0
   MERGE (0)
     TUPLE IDS: 4 
-    SCAN HDFS table=default.alltypessmall (1)
+    SCAN HDFS table=default.alltypestiny (1)
       TUPLE IDS: 0 
     AGGREGATE
     OUTPUT: 
-    GROUP BY: <slot 0>, <slot 1>
-    TUPLE IDS: 5 
+    GROUP BY: <slot 39>, <slot 40>, <slot 41>, <slot 42>, <slot 43>, <slot 44>, <slot 45>, <slot 46>, <slot 47>, <slot 48>, <slot 49>, <slot 50>, <slot 51>
+    TUPLE IDS: 3 
       MERGE (2)
         TUPLE IDS: 3 
-        SCAN HDFS table=default.alltypes (3)
+        SCAN HDFS table=default.alltypestiny (3)
           TUPLE IDS: 1 
-        SCAN HDFS table=default.alltypessmall (4)
+        SCAN HDFS table=default.alltypestiny (4)
           TUPLE IDS: 2 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 4
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Union unnesting: UNION ALL absorbs the children but not directly the operands 
 // of a nested union with mixed ALL/DISTINCT, first operand is nested
-(select int_col, bool_col from alltypes where year=2009 and month=1
+(select * from alltypestiny where year=2009 and month=1
  union distinct
- select int_col, bool_col from alltypessmall where year=2009 and month=2
+ select * from alltypestiny where year=2009 and month=2
  union all
- select int_col, bool_col from alltypes where year=2009 and month=2)
+ select * from alltypestiny where year=2009 and month=2)
 union all
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 ---- PLAN
 Plan Fragment 0
   MERGE (0)
     TUPLE IDS: 5 
     AGGREGATE
     OUTPUT: 
-    GROUP BY: <slot 0>, <slot 1>
-    TUPLE IDS: 6 
+    GROUP BY: <slot 39>, <slot 40>, <slot 41>, <slot 42>, <slot 43>, <slot 44>, <slot 45>, <slot 46>, <slot 47>, <slot 48>, <slot 49>, <slot 50>, <slot 51>
+    TUPLE IDS: 3 
       MERGE (1)
         TUPLE IDS: 3 
-        SCAN HDFS table=default.alltypes (2)
+        SCAN HDFS table=default.alltypestiny (2)
           TUPLE IDS: 0 
-        SCAN HDFS table=default.alltypessmall (3)
+        SCAN HDFS table=default.alltypestiny (3)
           TUPLE IDS: 1 
-    SCAN HDFS table=default.alltypes (6)
+    SCAN HDFS table=default.alltypestiny (6)
       TUPLE IDS: 2 
-    SCAN HDFS table=default.alltypessmall (7)
+    SCAN HDFS table=default.alltypestiny (7)
       TUPLE IDS: 4 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 6
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 7
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Union unnesting: UNION ALL absorbs the children but not directly the operands 
 // of a nested union with mixed ALL/DISTINCT, second operand is nested
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union all
-  (select int_col, bool_col from alltypes where year=2009 and month=1
+  (select * from alltypestiny where year=2009 and month=1
    union distinct
-   select int_col, bool_col from alltypessmall where year=2009 and month=2
+   select * from alltypestiny where year=2009 and month=2
    union all
-   select int_col, bool_col from alltypes where year=2009 and month=2)
+   select * from alltypestiny where year=2009 and month=2)
 ---- PLAN
 Plan Fragment 0
   MERGE (0)
     TUPLE IDS: 5 
-    SCAN HDFS table=default.alltypessmall (1)
+    SCAN HDFS table=default.alltypestiny (1)
       TUPLE IDS: 0 
     AGGREGATE
     OUTPUT: 
-    GROUP BY: <slot 0>, <slot 1>
-    TUPLE IDS: 6 
+    GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+    TUPLE IDS: 4 
       MERGE (2)
         TUPLE IDS: 4 
-        SCAN HDFS table=default.alltypes (3)
+        SCAN HDFS table=default.alltypestiny (3)
           TUPLE IDS: 1 
-        SCAN HDFS table=default.alltypessmall (4)
+        SCAN HDFS table=default.alltypestiny (4)
           TUPLE IDS: 2 
-    SCAN HDFS table=default.alltypes (7)
+    SCAN HDFS table=default.alltypestiny (7)
       TUPLE IDS: 3 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 4
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 7
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Union unnesting: UNION ALL doesn't absorb the children of a nested union  
 // with mixed ALL/DISTINCT and limit, second operand is nested
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union all
-  (select int_col, bool_col from alltypes where year=2009 and month=1
+  (select * from alltypestiny where year=2009 and month=1
    union distinct
-   select int_col, bool_col from alltypessmall where year=2009 and month=2
+   select * from alltypestiny where year=2009 and month=2
    union all
-   (select int_col, bool_col from alltypes where year=2009 and month=2)
+   (select * from alltypestiny where year=2009 and month=2)
    limit 10)
 ---- PLAN
 Plan Fragment 0
   MERGE (0)
     TUPLE IDS: 5 
-    SCAN HDFS table=default.alltypessmall (1)
+    SCAN HDFS table=default.alltypestiny (1)
       TUPLE IDS: 0 
     MERGE (6)
       LIMIT: 10
       TUPLE IDS: 4 
       AGGREGATE
       OUTPUT: 
-      GROUP BY: <slot 0>, <slot 1>
-      TUPLE IDS: 6 
+      GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+      TUPLE IDS: 4 
         MERGE (2)
           TUPLE IDS: 4 
-          SCAN HDFS table=default.alltypes (3)
+          SCAN HDFS table=default.alltypestiny (3)
             TUPLE IDS: 1 
-          SCAN HDFS table=default.alltypessmall (4)
+          SCAN HDFS table=default.alltypestiny (4)
             TUPLE IDS: 2 
-      SCAN HDFS table=default.alltypes (7)
+      SCAN HDFS table=default.alltypestiny (7)
         TUPLE IDS: 3 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 4
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 7
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Union unnesting: UNION ALL doesn't absorb nested union with order by and limit,
 // first operand is nested
-(select int_col, bool_col from alltypes where year=2009 and month=1
+(select * from alltypestiny where year=2009 and month=1
  union all
- (select int_col, bool_col from alltypessmall where year=2009 and month=2)
- order by 1 limit 10)
+ (select * from alltypestiny where year=2009 and month=2)
+ order by 3 limit 3)
 union all
-select int_col, bool_col from alltypessmall where year=2009 and month=1  
+select * from alltypestiny where year=2009 and month=1  
 ---- PLAN
 Plan Fragment 0
   MERGE (0)
     TUPLE IDS: 4 
     TOP-N
-    ORDER BY: <slot 0> ASC
-    LIMIT: 10
+    ORDER BY: <slot 28> ASC
+    LIMIT: 3
     TUPLE IDS: 2 
       MERGE (1)
         TUPLE IDS: 2 
-        SCAN HDFS table=default.alltypes (2)
+        SCAN HDFS table=default.alltypestiny (2)
           TUPLE IDS: 0 
-        SCAN HDFS table=default.alltypessmall (3)
+        SCAN HDFS table=default.alltypestiny (3)
           TUPLE IDS: 1 
-    SCAN HDFS table=default.alltypessmall (5)
+    SCAN HDFS table=default.alltypestiny (5)
       TUPLE IDS: 3 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 5
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Union unnesting: UNION ALL doesn't absorb nested union with order by and limit,
 // second operand is nested
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union all
-  (select int_col, bool_col from alltypes where year=2009 and month=1
+  (select * from alltypestiny where year=2009 and month=1
    union all
-   (select int_col, bool_col from alltypessmall where year=2009 and month=2)
-   order by 1 limit 10)
+   (select * from alltypestiny where year=2009 and month=2)
+   order by 3 limit 3)
 ---- PLAN
 Plan Fragment 0
   MERGE (0)
     TUPLE IDS: 4 
-    SCAN HDFS table=default.alltypessmall (1)
+    SCAN HDFS table=default.alltypestiny (1)
       TUPLE IDS: 0 
     TOP-N
-    ORDER BY: <slot 0> ASC
-    LIMIT: 10
+    ORDER BY: <slot 41> ASC
+    LIMIT: 3
     TUPLE IDS: 3 
       MERGE (2)
         TUPLE IDS: 3 
-        SCAN HDFS table=default.alltypes (3)
+        SCAN HDFS table=default.alltypestiny (3)
           TUPLE IDS: 1 
-        SCAN HDFS table=default.alltypessmall (4)
+        SCAN HDFS table=default.alltypestiny (4)
           TUPLE IDS: 2 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 4
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Union unnesting: UNION DISTINCT absorbs nested union with ALL
 // first operand is nested
-(select int_col, bool_col from alltypes where year=2009 and month=1
+(select * from alltypestiny where year=2009 and month=1
  union all
- select int_col, bool_col from alltypessmall where year=2009 and month=2)
+ select * from alltypestiny where year=2009 and month=2)
 union distinct
-select int_col, bool_col from alltypessmall where year=2009 and month=1  
+select * from alltypestiny where year=2009 and month=1
 ---- PLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: 
-  GROUP BY: <slot 0>, <slot 1>
-  TUPLE IDS: 5 
+  GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  TUPLE IDS: 4 
     MERGE (0)
       TUPLE IDS: 4 
-      SCAN HDFS table=default.alltypes (1)
+      SCAN HDFS table=default.alltypestiny (1)
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypessmall (2)
+      SCAN HDFS table=default.alltypestiny (2)
         TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypessmall (3)
+      SCAN HDFS table=default.alltypestiny (3)
         TUPLE IDS: 3 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Union unnesting: UNION DISTINCT absorbs nested union with ALL,
 // second operand is nested
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union distinct
-  (select int_col, bool_col from alltypes where year=2009 and month=1
+  (select * from alltypestiny where year=2009 and month=1
    union all
-   select int_col, bool_col from alltypessmall where year=2009 and month=2)
+   select * from alltypestiny where year=2009 and month=2)
 ---- PLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: 
-  GROUP BY: <slot 0>, <slot 1>
-  TUPLE IDS: 5 
+  GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  TUPLE IDS: 4 
     MERGE (0)
       TUPLE IDS: 4 
-      SCAN HDFS table=default.alltypessmall (1)
+      SCAN HDFS table=default.alltypestiny (1)
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypes (2)
+      SCAN HDFS table=default.alltypestiny (2)
         TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypessmall (3)
+      SCAN HDFS table=default.alltypestiny (3)
         TUPLE IDS: 2 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Union unnesting: UNION DISTINCT absorbs nested union with mixed ALL/DISTINCT,
 // first operand is nested
-(select int_col, bool_col from alltypes where year=2009 and month=1
+(select * from alltypestiny where year=2009 and month=1
  union distinct
- select int_col, bool_col from alltypessmall where year=2009 and month=2
+ select * from alltypestiny where year=2009 and month=2
  union all
- select int_col, bool_col from alltypes where year=2009 and month=2)
+ select * from alltypestiny where year=2009 and month=2)
 union distinct
-select int_col, bool_col from alltypessmall where year=2009 and month=1  
+select * from alltypestiny where year=2009 and month=1
 ---- PLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: 
-  GROUP BY: <slot 0>, <slot 1>
-  TUPLE IDS: 6 
+  GROUP BY: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+  TUPLE IDS: 5 
     MERGE (0)
       TUPLE IDS: 5 
-      SCAN HDFS table=default.alltypes (1)
+      SCAN HDFS table=default.alltypestiny (1)
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypessmall (2)
+      SCAN HDFS table=default.alltypestiny (2)
         TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypes (3)
+      SCAN HDFS table=default.alltypestiny (3)
         TUPLE IDS: 2 
-      SCAN HDFS table=default.alltypessmall (4)
+      SCAN HDFS table=default.alltypestiny (4)
         TUPLE IDS: 4 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 4
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Union unnesting: UNION DISTINCT absorbs nested union with mixed ALL/DISTINCT,
 // second operand is nested
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union distinct
-  (select int_col, bool_col from alltypes where year=2009 and month=1
+  (select * from alltypestiny where year=2009 and month=1
    union distinct
-   select int_col, bool_col from alltypessmall where year=2009 and month=2
+   select * from alltypestiny where year=2009 and month=2
    union all
-   select int_col, bool_col from alltypes where year=2009 and month=2)
+   select * from alltypestiny where year=2009 and month=2)
 ---- PLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: 
-  GROUP BY: <slot 0>, <slot 1>
-  TUPLE IDS: 6 
+  GROUP BY: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+  TUPLE IDS: 5 
     MERGE (0)
       TUPLE IDS: 5 
-      SCAN HDFS table=default.alltypessmall (1)
+      SCAN HDFS table=default.alltypestiny (1)
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypes (2)
+      SCAN HDFS table=default.alltypestiny (2)
         TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypessmall (3)
+      SCAN HDFS table=default.alltypestiny (3)
         TUPLE IDS: 2 
-      SCAN HDFS table=default.alltypes (4)
+      SCAN HDFS table=default.alltypestiny (4)
         TUPLE IDS: 3 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 4
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Union unnesting: UNION DISTINCT doesn't absorb nested union with order by and limit,
 // first operand is nested
-(select int_col, bool_col from alltypes where year=2009 and month=1
+(select * from alltypestiny where year=2009 and month=1
  union all
- (select int_col, bool_col from alltypessmall where year=2009 and month=2)
- order by 1 limit 10)
+ (select * from alltypestiny where year=2009 and month=2)
+ order by 3 limit 3)
 union distinct
-select int_col, bool_col from alltypessmall where year=2009 and month=1  
+select * from alltypestiny where year=2009 and month=1  
 ---- PLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: 
-  GROUP BY: <slot 0>, <slot 1>
-  TUPLE IDS: 5 
+  GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  TUPLE IDS: 4 
     MERGE (0)
       TUPLE IDS: 4 
       TOP-N
-      ORDER BY: <slot 0> ASC
-      LIMIT: 10
+      ORDER BY: <slot 28> ASC
+      LIMIT: 3
       TUPLE IDS: 2 
         MERGE (1)
           TUPLE IDS: 2 
-          SCAN HDFS table=default.alltypes (2)
+          SCAN HDFS table=default.alltypestiny (2)
             TUPLE IDS: 0 
-          SCAN HDFS table=default.alltypessmall (3)
+          SCAN HDFS table=default.alltypestiny (3)
             TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypessmall (5)
+      SCAN HDFS table=default.alltypestiny (5)
         TUPLE IDS: 3 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 5
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Union unnesting: UNION DISTINCT doesn't absorb nested union with order by and limit
 // second operand is nested
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union distinct
-  (select int_col, bool_col from alltypes where year=2009 and month=1
+  (select * from alltypestiny where year=2009 and month=1
    union all
-   (select int_col, bool_col from alltypessmall where year=2009 and month=2)
-   order by 1 limit 10)
+   (select * from alltypestiny where year=2009 and month=2)
+   order by 3 limit 3)
 ---- PLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: 
-  GROUP BY: <slot 0>, <slot 1>
-  TUPLE IDS: 5 
+  GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  TUPLE IDS: 4 
     MERGE (0)
       TUPLE IDS: 4 
-      SCAN HDFS table=default.alltypessmall (1)
+      SCAN HDFS table=default.alltypestiny (1)
         TUPLE IDS: 0 
       TOP-N
-      ORDER BY: <slot 0> ASC
-      LIMIT: 10
+      ORDER BY: <slot 41> ASC
+      LIMIT: 3
       TUPLE IDS: 3 
         MERGE (2)
           TUPLE IDS: 3 
-          SCAN HDFS table=default.alltypes (3)
+          SCAN HDFS table=default.alltypestiny (3)
             TUPLE IDS: 1 
-          SCAN HDFS table=default.alltypessmall (4)
+          SCAN HDFS table=default.alltypestiny (4)
             TUPLE IDS: 2 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 4
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Complex union unnesting: Multiple levels of UNION ALL, fully unnestable
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union all
-  (select int_col, bool_col from alltypes where year=2009 and month=1
+  (select * from alltypestiny where year=2009 and month=1
    union all
-     (select int_col, bool_col from alltypessmall where year=2009 and month=2
+     (select * from alltypestiny where year=2009 and month=2
       union all
-        (select int_col, bool_col from alltypes where year=2009 and month=2
+        (select * from alltypestiny where year=2009 and month=2
          union all
-         select int_col, bool_col from alltypessmall where year=2009 and month=3)))
+         select * from alltypestiny where year=2009 and month=3)))
 ---- PLAN
 Plan Fragment 0
   MERGE (0)
     TUPLE IDS: 8 
-    SCAN HDFS table=default.alltypessmall (1)
+    SCAN HDFS table=default.alltypestiny (1)
       TUPLE IDS: 0 
-    SCAN HDFS table=default.alltypes (2)
+    SCAN HDFS table=default.alltypestiny (2)
       TUPLE IDS: 1 
-    SCAN HDFS table=default.alltypessmall (3)
+    SCAN HDFS table=default.alltypestiny (3)
       TUPLE IDS: 2 
-    SCAN HDFS table=default.alltypes (4)
+    SCAN HDFS table=default.alltypestiny (4)
       TUPLE IDS: 3 
-    SCAN HDFS table=default.alltypessmall (5)
+    SCAN HDFS table=default.alltypestiny (5)
       TUPLE IDS: 4 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 4
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 5
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypestiny/year=2009/month=3/090301.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Complex union unnesting: Multiple levels of UNION DISTINCT, fully unnestable
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union distinct
-  (select int_col, bool_col from alltypes where year=2009 and month=1
+  (select * from alltypestiny where year=2009 and month=1
    union distinct
-     (select int_col, bool_col from alltypessmall where year=2009 and month=2
+     (select * from alltypestiny where year=2009 and month=2
       union distinct
-        (select int_col, bool_col from alltypes where year=2009 and month=2
+        (select * from alltypestiny where year=2009 and month=2
          union distinct
-         select int_col, bool_col from alltypessmall where year=2009 and month=3)))
+         select * from alltypestiny where year=2009 and month=3)))
 ---- PLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: 
-  GROUP BY: <slot 0>, <slot 1>
-  TUPLE IDS: 9 
+  GROUP BY: <slot 104>, <slot 105>, <slot 106>, <slot 107>, <slot 108>, <slot 109>, <slot 110>, <slot 111>, <slot 112>, <slot 113>, <slot 114>, <slot 115>, <slot 116>
+  TUPLE IDS: 8 
     MERGE (0)
       TUPLE IDS: 8 
-      SCAN HDFS table=default.alltypessmall (1)
+      SCAN HDFS table=default.alltypestiny (1)
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypes (2)
+      SCAN HDFS table=default.alltypestiny (2)
         TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypessmall (3)
+      SCAN HDFS table=default.alltypestiny (3)
         TUPLE IDS: 2 
-      SCAN HDFS table=default.alltypes (4)
+      SCAN HDFS table=default.alltypestiny (4)
         TUPLE IDS: 3 
-      SCAN HDFS table=default.alltypessmall (5)
+      SCAN HDFS table=default.alltypestiny (5)
         TUPLE IDS: 4 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 4
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 5
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypestiny/year=2009/month=3/090301.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Complex union unnesting: Partially unnestable up to 2nd level
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union all
-  (select int_col, bool_col from alltypes where year=2009 and month=1
+  (select * from alltypestiny where year=2009 and month=1
    union distinct
-     (select int_col, bool_col from alltypessmall where year=2009 and month=2
+     (select * from alltypestiny where year=2009 and month=2
       union all
-        (select int_col, bool_col from alltypes where year=2009 and month=2
+        (select * from alltypestiny where year=2009 and month=2
          union distinct
-         (select int_col, bool_col from alltypessmall where year=2009 and month=3)
-         order by 1 limit 10)))
+         (select * from alltypestiny where year=2009 and month=3)
+         order by 3 limit 3)))
 ---- PLAN
 Plan Fragment 0
   MERGE (0)
     TUPLE IDS: 8 
-    SCAN HDFS table=default.alltypessmall (1)
+    SCAN HDFS table=default.alltypestiny (1)
       TUPLE IDS: 0 
     AGGREGATE
     OUTPUT: 
-    GROUP BY: <slot 0>, <slot 1>
-    TUPLE IDS: 10 
+    GROUP BY: <slot 91>, <slot 92>, <slot 93>, <slot 94>, <slot 95>, <slot 96>, <slot 97>, <slot 98>, <slot 99>, <slot 100>, <slot 101>, <slot 102>, <slot 103>
+    TUPLE IDS: 7 
       MERGE (2)
         TUPLE IDS: 7 
-        SCAN HDFS table=default.alltypes (3)
+        SCAN HDFS table=default.alltypestiny (3)
           TUPLE IDS: 1 
-        SCAN HDFS table=default.alltypessmall (4)
+        SCAN HDFS table=default.alltypestiny (4)
           TUPLE IDS: 2 
         TOP-N
-        ORDER BY: <slot 0> ASC
-        LIMIT: 10
-        TUPLE IDS: 9 
+        ORDER BY: <slot 67> ASC
+        LIMIT: 3
+        TUPLE IDS: 5 
           AGGREGATE
           OUTPUT: 
-          GROUP BY: <slot 0>, <slot 1>
-          TUPLE IDS: 9 
+          GROUP BY: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+          TUPLE IDS: 5 
             MERGE (5)
               TUPLE IDS: 5 
-              SCAN HDFS table=default.alltypes (6)
+              SCAN HDFS table=default.alltypestiny (6)
                 TUPLE IDS: 3 
-              SCAN HDFS table=default.alltypessmall (7)
+              SCAN HDFS table=default.alltypestiny (7)
                 TUPLE IDS: 4 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 4
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 6
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 7
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypestiny/year=2009/month=3/090301.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Complex union unnesting: Partially unnestable up to 1st level
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union distinct
-  (select int_col, bool_col from alltypes where year=2009 and month=1
+  (select * from alltypestiny where year=2009 and month=1
    union distinct
-     (select int_col, bool_col from alltypessmall where year=2009 and month=2
+     (select * from alltypestiny where year=2009 and month=2
       union all
-        (select int_col, bool_col from alltypes where year=2009 and month=2
+        (select * from alltypestiny where year=2009 and month=2
          union distinct
-         (select int_col, bool_col from alltypessmall where year=2009 and month=3)
-         order by 1 limit 10)))
+         (select * from alltypestiny where year=2009 and month=3)
+         order by 3 limit 3)))
 ---- PLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: 
-  GROUP BY: <slot 0>, <slot 1>
-  TUPLE IDS: 10 
+  GROUP BY: <slot 104>, <slot 105>, <slot 106>, <slot 107>, <slot 108>, <slot 109>, <slot 110>, <slot 111>, <slot 112>, <slot 113>, <slot 114>, <slot 115>, <slot 116>
+  TUPLE IDS: 8 
     MERGE (0)
       TUPLE IDS: 8 
-      SCAN HDFS table=default.alltypessmall (1)
+      SCAN HDFS table=default.alltypestiny (1)
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypes (2)
+      SCAN HDFS table=default.alltypestiny (2)
         TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypessmall (3)
+      SCAN HDFS table=default.alltypestiny (3)
         TUPLE IDS: 2 
       TOP-N
-      ORDER BY: <slot 0> ASC
-      LIMIT: 10
-      TUPLE IDS: 9 
+      ORDER BY: <slot 67> ASC
+      LIMIT: 3
+      TUPLE IDS: 5 
         AGGREGATE
         OUTPUT: 
-        GROUP BY: <slot 0>, <slot 1>
-        TUPLE IDS: 9 
+        GROUP BY: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+        TUPLE IDS: 5 
           MERGE (4)
             TUPLE IDS: 5 
-            SCAN HDFS table=default.alltypes (5)
+            SCAN HDFS table=default.alltypestiny (5)
               TUPLE IDS: 3 
-            SCAN HDFS table=default.alltypessmall (6)
+            SCAN HDFS table=default.alltypestiny (6)
               TUPLE IDS: 4 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 5
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 6
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypestiny/year=2009/month=3/090301.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // Complex union unnesting: Multiple nested unions to test all rules in a single query
-select int_col, bool_col from alltypessmall where year=2009 and month=1
+select * from alltypestiny where year=2009 and month=1
 union distinct
-  (select int_col, bool_col from alltypes where year=2009 and month=1
+  (select * from alltypestiny where year=2009 and month=1
    union all
-   select int_col, bool_col from alltypessmall where year=2009 and month=2)
+   select * from alltypestiny where year=2009 and month=2)
 union distinct
-  (select int_col, bool_col from alltypes where year=2009 and month=2
+  (select * from alltypestiny where year=2009 and month=2
    union all
-   (select int_col, bool_col from alltypessmall where year=2009 and month=3)
-   order by 1 limit 10)
+   (select * from alltypestiny where year=2009 and month=3)
+   order by 3 limit 3)
 union all
-  (select int_col, bool_col from alltypes where year=2009 and month=3
+  (select * from alltypestiny where year=2009 and month=3
    union all
-   select int_col, bool_col from alltypessmall where year=2009 and month=4)
+   select * from alltypestiny where year=2009 and month=4)
 union all
-  (select int_col, bool_col from alltypes where year=2009 and month=4
+  (select * from alltypestiny where year=2009 and month=4
    union all
-   (select int_col, bool_col from alltypes where year=2009 and month=5)
-   order by 1 limit 10)        
+   (select * from alltypestiny where year=2009 and month=5)
+   order by 3 limit 3)        
 ---- PLAN
 Plan Fragment 0
   MERGE (9)
     TUPLE IDS: 13 
     AGGREGATE
     OUTPUT: 
-    GROUP BY: <slot 0>, <slot 1>
-    TUPLE IDS: 14 
+    GROUP BY: <slot 169>, <slot 170>, <slot 171>, <slot 172>, <slot 173>, <slot 174>, <slot 175>, <slot 176>, <slot 177>, <slot 178>, <slot 179>, <slot 180>, <slot 181>
+    TUPLE IDS: 13 
       MERGE (0)
         TUPLE IDS: 13 
-        SCAN HDFS table=default.alltypessmall (1)
+        SCAN HDFS table=default.alltypestiny (1)
           TUPLE IDS: 0 
-        SCAN HDFS table=default.alltypes (2)
+        SCAN HDFS table=default.alltypestiny (2)
           TUPLE IDS: 1 
-        SCAN HDFS table=default.alltypessmall (3)
+        SCAN HDFS table=default.alltypestiny (3)
           TUPLE IDS: 2 
         TOP-N
-        ORDER BY: <slot 0> ASC
-        LIMIT: 10
+         ORDER BY: <slot 80> ASC
+        LIMIT: 3
         TUPLE IDS: 6 
           MERGE (4)
             TUPLE IDS: 6 
-            SCAN HDFS table=default.alltypes (5)
+            SCAN HDFS table=default.alltypestiny (5)
               TUPLE IDS: 4 
-            SCAN HDFS table=default.alltypessmall (6)
+            SCAN HDFS table=default.alltypestiny (6)
               TUPLE IDS: 5 
-    SCAN HDFS table=default.alltypes (10)
+    SCAN HDFS table=default.alltypestiny (10)
       TUPLE IDS: 7 
-    SCAN HDFS table=default.alltypessmall (11)
+    SCAN HDFS table=default.alltypestiny (11)
       TUPLE IDS: 8 
     TOP-N
-    ORDER BY: <slot 0> ASC
-    LIMIT: 10
+    ORDER BY: <slot 158> ASC
+    LIMIT: 3
     TUPLE IDS: 12 
       MERGE (12)
         TUPLE IDS: 12 
-        SCAN HDFS table=default.alltypes (13)
+        SCAN HDFS table=default.alltypestiny (13)
           TUPLE IDS: 10 
-        SCAN HDFS table=default.alltypes (14)
+        SCAN HDFS table=default.alltypestiny (14)
           TUPLE IDS: 11 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 5
-        hdfs:alltypes/year=2009/month=2/090201.txt 0:18555
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
       HDFS SPLITS NODE ID: 6
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypestiny/year=2009/month=3/090301.txt 0:115
       HDFS SPLITS NODE ID: 10
-        hdfs:alltypes/year=2009/month=3/090301.txt 0:20543
+        hdfs:alltypestiny/year=2009/month=3/090301.txt 0:115
       HDFS SPLITS NODE ID: 11
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=4/090401.txt 0:115
       HDFS SPLITS NODE ID: 13
-        hdfs:alltypes/year=2009/month=4/090401.txt 0:20079
-      HDFS SPLITS NODE ID: 14
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+        hdfs:alltypestiny/year=2009/month=4/090401.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // UNION ALL in subquery
-select x.int_col, x.bool_col from
-  (select int_col, bool_col from alltypessmall where year=2009 and month=1
+select x.* from
+  (select * from alltypestiny where year=2009 and month=1
    union all
-   select int_col, bool_col from alltypes where year=2009 and month=1) x
+   select * from alltypestiny where year=2009 and month=1) x
 union all
-(select int_col, bool_col from alltypessmall where year=2009 and month=2)
-order by 1 limit 10
+(select * from alltypestiny where year=2009 and month=2)
+order by 3 limit 5
 ---- PLAN
 Plan Fragment 0
   TOP-N
-  ORDER BY: <slot 0> ASC
-  LIMIT: 10
+  ORDER BY: <slot 67> ASC
+  LIMIT: 5
   TUPLE IDS: 5 
     MERGE (0)
       TUPLE IDS: 5 
       MERGE (1)
         TUPLE IDS: 2 
-        SCAN HDFS table=default.alltypessmall (2)
+        SCAN HDFS table=default.alltypestiny (2)
           TUPLE IDS: 0 
-        SCAN HDFS table=default.alltypes (3)
+        SCAN HDFS table=default.alltypestiny (3)
           TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypessmall (4)
+      SCAN HDFS table=default.alltypestiny (4)
         TUPLE IDS: 4 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 4
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // UNION DISTINCT in subquery
-select x.int_col, x.bool_col from
-  (select int_col, bool_col from alltypessmall where year=2009 and month=1
+select x.* from
+  (select * from alltypestiny where year=2009 and month=1
    union distinct
-   select int_col, bool_col from alltypes where year=2009 and month=1) x
+   select * from alltypestiny where year=2009 and month=1) x
 union distinct
-(select int_col, bool_col from alltypessmall where year=2009 and month=2)
-order by 1 limit 10
+(select * from alltypestiny where year=2009 and month=2)
+order by 3 limit 3
 ---- PLAN
 Plan Fragment 0
   TOP-N
-  ORDER BY: <slot 0> ASC
-  LIMIT: 10
-  TUPLE IDS: 7 
+  ORDER BY: <slot 67> ASC
+  LIMIT: 3
+  TUPLE IDS: 5 
     AGGREGATE
     OUTPUT: 
-    GROUP BY: <slot 0>, <slot 1>
-    TUPLE IDS: 7 
+    GROUP BY: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+    TUPLE IDS: 5 
       MERGE (0)
         TUPLE IDS: 5 
         AGGREGATE
         OUTPUT: 
-        GROUP BY: <slot 0>, <slot 1>
-        TUPLE IDS: 6 
+        GROUP BY: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
+        TUPLE IDS: 2 
           MERGE (1)
             TUPLE IDS: 2 
-            SCAN HDFS table=default.alltypessmall (2)
+            SCAN HDFS table=default.alltypestiny (2)
               TUPLE IDS: 0 
-            SCAN HDFS table=default.alltypes (3)
+            SCAN HDFS table=default.alltypestiny (3)
               TUPLE IDS: 1 
-        SCAN HDFS table=default.alltypessmall (5)
+        SCAN HDFS table=default.alltypestiny (5)
           TUPLE IDS: 4 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 3
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 5
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
 ------------ DISTRIBUTEDPLAN
 not implemented
 ====
 // UNION ALL in subquery with a WHERE condition in the outer select.
-select x.int_col, x.bool_col from
-  (select int_col, bool_col from alltypessmall where year=2009 and month=1
+select x.* from
+  (select * from alltypestiny where year=2009 and month=1
    union all
-   select int_col, bool_col from alltypes where year=2009 and month=1) x
+   select * from alltypestiny where year=2009 and month=1) x
 where x.int_col < 5 and x.bool_col = false
 ---- PLAN
 Plan Fragment 0
   MERGE (0)
     TUPLE IDS: 2 
-    PREDICATES: <slot 0> < 5, <slot 1> = FALSE
-    SCAN HDFS table=default.alltypessmall (1)
+    PREDICATES: <slot 32> < 5, <slot 29> = FALSE
+    SCAN HDFS table=default.alltypestiny (1)
       TUPLE IDS: 0 
-    SCAN HDFS table=default.alltypes (2)
+    SCAN HDFS table=default.alltypestiny (2)
       TUPLE IDS: 1     
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (3)
@@ -1257,69 +1289,69 @@ Plan Fragment 1
     EXCHANGE ID: 3
   MERGE (0)
     TUPLE IDS: 2 
-    PREDICATES: <slot 0> < 5, <slot 1> = FALSE
-    SCAN HDFS table=default.alltypessmall (1)
+    PREDICATES: <slot 32> < 5, <slot 29> = FALSE
+    SCAN HDFS table=default.alltypestiny (1)
       TUPLE IDS: 0 
-    SCAN HDFS table=default.alltypes (2)
+    SCAN HDFS table=default.alltypestiny (2)
       TUPLE IDS: 1     
 
   EXEC PARAMS
-    HOST:
+    HOST: 
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
 ====
 // UNION DISTINCT in subquery with a WHERE condition in the outer select.
-select x.int_col, x.bool_col from
-  (select int_col, bool_col from alltypessmall where year=2009 and month=1
+select x.* from
+  (select * from alltypestiny where year=2009 and month=1
    union distinct
-   select int_col, bool_col from alltypes where year=2009 and month=1) x
+   select * from alltypestiny where year=2009 and month=1) x
 where x.int_col < 5 and x.bool_col = false
 ---- PLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: 
-  GROUP BY: <slot 0>, <slot 1>
-  TUPLE IDS: 4 
+  GROUP BY: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
+  TUPLE IDS: 2 
     MERGE (0)
       TUPLE IDS: 2 
-      PREDICATES: <slot 0> < 5, <slot 1> = FALSE
-      SCAN HDFS table=default.alltypessmall (1)
+      PREDICATES: <slot 32> < 5, <slot 29> = FALSE
+      SCAN HDFS table=default.alltypestiny (1)
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypes (2)
+      SCAN HDFS table=default.alltypestiny (2)
         TUPLE IDS: 1       
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (4)
-    TUPLE IDS: 4 
+    TUPLE IDS: 2 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 4
   AGGREGATE
   OUTPUT: 
-  GROUP BY: <slot 0>, <slot 1>
-  TUPLE IDS: 4 
+  GROUP BY: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
+  TUPLE IDS: 2 
     MERGE (0)
       TUPLE IDS: 2 
-      PREDICATES: <slot 0> < 5, <slot 1> = FALSE
-      SCAN HDFS table=default.alltypessmall (1)
+      PREDICATES: <slot 32> < 5, <slot 29> = FALSE
+      SCAN HDFS table=default.alltypestiny (1)
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypes (2)
+      SCAN HDFS table=default.alltypestiny (2)
         TUPLE IDS: 1       
 
   EXEC PARAMS
-    HOST:
+    HOST: 
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
       HDFS SPLITS NODE ID: 2
-        hdfs:alltypes/year=2009/month=1/090101.txt 0:20433
+        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
 ====

@@ -169,9 +169,8 @@ public class UnionStmt extends QueryStmt {
     // One slot per expr in the select blocks. Use first select block as representative.
     List<Expr> firstSelectExprs = operands.get(0).getQueryStmt().getResultExprs();
     for (int i = 0; i < firstSelectExprs.size(); ++i) {
-      SlotDescriptor slotDesc = new SlotDescriptor(i, tupleDesc);
+      SlotDescriptor slotDesc = analyzer.getDescTbl().addSlotDescriptor(tupleDesc);
       slotDesc.setType(firstSelectExprs.get(i).getType());
-      tupleDesc.addSlot(slotDesc);
       SlotRef slotRef = new SlotRef(slotDesc);
       resultExprs.add(slotRef);
       // Add to the substitution map so that column refs in "order by" can be resolved.

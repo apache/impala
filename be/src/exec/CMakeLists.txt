@@ -29,6 +29,7 @@ add_library(Exec STATIC
   hdfs-text-scanner.cc
   hdfs-text-scanner-ir.cc
   hdfs-text-table-writer.cc
+  merge-node.cc
   hbase-scan-node.cc
   hbase-table-scanner.cc
   text-converter.cc

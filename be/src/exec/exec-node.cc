@@ -14,6 +14,7 @@
 #include "exec/hdfs-scan-node.h"
 #include "exec/hbase-scan-node.h"
 #include "exec/exchange-node.h"
+#include "exec/merge-node.h"
 #include "exec/topn-node.h"
 #include "runtime/descriptors.h"
 #include "runtime/mem-pool.h"
@@ -139,6 +140,9 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
         error_msg << "ORDER BY with no LIMIT not implemented";
         return Status(error_msg.str());
       }
+      return Status::OK;
+    case TPlanNodeType::MERGE_NODE:
+      *node = pool->Add(new MergeNode(pool, tnode, descs));
       return Status::OK;
     default:
       map<int, const char*>::const_iterator i =

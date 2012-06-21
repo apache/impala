@@ -4,6 +4,8 @@ package com.cloudera.impala.service;
 
 import org.junit.Test;
 
+import com.google.common.collect.ImmutableList;
+
 public class QueryTest extends BaseQueryTest {
   @Test
   public void TestDistinct() {
@@ -59,6 +61,12 @@ public class QueryTest extends BaseQueryTest {
   @Test
   public void TestSubquery() {
     runTestInExecutionMode(EXECUTION_MODE, "subquery", false, 1000);
+  }
+
+  @Test
+  public void TestUnion() {
+    runQueryInAllBatchAndClusterPerms("union", false, 1000, null,
+        ImmutableList.of(0), ImmutableList.of(1));
   }
 
   @Test

@@ -120,6 +120,12 @@ class TestDataGenerator {
     dir.mkdirs();
     GenerateAllTypesData(dirName, 4, 25);
 
+    // Generate AllTypesSmall
+    dirName = args[0] + "/AllTypesTiny";
+    dir = new File(dirName);
+    dir.mkdirs();
+    GenerateAllTypesData(dirName, 4, 2);
+
     // Generate AllTypesAgg
     dirName = args[0] + "/AllTypesAgg";
     dir = new File(dirName);
