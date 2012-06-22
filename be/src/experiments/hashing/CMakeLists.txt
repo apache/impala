@@ -1,0 +1,12 @@
+# Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+
+# where to put generated libraries
+set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/experiments/hashing")
+
+# where to put generated binaries
+set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/experiments/hashing")
+
+
+add_executable(cache-hash-test cache-hash-test.cc)
+
+target_link_libraries(cache-hash-test ${IMPALA_TEST_LINK_LIBS})

@@ -22,3 +22,4 @@ target_link_libraries(string-search-test ${IMPALA_TEST_LINK_LIBS})
 
 add_test(string-search-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/experiments/string-search-test)
 
+add_subdirectory(hashing)
