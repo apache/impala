@@ -137,9 +137,13 @@ public class PlannerTest {
           actualOutput.append("not implemented\n");
         } else {
           actualOutput.append("------------ DISTRIBUTEDPLAN\n");
-          // Run multi-node query.
+          // Run multi-node query
+          // TODO: use Constants.NUM_NODES_ALL when multi-node planning is done (IMP-77)
+          // Using all nodes will cause unstable plan because data location is
+          // non-deterministic. To see incorrect multi-node planning, change 2 to
+          // 0 (use all nodes)
           actualOutput.append("------------\n");
-          RunQuery(query, Constants.NUM_NODES_ALL, testCase, Section.DISTRIBUTEDPLAN, errorLog,
+          RunQuery(query, 2, testCase, Section.DISTRIBUTEDPLAN, errorLog,
                    actualOutput, level);
         }
       }

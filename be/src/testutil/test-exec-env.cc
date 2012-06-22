@@ -35,7 +35,7 @@ class TestExecEnv::TestScheduler : public Scheduler {
   TestScheduler(TestExecEnv* parent): parent_(parent) {}
 
   virtual Status GetHosts(
-      const vector<string>& data_locations,
+      const vector<THostPort>& data_locations,
       vector<pair<string, int> >* hostports); 
  
  private:
@@ -43,7 +43,7 @@ class TestExecEnv::TestScheduler : public Scheduler {
 };
 
 Status TestExecEnv::TestScheduler::GetHosts(
-    const vector<string>& data_locations, vector<pair<std::string, int> >* hostports) {
+    const vector<THostPort>& data_locations, vector<pair<std::string, int> >* hostports) {
   hostports->clear();
   for (int i = 0; i < data_locations.size(); ++i) {
     hostports->push_back(make_pair(

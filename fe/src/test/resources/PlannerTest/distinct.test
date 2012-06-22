@@ -116,7 +116,7 @@ Plan Fragment 1
     SCAN HDFS table=default.alltypesagg (0)
 
   EXEC PARAMS
-    HOST: 127.0.0.1
+    HOST: 
       HDFS SPLITS NODE ID: 0
         hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
         hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
@@ -172,7 +172,7 @@ Plan Fragment 1
     SCAN HDFS table=default.alltypesagg (0)
 
   EXEC PARAMS
-    HOST: 127.0.0.1
+    HOST: 
       HDFS SPLITS NODE ID: 0
         hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
         hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
@@ -229,7 +229,7 @@ Plan Fragment 1
     SCAN HDFS table=default.alltypesagg (0)
 
   EXEC PARAMS
-    HOST: 127.0.0.1
+    HOST: 
       HDFS SPLITS NODE ID: 0
         hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
         hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
@@ -285,7 +285,7 @@ Plan Fragment 1
     SCAN HDFS table=default.alltypesagg (0)
 
   EXEC PARAMS
-    HOST: 127.0.0.1
+    HOST: 
       HDFS SPLITS NODE ID: 0
         hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
         hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263

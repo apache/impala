@@ -8,8 +8,8 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.PriorityQueue;
 import java.util.Map.Entry;
+import java.util.PriorityQueue;
 
 import org.apache.hadoop.fs.BlockLocation;
 import org.slf4j.Logger;
@@ -23,12 +23,13 @@ import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.Constants;
 import com.cloudera.impala.thrift.THdfsFileSplit;
 import com.cloudera.impala.thrift.THdfsScanNode;
+import com.cloudera.impala.thrift.THostPort;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TScanRange;
 import com.google.common.base.Objects;
-import com.google.common.base.Preconditions;
 import com.google.common.base.Objects.ToStringHelper;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -104,20 +105,23 @@ public class HdfsScanNode extends ScanNode {
 
   /**
    * Block assignment data, including the total number of assigned bytes, for a single
-   * host.
+   * host / port.
    */
   static private class HostBlockAssignment {
-    private final String hostname;
+    private final THostPort address;
     private long assignedBytes;
 
-    public String getHostname() { return hostname; }
     public long getAssignedBytes() { return assignedBytes; }
+
+    public THostPort getAddress() {
+      return address;
+    }
 
     // list of (file path, block location)
     private final List<HdfsTable.BlockMetadata> blockMetadata;
 
-    HostBlockAssignment(String hostname) {
-      this.hostname = hostname;
+    HostBlockAssignment(THostPort address) {
+      this.address = address;
       this.assignedBytes = 0;
       this.blockMetadata = Lists.newArrayList();
     }
@@ -146,10 +150,11 @@ public class HdfsScanNode extends ScanNode {
           HdfsTable.getBlockMetadata(partition);
 
       for (HdfsTable.BlockMetadata block: blockMetadata) {
-        String[] blockHosts = null;
+        String[] blockHostPorts = null;
         try {
-          blockHosts = block.getLocation().getHosts();
-          LOG.info(Arrays.toString(blockHosts));
+          // Use getNames() to get port number as well
+          blockHostPorts = block.getLocation().getNames();
+          LOG.info(Arrays.toString(blockHostPorts));
         } catch (IOException e) {
           // this shouldn't happen, getHosts() doesn't throw anything
           String errorMsg = "BlockLocation.getHosts() failed:\n" + e.getMessage();
@@ -158,18 +163,19 @@ public class HdfsScanNode extends ScanNode {
         }
 
         // greedy block assignment: find host with fewest assigned bytes
-        Preconditions.checkState(blockHosts.length > 0);
-        HostBlockAssignment minHost = assignmentMap.get(blockHosts[0]);
-        for (String host: blockHosts) {
-          if (assignmentMap.containsKey(host)) {
-            HostBlockAssignment info = assignmentMap.get(host);
+        Preconditions.checkState(blockHostPorts.length > 0);
+        HostBlockAssignment minHost = assignmentMap.get(blockHostPorts[0]);
+        for (String hostPort: blockHostPorts) {
+          if (assignmentMap.containsKey(hostPort)) {
+            HostBlockAssignment info = assignmentMap.get(hostPort);
             if (minHost.getAssignedBytes() > info.getAssignedBytes()) {
               minHost = info;
             }
           } else {
             // new host with 0 bytes so far
-            minHost = new HostBlockAssignment(host);
-            assignmentMap.put(host, minHost);
+            THostPort addr = addressToTHostPort(hostPort);
+            minHost = new HostBlockAssignment(addr);
+            assignmentMap.put(hostPort, minHost);
             break;
           }
         }
@@ -186,7 +192,7 @@ public class HdfsScanNode extends ScanNode {
 
   @Override
   public void getScanParams(
-      int numNodes, List<TScanRange> scanRanges, List<String> hostPorts) {
+      int numNodes, List<TScanRange> scanRanges, List<THostPort> hostPorts) {
     Preconditions.checkState(numNodes != Constants.NUM_NODES_ALL_RACKS);
 
     List<HostBlockAssignment> hostBlockAssignments =
@@ -213,7 +219,7 @@ public class HdfsScanNode extends ScanNode {
       }
       scanRanges.add(scanRange);
       if (hostPorts != null) {
-        hostPorts.add(blockAssignment.getHostname());
+        hostPorts.add(blockAssignment.getAddress());
       }
     }
 

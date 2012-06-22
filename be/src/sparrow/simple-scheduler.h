@@ -21,11 +21,11 @@ class SimpleScheduler : public Scheduler {
   // Initialize w/ contents of FLAGS_backends.
   SimpleScheduler();
   
-  // Returns backends from FLAGS_backends; if an element of data_locations
-  // matches a registered host exactly, it returns that host/port, otherwise
-  // a random one.
+  // Returns a list of backends in hostports from FLAGS_backends. For each data_location,
+  // the first backend whose host matches is inserted into hostports. If no match is
+  // found for a data location, the first backend in the list is inserted.
   virtual impala::Status GetHosts(
-      const std::vector<std::string>& data_locations,
+      const std::vector<impala::THostPort>& data_locations,
       std::vector<std::pair<std::string, int> >* hostports);
 
  private:

@@ -48,9 +48,14 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
   // (if that weren't the case, the code would be more complicated).
   DCHECK_GE(output_batch->capacity(), input_batch->capacity());
 
-  // copy all rows and attach all mempools from the input batch
+  // copy all rows (up to limit) and attach all mempools from the input batch
   DCHECK(input_batch->row_desc().IsPrefixOf(output_batch->row_desc()));
-  for (int i = 0; i < input_batch->num_rows(); ++i) {
+  int i = 0;
+  for (; i < input_batch->num_rows(); ++i) {
+    if (ReachedLimit()) {
+      *eos = true;
+      break;
+    }
     TupleRow* src = input_batch->GetRow(i);
     int j = output_batch->AddRow();
     DCHECK_EQ(i, j);
@@ -60,7 +65,7 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
     input_batch->CopyRow(src, dest);
     output_batch->CommitLastRow();
   }
-  num_rows_returned_ += input_batch->num_rows();
+  num_rows_returned_ += i;
   input_batch->TransferTupleData(output_batch);
   return Status::OK;
 }

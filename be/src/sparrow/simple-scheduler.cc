@@ -6,10 +6,12 @@
 #include <boost/algorithm/string.hpp>
 
 #include "sparrow/simple-scheduler.h"
+#include "gen-cpp/ImpalaBackendService.h"
 
 using namespace std;
 using namespace boost;
 using impala::Status;
+using impala::THostPort;
 
 DEFINE_string(backends, "", "comma-separated list of <host:port> pairs");
 
@@ -37,10 +39,10 @@ SimpleScheduler::SimpleScheduler() {
 }
 
 Status SimpleScheduler::GetHosts(
-    const vector<string>& data_locations, vector<pair<string, int> >* hostports) {
+    const vector<THostPort>& data_locations, vector<pair<string, int> >* hostports) {
   hostports->clear();
   for (int i = 0; i < data_locations.size(); ++i) {
-    HostMap::iterator entry = host_map_.find(data_locations[i]);
+    HostMap::iterator entry = host_map_.find(data_locations[i].host);
     if (entry == host_map_.end()) {
       // TODO: should we make an effort to pick a random host?
       entry = host_map_.begin();

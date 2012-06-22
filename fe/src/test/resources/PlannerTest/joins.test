@@ -583,7 +583,7 @@ Plan Fragment 1
         TUPLE IDS: 1 
 
   EXEC PARAMS
-    HOST: 127.0.0.1
+    HOST: 
       HDFS SPLITS NODE ID: 0
         hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
         hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621

@@ -78,10 +78,10 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
 
   // determine total number of fragments
   int num_threads = 0;
-  // execNodes may contain empty list
-  DCHECK_GE(request->execNodes.size(), request->fragmentRequests.size() - 1);
+  // dataLocations may contain empty list
+  DCHECK_GE(request->dataLocations.size(), request->fragmentRequests.size() - 1);
   for (int i = 1; i < request->fragmentRequests.size(); ++i) {
-    num_threads += request->execNodes[i - 1].size();
+    num_threads += request->dataLocations[i - 1].size();
   }
   if (num_threads > 0) {
     remote_exec_status_.resize(num_threads);
@@ -99,7 +99,8 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
     // * pass in request->nodeRequestParams and let the scheduler figure out where
     // we should be doing those scans, rather than the frontend
     vector<pair<string, int> > hosts;
-    RETURN_IF_ERROR(exec_env_->scheduler()->GetHosts(request->execNodes[i-1], &hosts));
+    RETURN_IF_ERROR(exec_env_->scheduler()->GetHosts(request->dataLocations[i-1],
+        &hosts));
     DCHECK_EQ(hosts.size(), request->nodeRequestParams[i].size());
 
     // start individual plan exec requests

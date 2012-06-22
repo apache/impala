@@ -5,6 +5,7 @@ package com.cloudera.impala.planner;
 import java.util.List;
 
 import com.cloudera.impala.analysis.TupleDescriptor;
+import com.cloudera.impala.thrift.THostPort;
 import com.cloudera.impala.thrift.TScanRange;
 import com.google.common.base.Objects;
 
@@ -34,19 +35,19 @@ abstract public class ScanNode extends PlanNode {
   }
 
   /**
-   * Returns one TScanRange per partition of the scan. If 'hosts' is non-null and there
-   * are multiple partitions, also returns hosts on which scan partitions are executed,
-   * one per range.
+   * Returns one TScanRange per partition of the scan. If 'hostports' is non-null and
+   * there are multiple partitions, also returns locations on which scan ranges are
+   * located, one per range.
    * @param numPartitions number of scan partitions; same semantics as
    *     TQueryRequest.numNodes; must be >= 1 or one of these special values:
    *     NUM_NODES_ALL: as many partitions as there are nodes that contain relevant data
    *     NUM_NODES_ALL_RACKS: as many partitions as there are racks that holds relevant
    *     data
    * @param scanRanges output parameter
-   * @param "host:port" strings (output parameter)
+   * @param dataLocations output parameter
    */
   abstract public void getScanParams(
-      int numPartitions, List<TScanRange> scanRanges, List<String> hostports);
+      int numPartitions, List<TScanRange> scanRanges, List<THostPort> dataLocations);
 
   @Override
   protected String debugString() {
@@ -56,6 +57,17 @@ abstract public class ScanNode extends PlanNode {
         .add("keyRanges", "")
         .addValue(super.debugString())
         .toString();
+  }
+
+  /**
+   * Helper function to parse a "host:port" address string into THostPort
+   */
+  protected static THostPort addressToTHostPort(String address) {
+    THostPort result = new THostPort();
+    String[] hostPort = address.split(":");
+    result.host = hostPort[0];
+    result.port = Integer.parseInt(hostPort[1]);
+    return result;
   }
 
 }

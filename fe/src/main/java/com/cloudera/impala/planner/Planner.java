@@ -48,6 +48,7 @@ import com.cloudera.impala.thrift.TScanRange;
 import com.cloudera.impala.thrift.TUniqueId;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 
 /**
@@ -486,17 +487,20 @@ public class Planner {
         // plan fragment 0 is the coordinator
         execParamExplain.append(prefix + "  HOST: coordinator\n");
       } else {
-        String hostnode = request.getExecNodes().get(planFragIdx - 1).get(nodeIdx);
+        THostPort hostport = request.getDataLocations().get(planFragIdx - 1).get(nodeIdx);
+        String hostnode = hostport.getHost() + ":" + hostport.getPort();
         execParamExplain.append(prefix + "  HOST: " + hostnode + "\n");
       }
 
       for (TScanRange scanRange: hostExecParams.getScanRanges()) {
         int nodeId = scanRange.getNodeId();
         if (scanRange.isSetHbaseKeyRanges()) {
-          // HBase scan range is printed as "startKey:stopKey"
+          // HBase scan ranges are sorted and are printed as "startKey:stopKey"
           execParamExplain.append(
               prefix + "    HBASE KEY RANGES NODE ID: " + nodeId + "\n");
-          for (THBaseKeyRange kr: scanRange.getHbaseKeyRanges()) {
+          List<THBaseKeyRange> keyRanges =
+              Ordering.natural().sortedCopy(scanRange.getHbaseKeyRanges());
+          for (THBaseKeyRange kr: keyRanges) {
             execParamExplain.append(prefix + "      ");
             if (kr.isSetStartKey()) {
               execParamExplain.append(
@@ -513,9 +517,11 @@ public class Planner {
             execParamExplain.append("\n");
           }
         } else if (scanRange.isSetHdfsFileSplits()) {
-          // HDFS splits is printed as "<path> <offset>:<length>"
+          // HDFS splits are sorted and are printed as "<path> <offset>:<length>"
           execParamExplain.append(prefix + "    HDFS SPLITS NODE ID: " + nodeId + "\n");
-          for (THdfsFileSplit fs: scanRange.getHdfsFileSplits() ) {
+          List<THdfsFileSplit> fileSplists =
+              Ordering.natural().sortedCopy(scanRange.getHdfsFileSplits());
+          for (THdfsFileSplit fs: fileSplists) {
             execParamExplain.append(prefix + "      ");
             execParamExplain.append(fs.getPath() + " ");
             execParamExplain.append(fs.getOffset() + ":");
@@ -760,15 +766,15 @@ public class Planner {
     // plan trees, otherwise we won't pick up on numSenders for exchange nodes
     ArrayList<ScanNode> scans = Lists.newArrayList();  // leftmost scan is first in list
     List<TScanRange> scanRanges = Lists.newArrayList();
-    List<String> hosts = Lists.newArrayList();
+    List<THostPort> dataLocations = Lists.newArrayList();
     if (numNodes == 1) {
-      createPartitionParams(root, 1, scanRanges, hosts);
+      createPartitionParams(root, 1, scanRanges, dataLocations);
       root.collectSubclasses(ScanNode.class, scans);
     } else {
-      createPartitionParams(slave, numNodes, scanRanges, hosts);
+      createPartitionParams(slave, numNodes, scanRanges, dataLocations);
       slave.collectSubclasses(ScanNode.class, scans);
       ExchangeNode exchangeNode = root.findFirstOf(ExchangeNode.class);
-      exchangeNode.setNumSenders(hosts.size());
+      exchangeNode.setNumSenders(dataLocations.size());
     }
 
     // collect data sinks for explain string; dataSinks.size() == # of plan fragments
@@ -806,13 +812,13 @@ public class Planner {
       dataSinks.add(0, null);
     }
 
-    // set request.execNodes and request.nodeRequestParams
+    // set request.dataLocations and request.nodeRequestParams
     if (numNodes != 1) {
       // add one empty exec param (coord fragment doesn't scan any tables
       // and doesn't send the output anywhere)
       request.addToNodeRequestParams(Lists.newArrayList(new TPlanExecParams()));
     }
-    createExecParams(request, scans, scanRanges, hosts);
+    createExecParams(request, scans, scanRanges, dataLocations);
 
     // Build the explain plan string, if requested
     if (explainString != null) {
@@ -977,10 +983,10 @@ public class Planner {
   }
 
   /**
-   * Compute partitioning parameters (scan ranges and hosts) for leftmost scan of plan.
+   * Compute partitioning parameters (scan ranges and host / ports) for leftmost scan of plan.
    */
   private void createPartitionParams(PlanNode plan, int numNodes,
-      List<TScanRange> scanRanges, List<String> hosts) {
+      List<TScanRange> scanRanges, List<THostPort> dataLocations) {
     ScanNode leftmostScan = getLeftmostScan(plan);
     if (leftmostScan == null) {
       // No scans in this plan.
@@ -997,11 +1003,11 @@ public class Planner {
     } else {
       numPartitions = 1;
     }
-    leftmostScan.getScanParams(numPartitions, scanRanges, hosts);
-    if (scanRanges.isEmpty() && hosts.isEmpty()) {
+    leftmostScan.getScanParams(numPartitions, scanRanges, dataLocations);
+    if (scanRanges.isEmpty() && dataLocations.isEmpty()) {
       // if we're scanning an empty table we still need a single
       // host to execute the scan
-      hosts.add("localhost");
+      dataLocations.add(new THostPort("localhost", 0));
     }
   }
 
@@ -1018,12 +1024,12 @@ public class Planner {
   }
 
   /**
-   * Set request.execNodes and request.nodeRequestParams based on
-   * scanRanges and hosts.
+   * Set request.dataLocations and request.nodeRequestParams based on
+   * scanRanges and data locations.
    */
   private void createExecParams(
       TQueryExecRequest request, ArrayList<ScanNode> scans,
-      List<TScanRange> scanRanges, List<String> hosts) {
+      List<TScanRange> scanRanges, List<THostPort> dataLocations) {
     // one TPlanExecParams per fragment/scan range;
     // we need to add an "empty" range for empty tables (in which case
     // scanRanges will be empty)
@@ -1034,10 +1040,10 @@ public class Planner {
       if (scanRange.hasNext()) {
         fragmentParams.addToScanRanges(scanRange.next());
       }
-      THostPort hostPort = new THostPort();
-      hostPort.host = "localhost";
-      hostPort.port = 0;  // set elsewhere
-      fragmentParams.setDestinations(Lists.newArrayList(hostPort));
+      THostPort address = new THostPort();
+      address.host = "localhost";
+      address.port = 0;  // set elsewhere
+      fragmentParams.setDestinations(Lists.newArrayList(address));
       fragmentParamsList.add(fragmentParams);
     } while (scanRange.hasNext());
 
@@ -1055,7 +1061,7 @@ public class Planner {
       }
     }
 
-    request.addToExecNodes(hosts);
+    request.addToDataLocations(dataLocations);
     request.addToNodeRequestParams(fragmentParamsList);
   }
 

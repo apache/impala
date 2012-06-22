@@ -78,11 +78,11 @@ struct TQueryExecRequest {
   // fragmentRequests[0] contains the coordinator fragment
   2: list<TPlanExecRequest> fragmentRequests
 
-  // hosts on which to execute plan fragments;
-  // execNodes.size() == fragmentRequests.size() - 1, and fragmentRequests[i+1] is
-  // executed on execNodes[i] (fragmentRequests[0] is the coordinator fragment, which
-  // is executed by the coordinator itself)
-  3: list<list<string>> execNodes
+  // list of host/port that serve the data for the plan fragments
+  // dataLocations.size() == fragmentRequests.size() - 1, and fragmentRequests[i+1] is
+  // executed on dataLocations[i] (fragmentRequests[0] is the coordinator fragment, which
+  // is executed by the coordinator itself)	
+  3: list<list<THostPort>> dataLocations
 
   // node-specific request parameters;
   // nodeRequestParams[i][j] is the parameter for fragmentRequests[i] executed on 

@@ -93,6 +93,8 @@ then
   # remove everything listed in .gitignore
   git clean -Xdf
 
+  # clean llvm
+  rm $IMPALA_HOME/llvm-ir/impala*.ll
 fi
 
 # Generate hive-site.xml from template via env var substitution

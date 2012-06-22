@@ -32,6 +32,7 @@ import com.cloudera.impala.thrift.Constants;
 import com.cloudera.impala.thrift.THBaseFilter;
 import com.cloudera.impala.thrift.THBaseKeyRange;
 import com.cloudera.impala.thrift.THBaseScanNode;
+import com.cloudera.impala.thrift.THostPort;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TScanRange;
@@ -224,7 +225,7 @@ public class HBaseScanNode extends ScanNode {
 
   @Override
   public void getScanParams(
-      int numPartitions, List<TScanRange> scanRanges, List<String> hosts) {
+      int numPartitions, List<TScanRange> scanRanges, List<THostPort> hostPorts) {
     // No usage of NUM_NODES_ALL_RACKS yet. The condition on numPartition depends on this check.
     Preconditions.checkState(numPartitions != Constants.NUM_NODES_ALL_RACKS);
 
@@ -251,7 +252,7 @@ public class HBaseScanNode extends ScanNode {
     // remaining region server, all its relevant regions will be assigned to a
     // TScanRange, in a round robin fashion.
 
-    // Convert list of HRegionLocation to Map<host, HRegionLocation>
+    // Convert list of HRegionLocation to Map<hostport, List<HRegionLocation>>
     Map<String, List<HRegionLocation>> locationMap = Maps.newHashMap();
     for (HRegionLocation regionLoc: regionsLoc) {
       String locHostPort = regionLoc.getHostnamePort();
@@ -291,8 +292,9 @@ public class HBaseScanNode extends ScanNode {
 
       if (curPartIdx < actualNumPart) {
         scanRanges.add(scanRange);
-        if (hosts != null) {
-          hosts.add(locEntry.getKey());
+        if (hostPorts != null) {
+          THostPort addr = addressToTHostPort(locEntry.getKey());
+          hostPorts.add(addr);
         }
       }
 

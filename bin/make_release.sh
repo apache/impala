@@ -33,7 +33,7 @@ then
   cd $IMPALA_HOME/common/thrift
   make
   cd $IMPALA_BE_DIR
-  make -j
+  make -j4
   cd $IMPALA_HOME
 
   # Run sample queries - outputs .gcda files
@@ -64,7 +64,7 @@ then
   cd $IMPALA_HOME/common/thrift
   make
   cd $IMPALA_BE_DIR
-  make -j
+  make -j4
   cd $IMPALA_HOME
 
   # Remove all the PGO intermediates and set build to release.  This seems to be the most
@@ -81,5 +81,5 @@ else
   cd $IMPALA_HOME/common/thrift
   make
   cd $IMPALA_BE_DIR
-  make -j
+  make -j4
 fi

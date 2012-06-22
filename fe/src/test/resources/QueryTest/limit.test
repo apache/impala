@@ -155,11 +155,3 @@ bigint, string, int, int, bigint, string, int
 1004,'Name4',94611,5000,1004,'Name4',94612
 1005,'Name5',94611,5000,1005,'Name5',94613
 ====
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
-double_col, date_string_col, string_col, timestamp_col
-from alltypessmall$TABLE limit 1
------
-int,boolean,tinyint,smallint,int,bigint,float,double,string,string,timestamp
------
-0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
-=====

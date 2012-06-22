@@ -1264,7 +1264,7 @@ Plan Fragment 1
       TUPLE IDS: 1     
 
   EXEC PARAMS
-    HOST: 127.0.0.1
+    HOST:
       HDFS SPLITS NODE ID: 1
         hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
       HDFS SPLITS NODE ID: 2
@@ -1317,7 +1317,7 @@ Plan Fragment 1
         TUPLE IDS: 1       
 
   EXEC PARAMS
-    HOST: 127.0.0.1
+    HOST:
       HDFS SPLITS NODE ID: 1
         hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
       HDFS SPLITS NODE ID: 2
