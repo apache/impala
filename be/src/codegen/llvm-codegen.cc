@@ -26,6 +26,7 @@
 
 #include "codegen/llvm-codegen.h"
 #include "impala-ir/impala-ir-names.h"
+#include "util/cpu-info.h"
 #include "util/path-builder.h"
 
 using namespace boost;
@@ -112,10 +113,15 @@ Status LlvmCodeGen::LoadFromFile(ObjectPool* pool,
 }
 
 Status LlvmCodeGen::LoadImpalaIR(ObjectPool* pool, scoped_ptr<LlvmCodeGen>* codegen_ret) {
-  // TODO: is this how we want to pick up external files?  Do we need better configuration
-  // support?
+  // Load the statically cross compiled file.  We cannot load an ll file with sse
+  // instructions on a machine without sse support (the load fails, doesn't matter
+  // if those instructions end up getting run or not).
   string module_file;
-  PathBuilder::GetFullPath("llvm-ir/impala.ll", &module_file);
+  if (CpuInfo::Instance()->IsSupported(CpuInfo::SSE4_2)) {
+    PathBuilder::GetFullPath("llvm-ir/impala-sse.ll", &module_file);
+  } else {
+    PathBuilder::GetFullPath("llvm-ir/impala-no-sse.ll", &module_file);
+  }
   RETURN_IF_ERROR(LoadFromFile(pool, module_file, codegen_ret));
   LlvmCodeGen* codegen = codegen_ret->get();
 

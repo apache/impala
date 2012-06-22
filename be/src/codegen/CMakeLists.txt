@@ -29,19 +29,30 @@ add_custom_target(gen_ir_functions ALL DEPENDS ${IR_DESC_GEN_OUTPUT})
 # this code gets cross compiled to a single IR module, impala.ll.  
 set(IR_INPUT_FILES impala-ir.cc)
 set(IR_TMP_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/impala-tmp.ll")
-set(IR_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/impala.ll")
+set(IR_SSE_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/impala-sse.ll")
+set(IR_NO_SSE_OUTPUT_FILE "${LLVM_IR_OUTPUT_DIRECTORY}/impala-no-sse.ll")
 
 # Run the clang compiler to generate IR.  Then run their opt tool to remove
 # unnamed instr.  This makes the IR verifiable and more readable.
+# We need to compile to IR twice, once with sse enabled and one without.  At runtime
+# impala will pick the correct file to load.
 add_custom_command(
-  OUTPUT ${IR_OUTPUT_FILE}
-  COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} ${CLANG_INCLUDE_FLAGS} ${IR_INPUT_FILES} -o ${IR_TMP_OUTPUT_FILE}
-  COMMAND ${LLVM_OPT_EXECUTABLE} --instnamer < ${IR_TMP_OUTPUT_FILE} > ${IR_OUTPUT_FILE}
+  OUTPUT ${IR_SSE_OUTPUT_FILE}
+  COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} "-msse4.2" ${CLANG_INCLUDE_FLAGS} ${IR_INPUT_FILES} -o ${IR_TMP_OUTPUT_FILE}
+  COMMAND ${LLVM_OPT_EXECUTABLE} --instnamer < ${IR_TMP_OUTPUT_FILE} > ${IR_SSE_OUTPUT_FILE}
   DEPENDS ${IR_INPUT_FILES}
 )
 
-add_custom_target(compile_to_ir ALL DEPENDS ${IR_OUTPUT_FILE})
+# Compile without sse enabled.
+add_custom_command(
+  OUTPUT ${IR_NO_SSE_OUTPUT_FILE}
+  COMMAND ${LLVM_CLANG_EXECUTABLE} ${CLANG_IR_CXX_FLAGS} ${CLANG_INCLUDE_FLAGS} ${IR_INPUT_FILES} -o ${IR_TMP_OUTPUT_FILE}
+  COMMAND ${LLVM_OPT_EXECUTABLE} --instnamer < ${IR_TMP_OUTPUT_FILE} > ${IR_NO_SSE_OUTPUT_FILE}
+  DEPENDS ${IR_INPUT_FILES}
+)
 
+add_custom_target(compile_to_ir_sse ALL DEPENDS ${IR_SSE_OUTPUT_FILE})
+add_custom_target(compile_to_ir_no_sse ALL DEPENDS ${IR_NO_SSE_OUTPUT_FILE})
 
 add_executable(llvm-codegen-test llvm-codegen-test.cc)
 target_link_libraries(llvm-codegen-test ${IMPALA_TEST_LINK_LIBS})

@@ -3,7 +3,13 @@
 #ifndef IMPALA_UTIL_HASH_UTIL_H
 #define IMPALA_UTIL_HASH_UTIL_H
 
+// For cross compiling with clang, we need to be able to generate an IR file with
+// no sse instructions.  Attempting to load a precompiled IR file that contains
+// unsupported instructions causes llvm to fail.  We need to use #defines to control
+// the code that is built and the runtime checks to control what code is run.
+#ifdef __SSE4_2__
 #include <nmmintrin.h>
+#endif
 #include "util/cpu-info.h"
 
 namespace impala {
@@ -11,6 +17,7 @@ namespace impala {
 // Utility class to compute hash values.   
 class HashUtil {
  public:
+#ifdef __SSE4_2__
   // Compute the Crc32 hash for data using SSE4 instructions.  The input hash parameter is 
   // the current hash/seed value.
   // This should only be called if SSE is supported.
@@ -34,6 +41,7 @@ class HashUtil {
 
     return hash;
   } 
+#endif
 
   // default values recommended by http://isthe.com/chongo/tech/comp/fnv/
   static const uint32_t FVN_PRIME = 0x01000193; //   16777619
@@ -57,11 +65,15 @@ class HashUtil {
   // Computes the hash value for data.  Will call either CrcHash or FvnHash
   // depending on hardware capabilities.
   static uint32_t Hash(const void* data, size_t bytes, uint32_t hash) {
+#ifdef __SSE4_2__
     if (CpuInfo::Instance()->IsSupported(CpuInfo::SSE4_2)) {
       return CrcHash(data, bytes, hash);
     } else {
       return FvnHash(data, bytes, hash);
     }
+#else
+    return FvnHash(data, bytes, hash);
+#endif
   }
 
 };
