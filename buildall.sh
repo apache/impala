@@ -175,8 +175,7 @@ then
   mvn exec:java -Dexec.mainClass=com.cloudera.impala.testutil.PlanService \
               -Dexec.classpathScope=test &
   PID=$!
-  cd $IMPALA_BE_DIR
-  make test
+  ${IMPALA_HOME}/bin/run-backend-tests.sh
   kill $PID
 fi
 
