@@ -30,11 +30,11 @@ enum THdfsFileFormat {
 }
 
 enum THdfsCompression {
-   NONE,
-   DEFAULT,
-   GZIP,
-   BZIP2,
-   SNAPPY
+  NONE,
+  DEFAULT,
+  GZIP,
+  BZIP2,
+  SNAPPY
 }
 
 struct THdfsPartition {

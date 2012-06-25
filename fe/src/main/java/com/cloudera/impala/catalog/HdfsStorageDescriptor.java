@@ -43,15 +43,17 @@ public class HdfsStorageDescriptor {
   private static final String COMPRESSION = "compression";
 
   // Mapping from compression names to enum values.
+  // These are common names for the compression algorithms as they appear
+  // in various documentation.
   private static final Map<String, THdfsCompression> COMPRESSION_MAP =
     new ImmutableMap.Builder<String, THdfsCompression>()
         .put("none", THdfsCompression.NONE)
+        .put("deflate", THdfsCompression.DEFAULT)
+        // Permit this alternate name since the codec class name contains Default
         .put("default", THdfsCompression.DEFAULT)
         .put("gzip", THdfsCompression.GZIP)
         .put("bzip2", THdfsCompression.BZIP2)
         .put("snappy", THdfsCompression.SNAPPY)
-        // This name is defined by Trevni.
-        .put("deflate", THdfsCompression.DEFAULT)
         .build();
 
   // Important: don't change the ordering of these keys - if e.g. FIELD_DELIM is not

@@ -346,6 +346,9 @@ class HdfsRCFileScanner : public HdfsScanner {
   // Location (file name) of previous scan range.
   std::string previous_location_;
 
+  // Offset to end of file header.
+  int64_t header_end_;
+
   // End of the scan range.
   int end_of_scan_range_;
 

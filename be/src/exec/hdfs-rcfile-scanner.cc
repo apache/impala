@@ -109,7 +109,18 @@ Status HdfsRCFileScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_par
   if (previous_location_ != current_byte_stream_->GetLocation()) {
     RETURN_IF_ERROR(current_byte_stream_->Seek(0));
     RETURN_IF_ERROR(ReadFileHeader());
+    // Save the current file name if we get the same file we can avoid
+    // rereading the header information.
     previous_location_ = current_byte_stream_->GetLocation();
+    // Save the seek offset of the end of the header information.  If we
+    // get a scan range that starts at the beginning of the file we can avoid
+    // reading the header but we must seek past it to get to the beginning of the data.
+    current_byte_stream_->GetPosition(&header_end_);
+  } else if (scan_range->offset_ == 0) {
+    // If are at the beginning of the file and we previously read the file header
+    // we do not have to read it again but we need to seek past the file header.
+    // We saved the offset above when we previously read and processed the header.
+    RETURN_IF_ERROR(current_byte_stream_->Seek(header_end_));
   }
 
   // Offset may not point to row group boundary so we need to search for the next

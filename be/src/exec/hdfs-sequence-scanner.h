@@ -265,6 +265,9 @@ class HdfsSequenceScanner : public HdfsScanner {
   // Location (file name) of previous scan range.
   std::string previous_location_;
 
+  // End of the header block so we don't have to reparse it.
+  int64_t header_end_;
+
   // Byte offset of the scan range.
   int end_of_scan_range_;
 

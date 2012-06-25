@@ -92,7 +92,18 @@ Status HdfsSequenceScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_p
     if (is_blk_compressed_) {
       unparsed_data_buffer_size_ = state_->file_buffer_size();
     }
+    // Save the current file name if we get the same file we can avoid
+    // rereading the header information.
     previous_location_ = unbuffered_byte_stream_->GetLocation();
+    // Save the seek offset of the end of the header information.  If we
+    // get a scan range that starts at the beginning of the file we can avoid
+    // reading the header but we must seek past it to get to the beginning of the data.
+    buffered_byte_stream_->GetPosition(&header_end_);
+  } else if (scan_range->offset_ == 0) {
+    // If are at the beginning of the file and we previously read the file header
+    // we do not have to read it again but we need to seek past the file header.
+    // We saved the offset above when we previously read and processed the header.
+    RETURN_IF_ERROR(buffered_byte_stream_->Seek(header_end_));
   }
 
   delimited_text_parser_->ParserReset();
