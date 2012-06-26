@@ -20,9 +20,10 @@ public enum PrimitiveType {
   DOUBLE("DOUBLE", 8, TPrimitiveType.DOUBLE),
   DATE("DATE", 4, TPrimitiveType.DATE),
   DATETIME("DATETIME", 8, TPrimitiveType.DATETIME),
-  // We use boost ptime which is 96 bits. Aligning to 8 bytes so 16 total
+  // The timestamp structure is 12 bytes, Aligning to 8 bytes makes it 16.
   TIMESTAMP("TIMESTAMP", 16, TPrimitiveType.TIMESTAMP),
-  // 8-byte pointer and 4-byte length indicator (12 bytes total). Aligning to 8 bytes so 16 total.
+  // 8-byte pointer and 4-byte length indicator (12 bytes total).
+  // Aligning to 8 bytes so 16 total.
   STRING("STRING", 16, TPrimitiveType.STRING);
 
   private final String description;

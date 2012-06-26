@@ -42,6 +42,7 @@ inline int GetByteSize(PrimitiveType type) {
     case TYPE_DOUBLE:
       return 8;
     case TYPE_TIMESTAMP:
+      // This is the size of the slot, the actual size of the data is 12.
       return 16;
     case TYPE_DATE:
     case INVALID_TYPE:

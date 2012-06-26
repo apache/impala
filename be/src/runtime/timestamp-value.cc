@@ -21,22 +21,20 @@ time_t to_time_t(ptime t) {
   return time_t(x);
 }
 
-TimestampValue::TimestampValue(const TimestampValue& timestamp_value)
-  : timestamp(timestamp_value.timestamp) { 
-}
-
 TimestampValue::TimestampValue(const string& strbuf) {
   try {
     // time_from_string has a bug: a missing time component will pass ok but
     // give strange answers.
     // Boost tickets #622 #6034.
     if (strbuf.size() < 11) {
-      timestamp = not_a_date_time;
+      ptime temp; // created as not_a_date_time
+      *this = TimestampValue(temp);
     } else {
-      timestamp = time_from_string(strbuf);
+      *this = TimestampValue(time_from_string(strbuf));
     }
   } catch (exception& e) {
-    timestamp = not_a_date_time;
+    ptime temp; // created as not_a_date_time
+    *this = TimestampValue(temp);
   }
 }
 

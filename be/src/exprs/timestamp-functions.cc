@@ -34,7 +34,9 @@ void* TimestampFunctions::Unix(Expr* e, TupleRow* row) {
   TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
   if (tv == NULL) return NULL;
 
-  e->result_.int_val = static_cast<int32_t>(to_time_t(tv->timestamp));
+  ptime temp;
+  tv->ToPtime(&temp);
+  e->result_.int_val = static_cast<int32_t>(to_time_t(temp));
   return &e->result_.int_val;
 }
 
@@ -44,7 +46,7 @@ void* TimestampFunctions::Year(Expr* e, TupleRow* row) {
   TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
   if (tv == NULL) return NULL;
 
-  e->result_.int_val = tv->timestamp.date().year();
+  e->result_.int_val = tv->date().year();
   return &e->result_.int_val;
 }
 
@@ -54,7 +56,7 @@ void* TimestampFunctions::Month(Expr* e, TupleRow* row) {
   TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
   if (tv == NULL) return NULL;
 
-  e->result_.int_val = tv->timestamp.date().month();
+  e->result_.int_val = tv->date().month();
   return &e->result_.int_val;
 }
 
@@ -64,7 +66,7 @@ void* TimestampFunctions::Day(Expr* e, TupleRow* row) {
   TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
   if (tv == NULL) return NULL;
 
-  e->result_.int_val = tv->timestamp.date().day_of_year();
+  e->result_.int_val = tv->date().day_of_year();
   return &e->result_.int_val;
 }
 
@@ -74,7 +76,7 @@ void* TimestampFunctions::DayOfMonth(Expr* e, TupleRow* row) {
   TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
   if (tv == NULL) return NULL;
 
-  e->result_.int_val = tv->timestamp.date().day();
+  e->result_.int_val = tv->date().day();
   return &e->result_.int_val;
 }
 
@@ -84,7 +86,7 @@ void* TimestampFunctions::WeekOfYear(Expr* e, TupleRow* row) {
   TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
   if (tv == NULL) return NULL;
 
-  e->result_.int_val = tv->timestamp.date().week_number();
+  e->result_.int_val = tv->date().week_number();
   return &e->result_.int_val;
 }
 
@@ -94,7 +96,7 @@ void* TimestampFunctions::Hour(Expr* e, TupleRow* row) {
   TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
   if (tv == NULL) return NULL;
 
-  e->result_.int_val = tv->timestamp.time_of_day().hours();
+  e->result_.int_val = tv->time_of_day().hours();
   return &e->result_.int_val;
 }
 
@@ -104,7 +106,7 @@ void* TimestampFunctions::Minute(Expr* e, TupleRow* row) {
   TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
   if (tv == NULL) return NULL;
 
-  e->result_.int_val = tv->timestamp.time_of_day().minutes();
+  e->result_.int_val = tv->time_of_day().minutes();
   return &e->result_.int_val;
 }
 
@@ -114,7 +116,7 @@ void* TimestampFunctions::Second(Expr* e, TupleRow* row) {
   TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
   if (tv == NULL) return NULL;
 
-  e->result_.int_val = tv->timestamp.time_of_day().seconds();
+  e->result_.int_val = tv->time_of_day().seconds();
   return &e->result_.int_val;
 }
 
@@ -124,7 +126,7 @@ void* TimestampFunctions::ToDate(Expr* e, TupleRow* row) {
   TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
   if (tv == NULL) return NULL;
 
-  string result = to_iso_extended_string(tv->timestamp.date());
+  string result = to_iso_extended_string(tv->date());
   e->result_.SetStringVal(result);
   return &e->result_.string_val;
 }
@@ -138,8 +140,8 @@ void* TimestampFunctions::DateAdd(Expr* e, TupleRow* row) {
   if (tv == NULL || count == NULL) return NULL;
 
   date_duration d(*count);
-  ptime ts(tv->timestamp.date() + d, tv->timestamp.time_of_day());
-  e->result_.timestamp_val.timestamp = ts;
+  ptime ts(tv->date() + d, tv->time_of_day());
+  e->result_.timestamp_val = ts;
 
   return &e->result_.timestamp_val;
 }
@@ -153,8 +155,8 @@ void* TimestampFunctions::DateSub(Expr* e, TupleRow* row) {
   if (tv == NULL || count == NULL) return NULL;
 
   date_duration d(*count);
-  ptime ts(tv->timestamp.date() - d, tv->timestamp.time_of_day());
-  e->result_.timestamp_val.timestamp = ts;
+  ptime ts(tv->date() - d, tv->time_of_day());
+  e->result_.timestamp_val = ts;
 
   return &e->result_.timestamp_val;
 }
@@ -167,7 +169,11 @@ void* TimestampFunctions::DateDiff(Expr* e, TupleRow* row) {
   TimestampValue* tv2 = reinterpret_cast<TimestampValue*>(op2->GetValue(row));
   if (tv1 == NULL || tv2 == NULL) return NULL;
 
-  e->result_.int_val = (tv1->timestamp - tv2->timestamp).total_seconds();
+  ptime temp1;
+  tv1->ToPtime(&temp1);
+  ptime temp2;
+  tv2->ToPtime(&temp2);
+  e->result_.int_val = (temp1 - temp2).total_seconds();
   return &e->result_.int_val;
 }
 
@@ -183,11 +189,13 @@ void* TimestampFunctions::FromUtc(Expr* e, TupleRow* row) {
   // This should raise some sort of error or at least null. Hive just ignores it.
   if (timezone == NULL) {
     LOG(ERROR) << "Unknown timezone '" << *tz << "'" << endl;
-    e->result_.timestamp_val.timestamp = tv->timestamp;
+    e->result_.timestamp_val = *tv;
     return &e->result_.timestamp_val;
   }
-  local_date_time lt(tv->timestamp, timezone);
-  e->result_.timestamp_val.timestamp = lt.local_time();
+  ptime temp;
+  tv->ToPtime(&temp);
+  local_date_time lt(temp, timezone);
+  e->result_.timestamp_val = lt.local_time();
   return &e->result_.timestamp_val;
 }
 
@@ -203,12 +211,12 @@ void* TimestampFunctions::ToUtc(Expr* e, TupleRow* row) {
   // This should raise some sort of error or at least null. Hive just ignores it.
   if (timezone == NULL) {
     LOG(ERROR) << "Unknown timezone '" << *tz << "'" << endl;
-    e->result_.timestamp_val.timestamp = tv->timestamp;
+    e->result_.timestamp_val = *tv;
     return &e->result_.timestamp_val;
   }
-  local_date_time lt(tv->timestamp.date(), tv->timestamp.time_of_day(),
+  local_date_time lt(tv->date(), tv->time_of_day(),
                      timezone, local_date_time::NOT_DATE_TIME_ON_ERROR);
-  e->result_.timestamp_val.timestamp = lt.utc_time();
+  e->result_.timestamp_val = TimestampValue(lt.utc_time());
   return &e->result_.timestamp_val;
 }
 

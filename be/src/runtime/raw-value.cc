@@ -46,7 +46,7 @@ void RawValue::PrintValueAsBytes(const void* value, PrimitiveType type,
       stream->write(static_cast<char*>(string_val->ptr), string_val->len);
       return;
     case TYPE_TIMESTAMP:
-      stream->write(chars, sizeof(TimestampValue));
+      stream->write(chars, TimestampValue::Size());
       break;
     default:
       DCHECK(false) << "bad RawValue::PrintValue() type: " << TypeToString(type);

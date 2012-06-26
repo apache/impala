@@ -124,7 +124,7 @@ inline uint32_t RawValue::GetHashValue(const void* v, PrimitiveType type, uint32
     case TYPE_DOUBLE:
       return HashUtil::Hash(v, 8, seed);
     case TYPE_TIMESTAMP:
-      return HashUtil::Hash(v, 8, seed);
+      return HashUtil::Hash(v, 12, seed);
     default:
       DCHECK(false) << "invalid type: " << TypeToString(type);
       return 0;
