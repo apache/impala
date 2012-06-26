@@ -21,3 +21,6 @@ HBaseAllTypesErrorNoNulls
 
 # Hive benchmark data (not in repo, manually copied)
 hive_benchmark
+
+# Generated block ids (hdfs ids) for each table
+block-ids

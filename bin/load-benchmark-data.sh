@@ -34,3 +34,6 @@ else
     execute_hive_query_from_file "$IMPALA_HOME/testdata/bin/create-benchmark-core-generated.sql"
     execute_hive_query_from_file "$IMPALA_HOME/testdata/bin/load-benchmark-core-generated.sql"
 fi
+
+$IMPALA_HOME/testdata/bin/generate-block-ids.sh
+

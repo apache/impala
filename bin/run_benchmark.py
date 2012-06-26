@@ -36,12 +36,15 @@ parser.add_option("-p", "--profiler", dest="profiler",
                   help="If set, also run google pprof for sample profiling.")
 parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
                   default = False, help="If set, outputs all benchmark diagnostics.")
+parser.add_option("--remote", dest="remote", action="store_true",
+                  default = False, help="Set to true if running on remote cluster.")
 parser.add_option("-q", "--query", dest="query", default = "",
                   help="Query to run.  If none specified, runs all queries.")
 parser.add_option("--iterations", dest="iterations", default="3",
                   help="Number of times to run the query.  Only to be used with -q")
-parser.add_option("--prime_cache", dest="prime_cache", default="3",
-                  help="Number of times to prime buffer cache.  Only to be used with -q")
+parser.add_option("--prime_cache", dest="prime_cache", default= True, 
+                  help="Whether or not to prime the buffer cache.  Only to be "\
+                  "used with -q")
 parser.add_option("--exploration_strategy", dest="exploration_strategy", default="core",
                   help="The exploration strategy to use for running benchmark: 'core', "\
                   "'pairwise', or 'exhaustive'")
@@ -58,6 +61,7 @@ parser.add_option("--compare_with_hive", dest="compare_with_hive", action="store
 
 profile_output_file = 'build/release/service/profile.tmp'
 gprof_cmd = 'google-pprof --text build/release/service/runquery %s | head -n 60'
+prime_cache_cmd = os.environ['IMPALA_HOME'] + "/testdata/bin/cache_tables.py -q \"%s\""
 result_single_regex = 'returned (\d*) rows? in (\d*).(\d*) s'
 result_multiple_regex = 'returned (\d*) rows? in (\d*).(\d*) s with stddev (\d*).(\d*)'
 hive_result_regex = 'Time taken: (\d*).(\d*) seconds'
@@ -142,7 +146,8 @@ def run_query_using_hive(query, iterations):
 # Function which will run the query and report the average time and standard deviation
 #   - reference_results: a dictionary with <query string,reference result> values
 #   - query: the query to run
-#   - prime_buffer_cache: number of times to run the query to prime the buffer cache
+#   - prime_buffer_cache: if true, will try to prime buffer cache for all tables in the
+#     query.
 #     This is not useful for very large (e.g. > 2 GB) data sets
 #   - iterations: number of times to run the query
 # Returns two strings as output.  The first string is the summary of the query run.
@@ -161,20 +166,24 @@ def run_query(reference_results, query, prime_buffer_cache, iterations):
     if "stddev" in reference_result:
       reference_stddev = float(reference_result["stddev"])
 
-  if prime_buffer_cache > 0:
-    # Run the query to prime the buffer cache.  It would be great to just get the files
-    # and cat them to /dev/null but that is not trivial.  Instead, parse for the table
-    # and run a count(*) query on the tables
-    tables = parse_tables(query)
-    for i in range (0, len(tables)):
-      count_cmd = '%s -query="select count(*) from %s" --iterations=%d ' \
-                  '-profile_output_file=""' % (options.query_cmd, tables[i],
-                  prime_buffer_cache)
-      subprocess.call(count_cmd, shell=True, stderr=dev_null, stdout=dev_null)
+  if prime_buffer_cache:
+    # On remote clusters, we'll prime the buffer cache by just running count(*)
+    # TODO: does this work well enough? Does having a real cluster and data
+    # locality make this more deterministic?
+    if options.remote:
+      tables = parse_tables(query)
+      for i in range (0, len(tables)):
+        count_cmd = '%s -query="select count(*) from %s" --iterations=5' % \
+                    (options.query_cmd, tables[i])
+        subprocess.call(count_cmd, shell=True, stderr=dev_null, stdout=dev_null)
+    else:
+      # On mini-dfs, we can prime the buffer cache by accessing the local file system
+      cmd = prime_cache_cmd % query
+      os.system(cmd)
 
   avg_time = 0
   stddev = ""
-  run_success = 0
+  run_success = False
 
   enable_counters = int(options.verbose)
   gprof_tmp_file = ""
@@ -186,7 +195,8 @@ def run_query(reference_results, query, prime_buffer_cache, iterations):
 
   # Run query
   query_output = tempfile.TemporaryFile("w+")
-  subprocess.call(cmd, shell=True, stderr=dev_null, stdout=query_output)
+  query_err = tempfile.TemporaryFile("w+")
+  subprocess.call(cmd, shell=True, stderr=query_err, stdout=query_output)
   query_output.seek(0)
   for line in query_output.readlines():
     if options.verbose != 0:
@@ -196,19 +206,26 @@ def run_query(reference_results, query, prime_buffer_cache, iterations):
       match = re.search(result_single_regex, line)
       if match:
         avg_time = ('%s.%s') % (match.group(2), match.group(3))
-        run_success = 1
+        run_success = True
     else:
       match = re.search(result_multiple_regex, line)
       if match:
         avg_time = ('%s.%s') % (match.group(2), match.group(3))
         stddev = ('%s.%s') % (match.group(4), match.group(5))
-        run_success = 1
-  query_output.close()
+        run_success = True
 
-  if run_success == 0:
-    print "Query: " + query
+  if not run_success:
     print "Query did not run succesfully"
+    query_output.seek(0)
+    query_err.seek(0)
+    for line in query_output.readlines():
+      print line.rstrip()
+    for line in query_err.readlines():
+      print line.rstrip()
     sys.exit(1)
+  
+  query_err.close()
+  query_output.close()
 
   if options.profiler:
     subprocess.call(gprof_cmd % gprof_tmp_file, shell=True)
@@ -260,7 +277,7 @@ reference_results = parse_reference_results(options.reference_result_file)
 # automatically flag regressions.  How do we reconcile the fact we are running on
 # different machines?
 queries = {'grep1GB': [
-  ["select count(*) from %(table_name)s", 5, 5],
+  ["select count(*) from %(table_name)s", 1, 5],
   ["select count(field) from %(table_name)s", 0, 5],
   ["select count(field) from %(table_name)s where field like '%%xyz%%'", 0, 5]
   ],
@@ -269,16 +286,16 @@ queries = {'grep1GB': [
   ["select uv.sourceip, avg(r.pagerank), sum(uv.adrevenue) as totalrevenue "\
    "from uservisits_%(table_name)s uv join rankings_%(table_name)s r on "\
    "(r.pageurl = uv.desturl) where uv.visitdate > '1999-01-01' and uv.visitdate "\
-   "< '2000-01-01' group by uv.sourceip order by totalrevenue desc limit 1", 5, 5],
+   "< '2000-01-01' group by uv.sourceip order by totalrevenue desc limit 1", 1, 5],
   ["select sourceIP, SUM(adRevenue) FROM uservisits_%(table_name)s GROUP by sourceIP "\
-   "order by SUM(adRevenue) desc limit 10", 5, 5],
+   "order by SUM(adRevenue) desc limit 10", 1, 5],
   ["select pageRank, pageURL from rankings_%(table_name)s where pageRank > 10 "\
-   "order by pageRank limit 100", 0, 5],
+   "order by pageRank limit 100", 1, 5],
   ["select count(*) from rankings_%(table_name)s where "\
-   "pageRank > 10 && pageRank < 25", 0, 5],
-  ["select avg(adRevenue) from uservisits_%(table_name)s", 0, 5],
+   "pageRank > 10 && pageRank < 25", 1, 5],
+  ["select avg(adRevenue) from uservisits_%(table_name)s", 1, 5],
   ["select avg(adRevenue) from uservisits_%(table_name)s "\
-   "where visitdate > '1999-07-01' and visitdate < '1999-12-31'", 0, 5],
+   "where visitdate > '1999-07-01' and visitdate < '1999-12-31'", 1, 5],
   ],
 
   'grep10GB': [
