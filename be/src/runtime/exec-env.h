@@ -32,12 +32,16 @@ class ExecEnv {
   // special c'tor for TestExecEnv::BackendInfo so that multiple in-process backends
   // can share a single fs cache
   ExecEnv(HdfsFsCache* fs_cache);
-  
+
   DataStreamMgr* stream_mgr() { return stream_mgr_; }
-  sparrow::Scheduler* scheduler() { return scheduler_; }
   BackendClientCache* client_cache() { return client_cache_; }
   HdfsFsCache* fs_cache() { return fs_cache_; }
   HBaseTableCache* htable_cache() { return htable_cache_; }
+
+  sparrow::Scheduler* scheduler() {
+    DCHECK(scheduler_ != NULL);
+    return scheduler_;
+  }
 
  private:
   boost::scoped_ptr<DataStreamMgr> stream_mgr_impl_;

@@ -35,10 +35,6 @@ class TestExecEnv : public ExecEnv {
   int num_backends_;
   int start_port_;
 
-  class TestScheduler;
-
-  boost::scoped_ptr<TestScheduler> test_scheduler_;
-
   struct BackendInfo;
   std::vector<BackendInfo*> backend_info_;  // owned by us
 

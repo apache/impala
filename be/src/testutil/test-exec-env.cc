@@ -12,13 +12,13 @@
 #include "runtime/client-cache.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/hdfs-fs-cache.h"
-#include "sparrow/scheduler.h"
+#include "sparrow/simple-scheduler.h"
 #include "gen-cpp/ImpalaBackendService.h"
 
 using namespace boost;
 using namespace std;
 using namespace apache::thrift::server;
-using sparrow::Scheduler;
+using sparrow::SimpleScheduler;
 
 namespace impala {
 
@@ -30,33 +30,17 @@ struct TestExecEnv::BackendInfo {
   BackendInfo(HdfsFsCache* fs_cache) : server(NULL), exec_env(fs_cache) {}
 };
 
-class TestExecEnv::TestScheduler : public Scheduler {
- public:
-  TestScheduler(TestExecEnv* parent): parent_(parent) {}
-
-  virtual Status GetHosts(
-      const vector<THostPort>& data_locations,
-      vector<pair<string, int> >* hostports); 
- 
- private:
-  TestExecEnv* parent_;
-};
-
-Status TestExecEnv::TestScheduler::GetHosts(
-    const vector<THostPort>& data_locations, vector<pair<std::string, int> >* hostports) {
-  hostports->clear();
-  for (int i = 0; i < data_locations.size(); ++i) {
-    hostports->push_back(make_pair(
-        "localhost", parent_->start_port_ + (i % parent_->num_backends_)));
-  }
-  return Status::OK;
-}
-
 TestExecEnv::TestExecEnv(int num_backends, int start_port)
   : num_backends_(num_backends),
-    start_port_(start_port),
-    test_scheduler_(new TestScheduler(this)) {
-  scheduler_ = test_scheduler_.get();
+    start_port_(start_port) {
+  vector<THostPort> addresses;
+  for (int i = 0; i < num_backends; ++i) {
+    addresses.push_back(THostPort());
+    THostPort& addr = addresses.back();
+    addr.host = "localhost";
+    addr.port = start_port + i;
+  }
+  scheduler_ = new SimpleScheduler(addresses);
 }
 
 TestExecEnv::~TestExecEnv() {

@@ -1,0 +1,128 @@
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+
+#include <gtest/gtest.h>
+#include <glog/logging.h>
+// include gflags.h *after* logging.h, otherwise the linker will complain about
+// undefined references to FLAGS_v
+#include <gflags/gflags.h>
+
+#include <boost/scoped_ptr.hpp>
+
+#include "simple-scheduler.h"
+
+using namespace std;
+using namespace boost;
+using sparrow::SimpleScheduler;
+
+namespace impala {
+
+class SimpleSchedulerTest : public testing::Test {
+ protected:
+  SimpleSchedulerTest() {
+    // Setup localhost_scheduler
+    num_backends_ = 3;
+    base_port_ = 1000;
+    vector<THostPort> backends;
+    backends.resize(num_backends_);
+    for (int i = 0; i < num_backends_; ++i) {
+      backends.at(i).host = "localhost";
+      backends.at(i).port = base_port_ + i;
+    }
+    localhost_scheduler_.reset(new SimpleScheduler(backends));
+
+    // Setup remote_scheduler
+    for (int i = 0; i < num_backends_; ++i) {
+      stringstream ss;
+      ss << "host_" << i;
+      backends.at(i).host = ss.str();
+      backends.at(i).port = base_port_ + i;
+    }
+    remote_scheduler_.reset(new SimpleScheduler(backends));
+
+    // Setup local_remote_scheduler_
+    backends.resize(4);
+    int k = 0;
+    for (int i = 0; i < 2; ++i) {
+      for (int j = 0; j < 2; ++j) {
+        stringstream ss;
+        ss << "host_" << i;
+        backends.at(k).host = ss.str();
+        backends.at(k).port = base_port_ + j;
+        ++k;
+      }
+    }
+    local_remote_scheduler_.reset(new SimpleScheduler(backends));
+  }
+
+  int base_port_;
+  int num_backends_;
+
+  // This scheduler has 3 backends, all on localhost but have 3 different ports.
+  boost::scoped_ptr<SimpleScheduler> localhost_scheduler_;
+
+  // This scheduler has 3 backends on different host and have 3 different ports.
+  boost::scoped_ptr<SimpleScheduler> remote_scheduler_;
+
+  // This scheduler has 4 backends; 2 on each host and have 4 different ports.
+  boost::scoped_ptr<SimpleScheduler> local_remote_scheduler_;
+};
+
+
+TEST_F(SimpleSchedulerTest, LocalMatches) {
+  // If data location matches some back end, use the matched backends in round robin.
+  vector<THostPort> data_locations;
+  data_locations.resize(5);
+  for (int i = 0; i < 5; ++i) {
+    data_locations.at(i).host = "host_1";
+    data_locations.at(i).port = 0;
+  }
+  vector<pair<string, int> > hostports;
+
+  local_remote_scheduler_->GetHosts(data_locations, &hostports);
+
+  // Expect 5 round robin hostports
+  EXPECT_EQ(5, hostports.size());
+  for (int i = 0; i < 5; ++i) {
+    EXPECT_EQ(hostports.at(i).first, "host_1");
+    EXPECT_EQ(hostports.at(i).second, base_port_ + i % 2);
+  }
+}
+
+TEST_F(SimpleSchedulerTest, NonLocalHost) {
+  // If data location doesn't match any of the host, expect round robin host/port list
+  vector<THostPort> data_locations;
+  data_locations.resize(5);
+  for (int i = 0; i < 5; ++i) {
+    data_locations.at(i).host = "non exists host";
+    data_locations.at(i).port = 0;
+  }
+  vector<pair<string, int> > hostports;
+
+  local_remote_scheduler_->GetHosts(data_locations, &hostports);
+
+  // Expect 5 round robin on host, then on port
+  // 1. host_0:1000
+  // 2. host_1:1000
+  // 3. host_0:1001
+  // 4. host_1:1001
+  // 5. host_0:1000
+  EXPECT_EQ(5, hostports.size());
+  EXPECT_EQ(hostports.at(0).first, "host_1");
+  EXPECT_EQ(hostports.at(0).second, 1000);
+  EXPECT_EQ(hostports.at(1).first, "host_0");
+  EXPECT_EQ(hostports.at(1).second, 1000);
+  EXPECT_EQ(hostports.at(2).first, "host_1");
+  EXPECT_EQ(hostports.at(2).second, 1001);
+  EXPECT_EQ(hostports.at(3).first, "host_0");
+  EXPECT_EQ(hostports.at(3).second, 1001);
+  EXPECT_EQ(hostports.at(4).first, "host_1");
+  EXPECT_EQ(hostports.at(4).second, 1000);
+}
+
+}
+
+int main(int argc, char **argv) {
+  google::InitGoogleLogging(argv[0]);
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}

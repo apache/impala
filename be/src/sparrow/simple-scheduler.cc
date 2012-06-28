@@ -1,7 +1,8 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
+#include <vector>
+
 #include <glog/logging.h>
-#include <gflags/gflags.h>
 
 #include <boost/algorithm/string.hpp>
 
@@ -13,22 +14,13 @@ using namespace boost;
 using impala::Status;
 using impala::THostPort;
 
-DEFINE_string(backends, "", "comma-separated list of <host:port> pairs");
-
 namespace sparrow {
 
-SimpleScheduler::SimpleScheduler() {
-  if (FLAGS_backends.empty()) return;
-  vector<string> backends;
-  split(backends, FLAGS_backends, is_any_of(","));
+SimpleScheduler::SimpleScheduler(const vector<THostPort>& backends) {
+  DCHECK(backends.size() > 0);
   for (int i = 0; i < backends.size(); ++i) {
-    int pos = backends[i].find(':');
-    if (pos == string::npos) {
-      LOG(ERROR) << "ignoring backend " << backends[i] << ": missing ':'";
-      continue;
-    }
-    string host = backends[i].substr(0, pos);
-    int port = atoi(backends[i].substr(pos + 1).c_str());
+    string host = backends[i].host;
+    int port = backends[i].port;
 
     HostMap::iterator i = host_map_.find(host);
     if (i == host_map_.end()) {
@@ -36,6 +28,7 @@ SimpleScheduler::SimpleScheduler() {
     }
     i->second.push_back(port);
   }
+  next_nonlocal_host_entry_ = host_map_.begin();
 }
 
 Status SimpleScheduler::GetHosts(
@@ -44,14 +37,20 @@ Status SimpleScheduler::GetHosts(
   for (int i = 0; i < data_locations.size(); ++i) {
     HostMap::iterator entry = host_map_.find(data_locations[i].host);
     if (entry == host_map_.end()) {
-      // TODO: should we make an effort to pick a random host?
-      entry = host_map_.begin();
+      // round robin the host
+      entry = next_nonlocal_host_entry_;
+      ++next_nonlocal_host_entry_;
+      if (next_nonlocal_host_entry_ == host_map_.end()) {
+        next_nonlocal_host_entry_ = host_map_.begin();
+      }
     }
     DCHECK(!entry->second.empty());
-    // TODO: return a randomly selected backend for this host?
-    // Will we ever have multiple backends on the same host, other
-    // than in a test setup?
-    hostports->push_back(make_pair(entry->first, entry->second.front()));
+    // Round-robin between impalads on the same host. Pick the first one, then move it
+    // to the back of the queue
+    int port = entry->second.front();
+    hostports->push_back(make_pair(entry->first, port));
+    entry->second.pop_front();
+    entry->second.push_back(port);
     VLOG(1) << "SimpleScheduler: selecting "
             << entry->first << ":" << entry->second.front();
   }

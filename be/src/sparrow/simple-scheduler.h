@@ -18,12 +18,15 @@ namespace sparrow {
 // Returns hosts "registered" via FLAGS_backends.
 class SimpleScheduler : public Scheduler {
  public:
-  // Initialize w/ contents of FLAGS_backends.
-  SimpleScheduler();
+  // Initialize with a list of <host:port> pairs.
+  SimpleScheduler(const std::vector<impala::THostPort>& backends);
   
-  // Returns a list of backends in hostports from FLAGS_backends. For each data_location,
-  // the first backend whose host matches is inserted into hostports. If no match is
-  // found for a data location, the first backend in the list is inserted.
+  // Returns a list of backends such that the impalad at hostports[i] should be used to
+  // read data from data_locations[i].
+  // For each data_location, we choose a backend whose host matches the data_location in
+  // a round robin fashion and insert it into hostports.
+  // If no match is found for a data location, assign the data location in round-robin
+  // order to any of the backends.
   virtual impala::Status GetHosts(
       const std::vector<impala::THostPort>& data_locations,
       std::vector<std::pair<std::string, int> >* hostports);
@@ -33,6 +36,9 @@ class SimpleScheduler : public Scheduler {
   // are listening
   typedef boost::unordered_map<std::string, std::list<int> > HostMap;
   HostMap host_map_;
+
+  // round robin entry in HostMap for non-local host assignment
+  HostMap::iterator next_nonlocal_host_entry_;
 };
 
 }
