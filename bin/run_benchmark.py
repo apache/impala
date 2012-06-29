@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #
 # This script should be used to benchmark queries.  It can either run in batch mode, in
 # which case it will run the set of hive benchmark queries or to run a single query.  In
@@ -11,16 +12,13 @@
 # can be passed which will enable gprof instrumentation and output the sampled call
 # stacks.  The -v and -p option are used by the perf regression tests.
 #
-# The script can also compare results against existing results.  The file that it looks
-# for is in $IMPALA_HOME/hive_benchmark_results.txt.  If the query is in that file, it
-# will compare against the mean from that file.  The output of this script can be copy and
-# pasted into that file. TODO: make this better.
-#
 # The script parses for output in the specific format in the regex below (result_regex).
 # This is not very robust but probably okay for this script.
 #
 # The planservice needs to be running before this script.
 # Run with the --help option to see the arguments.
+import collections
+import csv
 import math
 import os
 import re
@@ -48,14 +46,14 @@ parser.add_option("--prime_cache", dest="prime_cache", default= True,
 parser.add_option("--exploration_strategy", dest="exploration_strategy", default="core",
                   help="The exploration strategy to use for running benchmark: 'core', "\
                   "'pairwise', or 'exhaustive'")
-parser.add_option("--reference_result_file_name", dest="reference_result_file",
-                  default='hive_benchmark_results.txt',
-                  help="The reference result file to use for comparison.")
 parser.add_option("--query_cmd", dest="query_cmd",
                   default='build/release/service/runquery -profile_output_file=""',
                   help="The command to use for executing queries")
 parser.add_option("--compare_with_hive", dest="compare_with_hive", action="store_true",
                   default= False, help="Run all queries using Hive as well as Impala")
+parser.add_option("--results_csv_file", dest="results_csv_file",
+                  default=os.environ['IMPALA_HOME'] + "/benchmark_results.csv",
+                  help="The output file where benchmark results are saved")
 
 (options, args) = parser.parse_args()
 
@@ -74,6 +72,19 @@ END = '\033[0m'
 
 dev_null = open('/dev/null')
 
+class QueryExecutionResult:
+  def __init__(self, avg_time = '', stddev = ''):
+    self.avg_time = avg_time
+    self.stddev = stddev
+
+class QueryExecutionDetail:
+  def __init__(self,  file_format, compression, impala_execution_result,
+               hive_execution_result):
+    self.impala_execution_result = impala_execution_result
+    self.hive_execution_result = hive_execution_result
+    self.file_format = file_format
+    self.compression = compression
+
 # Parse for the tables used in this query
 def parse_tables(query):
   table_predecessor = ['from', 'join']
@@ -89,31 +100,28 @@ def parse_tables(query):
       next_is_table = 1
   return tables
 
-# Parse out the reference results so far
-def parse_reference_results(reference_result_file_name):
-  try:
-    results = {}
-    current_result = {}
-    full_path = os.environ['IMPALA_HOME'] + "/" + reference_result_file_name
-    f = open(full_path)
-    for line in f:
-      line = line.strip()
-      if line.startswith("Query:"):
-        current_result = {}
-        query = line[line.find(":") + 1:].strip()
-        results[query] = current_result
-      elif line.startswith("Avg Time:"):
-        time = line[line.find(":") + 1:].strip()
-        time = time[0:len(time) - 1]
-        current_result["avg"] = time
-      elif line.startswith("Std Dev:"):
-        time = line[line.find(":") + 1:].strip()
-        time = time[0:len(time) - 1]
-        current_result["stddev"] = time
-    return results
-  except IOError:
-    print "Could not find previous run results."
-    return {}
+def prime_buffer_cache_remote_impala(query):
+  # On remote clusters, we'll prime the buffer cache by just running count(*)
+  # TODO: does this work well enough? Does having a real cluster and data
+  # locality make this more deterministic?
+  tables = parse_tables(query)
+  for table in tables:
+    count_cmd = '%s -query="select count(*) from %s" --iterations=5' % \
+                (options.query_cmd, table)
+    subprocess.call(count_cmd, shell=True, stderr=dev_null, stdout=dev_null)
+
+def prime_buffer_cache_remote_hive(query):
+  tables = parse_tables(query)
+  for table in tables:
+    for iteration in range(5):
+      count_query = 'select count(*) from %s' % table
+      subprocess.call("hive -e \"%s\"" % count_query, shell=True,
+                      stderr=dev_ull, stdout=dev_null)
+
+def prime_buffer_cache_local(query):
+  # On mini-dfs, we can prime the buffer cache by accessing the local file system
+  cmd = prime_cache_cmd % query
+  os.system(cmd)
 
 def calculate_avg(values):
   return sum(values) / float(len(values))
@@ -122,10 +130,17 @@ def calculate_stddev(values):
   avg = calculate_avg(values)
   return math.sqrt(calculate_avg([(val - avg)**2 for val in values]))
 
-def run_query_using_hive(query, iterations):
-  queryString = (query.strip() + ';') * iterations
+def run_query_using_hive(query, prime_buffer_cache, iterations):
+  query = query.strip()
+  if prime_buffer_cache:
+    if options.remote:
+      prime_buffer_cache_remote_hive(query)
+    else:
+      prime_buffer_cache_local(query)
+
+  query_string = (query + ';') * iterations
   query_output = tempfile.TemporaryFile("w+")
-  subprocess.call("hive -e \"%s\"" % queryString, shell=True,
+  subprocess.call("hive -e \"%s\"" % query_string, shell=True,
                   stderr=query_output, stdout=dev_null)
   query_output.seek(0)
   execution_times = []
@@ -136,12 +151,16 @@ def run_query_using_hive(query, iterations):
         print line
       execution_times.append(float(('%s.%s') % (match.group(1), match.group(2))))
 
+  execution_result = QueryExecutionResult("N/A", "N/A")
   if len(execution_times) == iterations:
-    output =  "  Avg Time: %fs\n" % calculate_avg(execution_times)
-    output += "  Std Dev: %fs\n" % calculate_stddev(execution_times)
-    return output
+    avg_time = calculate_avg(execution_times)
+    stddev = calculate_stddev(execution_times)
+    output =  "  Avg Time: %fs\n" % avg_time
+    output += "  Std Dev: %fs\n" % stddev
+    execution_result = QueryExecutionResult(str(avg_time), str(stddev))
   else:
-    return "Error parsing Hive execution results. Check Hive logs."
+    output = "Error parsing Hive execution results. Check Hive logs."
+  return [output, execution_result]
 
 # Function which will run the query and report the average time and standard deviation
 #   - reference_results: a dictionary with <query string,reference result> values
@@ -152,34 +171,16 @@ def run_query_using_hive(query, iterations):
 #   - iterations: number of times to run the query
 # Returns two strings as output.  The first string is the summary of the query run.
 # The second is the comparison output against reference results if there are any.
-def run_query(reference_results, query, prime_buffer_cache, iterations):
+def run_query(query, prime_buffer_cache, iterations):
   query = query.strip()
   compare_output = ""
   output = ""
 
-  reference_avg = 0
-  reference_stddev = 0
-  if query in reference_results:
-    reference_result = reference_results[query]
-    if "avg" in reference_result:
-      reference_avg = float(reference_result["avg"])
-    if "stddev" in reference_result:
-      reference_stddev = float(reference_result["stddev"])
-
   if prime_buffer_cache:
-    # On remote clusters, we'll prime the buffer cache by just running count(*)
-    # TODO: does this work well enough? Does having a real cluster and data
-    # locality make this more deterministic?
     if options.remote:
-      tables = parse_tables(query)
-      for i in range (0, len(tables)):
-        count_cmd = '%s -query="select count(*) from %s" --iterations=5' % \
-                    (options.query_cmd, tables[i])
-        subprocess.call(count_cmd, shell=True, stderr=dev_null, stdout=dev_null)
+      prime_buffer_cache_remote_impala(query)
     else:
-      # On mini-dfs, we can prime the buffer cache by accessing the local file system
-      cmd = prime_cache_cmd % query
-      os.system(cmd)
+      prime_buffer_cache_local(query)
 
   avg_time = 0
   stddev = ""
@@ -223,7 +224,7 @@ def run_query(reference_results, query, prime_buffer_cache, iterations):
     for line in query_err.readlines():
       print line.rstrip()
     sys.exit(1)
-  
+
   query_err.close()
   query_output.close()
 
@@ -237,21 +238,9 @@ def run_query(reference_results, query, prime_buffer_cache, iterations):
   if len(stddev) != 0:
     output += "  Std Dev:  " + stddev + "s\n"
 
-  # TODO: some kind of statistics against reference_result/reference_stddev?
-  if reference_avg != 0:
-    compare_output = "Query: %s\n" % (query)
-    if avg_time < reference_avg:
-      diff = (reference_avg - avg_time) / reference_avg * 100
-      compare_output += "  Avg Time: %fs (-%s%.2f%%%s)\n" % (avg_time, GREEN, diff, END)
-    else:
-      diff = (avg_time - reference_avg) / reference_avg * 100
-      compare_output += "  Avg Time: %fs (+%s%.2f%%%s)\n" % (avg_time, RED, diff, END)
-    if len(stddev) != 0:
-      compare_output += "  Std Dev:  " + stddev + "s\n"
-
   output.rstrip()
-  compare_output.rstrip()
-  return [output, compare_output]
+  execution_result = QueryExecutionResult(str(avg_time), str(stddev))
+  return [output, execution_result]
 
 def choose_input_vector_file_name(exploration_strategy):
   return "benchmark_%s.vector" % exploration_strategy
@@ -262,8 +251,6 @@ def build_query(
   return query_format_string % {'table_name': table_name}
 
 os.chdir(os.environ['IMPALA_BE_DIR'])
-
-reference_results = parse_reference_results(options.reference_result_file)
 
 # This table contains a hash of dataset -> [query, numbers of times to prime buffer cache,
 # number of iterations].  Queries should be grouped by the data they touch.  This
@@ -298,36 +285,57 @@ queries = {'grep1GB': [
   ]
 }
 
+# Writes out results to a CSV file. Columns are delimited by '|' characters
+def write_to_csv(result_map, output_csv_file):
+  csv_writer = csv.writer(open(output_csv_file, 'wb'),
+                          delimiter='|',
+                          quoting=csv.QUOTE_MINIMAL)
+
+  for query, execution_results in result_map.iteritems():
+    for result in execution_results:
+      csv_writer.writerow([query, result.file_format, result.compression,
+                           result.impala_execution_result.avg_time,
+                           result.impala_execution_result.stddev,
+                           result.hive_execution_result.avg_time,
+                           result.hive_execution_result.stddev])
+
 # Run all queries
 if (len(options.query) == 0):
   vector_file = open(
     '../testdata/bin/' + choose_input_vector_file_name(options.exploration_strategy))
   output = ""
-  compare_output = ""
+  result_map = collections.defaultdict(list)
 
   for line in vector_file:
     file_format, data_set, compression = line.split()[:3]
     for query in queries[data_set]:
       query_string = build_query(query[0], options.exploration_strategy, data_set,
-                      file_format, compression)
-      result = run_query(reference_results, query_string, query[1], query[2])
+                                 file_format, compression)
+      result = run_query(query_string, query[1], query[2])
       output += result[0]
-      compare_output += result[1]
-      print result[1] or result[0]
+      print result[0]
+      execution_result = result[1]
+      hive_execution_result = QueryExecutionResult("N/A", "N/A")
       if options.compare_with_hive:
+        hive_result = run_query_using_hive(query_string, query[1], query[2])
         print "Hive Results:"
-        print run_query_using_hive(query_string, query[2])
+        print hive_result[0]
+        hive_execution_result = hive_result[1]
       if options.verbose != 0:
-        print "---------------------------------------------------------------------------"
+        print "--------------------------------------------------------------------------"
+
+      execution_detail = QueryExecutionDetail(file_format, compression, execution_result,
+                                              hive_execution_result)
+      result_map[query[0]].append(execution_detail)
   vector_file.close()
 
-  print compare_output
-  print "\nCopy and paste below to %s/%s to update the reference results:" % \
-        (os.environ['IMPALA_HOME'], options.reference_result_file)
+  print "\nResults saving to: " + options.results_csv_file
+  write_to_csv(result_map, options.results_csv_file)
+
   print output
 
 # Run query from command line
 else:
-  result = run_query(reference_results, options.query, int(options.prime_cache),
+  result = run_query(options.query, int(options.prime_cache),
                     int(options.iterations))
   print result[1] or result[0]
