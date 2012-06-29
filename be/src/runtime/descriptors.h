@@ -172,8 +172,10 @@ class HdfsPartitionDescriptor {
   // True if PrepareExprs has been called, to prevent repeating expensive codegen
   bool exprs_prepared_;
 
-  // List of literal expressions for each partition key. The Expr objects are owned by the
-  // local object pool.
+  // List of literal (and therefore constant) expressions for each
+  // partition key. The Expr objects are owned by the local object
+  // pool. Their order corresponds to the first num_clustering_cols of
+  // the parent table.
   std::vector<Expr*> partition_key_values_;
 
   // The format (e.g. text, sequence file etc.) of data in the files in this partition
@@ -195,14 +197,16 @@ class HdfsTableDescriptor : public TableDescriptor {
     return null_partition_key_value_;
   }
 
+  typedef std::map<int64_t, HdfsPartitionDescriptor*> PartitionIdToDescriptorMap;
+
   HdfsPartitionDescriptor* GetPartition(int64_t partition_id) const {
-    std::map<int64_t, HdfsPartitionDescriptor*>::const_iterator it =
+    PartitionIdToDescriptorMap::const_iterator it =
         partition_descriptors_.find(partition_id);
     if (it == partition_descriptors_.end()) return NULL;
     return it->second;
   }
 
-  const std::map<int64_t, HdfsPartitionDescriptor*>& partition_descriptors() const {
+  const PartitionIdToDescriptorMap& partition_descriptors() const {
     return partition_descriptors_;
   }
 
@@ -212,7 +216,7 @@ class HdfsTableDescriptor : public TableDescriptor {
   std::string hdfs_base_dir_;
   std::vector<std::string> partition_key_names_;
   std::string null_partition_key_value_;
-  std::map<int64_t, HdfsPartitionDescriptor*> partition_descriptors_;
+  PartitionIdToDescriptorMap partition_descriptors_;
   // Owned by DescriptorTbl
   ObjectPool* object_pool_;
 };

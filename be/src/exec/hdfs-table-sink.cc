@@ -77,17 +77,62 @@ Status HdfsTableSink::Init(RuntimeState* state) {
     error_msg << table_id_;
     return Status(error_msg.str());
   }
-  // Get file format for default partition int table descriptor.
-  // TODO: Make insert partition (and therefore format) aware
-  map<int64_t, HdfsPartitionDescriptor*>::const_iterator it =
-      table_desc_->partition_descriptors().find(
-      g_JavaConstants_constants.DEFAULT_PARTITION_ID);
-  if (it == table_desc_->partition_descriptors().end()) {
-    return Status("No default partition found for HdfsTextTableSink");
-  }
-  default_partition_ = it->second;
 
   PrepareExprs(state);
+
+  // Get file format for default partition in table descriptor, and
+  // build a map from partition key values to partition descriptor for
+  // multiple output format support. The map is keyed on the
+  // concatenation of the non-constant keys of the PARTITION clause of
+  // the INSERT statement.
+  HdfsTableDescriptor::PartitionIdToDescriptorMap::const_iterator it;
+  for (it = table_desc_->partition_descriptors().begin();
+       it != table_desc_->partition_descriptors().end();
+       ++it) {
+    if (it->first == g_JavaConstants_constants.DEFAULT_PARTITION_ID) {
+      default_partition_ = it->second;
+    } else {
+      // Evaluate non-constant partition keys and build a map from hash value to
+      // partition descriptor
+      bool relevant_partition = true;
+      HdfsPartitionDescriptor* partition = it->second;
+      partition->PrepareExprs(state);
+      DCHECK_EQ(partition->partition_key_values().size(), partition_key_exprs_.size());
+      vector<Expr*> dynamic_partition_key_values;
+      for (size_t i = 0; i < partition_key_exprs_.size(); ++i) {
+        // Remember non-constant partition key exprs for building hash table of Hdfs files
+        if (!partition_key_exprs_[i]->IsConstant()) {
+          dynamic_partition_key_values.push_back(
+              partition->partition_key_values()[i]);
+        } else {
+          // Deal with the following: one partition has (year=2009, month=3); another has
+          // (year=2010, month=3).
+          // A query like: INSERT INTO TABLE... PARTITION(year=2009) SELECT month FROM...
+          // would lead to both partitions having the same key modulo ignored constant
+          // partition keys. So only keep a reference to the partition which matches
+          // partition_key_values for constant values, since only that will be written to.
+          if (!RawValue::Eq(partition->partition_key_values()[i]->GetValue(NULL),
+                           partition_key_exprs_[i]->GetValue(NULL),
+                           partition_key_exprs_[i]->type())) {
+            relevant_partition = false;
+            break;
+          }
+        }
+      }
+      if (relevant_partition) {
+        string key;
+        // It's ok if current_row_ is NULL (which it should be here), since all of these
+        // expressions are constant, and can therefore be evaluated without a valid row
+        // context.
+        GetHashTblKey(dynamic_partition_key_values, &key);
+        partition_descriptor_map_[key] = partition;
+      }
+    }
+  }
+
+  if (default_partition_ == NULL) {
+    return Status("No default partition found for HdfsTextTableSink");
+  }
 
   // Get Hdfs connection from runtime state.
   hdfs_connection_ = state->fs_cache()->GetDefaultConnection();
@@ -142,34 +187,37 @@ void HdfsTableSink::BuildHdfsFileNames(OutputPartition* output) {
   output->tmp_hdfs_file_name = tmp_hdfs_file_name.str();
 }
 
-Status HdfsTableSink::InitOutputPartition(OutputPartition* output) {
-  BuildHdfsFileNames(output);
+Status HdfsTableSink::InitOutputPartition(
+    const HdfsPartitionDescriptor& partition_descriptor,
+    OutputPartition* output_partition) {
+  BuildHdfsFileNames(output_partition);
 
-  output->hdfs_connection = hdfs_connection_;
+  output_partition->hdfs_connection = hdfs_connection_;
   // Check if tmp_hdfs_file_name exists.
-  const char* tmp_hdfs_file_name_cstr = output->tmp_hdfs_file_name.c_str();
+  const char* tmp_hdfs_file_name_cstr = output_partition->tmp_hdfs_file_name.c_str();
   if (hdfsExists(hdfs_connection_, tmp_hdfs_file_name_cstr) == 0) {
     return Status(AppendHdfsErrorMessage("Temporary HDFS file already exists: ",
-                                         output->tmp_hdfs_file_name));
+                                         output_partition->tmp_hdfs_file_name));
   }
   // Open tmp_hdfs_file_name.
-  output->tmp_hdfs_file = hdfsOpenFile(hdfs_connection_,
-      tmp_hdfs_file_name_cstr, O_WRONLY, 0, 0, default_partition_->block_size());
-  if (output->tmp_hdfs_file == NULL) {
+  output_partition->tmp_hdfs_file = hdfsOpenFile(hdfs_connection_,
+      tmp_hdfs_file_name_cstr, O_WRONLY, 0, 0, partition_descriptor.block_size());
+  if (output_partition->tmp_hdfs_file == NULL) {
     return Status(AppendHdfsErrorMessage("Failed to open HDFS file for writing: ",
-                                         output->tmp_hdfs_file_name));
+                                         output_partition->tmp_hdfs_file_name));
   }
-  output->num_rows = 0;
-  switch (default_partition_->file_format()) {
+  output_partition->num_rows = 0;
+  switch (partition_descriptor.file_format()) {
     case THdfsFileFormat::TEXT: {
-      output->writer.reset(
-          new HdfsTextTableWriter(output, default_partition_, table_desc_, output_exprs_));
+      output_partition->writer.reset(
+          new HdfsTextTableWriter(output_partition, &partition_descriptor, table_desc_,
+                                  output_exprs_));
       break;
     }
-    default: 
+    default:
       stringstream error_msg;
       map<int, const char*>::const_iterator i =
-          _THdfsFileFormat_VALUES_TO_NAMES.find(table_format_);
+          _THdfsFileFormat_VALUES_TO_NAMES.find(partition_descriptor.file_format());
       const char* str = "Unknown data sink type ";
       if (i != _THdfsFileFormat_VALUES_TO_NAMES.end()) {
         str = i->second;
@@ -180,12 +228,12 @@ Status HdfsTableSink::InitOutputPartition(OutputPartition* output) {
   return Status::OK;
 }
 
-void HdfsTableSink::GetHashTblKey(string* key) {
+void HdfsTableSink::GetHashTblKey(const vector<Expr*>& exprs, string* key) {
   stringstream hash_table_key;
   TColumnValue col_val;
-  for (int i = 0; i < dynamic_partition_key_exprs_.size(); ++i) {
-    RawValue::PrintValueAsBytes(dynamic_partition_key_exprs_[i]->GetValue(current_row_),
-                                dynamic_partition_key_exprs_[0]->type(), &hash_table_key);
+  for (int i = 0; i < exprs.size(); ++i) {
+    RawValue::PrintValueAsBytes(exprs[i]->GetValue(current_row_),
+                                exprs[0]->type(), &hash_table_key);
     // Additionally append "/" to avoid accidental key collisions.
     hash_table_key << "/";
   }
@@ -202,14 +250,19 @@ Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch) {
       key = "";
       existing_partition = partition_keys_to_output_partitions_.begin();
     } else {
-      GetHashTblKey(&key);
+      GetHashTblKey(dynamic_partition_key_exprs_, &key);
       existing_partition = partition_keys_to_output_partitions_.find(key);
     }
     if (existing_partition == partition_keys_to_output_partitions_.end()) {
       // Create a new OutputPartition, and add it to
       // partition_keys_to_output_partitions.
+      const HdfsPartitionDescriptor* partition_descriptor = default_partition_;
+      PartitionDescriptorMap::const_iterator it = partition_descriptor_map_.find(key);
+      if (it != partition_descriptor_map_.end()) {
+        partition_descriptor = it->second;
+      }
       output = state->obj_pool()->Add(new OutputPartition());
-      RETURN_IF_ERROR(InitOutputPartition(output));
+      RETURN_IF_ERROR(InitOutputPartition(*partition_descriptor, output));
       partition_keys_to_output_partitions_[key] = output;
     } else {
       // Use existing output partition.

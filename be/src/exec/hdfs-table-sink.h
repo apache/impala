@@ -81,7 +81,7 @@ class HdfsTableSink : public DataSink {
   HdfsTableSink(const RowDescriptor& row_desc, const TUniqueId& query_id,
       const std::vector<TExpr>& select_list_texprs, const TDataSink& tsink);
 
-  // Prepares output_exprs and partition_key_exprs. 
+  // Prepares output_exprs and partition_key_exprs.
   // Also, connects to Hdfs, and prepares the single output partition for static inserts.
   virtual Status Init(RuntimeState* state);
 
@@ -92,16 +92,17 @@ class HdfsTableSink : public DataSink {
   // Remove original Hdfs files if overwrite was specified.
   virtual Status Close(RuntimeState* state);
 
-  // Initialises the filenames of a given output partition, and opens the temporary file.
-  Status InitOutputPartition(OutputPartition* output);
-
   std::string DebugString() const;
 
  private:
+  // Initialises the filenames of a given output partition, and opens the temporary file.
+  Status InitOutputPartition(const HdfsPartitionDescriptor& partition_descriptor,
+      OutputPartition* output_partition);
+
   // Generates string key for hash_tbl_ as a concatenation
-  // of all dynamic_partition_key_exprs_.
+  // of all evaluated exprs, evaluated against current_row_.
   // The generated string is much shorter than the full Hdfs file name.
-  void GetHashTblKey(std::string* key);
+  void GetHashTblKey(const std::vector<Expr*>& exprs, std::string* key);
 
   // Initialise and prepare select and partition key expressions
   Status PrepareExprs(RuntimeState* state);
@@ -156,9 +157,6 @@ class HdfsTableSink : public DataSink {
   // Table id resolved in Prepare() to set tuple_desc_;
   TableId table_id_;
 
-  // Format of table for sink.
-  THdfsFileFormat::type table_format_;
-
   // Thrift representation of select list exprs, saved in the constructor
   // to be used to initialise output_exprs_ in Init
   const std::vector<TExpr>& select_list_texprs_;
@@ -190,6 +188,13 @@ class HdfsTableSink : public DataSink {
   // Subset of partition_key_exprs_ which are not constant. Set in Prepare().
   // Used for generating the string key of hash_tbl_.
   std::vector<Expr*> dynamic_partition_key_exprs_;
+
+  // Map from row key (i.e. concatenated non-constant partition keys) to
+  // partition descriptor. We don't own the HdfsPartitionDescriptors, they
+  // belong to the table descriptor.
+  typedef boost::unordered_map<std::string, HdfsPartitionDescriptor*>
+      PartitionDescriptorMap;
+  PartitionDescriptorMap partition_descriptor_map_;
 };
 }
 #endif
