@@ -3,46 +3,51 @@
 #include <iostream>
 
 #include <glog/logging.h>
+#include <vector>
 
 #include "cache-hash-table.h"
+#include "cache-hash-table.inline.h"
+#include "standard-hash-table.h"
+#include "standard-hash-table.inline.h"
 #include "runtime/mem-pool.h"
+#include "util/debug-util.h"
 #include "util/hash-util.h"
 #include "util/runtime-profile.h"
+#include "util/stopwatch.h"
 
 using namespace impala;
 
 // Very basic hash aggregation prototype and test
-// TODO: Implement simple version of the currently-used hash table for comparison
-// TODO: Generalize beyond hash aggregation, beyond hashing one the one column, etc. 
+// TODO: Generalize beyond hash aggregation, beyond hashing on the one column, etc.
 
-
-BuildTuple* CacheHashTable::Find(const ProbeTuple* probe) {
-  uint32_t bucket = hash_id(probe->id) % num_buckets_;
-  for (int i = 0; i < buckets_[bucket].count; ++i) {
-    if (probe->id == buckets_[bucket].build_tuples[i].id) {
-      // found
-      return &buckets_[bucket].build_tuples[i];
-    }
-  }
-  return NULL;
+CacheHashTable::CacheHashTable() {
+  num_content_allocated_ = 0;
 }
 
-inline void CacheHashTable::Insert(const BuildTuple* row) {
-  // insert new
-  uint32_t hash = hash_id(row->id);
-  Bucket& bucket = buckets_[hash % num_buckets_];
-  DCHECK_LT(bucket.count, BUCKET_SIZE);
-  BuildTuple* tuple = &bucket.build_tuples[bucket.count];
-  tuple->count = row->count;
-  tuple->id = row->id;
-  tuple->hash = hash;
-  ++bucket.count;
+void CacheHashTable::BucketSizeDistribution() {
+  std::vector<int> bucket_size;
+  for (int i = 0; i < BUCKETS; ++i) {
+    int size = buckets_[i].count;
+    if (size >= bucket_size.size()) {
+      // grow bucket_size to fit this size
+      bucket_size.resize(size + 1, 0);
+    }
+    ++bucket_size[size];
+  }
+
+  std::stringstream distr;
+  for (int i = 0; i < bucket_size.size(); ++i) {
+    distr << i << ": " << bucket_size[i] << "\n";
+  }
+  LOG(INFO) << "Bucket Size Distribution\n" << distr.str();
 }
 
 
 // Update ht, which is doing a COUNT(*) GROUP BY id,
 // by having it process the new tuple probe.
-inline void Process(CacheHashTable* ht, const ProbeTuple* probe) {
+// Templatized on the type of hash table so we can reuse code without virtual calls.
+template<typename T>
+inline void Process(T* ht, const ProbeTuple* probe) {
   BuildTuple *existing = ht->Find(probe);
   if (existing != NULL) {
     ++existing->count;
@@ -65,17 +70,38 @@ ProbeTuple* GenTuples(int n, int max_id) {
   return tuples;
 }
 
+// Test ht by aggregating input, which is an array of num_tuples ProbeTuples
+// Templatized on the type of hash table so we can reuse code without virtual calls.
+template<typename T>
+uint64_t Test(T* ht, const ProbeTuple* input, uint64_t num_tuples)
+{
+  StopWatch time;
+  time.Start();
+  for (int i = 0; i < num_tuples; ++i) {
+    Process<T>(ht, &input[i]);
+  }
+  time.Stop();
+  return time.Ticks();
+}
+
 int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
 
-  CacheHashTable ht;
+  srand(time(NULL));
 
   const int NUM_TUPLES = 100000000; //10^8
-  ProbeTuple* input = GenTuples(NUM_TUPLES, CacheHashTable::MaxBuildTuples() / 2);
-  for (int i = 0; i < NUM_TUPLES; ++i) {
-    Process(&ht, &input[i]);
-  }
+  const int NUM_BUILD_TUPLES = 4 * CacheHashTable::MaxBuildTuples() / 10;
 
-  BuildTuple* first = ht.Find(&input[0]);
+  CacheHashTable cache_ht;
+  StandardHashTable std_ht;
+
+  ProbeTuple* input = GenTuples(NUM_TUPLES, NUM_BUILD_TUPLES);
+  uint64_t cache_time = Test<CacheHashTable>(&cache_ht, input, NUM_TUPLES);
+  LOG(ERROR) << "Cache-aware time: "
+             << PrettyPrinter::Print(cache_time, TCounterType::CPU_TICKS);
+  uint64_t std_time = Test<StandardHashTable>(&std_ht, input, NUM_TUPLES);
+
+  LOG(ERROR) << "Bucket-chained time: "
+             << PrettyPrinter::Print(std_time, TCounterType::CPU_TICKS);
   return 0;
 }
