@@ -5,7 +5,8 @@ thirdparty
 cscope.files
 cscope.out
 org.eclipse.jdt.core.prefs
-hive_benchmark_results.txt
+benchmark_results.csv
+reference_benchmark_results.csv
 testdata/data/test-warehouse
 
 pprof.out
