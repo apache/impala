@@ -33,13 +33,15 @@ parser.add_option("--no_output_table", dest="no_output_table", action="store_tru
                   default= False, help='Outputs results in table format to the console')
 parser.add_option("--verbose", "-v", dest="verbose", action="store_true",
                   default= False, help='Outputs to console with with increased verbosity')
+parser.add_option("--nocolor", dest="nocolor", action="store_true",
+                  default= False, help='Prints diff results without coloring the console')
 (options, args) = parser.parse_args()
 
 # Console color format strings
-GREEN = '\033[92m'
-YELLOW = '\033[93m'
-RED = '\033[91m'
-END = '\033[0m'
+GREEN = '' if options.nocolor else '\033[92m'
+YELLOW = '' if options.nocolor else '\033[93m'
+RED = '' if options.nocolor else '\033[91m'
+END =  '' if options.nocolor else '\033[0m'
 
 COLUMN_WIDTH = 18
 TOTAL_WIDTH = 122 if options.verbose else 90
@@ -79,7 +81,7 @@ def build_padded_row_string_comparison(row, diff_percent, column_width):
     # Since we have sliced the array, we need to substract 1 from the index
     if i == IMPALA_AVG_IDX - 1:
       color = GREEN if diff_percent >= 0.00 else RED
-      col = '{:s} ({:s}{:+.2f}%{:s})'.format(col, color, float(diff_percent), END)
+      col = '{0:s} ({1:s}{2:+.2f}%{3:s})'.format(col, color, float(diff_percent), END)
       row_string += col.ljust(column_width + 9)
     else:
       row_string += col.ljust(column_width)
@@ -100,7 +102,7 @@ def calculate_impala_hive_speedup(row):
   return impala_speedup
 
 def calculate_percentage_change(reference_val, new_val):
- return (float(reference_val) - float(new_val)) / float(reference_val) * 100
+  return (float(reference_val) - float(new_val)) / float(reference_val) * 100
 
 # Prints out the given result set in table format, grouped by query
 def print_table(results, verbose, reference_results = None):

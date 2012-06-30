@@ -281,7 +281,7 @@ queries = {'grep1GB': [
   ],
 
   'grep10GB': [
-  ["select count(field) from %(table_name)s where field like '%%xyz%%'", 0, 1]
+  ["select  count(field) from %(table_name)s where field like '%%xyz%%'", 0, 1]
   ]
 }
 
