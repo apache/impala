@@ -35,44 +35,51 @@ public class BlockIdGenerator {
       throw new Exception("Invalid args: BlockIdGenerator <output_file>");
     }
 
+    HdfsConfiguration hdfsConfig = new HdfsConfiguration();
     File output = new File(args[0]);
-    FileWriter writer = new FileWriter(output);
+    FileWriter writer = null;
 
-    // Load all tables in the catalog
-    Catalog catalog = new Catalog(false);
-    Db database = catalog.getDb(null);
+    try {
+      writer = new FileWriter(output);
 
-    Map<String,Table> tables = database.getTables();
-    for (String tableName: tables.keySet()) {
+      // Load all tables in the catalog
+      Catalog catalog = new Catalog(false);
+      Db database = catalog.getDb(null);
 
-      Table table = database.getTable(tableName);
-      // Only do this for hdfs tables
-      if (table == null || !(table instanceof HdfsTable)) {
-        continue;
-      }
-      HdfsTable hdfsTable = (HdfsTable)table;
-      HdfsConfiguration hdfsConfig = new HdfsConfiguration();
+      Map<String,Table> tables = database.getTables();
+      for (String tableName: tables.keySet()) {
 
-      // Write the output as <tablename>: <blockid1> <blockid2> <etc>
-      writer.write(tableName + ":");
-      for (HdfsPartition partition: hdfsTable.getPartitions()) {
-        List<FileDescriptor> fileDescriptors = partition.getFileDescriptors();
-        for (FileDescriptor fd : fileDescriptors) {
-          String path = fd.getFilePath();
-          Path p = new Path(path);
+        Table table = database.getTable(tableName);
+        // Only do this for hdfs tables
+        if (table == null || !(table instanceof HdfsTable)) {
+          continue;
+        }
+        HdfsTable hdfsTable = (HdfsTable)table;
 
-          // Use a deprecated API to get block ids
-          DistributedFileSystem dfs = (DistributedFileSystem)p.getFileSystem(hdfsConfig);
-          LocatedBlocks locations = dfs.getClient().getNamenode().getBlockLocations(
-              p.toUri().getPath(), 0, fd.getFileLength());
+        // Write the output as <tablename>: <blockid1> <blockid2> <etc>
+        writer.write(tableName + ":");
+        for (HdfsPartition partition: hdfsTable.getPartitions()) {
+          List<FileDescriptor> fileDescriptors = partition.getFileDescriptors();
+          for (FileDescriptor fd : fileDescriptors) {
+            String path = fd.getFilePath();
+            Path p = new Path(path);
 
-          for (LocatedBlock lb : locations.getLocatedBlocks()) {
-            long id = lb.getBlock().getBlockId();
-            writer.write(" " + id);
+            // Use a deprecated API to get block ids
+            DistributedFileSystem dfs = 
+                (DistributedFileSystem)p.getFileSystem(hdfsConfig);
+            LocatedBlocks locations = dfs.getClient().getNamenode().getBlockLocations(
+                p.toUri().getPath(), 0, fd.getFileLength());
+
+            for (LocatedBlock lb : locations.getLocatedBlocks()) {
+              long id = lb.getBlock().getBlockId();
+              writer.write(" " + id);
+            }
           }
         }
+        writer.write("\n");
       }
-      writer.write("\n");
+    } finally {
+      if (writer != null) writer.close();
     }
   }
 
