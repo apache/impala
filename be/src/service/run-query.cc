@@ -224,7 +224,7 @@ int main(int argc, char** argv) {
     // if we're not running against an existing impalad and don't have
     // backends specified explicitly, start them up
     TestExecEnv* test_exec_env = new TestExecEnv(
-        FLAGS_num_nodes > 0 ? FLAGS_num_nodes - 1 : 4, FLAGS_be_port + 1);
+        FLAGS_num_nodes > 1 ? FLAGS_num_nodes - 1 : 4, FLAGS_be_port + 1);
     test_exec_env->StartBackends();
     exec_env.reset(test_exec_env);
   } else {
