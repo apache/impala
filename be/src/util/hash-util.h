@@ -3,6 +3,8 @@
 #ifndef IMPALA_UTIL_HASH_UTIL_H
 #define IMPALA_UTIL_HASH_UTIL_H
 
+#include "common/logging.h"
+
 // For cross compiling with clang, we need to be able to generate an IR file with
 // no sse instructions.  Attempting to load a precompiled IR file that contains
 // unsupported instructions causes llvm to fail.  We need to use #defines to control
