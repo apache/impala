@@ -40,7 +40,7 @@ parser.add_option("-q", "--query", dest="query", default = "",
                   help="Query to run.  If none specified, runs all queries.")
 parser.add_option("--iterations", dest="iterations", default="3",
                   help="Number of times to run the query.  Only to be used with -q")
-parser.add_option("--prime_cache", dest="prime_cache", default= True, 
+parser.add_option("--prime_cache", dest="prime_cache", default= True,
                   help="Whether or not to prime the buffer cache.  Only to be "\
                   "used with -q")
 parser.add_option("--exploration_strategy", dest="exploration_strategy", default="core",
@@ -54,6 +54,8 @@ parser.add_option("--compare_with_hive", dest="compare_with_hive", action="store
 parser.add_option("--results_csv_file", dest="results_csv_file",
                   default=os.environ['IMPALA_HOME'] + "/benchmark_results.csv",
                   help="The output file where benchmark results are saved")
+parser.add_option("--hive_cmd", dest="hive_cmd", default="hive -e",
+                  help="The command to use for executing hive queries")
 
 (options, args) = parser.parse_args()
 
@@ -63,6 +65,7 @@ prime_cache_cmd = os.environ['IMPALA_HOME'] + "/testdata/bin/cache_tables.py -q 
 result_single_regex = 'returned (\d*) rows? in (\d*).(\d*) s'
 result_multiple_regex = 'returned (\d*) rows? in (\d*).(\d*) s with stddev (\d*).(\d*)'
 hive_result_regex = 'Time taken: (\d*).(\d*) seconds'
+set_hive_input_cmd = 'set hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;'
 
 # Console color format strings
 GREEN = '\033[92m'
@@ -138,9 +141,15 @@ def run_query_using_hive(query, prime_buffer_cache, iterations):
     else:
       prime_buffer_cache_local(query)
 
-  query_string = (query + ';') * iterations
+  query_string = ''
+  # This works around a problem with Hive where Hive cannot execute queries that result
+  # in multiple mapreduce steps on a mini-dfs cluster.
+  if not options.remote:
+    query_string = set_hive_input_cmd
+  query_string += (query + ';') * iterations
+
   query_output = tempfile.TemporaryFile("w+")
-  subprocess.call("hive -e \"%s\"" % query_string, shell=True,
+  subprocess.call(options.hive_cmd + "\"%s\"" % query_string, shell=True,
                   stderr=query_output, stdout=dev_null)
   query_output.seek(0)
   execution_times = []
