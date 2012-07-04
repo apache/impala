@@ -29,10 +29,11 @@ class HdfsTextTableWriter : public HdfsTableWriter {
   ~HdfsTextTableWriter() { }
 
   // There is nothing to do for text.
-  virtual Status Finalize(OutputPartition* output) { return Status::OK; }
+  virtual Status Finalize() { return Status::OK; }
 
-  // Appends delimited string representation of current_row_ to output partition.
-  Status AppendRow(TupleRow* current_row);
+  // Appends delimited string representation of the rows in the batch to output partition.
+  Status AppendRowBatch(RowBatch* current_row,
+                        std::vector<int32_t> row_group_indices, bool* new_file);
 
  private:
   // Character delimiting tuples.

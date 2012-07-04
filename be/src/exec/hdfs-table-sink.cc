@@ -151,18 +151,18 @@ static void MakeTmpHdfsDirectoryName(const string& base_dir, const string& query
   (*ss) << base_dir << "/" << query_id << "_" << rand() << "_dir/";
 }
 
-void HdfsTableSink::BuildHdfsFileNames(OutputPartition* output) {
-  // Create hdfs_file_name and tmp_hdfs_file_name.
+void HdfsTableSink::BuildHdfsFileNames(OutputPartition* output_partition) {
+  // Create hdfs_file_name_template and tmp_hdfs_file_name_template.
   // Path: <hdfs_base_dir>/<partition_values>/<query_id_str>
-  stringstream hdfs_file_name;
-  hdfs_file_name << table_desc_->hdfs_base_dir() << "/";
+  stringstream hdfs_file_name_template;
+  hdfs_file_name_template << table_desc_->hdfs_base_dir() << "/";
 
   // Path: <hdfs_base_dir>/<query_id>_dir/<partition_values>/<query_id_str>
   // Both the temporary directory and the file name, when moved to the
   // real partition directory must be unique.
-  stringstream tmp_hdfs_file_name;
+  stringstream tmp_hdfs_file_name_template;
   MakeTmpHdfsDirectoryName(table_desc_->hdfs_base_dir(), query_id_str_,
-                           &tmp_hdfs_file_name);
+                           &tmp_hdfs_file_name_template);
 
   stringstream common_suffix;
 
@@ -181,32 +181,44 @@ void HdfsTableSink::BuildHdfsFileNames(OutputPartition* output) {
   }
   // Use the query id as filename.
   common_suffix << query_id_str_ << "_" << rand();
-  hdfs_file_name << common_suffix.str() << "_data";
-  tmp_hdfs_file_name << common_suffix.str() << "_data";
-  output->hdfs_file_name = hdfs_file_name.str();
-  output->tmp_hdfs_file_name = tmp_hdfs_file_name.str();
+  hdfs_file_name_template << common_suffix.str() << "_data";
+  tmp_hdfs_file_name_template << common_suffix.str() << "_data";
+  output_partition->hdfs_file_name_template = hdfs_file_name_template.str();
+  output_partition->tmp_hdfs_file_name_template =
+      tmp_hdfs_file_name_template.str();
+  output_partition->num_files = 0;
+}
+
+//TODO: Clean up temporary files on error.
+Status HdfsTableSink::CreateNewTmpFile(OutputPartition* output_partition) {
+  stringstream filename;
+  filename << output_partition->tmp_hdfs_file_name_template
+      << "." << output_partition->num_files;
+  output_partition->current_file_name = filename.str();
+  // Check if tmp_hdfs_file_name_template exists.
+  const char* tmp_hdfs_file_name_template_cstr =
+      output_partition->current_file_name.c_str();
+  if (hdfsExists(hdfs_connection_, tmp_hdfs_file_name_template_cstr) == 0) {
+    return Status(AppendHdfsErrorMessage("Temporary HDFS file already exists: ",
+        output_partition->current_file_name));
+  }
+  output_partition->tmp_hdfs_file = hdfsOpenFile(hdfs_connection_,
+      tmp_hdfs_file_name_template_cstr, O_WRONLY, 0, 0,
+      output_partition->partition_descriptor->block_size());
+  if (output_partition->tmp_hdfs_file == NULL) {
+    return Status(AppendHdfsErrorMessage("Failed to open HDFS file for writing: ",
+        output_partition->current_file_name));
+  }
+  ++output_partition->num_files;
+  output_partition->num_rows = 0;
+  return Status::OK;
 }
 
 Status HdfsTableSink::InitOutputPartition(
     const HdfsPartitionDescriptor& partition_descriptor,
     OutputPartition* output_partition) {
-  BuildHdfsFileNames(output_partition);
-
   output_partition->hdfs_connection = hdfs_connection_;
-  // Check if tmp_hdfs_file_name exists.
-  const char* tmp_hdfs_file_name_cstr = output_partition->tmp_hdfs_file_name.c_str();
-  if (hdfsExists(hdfs_connection_, tmp_hdfs_file_name_cstr) == 0) {
-    return Status(AppendHdfsErrorMessage("Temporary HDFS file already exists: ",
-                                         output_partition->tmp_hdfs_file_name));
-  }
-  // Open tmp_hdfs_file_name.
-  output_partition->tmp_hdfs_file = hdfsOpenFile(hdfs_connection_,
-      tmp_hdfs_file_name_cstr, O_WRONLY, 0, 0, partition_descriptor.block_size());
-  if (output_partition->tmp_hdfs_file == NULL) {
-    return Status(AppendHdfsErrorMessage("Failed to open HDFS file for writing: ",
-                                         output_partition->tmp_hdfs_file_name));
-  }
-  output_partition->num_rows = 0;
+
   switch (partition_descriptor.file_format()) {
     case THdfsFileFormat::TEXT: {
       output_partition->writer.reset(
@@ -225,13 +237,14 @@ Status HdfsTableSink::InitOutputPartition(
       error_msg << str << " not implemented.";
       return Status(error_msg.str());
   }
-  return Status::OK;
+  output_partition->partition_descriptor = &partition_descriptor;
+  return CreateNewTmpFile(output_partition);
 }
 
 void HdfsTableSink::GetHashTblKey(const vector<Expr*>& exprs, string* key) {
   stringstream hash_table_key;
   TColumnValue col_val;
-  for (int i = 0; i < exprs.size(); ++i) {
+  for (int i = 0; i < dynamic_partition_key_exprs_.size(); ++i) {
     RawValue::PrintValueAsBytes(exprs[i]->GetValue(current_row_),
                                 exprs[0]->type(), &hash_table_key);
     // Additionally append "/" to avoid accidental key collisions.
@@ -240,51 +253,92 @@ void HdfsTableSink::GetHashTblKey(const vector<Expr*>& exprs, string* key) {
   *key = hash_table_key.str();
 }
 
-Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch) {
-  string key;
-  for (int i = 0; i < batch->num_rows(); ++i) {
-    current_row_ = batch->GetRow(i);
-    OutputPartition* output = NULL;
-    HashTable::iterator existing_partition;
-    if (dynamic_partition_key_exprs_.empty()) {
-      key = "";
-      existing_partition = partition_keys_to_output_partitions_.begin();
-    } else {
-      GetHashTblKey(dynamic_partition_key_exprs_, &key);
-      existing_partition = partition_keys_to_output_partitions_.find(key);
+inline Status HdfsTableSink::GetOutputPartition(
+   RuntimeState* state, const string& key, PartitionPair** partition_pair) {
+  PartitionMap::iterator existing_partition;
+  existing_partition = partition_keys_to_output_partitions_.find(key);
+  if (existing_partition == partition_keys_to_output_partitions_.end()) {
+    // Create a new OutputPartition, and add it to
+    // partition_keys_to_output_partitions.
+    const HdfsPartitionDescriptor* partition_descriptor = default_partition_;
+    PartitionDescriptorMap::const_iterator it = partition_descriptor_map_.find(key);
+    if (it != partition_descriptor_map_.end()) {
+      partition_descriptor = it->second;
     }
-    if (existing_partition == partition_keys_to_output_partitions_.end()) {
-      // Create a new OutputPartition, and add it to
-      // partition_keys_to_output_partitions.
-      const HdfsPartitionDescriptor* partition_descriptor = default_partition_;
-      PartitionDescriptorMap::const_iterator it = partition_descriptor_map_.find(key);
-      if (it != partition_descriptor_map_.end()) {
-        partition_descriptor = it->second;
-      }
-      output = state->obj_pool()->Add(new OutputPartition());
-      RETURN_IF_ERROR(InitOutputPartition(*partition_descriptor, output));
-      partition_keys_to_output_partitions_[key] = output;
-    } else {
-      // Use existing output partition.
-      output = existing_partition->second;
-    }
-    // Append current line to output partition.
-    RETURN_IF_ERROR(output->writer->AppendRow(current_row_));
-    ++output->num_rows;
+
+    OutputPartition* partition = state->obj_pool()->Add(new OutputPartition());
+    BuildHdfsFileNames(partition);
+    RETURN_IF_ERROR(InitOutputPartition(*partition_descriptor, partition));
+    partition_keys_to_output_partitions_[key].first = partition;
+    *partition_pair = &partition_keys_to_output_partitions_[key];
+  } else {
+    // Use existing output_partition partition.
+    *partition_pair = &existing_partition->second;
   }
   return Status::OK;
 }
 
-Status HdfsTableSink::FinalizePartition(RuntimeState* state,
-                                        OutputPartition* partition) {
-  partition->writer->Finalize(partition);
-  state->created_hdfs_files().push_back(partition->hdfs_file_name);
+Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch) {
+  // If there are no partition keys then just pass the whole batch to one partition.
+  if (dynamic_partition_key_exprs_.empty()) {
+    // If there are no dynamic keys just use an empty key.
+    PartitionPair *partition_pair;
+    RETURN_IF_ERROR(GetOutputPartition(state, "", &partition_pair));
+    // Pass the row batch to the writer. If new_file is returned true then the current
+    // file is finalized and a new file is opened.
+    // The writer tracks where it is in the batch when it returns with new_file set. 
+    OutputPartition* output_partition = partition_pair->first;
+    bool new_file;
+    do {
+      RETURN_IF_ERROR(output_partition->writer->AppendRowBatch(
+              batch, partition_pair->second, &new_file));
+      if (new_file) {
+        RETURN_IF_ERROR(FinalizePartitionFile(state, output_partition));
+        RETURN_IF_ERROR(CreateNewTmpFile(output_partition));
+      }
+    } while (new_file);
+  } else {
+    for (int i = 0; i < batch->num_rows(); ++i) {
+      current_row_ = batch->GetRow(i);
+
+      string key;
+      GetHashTblKey(dynamic_partition_key_exprs_, &key);
+      PartitionPair* partition_pair;
+      RETURN_IF_ERROR(GetOutputPartition(state, key, &partition_pair));
+      partition_pair->second.push_back(i);
+    }
+    for (PartitionMap::iterator partition = partition_keys_to_output_partitions_.begin();
+         partition != partition_keys_to_output_partitions_.end(); ++partition) {
+      OutputPartition* output_partition = partition->second.first;
+      if (partition->second.second.empty()) continue;
+
+      bool new_file;
+      do {
+        RETURN_IF_ERROR(output_partition->writer->AppendRowBatch(
+                batch, partition->second.second, &new_file));
+        if (new_file) {
+          RETURN_IF_ERROR(FinalizePartitionFile(state, output_partition));
+          RETURN_IF_ERROR(CreateNewTmpFile(output_partition));
+        }
+      } while (new_file);
+      partition->second.second.clear();
+    }
+  }
+  return Status::OK;
+}
+
+Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
+                                            OutputPartition* partition) {
+  partition->writer->Finalize();
+  stringstream filename;
+  filename << partition->hdfs_file_name_template << "." << (partition->num_files - 1);
+  state->created_hdfs_files().push_back(filename.str());
   state->num_appended_rows().push_back(partition->num_rows);
   // Close file.
   int hdfs_ret = hdfsCloseFile(hdfs_connection_, partition->tmp_hdfs_file);
   if (hdfs_ret != 0) {
     return Status(AppendHdfsErrorMessage("Failed to close HDFS file: ",
-                                         partition->tmp_hdfs_file_name));
+                                         partition->current_file_name));
   }
 
   return Status::OK;
@@ -292,11 +346,11 @@ Status HdfsTableSink::FinalizePartition(RuntimeState* state,
 
 Status HdfsTableSink::Close(RuntimeState* state) {
   // Close Hdfs files, and copy return stats to runtime state.
-  for (HashTable::iterator cur_partition =
+  for (PartitionMap::iterator cur_partition =
            partition_keys_to_output_partitions_.begin();
        cur_partition != partition_keys_to_output_partitions_.end();
        ++cur_partition) {
-    RETURN_IF_ERROR(FinalizePartition(state, cur_partition->second));
+    RETURN_IF_ERROR(FinalizePartitionFile(state, cur_partition->second.first));
   }
   // Move tmp Hdfs files to their final destination.
   RETURN_IF_ERROR(MoveTmpHdfsFiles());
@@ -307,14 +361,14 @@ Status HdfsTableSink::MoveTmpHdfsFiles() {
   // 1. Move all tmp Hdfs files to their final destinations.
   // 2. If overwrite_ is true, delete all the original files.
   const string* tmp_file = NULL;
-  for (HashTable::iterator output_partition_ =
+  for (PartitionMap::iterator partition =
        partition_keys_to_output_partitions_.begin();
-       output_partition_ != partition_keys_to_output_partitions_.end();
-       ++output_partition_) {
-    RETURN_IF_ERROR(MoveTmpHdfsFile(output_partition_->second));
-    tmp_file = &output_partition_->second->tmp_hdfs_file_name;
+       partition != partition_keys_to_output_partitions_.end();
+       ++partition) {
+    RETURN_IF_ERROR(MoveTmpHdfsFile(partition->second.first));
+    tmp_file = &partition->second.first->tmp_hdfs_file_name_template;
     if (overwrite_) {
-      RETURN_IF_ERROR(DeleteOriginalFiles(output_partition_->second));
+      RETURN_IF_ERROR(DeleteOriginalFiles(partition->second.first));
     }
   }
   // Delete temporary Hdfs dir.
@@ -331,20 +385,21 @@ Status HdfsTableSink::MoveTmpHdfsFiles() {
   return Status::OK;
 }
 
-Status HdfsTableSink::DeleteOriginalFiles(OutputPartition* output) {
+Status HdfsTableSink::DeleteOriginalFiles(OutputPartition* output_partition) {
   DCHECK(overwrite_ == true);
-  const char* dest = output->hdfs_file_name.c_str();
+  const char* dest = output_partition->hdfs_file_name_template.c_str();
   // Get the original files in the target dir.
   int num_orig_files = 0;
   hdfsFileInfo* orig_files = NULL;
-  string dest_dir = output->hdfs_file_name.substr(0,
-                                                  output->hdfs_file_name.rfind('/') + 1);
+  string dest_dir = output_partition->hdfs_file_name_template.substr(0,
+      output_partition->hdfs_file_name_template.rfind('/') + 1);
   orig_files = hdfsListDirectory(hdfs_connection_, dest_dir.c_str(), &num_orig_files);
   // Delete the original files from the target dir (if any, and if overwrite was set)
   Status status = Status::OK;
   for (int i = 0; i < num_orig_files; ++i) {
     // Don't delete the original file if it has the same name as the file we just moved.
-    if (strcmp(orig_files[i].mName, dest) == 0) {
+    // Just compare the base name, the file will have a file number appended.
+    if (strncmp(orig_files[i].mName, dest, strlen(dest)) == 0) {
       continue;
     }
     VLOG(1) << "Overwrite INSERT - deleting: " <<  orig_files[i].mName << endl;
@@ -358,20 +413,42 @@ Status HdfsTableSink::DeleteOriginalFiles(OutputPartition* output) {
   return status;
 }
 
-Status HdfsTableSink::MoveTmpHdfsFile(OutputPartition* output) {
-  const char* src = output->tmp_hdfs_file_name.c_str();
-  const char* dest = output->hdfs_file_name.c_str();
-  if (!overwrite_ && hdfsExists(hdfs_connection_, dest) == 0) {
-    return Status(AppendHdfsErrorMessage("Target HDFS file already exists: ",
-                                         output->hdfs_file_name));
+Status HdfsTableSink::MoveTmpHdfsFile(OutputPartition* output_partition) {
+  for (int file_num = 0; file_num < output_partition->num_files; ++file_num) {
+    stringstream src;
+    src << output_partition->tmp_hdfs_file_name_template << "." << file_num;
+    stringstream dest;
+    dest << output_partition->hdfs_file_name_template << "." << file_num;
+    if (!overwrite_ && hdfsExists(hdfs_connection_, dest.str().c_str()) == 0) {
+      return Status(
+          AppendHdfsErrorMessage("Target HDFS file already exists: ", dest.str()));
+    }
+    // Move the file/dir. Note that it is not necessary to create the target first.
+    if (hdfsMove(hdfs_connection_,
+         src.str().c_str(), hdfs_connection_, dest.str().c_str())) {
+      stringstream msg;
+      msg << "Failed to move temporary HDFS file/dir to final destination. "
+          << "(src: " << src << " / dst: " << dest << ")";
+      return Status(AppendHdfsErrorMessage(msg.str()));
+    }
   }
-  // Move the file/dir. Note that it is not necessary to create the target first.
-  if (hdfsMove(hdfs_connection_, src, hdfs_connection_, dest)) {
+  return Status::OK;
+}
+
+Status HdfsTableSink::GetFileBlockSize(OutputPartition* output_partition, int64_t* size) {
+  hdfsFileInfo* info = hdfsGetPathInfo(output_partition->hdfs_connection,
+      output_partition->current_file_name.c_str());
+
+  if (info == NULL) {
     stringstream msg;
-    msg << "Failed to move temporary HDFS file/dir to final destination. "
-        << "(src: " << src << " / dst: " << dest << ")";
+    msg << "Failed to get info on temporary HDFS file."
+        << output_partition->current_file_name;
     return Status(AppendHdfsErrorMessage(msg.str()));
   }
+
+  *size = info->mBlockSize;
+  hdfsFreeFileInfo(info, 1);
+
   return Status::OK;
 }
 

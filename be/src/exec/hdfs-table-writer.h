@@ -26,18 +26,27 @@ class HdfsTableWriter {
   // table_desc -- the descriptor for the table being written.
   // output_exprs -- expressions which generate the output values.
   HdfsTableWriter(OutputPartition* output,
-                  const HdfsPartitionDescriptor* partition,
+                  const HdfsPartitionDescriptor* partition_desc,
                   const HdfsTableDescriptor* table_desc,
                   const std::vector<Expr*>& output_exprs);
 
   virtual ~HdfsTableWriter() { }
 
-  // Appends the current row to the partition.
-  virtual Status AppendRow(TupleRow* current_row) = 0;
+  // Appends the current batch of rows to the partition.  If there are multiple
+  // partitions then row_group_indices will contain the rows that are for this
+  // partition, otherwise all rows in the batch are appended.
+  // If the current file is full, the writer stops appending and
+  // returns with *new_file == true.  A new file will be opened and
+  // the same row batch will be passed again.  The writer must track how
+  // much of the batch it had already processed asking for a new file.
+  // Otherwise the writer will return with *newfile == false.
+  virtual Status AppendRowBatch(RowBatch* batch,
+                                std::vector<int32_t> row_group_indices,
+                                bool* new_file) = 0;
 
   // Finalize this partition. The writer needs to finish processing
   // all data have written out after the return from this call.
-  virtual Status Finalize(OutputPartition* output) = 0;
+  virtual Status Finalize() = 0;
 
  protected:
   // Write to the current hdfs file.

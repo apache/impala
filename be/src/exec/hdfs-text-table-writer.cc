@@ -30,32 +30,50 @@ HdfsTextTableWriter::HdfsTextTableWriter(OutputPartition* output,
   escape_char_ = partition->escape_char();
 }
 
-Status HdfsTextTableWriter::AppendRow(TupleRow* current_row) {
-  stringstream row_stringstream;
+Status HdfsTextTableWriter::AppendRowBatch(RowBatch* batch,
+                                           vector<int32_t> row_group_indices,
+                                           bool* new_file) {
+  int32_t limit;
+  if (row_group_indices.empty()) {
+    limit = batch->num_rows();
+  } else {
+    limit = row_group_indices.size();
+  }
+      
+  bool all_rows = row_group_indices.empty();
   int num_non_partition_cols =
       table_desc_->num_cols() - table_desc_->num_clustering_cols();
-  // There might be a select expr for partition cols as well, but we shouldn't be writing
-  // their values to the row. Since there must be at least num_non_partition_cols select
-  // exprs, and we assume that by convention any partition col exprs are the last in
-  // output_exprs_, it's ok to just write the first num_non_partition_cols values.
-  for (int j = 0; j < num_non_partition_cols; ++j) {
-    void* value = output_exprs_[j]->GetValue(current_row);
-    // NULL values become empty strings
-    if (value != NULL) {
-      output_exprs_[j]->PrintValue(value, &row_stringstream);
+  for (int row_idx = 0; row_idx < limit; ++row_idx) {
+    TupleRow* current_row = all_rows ?
+        batch->GetRow(row_idx) : batch->GetRow(row_group_indices[row_idx]);
+    stringstream row_stringstream;
+    // There might be a select expr for partition cols as well, but we shouldn't be
+    // writing their values to the row. Since there must be at least
+    // num_non_partition_cols select exprs, and we assume that by convention any
+    // partition col exprs are the last in output_exprs_, it's ok to just write
+    // the first num_non_partition_cols values.
+    for (int j = 0; j < num_non_partition_cols; ++j) {
+      void* value = output_exprs_[j]->GetValue(current_row);
+      // NULL values become empty strings
+      if (value != NULL) {
+        output_exprs_[j]->PrintValue(value, &row_stringstream);
+      }
+      // Append field delimiter.
+      if (j + 1 < num_non_partition_cols) {
+        row_stringstream << field_delim_;
+      }
     }
-    // Append field delimiter.
-    if (j + 1 < num_non_partition_cols) {
-      row_stringstream << field_delim_;
-    }
+    // Append tuple delimiter.
+    row_stringstream << tuple_delim_;
+    // Write line to Hdfs file.
+    // HDFS does some buffering to fill a packet which is ~64kb in size.
+    // TODO: Determine if there's any throughput benefit in batching larger
+    // writes together.
+    string row_string = row_stringstream.str();
+    RETURN_IF_ERROR(Write(row_string.data(), row_string.size()));
+    ++output_->num_rows;
   }
-  // Append tuple delimiter.
-  row_stringstream << tuple_delim_;
-  // Write line to Hdfs file.
-  // HDFS does some buffering to fill a packet which is ~64kb in size. TODO: Determine if
-  // there's any throughput benefit in batching larger writes together.
-  string row_string = row_stringstream.str();
-  RETURN_IF_ERROR(Write(row_string.data(), row_string.size()));
+  *new_file = false;
   return Status::OK;
 }
 

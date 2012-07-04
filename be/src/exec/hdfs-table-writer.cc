@@ -7,7 +7,7 @@ using namespace std;
 namespace impala {
 
 HdfsTableWriter::HdfsTableWriter(OutputPartition* output,
-                                 const HdfsPartitionDescriptor* partition,
+                                 const HdfsPartitionDescriptor* partition_desc,
                                  const HdfsTableDescriptor* table_desc,
                                  const vector<Expr*>& output_exprs)
   : output_(output),
@@ -20,7 +20,7 @@ Status HdfsTableWriter::Write(const uint8_t* data, int32_t len) {
   if (ret == -1) {
     stringstream msg;
     msg << "Failed to write row (length: " << len
-        << " to Hdfs file: " << output_->tmp_hdfs_file_name;
+        << " to Hdfs file: " << output_->current_file_name;
     return Status(AppendHdfsErrorMessage(msg.str()));
   }
   return Status::OK;
