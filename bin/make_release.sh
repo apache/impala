@@ -38,19 +38,19 @@ then
 
   # Run sample queries - outputs .gcda files
   be/build/release/service/runquery -query="\
-    select count(field) from grep1gb_text_none where field like '%xyz%';\
-    select count(field) from grep1gb_rc_file_none where field like '%xyz%';\
-    select count(field) from grep1gb_sequence_file_snappy where field like '%xyz%';\
-    select sourceIP, SUM(adRevenue) FROM uservisits_web_sequence_file_none \
+    select count(field) from grep1gb where field like '%xyz%';\
+    select count(field) from grep1gb_rc_file where field like '%xyz%';\
+    select count(field) from grep1gb_seq_snap where field like '%xyz%';\
+    select sourceIP, SUM(adRevenue) FROM uservisits_web_seq \
       GROUP by sourceIP order by SUM(adRevenue) desc limit 10;\
-    select sourceIP, SUM(adRevenue) FROM uservisits_web_text_none \
+    select sourceIP, SUM(adRevenue) FROM uservisits \
       GROUP by sourceIP order by SUM(adRevenue) desc limit 10;\
-    select sourceIP, SUM(adRevenue) FROM uservisits_web_rc_file_none GROUP by sourceIP \
+    select sourceIP, SUM(adRevenue) FROM uservisits_web_rc GROUP by sourceIP \
       order by SUM(adRevenue) desc limit 10;select sourceIP, SUM(adRevenue) \
-      FROM uservisits_web_text_none \
+      FROM uservisits \
       GROUP by sourceIP order by SUM(adRevenue) desc limit 10;\
     select uv.sourceip, avg(r.pagerank), sum(uv.adrevenue) as totalrevenue \
-      from uservisits_web_text_none uv join rankings_web_text_none r on \
+      from uservisits uv join rankings r on \
       (r.pageurl = uv.desturl) \
       where uv.visitdate > '1999-01-01' and uv.visitdate < '2000-01-01' \
       group by uv.sourceip order by totalrevenue desc limit 1"\

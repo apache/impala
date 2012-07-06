@@ -226,6 +226,7 @@ def run_query(query, prime_buffer_cache, iterations):
 
   if not run_success:
     print "Query did not run succesfully"
+    print "Failed Query: %s\n" % (query)
     query_output.seek(0)
     query_err.seek(0)
     for line in query_output.readlines():
@@ -252,12 +253,29 @@ def run_query(query, prime_buffer_cache, iterations):
   return [output, execution_result]
 
 def choose_input_vector_file_name(exploration_strategy):
-  return "benchmark_%s.vector" % exploration_strategy
+  return "benchmark_%s.csv" % exploration_strategy
 
-def build_query(
-    query_format_string, exploration_strategy, data_set, file_format, compression):
-  table_name = "%s_%s_%s" % (data_set, file_format, compression)
-  return query_format_string % {'table_name': table_name}
+def build_table_suffix(file_format, codec, compression_type):
+  if file_format == 'text' and codec == 'none':
+    return ''
+  elif codec == 'none':
+    return '_%s' % (file_format)
+  elif compression_type == 'record':
+    return '_%s_%s_record' % (file_format, codec)
+  else:
+    return '_%s_%s' % (file_format, codec)
+
+def build_query(query_format_string, exploration_strategy, data_set,
+                file_format, codec, compression_type):
+  table_suffix = build_table_suffix(file_format, codec, compression_type)
+  return query_format_string % {'table_suffix': table_suffix}
+
+def read_csv_vector_file(file_name):
+  results = []
+  with open(file_name, 'rb') as vector_file:
+    for row in csv.reader(vector_file,  delimiter=','):
+      results.append(row)
+    return results
 
 os.chdir(os.environ['IMPALA_BE_DIR'])
 
@@ -267,30 +285,30 @@ os.chdir(os.environ['IMPALA_BE_DIR'])
 # TODO: it would be good if this table also contained the expected numbers and
 # automatically flag regressions.  How do we reconcile the fact we are running on
 # different machines?
-queries = {'grep1GB': [
-  ["select count(*) from %(table_name)s", 1, 5],
-  ["select count(field) from %(table_name)s", 0, 5],
-  ["select count(field) from %(table_name)s where field like '%%xyz%%'", 0, 5]
+queries = {'grep1gb': [
+  ["select count(*) from grep1gb%(table_suffix)s", 1, 5],
+  ["select count(field) from grep1gb%(table_suffix)s", 0, 5],
+  ["select count(field) from grep1gb%(table_suffix)s where field like '%%xyz%%'", 0, 5]
   ],
 
   'web': [
   ["select uv.sourceip, avg(r.pagerank), sum(uv.adrevenue) as totalrevenue "\
-   "from uservisits_%(table_name)s uv join rankings_%(table_name)s r on "\
+   "from uservisits%(table_suffix)s uv join rankings%(table_suffix)s r on "\
    "(r.pageurl = uv.desturl) where uv.visitdate > '1999-01-01' and uv.visitdate "\
    "< '2000-01-01' group by uv.sourceip order by totalrevenue desc limit 1", 1, 5],
-  ["select sourceIP, SUM(adRevenue) FROM uservisits_%(table_name)s GROUP by sourceIP "\
+  ["select sourceIP, SUM(adRevenue) FROM uservisits%(table_suffix)s GROUP by sourceIP "\
    "order by SUM(adRevenue) desc limit 10", 1, 5],
-  ["select pageRank, pageURL from rankings_%(table_name)s where pageRank > 10 "\
+  ["select pageRank, pageURL from rankings%(table_suffix)s where pageRank > 10 "\
    "order by pageRank limit 100", 1, 5],
-  ["select count(*) from rankings_%(table_name)s where "\
+  ["select count(*) from rankings%(table_suffix)s where "\
    "pageRank > 10 && pageRank < 25", 1, 5],
-  ["select avg(adRevenue) from uservisits_%(table_name)s", 1, 5],
-  ["select avg(adRevenue) from uservisits_%(table_name)s "\
+  ["select avg(adRevenue) from uservisits%(table_suffix)s", 1, 5],
+  ["select avg(adRevenue) from uservisits%(table_suffix)s "\
    "where visitdate > '1999-07-01' and visitdate < '1999-12-31'", 1, 5],
   ],
 
-  'grep10GB': [
-  ["select  count(field) from %(table_name)s where field like '%%xyz%%'", 0, 1]
+  'grep10gb': [
+  ["select count(field) from grep10gb%(table_suffix)s where field like '%%xyz%%'", 0, 1]
   ]
 }
 
@@ -310,16 +328,17 @@ def write_to_csv(result_map, output_csv_file):
 
 # Run all queries
 if (len(options.query) == 0):
-  vector_file = open(
-    '../testdata/bin/' + choose_input_vector_file_name(options.exploration_strategy))
+  vector_file_path = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin/',
+                         choose_input_vector_file_name(options.exploration_strategy))
+  vector = read_csv_vector_file(vector_file_path)
   output = ""
   result_map = collections.defaultdict(list)
 
-  for line in vector_file:
-    file_format, data_set, compression = line.split()[:3]
+  for row in vector:
+    file_format, data_set, codec, compression_type = row[:4]
     for query in queries[data_set]:
       query_string = build_query(query[0], options.exploration_strategy, data_set,
-                                 file_format, compression)
+                                 file_format, codec, compression_type)
       result = run_query(query_string, query[1], query[2])
       output += result[0]
       print result[0]
@@ -333,10 +352,9 @@ if (len(options.query) == 0):
       if options.verbose != 0:
         print "--------------------------------------------------------------------------"
 
-      execution_detail = QueryExecutionDetail(file_format, compression, execution_result,
+      execution_detail = QueryExecutionDetail(file_format, codec, execution_result,
                                               hive_execution_result)
       result_map[query[0]].append(execution_detail)
-  vector_file.close()
 
   print "\nResults saving to: " + options.results_csv_file
   write_to_csv(result_map, options.results_csv_file)

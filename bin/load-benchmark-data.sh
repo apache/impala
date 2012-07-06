@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Copyright (c) 2011 Cloudera, Inc. All rights reserved.
-
+# Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+#
 # Script that creates schema and loads data into hive for running benchmarks.
 # By default the script will load the base data for the "core" scenario.
 # If 'pairwise' is specified as a parameter the pairwise combinations of workload
@@ -14,26 +14,34 @@ bin=`cd "$bin"; pwd`
 
 set -e
 
+exploration_strategy=core
+if [ $1 ]; then
+  exploration_strategy=$1
+fi
+
+BENCHMARK_SCRIPT_DIR=$IMPALA_HOME/testdata/bin
+
 function execute_hive_query_from_file {
-    hive_args="-hiveconf hive.root.logger=WARN,console -v -f"
-    "$HIVE_HOME/bin/hive" $hive_args $1
+  hive_args="-hiveconf hive.root.logger=WARN,console -v -f"
+  "$HIVE_HOME/bin/hive" $hive_args $1
 }
 
-execute_hive_query_from_file "$IMPALA_HOME/testdata/bin/create-benchmark.sql"
-execute_hive_query_from_file "$IMPALA_HOME/testdata/bin/load-benchmark.sql"
+pushd "$IMPALA_HOME/testdata/bin";
+./generate_benchmark_statements.py --exploration_strategy $exploration_strategy
+popd
 
-if [ "$1" = "exhaustive" ]
-then
-    execute_hive_query_from_file "$IMPALA_HOME/testdata/bin/create-benchmark-exhaustive-generated.sql"
-    execute_hive_query_from_file "$IMPALA_HOME/testdata/bin/load-benchmark-exhaustive-generated.sql"
-elif [ "$1" = "pairwise" ]
-then
-    execute_hive_query_from_file "$IMPALA_HOME/testdata/bin/create-benchmark-pairwise-generated.sql"
-    execute_hive_query_from_file "$IMPALA_HOME/testdata/bin/load-benchmark-pairwise-generated-sql"
+if [ "$exploration_strategy" = "exhaustive" ]; then
+  execute_hive_query_from_file "$BENCHMARK_SCRIPT_DIR/create-benchmark-exhaustive-generated.sql"
+  execute_hive_query_from_file "$BENCHMARK_SCRIPT_DIR/load-benchmark-exhaustive-generated.sql"
+elif [ "$exploration_strategy" = "pairwise" ]; then
+  execute_hive_query_from_file "$BENCHMARK_SCRIPT_DIR/create-benchmark-pairwise-generated.sql"
+  execute_hive_query_from_file "$BENCHMARK_SCRIPT_DIR/load-benchmark-pairwise-generated-sql"
+elif [ "$exploration_strategy" = "core" ]; then
+  execute_hive_query_from_file "$BENCHMARK_SCRIPT_DIR/create-benchmark-core-generated.sql"
+  execute_hive_query_from_file "$BENCHMARK_SCRIPT_DIR/load-benchmark-core-generated.sql"
 else
-    execute_hive_query_from_file "$IMPALA_HOME/testdata/bin/create-benchmark-core-generated.sql"
-    execute_hive_query_from_file "$IMPALA_HOME/testdata/bin/load-benchmark-core-generated.sql"
+  echo "Invalid exploration strategy: $exploration_strategy"
+  exit 1
 fi
 
 $IMPALA_HOME/testdata/bin/generate-block-ids.sh
-

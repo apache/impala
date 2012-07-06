@@ -1,8 +1,0 @@
-text grep1GB none
-text grep10GB none
-text web none
-sequence_file grep10GB none
-sequence_file web default
-sequence_file grep1GB gzip
-sequence_file grep10GB bzip2
-sequence_file grep10GB snappy

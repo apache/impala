@@ -1,8 +1,0 @@
-text grep1GB none
-text grep10GB none
-text web none
-sequence_file grep1GB snappy
-sequence_file web snappy
-sequence_file web none
-rc_file grep1GB none
-rc_file web none

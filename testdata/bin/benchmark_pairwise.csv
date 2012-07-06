@@ -1,0 +1,7 @@
+text,grep1gb,none,none
+seq,grep10gb,def,none
+rc,web,gzip,none
+rc,grep10gb,bzip,block
+seq,grep1gb,snap,block
+text,web,none,none
+text,grep10gb,none,none

@@ -1,0 +1,4 @@
+text,seq,rc
+grep1gb,grep10gb,web
+none,def,gzip,bzip,snap
+none,block,record
