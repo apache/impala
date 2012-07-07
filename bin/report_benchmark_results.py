@@ -74,14 +74,14 @@ def format_if_float(float_str):
 def build_padded_row_string(row, column_width):
   return ''.join([format_if_float(col).ljust(column_width) for col in row])
 
-def build_padded_row_string_comparison(row, diff_percent, column_width):
+def build_padded_row_string_comparison(row, speedup, column_width):
   row_string = ''
   for i in range(len(row)):
     col = format_if_float(row[i])
     # Since we have sliced the array, we need to substract 1 from the index
-    if i == IMPALA_AVG_IDX - 1:
-      color = GREEN if diff_percent >= 0.00 else RED
-      col = '{0:s} ({1:s}{2:+.2f}%{3:s})'.format(col, color, float(diff_percent), END)
+    if i == IMPALA_AVG_IDX - 1 and speedup != 'N/A':
+      color = GREEN if float(speedup) >= 1.00 else RED
+      col = '{0:s} ({1:s}{2:.2f}X{3:s})'.format(col, color, float(speedup), END)
       row_string += col.ljust(column_width + 9)
     else:
       row_string += col.ljust(column_width)
@@ -95,14 +95,14 @@ def find_matching_row_in_reference_results(search_row, reference_results):
       return row
   return None
 
-def calculate_impala_hive_speedup(row):
-  impala_speedup = "N/A"
-  if row[HIVE_AVG_IDX] != 'N/A':
-    impala_speedup = str(float(row[HIVE_AVG_IDX]) / float(row[IMPALA_AVG_IDX]));
-  return impala_speedup
+def calculate_speedup(reference, actual):
+  if actual != 'N/A' and reference != 'N/A':
+    return float(reference) / float(actual);
+  else:
+    return 'N/A'
 
-def calculate_percentage_change(reference_val, new_val):
-  return (float(reference_val) - float(new_val)) / float(reference_val) * 100
+def calculate_impala_hive_speedup(row):
+  return calculate_speedup(row[HIVE_AVG_IDX], row[IMPALA_AVG_IDX])
 
 # Prints out the given result set in table format, grouped by query
 def print_table(results, verbose, reference_results = None):
@@ -130,8 +130,8 @@ def print_table(results, verbose, reference_results = None):
 
         reference_avg = float(comparison_row[IMPALA_AVG_IDX])
         avg = float(row[IMPALA_AVG_IDX])
-        percent_diff = calculate_percentage_change(reference_avg, avg)
-        print build_padded_row_string_comparison(full_row, percent_diff, COLUMN_WIDTH)
+        speedup = calculate_speedup(reference_avg, avg)
+        print build_padded_row_string_comparison(full_row, speedup, COLUMN_WIDTH)
       else:
         print build_padded_row_string(full_row, COLUMN_WIDTH)
     print "-" * TOTAL_WIDTH
