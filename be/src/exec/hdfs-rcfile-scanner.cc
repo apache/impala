@@ -13,7 +13,6 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/string-value.h"
 #include "util/runtime-profile.h"
-#include "util/decompress.h"
 #include "common/object-pool.h"
 #include "gen-cpp/PlanNodes_types.h"
 #include "exec/hdfs-rcfile-scanner.h"
@@ -193,7 +192,7 @@ Status HdfsRCFileScanner::ReadFileHeader() {
   if (is_compressed_) {
     // Read the codec and get the right decompressor class.
     RETURN_IF_ERROR(SerDeUtils::ReadText(current_byte_stream_, &codec));
-    RETURN_IF_ERROR(Decompressor::CreateDecompressor(state_,
+    RETURN_IF_ERROR(Codec::CreateDecompressor(state_,
         column_buffer_pool_.get(), !has_noncompact_strings_, codec, &decompressor_));
   }
 
@@ -333,7 +332,7 @@ Status HdfsRCFileScanner::ReadKeyBuffers() {
     RETURN_IF_ERROR(SerDeUtils::ReadBytes(current_byte_stream_,
         compressed_key_length_, compressed_data_buffer_));
     RETURN_IF_ERROR(decompressor_->ProcessBlock(compressed_key_length_,
-        compressed_data_buffer_, key_length_, &key_buffer_));
+        compressed_data_buffer_, &key_length_, &key_buffer_));
   } else {
     RETURN_IF_ERROR(
         SerDeUtils::ReadBytes(current_byte_stream_, key_length_, key_buffer_));
@@ -430,7 +429,7 @@ Status HdfsRCFileScanner::ReadColumnBuffers() {
             col_buf_len_[col_idx], compressed_data_buffer_));
         uint8_t* compressed_output = column_buffer_ + col_bufs_off_[col_idx];
         RETURN_IF_ERROR(decompressor_->ProcessBlock(col_buf_len_[col_idx],
-            compressed_data_buffer_, col_buf_uncompressed_len_[col_idx],
+            compressed_data_buffer_, &col_buf_uncompressed_len_[col_idx],
             &compressed_output));
       } else {
         RETURN_IF_ERROR(SerDeUtils::ReadBytes(current_byte_stream_,

@@ -2,7 +2,6 @@
 
 package com.cloudera.impala.catalog;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -15,7 +14,6 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.thrift.THdfsCompression;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
-import com.google.common.collect.ImmutableMap;
 
 /**
  * Represents the file format metadata for files stored in a table or partition.
@@ -41,20 +39,6 @@ public class HdfsStorageDescriptor {
   // Serde parameters that are recognized by table writers.
   private static final String BLOCK_SIZE = "blocksize";
   private static final String COMPRESSION = "compression";
-
-  // Mapping from compression names to enum values.
-  // These are common names for the compression algorithms as they appear
-  // in various documentation.
-  private static final Map<String, THdfsCompression> COMPRESSION_MAP =
-    new ImmutableMap.Builder<String, THdfsCompression>()
-        .put("none", THdfsCompression.NONE)
-        .put("deflate", THdfsCompression.DEFAULT)
-        // Permit this alternate name since the codec class name contains Default
-        .put("default", THdfsCompression.DEFAULT)
-        .put("gzip", THdfsCompression.GZIP)
-        .put("bzip2", THdfsCompression.BZIP2)
-        .put("snappy", THdfsCompression.SNAPPY)
-        .build();
 
   // Important: don't change the ordering of these keys - if e.g. FIELD_DELIM is not
   // found, the value of LINE_DELIM is used, so LINE_DELIM must be found first.
@@ -189,8 +173,10 @@ public class HdfsStorageDescriptor {
     THdfsCompression compression = THdfsCompression.NONE;
     String compressionValue = parameters.get(COMPRESSION);
     if (compressionValue != null) {
-      if (COMPRESSION_MAP.containsKey(compressionValue)) {
-        compression = COMPRESSION_MAP.get(compressionValue);
+      if (com.cloudera.impala.thrift.Constants.COMPRESSION_MAP.containsKey(
+            compressionValue)) {
+        compression =
+          com.cloudera.impala.thrift.Constants.COMPRESSION_MAP.get(compressionValue);
       } else {
         LOG.warn("Unknown compression type: " + compressionValue);
       }

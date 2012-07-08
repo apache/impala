@@ -3,6 +3,7 @@
 #ifndef IMPALA_EXEC_HDFS_SEQUENCE_SCANNER_H
 #define IMPALA_EXEC_HDFS_SEQUENCE_SCANNER_H
 
+#include "util/codec.h"
 #include "exec/hdfs-scanner.h"
 #include "exec/buffered-byte-stream.h"
 #include "exec/delimited-text-parser.h"
@@ -260,7 +261,7 @@ class HdfsSequenceScanner : public HdfsScanner {
   bool is_blk_compressed_;
 
   // The decompressor class to use.
-  boost::scoped_ptr<Decompressor> decompressor_;
+  boost::scoped_ptr<Codec> decompressor_;
 
   // Location (file name) of previous scan range.
   std::string previous_location_;

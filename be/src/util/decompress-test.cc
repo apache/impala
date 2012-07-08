@@ -28,15 +28,15 @@ class DecompressorTest : public ::testing::Test{
   }
 
   void RunTest(const char* codec_str) {
-    scoped_ptr<Compressor> compressor;
-    scoped_ptr<Decompressor> decompressor;
+    scoped_ptr<Codec> compressor;
+    scoped_ptr<Codec> decompressor;
     MemPool* mem_pool = new MemPool;
     vector<char> codec(strlen(codec_str));
     memcpy(&codec[0], codec_str, strlen(codec_str));
 
     EXPECT_TRUE(
-        Compressor::CreateCompressor(NULL, mem_pool, true, codec, &compressor).ok());
-    EXPECT_TRUE(Decompressor::CreateDecompressor(NULL,
+        Codec::CreateCompressor(NULL, mem_pool, true, codec, &compressor).ok());
+    EXPECT_TRUE(Codec::CreateDecompressor(NULL,
         mem_pool, true, codec, &decompressor).ok());
 
     uint8_t* compressed;
@@ -44,15 +44,18 @@ class DecompressorTest : public ::testing::Test{
     EXPECT_TRUE(compressor->ProcessBlock(sizeof (input_),
           input_, &compressed_length, &compressed).ok());
     uint8_t* output;
+    int out_len;
     EXPECT_TRUE(
-        decompressor->ProcessBlock(compressed_length, compressed, 0, &output).ok());
+        decompressor->ProcessBlock(compressed_length,
+            compressed, &out_len, &output).ok());
 
     EXPECT_TRUE(memcmp(&input_, output, sizeof (input_)) == 0);
 
     // Try again specifying the output buffer and length.
-    output = mem_pool->Allocate(sizeof (input_));
+    out_len = sizeof (input_);
+    output = mem_pool->Allocate(out_len);
     EXPECT_TRUE(decompressor->ProcessBlock(compressed_length,
-          compressed, sizeof (input_), &output).ok());
+          compressed, &out_len, &output).ok());
 
     EXPECT_TRUE(memcmp(&input_, output, sizeof (input_)) == 0);
   }
@@ -61,19 +64,19 @@ class DecompressorTest : public ::testing::Test{
 };
 
 TEST_F(DecompressorTest, Default) {
-  RunTest(Decompressor::Decompressor::DEFAULT_COMPRESSION);
+  RunTest(Codec::DEFAULT_COMPRESSION);
 }
 
 TEST_F(DecompressorTest, Gzip) {
-  RunTest(Decompressor::Decompressor::GZIP_COMPRESSION);
+  RunTest(Codec::GZIP_COMPRESSION);
 }
 
 TEST_F(DecompressorTest, Bzip) {
-  RunTest(Decompressor::Decompressor::BZIP2_COMPRESSION);
+  RunTest(Codec::BZIP2_COMPRESSION);
 }
 
 TEST_F(DecompressorTest, Snappy) {
-  RunTest(Decompressor::Decompressor::SNAPPY_COMPRESSION);
+  RunTest(Codec::SNAPPY_COMPRESSION);
 }
 
 }

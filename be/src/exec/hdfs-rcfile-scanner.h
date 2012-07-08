@@ -3,6 +3,7 @@
 #ifndef IMPALA_EXEC_HDFS_RCFILE_SCANNER_H
 #define IMPALA_EXEC_HDFS_RCFILE_SCANNER_H
 
+#include "util/codec.h"
 #include "exec/hdfs-scanner.h"
 #include "exec/delimited-text-parser.h"
 
@@ -386,7 +387,7 @@ class HdfsRCFileScanner : public HdfsScanner {
   int compressed_key_length_;
 
   // Decompressor class to use, if any.
-  boost::scoped_ptr<Decompressor> decompressor_;
+  boost::scoped_ptr<Codec> decompressor_;
 
   // Row Group Key Buffer data, indexed by column number.
   // Arrays of lengths.

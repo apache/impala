@@ -10,7 +10,6 @@
 #include "exec/delimited-text-parser.h"
 #include "exec/serde-utils.h"
 #include "exec/buffered-byte-stream.h"
-#include "util/decompress.h"
 #include "exec/text-converter.inline.h"
 #include "runtime/descriptors.h"
 #include <glog/logging.h>
@@ -179,8 +178,9 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
     RETURN_IF_ERROR(
         SerDeUtils::ReadBytes(buffered_byte_stream_.get(), in_size, &scratch_buf_));
 
+    int len = 0;
     RETURN_IF_ERROR(decompressor_->ProcessBlock(in_size,
-        &scratch_buf_[0], 0, &unparsed_data_buffer_));
+        &scratch_buf_[0], &len, &unparsed_data_buffer_));
     *record_ptr = unparsed_data_buffer_;
     // Read the length of the record.
     int size = SerDeUtils::GetVLong(*record_ptr, record_len);
@@ -391,7 +391,7 @@ Status HdfsSequenceScanner::ReadFileHeader() {
       has_noncompact_strings_ = false;
     }
     RETURN_IF_ERROR(SerDeUtils::ReadText(buffered_byte_stream_.get(), &codec));
-    RETURN_IF_ERROR(Decompressor::CreateDecompressor(state_,
+    RETURN_IF_ERROR(Codec::CreateDecompressor(state_,
         unparsed_data_buffer_pool_.get(),
         !has_noncompact_strings_, codec, &decompressor_));
   }
@@ -484,8 +484,9 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
       SerDeUtils::ReadBytes(unbuffered_byte_stream_, block_size, &scratch_buf_));
   RETURN_IF_ERROR(buffered_byte_stream_->SeekToParent());
 
+  int len = 0;
   RETURN_IF_ERROR(decompressor_->ProcessBlock(block_size, &scratch_buf_[0],
-      0, &unparsed_data_buffer_));
+      &len, &unparsed_data_buffer_));
   next_record_in_compressed_block_ = unparsed_data_buffer_;
   return Status::OK;
 }

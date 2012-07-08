@@ -34,7 +34,8 @@ enum THdfsCompression {
   DEFAULT,
   GZIP,
   BZIP2,
-  SNAPPY
+  SNAPPY,
+  SNAPPY_BLOCKED // Used by sequence and rc files but not stored in the metadata.
 }
 
 struct THdfsPartition {
@@ -50,6 +51,7 @@ struct THdfsPartition {
 }
 
 struct THdfsTable {
+
   1: required string hdfsBaseDir
 
   // Partition keys are the same as clustering columns in
