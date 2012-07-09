@@ -53,7 +53,7 @@ class StateStoreSubscriber
   // the server terminates or Stop() is called. Before Start() is called,
   // a boost::shared_ptr<StateStoreSubscriber> to this StateStoreSubscriber must exist
   // somewhere outside of this class.
-  void Start();
+  impala::Status Start();
 
   // Stops exporting StateStoreSubscriberService and unregisters all subscriptions.
   void Stop();

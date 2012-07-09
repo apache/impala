@@ -4,9 +4,15 @@
 
 // TODO: remove this!
 #include <glog/logging.h>
+#include <Thrift.h>
+#include <transport/TSocket.h>
 
 #include "util/hash-util.h"
 #include "gen-cpp/Types_types.h"
+
+using namespace std;
+using namespace apache::thrift;
+using namespace apache::thrift::transport;
 
 namespace impala {
 
@@ -25,5 +31,36 @@ bool THostPort::operator<(const THostPort& that) const {
   }
   return false;
 };
+
+static void ThriftOutputFunction(const char* output) {
+  VLOG(1) << output;
+}
+
+void InitThriftLogging() {
+  GlobalOutput.setOutputFunction(ThriftOutputFunction);
+}
+
+Status WaitForServer(const string& host, int port, int num_retries,
+    int retry_interval_ms) {
+  int retry_count = 0;
+  while (retry_count < num_retries) {
+    try {
+      TSocket socket(host, port);
+      // Timeout is in ms
+      socket.setConnTimeout(500);
+      socket.open();
+      socket.close();
+      return Status::OK;
+    } catch (TTransportException& e) {
+      VLOG(1) << "Connection failed: " << e.what();
+    }
+    ++retry_count;
+    VLOG(1) << "Waiting " << retry_interval_ms << "ms for Thrift server at "
+            << host << ":" << port << " to come up, failed attempt " << retry_count
+            << " of " << num_retries + 1;
+    usleep(retry_interval_ms * 1000);
+  }
+  return Status("Server did not come up");
+}
 
 }

@@ -74,6 +74,13 @@ void DeserializeThriftMsg(JNIEnv* env, jbyteArray serialized_msg, T* deserialize
   deserialized_msg->read(tproto.get());
 }
 
+// Redirects all Thrift logging to VLOG(1)
+void InitThriftLogging();
+
+// Wait for a server to start accepting connections, up to a maximum timeout
+Status WaitForServer(const std::string& host, int port, int num_retries,
+   int retry_interval_ms);
+
 }
 
 #endif

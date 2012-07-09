@@ -5,18 +5,71 @@
 #include <glog/logging.h>
 
 #include <boost/algorithm/string.hpp>
+#include <boost/bind.hpp>
+#include <boost/mem_fn.hpp>
+#include <boost/foreach.hpp>
+
+#include "runtime/coordinator.h"
+#include "runtime/exec-env.h"
 
 #include "sparrow/simple-scheduler.h"
+#include "service/impala-service.h"
 #include "gen-cpp/ImpalaBackendService.h"
 
 using namespace std;
 using namespace boost;
 using impala::Status;
 using impala::THostPort;
+using impala::ExecEnv;
+using impala::ImpalaService;
 
 namespace sparrow {
 
-SimpleScheduler::SimpleScheduler(const vector<THostPort>& backends) {
+SimpleScheduler::SimpleScheduler(SubscriptionManager* subscription_manager,
+    const ServiceId& backend_service_id)
+  : subscription_manager_(subscription_manager),
+    backend_service_id_(backend_service_id) {
+  next_nonlocal_host_entry_ = host_map_.begin();
+}
+
+impala::Status SimpleScheduler::Init() {
+  if (subscription_manager_ == NULL) return Status::OK;
+
+  unordered_set<string> services;
+  services.insert(backend_service_id_);
+  SubscriptionManager::UpdateCallback callback =
+      boost::bind<void>(boost::mem_fn(&SimpleScheduler::UpdateMembership), this, _1);
+  RETURN_IF_ERROR(
+      subscription_manager_->RegisterSubscription(callback, services, &subscription_id_));
+
+  return Status::OK;
+}
+
+void SimpleScheduler::UpdateMembership(const ServiceStateMap& service_state) {
+  lock_guard<mutex> lock(host_map_lock_);
+  VLOG(1) << "Received update from subscription manager" << endl;
+  host_map_.clear();
+  ServiceStateMap::const_iterator it = service_state.find(backend_service_id_);
+  if (it != service_state.end()) {
+    VLOG(1) << "Found membership information for " << backend_service_id_;
+    ServiceState service_state = it->second;
+    BOOST_FOREACH(const Membership::value_type& member, service_state.membership) {
+      VLOG(1) << "Got member: " << member.second.host << ":" << member.second.port;
+      HostMap::iterator host_it = host_map_.find(member.second.host);
+      if (host_it == host_map_.end()) {
+        host_it = host_map_.insert(make_pair(member.second.host, list<int>())).first;
+      }
+      host_it->second.push_back(member.second.port);
+    }
+  } else {
+    VLOG(1) << "No membership information found.";
+  }
+
+  next_nonlocal_host_entry_ = host_map_.begin();
+}
+
+SimpleScheduler::SimpleScheduler(const vector<THostPort>& backends)
+    : subscription_manager_(NULL) {
   DCHECK(backends.size() > 0);
   for (int i = 0; i < backends.size(); ++i) {
     string host = backends[i].host;
@@ -33,6 +86,10 @@ SimpleScheduler::SimpleScheduler(const vector<THostPort>& backends) {
 
 Status SimpleScheduler::GetHosts(
     const vector<THostPort>& data_locations, vector<pair<string, int> >* hostports) {
+  lock_guard<mutex> lock(host_map_lock_);
+  if (host_map_.size() == 0) {
+    return Status("No backends configured");
+  }
   hostports->clear();
   for (int i = 0; i < data_locations.size(); ++i) {
     HostMap::iterator entry = host_map_.find(data_locations[i].host);
@@ -56,6 +113,17 @@ Status SimpleScheduler::GetHosts(
   }
   DCHECK_EQ(data_locations.size(), hostports->size());
   return Status::OK;
+}
+
+SimpleScheduler::~SimpleScheduler() {
+  if (subscription_manager_ != NULL) {
+    VLOG(1) << "Unregistering simple scheduler with subscription manager";
+    Status status = subscription_manager_->UnregisterSubscription(subscription_id_);
+    if (!status.ok()) {
+      LOG(ERROR) << "Error unsubscribing from subscription manager: "
+                 << status.GetErrorMsg();
+    }
+  }
 }
 
 }

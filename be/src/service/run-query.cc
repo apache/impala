@@ -31,6 +31,7 @@
 #include "util/runtime-profile.h"
 #include "util/debug-counters.h"
 #include "util/stat-util.h"
+#include "util/thrift-util.h"
 #include "runtime/data-stream-mgr.h"
 
 DEFINE_string(query, "", "query to execute.  Multiple queries can be ; separated");
@@ -216,7 +217,7 @@ static void RunServer(TServer* server) {
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, true);
-
+  InitThriftLogging();
   LlvmCodeGen::InitializeLlvm();
   JniUtil::InitLibhdfs();
   scoped_ptr<ExecEnv> exec_env;
@@ -229,6 +230,7 @@ int main(int argc, char** argv) {
     exec_env.reset(test_exec_env);
   } else {
     exec_env.reset(new ExecEnv());
+    EXIT_IF_ERROR(exec_env->StartServices());
   }
   if (FLAGS_num_nodes != 1) {
     // start backend service to feed stream_mgr

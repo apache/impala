@@ -52,8 +52,7 @@ Status SubscriptionManager::UnregisterSubscription(SubscriptionId id) {
 }
 
 Status SubscriptionManager::Start() {
-  state_store_->Start();
-  return Status::OK;
+  return state_store_->Start();
 }
 
 Status SubscriptionManager::Stop() {

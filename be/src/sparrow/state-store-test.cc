@@ -17,6 +17,7 @@
 #include "sparrow/state-store-service.h"
 #include "sparrow/state-store-subscriber-service.h"
 #include "sparrow/util.h"
+#include "util/thrift-util.h"
 #include "gen-cpp/SparrowTypes_types.h"
 #include "gen-cpp/Types_types.h"
 
@@ -72,27 +73,13 @@ class StateStoreTest : public testing::Test {
     state_store_host_port_.port = next_port_++;
   }
 
-  // Wait for the server at the given port to come up.
-  void WaitForServerToComeUp(int port) {
-    shared_ptr<TSocket> socket(new TSocket(host_, port));
-    while (true) {
-      try {
-        // This causes some Thrift errors to be printed out when it fails, in spite
-        // of the catch clause ("Connection refused" and "client died: No more data to
-        // read").
-        socket->open();
-        break;
-      } catch (TTransportException& e) {
-        VLOG(1) << "Waiting for server at port " << port << " to start up.";
-        usleep(10000);
-      }
-    }
-    socket->close();
-  }
-
   virtual void SetUp() {
+    impala::InitThriftLogging();
     state_store_->Start(state_store_host_port_.port);
-    WaitForServerToComeUp(state_store_host_port_.port);
+    Status status =
+      impala::WaitForServer(state_store_host_port_.host,
+                            state_store_host_port_.port, 3, 2000);
+    EXPECT_TRUE(status.ok());
   }
 
   shared_ptr<StateStoreSubscriber> StartStateStoreSubscriber() {
@@ -100,7 +87,8 @@ class StateStoreTest : public testing::Test {
     subscribers_.push_back(shared_ptr<StateStoreSubscriber>(new StateStoreSubscriber(
         host_, port, state_store_host_port_.host, state_store_host_port_.port)));
     subscribers_.back()->Start();
-    WaitForServerToComeUp(port);
+    Status status = impala::WaitForServer("localhost", port, 3, 2000);
+    EXPECT_TRUE(status.ok());
     return subscribers_.back();
   }
 
@@ -332,7 +320,7 @@ TEST_F(StateStoreTest, UnregisterSubscription) {
   const SubscriberId expected_assigned_id = 1;
   register_condition.expected_state[service_id].membership[expected_assigned_id] =
       service_address;
-  SubscriptionManager::UpdateCallback update_callback = 
+  SubscriptionManager::UpdateCallback update_callback =
       bind(&StateStoreTest::Update, &register_condition, _1);
 
   // Register the listening_subscriber to receive updates.
@@ -399,12 +387,12 @@ TEST_F(StateStoreTest, UnregisterOneOfMultipleSubscriptions) {
   service_address_2.port = next_port_++;
    THostPort service_address_3;
   service_address_3.host = host_;
-  service_address_3.port = next_port_++; 
+  service_address_3.port = next_port_++;
 
   // We expect the membership to include one instance of each service.
   UpdateCondition register_condition_A;
   ServiceStateMap& expected_state_A = register_condition_A.expected_state;
-  const SubscriberId expected_first_assigned_id = 1; 
+  const SubscriberId expected_first_assigned_id = 1;
   expected_state_A[service_id_1].membership = Membership();
   expected_state_A[service_id_1].membership[expected_first_assigned_id] =
       service_address_1;
@@ -453,7 +441,7 @@ TEST_F(StateStoreTest, UnregisterOneOfMultipleSubscriptions) {
     while (!register_condition_A.correctly_called) {
       ASSERT_TRUE(register_condition_A.condition.timed_wait(lock_A, timeout));
     }
-    
+
     unique_lock<mutex> lock_B(register_condition_B.mut);
     timeout = get_system_time() + posix_time::seconds(10);
     while (!register_condition_B.correctly_called) {

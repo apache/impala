@@ -18,6 +18,9 @@ namespace sparrow {
 
 class TUpdateStateRequest;
 
+// Identifier for services
+typedef char const* ServiceId;
+
 // Identifer for a StateStoreSubscriber.
 typedef int SubscriberId;
 

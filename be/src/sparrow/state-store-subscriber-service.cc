@@ -17,6 +17,7 @@
 #include <transport/TBufferTransports.h>
 #include <transport/TServerSocket.h>
 #include <transport/TSocket.h>
+#include "util/thrift-util.h"
 
 #include "common/status.h"
 #include "gen-cpp/StateStoreService_types.h"
@@ -63,7 +64,8 @@ Status StateStoreSubscriber::RegisterService(const string& service_id,
   request.__set_service_address(address);
   TRegisterServiceResponse response;
   VLOG(1) << "Attempting to register service " << request.service_id
-          << " on subscriber at " << request.subscriber_address.host << ":"
+          << " on address " << address.host << ":" << address.port
+          << ", to subscriber at " << request.subscriber_address.host << ":"
           << request.subscriber_address.port;
 
   try {
@@ -220,20 +222,23 @@ void StateStoreSubscriber::UpdateState(TUpdateStateResponse& response,
   RETURN_AND_SET_STATUS_OK(response);
 }
 
-void StateStoreSubscriber::Start() {
+Status StateStoreSubscriber::Start() {
   shared_ptr<TProcessor> processor(
       new StateStoreSubscriberServiceProcessor(shared_from_this()));
   shared_ptr<TServerTransport> server_transport(new TServerSocket(host_port_.port));
   shared_ptr<TTransportFactory> transport_factory(new TBufferedTransportFactory());
   shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
 
-  LOG(INFO) << "StateStoreSubscriber listening on " << host_port_.port;
   server_.reset(new TSimpleServer(processor, server_transport, transport_factory,
                                   protocol_factory));
 
   DCHECK(!server_running_);
   server_running_ = true;
   server_thread_.reset(new thread(&TSimpleServer::serve, server_));
+
+  RETURN_IF_ERROR(impala::WaitForServer(host_port_.host, host_port_.port, 3, 2000));
+  LOG(INFO) << "StateStoreSubscriber listening on " << host_port_.port;
+  return Status::OK;
 }
 
 bool StateStoreSubscriber::IsRunning() {

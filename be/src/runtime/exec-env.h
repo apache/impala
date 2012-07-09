@@ -27,7 +27,9 @@ class HdfsFsCache;
 class TestExecEnv;
 
 // Execution environment for queries/plan fragments.
-// Contains all required global structures.
+// Contains all required global structures, and handles to
+// singleton services. Clients must call StartServices exactly
+// once to properly initialise service state.
 class ExecEnv {
  public:
   ExecEnv();
@@ -36,10 +38,6 @@ class ExecEnv {
   // special c'tor for TestExecEnv::BackendInfo so that multiple in-process backends
   // can share a single fs cache
   ExecEnv(HdfsFsCache* fs_cache);
-
-  // Starts the StateStoreSubscriberService in its own thread, listening on the
-  // port specified by FLAGS_state_store_subscriber_port.
-  void StartStateStoreSubscriberService();
 
   sparrow::SubscriptionManager* subscription_manager() {
     return subscription_manager_;
@@ -54,6 +52,9 @@ class ExecEnv {
     DCHECK(scheduler_ != NULL);
     return scheduler_;
   }
+
+  // Starts any dependent services in their correct order
+  Status StartServices();
 
  private:
   boost::scoped_ptr<DataStreamMgr> stream_mgr_impl_;

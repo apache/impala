@@ -193,7 +193,7 @@ class StateStore : public StateStoreServiceIf,
   // Next id to use for a StateStoreSubscriber.
   SubscriberId next_subscriber_id_;
 
-  // Getter and setter for is_updating_ (which both lock appropriately).
+  // Getter and setter for is_updating_, both are thread safe.
   bool is_updating();
   void set_is_updating(bool is_updating);
 
