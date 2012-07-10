@@ -44,7 +44,7 @@ class DecompressorTest : public ::testing::Test{
     EXPECT_TRUE(compressor->ProcessBlock(sizeof (input_),
           input_, &compressed_length, &compressed).ok());
     uint8_t* output;
-    int out_len;
+    int out_len = 0;
     EXPECT_TRUE(
         decompressor->ProcessBlock(compressed_length,
             compressed, &out_len, &output).ok());
