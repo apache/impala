@@ -36,6 +36,15 @@ Status& Status::operator=(const TStatus& status) {
   return *this;
 }
 
+void Status::AddErrorMsg(const std::string& msg) {
+    if (error_detail_ == NULL) {
+      error_detail_ = new ErrorDetail(msg);
+    } else {
+      error_detail_->error_msgs.insert(error_detail_->error_msgs.begin(), msg);
+    }
+    LOG(WARNING) << "Error Status: " << msg;
+}
+
 void Status::GetErrorMsgs(vector<string>* msgs) const {
   msgs->clear();
   if (error_detail_ != NULL) {

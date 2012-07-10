@@ -346,36 +346,43 @@ Status HdfsSequenceScanner::WriteFields(RowBatch* row_batch,
 Status HdfsSequenceScanner::ReadFileHeader() {
   RETURN_IF_ERROR(SerDeUtils::ReadBytes(buffered_byte_stream_.get(),
       sizeof(SEQFILE_VERSION_HEADER), &scratch_buf_));
+  Status status;
   if (memcmp(&scratch_buf_[0], SEQFILE_VERSION_HEADER, sizeof(SEQFILE_VERSION_HEADER))) {
-    if (state_->LogHasSpace()) {
-      state_->error_stream() << "Invalid SEQFILE_VERSION_HEADER: '"
-         << SerDeUtils::HexDump(&scratch_buf_[0], sizeof(SEQFILE_VERSION_HEADER)) << "'";
-    }
-    return Status("Invalid SEQFILE_VERSION_HEADER");
+    stringstream ss;
+    ss << "Invalid SEQFILE_VERSION_HEADER: '"
+       << SerDeUtils::HexDump(&scratch_buf_[0], sizeof(SEQFILE_VERSION_HEADER))
+       << "'" << endl;
+    status.AddErrorMsg(ss.str());
   }
 
   std::vector<char> scratch_text;
   RETURN_IF_ERROR(SerDeUtils::ReadText(buffered_byte_stream_.get(), &scratch_text));
   if (strncmp(&scratch_text[0],
       HdfsSequenceScanner::SEQFILE_KEY_CLASS_NAME, scratch_text.size())) {
-    if (state_->LogHasSpace()) {
-      state_->error_stream() << "Invalid SEQFILE_KEY_CLASS_NAME: '"
-         << string(&scratch_text[0], strlen(HdfsSequenceScanner::SEQFILE_KEY_CLASS_NAME))
-         << "'";
-    }
-    return Status("Invalid SEQFILE_KEY_CLASS_NAME");
+    stringstream ss;
+    ss << "Invalid SEQFILE_KEY_CLASS_NAME: '"
+       << string(&scratch_text[0],
+                 strlen(HdfsSequenceScanner::SEQFILE_KEY_CLASS_NAME))
+       << "'" << endl;
+    status.AddErrorMsg(ss.str());
   }
 
   RETURN_IF_ERROR(SerDeUtils::ReadText(buffered_byte_stream_.get(), &scratch_text));
   if (strncmp(&scratch_text[0], HdfsSequenceScanner::SEQFILE_VALUE_CLASS_NAME,
       scratch_text.size())) {
-    if (state_->LogHasSpace()) {
-      state_->error_stream() << "Invalid SEQFILE_VALUE_CLASS_NAME: '"
-         << string(
-             scratch_text[0], strlen(HdfsSequenceScanner::SEQFILE_VALUE_CLASS_NAME))
-         << "'";
-    }
-    return Status("Invalid SEQFILE_VALUE_CLASS_NAME");
+    stringstream ss;
+    ss << "Invalid SEQFILE_VALUE_CLASS_NAME: '"
+       << string(
+           &scratch_text[0], strlen(HdfsSequenceScanner::SEQFILE_VALUE_CLASS_NAME))
+       << "'" << endl;
+    status.AddErrorMsg(ss.str());
+  }
+
+  if (!status.ok()) {
+    stringstream ss;
+    ss << "Invalid header information: " << current_byte_stream_->GetLocation();
+    status.AddErrorMsg(ss.str());
+    return status;
   }
 
   RETURN_IF_ERROR(SerDeUtils::ReadBoolean(buffered_byte_stream_.get(), &is_compressed_));
@@ -454,6 +461,7 @@ Status HdfsSequenceScanner::CheckSync() {
            << "Actual:   '"
            << SerDeUtils::HexDump(hash, HdfsSequenceScanner::SYNC_HASH_SIZE)
            << "'" << endl;
+      state_->LogErrorStream();
     }
     return Status("Bad sync hash");
   }
