@@ -48,8 +48,8 @@ namespace impala {
 //
 // -- The name of the Java class responsible for reading the value buffer
 //
+// -- We don't care what this is.
 // file-value-class-name ::=
-//   Text {"org.apache.hadoop.io.Text"}
 //
 // -- Boolean variable indicating whether or not the file uses compression
 // -- for key/values in this file

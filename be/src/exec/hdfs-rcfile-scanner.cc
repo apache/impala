@@ -314,8 +314,35 @@ Status HdfsRCFileScanner::ReadHeader() {
     RETURN_IF_ERROR(ReadSync());
     RETURN_IF_ERROR(SerDeUtils::ReadInt(current_byte_stream_, &record_length));
   }
+  if (record_length < 0) {
+    stringstream ss;
+    int64_t position;
+    current_byte_stream_->GetPosition(&position);
+    position -= sizeof(int32_t);
+    ss << "Bad record length: " << record_length << " in file: "
+        << current_byte_stream_->GetLocation() << " at offset: " << position;
+    return Status(ss.str());
+  }
   RETURN_IF_ERROR(SerDeUtils::ReadInt(current_byte_stream_, &key_length_));
+  if (key_length_ < 0) {
+    stringstream ss;
+    int64_t position;
+    current_byte_stream_->GetPosition(&position);
+    position -= sizeof(int32_t);
+    ss << "Bad key length: " << key_length_ << " in file: "
+        << current_byte_stream_->GetLocation() << " at offset: " << position;
+    return Status(ss.str());
+  }
   RETURN_IF_ERROR(SerDeUtils::ReadInt(current_byte_stream_, &compressed_key_length_));
+  if (compressed_key_length_ < 0) {
+    stringstream ss;
+    int64_t position;
+    current_byte_stream_->GetPosition(&position);
+    position -= sizeof(int32_t);
+    ss << "Bad compressed key length: " << compressed_key_length_ << " in file: "
+        << current_byte_stream_->GetLocation() << " at offset: " << position;
+    return Status(ss.str());
+  }
   return Status::OK;
 }
 

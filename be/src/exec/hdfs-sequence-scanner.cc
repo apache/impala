@@ -26,8 +26,6 @@ const char* const HdfsSequenceScanner::SEQFILE_VALUE_CLASS_NAME =
 
 const uint8_t HdfsSequenceScanner::SEQFILE_VERSION_HEADER[4] = {'S', 'E', 'Q', 6};
 
-const int HdfsSequenceScanner::SEQFILE_KEY_LENGTH = 4;
-
 static const uint8_t SEQUENCE_FILE_RECORD_DELIMITER = 0xff;
 
 HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state, 
@@ -356,16 +354,8 @@ Status HdfsSequenceScanner::ReadFileHeader() {
   }
 
   std::vector<char> scratch_text;
+  // We don't care what this is since we don't use the keys.
   RETURN_IF_ERROR(SerDeUtils::ReadText(buffered_byte_stream_.get(), &scratch_text));
-  if (strncmp(&scratch_text[0],
-      HdfsSequenceScanner::SEQFILE_KEY_CLASS_NAME, scratch_text.size())) {
-    stringstream ss;
-    ss << "Invalid SEQFILE_KEY_CLASS_NAME: '"
-       << string(&scratch_text[0],
-                 strlen(HdfsSequenceScanner::SEQFILE_KEY_CLASS_NAME))
-       << "'" << endl;
-    status.AddErrorMsg(ss.str());
-  }
 
   RETURN_IF_ERROR(SerDeUtils::ReadText(buffered_byte_stream_.get(), &scratch_text));
   if (strncmp(&scratch_text[0], HdfsSequenceScanner::SEQFILE_VALUE_CLASS_NAME,
@@ -439,8 +429,26 @@ Status HdfsSequenceScanner::ReadBlockHeader(bool* sync) {
         SerDeUtils::ReadInt(buffered_byte_stream_.get(), &current_block_length_));
     *sync = true;
   }
+  if (current_block_length_ < 0) {
+    stringstream ss;
+    int64_t position;
+    buffered_byte_stream_->GetPosition(&position);
+    position -= sizeof(int32_t);
+    ss << "Bad block length: " << current_block_length_ << " in file: "
+        << buffered_byte_stream_->GetLocation() << " at offset: " << position;
+    return Status(ss.str());
+  }
   RETURN_IF_ERROR(SerDeUtils::ReadInt(buffered_byte_stream_.get(), &current_key_length_));
-  DCHECK_EQ(current_key_length_, SEQFILE_KEY_LENGTH);
+  if (current_key_length_ < 0) {
+    stringstream ss;
+    int64_t position;
+    buffered_byte_stream_->GetPosition(&position);
+    position -= sizeof(int32_t);
+    ss << "Bad key length: " << current_key_length_ << " in file: "
+        << buffered_byte_stream_->GetLocation() << " at offset: " << position;
+    return Status(ss.str());
+  }
+
   return Status::OK;
 }
 
