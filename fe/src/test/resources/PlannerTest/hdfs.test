@@ -527,6 +527,62 @@ Plan Fragment 1
         hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
         hdfs:alltypes/year=2009/month=9/090901.txt 0:20179
 ====
+# between predicate on second key
+select * from alltypes where year = 2009 and month between 6 and 8
+---- PLAN
+Plan Fragment 0
+  SCAN HDFS table=default.alltypes (0)
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypes/year=2009/month=6/090601.txt 0:20179
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+------------ DISTRIBUTEDPLAN
+Plan Fragment 0
+  EXCHANGE (1)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+  SCAN HDFS table=default.alltypes (0)
+
+  EXEC PARAMS
+    HOST:
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypes/year=2009/month=6/090601.txt 0:20179
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+====
+# between predicates on first and second keys
+select * from alltypes where year between 2009 and 2009 and month between 6 and 8
+---- PLAN
+Plan Fragment 0
+  SCAN HDFS table=default.alltypes (0)
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypes/year=2009/month=6/090601.txt 0:20179
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+------------ DISTRIBUTEDPLAN
+Plan Fragment 0
+  EXCHANGE (1)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+  SCAN HDFS table=default.alltypes (0)
+
+  EXEC PARAMS
+    HOST:
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypes/year=2009/month=6/090601.txt 0:20179
+        hdfs:alltypes/year=2009/month=7/090701.txt 0:20853
+        hdfs:alltypes/year=2009/month=8/090801.txt 0:20853
+====
 # slot binding can't be determined
 select * from alltypes where year - 1 = 2009
 ---- PLAN

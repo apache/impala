@@ -17,6 +17,7 @@
 #include "exprs/date-literal.h"
 #include "exprs/float-literal.h"
 #include "exprs/function-call.h"
+#include "exprs/in-predicate.h"
 #include "exprs/int-literal.h"
 #include "exprs/is-null-predicate.h"
 #include "exprs/like-predicate.h"
@@ -291,6 +292,13 @@ Status Expr::CreateExpr(ObjectPool* pool, const TExprNode& texpr_node, Expr** ex
         return Status("Int literal not set in thrift node");
       }
       *expr = pool->Add(new IntLiteral(texpr_node));
+      return Status::OK;
+    }
+    case TExprNodeType::IN_PRED: {
+      if (!texpr_node.__isset.in_predicate) {
+        return Status("In predicate not set in thrift node");
+      }
+      *expr = pool->Add(new InPredicate(texpr_node));
       return Status::OK;
     }
     case TExprNodeType::IS_NULL_PRED: {

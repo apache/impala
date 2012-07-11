@@ -970,6 +970,55 @@ public class AnalyzerTest {
     // AnalyzesOk("select * from alltypes where null is not null");
   }
 
+  @Test
+  public void TestBetweenPredicates() throws AnalysisException {
+    AnalyzesOk("select * from alltypes " +
+    		"where tinyint_col between smallint_col and int_col");
+    AnalyzesOk("select * from alltypes " +
+        "where tinyint_col not between smallint_col and int_col");
+    AnalyzesOk("select * from alltypes " +
+        "where 'abc' between string_col and date_string_col");
+    AnalyzesOk("select * from alltypes " +
+        "where 'abc' not between string_col and date_string_col");
+    // Lower and upper bounds require implicit casts.
+    AnalyzesOk("select * from alltypes " +
+    		"where double_col between smallint_col and int_col");
+    // Comparison expr requires implicit cast.
+    AnalyzesOk("select * from alltypes " +
+        "where smallint_col between float_col and double_col");
+    // Incompatible types.
+    AnalysisError("select * from alltypes " +
+    		"where string_col between bool_col and double_col",
+        "Incompatible return types 'STRING' and 'BOOLEAN' " +
+        "of exprs 'string_col' and 'bool_col'.");
+    AnalysisError("select * from alltypes " +
+    		"where timestamp_col between int_col and double_col",
+        "Incompatible return types 'TIMESTAMP' and 'INT' " +
+        "of exprs 'timestamp_col' and 'int_col'.");
+  }
+
+  @Test
+  public void TestInPredicates() throws AnalysisException {
+    AnalyzesOk("select * from alltypes where int_col in (1, 2, 3, 4)");
+    AnalyzesOk("select * from alltypes where int_col not in (1, 2, 3, 4)");
+    AnalyzesOk("select * from alltypes where string_col in ('a', 'b', 'c', 'd')");
+    AnalyzesOk("select * from alltypes where string_col not in ('a', 'b', 'c', 'd')");
+    // Test booleans.
+    AnalyzesOk("select * from alltypes where true in (bool_col, true and false)");
+    AnalyzesOk("select * from alltypes where true not in (bool_col, true and false)");
+    // In list requires implicit casts.
+    AnalyzesOk("select * from alltypes where double_col in (int_col, bigint_col)");
+    // Comparison expr requires implicit cast.
+    AnalyzesOk("select * from alltypes where int_col in (double_col, bigint_col)");
+    // Incompatible types.
+    AnalysisError("select * from alltypes where string_col in (bool_col, double_col)",
+        "Incompatible return types 'STRING' and 'BOOLEAN' " +
+        "of exprs 'string_col' and 'bool_col'.");
+    AnalysisError("select * from alltypes where timestamp_col in (int_col, double_col)",
+        "Incompatible return types 'TIMESTAMP' and 'INT' " +
+        "of exprs 'timestamp_col' and 'int_col'.");
+  }
+
   /**
    * Test of all arithmetic type casts following mysql's casting policy.
    * @throws AnalysisException

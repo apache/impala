@@ -447,6 +447,38 @@ public class ParserTest {
     }
   }
 
+  @Test public void TestBetweenPredicate() {
+    ParsesOk("select a, b, c from t where i between x and y");
+    ParsesOk("select a, b, c from t where i not between x and y");
+    // Missing condition expr.
+    ParserError("select a, b, c from t where between 5 and 10");
+    // Missing lower bound.
+    ParserError("select a, b, c from t where i between and 10");
+    // Missing upper bound.
+    ParserError("select a, b, c from t where i between 5 and");
+    // Missing exprs after between.
+    ParserError("select a, b, c from t where i between");
+  }
+
+  @Test public void TestInPredicate() {
+    ParsesOk("select a, b, c from t where i in (x, y, z)");
+    ParsesOk("select a, b, c from t where i not in (x, y, z)");
+    // Test NULL and boolean literals.
+    ParsesOk("select a, b, c from t where NULL in (NULL, NULL, NULL)");
+    ParsesOk("select a, b, c from t where true in (true, false, true)");
+    ParsesOk("select a, b, c from t where NULL not in (NULL, NULL, NULL)");
+    ParsesOk("select a, b, c from t where true not in (true, false, true)");
+    // Missing condition expr.
+    ParserError("select a, b, c from t where in (x, y, z)");
+    // Missing parentheses around in list.
+    ParserError("select a, b, c from t where i in x, y, z");
+    ParserError("select a, b, c from t where i in (x, y, z");
+    ParserError("select a, b, c from t where i in x, y, z)");
+    // Missing in list.
+    ParserError("select a, b, c from t where i in");
+    ParserError("select a, b, c from t where i in ( )");
+  }
+
   @Test public void TestSlotRef() {
     ParsesOk("select a from t where b > 5");
     ParsesOk("select a.b from a where b > 5");
@@ -547,7 +579,7 @@ public class ParserTest {
         "select c, b, c where a = 5\n" +
         "               ^\n" +
         "Encountered: WHERE\n" +
-        "Expected: AS, DIV, FROM, IS, LIKE, LIMIT, NOT, ORDER, " +
+        "Expected: AS, BETWEEN, DIV, FROM, IS, IN, LIKE, LIMIT, NOT, ORDER, " +
         "REGEXP, RLIKE, UNION, COMMA, IDENTIFIER\n");
 
     // missing table list
@@ -600,8 +632,8 @@ public class ParserTest {
         "select (i + 5)(1 - i) from t\n" +
         "              ^\n" +
         "Encountered: (\n" +
-        "Expected: AND, AS, ASC, DESC, DIV, ELSE, END, FROM, FULL, " +
-        "GROUP, HAVING, IS, INNER, JOIN, LEFT, LIKE, LIMIT, NOT, OR, ORDER, " +
+        "Expected: AND, AS, ASC, BETWEEN, DESC, DIV, ELSE, END, FROM, FULL, " +
+        "GROUP, HAVING, IS, IN, INNER, JOIN, LEFT, LIKE, LIMIT, NOT, OR, ORDER, " +
         "REGEXP, RLIKE, RIGHT, UNION, WHEN, WHERE, THEN, COMMA, " +
         "IDENTIFIER\n");
 
@@ -611,8 +643,8 @@ public class ParserTest {
         "(1 - i) from t\n" +
         "^\n" +
         "Encountered: (\n" +
-        "Expected: AND, AS, ASC, DESC, DIV, ELSE, END, FROM, FULL, " +
-        "GROUP, HAVING, IS, INNER, JOIN, LEFT, LIKE, LIMIT, NOT, OR, ORDER, " +
+        "Expected: AND, AS, ASC, BETWEEN, DESC, DIV, ELSE, END, FROM, FULL, " +
+        "GROUP, HAVING, IS, IN, INNER, JOIN, LEFT, LIKE, LIMIT, NOT, OR, ORDER, " +
         "REGEXP, RLIKE, RIGHT, UNION, WHEN, WHERE, THEN, COMMA, " +
         "IDENTIFIER\n");
 
@@ -623,8 +655,8 @@ public class ParserTest {
         "^\n" +
         "from t\n" +
         "Encountered: (\n" +
-        "Expected: AND, AS, ASC, DESC, DIV, ELSE, END, FROM, FULL, " +
-        "GROUP, HAVING, IS, INNER, JOIN, LEFT, LIKE, LIMIT, NOT, OR, ORDER, " +
+        "Expected: AND, AS, ASC, BETWEEN, DESC, DIV, ELSE, END, FROM, FULL, " +
+        "GROUP, HAVING, IS, IN, INNER, JOIN, LEFT, LIKE, LIMIT, NOT, OR, ORDER, " +
         "REGEXP, RLIKE, RIGHT, UNION, WHEN, WHERE, THEN, COMMA, " +
         "IDENTIFIER\n");
   }

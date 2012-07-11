@@ -132,10 +132,10 @@ parser code {:
   }
 :};
 
-terminal KW_AND, KW_ALL, KW_AS, KW_ASC, KW_AVG, KW_BIGINT, KW_BOOLEAN, KW_BY,
+terminal KW_AND, KW_ALL, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW_BIGINT, KW_BOOLEAN, KW_BY,
   KW_CASE, KW_CAST, KW_COUNT, KW_DATE, KW_DATETIME, KW_DESC, KW_DISTINCT,
   KW_DIV, KW_DOUBLE, KW_ELSE, KW_END, KW_FALSE, KW_FLOAT, KW_FROM, KW_FULL, KW_GROUP,
-  KW_HAVING, KW_IS, KW_INNER, KW_JOIN, KW_INT, KW_LEFT, KW_LIKE, KW_LIMIT, KW_MIN,
+  KW_HAVING, KW_IS, KW_IN, KW_INNER, KW_JOIN, KW_INT, KW_LEFT, KW_LIKE, KW_LIMIT, KW_MIN,
   KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_REGEXP,
   KW_RLIKE, KW_RIGHT, KW_SELECT, KW_SEMI, KW_SMALLINT, KW_STRING, KW_SUM,
   KW_TINYINT, KW_TRUE, KW_UNION, KW_USING, KW_WHEN, KW_WHERE, KW_THEN, KW_TIMESTAMP,
@@ -171,8 +171,8 @@ nonterminal String alias_clause;
 nonterminal ArrayList<String> ident_list;
 nonterminal TableName table_name;
 nonterminal Predicate where_clause;
-nonterminal Predicate predicate, comparison_predicate, compound_predicate,
-  like_predicate;
+nonterminal Predicate predicate, between_predicate, comparison_predicate, 
+  compound_predicate, in_predicate, like_predicate;
 nonterminal LiteralPredicate literal_predicate;
 nonterminal ArrayList<Expr> group_by_clause;
 nonterminal Predicate having_clause;
@@ -211,6 +211,7 @@ precedence left STAR, DIVIDE, MOD, KW_DIV;
 precedence left BITAND, BITOR, BITXOR, BITNOT;
 precedence left KW_ORDER, KW_BY, KW_LIMIT;
 precedence left RPAREN;
+precedence left KW_IN;
 
 start with insert_or_query_stmt;
 
@@ -814,9 +815,13 @@ predicate ::=
   {: RESULT = new IsNullPredicate(e, false); :}
   | expr:e KW_IS KW_NOT KW_NULL
   {: RESULT = new IsNullPredicate(e, true); :}
+  | between_predicate:p
+  {: RESULT = p; :}
   | comparison_predicate:p
   {: RESULT = p; :}  
-  | compound_predicate:p
+  | compound_predicate:p  
+  {: RESULT = p; :}
+  | in_predicate:p
   {: RESULT = p; :}
   | like_predicate:p
   {: RESULT = p; :}
@@ -890,6 +895,13 @@ like_predicate ::=
   {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT,
     new LikePredicate(LikePredicate.Operator.REGEXP, e1, e2), null); :}
   ;
+  
+between_predicate ::=
+  expr:e1 KW_BETWEEN expr:e2 KW_AND expr:e3
+  {: RESULT = new BetweenPredicate(e1, e2, e3, false); :}
+  | expr:e1 KW_NOT KW_BETWEEN expr:e2 KW_AND expr:e3
+  {: RESULT = new BetweenPredicate(e1, e2, e3, true); :}
+  ;
 
 compound_predicate ::=
   predicate:p1 KW_AND predicate:p2
@@ -900,6 +912,19 @@ compound_predicate ::=
   {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT, p, null); :}
   | NOT predicate:p
   {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT, p, null); :}
+  ;
+
+// Using expr_or_predicate here results in an unresolvable shift/reduce conflict.
+// Instead, we must list expr and predicate explicitly. 
+in_predicate ::=
+  expr:e KW_IN LPAREN func_arg_list:l RPAREN
+  {: RESULT = new InPredicate(e, l, false); :}
+  | predicate:p KW_IN LPAREN func_arg_list:l RPAREN
+  {: RESULT = new InPredicate(p, l, false); :}
+  | expr:e KW_NOT KW_IN LPAREN func_arg_list:l RPAREN
+  {: RESULT = new InPredicate(e, l, true); :}
+  | predicate:p KW_NOT KW_IN LPAREN func_arg_list:l RPAREN
+  {: RESULT = new InPredicate(p, l, true); :} 
   ;
 
 literal_predicate ::=

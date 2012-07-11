@@ -18,6 +18,7 @@ enum TExprNodeType {
   FLOAT_LITERAL,
   FUNCTION_CALL,
   INT_LITERAL,
+  IN_PRED,
   IS_NULL_PRED,
   LIKE_PRED,
   LITERAL_PRED,
@@ -61,6 +62,10 @@ struct TIntLiteral {
   1: required i64 value
 }
 
+struct TInPredicate {
+  1: required bool is_not_in
+}
+
 struct TIsNullPredicate {
   1: required bool is_not_null
 }
@@ -95,11 +100,12 @@ struct TExprNode {
   8: optional TDateLiteral date_literal
   9: optional TFloatLiteral float_literal
   10: optional TIntLiteral int_literal
-  11: optional TIsNullPredicate is_null_pred
-  12: optional TLikePredicate like_pred
-  13: optional TLiteralPredicate literal_pred
-  14: optional TSlotRef slot_ref
-  15: optional TStringLiteral string_literal
+  11: optional TInPredicate in_predicate
+  12: optional TIsNullPredicate is_null_pred
+  13: optional TLikePredicate like_pred
+  14: optional TLiteralPredicate literal_pred
+  15: optional TSlotRef slot_ref
+  16: optional TStringLiteral string_literal
 }
 
 // A flattened representation of a tree of Expr nodes, obtained by depth-first

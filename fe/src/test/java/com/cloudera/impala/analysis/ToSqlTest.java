@@ -83,6 +83,14 @@ public class ToSqlTest {
         "SELECT id FROM alltypes WHERE string_col = 'abc'");
     testToSql("select id from alltypes where string_col = 'abc'",
         "SELECT id FROM alltypes WHERE string_col = 'abc'");
+    testToSql("select id from alltypes where 5 between smallint_col and int_col",
+        "SELECT id FROM alltypes WHERE 5 BETWEEN smallint_col AND int_col");
+    testToSql("select id from alltypes where 5 not between smallint_col and int_col",
+        "SELECT id FROM alltypes WHERE 5 NOT BETWEEN smallint_col AND int_col");
+    testToSql("select id from alltypes where 5 in (smallint_col, int_col)",
+        "SELECT id FROM alltypes WHERE 5 IN (smallint_col, int_col)");
+    testToSql("select id from alltypes where 5 not in (smallint_col, int_col)",
+        "SELECT id FROM alltypes WHERE 5 NOT IN (smallint_col, int_col)");
   }
 
   // Test the toSql() output of aggregate and group by expressions.

@@ -876,6 +876,97 @@ TEST_F(ExprTest, LikePredicate) {
   TestValue("'a' LIKE '(./'", TYPE_BOOLEAN, false);
 }
 
+TEST_F(ExprTest, BetweenPredicate) {
+  // Between is rewritten into a conjunctive compound predicate.
+  // Compound predicates are also tested elsewere, so we just do basic testing here.
+  TestValue("5 between 0 and 10", TYPE_BOOLEAN, true);
+  TestValue("5 between 5 and 5", TYPE_BOOLEAN, true);
+  TestValue("5 between 6 and 10", TYPE_BOOLEAN, false);
+  TestValue("5 not between 0 and 10", TYPE_BOOLEAN, false);
+  TestValue("5 not between 5 and 5", TYPE_BOOLEAN, false);
+  TestValue("5 not between 6 and 10", TYPE_BOOLEAN, true);
+  // Test operator precedence.
+  TestValue("5+1 between 4 and 10", TYPE_BOOLEAN, true);
+  TestValue("5+1 not between 4 and 10", TYPE_BOOLEAN, false);
+  // Test TimestampValues.
+  TestValue("cast('2011-10-22 09:10:11' as timestamp) between "
+      "cast('2011-09-22 09:10:11' as timestamp) and "
+      "cast('2011-12-22 09:10:11' as timestamp)", TYPE_BOOLEAN, true);
+  TestValue("cast('2011-10-22 09:10:11' as timestamp) between "
+        "cast('2011-11-22 09:10:11' as timestamp) and "
+        "cast('2011-12-22 09:10:11' as timestamp)", TYPE_BOOLEAN, false);
+  TestValue("cast('2011-10-22 09:10:11' as timestamp) not between "
+      "cast('2011-09-22 09:10:11' as timestamp) and "
+      "cast('2011-12-22 09:10:11' as timestamp)", TYPE_BOOLEAN, false);
+  TestValue("cast('2011-10-22 09:10:11' as timestamp) not between "
+      "cast('2011-11-22 09:10:11' as timestamp) and "
+      "cast('2011-12-22 09:10:11' as timestamp)", TYPE_BOOLEAN, true);
+  // Test strings.
+  TestValue("'abc' between 'a' and 'z'", TYPE_BOOLEAN, true);
+  TestValue("'abc' between 'aaa' and 'aab'", TYPE_BOOLEAN, false);
+  TestValue("'abc' not between 'a' and 'z'", TYPE_BOOLEAN, false);
+  TestValue("'abc' not between 'aaa' and 'aab'", TYPE_BOOLEAN, true);
+}
+
+// Tests with NULLs are in the FE QueryTest.
+TEST_F(ExprTest, InPredicate) {
+  // Test integers.
+  unordered_map<int, int64_t>::iterator int_iter;
+  for(int_iter = min_int_values_.begin(); int_iter != min_int_values_.end();
+      ++int_iter) {
+    string& val = default_type_strs_[int_iter->first];
+    TestValue(val + " in (2, 3, " + val + ")", TYPE_BOOLEAN, true);
+    TestValue(val + " in (2, 3, 4)", TYPE_BOOLEAN, false);
+    TestValue(val + " not in (2, 3, " + val + ")", TYPE_BOOLEAN, false);
+    TestValue(val + " not in (2, 3, 4)", TYPE_BOOLEAN, true);
+  }
+
+  // Test floats.
+  unordered_map<int, double>::iterator float_iter;
+  for(float_iter = min_float_values_.begin(); float_iter != min_float_values_.end();
+      ++float_iter) {
+    string& val = default_type_strs_[float_iter->first];
+    TestValue(val + " in (2, 3, " + val + ")", TYPE_BOOLEAN, true);
+    TestValue(val + " in (2, 3, 4)", TYPE_BOOLEAN, false);
+    TestValue(val + " not in (2, 3, " + val + ")", TYPE_BOOLEAN, false);
+    TestValue(val + " not in (2, 3, 4)", TYPE_BOOLEAN, true);
+  }
+
+  // Test bools.
+  TestValue("true in (true, false, false)", TYPE_BOOLEAN, true);
+  TestValue("true in (false, false, false)", TYPE_BOOLEAN, false);
+  TestValue("true not in (true, false, false)", TYPE_BOOLEAN, false);
+  TestValue("true not in (false, false, false)", TYPE_BOOLEAN, true);
+
+  // Test strings.
+  TestValue("'ab' in ('ab', 'cd', 'efg')", TYPE_BOOLEAN, true);
+  TestValue("'ab' in ('cd', 'efg', 'h')", TYPE_BOOLEAN, false);
+  TestValue("'ab' not in ('ab', 'cd', 'efg')", TYPE_BOOLEAN, false);
+  TestValue("'ab' not in ('cd', 'efg', 'h')", TYPE_BOOLEAN, true);
+
+  // Test timestamps.
+  TestValue(default_timestamp_str_ + " "
+      "in (cast('2011-11-23 09:10:11' as timestamp), "
+      "cast('2011-11-24 09:11:12' as timestamp), " +
+      default_timestamp_str_ + ")", TYPE_BOOLEAN, true);
+  TestValue(default_timestamp_str_ + " "
+        "in (cast('2011-11-22 09:10:11' as timestamp), "
+        "cast('2011-11-23 09:11:12' as timestamp), "
+        "cast('2011-11-24 09:12:13' as timestamp))", TYPE_BOOLEAN, false);
+  TestValue(default_timestamp_str_ + " "
+      "not in (cast('2011-11-22 09:10:11' as timestamp), "
+      "cast('2011-11-23 09:11:12' as timestamp), " +
+      default_timestamp_str_ + ")", TYPE_BOOLEAN, false);
+  TestValue(default_timestamp_str_ + " "
+      "not in (cast('2011-11-22 09:10:11' as timestamp), "
+      "cast('2011-11-23 09:11:12' as timestamp), "
+      "cast('2011-11-24 09:12:13' as timestamp))", TYPE_BOOLEAN, true);
+
+  // Test operator precedence.
+  TestValue("5+1 in (3, 6, 10)", TYPE_BOOLEAN, true);
+  TestValue("5+1 not in (3, 6, 10)", TYPE_BOOLEAN, false);
+}
+
 TEST_F(ExprTest, StringFunctions) {
   TestStringValue("substring('Hello', 1)", "Hello");
   TestStringValue("substring('Hello', -2)", "lo");

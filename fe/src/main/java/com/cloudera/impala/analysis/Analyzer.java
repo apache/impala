@@ -432,4 +432,33 @@ public class Analyzer {
     }
     return newCompatibleType;
   }
+
+  /**
+   * Determines compatible type for given exprs, and casts them to compatible type.
+   * Calls analyze() on each of the exprs.
+   * Throw an AnalysisException if the types are incompatible,
+   * returns compatible type otherwise.
+   *
+   * @param exprs
+   * @throws AnalysisException
+   */
+  public PrimitiveType castAllToCompatibleType(List<Expr> exprs)
+      throws AnalysisException {
+    // Determine compatible type of exprs.
+    Expr lastCompatibleExpr = exprs.get(0);
+    PrimitiveType compatibleType = null;
+    for (int i = 0; i < exprs.size(); ++i) {
+      exprs.get(i).analyze(this);
+      compatibleType = getCompatibleType(compatibleType,
+          lastCompatibleExpr, exprs.get(i));
+    }
+    // Add implicit casts if necessary.
+    for (int i = 0; i < exprs.size(); ++i) {
+      if (exprs.get(i).getType() != compatibleType) {
+        Expr castExpr = exprs.get(i).castTo(compatibleType);
+        exprs.set(i, castExpr);
+      }
+    }
+    return compatibleType;
+  }
 }

@@ -246,6 +246,7 @@ class Expr {
   friend class TimestampFunctions;
   friend class ConditionalFunctions;
   friend class CaseExpr;
+  friend class InPredicate;
 
   Expr(PrimitiveType type, bool is_slotref = false);
   Expr(const TExprNode& node, bool is_slotref = false);

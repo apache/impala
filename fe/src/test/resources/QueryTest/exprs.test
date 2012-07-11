@@ -533,3 +533,251 @@ timestamp, string, int, int, int, int, int, int, int, int
 2009-04-03 00:23:00.930000000,'2009-04-03',2009,4,3,93,14,0,23,0
 2009-04-03 00:24:00.960000000,'2009-04-03',2009,4,3,93,14,0,24,0
 ====
+# IN predicate
+select NULL in (1, 2, 3)
+----
+boolean
+----
+NULL
+====
+select NULL in (1, NULL, 3)
+----
+boolean
+----
+NULL
+====
+select 1 in (2, NULL, 1)
+----
+boolean
+----
+true
+====
+select 1 in (1, NULL, 2)
+----
+boolean
+----
+true
+====
+select 1 in (2, NULL, 3)
+----
+boolean
+----
+NULL
+====
+select 1 in (2, 3, 4)
+----
+boolean
+----
+false
+====
+select NULL not in (1, 2, 3)
+----
+boolean
+----
+NULL
+====
+select NULL not in (1, NULL, 3)
+----
+boolean
+----
+NULL
+====
+select 1 not in (2, NULL, 1)
+----
+boolean
+----
+false
+====
+select 1 not in (1, NULL, 2)
+----
+boolean
+----
+false
+====
+select 1 not in (2, NULL, 3)
+----
+boolean
+----
+NULL
+====
+select 1 not in (2, 3, 4)
+----
+boolean
+----
+true
+====
+select count(*) from alltypesagg$TABLE
+where true in (bool_col, tinyint_col)
+----
+bigint
+----
+6000
+====
+select count(*) from alltypesagg$TABLE
+where true not in (bool_col, tinyint_col)
+----
+bigint
+----
+4000
+====
+select count(*) from alltypesagg$TABLE
+where 1 in (tinyint_col, smallint_col, int_col, bigint_col)
+----
+bigint
+----
+1000
+====
+select count(*) from alltypesagg$TABLE
+where 1 not in (tinyint_col, smallint_col, int_col, bigint_col) 
+----
+bigint
+----
+8000
+====
+select count(*) from alltypesagg$TABLE
+where 10.1 in (tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col) 
+----
+bigint
+----
+10
+====
+select count(*) from alltypesagg$TABLE
+where 10.1 not in (tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col) 
+----
+bigint
+----
+8990
+====
+select count(*) from alltypesagg$TABLE
+where '01/01/10' in (date_string_col, string_col, 'abc') 
+----
+bigint
+----
+1000
+====
+select count(*) from alltypesagg$TABLE
+where '01/01/10' not in (date_string_col, string_col, 'abc')
+----
+bigint
+----
+9000
+====
+select count(*) from alltypesagg$TABLE 
+where cast('2010-01-01 00:00:00' as timestamp) in (timestamp_col)
+----
+bigint
+----
+1
+====
+select count(*) from alltypesagg$TABLE 
+where cast('2010-01-01 00:00:00' as timestamp) not in (timestamp_col)
+----
+bigint
+----
+9999
+====
+# BETWEEN predicate
+select count(*) from alltypesagg$TABLE where tinyint_col between 1 and 2
+---- TYPES
+bigint
+---- RESULTS
+2000
+====
+select count(*) from alltypesagg$TABLE where tinyint_col not between 1 and 2
+---- TYPES
+bigint
+---- RESULTS
+7000
+====
+select count(*) from alltypesagg$TABLE where smallint_col between 1 and 20
+---- TYPES
+bigint
+---- RESULTS
+2000
+====
+select count(*) from alltypesagg$TABLE where smallint_col not between 1 and 20
+---- TYPES
+bigint
+---- RESULTS
+7900
+====
+select count(*) from alltypesagg$TABLE where int_col between 1 and 200
+---- TYPES
+bigint
+---- RESULTS
+2000
+====
+select count(*) from alltypesagg$TABLE where int_col not between 1 and 200
+---- TYPES
+bigint
+---- RESULTS
+7990
+====
+select count(*) from alltypesagg$TABLE where bigint_col between 1 and 2000
+---- TYPES
+bigint
+---- RESULTS
+2000
+====
+select count(*) from alltypesagg$TABLE where bigint_col not between 1 and 2000
+---- TYPES
+bigint
+---- RESULTS
+7990
+====
+select count(*) from alltypesagg$TABLE
+where float_col between cast(1.0 as float) and cast(110.0 as float)
+---- TYPES
+bigint
+---- RESULTS
+1000
+====
+select count(*) from alltypesagg$TABLE
+where float_col not between cast(1.0 as float) and cast(110.0 as float)
+---- TYPES
+bigint
+---- RESULTS
+8990
+====
+select count(*) from alltypesagg$TABLE where double_col between 1.0 and 110.0
+---- TYPES
+bigint
+---- RESULTS
+100
+====
+select count(*) from alltypesagg$TABLE where double_col not between 1.0 and 110.0
+---- TYPES
+bigint
+---- RESULTS
+9890
+====
+select count(*) from alltypesagg$TABLE where date_string_col
+between '01/01/10' and '01/05/10'
+---- TYPES
+bigint
+---- RESULTS
+5000
+====
+select count(*) from alltypesagg$TABLE where date_string_col
+not between '01/01/10' and '01/05/10'
+---- TYPES
+bigint
+---- RESULTS
+5000
+====
+select count(*) from alltypesagg$TABLE where timestamp_col
+between cast('2010-01-01 00:00:00' as timestamp) 
+and cast('2010-01-01 01:40:00' as timestamp)
+---- TYPES
+bigint
+---- RESULTS
+100
+====
+select count(*) from alltypesagg$TABLE where timestamp_col
+not between cast('2010-01-01 00:00:00' as timestamp) 
+and cast('2010-01-01 01:40:00' as timestamp)
+---- TYPES
+bigint
+---- RESULTS
+9900
+====
