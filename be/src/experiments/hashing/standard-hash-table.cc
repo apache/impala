@@ -33,4 +33,3 @@ void StandardHashTable::BucketSizeDistribution() {
   }
   LOG(INFO) << "Bucket Size Distribution\n" << distr.str();
 }
-

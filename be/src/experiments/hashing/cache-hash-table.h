@@ -3,7 +3,7 @@
 
 
 #include "util/hash-util.h"
-#include "cache-hash-test.h"
+#include "tuple-types.h"
 
 namespace impala {
 

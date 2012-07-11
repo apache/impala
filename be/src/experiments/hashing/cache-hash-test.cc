@@ -9,6 +9,7 @@
 #include "cache-hash-table.inline.h"
 #include "standard-hash-table.h"
 #include "standard-hash-table.inline.h"
+#include "tuple-types.h"
 #include "runtime/mem-pool.h"
 #include "util/debug-util.h"
 #include "util/hash-util.h"
@@ -57,17 +58,6 @@ inline void Process(T* ht, const ProbeTuple* probe) {
     build.count = 1;
     ht->Insert(&build);
   }
-}
-
-// Generate n random tuples, with ids in the range [0, max_id).
-ProbeTuple* GenTuples(int n, int max_id) {
-  ProbeTuple* tuples
-    = static_cast<ProbeTuple*>(malloc(n * sizeof(ProbeTuple)));
-
-  for (int i = 0; i < n; ++i) {
-    tuples[i].id = rand() % max_id;
-  }
-  return tuples;
 }
 
 // Test ht by aggregating input, which is an array of num_tuples ProbeTuples

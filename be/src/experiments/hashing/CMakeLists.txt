@@ -11,5 +11,7 @@ add_library(Hashing
 )
 
 add_executable(cache-hash-test cache-hash-test.cc)
+add_executable(growing-test growing-test.cc)
 
 target_link_libraries(cache-hash-test Hashing ${IMPALA_TEST_LINK_LIBS})
+target_link_libraries(growing-test Hashing ${IMPALA_TEST_LINK_LIBS})

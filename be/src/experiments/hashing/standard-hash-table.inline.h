@@ -18,7 +18,7 @@ inline BuildTuple* StandardHashTable::Find(const ProbeTuple* probe) {
 }
 
 inline void StandardHashTable::Insert(const BuildTuple* row) {
-  CHECK_LT(num_nodes_, NODES); //would need to grow, not implemented
+  DCHECK(!Full()); // caller is responsible for ensuring this passes.
   uint32_t hash = hash_id(row->id);
   int bucket_idx = hash % BUCKETS;
   Node* node = &nodes_[num_nodes_];
@@ -28,6 +28,22 @@ inline void StandardHashTable::Insert(const BuildTuple* row) {
   node->tuple.count = row->count;
   buckets_[bucket_idx].node_idx_ = num_nodes_;
   ++num_nodes_;
+}
+
+inline StandardHashTable::Iterator StandardHashTable::Begin() {
+  if (num_nodes_ > 0) {
+    return Iterator(this);
+  } else {
+    // If table is empty, give them an empty iterator.
+    return End();
+  }
+}
+
+inline void StandardHashTable::Iterator::Next() {
+  if (++node_idx_ >= table_->num_nodes_) {
+    // done
+    node_idx_ = -1;
+  }
 }
 
 }
