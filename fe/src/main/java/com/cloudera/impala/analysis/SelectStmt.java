@@ -122,14 +122,15 @@ public class SelectStmt extends QueryStmt {
         }
       } else {
         resultExprs.add(item.getExpr());
-        if (item.getAlias() != null) {
-          aliasSMap.lhs.add(
-              new SlotRef(null, item.getAlias().toLowerCase()));
-          aliasSMap.rhs.add(item.getExpr().clone(null));
-          colLabels.add(item.getAlias().toLowerCase());
-        } else {
-          colLabels.add(item.toColumnLabel().toLowerCase());
+        SlotRef aliasRef = new SlotRef(null, item.toColumnLabel());
+        if (aliasSMap.lhs.contains(aliasRef)) {
+          // If we have already seen this alias, it refers to more than one column and
+          // therefore is ambiguous.
+          ambiguousAliasList.add(aliasRef);
         }
+        aliasSMap.lhs.add(aliasRef);
+        aliasSMap.rhs.add(item.getExpr().clone(null));
+        colLabels.add(item.toColumnLabel());
       }
     }
 
@@ -292,6 +293,11 @@ public class SelectStmt extends QueryStmt {
       // exprs during analysis (in case we need to print them later)
       groupingExprsCopy = Expr.cloneList(groupingExprs, null);
       substituteOrdinals(groupingExprsCopy, "GROUP BY");
+      Expr ambiguousAlias = getFirstAmbiguousAlias(groupingExprsCopy);
+      if (ambiguousAlias != null) {
+        throw new AnalysisException("Column " + ambiguousAlias.toSql() +
+            " in group by clause is ambiguous");
+      }
       Expr.substituteList(groupingExprsCopy, aliasSMap);
       for (int i = 0; i < groupingExprsCopy.size(); ++i) {
         groupingExprsCopy.get(i).analyze(analyzer);

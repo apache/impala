@@ -27,3 +27,62 @@ order by 2,3 desc
 ---- PLAN
 not implemented
 ====
+# Test correct identification of the implicit aliasing of int_col in the select
+# list to t1.int_col
+select t1.int_col from alltypessmall t1, alltypessmall t2 where t1.id = t2.id 
+order by int_col
+limit 2
+---- PLAN
+Plan Fragment 0
+  TOP-N
+  ORDER BY: t1.int_col ASC
+  LIMIT: 2
+    HASH JOIN
+      JOIN OP: INNER JOIN
+      HASH PREDICATES:
+        t1.id = t2.id
+        SCAN HDFS table=default.alltypessmall (0)
+        SCAN HDFS table=default.alltypessmall (1) compact
+
+  EXEC PARAMS
+    HOST: coordinator
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+------------ DISTRIBUTEDPLAN
+Plan Fragment 0
+  TOP-N
+  ORDER BY: t1.int_col ASC
+  LIMIT: 2
+    EXCHANGE (3)
+
+Plan Fragment 1
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      t1.id = t2.id
+      SCAN HDFS table=default.alltypessmall (0)
+      SCAN HDFS table=default.alltypessmall (1) compact
+
+  EXEC PARAMS
+    HOST:
+      HDFS SPLITS NODE ID: 0
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+      HDFS SPLITS NODE ID: 1
+        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+====

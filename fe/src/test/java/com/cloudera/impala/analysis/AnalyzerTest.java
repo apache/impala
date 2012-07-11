@@ -769,6 +769,9 @@ public class AnalyzerTest {
         "cannot combine '*' in select list with GROUP BY");
     // picks up select item alias
     AnalyzesOk("select zip z, count(*) from testtbl group by z");
+    // ambiguous alias
+    AnalysisError("select zip a, id a, count(*) from testtbl group by a",
+        "Column a in group by clause is ambiguous");
 
     // can't group by aggregate
     AnalysisError("select zip, count(*) from testtbl group by count(*)",
@@ -846,6 +849,14 @@ public class AnalyzerTest {
     // ordering by floating-point exprs is okay
     AnalyzesOk("select float_col, int_col + 0.5 from alltypes order by 1, 2");
     AnalyzesOk("select float_col, int_col + 0.5 from alltypes order by 2, 1");
+
+    // select-list item takes precedence
+    AnalyzesOk("select t1.int_col from alltypes t1, alltypes t2 where t1.id = t2.id " +
+        "order by int_col");
+
+    // Ambiguous alias cause error
+    AnalysisError("select string_col a, int_col a from alltypessmall order by a limit 1",
+        "Column a in order clause is ambiguous");
   }
 
   @Test
@@ -1295,6 +1306,11 @@ public class AnalyzerTest {
     AnalysisError("(select int_col from alltypes) " +
         "union (select int_col from alltypessmall) order by 2",
         "ORDER BY: ordinal exceeds number of items in select list: 2");
+    // Ambiguous order by.
+    AnalysisError("(select int_col a, string_col a from alltypes) " +
+        "union (select int_col a, int_col a from alltypessmall) order by a",
+        "Column a in order clause is ambiguous");
+
     // Column labels are inherited from first select block.
     // Order by references an invalid column
     AnalysisError("(select smallint_col from alltypes) " +

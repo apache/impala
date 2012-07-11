@@ -175,8 +175,13 @@ public class UnionStmt extends QueryStmt {
       resultExprs.add(slotRef);
       // Add to the substitution map so that column refs in "order by" can be resolved.
       if (orderByElements != null) {
-        aliasSMap.lhs.add(new SlotRef(null, getColLabels().get(i)));
-        aliasSMap.rhs.add(slotRef);
+        SlotRef aliasRef = new SlotRef(null, getColLabels().get(i));
+        if (aliasSMap.lhs.contains(aliasRef)) {
+          ambiguousAliasList.add(aliasRef);
+        } else {
+          aliasSMap.lhs.add(aliasRef);
+          aliasSMap.rhs.add(slotRef);
+        }
       }
     }
   }

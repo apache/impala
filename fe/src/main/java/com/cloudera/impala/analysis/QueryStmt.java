@@ -37,6 +37,14 @@ public abstract class QueryStmt extends ParseNodeBase {
    */
   protected final Expr.SubstitutionMap aliasSMap = new Expr.SubstitutionMap();
 
+  /**
+   * Select list item alias does not have to be unique.
+   * This list contains all the non-unique aliases. For example,
+   *   select int_col a, string_col a from alltypessmall;
+   * Both columns are using the same alias "a".
+   */
+  protected final ArrayList<Expr> ambiguousAliasList = Lists.newArrayList();
+
   protected SortInfo sortInfo;
 
   QueryStmt(ArrayList<OrderByElement> orderByElements, long limit) {
@@ -65,10 +73,28 @@ public abstract class QueryStmt extends ParseNodeBase {
       isAscOrder.add(Boolean.valueOf(orderByElement.getIsAsc()));
     }
     substituteOrdinals(orderingExprs, "ORDER BY");
+    Expr ambiguousAlias = getFirstAmbiguousAlias(orderingExprs);
+    if (ambiguousAlias != null) {
+      throw new AnalysisException("Column " + ambiguousAlias.toSql() +
+          " in order clause is ambiguous");
+    }
     Expr.substituteList(orderingExprs, aliasSMap);
     Expr.analyze(orderingExprs, analyzer);
 
     sortInfo = new SortInfo(orderingExprs, isAscOrder);
+  }
+
+  /**
+   * Return the first expr in exprs that is a non-unique alias. Return null if none of
+   * exprs is an ambiguous alias.
+   */
+  protected Expr getFirstAmbiguousAlias(List<Expr> exprs) {
+    for (Expr exp: exprs) {
+      if (ambiguousAliasList.contains(exp)) {
+        return exp;
+      }
+    }
+    return null;
   }
 
   /**

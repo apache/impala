@@ -65,7 +65,10 @@ class SelectListItem {
    */
   public String toColumnLabel() {
     Preconditions.checkState(!isStar());
-    return expr.toColumnLabel();
+    if (alias != null) {
+      return alias.toLowerCase();
+    }
+    return expr.toColumnLabel().toLowerCase();
   }
 
 }

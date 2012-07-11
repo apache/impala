@@ -587,3 +587,15 @@ int
 9
 9
 ====
+# All select list items have an implicit alias. Test that the order by column ref
+# "int_col" is correctly aliased to t1.int_col, and therefore it is not an
+# ambiguous reference.
+select t1.int_col from alltypessmall t1, alltypessmall t2 where t1.id = t2.id 
+order by int_col
+limit 2
+----
+int
+----
+0
+0
+====
