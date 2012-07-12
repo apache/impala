@@ -19,8 +19,8 @@ target
 HBaseAllTypesError
 HBaseAllTypesErrorNoNulls
 
-# Hive benchmark data (not in repo, manually copied)
-hive_benchmark
+# Impala test data (not in repo, manually copied)
+impala-data
 
 # Generated block ids (hdfs ids) for each table
 block-ids

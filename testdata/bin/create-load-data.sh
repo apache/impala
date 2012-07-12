@@ -6,6 +6,10 @@ if [ x${JAVA_HOME} == x ]; then
   exit -1
 fi
 
+# Load the TPCH data set
+pushd ${IMPALA_HOME}/bin
+./load-impala-data.sh tpch core
+
 ${HIVE_HOME}/bin/hive -hiveconf hive.root.logger=WARN,console -v \
   -f ${IMPALA_HOME}/testdata/bin/create.sql 
 if [ $? != 0 ]; then

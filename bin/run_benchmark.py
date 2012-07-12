@@ -65,7 +65,6 @@ prime_cache_cmd = os.environ['IMPALA_HOME'] + "/testdata/bin/cache_tables.py -q 
 result_single_regex = 'returned (\d*) rows? in (\d*).(\d*) s'
 result_multiple_regex = 'returned (\d*) rows? in (\d*).(\d*) s with stddev (\d*).(\d*)'
 hive_result_regex = 'Time taken: (\d*).(\d*) seconds'
-set_hive_input_cmd = 'set hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;'
 
 # Console color format strings
 GREEN = '\033[92m'
@@ -141,12 +140,7 @@ def run_query_using_hive(query, prime_buffer_cache, iterations):
     else:
       prime_buffer_cache_local(query)
 
-  query_string = ''
-  # This works around a problem with Hive where Hive cannot execute queries that result
-  # in multiple mapreduce steps on a mini-dfs cluster.
-  if not options.remote:
-    query_string = set_hive_input_cmd
-  query_string += (query + ';') * iterations
+  query_string = (query + ';') * iterations
 
   query_output = tempfile.TemporaryFile("w+")
   subprocess.call(options.hive_cmd + "\"%s\"" % query_string, shell=True,

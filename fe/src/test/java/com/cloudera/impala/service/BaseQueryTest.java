@@ -468,7 +468,8 @@ public abstract class BaseQueryTest {
       // they can be very expensive.
       if (expectedResult.getSetup().size() > 0) {
         try {
-          runSetupSection(expectedResult.getSetup());
+          runSetupSection(testCase.getSectionContents(Section.SETUP, false,
+                                                      config.getTableSuffix()));
         } catch (Exception e) {
           fail(e.getMessage());
         }
@@ -511,8 +512,18 @@ public abstract class BaseQueryTest {
       boolean abortOnError, int maxErrors) {
     switch (executionMode) {
       case REDUCED:
-        // TODO: Consider running with the fastest format to cut down on execution time.
-        runQueryUncompressedTextOnly(testFile, abortOnError, maxErrors);
+        // TODO: TPCH Currently has a bug with when LLVM is enabled (IMP-129). This is a
+        // temporary workaround for this problem. Once that is resolved this can be
+        // removed.
+        if (testFile.trim().startsWith("tpch")) {
+          List<TestConfiguration> testConfigs = generateAllConfigurationPermutations(
+              TEXT_FORMAT_ONLY, UNCOMPRESSED_ONLY, ImmutableList.of(16),
+              SMALL_CLUSTER_SIZES,  ImmutableList.of(true));
+          runQueryWithTestConfigs(testConfigs, testFile, abortOnError, maxErrors);
+        } else {
+          // TODO: Consider running with the fastest format to cut down on execution time
+          runQueryUncompressedTextOnly(testFile, abortOnError, maxErrors);
+        }
         break;
       case EXHAUSTIVE:
         runQueryWithAllConfigurationPermutations(testFile, abortOnError, maxErrors);

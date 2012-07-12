@@ -7,7 +7,7 @@
 # by performing the defined INSERT / SELECT INTO statement. Each new table using the
 # file format/compression combination needs to have a unique name, so all the
 # statements are pameterized on table name.
-# This file is read in by the 'generate_benchmark_statements.py' script to
+# This file is read in by the 'generate_schema_statements.py' script to
 # to generate all the schema for the Imapla benchmark tests.
 #
 # Each table is defined as a new section in this file with the following format:
@@ -41,12 +41,12 @@ ALTER TABLE %(table_name)s ADD PARTITION (chunk=5);
 set hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s PARTITION(chunk) SELECT *;
 ---
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/grep1GB/part-00000' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=0);
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/grep1GB/part-00001' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=1);
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/grep1GB/part-00002' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=2);
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/grep1GB/part-00003' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=3);
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/grep1GB/part-00004' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=4);
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/grep1GB/part-00005' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=5);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep1GB/part-00000' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=0);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep1GB/part-00001' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=1);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep1GB/part-00002' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=2);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep1GB/part-00003' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=3);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep1GB/part-00004' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=4);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep1GB/part-00005' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=5);
 ===
 grep10gb
 ---
@@ -65,12 +65,12 @@ ALTER TABLE %(table_name)s ADD PARTITION (chunk=5);
 set hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s PARTITION(chunk) SELECT *;
 ---
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/grep10GB/part-00000' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=0);
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/grep10GB/part-00001' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=1);
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/grep10GB/part-00002' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=2);
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/grep10GB/part-00003' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=3);
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/grep10GB/part-00004' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=4);
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/grep10GB/part-00005' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=5);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep10GB/part-00000' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=0);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep10GB/part-00001' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=1);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep10GB/part-00002' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=2);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep10GB/part-00003' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=3);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep10GB/part-00004' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=4);
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep10GB/part-00005' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=5);
 ===
 web
 ---
@@ -87,7 +87,7 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s/Rankings.dat';
 set hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
 ---
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/html1GB/Rankings.dat' OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/html1GB/Rankings.dat' OVERWRITE INTO TABLE %(table_name)s;
 ===
 web
 ---
@@ -110,5 +110,5 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s/UserVisits.dat
 set hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
 ---
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/html1GB/UserVisits.dat' OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/html1GB/UserVisits.dat' OVERWRITE INTO TABLE %(table_name)s;
 ===

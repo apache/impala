@@ -37,6 +37,9 @@ parser = OptionParser()
 parser.add_option("--dimension_file", dest="dimension_file",
                   default = "benchmark_dimensions.csv",
                   help="The file containing the list of dimensions.")
+parser.add_option("--base_output_file_name", dest="base_output_file_name",
+                  default = "benchmark",
+                  help="The base file name for test vector output")
 (options, args) = parser.parse_args()
 
 FILE_FORMAT_IDX = 0
@@ -80,8 +83,8 @@ def write_vectors_to_csv(output_csv_file, matrix):
 
 vectors = read_csv_vector_file(options.dimension_file)
 vg = VectorGenerator(vectors)
-write_vectors_to_csv('benchmark_pairwise.csv',
+write_vectors_to_csv('%s_pairwise.csv' % options.base_output_file_name,
                      vg.generate_pairwise_matrix(is_valid_combination))
-write_vectors_to_csv('benchmark_exhaustive.csv',
+write_vectors_to_csv('%s_exhaustive.csv' % options.base_output_file_name,
                      vg.generate_exhaustive_matrix(is_valid_combination))
 

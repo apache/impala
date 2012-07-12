@@ -1,0 +1,51 @@
+# Q8 - National Market Share Query
+# Modifications: Removed ORDER BY, added round() calls
+select o_year,
+round(sum(case when nation = 'BRAZIL' then volume else 0.0 end) / sum(volume), 5) as mkt_share
+from
+( select year(o_orderdate) as o_year, l_extendedprice * (1-l_discount) as volume,
+  n2.n_name as nation
+  from nation$TABLE n2
+  join
+  ( select o_orderdate, l_discount, l_extendedprice, s_nationkey
+    from supplier$TABLE s
+    join
+    ( select o_orderdate, l_discount, l_extendedprice, l_suppkey
+      from part$TABLE p
+      join
+      ( select o_orderdate, l_partkey, l_discount, l_extendedprice, l_suppkey
+        from lineitem$TABLE l
+        join
+        ( select o_orderdate, o_orderkey
+          from orders$TABLE o
+          join
+          ( select c.c_custkey
+            from customer$TABLE c
+            join
+            ( select n1.n_nationkey
+              from nation$TABLE n1
+              join region r
+                on n1.n_regionkey = r.r_regionkey and r.r_name = 'AMERICA'
+            ) n11
+             on c.c_nationkey = n11.n_nationkey
+         ) c1
+           on c1.c_custkey = o.o_custkey
+        ) o1
+          on l.l_orderkey = o1.o_orderkey and o1.o_orderdate >= '1995-01-01'
+           and o1.o_orderdate < '1996-12-31'
+      ) l1
+        on p.p_partkey = l1.l_partkey and p.p_type = 'ECONOMY ANODIZED STEEL'
+    ) p1
+      on s.s_suppkey = p1.l_suppkey
+  ) s1
+    on s1.s_nationkey = n2.n_nationkey
+) all_nation
+group by o_year
+order by o_year
+limit 100
+---- TYPES
+int, double
+---- RESULTS
+1995,0.03444
+1996,0.04158
+====

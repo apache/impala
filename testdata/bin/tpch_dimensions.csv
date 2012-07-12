@@ -1,0 +1,4 @@
+text,seq,rc
+tpch
+none,def,gzip,bzip,snap
+none,block,record

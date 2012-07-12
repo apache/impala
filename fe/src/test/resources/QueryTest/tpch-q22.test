@@ -1,0 +1,44 @@
+# Q22 - Global Sales Opportunity Query
+# TODO: Missing a query. Need to rewrite it.
+insert overwrite table q22_customer_tmp$TABLE
+select c_acctbal, c_custkey, substr(c_phone, 1, 2) as cntrycode
+from customer$TABLE
+where
+  substr(c_phone, 1, 2) = '13' or
+  substr(c_phone, 1, 2) = '31' or
+  substr(c_phone, 1, 2) = '23' or
+  substr(c_phone, 1, 2) = '29' or
+  substr(c_phone, 1, 2) = '30' or
+  substr(c_phone, 1, 2) = '18' or
+  substr(c_phone, 1, 2) = '17'
+---- SETUP
+RESET q22_customer_tmp$TABLE
+RELOAD q22_customer_tmp$TABLE
+---- RESULTS
+---- NUMROWS
+42015
+====
+insert overwrite table q22_customer_tmp1$TABLE
+select avg(c_acctbal)
+from q22_customer_tmp$TABLE
+where c_acctbal > 0.00
+---- SETUP
+RESET q22_customer_tmp1$TABLE
+RELOAD q22_customer_tmp1$TABLE
+---- RESULTS
+---- NUMROWS
+1
+====
+# Modified to use subquery to work around IMP-127
+insert overwrite table q22_orders_tmp$TABLE
+select a.o_custkey
+from
+( select o_custkey, count(1)
+  from orders$TABLE
+  group by o_custkey
+) a
+---- SETUP
+RESET q22_orders_tmp$TABLE
+RELOAD q22_orders_tmp$TABLE
+---- RESULTS
+====

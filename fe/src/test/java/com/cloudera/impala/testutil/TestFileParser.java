@@ -125,7 +125,8 @@ public class TestFileParser {
       ArrayList<String> retList = Lists.newArrayList();
       for (String s : ret) {
         if (!(s.startsWith("#") || s.startsWith("//"))) {
-          if (tableSuffix != null && section == Section.QUERY) {
+          if (tableSuffix != null &&
+             (section == Section.QUERY || section == Section.SETUP)) {
             retList.add(s.replaceAll("\\$TABLE", tableSuffix));
           } else {
             retList.add(s);

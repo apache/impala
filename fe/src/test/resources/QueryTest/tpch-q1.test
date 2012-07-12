@@ -1,0 +1,19 @@
+# Q1 - Pricing Summary Report Query
+# Modifications: Remove ORDER BY, added ROUND() calls
+select
+  l_returnflag, l_linestatus, round(sum(l_quantity), 2), round(sum(l_extendedprice), 2),
+  round(sum(l_extendedprice*(1 - l_discount)), 1),
+  round(sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)), 1),
+  round(avg(l_quantity), 2), round(avg(l_extendedprice), 2),
+  round(avg(l_discount), 2), count(1)
+from lineitem$TABLE
+where l_shipdate<='1998-09-02'
+group by l_returnflag, l_linestatus
+---- TYPES
+string, string, double, double, double, double, double, double, double, bigint
+---- RESULTS
+'A','F',37734075,56586511539.29,53758218131,55909025048.8,25.52,38273.13,0.05,1478492
+'N','F',991417,1487504710.38,1413082168.1,1469649223.2,25.52,38284.47,0.05,38854
+'N','O',74476040,111701729697.74,106118230307.6,110367043872.5,25.5,38249.12,0.05,2920374
+'R','F',37719753,56568041380.9,53741292684.6,55889619119.8,25.51,38250.85,0.05,1478870
+====

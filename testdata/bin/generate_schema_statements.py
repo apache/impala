@@ -2,18 +2,18 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 # This script generates the "CREATE TABLE", "INSERT", and "LOAD" statements for loading
-# benchmark data and writes them to create-benchmark*-generated.sql and
-# load-benchmark*-generated.sql.
+# test data and writes them to create-*-generated.sql and
+# load-*-generated.sql.
 #
 # The statements that are generated are based on an input test vector
 # (read from a file) that describes the coverage desired. For example, currently
 # we want to run benchmarks with different data sets, across different file types, and
 # with different compression algorithms set. To improve data loading performance this
-# script will generate an INSERT INTO statement to generate the data if the file doesn't
-# already exist in HDFS. If the file does already exist in HDFS then we simply issue a
+# script will generate an INSERT INTO statement to generate the data if the file does
+# not already exist in HDFS. If the file does already exist in HDFS then we simply issue a
 # LOAD statement which is much faster.
 #
-# The input test vectors are generated via the 'generate_test_vectors.py' so
+# The input test vectors are generated via the generate_test_vectors.py so
 # ensure that script has been run (or the test vector files already exist) before
 # running this script.
 #
@@ -39,6 +39,17 @@ parser.add_option("--exploration_strategy", dest="exploration_strategy", default
 parser.add_option("--hive_warehouse_dir", dest="hive_warehouse_dir",
                   default="/test-warehouse",
                   help="The HDFS path to the base Hive test warehouse directory")
+parser.add_option("--schema_template", dest="schema_template",
+                  default="benchmark_schema_template.sql",
+                  help="The schema template to use for statement generation")
+parser.add_option("--base_output_file_name", dest="base_output_file_name",
+                  default="benchmark",
+                  help="The base file name to use for generated create/load scripts")
+parser.add_option("--force_reload", dest="force_reload", action="store_true",
+                  default= False, help='Skips HDFS exists check and reloads all tables')
+parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
+                  default = False, help="If set, outputs additional logging.")
+
 (options, args) = parser.parse_args()
 
 COMPRESSION_TYPE = "SET mapred.output.compression.type=%s;"
@@ -151,20 +162,25 @@ def write_statements_to_file_based_on_input_vector(output_name, input_file_name,
       # and skip loading the data. Otherwise, the data is generated using either an
       # INSERT INTO statement or a LOAD statement.
       data_path = os.path.join(options.hive_warehouse_dir, table_name)
-      if does_dir_exist_in_hdfs(data_path):
+      if not options.force_reload and does_dir_exist_in_hdfs(data_path):
         print 'Path:', data_path, 'already exists in HDFS. Data loading can be skipped.'
       else:
         print 'Path:', data_path, 'does not exists in HDFS. Data file will be generated.'
         if table_name == s.base_table_name:
-          output_load_base.append(build_load_statement(load_local, table_name))
-        else:
+          if load_local:
+            output_load_base.append(build_load_statement(load_local, table_name))
+          else:
+            print 'Empty base table load for %s. Skipping load generation' % table_name
+        elif insert:
           output_load.append(build_insert(insert, table_name, s.base_table_name,
                                           codec, compression_type))
+        else:
+            print 'Empty insert for table %s. Skipping insert generation' % table_name
 
   # Make sure we create the base tables before the remaining tables
   output_load = output_load_base + output_load
-  write_array_to_file('create-benchmark-' + output_name + '-generated.sql', output_create)
-  write_array_to_file('load-benchmark-' + output_name + '-generated.sql', output_load)
+  write_array_to_file('create-' + output_name + '-generated.sql', output_create)
+  write_array_to_file('load-' + output_name + '-generated.sql', output_load)
 
 def parse_benchmark_file(file_name):
   template = open(file_name, 'rb')
@@ -176,7 +192,7 @@ def parse_benchmark_file(file_name):
       data_set = sub_section[0]
       gen_statement = SqlGenerationStatement(*sub_section[1:5])
       statements[data_set.strip()].append(gen_statement)
-    else:
+    elif options.verbose:
       print 'Skipping invalid subsection:', sub_section
   return statements
 
@@ -186,9 +202,9 @@ if (options.exploration_strategy != 'core' and
   print 'Invalid exploration strategy:', options.exploration_strategy
   sys.exit(1)
 
-statements = parse_benchmark_file('benchmark_schema_template.sql')
+statements = parse_benchmark_file(options.schema_template)
 
 write_statements_to_file_based_on_input_vector(
-    options.exploration_strategy,
-    'benchmark_%s.csv' % options.exploration_strategy,
+    '%s-%s' % (options.base_output_file_name, options.exploration_strategy),
+    '%s_%s.csv' % (options.base_output_file_name, options.exploration_strategy),
     statements)

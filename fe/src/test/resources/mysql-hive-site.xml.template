@@ -86,5 +86,8 @@
   <name>dfs.replication</name>
   <value>3</value>
 </property>
-
+<property>
+  <name>hive.input.format</name>
+  <value>org.apache.hadoop.hive.ql.io.HiveInputFormat</value>
+</property>
 </configuration>
