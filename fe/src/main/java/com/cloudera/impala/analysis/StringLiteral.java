@@ -48,13 +48,13 @@ public class StringLiteral extends LiteralExpr {
   @Override
   protected Expr uncheckedCastTo(PrimitiveType targetType) throws AnalysisException {
     Preconditions.checkState(targetType.isNumericType() || targetType.isDateType());
-    LiteralExpr newLiteral = this;
     if (targetType.isNumericType()) {
-      newLiteral = convertToNumber();
+      return convertToNumber();
     } else if (targetType.isDateType()) {
-      newLiteral = convertToDate(targetType);
+      // Let the BE do the cast so it is in Boost format
+      return new CastExpr(targetType, this, true);
     }
-    return newLiteral;
+    return this;
   }
 
   /**
@@ -96,7 +96,8 @@ public class StringLiteral extends LiteralExpr {
       return new FloatLiteral((Double) sym.value * multiplier);
     }
     // Symbol is not an integer or floating point literal.
-    throw new AnalysisException("Failed to convert string literal '" + value + "' to number.");
+    throw new AnalysisException(
+        "Failed to convert string literal '" + value + "' to number.");
   }
 
 

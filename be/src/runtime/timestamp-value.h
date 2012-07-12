@@ -74,12 +74,15 @@ class  TimestampValue {
   }
 
   std::string DebugString() const {
-    boost::posix_time::ptime temp;
-    this->ToPtime(&temp);
-    std::string timestr = boost::posix_time::to_iso_extended_string(temp);
-    size_t off = timestr.find_first_of('T');
-    if (off != std::string::npos) timestr.replace(off, 1, 1, ' ');
-    return timestr;
+    std::stringstream ss;
+    if (!this->date_.is_special()) {
+      ss << boost::gregorian::to_iso_extended_string(this->date_);
+    }
+    if (!this->time_of_day_.is_special()) {
+      if (!this->date_.is_special()) ss << " ";
+      ss << boost::posix_time::to_simple_string(this->time_of_day_);
+    }
+    return ss.str();
   }
 
   bool operator==(const TimestampValue& other) const {
@@ -105,6 +108,11 @@ class  TimestampValue {
         (this->date_ == other.date_ && this->time_of_day_ > other.time_of_day_);
   }
 
+  // If the date or time of day are valid then this is valid.
+  bool NotADateTime() {
+    boost::posix_time::ptime temp;
+    return this->date_.is_special() && this->time_of_day_.is_special();
+  }
 
   operator bool() const {
     boost::posix_time::ptime temp;

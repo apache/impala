@@ -30,7 +30,7 @@ class TimestampFunctions {
   static void* Minute(Expr* e, TupleRow* row);
   static void* Second(Expr* e, TupleRow* row);
 
-  // Date functions.  Currently these return dates as strings.
+  // Date functions.
   static void* ToDate(Expr* e, TupleRow* row);
   static void* DateAdd(Expr* e, TupleRow* row);
   static void* DateSub(Expr* e, TupleRow* row);

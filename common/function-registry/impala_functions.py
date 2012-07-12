@@ -127,7 +127,7 @@ functions = [
   ['Timestamp_date_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
         'TimestampFunctions::DateSub', ['date_sub']],
   ['Timestamp_diff', 'INT', ['TIMESTAMP', 'TIMESTAMP'], \
-        'TimestampFunctions::DateDiff', ['date_diff']],
+        'TimestampFunctions::DateDiff', ['datediff']],
   ['From_utc_timestamp', 'TIMESTAMP', ['TIMESTAMP', 'STRING'], \
         'TimestampFunctions::FromUtc', ['from_utc_timestamp']],
   ['To_utc_timestamp', 'TIMESTAMP', ['TIMESTAMP', 'STRING'], \

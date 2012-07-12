@@ -1562,8 +1562,29 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestValue("hour(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 9); 
   TestValue("minute(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 10); 
   TestValue("second(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 11); 
+  TestValue("year(cast('2011-12-22' as timestamp))", TYPE_INT, 2011); 
+  TestValue("month(cast('2011-12-22' as timestamp))", TYPE_INT, 12); 
+  TestValue("dayofmonth(cast('2011-12-22' as timestamp))", TYPE_INT, 22); 
+  TestValue("day(cast('2011-12-22' as timestamp))", TYPE_INT, 356); 
+  TestValue("weekofyear(cast('2011-12-22' as timestamp))", TYPE_INT, 51); 
+  TestValue("hour(cast('09:10:11.000000' as timestamp))", TYPE_INT, 9); 
+  TestValue("minute(cast('09:10:11.000000' as timestamp))", TYPE_INT, 10); 
+  TestValue("second(cast('09:10:11.000000' as timestamp))", TYPE_INT, 11); 
   TestStringValue(
       "to_date(cast('2011-12-22 09:10:11.12345678' as timestamp))", "2011-12-22");
+  TestValue("datediff(cast('2011-12-22 09:10:11.12345678' as timestamp), "
+      "cast('2012-12-22' as timestamp))", TYPE_INT, 366);
+
+  TestIsNull("year(cast('09:10:11.000000' as timestamp))", TYPE_INT); 
+  TestIsNull("month(cast('09:10:11.000000' as timestamp))", TYPE_INT); 
+  TestIsNull("dayofmonth(cast('09:10:11.000000' as timestamp))", TYPE_INT); 
+  TestIsNull("day(cast('09:10:11.000000' as timestamp))", TYPE_INT); 
+  TestIsNull("weekofyear(cast('09:10:11.000000' as timestamp))", TYPE_INT); 
+  TestIsNull("hour(cast('2011-12-22' as timestamp))", TYPE_INT); 
+  TestIsNull("minute(cast('2011-12-22' as timestamp))", TYPE_INT); 
+  TestIsNull("second(cast('2011-12-22' as timestamp))", TYPE_INT); 
+  TestIsNull("datediff(cast('09:10:11.12345678' as timestamp), "
+      "cast('2012-12-22' as timestamp))", TYPE_INT);
 
   // Tests from Hive
   // The hive documentation states that timestamps are timezoneless, but the tests
@@ -1600,7 +1621,8 @@ TEST_F(ExprTest, TimestampFunctions) {
       "1970-01-01 00:00:00");
 
   // There is a boost bug converting from string we need to compensate for, test it
-  TestStringValue("cast(cast('1999-01-10' as timestamp) as string)", "not-a-date-time");
+  // With support of date strings this now generates the proper date.
+  TestStringValue("cast(cast('1999-01-10' as timestamp) as string)", "1999-01-10");
 }
 
 // TODO: Since we currently can't analyze NULL literals as function parameters,
