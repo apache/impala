@@ -79,16 +79,16 @@ if (DOXYGEN_FOUND)
   set(DOXYGEN_OUTPUT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/build/docs)
   # Possible to not input the subdirs one by one?
   set(CMAKE_DOXYGEN_INPUT
-    ${CMAKE_SOURCE_DIR}/src
-    ${CMAKE_SOURCE_DIR}/src/common/
-    ${CMAKE_SOURCE_DIR}/src/exec/
-    ${CMAKE_SOURCE_DIR}/src/exprs/
-    ${CMAKE_SOURCE_DIR}/src/runtime/
-    ${CMAKE_SOURCE_DIR}/src/service/
-    ${CMAKE_SOURCE_DIR}/src/sparrow/
-    ${CMAKE_SOURCE_DIR}/src/testutil/
-    ${CMAKE_SOURCE_DIR}/src/thrift/
-    ${CMAKE_SOURCE_DIR}/src/util/
+    ${CMAKE_SOURCE_DIR}/be/src
+    ${CMAKE_SOURCE_DIR}/be/src/common/
+    ${CMAKE_SOURCE_DIR}/be/src/exec/
+    ${CMAKE_SOURCE_DIR}/be/src/exprs/
+    ${CMAKE_SOURCE_DIR}/be/src/runtime/
+    ${CMAKE_SOURCE_DIR}/be/src/service/
+    ${CMAKE_SOURCE_DIR}/be/src/sparrow/
+    ${CMAKE_SOURCE_DIR}/be/src/testutil/
+    ${CMAKE_SOURCE_DIR}/be/src/thrift/
+    ${CMAKE_SOURCE_DIR}/be/src/util/
     )
   # CMake appends using ';'. doxygen wants spaces
   string(REPLACE ";" " " DOXYGEN_INPUT "${CMAKE_DOXYGEN_INPUT}")
