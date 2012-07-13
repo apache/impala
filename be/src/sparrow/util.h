@@ -8,9 +8,9 @@
 
 #include <boost/format.hpp>
 #include <boost/unordered_map.hpp>
-#include <glog/logging.h>
 
 #include "common/compiler-util.h"
+#include "common/logging.h"
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/SparrowTypes_types.h"
 
