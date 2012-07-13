@@ -30,7 +30,6 @@ RuntimeState::RuntimeState(
     const TUniqueId& fragment_id, const TQueryOptions& query_options, const string& now,
     ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
-    file_buffer_size_(DEFAULT_FILE_BUFFER_SIZE),
     profile_(obj_pool_.get(), "RuntimeState"),
     is_cancelled_(false) {
   Status status = Init(fragment_id, query_options, now, exec_env);
@@ -39,9 +38,9 @@ RuntimeState::RuntimeState(
 
 RuntimeState::RuntimeState()
   : obj_pool_(new ObjectPool()),
-    file_buffer_size_(DEFAULT_FILE_BUFFER_SIZE),
     profile_(obj_pool_.get(), "RuntimeState") {
   query_options_.batch_size = DEFAULT_BATCH_SIZE;
+  query_options_.file_buffer_size = DEFAULT_FILE_BUFFER_SIZE;
 }
 
 RuntimeState::~RuntimeState() {
@@ -65,7 +64,9 @@ Status RuntimeState::Init(
   if (query_options_.batch_size <= 0) {
     query_options_.batch_size = DEFAULT_BATCH_SIZE;
   }
-
+  if (query_options.file_buffer_size <= 0) {
+    query_options_.file_buffer_size = DEFAULT_FILE_BUFFER_SIZE;
+  }
   return Status::OK;
 }
 

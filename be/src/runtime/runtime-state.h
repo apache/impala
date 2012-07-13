@@ -47,7 +47,7 @@ class RuntimeState {
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }
   void set_desc_tbl(DescriptorTbl* desc_tbl) { desc_tbl_ = desc_tbl; }
   int batch_size() const { return query_options_.batch_size; }
-  int file_buffer_size() const { return file_buffer_size_; }
+  int file_buffer_size() const { return query_options_.file_buffer_size; }
   bool abort_on_error() const { return query_options_.abort_on_error; }
   int max_errors() const { return query_options_.max_errors; }
   const TimestampValue* now() const { return now_.get(); }
@@ -102,7 +102,6 @@ class RuntimeState {
 
   DescriptorTbl* desc_tbl_;
   boost::scoped_ptr<ObjectPool> obj_pool_;
-  int file_buffer_size_;
 
   // A buffer for error messages.
   // The entire error stream is written to the error_log_ in log_error_stream().

@@ -224,9 +224,10 @@ public class HBaseScanNode extends ScanNode {
   }
 
   @Override
-  public void getScanParams(
+  public void getScanParams(long maxScanRangeLength,
       int numPartitions, List<TScanRange> scanRanges, List<THostPort> hostPorts) {
-    // No usage of NUM_NODES_ALL_RACKS yet. The condition on numPartition depends on this check.
+    // No usage of NUM_NODES_ALL_RACKS yet. The condition on numPartition depends on this
+    // check.
     Preconditions.checkState(numPartitions != Constants.NUM_NODES_ALL_RACKS);
 
     // Retrieve relevant HBase regions and their region servers

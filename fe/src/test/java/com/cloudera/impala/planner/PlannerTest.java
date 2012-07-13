@@ -25,6 +25,7 @@ import com.cloudera.impala.testutil.TestFileParser.Section;
 import com.cloudera.impala.testutil.TestFileParser.TestCase;
 import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.Constants;
+import com.cloudera.impala.thrift.TQueryOptions;
 import com.google.common.collect.Lists;
 
 public class PlannerTest {
@@ -58,7 +59,10 @@ public class PlannerTest {
       Planner planner = new Planner();
       planner.setExplainPlanDetailLevel(level);
       explainStringBuilder.setLength(0);
-      planner.createPlanFragments(analysisResult, numNodes, explainStringBuilder);
+      TQueryOptions options = new TQueryOptions();
+      options.setNum_nodes(numNodes);
+      planner.createPlanFragments(analysisResult, options, explainStringBuilder);
+
 
       String explainStr = explainStringBuilder.toString();
       actualOutput.append(explainStr);
@@ -88,8 +92,9 @@ public class PlannerTest {
       AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
       Planner planner = new Planner();
       explainStringBuilder.setLength(0);
-
-      planner.createPlanFragments(analysisResult, numNodes, explainStringBuilder);
+      TQueryOptions options = new TQueryOptions();
+      options.setNum_nodes(numNodes);
+      planner.createPlanFragments(analysisResult, options, explainStringBuilder);
 
       errorLog.append(
           "query produced a plan\nquery=" + query + "\nplan=\n"

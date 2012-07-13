@@ -38,6 +38,8 @@ abstract public class ScanNode extends PlanNode {
    * Returns one TScanRange per partition of the scan. If 'hostports' is non-null and
    * there are multiple partitions, also returns locations on which scan ranges are
    * located, one per range.
+   * @param maxScanRangeLength the maximum number of bytes each scan range should scan;
+   *     only applicable to HDFS; less than or equal to zero means no maximum
    * @param numPartitions number of scan partitions; same semantics as
    *     TQueryRequest.numNodes; must be >= 1 or one of these special values:
    *     NUM_NODES_ALL: as many partitions as there are nodes that contain relevant data
@@ -46,7 +48,7 @@ abstract public class ScanNode extends PlanNode {
    * @param scanRanges output parameter
    * @param dataLocations output parameter
    */
-  abstract public void getScanParams(
+  abstract public void getScanParams(long maxScanRangeLength,
       int numPartitions, List<TScanRange> scanRanges, List<THostPort> dataLocations);
 
   @Override

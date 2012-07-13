@@ -31,6 +31,9 @@ struct TQueryOptions {
   5: required bool return_as_ascii = 1
   
   6: required i32 num_nodes = JavaConstants.NUM_NODES_ALL
+
+  7: required i64 max_scan_range_length = 0
+  8: required i32 file_buffer_size = 0
 }
 
 // Parameters for the execution of a plan fragment on a particular node.

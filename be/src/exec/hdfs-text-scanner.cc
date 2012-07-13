@@ -84,11 +84,33 @@ Status HdfsTextScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_parti
   boundary_row_.Clear();
   delimited_text_parser_->ParserReset();
 
+  eosr_ = false;
+
   // Offset may not point to tuple boundary
   if (scan_range->offset_ != 0) {
     COUNTER_SCOPED_TIMER(parse_delimiter_timer_);
     int first_tuple_offset = delimited_text_parser_->FindFirstInstance(
         byte_buffer_, byte_buffer_read_size_);
+    // Find the first tuple offset. We might have to read through a few buffers before
+    // we can find them.
+    while (first_tuple_offset < 0) {
+      // If we can't find the first tuple delimiter before reading the end of our scan
+      // range (or end of file), we're done. The bytes we've skipped are processed by
+      // some earlier scan range (not necessarily the previous one).
+      current_range_remaining_len_ -= byte_buffer_read_size_;
+      if (current_range_remaining_len_ <= 0) {
+        eosr_ = true;
+        return Status::OK;
+      }
+      RETURN_IF_ERROR(FillByteBuffer(current_range_remaining_len_));
+      if (byte_buffer_read_size_ == 0) {
+        eosr_ = true;
+        return Status::OK;
+      }
+      first_tuple_offset = delimited_text_parser_->FindFirstInstance(
+              byte_buffer_, byte_buffer_read_size_);
+    }
+    DCHECK_GE(first_tuple_offset, 0);
     DCHECK_LE(first_tuple_offset, min(state_->file_buffer_size(),
          current_range_remaining_len_));
     byte_buffer_ptr_ += first_tuple_offset;
@@ -164,30 +186,46 @@ Status HdfsTextScanner::GetNext(RowBatch* row_batch, bool* eosr) {
   // The only case where this will be false if the row batch fills up.
   *eosr = true;
 
+  // If we've reached EOS during the init scan range without finding a tuple delimiter,
+  // we're done.
+  if (eosr_) return Status::OK;
+
   // This loop contains a small state machine:
   //  1. byte_buffer_ptr_ != byte_buffer_end_: no need to read more, process what's in
   //     the read buffer.
   //  2. current_range_remaining_len_ > 0: keep reading from the current file location
-  //  3. current_range_remaining_len_ == 0: done with current range but might need more
-  //     to complete the last tuple.
-  //  4. current_range_remaining_len_ < 0: Reading past this scan range to finish tuple
+  //  3. current_range_remaining_len_ <= 0: Reading past this scan range to finish tuple
   while (true) {
     if (byte_buffer_ptr_ == byte_buffer_end_) {
-      if (current_range_remaining_len_ < 0) {
+      if (current_range_remaining_len_ <= 0) {
+        // We are at the end of the scan range and need to check if we need to read past
+        // the scan range to finish an incomplete tuple. There are two cases when this
+        // can occur:
+        //   1. We are in the middle of a row and we've seen at least one column. The
+        //      text parser stores this state.
+        //   2. we are in the middle of the first column. We can identify this case if
+        //      there are bytes in the boundary column buffer or the last parsed column
+        //      start location is still in this scan range.
+        bool incomplete_tuple = !boundary_column_.Empty() ||
+            !delimited_text_parser_->AtTupleStart() ||
+            (col_start != NULL && col_start != byte_buffer_ptr_);
+
         // We want to minimize how much we read next.  It is past the end of this block
         // and likely on another node.
         // TODO: Set it to be the average size of a row
         RETURN_IF_ERROR(FillByteBuffer(NEXT_BLOCK_READ_SIZE));
         if (byte_buffer_read_size_ == 0) {
-          // There was an incomplete tuple at the end of the file.  The file
-          // is corrupt.
-          if (state_->LogHasSpace()) {
-            state_->error_stream() << "Incomplete tuple at end of file: "
-                                   << current_byte_stream_->GetLocation() << endl;
-            state_->LogErrorStream();
+          if (incomplete_tuple) {
+            // There was an incomplete tuple at the end of the file.  The file
+            // is corrupt.
+            if (state_->LogHasSpace()) {
+              state_->error_stream() << "Incomplete tuple at end of file: "
+                                     << current_byte_stream_->GetLocation() << endl;
+              state_->LogErrorStream();
+            }
+            LOG(ERROR) << "Incomplete tuple at end of file: "
+                       << current_byte_stream_->GetLocation();
           }
-          LOG(ERROR) << "Incomplete tuple at end of file: " 
-                     << current_byte_stream_->GetLocation();
           current_range_remaining_len_ = 0;
           slot_idx_ = 0;
           delimited_text_parser_->ParserReset();
@@ -195,23 +233,6 @@ Status HdfsTextScanner::GetNext(RowBatch* row_batch, bool* eosr) {
           byte_buffer_ptr_ = NULL;
           break;
         }
-      } else if (current_range_remaining_len_ == 0) {
-        // Check if a tuple is straddling this block and the next:
-        //  1. boundary_column_ is not empty
-        //  2. if we are halfway through reading a tuple: !AtStart.
-        //  3. We have are in the middle of the first column
-        // We need to continue scanning until the end of the tuple.  Note that
-        // boundary_column_ will be empty if we are on a column boundary,
-        // but could still be inside a tuple. Similarly column_idx_ could be
-        // first_materialised_col_idx if we are in the middle of reading the first
-        // column. Therefore we need both checks.
-        // TODO: test that hits this condition.
-        if (!boundary_column_.Empty() || !delimited_text_parser_->AtTupleStart() ||
-          (col_start != NULL && col_start != byte_buffer_ptr_)) {
-          current_range_remaining_len_ = -1;
-          continue;
-        }
-        break;
       } else {
         // Continue reading from the current file location
         DCHECK_GE(current_range_remaining_len_, 0);
@@ -234,7 +255,7 @@ Status HdfsTextScanner::GetNext(RowBatch* row_batch, bool* eosr) {
     int max_tuples = row_batch->capacity() - row_batch->num_rows();
     // We are done with the current scan range, just parse for one more tuple to finish
     // it off
-    if (current_range_remaining_len_ < 0) {
+    if (current_range_remaining_len_ <= 0) {
       max_tuples = 1;
     }
 
@@ -252,7 +273,8 @@ Status HdfsTextScanner::GetNext(RowBatch* row_batch, bool* eosr) {
     DCHECK_GT(bytes_processed, 0);
 
     int num_tuples_materialized = 0;
-    if (scan_node_->materialized_slots().size() != 0) {
+    if (scan_node_->materialized_slots().size() != 0 &&
+        (num_fields > 0 || num_tuples > 0)) {
       // There can be one partial tuple which returned no more fields from this buffer.
       DCHECK_LE(num_tuples, num_fields + 1);
       if (!boundary_column_.Empty()) {
@@ -299,14 +321,14 @@ Status HdfsTextScanner::GetNext(RowBatch* row_batch, bool* eosr) {
 
     if (current_range_remaining_len_ < 0) {
       DCHECK_LE(num_tuples, 1);
-      // Just finished off this scan range
       if (num_tuples == 1) {
+        // Just finished off this scan range
         DCHECK(boundary_column_.Empty());
         DCHECK_EQ(slot_idx_, 0);
         current_range_remaining_len_ = 0;
         byte_buffer_ptr_ = byte_buffer_end_;
+        break;
       }
-      break;
     }
 
     // The row batch is full. We'll pick up where we left off in the next

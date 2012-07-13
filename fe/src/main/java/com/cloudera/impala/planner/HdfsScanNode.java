@@ -191,7 +191,7 @@ public class HdfsScanNode extends ScanNode {
   }
 
   @Override
-  public void getScanParams(
+  public void getScanParams(long maxScanRangeLength,
       int numNodes, List<TScanRange> scanRanges, List<THostPort> hostPorts) {
     Preconditions.checkState(numNodes != Constants.NUM_NODES_ALL_RACKS);
 
@@ -209,13 +209,22 @@ public class HdfsScanNode extends ScanNode {
       TScanRange scanRange = new TScanRange(id);
       for (HdfsTable.BlockMetadata metadata: blockAssignment.blockMetadata) {
         BlockLocation blockLocation = metadata.getLocation();
-        THdfsFileSplit fileSplit =
-            new THdfsFileSplit(metadata.fileName,
-                blockLocation.getOffset(),
-                blockLocation.getLength(),
-                metadata.getPartition().getId());
-
-        scanRange.addToHdfsFileSplits(fileSplit);
+        long currentOffset = blockLocation.getOffset();
+        long remainingLength = blockLocation.getLength();
+        while (remainingLength > 0) {
+          long currentLength = remainingLength;
+          if (maxScanRangeLength > 0 && remainingLength > maxScanRangeLength) {
+            currentLength = maxScanRangeLength;
+          }
+          THdfsFileSplit fileSplit =
+              new THdfsFileSplit(metadata.fileName,
+                  currentOffset,
+                  currentLength,
+                  metadata.getPartition().getId());
+          scanRange.addToHdfsFileSplits(fileSplit);
+          remainingLength -= currentLength;
+          currentOffset += currentLength;
+        }
       }
       scanRanges.add(scanRange);
       if (hostPorts != null) {

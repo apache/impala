@@ -32,7 +32,15 @@ enum ImpalaQueryOptions {
   //      more nodes than numNodes with plan fragments for this query, but at most
   //      numNodes would be active at any point in time)
   // Constants (NUM_NODES_ALL, NUM_NODES_ALL_RACKS) are defined in JavaConstants.thrift.
-  NUM_NODES
+  NUM_NODES,
+  
+  // maximum length of the scan range; only applicable to HDFS scan range; Unspecified or
+  // a length of 0 indicates backend default;  
+  MAX_SCAN_RANGE_LENGTH,
+  
+  // file buffer size used by text parsing; size of 0 indicates the backend's default
+  // file buffer size
+  FILE_BUFFER_SIZE
 }
 
 // For all rpc that return a TStatus as part of their result type,

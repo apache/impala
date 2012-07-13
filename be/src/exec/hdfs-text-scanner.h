@@ -190,6 +190,9 @@ class HdfsTextScanner : public HdfsScanner {
   // range. When <= 0, GetNext will prepare to exit.
   int current_range_remaining_len_;
 
+  // True if we've reached the end of scan range during init.
+  bool eosr_;
+
   // Matching typedef for WriteAlignedTuples for codegen.  Refer to comments for
   // that function.
   typedef int (*WriteTuplesFn)(HdfsTextScanner*, RowBatch*, FieldLocation*, int, int,

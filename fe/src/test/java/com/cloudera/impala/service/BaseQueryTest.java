@@ -139,14 +139,20 @@ public abstract class BaseQueryTest {
     public String getTableSuffix() { return tableSuffix; }
   }
 
-  static private class TestConfiguration {
+  static protected class TestConfiguration {
     private final CompressionFormat compressionFormat;
     private final TableFormat tableFormat;
     private final TestExecContext execContext;
 
     public TestConfiguration(int nodes, int batchSize, CompressionFormat compression,
         TableFormat tableFormat, boolean disableLlvm) {
-      this.execContext = new TestExecContext(nodes, batchSize, disableLlvm, false, 1000);
+      this(new TestExecContext(nodes, batchSize, disableLlvm, false, 1000), compression,
+          tableFormat);
+    }
+
+    public TestConfiguration(TestExecContext execContext, CompressionFormat compression,
+        TableFormat tableFormat) {
+      this.execContext = execContext;
       this.compressionFormat = compression;
       this.tableFormat = tableFormat;
     }
@@ -155,6 +161,7 @@ public abstract class BaseQueryTest {
       return tableFormat.getTableSuffix() + compressionFormat.getTableSuffix();
     }
 
+    public TestExecContext getTestExecContext() { return execContext; };
     public CompressionFormat getCompressionFormat() { return compressionFormat; }
     public TableFormat getTableFormat() { return tableFormat; }
     public int getClusterSize() { return execContext.getNumNodes(); }
@@ -428,7 +435,7 @@ public abstract class BaseQueryTest {
     return true;
   }
 
-  private void runQueryWithTestConfigs(List<TestConfiguration> testConfigs,
+  protected void runQueryWithTestConfigs(List<TestConfiguration> testConfigs,
       String testFile, boolean abortOnError, int maxErrors) {
     String fileName = new File(testDirName, testFile + ".test").getPath();
     TestFileParser queryFileParser = new TestFileParser(fileName);
@@ -438,10 +445,7 @@ public abstract class BaseQueryTest {
 
     for (TestConfiguration config: testConfigs) {
       queryFileParser.parseFile(config.getTableSuffix());
-      TestExecContext context = new TestExecContext(
-          config.getClusterSize(), config.getBatchSize(), config.getDisableLlvm(),
-          abortOnError, maxErrors);
-      runOneQueryTest(queryFileParser, config, context, new StringBuilder());
+      runOneQueryTest(queryFileParser, config, new StringBuilder());
 
       // Don't need to (or want to) run multiple test configurations if we are generating
       // new results.
@@ -483,7 +487,7 @@ public abstract class BaseQueryTest {
    * Run a single query test file as specified in the queryFileParser.
    */
   private void runOneQueryTest(TestFileParser queryFileParser, TestConfiguration config,
-                               TestExecContext context, StringBuilder errorLog) {
+                               StringBuilder errorLog) {
 
     List<QueryExecTestResult> results = Lists.newArrayList();
     for (TestCase testCase: queryFileParser.getTestCases()) {
@@ -506,7 +510,8 @@ public abstract class BaseQueryTest {
           Section.QUERY, false, " ", config.getTableSuffix());
 
       QueryExecTestResult result = TestUtils.runQueryUsingExecutor(getTargetExecutor(),
-          queryString, context, testCase.getStartingLineNum(), expectedResult, errorLog);
+          queryString, config.getTestExecContext(), testCase.getStartingLineNum(),
+          expectedResult, errorLog);
 
       if(GENERATE_NEW_TEST_RESULTS) {
         result.getQuery().addAll(expectedResult.getQuery());

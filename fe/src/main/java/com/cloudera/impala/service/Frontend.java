@@ -120,7 +120,7 @@ public class Frontend {
     Planner planner = new Planner();
     TCreateQueryExecRequestResult result = new TCreateQueryExecRequestResult();
     result.setQueryExecRequest(
-        planner.createPlanFragments(analysisResult, request.queryOptions.num_nodes,
+        planner.createPlanFragments(analysisResult, request.queryOptions,
             explainString));
     result.queryExecRequest.sql_stmt = request.stmt;
 

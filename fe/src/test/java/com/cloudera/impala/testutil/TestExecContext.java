@@ -6,6 +6,7 @@ import com.google.common.base.Objects;
 
 /*
  * Describes execution details for a query.
+ * TODO: replace it with TQueryOptions
  */
 public class TestExecContext {
   private final boolean abortOnError;
@@ -13,14 +14,24 @@ public class TestExecContext {
   private final boolean disableCodegen;
   private final int maxErrors;
   private final int numNodes;
+  private final long maxScanRangeLength;
+  private final int fileBufferSize;
 
   public TestExecContext(int numNodes, int batchSize, boolean disableCodegen,
-                         boolean abortOnError, int maxErrors) {
+                         boolean abortOnError, int maxErrors, long maxScanRangeLength,
+                         int fileBufferSize) {
     this.numNodes = numNodes;
     this.batchSize = batchSize;
     this.disableCodegen = disableCodegen;
     this.abortOnError = abortOnError;
     this.maxErrors = maxErrors;
+    this.maxScanRangeLength = maxScanRangeLength;
+    this.fileBufferSize = fileBufferSize;
+  }
+
+  public TestExecContext(int numNodes, int batchSize, boolean disableCodegen,
+      boolean abortOnError, int maxErrors) {
+    this(numNodes, batchSize, disableCodegen, abortOnError, maxErrors, 0, 0);
   }
 
   public boolean getAbortOnError() {
@@ -43,6 +54,14 @@ public class TestExecContext {
     return numNodes;
   }
 
+  public long getMaxScanRangeLength() {
+    return maxScanRangeLength;
+  }
+
+  public int getFileBufferSize() {
+    return fileBufferSize;
+  }
+
   @Override
   public String toString() {
       return Objects.toStringHelper(this).add("NumNodes", numNodes)
@@ -50,6 +69,8 @@ public class TestExecContext {
                                          .add("IsCodegenDisabled", disableCodegen)
                                          .add("AbortOnError", abortOnError)
                                          .add("MaxErrors", maxErrors)
+                                         .add("MaxScanRangeLength", maxScanRangeLength)
+                                         .add("FileBufferSize", fileBufferSize)
                                          .toString();
   }
 }

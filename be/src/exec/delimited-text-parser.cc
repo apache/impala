@@ -142,11 +142,10 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
 // Find the first instance of the tuple delimiter.  This will
 // find the start of the first full tuple in buffer by looking for the end of
 // the previous tuple.
-// TODO: most of this is not tested.  We need some tailored data to exercise the boundary
-// cases
 int DelimitedTextParser::FindFirstInstance(char* buffer, int len) {
   int tuple_start = 0;
   char* buffer_start = buffer;
+  bool found = false;
 restart:
   if (CpuInfo::Instance()->IsSupported(CpuInfo::SSE4_2)) {
     __m128i xmm_buffer, xmm_tuple_mask;
@@ -163,6 +162,7 @@ restart:
           _mm_cmpestrm(xmm_tuple_search_, 1, xmm_buffer, chr_count, SSEUtil::STRCHR_MODE);
       int tuple_mask = _mm_extract_epi16(xmm_tuple_mask, 0);
       if (tuple_mask != 0) {
+        found = true;
         for (int i = 0; i < SSEUtil::CHARS_PER_128_BIT_REGISTER; ++i) {
           if ((tuple_mask & SSEUtil::SSE_BITMASK[i]) != 0) {
             tuple_start += i + 1;
@@ -180,6 +180,7 @@ restart:
       char c = *buffer++;
       if (c == tuple_delim_) {
         tuple_start = i + 1;
+        found = true;
         break;
       }
     }
@@ -212,6 +213,7 @@ restart:
     }
   }
 
+  if (!found) return -1;
   return tuple_start;
 }
 

@@ -2,11 +2,16 @@
 
 package com.cloudera.impala.service;
 
+import java.util.List;
+
 import org.junit.Test;
 
+import com.cloudera.impala.testutil.TestExecContext;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 
 public class QueryTest extends BaseQueryTest {
+
   @Test
   public void TestDistinct() {
     runTestInExecutionMode(EXECUTION_MODE, "distinct", false, 1000);
@@ -73,4 +78,28 @@ public class QueryTest extends BaseQueryTest {
   public void TestMixedFormat() {
     runTestInExecutionMode(EXECUTION_MODE, "mixed-format", false, 1000);
   }
+
+  @Test
+  public void TestHdfsTinyScan() {
+    // We use very small scan ranges to exercise corner cases in the HDFS scanner more
+    // thoroughly. In particular, it will exercise:
+    // 1. scan range with no tuple
+    // 2. tuple that span across multiple scan ranges
+    TestExecContext execContext1 =
+        new TestExecContext(2, 1, true, false, 1000, 1, 0);
+
+    // We use a very small file buffer to test the HDFS scanner init code that seeks the
+    // first tuple delimiter.
+    TestExecContext execContext2 =
+        new TestExecContext(2, 1, true, false, 1000, 5, 1);
+
+    List<TestConfiguration> testConfigs = Lists.newArrayList();
+    testConfigs.add(
+        new TestConfiguration(execContext1, CompressionFormat.NONE, TableFormat.TEXT));
+    testConfigs.add(
+        new TestConfiguration(execContext2, CompressionFormat.NONE, TableFormat.TEXT));
+
+    runQueryWithTestConfigs(testConfigs, "hdfs-tiny-scan", false, 1000);
+  }
+
 }

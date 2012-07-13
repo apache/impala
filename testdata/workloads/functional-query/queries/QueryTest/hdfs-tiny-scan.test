@@ -1,0 +1,16 @@
+select * from tinytable
+---- TYPES
+string, string
+---- RESULTS
+'aaaaaaa','bbbbbbb'
+'ccccc','dddd'
+'eeeeeeee','f'
+====
+select a from tinytable
+---- TYPES
+string
+---- RESULTS
+'aaaaaaa'
+'ccccc'
+'eeeeeeee'
+====

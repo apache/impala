@@ -29,9 +29,9 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.thrift.TColumnValue;
@@ -88,6 +88,16 @@ public class Executor {
       List<String> errorLog, Map<String, Integer> fileErrors,
       BlockingQueue<TResultRow> resultQueue,
       InsertResult insertResult) throws ImpalaException {
+    runQuery(request, colTypes, colLabels, containsOrderBy, 0, batchSize, abortOnError,
+        maxErrors, disableCodegen, errorLog, fileErrors, resultQueue, insertResult);
+  }
+
+  public void runQuery(TQueryRequest request, List<PrimitiveType> colTypes,
+      List<String> colLabels, AtomicBoolean containsOrderBy, int file_buffer_size,
+      int batchSize, boolean abortOnError, int maxErrors, boolean disableCodegen,
+      List<String> errorLog, Map<String, Integer> fileErrors,
+      BlockingQueue<TResultRow> resultQueue,
+      InsertResult insertResult) throws ImpalaException {
     init();
     LOG.info("query: " + request.stmt);
     AnalysisContext.AnalysisResult analysisResult =
@@ -96,7 +106,9 @@ public class Executor {
       containsOrderBy.set(analysisResult.isQueryStmt()
           && analysisResult.getQueryStmt().hasOrderByClause());
     }
-    execQuery(analysisResult, request.queryOptions.num_nodes, batchSize, abortOnError,
+    execQuery(analysisResult, request.queryOptions.num_nodes,
+              request.queryOptions.max_scan_range_length,
+              file_buffer_size, batchSize, abortOnError,
               maxErrors, disableCodegen, errorLog, fileErrors,
               request.queryOptions.return_as_ascii, resultQueue, insertResult);
     addSentinelRow(resultQueue);
@@ -127,7 +139,10 @@ public class Executor {
     Runnable execCall = new Runnable() {
       public void run() {
         try {
-          execQuery(analysisResult, request.queryOptions.num_nodes, batchSize,
+          execQuery(analysisResult, request.queryOptions.num_nodes,
+                    request.queryOptions.max_scan_range_length,
+                    request.queryOptions.file_buffer_size,
+                    batchSize,
                     abortOnError, maxErrors, disableCodegen, errorLog, fileErrors,
                     request.queryOptions.return_as_ascii, resultQueue, insertResult);
         } catch (ImpalaException e) {
@@ -195,6 +210,7 @@ public class Executor {
   // strings.
   private void execQuery(
       AnalysisContext.AnalysisResult analysisResult, int numNodes,
+      long maxScanRangeLength, int file_buffer_size,
       int batchSize, boolean abortOnError, int maxErrors, boolean disableCodegen,
       List<String> errorLog, Map<String, Integer> fileErrors, boolean returnAsAscii,
       BlockingQueue<TResultRow> resultQueue, InsertResult insertResult)
@@ -202,9 +218,13 @@ public class Executor {
     // create plan fragments
     Planner planner = new Planner();
     StringBuilder explainString = new StringBuilder();
+    TQueryOptions options = new TQueryOptions();
+    options.setNum_nodes(numNodes);
+    options.setMax_scan_range_length(maxScanRangeLength);
+
     // for now, only single-node execution
     TQueryExecRequest execRequest = planner.createPlanFragments(
-        analysisResult, numNodes, explainString);
+        analysisResult, options, explainString);
     // Log explain string.
     LOG.info(explainString.toString());
 
@@ -235,6 +255,7 @@ public class Executor {
         planExecRequest.getQuery_options().setMax_errors(maxErrors);
         planExecRequest.getQuery_options().setDisable_codegen(disableCodegen);
         planExecRequest.getQuery_options().setBatch_size(batchSize);
+        planExecRequest.getQuery_options().setFile_buffer_size(file_buffer_size);
       }
 
       // set dest_fragment_ids of non-coord fragment

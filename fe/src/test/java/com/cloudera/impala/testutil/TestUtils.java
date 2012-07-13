@@ -356,6 +356,7 @@ public class TestUtils {
     TQueryOptions options = new TQueryOptions();
     options.setReturn_as_ascii(true);
     options.setNum_nodes(context.getNumNodes());
+    options.setMax_scan_range_length(context.getMaxScanRangeLength());
     TQueryRequest request = new TQueryRequest(query, options);
     ArrayList<String> errors = new ArrayList<String>();
     SortedMap<String, Integer> fileErrors = new TreeMap<String, Integer>();
@@ -367,6 +368,7 @@ public class TestUtils {
     QueryExecTestResult actualExecResults = new QueryExecTestResult();
     try {
       inProcessExecutor.runQuery(request, colTypes, colLabels, containsOrderBy,
+          context.getFileBufferSize(),
           context.getBatchSize(), context.getAbortOnError(), context.getMaxErrors(),
           context.isCodegenDisabled(), errors, fileErrors, resultQueue,
           insertResult);

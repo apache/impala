@@ -683,27 +683,25 @@ public class Planner {
   }
 
   /**
-   * Given an analysisResult, creates a sequence of plan fragments that implement the query.
+   * Given an analysisResult, creates a sequence of plan fragments that implement the
+   * query.
    *
    * @param analysisResult
    *          result of query analysis
-   * @param numNodes
-   *          number of nodes on which to execute fragments; same semantics as
-   *          TQueryRequest.numNodes;
-   *          allowed values:
-   *          1: single-node execution
-   *          NUM_NODES_ALL: executes on all nodes that contain relevant data
-   *          NUM_NODES_ALL_RACKS: executes on one node per rack that holds relevant data
-   *          > 1: executes on at most that many nodes at any point in time (ie, there
-   *          can be more nodes than numNodes with plan fragments for this query, but
-   *          at most numNodes would be active at any point in time)
+   * @param queryOptions
+   *          user specified query options; only num_nodes and max_scan_range_length are
+   *          used.
    * @param explainString output parameter of the explain plan string, if not null
    * @return query exec request containing plan fragments and all execution parameters
    */
   public TQueryExecRequest createPlanFragments(
-      AnalysisContext.AnalysisResult analysisResult, int numNodes,
+      AnalysisContext.AnalysisResult analysisResult, TQueryOptions queryOptions,
       StringBuilder explainString)
       throws NotImplementedException, InternalException {
+    // Only num_nodes and max_scan_range_length are used
+    int numNodes = queryOptions.num_nodes;
+    long maxScanRangeLength = queryOptions.max_scan_range_length;
+
     // Set queryStmt from analyzed SELECT or INSERT query.
     QueryStmt queryStmt = null;
     if (analysisResult.isInsertStmt()) {
@@ -782,10 +780,11 @@ public class Planner {
     List<TScanRange> scanRanges = Lists.newArrayList();
     List<THostPort> dataLocations = Lists.newArrayList();
     if (numNodes == 1) {
-      createPartitionParams(root, 1, scanRanges, dataLocations);
+      createPartitionParams(root, 1, maxScanRangeLength, scanRanges, dataLocations);
       root.collectSubclasses(ScanNode.class, scans);
     } else {
-      createPartitionParams(slave, numNodes, scanRanges, dataLocations);
+      createPartitionParams(slave, numNodes, maxScanRangeLength, scanRanges,
+          dataLocations);
       slave.collectSubclasses(ScanNode.class, scans);
       ExchangeNode exchangeNode = root.findFirstOf(ExchangeNode.class);
       exchangeNode.setNumSenders(dataLocations.size());
@@ -832,7 +831,7 @@ public class Planner {
       // and doesn't send the output anywhere)
       request.addToNode_request_params(Lists.newArrayList(new TPlanExecParams()));
     }
-    createExecParams(request, scans, scanRanges, dataLocations);
+    createExecParams(request, scans, maxScanRangeLength, scanRanges, dataLocations);
 
     // Build the explain plan string, if requested
     if (explainString != null) {
@@ -1014,9 +1013,10 @@ public class Planner {
   }
 
   /**
-   * Compute partitioning parameters (scan ranges and host / ports) for leftmost scan of plan.
+   * Compute partitioning parameters (scan ranges and host / ports) for leftmost scan of
+   * plan.
    */
-  private void createPartitionParams(PlanNode plan, int numNodes,
+  private void createPartitionParams(PlanNode plan, int numNodes, long maxScanRangeLength,
       List<TScanRange> scanRanges, List<THostPort> dataLocations) {
     ScanNode leftmostScan = getLeftmostScan(plan);
     if (leftmostScan == null) {
@@ -1034,7 +1034,8 @@ public class Planner {
     } else {
       numPartitions = 1;
     }
-    leftmostScan.getScanParams(numPartitions, scanRanges, dataLocations);
+    leftmostScan.getScanParams(maxScanRangeLength, numPartitions, scanRanges,
+        dataLocations);
     if (scanRanges.isEmpty() && dataLocations.isEmpty()) {
       // if we're scanning an empty table we still need a single
       // host to execute the scan
@@ -1062,7 +1063,7 @@ public class Planner {
    * scanRanges and data locations.
    */
   private void createExecParams(
-      TQueryExecRequest request, ArrayList<ScanNode> scans,
+      TQueryExecRequest request, ArrayList<ScanNode> scans, long maxScanRangeLength,
       List<TScanRange> scanRanges, List<THostPort> dataLocations) {
     // one TPlanExecParams per fragment/scan range;
     // we need to add an "empty" range for empty tables (in which case
@@ -1086,7 +1087,7 @@ public class Planner {
     for (int i = 1; i < scans.size(); ++i) {
       ScanNode scan = scans.get(i);
       scanRanges = Lists.newArrayList();
-      scan.getScanParams(1, scanRanges, null);
+      scan.getScanParams(maxScanRangeLength, 1, scanRanges, null);
       Preconditions.checkState(scanRanges.size() <= 1);
       if (!scanRanges.isEmpty()) {
         for (TPlanExecParams fragmentParams: fragmentParamsList) {

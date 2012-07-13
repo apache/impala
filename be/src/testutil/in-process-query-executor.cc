@@ -43,6 +43,12 @@
 DEFINE_int32(batch_size, 0,
     "batch size to be used by backend; a batch size of 0 indicates the "
     "backend's default batch size");
+DEFINE_int32(file_buffer_size, 0,
+    "file buffer size used by text parsing; size of 0 indicates the "
+    "backend's default file buffer size");
+DEFINE_int32(max_scan_range_length, 0,
+    "maximum length of the scan range; only applicable to HDFS scan range; a length of 0"
+    " indicates backend default");
 DEFINE_bool(abort_on_error, false, "if true, abort query when encountering any error");
 DEFINE_int32(max_errors, 100, "number of errors to report");
 DEFINE_int32(num_nodes, 1,
@@ -97,7 +103,8 @@ Status InProcessQueryExecutor::Setup() {
   return Status::OK;
 }
 
-Status InProcessQueryExecutor::Exec(const string& query, vector<PrimitiveType>* col_types) {
+Status InProcessQueryExecutor::Exec(const string& query,
+    vector<PrimitiveType>* col_types) {
   query_profile_.reset(new RuntimeProfile(obj_pool_.get(), "InProcessQueryExecutor"));
   RuntimeProfile::Counter* plan_gen_counter =
       ADD_COUNTER(query_profile_, "PlanGeneration", TCounterType::CPU_TICKS);
@@ -112,6 +119,8 @@ Status InProcessQueryExecutor::Exec(const string& query, vector<PrimitiveType>* 
   query_options.disable_codegen = !FLAGS_enable_jit;
   query_options.max_errors = FLAGS_max_errors;
   query_options.num_nodes = FLAGS_num_nodes;
+  query_options.file_buffer_size = FLAGS_file_buffer_size;
+  query_options.max_scan_range_length = FLAGS_max_scan_range_length;
 
   try {
     COUNTER_SCOPED_TIMER(plan_gen_counter);
@@ -310,6 +319,9 @@ Status InProcessQueryExecutor::Explain(const string& query, string* explain_plan
     query_options.disable_codegen = !FLAGS_enable_jit;
     query_options.max_errors = FLAGS_max_errors;
     query_options.num_nodes = FLAGS_num_nodes;
+    query_options.file_buffer_size = FLAGS_file_buffer_size;
+    query_options.max_scan_range_length = FLAGS_max_scan_range_length;
+
     TQueryRequest query_request;
     query_request.__set_stmt(query.c_str());
     query_request.__set_queryOptions(query_options);
