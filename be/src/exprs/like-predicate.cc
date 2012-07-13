@@ -24,6 +24,7 @@ void* LikePredicate::ConstantSubstringFn(Expr* e, TupleRow* row) {
   LikePredicate* p = static_cast<LikePredicate*>(e);
   DCHECK_EQ(p->GetNumChildren(), 2);
   StringValue* val = static_cast<StringValue*>(e->GetChild(0)->GetValue(row));
+  if (val == NULL) return NULL;
   p->result_.bool_val = p->substring_pattern_.Search(val) != -1;
   return &p->result_.bool_val;
 }
@@ -32,6 +33,7 @@ void* LikePredicate::ConstantRegexFn(Expr* e, TupleRow* row) {
   LikePredicate* p = static_cast<LikePredicate*>(e);
   DCHECK_EQ(p->GetNumChildren(), 2);
   StringValue* operand_val = static_cast<StringValue*>(e->GetChild(0)->GetValue(row));
+  if (operand_val == NULL) return NULL;
   p->result_.bool_val = regex_match(operand_val->ptr,
       operand_val->ptr + operand_val->len, *p->regex_);
   return &p->result_.bool_val;
@@ -76,13 +78,17 @@ Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc
     // determine pattern and decide on eval fn
     StringValue* pattern = static_cast<StringValue*>(GetChild(1)->GetValue(NULL));
     string pattern_str(pattern->ptr, pattern->len);
-    regex substring_re("(%*)([^%_]*)(%*)", regex::extended);
+    // Generate a regex search to look for the pattern: "%anything%".
+    // This maps to a fast substring search implementation. Regex marks
+    // the "anything" so it can be extracted for the pattern.
+    regex substring_re("(%+)([^%_]*)(%+)", regex::extended);
     smatch match_res;
     if (opcode_ == TExprOpcode::LIKE
         && regex_match(pattern_str, match_res, substring_re)) {
       // match_res.str(0) is the whole string, match_res.str(1) the first group, etc.
       substring_ = match_res.str(2);
-      substring_sv_ = StringValue(const_cast<char*>(substring_.c_str()), substring_.size());
+      substring_sv_ =
+          StringValue(const_cast<char*>(substring_.c_str()), substring_.size());
       substring_pattern_ = StringSearch(&substring_sv_);
       compute_fn_ = ConstantSubstringFn;
     } else {

@@ -8,3 +8,7 @@ seven,%seven%,n%seven%,.*seven.*,n.*seven.*
 eight,%eight%,n%eight%,.*eight.*,n.*eight.*
 nine,%nine%,n%nine%,.*nine.*,n.*nine.*
 ten,%ten%,n%ten%,.*ten.*,n.*ten.*
+beginning of line,begin%,not begin%,^begin.*,^not begin.*
+end of line,%line,%line end,.*line$,.*line end$
+middle of line,%of%,%of,^.*of.*$,.*of$
+,%,,.*,X

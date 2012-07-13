@@ -547,7 +547,7 @@ public class ParserTest {
         "select c, b, c where a = 5\n" +
         "               ^\n" +
         "Encountered: WHERE\n" +
-        "Expected: AS, DIV, FROM, IS, LIKE, LIMIT, ORDER, " +
+        "Expected: AS, DIV, FROM, IS, LIKE, LIMIT, NOT, ORDER, " +
         "REGEXP, RLIKE, UNION, COMMA, IDENTIFIER\n");
 
     // missing table list
@@ -601,7 +601,7 @@ public class ParserTest {
         "              ^\n" +
         "Encountered: (\n" +
         "Expected: AND, AS, ASC, DESC, DIV, ELSE, END, FROM, FULL, " +
-        "GROUP, HAVING, IS, INNER, JOIN, LEFT, LIKE, LIMIT, OR, ORDER, " +
+        "GROUP, HAVING, IS, INNER, JOIN, LEFT, LIKE, LIMIT, NOT, OR, ORDER, " +
         "REGEXP, RLIKE, RIGHT, UNION, WHEN, WHERE, THEN, COMMA, " +
         "IDENTIFIER\n");
 
@@ -612,7 +612,7 @@ public class ParserTest {
         "^\n" +
         "Encountered: (\n" +
         "Expected: AND, AS, ASC, DESC, DIV, ELSE, END, FROM, FULL, " +
-        "GROUP, HAVING, IS, INNER, JOIN, LEFT, LIKE, LIMIT, OR, ORDER, " +
+        "GROUP, HAVING, IS, INNER, JOIN, LEFT, LIKE, LIMIT, NOT, OR, ORDER, " +
         "REGEXP, RLIKE, RIGHT, UNION, WHEN, WHERE, THEN, COMMA, " +
         "IDENTIFIER\n");
 
@@ -624,7 +624,7 @@ public class ParserTest {
         "from t\n" +
         "Encountered: (\n" +
         "Expected: AND, AS, ASC, DESC, DIV, ELSE, END, FROM, FULL, " +
-        "GROUP, HAVING, IS, INNER, JOIN, LEFT, LIKE, LIMIT, OR, ORDER, " +
+        "GROUP, HAVING, IS, INNER, JOIN, LEFT, LIKE, LIMIT, NOT, OR, ORDER, " +
         "REGEXP, RLIKE, RIGHT, UNION, WHEN, WHERE, THEN, COMMA, " +
         "IDENTIFIER\n");
   }

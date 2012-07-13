@@ -880,6 +880,15 @@ like_predicate ::=
   {: RESULT = new LikePredicate(LikePredicate.Operator.RLIKE, e1, e2); :}
   | expr:e1 KW_REGEXP expr:e2
   {: RESULT = new LikePredicate(LikePredicate.Operator.REGEXP, e1, e2); :}
+  | expr:e1 KW_NOT KW_LIKE expr:e2
+  {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT,
+    new LikePredicate(LikePredicate.Operator.LIKE, e1, e2), null); :}
+  | expr:e1 KW_NOT KW_RLIKE expr:e2
+  {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT,
+    new LikePredicate(LikePredicate.Operator.RLIKE, e1, e2), null); :}
+  | expr:e1 KW_NOT KW_REGEXP expr:e2
+  {: RESULT = new CompoundPredicate(CompoundPredicate.Operator.NOT,
+    new LikePredicate(LikePredicate.Operator.REGEXP, e1, e2), null); :}
   ;
 
 compound_predicate ::=

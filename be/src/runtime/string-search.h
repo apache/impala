@@ -86,7 +86,7 @@ class StringSearch {
     for (int i = 0; i < mlast; ++i) {
       BloomAdd(pattern_->ptr[i]);
       if (pattern_->ptr[i] == pattern_->ptr[mlast])
-        skip_ = i - 1;
+        skip_ = mlast - i - 1;
     }
     BloomAdd(pattern_->ptr[mlast]);
   }
