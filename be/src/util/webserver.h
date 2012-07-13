@@ -1,0 +1,69 @@
+// (c) 2012 Cloudera, Inc. All rights reserved.
+#include <mongoose/mongoose.h>
+#include <string>
+#include <map>
+#include <boost/function.hpp>
+#include <boost/thread/mutex.hpp>
+
+#include "common/status.h"
+
+namespace impala {
+
+// Wrapper class for the Mongoose web server library. Clients may register callback
+// methods which produce output for a given URL path
+class Webserver {
+ public:
+  typedef boost::function<void (std::stringstream* output)> PathHandlerCallback;
+
+  // If interface is set to the empty string the socket will bind to all available
+  // interfaces.
+  Webserver(const std::string& interface, const int port);
+
+  // Uses FLAGS_webserver_{port, interface}
+  Webserver();
+
+  ~Webserver();
+
+  // Starts a webserver on the port passed to the constructor. The webserver runs in a
+  // separate thread, so this call is non-blocking.
+  Status Start();
+
+  // Stops the webserver synchronously.
+  void Stop();
+
+  // Register a handler with a particular URL path. Path should not include the
+  // http://hostname/ prefix.
+  void RegisterPathHandler(const std::string& path, const PathHandlerCallback& callback);
+
+ private:
+  // Static so that it can act as a function pointer, and then call the next method
+  static void* MongooseCallbackStatic(enum mg_event event,
+      struct mg_connection* connection, const struct mg_request_info* request_info);
+
+  // Dispatch point for all incoming requests.
+  void* MongooseCallback(enum mg_event event, struct mg_connection* connection,
+      const struct mg_request_info* request_info);
+
+  // Registered to handle "/", and prints a list of available URIs
+  void RootHandler(std::stringstream* output);
+
+  // Registered to handle "/flags", and prints out all command-line flags and their values
+  void FlagsHandler(std::stringstream* output);
+
+  // Lock guarding the path_handlers_ map
+  boost::mutex path_handlers_lock_;
+
+  // Map of path to a list of handlers. More than one handler may register itself with a
+  // path so that many components may contribute to a single page.
+  typedef std::map<std::string, std::vector<PathHandlerCallback> > PathHandlerMap;
+  PathHandlerMap path_handlers_;
+
+  const int port_;
+  // If empty, webserver will bind to all interfaces.
+  const std::string& interface_;
+
+  // Handle to Mongoose context; owned and freed by Mongoose internally
+  struct mg_context* context_;
+};
+
+}

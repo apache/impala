@@ -24,6 +24,13 @@ add_library(Util
   url-parser.cc
 )
 
+add_library(Webserver STATIC
+  ${MONGOOSE_SRC_DIR}/mongoose.c
+  webserver.cc
+)
+
+target_link_libraries(Webserver pthread dl)
+
 add_executable(perf-counters-test perf-counters-test.cc)
 add_executable(runtime-profile-test runtime-profile-test.cc)
 add_executable(benchmark-test benchmark-test.cc)

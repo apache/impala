@@ -25,6 +25,7 @@ class DataStreamMgr;
 class HBaseTableCache;
 class HdfsFsCache;
 class TestExecEnv;
+class Webserver;
 
 // Execution environment for queries/plan fragments.
 // Contains all required global structures, and handles to
@@ -47,6 +48,7 @@ class ExecEnv {
   BackendClientCache* client_cache() { return client_cache_; }
   HdfsFsCache* fs_cache() { return fs_cache_; }
   HBaseTableCache* htable_cache() { return htable_cache_; }
+  Webserver* webserver() { return webserver_.get(); }
 
   sparrow::Scheduler* scheduler() {
     DCHECK(scheduler_ != NULL);
@@ -63,6 +65,7 @@ class ExecEnv {
   boost::scoped_ptr<BackendClientCache> client_cache_impl_;
   boost::scoped_ptr<HdfsFsCache> fs_cache_impl_;
   boost::scoped_ptr<HBaseTableCache> htable_cache_impl_;
+  boost::scoped_ptr<Webserver> webserver_;
 
   TimezoneDatabase tz_database_;
 

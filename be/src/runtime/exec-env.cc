@@ -14,6 +14,7 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "sparrow/simple-scheduler.h"
 #include "sparrow/subscription-manager.h"
+#include "util/webserver.h"
 #include "gen-cpp/ImpalaBackendService.h"
 
 using namespace std;
@@ -34,6 +35,7 @@ ExecEnv::ExecEnv()
     client_cache_impl_(new BackendClientCache(0, 0)),
     fs_cache_impl_(new HdfsFsCache()),
     htable_cache_impl_(new HBaseTableCache()),
+    webserver_(new Webserver()),
     tz_database_(TimezoneDatabase()),
     stream_mgr_(stream_mgr_impl_.get()),
     subscription_manager_(subscription_manager_impl_.get()),
@@ -91,7 +93,7 @@ Status ExecEnv::StartServices() {
   // Start services in order to ensure that dependencies between them are met
   if (FLAGS_use_statestore) RETURN_IF_ERROR(subscription_manager_->Start());
   if (scheduler_ != NULL) scheduler_impl_->Init();
-
+  RETURN_IF_ERROR(webserver_->Start());
   return Status::OK;
 }
 

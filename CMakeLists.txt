@@ -46,6 +46,9 @@ find_package(HDFS REQUIRED)
 include_directories(${HDFS_INCLUDE_DIR})
 set(LIBS ${LIBS} ${HDFS_LIBS})
 
+find_package(Mongoose REQUIRED)
+include_directories(${MONGOOSE_INCLUDE_DIR})
+
 # find GFlags headers and libs (needed for GLog)
 find_package(GFlags REQUIRED)
 include_directories(${GFLAGS_INCLUDE_DIR})

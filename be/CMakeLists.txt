@@ -162,6 +162,7 @@ set (IMPALA_LINK_LIBS
   Opcode
   Exprs
   Util
+  Webserver
   ${SNAPPY_STATIC_LIB}
   ${Boost_LIBRARIES}
   ${LLVM_MODULE_LIBS}
@@ -193,6 +194,7 @@ add_subdirectory(src/sparrow)
 add_subdirectory(src/service)
 add_subdirectory(src/testutil)
 add_subdirectory(src/util)
+add_subdirectory(src/webserver)
 
 add_subdirectory(src/benchmarks)
 add_subdirectory(src/experiments)
