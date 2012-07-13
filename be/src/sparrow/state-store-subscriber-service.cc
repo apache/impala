@@ -48,10 +48,7 @@ StateStoreSubscriber::StateStoreSubscriber(const string& host, int port,
 }
 
 StateStoreSubscriber::~StateStoreSubscriber() {
-  if (!IsRunning()) {
-    LOG(ERROR) << "StateStoreSubscriber destructed before being properly shut "
-               << "down (using Stop())";
-    // This assumes that Stop() cannot be called in a different thread.
+  if (IsRunning()) {
     Stop();
   }
 }
