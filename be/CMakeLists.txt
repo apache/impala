@@ -194,7 +194,6 @@ add_subdirectory(src/sparrow)
 add_subdirectory(src/service)
 add_subdirectory(src/testutil)
 add_subdirectory(src/util)
-add_subdirectory(src/webserver)
 
 add_subdirectory(src/benchmarks)
 add_subdirectory(src/experiments)
