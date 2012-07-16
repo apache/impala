@@ -45,7 +45,6 @@ MemPool::MemPool(const vector<string>& chunks)
     chunk.data = new uint8_t[chunks[i].size()];
     memcpy(chunk.data, chunks[i].data(), chunks[i].size());
     chunk.size = chunks[i].size();
-    VLOG(1) << "chunk: data=" << (void*)chunk.data << " size=" << chunk.size;
     chunk.allocated_bytes = chunk.size;
     chunk.cumulative_allocated_bytes = total_allocated_bytes_;
     total_allocated_bytes_ += chunk.size;
@@ -54,10 +53,10 @@ MemPool::MemPool(const vector<string>& chunks)
 }
 
 MemPool::~MemPool() {
-  VLOG(1) << this << " ~mempool: deleting " << chunks_.size() << " chunks";
+  VLOG_FILE << this << " ~mempool: deleting " << chunks_.size() << " chunks";
   for (size_t i = 0; i < chunks_.size(); ++i) {
     if (!chunks_[i].owns_data) continue;
-    VLOG(1) << "deleting " << (void*)chunks_[i].data;
+    VLOG_FILE << "deleting " << (void*)chunks_[i].data;
     delete [] chunks_[i].data;
   }
 }

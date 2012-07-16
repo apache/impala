@@ -56,7 +56,7 @@ DECLARE_bool(use_statestore);
 namespace impala {
 
 static void RunServer(TServer* server) {
-  VLOG(1) << "started backend server thread";
+  VLOG_CONNECTION << "started backend server thread";
   server->serve();
 }
 

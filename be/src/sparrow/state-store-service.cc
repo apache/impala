@@ -9,6 +9,7 @@
 #include <boost/format.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/thread_time.hpp>
+#include <boost/algorithm/string/join.hpp>
 #include <concurrency/PosixThreadFactory.h>
 #include <concurrency/Thread.h>
 #include <concurrency/ThreadManager.h>
@@ -69,8 +70,9 @@ void StateStore::RegisterService(TRegisterServiceResponse& response,
   if (membership.find(subscriber.id()) == membership.end()) {
     membership.insert(make_pair(subscriber.id(), request.service_address));
     subscriber.AddService(request.service_id);
-    VLOG(1) << "Added service instance " << request.service_id << " at "
-            << request.service_address.host << ":" << request.service_address.port;
+    LOG(INFO) << "Added service instance " << request.service_id << " at "
+              << request.service_address.host << ":"
+              << request.service_address.port;
   }
   RETURN_AND_SET_STATUS_OK(response);
 }
@@ -134,9 +136,10 @@ void StateStore::RegisterSubscription(TRegisterSubscriptionResponse& response,
 
   SubscriptionId subscription_id = subscriber.AddSubscription(request.services);
   response.__set_subscription_id(subscription_id);
-  VLOG(1) << "Registered " << request.services.size() << " services for subscription "
-          << subscription_id << " at "
-          << request.subscriber_address.host << ":" << request.subscriber_address.port;
+  LOG(INFO) << "Registered " << request.services.size()
+            << " services for subscription " << subscription_id << " at "
+            << request.subscriber_address.host << ":"
+            << request.subscriber_address.port;
   
   RETURN_AND_SET_STATUS_OK(response);
 }
@@ -227,6 +230,8 @@ void StateStore::Subscriber::RemoveService(const string& service_id) {
 
 SubscriptionId StateStore::Subscriber::AddSubscription(const set<string>& services) {
   SubscriptionId subscription_id = next_subscription_id_++;
+  LOG(INFO) << "Added subscription " << subscription_id << " for " << id_ << " on "
+            << join(services, ", ") << ".";
   // Insert the new subscription with an empty set of services (to avoid copying the
   // subscribed services unnecessarily), and then add the given services.
   Subscriptions::value_type new_subscription =
@@ -250,6 +255,8 @@ SubscriptionId StateStore::Subscriber::AddSubscription(const set<string>& servic
 
 bool StateStore::Subscriber::RemoveSubscription(SubscriptionId id) {
   Subscriptions::iterator subscription = subscriptions_.find(id);
+  LOG(INFO) << "Remove subscription " << id << " for " << id_ << " on " 
+            << join(subscription->second, ", ") << ".";
   if (subscription != subscriptions_.end()) {
     // For each subscribed service, decrease the associated count, and remove the
     // service from the list of services that should be updated at this subscriber if

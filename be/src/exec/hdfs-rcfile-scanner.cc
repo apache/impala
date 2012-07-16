@@ -199,9 +199,9 @@ Status HdfsRCFileScanner::ReadFileHeader() {
         column_buffer_pool_.get(), !has_noncompact_strings_, codec, &decompressor_));
   }
 
-  VLOG(1) << current_byte_stream_->GetLocation() << ": "
-      << (is_compressed_ ?  "block compressed" : "not compressed");
-  if (is_compressed_) VLOG(1) << string(&codec[0], codec.size());
+  VLOG_FILE << current_byte_stream_->GetLocation() << ": "
+            << (is_compressed_ ?  "block compressed" : "not compressed");
+  if (is_compressed_) VLOG_FILE << string(&codec[0], codec.size());
 
   RETURN_IF_ERROR(ReadFileHeaderMetadata());
 

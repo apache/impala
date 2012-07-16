@@ -392,10 +392,10 @@ Status HdfsSequenceScanner::ReadFileHeader() {
         unparsed_data_buffer_pool_.get(),
         !has_noncompact_strings_, codec, &decompressor_));
   }
-  VLOG(1) << unbuffered_byte_stream_->GetLocation() << ": "
+  VLOG_FILE << unbuffered_byte_stream_->GetLocation() << ": "
       << (is_compressed_ ?
       (is_blk_compressed_ ?  "block compressed" : "record compresed") : "not compressed");
-  if (is_compressed_) VLOG(1) << string(&codec[0], codec.size());
+  if (is_compressed_) VLOG_FILE << string(&codec[0], codec.size());
 
   RETURN_IF_ERROR(ReadFileHeaderMetadata());
   RETURN_IF_ERROR(ReadSync());

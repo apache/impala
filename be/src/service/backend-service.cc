@@ -79,7 +79,7 @@ void ImpalaBackend::ExecPlanFragment(
 Status ImpalaBackend::ExecPlanFragment(
     const TPlanExecRequest& request, const TPlanExecParams& params,
     vector<TRuntimeProfileNode>* profiles) {
-  VLOG(1) << "starting ExecPlanFragment";
+  VLOG_QUERY << "starting ExecPlanFragment";
   if (!request.dataSink.__isset.dataStreamSink) {
     Status status("missing data stream sink");
     return status;
@@ -100,11 +100,11 @@ Status ImpalaBackend::ExecPlanFragment(
   while (true) {
     RETURN_IF_ERROR(executor.GetNext(&batch));
     if (batch == NULL) break;
-    VLOG(1) << "ExecPlanFragment: #rows=" << batch->num_rows();
-    if (VLOG_IS_ON(2)) {
+    VLOG_QUERY << "ExecPlanFragment: #rows=" << batch->num_rows();
+    if (VLOG_ROW_IS_ON) {
       for (int i = 0; i < batch->num_rows(); ++i) {
         TupleRow* row = batch->GetRow(i);
-        VLOG(2) << PrintRow(row, executor.row_desc());
+        VLOG_ROW << PrintRow(row, executor.row_desc());
       }
     }
     RETURN_IF_ERROR(sink->Send(executor.runtime_state(), batch));
@@ -114,7 +114,7 @@ Status ImpalaBackend::ExecPlanFragment(
 
   executor.query_profile()->ToThrift(profiles);
 
-  VLOG(1) << "finished ExecPlanFragment";
+  VLOG_QUERY << "finished ExecPlanFragment";
   return Status::OK;
 }
 

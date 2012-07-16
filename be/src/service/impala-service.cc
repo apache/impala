@@ -259,7 +259,7 @@ Status ImpalaService::ExecState::ConvertSingleRowToAscii(TupleRow* row,
     out_stream << (i > 0 ? "\t" : "");
     output_exprs_[i]->PrintValue(row, &out_stream);
   }
-  VLOG(2) << "query_id(" << PrintId(query_id()) << "): "
+  VLOG_ROW << "query_id(" << PrintId(query_id()) << "): "
       << "returned row as Ascii: " << out_stream.str();
   converted_rows->push_back(out_stream.str());
   return Status::OK;
@@ -352,7 +352,7 @@ void ImpalaService::executeAndWait(QueryHandle& query_handle, const Query& query
   // Translate Beeswax Query to Impala's QueryRequest and then call executeAndWaitInternal
   TQueryRequest queryRequest;
   QueryToTQueryRequest(query, &queryRequest);
-  VLOG(2) << "ImpalaService::executeAndWait: " << queryRequest.stmt;
+  VLOG_QUERY << "ImpalaService::executeAndWait: " << queryRequest.stmt;
 
   TUniqueId query_id;
   Status status = executeAndWaitInternal(queryRequest, &query_id);
@@ -366,7 +366,7 @@ void ImpalaService::executeAndWait(QueryHandle& query_handle, const Query& query
     exc.__isset.SQLState = true;
     throw exc;
   }
-  VLOG(2) << "ImpalaService::executeAndWait: query_id:" << PrintId(query_id);
+  VLOG_QUERY << "ImpalaService::executeAndWait: query_id:" << PrintId(query_id);
 
   // Convert TUnique back to QueryHandle
   TUniqueIdToQueryHandle(query_id, &query_handle);
@@ -381,7 +381,7 @@ void ImpalaService::explain(QueryExplanation& query_explanation, const Query& qu
   // before shipping to FE
   TQueryRequest queryRequest;
   QueryToTQueryRequest(query, &queryRequest);
-  VLOG(2) << "ImpalaService::explain: " << queryRequest.stmt;
+  VLOG_QUERY << "ImpalaService::explain: " << queryRequest.stmt;
 
   Status status = GetExplainPlan(queryRequest, &query_explanation.textual);
   if (!status.ok()) {
@@ -394,7 +394,7 @@ void ImpalaService::explain(QueryExplanation& query_explanation, const Query& qu
     throw exc;
   }
   query_explanation.__isset.textual = true;
-  VLOG(2) << "ImpalaService::explain plan: " << query_explanation.textual;
+  VLOG_QUERY << "ImpalaService::explain plan: " << query_explanation.textual;
 }
 
 ImpalaService::ExecState* ImpalaService::GetExecState(const TUniqueId& unique_id) {
@@ -421,7 +421,7 @@ void ImpalaService::fetch(Results& query_results, const QueryHandle& query_handl
   // Convert QueryHandle to TUniqueId and get the query exec state.
   TUniqueId query_id;
   QueryHandleToTUniqueId(query_handle, &query_id);
-  VLOG(2) << "ImpalaService::fetch query_id:" << PrintId(query_id)
+  VLOG_ROW << "ImpalaService::fetch query_id:" << PrintId(query_id)
       << ", fetch_size:" << fetch_size;
   ExecState* exec_state = GetExecState(query_id);
   if (exec_state == NULL) RaiseBeeswaxHandleNotFoundException();
@@ -482,7 +482,7 @@ void ImpalaService::get_results_metadata(ResultsMetadata& results_metadata,
   // Convert QueryHandle to TUniqueId and get the query exec state.
   TUniqueId query_id;
   QueryHandleToTUniqueId(handle, &query_id);
-  VLOG(2) << "ImpalaService::get_results_metadata: query_id:" << PrintId(query_id);
+  VLOG_QUERY << "ImpalaService::get_results_metadata: query_id:" << PrintId(query_id);
   ExecState* exec_state = GetExecState(query_id);
   if (exec_state == NULL) RaiseBeeswaxHandleNotFoundException();
 
@@ -514,7 +514,7 @@ void ImpalaService::close(const QueryHandle& handle) {
   // Convert QueryHandle to TUniqueId and get the query exec state.
   TUniqueId query_id;
   QueryHandleToTUniqueId(handle, &query_id);
-  VLOG(2) << "ImpalaService::close: query_id:" << PrintId(query_id);
+  VLOG_QUERY << "ImpalaService::close: query_id:" << PrintId(query_id);
 
   // TODO: use timeout to get rid of unwanted exec_state.
   lock_guard<mutex> l(exec_state_map_lock_);
@@ -522,7 +522,7 @@ void ImpalaService::close(const QueryHandle& handle) {
   if (entry != exec_state_map_.end()) {
     exec_state_map_.erase(entry);
   } else {
-    VLOG(2) << "ImpalaService::close invalid handle";
+    VLOG_QUERY << "ImpalaService::close invalid handle";
     RaiseBeeswaxHandleNotFoundException();
   }
 }

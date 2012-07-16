@@ -134,12 +134,12 @@ class DataStreamTest : public testing::Test {
   // Deplete stream and print batches
   void ReadStream() {
     RowBatch* batch;
-    VLOG(1) <<  "start reading\n";
+    VLOG_QUERY <<  "start reading\n";
     while ((batch = stream_recvr_->GetBatch()) != NULL) {
-      VLOG(1) << "read batch #rows=" << batch->num_rows() << "\n";
+      VLOG_QUERY << "read batch #rows=" << batch->num_rows() << "\n";
       usleep(100000);  // slow down receiver to exercise buffering logic
     }
-    VLOG(1) << "done reading\n";
+    VLOG_QUERY << "done reading\n";
   }
 
 
@@ -177,11 +177,11 @@ class DataStreamTest : public testing::Test {
 
   void Sender(int sender_num) {
     InProcessQueryExecutor exec(&test_env_);
-    VLOG(1) << "exec setup";
+    VLOG_QUERY << "exec setup";
     EXPECT_TRUE(exec.Setup().ok());
-    VLOG(1) << "exec::exec";
+    VLOG_QUERY << "exec::exec";
     EXPECT_TRUE(exec.Exec(stmt_, NULL).ok());
-    VLOG(1) << "create sender";
+    VLOG_QUERY << "create sender";
     DataStreamSender sender(exec.row_desc(), query_id_, sink_, dest_, 1024);
     EXPECT_TRUE(sender.Init(exec.runtime_state()).ok());
     RowBatch* batch = NULL;
@@ -189,11 +189,11 @@ class DataStreamTest : public testing::Test {
     for (;;) {
       EXPECT_TRUE(exec.FetchResult(&batch).ok());
       if (batch == NULL) break;
-      VLOG(1) << "#rows=" << batch->num_rows();
+      VLOG_QUERY << "#rows=" << batch->num_rows();
       info.status = sender.Send(exec.runtime_state(), batch);
       if (!info.status.ok()) break;
     }
-    VLOG(1) << "closing sender\n";
+    VLOG_QUERY << "closing sender\n";
     info.status = sender.Close(exec.runtime_state());
     info.num_bytes_sent = sender.GetNumDataBytesSent();
   }
@@ -202,46 +202,46 @@ class DataStreamTest : public testing::Test {
 
 TEST_F(DataStreamTest, SingleSenderSmallBuffer) {
   PrepareQuery("select * from alltypesagg");
-  VLOG(1) << "start receiver\n";
+  VLOG_QUERY << "start receiver\n";
   StartReceiver(1, 1024);
-  VLOG(1) << "start sender\n";
+  VLOG_QUERY << "start sender\n";
   StartSender();
-  VLOG(1) << "join senders\n";
+  VLOG_QUERY << "join senders\n";
   JoinSenders();
   EXPECT_TRUE(sender_info_[0].status.ok());
   EXPECT_GT(sender_info_[0].num_bytes_sent, 0);
-  VLOG(1) << "join receiver\n";
+  VLOG_QUERY << "join receiver\n";
   JoinReceiver();
-  VLOG(1) << "stop backend\n";
+  VLOG_QUERY << "stop backend\n";
   StopBackend();
 }
 
 TEST_F(DataStreamTest, SingleSenderLargeBuffer) {
   PrepareQuery("select * from alltypesagg");
-  VLOG(1) << "start receiver\n";
+  VLOG_QUERY << "start receiver\n";
   StartReceiver(1, 1024 * 1024);
-  VLOG(1) << "start sender\n";
+  VLOG_QUERY << "start sender\n";
   StartSender();
-  VLOG(1) << "join senders\n";
+  VLOG_QUERY << "join senders\n";
   JoinSenders();
   EXPECT_TRUE(sender_info_[0].status.ok());
   EXPECT_GT(sender_info_[0].num_bytes_sent, 0);
-  VLOG(1) << "join receiver\n";
+  VLOG_QUERY << "join receiver\n";
   JoinReceiver();
-  VLOG(1) << "stop backend\n";
+  VLOG_QUERY << "stop backend\n";
   StopBackend();
 }
 
 TEST_F(DataStreamTest, MultipleSendersSmallBuffer) {
   PrepareQuery("select * from alltypessmall");
-  VLOG(1) << "start receiver\n";
+  VLOG_QUERY << "start receiver\n";
   StartReceiver(4, 4 * 1024);
-  VLOG(1) << "start senders\n";
+  VLOG_QUERY << "start senders\n";
   StartSender();
   StartSender();
   StartSender();
   StartSender();
-  VLOG(1) << "join senders\n";
+  VLOG_QUERY << "join senders\n";
   JoinSenders();
   EXPECT_TRUE(sender_info_[0].status.ok());
   EXPECT_GT(sender_info_[0].num_bytes_sent, 0);
@@ -251,22 +251,22 @@ TEST_F(DataStreamTest, MultipleSendersSmallBuffer) {
   EXPECT_GT(sender_info_[2].num_bytes_sent, 0);
   EXPECT_TRUE(sender_info_[3].status.ok());
   EXPECT_GT(sender_info_[3].num_bytes_sent, 0);
-  VLOG(1) << "join receiver\n";
+  VLOG_QUERY << "join receiver\n";
   JoinReceiver();
-  VLOG(1) << "stop backend\n";
+  VLOG_QUERY << "stop backend\n";
   StopBackend();
 }
 
 TEST_F(DataStreamTest, MultipleSendersLargeBuffer) {
   PrepareQuery("select * from alltypessmall");
-  VLOG(1) << "start receiver\n";
+  VLOG_QUERY << "start receiver\n";
   StartReceiver(4, 4 * 1024 * 1024);
-  VLOG(1) << "start senders\n";
+  VLOG_QUERY << "start senders\n";
   StartSender();
   StartSender();
   StartSender();
   StartSender();
-  VLOG(1) << "join senders\n";
+  VLOG_QUERY << "join senders\n";
   JoinSenders();
   EXPECT_TRUE(sender_info_[0].status.ok());
   EXPECT_GT(sender_info_[0].num_bytes_sent, 0);
@@ -276,9 +276,9 @@ TEST_F(DataStreamTest, MultipleSendersLargeBuffer) {
   EXPECT_GT(sender_info_[2].num_bytes_sent, 0);
   EXPECT_TRUE(sender_info_[3].status.ok());
   EXPECT_GT(sender_info_[3].num_bytes_sent, 0);
-  VLOG(1) << "join receiver\n";
+  VLOG_QUERY << "join receiver\n";
   JoinReceiver();
-  VLOG(1) << "stop backend\n";
+  VLOG_QUERY << "stop backend\n";
   StopBackend();
 }
 

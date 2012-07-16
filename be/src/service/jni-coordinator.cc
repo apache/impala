@@ -80,7 +80,7 @@ void JniCoordinator::Exec(jbyteArray thrift_query_exec_request) {
 
 Status JniCoordinator::GetNext(RowBatch** batch) {
   Status result = coord_->GetNext(batch, runtime_state());
-  VLOG(1) << "jnicoord.getnext";
+  VLOG_ROW << "jnicoord.getnext";
   return result;
 }
 

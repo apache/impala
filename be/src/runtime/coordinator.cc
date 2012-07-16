@@ -136,8 +136,9 @@ void Coordinator::PrintClientInfo(
   for (int i = 0; i < params.scanRanges[0].hdfsFileSplits.size(); ++i) {
     total += params.scanRanges[0].hdfsFileSplits[i].length;
   }
-  VLOG(1) << "data volume for host " << hostport.first << ":" << hostport.second
-          << ": " << PrettyPrinter::Print(total, TCounterType::BYTES);
+  VLOG_CONNECTION << "data volume for host " << hostport.first
+      << ":" << hostport.second
+      << ": " << PrettyPrinter::Print(total, TCounterType::BYTES);
 }
 
 void Coordinator::ExecRemoteFragment(
@@ -145,7 +146,7 @@ void Coordinator::ExecRemoteFragment(
     ImpalaBackendServiceClient* client,
     const TPlanExecRequest& request,
     const TPlanExecParams& params) {
-  VLOG(1) << "making rpc: ExecPlanFragment";
+  VLOG_QUERY << "making rpc: ExecPlanFragment";
   TExecPlanFragmentResult thrift_result;
   try {
     client->ExecPlanFragment(thrift_result, request, params);
@@ -171,7 +172,7 @@ void Coordinator::ExecRemoteFragment(
 Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
   COUNTER_SCOPED_TIMER(query_profile_->total_time_counter());
   Status result = executor_->GetNext(batch);
-  VLOG(1) << "coord.getnext";
+  VLOG_ROW << "coord.getnext";
   if (*batch == NULL) {
     execution_completed_ = true;
     // Join the threads to collect all the perf counters

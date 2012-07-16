@@ -210,8 +210,8 @@ Function* ExecNode::CodegenEvalConjuncts(LlvmCodeGen* codegen,
     const vector<Expr*>& conjuncts) {
   for (int i = 0; i < conjuncts.size(); ++i) {
     if (conjuncts[i]->codegen_fn() == NULL) {
-      VLOG(1) << "Could not codegen EvalConjuncts because one of the conjuncts "
-              << "could not be codegen'd.";
+      VLOG_QUERY << "Could not codegen EvalConjuncts because one of the conjuncts "
+                 << "could not be codegen'd.";
       return NULL;
     }
   }

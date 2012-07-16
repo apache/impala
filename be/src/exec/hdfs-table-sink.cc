@@ -61,7 +61,7 @@ Status HdfsTableSink::Init(RuntimeState* state) {
   ptime now = microsec_clock::local_time();
   long seed = (now.time_of_day().seconds() * 1000)
     + (now.time_of_day().total_microseconds() / 1000);
-  VLOG(1) << "Random seed: " << seed;
+  VLOG_QUERY << "Random seed: " << seed;
   srand(seed);
 
   RETURN_IF_ERROR(Expr::CreateExprTrees(state->obj_pool(),
@@ -402,7 +402,7 @@ Status HdfsTableSink::DeleteOriginalFiles(OutputPartition* output_partition) {
     if (strncmp(orig_files[i].mName, dest, strlen(dest)) == 0) {
       continue;
     }
-    VLOG(1) << "Overwrite INSERT - deleting: " <<  orig_files[i].mName << endl;
+    VLOG_FILE << "Overwrite INSERT - deleting: " <<  orig_files[i].mName << endl;
     if (hdfsDelete(hdfs_connection_, orig_files[i].mName, -1)) {
       status =  Status(AppendHdfsErrorMessage("Failed to delete existing Hdfs file"
           " as part of overwriting:" + string(orig_files[i].mName)));

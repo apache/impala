@@ -151,10 +151,10 @@ Status AggregationNode::Open(RuntimeState* state) {
     RETURN_IF_ERROR(children_[0]->GetNext(state, &batch, &eos));
     COUNTER_SCOPED_TIMER(build_timer_);
 
-    if (VLOG_IS_ON(2)) {
+    if (VLOG_ROW_IS_ON) {
       for (int i = 0; i < batch.num_rows(); ++i) {
         TupleRow* row = batch.GetRow(i);
-        VLOG(2) << "input row: " << PrintRow(row, children_[0]->row_desc());
+        VLOG_ROW << "input row: " << PrintRow(row, children_[0]->row_desc());
       }
     }
     int64_t agg_rows_before = hash_tbl_->size();
@@ -176,8 +176,8 @@ Status AggregationNode::Open(RuntimeState* state) {
     hash_tbl_->Insert(reinterpret_cast<TupleRow*>(&singleton_output_tuple_));
     ++num_agg_rows;
   }
-  VLOG(1) << "aggregated " << num_input_rows << " input rows into "
-          << num_agg_rows << " output rows";
+  VLOG_QUERY << "aggregated " << num_input_rows << " input rows into "
+                   << num_agg_rows << " output rows";
   output_iterator_ = hash_tbl_->Begin();
   return Status::OK;
 }
@@ -198,7 +198,7 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
     TupleRow* row = row_batch->GetRow(row_idx);
     row->SetTuple(0, output_iterator_.GetRow()->GetTuple(0));
     if (ExecNode::EvalConjuncts(conjuncts, num_conjuncts, row)) {
-      VLOG(1) << "output row: " << PrintRow(row, row_desc());
+      VLOG_ROW << "output row: " << PrintRow(row, row_desc());
       row_batch->CommitLastRow();
       ++num_rows_returned_;
       if (ReachedLimit()) {
@@ -658,8 +658,8 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
     SlotDescriptor* slot_desc = agg_tuple_desc_->slots()[i];
     if (slot_desc->type() == TYPE_STRING || slot_desc->type() == TYPE_TIMESTAMP) {
       // TODO:
-      VLOG(1) << "Could not codegen UpdateAggTuple because "
-              << "string and timestamp slots are not yet supported.";
+      VLOG_QUERY << "Could not codegen UpdateAggTuple because "
+                 << "string and timestamp slots are not yet supported.";
       return NULL;
     }
   } 
@@ -667,15 +667,15 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
     AggregateExpr* agg_expr = static_cast<AggregateExpr*>(aggregate_exprs_[i]);
     // If the agg_expr can't be generated, bail generating this function
     if (!agg_expr->is_star() && agg_expr->codegen_fn() == NULL) {
-      VLOG(1) << "Could not codegen UpdateAggTuple because the "
-              << "underlying exprs cannot be codegened.";
+      VLOG_QUERY << "Could not codegen UpdateAggTuple because the "
+                 << "underlying exprs cannot be codegened.";
       return NULL;
     }
   }
   
   if (agg_tuple_desc_->GenerateLlvmStruct(codegen) == NULL) {
-    VLOG(1) << "Could not codegen UpdateAggTuple because we could not generate a "
-            << "matching llvm struct for the result agg tuple.";
+    VLOG_QUERY << "Could not codegen UpdateAggTuple because we could"
+               << "not generate a  matching llvm struct for the result agg tuple.";
     return NULL;
   }
 

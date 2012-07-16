@@ -52,7 +52,8 @@ class StateStoreTest : public testing::Test {
         return;
       }
 
-      VLOG(1) << "satisfied with size " << update_condition->expected_state.size();
+      VLOG_CONNECTION << "satisfied with size "
+                            << update_condition->expected_state.size();
       update_condition->correctly_called = true;
       update_condition->time_last_called = get_system_time();
     }
@@ -461,12 +462,12 @@ TEST_F(StateStoreTest, UnregisterOneOfMultipleSubscriptions) {
     unique_lock<mutex> lock_B(register_condition_B.mut);
     register_condition_B.expected_state.erase(service_id_1);
     register_condition_B.correctly_called = false;
-    VLOG(1) << register_condition_B.expected_state.size();
+    VLOG_CONNECTION << register_condition_B.expected_state.size();
     system_time timeout = get_system_time() + posix_time::seconds(10);
     while (!register_condition_B.correctly_called) {
       ASSERT_TRUE(register_condition_B.condition.timed_wait(lock_B, timeout));
     }
-    VLOG(1) << "correctly called";
+    VLOG_CONNECTION << "correctly called";
   }
 
   system_time timeout = get_system_time() + posix_time::seconds(10);

@@ -70,9 +70,9 @@ Status TestExecEnv::StartBackends() {
 }
 
 void TestExecEnv::RunBackendServer(TServer* server) {
-  VLOG(1) << "serve()";
+  VLOG_QUERY << "serve()";
   server->serve();
-  VLOG(1) << "exiting service loop";
+  VLOG_QUERY << "exiting service loop";
 }
 
 string TestExecEnv::DebugString() {

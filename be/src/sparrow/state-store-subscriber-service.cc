@@ -63,10 +63,10 @@ Status StateStoreSubscriber::RegisterService(const string& service_id,
   request.__set_service_id(service_id);
   request.__set_service_address(address);
   TRegisterServiceResponse response;
-  VLOG(1) << "Attempting to register service " << request.service_id
-          << " on address " << address.host << ":" << address.port
-          << ", to subscriber at " << request.subscriber_address.host << ":"
-          << request.subscriber_address.port;
+  VLOG_CONNECTION << "Attempting to register service " << request.service_id
+                        << " on address " << address.host << ":" << address.port
+                        << ", to subscriber at " << request.subscriber_address.host << ":"
+                        << request.subscriber_address.port;
 
   try {
     client_->RegisterService(response, request);
@@ -122,9 +122,10 @@ Status StateStoreSubscriber::RegisterSubscription(
   request.services.insert(update_services.begin(), update_services.end());
   request.__isset.services = true;
   TRegisterSubscriptionResponse response;
-  VLOG(1) << "Attempting to register subscriber for services "
-          << algorithm::join(update_services, ", ") << " at "
-          << request.subscriber_address.host << ":" << request.subscriber_address.port;
+  VLOG_CONNECTION << "Attempting to register subscriber for services "
+                        << algorithm::join(update_services, ", ") << " at "
+                        << request.subscriber_address.host << ":"
+                        << request.subscriber_address.port;
 
   try {
     client_->RegisterSubscription(response, request);
@@ -203,7 +204,7 @@ void StateStoreSubscriber::UpdateState(TUpdateStateResponse& response,
     new_state << "\n";
     // TODO: Log object updates here too, once we include them.
   }
-  VLOG(1) << "Received new state:\n" << new_state.str();
+  VLOG_CONNECTION << "Received new state:\n" << new_state.str();
 
   // Make a copy of update_callbacks_, to avoid problems if one of the callbacks
   // calls back into this StateStoreSubscriber, which may deadlock if we are holding
@@ -278,8 +279,8 @@ void StateStoreSubscriber::Stop() {
         if (!unregister_status.ok()) {
           string error_msg;
           unregister_status.GetErrorMsg(&error_msg);
-          VLOG(1) << "Error when unregistering subscription " << id << ":"
-                  << error_msg;
+          VLOG_CONNECTION << "Error when unregistering subscription "
+                          << id << ":" << error_msg;
         }
       }
     } catch (TTransportException& e) {

@@ -52,12 +52,12 @@ void Webserver::RootHandler(stringstream* output) {
 
 Status Webserver::Start() {
   if (FLAGS_no_webserver) {
-    VLOG(1) << "Not starting webserver";
+    LOG(INFO) << "Not starting webserver";
     return Status::OK;
   }
 
-  VLOG(1) << "Starting webserver on " << interface_
-          << (interface_.empty() ? "all interfaces, port " : ":") << port_;
+  LOG(INFO) << "Starting webserver on " << interface_
+              << (interface_.empty() ? "all interfaces, port " : ":") << port_;
 
   string port_as_string = boost::lexical_cast<string>(port_);
   stringstream listening_spec;
@@ -87,7 +87,7 @@ Status Webserver::Start() {
 
   RegisterPathHandler("/flags", flags_callback);
 
-  VLOG(1) << "Webserver started";
+  LOG(INFO) << "Webserver started";
   return Status::OK;
 }
 

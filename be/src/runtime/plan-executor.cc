@@ -43,8 +43,8 @@ PlanExecutor::~PlanExecutor() {
 Status PlanExecutor::Prepare(
     const TPlanExecRequest& request, const TPlanExecParams& params) {
 
-  //VLOG(1) << "plan exec request:\n" << ThriftDebugString(request);
-  VLOG(1) << "params:\n" << ThriftDebugString(params);
+  //1 << "plan exec request:\n" << ThriftDebugString(request);
+  VLOG_QUERY << "params:\n" << ThriftDebugString(params);
 
   // If FE disables it, turn it off, otherwise, use the BE setting
   bool enable_llvm;
@@ -66,7 +66,7 @@ Status PlanExecutor::Prepare(
   DCHECK(request.__isset.descTbl);
   RETURN_IF_ERROR(DescriptorTbl::Create(obj_pool(), request.descTbl, &desc_tbl));
   runtime_state_->set_desc_tbl(desc_tbl);
-  VLOG(1) << desc_tbl->DebugString();
+  VLOG_QUERY << desc_tbl->DebugString();
 
   // set up plan
   DCHECK(request.__isset.planFragment);
@@ -88,7 +88,7 @@ Status PlanExecutor::Prepare(
 
   row_batch_.reset(new RowBatch(plan_->row_desc(), runtime_state_->batch_size()));
   RETURN_IF_ERROR(plan_->Prepare(runtime_state_.get()));
-  VLOG(1) << "plan_root=\n" << plan_->DebugString();
+  VLOG_QUERY << "plan_root=\n" << plan_->DebugString();
   return Status::OK;
 }
 

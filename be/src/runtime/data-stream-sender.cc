@@ -137,7 +137,7 @@ Status DataStreamSender::Channel::Init() {
 }
 
 Status DataStreamSender::Channel::SendBatch(TRowBatch* batch) {
-  VLOG(1) << "Channel::SendBatch(" << batch << ")\n";
+  VLOG_ROW << "Channel::SendBatch(" << batch << ")\n";
   // return if the previous batch saw an error
   RETURN_IF_ERROR(GetSendStatus());
   DCHECK(in_flight_batch_ == NULL);
@@ -149,14 +149,14 @@ Status DataStreamSender::Channel::SendBatch(TRowBatch* batch) {
 void DataStreamSender::Channel::TransmitData() {
   DCHECK(in_flight_batch_ != NULL);
   try {
-    VLOG(1) << "calling transmitdata(" << in_flight_batch_ << ")\n";
+    VLOG_ROW << "calling transmitdata(" << in_flight_batch_ << ")\n";
     TStatus rpc_status;
     client_->TransmitData(rpc_status, query_id_, dest_node_id_, *in_flight_batch_);
     if (rpc_status.status_code != 0) {
       rpc_status_ = rpc_status;
     } else {
       num_data_bytes_sent_ += RowBatch::GetBatchSize(*in_flight_batch_);
-      VLOG(1) << "incremented #data_bytes_sent=" << num_data_bytes_sent_;
+      VLOG_ROW << "incremented #data_bytes_sent=" << num_data_bytes_sent_;
     }
   } catch (TException& e) {
     stringstream msg;
@@ -202,7 +202,7 @@ Status DataStreamSender::Channel::GetSendStatus() {
 }
 
 Status DataStreamSender::Channel::Close() {
-  VLOG(1) << "Channel::Close()\n";
+  VLOG_QUERY << "Channel::Close()\n";
   if (batch_->num_rows() > 0) {
     // flush
     RETURN_IF_ERROR(SendCurrentBatch());
@@ -211,7 +211,7 @@ Status DataStreamSender::Channel::Close() {
   RETURN_IF_ERROR(GetSendStatus());
   try {
     TStatus rpc_status;
-    VLOG(1) << "calling closechannel()\n";
+    VLOG_QUERY << "calling closechannel()\n";
     client_->CloseChannel(rpc_status, query_id_, dest_node_id_);
     return Status(rpc_status);
   } catch (TException& e) {
@@ -273,7 +273,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
   if (broadcast_ || channels_.size() == 1) {
     // current_thrift_batch_ is *not* the one that was written by the last call
     // to Serialize()
-    VLOG(1) << "serializing into " << current_thrift_batch_ << "\n";
+    VLOG_ROW << "serializing into " << current_thrift_batch_ << "\n";
     batch->Serialize(current_thrift_batch_);
     // SendBatch() will block if there are still in-flight rpcs (and those will
     // reference the previously written thrift batch)

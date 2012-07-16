@@ -31,7 +31,7 @@ Status HdfsByteStream::Open(const string& location) {
   if (hdfs_file_ == NULL) {
     return Status(AppendHdfsErrorMessage("Failed to open HDFS file ", location_));
   }
-  VLOG(1) << "HdfsByteStream: opened file " << location_;
+  VLOG_FILE << "HdfsByteStream: opened file " << location_;
   return Status::OK;
 }
 

@@ -103,7 +103,7 @@ Status InProcessQueryExecutor::Exec(const string& query, vector<PrimitiveType>* 
       ADD_COUNTER(query_profile_, "PlanGeneration", TCounterType::CPU_TICKS);
 
   COUNTER_SCOPED_TIMER(query_profile_->total_time_counter());
-  VLOG(1) << "query: " << query;
+  VLOG_QUERY << "query: " << query;
   eos_ = false;
   try {
     COUNTER_SCOPED_TIMER(plan_gen_counter);
@@ -114,7 +114,7 @@ Status InProcessQueryExecutor::Exec(const string& query, vector<PrimitiveType>* 
   } catch (TImpalaPlanServiceException& e) {
     return Status(e.what());
   }
-  VLOG(1) << "query request:\n" << ThriftDebugString(query_request_);
+  VLOG_QUERY << "query request:\n" << ThriftDebugString(query_request_);
 
   // we always need at least one plan fragment
   DCHECK_GT(query_request_.fragmentRequests.size(), 0);

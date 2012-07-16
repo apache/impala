@@ -46,7 +46,7 @@ static scoped_ptr<ExecStats> exec_stats;
 //static scoped_ptr<TestExecEnv> test_env;
 
 static void RunServer(TServer* server) {
-  VLOG(1) << "started backend server thread";
+  VLOG_CONNECTION << "started backend server thread";
   server->serve();
 }
 
@@ -74,10 +74,10 @@ jint JNI_OnLoadImpl(JavaVM* vm, void* pvt) {
   THROW_IF_ERROR_RET(JniCoordinator::Init(), env, impala_exc_cl, -1);
 
   // start backends in process, listening on ports > be_port
-  VLOG(1) << "creating test env";
+  VLOG_CONNECTION << "creating test env";
   test_env = new TestExecEnv(2, FLAGS_be_port + 1);
   exec_stats.reset(new ExecStats());
-  VLOG(1) << "starting backends";
+  VLOG_CONNECTION << "starting backends";
   test_env->StartBackends();
 
   // start one backend service for the coordinator on be_port
