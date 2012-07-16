@@ -2,8 +2,6 @@
 
 #include "util/thrift-util.h"
 
-// TODO: remove this!
-#include <glog/logging.h>
 #include <Thrift.h>
 #include <transport/TSocket.h>
 

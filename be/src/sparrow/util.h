@@ -3,10 +3,10 @@
 #ifndef SPARROW_UTIL_H
 #define SPARROW_UTIL_H
 
+#include <sstream>
 #include <string>
 #include <vector>
 
-#include <boost/format.hpp>
 #include <boost/unordered_map.hpp>
 
 #include "common/compiler-util.h"
@@ -63,9 +63,9 @@ void MembershipToThrift(const Membership& from_membership,
 template<typename T>
 void SetInvalidRequest(T* response, const std::string& missing_field_name) {
   response->status.status_code = impala::TStatusCode::INTERNAL_ERROR;
-  boost::format error_format =
-      boost::format("Invalid Thrift request: %1% not set") % missing_field_name;
-  response->status.error_msgs.push_back(error_format.str());
+  std::stringstream error_message;
+  error_message << "Invalid Thrift request: " << missing_field_name << " not set";
+  response->status.error_msgs.push_back(error_message.str());
   response->__isset.status = true;
 };
 

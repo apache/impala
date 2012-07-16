@@ -3,10 +3,10 @@
 #include "sparrow/state-store-service.h"
 
 #include <utility>
+#include <sstream>
 #include <vector>
 
 #include <boost/foreach.hpp>
-#include <boost/format.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/thread_time.hpp>
 #include <boost/algorithm/string/join.hpp>
@@ -89,9 +89,11 @@ void StateStore::UnregisterService(TUnregisterServiceResponse& response,
   Subscribers::iterator subscriber_iterator =
       subscribers_.find(request.subscriber_address);
   if (subscriber_iterator == subscribers_.end()) {
-    format error_format("No registered instances at subscriber %1%:%2%");
-    error_format % request.subscriber_address.host % request.subscriber_address.port;
-    RETURN_AND_SET_ERROR(error_format.str(), response);
+    stringstream error_message;
+    error_message << "No registered instances at subscriber "
+                  << request.subscriber_address.host << ":"
+                  << request.subscriber_address.port;
+    RETURN_AND_SET_ERROR(error_message.str(), response);
   }
   Subscriber& subscriber = subscriber_iterator->second;
 
@@ -117,10 +119,11 @@ void StateStore::UnregisterService(TUnregisterServiceResponse& response,
     }
   }
   if (!instance_unregistered) {
-    format error_format("No instance for service %1% at subscriber %2%:%3%");
-    error_format % request.service_id % request.subscriber_address.host
-                 % request.subscriber_address.port;
-    RETURN_AND_SET_ERROR(error_format.str(), response);
+    stringstream error_message;
+    error_message << "No instance for service " << request.service_id
+                  << " at subscriber " << request.subscriber_address.host << ":"
+                  << request.subscriber_address.port;
+    RETURN_AND_SET_ERROR(error_message.str(), response);
   }
 
   RETURN_AND_SET_STATUS_OK(response);
@@ -153,18 +156,21 @@ void StateStore::UnregisterSubscription(TUnregisterSubscriptionResponse& respons
   Subscribers::iterator subscriber_iterator =
       subscribers_.find(request.subscriber_address);
   if (subscriber_iterator == subscribers_.end()) {
-    format error_format("No registered subscriptions at subscriber %1%:%2%");
-    error_format % request.subscriber_address.host % request.subscriber_address.port;
-    RETURN_AND_SET_ERROR(error_format.str(), response);
+    stringstream error_message;
+    error_message << "No registered subscriptions at subscriber "
+                  << request.subscriber_address.host << ":"
+                  << request.subscriber_address.port;
+    RETURN_AND_SET_ERROR(error_message.str(), response);
   }
 
   Subscriber& subscriber = subscriber_iterator->second;
   bool subscription_existed = subscriber.RemoveSubscription(request.subscription_id);
   if (!subscription_existed) {
-    format error_format("No subscription with ID %1% at subscriber %2%:%3%");
-    error_format % request.subscription_id % request.subscriber_address.host
-                 % request.subscriber_address.port;
-    RETURN_AND_SET_ERROR(error_format.str(), response);
+    stringstream error_message;
+    error_message << "No subscription with ID " << request.subscription_id
+                  << " at subscriber " << request.subscriber_address.host << ":"
+                  << request.subscriber_address.port;
+    RETURN_AND_SET_ERROR(error_message.str(), response);
   }
 
   if (subscriber.IsZombie()) {

@@ -2,12 +2,11 @@
 
 #include "sparrow/state-store-subscriber-service.h"
 
-#include <iostream>
+#include <sstream>
 #include <utility>
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/foreach.hpp>
-#include <boost/format.hpp>
 #include <concurrency/PosixThreadFactory.h>
 #include <concurrency/Thread.h>
 #include <concurrency/ThreadManager.h>
@@ -88,9 +87,10 @@ Status StateStoreSubscriber::UnregisterService(const string& service_id) {
 
   unordered_set<string>::iterator service = services_.find(service_id);
   if (service == services_.end()) {
-    format error_status("Service id %1% not registered with this subscriber");
-    error_status % service_id;
-    return Status(error_status.str());
+    stringstream error_message;
+    error_message << "Service id " << service_id
+                  << " not registered with this subscriber";
+    return Status(error_message.str());
   }
 
   TUnregisterServiceRequest request;
@@ -158,9 +158,10 @@ Status StateStoreSubscriber::UnregisterSubscription(SubscriptionId id) {
     lock_guard<mutex> lock(update_callbacks_lock_);
     UpdateCallbacks::iterator callback = update_callbacks_.find(id);
     if (callback == update_callbacks_.end()) {
-      format error_status("Subscription id %1% not registered with this subscriber");
-      error_status % id;
-      return Status(error_status.str());
+      stringstream error_message;
+      error_message << "Subscription id " << id
+                    << " not registered with this subscriber";
+      return Status(error_message.str());
     }
   }
 
