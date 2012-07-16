@@ -16,6 +16,7 @@
 #include "common/object-pool.h"
 #include "gen-cpp/PlanNodes_types.h"
 #include "exec/hdfs-rcfile-scanner.h"
+#include "exec/hdfs-sequence-scanner.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/serde-utils.h"
 #include "exec/text-converter.inline.h"
@@ -33,7 +34,7 @@ const char* const HdfsRCFileScanner::RCFILE_VALUE_CLASS_NAME =
 const char* const HdfsRCFileScanner::RCFILE_METADATA_KEY_NUM_COLS =
   "hive.io.rcfile.column.number";
 
-const uint8_t HdfsRCFileScanner::RCFILE_VERSION_HEADER[4] = {'S', 'E', 'Q', 6};
+const uint8_t HdfsRCFileScanner::RCFILE_VERSION_HEADER[4] = {'R', 'C', 'F', 1};
 
 static const uint8_t RC_FILE_RECORD_DELIMITER = 0xff;
 
@@ -146,7 +147,9 @@ Status HdfsRCFileScanner::ReadFileHeader() {
   vector<uint8_t> head;
   RETURN_IF_ERROR(SerDeUtils::ReadBytes(current_byte_stream_,
       sizeof(RCFILE_VERSION_HEADER), &head));
-  if (memcmp(&head[0], RCFILE_VERSION_HEADER, sizeof(RCFILE_VERSION_HEADER))) {
+  if (memcmp(&head[0], RCFILE_VERSION_HEADER, sizeof(RCFILE_VERSION_HEADER)) &&
+      memcmp(&head[0], HdfsSequenceScanner::SEQFILE_VERSION_HEADER,
+             sizeof(HdfsSequenceScanner::SEQFILE_VERSION_HEADER))) {
     stringstream ss;
     ss << "Invalid RCFILE_VERSION_HEADER: '"
        << SerDeUtils::HexDump(&head[0], sizeof(RCFILE_VERSION_HEADER)) << "'";

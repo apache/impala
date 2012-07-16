@@ -33,9 +33,11 @@
 // -- based on a modified version of Hadoop's SequenceFile code. Some
 // -- things which should have been modified were not, including the code
 // -- that writes out the file version header. Consequently, RCFile and
-// -- SequenceFile actually share the same version header.
+// -- SequenceFile originally shared the same version header.  A newer
+// -- release has created a unique version string.
 //
 // file-version-header ::= Byte[4] {'S', 'E', 'Q', 6}
+//                     |   Byte[4] {'R', 'C', 'F', 1}
 //
 // -- The name of the Java class responsible for reading the key buffer
 // -- component of the rowgroup.
@@ -245,10 +247,8 @@ class HdfsRCFileScanner : public HdfsScanner {
   // present in the RCFile: "hive.io.rcfile.column.number"
   static const char* const RCFILE_METADATA_KEY_NUM_COLS;
 
-  // The four byte RCFile version header present at the beginning of every
-  // RCFile file: {'S', 'E', 'Q', 6}
-  // NOTE: This is a defect in the original RCFile implementation since
-  // this is actually the same version header used by SequenceFile.
+  // The four byte RCFile unique version header present at the beginning
+  // of the file {'R', 'C', 'F' 1} 
   static const uint8_t RCFILE_VERSION_HEADER[4];
 
   // read the current RCFile header

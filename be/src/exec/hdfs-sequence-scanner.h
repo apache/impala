@@ -138,6 +138,10 @@ namespace impala {
 
 class HdfsSequenceScanner : public HdfsScanner {
  public:
+  // The four byte SeqFile version header present at the beginning of every
+  // SeqFile file: {'S', 'E', 'Q', 6}
+  static const uint8_t SEQFILE_VERSION_HEADER[4];
+
   HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state, 
       Tuple* template_tuple, MemPool* tuple_pool);
 
@@ -159,10 +163,6 @@ class HdfsSequenceScanner : public HdfsScanner {
   // The value class name located in the SeqFile Header.
   // This is always "org.apache.hadoop.io.Text"
   static const char* const SEQFILE_VALUE_CLASS_NAME;
-
-  // The four byte SeqFile version header present at the beginning of every
-  // SeqFile file: {'S', 'E', 'Q', 6}
-  static const uint8_t SEQFILE_VERSION_HEADER[4];
 
   // The key should always be 4 bytes.
   static const int SEQFILE_KEY_LENGTH;
