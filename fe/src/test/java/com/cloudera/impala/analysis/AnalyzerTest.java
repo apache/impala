@@ -772,6 +772,8 @@ public class AnalyzerTest {
     // ambiguous alias
     AnalysisError("select zip a, id a, count(*) from testtbl group by a",
         "Column a in group by clause is ambiguous");
+    AnalysisError("select zip id, id, count(*) from testtbl group by id",
+        "Column id in group by clause is ambiguous");
 
     // can't group by aggregate
     AnalysisError("select zip, count(*) from testtbl group by count(*)",
@@ -1310,6 +1312,9 @@ public class AnalyzerTest {
     AnalysisError("(select int_col a, string_col a from alltypes) " +
         "union (select int_col a, int_col a from alltypessmall) order by a",
         "Column a in order clause is ambiguous");
+    // Ambiguous alias in the second union operand should work.
+    AnalyzesOk("(select int_col a, string_col b from alltypes) " +
+        "union (select int_col a, int_col a from alltypessmall) order by a");
 
     // Column labels are inherited from first select block.
     // Order by references an invalid column

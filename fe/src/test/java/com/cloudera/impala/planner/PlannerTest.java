@@ -29,7 +29,7 @@ import com.google.common.collect.Lists;
 
 public class PlannerTest {
   private final static Logger LOG = LoggerFactory.getLogger(PlannerTest.class);
-  private final static boolean GENERATE_OUTPUT_FILE = false;
+  private final static boolean GENERATE_OUTPUT_FILE = true;
 
   private static Catalog catalog;
   private static AnalysisContext analysisCtxt;
