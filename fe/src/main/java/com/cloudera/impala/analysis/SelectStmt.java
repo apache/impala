@@ -268,6 +268,12 @@ public class SelectStmt extends QueryStmt {
       return;
     }
 
+    // If we're computing an aggregate, we must have a FROM clause.
+    if (tableRefs.size() == 0) {
+      throw new AnalysisException(
+          "aggregation without a FROM clause is not allowed");
+    }
+
     if ((groupingExprs != null || Expr.contains(resultExprs, AggregateExpr.class))
         && selectList.isDistinct()) {
       throw new AnalysisException(

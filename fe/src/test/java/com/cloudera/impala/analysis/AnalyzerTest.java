@@ -661,6 +661,10 @@ public class AnalyzerTest {
         "SUM requires a numeric parameter: SUM(string_col)");
     AnalysisError("select avg(string_col) from alltypes",
         "AVG requires a numeric or timestamp parameter: AVG(string_col)");
+
+    // aggregate requires table in the FROM clause
+    AnalysisError("select count(*)", "aggregation without a FROM clause is not allowed");
+    AnalysisError("select min(1)", "aggregation without a FROM clause is not allowed");
   }
 
   @Test
