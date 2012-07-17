@@ -55,9 +55,10 @@ class DataStreamSender::Channel {
       query_id_(query_id),
       dest_node_id_(dest_node_id),
       num_data_bytes_sent_(0),
-      batch_(new RowBatch(row_desc, max(1, buffer_size / row_desc.GetRowSize()))),
       in_flight_batch_(NULL) {
       // TODO: figure out how to size batch_
+    int capacity = max(1, buffer_size / max(row_desc.GetRowSize(), 1));
+    batch_.reset(new RowBatch(row_desc, capacity));
   }
 
   // Initialize channel.

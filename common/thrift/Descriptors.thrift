@@ -87,7 +87,7 @@ struct TTupleDescriptor {
 }
 
 struct TDescriptorTable {
-  1: required list<TSlotDescriptor> slotDescriptors;
+  1: optional list<TSlotDescriptor> slotDescriptors;
   2: required list<TTupleDescriptor> tupleDescriptors;
 
   // all table descriptors referenced by tupleDescriptors

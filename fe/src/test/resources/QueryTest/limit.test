@@ -155,3 +155,11 @@ bigint, string, int, int, bigint, string, int
 1004,'Name4',94611,5000,1004,'Name4',94612
 1005,'Name5',94611,5000,1005,'Name5',94613
 ====
+# Test that query without referencing any column should work
+select 1 from alltypessmall limit 2
+----
+tinyint
+----
+1
+1
+====
