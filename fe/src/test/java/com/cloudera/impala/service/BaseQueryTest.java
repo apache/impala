@@ -4,7 +4,7 @@ package com.cloudera.impala.service;
 
 import static org.junit.Assert.fail;
 
-import java.util.ArrayList;
+import java.io.IOException;
 import java.util.List;
 import java.util.Set;
 
@@ -20,10 +20,12 @@ import org.junit.BeforeClass;
 
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.testutil.ImpaladClientExecutor;
+import com.cloudera.impala.testutil.QueryExecTestResult;
 import com.cloudera.impala.testutil.TestExecContext;
 import com.cloudera.impala.testutil.TestFileParser;
 import com.cloudera.impala.testutil.TestFileParser.Section;
 import com.cloudera.impala.testutil.TestFileParser.TestCase;
+import com.cloudera.impala.testutil.TestFileUtils;
 import com.cloudera.impala.testutil.TestUtils;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
@@ -41,6 +43,11 @@ public abstract class BaseQueryTest {
   private static final Logger LOG = Logger.getLogger(BaseQueryTest.class);
   private static final String TEST_DIR = "QueryTest";
   private static final int DEFAULT_FE_PORT = 21000;
+
+  // If set to true, new test results will be generated and saved to the specified
+  // output directory.
+  private final static boolean GENERATE_NEW_TEST_RESULTS = false;
+  private final static String TEST_RESULT_OUTPUT_DIRECTORY = "/tmp/";
 
   // Commands recognized as part of the SETUP section
   private static final String RESET_CMD = "RESET";
@@ -410,7 +417,13 @@ public abstract class BaseQueryTest {
       TestExecContext context = new TestExecContext(
           config.getClusterSize(), config.getBatchSize(), config.getDisableLlvm(),
           abortOnError, maxErrors);
-      runOneQueryTest(queryFileParser,  context, new StringBuilder());
+      runOneQueryTest(queryFileParser, config, context, new StringBuilder());
+
+      // Don't need to (or want to) run multiple test configurations if we are generating
+      // new results.
+      if (GENERATE_NEW_TEST_RESULTS) {
+        break;
+      }
     }
   }
 
@@ -443,33 +456,47 @@ public abstract class BaseQueryTest {
   /**
    * Run a single query test file as specified in the queryFileParser.
    */
-  private void runOneQueryTest(TestFileParser queryFileParser, TestExecContext context,
-                               StringBuilder errorLog) {
+  private void runOneQueryTest(TestFileParser queryFileParser, TestConfiguration config,
+                               TestExecContext context, StringBuilder errorLog) {
+
+    List<QueryExecTestResult> results = Lists.newArrayList();
     for (TestCase testCase: queryFileParser.getTestCases()) {
-      List<String> setupSection = testCase.getSectionContents(Section.SETUP);
-      ArrayList<String> expectedTypes = testCase.getSectionContents(Section.TYPES);
-      ArrayList<String> expectedResults = testCase.getSectionContents(Section.RESULTS);
-      ArrayList<String> expectedPartitions =
-        testCase.getSectionContents(Section.PARTITIONS);
-      ArrayList<String> expectedNumAppendedRows =
-        testCase.getSectionContents(Section.NUMROWS);
+
+      QueryExecTestResult expectedResult = testCase.getQueryExecTestResult();
+
       // We have to run the setup section once per query, not once per test. Therefore
       // they can be very expensive.
-      if (setupSection != null) {
+      if (expectedResult.getSetup().size() > 0) {
         try {
-          runSetupSection(setupSection);
+          runSetupSection(expectedResult.getSetup());
         } catch (Exception e) {
           fail(e.getMessage());
         }
       }
 
-      TestUtils.runQueryUsingExecutor(getTargetExecutor(),
-          testCase.getSectionAsString(Section.QUERY, false, " "),
-          context, testCase.getStartingLineNum(), null,
-          expectedTypes, expectedResults, null, null, expectedPartitions,
-          expectedNumAppendedRows, errorLog);
+      String queryString = testCase.getSectionAsString(
+          Section.QUERY, false, " ", config.getTableSuffix());
+
+      QueryExecTestResult result = TestUtils.runQueryUsingExecutor(getTargetExecutor(),
+          queryString, context, testCase.getStartingLineNum(), expectedResult, errorLog);
+
+      if(GENERATE_NEW_TEST_RESULTS) {
+        result.getQuery().addAll(expectedResult.getQuery());
+        result.getSetup().addAll(expectedResult.getSetup());
+        results.add((result));
+      }
     }
-    if (errorLog.length() != 0) {
+
+    // Ignore failure messages if we are updating test results. They are expected.
+    if (GENERATE_NEW_TEST_RESULTS) {
+      LOG.info(errorLog.toString());
+      try {
+        TestFileUtils.saveUpdatedResults(
+            TEST_RESULT_OUTPUT_DIRECTORY + queryFileParser.getTestFileName(), results);
+      } catch (IOException e) {
+        fail("Error updating results: " + e.toString());
+      }
+    } else if (errorLog.length() != 0) {
       fail(errorLog.toString());
     }
   }

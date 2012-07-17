@@ -4,7 +4,6 @@ package com.cloudera.impala.testutil;
 import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -36,6 +35,14 @@ public class TestUtils {
   private final static Logger LOG = LoggerFactory.getLogger(TestUtils.class);
   private final static String[] expectedFilePrefix = { "hdfs:" };
   private final static String[] ignoreContentAfter = { "HOST:" };
+
+  // Our partition file paths are returned in the format of:
+  // hdfs://<host>:<port>/<table>/year=2009/month=4/-47469796--667104359_25784_data.0
+  // Everything after the month=4 can vary run to run so we want to filter this out
+  // when comparing expected vs actual results. We also want to filter out the
+  // host/port because that could vary run to run as well.
+  private final static String HDFS_FILE_PATH_FILTER = "-*\\d+--\\d+_\\d+.*$";
+  private final static String HDFS_HOST_PORT_FILTER = "//\\w+:\\d+/";
 
   // Maps from uppercase type name to PrimitiveType
   private static Map<String, PrimitiveType> typeNameMap =
@@ -75,6 +82,7 @@ public class TestUtils {
         if (containsPrefix) {
           expectedStr = expectedStr.replaceFirst(expectedFilePrefix[prefixIdx], "");
           actualStr = actualStr.replaceFirst(expectedFilePrefix[prefixIdx], "");
+          expectedStr = applyHdfsFilePathFilter(expectedStr);
           break;
         }
       }
@@ -172,20 +180,29 @@ public class TestUtils {
    * @return an error message if actual does not match expected, "" otherwise.
    */
   private static String compareOutputTypes(
-      List<PrimitiveType> actual, String[] expectedStrTypes) {
-    if (actual.size() != expectedStrTypes.length) {
-      return "Unequal number of output types.\nFound: " + actual.toString()
-          + ".\nExpected: " + Arrays.toString(expectedStrTypes) + "\n";
+      List<String> actualTypes, List<String> expectedTypes) {
+    if (actualTypes.size() != expectedTypes.size()) {
+      return "Unequal number of output types.\nFound: " + actualTypes.toString()
+          + ".\nExpected: " + expectedTypes.toString() + "\n";
     }
-    for (int i = 0; i < expectedStrTypes.length; ++i) {
-      String upperCaseTypeStr = expectedStrTypes[i].toUpperCase();
-      PrimitiveType expectedType = typeNameMap.get(upperCaseTypeStr.trim());
-      if (actual.get(i) != expectedType) {
-        return "Mismatched output types.\nFound: " + actual.toString() +
-               ".\nExpected: " + Arrays.toString(expectedStrTypes) + "\n";
+
+    for (int i = 0; i < expectedTypes.size(); ++i) {
+      if (!actualTypes.get(i).toUpperCase().trim().equals(
+          expectedTypes.get(i).toUpperCase().trim())) {
+        return "Mismatched output types.\nFound: " + actualTypes.toString() +
+               ".\nExpected: " + expectedTypes.toString() + "\n";
       }
     }
     return "";
+  }
+
+  /**
+   * Applied a filter on the HDFS path to strip out information that might vary
+   * from run to run.
+   */
+  private static String applyHdfsFilePathFilter(String hdfsPath) {
+    hdfsPath = hdfsPath.replaceFirst(HDFS_HOST_PORT_FILTER, " ");
+    return hdfsPath.replaceFirst(HDFS_FILE_PATH_FILTER, "");
   }
 
   /**
@@ -212,58 +229,40 @@ public class TestUtils {
    *          Indicates the maximum number of errors to gather.
    * @param lineNum
    *          Line number in test file on which this test query started.
-   * @param expectedColLabels
-   *          Expected column labels.
-   * @param expectedTypes
-   *          Expected types in query's select list. Ignored if null.
    * @param expectedResults
-   *          Expected query results. Ignored if null.
-   * @param expectedErrors
-   *          Expected messages in error log. Ignored if null.
-   * @param expectedFileErrors
-   *          Expected number of errors per data file read from query. Ignored if null.
-   * @param expectedPartitions
-   *          Expected partitions created by an insert.
-   * @param expectedNumAppendedRows
-   *          Expected number of rows per partition file.
+   *          Expected query results. Used for comparison versus actual results.
    * @param testErrorLog
    *          Records error messages of failed tests to be reported at the very end of
    *          a test run.
-   * @return an error message if actual does not match expected, "" otherwise.
+   * @return A QueryExecTestResults object that contains information on the query
+   *         execution result.
    */
-  public static void runQueryUsingExecutor(Object executor, String query,
-      TestExecContext context, int lineNum,
-      ArrayList<String> expectedColLabels, ArrayList<String> expectedTypes,
-      ArrayList<String> expectedResults, ArrayList<String> expectedErrors,
-      ArrayList<String> expectedFileErrors, ArrayList<String> expectedPartitions,
-      ArrayList<String> expectedNumAppendedRows,
+  public static QueryExecTestResult runQueryUsingExecutor(Object executor, String query,
+      TestExecContext context, int lineNum, QueryExecTestResult expectedResults,
       StringBuilder testErrorLog) {
 
     Preconditions.checkNotNull(executor);
     if (executor instanceof ImpaladClientExecutor) {
-      runImpaladQuery(
-          (ImpaladClientExecutor) executor, query, context, lineNum, expectedColLabels,
-          expectedTypes, expectedResults, expectedErrors, expectedFileErrors,
-          expectedPartitions, expectedNumAppendedRows, testErrorLog);
+      return runImpaladQuery(
+          (ImpaladClientExecutor) executor, query, context, lineNum, expectedResults,
+          testErrorLog);
     } else if (executor instanceof Executor) {
-      runInProcessQuery(
-          (Executor) executor, query, context, lineNum, expectedColLabels, expectedTypes,
-          expectedResults, expectedErrors, expectedFileErrors, expectedPartitions,
-          expectedNumAppendedRows, testErrorLog);
+      return runInProcessQuery(
+          (Executor) executor, query, context, lineNum, expectedResults,
+          testErrorLog);
     } else {
       fail(String.format("Unknown executor type: '%s'", executor.getClass().getName()));
     }
+
+    return null;
   }
 
   /**
    * Runs the given query against an Impalad instance and validates expected results.
    */
-  private static void runImpaladQuery(ImpaladClientExecutor executor, String query,
-      TestExecContext context, int lineNum,
-      ArrayList<String> expectedColLabels, ArrayList<String> expectedTypes,
-      ArrayList<String> expectedResults, ArrayList<String> expectedErrors,
-      ArrayList<String> expectedFileErrors, ArrayList<String> expectedPartitions,
-      ArrayList<String> expectedNumAppendedRows, StringBuilder testErrorLog) {
+  private static QueryExecTestResult runImpaladQuery(ImpaladClientExecutor executor,
+      String query, TestExecContext context, int lineNum,
+      QueryExecTestResult expectedExecResults, StringBuilder testErrorLog) {
     String queryReportString = buildQueryDetailString(query, context);
     LOG.info("running query targeting impalad " + queryReportString);
 
@@ -281,7 +280,7 @@ public class TestUtils {
         testErrorLog.append("Error executing query '" +
                             query + "' on line " + lineNum + ":\n" + e.getMessage());
       }
-      return;
+      return null;
     }
 
     ArrayList<String> actualResults = Lists.newArrayList();
@@ -293,28 +292,28 @@ public class TestUtils {
       } catch (InterruptedException e) {
         e.printStackTrace();
         testErrorLog.append("unexpected interrupt");
-        return;
+        return null;
       }
 
       parseResultRow(resultRow, actualResults, colTypes);
     }
 
-    verifyTypesLabelsAndResults(queryReportString, testErrorLog, colLabels,
-        expectedColLabels, stringTypeToPrimitiveType(colTypes),
-        expectedTypes, actualResults, expectedResults);
+    QueryExecTestResult actualExecResults = new QueryExecTestResult();
+    actualExecResults.getColTypes().addAll(colTypes);
+    actualExecResults.getColTypes().addAll(colLabels);
+    actualExecResults.getResultSet().addAll(actualResults);
+
+    verifyTypesLabelsAndResults(queryReportString, testErrorLog,
+                                actualExecResults, expectedExecResults);
+    return actualExecResults;
   }
-
-
 
   /**
    * Executes the given query using the given in-process Executor.
    */
-  private static void runInProcessQuery(
+  private static QueryExecTestResult runInProcessQuery(
       Executor inProcessExecutor, String query, TestExecContext context, int lineNum,
-      ArrayList<String> expectedColLabels, ArrayList<String> expectedTypes,
-      ArrayList<String> expectedResults, ArrayList<String> expectedErrors,
-      ArrayList<String> expectedFileErrors, ArrayList<String> expectedPartitions,
-      ArrayList<String> expectedNumAppendedRows, StringBuilder testErrorLog) {
+      QueryExecTestResult expectedExecResults, StringBuilder testErrorLog) {
 
     String queryReportString = buildQueryDetailString(query, context);
     LOG.info("running query " + queryReportString);
@@ -326,7 +325,7 @@ public class TestUtils {
     AtomicBoolean containsOrderBy = new AtomicBoolean();
     BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
     InsertResult insertResult = new InsertResult();
-    ArrayList<String> actualResults = new ArrayList<String>();
+    QueryExecTestResult actualExecResults = new QueryExecTestResult();
     try {
       inProcessExecutor.runQuery(request, colTypes, colLabels, containsOrderBy,
           context.getBatchSize(), context.getAbortOnError(), context.getMaxErrors(),
@@ -334,46 +333,66 @@ public class TestUtils {
           insertResult);
     } catch (ImpalaException e) {
       // Compare errors if we are expecting some.
-      if (context.getAbortOnError() && expectedErrors != null) {
-        compareErrors(queryReportString, errors, fileErrors, expectedErrors,
-                      expectedFileErrors, testErrorLog);
+      if (context.getAbortOnError() && expectedExecResults.getErrors().size() > 0) {
+        compareErrors(queryReportString, errors, fileErrors,
+            expectedExecResults.getErrors(), expectedExecResults.getFileErrors(),
+            testErrorLog);
+
+        // Add errors to the results
+        actualExecResults.getErrors().addAll(errors);
+
+        // Enumerate all of the file errors and add them to the results.
+        Iterator iterator = fileErrors.keySet().iterator();
+        while (iterator.hasNext()) {
+          Object key = iterator.next();
+          actualExecResults.getFileErrors().add(
+              String.format("%s,%d", key, fileErrors.get(key)));
+        }
+        return actualExecResults;
       } else {
         testErrorLog.append(
             "Error executing query '" + query + "' on line " + lineNum
             + ":\n" + e.getMessage());
       }
-      return;
+      return actualExecResults;
     }
 
     // Check insert results for insert statements.
     // We check the num rows and the partitions independently,
     // because not all table types create new partition files (e.g., HBase tables).
-    if (expectedNumAppendedRows != null) {
+    if (expectedExecResults.getNumAppendedRows().size() > 0) {
       ArrayList<String> actualResultsArray = Lists.newArrayList();
       for (int i = 0; i < insertResult.getRowsAppended().size(); ++i) {
         actualResultsArray.add(insertResult.getRowsAppended().get(i).toString());
       }
-      String result =
-        TestUtils.compareOutput(actualResultsArray, expectedNumAppendedRows, true);
+
+      actualExecResults.getNumAppendedRows().addAll(actualResultsArray);
+
+      String result = TestUtils.compareOutput(actualResultsArray,
+          expectedExecResults.getNumAppendedRows(), true);
       if (!result.isEmpty()) {
-        testErrorLog.append("query:\n" + queryReportString  + "\n" + result);
-        return;
+        testErrorLog.append("query:\n" + queryReportString + "\n" + result);
       }
     }
-    if (expectedPartitions != null) {
-      ArrayList<String> modifiedPartitions =
-        Lists.newArrayList(insertResult.getModifiedPartitions());
-      String result =
-        TestUtils.compareOutput(modifiedPartitions, expectedPartitions, false);
+    if (expectedExecResults.getModifiedPartitions().size() > 0) {
+      for (String modifiedPartition : insertResult.getModifiedPartitions()) {
+        actualExecResults.getModifiedPartitions().add(
+            applyHdfsFilePathFilter(modifiedPartition));
+      }
+
+      String result = TestUtils.compareOutput(actualExecResults.getModifiedPartitions(),
+          expectedExecResults.getModifiedPartitions(), false);
+
       if (!result.isEmpty()) {
-        testErrorLog.append("query:\n" + queryReportString  + "\n" + result);
-        return;
+        testErrorLog.append("query:\n" + queryReportString + "\n" + result);
       }
     }
+
     // We only expect partitions and num rows for insert statements,
     // and we compared them above.
-    if (expectedNumAppendedRows != null || expectedPartitions != null) {
-      return;
+    if (expectedExecResults.getNumAppendedRows().size() > 0 ||
+        expectedExecResults.getModifiedPartitions().size() > 0) {
+      return actualExecResults;
     }
 
     while (true) {
@@ -383,7 +402,7 @@ public class TestUtils {
       } catch (InterruptedException e) {
         e.printStackTrace();
         testErrorLog.append("unexpected interrupt");
-        return;
+        return null;
       }
       if (resultRow.colVals == null) {
         break;
@@ -399,14 +418,21 @@ public class TestUtils {
 
         line.append(parseColumnValue(colVal.next().stringVal, colTypes.get(i)));
       }
-      actualResults.add(line.toString());
+      actualExecResults.getResultSet().add(line.toString());
     }
 
-    verifyTypesLabelsAndResults(queryReportString, testErrorLog, colLabels,
-        expectedColLabels, colTypes, expectedTypes, actualResults, expectedResults);
+    ArrayList<String> colTypeStrings = Lists.newArrayList();
+    for (PrimitiveType t : colTypes) {
+      colTypeStrings.add(t.toString().toLowerCase());
+    }
+    actualExecResults.getColTypes().addAll(colTypeStrings);
+    actualExecResults.getColLabels().addAll(colLabels);
 
-    compareErrors(queryReportString, errors, fileErrors, expectedErrors,
-                  expectedFileErrors, testErrorLog);
+    verifyTypesLabelsAndResults(queryReportString, testErrorLog,
+                                actualExecResults, expectedExecResults);
+    compareErrors(queryReportString, errors, fileErrors, expectedExecResults.getErrors(),
+        expectedExecResults.getErrors(), testErrorLog);
+    return actualExecResults;
   }
 
   private static void parseResultRow(String rawResultRow, List<String> results,
@@ -448,27 +474,28 @@ public class TestUtils {
   /**
    * Performs common verification between different types of Executors.
    */
-  private static void verifyTypesLabelsAndResults(
-      String queryReportString, StringBuilder testErrorLog,
-      ArrayList<String> actualColLabels, ArrayList<String> expectedColLabels,
-      ArrayList<PrimitiveType> actualColTypes, ArrayList<String> expectedColTypes,
-      ArrayList<String> actualResults, ArrayList<String> expectedResults) {
+  private static void verifyTypesLabelsAndResults(String queryReportString,
+      StringBuilder testErrorLog, QueryExecTestResult actualResults,
+      QueryExecTestResult expectedResults) {
 
-    String result = compareColumnLabels(actualColLabels, expectedColLabels);
+    String result = compareColumnLabels(actualResults.getColLabels(),
+                                        expectedResults.getColLabels());
     if (!result.isEmpty()) {
       testErrorLog.append("query:\n" + queryReportString + "\n" + result);
       return;
     }
 
-    result = compareExpectedTypes(actualColTypes, expectedColTypes);
+    result = compareExpectedTypes(actualResults.getColTypes(),
+                                  expectedResults.getColTypes());
     if (!result.isEmpty()) {
       testErrorLog.append("query:\n" + queryReportString + "\n" + result);
       return;
     }
 
-    result = compareExpectedResults(actualResults, expectedResults, false);
+    result = compareExpectedResults(actualResults.getResultSet(),
+                                    expectedResults.getResultSet(), false);
     if (!result.isEmpty()) {
-      testErrorLog.append("query:\n" + queryReportString  + "\n" + result);
+      testErrorLog.append("query:\n" + queryReportString + "\n" + result);
     }
   }
 
@@ -478,32 +505,18 @@ public class TestUtils {
    */
   private static String compareColumnLabels(ArrayList<String> actualColLabels,
                                             ArrayList<String> expectedColLabels) {
-    return (expectedColLabels != null) ?
+    return (expectedColLabels.size() > 0) ?
         TestUtils.compareOutput(actualColLabels, expectedColLabels, true) : "";
   }
 
-  private static String compareExpectedTypes(ArrayList<PrimitiveType> actualTypes,
+  private static String compareExpectedTypes(ArrayList<String> actualTypes,
       ArrayList<String> expectedTypes) {
     // Check types filled in by RunQuery()
-    if (expectedTypes != null) {
-      String[] expectedTypesArr;
-      if (expectedTypes.isEmpty()) {
-        expectedTypesArr = new String[0];
-      } else {
-        expectedTypesArr = expectedTypes.get(0).split(",");
-      }
-
-      return TestUtils.compareOutputTypes(actualTypes, expectedTypesArr);
+    if (expectedTypes.size() > 0) {
+      return TestUtils.compareOutputTypes(actualTypes,
+          Lists.newArrayList(expectedTypes.get(0).split(",")));
     }
     return "";
-  }
-
-  private static ArrayList<PrimitiveType> stringTypeToPrimitiveType(List<String> types) {
-    ArrayList<PrimitiveType> typeList = new ArrayList<PrimitiveType>();
-    for (String typeString : types) {
-      typeList.add(typeNameMap.get(typeString.toUpperCase().trim()));
-    }
-    return typeList;
   }
 
   /**
@@ -531,7 +544,7 @@ public class TestUtils {
       ArrayList<String> expectedErrors, ArrayList<String> expectedFileErrors,
       StringBuilder testErrorLog) {
     // Compare expected messages in error log.
-    if (expectedErrors != null) {
+    if (expectedErrors.size() > 0) {
       // Split the error messages by newline to compare them against the expected errors.
       ArrayList<String> splitErrors = new ArrayList<String>();
       for (String err : actualErrors) {
@@ -547,7 +560,7 @@ public class TestUtils {
       }
     }
     // Compare expected errors per file.
-    if (expectedFileErrors != null) {
+    if (expectedFileErrors.size() > 0) {
       ArrayList<String> actualFileErrorsArray = Lists.newArrayList();
       for(SortedMap.Entry<String, Integer> entry : actualFileErrors.entrySet()) {
         actualFileErrorsArray.add("file: " + entry.getKey() + "," + entry.getValue());

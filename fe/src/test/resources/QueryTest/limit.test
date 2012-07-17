@@ -1,24 +1,24 @@
 # We need to specify the day here, otherwise files get opened in random order
 select * from alltypesagg$TABLE where day = 1 limit 10
-----
+---- TYPES
 int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
-----
+---- RESULTS
 2010,1,1,0,true,NULL,NULL,NULL,NULL,NULL,NULL,'01/01/10','0',2010-01-01 00:00:00
-2010,1,1,1,false,1,1,1,10,1.1,10.1,'01/01/10','1',2010-01-01 00:01:00
-2010,1,1,2,true,2,2,2,20,2.2,20.2,'01/01/10','2',2010-01-01 00:02:00.100000000
-2010,1,1,3,false,3,3,3,30,3.3,30.3,'01/01/10','3',2010-01-01 00:03:00.300000000
-2010,1,1,4,true,4,4,4,40,4.4,40.4,'01/01/10','4',2010-01-01 00:04:00.600000000
+2010,1,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/10','1',2010-01-01 00:01:00
+2010,1,1,2,true,2,2,2,20,2.200000047683716,20.2,'01/01/10','2',2010-01-01 00:02:00.100000000
+2010,1,1,3,false,3,3,3,30,3.299999952316284,30.3,'01/01/10','3',2010-01-01 00:03:00.300000000
+2010,1,1,4,true,4,4,4,40,4.400000095367432,40.4,'01/01/10','4',2010-01-01 00:04:00.600000000
 2010,1,1,5,false,5,5,5,50,5.5,50.5,'01/01/10','5',2010-01-01 00:05:00.100000000
-2010,1,1,6,true,6,6,6,60,6.6,60.6,'01/01/10','6',2010-01-01 00:06:00.150000000
-2010,1,1,7,false,7,7,7,70,7.7,70.7,'01/01/10','7',2010-01-01 00:07:00.210000000
-2010,1,1,8,true,8,8,8,80,8.8,80.8,'01/01/10','8',2010-01-01 00:08:00.280000000
-2010,1,1,9,false,9,9,9,90,9.9,90.9,'01/01/10','9',2010-01-01 00:09:00.360000000
+2010,1,1,6,true,6,6,6,60,6.599999904632568,60.6,'01/01/10','6',2010-01-01 00:06:00.150000000
+2010,1,1,7,false,7,7,7,70,7.699999809265137,70.7,'01/01/10','7',2010-01-01 00:07:00.210000000
+2010,1,1,8,true,8,8,8,80,8.800000190734863,80.8,'01/01/10','8',2010-01-01 00:08:00.280000000
+2010,1,1,9,false,9,9,9,90,9.899999618530273,90.90000000000001,'01/01/10','9',2010-01-01 00:09:00.360000000
 ====
 # limit is applied after where clause
 select * from alltypesagg$TABLE where tinyint_col is null and day = 1 limit 10
-----
+---- TYPES
 int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
-----
+---- RESULTS
 2010,1,1,0,true,NULL,NULL,NULL,NULL,NULL,NULL,'01/01/10','0',2010-01-01 00:00:00
 2010,1,1,10,true,NULL,10,10,100,11,101,'01/01/10','10',2010-01-01 00:10:00.450000000
 2010,1,1,20,true,NULL,20,20,200,22,202,'01/01/10','20',2010-01-01 00:20:01.900000000
@@ -31,9 +31,12 @@ int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, stri
 2010,1,1,90,true,NULL,90,90,900,99,909,'01/01/10','90',2010-01-01 01:30:40.500000000
 ====
 select tinyint_col, count(*) from alltypesagg$TABLE group by 1
-----
+---- TYPES
 tinyint, bigint
-----
+---- RESULTS
+1,1000
+2,1000
+3,1000
 4,1000
 5,1000
 6,1000
@@ -41,14 +44,14 @@ tinyint, bigint
 8,1000
 9,1000
 NULL,1000
-1,1000
-2,1000
-3,1000
 ====
 select tinyint_col, count(*) from alltypesagg$TABLE group by 1 limit 10
-----
+---- TYPES
 tinyint, bigint
-----
+---- RESULTS
+1,1000
+2,1000
+3,1000
 4,1000
 5,1000
 6,1000
@@ -56,33 +59,30 @@ tinyint, bigint
 8,1000
 9,1000
 NULL,1000
-1,1000
-2,1000
-3,1000
 ====
 # limit and where clause don't interact
 select tinyint_col, count(*) from alltypesagg$TABLE where smallint_col > 49 group by 1 
 limit 10
-----
+---- TYPES
 tinyint, bigint
-----
+---- RESULTS
 1,500
-3,500
-6,500
-8,500
-NULL,500
-9,500
-4,500
-7,500
 2,500
+3,500
+4,500
 5,500
+6,500
+7,500
+8,500
+9,500
+NULL,500
 ====
 # limit is applied after having
 select tinyint_col, count(*) from alltypesagg$TABLE group by 1 having tinyint_col > 5 
 limit 5
-----
+---- TYPES
 tinyint, bigint
-----
+---- RESULTS
 6,1000
 7,1000
 8,1000
@@ -90,54 +90,54 @@ tinyint, bigint
 ====
 select j.*, d.*
 from JoinTbl j inner join DimTbl d on (j.test_id = d.id)
-----
+---- TYPES
 bigint, string, int, int, bigint, string, int
-----
+---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
 1003,'Name3',94611,5000,1003,'Name3',94612
 1004,'Name4',94611,5000,1004,'Name4',94612
 1005,'Name5',94611,5000,1005,'Name5',94613
-1006,'Name16',94612,5000,1006,'Name6',94613
-1006,'Name6',94616,5000,1006,'Name6',94613
-1006,'Name16',94616,5000,1006,'Name6',94613
 1006,'Name16',94612,15000,1006,'Name6',94613
-1006,'Name6',94616,15000,1006,'Name6',94613
+1006,'Name16',94612,5000,1006,'Name6',94613
 1006,'Name16',94616,15000,1006,'Name6',94613
+1006,'Name16',94616,5000,1006,'Name6',94613
+1006,'Name6',94616,15000,1006,'Name6',94613
+1006,'Name6',94616,5000,1006,'Name6',94613
 ====
 # limit is applied to join
 select j.*, d.*
 from JoinTbl j inner join DimTbl d on (j.test_id = d.id)
 limit 8
-----
+---- TYPES
 bigint, string, int, int, bigint, string, int
-----
+---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
 1003,'Name3',94611,5000,1003,'Name3',94612
 1004,'Name4',94611,5000,1004,'Name4',94612
 1005,'Name5',94611,5000,1005,'Name5',94613
 1006,'Name16',94612,5000,1006,'Name6',94613
-1006,'Name6',94616,5000,1006,'Name6',94613
 1006,'Name16',94616,5000,1006,'Name6',94613
+1006,'Name6',94616,5000,1006,'Name6',94613
 ====
 # limit is not pushed down past join
 select j.*, d.*
 from JoinTbl j right outer join DimTbl d on (j.test_id = d.id)
-----
+---- TYPES
 bigint, string, int, int, bigint, string, int
-----
+---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
 1003,'Name3',94611,5000,1003,'Name3',94612
 1004,'Name4',94611,5000,1004,'Name4',94612
 1005,'Name5',94611,5000,1005,'Name5',94613
-1006,'Name16',94612,5000,1006,'Name6',94613
-1006,'Name6',94616,5000,1006,'Name6',94613
-1006,'Name16',94616,5000,1006,'Name6',94613
 1006,'Name16',94612,15000,1006,'Name6',94613
-1006,'Name6',94616,15000,1006,'Name6',94613
+1006,'Name16',94612,5000,1006,'Name6',94613
 1006,'Name16',94616,15000,1006,'Name6',94613
+1006,'Name16',94616,5000,1006,'Name6',94613
+1006,'Name6',94616,15000,1006,'Name6',94613
+1006,'Name6',94616,5000,1006,'Name6',94613
 NULL,'NULL',NULL,NULL,1007,'Name7',94614
 NULL,'NULL',NULL,NULL,1008,'Name8',94614
 NULL,'NULL',NULL,NULL,1009,'Name9',94615
@@ -146,9 +146,9 @@ NULL,'NULL',NULL,NULL,1010,'Name10',94615
 select j.*, d.*
 from JoinTbl j right outer join DimTbl d on (j.test_id = d.id)
 limit 5
-----
+---- TYPES
 bigint, string, int, int, bigint, string, int
-----
+---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
 1003,'Name3',94611,5000,1003,'Name3',94612
@@ -157,9 +157,9 @@ bigint, string, int, int, bigint, string, int
 ====
 # Test that query without referencing any column should work
 select 1 from alltypessmall limit 2
-----
+---- TYPES
 tinyint
-----
+---- RESULTS
 1
 1
 ====

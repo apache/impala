@@ -22,6 +22,9 @@ class Tuple;
 // Useful utility functions for runtime values (which are passed around as void*).
 class RawValue {
  public:
+  // Ascii output precision for double/float
+  static const int ASCII_PRECISION;
+
   // Convert value into ascii and write to 'stream'.
   // NULL turns into "NULL".
   static void PrintValue(const void* value, PrimitiveType type,

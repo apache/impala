@@ -1,248 +1,248 @@
 # IS NULL predicate
 select count(*) from alltypesagg$TABLE
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 10000
 ====
 select count(*) from alltypesagg$TABLE where tinyint_col is null
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 1000
 ====
 select count(*) from alltypesagg$TABLE where tinyint_col is not null
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 9000
 ====
 # =
 select count(*) from alltypesagg$TABLE where tinyint_col = 1
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 1000
 ====
 select count(*) from alltypesagg$TABLE where smallint_col = 1
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 100
 ====
 select count(*) from alltypesagg$TABLE where int_col = 1
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 10
 ====
 select count(*) from alltypesagg$TABLE where bigint_col = 10
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 10
 ====
 select count(*) from alltypesagg$TABLE where float_col = cast(1.1 as float)
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 10
 ====
 select count(*) from alltypesagg$TABLE where double_col = 10.1
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 10
 ====
 select count(*) from alltypesagg$TABLE where date_string_col = '01/01/10'
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 1000
 ====
 # <>
 select count(*) from alltypesagg$TABLE where tinyint_col <> 1
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 8000
 ====
 select count(*) from alltypesagg$TABLE where smallint_col <> 1
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 9800
 ====
 select count(*) from alltypesagg$TABLE where int_col <> 1
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 9980
 ====
 select count(*) from alltypesagg$TABLE where bigint_col <> 1
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 9990
 ====
 select count(*) from alltypesagg$TABLE where float_col <> cast(1.1 as float)
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 9980
 ====
 select count(*) from alltypesagg$TABLE where double_col <> 10.1
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 9980
 ====
 # <
 select count(*) from alltypesagg$TABLE where tinyint_col < 2
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 1000
 ====
 select count(*) from alltypesagg$TABLE where smallint_col < 2
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 100
 ====
 select count(*) from alltypesagg$TABLE where int_col < 2
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 10
 ====
 select count(*) from alltypesagg$TABLE where bigint_col < 20
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 10
 ====
 select count(*) from alltypesagg$TABLE where float_col < 2.2
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 10
 ====
 select count(*) from alltypesagg$TABLE where double_col < 20.2
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 10
 ====
 # >
 select count(*) from alltypesagg$TABLE where tinyint_col > 1
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 8000
 ====
 select count(*) from alltypesagg$TABLE where smallint_col > 1
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 9800
 ====
 select count(*) from alltypesagg$TABLE where int_col > 1
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 9980
 ====
 select count(*) from alltypesagg$TABLE where bigint_col > 10
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 9980
 ====
 select count(*) from alltypesagg$TABLE where float_col > cast(1.1 as float) 
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 9980
 ====
 select count(*) from alltypesagg$TABLE where double_col > 10.1
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 9980
 ====
 # <=
 select count(*) from alltypesagg$TABLE where tinyint_col <= 1
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 1000
 ====
 select count(*) from alltypesagg$TABLE where smallint_col <= 1
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 100
 ====
 select count(*) from alltypesagg$TABLE where int_col <= 1
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 10
 ====
 select count(*) from alltypesagg$TABLE where bigint_col <= 10
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 10
 ====
 select count(*) from alltypesagg$TABLE where float_col <= cast(1.1 as float)
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 10
 ====
 select count(*) from alltypesagg$TABLE where double_col <= 10.1
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 10
 ====
 # >=
 select count(*) from alltypesagg$TABLE where tinyint_col >= 2
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 8000
 ====
 select count(*) from alltypesagg$TABLE where smallint_col >= 2
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 9800
 ====
 select count(*) from alltypesagg$TABLE where int_col >= 2
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 9980
 ====
 select count(*) from alltypesagg$TABLE where bigint_col >= 20
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 9980
 ====
 select count(*) from alltypesagg$TABLE where float_col >= 2.2
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 9980
 ====
 select count(*) from alltypesagg$TABLE where double_col >= 20.2
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 9980
 ====
 # +
@@ -258,10 +258,10 @@ SUM(tinyint_col + smallint_col + int_col + bigint_col + float_col),
 SUM(tinyint_col) + SUM(smallint_col) + SUM(int_col) + SUM(bigint_col) + SUM(float_col) + SUM(double_col),
 SUM(tinyint_col + smallint_col + int_col + bigint_col + float_col + double_col)
 from alltypesaggnonulls$TABLE
-----
+---- TYPES
 bigint, bigint, bigint, bigint, bigint, bigint, double, double, double, double
-----
-540000,540000,5535000,5535000,55485000,55485000,6.09795e+07,6.09795e+07,1.11429e+08,1.11429e+08
+---- RESULTS
+540000,540000,5535000,5535000,55485000,55485000,60979499.99976754,60979499.99976754,111428999.9997675,111428999.9997676
 ====
 # -
 select 
@@ -276,10 +276,10 @@ SUM(-1 * tinyint_col - smallint_col - int_col - bigint_col - float_col),
 -1 * SUM(tinyint_col) - SUM(smallint_col) - SUM(int_col) - SUM(bigint_col) - SUM(float_col) - SUM(double_col),
 SUM(-1 * tinyint_col - smallint_col - int_col - bigint_col - float_col - double_col)
 from alltypesaggnonulls$TABLE
-----
+---- TYPES
 bigint, bigint, bigint, bigint, bigint, bigint, double, double, double, double
-----
--540000,-540000,-5535000,-5535000,-55485000,-55485000,-6.09795e+07,-6.09795e+07,-1.11429e+08,-1.11429e+08
+---- RESULTS
+-540000,-540000,-5535000,-5535000,-55485000,-55485000,-60979499.99976754,-60979499.99976754,-111428999.9997675,-111428999.9997676
 ====
 # *
 select
@@ -294,43 +294,19 @@ MAX(tinyint_col * smallint_col * int_col * bigint_col * float_col),
 MAX(tinyint_col) * MAX(smallint_col) * MAX(int_col) * MAX(bigint_col) * MAX(float_col) * MAX(double_col),
 MAX(tinyint_col * smallint_col * int_col * bigint_col * float_col * double_col)
 from alltypesaggnonulls$TABLE
-----
+---- TYPES
 bigint, bigint, bigint, bigint, bigint, bigint, double, double, double, double
-----
-891,891,890109,890109,8892188910,8892188910,9.77163e+12,9.77163e+12,9.85947e+16,9.85947e+16
-#====
-# /
-# On hive, max(tinyint_col / smallint_col) results in NaN. Mysql turns this into a NULL.
-# TODO: decide what to emulate; at the moment, we're also returning Nan
-#select
-#MAX(tinyint_col) / MAX(smallint_col),
-#MAX(tinyint_col / smallint_col),
-#MAX(tinyint_col) / MAX(smallint_col) / MAX(int_col),
-#MAX(tinyint_col / smallint_col / int_col),
-#MAX(tinyint_col) / MAX(smallint_col) / MAX(int_col) / MAX(bigint_col),
-#MAX(tinyint_col / smallint_col / int_col / bigint_col),
-#MAX(tinyint_col) / MAX(smallint_col) / MAX(int_col) / MAX(bigint_col) / MAX(float_col),
-#MAX(tinyint_col / smallint_col / int_col / bigint_col / float_col),
-#MAX(tinyint_col) / MAX(smallint_col) / MAX(int_col) / MAX(bigint_col) / MAX(float_col) / MAX(double_col),
-#MAX(tinyint_col / smallint_col / int_col / bigint_col / float_col / double_col)
-#from alltypesaggnonulls$TABLE
-#----
-#double, double, double, double, double, double, double, double, double, double
-#----
-#891,891,890109,890109,8892188910,8892188910,9.77163e+12,9.77163e+12,9.85947e+16,9.85947e+16
+---- RESULTS
+891,891,890109,890109,8892188910,8892188910,9771626610293.455,9771626610293.455,9.859473533519994e+16,9.859473533519994e+16
 ====
 # LIKE exprs w/ the like/regex pattern coming from a column
 select * from LikeTbl
-----
+---- TYPES
 string, string, string, string, string
-----
-'NULL','%','NULL','.*','X'
-'beginning of line','begin%','not begin%','^begin.*','^not begin.*'
+---- RESULTS
 'eight','%eight%','n%eight%','.*eight.*','n.*eight.*'
-'end of line','%line','%line end','.*line$','.*line end$'
 'five','%five%','n%five%','.*five.*','n.*five.*'
 'four','%four%','n%four%','.*four.*','n.*four.*'
-'middle of line','%of%','%of','^.*of.*$','.*of$'
 'nine','%nine%','n%nine%','.*nine.*','n.*nine.*'
 'one','%one%','n%one%','.*one.*','n.*one.*'
 'seven','%seven%','n%seven%','.*seven.*','n.*seven.*'
@@ -341,15 +317,12 @@ string, string, string, string, string
 ====
 select str_col, match_like_col from LikeTbl
 where str_col LIKE match_like_col
-----
+---- TYPES
 string, string
-----
-'beginning of line','begin%'
+---- RESULTS
 'eight','%eight%'
-'end of line','%line'
 'five','%five%'
 'four','%four%'
-'middle of line','%of%'
 'nine','%nine%'
 'one','%one%'
 'seven','%seven%'
@@ -359,47 +332,19 @@ string, string
 'two','%two%'
 ====
 select str_col, match_like_col from LikeTbl
-where str_col NOT LIKE match_like_col
-----
-string, string
-----
-====
-select str_col, match_like_col from LikeTbl
 where str_col LIKE no_match_like_col
-----
+---- TYPES
 string, string
-----
-====
-select str_col, no_match_like_col from LikeTbl
-where str_col NOT LIKE no_match_like_col
-----
-string, string
-----
-'beginning of line','not begin%'
-'eight','n%eight%'
-'end of line','%line end'
-'five','n%five%'
-'four','n%four%'
-'middle of line','%of'
-'nine','n%nine%'
-'one','n%one%'
-'seven','n%seven%'
-'six','n%six%'
-'ten','n%ten%'
-'three','n%three%'
-'two','n%two%'
+---- RESULTS
 ====
 select str_col, match_regex_col from LikeTbl
 where str_col REGEXP match_regex_col
-----
+---- TYPES
 string, string
-----
-'beginning of line','^begin.*'
+---- RESULTS
 'eight','.*eight.*'
-'end of line','.*line$'
 'five','.*five.*'
 'four','.*four.*'
-'middle of line','^.*of.*$'
 'nine','.*nine.*'
 'one','.*one.*'
 'seven','.*seven.*'
@@ -410,34 +355,9 @@ string, string
 ====
 select str_col, no_match_regex_col from LikeTbl
 where str_col REGEXP no_match_regex_col
-----
+---- TYPES
 string, string
-----
-====
-select str_col, match_regex_col from LikeTbl
-where str_col NOT REGEXP match_regex_col
-----
-string, string
-----
-====
-select str_col, no_match_regex_col from LikeTbl
-where str_col NOT REGEXP no_match_regex_col
-----
-string, string
-----
-'beginning of line','^not begin.*'
-'eight','n.*eight.*'
-'end of line','.*line end$'
-'five','n.*five.*'
-'four','n.*four.*'
-'middle of line','.*of$'
-'nine','n.*nine.*'
-'one','n.*one.*'
-'seven','n.*seven.*'
-'six','n.*six.*'
-'ten','n.*ten.*'
-'three','n.*three.*'
-'two','n.*two.*'
+---- RESULTS
 ====
 select 1+2
 ---- TYPES
@@ -449,9 +369,9 @@ select timestamp_col, to_date(timestamp_col), year(timestamp_col), month(timesta
 dayofmonth(timestamp_col), day(timestamp_col), weekofyear(timestamp_col),
 hour(timestamp_col), minute(timestamp_col), second(timestamp_col)
 from alltypessmall$TABLE
-----
+---- TYPES
 timestamp, string, int, int, int, int, int, int, int, int
-----
+---- RESULTS
 2009-01-01 00:00:00,'2009-01-01',2009,1,1,1,1,0,0,0
 2009-01-01 00:01:00,'2009-01-01',2009,1,1,1,1,0,1,0
 2009-01-01 00:02:00.100000000,'2009-01-01',2009,1,1,1,1,0,2,0

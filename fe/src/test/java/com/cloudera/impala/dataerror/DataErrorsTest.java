@@ -12,6 +12,7 @@ import org.junit.Test;
 
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.service.Executor;
+import com.cloudera.impala.testutil.QueryExecTestResult;
 import com.cloudera.impala.testutil.TestExecContext;
 import com.cloudera.impala.testutil.TestFileParser;
 import com.cloudera.impala.testutil.TestFileParser.Section;
@@ -27,7 +28,7 @@ public class DataErrorsTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    catalog = new Catalog();
+    catalog = new Catalog(true);
     executor = new Executor(catalog);
     testErrorLog = new StringBuilder();
     tableList = new ArrayList<String>();
@@ -91,18 +92,18 @@ public class DataErrorsTest {
           // and with batch size of 1, which should trigger a lot of corner cases
           // in the execution engine code
           String query = testCase.getQuery();
+          QueryExecTestResult expectedResults = new QueryExecTestResult();
+          expectedResults.getErrors().addAll(expectedErrors);
+          expectedResults.getFileErrors().addAll(expectedFileErrors);
           TestUtils.runQueryUsingExecutor(executor, query,
               new TestExecContext(1, 0, disableCodegen, abortOnError, maxErrors),
-              testCase.getStartingLineNum(), null, null, null, null, null,
-              expectedErrors, expectedFileErrors, testErrorLog);
+              testCase.getStartingLineNum(), expectedResults, testErrorLog);
           TestUtils.runQueryUsingExecutor(executor, query,
               new TestExecContext(1, 16, disableCodegen, abortOnError, maxErrors),
-              testCase.getStartingLineNum(), null, null, null, null, null,
-              expectedErrors, expectedFileErrors, testErrorLog);
+              testCase.getStartingLineNum(), expectedResults, testErrorLog);
           TestUtils.runQueryUsingExecutor(executor, query,
               new TestExecContext(1, 1, disableCodegen, abortOnError, maxErrors),
-              testCase.getStartingLineNum(), null, null, null, null, null,
-              expectedErrors, expectedFileErrors, testErrorLog);
+              testCase.getStartingLineNum(), expectedResults, testErrorLog);
         }
       }
 

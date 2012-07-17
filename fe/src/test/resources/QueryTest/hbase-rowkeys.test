@@ -2,9 +2,9 @@
 select count(*)
 from hbasestringids
 where id = '5'
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 1
 ====
 # predicate on row key col is not applied to scan if row key is mapped as non-string col
@@ -12,9 +12,9 @@ bigint
 select count(*)
 from hbasealltypesagg
 where id = 5
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 1
 ====
 # ids are stored in ascii and ordered lexicographically
@@ -22,36 +22,36 @@ bigint
 select count(*)
 from hbasestringids
 where id < '5'
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 4445
 ====
 # inclusive upper bound
 select count(*)
 from hbasestringids
 where id <= '5'
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 4446
 ====
 # inclusive lower bound
 select count(*)
 from hbasestringids
 where id >= '6'
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 4444
 ====
 # exclusive lower bound
 select count(*)
 from hbasestringids
 where id > '6'
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 4443
 ====
 # combinations
@@ -59,36 +59,36 @@ select count(*)
 from hbasestringids
 where id > '5'
 and id < '6'
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 1110
 ====
 select count(*)
 from hbasestringids
 where id >= '5'
 and id < '6'
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 1111
 ====
 select count(*)
 from hbasestringids
 where id > '5'
 and id <= '6'
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 1111
 ====
 select count(*)
 from hbasestringids
 where id >= '5'
 and id <= '6'
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 1112
 ====
 # predicates on non-key cols are evaluated in the executor
@@ -97,8 +97,8 @@ select count(*)
 from hbasestringids
 where id < '5'
 and smallint_col < 5
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 180
 ====

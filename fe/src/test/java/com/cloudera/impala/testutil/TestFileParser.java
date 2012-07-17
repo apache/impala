@@ -72,7 +72,7 @@ public class TestFileParser {
   public static class TestCase {
 
     private final EnumMap<Section, ArrayList<String>> expectedResultSections =
-      Maps.newEnumMap(Section.class);
+        Maps.newEnumMap(Section.class);
 
     // Line number in the test case file where this case started
     private final int startLineNum;
@@ -97,24 +97,48 @@ public class TestFileParser {
       return getSectionContents(section, false);
     }
 
-    /**
-     * Returns a section corresponding to the given key, or null if one does not exist.
-     * If withComments is set, all comment lines are included.
-     */
     public ArrayList<String> getSectionContents(Section section, boolean withComments) {
+      return getSectionContents(section, withComments, null);
+    }
+
+    /**
+     * Returns a section corresponding to the given key, or an empty list if one does not
+     * exist.
+     * @param section
+     *          The Section to get
+     * @param withComments
+     *          If set, all comment lines are included.
+     * @param tableSuffix
+     *          If set, table names that contain the string $TABLE will be replaced with
+     *          the specified table suffix
+     * @return Collection of strings mapping to lines in the test file
+     */
+    public ArrayList<String> getSectionContents(Section section, boolean withComments,
+                                                String tableSuffix) {
       ArrayList<String> ret = expectedResultSections.get(section);
-      if (ret == null || withComments) {
+      if (ret == null) {
+        return Lists.newArrayList();
+      } else if (withComments) {
         return ret;
       }
 
       ArrayList<String> retList = Lists.newArrayList();
       for (String s : ret) {
         if (!(s.startsWith("#") || s.startsWith("//"))) {
-          retList.add(s);
+          if (tableSuffix != null && section == Section.QUERY) {
+            retList.add(s.replaceAll("\\$TABLE", tableSuffix));
+          } else {
+            retList.add(s);
+          }
         }
       }
 
       return retList;
+    }
+
+    public String getSectionAsString(Section section, boolean withComments,
+        String delimiter) {
+      return getSectionAsString(section, withComments, delimiter, null);
     }
 
     /**
@@ -122,11 +146,12 @@ public class TestFileParser {
      * used to separate each line.
      */
     public String getSectionAsString(Section section, boolean withComments,
-        String delimiter) {
-      List<String> sectionList = getSectionContents(section, withComments);
+                                     String delimiter, String tableSuffix) {
+      List<String> sectionList = getSectionContents(section, withComments, tableSuffix);
       if (sectionList == null) {
         return null;
       }
+
       return Joiner.on(delimiter).join(sectionList);
     }
 
@@ -136,6 +161,18 @@ public class TestFileParser {
     public String getQuery() {
       return getSectionAsString(Section.QUERY, false, " ");
     }
+
+
+    public QueryExecTestResult getQueryExecTestResult() {
+      QueryExecTestResult result = new QueryExecTestResult();
+      result.getColTypes().addAll(getSectionContents(Section.TYPES));
+      result.getSetup().addAll(getSectionContents(Section.SETUP, true));
+      result.getQuery().addAll(getSectionContents(Section.QUERY, true));
+      result.getResultSet().addAll(getSectionContents(Section.RESULTS));
+      result.getModifiedPartitions().addAll(getSectionContents(Section.PARTITIONS));
+      result.getNumAppendedRows().addAll(getSectionContents(Section.NUMROWS));
+      return result;
+    }
   }
 
   private final List<TestCase> testCases = Lists.newArrayList();
@@ -144,11 +181,10 @@ public class TestFileParser {
   private final String fileName;
   private InputStream stream;
   private Scanner scanner;
-  private String table;
 
   /**
    * For backwards compatibility, if no title is found this is the order in which
-   * sections are labelled.
+   * sections are labeled.
    */
   static private final ArrayList<Section> defaultSectionOrder =
     Lists.newArrayList(Section.QUERY, Section.TYPES, Section.RESULTS);
@@ -161,11 +197,14 @@ public class TestFileParser {
     return testCases;
   }
 
+  public String getTestFileName() {
+    return fileName;
+  }
+
   /**
    * Initializes the scanner and the input stream corresponding to the test file name
    */
   private void open(String table) {
-    this.table = table;
     try {
       ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
       stream = classLoader.getResourceAsStream(fileName);
@@ -223,9 +262,6 @@ public class TestFileParser {
 
         sectionContents = Lists.newArrayList();
       } else {
-          if (table != null && currentSection == Section.QUERY) {
-            line = line.replaceAll("\\$TABLE", table);
-          }
         sectionContents.add(line);
       }
     }
@@ -241,19 +277,28 @@ public class TestFileParser {
   }
 
   public void parseFile(String table) {
-    open(table);
-    testCases.clear();
-    while (scanner.hasNextLine()) {
-      testCases.add(parseOneTestCase());
+    try {
+      open(table);
+      testCases.clear();
+      while (scanner.hasNextLine()) {
+        testCases.add(parseOneTestCase());
+      }
+    } finally {
+      close();
     }
-    close();
   }
 
   private void close() {
-    try {
-      stream.close();
-    } catch (IOException e) {
-      // ignore
+    if (scanner != null) {
+      scanner.close();
+    }
+
+    if (stream != null) {
+      try {
+        stream.close();
+      } catch (IOException e) {
+        // ignore
+      }
     }
   }
 }

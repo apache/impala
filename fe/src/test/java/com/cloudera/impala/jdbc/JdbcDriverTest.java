@@ -26,6 +26,7 @@ import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.service.Executor;
+import com.cloudera.impala.testutil.QueryExecTestResult;
 import com.cloudera.impala.testutil.TestExecContext;
 import com.cloudera.impala.testutil.TestUtils;
 
@@ -203,8 +204,11 @@ public class JdbcDriverTest {
     StringBuilder errorLog = new StringBuilder();
     TestExecContext context = new TestExecContext(0, 1, Executor.DEFAULT_DISABLE_CODEGEN,
                                                   false, 1000);
-    TestUtils.runQueryUsingExecutor(executor, query, context, 0, expectedColLabels, null,
-        expectedResults, null, null, null, null, errorLog);
+    QueryExecTestResult expectedExecResults = new QueryExecTestResult();
+    expectedExecResults.getColLabels().addAll(expectedColLabels);
+    expectedExecResults.getResultSet().addAll(expectedResults);
+    TestUtils.runQueryUsingExecutor(executor, query, context, 0,
+        expectedExecResults, errorLog);
   }
 
   private void queryFailure(Connection conn, String query) throws ImpalaException {

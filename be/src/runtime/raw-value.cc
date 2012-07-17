@@ -13,6 +13,8 @@ using namespace std;
 
 namespace impala {
 
+const int RawValue::ASCII_PRECISION = 16; // print 16 digits for double/float
+
 void RawValue::PrintValueAsBytes(const void* value, PrimitiveType type,
                                  stringstream* stream) {
   if (value == NULL) return;
@@ -106,6 +108,7 @@ void RawValue::PrintValue(const void* value, PrimitiveType type, string* str) {
   }
 
   stringstream out;
+  out.precision(ASCII_PRECISION);
   const StringValue* string_val = NULL;
   string tmp;
   bool val;

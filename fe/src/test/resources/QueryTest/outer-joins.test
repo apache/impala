@@ -1,80 +1,80 @@
 # join cols aren't part of select list (and still get materialized)
 select j.test_name, d.name
 from JoinTbl j inner join DimTbl d on (j.test_id = d.id)
-----
+---- TYPES
 string, string
-----
+---- RESULTS
 'Name1','Name1'
+'Name16','Name6'
+'Name16','Name6'
+'Name16','Name6'
+'Name16','Name6'
 'Name2','Name2'
 'Name3','Name3'
 'Name4','Name4'
 'Name5','Name5'
-'Name16','Name6'
 'Name6','Name6'
-'Name16','Name6'
-'Name16','Name6'
 'Name6','Name6'
-'Name16','Name6'
 ====
 # join on bigint
 select j.*, d.*
 from JoinTbl j inner join DimTbl d on (j.test_id = d.id)
-----
+---- TYPES
 bigint, string, int, int, bigint, string, int
-----
+---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
 1003,'Name3',94611,5000,1003,'Name3',94612
 1004,'Name4',94611,5000,1004,'Name4',94612
 1005,'Name5',94611,5000,1005,'Name5',94613
-1006,'Name16',94612,5000,1006,'Name6',94613
-1006,'Name6',94616,5000,1006,'Name6',94613
-1006,'Name16',94616,5000,1006,'Name6',94613
 1006,'Name16',94612,15000,1006,'Name6',94613
-1006,'Name6',94616,15000,1006,'Name6',94613
+1006,'Name16',94612,5000,1006,'Name6',94613
 1006,'Name16',94616,15000,1006,'Name6',94613
+1006,'Name16',94616,5000,1006,'Name6',94613
+1006,'Name6',94616,15000,1006,'Name6',94613
+1006,'Name6',94616,5000,1006,'Name6',94613
 ====
 select j.*, d.*
 from JoinTbl j left outer join DimTbl d on (j.test_id = d.id)
-----
+---- TYPES
 bigint, string, int, int, bigint, string, int
-----
+---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
 1003,'Name3',94611,5000,1003,'Name3',94612
 1004,'Name4',94611,5000,1004,'Name4',94612
 1005,'Name5',94611,5000,1005,'Name5',94613
-1106,'Name6',94612,5000,NULL,'NULL',NULL
+1006,'Name16',94612,15000,1006,'Name6',94613
 1006,'Name16',94612,5000,1006,'Name6',94613
-1006,'Name6',94616,5000,1006,'Name6',94613
-1106,'Name16',94612,5000,NULL,'NULL',NULL
-1106,'Name6',94616,5000,NULL,'NULL',NULL
+1006,'Name16',94616,15000,1006,'Name6',94613
 1006,'Name16',94616,5000,1006,'Name6',94613
+1006,'Name6',94616,15000,1006,'Name6',94613
+1006,'Name6',94616,5000,1006,'Name6',94613
+1106,'Name16',94612,15000,NULL,'NULL',NULL
+1106,'Name16',94612,5000,NULL,'NULL',NULL
+1106,'Name16',94616,15000,NULL,'NULL',NULL
 1106,'Name16',94616,5000,NULL,'NULL',NULL
 1106,'Name6',94612,15000,NULL,'NULL',NULL
-1006,'Name16',94612,15000,1006,'Name6',94613
-1006,'Name6',94616,15000,1006,'Name6',94613
-1106,'Name16',94612,15000,NULL,'NULL',NULL
+1106,'Name6',94612,5000,NULL,'NULL',NULL
 1106,'Name6',94616,15000,NULL,'NULL',NULL
-1006,'Name16',94616,15000,1006,'Name6',94613
-1106,'Name16',94616,15000,NULL,'NULL',NULL
+1106,'Name6',94616,5000,NULL,'NULL',NULL
 ====
 select j.*, d.*
 from JoinTbl j right outer join DimTbl d on (j.test_id = d.id)
-----
+---- TYPES
 bigint, string, int, int, bigint, string, int
-----
+---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
 1003,'Name3',94611,5000,1003,'Name3',94612
 1004,'Name4',94611,5000,1004,'Name4',94612
 1005,'Name5',94611,5000,1005,'Name5',94613
-1006,'Name16',94612,5000,1006,'Name6',94613
-1006,'Name6',94616,5000,1006,'Name6',94613
-1006,'Name16',94616,5000,1006,'Name6',94613
 1006,'Name16',94612,15000,1006,'Name6',94613
-1006,'Name6',94616,15000,1006,'Name6',94613
+1006,'Name16',94612,5000,1006,'Name6',94613
 1006,'Name16',94616,15000,1006,'Name6',94613
+1006,'Name16',94616,5000,1006,'Name6',94613
+1006,'Name6',94616,15000,1006,'Name6',94613
+1006,'Name6',94616,5000,1006,'Name6',94613
 NULL,'NULL',NULL,NULL,1007,'Name7',94614
 NULL,'NULL',NULL,NULL,1008,'Name8',94614
 NULL,'NULL',NULL,NULL,1009,'Name9',94615
@@ -82,28 +82,28 @@ NULL,'NULL',NULL,NULL,1010,'Name10',94615
 ====
 select j.*, d.*
 from JoinTbl j full outer join DimTbl d on (j.test_id = d.id)
-----
+---- TYPES
 bigint, string, int, int, bigint, string, int
-----
+---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
 1003,'Name3',94611,5000,1003,'Name3',94612
 1004,'Name4',94611,5000,1004,'Name4',94612
 1005,'Name5',94611,5000,1005,'Name5',94613
-1106,'Name6',94612,5000,NULL,'NULL',NULL
+1006,'Name16',94612,15000,1006,'Name6',94613
 1006,'Name16',94612,5000,1006,'Name6',94613
-1006,'Name6',94616,5000,1006,'Name6',94613
-1106,'Name16',94612,5000,NULL,'NULL',NULL
-1106,'Name6',94616,5000,NULL,'NULL',NULL
+1006,'Name16',94616,15000,1006,'Name6',94613
 1006,'Name16',94616,5000,1006,'Name6',94613
+1006,'Name6',94616,15000,1006,'Name6',94613
+1006,'Name6',94616,5000,1006,'Name6',94613
+1106,'Name16',94612,15000,NULL,'NULL',NULL
+1106,'Name16',94612,5000,NULL,'NULL',NULL
+1106,'Name16',94616,15000,NULL,'NULL',NULL
 1106,'Name16',94616,5000,NULL,'NULL',NULL
 1106,'Name6',94612,15000,NULL,'NULL',NULL
-1006,'Name16',94612,15000,1006,'Name6',94613
-1006,'Name6',94616,15000,1006,'Name6',94613
-1106,'Name16',94612,15000,NULL,'NULL',NULL
+1106,'Name6',94612,5000,NULL,'NULL',NULL
 1106,'Name6',94616,15000,NULL,'NULL',NULL
-1006,'Name16',94616,15000,1006,'Name6',94613
-1106,'Name16',94616,15000,NULL,'NULL',NULL
+1106,'Name6',94616,5000,NULL,'NULL',NULL
 NULL,'NULL',NULL,NULL,1007,'Name7',94614
 NULL,'NULL',NULL,NULL,1008,'Name8',94614
 NULL,'NULL',NULL,NULL,1009,'Name9',94615
@@ -112,102 +112,102 @@ NULL,'NULL',NULL,NULL,1010,'Name10',94615
 # join on string
 select j.*, d.*
 from JoinTbl j inner join DimTbl d on (j.test_name = d.name)
-----
+---- TYPES
 bigint, string, int, int, bigint, string, int
-----
+---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
 1003,'Name3',94611,5000,1003,'Name3',94612
 1004,'Name4',94611,5000,1004,'Name4',94612
 1005,'Name5',94611,5000,1005,'Name5',94613
-1106,'Name6',94612,5000,1006,'Name6',94613
-1006,'Name6',94616,5000,1006,'Name6',94613
-1106,'Name6',94616,5000,1006,'Name6',94613
-1106,'Name6',94612,15000,1006,'Name6',94613
 1006,'Name6',94616,15000,1006,'Name6',94613
+1006,'Name6',94616,5000,1006,'Name6',94613
+1106,'Name6',94612,15000,1006,'Name6',94613
+1106,'Name6',94612,5000,1006,'Name6',94613
 1106,'Name6',94616,15000,1006,'Name6',94613
+1106,'Name6',94616,5000,1006,'Name6',94613
 ====
 select j.*, d.*
 from JoinTbl j left outer join DimTbl d on (j.test_name = d.name)
-----
+---- TYPES
 bigint, string, int, int, bigint, string, int
-----
+---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
 1003,'Name3',94611,5000,1003,'Name3',94612
 1004,'Name4',94611,5000,1004,'Name4',94612
 1005,'Name5',94611,5000,1005,'Name5',94613
-1106,'Name6',94612,5000,1006,'Name6',94613
+1006,'Name16',94612,15000,NULL,'NULL',NULL
 1006,'Name16',94612,5000,NULL,'NULL',NULL
-1006,'Name6',94616,5000,1006,'Name6',94613
-1106,'Name16',94612,5000,NULL,'NULL',NULL
-1106,'Name6',94616,5000,1006,'Name6',94613
+1006,'Name16',94616,15000,NULL,'NULL',NULL
 1006,'Name16',94616,5000,NULL,'NULL',NULL
+1006,'Name6',94616,15000,1006,'Name6',94613
+1006,'Name6',94616,5000,1006,'Name6',94613
+1106,'Name16',94612,15000,NULL,'NULL',NULL
+1106,'Name16',94612,5000,NULL,'NULL',NULL
+1106,'Name16',94616,15000,NULL,'NULL',NULL
 1106,'Name16',94616,5000,NULL,'NULL',NULL
 1106,'Name6',94612,15000,1006,'Name6',94613
-1006,'Name16',94612,15000,NULL,'NULL',NULL
-1006,'Name6',94616,15000,1006,'Name6',94613
-1106,'Name16',94612,15000,NULL,'NULL',NULL
+1106,'Name6',94612,5000,1006,'Name6',94613
 1106,'Name6',94616,15000,1006,'Name6',94613
-1006,'Name16',94616,15000,NULL,'NULL',NULL
-1106,'Name16',94616,15000,NULL,'NULL',NULL
+1106,'Name6',94616,5000,1006,'Name6',94613
 ====
 select j.*, d.*
 from JoinTbl j right outer join DimTbl d on (j.test_name = d.name)
-----
+---- TYPES
 bigint, string, int, int, bigint, string, int
-----
+---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
 1003,'Name3',94611,5000,1003,'Name3',94612
 1004,'Name4',94611,5000,1004,'Name4',94612
 1005,'Name5',94611,5000,1005,'Name5',94613
-1106,'Name6',94612,5000,1006,'Name6',94613
-1006,'Name6',94616,5000,1006,'Name6',94613
-1106,'Name6',94616,5000,1006,'Name6',94613
-1106,'Name6',94612,15000,1006,'Name6',94613
 1006,'Name6',94616,15000,1006,'Name6',94613
+1006,'Name6',94616,5000,1006,'Name6',94613
+1106,'Name6',94612,15000,1006,'Name6',94613
+1106,'Name6',94612,5000,1006,'Name6',94613
 1106,'Name6',94616,15000,1006,'Name6',94613
-NULL,'NULL',NULL,NULL,1009,'Name9',94615
-NULL,'NULL',NULL,NULL,1008,'Name8',94614
+1106,'Name6',94616,5000,1006,'Name6',94613
 NULL,'NULL',NULL,NULL,1007,'Name7',94614
+NULL,'NULL',NULL,NULL,1008,'Name8',94614
+NULL,'NULL',NULL,NULL,1009,'Name9',94615
 NULL,'NULL',NULL,NULL,1010,'Name10',94615
 ====
 select j.*, d.*
 from JoinTbl j full outer join DimTbl d on (j.test_name = d.name)
-----
+---- TYPES
 bigint, string, int, int, bigint, string, int
-----
+---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
 1003,'Name3',94611,5000,1003,'Name3',94612
 1004,'Name4',94611,5000,1004,'Name4',94612
 1005,'Name5',94611,5000,1005,'Name5',94613
-1106,'Name6',94612,5000,1006,'Name6',94613
+1006,'Name16',94612,15000,NULL,'NULL',NULL
 1006,'Name16',94612,5000,NULL,'NULL',NULL
-1006,'Name6',94616,5000,1006,'Name6',94613
-1106,'Name16',94612,5000,NULL,'NULL',NULL
-1106,'Name6',94616,5000,1006,'Name6',94613
+1006,'Name16',94616,15000,NULL,'NULL',NULL
 1006,'Name16',94616,5000,NULL,'NULL',NULL
+1006,'Name6',94616,15000,1006,'Name6',94613
+1006,'Name6',94616,5000,1006,'Name6',94613
+1106,'Name16',94612,15000,NULL,'NULL',NULL
+1106,'Name16',94612,5000,NULL,'NULL',NULL
+1106,'Name16',94616,15000,NULL,'NULL',NULL
 1106,'Name16',94616,5000,NULL,'NULL',NULL
 1106,'Name6',94612,15000,1006,'Name6',94613
-1006,'Name16',94612,15000,NULL,'NULL',NULL
-1006,'Name6',94616,15000,1006,'Name6',94613
-1106,'Name16',94612,15000,NULL,'NULL',NULL
+1106,'Name6',94612,5000,1006,'Name6',94613
 1106,'Name6',94616,15000,1006,'Name6',94613
-1006,'Name16',94616,15000,NULL,'NULL',NULL
-1106,'Name16',94616,15000,NULL,'NULL',NULL
-NULL,'NULL',NULL,NULL,1009,'Name9',94615
-NULL,'NULL',NULL,NULL,1008,'Name8',94614
+1106,'Name6',94616,5000,1006,'Name6',94613
 NULL,'NULL',NULL,NULL,1007,'Name7',94614
+NULL,'NULL',NULL,NULL,1008,'Name8',94614
+NULL,'NULL',NULL,NULL,1009,'Name9',94615
 NULL,'NULL',NULL,NULL,1010,'Name10',94615
 ====
 # join on int
 select j.*, d.*
 from JoinTbl j inner join DimTbl d on (j.test_zip = d.zip)
-----
+---- TYPES
 bigint, string, int, int, bigint, string, int
-----
+---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1001,'Name1',94611,5000,1002,'Name2',94611
 1002,'Name2',94611,5000,1001,'Name1',94611
@@ -218,24 +218,24 @@ bigint, string, int, int, bigint, string, int
 1004,'Name4',94611,5000,1002,'Name2',94611
 1005,'Name5',94611,5000,1001,'Name1',94611
 1005,'Name5',94611,5000,1002,'Name2',94611
-1106,'Name6',94612,5000,1003,'Name3',94612
-1106,'Name6',94612,5000,1004,'Name4',94612
+1006,'Name16',94612,15000,1003,'Name3',94612
+1006,'Name16',94612,15000,1004,'Name4',94612
 1006,'Name16',94612,5000,1003,'Name3',94612
 1006,'Name16',94612,5000,1004,'Name4',94612
+1106,'Name16',94612,15000,1003,'Name3',94612
+1106,'Name16',94612,15000,1004,'Name4',94612
 1106,'Name16',94612,5000,1003,'Name3',94612
 1106,'Name16',94612,5000,1004,'Name4',94612
 1106,'Name6',94612,15000,1003,'Name3',94612
 1106,'Name6',94612,15000,1004,'Name4',94612
-1006,'Name16',94612,15000,1003,'Name3',94612
-1006,'Name16',94612,15000,1004,'Name4',94612
-1106,'Name16',94612,15000,1003,'Name3',94612
-1106,'Name16',94612,15000,1004,'Name4',94612
+1106,'Name6',94612,5000,1003,'Name3',94612
+1106,'Name6',94612,5000,1004,'Name4',94612
 ====
 select j.*, d.*
 from JoinTbl j left outer join DimTbl d on (j.test_zip = d.zip)
-----
+---- TYPES
 bigint, string, int, int, bigint, string, int
-----
+---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1001,'Name1',94611,5000,1002,'Name2',94611
 1002,'Name2',94611,5000,1001,'Name1',94611
@@ -246,32 +246,32 @@ bigint, string, int, int, bigint, string, int
 1004,'Name4',94611,5000,1002,'Name2',94611
 1005,'Name5',94611,5000,1001,'Name1',94611
 1005,'Name5',94611,5000,1002,'Name2',94611
-1106,'Name6',94612,5000,1003,'Name3',94612
-1106,'Name6',94612,5000,1004,'Name4',94612
+1006,'Name16',94612,15000,1003,'Name3',94612
+1006,'Name16',94612,15000,1004,'Name4',94612
 1006,'Name16',94612,5000,1003,'Name3',94612
 1006,'Name16',94612,5000,1004,'Name4',94612
+1006,'Name16',94616,15000,NULL,'NULL',NULL
+1006,'Name16',94616,5000,NULL,'NULL',NULL
+1006,'Name6',94616,15000,NULL,'NULL',NULL
 1006,'Name6',94616,5000,NULL,'NULL',NULL
+1106,'Name16',94612,15000,1003,'Name3',94612
+1106,'Name16',94612,15000,1004,'Name4',94612
 1106,'Name16',94612,5000,1003,'Name3',94612
 1106,'Name16',94612,5000,1004,'Name4',94612
-1106,'Name6',94616,5000,NULL,'NULL',NULL
-1006,'Name16',94616,5000,NULL,'NULL',NULL
+1106,'Name16',94616,15000,NULL,'NULL',NULL
 1106,'Name16',94616,5000,NULL,'NULL',NULL
 1106,'Name6',94612,15000,1003,'Name3',94612
 1106,'Name6',94612,15000,1004,'Name4',94612
-1006,'Name16',94612,15000,1003,'Name3',94612
-1006,'Name16',94612,15000,1004,'Name4',94612
-1006,'Name6',94616,15000,NULL,'NULL',NULL
-1106,'Name16',94612,15000,1003,'Name3',94612
-1106,'Name16',94612,15000,1004,'Name4',94612
+1106,'Name6',94612,5000,1003,'Name3',94612
+1106,'Name6',94612,5000,1004,'Name4',94612
 1106,'Name6',94616,15000,NULL,'NULL',NULL
-1006,'Name16',94616,15000,NULL,'NULL',NULL
-1106,'Name16',94616,15000,NULL,'NULL',NULL
+1106,'Name6',94616,5000,NULL,'NULL',NULL
 ====
 select j.*, d.*
 from JoinTbl j right outer join DimTbl d on (j.test_zip = d.zip)
-----
+---- TYPES
 bigint, string, int, int, bigint, string, int
-----
+---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1001,'Name1',94611,5000,1002,'Name2',94611
 1002,'Name2',94611,5000,1001,'Name1',94611
@@ -282,18 +282,18 @@ bigint, string, int, int, bigint, string, int
 1004,'Name4',94611,5000,1002,'Name2',94611
 1005,'Name5',94611,5000,1001,'Name1',94611
 1005,'Name5',94611,5000,1002,'Name2',94611
-1106,'Name6',94612,5000,1003,'Name3',94612
-1106,'Name6',94612,5000,1004,'Name4',94612
+1006,'Name16',94612,15000,1003,'Name3',94612
+1006,'Name16',94612,15000,1004,'Name4',94612
 1006,'Name16',94612,5000,1003,'Name3',94612
 1006,'Name16',94612,5000,1004,'Name4',94612
+1106,'Name16',94612,15000,1003,'Name3',94612
+1106,'Name16',94612,15000,1004,'Name4',94612
 1106,'Name16',94612,5000,1003,'Name3',94612
 1106,'Name16',94612,5000,1004,'Name4',94612
 1106,'Name6',94612,15000,1003,'Name3',94612
 1106,'Name6',94612,15000,1004,'Name4',94612
-1006,'Name16',94612,15000,1003,'Name3',94612
-1006,'Name16',94612,15000,1004,'Name4',94612
-1106,'Name16',94612,15000,1003,'Name3',94612
-1106,'Name16',94612,15000,1004,'Name4',94612
+1106,'Name6',94612,5000,1003,'Name3',94612
+1106,'Name6',94612,5000,1004,'Name4',94612
 NULL,'NULL',NULL,NULL,1005,'Name5',94613
 NULL,'NULL',NULL,NULL,1006,'Name6',94613
 NULL,'NULL',NULL,NULL,1007,'Name7',94614
@@ -303,9 +303,9 @@ NULL,'NULL',NULL,NULL,1010,'Name10',94615
 ====
 select j.*, d.*
 from JoinTbl j full outer join DimTbl d on (j.test_zip = d.zip)
-----
+---- TYPES
 bigint, string, int, int, bigint, string, int
-----
+---- RESULTS
 1001,'Name1',94611,5000,1001,'Name1',94611
 1001,'Name1',94611,5000,1002,'Name2',94611
 1002,'Name2',94611,5000,1001,'Name1',94611
@@ -316,26 +316,26 @@ bigint, string, int, int, bigint, string, int
 1004,'Name4',94611,5000,1002,'Name2',94611
 1005,'Name5',94611,5000,1001,'Name1',94611
 1005,'Name5',94611,5000,1002,'Name2',94611
-1106,'Name6',94612,5000,1003,'Name3',94612
-1106,'Name6',94612,5000,1004,'Name4',94612
+1006,'Name16',94612,15000,1003,'Name3',94612
+1006,'Name16',94612,15000,1004,'Name4',94612
 1006,'Name16',94612,5000,1003,'Name3',94612
 1006,'Name16',94612,5000,1004,'Name4',94612
+1006,'Name16',94616,15000,NULL,'NULL',NULL
+1006,'Name16',94616,5000,NULL,'NULL',NULL
+1006,'Name6',94616,15000,NULL,'NULL',NULL
 1006,'Name6',94616,5000,NULL,'NULL',NULL
+1106,'Name16',94612,15000,1003,'Name3',94612
+1106,'Name16',94612,15000,1004,'Name4',94612
 1106,'Name16',94612,5000,1003,'Name3',94612
 1106,'Name16',94612,5000,1004,'Name4',94612
-1106,'Name6',94616,5000,NULL,'NULL',NULL
-1006,'Name16',94616,5000,NULL,'NULL',NULL
+1106,'Name16',94616,15000,NULL,'NULL',NULL
 1106,'Name16',94616,5000,NULL,'NULL',NULL
 1106,'Name6',94612,15000,1003,'Name3',94612
 1106,'Name6',94612,15000,1004,'Name4',94612
-1006,'Name16',94612,15000,1003,'Name3',94612
-1006,'Name16',94612,15000,1004,'Name4',94612
-1006,'Name6',94616,15000,NULL,'NULL',NULL
-1106,'Name16',94612,15000,1003,'Name3',94612
-1106,'Name16',94612,15000,1004,'Name4',94612
+1106,'Name6',94612,5000,1003,'Name3',94612
+1106,'Name6',94612,5000,1004,'Name4',94612
 1106,'Name6',94616,15000,NULL,'NULL',NULL
-1006,'Name16',94616,15000,NULL,'NULL',NULL
-1106,'Name16',94616,15000,NULL,'NULL',NULL
+1106,'Name6',94616,5000,NULL,'NULL',NULL
 NULL,'NULL',NULL,NULL,1005,'Name5',94613
 NULL,'NULL',NULL,NULL,1006,'Name6',94613
 NULL,'NULL',NULL,NULL,1007,'Name7',94614
@@ -346,9 +346,9 @@ NULL,'NULL',NULL,NULL,1010,'Name10',94615
 # semi-join on bigint
 select d.*
 from DimTbl d left semi join JoinTbl j on (d.id = j.test_id)
-----
+---- TYPES
 bigint, string, int
-----
+---- RESULTS
 1001,'Name1',94611
 1002,'Name2',94611
 1003,'Name3',94612
@@ -359,9 +359,9 @@ bigint, string, int
 # semi-join on string
 select d.*
 from DimTbl d left semi join JoinTbl j on (j.test_name = d.name)
-----
+---- TYPES
 bigint, string, int
-----
+---- RESULTS
 1001,'Name1',94611
 1002,'Name2',94611
 1003,'Name3',94612
@@ -372,9 +372,9 @@ bigint, string, int
 # semi-join on int
 select d.*
 from DimTbl d left semi join JoinTbl j on (j.test_zip = d.zip)
-----
+---- TYPES
 bigint, string, int
-----
+---- RESULTS
 1001,'Name1',94611
 1002,'Name2',94611
 1003,'Name3',94612
@@ -382,19 +382,19 @@ bigint, string, int
 ====
 # joins on empty tables
 select * from emptytable t1 full outer join emptytable t2 on (t1.field=t2.field)
-----
+---- TYPES
 int, string, int, string
-----
+---- RESULTS
 ====
 select * from emptytable t1 right outer join greptiny t2 on (t1.field=t2.field)
-----
+---- TYPES
 int, string, string
-----
+---- RESULTS
 ====
 select count(*) from greptiny t1 left outer join emptytable t2 on (t1.field=t2.field)
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 100
 ====
 # test nested joins
@@ -404,9 +404,9 @@ from alltypesagg a join alltypesagg b on
 left outer join alltypessmall c on 
 (c.id = a.id and a.month = c.id and a.month=c.month) 
 where a.id < 10
-----
-int, int, int, int, int, int , int, int
-----
+---- TYPES
+int, int, int, int, int, int, int, int
+---- RESULTS
 0,0,NULL,1,1,NULL,1,1
 1,1,1,1,1,1,1,1
 2,2,NULL,1,1,NULL,1,1
