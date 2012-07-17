@@ -9,12 +9,13 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "simple-scheduler.h"
+#include "subscription-manager.h"
 
 using namespace std;
 using namespace boost;
-using sparrow::SimpleScheduler;
+using namespace impala;
 
-namespace impala {
+namespace sparrow {
 
 class SimpleSchedulerTest : public testing::Test {
  protected:
@@ -118,6 +119,13 @@ TEST_F(SimpleSchedulerTest, NonLocalHost) {
   EXPECT_EQ(hostports.at(4).first, "host_1");
   EXPECT_EQ(hostports.at(4).second, 1000);
 }
+
+ TEST_F(SimpleSchedulerTest, CleanShutdownWithoutInit) {
+   SubscriptionManager subscription_manager;
+   SimpleScheduler simple_scheduler(&subscription_manager, "dummy_service_id");
+   // We're checking that the SimpleScheduler destructor finishes cleanly if Init is not
+   // called, so just allow simple_scheduler to go out of scope.
+ }
 
 }
 

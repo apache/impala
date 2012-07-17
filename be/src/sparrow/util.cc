@@ -15,6 +15,8 @@ using impala::THostPort;
 
 namespace sparrow {
 
+const SubscriptionId INVALID_SUBSCRIPTION_ID = -1;
+
 bool ServiceState::operator==(const ServiceState& that) const {
   if (membership != that.membership) {
     return false;

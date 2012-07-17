@@ -28,6 +28,7 @@ namespace sparrow {
 SimpleScheduler::SimpleScheduler(SubscriptionManager* subscription_manager,
     const ServiceId& backend_service_id)
   : subscription_manager_(subscription_manager),
+    subscription_id_(INVALID_SUBSCRIPTION_ID),
     backend_service_id_(backend_service_id) {
   next_nonlocal_host_entry_ = host_map_.begin();
 }
@@ -116,7 +117,7 @@ Status SimpleScheduler::GetHosts(
 }
 
 SimpleScheduler::~SimpleScheduler() {
-  if (subscription_manager_ != NULL) {
+  if (subscription_manager_ != NULL && subscription_id_ != INVALID_SUBSCRIPTION_ID) {
     VLOG_QUERY << "Unregistering simple scheduler with subscription manager";
     Status status = subscription_manager_->UnregisterSubscription(subscription_id_);
     if (!status.ok()) {

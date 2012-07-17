@@ -70,9 +70,9 @@ void StateStore::RegisterService(TRegisterServiceResponse& response,
   if (membership.find(subscriber.id()) == membership.end()) {
     membership.insert(make_pair(subscriber.id(), request.service_address));
     subscriber.AddService(request.service_id);
-    LOG(INFO) << "Added service instance " << request.service_id << " at "
-              << request.service_address.host << ":"
-              << request.service_address.port;
+    LOG(INFO) << "Registered service instance (id: " << request.service_id << ", host: "
+              << request.service_address.host << ":" << request.service_address.port
+              << ")";
   }
   RETURN_AND_SET_STATUS_OK(response);
 }
@@ -83,7 +83,7 @@ void StateStore::UnregisterService(TUnregisterServiceResponse& response,
   RETURN_IF_UNSET(request, service_id, response);
 
   lock_guard<recursive_mutex> lock(lock_);
- 
+
   // Ensure the associated subscriber is registered (if it's not, the service is
   // definitely not registered).
   Subscribers::iterator subscriber_iterator =
@@ -109,7 +109,7 @@ void StateStore::UnregisterService(TUnregisterServiceResponse& response,
       if (membership.empty()) {
         service_instances_.erase(service_membership);
       }
-      
+
       subscriber.RemoveService(request.service_id);
       if (subscriber.IsZombie()) {
         subscribers_.erase(subscriber_iterator);
@@ -125,22 +125,21 @@ void StateStore::UnregisterService(TUnregisterServiceResponse& response,
 
   RETURN_AND_SET_STATUS_OK(response);
 }
-  
+
 void StateStore::RegisterSubscription(TRegisterSubscriptionResponse& response,
                                       const TRegisterSubscriptionRequest& request) {
   RETURN_IF_UNSET(request, subscriber_address, response);
   RETURN_IF_UNSET(request, services, response);
- 
+
   lock_guard<recursive_mutex> lock(lock_);
   Subscriber& subscriber = GetOrCreateSubscriber(request.subscriber_address);
 
   SubscriptionId subscription_id = subscriber.AddSubscription(request.services);
   response.__set_subscription_id(subscription_id);
-  LOG(INFO) << "Registered " << request.services.size()
-            << " services for subscription " << subscription_id << " at "
-            << request.subscriber_address.host << ":"
-            << request.subscriber_address.port;
-  
+  LOG(INFO) << "Registered subscription (id: " << subscription_id << ", host: "
+            << request.subscriber_address.host << ":" << request.subscriber_address.port
+            << ") for " << request.services.size() << " topics";
+
   RETURN_AND_SET_STATUS_OK(response);
 }
 
@@ -158,7 +157,7 @@ void StateStore::UnregisterSubscription(TUnregisterSubscriptionResponse& respons
     error_format % request.subscriber_address.host % request.subscriber_address.port;
     RETURN_AND_SET_ERROR(error_format.str(), response);
   }
- 
+
   Subscriber& subscriber = subscriber_iterator->second;
   bool subscription_existed = subscriber.RemoveSubscription(request.subscription_id);
   if (!subscription_existed) {
@@ -255,7 +254,7 @@ SubscriptionId StateStore::Subscriber::AddSubscription(const set<string>& servic
 
 bool StateStore::Subscriber::RemoveSubscription(SubscriptionId id) {
   Subscriptions::iterator subscription = subscriptions_.find(id);
-  LOG(INFO) << "Remove subscription " << id << " for " << id_ << " on " 
+  LOG(INFO) << "Remove subscription " << id << " for " << id_ << " on "
             << join(subscription->second, ", ") << ".";
   if (subscription != subscriptions_.end()) {
     // For each subscribed service, decrease the associated count, and remove the
@@ -293,7 +292,7 @@ void StateStore::set_is_updating(bool is_updating) {
 
 StateStore::Subscriber& StateStore::GetOrCreateSubscriber(const THostPort& host_port) {
   lock_guard<recursive_mutex> lock(lock_);
-  Subscribers::iterator subscriber = subscribers_.find(host_port); 
+  Subscribers::iterator subscriber = subscribers_.find(host_port);
   if (subscriber == subscribers_.end()) {
     subscriber = subscribers_.insert(
         make_pair(host_port, Subscriber(next_subscriber_id_++))).first;
@@ -320,14 +319,14 @@ void StateStore::UpdateLoop() {
         if (!update.transport->isOpen()) {
           update.transport->open();
         }
-        
+
         TUpdateStateResponse response;
-        update.client->UpdateState(response, update.request); 
+        update.client->UpdateState(response, update.request);
         if (response.status.status_code != TStatusCode::OK) {
           Status status(response.status);
           LOG(ERROR) << status.GetErrorMsg();
         }
-        
+
       } catch (TTransportException& e) {
         // TODO: We currently assume that once a subscriber has joined, it will be part
         // of the cluster permanently.  Instead, inability to create a client should
@@ -341,7 +340,7 @@ void StateStore::UpdateLoop() {
     }
 
     if (get_system_time() < next_update_time && is_updating()) {
-      posix_time::time_duration duration = next_update_time - get_system_time();  
+      posix_time::time_duration duration = next_update_time - get_system_time();
       usleep(duration.total_microseconds());
     }
     next_update_time = get_system_time() + posix_time::seconds(UPDATE_FREQUENCY_SECONDS);
@@ -364,13 +363,13 @@ void StateStore::GenerateUpdates(vector<StateStore::SubscriberUpdate>* updates) 
       // Check if any instances exist for the service described by service_subscription,
       // and if they do, add them to the request.
       ServiceMemberships::iterator service_membership =
-          service_instances_.find(service_id); 
+          service_instances_.find(service_id);
       if (service_membership != service_instances_.end()) {
         // Add the membership information for the given service. Add an empty membership
         // and then modify it, to avoid copying all membership information twice.
         subscriber_update.request.service_memberships.push_back(TServiceMembership());
         TServiceMembership& new_membership =
-            subscriber_update.request.service_memberships.back(); 
+            subscriber_update.request.service_memberships.back();
         MembershipToThrift(service_membership->second,
                            &new_membership.service_instances);
         new_membership.service_id = service_id;

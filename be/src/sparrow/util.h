@@ -29,6 +29,10 @@ typedef int SubscriberId;
 // may facilitate more than one subscription to the state store.
 typedef int SubscriptionId;
 
+// Subscribers can use this SubscriptionId to distinguish between a not-yet-made
+// subscription and an active one.
+extern const SubscriptionId INVALID_SUBSCRIPTION_ID;
+
 // Describes a set of running instances.  The key is the ID of the StateStoreSubscriber
 // associated with the running instance, and the value is the network address of the
 // running instance.
