@@ -62,7 +62,8 @@ Status Webserver::Start() {
   string port_as_string = boost::lexical_cast<string>(port_);
   stringstream listening_spec;
   listening_spec << interface_ << (interface_.empty() ? "" : ":") << port_as_string;
-  const char* options[] = {"listening_ports", listening_spec.str().c_str(), NULL};
+  string listening_str = listening_spec.str();
+  const char* options[] = {"listening_ports", listening_str.c_str(), NULL};
 
   // To work around not being able to pass member functions as C callbacks, we store a
   // pointer to this server in the per-server state, and register a static method as the
