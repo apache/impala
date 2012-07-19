@@ -41,6 +41,7 @@ export PATH=$IMPALA_HOME/bin:$PATH
 
 export HADOOP_HOME=$IMPALA_HOME/thirdparty/hadoop-2.0.0-cdh4.1.0-SNAPSHOT/
 export HADOOP_CONF_DIR=${IMPALA_HOME}/fe/src/test/resources
+export MINI_DFS_BASE_DATA_DIR=$HADOOP_HOME/build/test/data
 export PATH=$HADOOP_HOME/bin:$PATH
 
 export HIVE_HOME=$IMPALA_HOME/thirdparty/hive-0.8.1-cdh4.0.0-SNAPSHOT/
@@ -74,11 +75,12 @@ CLASSPATH=$IMPALA_FE_DIR/src/test/resources:$CLASSPATH
 
 export CLASSPATH
 
-echo "IMPALA_HOME     = $IMPALA_HOME"
-echo "HADOOP_HOME     = $HADOOP_HOME"
-echo "HADOOP_CONF_DIR = $HADOOP_CONF_DIR"
-echo "HIVE_HOME       = $HIVE_HOME"
-echo "HIVE_CONF_DIR   = $HIVE_CONF_DIR"
-echo "HBASE_HOME      = $HBASE_HOME"
-echo "HBASE_CONF_DIR  = $HBASE_CONF_DIR"
-echo "CLASSPATH       = $CLASSPATH"
+echo "IMPALA_HOME            = $IMPALA_HOME"
+echo "HADOOP_HOME            = $HADOOP_HOME"
+echo "HADOOP_CONF_DIR        = $HADOOP_CONF_DIR"
+echo "MINI_DFS_BASE_DATA_DIR = $MINI_DFS_BASE_DATA_DIR"
+echo "HIVE_HOME              = $HIVE_HOME"
+echo "HIVE_CONF_DIR          = $HIVE_CONF_DIR"
+echo "HBASE_HOME             = $HBASE_HOME"
+echo "HBASE_CONF_DIR         = $HBASE_CONF_DIR"
+echo "CLASSPATH              = $CLASSPATH"
