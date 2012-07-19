@@ -31,7 +31,7 @@ HdfsTextTableWriter::HdfsTextTableWriter(OutputPartition* output,
 }
 
 Status HdfsTextTableWriter::AppendRowBatch(RowBatch* batch,
-                                           vector<int32_t> row_group_indices,
+                                           const vector<int32_t>& row_group_indices,
                                            bool* new_file) {
   int32_t limit;
   if (row_group_indices.empty()) {

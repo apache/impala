@@ -33,7 +33,7 @@ class HdfsTextTableWriter : public HdfsTableWriter {
 
   // Appends delimited string representation of the rows in the batch to output partition.
   Status AppendRowBatch(RowBatch* current_row,
-                        std::vector<int32_t> row_group_indices, bool* new_file);
+                        const std::vector<int32_t>& row_group_indices, bool* new_file);
 
  private:
   // Character delimiting tuples.

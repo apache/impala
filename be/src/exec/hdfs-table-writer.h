@@ -41,7 +41,7 @@ class HdfsTableWriter {
   // much of the batch it had already processed asking for a new file.
   // Otherwise the writer will return with *newfile == false.
   virtual Status AppendRowBatch(RowBatch* batch,
-                                std::vector<int32_t> row_group_indices,
+                                const std::vector<int32_t>& row_group_indices,
                                 bool* new_file) = 0;
 
   // Finalize this partition. The writer needs to finish processing
