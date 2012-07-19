@@ -332,10 +332,32 @@ string, string
 'two','%two%'
 ====
 select str_col, match_like_col from LikeTbl
+where str_col NOT LIKE match_like_col
+---- TYPES
+string, string
+---- RESULTS
+====
+select str_col, match_like_col from LikeTbl
 where str_col LIKE no_match_like_col
 ---- TYPES
 string, string
 ---- RESULTS
+====
+select str_col, no_match_like_col from LikeTbl
+where str_col NOT LIKE no_match_like_col
+---- TYPES
+string, string
+---- RESULTS
+'eight','n%eight%'
+'five','n%five%'
+'four','n%four%'
+'nine','n%nine%'
+'one','n%one%'
+'seven','n%seven%'
+'six','n%six%'
+'ten','n%ten%'
+'three','n%three%'
+'two','n%two%'
 ====
 select str_col, match_regex_col from LikeTbl
 where str_col REGEXP match_regex_col
@@ -358,6 +380,28 @@ where str_col REGEXP no_match_regex_col
 ---- TYPES
 string, string
 ---- RESULTS
+====
+select str_col, match_regex_col from LikeTbl
+where str_col NOT REGEXP match_regex_col
+---- TYPES
+string, string
+---- RESULTS
+====
+select str_col, no_match_regex_col from LikeTbl
+where str_col NOT REGEXP no_match_regex_col
+---- TYPES
+string, string
+---- RESULTS
+'eight','n.*eight.*'
+'five','n.*five.*'
+'four','n.*four.*'
+'nine','n.*nine.*'
+'one','n.*one.*'
+'seven','n.*seven.*'
+'six','n.*six.*'
+'ten','n.*ten.*'
+'three','n.*three.*'
+'two','n.*two.*'
 ====
 select 1+2
 ---- TYPES
