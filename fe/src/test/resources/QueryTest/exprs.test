@@ -304,9 +304,13 @@ select * from LikeTbl
 ---- TYPES
 string, string, string, string, string
 ---- RESULTS
+'NULL','%','NULL','.*','X'
+'beginning of line','begin%','not begin%','^begin.*','^not begin.*'
 'eight','%eight%','n%eight%','.*eight.*','n.*eight.*'
+'end of line','%line','%line end','.*line$','.*line end$'
 'five','%five%','n%five%','.*five.*','n.*five.*'
 'four','%four%','n%four%','.*four.*','n.*four.*'
+'middle of line','%of%','%of','^.*of.*$','.*of$'
 'nine','%nine%','n%nine%','.*nine.*','n.*nine.*'
 'one','%one%','n%one%','.*one.*','n.*one.*'
 'seven','%seven%','n%seven%','.*seven.*','n.*seven.*'
@@ -320,9 +324,12 @@ where str_col LIKE match_like_col
 ---- TYPES
 string, string
 ---- RESULTS
+'beginning of line','begin%'
 'eight','%eight%'
+'end of line','%line'
 'five','%five%'
 'four','%four%'
+'middle of line','%of%'
 'nine','%nine%'
 'one','%one%'
 'seven','%seven%'
@@ -348,9 +355,12 @@ where str_col NOT LIKE no_match_like_col
 ---- TYPES
 string, string
 ---- RESULTS
+'beginning of line','not begin%'
 'eight','n%eight%'
+'end of line','%line end'
 'five','n%five%'
 'four','n%four%'
+'middle of line','%of'
 'nine','n%nine%'
 'one','n%one%'
 'seven','n%seven%'
@@ -364,9 +374,12 @@ where str_col REGEXP match_regex_col
 ---- TYPES
 string, string
 ---- RESULTS
+'beginning of line','^begin.*'
 'eight','.*eight.*'
+'end of line','.*line$'
 'five','.*five.*'
 'four','.*four.*'
+'middle of line','^.*of.*$'
 'nine','.*nine.*'
 'one','.*one.*'
 'seven','.*seven.*'
@@ -392,9 +405,12 @@ where str_col NOT REGEXP no_match_regex_col
 ---- TYPES
 string, string
 ---- RESULTS
+'beginning of line','^not begin.*'
 'eight','n.*eight.*'
+'end of line','.*line end$'
 'five','n.*five.*'
 'four','n.*four.*'
+'middle of line','.*of$'
 'nine','n.*nine.*'
 'one','n.*one.*'
 'seven','n.*seven.*'
