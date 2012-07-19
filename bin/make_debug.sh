@@ -27,4 +27,4 @@ make
 cd $IMPALA_HOME/common/thrift
 make
 cd $IMPALA_BE_DIR
-make -j
+make -j4
