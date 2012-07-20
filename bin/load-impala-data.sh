@@ -58,4 +58,8 @@ do
 done
 popd
 
-$IMPALA_HOME/testdata/bin/generate-block-ids.sh
+# TODO: Temporarily disable block id generation for everything except benchmark runs
+# due to IMP-134
+if [ $data_set_type = "benchmark" ]; then
+  $IMPALA_HOME/testdata/bin/generate-block-ids.sh
+fi
