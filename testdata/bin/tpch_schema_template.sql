@@ -391,6 +391,17 @@ LOCATION '/test-warehouse/%(table_name)s';
 ===
 tpch
 ---
+q20_tmp4
+---
+DROP TABLE %(table_name)s;
+CREATE EXTERNAL TABLE %(table_name)s (ps_suppkey int)
+STORED AS %(file_format)s
+LOCATION '/test-warehouse/%(table_name)s';
+---
+---
+===
+tpch
+---
 q21_tmp1
 ---
 DROP TABLE %(table_name)s;
