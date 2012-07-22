@@ -84,7 +84,7 @@ static void StartImpalaService(ExecEnv* exec_env, int port) {
       processor, server_transport, transport_factory, protocol_factory,
       thread_mgr);
 
-  SubscriptionManager* subscription_manager = exec_env->subscription_manager();
+  SubscriptionManager* subscription_manager = exec_env->subscription_mgr();
   if (FLAGS_use_statestore) {
     THostPort host_port;
     host_port.port = FLAGS_be_port;

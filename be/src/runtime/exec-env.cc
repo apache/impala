@@ -30,22 +30,17 @@ DEFINE_bool(use_statestore, false,
 namespace impala {
 
 ExecEnv::ExecEnv()
-  : stream_mgr_impl_(new DataStreamMgr()),
-    subscription_manager_impl_(new SubscriptionManager()),
-    client_cache_impl_(new BackendClientCache(0, 0)),
-    fs_cache_impl_(new HdfsFsCache()),
-    htable_cache_impl_(new HBaseTableCache()),
+  : stream_mgr_(new DataStreamMgr()),
+    subscription_mgr_(new SubscriptionManager()),
+    client_cache_(new BackendClientCache(0, 0)),
+    fs_cache_(new HdfsFsCache()),
+    htable_cache_(new HBaseTableCache()),
     webserver_(new Webserver()),
-    tz_database_(TimezoneDatabase()),
-    stream_mgr_(stream_mgr_impl_.get()),
-    subscription_manager_(subscription_manager_impl_.get()),
-    client_cache_(client_cache_impl_.get()),
-    fs_cache_(fs_cache_impl_.get()),
-    htable_cache_(htable_cache_impl_.get()) {
+    tz_database_(TimezoneDatabase()) {
   // Initialize the scheduler either dynamically (with a statestore) or statically (with
   // configured backends)
   if (FLAGS_use_statestore) {
-    scheduler_impl_.reset(new SimpleScheduler(subscription_manager_, IMPALA_SERVICE_ID));
+    scheduler_.reset(new SimpleScheduler(subscription_mgr_.get(), IMPALA_SERVICE_ID));
   } else if (!FLAGS_backends.empty()) {
     vector<string> backends;
     vector<THostPort> addresses;
@@ -61,29 +56,22 @@ ExecEnv::ExecEnv()
       addr.host = backends[i].substr(0, pos);
       addr.port = atoi(backends[i].substr(pos + 1).c_str());
     }
-    scheduler_impl_.reset(new SimpleScheduler(addresses));
+    scheduler_.reset(new SimpleScheduler(addresses));
   } else {
     // No scheduler required if query is not distributed.
     // TODO: Check that num_nodes is correctly set?
-    scheduler_impl_.reset(NULL);
+    scheduler_.reset(NULL);
   }
-
-  scheduler_ = scheduler_impl_.get();
 }
 
 ExecEnv::ExecEnv(HdfsFsCache* fs_cache)
-  : stream_mgr_impl_(new DataStreamMgr()),
-    subscription_manager_impl_(new SubscriptionManager()),
-    client_cache_impl_(new BackendClientCache(0, 0)),
-    fs_cache_impl_(),
-    htable_cache_impl_(new HBaseTableCache()),
-    tz_database_(TimezoneDatabase()),
-    stream_mgr_(stream_mgr_impl_.get()),
+  : stream_mgr_(new DataStreamMgr()),
     scheduler_(NULL),
-    subscription_manager_(subscription_manager_impl_.get()),
-    client_cache_(client_cache_impl_.get()),
+    subscription_mgr_(new SubscriptionManager()),
+    client_cache_(new BackendClientCache(0, 0)),
     fs_cache_(fs_cache),
-    htable_cache_(htable_cache_impl_.get()) {
+    htable_cache_(new HBaseTableCache()),
+    tz_database_(TimezoneDatabase()) {
 }
 
 ExecEnv::~ExecEnv() {
@@ -91,8 +79,8 @@ ExecEnv::~ExecEnv() {
 
 Status ExecEnv::StartServices() {
   // Start services in order to ensure that dependencies between them are met
-  if (FLAGS_use_statestore) RETURN_IF_ERROR(subscription_manager_->Start());
-  if (scheduler_ != NULL) scheduler_impl_->Init();
+  if (FLAGS_use_statestore) RETURN_IF_ERROR(subscription_mgr_->Start());
+  if (scheduler_ != NULL) scheduler_->Init();
   RETURN_IF_ERROR(webserver_->Start());
   return Status::OK;
 }

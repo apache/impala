@@ -43,8 +43,10 @@ class SimpleScheduler : public Scheduler {
       const std::vector<impala::THostPort>& data_locations,
       std::vector<std::pair<std::string, int> >* hostports);
 
+  virtual void GetAllKnownHosts(std::vector<std::pair<std::string, int> >* hostports);
+
   // Registers with the subscription manager if required
-  impala::Status Init();
+  virtual impala::Status Init();
 
   ~SimpleScheduler();
 

@@ -15,6 +15,8 @@
 
 namespace apache { namespace thrift { namespace server { class TServer; } } }
 
+namespace sparrow { class StateStore; }
+
 namespace impala {
 
 // Create environment for single-process distributed query execution.
@@ -34,6 +36,15 @@ class TestExecEnv : public ExecEnv {
  private:
   int num_backends_;
   int start_port_;
+
+  // shared_ptr required to work around the vagaries of Thrift, which
+  // requires that we keep a reference to every service handler
+  // implementation. Otherwise Thrift takes sole ownership of this
+  // object when we pass it to a Processor to initialise, and will
+  // delete it when it is finished with it.
+  boost::shared_ptr<sparrow::StateStore> state_store_;
+
+  int state_store_port_;
 
   struct BackendInfo;
   std::vector<BackendInfo*> backend_info_;  // owned by us

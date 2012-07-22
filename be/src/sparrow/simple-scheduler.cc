@@ -116,6 +116,16 @@ Status SimpleScheduler::GetHosts(
   return Status::OK;
 }
 
+void SimpleScheduler::GetAllKnownHosts(vector<pair<string, int> >* hostports) {
+  lock_guard<mutex> lock(host_map_lock_);
+  hostports->clear();
+  BOOST_FOREACH(HostMap::value_type host, host_map_) {
+    BOOST_FOREACH(int port, host.second) {
+      hostports->push_back(make_pair(host.first, port));
+    }
+  }
+}
+
 SimpleScheduler::~SimpleScheduler() {
   if (subscription_manager_ != NULL && subscription_id_ != INVALID_SUBSCRIPTION_ID) {
     VLOG_QUERY << "Unregistering simple scheduler with subscription manager";

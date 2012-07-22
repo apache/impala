@@ -37,6 +37,13 @@ class SubscriptionManager {
   // contacts (state_store_host, state_store_port).
   SubscriptionManager();
 
+  // Initialises a subscription manager based on explicit
+  // configuration parameters, not flags.
+  SubscriptionManager(const std::string& state_store_subscriber_host,
+                      int state_store_subscriber_port,
+                      const std::string& state_store_host,
+                      int state_store_port);
+
   // Registers an instance of the given service type at the given
   // address with the state store.
   impala::Status RegisterService(const std::string& service_id,

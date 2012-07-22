@@ -14,7 +14,6 @@
 namespace sparrow {
 
 class Scheduler;
-class SimpleScheduler;
 
 } // namespace sparrow
 
@@ -40,45 +39,36 @@ class ExecEnv {
   // can share a single fs cache
   ExecEnv(HdfsFsCache* fs_cache);
 
-  sparrow::SubscriptionManager* subscription_manager() {
-    return subscription_manager_;
+  sparrow::SubscriptionManager* subscription_mgr() {
+    return subscription_mgr_.get();
   }
 
-  DataStreamMgr* stream_mgr() { return stream_mgr_; }
-  BackendClientCache* client_cache() { return client_cache_; }
-  HdfsFsCache* fs_cache() { return fs_cache_; }
-  HBaseTableCache* htable_cache() { return htable_cache_; }
+  DataStreamMgr* stream_mgr() { return stream_mgr_.get(); }
+  BackendClientCache* client_cache() { return client_cache_.get(); }
+  HdfsFsCache* fs_cache() { return fs_cache_.get(); }
+  HBaseTableCache* htable_cache() { return htable_cache_.get(); }
   Webserver* webserver() { return webserver_.get(); }
 
   sparrow::Scheduler* scheduler() {
-    DCHECK(scheduler_ != NULL);
-    return scheduler_;
+    DCHECK(scheduler_.get() != NULL);
+    return scheduler_.get();
   }
 
   // Starts any dependent services in their correct order
-  Status StartServices();
-
- private:
-  boost::scoped_ptr<DataStreamMgr> stream_mgr_impl_;
-  boost::scoped_ptr<sparrow::SimpleScheduler> scheduler_impl_;
-  boost::scoped_ptr<sparrow::SubscriptionManager> subscription_manager_impl_;
-  boost::scoped_ptr<BackendClientCache> client_cache_impl_;
-  boost::scoped_ptr<HdfsFsCache> fs_cache_impl_;
-  boost::scoped_ptr<HBaseTableCache> htable_cache_impl_;
-  boost::scoped_ptr<Webserver> webserver_;
-
-  TimezoneDatabase tz_database_;
+  virtual Status StartServices();
 
  protected:
-  // leave these protected so TestExecEnv can "override" them
-  // w/o having to resort to virtual getters
-  DataStreamMgr* stream_mgr_;
-  sparrow::Scheduler* scheduler_;
-  sparrow::SubscriptionManager* subscription_manager_;
-  BackendClientCache* client_cache_;
-  HdfsFsCache* fs_cache_;
-  HBaseTableCache* htable_cache_;
+  // Leave protected so that subclasses can override
+  boost::scoped_ptr<DataStreamMgr> stream_mgr_;
+  boost::scoped_ptr<sparrow::Scheduler> scheduler_;
+  boost::scoped_ptr<sparrow::SubscriptionManager> subscription_mgr_;
+  boost::scoped_ptr<BackendClientCache> client_cache_;
+  boost::scoped_ptr<HdfsFsCache> fs_cache_;
+  boost::scoped_ptr<HBaseTableCache> htable_cache_;
+  boost::scoped_ptr<Webserver> webserver_;
 
+ private:
+  TimezoneDatabase tz_database_;
 };
 
 } // namespace impala

@@ -24,6 +24,13 @@ class Scheduler {
   virtual impala::Status GetHosts(
       const std::vector<impala::THostPort>& data_locations,
       std::vector<std::pair<std::string, int> >* hostports) = 0;
+
+  // Return a list of all hosts known to the scheduler
+  virtual void GetAllKnownHosts(std::vector<std::pair<std::string, int> >* hostports) = 0;
+
+  // Initialises the scheduler, acquiring all resources needed to make
+  // scheduling decisions once this method returns.
+  virtual impala::Status Init() = 0;
 };
 
 }

@@ -8,6 +8,7 @@
 #include <boost/thread/thread.hpp>
 
 #include "common/status.h"
+#include "common/service-ids.h"
 #include "service/backend-service.h"
 #include "runtime/client-cache.h"
 #include "runtime/data-stream-mgr.h"
@@ -19,28 +20,51 @@ using namespace boost;
 using namespace std;
 using namespace apache::thrift::server;
 using sparrow::SimpleScheduler;
+using sparrow::SubscriptionManager;
+using sparrow::StateStore;
 
 namespace impala {
+
+// ExecEnv for slave backends run as part of a test environment, with webserver disabled,
+// no scheduler (since coordinator takes care of that) and a state store subscriber.
+class BackendTestExecEnv : public ExecEnv {
+ public:
+  BackendTestExecEnv(HdfsFsCache* fs_cache, int subscriber_port, int state_store_port);
+
+  virtual Status StartServices();
+};
+
 
 struct TestExecEnv::BackendInfo {
   thread backend_thread;
   TServer* server;
-  ExecEnv exec_env;
+  BackendTestExecEnv exec_env;
 
-  BackendInfo(HdfsFsCache* fs_cache) : server(NULL), exec_env(fs_cache) {}
+  BackendInfo(HdfsFsCache* fs_cache, int subscriber_port, int state_store_port)
+      : server(NULL),
+        exec_env(fs_cache, subscriber_port, state_store_port) {
+  }
 };
+
+
+BackendTestExecEnv::BackendTestExecEnv(HdfsFsCache* fs_cache, int subscriber_port,
+    int state_store_port)
+  : ExecEnv(fs_cache) {
+  subscription_mgr_.reset(new SubscriptionManager("localhost", subscriber_port,
+      "localhost", state_store_port));
+  scheduler_.reset(NULL);
+}
+
+Status BackendTestExecEnv::StartServices() {
+  // Don't start the scheduler, or the webserver
+  RETURN_IF_ERROR(subscription_mgr_->Start());
+  return Status::OK;
+}
 
 TestExecEnv::TestExecEnv(int num_backends, int start_port)
   : num_backends_(num_backends),
-    start_port_(start_port) {
-  vector<THostPort> addresses;
-  for (int i = 0; i < num_backends; ++i) {
-    addresses.push_back(THostPort());
-    THostPort& addr = addresses.back();
-    addr.host = "localhost";
-    addr.port = start_port + i;
-  }
-  scheduler_ = new SimpleScheduler(addresses);
+    start_port_(start_port),
+    state_store_(new StateStore()) {
 }
 
 TestExecEnv::~TestExecEnv() {
@@ -57,15 +81,56 @@ TestExecEnv::~TestExecEnv() {
 }
 
 Status TestExecEnv::StartBackends() {
-  LOG(INFO) << "starting " << num_backends_ << " backends";
-  int port = start_port_;
+  LOG(INFO) << "Starting " << num_backends_ << " backends";
+  int next_free_port = start_port_;
+  state_store_port_ = next_free_port++;
+  LOG(INFO) << "Starting in-process state-store";
+  state_store_->Start(state_store_port_);
+  RETURN_IF_ERROR(WaitForServer("localhost", state_store_port_, 10, 100));
+
   for (int i = 0; i < num_backends_; ++i) {
-    BackendInfo* info = new BackendInfo(fs_cache_);
-    info->server = StartImpalaBackendService(&info->exec_env, port++);
+    BackendInfo* info = new BackendInfo(fs_cache_.get(), next_free_port++,
+        state_store_port_);
+    int backend_port = next_free_port++;
+    info->server = StartImpalaBackendService(&info->exec_env, backend_port);
     DCHECK(info->server != NULL);
     info->backend_thread = thread(&TestExecEnv::RunBackendServer, this, info->server);
     backend_info_.push_back(info);
+    info->exec_env.StartServices();
+    THostPort address;
+    address.host = "localhost";
+    address.port = backend_port;
+    RETURN_IF_ERROR(
+        info->exec_env.subscription_mgr()->RegisterService(
+          IMPALA_SERVICE_ID, address));
   }
+
+  // Coordinator exec env gets both a subscription manager and a scheduler.
+  subscription_mgr_.reset(new SubscriptionManager("localhost", next_free_port++,
+      "localhost", state_store_port_));
+  scheduler_.reset(new SimpleScheduler(subscription_mgr_.get(), IMPALA_SERVICE_ID));
+  subscription_mgr_->Start();
+  scheduler_->Init();
+
+  // Wait until we see all the backends registered, or timeout if 5s pass
+  vector<pair<string, int> > host_ports;
+  const int NUM_RETRIES = 25;
+  for (int i = 1; i <= NUM_RETRIES; ++i) {
+    scheduler_->GetAllKnownHosts(&host_ports);
+
+    if (host_ports.size() == num_backends_) {
+      VLOG(1) << "Complete set of backends observed in under " << i * 200 << "ms";
+      break;
+    } else if (i == NUM_RETRIES) {
+      stringstream error_msg;
+      error_msg << "Failed to see " << num_backends_
+                << " backends, last membership size observed was: " << host_ports.size();
+      return Status(error_msg.str());
+    }
+    // Sleep for 200ms
+    usleep(200 * 1000);
+  };
+
   return Status::OK;
 }
 
