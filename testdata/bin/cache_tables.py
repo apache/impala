@@ -30,7 +30,7 @@ parser.add_option("-q", "--query", dest="query", default = "",
 (options, args) = parser.parse_args()
 
 block_ids_file = 'testdata/block-ids'
-data_node_root = os.environ['HADOOP_HOME'] + '/build/test/data/dfs/data'
+data_node_root = os.environ['MINI_DFS_BASE_DATA_DIR'] + '/dfs/data'
 block_ids = {}
 
 # Parse the block ids file to all the block ids for all the tables
