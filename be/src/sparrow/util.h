@@ -27,7 +27,7 @@ typedef int SubscriberId;
 // Identifier for a particular subscription to the state store. Note that there is not
 // a one to one mapping between subscriptions and subscribers; a given subscriber
 // may facilitate more than one subscription to the state store.
-typedef int SubscriptionId;
+typedef int64_t SubscriptionId;
 
 // Subscribers can use this SubscriptionId to distinguish between a not-yet-made
 // subscription and an active one.

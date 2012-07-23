@@ -69,7 +69,7 @@ class SimpleScheduler : public Scheduler {
   SubscriptionManager* subscription_manager_;
 
   // Subscription handle, used to unregister with subscription manager
-  int subscription_id_;
+  SubscriptionId subscription_id_;
 
   // Service identifier to subscribe to for backend membership information
   ServiceId backend_service_id_;

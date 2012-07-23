@@ -63,7 +63,7 @@ struct TRegisterSubscriptionResponse {
 
   // Unique identifier for the subscription, which is needed to unsubscribe.
   // Required in V1.
-  2: optional i32 subscription_id
+  2: optional i64 subscription_id
 }
 
 struct TUnregisterSubscriptionRequest {
@@ -74,7 +74,7 @@ struct TUnregisterSubscriptionRequest {
   2: optional Types.THostPort subscriber_address
 
   // Identifier for the subscription that should be unregistered. Required in V1.
-  3: optional i32 subscription_id
+  3: optional i64 subscription_id
 }
 
 struct TUnregisterSubscriptionResponse {
