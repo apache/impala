@@ -20,6 +20,7 @@ add_library(Util
   perf-counters.cc
   runtime-profile.cc
   thrift-util.cc
+  thrift-server.cc
   static-asserts.cc
   url-parser.cc
 )

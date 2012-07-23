@@ -155,6 +155,8 @@ set (IMPALA_LINK_LIBS
   Common
   Util
   thriftstatic
+  thriftnbstatic
+  event # event required for thriftnbstatic
   ImpalaThrift
   Service
   Exec

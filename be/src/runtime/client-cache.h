@@ -9,6 +9,8 @@
 #include <boost/unordered_map.hpp>
 #include <boost/thread/mutex.hpp>
 
+#include "util/thrift-client.h"
+
 #include "common/status.h"
 
 namespace impala {
@@ -48,15 +50,16 @@ class BackendClientCache {
   // this isn't going to scale for a high request rate
   boost::mutex lock_;
 
-  struct ClientInfo;
+  typedef ThriftClient<ImpalaInternalServiceClient> BackendClient;
+
   // map from (host, port) to list of clients;
-  // we own ClientInfo*
-  typedef boost::unordered_map<std::pair<std::string, int>, std::list<ClientInfo*> >
+  // we own BackendClient*
+  typedef boost::unordered_map<std::pair<std::string, int>, std::list<BackendClient*> >
       ClientCache;
   ClientCache client_cache_;
 
   // map from client back to its containing struct
-  typedef boost::unordered_map<ImpalaInternalServiceClient*, ClientInfo*> ClientMap;
+  typedef boost::unordered_map<ImpalaInternalServiceClient*, BackendClient*> ClientMap;
   ClientMap client_map_;
 };
 

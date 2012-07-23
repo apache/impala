@@ -10,29 +10,24 @@
 #include <boost/thread/locks.hpp>
 #include <boost/thread/thread_time.hpp>
 #include <boost/algorithm/string/join.hpp>
-#include <concurrency/PosixThreadFactory.h>
-#include <concurrency/Thread.h>
-#include <concurrency/ThreadManager.h>
 #include <glog/logging.h>
 #include <gflags/gflags.h>
-#include <server/TThreadPoolServer.h>
-#include <transport/TServerSocket.h>
 
 #include "common/status.h"
+#include "util/thrift-server.h"
+#include "util/thrift-client.h"
 #include "gen-cpp/StateStoreService_types.h"
 #include "gen-cpp/StateStoreSubscriberService_types.h"
 #include "gen-cpp/Types_types.h"
 
 using namespace boost;
 using namespace std;
-using namespace ::apache::thrift;
-using namespace ::apache::thrift::concurrency;
-using namespace ::apache::thrift::protocol;
-using namespace ::apache::thrift::transport;
+
 using namespace ::apache::thrift::server;
 using impala::Status;
 using impala::THostPort;
 using impala::TStatusCode;
+using impala::ThriftServer;
 
 DEFINE_int32(state_store_num_server_worker_threads, 4,
              "number of worker threads for the thread manager underlying the "
@@ -141,7 +136,8 @@ void StateStore::RegisterSubscription(TRegisterSubscriptionResponse& response,
   response.__set_subscription_id(subscription_id);
   LOG(INFO) << "Registered subscription (id: " << subscription_id << ", host: "
             << request.subscriber_address.host << ":" << request.subscriber_address.port
-            << ") for " << request.services.size() << " topics";
+            << ") for " << request.services.size() << " topics (" 
+            << join(request.services, ", ") << ")";
 
   RETURN_AND_SET_STATUS_OK(response);
 }
@@ -181,48 +177,27 @@ void StateStore::UnregisterSubscription(TUnregisterSubscriptionResponse& respons
 }
 
 void StateStore::Start(int port) {
+  set_is_updating(true);
+  update_thread_.reset(new thread(&StateStore::UpdateLoop, this));
+
   // If there isn't already a shared_ptr to this somewhere, this call will lead
   // to a boost runtime exception.
   shared_ptr<StateStore> state_store = shared_from_this();
   shared_ptr<TProcessor> processor(new StateStoreServiceProcessor(state_store));
-  shared_ptr<TServerTransport> server_transport(new TServerSocket(port));
-  shared_ptr<TTransportFactory> transport_factory(new TBufferedTransportFactory());
-  shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
-  shared_ptr<ThreadManager> thread_mgr(
-      ThreadManager::newSimpleThreadManager(FLAGS_state_store_num_server_worker_threads,
-                                            FLAGS_state_store_pending_task_count_max));
-  shared_ptr<ThreadFactory> thread_factory(new PosixThreadFactory());
-  thread_mgr->threadFactory(thread_factory);
-  thread_mgr->start();
 
-  set_is_updating(true);
-  update_thread_.reset(new thread(&StateStore::UpdateLoop, this));
+  server_.reset(new ThriftServer(processor, port,
+      FLAGS_state_store_num_server_worker_threads));
+  server_->Start();
 
   LOG(INFO) << "StateStore listening on " << port;
-  server_.reset(new TThreadPoolServer(processor, server_transport, transport_factory,
-                                      protocol_factory, thread_mgr));
-  server_thread_.reset(new thread(&TThreadPoolServer::serve, server_));
-}
-
-void StateStore::Stop() {
-  set_is_updating(false);
-  update_thread_->join();
-
-  server_->stop();
-  // Don't join on the server thread here because the server will not return
-  // until there are no more outstanding connections, which can take indefinitely
-  // long.
 }
 
 void StateStore::WaitForServerToStop() {
-  server_thread_->join();
+  server_->Join();
 }
 
 void StateStore::Subscriber::Init(const THostPort& address) {
-  socket_.reset(new TSocket(address.host, address.port));
-  transport_.reset(new TBufferedTransport(socket_));
-  shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport_));
-  client_.reset(new StateStoreSubscriberServiceClient(protocol));
+  client_.reset(new SubscriberClient(address.host, address.port));
 }
 
 void StateStore::Subscriber::AddService(const string& service_id) {
@@ -235,8 +210,6 @@ void StateStore::Subscriber::RemoveService(const string& service_id) {
 
 SubscriptionId StateStore::Subscriber::AddSubscription(const set<string>& services) {
   SubscriptionId subscription_id = next_subscription_id_++;
-  LOG(INFO) << "Added subscription " << subscription_id << " for " << id_ << " on "
-            << join(services, ", ") << ".";
   // Insert the new subscription with an empty set of services (to avoid copying the
   // subscribed services unnecessarily), and then add the given services.
   Subscriptions::value_type new_subscription =
@@ -319,29 +292,27 @@ void StateStore::UpdateLoop() {
     // Update each subscriber with the latest state.
     // TODO: Make this multithreaded.
     BOOST_FOREACH(SubscriberUpdate& update, subscriber_updates) {
-      try {
-        // Open the transport here so that we keep retrying if we don't succeed on the
-        // first attempt to open a connection.
-        if (!update.transport->isOpen()) {
-          update.transport->open();
-        }
-
-        TUpdateStateResponse response;
-        update.client->UpdateState(response, update.request);
-        if (response.status.status_code != TStatusCode::OK) {
-          Status status(response.status);
-          LOG(ERROR) << status.GetErrorMsg();
-        }
-
-      } catch (TTransportException& e) {
+      // Open the transport here so that we keep retrying if we don't succeed on the
+      // first attempt to open a connection.
+      Status status = update.client->Open();
+      if (!status.ok()) {
         // TODO: We currently assume that once a subscriber has joined, it will be part
         // of the cluster permanently.  Instead, inability to create a client should
         // transition the subscriber to a CRITICAL state, and if we have multiple failed
         // attempts to connect to the subscriber, it should be removed from the list of
         // available subscribers.
-        LOG(ERROR) << "Unable to update client at " << update.socket->getPeerHost()
-                   << ":" << update.socket->getPeerPort() << "; received error "
-                   << e.what();
+        
+        LOG(ERROR) << "Unable to update client at " << update.client->host()
+                   << ":" << update.client->port() << "; received error "
+                   << status.GetErrorMsg();
+        continue;
+      }
+      
+      TUpdateStateResponse response;
+      update.client->iface()->UpdateState(response, update.request);
+      if (response.status.status_code != TStatusCode::OK) {
+        Status status(response.status);
+        LOG(ERROR) << status.GetErrorMsg();
       }
     }
 

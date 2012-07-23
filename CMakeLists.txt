@@ -15,10 +15,13 @@ set(LIBS ${LIBS} ${Thrift_LIBS})
 message(STATUS "Thrift include dir: ${Thrift_INCLUDE_DIR}")
 message(STATUS "Thrift library path: ${Thrift_LIBS}")
 message(STATUS "Thrift static library: ${Thrift_STATIC_LIB}")
+message(STATUS "Thrift static non-blocking library: ${Thrift_NB_STATIC_LIB}")
 message(STATUS "Thrift compiler: ${Thrift_COMPILER}")
 # for static linking with Thrift, Thrift_STATIC_LIB is set in FindThrift.cmake
 add_library(thriftstatic STATIC IMPORTED)
 set_target_properties(thriftstatic PROPERTIES IMPORTED_LOCATION ${Thrift_STATIC_LIB})
+add_library(thriftnbstatic STATIC IMPORTED)
+set_target_properties(thriftnbstatic PROPERTIES IMPORTED_LOCATION ${Thrift_NB_STATIC_LIB})
 
 # find boost headers and libs
 set(Boost_DEBUG TRUE)
@@ -38,8 +41,8 @@ message(STATUS ${Boost_LIBRARIES})
 find_package(JNI REQUIRED)
 include_directories(${JNI_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${JNI_LIBRARIES})
-message(STATUS ${JNI_INCLUDE_DIRS})
-message(STATUS ${JNI_LIBRARIES})
+message(STATUS "JNI_INCLUDE_DIRS: ${JNI_INCLUDE_DIRS}")
+message(STATUS "JNI_LIBRARIES: ${JNI_LIBRARIES}")
 
 # find HDFS headers and libs
 find_package(HDFS REQUIRED)

@@ -42,6 +42,7 @@ if (Thrift_LIB)
   set(Thrift_FOUND TRUE)
   set(Thrift_LIBS ${Thrift_LIB})
   set(Thrift_STATIC_LIB ${Thrift_STATIC_LIB_PATH}/libthrift.a)
+  set(Thrift_NB_STATIC_LIB ${Thrift_STATIC_LIB_PATH}/libthriftnb.so)
   set(Thrift_COMPILER ${THRIFT_COMPILER_PATH}/thrift)
   exec_program(${Thrift_COMPILER}
     ARGS -version OUTPUT_VARIABLE Thrift_VERSION RETURN_VALUE Thrift_RETURN)

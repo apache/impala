@@ -29,6 +29,7 @@
 #include "util/logging.h"
 #include "util/thrift-util.h"
 #include "sparrow/subscription-manager.h"
+#include "util/thrift-server.h"
 #include "common/service-ids.h"
 #include "service/impala-server.h"
 #include "gen-cpp/ImpalaService.h"
@@ -50,11 +51,6 @@ DECLARE_bool(use_statestore);
 DECLARE_int32(fe_port);
 DECLARE_int32(be_port);
 
-static void RunServer(TServer* server) {
-  VLOG_CONNECTION << "started backend server thread";
-  server->serve();
-}
-
 int main(int argc, char** argv) {
   InitGoogleLoggingSafe(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, true);
@@ -67,10 +63,10 @@ int main(int argc, char** argv) {
 
   // start backend service for the coordinator on be_port
   ExecEnv exec_env;
-  TServer* fe_server = NULL;
-  TServer* be_server = NULL;
+  ThriftServer* fe_server = NULL;
+  ThriftServer* be_server = NULL;
   CreateImpalaServer(&exec_env, FLAGS_fe_port, FLAGS_be_port, &fe_server, &be_server);
-  thread be_server_thread = thread(&RunServer, be_server);
+  be_server->Start();
 
   EXIT_IF_ERROR(exec_env.StartServices());
 
@@ -91,7 +87,8 @@ int main(int argc, char** argv) {
   }
 
   // this blocks until the fe server terminates
-  fe_server->serve();
+  fe_server->Start();
+  fe_server->Join();
 
   delete be_server;
   delete fe_server;

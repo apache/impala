@@ -3,13 +3,11 @@
 #ifndef IMPALA_UTIL_THRIFT_UTIL_H
 #define IMPALA_UTIL_THRIFT_UTIL_H
 
-#include <sstream>
-
 #include <boost/shared_ptr.hpp>
-#include <jni.h>
 #include <protocol/TBinaryProtocol.h>
-#include <transport/TBufferTransports.h>
+#include <sstream>
 #include <TApplicationException.h>
+#include <transport/TBufferTransports.h>
 
 #include "common/status.h"
 #include "util/jni-util.h"
@@ -17,6 +15,7 @@
 namespace impala {
 
 class THostPort;
+class ThriftServer;
 
 // Hash function for THostPort. This function must be called hash_value to be picked
 // up properly by boost.
@@ -76,6 +75,11 @@ void DeserializeThriftMsg(JNIEnv* env, jbyteArray serialized_msg, T* deserialize
 
 // Redirects all Thrift logging to VLOG(1)
 void InitThriftLogging();
+
+// Wait for a server that is running locally to start accepting
+// connections, up to a maximum timeout
+Status WaitForLocalServer(const ThriftServer& server, int num_retries,
+   int retry_interval_ms);
 
 // Wait for a server to start accepting connections, up to a maximum timeout
 Status WaitForServer(const std::string& host, int port, int num_retries,

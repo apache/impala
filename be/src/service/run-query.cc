@@ -36,6 +36,7 @@
 #include "util/debug-counters.h"
 #include "util/stat-util.h"
 #include "util/thrift-util.h"
+#include "util/thrift-server.h"
 #include "runtime/data-stream-mgr.h"
 
 DEFINE_string(input_file, "", "file containing ';'-separated list of queries");
@@ -238,10 +239,6 @@ static void Exec(ExecEnv* exec_env) {
   }
 }
 
-static void RunServer(TServer* server) {
-  server->serve();
-}
-
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, true);
@@ -264,12 +261,11 @@ int main(int argc, char** argv) {
   }
   if (FLAGS_num_nodes != 1) {
     // start backend service to feed stream_mgr
-    ImpalaServer* impala_server;
-    TServer* fe_server;
-    TServer* be_server;
-    impala_server = CreateImpalaServer(exec_env.get(), FLAGS_fe_port, FLAGS_be_port,
-        &fe_server, &be_server);
-    thread server_thread = thread(&RunServer, be_server);
+    ThriftServer* fe_server;
+    ThriftServer* be_server;
+    CreateImpalaServer(exec_env.get(), FLAGS_fe_port, FLAGS_be_port, &fe_server, 
+        &be_server);
+    be_server->Start();
   }
   EXIT_IF_ERROR(JniUtil::Init());
   if (FLAGS_init_hbase) {

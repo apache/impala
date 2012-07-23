@@ -13,6 +13,7 @@
 #include "runtime/exec-env.h"
 
 #include "sparrow/simple-scheduler.h"
+#include "sparrow/state-store-subscriber-service.h"
 #include "gen-cpp/Types_types.h"
 
 using namespace std;

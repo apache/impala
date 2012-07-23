@@ -60,8 +60,8 @@ Status SubscriptionManager::Start() {
   return state_store_->Start();
 }
 
-Status SubscriptionManager::Stop() {
-  state_store_->Stop();
+Status SubscriptionManager::UnregisterAll() {
+  state_store_->UnregisterAll();
   return Status::OK;
 }
 

@@ -67,9 +67,9 @@ class SubscriptionManager {
   // Starts the underlying server, which receives updates from the StateStore.
   impala::Status Start();
 
-  // Stops the underlying server and unregisters any services or subscriptions that are
-  // currently registered.
-  impala::Status Stop();
+  // Unregisters any services or subscriptions that are currently
+  // registered.
+  impala::Status UnregisterAll();
 
  private:
   // Thrift requires a shared_ptr, which must have at least one active reference for the

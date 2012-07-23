@@ -6,13 +6,14 @@
 #include <string>
 
 #include <boost/enable_shared_from_this.hpp>
+#include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
-#include <server/TSimpleServer.h>
 
 #include "sparrow/util.h"
 #include "sparrow/subscription-manager.h"
+#include "util/thrift-util.h"
 #include "gen-cpp/StateStoreService.h"
 #include "gen-cpp/StateStoreSubscriberService.h"
 
@@ -20,6 +21,7 @@ namespace impala {
 
 class Status;
 class THostPort;
+class ThriftServer;
 
 } // namespace impala
 
@@ -56,7 +58,7 @@ class StateStoreSubscriber
   impala::Status Start();
 
   // Stops exporting StateStoreSubscriberService and unregisters all subscriptions.
-  void Stop();
+  void UnregisterAll();
 
   // Registers with the state store to receive updates for the given services.
   // Fills in the given id with an id identifying the subscription, which should be
@@ -102,11 +104,8 @@ class StateStoreSubscriber
   // Address of state store.
   impala::THostPort state_store_host_port_;
 
-  // Thread running the Thrift service.
-  boost::shared_ptr<boost::thread> server_thread_;
-
   // Thrift server.
-  boost::shared_ptr<apache::thrift::server::TSimpleServer> server_;
+  boost::scoped_ptr<impala::ThriftServer> server_;
 
   // Client to use to connect to the StateStore.
   boost::shared_ptr<StateStoreServiceClient> client_;

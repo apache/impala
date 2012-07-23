@@ -16,7 +16,7 @@
 #include <transport/TBufferTransports.h>
 #include <transport/TServerSocket.h>
 #include <transport/TSocket.h>
-#include "util/thrift-util.h"
+#include "util/thrift-server.h"
 
 #include "common/status.h"
 #include "gen-cpp/StateStoreService_types.h"
@@ -27,9 +27,9 @@ using namespace boost;
 using namespace ::apache::thrift;
 using namespace ::apache::thrift::protocol;
 using namespace ::apache::thrift::transport;
-using namespace ::apache::thrift::server;
 using impala::Status;
 using impala::THostPort;
+using impala::ThriftServer;
 using impala::TStatusCode;
 
 namespace sparrow {
@@ -48,9 +48,6 @@ StateStoreSubscriber::StateStoreSubscriber(const string& host, int port,
 }
 
 StateStoreSubscriber::~StateStoreSubscriber() {
-  if (IsRunning()) {
-    Stop();
-  }
 }
 
 Status StateStoreSubscriber::RegisterService(const string& service_id,
@@ -227,18 +224,14 @@ void StateStoreSubscriber::UpdateState(TUpdateStateResponse& response,
 Status StateStoreSubscriber::Start() {
   shared_ptr<TProcessor> processor(
       new StateStoreSubscriberServiceProcessor(shared_from_this()));
-  shared_ptr<TServerTransport> server_transport(new TServerSocket(host_port_.port));
-  shared_ptr<TTransportFactory> transport_factory(new TBufferedTransportFactory());
-  shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
 
-  server_.reset(new TSimpleServer(processor, server_transport, transport_factory,
-                                  protocol_factory));
+  server_.reset(new ThriftServer(processor, host_port_.port, 1));
 
   DCHECK(!server_running_);
   server_running_ = true;
-  server_thread_.reset(new thread(&TSimpleServer::serve, server_));
+  server_->Start();
 
-  RETURN_IF_ERROR(impala::WaitForServer(host_port_.host, host_port_.port, 3, 2000));
+  RETURN_IF_ERROR(impala::WaitForServer(host_port_.host, host_port_.port, 10, 500));
   LOG(INFO) << "StateStoreSubscriber listening on " << host_port_.port;
   return Status::OK;
 }
@@ -247,7 +240,7 @@ bool StateStoreSubscriber::IsRunning() {
   return server_running_;
 }
 
-void StateStoreSubscriber::Stop() {
+void StateStoreSubscriber::UnregisterAll() {
   Status status = InitClient();
   if (status.ok()) {
     try {
@@ -289,14 +282,6 @@ void StateStoreSubscriber::Stop() {
                  << "received error: " << e.what();
     }
   }
-
-  DCHECK(server_running_);
-  server_->stop();
-  server_running_ = false;
-  // TODO: The server seems to keep going indefinitely if the subscriber still has a
-  // connection to the state store, causing this to not return.  See if this is possible
-  // to fix.
-  //server_thread_->join();
 }
 
 Status StateStoreSubscriber::InitClient() {
@@ -306,7 +291,7 @@ Status StateStoreSubscriber::InitClient() {
   if (client_.get() == NULL) {
     shared_ptr<TSocket> socket(new TSocket(state_store_host_port_.host,
                                            state_store_host_port_.port));
-    shared_ptr<TTransport> transport(new TBufferedTransport(socket));
+    shared_ptr<TTransport> transport(new TFramedTransport(socket));
     shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
     client_.reset(new StateStoreServiceClient(protocol));
 

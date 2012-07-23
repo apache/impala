@@ -17,6 +17,7 @@
 #include "runtime/tuple-row.h"
 #include "runtime/row-batch.h"
 #include "runtime/raw-value.h"
+#include "util/thrift-client.h"
 
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaInternalService.h"
@@ -86,10 +87,8 @@ class DataStreamSender::Channel {
   int64_t num_data_bytes_sent() const { return num_data_bytes_sent_; }
 
  private:
-  shared_ptr<TTransport> socket_;
-  shared_ptr<TTransport> transport_;
-  shared_ptr<TProtocol> protocol_;
-  scoped_ptr<ImpalaInternalServiceClient> client_;
+  typedef ThriftClient<ImpalaInternalServiceClient> BackendThriftClient;
+  scoped_ptr<BackendThriftClient> client_;
 
   const RowDescriptor& row_desc_;
   string host_;
@@ -120,13 +119,10 @@ class DataStreamSender::Channel {
 };
 
 Status DataStreamSender::Channel::Init() {
-  socket_.reset(new TSocket(host_, port_));
-  transport_.reset(new TBufferedTransport(socket_));
-  protocol_.reset(new TBinaryProtocol(transport_));
-  client_.reset(new ImpalaInternalServiceClient(protocol_));
+  client_.reset(new BackendThriftClient(host_, port_));
 
   try {
-    transport_->open();
+    client_->Open();
   } catch (TTransportException& e) {
     stringstream msg;
     msg << "couldn't create ImpalaInternalService client for " << host_ << ":"
@@ -161,7 +157,7 @@ void DataStreamSender::Channel::TransmitData() {
     params.__set_row_batch(*in_flight_batch_);  // yet another copy
     params.__set_eos(false);
     TTransmitDataResult res;
-    client_->TransmitData(res, params);
+    client_->iface()->TransmitData(res, params);
     if (res.status.status_code != TStatusCode::OK) {
       rpc_status_ = res.status;
     } else {
@@ -233,7 +229,7 @@ Status DataStreamSender::Channel::Close() {
     params.__set_eos(true);
     TTransmitDataResult res;
     VLOG_QUERY << "calling TransmitData to close channel";
-    client_->TransmitData(res, params);
+    client_->iface()->TransmitData(res, params);
     return Status(res.status);
   } catch (TException& e) {
     stringstream msg;

@@ -2,7 +2,6 @@
 
 #include "testutil/test-exec-env.h"
 
-#include <server/TServer.h>
 #include <glog/logging.h>
 #include <gflags/gflags.h>
 #include <boost/thread/thread.hpp>
@@ -14,6 +13,8 @@
 #include "runtime/data-stream-mgr.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "sparrow/simple-scheduler.h"
+#include "sparrow/state-store-subscriber-service.h"
+#include "util/thrift-server.h"
 #include "gen-cpp/ImpalaInternalService.h"
 
 using namespace boost;
@@ -36,8 +37,7 @@ class BackendTestExecEnv : public ExecEnv {
 
 
 struct TestExecEnv::BackendInfo {
-  thread backend_thread;
-  TServer* server;
+  ThriftServer* server;
   BackendTestExecEnv exec_env;
 
   BackendInfo(HdfsFsCache* fs_cache, int subscriber_port, int state_store_port)
@@ -70,11 +70,6 @@ TestExecEnv::TestExecEnv(int num_backends, int start_port)
 TestExecEnv::~TestExecEnv() {
   for (int i = 0; i < backend_info_.size(); ++i) {
     BackendInfo* info = backend_info_[i];
-    // for some reason, this doesn't stop the thrift service loop anymore,
-    // so that the subsequent join() hangs
-    // TODO: investigate and fix
-    info->server->stop();
-    //info->backend_thread.join();
     // TODO: auto_ptr?
     delete info;
   }
@@ -94,9 +89,9 @@ Status TestExecEnv::StartBackends() {
     int backend_port = next_free_port++;
     CreateImpalaServer(&info->exec_env, 0, backend_port, NULL, &info->server);
     DCHECK(info->server != NULL);
-    info->backend_thread = thread(&TestExecEnv::RunBackendServer, this, info->server);
     backend_info_.push_back(info);
     info->exec_env.StartServices();
+    info->server->Start();
     THostPort address;
     address.host = "localhost";
     address.port = backend_port;
@@ -132,12 +127,6 @@ Status TestExecEnv::StartBackends() {
   };
 
   return Status::OK;
-}
-
-void TestExecEnv::RunBackendServer(TServer* server) {
-  VLOG_QUERY << "serve()";
-  server->serve();
-  VLOG_QUERY << "exiting service loop";
 }
 
 string TestExecEnv::DebugString() {

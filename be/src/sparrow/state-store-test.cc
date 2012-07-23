@@ -53,7 +53,7 @@ class StateStoreTest : public testing::Test {
       }
 
       VLOG_CONNECTION << "satisfied with size "
-                            << update_condition->expected_state.size();
+                      << update_condition->expected_state.size();
       update_condition->correctly_called = true;
       update_condition->time_last_called = get_system_time();
     }
@@ -83,23 +83,24 @@ class StateStoreTest : public testing::Test {
     EXPECT_TRUE(status.ok());
   }
 
+  virtual void TearDown() {
+    UnregisterAllSubscribers();
+  }
+
   shared_ptr<StateStoreSubscriber> StartStateStoreSubscriber() {
     int port = next_port_++;
     subscribers_.push_back(shared_ptr<StateStoreSubscriber>(new StateStoreSubscriber(
         host_, port, state_store_host_port_.host, state_store_host_port_.port)));
     subscribers_.back()->Start();
-    Status status = impala::WaitForServer("localhost", port, 3, 2000);
+    Status status = impala::WaitForServer("localhost", port, 10, 100);
     EXPECT_TRUE(status.ok());
     return subscribers_.back();
   }
 
-  void StopAll() {
-    // Stopping the server causes thift to print out an error message ("TServerTransport
-    // died on accept"), which will be fixed in thrift version 0.8.
-    state_store_->Stop();
+  void UnregisterAllSubscribers() {
     for (int i = 0; i < subscribers_.size(); ++i) {
       if (subscribers_[i]->IsRunning()) {
-        subscribers_[i]->Stop();
+        subscribers_[i]->UnregisterAll();
       }
     }
   }
@@ -144,17 +145,12 @@ TEST_F(StateStoreTest, SingleRegister) {
   EXPECT_TRUE(status.ok());
 
   {
-    // This lock needs to be scoped such that it gets unlocked before StopAll() is called.
-    // Otherwise, the UpdateLoop may still be running when Stop() is called on the
-    // StateStoreService.  In that case, Update() will be called, which needs to acquire
-    // the same lock.
     unique_lock<mutex> lock(update_condition.mut);
     system_time timeout = get_system_time() + posix_time::seconds(10);
     while (!update_condition.correctly_called) {
       ASSERT_TRUE(update_condition.condition.timed_wait(lock, timeout));
     }
   }
-  StopAll();
 };
 
 TEST_F(StateStoreTest, MultipleServiceRegister) {
@@ -210,12 +206,12 @@ TEST_F(StateStoreTest, MultipleServiceRegister) {
       ASSERT_TRUE(update_condition.condition.timed_wait(lock, timeout));
     }
   }
-  StopAll();
 };
 
 TEST_F(StateStoreTest, RegisterFailsGracefullyWhenStateStoreUnreachable) {
-  // Stop the state store, so it's not running.
-  state_store_->Stop();
+  // Nonblocking Thrift servers can't be stopped, so just point at a non-open socket
+  state_store_host_port_.host = "localhost";
+  state_store_host_port_.port = next_port_++;
 
   const string service_id = "test_service";
 
@@ -242,9 +238,6 @@ TEST_F(StateStoreTest, RegisterFailsGracefullyWhenStateStoreUnreachable) {
   status = running_subscriber->RegisterService(service_id, service_address);
   EXPECT_FALSE(status.ok());
 
-  for (int i = 0; i < subscribers_.size(); ++i) {
-    subscribers_[i]->Stop();
-  }
 };
 
 TEST_F(StateStoreTest, UnregisterService) {
@@ -301,7 +294,7 @@ TEST_F(StateStoreTest, UnregisterService) {
       ASSERT_TRUE(register_condition.condition.timed_wait(lock, timeout));
     }
   }
-  StopAll();
+
 };
 
 TEST_F(StateStoreTest, UnregisterSubscription) {
@@ -364,7 +357,6 @@ TEST_F(StateStoreTest, UnregisterSubscription) {
     ASSERT_LT(current_time, timeout);
     sleep(StateStore::UPDATE_FREQUENCY_SECONDS);
   }
-  StopAll();
 };
 
 TEST_F(StateStoreTest, UnregisterOneOfMultipleSubscriptions) {
@@ -485,7 +477,6 @@ TEST_F(StateStoreTest, UnregisterOneOfMultipleSubscriptions) {
     ASSERT_LT(current_time, timeout);
     sleep(StateStore::UPDATE_FREQUENCY_SECONDS);
   }
-  StopAll();
 };
 
 TEST_F(StateStoreTest, StopUnregisters) {
@@ -532,7 +523,7 @@ TEST_F(StateStoreTest, StopUnregisters) {
   // Now, unregister the running instance, and ensure that listening_subscriber gets
   // updated accordingly.
   EXPECT_TRUE(status.ok());
-  running_subscriber->Stop();
+  running_subscriber->UnregisterAll();
 
   {
     unique_lock<mutex> register_lock(register_condition.mut);
@@ -543,7 +534,6 @@ TEST_F(StateStoreTest, StopUnregisters) {
       ASSERT_TRUE(register_condition.condition.timed_wait(register_lock, timeout));
     }
   }
-  StopAll();
 };
 
 } // namespace sparrow

@@ -5,12 +5,24 @@
 #include <Thrift.h>
 #include <transport/TSocket.h>
 
+#include <boost/shared_ptr.hpp>
+#include <boost/thread.hpp>
+#include <server/TNonblockingServer.h>
+#include <transport/TServerSocket.h>
+#include <concurrency/ThreadManager.h>
+#include <concurrency/PosixThreadFactory.h>
+
 #include "util/hash-util.h"
+#include "util/thrift-server.h"
 #include "gen-cpp/Types_types.h"
 
 using namespace std;
 using namespace apache::thrift;
 using namespace apache::thrift::transport;
+using namespace apache::thrift::server;
+using namespace apache::thrift::protocol;
+using namespace apache::thrift::concurrency;
+using namespace boost;
 
 namespace impala {
 
@@ -36,6 +48,11 @@ static void ThriftOutputFunction(const char* output) {
 
 void InitThriftLogging() {
   GlobalOutput.setOutputFunction(ThriftOutputFunction);
+}
+
+Status WaitForLocalServer(const ThriftServer& server, int num_retries,
+    int retry_interval_ms) {
+  return WaitForServer("localhost", server.port(), num_retries, retry_interval_ms);
 }
 
 Status WaitForServer(const string& host, int port, int num_retries,

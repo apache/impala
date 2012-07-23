@@ -37,6 +37,7 @@
 #include "util/debug-util.h"
 #include "util/string-parser.h"
 #include "util/thrift-util.h"
+#include "util/thrift-server.h"
 #include "util/jni-util.h"
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/DataSinks_types.h"
@@ -958,12 +959,11 @@ void ImpalaServer::RunExecPlanFragment(FragmentExecState* exec_state) {
 }
 
 ImpalaServer* CreateImpalaServer(ExecEnv* exec_env, int fe_port, int be_port,
-    TServer** fe_server, TServer** be_server) {
+    ThriftServer** fe_server, ThriftServer** be_server) {
   DCHECK((fe_port == 0) == (fe_server == NULL));
   DCHECK((be_port == 0) == (be_server == NULL));
-  shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
+
   shared_ptr<ImpalaServer> handler(new ImpalaServer(exec_env));
-  shared_ptr<TTransportFactory> transport_factory(new TBufferedTransportFactory());
   // TODO: do we want a BoostThreadFactory?
   // TODO: we want separate thread factories here, so that fe requests can't starve
   // be requests
@@ -971,32 +971,16 @@ ImpalaServer* CreateImpalaServer(ExecEnv* exec_env, int fe_port, int be_port,
 
   if (fe_port != 0 && fe_server != NULL) {
     shared_ptr<TProcessor> fe_processor(new ImpalaServiceProcessor(handler));
-    shared_ptr<TServerTransport> fe_server_transport(new TServerSocket(fe_port));
-    shared_ptr<ThreadManager> fe_thread_mgr(
-        ThreadManager::newSimpleThreadManager(FLAGS_fe_service_threads));
-    fe_thread_mgr->threadFactory(thread_factory);
-    fe_thread_mgr->start();
-    fe_tm = fe_thread_mgr.get();
+    *fe_server = new ThriftServer(fe_processor, fe_port, FLAGS_fe_service_threads);
 
     LOG(INFO) << "ImpalaService listening on " << fe_port;
-    *fe_server = new TThreadPoolServer(
-        fe_processor, fe_server_transport, transport_factory, protocol_factory,
-        fe_thread_mgr);
   }
 
   if (be_port != 0 && be_server != NULL) {
     shared_ptr<TProcessor> be_processor(new ImpalaInternalServiceProcessor(handler));
-    shared_ptr<TServerTransport> be_server_transport(new TServerSocket(be_port));
-    shared_ptr<ThreadManager> be_thread_mgr(
-        ThreadManager::newSimpleThreadManager(FLAGS_be_service_threads));
-    be_thread_mgr->threadFactory(thread_factory);
-    be_thread_mgr->start();
-    be_tm = be_thread_mgr.get();
+    *be_server = new ThriftServer(be_processor, be_port, FLAGS_be_service_threads);
 
     LOG(INFO) << "ImpalaInternalService listening on " << be_port;
-    *be_server = new TThreadPoolServer(
-        be_processor, be_server_transport, transport_factory, protocol_factory,
-        be_thread_mgr);
   }
 
   return handler.get();

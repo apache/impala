@@ -28,6 +28,7 @@
 #include "util/jni-util.h"
 #include "util/logging.h"
 #include "util/thrift-util.h"
+#include "util/thrift-server.h"
 #include "util/debug-util.h"
 #include "gen-cpp/Data_types.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
@@ -45,11 +46,6 @@ static scoped_ptr<ExecStats> exec_stats;
 // calling the c'tor of the contained HdfsFsCache crashes
 // TODO(marcel): figure out why and fix it
 //static scoped_ptr<TestExecEnv> test_env;
-
-static void RunServer(TServer* server) {
-  VLOG_CONNECTION << "started backend server thread";
-  server->serve();
-}
 
 extern "C"
 jint JNI_OnLoadImpl(JavaVM* vm, void* pvt) {
@@ -83,10 +79,9 @@ jint JNI_OnLoadImpl(JavaVM* vm, void* pvt) {
   test_env->StartBackends();
 
   // start one ImpalaInternalService for the coordinator on be_port
-  TServer* be_server;
+  ThriftServer* be_server;
   CreateImpalaServer(test_env, 0, FLAGS_be_port, NULL, &be_server);
-  thread server_thread = thread(&RunServer, be_server);
-
+  be_server->Start();
   return JNI_VERSION_1_4;
 }
 

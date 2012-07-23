@@ -15,8 +15,6 @@
 #include "gen-cpp/ImpalaInternalService.h"
 #include "common/status.h"
 
-namespace apache { namespace thrift { namespace server { class TServer; } } }
-
 namespace impala {
 
 class ExecEnv;
@@ -37,6 +35,8 @@ class THostPort;
 class TQueryRequest;
 class TCreateQueryExecRequestResult;
 class ImpalaPlanServiceClient;
+
+class ThriftServer;
 
 // An ImpalaServer contains both frontend and backend functionality;
 // it implements both the ImpalaService and ImpalaInternalService APIs.
@@ -172,16 +172,15 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
 };
 
 // Create an ImpalaServer and Thrift servers.
-// If fe_port != 0 (and fe_server != NULL), creates a TServer exporting ImpalaService
+// If fe_port != 0 (and fe_server != NULL), creates a ThriftServer exporting ImpalaService
 // on fe_port (returned via fe_server).
-// If be_port != 0 (and be_server != NULL), create a TServer exporting
+// If be_port != 0 (and be_server != NULL), create a ThriftServer exporting
 // ImpalaInternalService on be_port (returned via be_server).
 // Returns created ImpalaServer. The caller owns fe_server and be_server.
 // The returned ImpalaServer is referenced by both of these via shared_ptrs and will be
 // deleted automatically.
 ImpalaServer* CreateImpalaServer(ExecEnv* exec_env, int fe_port, int be_port,
-    apache::thrift::server::TServer** fe_server,
-    apache::thrift::server::TServer** be_server);
+    ThriftServer** fe_server, ThriftServer** be_server);
 
 }
 

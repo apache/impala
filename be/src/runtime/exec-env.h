@@ -8,12 +8,12 @@
 #include <boost/thread/thread.hpp>
 
 #include "exprs/timestamp-functions.h"
-#include "sparrow/state-store-subscriber-service.h"
 #include "common/status.h"
 
 namespace sparrow {
 
 class Scheduler;
+class SubscriptionManager;
 
 } // namespace sparrow
 

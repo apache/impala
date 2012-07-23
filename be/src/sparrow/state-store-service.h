@@ -12,10 +12,8 @@
 #include <boost/thread/thread.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
-#include <protocol/TBinaryProtocol.h>
-#include <server/TThreadPoolServer.h>
-#include <transport/TBufferTransports.h>
-#include <transport/TSocket.h>
+#include "util/thrift-client.h"
+#include "util/thrift-server.h"
 
 #include "sparrow/util.h"
 #include "util/thrift-util.h"
@@ -63,14 +61,14 @@ class StateStore : public StateStoreServiceIf,
   // called, there must be a boost::shared_ptr<StateStore> to this StateStore.
   void Start(int port);
 
-  // Stops the server (using a blocking call), and stops performing updates.
-  void Stop();
-
-  // Blocks until the server stops (which will occur if the server returns due to an
-  // error, for example).
+  // Blocks until the server stops (which will occur if the server
+  // returns due to an error, for example). Note that is_updating does
+  // not control whether the Thrift server is running.
   void WaitForServerToStop();
 
  private:
+  typedef impala::ThriftClient<StateStoreSubscriberServiceClient> SubscriberClient;
+
   // Describes a subscriber connected to the StateStore. This class is not thread safe,
   // which is fine because access to subscribers_ is always protected by a lock.
   class Subscriber {
@@ -103,16 +101,8 @@ class StateStore : public StateStoreServiceIf,
     bool IsZombie();
 
     SubscriberId id() { return id_; };
-    
-    boost::shared_ptr<apache::thrift::transport::TSocket> socket() const { return
-      socket_;
-    };
 
-    boost::shared_ptr<apache::thrift::transport::TTransport> transport() const {
-      return transport_;
-    };
-
-    boost::shared_ptr<StateStoreSubscriberServiceClient> client() const {
+    boost::shared_ptr<SubscriberClient> client() const {
       return client_;
     };
 
@@ -136,30 +126,24 @@ class StateStore : public StateStoreServiceIf,
     // become unreachable, to determine which service instances should also be marked
     // as unreachable).
     boost::unordered_set<std::string> service_ids_;
-  
+
     Subscriptions subscriptions_;
 
     ServiceSubscriptionCounts service_subscription_counts_;
 
     // Thrift connection information.
-    boost::shared_ptr<apache::thrift::transport::TSocket> socket_;
-    boost::shared_ptr<apache::thrift::transport::TTransport> transport_;
-    boost::shared_ptr<StateStoreSubscriberServiceClient> client_;
+    boost::shared_ptr<SubscriberClient> client_;
   };
 
   // Information needed to update a subscriber with the latest state. Because we use
   // shared pointers to the thrift transport and client, it is fine if the corresponding
   // Subscriber gets deleted before this SubscriberUpdate is used.
   struct SubscriberUpdate {
-    boost::shared_ptr<apache::thrift::transport::TSocket> socket;
-    boost::shared_ptr<apache::thrift::transport::TTransport> transport;
-    boost::shared_ptr<StateStoreSubscriberServiceClient> client;
+    boost::shared_ptr<SubscriberClient> client;
     TUpdateStateRequest request;
 
     SubscriberUpdate(Subscriber* subscriber)
-      : socket(subscriber->socket()),
-        transport(subscriber->transport()),
-        client(subscriber->client()) {}
+      : client(subscriber->client()) {}
   };
 
   // Mapping of service ids to the corresponding membership.
@@ -179,8 +163,8 @@ class StateStore : public StateStoreServiceIf,
   volatile bool is_updating_;
 
   boost::scoped_ptr<boost::thread> update_thread_;
-  boost::scoped_ptr<boost::thread> server_thread_;
-  boost::shared_ptr<apache::thrift::server::TThreadPoolServer> server_;
+
+  boost::scoped_ptr<impala::ThriftServer> server_;
 
   // Protects all following member variables. Recursive because all of the RPC methods
   // take this lock before modifying member variables, but many of them subsequently
@@ -206,7 +190,7 @@ class StateStore : public StateStoreServiceIf,
   void UpdateLoop();
 
   // Fills in updates with a SubscriberUpdate (including a filled in TUpdateStateRequest)
-  // for each currently registered subscriber. 
+  // for each currently registered subscriber.
   void GenerateUpdates(std::vector<StateStore::SubscriberUpdate>* updates);
 };
 

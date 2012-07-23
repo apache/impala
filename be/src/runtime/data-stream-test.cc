@@ -3,9 +3,6 @@
 #include <boost/thread/thread.hpp>
 
 #include <protocol/TBinaryProtocol.h>
-#include <server/TSimpleServer.h>
-//#include <server/TThreadPoolServer.h>
-//#include <server/TThreadedServer.h>
 #include <transport/TServerSocket.h>
 #include <transport/TTransportUtils.h>
 #include <gtest/gtest.h>
@@ -23,6 +20,7 @@
 #include "testutil/in-process-query-executor.h"
 #include "testutil/test-exec-env.h"
 #include "util/debug-util.h"
+#include "util/thrift-server.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/Types_types.h"
 
@@ -32,8 +30,6 @@ using namespace boost;
 
 using namespace apache::thrift;
 using namespace apache::thrift::protocol;
-using namespace apache::thrift::transport;
-using namespace apache::thrift::server;
 
 DECLARE_int32(port);
 
@@ -83,8 +79,9 @@ class DataStreamTest : public testing::Test {
     sink_.destNodeId = DEST_NODE_ID;
     dest_.push_back(THostPort());
     dest_.back().host = "localhost";
-    dest_.back().port = FLAGS_port;
-    backend_thread_ = thread(&DataStreamTest::StartBackend, this);
+    // Need a unique port since backend servers are never stopped
+    dest_.back().port = FLAGS_port++;
+    StartBackend();
   }
 
   static const PlanNodeId DEST_NODE_ID = 1;
@@ -99,8 +96,7 @@ class DataStreamTest : public testing::Test {
   DataStreamMgr* stream_mgr_;
   DataStreamRecvr* stream_recvr_;
   thread recvr_thread_;
-  thread backend_thread_;
-  TSimpleServer* server_;
+  ThriftServer* server_;
 
   // sending node(s)
   TDataStreamSink sink_;
@@ -149,20 +145,14 @@ class DataStreamTest : public testing::Test {
 
   // Start backend in separate thread.
   void StartBackend() {
-    shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
     shared_ptr<ImpalaTestBackend> handler(new ImpalaTestBackend(stream_mgr_));
     shared_ptr<TProcessor> processor(new ImpalaInternalServiceProcessor(handler));
-    shared_ptr<TServerTransport> server_transport(new TServerSocket(FLAGS_port));
-    shared_ptr<TTransportFactory> transport_factory(new TBufferedTransportFactory());
 
-    server_ = new TSimpleServer(
-        processor, server_transport, transport_factory, protocol_factory);
-    server_->serve();
+    server_ = new ThriftServer(processor, dest_.back().port);
+    server_->Start();
   }
 
   void StopBackend() {
-    server_->stop();
-    backend_thread_.join();
     delete server_;
   }
 
