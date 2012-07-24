@@ -15,11 +15,8 @@ namespace impala {
 // update-or-create counters in one line of code. Counters created this way are not
 // intended to remain in the code; they are a tool for identifying hotspots without having
 // to run a full profiler.
-// The AddCounterIfAbsent call adds some more overhead to each macro, and therefore they
-// should not be used where minimal impact on performance is needed. You can still use
-// AddCounterIfAbsent in a less-critical section of the code, and then call the standard
-// counter macros with DebugRuntimeProfile::profile() as the profile instance in the usual
-// way.
+// The AddCounter call adds some more overhead to each macro, and therefore they  
+// should not be used where minimal impact on performance is needed. 
 class DebugRuntimeProfile {
  public:
   static RuntimeProfile& profile() {
@@ -31,15 +28,15 @@ class DebugRuntimeProfile {
 #if ENABLE_DEBUG_COUNTERS
 
 #define DEBUG_SCOPED_TIMER(counter_name) \
-  COUNTER_SCOPED_TIMER(DebugRuntimeProfile::profile().AddCounterIfAbsent(counter_name, \
+  COUNTER_SCOPED_TIMER(DebugRuntimeProfile::profile().AddCounter(counter_name, \
     TCounterType::CPU_TICKS))
 
 #define DEBUG_COUNTER_UPDATE(counter_name, v) \
-  COUNTER_UPDATE(DebugRuntimeProfile::profile().AddCounterIfAbsent(counter_name, \
+  COUNTER_UPDATE(DebugRuntimeProfile::profile().AddCounter(counter_name, \
     TCounterType::UNIT), v)
 
 #define DEBUG_COUNTER_SET(counter_name, v) \
-  COUNTER_SET(DebugRuntimeProfile::profile().AddCounterIfAbsent(counter_name, \
+  COUNTER_SET(DebugRuntimeProfile::profile().AddCounter(counter_name, \
     TCounterType::UNIT), v)
 
 #define PRETTY_PRINT_DEBUG_COUNTERS(ostream_ptr) \
