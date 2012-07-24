@@ -403,7 +403,7 @@ Status HdfsTableSink::DeleteOriginalFiles(OutputPartition* output_partition) {
       continue;
     }
     VLOG_FILE << "Overwrite INSERT - deleting: " <<  orig_files[i].mName << endl;
-    if (hdfsDelete(hdfs_connection_, orig_files[i].mName, -1)) {
+    if (hdfsDelete(hdfs_connection_, orig_files[i].mName, 1) == -1) {
       status =  Status(AppendHdfsErrorMessage("Failed to delete existing Hdfs file"
           " as part of overwriting:" + string(orig_files[i].mName)));
       break;
