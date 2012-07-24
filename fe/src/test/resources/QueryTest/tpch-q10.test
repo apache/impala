@@ -1,19 +1,37 @@
 # Q10 - Returned Item Reporting Query
 # Modifications: Cast c_acctbal to bigint due to float/double values not allowed in
-# GROUP BY clauses
-select c_custkey, c_name, round(sum(l_extendedprice * (1 - l_discount)), 5) as revenue,
-       cast(c_acctbal as bigint) cast_c_acctbal, n_name, c_address, c_phone, c_comment
-from customer$TABLE c
-join orders$TABLE o
-  on c.c_custkey = o.o_custkey and
-     o.o_orderdate >= '1993-10-01' and
-     o.o_orderdate < '1994-01-01'
-join nation$TABLE n
-  on c.c_nationkey = n.n_nationkey
-join lineitem$TABLE l
-  on l.l_orderkey = o.o_orderkey and l.l_returnflag = 'R'
-group by c_custkey, c_name, cast_c_acctbal, c_phone, n_name, c_address, c_comment
-order by revenue desc
+# GROUP BY clause, added round() calls, converted select from multiple tables to
+# joins
+select
+  c_custkey,
+  c_name,
+  round(sum(l_extendedprice * (1 - l_discount)), 5) as revenue,
+  cast(c_acctbal as bigint) cast_c_acctbal,
+  n_name,
+  c_address,
+  c_phone,
+  c_comment
+from lineitem$TABLE l
+  join orders$TABLE o
+    on (l.l_orderkey = o.o_orderkey)
+  join customer$TABLE c
+    on (c.c_custkey = o.o_custkey)
+  join nation$TABLE n
+    on (c.c_nationkey = n.n_nationkey)
+where
+  o.o_orderdate >= '1993-10-01' and
+  o.o_orderdate < '1994-01-01' and
+  l.l_returnflag = 'R'
+group by
+  c_custkey,
+  c_name,
+  cast(c_acctbal as bigint),
+  c_phone,
+  n_name,
+  c_address,
+  c_comment
+order by
+  revenue desc
 limit 20
 ---- TYPES
 int, string, double, bigint, string, string, string, string

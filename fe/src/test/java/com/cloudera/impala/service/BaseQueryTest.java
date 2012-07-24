@@ -263,14 +263,6 @@ public abstract class BaseQueryTest {
   }
 
   private void runSetupSection(List<String> setupCmds) throws Exception {
-    if (getTargetTestEnvironment() != TargetTestEnvironment.IN_PROCESS) {
-      // TODO: (lennik) The Setup section currently does not work with ImpalaD executor.
-      // This is okay for now because the INSERT tests are disabled for ImpalaD and they
-      // are the only tests that have SETUP sections.
-      fail("Test SETUP sections are currently only supported targeting on " +
-           "IN_PROCESS test execution environments.");
-    }
-
     for (String cmd: setupCmds) {
       if (cmd.startsWith(RESET_CMD)) {
         List<String> tableNames = getCmdArguments(RESET_CMD, cmd);
@@ -280,13 +272,17 @@ public abstract class BaseQueryTest {
         dropPartitions(tableNames);
       } else if (cmd.startsWith(RELOAD_CATALOG_CMD)) {
         List<String> tableNames = getCmdArguments(RELOAD_CATALOG_CMD, cmd);
-        if (tableNames.size() == 0) {
-          catalog.close();
-          catalog = new Catalog(true);
-          inProcessExecutor.setCatalog(catalog);
-        } else {
-          for (String table: tableNames) {
-            catalog.invalidateTable(table.trim());
+        // If running in-process we need to reload the catalog. If running vs Impalad
+        // that should be taken care of for us.
+        if (getTargetTestEnvironment() == TargetTestEnvironment.IN_PROCESS) {
+          if (tableNames.size() == 0) {
+            catalog.close();
+            catalog = new Catalog(true);
+            inProcessExecutor.setCatalog(catalog);
+          } else {
+            for (String table: tableNames) {
+              catalog.invalidateTable(table.trim());
+            }
           }
         }
       }
@@ -510,20 +506,21 @@ public abstract class BaseQueryTest {
    */
   protected void runTestInExecutionMode(TestExecMode executionMode, String testFile,
       boolean abortOnError, int maxErrors) {
+    // TODO: TPCH Currently has a bug with when LLVM is enabled (IMP-129). This is a
+    // temporary workaround for this problem. Once that is resolved this can be
+    // removed.
+    if (testFile.trim().startsWith("tpch")) {
+      List<TestConfiguration> testConfigs = generateAllConfigurationPermutations(
+          TEXT_FORMAT_ONLY, UNCOMPRESSED_ONLY,
+          ImmutableList.of(16), ImmutableList.of(2),  ImmutableList.of(true));
+      runQueryWithTestConfigs(testConfigs, testFile, abortOnError, maxErrors);
+      return;
+    }
+
     switch (executionMode) {
       case REDUCED:
-        // TODO: TPCH Currently has a bug with when LLVM is enabled (IMP-129). This is a
-        // temporary workaround for this problem. Once that is resolved this can be
-        // removed.
-        if (testFile.trim().startsWith("tpch")) {
-          List<TestConfiguration> testConfigs = generateAllConfigurationPermutations(
-              TEXT_FORMAT_ONLY, UNCOMPRESSED_ONLY, ImmutableList.of(16),
-              SMALL_CLUSTER_SIZES,  ImmutableList.of(true));
-          runQueryWithTestConfigs(testConfigs, testFile, abortOnError, maxErrors);
-        } else {
-          // TODO: Consider running with the fastest format to cut down on execution time
-          runQueryUncompressedTextOnly(testFile, abortOnError, maxErrors);
-        }
+        // TODO: Consider running with the fastest format to cut down on execution time
+        runQueryUncompressedTextOnly(testFile, abortOnError, maxErrors);
         break;
       case EXHAUSTIVE:
         runQueryWithAllConfigurationPermutations(testFile, abortOnError, maxErrors);

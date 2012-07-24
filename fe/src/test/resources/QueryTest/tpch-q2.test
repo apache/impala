@@ -1,16 +1,24 @@
 # Q2 - Minimum Cost Supplier Query
 insert overwrite table q2_minimum_cost_supplier_tmp1$TABLE
-select s.s_acctbal, s.s_name, n.n_name, p.p_partkey, ps.ps_supplycost, p.p_mfgr,
-s.s_address, s.s_phone, s.s_comment
-from nation$TABLE n
-  join region$TABLE r
-    on n.n_regionkey = r.r_regionkey and r.r_name = 'EUROPE'
-  join supplier$TABLE s
-    on s.s_nationkey = n.n_nationkey
-  join partsupp$TABLE ps
-    on  s.s_suppkey = ps.ps_suppkey
+select
+  s.s_acctbal,
+  s.s_name,
+  n.n_name,
+  p.p_partkey,
+  ps.ps_supplycost,
+  p.p_mfgr,
+  s.s_address,
+  s.s_phone,
+  s.s_comment
+from partsupp$TABLE ps
   join part$TABLE p
-    on p.p_partkey = ps.ps_partkey and p.p_size = 15 and p.p_type like '%BRASS'
+    on (p.p_partkey = ps.ps_partkey and p.p_size = 15 and p.p_type like '%BRASS')
+  join supplier$TABLE s
+    on (s.s_suppkey = ps.ps_suppkey)
+  join nation$TABLE n
+    on (s.s_nationkey = n.n_nationkey)
+  join region$TABLE r
+    on (n.n_regionkey = r.r_regionkey and r.r_name = 'EUROPE')
 ---- SETUP
 RESET q2_minimum_cost_supplier_tmp1$TABLE
 RELOAD q2_minimum_cost_supplier_tmp1$TABLE
@@ -18,9 +26,10 @@ RELOAD q2_minimum_cost_supplier_tmp1$TABLE
 ---- NUMROWS
 642
 ====
-# Q2 - Minimum Cost Supplier Query
 insert overwrite table q2_minimum_cost_supplier_tmp2$TABLE
-select p_partkey, min(ps_supplycost)
+select
+  p_partkey,
+  min(ps_supplycost)
 from  q2_minimum_cost_supplier_tmp1$TABLE
 group by p_partkey
 ---- SETUP
@@ -30,15 +39,24 @@ RELOAD q2_minimum_cost_supplier_tmp2$TABLE
 ---- NUMROWS
 460
 ====
-# Q2 - Minimum Cost Supplier Query
 # Modifications: Fully qualified name of p_partkey column in the ORDER BY clause
 select
-  t1.s_acctbal, t1.s_name, t1.n_name, t1.p_partkey, t1.p_mfgr, t1.s_address, t1.s_phone,
+  t1.s_acctbal,
+  t1.s_name,
+  t1.n_name,
+  t1.p_partkey,
+  t1.p_mfgr,
+  t1.s_address,
+  t1.s_phone,
   t1.s_comment
 from q2_minimum_cost_supplier_tmp1$TABLE t1
 join q2_minimum_cost_supplier_tmp2$TABLE t2
-  on t1.p_partkey = t2.p_partkey and t1.ps_supplycost=t2.ps_min_supplycost
-order by s_acctbal desc, n_name, s_name, t1.p_partkey
+  on (t1.p_partkey = t2.p_partkey and t1.ps_supplycost = t2.ps_min_supplycost)
+order by
+  s_acctbal desc,
+  n_name,
+  s_name,
+  t1.p_partkey
 limit 100
 ---- TYPES
 double, string, string, int, string, string, string, string

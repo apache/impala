@@ -40,7 +40,7 @@ public class PlannerTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    catalog = new Catalog();
+    catalog = new Catalog(true);
     analysisCtxt = new AnalysisContext(catalog);
   }
 
@@ -142,7 +142,6 @@ public class PlannerTest {
           // Using all nodes will cause unstable plan because data location is
           // non-deterministic. To see incorrect multi-node planning, change 2 to
           // 0 (use all nodes)
-          actualOutput.append("------------\n");
           RunQuery(query, 2, testCase, Section.DISTRIBUTEDPLAN, errorLog,
                    actualOutput, level);
         }
@@ -216,5 +215,12 @@ public class PlannerTest {
   @Test
   public void testUnion() {
     runPlannerTestFile("union", PlanNode.ExplainPlanLevel.HIGH);
+  }
+
+  @Test
+  public void testTpch() {
+    // TODO: Q20-Q22 are disabled due to IMP-137. Once that bug is resolved they should
+    // be re-enabled.
+    runPlannerTestFile("tpch-all", PlanNode.ExplainPlanLevel.HIGH);
   }
 }

@@ -1,36 +1,35 @@
 # Q5 - Local Supplier Volume Query
-# Modifications: Removed ORDER BY clause, added round() calls
-select n_name, round(sum(l_extendedprice * (1 - l_discount)), 5) as revenue
-from customer$TABLE c
-join
-    ( select n_name, l_extendedprice, l_discount, s_nationkey, o_custkey
-      from orders$TABLE o
-      join
-        ( select n_name, l_extendedprice, l_discount, l_orderkey, s_nationkey
-          from lineitem$TABLE l
-          join
-             ( select n_name, s_suppkey, s_nationkey
-               from supplier$TABLE s join
-                 ( select n_name, n_nationkey
-                   from nation$TABLE n
-                   join region$TABLE r
-                   on n.n_regionkey = r.r_regionkey and r.r_name = 'ASIA'
-                 ) n1
-                 on s.s_nationkey = n1.n_nationkey
-              ) s1
-              on l.l_suppkey = s1.s_suppkey
-        ) l1
-        on l1.l_orderkey = o.o_orderkey and o.o_orderdate >= '1994-01-01'
-           and o.o_orderdate < '1995-01-01'
-    ) o1
-    on c.c_nationkey = o1.s_nationkey and c.c_custkey = o1.o_custkey
-group by n_name
+# Modifications: Added round() call, converted selects from multiple tables
+# to joins, added limit
+select
+  n_name,
+  round(sum(l_extendedprice * (1 - l_discount)), 5) as revenue
+from lineitem$TABLE l
+join orders$TABLE o
+  on (l_orderkey = o_orderkey)
+join supplier$TABLE s
+  on (l_suppkey = s_suppkey)
+join customer$TABLE
+  on (c_nationkey = s_nationkey and c_custkey = o_custkey)
+join nation$TABLE
+  on (s_nationkey = n_nationkey)
+join region$TABLE
+  on (n_regionkey = r_regionkey)
+where
+  r_name = 'ASIA'
+  and o_orderdate >= '1994-01-01'
+  and o_orderdate < '1995-01-01'
+group by
+  n_name
+order by
+  revenue desc
+limit 100
 ---- TYPES
 string, double
 ---- RESULTS
+'INDONESIA',55502041.1697
+'VIETNAM',55295086.9967
 'CHINA',53724494.2566
 'INDIA',52035512.0002
-'INDONESIA',55502041.1697
 'JAPAN',45410175.6954
-'VIETNAM',55295086.9967
 ====

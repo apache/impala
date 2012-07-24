@@ -63,9 +63,12 @@ class VectorGenerator:
 
 def is_valid_combination(vector):
   if len(vector) == 4:
-    return not ((vector[FILE_FORMAT_IDX] == 'text' and vector[COMPRESSION_IDX] != 'none') or
-                (vector[COMPRESSION_IDX] == 'none' and vector[COMPRESSION_TYPE_IDX] != 'none') or
-                (vector[FILE_FORMAT_IDX] != 'seq' and vector[COMPRESSION_TYPE_IDX] == 'record'))
+    return not (
+         (vector[FILE_FORMAT_IDX] == 'text' and vector[COMPRESSION_IDX] != 'none') or
+         (vector[COMPRESSION_IDX] == 'none' and vector[COMPRESSION_TYPE_IDX] != 'none') or
+         (vector[COMPRESSION_IDX] != 'none' and vector[COMPRESSION_TYPE_IDX] == 'none') or
+         (vector[FILE_FORMAT_IDX] != 'seq' and vector[COMPRESSION_TYPE_IDX] == 'record') or
+         (vector[DATA_SET_IDX] == 'tpch' and vector[FILE_FORMAT_IDX] != 'text'))
   return True
 
 def read_csv_vector_file(file_name):

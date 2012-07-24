@@ -1,15 +1,22 @@
 # Q13 - Customer Distribution Query
-select c_count, count(1) as custdist
+select
+  c_count,
+  count(1) as custdist
 from
-( select c_custkey, count(o_orderkey) as c_count
-  from customer$TABLE c
-  left outer join orders$TABLE o
-    on c.c_custkey = o.o_custkey and
-       not o.o_comment like '%special%requests%'
-  group by c_custkey
-) c_orders
-group by c_count
-order by custdist desc, c_count desc
+  ( select
+      c_custkey,
+      count(o_orderkey) as c_count
+    from orders$TABLE o
+    right outer join customer$TABLE c
+      on (c.c_custkey = o.o_custkey and o.o_comment not like '%special%requests%')
+    group by
+      c_custkey
+  ) c_orders
+group by
+  c_count
+order by
+  custdist desc,
+  c_count desc
 limit 100
 ---- TYPES
 bigint, bigint

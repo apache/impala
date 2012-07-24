@@ -226,17 +226,6 @@ LOCATION '/test-warehouse/%(table_name)s';
 ===
 tpch
 ---
-q4_order_priority_tmp
----
-DROP TABLE %(table_name)s;
-CREATE EXTERNAL TABLE %(table_name)s (O_ORDERKEY INT)
-STORED AS %(file_format)s
-LOCATION '/test-warehouse/%(table_name)s';
----
----
-===
-tpch
----
 q7_volume_shipping_tmp
 ---
 DROP TABLE %(table_name)s;
@@ -402,63 +391,10 @@ LOCATION '/test-warehouse/%(table_name)s';
 ===
 tpch
 ---
-q21_tmp1
----
-DROP TABLE %(table_name)s;
-CREATE EXTERNAL TABLE %(table_name)s (
-l_orderkey int,
-count_suppkey int,
-max_suppkey int)
-STORED AS %(file_format)s
-LOCATION '/test-warehouse/%(table_name)s';
----
----
-===
-tpch
----
-q21_tmp2
----
-DROP TABLE %(table_name)s;
-CREATE EXTERNAL TABLE %(table_name)s (
-l_orderkey int,
-count_suppkey int,
-max_suppkey int)
-STORED AS %(file_format)s
-LOCATION '/test-warehouse/%(table_name)s';
----
----
-===
-tpch
----
-q22_customer_tmp
----
-DROP TABLE %(table_name)s;
-CREATE EXTERNAL TABLE %(table_name)s (
-c_acctbal double,
-c_custkey int,
-cntrycode string)
-STORED AS %(file_format)s
-LOCATION '/test-warehouse/%(table_name)s';
----
----
-===
-tpch
----
 q22_customer_tmp1
 ---
 DROP TABLE %(table_name)s;
-CREATE EXTERNAL TABLE %(table_name)s (avg_acctbal double)
-STORED AS %(file_format)s
-LOCATION '/test-warehouse/%(table_name)s';
----
----
-===
-tpch
----
-q22_orders_tmp
----
-DROP TABLE %(table_name)s;
-CREATE EXTERNAL TABLE %(table_name)s (o_custkey int)
+CREATE EXTERNAL TABLE %(table_name)s (avg_acctbal double, cust_name_char string)
 STORED AS %(file_format)s
 LOCATION '/test-warehouse/%(table_name)s';
 ---

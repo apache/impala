@@ -1,66 +1,35 @@
 # Q21 - Suppliers Who Kept Orders Waiting Query
-insert overwrite table q21_tmp1$TABLE
-select l_orderkey, count(distinct l_suppkey), max(l_suppkey) as max_suppkey
-from lineitem$TABLE
-group by l_orderkey
----- SETUP
-RESET q21_tmp1$TABLE
-RELOAD q21_tmp1$TABLE
----- RESULTS
----- NUMROWS
-1500000
-====
-insert overwrite table q21_tmp2$TABLE
-select l_orderkey, count(distinct l_suppkey), max(l_suppkey) as max_suppkey
-from lineitem$TABLE
-where l_receiptdate > l_commitdate
-group by l_orderkey
----- SETUP
-RESET q21_tmp2$TABLE
-RELOAD q21_tmp2$TABLE
----- RESULTS
----- NUMROWS
-1375365
-====
-select s_name, count(1) as numwait
-from
-( select s_name
-  from
-  ( select s_name, t2.l_orderkey, l_suppkey, count_suppkey, max_suppkey
-    from q21_tmp2$TABLE t2
-    right outer join
-    ( select s_name, l_orderkey, l_suppkey
-      from
-      ( select s_name, t1.l_orderkey, l_suppkey, count_suppkey, max_suppkey
-        from q21_tmp1$TABLE t1
-        join
-        ( select s_name, l_orderkey, l_suppkey
-          from orders$TABLE o
-          join
-          ( select s_name, l_orderkey, l_suppkey
-            from nation$TABLE n
-            join supplier$TABLE s
-              on s.s_nationkey = n.n_nationkey and
-                 n.n_name = 'SAUDI ARABIA'
-            join lineitem$TABLE l
-              on s.s_suppkey = l.l_suppkey
-            where l.l_receiptdate > l.l_commitdate
-          ) l1
-            on o.o_orderkey = l1.l_orderkey and
-               o.o_orderstatus = 'F'
-       ) l2
-         on l2.l_orderkey = t1.l_orderkey
-      ) a
-      where (count_suppkey > 1) or
-            ((count_suppkey=1) and (l_suppkey <> max_suppkey))
-    ) l3
-      on l3.l_orderkey = t2.l_orderkey
-  ) b
-  where (count_suppkey is null) or
-        ((count_suppkey=1) and (l_suppkey = max_suppkey))
-)c
-group by s_name
-order by numwait desc, s_name
+# Modifications: Converted 'EXISTS' into LEFT SEMI JOIN, converted
+# NOT EXISTS into LEFT OUTER JOIN, changed selectes from multiple tables to
+# joins, added limit
+# TODO: Impala returning wrong results due to bug IMP-137
+select
+  s_name,
+  count(*) as numwait
+from lineitem$TABLE l1
+  join supplier$TABLE s
+    on (s.s_suppkey = l1.l_suppkey)
+  join orders$TABLE o
+    on (o.o_orderkey = l1.l_orderkey)
+  join nation$TABLE n
+    on (s.s_nationkey = n.n_nationkey)
+  left semi join lineitem$TABLE l2
+    on (l2.l_orderkey = l1.l_orderkey)
+  left outer join lineitem$TABLE l3
+    on (l3.l_orderkey = l1.l_orderkey and
+        l3.l_receiptdate > l3.l_commitdate
+       )
+where
+  l2.l_suppkey <> l1.l_suppkey and
+  l3.l_suppkey <> l1.l_suppkey and
+  l3.l_orderkey is null and
+  n_name = 'SAUDI ARABIA' and
+  o_orderstatus = 'F'
+group by
+  s_name
+order by
+  numwait desc,
+  s_name
 limit 100
 ---- TYPES
 string, bigint

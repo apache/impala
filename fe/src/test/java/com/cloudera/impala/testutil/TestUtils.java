@@ -83,6 +83,7 @@ public class TestUtils {
           expectedStr = expectedStr.replaceFirst(expectedFilePrefix[prefixIdx], "");
           actualStr = actualStr.replaceFirst(expectedFilePrefix[prefixIdx], "");
           expectedStr = applyHdfsFilePathFilter(expectedStr);
+          actualStr = applyHdfsFilePathFilter(actualStr);
           break;
         }
       }
@@ -201,8 +202,8 @@ public class TestUtils {
    * from run to run.
    */
   private static String applyHdfsFilePathFilter(String hdfsPath) {
-    hdfsPath = hdfsPath.replaceFirst(HDFS_HOST_PORT_FILTER, " ");
-    return hdfsPath.replaceFirst(HDFS_FILE_PATH_FILTER, "");
+    hdfsPath = hdfsPath.replaceAll(HDFS_HOST_PORT_FILTER, " ");
+    return hdfsPath.replaceAll(HDFS_FILE_PATH_FILTER, "");
   }
 
   /**
@@ -300,7 +301,7 @@ public class TestUtils {
 
     QueryExecTestResult actualExecResults = new QueryExecTestResult();
     actualExecResults.getColTypes().addAll(colTypes);
-    actualExecResults.getColTypes().addAll(colLabels);
+    actualExecResults.getColLabels().addAll(colLabels);
     actualExecResults.getResultSet().addAll(actualResults);
 
     verifyTypesLabelsAndResults(queryReportString, testErrorLog,

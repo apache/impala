@@ -11,10 +11,17 @@ RELOAD q20_tmp1$TABLE
 2127
 ====
 insert overwrite table q20_tmp2$TABLE
-select l_partkey, l_suppkey, 0.5 * sum(l_quantity)
+select
+  l_partkey,
+  l_suppkey,
+  0.5 * sum(l_quantity)
 from lineitem$TABLE
-where l_shipdate >= '1994-01-01' and l_shipdate < '1995-01-01'
-group by l_partkey, l_suppkey
+where
+  l_shipdate >= '1994-01-01' and
+  l_shipdate < '1995-01-01'
+group by
+  l_partkey,
+  l_suppkey
 ---- SETUP
 RESET q20_tmp2$TABLE
 RELOAD q20_tmp2$TABLE
@@ -23,13 +30,15 @@ RELOAD q20_tmp2$TABLE
 543210
 ====
 insert overwrite table q20_tmp3$TABLE
-select ps_suppkey, ps_availqty, sum_quantity
-from partsupp$TABLE ps join q20_tmp1$TABLE t1
-on
-  ps.ps_partkey = t1.p_partkey
+select
+  ps_suppkey,
+  ps_availqty,
+  sum_quantity
+from partsupp$TABLE ps
   join q20_tmp2$TABLE t2
-on
-  ps.ps_partkey = t2.l_partkey and ps.ps_suppkey = t2.l_suppkey
+    on (ps.ps_partkey = t2.l_partkey and ps.ps_suppkey = t2.l_suppkey)
+  join q20_tmp1$TABLE t1
+    on (ps.ps_partkey = t1.p_partkey)
 ---- SETUP
 RESET q20_tmp3$TABLE
 RELOAD q20_tmp3$TABLE
@@ -40,22 +49,29 @@ RELOAD q20_tmp3$TABLE
 # Modified to use subquery to work around IMP-127
 insert overwrite table q20_tmp4$TABLE
 select a.ps_suppkey
-from (select ps_suppkey, count(1) from q20_tmp3$TABLE
-where ps_availqty > sum_quantity
-group by ps_suppkey) a
+from (select
+        ps_suppkey,
+        count(1) from q20_tmp3$TABLE
+      where ps_availqty > sum_quantity
+      group by ps_suppkey
+     ) a
 ---- SETUP
 RESET q20_tmp4$TABLE
 RELOAD q20_tmp4$TABLE
 ---- RESULTS
 ====
 # Modifications: Added limit
-select s_name, s_address
+select
+  s_name,
+  s_address
 from supplier$TABLE s
-join nation$TABLE n
-  on s.s_nationkey = n.n_nationkey and n.n_name = 'CANADA'
+  join nation$TABLE n
+    on (s.s_nationkey = n.n_nationkey and
+        n.n_name = 'CANADA')
 join q20_tmp4$TABLE t4
-  on s.s_suppkey = t4.ps_suppkey
-order by s_name
+  on (s.s_suppkey = t4.ps_suppkey)
+order by
+  s_name
 limit 100
 ---- TYPES
 string, string

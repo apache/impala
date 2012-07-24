@@ -1,24 +1,21 @@
 # Q4 - Order Priority Checking Query
-insert overwrite table q4_order_priority_tmp
-select distinct l_orderkey
-from lineitem$TABLE
-where l_commitdate < l_receiptdate
----- SETUP
-RESET q4_order_priority_tmp$TABLE
-RELOAD q4_order_priority_tmp$TABLE
----- RESULTS
----- NUMROWS
-1375365
-====
-# Modifications: Added limit clause
-select o_orderpriority, count(1) as order_count
-from orders$TABLE o
-join q4_order_priority_tmp$TABLE t
-  on o.o_orderkey = t.o_orderkey and
-     o.o_orderdate >= '1993-07-01' and
-     o.o_orderdate < '1993-10-01'
-group by o_orderpriority
-order by o_orderpriority
+# Modifications: Converted selects from multiple tables to joins,
+# rewrote 'exists' as an inner join + count(distinct), added
+# limit
+select
+  o_orderpriority,
+  count(distinct l_orderkey) as order_count
+from lineitem$TABLE l
+inner join orders$TABLE o
+  on (o.o_orderkey = l.l_orderkey and
+      l.l_commitdate < l.l_receiptdate)
+where
+  o_orderdate >= '1993-07-01' and
+  o_orderdate < '1993-10-01'
+group by
+  o_orderpriority
+order by
+  o_orderpriority
 limit 10
 ---- TYPES
 string, bigint
