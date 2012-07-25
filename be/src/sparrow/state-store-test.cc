@@ -348,14 +348,15 @@ TEST_F(StateStoreTest, UnregisterSubscription) {
     {
       lock_guard<mutex> lock(register_condition.mut);
       if (current_time - register_condition.time_last_called >
-          posix_time::seconds(2*StateStore::UPDATE_FREQUENCY_SECONDS)) {
+          posix_time::seconds(state_store_->subscriber_update_frequency_ms() 
+              * 2 / 1000 )) {
         break;
       }
     }
 
     // Ensure that the test times out, rather than running indefinitely.
     ASSERT_LT(current_time, timeout);
-    sleep(StateStore::UPDATE_FREQUENCY_SECONDS);
+    usleep(state_store_->subscriber_update_frequency_ms() * 1000);
   }
 };
 
@@ -468,14 +469,14 @@ TEST_F(StateStoreTest, UnregisterOneOfMultipleSubscriptions) {
     {
       lock_guard<mutex> lock(register_condition_A.mut);
       if (current_time - register_condition_A.time_last_called >
-          posix_time::seconds(2*StateStore::UPDATE_FREQUENCY_SECONDS)) {
+          posix_time::microseconds(2 * state_store_->subscriber_update_frequency_ms())) {
         break;
       }
     }
 
     // Ensure that the test times out, rather than running indefinitely.
     ASSERT_LT(current_time, timeout);
-    sleep(StateStore::UPDATE_FREQUENCY_SECONDS);
+    usleep(state_store_->subscriber_update_frequency_ms());
   }
 };
 

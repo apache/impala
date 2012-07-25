@@ -64,7 +64,7 @@ Status BackendTestExecEnv::StartServices() {
 TestExecEnv::TestExecEnv(int num_backends, int start_port)
   : num_backends_(num_backends),
     start_port_(start_port),
-    state_store_(new StateStore()) {
+    state_store_(new StateStore(500)) {
 }
 
 TestExecEnv::~TestExecEnv() {
@@ -109,12 +109,15 @@ Status TestExecEnv::StartBackends() {
 
   // Wait until we see all the backends registered, or timeout if 5s pass
   vector<pair<string, int> > host_ports;
-  const int NUM_RETRIES = 25;
+  const int NUM_RETRIES = 100;
+  const int POLL_INTERVAL_MS = 50;
+
   for (int i = 1; i <= NUM_RETRIES; ++i) {
     scheduler_->GetAllKnownHosts(&host_ports);
 
     if (host_ports.size() == num_backends_) {
-      VLOG(1) << "Complete set of backends observed in under " << i * 200 << "ms";
+      VLOG(1) << "Complete set of backends observed in under " 
+              << i * POLL_INTERVAL_MS << "ms";
       break;
     } else if (i == NUM_RETRIES) {
       stringstream error_msg;
@@ -122,8 +125,7 @@ Status TestExecEnv::StartBackends() {
                 << " backends, last membership size observed was: " << host_ports.size();
       return Status(error_msg.str());
     }
-    // Sleep for 200ms
-    usleep(200 * 1000);
+    usleep(POLL_INTERVAL_MS * 1000);
   };
 
   return Status::OK;

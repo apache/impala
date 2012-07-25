@@ -202,7 +202,7 @@ void StateStoreSubscriber::UpdateState(TUpdateStateResponse& response,
     new_state << "\n";
     // TODO: Log object updates here too, once we include them.
   }
-  VLOG_CONNECTION << "Received new state:\n" << new_state.str();
+  VLOG_ROW << "Received new state:\n" << new_state.str();
 
   // Make a copy of update_callbacks_, to avoid problems if one of the callbacks
   // calls back into this StateStoreSubscriber, which may deadlock if we are holding
@@ -231,7 +231,9 @@ Status StateStoreSubscriber::Start() {
   server_running_ = true;
   server_->Start();
 
-  RETURN_IF_ERROR(impala::WaitForServer(host_port_.host, host_port_.port, 10, 500));
+  // Wait for up to 2s for the server to start, polling at 50ms intervals
+  RETURN_IF_ERROR(impala::WaitForServer(host_port_.host, host_port_.port, 40, 50));
+
   LOG(INFO) << "StateStoreSubscriber listening on " << host_port_.port;
   return Status::OK;
 }

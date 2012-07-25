@@ -251,7 +251,7 @@ int main(int argc, char** argv) {
     // backends specified explicitly, start them up
     TestExecEnv* test_exec_env = new TestExecEnv(
         FLAGS_num_nodes > 1 ? FLAGS_num_nodes - 1 : 4, FLAGS_be_port + 1);
-    test_exec_env->StartBackends();
+    EXIT_IF_ERROR(test_exec_env->StartBackends());
     exec_env.reset(test_exec_env);
   } else {
     // TODO: ignore backends flag? It was introduced to let us run run_query

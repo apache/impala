@@ -39,7 +39,11 @@ DEFINE_int32(state_store_pending_task_count_max, 0,
 
 namespace sparrow {
 
-StateStore::StateStore() : is_updating_(false), next_subscriber_id_(0) {}
+StateStore::StateStore(int subscriber_update_frequency_ms) 
+    : is_updating_(false), 
+      next_subscriber_id_(0),
+      subscriber_update_frequency_ms_(subscriber_update_frequency_ms) {
+}
 
 void StateStore::RegisterService(TRegisterServiceResponse& response,
                                  const TRegisterServiceRequest& request) {
@@ -284,7 +288,7 @@ void StateStore::UpdateLoop() {
   LOG(INFO) << "Beginning to pull/push updates";
 
   system_time next_update_time =
-      (get_system_time() + posix_time::seconds(UPDATE_FREQUENCY_SECONDS));
+      (get_system_time() + posix_time::milliseconds(subscriber_update_frequency_ms_));
   vector<SubscriberUpdate> subscriber_updates;
   while (is_updating()) {
     GenerateUpdates(&subscriber_updates);
@@ -320,7 +324,8 @@ void StateStore::UpdateLoop() {
       posix_time::time_duration duration = next_update_time - get_system_time();
       usleep(duration.total_microseconds());
     }
-    next_update_time = get_system_time() + posix_time::seconds(UPDATE_FREQUENCY_SECONDS);
+    next_update_time = 
+      get_system_time() + posix_time::milliseconds(subscriber_update_frequency_ms_);
   }
 }
 

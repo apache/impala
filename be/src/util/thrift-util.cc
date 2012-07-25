@@ -72,7 +72,7 @@ Status WaitForServer(const string& host, int port, int num_retries,
     ++retry_count;
     VLOG_QUERY << "Waiting " << retry_interval_ms << "ms for Thrift server at "
                << host << ":" << port << " to come up, failed attempt " << retry_count
-               << " of " << num_retries + 1;
+               << " of " << num_retries;
     usleep(retry_interval_ms * 1000);
   }
   return Status("Server did not come up");

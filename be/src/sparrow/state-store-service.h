@@ -42,9 +42,9 @@ class StateStore : public StateStoreServiceIf,
                    public boost::enable_shared_from_this<StateStore> {
  public:
   // Frequency at which subscribers are updated.
-  static const int UPDATE_FREQUENCY_SECONDS = 1;
+  static const int DEFAULT_UPDATE_FREQUENCY_MS = 1000;
 
-  StateStore();
+  StateStore(int subscriber_update_frequency_ms = DEFAULT_UPDATE_FREQUENCY_MS);
 
   // StateStoreServiceIf RPCS.
   virtual void RegisterService(TRegisterServiceResponse& response,
@@ -65,6 +65,8 @@ class StateStore : public StateStoreServiceIf,
   // returns due to an error, for example). Note that is_updating does
   // not control whether the Thrift server is running.
   void WaitForServerToStop();
+
+  int subscriber_update_frequency_ms() { return subscriber_update_frequency_ms_; }
 
  private:
   typedef impala::ThriftClient<StateStoreSubscriberServiceClient> SubscriberClient;
@@ -176,6 +178,9 @@ class StateStore : public StateStoreServiceIf,
 
   // Next id to use for a StateStoreSubscriber.
   SubscriberId next_subscriber_id_;
+
+  // Frequency of updates to subscribers
+  int subscriber_update_frequency_ms_;
 
   // Getter and setter for is_updating_, both are thread safe.
   bool is_updating();
