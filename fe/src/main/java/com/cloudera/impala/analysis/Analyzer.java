@@ -106,7 +106,7 @@ public class Analyzer {
    * @throws AnalysisException
    */
   public TupleDescriptor registerBaseTableRef(BaseTableRef ref) throws AnalysisException {
-    String lookupAlias = ref.getAlias();
+    String lookupAlias = ref.getAlias().toLowerCase();
     if (aliasMap.containsKey(lookupAlias)) {
       throw new AnalysisException("duplicate table alias: '" + lookupAlias + "'");
     }
@@ -138,7 +138,7 @@ public class Analyzer {
    */
   public TupleDescriptor registerInlineViewRef(InlineViewRef ref)
       throws AnalysisException {
-    String lookupAlias = ref.getAlias();
+    String lookupAlias = ref.getAlias().toLowerCase();
     if (aliasMap.containsKey(lookupAlias)) {
       throw new AnalysisException("duplicate table alias: '" + lookupAlias + "'");
     }

@@ -237,8 +237,11 @@ public abstract class BaseQueryTest {
     HiveMetaStoreClient client = new HiveMetaStoreClient(new HiveConf(QueryTest.class));
     for (String tableName: tableNames) {
       try {
-        Table table = client.getTable("default", tableName.trim());
-        client.dropTable("default", tableName, true, true);
+        String db_tblname[] = TestUtils.splitDbTablename(tableName.trim());
+        String db = db_tblname[0];
+        String tblName = db_tblname[1];
+        Table table = client.getTable(db, tblName);
+        client.dropTable(db, tblName, true, true);
         client.createTable(table);
       } catch (Exception e) {
         LOG.warn("Failed to drop and recreate table: " + tableName, e);
@@ -281,7 +284,10 @@ public abstract class BaseQueryTest {
             inProcessExecutor.setCatalog(catalog);
           } else {
             for (String table: tableNames) {
-              catalog.invalidateTable(table.trim());
+              String db_tblname[] = TestUtils.splitDbTablename(table.trim());
+              String db = db_tblname[0];
+              String tblName = db_tblname[1];
+              catalog.invalidateTable(db, tblName);
             }
           }
         }

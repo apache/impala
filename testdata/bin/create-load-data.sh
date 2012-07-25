@@ -8,7 +8,7 @@ fi
 
 # Load the TPCH data set
 pushd ${IMPALA_HOME}/bin
-./load-impala-data.sh tpch core
+./load-impala-data.sh query-test core
 
 ${HIVE_HOME}/bin/hive -hiveconf hive.root.logger=WARN,console -v \
   -f ${IMPALA_HOME}/testdata/bin/create.sql 

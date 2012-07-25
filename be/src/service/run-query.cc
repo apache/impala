@@ -34,6 +34,7 @@
 #include "util/thrift-util.h"
 #include "runtime/data-stream-mgr.h"
 
+DEFINE_string(input_file, "", "file containing ';'-separated list of queries");
 DEFINE_string(query, "", "query to execute.  Multiple queries can be ; separated");
 DEFINE_bool(init_hbase, true, "if true, call hbase jni initialization");
 DEFINE_string(profile_output_file, "pprof.out", "google pprof output file");
@@ -101,6 +102,28 @@ static void Exec(ExecEnv* exec_env) {
 
   vector<string> queries;
   split(queries, FLAGS_query, is_any_of(";"), token_compress_on );
+
+  if (FLAGS_input_file.length() > 0) {
+    if (FLAGS_query.length() > 0) {
+      cout << "Use either -query or -input_file but not both" << endl;
+      return;
+    }
+    FILE *input_file = fopen(FLAGS_input_file.c_str(), "r");
+    if (input_file == NULL) {
+      cerr << "Unable top open file: " << FLAGS_input_file.c_str() << endl;
+      return;
+    }
+
+    fseek(input_file, 0 ,SEEK_END);
+    size_t file_size = ftell(input_file);
+    rewind(input_file);
+
+    char* buffer = new char[(sizeof(char) * file_size + 1)];
+    fread(buffer, 1, file_size, input_file);
+
+    string str(buffer, file_size);
+    split(queries, str, is_any_of(";"), token_compress_on );
+  }
 
   if (queries.size() == 0) {
     cout << "Invalid query: " << FLAGS_query << endl;

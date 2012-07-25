@@ -35,6 +35,7 @@ public class TestUtils {
   private final static Logger LOG = LoggerFactory.getLogger(TestUtils.class);
   private final static String[] expectedFilePrefix = { "hdfs:" };
   private final static String[] ignoreContentAfter = { "HOST:" };
+  private final static String DEFAULT_DB = "default";
 
   // Our partition file paths are returned in the format of:
   // hdfs://<host>:<port>/<table>/year=2009/month=4/-47469796--667104359_25784_data.0
@@ -51,6 +52,26 @@ public class TestUtils {
     for(PrimitiveType type: PrimitiveType.values()) {
       typeNameMap.put(type.toString(), type);
     }
+  }
+
+  /**
+   * Return the database and the tablename in an array of the given tablename. Db will be
+   * at index 0, table name will be at index 1.
+   * If the tableName is not database qualified (without the db. prefix), "default" will
+   * be returned as the database name
+   * @param tableName
+   * @return
+   */
+  public static String[] splitDbTablename(String tableName) {
+    String db = DEFAULT_DB;
+    String tblName = tableName.trim();
+    String db_tblname[] = tblName.split("\\.");
+    if (db_tblname.length == 2) {
+      db = db_tblname[0];
+      tblName = db_tblname[1];
+    }
+    String[] ans = { db, tblName };
+    return ans;
   }
 
   /**

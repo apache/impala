@@ -18,6 +18,8 @@ if [ $1 = "hive-benchmark" ]; then
   data_set_type=benchmark
 elif [ $1 = "tpch" ]; then
   data_set_type=tpch
+elif [ $1 = "query-test" ]; then
+  data_set_type="tpch"
 elif [ $1 = "all" ]; then
   data_set_type="benchmark tpch"
 else
@@ -60,6 +62,6 @@ popd
 
 # TODO: Temporarily disable block id generation for everything except benchmark runs
 # due to IMP-134
-if [ $data_set_type = "benchmark" ]; then
+if [ $1 = "hive-benchmark" ]; then
   $IMPALA_HOME/testdata/bin/generate-block-ids.sh
 fi

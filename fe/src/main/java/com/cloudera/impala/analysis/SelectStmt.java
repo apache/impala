@@ -455,7 +455,6 @@ public class SelectStmt extends QueryStmt {
       Preconditions.checkState(aggExprs.isEmpty());
       createSelectDistinctInfo(analyzer.getDescTbl());
     } else {
-      Preconditions.checkState(!aggExprs.isEmpty());
       // collect agg exprs with DISTINCT clause
       ArrayList<AggregateExpr> distinctAggExprs = Lists.newArrayList();
       for (AggregateExpr aggExpr: aggExprs) {
