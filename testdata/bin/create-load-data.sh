@@ -3,46 +3,42 @@
 
 if [ x${JAVA_HOME} == x ]; then
   echo JAVA_HOME not set
-  exit -1
+  exit 1
 fi
 
-# Load the TPCH data set
+set -e
+
+# Load the data set
 pushd ${IMPALA_HOME}/bin
-./load-impala-data.sh query-test core
 
-${HIVE_HOME}/bin/hive -hiveconf hive.root.logger=WARN,console -v \
-  -f ${IMPALA_HOME}/testdata/bin/create.sql 
+./load-data.sh functional exhaustive
 if [ $? != 0 ]; then
-  echo CREATE FAILED
-  exit -1
+  echo LOAD OF FUNCTIONAL DATA FAILED
+  exit 1
 fi
-if [ -d ${IMPALA_HOME}/testdata/data/test-warehouse ] ; then 
-  # The data has already been created, just load it.
-  ${HIVE_HOME}/bin/hive -hiveconf hive.root.logger=WARN,console -v \
-    -f ${IMPALA_HOME}/testdata/bin/load.sql 
-  if [ $? != 0 ]; then
-    echo LOAD FAILED
-    exit -1
-  fi
-else
-  ${HIVE_HOME}/bin/hive -hiveconf hive.root.logger=WARN,console -v \
-    -f ${IMPALA_HOME}/testdata/bin/load-raw-data.sql
-  if [ $? != 0 ]; then 
-    echo RAW DATA LOAD FAILED
-    exit -1
-  fi
-  cd ${IMPALA_HOME}/testdata/data
-  hadoop fs -get /test-warehouse
-  if [ $? != 0 ]; then 
-    echo HADOOP GET FAILED
-    exit -1
-  fi
+
+./load-data.sh tpch core
+if [ $? != 0 ]; then
+  echo LOAD OF TPCH DATA FAILED
+  exit 1
 fi
+popd
+
+# TODO: The multi-format table will move these files. So we need to copy them to a temporary location
+# for that table to use. Should find a better way to handle this.
+echo COPYING DATA FOR DEPENDENT TABLES
+hadoop fs -rm -r -f /tmp/alltypes_rc
+hadoop fs -rm -r -f /tmp/alltypes_seq
+hadoop fs -mkdir -p /tmp/alltypes_seq/year=2009
+hadoop fs -mkdir -p /tmp/alltypes_rc/year=2009
+hadoop fs -cp  /test-warehouse/alltypes_seq/year=2009/month=2/ /tmp/alltypes_seq/year=2009
+hadoop fs -cp  /test-warehouse/alltypes_rc/year=2009/month=3/ /tmp/alltypes_rc/year=2009
 
 # For tables that rely on loading data from local fs test-warehouse
+# TODO: Find a good way to integrate this with the normal data loading scripts
 ${HIVE_HOME}/bin/hive -hiveconf hive.root.logger=WARN,console -v \
-  -f ${IMPALA_HOME}/testdata/bin/load-dependent-tables.sql 
+  -f ${IMPALA_HOME}/testdata/bin/load-dependent-tables.sql
 if [ $? != 0 ]; then
   echo DEPENDENT LOAD FAILED
-  exit -1
+  exit 1
 fi

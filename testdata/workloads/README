@@ -1,0 +1,9 @@
+This directory contains Impala test workloads. The directory layout for the workloads should follow:
+
+workloads/
+   <data set name>/<data set name>_dimensions.csv  <- The test dimension file
+   <data set name>/<data set name>_core.csv  <- A test vector file
+   <data set name>/<data set name>_pairwise.csv
+   <data set name>/<data set name>_exhaustive.csv
+   <data set name>/queries/<query test>.test <- The queries for this workload
+

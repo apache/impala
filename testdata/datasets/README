@@ -1,0 +1,9 @@
+This directory contains Impala test data sets. The directory layout is structured as follows:
+
+datasets/
+   <data set>/<data set>_schema_template.sql
+   <data set>/<data files SF1>/data files
+   <data set>/<data files SF2>/data files
+
+Where SF is the scale factor controlling data size. This allows for scaling the same schema to
+different sizes based on the target test environment.

@@ -1,3 +1,4 @@
+# Manually created file. The vector value order is: file format, data_group, compression codec, compression type
 text,grep1gb,none,none
 text,grep10gb,none,none
 text,web,none,none

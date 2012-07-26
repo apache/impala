@@ -18,16 +18,17 @@
 # sets.
 #
 # The output files output can then be read in by other tests by other scripts,tools,tests.
-# In the benchmark case the vector files are used by generate_benchmark_statements.rb to
-# dynamically build the schema and data for running benchmarks.
+# One major use case is the generate_scehma_statements.py script, which uses the vector
+# files to dynamically build schema for running benchmark and functional tests.
 #
-# We use the Python 'AllPairs' module which can be download from:
-# http://pypi.python.org/pypi/AllPairs/2.0.1
+# The pairwise generation is done using the Python 'AllPairs' module. This module can be
+# downloaded from http://pypi.python.org/pypi/AllPairs/2.0.1
 #
+import collections
 import csv
 import math
 import os
-import random
+import sys
 from itertools import product
 from optparse import OptionParser
 import metacomm.combinatorics.all_pairs2
@@ -35,17 +36,21 @@ all_pairs = metacomm.combinatorics.all_pairs2.all_pairs2
 
 parser = OptionParser()
 parser.add_option("--dimension_file", dest="dimension_file",
-                  default = "benchmark_dimensions.csv",
+                  default = "hive-benchmark_dimensions.csv",
                   help="The file containing the list of dimensions.")
-parser.add_option("--base_output_file_name", dest="base_output_file_name",
-                  default = "benchmark",
-                  help="The base file name for test vector output")
+parser.add_option("--workload", dest="workload", default = "hive-benchmark",
+                  help="The workload to generate test vectors for")
 (options, args) = parser.parse_args()
+
+WORKLOAD_DIR = os.environ['IMPALA_HOME'] + '/testdata/workloads'
 
 FILE_FORMAT_IDX = 0
 DATA_SET_IDX = 1
 COMPRESSION_IDX = 2
 COMPRESSION_TYPE_IDX = 3
+
+KNOWN_DIMENSION_NAMES = ['file_format', 'data_group', 'compression_codec',
+                         'compression_type']
 
 class VectorGenerator:
   def __init__(self, input_vectors):
@@ -61,6 +66,7 @@ class VectorGenerator:
       filter_func = lambda vector: True
     return [list(vec) for vec in product(*self.input_vectors) if filter_func(vec)]
 
+# Add vector value constraints to this function. This
 def is_valid_combination(vector):
   if len(vector) == 4:
     return not (
@@ -69,25 +75,58 @@ def is_valid_combination(vector):
          (vector[COMPRESSION_IDX] != 'none' and vector[COMPRESSION_TYPE_IDX] == 'none') or
          (vector[FILE_FORMAT_IDX] != 'seq' and vector[COMPRESSION_TYPE_IDX] == 'record') or
          (vector[DATA_SET_IDX] == 'tpch' and vector[FILE_FORMAT_IDX] != 'text'))
+
+  # The pairwise generator may call this with different vector lengths. In that case this
+  # should always return true.
   return True
 
-def read_csv_vector_file(file_name):
-  results = []
-  for row in csv.reader(open(file_name, 'rb'), delimiter=','):
-    results.append(row)
-  return results
+# Vector files have the format: <dimension name>: value1, value2, ...
+def read_dimension_file(file_name):
+  dimension_map = collections.defaultdict(list)
+  with open(file_name, 'rb') as input_file:
+    for line in input_file.readlines():
+      if line.strip().startswith('#'):
+         continue
+      values = line.split(':')
+      if len(values) != 2:
+        print 'Invalid dimension file format. Expected format is <dimension name>: val1,'\
+              ' val2, ... Found: ' + line
+        sys.exit(1)
+      if not values[0] in KNOWN_DIMENSION_NAMES:
+        print 'Unknown dimension name: ' + values[0]
+        print 'Valid dimension names: ' + ', '.join(KNOWN_DIMENSION_NAMES)
+        sys.exit(1)
+      dimension_map[values[0]] = [val.strip() for val in  values[1].split(',')]
+  return dimension_map
 
-def write_vectors_to_csv(output_csv_file, matrix):
-  csv_writer = csv.writer(open(output_csv_file, 'wb'),
-                          delimiter=',',
-                          quoting=csv.QUOTE_MINIMAL)
-  for vector in matrix:
-    csv_writer.writerow(vector)
+def write_vectors_to_csv(output_dir, output_file, matrix):
+  output_text = "# Generated File. The vector value order is: file format, data_group, "\
+                "compression codec, compression type"
+  for row in matrix:
+    output_text += '\n' + ','.join(row)
 
-vectors = read_csv_vector_file(options.dimension_file)
+  with open(os.path.join(output_dir, output_file), 'wb') as output_file:
+    output_file.write(output_text)
+    output_file.write('\n')
+
+dimension_file = os.path.join(WORKLOAD_DIR, options.workload,
+                              '%s_dimensions.csv' % options.workload)
+if not os.path.isfile(dimension_file):
+  print 'Dimension file not found: ' + dimension_file
+  sys.exit(1)
+
+print 'Reading dimension file: ' + dimension_file
+vector_map = read_dimension_file(dimension_file)
+vectors = []
+# This ordering matters! We need to know the order to apply the proper constraints.
+vectors.append(vector_map['file_format'])
+vectors.append(vector_map['data_group'])
+vectors.append(vector_map['compression_codec'])
+vectors.append(vector_map['compression_type'])
 vg = VectorGenerator(vectors)
-write_vectors_to_csv('%s_pairwise.csv' % options.base_output_file_name,
-                     vg.generate_pairwise_matrix(is_valid_combination))
-write_vectors_to_csv('%s_exhaustive.csv' % options.base_output_file_name,
-                     vg.generate_exhaustive_matrix(is_valid_combination))
 
+output_dir = os.path.join(WORKLOAD_DIR, options.workload)
+write_vectors_to_csv(output_dir, '%s_pairwise.csv' % options.workload,
+                     vg.generate_pairwise_matrix(is_valid_combination))
+write_vectors_to_csv(output_dir, '%s_exhaustive.csv' % options.workload,
+                     vg.generate_exhaustive_matrix(is_valid_combination))

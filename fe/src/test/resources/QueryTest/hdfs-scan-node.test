@@ -759,7 +759,7 @@ bigint
 10000
 ====
 # Test multi files non-partitioned table (text)
-select count(*) from AllTypesAggMultiFilesNoPart_text
+select count(*) from AllTypesAggMultiFilesNoPart
 ---- TYPES
 bigint
 ---- RESULTS

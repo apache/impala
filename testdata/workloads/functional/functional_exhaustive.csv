@@ -1,0 +1,16 @@
+# Generated File. The vector value order is: file format, data_group, compression codec, compression type
+text,functional,none,none
+seq,functional,none,none
+seq,functional,def,block
+seq,functional,def,record
+seq,functional,gzip,block
+seq,functional,gzip,record
+seq,functional,bzip,block
+seq,functional,bzip,record
+seq,functional,snap,block
+seq,functional,snap,record
+rc,functional,none,none
+rc,functional,def,block
+rc,functional,gzip,block
+rc,functional,bzip,block
+rc,functional,snap,block

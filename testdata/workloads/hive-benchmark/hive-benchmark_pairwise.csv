@@ -1,0 +1,8 @@
+# Generated File. The vector value order is: file format, data_group, compression codec, compression type
+text,grep1gb,none,none
+seq,grep10gb,def,block
+rc,web,gzip,block
+rc,grep10gb,bzip,block
+seq,grep1gb,snap,record
+text,web,none,none
+text,grep10gb,none,none

@@ -1,0 +1,4 @@
+file_format: text,seq,rc
+data_group: grep1gb,grep10gb,web
+compression_codec: none,def,gzip,bzip,snap
+compression_type: none,block,record

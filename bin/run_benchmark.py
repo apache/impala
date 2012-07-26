@@ -247,7 +247,7 @@ def run_query(query, prime_buffer_cache, iterations):
   return [output, execution_result]
 
 def choose_input_vector_file_name(exploration_strategy):
-  return "benchmark_%s.csv" % exploration_strategy
+  return "hive-benchmark_%s.csv" % exploration_strategy
 
 def build_table_suffix(file_format, codec, compression_type):
   if file_format == 'text' and codec == 'none':
@@ -255,7 +255,7 @@ def build_table_suffix(file_format, codec, compression_type):
   elif codec == 'none':
     return '_%s' % (file_format)
   elif compression_type == 'record':
-    return '_%s_%s_record' % (file_format, codec)
+    return '_%s_record_%s' % (file_format, codec)
   else:
     return '_%s_%s' % (file_format, codec)
 
@@ -264,12 +264,14 @@ def build_query(query_format_string, exploration_strategy, data_set,
   table_suffix = build_table_suffix(file_format, codec, compression_type)
   return query_format_string % {'table_suffix': table_suffix}
 
-def read_csv_vector_file(file_name):
-  results = []
+def read_vector_file(file_name):
+  if not os.path.isfile(file_name):
+    print 'Cannot find vector file: ' + file_name
+    sys.exit(1)
+
   with open(file_name, 'rb') as vector_file:
-    for row in csv.reader(vector_file,  delimiter=','):
-      results.append(row)
-    return results
+    return [line.strip().split(',')
+        for line in vector_file.readlines() if not line.startswith('#')]
 
 os.chdir(os.environ['IMPALA_BE_DIR'])
 
@@ -322,9 +324,11 @@ def write_to_csv(result_map, output_csv_file):
 
 # Run all queries
 if (len(options.query) == 0):
-  vector_file_path = os.path.join(os.environ['IMPALA_HOME'], 'testdata/bin/',
-                         choose_input_vector_file_name(options.exploration_strategy))
-  vector = read_csv_vector_file(vector_file_path)
+  vector_file_path = os.path.join(
+      os.environ['IMPALA_HOME'], 'testdata/workloads/hive-benchmark/',
+      choose_input_vector_file_name(options.exploration_strategy))
+
+  vector = read_vector_file(vector_file_path)
   output = ""
   result_map = collections.defaultdict(list)
 

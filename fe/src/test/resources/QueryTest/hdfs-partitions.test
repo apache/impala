@@ -133,7 +133,7 @@ bigint
 10000
 ====
 # Test multi files partitioned table (text)
-select count(*) from alltypesaggmultifiles_text
+select count(*) from alltypesaggmultifiles
 ---- TYPES
 bigint
 ---- RESULTS

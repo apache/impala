@@ -10,20 +10,25 @@
 # a basic set of combinations. If 'pairwise' is specified the pairwise combinations
 # of workload # + file format + compression will be loaded. If 'exhaustive' is
 # passed as an argument the exhaustive set of combinations will be loaded.
+# TODO: Rewrite this script in python and detect and load workloads by enumerating
+# the workloads directory.
 
-exploration_strategy=core
-data_set_type=benchmark
+exploration_strategy=
+data_set_type=
 
 if [ $1 = "hive-benchmark" ]; then
-  data_set_type=benchmark
+  data_set_type=$1
+elif [ $1 = "functional" ]; then
+  data_set_type=$1
 elif [ $1 = "tpch" ]; then
-  data_set_type=tpch
+  data_set_type=$1
 elif [ $1 = "query-test" ]; then
-  data_set_type="tpch"
+  data_set_type="tpch functional"
 elif [ $1 = "all" ]; then
-  data_set_type="benchmark tpch"
+  data_set_type="hive-benchmark tpch functional"
 else
-  echo "Invalid run type: $1. Valid values are 'all, tpch, hive-benchmark'"
+  echo "Invalid run type: $1. Valid values are 'all, query-test,"\
+       "functional, tpch, hive-benchmark'"
   exit 1
 fi
 
@@ -41,20 +46,23 @@ bin=`cd "$bin"; pwd`
 set -e
 
 SCRIPT_DIR=$IMPALA_HOME/testdata/bin
+WORKLOAD_DIR=$IMPALA_HOME/testdata/workloads
+DATASET_DIR=$IMPALA_HOME/testdata/datasets
 
 function execute_hive_query_from_file {
   hive_args="-hiveconf hive.root.logger=WARN,console -v -f"
   "$HIVE_HOME/bin/hive" $hive_args $1
+  if [ $? != 0 ]; then
+    echo LOAD OF $1 FAILED
+    exit -1
+  fi
 }
 
 pushd "$IMPALA_HOME/testdata/bin";
 for ds in $data_set_type
 do
   ./generate_schema_statements.py --exploration_strategy ${exploration_strategy}\
-                                  --base_output_file_name=${ds}\
-                                  --schema_template=${ds}_schema_template.sql
-  execute_hive_query_from_file \
-      "$SCRIPT_DIR/create-${ds}-${exploration_strategy}-generated.sql"
+                                  --workload=${ds} --verbose
   execute_hive_query_from_file \
       "$SCRIPT_DIR/load-${ds}-${exploration_strategy}-generated.sql"
 done
