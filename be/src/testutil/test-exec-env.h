@@ -48,9 +48,6 @@ class TestExecEnv : public ExecEnv {
 
   struct BackendInfo;
   std::vector<BackendInfo*> backend_info_;  // owned by us
-
-  // Wrapper for server->serve().
-  void RunBackendServer(apache::thrift::server::TServer* server);
 };
 
 }

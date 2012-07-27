@@ -4,6 +4,7 @@
 #define IMPALA_RUNTIME_DATA_STREAM_MGR_H
 
 #include <list>
+#include <set>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/unordered_map.hpp>
@@ -24,9 +25,13 @@ class TRowBatch;
 // provides both producer and consumer functionality for each data stream.
 // - ImpalaBackend service threads use this to add incoming data to streams
 //   in response to TransmitData rpcs (AddData()) or to signal end-of-stream conditions
-//   in response to CloseChannel rpcs (CloseChannel()).
+//   (CloseSender()).
 // - Exchange nodes extract data from an incoming stream via a DataStreamRecvr,
-//   which is created via DataStreamMgr::CreateRecvr().
+//   which is created with CreateRecvr().
+//
+// DataStreamMgr also allows asynchronous cancellation of streams via Cancel()
+// which unblocks all DataStreamRecvr::GetBatch() calls that are made on behalf
+// of the cancelled fragment id.
 class DataStreamMgr {
  public:
   DataStreamMgr() {}
@@ -52,7 +57,10 @@ class DataStreamMgr {
   // Decreases the #remaining_senders count for the stream identified by
   // fragment_id/dest_node_id.
   // Returns OK if successful, error status otherwise.
-  Status CloseStream(const TUniqueId& fragment_id, PlanNodeId dest_node_id);
+  Status CloseSender(const TUniqueId& fragment_id, PlanNodeId dest_node_id);
+
+  // Closes all streams registered for fragment_id immediately.
+  void Cancel(const TUniqueId& fragment_id);
 
  private:
   friend class DataStreamRecvr;
@@ -63,13 +71,14 @@ class DataStreamMgr {
         const RowDescriptor& row_desc, const TUniqueId& fragment_id,
         PlanNodeId dest_node_id, int num_senders, int buffer_size);
 
-    // Returns next available batch or NULL if end-of-stream.
+    // Returns next available batch or NULL if end-of-stream or stream got
+    // cancelled (sets 'is_cancelled' accordingly).
     // A returned batch that is not filled to capacity does *not* indicate
     // end-of-stream.
     // The call blocks until another batch arrives or all senders close
     // their channels.
     // The caller owns the batch.
-    RowBatch* GetBatch();
+    RowBatch* GetBatch(bool* is_cancelled);
 
     // Adds a row batch to this stream's queue; blocks if this will
     // make the stream exceed its buffer limit.
@@ -78,6 +87,9 @@ class DataStreamMgr {
     // Decrement the number of remaining senders and signal eos ("new data")
     // if the count drops to 0.
     void DecrementSenders();
+
+    // Set cancellation flag and signal cancellation to receiver.
+    void CancelStream();
 
     const TUniqueId& fragment_id() const { return fragment_id_; }
     PlanNodeId dest_node_id() const { return dest_node_id_; }
@@ -89,6 +101,9 @@ class DataStreamMgr {
 
     // protects all subsequent data in this block
     boost::mutex lock_;
+
+    // if true, the receiver fragment for this stream got cancelled
+    bool is_cancelled_;
 
     // soft upper limit on the amount of buffering allowed for this stream;
     // we stop acking incoming data once the amount of buffered data
@@ -102,7 +117,7 @@ class DataStreamMgr {
     // (if it drops to 0, end-of-stream is true)
     int num_remaining_senders_;
 
-    // signal arrival of new batch or the eos condition
+    // signal arrival of new batch or the eos/cancelled condition
     boost::condition_variable data_arrival_;
 
     // signal removal of data by stream consumer
@@ -115,21 +130,47 @@ class DataStreamMgr {
 
   ObjectPool pool_;  // holds control blocks
 
+  // protects all fields below
+  boost::mutex lock_;
+
   // map from hash value of fragment id/node id pair to control blocks;
   // we don't want to create a map<pair<TUniqueId, PlanNodeId>, StreamControlBlock*>,
   // because that requires a bunch of copying of ids for lookup
-  typedef boost::unordered_multimap<size_t, StreamControlBlock*> StreamMap;
+  typedef boost::unordered_multimap<uint32_t, StreamControlBlock*> StreamMap;
   StreamMap stream_map_;
-  boost::mutex stream_map_lock_;
+
+  // less-than ordering for pair<TUniqueId, PlanNodeId>
+  struct ComparisonOp {
+    bool operator()(const std::pair<impala::TUniqueId, PlanNodeId>& a,
+                    const std::pair<impala::TUniqueId, PlanNodeId>& b) {
+      if (a.first.hi < b.first.hi) {
+        return true;
+      } else if (a.first.hi > b.first.hi) {
+        return false;
+      } else if (a.first.lo < b.first.lo) {
+        return true;
+      } else if (a.first.lo > b.first.lo) {
+        return false;
+      }
+      return a.second < b.second;
+    }
+  };
+
+  // ordered set of registered streams' fragment id/node id
+  typedef std::set<std::pair<TUniqueId, PlanNodeId>, ComparisonOp > FragmentStreamSet;
+  FragmentStreamSet fragment_stream_set_;
 
   // Return iterator into stream_map_ for given fragment_id/node_id, or stream_map_.end()
   // if not found.
-  StreamMap::iterator FindControlBlock(const TUniqueId& fragment_id, PlanNodeId node_id);
+  // If 'acquire_lock' is false, assumes lock_ is already being held and won't try to
+  // acquire it.
+  StreamMap::iterator FindControlBlock(const TUniqueId& fragment_id, PlanNodeId node_id,
+                                       bool acquire_lock = true);
 
   // Remove control block for fragment_id/node_id.
   Status DeregisterRecvr(const TUniqueId& fragment_id, PlanNodeId node_id);
 
-  size_t GetHashValue(const TUniqueId& fragment_id, PlanNodeId node_id);
+  inline uint32_t GetHashValue(const TUniqueId& fragment_id, PlanNodeId node_id);
 };
 
 }

@@ -135,6 +135,11 @@ class RuntimeState {
   Status CreateCodegen();
 };
 
+#define RETURN_IF_CANCELLED(state) \
+  do { \
+    if (UNLIKELY((state)->is_cancelled())) return Status(TStatusCode::CANCELLED); \
+  } while (false)
+
 }
 
 #endif

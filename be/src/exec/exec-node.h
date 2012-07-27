@@ -23,6 +23,9 @@ class TupleRow;
 class DataSink;
 
 // Superclass of all executor nodes.
+// All subclasses need to make sure to check RuntimeState::is_cancelled()
+// periodically in order to ensure timely termination after the cancellation
+// flag gets set.
 class ExecNode {
  public:
   // Init conjuncts.
@@ -51,10 +54,12 @@ class ExecNode {
   // row_batch's tuple_data_pool.
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) = 0;
 
-  // Releases all resources that were allocated in Open()/GetNext().
-  // Must call Open() again prior to subsequent calls to GetNext().
-  // Close() should be called once for every call to Open()
-  // Default implementation updates runtime profile counters.
+  // Close() is called once for every call to Open(), and must release all resources
+  // that were allocated in Open()/GetNext(), even if the latter ended with an error.
+  // After calling Close(), the caller calls Open() again prior to subsequent calls to
+  // GetNext(). The default implementation updates runtime profile counters and calls
+  // Close() on the children. To ensure that Close() is called on the entire plan tree,
+  // each implementation should start out by calling the default implementation.
   virtual Status Close(RuntimeState* state);
 
   // Creates exec node tree from list of nodes contained in plan via depth-first

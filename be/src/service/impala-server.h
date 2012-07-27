@@ -42,12 +42,21 @@ class ThriftServer;
 // it implements both the ImpalaService and ImpalaInternalService APIs.
 // This class is partially thread-safe. To ensure freedom from deadlock,
 // locks on the maps are obtained before locks on the items contained in the maps.
+//
+// TODO: The state of a running query is currently not cleaned up if the
+// query doesn't experience any errors at runtime and close() doesn't get called.
+// The solution is to have a separate thread that cleans up orphaned
+// query execution states after a timeout period.
+// TODO: The same doesn't apply to the execution state of an individual plan
+// fragment: the originating coordinator might die, but we can get notified of
+// that via sparrow. This still needs to be implemented.
 class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
  public:
   ImpalaServer(ExecEnv* exec_env);
   ~ImpalaServer();
 
   // ImpalaService rpcs: Beeswax API
+  virtual void query(beeswax::QueryHandle& query_handle, const beeswax::Query& query);
   virtual void executeAndWait(beeswax::QueryHandle& query_handle,
       const beeswax::Query& query, const beeswax::LogContextId& client_ctx);
   virtual void explain(beeswax::QueryExplanation& query_explanation,
@@ -64,7 +73,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
 
   // ImpalaService rpcs: unimplemented parts of Beeswax API.
   // These APIs will not be implemented because ODBC driver does not use them.
-  virtual void query(beeswax::QueryHandle& query_handle, const beeswax::Query& query);
   virtual void dump_config(std::string& config);
   virtual void get_log(std::string& log, const beeswax::LogContextId& context);
   virtual void get_default_configuration(
@@ -142,10 +150,26 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   // Helper function to raise BeeswaxException
   void RaiseBeeswaxException(const std::string& msg, const char* sql_state);
 
-  Status ExecuteAndWaitInternal(const TQueryRequest& request, TUniqueId* query_id);
+  // Starts asynchronous execution of query. Creates QueryExecState (returned
+  // in exec_state), registers it and calls Coordinator::Execute().
+  // If it returns with an error status, exec_state will be NULL and nothing
+  // will have been registered in query_exec_state_map_.
+  Status Execute(const TQueryRequest& request,
+                 boost::shared_ptr<QueryExecState>* exec_state);
+
+  // Remove exec_state from query_exec_state_map_. Returns true if it found
+  // a registered exec_state, otherwise false.
+  bool UnregisterQuery(const TUniqueId& query_id);
+
+  // Executes the fetch logic. Doesn't clean up the exec state if an error occurs.
+  Status FetchInternal(const TUniqueId& query_id, bool start_over,
+      int32_t fetch_size, beeswax::Results* query_results);
 
   // Webserver callback. Retrieves Hadoop confs from frontend and writes them to output
   void RenderHadoopConfigs(std::stringstream* output);
+
+  // Wrapper around Coordinator::Wait(); suitable for execution inside thread.
+  void Wait(boost::shared_ptr<QueryExecState> exec_state);
 
   // global, per-server state
   jobject fe_;  // instance of com.cloudera.impala.service.JniFrontend

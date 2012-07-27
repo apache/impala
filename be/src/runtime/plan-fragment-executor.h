@@ -42,9 +42,13 @@ class PlanFragmentExecutor {
 
   // Return results through 'batch'. Sets '*batch' to NULL if no more results.
   // '*batch' is owned by PlanFragmentExecutor and must not be deleted.
-  // When *batch == NULL, the underlying plan tree will have been closed and
-  // GetNext() should not be called anymore.
+  // When *batch == NULL, GetNext() should not be called anymore.
   Status GetNext(RowBatch** batch);
+
+  // Closes the underlying plan fragment and frees up all resources allocated
+  // in Open()/GetNext(). This *must* be called whenever Open() was called,
+  // even in the error or cancellation case.
+  Status Close();
 
   RuntimeState* runtime_state() { return runtime_state_.get(); }
   const RowDescriptor& row_desc();

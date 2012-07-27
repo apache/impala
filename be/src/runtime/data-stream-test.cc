@@ -55,7 +55,7 @@ class ImpalaTestBackend : public ImpalaInternalServiceIf {
       mgr_->AddData(params.dest_fragment_id, params.dest_node_id, params.row_batch)
           .SetTStatus(&return_val);
     } else {
-      mgr_->CloseStream(params.dest_fragment_id, params.dest_node_id)
+      mgr_->CloseSender(params.dest_fragment_id, params.dest_node_id)
           .SetTStatus(&return_val);
     }
   }
@@ -72,8 +72,8 @@ class DataStreamTest : public testing::Test {
   }
 
   virtual void SetUp() {
-    query_id_.lo = 0;
-    query_id_.hi = 0;
+    fragment_id_.lo = 0;
+    fragment_id_.hi = 0;
     stream_mgr_ = new DataStreamMgr();
     EXPECT_TRUE(exec_.Setup().ok());
     sink_.destNodeId = DEST_NODE_ID;
@@ -89,13 +89,14 @@ class DataStreamTest : public testing::Test {
   const RowDescriptor* row_desc_;
   TestExecEnv test_env_;
   InProcessQueryExecutor exec_;
-  TUniqueId query_id_;
+  TUniqueId fragment_id_;
   string stmt_;
 
   // receiving node
   DataStreamMgr* stream_mgr_;
   DataStreamRecvr* stream_recvr_;
   thread recvr_thread_;
+  Status recvr_status_;
   ThriftServer* server_;
 
   // sending node(s)
@@ -122,7 +123,7 @@ class DataStreamTest : public testing::Test {
   // Start receiver (expecting given number of senders) in separate thread.
   void StartReceiver(int num_senders, int buffer_size) {
     stream_recvr_ =
-        stream_mgr_->CreateRecvr(*row_desc_, query_id_, DEST_NODE_ID, num_senders,
+        stream_mgr_->CreateRecvr(*row_desc_, fragment_id_, DEST_NODE_ID, num_senders,
                                  buffer_size);
     recvr_thread_ = thread(&DataStreamTest::ReadStream, this);
   }
@@ -134,12 +135,15 @@ class DataStreamTest : public testing::Test {
   // Deplete stream and print batches
   void ReadStream() {
     RowBatch* batch;
-    VLOG_QUERY <<  "start reading\n";
-    while ((batch = stream_recvr_->GetBatch()) != NULL) {
-      VLOG_QUERY << "read batch #rows=" << batch->num_rows() << "\n";
+    VLOG_QUERY <<  "start reading";
+    bool is_cancelled;
+    while ((batch = stream_recvr_->GetBatch(&is_cancelled)) != NULL && !is_cancelled) {
+      VLOG_QUERY << "read batch #rows=" << (batch != NULL ? batch->num_rows() : 0);
       usleep(100000);  // slow down receiver to exercise buffering logic
     }
-    VLOG_QUERY << "done reading\n";
+    if (is_cancelled) VLOG_QUERY << "reader is cancelled";
+    recvr_status_ = (is_cancelled ? Status::CANCELLED : Status::OK);
+    VLOG_QUERY << "done reading";
   }
 
 
@@ -176,7 +180,7 @@ class DataStreamTest : public testing::Test {
     VLOG_QUERY << "exec::exec";
     EXPECT_TRUE(exec.Exec(stmt_, NULL).ok());
     VLOG_QUERY << "create sender";
-    DataStreamSender sender(exec.row_desc(), query_id_, sink_, dest_, 1024);
+    DataStreamSender sender(exec.row_desc(), fragment_id_, sink_, dest_, 1024);
     EXPECT_TRUE(sender.Init(exec.runtime_state()).ok());
     RowBatch* batch = NULL;
     SenderInfo& info = sender_info_[sender_num];
@@ -294,6 +298,14 @@ TEST_F(DataStreamTest, UnknownSenderLargeResult) {
   JoinSenders();
   EXPECT_FALSE(sender_info_[0].status.ok());
   EXPECT_EQ(sender_info_[0].num_bytes_sent, 0);
+}
+
+TEST_F(DataStreamTest, Cancel) {
+  PrepareQuery("select * from alltypesagg");
+  StartReceiver(1, 1024);
+  stream_mgr_->Cancel(fragment_id_);
+  JoinReceiver();
+  EXPECT_TRUE(recvr_status_.IsCancelled());
 }
 
 // TODO: more tests:

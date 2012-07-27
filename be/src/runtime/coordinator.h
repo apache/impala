@@ -72,14 +72,19 @@ class Coordinator {
   // Blocks until result rows are ready to be retrieved via GetNext(), or, if the
   // query doesn't return rows, until the query finishes or is cancelled.
   // A call to Wait() must precede all calls to GetNext().
+  // Multiple calls to Wait() are idempotent and it is okay to issue multiple
+  // Wait() calls concurrently.
   Status Wait();
 
   // Returns tuples from the coordinator fragment. Any returned tuples are valid until
   // the next GetNext() call. If the coordinator has a sink, then no tuples will be
   // returned via *batch, but will instead be sent to the sink. In that case,
   // GetNext() will block until all result rows have been sent to the sink.
+  // (TODO: this is not how the code behaves; we need to fix the code)
   // '*batch' is owned by the underlying PlanFragmentExecutor and must not be deleted.
   // *state is owned by the caller, and must not be deleted.
+  // Returns an error status if an error was encountered either locally or by
+  // any of the remote fragments or if the query was cancelled.
   // GetNext() is not thread-safe: multiple threads must not make concurrent
   // GetNext() calls (but may call any of the other member functions concurrently
   // with GetNext()).
@@ -98,6 +103,7 @@ class Coordinator {
   Status UpdateFragmentExecStatus(int backend_num, const TStatus& status,
       bool done, const TRuntimeProfileTree& cumulative_profile);
 
+  // only valid *after* calling Exec()
   RuntimeState* runtime_state();
   const RowDescriptor& row_desc() const;
 
@@ -151,6 +157,9 @@ class Coordinator {
   // protects all fields below
   boost::mutex lock_;
 
+  // ensures single-threaded execution of Wait()
+  boost::mutex wait_lock_;
+
   // execution state of coordinator fragment
   boost::scoped_ptr<PlanFragmentExecutor> executor_;
 
@@ -190,6 +199,10 @@ class Coordinator {
   // Print total data volume contained in params to VLOG(1)
   void PrintClientInfo(
       const std::pair<std::string, int>& host, const TPlanExecParams& params);
+
+  // Executes the GetNext() logic, but doesn't call Close() when execution
+  // is completed.
+  Status GetNextInternal(RowBatch** batch, RuntimeState* state);
 
   // Runs cancel logic. If 'get_lock' is true, obtains lock_; otherwise doesn't.
   void Cancel(bool get_lock);

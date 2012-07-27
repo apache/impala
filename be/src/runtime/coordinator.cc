@@ -13,6 +13,7 @@
 #include "exec/hdfs-table-sink.h"
 #include "runtime/client-cache.h"
 #include "runtime/data-stream-sender.h"
+#include "runtime/data-stream-mgr.h"
 #include "runtime/exec-env.h"
 #include "runtime/plan-fragment-executor.h"
 #include "runtime/row-batch.h"
@@ -132,9 +133,11 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
 }
 
 Status Coordinator::Wait() {
-  // Open() may block waiting for input from the remote fragments
-  RETURN_IF_ERROR(executor_->Open());
+  lock_guard<mutex> l(wait_lock_);
+  if (has_called_wait_) return Status::OK;
   has_called_wait_ = true;
+  // Open() may block
+  RETURN_IF_ERROR(executor_->Open());
   return Status::OK;
 }
 
@@ -190,6 +193,16 @@ Status Coordinator::ExecRemoteFragment(
 }
 
 Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
+  Status status = GetNextInternal(batch, state);
+  // close the executor if we see an error status (including cancellation) or 
+  // hit the end
+  if (!status.ok() || execution_completed_) {
+    status.AddError(executor_->Close());
+  }
+  return status;
+}
+
+Status Coordinator::GetNextInternal(RowBatch** batch, RuntimeState* state) {
   DCHECK(has_called_wait_);
   COUNTER_SCOPED_TIMER(query_profile_->total_time_counter());
   VLOG_ROW << "coord.getnext";
@@ -198,6 +211,9 @@ Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
     execution_completed_ = true;
     if (sink_.get() != NULL) RETURN_IF_ERROR(sink_->Close(state));
   } else {
+    // TODO: fix this: the advertised behavior is that when we're sending to
+    // a sink, GetNext() doesn't return until all input has been sent; ie,
+    // we need to loop here
     if (sink_.get() != NULL) {
       RETURN_IF_ERROR(sink_->Send(state, *batch));
       // Only update stats once we've done all the work intended for a batch
@@ -224,6 +240,8 @@ void Coordinator::Cancel(bool get_lock) {
   // cancel local fragment
   if (executor_.get() != NULL) {
     executor_->runtime_state()->set_is_cancelled(true);
+    // cancel all incoming data streams
+    exec_env_->stream_mgr()->Cancel(runtime_state()->fragment_id());
   }
 
   for (int i = 0; i < backend_exec_states_.size(); ++i) {

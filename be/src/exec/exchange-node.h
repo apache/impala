@@ -19,7 +19,6 @@ class ExchangeNode : public ExecNode {
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
-  virtual Status Close(RuntimeState* state);
 
  protected:
   virtual void DebugString(int indentation_level, std::stringstream* out) const;

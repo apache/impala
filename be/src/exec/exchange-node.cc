@@ -39,7 +39,9 @@ Status ExchangeNode::Open(RuntimeState* state) {
 
 Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* eos) {
   COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
-  scoped_ptr<RowBatch> input_batch(stream_recvr_->GetBatch());
+  bool is_cancelled;
+  scoped_ptr<RowBatch> input_batch(stream_recvr_->GetBatch(&is_cancelled));
+  if (is_cancelled) return Status(TStatusCode::CANCELLED);
   output_batch->Reset();
   *eos = (input_batch.get() == NULL);
   if (*eos) return Status::OK;
@@ -67,11 +69,6 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
   }
   num_rows_returned_ += i;
   input_batch->TransferTupleData(output_batch);
-  return Status::OK;
-}
-
-Status ExchangeNode::Close(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecNode::Close(state));
   return Status::OK;
 }
 

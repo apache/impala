@@ -51,6 +51,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
 }
 
 Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  RETURN_IF_CANCELLED(state);
   COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
 
   // Guard against trying to read an empty set of scan ranges
@@ -69,6 +70,7 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   do {
     bool eosr = false;
     RETURN_IF_ERROR(current_scanner_->GetNext(row_batch, &eosr));
+    RETURN_IF_CANCELLED(state);
 
     if (ReachedLimit()) {
       *eos = true;
@@ -258,11 +260,12 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 }
 
 Status HdfsScanNode::Close(RuntimeState* state) {
+  Status result;
   if (current_byte_stream_ != NULL) {
-    RETURN_IF_ERROR(current_byte_stream_->Close());
+    result.AddError(current_byte_stream_->Close());
   }
   scanner_pool_.reset(NULL);
   COUNTER_UPDATE(memory_used_counter_, tuple_pool_->peak_allocated_bytes());
-  RETURN_IF_ERROR(ExecNode::Close(state));
-  return Status::OK;
+  result.AddError(ExecNode::Close(state));
+  return result;
 }

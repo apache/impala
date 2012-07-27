@@ -57,6 +57,8 @@ class HdfsScanNode : public ScanNode {
 
   virtual Status Open(RuntimeState* state);
 
+  // Checks for cancellation at the very beginning and then again after
+  // each call to HdfsScanner::GetNext().
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
 
   virtual Status Close(RuntimeState* state);

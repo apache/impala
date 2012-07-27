@@ -148,6 +148,7 @@ Status AggregationNode::Open(RuntimeState* state) {
   int64_t num_agg_rows = 0;
   while (true) {
     bool eos;
+    RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(children_[0]->GetNext(state, &batch, &eos));
     COUNTER_SCOPED_TIMER(build_timer_);
 
@@ -183,6 +184,7 @@ Status AggregationNode::Open(RuntimeState* state) {
 }
 
 Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  RETURN_IF_CANCELLED(state);
   COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   COUNTER_SCOPED_TIMER(get_results_timer_);
 
@@ -216,8 +218,7 @@ Status AggregationNode::Close(RuntimeState* state) {
   COUNTER_UPDATE(memory_used_counter(), tuple_pool_->peak_allocated_bytes());
   COUNTER_UPDATE(memory_used_counter(), hash_tbl_->byte_size());
   COUNTER_UPDATE(hash_table_buckets_counter_, hash_tbl_->num_buckets());
-  RETURN_IF_ERROR(ExecNode::Close(state));
-  return Status::OK;
+  return ExecNode::Close(state);
 }
 
 AggregationTuple* AggregationNode::ConstructAggTuple() {

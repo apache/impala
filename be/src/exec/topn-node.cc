@@ -86,12 +86,14 @@ Status TopNNode::Prepare(RuntimeState* state) {
 }
 
 Status TopNNode::Open(RuntimeState* state) {
+  RETURN_IF_CANCELLED(state);
   COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(child(0)->Open(state));
 
   RowBatch batch(child(0)->row_desc(), state->batch_size());
   bool eos;
   do {
+    RETURN_IF_CANCELLED(state);
     batch.Reset();
     RETURN_IF_ERROR(child(0)->GetNext(state, &batch, &eos));
     for (int i = 0; i < batch.num_rows(); ++i) {
@@ -106,6 +108,7 @@ Status TopNNode::Open(RuntimeState* state) {
 }
 
 Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  RETURN_IF_CANCELLED(state);
   COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   while (!row_batch->IsFull() && (get_next_iter_ != sorted_top_n_.end())) {
     int row_idx = row_batch->AddRow();
@@ -122,8 +125,7 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 
 Status TopNNode::Close(RuntimeState* state) {
   COUNTER_UPDATE(memory_used_counter(), tuple_pool_->peak_allocated_bytes());
-  RETURN_IF_ERROR(ExecNode::Close(state));
-  return Status::OK;
+  return ExecNode::Close(state);
 }
 
 // Insert if either not at the limit or it's a new TopN tuple_row

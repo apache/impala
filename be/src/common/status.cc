@@ -10,6 +10,7 @@ using namespace boost::algorithm;
 namespace impala {
 
 const Status Status::OK;
+const Status Status::CANCELLED(TStatusCode::CANCELLED);
 
 Status::ErrorDetail::ErrorDetail(const TStatus& status)
   : error_code(status.status_code),
@@ -55,6 +56,11 @@ void Status::AddErrorMsg(TStatusCode::type code, const std::string& msg) {
 
 void Status::AddErrorMsg(const std::string& msg) {
   AddErrorMsg(TStatusCode::INTERNAL_ERROR, msg);
+}
+
+void Status::AddError(const Status& status) {
+  if (status.ok()) return;
+  AddErrorMsg(status.code(), status.GetErrorMsg());
 }
 
 void Status::GetErrorMsgs(vector<string>* msgs) const {

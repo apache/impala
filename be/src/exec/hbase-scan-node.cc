@@ -86,6 +86,7 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
 }
 
 Status HBaseScanNode::Open(RuntimeState* state) {
+  RETURN_IF_CANCELLED(state);
   COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   return hbase_scanner_->StartScan(tuple_desc_, scan_range_vector_, filters_);
 }
@@ -108,6 +109,7 @@ void HBaseScanNode::WriteTextSlot(
 }
 
 Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  RETURN_IF_CANCELLED(state);
   // For GetNext, most of the time is spent in HBaseTableScanner::ResultScanner_next,
   // but there's still some considerable time inside here.
   // TODO: need to understand how the time is spent inside this function.
@@ -130,6 +132,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
   // Indicates whether there are more rows to process. Set in hbase_scanner_.Next().
   bool has_next = false;
   while (true) {
+    RETURN_IF_CANCELLED(state);
     if (ReachedLimit() || row_batch->IsFull()) {
       // hang on to last allocated chunk in pool, we'll keep writing into it in the
       // next GetNext() call
@@ -224,8 +227,7 @@ Status HBaseScanNode::Close(RuntimeState* state) {
   if (num_errors_ > 0) {
     state->ReportFileErrors(table_name_, num_errors_);
   }
-  RETURN_IF_ERROR(ExecNode::Close(state));
-  return Status::OK;
+  return ExecNode::Close(state);
 }
 
 void HBaseScanNode::DebugString(int indentation_level, stringstream* out) const {

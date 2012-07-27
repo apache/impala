@@ -65,6 +65,8 @@ Status MergeNode::Prepare(RuntimeState* state) {
 }
 
 Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  RETURN_IF_CANCELLED(state);
+  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   // Create new tuple buffer for row_batch.
   int tuple_buffer_size = row_batch->capacity() * tuple_desc_->byte_size();
   void* tuple_buffer = row_batch->tuple_data_pool()->Allocate(tuple_buffer_size);
@@ -88,6 +90,7 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   while (child_idx_ < children_.size()) {
     // Row batch was either never set or we're moving on to a different child.
     if (child_row_batch_.get() == NULL) {
+      RETURN_IF_CANCELLED(state);
       child_row_batch_.reset(
           new RowBatch(child(child_idx_)->row_desc(), state->batch_size()));
       // Open child and fetch the first row batch.
@@ -110,10 +113,10 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
         }
         return Status::OK;
       }
+
       // Fetch new batch if one is available, otherwise move on to next child.
-      if (child_eos_) {
-        break;
-      }
+      if (child_eos_) break;
+      RETURN_IF_CANCELLED(state);
       child_row_batch_->Reset();
       RETURN_IF_ERROR(child(child_idx_)->GetNext(state, child_row_batch_.get(),
           &child_eos_));
@@ -125,6 +128,7 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     ++child_idx_;
     child_row_batch_.reset(NULL);
   }
+
   // Don't close the current child again in Close().
   child_idx_ = INVALID_CHILD_IDX;
   *eos = true;
@@ -132,11 +136,13 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 }
 
 Status MergeNode::Close(RuntimeState* state) {
-  RETURN_IF_ERROR(ExecNode::Close(state));
+  // don't call ExecNode::Close(), it always closes all children
+  COUNTER_UPDATE(rows_returned_counter_, num_rows_returned_);
+  Status result;
   if (child_idx_ != INVALID_CHILD_IDX) {
-    RETURN_IF_ERROR(child(child_idx_)->Close(state));
+    result.AddError(child(child_idx_)->Close(state));
   }
-  return Status::OK;
+  return result;
 }
 
 bool MergeNode::EvalAndMaterializeExprs(const vector<Expr*>& exprs,

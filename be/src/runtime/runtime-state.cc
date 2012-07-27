@@ -31,7 +31,8 @@ RuntimeState::RuntimeState(
     max_errors_(max_errors),
     fragment_id_(fragment_id),
     exec_env_(exec_env),
-    profile_(obj_pool_.get(), "RuntimeState") {
+    profile_(obj_pool_.get(), "RuntimeState"),
+    is_cancelled_(false) {
   if (llvm_enabled) {
     Status status = CreateCodegen();
     DCHECK(status.ok()); // TODO better error handling

@@ -135,14 +135,13 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
 }
 
 Status HashJoinNode::Close(RuntimeState* state) {
-  RETURN_IF_ERROR(child(0)->Close(state));
   COUNTER_UPDATE(memory_used_counter_, build_pool_->peak_allocated_bytes());
   COUNTER_UPDATE(memory_used_counter_, hash_tbl_->byte_size());
-  RETURN_IF_ERROR(ExecNode::Close(state));
-  return Status::OK;
+  return ExecNode::Close(state);
 }
 
 Status HashJoinNode::Open(RuntimeState* state) {
+  RETURN_IF_CANCELLED(state);
   COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   eos_ = false;
 
@@ -154,6 +153,7 @@ Status HashJoinNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(child(1)->Open(state));
   while (true) {
     COUNTER_SCOPED_TIMER(build_timer_);
+    RETURN_IF_CANCELLED(state);
     bool eos;
     RETURN_IF_ERROR(child(1)->GetNext(state, &build_batch, &eos));
     // take ownership of tuple data of build_batch
@@ -206,6 +206,7 @@ Status HashJoinNode::Open(RuntimeState* state) {
 }
 
 Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos) {
+  RETURN_IF_CANCELLED(state);
   COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   COUNTER_SCOPED_TIMER(probe_timer_);
   if (ReachedLimit()) {

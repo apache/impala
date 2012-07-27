@@ -12,7 +12,7 @@
 
 namespace impala {
 
-// Status is used as a function return type to indicate success or failure
+// Status is used as a function return type to indicate success, failure or cancellation
 // of the function. In case of successful completion, it only occupies sizeof(void*)
 // statically allocated memory. In the error case, it records a stack of error messages.
 //
@@ -34,6 +34,7 @@ class Status {
   Status(): error_detail_(NULL) {}
 
   static const Status OK;
+  static const Status CANCELLED;
 
   // copy c'tor makes copy of error detail so Status can be returned by value
   Status(const Status& status)
@@ -41,6 +42,11 @@ class Status {
         status.error_detail_ != NULL
           ? new ErrorDetail(*status.error_detail_)
           : NULL) {
+  }
+
+  // c'tor for error case - is this useful for anything other than CANCELLED?
+  Status(TStatusCode::type code)
+    : error_detail_(new ErrorDetail(code)) {
   }
 
   // c'tor for error case
@@ -87,6 +93,11 @@ class Status {
   // set yet. If a code has already been set, it is left unchanged.
   void AddErrorMsg(const std::string& msg);
 
+  // Does nothing if status.ok().
+  // Otherwise: if 'this' is an error status, adds the error msg from 'status;
+  // otherwise assigns 'status'.
+  void AddError(const Status& status);
+
   // Return all accumulated error msgs.
   void GetErrorMsgs(std::vector<std::string>* msgs) const;
 
@@ -102,8 +113,12 @@ class Status {
 
   // Return all accumulated error msgs in a single string.
   void GetErrorMsg(std::string* msg) const;
-  //std::string GetErrorString() const;
+
   std::string GetErrorMsg() const;
+
+  TStatusCode::type code() const {
+    return error_detail_ == NULL ? TStatusCode::OK : error_detail_->error_code;
+  }
 
  private:
   struct ErrorDetail {
@@ -111,6 +126,8 @@ class Status {
     std::vector<std::string> error_msgs;
 
     ErrorDetail(const TStatus& status);
+    ErrorDetail(TStatusCode::type code)
+      : error_code(code) {}
     ErrorDetail(TStatusCode::type code, const std::string& msg)
       : error_code(code), error_msgs(1, msg) {}
   };

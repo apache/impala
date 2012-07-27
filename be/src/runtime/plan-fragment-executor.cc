@@ -43,7 +43,6 @@ PlanFragmentExecutor::~PlanFragmentExecutor() {
 Status PlanFragmentExecutor::Prepare(
     const TPlanExecRequest& request, const TPlanExecParams& params) {
 
-  //1 << "plan exec request:\n" << ThriftDebugString(request);
   VLOG_QUERY << "params:\n" << ThriftDebugString(params);
 
   // If FE disables it, turn it off, otherwise, use the BE setting
@@ -131,6 +130,10 @@ Status PlanFragmentExecutor::GetNext(RowBatch** batch) {
 #endif
 
   return Status::OK;
+}
+
+Status PlanFragmentExecutor::Close() {
+  return plan_->Close(runtime_state_.get());
 }
 
 const RowDescriptor& PlanFragmentExecutor::row_desc() {
