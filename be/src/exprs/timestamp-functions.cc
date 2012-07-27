@@ -133,6 +133,12 @@ void* TimestampFunctions::Second(Expr* e, TupleRow* row) {
   return &e->result_.int_val;
 }
 
+void* TimestampFunctions::Now(Expr* e, TupleRow* row) {
+  // Make sure FunctionCall::Prepare() properly set the timestamp value.
+  DCHECK(!e->result_.timestamp_val.date().is_special());
+  return &e->result_.timestamp_val;
+}
+
 void* TimestampFunctions::ToDate(Expr* e, TupleRow* row) {
   DCHECK_EQ(e->GetNumChildren(), 1);
   Expr* op = e->children()[0];

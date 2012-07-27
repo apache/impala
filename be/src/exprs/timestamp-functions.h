@@ -31,6 +31,7 @@ class TimestampFunctions {
   static void* Second(Expr* e, TupleRow* row);
 
   // Date functions.
+  static void* Now(Expr* e, TupleRow* row);
   static void* ToDate(Expr* e, TupleRow* row);
   static void* DateAdd(Expr* e, TupleRow* row);
   static void* DateSub(Expr* e, TupleRow* row);
@@ -39,6 +40,7 @@ class TimestampFunctions {
   // Convert a timestamp to or from a particular timezone based time.
   static void* FromUtc(Expr* e, TupleRow* row);
   static void* ToUtc(Expr* e, TupleRow* row);
+
 };
 
 // Functions to load and access the timestamp database.

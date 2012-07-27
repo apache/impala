@@ -549,9 +549,11 @@ Status ImpalaServer::Execute(const TQueryRequest& request,
   if (!exec_request.fragment_requests[0].__isset.desc_tbl) {
     // query without a FROM clause
     DCHECK(!exec_request.fragment_requests[0].__isset.plan_fragment);
+    TimestampValue now(exec_request.fragment_requests[0].query_globals.now_string);
     exec_state->local_runtime_state()->Init(
         exec_request.query_id, exec_request.abort_on_error, exec_request.max_errors,
-        FLAGS_enable_jit, NULL /* = we don't expect to be executing anything here */);
+        &now, FLAGS_enable_jit,
+        NULL /* = we don't expect to be executing anything here */);
     RETURN_IF_ERROR(exec_state->PrepareSelectListExprs(exec_state->local_runtime_state(),
         exec_request.fragment_requests[0].output_exprs, RowDescriptor()));
   } else {

@@ -6,6 +6,7 @@
 
 #include "codegen/llvm-codegen.h"
 #include "exprs/function-call.h"
+#include "runtime/runtime-state.h"
 
 using namespace llvm;
 
@@ -16,6 +17,17 @@ namespace impala {
 
 FunctionCall::FunctionCall(const TExprNode& node)
   : Expr(node), regex_(NULL) {
+}
+
+Status FunctionCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
+  RETURN_IF_ERROR(Expr::Prepare(state, row_desc));
+  // Set now timestamp from runtime state.
+  if (opcode_ == TExprOpcode::TIMESTAMP_NOW) {
+    DCHECK_NOTNULL(state);
+    DCHECK(!state->now()->NotADateTime());
+    result_.timestamp_val = *(state->now());
+  }
+  return Status::OK;
 }
 
 string FunctionCall::DebugString() const {

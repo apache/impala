@@ -35,6 +35,8 @@ public class TestUtils {
   private final static Logger LOG = LoggerFactory.getLogger(TestUtils.class);
   private final static String[] expectedFilePrefix = { "hdfs:" };
   private final static String[] ignoreContentAfter = { "HOST:" };
+  // Special prefix for accepting an actual result if it matches a given regex.
+  private final static String regexAgainstActual = "regex:";
   private final static String DEFAULT_DB = "default";
 
   // Our partition file paths are returned in the format of:
@@ -112,6 +114,17 @@ public class TestUtils {
       boolean ignoreAfter = false;
       for (int icIdx = 0; icIdx < ignoreContentAfter.length; ++icIdx) {
         ignoreAfter |= expectedStr.trim().startsWith(ignoreContentAfter[icIdx]);
+      }
+
+      if (expectedStr.trim().startsWith(regexAgainstActual)) {
+        // Get regex to check against by removing prefix.
+        String regex = expectedStr.replace(regexAgainstActual, "").trim();
+        if (!actualStr.matches(regex)) {
+          mismatch = i;
+          break;
+        }
+        // Accept actualStr.
+        continue;
       }
 
       // do a whitespace-insensitive comparison

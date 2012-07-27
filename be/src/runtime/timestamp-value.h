@@ -109,7 +109,7 @@ class  TimestampValue {
   }
 
   // If the date or time of day are valid then this is valid.
-  bool NotADateTime() {
+  bool NotADateTime() const {
     boost::posix_time::ptime temp;
     return this->date_.is_special() && this->time_of_day_.is_special();
   }

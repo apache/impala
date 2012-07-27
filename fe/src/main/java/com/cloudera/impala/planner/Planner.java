@@ -2,7 +2,9 @@
 
 package com.cloudera.impala.planner;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -44,6 +46,7 @@ import com.cloudera.impala.thrift.THostPort;
 import com.cloudera.impala.thrift.TPlanExecParams;
 import com.cloudera.impala.thrift.TPlanExecRequest;
 import com.cloudera.impala.thrift.TQueryExecRequest;
+import com.cloudera.impala.thrift.TQueryGlobals;
 import com.cloudera.impala.thrift.TScanRange;
 import com.cloudera.impala.thrift.TUniqueId;
 import com.google.common.base.Preconditions;
@@ -58,6 +61,10 @@ import com.google.common.collect.Sets;
  */
 public class Planner {
   private final static Logger LOG = LoggerFactory.getLogger(Planner.class);
+
+  // For generating a string of the current time.
+  private final SimpleDateFormat formatter =
+      new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
 
   // counter to assign sequential node ids
   private int nextNodeId = 0;
@@ -703,8 +710,11 @@ public class Planner {
     } else {
       queryStmt = analysisResult.getQueryStmt();
     }
-
     Analyzer analyzer = analysisResult.getAnalyzer();
+
+    // Global query parameters to be set in each TPlanExecRequest.
+    TQueryGlobals queryGlobals = createQueryGlobals(analyzer);
+
     TQueryExecRequest request = new TQueryExecRequest();
     // root: the node producing the final output (ie, coord plan for distrib. execution)
     PlanNode root = null;
@@ -718,7 +728,7 @@ public class Planner {
         // SELECT without FROM clause
         TPlanExecRequest fragmentRequest = new TPlanExecRequest(
             new TUniqueId(), new TUniqueId(),
-            Expr.treesToThrift(selectStmt.getResultExprs()));
+            Expr.treesToThrift(selectStmt.getResultExprs()), queryGlobals);
         request.addToFragment_requests(fragmentRequest);
         explainString.append("Plan Fragment " + 0 + "\n");
         explainString.append("  SELECT CONSTANT\n");
@@ -784,17 +794,17 @@ public class Planner {
     // create TPlanExecRequests and set up data sinks
     if (numNodes == 1) {
       TPlanExecRequest planRequest =
-          createPlanExecRequest(root, analyzer.getDescTbl(), request);
+          createPlanExecRequest(root, analyzer.getDescTbl(), queryGlobals, request);
       planRequest.setOutput_exprs(
           Expr.treesToThrift(queryStmt.getResultExprs()));
     } else {
       // coordinator fragment comes first
       TPlanExecRequest coordRequest =
-          createPlanExecRequest(root, analyzer.getDescTbl(), request);
+          createPlanExecRequest(root, analyzer.getDescTbl(), queryGlobals, request);
       coordRequest.setOutput_exprs(
           Expr.treesToThrift(queryStmt.getResultExprs()));
       // create TPlanExecRequest for slave plan
-      createPlanExecRequest(slave, analyzer.getDescTbl(), request);
+      createPlanExecRequest(slave, analyzer.getDescTbl(), queryGlobals, request);
 
       // Slaves write to stream data sink for an exchange node.
       ExchangeNode exchNode = root.findFirstOf(ExchangeNode.class);
@@ -836,6 +846,17 @@ public class Planner {
     Preconditions.checkState(!analyzer.hasUnassignedConjuncts());
 
     return request;
+  }
+
+  /**
+   * Create query global parameters to be set in each TPlanExecRequest.
+   */
+  private TQueryGlobals createQueryGlobals(Analyzer analyzer) {
+    TQueryGlobals queryGlobals = new TQueryGlobals();
+    Calendar currentDate = Calendar.getInstance();
+    String nowStr = formatter.format(currentDate.getTime());
+    queryGlobals.setNow_string(nowStr);
+    return queryGlobals;
   }
 
   /**
@@ -1023,10 +1044,12 @@ public class Planner {
    * Create TPlanExecRequest for root and add it to queryRequest.
    */
   private TPlanExecRequest createPlanExecRequest(PlanNode root,
-      DescriptorTable descTbl, TQueryExecRequest queryRequest) {
+      DescriptorTable descTbl, TQueryGlobals queryGlobals,
+      TQueryExecRequest queryRequest) {
     TPlanExecRequest planRequest = new TPlanExecRequest();
     planRequest.setPlan_fragment(root.treeToThrift());
     planRequest.setDesc_tbl(descTbl.toThrift());
+    planRequest.setQuery_globals(queryGlobals);
     queryRequest.addToFragment_requests(planRequest);
     return planRequest;
   }

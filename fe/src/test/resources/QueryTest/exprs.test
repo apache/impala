@@ -781,3 +781,42 @@ bigint
 ---- RESULTS
 9900
 ====
+// Test NOW() function.
+select now()
+---- TYPES
+timestamp
+---- RESULTS
+// Matches a single date of the form 'yyyy-MM-dd HH:mm:ss' 
+// or 'yyyy-MM-dd HH:mm:ss.SSSSSS'
+regex: \d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?
+====
+select now(), now(), now(), now()
+---- TYPES
+timestamp, timestamp, timestamp, timestamp
+---- RESULTS
+// Matches four identical timestamps separated by commas.
+regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
+====
+select now(), now(), now(), now() from alltypestiny
+---- TYPES
+timestamp, timestamp, timestamp, timestamp
+---- RESULTS
+// Matches four identical timestamps separated by commas.
+regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
+regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
+regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
+regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
+regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
+regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
+regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
+regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
+====
+// Check that now() returns the same value when evaluated on different nodes
+// (alltypessmall is partitioned)
+select min(now()), max(now()) from alltypessmall
+---- TYPES
+timestamp, timestamp
+---- RESULTS
+// Matches two identical timestamps separated by commas.
+regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1
+====

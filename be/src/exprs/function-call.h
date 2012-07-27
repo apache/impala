@@ -12,6 +12,7 @@
 namespace impala {
 
 class TExprNode;
+class RuntimeState;
 
 class FunctionCall: public Expr {
  public:
@@ -22,6 +23,7 @@ class FunctionCall: public Expr {
   friend class StringFunctions;
 
   FunctionCall(const TExprNode& node);
+  virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);
   virtual std::string DebugString() const;
 
   // Returns false if the pattern is invalid, true otherwise.

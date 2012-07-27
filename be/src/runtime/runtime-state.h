@@ -22,21 +22,26 @@ class DescriptorTbl;
 class ObjectPool;
 class Status;
 class ExecEnv;
+class Expr;
 class LlvmCodeGen;
+class TimestampValue;
 
 // A collection of items that are part of the global state of a
 // query and shared across all execution nodes of that query.
 class RuntimeState {
  public:
   RuntimeState(const TUniqueId& fragment_id, bool abort_on_error, int max_errors,
-               int batch_size, bool llvm_enabled, ExecEnv* exec_env);
+               int batch_size, const TimestampValue* now, bool llvm_enabled,
+               ExecEnv* exec_env);
 
   // RuntimeState for executing queries w/o a from clause.
   RuntimeState();
+  // Empty d'tor to avoid issues with scoped_ptr.
+  ~RuntimeState();
 
   // Set per-query state.
   Status Init(const TUniqueId& fragment_id, bool abort_on_error, int max_errors,
-              bool llvm_enabled, ExecEnv* exec_env);
+              const TimestampValue* now, bool llvm_enabled, ExecEnv* exec_env);
 
   ObjectPool* obj_pool() const { return obj_pool_.get(); }
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }
@@ -45,6 +50,8 @@ class RuntimeState {
   int file_buffer_size() const { return file_buffer_size_; }
   bool abort_on_error() const { return abort_on_error_; }
   int max_errors() const { return max_errors_; }
+  const TimestampValue* now() const { return now_.get(); }
+  void set_now(const TimestampValue* now);
   const std::vector<std::string>& error_log() const { return error_log_; }
   std::stringstream& error_stream() { return error_stream_; }
   const std::vector<std::pair<std::string, int> >& file_errors() const {
@@ -112,6 +119,10 @@ class RuntimeState {
 
   // Maximum number of errors to log.
   int max_errors_;
+
+  // Query-global timestamp, e.g., for implementing now().
+  // Use pointer to avoid inclusion of timestampvalue.h and avoid clang issues.
+  boost::scoped_ptr<TimestampValue> now_;
 
   TUniqueId fragment_id_;
   ExecEnv* exec_env_;

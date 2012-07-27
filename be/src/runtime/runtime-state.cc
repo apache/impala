@@ -8,8 +8,10 @@
 #include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
 #include "common/status.h"
+#include "exprs/expr.h"
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
+#include "runtime/timestamp-value.h"
 #include "util/jni-util.h"
 
 #include <jni.h>
@@ -23,12 +25,13 @@ namespace impala {
 
 RuntimeState::RuntimeState(
     const TUniqueId& fragment_id, bool abort_on_error, int max_errors, int batch_size,
-    bool llvm_enabled, ExecEnv* exec_env)
+    const TimestampValue* now, bool llvm_enabled, ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
     batch_size_(batch_size > 0 ? batch_size : DEFAULT_BATCH_SIZE),
     file_buffer_size_(DEFAULT_FILE_BUFFER_SIZE),
     abort_on_error_(abort_on_error),
     max_errors_(max_errors),
+    now_(new TimestampValue(*now)),
     fragment_id_(fragment_id),
     exec_env_(exec_env),
     profile_(obj_pool_.get(), "RuntimeState"),
@@ -46,12 +49,16 @@ RuntimeState::RuntimeState()
     profile_(obj_pool_.get(), "RuntimeState") {
 }
 
+RuntimeState::~RuntimeState() {
+}
+
 Status RuntimeState::Init(
-    const TUniqueId& fragment_id, bool abort_on_error, int max_errors, bool llvm_enabled,
-    ExecEnv* exec_env) {
+    const TUniqueId& fragment_id, bool abort_on_error, int max_errors,
+    const TimestampValue* now, bool llvm_enabled, ExecEnv* exec_env) {
   fragment_id_ = fragment_id;
   abort_on_error_ = abort_on_error;
   max_errors_ = max_errors_;
+  now_.reset(new TimestampValue(*now));
   exec_env_ = exec_env;
   if (llvm_enabled) {
     RETURN_IF_ERROR(CreateCodegen());
@@ -59,6 +66,10 @@ Status RuntimeState::Init(
     codegen_.reset(NULL);
   }
   return Status::OK;
+}
+
+void RuntimeState::set_now(const TimestampValue* now) {
+  now_.reset(new TimestampValue(*now));
 }
 
 Status RuntimeState::CreateCodegen() {

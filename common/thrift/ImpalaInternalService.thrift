@@ -34,6 +34,12 @@ struct TPlanExecParams {
   7: required i32 batch_size
 }
 
+// Global query parameters assigned by the coordinator.
+struct TQueryGlobals {
+  // String containing a timestamp set as the current time.
+  1: required string now_string
+}
+
 // TPlanExecRequest encapsulates info needed to execute a particular
 // plan fragment, including how to produce and how to partition its output.
 // It leaves out node-specific parameters (see TPlanExecParams).
@@ -56,6 +62,9 @@ struct TPlanExecRequest {
   // the data to a remote plan fragment, or a sink which writes to a table (for
   // insert stmts).
   6: optional DataSinks.TDataSink data_sink
+  
+  // Global query parameters assigned by coordinator.
+  7: required TQueryGlobals query_globals
 }
 
 // TQueryExecRequest encapsulates everything needed to execute all plan fragments

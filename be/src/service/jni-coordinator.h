@@ -26,11 +26,11 @@ class RowBatch;
 class TupleDescriptor;
 class DataStreamMgr;
 class Coordinator;
-class RuntimeState;
 class RowDescriptor;
 class ExecEnv;
 class ExecStats;
 class DataSink;
+class RuntimeState;
 
 // Shim class to adapt backend coordinator to jni.
 class JniCoordinator {
@@ -87,6 +87,8 @@ class JniCoordinator {
   bool as_ascii_;
   bool is_constant_query_;
   jobject result_queue_;
+  // Special RuntimeState for constant queries, set in Exec().
+  boost::scoped_ptr<RuntimeState> const_runtime_state_;
 
   // Specific to insert queries.
   jobject insert_result_;

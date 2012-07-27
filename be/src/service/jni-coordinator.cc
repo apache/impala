@@ -31,6 +31,7 @@ JniCoordinator::JniCoordinator(
     file_errors_(file_errors),
     coord_(new Coordinator(exec_env, exec_stats)),
     result_queue_(result_queue),
+    const_runtime_state_(NULL),
     insert_result_(insert_result) {
 }
 
@@ -52,7 +53,17 @@ Status JniCoordinator::DeserializeRequest(jbyteArray thrift_query_exec_request) 
   if (coord_request.__isset.desc_tbl != coord_request.__isset.plan_fragment) {
       return Status("bad TPlanExecRequest: only one of {plan_fragment, desc_tbl} is set");
   }
+
   is_constant_query_ = !coord_request.__isset.desc_tbl;
+  if (is_constant_query_) {
+    // Create a dummy runtime state because some exprs depend on having one.
+    const_runtime_state_.reset(new RuntimeState());
+    // Set now timestamp in const_runtime_state_.
+    TimestampValue now(
+        query_exec_request_.fragment_requests[0].query_globals.now_string);
+    const_runtime_state_->set_now(&now);
+  }
+
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(
           &obj_pool_, query_exec_request_.fragment_requests[0].output_exprs,
@@ -259,6 +270,7 @@ Status JniCoordinator::Init() {
 }
 
 RuntimeState* JniCoordinator::runtime_state() {
+  if (is_constant_query_) return const_runtime_state_.get();
   DCHECK(coord_.get() != NULL);
   return coord_->runtime_state();
 }

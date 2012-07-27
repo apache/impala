@@ -120,6 +120,7 @@ functions = [
   ['Timestamp_hour', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Hour', ['hour']],
   ['Timestamp_minute', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Minute', ['minute']],
   ['Timestamp_second', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Second', ['second']],
+  ['Timestamp_now', 'TIMESTAMP', [], 'TimestampFunctions::Now', ['now']],
   ['Timestamp_to_date', 'STRING', ['TIMESTAMP'], \
         'TimestampFunctions::ToDate', ['to_date']],
   ['Timestamp_date_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \

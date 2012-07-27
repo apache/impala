@@ -156,6 +156,14 @@ class ExprTest : public testing::Test {
     EXPECT_EQ(*result, expected_result);
   }
 
+  // Tests whether the returned TimestampValue is valid.
+  // We use this function for tests where the expected value is unknown, e.g., now().
+  void TestValidTimestampValue(const string& expr) {
+    TimestampValue* result;
+    GetValue(expr, TYPE_TIMESTAMP, reinterpret_cast<void**>(&result));
+    EXPECT_FALSE(result->NotADateTime());
+  }
+
   template <class T> void TestValue(const string& expr, PrimitiveType expr_type,
                                     const T& expected_result, bool test_codegen = false) {
     void* result;
@@ -1724,6 +1732,9 @@ TEST_F(ExprTest, TimestampFunctions) {
   // There is a boost bug converting from string we need to compensate for, test it
   // With support of date strings this now generates the proper date.
   TestStringValue("cast(cast('1999-01-10' as timestamp) as string)", "1999-01-10");
+
+  // Test functions with unknown expected value.
+  TestValidTimestampValue("now()");
 }
 
 // TODO: Since we currently can't analyze NULL literals as function parameters,
