@@ -166,7 +166,7 @@ int RawValue::Compare(const void* v1, const void* v2, PrimitiveType type) {
     case TYPE_TIMESTAMP:
       ts_value1 = reinterpret_cast<const TimestampValue*>(v1);
       ts_value2 = reinterpret_cast<const TimestampValue*>(v2);
-      return ts_value1 > ts_value2 ? 1 : (ts_value1 < ts_value2 ? -1 : 0);
+      return *ts_value1 > *ts_value2 ? 1 : (*ts_value1 < *ts_value2 ? -1 : 0);
     default:
       DCHECK(false) << "invalid type: " << TypeToString(type);
       return 0;
