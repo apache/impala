@@ -2,6 +2,9 @@
 
 package com.cloudera.impala.service;
 
+import java.util.Map;
+
+import org.apache.hadoop.conf.Configuration;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
@@ -11,8 +14,8 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.thrift.TQueryRequest;
 import com.cloudera.impala.thrift.TCreateQueryExecRequestResult;
+import com.cloudera.impala.thrift.TQueryRequest;
 
 /**
  * JNI-callable interface onto a wrapped Frontend instance. The main point is to serialise
@@ -88,6 +91,28 @@ public class JniFrontend {
     String plan = frontend.getExplainString(request);
     LOG.info("Explain plan: " + plan);
     return plan;
+  }
+
+  // Caching this saves ~50ms per call to getHadoopConfigAsHtml
+  private static final Configuration CONF = new Configuration();
+
+  /**
+   * Returns a string of all loaded Hadoop configuration parameters as a table of keys
+   * and values.
+   */
+  public String getHadoopConfigAsHtml() {
+    StringBuilder output = new StringBuilder();
+    // Write the set of files that make up the configuration
+    output.append(CONF.toString());
+    output.append("\n\n");
+
+    // Write a table of key, value pairs
+    output.append("<table><tr><th>Key</th><th>Value</th></tr>");
+    for (Map.Entry<String, String> e : CONF) {
+      output.append("<tr><td>" + e.getKey() + "</td><td>" + e.getValue() + "</td</tr>");
+    }
+    output.append("</table>");
+    return output.toString();
   }
 
   public void resetCatalog() {

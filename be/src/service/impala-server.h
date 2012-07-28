@@ -125,7 +125,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   boost::shared_ptr<QueryExecState> GetQueryExecState(const TUniqueId& query_id);
 
   // Return exec state for given fragment_id, or NULL if not found.
-  FragmentExecState* GetFragmentExecState(const TUniqueId& fragment_id); 
+  FragmentExecState* GetFragmentExecState(const TUniqueId& fragment_id);
 
   // Call FE to get TQueryRequestResult.
   Status GetQueryExecRequest(const TQueryRequest& request,
@@ -144,10 +144,14 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
 
   Status ExecuteAndWaitInternal(const TQueryRequest& request, TUniqueId* query_id);
 
+  // Webserver callback. Retrieves Hadoop confs from frontend and writes them to output
+  void RenderHadoopConfigs(std::stringstream* output);
+
   // global, per-server state
   jobject fe_;  // instance of com.cloudera.impala.service.JniFrontend
   jmethodID create_query_exec_request_id_;  // JniFrontend.createQueryExecRequest()
   jmethodID get_explain_plan_id_;  // JniFrontend.getExplainPlan()
+  jmethodID get_hadoop_config_id_;  // JniFrontend.getHadoopConfigAsHtml()
   jmethodID reset_catalog_id_; // JniFrontend.resetCatalog()
   ExecEnv* exec_env_;  // not owned
 

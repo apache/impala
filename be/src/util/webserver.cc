@@ -39,6 +39,7 @@ Webserver::~Webserver() {
 }
 
 void Webserver::FlagsHandler(stringstream* output) {
+  (*output) << "<h2>Command-line Flags</h2>";
   (*output) << "<pre>" << CommandlineFlagsIntoString() << "</pre>";
 }
 
@@ -80,7 +81,7 @@ Status Webserver::Start() {
   PathHandlerCallback flags_callback =
       bind<void>(mem_fn(&Webserver::FlagsHandler), this, _1);
 
-  RegisterPathHandler("/flags", flags_callback);
+  RegisterPathHandler("/varz", flags_callback);
 
   LOG(INFO) << "Webserver started";
   return Status::OK;
@@ -111,15 +112,20 @@ void* Webserver::MongooseCallback(enum mg_event event, struct mg_connection* con
       return PROCESSING_COMPLETE;
     }
 
-    mg_printf(connection, "HTTP/1.1 200 OK\r\n"
-              "Content-Type: text/html\r\n\r\n");
     // TODO: Consider adding simple HTML boilerplate, e.g. <html><body> ... </body></html>
     stringstream output;
     BOOST_FOREACH(const PathHandlerCallback& callback, it->second) {
       callback(&output);
     }
 
-    mg_printf(connection, "%s", output.str().c_str());
+    string str = output.str();
+    mg_printf(connection, "HTTP/1.1 200 OK\r\n"
+        "Content-Type: text/html\r\n"
+        "Content-Length: %d\r\n"
+        "\r\n", (int)str.length());
+
+    // Make sure to use mg_write for printing the body; mg_printf truncates at 8kb
+    mg_write(connection, str.c_str(), str.length());
     return PROCESSING_COMPLETE;
   } else {
     return NULL;

@@ -18,6 +18,7 @@
 // undefined references to FLAGS_v
 #include <gflags/gflags.h>
 #include <boost/foreach.hpp>
+#include <boost/bind.hpp>
 
 #include "exprs/expr.h"
 #include "exec/hdfs-table-sink.h"
@@ -39,6 +40,7 @@
 #include "util/thrift-util.h"
 #include "util/thrift-server.h"
 #include "util/jni-util.h"
+#include "util/webserver.h"
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/DataSinks_types.h"
 #include "gen-cpp/Types_types.h"
@@ -411,6 +413,10 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     EXIT_IF_EXC(jni_env);
     reset_catalog_id_ = jni_env->GetMethodID(fe_class, "resetCatalog", "()V");
     EXIT_IF_EXC(jni_env);
+    get_hadoop_config_id_ = jni_env->GetMethodID(fe_class, "getHadoopConfigAsHtml",
+        "()Ljava/lang/String;");
+    EXIT_IF_EXC(jni_env);
+
     jboolean lazy = (FLAGS_load_catalog_at_startup ? false : true);
     jobject fe = jni_env->NewObject(fe_class, fe_ctor, lazy);
     EXIT_IF_EXC(jni_env);
@@ -423,6 +429,30 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     planservice_client_.reset(new ImpalaPlanServiceClient(planservice_protocol_));
     planservice_transport_->open();
   }
+
+  Webserver::PathHandlerCallback default_callback =
+      bind<void>(mem_fn(&ImpalaServer::RenderHadoopConfigs), this, _1);
+  exec_env->webserver()->RegisterPathHandler("/varz", default_callback);
+}
+
+void ImpalaServer::RenderHadoopConfigs(stringstream* output) {
+  (*output) << "<h2>Hadoop Configuration</h2>";
+  if (FLAGS_use_planservice) {
+    (*output) << "Using external PlanService, no Hadoop configs available";
+    return;
+  }
+  (*output) << "<pre>";
+  JNIEnv* jni_env = getJNIEnv();
+  jstring java_explain_string =
+      static_cast<jstring>(jni_env->CallObjectMethod(fe_, get_hadoop_config_id_));
+  RETURN_IF_EXC(jni_env);
+  jboolean is_copy;
+  const char *str = jni_env->GetStringUTFChars(java_explain_string, &is_copy);
+  RETURN_IF_EXC(jni_env);
+  (*output) << str;
+  (*output) << "</pre>";
+  jni_env->ReleaseStringUTFChars(java_explain_string, str);
+  RETURN_IF_EXC(jni_env);
 }
 
 ImpalaServer::~ImpalaServer() {}
