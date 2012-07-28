@@ -257,13 +257,14 @@ int main(int argc, char** argv) {
     // TODO: ignore backends flag? It was introduced to let us run run_query
     // against distributed backends, but we can do that via impalad now.
     exec_env.reset(new ExecEnv());
+    exec_env->set_enable_webserver(false);
     EXIT_IF_ERROR(exec_env->StartServices());
   }
   if (FLAGS_num_nodes != 1) {
     // start backend service to feed stream_mgr
     ThriftServer* fe_server;
     ThriftServer* be_server;
-    CreateImpalaServer(exec_env.get(), FLAGS_fe_port, FLAGS_be_port, &fe_server, 
+    CreateImpalaServer(exec_env.get(), FLAGS_fe_port, FLAGS_be_port, &fe_server,
         &be_server);
     be_server->Start();
   }

@@ -925,7 +925,7 @@ Status ImpalaServer::StartPlanFragmentExecution(
 
   auto_ptr<FragmentExecState> new_exec_state(
       new FragmentExecState(
-        request.query_id, request.fragment_id, exec_env_, 
+        request.query_id, request.fragment_id, exec_env_,
         make_pair(coord_hostport.host, coord_hostport.port)));
   RETURN_IF_ERROR(new_exec_state->Prepare(request, params));
 
@@ -936,7 +936,7 @@ Status ImpalaServer::StartPlanFragmentExecution(
     fragment_exec_state_map_[request.fragment_id] = new_exec_state.release();
   }
 
-  // execute plan fragment in new thread 
+  // execute plan fragment in new thread
   // TODO: manage threads via global thread pool
   exec_state->set_exec_thread(
       new thread(&ImpalaServer::RunExecPlanFragment, this, exec_state));

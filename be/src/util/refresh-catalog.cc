@@ -4,6 +4,7 @@
 #include <protocol/TDebugProtocol.h>
 #include <transport/TSocket.h>
 #include <transport/TTransportUtils.h>
+#include <glog/logging.h>
 #include <gflags/gflags.h>
 
 #include "gen-cpp/ImpalaPlanService.h"
@@ -11,6 +12,8 @@
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/Data_types.h"
+
+#include "util/thrift-client.h"
 
 #include <iostream>
 
@@ -29,29 +32,31 @@ using namespace std;
 int main(int argc, char** argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);
 
-  shared_ptr<TSocket> socket(
-      new TSocket(FLAGS_planservice_host, FLAGS_planservice_port));
-  shared_ptr<TBufferedTransport> transport(new TBufferedTransport(socket));
-  shared_ptr<TBinaryProtocol> protocol(new TBinaryProtocol(transport));
   cout << "Connecting to " << FLAGS_planservice_host << ":"
        << FLAGS_planservice_port << endl;
 
-  try {
-    transport->open();
-  } catch (TTransportException& e) {
-    cout << "Could not open connection to impalad / planservice: " << e.what() << endl;
-    exit(1);
-  }
-  cout << "Connected. Refreshing metadata." << endl;
-
   if (FLAGS_impalad) {
-    ImpalaServiceClient client(protocol);
-
+    ThriftClient<ImpalaServiceClient> client(FLAGS_planservice_host,
+        FLAGS_planservice_port);
+    EXIT_IF_ERROR(client.Open());
+    cout << "Connected. Refreshing metadata." << endl;
     TStatus status;
-    client.ResetCatalog(status);
-    transport->close();
+    client.iface()->ResetCatalog(status);
     cout << "Done." << endl;
   } else {
+    shared_ptr<TSocket> socket(
+        new TSocket(FLAGS_planservice_host, FLAGS_planservice_port));
+    shared_ptr<TBufferedTransport> transport(new TBufferedTransport(socket));
+    shared_ptr<TBinaryProtocol> protocol(new TBinaryProtocol(transport));
+
+    try {
+      transport->open();
+    } catch (TTransportException& e) {
+      cout << "Could not open connection to planservice: " << e.what() << endl;
+      exit(1);
+    }
+    cout << "Connected. Refreshing metadata." << endl;
+
     ImpalaPlanServiceClient client(protocol);
 
     client.RefreshMetadata();

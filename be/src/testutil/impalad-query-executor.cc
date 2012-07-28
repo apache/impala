@@ -6,12 +6,8 @@
 #include <boost/algorithm/string.hpp>
 #include <glog/logging.h>
 #include <gflags/gflags.h>
-#include <protocol/TDebugProtocol.h>
 
-#include <protocol/TBinaryProtocol.h>
-#include <protocol/TDebugProtocol.h>
-#include <transport/TSocket.h>
-#include <transport/TTransportUtils.h>
+#include "util/thrift-client.h"
 
 DEFINE_string(impalad, "", "host:port of impalad process");
 DECLARE_int32(num_nodes);
@@ -39,16 +35,9 @@ Status ImpaladQueryExecutor::Setup() {
   DCHECK_EQ(elems.size(), 2);
   int port = atoi(elems[1].c_str());
   DCHECK_GT(port, 0);
-  socket_.reset(new TSocket(elems[0], port));
-  transport_.reset(new TBufferedTransport(socket_));
-  protocol_.reset(new TBinaryProtocol(transport_));
-  client_.reset(new ImpalaServiceClient(protocol_));
 
-  try {
-    transport_->open();
-  } catch (TTransportException& e) {
-    return Status(e.what());
-  }
+  client_.reset(new ThriftClient<ImpalaServiceClient>(elems[0], port));
+  RETURN_IF_ERROR(client_->Open());
 
   return Status::OK;
 }
@@ -62,7 +51,7 @@ Status ImpaladQueryExecutor::Exec(
   // LogContextId of "" will ask the Beeswax service to assign a new id but Beeswax
   // does not provide a constant for it.
   try {
-    client_->executeAndWait(query_handle_, query, "");
+    client_->iface()->executeAndWait(query_handle_, query, "");
   } catch (BeeswaxException& e) {
     stringstream ss;
     ss << e.SQLState << ": " << e.message;
@@ -77,7 +66,7 @@ Status ImpaladQueryExecutor::FetchResult(RowBatch** batch) {
 }
 
 Status ImpaladQueryExecutor::FetchResult(string* row) {
-  client_->fetch(query_results_, query_handle_, false, 1);
+  client_->iface()->fetch(query_results_, query_handle_, false, 1);
 
   // We've implemented fetch as sync. So, it always returns with result.
   DCHECK(query_results_.ready);
@@ -110,7 +99,7 @@ Status ImpaladQueryExecutor::Explain(const string& query_string, string* explain
   query.query = query_string;
 
   try {
-    client_->explain(query_explanation_, query);
+    client_->iface()->explain(query_explanation_, query);
     *explain_plan = query_explanation_.textual;
   } catch (BeeswaxException& e) {
     stringstream ss;

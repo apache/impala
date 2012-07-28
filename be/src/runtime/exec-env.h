@@ -49,6 +49,8 @@ class ExecEnv {
   HBaseTableCache* htable_cache() { return htable_cache_.get(); }
   Webserver* webserver() { return webserver_.get(); }
 
+  void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
+
   sparrow::Scheduler* scheduler() {
     DCHECK(scheduler_.get() != NULL);
     return scheduler_.get();
@@ -66,6 +68,8 @@ class ExecEnv {
   boost::scoped_ptr<HdfsFsCache> fs_cache_;
   boost::scoped_ptr<HBaseTableCache> htable_cache_;
   boost::scoped_ptr<Webserver> webserver_;
+
+  bool enable_webserver_;
 
  private:
   TimezoneDatabase tz_database_;

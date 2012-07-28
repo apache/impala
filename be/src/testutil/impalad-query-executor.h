@@ -18,10 +18,10 @@
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaService_types.h"
 
-namespace apache { namespace thrift { namespace transport { class TTransport; } } }
-namespace apache { namespace thrift { namespace protocol { class TProtocol; } } }
-
 namespace impala {
+
+template <class InterfaceType>
+class ThriftClient;
 
 // Query execution against running impalad process.
 class ImpaladQueryExecutor : public QueryExecutorIf {
@@ -74,10 +74,7 @@ class ImpaladQueryExecutor : public QueryExecutorIf {
 
  private:
   // fe service-related
-  boost::shared_ptr<apache::thrift::transport::TTransport> socket_;
-  boost::shared_ptr<apache::thrift::transport::TTransport> transport_;
-  boost::shared_ptr<apache::thrift::protocol::TProtocol> protocol_;
-  boost::scoped_ptr<ImpalaServiceClient> client_;
+  boost::scoped_ptr<ThriftClient<ImpalaServiceClient> > client_;
 
   // Beeswax query handle and result
   beeswax::QueryHandle query_handle_;

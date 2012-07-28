@@ -18,7 +18,6 @@ using namespace google;
 DEFINE_int32(webserver_port, 8080, "Port to start debug webserver on");
 DEFINE_string(webserver_interface, "",
     "Interface to start debug webserver on. If blank, webserver binds to 0.0.0.0");
-DEFINE_bool(no_webserver, false, "If true, debug webserver is not started");
 
 namespace impala {
 
@@ -51,11 +50,6 @@ void Webserver::RootHandler(stringstream* output) {
 }
 
 Status Webserver::Start() {
-  if (FLAGS_no_webserver) {
-    LOG(INFO) << "Not starting webserver";
-    return Status::OK;
-  }
-
   LOG(INFO) << "Starting webserver on " << interface_
               << (interface_.empty() ? "all interfaces, port " : ":") << port_;
 

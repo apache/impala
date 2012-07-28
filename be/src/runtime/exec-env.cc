@@ -26,6 +26,7 @@ using sparrow::SubscriptionManager;
 DEFINE_string(backends, "", "comma-separated list of <host:port> pairs");
 DEFINE_bool(use_statestore, false,
     "Use an external state store for membership information");
+DEFINE_bool(enable_webserver, true, "If true, debug webserver is enabled");
 
 namespace impala {
 
@@ -36,6 +37,7 @@ ExecEnv::ExecEnv()
     fs_cache_(new HdfsFsCache()),
     htable_cache_(new HBaseTableCache()),
     webserver_(new Webserver()),
+    enable_webserver_(FLAGS_enable_webserver),
     tz_database_(TimezoneDatabase()) {
   // Initialize the scheduler either dynamically (with a statestore) or statically (with
   // configured backends)
@@ -71,6 +73,7 @@ ExecEnv::ExecEnv(HdfsFsCache* fs_cache)
     client_cache_(new BackendClientCache(0, 0)),
     fs_cache_(fs_cache),
     htable_cache_(new HBaseTableCache()),
+    webserver_(new Webserver()),
     tz_database_(TimezoneDatabase()) {
 }
 
@@ -81,7 +84,12 @@ Status ExecEnv::StartServices() {
   // Start services in order to ensure that dependencies between them are met
   if (FLAGS_use_statestore) RETURN_IF_ERROR(subscription_mgr_->Start());
   if (scheduler_ != NULL) scheduler_->Init();
-  RETURN_IF_ERROR(webserver_->Start());
+  if (enable_webserver_) {
+    RETURN_IF_ERROR(webserver_->Start());
+  } else {
+    LOG(INFO) << "Not starting webserver";
+  }
+
   return Status::OK;
 }
 

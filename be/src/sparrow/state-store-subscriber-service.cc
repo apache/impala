@@ -7,15 +7,10 @@
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/foreach.hpp>
-#include <concurrency/PosixThreadFactory.h>
-#include <concurrency/Thread.h>
-#include <concurrency/ThreadManager.h>
 #include <glog/logging.h>
 #include <gflags/gflags.h>
-#include <protocol/TBinaryProtocol.h>
 #include <transport/TBufferTransports.h>
-#include <transport/TServerSocket.h>
-#include <transport/TSocket.h>
+#include "util/thrift-client.h"
 #include "util/thrift-server.h"
 
 #include "common/status.h"
@@ -25,10 +20,10 @@
 using namespace std;
 using namespace boost;
 using namespace ::apache::thrift;
-using namespace ::apache::thrift::protocol;
 using namespace ::apache::thrift::transport;
 using impala::Status;
 using impala::THostPort;
+using impala::ThriftClient;
 using impala::ThriftServer;
 using impala::TStatusCode;
 
@@ -65,7 +60,7 @@ Status StateStoreSubscriber::RegisterService(const string& service_id,
                         << request.subscriber_address.port;
 
   try {
-    client_->RegisterService(response, request);
+    client_->iface()->RegisterService(response, request);
   } catch (TTransportException& e) {
     // Client has gotten disconnected from the state store.
     Status status(e.what());
@@ -96,7 +91,7 @@ Status StateStoreSubscriber::UnregisterService(const string& service_id) {
   TUnregisterServiceResponse response;
 
   try {
-    client_->UnregisterService(response, request);
+    client_->iface()->UnregisterService(response, request);
   } catch ( TTransportException& e) {
     Status status(e.what());
     status.AddErrorMsg(DISCONNECTED_FROM_STATE_STORE_ERROR);
@@ -125,7 +120,7 @@ Status StateStoreSubscriber::RegisterSubscription(
                         << request.subscriber_address.port;
 
   try {
-    client_->RegisterSubscription(response, request);
+    client_->iface()->RegisterSubscription(response, request);
   } catch (TTransportException& e) {
     // Client has gotten disconnected from the state store.
     Status status(e.what());
@@ -167,7 +162,7 @@ Status StateStoreSubscriber::UnregisterSubscription(SubscriptionId id) {
   request.__set_subscription_id(id);
   TUnregisterSubscriptionResponse response;
   try {
-    client_->UnregisterSubscription(response, request);
+    client_->iface()->UnregisterSubscription(response, request);
   } catch (TTransportException& e) {
     Status status(e.what());
     status.AddErrorMsg(DISCONNECTED_FROM_STATE_STORE_ERROR);
@@ -252,7 +247,7 @@ void StateStoreSubscriber::UnregisterAll() {
         request.__set_subscriber_address(host_port_);
         request.__set_service_id(service_id);
         TUnregisterServiceResponse response;
-        client_->UnregisterService(response, request);
+        client_->iface()->UnregisterService(response, request);
         Status unregister_status(response.status);
         if (!unregister_status.ok()) {
           LOG(ERROR) << "Error when unregistering service " << service_id << ":"
@@ -270,7 +265,7 @@ void StateStoreSubscriber::UnregisterAll() {
         request.__set_subscription_id(id);
         TUnregisterSubscriptionResponse response;
         // Ignore any errors in the response.
-        client_->UnregisterSubscription(response, request);
+        client_->iface()->UnregisterSubscription(response, request);
         Status unregister_status(response.status);
         if (!unregister_status.ok()) {
           string error_msg;
@@ -288,23 +283,13 @@ void StateStoreSubscriber::UnregisterAll() {
 
 Status StateStoreSubscriber::InitClient() {
   DCHECK(server_running_);
-
-  Status status;
   if (client_.get() == NULL) {
-    shared_ptr<TSocket> socket(new TSocket(state_store_host_port_.host,
-                                           state_store_host_port_.port));
-    shared_ptr<TTransport> transport(new TFramedTransport(socket));
-    shared_ptr<TProtocol> protocol(new TBinaryProtocol(transport));
-    client_.reset(new StateStoreServiceClient(protocol));
+    client_.reset(new ThriftClient<StateStoreServiceClient>(state_store_host_port_.host,
+        state_store_host_port_.port));
 
-    try {
-      transport->open();
-    } catch (TTransportException& e) {
-      status.AddErrorMsg(e.what());
-      status.AddErrorMsg("Unable to register with the StateStore");
-    }
+    RETURN_IF_ERROR(client_->Open());
   }
-  return status;
+  return Status::OK;
 }
 
 }
