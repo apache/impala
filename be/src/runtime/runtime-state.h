@@ -64,6 +64,7 @@ class RuntimeState {
   HdfsFsCache* fs_cache() { return exec_env_->fs_cache(); }
   HBaseTableCache* htable_cache() { return exec_env_->htable_cache(); }
   std::vector<std::string>& created_hdfs_files() { return created_hdfs_files_; }
+  std::set<std::string>& updated_hdfs_partitions() { return updated_hdfs_partitions_; }
   std::vector<int64_t>& num_appended_rows() { return num_appended_rows_; }
 
   // Returns runtime state profile
@@ -132,9 +133,12 @@ class RuntimeState {
   // Lists the Hdfs files created by this query (e.g., for inserts).
   std::vector<std::string> created_hdfs_files_;
 
+  // Lists the Hdfs partitions affected by this query
+  std::set<std::string> updated_hdfs_partitions_;
+
   // Records the total number of appended rows per created Hdfs file.
   std::vector<int64_t> num_appended_rows_;
-  
+
   RuntimeProfile profile_;
 
   // if true, execution should stop with a CANCELLED status

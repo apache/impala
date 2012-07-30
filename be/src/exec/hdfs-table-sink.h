@@ -42,6 +42,9 @@ struct OutputPartition {
   // Path: <hdfs_base_dir>/<unique_id>_dir/<partition_values>/<unique_id_str>
   std::string tmp_hdfs_file_name_template;
 
+  // key1=val1/key2=val2/ etc. Used to identify partitions to the metastore.
+  std::string partition_name;
+
   // Connection to hdfs.
   hdfsFS hdfs_connection;
 

@@ -2,6 +2,7 @@
 
 #include "service/impala-server.h"
 
+#include <boost/algorithm/string/join.hpp>
 #include <jni.h>
 #include <protocol/TBinaryProtocol.h>
 #include <protocol/TDebugProtocol.h>
@@ -48,10 +49,12 @@
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
+#include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/JavaConstants_constants.h"
 
 using namespace std;
 using namespace boost;
+using namespace boost::algorithm;
 using namespace apache::thrift;
 using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
@@ -91,12 +94,14 @@ ThreadManager* be_tm;
 class ImpalaServer::QueryExecState {
  public:
   QueryExecState(const TQueryRequest& request, const TUniqueId& query_id,
-      ExecEnv* exec_env, const TResultSetMetadata& metadata)
+      ExecEnv* exec_env, const TResultSetMetadata& metadata, 
+      const TQueryExecRequest& exec_request)
     : request_(request), query_id_(query_id),
       exec_env_(exec_env),
       coord_(NULL),
       eos_(false),
       query_state_(QueryState::CREATED),
+      query_exec_request_(exec_request),
       result_metadata_(metadata), current_batch_(NULL), current_batch_row_(0),
       current_row_(0) {}
 
@@ -143,6 +148,7 @@ class ImpalaServer::QueryExecState {
   int current_row() const { return current_row_; }
   const TResultSetMetadata* result_metadata() { return &result_metadata_; }
   const TUniqueId& query_id() const { return query_id_; }
+  const TQueryExecRequest& query_exec_request() const { return query_exec_request_; }
   mutex* lock() { return &lock_; }
   const QueryState::type query_state() const { return query_state_; }
   void set_query_state(QueryState::type state) { query_state_ = state; }
@@ -161,6 +167,7 @@ class ImpalaServer::QueryExecState {
   bool eos_;  // if true, there are no more rows to return
   QueryState::type query_state_;
   Status query_status_;
+  TQueryExecRequest query_exec_request_;
 
   TResultSetMetadata result_metadata_; // metadata for select query
   RowBatch* current_batch_; // the current row batch; only applicable if coord is set
@@ -254,7 +261,7 @@ Status ImpalaServer::QueryExecState::FetchNextBatch() {
   RETURN_IF_ERROR(coord_->GetNext(&current_batch_, coord_->runtime_state()));
 
   current_batch_row_ = 0;
-  eos_ = (current_batch_ == NULL);
+  eos_ = coord_->execution_completed();
   return Status::OK;
 }
 
@@ -349,7 +356,6 @@ class ImpalaServer::FragmentExecState {
   PlanFragmentExecutor* executor() { return &executor_; }
   RuntimeState* runtime_state() { return executor_.runtime_state(); }
   void set_exec_thread(thread* exec_thread) { exec_thread_.reset(exec_thread); }
-  DataSink* sink() { return sink_.get(); }
 
  private:
   Status ExecInternal();
@@ -358,7 +364,6 @@ class ImpalaServer::FragmentExecState {
   int backend_num_;
   TUniqueId fragment_id_;
   PlanFragmentExecutor executor_;
-  scoped_ptr<DataSink> sink_;
   BackendClientCache* client_cache_;
 
   // initiating coordinator to which we occasionally need to report back
@@ -404,9 +409,6 @@ Status ImpalaServer::FragmentExecState::Cancel() {
 Status ImpalaServer::FragmentExecState::Prepare(
     const TPlanExecRequest& request, const TPlanExecParams& params) {
   RETURN_IF_ERROR(executor_.Prepare(request, params));
-  RETURN_IF_ERROR(DataSink::CreateDataSink(request,
-      params, executor_.row_desc(), &sink_));
-  RETURN_IF_ERROR(sink_->Init(executor_.runtime_state()));
   return Status::OK;
 }
 
@@ -419,23 +421,6 @@ Status ImpalaServer::FragmentExecState::Exec() {
 Status ImpalaServer::FragmentExecState::ExecInternal() {
   VLOG_QUERY << "FragmentExecState::Exec(): fragment_id=" << fragment_id_;
   RETURN_IF_ERROR(executor_.Open());
-
-  RowBatch* batch;
-  while (true) {
-    RETURN_IF_ERROR(executor_.GetNext(&batch));
-    if (batch == NULL) break;
-    VLOG_FILE << "ExecInternal: #rows=" << batch->num_rows();
-    if (VLOG_ROW_IS_ON) {
-      for (int i = 0; i < batch->num_rows(); ++i) {
-        TupleRow* row = batch->GetRow(i);
-        VLOG_ROW << PrintRow(row, executor_.row_desc());
-      }
-    }
-    RETURN_IF_ERROR(
-        sink_->Send(executor_.runtime_state(), batch));
-    batch = NULL;
-  }
-  RETURN_IF_ERROR(sink_->Close(executor_.runtime_state()));
 
   return Status::OK;
 }
@@ -483,6 +468,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     EXIT_IF_EXC(jni_env);
     get_hadoop_config_id_ = jni_env->GetMethodID(fe_class, "getHadoopConfigAsHtml",
         "()Ljava/lang/String;");
+    EXIT_IF_EXC(jni_env);
+    update_metastore_id_ = jni_env->GetMethodID(fe_class, "updateMetastore", "([B)V");
     EXIT_IF_EXC(jni_env);
 
     jboolean lazy = (FLAGS_load_catalog_at_startup ? false : true);
@@ -551,18 +538,27 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
 
   shared_ptr<QueryExecState> exec_state;
   Status status = Execute(query_request, &exec_state);
+
   if (!status.ok()) {
     // raise Syntax error or access violation;
     // it's likely to be syntax/analysis error
     RaiseBeeswaxException(
         status.GetErrorMsg(), SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
   }
+
   exec_state->UpdateQueryState(QueryState::RUNNING);
   // block until results are ready
   status = exec_state->Wait();
   if (!status.ok()) {
     UnregisterQuery(exec_state->query_id());
     RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
+  }
+
+  const TPlanExecRequest& root_fragment = 
+      exec_state->query_exec_request().fragment_requests[0];
+  if (root_fragment.__isset.data_sink && 
+      root_fragment.data_sink.dataSinkType == TDataSinkType::TABLE_SINK) {
+    UpdateMetastore(exec_state.get());
   }
   exec_state->UpdateQueryState(QueryState::FINISHED);
   TUniqueIdToQueryHandle(exec_state->query_id(), &query_handle);
@@ -583,10 +579,12 @@ Status ImpalaServer::Execute(const TQueryRequest& request,
   //shared_ptr<QueryExecState> exec_state(
   exec_state->reset(
       new QueryExecState(request, exec_request.query_id, exec_env_,
-                         result.resultSetMetadata));
-
+          result.resultSetMetadata, exec_request));
+ 
   if (exec_request.fragment_requests[0].__isset.desc_tbl) {
     // query with FROM clause
+    // TODO: This doesn't correcly handle INSERT INTO TABLE ... SELECT <list of constant values>
+    // because nothing is driving the sink. 
     DCHECK_GT(exec_request.node_request_params.size(), 0);
     // the first node_request_params list contains exactly one TPlanExecParams
     // (it's meant for the coordinator fragment)
@@ -663,6 +661,62 @@ void ImpalaServer::Wait(boost::shared_ptr<QueryExecState> exec_state) {
   }
 }
 
+Status ImpalaServer::UpdateMetastore(QueryExecState* query_state) {
+  // TODO: Doesn't handle INSERT with no FROM
+  if (query_state->coord() == NULL) {
+    LOG(ERROR) << "INSERT with no FROM clause not fully supported, not updating metastore"
+               << " (query_id: " << query_state->query_id() << ")";
+    return Status::OK;
+  }
+
+  const TPlanExecRequest& root_fragment = 
+      query_state->query_exec_request().fragment_requests[0];
+
+  TTableId target_table_id = root_fragment.data_sink.tableSink.targetTableId;
+  RuntimeState* state = query_state->coord()->runtime_state();
+  // Resolve table id and set input tuple descriptor.
+  TableDescriptor* table_desc_ = state->desc_tbl().GetTableDescriptor(target_table_id);
+
+  const set<string>& updated_hdfs_partitions = state->updated_hdfs_partitions();
+
+  if (updated_hdfs_partitions.size() == 0) {
+    VLOG_QUERY << "No partitions altered, not updating metastore (query id: " 
+               << query_state->query_id() << ")";
+    return Status::OK;
+  }
+
+  // TODO: We track partitions written to, not created, which means
+  // that we do more work than is necessary, because written-to
+  // partitions don't always require a metastore change.
+  VLOG_QUERY << "Updating metastore with " << updated_hdfs_partitions.size()
+             << " altered partitions (" << join (updated_hdfs_partitions, ", ") << ")";
+
+  TCatalogUpdate catalog_update;
+  catalog_update.target_table = table_desc_->name();
+  catalog_update.db_name = table_desc_->database();
+
+  // This does an extra copy, which is unfortunate, but not clear that
+  // it's ok to directly reach in and initialise Thrift structure
+  // members that aren't primitive types directly.
+  vector<string> partitions_vector(updated_hdfs_partitions.begin(), 
+      updated_hdfs_partitions.end());
+  catalog_update.__set_created_partitions(partitions_vector);
+
+  if (!FLAGS_use_planservice) {
+    JNIEnv* jni_env = getJNIEnv();
+    jbyteArray request_bytes;
+    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &catalog_update, &request_bytes));
+    jni_env->CallObjectMethod(fe_, update_metastore_id_, request_bytes);
+    RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  } else {
+    planservice_client_->UpdateMetastore(catalog_update);
+  }
+
+  // TODO: Reset only the updated table
+  return ResetCatalogInternal();
+}
+
+
 Status ImpalaServer::GetQueryExecRequest(
     const TQueryRequest& request, TCreateQueryExecRequestResult* result) {
   if (!FLAGS_use_planservice) {
@@ -714,12 +768,11 @@ Status ImpalaServer::GetExplainPlan(
   }
 }
 
-void ImpalaServer::ResetCatalog(impala::TStatus& status) {
-  status.status_code = TStatusCode::INTERNAL_ERROR;
+Status ImpalaServer::ResetCatalogInternal() {
   if (!FLAGS_use_planservice) {
     JNIEnv* jni_env = getJNIEnv();
     jni_env->CallObjectMethod(fe_, reset_catalog_id_);
-    RETURN_IF_EXC(jni_env);
+    RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
   } else {
     try {
       planservice_client_->RefreshMetadata();
@@ -728,11 +781,15 @@ void ImpalaServer::ResetCatalog(impala::TStatus& status) {
       msg << "RefreshMetadata rpc failed: " << e.what();
       LOG(ERROR) << msg.str();
       // TODO: different error code here?
-      status.error_msgs.push_back(msg.str());
-      return;
+      return Status(msg.str());
     }
   }
-  status.status_code = TStatusCode::OK;
+
+  return Status::OK;
+}
+
+void ImpalaServer::ResetCatalog(impala::TStatus& status) {
+  ResetCatalogInternal().ToThrift(&status);
 }
 
 void ImpalaServer::Cancel(impala::TStatus& status,

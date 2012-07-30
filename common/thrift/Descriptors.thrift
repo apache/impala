@@ -52,7 +52,6 @@ struct THdfsPartition {
 }
 
 struct THdfsTable {
-
   1: required string hdfsBaseDir
 
   // Partition keys are the same as clustering columns in
@@ -78,6 +77,12 @@ struct TTableDescriptor {
   4: required i32 numClusteringCols
   5: optional THdfsTable hdfsTable
   6: optional THBaseTable hbaseTable
+
+  // Unqualified name of table
+  7: required string tableName;
+
+  // Name of the database that the table belongs to
+  8: required string dbName;
 }
 
 struct TTupleDescriptor {

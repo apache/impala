@@ -5,6 +5,7 @@ package com.cloudera.impala.service;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.thrift.TBase;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
 import org.apache.thrift.TSerializer;
@@ -14,6 +15,7 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.thrift.TCatalogUpdate;
 import com.cloudera.impala.thrift.TCreateQueryExecRequestResult;
 import com.cloudera.impala.thrift.TQueryRequest;
 
@@ -38,21 +40,18 @@ public class JniFrontend {
   }
 
   /**
-   * Deserialized a serialized form of thriftQueryRequest to TQueryRequest
+   * Deserialized a serialized form of a Thrift data structure to its object form
    */
-  private TQueryRequest deserializeTQueryRequest(byte[] thriftQueryRequest)
+  private <T extends TBase> void deserializeThrift(T result, byte[] thriftData)
       throws ImpalaException {
     // TODO: avoid creating deserializer for each query?
     TDeserializer deserializer = new TDeserializer(protocolFactory);
 
-    TQueryRequest request = new TQueryRequest();
     try {
-      deserializer.deserialize(request, thriftQueryRequest);
+      deserializer.deserialize(result, thriftData);
     } catch (TException e) {
       throw new InternalException(e.getMessage());
     }
-    LOG.info("creating TQueryExecRequest for " + request.toString());
-    return request;
   }
 
   /**
@@ -62,7 +61,8 @@ public class JniFrontend {
    * This call is thread-safe.
    */
   public byte[] createQueryExecRequest(byte[] thriftQueryRequest) throws ImpalaException {
-    TQueryRequest request = deserializeTQueryRequest(thriftQueryRequest);
+    TQueryRequest request = new TQueryRequest();
+    deserializeThrift(request, thriftQueryRequest);
 
     // process front end
     StringBuilder explainString = new StringBuilder();
@@ -87,10 +87,20 @@ public class JniFrontend {
    * This call is thread-safe.
    */
   public String getExplainPlan(byte[] thriftQueryRequest) throws ImpalaException {
-    TQueryRequest request = deserializeTQueryRequest(thriftQueryRequest);
+    TQueryRequest request = new TQueryRequest();
+    deserializeThrift(request, thriftQueryRequest);
     String plan = frontend.getExplainString(request);
     LOG.info("Explain plan: " + plan);
     return plan;
+  }
+
+  /**
+   * Process any updates to the metastore required after a query executes
+   */
+  public void updateMetastore(byte[] thriftCatalogUpdate) throws ImpalaException {
+    TCatalogUpdate update = new TCatalogUpdate();
+    deserializeThrift(update, thriftCatalogUpdate);
+    frontend.updateMetastore(update);
   }
 
   // Caching this saves ~50ms per call to getHadoopConfigAsHtml

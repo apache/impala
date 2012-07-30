@@ -63,7 +63,9 @@ std::string SlotDescriptor::DebugString() const {
 }
 
 TableDescriptor::TableDescriptor(const TTableDescriptor& tdesc)
-  : id_(tdesc.id),
+  : name_(tdesc.tableName),
+    database_(tdesc.dbName),
+    id_(tdesc.id),
     num_cols_(tdesc.numCols),
     num_clustering_cols_(tdesc.numClusteringCols) {
 }

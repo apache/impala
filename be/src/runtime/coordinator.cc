@@ -35,7 +35,6 @@ Coordinator::Coordinator(ExecEnv* exec_env, ExecStats* exec_stats)
   : exec_env_(exec_env),
     has_called_wait_(false),
     executor_(new PlanFragmentExecutor(exec_env)),
-    sink_(NULL),
     execution_completed_(false),
     exec_stats_(exec_stats) {
 }
@@ -63,16 +62,6 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
   // register data streams for coord fragment
   RETURN_IF_ERROR(executor_->Prepare(
       request->fragment_requests[0], request->node_request_params[0][0]));
-
-  // Only table sinks are valid sinks for coordinator fragments
-  if (request->fragment_requests[0].data_sink.__isset.tableSink) {
-    RETURN_IF_ERROR(DataSink::CreateDataSink(request->fragment_requests[0],
-        request->node_request_params[0][0], executor_->row_desc(), &sink_));
-    exec_stats_->query_type_ = ExecStats::INSERT;
-    RETURN_IF_ERROR(sink_->Init(executor_->runtime_state()));
-  } else {
-    sink_.reset(NULL);
-  }
 
   if (request->node_request_params.size() > 1) {
     // for now, set destinations of 2nd fragment to coord host/port
@@ -220,21 +209,8 @@ Status Coordinator::GetNextInternal(RowBatch** batch, RuntimeState* state) {
   if (*batch == NULL) {
     execution_completed_ = true;
     query_profile_->AddChild(executor_->query_profile());
-    if (sink_.get() != NULL) RETURN_IF_ERROR(sink_->Close(state));
   } else {
-    // TODO: fix this: the advertised behavior is that when we're sending to
-    // a sink, GetNext() doesn't return until all input has been sent; ie,
-    // we need to loop here
-    if (sink_.get() != NULL) {
-      RETURN_IF_ERROR(sink_->Send(state, *batch));
-      // Only update stats once we've done all the work intended for a batch
-      exec_stats_->num_rows_ += (*batch)->num_rows();
-      // Callers of this method should not use batch == NULL to detect
-      // if there is no more work to be done
-      *batch = NULL;
-    } else {
-      exec_stats_->num_rows_ += (*batch)->num_rows();
-    }
+    exec_stats_->num_rows_ += (*batch)->num_rows();
   }
   return Status::OK;
 }

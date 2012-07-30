@@ -73,6 +73,7 @@ Status HdfsTableSink::Init(RuntimeState* state) {
   // Resolve table id and set input tuple descriptor.
   table_desc_ = static_cast<const HdfsTableDescriptor*>(
       state->desc_tbl().GetTableDescriptor(table_id_));
+
   if (table_desc_ == NULL) {
     stringstream error_msg("Failed to get table descriptor for table id: ");
     error_msg << table_id_;
@@ -180,6 +181,11 @@ void HdfsTableSink::BuildHdfsFileNames(OutputPartition* output_partition) {
     }
     common_suffix << "/";
   }
+
+  // common_suffix now holds the unique descriptor for this partition,
+  // save it before we build the suffix out further
+  output_partition->partition_name = common_suffix.str();
+
   // Use the query id as filename.
   common_suffix << unique_id_str_ << "_" << rand();
   hdfs_file_name_template << common_suffix.str() << "_data";
@@ -294,7 +300,7 @@ Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch) {
     RETURN_IF_ERROR(GetOutputPartition(state, "", &partition_pair));
     // Pass the row batch to the writer. If new_file is returned true then the current
     // file is finalized and a new file is opened.
-    // The writer tracks where it is in the batch when it returns with new_file set. 
+    // The writer tracks where it is in the batch when it returns with new_file set.
     OutputPartition* output_partition = partition_pair->first;
     bool new_file;
     do {
@@ -341,7 +347,12 @@ Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
   stringstream filename;
   filename << partition->hdfs_file_name_template << "." << (partition->num_files - 1);
   state->created_hdfs_files().push_back(filename.str());
+  // The root partition has an empty partition name, and should be ignored
+  if (!partition->partition_name.empty()) {
+    state->updated_hdfs_partitions().insert(partition->partition_name);
+  }
   state->num_appended_rows().push_back(partition->num_rows);
+
   // Close file.
   int hdfs_ret = hdfsCloseFile(hdfs_connection_, partition->tmp_hdfs_file);
   if (hdfs_ret != 0) {

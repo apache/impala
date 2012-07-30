@@ -137,7 +137,12 @@ class TableDescriptor {
     return slot_desc->col_pos() < num_clustering_cols_;
   }
 
+  const std::string& name() const { return name_; }
+  const std::string& database() const { return database_; }
+
  protected:
+  std::string name_;
+  std::string database_;
   TableId id_;
   int num_cols_;
   int num_clustering_cols_;

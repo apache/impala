@@ -22,5 +22,10 @@ service ImpalaPlanService {
   string GetExplainString(1:string query, 2:i32 numNodes)
       throws (1:TImpalaPlanServiceException e);
 
+  // Makes changes to the metastore - usually creates partitions as a result of an INSERT
+  // statement
+  void UpdateMetastore(1:Frontend.TCatalogUpdate update) 
+      throws (1:TImpalaPlanServiceException e);
+
   void ShutdownServer();
 }

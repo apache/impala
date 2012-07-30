@@ -139,6 +139,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   Status GetQueryExecRequest(const TQueryRequest& request,
       TCreateQueryExecRequestResult* result);
 
+  // Make any changes required to the metastore as a result of an
+  // INSERT query, e.g. newly created partitions.
+  Status UpdateMetastore(QueryExecState* query_state);
+
   // Call FE to get explain plan
   Status GetExplainPlan(const TQueryRequest& query_request, std::string* explain_string);
 
@@ -165,6 +169,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   Status FetchInternal(const TUniqueId& query_id, bool start_over,
       int32_t fetch_size, beeswax::Results* query_results);
 
+  // Non-thrift callable version of ResetCatalog
+  Status ResetCatalogInternal();
+
   // Webserver callback. Retrieves Hadoop confs from frontend and writes them to output
   void RenderHadoopConfigs(std::stringstream* output);
 
@@ -177,6 +184,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   jmethodID get_explain_plan_id_;  // JniFrontend.getExplainPlan()
   jmethodID get_hadoop_config_id_;  // JniFrontend.getHadoopConfigAsHtml()
   jmethodID reset_catalog_id_; // JniFrontend.resetCatalog()
+  jmethodID update_metastore_id_; // JniFrontend.updateMetastore()
   ExecEnv* exec_env_;  // not owned
 
   // plan service-related - impalad optionally uses a standalone

@@ -17,6 +17,7 @@ import org.apache.thrift.transport.TTransportException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.service.Frontend;
 import com.cloudera.impala.thrift.ImpalaPlanService;
+import com.cloudera.impala.thrift.TCatalogUpdate;
 import com.cloudera.impala.thrift.TCreateQueryExecRequestResult;
 import com.cloudera.impala.thrift.TImpalaPlanServiceException;
 import com.cloudera.impala.thrift.TQueryRequest;
@@ -90,6 +91,19 @@ public class PlanService {
         return frontend.getExplainString(new TQueryRequest(query, false, numNodes));
       } catch (ImpalaException e) {
         LOG.warn("Error getting explain string", e);
+        throw new TImpalaPlanServiceException(e.getMessage());
+      }
+    }
+
+    /**
+     * Updates the metastore with new partitions
+     */
+    @Override
+    public void UpdateMetastore(TCatalogUpdate update)
+        throws TImpalaPlanServiceException {
+      try {
+        frontend.updateMetastore(update);
+      } catch (ImpalaException e) {
         throw new TImpalaPlanServiceException(e.getMessage());
       }
     }

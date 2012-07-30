@@ -260,7 +260,7 @@ int main(int argc, char** argv) {
     exec_env->set_enable_webserver(false);
     EXIT_IF_ERROR(exec_env->StartServices());
   }
-  if (FLAGS_num_nodes != 1) {
+  if (FLAGS_num_nodes != 1 && FLAGS_impalad.empty()) {
     // start backend service to feed stream_mgr
     ThriftServer* fe_server;
     ThriftServer* be_server;

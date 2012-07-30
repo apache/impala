@@ -11,13 +11,14 @@
 
 #include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
+#include "exec/data-sink.h"
 #include "exec/exec-node.h"
 #include "exec/scan-node.h"
 #include "exec/hbase-table-scanner.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
 #include "runtime/row-batch.h"
-#include "util/jni-util.h"
+#include "util/debug-util.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
 
 DEFINE_bool(serialize_batch, false, "serialize and deserialize each returned row batch");
@@ -85,6 +86,14 @@ Status PlanFragmentExecutor::Prepare(
     }
   }
 
+  // set up sink, if required  
+  if (request.__isset.data_sink) {
+    RETURN_IF_ERROR(DataSink::CreateDataSink(request, params, row_desc(), &sink_));
+    RETURN_IF_ERROR(sink_->Init(runtime_state()));
+  } else {
+    sink_.reset(NULL);
+  }
+
   row_batch_.reset(new RowBatch(plan_->row_desc(), runtime_state_->batch_size()));
   RETURN_IF_ERROR(plan_->Prepare(runtime_state_.get()));
   VLOG_QUERY << "plan_root=\n" << plan_->DebugString();
@@ -93,6 +102,28 @@ Status PlanFragmentExecutor::Prepare(
 
 Status PlanFragmentExecutor::Open() {
   RETURN_IF_ERROR(plan_->Open(runtime_state_.get()));
+
+  // If there is a sink, do all the work of driving it here, so that
+  // when this returns the query has actually finished
+  if (sink_.get() != NULL) {
+    RowBatch* batch = NULL;
+    while (true) {
+      RETURN_IF_ERROR(GetNext(&batch));
+      if (batch == NULL) break;
+      VLOG_FILE << "ExecInternal: #rows=" << batch->num_rows();
+      if (VLOG_ROW_IS_ON) {
+        for (int i = 0; i < batch->num_rows(); ++i) {
+          TupleRow* row = batch->GetRow(i);
+          VLOG_ROW << PrintRow(row, row_desc());
+        }
+      }
+
+      RETURN_IF_ERROR(sink_->Send(runtime_state(), batch));
+      batch = NULL;
+    }
+    RETURN_IF_ERROR(sink_->Close(runtime_state()));
+  }
+
   return Status::OK;
 }
 

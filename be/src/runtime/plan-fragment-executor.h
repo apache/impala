@@ -16,6 +16,7 @@ class HdfsFsCache;
 class ExecNode;
 class RowDescriptor;
 class RowBatch;
+class DataSink;
 class DataStreamMgr;
 class RuntimeProfile;
 class RuntimeState;
@@ -38,7 +39,9 @@ class PlanFragmentExecutor {
   Status Prepare(const TPlanExecRequest& request, const TPlanExecParams& params);
 
   // Start execution. Call this prior to GetNext().
-  // This call may block.
+  // If this fragment has a sink, Open() will send all rows produced
+  // by the fragment to that sink. Therefore, Open() may block until
+  // all rows are produced.
   Status Open();
 
   // Return results through 'batch'. Sets '*batch' to NULL if no more results.
@@ -59,6 +62,11 @@ class PlanFragmentExecutor {
  private:
   ExecEnv* exec_env_;  // not owned
   ExecNode* plan_;  // lives in runtime_state_->obj_pool()
+
+  // Output sink for rows sent to this fragment. May not be set, in which case rows are
+  // returned via GetNext's row batch
+  // Created in Prepare (if required), owned by this object.
+  boost::scoped_ptr<DataSink> sink_;
   boost::scoped_ptr<RuntimeState> runtime_state_;
   bool done_;
   boost::scoped_ptr<RowBatch> row_batch_;

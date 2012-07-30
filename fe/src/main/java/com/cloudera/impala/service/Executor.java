@@ -29,11 +29,9 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.Column;
-import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.catalog.Table;
+import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.thrift.TColumnValue;
@@ -293,7 +291,7 @@ public class Executor {
     if (table.getNumClusteringCols() > 0) {
       // Add all partitions to metastore.
       for (String hdfsPath : insertResult.getModifiedPartitions()) {
-        String partName = getPartitionName(table, hdfsPath);
+        String partName = HdfsTable.getPartitionName(table, hdfsPath);
         try {
           // TODO: Replace with appendPartition
           msClient.appendPartitionByName(dbName, tblName, partName);
@@ -305,21 +303,6 @@ public class Executor {
     org.apache.hadoop.hive.metastore.api.Table msTbl = msClient.getTable(dbName, tblName);
     // Reload the partition files from the Metastore into the Impala Catalog.
     table.loadPartitions(msClient.listPartitions(dbName, tblName, Short.MAX_VALUE), msTbl);
-  }
-
-  /**
-   * Return a partition name formed from concatenating partition keys and their values,
-   * compatible with the way Hive names partitions.
-   */
-  private String getPartitionName(Table table, String hdfsPath) {
-    List<Column> cols = table.getColumns();
-    int firstPartColPos = hdfsPath.indexOf(cols.get(0).getName() + "=");
-    int lastPartColPos =
-      hdfsPath.indexOf(cols.get(table.getNumClusteringCols() - 1).getName() + "=");
-    // Find the first '/' after the last partitioning-column folder.
-    lastPartColPos = hdfsPath.indexOf('/', lastPartColPos);
-    String partitionName = hdfsPath.substring(firstPartColPos, lastPartColPos);
-    return partitionName;
   }
 
   public static Catalog createCatalog() {

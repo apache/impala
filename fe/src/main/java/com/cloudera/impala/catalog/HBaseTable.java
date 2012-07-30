@@ -141,7 +141,8 @@ public class HBaseTable extends Table {
       }
     }
     TTableDescriptor TTableDescriptor =
-        new TTableDescriptor(id.asInt(), TTableType.HBASE_TABLE, colsByPos.size(), numClusteringCols);
+        new TTableDescriptor(id.asInt(), TTableType.HBASE_TABLE, colsByPos.size(),
+            numClusteringCols, hbaseTableName, db.getName());
     TTableDescriptor.setHbaseTable(tHbaseTable);
     return TTableDescriptor;
   }

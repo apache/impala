@@ -4,15 +4,21 @@ package com.cloudera.impala.service;
 
 import java.util.UUID;
 
+import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
+import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.planner.Planner;
+import com.cloudera.impala.thrift.TCatalogUpdate;
 import com.cloudera.impala.thrift.TColumnDesc;
 import com.cloudera.impala.thrift.TCreateQueryExecRequestResult;
 import com.cloudera.impala.thrift.TPlanExecParams;
@@ -143,5 +149,36 @@ public class Frontend {
     StringBuilder stringBuilder = new StringBuilder();
     createQueryExecRequest(request, stringBuilder);
     return stringBuilder.toString();
+  }
+
+  /**
+   * Create any new partitions required as a result of an INSERT statement
+   */
+  public void updateMetastore(TCatalogUpdate update) throws ImpalaException {
+    // Only update metastore for Hdfs tables.
+    Table table = catalog.getDb(update.getDb_name()).getTable(update.getTarget_table());
+    if (!(table instanceof HdfsTable)) {
+      LOG.warn("Unexpected table type in updateMetastore: "
+          + update.getTarget_table());
+      return;
+    }
+
+    String dbName = table.getDb().getName();
+    String tblName = table.getName();
+    HiveMetaStoreClient msClient = catalog.getMetaStoreClient();
+    if (table.getNumClusteringCols() > 0) {
+      // Add all partitions to metastore.
+      for (String partName : update.getCreated_partitions()) {
+        try {
+          LOG.info("Creating partition: " + partName + " in table: " + tblName);
+          msClient.appendPartitionByName(dbName, tblName, partName);
+        } catch (AlreadyExistsException e) {
+          LOG.info("Ignoring partition " + partName + ", since it already exists");
+          // Ignore since partition already exists.
+        } catch (Exception e) {
+          throw new InternalException("Error updating metastore", e);
+        }
+      }
+    }
   }
 }

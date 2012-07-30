@@ -276,7 +276,8 @@ public class HdfsTable extends Table {
   public TTableDescriptor toThrift() {
     TTableDescriptor TTableDescriptor =
         new TTableDescriptor(
-            id.asInt(), TTableType.HDFS_TABLE, colsByPos.size(), numClusteringCols);
+            id.asInt(), TTableType.HDFS_TABLE, colsByPos.size(), numClusteringCols, name,
+            db.getName());
     List<String> partitionKeyNames = new ArrayList<String>();
     for (int i = 0; i < numClusteringCols; ++i) {
       partitionKeyNames.add(colsByPos.get(i).getName());
@@ -336,4 +337,21 @@ public class HdfsTable extends Table {
   public String getHdfsBaseDir() {
     return hdfsBaseDir;
   }
+
+  /**
+   * Return a partition name formed from concatenating partition keys and their values,
+   * compatible with the way Hive names partitions.
+   */
+  static public String getPartitionName(Table table, String hdfsPath) {
+    Preconditions.checkState(table.getNumClusteringCols() > 0);
+    List<Column> cols = table.getColumns();
+    int firstPartColPos = hdfsPath.indexOf(cols.get(0).getName() + "=");
+    int lastPartColPos =
+      hdfsPath.indexOf(cols.get(table.getNumClusteringCols() - 1).getName() + "=");
+    // Find the first '/' after the last partitioning-column folder.
+    lastPartColPos = hdfsPath.indexOf('/', lastPartColPos);
+    String partitionName = hdfsPath.substring(firstPartColPos, lastPartColPos);
+    return partitionName;
+  }
+
 }

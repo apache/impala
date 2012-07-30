@@ -170,10 +170,6 @@ class Coordinator {
   typedef boost::unordered_map<TUniqueId, BackendExecState*> BackendExecStateMap;
   BackendExecStateMap backend_exec_state_map_;
 
-  // Output sink for rows sent to this fragment. May not be set, in which case rows are
-  // returned via GetNext's row batch
-  boost::scoped_ptr<DataSink> sink_;
-
   // Return executor_'s runtime state's obj pool
   ObjectPool* obj_pool();
 

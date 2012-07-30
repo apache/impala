@@ -35,6 +35,8 @@ add_executable(runquery
 # launched from C++ like Impalad. 
 add_library(shimbackend SHARED shim-backend.cc)
 
+target_link_libraries(shimbackend boost_thread-mt)
+
 target_link_libraries(runquery
   ${IMPALA_LINK_LIBS}
   # this is commented out from IMPALA_LINK_LIBS because it causes crashes in libbackend.so
