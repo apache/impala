@@ -13,19 +13,8 @@ struct TQueryRequest {
   // select stmt to be executed
   1: required string stmt
 
-  // if true, return query results in ASCII format (TColumnValue.stringVal),
-  // otherwise return results in their native format (each TColumnValue
-  // uses the field corresponding to the column's native type).
-  2: required bool returnAsAscii
-
-  // specifies the degree of parallelism with which to execute the query;
-  // 1: single-node execution
-  // NUM_NODES_ALL: executes on all nodes that contain relevant data
-  // NUM_NODES_ALL_RACKS: executes on one node per rack that holds relevant data
-  // > 1: executes on at most that many nodes at any point in time (ie, there can be
-  //      more nodes than numNodes with plan fragments for this query, but at most
-  //      numNodes would be active at any point in time)
-  3: required i32 numNodes
+  // query options
+  2: required ImpalaInternalService.TQueryOptions queryOptions
 }
 
 struct TColumnDesc {

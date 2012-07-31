@@ -46,6 +46,7 @@ Status ImpaladQueryExecutor::Exec(
     const string& query_string, vector<PrimitiveType>* col_types) {
   Query query;
   query.query = query_string;
+  query.configuration = exec_options_;
 
   // TODO: catch exception and return error code
   // LogContextId of "" will ask the Beeswax service to assign a new id but Beeswax

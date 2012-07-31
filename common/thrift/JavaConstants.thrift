@@ -10,7 +10,7 @@ namespace java com.cloudera.impala.thrift
 
 include "Descriptors.thrift"
 
-// constants for TQueryRequest.numNodes
+// constants for TQueryOptions.num_nodes
 const i32 NUM_NODES_ALL = 0
 const i32 NUM_NODES_ALL_RACKS = -1
 

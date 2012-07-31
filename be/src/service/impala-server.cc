@@ -20,6 +20,7 @@
 #include <gflags/gflags.h>
 #include <boost/foreach.hpp>
 #include <boost/bind.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include "exprs/expr.h"
 #include "exec/hdfs-table-sink.h"
@@ -46,6 +47,7 @@
 #include "gen-cpp/DataSinks_types.h"
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaService.h"
+#include "gen-cpp/ImpalaService_types.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
@@ -72,9 +74,9 @@ DEFINE_int32(be_port, 22000, "port on which ImpalaInternalService is exported");
 DEFINE_int32(be_service_threads, 10,
     "number of threads servicing ImpalaInternalService requests");
 DEFINE_bool(load_catalog_at_startup, false, "if true, load all catalog data at startup");
-DECLARE_bool(enable_jit);
-DECLARE_int32(num_nodes);
-DECLARE_int32(batch_size);
+DEFINE_int32(default_num_nodes, 1, "default degree of parallelism for all queries; query "
+    "can override it by specifying num_nodes in beeswax.Query.Configuration");
+DECLARE_int32(be_port);
 DECLARE_int32(fe_port);
 DECLARE_int32(be_port);
 
@@ -203,9 +205,9 @@ Status ImpalaServer::QueryExecState::Exec(TQueryExecRequest* exec_request) {
   if (!exec_request->fragment_requests[0].__isset.desc_tbl) {
     // query without a FROM clause
     local_runtime_state_.Init(
-        exec_request->query_id, exec_request->abort_on_error, exec_request->max_errors,
-        FLAGS_batch_size, exec_request->fragment_requests[0].query_globals.now_string,
-        FLAGS_enable_jit, NULL /* = we don't expect to be executing anything here */);
+        exec_request->query_id, exec_request->fragment_requests[0].query_options,
+        exec_request->fragment_requests[0].query_globals.now_string,
+        NULL /* = we don't expect to be executing anything here */);
     RETURN_IF_ERROR(PrepareSelectListExprs(&local_runtime_state_,
         exec_request->fragment_requests[0].output_exprs, RowDescriptor()));
   } else {
@@ -532,7 +534,7 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
 }
 
 void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
-  const LogContextId& client_ctx) {
+    const LogContextId& client_ctx) {
   TQueryRequest query_request;
   QueryToTQueryRequest(query, &query_request);
 
@@ -590,13 +592,14 @@ Status ImpalaServer::Execute(const TQueryRequest& request,
     // (it's meant for the coordinator fragment)
     DCHECK_EQ(exec_request.node_request_params[0].size(), 1);
 
-    if (request.numNodes != 1) {
+    if (request.queryOptions.num_nodes != 1) {
       // for distributed execution, for the time being we only expect one slave
       // fragment which will be executed by request.num_nodes - 1 nodes;
       // this will change once we support multiple phases (such as for DISTINCT)
       DCHECK_EQ(exec_request.fragment_requests.size(), 2);
       DCHECK_EQ(exec_request.node_request_params.size(), 2);
-      DCHECK_LE(exec_request.node_request_params[1].size(), request.numNodes - 1);
+      DCHECK_LE(exec_request.node_request_params[1].size(),
+          request.queryOptions.num_nodes - 1);
 
       // set destinations to be port
       for (int i = 0; i < exec_request.node_request_params[1].size(); ++i) {
@@ -605,12 +608,9 @@ Status ImpalaServer::Execute(const TQueryRequest& request,
       }
     }
 
-    // Set the batch size
-    exec_request.batch_size = FLAGS_batch_size;
-    for (int i = 0; i < exec_request.node_request_params.size(); ++i) {
-      for (int j = 0; j < exec_request.node_request_params[i].size(); ++j) {
-        exec_request.node_request_params[i][j].batch_size = FLAGS_batch_size;
-      }
+    // Set the query exection options
+    for (int i = 0; i < exec_request.fragment_requests.size(); ++i) {
+      exec_request.fragment_requests[i].query_options = request.queryOptions;
     }
   } else {
     // query without a FROM clause
@@ -734,8 +734,7 @@ Status ImpalaServer::GetQueryExecRequest(
     //RETURN_IF_JNIERROR(jvm_->DetachCurrentThread());
     return Status::OK;
   } else {
-    // TODO: Use Beeswax.Query.configuration to pass in num_nodes
-    planservice_client_->CreateQueryExecRequest(*result, request.stmt, FLAGS_num_nodes);
+    planservice_client_->CreateQueryExecRequest(*result, request);
     return Status::OK;
   }
 }
@@ -760,7 +759,7 @@ Status ImpalaServer::GetExplainPlan(
     return Status::OK;
   } else {
     try {
-      planservice_client_->GetExplainString(*explain_string, query_request.stmt, 0);
+      planservice_client_->GetExplainString(*explain_string, query_request);
     } catch (TException& e) {
       return Status(e.what());
     }
@@ -981,10 +980,52 @@ void ImpalaServer::get_default_configuration(
     vector<ConfigVariable> & configurations, const bool include_hadoop) {
 }
 
-void ImpalaServer::QueryToTQueryRequest(const Query& query, TQueryRequest* request) {
-  request->numNodes = FLAGS_num_nodes;
-  request->returnAsAscii = true;
+void ImpalaServer::QueryToTQueryRequest(const Query& query,
+    TQueryRequest* request) {
+  request->queryOptions.num_nodes = FLAGS_default_num_nodes;
+  request->queryOptions.return_as_ascii = true;
   request->stmt = query.query;
+
+  // Convert Query.Configuration to TQueryRequest.queryOptions
+  if (query.__isset.configuration) {
+    BOOST_FOREACH(string kv_string, query.configuration) {
+      trim(kv_string);
+      vector<string> key_value;
+      split(key_value, kv_string, is_any_of(":"), token_compress_on);
+      if (key_value.size() != 2) {
+        LOG(WARNING) << "ignoring invalid configuration option " << kv_string
+            << ": bad format (expected key:value)";
+        continue;
+      }
+
+      int option = GetQueryOption(key_value[0]);
+      if (option < 0) {
+        LOG(WARNING) << "ignoring invalid configuration option: " << key_value[0];
+      } else {
+        switch (option) {
+          case ImpalaQueryOptions::ABORT_ON_ERROR:
+            request->queryOptions.abort_on_error =
+                iequals(key_value[1], "true") || iequals(key_value[1], "1");
+            break;
+          case ImpalaQueryOptions::MAX_ERRORS:
+            request->queryOptions.max_errors = atoi(key_value[1].c_str());
+            break;
+          case ImpalaQueryOptions::DISABLE_CODEGEN:
+            request->queryOptions.disable_codegen =
+                iequals(key_value[1], "true") || iequals(key_value[1], "1");
+            break;
+          case ImpalaQueryOptions::BATCH_SIZE:
+            request->queryOptions.batch_size = atoi(key_value[1].c_str());
+            break;
+          case ImpalaQueryOptions::NUM_NODES:
+            request->queryOptions.num_nodes = atoi(key_value[1].c_str());
+            break;
+          }
+      }
+    }
+    VLOG_QUERY << "TQueryRequest.queryOptions: "
+               << ThriftDebugString(request->queryOptions);
+  }
 }
 
 void ImpalaServer::TUniqueIdToQueryHandle(const TUniqueId& query_id,
@@ -1160,6 +1201,18 @@ void ImpalaServer::RunExecPlanFragment(FragmentExecState* exec_state) {
     }
   }
 }
+
+int ImpalaServer::GetQueryOption(const string& key) {
+  map<int, const char*>::const_iterator itr =
+      _ImpalaQueryOptions_VALUES_TO_NAMES.begin();
+  for (; itr != _ImpalaQueryOptions_VALUES_TO_NAMES.end(); ++itr) {
+    if (iequals(key, (*itr).second)) {
+      return itr->first;
+    }
+  }
+  return -1;
+}
+
 
 ImpalaServer* CreateImpalaServer(ExecEnv* exec_env, int fe_port, int be_port,
     ThriftServer** fe_server, ThriftServer** be_server) {

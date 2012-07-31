@@ -20,6 +20,7 @@ import com.cloudera.impala.thrift.ImpalaPlanService;
 import com.cloudera.impala.thrift.TCatalogUpdate;
 import com.cloudera.impala.thrift.TCreateQueryExecRequestResult;
 import com.cloudera.impala.thrift.TImpalaPlanServiceException;
+import com.cloudera.impala.thrift.TPlanExecRequest;
 import com.cloudera.impala.thrift.TQueryRequest;
 import com.google.common.collect.Sets;
 
@@ -45,11 +46,11 @@ public class PlanService {
       frontend = new Frontend(lazy);
     }
 
-    public TCreateQueryExecRequestResult CreateQueryExecRequest(String stmt, int numNodes)
+    public TCreateQueryExecRequestResult CreateQueryExecRequest(TQueryRequest tRequest)
         throws TImpalaPlanServiceException {
       LOG.info(
-          "Executing '" + stmt + "' for " + Integer.toString(numNodes) + " nodes");
-      TQueryRequest tRequest = new TQueryRequest(stmt, false, numNodes);
+          "Executing '" + tRequest.stmt + "' for " +
+          Integer.toString(tRequest.queryOptions.num_nodes) + " nodes");
       StringBuilder explainStringBuilder = new StringBuilder();
       TCreateQueryExecRequestResult result;
       try {
@@ -59,10 +60,8 @@ public class PlanService {
         throw new TImpalaPlanServiceException(e.getMessage());
       }
 
-      result.queryExecRequest.setAs_ascii(false);
-      result.queryExecRequest.setAbort_on_error(false);
-      result.queryExecRequest.setMax_errors(100);
-      result.queryExecRequest.setBatch_size(0);
+      TPlanExecRequest planExecRequest = result.queryExecRequest.fragment_requests.get(0);
+      planExecRequest.query_options.setReturn_as_ascii(false);
 
       // Print explain string.
       LOG.info(explainStringBuilder.toString());
@@ -85,10 +84,10 @@ public class PlanService {
     }
 
     @Override
-    public String GetExplainString(String query, int numNodes)
+    public String GetExplainString(TQueryRequest tRequest)
         throws TImpalaPlanServiceException {
       try {
-        return frontend.getExplainString(new TQueryRequest(query, false, numNodes));
+        return frontend.getExplainString(tRequest);
       } catch (ImpalaException e) {
         LOG.warn("Error getting explain string", e);
         throw new TImpalaPlanServiceException(e.getMessage());

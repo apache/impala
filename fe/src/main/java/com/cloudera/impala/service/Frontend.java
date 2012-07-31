@@ -120,7 +120,8 @@ public class Frontend {
     Planner planner = new Planner();
     TCreateQueryExecRequestResult result = new TCreateQueryExecRequestResult();
     result.setQueryExecRequest(
-        planner.createPlanFragments(analysisResult, request.numNodes, explainString));
+        planner.createPlanFragments(analysisResult, request.queryOptions.num_nodes,
+            explainString));
     result.queryExecRequest.sql_stmt = request.stmt;
 
     // fill the metadata (for query statement)

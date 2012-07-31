@@ -4,6 +4,7 @@
 #include <sstream>
 
 #include <boost/algorithm/string/join.hpp>
+#include <gflags/gflags.h>
 
 #include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
@@ -17,6 +18,8 @@
 #include <jni.h>
 #include <iostream>
 
+DECLARE_int32(max_errors);
+
 using namespace llvm;
 using namespace std;
 using namespace boost::algorithm;
@@ -24,48 +27,45 @@ using namespace boost::algorithm;
 namespace impala {
 
 RuntimeState::RuntimeState(
-    const TUniqueId& fragment_id, bool abort_on_error, int max_errors, int batch_size,
-    const string& now, bool llvm_enabled, ExecEnv* exec_env)
+    const TUniqueId& fragment_id, const TQueryOptions& query_options, const string& now,
+    ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
-    batch_size_(batch_size > 0 ? batch_size : DEFAULT_BATCH_SIZE),
     file_buffer_size_(DEFAULT_FILE_BUFFER_SIZE),
-    abort_on_error_(abort_on_error),
-    max_errors_(max_errors),
-    now_(new TimestampValue(now)),
-    fragment_id_(fragment_id),
-    exec_env_(exec_env),
     profile_(obj_pool_.get(), "RuntimeState"),
     is_cancelled_(false) {
-  if (llvm_enabled) {
-    Status status = CreateCodegen();
-    DCHECK(status.ok()); // TODO better error handling
-  }
+  Status status = Init(fragment_id, query_options, now, exec_env);
+  DCHECK(status.ok());
 }
 
 RuntimeState::RuntimeState()
   : obj_pool_(new ObjectPool()),
-    batch_size_(DEFAULT_BATCH_SIZE),
     file_buffer_size_(DEFAULT_FILE_BUFFER_SIZE),
     profile_(obj_pool_.get(), "RuntimeState") {
+  query_options_.batch_size = DEFAULT_BATCH_SIZE;
 }
 
 RuntimeState::~RuntimeState() {
 }
 
 Status RuntimeState::Init(
-    const TUniqueId& fragment_id, bool abort_on_error, int max_errors,
-    int batch_size, const string& now, bool llvm_enabled, ExecEnv* exec_env) {
+    const TUniqueId& fragment_id, const TQueryOptions& query_options, const string& now,
+    ExecEnv* exec_env) {
   fragment_id_ = fragment_id;
-  abort_on_error_ = abort_on_error;
-  max_errors_ = max_errors_;
-  batch_size_ = batch_size;
+  query_options_ = query_options;
   now_.reset(new TimestampValue(now));
   exec_env_ = exec_env;
-  if (llvm_enabled) {
+  if (!query_options.disable_codegen) {
     RETURN_IF_ERROR(CreateCodegen());
   } else {
     codegen_.reset(NULL);
   }
+  if (query_options_.max_errors <= 0) {
+    query_options_.max_errors = FLAGS_max_errors;
+  }
+  if (query_options_.batch_size <= 0) {
+    query_options_.batch_size = DEFAULT_BATCH_SIZE;
+  }
+
   return Status::OK;
 }
 

@@ -13,13 +13,13 @@ exception TImpalaPlanServiceException {
 // test driver can get plans to run.
 service ImpalaPlanService {
   Frontend.TCreateQueryExecRequestResult CreateQueryExecRequest(
-      1:string query, 2:i32 numNodes) throws (1:TImpalaPlanServiceException e);
+      1:Frontend.TQueryRequest queryRequest) throws (1:TImpalaPlanServiceException e);
 
   // Force planservice to reload table metadata, in case it has changed due to e.g. an 
   // insert
   void RefreshMetadata();
 
-  string GetExplainString(1:string query, 2:i32 numNodes)
+  string GetExplainString(1:Frontend.TQueryRequest queryRequest)
       throws (1:TImpalaPlanServiceException e);
 
   // Makes changes to the metastore - usually creates partitions as a result of an INSERT

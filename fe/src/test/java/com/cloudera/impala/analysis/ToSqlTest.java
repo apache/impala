@@ -12,6 +12,7 @@ import org.junit.Test;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.service.Executor;
+import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TQueryRequest;
 
 public class ToSqlTest {
@@ -31,7 +32,10 @@ public class ToSqlTest {
 
   private static AnalysisContext.AnalysisResult analyze(String query) {
     try {
-      TQueryRequest tqueryRequest = new TQueryRequest(query, false, 1);
+      TQueryOptions tqueryOptions = new TQueryOptions();
+      tqueryOptions.setReturn_as_ascii(false);
+      tqueryOptions.setNum_nodes(1);
+      TQueryRequest tqueryRequest = new TQueryRequest(query, tqueryOptions);
       ArrayList<PrimitiveType> colTypes = new ArrayList<PrimitiveType>();
       ArrayList<String> colLabels = new ArrayList<String>();
       return executor.analyzeQuery(tqueryRequest, colTypes, colLabels);

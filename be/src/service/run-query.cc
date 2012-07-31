@@ -13,6 +13,7 @@
 #include <boost/thread/thread.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/foreach.hpp>
 
 #include "codegen/llvm-codegen.h"
 #include "common/status.h"
@@ -39,6 +40,8 @@
 #include "util/thrift-server.h"
 #include "runtime/data-stream-mgr.h"
 
+DEFINE_string(exec_options, "", "key:value pair of execution options for impalad,"
+    " separated by ;");
 DEFINE_string(input_file, "", "file containing ';'-separated list of queries");
 DEFINE_string(query, "", "query to execute.  Multiple queries can be ; separated");
 DEFINE_bool(init_hbase, true, "if true, call hbase jni initialization");
@@ -82,7 +85,28 @@ static void ConstructSummaryString(ExecStats::QueryType query_type, int num_rows
 
 static QueryExecutorIf* CreateExecutor(ExecEnv* exec_env) {
   if (!FLAGS_impalad.empty()) {
-    return new ImpaladQueryExecutor();
+    ImpaladQueryExecutor* executor = new ImpaladQueryExecutor();
+    if (FLAGS_exec_options.size() > 0) {
+      vector<string> exec_options;
+      split(exec_options, FLAGS_exec_options, is_any_of(";"), token_compress_on );
+      // Check the specified option against TImpalaExecutionOption
+      BOOST_FOREACH(string exec_option, exec_options) {
+        trim(exec_option);
+        vector<string> key_value;
+        split(key_value, exec_option, is_any_of(":"), token_compress_on );
+        if (key_value.size() != 2) {
+          cout << "exec_options must be a list of key:value pairs: " << exec_option
+               << endl;
+          exit(1);
+        }
+        if (ImpalaServer::GetQueryOption(key_value[0]) < 0) {
+          cout << "invalid exec option: " << key_value[0] << endl;
+          exit(1);
+        }
+      }
+      executor->setExecOptions(exec_options);
+    }
+    return executor;
   } else {
     return new InProcessQueryExecutor(exec_env);
   }

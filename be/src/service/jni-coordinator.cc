@@ -42,9 +42,7 @@ Status JniCoordinator::DeserializeRequest(jbyteArray thrift_query_exec_request) 
   // Deserialize request bytes into c++ request using memory transport.
   DeserializeThriftMsg(env_, thrift_query_exec_request, &query_exec_request_);
   LOG(INFO) << "query=" << query_exec_request_.sql_stmt
-            << " #fragments=" << query_exec_request_.fragment_requests.size()
-            << " batch_size=" << query_exec_request_.batch_size;
-  as_ascii_ = query_exec_request_.as_ascii;
+            << " #fragments=" << query_exec_request_.fragment_requests.size();
 
   if (query_exec_request_.fragment_requests.size() == 0) {
     return Status("query exec request contains no plan fragments");
@@ -54,6 +52,7 @@ Status JniCoordinator::DeserializeRequest(jbyteArray thrift_query_exec_request) 
       return Status("bad TPlanExecRequest: only one of {plan_fragment, desc_tbl} is set");
   }
 
+  as_ascii_ = coord_request.query_options.return_as_ascii;
   is_constant_query_ = !coord_request.__isset.desc_tbl;
   if (is_constant_query_) {
     // Create a dummy runtime state because some exprs depend on having one.

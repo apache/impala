@@ -22,8 +22,6 @@
 #include "gen-cpp/ImpalaPlanService_types.h"
 
 DEFINE_bool(serialize_batch, false, "serialize and deserialize each returned row batch");
-DECLARE_bool(enable_jit);
-DECLARE_int32(max_errors);
 
 using namespace std;
 using namespace boost;
@@ -46,20 +44,9 @@ Status PlanFragmentExecutor::Prepare(
 
   VLOG_QUERY << "params:\n" << ThriftDebugString(params);
 
-  // If FE disables it, turn it off, otherwise, use the BE setting
-  bool enable_llvm;
-  if (params.disable_codegen) {
-    enable_llvm = false;
-  } else {
-    enable_llvm = FLAGS_enable_jit;
-  }
-
-  int max_errors = params.max_errors;
-  if (max_errors == 0) max_errors = FLAGS_max_errors;
   runtime_state_.reset(
-      new RuntimeState(request.fragment_id, params.abort_on_error, params.max_errors,
-                       params.batch_size, request.query_globals.now_string,
-                       enable_llvm, exec_env_));
+      new RuntimeState(request.fragment_id, request.query_options,
+          request.query_globals.now_string, exec_env_));
 
   // set up desc tbl
   DescriptorTbl* desc_tbl = NULL;

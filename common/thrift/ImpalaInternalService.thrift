@@ -13,6 +13,25 @@ include "PlanNodes.thrift"
 include "DataSinks.thrift"
 include "Data.thrift"
 include "RuntimeProfile.thrift"
+include "ImpalaService.thrift"
+include "JavaConstants.thrift"
+
+// Query options that correspond to ImpalaService.ImpalaQueryOptions
+struct TQueryOptions {
+  1: required bool abort_on_error = 1
+  2: required i32 max_errors = 0
+  3: required bool disable_codegen = 0
+  4: required i32 batch_size = 0
+  
+  // return_as_ascii is not listed in ImpalaService.ImpalaQueryOptions because Beeswax
+  // should only return ascii. This option is only for internal testing.
+  // if true, return query results in ASCII format (TColumnValue.stringVal),
+  // otherwise return results in their native format (each TColumnValue
+  // uses the field corresponding to the column's native type). 
+  5: required bool return_as_ascii = 1
+  
+  6: required i32 num_nodes = JavaConstants.NUM_NODES_ALL
+}
 
 // Parameters for the execution of a plan fragment on a particular node.
 struct TPlanExecParams {
@@ -24,14 +43,6 @@ struct TPlanExecParams {
 
   // (host, port) pairs of output destinations, one per output partition
   3: list<Types.THostPort> destinations
-
-  // global execution flags
-  4: required bool abort_on_error
-  5: required i32 max_errors
-  6: required bool disable_codegen
-
-  // 0 means use default
-  7: required i32 batch_size
 }
 
 // Global query parameters assigned by the coordinator.
@@ -65,6 +76,10 @@ struct TPlanExecRequest {
   
   // Global query parameters assigned by coordinator.
   7: required TQueryGlobals query_globals
+  
+  // query options for the query
+  8: required TQueryOptions query_options
+  
 }
 
 // TQueryExecRequest encapsulates everything needed to execute all plan fragments
@@ -91,25 +106,8 @@ struct TQueryExecRequest {
   // execNodes[i-1][j]
   4: list<list<TPlanExecParams>> node_request_params
 
-  // if true, return result in ascii, otherwise return in binary format
-  // (see TColumnValue)
-  5: required bool as_ascii
-
-  // if true, abort execution on the first error
-  6: required bool abort_on_error
-
-  // maximum # of errors to be reported
-  7: required i32 max_errors
-
-  // if true, BE will disable llvm codegen
-  8: required bool disable_codegen
-
-  // for debugging: set batch size used by backend internally;
-  // a size of 0 indicates backend default
-  9: required i32 batch_size
-
   // for debugging purposes (to allow backend to log the query string)
-  10: optional string sql_stmt;
+  5: optional string sql_stmt;
 }
 
 

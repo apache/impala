@@ -47,6 +47,7 @@ import com.cloudera.impala.thrift.TPlanExecParams;
 import com.cloudera.impala.thrift.TPlanExecRequest;
 import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TQueryGlobals;
+import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TScanRange;
 import com.cloudera.impala.thrift.TUniqueId;
 import com.google.common.base.Preconditions;
@@ -728,7 +729,8 @@ public class Planner {
         // SELECT without FROM clause
         TPlanExecRequest fragmentRequest = new TPlanExecRequest(
             new TUniqueId(), new TUniqueId(),
-            Expr.treesToThrift(selectStmt.getResultExprs()), queryGlobals);
+            Expr.treesToThrift(selectStmt.getResultExprs()), queryGlobals,
+            new TQueryOptions());
         request.addToFragment_requests(fragmentRequest);
         explainString.append("Plan Fragment " + 0 + "\n");
         explainString.append("  SELECT CONSTANT\n");
@@ -1050,6 +1052,7 @@ public class Planner {
     planRequest.setPlan_fragment(root.treeToThrift());
     planRequest.setDesc_tbl(descTbl.toThrift());
     planRequest.setQuery_globals(queryGlobals);
+    planRequest.setQuery_options(new TQueryOptions());
     queryRequest.addToFragment_requests(planRequest);
     return planRequest;
   }

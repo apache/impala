@@ -14,6 +14,7 @@
 
 #include "runtime/exec-env.h"
 #include "gen-cpp/Types_types.h"  // for TUniqueId
+#include "gen-cpp/ImpalaInternalService_types.h"  // for TQueryOptions
 #include "util/runtime-profile.h"
 
 namespace impala {
@@ -30,9 +31,8 @@ class TimestampValue;
 // query and shared across all execution nodes of that query.
 class RuntimeState {
  public:
-  RuntimeState(const TUniqueId& fragment_id, bool abort_on_error, int max_errors,
-               int batch_size, const std::string& now, bool llvm_enabled,
-               ExecEnv* exec_env);
+  RuntimeState(const TUniqueId& fragment_id, const TQueryOptions& query_options,
+               const std::string& now, ExecEnv* exec_env);
 
   // RuntimeState for executing queries w/o a from clause.
   RuntimeState();
@@ -40,17 +40,16 @@ class RuntimeState {
   ~RuntimeState();
 
   // Set per-query state.
-  Status Init(const TUniqueId& fragment_id, bool abort_on_error, int max_errors,
-              int batch_size, const std::string& now, bool llvm_enabled,
-              ExecEnv* exec_env);
+  Status Init(const TUniqueId& fragment_id, const TQueryOptions& query_options,
+              const std::string& now, ExecEnv* exec_env);
 
   ObjectPool* obj_pool() const { return obj_pool_.get(); }
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }
   void set_desc_tbl(DescriptorTbl* desc_tbl) { desc_tbl_ = desc_tbl; }
-  int batch_size() const { return batch_size_; }
+  int batch_size() const { return query_options_.batch_size; }
   int file_buffer_size() const { return file_buffer_size_; }
-  bool abort_on_error() const { return abort_on_error_; }
-  int max_errors() const { return max_errors_; }
+  bool abort_on_error() const { return query_options_.abort_on_error; }
+  int max_errors() const { return query_options_.max_errors; }
   const TimestampValue* now() const { return now_.get(); }
   void set_now(const TimestampValue* now);
   const std::vector<std::string>& error_log() const { return error_log_; }
@@ -77,7 +76,7 @@ class RuntimeState {
   void LogErrorStream();
 
   // Returns true if the error log has not reached max_errors_.
-  bool LogHasSpace() const { return error_log_.size() < max_errors_; }
+  bool LogHasSpace() const { return error_log_.size() < query_options_.max_errors; }
 
   // Clears the error log.
   void ClearErrorLog() { error_log_.clear(); }
@@ -103,7 +102,6 @@ class RuntimeState {
 
   DescriptorTbl* desc_tbl_;
   boost::scoped_ptr<ObjectPool> obj_pool_;
-  int batch_size_;
   int file_buffer_size_;
 
   // A buffer for error messages.
@@ -116,17 +114,12 @@ class RuntimeState {
   // Stores the number of parse errors per file.
   std::vector<std::pair<std::string, int> > file_errors_;
 
-  // Whether to abort if an error is encountered.
-  bool abort_on_error_;
-
-  // Maximum number of errors to log.
-  int max_errors_;
-
   // Query-global timestamp, e.g., for implementing now().
   // Use pointer to avoid inclusion of timestampvalue.h and avoid clang issues.
   boost::scoped_ptr<TimestampValue> now_;
 
   TUniqueId fragment_id_;
+  TQueryOptions query_options_;
   ExecEnv* exec_env_;
   boost::scoped_ptr<LlvmCodeGen> codegen_;
 

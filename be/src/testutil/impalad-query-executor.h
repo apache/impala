@@ -72,9 +72,16 @@ class ImpaladQueryExecutor : public QueryExecutorIf {
 
   virtual ExecStats* exec_stats() { return &exec_stats_; }
 
+  void setExecOptions(const std::vector<std::string>& exec_options) {
+    exec_options_ = exec_options;
+  }
+
  private:
   // fe service-related
   boost::scoped_ptr<ThriftClient<ImpalaServiceClient> > client_;
+
+  // Execution options
+  std::vector<std::string> exec_options_;
 
   // Beeswax query handle and result
   beeswax::QueryHandle query_handle_;

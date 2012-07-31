@@ -105,11 +105,22 @@ Status InProcessQueryExecutor::Exec(const string& query, vector<PrimitiveType>* 
   COUNTER_SCOPED_TIMER(query_profile_->total_time_counter());
   VLOG_QUERY << "query: " << query;
   eos_ = false;
+
+  TQueryOptions query_options;
+  query_options.abort_on_error = FLAGS_abort_on_error;
+  query_options.batch_size = FLAGS_batch_size;
+  query_options.disable_codegen = !FLAGS_enable_jit;
+  query_options.max_errors = FLAGS_max_errors;
+  query_options.num_nodes = FLAGS_num_nodes;
+
   try {
     COUNTER_SCOPED_TIMER(plan_gen_counter);
     CHECK(client_.get() != NULL) << "didn't call InProcessQueryExecutor::Setup()";
+    TQueryRequest query_request;
+    query_request.__set_stmt(query.c_str());
+    query_request.__set_queryOptions(query_options);
     TCreateQueryExecRequestResult result;
-    client_->CreateQueryExecRequest(result, query.c_str(), FLAGS_num_nodes);
+    client_->CreateQueryExecRequest(result, query_request);
     query_request_ = result.queryExecRequest;
   } catch (TImpalaPlanServiceException& e) {
     return Status(e.what());
@@ -124,9 +135,8 @@ Status InProcessQueryExecutor::Exec(const string& query, vector<PrimitiveType>* 
     DCHECK(!query_request_.fragment_requests[0].__isset.plan_fragment);
     // Set now timestamp in local_state_.
     local_state_.reset(new RuntimeState(
-        query_request_.query_id, FLAGS_abort_on_error, FLAGS_max_errors,
-        FLAGS_batch_size, query_request_.fragment_requests[0].query_globals.now_string,
-        FLAGS_enable_jit, NULL));
+        query_request_.query_id, query_options,
+        query_request_.fragment_requests[0].query_globals.now_string, NULL));
     query_profile_->AddChild(local_state_->runtime_profile());
     RETURN_IF_ERROR(
         PrepareSelectListExprs(local_state_.get(), RowDescriptor(), col_types));
@@ -138,13 +148,8 @@ Status InProcessQueryExecutor::Exec(const string& query, vector<PrimitiveType>* 
   // (it's meant for the coordinator fragment)
   DCHECK_EQ(query_request_.node_request_params[0].size(), 1);
 
-  if (FLAGS_batch_size != 0) {
-    query_request_.batch_size = FLAGS_batch_size;
-    for (int i = 0; i < query_request_.node_request_params.size(); ++i) {
-      for (int j = 0; j < query_request_.node_request_params[i].size(); ++j) {
-        query_request_.node_request_params[i][j].batch_size = FLAGS_batch_size;
-      }
-    }
+  for (int i = 0; i < query_request_.fragment_requests.size(); ++i) {
+    query_request_.fragment_requests[i].query_options = query_options;
   }
 
   if (FLAGS_num_nodes != 1) {
@@ -299,7 +304,17 @@ string InProcessQueryExecutor::FileErrors() const {
 
 Status InProcessQueryExecutor::Explain(const string& query, string* explain_plan) {
   try {
-    client_->GetExplainString(*explain_plan, query, 0);
+    TQueryOptions query_options;
+    query_options.abort_on_error = FLAGS_abort_on_error;
+    query_options.batch_size = FLAGS_batch_size;
+    query_options.disable_codegen = !FLAGS_enable_jit;
+    query_options.max_errors = FLAGS_max_errors;
+    query_options.num_nodes = FLAGS_num_nodes;
+    TQueryRequest query_request;
+    query_request.__set_stmt(query.c_str());
+    query_request.__set_queryOptions(query_options);
+
+    client_->GetExplainString(*explain_plan, query_request);
     return Status::OK;
   } catch (TImpalaPlanServiceException& e) {
     return Status(e.what());

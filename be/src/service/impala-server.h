@@ -93,6 +93,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   virtual void TransmitData(
       TTransmitDataResult& return_val, const TTransmitDataParams& params);
 
+  // Returns the ImpalaQueryOptions enum for the given "key". Input is case in-sensitive.
+  // Return -1 if the input is an invalid option.
+  static int GetQueryOption(const std::string& key);
+
  private:
   class QueryExecState;
   class FragmentExecState;

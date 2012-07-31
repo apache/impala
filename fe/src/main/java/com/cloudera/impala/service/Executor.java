@@ -38,6 +38,7 @@ import com.cloudera.impala.thrift.TColumnValue;
 import com.cloudera.impala.thrift.TPlanExecParams;
 import com.cloudera.impala.thrift.TPlanExecRequest;
 import com.cloudera.impala.thrift.TQueryExecRequest;
+import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TQueryRequest;
 import com.cloudera.impala.thrift.TResultRow;
 import com.cloudera.impala.thrift.TUniqueId;
@@ -95,9 +96,9 @@ public class Executor {
       containsOrderBy.set(analysisResult.isQueryStmt()
           && analysisResult.getQueryStmt().hasOrderByClause());
     }
-    execQuery(analysisResult, request.numNodes, batchSize, abortOnError, maxErrors,
-              disableCodegen, errorLog, fileErrors, request.returnAsAscii, resultQueue,
-              insertResult);
+    execQuery(analysisResult, request.queryOptions.num_nodes, batchSize, abortOnError,
+              maxErrors, disableCodegen, errorLog, fileErrors,
+              request.queryOptions.return_as_ascii, resultQueue, insertResult);
     addSentinelRow(resultQueue);
   }
 
@@ -126,9 +127,9 @@ public class Executor {
     Runnable execCall = new Runnable() {
       public void run() {
         try {
-          execQuery(analysisResult, request.numNodes, batchSize, abortOnError,
-                    maxErrors, disableCodegen, errorLog, fileErrors, request.returnAsAscii,
-                    resultQueue, insertResult);
+          execQuery(analysisResult, request.queryOptions.num_nodes, batchSize,
+                    abortOnError, maxErrors, disableCodegen, errorLog, fileErrors,
+                    request.queryOptions.return_as_ascii, resultQueue, insertResult);
         } catch (ImpalaException e) {
           errorMsg = e.getMessage();
         }
@@ -212,11 +213,7 @@ public class Executor {
     execRequest.setQuery_id(
         new TUniqueId(queryId.getMostSignificantBits(),
                       queryId.getLeastSignificantBits()));
-    execRequest.setAs_ascii(returnAsAscii);
-    execRequest.setAbort_on_error(abortOnError);
-    execRequest.setMax_errors(maxErrors);
-    execRequest.setDisable_codegen(disableCodegen);
-    execRequest.setBatch_size(batchSize);
+    execRequest.fragment_requests.get(0).query_options.setReturn_as_ascii(returnAsAscii);
     execRequest.setSql_stmt(analysisResult.getStmt().toSql());
 
     // assign fragment ids
@@ -232,11 +229,12 @@ public class Executor {
 
     // Node request params may not be set for queries w/o a coordinator
     if (execRequest.getNode_request_params() != null) {
-      for (List<TPlanExecParams> planParamsList : execRequest.getNode_request_params()) {
-        for (TPlanExecParams params : planParamsList) {
-          params.setBatch_size(batchSize);
-          params.setDisable_codegen(disableCodegen);
-        }
+      // Set the execution option for the query
+      for (TPlanExecRequest planExecRequest : execRequest.getFragment_requests()) {
+        planExecRequest.getQuery_options().setAbort_on_error(abortOnError);
+        planExecRequest.getQuery_options().setMax_errors(maxErrors);
+        planExecRequest.getQuery_options().setDisable_codegen(disableCodegen);
+        planExecRequest.getQuery_options().setBatch_size(batchSize);
       }
 
       // set dest_fragment_ids of non-coord fragment
@@ -332,7 +330,10 @@ public class Executor {
       int batchSize, PrintStream targetStream) throws ImpalaException {
     Preconditions.checkNotNull(catalog);
     int numRows = 0;
-    TQueryRequest request = new TQueryRequest(query, true, 2);
+    TQueryOptions requestOptions = new TQueryOptions();
+    requestOptions.setReturn_as_ascii(true);
+    requestOptions.setNum_nodes(2);
+    TQueryRequest request = new TQueryRequest(query, requestOptions);
     List<String> errorLog = new ArrayList<String>();
     Map<String, Integer> fileErrors = new HashMap<String, Integer>();
     List<PrimitiveType> dummyColTypes = Lists.newArrayList();

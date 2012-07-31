@@ -6,6 +6,35 @@ namespace java com.cloudera.impala.thrift
 include "Status.thrift"
 include "beeswax.thrift"
 
+// ImpalaService accepts query execution options through beeswax.Query.configuration in
+// key:value form. For example, the list of strings could be:
+//     "num_nodes:1", "abort_on_error:false"
+// The valid keys are listed in this enum. They map to TQueryOptions.
+enum ImpalaQueryOptions {
+  // if true, abort execution on the first error; default is true
+  ABORT_ON_ERROR,
+  
+  // maximum # of errors to be reported; Unspecified or 0 indicates backend default
+  MAX_ERRORS,
+  
+  // if true, disable llvm codegen; default is false
+  DISABLE_CODEGEN,
+  
+  // batch size to be used by backend; Unspecified or a size of 0 indicates backend
+  // default
+  BATCH_SIZE,
+   
+  // specifies the degree of parallelism with which to execute the query;
+  // 1: single-node execution
+  // NUM_NODES_ALL: executes on all nodes that contain relevant data
+  // NUM_NODES_ALL_RACKS: executes on one node per rack that holds relevant data
+  // > 1: executes on at most that many nodes at any point in time (ie, there can be
+  //      more nodes than numNodes with plan fragments for this query, but at most
+  //      numNodes would be active at any point in time)
+  // Constants (NUM_NODES_ALL, NUM_NODES_ALL_RACKS) are defined in JavaConstants.thrift.
+  NUM_NODES
+}
+
 // For all rpc that return a TStatus as part of their result type,
 // if the status_code field is set to anything other than OK, the contents
 // of the remainder of the result type is undefined (typically not set)

@@ -26,6 +26,7 @@ import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.service.Executor;
 import com.cloudera.impala.service.InsertResult;
 import com.cloudera.impala.thrift.TColumnValue;
+import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TQueryRequest;
 import com.cloudera.impala.thrift.TResultRow;
 import com.google.common.base.Preconditions;
@@ -352,7 +353,10 @@ public class TestUtils {
 
     String queryReportString = buildQueryDetailString(query, context);
     LOG.info("running query " + queryReportString);
-    TQueryRequest request = new TQueryRequest(query, true, context.getNumNodes());
+    TQueryOptions options = new TQueryOptions();
+    options.setReturn_as_ascii(true);
+    options.setNum_nodes(context.getNumNodes());
+    TQueryRequest request = new TQueryRequest(query, options);
     ArrayList<String> errors = new ArrayList<String>();
     SortedMap<String, Integer> fileErrors = new TreeMap<String, Integer>();
     ArrayList<PrimitiveType> colTypes = new ArrayList<PrimitiveType>();
