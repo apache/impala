@@ -983,8 +983,13 @@ void ImpalaServer::RunExecPlanFragment(FragmentExecState* exec_state) {
     lock_guard<mutex> l(fragment_exec_state_map_lock_);
     FragmentExecStateMap::iterator i =
         fragment_exec_state_map_.find(exec_state->fragment_id());
-    delete i->second;
-    fragment_exec_state_map_.erase(i);
+    if (i != fragment_exec_state_map_.end()) {
+      delete i->second;
+      fragment_exec_state_map_.erase(i);
+    } else {
+      LOG(ERROR) << "missing entry in fragment exec state map: fragment_id="
+                 << exec_state->fragment_id();
+    }
   }
 }
 
