@@ -47,8 +47,11 @@ public class StringLiteral extends LiteralExpr {
 
   @Override
   protected Expr uncheckedCastTo(PrimitiveType targetType) throws AnalysisException {
-    Preconditions.checkState(targetType.isNumericType() || targetType.isDateType());
-    if (targetType.isNumericType()) {
+    Preconditions.checkState(targetType.isNumericType() || targetType.isDateType()
+        || targetType == this.type);
+    if (targetType == this.type) {
+      return this;
+    } else if (targetType.isNumericType()) {
       return convertToNumber();
     } else if (targetType.isDateType()) {
       // Let the BE do the cast so it is in Boost format

@@ -847,3 +847,10 @@ LIKE AllTypesAggMultiFilesNoPart_seq;
 DROP TABLE IF EXISTS AllTypesMixedFormat;
 CREATE TABLE AllTypesMixedFormat
 LIKE AllTypes;
+
+-- Regression for IMP-163, failure to load tables partitioned by string column
+DROP TABLE IF EXISTS StringPartitionKey;
+CREATE TABLE StringPartitionKey (
+  id int) 
+PARTITIONED BY (string_col string);
+ALTER TABLE StringPartitionKey ADD PARTITION (string_col = "partition1");

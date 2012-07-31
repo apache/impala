@@ -117,6 +117,9 @@ public class CatalogTest {
     assertNotNull(defaultDb.getTable("rankingssmall"));
     assertNotNull(defaultDb.getTable("uservisitssmall"));
 
+    // IMP-163 - table with string partition column does not load if there are partitions
+    assertNotNull(defaultDb.getTable("StringPartitionKey"));
+
     // testdb contains tables alltypes and testtbl.
     assertEquals(2, testDb.getTables().size());
     assertNotNull(testDb.getTable("alltypes"));
