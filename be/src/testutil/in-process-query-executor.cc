@@ -138,8 +138,9 @@ Status InProcessQueryExecutor::Exec(const string& query,
 
   // we always need at least one plan fragment
   DCHECK_GT(query_request_.fragment_requests.size(), 0);
-
-  if (!query_request_.fragment_requests[0].__isset.desc_tbl) {
+  
+  if (query_request_.has_coordinator_fragment 
+      && !query_request_.fragment_requests[0].__isset.desc_tbl) {
     // query without a FROM clause: don't create a coordinator
     DCHECK(!query_request_.fragment_requests[0].__isset.plan_fragment);
     // Set now timestamp in local_state_.
@@ -151,11 +152,11 @@ Status InProcessQueryExecutor::Exec(const string& query,
         PrepareSelectListExprs(local_state_.get(), RowDescriptor(), col_types));
     return Status::OK;
   }
-
-  DCHECK_GT(query_request_.node_request_params.size(), 0);
-  // the first node_request_params list contains exactly one TPlanExecParams
-  // (it's meant for the coordinator fragment)
-  DCHECK_EQ(query_request_.node_request_params[0].size(), 1);
+  if (!query_request_.has_coordinator_fragment) {
+    // the first node_request_params list contains exactly one TPlanExecParams
+    // (it's meant for the coordinator fragment)
+    DCHECK_EQ(query_request_.node_request_params[0].size(), 1);
+  }
 
   for (int i = 0; i < query_request_.fragment_requests.size(); ++i) {
     query_request_.fragment_requests[i].query_options = query_options;
@@ -166,7 +167,7 @@ Status InProcessQueryExecutor::Exec(const string& query,
     // will be executed by FLAGS_num_nodes - 1 nodes
     DCHECK_EQ(query_request_.fragment_requests.size(), 2);
     DCHECK_EQ(query_request_.node_request_params.size(), 2);
-    DCHECK_LE(query_request_.node_request_params[1].size(), FLAGS_num_nodes - 1);
+    DCHECK_LE(query_request_.node_request_params[0].size(), FLAGS_num_nodes - 1);
 
     // set destinations to coord host/port
     for (int i = 0; i < query_request_.node_request_params[1].size(); ++i) {
@@ -179,8 +180,10 @@ Status InProcessQueryExecutor::Exec(const string& query,
   coord_.reset(new Coordinator(exec_env_, exec_stats_.get()));
   RETURN_IF_ERROR(coord_->Exec(&query_request_));
   RETURN_IF_ERROR(coord_->Wait());
-  RETURN_IF_ERROR(PrepareSelectListExprs(
-      coord_->runtime_state(), coord_->row_desc(), col_types));
+  if (query_request_.has_coordinator_fragment) {
+    RETURN_IF_ERROR(PrepareSelectListExprs(
+            coord_->runtime_state(), coord_->row_desc(), col_types));
+  }
 
   query_profile_->AddChild(coord_->query_profile());
   return Status::OK;

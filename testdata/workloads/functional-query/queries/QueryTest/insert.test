@@ -15,8 +15,6 @@ RELOAD alltypesnopart_insert$TABLE
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
 from alltypesnopart_insert$TABLE
----- SETUP
-RELOAD alltypesnopart_insert$TABLE
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 ---- RESULTS
@@ -61,8 +59,6 @@ RESET alltypesnopart_insert$TABLE
 ====
 # search the table to verify it contains 25 rows
 select count(*) from alltypesnopart_insert$TABLE
----- SETUP
-RELOAD alltypesnopart_insert$TABLE
 ---- TYPES
 bigint
 ---- RESULTS
@@ -115,7 +111,7 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 98,true,3,3,3,30,3.299999952316284,30.3,'04/03/09','3'
 99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4'
 ====
-# static partition insert$TABLE
+# static partition insert$TABLE, test creation of partitions
 insert into table alltypesinsert$TABLE
 partition (year=2009, month=4) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
@@ -133,8 +129,6 @@ year=2009/month=4/
 # search the partition to verify it contains all 25 rows
 select count(*) from alltypesinsert$TABLE
 where year=2009 and month=4
----- SETUP
-RELOAD alltypesinsert$TABLE
 ---- TYPES
 bigint
 ---- RESULTS
@@ -241,7 +235,7 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 98,true,3,3,3,30,3.299999952316284,30.3,'04/03/09','3'
 99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4'
 ====
-# partially dynamic partition insert$TABLE
+# partially dynamic partition insert$TABLE, check partition creation
 insert into table alltypesinsert$TABLE
 partition (year=2009, month) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
@@ -395,7 +389,7 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 98,true,3,3,3,30,3.299999952316284,30.3,'04/03/09','3'
 99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4'
 ====
-# fully dynamic partition insert$TABLE
+# fully dynamic partition insert$TABLE, check partition creation
 insert into table alltypesinsert$TABLE
 partition (year, month) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 

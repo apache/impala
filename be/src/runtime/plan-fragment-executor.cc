@@ -41,8 +41,7 @@ PlanFragmentExecutor::~PlanFragmentExecutor() {
 
 Status PlanFragmentExecutor::Prepare(
     const TPlanExecRequest& request, const TPlanExecParams& params) {
-
-  VLOG(2) << "params:\n" << ThriftDebugString(params);
+  VLOG_QUERY << "params:\n" << ThriftDebugString(params);
 
   runtime_state_.reset(
       new RuntimeState(request.fragment_id, request.query_options,
@@ -81,6 +80,10 @@ Status PlanFragmentExecutor::Prepare(
     sink_.reset(NULL);
   }
 
+  // set up profile counters
+  rows_produced_counter_ = ADD_COUNTER(runtime_state_->runtime_profile(), "RowsProduced",
+      TCounterType::UNIT);
+
   row_batch_.reset(new RowBatch(plan_->row_desc(), runtime_state_->batch_size()));
   RETURN_IF_ERROR(plan_->Prepare(runtime_state_.get()));
   VLOG(2) << "plan_root=\n" << plan_->DebugString();
@@ -105,6 +108,7 @@ Status PlanFragmentExecutor::Open() {
         }
       }
 
+      COUNTER_UPDATE(rows_produced_counter_, row_batch_->num_rows());
       RETURN_IF_ERROR(sink_->Send(runtime_state(), batch));
       batch = NULL;
     }
@@ -125,6 +129,7 @@ Status PlanFragmentExecutor::GetNext(RowBatch** batch) {
     row_batch_->Reset();
     RETURN_IF_ERROR(plan_->GetNext(runtime_state_.get(), row_batch_.get(), &done_));
     if (row_batch_->num_rows() > 0) {
+      COUNTER_UPDATE(rows_produced_counter_, row_batch_->num_rows());
       *batch = row_batch_.get();
       break;
     }

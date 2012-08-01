@@ -21,6 +21,7 @@ import com.cloudera.impala.analysis.BinaryPredicate;
 import com.cloudera.impala.analysis.DescriptorTable;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.InlineViewRef;
+import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.analysis.SelectStmt;
@@ -52,6 +53,7 @@ import com.cloudera.impala.thrift.TScanRange;
 import com.cloudera.impala.thrift.TUniqueId;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 
@@ -482,8 +484,9 @@ public class Planner {
     StringBuilder execParamExplain = new StringBuilder();
     String prefix = "  ";
 
-    List<TPlanExecParams> execHostsParams =
+    List<TPlanExecParams> execHostsParams = 
         request.getNode_request_params().get(planFragIdx);
+
     for (int nodeIdx = 0; nodeIdx < execHostsParams.size(); nodeIdx++) {
       // If the host has no parameter set, don't print anything
       TPlanExecParams hostExecParams = execHostsParams.get(nodeIdx);
@@ -571,6 +574,9 @@ public class Planner {
       List<DataSink> dataSinks, TQueryExecRequest request) {
     Preconditions.checkState(planFragments.size() == dataSinks.size());
 
+    if (!request.has_coordinator_fragment) {
+      explainStr.append("NO COORDINATOR FRAGMENT\n");
+    }
     for (int planFragIdx = 0; planFragIdx < planFragments.size(); ++planFragIdx) {
       // An extra line after each plan fragment
       if (planFragIdx != 0) {
@@ -738,11 +744,16 @@ public class Planner {
       PlanNode spjPlan = createSpjPlan(selectStmt, analyzer);
       if (spjPlan == null) {
         // SELECT without FROM clause
+        // TODO: This incorrectly plans INSERT INTO TABLE ... SELECT 1 as a 
+        // SELECT CONSTANT plan with no sink. The backend won't correctly execute
+        // such a plan at the moment anyhow, but this bug causes the query to return
+        // results, which is counterintuitive. 
         TPlanExecRequest fragmentRequest = new TPlanExecRequest(
             new TUniqueId(), new TUniqueId(),
             Expr.treesToThrift(selectStmt.getResultExprs()), queryGlobals,
             new TQueryOptions());
         request.addToFragment_requests(fragmentRequest);
+        request.has_coordinator_fragment = true;
         explainString.append("Plan Fragment " + 0 + "\n");
         explainString.append("  SELECT CONSTANT\n");
         return request;
@@ -803,56 +814,98 @@ public class Planner {
       exchangeNode.setNumSenders(dataLocations.size());
     }
 
-    // collect data sinks for explain string; dataSinks.size() == # of plan fragments
+    // collect data sinks for explain string; dataSinks.size() == # of plan 
+    // fragments
     List<DataSink> dataSinks = Lists.newArrayList();
+    List<PlanNode> planFragments = Lists.newArrayList();
+
+    // Under certain circumstances, we can't do parallel INSERT.  In
+    // particular, OVERWRITE introduces a bug where all backends will
+    // race to delete the existing table data, and may delete each
+    // other's results.
+    boolean coordinatorDoesInsert = (numNodes == 1) 
+      || (analysisResult.isInsertStmt() && analysisResult.getInsertStmt().isOverwrite());
+    
+    if (queryStmt instanceof SelectStmt) { // Could be UNION
+      SelectStmt selectStmt = (SelectStmt)queryStmt;
+      if ((selectStmt.getAggInfo() != null ||
+           selectStmt.getHavingPred() != null ||
+           selectStmt.getSortInfo() != null)) {
+        coordinatorDoesInsert = true;
+      }
+    }
+
+    if (analysisResult.isInsertStmt()) {
+      InsertStmt insertStmt = analysisResult.getInsertStmt();
+      request.setInsert_table_name(insertStmt.getTargetTableName().getTbl());
+      request.setInsert_table_db(insertStmt.getTargetTableName().getDb());
+    }
+
     // create TPlanExecRequests and set up data sinks
     if (numNodes == 1) {
       TPlanExecRequest planRequest =
-          createPlanExecRequest(root, analyzer.getDescTbl(), queryGlobals, request);
+          createPlanExecRequest(root, analyzer.getDescTbl(), queryGlobals);
       planRequest.setOutput_exprs(
           Expr.treesToThrift(queryStmt.getResultExprs()));
-    } else {
-      // coordinator fragment comes first
-      TPlanExecRequest coordRequest =
-          createPlanExecRequest(root, analyzer.getDescTbl(), queryGlobals, request);
-      coordRequest.setOutput_exprs(
-          Expr.treesToThrift(queryStmt.getResultExprs()));
-      // create TPlanExecRequest for slave plan
-      createPlanExecRequest(slave, analyzer.getDescTbl(), queryGlobals, request);
 
-      // Slaves write to stream data sink for an exchange node.
-      ExchangeNode exchNode = root.findFirstOf(ExchangeNode.class);
-      DataSink dataSink = new DataStreamSink(exchNode.getId());
-      request.fragment_requests.get(1).setData_sink(dataSink.toThrift());
+      request.addToFragment_requests(planRequest);
+      request.has_coordinator_fragment = true;
+    } else {
+      // coordinator fragment comes first, only if no insert
+      if (!analysisResult.isInsertStmt() || coordinatorDoesInsert) {
+        TPlanExecRequest coordRequest =
+          createPlanExecRequest(root, analyzer.getDescTbl(), queryGlobals);
+        coordRequest.setOutput_exprs(
+            Expr.treesToThrift(queryStmt.getResultExprs()));
+
+        request.addToFragment_requests(coordRequest);
+        request.has_coordinator_fragment = true;
+      }
+      // create TPlanExecRequest for slave plan
+      TPlanExecRequest slaveRequest = 
+          createPlanExecRequest(slave, analyzer.getDescTbl(), queryGlobals);
+
+      // Choose sink for slave fragment.
+      DataSink dataSink;
+      if (analysisResult.isInsertStmt() && !coordinatorDoesInsert) {
+        dataSink = analysisResult.getInsertStmt().createDataSink();
+        slaveRequest.setOutput_exprs(
+            Expr.treesToThrift(queryStmt.getResultExprs()));                      
+        request.has_coordinator_fragment = false;
+      } else {
+        // Slaves write to stream data sink for an exchange node.
+        ExchangeNode exchNode = root.findFirstOf(ExchangeNode.class);
+        dataSink = new DataStreamSink(exchNode.getId());
+      }
+
+      slaveRequest.setData_sink(dataSink.toThrift());
+      request.addToFragment_requests(slaveRequest);
+
+      planFragments.add(slave);
       dataSinks.add(dataSink);
     }
 
     // create table data sink for insert stmt
-    if (analysisResult.isInsertStmt()) {
+    if (analysisResult.isInsertStmt() && coordinatorDoesInsert) {
       DataSink dataSink = analysisResult.getInsertStmt().createDataSink();
       request.fragment_requests.get(0).setData_sink(dataSink.toThrift());
       // this is the fragment producing the output; always add in first position
+      planFragments.add(0, root);
       dataSinks.add(0, dataSink);
     } else {
       // record the fact that coord doesn't have a sink
-      dataSinks.add(0, null);
+      if (request.has_coordinator_fragment) {
+        planFragments.add(0, root);
+        dataSinks.add(0, null);
+      }
     }
 
     // set request.dataLocations and request.nodeRequestParams
-    if (numNodes != 1) {
-      // add one empty exec param (coord fragment doesn't scan any tables
-      // and doesn't send the output anywhere)
-      request.addToNode_request_params(Lists.newArrayList(new TPlanExecParams()));
-    }
-    createExecParams(request, scans, maxScanRangeLength, scanRanges, dataLocations);
+    createExecParams(request, scans, maxScanRangeLength, scanRanges, dataLocations, 
+        numNodes);
 
     // Build the explain plan string, if requested
     if (explainString != null) {
-      List<PlanNode> planFragments = Lists.newArrayList();
-      planFragments.add(root);
-      if (slave != null) {
-        planFragments.add(slave);
-      }
       buildExplainString(explainString, planFragments, dataSinks, request);
     }
 
@@ -1060,14 +1113,12 @@ public class Planner {
    * Create TPlanExecRequest for root and add it to queryRequest.
    */
   private TPlanExecRequest createPlanExecRequest(PlanNode root,
-      DescriptorTable descTbl, TQueryGlobals queryGlobals,
-      TQueryExecRequest queryRequest) {
+      DescriptorTable descTbl, TQueryGlobals queryGlobals) {
     TPlanExecRequest planRequest = new TPlanExecRequest();
     planRequest.setPlan_fragment(root.treeToThrift());
     planRequest.setDesc_tbl(descTbl.toThrift());
     planRequest.setQuery_globals(queryGlobals);
     planRequest.setQuery_options(new TQueryOptions());
-    queryRequest.addToFragment_requests(planRequest);
     return planRequest;
   }
 
@@ -1077,11 +1128,18 @@ public class Planner {
    */
   private void createExecParams(
       TQueryExecRequest request, ArrayList<ScanNode> scans, long maxScanRangeLength,
-      List<TScanRange> scanRanges, List<THostPort> dataLocations) {
+      List<TScanRange> scanRanges, List<THostPort> dataLocations, int numNodes) {
     // one TPlanExecParams per fragment/scan range;
     // we need to add an "empty" range for empty tables (in which case
     // scanRanges will be empty)
     List<TPlanExecParams> fragmentParamsList = Lists.newArrayList();
+
+    if (numNodes != 1 && request.has_coordinator_fragment) {
+      // For distributed queries, coord fragment doesn't scan any tables
+      // and doesn't send the output anywhere
+      request.addToNode_request_params(Lists.newArrayList(new TPlanExecParams()));
+    }
+
     Iterator<TScanRange> scanRange = scanRanges.iterator();
     do {
       TPlanExecParams fragmentParams = new TPlanExecParams();

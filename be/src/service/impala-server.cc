@@ -97,7 +97,7 @@ class ImpalaServer::QueryExecState {
  public:
   QueryExecState(const TQueryRequest& request, const TUniqueId& query_id,
       ExecEnv* exec_env, const TResultSetMetadata& metadata, 
-      const TQueryExecRequest& exec_request)
+      const TQueryExecRequest& exec_request, ImpalaServer* impala_server)
     : request_(request), query_id_(query_id),
       exec_env_(exec_env),
       coord_(NULL),
@@ -105,7 +105,8 @@ class ImpalaServer::QueryExecState {
       query_state_(QueryState::CREATED),
       query_exec_request_(exec_request),
       result_metadata_(metadata), current_batch_(NULL), current_batch_row_(0),
-      current_row_(0) {}
+      current_row_(0),
+      impala_server_(impala_server) {}
 
   ~QueryExecState() {
   }
@@ -119,10 +120,11 @@ class ImpalaServer::QueryExecState {
   // Must be preceded by call to Exec().
   Status Wait() {
     if (coord_.get() != NULL) { 
-      return coord_->Wait();
-    } else {
-      return Status::OK;
+      RETURN_IF_ERROR(coord_->Wait());
+      RETURN_IF_ERROR(UpdateMetastore());
     }
+        
+    return Status::OK;
   }
 
   // Return at most max_rows from the current batch. If the entire current batch has
@@ -176,6 +178,9 @@ class ImpalaServer::QueryExecState {
   int current_batch_row_; // num of rows fetched within the current batch
   int current_row_; // num of rows that has been fetched for the entire query
 
+  // To get access to UpdateMetastore
+  ImpalaServer* impala_server_;
+
   // Core logic of FetchRowsAsAscii(). Does not update query_state_/status_.
   Status FetchRowsAsAsciiInternal(const int32_t max_rows, vector<string>* fetched_rows);
 
@@ -199,10 +204,17 @@ class ImpalaServer::QueryExecState {
   Status PrepareSelectListExprs(RuntimeState* runtime_state,
       const vector<TExpr>& exprs, const RowDescriptor& row_desc);
 
+  // Gather and publish all required updates to the metastore
+  Status UpdateMetastore();
+
 };
 
 Status ImpalaServer::QueryExecState::Exec(TQueryExecRequest* exec_request) {
-  if (!exec_request->fragment_requests[0].__isset.desc_tbl) {
+  if (exec_request->has_coordinator_fragment 
+      && !exec_request->fragment_requests[0].__isset.desc_tbl) {
+    // TODO: This does not handle INSERT INTO ... SELECT 1 because there is no coordinator
+    // fragment actually executing to drive the sink. 
+    // Workaround: INSERT INTO ... SELECT 1 FROM tbl LIMIT 1
     // query without a FROM clause
     local_runtime_state_.Init(
         exec_request->query_id, exec_request->fragment_requests[0].query_options,
@@ -213,8 +225,11 @@ Status ImpalaServer::QueryExecState::Exec(TQueryExecRequest* exec_request) {
   } else {
     coord_.reset(new Coordinator(exec_env_, &exec_stats_));
     RETURN_IF_ERROR(coord_->Exec(exec_request));
-    RETURN_IF_ERROR(PrepareSelectListExprs(coord_->runtime_state(),
-        exec_request->fragment_requests[0].output_exprs, coord_->row_desc()));
+    if (exec_request->has_coordinator_fragment) {
+      DCHECK(exec_request->fragment_requests[0].__isset.desc_tbl);
+      RETURN_IF_ERROR(PrepareSelectListExprs(coord_->runtime_state(),
+          exec_request->fragment_requests[0].output_exprs, coord_->row_desc()));
+    }
   }
   return Status::OK;
 }
@@ -256,6 +271,44 @@ Status ImpalaServer::QueryExecState::PrepareSelectListExprs(
     RETURN_IF_ERROR(Expr::Prepare(output_exprs_[i], runtime_state, row_desc));
   }
   return Status::OK;
+}
+
+Status ImpalaServer::QueryExecState::UpdateMetastore() {
+  if (!query_exec_request().__isset.insert_table_name) {
+    // insert_table_name is set iff this is an INSERT query
+    return Status::OK;
+  }
+
+  // TODO: Doesn't handle INSERT with no FROM
+  if (coord() == NULL) {
+    stringstream ss;
+    ss << "INSERT with no FROM clause not fully supported, not updating metastore"
+       << " (query_id: " << query_id() << ")";
+    LOG(ERROR) << ss.str();
+    return Status(ss.str());
+  }
+
+  TCatalogUpdate catalog_update;
+  if (!coord()->PrepareCatalogUpdate(&catalog_update)) {
+    VLOG_QUERY << "No partitions altered, not updating metastore (query id: " 
+               << query_id() << ")";
+  } else {
+    DCHECK(query_exec_request().__isset.insert_table_name);
+
+    // TODO: We track partitions written to, not created, which means
+    // that we do more work than is necessary, because written-to
+    // partitions don't always require a metastore change.
+    VLOG_QUERY << "Updating metastore with " << catalog_update.created_partitions.size()
+               << " altered partitions (" 
+               << join (catalog_update.created_partitions, ", ") << ")";
+    
+    catalog_update.target_table = query_exec_request().insert_table_name;
+    catalog_update.db_name = query_exec_request().insert_table_db;
+    RETURN_IF_ERROR(impala_server_->UpdateMetastore(catalog_update));
+  }
+
+  // TODO: Reset only the updated table
+  return impala_server_->ResetCatalogInternal(); 
 }
 
 Status ImpalaServer::QueryExecState::FetchNextBatch() {
@@ -369,6 +422,7 @@ class ImpalaServer::FragmentExecState {
   TUniqueId fragment_id_;
   PlanFragmentExecutor executor_;
   BackendClientCache* client_cache_;
+  TPlanExecRequest plan_exec_request_;
 
   // initiating coordinator to which we occasionally need to report back
   // (it's exported ImpalaInternalService)
@@ -412,6 +466,7 @@ Status ImpalaServer::FragmentExecState::Cancel() {
 
 Status ImpalaServer::FragmentExecState::Prepare(
     const TPlanExecRequest& request, const TPlanExecParams& params) {
+  plan_exec_request_ = request;
   RETURN_IF_ERROR(executor_.Prepare(request, params));
   return Status::OK;
 }
@@ -419,6 +474,7 @@ Status ImpalaServer::FragmentExecState::Prepare(
 Status ImpalaServer::FragmentExecState::Exec() {
   exec_status_ = ExecInternal();
   exec_status_.AddError(executor_.Close());
+  done_ = true;
   return exec_status_;
 }
 
@@ -443,6 +499,16 @@ Status ImpalaServer::FragmentExecState::ReportStatus() {
   params.__set_done(true);
   executor_.query_profile()->ToThrift(&params.profile);
   params.__isset.profile = true;
+
+  if (executor_.runtime_state()->updated_hdfs_partitions().size() > 0) {
+    params.partitions_to_create.insert(
+        params.partitions_to_create.begin(),
+        executor_.runtime_state()->updated_hdfs_partitions().begin(), 
+        executor_.runtime_state()->updated_hdfs_partitions().end());
+
+    params.__isset.partitions_to_create = true;
+  }
+
   TReportExecStatusResult res;
   coord->ReportExecStatus(res, params);
   client_cache_->ReleaseClient(coord);
@@ -561,12 +627,6 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
     RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
   }
 
-  const TPlanExecRequest& root_fragment = 
-      exec_state->query_exec_request().fragment_requests[0];
-  if (root_fragment.__isset.data_sink && 
-      root_fragment.data_sink.dataSinkType == TDataSinkType::TABLE_SINK) {
-    UpdateMetastore(exec_state.get());
-  }
   exec_state->UpdateQueryState(QueryState::FINISHED);
   TUniqueIdToQueryHandle(exec_state->query_id(), &query_handle);
 
@@ -583,43 +643,29 @@ Status ImpalaServer::Execute(const TQueryRequest& request,
   // we always need at least one plan fragment
   DCHECK_GT(exec_request.fragment_requests.size(), 0);
 
-  //shared_ptr<QueryExecState> exec_state(
+  // If desc_tbl is not set, query has SELECT with no FROM. In that
+  // case, the query must have a coordinator fragment. This check
+  // confirms that. If desc_tbl is set, the query may or may not have
+  // a coordinator fragment.
+  DCHECK(exec_request.has_coordinator_fragment || 
+      exec_request.fragment_requests[0].__isset.desc_tbl);
+
   exec_state->reset(
       new QueryExecState(request, exec_request.query_id, exec_env_,
-          result.resultSetMetadata, exec_request));
- 
-  if (exec_request.fragment_requests[0].__isset.desc_tbl) {
-    // query with FROM clause
-    // TODO: This doesn't correcly handle INSERT INTO TABLE ... SELECT <list of constant values>
-    // because nothing is driving the sink. 
-    DCHECK_GT(exec_request.node_request_params.size(), 0);
-    // the first node_request_params list contains exactly one TPlanExecParams
-    // (it's meant for the coordinator fragment)
-    DCHECK_EQ(exec_request.node_request_params[0].size(), 1);
+          result.resultSetMetadata, exec_request, this));
 
-    if (request.queryOptions.num_nodes != 1) {
-      // for distributed execution, for the time being we only expect one slave
-      // fragment which will be executed by request.num_nodes - 1 nodes;
-      // this will change once we support multiple phases (such as for DISTINCT)
-      DCHECK_EQ(exec_request.fragment_requests.size(), 2);
-      DCHECK_EQ(exec_request.node_request_params.size(), 2);
-      DCHECK_LE(exec_request.node_request_params[1].size(),
-          request.queryOptions.num_nodes - 1);
-
-      // set destinations to be port
-      for (int i = 0; i < exec_request.node_request_params[1].size(); ++i) {
-        DCHECK_EQ(exec_request.node_request_params[1][i].destinations.size(), 1);
-        exec_request.node_request_params[1][i].destinations[0].port = FLAGS_be_port;
-      }
+  if (exec_request.has_coordinator_fragment) {
+    if (exec_request.fragment_requests[0].__isset.desc_tbl) {
+      DCHECK_GT(exec_request.node_request_params.size(), 0);
+    } else {
+      // query without a FROM clause, first fragment request has no plan fragment
+      DCHECK(!exec_request.fragment_requests[0].__isset.plan_fragment);
     }
+  }
 
-    // Set the query exection options
-    for (int i = 0; i < exec_request.fragment_requests.size(); ++i) {
-      exec_request.fragment_requests[i].query_options = request.queryOptions;
-    }
-  } else {
-    // query without a FROM clause
-    DCHECK(!exec_request.fragment_requests[0].__isset.plan_fragment);
+  // Set the query options across all fragments
+  for (int i = 0; i < exec_request.fragment_requests.size(); ++i) {
+    exec_request.fragment_requests[i].query_options = request.queryOptions;
   }
 
   RETURN_IF_ERROR((*exec_state)->Exec(&exec_request));
@@ -666,47 +712,7 @@ void ImpalaServer::Wait(boost::shared_ptr<QueryExecState> exec_state) {
   }
 }
 
-Status ImpalaServer::UpdateMetastore(QueryExecState* query_state) {
-  // TODO: Doesn't handle INSERT with no FROM
-  if (query_state->coord() == NULL) {
-    LOG(ERROR) << "INSERT with no FROM clause not fully supported, not updating metastore"
-               << " (query_id: " << query_state->query_id() << ")";
-    return Status::OK;
-  }
-
-  const TPlanExecRequest& root_fragment = 
-      query_state->query_exec_request().fragment_requests[0];
-
-  TTableId target_table_id = root_fragment.data_sink.tableSink.targetTableId;
-  RuntimeState* state = query_state->coord()->runtime_state();
-  // Resolve table id and set input tuple descriptor.
-  TableDescriptor* table_desc_ = state->desc_tbl().GetTableDescriptor(target_table_id);
-
-  const set<string>& updated_hdfs_partitions = state->updated_hdfs_partitions();
-
-  if (updated_hdfs_partitions.size() == 0) {
-    VLOG_QUERY << "No partitions altered, not updating metastore (query id: " 
-               << query_state->query_id() << ")";
-    return Status::OK;
-  }
-
-  // TODO: We track partitions written to, not created, which means
-  // that we do more work than is necessary, because written-to
-  // partitions don't always require a metastore change.
-  VLOG_QUERY << "Updating metastore with " << updated_hdfs_partitions.size()
-             << " altered partitions (" << join (updated_hdfs_partitions, ", ") << ")";
-
-  TCatalogUpdate catalog_update;
-  catalog_update.target_table = table_desc_->name();
-  catalog_update.db_name = table_desc_->database();
-
-  // This does an extra copy, which is unfortunate, but not clear that
-  // it's ok to directly reach in and initialise Thrift structure
-  // members that aren't primitive types directly.
-  vector<string> partitions_vector(updated_hdfs_partitions.begin(), 
-      updated_hdfs_partitions.end());
-  catalog_update.__set_created_partitions(partitions_vector);
-
+Status ImpalaServer::UpdateMetastore(const TCatalogUpdate& catalog_update) {
   if (!FLAGS_use_planservice) {
     JNIEnv* jni_env = getJNIEnv();
     jbyteArray request_bytes;
@@ -714,11 +720,14 @@ Status ImpalaServer::UpdateMetastore(QueryExecState* query_state) {
     jni_env->CallObjectMethod(fe_, update_metastore_id_, request_bytes);
     RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
   } else {
-    planservice_client_->UpdateMetastore(catalog_update);
+    try {
+      planservice_client_->UpdateMetastore(catalog_update);
+    } catch (TException& e) {
+      return Status(e.what());
+    }
   }
 
-  // TODO: Reset only the updated table
-  return ResetCatalogInternal();
+  return Status::OK;
 }
 
 
@@ -773,6 +782,7 @@ Status ImpalaServer::GetExplainPlan(
 }
 
 Status ImpalaServer::ResetCatalogInternal() {
+  LOG(INFO) << "Refreshing catalog";
   if (!FLAGS_use_planservice) {
     JNIEnv* jni_env = getJNIEnv();
     jni_env->CallObjectMethod(fe_, reset_catalog_id_);
@@ -1165,8 +1175,7 @@ void ImpalaServer::ReportExecStatus(
   }
   // query_exec_state's coordinator is thread-safe, no need to hold the lock
   query_exec_state->lock()->unlock();
-  query_exec_state->coord()->UpdateFragmentExecStatus(
-      params.backend_num, params.status, params.done, params.profile)
+  query_exec_state->coord()->UpdateFragmentExecStatus(params)
       .SetTStatus(&return_val);
 }
 
@@ -1213,8 +1222,9 @@ void ImpalaServer::TransmitData(
 Status ImpalaServer::StartPlanFragmentExecution(
     const TPlanExecRequest& request, const TPlanExecParams& params,
     const THostPort& coord_hostport, int backend_num) {
-  if (!request.data_sink.__isset.dataStreamSink) {
-    return Status("missing data stream sink");
+  if (!request.data_sink.__isset.dataStreamSink &&
+      !request.data_sink.__isset.tableSink) {
+    return Status("missing sink in slave plan fragment");
   }
 
   auto_ptr<FragmentExecState> new_exec_state(

@@ -35,7 +35,7 @@ struct TCatalogUpdate {
   2: required string db_name;
 
   // List of partitions that are new and need to be created
-  3: required list<string> created_partitions;
+  3: required set<string> created_partitions;
 }
 
 // Result of call to createQueryExecRequest()

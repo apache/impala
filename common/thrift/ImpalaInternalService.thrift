@@ -93,24 +93,36 @@ struct TQueryExecRequest {
   // Globally unique id for this query. Assigned by the planner.
   1: required Types.TUniqueId query_id
 
+  // True if the coordinator should execute a fragment, located in fragment_requests[0]
+  2: required bool has_coordinator_fragment;
+
   // one request per plan fragment;
   // fragmentRequests[i] may consume the output of fragmentRequests[j > i];
-  // fragmentRequests[0] contains the coordinator fragment
-  2: list<TPlanExecRequest> fragment_requests
+  // fragmentRequests[0] will contain the coordinator fragment if one exists
+  3: list<TPlanExecRequest> fragment_requests
 
   // list of host/port pairs that serve the data for the plan fragments
-  // data_locations.size() == fragment_requests.size() - 1, and fragment_requests[i+1]
-  // is executed on data_locations[i] (fragment_requests[0] is the coordinator
-  // fragment, which is executed by the coordinator itself)	
-  3: list<list<Types.THostPort>> data_locations
+  // If has_coordinator_fragment == true then:
+  //   data_locations.size() == fragment_requests.size() - 1, and fragment_requests[i+1]
+  //   is executed on data_locations[i], since (fragment_requests[0] is the coordinator
+  //   fragment, which is executed by the coordinator itself) 
+  // else: 
+  //   data_locations.size() == fragment_requests.size(), and fragment_requests[i]
+  // is executed on data_locations[i]
+  4: list<list<Types.THostPort>> data_locations
 
   // node-specific request parameters;
   // nodeRequestParams[i][j] is the parameter for fragmentRequests[i] executed on 
-  // execNodes[i-1][j]
-  4: list<list<TPlanExecParams>> node_request_params
+  // execNodes[i][j]
+  5: list<list<TPlanExecParams>> node_request_params
 
   // for debugging purposes (to allow backend to log the query string)
-  5: optional string sql_stmt;
+  6: optional string sql_stmt;
+
+  // If this query INSERTs data, it is convenient to have to table name and db available
+  // when updating the metastore. 
+  7: optional string insert_table_name;
+  8: optional string insert_table_db;
 }
 
 
@@ -174,6 +186,11 @@ struct TReportExecStatusParams {
   // cumulative profile
   // required in V1
   7: optional RuntimeProfile.TRuntimeProfileTree profile
+
+  // list of partitions that need to be created after an INSERT.
+  // Target table name is recorded in TQueryExecRequest.
+  // optional in V1
+  8: optional list<string> partitions_to_create
 }
 
 struct TReportExecStatusResult {

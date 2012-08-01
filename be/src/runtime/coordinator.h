@@ -9,6 +9,7 @@
 #include <boost/unordered_map.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/thread/condition_variable.hpp>
 
 #include "common/status.h"
 #include "gen-cpp/Types_types.h"
@@ -26,7 +27,9 @@ class RuntimeState;
 class ImpalaInternalServiceClient;
 class Expr;
 class ExecEnv;
+class TCatalogUpdate;
 class TQueryExecRequest;
+class TReportExecStatusParams;
 class TRowBatch;
 class TPlanExecRequest;
 class TPlanExecParams;
@@ -94,16 +97,16 @@ class Coordinator {
   // if any, as well as all plan fragments on remote nodes.
   void Cancel();
 
-  // Updates status and profile of a particular fragment; if 'status' is an
-  // error status or if 'done' is true, considers the plan fragment to have finished
-  // execution. Assumes that calls to UpdateFragmentExecStatus() won't happen
+  // Updates status and query execution metadata of a particular
+  // fragment; if 'status' is an error status or if 'done' is true,
+  // considers the plan fragment to have finished execution. Assumes
+  // that calls to UpdateFragmentExecStatus() won't happen
   // concurrently for the same backend.
   // If 'status' is an error status, also cancel execution of the query via a call
   // to Cancel().
-  Status UpdateFragmentExecStatus(int backend_num, const TStatus& status,
-      bool done, const TRuntimeProfileTree& cumulative_profile);
+  Status UpdateFragmentExecStatus(const TReportExecStatusParams& params);
 
-  // only valid *after* calling Exec()
+  // only valid *after* calling Exec(), and may return NULL if there is no executor
   RuntimeState* runtime_state();
   const RowDescriptor& row_desc() const;
 
@@ -120,6 +123,11 @@ class Coordinator {
 
   ExecStats* exec_stats() { return exec_stats_; }
   const TUniqueId& query_id() const { return query_id_; }
+
+  // Gathers all updates to the catalog required once this query has completed execution.
+  // Returns true if a catalog update is required, false otherwise.
+  // Must only be called after Wait()
+  bool PrepareCatalogUpdate(TCatalogUpdate* catalog_update);
 
  private:
   ExecEnv* exec_env_;
@@ -146,6 +154,9 @@ class Coordinator {
     bool done;  // if true, execution terminated
     RuntimeProfile* profile;  // owned by obj_pool()
 
+    // Lists the Hdfs partitions affected by this query
+    std::set<std::string> updated_hdfs_partitions;
+    
     BackendExecState(const TUniqueId& fragment_id, int backend_num,
                      const std::pair<std::string, int>& hostport,
                      const TPlanExecRequest* exec_request,
@@ -184,7 +195,8 @@ class Coordinator {
   typedef boost::unordered_map<TUniqueId, BackendExecState*> BackendExecStateMap;
   BackendExecStateMap backend_exec_state_map_;
 
-  // Return executor_'s runtime state's obj pool
+  // Return executor_'s runtime state's object pool, if executor_ is set,
+  // otherwise return a local object pool.
   ObjectPool* obj_pool();
 
   // True if execution has completed, false otherwise.
@@ -193,6 +205,30 @@ class Coordinator {
   // Repository for statistics gathered during the execution of a
   // single query. Not owned by us.
   ExecStats* exec_stats_;
+
+  // If there is no coordinator fragment, Wait simply waits until all
+  // backends report completion. The following variables manage
+  // signalling from UpdateFragmentExecStatus to Wait once all
+  // backends are done.
+
+  // Protects access to num_remaining_backends_, and coordinates
+  // signal / wait on backend_completion_cv_. Must be the last lock
+  // acquired - do not acquire any other locks while holding
+  // backend_completion_lock_. wait_lock_ or lock_ may be held when
+  // acquiring this lock.
+  boost::mutex backend_completion_lock_;
+  boost::condition_variable backend_completion_cv_;
+
+  // Count of the number of backends for which done != true. When this
+  // hits 0, any Wait()'ing thread is notified
+  int num_remaining_backends_;
+
+  // True if we Cancel was called one or more times
+  bool is_cancelled_;
+
+  // Object pool used used only if no fragment is executing (otherwise
+  // we use the executor's object pool), use obj_pool() to access
+  boost::scoped_ptr<ObjectPool> obj_pool_;
 
   // Aggregate counters for the entire query.
   boost::scoped_ptr<RuntimeProfile> query_profile_;

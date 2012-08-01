@@ -3,6 +3,7 @@
 package com.cloudera.impala.service;
 
 import java.util.UUID;
+import java.util.Iterator;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
@@ -87,6 +88,7 @@ public class Frontend {
     }
 
     if (request.node_request_params != null && request.node_request_params.size() == 2) {
+      Preconditions.checkState(request.has_coordinator_fragment);
       // we only have two fragments (1st one: coord); the destination
       // of the 2nd fragment is the coordinator fragment
       TUniqueId coordFragmentId = request.fragment_requests.get(0).fragment_id;
@@ -169,7 +171,7 @@ public class Frontend {
     HiveMetaStoreClient msClient = catalog.getMetaStoreClient();
     if (table.getNumClusteringCols() > 0) {
       // Add all partitions to metastore.
-      for (String partName : update.getCreated_partitions()) {
+      for (String partName: update.getCreated_partitions()) {
         try {
           LOG.info("Creating partition: " + partName + " in table: " + tblName);
           msClient.appendPartitionByName(dbName, tblName, partName);

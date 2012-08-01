@@ -21,6 +21,7 @@ class ExecEnv;
 class DataSink;
 class RowDescriptor;
 
+class TCatalogUpdate;
 class TPlanExecRequest;
 class TPlanExecParams;
 class TExecPlanFragmentArgs;
@@ -152,7 +153,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
 
   // Make any changes required to the metastore as a result of an
   // INSERT query, e.g. newly created partitions.
-  Status UpdateMetastore(QueryExecState* query_state);
+  Status UpdateMetastore(const TCatalogUpdate& catalog_update);
 
   // Call FE to get explain plan
   Status GetExplainPlan(const TQueryRequest& query_request, std::string* explain_string);

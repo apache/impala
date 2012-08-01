@@ -72,6 +72,8 @@ class PlanFragmentExecutor {
   boost::scoped_ptr<RowBatch> row_batch_;
   boost::scoped_ptr<TRowBatch> thrift_batch_;
 
+  RuntimeProfile::Counter* rows_produced_counter_;
+
   ObjectPool* obj_pool() { return runtime_state_->obj_pool(); }
   const DescriptorTbl& desc_tbl() { return runtime_state_->desc_tbl(); }
 };
