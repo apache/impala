@@ -108,8 +108,8 @@ def build_insert_into_statement(insert, base_table_name, table_name):
   statement = SET_PARTITION_MODE_NONSTRICT_STATEMENT + "\n"
   statement += SET_DYNAMIC_PARTITION_STATEMENT + "\n"
   # For some reason (hive bug?) we need to have the CombineHiveInputFormat set for cases
-  # where we are compressing in bzip on certain tables that have no partitions.
-  if 'bzip' in table_name and 'nopart' in table_name:
+  # where we are compressing in bzip on certain tables that have multiple files.
+  if 'bzip' in table_name and 'multi' in table_name:
     statement += SET_HIVE_INPUT_FORMAT % "CombineHiveInputFormat"
   else:
     statement += SET_HIVE_INPUT_FORMAT % "HiveInputFormat"
