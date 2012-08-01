@@ -209,6 +209,7 @@ Status Coordinator::GetNextInternal(RowBatch** batch, RuntimeState* state) {
   RETURN_IF_ERROR(executor_->GetNext(batch));
   if (*batch == NULL) {
     execution_completed_ = true;
+    query_profile_->AddChild(executor_->query_profile());
     if (sink_.get() != NULL) RETURN_IF_ERROR(sink_->Close(state));
   } else {
     // TODO: fix this: the advertised behavior is that when we're sending to

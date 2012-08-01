@@ -112,7 +112,7 @@ class Coordinator {
   // the future if not all fragments have finished execution.
   // RuntimeProfile is not thread-safe, but non-updating functions (PrettyPrint(),
   // ToThrift(), etc.) are safe to call while counters are being updated concurrently.
-  const RuntimeProfile& query_profile() const { return *query_profile_.get(); }
+  RuntimeProfile* query_profile() const { return query_profile_.get(); }
 
   // True iff either a) all rows have been returned or sent to a table sink or b) the
   // query has been aborted

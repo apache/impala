@@ -167,8 +167,7 @@ Status InProcessQueryExecutor::Exec(const string& query, vector<PrimitiveType>* 
   RETURN_IF_ERROR(PrepareSelectListExprs(
       coord_->runtime_state(), coord_->row_desc(), col_types));
 
-  // TODO: fix
-  //query_profile_->AddChild(coord_->query_profile());
+  query_profile_->AddChild(coord_->query_profile());
   return Status::OK;
 }
 
