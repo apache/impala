@@ -856,38 +856,6 @@ insert into table %(table_name)s SELECT id, bool_col, tinyint_col, smallint_col,
 ====
 functional
 ----
-alltypesmixedformat
-----
-CREATE EXTERNAL TABLE %(table_name)s (
-  id int,
-  bool_col boolean,
-  tinyint_col tinyint,
-  smallint_col smallint,
-  int_col int,
-  bigint_col bigint,
-  float_col float,
-  double_col double,
-  date_string_col string,
-  string_col string,
-  timestamp_col timestamp)
-partitioned by (year int, month int)
-row format delimited fields terminated by ','  escaped by '\\'
-stored as %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-
-ALTER TABLE %(table_name)s ADD PARTITION (year=2009, month=1);
-ALTER TABLE %(table_name)s ADD PARTITION (year=2009, month=2);
-ALTER TABLE %(table_name)s ADD PARTITION (year=2009, month=3);
-
-ALTER TABLE %(table_name)s PARTITION (year=2009, month=1) SET FILEFORMAT TEXTFILE;
-ALTER TABLE %(table_name)s PARTITION (year=2009, month=1) SET SERDEPROPERTIES('field.delim'=',', 'escape.delim'='\\');
-ALTER TABLE %(table_name)s PARTITION(year=2009, month=2) SET SERDEPROPERTIES('field.delim'='\001');
-ALTER TABLE %(table_name)s PARTITION (year=2009, month=2) SET FILEFORMAT SEQUENCEFILE;
-----
-----
-====
-functional
-----
 stringpartitionkey
 ----
 -- Regression for IMP-163, failure to load tables partitioned by string column

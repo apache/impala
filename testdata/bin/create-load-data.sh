@@ -24,9 +24,10 @@ if [ $? != 0 ]; then
 fi
 popd
 
-# TODO: The multi-format table will move these files. So we need to copy them to a temporary location
-# for that table to use. Should find a better way to handle this.
+# TODO: The multi-format table will move these files. So we need to copy them to a
+# temporary location for that table to use. Should find a better way to handle this.
 echo COPYING DATA FOR DEPENDENT TABLES
+hadoop fs -rm -r -f /test-warehouse/alltypesmixedformat
 hadoop fs -rm -r -f /tmp/alltypes_rc
 hadoop fs -rm -r -f /tmp/alltypes_seq
 hadoop fs -mkdir -p /tmp/alltypes_seq/year=2009
