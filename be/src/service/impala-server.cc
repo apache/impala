@@ -94,7 +94,7 @@ class ImpalaServer::QueryExecState {
       ExecEnv* exec_env, const TResultSetMetadata& metadata)
     : request_(request), query_id_(query_id),
       exec_env_(exec_env),
-      coord_(new Coordinator(exec_env_, &exec_stats_)),
+      coord_(NULL),
       eos_(false),
       query_state_(QueryState::CREATED),
       result_metadata_(metadata), current_batch_(NULL), current_batch_row_(0),
@@ -103,9 +103,20 @@ class ImpalaServer::QueryExecState {
   ~QueryExecState() {
   }
 
-  // Set output_exprs_, based on exprs.
-  Status PrepareSelectListExprs(RuntimeState* runtime_state,
-      const vector<TExpr>& exprs, const RowDescriptor& row_desc);
+  // Initiates execution of plan fragments, if there are any, and sets
+  // up the output exprs for subsequent calls to FetchRowsAsAscii().
+  // Non-blocking.
+  Status Exec(TQueryExecRequest* exec_request);
+
+  // Call this to ensure that rows are ready when calling FetchRowsAsAscii().
+  // Must be preceded by call to Exec().
+  Status Wait() {
+    if (coord_.get() != NULL) { 
+      return coord_->Wait();
+    } else {
+      return Status::OK;
+    }
+  }
 
   // Return at most max_rows from the current batch. If the entire current batch has
   // been returned, fetch another batch first.
@@ -130,7 +141,6 @@ class ImpalaServer::QueryExecState {
   bool eos() { return eos_; }
   Coordinator* coord() const { return coord_.get(); }
   int current_row() const { return current_row_; }
-  RuntimeState* local_runtime_state() { return &local_runtime_state_; }
   const TResultSetMetadata* result_metadata() { return &result_metadata_; }
   const TUniqueId& query_id() const { return query_id_; }
   mutex* lock() { return &lock_; }
@@ -175,7 +185,30 @@ class ImpalaServer::QueryExecState {
   // Creates a single string out of the ascii expr values and appends that string
   // to converted_rows.
   Status ConvertSingleRowToAscii(TupleRow* row, vector<string>* converted_rows);
+
+  // Set output_exprs_, based on exprs.
+  Status PrepareSelectListExprs(RuntimeState* runtime_state,
+      const vector<TExpr>& exprs, const RowDescriptor& row_desc);
+
 };
+
+Status ImpalaServer::QueryExecState::Exec(TQueryExecRequest* exec_request) {
+  if (!exec_request->fragment_requests[0].__isset.desc_tbl) {
+    // query without a FROM clause
+    local_runtime_state_.Init(
+        exec_request->query_id, exec_request->abort_on_error, exec_request->max_errors,
+        FLAGS_batch_size, exec_request->fragment_requests[0].query_globals.now_string,
+        FLAGS_enable_jit, NULL /* = we don't expect to be executing anything here */);
+    RETURN_IF_ERROR(PrepareSelectListExprs(&local_runtime_state_,
+        exec_request->fragment_requests[0].output_exprs, RowDescriptor()));
+  } else {
+    coord_.reset(new Coordinator(exec_env_, &exec_stats_));
+    RETURN_IF_ERROR(coord_->Exec(exec_request));
+    RETURN_IF_ERROR(PrepareSelectListExprs(coord_->runtime_state(),
+        exec_request->fragment_requests[0].output_exprs, coord_->row_desc()));
+  }
+  return Status::OK;
+}
 
 Status ImpalaServer::QueryExecState::FetchRowsAsAscii(const int32_t max_rows,
     vector<string>* fetched_rows) {
@@ -206,8 +239,8 @@ Status ImpalaServer::QueryExecState::FetchRowsAsAsciiInternal(const int32_t max_
 }
 
 Status ImpalaServer::QueryExecState::PrepareSelectListExprs(
-    RuntimeState* runtime_state, const vector<TExpr>& exprs,
-    const RowDescriptor& row_desc) {
+    RuntimeState* runtime_state,
+    const vector<TExpr>& exprs, const RowDescriptor& row_desc) {
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(runtime_state->obj_pool(), exprs, &output_exprs_));
   for (int i = 0; i < output_exprs_.size(); ++i) {
@@ -269,10 +302,11 @@ Status ImpalaServer::QueryExecState::ConvertSingleRowToAscii(TupleRow* row,
 // Execution state of a single plan fragment.
 class ImpalaServer::FragmentExecState {
  public:
-  FragmentExecState(const TUniqueId& query_id, const TUniqueId& fragment_id,
-                    ExecEnv* exec_env,
+  FragmentExecState(const TUniqueId& query_id, int backend_num,
+                    const TUniqueId& fragment_id, ExecEnv* exec_env,
                     const pair<string, int>& coord_hostport)
     : query_id_(query_id),
+      backend_num_(backend_num),
       fragment_id_(fragment_id),
       executor_(exec_env),
       client_cache_(exec_env->client_cache()),
@@ -321,6 +355,7 @@ class ImpalaServer::FragmentExecState {
   Status ExecInternal();
 
   TUniqueId query_id_;
+  int backend_num_;
   TUniqueId fragment_id_;
   PlanFragmentExecutor executor_;
   scoped_ptr<DataSink> sink_;
@@ -344,9 +379,11 @@ class ImpalaServer::FragmentExecState {
 
 };
 
+#if 0
 void ImpalaServer::FragmentExecState::GetStatus(TReportExecStatusParams* params) {
   params->protocol_version = ImpalaInternalServiceVersion::V1;
   params->__set_query_id(query_id_);
+  params->__set_backend_num(backend_num_);
   params->__set_fragment_id(fragment_id_);
   lock_guard<mutex> l(lock_);
   exec_status_.SetTStatus(params);
@@ -354,6 +391,7 @@ void ImpalaServer::FragmentExecState::GetStatus(TReportExecStatusParams* params)
   executor_.query_profile()->ToThrift(&params->profile);
   params->__isset.profile = true;
 }
+#endif
 
 Status ImpalaServer::FragmentExecState::Cancel() {
   lock_guard<mutex> l(lock_);
@@ -410,6 +448,7 @@ Status ImpalaServer::FragmentExecState::ReportStatus() {
   TReportExecStatusParams params;
   params.protocol_version = ImpalaInternalServiceVersion::V1;
   params.__set_query_id(query_id_);
+  params.__set_backend_num(backend_num_);
   params.__set_fragment_id(fragment_id_);
   exec_status_.SetTStatus(&params);
   params.__set_done(done_);
@@ -520,7 +559,7 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
   }
   exec_state->UpdateQueryState(QueryState::RUNNING);
   // block until results are ready
-  status = exec_state->coord()->Wait();
+  status = exec_state->Wait();
   if (!status.ok()) {
     UnregisterQuery(exec_state->query_id());
     RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
@@ -534,29 +573,20 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
 }
 
 Status ImpalaServer::Execute(const TQueryRequest& request,
-    shared_ptr<QueryExecState>* exec_state_arg) {
-  exec_state_arg = NULL;
+    shared_ptr<QueryExecState>* exec_state) {
   TCreateQueryExecRequestResult result;
   RETURN_IF_ERROR(GetQueryExecRequest(request, &result));
   TQueryExecRequest& exec_request = result.queryExecRequest;
   // we always need at least one plan fragment
   DCHECK_GT(exec_request.fragment_requests.size(), 0);
 
-  shared_ptr<QueryExecState> exec_state(
+  //shared_ptr<QueryExecState> exec_state(
+  exec_state->reset(
       new QueryExecState(request, exec_request.query_id, exec_env_,
                          result.resultSetMetadata));
 
-  if (!exec_request.fragment_requests[0].__isset.desc_tbl) {
-    // query without a FROM clause
-    DCHECK(!exec_request.fragment_requests[0].__isset.plan_fragment);
-    TimestampValue now(exec_request.fragment_requests[0].query_globals.now_string);
-    exec_state->local_runtime_state()->Init(
-        exec_request.query_id, exec_request.abort_on_error, exec_request.max_errors,
-        &now, FLAGS_enable_jit,
-        NULL /* = we don't expect to be executing anything here */);
-    RETURN_IF_ERROR(exec_state->PrepareSelectListExprs(exec_state->local_runtime_state(),
-        exec_request.fragment_requests[0].output_exprs, RowDescriptor()));
-  } else {
+  if (exec_request.fragment_requests[0].__isset.desc_tbl) {
+    // query with FROM clause
     DCHECK_GT(exec_request.node_request_params.size(), 0);
     // the first node_request_params list contains exactly one TPlanExecParams
     // (it's meant for the coordinator fragment)
@@ -584,13 +614,12 @@ Status ImpalaServer::Execute(const TQueryRequest& request,
         exec_request.node_request_params[i][j].batch_size = FLAGS_batch_size;
       }
     }
-
-    RETURN_IF_ERROR(exec_state->PrepareSelectListExprs(
-        exec_state->coord()->runtime_state(),
-        exec_request.fragment_requests[0].output_exprs, exec_state->coord()->row_desc()));
-
-    RETURN_IF_ERROR(exec_state->coord()->Exec(&exec_request));
+  } else {
+    // query without a FROM clause
+    DCHECK(!exec_request.fragment_requests[0].__isset.plan_fragment);
   }
+
+  RETURN_IF_ERROR((*exec_state)->Exec(&exec_request));
 
   {
     lock_guard<mutex> l(query_exec_state_map_lock_);
@@ -606,10 +635,9 @@ Status ImpalaServer::Execute(const TQueryRequest& request,
       return Status(TStatusCode::INTERNAL_ERROR, ss.str());
     }
 
-    query_exec_state_map_.insert(make_pair(exec_request.query_id, exec_state));
+    query_exec_state_map_.insert(make_pair(exec_request.query_id, (*exec_state)));
   }
 
-  *exec_state_arg = exec_state;
   return Status::OK;
 }
 
@@ -627,7 +655,7 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id) {
 
 void ImpalaServer::Wait(boost::shared_ptr<QueryExecState> exec_state) {
   // block until results are ready
-  Status status = exec_state->coord()->Wait();
+  Status status = exec_state->Wait();
   if (status.ok()) {
     exec_state->UpdateQueryState(QueryState::FINISHED);
   } else {
@@ -958,12 +986,18 @@ inline shared_ptr<ImpalaServer::QueryExecState> ImpalaServer::GetQueryExecState(
 
 void ImpalaServer::ExecPlanFragment(
     TExecPlanFragmentResult& return_val, const TExecPlanFragmentParams& params) {
+  VLOG_QUERY << "ExecPlanFragment() fragment_id=" << params.request.fragment_id
+             << " coord=" << params.coord.host << ":" << params.coord.port
+             << " backend#=" << params.backend_num;
   StartPlanFragmentExecution(
-      params.request, params.params, params.coord).SetTStatus(&return_val);
+      params.request, params.params, params.coord, params.backend_num)
+      .SetTStatus(&return_val);
 }
 
 void ImpalaServer::ReportExecStatus(
     TReportExecStatusResult& return_val, const TReportExecStatusParams& params) {
+  VLOG_QUERY << "ReportExecStatus() query_id=" << params.query_id
+             << " backend#=" << params.backend_num;
   // TODO: implement something more efficient here, we're currently creating
   // a shared_ptr, acquiring/releasing the map lock and doing a map lookup for
   // every report (assign each query a local int32_t id and use that to index into a
@@ -1002,6 +1036,9 @@ void ImpalaServer::CancelPlanFragment(
 
 void ImpalaServer::TransmitData(
     TTransmitDataResult& return_val, const TTransmitDataParams& params) {
+  VLOG_ROW << "TransmitData(): fragment_id=" << params.dest_fragment_id
+           << " node_id=" << params.dest_node_id
+           << " #rows=" << params.row_batch.num_rows;
   // TODO: fix Thrift so we can simply take ownership of thrift_batch instead
   // of having to copy its data
   if (params.row_batch.num_rows > 0) {
@@ -1022,14 +1059,14 @@ void ImpalaServer::TransmitData(
 
 Status ImpalaServer::StartPlanFragmentExecution(
     const TPlanExecRequest& request, const TPlanExecParams& params,
-    const THostPort& coord_hostport) {
+    const THostPort& coord_hostport, int backend_num) {
   if (!request.data_sink.__isset.dataStreamSink) {
     return Status("missing data stream sink");
   }
 
   auto_ptr<FragmentExecState> new_exec_state(
       new FragmentExecState(
-        request.query_id, request.fragment_id, exec_env_,
+        request.query_id, backend_num, request.fragment_id, exec_env_,
         make_pair(coord_hostport.host, coord_hostport.port)));
   RETURN_IF_ERROR(new_exec_state->Prepare(request, params));
 

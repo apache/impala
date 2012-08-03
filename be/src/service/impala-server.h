@@ -110,7 +110,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   // Creates new FragmentExecState and registers it in corresp. map.
   Status StartPlanFragmentExecution(
       const TPlanExecRequest& request, const TPlanExecParams& params,
-      const THostPort& coord_hostport);
+      const THostPort& coord_hostport, int backend_num);
 
   // Top-level loop for synchronously executing plan fragment, which runs in
   // exec_state's thread. Repeatedly calls GetNext() on the executor

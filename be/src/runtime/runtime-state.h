@@ -31,7 +31,7 @@ class TimestampValue;
 class RuntimeState {
  public:
   RuntimeState(const TUniqueId& fragment_id, bool abort_on_error, int max_errors,
-               int batch_size, const TimestampValue* now, bool llvm_enabled,
+               int batch_size, const std::string& now, bool llvm_enabled,
                ExecEnv* exec_env);
 
   // RuntimeState for executing queries w/o a from clause.
@@ -41,7 +41,8 @@ class RuntimeState {
 
   // Set per-query state.
   Status Init(const TUniqueId& fragment_id, bool abort_on_error, int max_errors,
-              const TimestampValue* now, bool llvm_enabled, ExecEnv* exec_env);
+              int batch_size, const std::string& now, bool llvm_enabled,
+              ExecEnv* exec_env);
 
   ObjectPool* obj_pool() const { return obj_pool_.get(); }
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }

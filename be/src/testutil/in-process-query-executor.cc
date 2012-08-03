@@ -123,10 +123,10 @@ Status InProcessQueryExecutor::Exec(const string& query, vector<PrimitiveType>* 
     // query without a FROM clause: don't create a coordinator
     DCHECK(!query_request_.fragment_requests[0].__isset.plan_fragment);
     // Set now timestamp in local_state_.
-    TimestampValue now(query_request_.fragment_requests[0].query_globals.now_string);
-    local_state_.reset(
-        new RuntimeState(query_request_.query_id, FLAGS_abort_on_error, FLAGS_max_errors,
-                         FLAGS_batch_size, &now, FLAGS_enable_jit, NULL));
+    local_state_.reset(new RuntimeState(
+        query_request_.query_id, FLAGS_abort_on_error, FLAGS_max_errors,
+        FLAGS_batch_size, query_request_.fragment_requests[0].query_globals.now_string,
+        FLAGS_enable_jit, NULL));
     query_profile_->AddChild(local_state_->runtime_profile());
     RETURN_IF_ERROR(
         PrepareSelectListExprs(local_state_.get(), RowDescriptor(), col_types));

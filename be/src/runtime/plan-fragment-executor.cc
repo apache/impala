@@ -55,11 +55,10 @@ Status PlanFragmentExecutor::Prepare(
 
   int max_errors = params.max_errors;
   if (max_errors == 0) max_errors = FLAGS_max_errors;
-  // Set now timestamp in runtime_state_.
-  TimestampValue now(request.query_globals.now_string);
   runtime_state_.reset(
       new RuntimeState(request.fragment_id, params.abort_on_error, params.max_errors,
-                       params.batch_size, &now, enable_llvm, exec_env_));
+                       params.batch_size, request.query_globals.now_string,
+                       enable_llvm, exec_env_));
 
   // set up desc tbl
   DescriptorTbl* desc_tbl = NULL;

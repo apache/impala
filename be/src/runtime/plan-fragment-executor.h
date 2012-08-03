@@ -34,6 +34,7 @@ class PlanFragmentExecutor {
 
   // Prepare for execution. Call this prior to Open().
   // This call won't block.
+  // runtime_state() and row_desc() will not be valid until Prepare() is called.
   Status Prepare(const TPlanExecRequest& request, const TPlanExecParams& params);
 
   // Start execution. Call this prior to GetNext().

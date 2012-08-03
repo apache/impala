@@ -59,8 +59,10 @@ public class Frontend {
   }
 
   /**
-   * Assigns query and fragment ids. Fragment ids are derived from the
-   * query id by adding the fragment number to query_id.lo.
+   * Assigns query id and id of the coordinator fragment, which is set to be the same
+   * as the query id. Fragment ids need to be globally unique across all plan fragment
+   * executions, and therefore need to be assigned by the coordinator when initiating
+   * fragment execution.
    * Also sets TPlanExecParams.dest_fragment_id.
    */
   private void assignIds(TQueryExecRequest request) {
@@ -72,10 +74,9 @@ public class Frontend {
     for (int fragmentNum = 0; fragmentNum < request.fragment_requests.size();
          ++fragmentNum) {
       request.fragment_requests.get(fragmentNum).setQuery_id(request.query_id);
-      Preconditions.checkState(request.query_id.lo < Long.MAX_VALUE - fragmentNum);
-      TUniqueId fragmentId =
-          new TUniqueId(request.query_id.hi, request.query_id.lo + fragmentNum);
-      request.fragment_requests.get(fragmentNum).setFragment_id(fragmentId);
+    }
+    if (request.fragment_requests.size() > 0) {
+      request.fragment_requests.get(0).setFragment_id(request.query_id);
     }
 
     if (request.node_request_params != null && request.node_request_params.size() == 2) {
@@ -113,6 +114,7 @@ public class Frontend {
     TCreateQueryExecRequestResult result = new TCreateQueryExecRequestResult();
     result.setQueryExecRequest(
         planner.createPlanFragments(analysisResult, request.numNodes, explainString));
+    result.queryExecRequest.sql_stmt = request.stmt;
 
     // fill the metadata (for query statement)
     if (analysisResult.isQueryStmt()) {

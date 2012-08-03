@@ -109,17 +109,24 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
     // that we use to start plan fragments at backends)
     TPlanExecRequest& fragment_request = request->fragment_requests[i];
     for (int j = 0; j < hosts.size(); ++j) {
+      // assign fragment id that's unique across all fragment executions;
+      // backend_num + 1: backend_num starts at 0, and the coordinator fragment 
+      // is already assigned the query id
+      TUniqueId fragment_id;
+      fragment_id.hi = request->query_id.hi;
+      DCHECK_LT(request->query_id.lo, numeric_limits<int64_t>::max() - backend_num - 1);
+      fragment_id.lo = request->query_id.lo + backend_num + 1;
+
       // TODO: pool of pre-formatted BackendExecStates?
       BackendExecState* exec_state =
-          obj_pool()->Add(
-            new BackendExecState(fragment_request.fragment_id, backend_num, hosts[j]));
+          obj_pool()->Add(new BackendExecState(fragment_id, backend_num, hosts[j]));
       DCHECK_EQ(backend_exec_states_.size(), backend_num);
       backend_exec_states_.push_back(exec_state);
       query_profile_->AddChild(exec_state->profile);
       PrintClientInfo(hosts[j], request->node_request_params[i][j]);
 
       Status fragment_exec_status = ExecRemoteFragment(exec_state,
-          fragment_request, request->node_request_params[i][j]);
+          &fragment_request, request->node_request_params[i][j]);
       if (!fragment_exec_status.ok()) {
         // tear down running fragments and return
         Cancel(false);
@@ -155,9 +162,11 @@ void Coordinator::PrintClientInfo(
 
 Status Coordinator::ExecRemoteFragment(
     BackendExecState* exec_state,
-    const TPlanExecRequest& exec_request,
+    TPlanExecRequest* exec_request,
     const TPlanExecParams& exec_params) {
-  VLOG_QUERY << "making rpc: ExecPlanFragment";
+  VLOG_QUERY << "making rpc: ExecPlanFragment fragment_id=" << exec_state->fragment_id
+             << " host=" << exec_state->hostport.first
+             << " port=" << exec_state->hostport.second;
   lock_guard<mutex> l(exec_state->lock);
 
   // this client needs to have been released when this function finishes
@@ -166,10 +175,11 @@ Status Coordinator::ExecRemoteFragment(
       exec_env_->client_cache()->GetClient(exec_state->hostport, &backend_client));
   DCHECK(backend_client != NULL);
 
+  exec_request->fragment_id = exec_state->fragment_id;
   TExecPlanFragmentParams params;
   params.protocol_version = ImpalaInternalServiceVersion::V1;
   // TODO: is this yet another copy? find a way to avoid those.
-  params.__set_request(exec_request);
+  params.__set_request(*exec_request);
   params.__set_params(exec_params);
   params.coord.host = FLAGS_host;
   params.coord.port = FLAGS_be_port;

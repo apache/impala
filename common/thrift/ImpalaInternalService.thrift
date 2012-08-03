@@ -44,7 +44,7 @@ struct TQueryGlobals {
 // plan fragment, including how to produce and how to partition its output.
 // It leaves out node-specific parameters (see TPlanExecParams).
 struct TPlanExecRequest {
-  // Globally unique id for each fragment. Assigned by the planner.
+  // Globally unique id for each fragment. Assigned by coordinator.
   1: required Types.TUniqueId fragment_id
 
   // same as TQueryExecRequest.query_id

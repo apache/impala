@@ -190,8 +190,10 @@ class Coordinator {
   // Wrapper for ExecPlanFragment() rpc.
   // Obtains exec_state->lock prior to making rpc, so that it serializes
   // correctly with UpdateFragmentExecStatus().
+  // 'request' is an in/out parameter, because the fragment id needs to be
+  // set for each backend individually.
   Status ExecRemoteFragment(BackendExecState* exec_state,
-      const TPlanExecRequest& request, const TPlanExecParams& params);
+      TPlanExecRequest* request, const TPlanExecParams& params);
 
   // Determine fragment number, given fragment id.
   int GetFragmentNum(const TUniqueId& fragment_id);

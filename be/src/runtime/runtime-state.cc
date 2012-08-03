@@ -25,13 +25,13 @@ namespace impala {
 
 RuntimeState::RuntimeState(
     const TUniqueId& fragment_id, bool abort_on_error, int max_errors, int batch_size,
-    const TimestampValue* now, bool llvm_enabled, ExecEnv* exec_env)
+    const string& now, bool llvm_enabled, ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
     batch_size_(batch_size > 0 ? batch_size : DEFAULT_BATCH_SIZE),
     file_buffer_size_(DEFAULT_FILE_BUFFER_SIZE),
     abort_on_error_(abort_on_error),
     max_errors_(max_errors),
-    now_(new TimestampValue(*now)),
+    now_(new TimestampValue(now)),
     fragment_id_(fragment_id),
     exec_env_(exec_env),
     profile_(obj_pool_.get(), "RuntimeState"),
@@ -54,11 +54,12 @@ RuntimeState::~RuntimeState() {
 
 Status RuntimeState::Init(
     const TUniqueId& fragment_id, bool abort_on_error, int max_errors,
-    const TimestampValue* now, bool llvm_enabled, ExecEnv* exec_env) {
+    int batch_size, const string& now, bool llvm_enabled, ExecEnv* exec_env) {
   fragment_id_ = fragment_id;
   abort_on_error_ = abort_on_error;
   max_errors_ = max_errors_;
-  now_.reset(new TimestampValue(*now));
+  batch_size_ = batch_size;
+  now_.reset(new TimestampValue(now));
   exec_env_ = exec_env;
   if (llvm_enabled) {
     RETURN_IF_ERROR(CreateCodegen());
