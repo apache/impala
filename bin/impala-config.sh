@@ -36,6 +36,8 @@ fi
 
 export IMPALA_FE_DIR=$IMPALA_HOME/fe
 export IMPALA_BE_DIR=$IMPALA_HOME/be
+export IMPALA_WORKLOAD_DIR=$IMPALA_HOME/testdata/workloads
+export IMPALA_DATASET_DIR=$IMPALA_HOME/testdata/datasets
 export IMPALA_COMMON_DIR=$IMPALA_HOME/common
 export PATH=$IMPALA_HOME/bin:$PATH
 

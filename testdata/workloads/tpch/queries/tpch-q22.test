@@ -1,0 +1,69 @@
+# Q22 - Global Sales Opportunity Query
+# Modifications: Added a cust_name_char column that will always have
+# a constant value ('C') so that we can do a join between this table
+# in the main query. This was needed because we only support equi-joins
+# and had to have a column to join on.
+insert overwrite table tpch.q22_customer_tmp1$TABLE
+select
+  avg(c_acctbal) avg_acctbal,
+  substr(c_name, 1, 1) as cust_name_char
+from tpch.customer$TABLE c
+where
+   c.c_acctbal > 0.00 and
+   (substr(c.c_phone, 1, 2) = '13' or
+    substr(c.c_phone, 1, 2) = '31' or
+    substr(c.c_phone, 1, 2) = '23' or
+    substr(c.c_phone, 1, 2) = '29' or
+    substr(c.c_phone, 1, 2) = '30' or
+    substr(c.c_phone, 1, 2) = '18' or
+    substr(c.c_phone, 1, 2) = '17')
+group by
+  substr(c_name, 1, 1)
+---- SETUP
+RESET tpch.q22_customer_tmp1$TABLE
+RELOAD tpch.q22_customer_tmp1$TABLE
+---- RESULTS
+---- NUMROWS
+1
+====
+# Modifications: Updated to use LEFT OUTER JOIN instead of NOT EXISTS,
+# removed subquery by pushing aggregation up a level, added temp table
+# to remove another subquery that computed the average account balance,
+# added limit, added round()
+# TODO: Results are from Hive, Impala returning wrong results due to
+# bug IMP-137
+select
+  substring(c_phone, 1, 2) as cntrycode,
+  count(*) as numcust,
+  round(sum(c_acctbal), 4) as totacctbal
+from tpch.customer$TABLE c
+  join tpch.q22_customer_tmp1$TABLE ct
+    on (substr(c.c_name, 1, 1) = ct.cust_name_char)
+  left outer join tpch.orders$TABLE o
+    on (o.o_custkey = c.c_custkey)
+where
+  o_custkey is null and
+  c.c_acctbal > ct.avg_acctbal and
+  (substr(c.c_phone, 1, 2) = '13' or
+   substr(c.c_phone, 1, 2) = '31' or
+   substr(c.c_phone, 1, 2) = '23' or
+   substr(c.c_phone, 1, 2) = '29' or
+   substr(c.c_phone, 1, 2) = '30' or
+   substr(c.c_phone, 1, 2) = '18' or
+   substr(c.c_phone, 1, 2) = '17')
+group by
+  substring(c_phone, 1, 2)
+order by
+  cntrycode
+limit 100
+---- TYPES
+string, bigint, double
+---- RESULTS
+'13',888,6737713.99
+'17',861,6460573.72
+'18',964,7236687.4
+'23',892,6701457.95
+'29',948,7158866.63
+'30',909,6808436.13
+'31',922,6806670.18
+====

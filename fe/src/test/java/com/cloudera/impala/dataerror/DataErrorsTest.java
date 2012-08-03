@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 package com.cloudera.impala.dataerror;
 
@@ -23,7 +23,7 @@ public class DataErrorsTest {
   private static Catalog catalog;
   private static Executor executor;
   private static StringBuilder testErrorLog;
-  private final String testDir = "DataErrorsTest";
+  private final String testDir = "functional-query/queries/DataErrorsTest";
   private static ArrayList<String>  tableList;
 
   @BeforeClass

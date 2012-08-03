@@ -1,9 +1,7 @@
-# Manually created file. The vector value order is: file format, data_group, compression codec, compression type
-text,grep1gb,none,none
-text,grep10gb,none,none
-text,web,none,none
-seq,grep1gb,bzip,none
-seq,web,snap,record
-seq,web,none,none
-rc,grep1gb,def,block
-rc,web,none,none
+# Manually created file.
+file_format: text, dataset: hive-benchmark, compression_codec: none, compression_type: none
+file_format: seq, dataset: hive-benchmark, compression_codec: bzip, compression_type: none
+file_format: seq, dataset: hive-benchmark, compression_codec: gzip, compression_type: record
+file_format: rc, dataset: hive-benchmark, compression_codec: def, compression_type: block
+file_format: rc, dataset: hive-benchmark, compression_codec: none, compression_type: none
+file_format: trevni, dataset: hive-benchmark, compression_codec: snap, compression_type: block

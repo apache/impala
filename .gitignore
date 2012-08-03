@@ -7,9 +7,8 @@ cscope.out
 org.eclipse.jdt.core.prefs
 benchmark_results.csv
 reference_benchmark_results.csv
-testdata/data/test-warehouse
-testdata/bin/create-*-generated.sql
-testdata/bin/load-*-generated.sql
+load-trevni-*-generated.sh
+load-*-generated.sql
 
 pprof.out
 

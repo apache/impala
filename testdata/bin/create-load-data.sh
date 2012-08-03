@@ -6,22 +6,14 @@ if [ x${JAVA_HOME} == x ]; then
   exit 1
 fi
 
+set -u
 set -e
 
 # Load the data set
 pushd ${IMPALA_HOME}/bin
-
-./load-data.sh functional exhaustive
-if [ $? != 0 ]; then
-  echo LOAD OF FUNCTIONAL DATA FAILED
-  exit 1
-fi
-
-./load-data.sh tpch core
-if [ $? != 0 ]; then
-  echo LOAD OF TPCH DATA FAILED
-  exit 1
-fi
+./load-data.py --workloads functional-query --exploration_strategy exhaustive
+./load-data.py --workloads functional-planner --exploration_strategy exhaustive
+./load-data.py --workloads tpch --exploration_strategy core
 popd
 
 # TODO: The multi-format table will move these files. So we need to copy them to a

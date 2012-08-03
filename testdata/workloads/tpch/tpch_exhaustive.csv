@@ -1,2 +1,5 @@
-# Generated File. The vector value order is: file format, data_group, compression codec, compression type
-text,tpch,none,none
+# Generated File.
+file_format: text, dataset: tpch, compression_codec: none, compression_type: none
+file_format: trevni, dataset: tpch, compression_codec: none, compression_type: none
+file_format: trevni, dataset: tpch, compression_codec: def, compression_type: block
+file_format: trevni, dataset: tpch, compression_codec: snap, compression_type: block

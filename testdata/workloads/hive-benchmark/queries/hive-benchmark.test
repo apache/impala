@@ -1,0 +1,27 @@
+====
+select count(*) from grep1gb$TABLE
+====
+select count(field) from grep1gb$TABLE
+====
+select count(field) from grep1gb$TABLE where field like '%%xyz%%'
+====
+select uv.sourceip, avg(r.pagerank), sum(uv.adrevenue) as totalrevenue
+from uservisits$TABLE uv join rankings$TABLE r on
+   (r.pageurl = uv.desturl) where uv.visitdate > '1999-01-01' and uv.visitdate
+   < '2000-01-01' group by uv.sourceip order by totalrevenue desc limit 1
+====
+select sourceIP, SUM(adRevenue) FROM uservisits$TABLE GROUP by sourceIP
+order by SUM(adRevenue) desc limit 10
+====
+select pageRank, pageURL from rankings$TABLE where pageRank > 10
+order by pageRank limit 100
+====
+select count(*) from rankings$TABLE where pageRank > 10 && pageRank < 25
+====
+select avg(adRevenue) from uservisits$TABLE
+====
+select avg(adRevenue) from uservisits$TABLE
+where visitdate > '1999-07-01' and visitdate < '1999-12-31'
+====
+select count(field) from grep10gb$TABLE where field like '%%xyz%%'
+====

@@ -4,6 +4,7 @@ package com.cloudera.impala.service;
 
 import static org.junit.Assert.fail;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Set;
@@ -41,7 +42,7 @@ import com.google.common.collect.Sets;
  */
 public abstract class BaseQueryTest {
   private static final Logger LOG = Logger.getLogger(BaseQueryTest.class);
-  private static final String TEST_DIR = "QueryTest";
+  private static final String TEST_DIR = "functional-query/queries/QueryTest";
   private static final int DEFAULT_FE_PORT = 21000;
 
   // If set to true, new test results will be generated and saved to the specified
@@ -92,6 +93,9 @@ public abstract class BaseQueryTest {
 
   protected final static TestExecMode EXECUTION_MODE = TestExecMode.valueOf(
       System.getProperty("testExecutionMode", "reduced").toUpperCase());
+
+  // A relative path from the 'workloads' directory to the base test directory.
+  private final String testDirName;
 
   /**
    * The type of target test environments. Determines whether the front end is running
@@ -164,6 +168,14 @@ public abstract class BaseQueryTest {
                                          .add("Table format", tableFormat)
                                          .toString();
     }
+  }
+
+  protected BaseQueryTest() {
+    this(TEST_DIR);
+  }
+
+  protected BaseQueryTest(String testDirName) {
+    this.testDirName = testDirName;
   }
 
   @BeforeClass
@@ -418,7 +430,7 @@ public abstract class BaseQueryTest {
 
   private void runQueryWithTestConfigs(List<TestConfiguration> testConfigs,
       String testFile, boolean abortOnError, int maxErrors) {
-    String fileName = TEST_DIR + "/" + testFile + ".test";
+    String fileName = new File(testDirName, testFile + ".test").getPath();
     TestFileParser queryFileParser = new TestFileParser(fileName);
 
     LOG.debug("Running the following configurations over file " + fileName + " : ");

@@ -4,8 +4,10 @@ package com.cloudera.impala.testutil;
 
 import static org.junit.Assert.fail;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.List;
@@ -183,7 +185,7 @@ public class TestFileParser {
 
   private int lineNum = 0;
   private final String fileName;
-  private InputStream stream;
+  private BufferedReader reader;
   private Scanner scanner;
 
   /**
@@ -210,9 +212,9 @@ public class TestFileParser {
    */
   private void open(String table) {
     try {
-      ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-      stream = classLoader.getResourceAsStream(fileName);
-      scanner = new Scanner(stream);
+      String fullPath = new File(TestFileUtils.getTestFileBaseDir(), fileName).getPath();
+      reader = new BufferedReader(new FileReader(fullPath));
+      scanner = new Scanner(reader);
     } catch (Exception e) {
       fail(e.getMessage());
     }
@@ -293,16 +295,16 @@ public class TestFileParser {
   }
 
   private void close() {
-    if (scanner != null) {
-      scanner.close();
+    if (reader != null) {
+      try {
+        reader.close();
+      } catch (IOException e) {
+        fail(e.getMessage());
+      }
     }
 
-    if (stream != null) {
-      try {
-        stream.close();
-      } catch (IOException e) {
-        // ignore
-      }
+    if (scanner != null) {
+      scanner.close();
     }
   }
 }

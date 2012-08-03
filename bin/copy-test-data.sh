@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-bin=`dirname "$0"`
-bin=`cd "$bin"; pwd`
-. "$bin"/impala-config.sh
-
 set -e
+set -u
 
 echo "Copying data files from the share.  If the file already exists locally, the files"\
      "will not be copied.  It's not check summing the files or anything like that, if"\

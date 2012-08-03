@@ -6,6 +6,10 @@ import org.junit.Test;
 
 public class TpchQueryTest extends BaseQueryTest {
 
+  public TpchQueryTest() {
+    super("tpch/queries");
+  }
+
   @Test
   public void TestTpchQ1() {
     runTestInExecutionMode(EXECUTION_MODE, "tpch-q1", false, 1000);

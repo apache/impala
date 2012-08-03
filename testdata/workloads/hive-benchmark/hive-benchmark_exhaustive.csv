@@ -1,55 +1,19 @@
-# Generated File. The vector value order is: file format, data_group, compression codec, compression type
-text,grep1gb,none,none
-text,grep10gb,none,none
-text,web,none,none
-seq,grep1gb,none,none
-seq,grep1gb,def,block
-seq,grep1gb,def,record
-seq,grep1gb,gzip,block
-seq,grep1gb,gzip,record
-seq,grep1gb,bzip,block
-seq,grep1gb,bzip,record
-seq,grep1gb,snap,block
-seq,grep1gb,snap,record
-seq,grep10gb,none,none
-seq,grep10gb,def,block
-seq,grep10gb,def,record
-seq,grep10gb,gzip,block
-seq,grep10gb,gzip,record
-seq,grep10gb,bzip,block
-seq,grep10gb,bzip,record
-seq,grep10gb,snap,block
-seq,grep10gb,snap,record
-seq,web,none,none
-seq,web,def,block
-seq,web,def,record
-seq,web,gzip,block
-seq,web,gzip,record
-seq,web,bzip,block
-seq,web,bzip,record
-seq,web,snap,block
-seq,web,snap,record
-rc,grep1gb,none,none
-rc,grep1gb,def,block
-rc,grep1gb,gzip,block
-rc,grep1gb,bzip,block
-rc,grep1gb,snap,block
-rc,grep10gb,none,none
-rc,grep10gb,def,block
-rc,grep10gb,gzip,block
-rc,grep10gb,bzip,block
-rc,grep10gb,snap,block
-rc,web,none,none
-rc,web,def,block
-rc,web,gzip,block
-rc,web,bzip,block
-rc,web,snap,block
-trevni,grep1gb,none,none
-trevni,grep1gb,def,block
-trevni,grep1gb,snap,block
-trevni,grep10gb,none,none
-trevni,grep10gb,def,block
-trevni,grep10gb,snap,block
-trevni,web,none,none
-trevni,web,def,block
-trevni,web,snap,block
+# Generated File.
+file_format: text, dataset: hive-benchmark, compression_codec: none, compression_type: none
+file_format: seq, dataset: hive-benchmark, compression_codec: none, compression_type: none
+file_format: seq, dataset: hive-benchmark, compression_codec: def, compression_type: block
+file_format: seq, dataset: hive-benchmark, compression_codec: def, compression_type: record
+file_format: seq, dataset: hive-benchmark, compression_codec: gzip, compression_type: block
+file_format: seq, dataset: hive-benchmark, compression_codec: gzip, compression_type: record
+file_format: seq, dataset: hive-benchmark, compression_codec: bzip, compression_type: block
+file_format: seq, dataset: hive-benchmark, compression_codec: bzip, compression_type: record
+file_format: seq, dataset: hive-benchmark, compression_codec: snap, compression_type: block
+file_format: seq, dataset: hive-benchmark, compression_codec: snap, compression_type: record
+file_format: rc, dataset: hive-benchmark, compression_codec: none, compression_type: none
+file_format: rc, dataset: hive-benchmark, compression_codec: def, compression_type: block
+file_format: rc, dataset: hive-benchmark, compression_codec: gzip, compression_type: block
+file_format: rc, dataset: hive-benchmark, compression_codec: bzip, compression_type: block
+file_format: rc, dataset: hive-benchmark, compression_codec: snap, compression_type: block
+file_format: trevni, dataset: hive-benchmark, compression_codec: none, compression_type: none
+file_format: trevni, dataset: hive-benchmark, compression_codec: def, compression_type: block
+file_format: trevni, dataset: hive-benchmark, compression_codec: snap, compression_type: block

@@ -1,4 +1,4 @@
 file_format: text,seq,rc,trevni
-data_group: grep1gb,grep10gb,web
+dataset: hive-benchmark
 compression_codec: none,def,gzip,bzip,snap
 compression_type: none,block,record

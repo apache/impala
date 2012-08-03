@@ -67,4 +67,11 @@ public class TestFileUtils {
       fw.close();
     }
   }
+
+  /**
+   * Returns the base directory for test files.
+   */
+  public static String getTestFileBaseDir() {
+    return new File(System.getenv("IMPALA_HOME"), "testdata/workloads").getPath();
+  }
 }

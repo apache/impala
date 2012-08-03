@@ -24,7 +24,7 @@
 # ---- <- End sub-section
 # LOAD from LOCAL - How to load data for the the base table
 ====
-grep1gb
+hive-benchmark
 ----
 grep1gb
 ----
@@ -49,7 +49,7 @@ LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep1GB/part-000
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep1GB/part-00004' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=4);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep1GB/part-00005' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=5);
 ====
-grep10gb
+hive-benchmark
 ----
 grep10gb
 ----
@@ -75,7 +75,7 @@ LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep10GB/part-00
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep10GB/part-00004' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=4);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep10GB/part-00005' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=5);
 ====
-web
+hive-benchmark
 ----
 rankings
 ----
@@ -94,7 +94,7 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/html1GB/Rankings.dat' OVERWRITE INTO TABLE %(table_name)s;
 ====
-web
+hive-benchmark
 ----
 uservisits
 ----

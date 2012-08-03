@@ -1,0 +1,3 @@
+# Manually created file.
+file_format:text, dataset:functional, compression_codec:none, compression_type:none
+file_format:seq, dataset:functional, compression_codec:none, compression_type:none

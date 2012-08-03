@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 package com.cloudera.impala.planner;
 
@@ -33,7 +33,7 @@ public class PlannerTest {
 
   private static Catalog catalog;
   private static AnalysisContext analysisCtxt;
-  private final String testDir = "PlannerTest";
+  private final String testDir = "functional-planner/queries/PlannerTest";
   private final String outDir = "/tmp/PlannerTest/";
 
   private final StringBuilder explainStringBuilder = new StringBuilder();

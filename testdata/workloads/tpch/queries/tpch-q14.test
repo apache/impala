@@ -1,0 +1,16 @@
+# Q14 - Promotion Effect
+select
+round(100.00 * sum(case when p_type like 'PROMO%' then l_extendedprice*(1-l_discount)
+             else 0.0
+             end
+             ) / sum(l_extendedprice * (1 - l_discount)), 5) as promo_revenue
+from tpch.lineitem$TABLE l
+join tpch.part$TABLE p
+  on l.l_partkey = p.p_partkey and
+     l.l_shipdate >= '1995-09-01' and
+     l.l_shipdate < '1995-10-01'
+---- TYPES
+double
+---- RESULTS
+16.38078
+====
