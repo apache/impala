@@ -73,10 +73,11 @@ public class Frontend {
 
     for (int fragmentNum = 0; fragmentNum < request.fragment_requests.size();
          ++fragmentNum) {
+      // we only need to assign the coordinator fragment's id (= query id), the
+      // rest is done by the coordinator as it issues fragment execution rpcs,
+      // but fragment_id is required, so we give it a dummy value
+      request.fragment_requests.get(fragmentNum).setFragment_id(request.query_id);
       request.fragment_requests.get(fragmentNum).setQuery_id(request.query_id);
-    }
-    if (request.fragment_requests.size() > 0) {
-      request.fragment_requests.get(0).setFragment_id(request.query_id);
     }
 
     if (request.node_request_params != null && request.node_request_params.size() == 2) {
