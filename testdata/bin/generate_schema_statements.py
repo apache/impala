@@ -196,9 +196,11 @@ def write_trevni_file(file_name, array):
   with open(file_name, "w") as f:
     if len(array) != 0:
       f.write("${IMPALA_HOME}/bin/runplanservice >& /tmp/planservice.out&\n")
+      f.write("PID=$!\n")
       f.write("${IMPALA_HOME}/be/build/debug/util/refresh-catalog\n")
       f.write('\n\n'.join(array))
       f.write("\n${IMPALA_HOME}/be/build/debug/util/refresh-catalog\n")
+      f.write("kill $PID\n")
 
 def write_statements_to_file_based_on_input_vector(output_name, input_file_name,
                                                    statements):
