@@ -13,6 +13,14 @@ public class InsertQueryTest extends BaseQueryTest {
         ImmutableList.of(0), ImmutableList.of(1));
   }
 
+  // Because we disagree with hive on what to do on overflow, only
+  // test overflow on those types that we can insert.
+  // Hive makes them NULL.
+  public void TestOverflow() {
+    runQueryInAllBatchAndClusterPerms("overflow", false, 1000, INSERT_FORMATS,
+        ImmutableList.of(0), ImmutableList.of(1));
+  }
+
   //TODO - see hdfs-text-scanner.cc for what needs to be done to support NULL partition
   //keys.
   //@Test

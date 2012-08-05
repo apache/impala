@@ -742,15 +742,6 @@ string, string, int, int
 'one\,one','two',3,4
 'one\\','two',3,4
 ====
-# Tests overflow
-select * from Overflow
----- TYPES
-tinyint, smallint, int, bigint, float, double
----- RESULTS
--128,-32768,-2147483648,-9223372036854775808,-inf,-inf
-1,2,3,4,5.5,6.6
-127,32767,2147483647,9223372036854775807,inf,inf
-====
 # Test multi files non-partitioned table (hdfs)
 select count(*) from AllTypesAggMultiFilesNoPart$TABLE
 ---- TYPES

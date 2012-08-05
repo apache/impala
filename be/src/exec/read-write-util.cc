@@ -72,32 +72,34 @@ Status ReadWriteUtil::SkipBytes(ByteStream* byte_stream) {
 }
 
 int ReadWriteUtil::PutZInt(int32_t integer, uint8_t* buf) {
-  integer = (integer << 1) ^ (integer >> 31);
+  // Move the sign bit to the first bit.
+  uint32_t uinteger = (integer << 1) ^ (integer >> 31);
   const int mask = 0x7f;
   const int cont = 0x80;
-  buf[0] = integer & mask;
+  buf[0] = uinteger & mask;
   int len = 1;
-  while ((integer >>= 7) != 0) {
+  while ((uinteger >>= 7) != 0) {
     // Set the continuation bit.
     buf[len - 1] |= cont;
-    buf[len] = integer & mask;
-    len++;
+    buf[len] = uinteger & mask;
+    ++len;
   }
 
   return len;
 }
 
 int ReadWriteUtil::PutZLong(int64_t longint, uint8_t* buf) {
-  longint = (longint << 1) ^ (longint >> 31);
+  // Move the sign bit to the first bit.
+  uint64_t ulongint = (longint << 1) ^ (longint >> 63);
   const int mask = 0x7f;
   const int cont = 0x80;
-  buf[0] = longint & mask;
+  buf[0] = ulongint & mask;
   int len = 1;
-  while ((longint >>= 7) != 0) {
+  while ((ulongint >>= 7) != 0) {
     // Set the continuation bit.
     buf[len - 1] |= cont;
-    buf[len] = longint & mask;
-    len++;
+    buf[len] = ulongint & mask;
+    ++len;
   }
 
   return len;
