@@ -15,6 +15,9 @@ namespace impala {
 // open until the process terminates.
 // (Calls to hdfsDisconnect() by individual threads would terminate all
 // other connections handed out via hdfsConnect() to the same URI.)
+// TestExecEnv has multiple of these in the same process, but they don't get
+// destroyed until TestExecEnv gets destroyed (otherwise having several of these
+// in a single process would be a problem).
 class HdfsFsCache {
  public:
   ~HdfsFsCache();

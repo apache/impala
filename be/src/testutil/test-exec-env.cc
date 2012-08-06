@@ -30,7 +30,7 @@ namespace impala {
 // no scheduler (since coordinator takes care of that) and a state store subscriber.
 class BackendTestExecEnv : public ExecEnv {
  public:
-  BackendTestExecEnv(HdfsFsCache* fs_cache, int subscriber_port, int state_store_port);
+  BackendTestExecEnv(int subscriber_port, int state_store_port);
 
   virtual Status StartServices();
 };
@@ -40,16 +40,15 @@ struct TestExecEnv::BackendInfo {
   ThriftServer* server;
   BackendTestExecEnv exec_env;
 
-  BackendInfo(HdfsFsCache* fs_cache, int subscriber_port, int state_store_port)
+  BackendInfo(int subscriber_port, int state_store_port)
       : server(NULL),
-        exec_env(fs_cache, subscriber_port, state_store_port) {
+        exec_env(subscriber_port, state_store_port) {
   }
 };
 
 
-BackendTestExecEnv::BackendTestExecEnv(HdfsFsCache* fs_cache, int subscriber_port,
-    int state_store_port)
-  : ExecEnv(fs_cache) {
+BackendTestExecEnv::BackendTestExecEnv(int subscriber_port, int state_store_port)
+  : ExecEnv() {
   subscription_mgr_.reset(new SubscriptionManager("localhost", subscriber_port,
       "localhost", state_store_port));
   scheduler_.reset(NULL);
@@ -84,8 +83,7 @@ Status TestExecEnv::StartBackends() {
   RETURN_IF_ERROR(WaitForServer("localhost", state_store_port_, 10, 100));
 
   for (int i = 0; i < num_backends_; ++i) {
-    BackendInfo* info = new BackendInfo(fs_cache_.get(), next_free_port++,
-        state_store_port_);
+    BackendInfo* info = new BackendInfo(next_free_port++, state_store_port_);
     int backend_port = next_free_port++;
     CreateImpalaServer(&info->exec_env, 0, backend_port, NULL, &info->server);
     DCHECK(info->server != NULL);

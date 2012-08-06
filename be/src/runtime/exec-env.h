@@ -35,10 +35,6 @@ class ExecEnv {
   ExecEnv();
   virtual ~ExecEnv();
 
-  // special c'tor for TestExecEnv::BackendInfo so that multiple in-process backends
-  // can share a single fs cache
-  ExecEnv(HdfsFsCache* fs_cache);
-
   sparrow::SubscriptionManager* subscription_mgr() {
     return subscription_mgr_.get();
   }

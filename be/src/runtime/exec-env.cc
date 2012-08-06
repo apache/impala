@@ -66,17 +66,6 @@ ExecEnv::ExecEnv()
   }
 }
 
-ExecEnv::ExecEnv(HdfsFsCache* fs_cache)
-  : stream_mgr_(new DataStreamMgr()),
-    scheduler_(NULL),
-    subscription_mgr_(new SubscriptionManager()),
-    client_cache_(new BackendClientCache(0, 0)),
-    fs_cache_(fs_cache),
-    htable_cache_(new HBaseTableCache()),
-    webserver_(new Webserver()),
-    tz_database_(TimezoneDatabase()) {
-}
-
 ExecEnv::~ExecEnv() {
 }
 
