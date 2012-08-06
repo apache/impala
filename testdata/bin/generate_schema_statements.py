@@ -195,12 +195,20 @@ def list_hdfs_subdir_names(path):
 def write_trevni_file(file_name, array):
   with open(file_name, "w") as f:
     if len(array) != 0:
-      f.write("${IMPALA_HOME}/bin/runplanservice >& /tmp/planservice.out&\n")
+      # Start a plan service.  If there is already one running then we
+      # need to refresh it. So we sleep in case there was not one
+      # running so the one we start will be active.
+      f.write("set -e\nset -u\n")
+      f.write("pushd ${IMPALA_FE_DIR}\n");
+      f.write("mvn exec:java -Dexec.mainClass=com.cloudera.impala.testutil.PlanService \
+                        -Dexec.classpathScope=test >& /tmp/planservice.out&\n");
       f.write("PID=$!\n")
+      f.write("popd\n");
+      f.write("sleep 5\n");
       f.write("${IMPALA_HOME}/be/build/debug/util/refresh-catalog\n")
       f.write('\n\n'.join(array))
       f.write("\n${IMPALA_HOME}/be/build/debug/util/refresh-catalog\n")
-      f.write("kill $PID\n")
+      f.write("(kill $PID; exit 0)\n")
 
 def write_statements_to_file_based_on_input_vector(output_name, input_file_name,
                                                    statements):
