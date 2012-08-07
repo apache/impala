@@ -23,7 +23,8 @@ class ThriftServer {
 
   // Creates, but does not start, a new server on the specified port
   // that exports the supplied interface.
-  ThriftServer(const boost::shared_ptr<apache::thrift::TProcessor>& processor, int port,
+  ThriftServer(const std::string& name,
+      const boost::shared_ptr<apache::thrift::TProcessor>& processor, int port,
       int num_worker_threads = DEFAULT_WORKER_THREADS);
 
   int port() const { return port_; }
@@ -37,12 +38,30 @@ class ThriftServer {
   Status Start();
 
  private:
+  // True if the server has been successfully started, for internal use only
   bool started_;
+
+  // The port on which the server interface is exposed
   int port_;
+  
+  // How many worker threads to use to serve incoming requests
+  // (requests are queued if no thread is immediately available)
   int num_worker_threads_;
+
+  // User-specified identifier that shows up in logs
+  const std::string name_;
+
+  // Thread that runs the TNonblockingServer::serve loop
   boost::scoped_ptr<boost::thread> server_thread_;
+
+  // Thrift housekeeping 
   boost::scoped_ptr<apache::thrift::server::TNonblockingServer> server_;
   boost::shared_ptr<apache::thrift::TProcessor> processor_;
+
+  // Helper class which monitors starting servers. Needs access to internal members, and
+  // is not used outside of this class.
+  class ThriftServerEventProcessor;
+  friend class ThriftServerEventProcessor;
 };
 
 }

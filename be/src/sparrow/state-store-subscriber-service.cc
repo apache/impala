@@ -220,7 +220,7 @@ Status StateStoreSubscriber::Start() {
   shared_ptr<TProcessor> processor(
       new StateStoreSubscriberServiceProcessor(shared_from_this()));
 
-  server_.reset(new ThriftServer(processor, host_port_.port, 1));
+  server_.reset(new ThriftServer("StateStoreSubscriber", processor, host_port_.port, 1));
 
   DCHECK(!server_running_);
   server_running_ = true;

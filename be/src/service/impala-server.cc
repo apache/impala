@@ -1174,14 +1174,16 @@ ImpalaServer* CreateImpalaServer(ExecEnv* exec_env, int fe_port, int be_port,
 
   if (fe_port != 0 && fe_server != NULL) {
     shared_ptr<TProcessor> fe_processor(new ImpalaServiceProcessor(handler));
-    *fe_server = new ThriftServer(fe_processor, fe_port, FLAGS_fe_service_threads);
+    *fe_server = new ThriftServer("ImpalaServer Frontend", fe_processor, fe_port, 
+        FLAGS_fe_service_threads);
 
     LOG(INFO) << "ImpalaService listening on " << fe_port;
   }
 
   if (be_port != 0 && be_server != NULL) {
     shared_ptr<TProcessor> be_processor(new ImpalaInternalServiceProcessor(handler));
-    *be_server = new ThriftServer(be_processor, be_port, FLAGS_be_service_threads);
+    *be_server = new ThriftServer("ImpalaServer Backend", be_processor, be_port, 
+        FLAGS_be_service_threads);
 
     LOG(INFO) << "ImpalaInternalService listening on " << be_port;
   }
