@@ -29,7 +29,29 @@ class SubscriptionManager {
   // Function called to update a service with new state. Called in a separate thread to
   // the one in which it is registered.
   // TODO: Also return object updates using this callback.
-  typedef boost::function<void (const ServiceStateMap& state)> UpdateCallback;
+  typedef boost::function<void (const ServiceStateMap& state)> UpdateCallbackFunction;
+
+  // The UpdateCallback class is a lightweight wrappper for UpdateCallbackFunction,
+  // which ensures that the callback is not registered with the SubscriptionManager
+  // when it is destroyed. If the callback is still registered when it is destroyed, it
+  // may be called after being destroyed, which will lead to a seg fault.
+  class UpdateCallback {
+   public:
+    UpdateCallback(UpdateCallbackFunction callback_function)
+      : callback_function_(callback_function), currently_registered_(false) {}
+
+    // Checks to ensure that the callback function is not currently registered.
+    ~UpdateCallback();
+
+   private:
+    friend class StateStoreSubscriber;
+
+    UpdateCallbackFunction callback_function_;
+    
+    // Whether the callback function is currently registered with the subscription
+    // manager.
+    bool currently_registered_;
+  };
 
   // Initializes a subscription manager based on flags used to describe the address of
   // the underlying StateStoreSubscriber (state_store_subscriber_host and
@@ -56,9 +78,12 @@ class SubscriptionManager {
   // Fills in the given id with an id identifying the subscription, which should be
   // used when unregistering.  The given UpdateCallback will be called with updates and
   // takes a single ServiceStateMap as a parameter, which contains a mapping of service
-  // ids to the relevant state for that service.
-  impala::Status RegisterSubscription(const UpdateCallback& update_callback,
-      const boost::unordered_set<std::string>& services, SubscriptionId* id);
+  // ids to the relevant state for that service. update_callback is owned by the caller.
+  // The caller must not deallocate the memory until after calling
+  // UnregisterSubscription().
+  impala::Status RegisterSubscription(
+      const boost::unordered_set<std::string>& services, UpdateCallback* update_callback,
+      SubscriptionId* id);
 
   // Unregisters the subscription identified by the given id with the state store. Also
   // unregisters the associated callback, so that it will no longer be called.

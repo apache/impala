@@ -83,10 +83,6 @@ class StateStoreTest : public testing::Test {
     EXPECT_TRUE(status.ok());
   }
 
-  virtual void TearDown() {
-    UnregisterAllSubscribers();
-  }
-
   shared_ptr<StateStoreSubscriber> StartStateStoreSubscriber() {
     int port = next_port_++;
     subscribers_.push_back(shared_ptr<StateStoreSubscriber>(new StateStoreSubscriber(
@@ -128,15 +124,15 @@ TEST_F(StateStoreTest, SingleRegister) {
   const SubscriberId expected_assigned_id = 1;
   update_condition.expected_state[service_id].membership[expected_assigned_id] =
       service_address;
-  SubscriptionManager::UpdateCallback update_callback =
-      bind(&StateStoreTest::Update, &update_condition, _1);
+  SubscriptionManager::UpdateCallback update_callback(
+      bind(&StateStoreTest::Update, &update_condition, _1));
 
   // Register the listening_subscriber to receive updates.
   unordered_set<string> update_services;
   update_services.insert(service_id);
   SubscriptionId id;
-  Status status = listening_subscriber->RegisterSubscription(update_callback,
-                                                             update_services, &id);
+  Status status = listening_subscriber->RegisterSubscription(update_services,
+                                                             &update_callback, &id);
   EXPECT_TRUE(status.ok());
 
   // Register a running service on running_subscriber, and wait for the
@@ -151,6 +147,11 @@ TEST_F(StateStoreTest, SingleRegister) {
       ASSERT_TRUE(update_condition.condition.timed_wait(lock, timeout));
     }
   }
+
+  // Unregister everything, because the UpdateCallback class checks
+  // that the callback has been unregistered (which happens with the associated
+  // subscrition is unregistered) in its destructor.
+  UnregisterAllSubscribers();
 };
 
 TEST_F(StateStoreTest, MultipleServiceRegister) {
@@ -181,15 +182,15 @@ TEST_F(StateStoreTest, MultipleServiceRegister) {
   const SubscriberId expected_assigned_id = 2;
   update_condition.expected_state[service2].membership[expected_assigned_id] =
       service2_address;
-  SubscriptionManager::UpdateCallback update_callback =
-      bind(&StateStoreTest::Update, &update_condition, _1);
+  SubscriptionManager::UpdateCallback update_callback(
+      bind(&StateStoreTest::Update, &update_condition, _1));
 
   // Register the listening_subscriber to receive updates.
   unordered_set<string> update_services;
   update_services.insert(service2);
   SubscriptionId id;
-  Status status = listening_subscriber->RegisterSubscription(update_callback,
-                                                             update_services, &id);
+  Status status = listening_subscriber->RegisterSubscription(update_services,
+                                                             &update_callback, &id);
   EXPECT_TRUE(status.ok());
 
   // Register both running services, and wait for the listening_subscriber to receive
@@ -206,6 +207,7 @@ TEST_F(StateStoreTest, MultipleServiceRegister) {
       ASSERT_TRUE(update_condition.condition.timed_wait(lock, timeout));
     }
   }
+  UnregisterAllSubscribers();
 };
 
 TEST_F(StateStoreTest, RegisterFailsGracefullyWhenStateStoreUnreachable) {
@@ -222,13 +224,13 @@ TEST_F(StateStoreTest, RegisterFailsGracefullyWhenStateStoreUnreachable) {
 
   // Dummy update function, since we need to pass one to RegisterSubscription().
   UpdateCondition update_condition;
-  SubscriptionManager::UpdateCallback update_callback =
-      bind(&StateStoreTest::Update, &update_condition, _1);
+  SubscriptionManager::UpdateCallback update_callback(
+      bind(&StateStoreTest::Update, &update_condition, _1));
   unordered_set<string> update_services;
   update_services.insert(service_id);
   SubscriptionId id;
-  Status status = listening_subscriber->RegisterSubscription(update_callback,
-                                                             update_services, &id);
+  Status status = listening_subscriber->RegisterSubscription(update_services,
+                                                             &update_callback, &id);
   EXPECT_FALSE(status.ok());
 
   // Address where service_id is running.
@@ -238,6 +240,7 @@ TEST_F(StateStoreTest, RegisterFailsGracefullyWhenStateStoreUnreachable) {
   status = running_subscriber->RegisterService(service_id, service_address);
   EXPECT_FALSE(status.ok());
 
+  UnregisterAllSubscribers();
 };
 
 TEST_F(StateStoreTest, UnregisterService) {
@@ -257,15 +260,15 @@ TEST_F(StateStoreTest, UnregisterService) {
   const SubscriberId expected_assigned_id = 1;
   register_condition.expected_state[service_id].membership[expected_assigned_id] =
       service_address;
-  SubscriptionManager::UpdateCallback update_callback =
-      bind(&StateStoreTest::Update, &register_condition, _1);
+  SubscriptionManager::UpdateCallback update_callback(
+      bind(&StateStoreTest::Update, &register_condition, _1));
 
   // Register the listening_subscriber to receive updates.
   unordered_set<string> update_services;
   update_services.insert(service_id);
   SubscriptionId id;
-  Status status = listening_subscriber->RegisterSubscription(update_callback,
-                                                             update_services, &id);
+  Status status = listening_subscriber->RegisterSubscription(update_services,
+                                                             &update_callback, &id);
   EXPECT_TRUE(status.ok());
 
   // Register a running service on running_subscriber, and wait for the
@@ -295,6 +298,7 @@ TEST_F(StateStoreTest, UnregisterService) {
     }
   }
 
+  UnregisterAllSubscribers();
 };
 
 TEST_F(StateStoreTest, UnregisterSubscription) {
@@ -314,15 +318,15 @@ TEST_F(StateStoreTest, UnregisterSubscription) {
   const SubscriberId expected_assigned_id = 1;
   register_condition.expected_state[service_id].membership[expected_assigned_id] =
       service_address;
-  SubscriptionManager::UpdateCallback update_callback =
-      bind(&StateStoreTest::Update, &register_condition, _1);
+  SubscriptionManager::UpdateCallback update_callback(
+      bind(&StateStoreTest::Update, &register_condition, _1));
 
   // Register the listening_subscriber to receive updates.
   unordered_set<string> update_services;
   update_services.insert(service_id);
   SubscriptionId id;
-  Status status = listening_subscriber->RegisterSubscription(update_callback,
-                                                             update_services, &id);
+  Status status = listening_subscriber->RegisterSubscription(update_services,
+                                                             &update_callback, &id);
   EXPECT_TRUE(status.ok());
 
   // Register a running service on running_subscriber, and wait for the
@@ -358,6 +362,7 @@ TEST_F(StateStoreTest, UnregisterSubscription) {
     ASSERT_LT(current_time, timeout);
     usleep(state_store_->subscriber_update_frequency_ms() * 1000);
   }
+  UnregisterAllSubscribers();
 };
 
 TEST_F(StateStoreTest, UnregisterOneOfMultipleSubscriptions) {
@@ -401,11 +406,11 @@ TEST_F(StateStoreTest, UnregisterOneOfMultipleSubscriptions) {
   unordered_set<string> update_services_A;
   update_services_A.insert(service_id_1);
   update_services_A.insert(service_id_2);
-  SubscriptionManager::UpdateCallback update_callback_A =
-      bind(&StateStoreTest::Update, &register_condition_A, _1);
+  SubscriptionManager::UpdateCallback update_callback_A(
+      bind(&StateStoreTest::Update, &register_condition_A, _1));
   SubscriptionId id_A;
-  Status status = listening_subscriber->RegisterSubscription(update_callback_A,
-                                                             update_services_A, &id_A);
+  Status status = listening_subscriber->RegisterSubscription(update_services_A,
+                                                             &update_callback_A, &id_A);
   EXPECT_TRUE(status.ok());
 
   unordered_set<string> update_services_B;
@@ -413,11 +418,11 @@ TEST_F(StateStoreTest, UnregisterOneOfMultipleSubscriptions) {
   update_services_B.insert(service_id_3);
   UpdateCondition register_condition_B;
   register_condition_B.expected_state = register_condition_A.expected_state;
-  SubscriptionManager::UpdateCallback update_callback_B =
-      bind(&StateStoreTest::Update, &register_condition_B, _1);
+  SubscriptionManager::UpdateCallback update_callback_B(
+      bind(&StateStoreTest::Update, &register_condition_B, _1));
   SubscriptionId id_B;
-  status = listening_subscriber->RegisterSubscription(update_callback_B,
-                                                      update_services_B, &id_B);
+  status = listening_subscriber->RegisterSubscription(update_services_B,
+                                                      &update_callback_B, &id_B);
   EXPECT_TRUE(status.ok());
 
   // Register the three services on running_subscriber, and wait for both subscriptions
@@ -478,9 +483,10 @@ TEST_F(StateStoreTest, UnregisterOneOfMultipleSubscriptions) {
     ASSERT_LT(current_time, timeout);
     usleep(state_store_->subscriber_update_frequency_ms());
   }
+  UnregisterAllSubscribers();
 };
 
-TEST_F(StateStoreTest, StopUnregisters) {
+TEST_F(StateStoreTest, UnregisterAll) {
   const string service_id = "test_service";
 
   shared_ptr<StateStoreSubscriber> running_subscriber = StartStateStoreSubscriber();
@@ -497,15 +503,15 @@ TEST_F(StateStoreTest, StopUnregisters) {
   const SubscriberId expected_assigned_id = 1;
   register_condition.expected_state[service_id].membership[expected_assigned_id] =
       service_address;
-  SubscriptionManager::UpdateCallback update_callback =
-      bind(&StateStoreTest::Update, &register_condition, _1);
+  SubscriptionManager::UpdateCallback update_callback(
+      bind(&StateStoreTest::Update, &register_condition, _1));
 
   // Register the listening_subscriber to receive updates.
   unordered_set<string> update_services;
   update_services.insert(service_id);
   SubscriptionId id;
-  Status status = listening_subscriber->RegisterSubscription(update_callback,
-                                                             update_services, &id);
+  Status status = listening_subscriber->RegisterSubscription(update_services,
+                                                             &update_callback, &id);
   EXPECT_TRUE(status.ok());
 
   // Register a running service on running_subscriber, and wait for the
@@ -521,8 +527,9 @@ TEST_F(StateStoreTest, StopUnregisters) {
     }
   }
 
-  // Now, unregister the running instance, and ensure that listening_subscriber gets
-  // updated accordingly.
+  // Now, unregister everything on the running instance, and ensure that
+  // everything is actually unregistered (by checking that listening_subscriber gets
+  // updated accordingly).
   EXPECT_TRUE(status.ok());
   running_subscriber->UnregisterAll();
 
@@ -535,6 +542,7 @@ TEST_F(StateStoreTest, StopUnregisters) {
       ASSERT_TRUE(register_condition.condition.timed_wait(register_lock, timeout));
     }
   }
+  UnregisterAllSubscribers();
 };
 
 } // namespace sparrow

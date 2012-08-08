@@ -36,6 +36,8 @@ namespace sparrow {
 // The class is generally not thread safe; however, the UpdateState() method
 // (which is part of the StateStoreSubscriberIf) may be called concurrently
 // with any other class method.
+// TODO: Make this class thread safe, so it can be used by multiple in-process threads
+// that all wish to register and unregister subscriptions and services.
 class StateStoreSubscriber
   : public StateStoreSubscriberServiceIf,
     public boost::enable_shared_from_this<StateStoreSubscriber> {
@@ -65,14 +67,15 @@ class StateStoreSubscriber
   // Fills in the given id with an id identifying the subscription, which should be
   // used when unregistering.  The given UpdateCallback will be called with updates and
   // takes a single ServiceStateMap as a parameter, which contains a mapping of service
-  // ids to the relevant state for that service.
+  // ids to the relevant state for that service. The callback may not Register() or
+  // Unregister() any subscriptions.
   impala::Status RegisterSubscription(
-      const SubscriptionManager::UpdateCallback& update,
-      const boost::unordered_set<std::string>& update_services, SubscriptionId* id);
+      const boost::unordered_set<std::string>& update_services,
+      SubscriptionManager::UpdateCallback* update, SubscriptionId* id);
 
   // Unregisters the subscription identified by the given id with the state store. Also
   // unregisters the associated callback, so that it will no longer be called.
-  impala::Status UnregisterSubscription(SubscriptionId id);
+  impala::Status UnregisterSubscription(const SubscriptionId& id);
 
   // Registers an instance of the given service type at the given
   // address with the state store.
@@ -90,8 +93,11 @@ class StateStoreSubscriber
       const TUpdateStateRequest& request);
 
  private:
- // Mapping of subscription ids to the associated callback.
-  typedef boost::unordered_map<SubscriptionId, SubscriptionManager::UpdateCallback>
+ // Mapping of subscription ids to the associated callback. Because this mapping
+ // stores a pointer to an UpdateCallback, memory errors will occur if an UpdateCallback
+ // is deleted before being unregistered. The UpdateCallback destructor checks for
+ // such problems, so that we will have an assertion failure rather than a memory error.
+  typedef boost::unordered_map<SubscriptionId, SubscriptionManager::UpdateCallback*>
       UpdateCallbacks;
 
   static const char* DISCONNECTED_FROM_STATE_STORE_ERROR;
@@ -116,12 +122,41 @@ class StateStoreSubscriber
   UpdateCallbacks update_callbacks_;
   boost::mutex update_callbacks_lock_;
 
+  // The thread that the callbacks are being executed in. If the callbacks are
+  // not currently executing in any thread, calblack_thread_id_ will be set to the
+  // default boost::thread::id value, which does not refer to any thread.
+  boost::thread::id callback_thread_id_;
+
+  // Lock for callback_thread_id_.  A lock is necessary because boost::thread::id may
+  // not be an atomic value.
+  boost::mutex callback_thread_id_lock_;
+
   // Services registered with this subscriber. Used to properly unregister if the
   // subscriber is Stop()ed.
   boost::unordered_set<std::string> services_;
 
   // Initializes client_, if it hasn't been intialized already.
   impala::Status InitClient();
+
+  // Verifies that the current thread of execution is not the thread that is executing
+  // callbacks. This function should be called before attempting to acquire
+  // update_callbacks_lock_, and is used to ensure that UpdateCallbacks don't register
+  // or unregister subscritions, which leads to deadlock.
+  //
+  // Since this function expects to be called before the update_callbacks_lock_ is
+  // acquired, there is a possible race condition between verifiying that the current
+  // thread is not the callback thread and acquiring update_callbacks_lock_. This is not
+  // a problem because the race condition only occurs when this function and
+  // UpdateState() are called from different threads, so it doesn't effect the case
+  // we're trying to check for (when this function and UpdateState are called from the
+  // same thread).
+  void CheckNotInCallbackThread();
+
+  // Executes an RPC to unregister the given service with the state store.
+  impala::Status UnregisterServiceWithStateStore(const std::string& service_id);
+
+  // Executes an RPC to unregister the given subscription with the state store.
+  impala::Status UnregisterSubscriptionWithStateStore(const SubscriptionId& id);
 };
 
 }

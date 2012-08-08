@@ -75,8 +75,6 @@ Status StateStoreSubscriber::RegisterService(const string& service_id,
 }
 
 Status StateStoreSubscriber::UnregisterService(const string& service_id) {
-  RETURN_IF_ERROR(InitClient());
-
   unordered_set<string>::iterator service = services_.find(service_id);
   if (service == services_.end()) {
     stringstream error_message;
@@ -85,19 +83,7 @@ Status StateStoreSubscriber::UnregisterService(const string& service_id) {
     return Status(error_message.str());
   }
 
-  TUnregisterServiceRequest request;
-  request.__set_subscriber_address(host_port_);
-  request.__set_service_id(service_id);
-  TUnregisterServiceResponse response;
-
-  try {
-    client_->iface()->UnregisterService(response, request);
-  } catch ( TTransportException& e) {
-    Status status(e.what());
-    status.AddErrorMsg(DISCONNECTED_FROM_STATE_STORE_ERROR);
-    return status;
-  }
-  Status status(response.status);
+  Status status = UnregisterServiceWithStateStore(service_id);
   if (status.ok()) {
     services_.erase(service);
   }
@@ -105,8 +91,8 @@ Status StateStoreSubscriber::UnregisterService(const string& service_id) {
 }
 
 Status StateStoreSubscriber::RegisterSubscription(
-    const SubscriptionManager::UpdateCallback& update_callback,
-    const unordered_set<string>& update_services, SubscriptionId* id) {
+    const unordered_set<string>& update_services,
+    SubscriptionManager::UpdateCallback* update_callback, SubscriptionId* id) {
   RETURN_IF_ERROR(InitClient());
 
   TRegisterSubscriptionRequest request;
@@ -138,15 +124,16 @@ Status StateStoreSubscriber::RegisterSubscription(
   }
 
   *id = response.subscription_id;
+  CheckNotInCallbackThread();
   lock_guard<mutex> lock(update_callbacks_lock_);
   update_callbacks_.insert(make_pair(response.subscription_id, update_callback));
+  update_callback->currently_registered_ = true;
   return status;
 }
 
-Status StateStoreSubscriber::UnregisterSubscription(SubscriptionId id) {
-  RETURN_IF_ERROR(InitClient());
-
+Status StateStoreSubscriber::UnregisterSubscription(const SubscriptionId& id) {
   {
+    CheckNotInCallbackThread();
     lock_guard<mutex> lock(update_callbacks_lock_);
     UpdateCallbacks::iterator callback = update_callbacks_.find(id);
     if (callback == update_callbacks_.end()) {
@@ -157,25 +144,19 @@ Status StateStoreSubscriber::UnregisterSubscription(SubscriptionId id) {
     }
   }
 
-  TUnregisterSubscriptionRequest request;
-  request.__set_subscriber_address(host_port_);
-  request.__set_subscription_id(id);
-  TUnregisterSubscriptionResponse response;
-  try {
-    client_->iface()->UnregisterSubscription(response, request);
-  } catch (TTransportException& e) {
-    Status status(e.what());
-    status.AddErrorMsg(DISCONNECTED_FROM_STATE_STORE_ERROR);
-    return status;
-  }
+  Status status = UnregisterSubscriptionWithStateStore(id);
 
-  Status status(response.status);
-  if (status.ok()) {
-    lock_guard<mutex> lock(update_callbacks_lock_);
-    // Don't use the iterator to erase, because it may have been invalidated by now.
-    update_callbacks_.erase(id);
+  CheckNotInCallbackThread();
+  lock_guard<mutex> lock(update_callbacks_lock_);
+  // Don't save the old iterator and use it to erase, because it may have been
+  // invalidated by now.
+  UpdateCallbacks::iterator callback = update_callbacks_.find(id);
+  if (callback != update_callbacks_.end()) {
+    DCHECK(callback->second->currently_registered_);
+    callback->second->currently_registered_ = false;
+    update_callbacks_.erase(callback);
   }
-  return Status(response.status);
+  return status;
 }
 
 void StateStoreSubscriber::UpdateState(TUpdateStateResponse& response,
@@ -199,19 +180,25 @@ void StateStoreSubscriber::UpdateState(TUpdateStateResponse& response,
   }
   VLOG_ROW << "Received new state:\n" << new_state.str();
 
-  // Make a copy of update_callbacks_, to avoid problems if one of the callbacks
-  // calls back into this StateStoreSubscriber, which may deadlock if we are holding
-  // the update_callbacks_lock_.
-  UpdateCallbacks update_callbacks_copy;
   {
-    lock_guard<mutex> lock(update_callbacks_lock_);
-    update_callbacks_copy = update_callbacks_;
+    lock_guard<mutex> lock(callback_thread_id_lock_);
+    callback_thread_id_ = boost::this_thread::get_id();
   }
 
+  lock_guard<mutex> lock(update_callbacks_lock_);
+  // callback_thread_id_lock_ cannot be held while executing the callbacks,
+  // otherwise the deadlock that it helps prevent (on update_callbacks_lock_) would
+  // occur on callback_thread_id_lock_ instead.
   // TODO: This is problematic if any of the callbacks take a long time. Eventually,
-  // we'll probably want to execute the callbacks asynchronously in a different thread.
-  BOOST_FOREACH(UpdateCallbacks::value_type& update, update_callbacks_copy) {
-    update.second(state);
+  // we'll probably want to execute the callbacks asynchronously in a different thread.  
+  BOOST_FOREACH(UpdateCallbacks::value_type& update, update_callbacks_) {
+    DCHECK(update.second->currently_registered_);
+    update.second->callback_function_(state);
+  }
+
+  {
+    lock_guard<mutex> lock(callback_thread_id_lock_);
+    callback_thread_id_ = thread::id();
   }
   RETURN_AND_SET_STATUS_OK(response);
 }
@@ -240,44 +227,40 @@ bool StateStoreSubscriber::IsRunning() {
 void StateStoreSubscriber::UnregisterAll() {
   Status status = InitClient();
   if (status.ok()) {
-    try {
-      // Unregister all running services.
-      BOOST_FOREACH(const string& service_id, services_) {
-        TUnregisterServiceRequest request;
-        request.__set_subscriber_address(host_port_);
-        request.__set_service_id(service_id);
-        TUnregisterServiceResponse response;
-        client_->iface()->UnregisterService(response, request);
-        Status unregister_status(response.status);
-        if (!unregister_status.ok()) {
-          LOG(ERROR) << "Error when unregistering service " << service_id << ":"
-                     << unregister_status.GetErrorMsg();
-        }
+    // Unregister all services.
+    BOOST_FOREACH(const string& service_id, services_) {
+      Status unregister_status = UnregisterServiceWithStateStore(service_id);
+      if (!unregister_status.ok()) {
+        string error_msg;
+        unregister_status.GetErrorMsg(&error_msg);
+        LOG(ERROR) << "Error when unregistering service " << service_id << ":"
+                   << error_msg;
+        // Add the unregistration error message to status, which contains all error
+        // messages. Keep going, rather than failing here, so we make a best-effort
+        // attempt to unregister everything.
+        status.AddErrorMsg(error_msg);
       }
-
-     lock_guard<mutex> lock(update_callbacks_lock_);
-      // Unregister all subscriptions.
-      BOOST_FOREACH(const UpdateCallbacks::value_type& callback_pair,
-                    update_callbacks_) {
-        SubscriptionId id = callback_pair.first;
-        TUnregisterSubscriptionRequest request;
-        request.__set_subscriber_address(host_port_);
-        request.__set_subscription_id(id);
-        TUnregisterSubscriptionResponse response;
-        // Ignore any errors in the response.
-        client_->iface()->UnregisterSubscription(response, request);
-        Status unregister_status(response.status);
-        if (!unregister_status.ok()) {
-          string error_msg;
-          unregister_status.GetErrorMsg(&error_msg);
-          VLOG_CONNECTION << "Error when unregistering subscription "
-                          << id << ":" << error_msg;
-        }
-      }
-    } catch (TTransportException& e) {
-      LOG(ERROR) << "Connection to state store disrupted when trying to unregister; "
-                 << "received error: " << e.what();
     }
+    services_.clear();
+
+    // Unregister all subscriptions.
+    CheckNotInCallbackThread();
+    lock_guard<mutex> lock(update_callbacks_lock_);
+    BOOST_FOREACH(const UpdateCallbacks::value_type& callback_pair,
+                  update_callbacks_) {
+      DCHECK(callback_pair.second->currently_registered_);
+      SubscriptionId id = callback_pair.first;
+      Status unregister_status = UnregisterSubscriptionWithStateStore(id);
+      if (!unregister_status.ok()) {
+        string error_msg;
+        unregister_status.GetErrorMsg(&error_msg);
+        LOG(ERROR) << "Error when unregistering subscription " << id << ":" << error_msg;
+        // As above, add the unregistration error message to status.
+        status.AddErrorMsg(error_msg);
+      }
+      callback_pair.second->currently_registered_ = false;
+    }
+    update_callbacks_.clear();
   }
 }
 
@@ -290,6 +273,49 @@ Status StateStoreSubscriber::InitClient() {
     RETURN_IF_ERROR(client_->Open());
   }
   return Status::OK;
+}
+
+void StateStoreSubscriber::CheckNotInCallbackThread() {
+  lock_guard<mutex> lock(callback_thread_id_lock_);
+  DCHECK_NE(callback_thread_id_, this_thread::get_id());
+}
+
+
+Status StateStoreSubscriber::UnregisterServiceWithStateStore(const string& service_id) {
+  RETURN_IF_ERROR(InitClient());
+
+  TUnregisterServiceRequest request;
+  request.__set_subscriber_address(host_port_);
+  request.__set_service_id(service_id);
+  TUnregisterServiceResponse response;
+
+  try {
+    client_->iface()->UnregisterService(response, request);
+  } catch ( TTransportException& e) {
+    Status status(e.what());
+    status.AddErrorMsg(DISCONNECTED_FROM_STATE_STORE_ERROR);
+    return status;
+  }
+  return Status(response.status);
+}
+
+Status StateStoreSubscriber::UnregisterSubscriptionWithStateStore(
+    const SubscriptionId& id) {
+  RETURN_IF_ERROR(InitClient());
+
+  TUnregisterSubscriptionRequest request;
+  request.__set_subscriber_address(host_port_);
+  request.__set_subscription_id(id);
+  TUnregisterSubscriptionResponse response;
+  try {
+    client_->iface()->UnregisterSubscription(response, request);
+  } catch (TTransportException& e) {
+    Status status(e.what());
+    status.AddErrorMsg(DISCONNECTED_FROM_STATE_STORE_ERROR);
+    return status;
+  }
+
+  return Status(response.status);
 }
 
 }

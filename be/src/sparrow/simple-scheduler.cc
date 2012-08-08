@@ -27,6 +27,7 @@ namespace sparrow {
 SimpleScheduler::SimpleScheduler(SubscriptionManager* subscription_manager,
     const ServiceId& backend_service_id)
   : subscription_manager_(subscription_manager),
+    callback_(bind<void>(mem_fn(&SimpleScheduler::UpdateMembership), this, _1)),
     subscription_id_(INVALID_SUBSCRIPTION_ID),
     backend_service_id_(backend_service_id) {
   next_nonlocal_host_entry_ = host_map_.begin();
@@ -37,10 +38,8 @@ impala::Status SimpleScheduler::Init() {
 
   unordered_set<string> services;
   services.insert(backend_service_id_);
-  SubscriptionManager::UpdateCallback callback =
-      boost::bind<void>(boost::mem_fn(&SimpleScheduler::UpdateMembership), this, _1);
-  RETURN_IF_ERROR(
-      subscription_manager_->RegisterSubscription(callback, services, &subscription_id_));
+  RETURN_IF_ERROR(subscription_manager_->RegisterSubscription(
+      services, &callback_, &subscription_id_));
 
   return Status::OK;
 }
@@ -69,7 +68,8 @@ void SimpleScheduler::UpdateMembership(const ServiceStateMap& service_state) {
 }
 
 SimpleScheduler::SimpleScheduler(const vector<THostPort>& backends)
-    : subscription_manager_(NULL) {
+  : subscription_manager_(NULL),
+    callback_(bind<void>(mem_fn(&SimpleScheduler::UpdateMembership), this, _1)) {
   DCHECK(backends.size() > 0);
   for (int i = 0; i < backends.size(); ++i) {
     string host = backends[i].host;

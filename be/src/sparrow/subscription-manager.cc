@@ -24,6 +24,10 @@ DEFINE_int32(state_store_subscriber_port, 23000,
 
 namespace sparrow {
 
+SubscriptionManager::UpdateCallback::~UpdateCallback() {
+  DCHECK(!currently_registered_);
+}
+
 SubscriptionManager::SubscriptionManager()
     : state_store_(new StateStoreSubscriber(FLAGS_host,
                        FLAGS_state_store_subscriber_port, FLAGS_state_store_host,
@@ -46,9 +50,9 @@ Status SubscriptionManager::UnregisterService(const string& service_id) {
 }
 
 Status SubscriptionManager::RegisterSubscription(
-    const UpdateCallback& update, const unordered_set<std::string>& services,
+    const unordered_set<std::string>& services, UpdateCallback* update,
     SubscriptionId* id) {
-  return state_store_->RegisterSubscription(update, services, id);
+  return state_store_->RegisterSubscription(services, update, id);
 }
 
 Status SubscriptionManager::UnregisterSubscription(SubscriptionId id) {

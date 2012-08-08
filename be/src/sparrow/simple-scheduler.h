@@ -11,13 +11,12 @@
 
 #include "common/status.h"
 #include "sparrow/scheduler.h"
+#include "sparrow/subscription-manager.h"
 #include "sparrow/util.h"
 #include "sparrow/state-store-service.h"
 #include "gen-cpp/Types_types.h"  // for THostPort
 
 namespace sparrow {
-
-class SubscriptionManager;
 
 // Temporary stand-in for a scheduler, while we're waiting for the Sparrow
 // client library.
@@ -64,10 +63,13 @@ class SimpleScheduler : public Scheduler {
   // round robin entry in HostMap for non-local host assignment
   HostMap::iterator next_nonlocal_host_entry_;
 
-  // Pointer to a subscription manager (which we do not own) which is used to register for
-  // dynamic updates to the set of available backends. May be NULL if the set of backends
-  // is fixed.
+  // Pointer to a subscription manager (which we do not own) which is used to register
+  // for dynamic updates to the set of available backends. May be NULL if the set of
+  // backends is fixed.
   SubscriptionManager* subscription_manager_;
+
+  // UpdateCallback to use for registering a subscription with the subscription manager.
+  SubscriptionManager::UpdateCallback callback_;
 
   // Subscription handle, used to unregister with subscription manager
   SubscriptionId subscription_id_;
