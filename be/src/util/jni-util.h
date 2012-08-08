@@ -56,7 +56,8 @@
     jthrowable exc = (env)->ExceptionOccurred(); \
     if (exc != NULL) { \
       DCHECK((throwable_to_string_id_) != NULL); \
-      jstring msg = (jstring) env->CallObjectMethod(exc, (throwable_to_string_id_)); \
+      jstring msg = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
+          exc, (throwable_to_string_id_));                              \
       jboolean is_copy; \
       const char* c_msg = \
           reinterpret_cast<const char*>((env)->GetStringUTFChars(msg, &is_copy)); \
@@ -70,7 +71,12 @@
   do { \
     jthrowable exc = (env)->ExceptionOccurred(); \
     if (exc != NULL) { \
-      (env)->ExceptionDescribe(); \
+      jstring msg = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
+          JniUtil::throwable_to_string_id(), exc); \
+      jboolean is_copy; \
+      const char* c_msg = \
+          reinterpret_cast<const char*>((env)->GetStringUTFChars(msg, &is_copy)); \
+      VLOG(1) << string(c_msg); \
      return; \
     } \
   } while (false)
@@ -79,7 +85,12 @@
   do { \
     jthrowable exc = (env)->ExceptionOccurred(); \
     if (exc != NULL) { \
-      (env)->ExceptionDescribe(); \
+      jstring msg = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
+          JniUtil::throwable_to_string_id(), exc);                          \
+      jboolean is_copy; \
+      const char* c_msg = \
+          reinterpret_cast<const char*>((env)->GetStringUTFChars(msg, &is_copy)); \
+      LOG(FATAL) << string(c_msg); \
      exit(1); \
     } \
   } while (false)
@@ -89,7 +100,8 @@
     jthrowable exc = (env)->ExceptionOccurred(); \
     if (exc != NULL) { \
       DCHECK((throwable_to_string_id_) != NULL); \
-      jstring msg = (jstring) env->CallObjectMethod(exc, (throwable_to_string_id_)); \
+      jstring msg = (jstring) env->CallStaticObjectMethod(JniUtil::jni_util_class(), \
+          (throwable_to_string_id_), exc); \
       jboolean is_copy; \
       const char* c_msg = \
           reinterpret_cast<const char*>((env)->GetStringUTFChars(msg, &is_copy)); \
@@ -141,7 +153,7 @@ class JniUtil {
   // Call this prior to any libhdfs calls.
   static void InitLibhdfs();
 
-  // Find Throwable class, and get Throwable toString() method id.
+  // Find JniUtil class, and get JniUtil.throwableToString method id
   static Status Init();
 
   // Returns a global JNI reference to the class specified by class_str into class_ref.
@@ -158,11 +170,14 @@ class JniUtil {
 
   static jmethodID throwable_to_string_id() { return throwable_to_string_id_; }
 
+  // Global reference to java JniUtil class
+  static jclass jni_util_class() { return jni_util_cl_; }
+
   // Delete all global references: class members, and those stored in global_refs_.
   static Status Cleanup();
 
  private:
-  static jclass throwable_cl_;
+  static jclass jni_util_cl_;
   static jmethodID throwable_to_string_id_;
   // List of global references created with GetGlobalClassRef() or LocalToGlobalRef.
   // All global references are deleted in Cleanup().

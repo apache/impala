@@ -8,7 +8,7 @@ using namespace std;
 
 namespace impala {
 
-jclass JniUtil::throwable_cl_ = NULL;
+jclass JniUtil::jni_util_cl_ = NULL;
 jmethodID JniUtil::throwable_to_string_id_ = NULL;
 vector<jobject> JniUtil::global_refs_;
 
@@ -38,27 +38,28 @@ Status JniUtil::Init() {
   }
 
   // Throwable
-  jclass local_throwable_cl = env->FindClass("java/lang/Throwable");
-  if (local_throwable_cl == NULL) {
+  jclass local_jni_util_cl = env->FindClass("com/cloudera/impala/common/JniUtil");
+  if (local_jni_util_cl == NULL) {
     if (env->ExceptionOccurred()) env->ExceptionDescribe();
-    return Status("Failed to find Java Throwable class.");
+    return Status("Failed to find JniUtil class.");
   }
-  throwable_cl_ = reinterpret_cast<jclass>(env->NewGlobalRef(local_throwable_cl));
-  if (throwable_cl_ == NULL) {
+  jni_util_cl_ = reinterpret_cast<jclass>(env->NewGlobalRef(local_jni_util_cl));
+  if (jni_util_cl_ == NULL) {
     if (env->ExceptionOccurred()) env->ExceptionDescribe();
-    return Status("Failed to create global reference to Java Throwable class.");
+    return Status("Failed to create global reference to JniUtil class.");
   }
-  env->DeleteLocalRef(local_throwable_cl);
+  env->DeleteLocalRef(local_jni_util_cl);
   if (env->ExceptionOccurred()) {
-    return Status("Failed to delete local reference to Java Throwable class.");
+    return Status("Failed to delete local reference to JniUtil class.");
   }
 
   // Throwable toString()
   throwable_to_string_id_ =
-      env->GetMethodID(throwable_cl_, "toString", "()Ljava/lang/String;");
+      env->GetStaticMethodID(jni_util_cl_, "throwableToString", 
+          "(Ljava/lang/Throwable;)Ljava/lang/String;");
   if (throwable_to_string_id_ == NULL) {
     if (env->ExceptionOccurred()) env->ExceptionDescribe();
-    return Status("Failed to find Java Throwable toString() method.");
+    return Status("Failed to find JniUtil.throwableToString method.");
   }
 
   return Status::OK;
