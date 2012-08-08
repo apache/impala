@@ -5,11 +5,13 @@
 
 #include <vector>
 #include <boost/thread/mutex.hpp>
+#include <boost/thread/locks.hpp>
 
 namespace impala {
 
 // An ObjectPool maintains a list of C++ objects which are deallocated
 // by destroying the pool.
+// Thread-safe.
 class ObjectPool {
  public:
   ObjectPool(): objects_() {}
@@ -23,6 +25,7 @@ class ObjectPool {
 
   template <class T>
   T* Add(T* t) {
+    boost::lock_guard<boost::mutex> l(lock_);
     objects_.push_back(new SpecificElement<T>(t));
     return t;
   }
@@ -44,6 +47,7 @@ class ObjectPool {
 
   typedef std::vector<GenericElement*> ElementVector;
   ElementVector objects_;
+  boost::mutex lock_;
 };
 
 }

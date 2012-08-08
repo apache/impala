@@ -27,8 +27,8 @@ class DescriptorTbl;
 class ByteStream;
 
 struct HdfsScanRange {
-  int offset_;
-  int length_;
+  int64_t offset_;
+  int64_t length_;
 
   // Index into map of partitions in the related HdfsTableDescriptor
   // May not be unique across tables.
