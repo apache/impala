@@ -134,6 +134,12 @@ Status PlanFragmentExecutor::GetNext(RowBatch** batch) {
   if (done_ && *batch == NULL) {
     // make sure to call Close() before returning 'eos'.
     RETURN_IF_ERROR(plan_->Close(runtime_state_.get()));
+    if (VLOG_QUERY_IS_ON) {
+      stringstream ss;
+      plan_->runtime_profile()->PrettyPrint(&ss);
+      VLOG_QUERY << "Runtime profile for fragment " << runtime_state_->fragment_id()
+                 << endl << ss.str();
+    }
   }
 
 #if 0

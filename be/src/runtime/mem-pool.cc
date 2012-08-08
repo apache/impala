@@ -53,10 +53,8 @@ MemPool::MemPool(const vector<string>& chunks)
 }
 
 MemPool::~MemPool() {
-  VLOG_FILE << this << " ~mempool: deleting " << chunks_.size() << " chunks";
   for (size_t i = 0; i < chunks_.size(); ++i) {
     if (!chunks_[i].owns_data) continue;
-    VLOG_FILE << "deleting " << (void*)chunks_[i].data;
     delete [] chunks_[i].data;
   }
 }
