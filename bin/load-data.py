@@ -85,7 +85,7 @@ def get_dataset_for_workload(workload):
     print 'Dimension file not found: ' + dimension_file_name
     sys.exit(1)
   with open(dimension_file_name, 'rb') as input_file:
-    match = re.search('dataset:\s*(\w+)', input_file.read())
+    match = re.search('dataset:\s*([\w\-\.]+)', input_file.read())
     if match:
       return match.group(1)
     else:
