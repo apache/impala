@@ -140,7 +140,7 @@ terminal KW_AND, KW_ALL, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW_BIGINT, KW_BOOLEA
   KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_REGEXP,
   KW_RLIKE, KW_RIGHT, KW_SELECT, KW_SEMI, KW_SMALLINT, KW_STRING, KW_SUM,
   KW_TINYINT, KW_TRUE, KW_UNION, KW_USING, KW_WHEN, KW_WHERE, KW_THEN, KW_TIMESTAMP,
-  KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION;
+  KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION, KW_INTERVAL;
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
 terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
@@ -165,7 +165,7 @@ nonterminal SelectList select_clause;
 nonterminal SelectList select_list;
 nonterminal SelectListItem select_list_item;
 nonterminal SelectListItem star_expr ;
-nonterminal Expr expr, arithmetic_expr;
+nonterminal Expr expr, arithmetic_expr, timestamp_arithmetic_expr;
 nonterminal ArrayList<Expr> expr_list;
 nonterminal ArrayList<Expr> func_arg_list;
 nonterminal String alias_clause;
@@ -213,6 +213,8 @@ precedence left BITAND, BITOR, BITXOR, BITNOT;
 precedence left KW_ORDER, KW_BY, KW_LIMIT;
 precedence left RPAREN;
 precedence left KW_IN;
+// Support chaining of timestamp arithmetic exprs.
+precedence left KW_INTERVAL;
 
 start with insert_or_query_stmt;
 
@@ -413,7 +415,7 @@ select_list_item ::=
   | predicate:p alias_clause:alias
   {: RESULT = new SelectListItem(p, alias); :}
   | predicate:p
-  {: RESULT = new SelectListItem(p, null); :}  
+  {: RESULT = new SelectListItem(p, null); :}
   | star_expr:expr
   {: RESULT = expr; :}  
   ;
@@ -678,7 +680,7 @@ expr ::=
   subtract_chain_expr:e
   {: RESULT = e; :}  
   | literal:l
-  {: RESULT = l; :}
+  {: RESULT = l; :} 
   | IDENT:functionName LPAREN RPAREN
   {: RESULT = new FunctionCallExpr(functionName, new ArrayList<Expr>()); :}
   | IDENT:functionName LPAREN func_arg_list:exprs RPAREN
@@ -691,10 +693,12 @@ expr ::=
   {: RESULT = a; :}
   | column_ref:c
   {: RESULT = c; :}
-  | arithmetic_expr:e
+  | timestamp_arithmetic_expr:e
+  {: RESULT = e; :}  
+  | arithmetic_expr:e  
   {: RESULT = e; :}
   | LPAREN expr:e RPAREN
-  {: RESULT = e; :}
+  {: RESULT = e; :}  
   ;
 
 func_arg_list ::=
@@ -733,6 +737,46 @@ arithmetic_expr ::=
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.BITXOR, e1, e2); :}
   | BITNOT expr:e
   {: RESULT = new ArithmeticExpr(ArithmeticExpr.Operator.BITNOT, e, null); :}
+  ;
+
+// We use IDENT for the temporal unit to avoid making DAY, YEAR, etc. keywords.
+// This way we do not need to change existing uses of IDENT.
+// We chose not to make DATE_ADD and DATE_SUB keywords for the same reason.
+timestamp_arithmetic_expr ::=
+  KW_INTERVAL expr:v IDENT:u ADD expr:t
+  {: RESULT = new TimestampArithmeticExpr(ArithmeticExpr.Operator.ADD, t, v, u, true); :}
+  | expr:t ADD KW_INTERVAL expr:v IDENT:u
+  {: 
+    RESULT = new TimestampArithmeticExpr(ArithmeticExpr.Operator.ADD, t, v, u, false);
+  :}
+  // Set precedence to KW_INTERVAL (which is higher than ADD) for chaining.
+  %prec KW_INTERVAL
+  | expr:t SUBTRACT KW_INTERVAL expr:v IDENT:u
+  {:
+    RESULT = 
+        new TimestampArithmeticExpr(ArithmeticExpr.Operator.SUBTRACT, t, v, u, false);
+  :}
+  // Set precedence to KW_INTERVAL (which is higher than ADD) for chaining.
+  %prec KW_INTERVAL
+  // Timestamp arithmetic expr that looks like a function call.
+  // We use func_arg_list instead of expr to avoid a shift/reduce conflict with
+  // func_arg_list on COMMA, and report an error if the list contains more than one expr.
+  | IDENT:functionName LPAREN func_arg_list:l COMMA KW_INTERVAL expr:v IDENT:u RPAREN
+  {:
+    if (l.size() > 1) {
+      // Report parsing failure on keyword interval.
+      Symbol errorToken = parser.getSymbolFactory().newSymbol("interval",
+        SqlParserSymbols.KW_INTERVAL,
+        ((Symbol) CUP$SqlParser$stack.peek()),
+        ((Symbol) CUP$SqlParser$stack.peek()), RESULT);
+      // Call syntax error to gather information about expected tokens, etc.
+      // syntax_error does not throw an exception
+      parser.syntax_error(errorToken);
+      // Unrecovered_syntax_error throws an exception and will terminate parsing
+      parser.unrecovered_syntax_error(errorToken);    
+    }
+    RESULT = new TimestampArithmeticExpr(functionName, l.get(0), v, u);
+  :}
   ;
 
 literal ::=

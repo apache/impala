@@ -30,12 +30,38 @@ class TimestampFunctions {
   static void* Minute(Expr* e, TupleRow* row);
   static void* Second(Expr* e, TupleRow* row);
 
-  // Date functions.
+  // Date/time functions.
   static void* Now(Expr* e, TupleRow* row);
   static void* ToDate(Expr* e, TupleRow* row);
-  static void* DateAdd(Expr* e, TupleRow* row);
-  static void* DateSub(Expr* e, TupleRow* row);
   static void* DateDiff(Expr* e, TupleRow* row);
+  static void* YearsAdd(Expr* e, TupleRow* row);
+  static void* YearsSub(Expr* e, TupleRow* row);
+  static void* MonthsAdd(Expr* e, TupleRow* row);
+  static void* MonthsSub(Expr* e, TupleRow* row);
+  static void* WeeksAdd(Expr* e, TupleRow* row);
+  static void* WeeksSub(Expr* e, TupleRow* row);
+  static void* DaysAdd(Expr* e, TupleRow* row);
+  static void* DaysSub(Expr* e, TupleRow* row);
+  static void* HoursAdd(Expr* e, TupleRow* row);
+  static void* HoursSub(Expr* e, TupleRow* row);
+  static void* MinutesAdd(Expr* e, TupleRow* row);
+  static void* MinutesSub(Expr* e, TupleRow* row);
+  static void* SecondsAdd(Expr* e, TupleRow* row);
+  static void* SecondsSub(Expr* e, TupleRow* row);
+  static void* MillisAdd(Expr* e, TupleRow* row);
+  static void* MillisSub(Expr* e, TupleRow* row);
+  static void* MicrosAdd(Expr* e, TupleRow* row);
+  static void* MicrosSub(Expr* e, TupleRow* row);
+  static void* NanosAdd(Expr* e, TupleRow* row);
+  static void* NanosSub(Expr* e, TupleRow* row);
+
+  // Helper for add/sub functions on the date portion.
+  template <class UNIT>
+  static void* TimestampDateOp(Expr* e, TupleRow* row, bool is_add);
+
+  // Helper for add/sub functions on the time portion.
+  template <class UNIT>
+  static void* TimestampTimeOp(Expr* e, TupleRow* row, bool is_add);
 
   // Convert a timestamp to or from a particular timezone based time.
   static void* FromUtc(Expr* e, TupleRow* row);
@@ -56,6 +82,7 @@ class TimezoneDatabase {
   static boost::local_time::tz_database tz_database_;
   static std::vector<std::string> tz_region_list_;
 };
+
 }
 
 #endif

@@ -820,3 +820,284 @@ timestamp, timestamp
 // Matches two identical timestamps separated by commas.
 regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1
 ====
+# Timestamp arithmetic tests (lowest timestamp_col has value 2009-01-01 00:00:00).
+# Add/sub years, non-function-call like version.
+select timestamp_col + interval 10 years,
+       interval 10 years + timestamp_col,
+       timestamp_col - interval 10 years
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp,timestamp
+---- RESULTS
+2019-01-01 00:00:00,2019-01-01 00:00:00,1999-01-01 00:00:00
+====
+# Add/sub years, function-call like version.
+select date_add(timestamp_col, interval 10 years),
+       date_sub(timestamp_col, interval 10 years)
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp
+---- RESULTS
+2019-01-01 00:00:00,1999-01-01 00:00:00
+====
+# Add/sub months, non-function-call like version.
+select timestamp_col + interval 13 months,
+       timestamp_col + interval 1 month,
+       interval 13 months + timestamp_col,
+       interval 1 month + timestamp_col,
+       timestamp_col - interval 13 months,
+       timestamp_col - interval 1 month
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp,timestamp,timestamp,timestamp,timestamp
+---- RESULTS
+2010-02-01 00:00:00,2009-02-01 00:00:00,2010-02-01 00:00:00,2009-02-01 00:00:00,2007-12-01 00:00:00,2008-12-01 00:00:00
+====
+# Add/sub months, function-call like version.
+select date_add(timestamp_col, interval 13 months),
+       date_add(timestamp_col, interval 1 month),
+       date_sub(timestamp_col, interval 13 months),
+       date_sub(timestamp_col, interval 1 month)
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp,timestamp,timestamp
+---- RESULTS
+2010-02-01 00:00:00,2009-02-01 00:00:00,2007-12-01 00:00:00,2008-12-01 00:00:00
+====
+# Add/sub weeks, non-function-call like version.
+select timestamp_col + interval 2 weeks,       
+       timestamp_col + interval 53 weeks,
+       interval 2 weeks + timestamp_col,
+       interval 53 weeks + timestamp_col,
+       timestamp_col - interval 2 weeks,
+       timestamp_col - interval 53 weeks
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp,timestamp,timestamp,timestamp,timestamp
+---- RESULTS
+2009-01-15 00:00:00,2010-01-07 00:00:00,2009-01-15 00:00:00,2010-01-07 00:00:00,2008-12-18 00:00:00,2007-12-27 00:00:00
+====
+# Add/sub weeks, function-call like version.
+select date_add(timestamp_col, interval 2 weeks),       
+       date_add(timestamp_col, interval 53 weeks),
+       date_sub(timestamp_col, interval 2 weeks),
+       date_sub(timestamp_col, interval 53 weeks)
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp,timestamp,timestamp
+---- RESULTS
+2009-01-15 00:00:00,2010-01-07 00:00:00,2008-12-18 00:00:00,2007-12-27 00:00:00
+====
+# Add/sub days, non-function-call like version.
+select timestamp_col + interval 10 days,       
+       timestamp_col + interval 10 days,
+       interval 10 days + timestamp_col,       
+       interval 10 days + timestamp_col,
+       timestamp_col - interval 10 days,
+       timestamp_col - interval 365 days
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp,timestamp,timestamp,timestamp,timestamp
+---- RESULTS
+2009-01-11 00:00:00,2009-01-11 00:00:00,2009-01-11 00:00:00,2009-01-11 00:00:00,2008-12-22 00:00:00,2008-01-02 00:00:00
+====
+# Add/sub days, function-call like version.
+select date_add(timestamp_col, interval 10 days),
+       date_add(timestamp_col, interval 10 days),
+       date_sub(timestamp_col, interval 10 days),
+       date_sub(timestamp_col, interval 365 days)
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp,timestamp,timestamp
+---- RESULTS
+2009-01-11 00:00:00,2009-01-11 00:00:00,2008-12-22 00:00:00,2008-01-02 00:00:00
+====
+# Add/sub hours, non-function-call like version.
+select timestamp_col + interval 25 hours,
+       interval 25 hours + timestamp_col,
+       timestamp_col - interval 25 hours
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp,timestamp
+---- RESULTS
+2009-01-02 01:00:00,2009-01-02 01:00:00,2008-12-30 23:00:00
+====
+# Add/sub hours, function-call like version.
+select date_add(timestamp_col, interval 25 hours),
+       date_sub(timestamp_col, interval 25 hours)
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp
+---- RESULTS
+2009-01-02 01:00:00,2008-12-30 23:00:00
+====
+# Add/sub minutes (1533 minutes are 25h33m), non-function-call like version.
+select timestamp_col + interval 1533 minutes,
+       interval 1533 minutes + timestamp_col,
+       timestamp_col - interval 1533 minutes
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp,timestamp
+---- RESULTS
+2009-01-02 01:33:00,2009-01-02 01:33:00,2008-12-30 22:27:00
+====
+# Add/sub minutes (1533 minutes are 25h33m), function-call like version.
+select date_add(timestamp_col, interval 1533 minutes),
+       date_sub(timestamp_col, interval 1533 minutes)
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp
+---- RESULTS
+2009-01-02 01:33:00,2008-12-30 22:27:00
+====
+# Add/sub seconds (90033 seconds are 25h33s), non-function-call like version.
+select timestamp_col + interval 90033 seconds,
+       interval 90033 seconds + timestamp_col,
+       timestamp_col - interval 90033 seconds
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp,timestamp
+---- RESULTS
+2009-01-02 01:00:33,2009-01-02 01:00:33,2008-12-30 22:59:27
+====
+# Add/sub seconds (90033 seconds are 25h33s), function-call like version.
+select date_add(timestamp_col, interval 90033 seconds),
+       date_sub(timestamp_col, interval 90033 seconds)
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp
+---- RESULTS
+2009-01-02 01:00:33,2008-12-30 22:59:27
+====
+# Add/sub milliseconds (90000033 seconds are 25h33ms), non-function-call like version.
+select timestamp_col + interval 90000033 milliseconds,
+       interval 90000033 milliseconds + timestamp_col,
+       timestamp_col - interval 90000033 milliseconds
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp,timestamp
+---- RESULTS
+2009-01-02 01:00:00.033000000,2009-01-02 01:00:00.033000000,2008-12-30 22:59:59.967000000
+====
+# Add/sub milliseconds (90000033 seconds are 25h33ms), function-call like version.
+select date_add(timestamp_col, interval 90000033 milliseconds),
+       date_sub(timestamp_col, interval 90000033 milliseconds)
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp
+---- RESULTS
+2009-01-02 01:00:00.033000000,2008-12-30 22:59:59.967000000
+====
+# Add/sub microseconds, non-function-call like version.
+select timestamp_col + interval 1033 microseconds,
+       interval 1033 microseconds + timestamp_col,
+       timestamp_col - interval 1033 microseconds
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp,timestamp
+---- RESULTS
+2009-01-01 00:00:00.001033000,2009-01-01 00:00:00.001033000,2008-12-31 23:59:59.998967000
+====
+# Add/sub microseconds, function-call like version.
+select date_add(timestamp_col, interval 1033 microseconds),
+       date_sub(timestamp_col, interval 1033 microseconds)
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp
+---- RESULTS
+2009-01-01 00:00:00.001033000,2008-12-31 23:59:59.998967000
+====
+# Add/sub nanoseconds, non-function-call like version.
+select timestamp_col + interval 1033 nanoseconds,
+       interval 1033 nanoseconds + timestamp_col,
+       timestamp_col - interval 1033 nanoseconds
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp,timestamp
+---- RESULTS
+2009-01-01 00:00:00.000001033,2009-01-01 00:00:00.000001033,2008-12-31 23:59:59.999998967
+====
+# Add/sub nanoseconds, function-call like version.
+select date_add(timestamp_col, interval 1033 nanoseconds),
+       date_sub(timestamp_col, interval 1033 nanoseconds)
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp
+---- RESULTS
+2009-01-01 00:00:00.000001033,2008-12-31 23:59:59.999998967
+====
+# Chaining of arithmetic operations (only non-function-call like version).
+select timestamp_col + interval 10 years + interval 2 months + interval 5 days,
+       interval 10 years + timestamp_col + interval 2 months + interval 5 days,       
+       timestamp_col + interval 10 years - interval 2 months + interval 5 days,
+       interval 10 years + timestamp_col - interval 2 months + interval 5 days,
+       timestamp_col - interval 10 years - interval 2 months - interval 5 days
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp,timestamp,timestamp,timestamp
+---- RESULTS
+2019-03-06 00:00:00,2019-03-06 00:00:00,2018-11-06 00:00:00,2018-11-06 00:00:00,1998-10-27 00:00:00
+====
+select timestamp_col + interval 10 hours + interval 2 minutes + interval 5 seconds
+            + interval 3 milliseconds + interval 3 microseconds + interval 3 nanoseconds,
+       interval 10 hours + timestamp_col + interval 2 minutes + interval 5 seconds
+            + interval 3 milliseconds + interval 3 microseconds + interval 3 nanoseconds,
+       timestamp_col + interval 10 hours - interval 2 minutes + interval 5 seconds
+            - interval 3 milliseconds + interval 3 microseconds - interval 3 nanoseconds,
+       interval 10 hours + timestamp_col + interval 2 minutes + interval 5 seconds
+            - interval 3 milliseconds + interval 3 microseconds - interval 3 nanoseconds,
+       timestamp_col - interval 10 hours - interval 2 minutes - interval 5 seconds
+            - interval 3 milliseconds - interval 3 microseconds - interval 3 nanoseconds
+from alltypes$TABLE order by id limit 1
+---- TYPES
+timestamp,timestamp,timestamp,timestamp,timestamp
+---- RESULTS
+2009-01-01 10:02:05.003003003,2009-01-01 10:02:05.003003003,2009-01-01 09:58:04.997002997,2009-01-01 10:02:04.997002997,2008-12-31 13:57:54.996996997
+====
+# Test corner cases and also timestamp arithmetic without from clause.
+select cast("2012-02-29 00:00:00" as timestamp) + interval 1 year,
+       cast("2013-02-28 00:00:00" as timestamp) - interval 1 year,
+       cast("2012-01-01 00:00:00" as timestamp) + interval 365 days,
+       cast("2013-01-01 00:00:00" as timestamp) - interval 366 days
+---- TYPES
+timestamp,timestamp,timestamp,timestamp
+---- RESULTS
+2013-02-28 00:00:00,2012-02-29 00:00:00,2012-12-31 00:00:00,2012-01-01 00:00:00
+====
+# Test overflow (2147483647 is MAX_INT).
+select cast("2012-01-01 00:00:00" as timestamp) + interval 2147483647 years,
+       cast("2012-01-01 00:00:00" as timestamp) - interval 2147483647 years
+---- TYPES
+timestamp,timestamp
+---- RESULTS
+2011-01-01 00:00:00,2013-01-01 00:00:00
+====
+# Timestamp arithmetic inside a predicate.
+select year, month from alltypes$TABLE
+where year = year((cast('2012-01-01 09:10:11' as timestamp) - interval 3 years))
+and month = month((cast('2012-01-01 09:10:11' as timestamp) + interval 3 months))
+limit 3
+---- TYPES
+int,int
+---- RESULTS
+2009,4
+2009,4
+2009,4
+====
+# Test NULLs in second operand
+select count(*) from alltypesagg$TABLE
+where (cast('2012-01-01 09:10:11' as timestamp) + interval tinyint_col seconds) IS NULL
+---- TYPES
+bigint
+---- RESULTS
+1000
+====
+# Test NULLs in first operand
+select count(*) from alltypesagg$TABLE
+where (cast('2012-01-01 09:10:11' as timestamp) + interval tinyint_col seconds)
+      + interval 10 years IS NULL
+---- TYPES
+bigint
+---- RESULTS
+1000
+====

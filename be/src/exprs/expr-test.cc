@@ -1645,6 +1645,53 @@ TEST_F(ExprTest, MathRoundingFunctions) {
 TEST_F(ExprTest, TimestampFunctions) {
   TestStringValue("cast(cast('2012-01-01 09:10:11.123456789' as timestamp) as string)",
       "2012-01-01 09:10:11.123456789");
+  // Add/sub years.
+  TestStringValue("cast(date_add(cast('2012-01-01 09:10:11.123456789' "
+      "as timestamp), interval 10 years) as string)",
+      "2022-01-01 09:10:11.123456789");
+  TestStringValue("cast(date_sub(cast('2012-01-01 09:10:11.123456789' "
+      "as timestamp), interval 10 years) as string)",
+      "2002-01-01 09:10:11.123456789");
+  // Add/sub months.
+  TestStringValue("cast(date_add(cast('2012-01-01 09:10:11.123456789' "
+      "as timestamp), interval 13 months) as string)",
+      "2013-02-01 09:10:11.123456789");
+  TestStringValue("cast(date_sub(cast('2013-02-01 09:10:11.123456789' "
+      "as timestamp), interval 13 months) as string)",
+      "2012-01-01 09:10:11.123456789");
+  TestStringValue("cast(date_add(cast('2012-01-31 09:10:11.123456789' "
+      "as timestamp), interval 1 month) as string)",
+      "2012-02-29 09:10:11.123456789");
+  TestStringValue("cast(date_sub(cast('2012-02-29 09:10:11.123456789' "
+      "as timestamp), interval 1 month) as string)",
+      "2012-01-31 09:10:11.123456789");
+  // Add/sub weeks.
+  TestStringValue("cast(date_add(cast('2012-01-01 09:10:11.123456789' "
+      "as timestamp), interval 2 weeks) as string)",
+      "2012-01-15 09:10:11.123456789");
+  TestStringValue("cast(date_sub(cast('2012-01-15 09:10:11.123456789' "
+      "as timestamp), interval 2 weeks) as string)",
+      "2012-01-01 09:10:11.123456789");
+  TestStringValue("cast(date_add(cast('2012-01-01 09:10:11.123456789' "
+      "as timestamp), interval 53 weeks) as string)",
+      "2013-01-06 09:10:11.123456789");
+  TestStringValue("cast(date_sub(cast('2013-01-06 09:10:11.123456789' "
+      "as timestamp), interval 53 weeks) as string)",
+      "2012-01-01 09:10:11.123456789");
+  // Add/sub days.
+  TestStringValue("cast(date_add(cast('2012-01-01 09:10:11.123456789' "
+      "as timestamp), interval 10 days) as string)",
+      "2012-01-11 09:10:11.123456789");
+  TestStringValue("cast(date_sub(cast('2012-01-01 09:10:11.123456789' "
+      "as timestamp), interval 10 days) as string)",
+      "2011-12-22 09:10:11.123456789");
+  TestStringValue("cast(date_add(cast('2011-12-22 09:10:11.12345678' "
+      "as timestamp), interval 10 days) as string)",
+      "2012-01-01 09:10:11.123456780");
+  TestStringValue("cast(date_sub(cast('2011-12-22 09:10:11.12345678' "
+      "as timestamp), interval 365 days) as string)",
+      "2010-12-22 09:10:11.123456780");
+  // Add/sub days (HIVE's date_add/sub variant).
   TestStringValue("cast(date_add(cast('2012-01-01 09:10:11.123456789' "
       "as timestamp), 10) as string)",
       "2012-01-11 09:10:11.123456789");
@@ -1657,6 +1704,60 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestStringValue(
       "cast(date_sub(cast('2011-12-22 09:10:11.12345678' as timestamp), 365) as string)",
       "2010-12-22 09:10:11.123456780");
+  // Add/sub hours.
+  TestStringValue("cast(date_add(cast('2012-01-01 00:00:00.123456789' "
+      "as timestamp), interval 25 hours) as string)",
+      "2012-01-02 01:00:00.123456789");
+  TestStringValue("cast(date_sub(cast('2012-01-02 01:00:00.123456789' "
+      "as timestamp), interval 25 hours) as string)",
+      "2012-01-01 00:00:00.123456789");
+  // Add/sub minutes.
+  TestStringValue("cast(date_add(cast('2012-01-01 00:00:00.123456789' "
+      "as timestamp), interval 1533 minutes) as string)",
+      "2012-01-02 01:33:00.123456789");
+  TestStringValue("cast(date_sub(cast('2012-01-02 01:33:00.123456789' "
+      "as timestamp), interval 1533 minutes) as string)",
+      "2012-01-01 00:00:00.123456789");
+  // Add/sub seconds.
+  TestStringValue("cast(date_add(cast('2012-01-01 00:00:00.123456789' "
+      "as timestamp), interval 90033 seconds) as string)",
+      "2012-01-02 01:00:33.123456789");
+  TestStringValue("cast(date_sub(cast('2012-01-02 01:00:33.123456789' "
+      "as timestamp), interval 90033 seconds) as string)",
+      "2012-01-01 00:00:00.123456789");
+  // Add/sub milliseconds.
+  TestStringValue("cast(date_add(cast('2012-01-01 00:00:00.000000001' "
+      "as timestamp), interval 90000033 milliseconds) as string)",
+      "2012-01-02 01:00:00.033000001");
+  TestStringValue("cast(date_sub(cast('2012-01-02 01:00:00.033000001' "
+      "as timestamp), interval 90000033 milliseconds) as string)",
+      "2012-01-01 00:00:00.000000001");
+  // Add/sub microseconds.
+  TestStringValue("cast(date_add(cast('2012-01-01 00:00:00.000000001' "
+      "as timestamp), interval 1033 microseconds) as string)",
+      "2012-01-01 00:00:00.001033001");
+  TestStringValue("cast(date_sub(cast('2012-01-01 00:00:00.001033001' "
+      "as timestamp), interval 1033 microseconds) as string)",
+      "2012-01-01 00:00:00.000000001");
+  // Add/sub nanoseconds.
+  TestStringValue("cast(date_add(cast('2012-01-01 00:00:00.000000001' "
+      "as timestamp), interval 1033 nanoseconds) as string)",
+      "2012-01-01 00:00:00.000001034");
+  TestStringValue("cast(date_sub(cast('2012-01-01 00:00:00.000001034' "
+      "as timestamp), interval 1033 nanoseconds) as string)",
+      "2012-01-01 00:00:00.000000001");
+
+  // Test add/sub behavior with very large time values.
+  string max_int = lexical_cast<string>(numeric_limits<int32_t>::max());
+  TestStringValue(
+        "cast(years_add(cast('2000-01-01 00:00:00' "
+        "as timestamp), " + max_int + ") as string)",
+        "1999-01-01 00:00:00");
+  TestStringValue(
+      "cast(years_sub(cast('2000-01-01 00:00:00' "
+      "as timestamp), " + max_int + ") as string)",
+      "2001-01-01 00:00:00");
+
   TestValue("unix_timestamp(cast('1970-01-01 00:00:00' as timestamp))", TYPE_INT, 0);
   TestStringValue("cast(cast(0 as timestamp) as string)", "1970-01-01 00:00:00");
   TestValue("cast('2011-12-22 09:10:11.123456789' as timestamp) > \

@@ -68,6 +68,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("in", new Integer(SqlParserSymbols.KW_IN));
     keywordMap.put("inner", new Integer(SqlParserSymbols.KW_INNER));
     keywordMap.put("insert", new Integer(SqlParserSymbols.KW_INSERT));
+    keywordMap.put("interval", new Integer(SqlParserSymbols.KW_INTERVAL));
     keywordMap.put("into", new Integer(SqlParserSymbols.KW_INTO)); 
     keywordMap.put("join", new Integer(SqlParserSymbols.KW_JOIN));
     keywordMap.put("int", new Integer(SqlParserSymbols.KW_INT));    

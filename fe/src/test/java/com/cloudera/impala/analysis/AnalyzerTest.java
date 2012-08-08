@@ -20,6 +20,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.TestSchemaUtils;
@@ -1190,6 +1191,122 @@ public class AnalyzerTest {
         "Invalid floating point argument to operation |");
     AnalysisError("select int_col from alltypes where float_col & bool_col > 5",
         "Arithmetic operation requires numeric or string operands");
+  }
+
+  /**
+   * We have three variants of timestamp arithmetic exprs, as in MySQL:
+   * http://dev.mysql.com/doc/refman/5.5/en/date-and-time-functions.html
+   * (section #function_date-add)
+   * 1. Non-function-call like version, e.g., 'a + interval b timeunit'
+   * 2. Beginning with an interval (only for '+'), e.g., 'interval b timeunit + a'
+   * 3. Function-call like version, e.g., date_add(a, interval b timeunit)
+   */
+  @Test
+  public void TestTimestampArithmeticExpressions() {
+    String[] valueTypeCols =
+      new String[] { "tinyint_col", "smallint_col", "int_col" };
+
+    // Tests all time units.
+    for (TimeUnit timeUnit : TimeUnit.values()) {
+      // Tests on all valid time value types (fixed points).
+      for (String col : valueTypeCols) {
+        // Non-function call like version.
+        AnalyzesOk("select timestamp_col + interval " + col + " " + timeUnit.toString() +
+            " from alltypes");
+        AnalyzesOk("select timestamp_col - interval " + col + " " + timeUnit.toString() +
+            " from alltypes");
+        // Reversed interval and timestamp using addition.
+        AnalyzesOk("select interval " + col + " " + timeUnit.toString() +
+            " + timestamp_col from alltypes");
+        // Function-call like version.
+        AnalyzesOk("select date_add(timestamp_col, interval " + col + " " +
+            timeUnit.toString() + ") from alltypes");
+        AnalyzesOk("select date_sub(timestamp_col, interval " + col + " " +
+            timeUnit.toString() + ") from alltypes");
+      }
+    }
+
+    // First operand does not return a timestamp. Non-function-call like version.
+    AnalysisError("select float_col + interval 10 years from alltypes",
+        "Operand 'float_col' of timestamp arithmetic expression " +
+        "'float_col + INTERVAL 10 years' returns type 'FLOAT'. " +
+        "Expected type 'TIMESTAMP'.");
+    AnalysisError("select string_col + interval 10 years from alltypes",
+        "Operand 'string_col' of timestamp arithmetic expression " +
+        "'string_col + INTERVAL 10 years' returns type 'STRING'. " +
+        "Expected type 'TIMESTAMP'.");
+    // Reversed interval and timestamp using addition.
+    AnalysisError("select interval 10 years + float_col from alltypes",
+        "Operand 'float_col' of timestamp arithmetic expression " +
+        "'INTERVAL 10 years + float_col' returns type 'FLOAT'. " +
+        "Expected type 'TIMESTAMP'");
+    AnalysisError("select interval 10 years + string_col from alltypes",
+        "Operand 'string_col' of timestamp arithmetic expression " +
+        "'INTERVAL 10 years + string_col' returns type 'STRING'. " +
+        "Expected type 'TIMESTAMP'");
+    // First operand does not return a timestamp. Function-call like version.
+    AnalysisError("select date_add(float_col, interval 10 years) from alltypes",
+        "Operand 'float_col' of timestamp arithmetic expression " +
+        "'date_add(float_col, INTERVAL 10 years)' returns type 'FLOAT'. " +
+        "Expected type 'TIMESTAMP'.");
+    AnalysisError("select date_add(string_col, interval 10 years) from alltypes",
+        "Operand 'string_col' of timestamp arithmetic expression " +
+        "'date_add(string_col, INTERVAL 10 years)' returns type 'STRING'. " +
+        "Expected type 'TIMESTAMP'.");
+
+    // Second operand is not compatible with type INT. Non-function-call like version.
+    AnalysisError("select timestamp_col + interval 5.2 years from alltypes",
+        "Operand '5.2' of timestamp arithmetic expression " +
+        "'timestamp_col + INTERVAL 5.2 years' returns type 'DOUBLE' " +
+        "which is incompatible with expected type 'INT'.");
+    AnalysisError("select timestamp_col + interval bigint_col years from alltypes",
+        "Operand 'bigint_col' of timestamp arithmetic expression " +
+        "'timestamp_col + INTERVAL bigint_col years' returns type 'BIGINT' " +
+        "which is incompatible with expected type 'INT'.");
+    // Implicit cast from STRING to INT.
+    AnalyzesOk("select timestamp_col + interval '10' years from alltypes");
+    // Reversed interval and timestamp using addition.
+    AnalysisError("select interval 5.2 years + timestamp_col from alltypes",
+        "Operand '5.2' of timestamp arithmetic expression " +
+        "'INTERVAL 5.2 years + timestamp_col' returns type 'DOUBLE' " +
+        "which is incompatible with expected type 'INT'.");
+    AnalysisError("select interval bigint_col years + timestamp_col from alltypes",
+        "Operand 'bigint_col' of timestamp arithmetic expression " +
+        "'INTERVAL bigint_col years + timestamp_col' returns type 'BIGINT' " +
+        "which is incompatible with expected type 'INT'.");
+    // Implicit cast from STRING to INT.
+    AnalyzesOk("select interval '10' years + timestamp_col from alltypes");
+    // Second operand is not compatible with type INT. Function-call like version.
+    AnalysisError("select date_add(timestamp_col, interval 5.2 years) from alltypes",
+        "Operand '5.2' of timestamp arithmetic expression " +
+        "'date_add(timestamp_col, INTERVAL 5.2 years)' returns type 'DOUBLE' " +
+        "which is incompatible with expected type 'INT'.");
+    AnalysisError("select date_add(timestamp_col, interval bigint_col years) " +
+    		"from alltypes",
+        "Operand 'bigint_col' of timestamp arithmetic expression " +
+        "'date_add(timestamp_col, INTERVAL bigint_col years)' returns type 'BIGINT' " +
+        "which is incompatible with expected type 'INT'.");
+    // Implicit cast from STRING to INT.
+    AnalyzesOk("select date_add(timestamp_col, interval '10' years) from alltypes");
+
+    // Invalid time unit. Non-function-call like version.
+    AnalysisError("select timestamp_col + interval 10 error from alltypes",
+        "Invalid time unit 'error' in timestamp arithmetic expression " +
+        "'timestamp_col + INTERVAL 10 error'.");
+    AnalysisError("select timestamp_col - interval 10 error from alltypes",
+        "Invalid time unit 'error' in timestamp arithmetic expression " +
+        "'timestamp_col - INTERVAL 10 error'.");
+    // Reversed interval and timestamp using addition.
+    AnalysisError("select interval 10 error + timestamp_col from alltypes",
+        "Invalid time unit 'error' in timestamp arithmetic expression " +
+        "'INTERVAL 10 error + timestamp_col'.");
+    // Invalid time unit. Function-call like version.
+    AnalysisError("select date_add(timestamp_col, interval 10 error) from alltypes",
+        "Invalid time unit 'error' in timestamp arithmetic expression " +
+        "'date_add(timestamp_col, INTERVAL 10 error)'.");
+    AnalysisError("select date_sub(timestamp_col, interval 10 error) from alltypes",
+        "Invalid time unit 'error' in timestamp arithmetic expression " +
+        "'date_sub(timestamp_col, INTERVAL 10 error)'.");
   }
 
   @Test

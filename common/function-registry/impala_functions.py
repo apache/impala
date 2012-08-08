@@ -123,10 +123,46 @@ functions = [
   ['Timestamp_now', 'TIMESTAMP', [], 'TimestampFunctions::Now', ['now']],
   ['Timestamp_to_date', 'STRING', ['TIMESTAMP'], \
         'TimestampFunctions::ToDate', ['to_date']],
-  ['Timestamp_date_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
-        'TimestampFunctions::DateAdd', ['date_add']],
-  ['Timestamp_date_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
-        'TimestampFunctions::DateSub', ['date_sub']],
+  ['Timestamp_years_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::YearsAdd', ['years_add']],
+  ['Timestamp_years_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::YearsSub', ['years_sub']],
+  ['Timestamp_months_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::MonthsAdd', ['months_add']],
+  ['Timestamp_months_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::MonthsSub', ['months_sub']],
+  ['Timestamp_weeks_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::WeeksAdd', ['weeks_add']],
+  ['Timestamp_weeks_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::WeeksSub', ['weeks_sub']],
+  ['Timestamp_days_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::DaysAdd', ['days_add', 'date_add', 'adddate']],
+  ['Timestamp_days_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::DaysSub', ['days_sub', 'date_sub', 'subdate']],
+  ['Timestamp_hours_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::HoursAdd', ['hours_add']],
+  ['Timestamp_hours_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::HoursSub', ['hours_sub']],
+  ['Timestamp_minutes_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::MinutesAdd', ['minutes_add']],
+  ['Timestamp_minutes_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::MinutesSub', ['minutes_sub']],
+  ['Timestamp_seconds_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::SecondsAdd', ['seconds_add']],
+  ['Timestamp_seconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::SecondsSub', ['seconds_sub']],
+  ['Timestamp_milliseconds_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::MillisAdd', ['milliseconds_add']],
+  ['Timestamp_milliseconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::MillisSub', ['milliseconds_sub']],
+  ['Timestamp_microseconds_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::MicrosAdd', ['microseconds_add']],
+  ['Timestamp_microseconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::MicrosSub', ['microseconds_sub']],
+  ['Timestamp_nanoseconds_add', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::NanosAdd', ['nanoseconds_add']],
+  ['Timestamp_nanoseconds_sub', 'TIMESTAMP', ['TIMESTAMP', 'INT'], \
+        'TimestampFunctions::NanosSub', ['nanoseconds_sub']],
   ['Timestamp_diff', 'INT', ['TIMESTAMP', 'TIMESTAMP'], \
         'TimestampFunctions::DateDiff', ['datediff']],
   ['From_utc_timestamp', 'TIMESTAMP', ['TIMESTAMP', 'STRING'], \

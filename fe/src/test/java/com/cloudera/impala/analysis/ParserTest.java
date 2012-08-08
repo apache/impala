@@ -10,12 +10,15 @@ import java.io.StringReader;
 
 import org.junit.Test;
 
+import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
+
 public class ParserTest {
   /**
    * Asserts in case of parser error.
    * @param stmt
+   * @return parse result
    */
-  public void ParsesOk(String stmt) {
+  public Object ParsesOk(String stmt) {
     SqlScanner input = new SqlScanner(new StringReader(stmt));
     SqlParser parser = new SqlParser(input);
     Object result = null;
@@ -26,6 +29,7 @@ public class ParserTest {
       fail("\n" + parser.getErrorMsg(stmt));
     }
     assertNotNull(result);
+    return result;
   }
 
   /**
@@ -353,6 +357,51 @@ public class ParserTest {
     ParserError("select a ~ a from t");
   }
 
+  /**
+   * We have three variants of timestamp arithmetic exprs, as in MySQL:
+   * http://dev.mysql.com/doc/refman/5.5/en/date-and-time-functions.html
+   * (section #function_date-add)
+   * 1. Non-function-call like version, e.g., 'a + interval b timeunit'
+   * 2. Beginning with an interval (only for '+'), e.g., 'interval b timeunit + a'
+   * 3. Function-call like version, e.g., date_add(a, interval b timeunit)
+   */
+  @Test public void TestTimestampArithmeticExprs() {
+    // Tests all valid time units.
+    for (TimeUnit timeUnit : TimeUnit.values()) {
+      // Non-function call like versions.
+      ParsesOk("select a + interval b " + timeUnit.toString());
+      ParsesOk("select a - interval b " + timeUnit.toString());
+      // Reversed interval and timestamp is ok for addition.
+      ParsesOk("select interval b " + timeUnit.toString() + " + a");
+      // Reversed interval and timestamp is an error for subtraction.
+      ParserError("select interval b " + timeUnit.toString() + " - a");
+      // Function-call like versions.
+      ParsesOk("select date_add(a, interval b " + timeUnit.toString() + ")");
+      ParsesOk("select date_sub(a, interval b " + timeUnit.toString() + ")");
+      // Invalid function name for timestamp arithmetic expr should parse ok.
+      ParsesOk("select error(a, interval b " + timeUnit.toString() + ")");
+      // Invalid time unit parses ok.
+      ParsesOk("select error(a, interval b error)");
+      // Missing 'interval' keyword. Note that the non-function-call like version will
+      // pass without 'interval' because the time unit is recognized as an alias.
+      ParserError("select date_add(a, b " + timeUnit.toString() + ")");
+      ParserError("select date_sub(a, b " + timeUnit.toString() + ")");
+    }
+
+    // Test chained timestamp arithmetic exprs.
+    ParsesOk("select a + interval b years + interval c months + interval d days");
+    ParsesOk("select a - interval b years - interval c months - interval d days");
+    ParsesOk("select a + interval b years - interval c months + interval d days");
+    // Starting with interval.
+    ParsesOk("select interval b years + a + interval c months + interval d days");
+    ParsesOk("select interval b years + a - interval c months - interval d days");
+    ParsesOk("select interval b years + a - interval c months + interval d days");
+
+    // To many arguments.
+    ParserError("select date_sub(a, c, interval b year)");
+    ParserError("select date_sub(a, interval b year, c)");
+  }
+
   @Test public void TestCaseExprs() {
     // Test regular exps.
     ParsesOk("select case a when '5' then x when '6' then y else z end from t");
@@ -575,7 +624,7 @@ public class ParserTest {
         "       ^\n" +
         "Encountered: FROM\n" +
         "Expected: AVG, CASE, CAST, COUNT, DISTINCT, DISTINCTPC, " +
-        "DISTINCTPCSA, FALSE, MIN, MAX, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
+        "DISTINCTPCSA, FALSE, MIN, MAX, NOT, NULL, SUM, TRUE, INTERVAL, IDENTIFIER\n");
 
     // missing from
     ParserError("select c, b, c where a = 5",
@@ -601,7 +650,7 @@ public class ParserTest {
         "                           ^\n" +
         "Encountered: EOF\n" +
         "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, " +
-        "FALSE, MIN, MAX, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
+        "FALSE, MIN, MAX, NOT, NULL, SUM, TRUE, INTERVAL, IDENTIFIER\n");
 
     // missing predicate in where clause (group by)
     ParserError("select c, b, c from t where group by a, b",
@@ -610,7 +659,7 @@ public class ParserTest {
         "                            ^\n" +
         "Encountered: GROUP\n" +
         "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, " +
-        "FALSE, MIN, MAX, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
+        "FALSE, MIN, MAX, NOT, NULL, SUM, TRUE, INTERVAL, IDENTIFIER\n");
 
     // unmatched string literal starting with "
     ParserError("select c, \"b, c from t",

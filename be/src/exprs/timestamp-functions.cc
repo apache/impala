@@ -150,35 +150,119 @@ void* TimestampFunctions::ToDate(Expr* e, TupleRow* row) {
   return &e->result_.string_val;
 }
 
-void* TimestampFunctions::DateAdd(Expr* e, TupleRow* row) {
+void* TimestampFunctions::YearsAdd(Expr* e, TupleRow* row) {
+  return TimestampDateOp<years>(e, row, true);
+}
+
+void* TimestampFunctions::YearsSub(Expr* e, TupleRow* row) {
+  return TimestampDateOp<years>(e, row, false);
+}
+
+void* TimestampFunctions::MonthsAdd(Expr* e, TupleRow* row) {
+  return TimestampDateOp<months>(e, row, true);
+}
+
+void* TimestampFunctions::MonthsSub(Expr* e, TupleRow* row) {
+  return TimestampDateOp<months>(e, row, false);
+}
+
+void* TimestampFunctions::WeeksAdd(Expr* e, TupleRow* row) {
+  return TimestampDateOp<weeks>(e, row, true);
+}
+
+void* TimestampFunctions::WeeksSub(Expr* e, TupleRow* row) {
+  return TimestampDateOp<weeks>(e, row, false);
+}
+
+void* TimestampFunctions::DaysAdd(Expr* e, TupleRow* row) {
+  return TimestampDateOp<date_duration>(e, row, true);
+}
+
+void* TimestampFunctions::DaysSub(Expr* e, TupleRow* row) {
+  return TimestampDateOp<date_duration>(e, row, false);
+}
+
+void* TimestampFunctions::HoursAdd(Expr* e, TupleRow* row) {
+  return TimestampTimeOp<hours>(e, row, true);
+}
+
+void* TimestampFunctions::HoursSub(Expr* e, TupleRow* row) {
+  return TimestampTimeOp<hours>(e, row, false);
+}
+
+void* TimestampFunctions::MinutesAdd(Expr* e, TupleRow* row) {
+  return TimestampTimeOp<minutes>(e, row, true);
+}
+
+void* TimestampFunctions::MinutesSub(Expr* e, TupleRow* row) {
+  return TimestampTimeOp<minutes>(e, row, false);
+}
+
+void* TimestampFunctions::SecondsAdd(Expr* e, TupleRow* row) {
+  return TimestampTimeOp<seconds>(e, row, true);
+}
+
+void* TimestampFunctions::SecondsSub(Expr* e, TupleRow* row) {
+  return TimestampTimeOp<seconds>(e, row, false);
+}
+
+void* TimestampFunctions::MillisAdd(Expr* e, TupleRow* row) {
+  return TimestampTimeOp<milliseconds>(e, row, true);
+}
+
+void* TimestampFunctions::MillisSub(Expr* e, TupleRow* row) {
+  return TimestampTimeOp<milliseconds>(e, row, false);
+}
+
+void* TimestampFunctions::MicrosAdd(Expr* e, TupleRow* row) {
+  return TimestampTimeOp<microseconds>(e, row, true);
+}
+
+void* TimestampFunctions::MicrosSub(Expr* e, TupleRow* row) {
+  return TimestampTimeOp<microseconds>(e, row, false);
+}
+
+void* TimestampFunctions::NanosAdd(Expr* e, TupleRow* row) {
+  return TimestampTimeOp<nanoseconds>(e, row, true);
+}
+
+void* TimestampFunctions::NanosSub(Expr* e, TupleRow* row) {
+  return TimestampTimeOp<nanoseconds>(e, row, false);
+}
+
+template <class UNIT>
+void* TimestampFunctions::TimestampDateOp(Expr* e, TupleRow* row, bool is_add) {
   DCHECK_EQ(e->GetNumChildren(), 2);
   Expr* op1 = e->children()[0];
   Expr* op2 = e->children()[1];
   TimestampValue* tv = reinterpret_cast<TimestampValue*>(op1->GetValue(row));
-  int* count = reinterpret_cast<int*>(op2->GetValue(row));
+  int32_t* count = reinterpret_cast<int32_t*>(op2->GetValue(row));
   if (tv == NULL || count == NULL) return NULL;
 
   if (tv->date().is_special()) return NULL;
 
-  date_duration d(*count);
-  TimestampValue value(tv->date() + d, tv->time_of_day());
+  UNIT unit(*count);
+  TimestampValue
+      value((is_add ? tv->date() + unit : tv->date() - unit), tv->time_of_day());
   e->result_.timestamp_val = value;
 
   return &e->result_.timestamp_val;
 }
 
-void* TimestampFunctions::DateSub(Expr* e, TupleRow* row) {
+template <class UNIT>
+void* TimestampFunctions::TimestampTimeOp(Expr* e, TupleRow* row, bool is_add) {
   DCHECK_EQ(e->GetNumChildren(), 2);
   Expr* op1 = e->children()[0];
   Expr* op2 = e->children()[1];
   TimestampValue* tv = reinterpret_cast<TimestampValue*>(op1->GetValue(row));
-  int* count = reinterpret_cast<int*>(op2->GetValue(row));
+  int32_t* count = reinterpret_cast<int32_t*>(op2->GetValue(row));
   if (tv == NULL || count == NULL) return NULL;
 
-  if (tv->time_of_day().is_special()) return NULL;
+  if (tv->date().is_special()) return NULL;
 
-  date_duration d(*count);
-  TimestampValue value(tv->date() - d, tv->time_of_day());
+  UNIT unit(*count);
+  ptime p(tv->date(), tv->time_of_day());
+  TimestampValue value(is_add ? p + unit : p - unit);
   e->result_.timestamp_val = value;
 
   return &e->result_.timestamp_val;
