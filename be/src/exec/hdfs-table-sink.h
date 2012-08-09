@@ -36,10 +36,13 @@ struct OutputPartition {
   // Path: <hdfs_base_dir>/<partition_values>/<unique_id_str>.<sequence number>
   std::string current_file_name;
 
+  // Name of the temporary directory.
+  // Path: <hdfs_base_dir>/<unique_id>_dir/
+  std::string tmp_hdfs_dir_name;
+
   // Base name for temporary files: queryId/hdfs_file_name
   // The file is moved to hdfs_file_name in Close().
-  // If overwrite is true, then we move the directory instead of the file.
-  // Path: <hdfs_base_dir>/<unique_id>_dir/<partition_values>/<unique_id_str>
+  // Path: tmp_hdfs_dir_name/<partition_values>/<unique_id_str>
   std::string tmp_hdfs_file_name_template;
 
   // key1=val1/key2=val2/ etc. Used to identify partitions to the metastore.

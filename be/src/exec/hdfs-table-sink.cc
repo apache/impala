@@ -165,6 +165,7 @@ void HdfsTableSink::BuildHdfsFileNames(OutputPartition* output_partition) {
   stringstream tmp_hdfs_file_name_template;
   MakeTmpHdfsDirectoryName(table_desc_->hdfs_base_dir(), unique_id_str_,
                            &tmp_hdfs_file_name_template);
+  output_partition->tmp_hdfs_dir_name = tmp_hdfs_file_name_template.str();
 
   stringstream common_suffix;
 
@@ -376,29 +377,24 @@ Status HdfsTableSink::Close(RuntimeState* state) {
   return Status::OK;
 }
 
+// TODO: testing that temporary files/directories actually get deleted.
 Status HdfsTableSink::MoveTmpHdfsFiles() {
   // 1. Move all tmp Hdfs files to their final destinations.
   // 2. If overwrite_ is true, delete all the original files.
-  const string* tmp_file = NULL;
   for (PartitionMap::iterator partition =
        partition_keys_to_output_partitions_.begin();
        partition != partition_keys_to_output_partitions_.end();
        ++partition) {
     RETURN_IF_ERROR(MoveTmpHdfsFile(partition->second.first));
-    tmp_file = &partition->second.first->tmp_hdfs_file_name_template;
+    // Delete temporary Hdfs dir. The delete is recursive if the third argument
+    // is non-zero.
+    if (hdfsDelete(hdfs_connection_,
+                   partition->second.first->tmp_hdfs_dir_name.c_str(), 1) == -1) {
+      return Status(AppendHdfsErrorMessage("Failed to delete temporary HDFS dir: ",
+          partition->second.first->tmp_hdfs_dir_name.c_str()));
+    }
     if (overwrite_) {
       RETURN_IF_ERROR(DeleteOriginalFiles(partition->second.first));
-    }
-  }
-  // Delete temporary Hdfs dir.
-  if (tmp_file != NULL) {
-    string tmp_dir = tmp_file->substr(0, tmp_file->rfind('/') + 1);
-    if (hdfsDelete(hdfs_connection_, tmp_dir.c_str(), 1) == -1) {
-      // For unpartitioned tables, the dir will be deleted as part of the file move.
-      if (!dynamic_partition_key_exprs_.empty()) {
-        return Status(AppendHdfsErrorMessage("Failed to delete temporary HDFS dir: ",
-            tmp_dir));
-      }
     }
   }
   return Status::OK;
@@ -433,6 +429,15 @@ Status HdfsTableSink::DeleteOriginalFiles(OutputPartition* output_partition) {
 }
 
 Status HdfsTableSink::MoveTmpHdfsFile(OutputPartition* output_partition) {
+  if (!partition_key_exprs_.empty()) {
+    // Create the directory if it does not exist.
+    string dest_dir = output_partition->hdfs_file_name_template.substr(0,
+        output_partition->hdfs_file_name_template.rfind('/') + 1);
+    // Ignore error, it might already be there.
+    hdfsCreateDirectory(hdfs_connection_, dest_dir.c_str());
+  }
+
+  // Move the files. hdfsMove actually does a copy, so call hdfsRename.
   for (int file_num = 0; file_num < output_partition->num_files; ++file_num) {
     stringstream src;
     src << output_partition->tmp_hdfs_file_name_template << "." << file_num;
@@ -442,12 +447,11 @@ Status HdfsTableSink::MoveTmpHdfsFile(OutputPartition* output_partition) {
       return Status(
           AppendHdfsErrorMessage("Target HDFS file already exists: ", dest.str()));
     }
-    // Move the file/dir. Note that it is not necessary to create the target first.
-    if (hdfsMove(hdfs_connection_,
-         src.str().c_str(), hdfs_connection_, dest.str().c_str())) {
+    // Move the file/dir. 
+    if (hdfsRename(hdfs_connection_, src.str().c_str(), dest.str().c_str())) {
       stringstream msg;
-      msg << "Failed to move temporary HDFS file/dir to final destination. "
-          << "(src: " << src << " / dst: " << dest << ")";
+      msg << "Failed to move temporary HDFS file to final destination. "
+          << "(src: " << src.str() << " / dst: " << dest.str() << ")";
       return Status(AppendHdfsErrorMessage(msg.str()));
     }
   }
