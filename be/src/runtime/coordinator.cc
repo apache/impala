@@ -111,7 +111,6 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
           obj_pool()->Add(new BackendExecState(fragment_id, backend_num, hosts[j]));
       DCHECK_EQ(backend_exec_states_.size(), backend_num);
       backend_exec_states_.push_back(exec_state);
-      query_profile_->AddChild(exec_state->profile);
       PrintClientInfo(hosts[j], request->node_request_params[i][j]);
 
       Status fragment_exec_status = ExecRemoteFragment(exec_state,
@@ -302,6 +301,14 @@ Status Coordinator::UpdateFragmentExecStatus(
     exec_state->done = done;
     exec_state->profile =
         RuntimeProfile::CreateFromThrift(obj_pool(), cumulative_profile);
+  }
+  if (done) {
+    DCHECK(exec_state->profile != NULL);
+    // TODO: this is not going to work for getting incremental stats.
+    // We need a way to modify counters in place (instead of creating a new 
+    // RuntimeProfile from thrift) or a way to remove existing profile children
+    // TODO: think about the thread safety of query_profile_
+    query_profile_->AddChild(exec_state->profile);
   }
 
   // for now, abort the query if we see any error

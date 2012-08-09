@@ -21,6 +21,7 @@ HBaseAllTypesErrorNoNulls
 
 # Impala test data (not in repo, manually copied)
 impala-data
+data/test-warehouse
 
 # Generated block ids (hdfs ids) for each table
 block-ids

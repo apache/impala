@@ -3,12 +3,13 @@
 #ifndef IMPALA_UTIL_COUNTERS_H
 #define IMPALA_UTIL_COUNTERS_H
 
+#include "common/logging.h"
 #include "common/object-pool.h"
 #include "util/stopwatch.h"
 
 #include "gen-cpp/RuntimeProfile_types.h"
-#include "common/logging.h"
 
+#include <boost/thread/mutex.hpp>
 #include <iostream>
 
 namespace impala {
@@ -39,7 +40,8 @@ class ObjectPool;
 // Runtime profile is a group of profiling counters.  It supports adding named counters
 // and being able to serialize and deserialize them.
 // The profiles support a tree structure to form a hierarchy of counters.
-// This class is not thread safe.
+// Most of this class is not thread safe except for the AddChild.
+// TODO: we need this to be thread safe without affecting performance.
 class RuntimeProfile {
  public:
   class Counter {
@@ -72,11 +74,11 @@ class RuntimeProfile {
   static RuntimeProfile* CreateFromThrift(ObjectPool* pool,
       const TRuntimeProfileTree& profiles);
 
-  // Adds a child profile
+  // Adds a child profile.  This is thread safe.
   void AddChild(RuntimeProfile* child);
 
   // Merges the src profile into this one, combining counters that have an identical
-  // path.
+  // path.  
   void Merge(const RuntimeProfile& src);
 
   // Add a counter with 'name'/'type'.  Returns a counter object that the caller can
@@ -123,6 +125,9 @@ class RuntimeProfile {
   // Map from counter names to counters.  The profile owns the memory for the
   // counters.
   std::map<std::string, Counter*> counter_map_;
+
+  // Lock protecting children_
+  boost::mutex lock_;
 
   // Child profiles.  Does not own memory
   std::vector<RuntimeProfile*> children_;

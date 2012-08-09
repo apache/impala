@@ -6,7 +6,9 @@
 #include "util/debug-util.h"
 
 #include <iostream>
+#include <boost/thread/locks.hpp>
 
+using namespace boost;
 using namespace std;
 
 namespace impala {
@@ -66,6 +68,7 @@ void RuntimeProfile::Merge(const RuntimeProfile& other) {
   // Recursively merge children with matching names
   for (int i = 0; i < other.children_.size(); ++i) {
     const RuntimeProfile* other_child = other.children_[i];
+    DCHECK(other_child != NULL);
     bool merged = false;
     for (int j = 0; j < children_.size(); ++j) {
       if (children_[j]->name_.compare(other_child->name_) == 0) {
@@ -93,8 +96,10 @@ void RuntimeProfile::Divide(int n) {
   }
 }
 
-void RuntimeProfile::AddChild(RuntimeProfile* parent) {
-  children_.push_back(parent);
+void RuntimeProfile::AddChild(RuntimeProfile* child) {
+  DCHECK(child != NULL);
+  lock_guard<mutex> l(lock_);
+  children_.push_back(child);
 }
 
 RuntimeProfile::Counter* RuntimeProfile::AddCounter(
