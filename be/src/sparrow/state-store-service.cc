@@ -2,6 +2,7 @@
 
 #include "sparrow/state-store-service.h"
 
+#include <exception>
 #include <utility>
 #include <sstream>
 #include <vector>
@@ -12,6 +13,7 @@
 #include <boost/algorithm/string/join.hpp>
 #include <glog/logging.h>
 #include <gflags/gflags.h>
+#include <transport/TTransportException.h>
 
 #include "common/status.h"
 #include "util/thrift-server.h"
@@ -24,6 +26,7 @@ using namespace boost;
 using namespace std;
 
 using namespace ::apache::thrift::server;
+using namespace ::apache::thrift::transport;
 using impala::Status;
 using impala::THostPort;
 using impala::TStatusCode;
@@ -305,7 +308,6 @@ void StateStore::UpdateLoop() {
         // transition the subscriber to a CRITICAL state, and if we have multiple failed
         // attempts to connect to the subscriber, it should be removed from the list of
         // available subscribers.
-        
         LOG(ERROR) << "Unable to update client at " << update.client->host()
                    << ":" << update.client->port() << "; received error "
                    << status.GetErrorMsg();
@@ -313,10 +315,21 @@ void StateStore::UpdateLoop() {
       }
       
       TUpdateStateResponse response;
-      update.client->iface()->UpdateState(response, update.request);
-      if (response.status.status_code != TStatusCode::OK) {
-        Status status(response.status);
-        LOG(ERROR) << status.GetErrorMsg();
+      try {
+        update.client->iface()->UpdateState(response, update.request);
+        if (response.status.status_code != TStatusCode::OK) {
+          Status status(response.status);
+          LOG(ERROR) << status.GetErrorMsg();
+        }
+      } catch (TTransportException& e) {
+        // TODO: As above, this error should transition the subscriber to a CRITICAL
+        // state.
+        LOG(ERROR) << "Unable to update client at " << update.client->host()
+                   << ":" << update.client->port() << "; received error "
+                   << e.what();
+      } catch (std::exception& e) {
+        // Make sure Thrift isn't throwing any other exceptions.
+        DCHECK(false) << e.what();
       }
     }
 

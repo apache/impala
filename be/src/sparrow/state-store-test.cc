@@ -52,8 +52,6 @@ class StateStoreTest : public testing::Test {
         return;
       }
 
-      VLOG_CONNECTION << "satisfied with size "
-                      << update_condition->expected_state.size();
       update_condition->correctly_called = true;
       update_condition->time_last_called = get_system_time();
     }
@@ -101,57 +99,66 @@ class StateStoreTest : public testing::Test {
     }
   }
 
+  // Verify that registering a single service instance works, by first registering a
+  // service instance, and then registering a subscription for the same service id
+  // and ensuring that it's updated correctly. num_registered_subscribers describes
+  // the number of subscribers that have already been registered with the state store
+  // before calling this function (needed to determine the subscriber id of the
+  // subscribers that are registered in this function).
+  void VerifySingleRegisterWorks(int num_registered_subscribers) {
+    const string service_id = "test_service";
+
+    shared_ptr<StateStoreSubscriber> running_subscriber = StartStateStoreSubscriber();
+
+    shared_ptr<StateStoreSubscriber> listening_subscriber = StartStateStoreSubscriber();
+
+    // Address where service_id is running.
+    THostPort service_address;
+    service_address.host = host_;
+    service_address.port = next_port_++;
+
+    // We expect the membership to include just one running instance of service_id.
+    UpdateCondition update_condition;
+    update_condition.expected_state[service_id].membership = Membership();
+    const SubscriberId expected_assigned_id = num_registered_subscribers + 1;
+    update_condition.expected_state[service_id].membership[expected_assigned_id] =
+        service_address;
+    SubscriptionManager::UpdateCallback update_callback(
+        bind(&StateStoreTest::Update, &update_condition, _1));
+
+    // Register the listening_subscriber to receive updates.
+    unordered_set<string> update_services;
+    update_services.insert(service_id);
+    SubscriptionId id;
+    Status status = listening_subscriber->RegisterSubscription(update_services,
+                                                               &update_callback, &id);
+    EXPECT_TRUE(status.ok());
+
+    // Register a running service on running_subscriber, and wait for the
+    // listening_subscriber to receive the update.
+    status = running_subscriber->RegisterService(service_id, service_address);
+    EXPECT_TRUE(status.ok());
+
+    {
+      unique_lock<mutex> lock(update_condition.mut);
+      system_time timeout = get_system_time() + posix_time::seconds(30);
+      while (!update_condition.correctly_called) {
+        ASSERT_TRUE(update_condition.condition.timed_wait(lock, timeout));
+      }
+    }
+
+    // Unregister everything, because the UpdateCallback class checks
+    // that the callback has been unregistered (which happens with the associated
+    // subscrition is unregistered) in its destructor.
+    UnregisterAllSubscribers();
+  }
 };
 
 const char* StateStoreTest::host_ = "localhost";
 int StateStoreTest::next_port_ = 23000;
 
 TEST_F(StateStoreTest, SingleRegister) {
-  const string service_id = "test_service";
-
-  shared_ptr<StateStoreSubscriber> running_subscriber = StartStateStoreSubscriber();
-
-  shared_ptr<StateStoreSubscriber> listening_subscriber = StartStateStoreSubscriber();
-
-  // Address where service_id is running.
-  THostPort service_address;
-  service_address.host = host_;
-  service_address.port = next_port_++;
-
-  // We expect the membership to include just one running instance of service_id.
-  UpdateCondition update_condition;
-  update_condition.expected_state[service_id].membership = Membership();
-  const SubscriberId expected_assigned_id = 1;
-  update_condition.expected_state[service_id].membership[expected_assigned_id] =
-      service_address;
-  SubscriptionManager::UpdateCallback update_callback(
-      bind(&StateStoreTest::Update, &update_condition, _1));
-
-  // Register the listening_subscriber to receive updates.
-  unordered_set<string> update_services;
-  update_services.insert(service_id);
-  SubscriptionId id;
-  Status status = listening_subscriber->RegisterSubscription(update_services,
-                                                             &update_callback, &id);
-  EXPECT_TRUE(status.ok());
-
-  // Register a running service on running_subscriber, and wait for the
-  // listening_subscriber to receive the update.
-  status = running_subscriber->RegisterService(service_id, service_address);
-  EXPECT_TRUE(status.ok());
-
-  {
-    unique_lock<mutex> lock(update_condition.mut);
-    system_time timeout = get_system_time() + posix_time::seconds(10);
-    while (!update_condition.correctly_called) {
-      ASSERT_TRUE(update_condition.condition.timed_wait(lock, timeout));
-    }
-  }
-
-  // Unregister everything, because the UpdateCallback class checks
-  // that the callback has been unregistered (which happens with the associated
-  // subscrition is unregistered) in its destructor.
-  UnregisterAllSubscribers();
+  VerifySingleRegisterWorks(0);
 };
 
 TEST_F(StateStoreTest, MultipleServiceRegister) {
@@ -543,6 +550,51 @@ TEST_F(StateStoreTest, UnregisterAll) {
     }
   }
   UnregisterAllSubscribers();
+};
+
+TEST_F(StateStoreTest, SubscriberFailure) {
+  // Tests that failure of a subscriber does not cause the state store to die. Because
+  // the subscriber uses a thrift server that does not fail gracefully, we need to fork
+  // a process and then have that process commit suicide to bring the server down.
+
+  // Pick a random-esque exit id, so we can make sure the child didn't exit for a
+  // reason other than it committing suicide.
+  int expected_child_exit_id = 23;
+  
+  pid_t child_pid = fork();
+  if (child_pid == 0) {
+    // This is the child thread. Start a subscriber and register a subscription.
+    shared_ptr<StateStoreSubscriber> subscriber = StartStateStoreSubscriber();
+    unordered_set<string> update_services;
+    update_services.insert("test_service");
+    
+    UpdateCondition update_condition;
+    SubscriptionManager::UpdateCallback update_callback(
+        bind(&StateStoreTest::Update, &update_condition, _1));
+    SubscriptionId id;
+    Status status = subscriber->RegisterSubscription(update_services, &update_callback,
+                                                     &id);
+    EXPECT_TRUE(status.ok());
+
+    // Commit suicide.
+    exit(expected_child_exit_id);
+  } else {
+    // Parent process.
+    // The port specified by next_port_ will be used by the child process to create a new
+    // subscriber, so increment it here to ensure any ports used by the parent process
+    // are still unique.
+    next_port_++;
+
+    // Wait for the child to die.
+    int child_result;
+    waitpid(child_pid, &child_result, 0);
+    DCHECK_EQ(expected_child_exit_id, WEXITSTATUS(child_result));
+
+    // Sanity check that the state store is still working properly by
+    // registering a subscription and a running instance, and ensuring that the
+    // subscription is updated correctly.
+    VerifySingleRegisterWorks(1);
+  }
 };
 
 } // namespace sparrow
