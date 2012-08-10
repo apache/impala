@@ -65,11 +65,11 @@ using namespace apache::thrift::concurrency;
 using namespace beeswax;
 
 DEFINE_bool(use_planservice, false, "Use external planservice if true");
-DEFINE_string(planservice_host, "localhost",
-    "Host on which external planservice is running");
-DEFINE_int32(planservice_port, 20000, "Port on which external planservice is running");
+DECLARE_string(planservice_host);
+DECLARE_int32(planservice_port);
 DEFINE_int32(fe_port, 21000, "port on which ImpalaService is exported");
-DEFINE_int32(fe_service_threads, 10, "number of threads servicing ImpalaService requests");
+DEFINE_int32(fe_service_threads, 10,
+    "number of threads servicing ImpalaService requests");
 DEFINE_int32(be_port, 22000, "port on which ImpalaInternalService is exported");
 DEFINE_int32(be_service_threads, 10,
     "number of threads servicing ImpalaInternalService requests");

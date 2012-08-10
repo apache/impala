@@ -18,15 +18,14 @@ using impala::THostPort;
 DEFINE_string(state_store_host, "localhost",
               "hostname where StateStoreService is running");
 DEFINE_int32(state_store_port, 24000, "port where StateStoreService is running");
-DEFINE_string(state_store_subscriber_host, "localhost",
-              "hostname where StateStoreSubscriberService is running");
+DECLARE_string(host);
 DEFINE_int32(state_store_subscriber_port, 23000,
-             "port where StateStoreSubscriberService is running");
+             "port where StateStoreSubscriberService should be exported");
 
 namespace sparrow {
 
 SubscriptionManager::SubscriptionManager()
-    : state_store_(new StateStoreSubscriber(FLAGS_state_store_subscriber_host,
+    : state_store_(new StateStoreSubscriber(FLAGS_host,
                        FLAGS_state_store_subscriber_port, FLAGS_state_store_host,
                        FLAGS_state_store_port)) {
 }

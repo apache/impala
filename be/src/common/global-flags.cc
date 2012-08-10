@@ -9,3 +9,5 @@
 
 DEFINE_string(classpath, "", "java classpath");
 DEFINE_string(host, "localhost", "The host on which we're running.");
+DEFINE_string(planservice_host, "localhost", "Host on which planservice is running");
+DEFINE_int32(planservice_port, 20000, "Port on which planservice is running");

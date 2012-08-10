@@ -17,9 +17,9 @@
 
 #include <iostream>
 
-DEFINE_string(planservice_host, "localhost", "Hostname of planservice");
-DEFINE_int32(planservice_port, 20000, "Port number of planservice");
 DEFINE_bool(impalad, false, "Refresh via impalad instead of planservice");
+DECLARE_string(planservice_host);
+DECLARE_int32(planservice_port);
 
 using namespace apache::thrift;
 using namespace apache::thrift::protocol;

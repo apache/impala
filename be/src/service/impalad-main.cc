@@ -44,9 +44,8 @@ using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
 using namespace apache::thrift::concurrency;
 
-DEFINE_string(classpath, "", "java classpath");
-//DECLARE_string(host);
-DEFINE_string(host, "localhost", "The host on which we're running.");
+DECLARE_string(classpath);
+DECLARE_string(host);
 DECLARE_bool(use_statestore);
 DECLARE_int32(fe_port);
 DECLARE_int32(be_port);
