@@ -75,7 +75,7 @@ void TextConverter::UnescapeString(const char* src, char* dest, int* len) {
 // }
 Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen, 
     TupleDescriptor* tuple_desc, SlotDescriptor* slot_desc) {
-  COUNTER_SCOPED_TIMER(codegen->codegen_timer());
+  SCOPED_TIMER(codegen->codegen_timer());
 
   // Don't codegen with escape characters.  
   // TODO: handle this case and also the case to copy strings for data compaction

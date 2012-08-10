@@ -62,7 +62,7 @@ HdfsScanNode::~HdfsScanNode() {
 
 Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_CANCELLED(state);
-  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
 
   {
     unique_lock<recursive_mutex> l(lock_);
@@ -319,10 +319,6 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
 
   // One-time initialisation of state that is constant across scan ranges
   DCHECK(tuple_desc_->table_desc() != NULL);
-
-  // set up Hdfs specific counters
-  hdfs_read_timer_ =
-      ADD_COUNTER(runtime_profile(), "HdfsReadTime", TCounterType::CPU_TICKS);
 
   hdfs_table_ = static_cast<const HdfsTableDescriptor*>(tuple_desc_->table_desc());
 

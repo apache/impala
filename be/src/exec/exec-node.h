@@ -106,6 +106,9 @@ class ExecNode {
   RuntimeProfile* runtime_profile() { return runtime_profile_.get(); }
   RuntimeProfile::Counter* memory_used_counter() const { return memory_used_counter_; }
 
+  // Extract node id from p->name().
+  static int GetNodeIdFromProfile(RuntimeProfile* p);
+
  protected:
   int id_;  // unique w/in single plan tree
   ObjectPool* pool_;

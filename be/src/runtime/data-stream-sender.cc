@@ -295,6 +295,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
     // SendBatch() will block if there are still in-flight rpcs (and those will
     // reference the previously written thrift batch)
     for (int i = 0; i < channels_.size(); ++i) {
+      LOG(INFO) << "send on channel " << i;
       RETURN_IF_ERROR(channels_[i]->SendBatch(current_thrift_batch_));
     }
     current_thrift_batch_ =
@@ -315,6 +316,7 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
 Status DataStreamSender::Close(RuntimeState* state) {
   // TODO: only close channels that didn't have any errors
   for (int i = 0; i < channels_.size(); ++i) {
+    LOG(INFO) << "closing channel " << i;
     RETURN_IF_ERROR(channels_[i]->Close());
   }
   return Status::OK;

@@ -33,14 +33,18 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
 }
 
 Status ExchangeNode::Open(RuntimeState* state) {
-  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   return Status::OK;
 }
 
 Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* eos) {
-  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   bool is_cancelled;
   scoped_ptr<RowBatch> input_batch(stream_recvr_->GetBatch(&is_cancelled));
+  VLOG_QUERY << "exch: has batch=" << (input_batch.get() == NULL ? "false" : "true")
+            << " #rows=" << (input_batch.get() != NULL ? input_batch->num_rows() : 0)
+            << " is_cancelled=" << (is_cancelled ? "true" : "false")
+            << " fragment_id=" << state->fragment_id();
   if (is_cancelled) return Status(TStatusCode::CANCELLED);
   output_batch->Reset();
   *eos = (input_batch.get() == NULL);

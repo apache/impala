@@ -23,10 +23,14 @@ using namespace beeswax;
 
 namespace impala {
 
-ImpaladQueryExecutor::ImpaladQueryExecutor(): current_row_(0), eos_(false) {
+ImpaladQueryExecutor::ImpaladQueryExecutor()
+  : query_in_progress_(false),
+    current_row_(0),
+    eos_(false) {
 }
 
 ImpaladQueryExecutor::~ImpaladQueryExecutor() {
+  Close();
 }
 
 Status ImpaladQueryExecutor::Setup() {
@@ -48,8 +52,23 @@ Status ImpaladQueryExecutor::Setup() {
   return Status::OK;
 }
 
+Status ImpaladQueryExecutor::Close() {
+  if (!query_in_progress_) return Status::OK;
+  try {
+    client_->iface()->close(query_handle_);
+  } catch (BeeswaxException& e) {
+    stringstream ss;
+    ss << e.SQLState << ": " << e.message;
+    return Status(ss.str());
+  }
+  query_in_progress_ = false;
+  return Status::OK;
+}
+
 Status ImpaladQueryExecutor::Exec(
     const string& query_string, vector<PrimitiveType>* col_types) {
+  // close anything that ran previously
+  Close();
   Query query;
   query.query = query_string;
   query.configuration = exec_options_;
@@ -65,6 +84,7 @@ Status ImpaladQueryExecutor::Exec(
     return Status(ss.str());
   }
   current_row_ = 0;
+  query_in_progress_ = true;
   return Status::OK;
 }
 

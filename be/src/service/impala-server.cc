@@ -99,24 +99,25 @@ const string NO_QUERY_HANDLE = "no_query_handle";
 // while holding the exec state's lock.
 class ImpalaServer::QueryExecState {
  public:
-  QueryExecState(const TClientRequest& request, const TUniqueId& query_id,
-      ExecEnv* exec_env, const TResultSetMetadata& metadata, 
-      const TQueryExecRequest& exec_request, ImpalaServer* impala_server)
-    : request_(request), query_id_(query_id),
-      exec_env_(exec_env),
+  QueryExecState(ExecEnv* exec_env, ImpalaServer* server)
+    : exec_env_(exec_env),
       coord_(NULL),
+      profile_(&profile_pool_, "Query"),  // assign name w/ id after planning
       eos_(false),
       query_state_(QueryState::CREATED),
-      query_exec_request_(exec_request),
-      result_metadata_(metadata), current_batch_(NULL), current_batch_row_(0),
+      current_batch_(NULL),
+      current_batch_row_(0),
       current_row_(0),
-      impala_server_(impala_server) {}
+      impala_server_(server) {
+    planner_timer_ = ADD_COUNTER(&profile_, "PlanningTime", TCounterType::CPU_TICKS);
+  }
 
   ~QueryExecState() {
   }
 
   // Initiates execution of plan fragments, if there are any, and sets
   // up the output exprs for subsequent calls to FetchRowsAsAscii().
+  // Also sets up profile and pre-execution counters.
   // Non-blocking.
   Status Exec(TQueryExecRequest* exec_request);
 
@@ -151,19 +152,25 @@ class ImpalaServer::QueryExecState {
     query_status_ = status;
   }
 
+  // Sets state to EXCEPTION and cancels coordinator.
+  // Caller needs to hold lock().
+  void Cancel();
+
   bool eos() { return eos_; }
   Coordinator* coord() const { return coord_.get(); }
   int current_row() const { return current_row_; }
   const TResultSetMetadata* result_metadata() { return &result_metadata_; }
   const TUniqueId& query_id() const { return query_id_; }
-  const TQueryExecRequest& query_exec_request() const { return query_exec_request_; }
+  const TQueryExecRequest& query_exec_request() const { return exec_request_; }
   mutex* lock() { return &lock_; }
   const QueryState::type query_state() const { return query_state_; }
   void set_query_state(QueryState::type state) { query_state_ = state; }
   const Status& query_status() const { return query_status_; }
+  RuntimeProfile::Counter* planner_timer() { return planner_timer_; }
+  void set_result_metadata(const TResultSetMetadata& md) { result_metadata_ = md; }
 
  private:
-  TClientRequest request_;  // the original request
+  //TClientRequest request_;  // the original request
   TUniqueId query_id_;
   mutex lock_;  // protects all following fields
   ExecStats exec_stats_;
@@ -171,11 +178,14 @@ class ImpalaServer::QueryExecState {
   scoped_ptr<Coordinator> coord_;  // not set for queries w/o FROM
   // local runtime_state_ in case we don't have a coord_
   RuntimeState local_runtime_state_;
+  ObjectPool profile_pool_;
+  RuntimeProfile profile_;
+  RuntimeProfile::Counter* planner_timer_;
   vector<Expr*> output_exprs_;
   bool eos_;  // if true, there are no more rows to return
   QueryState::type query_state_;
   Status query_status_;
-  TQueryExecRequest query_exec_request_;
+  TQueryExecRequest exec_request_;
 
   TResultSetMetadata result_metadata_; // metadata for select query
   RowBatch* current_batch_; // the current row batch; only applicable if coord is set
@@ -214,12 +224,15 @@ class ImpalaServer::QueryExecState {
 };
 
 Status ImpalaServer::QueryExecState::Exec(TQueryExecRequest* exec_request) {
+  exec_request_ = *exec_request;
+  profile_.set_name("Query (id=" + PrintId(exec_request->query_id) + ")");
+
   if (exec_request->has_coordinator_fragment 
       && !exec_request->fragment_requests[0].__isset.desc_tbl) {
-    // TODO: This does not handle INSERT INTO ... SELECT 1 because there is no coordinator
-    // fragment actually executing to drive the sink. 
-    // Workaround: INSERT INTO ... SELECT 1 FROM tbl LIMIT 1
     // query without a FROM clause
+    // TODO: This does not handle INSERT INTO ... SELECT 1 because there is no
+    // coordinator fragment actually executing to drive the sink. 
+    // Workaround: INSERT INTO ... SELECT 1 FROM tbl LIMIT 1
     local_runtime_state_.Init(
         exec_request->query_id, exec_request->fragment_requests[0].query_options,
         exec_request->fragment_requests[0].query_globals.now_string,
@@ -234,7 +247,10 @@ Status ImpalaServer::QueryExecState::Exec(TQueryExecRequest* exec_request) {
       RETURN_IF_ERROR(PrepareSelectListExprs(coord_->runtime_state(),
           exec_request->fragment_requests[0].output_exprs, coord_->row_desc()));
     }
+    profile_.AddChild(coord_->query_profile());
   }
+
+  query_id_ = exec_request->query_id;
   return Status::OK;
 }
 
@@ -266,6 +282,14 @@ Status ImpalaServer::QueryExecState::FetchRowsAsAsciiInternal(const int32_t max_
   }
 }
 
+void ImpalaServer::QueryExecState::Cancel() {
+  // we don't want multiple concurrent cancel calls to end up executing
+  // Coordinator::Cancel() multiple times
+  if (query_state_ == QueryState::EXCEPTION) return;
+  query_state_ = QueryState::EXCEPTION;
+  coord_->Cancel();
+}
+
 Status ImpalaServer::QueryExecState::PrepareSelectListExprs(
     RuntimeState* runtime_state,
     const vector<TExpr>& exprs, const RowDescriptor& row_desc) {
@@ -288,7 +312,7 @@ Status ImpalaServer::QueryExecState::UpdateMetastore() {
     stringstream ss;
     ss << "INSERT with no FROM clause not fully supported, not updating metastore"
        << " (query_id: " << query_id() << ")";
-    LOG(ERROR) << ss.str();
+    VLOG_QUERY << ss.str();
     return Status(ss.str());
   }
 
@@ -320,7 +344,7 @@ Status ImpalaServer::QueryExecState::FetchNextBatch() {
   RETURN_IF_ERROR(coord_->GetNext(&current_batch_, coord_->runtime_state()));
 
   current_batch_row_ = 0;
-  eos_ = coord_->execution_completed();
+  eos_ = current_batch_ == NULL;
   return Status::OK;
 }
 
@@ -376,10 +400,11 @@ class ImpalaServer::FragmentExecState {
     : query_id_(query_id),
       backend_num_(backend_num),
       fragment_id_(fragment_id),
-      executor_(exec_env),
+      executor_(exec_env,
+          bind<void>(mem_fn(&ImpalaServer::FragmentExecState::ReportStatusCb),
+                     this, _1, _2, _3)),
       client_cache_(exec_env->client_cache()),
-      coord_hostport_(coord_hostport),
-      done_(false) {
+      coord_hostport_(coord_hostport) {
   }
 
   // Calling the d'tor releases all memory and closes all data streams
@@ -387,40 +412,22 @@ class ImpalaServer::FragmentExecState {
   ~FragmentExecState() {
   }
 
-  // Acquires lock_ and sets executor_'s cancel flag. Returns current
-  // status of execution.
+  // Returns current execution status, if there was an error. Otherwise cancels
+  // the fragment and returns OK.
   Status Cancel();
 
   // Call Prepare() and create and initialize data sink.
   Status Prepare(const TPlanExecRequest& request, const TPlanExecParams& params);
 
-  // Main loop of plan fragment execution. Closes the fragment at the end.
-  // Updates exec_status_ and returns that status.
-  Status Exec();
-
-  // Fill in 'params'. Acquires lock_.
-  void GetStatus(TReportExecStatusParams* Params);
-
-  // Call our coord's ReportFragmentStatus()
-  Status ReportStatus();
+  // Main loop of plan fragment execution. Blocks until execution finishes.
+  void Exec();
 
   const TUniqueId& query_id() const { return query_id_; }
   const TUniqueId& fragment_id() const { return fragment_id_; }
 
-  // the following all require having locked lock_
-  // (Unfortunately, boost doesn't let us check whether a lock is being held,
-  // otherwise we'd have something like AssertHeld(lock_) in there. How did they
-  // manage to forget that?)
-  bool done() const { return done_; }
-  Status status() const { return exec_status_; }
-  void set_status(const Status& status) { exec_status_ = status; }
-  PlanFragmentExecutor* executor() { return &executor_; }
-  RuntimeState* runtime_state() { return executor_.runtime_state(); }
   void set_exec_thread(thread* exec_thread) { exec_thread_.reset(exec_thread); }
 
  private:
-  Status ExecInternal();
-
   TUniqueId query_id_;
   int backend_num_;
   TUniqueId fragment_id_;
@@ -435,36 +442,32 @@ class ImpalaServer::FragmentExecState {
   // the thread executing this plan fragment
   scoped_ptr<thread> exec_thread_;
 
-  // protects access to all of the following fields
-  mutex lock_;
+  // protects exec_status_
+  mutex status_lock_;
 
+  // set in ReportStatusCb();
   // if set to anything other than OK, execution has terminated w/ an error
   Status exec_status_;
 
-  // if true, execution has terminated
-  bool done_;
+  // Callback for executor; updates exec_status_ if 'status' indicates an error
+  // or if there was a thrift error.
+  void ReportStatusCb(const Status& status, RuntimeProfile* profile, bool done);
 
+  // Update exec_status_ w/ status, if the former isn't already an error.
+  // Returns current exec_status_.
+  Status UpdateStatus(const Status& status);
 };
 
-#if 0
-void ImpalaServer::FragmentExecState::GetStatus(TReportExecStatusParams* params) {
-  params->protocol_version = ImpalaInternalServiceVersion::V1;
-  params->__set_query_id(query_id_);
-  params->__set_backend_num(backend_num_);
-  params->__set_fragment_id(fragment_id_);
-  lock_guard<mutex> l(lock_);
-  exec_status_.SetTStatus(params);
-  params->__set_done(done_);
-  executor_.query_profile()->ToThrift(&params->profile);
-  params->__isset.profile = true;
+Status ImpalaServer::FragmentExecState::UpdateStatus(const Status& status) {
+  lock_guard<mutex> l(status_lock_);
+  if (!status.ok() && exec_status_.ok()) exec_status_ = status;
+  return exec_status_;
 }
-#endif
 
 Status ImpalaServer::FragmentExecState::Cancel() {
-  lock_guard<mutex> l(lock_);
-  if (done_) return Status::OK;
+  lock_guard<mutex> l(status_lock_);
   RETURN_IF_ERROR(exec_status_);
-  executor_.runtime_state()->set_is_cancelled(true);
+  executor_.Cancel();
   return Status::OK;
 }
 
@@ -475,23 +478,28 @@ Status ImpalaServer::FragmentExecState::Prepare(
   return Status::OK;
 }
 
-Status ImpalaServer::FragmentExecState::Exec() {
-  exec_status_ = ExecInternal();
-  exec_status_.AddError(executor_.Close());
-  done_ = true;
-  return exec_status_;
+void ImpalaServer::FragmentExecState::Exec() {
+  // Open() does the full execution, because all plan fragments have sinks
+  executor_.Open();
 }
 
-Status ImpalaServer::FragmentExecState::ExecInternal() {
-  VLOG_QUERY << "FragmentExecState::Exec(): fragment_id=" << fragment_id_;
-  RETURN_IF_ERROR(executor_.Open());
+// There can only be one of these callbacks in-flight at any moment, because
+// it is only invoked from the executor's reporting thread.
+// Also, the reported status will always reflect the most recent execution status,
+// including the final status when execution finishes.
+void ImpalaServer::FragmentExecState::ReportStatusCb(
+    const Status& status, RuntimeProfile* profile, bool done) {
+  DCHECK(status.ok() || done);  // if !status.ok() => done
+  Status exec_status = UpdateStatus(status);
 
-  return Status::OK;
-}
-
-Status ImpalaServer::FragmentExecState::ReportStatus() {
   ImpalaInternalServiceClient* coord;
-  RETURN_IF_ERROR(client_cache_->GetClient(coord_hostport_, &coord));
+  if (!client_cache_->GetClient(coord_hostport_, &coord).ok()) {
+    stringstream s;
+    s << "couldn't get a client for " << coord_hostport_.first
+      << ":" << coord_hostport_.second;
+    UpdateStatus(Status(TStatusCode::INTERNAL_ERROR, s.str()));
+    return;
+  }
   DCHECK(coord != NULL);
 
   TReportExecStatusParams params;
@@ -499,9 +507,9 @@ Status ImpalaServer::FragmentExecState::ReportStatus() {
   params.__set_query_id(query_id_);
   params.__set_backend_num(backend_num_);
   params.__set_fragment_id(fragment_id_);
-  exec_status_.SetTStatus(&params);
-  params.__set_done(true);
-  executor_.query_profile()->ToThrift(&params.profile);
+  exec_status.SetTStatus(&params);
+  params.__set_done(done);
+  profile->ToThrift(&params.profile);
   params.__isset.profile = true;
 
   if (executor_.runtime_state()->updated_hdfs_partitions().size() > 0) {
@@ -514,9 +522,24 @@ Status ImpalaServer::FragmentExecState::ReportStatus() {
   }
 
   TReportExecStatusResult res;
-  coord->ReportExecStatus(res, params);
+  Status rpc_status;
+  try {
+    coord->ReportExecStatus(res, params);
+    rpc_status = Status(res.status);
+  } catch (TException& e) {
+    stringstream msg;
+    msg << "ReportExecStatus() to " << coord_hostport_.first << ":"
+        << coord_hostport_.second << " failed:\n" << e.what();
+    VLOG_QUERY << msg.str();
+    rpc_status = Status(TStatusCode::INTERNAL_ERROR, msg.str());
+  }
   client_cache_->ReleaseClient(coord);
-  return Status(res.status);
+
+  if (!rpc_status.ok()) {
+    // we need to cancel the execution of this fragment
+    UpdateStatus(rpc_status);
+    executor_.Cancel();
+  }
 }
 
 const char* ImpalaServer::SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION = "42000";
@@ -592,12 +615,14 @@ ImpalaServer::~ImpalaServer() {}
 void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
   TClientRequest query_request;
   QueryToTClientRequest(query, &query_request);
+  VLOG_QUERY << "query(): query=" << query.query;
   shared_ptr<QueryExecState> exec_state;
   Status status = Execute(query_request, &exec_state);
   
   if (!status.ok()) {
     // raise Syntax error or access violation;
     // it's likely to be syntax/analysis error
+    // TODO: that may not be true; fix this
     RaiseBeeswaxException(
         status.GetErrorMsg(), SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
   }
@@ -621,6 +646,7 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
     const LogContextId& client_ctx) {
   TClientRequest query_request;
   QueryToTClientRequest(query, &query_request);
+  VLOG_QUERY << "executeAndWait(): query=" << query.query;
 
   shared_ptr<QueryExecState> exec_state;
   Status status = Execute(query_request, &exec_state);
@@ -628,6 +654,7 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
   if (!status.ok()) {
     // raise Syntax error or access violation;
     // it's likely to be syntax/analysis error
+    // TODO: that may not be true; fix this
     RaiseBeeswaxException(
         status.GetErrorMsg(), SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
   }
@@ -657,16 +684,35 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
 
 Status ImpalaServer::Execute(const TClientRequest& request,
     shared_ptr<QueryExecState>* exec_state) {
-  TCreateExecRequestResult result;
-  RETURN_IF_ERROR(GetQueryExecRequest(request, &result));
-
-  if (result.stmt_type == TStmtType::DDL) {
-    // Only DDL command is USE at the moment.
-    LOG(INFO) << "USE command ignored";
-    exec_state = NULL;
-    return Status::OK;
+  bool registered_exec_state;
+  Status status = ExecuteInternal(request, &registered_exec_state, exec_state);
+  if (!status.ok() && registered_exec_state) {
+    UnregisterQuery((*exec_state)->query_id());
   }
+  return status;
+}
 
+Status ImpalaServer::ExecuteInternal(
+    const TClientRequest& request, bool* registered_exec_state,
+    boost::shared_ptr<QueryExecState>* exec_state) {
+  exec_state->reset(new QueryExecState(exec_env_, this));
+  *registered_exec_state = false;
+
+  TCreateExecRequestResult result;
+  {
+    SCOPED_TIMER((*exec_state)->planner_timer());
+    RETURN_IF_ERROR(GetQueryExecRequest(request, &result));
+
+    if (result.stmt_type == TStmtType::DDL) {
+      // Only DDL command is USE at the moment.
+      LOG(INFO) << "USE command ignored";
+      exec_state = NULL;
+      return Status::OK;
+    }
+  }
+  if (result.__isset.resultSetMetadata) {
+    (*exec_state)->set_result_metadata(result.resultSetMetadata);
+  }
   TQueryExecRequest& exec_request = result.queryExecRequest;
   // we always need at least one plan fragment
   DCHECK_GT(exec_request.fragment_requests.size(), 0);
@@ -677,10 +723,6 @@ Status ImpalaServer::Execute(const TClientRequest& request,
   // a coordinator fragment.
   DCHECK(exec_request.has_coordinator_fragment || 
       exec_request.fragment_requests[0].__isset.desc_tbl);
-
-  exec_state->reset(
-      new QueryExecState(request, exec_request.query_id, exec_env_,
-          result.resultSetMetadata, exec_request, this));
 
   if (exec_request.has_coordinator_fragment) {
     if (exec_request.fragment_requests[0].__isset.desc_tbl) {
@@ -696,8 +738,8 @@ Status ImpalaServer::Execute(const TClientRequest& request,
     exec_request.fragment_requests[i].query_options = request.queryOptions;
   }
 
-  RETURN_IF_ERROR((*exec_state)->Exec(&exec_request));
-
+  // register exec state before starting execution in order to handle incoming
+  // status reports
   {
     lock_guard<mutex> l(query_exec_state_map_lock_);
 
@@ -712,22 +754,36 @@ Status ImpalaServer::Execute(const TClientRequest& request,
       return Status(TStatusCode::INTERNAL_ERROR, ss.str());
     }
 
-    query_exec_state_map_.insert(make_pair(exec_request.query_id, (*exec_state)));
+    query_exec_state_map_.insert(make_pair(exec_request.query_id, *exec_state));
+    *registered_exec_state = true;
   }
+
+  // start execution of query; also starts fragment status reports
+  RETURN_IF_ERROR((*exec_state)->Exec(&exec_request));
 
   return Status::OK;
 }
 
 bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id) {
-  lock_guard<mutex> l(query_exec_state_map_lock_);
-  QueryExecStateMap::iterator entry = query_exec_state_map_.find(query_id);
-  if (entry == query_exec_state_map_.end()) {
-    LOG(ERROR) << "unknown query id: " << PrintId(query_id);
-    return false;
-  } else {
-    query_exec_state_map_.erase(entry);
-    return true;
+  VLOG_QUERY << "UnregisterQuery(): query_id=" << query_id;
+  shared_ptr<QueryExecState> exec_state;
+  {
+    lock_guard<mutex> l(query_exec_state_map_lock_);
+    QueryExecStateMap::iterator entry = query_exec_state_map_.find(query_id);
+    if (entry == query_exec_state_map_.end()) {
+      VLOG_QUERY << "unknown query id: " << PrintId(query_id);
+      return false;
+    } else {
+      exec_state = entry->second;
+      query_exec_state_map_.erase(entry);
+    }
   }
+
+  {
+    lock_guard<mutex> l(*exec_state->lock());
+    //exec_state->Cancel();
+  }
+  return true;
 }
 
 void ImpalaServer::Wait(boost::shared_ptr<QueryExecState> exec_state) {
@@ -741,6 +797,7 @@ void ImpalaServer::Wait(boost::shared_ptr<QueryExecState> exec_state) {
 }
 
 Status ImpalaServer::UpdateMetastore(const TCatalogUpdate& catalog_update) {
+  VLOG_QUERY << "UpdateMetastore()";
   if (!FLAGS_use_planservice) {
     JNIEnv* jni_env = getJNIEnv();
     jbyteArray request_bytes;
@@ -758,7 +815,6 @@ Status ImpalaServer::UpdateMetastore(const TCatalogUpdate& catalog_update) {
   return Status::OK;
 }
 
-
 Status ImpalaServer::GetQueryExecRequest(
     const TClientRequest& request, TCreateExecRequestResult* result) {
   if (!FLAGS_use_planservice) {
@@ -770,7 +826,7 @@ Status ImpalaServer::GetQueryExecRequest(
     jbyteArray result_bytes = static_cast<jbyteArray>(
         jni_env->CallObjectMethod(fe_, create_exec_request_id_, request_bytes));
     RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
-    DeserializeThriftMsg(jni_env, result_bytes, result);
+    RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, result));
     // TODO: dealloc result_bytes?
     // TODO: figure out if we should detach here
     //RETURN_IF_JNIERROR(jvm_->DetachCurrentThread());
@@ -839,20 +895,15 @@ void ImpalaServer::Cancel(impala::TStatus& status,
   // Convert QueryHandle to TUniqueId and get the query exec state.
   TUniqueId query_id;
   QueryHandleToTUniqueId(query_handle, &query_id);
-  VLOG_QUERY << "ImpalaServer::Cancel(): query_id=" << PrintId(query_id);
-  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id);
+  VLOG_QUERY << "Cancel(): query_id=" << PrintId(query_id);
+  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
   if (exec_state == NULL) {
     RaiseBeeswaxException("Invalid query handle", SQLSTATE_GENERAL_ERROR);
   }
   status.status_code = TStatusCode::OK;
-  {
-    lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
-    // we don't want multiple concurrent cancel calls to end up executing
-    // Coordinator::Cancel() multiple times
-    if (exec_state->query_state() == QueryState::EXCEPTION) return;
-    exec_state->set_query_state(QueryState::EXCEPTION);
-  }
-  exec_state->coord()->Cancel();
+  lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
+  // TODO: can we call Coordinator::Cancel() here while holding lock?
+  exec_state->Cancel();
 }
 
 void ImpalaServer::explain(QueryExplanation& query_explanation, const Query& query) {
@@ -860,6 +911,7 @@ void ImpalaServer::explain(QueryExplanation& query_explanation, const Query& que
   // before shipping to FE
   TClientRequest query_request;
   QueryToTClientRequest(query, &query_request);
+  VLOG_QUERY << "explain(): query=" << query.query;
 
   Status status = GetExplainPlan(query_request, &query_explanation.textual);
   if (!status.ok()) {
@@ -888,8 +940,7 @@ void ImpalaServer::fetch(Results& query_results, const QueryHandle& query_handle
 
   TUniqueId query_id;
   QueryHandleToTUniqueId(query_handle, &query_id);
-  VLOG_ROW << "ImpalaServer::fetch query_id=" << PrintId(query_id)
-           << " fetch_size=" << fetch_size;
+  VLOG_ROW << "fetch(): query_id=" << PrintId(query_id) << " fetch_size=" << fetch_size;
 
   Status status = FetchInternal(query_id, start_over, fetch_size, &query_results);
   if (!status.ok()) {
@@ -900,7 +951,7 @@ void ImpalaServer::fetch(Results& query_results, const QueryHandle& query_handle
 
 Status ImpalaServer::FetchInternal(const TUniqueId& query_id,
     const bool start_over, const int32_t fetch_size, beeswax::Results* query_results) {
-  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id);
+  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
   if (exec_state == NULL) return Status("Invalid query handle");
 
   // make sure we release the lock on exec_state if we see any error
@@ -932,7 +983,7 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id,
 
   Status fetch_rows_status;
   if (exec_state->eos()) {
-    // if we've hit EOS, return no rows and set has_more to false.
+    // if we hit EOS, return no rows and set has_more to false.
     query_results->data.clear();
   } else {
     fetch_rows_status = exec_state->FetchRowsAsAscii(fetch_size, &query_results->data);
@@ -948,8 +999,8 @@ void ImpalaServer::get_results_metadata(ResultsMetadata& results_metadata,
   // Convert QueryHandle to TUniqueId and get the query exec state.
   TUniqueId query_id;
   QueryHandleToTUniqueId(handle, &query_id);
-  VLOG_QUERY << "ImpalaServer::get_results_metadata: query_id=" << PrintId(query_id);
-  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id);
+  VLOG_QUERY << "get_results_metadata(): query_id=" << PrintId(query_id);
+  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
   if (exec_state.get() == NULL) {
     RaiseBeeswaxException("Invalid query handle", SQLSTATE_GENERAL_ERROR);
   }
@@ -987,7 +1038,7 @@ void ImpalaServer::close(const QueryHandle& handle) {
 
   TUniqueId query_id;
   QueryHandleToTUniqueId(handle, &query_id);
-  VLOG_QUERY << "ImpalaServer::close: query_id=" << PrintId(query_id);
+  VLOG_QUERY << "close(): query_id=" << PrintId(query_id);
 
   // TODO: do we need to raise an exception if the query state is
   // EXCEPTION?
@@ -1001,7 +1052,7 @@ void ImpalaServer::CloseInsert(TInsertResult& insert_result,
     const QueryHandle& query_handle) {
   TUniqueId query_id;
   QueryHandleToTUniqueId(query_handle, &query_id);
-  VLOG_QUERY << "ImpalaServer::CloseInsert: query_id=" << PrintId(query_id);
+  VLOG_QUERY << "CloseInsert(): query_id=" << PrintId(query_id);
 
   Status status = CloseInsertInternal(query_id, &insert_result);
   if (!status.ok()) {
@@ -1011,18 +1062,21 @@ void ImpalaServer::CloseInsert(TInsertResult& insert_result,
 
 Status ImpalaServer::CloseInsertInternal(const TUniqueId& query_id,
     TInsertResult* insert_result) {
-  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id);
+  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
   if (exec_state == NULL) return Status("Invalid query handle");
 
-  DCHECK(exec_state->coord() != NULL);
-  DCHECK(exec_state->coord()->runtime_state() != NULL);
-  RuntimeState* runtime_state = exec_state->coord()->runtime_state();
-  set<std::string>& updated_partitions = runtime_state->updated_hdfs_partitions();
-  insert_result->modified_hdfs_partitions.insert(
-      insert_result->modified_hdfs_partitions.begin(),
-      updated_partitions.begin(), updated_partitions.end());
-  insert_result->__set_rows_appended(runtime_state->num_appended_rows());
-  exec_state->lock()->unlock();
+  {
+    lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
+    DCHECK(exec_state->coord() != NULL);
+    DCHECK(exec_state->coord()->runtime_state() != NULL);
+    RuntimeState* runtime_state = exec_state->coord()->runtime_state();
+    set<std::string>& updated_partitions = runtime_state->updated_hdfs_partitions();
+    insert_result->modified_hdfs_partitions.insert(
+        insert_result->modified_hdfs_partitions.begin(),
+        updated_partitions.begin(), updated_partitions.end());
+    insert_result->__set_rows_appended(runtime_state->num_appended_rows());
+  }
+
   if (!UnregisterQuery(query_id)) {
     stringstream ss;
     ss << "Failed to unregister query ID '" << ThriftDebugString(query_id) << "'";
@@ -1038,7 +1092,7 @@ QueryState::type ImpalaServer::get_state(const QueryHandle& handle) {
 
   TUniqueId query_id;
   QueryHandleToTUniqueId(handle, &query_id);
-  VLOG_QUERY << "ImpalaServer::get_state: query_id=" << PrintId(query_id);
+  VLOG_QUERY << "get_state(): query_id=" << PrintId(query_id);
 
   lock_guard<mutex> l(query_exec_state_map_lock_);
   QueryExecStateMap::iterator entry = query_exec_state_map_.find(query_id);
@@ -1088,7 +1142,7 @@ void ImpalaServer::QueryToTClientRequest(const Query& query,
       split(key_value, kv_string, is_any_of(":"), token_compress_on);
       if (key_value.size() != 2) {
         LOG(WARNING) << "ignoring invalid configuration option " << kv_string
-            << ": bad format (expected key:value)";
+                     << ": bad format (expected key:value)";
         continue;
       }
 
@@ -1155,7 +1209,8 @@ void ImpalaServer::QueryHandleToTUniqueId(const QueryHandle& handle,
   int i = 0;
   BOOST_FOREACH(string t, tokens) {
     StringParser::ParseResult parse_result = StringParser::PARSE_SUCCESS;
-    int64_t id = StringParser::StringToInt<int64_t>(t.c_str(), t.length(), &parse_result);
+    int64_t id = StringParser::StringToInt<int64_t>(
+        t.c_str(), t.length(), &parse_result);
     if (i == 0) {
       query_id->hi = id;
     } else {
@@ -1172,25 +1227,25 @@ void ImpalaServer::RaiseBeeswaxException(const string& msg, const char* sql_stat
   throw exc;
 }
 
-inline ImpalaServer::FragmentExecState* ImpalaServer::GetFragmentExecState(
+inline shared_ptr<ImpalaServer::FragmentExecState> ImpalaServer::GetFragmentExecState(
     const TUniqueId& fragment_id) {
   lock_guard<mutex> l(fragment_exec_state_map_lock_);
   FragmentExecStateMap::iterator i = fragment_exec_state_map_.find(fragment_id);
   if (i == fragment_exec_state_map_.end()) {
-    return NULL;
+    return shared_ptr<FragmentExecState>();
   } else {
     return i->second;
   }
 }
 
 inline shared_ptr<ImpalaServer::QueryExecState> ImpalaServer::GetQueryExecState(
-    const TUniqueId& query_id) {
+    const TUniqueId& query_id, bool lock) {
   lock_guard<mutex> l(query_exec_state_map_lock_);
   QueryExecStateMap::iterator i = query_exec_state_map_.find(query_id);
   if (i == query_exec_state_map_.end()) {
     return shared_ptr<QueryExecState>();
   } else {
-    i->second->lock()->lock();
+    if (lock) i->second->lock()->lock();
     return i->second;
   }
 }
@@ -1211,29 +1266,27 @@ void ImpalaServer::ReportExecStatus(
             << " backend#=" << params.backend_num
             << " fragment_id=" << params.fragment_id
             << " done=" << (params.done ? "true" : "false");
-  // TODO: implement something more efficient here, we're currently creating
-  // a shared_ptr, acquiring/releasing the map lock and doing a map lookup for
+  // TODO: implement something more efficient here, we're currently 
+  // acquiring/releasing the map lock and doing a map lookup for
   // every report (assign each query a local int32_t id and use that to index into a
   // vector of QueryExecStates, w/o lookup or locking?)
-  shared_ptr<QueryExecState> query_exec_state = GetQueryExecState(params.query_id);
-  if (query_exec_state.get() == NULL) {
+  shared_ptr<QueryExecState> exec_state = GetQueryExecState(params.query_id, false);
+  if (exec_state.get() == NULL) {
     return_val.status.__set_status_code(TStatusCode::INTERNAL_ERROR);
     stringstream str;
     str << "unknown query id: " << params.query_id;
     return_val.status.error_msgs.push_back(str.str());
+    LOG(ERROR) << str.str();
     return;
   }
-  // query_exec_state's coordinator is thread-safe, no need to hold the lock
-  query_exec_state->lock()->unlock();
-  query_exec_state->coord()->UpdateFragmentExecStatus(params)
-      .SetTStatus(&return_val);
+  exec_state->coord()->UpdateFragmentExecStatus(params).SetTStatus(&return_val);
 }
 
 void ImpalaServer::CancelPlanFragment(
     TCancelPlanFragmentResult& return_val, const TCancelPlanFragmentParams& params) {
   VLOG_QUERY << "CancelPlanFragment(): fragment_id=" << params.fragment_id;
-  FragmentExecState* exec_state = GetFragmentExecState(params.fragment_id);
-  if (exec_state == NULL) {
+  shared_ptr<FragmentExecState> exec_state = GetFragmentExecState(params.fragment_id);
+  if (exec_state.get() == NULL) {
     stringstream str;
     str << "unknown fragment id: " << params.fragment_id;
     Status status(TStatusCode::INTERNAL_ERROR, str.str());
@@ -1250,7 +1303,8 @@ void ImpalaServer::TransmitData(
     TTransmitDataResult& return_val, const TTransmitDataParams& params) {
   VLOG_ROW << "TransmitData(): fragment_id=" << params.dest_fragment_id
            << " node_id=" << params.dest_node_id
-           << " #rows=" << params.row_batch.num_rows;
+           << " #rows=" << params.row_batch.num_rows
+           << " eos=" << (params.eos ? "true" : "false");
   // TODO: fix Thrift so we can simply take ownership of thrift_batch instead
   // of having to copy its data
   if (params.row_batch.num_rows > 0) {
@@ -1277,30 +1331,31 @@ Status ImpalaServer::StartPlanFragmentExecution(
     return Status("missing sink in slave plan fragment");
   }
 
-  auto_ptr<FragmentExecState> new_exec_state(
+  shared_ptr<FragmentExecState> exec_state(
       new FragmentExecState(
         request.query_id, backend_num, request.fragment_id, exec_env_,
         make_pair(coord_hostport.host, coord_hostport.port)));
-  RETURN_IF_ERROR(new_exec_state->Prepare(request, params));
+  // Call Prepare() now, before registering the exec state, to avoid calling
+  // exec_state->Cancel().
+  // We might get an async cancellation, and the executor requires that Cancel() not
+  // be called before Prepare() returns.
+  RETURN_IF_ERROR(exec_state->Prepare(request, params));
 
-  FragmentExecState* exec_state = new_exec_state.get();
   {
     lock_guard<mutex> l(fragment_exec_state_map_lock_);
     // register exec_state before starting exec thread
-    fragment_exec_state_map_[request.fragment_id] = new_exec_state.release();
+    fragment_exec_state_map_.insert(make_pair(request.fragment_id, exec_state));
   }
 
   // execute plan fragment in new thread
   // TODO: manage threads via global thread pool
   exec_state->set_exec_thread(
-      new thread(&ImpalaServer::RunExecPlanFragment, this, exec_state));
+      new thread(&ImpalaServer::RunExecPlanFragment, this, exec_state.get()));
   return Status::OK;
 }
 
 void ImpalaServer::RunExecPlanFragment(FragmentExecState* exec_state) {
-  // don't report status if this fragment was cancelled, the coord may not know
-  // about it anymore
-  if (!exec_state->Exec().IsCancelled()) exec_state->ReportStatus();
+  exec_state->Exec();
 
   // we're done with this plan fragment
   {
@@ -1308,7 +1363,7 @@ void ImpalaServer::RunExecPlanFragment(FragmentExecState* exec_state) {
     FragmentExecStateMap::iterator i =
         fragment_exec_state_map_.find(exec_state->fragment_id());
     if (i != fragment_exec_state_map_.end()) {
-      delete i->second;
+      // ends up calling the d'tor, if there are no async cancellations
       fragment_exec_state_map_.erase(i);
     } else {
       LOG(ERROR) << "missing entry in fragment exec state map: fragment_id="

@@ -188,7 +188,7 @@ Status HdfsTextScanner::ProcessRange(int* num_tuples, bool past_scan_range) {
     char* col_start = byte_buffer_ptr_;
     {
       // Parse the bytes for delimiters and store their offsets in field_locations_
-      COUNTER_SCOPED_TIMER(parse_delimiter_timer_);
+      SCOPED_TIMER(parse_delimiter_timer_);
       RETURN_IF_ERROR(delimited_text_parser_->ParseFieldLocations(max_tuples,
           byte_buffer_end_ - byte_buffer_ptr_, &byte_buffer_ptr_, 
           &row_end_locations_[0],
@@ -213,7 +213,7 @@ Status HdfsTextScanner::ProcessRange(int* num_tuples, bool past_scan_range) {
         boundary_row_.Clear();
       }
     } else if (*num_tuples != 0) {
-      COUNTER_SCOPED_TIMER(scan_node_->materialize_tuple_timer());
+      SCOPED_TIMER(scan_node_->materialize_tuple_timer());
       // If we are doing count(*) then we return tuples only containing partition keys
       boundary_row_.Clear();
       num_tuples_materialized = WriteEmptyTuples(context_, tuple_row_mem, *num_tuples);
@@ -251,16 +251,9 @@ Status HdfsTextScanner::ProcessRange(int* num_tuples, bool past_scan_range) {
 
 Status HdfsTextScanner::FillByteBuffer(bool* eosr, int num_bytes) {
   *eosr = false;
-  // TODO: this is not really reading throughput from hdfs (disk throughput) since
-  // the reads are asynchronous (i.e. if all hdfs reads were faster than the
-  // scan nodes, this would report 0).  Nevertheless, this is still useful to help
-  // identify bottlenecks.  The io mgr should have a disk read counter.
-  COUNTER_SCOPED_TIMER(scan_node_->hdfs_read_timer());
-  
   RETURN_IF_ERROR(context_->GetBytes(
       reinterpret_cast<uint8_t**>(&byte_buffer_ptr_), num_bytes, 
           &byte_buffer_read_size_, eosr));
-  
   byte_buffer_end_ = byte_buffer_ptr_ + byte_buffer_read_size_;
   return Status::OK;
 }
@@ -275,7 +268,7 @@ Status HdfsTextScanner::FindFirstTuple(bool* tuple_found) {
       bool eosr = false;
       RETURN_IF_ERROR(FillByteBuffer(&eosr));
 
-      COUNTER_SCOPED_TIMER(parse_delimiter_timer_);
+      SCOPED_TIMER(parse_delimiter_timer_);
       int first_tuple_offset = delimited_text_parser_->FindFirstInstance(
           byte_buffer_ptr_, byte_buffer_read_size_);
       
@@ -392,7 +385,7 @@ Status HdfsTextScanner::ReportRowParseError(int row_idx) {
 //   the next time around.
 int HdfsTextScanner::WriteFields(MemPool* pool, TupleRow* tuple_row, 
     int num_fields, int num_tuples) {
-  COUNTER_SCOPED_TIMER(scan_node_->materialize_tuple_timer());
+  SCOPED_TIMER(scan_node_->materialize_tuple_timer());
 
   FieldLocation* fields = &field_locations_[0];
 
@@ -614,7 +607,7 @@ bool HdfsTextScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields,
 //   ret i1 false
 // }
 Function* HdfsTextScanner::CodegenWriteCompleteTuple(LlvmCodeGen* codegen) {
-  COUNTER_SCOPED_TIMER(codegen->codegen_timer());
+  SCOPED_TIMER(codegen->codegen_timer());
   // TODO: Timestamp is not yet supported
   for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
     SlotDescriptor* slot_desc = scan_node_->materialized_slots()[i];
@@ -814,7 +807,7 @@ Function* HdfsTextScanner::CodegenWriteCompleteTuple(LlvmCodeGen* codegen) {
 
 Function* HdfsTextScanner::CodegenWriteAlignedTuples(LlvmCodeGen* codegen,
     Function* write_complete_tuple_fn) {
-  COUNTER_SCOPED_TIMER(codegen->codegen_timer());
+  SCOPED_TIMER(codegen->codegen_timer());
   DCHECK(write_complete_tuple_fn != NULL);
 
   Function* write_tuples_fn =

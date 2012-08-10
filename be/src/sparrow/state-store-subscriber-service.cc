@@ -55,9 +55,9 @@ Status StateStoreSubscriber::RegisterService(const string& service_id,
   request.__set_service_address(address);
   TRegisterServiceResponse response;
   VLOG_CONNECTION << "Attempting to register service " << request.service_id
-                        << " on address " << address.host << ":" << address.port
-                        << ", to subscriber at " << request.subscriber_address.host << ":"
-                        << request.subscriber_address.port;
+                  << " on address " << address.host << ":" << address.port
+                  << ", to subscriber at " << request.subscriber_address.host << ":"
+                  << request.subscriber_address.port;
 
   try {
     client_->iface()->RegisterService(response, request);
@@ -101,9 +101,9 @@ Status StateStoreSubscriber::RegisterSubscription(
   request.__isset.services = true;
   TRegisterSubscriptionResponse response;
   VLOG_CONNECTION << "Attempting to register subscriber for services "
-                        << algorithm::join(update_services, ", ") << " at "
-                        << request.subscriber_address.host << ":"
-                        << request.subscriber_address.port;
+                  << algorithm::join(update_services, ", ") << " at "
+                  << request.subscriber_address.host << ":"
+                  << request.subscriber_address.port;
 
   try {
     client_->iface()->RegisterSubscription(response, request);
@@ -178,7 +178,7 @@ void StateStoreSubscriber::UpdateState(TUpdateStateResponse& response,
     new_state << "\n";
     // TODO: Log object updates here too, once we include them.
   }
-  VLOG_ROW << "Received new state:\n" << new_state.str();
+  VLOG(4) << "Received new state:\n" << new_state.str();
 
   {
     lock_guard<mutex> lock(callback_thread_id_lock_);

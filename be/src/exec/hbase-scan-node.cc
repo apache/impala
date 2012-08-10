@@ -83,7 +83,7 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
 
 Status HBaseScanNode::Open(RuntimeState* state) {
   RETURN_IF_CANCELLED(state);
-  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   JNIEnv* env = getJNIEnv();
   return hbase_scanner_->StartScan(env, tuple_desc_, scan_range_vector_, filters_);
 }
@@ -92,7 +92,7 @@ void HBaseScanNode::WriteTextSlot(
     const string& family, const string& qualifier,
     void* value, int value_length, SlotDescriptor* slot,
     RuntimeState* state, bool* error_in_row) {
-  COUNTER_SCOPED_TIMER(materialize_tuple_timer());
+  SCOPED_TIMER(materialize_tuple_timer());
   if (!text_converter_->WriteSlot(slot, tuple_,
       reinterpret_cast<char*>(value), value_length, true, false, tuple_pool_.get())) {
     *error_in_row = true;
@@ -110,8 +110,8 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
   // For GetNext, most of the time is spent in HBaseTableScanner::ResultScanner_next,
   // but there's still some considerable time inside here.
   // TODO: need to understand how the time is spent inside this function.
-  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
-  COUNTER_SCOPED_TIMER(materialize_tuple_timer());
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
+  SCOPED_TIMER(materialize_tuple_timer());
   if (ReachedLimit()) {
     *eos = true;
     return Status::OK;
@@ -217,7 +217,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
 }
 
 Status HBaseScanNode::Close(RuntimeState* state) {
-  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   COUNTER_UPDATE(memory_used_counter(), tuple_pool_->peak_allocated_bytes());
 
   JNIEnv* env = getJNIEnv();

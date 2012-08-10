@@ -116,6 +116,8 @@ public class ImpaladClientExecutor {
         break;
       }
     }
+    client.close(queryHandle);
+
     return numRows;
   }
 

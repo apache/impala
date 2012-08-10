@@ -405,7 +405,7 @@ Status HdfsTrevniScanner::GetNext(RowBatch* row_batch, bool* eosr) {
     return Status::OK;
   }
 
-  COUNTER_SCOPED_TIMER(scan_node_->materialize_tuple_timer());
+  SCOPED_TIMER(scan_node_->materialize_tuple_timer());
   // Index into current row in row_batch.
   int row_idx = RowBatch::INVALID_ROW_INDEX;
 

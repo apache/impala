@@ -240,7 +240,7 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr, int64_t* reco
 Status HdfsSequenceScanner::ProcessRange() {
   // We count the time here since there is too much overhead to do
   // this on each record.
-  COUNTER_SCOPED_TIMER(scan_node_->materialize_tuple_timer());
+  SCOPED_TIMER(scan_node_->materialize_tuple_timer());
   
   while (!context_->eosr() || num_buffered_records_in_compressed_block_ > 0) {
     // Current record to process and its length.

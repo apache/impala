@@ -52,7 +52,7 @@ Status SerializeThriftMsg(JNIEnv* env, T* msg, jbyteArray* serialized_msg) {
 }
 
 template <class T>
-void DeserializeThriftMsg(JNIEnv* env, jbyteArray serialized_msg, T* deserialized_msg) {
+Status DeserializeThriftMsg(JNIEnv* env, jbyteArray serialized_msg, T* deserialized_msg) {
   jboolean is_copy = false;
   int buf_size = env->GetArrayLength(serialized_msg);
   jbyte* buf = env->GetByteArrayElements(serialized_msg, &is_copy);
@@ -65,11 +65,17 @@ void DeserializeThriftMsg(JNIEnv* env, jbyteArray serialized_msg, T* deserialize
     TBinaryProtocolFactoryT<apache::thrift::transport::TMemoryBuffer> tproto_factory;
   boost::shared_ptr<apache::thrift::protocol::TProtocol> tproto =
       tproto_factory.getProtocol(tmem_transport);
-  deserialized_msg->read(tproto.get());
-
+  try {
+    deserialized_msg->read(tproto.get());
+  } catch (apache::thrift::protocol::TProtocolException& e) {
+    std::stringstream msg;
+    msg << "couldn't deserialize thrift msg:\n" << e.what();
+    return Status(msg.str());
+  }
   // Return buffer back. JNI_ABORT indicates to not copy contents back to java
   // side.
   env->ReleaseByteArrayElements(serialized_msg, buf, JNI_ABORT);
+  return Status::OK;
 }
 
 // Redirects all Thrift logging to VLOG(1)

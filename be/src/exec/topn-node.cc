@@ -87,7 +87,7 @@ Status TopNNode::Prepare(RuntimeState* state) {
 
 Status TopNNode::Open(RuntimeState* state) {
   RETURN_IF_CANCELLED(state);
-  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   RETURN_IF_ERROR(child(0)->Open(state));
 
   RowBatch batch(child(0)->row_desc(), state->batch_size());
@@ -108,7 +108,7 @@ Status TopNNode::Open(RuntimeState* state) {
 
 Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_CANCELLED(state);
-  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   while (!row_batch->IsFull() && (get_next_iter_ != sorted_top_n_.end())) {
     int row_idx = row_batch->AddRow();
     TupleRow* dst_row = row_batch->GetRow(row_idx);

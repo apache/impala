@@ -72,7 +72,6 @@ public class JniFrontend {
     // Print explain string.
     LOG.info(explainString.toString());
 
-    LOG.info("returned TCreateExecRequestResult: " + result.toString());
     // TODO: avoid creating serializer for each query?
     TSerializer serializer = new TSerializer(protocolFactory);
     try {

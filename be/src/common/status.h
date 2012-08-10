@@ -137,14 +137,17 @@ class Status {
 
 // some generally useful macros
 #define RETURN_IF_ERROR(stmt) \
-  do { Status status = (stmt); if (UNLIKELY(!status.ok())) return status; } while (false)
+  do { \
+    Status __status__ = (stmt); \
+    if (UNLIKELY(!__status__.ok())) return __status__; \
+  } while (false)
 
 #define EXIT_IF_ERROR(stmt) \
   do { \
-    Status status = (stmt); \
-    if (UNLIKELY(!status.ok())) { \
+    Status __status__ = (stmt); \
+    if (UNLIKELY(!__status__.ok())) { \
       string msg; \
-      status.GetErrorMsg(&msg); \
+      __status__.GetErrorMsg(&msg); \
       cerr << msg; \
       exit(1); \
     } \

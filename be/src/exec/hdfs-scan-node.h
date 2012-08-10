@@ -108,8 +108,6 @@ class HdfsScanNode : public ScanNode {
  
   DiskIoMgr::ReaderContext* reader_context() { return reader_context_; }
 
-  RuntimeProfile::Counter* hdfs_read_timer() const { return hdfs_read_timer_; }
-
   // Returns index into materialized_slots with 'col_idx'.  Returns SKIP_COLUMN if
   // that column is not materialized.
   int GetMaterializedSlotIdx(int col_idx) const {
@@ -234,9 +232,6 @@ class HdfsScanNode : public ScanNode {
   // These descriptors are sorted in order of increasing col_pos
   std::vector<SlotDescriptor*> partition_key_slots_;
 
-  // Time spent reading from hdfs
-  RuntimeProfile::Counter* hdfs_read_timer_;      
- 
   // Thread that constantly reads from the disk io mgr and queues the work on the
   // context for that scan range.
   boost::scoped_ptr<boost::thread> disk_read_thread_;

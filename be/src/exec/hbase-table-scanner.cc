@@ -84,7 +84,9 @@ HBaseTableScanner::HBaseTableScanner(ScanNode* scan_node, HBaseTableCache* htabl
     all_keyvalues_present_(false),
     value_pool_(new MemPool()),
     buffer_pool_(new MemPool()),
-    rows_cached_(DEFAULT_ROWS_CACHED) {
+    rows_cached_(DEFAULT_ROWS_CACHED),
+    scan_setup_timer_(ADD_COUNTER(scan_node_->runtime_profile(),
+      "HBaseTableScanner.ScanSetup", TCounterType::CPU_TICKS)) {
 }
 
 Status HBaseTableScanner::Init() {
@@ -254,10 +256,7 @@ Status HBaseTableScanner::Init() {
 
 Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_desc,
     const vector<THBaseFilter>& filters) {
-  // set up HBase specific counter
-  scan_setup_timer_  = ADD_COUNTER(scan_node_->runtime_profile(),
-      "HBaseTableScanner.ScanSetup", TCounterType::CPU_TICKS);
-  COUNTER_SCOPED_TIMER(scan_setup_timer_);
+  SCOPED_TIMER(scan_setup_timer_);
 
   const HBaseTableDescriptor* hbase_table =
       static_cast<const HBaseTableDescriptor*>(tuple_desc->table_desc());
@@ -407,19 +406,22 @@ Status HBaseTableScanner::CreateByteArray(JNIEnv* env, const std::string& s,
 }
 
 Status HBaseTableScanner::Next(JNIEnv* env, bool* has_next) {
-  while(true) {
-    //result_ = resultscanner_.next();
-    result_ = env->CallObjectMethod(resultscanner_, resultscanner_next_id_);
+  {
+    SCOPED_TIMER(scan_node_->read_timer());
+    while(true) {
+      //result_ = resultscanner_.next();
+      result_ = env->CallObjectMethod(resultscanner_, resultscanner_next_id_);
 
-    // jump to the next region when finished with the current region.
-    if (result_ == NULL &&
-        current_scan_range_idx_ + 1 < scan_range_vector_->size()) {
-      ++current_scan_range_idx_;
-      RETURN_IF_ERROR(InitScanRange(env,
-          scan_range_vector_->at(current_scan_range_idx_)));
-      continue;
+      // jump to the next region when finished with the current region.
+      if (result_ == NULL &&
+          current_scan_range_idx_ + 1 < scan_range_vector_->size()) {
+        ++current_scan_range_idx_;
+        RETURN_IF_ERROR(InitScanRange(env,
+            scan_range_vector_->at(current_scan_range_idx_)));
+        continue;
+      }
+      break;
     }
-    break;
   }
 
   if (result_ == NULL) {

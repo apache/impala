@@ -26,8 +26,14 @@
 
 using namespace llvm;
 using namespace std;
+using namespace boost;
 
 namespace impala {
+
+int ExecNode::GetNodeIdFromProfile(RuntimeProfile* p) {
+  int64_t id = reinterpret_cast<int64_t>(p->metadata());
+  return id;
+}
 
 ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : id_(tnode.node_id),
@@ -99,7 +105,6 @@ Status ExecNode::CreateTreeHelper(
   // assert(parent != NULL || (node_idx == 0 && root_expr != NULL));
   if (parent != NULL) {
     parent->children_.push_back(node);
-    parent->runtime_profile()->AddChild(node->runtime_profile());
   } else {
     *root = node;
   }
@@ -113,6 +118,16 @@ Status ExecNode::CreateTreeHelper(
       return Status("Failed to reconstruct plan tree from thrift.");
     }
   }
+
+  // build up tree of profiles; add children >0 first, so that when we print
+  // the profile, child 0 is printed last (makes the output more readable)
+  for (int i = 1; i < node->children_.size(); ++i) {
+    node->runtime_profile()->AddChild(node->children_[i]->runtime_profile());
+  }
+  if (!node->children_.empty()) {
+    node->runtime_profile()->AddChild(node->children_[0]->runtime_profile(), false);
+  }
+
   return Status::OK;
 }
 
@@ -291,8 +306,10 @@ void ExecNode::CollectScanNodes(vector<ExecNode*>* scan_nodes) {
 
 void ExecNode::InitRuntimeProfile(const string& name) {
   stringstream ss;
-  ss << name << "(id=" << id_ << ")";
+  ss << name << " (id=" << id_ << ")";
   runtime_profile_.reset(new RuntimeProfile(pool_, ss.str()));
+  void* id = reinterpret_cast<void*>(id_);
+  runtime_profile_->set_metadata(id);
 }
 
 }

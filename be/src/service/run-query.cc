@@ -234,13 +234,7 @@ static void Exec(ExecEnv* exec_env, const vector<string>& queries) {
       }
 
       RuntimeProfile* profile = executor->query_profile();
-      if (profile != NULL) {
-        if (FLAGS_iterations > 1 && profile->children().size() == 1) {
-          // Rename the query to drop the query id so the results merge
-          profile->children()[0]->Rename("Query");
-        }
-        aggregate_profile.Merge(*profile);
-      }
+      if (profile != NULL) aggregate_profile.Merge(profile);
     }
 
     num_rows /= FLAGS_iterations;

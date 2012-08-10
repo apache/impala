@@ -150,7 +150,7 @@ Status HashJoinNode::Close(RuntimeState* state) {
 
 Status HashJoinNode::Open(RuntimeState* state) {
   RETURN_IF_CANCELLED(state);
-  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   eos_ = false;
 
   // Do a full scan of child(1) and store everything in hash_tbl_
@@ -160,7 +160,7 @@ Status HashJoinNode::Open(RuntimeState* state) {
   RowBatch build_batch(child(1)->row_desc(), state->batch_size());
   RETURN_IF_ERROR(child(1)->Open(state));
   while (true) {
-    COUNTER_SCOPED_TIMER(build_timer_);
+    SCOPED_TIMER(build_timer_);
     RETURN_IF_CANCELLED(state);
     bool eos;
     RETURN_IF_ERROR(child(1)->GetNext(state, &build_batch, &eos));
@@ -183,7 +183,7 @@ Status HashJoinNode::Open(RuntimeState* state) {
 
   VLOG_ROW << hash_tbl_->DebugString(true, &child(1)->row_desc());
 
-  COUNTER_SCOPED_TIMER(probe_timer_);
+  SCOPED_TIMER(probe_timer_);
   RETURN_IF_ERROR(child(0)->Open(state));
 
   // seed probe batch and current_probe_row_, etc.
@@ -219,8 +219,8 @@ Status HashJoinNode::Open(RuntimeState* state) {
 
 Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos) {
   RETURN_IF_CANCELLED(state);
-  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
-  COUNTER_SCOPED_TIMER(probe_timer_);
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
+  SCOPED_TIMER(probe_timer_);
   if (ReachedLimit()) {
     *eos = true;
     return Status::OK;

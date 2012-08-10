@@ -86,14 +86,14 @@ impala::Status SimpleScheduler::Init() {
 
 void SimpleScheduler::UpdateMembership(const ServiceStateMap& service_state) {
   lock_guard<mutex> lock(host_map_lock_);
-  VLOG_ROW << "Received update from subscription manager" << endl;
+  VLOG(4) << "Received update from subscription manager" << endl;
   host_map_.clear();
   ServiceStateMap::const_iterator it = service_state.find(backend_service_id_);
   if (it != service_state.end()) {
-    VLOG_ROW << "Found membership information for " << backend_service_id_;
+    VLOG(4) << "Found membership information for " << backend_service_id_;
     ServiceState service_state = it->second;
     BOOST_FOREACH(const Membership::value_type& member, service_state.membership) {
-      VLOG_ROW << "Got member: " << member.second.host << ":" << member.second.port;
+      VLOG(4) << "Got member: " << member.second.host << ":" << member.second.port;
       HostMap::iterator host_it = host_map_.find(member.second.host);
       if (host_it == host_map_.end()) {
         host_it = host_map_.insert(make_pair(member.second.host, list<int>())).first;
@@ -101,7 +101,7 @@ void SimpleScheduler::UpdateMembership(const ServiceStateMap& service_state) {
       host_it->second.push_back(member.second.port);
     }
   } else {
-    VLOG_QUERY << "No membership information found.";
+    VLOG(4) << "No membership information found.";
   }
 
   next_nonlocal_host_entry_ = host_map_.begin();

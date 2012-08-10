@@ -511,7 +511,7 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
       if (num_rows_ == 0) break;
     }
 
-    COUNTER_SCOPED_TIMER(scan_node_->materialize_tuple_timer());
+    SCOPED_TIMER(scan_node_->materialize_tuple_timer());
     // Copy rows out of the current row group into the row_batch
     while (!scan_node_->ReachedLimit() && !row_batch->IsFull() && NextRow()) {
       // Index into current row in row_batch.

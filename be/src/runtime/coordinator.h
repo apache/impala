@@ -12,6 +12,8 @@
 #include <boost/thread/condition_variable.hpp>
 
 #include "common/status.h"
+#include "common/global-types.h"
+#include "util/runtime-profile.h"
 #include "gen-cpp/Types_types.h"
 
 namespace impala {
@@ -43,7 +45,7 @@ class RuntimeProfile;
 // The coordinator fragment is executed locally in the calling thread, all other
 // fragments are sent to remote nodes. The coordinator also monitors
 // the execution status of the remote fragments and aborts the entire query if an error
-// occurs.
+// occurs, either in any of the remote fragments or in the local fragment.
 // Once a query has finished executing and all results have been returned either to the
 // caller of GetNext() or a data sink, execution_completed() will return true. If the
 // query is aborted, execution_completed should also be set to true.
@@ -55,9 +57,11 @@ class RuntimeProfile;
 // 2. client: Wait()/client: Cancel()/backend: UpdateFragmentExecStatus()
 // 3. client: GetNext()*/client: Cancel()/backend: UpdateFragmentExecStatus()
 //
+// The implementation ensures that setting an overall error status and initiating
+// cancellation of local and all remote fragments is atomic.
+//
 // TODO:
 // - add profile counters for coordinator (how much time do we spend in startup?)
-// - start all backends for a particular TPlanExecRequest in parallel
 class Coordinator {
  public:
   Coordinator(ExecEnv* exec_env, ExecStats* exec_stats);
@@ -80,10 +84,10 @@ class Coordinator {
   Status Wait();
 
   // Returns tuples from the coordinator fragment. Any returned tuples are valid until
-  // the next GetNext() call. If the coordinator has a sink, then no tuples will be
-  // returned via *batch, but will instead be sent to the sink. In that case,
-  // GetNext() will block until all result rows have been sent to the sink.
-  // (TODO: this is not how the code behaves; we need to fix the code)
+  // the next GetNext() call. If *batch is NULL, execution has completed and GetNext()
+  // must not be called again.
+  // It is safe to call GetNext() even in the case where there is no coordinator fragment
+  // (distributed INSERT).
   // '*batch' is owned by the underlying PlanFragmentExecutor and must not be deleted.
   // *state is owned by the caller, and must not be deleted.
   // Returns an error status if an error was encountered either locally or by
@@ -103,7 +107,7 @@ class Coordinator {
   // that calls to UpdateFragmentExecStatus() won't happen
   // concurrently for the same backend.
   // If 'status' is an error status, also cancel execution of the query via a call
-  // to Cancel().
+  // to CancelInternal().
   Status UpdateFragmentExecStatus(const TReportExecStatusParams& params);
 
   // only valid *after* calling Exec(), and may return NULL if there is no executor
@@ -113,13 +117,7 @@ class Coordinator {
   // Get cumulative profile aggregated over all fragments of the query.
   // This is a snapshot of the current state of execution and will change in
   // the future if not all fragments have finished execution.
-  // RuntimeProfile is not thread-safe, but non-updating functions (PrettyPrint(),
-  // ToThrift(), etc.) are safe to call while counters are being updated concurrently.
   RuntimeProfile* query_profile() const { return query_profile_.get(); }
-
-  // True iff either a) all rows have been returned or sent to a table sink or b) the
-  // query has been aborted
-  bool execution_completed() { return execution_completed_; }
 
   ExecStats* exec_stats() { return exec_stats_; }
   const TUniqueId& query_id() const { return query_id_; }
@@ -133,14 +131,17 @@ class Coordinator {
   ExecEnv* exec_env_;
   TUniqueId query_id_;
 
-  bool has_called_wait_;  // if true, Wait() was called
-
-  // execution state of a particular fragment
+  // Execution state of a particular fragment.
+  // Concurrent accesses:
+  // - GetNodeThroughput() called when coordinator's profile is printed
+  // - updates through UpdateFragmentExecStatus()
   struct BackendExecState {
     TUniqueId fragment_id;
     int backend_num;  // backend_exec_states_[backend_num] points to us
     const std::pair<std::string, int> hostport;  // of ImpalaInternalService
-    int64_t total_split_size;  // summed up across all splits
+    int64_t total_split_size;  // summed up across all splits; in bytes
+
+    // needed for ParallelExecutor::Exec()
     const TPlanExecRequest* exec_request;  
     const TPlanExecParams* exec_params;  
 
@@ -149,41 +150,54 @@ class Coordinator {
     // to lock
     boost::mutex lock;
 
+    // if the status indicates an error status, execution of this fragment
+    // has either been aborted by the remote backend (which then reported the error)
+    // or cancellation has been initiated; either way, execution must not be cancelled
     Status status;
+
     bool initiated; // if true, TPlanExecRequest rpc has been sent
-    bool done;  // if true, execution terminated
+    bool done;  // if true, execution terminated; do not cancel in that case
+    bool profile_created;  // true after the first call to profile->Update()
     RuntimeProfile* profile;  // owned by obj_pool()
 
     // Lists the Hdfs partitions affected by this query
     std::set<std::string> updated_hdfs_partitions;
     
+    // map from id of a scan node to the throughput counter in this->profile
+    typedef std::map<PlanNodeId, RuntimeProfile::Counter*> ThroughputCounterMap;
+    ThroughputCounterMap throughput_counters;
+
     BackendExecState(const TUniqueId& fragment_id, int backend_num,
                      const std::pair<std::string, int>& hostport,
                      const TPlanExecRequest* exec_request,
-                     const TPlanExecParams* exec_params) 
-      : fragment_id(fragment_id),
-        backend_num(backend_num),
-        hostport(hostport),
-        total_split_size(0),
-        exec_request(exec_request),
-        exec_params(exec_params),
-        initiated(false),
-        done(false),
-        profile(NULL) {
-      ComputeTotalSplitSize(*exec_params);
-    }
+                     const TPlanExecParams* exec_params,
+                     ObjectPool* obj_pool);
 
+    // Computes sum of split sizes of leftmost scan
     void ComputeTotalSplitSize(const TPlanExecParams& params);
-  };
 
+    // Build throughput_counters from profile. Assumes that lock is held.
+    void CreateThroughputCounters();
+
+    // Return value of throughput counter for given plan_node_id, or 0 if that node
+    // doesn't exist.
+    // Thread-safe.
+    int64_t GetNodeThroughput(int plan_node_id);
+  };
   // BackendExecStates owned by obj_pool()
   std::vector<BackendExecState*> backend_exec_states_;
+
+  // ensures single-threaded execution of Wait(); must not hold lock_ when acquiring this
+  boost::mutex wait_lock_;
+
+  bool has_called_wait_;  // if true, Wait() was called; protected by wait_lock_
 
   // protects all fields below
   boost::mutex lock_;
 
-  // ensures single-threaded execution of Wait()
-  boost::mutex wait_lock_;
+  // Overall status of the entire query; set to the first reported fragment error
+  // status or to CANCELLED, if Cancel() is called.
+  Status query_status_;
 
   // execution state of coordinator fragment
   boost::scoped_ptr<PlanFragmentExecutor> executor_;
@@ -210,24 +224,13 @@ class Coordinator {
   ExecStats* exec_stats_;
 
   // If there is no coordinator fragment, Wait simply waits until all
-  // backends report completion. The following variables manage
-  // signalling from UpdateFragmentExecStatus to Wait once all
-  // backends are done.
-
-  // Protects access to num_remaining_backends_, and coordinates
-  // signal / wait on backend_completion_cv_. Must be the last lock
-  // acquired - do not acquire any other locks while holding
-  // backend_completion_lock_. wait_lock_ or lock_ may be held when
-  // acquiring this lock.
-  boost::mutex backend_completion_lock_;
+  // backends report completion by notifying on backend_completion_cv_.
+  // Tied to lock_.
   boost::condition_variable backend_completion_cv_;
 
   // Count of the number of backends for which done != true. When this
   // hits 0, any Wait()'ing thread is notified
   int num_remaining_backends_;
-
-  // True if we Cancel was called one or more times
-  bool is_cancelled_;
 
   // Object pool used used only if no fragment is executing (otherwise
   // we use the executor's object pool), use obj_pool() to access
@@ -235,6 +238,9 @@ class Coordinator {
 
   // Aggregate counters for the entire query.
   boost::scoped_ptr<RuntimeProfile> query_profile_;
+
+  // Profile for aggregate throughput counters; allocated in obj_pool().
+  RuntimeProfile* agg_throughput_profile_;
 
   // Wrapper for ExecPlanFragment() rpc.  This function will be called in parallel
   // from multiple threads.
@@ -251,12 +257,23 @@ class Coordinator {
   // Print hdfs split size stats to VLOG_QUERY and details to VLOG_FILE
   void PrintBackendInfo();
 
-  // Executes the GetNext() logic, but doesn't call Close() when execution
-  // is completed.
-  Status GetNextInternal(RowBatch** batch, RuntimeState* state);
+  // Create aggregate throughput counters for all scan nodes in any of the fragments
+  void CreateThroughputCounters(const std::vector<TPlanExecRequest>& fragment_requests);
 
-  // Runs cancel logic. If 'get_lock' is true, obtains lock_; otherwise doesn't.
-  void Cancel(bool get_lock);
+  // Derived counter function: aggregates throughput for node_id across all backends
+  // (id needs to be for a ScanNode)
+  int64_t ComputeTotalThroughput(int node_id);
+
+  // Runs cancel logic. Assumes that lock_ is held.
+  void CancelInternal();
+
+  // Returns query_status_.
+  Status GetStatus();
+
+  // Acquires lock_ and updates query_status_ with 'status' if it's not already
+  // an error status, and returns the current query_status_.
+  // Calls CancelInternal() when switching to an error status.
+  Status UpdateStatus(const Status& status);
 };
 
 }

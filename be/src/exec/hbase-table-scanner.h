@@ -199,7 +199,7 @@ class HBaseTableScanner {
   // Set in the HBase call Scan.setCaching();
   int rows_cached_;
 
-  // HBase specific counter
+  // HBase specific counters
   RuntimeProfile::Counter* scan_setup_timer_;
 
   // Lexicographically compares s with the string at offset in buffer_ having given

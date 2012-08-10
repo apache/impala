@@ -30,14 +30,14 @@ class StopWatch {
   }
 
   uint64_t Ticks() const {
-    return total_time_;
+    return running_ ? Rdtsc() - start_ : total_time_;
   }
 
   // This instruction (existed since Pentiums) returns the clock counter
   // on the chip.  It is not perfectly accurate because of skew between
   // cores and cores running slower for power savings.  Nevertheless,
   // it is extremely low overhead and probably accurate enough for us.
-  uint64_t Rdtsc() {
+  uint64_t Rdtsc() const {
     uint32_t lo, hi;
     __asm__ __volatile__ (      
       "xorl %%eax,%%eax \n        cpuid"

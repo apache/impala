@@ -7,12 +7,12 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/common")
 # where to put generated binaries
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/common")
 
-add_library(Common
+add_library(Common STATIC
   service-ids.cc
   status.cc
 )
 
-add_library(GlobalFlags
+add_library(GlobalFlags STATIC
   global-flags.cc
 )
 

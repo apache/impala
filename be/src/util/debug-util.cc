@@ -49,7 +49,7 @@ ostream& operator<<(ostream& os, const TAggregationOp::type& op) {
 
 string PrintId(const TUniqueId& id) {
   stringstream out;
-  out << id.hi << "|" << id.lo;
+  out << id.hi << ":" << id.lo;
   return out.str();
 }
 

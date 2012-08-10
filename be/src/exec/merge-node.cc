@@ -66,7 +66,7 @@ Status MergeNode::Prepare(RuntimeState* state) {
 
 Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_CANCELLED(state);
-  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
   // Create new tuple buffer for row_batch.
   int tuple_buffer_size = row_batch->capacity() * tuple_desc_->byte_size();
   void* tuple_buffer = row_batch->tuple_data_pool()->Allocate(tuple_buffer_size);

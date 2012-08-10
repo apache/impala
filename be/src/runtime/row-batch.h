@@ -124,6 +124,7 @@ class RowBatch {
   }
 
   void AddIoBuffer(DiskIoMgr::BufferDescriptor* buffer) {
+    LOG(INFO) << "AddIoBuffer()";
     io_buffers_.push_back(buffer);
   }
 

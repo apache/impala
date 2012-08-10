@@ -26,6 +26,12 @@ add_test(state-store-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/sparrow/state-store-tes
 
 add_executable(simple-scheduler-test simple-scheduler-test.cc)
 
-target_link_libraries(simple-scheduler-test ${IMPALA_TEST_LINK_LIBS})
+target_link_libraries(simple-scheduler-test
+  Common
+  Runtime
+  Common
+  Runtime
+  ${IMPALA_TEST_LINK_LIBS}
+)
 
 add_test(simple-scheduler-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/sparrow/simple-scheduler-test)

@@ -1,11 +1,11 @@
-select year, count(*) from alltypes$TABLE group by 1
+select year, count(*) from alltypes$TABLE group by 1 order by 1 limit 10
 ---- TYPES
 int, bigint
 ---- RESULTS
 2009,3650
 2010,3650
 ====
-select month, count(*) from alltypes$TABLE group by 1
+select month, count(*) from alltypes$TABLE group by 1 order by 1 limit 100
 ---- TYPES
 int, bigint
 ---- RESULTS
@@ -22,7 +22,7 @@ int, bigint
 8,620
 9,600
 ====
-select year, month, count(*) from alltypes$TABLE group by 1, 2
+select year, month, count(*) from alltypes$TABLE group by 1, 2 order by 1, 2 limit 100
 ---- TYPES
 int, int, bigint
 ---- RESULTS

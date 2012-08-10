@@ -737,6 +737,6 @@ bool Expr::IsJittable(LlvmCodeGen* codegen) const {
 }
 
 Function* Expr::CodegenExprTree(LlvmCodeGen* codegen) {
-  COUNTER_SCOPED_TIMER(codegen->codegen_timer());
+  SCOPED_TIMER(codegen->codegen_timer());
   return this->Codegen(codegen);
 }

@@ -23,6 +23,10 @@ struct TRuntimeProfileNode {
   1: required string name
   2: required i32 num_children 
   3: required list<TCounter> counters
+
+  // indicates whether the child will be printed with extra indentation;
+  // corresponds to indent param of RuntimeProfile::AddChild()
+  4: required bool indent
 }
 
 // A flattened tree of runtime profiles, obtained by an

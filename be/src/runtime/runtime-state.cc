@@ -14,6 +14,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/timestamp-value.h"
 #include "util/cpu-info.h"
+#include "util/debug-util.h"
 #include "util/jni-util.h"
 
 #include <jni.h>
@@ -31,7 +32,7 @@ RuntimeState::RuntimeState(
     const TUniqueId& fragment_id, const TQueryOptions& query_options, const string& now,
     ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
-    profile_(obj_pool_.get(), "RuntimeState"),
+    profile_(obj_pool_.get(), "Fragment " + PrintId(fragment_id)),
     is_cancelled_(false) {
   Status status = Init(fragment_id, query_options, now, exec_env);
   DCHECK(status.ok());
@@ -39,7 +40,7 @@ RuntimeState::RuntimeState(
 
 RuntimeState::RuntimeState()
   : obj_pool_(new ObjectPool()),
-    profile_(obj_pool_.get(), "RuntimeState") {
+    profile_(obj_pool_.get(), "<unnamed>") {
   query_options_.batch_size = DEFAULT_BATCH_SIZE;
   query_options_.file_buffer_size = DEFAULT_FILE_BUFFER_SIZE;
 }

@@ -86,7 +86,7 @@ Status LlvmCodeGen::LoadFromFile(ObjectPool* pool,
     const string& file, scoped_ptr<LlvmCodeGen>* codegen) {
   codegen->reset(new LlvmCodeGen(pool, ""));
 
-  COUNTER_SCOPED_TIMER((*codegen)->load_module_timer_);
+  SCOPED_TIMER((*codegen)->load_module_timer_);
   OwningPtr<MemoryBuffer> file_buffer;
   llvm::error_code err = MemoryBuffer::getFile(file, file_buffer);
   if (err.value() != 0) {
@@ -124,7 +124,7 @@ Status LlvmCodeGen::LoadImpalaIR(ObjectPool* pool, scoped_ptr<LlvmCodeGen>* code
   LlvmCodeGen* codegen = codegen_ret->get();
 
   // Parse module for cross compiled functions and types
-  COUNTER_SCOPED_TIMER(codegen->load_module_timer_);
+  SCOPED_TIMER(codegen->load_module_timer_);
 
   // Get type for StringValue
   codegen->string_val_type_ = codegen->GetType(StringValue::LLVM_CLASS_NAME);
@@ -536,13 +536,13 @@ Function* LlvmCodeGen::FinalizeFunction(Function* function) {
 
 void LlvmCodeGen::OptimizeFunction(Function* function) {
   if (optimizations_enabled_) {
-    COUNTER_SCOPED_TIMER(compile_timer_);
+    SCOPED_TIMER(compile_timer_);
     function_pass_mgr_->run(*function);
   }
 }
 
 void* LlvmCodeGen::JitFunction(Function* function, int* scratch_size) {
-  COUNTER_SCOPED_TIMER(compile_timer_);
+  SCOPED_TIMER(compile_timer_);
   if (optimizations_enabled_) {
     function_pass_mgr_->run(*function);
   }

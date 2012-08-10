@@ -622,7 +622,7 @@ public class ParserTest {
         "c, b, c from t\n" +
         "^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: SELECT, INSERT\n");
+        "Expected: SELECT, USE, INSERT\n");
 
     // missing select list
     ParserError("select from t",

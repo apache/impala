@@ -34,6 +34,11 @@ using namespace llvm;
 // lengths of the string buffers in the tuple.
 namespace impala {
 
+const char* AggregationNode::LLVM_CLASS_NAME = "class.impala::AggregationNode";
+const int AggregationNode::NUM_PC_BITMAPS = 64;
+const int AggregationNode::PC_BITMAP_LENGTH = 32;
+const float AggregationNode::PC_THETA = 0.77351;
+
 class AggregationTuple {
  public:
   static AggregationTuple* Create(int tuple_size, int num_string_slots, MemPool* pool) {
@@ -62,11 +67,6 @@ class AggregationTuple {
 };
 
 const char* AggregationTuple::LLVM_CLASS_NAME = "class.impala::AggregationTuple";
-
-}
-
-const char* AggregationNode::LLVM_CLASS_NAME = "class.impala::AggregationNode";
-const float AggregationNode::PC_THETA = 0.77351;
 
 // TODO: pass in maximum size; enforce by setting limit in mempool
 // TODO: have a Status ExecNode::Init(const TPlanNode&) member function
@@ -143,7 +143,7 @@ Status AggregationNode::Prepare(RuntimeState* state) {
 }
 
 Status AggregationNode::Open(RuntimeState* state) {
-  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
 
   RETURN_IF_ERROR(children_[0]->Open(state));
 
@@ -154,7 +154,7 @@ Status AggregationNode::Open(RuntimeState* state) {
     bool eos;
     RETURN_IF_CANCELLED(state);
     RETURN_IF_ERROR(children_[0]->GetNext(state, &batch, &eos));
-    COUNTER_SCOPED_TIMER(build_timer_);
+    SCOPED_TIMER(build_timer_);
 
     if (VLOG_ROW_IS_ON) {
       for (int i = 0; i < batch.num_rows(); ++i) {
@@ -189,8 +189,8 @@ Status AggregationNode::Open(RuntimeState* state) {
 
 Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
   RETURN_IF_CANCELLED(state);
-  COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
-  COUNTER_SCOPED_TIMER(get_results_timer_);
+  SCOPED_TIMER(runtime_profile_->total_time_counter());
+  SCOPED_TIMER(get_results_timer_);
 
   if (ReachedLimit()) {
     *eos = true;
@@ -729,7 +729,7 @@ llvm::Function* AggregationNode::CodegenUpdateSlot(LlvmCodeGen* codegen, int slo
 //   ret void
 // }
 Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
-  COUNTER_SCOPED_TIMER(codegen->codegen_timer());
+  SCOPED_TIMER(codegen->codegen_timer());
   for (int i = 0; i < agg_tuple_desc_->slots().size(); ++i) {
     SlotDescriptor* slot_desc = agg_tuple_desc_->slots()[i];
     if (slot_desc->type() == TYPE_STRING || slot_desc->type() == TYPE_TIMESTAMP) {
@@ -822,7 +822,7 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
 
 Function* AggregationNode::CodegenProcessRowBatch(
     LlvmCodeGen* codegen, Function* update_tuple_fn) {
-  COUNTER_SCOPED_TIMER(codegen->codegen_timer());
+  SCOPED_TIMER(codegen->codegen_timer());
   DCHECK(update_tuple_fn != NULL);
 
   // Get the cross compiled update row batch function
@@ -1034,3 +1034,6 @@ string AggregationNode::DistinctEstimateBitMapToString(char* v) {
   debugstr << "\n";
   return debugstr.str();
 }
+
+}
+

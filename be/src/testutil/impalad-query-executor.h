@@ -88,9 +88,13 @@ class ImpaladQueryExecutor : public QueryExecutorIf {
   beeswax::Results query_results_;
   beeswax::QueryExplanation query_explanation_;
 
+  bool query_in_progress_;
   int current_row_;
   bool eos_;
   ExecStats exec_stats_;  // not set right now
+
+  // call beeswax.close() for current query, if one in progress
+  Status Close();
 };
 
 }

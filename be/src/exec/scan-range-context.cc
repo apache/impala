@@ -119,7 +119,7 @@ Status ScanRangeContext::GetRawBytes(uint8_t** out_buffer, int* len, bool* eos) 
 
 Status ScanRangeContext::GetBytesInternal(uint8_t** out_buffer, int requested_len, 
     int* out_len, bool* eos) {
-  COUNTER_SCOPED_TIMER(scan_node_->hdfs_read_timer());
+  SCOPED_TIMER(scan_node_->read_timer());
   *out_len = 0;
   *out_buffer = NULL;
   *eos = true;

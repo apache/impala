@@ -36,13 +36,10 @@ DataStreamMgr::StreamControlBlock::StreamControlBlock(
 
 RowBatch* DataStreamMgr::StreamControlBlock::GetBatch(bool* is_cancelled) {
   unique_lock<mutex> l(lock_);
-  if (is_cancelled_) {
-    *is_cancelled = true;
-    return NULL;
-  }
   // wait until something shows up or we know we're done
-  while (batch_queue_.empty() && num_remaining_senders_ > 0) {
-    VLOG_ROW << "wait arrival query=" << fragment_id_ << " node=" << dest_node_id_;
+  while (!is_cancelled_ && batch_queue_.empty() && num_remaining_senders_ > 0) {
+    LOG(INFO) << "wait arrival query=" << fragment_id_ << " node=" << dest_node_id_;
+    //VLOG_ROW << "wait arrival query=" << fragment_id_ << " node=" << dest_node_id_;
     data_arrival_.wait(l);
   }
   if (is_cancelled_) {
@@ -198,10 +195,10 @@ void DataStreamMgr::Cancel(const TUniqueId& fragment_id) {
   lock_guard<mutex> l(lock_);
   FragmentStreamSet::iterator i =
       fragment_stream_set_.lower_bound(make_pair(fragment_id, 0));
-  while (i->first == fragment_id) {
+  while (i != fragment_stream_set_.end() && i->first == fragment_id) {
     StreamMap::iterator j = FindControlBlock(i->first, i->second, false);
     if (j == stream_map_.end()) {
-      // keep going to at least log it
+      // keep going but at least log it
       stringstream err;
       err << "Cancel(): missing in stream_map: fragment=" << i->first
           << " node=" << i->second;

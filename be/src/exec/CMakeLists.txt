@@ -37,6 +37,7 @@ add_library(Exec STATIC
   read-write-util.cc
   scan-range-context.cc
   serde-utils.cc
+  scan-node.cc
   text-converter.cc
   topn-node.cc
 )

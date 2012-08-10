@@ -19,6 +19,7 @@ namespace impala {
 
 class ExecEnv;
 class DataSink;
+class Coordinator;
 class RowDescriptor;
 
 class TCatalogUpdate;
@@ -119,7 +120,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   static const int ASCII_PRECISION;
 
   // Initiate execution of plan fragment in newly created thread.
-  // Creates new FragmentExecState and registers it in corresp. map.
+  // Creates new FragmentExecState and registers it in fragment_exec_state_map_.
   Status StartPlanFragmentExecution(
       const TPlanExecRequest& request, const TPlanExecParams& params,
       const THostPort& coord_hostport, int backend_num);
@@ -141,11 +142,14 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
       const RowDescriptor& row_desc, DataSink** sink);
 
   // Return exec state for given query_id, or NULL if not found.
-  // The returned exec state's lock() will be held.
-  boost::shared_ptr<QueryExecState> GetQueryExecState(const TUniqueId& query_id);
+  // If 'lock' is true, the returned exec state's lock() will be acquired before
+  // the query_exec_state_map_lock_ is released.
+  boost::shared_ptr<QueryExecState> GetQueryExecState(
+      const TUniqueId& query_id, bool lock);
 
   // Return exec state for given fragment_id, or NULL if not found.
-  FragmentExecState* GetFragmentExecState(const TUniqueId& fragment_id);
+  boost::shared_ptr<FragmentExecState> GetFragmentExecState(
+      const TUniqueId& fragment_id);
 
   // Call FE to get TClientRequestResult.
   Status GetQueryExecRequest(const TClientRequest& request,
@@ -172,9 +176,13 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   // will have been registered in query_exec_state_map_.
   Status Execute(const TClientRequest& request,
                  boost::shared_ptr<QueryExecState>* exec_state);
+  
+  // Implements Execute() logic, but doesn't unregister query on error.
+  Status ExecuteInternal(const TClientRequest& request, bool* registered_exec_state,
+                         boost::shared_ptr<QueryExecState>* exec_state);
 
-  // Remove exec_state from query_exec_state_map_. Returns true if it found
-  // a registered exec_state, otherwise false.
+  // Removes exec_state from query_exec_state_map_ and cancels execution.
+  // Returns true if it found a registered exec_state, otherwise false.
   bool UnregisterQuery(const TUniqueId& query_id);
 
   // Executes the fetch logic. Doesn't clean up the exec state if an error occurs.
@@ -221,8 +229,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   QueryExecStateMap query_exec_state_map_;
   boost::mutex query_exec_state_map_lock_;  // protects query_exec_state_map_
 
-  // map from fragment id to exec state; FragmentExecState is owned by us
-  typedef boost::unordered_map<TUniqueId, FragmentExecState*> FragmentExecStateMap;
+  // map from fragment id to exec state; FragmentExecState is owned by us and
+  // referenced as a shared_ptr to allow asynchronous calls to CancelPlanFragment()
+  typedef boost::unordered_map<TUniqueId, boost::shared_ptr<FragmentExecState> >
+      FragmentExecStateMap;
   FragmentExecStateMap fragment_exec_state_map_;
   boost::mutex fragment_exec_state_map_lock_;  // protects fragment_exec_state_map_
 

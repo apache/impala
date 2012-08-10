@@ -111,7 +111,7 @@ Status InProcessQueryExecutor::Exec(const string& query,
   RuntimeProfile::Counter* plan_gen_counter =
       ADD_COUNTER(query_profile_, "PlanGeneration", TCounterType::CPU_TICKS);
 
-  COUNTER_SCOPED_TIMER(query_profile_->total_time_counter());
+  SCOPED_TIMER(query_profile_->total_time_counter());
   VLOG_QUERY << "query: " << query;
   eos_ = false;
 
@@ -126,7 +126,7 @@ Status InProcessQueryExecutor::Exec(const string& query,
   query_options.num_scanner_threads = FLAGS_num_scanner_threads;
 
   try {
-    COUNTER_SCOPED_TIMER(plan_gen_counter);
+    SCOPED_TIMER(plan_gen_counter);
     CHECK(client_.get() != NULL) << "didn't call InProcessQueryExecutor::Setup()";
     TClientRequest client_request;
     client_request.__set_stmt(query.c_str());
@@ -137,7 +137,7 @@ Status InProcessQueryExecutor::Exec(const string& query,
   } catch (TImpalaPlanServiceException& e) {
     return Status(e.what());
   }
-  VLOG_QUERY << "query request:\n" << ThriftDebugString(query_request_);
+  //VLOG_QUERY << "query request:\n" << ThriftDebugString(query_request_);
 
   // we always need at least one plan fragment
   DCHECK_GT(query_request_.fragment_requests.size(), 0);
@@ -217,7 +217,7 @@ Status InProcessQueryExecutor::FetchResult(RowBatch** batch) {
 }
 
 Status InProcessQueryExecutor::FetchResult(string* result) {
-  COUNTER_SCOPED_TIMER(query_profile_->total_time_counter());
+  SCOPED_TIMER(query_profile_->total_time_counter());
   vector<void*> row;
   RETURN_IF_ERROR(FetchResult(&row));
   result->clear();
@@ -233,7 +233,7 @@ Status InProcessQueryExecutor::FetchResult(string* result) {
 }
 
 Status InProcessQueryExecutor::FetchResult(vector<void*>* select_list_values) {
-  COUNTER_SCOPED_TIMER(query_profile_->total_time_counter());
+  SCOPED_TIMER(query_profile_->total_time_counter());
   select_list_values->clear();
   if (coord_.get() == NULL) {
     // query without FROM clause: we return exactly one row
@@ -254,7 +254,7 @@ Status InProcessQueryExecutor::FetchResult(vector<void*>* select_list_values) {
 
     // we need a new row batch
     RETURN_IF_ERROR(coord_->GetNext(&row_batch_, runtime_state()));
-    if (coord_->execution_completed()) {
+    if (row_batch_ == NULL) {
       // no more rows to return
       eos_ = true;
     }
@@ -340,5 +340,6 @@ Status InProcessQueryExecutor::Explain(const string& query, string* explain_plan
 }
 
 RuntimeProfile* InProcessQueryExecutor::query_profile() {
-  return query_profile_.get();
+  return coord_.get() != NULL ? coord_->query_profile() : NULL;
 }
+

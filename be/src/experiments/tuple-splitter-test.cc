@@ -153,7 +153,7 @@ class DataPartitioner {
   }
   
   bool Finalize(vector<Partition>* results) {
-    COUNTER_SCOPED_TIMER(split_time_);
+    SCOPED_TIMER(split_time_);
     bool result = true;
     for (int i = 0; i < build_partitions_.size(); ++i) {
       if (build_partitions_[i].blocks.size() > 0) {
@@ -238,7 +238,7 @@ class DataPartitioner {
 };
 
 void DataPartitioner::AddData(int n, uint8_t* data) {
-  COUNTER_SCOPED_TIMER(add_time_);
+  SCOPED_TIMER(add_time_);
   COUNTER_UPDATE(bytes_copied_, n * size_);
 
   for (int i = 0; i < n; ++i) {
