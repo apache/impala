@@ -16,6 +16,7 @@
 import csv
 import math
 import os
+import sys
 
 from itertools import groupby
 from optparse import OptionParser
