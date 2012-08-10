@@ -57,8 +57,7 @@ parser.add_option("--hive_cmd", dest="hive_cmd", default="hive -e",
 parser.add_option("-i", "--iterations", dest="iterations", default="5",
                   help="Number of times to run each query.")
 parser.add_option("--prime_cache", dest="prime_cache", default= True,
-                  help="Whether or not to prime the buffer cache. Only to be "\
-                  "used with -q")
+                  help="Whether or not to prime the buffer cache. ")
 
 (options, args) = parser.parse_args()
 
@@ -188,6 +187,8 @@ def run_query(query, prime_buffer_cache, iterations):
   compare_output = ""
   output = ""
 
+  print "Running query: %s" % (query)
+
   if prime_buffer_cache:
     if options.remote:
       prime_buffer_cache_remote_impala(query)
@@ -228,8 +229,7 @@ def run_query(query, prime_buffer_cache, iterations):
         run_success = True
 
   if not run_success:
-    print "Query did not run succesfully"
-    print "Failed Query: %s\n" % (query)
+    print "Query did not run successfully"
     query_output.seek(0)
     query_err.seek(0)
     for line in query_output.readlines():
@@ -358,45 +358,46 @@ def extract_queries_from_test_files(workload):
           queries.append(formatted_query.strip())
   return queries
 
-result_map = collections.defaultdict(list)
-output = ""
+if __name__ == "__main__":
+  result_map = collections.defaultdict(list)
+  output = ""
 
-# For each workload specified in, look up the associated query files. Extract valid
-# queries in each file and execute them using the specified number of execution
-# iterations. Finally, write results to an output CSV file for reporting.
-for workload in options.workloads.split(','):
-  print 'Starting running of workload: ' + workload
-  queries = extract_queries_from_test_files(workload)
+  # For each workload specified in, look up the associated query files. Extract valid
+  # queries in each file and execute them using the specified number of execution
+  # iterations. Finally, write results to an output CSV file for reporting.
+  for workload in options.workloads.split(','):
+    print 'Starting running of workload: ' + workload
+    queries = extract_queries_from_test_files(workload)
 
-  vector_file_path = os.path.join(WORKLOAD_DIR, workload,
-                                  vector_file_name(workload,
-                                  options.exploration_strategy))
-  test_vector = read_vector_file(vector_file_path)
+    vector_file_path = os.path.join(WORKLOAD_DIR, workload,
+                                    vector_file_name(workload,
+                                    options.exploration_strategy))
+    test_vector = read_vector_file(vector_file_path)
 
-  # Execute the queries for combinations of file format, compression, etc.
-  for row in test_vector:
-    file_format, data_group, codec, compression_type = row[:4]
-    print 'Test Vector Values: ' + ', '.join(row)
-    for query in queries:
-      query_string = build_query(query.strip(), file_format, codec, compression_type,
-                                 workload, options.scale_factor)
-      result = run_query(query_string, 1, int(options.iterations))
-      output += result[0]
-      execution_result = result[1]
-      hive_execution_result = QueryExecutionResult("N/A", "N/A")
-      if options.compare_with_hive:
-        hive_result = run_query_using_hive(query_string, 1, int(options.iterations))
-        print "Hive Results:"
-        print hive_result[0]
-        hive_execution_result = hive_result[1]
-      if options.verbose != 0:
-        print "------------------------------------------------------------------------"
+    # Execute the queries for combinations of file format, compression, etc.
+    for row in test_vector:
+      file_format, data_group, codec, compression_type = row[:4]
+      print 'Test Vector Values: ' + ', '.join(row)
+      for query in queries:
+        query_string = build_query(query.strip(), file_format, codec, compression_type,
+                                  workload, options.scale_factor)
+        result = run_query(query_string, 1, int(options.iterations))
+        output += result[0]
+        execution_result = result[1]
+        hive_execution_result = QueryExecutionResult("N/A", "N/A")
+        if options.compare_with_hive:
+          hive_result = run_query_using_hive(query_string, 1, int(options.iterations))
+          print "Hive Results:"
+          print hive_result[0]
+          hive_execution_result = hive_result[1]
+        if options.verbose != 0:
+          print "------------------------------------------------------------------------"
 
-      execution_detail = QueryExecutionDetail(workload, file_format, codec,
-                                              compression_type, execution_result,
-                                              hive_execution_result)
-      result_map[query].append(execution_detail)
+        execution_detail = QueryExecutionDetail(workload, file_format, codec,
+                                                compression_type, execution_result,
+                                                hive_execution_result)
+        result_map[query].append(execution_detail)
 
-  print "\nResults saving to: " + options.results_csv_file
-  write_to_csv(result_map, options.results_csv_file)
-  print output
+    print "\nResults saving to: " + options.results_csv_file
+    write_to_csv(result_map, options.results_csv_file)
+    print output

@@ -152,7 +152,8 @@ Status Coordinator::ExecRemoteFragment(
     BackendExecState* exec_state,
     TPlanExecRequest* exec_request,
     const TPlanExecParams& exec_params) {
-  VLOG_QUERY << "making rpc: ExecPlanFragment fragment_id=" << exec_state->fragment_id
+  VLOG_QUERY << "making rpc: ExecPlanFragment query_id=" << query_id_
+             << " fragment_id=" << exec_state->fragment_id
              << " host=" << exec_state->hostport.first
              << " port=" << exec_state->hostport.second;
   lock_guard<mutex> l(exec_state->lock);
@@ -179,7 +180,9 @@ Status Coordinator::ExecRemoteFragment(
     backend_client->ExecPlanFragment(thrift_result, params);
   } catch (TTransportException& e) {
     stringstream msg;
-    msg << "ExecPlanRequest rpc failed: " << e.what();
+    msg << "ExecPlanRequest rpc query_id=" << query_id_
+        << " fragment_id=" << exec_state->fragment_id 
+        << " failed: " << e.what();
     LOG(ERROR) << msg.str();
     exec_state->status = Status(msg.str());
     exec_env_->client_cache()->ReleaseClient(backend_client);
@@ -258,7 +261,9 @@ void Coordinator::Cancel(bool get_lock) {
       backend_client->CancelPlanFragment(res, params);
     } catch (TTransportException& e) {
       stringstream msg;
-      msg << "CancelPlanFragment rpc failed: " << e.what();
+      msg << "CancelPlanFragment rpc query_id=" << query_id_
+          << " fragment_id=" << exec_state->fragment_id 
+          << " failed: " << e.what();
       // make a note of the error status, but keep on cancelling the other fragments
       if (exec_state->status.ok()) {
         exec_state->status = Status(msg.str());
@@ -295,7 +300,7 @@ Status Coordinator::UpdateFragmentExecStatus(
     // make sure we don't go from error status to OK
     DCHECK(!status.ok() || exec_state->status.ok())
         << "fragment is transitioning from error status to OK:"
-        << " query_id=" << query_id_ << " fragment#=" << backend_num
+        << " query_id=" << query_id_ << " fragment_id=" << exec_state->fragment_id
         << " status=" << exec_state->status.GetErrorMsg();
     exec_state->status = status;
     exec_state->done = done;
