@@ -31,6 +31,10 @@ enum TAggregationOp {
   INVALID,
   COUNT,
   MAX,
+  DISTINCT_PC,
+  MERGE_PC,
+  DISTINCT_PCSA,
+  MERGE_PCSA,
   MIN,
   SUM,
 }

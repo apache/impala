@@ -73,7 +73,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
   // Start of this batch.
   *next_column_start = *byte_buffer_ptr;
 
-  if (CpuInfo::Instance()->IsSupported(CpuInfo::SSE4_2)) {
+  if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
     if (escape_char_ == '\0') {
       ParseSse<false>(max_tuples, &remaining_len, byte_buffer_ptr, row_end_locations,
           field_locations, num_tuples, num_fields, next_column_start);
@@ -147,7 +147,7 @@ int DelimitedTextParser::FindFirstInstance(char* buffer, int len) {
   char* buffer_start = buffer;
   bool found = false;
 restart:
-  if (CpuInfo::Instance()->IsSupported(CpuInfo::SSE4_2)) {
+  if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
     __m128i xmm_buffer, xmm_tuple_mask;
     while (tuple_start < len) {
       // TODO: can we parallelize this as well?  Are there multiple sse execution units?

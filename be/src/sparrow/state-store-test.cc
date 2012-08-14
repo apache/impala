@@ -17,6 +17,7 @@
 #include "sparrow/state-store-service.h"
 #include "sparrow/state-store-subscriber-service.h"
 #include "sparrow/util.h"
+#include "util/cpu-info.h"
 #include "util/thrift-util.h"
 #include "gen-cpp/SparrowTypes_types.h"
 #include "gen-cpp/Types_types.h"
@@ -602,5 +603,6 @@ TEST_F(StateStoreTest, SubscriberFailure) {
 int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
   ::testing::InitGoogleTest(&argc, argv);
+  impala::CpuInfo::Init();
   return RUN_ALL_TESTS();
 }

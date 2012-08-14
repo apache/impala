@@ -4,6 +4,7 @@
 #define IMPALA_UTIL_HASH_UTIL_H
 
 #include "common/logging.h"
+#include "common/compiler-util.h"
 
 // For cross compiling with clang, we need to be able to generate an IR file with
 // no sse instructions.  Attempting to load a precompiled IR file that contains
@@ -25,7 +26,7 @@ class HashUtil {
   // This should only be called if SSE is supported.
   // This is ~4x faster than Fvn/Boost Hash.
   static uint32_t CrcHash(const void* data, int32_t bytes, uint32_t hash) {
-    DCHECK(CpuInfo::Instance()->IsSupported(CpuInfo::SSE4_2));
+    DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2));
     uint32_t words = bytes / sizeof(uint32_t);
     bytes = bytes % sizeof(uint32_t);
 
@@ -68,7 +69,7 @@ class HashUtil {
   // depending on hardware capabilities.
   static uint32_t Hash(const void* data, int32_t bytes, uint32_t hash) {
 #ifdef __SSE4_2__
-    if (CpuInfo::Instance()->IsSupported(CpuInfo::SSE4_2)) {
+    if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
       return CrcHash(data, bytes, hash);
     } else {
       return FvnHash(data, bytes, hash);

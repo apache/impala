@@ -387,6 +387,10 @@ public class ParserTest {
     ParsesOk("select avg(a), avg(distinct a) from t");
     ParserError("select avg() from t");
     ParsesOk("select distinct a, b, c from t");
+    ParsesOk("select distinctpc(a), distinctpc(distinct a) from t");
+    ParserError("select distinctpc() from t");
+    ParsesOk("select distinctpcsa(a), distinctpcsa(distinct a) from t");
+    ParserError("select distinctpcsa() from t");
   }
 
   @Test public void TestPredicates() {
@@ -570,8 +574,8 @@ public class ParserTest {
         "select from t\n" +
         "       ^\n" +
         "Encountered: FROM\n" +
-        "Expected: AVG, CASE, CAST, COUNT, DISTINCT, FALSE, " +
-        "MIN, MAX, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
+        "Expected: AVG, CASE, CAST, COUNT, DISTINCT, DISTINCTPC, " +
+        "DISTINCTPCSA, FALSE, MIN, MAX, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
 
     // missing from
     ParserError("select c, b, c where a = 5",
@@ -596,8 +600,8 @@ public class ParserTest {
         "select c, b, c from t where\n" +
         "                           ^\n" +
         "Encountered: EOF\n" +
-        "Expected: AVG, CASE, CAST, COUNT, FALSE, MIN, MAX, NOT, NULL, SUM, " +
-        "TRUE, IDENTIFIER\n");
+        "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, " +
+        "FALSE, MIN, MAX, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
 
     // missing predicate in where clause (group by)
     ParserError("select c, b, c from t where group by a, b",
@@ -605,8 +609,8 @@ public class ParserTest {
         "select c, b, c from t where group by a, b\n" +
         "                            ^\n" +
         "Encountered: GROUP\n" +
-        "Expected: AVG, CASE, CAST, COUNT, FALSE, MIN, MAX, NOT, NULL, SUM, " +
-        "TRUE, IDENTIFIER\n");
+        "Expected: AVG, CASE, CAST, COUNT, DISTINCTPC, DISTINCTPCSA, " +
+        "FALSE, MIN, MAX, NOT, NULL, SUM, TRUE, IDENTIFIER\n");
 
     // unmatched string literal starting with "
     ParserError("select c, \"b, c from t",

@@ -74,6 +74,12 @@ class AggregationNode : public ExecNode {
   // Jitted ProcessRowBatch function pointer.  Null if codegen is disabled.
   ProcessRowBatchFn process_row_batch_fn_;
 
+  // Certain aggregates require a finalize step, which is the final step of the
+  // aggregate after consuming all input rows. The finalize step converts the aggregate
+  // value into its final form. This is true if this node contains aggregate that requires
+  // a finalize step.
+  bool needs_finalize_;
+
   // Time spent processing the child rows
   RuntimeProfile::Counter* build_timer_;
   // Time spent returning the aggregated rows
@@ -112,6 +118,10 @@ class AggregationNode : public ExecNode {
   // computed over 'row'.
   void UpdateAggTuple(AggregationTuple* tuple, TupleRow* row);
 
+  // Called when all rows have been aggregated for the aggregation tuple to compute final
+  // aggregate values
+  void FinalizeAggTuple(AggregationTuple* tuple);
+
   // Do the aggregation for all tuple rows in the batch
   void ProcessRowBatchNoGrouping(RowBatch* batch);
   void ProcessRowBatchWithGrouping(RowBatch* batch);
@@ -129,6 +139,42 @@ class AggregationNode : public ExecNode {
 
   // Codegen UpdateAggTuple.  Returns NULL if codegen is unsuccessful.
   llvm::Function* CodegenUpdateAggTuple(LlvmCodeGen* codegen);
+
+  // Compute distinctpc and distinctpcsa using Flajolet and Martin's algorithm
+  // (Probabilistic Counting Algorithms for Data Base Applications)
+  // We have implemented two variants here: one with stochastic averaging (with PCSA
+  // postfix) and one without.
+  // There are 4 phases to compute the aggregate:
+  //   1. allocate a bitmap, stored in the aggregation tuple's output string slot
+  //   2. update the bitmap per row (UpdateDistinctEstimateSlot)
+  //   3. for distribtued plan, merge the bitmaps from all the nodes
+  //      (UpdateMergeEstimateSlot)
+  //   4. compute the estimate using the bitmaps when all the rows are processed
+  //      (FinalizeEstimateSlot)
+  const static int NUM_PC_BITMAPS = 64; // number of bitmaps
+  const static int PC_BITMAP_LENGTH = 32; // the length of each bit map
+  const static float PC_THETA = 0.77351; // the magic number to compute the final result
+
+  // Initialize the NUM_PC_BITMAPS * PC_BITMAP_LENGTH bitmaps. The bitmaps are allocated
+  // as a string value of the slot. Both algorithms share the same bitmap structure.
+  void ConstructDistinctEstimateSlot(AggregationTuple*, const NullIndicatorOffset&,
+                                     int slot_id, void* slot);
+
+  // Update the distinct estimate bitmaps for a single input row we consumed
+  void UpdateDistinctEstimatePCSASlot(void* slot, void* value, PrimitiveType type);
+  void UpdateDistinctEstimateSlot(void* slot, void* value, PrimitiveType type);
+
+  // Merge the distinct estimate bitmaps from all slave nodes (multi-node plan) by
+  // union-ing all the bits. Both algorithms share the same merging logic.
+  void UpdateMergeEstimateSlot(AggregationTuple*, int slot_id, void* slot, void* value);
+
+  // Convert the distinct estimate bitmaps into the final estimated number in string form
+  // The logic differs slightly between the two algorithm. agg_op indicates which
+  // algorithm we are executing.
+  void FinalizeEstimateSlot(int slot_id, void* slot, TAggregationOp::type agg_op);
+
+  // Helper function to print aggregation tuple's distinct estimate bitmap
+  static std::string DistinctEstimateBitMapToString(char* v);
 };
 
 }

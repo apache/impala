@@ -15,18 +15,24 @@ import com.google.common.base.Preconditions;
 
 public class AggregateExpr extends Expr {
   public enum Operator {
-    COUNT("COUNT", TAggregationOp.COUNT),
-    MIN("MIN", TAggregationOp.MIN),
-    MAX("MAX", TAggregationOp.MAX),
-    SUM("SUM", TAggregationOp.SUM),
-    AVG("AVG", TAggregationOp.INVALID);
+    COUNT("COUNT", TAggregationOp.COUNT, false),
+    MIN("MIN", TAggregationOp.MIN, false),
+    MAX("MAX", TAggregationOp.MAX, false),
+    DISTINCT_PC("DISTINC_PC", TAggregationOp.DISTINCT_PC, true),
+    MERGE_PC("MERGE_PC", TAggregationOp.MERGE_PC, true),
+    DISTINCT_PCSA("DISTINC_PCSA", TAggregationOp.DISTINCT_PCSA,true),
+    MERGE_PCSA("MERGE_PCSA", TAggregationOp.MERGE_PCSA, true),
+    SUM("SUM", TAggregationOp.SUM, false),
+    AVG("AVG", TAggregationOp.INVALID, false);
 
     private final String description;
     private final TAggregationOp thriftOp;
+    private final boolean needFinalize;
 
-    private Operator(String description, TAggregationOp thriftOp) {
+    private Operator(String description, TAggregationOp thriftOp, boolean needFinalize) {
       this.description = description;
       this.thriftOp = thriftOp;
+      this.needFinalize = needFinalize;
     }
 
     @Override
@@ -36,6 +42,10 @@ public class AggregateExpr extends Expr {
 
     public TAggregationOp toThrift() {
       return thriftOp;
+    }
+
+    public boolean getNeedFinalize() {
+      return needFinalize;
     }
   }
   private final Operator op;
@@ -154,6 +164,27 @@ public class AggregateExpr extends Expr {
         (!arg.type.isNumericType() && arg.type != PrimitiveType.TIMESTAMP)) {
       throw new AnalysisException(
                     "AVG requires a numeric or timestamp parameter: " + this.toSql());
+    }
+
+    if ((op == Operator.MERGE_PC || op == Operator.MERGE_PCSA)
+        && !arg.type.isStringType()) {
+      Preconditions.checkState(false,
+          "MERGEPC(SA) expects string type input but gets " +
+          arg.type.toString());
+    }
+
+    if (op == Operator.DISTINCT_PC ||
+        op == Operator.MERGE_PC ||
+        op == Operator.DISTINCT_PCSA ||
+        op == Operator.MERGE_PCSA) {
+      // Distinct/Merge Estimate is a string type.
+      // Although the number of distinct value is a number, we're using string as return
+      // type. This is because the distinct estimation algorithm uses a bitmap as an
+      // intermediate working context, which can fit nicely in a string. Also we need
+      // string so intermediate from different nodes are sent as part of the
+      // thrift row batch.
+      type = PrimitiveType.STRING;
+      return;
     }
 
     if (op == Operator.AVG) {

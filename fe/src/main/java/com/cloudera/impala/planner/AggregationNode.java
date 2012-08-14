@@ -4,6 +4,7 @@ package com.cloudera.impala.planner;
 
 import java.util.List;
 
+import com.cloudera.impala.analysis.AggregateExpr;
 import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotId;
@@ -19,11 +20,38 @@ import com.google.common.base.Objects;
 public class AggregationNode extends PlanNode {
   private final AggregateInfo aggInfo;
 
-  public AggregationNode(int id, PlanNode input, AggregateInfo aggInfo) {
+  // Set to true if this aggregation node contains aggregate functions that require
+  // finalization to complete after all rows have been aggregated, and this node is not
+  // an intermediate node.
+  private boolean needsFinalize;
+
+  /**
+   * Create an agg node that is not an intermediate node.
+   * isIntermediate is true if it is a slave node in a 2-part agg plan.
+   */
+  public AggregationNode(int id, PlanNode input, AggregateInfo aggInfo,
+      boolean isIntermediate) {
     super(id, aggInfo.getAggTupleId().asList());
     this.aggInfo = aggInfo;
     this.children.add(input);
     this.rowTupleIds.add(aggInfo.getAggTupleId());
+    needsFinalize = false;
+    if (!isIntermediate) {
+      for (AggregateExpr expr: aggInfo.getAggregateExprs()) {
+        if (expr.getOp().getNeedFinalize()) {
+          needsFinalize = true;
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Create an agg node that is not an intermediate agg node. It is either an agg node in
+   * a single node plan, or a coord agg node in a multi-node plan.
+   */
+  public AggregationNode(int id, PlanNode input, AggregateInfo aggInfo) {
+    this(id, input, aggInfo, false);
   }
 
   public AggregateInfo getAggInfo() {
@@ -48,7 +76,7 @@ public class AggregationNode extends PlanNode {
     msg.node_type = TPlanNodeType.AGGREGATION_NODE;
     msg.agg_node = new TAggregationNode(
         Expr.treesToThrift(aggInfo.getAggregateExprs()),
-        aggInfo.getAggTupleId().asInt());
+        aggInfo.getAggTupleId().asInt(), needsFinalize);
     List<Expr> groupingExprs = aggInfo.getGroupingExprs();
     if (groupingExprs != null) {
       msg.agg_node.setGrouping_exprs(Expr.treesToThrift(groupingExprs));

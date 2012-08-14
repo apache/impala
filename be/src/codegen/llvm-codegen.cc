@@ -116,7 +116,7 @@ Status LlvmCodeGen::LoadImpalaIR(ObjectPool* pool, scoped_ptr<LlvmCodeGen>* code
   // instructions on a machine without sse support (the load fails, doesn't matter
   // if those instructions end up getting run or not).
   string module_file;
-  if (CpuInfo::Instance()->IsSupported(CpuInfo::SSE4_2)) {
+  if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
     PathBuilder::GetFullPath("llvm-ir/impala-sse.ll", &module_file);
   } else {
     PathBuilder::GetFullPath("llvm-ir/impala-no-sse.ll", &module_file);
@@ -828,7 +828,7 @@ void LlvmCodeGen::ClearHashFns() {
 //   ret i32 %12
 // }
 Function* LlvmCodeGen::GetHashFunction(int num_bytes) {
-  if (CpuInfo::Instance()->IsSupported(CpuInfo::SSE4_2)) {
+  if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
     if (num_bytes == -1) {
       // -1 indicates variable length, just return the generic loop based
       // hash fn.

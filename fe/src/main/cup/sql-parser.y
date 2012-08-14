@@ -134,6 +134,7 @@ parser code {:
 
 terminal KW_AND, KW_ALL, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW_BIGINT, KW_BOOLEAN, KW_BY,
   KW_CASE, KW_CAST, KW_COUNT, KW_DATE, KW_DATETIME, KW_DESC, KW_DISTINCT,
+  KW_DISTINCTPC, KW_DISTINCTPCSA,
   KW_DIV, KW_DOUBLE, KW_ELSE, KW_END, KW_FALSE, KW_FLOAT, KW_FROM, KW_FULL, KW_GROUP,
   KW_HAVING, KW_IS, KW_IN, KW_INNER, KW_JOIN, KW_INT, KW_LEFT, KW_LIKE, KW_LIMIT, KW_MIN,
   KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_REGEXP,
@@ -795,6 +796,10 @@ aggregate_operator ::=
   {: RESULT = AggregateExpr.Operator.MIN; :}
   | KW_MAX
   {: RESULT = AggregateExpr.Operator.MAX; :}
+  | KW_DISTINCTPC
+  {: RESULT = AggregateExpr.Operator.DISTINCT_PC; :}
+  | KW_DISTINCTPCSA
+  {: RESULT = AggregateExpr.Operator.DISTINCT_PCSA; :}
   | KW_SUM
   {: RESULT = AggregateExpr.Operator.SUM; :}
   | KW_AVG

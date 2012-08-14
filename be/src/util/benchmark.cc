@@ -12,7 +12,7 @@ namespace impala {
   
 double Benchmark::Measure(BenchmarkFunction function, void* args,
     int max_time, int batch_size) {
-  int64_t target_cycles = CpuInfo::Instance()->cycles_per_ms() * max_time;
+  int64_t target_cycles = CpuInfo::cycles_per_ms() * max_time;
   int64_t iters = 0;
   
   // Run it with the default batch size to roughly estimate how many iterations
@@ -42,7 +42,7 @@ double Benchmark::Measure(BenchmarkFunction function, void* args,
     iters += batch_size;
   }
 
-  double ms_elapsed = sw.Ticks() / CpuInfo::Instance()->cycles_per_ms();
+  double ms_elapsed = sw.Ticks() / CpuInfo::cycles_per_ms();
   return iters / ms_elapsed;
 }
 

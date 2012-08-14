@@ -6,6 +6,7 @@
 #include <limits.h>
 #include <gtest/gtest.h>
 #include "exec/read-write-util.h"
+#include "util/cpu-info.h"
 #include "util/hash-util.h"
 
 using namespace std;
@@ -63,6 +64,7 @@ TEST(ZigzagTest, Basic) {
 }
 
 int main(int argc, char **argv) {
+  impala::CpuInfo::Init();
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
 }

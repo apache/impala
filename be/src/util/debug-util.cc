@@ -116,7 +116,7 @@ string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
       break;
 
     case TCounterType::CPU_TICKS:
-      value /= CpuInfo::Instance()->cycles_per_ms();
+      value /= CpuInfo::cycles_per_ms();
       // fall-through
     case TCounterType::TIME_MS:
       if (value == 0 ) {

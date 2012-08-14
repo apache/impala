@@ -1,3 +1,106 @@
+# Test the distinctpcsa aggregate function on all col types with group by
+select
+  tinyint_col,
+  distinctpcsa(id),
+  distinctpcsa(bool_col),
+  distinctpcsa(smallint_col),
+  distinctpcsa(int_col),
+  distinctpcsa(bigint_col),
+  distinctpcsa(float_col),
+  distinctpcsa(double_col),
+  distinctpcsa(string_col),
+  distinctpcsa(timestamp_col)
+from alltypesagg
+group by tinyint_col
+order by tinyint_col
+limit 100
+---- TYPES
+tinyint, string, string, string, string, string, string, string, string, string
+---- RESULTS
+1,'1101','82','87','142','136','137','124','117','1149'
+2,'1162','82','88','137','137','153','134','117','926'
+3,'1125','82','86','146','153','145','133','117','967'
+4,'1031','82','87','143','140','134','143','117','1031'
+5,'1175','82','87','146','140','156','145','117','1009'
+6,'1077','82','86','146','146','151','139','117','988'
+7,'1213','82','88','146','148','139','148','117','1101'
+8,'1137','82','87','145','139','156','133','117','1077'
+9,'998','82','87','140','143','148','130','117','1101'
+NULL,'1162','82','87','151','136','146','140','117','1031'
+====
+# Test the distinctpcsa aggregate function on all col types without group by
+select
+  distinctpcsa(id),
+  distinctpcsa(bool_col),
+  distinctpcsa(tinyint_col),
+  distinctpcsa(smallint_col),
+  distinctpcsa(int_col),
+  distinctpcsa(bigint_col),
+  distinctpcsa(float_col),
+  distinctpcsa(double_col),
+  distinctpcsa(string_col),
+  distinctpcsa(timestamp_col)
+from alltypesagg
+---- TYPES
+string, string, string, string, string, string, string, string, string, string
+---- RESULTS
+'3744','82','88','172','1832','1089','1077','1009','988','9817'
+====
+# Test the distinctpc aggregate function on all col types with group by
+select
+  tinyint_col,
+  distinctpc(id),
+  distinctpc(bool_col),
+  distinctpc(smallint_col),
+  distinctpc(int_col),
+  distinctpc(bigint_col),
+  distinctpc(float_col),
+  distinctpc(double_col),
+  distinctpc(string_col),
+  distinctpc(timestamp_col)
+from alltypesagg
+group by tinyint_col
+order by tinyint_col
+limit 100
+---- TYPES
+tinyint, string, string, string, string, string, string, string, string, string
+---- RESULTS
+1,'1089','1','11','120','70','99','96','82','1125'
+2,'1043','1','11','105','94','88','92','82','886'
+3,'1043','1','11','105','107','106','81','82','906'
+4,'1009','1','9','109','108','103','97','165','977'
+5,'1009','1','9','109','122','96','123','165','988'
+6,'977','1','12','101','112','98','119','165','956'
+7,'977','1','12','101','95','118','99','165','1227'
+8,'1043','1','8','107','85','100','124','82','1149'
+9,'1043','1','8','107','88','96','91','82','1125'
+NULL,'1089','1','6','119','86','119','93','82','998'
+====
+# Test the distinctpc aggregate function on all col types without group by
+select
+  distinctpc(id),
+  distinctpc(bool_col),
+  distinctpc(tinyint_col),
+  distinctpc(smallint_col),
+  distinctpc(int_col),
+  distinctpc(bigint_col),
+  distinctpc(float_col),
+  distinctpc(double_col),
+  distinctpc(string_col),
+  distinctpc(timestamp_col)
+from alltypesagg
+---- TYPES
+string, string, string, string, string, string, string, string, string, string
+---- RESULTS
+'2647','3','3','122','1323','1295','1101','1031','1077','11930'
+====
+# Test the distinctpc aggregate function on empty table
+select distinctpc(field) from EmptyTable
+---- TYPES
+string
+---- RESULTS
+'0'
+====
 # no grouping exprs, cols contain nulls
 select count(*), count(tinyint_col), min(tinyint_col), max(tinyint_col), sum(tinyint_col),
 avg(tinyint_col)

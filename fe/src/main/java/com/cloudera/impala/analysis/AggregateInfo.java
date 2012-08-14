@@ -129,6 +129,16 @@ public class AggregateInfo {
       if (inputExpr.getOp() == AggregateExpr.Operator.COUNT) {
         aggExpr =
             new AggregateExpr(AggregateExpr.Operator.SUM, false, false, aggExprParamList);
+      } else if (inputExpr.getOp() == AggregateExpr.Operator.DISTINCT_PC) {
+        // Merge local distinct estimate
+        aggExpr =
+            new AggregateExpr(AggregateExpr.Operator.MERGE_PC, false, false,
+                aggExprParamList);
+      } else if (inputExpr.getOp() == AggregateExpr.Operator.DISTINCT_PCSA) {
+        // Merge local stochastic averaging distinct estimate
+        aggExpr =
+            new AggregateExpr(AggregateExpr.Operator.MERGE_PCSA, false, false,
+                aggExprParamList);
       } else {
         aggExpr = new AggregateExpr(inputExpr.getOp(), false, false, aggExprParamList);
       }

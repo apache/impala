@@ -43,6 +43,10 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("bigint", new Integer(SqlParserSymbols.KW_BIGINT));
     keywordMap.put("boolean", new Integer(SqlParserSymbols.KW_BOOLEAN));
     keywordMap.put("by", new Integer(SqlParserSymbols.KW_BY));
+    keywordMap.put("distinctpc",
+       new Integer(SqlParserSymbols.KW_DISTINCTPC));
+    keywordMap.put("distinctpcsa",
+       new Integer(SqlParserSymbols.KW_DISTINCTPCSA));
     keywordMap.put("case", new Integer(SqlParserSymbols.KW_CASE));
     keywordMap.put("cast", new Integer(SqlParserSymbols.KW_CAST));    
     keywordMap.put("count", new Integer(SqlParserSymbols.KW_COUNT));

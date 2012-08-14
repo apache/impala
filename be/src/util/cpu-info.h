@@ -6,11 +6,12 @@
 #include <string>
 #include <boost/cstdint.hpp>
 
+#include "common/logging.h"
+
 namespace impala {
 
 // CpuInfo is an interface to query for cpu information at runtime.  The caller can
-// ask for the sizes of the caches and what hardware features are supported.  This
-// class is a singleton. 
+// ask for the sizes of the caches and what hardware features are supported.
 // On Linux, this information is pulled from a couple of sys files (/proc/cpuinfo and 
 // /sys/devices)
 class CpuInfo {
@@ -26,47 +27,46 @@ class CpuInfo {
     L3_CACHE = 2,
   };
 
-  // Singleton interface
-  static CpuInfo* Instance() { 
-    if (instance_ == NULL) {
-      instance_ = new CpuInfo();
-      instance_->Init();
-    }
-    return instance_;
-  }
+  // Initialize CpuInfo.
+  static void Init();
 
   // Returns all the flags for this cpu
-  int64_t hardware_flags() const { return hardware_flags_; }
+  static int64_t hardware_flags() {
+    DCHECK(initialized_);
+    return hardware_flags_;
+  }
   
   // Returns whether of not the cpu supports this flag
-  bool IsSupported(long flag) const { return (hardware_flags_ & flag) != 0; }
+  inline static bool IsSupported(long flag) {
+    DCHECK(initialized_);
+    return (hardware_flags_ & flag) != 0;
+  }
 
   // Toggle a hardware feature on and off.  It is not valid to turn on a feature
   // that the underlying hardware cannot support. This is useful for testing.
-  void EnableFeature(long flag, bool enable);
+  static void EnableFeature(long flag, bool enable);
 
   // Returns the size of the cache in KB at this cache level
-  long CacheSize(CacheLevel level) const { return cache_sizes_[level]; }
+  static long CacheSize(CacheLevel level) {
+    DCHECK(initialized_);
+    return cache_sizes_[level];
+  }
 
   // Returns the number of cpu cycles per millisecond
-  int64_t cycles_per_ms() const { return cycles_per_ms_; }
+  static int64_t cycles_per_ms() {
+    DCHECK(initialized_);
+    return cycles_per_ms_;
+  }
+
+  static std::string DebugString();
 
  private:
-  static CpuInfo* instance_;
-
-  CpuInfo();
-  void Init();
-
-  int64_t hardware_flags_;
-  int64_t original_hardware_flags_;
-  long cache_sizes_[L3_CACHE + 1];
-  int64_t cycles_per_ms_;
+  static bool initialized_;
+  static int64_t hardware_flags_;
+  static int64_t original_hardware_flags_;
+  static long cache_sizes_[L3_CACHE + 1];
+  static int64_t cycles_per_ms_;
 };
-
-// Prints the cpu information
-std::ostream& operator<<(std::ostream& os, const CpuInfo& info);
-
 }
-
 #endif
 

@@ -6,6 +6,7 @@
 
 #include "codegen/llvm-codegen.h"
 #include "runtime/raw-value.h"
+#include "util/cpu-info.h"
 #include "util/hash-util.h"
 #include "util/path-builder.h"
 
@@ -402,8 +403,8 @@ TEST_F(LlvmCodeGenTest, HashTest) {
     // Validate that the hashes are identical
     EXPECT_EQ(result, expected_hash);
 
-    if (i == 0 && CpuInfo::Instance()->IsSupported(CpuInfo::SSE4_2)) {
-      CpuInfo::Instance()->EnableFeature(CpuInfo::SSE4_2, false);
+    if (i == 0 && CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
+      CpuInfo::EnableFeature(CpuInfo::SSE4_2, false);
       restore_sse_support = true;
       LlvmCodeGenTest::ClearHashFns(codegen.get());
     } else {
@@ -413,12 +414,13 @@ TEST_F(LlvmCodeGenTest, HashTest) {
   }
 
   // Restore hardware feature for next test
-  CpuInfo::Instance()->EnableFeature(CpuInfo::SSE4_2, restore_sse_support);
+  CpuInfo::EnableFeature(CpuInfo::SSE4_2, restore_sse_support);
 }
 
 }
 
 int main(int argc, char **argv) {
+  impala::CpuInfo::Init();
   ::testing::InitGoogleTest(&argc, argv);
   impala::LlvmCodeGen::InitializeLlvm();
   return RUN_ALL_TESTS();

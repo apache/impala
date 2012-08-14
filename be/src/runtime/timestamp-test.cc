@@ -46,6 +46,7 @@ TEST(TimestampTest, Basic) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
+  impala::CpuInfo::Init();
   return RUN_ALL_TESTS();
 }
 

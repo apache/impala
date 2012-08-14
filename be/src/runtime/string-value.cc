@@ -24,7 +24,7 @@ const char* StringValue::LLVM_CLASS_NAME = "struct.impala::StringValue";
 //   - len: min(n1, n2) - this can be more cheaply passed in by the caller
 static inline int StringCompare(const char* s1, int n1, const char* s2, int n2, int len) {
   DCHECK_EQ(len, min(n1, n2));
-  if (CpuInfo::Instance()->IsSupported(CpuInfo::SSE4_2)) {
+  if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
     while (len >= SSEUtil::CHARS_PER_128_BIT_REGISTER) {
       __m128i xmm0 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(s1));
       __m128i xmm1 = _mm_loadu_si128(reinterpret_cast<const __m128i*>(s2));

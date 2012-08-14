@@ -12,6 +12,7 @@
 #include "runtime/raw-value.h"
 #include "runtime/string-value.h"
 #include "util/benchmark.h"
+#include "util/cpu-info.h"
 #include "util/hash-util.h"
 
 using namespace boost;
@@ -337,6 +338,7 @@ Function* CodegenCrcHash(LlvmCodeGen* codegen, bool mixed) {
 }
 
 int main(int argc, char **argv) {
+  CpuInfo::Init();
   LlvmCodeGen::InitializeLlvm();
 
   const int NUM_ROWS = 1024;

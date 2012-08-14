@@ -69,7 +69,7 @@ inline void DelimitedTextParser::ParseSse(int max_tuples,
     char** row_end_locations, 
     std::vector<FieldLocation>* field_locations,
     int* num_tuples, int* num_fields, char** next_column_start) {
-  DCHECK(CpuInfo::Instance()->IsSupported(CpuInfo::SSE4_2));
+  DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2));
 
   // To parse using SSE, we:
   //  1. Load into different sse registers the different characters we need to search for

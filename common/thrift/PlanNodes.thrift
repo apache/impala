@@ -112,6 +112,10 @@ struct TAggregationNode {
   1: optional list<Exprs.TExpr> grouping_exprs
   2: required list<Exprs.TExpr> aggregate_exprs
   3: required Types.TTupleId agg_tuple_id
+  
+  // Set to true if this aggregation function requires finalization to complete after all
+  // rows have been aggregated, and this node is not an intermediate node.
+  4: required bool need_finalize
 }
 
 struct TSortNode {

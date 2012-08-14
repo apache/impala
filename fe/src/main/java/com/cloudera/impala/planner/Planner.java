@@ -638,7 +638,7 @@ public class Planner {
     // add aggregation to slave, if required, but without having predicate
     AggregateInfo aggInfo = selectStmt.getAggInfo();
     if (aggInfo != null) {
-      slave = new AggregationNode(getNextNodeId(), slave, aggInfo);
+      slave = new AggregationNode(getNextNodeId(), slave, aggInfo, true);
     }
 
     // create coordinator plan fragment (single ExchangeNode, possibly

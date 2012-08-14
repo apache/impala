@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <iostream>
 #include "util/benchmark.h"
+#include "util/cpu-info.h"
 #include "runtime/string-search.h"
 #include "experiments/string-search-sse.h"
 
@@ -137,6 +138,8 @@ void InitTestData(TestData* data) {
 }
 
 int main(int argc, char **argv) {
+  CpuInfo::Init();
+
   TestData data;
   InitTestData(&data);
 

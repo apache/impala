@@ -2,8 +2,11 @@
 
 #include "exec/aggregation-node.h"
 
+#include <math.h>
 #include <sstream>
 #include <boost/functional/hash.hpp>
+
+#include <x86intrin.h>
 
 #include "codegen/llvm-codegen.h"
 #include "exec/hash-table.inline.h"
@@ -27,9 +30,8 @@ using namespace std;
 using namespace boost;
 using namespace llvm;
 
-
-// This object appends n-int32s to the end of a normal tuple object to maintain the lengths
-// of the string buffers in the tuple.
+// This object appends n-int32s to the end of a normal tuple object to maintain the
+// lengths of the string buffers in the tuple.
 namespace impala {
 
 class AggregationTuple {
@@ -76,7 +78,8 @@ AggregationNode::AggregationNode(ObjectPool* pool, const TPlanNode& tnode,
     singleton_output_tuple_(NULL),
     num_string_slots_(0),
     tuple_pool_(new MemPool()),
-    process_row_batch_fn_(NULL) {
+    process_row_batch_fn_(NULL),
+    needs_finalize_(tnode.agg_node.need_finalize) {
   // ignore return status for now
   Expr::CreateExprTrees(pool, tnode.agg_node.grouping_exprs, &probe_exprs_);
   Expr::CreateExprTrees(pool, tnode.agg_node.aggregate_exprs, &aggregate_exprs_);
@@ -178,7 +181,7 @@ Status AggregationNode::Open(RuntimeState* state) {
     ++num_agg_rows;
   }
   VLOG_QUERY << "aggregated " << num_input_rows << " input rows into "
-                   << num_agg_rows << " output rows";
+             << num_agg_rows << " output rows";
   output_iterator_ = hash_tbl_->Begin();
   return Status::OK;
 }
@@ -198,7 +201,11 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
   while (output_iterator_.HasNext() && !row_batch->IsFull()) {
     int row_idx = row_batch->AddRow();
     TupleRow* row = row_batch->GetRow(row_idx);
-    row->SetTuple(0, output_iterator_.GetRow()->GetTuple(0));
+    Tuple* agg_tuple = output_iterator_.GetRow()->GetTuple(0);
+    if (needs_finalize_) {
+      FinalizeAggTuple(reinterpret_cast<AggregationTuple*>(agg_tuple));
+    }
+    row->SetTuple(0, agg_tuple);
     if (ExecNode::EvalConjuncts(conjuncts, num_conjuncts, row)) {
       VLOG_ROW << "output row: " << PrintRow(row, row_desc());
       row_batch->CommitLastRow();
@@ -227,31 +234,49 @@ AggregationTuple* AggregationNode::ConstructAggTuple() {
           num_string_slots_, tuple_pool_.get());
   Tuple* agg_tuple = agg_out_tuple->tuple();
 
-  vector<SlotDescriptor*>::const_iterator slot_d = agg_tuple_desc_->slots().begin();
+  vector<SlotDescriptor*>::const_iterator slot_desc = agg_tuple_desc_->slots().begin();
   // copy grouping values
-  for (int i = 0; i < probe_exprs_.size(); ++i, ++slot_d) {
+  for (int i = 0; i < probe_exprs_.size(); ++i, ++slot_desc) {
     if (hash_tbl_->last_expr_value_null(i)) {
-      agg_tuple->SetNull((*slot_d)->null_indicator_offset());
+      agg_tuple->SetNull((*slot_desc)->null_indicator_offset());
     } else {
       void* src = hash_tbl_->last_expr_value(i);
-      void* dst = agg_tuple->GetSlot((*slot_d)->tuple_offset());
-      RawValue::Write(src, dst, (*slot_d)->type(), tuple_pool_.get());
+      void* dst = agg_tuple->GetSlot((*slot_desc)->tuple_offset());
+      RawValue::Write(src, dst, (*slot_desc)->type(), tuple_pool_.get());
     }
   }
 
+  int string_slot_idx = -1;
+
   // All aggregate values except for COUNT start out with NULL
   // (so that SUM(<col>) stays NULL if <col> only contains NULL values).
-  for (int i = 0; i < aggregate_exprs_.size(); ++i, ++slot_d) {
+  for (int i = 0; i < aggregate_exprs_.size(); ++i, ++slot_desc) {
     AggregateExpr* agg_expr = static_cast<AggregateExpr*>(aggregate_exprs_[i]);
-    if ((*slot_d)->is_nullable()) {
+    if ((*slot_desc)->is_nullable()) {
       DCHECK_NE(agg_expr->agg_op(), TAggregationOp::COUNT);
-      agg_tuple->SetNull((*slot_d)->null_indicator_offset());
+      agg_tuple->SetNull((*slot_desc)->null_indicator_offset());
     } else {
       // For distributed plans, some SUMs (distributed count(*) will be non-nullable)
       DCHECK(agg_expr->agg_op() == TAggregationOp::COUNT ||
              agg_expr->agg_op() == TAggregationOp::SUM);
       // we're only aggregating into bigint slots and never return NULL
-      *reinterpret_cast<int64_t*>(agg_tuple->GetSlot((*slot_d)->tuple_offset())) = 0;
+      *reinterpret_cast<int64_t*>(agg_tuple->GetSlot((*slot_desc)->tuple_offset())) = 0;
+    }
+
+    // Keep track of how many string slots we have seen, in order to know the index of the
+    // current slot in the array of string buffer lengths
+    if (agg_expr->type() == TYPE_STRING) {
+      ++string_slot_idx;
+    }
+
+    // Construct Distinct Estimate bitmap
+    void* slot = agg_tuple->GetSlot((*slot_desc)->tuple_offset());
+    if (agg_expr->agg_op() == TAggregationOp::DISTINCT_PC ||
+        agg_expr->agg_op() == TAggregationOp::DISTINCT_PCSA ||
+        agg_expr->agg_op() == TAggregationOp::MERGE_PC ||
+        agg_expr->agg_op() == TAggregationOp::MERGE_PCSA) {
+      ConstructDistinctEstimateSlot(agg_out_tuple,
+          (*slot_desc)->null_indicator_offset(), string_slot_idx, slot);
     }
   }
 
@@ -269,8 +294,8 @@ char* AggregationNode::AllocateStringBuffer(int new_size, int* allocated_size) {
   return buffer;
 }
 
-inline void AggregationNode::UpdateStringSlot(AggregationTuple* tuple, int string_slot_idx,
-                                       StringValue* dst, const StringValue* src) {
+inline void AggregationNode::UpdateStringSlot(AggregationTuple* tuple,
+    int string_slot_idx, StringValue* dst, const StringValue* src) {
   int32_t* string_buffer_lengths = tuple->BufferLengths(agg_tuple_desc_->byte_size());
   int curr_size = string_buffer_lengths[string_slot_idx];
   if (curr_size < src->len) {
@@ -282,8 +307,8 @@ inline void AggregationNode::UpdateStringSlot(AggregationTuple* tuple, int strin
 }
 
 inline void AggregationNode::UpdateMinStringSlot(AggregationTuple* agg_tuple, 
-                                          const NullIndicatorOffset& null_indicator_offset, 
-                                          int string_slot_idx, void* slot, void* value) {
+    const NullIndicatorOffset& null_indicator_offset, int string_slot_idx,
+    void* slot, void* value) {
   DCHECK(value != NULL);
   Tuple* tuple = agg_tuple->tuple();
   StringValue* dst_value = static_cast<StringValue*>(slot);
@@ -298,8 +323,8 @@ inline void AggregationNode::UpdateMinStringSlot(AggregationTuple* agg_tuple,
 }
 
 inline void AggregationNode::UpdateMaxStringSlot(AggregationTuple* agg_tuple, 
-                                          const NullIndicatorOffset& null_indicator_offset,
-                                          int string_slot_idx, void* slot, void* value) {
+    const NullIndicatorOffset& null_indicator_offset, int string_slot_idx,
+    void* slot, void* value) {
   DCHECK(value != NULL);
   Tuple* tuple = agg_tuple->tuple();
   StringValue* dst_value = static_cast<StringValue*>(slot);
@@ -356,23 +381,22 @@ void AggregationNode::UpdateAggTuple(AggregationTuple* agg_out_tuple, TupleRow* 
   DCHECK(agg_out_tuple != NULL);
   Tuple* tuple = agg_out_tuple->tuple();
   int string_slot_idx = -1;
-  vector<SlotDescriptor*>::const_iterator slot_d = 
+  vector<SlotDescriptor*>::const_iterator slot_desc =
       agg_tuple_desc_->slots().begin() + probe_exprs_.size();
-  for (vector<Expr*>::iterator expr = aggregate_exprs_.begin();
-        expr != aggregate_exprs_.end(); ++expr, ++slot_d) {
-    void* slot = tuple->GetSlot((*slot_d)->tuple_offset());
+  for (vector<Expr*>::const_iterator expr = aggregate_exprs_.begin();
+      expr != aggregate_exprs_.end(); ++expr, ++slot_desc) {
+    void* slot = tuple->GetSlot((*slot_desc)->tuple_offset());
     AggregateExpr* agg_expr = static_cast<AggregateExpr*>(*expr);
 
-    // keep track of which string slot we are on
-    if (agg_expr->type() == TYPE_STRING) {
-      ++string_slot_idx;
-    }
+    // Keep track of how many string slots we have seen, in order to know the index of the
+    // current slot in the array of string buffer lengths
+    if (agg_expr->type() == TYPE_STRING) ++string_slot_idx;
 
     // deal with COUNT(*) separately (no need to check the actual child expr value)
     if (agg_expr->is_star()) {
       DCHECK_EQ(agg_expr->agg_op(), TAggregationOp::COUNT);
       // we're only aggregating into bigint slots
-      DCHECK_EQ((*slot_d)->type(), TYPE_BIGINT);
+      DCHECK_EQ((*slot_desc)->type(), TYPE_BIGINT);
       ++*reinterpret_cast<int64_t*>(slot);
       continue;
     }
@@ -392,39 +416,40 @@ void AggregationNode::UpdateAggTuple(AggregationTuple* agg_out_tuple, TupleRow* 
       case TAggregationOp::MIN:
         switch (agg_expr->type()) {
           case TYPE_BOOLEAN:
-            UpdateMinSlot<bool>(tuple,
-                                (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMinSlot<bool>(tuple, (*slot_desc)->null_indicator_offset(), slot,
+                value);
             break;
           case TYPE_TINYINT:
-            UpdateMinSlot<int8_t>(tuple,
-                                  (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMinSlot<int8_t>(tuple, (*slot_desc)->null_indicator_offset(), slot,
+                value);
             break;
           case TYPE_SMALLINT:
-            UpdateMinSlot<int16_t>(tuple,
-                                   (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMinSlot<int16_t>(tuple, (*slot_desc)->null_indicator_offset(), slot,
+                value);
             break;
           case TYPE_INT:
-            UpdateMinSlot<int32_t>(tuple,
-                                   (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMinSlot<int32_t>(tuple, (*slot_desc)->null_indicator_offset(), slot,
+                value);
             break;
           case TYPE_BIGINT:
-            UpdateMinSlot<int64_t>(tuple,
-                                   (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMinSlot<int64_t>(tuple, (*slot_desc)->null_indicator_offset(), slot,
+                value);
             break;
           case TYPE_FLOAT:
-            UpdateMinSlot<float>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMinSlot<float>(tuple, (*slot_desc)->null_indicator_offset(), slot,
+                value);
             break;
           case TYPE_DOUBLE:
-            UpdateMinSlot<double>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMinSlot<double>(tuple, (*slot_desc)->null_indicator_offset(), slot,
+                value);
             break;
           case TYPE_TIMESTAMP:
-            UpdateMinSlot<TimestampValue>(tuple,
-                                          (*slot_d)->null_indicator_offset(),
-                                          slot, value);
+            UpdateMinSlot<TimestampValue>(tuple, (*slot_desc)->null_indicator_offset(),
+                slot, value);
             break;
           case TYPE_STRING:
-            UpdateMinStringSlot(agg_out_tuple, (*slot_d)->null_indicator_offset(), 
-                                string_slot_idx, slot, value);
+            UpdateMinStringSlot(agg_out_tuple, (*slot_desc)->null_indicator_offset(),
+                string_slot_idx, slot, value);
             break;
           default:
             DCHECK(false) << "invalid type: " << TypeToString(agg_expr->type());
@@ -434,37 +459,40 @@ void AggregationNode::UpdateAggTuple(AggregationTuple* agg_out_tuple, TupleRow* 
       case TAggregationOp::MAX:
         switch (agg_expr->type()) {
           case TYPE_BOOLEAN:
-            UpdateMaxSlot<bool>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMaxSlot<bool>(tuple, (*slot_desc)->null_indicator_offset(), slot,
+                value);
             break;
           case TYPE_TINYINT:
-            UpdateMaxSlot<int8_t>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMaxSlot<int8_t>(tuple, (*slot_desc)->null_indicator_offset(), slot,
+                value);
             break;
           case TYPE_SMALLINT:
-            UpdateMaxSlot<int16_t>(tuple,
-                                   (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMaxSlot<int16_t>(tuple, (*slot_desc)->null_indicator_offset(), slot,
+                value);
             break;
           case TYPE_INT:
-            UpdateMaxSlot<int32_t>(tuple,
-                                   (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMaxSlot<int32_t>(tuple, (*slot_desc)->null_indicator_offset(), slot,
+                value);
             break;
           case TYPE_BIGINT:
-            UpdateMaxSlot<int64_t>(tuple,
-                                   (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMaxSlot<int64_t>(tuple, (*slot_desc)->null_indicator_offset(), slot,
+                value);
             break;
           case TYPE_FLOAT:
-            UpdateMaxSlot<float>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMaxSlot<float>(tuple, (*slot_desc)->null_indicator_offset(), slot,
+                value);
             break;
           case TYPE_DOUBLE:
-            UpdateMaxSlot<double>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateMaxSlot<double>(tuple, (*slot_desc)->null_indicator_offset(), slot,
+                value);
             break;
           case TYPE_TIMESTAMP:
-            UpdateMaxSlot<TimestampValue>(tuple,
-                                          (*slot_d)->null_indicator_offset(),
-                                          slot, value);
+            UpdateMaxSlot<TimestampValue>(tuple, (*slot_desc)->null_indicator_offset(),
+                slot, value);
             break;
           case TYPE_STRING:
-            UpdateMaxStringSlot(agg_out_tuple, (*slot_d)->null_indicator_offset(), 
-                                string_slot_idx, slot, value);
+            UpdateMaxStringSlot(agg_out_tuple, (*slot_desc)->null_indicator_offset(),
+                string_slot_idx, slot, value);
             break;
           default:
             DCHECK(false) << "invalid type: " << TypeToString(agg_expr->type());
@@ -474,19 +502,65 @@ void AggregationNode::UpdateAggTuple(AggregationTuple* agg_out_tuple, TupleRow* 
       case TAggregationOp::SUM:
         switch (agg_expr->type()) {
           case TYPE_BIGINT:
-            UpdateSumSlot<int64_t>(tuple,
-                                   (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateSumSlot<int64_t>(tuple, (*slot_desc)->null_indicator_offset(), slot,
+                value);
             break;
           case TYPE_DOUBLE:
-            UpdateSumSlot<double>(tuple, (*slot_d)->null_indicator_offset(), slot, value);
+            UpdateSumSlot<double>(tuple, (*slot_desc)->null_indicator_offset(), slot,
+                value);
             break;
           default:
             DCHECK(false) << "invalid type: " << TypeToString(agg_expr->type());
         };
         break;
 
+      case TAggregationOp::DISTINCT_PC:
+        UpdateDistinctEstimateSlot(slot, value, agg_expr->GetChild(0)->type());
+        break;
+
+      case TAggregationOp::DISTINCT_PCSA:
+        UpdateDistinctEstimatePCSASlot(slot, value, agg_expr->GetChild(0)->type());
+        break;
+
+      case TAggregationOp::MERGE_PCSA:
+      case TAggregationOp::MERGE_PC:
+        DCHECK_EQ(agg_expr->GetChild(0)->type(), TYPE_STRING);
+        UpdateMergeEstimateSlot(agg_out_tuple, string_slot_idx, slot, value);
+        break;
+
       default:
         DCHECK(false) << "bad aggregate operator: " << agg_expr->agg_op();
+    }
+  }
+}
+
+void AggregationNode::FinalizeAggTuple(AggregationTuple* agg_out_tuple) {
+  DCHECK(agg_out_tuple != NULL);
+  Tuple* tuple = agg_out_tuple->tuple();
+  int string_slot_idx = -1;
+  vector<SlotDescriptor*>::const_iterator slot_desc =
+      agg_tuple_desc_->slots().begin() + probe_exprs_.size();
+  for (vector<Expr*>::const_iterator expr = aggregate_exprs_.begin();
+      expr != aggregate_exprs_.end(); ++expr, ++slot_desc) {
+    void* slot = tuple->GetSlot((*slot_desc)->tuple_offset());
+    AggregateExpr* agg_expr = static_cast<AggregateExpr*>(*expr);
+
+    // Keep track of how many string slots we have seen, in order to know the index of the
+    // current slot in the array of string buffer lengths
+    if (agg_expr->type() == TYPE_STRING) ++string_slot_idx;
+
+    switch (agg_expr->agg_op()) {
+      // Only DISTINCT/MERGE_PC(SA) needs to do finalize
+      case TAggregationOp::DISTINCT_PC:
+      case TAggregationOp::MERGE_PC:
+      case TAggregationOp::DISTINCT_PCSA:
+      case TAggregationOp::MERGE_PCSA:
+        // Convert the bit vector into a number
+        FinalizeEstimateSlot(string_slot_idx, slot, agg_expr->agg_op());
+        break;
+        // For all other aggregate, do nothing.
+      default:
+        break;
     }
   }
 }
@@ -672,6 +746,13 @@ Function* AggregationNode::CodegenUpdateAggTuple(LlvmCodeGen* codegen) {
                  << "underlying exprs cannot be codegened.";
       return NULL;
     }
+    // Don't code gen distinct estiamte
+    if (agg_expr->agg_op() == TAggregationOp::DISTINCT_PC
+        || agg_expr->agg_op() == TAggregationOp::DISTINCT_PCSA
+        || agg_expr->agg_op() == TAggregationOp::MERGE_PCSA
+        || agg_expr->agg_op() == TAggregationOp::MERGE_PC) {
+      return NULL;
+    }
   }
   
   if (agg_tuple_desc_->GenerateLlvmStruct(codegen) == NULL) {
@@ -763,3 +844,192 @@ Function* AggregationNode::CodegenProcessRowBatch(
   return codegen->FinalizeFunction(process_batch_fn);
 }
 
+void AggregationNode::ConstructDistinctEstimateSlot(AggregationTuple* agg_tuple,
+    const NullIndicatorOffset& null_indicator_offset, int string_slot_idx,
+    void* slot) {
+  // Initialize the distinct estimate bit map - Probablistic Counting Algorithms for Data
+  // Base Applications (Flajolet and Martin)
+  //
+  // The bitmap is a 64bit(1st index) x 32bit(2nd index) matrix.
+  // So, the string length of 256 byte is enough.
+  // The layout is:
+  //   row  1: 8bit 8bit 8bit 8bit
+  //   row  2: 8bit 8bit 8bit 8bit
+  //   ...     ..
+  //   ...     ..
+  //   row 64: 8bit 8bit 8bit 8bit
+  //
+  // Using 32bit length, we can count up to 10^8. This will not be enough for Fact table
+  // primary key, but once we approach the limit, we could interpret the result as
+  // "every row is distinct".
+  //
+  // We use "string" type for DISTINCT_PC function so that we can use the string
+  // slot to hold the bitmaps.
+  StringValue* bitmap_value = static_cast<StringValue*>(slot);
+  int32_t* string_buffer_lengths = agg_tuple->BufferLengths(
+      agg_tuple_desc_->byte_size());
+  DCHECK_EQ(string_buffer_lengths[string_slot_idx], 0);
+
+  int str_length = NUM_PC_BITMAPS * PC_BITMAP_LENGTH / 8;
+  bitmap_value->ptr = AllocateStringBuffer(str_length,
+      &(string_buffer_lengths[string_slot_idx]));
+  bitmap_value->len = str_length;
+  memset(bitmap_value->ptr, 0, str_length);
+  agg_tuple->tuple()->SetNotNull(null_indicator_offset);
+}
+
+static inline void SetDistinctEstimateBit(char* bitmap,
+    uint32_t row_index, uint32_t bit_index) {
+  // We need to convert Bitmap[alpha,index] into the index of the string.
+  // alpha tells which of the 32bit we've to jump to.
+  // index then lead us to the byte and bit.
+  uint32_t *int_bitmap = reinterpret_cast<uint32_t*>(bitmap);
+  int_bitmap[row_index] |= (1 << bit_index);
+}
+
+inline void AggregationNode::UpdateDistinctEstimatePCSASlot(void* slot, void* value,
+    PrimitiveType type) {
+  DCHECK(value != NULL);
+  StringValue* dst_value = static_cast<StringValue*>(slot);
+
+  // Core of the algorithm. This is a direct translation of the code in the paper.
+  // Please see the paper for details. Using stochastic averaging, we only need to
+  // the hash value once for each row.
+  uint32_t hash_value = RawValue::GetHashValue(value, type, 0);
+  uint32_t row_index = hash_value % NUM_PC_BITMAPS;
+
+  // We want the zero-based position of the least significant 1-bit in binary
+  // representation of hash_value. _bit_scan_forward does exactly this because it returns
+  // the bit index of the least significant set bit of x (or undefined if x is zero).
+  int bit_index = _bit_scan_forward(hash_value / NUM_PC_BITMAPS);
+  if (UNLIKELY(hash_value == 0)) bit_index = PC_BITMAP_LENGTH - 1;
+
+  // Set bitmap[row_index, bit_index] to 1
+  SetDistinctEstimateBit(dst_value->ptr, row_index, bit_index);
+}
+
+inline void AggregationNode::UpdateDistinctEstimateSlot(void* slot, void* value,
+    PrimitiveType type) {
+  DCHECK(value != NULL);
+  StringValue* dst_value = static_cast<StringValue*>(slot);
+
+  // Core of the algorithm. This is a direct translation of the code in the paper.
+  // Please see the paper for details. For simple averaging, we need to compute hash
+  // values NUM_PC_BITMAPS times using NUM_PC_BITMAPS different hash functions (by using a
+  // different seed).
+  for (int i = 0; i < NUM_PC_BITMAPS; ++i) {
+    uint32_t hash_value = RawValue::GetHashValue(value, type, i);
+    int bit_index = _bit_scan_forward(hash_value);
+    if (UNLIKELY(hash_value == 0)) bit_index = PC_BITMAP_LENGTH - 1;
+
+    // Set bitmap[i, bit_index] to 1
+    SetDistinctEstimateBit(dst_value->ptr, i, bit_index);
+  }
+}
+
+inline void AggregationNode::UpdateMergeEstimateSlot(AggregationTuple* agg_tuple,
+    int string_slot_idx, void* slot, void* value) {
+  DCHECK(value != NULL);
+  StringValue* dst_value = static_cast<StringValue*>(slot);
+  StringValue* src_value = static_cast<StringValue*>(value);
+
+  DCHECK_EQ(src_value->len, NUM_PC_BITMAPS * PC_BITMAP_LENGTH / 8);
+
+  int32_t* string_buffer_lengths = agg_tuple->BufferLengths(agg_tuple_desc_->byte_size());
+  DCHECK_EQ(string_buffer_lengths[string_slot_idx],
+      NUM_PC_BITMAPS * PC_BITMAP_LENGTH / 8);
+
+  // Merge the bits
+  // I think _mm_or_ps can do it, but perf doesn't really matter here. We call this only
+  // once group per node.
+  for (int i = 0; i < NUM_PC_BITMAPS * PC_BITMAP_LENGTH / 8; ++i) {
+    *(dst_value->ptr + i) |= *(src_value->ptr + i);
+  }
+
+  VLOG_ROW << "UpdateMergeEstimateSlot Src Bit map:\n"
+           << DistinctEstimateBitMapToString(src_value->ptr);
+  VLOG_ROW << "UpdateMergeEstimateSlot Dst Bit map:\n"
+           << DistinctEstimateBitMapToString(dst_value->ptr);
+}
+
+static inline bool GetDistinctEstimateBit(char* bitmap,
+    uint32_t row_index, uint32_t bit_index) {
+  uint32_t *int_bitmap = reinterpret_cast<uint32_t*>(bitmap);
+  return ((int_bitmap[row_index] & (1 << bit_index)) > 0);
+}
+
+void AggregationNode::FinalizeEstimateSlot(int slot_id, void* slot,
+    TAggregationOp::type agg_op) {
+  StringValue* dst_value = static_cast<StringValue*>(slot);
+
+  DCHECK_EQ(dst_value->len, NUM_PC_BITMAPS * PC_BITMAP_LENGTH / 8);
+  DCHECK(agg_op == TAggregationOp::DISTINCT_PCSA ||
+      agg_op == TAggregationOp::MERGE_PCSA ||
+      agg_op == TAggregationOp::DISTINCT_PC ||
+      agg_op == TAggregationOp::MERGE_PC);
+  VLOG_ROW << "FinalizeEstimateSlot Bit map:\n"
+           << DistinctEstimateBitMapToString(dst_value->ptr);
+
+  // We haven't processed any rows if none of the bits are set. Therefore, we have zero
+  // distinct rows. We're overwriting the result in the same string buffer we've
+  // allocated.
+  bool is_empty = true;
+  for (int i = 0; i < NUM_PC_BITMAPS * PC_BITMAP_LENGTH / 8; ++i) {
+    if (dst_value->ptr[i] != 0) {
+      is_empty = false;
+      break;
+    }
+  }
+  if (is_empty) {
+    *(dst_value->ptr) = '0';
+    dst_value->len = 1;
+    return;
+  }
+
+  // Convert the bitmap to a number, please see the paper for details
+  // In short, we count the average number of leading 1s (per row) in the bit map.
+  // The number is proportional to the log2(1/NUM_PC_BITMAPS of  the actual number of
+  // distinct).
+  // To get the actual number of distinct, we'll do 2^avg / PC_THETA.
+  // PC_THETA is a magic number.
+  int sum = 0;
+  for (int i = 0; i < NUM_PC_BITMAPS; ++i) {
+    int row_bit_count = 0;
+    // Count the number of leading ones for each row in the bitmap
+    // We could have used the build in __builtin_clz to count of number of leading zeros
+    // but we first need to invert the 1 and 0.
+    while (GetDistinctEstimateBit(dst_value->ptr, i, row_bit_count) &&
+        row_bit_count < PC_BITMAP_LENGTH) {
+      ++row_bit_count;
+    }
+    sum += row_bit_count;
+  }
+  double avg = static_cast<double>(sum) / static_cast<double>(NUM_PC_BITMAPS);
+  double result = pow(static_cast<double>(2), avg) / PC_THETA;
+
+  // If we're using stochastic averaging, the result has to be multiplied by
+  // NUM_PC_BITMAPS.
+  if (agg_op == TAggregationOp::DISTINCT_PCSA ||
+      agg_op == TAggregationOp::MERGE_PCSA) {
+    result *= NUM_PC_BITMAPS;
+  }
+
+  // We're overwriting the result ing the same string buffer we've allocated.
+  stringstream out;
+  out << static_cast<int>(result);
+  strncpy(dst_value->ptr, out.str().c_str(), out.str().length());
+  dst_value->len = out.str().length();
+}
+
+string AggregationNode::DistinctEstimateBitMapToString(char* v) {
+  stringstream debugstr;
+  for (int i = 0; i < NUM_PC_BITMAPS; ++i) {
+    for (int j = 0; j < PC_BITMAP_LENGTH; ++j) {
+      // print bitmap[i][j]
+      debugstr << GetDistinctEstimateBit(v, i, j);
+    }
+    debugstr << "\n";
+  }
+  debugstr << "\n";
+  return debugstr.str();
+}

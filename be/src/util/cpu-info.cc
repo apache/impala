@@ -17,7 +17,13 @@ using namespace boost;
 using namespace std;
 
 namespace impala {
-CpuInfo* CpuInfo::instance_ = NULL; 
+
+bool CpuInfo::initialized_ = false;
+int64_t CpuInfo::hardware_flags_ = 0;
+int64_t CpuInfo::original_hardware_flags_;
+long CpuInfo::cache_sizes_[L3_CACHE + 1];
+int64_t CpuInfo::cycles_per_ms_;
+
 
 static struct {
   string name;
@@ -29,10 +35,6 @@ static struct {
   { "sse4_2", CpuInfo::SSE4_2 },
 };
 static const long num_flags = sizeof(flag_mappings) / sizeof(flag_mappings[0]);
-
-CpuInfo::CpuInfo() : hardware_flags_(0) {
-  memset(&cache_sizes_, 0, sizeof(cache_sizes_));
-}
 
 // Helper function to parse for hardware flags.  
 // values contains a list of space-seperated flags.  check to see if the flags we
@@ -54,6 +56,8 @@ void CpuInfo::Init() {
   string value;
   
   float max_mhz = 0;
+
+  memset(&cache_sizes_, 0, sizeof(cache_sizes_));
 
   // Read from /proc/cpuinfo
   ifstream cpuinfo("/proc/cpuinfo", ios::in);
@@ -91,9 +95,13 @@ void CpuInfo::Init() {
     cycles_per_ms_ = 1000000;
   }
   original_hardware_flags_ = hardware_flags_;
+  initialized_ = true;
+
+  LOG(INFO) << DebugString();
 }
 
 void CpuInfo::EnableFeature(long flag, bool enable) {
+  DCHECK(initialized_);
   if (!enable) {
     hardware_flags_ &= ~flag;
   } else {
@@ -103,21 +111,23 @@ void CpuInfo::EnableFeature(long flag, bool enable) {
   }
 }
 
-ostream& operator<<(ostream& stream, const CpuInfo& info) {
-  int64_t L1 = info.CacheSize(CpuInfo::L1_CACHE);
-  int64_t L2 = info.CacheSize(CpuInfo::L2_CACHE);
-  int64_t L3 = info.CacheSize(CpuInfo::L3_CACHE);
+string CpuInfo::DebugString() {
+  DCHECK(initialized_);
+  stringstream stream;
+  int64_t L1 = CacheSize(L1_CACHE);
+  int64_t L2 = CacheSize(L2_CACHE);
+  int64_t L3 = CacheSize(L3_CACHE);
   stream << "Cpu Info:" << endl;
   stream << "  L1 Cache: " << PrettyPrinter::Print(L1, TCounterType::BYTES) << endl;
   stream << "  L2 Cache: " << PrettyPrinter::Print(L2, TCounterType::BYTES) << endl;
   stream << "  L3 Cache: " << PrettyPrinter::Print(L3, TCounterType::BYTES) << endl;
   stream << "  Hardware Supports:" << endl;
   for (int i = 0; i < num_flags; ++i) {
-    if (info.IsSupported(flag_mappings[i].flag)) {
+    if (IsSupported(flag_mappings[i].flag)) {
       stream << "    " << flag_mappings[i].name << endl;
     }
   }
-  return stream;
+  return stream.str();
 }
 
 }

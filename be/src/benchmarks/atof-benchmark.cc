@@ -7,6 +7,7 @@
 #include <sstream>
 #include "runtime/string-value.h"
 #include "util/benchmark.h"
+#include "util/cpu-info.h"
 #include "util/string-parser.h"
 
 using namespace impala;
@@ -94,6 +95,8 @@ void TestStrtod(int batch_size, void* d) {
 }
 
 int main(int argc, char **argv) {
+  CpuInfo::Init();
+
   TestData data;
 
   // Most data is probably positive

@@ -24,6 +24,8 @@
 #include "exprs/null-literal.h"
 #include "exprs/string-literal.h"
 #include "codegen/llvm-codegen.h"
+#include "util/cpu-info.h"
+
 
 using namespace llvm;
 using namespace std;
@@ -2024,6 +2026,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
 int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
   ::testing::InitGoogleTest(&argc, argv);
+  impala::CpuInfo::Init();
   impala::LlvmCodeGen::InitializeLlvm();
   return RUN_ALL_TESTS();
 }

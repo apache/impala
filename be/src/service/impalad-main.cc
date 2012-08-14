@@ -25,6 +25,7 @@
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
 #include "testutil/test-exec-env.h"
+#include "util/cpu-info.h"
 #include "util/jni-util.h"
 #include "util/logging.h"
 #include "util/thrift-util.h"
@@ -54,6 +55,7 @@ int main(int argc, char** argv) {
   InitGoogleLoggingSafe(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, true);
   InitThriftLogging();
+  CpuInfo::Init();
   LlvmCodeGen::InitializeLlvm();
   JniUtil::InitLibhdfs();
   EXIT_IF_ERROR(JniUtil::Init());
