@@ -899,9 +899,9 @@ inline void AggregationNode::UpdateDistinctEstimatePCSASlot(void* slot, void* va
   uint32_t row_index = hash_value % NUM_PC_BITMAPS;
 
   // We want the zero-based position of the least significant 1-bit in binary
-  // representation of hash_value. _bit_scan_forward does exactly this because it returns
-  // the bit index of the least significant set bit of x (or undefined if x is zero).
-  int bit_index = _bit_scan_forward(hash_value / NUM_PC_BITMAPS);
+  // representation of hash_value. __builtin_ctz does exactly this because it returns
+  // the number of trailing 0-bits in x (or undefined if x is zero).
+  int bit_index = __builtin_ctz(hash_value / NUM_PC_BITMAPS);
   if (UNLIKELY(hash_value == 0)) bit_index = PC_BITMAP_LENGTH - 1;
 
   // Set bitmap[row_index, bit_index] to 1
@@ -919,7 +919,7 @@ inline void AggregationNode::UpdateDistinctEstimateSlot(void* slot, void* value,
   // different seed).
   for (int i = 0; i < NUM_PC_BITMAPS; ++i) {
     uint32_t hash_value = RawValue::GetHashValue(value, type, i);
-    int bit_index = _bit_scan_forward(hash_value);
+    int bit_index = __builtin_ctz(hash_value);
     if (UNLIKELY(hash_value == 0)) bit_index = PC_BITMAP_LENGTH - 1;
 
     // Set bitmap[i, bit_index] to 1
