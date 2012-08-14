@@ -14,6 +14,7 @@
 #include <boost/accumulators/statistics/median.hpp>
 #include <boost/accumulators/statistics/max.hpp>
 #include <boost/accumulators/statistics/variance.hpp>
+#include <boost/bind.hpp>
 
 #include "exec/data-sink.h"
 #include "runtime/client-cache.h"
@@ -22,6 +23,7 @@
 #include "runtime/exec-env.h"
 #include "runtime/plan-fragment-executor.h"
 #include "runtime/row-batch.h"
+#include "runtime/parallel-executor.h"
 #include "sparrow/scheduler.h"
 #include "exec/exec-stats.h"
 #include "exec/data-sink.h"
@@ -104,7 +106,6 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
     // TODO: to start up more quickly, we need to start fragment_requests[i]
     // on all backends in parallel (ie, we need to have a server-wide pool of threads
     // that we use to start plan fragments at backends)
-    TPlanExecRequest& fragment_request = request->fragment_requests[i];
     for (int j = 0; j < hosts.size(); ++j) {
       // assign fragment id that's unique across all fragment executions;
       // backend_num + 1: backend_num starts at 0, and the coordinator fragment 
@@ -116,22 +117,32 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
 
       // TODO: pool of pre-formatted BackendExecStates?
       BackendExecState* exec_state =
-          obj_pool()->Add(
-            new BackendExecState(fragment_id, backend_num, hosts[j],
-                                 request->node_request_params[i][j]));
+          obj_pool()->Add(new BackendExecState(fragment_id, backend_num, hosts[j],
+                &request->fragment_requests[i],
+                &request->node_request_params[i][j]));
       DCHECK_EQ(backend_exec_states_.size(), backend_num);
       backend_exec_states_.push_back(exec_state);
-
-      Status fragment_exec_status = ExecRemoteFragment(exec_state,
-          &fragment_request, request->node_request_params[i][j]);
-      if (!fragment_exec_status.ok()) {
-        // tear down running fragments and return
-        Cancel(false);
-        return fragment_exec_status;
-      }
       ++backend_num;
     }
     PrintBackendInfo();
+  }
+  
+  // Issue all rpcs in parallel
+  Status fragments_exec_status = ParallelExecutor::Exec(
+      bind<Status>(mem_fn(&Coordinator::ExecRemoteFragment), this, _1), 
+      reinterpret_cast<void**>(&backend_exec_states_[0]), backend_exec_states_.size());
+
+  // Clear state in backend_exec_states_ that is only guaranteed to exist for the
+  // duration of this function
+  for (int i = 0; i < backend_exec_states_.size(); ++i) {
+    backend_exec_states_[i]->exec_request = NULL;
+    backend_exec_states_[i]->exec_params = NULL;
+  }
+
+  if (!fragments_exec_status.ok()) {
+    // tear down running fragments and return
+    Cancel(false);
+    return fragments_exec_status;
   }
 
   return Status::OK;
@@ -183,10 +194,8 @@ void Coordinator::PrintBackendInfo() {
   }
 }
 
-Status Coordinator::ExecRemoteFragment(
-    BackendExecState* exec_state,
-    TPlanExecRequest* exec_request,
-    const TPlanExecParams& exec_params) {
+Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
+  BackendExecState* exec_state = reinterpret_cast<BackendExecState*>(exec_state_arg);
   VLOG_FILE << "making rpc: ExecPlanFragment query_id=" << query_id_
             << " fragment_id=" << exec_state->fragment_id
             << " host=" << exec_state->hostport.first
@@ -195,16 +204,16 @@ Status Coordinator::ExecRemoteFragment(
 
   // this client needs to have been released when this function finishes
   ImpalaInternalServiceClient* backend_client;
-  RETURN_IF_ERROR(
-      exec_env_->client_cache()->GetClient(exec_state->hostport, &backend_client));
+  RETURN_IF_ERROR(exec_env_->client_cache()->GetClient(
+      exec_state->hostport, &backend_client));
   DCHECK(backend_client != NULL);
 
-  exec_request->fragment_id = exec_state->fragment_id;
   TExecPlanFragmentParams params;
   params.protocol_version = ImpalaInternalServiceVersion::V1;
   // TODO: is this yet another copy? find a way to avoid those.
-  params.__set_request(*exec_request);
-  params.__set_params(exec_params);
+  params.__set_request(*exec_state->exec_request);
+  params.request.fragment_id = exec_state->fragment_id;
+  params.__set_params(*exec_state->exec_params);
   params.coord.host = FLAGS_host;
   params.coord.port = FLAGS_be_port;
   params.__isset.coord = true;
@@ -225,6 +234,7 @@ Status Coordinator::ExecRemoteFragment(
   }
   exec_state->status = thrift_result.status;
   exec_env_->client_cache()->ReleaseClient(backend_client);
+  if (exec_state->status.ok()) exec_state->initiated = true;
   return exec_state->status;
 }
 
@@ -280,6 +290,9 @@ void Coordinator::Cancel(bool get_lock) {
     // lock each exec_state individually to synchronize correctly with
     // UpdateFragmentExecStatus() (which doesn't get the global lock_)
     lock_guard<mutex> l(exec_state->lock);
+
+    // Nothing to cancel if the exec rpc was not sent
+    if (!exec_state->initiated) continue;
 
     // don't cancel if it already finished
     if (exec_state->done) continue;

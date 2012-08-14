@@ -133,6 +133,8 @@ class Coordinator {
     int backend_num;  // backend_exec_states_[backend_num] points to us
     const std::pair<std::string, int> hostport;  // of ImpalaInternalService
     int64_t total_split_size;  // summed up across all splits
+    const TPlanExecRequest* exec_request;  
+    const TPlanExecParams* exec_params;  
 
     // protects fields below
     // lock ordering: Coordinator::lock_ can only get obtained *prior*
@@ -140,18 +142,24 @@ class Coordinator {
     boost::mutex lock;
 
     Status status;
+    bool initiated; // if true, TPlanExecRequest rpc has been sent
     bool done;  // if true, execution terminated
     RuntimeProfile* profile;  // owned by obj_pool()
 
     BackendExecState(const TUniqueId& fragment_id, int backend_num,
                      const std::pair<std::string, int>& hostport,
-                     const TPlanExecParams& params)
+                     const TPlanExecRequest* exec_request,
+                     const TPlanExecParams* exec_params) 
       : fragment_id(fragment_id),
         backend_num(backend_num),
         hostport(hostport),
         total_split_size(0),
+        exec_request(exec_request),
+        exec_params(exec_params),
+        initiated(false),
+        done(false),
         profile(NULL) {
-      ComputeTotalSplitSize(params);
+      ComputeTotalSplitSize(*exec_params);
     }
 
     void ComputeTotalSplitSize(const TPlanExecParams& params);
@@ -189,13 +197,14 @@ class Coordinator {
   // Aggregate counters for the entire query.
   boost::scoped_ptr<RuntimeProfile> query_profile_;
 
-  // Wrapper for ExecPlanFragment() rpc.
+  // Wrapper for ExecPlanFragment() rpc.  This function will be called in parallel
+  // from multiple threads.
   // Obtains exec_state->lock prior to making rpc, so that it serializes
   // correctly with UpdateFragmentExecStatus().
-  // 'request' is an in/out parameter, because the fragment id needs to be
-  // set for each backend individually.
-  Status ExecRemoteFragment(BackendExecState* exec_state,
-      TPlanExecRequest* request, const TPlanExecParams& params);
+  // exec_state contains all information needed to issue the rpc.
+  // 'coordinator' will always be an instance to this class and 'exec_state' will
+  // always be an instance of BackendExecState.
+  Status ExecRemoteFragment(void* exec_state);
 
   // Determine fragment number, given fragment id.
   int GetFragmentNum(const TUniqueId& fragment_id);
