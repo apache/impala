@@ -55,6 +55,12 @@ class SimpleSchedulerTest : public testing::Test {
     local_remote_scheduler_.reset(new SimpleScheduler(backends));
   }
 
+  virtual void TearDown() {
+    localhost_scheduler_->Close();
+    remote_scheduler_->Close();
+    local_remote_scheduler_->Close();
+  }
+
   int base_port_;
   int num_backends_;
 

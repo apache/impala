@@ -67,6 +67,7 @@ ExecEnv::ExecEnv()
 }
 
 ExecEnv::~ExecEnv() {
+  if (scheduler_ != NULL) scheduler_->Close();
 }
 
 Status ExecEnv::StartServices() {

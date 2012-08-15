@@ -31,6 +31,8 @@ class SimpleScheduler : public Scheduler {
   // Initialize with a list of <host:port> pairs in 'static' mode - i.e. the set of
   // backends is fixed and will not be updated.
   SimpleScheduler(const std::vector<impala::THostPort>& backends);
+  
+  virtual ~SimpleScheduler();
 
   // Returns a list of backends such that the impalad at hostports[i] should be used to
   // read data from data_locations[i].
@@ -48,7 +50,8 @@ class SimpleScheduler : public Scheduler {
   // Registers with the subscription manager if required
   virtual impala::Status Init();
 
-  ~SimpleScheduler();
+  // Unregister with the subscription manager
+  virtual void Close();
 
  private:
   // map from host name to list of ports on which ImpalaServiceBackends

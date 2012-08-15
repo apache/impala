@@ -34,6 +34,28 @@ SimpleScheduler::SimpleScheduler(SubscriptionManager* subscription_manager,
   next_nonlocal_host_entry_ = host_map_.begin();
 }
 
+SimpleScheduler::SimpleScheduler(const vector<THostPort>& backends)
+  : subscription_manager_(NULL),
+    callback_(NULL),
+    subscription_id_(INVALID_SUBSCRIPTION_ID) {
+  DCHECK(backends.size() > 0);
+  for (int i = 0; i < backends.size(); ++i) {
+    string host = backends[i].host;
+    int port = backends[i].port;
+
+    HostMap::iterator i = host_map_.find(host);
+    if (i == host_map_.end()) {
+      i = host_map_.insert(make_pair(host, list<int>())).first;
+    }
+    i->second.push_back(port);
+  }
+  next_nonlocal_host_entry_ = host_map_.begin();
+}
+
+SimpleScheduler::~SimpleScheduler() {
+  DCHECK_EQ(subscription_id_, INVALID_SUBSCRIPTION_ID) << "Did not call Close()";
+}
+
 impala::Status SimpleScheduler::Init() {
   if (subscription_manager_ == NULL) return Status::OK;
 
@@ -65,23 +87,6 @@ void SimpleScheduler::UpdateMembership(const ServiceStateMap& service_state) {
     VLOG_QUERY << "No membership information found.";
   }
 
-  next_nonlocal_host_entry_ = host_map_.begin();
-}
-
-SimpleScheduler::SimpleScheduler(const vector<THostPort>& backends)
-  : subscription_manager_(NULL),
-    callback_(bind<void>(mem_fn(&SimpleScheduler::UpdateMembership), this, _1)) {
-  DCHECK(backends.size() > 0);
-  for (int i = 0; i < backends.size(); ++i) {
-    string host = backends[i].host;
-    int port = backends[i].port;
-
-    HostMap::iterator i = host_map_.find(host);
-    if (i == host_map_.end()) {
-      i = host_map_.insert(make_pair(host, list<int>())).first;
-    }
-    i->second.push_back(port);
-  }
   next_nonlocal_host_entry_ = host_map_.begin();
 }
 
@@ -134,7 +139,7 @@ void SimpleScheduler::GetAllKnownHosts(vector<pair<string, int> >* hostports) {
   }
 }
 
-SimpleScheduler::~SimpleScheduler() {
+void SimpleScheduler::Close() {
   if (subscription_manager_ != NULL && subscription_id_ != INVALID_SUBSCRIPTION_ID) {
     VLOG_QUERY << "Unregistering simple scheduler with subscription manager";
     Status status = subscription_manager_->UnregisterSubscription(subscription_id_);
@@ -143,6 +148,10 @@ SimpleScheduler::~SimpleScheduler() {
                  << status.GetErrorMsg();
     }
   }
+  // Reset everything to make sure no one can use this anymore
+  subscription_id_ = INVALID_SUBSCRIPTION_ID;
+  subscription_manager_ = NULL;
+  host_map_.clear();
 }
 
 }

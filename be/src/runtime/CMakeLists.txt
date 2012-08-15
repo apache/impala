@@ -54,4 +54,4 @@ add_test(string-buffer-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/string-buffer
 add_test(data-stream-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/data-stream-test)
 add_test(timestamp-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/timestamp-test)
 add_test(disk-io-mgr-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/disk-io-mgr-test)
-add_test(parallel-executor-test {BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/parallel-executor-test)
+add_test(parallel-executor-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/parallel-executor-test)

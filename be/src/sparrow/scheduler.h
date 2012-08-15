@@ -18,6 +18,8 @@ namespace sparrow {
 // on those hosts.
 class Scheduler {
  public:
+  virtual ~Scheduler() { }
+
   // Given a list of host / port pairs that represent data locations,
   // fills in hostports with host/port pairs of known ImpalaInternalServices
   // (that are running on those hosts or nearby).
@@ -31,6 +33,9 @@ class Scheduler {
   // Initialises the scheduler, acquiring all resources needed to make
   // scheduling decisions once this method returns.
   virtual impala::Status Init() = 0;
+
+  // Scheduler should clean up all resources in Close()
+  virtual void Close() = 0;
 };
 
 }
