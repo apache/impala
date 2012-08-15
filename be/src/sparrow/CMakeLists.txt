@@ -14,9 +14,9 @@ add_library(Sparrow STATIC
   subscription-manager.cc
 )
 
-add_executable(statestored state-store-main.cc)
+add_executable(state-store-service state-store-main.cc)
 
-target_link_libraries(statestored ${IMPALA_LINK_LIBS})
+target_link_libraries(state-store-service ${IMPALA_LINK_LIBS})
 
 add_executable(state-store-test state-store-test.cc)
 

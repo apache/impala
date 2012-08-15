@@ -89,7 +89,7 @@ Plan Fragment 0
         TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: coordinator
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ------------ DISTRIBUTEDPLAN
@@ -117,7 +117,7 @@ Plan Fragment 1
       TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: localhost:60203
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ====
@@ -140,7 +140,7 @@ Plan Fragment 0
         TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: coordinator
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ------------ DISTRIBUTEDPLAN
@@ -167,7 +167,7 @@ Plan Fragment 1
       TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: localhost:60203
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ====
