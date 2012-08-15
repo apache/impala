@@ -527,14 +527,27 @@ public class Planner {
           }
         } else if (scanRange.isSetHdfsFileSplits()) {
           // HDFS splits are sorted and are printed as "<path> <offset>:<length>"
-          execParamExplain.append(prefix + "    HDFS SPLITS NODE ID: " + nodeId + "\n");
+          execParamExplain.append(prefix + "    HDFS SPLITS NODE ID: " + nodeId);
+          if (explainPlanLevel == PlanNode.ExplainPlanLevel.HIGH) {
+            execParamExplain.append("\n");
+          }
           List<THdfsFileSplit> fileSplists =
               Ordering.natural().sortedCopy(scanRange.getHdfsFileSplits());
+          long totalLength = 0;
+          // print per-split details for high explain level
           for (THdfsFileSplit fs: fileSplists) {
-            execParamExplain.append(prefix + "      ");
-            execParamExplain.append(fs.getPath() + " ");
-            execParamExplain.append(fs.getOffset() + ":");
-            execParamExplain.append(fs.getLength() + "\n");
+            if (explainPlanLevel == PlanNode.ExplainPlanLevel.HIGH) {
+              execParamExplain.append(prefix + "      ");
+              execParamExplain.append(fs.getPath() + " ");
+              execParamExplain.append(fs.getOffset() + ":");
+              execParamExplain.append(fs.getLength() + "\n");
+            }
+            totalLength += fs.getLength();
+          }
+
+          // print summary for normal explain level
+          if (explainPlanLevel == PlanNode.ExplainPlanLevel.NORMAL) {
+            execParamExplain.append(" TOTAL SIZE: " + totalLength + "\n");
           }
         }
       }

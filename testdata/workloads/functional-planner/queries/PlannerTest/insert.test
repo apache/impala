@@ -9,26 +9,29 @@ Plan Fragment 0
   WRITE TO HDFS table=default.alltypesnopart
     OVERWRITE=false
   SCAN HDFS table=default.alltypes (0)
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST: coordinator
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypesnopart
     OVERWRITE=false
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
 ====
 # insert into a static partition
 insert into table alltypessmall
@@ -43,27 +46,30 @@ Plan Fragment 0
     OVERWRITE=false
     PARTITIONS: 2009,4
   SCAN HDFS table=default.alltypes (0)
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST: coordinator
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
     PARTITIONS: 2009,4
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
 ====
 # overwrite a static partition
 insert overwrite table alltypessmall
@@ -78,27 +84,30 @@ Plan Fragment 0
     OVERWRITE=true
     PARTITIONS: 2009,4
   SCAN HDFS table=default.alltypes (0)
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST: coordinator
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=true
     PARTITIONS: 2009,4
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=5/090501.txt 0:20853
+        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
 ====
 # insert into a fully dynamic partition
 insert into table alltypessmall
@@ -113,29 +122,32 @@ Plan Fragment 0
     OVERWRITE=false
     PARTITIONS: year,month
   SCAN HDFS table=default.alltypes (0)
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST: coordinator
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
     PARTITIONS: year,month
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
 ====
 # insert into a partially dynamic partition
 insert into table alltypessmall
@@ -150,29 +162,32 @@ Plan Fragment 0
     OVERWRITE=false
     PARTITIONS: 2009,month
   SCAN HDFS table=default.alltypes (0)
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST: coordinator
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
     PARTITIONS: 2009,month
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs:alltypes/year=2009/month=12/091201.txt 0:20853
+        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
+        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
 ====
 # insert into a partially dynamic partition
 insert into table alltypessmall
@@ -187,25 +202,28 @@ Plan Fragment 0
     OVERWRITE=false
     PARTITIONS: year,4
   SCAN HDFS table=default.alltypes (0)
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST: coordinator
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2010/month=4/100401.txt 0:20179
+        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=4/100401.txt 0:20179
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
     PARTITIONS: year,4
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypes/year=2010/month=4/100401.txt 0:20179
+        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=4/100401.txt 0:20179
 ====

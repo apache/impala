@@ -37,31 +37,37 @@ Plan Fragment 0
   TOP-N
   ORDER BY: t1.int_col ASC
   LIMIT: 2
+  TUPLE IDS: 0 1 
     HASH JOIN
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         t1.id = t2.id
+      TUPLE IDS: 0 1 
         SCAN HDFS table=default.alltypessmall (0)
+          TUPLE IDS: 0 
         SCAN HDFS table=default.alltypessmall (1) compact
+          TUPLE IDS: 1 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   TOP-N
   ORDER BY: t1.int_col ASC
   LIMIT: 2
+  TUPLE IDS: 0 1 
     EXCHANGE (3)
+      TUPLE IDS: 0 1 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -70,21 +76,24 @@ Plan Fragment 1
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       t1.id = t2.id
+    TUPLE IDS: 0 1 
       SCAN HDFS table=default.alltypessmall (0)
+        TUPLE IDS: 0 
       SCAN HDFS table=default.alltypessmall (1) compact
+        TUPLE IDS: 1 
 
   EXEC PARAMS
     HOST:
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
       HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
 ====
 # Test that the sort is on int_col and not on the id column
 select int_col as id from alltypessmall order by id limit 2
@@ -93,34 +102,39 @@ Plan Fragment 0
   TOP-N
   ORDER BY: int_col ASC
   LIMIT: 2
+  TUPLE IDS: 0 
     SCAN HDFS table=default.alltypessmall (0)
+      TUPLE IDS: 0 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   TOP-N
   ORDER BY: int_col ASC
   LIMIT: 2
+  TUPLE IDS: 0 
     EXCHANGE (1)
+      TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypessmall (0)
+    TUPLE IDS: 0 
 
   EXEC PARAMS
     HOST:
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
 ====
 # Test that the sort is on id and not on int_col
 select int_col as id from alltypessmall order by alltypessmall.id limit 2
@@ -129,12 +143,14 @@ Plan Fragment 0
   TOP-N
   ORDER BY: alltypessmall.id ASC
   LIMIT: 2
+  TUPLE IDS: 0 
     SCAN HDFS table=default.alltypessmall (0)
+      TUPLE IDS: 0 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
+        hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
         hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
         hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
         hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
@@ -143,12 +159,15 @@ Plan Fragment 0
   TOP-N
   ORDER BY: alltypessmall.id ASC
   LIMIT: 2
+  TUPLE IDS: 0 
     EXCHANGE (1)
+      TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.alltypessmall (0)
+    TUPLE IDS: 0 
 
   EXEC PARAMS
     HOST:

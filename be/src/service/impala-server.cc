@@ -438,7 +438,7 @@ Status ImpalaServer::FragmentExecState::ReportStatus() {
   params.__set_backend_num(backend_num_);
   params.__set_fragment_id(fragment_id_);
   exec_status_.SetTStatus(&params);
-  params.__set_done(done_);
+  params.__set_done(true);
   executor_.query_profile()->ToThrift(&params.profile);
   params.__isset.profile = true;
   TReportExecStatusResult res;
@@ -1094,8 +1094,10 @@ void ImpalaServer::ExecPlanFragment(
 
 void ImpalaServer::ReportExecStatus(
     TReportExecStatusResult& return_val, const TReportExecStatusParams& params) {
-  VLOG_QUERY << "ReportExecStatus() query_id=" << params.query_id
-             << " backend#=" << params.backend_num;
+  VLOG_FILE << "ReportExecStatus() query_id=" << params.query_id
+            << " backend#=" << params.backend_num
+            << " fragment_id=" << params.fragment_id
+            << " done=" << (params.done ? "true" : "false");
   // TODO: implement something more efficient here, we're currently creating
   // a shared_ptr, acquiring/releasing the map lock and doing a map lookup for
   // every report (assign each query a local int32_t id and use that to index into a

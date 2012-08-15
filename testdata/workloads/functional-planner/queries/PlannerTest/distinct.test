@@ -6,13 +6,17 @@ Plan Fragment 0
   AGGREGATE
   OUTPUT: 
   GROUP BY: testtbl.id, testtbl.name, testtbl.zip
+  TUPLE IDS: 1 
     SCAN HDFS table=default.testtbl (0)
+      TUPLE IDS: 0 
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: 
   GROUP BY: <slot 3>, <slot 4>, <slot 5>
+  TUPLE IDS: 1 
     EXCHANGE (2)
+      TUPLE IDS: 1 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -20,7 +24,9 @@ Plan Fragment 1
   AGGREGATE
   OUTPUT: 
   GROUP BY: testtbl.id, testtbl.name, testtbl.zip
+  TUPLE IDS: 1 
     SCAN HDFS table=default.testtbl (0)
+      TUPLE IDS: 0 
 ====
 # distinct w/ explicit select list
 select distinct id, zip
@@ -30,13 +36,17 @@ Plan Fragment 0
   AGGREGATE
   OUTPUT: 
   GROUP BY: id, zip
+  TUPLE IDS: 1 
     SCAN HDFS table=default.testtbl (0)
+      TUPLE IDS: 0 
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: 
   GROUP BY: <slot 2>, <slot 3>
+  TUPLE IDS: 1 
     EXCHANGE (2)
+      TUPLE IDS: 1 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -44,7 +54,9 @@ Plan Fragment 1
   AGGREGATE
   OUTPUT: 
   GROUP BY: id, zip
+  TUPLE IDS: 1 
     SCAN HDFS table=default.testtbl (0)
+      TUPLE IDS: 0 
 ====
 # count(distinct)
 select count(distinct id, zip)
@@ -54,16 +66,21 @@ Plan Fragment 0
   AGGREGATE
   OUTPUT: COUNT(*)
   GROUP BY: 
+  TUPLE IDS: 2 
     AGGREGATE
     OUTPUT: 
     GROUP BY: id, zip
+    TUPLE IDS: 1 
       SCAN HDFS table=default.testtbl (0)
+        TUPLE IDS: 0 
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: COUNT(*)
   GROUP BY: 
+  TUPLE IDS: 2 
     EXCHANGE (2)
+      TUPLE IDS: 1 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -71,7 +88,9 @@ Plan Fragment 1
   AGGREGATE
   OUTPUT: 
   GROUP BY: id, zip
+  TUPLE IDS: 1 
     SCAN HDFS table=default.testtbl (0)
+      TUPLE IDS: 0 
 ====
 # count(distinct) w/ grouping
 select tinyint_col, count(distinct int_col, bigint_col)
@@ -82,30 +101,35 @@ Plan Fragment 0
   AGGREGATE
   OUTPUT: COUNT(*)
   GROUP BY: <slot 3>
+  TUPLE IDS: 2 
     AGGREGATE
     OUTPUT: 
     GROUP BY: tinyint_col, int_col, bigint_col
+    TUPLE IDS: 1 
       SCAN HDFS table=default.alltypesagg (0)
+        TUPLE IDS: 0 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: COUNT(*)
   GROUP BY: <slot 3>
+  TUPLE IDS: 2 
     EXCHANGE (2)
+      TUPLE IDS: 1 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -113,21 +137,23 @@ Plan Fragment 1
   AGGREGATE
   OUTPUT: 
   GROUP BY: tinyint_col, int_col, bigint_col
+  TUPLE IDS: 1 
     SCAN HDFS table=default.alltypesagg (0)
+      TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ====
 # count(distinct) and sum(distinct) w/ grouping
 select tinyint_col, count(distinct int_col), sum(distinct int_col)
@@ -138,30 +164,35 @@ Plan Fragment 0
   AGGREGATE
   OUTPUT: COUNT(*), SUM(<slot 3>)
   GROUP BY: <slot 2>
+  TUPLE IDS: 2 
     AGGREGATE
     OUTPUT: 
     GROUP BY: tinyint_col, int_col
+    TUPLE IDS: 1 
       SCAN HDFS table=default.alltypesagg (0)
+        TUPLE IDS: 0 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: COUNT(*), SUM(<slot 3>)
   GROUP BY: <slot 2>
+  TUPLE IDS: 2 
     EXCHANGE (2)
+      TUPLE IDS: 1 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -169,21 +200,23 @@ Plan Fragment 1
   AGGREGATE
   OUTPUT: 
   GROUP BY: tinyint_col, int_col
+  TUPLE IDS: 1 
     SCAN HDFS table=default.alltypesagg (0)
+      TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ====
 # count(distinct) and sum(distinct) w/ grouping; distinct in min() and max()
 # is ignored
@@ -195,30 +228,35 @@ Plan Fragment 0
   AGGREGATE
   OUTPUT: COUNT(*), MIN(<slot 6>), MAX(<slot 7>)
   GROUP BY: <slot 4>
+  TUPLE IDS: 2 
     AGGREGATE
     OUTPUT: MIN(smallint_col), MAX(string_col)
     GROUP BY: tinyint_col, int_col
+    TUPLE IDS: 1 
       SCAN HDFS table=default.alltypesagg (0)
+        TUPLE IDS: 0 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: COUNT(*), MIN(<slot 6>), MAX(<slot 7>)
   GROUP BY: <slot 4>
+  TUPLE IDS: 2 
     EXCHANGE (2)
+      TUPLE IDS: 1 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -226,21 +264,23 @@ Plan Fragment 1
   AGGREGATE
   OUTPUT: MIN(smallint_col), MAX(string_col)
   GROUP BY: tinyint_col, int_col
+  TUPLE IDS: 1 
     SCAN HDFS table=default.alltypesagg (0)
+      TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ====
 # aggregate fns with and without distinct
 select tinyint_col, count(distinct int_col), count(*), sum(distinct int_col),
@@ -251,30 +291,35 @@ Plan Fragment 0
   AGGREGATE
   OUTPUT: COUNT(*), SUM(<slot 5>), SUM(<slot 6>), SUM(<slot 7>), MIN(<slot 8>), MAX(<slot 9>)
   GROUP BY: <slot 4>
+  TUPLE IDS: 2 
     AGGREGATE
     OUTPUT: COUNT(*), SUM(int_col), MIN(smallint_col), MAX(bigint_col)
     GROUP BY: tinyint_col, int_col
+    TUPLE IDS: 1 
       SCAN HDFS table=default.alltypesagg (0)
+        TUPLE IDS: 0 
 
   EXEC PARAMS
     HOST: coordinator
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   AGGREGATE
   OUTPUT: COUNT(*), SUM(<slot 5>), SUM(<slot 6>), SUM(<slot 7>), MIN(<slot 8>), MAX(<slot 9>)
   GROUP BY: <slot 4>
+  TUPLE IDS: 2 
     EXCHANGE (2)
+      TUPLE IDS: 1 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -282,19 +327,21 @@ Plan Fragment 1
   AGGREGATE
   OUTPUT: COUNT(*), SUM(int_col), MIN(smallint_col), MAX(bigint_col)
   GROUP BY: tinyint_col, int_col
+  TUPLE IDS: 1 
     SCAN HDFS table=default.alltypesagg (0)
+      TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+        hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
 ====

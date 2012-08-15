@@ -42,7 +42,7 @@ PlanFragmentExecutor::~PlanFragmentExecutor() {
 Status PlanFragmentExecutor::Prepare(
     const TPlanExecRequest& request, const TPlanExecParams& params) {
 
-  VLOG_QUERY << "params:\n" << ThriftDebugString(params);
+  VLOG(2) << "params:\n" << ThriftDebugString(params);
 
   runtime_state_.reset(
       new RuntimeState(request.fragment_id, request.query_options,
@@ -83,7 +83,7 @@ Status PlanFragmentExecutor::Prepare(
 
   row_batch_.reset(new RowBatch(plan_->row_desc(), runtime_state_->batch_size()));
   RETURN_IF_ERROR(plan_->Prepare(runtime_state_.get()));
-  VLOG_QUERY << "plan_root=\n" << plan_->DebugString();
+  VLOG(2) << "plan_root=\n" << plan_->DebugString();
   return Status::OK;
 }
 

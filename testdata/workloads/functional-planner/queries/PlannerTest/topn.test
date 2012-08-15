@@ -7,18 +7,23 @@ Plan Fragment 0
   TOP-N
   ORDER BY: name ASC
   LIMIT: 1
+  TUPLE IDS: 0 
     SCAN HDFS table=default.testtbl (0)
+      TUPLE IDS: 0 
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   TOP-N
   ORDER BY: name ASC
   LIMIT: 1
+  TUPLE IDS: 0 
     EXCHANGE (1)
+      TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HDFS table=default.testtbl (0)
+    TUPLE IDS: 0 
 ====
 select zip, count(*)
 from testtbl
@@ -31,20 +36,26 @@ Plan Fragment 0
   TOP-N
   ORDER BY: <slot 3> DESC
   LIMIT: 10
+  TUPLE IDS: 1 
     AGGREGATE
     OUTPUT: COUNT(*)
     GROUP BY: zip
+    TUPLE IDS: 1 
       SCAN HDFS table=default.testtbl (0)
         PREDICATES: name LIKE 'm%'
+        TUPLE IDS: 0 
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   TOP-N
   ORDER BY: <slot 3> DESC
   LIMIT: 10
+  TUPLE IDS: 1 
     AGGREGATE
     OUTPUT: SUM(<slot 3>)
     GROUP BY: <slot 2>
+    TUPLE IDS: 1 
       EXCHANGE (2)
+        TUPLE IDS: 1 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -52,8 +63,10 @@ Plan Fragment 1
   AGGREGATE
   OUTPUT: COUNT(*)
   GROUP BY: zip
+  TUPLE IDS: 1 
     SCAN HDFS table=default.testtbl (0)
       PREDICATES: name LIKE 'm%'
+      TUPLE IDS: 0 
 ====
 select int_col, sum(float_col) 
 from hbasealltypessmall
@@ -66,14 +79,17 @@ Plan Fragment 0
   TOP-N
   ORDER BY: <slot 4> ASC
   LIMIT: 4
+  TUPLE IDS: 1 
     AGGREGATE
     OUTPUT: SUM(float_col)
     GROUP BY: int_col
+    TUPLE IDS: 1 
       SCAN HBASE table=hbasealltypessmall (0)
         PREDICATES: id < 5
+        TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST: coordinator
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ------------ DISTRIBUTEDPLAN
@@ -81,10 +97,13 @@ Plan Fragment 0
   TOP-N
   ORDER BY: <slot 4> ASC
   LIMIT: 4
+  TUPLE IDS: 1 
     AGGREGATE
     OUTPUT: SUM(<slot 4>)
     GROUP BY: <slot 3>
+    TUPLE IDS: 1 
       EXCHANGE (2)
+        TUPLE IDS: 1 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -92,11 +111,13 @@ Plan Fragment 1
   AGGREGATE
   OUTPUT: SUM(float_col)
   GROUP BY: int_col
+  TUPLE IDS: 1 
     SCAN HBASE table=hbasealltypessmall (0)
       PREDICATES: id < 5
+      TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST: localhost:60203
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ====
@@ -110,13 +131,16 @@ Plan Fragment 0
   TOP-N
   ORDER BY: <slot 3> ASC, <slot 4> DESC
   LIMIT: 0
+  TUPLE IDS: 1 
     AGGREGATE
     OUTPUT: SUM(float_col), MIN(float_col)
     GROUP BY: int_col
+    TUPLE IDS: 1 
       SCAN HBASE table=hbasealltypessmall (0)
+        TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST: coordinator
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ------------ DISTRIBUTEDPLAN
@@ -124,10 +148,13 @@ Plan Fragment 0
   TOP-N
   ORDER BY: <slot 3> ASC, <slot 4> DESC
   LIMIT: 0
+  TUPLE IDS: 1 
     AGGREGATE
     OUTPUT: SUM(<slot 3>), MIN(<slot 4>)
     GROUP BY: <slot 2>
+    TUPLE IDS: 1 
       EXCHANGE (2)
+        TUPLE IDS: 1 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -135,10 +162,12 @@ Plan Fragment 1
   AGGREGATE
   OUTPUT: SUM(float_col), MIN(float_col)
   GROUP BY: int_col
+  TUPLE IDS: 1 
     SCAN HBASE table=hbasealltypessmall (0)
+      TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST: localhost:60203
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ====

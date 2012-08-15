@@ -52,12 +52,12 @@ public class PlannerTest {
 
   private void RunQuery(String query, int numNodes, TestCase testCase,
                         Section section, StringBuilder errorLog,
-                        StringBuilder actualOutput, PlanNode.ExplainPlanLevel level) {
+                        StringBuilder actualOutput) {
     try {
       LOG.info("running query " + query);
       AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
       Planner planner = new Planner();
-      planner.setExplainPlanDetailLevel(level);
+      planner.setExplainPlanDetailLevel(PlanNode.ExplainPlanLevel.HIGH);
       explainStringBuilder.setLength(0);
       TQueryOptions options = new TQueryOptions();
       options.setNum_nodes(numNodes);
@@ -108,7 +108,7 @@ public class PlannerTest {
     }
   }
 
-  private void runPlannerTestFile(String testFile, PlanNode.ExplainPlanLevel level) {
+  private void runPlannerTestFile(String testFile) {
     String fileName = testDir + "/" + testFile + ".test";
     TestFileParser queryFileParser = new TestFileParser(fileName);
     StringBuilder actualOutput = new StringBuilder();
@@ -133,7 +133,7 @@ public class PlannerTest {
         actualOutput.append("not implemented\n");
       } else {
         // Run single-node query,
-        RunQuery(query, 1, testCase, Section.PLAN, errorLog, actualOutput, level);
+        RunQuery(query, 1, testCase, Section.PLAN, errorLog, actualOutput);
         // Check if multi-node query is implemented.
         ArrayList<String> multiNodePlan = testCase.getSectionContents(Section.DISTRIBUTEDPLAN);
         if (multiNodePlan.size() > 0 &&
@@ -148,7 +148,7 @@ public class PlannerTest {
           // non-deterministic. To see incorrect multi-node planning, change 2 to
           // 0 (use all nodes)
           RunQuery(query, 2, testCase, Section.DISTRIBUTEDPLAN, errorLog,
-                   actualOutput, level);
+                   actualOutput);
         }
       }
       actualOutput.append("====\n");
@@ -174,58 +174,58 @@ public class PlannerTest {
 
   @Test
   public void testDistinct() {
-    runPlannerTestFile("distinct", PlanNode.ExplainPlanLevel.NORMAL);
+    runPlannerTestFile("distinct");
   }
 
   @Test
   public void testAggregation() {
-    runPlannerTestFile("aggregation", PlanNode.ExplainPlanLevel.NORMAL);
+    runPlannerTestFile("aggregation");
   }
 
   @Test
   public void testHBase() {
-    runPlannerTestFile("hbase", PlanNode.ExplainPlanLevel.NORMAL);
+    runPlannerTestFile("hbase");
   }
 
   @Test
   public void testInsert() {
-    runPlannerTestFile("insert", PlanNode.ExplainPlanLevel.NORMAL);
+    runPlannerTestFile("insert");
   }
 
   @Test
   public void testHdfs() {
-    runPlannerTestFile("hdfs", PlanNode.ExplainPlanLevel.NORMAL);
+    runPlannerTestFile("hdfs");
   }
 
   @Test
   public void testJoins() {
-    runPlannerTestFile("joins", PlanNode.ExplainPlanLevel.HIGH);
+    runPlannerTestFile("joins");
   }
 
   @Test
   public void testOrder() {
-    runPlannerTestFile("order", PlanNode.ExplainPlanLevel.NORMAL);
+    runPlannerTestFile("order");
   }
 
   @Test
   public void testTopN() {
-    runPlannerTestFile("topn", PlanNode.ExplainPlanLevel.NORMAL);
+    runPlannerTestFile("topn");
   }
 
   @Test
   public void testSubquery() {
-    runPlannerTestFile("subquery", PlanNode.ExplainPlanLevel.HIGH);
+    runPlannerTestFile("subquery");
   }
 
   @Test
   public void testUnion() {
-    runPlannerTestFile("union", PlanNode.ExplainPlanLevel.HIGH);
+    runPlannerTestFile("union");
   }
 
   @Test
   public void testTpch() {
     // TODO: Q20-Q22 are disabled due to IMP-137. Once that bug is resolved they should
     // be re-enabled.
-    runPlannerTestFile("tpch-all", PlanNode.ExplainPlanLevel.HIGH);
+    runPlannerTestFile("tpch-all");
   }
 }

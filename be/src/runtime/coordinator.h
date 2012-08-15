@@ -132,6 +132,7 @@ class Coordinator {
     TUniqueId fragment_id;
     int backend_num;  // backend_exec_states_[backend_num] points to us
     const std::pair<std::string, int> hostport;  // of ImpalaInternalService
+    int64_t total_split_size;  // summed up across all splits
 
     // protects fields below
     // lock ordering: Coordinator::lock_ can only get obtained *prior*
@@ -143,12 +144,17 @@ class Coordinator {
     RuntimeProfile* profile;  // owned by obj_pool()
 
     BackendExecState(const TUniqueId& fragment_id, int backend_num,
-                     const std::pair<std::string, int>& hostport)
+                     const std::pair<std::string, int>& hostport,
+                     const TPlanExecParams& params)
       : fragment_id(fragment_id),
         backend_num(backend_num),
         hostport(hostport),
+        total_split_size(0),
         profile(NULL) {
+      ComputeTotalSplitSize(params);
     }
+
+    void ComputeTotalSplitSize(const TPlanExecParams& params);
   };
 
   // BackendExecStates owned by obj_pool()
@@ -194,9 +200,8 @@ class Coordinator {
   // Determine fragment number, given fragment id.
   int GetFragmentNum(const TUniqueId& fragment_id);
 
-  // Print total data volume contained in params to VLOG(1)
-  void PrintClientInfo(
-      const std::pair<std::string, int>& host, const TPlanExecParams& params);
+  // Print hdfs split size stats to VLOG_QUERY and details to VLOG_FILE
+  void PrintBackendInfo();
 
   // Executes the GetNext() logic, but doesn't call Close() when execution
   // is completed.

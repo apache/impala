@@ -3,22 +3,25 @@ select * from hbasealltypessmall
 ---- PLAN
 Plan Fragment 0
   SCAN HBASE table=hbasealltypessmall (0)
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HBASE table=hbasealltypessmall (0)
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ====
@@ -30,23 +33,26 @@ where id < 5
 Plan Fragment 0
   SCAN HBASE table=hbasealltypessmall (0)
     PREDICATES: id < 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HBASE table=hbasealltypessmall (0)
     PREDICATES: id < 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ====
@@ -60,14 +66,16 @@ Plan Fragment 0
     START KEY: 5
     STOP KEY: 5\0
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         5:5\0
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -76,9 +84,10 @@ Plan Fragment 1
     START KEY: 5
     STOP KEY: 5\0
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         5:5\0
 ====
@@ -90,14 +99,16 @@ Plan Fragment 0
   SCAN HBASE table=hbasestringids (0)
     START KEY: 5\0
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         5\0:<unbounded>
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -105,9 +116,10 @@ Plan Fragment 1
   SCAN HBASE table=hbasestringids (0)
     START KEY: 5\0
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         5\0:<unbounded>
 ====
@@ -119,14 +131,16 @@ Plan Fragment 0
   SCAN HBASE table=hbasestringids (0)
     START KEY: 5
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         5:<unbounded>
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -134,9 +148,10 @@ Plan Fragment 1
   SCAN HBASE table=hbasestringids (0)
     START KEY: 5
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         5:<unbounded>
 ====
@@ -148,14 +163,16 @@ Plan Fragment 0
   SCAN HBASE table=hbasestringids (0)
     STOP KEY: 5
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:5
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -163,9 +180,10 @@ Plan Fragment 1
   SCAN HBASE table=hbasestringids (0)
     STOP KEY: 5
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:5
 ====
@@ -177,14 +195,16 @@ Plan Fragment 0
   SCAN HBASE table=hbasestringids (0)
     STOP KEY: 5\0
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:5\0
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -192,9 +212,10 @@ Plan Fragment 1
   SCAN HBASE table=hbasestringids (0)
     STOP KEY: 5\0
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:5\0
 ====
@@ -207,14 +228,16 @@ Plan Fragment 0
     START KEY: 4\0
     STOP KEY: 5
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         4\0:5
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -223,9 +246,10 @@ Plan Fragment 1
     START KEY: 4\0
     STOP KEY: 5
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         4\0:5
 ====
@@ -238,14 +262,16 @@ Plan Fragment 0
     START KEY: 4
     STOP KEY: 5
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         4:5
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -254,9 +280,10 @@ Plan Fragment 1
     START KEY: 4
     STOP KEY: 5
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         4:5
 ====
@@ -269,14 +296,16 @@ Plan Fragment 0
     START KEY: 4\0
     STOP KEY: 5\0
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         4\0:5\0
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -285,9 +314,10 @@ Plan Fragment 1
     START KEY: 4\0
     STOP KEY: 5\0
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         4\0:5\0
 ====
@@ -300,14 +330,16 @@ Plan Fragment 0
     START KEY: 4
     STOP KEY: 5\0
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         4:5\0
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -316,9 +348,10 @@ Plan Fragment 1
     START KEY: 4
     STOP KEY: 5\0
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         4:5\0
 ====
@@ -332,11 +365,13 @@ Plan Fragment 0
   AGGREGATE
   OUTPUT: COUNT(*)
   GROUP BY: int_col
+  TUPLE IDS: 1 
     SCAN HBASE table=hbasealltypessmall (0)
       PREDICATES: id < 5
+      TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ------------ DISTRIBUTEDPLAN
@@ -344,7 +379,9 @@ Plan Fragment 0
   AGGREGATE
   OUTPUT: SUM(<slot 3>)
   GROUP BY: <slot 2>
+  TUPLE IDS: 1 
     EXCHANGE (2)
+      TUPLE IDS: 1 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -352,11 +389,13 @@ Plan Fragment 1
   AGGREGATE
   OUTPUT: COUNT(*)
   GROUP BY: int_col
+  TUPLE IDS: 1 
     SCAN HBASE table=hbasealltypessmall (0)
       PREDICATES: id < 5
+      TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ====
@@ -366,23 +405,26 @@ select * from hbasealltypessmall where string_col = '4'
 Plan Fragment 0
   SCAN HBASE table=hbasealltypessmall (0)
     HBASE FILTERS: strings:string_col EQUAL '4'
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HBASE table=hbasealltypessmall (0)
     HBASE FILTERS: strings:string_col EQUAL '4'
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ====
@@ -392,23 +434,26 @@ select * from hbasealltypessmall where string_col != '4'
 Plan Fragment 0
   SCAN HBASE table=hbasealltypessmall (0)
     HBASE FILTERS: strings:string_col NOT_EQUAL '4'
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HBASE table=hbasealltypessmall (0)
     HBASE FILTERS: strings:string_col NOT_EQUAL '4'
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ====
@@ -417,23 +462,26 @@ select * from hbasealltypessmall where string_col < '4'
 Plan Fragment 0
   SCAN HBASE table=hbasealltypessmall (0)
     HBASE FILTERS: strings:string_col LESS '4'
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HBASE table=hbasealltypessmall (0)
     HBASE FILTERS: strings:string_col LESS '4'
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ====
@@ -442,23 +490,26 @@ select * from hbasealltypessmall where string_col > '4'
 Plan Fragment 0
   SCAN HBASE table=hbasealltypessmall (0)
     HBASE FILTERS: strings:string_col GREATER '4'
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HBASE table=hbasealltypessmall (0)
     HBASE FILTERS: strings:string_col GREATER '4'
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ====
@@ -467,23 +518,26 @@ select * from hbasealltypessmall where string_col <= '4'
 Plan Fragment 0
   SCAN HBASE table=hbasealltypessmall (0)
     HBASE FILTERS: strings:string_col LESS_OR_EQUAL '4'
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HBASE table=hbasealltypessmall (0)
     HBASE FILTERS: strings:string_col LESS_OR_EQUAL '4'
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ====
@@ -492,23 +546,26 @@ select * from hbasealltypessmall where string_col >= '4'
 Plan Fragment 0
   SCAN HBASE table=hbasealltypessmall (0)
     HBASE FILTERS: strings:string_col GREATER_OR_EQUAL '4'
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HBASE table=hbasealltypessmall (0)
     HBASE FILTERS: strings:string_col GREATER_OR_EQUAL '4'
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ====
@@ -522,14 +579,16 @@ Plan Fragment 0
   strings:date_string_col EQUAL '04/03/09'
   strings:string_col GREATER_OR_EQUAL '4'
   strings:string_col NOT_EQUAL '2'
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -539,9 +598,10 @@ Plan Fragment 1
   strings:date_string_col EQUAL '04/03/09'
   strings:string_col GREATER_OR_EQUAL '4'
   strings:string_col NOT_EQUAL '2'
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ====
@@ -552,14 +612,16 @@ Plan Fragment 0
   SCAN HBASE table=hbasealltypessmall (0)
     HBASE FILTERS: strings:string_col EQUAL '4'
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -567,9 +629,10 @@ Plan Fragment 1
   SCAN HBASE table=hbasealltypessmall (0)
     HBASE FILTERS: strings:string_col EQUAL '4'
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ====
@@ -583,14 +646,16 @@ Plan Fragment 0
     STOP KEY: 5\0
     HBASE FILTERS: strings:string_col EQUAL '4'
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         4:5\0
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
@@ -600,9 +665,10 @@ Plan Fragment 1
     STOP KEY: 5\0
     HBASE FILTERS: strings:string_col EQUAL '4'
     PREDICATES: tinyint_col = 5
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         4:5\0
 ====
@@ -612,23 +678,26 @@ select * from hbasealltypessmall where string_col >= 4
 Plan Fragment 0
   SCAN HBASE table=hbasealltypessmall (0)
     PREDICATES: string_col >= 4
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HBASE table=hbasealltypessmall (0)
     PREDICATES: string_col >= 4
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ====
@@ -638,23 +707,26 @@ select * from hbasealltypessmall where string_col >= date_string_col
 Plan Fragment 0
   SCAN HBASE table=hbasealltypessmall (0)
     PREDICATES: string_col >= date_string_col
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ------------ DISTRIBUTEDPLAN
 Plan Fragment 0
   EXCHANGE (1)
+    TUPLE IDS: 0 
 
 Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
   SCAN HBASE table=hbasealltypessmall (0)
     PREDICATES: string_col >= date_string_col
+    TUPLE IDS: 0 
 
   EXEC PARAMS
-    HOST: 
+    HOST:
       HBASE KEY RANGES NODE ID: 0
         <unbounded>:<unbounded>
 ====

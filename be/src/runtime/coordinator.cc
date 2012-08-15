@@ -7,6 +7,13 @@
 #include <gflags/gflags.h>
 #include <transport/TTransportUtils.h>
 #include <boost/algorithm/string/join.hpp>
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
+#include <boost/accumulators/statistics/min.hpp>
+#include <boost/accumulators/statistics/mean.hpp>
+#include <boost/accumulators/statistics/median.hpp>
+#include <boost/accumulators/statistics/max.hpp>
+#include <boost/accumulators/statistics/variance.hpp>
 
 #include "exec/data-sink.h"
 #include "runtime/client-cache.h"
@@ -24,6 +31,7 @@
 
 using namespace std;
 using namespace boost;
+using namespace boost::accumulators;
 using namespace apache::thrift::transport;
 
 DECLARE_int32(be_port);
@@ -108,10 +116,11 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
 
       // TODO: pool of pre-formatted BackendExecStates?
       BackendExecState* exec_state =
-          obj_pool()->Add(new BackendExecState(fragment_id, backend_num, hosts[j]));
+          obj_pool()->Add(
+            new BackendExecState(fragment_id, backend_num, hosts[j],
+                                 request->node_request_params[i][j]));
       DCHECK_EQ(backend_exec_states_.size(), backend_num);
       backend_exec_states_.push_back(exec_state);
-      PrintClientInfo(hosts[j], request->node_request_params[i][j]);
 
       Status fragment_exec_status = ExecRemoteFragment(exec_state,
           &fragment_request, request->node_request_params[i][j]);
@@ -122,6 +131,7 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
       }
       ++backend_num;
     }
+    PrintBackendInfo();
   }
 
   return Status::OK;
@@ -136,26 +146,51 @@ Status Coordinator::Wait() {
   return Status::OK;
 }
 
-void Coordinator::PrintClientInfo(
-    const pair<string, int>& hostport, const TPlanExecParams& params) {
+void Coordinator::BackendExecState::ComputeTotalSplitSize(
+    const TPlanExecParams& params) {
   if (params.scan_ranges.empty()) return;
-  int64_t total = 0;
+  total_split_size = 0;
   for (int i = 0; i < params.scan_ranges[0].hdfsFileSplits.size(); ++i) {
-    total += params.scan_ranges[0].hdfsFileSplits[i].length;
+    total_split_size += params.scan_ranges[0].hdfsFileSplits[i].length;
   }
-  VLOG_CONNECTION << "data volume for host " << hostport.first
-      << ":" << hostport.second
-      << ": " << PrettyPrinter::Print(total, TCounterType::BYTES);
+}
+
+void Coordinator::PrintBackendInfo() {
+  accumulator_set<int64_t, features<tag::min, tag::max, tag::mean, tag::variance> > acc;
+  for (int i = 0; i < backend_exec_states_.size(); ++i) {
+    acc(backend_exec_states_[i]->total_split_size);
+  }
+  double min = accumulators::min(acc);
+  double max = accumulators::max(acc);
+  // TODO: including the median doesn't compile, looks like some includes are missing
+  //double median = accumulators::median(acc);
+  double mean = accumulators::mean(acc);
+  double stddev = sqrt(accumulators::variance(acc));
+  VLOG_QUERY << "split sizes for " << backend_exec_states_.size() << " backends:"
+             << " min: " << PrettyPrinter::Print(min, TCounterType::BYTES)
+             << ", max: " << PrettyPrinter::Print(max, TCounterType::BYTES)
+             //<< ", median: " << PrettyPrinter::Print(median, TCounterType::BYTES)
+             << ", avg: " << PrettyPrinter::Print(mean, TCounterType::BYTES)
+             << ", stddev: " << PrettyPrinter::Print(stddev, TCounterType::BYTES);
+  if (VLOG_FILE_IS_ON) {
+    for (int i = 0; i < backend_exec_states_.size(); ++i) {
+      BackendExecState* exec_state = backend_exec_states_[i];
+      VLOG_FILE << "data volume for host " << exec_state->hostport.first
+                << ":" << exec_state->hostport.second << ": "
+                << PrettyPrinter::Print(
+                  exec_state->total_split_size, TCounterType::BYTES);
+    }
+  }
 }
 
 Status Coordinator::ExecRemoteFragment(
     BackendExecState* exec_state,
     TPlanExecRequest* exec_request,
     const TPlanExecParams& exec_params) {
-  VLOG_QUERY << "making rpc: ExecPlanFragment query_id=" << query_id_
-             << " fragment_id=" << exec_state->fragment_id
-             << " host=" << exec_state->hostport.first
-             << " port=" << exec_state->hostport.second;
+  VLOG_FILE << "making rpc: ExecPlanFragment query_id=" << query_id_
+            << " fragment_id=" << exec_state->fragment_id
+            << " host=" << exec_state->hostport.first
+            << " port=" << exec_state->hostport.second;
   lock_guard<mutex> l(exec_state->lock);
 
   // this client needs to have been released when this function finishes
@@ -199,6 +234,12 @@ Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
   // hit the end
   if (!status.ok() || execution_completed_) {
     status.AddError(executor_->Close());
+  }
+  if (execution_completed_ && VLOG_QUERY_IS_ON) {
+    stringstream s;
+    query_profile_->PrettyPrint(&s);
+    VLOG_QUERY << "cumulative profile for query_id=" << query_id_ << "\n"
+               << s.str();
   }
   return status;
 }
@@ -314,6 +355,20 @@ Status Coordinator::UpdateFragmentExecStatus(
     // RuntimeProfile from thrift) or a way to remove existing profile children
     // TODO: think about the thread safety of query_profile_
     query_profile_->AddChild(exec_state->profile);
+    if (VLOG_FILE_IS_ON) {
+      stringstream s;
+      exec_state->profile->PrettyPrint(&s);
+      VLOG_FILE << "profile for query_id=" << query_id_
+                << " fragment_id=" << exec_state->fragment_id << "\n" << s.str();
+    }
+    // also print the cumulative profile
+    // TODO: fix the coordinator/PlanFragmentExecutor, so this isn't needed
+    if (VLOG_FILE_IS_ON) {
+      stringstream s;
+      query_profile_->PrettyPrint(&s);
+      VLOG_FILE << "cumulative profile for query_id=" << query_id_ 
+                << "\n" << s.str();
+    }
   }
 
   // for now, abort the query if we see any error

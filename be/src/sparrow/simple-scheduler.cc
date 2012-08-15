@@ -5,6 +5,7 @@
 #include <glog/logging.h>
 
 #include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/join.hpp>
 #include <boost/bind.hpp>
 #include <boost/mem_fn.hpp>
 #include <boost/foreach.hpp>
@@ -108,8 +109,16 @@ Status SimpleScheduler::GetHosts(
     hostports->push_back(make_pair(entry->first, port));
     entry->second.pop_front();
     entry->second.push_back(port);
+  }
+  if (VLOG_QUERY_IS_ON) {
+    vector<string> hostport_strings;
+    for (int i = 0; i < hostports->size(); ++i) {
+      stringstream s;
+      s << (*hostports)[i].first << ":" << (*hostports)[i].second;
+      hostport_strings.push_back(s.str());
+    }
     VLOG_QUERY << "SimpleScheduler: selecting "
-            << entry->first << ":" << entry->second.front();
+               << algorithm::join(hostport_strings, ", ");
   }
   DCHECK_EQ(data_locations.size(), hostports->size());
   return Status::OK;

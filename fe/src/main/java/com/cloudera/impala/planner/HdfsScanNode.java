@@ -154,7 +154,8 @@ public class HdfsScanNode extends ScanNode {
         try {
           // Use getNames() to get port number as well
           blockHostPorts = block.getLocation().getNames();
-          LOG.info(Arrays.toString(blockHostPorts));
+          // uncomment if you need to see detailed block locations
+          //LOG.info(Arrays.toString(blockHostPorts));
         } catch (IOException e) {
           // this shouldn't happen, getHosts() doesn't throw anything
           String errorMsg = "BlockLocation.getHosts() failed:\n" + e.getMessage();
