@@ -113,26 +113,8 @@ static QueryExecutorIf* CreateExecutor(ExecEnv* exec_env) {
   }
 }
 
-static void Explain(ExecEnv* exec_env) {
-  scoped_ptr<QueryExecutorIf> executor(CreateExecutor(exec_env));
-  EXIT_IF_ERROR(executor->Setup());
-  string explain_plan;
-  EXIT_IF_ERROR(executor->Explain(FLAGS_query, &explain_plan));
-  cout << "Explan Plan:" << endl << explain_plan << endl;
-}
-
-static void Exec(ExecEnv* exec_env) {
-  bool enable_profiling = false;
-  if (FLAGS_enable_counters && FLAGS_profile_output_file.size() != 0) {
-    ProfilerStart(FLAGS_profile_output_file.c_str());
-    enable_profiling = true;
-  }
-
-  vector<double> elapsed_times;
-  elapsed_times.resize(FLAGS_iterations);
-
-  vector<string> queries;
-  split(queries, FLAGS_query, is_any_of(";"), token_compress_on );
+static void GetQueries(vector<string>* queries) {
+  queries->clear();
 
   if (FLAGS_input_file.length() > 0) {
     if (FLAGS_query.length() > 0) {
@@ -153,13 +135,34 @@ static void Exec(ExecEnv* exec_env) {
     fread(buffer, 1, file_size, input_file);
 
     string str(buffer, file_size);
-    split(queries, str, is_any_of(";"), token_compress_on );
+    split(*queries, str, is_any_of(";"), token_compress_on );
+  } else if (FLAGS_query.length() > 0) {
+    split(*queries, FLAGS_query, is_any_of(";"), token_compress_on );
+  }
+}
+
+static void Explain(ExecEnv* exec_env, const vector<string>& queries) {
+  scoped_ptr<QueryExecutorIf> executor(CreateExecutor(exec_env));
+  EXIT_IF_ERROR(executor->Setup());
+  string explain_plan;
+
+  for (int i = 0; i < queries.size(); ++i) {
+    EXIT_IF_ERROR(executor->Explain(queries[i], &explain_plan));
+    cout << "Explan Plan: ";
+    if (queries.size() > 1)  cout << queries[i];
+    cout << endl << explain_plan << endl;
+  }
+}
+
+static void Exec(ExecEnv* exec_env, const vector<string>& queries) {
+  bool enable_profiling = false;
+  if (FLAGS_enable_counters && FLAGS_profile_output_file.size() != 0) {
+    ProfilerStart(FLAGS_profile_output_file.c_str());
+    enable_profiling = true;
   }
 
-  if (queries.size() == 0) {
-    cout << "Invalid query: " << FLAGS_query << endl;
-    return;
-  }
+  vector<double> elapsed_times;
+  elapsed_times.resize(FLAGS_iterations);
 
   // If the number of iterations is greater than 1, run once to Ignore JVM startup time.
   if (FLAGS_iterations > 1) {
@@ -300,10 +303,17 @@ int main(int argc, char** argv) {
     EXIT_IF_ERROR(HBaseTableCache::Init());
   }
 
+  vector<string> queries;
+  GetQueries(&queries);
+  if (queries.empty()) {
+    cout << "No input queries." << endl;
+    return 1;
+  }
+
   if (FLAGS_explain_plan) {
-    Explain(exec_env.get());
+    Explain(exec_env.get(), queries);
   } else {
-    Exec(exec_env.get());
+    Exec(exec_env.get(), queries);
   }
 
   // Delete all global JNI references.
