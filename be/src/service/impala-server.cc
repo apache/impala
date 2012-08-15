@@ -454,6 +454,9 @@ const int ImpalaServer::ASCII_PRECISION = 16; // print 16 digits for double/floa
 
 ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   : exec_env_(exec_env) {
+  // Initialize default config
+  InitializeConfigVariables();
+
   if (!FLAGS_use_planservice) {
     JNIEnv* jni_env = getJNIEnv();
     // create instance of java class JniFrontend
@@ -976,8 +979,10 @@ void ImpalaServer::get_log(string& log, const LogContextId& context) {
   log = "logs are distributed. Skip it for now";
 }
 
-void ImpalaServer::get_default_configuration(
-    vector<ConfigVariable> & configurations, const bool include_hadoop) {
+void ImpalaServer::get_default_configuration(vector<ConfigVariable> &configurations,
+    const bool include_hadoop) {
+  configurations.insert(configurations.end(), default_configs_.begin(),
+      default_configs_.end());
 }
 
 void ImpalaServer::QueryToTQueryRequest(const Query& query,
@@ -1215,6 +1220,46 @@ int ImpalaServer::GetQueryOption(const string& key) {
   return -1;
 }
 
+void ImpalaServer::InitializeConfigVariables() {
+  TQueryOptions default_options;
+  map<int, const char*>::const_iterator itr =
+      _ImpalaQueryOptions_VALUES_TO_NAMES.begin();
+  for (; itr != _ImpalaQueryOptions_VALUES_TO_NAMES.end(); ++itr) {
+    ConfigVariable option;
+    stringstream value;
+    switch (itr->first) {
+      case ImpalaQueryOptions::ABORT_ON_ERROR:
+        value << default_options.abort_on_error;
+        break;
+      case ImpalaQueryOptions::MAX_ERRORS:
+        value << default_options.max_errors;
+        break;
+      case ImpalaQueryOptions::DISABLE_CODEGEN:
+        value << default_options.disable_codegen;
+        break;
+      case ImpalaQueryOptions::BATCH_SIZE:
+        value << default_options.batch_size;
+        break;
+      case ImpalaQueryOptions::NUM_NODES:
+        value << FLAGS_default_num_nodes;
+        break;
+      case ImpalaQueryOptions::MAX_SCAN_RANGE_LENGTH:
+        value << default_options.max_scan_range_length;
+        break;
+      case ImpalaQueryOptions::FILE_BUFFER_SIZE:
+        value << default_options.file_buffer_size;
+        break;
+    }
+    option.__set_key(itr->second);
+    option.__set_value(value.str());
+    default_configs_.push_back(option);
+  }
+  ConfigVariable support_start_over;
+  support_start_over.__set_key("support_start_over");
+  support_start_over.__set_value("false");
+  default_configs_.push_back(support_start_over);
+}
+
 
 ImpalaServer* CreateImpalaServer(ExecEnv* exec_env, int fe_port, int be_port,
     ThriftServer** fe_server, ThriftServer** be_server) {
@@ -1228,9 +1273,10 @@ ImpalaServer* CreateImpalaServer(ExecEnv* exec_env, int fe_port, int be_port,
   shared_ptr<ThreadFactory> thread_factory(new PosixThreadFactory());
 
   if (fe_port != 0 && fe_server != NULL) {
+    // FE must be a TThreadPoolServer because ODBC and Hue only support TThreadPoolServer.
     shared_ptr<TProcessor> fe_processor(new ImpalaServiceProcessor(handler));
     *fe_server = new ThriftServer("ImpalaServer Frontend", fe_processor, fe_port, 
-        FLAGS_fe_service_threads);
+        FLAGS_fe_service_threads, ThriftServer::ThreadPool);
 
     LOG(INFO) << "ImpalaService listening on " << fe_port;
   }

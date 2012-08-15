@@ -36,7 +36,8 @@ Status ImpaladQueryExecutor::Setup() {
   int port = atoi(elems[1].c_str());
   DCHECK_GT(port, 0);
 
-  client_.reset(new ThriftClient<ImpalaServiceClient>(elems[0], port));
+  client_.reset(new ThriftClient<ImpalaServiceClient>(elems[0], port,
+      ThriftServer::ThreadPool));
   RETURN_IF_ERROR(client_->Open());
 
   return Status::OK;

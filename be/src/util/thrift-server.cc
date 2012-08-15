@@ -8,6 +8,10 @@
 #include <concurrency/ThreadManager.h>
 #include <protocol/TBinaryProtocol.h>
 #include <server/TNonblockingServer.h>
+#include <server/TThreadPoolServer.h>
+#include <transport/TSocket.h>
+#include <server/TThreadPoolServer.h>
+#include <transport/TServerSocket.h>
 
 #include "util/thrift-server.h"
 
@@ -140,10 +144,11 @@ void ThriftServer::ThriftServerEventProcessor::preServe() {
 }
 
 ThriftServer::ThriftServer(const string& name, const shared_ptr<TProcessor>& processor,
-    int port, int num_worker_threads)
+    int port, int num_worker_threads, ServerType server_type)
     : started_(false),
       port_(port),
       num_worker_threads_(num_worker_threads),
+      server_type_(server_type),
       name_(name),
       server_thread_(NULL),
       server_(NULL),
@@ -156,11 +161,29 @@ Status ThriftServer::Start() {
   shared_ptr<ThreadManager> thread_mgr(
       ThreadManager::newSimpleThreadManager(num_worker_threads_));
   shared_ptr<ThreadFactory> thread_factory(new PosixThreadFactory());
+  shared_ptr<TServerTransport> fe_server_transport;
+  shared_ptr<TTransportFactory> transport_factory;
 
   thread_mgr->threadFactory(thread_factory);
   thread_mgr->start();
 
-  server_.reset(new TNonblockingServer(processor_, protocol_factory, port_, thread_mgr));
+  switch (server_type_) {
+    case Nonblocking:
+      server_.reset(new TNonblockingServer(processor_, protocol_factory, port_,
+          thread_mgr));
+      break;
+    case ThreadPool:
+      fe_server_transport.reset(new TServerSocket(port_));
+      transport_factory.reset(new TBufferedTransportFactory());
+      server_.reset(new TThreadPoolServer(processor_, fe_server_transport,
+          transport_factory, protocol_factory, thread_mgr));
+      break;
+    default:
+      stringstream error_msg;
+      error_msg << "Unsupported server type: " << server_type_;
+      LOG(ERROR) << error_msg.str();
+      return Status(error_msg.str());
+  }
   shared_ptr<ThriftServer::ThriftServerEventProcessor> event_processor(
       new ThriftServer::ThriftServerEventProcessor(this));
   server_->setServerEventHandler(event_processor);

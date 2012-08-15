@@ -71,13 +71,17 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   virtual void echo(std::string& echo_string, const std::string& input_string);
   virtual void clean(const beeswax::LogContextId& log_context);
 
+  // Return ImpalaQueryOptions default values and "support_start_over/false" to indicate
+  // that Impala does not support start over in the fetch call. Hue relies on this not to
+  // issue a "start_over" fetch call.
+  // "include_hadoop" is not applicable.
+  virtual void get_default_configuration(
+      std::vector<beeswax::ConfigVariable>& configurations, const bool include_hadoop);
+
   // ImpalaService rpcs: unimplemented parts of Beeswax API.
   // These APIs will not be implemented because ODBC driver does not use them.
   virtual void dump_config(std::string& config);
   virtual void get_log(std::string& log, const beeswax::LogContextId& context);
-  virtual void get_default_configuration(
-      std::vector<beeswax::ConfigVariable> & configurations,
-      const bool include_hadoop);
 
   // ImpalaService rpcs: extensions over Beeswax
   virtual void Cancel(impala::TStatus& status, const beeswax::QueryHandle& query_id);
@@ -182,6 +186,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   // Wrapper around Coordinator::Wait(); suitable for execution inside thread.
   void Wait(boost::shared_ptr<QueryExecState> exec_state);
 
+  // Initialize "default_configs_" to show the default values for ImpalaQueryOptions and
+  // "support_start_over/false" to indicate that Impala does not support start over
+  // in the fetch call.
+  void InitializeConfigVariables();
+
   // global, per-server state
   jobject fe_;  // instance of com.cloudera.impala.service.JniFrontend
   jmethodID create_query_exec_request_id_;  // JniFrontend.createQueryExecRequest()
@@ -209,6 +218,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   typedef boost::unordered_map<TUniqueId, FragmentExecState*> FragmentExecStateMap;
   FragmentExecStateMap fragment_exec_state_map_;
   boost::mutex fragment_exec_state_map_lock_;  // protects fragment_exec_state_map_
+
+  // Default configurations
+  std::vector<beeswax::ConfigVariable> default_configs_;
 };
 
 // Create an ImpalaServer and Thrift servers.

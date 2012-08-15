@@ -9,6 +9,9 @@
 #include <transport/TSocket.h>
 #include <transport/TBufferTransports.h>
 #include <protocol/TBinaryProtocol.h>
+#include <sstream>
+
+#include "util/thrift-server.h"
 
 namespace impala {
 
@@ -17,7 +20,8 @@ namespace impala {
 template <class InterfaceType>
 class ThriftClient {
  public:
-  ThriftClient(std::string host, int port);
+  ThriftClient(std::string host, int port,
+      ThriftServer::ServerType server_type = ThriftServer::Nonblocking);
   ~ThriftClient();
 
   // Returns the object used to actually make RPCs against the remote server
@@ -40,19 +44,34 @@ class ThriftClient {
 
   // All shared pointers, because Thrift requires them to be
   boost::shared_ptr<apache::thrift::transport::TSocket> socket_;
-  boost::shared_ptr<apache::thrift::transport::TFramedTransport> transport_;
+  boost::shared_ptr<apache::thrift::transport::TTransport> transport_;
   boost::shared_ptr<apache::thrift::protocol::TBinaryProtocol> protocol_;
   boost::shared_ptr<InterfaceType> iface_;
 };
 
 template <class InterfaceType>
-ThriftClient<InterfaceType>::ThriftClient(std::string host, int port)
+ThriftClient<InterfaceType>::ThriftClient(std::string host, int port,
+    ThriftServer::ServerType server_type)
     : host_(host),
       port_(port),
       socket_(new apache::thrift::transport::TSocket(host, port)),
-      transport_(new apache::thrift::transport::TFramedTransport(socket_)),
-      protocol_(new apache::thrift::protocol::TBinaryProtocol(transport_)),
       iface_(new InterfaceType(protocol_)) {
+  switch (server_type) {
+    case ThriftServer::Nonblocking:
+      transport_.reset(new apache::thrift::transport::TFramedTransport(socket_));
+      break;
+    case ThriftServer::ThreadPool:
+      transport_ = socket_;
+      break;
+    default:
+      std::stringstream error_msg;
+      error_msg << "Unsupported server type: " << server_type;
+      LOG(ERROR) << error_msg.str();
+      DCHECK(false);
+      break;
+  }
+  protocol_.reset(new apache::thrift::protocol::TBinaryProtocol(transport_));
+  iface_.reset(new InterfaceType(protocol_));
 }
 
 template <class InterfaceType>

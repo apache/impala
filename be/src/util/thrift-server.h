@@ -14,18 +14,23 @@ namespace boost { class thread; }
 
 namespace impala {
 
-// Utility class for all Thrift servers. Runs a TNonblockingServer
-// with, by default, 2 worker threads, that exposes the interface
+// Utility class for all Thrift servers. Runs a TNonblockingServer(default) or a
+// TThreadPoolServer with, by default, 2 worker threads, that exposes the interface
 // described by a user-supplied TProcessor object.
+// If TNonblockingServer is used, client must use TFramedTransport.
+// If TThreadPoolServer is used, client must use TSocket as transport.
 class ThriftServer {
  public:
   static const int DEFAULT_WORKER_THREADS = 2;
+
+  enum ServerType { ThreadPool = 0, Nonblocking };
 
   // Creates, but does not start, a new server on the specified port
   // that exports the supplied interface.
   ThriftServer(const std::string& name,
       const boost::shared_ptr<apache::thrift::TProcessor>& processor, int port,
-      int num_worker_threads = DEFAULT_WORKER_THREADS);
+      int num_worker_threads = DEFAULT_WORKER_THREADS,
+      ServerType server_type = Nonblocking);
 
   int port() const { return port_; }
 
@@ -48,6 +53,9 @@ class ThriftServer {
   // (requests are queued if no thread is immediately available)
   int num_worker_threads_;
 
+  // ThreadPool or NonBlocking server
+  ServerType server_type_;
+
   // User-specified identifier that shows up in logs
   const std::string name_;
 
@@ -55,7 +63,7 @@ class ThriftServer {
   boost::scoped_ptr<boost::thread> server_thread_;
 
   // Thrift housekeeping 
-  boost::scoped_ptr<apache::thrift::server::TNonblockingServer> server_;
+  boost::scoped_ptr<apache::thrift::server::TServer> server_;
   boost::shared_ptr<apache::thrift::TProcessor> processor_;
 
   // Helper class which monitors starting servers. Needs access to internal members, and
