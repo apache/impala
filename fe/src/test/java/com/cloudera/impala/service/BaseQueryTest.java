@@ -85,21 +85,14 @@ public abstract class BaseQueryTest {
   protected static final List<CompressionFormat> UNCOMPRESSED_ONLY =
       ImmutableList.of(CompressionFormat.NONE);
 
-  // TODO: Disabled due to IMP-186 - Crashes during Trevni data loading
   protected static final List<TableFormat> ALL_TABLE_FORMATS =
-      ImmutableList.of(TableFormat.TEXT, TableFormat.RCFILE,
-      TableFormat.SEQUENCEFILE, TableFormat.SEQUENCEFILE_RECORD);
-  //protected static final List<TableFormat> ALL_TABLE_FORMATS =
-  //    ImmutableList.copyOf(TableFormat.values());
+      ImmutableList.copyOf(TableFormat.values());
 
   protected static final List<TableFormat> TEXT_FORMAT_ONLY =
       ImmutableList.of(TableFormat.TEXT);
 
   protected static final List<TableFormat> INSERT_FORMATS =
-      ImmutableList.of(TableFormat.TEXT);
-  // TODO: Disabled due to IMP-186 - Crashes during Trevni data loading
-  //protected static final List<TableFormat> INSERT_FORMATS =
-  //      ImmutableList.of(TableFormat.TEXT, TableFormat.TREVNI);
+      ImmutableList.of(TableFormat.TEXT, TableFormat.TREVNI);
 
   protected final static TestExecMode EXECUTION_MODE = TestExecMode.valueOf(
       System.getProperty("testExecutionMode", "reduced").toUpperCase());

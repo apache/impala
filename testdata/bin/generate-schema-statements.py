@@ -48,6 +48,8 @@ parser.add_option("-f", "--force_reload", dest="force_reload", action="store_tru
                   default= False, help='Skips HDFS exists check and reloads all tables')
 parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
                   default = False, help="If set, outputs additional logging.")
+parser.add_option("-b", "--backend", dest="backend", default="localhost:21000",
+                  help="Backend connection to use, default: localhost:21000")
 
 (options, args) = parser.parse_args()
 
@@ -166,7 +168,11 @@ def build_load_statement(load_template, table_name, scale_factor):
                                'scale_factor': scale_factor}).replace(' *** ', ' % ')
 
 def build_trevni(trevni_template, table_name, base_table_name):
-  return trevni_template % {'table_name': table_name, 'base_table_name': base_table_name}
+  retstr =  \
+    trevni_template % {'table_name': table_name, 'base_table_name': base_table_name}
+  return retstr.replace('run-query.sh', 
+      'run-query.sh --exec_options="abort_on_error:false" --impalad=' +
+      options.backend, 1) 
 
 def build_table_suffix(file_format, codec, compression_type):
   if file_format == 'text' and codec != 'none':
@@ -213,11 +219,9 @@ def write_trevni_file(file_name, array):
     if len(array) != 0:
       # Start a plan service.  
       f.write("set -e\nset -u\n")
-      f.write("pushd ${IMPALA_FE_DIR}\n");
-      f.write("mvn exec:java -Dexec.mainClass=com.cloudera.impala.testutil.PlanService \
-                        -Dexec.classpathScope=test >& /tmp/planservice.out&\n");
+      f.write("(. ${IMPALA_HOME}/bin/set-classpath.sh; ")
+      f.write("exec $IMPALA_BE_DIR/build/debug/service/impalad) >& /tmp/impalad.out&\n")
       f.write("PID=$!\n")
-      f.write("popd\n");
       f.write("sleep 5\n");
       f.write('\n\n'.join(array))
       # Kill off the plan service.

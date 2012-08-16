@@ -8,6 +8,7 @@
 #include <gflags/gflags.h>
 
 #include "util/thrift-client.h"
+#include "util/thrift-util.h"
 
 DEFINE_string(impalad, "", "host:port of impalad process");
 DECLARE_int32(num_nodes);
@@ -38,6 +39,10 @@ Status ImpaladQueryExecutor::Setup() {
 
   client_.reset(new ThriftClient<ImpalaServiceClient>(elems[0], port,
       ThriftServer::ThreadPool));
+
+  // Wait for up to 10s for the server to start, polling at 50ms intervals
+  RETURN_IF_ERROR(WaitForServer(elems[0], port, 200, 50));
+
   RETURN_IF_ERROR(client_->Open());
 
   return Status::OK;
