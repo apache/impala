@@ -28,6 +28,8 @@ add_executable(runquery
   run-query.cc
 )
 
+message(STATUS, "IMPALA_LINK_LIBS: ${IMPALA_LINK_LIBS}")
+
 # Must not include any source libraries other than shim-backend.cc;
 # used only to avoid issues when loading backend code twice. See
 # IMP-75
@@ -38,6 +40,9 @@ add_library(shimbackend SHARED shim-backend.cc)
 target_link_libraries(shimbackend boost_thread-mt)
 
 target_link_libraries(runquery
+  # Library intercepts signal handlers and sets them properly for running the JVM.
+  # Must be before other libraries.
+  ${JAVA_JSIG_LIBRARY}
   ${IMPALA_LINK_LIBS}
   # this is commented out from IMPALA_LINK_LIBS because it causes crashes in libbackend.so
   # see Imp-39
@@ -50,6 +55,7 @@ add_executable(impalad
 )
 
 target_link_libraries(impalad
+  ${JAVA_JSIG_LIBRARY}
   ${IMPALA_LINK_LIBS}
 # does this crash the FE tests?
 #tcmallocstatic
