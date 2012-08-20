@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 package com.cloudera.impala.planner;
 
@@ -15,7 +15,7 @@ import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.service.NativeBackend;
+import com.cloudera.impala.service.FeSupport;
 import com.cloudera.impala.thrift.TExpr;
 import com.google.common.base.Preconditions;
 
@@ -91,7 +91,7 @@ public class ValueRange {
     TExpr thriftExpr = p.treeToThrift();
     TSerializer serializer = new TSerializer(new TBinaryProtocol.Factory());
     try {
-      boolean result = NativeBackend.EvalPredicate(serializer.serialize(thriftExpr));
+      boolean result = FeSupport.EvalPredicate(serializer.serialize(thriftExpr));
       return result;
     } catch (TException e) {
       // this should never happen

@@ -946,6 +946,40 @@ void ImpalaServer::close(const QueryHandle& handle) {
   }
 }
 
+void ImpalaServer::CloseInsert(TInsertResult& insert_result,
+    const QueryHandle& query_handle) {
+  TUniqueId query_id;
+  QueryHandleToTUniqueId(query_handle, &query_id);
+  VLOG_QUERY << "ImpalaServer::CloseInsert: query_id=" << PrintId(query_id);
+
+  Status status = CloseInsertInternal(query_id, &insert_result);
+  if (!status.ok()) {
+    RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
+  }
+}
+
+Status ImpalaServer::CloseInsertInternal(const TUniqueId& query_id,
+    TInsertResult* insert_result) {
+  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id);
+  if (exec_state == NULL) return Status("Invalid query handle");
+
+  DCHECK(exec_state->coord() != NULL);
+  DCHECK(exec_state->coord()->runtime_state() != NULL);
+  RuntimeState* runtime_state = exec_state->coord()->runtime_state();
+  set<std::string>& updated_partitions = runtime_state->updated_hdfs_partitions();
+  insert_result->modified_hdfs_partitions.insert(
+      insert_result->modified_hdfs_partitions.begin(),
+      updated_partitions.begin(), updated_partitions.end());
+  insert_result->__set_rows_appended(runtime_state->num_appended_rows());
+  exec_state->lock()->unlock();
+  if (!UnregisterQuery(query_id)) {
+    stringstream ss;
+    ss << "Failed to unregister query ID '" << ThriftDebugString(query_id) << "'";
+    return Status(ss.str());
+  }
+  return Status::OK;
+}
+
 QueryState::type ImpalaServer::get_state(const QueryHandle& handle) {
   TUniqueId query_id;
   QueryHandleToTUniqueId(handle, &query_id);
@@ -1008,21 +1042,21 @@ void ImpalaServer::QueryToTQueryRequest(const Query& query,
         LOG(WARNING) << "ignoring invalid configuration option: " << key_value[0];
       } else {
         switch (option) {
-          case ImpalaQueryOptions::ABORT_ON_ERROR:
+          case TImpalaQueryOptions::ABORT_ON_ERROR:
             request->queryOptions.abort_on_error =
                 iequals(key_value[1], "true") || iequals(key_value[1], "1");
             break;
-          case ImpalaQueryOptions::MAX_ERRORS:
+          case TImpalaQueryOptions::MAX_ERRORS:
             request->queryOptions.max_errors = atoi(key_value[1].c_str());
             break;
-          case ImpalaQueryOptions::DISABLE_CODEGEN:
+          case TImpalaQueryOptions::DISABLE_CODEGEN:
             request->queryOptions.disable_codegen =
                 iequals(key_value[1], "true") || iequals(key_value[1], "1");
             break;
-          case ImpalaQueryOptions::BATCH_SIZE:
+          case TImpalaQueryOptions::BATCH_SIZE:
             request->queryOptions.batch_size = atoi(key_value[1].c_str());
             break;
-          case ImpalaQueryOptions::NUM_NODES:
+          case TImpalaQueryOptions::NUM_NODES:
             request->queryOptions.num_nodes = atoi(key_value[1].c_str());
             break;
           }
@@ -1211,8 +1245,8 @@ void ImpalaServer::RunExecPlanFragment(FragmentExecState* exec_state) {
 
 int ImpalaServer::GetQueryOption(const string& key) {
   map<int, const char*>::const_iterator itr =
-      _ImpalaQueryOptions_VALUES_TO_NAMES.begin();
-  for (; itr != _ImpalaQueryOptions_VALUES_TO_NAMES.end(); ++itr) {
+      _TImpalaQueryOptions_VALUES_TO_NAMES.begin();
+  for (; itr != _TImpalaQueryOptions_VALUES_TO_NAMES.end(); ++itr) {
     if (iequals(key, (*itr).second)) {
       return itr->first;
     }
@@ -1223,30 +1257,30 @@ int ImpalaServer::GetQueryOption(const string& key) {
 void ImpalaServer::InitializeConfigVariables() {
   TQueryOptions default_options;
   map<int, const char*>::const_iterator itr =
-      _ImpalaQueryOptions_VALUES_TO_NAMES.begin();
-  for (; itr != _ImpalaQueryOptions_VALUES_TO_NAMES.end(); ++itr) {
+      _TImpalaQueryOptions_VALUES_TO_NAMES.begin();
+  for (; itr != _TImpalaQueryOptions_VALUES_TO_NAMES.end(); ++itr) {
     ConfigVariable option;
     stringstream value;
     switch (itr->first) {
-      case ImpalaQueryOptions::ABORT_ON_ERROR:
+      case TImpalaQueryOptions::ABORT_ON_ERROR:
         value << default_options.abort_on_error;
         break;
-      case ImpalaQueryOptions::MAX_ERRORS:
+      case TImpalaQueryOptions::MAX_ERRORS:
         value << default_options.max_errors;
         break;
-      case ImpalaQueryOptions::DISABLE_CODEGEN:
+      case TImpalaQueryOptions::DISABLE_CODEGEN:
         value << default_options.disable_codegen;
         break;
-      case ImpalaQueryOptions::BATCH_SIZE:
+      case TImpalaQueryOptions::BATCH_SIZE:
         value << default_options.batch_size;
         break;
-      case ImpalaQueryOptions::NUM_NODES:
+      case TImpalaQueryOptions::NUM_NODES:
         value << FLAGS_default_num_nodes;
         break;
-      case ImpalaQueryOptions::MAX_SCAN_RANGE_LENGTH:
+      case TImpalaQueryOptions::MAX_SCAN_RANGE_LENGTH:
         value << default_options.max_scan_range_length;
         break;
-      case ImpalaQueryOptions::FILE_BUFFER_SIZE:
+      case TImpalaQueryOptions::FILE_BUFFER_SIZE:
         value << default_options.file_buffer_size;
         break;
     }

@@ -25,6 +25,7 @@ class TPlanExecRequest;
 class TPlanExecParams;
 class TExecPlanFragmentArgs;
 class TExecPlanFragmentResult;
+class TInsertResult;
 class TReportExecStatusArgs;
 class TReportExecStatusResult;
 class TCancelPlanFragmentArgs;
@@ -86,6 +87,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   // ImpalaService rpcs: extensions over Beeswax
   virtual void Cancel(impala::TStatus& status, const beeswax::QueryHandle& query_id);
   virtual void ResetCatalog(impala::TStatus& status);
+  virtual void CloseInsert(impala::TInsertResult& insert_result,
+      const beeswax::QueryHandle& query_handle);
 
   // ImpalaInternalService rpcs
   virtual void ExecPlanFragment(
@@ -176,6 +179,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   // Executes the fetch logic. Doesn't clean up the exec state if an error occurs.
   Status FetchInternal(const TUniqueId& query_id, bool start_over,
       int32_t fetch_size, beeswax::Results* query_results);
+
+  // Populate insert_result and clean up exec state
+  Status CloseInsertInternal(const TUniqueId& query_id, TInsertResult* insert_result);
 
   // Non-thrift callable version of ResetCatalog
   Status ResetCatalogInternal();

@@ -13,6 +13,7 @@
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/Data_types.h"
 
+#include "util/cpu-info.h"
 #include "util/thrift-client.h"
 
 #include <iostream>
@@ -31,6 +32,7 @@ using namespace std;
 // Simple utility to force a planservice or impalad frontend to reload its catalog
 int main(int argc, char** argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);
+  CpuInfo::Init();
 
   cout << "Connecting to " << FLAGS_planservice_host << ":"
        << FLAGS_planservice_port << endl;

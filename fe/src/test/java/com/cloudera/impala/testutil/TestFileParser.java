@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 package com.cloudera.impala.testutil;
 
@@ -187,6 +187,7 @@ public class TestFileParser {
   private final String fileName;
   private BufferedReader reader;
   private Scanner scanner;
+  private boolean hasSetupSection = false;
 
   /**
    * For backwards compatibility, if no title is found this is the order in which
@@ -205,6 +206,10 @@ public class TestFileParser {
 
   public String getTestFileName() {
     return fileName;
+  }
+
+  public boolean hasSetupSection() {
+    return hasSetupSection;
   }
 
   /**
@@ -248,6 +253,9 @@ public class TestFileParser {
           for (Section s : Section.values()) {
             if (line.endsWith(" " + s.toString().toLowerCase())) {
               currentSection = s;
+              if (s == Section.SETUP) {
+                hasSetupSection = true;
+              }
               found = true;
               break;
             }

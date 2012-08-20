@@ -2,31 +2,32 @@
 
 package com.cloudera.impala.testutil;
 
+import com.cloudera.impala.thrift.TQueryOptions;
 import com.google.common.base.Objects;
 
 /*
- * Describes execution details for a query.
+ * Describes execution details for a query. It contains TQueryOptions for specifying the
+ * backend execution and some client side options (such as fetch size).
  * TODO: replace it with TQueryOptions
  */
 public class TestExecContext {
-  private final boolean abortOnError;
-  private final int batchSize;
-  private final boolean disableCodegen;
-  private final int maxErrors;
-  private final int numNodes;
-  private final long maxScanRangeLength;
-  private final int fileBufferSize;
+  private final TQueryOptions queryOptions;
+
+  //TODO: (lennik) Consider updating this to support different fetch sizes
+  private int fetchSize = 1;
 
   public TestExecContext(int numNodes, int batchSize, boolean disableCodegen,
                          boolean abortOnError, int maxErrors, long maxScanRangeLength,
                          int fileBufferSize) {
-    this.numNodes = numNodes;
-    this.batchSize = batchSize;
-    this.disableCodegen = disableCodegen;
-    this.abortOnError = abortOnError;
-    this.maxErrors = maxErrors;
-    this.maxScanRangeLength = maxScanRangeLength;
-    this.fileBufferSize = fileBufferSize;
+    queryOptions = new TQueryOptions(abortOnError, maxErrors, disableCodegen, batchSize,
+        true, numNodes, maxScanRangeLength, fileBufferSize);
+    queryOptions.abort_on_error = abortOnError;
+    queryOptions.max_errors = maxErrors;
+    queryOptions.disable_codegen = disableCodegen;
+    queryOptions.batch_size = batchSize;
+    queryOptions.num_nodes = numNodes;
+    queryOptions.max_scan_range_length = maxScanRangeLength;
+    queryOptions.file_buffer_size = fileBufferSize;
   }
 
   public TestExecContext(int numNodes, int batchSize, boolean disableCodegen,
@@ -34,43 +35,23 @@ public class TestExecContext {
     this(numNodes, batchSize, disableCodegen, abortOnError, maxErrors, 0, 0);
   }
 
-  public boolean getAbortOnError() {
-    return abortOnError;
+  public TestExecContext(TQueryOptions queryOptions, int fetchSize) {
+    this.queryOptions = queryOptions.deepCopy();
+    this.fetchSize = fetchSize;
   }
 
-  public int getBatchSize() {
-    return batchSize;
+  public TQueryOptions getTQueryOptions() {
+    return queryOptions;
   }
 
-  public boolean isCodegenDisabled() {
-    return disableCodegen;
-  }
-
-  public int getMaxErrors() {
-    return maxErrors;
-  }
-
-  public int getNumNodes() {
-    return numNodes;
-  }
-
-  public long getMaxScanRangeLength() {
-    return maxScanRangeLength;
-  }
-
-  public int getFileBufferSize() {
-    return fileBufferSize;
+  public int getFetchSize() {
+    return fetchSize;
   }
 
   @Override
   public String toString() {
-      return Objects.toStringHelper(this).add("NumNodes", numNodes)
-                                         .add("BatchSize",batchSize)
-                                         .add("IsCodegenDisabled", disableCodegen)
-                                         .add("AbortOnError", abortOnError)
-                                         .add("MaxErrors", maxErrors)
-                                         .add("MaxScanRangeLength", maxScanRangeLength)
-                                         .add("FileBufferSize", fileBufferSize)
+      return Objects.toStringHelper(this).add("TQueryOptions", queryOptions.toString())
+                                         .add("FetchSize", fetchSize)
                                          .toString();
   }
 }

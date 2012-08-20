@@ -15,12 +15,17 @@ import org.apache.thrift.transport.TTransport;
 import org.apache.thrift.transport.TTransportException;
 
 import com.cloudera.beeswax.api.BeeswaxException;
-import com.cloudera.beeswax.api.BeeswaxService.Client;
 import com.cloudera.beeswax.api.Query;
 import com.cloudera.beeswax.api.QueryHandle;
 import com.cloudera.beeswax.api.QueryNotFoundException;
 import com.cloudera.beeswax.api.Results;
 import com.cloudera.beeswax.api.ResultsMetadata;
+import com.cloudera.impala.thrift.ImpalaService.Client;
+import com.cloudera.impala.thrift.TImpalaQueryOptions;
+import com.cloudera.impala.thrift.TInsertResult;
+import com.cloudera.impala.thrift.TQueryOptions;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 
 /*
  * Enables executing queries against the specified Impala Daemon.
@@ -47,26 +52,41 @@ public class ImpaladClientExecutor {
     }
   }
 
+  public void resetCatalog() throws TException {
+    client.ResetCatalog();
+  }
+
   /**
    * Executes the given query string and saves the results to the result queue
    * @param queryString
    *        Query to execute
+   * @param execContext
+   *        query execution options
    * @param results
    *        Queue to save results to
    * @param colTypes
    *        List to save column types to
    * @param colLabels
    *        List to save column labels to
+   * @param insertResult
+   *        Summary of the insert
    * @return
    *        The number of rows returned
+   * @throws BeeswaxException
+   * @throws TException
+   * @throws QueryNotFoundException
    */
-  public int runQuery(String queryString, Queue<String> results,
-                      List<String> colTypes, List<String> colLabels)
+  public int runQuery(String queryString, TestExecContext execContext,
+                      Queue<String> results,
+                      List<String> colTypes, List<String> colLabels,
+                      TInsertResult insertResult)
                       throws BeeswaxException, TException, QueryNotFoundException {
     LOG.info("query: " + queryString);
+    LOG.info("query option: " + execContext.getTQueryOptions());
     Query query = new Query();
     query.query = queryString;
-    QueryHandle queryHandle = client.executeAndWait(query, "");
+    query.configuration = getBeeswaxQueryConfigurations(execContext.getTQueryOptions());
+    QueryHandle queryHandle = client.executeAndWait(query, "1");
 
     ResultsMetadata resultsMetadata = client.get_results_metadata(queryHandle);
     for (FieldSchema fs : resultsMetadata.schema.getFieldSchemas()) {
@@ -74,10 +94,19 @@ public class ImpaladClientExecutor {
       colTypes.add(fs.getType());
     }
 
+    if (insertResult != null) {
+      // Insert
+      TInsertResult tInsertResult = client.CloseInsert(queryHandle);
+      insertResult.setModified_hdfs_partitions(
+          tInsertResult.getModified_hdfs_partitions());
+      insertResult.setRows_appended(tInsertResult.getRows_appended());
+      return 0;
+    }
+
+    // Query
     int numRows = 0;
     while (true) {
-      // TODO: (lennik) Consider updating this to support different fetch sizes
-      Results result = client.fetch(queryHandle, false, 1);
+      Results result = client.fetch(queryHandle, false, execContext.getFetchSize());
       if (result.data.size() > 0) {
         results.add(result.getData().get(0));
         ++numRows;
@@ -87,7 +116,6 @@ public class ImpaladClientExecutor {
         break;
       }
     }
-
     return numRows;
   }
 
@@ -102,5 +130,39 @@ public class ImpaladClientExecutor {
     Query query = new Query();
     query.query = queryString;
     return client.explain(query).textual;
+  }
+
+  private List<String> getBeeswaxQueryConfigurations(TQueryOptions queryOptions) {
+    List<String> result = Lists.newArrayList();
+    for (TImpalaQueryOptions option: TImpalaQueryOptions.values()) {
+      String optionValue = "";
+      switch(option) {
+        case ABORT_ON_ERROR:
+          optionValue = String.valueOf(queryOptions.isAbort_on_error());
+          break;
+        case MAX_ERRORS:
+          optionValue = String.valueOf(queryOptions.getMax_errors());
+          break;
+        case DISABLE_CODEGEN:
+          optionValue = String.valueOf(queryOptions.isDisable_codegen());
+          break;
+        case BATCH_SIZE:
+          optionValue = String.valueOf(queryOptions.getBatch_size());
+          break;
+        case NUM_NODES:
+          optionValue = String.valueOf(queryOptions.getNum_nodes());
+          break;
+        case MAX_SCAN_RANGE_LENGTH:
+          optionValue = String.valueOf(queryOptions.getMax_scan_range_length());
+          break;
+        case FILE_BUFFER_SIZE:
+          optionValue = String.valueOf(queryOptions.getFile_buffer_size());
+          break;
+        default:
+          Preconditions.checkState(false, "Unhandled option:" + option.toString());
+      }
+      result.add(String.format("%s:%s", option.toString(), optionValue));
+    }
+    return result;
   }
 }

@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 namespace cpp impala
 namespace java com.cloudera.impala.thrift
@@ -10,7 +10,7 @@ include "beeswax.thrift"
 // key:value form. For example, the list of strings could be:
 //     "num_nodes:1", "abort_on_error:false"
 // The valid keys are listed in this enum. They map to TQueryOptions.
-enum ImpalaQueryOptions {
+enum TImpalaQueryOptions {
   // if true, abort execution on the first error; default is true
   ABORT_ON_ERROR,
   
@@ -43,6 +43,17 @@ enum ImpalaQueryOptions {
   FILE_BUFFER_SIZE
 }
 
+// The summary of an insert.
+struct TInsertResult {
+  // List of partitions that were modified by an insert.
+  // Doesn't apply HBase tables.
+  // For non-partitioned table, the list will be empty.
+  1: required list<string> modified_hdfs_partitions,
+  
+  // Number of appended rows per modified partition.
+  2: required list<i64> rows_appended
+}
+
 // For all rpc that return a TStatus as part of their result type,
 // if the status_code field is set to anything other than OK, the contents
 // of the remainder of the result type is undefined (typically not set)
@@ -55,7 +66,11 @@ service ImpalaService extends beeswax.BeeswaxService {
   // necessarily indicate an error: the query might have finished).
   Status.TStatus Cancel(1:beeswax.QueryHandle query_id)
       throws(1:beeswax.BeeswaxException error);
-
+        
   // Invalidates all catalog metadata, forcing a reload
   Status.TStatus ResetCatalog();
+  
+  // Closes the query handle and return the result summary of the insert.
+  TInsertResult CloseInsert(1:beeswax.QueryHandle handle)
+      throws(1:beeswax.QueryNotFoundException error, 2:beeswax.BeeswaxException error2);
 }

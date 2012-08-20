@@ -1,28 +1,21 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 package com.cloudera.impala.analysis;
 
 import static org.junit.Assert.fail;
-
-import java.util.ArrayList;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.service.Executor;
-import com.cloudera.impala.thrift.TQueryOptions;
-import com.cloudera.impala.thrift.TQueryRequest;
+import com.google.common.base.Preconditions;
 
 public class ToSqlTest {
 
-  private static Executor executor;
   private static Catalog catalog;
   @BeforeClass
   public static void setUp() throws Exception {
     catalog = new Catalog();
-    executor = new Executor(catalog);
   }
 
   @AfterClass
@@ -32,13 +25,10 @@ public class ToSqlTest {
 
   private static AnalysisContext.AnalysisResult analyze(String query) {
     try {
-      TQueryOptions tqueryOptions = new TQueryOptions();
-      tqueryOptions.setReturn_as_ascii(false);
-      tqueryOptions.setNum_nodes(1);
-      TQueryRequest tqueryRequest = new TQueryRequest(query, tqueryOptions);
-      ArrayList<PrimitiveType> colTypes = new ArrayList<PrimitiveType>();
-      ArrayList<String> colLabels = new ArrayList<String>();
-      return executor.analyzeQuery(tqueryRequest, colTypes, colLabels);
+      AnalysisContext analysisCtxt = new AnalysisContext(catalog);
+      AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
+      Preconditions.checkNotNull(analysisResult.getStmt());
+      return analysisResult;
     } catch (Exception e) {
       e.printStackTrace();
       fail("Failed to analyze query: " + query + "\n" + e.getMessage());

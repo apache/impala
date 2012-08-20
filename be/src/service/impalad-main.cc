@@ -33,6 +33,7 @@
 #include "util/thrift-server.h"
 #include "common/service-ids.h"
 #include "service/impala-server.h"
+#include "service/fe-support.h"
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaInternalService.h"
 
@@ -61,6 +62,7 @@ int main(int argc, char** argv) {
   EXIT_IF_ERROR(JniUtil::Init());
   EXIT_IF_ERROR(HBaseTableScanner::Init());
   EXIT_IF_ERROR(HBaseTableCache::Init());
+  InitFeSupport();
 
   // start backend service for the coordinator on be_port
   ExecEnv exec_env;

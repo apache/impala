@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #ifndef IMPALA_EXEC_HBASE_TABLE_SCANNER_H
 #define IMPALA_EXEC_HBASE_TABLE_SCANNER_H
@@ -30,10 +30,10 @@ class Status;
 class HBaseTableScanner {
  public:
 
-  // Initialize all members to NULL, except JNIEnv, ScanNode and HTable cache
+  // Initialize all members to NULL, except ScanNode and HTable cache
   // scan_node is the enclosing hbase scan node and its performance counter will be
   // updated.
-  HBaseTableScanner(JNIEnv* env, ScanNode* scan_node, HBaseTableCache* htable_cache);
+  HBaseTableScanner(ScanNode* scan_node, HBaseTableCache* htable_cache);
 
   // JNI setup. Create global references to classes,
   // and find method ids.
@@ -65,26 +65,26 @@ class HBaseTableScanner {
   // Perform a table scan, retrieving the families/qualifiers referenced in tuple_desc.
   // If start_/stop_key is not empty, is used for the corresponding role in the scan.
   // Note: scan_range_vector cannot be modified for the duration of the scan.
-  Status StartScan(const TupleDescriptor* tuple_desc,
+  Status StartScan(JNIEnv* env, const TupleDescriptor* tuple_desc,
                    const ScanRangeVector& scan_range_vector,
                    const std::vector<THBaseFilter>& filters);
 
   // Position cursor to next row. Sets has_next to true if more rows exist, false
   // otherwise.
   // Returns non-ok status if an error occurred.
-  Status Next(bool* has_next);
+  Status Next(JNIEnv* env, bool* has_next);
 
   // Get the current HBase row key.
-  void GetRowKey(void** key, int* key_length);
+  void GetRowKey(JNIEnv* env, void** key, int* key_length);
 
   // Used to fetch HBase values in order of family/qualifier.
   // Fetch the next value matching family and qualifier into value/value_length.
   // If there is no match, value is set to NULL and value_length to 0.
-  void GetValue(const std::string& family, const std::string& qualifier,
+  void GetValue(JNIEnv* env, const std::string& family, const std::string& qualifier,
       void** value, int* value_length);
 
   // Close HTable and ResultScanner.
-  void Close();
+  void Close(JNIEnv* env);
 
   void set_num_requested_keyvalues(int num_requested_keyvalues) {
     num_requested_keyvalues_ = num_requested_keyvalues;
@@ -92,8 +92,6 @@ class HBaseTableScanner {
 
  private:
   static const int DEFAULT_ROWS_CACHED = 1024;
-
-  JNIEnv* env_;
 
   // The enclosing ScanNode; it is used to update performance counters.
   ScanNode* scan_node_;
@@ -211,14 +209,14 @@ class HBaseTableScanner {
   int CompareStrings(const std::string& s, int offset, int length);
 
   // Turn string s into java byte array.
-  Status CreateByteArray(const std::string& s, jbyteArray* bytes);
+  Status CreateByteArray(JNIEnv* env, const std::string& s, jbyteArray* bytes);
 
   // First time scanning the table, do some setup
-  Status ScanSetup(const TupleDescriptor* tuple_desc,
+  Status ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_desc,
                    const std::vector<THBaseFilter>& filters);
 
   // Initialize the scan to the given range
-  Status InitScanRange(const ScanRange& scan_range);
+  Status InitScanRange(JNIEnv* env, const ScanRange& scan_range);
 };
 
 }

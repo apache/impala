@@ -1,8 +1,17 @@
-// (c) 2011 Cloudera, Inc. All rights reserved.
+// (c) 2012 Cloudera, Inc. All rights reserved.
 //
-// This file contains implementations for the JNI backend interface. To avoid calling
-// initialisation functions twice by loading this code multiple times, these functions are
-// called through libshimbackend - see shim-backend.cc for details.
+// This file contains implementations for the JNI FeSupport interface. Avoid loading the
+// code more than once as each loading will invoke the initialization function
+// JNI_OnLoad (which can be executed at most once).
+//
+// If the execution path to the JNI FeSupport interfaces does not involves Impalad
+// ("mvn test") execution, these functions are called through fesupport.so. This will
+// execute the JNI_OnLoadImpl, which starts ImpalaServer (both FE and BE).
+//
+// If the execution path involves Impalad (which is the normal Impalad execution), the
+// JNI_OnLoadImpl will not be executed.
+
+#include "service/fe-support.h"
 
 #include <boost/scoped_ptr.hpp>
 #include <glog/logging.h>
@@ -22,7 +31,6 @@
 #include "runtime/data-stream-mgr.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/client-cache.h"
-#include "service/jni-coordinator.h"
 #include "service/impala-server.h"
 #include "testutil/test-exec-env.h"
 #include "util/cpu-info.h"
@@ -36,6 +44,7 @@
 
 DECLARE_bool(serialize_batch);
 DECLARE_int32(be_port);
+DECLARE_int32(fe_port);
 
 using namespace impala;
 using namespace std;
@@ -44,13 +53,16 @@ using namespace apache::thrift::server;
 
 static TestExecEnv* test_env;
 static scoped_ptr<ExecStats> exec_stats;
+static ThriftServer* fe_server;
+static ThriftServer* be_server;
+
 // calling the c'tor of the contained HdfsFsCache crashes
 // TODO(marcel): figure out why and fix it
 //static scoped_ptr<TestExecEnv> test_env;
 
 extern "C"
-jint JNI_OnLoadImpl(JavaVM* vm, void* pvt) {
-  InitGoogleLoggingSafe("impala-backend");
+JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
+  InitGoogleLoggingSafe("fe-support");
   InitThriftLogging();
   CpuInfo::Init();
   LlvmCodeGen::InitializeLlvm(true);
@@ -71,24 +83,22 @@ jint JNI_OnLoadImpl(JavaVM* vm, void* pvt) {
   THROW_IF_ERROR_RET(JniUtil::Init(), env, impala_exc_cl, -1);
   THROW_IF_ERROR_RET(HBaseTableScanner::Init(), env, impala_exc_cl, -1);
   THROW_IF_ERROR_RET(HBaseTableCache::Init(), env, impala_exc_cl, -1);
-  THROW_IF_ERROR_RET(JniCoordinator::Init(), env, impala_exc_cl, -1);
 
-  // start backends in process, listening on ports > be_port
+  // Create an in-process Impala server and in-process backends for test environment.
   VLOG_CONNECTION << "creating test env";
   test_env = new TestExecEnv(2, FLAGS_be_port + 1);
   exec_stats.reset(new ExecStats());
   VLOG_CONNECTION << "starting backends";
   test_env->StartBackends();
 
-  // start one ImpalaInternalService for the coordinator on be_port
-  ThriftServer* be_server;
-  CreateImpalaServer(test_env, 0, FLAGS_be_port, NULL, &be_server);
+  CreateImpalaServer(test_env, FLAGS_fe_port, FLAGS_be_port, &fe_server, &be_server);
+  fe_server->Start();
   be_server->Start();
   return JNI_VERSION_1_4;
 }
 
 extern "C"
-void JNI_OnUnloadImpl(JavaVM* vm, void* pvt) {
+JNIEXPORT void JNICALL JNI_OnUnload(JavaVM* vm, void* pvt) {
   // Get the JNIEnv* corresponding to current thread.
   JNIEnv* env = getJNIEnv();
   if (env == NULL) {
@@ -106,66 +116,8 @@ void JNI_OnUnloadImpl(JavaVM* vm, void* pvt) {
 }
 
 extern "C"
-void NativeBackend_ExecQueryImpl(
-    JNIEnv* env, jclass caller_class, jbyteArray thrift_query_exec_request,
-    jobject error_log, jobject file_errors, jobject result_queue, jobject insert_result) {
-  JniCoordinator coord(env, test_env, exec_stats.get(), error_log, file_errors,
-                       result_queue, insert_result);
-  coord.Exec(thrift_query_exec_request);
-  RETURN_IF_EXC(env);
-
-  // Prepare select list expressions.
-  const vector<Expr*>& select_list_exprs = coord.select_list_exprs();
-  for (size_t i = 0; i < select_list_exprs.size(); ++i) {
-    Status status =
-        Expr::Prepare(select_list_exprs[i], coord.runtime_state(), coord.row_desc());
-    if (!status.ok()) {
-      string error_msg;
-      status.GetErrorMsg(&error_msg);
-      jclass internal_exc_cl =
-          env->FindClass("com/cloudera/impala/common/InternalException");
-      if (internal_exc_cl == NULL) {
-        if (env->ExceptionOccurred()) env->ExceptionDescribe();
-        return;
-      }
-      env->ThrowNew(internal_exc_cl, error_msg.c_str());
-      return;
-    }
-  }
-
-  if (coord.is_constant_query()) {
-    // no FROM clause: the select list only contains constant exprs
-    coord.AddResultRow(NULL);
-    RETURN_IF_EXC(env);
-    return;
-  }
-
-  // TODO: turn this into a flag in the TQueryExecRequest
-  // FLAGS_serialize_batch = true;
-  while (true) {
-    RowBatch* batch;
-    THROW_IF_ERROR_WITH_LOGGING(coord.GetNext(&batch), env, &coord);
-
-    if (coord.coord()->execution_completed()) break;
-    if (batch != NULL) {
-      LOG(INFO) << "#rows=" << batch->num_rows();
-      for (int i = 0; i < batch->num_rows(); ++i) {
-        TupleRow* row = batch->GetRow(i);
-        LOG(INFO) << PrintRow(row, coord.row_desc());
-        coord.AddResultRow(row);
-      }
-    }
-    RETURN_IF_EXC(env);
-  }
-
-  // Report error log and file error stats.
-  coord.WriteErrorLog();
-  coord.WriteFileErrors();
-  coord.WriteInsertResult();
-}
-
-extern "C"
-jboolean NativeBackend_EvalPredicateImpl(
+JNIEXPORT jboolean JNICALL
+Java_com_cloudera_impala_service_FeSupport_NativeEvalPredicate(
     JNIEnv* env, jclass caller_class, jbyteArray thrift_predicate_bytes) {
   ObjectPool obj_pool;
   TExpr thrift_predicate;
@@ -178,7 +130,8 @@ jboolean NativeBackend_EvalPredicateImpl(
   if (!status.ok()) {
     string error_msg;
     status.GetErrorMsg(&error_msg);
-    jclass internal_exc_cl = env->FindClass("com/cloudera/impala/common/InternalException");
+    jclass internal_exc_cl =
+        env->FindClass("com/cloudera/impala/common/InternalException");
     if (internal_exc_cl == NULL) {
       if (env->ExceptionOccurred()) env->ExceptionDescribe();
       return false;
@@ -194,4 +147,20 @@ jboolean NativeBackend_EvalPredicateImpl(
   }
   bool* v = static_cast<bool*>(value);
   return *v;
+}
+
+
+namespace impala {
+
+void InitFeSupport() {
+  JNIEnv* env = getJNIEnv();
+  JNINativeMethod nm;
+  jclass native_backend_cl = env->FindClass("com/cloudera/impala/service/FeSupport");
+  nm.name = const_cast<char*>("NativeEvalPredicate");
+  nm.signature = const_cast<char*>("([B)Z");
+  nm.fnPtr = reinterpret_cast<void*>(
+      ::Java_com_cloudera_impala_service_FeSupport_NativeEvalPredicate);
+  env->RegisterNatives(native_backend_cl, &nm, 1);
+}
+
 }

@@ -54,9 +54,8 @@ void LlvmCodeGen::InitializeLlvm(bool load_backend) {
 
   if (load_backend) {
     string path;
-    // TODO: this is not robust but we should be able to remove all this
-    // once impalad is in the final shape.
-    PathBuilder::GetFullBuildPath("service/libbackend.so", &path);
+    // For test env, we have to load libfesupport.so to provide sym for LLVM.
+    PathBuilder::GetFullBuildPath("service/libfesupport.so", &path);
     bool failed = llvm::sys::DynamicLibrary::LoadLibraryPermanently(path.c_str());
     DCHECK_EQ(failed, 0);
   }

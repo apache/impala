@@ -23,7 +23,7 @@
     <test.hive.testdata>${project.basedir}/../testdata/target/AllTypes.txt</test.hive.testdata>
     <backend.library.path>${env.IMPALA_HOME}/be/build/debug/service:${env.IMPALA_HOME}/be/build/release/service</backend.library.path>
     <fe_port>21000</fe_port>
-    <impalad></impalad>
+    <impalad>localhost</impalad>
     <testExecutionMode>reduced</testExecutionMode>
     <hadoop.version>2.0.0-cdh4.1.0-SNAPSHOT</hadoop.version>
     <hive.version>0.8.1-cdh4.0.0-SNAPSHOT</hive.version>

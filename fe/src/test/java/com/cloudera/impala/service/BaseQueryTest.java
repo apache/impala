@@ -43,7 +43,6 @@ import com.google.common.collect.Sets;
 public abstract class BaseQueryTest {
   private static final Logger LOG = Logger.getLogger(BaseQueryTest.class);
   private static final String TEST_DIR = "functional-query/queries/QueryTest";
-  private static final int DEFAULT_FE_PORT = 21000;
 
   // If set to true, new test results will be generated and saved to the specified
   // output directory.
@@ -56,10 +55,7 @@ public abstract class BaseQueryTest {
   private static final String RELOAD_CATALOG_CMD = "RELOAD";
 
   private static Catalog catalog;
-  private static Executor inProcessExecutor;
   private static ImpaladClientExecutor impaladClientExecutor;
-  private static TargetTestEnvironment targetTestEnvironment =
-      TargetTestEnvironment.IN_PROCESS;
 
   //Test dimension values
   protected static final List<Integer> ALL_BATCH_SIZES = ImmutableList.of(0, 16, 1);
@@ -99,15 +95,6 @@ public abstract class BaseQueryTest {
 
   // A relative path from the 'workloads' directory to the base test directory.
   private final String testDirName;
-
-  /**
-   * The type of target test environments. Determines whether the front end is running
-   * in-process or out-of-process (ImpalaD).
-   */
-  protected enum TargetTestEnvironment {
-    IN_PROCESS,
-    EXTERNAL_PROCESS;
-  }
 
   /**
    * The different test execution modes that are supported. These modes control which
@@ -167,9 +154,6 @@ public abstract class BaseQueryTest {
     public TestExecContext getTestExecContext() { return execContext; };
     public CompressionFormat getCompressionFormat() { return compressionFormat; }
     public TableFormat getTableFormat() { return tableFormat; }
-    public int getClusterSize() { return execContext.getNumNodes(); }
-    public int getBatchSize() { return execContext.getBatchSize(); }
-    public boolean getDisableLlvm() { return execContext.isCodegenDisabled(); }
 
     @Override
     public String toString() {
@@ -190,21 +174,7 @@ public abstract class BaseQueryTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    String impaladHostname = System.getProperty("impalad");
-    impaladClientExecutor = null;
-
-    // If hostname is set, ImpalaD is the target test environment.
-    if (impaladHostname != null && !impaladHostname.isEmpty()) {
-      impaladClientExecutor = createImpaladClientExecutor(impaladHostname);
-      targetTestEnvironment = TargetTestEnvironment.EXTERNAL_PROCESS;
-    }
-    else {
-      catalog = new Catalog(true);
-      inProcessExecutor = new Executor(catalog);
-      targetTestEnvironment = TargetTestEnvironment.IN_PROCESS;
-    }
-
-    LOG.info("Targeting Test Environment: " + targetTestEnvironment);
+    impaladClientExecutor = TestUtils.createImpaladClientExecutor();
     LOG.info(String.format("Executing tests in mode: %s", EXECUTION_MODE));
   }
 
@@ -222,36 +192,6 @@ public abstract class BaseQueryTest {
         fail("Problem closing transport: " + e.getMessage());
       }
     }
-  }
-
-  private static ImpaladClientExecutor createImpaladClientExecutor(String hostName) {
-    int fePort = DEFAULT_FE_PORT;
-    ImpaladClientExecutor client = null;
-    try {
-      fePort = Integer.parseInt(
-                   System.getProperty("fe_port", Integer.toString(DEFAULT_FE_PORT)));
-    } catch (NumberFormatException nfe) {
-      fail("Invalid port format.");
-    }
-
-    client = new ImpaladClientExecutor(hostName, fePort);
-    try {
-      client.init();
-    } catch (TTransportException e) {
-      e.printStackTrace();
-      fail("Error opening transport: " + e.getMessage());
-    }
-
-    return client;
-  }
-
-  private Object getTargetExecutor() {
-    return (getTargetTestEnvironment() == TargetTestEnvironment.IN_PROCESS) ?
-               inProcessExecutor : impaladClientExecutor;
-  }
-
-  protected TargetTestEnvironment getTargetTestEnvironment() {
-    return targetTestEnvironment;
   }
 
   private static List<String> getCmdArguments(String cmd, String completeCmd) {
@@ -300,24 +240,6 @@ public abstract class BaseQueryTest {
       } else if (cmd.startsWith(DROP_PARTITIONS_CMD)) {
         List<String> tableNames = getCmdArguments(DROP_PARTITIONS_CMD, cmd);
         dropPartitions(tableNames);
-      } else if (cmd.startsWith(RELOAD_CATALOG_CMD)) {
-        List<String> tableNames = getCmdArguments(RELOAD_CATALOG_CMD, cmd);
-        // If running in-process we need to reload the catalog. If running vs Impalad
-        // that should be taken care of for us.
-        if (getTargetTestEnvironment() == TargetTestEnvironment.IN_PROCESS) {
-          if (tableNames.size() == 0) {
-            catalog.close();
-            catalog = new Catalog(true);
-            inProcessExecutor.setCatalog(catalog);
-          } else {
-            for (String table: tableNames) {
-              String db_tblname[] = TestUtils.splitDbTablename(table.trim());
-              String db = db_tblname[0];
-              String tblName = db_tblname[1];
-              catalog.invalidateTable(db, tblName);
-            }
-          }
-        }
       }
     }
   }
@@ -498,21 +420,26 @@ public abstract class BaseQueryTest {
       QueryExecTestResult expectedResult =
           testCase.getQueryExecTestResult(config.getTableSuffix());
 
-      // We have to run the setup section once per query, not once per test. Therefore
-      // they can be very expensive.
-      if (expectedResult.getSetup().size() > 0) {
-        try {
+      try {
+        // We have to run the setup section once per query, not once per test. Therefore
+        // they can be very expensive.
+        if (expectedResult.getSetup().size() > 0) {
           runSetupSection(testCase.getSectionContents(Section.SETUP, false,
                                                       config.getTableSuffix()));
-        } catch (Exception e) {
-          fail(e.getMessage());
         }
+
+        // Always reset the catalog if the test file has a setup section
+        if (queryFileParser.hasSetupSection()) {
+          impaladClientExecutor.resetCatalog();
+        }
+      } catch (Exception e) {
+        fail(e.getMessage());
       }
 
       String queryString = testCase.getSectionAsString(
           Section.QUERY, false, " ", config.getTableSuffix());
 
-      QueryExecTestResult result = TestUtils.runQueryUsingExecutor(getTargetExecutor(),
+      QueryExecTestResult result = TestUtils.runQuery(impaladClientExecutor,
           queryString, config.getTestExecContext(), testCase.getStartingLineNum(),
           expectedResult, errorLog);
 

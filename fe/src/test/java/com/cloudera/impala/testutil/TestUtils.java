@@ -14,21 +14,17 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import junit.framework.Assert;
 
+import org.apache.thrift.transport.TTransportException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.common.ImpalaException;
-import com.cloudera.impala.service.Executor;
-import com.cloudera.impala.service.InsertResult;
-import com.cloudera.impala.thrift.TColumnValue;
+import com.cloudera.impala.service.FeSupport;
+import com.cloudera.impala.thrift.TInsertResult;
 import com.cloudera.impala.thrift.TQueryOptions;
-import com.cloudera.impala.thrift.TQueryRequest;
-import com.cloudera.impala.thrift.TResultRow;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
@@ -47,6 +43,9 @@ public class TestUtils {
   // host/port because that could vary run to run as well.
   private final static String HDFS_FILE_PATH_FILTER = "-*\\d+--\\d+_\\d+.*$";
   private final static String HDFS_HOST_PORT_FILTER = "//\\w+:\\d+/";
+
+  private static final int DEFAULT_FE_PORT = 21000;
+  private static final String DEFAULT_FE_HOST = "localhost";
 
   // Maps from uppercase type name to PrimitiveType
   private static Map<String, PrimitiveType> typeNameMap =
@@ -273,108 +272,32 @@ public class TestUtils {
    * @return A QueryExecTestResults object that contains information on the query
    *         execution result.
    */
-  public static QueryExecTestResult runQueryUsingExecutor(Object executor, String query,
-      TestExecContext context, int lineNum, QueryExecTestResult expectedResults,
-      StringBuilder testErrorLog) {
-
-    Preconditions.checkNotNull(executor);
-    if (executor instanceof ImpaladClientExecutor) {
-      return runImpaladQuery(
-          (ImpaladClientExecutor) executor, query, context, lineNum, expectedResults,
-          testErrorLog);
-    } else if (executor instanceof Executor) {
-      return runInProcessQuery(
-          (Executor) executor, query, context, lineNum, expectedResults,
-          testErrorLog);
-    } else {
-      fail(String.format("Unknown executor type: '%s'", executor.getClass().getName()));
-    }
-
-    return null;
-  }
-
-  /**
-   * Runs the given query against an Impalad instance and validates expected results.
-   */
-  private static QueryExecTestResult runImpaladQuery(ImpaladClientExecutor executor,
+  public static QueryExecTestResult runQuery(ImpaladClientExecutor executor,
       String query, TestExecContext context, int lineNum,
       QueryExecTestResult expectedExecResults, StringBuilder testErrorLog) {
+    Preconditions.checkNotNull(executor);
     String queryReportString = buildQueryDetailString(query, context);
     LOG.info("running query targeting impalad " + queryReportString);
 
     BlockingQueue<String> resultQueue = new LinkedBlockingQueue<String>();
-    ArrayList<String> colLabels = new ArrayList<String>();
-    ArrayList<String> colTypes = new ArrayList<String>();
-
-    try {
-      executor.runQuery(query, resultQueue, colTypes, colLabels);
-    } catch(Exception e) {
-      e.printStackTrace();
-      if (context.getAbortOnError()) {
-        fail(String.format("Query failed. Message: %s", e.getMessage()));
-      } else {
-        testErrorLog.append("Error executing query '" +
-                            query + "' on line " + lineNum + ":\n" + e.getMessage());
-      }
-      return null;
-    }
-
-    ArrayList<String> actualResults = Lists.newArrayList();
-
-    while (!resultQueue.isEmpty()) {
-      String resultRow = null;
-      try {
-        resultRow = resultQueue.take();
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-        testErrorLog.append("unexpected interrupt");
-        return null;
-      }
-
-      parseResultRow(resultRow, actualResults, colTypes);
-    }
-
-    QueryExecTestResult actualExecResults = new QueryExecTestResult();
-    actualExecResults.getColTypes().addAll(colTypes);
-    actualExecResults.getColLabels().addAll(colLabels);
-    actualExecResults.getResultSet().addAll(actualResults);
-
-    verifyTypesLabelsAndResults(queryReportString, testErrorLog,
-                                actualExecResults, expectedExecResults);
-    return actualExecResults;
-  }
-
-  /**
-   * Executes the given query using the given in-process Executor.
-   */
-  private static QueryExecTestResult runInProcessQuery(
-      Executor inProcessExecutor, String query, TestExecContext context, int lineNum,
-      QueryExecTestResult expectedExecResults, StringBuilder testErrorLog) {
-
-    String queryReportString = buildQueryDetailString(query, context);
-    LOG.info("running query " + queryReportString);
-    TQueryOptions options = new TQueryOptions();
-    options.setReturn_as_ascii(true);
-    options.setNum_nodes(context.getNumNodes());
-    options.setMax_scan_range_length(context.getMaxScanRangeLength());
-    TQueryRequest request = new TQueryRequest(query, options);
     ArrayList<String> errors = new ArrayList<String>();
     SortedMap<String, Integer> fileErrors = new TreeMap<String, Integer>();
-    ArrayList<PrimitiveType> colTypes = new ArrayList<PrimitiveType>();
     ArrayList<String> colLabels = new ArrayList<String>();
-    AtomicBoolean containsOrderBy = new AtomicBoolean();
-    BlockingQueue<TResultRow> resultQueue = new LinkedBlockingQueue<TResultRow>();
-    InsertResult insertResult = new InsertResult();
+    ArrayList<String> colTypes = new ArrayList<String>();
+    TInsertResult insertResult = null;
+    if (expectedExecResults.getModifiedPartitions().size() > 0 ||
+        expectedExecResults.getNumAppendedRows().size() > 0) {
+      insertResult = new TInsertResult();
+    }
+
     QueryExecTestResult actualExecResults = new QueryExecTestResult();
+    TQueryOptions contextQueryOptions = context.getTQueryOptions();
     try {
-      inProcessExecutor.runQuery(request, colTypes, colLabels, containsOrderBy,
-          context.getFileBufferSize(),
-          context.getBatchSize(), context.getAbortOnError(), context.getMaxErrors(),
-          context.isCodegenDisabled(), errors, fileErrors, resultQueue,
-          insertResult);
-    } catch (ImpalaException e) {
+      executor.runQuery(query, context, resultQueue, colTypes, colLabels, insertResult);
+    } catch(Exception e) {
       // Compare errors if we are expecting some.
-      if (context.getAbortOnError() && expectedExecResults.getErrors().size() > 0) {
+      if (contextQueryOptions.isAbort_on_error() &&
+          expectedExecResults.getErrors().size() > 0) {
         compareErrors(queryReportString, errors, fileErrors,
             expectedExecResults.getErrors(), expectedExecResults.getFileErrors(),
             testErrorLog);
@@ -403,8 +326,8 @@ public class TestUtils {
     // because not all table types create new partition files (e.g., HBase tables).
     if (expectedExecResults.getNumAppendedRows().size() > 0) {
       ArrayList<String> actualResultsArray = Lists.newArrayList();
-      for (int i = 0; i < insertResult.getRowsAppended().size(); ++i) {
-        actualResultsArray.add(insertResult.getRowsAppended().get(i).toString());
+      for (int i = 0; i < insertResult.getRows_appendedSize(); ++i) {
+        actualResultsArray.add(insertResult.getRows_appended().get(i).toString());
       }
 
       actualExecResults.getNumAppendedRows().addAll(actualResultsArray);
@@ -416,7 +339,7 @@ public class TestUtils {
       }
     }
     if (expectedExecResults.getModifiedPartitions().size() > 0) {
-      for (String modifiedPartition : insertResult.getModifiedPartitions()) {
+      for (String modifiedPartition : insertResult.getModified_hdfs_partitions()) {
         actualExecResults.getModifiedPartitions().add(
             applyHdfsFilePathFilter(modifiedPartition));
       }
@@ -436,8 +359,11 @@ public class TestUtils {
       return actualExecResults;
     }
 
-    while (true) {
-      TResultRow resultRow = null;
+    // Verify query result
+    ArrayList<String> actualResults = Lists.newArrayList();
+
+    while (!resultQueue.isEmpty()) {
+      String resultRow = null;
       try {
         resultRow = resultQueue.take();
       } catch (InterruptedException e) {
@@ -445,34 +371,16 @@ public class TestUtils {
         testErrorLog.append("unexpected interrupt");
         return null;
       }
-      if (resultRow.colVals == null) {
-        break;
-      }
 
-      // Concatenate columns separated by ","
-      StringBuilder line = new StringBuilder();
-      Iterator<TColumnValue> colVal = resultRow.colVals.iterator();
-      for (int i = 0; i < colTypes.size(); ++i) {
-        if (i > 0) {
-          line.append(',');
-        }
-
-        line.append(parseColumnValue(colVal.next().stringVal, colTypes.get(i)));
-      }
-      actualExecResults.getResultSet().add(line.toString());
+      parseResultRow(resultRow, actualResults, colTypes);
     }
 
-    ArrayList<String> colTypeStrings = Lists.newArrayList();
-    for (PrimitiveType t : colTypes) {
-      colTypeStrings.add(t.toString().toLowerCase());
-    }
-    actualExecResults.getColTypes().addAll(colTypeStrings);
+    actualExecResults.getColTypes().addAll(colTypes);
     actualExecResults.getColLabels().addAll(colLabels);
+    actualExecResults.getResultSet().addAll(actualResults);
 
     verifyTypesLabelsAndResults(queryReportString, testErrorLog,
                                 actualExecResults, expectedExecResults);
-    compareErrors(queryReportString, errors, fileErrors, expectedExecResults.getErrors(),
-        expectedExecResults.getErrors(), testErrorLog);
     return actualExecResults;
   }
 
@@ -613,4 +521,32 @@ public class TestUtils {
       }
     }
   }
+
+  /**
+   * Start an in-process ImpalaServer using the default FE and BE ports and then return
+   * an ImpaladClientExecutor that has been connected to the in-process ImpalaServer.
+   */
+  public static ImpaladClientExecutor createImpaladClientExecutor() {
+    FeSupport.loadLibrary();
+    String hostName = System.getProperty("impalad", DEFAULT_FE_HOST);
+    int fePort = DEFAULT_FE_PORT;
+    ImpaladClientExecutor client = null;
+    try {
+      fePort = Integer.parseInt(
+          System.getProperty("fe_port", Integer.toString(DEFAULT_FE_PORT)));
+    } catch (NumberFormatException nfe) {
+      fail("Invalid port format.");
+    }
+
+    client = new ImpaladClientExecutor(hostName, fePort);
+    try {
+      client.init();
+    } catch (TTransportException e) {
+      e.printStackTrace();
+      fail("Error opening transport: " + e.getMessage());
+    }
+
+    return client;
+  }
+
 }

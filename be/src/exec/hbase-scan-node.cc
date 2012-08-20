@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #include "hbase-scan-node.h"
 #include <algorithm>
@@ -40,11 +40,7 @@ bool HBaseScanNode::CmpColPos(const SlotDescriptor* a, const SlotDescriptor* b) 
 Status HBaseScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ScanNode::Prepare(state));
 
-  JNIEnv* env = getJNIEnv();
-  if (env == NULL) {
-    return Status("Failed to get/create JVM");
-  }
-  hbase_scanner_.reset(new HBaseTableScanner(env, this, state->htable_cache()));
+  hbase_scanner_.reset(new HBaseTableScanner(this, state->htable_cache()));
 
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   if (tuple_desc_ == NULL) {
@@ -88,7 +84,8 @@ Status HBaseScanNode::Prepare(RuntimeState* state) {
 Status HBaseScanNode::Open(RuntimeState* state) {
   RETURN_IF_CANCELLED(state);
   COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
-  return hbase_scanner_->StartScan(tuple_desc_, scan_range_vector_, filters_);
+  JNIEnv* env = getJNIEnv();
+  return hbase_scanner_->StartScan(env, tuple_desc_, scan_range_vector_, filters_);
 }
 
 void HBaseScanNode::WriteTextSlot(
@@ -130,6 +127,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
   bool error_in_row = false;
 
   // Indicates whether there are more rows to process. Set in hbase_scanner_.Next().
+  JNIEnv* env = getJNIEnv();
   bool has_next = false;
   while (true) {
     RETURN_IF_CANCELLED(state);
@@ -140,7 +138,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
       *eos = ReachedLimit();
       return Status::OK;
     }
-    RETURN_IF_ERROR(hbase_scanner_->Next(&has_next));
+    RETURN_IF_ERROR(hbase_scanner_->Next(env, &has_next));
     if (!has_next) {
       if (num_errors_ > 0) {
         const HBaseTableDescriptor* hbase_table =
@@ -160,7 +158,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
     if (row_key_slot_ != NULL) {
       void* key;
       int key_length;
-      hbase_scanner_->GetRowKey(&key, &key_length);
+      hbase_scanner_->GetRowKey(env, &key, &key_length);
       if (key == NULL) {
         tuple_->SetNull(row_key_slot_->null_indicator_offset());
       } else {
@@ -173,7 +171,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
     for (int i = 0; i < sorted_non_key_slots_.size(); ++i) {
       void* value;
       int value_length;
-      hbase_scanner_->GetValue(sorted_cols_[i]->first, sorted_cols_[i]->second,
+      hbase_scanner_->GetValue(env, sorted_cols_[i]->first, sorted_cols_[i]->second,
           &value, &value_length);
       if (value == NULL) {
         tuple_->SetNull(sorted_non_key_slots_[i]->null_indicator_offset());
@@ -191,7 +189,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
         state->error_stream() << "hbase table: " << table_name_ << endl;
         void* key;
         int key_length;
-        hbase_scanner_->GetRowKey(&key, &key_length);
+        hbase_scanner_->GetRowKey(env, &key, &key_length);
         state->error_stream() << "row key: "
             << string(reinterpret_cast<const char*>(key), key_length);
         state->LogErrorStream();
@@ -222,7 +220,8 @@ Status HBaseScanNode::Close(RuntimeState* state) {
   COUNTER_SCOPED_TIMER(runtime_profile_->total_time_counter());
   COUNTER_UPDATE(memory_used_counter(), tuple_pool_->peak_allocated_bytes());
 
-  hbase_scanner_->Close();
+  JNIEnv* env = getJNIEnv();
+  hbase_scanner_->Close(env);
   // Report total number of errors.
   if (num_errors_ > 0) {
     state->ReportFileErrors(table_name_, num_errors_);

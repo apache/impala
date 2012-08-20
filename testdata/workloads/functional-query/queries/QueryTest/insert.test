@@ -56,12 +56,13 @@ where year=2009 and month=04
 RESET alltypesnopart_insert$TABLE
 ---- RESULTS
 ---- PARTITIONS
-hdfs: alltypesnopart_insert$TABLE/
 ---- NUMROWS
 25
 ====
 # search the table to verify it contains 25 rows
 select count(*) from alltypesnopart_insert$TABLE
+---- SETUP
+RELOAD alltypesnopart_insert$TABLE
 ---- TYPES
 bigint
 ---- RESULTS
@@ -76,7 +77,7 @@ from alltypessmall
 where year=2009 and month=4
 ---- RESULTS
 ---- PARTITIONS
-hdfs: alltypesinsert$TABLE/year=2009/month=4/
+year=2009/month=4/
 ---- NUMROWS
 25
 ====
@@ -125,13 +126,15 @@ where year=2009 and month=4
 DROP PARTITIONS alltypesinsert$TABLE
 ---- RESULTS
 ---- PARTITIONS
-hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=4/
+year=2009/month=4/
 ---- NUMROWS
 25
 ====
 # search the partition to verify it contains all 25 rows
 select count(*) from alltypesinsert$TABLE
 where year=2009 and month=4
+---- SETUP
+RELOAD alltypesinsert$TABLE
 ---- TYPES
 bigint
 ---- RESULTS
@@ -146,9 +149,9 @@ from alltypessmall
 where year=2009 and month>1 and month<=4
 ---- RESULTS
 ---- PARTITIONS
-hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=2/
-hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=3/
-hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=4/
+year=2009/month=2/
+year=2009/month=3/
+year=2009/month=4/
 ---- NUMROWS
 25
 25
@@ -249,9 +252,9 @@ where year=2009 and month>=1 and month<4
 DROP PARTITIONS alltypesinsert$TABLE
 ---- PARTITIONS
 ---- RESULTS
-hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=1/
-hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=2/
-hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=3/
+year=2009/month=1/
+year=2009/month=2/
+year=2009/month=3/
 ---- NUMROWS
 25
 25
@@ -273,10 +276,10 @@ float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 from alltypessmall
 ---- RESULTS
 ---- PARTITIONS
-hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=1/
-hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=2/
-hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=3/
-hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=4/
+year=2009/month=1/
+year=2009/month=2/
+year=2009/month=3/
+year=2009/month=4/
 ---- NUMROWS
 25
 25
@@ -402,10 +405,10 @@ from alltypessmall
 DROP PARTITIONS alltypesinsert$TABLE
 ---- RESULTS
 ---- PARTITIONS
-hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=1/
-hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=2/
-hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=3/
-hdfs: test-warehouse/alltypesinsert$TABLE/year=2009/month=4/
+year=2009/month=1/
+year=2009/month=2/
+year=2009/month=3/
+year=2009/month=4/
 ---- NUMROWS
 25
 25

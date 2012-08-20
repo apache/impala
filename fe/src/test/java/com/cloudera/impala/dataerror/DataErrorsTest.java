@@ -6,12 +6,10 @@ import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
 
-import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.service.Executor;
+import com.cloudera.impala.testutil.ImpaladClientExecutor;
 import com.cloudera.impala.testutil.QueryExecTestResult;
 import com.cloudera.impala.testutil.TestExecContext;
 import com.cloudera.impala.testutil.TestFileParser;
@@ -20,16 +18,14 @@ import com.cloudera.impala.testutil.TestFileParser.TestCase;
 import com.cloudera.impala.testutil.TestUtils;
 
 public class DataErrorsTest {
-  private static Catalog catalog;
-  private static Executor executor;
+  private static ImpaladClientExecutor executor;
   private static StringBuilder testErrorLog;
   private final String testDir = "functional-query/queries/DataErrorsTest";
   private static ArrayList<String>  tableList;
 
   @BeforeClass
   public static void setUp() throws Exception {
-    catalog = new Catalog(true);
-    executor = new Executor(catalog);
+    executor = TestUtils.createImpaladClientExecutor();
     testErrorLog = new StringBuilder();
     tableList = new ArrayList<String>();
     tableList.add("");
@@ -43,11 +39,6 @@ public class DataErrorsTest {
     tableList.add("_seq_record_gzip");
     tableList.add("_seq_record_bzip");
     tableList.add("_seq_record_snap");
-  }
-
-  @AfterClass
-  public static void cleanUp() {
-    catalog.close();
   }
 
   private void runErrorTestFile(String testFile, boolean abortOnError, int maxErrors,
@@ -95,13 +86,13 @@ public class DataErrorsTest {
           QueryExecTestResult expectedResults = new QueryExecTestResult();
           expectedResults.getErrors().addAll(expectedErrors);
           expectedResults.getFileErrors().addAll(expectedFileErrors);
-          TestUtils.runQueryUsingExecutor(executor, query,
+          TestUtils.runQuery(executor, query,
               new TestExecContext(1, 0, disableCodegen, abortOnError, maxErrors),
               testCase.getStartingLineNum(), expectedResults, testErrorLog);
-          TestUtils.runQueryUsingExecutor(executor, query,
+          TestUtils.runQuery(executor, query,
               new TestExecContext(1, 16, disableCodegen, abortOnError, maxErrors),
               testCase.getStartingLineNum(), expectedResults, testErrorLog);
-          TestUtils.runQueryUsingExecutor(executor, query,
+          TestUtils.runQuery(executor, query,
               new TestExecContext(1, 1, disableCodegen, abortOnError, maxErrors),
               testCase.getStartingLineNum(), expectedResults, testErrorLog);
         }
