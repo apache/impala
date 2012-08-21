@@ -274,7 +274,9 @@ Status ImpalaServer::QueryExecState::ConvertRowBatchToAscii(const int32_t max_ro
 
   // Convert the available rows, limited by max_rows
   int available = current_batch_->num_rows() - current_batch_row_;
-  int fetched_count = min(available, max_rows);
+  int fetched_count = available;
+  // max_rows <= 0 means no limit
+  if (max_rows > 0 && max_rows < available) fetched_count = max_rows;
   fetched_rows->reserve(fetched_count);
   for (int i = 0; i < fetched_count; ++i) {
     TupleRow* row = current_batch_->GetRow(current_batch_row_);
@@ -879,9 +881,9 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id,
 
   // Results are always ready because we're blocking.
   query_results->__set_ready(true);
-  // It's likely that ODBC doesn't care about start_row, but set it anyway for
-  // completeness.
-  query_results->__set_start_row(exec_state->current_row() + 1);
+  // It's likely that ODBC doesn't care about start_row, but Hue needs it. For Hue,
+  // start_row starts from zero, not one.
+  query_results->__set_start_row(exec_state->current_row());
 
   Status fetch_rows_status;
   if (exec_state->eos()) {
