@@ -79,256 +79,256 @@ Plan Fragment 1
         hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
 ====
 # Q2 - Minimum Cost Supplier Query
-insert overwrite table tpch.q2_minimum_cost_supplier_tmp1
-select
-  s.s_acctbal,
-  s.s_name,
-  n.n_name,
-  p.p_partkey,
-  ps.ps_supplycost,
-  p.p_mfgr,
-  s.s_address,
-  s.s_phone,
-  s.s_comment
-from tpch.partsupp ps
-  join tpch.part p
-    on (p.p_partkey = ps.ps_partkey and p.p_size = 15 and p.p_type like '%BRASS')
-  join tpch.supplier s
-    on (s.s_suppkey = ps.ps_suppkey)
-  join tpch.nation n
-    on (s.s_nationkey = n.n_nationkey)
-  join tpch.region r
-    on (n.n_regionkey = r.r_regionkey and r.r_name = 'EUROPE')
----- PLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp1
-    OVERWRITE=true
-  HASH JOIN
-    JOIN OP: INNER JOIN
-    HASH PREDICATES:
-      n.n_regionkey = r.r_regionkey
-    OTHER JOIN PREDICATES: r.r_name = 'EUROPE'
-    TUPLE IDS: 0 1 2 3 4 
-      HASH JOIN
-        JOIN OP: INNER JOIN
-        HASH PREDICATES:
-          s.s_nationkey = n.n_nationkey
-        TUPLE IDS: 0 1 2 3 
-          HASH JOIN
-            JOIN OP: INNER JOIN
-            HASH PREDICATES:
-              ps.ps_suppkey = s.s_suppkey
-            TUPLE IDS: 0 1 2 
-              HASH JOIN
-                JOIN OP: INNER JOIN
-                HASH PREDICATES:
-                  ps.ps_partkey = p.p_partkey
-                OTHER JOIN PREDICATES: p.p_size = 15, p.p_type LIKE '%BRASS'
-                TUPLE IDS: 0 1 
-                  SCAN HDFS table=tpch.partsupp (0)
-                    TUPLE IDS: 0 
-                  SCAN HDFS table=tpch.part (1) compact
-                    PREDICATES: p.p_size = 15, p.p_type LIKE '%BRASS'
-                    TUPLE IDS: 1 
-              SCAN HDFS table=tpch.supplier (3) compact
-                TUPLE IDS: 2 
-          SCAN HDFS table=tpch.nation (5) compact
-            TUPLE IDS: 3 
-      SCAN HDFS table=tpch.region (7) compact
-        PREDICATES: r.r_name = 'EUROPE'
-        TUPLE IDS: 4 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 0:67108864
-        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 67108864:51075752
-      HDFS SPLITS NODE ID: 1
-        hdfs:test-warehouse/tpch.part/part.tbl 0:23935125
-      HDFS SPLITS NODE ID: 3
-        hdfs:test-warehouse/tpch.supplier/supplier.tbl 0:1399184
-      HDFS SPLITS NODE ID: 5
-        hdfs:test-warehouse/tpch.nation/nation.tbl 0:2199
-      HDFS SPLITS NODE ID: 7
-        hdfs:test-warehouse/tpch.region/region.tbl 0:384
------------- DISTRIBUTEDPLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp1
-    OVERWRITE=true
-  EXCHANGE (9)
-    TUPLE IDS: 0 1 2 3 4 
-
-Plan Fragment 1
-  STREAM DATA SINK
-    EXCHANGE ID: 9
-  HASH JOIN
-    JOIN OP: INNER JOIN
-    HASH PREDICATES:
-      n.n_regionkey = r.r_regionkey
-    OTHER JOIN PREDICATES: r.r_name = 'EUROPE'
-    TUPLE IDS: 0 1 2 3 4 
-      HASH JOIN
-        JOIN OP: INNER JOIN
-        HASH PREDICATES:
-          s.s_nationkey = n.n_nationkey
-        TUPLE IDS: 0 1 2 3 
-          HASH JOIN
-            JOIN OP: INNER JOIN
-            HASH PREDICATES:
-              ps.ps_suppkey = s.s_suppkey
-            TUPLE IDS: 0 1 2 
-              HASH JOIN
-                JOIN OP: INNER JOIN
-                HASH PREDICATES:
-                  ps.ps_partkey = p.p_partkey
-                OTHER JOIN PREDICATES: p.p_size = 15, p.p_type LIKE '%BRASS'
-                TUPLE IDS: 0 1 
-                  SCAN HDFS table=tpch.partsupp (0)
-                    TUPLE IDS: 0 
-                  SCAN HDFS table=tpch.part (1) compact
-                    PREDICATES: p.p_size = 15, p.p_type LIKE '%BRASS'
-                    TUPLE IDS: 1 
-              SCAN HDFS table=tpch.supplier (3) compact
-                TUPLE IDS: 2 
-          SCAN HDFS table=tpch.nation (5) compact
-            TUPLE IDS: 3 
-      SCAN HDFS table=tpch.region (7) compact
-        PREDICATES: r.r_name = 'EUROPE'
-        TUPLE IDS: 4 
-
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 0:67108864
-        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 67108864:51075752
-      HDFS SPLITS NODE ID: 1
-        hdfs:test-warehouse/tpch.part/part.tbl 0:23935125
-      HDFS SPLITS NODE ID: 3
-        hdfs:test-warehouse/tpch.supplier/supplier.tbl 0:1399184
-      HDFS SPLITS NODE ID: 5
-        hdfs:test-warehouse/tpch.nation/nation.tbl 0:2199
-      HDFS SPLITS NODE ID: 7
-        hdfs:test-warehouse/tpch.region/region.tbl 0:384
-====
-insert overwrite table tpch.q2_minimum_cost_supplier_tmp2
-select
-  p_partkey,
-  min(ps_supplycost)
-from  tpch.q2_minimum_cost_supplier_tmp1
-group by p_partkey
----- PLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp2
-    OVERWRITE=true
-  AGGREGATE
-  OUTPUT: MIN(ps_supplycost)
-  GROUP BY: p_partkey
-  TUPLE IDS: 1 
-    SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 (0)
-      TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.q2_minimum_cost_supplier_tmp1/
------------- DISTRIBUTEDPLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp2
-    OVERWRITE=true
-  AGGREGATE
-  OUTPUT: MIN(<slot 3>)
-  GROUP BY: <slot 2>
-  TUPLE IDS: 1 
-    EXCHANGE (2)
-      TUPLE IDS: 1 
-
-Plan Fragment 1
-  STREAM DATA SINK
-    EXCHANGE ID: 2
-  AGGREGATE
-  OUTPUT: MIN(ps_supplycost)
-  GROUP BY: p_partkey
-  TUPLE IDS: 1 
-    SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 (0)
-      TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.q2_minimum_cost_supplier_tmp1/
-====
-# Modifications: Fully qualified name of p_partkey column in the ORDER BY clause
-select
-  t1.s_acctbal,
-  t1.s_name,
-  t1.n_name,
-  t1.p_partkey,
-  t1.p_mfgr,
-  t1.s_address,
-  t1.s_phone,
-  t1.s_comment
-from tpch.q2_minimum_cost_supplier_tmp1 t1
-join tpch.q2_minimum_cost_supplier_tmp2 t2
-  on (t1.p_partkey = t2.p_partkey and t1.ps_supplycost = t2.ps_min_supplycost)
-order by
-  s_acctbal desc,
-  n_name,
-  s_name,
-  t1.p_partkey
-limit 100
----- PLAN
-Plan Fragment 0
-  TOP-N
-  ORDER BY: t1.s_acctbal DESC, t1.n_name ASC, t1.s_name ASC, t1.p_partkey ASC
-  LIMIT: 100
-  TUPLE IDS: 0 1 
-    HASH JOIN
-      JOIN OP: INNER JOIN
-      HASH PREDICATES:
-        t1.p_partkey = t2.p_partkey
-        t1.ps_supplycost = t2.ps_min_supplycost
-      TUPLE IDS: 0 1 
-        SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 (0)
-          TUPLE IDS: 0 
-        SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp2 (1) compact
-          TUPLE IDS: 1 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.q2_minimum_cost_supplier_tmp1/
-      HDFS SPLITS NODE ID: 1
-        hdfs:test-warehouse/tpch.q2_minimum_cost_supplier_tmp2
------------- DISTRIBUTEDPLAN
-Plan Fragment 0
-  TOP-N
-  ORDER BY: t1.s_acctbal DESC, t1.n_name ASC, t1.s_name ASC, t1.p_partkey ASC
-  LIMIT: 100
-  TUPLE IDS: 0 1 
-    EXCHANGE (3)
-      TUPLE IDS: 0 1 
-
-Plan Fragment 1
-  STREAM DATA SINK
-    EXCHANGE ID: 3
-  HASH JOIN
-    JOIN OP: INNER JOIN
-    HASH PREDICATES:
-      t1.p_partkey = t2.p_partkey
-      t1.ps_supplycost = t2.ps_min_supplycost
-    TUPLE IDS: 0 1 
-      SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 (0)
-        TUPLE IDS: 0 
-      SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp2 (1) compact
-        TUPLE IDS: 1 
-
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.q2_minimum_cost_supplier_tmp1/
-      HDFS SPLITS NODE ID: 1
-        hdfs:test-warehouse/tpch.q2_minimum_cost_supplier_tmp2
-====
+#insert overwrite table tpch.q2_minimum_cost_supplier_tmp1
+#select
+#  s.s_acctbal,
+#  s.s_name,
+#  n.n_name,
+#  p.p_partkey,
+#  ps.ps_supplycost,
+#  p.p_mfgr,
+#  s.s_address,
+#  s.s_phone,
+#  s.s_comment
+#from tpch.partsupp ps
+#  join tpch.part p
+#    on (p.p_partkey = ps.ps_partkey and p.p_size = 15 and p.p_type like '%BRASS')
+#  join tpch.supplier s
+#    on (s.s_suppkey = ps.ps_suppkey)
+#  join tpch.nation n
+#    on (s.s_nationkey = n.n_nationkey)
+#  join tpch.region r
+#    on (n.n_regionkey = r.r_regionkey and r.r_name = 'EUROPE')
+#---- PLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp1
+#    OVERWRITE=true
+#  HASH JOIN
+#    JOIN OP: INNER JOIN
+#    HASH PREDICATES:
+#      n.n_regionkey = r.r_regionkey
+#    OTHER JOIN PREDICATES: r.r_name = 'EUROPE'
+#    TUPLE IDS: 0 1 2 3 4 
+#      HASH JOIN
+#        JOIN OP: INNER JOIN
+#        HASH PREDICATES:
+#          s.s_nationkey = n.n_nationkey
+#        TUPLE IDS: 0 1 2 3 
+#          HASH JOIN
+#            JOIN OP: INNER JOIN
+#            HASH PREDICATES:
+#              ps.ps_suppkey = s.s_suppkey
+#            TUPLE IDS: 0 1 2 
+#              HASH JOIN
+#                JOIN OP: INNER JOIN
+#                HASH PREDICATES:
+#                  ps.ps_partkey = p.p_partkey
+#                OTHER JOIN PREDICATES: p.p_size = 15, p.p_type LIKE '%BRASS'
+#                TUPLE IDS: 0 1 
+#                  SCAN HDFS table=tpch.partsupp (0)
+#                    TUPLE IDS: 0 
+#                  SCAN HDFS table=tpch.part (1) compact
+#                    PREDICATES: p.p_size = 15, p.p_type LIKE '%BRASS'
+#                    TUPLE IDS: 1 
+#              SCAN HDFS table=tpch.supplier (3) compact
+#                TUPLE IDS: 2 
+#          SCAN HDFS table=tpch.nation (5) compact
+#            TUPLE IDS: 3 
+#      SCAN HDFS table=tpch.region (7) compact
+#        PREDICATES: r.r_name = 'EUROPE'
+#        TUPLE IDS: 4 
+#
+#  EXEC PARAMS
+#    HOST: coordinator
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 0:67108864
+#        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 67108864:51075752
+#      HDFS SPLITS NODE ID: 1
+#        hdfs:test-warehouse/tpch.part/part.tbl 0:23935125
+#      HDFS SPLITS NODE ID: 3
+#        hdfs:test-warehouse/tpch.supplier/supplier.tbl 0:1399184
+#      HDFS SPLITS NODE ID: 5
+#        hdfs:test-warehouse/tpch.nation/nation.tbl 0:2199
+#      HDFS SPLITS NODE ID: 7
+#        hdfs:test-warehouse/tpch.region/region.tbl 0:384
+#------------ DISTRIBUTEDPLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp1
+#    OVERWRITE=true
+#  EXCHANGE (9)
+#    TUPLE IDS: 0 1 2 3 4 
+#
+#Plan Fragment 1
+#  STREAM DATA SINK
+#    EXCHANGE ID: 9
+#  HASH JOIN
+#    JOIN OP: INNER JOIN
+#    HASH PREDICATES:
+#      n.n_regionkey = r.r_regionkey
+#    OTHER JOIN PREDICATES: r.r_name = 'EUROPE'
+#    TUPLE IDS: 0 1 2 3 4 
+#      HASH JOIN
+#        JOIN OP: INNER JOIN
+#        HASH PREDICATES:
+#          s.s_nationkey = n.n_nationkey
+#        TUPLE IDS: 0 1 2 3 
+#          HASH JOIN
+#            JOIN OP: INNER JOIN
+#            HASH PREDICATES:
+#              ps.ps_suppkey = s.s_suppkey
+#            TUPLE IDS: 0 1 2 
+#              HASH JOIN
+#                JOIN OP: INNER JOIN
+#                HASH PREDICATES:
+#                  ps.ps_partkey = p.p_partkey
+#                OTHER JOIN PREDICATES: p.p_size = 15, p.p_type LIKE '%BRASS'
+#                TUPLE IDS: 0 1 
+#                  SCAN HDFS table=tpch.partsupp (0)
+#                    TUPLE IDS: 0 
+#                  SCAN HDFS table=tpch.part (1) compact
+#                    PREDICATES: p.p_size = 15, p.p_type LIKE '%BRASS'
+#                    TUPLE IDS: 1 
+#              SCAN HDFS table=tpch.supplier (3) compact
+#                TUPLE IDS: 2 
+#          SCAN HDFS table=tpch.nation (5) compact
+#            TUPLE IDS: 3 
+#      SCAN HDFS table=tpch.region (7) compact
+#        PREDICATES: r.r_name = 'EUROPE'
+#        TUPLE IDS: 4 
+#
+#  EXEC PARAMS
+#    HOST: 
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 0:67108864
+#        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 67108864:51075752
+#      HDFS SPLITS NODE ID: 1
+#        hdfs:test-warehouse/tpch.part/part.tbl 0:23935125
+#      HDFS SPLITS NODE ID: 3
+#        hdfs:test-warehouse/tpch.supplier/supplier.tbl 0:1399184
+#      HDFS SPLITS NODE ID: 5
+#        hdfs:test-warehouse/tpch.nation/nation.tbl 0:2199
+#      HDFS SPLITS NODE ID: 7
+#        hdfs:test-warehouse/tpch.region/region.tbl 0:384
+#====
+#insert overwrite table tpch.q2_minimum_cost_supplier_tmp2
+#select
+#  p_partkey,
+#  min(ps_supplycost)
+#from  tpch.q2_minimum_cost_supplier_tmp1
+#group by p_partkey
+#---- PLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp2
+#    OVERWRITE=true
+#  AGGREGATE
+#  OUTPUT: MIN(ps_supplycost)
+#  GROUP BY: p_partkey
+#  TUPLE IDS: 1 
+#    SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 (0)
+#      TUPLE IDS: 0 
+#
+#  EXEC PARAMS
+#    HOST: coordinator
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.q2_minimum_cost_supplier_tmp1/
+#------------ DISTRIBUTEDPLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp2
+#    OVERWRITE=true
+#  AGGREGATE
+#  OUTPUT: MIN(<slot 3>)
+#  GROUP BY: <slot 2>
+#  TUPLE IDS: 1 
+#    EXCHANGE (2)
+#      TUPLE IDS: 1 
+#
+#Plan Fragment 1
+#  STREAM DATA SINK
+#    EXCHANGE ID: 2
+#  AGGREGATE
+#  OUTPUT: MIN(ps_supplycost)
+#  GROUP BY: p_partkey
+#  TUPLE IDS: 1 
+#    SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 (0)
+#      TUPLE IDS: 0 
+#
+#  EXEC PARAMS
+#    HOST: 
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.q2_minimum_cost_supplier_tmp1/
+#====
+## Modifications: Fully qualified name of p_partkey column in the ORDER BY clause
+#select
+#  t1.s_acctbal,
+#  t1.s_name,
+#  t1.n_name,
+#  t1.p_partkey,
+#  t1.p_mfgr,
+#  t1.s_address,
+#  t1.s_phone,
+#  t1.s_comment
+#from tpch.q2_minimum_cost_supplier_tmp1 t1
+#join tpch.q2_minimum_cost_supplier_tmp2 t2
+#  on (t1.p_partkey = t2.p_partkey and t1.ps_supplycost = t2.ps_min_supplycost)
+#order by
+#  s_acctbal desc,
+#  n_name,
+#  s_name,
+#  t1.p_partkey
+#limit 100
+#---- PLAN
+#Plan Fragment 0
+#  TOP-N
+#  ORDER BY: t1.s_acctbal DESC, t1.n_name ASC, t1.s_name ASC, t1.p_partkey ASC
+#  LIMIT: 100
+#  TUPLE IDS: 0 1 
+#    HASH JOIN
+#      JOIN OP: INNER JOIN
+#      HASH PREDICATES:
+#        t1.p_partkey = t2.p_partkey
+#        t1.ps_supplycost = t2.ps_min_supplycost
+#      TUPLE IDS: 0 1 
+#        SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 (0)
+#          TUPLE IDS: 0 
+#        SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp2 (1) compact
+#          TUPLE IDS: 1 
+#
+#  EXEC PARAMS
+#    HOST: coordinator
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.q2_minimum_cost_supplier_tmp1/
+#      HDFS SPLITS NODE ID: 1
+#        hdfs:test-warehouse/tpch.q2_minimum_cost_supplier_tmp2
+#------------ DISTRIBUTEDPLAN
+#Plan Fragment 0
+#  TOP-N
+#  ORDER BY: t1.s_acctbal DESC, t1.n_name ASC, t1.s_name ASC, t1.p_partkey ASC
+#  LIMIT: 100
+#  TUPLE IDS: 0 1 
+#    EXCHANGE (3)
+#      TUPLE IDS: 0 1 
+#
+#Plan Fragment 1
+#  STREAM DATA SINK
+#    EXCHANGE ID: 3
+#  HASH JOIN
+#    JOIN OP: INNER JOIN
+#    HASH PREDICATES:
+#      t1.p_partkey = t2.p_partkey
+#      t1.ps_supplycost = t2.ps_min_supplycost
+#    TUPLE IDS: 0 1 
+#      SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp1 (0)
+#        TUPLE IDS: 0 
+#      SCAN HDFS table=tpch.q2_minimum_cost_supplier_tmp2 (1) compact
+#        TUPLE IDS: 1 
+#
+#  EXEC PARAMS
+#    HOST: 
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.q2_minimum_cost_supplier_tmp1/
+#      HDFS SPLITS NODE ID: 1
+#        hdfs:test-warehouse/tpch.q2_minimum_cost_supplier_tmp2
+#====
 # Q3 - Shipping Priority Query
 # Modifications: Added round() calls
 select
@@ -1445,141 +1445,141 @@ Plan Fragment 1
 # Q11 - Important Stock Identification
 # NOTE: Alan is re-writing tpch.part of this query set
 # so it is missing for now
-insert overwrite table tpch.q11_part_tmp
-select ps_partkey, sum(ps_supplycost * ps_availqty) as part_value
-from tpch.nation n
-join tpch.supplier s
-  on s.s_nationkey = n.n_nationkey and n.n_name = 'GERMANY'
-join tpch.partsupp ps
-  on ps.ps_suppkey = s.s_suppkey
-group by ps_partkey
----- PLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.q11_part_tmp
-    OVERWRITE=true
-  AGGREGATE
-  OUTPUT: SUM(ps_supplycost * ps_availqty)
-  GROUP BY: ps_partkey
-  TUPLE IDS: 3 
-    HASH JOIN
-      JOIN OP: INNER JOIN
-      HASH PREDICATES:
-        s.s_suppkey = ps.ps_suppkey
-      TUPLE IDS: 0 1 2 
-        HASH JOIN
-          JOIN OP: INNER JOIN
-          HASH PREDICATES:
-            n.n_nationkey = s.s_nationkey
-          OTHER JOIN PREDICATES: n.n_name = 'GERMANY'
-          TUPLE IDS: 0 1 
-            SCAN HDFS table=tpch.nation (0)
-              PREDICATES: n.n_name = 'GERMANY'
-              TUPLE IDS: 0 
-            SCAN HDFS table=tpch.supplier (1) compact
-              TUPLE IDS: 1 
-        SCAN HDFS table=tpch.partsupp (3) compact
-          TUPLE IDS: 2 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.nation/nation.tbl 0:2199
-      HDFS SPLITS NODE ID: 1
-        hdfs:test-warehouse/tpch.supplier/supplier.tbl 0:1399184
-      HDFS SPLITS NODE ID: 3
-        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 0:67108864
-        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 67108864:51075752
------------- DISTRIBUTEDPLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.q11_part_tmp
-    OVERWRITE=true
-  AGGREGATE
-  OUTPUT: SUM(<slot 9>)
-  GROUP BY: <slot 8>
-  TUPLE IDS: 3 
-    EXCHANGE (6)
-      TUPLE IDS: 3 
-
-Plan Fragment 1
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-  AGGREGATE
-  OUTPUT: SUM(ps_supplycost * ps_availqty)
-  GROUP BY: ps_partkey
-  TUPLE IDS: 3 
-    HASH JOIN
-      JOIN OP: INNER JOIN
-      HASH PREDICATES:
-        s.s_suppkey = ps.ps_suppkey
-      TUPLE IDS: 0 1 2 
-        HASH JOIN
-          JOIN OP: INNER JOIN
-          HASH PREDICATES:
-            n.n_nationkey = s.s_nationkey
-          OTHER JOIN PREDICATES: n.n_name = 'GERMANY'
-          TUPLE IDS: 0 1 
-            SCAN HDFS table=tpch.nation (0)
-              PREDICATES: n.n_name = 'GERMANY'
-              TUPLE IDS: 0 
-            SCAN HDFS table=tpch.supplier (1) compact
-              TUPLE IDS: 1 
-        SCAN HDFS table=tpch.partsupp (3) compact
-          TUPLE IDS: 2 
-
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.nation/nation.tbl 0:2199
-      HDFS SPLITS NODE ID: 1
-        hdfs:test-warehouse/tpch.supplier/supplier.tbl 0:1399184
-      HDFS SPLITS NODE ID: 3
-        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 0:67108864
-        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 67108864:51075752
-====
-insert overwrite table tpch.q11_sum_tmp
-select sum(part_value) as total_value
-from tpch.q11_part_tmp
----- PLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.q11_sum_tmp
-    OVERWRITE=true
-  AGGREGATE
-  OUTPUT: SUM(part_value)
-  GROUP BY: 
-  TUPLE IDS: 1 
-    SCAN HDFS table=tpch.q11_part_tmp (0)
-      TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.q11_part_tmp
------------- DISTRIBUTEDPLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.q11_sum_tmp
-    OVERWRITE=true
-  AGGREGATE
-  OUTPUT: SUM(<slot 1>)
-  GROUP BY: 
-  TUPLE IDS: 1 
-    EXCHANGE (2)
-      TUPLE IDS: 1 
-
-Plan Fragment 1
-  STREAM DATA SINK
-    EXCHANGE ID: 2
-  AGGREGATE
-  OUTPUT: SUM(part_value)
-  GROUP BY: 
-  TUPLE IDS: 1 
-    SCAN HDFS table=tpch.q11_part_tmp (0)
-      TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.q11_part_tmp
-====
+#insert overwrite table tpch.q11_part_tmp
+#select ps_partkey, sum(ps_supplycost * ps_availqty) as part_value
+#from tpch.nation n
+#join tpch.supplier s
+#  on s.s_nationkey = n.n_nationkey and n.n_name = 'GERMANY'
+#join tpch.partsupp ps
+#  on ps.ps_suppkey = s.s_suppkey
+#group by ps_partkey
+#---- PLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.q11_part_tmp
+#    OVERWRITE=true
+#  AGGREGATE
+#  OUTPUT: SUM(ps_supplycost * ps_availqty)
+#  GROUP BY: ps_partkey
+#  TUPLE IDS: 3 
+#    HASH JOIN
+#      JOIN OP: INNER JOIN
+#      HASH PREDICATES:
+#        s.s_suppkey = ps.ps_suppkey
+#      TUPLE IDS: 0 1 2 
+#        HASH JOIN
+#          JOIN OP: INNER JOIN
+#          HASH PREDICATES:
+#            n.n_nationkey = s.s_nationkey
+#          OTHER JOIN PREDICATES: n.n_name = 'GERMANY'
+#          TUPLE IDS: 0 1 
+#            SCAN HDFS table=tpch.nation (0)
+#              PREDICATES: n.n_name = 'GERMANY'
+#              TUPLE IDS: 0 
+#            SCAN HDFS table=tpch.supplier (1) compact
+#              TUPLE IDS: 1 
+#        SCAN HDFS table=tpch.partsupp (3) compact
+#          TUPLE IDS: 2 
+#
+#  EXEC PARAMS
+#    HOST: coordinator
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.nation/nation.tbl 0:2199
+#      HDFS SPLITS NODE ID: 1
+#        hdfs:test-warehouse/tpch.supplier/supplier.tbl 0:1399184
+#      HDFS SPLITS NODE ID: 3
+#        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 0:67108864
+#        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 67108864:51075752
+#------------ DISTRIBUTEDPLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.q11_part_tmp
+#    OVERWRITE=true
+#  AGGREGATE
+#  OUTPUT: SUM(<slot 9>)
+#  GROUP BY: <slot 8>
+#  TUPLE IDS: 3 
+#    EXCHANGE (6)
+#      TUPLE IDS: 3 
+#
+#Plan Fragment 1
+#  STREAM DATA SINK
+#    EXCHANGE ID: 6
+#  AGGREGATE
+#  OUTPUT: SUM(ps_supplycost * ps_availqty)
+#  GROUP BY: ps_partkey
+#  TUPLE IDS: 3 
+#    HASH JOIN
+#      JOIN OP: INNER JOIN
+#      HASH PREDICATES:
+#        s.s_suppkey = ps.ps_suppkey
+#      TUPLE IDS: 0 1 2 
+#        HASH JOIN
+#          JOIN OP: INNER JOIN
+#          HASH PREDICATES:
+#            n.n_nationkey = s.s_nationkey
+#          OTHER JOIN PREDICATES: n.n_name = 'GERMANY'
+#          TUPLE IDS: 0 1 
+#            SCAN HDFS table=tpch.nation (0)
+#              PREDICATES: n.n_name = 'GERMANY'
+#              TUPLE IDS: 0 
+#            SCAN HDFS table=tpch.supplier (1) compact
+#              TUPLE IDS: 1 
+#        SCAN HDFS table=tpch.partsupp (3) compact
+#          TUPLE IDS: 2 
+#
+#  EXEC PARAMS
+#    HOST: 
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.nation/nation.tbl 0:2199
+#      HDFS SPLITS NODE ID: 1
+#        hdfs:test-warehouse/tpch.supplier/supplier.tbl 0:1399184
+#      HDFS SPLITS NODE ID: 3
+#        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 0:67108864
+#        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 67108864:51075752
+#====
+#insert overwrite table tpch.q11_sum_tmp
+#select sum(part_value) as total_value
+#from tpch.q11_part_tmp
+#---- PLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.q11_sum_tmp
+#    OVERWRITE=true
+#  AGGREGATE
+#  OUTPUT: SUM(part_value)
+#  GROUP BY: 
+#  TUPLE IDS: 1 
+#    SCAN HDFS table=tpch.q11_part_tmp (0)
+#      TUPLE IDS: 0 
+#
+#  EXEC PARAMS
+#    HOST: coordinator
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.q11_part_tmp
+#------------ DISTRIBUTEDPLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.q11_sum_tmp
+#    OVERWRITE=true
+#  AGGREGATE
+#  OUTPUT: SUM(<slot 1>)
+#  GROUP BY: 
+#  TUPLE IDS: 1 
+#    EXCHANGE (2)
+#      TUPLE IDS: 1 
+#
+#Plan Fragment 1
+#  STREAM DATA SINK
+#    EXCHANGE ID: 2
+#  AGGREGATE
+#  OUTPUT: SUM(part_value)
+#  GROUP BY: 
+#  TUPLE IDS: 1 
+#    SCAN HDFS table=tpch.q11_part_tmp (0)
+#      TUPLE IDS: 0 
+#
+#  EXEC PARAMS
+#    HOST: 
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.q11_part_tmp
+#====
 # Q12 - Shipping Mode and Order Priority Query
 # Modifications: Converted select from multiple tables to joins, added limit
 select l_shipmode,
@@ -1896,782 +1896,782 @@ Plan Fragment 1
         hdfs:test-warehouse/tpch.part/part.tbl 0:23935125
 ====
 # Q15 - Top Supplier Query
-insert overwrite table tpch.revenue
-select
-  l_suppkey as supplier_no,
-  sum(l_extendedprice * (1 - l_discount)) as total_revenue
-from tpch.lineitem
-where l_shipdate >= '1996-01-01' and l_shipdate < '1996-04-01'
-group by l_suppkey
----- PLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.revenue
-    OVERWRITE=true
-  AGGREGATE
-  OUTPUT: SUM(l_extendedprice * 1.0 - l_discount)
-  GROUP BY: l_suppkey
-  TUPLE IDS: 1 
-    SCAN HDFS table=tpch.lineitem (0)
-      PREDICATES: l_shipdate >= '1996-01-01', l_shipdate < '1996-04-01'
-      TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
------------- DISTRIBUTEDPLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.revenue
-    OVERWRITE=true
-  AGGREGATE
-  OUTPUT: SUM(<slot 5>)
-  GROUP BY: <slot 4>
-  TUPLE IDS: 1 
-    EXCHANGE (2)
-      TUPLE IDS: 1 
-
-Plan Fragment 1
-  STREAM DATA SINK
-    EXCHANGE ID: 2
-  AGGREGATE
-  OUTPUT: SUM(l_extendedprice * 1.0 - l_discount)
-  GROUP BY: l_suppkey
-  TUPLE IDS: 1 
-    SCAN HDFS table=tpch.lineitem (0)
-      PREDICATES: l_shipdate >= '1996-01-01', l_shipdate < '1996-04-01'
-      TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
-====
-insert overwrite table tpch.max_revenue
-select max(total_revenue)
-from tpch.revenue
----- PLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.max_revenue
-    OVERWRITE=true
-  AGGREGATE
-  OUTPUT: MAX(total_revenue)
-  GROUP BY: 
-  TUPLE IDS: 1 
-    SCAN HDFS table=tpch.revenue (0)
-      TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.revenue/
------------- DISTRIBUTEDPLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.max_revenue
-    OVERWRITE=true
-  AGGREGATE
-  OUTPUT: MAX(<slot 1>)
-  GROUP BY: 
-  TUPLE IDS: 1 
-    EXCHANGE (2)
-      TUPLE IDS: 1 
-
-Plan Fragment 1
-  STREAM DATA SINK
-    EXCHANGE ID: 2
-  AGGREGATE
-  OUTPUT: MAX(total_revenue)
-  GROUP BY: 
-  TUPLE IDS: 1 
-    SCAN HDFS table=tpch.revenue (0)
-      TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.revenue/
-====
-# Modifications - Added limit
-select
-  s_suppkey,
-  s_name,
-  s_address,
-  s_phone,
-  total_revenue
-from tpch.supplier s
-join tpch.revenue r
-  on (s.s_suppkey = r.supplier_no)
-join tpch.max_revenue m
-  on (r.total_revenue = m.max_revenue)
-order by s_suppkey
-limit 100
----- PLAN
-Plan Fragment 0
-  TOP-N
-  ORDER BY: s_suppkey ASC
-  LIMIT: 100
-  TUPLE IDS: 0 1 2 
-    HASH JOIN
-      JOIN OP: INNER JOIN
-      HASH PREDICATES:
-        r.total_revenue = m.max_revenue
-      TUPLE IDS: 0 1 2 
-        HASH JOIN
-          JOIN OP: INNER JOIN
-          HASH PREDICATES:
-            s.s_suppkey = r.supplier_no
-          TUPLE IDS: 0 1 
-            SCAN HDFS table=tpch.supplier (0)
-              TUPLE IDS: 0 
-            SCAN HDFS table=tpch.revenue (1) compact
-              TUPLE IDS: 1 
-        SCAN HDFS table=tpch.max_revenue (3) compact
-          TUPLE IDS: 2 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.supplier/supplier.tbl 0:1399184
-      HDFS SPLITS NODE ID: 1
-        hdfs:test-warehouse/tpch.revenue/
-      HDFS SPLITS NODE ID: 3
-        hdfs:test-warehouse/tpch.max_revenue
------------- DISTRIBUTEDPLAN
-Plan Fragment 0
-  TOP-N
-  ORDER BY: s_suppkey ASC
-  LIMIT: 100
-  TUPLE IDS: 0 1 2 
-    EXCHANGE (5)
-      TUPLE IDS: 0 1 2 
-
-Plan Fragment 1
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-  HASH JOIN
-    JOIN OP: INNER JOIN
-    HASH PREDICATES:
-      r.total_revenue = m.max_revenue
-    TUPLE IDS: 0 1 2 
-      HASH JOIN
-        JOIN OP: INNER JOIN
-        HASH PREDICATES:
-          s.s_suppkey = r.supplier_no
-        TUPLE IDS: 0 1 
-          SCAN HDFS table=tpch.supplier (0)
-            TUPLE IDS: 0 
-          SCAN HDFS table=tpch.revenue (1) compact
-            TUPLE IDS: 1 
-      SCAN HDFS table=tpch.max_revenue (3) compact
-        TUPLE IDS: 2 
-
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.supplier/supplier.tbl 0:1399184
-      HDFS SPLITS NODE ID: 1
-        hdfs:test-warehouse/tpch.revenue/
-      HDFS SPLITS NODE ID: 3
-        hdfs:test-warehouse/tpch.max_revenue
-====
-# Q16 - Parts/Supplier Relation Query
-insert overwrite table tpch.supplier_tmp
-select s_suppkey
-from tpch.supplier
-where not s_comment like '%Customer%Complaints%'
----- PLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.supplier_tmp
-    OVERWRITE=true
-  SCAN HDFS table=tpch.supplier (0)
-    PREDICATES: NOT s_comment LIKE '%Customer%Complaints%'
-    TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.supplier/supplier.tbl 0:1399184
------------- DISTRIBUTEDPLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.supplier_tmp
-    OVERWRITE=true
-  EXCHANGE (1)
-    TUPLE IDS: 0 
-
-Plan Fragment 1
-  STREAM DATA SINK
-    EXCHANGE ID: 1
-  SCAN HDFS table=tpch.supplier (0)
-    PREDICATES: NOT s_comment LIKE '%Customer%Complaints%'
-    TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.supplier/supplier.tbl 0:1399184
-====
-insert overwrite table tpch.q16_tmp
-select p_brand, p_type, p_size, ps_suppkey
-from tpch.partsupp ps
-join tpch.part p
-  on p.p_partkey = ps.ps_partkey and
-     p.p_brand <> 'Brand#45' and
-     not p.p_type like 'MEDIUM POLISHED%'
-join tpch.supplier_tmp s
-  on ps.ps_suppkey = s.s_suppkey
----- PLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.q16_tmp
-    OVERWRITE=true
-  HASH JOIN
-    JOIN OP: INNER JOIN
-    HASH PREDICATES:
-      ps.ps_suppkey = s.s_suppkey
-    TUPLE IDS: 0 1 2 
-      HASH JOIN
-        JOIN OP: INNER JOIN
-        HASH PREDICATES:
-          ps.ps_partkey = p.p_partkey
-        OTHER JOIN PREDICATES: p.p_brand != 'Brand#45', NOT p.p_type LIKE 'MEDIUM POLISHED%'
-        TUPLE IDS: 0 1 
-          SCAN HDFS table=tpch.partsupp (0)
-            TUPLE IDS: 0 
-          SCAN HDFS table=tpch.part (1) compact
-            PREDICATES: p.p_brand != 'Brand#45', NOT p.p_type LIKE 'MEDIUM POLISHED%'
-            TUPLE IDS: 1 
-      SCAN HDFS table=tpch.supplier_tmp (3) compact
-        TUPLE IDS: 2 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 0:67108864
-        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 67108864:51075752
-      HDFS SPLITS NODE ID: 1
-        hdfs:test-warehouse/tpch.part/part.tbl 0:23935125
-      HDFS SPLITS NODE ID: 3
-        hdfs:test-warehouse/tpch.supplier_tmp
------------- DISTRIBUTEDPLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.q16_tmp
-    OVERWRITE=true
-  EXCHANGE (5)
-    TUPLE IDS: 0 1 2 
-
-Plan Fragment 1
-  STREAM DATA SINK
-    EXCHANGE ID: 5
-  HASH JOIN
-    JOIN OP: INNER JOIN
-    HASH PREDICATES:
-      ps.ps_suppkey = s.s_suppkey
-    TUPLE IDS: 0 1 2 
-      HASH JOIN
-        JOIN OP: INNER JOIN
-        HASH PREDICATES:
-          ps.ps_partkey = p.p_partkey
-        OTHER JOIN PREDICATES: p.p_brand != 'Brand#45', NOT p.p_type LIKE 'MEDIUM POLISHED%'
-        TUPLE IDS: 0 1 
-          SCAN HDFS table=tpch.partsupp (0)
-            TUPLE IDS: 0 
-          SCAN HDFS table=tpch.part (1) compact
-            PREDICATES: p.p_brand != 'Brand#45', NOT p.p_type LIKE 'MEDIUM POLISHED%'
-            TUPLE IDS: 1 
-      SCAN HDFS table=tpch.supplier_tmp (3) compact
-        TUPLE IDS: 2 
-
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 0:67108864
-        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 67108864:51075752
-      HDFS SPLITS NODE ID: 1
-        hdfs:test-warehouse/tpch.part/part.tbl 0:23935125
-      HDFS SPLITS NODE ID: 3
-        hdfs:test-warehouse/tpch.supplier_tmp
-====
-# Modifications: Added limit, removed 'DISTINCT' from count due to IMP-132
-select p_brand, p_type, p_size, count(ps_suppkey) as supplier_cnt
-from
-( select * from tpch.q16_tmp
-  where p_size = 49 or p_size = 14 or
-        p_size = 23 or p_size = 45 or
-        p_size = 19 or p_size = 3 or
-        p_size = 36 or p_size = 9
-) q16_all
-group by p_brand, p_type, p_size
-order by supplier_cnt desc, p_brand, p_type, p_size
-limit 1000
----- PLAN
-Plan Fragment 0
-  TOP-N
-  ORDER BY: <slot 11> DESC, <slot 8> ASC, <slot 9> ASC, <slot 10> ASC
-  LIMIT: 1000
-  TUPLE IDS: 2 
-    AGGREGATE
-    OUTPUT: COUNT(tpch.q16_tmp.ps_suppkey)
-    GROUP BY: tpch.q16_tmp.p_brand, tpch.q16_tmp.p_type, tpch.q16_tmp.p_size
-    TUPLE IDS: 2 
-      SCAN HDFS table=tpch.q16_tmp (0)
-        PREDICATES: p_size = 49 OR p_size = 14 OR p_size = 23 OR p_size = 45 OR p_size = 19 OR p_size = 3 OR p_size = 36 OR p_size = 9
-        TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.q16_tmp
------------- DISTRIBUTEDPLAN
-Plan Fragment 0
-  TOP-N
-  ORDER BY: <slot 11> DESC, <slot 8> ASC, <slot 9> ASC, <slot 10> ASC
-  LIMIT: 1000
-  TUPLE IDS: 2 
-    AGGREGATE
-    OUTPUT: SUM(<slot 11>)
-    GROUP BY: <slot 8>, <slot 9>, <slot 10>
-    TUPLE IDS: 2 
-      EXCHANGE (2)
-        TUPLE IDS: 2 
-
-Plan Fragment 1
-  STREAM DATA SINK
-    EXCHANGE ID: 2
-  AGGREGATE
-  OUTPUT: COUNT(tpch.q16_tmp.ps_suppkey)
-  GROUP BY: tpch.q16_tmp.p_brand, tpch.q16_tmp.p_type, tpch.q16_tmp.p_size
-  TUPLE IDS: 2 
-    SCAN HDFS table=tpch.q16_tmp (0)
-      PREDICATES: p_size = 49 OR p_size = 14 OR p_size = 23 OR p_size = 45 OR p_size = 19 OR p_size = 3 OR p_size = 36 OR p_size = 9
-      TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.q16_tmp
-====
-# Q17 - Small-Quantity-Order Revenue Query
-insert overwrite table tpch.lineitem_tmp
-select l_partkey as t_partkey, 0.2 * avg(l_quantity) as t_avg_quantity
-from tpch.lineitem
-group by l_partkey
----- PLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.lineitem_tmp
-    OVERWRITE=true
-  AGGREGATE
-  OUTPUT: SUM(l_quantity), COUNT(l_quantity)
-  GROUP BY: l_partkey
-  TUPLE IDS: 1 
-    SCAN HDFS table=tpch.lineitem (0)
-      TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
------------- DISTRIBUTEDPLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.lineitem_tmp
-    OVERWRITE=true
-  AGGREGATE
-  OUTPUT: SUM(<slot 3>), SUM(<slot 4>)
-  GROUP BY: <slot 2>
-  TUPLE IDS: 1 
-    EXCHANGE (2)
-      TUPLE IDS: 1 
-
-Plan Fragment 1
-  STREAM DATA SINK
-    EXCHANGE ID: 2
-  AGGREGATE
-  OUTPUT: SUM(l_quantity), COUNT(l_quantity)
-  GROUP BY: l_partkey
-  TUPLE IDS: 1 
-    SCAN HDFS table=tpch.lineitem (0)
-      TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
-====
-# Modifications: Converted selects from multiple tables to joins,
-# added round() call, removed subquery
-select round(sum(l_extendedprice) / 7.0, 5) as avg_yearly
-from tpch.lineitem l
-  join tpch.part p
-    on (p.p_partkey = l.l_partkey)
-  join tpch.lineitem_tmp lt
-    on (lt.t_partkey = p.p_partkey)
-where
-  p.p_brand = 'Brand#23' and
-  p.p_container = 'MED BOX' and
-  l.l_quantity < lt.t_avg_quantity
----- PLAN
-Plan Fragment 0
-  AGGREGATE
-  OUTPUT: SUM(l_extendedprice)
-  GROUP BY: 
-  TUPLE IDS: 3 
-    HASH JOIN
-      JOIN OP: INNER JOIN
-      HASH PREDICATES:
-        p.p_partkey = lt.t_partkey
-      OTHER PREDICATES: l.l_quantity < lt.t_avg_quantity
-      TUPLE IDS: 0 1 2 
-        HASH JOIN
-          JOIN OP: INNER JOIN
-          HASH PREDICATES:
-            l.l_partkey = p.p_partkey
-          TUPLE IDS: 0 1 
-            SCAN HDFS table=tpch.lineitem (0)
-              TUPLE IDS: 0 
-            SCAN HDFS table=tpch.part (1) compact
-              PREDICATES: p.p_brand = 'Brand#23', p.p_container = 'MED BOX'
-              TUPLE IDS: 1 
-        SCAN HDFS table=tpch.lineitem_tmp (3) compact
-          TUPLE IDS: 2 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
-      HDFS SPLITS NODE ID: 1
-        hdfs:test-warehouse/tpch.part/part.tbl 0:23935125
-      HDFS SPLITS NODE ID: 3
-        hdfs:test-warehouse/tpch.lineitem_tmp/
------------- DISTRIBUTEDPLAN
-Plan Fragment 0
-  AGGREGATE
-  OUTPUT: SUM(<slot 8>)
-  GROUP BY: 
-  TUPLE IDS: 3 
-    EXCHANGE (6)
-      TUPLE IDS: 3 
-
-Plan Fragment 1
-  STREAM DATA SINK
-    EXCHANGE ID: 6
-  AGGREGATE
-  OUTPUT: SUM(l_extendedprice)
-  GROUP BY: 
-  TUPLE IDS: 3 
-    HASH JOIN
-      JOIN OP: INNER JOIN
-      HASH PREDICATES:
-        p.p_partkey = lt.t_partkey
-      OTHER PREDICATES: l.l_quantity < lt.t_avg_quantity
-      TUPLE IDS: 0 1 2 
-        HASH JOIN
-          JOIN OP: INNER JOIN
-          HASH PREDICATES:
-            l.l_partkey = p.p_partkey
-          TUPLE IDS: 0 1 
-            SCAN HDFS table=tpch.lineitem (0)
-              TUPLE IDS: 0 
-            SCAN HDFS table=tpch.part (1) compact
-              PREDICATES: p.p_brand = 'Brand#23', p.p_container = 'MED BOX'
-              TUPLE IDS: 1 
-        SCAN HDFS table=tpch.lineitem_tmp (3) compact
-          TUPLE IDS: 2 
-
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
-      HDFS SPLITS NODE ID: 1
-        hdfs:test-warehouse/tpch.part/part.tbl 0:23935125
-      HDFS SPLITS NODE ID: 3
-        hdfs:test-warehouse/tpch.lineitem_tmp/
-====
-# Q18 - Large Value Customer Query
-insert overwrite table tpch.q18_tmp
-select l_orderkey, sum(l_quantity) as t_sum_quantity
-from tpch.lineitem
-group by l_orderkey
----- PLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.q18_tmp
-    OVERWRITE=true
-  AGGREGATE
-  OUTPUT: SUM(l_quantity)
-  GROUP BY: l_orderkey
-  TUPLE IDS: 1 
-    SCAN HDFS table=tpch.lineitem (0)
-      TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
------------- DISTRIBUTEDPLAN
-Plan Fragment 0
-  WRITE TO HDFS table=tpch.q18_tmp
-    OVERWRITE=true
-  AGGREGATE
-  OUTPUT: SUM(<slot 3>)
-  GROUP BY: <slot 2>
-  TUPLE IDS: 1 
-    EXCHANGE (2)
-      TUPLE IDS: 1 
-
-Plan Fragment 1
-  STREAM DATA SINK
-    EXCHANGE ID: 2
-  AGGREGATE
-  OUTPUT: SUM(l_quantity)
-  GROUP BY: l_orderkey
-  TUPLE IDS: 1 
-    SCAN HDFS table=tpch.lineitem (0)
-      TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
-====
-# Modifications: Cast o_totalprice column due to float/double values not
-# allowed in GROUP BY.
-select
-  c_name,
-  c_custkey,
-  o_orderkey,
-  o_orderdate,
-  cast(o_totalprice as bigint) as total_price_bigint,
-  round(sum(l_quantity), 5)
-from tpch.lineitem l
-  join tpch.orders o
-    on (o.o_orderkey = l.l_orderkey)
-  join tpch.customer c
-    on (c.c_custkey = o.o_custkey)
-  join tpch.q18_tmp t
-    on (o.o_orderkey = t.l_orderkey and t.t_sum_quantity > 300)
-group by
-  c_name,
-  c_custkey,
-  o_orderkey,
-  o_orderdate,
-  cast(o_totalprice as bigint)
-order by
-  total_price_bigint,
-  o_orderdate
-limit 100
----- PLAN
-Plan Fragment 0
-  TOP-N
-  ORDER BY: <slot 14> ASC, <slot 13> ASC
-  LIMIT: 100
-  TUPLE IDS: 4 
-    AGGREGATE
-    OUTPUT: SUM(l_quantity)
-    GROUP BY: c_name, c_custkey, o_orderkey, o_orderdate, CAST(o_totalprice AS BIGINT)
-    TUPLE IDS: 4 
-      HASH JOIN
-        JOIN OP: INNER JOIN
-        HASH PREDICATES:
-          o.o_orderkey = t.l_orderkey
-        OTHER JOIN PREDICATES: t.t_sum_quantity > 300.0
-        TUPLE IDS: 0 1 2 3 
-          HASH JOIN
-            JOIN OP: INNER JOIN
-            HASH PREDICATES:
-              o.o_custkey = c.c_custkey
-            TUPLE IDS: 0 1 2 
-              HASH JOIN
-                JOIN OP: INNER JOIN
-                HASH PREDICATES:
-                  l.l_orderkey = o.o_orderkey
-                TUPLE IDS: 0 1 
-                  SCAN HDFS table=tpch.lineitem (0)
-                    TUPLE IDS: 0 
-                  SCAN HDFS table=tpch.orders (1) compact
-                    TUPLE IDS: 1 
-              SCAN HDFS table=tpch.customer (3) compact
-                TUPLE IDS: 2 
-          SCAN HDFS table=tpch.q18_tmp (5) compact
-            PREDICATES: t.t_sum_quantity > 300.0
-            TUPLE IDS: 3 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
-      HDFS SPLITS NODE ID: 1
-        hdfs:test-warehouse/tpch.orders/orders.tbl 0:67108864
-        hdfs:test-warehouse/tpch.orders/orders.tbl 67108864:67108864
-        hdfs:test-warehouse/tpch.orders/orders.tbl 134217728:36234433
-      HDFS SPLITS NODE ID: 3
-        hdfs:test-warehouse/tpch.customer/customer.tbl 0:24196144
-      HDFS SPLITS NODE ID: 5
-        hdfs:test-warehouse/tpch.q18_tmp/
------------- DISTRIBUTEDPLAN
-Plan Fragment 0
-  TOP-N
-  ORDER BY: <slot 14> ASC, <slot 13> ASC
-  LIMIT: 100
-  TUPLE IDS: 4 
-    AGGREGATE
-    OUTPUT: SUM(<slot 15>)
-    GROUP BY: <slot 10>, <slot 11>, <slot 12>, <slot 13>, <slot 14>
-    TUPLE IDS: 4 
-      EXCHANGE (8)
-        TUPLE IDS: 4 
-
-Plan Fragment 1
-  STREAM DATA SINK
-    EXCHANGE ID: 8
-  AGGREGATE
-  OUTPUT: SUM(l_quantity)
-  GROUP BY: c_name, c_custkey, o_orderkey, o_orderdate, CAST(o_totalprice AS BIGINT)
-  TUPLE IDS: 4 
-    HASH JOIN
-      JOIN OP: INNER JOIN
-      HASH PREDICATES:
-        o.o_orderkey = t.l_orderkey
-      OTHER JOIN PREDICATES: t.t_sum_quantity > 300.0
-      TUPLE IDS: 0 1 2 3 
-        HASH JOIN
-          JOIN OP: INNER JOIN
-          HASH PREDICATES:
-            o.o_custkey = c.c_custkey
-          TUPLE IDS: 0 1 2 
-            HASH JOIN
-              JOIN OP: INNER JOIN
-              HASH PREDICATES:
-                l.l_orderkey = o.o_orderkey
-              TUPLE IDS: 0 1 
-                SCAN HDFS table=tpch.lineitem (0)
-                  TUPLE IDS: 0 
-                SCAN HDFS table=tpch.orders (1) compact
-                  TUPLE IDS: 1 
-            SCAN HDFS table=tpch.customer (3) compact
-              TUPLE IDS: 2 
-        SCAN HDFS table=tpch.q18_tmp (5) compact
-          PREDICATES: t.t_sum_quantity > 300.0
-          TUPLE IDS: 3 
-
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
-        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
-      HDFS SPLITS NODE ID: 1
-        hdfs:test-warehouse/tpch.orders/orders.tbl 0:67108864
-        hdfs:test-warehouse/tpch.orders/orders.tbl 67108864:67108864
-        hdfs:test-warehouse/tpch.orders/orders.tbl 134217728:36234433
-      HDFS SPLITS NODE ID: 3
-        hdfs:test-warehouse/tpch.customer/customer.tbl 0:24196144
-      HDFS SPLITS NODE ID: 5
-        hdfs:test-warehouse/tpch.q18_tmp/
-====
+#insert overwrite table tpch.revenue
+#select
+#  l_suppkey as supplier_no,
+#  sum(l_extendedprice * (1 - l_discount)) as total_revenue
+#from tpch.lineitem
+#where l_shipdate >= '1996-01-01' and l_shipdate < '1996-04-01'
+#group by l_suppkey
+#---- PLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.revenue
+#    OVERWRITE=true
+#  AGGREGATE
+#  OUTPUT: SUM(l_extendedprice * 1.0 - l_discount)
+#  GROUP BY: l_suppkey
+#  TUPLE IDS: 1 
+#    SCAN HDFS table=tpch.lineitem (0)
+#      PREDICATES: l_shipdate >= '1996-01-01', l_shipdate < '1996-04-01'
+#      TUPLE IDS: 0 
+#
+#  EXEC PARAMS
+#    HOST: coordinator
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+#------------ DISTRIBUTEDPLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.revenue
+#    OVERWRITE=true
+#  AGGREGATE
+#  OUTPUT: SUM(<slot 5>)
+#  GROUP BY: <slot 4>
+#  TUPLE IDS: 1 
+#    EXCHANGE (2)
+#      TUPLE IDS: 1 
+#
+#Plan Fragment 1
+#  STREAM DATA SINK
+#    EXCHANGE ID: 2
+#  AGGREGATE
+#  OUTPUT: SUM(l_extendedprice * 1.0 - l_discount)
+#  GROUP BY: l_suppkey
+#  TUPLE IDS: 1 
+#    SCAN HDFS table=tpch.lineitem (0)
+#      PREDICATES: l_shipdate >= '1996-01-01', l_shipdate < '1996-04-01'
+#      TUPLE IDS: 0 
+#
+#  EXEC PARAMS
+#    HOST: 
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+#====
+#insert overwrite table tpch.max_revenue
+#select max(total_revenue)
+#from tpch.revenue
+#---- PLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.max_revenue
+#    OVERWRITE=true
+#  AGGREGATE
+#  OUTPUT: MAX(total_revenue)
+#  GROUP BY: 
+#  TUPLE IDS: 1 
+#    SCAN HDFS table=tpch.revenue (0)
+#      TUPLE IDS: 0 
+#
+#  EXEC PARAMS
+#    HOST: coordinator
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.revenue/
+#------------ DISTRIBUTEDPLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.max_revenue
+#    OVERWRITE=true
+#  AGGREGATE
+#  OUTPUT: MAX(<slot 1>)
+#  GROUP BY: 
+#  TUPLE IDS: 1 
+#    EXCHANGE (2)
+#      TUPLE IDS: 1 
+#
+#Plan Fragment 1
+#  STREAM DATA SINK
+#    EXCHANGE ID: 2
+#  AGGREGATE
+#  OUTPUT: MAX(total_revenue)
+#  GROUP BY: 
+#  TUPLE IDS: 1 
+#    SCAN HDFS table=tpch.revenue (0)
+#      TUPLE IDS: 0 
+#
+#  EXEC PARAMS
+#    HOST: 
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.revenue/
+#====
+## Modifications - Added limit
+#select
+#  s_suppkey,
+#  s_name,
+#  s_address,
+#  s_phone,
+#  total_revenue
+#from tpch.supplier s
+#join tpch.revenue r
+#  on (s.s_suppkey = r.supplier_no)
+#join tpch.max_revenue m
+#  on (r.total_revenue = m.max_revenue)
+#order by s_suppkey
+#limit 100
+#---- PLAN
+#Plan Fragment 0
+#  TOP-N
+#  ORDER BY: s_suppkey ASC
+#  LIMIT: 100
+#  TUPLE IDS: 0 1 2 
+#    HASH JOIN
+#      JOIN OP: INNER JOIN
+#      HASH PREDICATES:
+#        r.total_revenue = m.max_revenue
+#      TUPLE IDS: 0 1 2 
+#        HASH JOIN
+#          JOIN OP: INNER JOIN
+#          HASH PREDICATES:
+#            s.s_suppkey = r.supplier_no
+#          TUPLE IDS: 0 1 
+#            SCAN HDFS table=tpch.supplier (0)
+#              TUPLE IDS: 0 
+#            SCAN HDFS table=tpch.revenue (1) compact
+#              TUPLE IDS: 1 
+#        SCAN HDFS table=tpch.max_revenue (3) compact
+#          TUPLE IDS: 2 
+#
+#  EXEC PARAMS
+#    HOST: coordinator
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.supplier/supplier.tbl 0:1399184
+#      HDFS SPLITS NODE ID: 1
+#        hdfs:test-warehouse/tpch.revenue/
+#      HDFS SPLITS NODE ID: 3
+#        hdfs:test-warehouse/tpch.max_revenue
+#------------ DISTRIBUTEDPLAN
+#Plan Fragment 0
+#  TOP-N
+#  ORDER BY: s_suppkey ASC
+#  LIMIT: 100
+#  TUPLE IDS: 0 1 2 
+#    EXCHANGE (5)
+#      TUPLE IDS: 0 1 2 
+#
+#Plan Fragment 1
+#  STREAM DATA SINK
+#    EXCHANGE ID: 5
+#  HASH JOIN
+#    JOIN OP: INNER JOIN
+#    HASH PREDICATES:
+#      r.total_revenue = m.max_revenue
+#    TUPLE IDS: 0 1 2 
+#      HASH JOIN
+#        JOIN OP: INNER JOIN
+#        HASH PREDICATES:
+#          s.s_suppkey = r.supplier_no
+#        TUPLE IDS: 0 1 
+#          SCAN HDFS table=tpch.supplier (0)
+#            TUPLE IDS: 0 
+#          SCAN HDFS table=tpch.revenue (1) compact
+#            TUPLE IDS: 1 
+#      SCAN HDFS table=tpch.max_revenue (3) compact
+#        TUPLE IDS: 2 
+#
+#  EXEC PARAMS
+#    HOST: 
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.supplier/supplier.tbl 0:1399184
+#      HDFS SPLITS NODE ID: 1
+#        hdfs:test-warehouse/tpch.revenue/
+#      HDFS SPLITS NODE ID: 3
+#        hdfs:test-warehouse/tpch.max_revenue
+#====
+## Q16 - Parts/Supplier Relation Query
+#insert overwrite table tpch.supplier_tmp
+#select s_suppkey
+#from tpch.supplier
+#where not s_comment like '%Customer%Complaints%'
+#---- PLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.supplier_tmp
+#    OVERWRITE=true
+#  SCAN HDFS table=tpch.supplier (0)
+#    PREDICATES: NOT s_comment LIKE '%Customer%Complaints%'
+#    TUPLE IDS: 0 
+#
+#  EXEC PARAMS
+#    HOST: coordinator
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.supplier/supplier.tbl 0:1399184
+#------------ DISTRIBUTEDPLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.supplier_tmp
+#    OVERWRITE=true
+#  EXCHANGE (1)
+#    TUPLE IDS: 0 
+#
+#Plan Fragment 1
+#  STREAM DATA SINK
+#    EXCHANGE ID: 1
+#  SCAN HDFS table=tpch.supplier (0)
+#    PREDICATES: NOT s_comment LIKE '%Customer%Complaints%'
+#    TUPLE IDS: 0 
+#
+#  EXEC PARAMS
+#    HOST: 
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.supplier/supplier.tbl 0:1399184
+#====
+#insert overwrite table tpch.q16_tmp
+#select p_brand, p_type, p_size, ps_suppkey
+#from tpch.partsupp ps
+#join tpch.part p
+#  on p.p_partkey = ps.ps_partkey and
+#     p.p_brand <> 'Brand#45' and
+#     not p.p_type like 'MEDIUM POLISHED%'
+#join tpch.supplier_tmp s
+#  on ps.ps_suppkey = s.s_suppkey
+#---- PLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.q16_tmp
+#    OVERWRITE=true
+#  HASH JOIN
+#    JOIN OP: INNER JOIN
+#    HASH PREDICATES:
+#      ps.ps_suppkey = s.s_suppkey
+#    TUPLE IDS: 0 1 2 
+#      HASH JOIN
+#        JOIN OP: INNER JOIN
+#        HASH PREDICATES:
+#          ps.ps_partkey = p.p_partkey
+#        OTHER JOIN PREDICATES: p.p_brand != 'Brand#45', NOT p.p_type LIKE 'MEDIUM POLISHED%'
+#        TUPLE IDS: 0 1 
+#          SCAN HDFS table=tpch.partsupp (0)
+#            TUPLE IDS: 0 
+#          SCAN HDFS table=tpch.part (1) compact
+#            PREDICATES: p.p_brand != 'Brand#45', NOT p.p_type LIKE 'MEDIUM POLISHED%'
+#            TUPLE IDS: 1 
+#      SCAN HDFS table=tpch.supplier_tmp (3) compact
+#        TUPLE IDS: 2 
+#
+#  EXEC PARAMS
+#    HOST: coordinator
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 0:67108864
+#        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 67108864:51075752
+#      HDFS SPLITS NODE ID: 1
+#        hdfs:test-warehouse/tpch.part/part.tbl 0:23935125
+#      HDFS SPLITS NODE ID: 3
+#        hdfs:test-warehouse/tpch.supplier_tmp
+#------------ DISTRIBUTEDPLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.q16_tmp
+#    OVERWRITE=true
+#  EXCHANGE (5)
+#    TUPLE IDS: 0 1 2 
+#
+#Plan Fragment 1
+#  STREAM DATA SINK
+#    EXCHANGE ID: 5
+#  HASH JOIN
+#    JOIN OP: INNER JOIN
+#    HASH PREDICATES:
+#      ps.ps_suppkey = s.s_suppkey
+#    TUPLE IDS: 0 1 2 
+#      HASH JOIN
+#        JOIN OP: INNER JOIN
+#        HASH PREDICATES:
+#          ps.ps_partkey = p.p_partkey
+#        OTHER JOIN PREDICATES: p.p_brand != 'Brand#45', NOT p.p_type LIKE 'MEDIUM POLISHED%'
+#        TUPLE IDS: 0 1 
+#          SCAN HDFS table=tpch.partsupp (0)
+#            TUPLE IDS: 0 
+#          SCAN HDFS table=tpch.part (1) compact
+#            PREDICATES: p.p_brand != 'Brand#45', NOT p.p_type LIKE 'MEDIUM POLISHED%'
+#            TUPLE IDS: 1 
+#      SCAN HDFS table=tpch.supplier_tmp (3) compact
+#        TUPLE IDS: 2 
+#
+#  EXEC PARAMS
+#    HOST: 
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 0:67108864
+#        hdfs:test-warehouse/tpch.partsupp/partsupp.tbl 67108864:51075752
+#      HDFS SPLITS NODE ID: 1
+#        hdfs:test-warehouse/tpch.part/part.tbl 0:23935125
+#      HDFS SPLITS NODE ID: 3
+#        hdfs:test-warehouse/tpch.supplier_tmp
+#====
+## Modifications: Added limit, removed 'DISTINCT' from count due to IMP-132
+#select p_brand, p_type, p_size, count(ps_suppkey) as supplier_cnt
+#from
+#( select * from tpch.q16_tmp
+#  where p_size = 49 or p_size = 14 or
+#        p_size = 23 or p_size = 45 or
+#        p_size = 19 or p_size = 3 or
+#        p_size = 36 or p_size = 9
+#) q16_all
+#group by p_brand, p_type, p_size
+#order by supplier_cnt desc, p_brand, p_type, p_size
+#limit 1000
+#---- PLAN
+#Plan Fragment 0
+#  TOP-N
+#  ORDER BY: <slot 11> DESC, <slot 8> ASC, <slot 9> ASC, <slot 10> ASC
+#  LIMIT: 1000
+#  TUPLE IDS: 2 
+#    AGGREGATE
+#    OUTPUT: COUNT(tpch.q16_tmp.ps_suppkey)
+#    GROUP BY: tpch.q16_tmp.p_brand, tpch.q16_tmp.p_type, tpch.q16_tmp.p_size
+#    TUPLE IDS: 2 
+#      SCAN HDFS table=tpch.q16_tmp (0)
+#        PREDICATES: p_size = 49 OR p_size = 14 OR p_size = 23 OR p_size = 45 OR p_size = 19 OR p_size = 3 OR p_size = 36 OR p_size = 9
+#        TUPLE IDS: 0 
+#
+#  EXEC PARAMS
+#    HOST: coordinator
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.q16_tmp
+#------------ DISTRIBUTEDPLAN
+#Plan Fragment 0
+#  TOP-N
+#  ORDER BY: <slot 11> DESC, <slot 8> ASC, <slot 9> ASC, <slot 10> ASC
+#  LIMIT: 1000
+#  TUPLE IDS: 2 
+#    AGGREGATE
+#    OUTPUT: SUM(<slot 11>)
+#    GROUP BY: <slot 8>, <slot 9>, <slot 10>
+#    TUPLE IDS: 2 
+#      EXCHANGE (2)
+#        TUPLE IDS: 2 
+#
+#Plan Fragment 1
+#  STREAM DATA SINK
+#    EXCHANGE ID: 2
+#  AGGREGATE
+#  OUTPUT: COUNT(tpch.q16_tmp.ps_suppkey)
+#  GROUP BY: tpch.q16_tmp.p_brand, tpch.q16_tmp.p_type, tpch.q16_tmp.p_size
+#  TUPLE IDS: 2 
+#    SCAN HDFS table=tpch.q16_tmp (0)
+#      PREDICATES: p_size = 49 OR p_size = 14 OR p_size = 23 OR p_size = 45 OR p_size = 19 OR p_size = 3 OR p_size = 36 OR p_size = 9
+#      TUPLE IDS: 0 
+#
+#  EXEC PARAMS
+#    HOST: 
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.q16_tmp
+#====
+## Q17 - Small-Quantity-Order Revenue Query
+#insert overwrite table tpch.lineitem_tmp
+#select l_partkey as t_partkey, 0.2 * avg(l_quantity) as t_avg_quantity
+#from tpch.lineitem
+#group by l_partkey
+#---- PLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.lineitem_tmp
+#    OVERWRITE=true
+#  AGGREGATE
+#  OUTPUT: SUM(l_quantity), COUNT(l_quantity)
+#  GROUP BY: l_partkey
+#  TUPLE IDS: 1 
+#    SCAN HDFS table=tpch.lineitem (0)
+#      TUPLE IDS: 0 
+#
+#  EXEC PARAMS
+#    HOST: coordinator
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+#------------ DISTRIBUTEDPLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.lineitem_tmp
+#    OVERWRITE=true
+#  AGGREGATE
+#  OUTPUT: SUM(<slot 3>), SUM(<slot 4>)
+#  GROUP BY: <slot 2>
+#  TUPLE IDS: 1 
+#    EXCHANGE (2)
+#      TUPLE IDS: 1 
+#
+#Plan Fragment 1
+#  STREAM DATA SINK
+#    EXCHANGE ID: 2
+#  AGGREGATE
+#  OUTPUT: SUM(l_quantity), COUNT(l_quantity)
+#  GROUP BY: l_partkey
+#  TUPLE IDS: 1 
+#    SCAN HDFS table=tpch.lineitem (0)
+#      TUPLE IDS: 0 
+#
+#  EXEC PARAMS
+#    HOST: 
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+#====
+## Modifications: Converted selects from multiple tables to joins,
+## added round() call, removed subquery
+#select round(sum(l_extendedprice) / 7.0, 5) as avg_yearly
+#from tpch.lineitem l
+#  join tpch.part p
+#    on (p.p_partkey = l.l_partkey)
+#  join tpch.lineitem_tmp lt
+#    on (lt.t_partkey = p.p_partkey)
+#where
+#  p.p_brand = 'Brand#23' and
+#  p.p_container = 'MED BOX' and
+#  l.l_quantity < lt.t_avg_quantity
+#---- PLAN
+#Plan Fragment 0
+#  AGGREGATE
+#  OUTPUT: SUM(l_extendedprice)
+#  GROUP BY: 
+#  TUPLE IDS: 3 
+#    HASH JOIN
+#      JOIN OP: INNER JOIN
+#      HASH PREDICATES:
+#        p.p_partkey = lt.t_partkey
+#      OTHER PREDICATES: l.l_quantity < lt.t_avg_quantity
+#      TUPLE IDS: 0 1 2 
+#        HASH JOIN
+#          JOIN OP: INNER JOIN
+#          HASH PREDICATES:
+#            l.l_partkey = p.p_partkey
+#          TUPLE IDS: 0 1 
+#            SCAN HDFS table=tpch.lineitem (0)
+#              TUPLE IDS: 0 
+#            SCAN HDFS table=tpch.part (1) compact
+#              PREDICATES: p.p_brand = 'Brand#23', p.p_container = 'MED BOX'
+#              TUPLE IDS: 1 
+#        SCAN HDFS table=tpch.lineitem_tmp (3) compact
+#          TUPLE IDS: 2 
+#
+#  EXEC PARAMS
+#    HOST: coordinator
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+#      HDFS SPLITS NODE ID: 1
+#        hdfs:test-warehouse/tpch.part/part.tbl 0:23935125
+#      HDFS SPLITS NODE ID: 3
+#        hdfs:test-warehouse/tpch.lineitem_tmp/
+#------------ DISTRIBUTEDPLAN
+#Plan Fragment 0
+#  AGGREGATE
+#  OUTPUT: SUM(<slot 8>)
+#  GROUP BY: 
+#  TUPLE IDS: 3 
+#    EXCHANGE (6)
+#      TUPLE IDS: 3 
+#
+#Plan Fragment 1
+#  STREAM DATA SINK
+#    EXCHANGE ID: 6
+#  AGGREGATE
+#  OUTPUT: SUM(l_extendedprice)
+#  GROUP BY: 
+#  TUPLE IDS: 3 
+#    HASH JOIN
+#      JOIN OP: INNER JOIN
+#      HASH PREDICATES:
+#        p.p_partkey = lt.t_partkey
+#      OTHER PREDICATES: l.l_quantity < lt.t_avg_quantity
+#      TUPLE IDS: 0 1 2 
+#        HASH JOIN
+#          JOIN OP: INNER JOIN
+#          HASH PREDICATES:
+#            l.l_partkey = p.p_partkey
+#          TUPLE IDS: 0 1 
+#            SCAN HDFS table=tpch.lineitem (0)
+#              TUPLE IDS: 0 
+#            SCAN HDFS table=tpch.part (1) compact
+#              PREDICATES: p.p_brand = 'Brand#23', p.p_container = 'MED BOX'
+#              TUPLE IDS: 1 
+#        SCAN HDFS table=tpch.lineitem_tmp (3) compact
+#          TUPLE IDS: 2 
+#
+#  EXEC PARAMS
+#    HOST: 
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+#      HDFS SPLITS NODE ID: 1
+#        hdfs:test-warehouse/tpch.part/part.tbl 0:23935125
+#      HDFS SPLITS NODE ID: 3
+#        hdfs:test-warehouse/tpch.lineitem_tmp/
+#====
+## Q18 - Large Value Customer Query
+#insert overwrite table tpch.q18_tmp
+#select l_orderkey, sum(l_quantity) as t_sum_quantity
+#from tpch.lineitem
+#group by l_orderkey
+#---- PLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.q18_tmp
+#    OVERWRITE=true
+#  AGGREGATE
+#  OUTPUT: SUM(l_quantity)
+#  GROUP BY: l_orderkey
+#  TUPLE IDS: 1 
+#    SCAN HDFS table=tpch.lineitem (0)
+#      TUPLE IDS: 0 
+#
+#  EXEC PARAMS
+#    HOST: coordinator
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+#------------ DISTRIBUTEDPLAN
+#Plan Fragment 0
+#  WRITE TO HDFS table=tpch.q18_tmp
+#    OVERWRITE=true
+#  AGGREGATE
+#  OUTPUT: SUM(<slot 3>)
+#  GROUP BY: <slot 2>
+#  TUPLE IDS: 1 
+#    EXCHANGE (2)
+#      TUPLE IDS: 1 
+#
+#Plan Fragment 1
+#  STREAM DATA SINK
+#    EXCHANGE ID: 2
+#  AGGREGATE
+#  OUTPUT: SUM(l_quantity)
+#  GROUP BY: l_orderkey
+#  TUPLE IDS: 1 
+#    SCAN HDFS table=tpch.lineitem (0)
+#      TUPLE IDS: 0 
+#
+#  EXEC PARAMS
+#    HOST: 
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+#====
+## Modifications: Cast o_totalprice column due to float/double values not
+## allowed in GROUP BY.
+#select
+#  c_name,
+#  c_custkey,
+#  o_orderkey,
+#  o_orderdate,
+#  cast(o_totalprice as bigint) as total_price_bigint,
+#  round(sum(l_quantity), 5)
+#from tpch.lineitem l
+#  join tpch.orders o
+#    on (o.o_orderkey = l.l_orderkey)
+#  join tpch.customer c
+#    on (c.c_custkey = o.o_custkey)
+#  join tpch.q18_tmp t
+#    on (o.o_orderkey = t.l_orderkey and t.t_sum_quantity > 300)
+#group by
+#  c_name,
+#  c_custkey,
+#  o_orderkey,
+#  o_orderdate,
+#  cast(o_totalprice as bigint)
+#order by
+#  total_price_bigint,
+#  o_orderdate
+#limit 100
+#---- PLAN
+#Plan Fragment 0
+#  TOP-N
+#  ORDER BY: <slot 14> ASC, <slot 13> ASC
+#  LIMIT: 100
+#  TUPLE IDS: 4 
+#    AGGREGATE
+#    OUTPUT: SUM(l_quantity)
+#    GROUP BY: c_name, c_custkey, o_orderkey, o_orderdate, CAST(o_totalprice AS BIGINT)
+#    TUPLE IDS: 4 
+#      HASH JOIN
+#        JOIN OP: INNER JOIN
+#        HASH PREDICATES:
+#          o.o_orderkey = t.l_orderkey
+#        OTHER JOIN PREDICATES: t.t_sum_quantity > 300.0
+#        TUPLE IDS: 0 1 2 3 
+#          HASH JOIN
+#            JOIN OP: INNER JOIN
+#            HASH PREDICATES:
+#              o.o_custkey = c.c_custkey
+#            TUPLE IDS: 0 1 2 
+#              HASH JOIN
+#                JOIN OP: INNER JOIN
+#                HASH PREDICATES:
+#                  l.l_orderkey = o.o_orderkey
+#                TUPLE IDS: 0 1 
+#                  SCAN HDFS table=tpch.lineitem (0)
+#                    TUPLE IDS: 0 
+#                  SCAN HDFS table=tpch.orders (1) compact
+#                    TUPLE IDS: 1 
+#              SCAN HDFS table=tpch.customer (3) compact
+#                TUPLE IDS: 2 
+#          SCAN HDFS table=tpch.q18_tmp (5) compact
+#            PREDICATES: t.t_sum_quantity > 300.0
+#            TUPLE IDS: 3 
+#
+#  EXEC PARAMS
+#    HOST: coordinator
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+#      HDFS SPLITS NODE ID: 1
+#        hdfs:test-warehouse/tpch.orders/orders.tbl 0:67108864
+#        hdfs:test-warehouse/tpch.orders/orders.tbl 67108864:67108864
+#        hdfs:test-warehouse/tpch.orders/orders.tbl 134217728:36234433
+#      HDFS SPLITS NODE ID: 3
+#        hdfs:test-warehouse/tpch.customer/customer.tbl 0:24196144
+#      HDFS SPLITS NODE ID: 5
+#        hdfs:test-warehouse/tpch.q18_tmp/
+#------------ DISTRIBUTEDPLAN
+#Plan Fragment 0
+#  TOP-N
+#  ORDER BY: <slot 14> ASC, <slot 13> ASC
+#  LIMIT: 100
+#  TUPLE IDS: 4 
+#    AGGREGATE
+#    OUTPUT: SUM(<slot 15>)
+#    GROUP BY: <slot 10>, <slot 11>, <slot 12>, <slot 13>, <slot 14>
+#    TUPLE IDS: 4 
+#      EXCHANGE (8)
+#        TUPLE IDS: 4 
+#
+#Plan Fragment 1
+#  STREAM DATA SINK
+#    EXCHANGE ID: 8
+#  AGGREGATE
+#  OUTPUT: SUM(l_quantity)
+#  GROUP BY: c_name, c_custkey, o_orderkey, o_orderdate, CAST(o_totalprice AS BIGINT)
+#  TUPLE IDS: 4 
+#    HASH JOIN
+#      JOIN OP: INNER JOIN
+#      HASH PREDICATES:
+#        o.o_orderkey = t.l_orderkey
+#      OTHER JOIN PREDICATES: t.t_sum_quantity > 300.0
+#      TUPLE IDS: 0 1 2 3 
+#        HASH JOIN
+#          JOIN OP: INNER JOIN
+#          HASH PREDICATES:
+#            o.o_custkey = c.c_custkey
+#          TUPLE IDS: 0 1 2 
+#            HASH JOIN
+#              JOIN OP: INNER JOIN
+#              HASH PREDICATES:
+#                l.l_orderkey = o.o_orderkey
+#              TUPLE IDS: 0 1 
+#                SCAN HDFS table=tpch.lineitem (0)
+#                  TUPLE IDS: 0 
+#                SCAN HDFS table=tpch.orders (1) compact
+#                  TUPLE IDS: 1 
+#            SCAN HDFS table=tpch.customer (3) compact
+#              TUPLE IDS: 2 
+#        SCAN HDFS table=tpch.q18_tmp (5) compact
+#          PREDICATES: t.t_sum_quantity > 300.0
+#          TUPLE IDS: 3 
+#
+#  EXEC PARAMS
+#    HOST: 
+#      HDFS SPLITS NODE ID: 0
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 0:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 67108864:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 134217728:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 201326592:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 268435456:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 335544320:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 402653184:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 469762048:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 536870912:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 603979776:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 671088640:67108864
+#        hdfs:test-warehouse/tpch.lineitem/lineitem.tbl 738197504:15664568
+#      HDFS SPLITS NODE ID: 1
+#        hdfs:test-warehouse/tpch.orders/orders.tbl 0:67108864
+#        hdfs:test-warehouse/tpch.orders/orders.tbl 67108864:67108864
+#        hdfs:test-warehouse/tpch.orders/orders.tbl 134217728:36234433
+#      HDFS SPLITS NODE ID: 3
+#        hdfs:test-warehouse/tpch.customer/customer.tbl 0:24196144
+#      HDFS SPLITS NODE ID: 5
+#        hdfs:test-warehouse/tpch.q18_tmp/
+#====
 # Q19 - Discounted Revenue Query
 # Modifications: Added round() calls
 select round(sum(l_extendedprice * (1 - l_discount) ), 5) as revenue
