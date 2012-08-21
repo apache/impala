@@ -42,7 +42,8 @@ using namespace boost::accumulators;
 using namespace apache::thrift::transport;
 
 DECLARE_int32(be_port);
-DECLARE_string(host);
+DECLARE_string(ipaddress);
+DECLARE_string(hostname);
 
 namespace impala {
 
@@ -131,11 +132,12 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
             request->fragment_requests[0], request->node_request_params[0][0]));
 
     if (request->node_request_params.size() > 1) {
-      // for now, set destinations of 2nd fragment to coord host/port
+      // for now, set destinations of 2nd fragment to coord ipaddress/port
       // TODO: determine execution hosts first, then set destinations to those hosts
       for (int i = 0; i < request->node_request_params[1].size(); ++i) {
         DCHECK_EQ(request->node_request_params[1][i].destinations.size(), 1);
-        request->node_request_params[1][i].destinations[0].host = FLAGS_host;
+        request->node_request_params[1][i].destinations[0].hostname = FLAGS_hostname;
+        request->node_request_params[1][i].destinations[0].ipaddress = FLAGS_ipaddress;
         request->node_request_params[1][i].destinations[0].port = FLAGS_be_port;
       }
     }
@@ -448,7 +450,7 @@ void Coordinator::PrintBackendInfo() {
   if (VLOG_FILE_IS_ON) {
     for (int i = 0; i < backend_exec_states_.size(); ++i) {
       BackendExecState* exec_state = backend_exec_states_[i];
-      VLOG_FILE << "data volume for host " << exec_state->hostport.first
+      VLOG_FILE << "data volume for ipaddress " << exec_state->hostport.first
                 << ":" << exec_state->hostport.second << ": "
                 << PrettyPrinter::Print(
                   exec_state->total_split_size, TCounterType::BYTES);
@@ -515,7 +517,7 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
   BackendExecState* exec_state = reinterpret_cast<BackendExecState*>(exec_state_arg);
   VLOG_FILE << "making rpc: ExecPlanFragment query_id=" << query_id_
             << " fragment_id=" << exec_state->fragment_id
-            << " host=" << exec_state->hostport.first
+            << " ipaddress=" << exec_state->hostport.first
             << " port=" << exec_state->hostport.second;
   lock_guard<mutex> l(exec_state->lock);
 
@@ -531,7 +533,8 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
   params.__set_request(*exec_state->exec_request);
   params.request.fragment_id = exec_state->fragment_id;
   params.__set_params(*exec_state->exec_params);
-  params.coord.host = FLAGS_host;
+  params.coord.hostname = FLAGS_hostname;
+  params.coord.ipaddress = FLAGS_ipaddress;
   params.coord.port = FLAGS_be_port;
   params.__isset.coord = true;
   params.__set_backend_num(exec_state->backend_num);

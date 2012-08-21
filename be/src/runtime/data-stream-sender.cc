@@ -35,7 +35,7 @@ DEFINE_int32(port, 20001, "port on which to run Impala backend");
 namespace impala {
 
 // A channel sends data asynchronously via calls to TransmitData
-// to a single destination host/node.
+// to a single destination ipaddress/node.
 // It has a fixed-capacity buffer and allows the caller either to add rows to
 // that buffer individually (AddRow()), or circumvent the buffer altogether and send
 // TRowBatches directly (SendBatch()). Either way, there can only be one in-flight RPC
@@ -44,14 +44,14 @@ namespace impala {
 // *Not* thread-safe.
 class DataStreamSender::Channel {
  public:
-  // Create channel to send data to particular host/port/query/node
+  // Create channel to send data to particular ipaddress/port/query/node
   // combination. buffer_size is specified in bytes and a soft limit on
   // how much tuple data is getting accumulated before being sent; it only applies
   // when data is added via AddRow() and not sent directly via SendBatch().
   Channel(const RowDescriptor& row_desc, const THostPort& destination,
           const TUniqueId& fragment_id, PlanNodeId dest_node_id, int buffer_size)
     : row_desc_(row_desc),
-      host_(destination.host),
+      ipaddress_(destination.ipaddress),
       port_(destination.port),
       fragment_id_(fragment_id),
       dest_node_id_(dest_node_id),
@@ -87,11 +87,11 @@ class DataStreamSender::Channel {
   int64_t num_data_bytes_sent() const { return num_data_bytes_sent_; }
 
  private:
-  typedef ThriftClient<ImpalaInternalServiceClient> BackendThriftClient;
+  typedef ThriftClient<ImpalaInternalServiceClient, IMPALA_SERVER> BackendThriftClient;
   scoped_ptr<BackendThriftClient> client_;
 
   const RowDescriptor& row_desc_;
-  string host_;
+  string ipaddress_;
   int port_;
   TUniqueId fragment_id_;
   PlanNodeId dest_node_id_;
@@ -119,13 +119,13 @@ class DataStreamSender::Channel {
 };
 
 Status DataStreamSender::Channel::Init() {
-  client_.reset(new BackendThriftClient(host_, port_));
+  client_.reset(new BackendThriftClient(ipaddress_, port_));
 
   try {
     client_->Open();
   } catch (TTransportException& e) {
     stringstream msg;
-    msg << "couldn't create ImpalaInternalService client for " << host_ << ":"
+    msg << "couldn't create ImpalaInternalService client for " << ipaddress_ << ":"
         << port_ << ":\n" << e.what();
     return Status(msg.str());
   }
@@ -167,7 +167,7 @@ void DataStreamSender::Channel::TransmitData() {
     }
   } catch (TException& e) {
     stringstream msg;
-    msg << "TransmitData() to " << host_ << ":" << port_ << " failed:\n" << e.what();
+    msg << "TransmitData() to " << ipaddress_ << ":" << port_ << " failed:\n" << e.what();
     rpc_status_ = Status(msg.str());
     return;
   }
@@ -233,7 +233,8 @@ Status DataStreamSender::Channel::Close() {
     return Status(res.status);
   } catch (TException& e) {
     stringstream msg;
-    msg << "CloseChannel() to " << host_ << ":" << port_ << " failed:\n" << e.what();
+    msg << "CloseChannel() to "
+        << ipaddress_ << ":" << port_ << " failed:\n" << e.what();
     return Status(msg.str());
   }
   return Status::OK;
@@ -257,7 +258,7 @@ DataStreamSender::DataStreamSender(
       LOG(INFO) << "partition boundaries not empty for hash-partitioned output; "
                    "ignoring";
     }
-    // we need a partitioning expr if we send to more than one host
+    // we need a partitioning expr if we send to more than one ipaddress
     DCHECK(partition_spec.__isset.partitionExpr || destinations.size() == 1);
     // TODO: switch to Init() function that returns Status
     DCHECK(Expr::CreateExprTree(

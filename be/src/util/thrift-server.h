@@ -23,14 +23,20 @@ class ThriftServer {
  public:
   static const int DEFAULT_WORKER_THREADS = 2;
 
-  enum ServerType { ThreadPool = 0, Nonblocking };
+  // There are 3 servers supported by Thrift with different threading models.
+  // ThreadPool  -- Allocates a fixed number of threads. A thread is used by a
+  //                connection until it closes.
+  // Threaded    -- Allocates 1 thread per connection, as needed.
+  // Nonblocking -- Threads are allocated to a connection only when the server
+  //                is working on behalf of the connection.
+  enum ServerType { ThreadPool = 0, Threaded, Nonblocking };
 
   // Creates, but does not start, a new server on the specified port
   // that exports the supplied interface.
   ThriftServer(const std::string& name,
       const boost::shared_ptr<apache::thrift::TProcessor>& processor, int port,
       int num_worker_threads = DEFAULT_WORKER_THREADS,
-      ServerType server_type = Nonblocking);
+      ServerType server_type = Threaded);
 
   int port() const { return port_; }
 

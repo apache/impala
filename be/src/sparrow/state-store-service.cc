@@ -80,12 +80,15 @@ void StateStore::RegisterService(TRegisterServiceResponse& response,
   if (membership.find(subscriber.id()) == membership.end()) {
     membership.insert(make_pair(subscriber.id(), request.service_address));
     subscriber.AddService(request.service_id);
-    LOG(INFO) << "Registered service instance (id: " << request.service_id << ", host: "
-              << request.service_address.host << ":" << request.service_address.port
+    LOG(INFO) << "Registered service instance (id: "
+              << request.service_id << ", for: "
+              << request.service_address.hostname << "("
+              << request.service_address.ipaddress << "):"
+              << request.service_address.port
               << ")";
     num_backends_metric_->Increment(1L);
     stringstream ss;
-    ss << request.service_address.host << ":" << request.service_address.port;
+    ss << request.service_address.ipaddress << ":" << request.service_address.port;
     backend_set_metric_->Add(ss.str());
     VLOG(2) << "Number of backends registered: " << num_backends_metric_->value();
   }
@@ -106,7 +109,7 @@ void StateStore::UnregisterService(TUnregisterServiceResponse& response,
   if (subscriber_iterator == subscribers_.end()) {
     stringstream error_message;
     error_message << "No registered instances at subscriber "
-                  << request.subscriber_address.host << ":"
+                  << request.subscriber_address.ipaddress << ":"
                   << request.subscriber_address.port;
     RETURN_AND_SET_ERROR(error_message.str(), response);
   }
@@ -123,7 +126,7 @@ void StateStore::UnregisterService(TUnregisterServiceResponse& response,
     if (instance != membership.end()) {
       instance_unregistered = true;
       stringstream ss;
-      ss << instance->second.host << ":" << instance->second.port;
+      ss << instance->second.ipaddress << ":" << instance->second.port;
       backend_set_metric_->Remove(ss.str());
 
       membership.erase(instance);
@@ -140,7 +143,7 @@ void StateStore::UnregisterService(TUnregisterServiceResponse& response,
   if (!instance_unregistered) {
     stringstream error_message;
     error_message << "No instance for service " << request.service_id
-                  << " at subscriber " << request.subscriber_address.host << ":"
+                  << " at subscriber " << request.subscriber_address.ipaddress << ":"
                   << request.subscriber_address.port;
     RETURN_AND_SET_ERROR(error_message.str(), response);
   }
@@ -161,8 +164,9 @@ void StateStore::RegisterSubscription(TRegisterSubscriptionResponse& response,
 
   SubscriptionId subscription_id = subscriber.AddSubscription(request.services);
   response.__set_subscription_id(subscription_id);
-  LOG(INFO) << "Registered subscription (id: " << subscription_id << ", host: "
-            << request.subscriber_address.host << ":" << request.subscriber_address.port
+  LOG(INFO) << "Registered subscription (id: " << subscription_id << ", for: "
+            << request.subscriber_address.ipaddress
+            << ":" << request.subscriber_address.port
             << ") for " << request.services.size() << " topics (" 
             << join(request.services, ", ") << ")";
 
@@ -181,7 +185,7 @@ void StateStore::UnregisterSubscription(TUnregisterSubscriptionResponse& respons
   if (subscriber_iterator == subscribers_.end()) {
     stringstream error_message;
     error_message << "No registered subscriptions at subscriber "
-                  << request.subscriber_address.host << ":"
+                  << request.subscriber_address.ipaddress << ":"
                   << request.subscriber_address.port;
     RETURN_AND_SET_ERROR(error_message.str(), response);
   }
@@ -191,7 +195,7 @@ void StateStore::UnregisterSubscription(TUnregisterSubscriptionResponse& respons
   if (!subscription_existed) {
     stringstream error_message;
     error_message << "No subscription with ID " << request.subscription_id
-                  << " at subscriber " << request.subscriber_address.host << ":"
+                  << " at subscriber " << request.subscriber_address.ipaddress << ":"
                   << request.subscriber_address.port;
     RETURN_AND_SET_ERROR(error_message.str(), response);
   }
@@ -231,7 +235,7 @@ void StateStore::WaitForServerToStop() {
 }
 
 void StateStore::Subscriber::Init(const THostPort& address) {
-  client_.reset(new SubscriberClient(address.host, address.port));
+  client_.reset(new SubscriberClient(address.hostname, address.port));
 }
 
 void StateStore::Subscriber::AddService(const string& service_id) {
@@ -335,7 +339,7 @@ void StateStore::UpdateLoop() {
         // transition the subscriber to a CRITICAL state, and if we have multiple failed
         // attempts to connect to the subscriber, it should be removed from the list of
         // available subscribers.
-        LOG(ERROR) << "Unable to update client at " << update.client->host()
+        LOG(ERROR) << "Unable to update client at " << update.client->ipaddress()
                    << ":" << update.client->port() << "; received error "
                    << status.GetErrorMsg();
         continue;
@@ -351,7 +355,7 @@ void StateStore::UpdateLoop() {
       } catch (TTransportException& e) {
         // TODO: As above, this error should transition the subscriber to a CRITICAL
         // state.
-        LOG(ERROR) << "Unable to update client at " << update.client->host()
+        LOG(ERROR) << "Unable to update client at " << update.client->ipaddress()
                    << ":" << update.client->port() << "; received error "
                    << e.what();
       } catch (std::exception& e) {

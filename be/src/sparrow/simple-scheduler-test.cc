@@ -23,7 +23,7 @@ class SimpleSchedulerTest : public testing::Test {
     vector<THostPort> backends;
     backends.resize(num_backends_);
     for (int i = 0; i < num_backends_; ++i) {
-      backends.at(i).host = "localhost";
+      backends.at(i).ipaddress = "127.0.0.1";
       backends.at(i).port = base_port_ + i;
     }
     localhost_scheduler_.reset(new SimpleScheduler(backends, NULL));
@@ -32,7 +32,7 @@ class SimpleSchedulerTest : public testing::Test {
     for (int i = 0; i < num_backends_; ++i) {
       stringstream ss;
       ss << "host_" << i;
-      backends.at(i).host = ss.str();
+      backends.at(i).ipaddress = ss.str();
       backends.at(i).port = base_port_ + i;
     }
     remote_scheduler_.reset(new SimpleScheduler(backends, NULL));
@@ -44,7 +44,7 @@ class SimpleSchedulerTest : public testing::Test {
       for (int j = 0; j < 2; ++j) {
         stringstream ss;
         ss << "host_" << i;
-        backends.at(k).host = ss.str();
+        backends.at(k).ipaddress = ss.str();
         backends.at(k).port = base_port_ + j;
         ++k;
       }
@@ -64,10 +64,10 @@ class SimpleSchedulerTest : public testing::Test {
   // This scheduler has 3 backends, all on localhost but have 3 different ports.
   boost::scoped_ptr<SimpleScheduler> localhost_scheduler_;
 
-  // This scheduler has 3 backends on different host and have 3 different ports.
+  // This scheduler has 3 backends on different ipaddresses and has 3 different ports.
   boost::scoped_ptr<SimpleScheduler> remote_scheduler_;
 
-  // This scheduler has 4 backends; 2 on each host and have 4 different ports.
+  // This scheduler has 4 backends; 2 on each ipaddresses and has 4 different ports.
   boost::scoped_ptr<SimpleScheduler> local_remote_scheduler_;
 };
 
@@ -77,7 +77,7 @@ TEST_F(SimpleSchedulerTest, LocalMatches) {
   vector<THostPort> data_locations;
   data_locations.resize(5);
   for (int i = 0; i < 5; ++i) {
-    data_locations.at(i).host = "host_1";
+    data_locations.at(i).ipaddress = "host_1";
     data_locations.at(i).port = 0;
   }
   vector<pair<string, int> > hostports;
@@ -93,18 +93,19 @@ TEST_F(SimpleSchedulerTest, LocalMatches) {
 }
 
 TEST_F(SimpleSchedulerTest, NonLocalHost) {
-  // If data location doesn't match any of the host, expect round robin host/port list
+  // If data location doesn't match any of the ipaddress,
+  // expect round robin ipaddress/port list
   vector<THostPort> data_locations;
   data_locations.resize(5);
   for (int i = 0; i < 5; ++i) {
-    data_locations.at(i).host = "non exists host";
+    data_locations.at(i).ipaddress = "non exists ipaddress";
     data_locations.at(i).port = 0;
   }
   vector<pair<string, int> > hostports;
 
   local_remote_scheduler_->GetHosts(data_locations, &hostports);
 
-  // Expect 5 round robin on host, then on port
+  // Expect 5 round robin on ipaddress, then on port
   // 1. host_0:1000
   // 2. host_1:1000
   // 3. host_0:1001

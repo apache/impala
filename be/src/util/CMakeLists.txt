@@ -7,6 +7,7 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/util")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/util")
 
 add_library(Util
+  authorization.cc
   benchmark.cc
   codec.cc
   compress.cc
@@ -24,10 +25,11 @@ add_library(Util
   perf-counters.cc
   runtime-profile.cc
   thrift-util.cc
+  thrift-client.cc
   thrift-server.cc
   static-asserts.cc
   url-parser.cc
-)
+  )
 
 add_library(Webserver STATIC
   ${MONGOOSE_SRC_DIR}/mongoose.c

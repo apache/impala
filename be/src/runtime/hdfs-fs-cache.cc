@@ -8,7 +8,7 @@
 
 using namespace boost;
 
-DEFINE_string(nn, "localhost", "namenode host");
+DEFINE_string(nn, "localhost", "hostname or ip address of HDFS namenode");
 DEFINE_int32(nn_port, 20500, "namenode port");
 
 namespace impala {

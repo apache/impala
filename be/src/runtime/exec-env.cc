@@ -30,7 +30,7 @@ DEFINE_bool(use_statestore, true,
     "Use an external state-store process to manage cluster membership");
 DEFINE_bool(enable_webserver, true, "If true, debug webserver is enabled");
 DECLARE_int32(be_port);
-DECLARE_string(host);
+DECLARE_string(ipaddress);
 
 namespace impala {
 
@@ -53,7 +53,7 @@ ExecEnv::ExecEnv()
   } else {
     vector<THostPort> addresses;
     THostPort address;
-    address.host = FLAGS_host;
+    address.ipaddress = FLAGS_ipaddress;
     address.port = FLAGS_be_port; 
     addresses.push_back(address);
     scheduler_.reset(new SimpleScheduler(addresses, metrics_.get()));

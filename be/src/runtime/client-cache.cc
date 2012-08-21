@@ -42,7 +42,8 @@ Status BackendClientCache::GetClient(
   list<BackendClient*>& info_list = cache_entry->second;
   if (!info_list.empty()) {
     *client = info_list.front()->iface();
-    VLOG_CONNECTION << "GetClient(): adding client for " << info_list.front()->host()
+    VLOG_CONNECTION << "GetClient(): adding client for "
+                    << info_list.front()->ipaddress()
                     << ":" << info_list.front()->port();
     info_list.pop_front();
   } else {
@@ -51,7 +52,7 @@ Status BackendClientCache::GetClient(
     RETURN_IF_ERROR(info->Open());
     client_map_[info->iface()] = info.get();
     VLOG_CONNECTION << "GetClient(): creating client for "
-                    << info->host() << ":" << info->port();
+                    << info->ipaddress() << ":" << info->port();
     *client = info.release()->iface();
   }
 
@@ -63,8 +64,10 @@ void BackendClientCache::ReleaseClient(ImpalaInternalServiceClient* client) {
   ClientMap::iterator i = client_map_.find(client);
   DCHECK(i != client_map_.end());
   BackendClient* info = i->second;
-  VLOG_CONNECTION << "releasing client for " << info->host() << ":" << info->port();
-  ClientCache::iterator j = client_cache_.find(make_pair(info->host(), info->port()));
+  VLOG_CONNECTION << "releasing client for "
+                  << info->ipaddress() << ":" << info->port();
+  ClientCache::iterator j =
+      client_cache_.find(make_pair(info->ipaddress(), info->port()));
   DCHECK(j != client_cache_.end());
   j->second.push_back(info);
 }

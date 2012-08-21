@@ -503,7 +503,7 @@ public class Planner {
       } else {
         THostPort hostport =
             request.getData_locations().get(planFragIdx - 1).get(nodeIdx);
-        String hostnode = hostport.getHost() + ":" + hostport.getPort();
+        String hostnode = hostport.getIpaddress() + ":" + hostport.getPort();
         execParamExplain.append(prefix + "  HOST: " + hostnode + "\n");
       }
 
@@ -1116,7 +1116,7 @@ public class Planner {
     if (scanRanges.isEmpty() && dataLocations.isEmpty()) {
       // if we're scanning an empty table we still need a single
       // host to execute the scan
-      dataLocations.add(new THostPort("localhost", 0));
+      dataLocations.add(new THostPort("localhost", "127.0.0.1", 0));
     }
   }
 
@@ -1158,7 +1158,8 @@ public class Planner {
         fragmentParams.addToScan_ranges(scanRange.next());
       }
       THostPort address = new THostPort();
-      address.host = "localhost";
+      address.hostname = "localhost";
+      address.ipaddress = "127.0.0.1";
       address.port = 0;  // set elsewhere
       fragmentParams.setDestinations(Lists.newArrayList(address));
       fragmentParamsList.add(fragmentParams);

@@ -10,6 +10,7 @@
 #include <boost/thread/thread.hpp>
 
 #include "testutil/query-executor-if.h"
+#include "util/thrift-client.h"
 #include "common/status.h"
 #include "exec/exec-stats.h"
 #include "runtime/primitive-type.h"
@@ -19,9 +20,6 @@
 #include "gen-cpp/ImpalaService_types.h"
 
 namespace impala {
-
-template <class InterfaceType>
-class ThriftClient;
 
 // Query execution against running impalad process.
 class ImpaladQueryExecutor : public QueryExecutorIf {
@@ -78,7 +76,7 @@ class ImpaladQueryExecutor : public QueryExecutorIf {
 
  private:
   // fe service-related
-  boost::scoped_ptr<ThriftClient<ImpalaServiceClient> > client_;
+  boost::scoped_ptr<ThriftClient<ImpalaServiceClient, IMPALA_SERVER> > client_;
 
   // Execution options
   std::vector<std::string> exec_options_;

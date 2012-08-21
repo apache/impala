@@ -9,11 +9,14 @@
 #include <protocol/TBinaryProtocol.h>
 #include <server/TNonblockingServer.h>
 #include <server/TThreadPoolServer.h>
+#include <server/TThreadedServer.h>
 #include <transport/TSocket.h>
 #include <server/TThreadPoolServer.h>
 #include <transport/TServerSocket.h>
+#include <gflags/gflags.h>
 
 #include "util/thrift-server.h"
+#include "util/authorization.h"
 
 #include <sstream>
 
@@ -29,6 +32,10 @@ DEFINE_int32(rpc_cnxn_attempts, 10,
     "Advanced: The number of times to retry connecting to an RPC server");
 DEFINE_int32(rpc_cnxn_retry_interval_ms, 2000,
     "Advanced: The interval, in ms, between retrying connections to an RPC server");
+DECLARE_string(principal);
+DECLARE_string(keytab_file);
+DEFINE_bool(use_nonblocking, false, \
+     "Use nonblocking servers if true. Only valid if security is not enabled.");
 
 namespace impala {
 
@@ -163,25 +170,60 @@ ThriftServer::ThriftServer(const string& name, const shared_ptr<TProcessor>& pro
 Status ThriftServer::Start() {
   DCHECK(!started_);
   shared_ptr<TProtocolFactory> protocol_factory(new TBinaryProtocolFactory());
-  shared_ptr<ThreadManager> thread_mgr(
-      ThreadManager::newSimpleThreadManager(num_worker_threads_));
+  shared_ptr<ThreadManager> thread_mgr;
   shared_ptr<ThreadFactory> thread_factory(new PosixThreadFactory());
   shared_ptr<TServerTransport> fe_server_transport;
   shared_ptr<TTransportFactory> transport_factory;
 
-  thread_mgr->threadFactory(thread_factory);
-  thread_mgr->start();
+  if (FLAGS_use_nonblocking && server_type_ == Threaded) server_type_ = Nonblocking;
+
+  // TODO: The thrift non-blocking server needs to be fixed.
+  if (server_type_ == Nonblocking && !FLAGS_principal.empty()) {
+    string mesg("Nonblocking servers cannot be used with Kerberos");
+    LOG(ERROR) << mesg;
+    return (Status(mesg));
+  }
+
+  if (server_type_ != Threaded) {
+    thread_mgr = ThreadManager::newSimpleThreadManager(num_worker_threads_);
+    thread_mgr->threadFactory(thread_factory);
+    thread_mgr->start();
+  }
+
+  if (!FLAGS_principal.empty()) {
+    if (FLAGS_keytab_file.empty()) {
+      LOG(ERROR) << "Kerberos principal, '" << FLAGS_principal <<
+          "' specified, but no keyfile";
+      return Status("no keyfile");
+    }
+    RETURN_IF_ERROR(GetKerberosTransportFactory(FLAGS_principal,
+        FLAGS_keytab_file, &transport_factory));
+  }
 
   switch (server_type_) {
     case Nonblocking:
-      server_.reset(new TNonblockingServer(processor_, protocol_factory, port_,
-          thread_mgr));
+      if (transport_factory.get() == NULL) {
+        transport_factory.reset(new TTransportFactory());
+      }
+      server_.reset(new TNonblockingServer(processor_, 
+          transport_factory, transport_factory,
+          protocol_factory, protocol_factory, port_, thread_mgr));
       break;
     case ThreadPool:
       fe_server_transport.reset(new TServerSocket(port_));
-      transport_factory.reset(new TBufferedTransportFactory());
+      if (transport_factory.get() == NULL) {
+        transport_factory.reset(new TBufferedTransportFactory());
+      }
       server_.reset(new TThreadPoolServer(processor_, fe_server_transport,
           transport_factory, protocol_factory, thread_mgr));
+      break;
+    case Threaded:
+      fe_server_transport.reset(new TServerSocket(port_));
+      if (transport_factory.get() == NULL) {
+        transport_factory.reset(new TBufferedTransportFactory());
+      }
+      server_.reset(new TThreadedServer(processor_, fe_server_transport,
+          transport_factory, protocol_factory, thread_factory));
       break;
     default:
       stringstream error_msg;

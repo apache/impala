@@ -26,7 +26,7 @@ class HdfsFsCache {
   hdfsFS GetDefaultConnection();
 
   // Get connection to specific fs by specifying the name node's
-  // host and port.
+  // ipaddress or hostname and port.
   hdfsFS GetConnection(const std::string& host, int port);
 
  private:

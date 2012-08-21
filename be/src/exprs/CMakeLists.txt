@@ -37,6 +37,7 @@ add_library(Exprs
 
 target_link_libraries(Exprs
   Util
+  ThriftSaslTransport
   boost_regex-mt
 )
 

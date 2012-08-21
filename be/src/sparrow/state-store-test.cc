@@ -65,7 +65,7 @@ class StateStoreTest : public testing::Test {
 
  protected:
   static int next_port_;
-  static const char* host_;
+  static const char* ipaddress_;
 
   THostPort state_store_host_port_;
   scoped_ptr<Metrics> metrics_;
@@ -75,7 +75,7 @@ class StateStoreTest : public testing::Test {
 
   StateStoreTest() 
       : metrics_(new Metrics()), state_store_(new StateStore(1000L, metrics_.get())) {
-    state_store_host_port_.host = "localhost";
+    state_store_host_port_.ipaddress = "127.0.0.1";
     state_store_host_port_.port = next_port_++;
     FLAGS_rpc_cnxn_attempts = 1;
     FLAGS_rpc_cnxn_retry_interval_ms = 100;
@@ -85,7 +85,7 @@ class StateStoreTest : public testing::Test {
     impala::InitThriftLogging();
     state_store_->Start(state_store_host_port_.port);
     Status status =
-      impala::WaitForServer(state_store_host_port_.host,
+      impala::WaitForServer(state_store_host_port_.ipaddress,
                             state_store_host_port_.port, 3, 500);
     EXPECT_TRUE(status.ok());
   }
@@ -93,7 +93,7 @@ class StateStoreTest : public testing::Test {
   shared_ptr<StateStoreSubscriber> StartStateStoreSubscriber() {
     int port = next_port_++;
     subscribers_.push_back(shared_ptr<StateStoreSubscriber>(new StateStoreSubscriber(
-        host_, port, state_store_host_port_.host, state_store_host_port_.port)));
+        ipaddress_, ipaddress_, port, state_store_host_port_.ipaddress, state_store_host_port_.port)));
     subscribers_.back()->Start();
     Status status = impala::WaitForServer("localhost", port, 10, 100);
     EXPECT_TRUE(status.ok());
@@ -123,7 +123,7 @@ class StateStoreTest : public testing::Test {
 
     // Address where service_id is running.
     THostPort service_address;
-    service_address.host = host_;
+    service_address.ipaddress = ipaddress_;
     service_address.port = next_port_++;
 
     // We expect the membership to include just one running instance of service_id.
@@ -163,7 +163,7 @@ class StateStoreTest : public testing::Test {
   }
 };
 
-const char* StateStoreTest::host_ = "localhost";
+const char* StateStoreTest::ipaddress_ = "127.0.0.1";
 int StateStoreTest::next_port_ = 23000;
 
 TEST_F(StateStoreTest, SingleRegister) {
@@ -185,11 +185,13 @@ TEST_F(StateStoreTest, MultipleServiceRegister) {
 
   // Addresses where services are running.
   THostPort service1_address;
-  service1_address.host = host_;
+  service1_address.ipaddress = ipaddress_;
+  service1_address.hostname = ipaddress_;
   service1_address.port = next_port_++;
 
   THostPort service2_address;
-  service2_address.host = host_;
+  service2_address.ipaddress = ipaddress_;
+  service2_address.hostname = ipaddress_;
   service2_address.port = next_port_++;
 
   // We expect the membership to include just one running instance of service2.
@@ -228,7 +230,7 @@ TEST_F(StateStoreTest, MultipleServiceRegister) {
 
 TEST_F(StateStoreTest, RegisterFailsGracefullyWhenStateStoreUnreachable) {
   // Nonblocking Thrift servers can't be stopped, so just point at a non-open socket
-  state_store_host_port_.host = "localhost";
+  state_store_host_port_.ipaddress = "127.0.0.1";
   state_store_host_port_.port = next_port_++;
 
   const string service_id = "test_service";
@@ -251,7 +253,8 @@ TEST_F(StateStoreTest, RegisterFailsGracefullyWhenStateStoreUnreachable) {
 
   // Address where service_id is running.
   THostPort service_address;
-  service_address.host = host_;
+  service_address.ipaddress = ipaddress_;
+  service_address.hostname = ipaddress_;
   service_address.port = next_port_++;
   status = running_subscriber->RegisterService(service_id, service_address);
   EXPECT_FALSE(status.ok());
@@ -267,7 +270,8 @@ TEST_F(StateStoreTest, UnregisterService) {
 
   // Address where service_id is running.
   THostPort service_address;
-  service_address.host = host_;
+  service_address.ipaddress = ipaddress_;
+  service_address.hostname = ipaddress_;
   service_address.port = next_port_++;
 
   // We expect the membership to include just one running instance of service_id.
@@ -325,7 +329,8 @@ TEST_F(StateStoreTest, UnregisterSubscription) {
 
   // Address where service_id is running.
   THostPort service_address;
-  service_address.host = host_;
+  service_address.ipaddress = ipaddress_;
+  service_address.hostname = ipaddress_;
   service_address.port = next_port_++;
 
   // We expect the membership to include just one running instance of service_id.
@@ -395,13 +400,16 @@ TEST_F(StateStoreTest, UnregisterOneOfMultipleSubscriptions) {
 
   // Address where services are running.
   THostPort service_address_1;
-  service_address_1.host = host_;
+  service_address_1.ipaddress = ipaddress_;
+  service_address_1.hostname = ipaddress_;
   service_address_1.port = next_port_++;
   THostPort service_address_2;
-  service_address_2.host = host_;
+  service_address_2.ipaddress = ipaddress_;
+  service_address_2.hostname = ipaddress_;
   service_address_2.port = next_port_++;
    THostPort service_address_3;
-  service_address_3.host = host_;
+  service_address_3.ipaddress = ipaddress_;
+  service_address_3.hostname = ipaddress_;
   service_address_3.port = next_port_++;
 
   // We expect the membership to include one instance of each service.
@@ -510,7 +518,8 @@ TEST_F(StateStoreTest, UnregisterAll) {
 
   // Address where service_id is running.
   THostPort service_address;
-  service_address.host = host_;
+  service_address.ipaddress = ipaddress_;
+  service_address.hostname = ipaddress_;
   service_address.port = next_port_++;
 
   // We expect the membership to include just one running instance of service_id.

@@ -60,3 +60,14 @@ cd $IMPALA_HOME/thirdparty/snappy-1.0.5
 ./configure --with-pic --prefix=$IMPALA_HOME/thirdparty/snappy-1.0.5/build
 make install
 
+# Build Sasl
+# Disable everything except those protocols needed -- currently just Kerberos.
+# Sasl does not have a --with-pic configuration.
+cd $IMPALA_HOME/thirdparty/cyrus-sasl-2.1.23
+CFLAGS="-fPIC -DPIC" CXXFLAGS="-fPIC -DPIC" ./configure \
+  --disable-digest --disable-sql --disable-cram --disable-ldap \
+  --disable-digest --disable-otp  \
+  --prefix=$IMPALA_HOME/thirdparty/cyrus-sasl-2.1.23/build \
+  --enable-static --enable-staticdlopen
+make
+make install

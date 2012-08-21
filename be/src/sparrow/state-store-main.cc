@@ -4,6 +4,7 @@
 // which exports the Thrift service StateStoreService.
 
 #include <iostream>
+#include <string>
 
 #include "common/logging.h"
 #include "common/status.h"
@@ -18,16 +19,23 @@
 DECLARE_int32(state_store_port);
 DECLARE_int32(webserver_port);
 DECLARE_bool(enable_webserver);
+DECLARE_string(principal);
 
 using impala::Webserver;
 using impala::Status;
 using impala::Metrics;
+using namespace impala;
 using namespace std;
 using namespace boost;
 
 int main(int argc, char** argv) {
   // Override default for webserver port
   FLAGS_webserver_port = 9190;
+  // Set the default hostname.  The user can override this with the hostname flag.
+  FLAGS_hostname = GetHostname();
+  if (!FLAGS_hostname.empty()) {
+    LOG(INFO) << "Setting default hostname: " << FLAGS_hostname;
+  }
   google::ParseCommandLineFlags(&argc, &argv, true);
   impala::InitGoogleLoggingSafe(argv[0]);
 
@@ -37,6 +45,10 @@ int main(int argc, char** argv) {
   }
   LOG(INFO) << impala::GetVersionString();
   impala::LogCommandLineFlags();
+
+  if (!FLAGS_principal.empty()) {
+    EXIT_IF_ERROR(InitKerberos("StateStore"));
+  }
 
   impala::CpuInfo::Init();
 

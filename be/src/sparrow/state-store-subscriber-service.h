@@ -14,6 +14,7 @@
 #include "sparrow/util.h"
 #include "sparrow/subscription-manager.h"
 #include "util/thrift-util.h"
+#include "util/thrift-client.h"
 #include "gen-cpp/StateStoreService.h"
 #include "gen-cpp/StateStoreSubscriberService.h"
 
@@ -21,7 +22,6 @@ namespace impala {
 
 class Status;
 class THostPort;
-template <class ClientType> class ThriftClient;
 class ThriftServer;
 
 } // namespace impala
@@ -42,7 +42,8 @@ class StateStoreSubscriber
   : public StateStoreSubscriberServiceIf,
     public boost::enable_shared_from_this<StateStoreSubscriber> {
  public:
-  StateStoreSubscriber(const std::string& host, int port,
+  StateStoreSubscriber(const std::string& hostname, const std::string& ipaddress,
+                       int port,
                        const std::string& state_store_host, int state_store_port);
 
   ~StateStoreSubscriber();
@@ -115,7 +116,8 @@ class StateStoreSubscriber
   boost::scoped_ptr<impala::ThriftServer> server_;
 
   // Client to use to connect to the StateStore.
-  boost::shared_ptr<impala::ThriftClient<StateStoreServiceClient> > client_;
+  boost::shared_ptr<impala::ThriftClient<StateStoreServiceClient,
+      impala::SPARROW_SERVER> > client_;
 
   // Callback for all services that have registered for updates (indexed by the
   // associated SubscriptionId), and associated lock.

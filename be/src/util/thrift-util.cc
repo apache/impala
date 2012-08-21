@@ -27,16 +27,17 @@ using namespace boost;
 namespace impala {
 
 std::size_t hash_value(const THostPort& host_port) {
-  uint32_t hash = HashUtil::Hash(host_port.host.c_str(), host_port.host.length(), 0);
+  uint32_t hash =
+      HashUtil::Hash(host_port.ipaddress.c_str(), host_port.ipaddress.length(), 0);
   return HashUtil::Hash(&host_port.port, sizeof(host_port.port), hash);
 }
 
 // Comparator for THostPorts. Thrift declares this (in gen-cpp/Types_types.h) but
 // never defines it.
 bool THostPort::operator<(const THostPort& that) const {
-  if (this->host < that.host) {
+  if (this->ipaddress < that.ipaddress) {
     return true;
-  } else if ((this->host == that.host) && (this->port < that.port)) {
+  } else if ((this->ipaddress == that.ipaddress) && (this->port < that.port)) {
     return true;
   }
   return false;
@@ -71,7 +72,8 @@ Status WaitForServer(const string& host, int port, int num_retries,
     }
     ++retry_count;
     VLOG_QUERY << "Waiting " << retry_interval_ms << "ms for Thrift server at "
-               << host << ":" << port << " to come up, failed attempt " << retry_count
+               << host << ":" << port
+               << " to come up, failed attempt " << retry_count
                << " of " << num_retries;
     usleep(retry_interval_ms * 1000);
   }

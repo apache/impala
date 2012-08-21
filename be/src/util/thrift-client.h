@@ -8,62 +8,118 @@
 #include <common/status.h>
 #include <transport/TSocket.h>
 #include <transport/TBufferTransports.h>
+#include <transport/TSaslClientTransport.h>
+#include <transport/TSasl.h>
 #include <protocol/TBinaryProtocol.h>
 #include <sstream>
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 
 #include "util/thrift-server.h"
+#include "util/authorization.h"
+
+DECLARE_string(principal);
+DECLARE_string(hostname);
+DECLARE_bool(use_nonblocking);
 
 namespace impala {
+// Names of the servers, used for Kerberos.
+enum ServiceName {
+  NON_KERBEROS_SERVER, // Any unknown server that is not secure.
+  // Servers we know about.
+  IMPALA_SERVER,
+  SPARROW_SERVER
+};
 
-// Utility client to a Thrift server. The parameter type is the
-// Thrift interface type that the server implements.
-template <class InterfaceType>
-class ThriftClient {
+extern const std::map<ServiceName, std::string> SERVICE_NAME_MAP;
+
+// Super class for templatized thrift clients.
+class ThriftClientImpl {
  public:
-  ThriftClient(std::string host, int port,
-      ThriftServer::ServerType server_type = ThriftServer::Nonblocking);
-  ~ThriftClient();
-
-  // Returns the object used to actually make RPCs against the remote server
-  InterfaceType* iface() { return iface_.get(); }
-
-  const std::string& host() { return host_; }
+  ~ThriftClientImpl() {
+    Close();
+  }
+  const std::string& ipaddress() { return ipaddress_; }
   int port() { return port_; }
 
   // Open the connection to the remote server. May be called
   // repeatedly, is idempotent unless there is a failure to connect.
   Status Open();
 
+  // Retry the Open num_retries time waiting wait_ms milliseconds between retries.
   Status OpenWithRetry(int num_retries, int wait_ms);
 
   // Close the connection with the remote server. May be called
   // repeatedly.
   Status Close();
-
- private:
-  std::string host_;
+ protected:
+  ThriftClientImpl(const std::string& ipaddress, int port)
+    : ipaddress_(ipaddress),
+      port_(port),
+      socket_(new apache::thrift::transport::TSocket(ipaddress, port)) {
+  }
+  std::string ipaddress_;
   int port_;
+
+  // Sasl Client object.  Contains client kerberos identification data.
+  // Will be NULL if kerberos is not being used.
+  boost::shared_ptr<sasl::TSasl> sasl_client_;
 
   // All shared pointers, because Thrift requires them to be
   boost::shared_ptr<apache::thrift::transport::TSocket> socket_;
   boost::shared_ptr<apache::thrift::transport::TTransport> transport_;
   boost::shared_ptr<apache::thrift::protocol::TBinaryProtocol> protocol_;
-  boost::shared_ptr<InterfaceType> iface_;
+
 };
 
-template <class InterfaceType>
-ThriftClient<InterfaceType>::ThriftClient(std::string host, int port,
-    ThriftServer::ServerType server_type)
-    : host_(host),
-      port_(port),
-      socket_(new apache::thrift::transport::TSocket(host, port)),
-      iface_(new InterfaceType(protocol_)) {
+
+// Utility client to a Thrift server. The parameter type is the
+// Thrift interface type that the server implements.
+// The ServiceName is the enum of the service the client talks to.
+template <class InterfaceType, ServiceName>
+class ThriftClient : public ThriftClientImpl{
+ public:
+  ThriftClient(const std::string& ipaddress, int port,
+      ThriftServer::ServerType server_type = ThriftServer::Threaded);
+
+  // Returns the object used to actually make RPCs against the remote server
+  InterfaceType* iface() { return iface_.get(); }
+
+ private:
+  boost::shared_ptr<InterfaceType> iface_;
+
+};
+
+template <class InterfaceType, ServiceName service_name>
+ThriftClient<InterfaceType, service_name>::ThriftClient(
+    const std::string& ipaddress, int port, ThriftServer::ServerType server_type)
+      : ThriftClientImpl(ipaddress, port),
+        iface_(new InterfaceType(protocol_)) {
+  transport_ = socket_;
+  // Check to enable kerberos
+  if (!FLAGS_principal.empty() && service_name != NON_KERBEROS_SERVER) {
+    std::map<ServiceName, std::string>::const_iterator service =
+        SERVICE_NAME_MAP.find(service_name);
+    DCHECK(service != SERVICE_NAME_MAP.end());
+    GetTSaslClient(service->second, ipaddress_, &sasl_client_);
+    transport_.reset(new apache::thrift::transport::TSaslClientTransport(
+        sasl_client_.get(), socket_));
+  }
+
+  // Switch to Nonblocking as the default.
+  if (FLAGS_use_nonblocking && server_type == ThriftServer::Threaded) {
+    server_type = ThriftServer::Nonblocking;
+  }
+
   switch (server_type) {
     case ThriftServer::Nonblocking:
-      transport_.reset(new apache::thrift::transport::TFramedTransport(socket_));
+      if (!FLAGS_principal.empty()) {
+        LOG(ERROR) << "Nonblocking servers cannot be used with Kerberos";
+      }
+      transport_.reset(new apache::thrift::transport::TFramedTransport(transport_));
       break;
     case ThriftServer::ThreadPool:
-      transport_ = socket_;
+    case ThriftServer::Threaded:
       break;
     default:
       std::stringstream error_msg;
@@ -76,51 +132,5 @@ ThriftClient<InterfaceType>::ThriftClient(std::string host, int port,
   iface_.reset(new InterfaceType(protocol_));
 }
 
-template <class InterfaceType>
-Status ThriftClient<InterfaceType>::Open() {
-  try {
-    if (!transport_->isOpen()) {
-      transport_->open();
-    }
-  } catch (apache::thrift::transport::TTransportException& e) {
-    std::stringstream msg;
-    msg << "Couldn't open transport for " << host() << ":" << port()
-        << "(" << e.what() << ")";
-    return impala::Status(msg.str());
-  }
-  return impala::Status::OK;
 }
-
-template <class InterfaceType>
-Status ThriftClient<InterfaceType>::OpenWithRetry(int num_retries, int wait_ms) {
-  DCHECK_GT(num_retries, 0);
-  DCHECK_GE(wait_ms, 0);
-  Status status;
-  for (int i = 0; i < num_retries; ++i) {
-    status = Open();
-    if (status.ok()) return status;
-    LOG(INFO) << "Unable to connect to " << host_ << ":" << port_ 
-              << " (Attempt " << i + 1 << " of " << num_retries << ")";
-    usleep(wait_ms * 1000L);
-  }
-
-  return status;
-}
-
-
-template <class InterfaceType>
-Status ThriftClient<InterfaceType>::Close() {
-  if (transport_->isOpen()) {
-    transport_->close();
-  }
-  return Status::OK;
-}
-
-template <class InterfaceType>
-ThriftClient<InterfaceType>::~ThriftClient() {
-  Close();
-}
-
-}
-
 #endif

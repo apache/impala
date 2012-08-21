@@ -63,11 +63,15 @@ abstract public class ScanNode extends PlanNode {
 
   /**
    * Helper function to parse a "host:port" address string into THostPort
+   * This is called with ipaddress:port when doing scan range assigment.  
    */
   protected static THostPort addressToTHostPort(String address) {
     THostPort result = new THostPort();
     String[] hostPort = address.split(":");
-    result.host = hostPort[0];
+    // In this context we don't have or need a hostname,
+    // so we just set it to the ipaddress.
+    result.hostname = hostPort[0];
+    result.ipaddress = hostPort[0];
     result.port = Integer.parseInt(hostPort[1]);
     return result;
   }

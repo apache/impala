@@ -50,7 +50,7 @@ class BackendClientCache {
   // this isn't going to scale for a high request rate
   boost::mutex lock_;
 
-  typedef ThriftClient<ImpalaInternalServiceClient> BackendClient;
+  typedef ThriftClient<ImpalaInternalServiceClient, IMPALA_SERVER> BackendClient;
 
   // map from (host, port) to list of clients;
   // we own BackendClient*

@@ -71,7 +71,8 @@ class StateStore : public StateStoreServiceIf,
   int subscriber_update_frequency_ms() { return subscriber_update_frequency_ms_; }
 
  private:
-  typedef impala::ThriftClient<StateStoreSubscriberServiceClient> SubscriberClient;
+  typedef impala::ThriftClient<StateStoreSubscriberServiceClient,
+      impala::IMPALA_SERVER> SubscriberClient;
 
   // Describes a subscriber connected to the StateStore. This class is not thread safe,
   // which is fine because access to subscribers_ is always protected by a lock.

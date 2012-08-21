@@ -17,7 +17,8 @@ using impala::THostPort;
 DEFINE_string(state_store_host, "localhost",
               "hostname where StateStoreService is running");
 DEFINE_int32(state_store_port, 24000, "port where StateStoreService is running");
-DECLARE_string(host);
+DECLARE_string(ipaddress);
+DECLARE_string(hostname);
 DEFINE_int32(state_store_subscriber_port, 23000,
              "port where StateStoreSubscriberService should be exported");
 
@@ -28,15 +29,16 @@ SubscriptionManager::UpdateCallback::~UpdateCallback() {
 }
 
 SubscriptionManager::SubscriptionManager()
-    : state_store_(new StateStoreSubscriber(FLAGS_host,
-                       FLAGS_state_store_subscriber_port, FLAGS_state_store_host,
-                       FLAGS_state_store_port)) {
+    : state_store_(new StateStoreSubscriber(FLAGS_hostname, FLAGS_ipaddress,
+        FLAGS_state_store_subscriber_port, FLAGS_state_store_host,
+        FLAGS_state_store_port)) {
 }
 
 SubscriptionManager::SubscriptionManager(const string& state_store_subscriber_host,
     int state_store_subscriber_port, const string& state_store_host, int state_store_port)
     : state_store_(new StateStoreSubscriber(state_store_subscriber_host,
-                       state_store_subscriber_port, state_store_host, state_store_port)) {
+        state_store_subscriber_host,
+        state_store_subscriber_port, state_store_host, state_store_port)) {
 }
 
 Status SubscriptionManager::RegisterService(const string& service_id,

@@ -1350,7 +1350,7 @@ inline shared_ptr<ImpalaServer::QueryExecState> ImpalaServer::GetQueryExecState(
 void ImpalaServer::ExecPlanFragment(
     TExecPlanFragmentResult& return_val, const TExecPlanFragmentParams& params) {
   VLOG_QUERY << "ExecPlanFragment() fragment_id=" << params.request.fragment_id
-             << " coord=" << params.coord.host << ":" << params.coord.port
+             << " coord=" << params.coord.ipaddress << ":" << params.coord.port
              << " backend#=" << params.backend_num;
   StartPlanFragmentExecution(
       params.request, params.params, params.coord, params.backend_num)
@@ -1431,7 +1431,7 @@ Status ImpalaServer::StartPlanFragmentExecution(
   shared_ptr<FragmentExecState> exec_state(
       new FragmentExecState(
         request.query_id, backend_num, request.fragment_id, exec_env_,
-        make_pair(coord_hostport.host, coord_hostport.port)));
+        make_pair(coord_hostport.ipaddress, coord_hostport.port)));
   // Call Prepare() now, before registering the exec state, to avoid calling
   // exec_state->Cancel().
   // We might get an async cancellation, and the executor requires that Cancel() not

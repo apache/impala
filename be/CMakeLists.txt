@@ -98,6 +98,7 @@ if (DOXYGEN_FOUND)
     ${CMAKE_SOURCE_DIR}/be/src/testutil/
     ${CMAKE_SOURCE_DIR}/be/src/thrift/
     ${CMAKE_SOURCE_DIR}/be/src/util/
+    ${CMAKE_SOURCE_DIR}/be/src/transport/
     )
   # CMake appends using ';'. doxygen wants spaces
   string(REPLACE ";" " " DOXYGEN_INPUT "${CMAKE_DOXYGEN_INPUT}")
@@ -113,7 +114,7 @@ else (DOXYGEN_FOUND)
 endif(DOXYGEN_FOUND)
 
 # resolve "#include "<subdir>/<name>.h"
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
 # resolve includes of generated code
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/generated-sources)
@@ -158,6 +159,7 @@ set (IMPALA_LINK_LIBS
   Opcode
   Exprs
   Util
+  ThriftSaslTransport
   Runtime
   Sparrow
   CodeGen
@@ -165,6 +167,8 @@ set (IMPALA_LINK_LIBS
   Util
   thriftstatic
   thriftnbstatic
+  ${SASL_LIBRARY}
+  ThriftSaslTransport
   event # event required for thriftnbstatic
   ImpalaThrift
   Service
@@ -185,6 +189,7 @@ set (IMPALA_LINK_LIBS
   pprofstatic
   -lz -lbz2 -lboost_date_time
 )
+MESSAGE(STATUS, "${IMPALA_LINK_LIBS}")
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE")
   set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} -lgcov)
@@ -207,6 +212,7 @@ add_subdirectory(src/sparrow)
 add_subdirectory(src/service)
 add_subdirectory(src/testutil)
 add_subdirectory(src/util)
+add_subdirectory(src/transport)
 
 add_subdirectory(src/benchmarks)
 add_subdirectory(src/experiments)
@@ -224,6 +230,7 @@ link_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/build/testutil
   ${CMAKE_CURRENT_SOURCE_DIR}/build/thrift
   ${CMAKE_CURRENT_SOURCE_DIR}/build/util
+  ${CMAKE_CURRENT_SOURCE_DIR}/build/transport
 )
 
 # only generate statically linked libs and executables

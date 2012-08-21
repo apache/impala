@@ -51,12 +51,12 @@ SimpleScheduler::SimpleScheduler(const vector<THostPort>& backends, Metrics* met
     initialised_(NULL) {
   DCHECK(backends.size() > 0);
   for (int i = 0; i < backends.size(); ++i) {
-    string host = backends[i].host;
+    string ipaddress = backends[i].ipaddress;
     int port = backends[i].port;
 
-    HostMap::iterator i = host_map_.find(host);
+    HostMap::iterator i = host_map_.find(ipaddress);
     if (i == host_map_.end()) {
-      i = host_map_.insert(make_pair(host, list<int>())).first;
+      i = host_map_.insert(make_pair(ipaddress, list<int>())).first;
     }
     i->second.push_back(port);
   }
@@ -95,10 +95,10 @@ void SimpleScheduler::UpdateMembership(const ServiceStateMap& service_state) {
     VLOG(4) << "Found membership information for " << backend_service_id_;
     ServiceState service_state = it->second;
     BOOST_FOREACH(const Membership::value_type& member, service_state.membership) {
-      VLOG(4) << "Got member: " << member.second.host << ":" << member.second.port;
-      HostMap::iterator host_it = host_map_.find(member.second.host);
+      VLOG(4) << "Got member: " << member.second.ipaddress << ":" << member.second.port;
+      HostMap::iterator host_it = host_map_.find(member.second.ipaddress);
       if (host_it == host_map_.end()) {
-        host_it = host_map_.insert(make_pair(member.second.host, list<int>())).first;
+        host_it = host_map_.insert(make_pair(member.second.ipaddress, list<int>())).first;
       }
       host_it->second.push_back(member.second.port);
     }
@@ -118,9 +118,9 @@ Status SimpleScheduler::GetHosts(
   hostports->clear();
   int num_local_assignments = 0;
   for (int i = 0; i < data_locations.size(); ++i) {
-    HostMap::iterator entry = host_map_.find(data_locations[i].host);
+    HostMap::iterator entry = host_map_.find(data_locations[i].ipaddress);
     if (entry == host_map_.end()) {
-      // round robin the host
+      // round robin the ipaddress
       entry = next_nonlocal_host_entry_;
       ++next_nonlocal_host_entry_;
       if (next_nonlocal_host_entry_ == host_map_.end()) {
@@ -130,8 +130,8 @@ Status SimpleScheduler::GetHosts(
       ++num_local_assignments;
     }
     DCHECK(!entry->second.empty());
-    // Round-robin between impalads on the same host. Pick the first one, then move it
-    // to the back of the queue
+    // Round-robin between impalads on the same ipaddress.
+    // Pick the first one, then move it to the back of the queue
     int port = entry->second.front();
     hostports->push_back(make_pair(entry->first, port));
     entry->second.pop_front();
@@ -147,7 +147,7 @@ Status SimpleScheduler::GetHosts(
     vector<string> hostport_strings;
     for (int i = 0; i < hostports->size(); ++i) {
       stringstream s;
-      s << "(" << data_locations[i].host << ":" << data_locations[i].port 
+      s << "(" << data_locations[i].ipaddress << ":" << data_locations[i].port 
         << " -> " << (*hostports)[i].first << ":" << (*hostports)[i].second << ")";
       hostport_strings.push_back(s.str());
     }
@@ -167,9 +167,9 @@ Status SimpleScheduler::GetHosts(
 void SimpleScheduler::GetAllKnownHosts(vector<pair<string, int> >* hostports) {
   lock_guard<mutex> lock(host_map_lock_);
   hostports->clear();
-  BOOST_FOREACH(HostMap::value_type host, host_map_) {
-    BOOST_FOREACH(int port, host.second) {
-      hostports->push_back(make_pair(host.first, port));
+  BOOST_FOREACH(const HostMap::value_type& ipaddress, host_map_) {
+    BOOST_FOREACH(int port, ipaddress.second) {
+      hostports->push_back(make_pair(ipaddress.first, port));
     }
   }
 }

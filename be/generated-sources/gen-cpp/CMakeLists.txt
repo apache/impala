@@ -68,4 +68,5 @@ add_dependencies(ImpalaThrift thrift-cpp)
 
 target_link_libraries(ImpalaThrift
   thriftstatic
+  ${SASL_LIBRARY}
 )

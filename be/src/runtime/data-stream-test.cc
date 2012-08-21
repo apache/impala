@@ -73,7 +73,7 @@ class DataStreamTest : public testing::Test {
     stream_mgr_ = new DataStreamMgr();
     sink_.destNodeId = DEST_NODE_ID;
     dest_.push_back(THostPort());
-    dest_.back().host = "localhost";
+    dest_.back().ipaddress = "127.0.0.1";
     // Need a unique port since backend servers are never stopped
     dest_.back().port = FLAGS_port++;
     CreateRowDesc();

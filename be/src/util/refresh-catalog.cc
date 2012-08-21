@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
        << FLAGS_planservice_port << endl;
 
   if (FLAGS_impalad) {
-    ThriftClient<ImpalaServiceClient> client(FLAGS_planservice_host,
+    ThriftClient<ImpalaServiceClient, IMPALA_SERVER> client(FLAGS_planservice_host,
         FLAGS_planservice_port);
     EXIT_IF_ERROR(client.Open());
     cout << "Connected. Refreshing metadata." << endl;

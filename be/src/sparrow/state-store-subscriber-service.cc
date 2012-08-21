@@ -8,8 +8,6 @@
 #include <boost/algorithm/string/join.hpp>
 #include <boost/foreach.hpp>
 #include <transport/TBufferTransports.h>
-#include "util/thrift-client.h"
-#include "util/thrift-server.h"
 
 #include "common/logging.h"
 #include "common/status.h"
@@ -34,14 +32,17 @@ namespace sparrow {
 const char* StateStoreSubscriber::DISCONNECTED_FROM_STATE_STORE_ERROR =
     "Client disconnected from state store";
 
-StateStoreSubscriber::StateStoreSubscriber(const string& host, int port,
+StateStoreSubscriber::StateStoreSubscriber(const string& hostname,
+                                           const string& ipaddress, int port,
                                            const string& state_store_host,
                                            int state_store_port)
   : server_running_(false) {
   client_.reset();
-  host_port_.host = host;
+  host_port_.ipaddress = ipaddress;
   host_port_.port = port;
-  state_store_host_port_.host = state_store_host;
+  host_port_.hostname = hostname;
+  state_store_host_port_.ipaddress = state_store_host;
+  state_store_host_port_.hostname = state_store_host;
   state_store_host_port_.port = state_store_port;
 }
 
@@ -58,8 +59,8 @@ Status StateStoreSubscriber::RegisterService(const string& service_id,
   request.__set_service_address(address);
   TRegisterServiceResponse response;
   VLOG_CONNECTION << "Attempting to register service " << request.service_id
-                  << " on address " << address.host << ":" << address.port
-                  << ", to subscriber at " << request.subscriber_address.host << ":"
+                  << " on address " << address.ipaddress << ":" << address.port
+                  << ", to subscriber at " << request.subscriber_address.ipaddress << ":"
                   << request.subscriber_address.port;
 
   try {
@@ -105,7 +106,7 @@ Status StateStoreSubscriber::RegisterSubscription(
   TRegisterSubscriptionResponse response;
   VLOG_CONNECTION << "Attempting to register subscriber for services "
                   << algorithm::join(update_services, ", ") << " at "
-                  << request.subscriber_address.host << ":"
+                  << request.subscriber_address.ipaddress << ":"
                   << request.subscriber_address.port;
 
   try {
@@ -175,7 +176,7 @@ void StateStoreSubscriber::UpdateState(TUpdateStateResponse& response,
     new_state << "State for service " << service_state.first << ":\n" << "Membership: ";
     BOOST_FOREACH(const Membership::value_type& instance,
                   service_state.second.membership) {
-      new_state << instance.second.host << ":" << instance.second.port
+      new_state << instance.second.ipaddress << ":" << instance.second.port
                 << " (at subscriber " << instance.first << "),";
     }
     new_state << "\n";
@@ -217,7 +218,7 @@ Status StateStoreSubscriber::Start() {
   server_->Start();
 
   // Wait for up to 2s for the server to start, polling at 50ms intervals
-  RETURN_IF_ERROR(impala::WaitForServer(host_port_.host, host_port_.port, 40, 50));
+  RETURN_IF_ERROR(impala::WaitForServer(host_port_.ipaddress, host_port_.port, 40, 50));
 
   LOG(INFO) << "StateStoreSubscriber listening on " << host_port_.port;
   return Status::OK;
@@ -270,8 +271,8 @@ void StateStoreSubscriber::UnregisterAll() {
 Status StateStoreSubscriber::InitClient() {
   DCHECK(server_running_);
   if (client_.get() == NULL) {
-    client_.reset(new ThriftClient<StateStoreServiceClient>(state_store_host_port_.host,
-        state_store_host_port_.port));
+    client_.reset(new ThriftClient<StateStoreServiceClient, impala::SPARROW_SERVER>(
+        state_store_host_port_.ipaddress, state_store_host_port_.port));
 
     Status status = client_->OpenWithRetry(FLAGS_rpc_cnxn_attempts, 
         FLAGS_rpc_cnxn_retry_interval_ms);    

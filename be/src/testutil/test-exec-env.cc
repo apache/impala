@@ -92,7 +92,7 @@ Status TestExecEnv::StartBackends() {
     info->exec_env.StartServices();
     info->server->Start();
     THostPort address;
-    address.host = "localhost";
+    address.ipaddress = "127.0.0.1";
     address.port = backend_port;
     RETURN_IF_ERROR(
         info->exec_env.subscription_mgr()->RegisterService(

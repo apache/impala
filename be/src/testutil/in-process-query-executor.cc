@@ -55,7 +55,7 @@ DEFINE_int32(num_nodes, 1,
 DECLARE_int32(be_port);
 // TODO: we probably want to add finer grain control of what is codegen'd
 DEFINE_bool(enable_jit, true, "if true, enable codegen for query execution");
-DECLARE_string(host);
+DECLARE_string(ipaddress);
 
 using namespace std;
 using namespace boost;
@@ -168,10 +168,11 @@ Status InProcessQueryExecutor::Exec(const string& query,
     DCHECK_EQ(query_request_.node_request_params.size(), 2);
     DCHECK_LE(query_request_.node_request_params[0].size(), FLAGS_num_nodes - 1);
 
-    // set destinations to coord host/port
+    // set destinations to coord ipaddress/port
     for (int i = 0; i < query_request_.node_request_params[1].size(); ++i) {
       DCHECK_EQ(query_request_.node_request_params[1][i].destinations.size(), 1);
-      query_request_.node_request_params[1][i].destinations[0].host = FLAGS_host;
+      query_request_.node_request_params[1][i].destinations[0].ipaddress =
+          FLAGS_ipaddress;
       query_request_.node_request_params[1][i].destinations[0].port = FLAGS_be_port;
     }
   }

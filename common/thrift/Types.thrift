@@ -37,9 +37,18 @@ enum TExplainLevel {
   VERBOSE
 }
 
+// A THostPort represents a general network address. It includes both
+// hostname and IP address fields in order to support use cases that may
+// require either one or both these fields set. An example is those
+// network addresses stored by the state-store which require IP addresses
+// in order for the scheduler to correctly assign data locations to
+// Impala backends but also fully qualified hostnames to be able to
+// establish secure connections with subscribers. Which of the fields are
+// set in general is usage specific.
 struct THostPort {
-  1: required string host
-  2: required i32 port
+  1: required string hostname
+  2: required string ipaddress
+  3: required i32 port
 }
 
 // Wire format for UniqueId

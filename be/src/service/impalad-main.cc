@@ -3,6 +3,7 @@
 // This file contains the main() function for the impala daemon process,
 // which exports the Thrift services ImpalaService and ImpalaInternalService.
 
+#include <unistd.h>
 #include <jni.h>
 #include <boost/scoped_ptr.hpp>
 #include <boost/unordered_map.hpp>
@@ -33,6 +34,7 @@
 #include "sparrow/subscription-manager.h"
 #include "util/thrift-server.h"
 #include "common/service-ids.h"
+#include "util/authorization.h"
 #include "service/impala-server.h"
 #include "service/fe-support.h"
 #include "gen-cpp/ImpalaService.h"
@@ -48,12 +50,19 @@ using namespace apache::thrift::transport;
 using namespace apache::thrift::concurrency;
 
 DECLARE_string(classpath);
-DECLARE_string(host);
+DECLARE_string(ipaddress);
 DECLARE_bool(use_statestore);
 DECLARE_int32(fe_port);
 DECLARE_int32(be_port);
+DECLARE_string(principal);
+DECLARE_string(hostname);
 
 int main(int argc, char** argv) {
+  // Set the default hostname.  The user can override this with the hostname flag.
+  FLAGS_hostname = GetHostname();
+  if (!FLAGS_hostname.empty()) {
+    LOG(INFO) << "Setting default hostname: " << FLAGS_hostname;
+  }
   google::ParseCommandLineFlags(&argc, &argv, true);
   InitGoogleLoggingSafe(argv[0]);
 
@@ -71,6 +80,12 @@ int main(int argc, char** argv) {
   CpuInfo::Init();
   DiskInfo::Init();
   LlvmCodeGen::InitializeLlvm();
+  
+  // Enable Kerberos security if requested.
+  if (!FLAGS_principal.empty()) {
+    EXIT_IF_ERROR(InitKerberos("Impalad"));
+  }
+  
   JniUtil::InitLibhdfs();
   EXIT_IF_ERROR(JniUtil::Init());
   EXIT_IF_ERROR(HBaseTableScanner::Init());
@@ -96,7 +111,8 @@ int main(int argc, char** argv) {
   if (FLAGS_use_statestore) {
     THostPort host_port;
     host_port.port = FLAGS_be_port;
-    host_port.host = FLAGS_host;
+    host_port.ipaddress = FLAGS_ipaddress;
+    host_port.hostname = FLAGS_hostname;
     // TODO: Unregister on tear-down (after impala service changes)
     Status status =
         exec_env.subscription_mgr()->RegisterService(IMPALA_SERVICE_ID, host_port);
