@@ -80,6 +80,8 @@ LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypes/100901.txt' 
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypes/101001.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=10);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypes/101101.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=11);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypes/101201.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=12);
+----
+ANALYZE TABLE %(table_name)s PARTITION(year, month) COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -103,6 +105,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -144,6 +148,8 @@ LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesSmall/090101.
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesSmall/090201.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=2);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesSmall/090301.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=3);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesSmall/090401.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=4);
+----
+ANALYZE TABLE %(table_name)s PARTITION(year, month) COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -185,6 +191,8 @@ LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesTiny/090101.t
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesTiny/090201.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=2);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesTiny/090301.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=3);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesTiny/090401.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=4);
+----
+ANALYZE TABLE %(table_name)s PARTITION(year, month) COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -194,6 +202,8 @@ CREATE TABLE %(table_name)s LIKE AllTypes;
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s PARTITION(year, month) COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -203,6 +213,8 @@ CREATE TABLE %(table_name)s like AllTypesNoPart;
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -295,6 +307,7 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesError/0901.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=1);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesError/0902.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=2);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesError/0903.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=3);
+----
 ====
 functional
 ----
@@ -388,6 +401,7 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesErrorNoNulls/0901.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=1);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesErrorNoNulls/0902.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=2);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesErrorNoNulls/0903.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=3);
+----
 ====
 functional
 ----
@@ -440,6 +454,8 @@ LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAgg/100107.tx
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAgg/100108.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=8);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAgg/100109.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=9);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAgg/100110.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=10);
+----
+ANALYZE TABLE %(table_name)s PARTITION(year, month, day) COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -492,6 +508,8 @@ LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAggNoNulls/10
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAggNoNulls/100108.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=8);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAggNoNulls/100109.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=9);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAggNoNulls/100110.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=10);
+----
+ANALYZE TABLE %(table_name)s PARTITION(year, month, day) COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -508,6 +526,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -528,6 +548,8 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
   select * FROM %(base_table_name)s"
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/DimTbl/data.csv' OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -549,6 +571,8 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
   select * FROM %(base_table_name)s"
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/JoinTbl/data.csv' OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -573,6 +597,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -589,6 +615,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -611,6 +639,8 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
   select * FROM %(base_table_name)s"
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/LikeTbl/data.csv' OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -640,6 +670,7 @@ TBLPROPERTIES("hbase.table.name" = "hbasealltypessmall");
 INSERT OVERWRITE TABLE %(table_name)s
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
 FROM alltypessmall;
+----
 ====
 functional
 ----
@@ -666,6 +697,7 @@ TBLPROPERTIES("hbase.table.name" = "hbasealltypeserror");
 ----
 ----
 ----
+----
 ====
 functional
 ----
@@ -689,6 +721,7 @@ WITH SERDEPROPERTIES (
   ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col,strings:timestamp_col"
 )
 TBLPROPERTIES("hbase.table.name" = "hbasealltypeserrornonulls");
+----
 ----
 ----
 ----
@@ -721,6 +754,7 @@ TBLPROPERTIES("hbase.table.name" = "hbasealltypesagg");
 INSERT OVERWRITE TABLE %(table_name)s
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
 FROM alltypesagg;
+----
 ====
 functional
 ----
@@ -747,6 +781,7 @@ TBLPROPERTIES("hbase.table.name" = "hbasealltypesagg");
 ----
 ----
 ----
+----
 ====
 functional
 ----
@@ -768,6 +803,8 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
   select * FROM %(base_table_name)s"
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/escape-no-quotes.txt' OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -791,6 +828,8 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
   select * FROM %(base_table_name)s"
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/overflow.txt' OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -806,6 +845,8 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
   select * FROM %(base_table_name)s"
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/grepTiny/part-00000' OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -826,6 +867,8 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
   select * FROM %(base_table_name)s"
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/htmlTiny/Rankings.dat' OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -852,6 +895,8 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
   select * FROM %(base_table_name)s"
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/htmlTiny/UserVisits.dat' OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -863,6 +908,8 @@ partitioned by (f2 int);
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s PARTITION(f2) COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -912,6 +959,8 @@ insert into table %(table_name)s partition (year, month, day) SELECT id, bool_co
 insert into table %(table_name)s partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 1;
 insert into table %(table_name)s partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 2;
 insert into table %(table_name)s partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 3;
+----
+ANALYZE TABLE %(table_name)s PARTITION(year, month, day) COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -948,6 +997,8 @@ insert into table %(table_name)s SELECT id, bool_col, tinyint_col, smallint_col,
 insert into table %(table_name)s SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 1;
 insert into table %(table_name)s SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 2;
 insert into table %(table_name)s SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 3;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -964,6 +1015,8 @@ ALTER TABLE %(table_name)s ADD PARTITION (string_col = "partition1");
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s PARTITION(string_col) COMPUTE STATISTICS;
 ====
 functional
 ----
@@ -983,4 +1036,6 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
   select * FROM %(base_table_name)s"
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/TinyTable/data.csv' OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====

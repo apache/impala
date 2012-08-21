@@ -45,7 +45,20 @@
   <name>datanucleus.autoCreateSchema</name>
   <value>true</value>
 </property>
- 
+
+<property>
+  <name>hive.stats.dbclass</name>
+  <value>jdbc:mysql</value>
+</property>
+<property>
+  <name>hive.stats.dbconnectionstring</name>
+  <value>jdbc:mysql://localhost:3306/hive_${METASTORE_DB}_Stats?createDatabaseIfNotExist=true&amp;user=hiveuser&amp;password=password</value>
+</property>
+<property>
+  <name>hive.stats.jdbcdriver</name>
+  <value>com.mysql.jdbc.Driver</value>
+</property>
+
 <property>
   <name>datanucleus.fixedDatastore</name>
   <value>false</value>

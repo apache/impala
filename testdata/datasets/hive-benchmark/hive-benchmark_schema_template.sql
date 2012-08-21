@@ -23,6 +23,8 @@
 # Trevni loading code executed by bash.
 # ---- <- End sub-section
 # LOAD from LOCAL - How to load data for the the base table
+#----- <- End sub-section
+# ANALYZE TABLE ... COMPUTE STATISTICS - Compute statistics statement for table
 ====
 hive-benchmark
 ----
@@ -48,6 +50,8 @@ LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep1GB/part-000
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep1GB/part-00003' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=3);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep1GB/part-00004' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=4);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep1GB/part-00005' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=5);
+----
+ANALYZE TABLE %(table_name)s PARTITION(chunk) COMPUTE STATISTICS;
 ====
 hive-benchmark
 ----
@@ -74,6 +78,8 @@ LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep10GB/part-00
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep10GB/part-00003' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=3);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep10GB/part-00004' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=4);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/grep10GB/part-00005' OVERWRITE INTO TABLE %(table_name)s PARTITION(chunk=5);
+----
+ANALYZE TABLE %(table_name)s PARTITION(chunk) COMPUTE STATISTICS;
 ====
 hive-benchmark
 ----
@@ -93,6 +99,8 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
   select pageRank, pageURL, avgDuration FROM %(base_table_name)s"
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/html1GB/Rankings.dat' OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 hive-benchmark
 ----
@@ -119,4 +127,6 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
   sKeyword, avgTimeOnSite FROM %(base_table_name)s"
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/html1GB/UserVisits.dat' OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====

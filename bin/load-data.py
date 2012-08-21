@@ -26,6 +26,8 @@ parser.add_option("-s", "--scale_factor", dest="scale_factor", default="",
                   help="An optional scale factor to generate the schema for")
 parser.add_option("-f", "--force_reload", dest="force_reload", action="store_true",
                   default=False, help='Skips HDFS exists check and reloads all tables')
+parser.add_option("--skip_compute_stats", dest="compute_stats", action="store_false",
+                  default= True, help="Skip generation of compute table stat statements")
 
 (options, args) = parser.parse_args()
 
@@ -72,6 +74,8 @@ def generate_schema_statements(workload):
     generate_cmd += " --force_reload"
   if options.hive_warehouse_dir is not None:
     generate_cmd += " --hive_warehouse_dir=%s" % options.hive_warehouse_dir
+  if not options.compute_stats:
+    generate_cmd += " --skip_compute_stats"
   print 'Executing Generate Schema Command: ' + generate_cmd
   ret_val = subprocess.call(os.path.join(TESTDATA_BIN_DIR, generate_cmd), shell = True)
   if ret_val != 0:

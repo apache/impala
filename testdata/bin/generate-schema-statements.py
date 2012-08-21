@@ -34,9 +34,9 @@ from itertools import product
 from optparse import OptionParser
 
 parser = OptionParser()
-parser.add_option("-e", "--exploration_strategy", dest="exploration_strategy", default="core",
-                  help="The exploration strategy for schema gen: 'core', "\
-                  "'pairwise', or 'exhaustive'")
+parser.add_option("-e", "--exploration_strategy", dest="exploration_strategy",
+                  default="core", help="The exploration strategy for schema gen: 'core',"\
+                  " 'pairwise', or 'exhaustive'")
 parser.add_option("--hive_warehouse_dir", dest="hive_warehouse_dir",
                   default="/test-warehouse",
                   help="The HDFS path to the base Hive test warehouse directory")
@@ -50,6 +50,8 @@ parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
                   default = False, help="If set, outputs additional logging.")
 parser.add_option("-b", "--backend", dest="backend", default="localhost:21000",
                   help="Backend connection to use, default: localhost:21000")
+parser.add_option("--skip_compute_stats", dest="compute_stats", action="store_false",
+                  default= True, help="Skip generation of compute table stat statements")
 
 (options, args) = parser.parse_args()
 
@@ -69,7 +71,6 @@ SET_DYNAMIC_PARTITION_STATEMENT = "SET hive.exec.dynamic.partition=true;"
 SET_PARTITION_MODE_NONSTRICT_STATEMENT = "SET hive.exec.dynamic.partition.mode=nonstrict;"
 SET_HIVE_INPUT_FORMAT = "SET mapred.max.split.size=256000000;\n"\
                         "SET hive.input.format=org.apache.hadoop.hive.ql.io.%s;\n"
-
 FILE_FORMAT_IDX = 0
 DATA_SET_IDX = 1
 CODEC_IDX = 2
@@ -98,15 +99,19 @@ FILE_FORMAT_MAP = {'text': 'TEXTFILE',
 
 TREVNI_ALTER_STATEMENT = "ALTER TABLE %(table_name)s SET\n\
      SERDEPROPERTIES ('blocksize' = '1073741824', 'compression' = '%(compression)s');"
-
+KNOWN_EXPLORATION_STRATEGIES = ['core', 'pairwise', 'exhaustive']
 
 class SqlGenerationStatement:
-  def __init__(self, base_table_name, create, insert, trevni, load_local):
+  def __init__(self, base_table_name, create, insert, trevni, load_local, compute_stats):
     self.base_table_name = base_table_name.strip()
     self.create = create.strip()
     self.insert = insert.strip()
     self.trevni = trevni.strip()
     self.load_local = load_local.strip()
+    self.compute_stats = compute_stats.strip()
+
+def build_compute_stats_statement(compute_stats_template, table_name):
+  return compute_stats_template.strip() % {'table_name' : table_name}
 
 def build_create_statement(table_template, table_name, file_format,
                            compression, scale_factor):
@@ -134,8 +139,7 @@ def build_compression_codec_statement(codec, compression_type):
   if compression_codec:
     return COMPRESSION_TYPE % compression_type.upper() + '\n' +\
            COMPRESSION_CODEC % compression_codec
-  else:
-    return ''
+  return ''
 
 def build_codec_enabled_statement(codec):
   compression_enabled = 'false' if codec == 'none' else 'true'
@@ -170,9 +174,9 @@ def build_load_statement(load_template, table_name, scale_factor):
 def build_trevni(trevni_template, table_name, base_table_name):
   retstr =  \
     trevni_template % {'table_name': table_name, 'base_table_name': base_table_name}
-  return retstr.replace('run-query.sh', 
+  return retstr.replace('run-query.sh',
       'run-query.sh --exec_options="abort_on_error:false" --impalad=' +
-      options.backend, 1) 
+      options.backend, 1)
 
 def build_table_suffix(file_format, codec, compression_type):
   if file_format == 'text' and codec != 'none':
@@ -217,7 +221,7 @@ def list_hdfs_subdir_names(path):
 def write_trevni_file(file_name, array):
   with open(file_name, "w") as f:
     if len(array) != 0:
-      # Start a plan service.  
+      # Start a plan service.
       f.write("set -e\nset -u\n")
       f.write("(. ${IMPALA_HOME}/bin/set-classpath.sh; ")
       f.write("exec $IMPALA_BE_DIR/build/debug/service/impalad) >& /tmp/impalad.out&\n")
@@ -229,6 +233,7 @@ def write_trevni_file(file_name, array):
 
 def write_statements_to_file_based_on_input_vector(output_name, test_vectors,
                                                    statements):
+  output_stats = [SET_HIVE_INPUT_FORMAT % "HiveInputFormat"]
   output_create = []
   output_load = []
   output_load_base = []
@@ -253,6 +258,14 @@ def write_statements_to_file_based_on_input_vector(output_name, test_vectors,
 
       output_create.append(build_create_statement(create, table_name, file_format, codec,
                                                   options.scale_factor))
+      if options.compute_stats:
+        # Don't generate empty compute stats statements.
+        # TODO: There is also currently an issue when running Hive in local mode
+        # (no map reduce) against bzip compression. Disabling stats generation for these
+        # tables until that problem is resolved. Also, table stats don't work properly
+        # for trevni file format.
+        if s.compute_stats and codec != 'bzip' and file_format != 'trevni':
+          output_stats.append(build_compute_stats_statement(s.compute_stats, table_name))
 
       # If the directory already exists in HDFS, assume that data files already exist
       # and skip loading the data. Otherwise, the data is generated using either an
@@ -261,7 +274,7 @@ def write_statements_to_file_based_on_input_vector(output_name, test_vectors,
       if not options.force_reload and table_name in existing_tables:
         print 'Path:', data_path, 'already exists in HDFS. Data loading can be skipped.'
       else:
-        print 'Path:', data_path, 'does not exists in HDFS. Data file will be generated.'
+        print 'Path:', data_path, 'does not exists in HDFS. Data will be loaded.'
         if table_name == base_table_name:
           if load_local:
             output_load_base.append(build_load_statement(load_local, table_name,
@@ -280,30 +293,28 @@ def write_statements_to_file_based_on_input_vector(output_name, test_vectors,
                                             codec, compression_type))
           else:
               print 'Empty insert for table %s. Skipping insert generation' % table_name
-
-  # Make sure we create the base tables before the remaining tables
-  output_load = output_create + output_load_base + output_load
+  # Make sure we create the base tables first and compute stats last
+  output_load = output_create + output_load_base + output_load + output_stats
   write_array_to_file('load-' + output_name + '-generated.sql', output_load)
   write_trevni_file('load-trevni-' + output_name + '-generated.sh', output_trevni);
 
 def parse_benchmark_file(file_name):
   template = open(file_name, 'rb')
   statements = collections.defaultdict(list)
-
+  EXPECTED_NUM_SUBSECTIONS = 7
   for section in template.read().split('===='):
     sub_section = section.split('----')
-    if len(sub_section) == 6:
+    if len(sub_section) == EXPECTED_NUM_SUBSECTIONS:
       data_set = sub_section[0]
-      gen_statement = SqlGenerationStatement(*sub_section[1:6])
+      gen_statement = SqlGenerationStatement(*sub_section[1:EXPECTED_NUM_SUBSECTIONS])
       statements[data_set.strip()].append(gen_statement)
     else:
       print 'Skipping invalid subsection:', sub_section
   return statements
 
-if (options.exploration_strategy != 'core' and
-    options.exploration_strategy != 'pairwise' and
-    options.exploration_strategy != 'exhaustive'):
+if options.exploration_strategy not in KNOWN_EXPLORATION_STRATEGIES:
   print 'Invalid exploration strategy:', options.exploration_strategy
+  print 'Valid values:', ', '.join(KNOWN_EXPLORATION_STRATEGIES)
   sys.exit(1)
 
 test_vector_file = os.path.join(WORKLOAD_DIR, options.workload,

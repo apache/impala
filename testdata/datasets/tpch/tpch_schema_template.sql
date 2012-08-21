@@ -35,6 +35,8 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/lineitem/'
 OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -63,6 +65,8 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/part/'
 OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -86,6 +90,8 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/partsupp/'
 OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -111,6 +117,8 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/supplier/'
 OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -133,6 +141,8 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/nation/'
 OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -154,6 +164,8 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/region/'
 OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -181,6 +193,8 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/orders/'
 OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -207,6 +221,8 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/customer/'
 OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -227,6 +243,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -240,6 +258,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -255,6 +275,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -268,6 +290,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -279,6 +303,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -292,6 +318,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -303,6 +331,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -314,6 +344,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -329,6 +361,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -342,6 +376,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -355,6 +391,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -366,6 +404,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -380,6 +420,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -394,6 +436,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -405,6 +449,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 tpch
 ----
@@ -416,4 +462,6 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 ----
 ----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
