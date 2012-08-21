@@ -64,7 +64,13 @@ public class TestFileParser {
     FILEERRORS,
     PARTITIONS,
     SETUP,
-    ERRORS
+    ERRORS,
+    SCANRANGELOCATIONS;
+
+    // Return header line for this section
+    public String getHeader() {
+      return "---- " + this.toString();
+    }
   }
 
   /**

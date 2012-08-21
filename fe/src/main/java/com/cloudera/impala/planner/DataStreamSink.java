@@ -3,18 +3,25 @@
 package com.cloudera.impala.planner;
 
 import com.cloudera.impala.thrift.TDataSink;
+import com.cloudera.impala.thrift.TDataSink2;
 import com.cloudera.impala.thrift.TDataSinkType;
 import com.cloudera.impala.thrift.TDataStreamSink;
+import com.cloudera.impala.thrift.TDataStreamSink2;
 
 /**
  * Data sink that forwards data to an exchange node.
  *
  */
 public class DataStreamSink extends DataSink {
-  private final int exchNodeId;
+  private final PlanNodeId exchNodeId;
+  private DataPartition outputPartition;
 
-  public DataStreamSink(int exchNodeId) {
+  public DataStreamSink(PlanNodeId exchNodeId) {
     this.exchNodeId = exchNodeId;
+  }
+
+  public void setPartition(DataPartition partition) {
+    outputPartition = partition;
   }
 
   @Override
@@ -28,7 +35,16 @@ public class DataStreamSink extends DataSink {
   @Override
   protected TDataSink toThrift() {
     TDataSink tdataSink = new TDataSink(TDataSinkType.DATA_STREAM_SINK);
-    tdataSink.setDataStreamSink(new TDataStreamSink(exchNodeId));
+    tdataSink.setDataStreamSink(new TDataStreamSink(exchNodeId.asInt()));
     return tdataSink;
+  }
+
+  @Override
+  protected TDataSink2 toThrift2() {
+    TDataSink2 result = new TDataSink2(TDataSinkType.DATA_STREAM_SINK);
+    TDataStreamSink2 tStreamSink = new TDataStreamSink2(exchNodeId.asInt());
+    tStreamSink.setOutput_partition(outputPartition.toThrift());
+    result.setStream_sink(tStreamSink);
+    return result;
   }
 }

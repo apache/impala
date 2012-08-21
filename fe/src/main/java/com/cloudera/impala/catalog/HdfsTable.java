@@ -88,7 +88,7 @@ public class HdfsTable extends Table {
     }
 
     /**
-     * Return the volume id of the block in BlockLocation.getName()[hostIndex]; -1 if
+     * Return the volume id of the block in BlockLocation.getNames()[hostIndex]; -1 if
      * volumn id is not supported.
      */
     public int getVolumeId(int hostIndex) {

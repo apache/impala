@@ -2,12 +2,15 @@
 
 package com.cloudera.impala.common;
 
+import java.util.ArrayList;
+import com.google.common.collect.Lists;
+
 /**
- * Integer ids that cannot accidentally be compared with ints..
+ * Integer ids that cannot accidentally be compared with ints.
  *
  */
-public abstract class Id {
-  private final int id;
+public class Id<IdType extends Id<IdType>> {
+  protected final int id;
 
   static private int INVALID_ID = -1;
 
@@ -41,5 +44,15 @@ public abstract class Id {
 
   public int asInt() {
     return id;
+  }
+
+  public ArrayList<IdType> asList() {
+    ArrayList<IdType> list = new ArrayList<IdType>();
+    list.add((IdType) this);
+    return list;
+  }
+
+  public String toString() {
+    return Integer.toString(id);
   }
 }

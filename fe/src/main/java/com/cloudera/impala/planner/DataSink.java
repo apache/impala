@@ -3,6 +3,7 @@
 package com.cloudera.impala.planner;
 
 import com.cloudera.impala.thrift.TDataSink;
+import com.cloudera.impala.thrift.TDataSink2;
 
 /**
  * A DataSink describes the destination of a plan fragment's output rows.
@@ -21,4 +22,5 @@ public abstract class DataSink {
   public abstract String getExplainString(String prefix);
 
   protected abstract TDataSink toThrift();
+  protected abstract TDataSink2 toThrift2();
 }

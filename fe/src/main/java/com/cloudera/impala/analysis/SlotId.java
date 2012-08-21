@@ -2,13 +2,10 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import com.cloudera.impala.common.Id;
-import com.google.common.collect.Lists;
+import com.cloudera.impala.common.IdGenerator;
 
-public class SlotId extends Id {
+public class SlotId extends Id<SlotId> {
   public SlotId() {
     super();
   }
@@ -17,9 +14,7 @@ public class SlotId extends Id {
     super(id);
   }
 
-  public List<SlotId> asList() {
-    ArrayList<SlotId> list = Lists.newArrayList();
-    list.add(this);
-    return list;
+  public SlotId(IdGenerator<SlotId> idGenerator) {
+    super(idGenerator.getNextId());
   }
 }

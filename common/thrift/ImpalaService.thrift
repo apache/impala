@@ -53,6 +53,11 @@ enum TImpalaQueryOptions {
 
   // Number of scanner threads.
   NUM_SCANNER_THREADS,
+
+  // boolean; if true, do a distributed aggregation, which reduces the per-node memory
+  // consumption, but may require an additional repartitioning step on the grouping
+  // exprs; ignored if no grouping
+  PARTITION_AGG,
 }
 
 // The summary of an insert.

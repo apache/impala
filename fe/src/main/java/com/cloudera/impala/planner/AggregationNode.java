@@ -11,6 +11,7 @@ import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.thrift.TAggregationNode;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
+import com.cloudera.impala.thrift.TExplainLevel;
 import com.google.common.base.Objects;
 
 /**
@@ -21,15 +22,14 @@ public class AggregationNode extends PlanNode {
   private final AggregateInfo aggInfo;
 
   // Set to true if this aggregation node contains aggregate functions that require
-  // finalization to complete after all rows have been aggregated, and this node is not
-  // an intermediate node.
+  // finalization after all rows have been aggregated.
   private boolean needsFinalize;
 
   /**
    * Create an agg node that is not an intermediate node.
    * isIntermediate is true if it is a slave node in a 2-part agg plan.
    */
-  public AggregationNode(int id, PlanNode input, AggregateInfo aggInfo,
+  public AggregationNode(PlanNodeId id, PlanNode input, AggregateInfo aggInfo,
       boolean isIntermediate) {
     super(id, aggInfo.getAggTupleId().asList());
     this.aggInfo = aggInfo;
@@ -50,7 +50,7 @@ public class AggregationNode extends PlanNode {
    * Create an agg node that is not an intermediate agg node. It is either an agg node in
    * a single node plan, or a coord agg node in a multi-node plan.
    */
-  public AggregationNode(int id, PlanNode input, AggregateInfo aggInfo) {
+  public AggregationNode(PlanNodeId id, PlanNode input, AggregateInfo aggInfo) {
     this(id, input, aggInfo, false);
   }
 
@@ -84,7 +84,7 @@ public class AggregationNode extends PlanNode {
   }
 
   @Override
-  protected String getExplainString(String prefix, ExplainPlanLevel detailLevel) {
+  protected String getExplainString(String prefix, TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder()
         .append(prefix + "AGGREGATE\n")
         .append(prefix + "OUTPUT: ")

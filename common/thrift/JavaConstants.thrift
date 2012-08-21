@@ -40,4 +40,5 @@ const map<ImpalaService.TImpalaQueryOptions, string> DEFAULT_QUERY_OPTIONS = {
   ImpalaService.TImpalaQueryOptions.FILE_BUFFER_SIZE : "0"
   ImpalaService.TImpalaQueryOptions.MAX_IO_BUFFERS : "0"
   ImpalaService.TImpalaQueryOptions.NUM_SCANNER_THREADS : "0"
+  ImpalaService.TImpalaQueryOptions.PARTITION_AGG : "false"
 }

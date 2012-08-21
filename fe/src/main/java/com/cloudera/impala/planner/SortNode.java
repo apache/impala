@@ -11,6 +11,7 @@ import com.cloudera.impala.analysis.SortInfo;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TSortNode;
+import com.cloudera.impala.thrift.TExplainLevel;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -24,7 +25,7 @@ public class SortNode extends PlanNode {
   private final SortInfo info;
   private final boolean useTopN;
 
-  public SortNode(int id, PlanNode input, SortInfo info, boolean useTopN) {
+  public SortNode(PlanNodeId id, PlanNode input, SortInfo info, boolean useTopN) {
     super(id);
     this.info = info;
     this.useTopN = useTopN;
@@ -67,7 +68,7 @@ public class SortNode extends PlanNode {
   }
 
   @Override
-  protected String getExplainString(String prefix, ExplainPlanLevel detailLevel) {
+  protected String getExplainString(String prefix, TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     if (useTopN) {
       output.append(prefix + "TOP-N\n");

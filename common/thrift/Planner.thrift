@@ -18,8 +18,9 @@ struct TPlanFragment {
   // no plan or descriptor table: query without From clause
   2: optional PlanNodes.TPlan plan_tree
 
-  // exprs that produce values for slots of output tuple (one expr per slot)
-  4: list<Exprs.TExpr> output_exprs
+  // exprs that produce values for slots of output tuple (one expr per slot);
+  // if not set, plan fragment materializes full rows of plan_tree
+  4: optional list<Exprs.TExpr> output_exprs
   
   // Specifies the destination of this plan fragment's output rows.
   // For example, the destination could be a stream sink which forwards 
@@ -36,7 +37,7 @@ struct TPlanFragment {
   // - RANGE_PARTITIONING: currently not supported
   // This is distinct from the partitioning of each plan fragment's
   // output, which is specified by output_sink.output_partitioning.
-  6: required Partitions.TPartitioningSpec partitioning
+  6: required Partitions.TDataPartition partition
 }
 
 // location information for a single scan range
@@ -44,14 +45,14 @@ struct TScanRangeLocation {
   1: required Types.THostPort server
 
   // disk volume identifier of a particular scan range at 'server';
-  // -1 indicates an unknown volume id
-  2: required i32 volume_id = -1
+  // -1 indicates an unknown volume id;
+  // only set for TScanRange2.hdfsFileSplit
+  2: optional i32 volume_id = -1
 }
 
 // A single scan range plus the hosts that serve it
 struct TScanRangeLocations {
   1: required PlanNodes.TScanRange2 scan_range
-
   // non-empty list
   2: list<TScanRangeLocation> locations
 }

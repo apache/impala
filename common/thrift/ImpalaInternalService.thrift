@@ -36,6 +36,7 @@ struct TQueryOptions {
   8: required i32 file_buffer_size = 0
   9: required i32 num_scanner_threads = 0
   10: required i32 max_io_buffers = 0
+  11: required bool partition_agg = 0
 }
 
 // Parameters for the execution of a plan fragment on a particular node.
@@ -116,7 +117,7 @@ struct TPlanExecRequest {
   // insert stmts).
   6: optional DataSinks.TDataSink data_sink
   
-  // Global query parameters assigned by coordinator.
+  // Global query parameters assigned by planner
   7: required TQueryGlobals query_globals
   
   // query options for the query

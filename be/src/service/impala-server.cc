@@ -1313,6 +1313,9 @@ void ImpalaServer::QueryToTClientRequest(const Query& query,
             break;
           case TImpalaQueryOptions::NUM_SCANNER_THREADS:
             request->queryOptions.num_scanner_threads = atoi(key_value[1].c_str());
+          case TImpalaQueryOptions::PARTITION_AGG:
+            request->queryOptions.partition_agg = 
+                iequals(key_value[1], "true") || iequals(key_value[1], "1");
             break;
           default:
             // We hit this DCHECK(false) if we forgot to add the corresponding entry here
@@ -1551,6 +1554,9 @@ void ImpalaServer::InitializeConfigVariables() {
         break;
       case TImpalaQueryOptions::NUM_SCANNER_THREADS:
         value << default_options.num_scanner_threads;
+        break;
+      case TImpalaQueryOptions::PARTITION_AGG:
+        value << default_options.partition_agg;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here

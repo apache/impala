@@ -167,6 +167,9 @@ public class ImpaladClientExecutor {
         case NUM_SCANNER_THREADS:
           optionValue = String.valueOf(queryOptions.getNum_scanner_threads());
           break;
+        case PARTITION_AGG:
+          optionValue = String.valueOf(queryOptions.isPartition_agg());
+          break;
         default:
           Preconditions.checkState(false, "Unhandled option:" + option.toString());
       }

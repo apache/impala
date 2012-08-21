@@ -2,8 +2,8 @@
 
 package com.cloudera.impala.service;
 
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.thrift.TBase;
@@ -17,12 +17,13 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TCatalogUpdate;
-import com.cloudera.impala.thrift.TGetTablesParams;
-import com.cloudera.impala.thrift.TGetTablesResult;
+import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TDescribeTableParams;
 import com.cloudera.impala.thrift.TDescribeTableResult;
 import com.cloudera.impala.thrift.TExecRequest;
-import com.cloudera.impala.thrift.TClientRequest;
+import com.cloudera.impala.thrift.TGetTablesParams;
+import com.cloudera.impala.thrift.TGetTablesResult;
+import com.cloudera.impala.thrift.TQueryExecRequest2;
 
 /**
  * JNI-callable interface onto a wrapped Frontend instance. The main point is to serialise
@@ -87,7 +88,31 @@ public class JniFrontend {
   }
 
   /**
-   * Return an explain plan based on thriftQueryRequest, a serialized TClientRequest.
+   * Jni wrapper for Frontend.createQueryExecRequest2(). Accepts a serialized
+   * TClientRequest; returns a serialized TQueryExecRequest2.
+   */
+  public byte[] createQueryExecRequest2(byte[] thriftClientRequest)
+      throws ImpalaException {
+    TClientRequest request = new TClientRequest();
+    deserializeThrift(request, thriftClientRequest);
+
+    StringBuilder explainString = new StringBuilder();
+    TQueryExecRequest2 result =
+        frontend.createQueryExecRequest2(request, explainString);
+    LOG.info(explainString.toString());
+
+    LOG.info("returned TQueryExecRequest2: " + result.toString());
+    // TODO: avoid creating serializer for each query?
+    TSerializer serializer = new TSerializer(protocolFactory);
+    try {
+      return serializer.serialize(result);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
+  /**
+   * Return an explain plan based on thriftQueryRequest, a serialized TQueryRequest.
    * This call is thread-safe.
    */
   public String getExplainPlan(byte[] thriftQueryRequest) throws ImpalaException {
@@ -110,7 +135,7 @@ public class JniFrontend {
   }
 
   /**
-   * Returns a list of table names matching an optional pattern. 
+   * Returns a list of table names matching an optional pattern.
    * The argument is a serialized TGetTablesParams object.
    * The return type is a serialised TGetTablesResult object.
    * @see Frontend#getTableNames

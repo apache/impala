@@ -31,8 +31,9 @@ import com.google.common.collect.Lists;
 public class TestUtils {
   private final static Logger LOG = LoggerFactory.getLogger(TestUtils.class);
   private final static String[] expectedFilePrefix = { "hdfs:", "file: " };
-  private final static String[] ignoreContentAfter = { "HOST:" };
-  // Special prefix for accepting an actual result if it matches a given regex.
+  private final static String[] ignoreContentAfter = { "HOST:", "LOCATIONS:" };
+  // Special prefix that designates an expected value specified as a regex rather
+  // than a literal
   private final static String regexAgainstActual = "regex:";
   private final static String DEFAULT_DB = "default";
 
@@ -96,12 +97,12 @@ public class TestUtils {
     int mismatch = -1; // line in actual w/ mismatch
     int maxLen = Math.min(actual.size(), expected.size());
     for (int i = 0; i < maxLen; ++i) {
-      String expectedStr = expected.get(i);
+      String expectedStr = expected.get(i).trim();
       String actualStr = actual.get(i);
       // Look for special prefixes in containsPrefixes.
       boolean containsPrefix = false;
       for (int prefixIdx = 0; prefixIdx < expectedFilePrefix.length; ++prefixIdx) {
-        containsPrefix = expectedStr.trim().startsWith(expectedFilePrefix[prefixIdx]);
+        containsPrefix = expectedStr.contains(expectedFilePrefix[prefixIdx]);
         if (containsPrefix) {
           expectedStr = expectedStr.replaceFirst(expectedFilePrefix[prefixIdx], "");
           actualStr = actualStr.replaceFirst(expectedFilePrefix[prefixIdx], "");
@@ -112,11 +113,11 @@ public class TestUtils {
       }
 
       boolean ignoreAfter = false;
-      for (int icIdx = 0; icIdx < ignoreContentAfter.length; ++icIdx) {
-        ignoreAfter |= expectedStr.trim().startsWith(ignoreContentAfter[icIdx]);
+      for (int j = 0; j < ignoreContentAfter.length; ++j) {
+        ignoreAfter |= expectedStr.startsWith(ignoreContentAfter[j]);
       }
 
-      if (expectedStr.trim().startsWith(regexAgainstActual)) {
+      if (expectedStr.startsWith(regexAgainstActual)) {
         // Get regex to check against by removing prefix.
         String regex = expectedStr.replace(regexAgainstActual, "").trim();
         if (!actualStr.matches(regex)) {

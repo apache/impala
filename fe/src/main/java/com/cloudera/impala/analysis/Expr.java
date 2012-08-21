@@ -215,7 +215,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     }
 
     /**
-     * Create combined map which is equivalent to applying f followed by g.
+     * Create combined map which is equivalent to applying f followed by g,
+     * i.e., g(f()).
      */
     public static SubstitutionMap combine(SubstitutionMap f, SubstitutionMap g) {
       SubstitutionMap result = new SubstitutionMap();

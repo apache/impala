@@ -29,6 +29,7 @@ import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.Constants;
+import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.THBaseFilter;
 import com.cloudera.impala.thrift.THBaseKeyRange;
 import com.cloudera.impala.thrift.THBaseScanNode;
@@ -36,6 +37,7 @@ import com.cloudera.impala.thrift.THostPort;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TScanRange;
+import com.cloudera.impala.thrift.TScanRangeLocations;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -61,7 +63,7 @@ public class HBaseScanNode extends ScanNode {
   // HBase config; Common across all object instance.
   private static Configuration hbaseConf = HBaseConfiguration.create();
 
-  public HBaseScanNode(int id, TupleDescriptor desc) {
+  public HBaseScanNode(PlanNodeId id, TupleDescriptor desc) {
     super(id, desc);
     this.desc = desc;
   }
@@ -152,6 +154,14 @@ public class HBaseScanNode extends ScanNode {
     if (!filters.isEmpty()) {
       msg.hbase_scan_node.setFilters(filters);
     }
+  }
+
+  /**
+   * TODO: Return scan ranges
+   */
+  @Override
+  public List<TScanRangeLocations> getScanRangeLocations(long maxScanRangeLength) {
+    return null;
   }
 
   /**
@@ -268,8 +278,10 @@ public class HBaseScanNode extends ScanNode {
     int actualNumPart = (numPartitions == Constants.NUM_NODES_ALL) ?
         locationMap.size() : numPartitions;
     for (Map.Entry<String, List<HRegionLocation>> locEntry: locationMap.entrySet()) {
-      TScanRange scanRange = (curPartIdx < actualNumPart) ? new TScanRange(id) :
-          scanRanges.get(curPartIdx % actualNumPart);
+      TScanRange scanRange =
+          curPartIdx < actualNumPart
+            ? new TScanRange(id.asInt())
+            : scanRanges.get(curPartIdx % actualNumPart);
 
       // HBaseTableScanner(backend) initializes a result scanner for each key range.
       // To minimize # of result scanner re-init, reduce the number of key ranges by
@@ -304,7 +316,7 @@ public class HBaseScanNode extends ScanNode {
   }
 
   @Override
-  protected String getExplainString(String prefix, ExplainPlanLevel detailLevel) {
+  protected String getExplainString(String prefix, TExplainLevel detailLevel) {
     HBaseTable tbl = (HBaseTable) desc.getTable();
     StringBuilder output = new StringBuilder()
         .append(prefix + "SCAN HBASE table=" + tbl.getName() + " (" + id + ")\n");
@@ -368,7 +380,8 @@ public class HBaseScanNode extends ScanNode {
     return result.toString();
   }
 
-  private static CompareFilter.CompareOp impalaOpToHBaseOp(BinaryPredicate.Operator impalaOp) {
+  private static CompareFilter.CompareOp impalaOpToHBaseOp(
+      BinaryPredicate.Operator impalaOp) {
     switch(impalaOp) {
       case EQ: return CompareFilter.CompareOp.EQUAL;
       case NE: return CompareFilter.CompareOp.NOT_EQUAL;

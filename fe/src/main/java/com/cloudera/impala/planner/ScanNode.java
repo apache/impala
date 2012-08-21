@@ -7,6 +7,7 @@ import java.util.List;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.thrift.THostPort;
 import com.cloudera.impala.thrift.TScanRange;
+import com.cloudera.impala.thrift.TScanRangeLocations;
 import com.google.common.base.Objects;
 
 /**
@@ -23,7 +24,7 @@ abstract public class ScanNode extends PlanNode {
    */
   protected List<ValueRange> keyRanges;
 
-  public ScanNode(int id, TupleDescriptor desc) {
+  public ScanNode(PlanNodeId id, TupleDescriptor desc) {
     super(id, desc.getId().asList());
     this.desc = desc;
   }
@@ -51,6 +52,14 @@ abstract public class ScanNode extends PlanNode {
   abstract public void getScanParams(long maxScanRangeLength,
       int numPartitions, List<TScanRange> scanRanges, List<THostPort> dataLocations);
 
+  /**
+   * Returns all scan ranges plus their locations. Needs to be preceded by a call to
+   * finalize().
+   * @param maxScanRangeLength The maximum number of bytes each scan range should scan;
+   *     only applicable to HDFS; less than or equal to zero means no maximum.
+   */
+  abstract public List<TScanRangeLocations> getScanRangeLocations(long maxScanRangeLength);
+
   @Override
   protected String debugString() {
     return Objects.toStringHelper(this)
@@ -63,7 +72,7 @@ abstract public class ScanNode extends PlanNode {
 
   /**
    * Helper function to parse a "host:port" address string into THostPort
-   * This is called with ipaddress:port when doing scan range assigment.  
+   * This is called with ipaddress:port when doing scan range assigment.
    */
   protected static THostPort addressToTHostPort(String address) {
     THostPort result = new THostPort();

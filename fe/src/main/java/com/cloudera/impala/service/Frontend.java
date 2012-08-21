@@ -2,14 +2,16 @@
 
 package com.cloudera.impala.service;
 
-import java.util.UUID;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
-import java.util.Iterator;
+import java.util.Calendar;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
-import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,29 +19,37 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.Column;
+import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.NotImplementedException;
+import com.cloudera.impala.planner.NewPlanner;
+import com.cloudera.impala.planner.PlanFragment;
 import com.cloudera.impala.planner.Planner;
+import com.cloudera.impala.planner.ScanNode;
 import com.cloudera.impala.thrift.TCatalogUpdate;
+import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TColumnDesc;
-import com.cloudera.impala.thrift.TExecRequest;
-import com.cloudera.impala.thrift.TPlanExecParams;
-import com.cloudera.impala.thrift.TPrimitiveType;
-import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TDdlExecRequest;
 import com.cloudera.impala.thrift.TDdlType;
+import com.cloudera.impala.thrift.TExecRequest;
+import com.cloudera.impala.thrift.TExplainLevel;
+import com.cloudera.impala.thrift.TPlanExecParams;
+import com.cloudera.impala.thrift.TPlanFragment;
+import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TQueryExecRequest;
-import com.cloudera.impala.thrift.TClientRequest;
-import com.cloudera.impala.thrift.TStmtType;
+import com.cloudera.impala.thrift.TQueryExecRequest2;
+import com.cloudera.impala.thrift.TQueryGlobals;
 import com.cloudera.impala.thrift.TResultSetMetadata;
+import com.cloudera.impala.thrift.TStmtType;
 import com.cloudera.impala.thrift.TUniqueId;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 /**
  * Frontend API for the impalad process.
@@ -50,6 +60,10 @@ public class Frontend {
   private final static Logger LOG = LoggerFactory.getLogger(Frontend.class);
   private Catalog catalog;
   final boolean lazyCatalog;
+
+  // For generating a string of the current time.
+  private final SimpleDateFormat formatter =
+      new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
 
   public Frontend() {
     // Default to eager loading
@@ -95,11 +109,13 @@ public class Frontend {
         // we only need to assign the coordinator fragment's id (= query id), the
         // rest is done by the coordinator as it issues fragment execution rpcs,
         // but fragment_id is required, so we give it a dummy value
-        queryExecRequest.fragment_requests.get(fragmentNum).setFragment_id(request.request_id);
-        queryExecRequest.fragment_requests.get(fragmentNum).setQuery_id(request.request_id);
+        queryExecRequest.fragment_requests.get(fragmentNum).
+            setFragment_id(request.request_id);
+        queryExecRequest.fragment_requests.get(fragmentNum).
+            setQuery_id(request.request_id);
       }
-      
-      if (queryExecRequest.node_request_params != null && 
+
+      if (queryExecRequest.node_request_params != null &&
           queryExecRequest.node_request_params.size() == 2) {
         Preconditions.checkState(queryExecRequest.has_coordinator_fragment);
         // we only have two fragments (1st one: coord); the destination
@@ -123,6 +139,7 @@ public class Frontend {
       StringBuilder explainString) throws ImpalaException {
     AnalysisContext analysisCtxt = new AnalysisContext(catalog);
     AnalysisContext.AnalysisResult analysisResult = null;
+    LOG.info("createExecRequest for query " + request.stmt);
     try {
       analysisResult = analysisCtxt.analyze(request.stmt);
     } catch (AnalysisException e) {
@@ -130,6 +147,8 @@ public class Frontend {
       throw e;
     }
     Preconditions.checkNotNull(analysisResult.getStmt());
+
+    LOG.info("desc tbl:\n" + analysisResult.getAnalyzer().getDescTbl().debugString());
 
     TExecRequest result = new TExecRequest();
 
@@ -143,7 +162,7 @@ public class Frontend {
           planner.createPlanFragments(analysisResult, request.queryOptions,
                                       explainString));
       result.queryExecRequest.sql_stmt = request.stmt;
-      
+
       // fill the metadata (for query statement)
       if (analysisResult.isQueryStmt()) {
         TResultSetMetadata metadata = new TResultSetMetadata();
@@ -172,13 +191,13 @@ public class Frontend {
    * Constructs a TDdlExecRequest and attaches it, plus any metadata, to the
    * result argument.
    */
-  private void createDdlExecRequest(AnalysisContext.AnalysisResult analysis, 
+  private void createDdlExecRequest(AnalysisContext.AnalysisResult analysis,
       TExecRequest result) {
     TDdlExecRequest ddl = new TDdlExecRequest();
     TResultSetMetadata metadata = new TResultSetMetadata();
     if (analysis.isUseStmt()) {
       ddl.ddl_type = TDdlType.USE;
-      ddl.setDatabase(analysis.getUseStmt().getDatabase());      
+      ddl.setDatabase(analysis.getUseStmt().getDatabase());
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
     } else if (analysis.isShowStmt()) {
       ddl.ddl_type = TDdlType.SHOW;
@@ -190,7 +209,7 @@ public class Frontend {
       ddl.setDescribe_table(analysis.getDescribeStmt().getTable().getTbl());
       ddl.setDatabase(analysis.getDescribeStmt().getTable().getDb());
       metadata.setColumnDescs(Arrays.asList(
-          new TColumnDesc("name", TPrimitiveType.STRING), 
+          new TColumnDesc("name", TPrimitiveType.STRING),
           new TColumnDesc("type", TPrimitiveType.STRING)));
     }
 
@@ -213,7 +232,7 @@ public class Frontend {
    * pattern is null, matches all tables. If db is null, all databases are
    * searched for matches.
    */
-  public List<String> getTableNames(String dbName, String tablePattern) 
+  public List<String> getTableNames(String dbName, String tablePattern)
       throws ImpalaException {
     return catalog.getTableNames(dbName, tablePattern);
   }
@@ -223,7 +242,7 @@ public class Frontend {
    * specified table. Throws an AnalysisException if the table or db is not
    * found.
    */
-  public List<TColumnDesc> describeTable(String dbName, String tableName) 
+  public List<TColumnDesc> describeTable(String dbName, String tableName)
       throws ImpalaException {
     Db db = catalog.getDb(dbName);
     if (db == null) {
@@ -244,6 +263,94 @@ public class Frontend {
     }
 
     return columns;
+  }
+
+  /**
+   * new planner interface:
+   * Return plan fragments for the given request.stmt, taking into account
+   * whether distributed execution is requested.
+   */
+  public TQueryExecRequest2 createQueryExecRequest2(
+      TClientRequest request, StringBuilder explainString)
+      throws InternalException, AnalysisException, NotImplementedException {
+    AnalysisContext analysisCtxt = new AnalysisContext(catalog);
+    AnalysisContext.AnalysisResult analysisResult = null;
+    try {
+      analysisResult = analysisCtxt.analyze(request.stmt);
+    } catch (AnalysisException e) {
+      LOG.info(e.getMessage());
+      throw e;
+    }
+    Preconditions.checkNotNull(analysisResult.getStmt());
+
+    // assign query_id
+    TQueryExecRequest2 result = new TQueryExecRequest2();
+    UUID queryId = UUID.randomUUID();
+    result.query_id =
+        new TUniqueId(queryId.getMostSignificantBits(),
+                      queryId.getLeastSignificantBits());
+    // create plan
+    NewPlanner planner = new NewPlanner();
+    ArrayList<PlanFragment> fragments =
+        planner.createPlanFragments(analysisResult, request.queryOptions);
+    List<ScanNode> scanNodes = Lists.newArrayList();
+    // map from fragment to its index in result.fragments; needed for
+    // result.dest_fragment_idx
+    Map<PlanFragment, Integer> fragmentIdx = Maps.newHashMap();
+    for (PlanFragment fragment: fragments) {
+      TPlanFragment thriftFragment = fragment.toThrift();
+      result.addToFragments(thriftFragment);
+      fragment.getPlanRoot().collectSubclasses(ScanNode.class, scanNodes);
+      fragmentIdx.put(fragment, result.fragments.size());
+    }
+    explainString.append(planner.getExplainString(fragments, TExplainLevel.VERBOSE));
+    LOG.info("desc tbl:\n" + analysisResult.getAnalyzer().getDescTbl().debugString());
+    result.desc_tbl = analysisResult.getAnalyzer().getDescTbl().toThrift();
+
+    // set fragment destinations
+    for (int i = 1; i < fragments.size(); ++i) {
+      PlanFragment dest = fragments.get(i).getDestFragment();
+      Integer idx = fragmentIdx.get(dest);
+      Preconditions.checkState(idx != null);
+      result.addToDest_fragment_idx(idx.intValue());
+    }
+
+    // set scan ranges/locations for scan nodes
+    for (ScanNode scanNode: scanNodes) {
+      result.putToPer_node_scan_ranges(
+          scanNode.getId().asInt(),
+          scanNode.getScanRangeLocations(request.queryOptions.getMax_scan_range_length()));
+    }
+
+    // fill the metadata (for query statement)
+    if (analysisResult.isQueryStmt()) {
+      TResultSetMetadata metadata = new TResultSetMetadata();
+      QueryStmt queryStmt = analysisResult.getQueryStmt();
+      int colCnt = queryStmt.getColLabels().size();
+      for (int i = 0; i < colCnt; ++i) {
+        TColumnDesc colDesc = new TColumnDesc();
+        colDesc.columnName = queryStmt.getColLabels().get(i);
+        colDesc.columnType = queryStmt.getResultExprs().get(i).getType().toThrift();
+        metadata.addToColumnDescs(colDesc);
+      }
+      result.result_set_metadata = metadata;
+    }
+
+    // Global query parameters to be set in each TPlanExecRequest.
+    result.query_globals = createQueryGlobals();
+
+    return result;
+  }
+
+  /**
+   * Create query global parameters to be set in each TPlanExecRequest.
+   */
+  private TQueryGlobals createQueryGlobals() {
+    TQueryGlobals queryGlobals = new TQueryGlobals();
+    Calendar currentDate = Calendar.getInstance();
+    String nowStr = formatter.format(currentDate.getTime());
+    queryGlobals.setNow_string(nowStr);
+    return queryGlobals;
   }
 
   /**

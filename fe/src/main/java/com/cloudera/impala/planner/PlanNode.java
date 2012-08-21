@@ -15,6 +15,7 @@ import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.TreeNode;
 import com.cloudera.impala.thrift.TPlan;
 import com.cloudera.impala.thrift.TPlanNode;
+import com.cloudera.impala.thrift.TExplainLevel;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -35,7 +36,8 @@ import com.google.common.collect.Sets;
  * its children (= are bound by tupleIds).
  */
 abstract public class PlanNode extends TreeNode<PlanNode> {
-  protected final int id;  // unique w/in plan tree; assigned by planner
+  protected final PlanNodeId id;  // unique w/in plan tree; assigned by planner
+  protected PlanFragmentId fragmentId;  // assigned by planner after fragmentation step
   protected long limit; // max. # of rows to be returned; 0: no limit
 
   // ids materialized by the tree rooted at this node
@@ -57,13 +59,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   //  Node should compact data.
   protected boolean compactData;
 
-  // Control how much info explain plan will output
-  public enum ExplainPlanLevel {
-    NORMAL,
-    HIGH
-  }
-
-  protected PlanNode(int id, ArrayList<TupleId> tupleIds) {
+  protected PlanNode(PlanNodeId id, ArrayList<TupleId> tupleIds) {
     this.id = id;
     this.limit = -1;
     // make a copy, just to be on the safe side
@@ -73,7 +69,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     this.nullableTupleIds = Sets.newHashSet();
   }
 
-  protected PlanNode(int id) {
+  protected PlanNode(PlanNodeId id) {
     this.id = id;
     this.limit = -1;
     this.tupleIds = Lists.newArrayList();
@@ -82,8 +78,29 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     this.nullableTupleIds = Sets.newHashSet();
   }
 
-  public int getId() {
+  /**
+   * Copy c'tor. Also passes in new id.
+   */
+  protected PlanNode(PlanNodeId id, PlanNode node) {
+    this.id = id;
+    this.limit = node.limit;
+    this.tupleIds = Lists.newArrayList(node.tupleIds);
+    this.rowTupleIds = Lists.newArrayList(node.rowTupleIds);
+    this.nullableTupleIds = Sets.newHashSet(node.nullableTupleIds);
+    this.conjuncts = Expr.cloneList(node.conjuncts, null);
+    this.compactData = node.compactData;
+  }
+
+  public PlanNodeId getId() {
     return id;
+  }
+
+  public void setFragmentId(PlanFragmentId id) {
+    fragmentId = id;
+  }
+
+  public PlanFragmentId getFragmentId() {
+    return fragmentId;
   }
 
   public long getLimit() {
@@ -134,18 +151,23 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     }
   }
 
-  public String getExplainString() {
-    return getExplainString("", ExplainPlanLevel.NORMAL);
+  public void transferConjuncts(PlanNode recipient) {
+    recipient.conjuncts.addAll(conjuncts);
+    conjuncts.clear();
   }
 
-  protected String getExplainString(String prefix, ExplainPlanLevel detailLevel) {
+  public String getExplainString() {
+    return getExplainString("", TExplainLevel.NORMAL);
+  }
+
+  protected String getExplainString(String prefix, TExplainLevel detailLevel) {
     String expStr = "";
     if (limit != -1) {
       expStr =  prefix + "LIMIT: " + limit + "\n";
     }
 
-    // Output Tuple Ids only when explain plan level is set to high
-    if (detailLevel.equals(ExplainPlanLevel.HIGH)) {
+    // Output Tuple Ids only when explain plan level is set to verbose
+    if (detailLevel.equals(TExplainLevel.VERBOSE)) {
       expStr += prefix + "TUPLE IDS: ";
       for (TupleId tupleId: tupleIds) {
         String nullIndicator = nullableTupleIds.contains(tupleId) ? "N" : "";
@@ -167,7 +189,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // Append a flattened version of this plan node, including all children, to 'container'.
   private void treeToThriftHelper(TPlan container) {
     TPlanNode msg = new TPlanNode();
-    msg.node_id = id;
+    msg.node_id = id.asInt();
     msg.num_children = children.size();
     msg.limit = limit;
     for (TupleId tid: rowTupleIds) {

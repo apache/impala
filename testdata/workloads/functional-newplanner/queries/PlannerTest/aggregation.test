@@ -1,0 +1,113 @@
+# basic aggregation
+select count(*), count(tinyint_col), min(tinyint_col), max(tinyint_col), sum(tinyint_col),
+avg(tinyint_col)
+from alltypesagg
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  AGGREGATE
+  OUTPUT: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
+  GROUP BY: 
+  TUPLE IDS: 1 
+    SCAN HDFS table=default.alltypesagg (0)
+      TUPLE IDS: 0 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  AGGREGATE
+  OUTPUT: SUM(<slot 1>), SUM(<slot 2>), MIN(<slot 3>), MAX(<slot 4>), SUM(<slot 5>)
+  GROUP BY: 
+  TUPLE IDS: 1 
+    EXCHANGE (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 2
+  AGGREGATE
+  OUTPUT: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
+  GROUP BY: 
+  TUPLE IDS: 1 
+    SCAN HDFS table=default.alltypesagg (0)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+  LOCATIONS:
+====
+# with grouping
+select tinyint_col, count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col),
+avg(tinyint_col)
+from alltypesagg
+group by 1
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  AGGREGATE
+  OUTPUT: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
+  GROUP BY: tinyint_col
+  TUPLE IDS: 1 
+    SCAN HDFS table=default.alltypesagg (0)
+      TUPLE IDS: 0 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  AGGREGATE
+  OUTPUT: SUM(<slot 2>), MIN(<slot 3>), MAX(<slot 4>), SUM(<slot 5>), SUM(<slot 6>)
+  GROUP BY: <slot 1>
+  TUPLE IDS: 1 
+    EXCHANGE (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 2
+  AGGREGATE
+  OUTPUT: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
+  GROUP BY: tinyint_col
+  TUPLE IDS: 1 
+    SCAN HDFS table=default.alltypesagg (0)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+  LOCATIONS:
+====

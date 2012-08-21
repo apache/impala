@@ -30,14 +30,11 @@ public class SelectStmt extends QueryStmt {
   private final ArrayList<Expr> groupingExprs;
   private final Predicate havingClause;  // original having clause
 
-  /**  havingClause with aliases and agg output resolved */
+  // havingClause with aliases and agg output resolved
   private Predicate havingPred;
 
-  /** set if we have any kind of aggregation operation, include SELECT DISTINCT */
+  // set if we have any kind of aggregation operation, include SELECT DISTINCT
   private AggregateInfo aggInfo;
-
-  /** set if we have DISTINCT aggregate functions */
-  private AggregateInfo mergeAggInfo;
 
   SelectStmt(SelectList selectList,
              List<TableRef> tableRefList,
@@ -85,10 +82,6 @@ public class SelectStmt extends QueryStmt {
 
   public AggregateInfo getAggInfo() {
     return aggInfo;
-  }
-
-  public AggregateInfo getMergeAggInfo() {
-    return mergeAggInfo;
   }
 
   @Override
@@ -150,7 +143,11 @@ public class SelectStmt extends QueryStmt {
     analyzeAggregation(analyzer);
 
     // Substitute expressions to the underlying inline view expressions
-    substituteInlineViewExpressions(analyzer);
+    substituteInlineViewExprs(analyzer);
+
+    if (aggInfo != null) {
+      LOG.info("post-analysis " + aggInfo.debugString());
+    }
   }
 
   /**
@@ -161,7 +158,7 @@ public class SelectStmt extends QueryStmt {
    * @param analyzer The analyzer of the current select block.
    * @throws AnalysisException
    */
-  protected void substituteInlineViewExpressions(Analyzer analyzer) {
+  protected void substituteInlineViewExprs(Analyzer analyzer) {
     // Gather all the inline view substitution map from all the enclosed inline views
     Expr.SubstitutionMap sMap = new Expr.SubstitutionMap();
     for (TableRef tblRef: tableRefs) {
@@ -341,12 +338,13 @@ public class SelectStmt extends QueryStmt {
     ArrayList<AggregateExpr> nonAvgAggExprs = Lists.newArrayList();
     Expr.collectList(aggExprs, AggregateExpr.class, nonAvgAggExprs);
     aggExprs = nonAvgAggExprs;
-    LOG.info("aggExprs=" + Expr.debugString(aggExprs));
     createAggInfo(groupingExprsCopy, aggExprs, analyzer);
-    LOG.info("agg smap: " + aggInfo.getSMap().debugString());
 
     // combine avg smap with the one that produces the final agg output
-    AggregateInfo finalAggInfo = mergeAggInfo != null ? mergeAggInfo : aggInfo;
+    AggregateInfo finalAggInfo =
+        aggInfo.getSecondPhaseDistinctAggInfo() != null
+          ? aggInfo.getSecondPhaseDistinctAggInfo()
+          : aggInfo;
     Expr.SubstitutionMap combinedSMap =
         Expr.SubstitutionMap.combine(avgSMap, finalAggInfo.getSMap());
     LOG.info("combined smap: " + combinedSMap.debugString());
@@ -445,108 +443,22 @@ public class SelectStmt extends QueryStmt {
   }
 
   /**
-   * Create aggInfo and possibly mergeAggInfo for the given grouping and agg exprs.
+   * Create aggInfo for the given grouping and agg exprs.
    */
   private void createAggInfo(ArrayList<Expr> groupingExprs,
       ArrayList<AggregateExpr> aggExprs, Analyzer analyzer)
       throws AnalysisException, InternalException {
     if (selectList.isDistinct()) {
+       // Create aggInfo for SELECT DISTINCT ... stmt:
+       // - all select list items turn into grouping exprs
+       // - there are no aggregate exprs
       Preconditions.checkState(groupingExprs.isEmpty());
       Preconditions.checkState(aggExprs.isEmpty());
-      createSelectDistinctInfo(analyzer.getDescTbl());
+      aggInfo =
+          AggregateInfo.create(Expr.cloneList(resultExprs, null), null, null, analyzer);
     } else {
-      // collect agg exprs with DISTINCT clause
-      ArrayList<AggregateExpr> distinctAggExprs = Lists.newArrayList();
-      for (AggregateExpr aggExpr: aggExprs) {
-        if (aggExpr.isDistinct()) {
-          distinctAggExprs.add(aggExpr);
-        }
-      }
-
-      if (distinctAggExprs.isEmpty()) {
-        aggInfo = new AggregateInfo(groupingExprs, aggExprs);
-        aggInfo.createAggTuple(analyzer.getDescTbl());
-      } else {
-        createDistinctAggInfo(groupingExprs, distinctAggExprs, aggExprs, analyzer);
-      }
+      aggInfo = AggregateInfo.create(groupingExprs, aggExprs, null, analyzer);
     }
-  }
-
-  /**
-   * Create aggInfo for SELECT DISTINCT ... stmt:
-   * - all select list items turn into grouping exprs
-   * - there are no aggregate exprs
-   */
-  private void createSelectDistinctInfo(DescriptorTable descTbl) {
-    ArrayList<Expr> groupingExprs = Expr.cloneList(resultExprs, null);
-    aggInfo = new AggregateInfo(groupingExprs, null);
-    aggInfo.createAggTuple(descTbl);
-  }
-
-  /**
-   * Create aggregate info for select block containing aggregate exprs with
-   * DISTINCT clause. At the moment, we require that all distinct aggregate
-   * functions be applied to the same set of exprs (ie, we can't do something
-   * like SELECT COUNT(DISTINCT id), COUNT(DISTINCT address)).
-   * Aggregation happens in two successive phases:
-   * - the first phase aggregates by all grouping exprs plus all parameter exprs
-   *   of DISTINCT aggregate functions
-   * - the second phase re-aggregates the output of the first phase by
-   *   grouping by the original grouping exprs and performing a merge aggregation
-   *   (ie, COUNT turns into SUM)
-   *
-   * Example:
-   *   SELECT a, COUNT(DISTINCT b, c), MIN(d), COUNT(*) FROM T GROUP BY a
-   * - 1st phase grouping exprs: a, b, c
-   * - 1st phase agg exprs: MIN(d), COUNT(*)
-   * - 2nd phase grouping exprs: a
-   * - 2nd phase agg exprs: COUNT(*), MIN(<MIN(d) from 1st phase>),
-   *     SUM(<COUNT(*) from 1st phase>)
-   *
-   * TODO: expand implementation to cover the general case; this will require
-   * a different execution strategy
-   */
-  private void createDistinctAggInfo(ArrayList<Expr> groupingExprs,
-      ArrayList<AggregateExpr> distinctAggExprs, ArrayList<AggregateExpr> aggExprs,
-      Analyzer analyzer) throws AnalysisException, InternalException {
-    Preconditions.checkState(!distinctAggExprs.isEmpty());
-    // make sure that all DISTINCT params are the same;
-    // ignore top-level implicit casts in the comparison, we might have inserted
-    // those during analysis
-    ArrayList<Expr> expr0Children = Lists.newArrayList();
-    for (Expr expr: distinctAggExprs.get(0).getChildren()) {
-      expr0Children.add(expr.ignoreImplicitCast());
-    }
-    for (int i = 1; i < distinctAggExprs.size(); ++i) {
-      ArrayList<Expr> exprIChildren = Lists.newArrayList();
-      for (Expr expr: distinctAggExprs.get(i).getChildren()) {
-        exprIChildren.add(expr.ignoreImplicitCast());
-      }
-      if (!Expr.equalLists(expr0Children, exprIChildren)) {
-        throw new AnalysisException(
-            "all DISTINCT aggregate functions need to have the same set of parameters: "
-            + distinctAggExprs.get(1).toSql());
-      }
-    }
-
-    // add DISTINCT parameters to grouping exprs
-    ArrayList<Expr> phase1GroupingExprs = Lists.newArrayList();
-    phase1GroupingExprs.addAll(groupingExprs);
-    phase1GroupingExprs.addAll(distinctAggExprs.get(0).getChildren());
-
-    // remove DISTINCT aggregate functions from aggExprs
-    ArrayList<AggregateExpr> phase1AggExprs = Lists.newArrayList();
-    phase1AggExprs.addAll(aggExprs);
-    phase1AggExprs.removeAll(distinctAggExprs);
-
-    aggInfo = new AggregateInfo(phase1GroupingExprs, phase1AggExprs);
-    aggInfo.createAggTuple(analyzer.getDescTbl());
-    LOG.info("distinct agg smap, phase 1: " + aggInfo.getSMap().debugString());
-
-    // create merge agg info
-    mergeAggInfo =
-        AggregateInfo.createDistinctMergeAggInfo(aggInfo, distinctAggExprs, analyzer);
-    LOG.info("distinct agg smap, phase 2: " + mergeAggInfo.getSMap().debugString());
   }
 
   /**

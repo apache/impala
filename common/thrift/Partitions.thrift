@@ -18,11 +18,11 @@ enum TPartitionType {
   RANGE_PARTITIONED
 }
 
-// Specification of how a single logical data stream is logically partitioned.
-// This leaves the parameters that determine the physical partitioning (for hash
+// Specification of how a single logical data stream is partitioned.
+// This leaves out the parameters that determine the physical partitioning (for hash
 // partitioning, the number of partitions; for range partitioning, the partitions'
 // boundaries), which need to be specified by the enclosing structure/context.
-struct TPartitioningSpec {
+struct TDataPartition {
   1: required TPartitionType type
   2: optional list<Exprs.TExpr> partitioning_exprs
 }

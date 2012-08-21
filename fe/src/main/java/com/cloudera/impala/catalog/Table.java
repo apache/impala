@@ -147,7 +147,7 @@ public abstract class Table {
   }
 
   public String getFullName() {
-    return db.getName() + "." + name;
+    return (db != null ? db.getName() + "." : "") + name;
   }
 
   public String getOwner() {

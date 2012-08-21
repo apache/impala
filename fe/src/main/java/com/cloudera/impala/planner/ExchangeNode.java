@@ -11,6 +11,7 @@ import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.thrift.TExchangeNode;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
+import com.cloudera.impala.thrift.TExplainLevel;
 import com.google.common.base.Objects;
 
 /**
@@ -21,14 +22,22 @@ import com.google.common.base.Objects;
 public class ExchangeNode extends PlanNode {
   private final static Logger LOG = LoggerFactory.getLogger(ExchangeNode.class);
 
+  // TODO: remove after transitioning to new planner
   private int numSenders;
 
   public void setNumSenders(int numSenders) {
     this.numSenders = numSenders;
   }
 
-  public ExchangeNode(int id, ArrayList<TupleId> tupleIds) {
+  public ExchangeNode(PlanNodeId id, ArrayList<TupleId> tupleIds) {
     super(id, tupleIds);
+  }
+
+  /**
+   * Create ExchangeNode with same parameters as 'node'.
+   */
+  public ExchangeNode(PlanNodeId id, PlanNode node) {
+    super(id, node);
   }
 
   @Override
@@ -38,9 +47,9 @@ public class ExchangeNode extends PlanNode {
   }
 
   @Override
-  protected String getExplainString(String prefix, ExplainPlanLevel detailLevel) {
+  protected String getExplainString(String prefix, TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
-    output.append(prefix + "EXCHANGE (" + Integer.toString(id) + ")");
+    output.append(prefix + "EXCHANGE (" + id.toString() + ")");
     output.append("\n");
     output.append(super.getExplainString(prefix + "  ", detailLevel));
     return output.toString();

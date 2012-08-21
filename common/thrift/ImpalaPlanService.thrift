@@ -15,6 +15,10 @@ service ImpalaPlanService {
   Frontend.TExecRequest CreateExecRequest(
       1:Frontend.TClientRequest clientRequest) throws (1:TImpalaPlanServiceException e);
 
+  // new planner interface
+  Frontend.TQueryExecRequest2 CreateQueryExecRequest2(
+    1:Frontend.TClientRequest clientRequest) throws (1:TImpalaPlanServiceException e);
+
   // Force planservice to reload table metadata, in case it has changed due to e.g. an 
   // insert
   void RefreshMetadata();

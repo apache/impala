@@ -36,13 +36,15 @@ import com.cloudera.impala.analysis.UnionStmt;
 import com.cloudera.impala.analysis.UnionStmt.Qualifier;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.catalog.HdfsTable;
-import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.PrimitiveType;
+import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.IdGenerator;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.Reference;
 import com.cloudera.impala.thrift.Constants;
+import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TFinalizeParams;
 import com.cloudera.impala.thrift.THBaseKeyRange;
 import com.cloudera.impala.thrift.THdfsFileSplit;
@@ -56,7 +58,6 @@ import com.cloudera.impala.thrift.TScanRange;
 import com.cloudera.impala.thrift.TUniqueId;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
 import com.google.common.collect.Sets;
 
@@ -73,24 +74,17 @@ public class Planner {
       new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
 
   // counter to assign sequential node ids
-  private int nextNodeId = 0;
+  private final IdGenerator<PlanNodeId> nodeIdGenerator = new IdGenerator<PlanNodeId>();
 
   // Control how much info explain plan outputs
-  private PlanNode.ExplainPlanLevel explainPlanLevel = PlanNode.ExplainPlanLevel.NORMAL;
-
-  private int getNextNodeId() {
-    return nextNodeId++;
-  }
-
-  public Planner() {
-  }
+  private TExplainLevel explainLevel = TExplainLevel.NORMAL;
 
   /**
    * Sets how much details the explain plan the planner will generate.
    * @param level
    */
-  public void setExplainPlanDetailLevel(PlanNode.ExplainPlanLevel level) {
-    explainPlanLevel = level;
+  public void setExplainLevel(TExplainLevel level) {
+    explainLevel = level;
   }
 
   /**
@@ -205,11 +199,12 @@ public class Planner {
     ScanNode scanNode = null;
 
     if (tblRef.getTable() instanceof HdfsTable) {
-      scanNode = new HdfsScanNode(getNextNodeId(), tblRef.getDesc(),
+      scanNode = new HdfsScanNode(
+          new PlanNodeId(nodeIdGenerator), tblRef.getDesc(),
           (HdfsTable)tblRef.getTable());
     } else {
       // HBase table
-      scanNode = new HBaseScanNode(getNextNodeId(), tblRef.getDesc());
+      scanNode = new HBaseScanNode(new PlanNodeId(nodeIdGenerator), tblRef.getDesc());
     }
 
     // TODO (alan): this is incorrect for left outer joins. Predicate should not be
@@ -323,8 +318,9 @@ public class Planner {
           "Join requires at least one equality predicate between the two tables.");
     }
     HashJoinNode result =
-        new HashJoinNode(getNextNodeId(), outer, inner, innerRef.getJoinOp(),
-                         eqJoinConjuncts, innerRef.getOtherJoinConjuncts());
+        new HashJoinNode(new PlanNodeId(nodeIdGenerator), outer, inner,
+                         innerRef.getJoinOp(), eqJoinConjuncts,
+                         innerRef.getOtherJoinConjuncts());
     analyzer.markConjunctsAssigned(eqJoinPredicates);
 
     // The remaining conjuncts that are bound by result.getTupleIds()
@@ -423,10 +419,6 @@ public class Planner {
   /**
    * Create tree of PlanNodes that implements the Select/Project/Join/Group by/Having
    * of the selectStmt query block.
-   *
-   * @param selectStmt
-   * @param analyzer
-   * @return return a tree of PlanNodes for the selectStmt
    */
   private PlanNode createSelectPlan(SelectStmt selectStmt, Analyzer analyzer)
       throws NotImplementedException, InternalException {
@@ -438,12 +430,13 @@ public class Planner {
     // add aggregation, if required
     AggregateInfo aggInfo = selectStmt.getAggInfo();
     if (aggInfo != null) {
-      result = new AggregationNode(getNextNodeId(), result, aggInfo);
+      result = new AggregationNode(new PlanNodeId(nodeIdGenerator), result, aggInfo);
       // if we're computing DISTINCT agg fns, the analyzer already created the
-      // merge agginfo
-      if (selectStmt.getMergeAggInfo() != null) {
-        result = new AggregationNode(getNextNodeId(), result,
-            selectStmt.getMergeAggInfo());
+      // 2nd phase agginfo
+      if (aggInfo.isDistinctAgg()) {
+        result = new AggregationNode(
+            new PlanNodeId(nodeIdGenerator), result,
+            aggInfo.getSecondPhaseDistinctAggInfo());
       }
     }
     // add having clause, if required
@@ -457,7 +450,7 @@ public class Planner {
     SortInfo sortInfo = selectStmt.getSortInfo();
     if (sortInfo != null) {
       Preconditions.checkState(selectStmt.getLimit() != -1);
-      result = new SortNode(getNextNodeId(), result, sortInfo, true);
+      result = new SortNode(new PlanNodeId(nodeIdGenerator), result, sortInfo, true);
     }
     result.setLimit(selectStmt.getLimit());
 
@@ -487,7 +480,7 @@ public class Planner {
     StringBuilder execParamExplain = new StringBuilder();
     String prefix = "  ";
 
-    List<TPlanExecParams> execHostsParams = 
+    List<TPlanExecParams> execHostsParams =
         request.getNode_request_params().get(planFragIdx);
 
     for (int nodeIdx = 0; nodeIdx < execHostsParams.size(); nodeIdx++) {
@@ -534,7 +527,7 @@ public class Planner {
         } else if (scanRange.isSetHdfsFileSplits()) {
           // HDFS splits are sorted and are printed as "<path> <offset>:<length>"
           execParamExplain.append(prefix + "    HDFS SPLITS NODE ID: " + nodeId);
-          if (explainPlanLevel == PlanNode.ExplainPlanLevel.HIGH) {
+          if (explainLevel == TExplainLevel.VERBOSE) {
             execParamExplain.append("\n");
           }
           List<THdfsFileSplit> fileSplists =
@@ -542,7 +535,7 @@ public class Planner {
           long totalLength = 0;
           // print per-split details for high explain level
           for (THdfsFileSplit fs: fileSplists) {
-            if (explainPlanLevel == PlanNode.ExplainPlanLevel.HIGH) {
+            if (explainLevel == TExplainLevel.VERBOSE) {
               execParamExplain.append(prefix + "      ");
               execParamExplain.append(fs.getPath() + " ");
               execParamExplain.append(fs.getOffset() + ":");
@@ -552,7 +545,7 @@ public class Planner {
           }
 
           // print summary for normal explain level
-          if (explainPlanLevel == PlanNode.ExplainPlanLevel.NORMAL) {
+          if (explainLevel == TExplainLevel.NORMAL) {
             execParamExplain.append(" TOTAL SIZE: " + totalLength + "\n");
           }
         }
@@ -593,10 +586,10 @@ public class Planner {
       // Coordinator (can only be the first) fragment might not have an associated sink.
       if (dataSink == null) {
         Preconditions.checkState(planFragIdx == 0);
-        expString = fragment.getExplainString("  ", explainPlanLevel);
+        expString = fragment.getExplainString("  ", explainLevel);
       } else {
         expString = dataSink.getExplainString("  ") +
-            fragment.getExplainString("  ", explainPlanLevel);
+            fragment.getExplainString("  ", explainLevel);
       }
       explainStr.append(expString);
 
@@ -615,12 +608,15 @@ public class Planner {
     // add aggregation, if required, but without having predicate
     PlanNode root = spjPlan;
     if (selectStmt.getAggInfo() != null) {
-      root = new AggregationNode(getNextNodeId(), root, selectStmt.getAggInfo());
+      AggregateInfo aggInfo = selectStmt.getAggInfo();
+      root = new AggregationNode(new PlanNodeId(nodeIdGenerator), root, aggInfo);
 
       // if we're computing DISTINCT agg fns, the analyzer already created the
-      // merge agginfo
-      if (selectStmt.getMergeAggInfo() != null) {
-        root = new AggregationNode(getNextNodeId(), root, selectStmt.getMergeAggInfo());
+      // 2nd phase agginfo
+      if (aggInfo.isDistinctAgg()) {
+        root = new AggregationNode(
+            new PlanNodeId(nodeIdGenerator), root,
+            aggInfo.getSecondPhaseDistinctAggInfo());
       }
     }
 
@@ -635,7 +631,7 @@ public class Planner {
     SortInfo sortInfo = selectStmt.getSortInfo();
     if (sortInfo != null) {
       Preconditions.checkState(selectStmt.getLimit() != -1);
-      root = new SortNode(getNextNodeId(), root, sortInfo, true);
+      root = new SortNode(new PlanNodeId(nodeIdGenerator), root, sortInfo, true);
     }
 
     return root;
@@ -660,25 +656,18 @@ public class Planner {
     // add aggregation to slave, if required, but without having predicate
     AggregateInfo aggInfo = selectStmt.getAggInfo();
     if (aggInfo != null) {
-      slave = new AggregationNode(getNextNodeId(), slave, aggInfo, true);
+      slave = new AggregationNode(new PlanNodeId(nodeIdGenerator), slave, aggInfo, true);
     }
 
     // create coordinator plan fragment (single ExchangeNode, possibly
     // followed by a merge aggregation step and a top-n node)
-    coord = new ExchangeNode(getNextNodeId(), slave.getTupleIds());
+    coord = new ExchangeNode(new PlanNodeId(nodeIdGenerator), slave.getTupleIds());
     coord.rowTupleIds = slave.rowTupleIds;
     coord.nullableTupleIds = slave.nullableTupleIds;
 
-    if (aggInfo != null) {
-      if (selectStmt.getMergeAggInfo() != null) {
-        // if we're computing DISTINCT agg fns, the analyzer already created the
-        // merge agginfo
-        coord = new AggregationNode(getNextNodeId(), coord, selectStmt.getMergeAggInfo());
-      } else {
-        AggregateInfo mergeAggInfo =
-            AggregateInfo.createMergeAggInfo(aggInfo, analyzer);
-        coord = new AggregationNode(getNextNodeId(), coord, mergeAggInfo);
-      }
+    if (aggInfo != null && aggInfo.getMergeAggInfo() != null) {
+      coord = new AggregationNode(
+          new PlanNodeId(nodeIdGenerator), coord, aggInfo.getMergeAggInfo());
     }
 
     if (selectStmt.getHavingPred() != null) {
@@ -697,7 +686,7 @@ public class Planner {
     SortInfo sortInfo = selectStmt.getSortInfo();
     if (sortInfo != null) {
       Preconditions.checkState(selectStmt.getLimit() != -1);
-      coord = new SortNode(getNextNodeId(), coord, sortInfo, true);
+      coord = new SortNode(new PlanNodeId(nodeIdGenerator), coord, sortInfo, true);
     }
 
     coordRef.setRef(coord);
@@ -747,10 +736,10 @@ public class Planner {
       PlanNode spjPlan = createSpjPlan(selectStmt, analyzer);
       if (spjPlan == null) {
         // SELECT without FROM clause
-        // TODO: This incorrectly plans INSERT INTO TABLE ... SELECT 1 as a 
+        // TODO: This incorrectly plans INSERT INTO TABLE ... SELECT 1 as a
         // SELECT CONSTANT plan with no sink. The backend won't correctly execute
         // such a plan at the moment anyhow, but this bug causes the query to return
-        // results, which is counterintuitive. 
+        // results, which is counterintuitive.
         TPlanExecRequest fragmentRequest = new TPlanExecRequest(
             new TUniqueId(), new TUniqueId(),
             Expr.treesToThrift(selectStmt.getResultExprs()), queryGlobals,
@@ -817,19 +806,19 @@ public class Planner {
       exchangeNode.setNumSenders(dataLocations.size());
     }
 
-    // collect data sinks for explain string; dataSinks.size() == # of plan 
+    // collect data sinks for explain string; dataSinks.size() == # of plan
     // fragments
     List<DataSink> dataSinks = Lists.newArrayList();
     List<PlanNode> planFragments = Lists.newArrayList();
 
-    boolean coordinatorDoesInsert = (numNodes == 1); 
-    
+    boolean coordinatorDoesInsert = (numNodes == 1);
+
     if (queryStmt instanceof SelectStmt) { // Could be UNION
       SelectStmt selectStmt = (SelectStmt)queryStmt;
       if ((selectStmt.getAggInfo() != null ||
            selectStmt.getHavingPred() != null ||
            selectStmt.getSortInfo() != null) ||
-           selectStmt.hasOrderByClause() || 
+           selectStmt.hasOrderByClause() ||
            selectStmt.hasLimitClause()) {
         coordinatorDoesInsert = true;
       }
@@ -838,7 +827,7 @@ public class Planner {
     if (analysisResult.isInsertStmt()) {
       InsertStmt insertStmt = analysisResult.getInsertStmt();
       TFinalizeParams finalizeParams = new TFinalizeParams();
-      
+
       finalizeParams.setIs_overwrite(insertStmt.isOverwrite());
       finalizeParams.setTable_name(insertStmt.getTargetTableName().getTbl());
 
@@ -873,7 +862,7 @@ public class Planner {
         request.has_coordinator_fragment = true;
       }
       // create TPlanExecRequest for slave plan
-      TPlanExecRequest slaveRequest = 
+      TPlanExecRequest slaveRequest =
           createPlanExecRequest(slave, analyzer.getDescTbl(), queryGlobals);
 
       // Choose sink for slave fragment.
@@ -881,7 +870,7 @@ public class Planner {
       if (analysisResult.isInsertStmt() && !coordinatorDoesInsert) {
         dataSink = analysisResult.getInsertStmt().createDataSink();
         slaveRequest.setOutput_exprs(
-            Expr.treesToThrift(queryStmt.getResultExprs()));                      
+            Expr.treesToThrift(queryStmt.getResultExprs()));
         request.has_coordinator_fragment = false;
       } else {
         // Slaves write to stream data sink for an exchange node.
@@ -912,7 +901,7 @@ public class Planner {
     }
 
     // set request.dataLocations and request.nodeRequestParams
-    createExecParams(request, scans, maxScanRangeLength, scanRanges, dataLocations, 
+    createExecParams(request, scans, maxScanRangeLength, scanRanges, dataLocations,
         numNodes);
 
     // Build the explain plan string, if requested
@@ -953,7 +942,7 @@ public class Planner {
     TupleDescriptor tupleDesc =
         analyzer.getDescTbl().getTupleDesc(unionStmt.getTupleId());
 
-    MergeNode mergeNode = new MergeNode(getNextNodeId(), tupleDesc);
+    MergeNode mergeNode = new MergeNode(new PlanNodeId(nodeIdGenerator), tupleDesc);
     PlanNode result = mergeNode;
     absorbUnionOperand(operands.get(0), mergeNode, operands.get(1).getQualifier());
 
@@ -976,14 +965,20 @@ public class Planner {
     AggregateInfo aggInfo = null;
     if (hasDistinct) {
       ArrayList<Expr> groupingExprs = Expr.cloneList(unionStmt.getResultExprs(), null);
-      aggInfo = new AggregateInfo(groupingExprs, null);
       // Aggregate produces exactly the same tuple as the original union stmt.
-      aggInfo.setAggTupleDesc(analyzer.getDescTbl().getTupleDesc(unionStmt.getTupleId()));
-      result = new AggregationNode(getNextNodeId(), mergeNode, aggInfo);
+      try {
+        aggInfo =
+            AggregateInfo.create(groupingExprs, null,
+              analyzer.getDescTbl().getTupleDesc(unionStmt.getTupleId()), analyzer);
+      } catch (AnalysisException e) {
+        // this should never happen
+        throw new InternalException("error creating agg info in createUnionPlan()");
+      }
+      result = new AggregationNode(new PlanNodeId(nodeIdGenerator), mergeNode, aggInfo);
       // If there are more operands, then add the distinct subplan as a child
       // of a new merge node which also merges the remaining ALL-qualified operands.
       if (opIx < operands.size()) {
-        mergeNode = new MergeNode(getNextNodeId(), tupleDesc);
+        mergeNode = new MergeNode(new PlanNodeId(nodeIdGenerator), tupleDesc);
         mergeNode.addChild(result, unionStmt.getResultExprs());
         result = mergeNode;
       }
@@ -1019,7 +1014,7 @@ public class Planner {
         throw new NotImplementedException(
             "ORDER BY without LIMIT currently not supported");
       }
-      result = new SortNode(getNextNodeId(), result, sortInfo, true);
+      result = new SortNode(new PlanNodeId(nodeIdGenerator), result, sortInfo, true);
     }
     result.setLimit(unionStmt.getLimit());
 
@@ -1121,7 +1116,7 @@ public class Planner {
   }
 
   /**
-   * Create TPlanExecRequest for root and add it to queryRequest.
+   * Create TPlanExecRequest for root.
    */
   private TPlanExecRequest createPlanExecRequest(PlanNode root,
       DescriptorTable descTbl, TQueryGlobals queryGlobals) {

@@ -18,10 +18,11 @@ import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.service.Frontend;
 import com.cloudera.impala.thrift.ImpalaPlanService;
 import com.cloudera.impala.thrift.TCatalogUpdate;
+import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TImpalaPlanServiceException;
 import com.cloudera.impala.thrift.TPlanExecRequest;
-import com.cloudera.impala.thrift.TClientRequest;
+import com.cloudera.impala.thrift.TQueryExecRequest2;
 import com.google.common.collect.Sets;
 
 /**
@@ -68,6 +69,11 @@ public class PlanService {
 
       LOG.info("returned TExecRequest: " + result.toString());
       return result;
+    }
+
+    public TQueryExecRequest2 CreateQueryExecRequest2(TClientRequest tRequest)
+        throws TImpalaPlanServiceException {
+      return null;
     }
 
     public void ShutdownServer() {

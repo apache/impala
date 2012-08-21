@@ -86,7 +86,6 @@ struct TFinalizeParams {
 }
 
 // Result of call to ImpalaPlanService/JniFrontend.CreateQueryRequest()
-// TODO: move to ImpalaInternalService.thrift
 // TODO: remove existing TQueryExecRequest
 struct TQueryExecRequest2 {
   // a globally unique id
@@ -96,9 +95,8 @@ struct TQueryExecRequest2 {
   2: optional Descriptors.TDescriptorTable desc_tbl
 
   // fragments[i] may consume the output of fragments[j > i];
-  // fragments[0] is the root fragment and will contain the coordinator fragment, if
-  // one exists.
-  // (fragments[0] is executed by the coordinator itself if it is unpartitioned.)
+  // fragments[0] is the root fragment and also the coordinator fragment, if
+  // it is unpartitioned.
   3: required list<Planner.TPlanFragment> fragments
 
   // Specifies the destination fragment of the output of each fragment.
@@ -115,7 +113,9 @@ struct TQueryExecRequest2 {
   6: optional TResultSetMetadata result_set_metadata
 
   // Set if the query needs finalization after it executes
-  7: optional TFinalizeParams finalize_params;
+  7: optional TFinalizeParams finalize_params
+
+  8: required ImpalaInternalService.TQueryGlobals query_globals
 }
 
 enum TDdlType {

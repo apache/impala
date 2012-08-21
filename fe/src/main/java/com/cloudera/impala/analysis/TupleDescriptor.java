@@ -147,4 +147,16 @@ public class TupleDescriptor {
 
     this.byteSize = offset;
   }
+
+  /**
+   * Returns true if tuples of type 'this' can be assigned to tuples of type 'desc'
+   * (checks that both have the same number of slots and that slots are of the same type)
+   */
+  public boolean isCompatible(TupleDescriptor desc) {
+    if (slots.size() != desc.slots.size()) return false;
+    for (int i = 0; i < slots.size(); ++i) {
+      if (slots.get(i).getType() != desc.slots.get(i).getType()) return false;
+    }
+    return true;
+  }
 }

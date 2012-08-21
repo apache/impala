@@ -86,12 +86,12 @@ public class QueryTest extends BaseQueryTest {
     // 1. scan range with no tuple
     // 2. tuple that span across multiple scan ranges
     TestExecContext execContext1 =
-        new TestExecContext(2, 1, true, true, 0, 1, 0);
+        new TestExecContext(2, 1, true, true, 0, 1, 0, false);
 
     // We use a very small file buffer to test the HDFS scanner init code that seeks the
     // first tuple delimiter.
     TestExecContext execContext2 =
-        new TestExecContext(2, 1, true, true, 0, 5, 1);
+        new TestExecContext(2, 1, true, true, 0, 5, 1, false);
 
     List<TestConfiguration> testConfigs = Lists.newArrayList();
     testConfigs.add(

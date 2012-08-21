@@ -13,6 +13,7 @@ import com.cloudera.impala.thrift.TEqJoinCondition;
 import com.cloudera.impala.thrift.THashJoinNode;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
+import com.cloudera.impala.thrift.TExplainLevel;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
@@ -31,7 +32,7 @@ public class HashJoinNode extends PlanNode {
   private final List<Predicate> otherJoinConjuncts;
 
   public HashJoinNode(
-      int id, PlanNode outer, PlanNode inner, JoinOperator joinOp,
+      PlanNodeId id, PlanNode outer, PlanNode inner, JoinOperator joinOp,
       List<Pair<Expr, Expr> > eqJoinConjuncts,
       List<Predicate> otherJoinConjuncts) {
     super(id);
@@ -105,7 +106,7 @@ public class HashJoinNode extends PlanNode {
   }
 
   @Override
-  protected String getExplainString(String prefix, ExplainPlanLevel detailLevel) {
+  protected String getExplainString(String prefix, TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder()
         .append(prefix + "HASH JOIN\n")
         .append(prefix + "  JOIN OP: " + joinOp.toString() + "\n")

@@ -5,11 +5,14 @@ package com.cloudera.impala.planner;
 import java.util.List;
 
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.TupleDescriptor;
+import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.TMergeNode;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 /**
@@ -28,11 +31,27 @@ public class MergeNode extends PlanNode {
   // Output tuple materialized by this node.
   protected final TupleDescriptor tupleDesc;
 
-  protected MergeNode(int id, TupleDescriptor tupleDesc) {
+  protected MergeNode(PlanNodeId id, TupleDescriptor tupleDesc) {
     super(id, tupleDesc.getId().asList());
     this.tupleDesc = tupleDesc;
     this.rowTupleIds.clear();
     this.rowTupleIds.addAll(tupleDesc.getId().asList());
+  }
+
+  /**
+   * C'tor for distributed merge operation: the child fragment corresponding to child i
+   * of singleNodeMerge performs a "merge"/tuple materialization operation, but only
+   * for child i of singleNodeMerge.
+   */
+  protected MergeNode(
+      PlanNodeId id, MergeNode singleNodeMerge, int childIdx, PlanNode childPlan) {
+    super(id, singleNodeMerge);
+    Preconditions.checkState(singleNodeMerge.constExprLists.isEmpty());
+    this.tupleDesc = singleNodeMerge.tupleDesc;
+    addChild(childPlan);
+    List<Expr> resultExprs =
+        Expr.cloneList(singleNodeMerge.resultExprLists.get(childIdx), null);
+    resultExprLists.add(resultExprs);
   }
 
   public void addConstExprList(List<Expr> exprs) {
@@ -67,7 +86,7 @@ public class MergeNode extends PlanNode {
   }
 
   @Override
-  protected String getExplainString(String prefix, ExplainPlanLevel detailLevel) {
+  protected String getExplainString(String prefix, TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     output.append(prefix + "MERGE (" + id + ")\n");
     output.append(super.getExplainString(prefix + "  ", detailLevel));
@@ -83,5 +102,14 @@ public class MergeNode extends PlanNode {
       output.append(child.getExplainString(prefix + "  ", detailLevel));
     }
     return output.toString();
+  }
+
+  @Override
+  public void getMaterializedIds(List<SlotId> ids) {
+    super.getMaterializedIds(ids);
+
+    for (List<Expr> resultExprs: resultExprLists) {
+      Expr.getIds(resultExprs, null, ids);
+    }
   }
 }

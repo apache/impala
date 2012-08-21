@@ -94,4 +94,13 @@ public class DescriptorTable {
     }
     return result;
   }
+
+  public String debugString() {
+    StringBuilder out = new StringBuilder();
+    out.append("tuples:\n");
+    for (TupleDescriptor desc: tupleDescs.values()) {
+      out.append(desc.debugString() + "\n");
+    }
+    return out.toString();
+  }
 }

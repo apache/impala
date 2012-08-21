@@ -25,6 +25,7 @@ import com.cloudera.impala.testutil.TestFileParser.Section;
 import com.cloudera.impala.testutil.TestFileParser.TestCase;
 import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.Constants;
+import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.google.common.collect.Lists;
 
@@ -57,12 +58,11 @@ public class PlannerTest {
       LOG.info("running query " + query);
       AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
       Planner planner = new Planner();
-      planner.setExplainPlanDetailLevel(PlanNode.ExplainPlanLevel.HIGH);
+      planner.setExplainLevel(TExplainLevel.VERBOSE);
       explainStringBuilder.setLength(0);
       TQueryOptions options = new TQueryOptions();
       options.setNum_nodes(numNodes);
       planner.createPlanFragments(analysisResult, options, explainStringBuilder);
-
 
       String explainStr = explainStringBuilder.toString();
       actualOutput.append(explainStr);

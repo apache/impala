@@ -7,10 +7,11 @@ import java.util.List;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.thrift.TDataSink;
+import com.cloudera.impala.thrift.TDataSink2;
 import com.cloudera.impala.thrift.TDataSinkType;
+import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.cloudera.impala.thrift.THdfsTableSink;
 import com.cloudera.impala.thrift.TTableSink;
-import com.cloudera.impala.thrift.THdfsFileFormat;
 
 /**
  * Base class for Hdfs data sinks such as HdfsTextTableSink.
@@ -54,5 +55,15 @@ public class HdfsTableSink extends TableSink {
     dataSink.tableSink = new TTableSink(targetTable.getId().asInt(),
         hdfsTableSink);
     return dataSink;
+  }
+
+  @Override
+  protected TDataSink2 toThrift2() {
+    TDataSink2 result = new TDataSink2(TDataSinkType.TABLE_SINK);
+    THdfsTableSink hdfsTableSink =
+        new THdfsTableSink(Expr.treesToThrift(partitionKeyExprs), overwrite);
+    result.table_sink = new TTableSink(targetTable.getId().asInt(),
+        hdfsTableSink);
+    return result;
   }
 }

@@ -2,12 +2,10 @@
 
 package com.cloudera.impala.analysis;
 
-import java.util.ArrayList;
-
 import com.cloudera.impala.common.Id;
-import com.google.common.collect.Lists;
+import com.cloudera.impala.common.IdGenerator;
 
-public class TupleId extends Id {
+public class TupleId extends Id<TupleId> {
   public TupleId() {
     super();
   }
@@ -16,9 +14,8 @@ public class TupleId extends Id {
     super(id);
   }
 
-  public ArrayList<TupleId> asList() {
-    ArrayList<TupleId> list = Lists.newArrayList();
-    list.add(this);
-    return list;
+  public TupleId(IdGenerator<TupleId> idGenerator) {
+    super(idGenerator.getNextId());
   }
+
 }

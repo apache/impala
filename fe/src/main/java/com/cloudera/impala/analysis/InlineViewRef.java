@@ -5,6 +5,9 @@ package com.cloudera.impala.analysis;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.google.common.base.Preconditions;
@@ -15,6 +18,8 @@ import com.google.common.collect.Lists;
  * Inline view is a query statement with an alias
  */
 public class InlineViewRef extends TableRef {
+  private final static Logger LOG = LoggerFactory.getLogger(SelectStmt.class);
+
   // The select or union statement of the inline view
   private final QueryStmt queryStmt;
 
@@ -69,6 +74,8 @@ public class InlineViewRef extends TableRef {
       sMap.lhs.add(new SlotRef(slotD));
       sMap.rhs.add(colexpr);
     }
+
+    LOG.info("inline view smap: " + sMap.debugString());
 
     isAnalyzed = true;
   }
