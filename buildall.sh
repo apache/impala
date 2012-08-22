@@ -8,6 +8,7 @@ root=`cd "$root"; pwd`
 
 export IMPALA_HOME=$root
 export METASTORE_DB=`basename $root | sed -e "s/\\./_/g" | sed -e "s/[.-]/_/g"`
+export CURRENT_USER=`whoami`
 
 . "$root"/bin/impala-config.sh
 
@@ -120,6 +121,9 @@ cd ${IMPALA_FE_DIR}/src/test/resources
 perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
 hbase-site.xml.template > hbase-site.xml
 
+# Update dfs.block.local-path-access.user with the current user
+perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
+core-site.xml.template > core-site.xml
 # Exit on non-true return value
 set -e
 
