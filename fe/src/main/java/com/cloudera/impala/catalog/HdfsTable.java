@@ -4,14 +4,19 @@ package com.cloudera.impala.catalog;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
+import org.apache.hadoop.fs.BlockStorageLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.VolumeId;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
+import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.ConfigValSecurityException;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
@@ -73,6 +78,22 @@ public class HdfsTable extends Table {
     public String getFileName() { return fileName; }
     public BlockLocation getLocation() { return blockLocation; }
     public HdfsPartition getPartition() { return parentPartition; }
+
+    /**
+     * Return the volume id of the block in BlockLocation.getName()[hostIndex]; -1 if
+     * volumn id is not supported.
+     */
+    public byte getVolumeId(int hostIndex) {
+      if (blockLocation instanceof BlockStorageLocation) {
+        BlockStorageLocation blockStorageLocation =(BlockStorageLocation)blockLocation;
+        VolumeId[] volumeIds = blockStorageLocation.getVolumeIds();
+        Preconditions.checkArgument(hostIndex >= 0);
+        Preconditions.checkArgument(hostIndex < volumeIds.length);
+        String volumeIdStr = volumeIds[hostIndex].toString();
+        return Byte.parseByte(volumeIdStr);
+      }
+      return -1;
+    }
   }
 
   private final List<HdfsPartition> partitions; // these are only non-empty partitions
@@ -307,22 +328,33 @@ public class HdfsTable extends Table {
    */
   public static List<BlockMetadata> getBlockMetadata(HdfsPartition partition) {
     List<BlockMetadata> result = Lists.newArrayList();
+    boolean supportVolumeId =
+        CONF.getBoolean(DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED, false);
 
     for (FileDescriptor fileDescriptor: partition.getFileDescriptors()) {
       Path p = new Path(fileDescriptor.getFilePath());
       BlockLocation[] locations = null;
       try {
         FileSystem fs = p.getFileSystem(CONF);
-        FileStatus fileStatus = fs.getFileStatus(p);
+        if (!(fs instanceof DistributedFileSystem)) {
+          throw new RuntimeException("HDFS FileSystem should be DistributedFileSystem but"
+              + "got " + fs.getClass().getName());
+        }
+        DistributedFileSystem dfs = (DistributedFileSystem)fs;
+        FileStatus fileStatus = dfs.getFileStatus(p);
         // Ignore directories (and files in them) - if a directory is erroneously created
         // as a subdirectory of a partition dir we should ignore it and move on
         // (getFileBlockLocations will throw when
         // called on a directory). Hive will not recurse into directories.
         if (!fileStatus.isDirectory()) {
-          locations = fs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
+          locations = dfs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
+          if (supportVolumeId) {
+            List<BlockLocation> blocks = Arrays.asList(locations);
+            locations = dfs.getFileBlockStorageLocations(blocks);
+          }
           for (int i = 0; i < locations.length; ++i) {
-            result.add(new BlockMetadata(fileDescriptor.getFilePath(), locations[i],
-                partition));
+            result.add(new BlockMetadata(fileDescriptor.getFilePath(),
+                locations[i], partition));
           }
         }
       } catch (IOException e) {

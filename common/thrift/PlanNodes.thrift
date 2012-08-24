@@ -37,6 +37,11 @@ struct THdfsFileSplit {
   // ID of partition in parentTHdfsScanNode. Meaningful only
   // in the context of a single THdfsScanNode, may not be unique elsewhere.
   4: required i64 partitionId
+  
+  // Planner has already picked a data node to read this split from. This voluleId
+  // is the disk volume identifier of the chosen data node.
+  // If the Hadoop cluster does not support volumeId, it'll be -1.
+  5: required byte volumeId
 }
 
 // key range for single THBaseScanNode

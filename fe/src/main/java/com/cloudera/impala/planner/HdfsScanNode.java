@@ -4,7 +4,6 @@ package com.cloudera.impala.planner;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -111,28 +110,35 @@ public class HdfsScanNode extends ScanNode {
     private final THostPort address;
     private long assignedBytes;
 
+    // list of (file path, block location)
+    private final List<HdfsTable.BlockMetadata> blockMetadata;
+
+    // We've chosen a particular datanode. blockHostPortIndex[i] is the index to the
+    // chosen in blockMetadata[i].getLocation().getName().
+    private final List<Integer> blockHostPortIndex;
+
     public long getAssignedBytes() { return assignedBytes; }
 
     public THostPort getAddress() {
       return address;
     }
 
-    // list of (file path, block location)
-    private final List<HdfsTable.BlockMetadata> blockMetadata;
-
     HostBlockAssignment(THostPort address) {
       this.address = address;
       this.assignedBytes = 0;
       this.blockMetadata = Lists.newArrayList();
+      this.blockHostPortIndex = Lists.newArrayList();
     }
 
-    public void addBlock(HdfsTable.BlockMetadata block) {
+    public void addBlock(HdfsTable.BlockMetadata block, int hostPortIndex) {
       blockMetadata.add(block);
+      blockHostPortIndex.add(new Integer(hostPortIndex));
       assignedBytes += block.getLocation().getLength();
     }
 
     public void add(HostBlockAssignment info) {
       blockMetadata.addAll(info.blockMetadata);
+      blockHostPortIndex.addAll(info.blockHostPortIndex);
       assignedBytes += info.assignedBytes;
     }
   }
@@ -165,22 +171,26 @@ public class HdfsScanNode extends ScanNode {
 
         // greedy block assignment: find host with fewest assigned bytes
         Preconditions.checkState(blockHostPorts.length > 0);
+        int chosenHostPortIndex = 0;
         HostBlockAssignment minHost = assignmentMap.get(blockHostPorts[0]);
-        for (String hostPort: blockHostPorts) {
+        for (int i = 0; i < blockHostPorts.length; ++i) {
+          String hostPort = blockHostPorts[i];
           if (assignmentMap.containsKey(hostPort)) {
             HostBlockAssignment info = assignmentMap.get(hostPort);
             if (minHost.getAssignedBytes() > info.getAssignedBytes()) {
               minHost = info;
+              chosenHostPortIndex = i;
             }
           } else {
             // new host with 0 bytes so far
             THostPort addr = addressToTHostPort(hostPort);
             minHost = new HostBlockAssignment(addr);
+            chosenHostPortIndex = i;
             assignmentMap.put(hostPort, minHost);
             break;
           }
         }
-        minHost.addBlock(block);
+        minHost.addBlock(block, chosenHostPortIndex);
       }
 
       if (numNodes != Constants.NUM_NODES_ALL) {
@@ -208,7 +218,10 @@ public class HdfsScanNode extends ScanNode {
     // Build a TScanRange for each host, with one file split per block range.
     for (HostBlockAssignment blockAssignment: hostBlockAssignments) {
       TScanRange scanRange = new TScanRange(id);
-      for (HdfsTable.BlockMetadata metadata: blockAssignment.blockMetadata) {
+      for (int i = 0; i < blockAssignment.blockMetadata.size(); ++i) {
+        HdfsTable.BlockMetadata metadata = blockAssignment.blockMetadata.get(i);
+        int hostPortIndex = blockAssignment.blockHostPortIndex.get(i).intValue();
+        byte volumnId = metadata.getVolumeId(hostPortIndex);
         BlockLocation blockLocation = metadata.getLocation();
         long currentOffset = blockLocation.getOffset();
         long remainingLength = blockLocation.getLength();
@@ -221,7 +234,8 @@ public class HdfsScanNode extends ScanNode {
               new THdfsFileSplit(metadata.fileName,
                   currentOffset,
                   currentLength,
-                  metadata.getPartition().getId());
+                  metadata.getPartition().getId(),
+                  volumnId);
           scanRange.addToHdfsFileSplits(fileSplit);
           remainingLength -= currentLength;
           currentOffset += currentLength;
