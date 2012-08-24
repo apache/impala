@@ -153,7 +153,7 @@ class AggregationNode : public ExecNode {
   //      (FinalizeEstimateSlot)
   const static int NUM_PC_BITMAPS = 64; // number of bitmaps
   const static int PC_BITMAP_LENGTH = 32; // the length of each bit map
-  const static float PC_THETA = 0.77351; // the magic number to compute the final result
+  const static float PC_THETA; // the magic number to compute the final result
 
   // Initialize the NUM_PC_BITMAPS * PC_BITMAP_LENGTH bitmaps. The bitmaps are allocated
   // as a string value of the slot. Both algorithms share the same bitmap structure.

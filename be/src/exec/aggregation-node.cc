@@ -66,6 +66,7 @@ const char* AggregationTuple::LLVM_CLASS_NAME = "class.impala::AggregationTuple"
 }
 
 const char* AggregationNode::LLVM_CLASS_NAME = "class.impala::AggregationNode";
+const float AggregationNode::PC_THETA = 0.77351;
 
 // TODO: pass in maximum size; enforce by setting limit in mempool
 // TODO: have a Status ExecNode::Init(const TPlanNode&) member function
