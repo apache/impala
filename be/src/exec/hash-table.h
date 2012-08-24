@@ -194,7 +194,7 @@ class HashTable {
 
     HashTable* table_;
     // Current bucket idx
-    int bucket_idx_;        
+    int64_t bucket_idx_;        
     // Current node idx (within current bucket)
     int64_t node_idx_;          
     // cached hash value for the row passed to Find()()
@@ -208,8 +208,8 @@ class HashTable {
   // Header portion of a Node.  The node data (TupleRow) is right after the 
   // node memory to maximize cache hits.
   struct Node {
-    int next_idx_;    // chain to next node for collisions
-    uint32_t hash_;   // Cache of the hash for data_
+    int64_t next_idx_;  // chain to next node for collisions
+    uint32_t hash_;     // Cache of the hash for data_
 
     TupleRow* data() {
       uint8_t* mem = reinterpret_cast<uint8_t*>(this);
@@ -219,7 +219,7 @@ class HashTable {
   };
 
   struct Bucket {
-    int node_idx_;
+    int64_t node_idx_;
 
     Bucket() {
       node_idx_ = -1;
@@ -228,7 +228,7 @@ class HashTable {
 
   // Returns the next non-empty bucket and updates idx to be the index of that bucket.
   // If there are no more buckets, returns NULL and sets idx to -1
-  Bucket* NextBucket(int* bucket_idx);
+  Bucket* NextBucket(int64_t* bucket_idx);
 
   // Returns node at idx.  Tracking structures do not use pointers since they will
   // change as the HashTable grows.

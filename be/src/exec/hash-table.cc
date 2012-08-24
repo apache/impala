@@ -551,7 +551,7 @@ void HashTable::ResizeBuckets(int64_t num_buckets) {
 
   Iterator iter = Begin();
   while (iter.HasNext()) {
-    int node_idx = iter.node_idx_;
+    int64_t node_idx = iter.node_idx_;
     // Advance to next node before modifying the node's next link
     iter.Next<false>();
 
@@ -559,7 +559,7 @@ void HashTable::ResizeBuckets(int64_t num_buckets) {
 
     // Assign it to a new bucket
     uint32_t hash = node->hash_;
-    int bucket_idx = hash % num_buckets;
+    int64_t bucket_idx = hash % num_buckets;
     AddToBucket(&new_buckets[bucket_idx], node_idx, node);
   }
 
@@ -578,7 +578,7 @@ string HashTable::DebugString(bool skip_empty, const RowDescriptor* desc) {
   stringstream ss;
   ss << endl;
   for (int i = 0; i < buckets_.size(); ++i) {
-    int node_idx = buckets_[i].node_idx_;
+    int64_t node_idx = buckets_[i].node_idx_;
     bool first = true;
     if (skip_empty && node_idx == -1) continue;
     ss << i << ": ";
