@@ -23,7 +23,7 @@ std::size_t hash_value(const THostPort& host_port);
 
 template <class T>
 Status SerializeThriftMsg(JNIEnv* env, T* msg, jbyteArray* serialized_msg) {
-  int buffer_size = 100 * 1024;  // start out with 1MB
+  int buffer_size = 100 * 1024;  // start out with 100KB
 
   // Serialize msg into java bytearray using memory transport.
   boost::shared_ptr<apache::thrift::transport::TMemoryBuffer> tmem_transport(
@@ -53,24 +53,23 @@ Status SerializeThriftMsg(JNIEnv* env, T* msg, jbyteArray* serialized_msg) {
 
 template <class T>
 void DeserializeThriftMsg(JNIEnv* env, jbyteArray serialized_msg, T* deserialized_msg) {
-  // TODO: Find out why using serialized_msg directly does not work.
-  // Copy java byte array into native byte array.
   jboolean is_copy = false;
   int buf_size = env->GetArrayLength(serialized_msg);
   jbyte* buf = env->GetByteArrayElements(serialized_msg, &is_copy);
-  uint8_t native_bytes[buf_size];
-  for (int i = 0; i < buf_size; i++) {
-    native_bytes[i] = buf[i];
-  }
-
+  
   // Deserialize msg bytes into c++ thrift msg using memory transport.
   boost::shared_ptr<apache::thrift::transport::TTransport> tmem_transport(
-      new apache::thrift::transport::TMemoryBuffer(native_bytes, buf_size));
+      new apache::thrift::transport::TMemoryBuffer(
+          reinterpret_cast<uint8_t*>(buf), buf_size));
   apache::thrift::protocol::
     TBinaryProtocolFactoryT<apache::thrift::transport::TMemoryBuffer> tproto_factory;
   boost::shared_ptr<apache::thrift::protocol::TProtocol> tproto =
       tproto_factory.getProtocol(tmem_transport);
   deserialized_msg->read(tproto.get());
+
+  // Return buffer back. JNI_ABORT indicates to not copy contents back to java
+  // side.
+  env->ReleaseByteArrayElements(serialized_msg, buf, JNI_ABORT);
 }
 
 // Redirects all Thrift logging to VLOG(1)
