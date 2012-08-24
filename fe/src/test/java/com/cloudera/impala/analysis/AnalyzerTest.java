@@ -53,7 +53,7 @@ public class AnalyzerTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    catalog = new Catalog();
+    catalog = new Catalog(true);
   }
 
   @AfterClass
@@ -773,12 +773,15 @@ public class AnalyzerTest {
     AnalysisError("select * from alltypes group by 1",
         "cannot combine '*' in select list with GROUP BY");
     // picks up select item alias
-    AnalyzesOk("select zip z, count(*) from testtbl group by z");
+    AnalyzesOk("select zip z, id iD1, id ID2, count(*) from testtbl group by z, ID1, id2");
     // ambiguous alias
     AnalysisError("select zip a, id a, count(*) from testtbl group by a",
         "Column a in group by clause is ambiguous");
     AnalysisError("select zip id, id, count(*) from testtbl group by id",
         "Column id in group by clause is ambiguous");
+    AnalysisError("select zip id, zip ID, count(*) from testtbl group by id",
+    "Column id in group by clause is ambiguous");
+
 
     // can't group by aggregate
     AnalysisError("select zip, count(*) from testtbl group by count(*)",
@@ -837,7 +840,7 @@ public class AnalyzerTest {
     AnalysisError("select * from alltypes order by 1",
         "ORDER BY: ordinal refers to '*' in select list");
     // picks up select item alias
-    AnalyzesOk("select zip z, id c from testtbl order by z, c");
+    AnalyzesOk("select zip z, id C, id D from testtbl order by z, C, d");
 
     // can introduce additional aggregates in order by clause
     AnalyzesOk("select zip, count(*) from testtbl group by 1 order by count(*)");
@@ -864,6 +867,8 @@ public class AnalyzerTest {
     // Ambiguous alias cause error
     AnalysisError("select string_col a, int_col a from alltypessmall order by a limit 1",
         "Column a in order clause is ambiguous");
+    AnalysisError("select string_col a, int_col A from alltypessmall order by a limit 1",
+    "Column a in order clause is ambiguous");
   }
 
   @Test
