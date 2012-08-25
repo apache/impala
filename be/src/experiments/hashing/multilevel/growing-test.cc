@@ -37,22 +37,20 @@ class GrowingTest : public testing::Test {
   template <int buffer_size>
   static void SanityCheck(const HashStore<buffer_size> & hs,
                           uint64_t num_probe_tuples, int max_id, int num_tables) {
-    uint64_t total_count = 0;
-    for (int i = 0; i < hs.num_tables_; ++i) {
-      StandardHashTable& ht = hs.tables_[i];
-      for (StandardHashTable::Iterator it = ht.Begin(); it.HasNext(); it.Next()) {
-        total_count += it.GetRow()->count;
-      }
-    }
-    ASSERT_EQ(num_probe_tuples, total_count);
-    ASSERT_EQ(num_tables, hs.num_tables_)
+    ASSERT_EQ(num_probe_tuples, hs.TupleCount());
+    // Because CRC hashes contiguous integers nearly perfectly, we should always have
+    // exactly num_tables tables, even though we grow on demand.
+    ASSERT_EQ(num_tables, hs.TableCount())
       << "You do not have the number of tables that you hoped.\n"
       << "This could mean that there weren't enough probe tuples to fill the keyspace, "
       << "skewed hashing lead a hash table that we expected not to overflow to overflow, "
       << "or a genuine bug.";
+#ifdef NDEBUG
     if (buffer_size > 0) {
+      // Can't check this in debug mode because it won't neccessarily pack the struct.
       ASSERT_EQ(buffer_size, sizeof(typename HashStore<buffer_size>::Buffer));
     }
+#endif
   }
 
   template <int buffer_size>
@@ -82,13 +80,7 @@ class GrowingTest : public testing::Test {
                << "):";
     LOG(ERROR) << "#BuildTuples\tTime\tdTime";
     uint64_t prev = 0;
-    // only go up to 2^12 hashtables because after that, there are at least as many
-    // buffers as L2 cache lines. We won't let this happen; we'll do multi-level fanout.
-    // Note that we should probably allow 2 cache lines per buffer (since a write might
-    // span a line break), plus we need some memory aside from the buffers, so we'll
-    // actually stop at 2^11, or maybe 2^12. And we might want to keep them in L1,
-    // in which case we'll stop at 2^7 or so.
-    for (int num_tables = 1; num_tables <= 1<<12; num_tables *= 2) {
+    for (int num_tables = 1; num_tables <= 1<<16; num_tables *= 2) {
       // how many total build tuples we'll use to fill num_tables tables
       // Needs to be comfortably less than the total capacity of num_tables tables
       // (the below expression without the constant factor multiplied by it)
@@ -113,8 +105,6 @@ int main(int argc, char** argv) {
 }
 
 TEST(GrowingTest, All) {
-  // test without buffers
-  GrowingTest::Test<0>();
   // test with one of the best buffer sizes
   // Make it slightly more than a power of 2 cache lines so that they are offset.
   GrowingTest::Test< (1 << 13) + 3 * 64 >();

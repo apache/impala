@@ -16,35 +16,48 @@ namespace impala {
 // affect performance.
 class GrowingTest : public testing::Test {
  public:
-  static const uint64_t NUM_PROBE_TUPLES = 100000000; // 10^8
+  static const uint64_t NUM_PROBE_TUPLES = 10000000; // 10^7
+
+  // how many total build tuples we'll use to fill a table
+  // Needs to be comfortably less than the total capacity of num_tables tables
+  // (the below expression without the constant factor multiplied by it)
+  // because the hashes will not be spread perfectly.
+  // But should be more than 1/2 of that expression because otherwise if the hashes
+  // spread out perfectly, it will fit in num_tables / 2 and not give us the fanout
+  // we expect. (A test will fail in this case so that we know.)
+  static const int TUPLES_IN_TABLE = (StandardHashTable::NODES / 10) * 8;
+
 
   template <int buffer_size>
-  inline static uint64_t AggregateTest(uint64_t num_probe_tuples, int max_id,
+  inline static uint64_t AggregateTest(uint64_t num_probe_tuples,
                                        int num_tables) {
-    ProbeTuple* tuples = GenTuples(num_probe_tuples, max_id);
+    ProbeTuple* tuples = GenTuples(num_probe_tuples, TUPLES_IN_TABLE, num_tables);
     HashStore<buffer_size> hs;
     StopWatch watch;
     watch.Start();
     hs.Aggregate(tuples, num_probe_tuples);
     watch.Stop();
-    SanityCheck<buffer_size>(hs, num_probe_tuples, max_id, num_tables);
+    SanityCheck<buffer_size>(hs, num_probe_tuples, num_tables);
     free(tuples);
     return watch.Ticks();
   }
 
   // Confirm that hs appears to be the correct result of aggregating num_probe_tuples,
-  // with a keyspace of size max_id, with a fanout into num_tables tables.
+  // with a fanout into num_tables tables.
   template <int buffer_size>
   static void SanityCheck(const HashStore<buffer_size> & hs,
-                          uint64_t num_probe_tuples, int max_id, int num_tables) {
+                          uint64_t num_probe_tuples, int num_tables) {
     uint64_t total_count = 0;
+    uint64_t build_tuples = 0;
     for (int i = 0; i < hs.num_tables_; ++i) {
       StandardHashTable& ht = hs.tables_[i];
       for (StandardHashTable::Iterator it = ht.Begin(); it.HasNext(); it.Next()) {
         total_count += it.GetRow()->count;
+        ++build_tuples;
       }
     }
     ASSERT_EQ(num_probe_tuples, total_count);
+    ASSERT_EQ(num_tables * TUPLES_IN_TABLE, build_tuples);
     ASSERT_EQ(num_tables, hs.num_tables_)
       << "You do not have the number of tables that you hoped.\n"
       << "This could mean that there weren't enough probe tuples to fill the keyspace, "
@@ -56,8 +69,8 @@ class GrowingTest : public testing::Test {
   }
 
   template <int buffer_size>
-  inline static uint64_t NextTestCase(int build_tuples, uint64_t prev, int num_tables) {
-    uint64_t time = AggregateTest<buffer_size>(NUM_PROBE_TUPLES, build_tuples, num_tables);
+  inline static uint64_t NextTestCase(uint64_t prev, int num_tables) {
+    uint64_t time = AggregateTest<buffer_size>(NUM_PROBE_TUPLES, num_tables);
     int64_t delta;
     if (prev == 0) {
       // just print 0 for the delta the first time.
@@ -66,7 +79,7 @@ class GrowingTest : public testing::Test {
     else {
       delta = static_cast<int64_t>(time) - static_cast<int64_t>(prev);
     }
-    LOG(ERROR) << build_tuples << "\t"
+    LOG(ERROR) << num_tables * TUPLES_IN_TABLE << "\t"
                << PrettyPrinter::Print(time, TCounterType::CPU_TICKS)
                << "\t" << PrettyPrinter::Print(delta, TCounterType::CPU_TICKS);
     return time;
@@ -88,16 +101,8 @@ class GrowingTest : public testing::Test {
     // span a line break), plus we need some memory aside from the buffers, so we'll
     // actually stop at 2^11, or maybe 2^12. And we might want to keep them in L1,
     // in which case we'll stop at 2^7 or so.
-    for (int num_tables = 1; num_tables <= 1<<12; num_tables *= 2) {
-      // how many total build tuples we'll use to fill num_tables tables
-      // Needs to be comfortably less than the total capacity of num_tables tables
-      // (the below expression without the constant factor multiplied by it)
-      // because the hashes will not be spread perfectly.
-      // But should be more than 1/2 of that expression because otherwise if the hashes
-      // spread out perfectly, it will fit in num_tables / 2 and not give us the fanout
-      // we expect. (A test will fail in this case so that we know.)
-      int build_tuples = (StandardHashTable::NODES * num_tables / 10) * 8;
-      prev = NextTestCase<buffer_size>(build_tuples, prev, num_tables);
+    for (int num_tables = 1; num_tables <= 1<<10; num_tables *= 2) {
+      prev = NextTestCase<buffer_size>(prev, num_tables);
     }
   }
 };

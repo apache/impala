@@ -1,6 +1,8 @@
 #ifndef IMPALA_EXPERIMENTS_HASHING_STANDARD_HASH_TABLE_H
 #define IMPALA_EXPERIMENTS_HASHING_STANDARD_HASH_TABLE_H
 
+#include <glog/logging.h>
+
 #include "util/hash-util.h"
 #include "tuple-types.h"
 
@@ -106,6 +108,9 @@ class StandardHashTable {
   friend class Iterator;
   friend class GrowingTest;
 
+  static const int BUCKETS = 1700 * 3/4;
+  static const int NODES = 1500 * 3/4;
+
   typedef uint16_t idx_t;
   static const idx_t NULL_CONTENT = UINT16_MAX;
 
@@ -128,28 +133,6 @@ class StandardHashTable {
       next_idx_ = NULL_CONTENT;
     }
   };
-
-  static const int RAM_BUDGET = 23000; // bytes
-
-  // 1.1x as many buckets as nodes
-  static const int BUCKET_TO_NODE_NUMERATOR = 11;
-  static const int BUCKET_TO_NODE_DENOMINATOR = 10;
-
-  // The cost of a node is its size, plus the size of the buckets it's adding
-  // (so sizeof(Node) + sizeof(Bucket) * NUMERATOR / DENOMINATOR).
-  // We want to maximize NODES, subject to total cost <= RAM_BUDGET.
-  // sizeof(Node) * nodes + sizeof(Bucket) * buckets <= RAM_BUDGET
-  //  substitute ratio of nodes to buckets so we only have 1 variable
-  // sizeof(Node) * nodes + sizeof(Bucket) * nodes * NUMER/DENOM <= RAM_BUDGET
-  // (sizeof(Node) + NUMER/DENOM * sizeof(Bucket)) * nodes <= RAM_BUDGET
-  // nodes <= RAM_BUDGET / (sizeof(Node) + NUMER/DENOM * sizeof(Bucket))
-  // To lose as little as possible from rounding down, multiply by DENOM/DENOM
-  // nodes <= RAM_BUDGET * DENOM / (DENOM * sizeof(Node) + NUMER * sizeof(Bucket))
-  static const int NODES = RAM_BUDGET * BUCKET_TO_NODE_DENOMINATOR /
-    (sizeof(Node) * BUCKET_TO_NODE_DENOMINATOR + sizeof(Bucket)
-     * BUCKET_TO_NODE_NUMERATOR);
-
-  static const int BUCKETS = NODES * BUCKET_TO_NODE_NUMERATOR / BUCKET_TO_NODE_DENOMINATOR;
 
   Node nodes_[NODES];
   Bucket buckets_[BUCKETS];
