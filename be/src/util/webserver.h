@@ -1,4 +1,8 @@
 // (c) 2012 Cloudera, Inc. All rights reserved.
+
+#ifndef IMPALA_UTIL_WEBSERVER_H
+#define IMPALA_UTIL_WEBSERVER_H
+
 #include <mongoose/mongoose.h>
 #include <string>
 #include <map>
@@ -47,9 +51,6 @@ class Webserver {
   // Registered to handle "/", and prints a list of available URIs
   void RootHandler(std::stringstream* output);
 
-  // Registered to handle "/flags", and prints out all command-line flags and their values
-  void FlagsHandler(std::stringstream* output);
-
   // Lock guarding the path_handlers_ map
   boost::mutex path_handlers_lock_;
 
@@ -67,3 +68,5 @@ class Webserver {
 };
 
 }
+
+#endif // IMPALA_UTIL_WEBSERVER_H

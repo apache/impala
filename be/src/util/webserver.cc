@@ -10,6 +10,7 @@
 #include <gflags/gflags.h>
 
 #include "util/webserver.h"
+#include "util/logging.h"
 
 using namespace std;
 using namespace boost;
@@ -36,11 +37,6 @@ Webserver::Webserver(const string& interface, const int port)
 
 Webserver::~Webserver() {
   Stop();
-}
-
-void Webserver::FlagsHandler(stringstream* output) {
-  (*output) << "<h2>Command-line Flags</h2>";
-  (*output) << "<pre>" << CommandlineFlagsIntoString() << "</pre>";
 }
 
 void Webserver::RootHandler(stringstream* output) {
@@ -77,11 +73,6 @@ Status Webserver::Start() {
       bind<void>(mem_fn(&Webserver::RootHandler), this, _1);
 
   RegisterPathHandler("/", default_callback);
-
-  PathHandlerCallback flags_callback =
-      bind<void>(mem_fn(&Webserver::FlagsHandler), this, _1);
-
-  RegisterPathHandler("/varz", flags_callback);
 
   LOG(INFO) << "Webserver started";
   return Status::OK;

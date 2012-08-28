@@ -13,6 +13,7 @@ add_library(Util
   cpu-info.cc
   debug-util.cc
   decompress.cc
+  default-path-handlers.cc
   hdfs-util.cc
   integer-array.cc
   jni-util.cc

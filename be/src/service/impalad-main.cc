@@ -53,8 +53,8 @@ DECLARE_int32(fe_port);
 DECLARE_int32(be_port);
 
 int main(int argc, char** argv) {
-  InitGoogleLoggingSafe(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, true);
+  InitGoogleLoggingSafe(argv[0]);
   InitThriftLogging();
   CpuInfo::Init();
   LlvmCodeGen::InitializeLlvm();

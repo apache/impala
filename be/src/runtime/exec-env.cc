@@ -15,6 +15,7 @@
 #include "sparrow/simple-scheduler.h"
 #include "sparrow/subscription-manager.h"
 #include "util/webserver.h"
+#include "util/default-path-handlers.h"
 #include "gen-cpp/ImpalaInternalService.h"
 
 using namespace std;
@@ -76,6 +77,7 @@ Status ExecEnv::StartServices() {
   if (scheduler_ != NULL) scheduler_->Init();
   if (enable_webserver_) {
     RETURN_IF_ERROR(webserver_->Start());
+    AddDefaultPathHandlers(webserver_.get());
   } else {
     LOG(INFO) << "Not starting webserver";
   }
