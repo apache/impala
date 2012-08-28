@@ -527,7 +527,12 @@ public class TestUtils {
    * an ImpaladClientExecutor that has been connected to the in-process ImpalaServer.
    */
   public static ImpaladClientExecutor createImpaladClientExecutor() {
-    FeSupport.loadLibrary();
+    boolean useExternalImpalad = Boolean.parseBoolean(
+        System.getProperty("use_external_impalad", "false"));
+
+    if (!useExternalImpalad) {
+      FeSupport.loadLibrary();
+    }
     String hostName = System.getProperty("impalad", DEFAULT_FE_HOST);
     int fePort = DEFAULT_FE_PORT;
     ImpaladClientExecutor client = null;

@@ -24,6 +24,7 @@
     <backend.library.path>${env.IMPALA_HOME}/be/build/debug/service:${env.IMPALA_HOME}/be/build/release/service</backend.library.path>
     <fe_port>21000</fe_port>
     <impalad>localhost</impalad>
+    <use_external_impalad>false</use_external_impalad>
     <testExecutionMode>reduced</testExecutionMode>
     <hadoop.version>2.0.0-cdh4.1.0-SNAPSHOT</hadoop.version>
     <hive.version>0.8.1-cdh4.0.0-SNAPSHOT</hive.version>
@@ -319,6 +320,8 @@
               <value>${fe_port}</value>
               <name>impalad</name>
               <value>${impalad}</value>
+              <name>use_external_impalad</name>
+              <value>${use_external_impalad}</value>
             </property>
           </systemProperties>
         </configuration>
