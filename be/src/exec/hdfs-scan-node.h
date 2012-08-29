@@ -272,6 +272,10 @@ class HdfsScanNode : public ScanNode {
   // Lock protects access between scanner thread and main query thread (the one calling
   // GetNext()) for all fields below.  If this lock and one of the condition variable
   // locks needs to be take together, this lock must be taken first.
+  // This lock is recursive since some of the functions provided to the scanner are
+  // also called from internal functions.
+  // TODO: we can split out 'external' functions for internal functions and make this
+  // lock non-recursive.
   boost::recursive_mutex lock_;
 
   // Pool for allocating partition key tuple and string buffers

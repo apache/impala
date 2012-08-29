@@ -679,44 +679,41 @@ void HdfsScanNode::ScannerThread(HdfsScanner* scanner, ScanRangeContext* context
   // Call into the scanner to process the range.  From the scanner's perspective,
   // everything is single threaded.
   Status status = scanner->ProcessScanRange(context);
-  context->Close();
 
-  {
-    unique_lock<recursive_mutex> l(lock_);
-    --ranges_in_flight_;
-    contexts_.erase(context->scan_range());
-
-    if (num_ranges_finished_ == total_scan_ranges_) {
-      {
-        unique_lock<mutex> l(row_batches_lock_);
-        done_ = true;
-      }
-      row_batch_added_cv_.notify_one();
-    }
-  }
-
-  if (status.ok()) {
-    IssueMoreRanges();
-    return;
-  }
-
-  if (status.IsCancelled()) {
-    // Scan node should be the only thing that initiated scanner threads to see
-    // cancelled.
-    DCHECK(done_);
-    return;
-  }
-
-  // Scanner thread ran into an error.  If this is the first error, trigger cleanup.
+  // Scanner thread completed. Take a look and update the status 
   unique_lock<recursive_mutex> l(lock_);
-  if (status_.ok()) {
+  
+  // If there was already an error, the disk thread will do the cleanup.
+  if (!status_.ok()) return;
+
+  if (!status.ok()) {
+    if (status.IsCancelled()) {
+      // Scan node should be the only thing that initiated scanner threads to see
+      // cancelled (i.e. limit reached).  No need to do anything here.
+      DCHECK(done_);
+      return;
+    }
+  
+    // This thread hit an error, record it and bail
     status_ = status;
     done_ = true;
     // Notify the disk which will trigger tear down of all threads.
     runtime_state_->io_mgr()->CancelReader(reader_context_);
     // Notify the main thread which reports the error
     row_batch_added_cv_.notify_one();
-  } 
+  }
+
+  --ranges_in_flight_;
+  if (num_ranges_finished_ == total_scan_ranges_) {
+    // All ranges are finished.  Indicate we are done.
+    {
+      unique_lock<mutex> l(row_batches_lock_);
+      done_ = true;
+    }
+    row_batch_added_cv_.notify_one();
+  } else {
+    IssueMoreRanges();
+  }
 }
 
 void HdfsScanNode::RangeComplete() {
