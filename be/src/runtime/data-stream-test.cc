@@ -120,6 +120,7 @@ class DataStreamTest : public testing::Test {
     Status status = exec_.Exec(stmt, NULL);
     EXPECT_TRUE(status.ok()) << status.GetErrorMsg();
     row_desc_ = &exec_.row_desc();
+    FinishExec(&exec_);
   }
 
   // Start receiver (expecting given number of senders) in separate thread.
@@ -162,6 +163,18 @@ class DataStreamTest : public testing::Test {
     delete server_;
   }
 
+  // In error cases, we still need to have exec finish calling FetchResult to trigger
+  // proper cleanup.
+  // TODO: better/easier way to do this? Maybe call cancel instead?
+  void FinishExec(InProcessQueryExecutor* exec) {
+    RowBatch* batch = NULL;
+    while (true) {
+      Status status = exec->FetchResult(&batch);
+      EXPECT_TRUE(status.ok()) << status.GetErrorMsg();
+      if (batch == NULL) break;
+    }
+  }
+
   void StartSender() {
     int num_senders = sender_info_.size();
     sender_info_.push_back(SenderInfo());
@@ -193,11 +206,11 @@ class DataStreamTest : public testing::Test {
       info.status = sender.Send(exec.runtime_state(), batch);
       if (!info.status.ok()) break;
     }
+    if (!info.status.ok()) FinishExec(&exec);
     VLOG_QUERY << "closing sender\n";
     info.status = sender.Close(exec.runtime_state());
     info.num_bytes_sent = sender.GetNumDataBytesSent();
   }
-
 };
 
 TEST_F(DataStreamTest, SingleSenderSmallBuffer) {

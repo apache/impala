@@ -121,7 +121,7 @@ class DiskIoMgr {
     bool eosr() { return eosr_; }
 
     // Returns the offset within the scan range that this buffer starts at
-    int64_t scan_range_offset() { return scan_range_->bytes_read_ - len_; }
+    int64_t scan_range_offset() const { return scan_range_offset_; }
 
     // Returns the buffer to the IO Mgr. This must be called for every buffer 
     // returned by GetNext()/Reader() that did not return an error. This is non-blocking.
@@ -153,6 +153,8 @@ class DiskIoMgr {
 
     // Status of the read to this buffer.  if status is not ok, 'buffer' is NULL
     Status status_;
+
+    int64_t scan_range_offset_;
   };
   
   // Create a DiskIoMgr object.
@@ -163,6 +165,9 @@ class DiskIoMgr {
   //    TODO: make this more complicated?  global/per query buffers limits?
   //  - max_read_size: maximum read size (in bytes)
   DiskIoMgr(int num_disks, int threads_per_disk, int max_read_size);
+
+  // Create DiskIoMgr with default configs.
+  DiskIoMgr();
 
   // Clean up all threads and resources.  This is mostly useful for testing since
   // for impalad, this object is never destroyed.
@@ -235,6 +240,8 @@ class DiskIoMgr {
 
   // Dumps the disk io mgr queues (for readers and disks)
   std::string DebugString();
+
+  int num_empty_buffers(ReaderContext*);
 
   // Validates the internal state is consistent.  This is intended to only be used
   // for debugging.

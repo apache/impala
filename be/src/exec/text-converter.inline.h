@@ -14,8 +14,7 @@
 namespace impala {
 
 inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tuple,
-                              const char* data, int len,
-                              bool copy_string, bool need_escape) {
+    const char* data, int len, bool copy_string, bool need_escape, MemPool* pool) {
   if (len == 0) {
     tuple->SetNull(slot_desc->null_indicator_offset());
   } else {
@@ -29,7 +28,8 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
         str_slot->ptr = const_cast<char*>(data);
         str_slot->len = len;
         if (copy_string || need_escape) {
-          char* slot_data = reinterpret_cast<char*>(var_len_pool_->Allocate(len));
+          DCHECK(pool != NULL);
+          char* slot_data = reinterpret_cast<char*>(pool->Allocate(len));
           if (need_escape) {
             UnescapeString(data, slot_data, &str_slot->len);
           } else {

@@ -41,6 +41,11 @@ PlanFragmentExecutor::~PlanFragmentExecutor() {
 
 Status PlanFragmentExecutor::Prepare(
     const TPlanExecRequest& request, const TPlanExecParams& params) {
+  query_id_ = request.query_id;
+  fragment_id_ = request.fragment_id;
+
+  VLOG_QUERY << "Begin executing fragment query_id=" << PrintId(query_id_)
+             << " fragment_id=" << PrintId(fragment_id_);
   VLOG_QUERY << "params:\n" << ThriftDebugString(params);
 
   runtime_state_.reset(
@@ -59,6 +64,8 @@ Status PlanFragmentExecutor::Prepare(
   RETURN_IF_ERROR(
       ExecNode::CreateTree(obj_pool(), request.plan_fragment, *desc_tbl, &plan_));
   runtime_state_->runtime_profile()->AddChild(plan_->runtime_profile());
+  
+  RETURN_IF_ERROR(plan_->Prepare(runtime_state_.get()));
 
   // set scan ranges
   vector<ExecNode*> scan_nodes;
@@ -85,8 +92,7 @@ Status PlanFragmentExecutor::Prepare(
       TCounterType::UNIT);
 
   row_batch_.reset(new RowBatch(plan_->row_desc(), runtime_state_->batch_size()));
-  RETURN_IF_ERROR(plan_->Prepare(runtime_state_.get()));
-  VLOG(2) << "plan_root=\n" << plan_->DebugString();
+  VLOG_QUERY << "plan_root=\n" << plan_->DebugString();
   return Status::OK;
 }
 
@@ -100,8 +106,8 @@ Status PlanFragmentExecutor::Open() {
     while (true) {
       RETURN_IF_ERROR(GetNext(&batch));
       if (batch == NULL) break;
-      VLOG_FILE << "ExecInternal: #rows=" << batch->num_rows();
       if (VLOG_ROW_IS_ON) {
+        VLOG_ROW << "ExecInternal: #rows=" << batch->num_rows();
         for (int i = 0; i < batch->num_rows(); ++i) {
           TupleRow* row = batch->GetRow(i);
           VLOG_ROW << PrintRow(row, row_desc());
@@ -121,7 +127,6 @@ Status PlanFragmentExecutor::Open() {
 Status PlanFragmentExecutor::GetNext(RowBatch** batch) {
   if (done_) {
     *batch = NULL;
-    RETURN_IF_ERROR(plan_->Close(runtime_state_.get()));
     return Status::OK;
   }
 
@@ -136,17 +141,6 @@ Status PlanFragmentExecutor::GetNext(RowBatch** batch) {
     *batch = NULL;
   }
 
-  if (done_ && *batch == NULL) {
-    // make sure to call Close() before returning 'eos'.
-    RETURN_IF_ERROR(plan_->Close(runtime_state_.get()));
-    if (VLOG_QUERY_IS_ON) {
-      stringstream ss;
-      plan_->runtime_profile()->PrettyPrint(&ss);
-      VLOG_QUERY << "Runtime profile for fragment " << runtime_state_->fragment_id()
-                 << endl << ss.str();
-    }
-  }
-
 #if 0
   // TODO: move this to QueryExecutor
   if (FLAGS_serialize_batch) {
@@ -158,11 +152,24 @@ Status PlanFragmentExecutor::GetNext(RowBatch** batch) {
   }
 #endif
 
+  if (done_) {
+    VLOG_QUERY << "Finished executing fragment query_id=" << PrintId(query_id_)
+               << " fragment_id=" << PrintId(fragment_id_);
+  }
+
   return Status::OK;
 }
 
 Status PlanFragmentExecutor::Close() {
-  return plan_->Close(runtime_state_.get());
+  row_batch_.reset(NULL);
+  RETURN_IF_ERROR(plan_->Close(runtime_state_.get()));
+  if (VLOG_QUERY_IS_ON) {
+    stringstream ss;
+    plan_->runtime_profile()->PrettyPrint(&ss);
+    VLOG_QUERY << "Runtime profile for fragment " << runtime_state_->fragment_id()
+                << endl << ss.str();
+  }
+  return Status::OK;
 }
 
 const RowDescriptor& PlanFragmentExecutor::row_desc() {

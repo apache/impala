@@ -19,8 +19,12 @@ public class TestExecContext {
   public TestExecContext(int numNodes, int batchSize, boolean disableCodegen,
                          boolean abortOnError, int maxErrors, long maxScanRangeLength,
                          int fileBufferSize) {
+    // TODO: turn on multiple threads by setting that 1 to 0.  This doesn't currently
+    // pass all the tests due to numerical precision issues.  With multiple threads
+    // and a small batch size, aggregation over float columns result in slightly
+    // different results.
     queryOptions = new TQueryOptions(abortOnError, maxErrors, disableCodegen, batchSize,
-        true, numNodes, maxScanRangeLength, fileBufferSize);
+        true, numNodes, maxScanRangeLength, fileBufferSize, 1, 0);
     queryOptions.abort_on_error = abortOnError;
     queryOptions.max_errors = maxErrors;
     queryOptions.disable_codegen = disableCodegen;

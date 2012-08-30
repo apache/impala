@@ -33,7 +33,7 @@ class DiskIoMgrTest : public testing::Test {
   
     Status status;
     DiskIoMgr::BufferDescriptor* buffer;
-    bool eos;
+    bool eos = true;
 
     for (int i = 0; i < len; ++i) {
       status = io_mgr->GetNext(reader, &buffer, &eos);
@@ -47,9 +47,6 @@ class DiskIoMgrTest : public testing::Test {
       buffer->Return();
     }
   
-    status = io_mgr->GetNext(reader, &buffer, &eos);
-    EXPECT_TRUE(status.ok());
-    EXPECT_TRUE(buffer == NULL);
     EXPECT_TRUE(eos);
   }
 

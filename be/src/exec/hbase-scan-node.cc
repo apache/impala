@@ -27,7 +27,7 @@ HBaseScanNode::HBaseScanNode(ObjectPool* pool, const TPlanNode& tnode,
       tuple_pool_(new MemPool()),
       hbase_scanner_(NULL),
       row_key_slot_(NULL),
-      text_converter_(new TextConverter('\\', tuple_pool_.get())) {
+      text_converter_(new TextConverter('\\')) {
 }
 
 HBaseScanNode::~HBaseScanNode() {
@@ -94,7 +94,7 @@ void HBaseScanNode::WriteTextSlot(
     RuntimeState* state, bool* error_in_row) {
   COUNTER_SCOPED_TIMER(materialize_tuple_timer());
   if (!text_converter_->WriteSlot(slot, tuple_,
-      reinterpret_cast<char*>(value), value_length, true, false)) {
+      reinterpret_cast<char*>(value), value_length, true, false, tuple_pool_.get())) {
     *error_in_row = true;
     if (state->LogHasSpace()) {
       state->error_stream() << "Error converting column " << family

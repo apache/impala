@@ -35,9 +35,10 @@ add_library(Exec STATIC
   hbase-scan-node.cc
   hbase-table-scanner.cc
   read-write-util.cc
+  scan-range-context.cc
+  serde-utils.cc
   text-converter.cc
   topn-node.cc
-  serde-utils.cc
 )
 
 target_link_libraries(Exec
@@ -54,3 +55,6 @@ add_executable(hash-table-test hash-table-test.cc)
 target_link_libraries(hash-table-test ${IMPALA_TEST_LINK_LIBS})
 add_test(hash-table-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/hash-table-test)
 
+add_executable(delimited-text-parser-test delimited-text-parser-test.cc)
+target_link_libraries(delimited-text-parser-test ${IMPALA_TEST_LINK_LIBS})
+add_test(delimited-text-parser-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/delimited-text-parser-test)

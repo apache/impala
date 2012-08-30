@@ -482,7 +482,7 @@ public abstract class BaseQueryTest {
     if (testFile.trim().startsWith("tpch")) {
       List<TestConfiguration> testConfigs = generateAllConfigurationPermutations(
           TEXT_FORMAT_ONLY, UNCOMPRESSED_ONLY,
-          ImmutableList.of(16), ImmutableList.of(2),  ImmutableList.of(true));
+          ImmutableList.of(1024), ImmutableList.of(2),  ImmutableList.of(true));
       runQueryWithTestConfigs(testConfigs, testFile, abortOnError, maxErrors);
       return;
     }

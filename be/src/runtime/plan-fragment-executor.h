@@ -63,6 +63,9 @@ class PlanFragmentExecutor {
   ExecEnv* exec_env_;  // not owned
   ExecNode* plan_;  // lives in runtime_state_->obj_pool()
 
+  TUniqueId query_id_;
+  TUniqueId fragment_id_;
+
   // Output sink for rows sent to this fragment. May not be set, in which case rows are
   // returned via GetNext's row batch
   // Created in Prepare (if required), owned by this object.

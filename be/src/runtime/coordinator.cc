@@ -48,6 +48,7 @@ Coordinator::Coordinator(ExecEnv* exec_env, ExecStats* exec_stats)
     has_called_wait_(false),
     executor_(new PlanFragmentExecutor(exec_env)),
     execution_completed_(false),
+    num_remote_fragements_complete_(0),
     exec_stats_(exec_stats),
     num_remaining_backends_(0),
     is_cancelled_(false),
@@ -91,6 +92,8 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
     executor_.reset(NULL);
     obj_pool_.reset(new ObjectPool());
   }
+
+  VLOG_QUERY << "Start to execute query: " << PrintId(request->query_id);
 
   query_profile_.reset(
       new RuntimeProfile(obj_pool(), "Query(id=" + PrintId(request->query_id) + ")"));
@@ -165,7 +168,11 @@ Status Coordinator::Wait() {
   has_called_wait_ = true;
   if (executor_.get() != NULL) {
     // Open() may block
-    RETURN_IF_ERROR(executor_->Open());
+    Status status = executor_->Open();
+    if (!status.ok()) {
+      executor_->Close();
+      return status;
+    }
   } else {
     unique_lock<mutex> l(backend_completion_lock_);
     VLOG_QUERY << "Coordinator waiting for backends to finish, " 
@@ -278,6 +285,7 @@ Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
     query_profile_->PrettyPrint(&s);
     VLOG_QUERY << "cumulative profile for query_id=" << query_id_ << "\n"
                << s.str();
+    VLOG_QUERY << "Query Complete: " << PrintId(query_id_);
   }
   return status;
 }
@@ -421,15 +429,20 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
       exec_state->profile->PrettyPrint(&s);
       VLOG_FILE << "profile for query_id=" << query_id_
                 << " fragment_id=" << exec_state->fragment_id << "\n" << s.str();
+      ++num_remote_fragements_complete_;
+      VLOG_FILE << "Completed " << num_remote_fragements_complete_ << " out of " 
+                << backend_exec_states_.size();
     }
     // also print the cumulative profile
     // TODO: fix the coordinator/PlanFragmentExecutor, so this isn't needed
+#if 0
     if (VLOG_FILE_IS_ON) {
       stringstream s;
       query_profile_->PrettyPrint(&s);
       VLOG_FILE << "cumulative profile for query_id=" << query_id_ 
                 << "\n" << s.str();
     }
+#endif
 
     // Gather any metastore operations to be made
     if (params.__isset.partitions_to_create) {

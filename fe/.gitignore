@@ -22,6 +22,9 @@ src/test/resources/hive-site.xml
 # Generated hbase-site.xml file
 src/test/resources/hbase-site.xml
 
+# Generated core-site.xml file
+src/test/resources/core-site.xml
+
 # Generated thrift files
 generated-sources
 

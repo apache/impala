@@ -90,7 +90,6 @@ HBaseTableScanner::HBaseTableScanner(ScanNode* scan_node, HBaseTableCache* htabl
 Status HBaseTableScanner::Init() {
   // Get the JNIEnv* corresponding to current thread.
   JNIEnv* env = getJNIEnv();
-  LOG(INFO) << "tablescanner jnienv=" << env;
   if (env == NULL) {
     return Status("Failed to get/create JVM");
   }

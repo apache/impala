@@ -102,7 +102,6 @@ Status TopNNode::Open(RuntimeState* state) {
   } while (!eos);
   
   DCHECK_LE(priority_queue_.size(), limit_);
-  RETURN_IF_ERROR(child(0)->Close(state));
   PrepareForOutput();
   return Status::OK;
 }
@@ -181,4 +180,3 @@ void TopNNode::DebugString(int indentation_level, stringstream* out) const {
   ExecNode::DebugString(indentation_level, out);
   *out << ")";
 }
-

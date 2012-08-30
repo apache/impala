@@ -37,6 +37,11 @@ class StringBuffer {
     string_value_.len = new_len;
   }
 
+  // TODO: switch everything to uint8_t?
+  void Append(const uint8_t* str, int len) {
+    Append(reinterpret_cast<const char*>(str), len);
+  }
+
   // Assigns contents to StringBuffer
   void Assign(const char* str, int len) {
     Clear();

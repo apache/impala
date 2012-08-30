@@ -23,6 +23,7 @@ int64_t CpuInfo::hardware_flags_ = 0;
 int64_t CpuInfo::original_hardware_flags_;
 long CpuInfo::cache_sizes_[L3_CACHE + 1];
 int64_t CpuInfo::cycles_per_ms_;
+int CpuInfo::num_cores_ = 1;
 
 static struct {
   string name;
@@ -55,6 +56,7 @@ void CpuInfo::Init() {
   string value;
   
   float max_mhz = 0;
+  int num_cores = 0;
 
   memset(&cache_sizes_, 0, sizeof(cache_sizes_));
 
@@ -78,6 +80,8 @@ void CpuInfo::Init() {
         // Window's QueryPerformanceFrequency()
         float mhz = atof(value.c_str());
         max_mhz = max(mhz, max_mhz);
+      } else if (name.compare("processor") == 0) {
+        ++num_cores;
       }
     }
   }
@@ -94,8 +98,15 @@ void CpuInfo::Init() {
     cycles_per_ms_ = 1000000;
   }
   original_hardware_flags_ = hardware_flags_;
-  initialized_ = true;
 
+
+  if (num_cores > 0) {
+    num_cores_ = num_cores;
+  } else {
+    num_cores_ = 1;
+  }
+  
+  initialized_ = true;
   LOG(INFO) << DebugString();
 }
 
@@ -116,11 +127,12 @@ string CpuInfo::DebugString() {
   int64_t L1 = CacheSize(L1_CACHE);
   int64_t L2 = CacheSize(L2_CACHE);
   int64_t L3 = CacheSize(L3_CACHE);
-  stream << "Cpu Info:" << endl;
-  stream << "  L1 Cache: " << PrettyPrinter::Print(L1, TCounterType::BYTES) << endl;
-  stream << "  L2 Cache: " << PrettyPrinter::Print(L2, TCounterType::BYTES) << endl;
-  stream << "  L3 Cache: " << PrettyPrinter::Print(L3, TCounterType::BYTES) << endl;
-  stream << "  Hardware Supports:" << endl;
+  stream << "Cpu Info:" << endl
+         << "  Cores: " << num_cores_ << endl
+         << "  L1 Cache: " << PrettyPrinter::Print(L1, TCounterType::BYTES) << endl
+         << "  L2 Cache: " << PrettyPrinter::Print(L2, TCounterType::BYTES) << endl
+         << "  L3 Cache: " << PrettyPrinter::Print(L3, TCounterType::BYTES) << endl
+         << "  Hardware Supports:" << endl;
   for (int i = 0; i < num_flags; ++i) {
     if (IsSupported(flag_mappings[i].flag)) {
       stream << "    " << flag_mappings[i].name << endl;
@@ -130,4 +142,3 @@ string CpuInfo::DebugString() {
 }
 
 }
-

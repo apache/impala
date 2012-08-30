@@ -42,7 +42,14 @@ enum TImpalaQueryOptions {
   
   // file buffer size used by text parsing; size of 0 indicates the backend's default
   // file buffer size
-  FILE_BUFFER_SIZE
+  FILE_BUFFER_SIZE,
+
+  // Maximum number of io buffers (per disk)
+  MAX_IO_BUFFERS,
+
+  // Number of scanner threads.
+  NUM_SCANNER_THREADS,
+
 }
 
 // The summary of an insert.

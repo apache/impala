@@ -9,6 +9,7 @@
 
 #include "common/logging.h"
 #include "runtime/descriptors.h"
+#include "runtime/disk-io-mgr.h"
 #include "runtime/mem-pool.h"
 
 namespace impala {
@@ -21,6 +22,14 @@ class TupleDescriptor;
 // A RowBatch encapsulates a batch of rows, each composed of a number of tuples.
 // The maximum number of rows is fixed at the time of construction, and the caller
 // can add rows up to that capacity.
+// The row batch reference a few different sources of memory.
+//   1. TupleRow ptrs - this is always owned and managed by the row batch.
+//   2. Tuple memory - this is allocated (or transferred to) the row batches tuple pool.
+//   3. Auxillary tuple memory (e.g. string data) - this can either be stored externally
+//      (don't copy strings) or from the tuple pool (strings are copied).  If external,
+//      the data is in an io buffer that may not be attached to this row batch.  The
+//      creator of that row batch has to make sure that the io buffer is not recycled
+//      until all batches that reference the memory have been consumed.  
 // TODO: stick tuple_ptrs_ into a pool?
 class RowBatch {
  public:
@@ -29,30 +38,14 @@ class RowBatch {
   RowBatch(const RowDescriptor& row_desc, int capacity)
     : has_in_flight_row_(false),
       is_self_contained_(false),
-      own_tuple_ptrs_mem_(true),
-      num_rows_(0),
-      capacity_(capacity),
-      num_tuples_per_row_(row_desc.tuple_descriptors().size()),
-      row_desc_(row_desc),
-      tuple_ptrs_(new Tuple*[capacity_ * num_tuples_per_row_]),
-      tuple_data_pool_(new MemPool()) {
-    DCHECK_GT(capacity, 0);
-  }
-
-  // Create RowBatch for a maximum of 'capacity' rows of tuples specified
-  // by 'row_desc' using memory for the tuple_ptrs_ from the given mem pool
-  RowBatch(const RowDescriptor& row_desc, int capacity, MemPool* mem_pool)
-    : has_in_flight_row_(false),
-      is_self_contained_(false),
-      own_tuple_ptrs_mem_(false),
       num_rows_(0),
       capacity_(capacity),
       num_tuples_per_row_(row_desc.tuple_descriptors().size()),
       row_desc_(row_desc),
       tuple_data_pool_(new MemPool()) {
-    DCHECK_GT(capacity, 0);
     tuple_ptrs_size_ = capacity_ * num_tuples_per_row_ * sizeof(Tuple*);
-    tuple_ptrs_ = reinterpret_cast<Tuple**>(mem_pool->Allocate(tuple_ptrs_size_));
+    tuple_ptrs_ = new Tuple*[capacity_ * num_tuples_per_row_];
+    DCHECK_GT(capacity, 0);
   }
 
   // Populate a row batch from input_batch by copying input_batch's
@@ -62,6 +55,10 @@ class RowBatch {
   // (so that we don't need to make yet another copy)
   RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch);
 
+  // Releases all resources accumulated at this row batch.  This includes
+  //  - tuple_ptrs
+  //  - tuple mem pool data
+  //  - buffer handles from the io mgr
   ~RowBatch();
 
   static const int INVALID_ROW_INDEX = -1;
@@ -87,9 +84,19 @@ class RowBatch {
   
   void CommitLastRow() { CommitRows(1); }
 
-  // Returns true if row_batch has reached capacity, false otherwise
+  // Set function can be used to reduce the number of rows in the batch.  This is only
+  // used in the limit case where more rows were added than necessary.
+  void set_num_rows(int num_rows) {
+    DCHECK_LE(num_rows, num_rows_);
+    num_rows_ = num_rows;
+  }
+
+  // Returns true if row_batch has reached capacity or there are io buffers attached to
+  // this batch, false otherwise
+  // IO buffers are a scarce resource and must be recycled as quickly as possible to get
+  // the best cpu/disk interleaving.
   bool IsFull() {
-    return num_rows_ == capacity_;
+    return num_rows_ == capacity_ || !io_buffers_.empty();
   }
 
   int row_byte_size() {
@@ -106,27 +113,31 @@ class RowBatch {
     num_rows_ = 0;
     has_in_flight_row_ = false;
     tuple_data_pool_.reset(new MemPool());
-  }
-
-  // Reset the row batch.
-  // tuple_ptrs will be release if this object owns the memory. It will then use
-  // the memory allocated from mem_pool.
-  void Reset(MemPool* mem_pool) {
-    Reset();
-    if (own_tuple_ptrs_mem_) {
-      delete [] tuple_ptrs_;
-      own_tuple_ptrs_mem_ = false;
+    for (int i = 0; i < io_buffers_.size(); ++i) {
+      io_buffers_[i]->Return();
     }
-    tuple_ptrs_ = reinterpret_cast<Tuple**>(mem_pool->Allocate(tuple_ptrs_size_));
+    io_buffers_.clear();
   }
 
   MemPool* tuple_data_pool() {
     return tuple_data_pool_.get();
   }
 
-  // Transfer ownership of our tuple data to dest.
-  void TransferTupleData(RowBatch* dest) {
+  void AddIoBuffer(DiskIoMgr::BufferDescriptor* buffer) {
+    io_buffers_.push_back(buffer);
+  }
+
+  int num_io_buffers() {
+    return io_buffers_.size();
+  }
+
+  // Transfer ownership of resources to dest.  This includes tuple data in mem
+  // pool and io buffers.
+  void TransferResourceOwnership(RowBatch* dest) {
     dest->tuple_data_pool_->AcquireData(tuple_data_pool_.get(), false);
+    dest->io_buffers_.insert(dest->io_buffers_.begin(), 
+        io_buffers_.begin(), io_buffers_.end());
+    io_buffers_.clear();
     // make sure we can't access our tuples after we gave up the pools holding the
     // tuple data
     Reset();
@@ -143,6 +154,15 @@ class RowBatch {
   void ClearBatch() {
     memset(tuple_ptrs_, 0, capacity_ * num_tuples_per_row_ * sizeof(Tuple*));
   }
+
+  // Swaps all of the row batch state with 'other'.  This is used for scan nodes
+  // which produce RowBatches asynchronously.  Typically, an ExecNode is handed
+  // a row batch to populate (pull model) but ScanNodes have multiple threads
+  // which push row batches.  This function is used to swap the pushed row batch
+  // contents with the row batch that's passed from the caller.
+  // TODO: this is wasteful and makes a copy that's unnecessary.  Think about cleaning
+  // this up.
+  void Swap(RowBatch* other);
 
   // Create a serialized version of this row batch in output_batch, attaching
   // all of the data it references (TRowBatch::tuple_data) to output_batch.tuple_data.
@@ -168,11 +188,13 @@ class RowBatch {
   const RowDescriptor& row_desc() const { return row_desc_; }
 
  private:
+  // All members need to be handled in RowBatch::Swap()
+
   bool has_in_flight_row_;  // if true, last row hasn't been committed yet
   bool is_self_contained_;  // if true, contains all ref'd data in tuple_data_pool_
-  bool own_tuple_ptrs_mem_; // if true, tuple_ptrs_ memory is owned by this object.
   int num_rows_;  // # of committed rows
   int capacity_;  // maximum # of rows
+
   int num_tuples_per_row_;
   RowDescriptor row_desc_;
 
@@ -183,6 +205,8 @@ class RowBatch {
 
   // holding (some of the) data referenced by rows
   boost::scoped_ptr<MemPool> tuple_data_pool_;
+
+  std::vector<DiskIoMgr::BufferDescriptor*> io_buffers_;
 };
 
 }

@@ -201,6 +201,9 @@ class Coordinator {
 
   // True if execution has completed, false otherwise.
   bool execution_completed_;
+  
+  // Number of remote fragments that have completed
+  int num_remote_fragements_complete_;
 
   // Repository for statistics gathered during the execution of a
   // single query. Not owned by us.

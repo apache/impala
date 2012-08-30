@@ -25,7 +25,8 @@ class ScanNode : public ExecNode {
     return Status::OK;
   }
 
-  // Convert scan_range into node-specific scan restrictions.
+  // Convert scan_range into node-specific scan restrictions.  This should be 
+  // called after Prepare()
   virtual Status SetScanRange(const TScanRange& scan_range) = 0;
 
   virtual bool IsScanNode() const { return true; }

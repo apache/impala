@@ -4,6 +4,7 @@
 #include "util/codec.h"
 #include "util/compress.h"
 #include "util/decompress.h"
+#include "util/cpu-info.h"
 #include "exec/serde-utils.h"
 #include "runtime/runtime-state.h"
 #include "gen-cpp/Descriptors_types.h"
@@ -45,15 +46,14 @@ string Codec::GetCodecName(THdfsCompression::type type) {
 }
 
 Status Codec::CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                                     bool reuse, const vector<char>& codec,
+                                     bool reuse, const string& codec,
                                      scoped_ptr<Codec>* compressor) {
-  string strval(&codec[0], codec.size());
   map<const string, const THdfsCompression::type>::const_iterator
-      type = compression_map.find(strval);
+      type = compression_map.find(codec);
 
   if (type == compression_map.end()) {
     if (runtime_state != NULL && runtime_state->LogHasSpace()) {
-      runtime_state->error_stream() << "Unknown Codec: " << strval;
+      runtime_state->error_stream() << "Unknown Codec: " << codec;
     }
     return Status("Unknown Codec");
   }
@@ -92,15 +92,14 @@ Status Codec::CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
 }
 
 Status Codec::CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                                       bool reuse, const vector<char>& codec,
+                                       bool reuse, const string& codec,
                                        scoped_ptr<Codec>* decompressor) {
-  string strval(&codec[0], codec.size());
   map<const string, const THdfsCompression::type>::const_iterator
-      type = compression_map.find(strval);
+      type = compression_map.find(codec);
 
   if (type == compression_map.end()) {
     if (runtime_state != NULL && runtime_state->LogHasSpace()) {
-      runtime_state->error_stream() << "Unknown Codec: " << strval;
+      runtime_state->error_stream() << "Unknown Codec: " << codec;
     }
     return Status("Unknown Codec");
   }
@@ -142,3 +141,4 @@ Codec::Codec(MemPool* mem_pool, bool reuse_buffer)
     out_buffer_(NULL),
     buffer_length_(0) {
 }
+

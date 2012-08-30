@@ -1,8 +1,10 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-#include "util/cpu-info.h"
-#include "exec/hdfs-scanner.h"
 #include "exec/delimited-text-parser.inline.h"
+
+#include "exec/byte-stream.h"
+#include "exec/hdfs-scanner.h"
+#include "util/cpu-info.h"
 
 using namespace impala;
 using namespace std;
@@ -16,7 +18,10 @@ DelimitedTextParser::DelimitedTextParser(HdfsScanNode* scan_node,
       field_delim_(field_delim),
       escape_char_(escape_char),
       collection_item_delim_(collection_item_delim),
-      tuple_delim_(tuple_delim) {
+      tuple_delim_(tuple_delim),
+      current_column_has_escape_(false),
+      last_char_is_escape_(false),
+      column_idx_(0) {
 
   // Initialize the sse search registers.
   char search_chars[SSEUtil::CHARS_PER_128_BIT_REGISTER];
@@ -56,7 +61,8 @@ DelimitedTextParser::DelimitedTextParser(HdfsScanNode* scan_node,
   DCHECK_GT(num_delims, 0);
   xmm_delim_search_ = _mm_loadu_si128(reinterpret_cast<__m128i*>(search_chars));
 
-  ParserReset();
+  // scan_node_ can only be NULL in test setups
+  if (scan_node_ != NULL) ParserReset();
 }
 
 void DelimitedTextParser::ParserReset() {
@@ -142,9 +148,9 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
 // Find the first instance of the tuple delimiter.  This will
 // find the start of the first full tuple in buffer by looking for the end of
 // the previous tuple.
-int DelimitedTextParser::FindFirstInstance(char* buffer, int len) {
+int DelimitedTextParser::FindFirstInstance(const char* buffer, int len) {
   int tuple_start = 0;
-  char* buffer_start = buffer;
+  const char* buffer_start = buffer;
   bool found = false;
 restart:
   if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
@@ -157,7 +163,7 @@ restart:
       if (chr_count > SSEUtil::CHARS_PER_128_BIT_REGISTER) {
         chr_count = SSEUtil::CHARS_PER_128_BIT_REGISTER;
       }
-      xmm_buffer = _mm_loadu_si128(reinterpret_cast<__m128i*>(buffer));
+      xmm_buffer = _mm_loadu_si128(reinterpret_cast<const __m128i*>(buffer));
       xmm_tuple_mask =
           _mm_cmpestrm(xmm_tuple_search_, 1, xmm_buffer, chr_count, SSEUtil::STRCHR_MODE);
       int tuple_mask = _mm_extract_epi16(xmm_tuple_mask, 0);
@@ -202,9 +208,18 @@ restart:
         break;
       }
     }
+    
     // TODO: This sucks.  All the preceding characters before the tuple delim were
     // escape characters.  We need to read from the previous block to see what to do.
-    DCHECK_GT(before_tuple_end, 0);
+    if (before_tuple_end < 0) {
+      static bool warning_logged = false;
+      if (!warning_logged) {
+        LOG(WARNING) << "Unhandled code path.  This might cause a tuple to be "
+                     << "skipped or repeated.";
+        warning_logged = true;
+        return tuple_start;
+      }
+    }
 
     // An even number of escape characters means they cancel out and this tuple break
     // is *not* escaped.

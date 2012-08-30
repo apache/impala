@@ -15,10 +15,11 @@
 #include "util/runtime-profile.h"
 #include "common/object-pool.h"
 #include "gen-cpp/PlanNodes_types.h"
+#include "exec/buffered-byte-stream.h"
 #include "exec/hdfs-rcfile-scanner.h"
 #include "exec/hdfs-sequence-scanner.h"
 #include "exec/hdfs-scan-node.h"
-#include "exec/serde-utils.h"
+#include "exec/serde-utils.inline.h"
 #include "exec/text-converter.inline.h"
 
 using namespace std;
@@ -39,8 +40,8 @@ const uint8_t HdfsRCFileScanner::RCFILE_VERSION_HEADER[4] = {'R', 'C', 'F', 1};
 static const uint8_t RC_FILE_RECORD_DELIMITER = 0xff;
 
 HdfsRCFileScanner::HdfsRCFileScanner(HdfsScanNode* scan_node, RuntimeState* state,
-    Tuple* template_tuple, MemPool* mem_pool)
-    : HdfsScanner(scan_node, state, template_tuple, mem_pool),
+    MemPool* mem_pool)
+    : HdfsScanner(scan_node, state, mem_pool),
       scan_range_fully_buffered_(false),
       key_buffer_pool_(new MemPool()),
       key_buffer_length_(0),
@@ -61,7 +62,7 @@ HdfsRCFileScanner::~HdfsRCFileScanner() {
 Status HdfsRCFileScanner::Prepare() {
   RETURN_IF_ERROR(HdfsScanner::Prepare());
 
-  text_converter_.reset(new TextConverter(0, tuple_pool_));
+  text_converter_.reset(new TextConverter(0));
 
   // Allocate the buffers for the key information that is used to read and decode
   // the column data from its run length encoding.
@@ -99,10 +100,11 @@ Status HdfsRCFileScanner::Prepare() {
 }
 
 Status HdfsRCFileScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
-    HdfsScanRange* scan_range, Tuple* template_tuple, ByteStream* current_byte_stream_) {
+    DiskIoMgr::ScanRange* scan_range, Tuple* template_tuple, 
+    ByteStream* current_byte_stream_) {
   RETURN_IF_ERROR(HdfsScanner::InitCurrentScanRange(hdfs_partition, scan_range, 
       template_tuple, current_byte_stream_));
-  end_of_scan_range_ = scan_range->length_ + scan_range->offset_;
+  end_of_scan_range_ = scan_range->len() + scan_range->offset();
 
   // Check the Location (file name) to see if we have changed files.
   // If this a new file then we need to read and process the header.
@@ -116,7 +118,7 @@ Status HdfsRCFileScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_par
     // get a scan range that starts at the beginning of the file we can avoid
     // reading the header but we must seek past it to get to the beginning of the data.
     current_byte_stream_->GetPosition(&header_end_);
-  } else if (scan_range->offset_ == 0) {
+  } else if (scan_range->offset() == 0) {
     // If are at the beginning of the file and we previously read the file header
     // we do not have to read it again but we need to seek past the file header.
     // We saved the offset above when we previously read and processed the header.
@@ -125,8 +127,8 @@ Status HdfsRCFileScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_par
 
   // Offset may not point to row group boundary so we need to search for the next
   // sync block.
-  if (scan_range->offset_ != 0) {
-    RETURN_IF_ERROR(current_byte_stream_->Seek(scan_range->offset_));
+  if (scan_range->offset() != 0) {
+    RETURN_IF_ERROR(current_byte_stream_->Seek(scan_range->offset()));
     RETURN_IF_ERROR(find_first_parser_->FindSyncBlock(end_of_scan_range_,
           SYNC_HASH_SIZE, &(sync_hash_[0]), current_byte_stream_));
   }
@@ -195,8 +197,9 @@ Status HdfsRCFileScanner::ReadFileHeader() {
   if (is_compressed_) {
     // Read the codec and get the right decompressor class.
     RETURN_IF_ERROR(SerDeUtils::ReadText(current_byte_stream_, &codec));
+    string codec_str(&codec[0], codec.size());
     RETURN_IF_ERROR(Codec::CreateDecompressor(state_,
-        column_buffer_pool_.get(), !has_noncompact_strings_, codec, &decompressor_));
+        column_buffer_pool_.get(), !has_noncompact_strings_, codec_str, &decompressor_));
   }
 
   VLOG_FILE << current_byte_stream_->GetLocation() << ": "
@@ -514,7 +517,7 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
       current_row->SetTuple(tuple_idx_, tuple_);
       // Initialize tuple_ from the partition key template tuple before writing the
       // slots
-      InitTuple(tuple_);
+      InitTuple(template_tuple_, tuple_);
 
       const vector<SlotDescriptor*>& materialized_slots = 
           scan_node_->materialized_slots();
@@ -531,7 +534,7 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
             reinterpret_cast<const char*>(column_buffer_ + total_col_length_));
 
         if (!text_converter_->WriteSlot(slot_desc, tuple_, 
-              col_start, field_len, !has_noncompact_strings_, false)) {
+              col_start, field_len, !has_noncompact_strings_, false, tuple_pool_)) {
           if (state_->LogHasSpace()) {
             state_->error_stream() << "Error converting column: " << rc_column_idx <<
                 " TO " << TypeToString(slot_desc->type()) << endl;
@@ -558,11 +561,8 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
       }
 
       // Evaluate the conjuncts and add the row to the batch
-      bool conjuncts_true = scan_node_->EvalConjunctsForScanner(current_row);
-
-      if (conjuncts_true) {
+      if (ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, current_row)) {
         row_batch->CommitLastRow();
-        scan_node_->IncrNumRowsReturned();
         if (scan_node_->ReachedLimit() || row_batch->IsFull()) {
           tuple_ = NULL;
           return Status::OK;

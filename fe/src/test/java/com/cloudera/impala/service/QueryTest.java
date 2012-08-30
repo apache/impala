@@ -71,7 +71,7 @@ public class QueryTest extends BaseQueryTest {
   public void TestEmpty() {
     runTestInExecutionMode(EXECUTION_MODE, "empty", true, 0);
   }
-
+  
   @Test
   public void TestSubquery() {
     runTestInExecutionMode(EXECUTION_MODE, "subquery", true, 0);
@@ -82,7 +82,7 @@ public class QueryTest extends BaseQueryTest {
     runQueryInAllBatchAndClusterPerms("union", true, 0, null,
         ImmutableList.of(0), ImmutableList.of(1));
   }
-
+  
   @Test
   public void TestMixedFormat() {
     runTestInExecutionMode(EXECUTION_MODE, "mixed-format", true, 0);

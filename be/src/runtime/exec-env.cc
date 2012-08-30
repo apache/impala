@@ -10,6 +10,7 @@
 #include "common/service-ids.h"
 #include "runtime/client-cache.h"
 #include "runtime/data-stream-mgr.h"
+#include "runtime/disk-io-mgr.h"
 #include "runtime/hbase-table-cache.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "sparrow/simple-scheduler.h"
@@ -38,6 +39,7 @@ ExecEnv::ExecEnv()
     client_cache_(new BackendClientCache(0, 0)),
     fs_cache_(new HdfsFsCache()),
     htable_cache_(new HBaseTableCache()),
+    disk_io_mgr_(new DiskIoMgr()),
     webserver_(new Webserver()),
     metrics_(new Metrics()),
     enable_webserver_(FLAGS_enable_webserver),
@@ -68,6 +70,8 @@ ExecEnv::ExecEnv()
     // TODO: Check that num_nodes is correctly set?
     scheduler_.reset(NULL);
   }
+  Status status = disk_io_mgr_->Init();
+  CHECK(status.ok());
 }
 
 ExecEnv::~ExecEnv() {

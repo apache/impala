@@ -12,11 +12,18 @@ enable_testing()
 #      to CMakeFiles/<currentdir>.dir/<srcfile>.s
 PROJECT(ASSEMBLER)
 
+# compiler flags that are common across debug/release builds
+#  - msse4.2: Enable sse4.2 compiler intrinsics.
+#  - Wall: Enable all warnings.
+#  - Wno-sign-compare: suppress warnings for comparison between signed and unsigned 
+#    integers
+#  - pthread: enable multithreaded malloc
+#  - DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG: enable nanosecond precision for boost
+SET(CXX_COMMON_FLAGS "-msse4.2 -Wall -Wno-sign-compare -pthread")
+SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
+
 # compiler flags for different build types (run 'cmake -DCMAKE_BUILD_TYPE=<type> .')
 # For all builds:
-#   -msse4.2: Enable sse4.2 compiler intrinsics.
-#   -Wall: Enable all warnings.
-#   -Wno-sign-compare: suppress warnings for comparison between signed and unsigned integers
 # For CMAKE_BUILD_TYPE=Debug
 #   -ggdb: Enable gdb debugging
 # For CMAKE_BUILD_TYPE=Release
@@ -31,8 +38,8 @@ PROJECT(ASSEMBLER)
 #   2. Run the benchmarks (generates *.gcda profiling data).
 #   3. Build again with CMAKE_BUILD_TYPE_PROFILE_BUILD
 #     -fprofile-use: Compiler will use the profile outputs for optimizations
-SET(CXX_FLAGS_DEBUG "-ggdb -msse4.2 -Wall -Wno-sign-compare -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
-SET(CXX_FLAGS_RELEASE "-O3 -g -DNDEBUG -Wall -msse4.2 -Wno-sign-compare -Wno-strict-aliasing -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
+SET(CXX_FLAGS_DEBUG "-ggdb")
+SET(CXX_FLAGS_RELEASE "-O3 -g -DNDEBUG -Wno-strict-aliasing")
 SET(CXX_FLAGS_PROFILE_GEN "${CXX_FLAGS_RELEASE} -fprofile-generate")
 SET(CXX_FLAGS_PROFILE_BUILD "${CXX_FLAGS_RELEASE} -fprofile-use")
 SET(CXX_FLAGS_CODE_COVERAGE "${CXX_FLAGS_DEBUG}  -fprofile-arcs -ftest-coverage")
@@ -59,12 +66,12 @@ else()
   message(FATAL_ERROR "Unknown build type: ${CMAKE_BUILD_TYPE}")
 endif ()
 
-# Adding -fverboase-asm creates better annotated assembly.  This
-# doesn't seem to affect when building the binary.
-# TODO: is it possible to have specify different build flags for assembly?
+# Add flags that are common across build types
+#  - fverboase-asm creates better annotated assembly.  This doesn't seem to affect 
+#    when building the binary.
+# LLMV_CFLAGS - Adding llvm compile flags
+SET(CMAKE_CXX_FLAGS "${CXX_COMMON_FLAGS} ${CMAKE_CXX_FLAGS}")
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fverbose-asm")
-
-# Adding llvm compile flags
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${LLVM_CFLAGS}")
 
 Message(${CMAKE_CXX_FLAGS})

@@ -199,7 +199,7 @@ string TupleDescriptor::DebugString() const {
   stringstream out;
   out << "Tuple(id=" << id_ << " size=" << byte_size_;
   if (table_desc_ != NULL) {
-    out << " " << table_desc_->DebugString();
+    //out << " " << table_desc_->DebugString();
   }
   out << " slots=[";
   for (size_t i = 0; i < slots_.size(); ++i) {
@@ -265,6 +265,23 @@ bool RowDescriptor::IsPrefixOf(const RowDescriptor& other_desc) const {
     if (tuple_desc_map_[i] != other_desc.tuple_desc_map_[i]) return false;
   }
   return true;
+}
+
+bool RowDescriptor::Equals(const RowDescriptor& other_desc) const {
+  if (tuple_desc_map_.size() != other_desc.tuple_desc_map_.size()) return false;
+  for (int i = 0; i < tuple_desc_map_.size(); ++i) {
+    // pointer comparison okay, descriptors are unique
+    if (tuple_desc_map_[i] != other_desc.tuple_desc_map_[i]) return false;
+  }
+  return true;
+}
+
+string RowDescriptor::DebugString() const {
+  stringstream ss;
+  for (int i = 0; i < tuple_desc_map_.size(); ++i) {
+    ss << tuple_desc_map_[i]->DebugString() << endl;
+  }
+  return ss.str();
 }
 
 Status DescriptorTbl::Create(ObjectPool* pool, const TDescriptorTable& thrift_tbl,

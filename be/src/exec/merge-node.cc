@@ -107,8 +107,6 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
           row_batch)) {
         *eos = ReachedLimit();
         if (*eos) {
-          RETURN_IF_ERROR(child(child_idx_)->Close(state));
-          // Don't close the current child again in Close().
           child_idx_ = INVALID_CHILD_IDX;
         }
         return Status::OK;
@@ -124,12 +122,10 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     }
 
     // Close current child and move on to next one.
-    RETURN_IF_ERROR(child(child_idx_)->Close(state));
     ++child_idx_;
     child_row_batch_.reset(NULL);
   }
 
-  // Don't close the current child again in Close().
   child_idx_ = INVALID_CHILD_IDX;
   *eos = true;
   return Status::OK;
@@ -137,12 +133,9 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 
 Status MergeNode::Close(RuntimeState* state) {
   // don't call ExecNode::Close(), it always closes all children
+  child_row_batch_.reset(NULL);
   COUNTER_UPDATE(rows_returned_counter_, num_rows_returned_);
-  Status result;
-  if (child_idx_ != INVALID_CHILD_IDX) {
-    result.AddError(child(child_idx_)->Close(state));
-  }
-  return result;
+  return ExecNode::Close(state);
 }
 
 bool MergeNode::EvalAndMaterializeExprs(const vector<Expr*>& exprs,

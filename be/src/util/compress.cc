@@ -1,7 +1,7 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #include "util/compress.h"
-#include "exec/serde-utils.h"
+#include "exec/serde-utils.inline.h"
 #include "runtime/runtime-state.h"
 
 // Codec libraries

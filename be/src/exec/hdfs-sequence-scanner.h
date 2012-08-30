@@ -5,7 +5,6 @@
 
 #include "util/codec.h"
 #include "exec/hdfs-scanner.h"
-#include "exec/buffered-byte-stream.h"
 #include "exec/delimited-text-parser.h"
 
 namespace impala {
@@ -142,12 +141,16 @@ class HdfsSequenceScanner : public HdfsScanner {
   // SeqFile file: {'S', 'E', 'Q', 6}
   static const uint8_t SEQFILE_VERSION_HEADER[4];
 
-  HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state, 
-      Tuple* template_tuple, MemPool* tuple_pool);
+  HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state);
 
   virtual ~HdfsSequenceScanner();
+  
+  // Implementation of HdfsScanner interface.
   virtual Status Prepare();
-  virtual Status GetNext(RowBatch* row_batch, bool* eosr);
+  virtual Status ProcessScanRange(ScanRangeContext* context);
+
+  // Issue the initial scan ranges for all sequence files.
+  static void IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>&);
 
  private:
   // Sync indicator
@@ -167,11 +170,14 @@ class HdfsSequenceScanner : public HdfsScanner {
   // The key should always be 4 bytes.
   static const int SEQFILE_KEY_LENGTH;
 
-  // Initialises any state required at the beginning of a new scan range.
-  // If not at the begining of the file it will trigger a search for the
-  // next sync block, where the scan will start.
-  virtual Status InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
-      HdfsScanRange* scan_range, Tuple* template_tuple, ByteStream* byte_stream);
+  // Estimate of header size in bytes.  Headers are likely on remote nodes.  If
+  // this is not big enough, the scanner will read more as necessary.
+  static const int HEADER_SIZE;
+
+  void IssueFileRanges(const char* filename);
+
+  Status InitNewRange();
+  Status ProcessRange();
 
   // Writes the intermediate parsed data in to slots, outputting
   // tuples to row_batch as they complete.
@@ -181,14 +187,12 @@ class HdfsSequenceScanner : public HdfsScanner {
   //  num_fields: Total number of fields contained in parsed_data_
   // Input/Output Parameters
   //  row_idx: Index of current row in row_batch.
-  Status WriteFields(RowBatch* row_batch, int num_fields, int* row_idx);
+  Status WriteFields(MemPool*, TupleRow*, int num_fields, bool* add_row);
 
   // Find the first record of a scan range.
   // If the scan range is not at the beginning of the file then this is called to
   // move the buffered_byte_stream_ seek point to before the next sync field.
-  // If there is none present then the buffered_byte_stream_ will be beyond the
-  // end of the scan range and the scan will end.
-  Status FindFirstRecord();
+  Status FindFirstRecord(bool* found);
 
   // Read the current Sequence file header from the begining of the file.
   // Verifies:
@@ -218,8 +222,7 @@ class HdfsSequenceScanner : public HdfsScanner {
   //   record_ptr: ponter to the record.
   //   record_len: length of the record
   //   eors: set to true if we are at the end of the scan range.
-  Status GetRecordFromCompressedBlock(uint8_t** record_ptr, int64_t *record_len, 
-                                      bool *eors);
+  Status GetRecordFromCompressedBlock(uint8_t** record_ptr, int64_t *record_len);
 
   // Read compressed or uncompressed records from the byte stream into memory
   // in unparsed_data_buffer_pool_.
@@ -227,7 +230,7 @@ class HdfsSequenceScanner : public HdfsScanner {
   //   record_ptr: ponter to the record.
   //   record_len: length of the record
   //   eors: set to true if we are at the end of the scan range.
-  Status GetRecord(uint8_t** record_ptr, int64_t *record_len, bool *eosr);
+  Status GetRecord(uint8_t** record_ptr, int64_t *record_len);
 
   // Read a compressed block.
   // Decompress to unparsed_data_buffer_ allocated from unparsed_data_buffer_pool_.
@@ -236,41 +239,38 @@ class HdfsSequenceScanner : public HdfsScanner {
   // read and verify a sync block.
   Status CheckSync();
 
-  // a buffered byte stream to wrap the stream we are passed.
-  boost::scoped_ptr<BufferedByteStream> buffered_byte_stream_;
+  // Context for this scanner.  The context maps to a single scan range.
+  ScanRangeContext* context_;
 
   // Helper class for picking fields and rows from delimited text.
   boost::scoped_ptr<DelimitedTextParser> delimited_text_parser_;
   std::vector<FieldLocation> field_locations_;
 
-  // Parser to find the first record. This uses different delimiters.
-  boost::scoped_ptr<DelimitedTextParser> find_first_parser_;
-
   // Helper class for converting text fields to internal types.
   boost::scoped_ptr<TextConverter> text_converter_;
 
-  // The original byte stream we are passed.
-  ByteStream* unbuffered_byte_stream_;
+  // Data that is fixed across headers.  This struct is shared between scan ranges.
+  struct FileHeader {
+    // The sync hash read in from the file header.
+    uint8_t sync[SYNC_HASH_SIZE];
 
-  // The sync hash read in from the file header.
-  uint8_t sync_[SYNC_HASH_SIZE];
+    // File compression or not.
+    bool is_compressed;
+    // Block compression or not.
+    bool is_blk_compressed;
 
-  // File compression or not.
-  bool is_compressed_;
-  // Block compression or not.
-  bool is_blk_compressed_;
+    // Codec name if it is compressed.
+    std::string codec;
+  
+    // End of the header block so we don't have to reparse it.
+    int64_t header_size;
+  };
+
+  // Header for this scan range.  Memory is owned by the parent scan node.
+  FileHeader* header_;
 
   // The decompressor class to use.
   boost::scoped_ptr<Codec> decompressor_;
-
-  // Location (file name) of previous scan range.
-  std::string previous_location_;
-
-  // End of the header block so we don't have to reparse it.
-  int64_t header_end_;
-
-  // Byte offset of the scan range.
-  int end_of_scan_range_;
 
   // Length of the current sequence file block (or record).
   int current_block_length_;
@@ -284,18 +284,11 @@ class HdfsSequenceScanner : public HdfsScanner {
   // Buffer for data read from HDFS or from decompressing the HDFS data.
   uint8_t* unparsed_data_buffer_;
 
-  // Size of the unparsed_data_buffer_.
-  int64_t unparsed_data_buffer_size_;
-
   // Number of buffered records unparsed_data_buffer_ from block compressed data.
   int64_t num_buffered_records_in_compressed_block_;
 
   // Next record from block compressed data.
   uint8_t* next_record_in_compressed_block_;
-
-  // Temporary buffer used for reading headers and compressed data.
-  // It will grow to be big enough for the largest compressed record or block.
-  std::vector<uint8_t> scratch_buf_;
 };
 
 } // namespace impala

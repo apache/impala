@@ -99,6 +99,25 @@ string PrintRow(TupleRow* row, const RowDescriptor& d) {
   return out.str();
 }
 
+static double GetByteUnit(int64_t value, string* unit) {
+  if (value == 0) {
+    *unit = "";
+    return value;
+  } else if (value > GIGABYTE) {
+    *unit = "GB";
+    return value /(double) GIGABYTE;
+  } else if (value > MEGABYTE ) {
+    *unit = "MB";
+    return value /(double) MEGABYTE;
+  } else if (value > KILOBYTE)  {
+    *unit = "KB";
+    return value /(double) KILOBYTE;
+  } else {
+    *unit = "B";
+    return value;
+  }
+}
+
 string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
   stringstream ss;
   ss.flags(ios::fixed);
@@ -148,19 +167,12 @@ string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
       }
       break;
 
-    case TCounterType::BYTES:
-      if (value == 0) {
-        ss << value;
-      } else if (value > GIGABYTE) {
-        ss << setprecision(PRECISION) << value / (double) GIGABYTE << " GB";
-      } else if (value > MEGABYTE ) {
-        ss << setprecision(PRECISION) << value / (double) MEGABYTE << " MB";
-      } else if (value > KILOBYTE)  {
-        ss << setprecision(PRECISION) << value / (double) KILOBYTE << " KB";
-      } else {
-        ss << value << " B";
-      }
+    case TCounterType::BYTES: {
+      string unit;
+      double output = GetByteUnit(value, &unit); 
+      ss << setprecision(PRECISION) << output << " " << unit;
       break;
+    }
 
     default:
       DCHECK(false);

@@ -3,11 +3,17 @@
 #ifndef IMPALA_EXEC_CODEC_H
 #define IMPALA_EXEC_CODEC_H
 
-#include "exec/hdfs-scanner.h"
+#include "common/status.h"
 #include "runtime/mem-pool.h"
+#include "util/runtime-profile.h"
+
+#include <boost/scoped_ptr.hpp>
 #include "gen-cpp/Descriptors_types.h"
 
 namespace impala {
+
+class MemPool;
+class RuntimeState;
 
 // Create a compression object.  This is the base class for all compression
 // algorithms. A compression algorithm is either a compressor or a decompressor.
@@ -40,7 +46,7 @@ class Codec {
 
   // Alternate creator: takes a codec string and returns a scoped pointer.
   static Status CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                                   bool reuse, const std::vector<char>& codec,
+                                   bool reuse, const std::string& codec,
                                    boost::scoped_ptr<Codec>* decompressor);
 
   // Create the compressor.
@@ -59,7 +65,7 @@ class Codec {
   // Input, as above except:
   //  codec: the string representing the codec of the current file.
   static Status CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
-                                 bool reuse, const std::vector<char>& codec,
+                                 bool reuse, const std::string& codec,
                                  boost::scoped_ptr<Codec>* compressor);
 
   virtual ~Codec() {}

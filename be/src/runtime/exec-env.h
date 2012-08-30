@@ -21,6 +21,7 @@ namespace impala {
 
 class BackendClientCache;
 class DataStreamMgr;
+class DiskIoMgr;
 class HBaseTableCache;
 class HdfsFsCache;
 class TestExecEnv;
@@ -44,6 +45,7 @@ class ExecEnv {
   BackendClientCache* client_cache() { return client_cache_.get(); }
   HdfsFsCache* fs_cache() { return fs_cache_.get(); }
   HBaseTableCache* htable_cache() { return htable_cache_.get(); }
+  DiskIoMgr* disk_io_mgr() { return disk_io_mgr_.get(); }
   Webserver* webserver() { return webserver_.get(); }
   Metrics* metrics() { return metrics_.get(); }
 
@@ -65,6 +67,7 @@ class ExecEnv {
   boost::scoped_ptr<BackendClientCache> client_cache_;
   boost::scoped_ptr<HdfsFsCache> fs_cache_;
   boost::scoped_ptr<HBaseTableCache> htable_cache_;
+  boost::scoped_ptr<DiskIoMgr> disk_io_mgr_;
   boost::scoped_ptr<Webserver> webserver_;
   boost::scoped_ptr<Metrics> metrics_;
 

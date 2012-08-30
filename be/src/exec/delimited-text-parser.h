@@ -66,7 +66,7 @@ class DelimitedTextParser {
   // Used to find the start of a tuple if jumping into the middle of a text file.
   // Also used to find the sync marker for Sequenced and RC files.
   // If no tuple delimiter is found within the buffer, return -1;
-  int FindFirstInstance(char* buffer, int len);
+  int FindFirstInstance(const char* buffer, int len);
 
   // Find a sync block if jumping into the middle of a Sequence or RC file.
   // The sync block is always proceeded by an indicator of 4 bytes of -1 (0xff).

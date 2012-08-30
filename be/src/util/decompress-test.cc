@@ -27,12 +27,10 @@ class DecompressorTest : public ::testing::Test{
     }
   }
 
-  void RunTest(const char* codec_str) {
+  void RunTest(const char* codec) {
     scoped_ptr<Codec> compressor;
     scoped_ptr<Codec> decompressor;
     MemPool* mem_pool = new MemPool;
-    vector<char> codec(strlen(codec_str));
-    memcpy(&codec[0], codec_str, strlen(codec_str));
 
     EXPECT_TRUE(
         Codec::CreateCompressor(NULL, mem_pool, true, codec, &compressor).ok());

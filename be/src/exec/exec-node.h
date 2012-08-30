@@ -99,9 +99,9 @@ class ExecNode {
 
   int id() const { return id_; }
   const RowDescriptor& row_desc() const { return row_descriptor_; }
-  int rows_returned() const { return num_rows_returned_; }
-  int limit() const { return limit_; }
-  bool ReachedLimit() { return limit_ != -1 && num_rows_returned_ == limit_; }
+  int64_t rows_returned() const { return num_rows_returned_; }
+  int64_t limit() const { return limit_; }
+  bool ReachedLimit() { return limit_ != -1 && num_rows_returned_ >= limit_; }
 
   RuntimeProfile* runtime_profile() { return runtime_profile_.get(); }
   RuntimeProfile::Counter* memory_used_counter() const { return memory_used_counter_; }

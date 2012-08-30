@@ -28,8 +28,8 @@ using namespace boost;
 using namespace impala;
 
 HdfsTrevniScanner::HdfsTrevniScanner(HdfsScanNode* scan_node, RuntimeState* state,
-                                     Tuple* template_tuple, MemPool* mem_pool)
-    : HdfsScanner(scan_node, state, template_tuple, mem_pool),
+                                     MemPool* mem_pool)
+    : HdfsScanner(scan_node, state, mem_pool),
       decompressor_(NULL),
       compressed_data_pool_(new MemPool()),
       file_checksum_(false),
@@ -47,17 +47,19 @@ HdfsTrevniScanner::~HdfsTrevniScanner() {
 }
 
 Status HdfsTrevniScanner::Prepare() {
+  RETURN_IF_ERROR(HdfsScanner::Prepare());
   tuple_ = NULL;
   return Status::OK;
 }
 
 Status HdfsTrevniScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition,
-    HdfsScanRange* scan_range, Tuple* template_tuple, ByteStream* current_byte_stream) {
+    DiskIoMgr::ScanRange* scan_range, Tuple* template_tuple, 
+    ByteStream* current_byte_stream) {
   RETURN_IF_ERROR(HdfsScanner::InitCurrentScanRange(hdfs_partition,
       scan_range, template_tuple, current_byte_stream));
 
   // Trevni files are required to be in a single Hdfs block.
-  if (scan_range->offset_ != 0) {
+  if (scan_range->offset() != 0) {
     return FileReadError(
         "Bad scan range, offset != 0, Trevni files must be in a single block.");
   }
@@ -407,7 +409,7 @@ Status HdfsTrevniScanner::GetNext(RowBatch* row_batch, bool* eosr) {
     const vector<SlotDescriptor*>& materialized_slots = scan_node_->materialized_slots();
     vector<SlotDescriptor*>::const_iterator it;
 
-    InitTuple(tuple_);
+    InitTuple(template_tuple_, tuple_);
     TrevniColumnInfo* column = &column_info_[0];
     for (it = materialized_slots.begin();
          it != materialized_slots.end(); ++it, ++column) {
@@ -540,12 +542,9 @@ Status HdfsTrevniScanner::GetNext(RowBatch* row_batch, bool* eosr) {
     current_row->SetTuple(tuple_idx_, tuple_);
 
     // Evaluate the conjuncts and add the row to the batch
-    bool conjuncts_true = scan_node_->EvalConjunctsForScanner(current_row);
-
-    if (conjuncts_true) {
+    if (ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, current_row)) {
       row_batch->CommitLastRow();
       row_idx = RowBatch::INVALID_ROW_INDEX;
-      scan_node_->IncrNumRowsReturned();
       if (scan_node_->ReachedLimit() || row_batch->IsFull()) {
         tuple_ = NULL;
         break;

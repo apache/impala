@@ -15,8 +15,7 @@ namespace impala {
 // (tuples, rows, row batches).
 class HdfsTrevniScanner : public HdfsScanner {
  public:
-  HdfsTrevniScanner(HdfsScanNode* scan_node, RuntimeState* state,
-                    Tuple* template_tuple, MemPool* tuple_pool);
+  HdfsTrevniScanner(HdfsScanNode* scan_node, RuntimeState* state, MemPool* tuple_pool);
 
   virtual ~HdfsTrevniScanner();
   virtual Status Prepare();
@@ -141,8 +140,8 @@ class HdfsTrevniScanner : public HdfsScanner {
 
   // Initialises any state required at the beginning of a new scan range.
   virtual Status InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition,
-                                      HdfsScanRange* scan_range, Tuple* template_tuple,
-                                      ByteStream* byte_stream);
+                                      DiskIoMgr::ScanRange* scan_range, 
+                                      Tuple* template_tuple, ByteStream* byte_stream);
 
   // Read the current Trevni file header from the beginning of the file.
   // Verifies:

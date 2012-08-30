@@ -158,6 +158,12 @@ public class ImpaladClientExecutor {
         case FILE_BUFFER_SIZE:
           optionValue = String.valueOf(queryOptions.getFile_buffer_size());
           break;
+        case MAX_IO_BUFFERS:
+          optionValue = String.valueOf(queryOptions.getMax_io_buffers());
+          break;
+        case NUM_SCANNER_THREADS:
+          optionValue = String.valueOf(queryOptions.getNum_scanner_threads());
+          break;
         default:
           Preconditions.checkState(false, "Unhandled option:" + option.toString());
       }

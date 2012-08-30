@@ -59,6 +59,11 @@ Status HashJoinNode::Init(ObjectPool* pool, const TPlanNode& tnode) {
   return Status::OK;
 }
 
+HashJoinNode::~HashJoinNode() {
+  // probe_batch_ must be cleaned up in Close() to ensure proper resource freeing.
+  DCHECK(probe_batch_ == NULL);
+}
+
 Status HashJoinNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
 
@@ -93,6 +98,7 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
 
   // TODO: default buckets
   hash_tbl_.reset(new HashTable(build_exprs_, probe_exprs_, build_tuple_size_, false));
+  
   probe_batch_.reset(new RowBatch(row_descriptor_, state->batch_size()));
   
   LlvmCodeGen* codegen = state->llvm_codegen();
@@ -135,6 +141,8 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
 }
 
 Status HashJoinNode::Close(RuntimeState* state) {
+  // Must reset probe_batch_ in Close() to release resources
+  probe_batch_.reset(NULL);
   COUNTER_UPDATE(memory_used_counter_, build_pool_->peak_allocated_bytes());
   COUNTER_UPDATE(memory_used_counter_, hash_tbl_->byte_size());
   return ExecNode::Close(state);
@@ -167,14 +175,11 @@ Status HashJoinNode::Open(RuntimeState* state) {
     }
     VLOG_ROW << hash_tbl_->DebugString(true, &child(1)->row_desc());
 
-    if (eos) break;
-
     build_batch.Reset();
+    if (eos) break;
   }
   COUNTER_UPDATE(build_row_counter_, hash_tbl_->size());
   COUNTER_UPDATE(build_buckets_counter_, hash_tbl_->num_buckets());
-
-  RETURN_IF_ERROR(child(1)->Close(state));
 
   VLOG_ROW << hash_tbl_->DebugString(true, &child(1)->row_desc());
 
@@ -188,18 +193,25 @@ Status HashJoinNode::Open(RuntimeState* state) {
   // operation we do only touches the tuples that have been assigned.  Doesn't
   // show up as a perf hit.
   probe_batch_->ClearBatch();
-  RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_eos_));
   
-  COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
-  probe_batch_pos_ = 0;
-  if (probe_batch_->num_rows() == 0) {
-    DCHECK(probe_eos_);
-    eos_ = true;
-  } else {
-    current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
-    VLOG_ROW << "probe row: " << PrintRow(current_probe_row_, child(0)->row_desc());
-    matched_probe_ = false;
-    hash_tbl_iterator_ = hash_tbl_->Find(current_probe_row_);
+  while (true) {
+    RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_eos_));
+    COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
+    probe_batch_pos_ = 0;
+    if (probe_batch_->num_rows() == 0) {
+      if (probe_eos_) {
+        eos_ = true;
+        break;
+      }
+      probe_batch_->Reset();
+      continue;
+    } else {
+      current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
+      VLOG_ROW << "probe row: " << PrintRow(current_probe_row_, child(0)->row_desc());
+      matched_probe_ = false;
+      hash_tbl_iterator_ = hash_tbl_->Find(current_probe_row_);
+      break;
+    }
   }
 
   return Status::OK;
@@ -280,20 +292,34 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
     }
     
     if (probe_batch_pos_ == probe_batch_->num_rows()) {
-      // pass on pools, out_batch might still need them
-      probe_batch_->TransferTupleData(out_batch);
+      // pass on resources, out_batch might still need them
+      probe_batch_->TransferResourceOwnership(out_batch);
+      probe_batch_pos_ = 0;
+      if (out_batch->IsFull()) return Status::OK;
       // get new probe batch
       if (!probe_eos_) {
         probe_batch_->ClearBatch();
-        RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_eos_));
-        COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
-        probe_batch_pos_ = 0;
-        eos_ = (probe_batch_->num_rows() == 0);
+        while (true) {
+          RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_eos_));
+          if (probe_batch_->num_rows() == 0) {
+            if (probe_eos_) {
+              eos_ = true;
+              break;
+            }
+            probe_batch_->Reset();
+            continue;
+          } else {
+            COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
+            break;
+          }
+        }
       } else {
         eos_ = true;
       }
       // finish up right outer join
-      if (eos_ && match_all_build_) hash_tbl_iterator_ = hash_tbl_->Begin();
+      if (eos_ && match_all_build_) {
+        hash_tbl_iterator_ = hash_tbl_->Begin();
+      }
     }
 
     if (eos_) break;
@@ -329,7 +355,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
       }
     }
     // we're done if there are no more rows left to check
-    *eos = build_row == NULL;
+    *eos = !hash_tbl_iterator_.HasNext();
   }
   return Status::OK;
 }
@@ -340,10 +366,8 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
 
   while (!eos_) {
     // Compute max rows that should be added to out_batch
-    int max_added_rows = out_batch->capacity() - out_batch->num_rows();
-    if (limit() != -1) {
-      max_added_rows = min(max_added_rows, limit() - rows_returned());
-    }
+    int64_t max_added_rows = out_batch->capacity() - out_batch->num_rows();
+    if (limit() != -1) max_added_rows = min(max_added_rows, limit() - rows_returned());
     
     // Continue processing this row batch
     if (process_probe_batch_fn_ == NULL) {
@@ -362,7 +386,9 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
     
     // Check to see if we're done processing the current probe batch
     if (!hash_tbl_iterator_.HasNext() && probe_batch_pos_ == probe_batch_->num_rows()) {
-      probe_batch_->TransferTupleData(out_batch);
+      probe_batch_->TransferResourceOwnership(out_batch);
+      probe_batch_pos_ = 0;
+      if (out_batch->IsFull()) break;
       if (probe_eos_) {
         *eos = eos_ = true;
         break;
@@ -370,7 +396,6 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
         probe_batch_->ClearBatch();
         RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_eos_));
         COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
-        probe_batch_pos_ = 0;
       }
     }
   }
@@ -582,4 +607,3 @@ Function* HashJoinNode::CodegenProcessProbeBatch(LlvmCodeGen* codegen,
   
   return codegen->FinalizeFunction(process_probe_batch_fn);
 }
-

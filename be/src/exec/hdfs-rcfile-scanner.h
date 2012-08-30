@@ -218,13 +218,12 @@ class Tuple;
 // A scanner for reading RCFiles into tuples. 
 class HdfsRCFileScanner : public HdfsScanner {
  public:
-  HdfsRCFileScanner(HdfsScanNode* scan_node, RuntimeState* state,
-                    Tuple* template_tuple, MemPool* tuple_pool);
+  HdfsRCFileScanner(HdfsScanNode* scan_node, RuntimeState* state, MemPool* tuple_pool);
   virtual ~HdfsRCFileScanner();
   virtual Status GetNext(RowBatch* row_batch, bool* eos);
   virtual Status Prepare();
   virtual Status InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
-      HdfsScanRange* scan_range, Tuple* template_tuple, ByteStream* byte_stream);
+      DiskIoMgr::ScanRange* scan_range, Tuple* template_tuple, ByteStream* byte_stream);
 
   void DebugString(int indentation_level, std::stringstream* out) const;
 

@@ -2,7 +2,7 @@
 
 #include <boost/assign/list_of.hpp>
 #include "util/decompress.h"
-#include "exec/serde-utils.h"
+#include "exec/serde-utils.inline.h"
 #include "runtime/runtime-state.h"
 #include "gen-cpp/Descriptors_types.h"
 
@@ -55,7 +55,9 @@ Status GzipDecompressor::ProcessBlock(int input_length, uint8_t* input,
     stream_.next_out = reinterpret_cast<Bytef*>(out_buffer_);
     stream_.avail_out = buffer_length_;
 
-    if ((ret = inflate(&stream_, 1)) != Z_STREAM_END) {
+    ret = inflate(&stream_, 1);
+
+    if (ret != Z_STREAM_END) {
       if (ret == Z_OK) {
         // Not enough output space.
         DCHECK_EQ(*output_length, 0);
@@ -66,6 +68,7 @@ Status GzipDecompressor::ProcessBlock(int input_length, uint8_t* input,
         buffer_length_ *= 2;
         out_buffer_ = temp_memory_pool_.Allocate(buffer_length_);
         if (inflateReset(&stream_) != Z_OK) {
+          DCHECK(false);
           return Status("zlib inflateEnd failed: " + string(stream_.msg));
         }
         continue;
@@ -74,11 +77,14 @@ Status GzipDecompressor::ProcessBlock(int input_length, uint8_t* input,
     }
   }
   if (inflateReset(&stream_) != Z_OK) {
+          DCHECK(false);
     return Status("zlib inflateEnd failed: " + string(stream_.msg));
   }
 
   *output = out_buffer_;
-  if (*output_length == 0) *output_length = stream_.avail_out;
+  // stream_.avail_out is the number of bytes *left* in the out buffer, but
+  // we're interested in the number of bytes used.
+  if (*output_length == 0) *output_length = buffer_length_ - stream_.avail_out;
   if (use_temp) memory_pool_->AcquireData(&temp_memory_pool_, reuse_buffer_);
   return Status::OK;
 }

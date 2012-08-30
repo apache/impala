@@ -10,25 +10,26 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "exec/scan-node.h"
+#include "runtime/disk-io-mgr.h"
 
 namespace impala {
 
-class DescriptorTbl;
-class TPlanNode;
-class RowBatch;
-class Status;
-class TupleDescriptor;
-class MemPool;
-class Tuple;
-class SlotDescriptor;
-class Expr;
-class TextConverter;
-class TScanRange;
 class ByteStream;
-class HdfsScanNode;
-class HdfsPartitionDescriptor;
 class Compression;
-struct HdfsScanRange;
+class DescriptorTbl;
+class Expr;
+class HdfsPartitionDescriptor;
+class HdfsScanNode;
+class MemPool;
+class RowBatch;
+class ScanRangeContext;
+class SlotDescriptor;
+class Status;
+class TextConverter;
+class Tuple;
+class TupleDescriptor;
+class TPlanNode;
+class TScanRange;
 
 // Intermediate structure used for two pass parsing approach. In the first pass,
 // the FieldLocation structs are filled out and contain where all the fields start and
@@ -44,6 +45,8 @@ struct FieldLocation {
   static const char* LLVM_CLASS_NAME;
 };
 
+// TODO: Remove this comment when all scanners are updated to use IO mgr.  See
+// ScanRangeContext comments for how the io mgr based scanners work.
 // HdfsScanners are instantiated by an HdfsScanNode to parse file data in a particular
 // format into Impala's Tuple structures. They are an abstract class; the actual mechanism
 // for parsing bytes into tuples is format specific and supplied by subclasses.  This
@@ -53,8 +56,8 @@ struct FieldLocation {
 // HdfsByteStream. Management of any buffer space to stage those bytes is the
 // responsibility of the subclass.  The scan node also provides a template tuple
 // containing pre-materialised slots to initialise each tuple.
-// Subclasses must implement GetNext. They must also call scan_node_->IncrNumRowsReturned()
-// for every row they write.
+// Subclasses must implement GetNext. They must also call 
+// scan_node_->IncrNumRowsReturned() for every row they write.
 // The typical lifecycle is:
 //   1. Prepare
 //   2. InitCurrentScanRange
@@ -68,19 +71,21 @@ class HdfsScanner {
   const static int FILE_BLOCK_SIZE = 4096;
 
   // scan_node - parent scan node
-  // template_tuple - the default (i.e. partition key) tuple before
   // filling materialized slots
   // tuple_pool - mem pool owned by parent scan node for allocation
   // of tuple buffer data
-  HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state, 
-              Tuple* template_tuple, MemPool* tuple_pool);
+  HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state, MemPool* tuple_pool);
 
   virtual ~HdfsScanner();
 
   // Writes parsed tuples into tuple buffer,
   // and sets pointers in row_batch to point to them.
   // row_batch may be non-full when all scan ranges have been read
-  virtual Status GetNext(RowBatch* row_batch, bool* eos) = 0;
+  virtual Status GetNext(RowBatch* row_batch, bool* eos) { 
+    // TODO: remove when all scanners are updated
+    DCHECK(false);
+    return Status::OK;
+  }
 
   // One-time initialisation of state that is constant across scan ranges.
   virtual Status Prepare();
@@ -88,14 +93,32 @@ class HdfsScanner {
   // One-time initialisation of per-scan-range state.  The scanner objects are
   // reused for different scan ranges so this function must reset all state.
   virtual Status InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
-      HdfsScanRange* scan_range, Tuple* template_tuple, ByteStream* byte_stream);
+      DiskIoMgr::ScanRange* scan_range, Tuple* template_tuple, ByteStream* byte_stream);
 
+  // Process an entire scan range reading bytes from context.  Context is initialized
+  // with the scan range meta data (e.g. template tuple, partition descriptor, etc).
+  // This function should only return on error or end of scan range.
+  virtual Status ProcessScanRange(ScanRangeContext* context) {
+    // TODO: make this pure virtual when all scanners are updated.
+    return Status::OK;
+  }
+  
  protected:
   // For EvalConjunctsForScanner
   HdfsScanNode* scan_node_;
 
   // RuntimeState for error reporting
   RuntimeState* state_;
+
+  // Conjuncts for this scanner.  Multiple scanners from multiple threads can
+  // be scanning and Exprs are currently not thread safe.
+  std::vector<Expr*> conjuncts_mem_;
+
+  // Cache of &conjuncts[0] to avoid using vector functions.
+  Expr** conjuncts_;
+
+  // Cache of conjuncts_mem_.size()
+  int num_conjuncts_;
 
   // Contiguous block of memory into which tuples are written, allocated
   // from tuple_pool_. We don't allocate individual tuples from tuple_pool_ directly,
@@ -143,8 +166,8 @@ class HdfsScanner {
   bool has_noncompact_strings_;
 
   // The scan range currently being read
-  HdfsScanRange* current_scan_range_;
-
+  DiskIoMgr::ScanRange* current_scan_range_;
+  
   // Allocates a buffer from tuple_pool_ large enough to hold one
   // tuple for every remaining row in row_batch.  The tuple memory
   // is uninitialized.
@@ -156,6 +179,9 @@ class HdfsScanner {
   // Returns the number of tuples added to the row batch.
   int WriteEmptyTuples(RowBatch* row_batch, int num_tuples);
 
+  // Write empty tuples and commit them to the context object
+  int WriteEmptyTuples(ScanRangeContext* context, TupleRow* tuple_row, int num_tuples);
+
   // Report parse error for column @ desc
   void ReportColumnParseError(const SlotDescriptor* desc, const char* data, int len);
 
@@ -164,9 +190,9 @@ class HdfsScanner {
 
   // Initialize a tuple.
   // TODO: only copy over non-null slots.
-  void InitTuple(Tuple* tuple) {
-    if (template_tuple_ != NULL) {
-      memcpy(tuple, template_tuple_, tuple_byte_size_);
+  void InitTuple(Tuple* template_tuple, Tuple* tuple) {
+    if (template_tuple != NULL) {
+      memcpy(tuple, template_tuple, tuple_byte_size_);
     } else {
       memset(tuple, 0, sizeof(uint8_t) * num_null_bytes_);
     }

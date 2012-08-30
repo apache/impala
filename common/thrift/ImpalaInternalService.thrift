@@ -20,7 +20,7 @@ include "JavaConstants.thrift"
 struct TQueryOptions {
   1: required bool abort_on_error = 1
   2: required i32 max_errors = 0
-  3: required bool disable_codegen = 0
+  3: required bool disable_codegen = 1
   4: required i32 batch_size = 0
   
   // return_as_ascii is not listed in ImpalaService.ImpalaQueryOptions because Beeswax
@@ -34,6 +34,9 @@ struct TQueryOptions {
 
   7: required i64 max_scan_range_length = 0
   8: required i32 file_buffer_size = 0
+
+  9: required i32 num_scanner_threads = 0
+  10: required i32 max_io_buffers = 0
 }
 
 // Parameters for the execution of a plan fragment on a particular node.

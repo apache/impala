@@ -13,6 +13,7 @@
 #include "runtime/descriptors.h"
 #include "runtime/runtime-state.h"
 #include "runtime/timestamp-value.h"
+#include "util/cpu-info.h"
 #include "util/jni-util.h"
 
 #include <jni.h>
@@ -67,6 +68,16 @@ Status RuntimeState::Init(
   if (query_options.file_buffer_size <= 0) {
     query_options_.file_buffer_size = DEFAULT_FILE_BUFFER_SIZE;
   }
+  if (query_options_.max_io_buffers <= 0) {
+    query_options_.max_io_buffers = DEFAULT_MAX_IO_BUFFERS;
+  }
+  
+  if (query_options_.num_scanner_threads == 0) {
+    query_options_.num_scanner_threads = CpuInfo::num_cores();
+  }
+  
+  DCHECK_GT(query_options_.max_io_buffers, 0);
+  DCHECK_GT(query_options_.num_scanner_threads, 0);
   return Status::OK;
 }
 
@@ -104,4 +115,5 @@ void RuntimeState::LogErrorStream() {
   // Clear the ios error flags, if any.
   error_stream_.clear();
 }
+
 }

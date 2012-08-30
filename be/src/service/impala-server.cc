@@ -1077,13 +1077,19 @@ void ImpalaServer::QueryToTQueryRequest(const Query& query,
           case TImpalaQueryOptions::FILE_BUFFER_SIZE:
             request->queryOptions.file_buffer_size = atoi(key_value[1].c_str());
             break;
+          case TImpalaQueryOptions::MAX_IO_BUFFERS:
+            request->queryOptions.max_io_buffers = atoi(key_value[1].c_str());
+            break;
+          case TImpalaQueryOptions::NUM_SCANNER_THREADS:
+            request->queryOptions.num_scanner_threads = atoi(key_value[1].c_str());
+            break;
           default:
             // We hit this DCHECK(false) if we forgot to add the corresponding entry here
             // when we add a new query option.
             LOG(ERROR) << "Missing exec option implementation: " << kv_string;
             DCHECK(false);
             break;
-        }
+          }
       }
     }
     VLOG_QUERY << "TQueryRequest.queryOptions: "
@@ -1307,12 +1313,17 @@ void ImpalaServer::InitializeConfigVariables() {
       case TImpalaQueryOptions::FILE_BUFFER_SIZE:
         value << default_options.file_buffer_size;
         break;
+      case TImpalaQueryOptions::MAX_IO_BUFFERS:
+        value << default_options.max_io_buffers;
+        break;
+      case TImpalaQueryOptions::NUM_SCANNER_THREADS:
+        value << default_options.num_scanner_threads;
+        break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
         LOG(ERROR) << "Missing exec option implementation: " << itr->second;
         DCHECK(false);
-        break;
     }
     option.__set_key(itr->second);
     option.__set_value(value.str());

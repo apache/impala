@@ -68,7 +68,7 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
     output_batch->CommitLastRow();
   }
   num_rows_returned_ += i;
-  input_batch->TransferTupleData(output_batch);
+  input_batch->TransferResourceOwnership(output_batch);
   return Status::OK;
 }
 
@@ -78,4 +78,3 @@ void ExchangeNode::DebugString(int indentation_level, std::stringstream* out) co
   ExecNode::DebugString(indentation_level, out);
   *out << ")";
 }
-

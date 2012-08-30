@@ -6,50 +6,70 @@
 #include <vector>
 #include <memory>
 #include <stdint.h>
-#include <boost/regex.hpp>
+
 #include <boost/scoped_ptr.hpp>
+#include <boost/thread/condition_variable.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/recursive_mutex.hpp>
+#include <boost/thread/thread.hpp>
+
 #include <hdfs.h>
 
 #include "exec/scan-node.h"
-#include "exec/byte-stream.h"
-#include "exec/hdfs-scanner.h"
 #include "runtime/descriptors.h"
+#include "runtime/disk-io-mgr.h"
 #include "runtime/string-buffer.h"
 #include "gen-cpp/PlanNodes_types.h"
 
 namespace impala {
 
-class TScanRange;
+class ByteStream;
+class DescriptorTbl;
+class HdfsScanner;
 class RowBatch;
 class Status;
+class ScanRangeContext;
+class Tuple;
 class TPlanNode;
-class DescriptorTbl;
-class ByteStream;
+class TScanRange;
 
-struct HdfsScanRange {
-  int64_t offset_;
-  int64_t length_;
-
-  // Index into map of partitions in the related HdfsTableDescriptor
-  // May not be unique across tables.
-  int64_t partition_id_;
-
-  HdfsScanRange(const THdfsFileSplit& file_split)
-    : offset_(file_split.offset),
-      length_(file_split.length),
-      partition_id_(file_split.partitionId) {
-  }
+// Maintains per file information for files assigned to this scan node.  This includes 
+// all the scan ranges for the file as well as a lock which can be used when updating 
+// the file's metadata.
+struct HdfsFileDesc {
+  boost::mutex lock;
+  std::string filename;
+  std::vector<DiskIoMgr::ScanRange*> ranges;
+  HdfsFileDesc(const std::string& filename) : filename(filename) {}
 };
 
-// A ScanNode implementation that is used for all tables read directly
-// from HDFS-serialised data. An HdfsScanNode iterates over a set of
-// scan ranges, and constructs an appropriate HdfsScanner for each
-// one.  The scan node also deals with opening and closing files in
-// HDFS and passing them to the scanners it creates; this way files
-// can be cached across scan ranges.
+// A ScanNode implementation that is used for all tables read directly from 
+// HDFS-serialised data. 
+// A HdfsScanNode spawns multiple scanner threads to process the bytes in
+// parallel.  There is a handshake between the scan node and the scanners 
+// to get all the scan ranges queued and bytes processed.  
+// 1. The scan node initially calls the Scanner with a list of files and ranges 
+//    for that scanner/file format.
+// 2. The scanner issues the initial byte ranges for each of those files.  For text
+//    this is simply the entire range but for rc files, this would just be the header
+//    byte range.  The scan node doesn't care either way.
+// 3. Buffers for the issued ranges return and the scan node enqueues them to the
+//    scanner's ready buffer queue.  
+// 4. The scanner processes the buffers, issuing more byte ranges if necessary.
+// 5. The scanner finishes the scan range and informs the scan node so it can track
+//    end of stream.
+// TODO: this class currently throttles ranges sent to the io mgr.  This should be
+// updated to not have to do this once we can restrict the number of scanner threads
+// a better way.
+// TODO: this needs to be moved into the io mgr.  RegisterReader needs to take
+// another argument for max parallel ranges or something like that.
+// TODO: this class supports two types of scanners, TEXT and SEQUENCE which use
+// the io mgr and RCFILE and TREVNI which don't.  Remove the non io mgr path.
 class HdfsScanNode : public ScanNode {
  public:
   HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+
+  ~HdfsScanNode();
 
   // ExecNode methods
 
@@ -67,17 +87,14 @@ class HdfsScanNode : public ScanNode {
 
   virtual Status SetScanRange(const TScanRange& scan_range);
 
-  // Public so the scanner can call this.
-  bool EvalConjunctsForScanner(TupleRow* row) { 
-    return EvalConjuncts(&conjuncts_[0], conjuncts_.size(), row); 
-  }
+  // Methods for the scanners to use
+
+  Status CreateConjuncts(std::vector<Expr*>* exprs);
 
   int limit() const { return limit_; }
 
   bool compact_data() const { return compact_data_; }
   
-  const static int SKIP_COLUMN = -1;
-
   const std::vector<SlotDescriptor*>& materialized_slots()
       const { return materialized_slots_; }
 
@@ -87,10 +104,9 @@ class HdfsScanNode : public ScanNode {
   
   const TupleDescriptor* tuple_desc() { return tuple_desc_; }
 
-  // Scanners check the scan-node every row to see if the limit clause
-  // has been satisfied. Therefore they need to update the total
-  // number of rows seen directly in the scan node.
-  void IncrNumRowsReturned(int num_rows = 1) { num_rows_returned_ += num_rows; }
+  hdfsFS hdfs_connection() { return hdfs_connection_; }
+ 
+  DiskIoMgr::ReaderContext* reader_context() { return reader_context_; }
 
   RuntimeProfile::Counter* hdfs_read_timer() const { return hdfs_read_timer_; }
 
@@ -100,7 +116,52 @@ class HdfsScanNode : public ScanNode {
     return column_idx_to_materialized_slot_idx_[col_idx];
   }
 
+  // Adds a materialized row batch for the scan node.  This is called from scanner
+  // threads.
+  void AddMaterializedRowBatch(RowBatch* row_batch);
+
+  // Allocate a new scan range object.  This is thread safe.
+  DiskIoMgr::ScanRange* AllocateScanRange(const char* file, int64_t len, int64_t offset,
+      int64_t partition_id, int disk_id);
+
+  // Adds a scan range to the disk io mgr queue.
+  void AddDiskIoRange(DiskIoMgr::ScanRange* range);
+
+  // Adds all ranges for file_desc to the io mgr queue.
+  void AddDiskIoRange(const HdfsFileDesc* file_desc);
+
+  // Scanners must call this when an entire file is queued.
+  void FileQueued(const char* filename);
+
+  // Allocates and initialises template_tuple_ with any values from
+  // the partition columns for the current scan range
+  Tuple* InitTemplateTuple(RuntimeState* state, const std::vector<Expr*>& expr_values);
+
+  // Returns the file desc for 'filename'.  Returns NULL if filename is invalid.
+  HdfsFileDesc* GetFileDesc(const std::string& filename);
+
+  // Gets scanner specific metadata for 'filename'.  Scanners can use this to store
+  // file header information.
+  // Returns NULL if there is no metadata.
+  // This is thread safe.
+  void* GetFileMetadata(const std::string& filename);
+
+  // Sets the scanner specific metadata for 'filename'.
+  // This is thread safe.
+  void SetFileMetadata(const std::string& filename, void* metadata);
+
+  // Called by the scanner when a range is complete.  Used to log progress.
+  void RangeComplete();
+
+  const static int SKIP_COLUMN = -1;
+
  private:
+  // Cache of the plan node.  This is needed to be able to create a copy of
+  // the conjuncts per scanner since our Exprs are not thread safe.
+  boost::scoped_ptr<TPlanNode> thrift_plan_node_;
+
+  RuntimeState* runtime_state_;
+
   // Tuple id resolved in Prepare() to set tuple_desc_;
   int tuple_id_;
 
@@ -108,6 +169,9 @@ class HdfsScanNode : public ScanNode {
   // We try to avoid the overhead copying strings if the data will just
   // stream to another node that will release the memory.
   bool compact_data_;
+
+  // ReaderContext object to use with the disk-io-mgr
+  DiskIoMgr::ReaderContext* reader_context_;
 
   // Descriptor for tuples this scan node constructs
   const TupleDescriptor* tuple_desc_;
@@ -120,17 +184,18 @@ class HdfsScanNode : public ScanNode {
   // but owned here.
   boost::scoped_ptr<MemPool> tuple_pool_;
 
-  // Map from filename to list of scan ranges, to that we can iterate
-  // over all scan ranges for a particular file efficiently
-  typedef std::map<std::string, std::vector<HdfsScanRange> > ScanRangeMap;
-
+  // Files and their scan ranges
+  typedef std::map<std::string, HdfsFileDesc*> ScanRangeMap;
   ScanRangeMap per_file_scan_ranges_;
-
+  
   // Points at the (file, [scan ranges]) pair currently being processed
   ScanRangeMap::iterator current_file_scan_ranges_;
 
   // The index of the current scan range in the current file's scan range list
   int current_range_idx_;
+
+  // Number of files that have not been issued from the scanners.
+  int num_unqueued_files_;
 
   // Connection to hdfs, established in Open() and closed in Close().
   hdfsFS hdfs_connection_;
@@ -153,16 +218,6 @@ class HdfsScanNode : public ScanNode {
   // current file / scan-range combination.
   boost::scoped_ptr<ByteStream> current_byte_stream_;
 
-  // Tuple containing only materialized partition keys.  In the case where there
-  // are only partition key slots, this tuple ptr is directly stored in tuple rows.
-  // In the case where there are other slots, this template is copied into a new tuple
-  // before the other slots are written.  In this case, the address of template_tuple_
-  // can not change as the value is baked into the codegen'd functions.
-  Tuple* template_tuple_;
-
-  // Pool for allocating partition key tuple and string buffers
-  boost::scoped_ptr<MemPool> partition_key_pool_;
-
   // Total number of partition slot descriptors, including non-materialized ones.
   int num_partition_keys_;
 
@@ -181,15 +236,100 @@ class HdfsScanNode : public ScanNode {
 
   // Time spent reading from hdfs
   RuntimeProfile::Counter* hdfs_read_timer_;      
+ 
+  // Thread that constantly reads from the disk io mgr and queues the work on the
+  // context for that scan range.
+  boost::scoped_ptr<boost::thread> disk_read_thread_;
+ 
+  // Number of scanner threads to use
+  int num_scanner_threads_;
 
+  // Total number of scan ranges assigned to this scan node.  Used to report progress.
+  int total_scan_ranges_;     
+
+  // The number of scan ranges that have finished.  Used to report progress.
+  int num_ranges_finished_;
+
+  // Scanner specific per file metadata (e.g. header information) and associated lock.
+  boost::mutex metadata_lock_;
+  std::map<std::string, void*> per_file_metadata_;
+
+  // Thread group for all scanner worker threads
+  boost::thread_group scanner_threads_;
+
+  // Lock and condition variable protecting materialized_row_batches_.  Row batches
+  // are produced by the scanner threads and consumed by the main thread in GetNext
+  // Lock to protect materialized_row_batches_
+  boost::mutex row_batches_lock_;
+  boost::condition_variable row_batch_added_cv_;
+  std::list<RowBatch*> materialized_row_batches_;
+
+  // Flag signaling that all scanner threads are done.  This could be because they
+  // are finished, an error/cancellation occurred, or the limit was reached.
+  // Setting this to true triggers the scanner threads to clean up.
+  bool done_;
+
+  // Lock protects access between scanner thread and main query thread (the one calling
+  // GetNext()) for all fields below.  If this lock and one of the condition variable
+  // locks needs to be take together, this lock must be taken first.
+  boost::recursive_mutex lock_;
+
+  // Pool for allocating partition key tuple and string buffers
+  boost::scoped_ptr<MemPool> partition_key_pool_;
+
+  // The queue of all ranges that the scanners want to issue.
+  std::vector<DiskIoMgr::ScanRange*> all_ranges_;
+
+  // The next idx (in all_ranges_) that should be issued.
+  int next_range_to_issue_idx_;
+
+  // If true, all ranges have been queued by the scanners.  They haven't necessarily
+  // made it to the io mgr yet though.
+  bool all_ranges_in_queue_;
+  
+  // The number of ranges in flight in the io mgr.
+  int ranges_in_flight_;
+
+  // If true, all ranges have been sent to the io mgr.
+  bool all_ranges_issued_;
+
+  // Mapping of hdfs scan range to the scan range context for processing it.  
+  typedef std::map<const DiskIoMgr::ScanRange*, ScanRangeContext*> ContextMap;
+  ContextMap contexts_;
+
+  // Status of failed operations.  This is set asynchronously in DiskThread and
+  // ScannerThread.  Returned in GetNext() if an error occurred.  An non-ok
+  // status triggers cleanup of the disk and scanner threads.
+  Status status_;
+
+  // Issue the next set of queued ranges to the io mgr.  This is used to throttle
+  // the number of scan ranges being parsed to the number of scanner threads.
+  Status IssueMoreRanges();
+  
   // Called once per scan-range to initialise (potentially) a new byte
   // stream and to call the same method on the current scanner.
   Status InitNextScanRange(RuntimeState* state, bool* scan_ranges_finished);
 
-  // Allocates and initialises template_tuple_ with any values from
-  // the partition columns for the current scan range
-  void InitTemplateTuple(RuntimeState* state, const std::vector<Expr*>& expr_values);
+  // Gets a scanner for the file type for this partition, creating one if none
+  // exists.
+  // TODO: remove when all scanners are updated.
+  HdfsScanner* GetScanner(HdfsPartitionDescriptor*);
 
+  // Create a new scanner for this partition type and initialize it.
+  HdfsScanner* CreateScanner(HdfsPartitionDescriptor*);
+
+  // Main function for disk thread which reads from the io mgr and pushes read
+  // buffers to the scan range context.  This thread spawns new scanner threads
+  // for each new context.
+  void DiskThread();
+
+  // Start a new scanner thread for this range with the initial 'buffer'.
+  void StartNewScannerThread(DiskIoMgr::BufferDescriptor* buffer);
+
+  // Main function for scanner thread.  This simply delegates to the scanner
+  // to process the range.  This thread terminates when the scan range is complete
+  // or an error occurred.
+  void ScannerThread(HdfsScanner* scanner, ScanRangeContext*);
 };
 
 }

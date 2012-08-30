@@ -191,6 +191,14 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * on the children.
    */
   public void finalize(Analyzer analyzer) throws InternalException {
+    if (this instanceof HashJoinNode && children.get(0) instanceof HdfsScanNode) {
+      PlanNode leftChild = children.get(0);
+      for (TupleId tid: rowTupleIds) {
+        if (!leftChild.rowTupleIds.contains(tid)) {
+          leftChild.rowTupleIds.add(tid);
+        }
+      }
+    }
     for (PlanNode child: children) {
       child.finalize(analyzer);
     }

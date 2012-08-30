@@ -347,6 +347,11 @@ class RowDescriptor {
   // of the tuple ids of other_desc.
   bool IsPrefixOf(const RowDescriptor& other_desc) const;
 
+  // Return true if the tuple ids of this descriptor match tuple ids of other desc.
+  bool Equals(const RowDescriptor& other_desc) const;
+
+  std::string DebugString() const;
+
  private:
   // map from position of tuple w/in row to its descriptor
   std::vector<TupleDescriptor*> tuple_desc_map_;

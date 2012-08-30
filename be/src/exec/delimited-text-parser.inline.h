@@ -1,6 +1,9 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #include "delimited-text-parser.h"
+#include "util/cpu-info.h"
+
+#include "util/cpu-info.h"
 
 namespace impala {
 

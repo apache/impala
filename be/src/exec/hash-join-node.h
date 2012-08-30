@@ -33,6 +33,8 @@ class HashJoinNode : public ExecNode {
  public:
   HashJoinNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
+  ~HashJoinNode();
+
   virtual Status Prepare(RuntimeState* state);
   virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);

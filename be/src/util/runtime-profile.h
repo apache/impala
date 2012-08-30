@@ -46,9 +46,18 @@ class RuntimeProfile {
  public:
   class Counter {
    public:
+    Counter(TCounterType::type type, int64_t value = 0) :
+      value_(value),
+      type_(type) {
+    }
+
     void Update(int64_t delta) { value_ += delta; }
 
     void Set(int64_t value) { value_ = value; }
+
+    void SetRate(double value) {
+      value_ = *reinterpret_cast<int64_t*>(&value);
+    }
 
     int64_t value() const { return value_; }
 
@@ -56,11 +65,6 @@ class RuntimeProfile {
 
    private:
     friend class RuntimeProfile;
-
-    Counter(TCounterType::type type, int64_t value = 0) :
-      value_(value),
-      type_(type) {
-    }
 
     int64_t value_;
     TCounterType::type type_;

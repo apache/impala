@@ -10,6 +10,7 @@
 #include "exec/text-converter.h"
 #include "exec/hdfs-byte-stream.h"
 #include "exec/hdfs-scan-node.h"
+#include "exec/scan-range-context.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
 #include "runtime/hdfs-fs-cache.h"
@@ -34,7 +35,7 @@ using namespace impala;
 const char* FieldLocation::LLVM_CLASS_NAME = "struct.impala::FieldLocation";
 
 HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state, 
-                         Tuple* template_tuple, MemPool* tuple_pool)
+                         MemPool* tuple_pool)
     : scan_node_(scan_node),
       state_(state),
       tuple_buffer_(NULL),
@@ -44,7 +45,7 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state,
       tuple_(NULL),
       num_errors_in_file_(0),
       current_byte_stream_(NULL),
-      template_tuple_(template_tuple),
+      template_tuple_(NULL),
       has_noncompact_strings_(!scan_node->compact_data() &&
                               !scan_node->tuple_desc()->string_slots().empty()),
       current_scan_range_(NULL),
@@ -57,6 +58,15 @@ HdfsScanner::~HdfsScanner() {
 Status HdfsScanner::Prepare() {
   // TODO(marcel): add int tuple_idx_[] indexed by TupleId somewhere in runtime-state.h
   tuple_idx_ = 0;
+
+  // Create a copy of the conjuncts. Exprs are not thread safe (they store results 
+  // inside the expr) so each scanner needs its own copy.
+  // TODO: fix exprs
+  RETURN_IF_ERROR(scan_node_->CreateConjuncts(&conjuncts_mem_));
+  if (conjuncts_mem_.size() > 0) {
+    conjuncts_ = &conjuncts_mem_[0];
+  }
+  num_conjuncts_ = conjuncts_mem_.size();
   return Status::OK;
 }
 
@@ -72,7 +82,7 @@ void HdfsScanner::AllocateTupleBuffer(RowBatch* row_batch) {
 }
 
 Status HdfsScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
-    HdfsScanRange* range, Tuple* template_tuple, ByteStream* byte_stream) {
+    DiskIoMgr::ScanRange* range, Tuple* template_tuple, ByteStream* byte_stream) {
   // There is only one case where the scanner would get a new template_tuple
   // memory location.  Most of the time, the template_tuple is copied into
   // the tuple being materialized so the template tuple memory can be reused.  
@@ -82,8 +92,6 @@ Status HdfsScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition
   // not important but the address of template_tuple is baked into the codegen
   // functions.  In the case with no materialized slots, there is no codegen
   // function so it is not a problem.
-  DCHECK(scan_node_->materialized_slots().size() == 0 || 
-      template_tuple == template_tuple_);
   DCHECK(byte_stream != NULL);
   current_scan_range_ = range;
   template_tuple_ = template_tuple;
@@ -117,12 +125,11 @@ int HdfsScanner::WriteEmptyTuples(RowBatch* row_batch, int num_tuples) {
     
     TupleRow* current_row = row_batch->GetRow(row_idx);
     current_row->SetTuple(tuple_idx_, template_tuple_);
-    if (!scan_node_->EvalConjunctsForScanner(current_row)) {
+    if (!ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, current_row)) {
       return 0;
     }
     // Add first tuple
     row_batch->CommitLastRow();
-    scan_node_->IncrNumRowsReturned();
     --num_tuples;
 
     DCHECK_LE(num_tuples, row_batch->capacity() - row_batch->num_rows());
@@ -136,12 +143,41 @@ int HdfsScanner::WriteEmptyTuples(RowBatch* row_batch, int num_tuples) {
       row_batch->CommitLastRow();
     }
   } 
-  scan_node_->IncrNumRowsReturned(num_tuples);
+  return num_tuples;
+}
+
+// In this code path, no slots were materialized from the input files.  The only
+// slots are from partition keys.  This lets us simplify writing out the batches.
+//   1. template_tuple_ is the complete tuple.
+//   2. Eval conjuncts against the tuple.
+//   3. If it passes, stamp out 'num_tuples' copies of it into the row_batch.
+int HdfsScanner::WriteEmptyTuples(ScanRangeContext* context, 
+    TupleRow* row, int num_tuples) {
+  // Cap the number of result tuples up at the limit
+  if (scan_node_->limit() != -1) {
+    num_tuples = min(num_tuples,
+        static_cast<int>(scan_node_->limit() - scan_node_->rows_returned()));
+  }
+  if (num_tuples == 0) return 0;
+
+  if (template_tuple_ == NULL) {
+    return num_tuples;
+  } else {
+    row->SetTuple(tuple_idx_, template_tuple_);
+    if (!ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, row)) return 0;
+    row = context->next_row(row);
+
+    for (int n = 1; n < num_tuples; ++n) {
+      row->SetTuple(tuple_idx_, template_tuple_);
+      row = context->next_row(row);
+    }
+  } 
   return num_tuples;
 }
   
 void HdfsScanner::ReportColumnParseError(const SlotDescriptor* desc, 
     const char* data, int len) {
+  unique_lock<mutex> l(state_->errors_lock());
   if (state_->LogHasSpace()) {
     state_->error_stream()
       << "Error converting column: " 

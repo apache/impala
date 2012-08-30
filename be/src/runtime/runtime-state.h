@@ -20,6 +20,7 @@
 namespace impala {
 
 class DescriptorTbl;
+class DiskIoMgr;
 class ObjectPool;
 class Status;
 class ExecEnv;
@@ -50,9 +51,12 @@ class RuntimeState {
   int file_buffer_size() const { return query_options_.file_buffer_size; }
   bool abort_on_error() const { return query_options_.abort_on_error; }
   int max_errors() const { return query_options_.max_errors; }
+  int max_io_buffers() const { return query_options_.max_io_buffers; }
+  int num_scanner_threads() const { return query_options_.num_scanner_threads; }
   const TimestampValue* now() const { return now_.get(); }
   void set_now(const TimestampValue* now);
   const std::vector<std::string>& error_log() const { return error_log_; }
+  boost::mutex& errors_lock() { return errors_lock_; }
   std::stringstream& error_stream() { return error_stream_; }
   const std::vector<std::pair<std::string, int> >& file_errors() const {
     return file_errors_;
@@ -62,6 +66,7 @@ class RuntimeState {
   DataStreamMgr* stream_mgr() { return exec_env_->stream_mgr(); }
   HdfsFsCache* fs_cache() { return exec_env_->fs_cache(); }
   HBaseTableCache* htable_cache() { return exec_env_->htable_cache(); }
+  DiskIoMgr* io_mgr() { return exec_env_->disk_io_mgr(); }
   std::vector<std::string>& created_hdfs_files() { return created_hdfs_files_; }
   std::set<std::string>& updated_hdfs_partitions() { return updated_hdfs_partitions_; }
   std::vector<int64_t>& num_appended_rows() { return num_appended_rows_; }
@@ -99,9 +104,14 @@ class RuntimeState {
  private:
   static const int DEFAULT_BATCH_SIZE = 1024;
   static const int DEFAULT_FILE_BUFFER_SIZE = 1024 * 1024;
+  // This is the number of buffers per disk.
+  static const int DEFAULT_MAX_IO_BUFFERS = 3;
 
   DescriptorTbl* desc_tbl_;
   boost::scoped_ptr<ObjectPool> obj_pool_;
+
+  // Lock protecting error_stream_ and error_log_
+  boost::mutex errors_lock_;
 
   // A buffer for error messages.
   // The entire error stream is written to the error_log_ in log_error_stream().

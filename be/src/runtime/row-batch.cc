@@ -13,8 +13,9 @@ using namespace std;
 namespace impala {
 
 RowBatch::~RowBatch() {
-  if (own_tuple_ptrs_mem_) {
-    delete [] tuple_ptrs_;
+  delete [] tuple_ptrs_;
+  for (int i = 0; i < io_buffers_.size(); ++i) {
+    io_buffers_[i]->Return();
   }
 }
 
@@ -95,7 +96,6 @@ void RowBatch::Serialize(TRowBatch* output_batch) {
 RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch)
   : has_in_flight_row_(false),
     is_self_contained_(true),
-    own_tuple_ptrs_mem_(true),
     num_rows_(input_batch.num_rows),
     capacity_(num_rows_),
     num_tuples_per_row_(input_batch.row_tuples.size()),
@@ -152,6 +152,26 @@ int RowBatch::GetBatchSize(const TRowBatch& batch) {
     result += batch.tuple_data[i].size();
   }
   return result;
+}
+
+void RowBatch::Swap(RowBatch* other) {
+  DCHECK(row_desc_.Equals(other->row_desc_));
+  DCHECK_EQ(num_tuples_per_row_, other->num_tuples_per_row_);
+  DCHECK_EQ(tuple_ptrs_size_, other->tuple_ptrs_size_);
+
+  // The destination row batch should be empty.  
+  DCHECK(!has_in_flight_row_);
+  DCHECK(!is_self_contained_);
+  DCHECK(io_buffers_.empty());
+  DCHECK_EQ(tuple_data_pool_->GetTotalChunkSizes(), 0);
+
+  std::swap(has_in_flight_row_, other->has_in_flight_row_);
+  std::swap(is_self_contained_, other->is_self_contained_);
+  std::swap(num_rows_, other->num_rows_);
+  std::swap(capacity_, other->capacity_);
+  std::swap(tuple_ptrs_, other->tuple_ptrs_);
+  std::swap(io_buffers_, other->io_buffers_);
+  tuple_data_pool_.swap(other->tuple_data_pool_);
 }
 
 }

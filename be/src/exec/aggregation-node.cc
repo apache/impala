@@ -173,10 +173,10 @@ Status AggregationNode::Open(RuntimeState* state) {
     num_agg_rows += (hash_tbl_->size() - agg_rows_before);
     num_input_rows += batch.num_rows();
 
-    if (eos) break;
     batch.Reset();
+    if (eos) break;
   }
-  RETURN_IF_ERROR(children_[0]->Close(state));
+  
   if (singleton_output_tuple_ != NULL) {
     hash_tbl_->Insert(reinterpret_cast<TupleRow*>(&singleton_output_tuple_));
     ++num_agg_rows;

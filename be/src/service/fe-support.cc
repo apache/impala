@@ -34,6 +34,7 @@
 #include "service/impala-server.h"
 #include "testutil/test-exec-env.h"
 #include "util/cpu-info.h"
+#include "util/disk-info.h"
 #include "util/jni-util.h"
 #include "util/logging.h"
 #include "util/thrift-util.h"
@@ -65,6 +66,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
   InitGoogleLoggingSafe("fe-support");
   InitThriftLogging();
   CpuInfo::Init();
+  DiskInfo::Init();
   LlvmCodeGen::InitializeLlvm(true);
   // install libunwind before activating this on 64-bit systems:
   //google::InstallFailureSignalHandler();

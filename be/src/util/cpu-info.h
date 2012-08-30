@@ -58,6 +58,12 @@ class CpuInfo {
     return cycles_per_ms_;
   }
 
+  // Returns the number of cores (including hyper-threaded) on this machine.
+  static int num_cores() { 
+    DCHECK(initialized_);
+    return num_cores_; 
+  }
+
   static std::string DebugString();
 
  private:
@@ -66,7 +72,8 @@ class CpuInfo {
   static int64_t original_hardware_flags_;
   static long cache_sizes_[L3_CACHE + 1];
   static int64_t cycles_per_ms_;
+  static int num_cores_;
 };
+
 }
 #endif
-

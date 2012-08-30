@@ -25,7 +25,7 @@
 #include "exprs/string-literal.h"
 #include "codegen/llvm-codegen.h"
 #include "util/cpu-info.h"
-
+#include "util/disk-info.h"
 
 using namespace llvm;
 using namespace std;
@@ -2128,6 +2128,7 @@ int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
   ::testing::InitGoogleTest(&argc, argv);
   impala::CpuInfo::Init();
+  impala::DiskInfo::Init();
   impala::LlvmCodeGen::InitializeLlvm();
   return RUN_ALL_TESTS();
 }

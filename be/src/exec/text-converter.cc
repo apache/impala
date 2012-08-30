@@ -17,13 +17,12 @@ using namespace impala;
 using namespace llvm;
 using namespace std;
 
-TextConverter::TextConverter(char escape_char, MemPool* var_len_pool)
-  : escape_char_(escape_char),
-    var_len_pool_(var_len_pool) {
+TextConverter::TextConverter(char escape_char) 
+  : escape_char_(escape_char) {
 }
 
-void TextConverter::UnescapeString(StringValue* value) {
-  char* new_data = reinterpret_cast<char*>(var_len_pool_->Allocate(value->len));
+void TextConverter::UnescapeString(StringValue* value, MemPool* pool) {
+  char* new_data = reinterpret_cast<char*>(pool->Allocate(value->len));
   UnescapeString(value->ptr, new_data, &value->len);
   value->ptr = new_data;
 }

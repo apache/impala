@@ -4,16 +4,12 @@
 #define IMPALA_EXEC_SERDE_UTILS_H_
 
 #include <vector>
-#include <sstream>
-
-#include <hdfs.h>
-
 #include "common/status.h"
-#include "exec/byte-stream.h"
 
 namespace impala {
 
-class Status;
+class ByteStream;
+class ScanRangeContext;
 
 // SerDeUtils:
 // A collection of utility functions for deserializing
@@ -23,8 +19,41 @@ class Status;
 // Ref: http://download.oracle.com/javase/6/docs/api/java/io/DataInput.html
 // Ref: http://hadoop.apache.org/common/docs/current/api/org/apache/hadoop/io/Writable.html
 //
+// There are 3 version of some of the serde utilities.
+//  1. The buffer is known to be big enough, simply parse it for the value.
+//  2. The buffer if read from scan range context.  This blocks and waits for more
+//     bytes as needed (bytes are provided asynchronously by another thread).
+//  3. The operation is over a byte stream and the function will read more bytes as
+//     needed (synchronously).  TODO: this should be removed.
 class SerDeUtils {
-public:
+ public:
+  static const int MAX_VINT_LEN = 9;
+
+  // Get an Integer from a buffer.  The buffer does not have to be word aligned.
+  static int32_t GetInt(const uint8_t* buffer);
+
+  // Put an Integer into a buffer in "Hadoop format".  The buffer must be at least
+  // 4 bytes long.
+  static void PutInt(uint8_t* buf, int32_t integer);
+
+  // Get a variable-length Long value from a byte buffer.
+  static int GetVLong(uint8_t* buf, int64_t* vlong);
+  static int GetVInt(uint8_t* buf, int32_t* vint);
+
+  // Read a variable-length Long value from a byte buffer
+  // starting at the specified byte offset.
+  static int GetVLong(uint8_t* buf, int64_t offset, int64_t* vlong);
+
+  // Case 2 functions
+  static Status ReadBoolean(ScanRangeContext* context, bool* boolean);
+  static Status ReadInt(ScanRangeContext* context, int32_t* val);
+  static Status ReadVLong(ScanRangeContext* context, int64_t* val);
+  static Status ReadVInt(ScanRangeContext* context, int32_t* val);
+  static Status ReadBytes(ScanRangeContext* context, int length, uint8_t** buf);
+  static Status SkipBytes(ScanRangeContext* context, int length);
+  static Status ReadText(ScanRangeContext* context, uint8_t** buf, int* length);
+  static Status SkipText(ScanRangeContext* context);
+
   // Read a Boolean primitive value written using Java serialization.
   // Equivalent to java.io.DataInput.readBoolean()
   static Status ReadBoolean(ByteStream* byte_stream, bool* boolean);
@@ -33,39 +62,9 @@ public:
   // Equivalent to java.io.DataInput.readInt()
   static Status ReadInt(ByteStream* byte_stream, int32_t* integer);
 
-  // Get an Integer from a buffer.
-  static int32_t GetInt(uint8_t* buf) {
-    return (buf[0] << 24)
-        | (buf[1] << 16)
-        | (buf[2] << 8)
-        |  buf[3];
-  }
-
-  // Put an Integer into a buffer in "Hadoop format"
-  static void PutInt(uint8_t* buf, int32_t integer) {
-    buf[0] = integer >> 24;
-    buf[1] = integer >> 16;
-    buf[2] = integer >> 8;
-    buf[3] = integer;
-  }
-
   // Read a variable-length Long value written using Writable serialization.
   // Ref: org.apache.hadoop.io.WritableUtils.readVLong()
   static Status ReadVLong(ByteStream* byte_stream, int64_t* vlong);
-
-  // Get a variable-length Long value from a byte buffer.
-  static int GetVLong(uint8_t* buf, int64_t* vlong);
-  static int GetVInt(uint8_t* buf, int32_t* vint) {
-    int64_t vlong;
-    int len = GetVLong(buf, &vlong);
-    *vint = static_cast<int32_t>(vlong);
-    return len;
-  }
-
-
-  // Read a variable-length Long value from a byte buffer
-  // starting at the specified byte offset.
-  static int GetVLong(uint8_t* buf, int64_t offset, int64_t* vlong);
 
   // Read a variable length Integer value written using Writable serialization.
   // Ref: org.apache.hadoop.io.WritableUtils.readVInt()
@@ -73,10 +72,10 @@ public:
 
   // Read length bytes from an HDFS file into the supplied buffer.
   static Status ReadBytes(ByteStream* byte_stream, int64_t length,
-                          std::vector<uint8_t>* buf);
+      std::vector<uint8_t>* buf);
 
   static Status ReadBytes(ByteStream* byte_stream, int64_t length,
-                         uint8_t* buf);
+      uint8_t* buf);
 
   // Skip over the next length bytes in the specified HDFS file.
   static Status SkipBytes(ByteStream* byte_stream, int64_t length);
@@ -90,8 +89,9 @@ public:
 
   // Dump the first length bytes of buf to a Hex string.
   static std::string HexDump(const uint8_t* buf, int64_t length);
+  static std::string HexDump(const char* buf, int64_t length);
 
-private:
+ private:
   // Determines the sign of a VInt/VLong from the first byte.
   static bool IsNegativeVInt(int8_t byte);
 
@@ -102,4 +102,4 @@ private:
 
 } // namespace impala
 
-#endif // IMPALA_EXEC_SERDE_UTILS_H_
+#endif // IMPALA_EXEC_SERDE_UTIL

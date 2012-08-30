@@ -16,19 +16,14 @@ using namespace impala;
 // This function takes more arguments that is strictly necessary (they could be
 // computed inside this function) but this is done to minimize the clang dependencies,
 // specifically, calling function on the scan node.
-int HdfsTextScanner::WriteAlignedTuples(RowBatch* row_batch, FieldLocation* fields,
-    int num_tuples, int max_added_tuples, int slots_per_tuple, int row_idx_start) {
+int HdfsTextScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row, int row_size, 
+    FieldLocation* fields, int num_tuples, int max_added_tuples, 
+    int slots_per_tuple, int row_idx_start) {
   
   DCHECK(tuple_ != NULL);
-  // Reserve tuple rows from the batch.  num_tuples will never overflow the
-  // batch because we never parse for more slots than we can handle.
-  int row_idx = row_batch->AddRows(num_tuples);
-  DCHECK(row_idx != RowBatch::INVALID_ROW_INDEX);
-
-  uint8_t* tuple_row_mem = reinterpret_cast<uint8_t*>(row_batch->GetRow(row_idx));
+  uint8_t* tuple_row_mem = reinterpret_cast<uint8_t*>(tuple_row);
   uint8_t* tuple_mem = reinterpret_cast<uint8_t*>(tuple_);
   Tuple* tuple = reinterpret_cast<Tuple*>(tuple_mem);
-  TupleRow* tuple_row = reinterpret_cast<TupleRow*>(tuple_row_mem);
 
   uint8_t error[slots_per_tuple];
   memset(error, 0, sizeof(error));
@@ -40,10 +35,10 @@ int HdfsTextScanner::WriteAlignedTuples(RowBatch* row_batch, FieldLocation* fiel
     uint8_t error_in_row = false;
     // Materialize a single tuple.  This function will be replaced by a codegen'd
     // function.
-    if (WriteCompleteTuple(fields, tuple, tuple_row, error, &error_in_row)) {
+    if (WriteCompleteTuple(pool, fields, tuple, tuple_row, error, &error_in_row)) {
       ++tuples_returned;
       tuple_mem += tuple_byte_size_;
-      tuple_row_mem += row_batch->row_byte_size();
+      tuple_row_mem += row_size;
       tuple = reinterpret_cast<Tuple*>(tuple_mem);
       tuple_row = reinterpret_cast<TupleRow*>(tuple_row_mem);
     }
@@ -63,13 +58,7 @@ int HdfsTextScanner::WriteAlignedTuples(RowBatch* row_batch, FieldLocation* fiel
       break;
     }
   }
-
-  // Commit all the tuples that were materialized to the row batch
-  row_batch->CommitRows(tuples_returned);
-
-  // Update tuple_ for next batch
-  tuple_ = reinterpret_cast<Tuple*>(tuple_mem);
-
+  
   return tuples_returned;
 }
 

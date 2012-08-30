@@ -49,6 +49,8 @@ DEFINE_int32(file_buffer_size, 0,
 DEFINE_int32(max_scan_range_length, 0,
     "maximum length of the scan range; only applicable to HDFS scan range; a length of 0"
     " indicates backend default");
+DEFINE_int32(num_scanner_threads, 1,
+    "number of scanner threads to use in the backend.");
 DEFINE_bool(abort_on_error, false, "if true, abort query when encountering any error");
 DEFINE_int32(max_errors, 100, "number of errors to report");
 DEFINE_int32(num_nodes, 1,
@@ -56,7 +58,7 @@ DEFINE_int32(num_nodes, 1,
     "0 = run in # of data nodes + 1 for coordinator");
 DECLARE_int32(be_port);
 // TODO: we probably want to add finer grain control of what is codegen'd
-DEFINE_bool(enable_jit, true, "if true, enable codegen for query execution");
+DEFINE_bool(enable_jit, false, "if true, enable codegen for query execution");
 DECLARE_string(host);
 
 using namespace std;
@@ -121,6 +123,7 @@ Status InProcessQueryExecutor::Exec(const string& query,
   query_options.num_nodes = FLAGS_num_nodes;
   query_options.file_buffer_size = FLAGS_file_buffer_size;
   query_options.max_scan_range_length = FLAGS_max_scan_range_length;
+  query_options.num_scanner_threads = FLAGS_num_scanner_threads;
 
   try {
     COUNTER_SCOPED_TIMER(plan_gen_counter);
