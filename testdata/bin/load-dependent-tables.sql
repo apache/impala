@@ -30,11 +30,11 @@ FROM alltypes
 WHERE year=2009 and month=1;
 
 ALTER TABLE alltypesmixedformat SET FILEFORMAT SEQUENCEFILE;
-LOAD DATA INPATH '${hiveconf:hive.metastore.warehouse.dir}/alltypes_seq/year=2009/month=2/'
+LOAD DATA INPATH '/tmp/alltypes_seq/year=2009/month=2/'
 OVERWRITE INTO TABLE alltypesmixedformat PARTITION (year=2009, month=2);
 
 ALTER TABLE alltypesmixedformat SET FILEFORMAT RCFILE;
-LOAD DATA INPATH '${hiveconf:hive.metastore.warehouse.dir}/alltypes_rc/year=2009/month=3/'
+LOAD DATA INPATH '/tmp/alltypes_rc/year=2009/month=3/'
 OVERWRITE INTO TABLE alltypesmixedformat PARTITION (year=2009, month=3);
 
 
