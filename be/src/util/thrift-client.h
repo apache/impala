@@ -3,6 +3,7 @@
 #ifndef IMPALA_UTIL_THRIFT_CLIENT_H
 #define IMPALA_UTIL_THRIFT_CLIENT_H
 
+#include <ostream>
 #include <sstream>
 #include <boost/shared_ptr.hpp>
 #include <common/status.h>
@@ -17,6 +18,7 @@
 
 #include "util/thrift-server.h"
 #include "util/authorization.h"
+#include "gen-cpp/Types_types.h"
 
 DECLARE_string(principal);
 DECLARE_string(hostname);

@@ -32,6 +32,7 @@ using impala::Metrics;
 
 DECLARE_int32(rpc_cnxn_attempts);
 DECLARE_int32(rpc_cnxn_retry_interval_ms);
+DECLARE_int32(state_store_max_missed_heartbeats);
 
 namespace sparrow {
 
@@ -74,20 +75,30 @@ class StateStoreTest : public testing::Test {
   vector<shared_ptr<StateStoreSubscriber> > subscribers_;
 
   StateStoreTest() 
-      : metrics_(new Metrics()), state_store_(new StateStore(1000L, metrics_.get())) {
+      : metrics_(new Metrics()), state_store_(new StateStore(250L, metrics_.get())) {
     state_store_host_port_.ipaddress = "127.0.0.1";
     state_store_host_port_.port = next_port_++;
     FLAGS_rpc_cnxn_attempts = 1;
     FLAGS_rpc_cnxn_retry_interval_ms = 100;
+    FLAGS_state_store_max_missed_heartbeats = 2;
+
+    // Required so that StopForTesting works for failure testing. Can be removed
+    // when we move onto Thrift 0.9.x
+    FLAGS_use_nonblocking = false;
   }
 
   virtual void SetUp() {
+    LOG(INFO) << "SETTING UP";
     impala::InitThriftLogging();
     state_store_->Start(state_store_host_port_.port);
     Status status =
       impala::WaitForServer(state_store_host_port_.ipaddress,
                             state_store_host_port_.port, 3, 500);
     EXPECT_TRUE(status.ok());
+  }
+
+  virtual void TearDown() {
+    state_store_->Stop();
   }
 
   shared_ptr<StateStoreSubscriber> StartStateStoreSubscriber() {
@@ -161,6 +172,71 @@ class StateStoreTest : public testing::Test {
     // subscrition is unregistered) in its destructor.
     UnregisterAllSubscribers();
   }
+
+  // Confirms that if a single subscriber fails, it is removed from the list of
+  // registered services.
+  void VerifySingleFailure(int num_registered_subscribers) {
+    const string service_id = "test_service";
+    shared_ptr<StateStoreSubscriber> running_subscriber = StartStateStoreSubscriber();
+    shared_ptr<StateStoreSubscriber> listening_subscriber = StartStateStoreSubscriber();
+
+    // Address where service_id is running.
+    THostPort service_address;
+    service_address.ipaddress = ipaddress_;
+    service_address.port = next_port_++;
+    // We expect the membership to include just one running instance of service_id.
+    UpdateCondition update_condition;
+    update_condition.expected_state[service_id].membership = Membership();
+    const SubscriberId expected_assigned_id = num_registered_subscribers + 1;
+    update_condition.expected_state[service_id].membership[expected_assigned_id] =
+        service_address;
+    SubscriptionManager::UpdateCallback update_callback(
+        bind(&StateStoreTest::Update, &update_condition, _1));
+
+    // Register the listening_subscriber to receive updates.
+    unordered_set<string> update_services;
+    update_services.insert(service_id);
+    SubscriptionId id;
+    Status status = listening_subscriber->RegisterSubscription(update_services,
+                                                               &update_callback, &id);
+    EXPECT_TRUE(status.ok());
+
+    // Register a running service on running_subscriber, and wait for the
+    // listening_subscriber to receive the update.
+    status = running_subscriber->RegisterService(service_id, service_address);
+    EXPECT_TRUE(status.ok());
+
+    {
+      // Wait for a single backend to show up
+      unique_lock<mutex> lock(update_condition.mut);
+      system_time timeout = get_system_time() + posix_time::seconds(30);
+      while (!update_condition.correctly_called) {
+        ASSERT_TRUE(update_condition.condition.timed_wait(lock, timeout));
+      }
+    }
+
+    // Now kill the running subscriber
+    running_subscriber->server_->StopForTesting();
+    running_subscriber->server_->Join();
+
+    {
+      // Update the expected condition to show no backends
+      unique_lock<mutex> lock(update_condition.mut);
+      update_condition.expected_state = ServiceStateMap();
+      update_condition.correctly_called = false;
+    }
+
+    {
+      // Wait for the backend to be removed. 
+      unique_lock<mutex> lock(update_condition.mut);
+      system_time timeout = get_system_time() + posix_time::seconds(30);
+      while (!update_condition.correctly_called) {
+        ASSERT_TRUE(update_condition.condition.timed_wait(lock, timeout));
+      }
+    }
+
+    listening_subscriber->UnregisterAll();
+  }
 };
 
 const char* StateStoreTest::ipaddress_ = "127.0.0.1";
@@ -169,6 +245,10 @@ int StateStoreTest::next_port_ = 23000;
 TEST_F(StateStoreTest, SingleRegister) {
   VerifySingleRegisterWorks(0);
 };
+
+TEST_F(StateStoreTest, SingleFailure) {
+  VerifySingleFailure(0);
+}
 
 TEST_F(StateStoreTest, MultipleServiceRegister) {
   const string service1 = "test_service_1";

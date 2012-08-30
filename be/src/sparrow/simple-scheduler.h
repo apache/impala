@@ -43,11 +43,9 @@ class SimpleScheduler : public Scheduler {
   // If no match is found for a data location, assign the data location in round-robin
   // order to any of the backends.
   // If the set of available hosts is updated between calls, round-robin state is reset.
-  virtual impala::Status GetHosts(
-      const std::vector<impala::THostPort>& data_locations,
-      std::vector<std::pair<std::string, int> >* hostports);
+  virtual impala::Status GetHosts(const HostList& data_locations, HostList* hostports);
 
-  virtual void GetAllKnownHosts(std::vector<std::pair<std::string, int> >* hostports);
+  virtual void GetAllKnownHosts(HostList* hostports);
 
   // Registers with the subscription manager if required
   virtual impala::Status Init();

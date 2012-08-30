@@ -134,20 +134,19 @@ void ThriftServer::ThriftServerEventProcessor::Supervise() {
   } catch (TException& e) {
     LOG(ERROR) << "ThriftServer '" << thrift_server_->name_ << "' (on port: "
                << thrift_server_->port_ << ") exited due to TException: " << e.what();
-
-    {
-      // signal_lock_ ensures mutual exclusion of access to thrift_server_
-      lock_guard<mutex> lock(signal_lock_);
-      thrift_server_->started_ = false;
-
-      // There may not be anyone waiting on this signal (if the
-      // exception occurs after startup). That's not a problem, this is
-      // just to avoid waiting for the timeout in case of a bind
-      // failure, for example.
-      signal_fired_ = true;
-    }
-    signal_cond_.notify_all();
   }
+  {
+    // signal_lock_ ensures mutual exclusion of access to thrift_server_
+    lock_guard<mutex> lock(signal_lock_);
+    thrift_server_->started_ = false;
+
+    // There may not be anyone waiting on this signal (if the
+    // exception occurs after startup). That's not a problem, this is
+    // just to avoid waiting for the timeout in case of a bind
+    // failure, for example.
+    signal_fired_ = true;
+  }
+  signal_cond_.notify_all();
 }
 
 void ThriftServer::ThriftServerEventProcessor::preServe() {
@@ -330,6 +329,10 @@ Status ThriftServer::Start() {
 
   DCHECK(started_);
   return Status::OK;
+}
+
+void ThriftServer::StopForTesting() {
+  server_->stop();
 }
 
 void ThriftServer::Join() {

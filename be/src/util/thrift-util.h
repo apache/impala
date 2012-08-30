@@ -86,6 +86,12 @@ Status WaitForLocalServer(const ThriftServer& server, int num_retries,
 Status WaitForServer(const std::string& host, int port, int num_retries,
    int retry_interval_ms);
 
+// Utility method to print address as address:port
+void THostPortToString(const THostPort& address, std::string* out);
+
+// Prints a hostport as ipaddress:port
+std::ostream& operator<<(std::ostream& out, THostPort& hostport);
+
 }
 
 #endif

@@ -8,6 +8,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/sparrow")
 
 add_library(Sparrow STATIC
   util.cc
+  failure-detector.cc
   simple-scheduler.cc
   state-store-service.cc
   state-store-subscriber-service.cc

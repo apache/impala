@@ -23,6 +23,7 @@ using namespace apache::thrift::server;
 using sparrow::SimpleScheduler;
 using sparrow::SubscriptionManager;
 using sparrow::StateStore;
+using sparrow::Scheduler;
 
 namespace impala {
 
@@ -106,11 +107,11 @@ Status TestExecEnv::StartBackends() {
   subscription_mgr_->Start();
   scheduler_->Init();
 
-  // Wait until we see all the backends registered, or timeout if 5s pass
-  vector<pair<string, int> > host_ports;
+  Scheduler::HostList host_ports;
   const int NUM_RETRIES = 100;
   const int POLL_INTERVAL_MS = 50;
 
+  // Wait until we see all the backends registered, or timeout if 5s pass
   for (int i = 1; i <= NUM_RETRIES; ++i) {
     scheduler_->GetAllKnownHosts(&host_ports);
 

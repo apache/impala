@@ -80,15 +80,16 @@ TEST_F(SimpleSchedulerTest, LocalMatches) {
     data_locations.at(i).ipaddress = "host_1";
     data_locations.at(i).port = 0;
   }
-  vector<pair<string, int> > hostports;
+  SimpleScheduler::HostList hostports;
 
   local_remote_scheduler_->GetHosts(data_locations, &hostports);
 
   // Expect 5 round robin hostports
   EXPECT_EQ(5, hostports.size());
   for (int i = 0; i < 5; ++i) {
-    EXPECT_EQ(hostports.at(i).first, "host_1");
-    EXPECT_EQ(hostports.at(i).second, base_port_ + i % 2);
+    // Note mismatch; not really an ipaddress but what we put in is what comes out.
+    EXPECT_EQ(hostports.at(i).ipaddress, "host_1");
+    EXPECT_EQ(hostports.at(i).port, base_port_ + i % 2);
   }
 }
 
@@ -101,7 +102,7 @@ TEST_F(SimpleSchedulerTest, NonLocalHost) {
     data_locations.at(i).ipaddress = "non exists ipaddress";
     data_locations.at(i).port = 0;
   }
-  vector<pair<string, int> > hostports;
+  SimpleScheduler::HostList hostports;
 
   local_remote_scheduler_->GetHosts(data_locations, &hostports);
 
@@ -112,16 +113,16 @@ TEST_F(SimpleSchedulerTest, NonLocalHost) {
   // 4. host_1:1001
   // 5. host_0:1000
   EXPECT_EQ(5, hostports.size());
-  EXPECT_EQ(hostports.at(0).first, "host_1");
-  EXPECT_EQ(hostports.at(0).second, 1000);
-  EXPECT_EQ(hostports.at(1).first, "host_0");
-  EXPECT_EQ(hostports.at(1).second, 1000);
-  EXPECT_EQ(hostports.at(2).first, "host_1");
-  EXPECT_EQ(hostports.at(2).second, 1001);
-  EXPECT_EQ(hostports.at(3).first, "host_0");
-  EXPECT_EQ(hostports.at(3).second, 1001);
-  EXPECT_EQ(hostports.at(4).first, "host_1");
-  EXPECT_EQ(hostports.at(4).second, 1000);
+  EXPECT_EQ(hostports.at(0).ipaddress, "host_1");
+  EXPECT_EQ(hostports.at(0).port, 1000);
+  EXPECT_EQ(hostports.at(1).ipaddress, "host_0");
+  EXPECT_EQ(hostports.at(1).port, 1000);
+  EXPECT_EQ(hostports.at(2).ipaddress, "host_1");
+  EXPECT_EQ(hostports.at(2).port, 1001);
+  EXPECT_EQ(hostports.at(3).ipaddress, "host_0");
+  EXPECT_EQ(hostports.at(3).port, 1001);
+  EXPECT_EQ(hostports.at(4).ipaddress, "host_1");
+  EXPECT_EQ(hostports.at(4).port, 1000);
 }
 
  TEST_F(SimpleSchedulerTest, CleanShutdownWithoutInit) {

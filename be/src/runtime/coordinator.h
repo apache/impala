@@ -23,6 +23,7 @@
 #include "util/progress-updater.h"
 #include "util/runtime-profile.h"
 #include "runtime/runtime-state.h"
+#include "sparrow/simple-scheduler.h"
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/Frontend_types.h"
 
@@ -181,11 +182,10 @@ class Coordinator {
   // per-fragment instance TPlanFragmentExecParams;
   // hosts.size() == instance_ids.size()
   struct FragmentExecParams {
-    // TODO(henry): replace 'pair' with something better
-    std::vector<std::pair<std::string, int> > hosts;  // execution backends
+    sparrow::SimpleScheduler::HostList hosts; // execution backends
 
     // map from scan range server (from TScanRangeLocations) to host in 'hosts'
-    typedef boost::unordered_map<THostPort, std::pair<std::string, int> > DataServerMap;
+    typedef boost::unordered_map<THostPort, THostPort> DataServerMap;
     DataServerMap data_server_map;
 
     std::vector<TUniqueId> instance_ids;

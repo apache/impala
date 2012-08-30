@@ -1,0 +1,110 @@
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+
+#ifndef IMPALA_SPARROW_FAILURE_DETECTOR_H
+#define IMPALA_SPARROW_FAILURE_DETECTOR_H
+
+#include <boost/thread/thread_time.hpp>
+#include <string>
+#include <boost/date_time/posix_time/posix_time_types.hpp>
+
+namespace impala {
+
+// A failure detector tracks the liveness of a set of peers which is computed as
+// a function of received 'heartbeat' signals. 
+// A peer may be in one of four states:
+//   FAILED -> the peer is assumed to be failed
+//   SUSPECTED -> the peer may have failed, and may be moved to the FAILED state shortly.
+//   OK -> the peer is apparently healthy and sending regular heartbeats
+//   UNKNOWN -> nothing has been heard about the peer
+class FailureDetector {
+ public:
+  enum PeerState {
+    FAILED = 0,
+    SUSPECTED = 1,
+    OK = 2,
+    UNKNOWN = 3    
+  };
+
+  // Updates the state of a peer according to the most recent heartbeat
+  // state. If 'seen' is true, this method indicates that a heartbeat has been
+  // received. If seen is 'false', this method indicates that a heartbeat has
+  // not been received since the last successful heartbeat receipt.
+  // This method returns the current state of the updated peer.
+  virtual PeerState UpdateHeartbeat(const std::string& peer, bool seen) = 0;
+
+  // Returns the current state of a peer.
+  virtual PeerState GetPeerState(const std::string& peer) = 0;
+
+  // Utility method to convert a PeerState enum to a string.
+  static const std::string& PeerStateToString(PeerState peer_state);
+};
+
+// A failure detector based on a maximum time between successful heartbeats.
+// Peers that do not successfully heartbeat before the failure_timeout are
+// considered failed; those that do not heartbeat before the suspect_timeout are
+// considered suspected.
+// A timeout failure detector is most appropriate for a client which is
+// receiving periodic heartbeats.
+// Not thread safe.
+class TimeoutFailureDetector : public FailureDetector {
+ public:
+  TimeoutFailureDetector(boost::posix_time::time_duration failure_timeout,
+      boost::posix_time::time_duration suspect_timeout) 
+      : failure_timeout_(failure_timeout),
+        suspect_timeout_(suspect_timeout) { };
+
+  virtual PeerState UpdateHeartbeat(const std::string& peer, bool seen);
+
+  virtual PeerState GetPeerState(const std::string& peer); 
+
+ private:
+  // Record of last time a successful heartbeat was received
+  std::map<std::string, boost::system_time> peer_heartbeat_record_;
+
+  // The maximum time that may elapse without a heartbeat before a peer is
+  // considered failed
+  const boost::posix_time::time_duration failure_timeout_;
+
+  // The maximum time that may elapse without a heartbeat before a peer is
+  // suspected of failure  
+  const boost::posix_time::time_duration suspect_timeout_;
+};
+
+// A failure detector based on a maximum number of consecutive heartbeats missed
+// before a peer is considered failed. Clients must call 
+// UpdateHeartbeat(..., false) to indicate that a heartbeat has been missed.
+// The MissedHeartbeatFailureDetector is most appropriate when heartbeats are
+// being sent, not being received, because it is easy in that situation tell
+// when a heartbeat has not been successful..
+// Not thread safe.
+class MissedHeartbeatFailureDetector : public FailureDetector {
+ public:
+  // max_missed_heartbeats -> the number of heartbeats that can be missed before a
+  // peer is considered failed.
+  // suspect_missed_heartbeats -> the number of heartbeats that can be missed before a
+  // peer is suspected of failure.
+  MissedHeartbeatFailureDetector(int32_t max_missed_heartbeats,
+      int32_t suspect_missed_heartbeats) 
+    : max_missed_heartbeats_(max_missed_heartbeats),
+      suspect_missed_heartbeats_(suspect_missed_heartbeats) { }
+
+  virtual PeerState UpdateHeartbeat(const std::string& peer, bool seen);
+
+  virtual PeerState GetPeerState(const std::string& peer); 
+
+ private:
+  // The maximum number of heartbeats that can be missed consecutively before a
+  // peer is considered failed.
+  int32_t max_missed_heartbeats_;
+
+  // The maximum number of heartbeats that can be missed consecutively before a
+  // peer is suspected of failre.
+  int32_t suspect_missed_heartbeats_;
+
+  // Number of consecutive heartbeats missed by peer.
+  std::map<std::string, int32_t> missed_heartbeat_counts_;
+};
+
+}
+
+#endif // IMPALA_SPARROW_FAILURE_DETECTOR_H

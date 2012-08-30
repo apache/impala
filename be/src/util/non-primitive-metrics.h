@@ -45,11 +45,11 @@ class ListMetric : public Metrics::Metric<std::vector<T> > {
 
  protected:
   virtual void PrintValueJson(std::stringstream* out) {
-    PrintStringList<T, std::vector<T> >(true, this->value(), out);
+    PrintStringList<T, std::vector<T> >(true, this->value_, out);
   }
 
   virtual void PrintValue(std::stringstream* out) {
-    PrintStringList<T, std::vector<T> >(false, this->value(), out);
+    PrintStringList<T, std::vector<T> >(false, this->value_, out);
   }
 };
 
@@ -73,11 +73,56 @@ class SetMetric : public Metrics::Metric<std::set<T> > {
 
  protected:
   virtual void PrintValueJson(std::stringstream* out) {    
-    PrintStringList<T, std::set<T> >(true, this->value(), out);
+    PrintStringList<T, std::set<T> >(true, this->value_, out);
   }
 
   virtual void PrintValue(std::stringstream* out) {
-    PrintStringList<T, std::set<T> >(false, this->value(), out);
+    PrintStringList<T, std::set<T> >(false, this->value_, out);
+  }
+};
+
+// Metric whose value is a map from primitive type to primitive type
+template <typename K, typename V>
+class MapMetric : public Metrics::Metric<std::map<K, V> > {
+ public:
+  MapMetric(const std::string& key, const std::map<K, V>& value)
+      : Metrics::Metric<std::map<K, V> >(key, value) { }
+
+  void Add(const K& key, const V& value) {
+    boost::lock_guard<boost::mutex> l(this->lock_);
+    this->value_[key] = value;
+  }
+
+  void Remove(const K& key) {
+    boost::lock_guard<boost::mutex> l(this->lock_);
+    this->value_.erase(key);
+  }
+
+ protected:
+  void PrintToString(bool quoted_items, std::stringstream* out) {
+    std::vector<std::string> strings;
+    typedef typename std::map<K, V>::value_type ValueType;
+    BOOST_FOREACH(const ValueType& entry, this->value_) {
+      std::stringstream ss;
+      ss << "  ";
+      if (quoted_items) {
+        ss << "\"" << entry.first << "\" : \"" << entry.second << "\"";
+      } else {
+        ss << entry.first << " : " << entry.second;
+      }
+
+      strings.push_back(ss.str());
+    }
+    (*out) << "\n{\n" << boost::algorithm::join(strings, ",\n") << "\n} ";
+  }
+
+
+  virtual void PrintValueJson(std::stringstream* out) {    
+    PrintToString(true, out);
+  }
+
+  virtual void PrintValue(std::stringstream* out) {
+    PrintToString(false, out);
   }
 };
 

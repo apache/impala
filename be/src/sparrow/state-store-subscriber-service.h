@@ -28,6 +28,8 @@ class ThriftServer;
 
 namespace sparrow {
 
+class StateStoreTest;
+
 // The StateStoreSubscriber class implements the
 // StateStoreSubscriberService interface, which allows it to receive
 // updates from the central state store.  It also allows local
@@ -158,6 +160,9 @@ class StateStoreSubscriber
 
   // Executes an RPC to unregister the given subscription with the state store.
   impala::Status UnregisterSubscriptionWithStateStore(const SubscriptionId& id);
+
+  // Friend so that tests can force shutdown to simulate failure. 
+  friend class StateStoreTest;
 };
 
 }

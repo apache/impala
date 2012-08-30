@@ -218,6 +218,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   // Webserver callback that prints a list of all known databases and tables
   void CatalogPathHandler(std::stringstream* output);
 
+  // Webserver callback that prints a list of known backends
+  void BackendsPathHandler(std::stringstream* output);
+
   // Wrapper around Coordinator::Wait(); suitable for execution inside thread.
   void Wait(boost::shared_ptr<QueryExecState> exec_state);
 

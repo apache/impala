@@ -82,6 +82,11 @@ class ThriftServer {
   // It is also only safe to reference the returned value during an RPC method. 
   static SessionKey* GetThreadSessionKey();
 
+  // Stops the underlying thrift server. This should only be used for testing,
+  // and is not a general purpose method for bringing down a server.
+  // Note: has no effect with TNonBlockingServer before Thrift 0.9.x.
+  void StopForTesting();
+
  private:
   // True if the server has been successfully started, for internal use only
   bool started_;

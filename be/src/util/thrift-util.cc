@@ -74,4 +74,15 @@ Status WaitForServer(const string& host, int port, int num_retries,
   return Status("Server did not come up");
 }
 
+void THostPortToString(const THostPort& address, string* out) {
+  stringstream ss;
+  ss << address.ipaddress << ":" << address.port;
+  *out = ss.str();
+}
+
+std::ostream& operator<<(std::ostream& out, THostPort& hostport) {
+  out << hostport.ipaddress << ":" << hostport.port;
+  return out;
+}
+
 }

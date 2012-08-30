@@ -1,0 +1,73 @@
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+#include "sparrow/failure-detector.h"
+#include <boost/assign.hpp>
+#include "common/logging.h"
+
+using namespace impala;
+using namespace std;
+using namespace boost;
+using namespace boost::posix_time;
+
+static const map<FailureDetector::PeerState, string> PEER_STATE_TO_STRING =
+    boost::assign::map_list_of
+      (FailureDetector::OK, "OK")
+      (FailureDetector::SUSPECTED, "SUSPECTED")
+      (FailureDetector::UNKNOWN, "UNKNOWN")
+      (FailureDetector::FAILED, "FAILED");
+
+const string& FailureDetector::PeerStateToString(FailureDetector::PeerState peer_state) {
+  map<FailureDetector::PeerState, string>::const_iterator it = 
+      PEER_STATE_TO_STRING.find(peer_state);
+  DCHECK(it != PEER_STATE_TO_STRING.end());
+  return it->second;
+}
+
+FailureDetector::PeerState TimeoutFailureDetector::UpdateHeartbeat(
+    const string& peer, bool seen) {
+  if (seen) peer_heartbeat_record_[peer] = get_system_time();
+  return GetPeerState(peer);
+}
+
+FailureDetector::PeerState TimeoutFailureDetector::GetPeerState(const std::string& peer) {
+  map<string, system_time>::iterator heartbeat_record = peer_heartbeat_record_.find(peer);
+  if (heartbeat_record == peer_heartbeat_record_.end()) return UNKNOWN;
+
+  time_duration duration = get_system_time() - heartbeat_record->second;
+  if (duration > failure_timeout_) {
+    return FAILED;
+  } else if (duration > suspect_timeout_) {
+    return SUSPECTED;
+  }
+
+  return OK;
+}
+
+FailureDetector::PeerState MissedHeartbeatFailureDetector::UpdateHeartbeat(
+    const string& peer, bool seen) {
+  if (seen) {
+    missed_heartbeat_counts_[peer] = 0;
+    return OK;
+  } else {
+    ++missed_heartbeat_counts_[peer];
+  }
+
+  return GetPeerState(peer);
+}
+
+FailureDetector::PeerState MissedHeartbeatFailureDetector::GetPeerState(
+    const std::string& peer) {
+  map<string, int32_t>::iterator heartbeat_record = missed_heartbeat_counts_.find(peer);
+
+  if (heartbeat_record == missed_heartbeat_counts_.end()) {
+    return UNKNOWN;
+  }
+
+  if (heartbeat_record->second > max_missed_heartbeats_) {
+    return FAILED;
+  } else if (heartbeat_record->second > suspect_missed_heartbeats_) {
+    return SUSPECTED;
+  }
+
+  return OK;
+}
+

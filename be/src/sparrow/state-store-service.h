@@ -22,17 +22,18 @@
 #include "gen-cpp/SparrowTypes_types.h"
 #include "gen-cpp/StateStoreService.h"
 #include "gen-cpp/StateStoreSubscriberService.h"
+#include "sparrow/failure-detector.h"
 
 namespace impala {
 
 class Status;
 class THostPort;
-
 }
 
 namespace sparrow {
 
 class TUpdateStateRequest;
+class StateStoreTest;
 
 // The StateStore is a single, centralized repository that stores soft state. It stores
 // both membership information about the instances of each service, and generic
@@ -63,6 +64,9 @@ class StateStore : public StateStoreServiceIf,
   // called, there must be a boost::shared_ptr<StateStore> to this StateStore.
   void Start(int port);
 
+  // Stops the server. Once the server is stopped it may not be restarted.
+  void Stop();
+
   // Blocks until the server stops (which will occur if the server
   // returns due to an error, for example). Note that is_updating does
   // not control whether the Thrift server is running.
@@ -79,6 +83,11 @@ class StateStore : public StateStoreServiceIf,
    public:
     // Count of the number of registered subscriptions for each service id.
     typedef boost::unordered_map<std::string, int> ServiceSubscriptionCounts;
+
+    // Mapping between a subscription id, and a list of service ids for which updates
+    // should be pushed.
+    typedef boost::unordered_map<SubscriptionId, boost::unordered_set<std::string> >
+        Subscriptions;
 
     Subscriber(SubscriberId id) : id_(id), next_subscription_id_(0) {};
 
@@ -114,11 +123,15 @@ class StateStore : public StateStoreServiceIf,
       return service_subscription_counts_;
     }
 
+    const Subscriptions& subscriptions() const {
+      return subscriptions_;
+    }
+
+    const boost::unordered_set<std::string>& service_ids() const {
+      return service_ids_;
+    }
+
    private:
-    // Mapping between a subscription id, and a list of service ids for which updates
-    // should be pushed.
-    typedef boost::unordered_map<SubscriptionId, boost::unordered_set<std::string> >
-        Subscriptions;
 
     // Unique identifier for the subscriber.
     SubscriberId id_;
@@ -143,11 +156,15 @@ class StateStore : public StateStoreServiceIf,
   // shared pointers to the thrift transport and client, it is fine if the corresponding
   // Subscriber gets deleted before this SubscriberUpdate is used.
   struct SubscriberUpdate {
+    // Address of the subscriber to receive this update
+    impala::THostPort subscriber_address;
+
     boost::shared_ptr<SubscriberClient> client;
     TUpdateStateRequest request;
 
-    SubscriberUpdate(Subscriber* subscriber)
-      : client(subscriber->client()) {}
+    SubscriberUpdate(const impala::THostPort& address, Subscriber* subscriber)
+      : subscriber_address(address),
+        client(subscriber->client()) {}
   };
 
   // Mapping of service ids to the corresponding membership.
@@ -184,6 +201,8 @@ class StateStore : public StateStoreServiceIf,
   // Frequency of updates to subscribers
   int subscriber_update_frequency_ms_;
 
+  boost::scoped_ptr<impala::MissedHeartbeatFailureDetector> failure_detector_;
+
   // May not be NULL. Not owned by us.
   impala::Metrics* metrics_;
 
@@ -193,6 +212,7 @@ class StateStore : public StateStoreServiceIf,
   // services registered which is the same thing.
   impala::Metrics::IntMetric* num_backends_metric_;
   impala::SetMetric<std::string>* backend_set_metric_;
+  impala::MapMetric<std::string, std::string>* backend_state_metric_;
 
   // Getter and setter for is_updating_, both are thread safe.
   bool is_updating();
@@ -209,6 +229,13 @@ class StateStore : public StateStoreServiceIf,
   // Fills in updates with a SubscriberUpdate (including a filled in TUpdateStateRequest)
   // for each currently registered subscriber.
   void GenerateUpdates(std::vector<StateStore::SubscriberUpdate>* updates);
+
+  // Removes all subscriptions and registered services for the subscriber with
+  // the given address.
+  void UnregisterSubscriberCompletely(const impala::THostPort& address);
+
+  // Friend class so that tests can manipulate internal data structures
+  friend class StateStoreTest;
 };
 
 }

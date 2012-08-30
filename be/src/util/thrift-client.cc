@@ -2,9 +2,11 @@
 
 #include <util/thrift-client.h>
 #include <boost/assign.hpp>
+#include <ostream>
 
 using namespace std;
 using namespace boost;
+using namespace apache::thrift::transport;
 
 namespace impala {
 
@@ -13,8 +15,8 @@ Status ThriftClientImpl::Open() {
     if (!transport_->isOpen()) {
       transport_->open();
     }
-  } catch (apache::thrift::transport::TTransportException& e) {
-    std::stringstream msg;
+  } catch (TTransportException& e) {
+    stringstream msg;
     msg << "Couldn't open transport for " << ipaddress() << ":" << port()
         << "(" << e.what() << ")";
     return impala::Status(msg.str());
@@ -44,4 +46,5 @@ Status ThriftClientImpl::Close() {
   }
   return Status::OK;
 }
+
 }

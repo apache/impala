@@ -12,6 +12,7 @@
 #include <boost/thread/locks.hpp>
 #include <boost/thread/thread_time.hpp>
 #include <boost/algorithm/string/join.hpp>
+#include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <transport/TTransportException.h>
 
 #include "common/logging.h"
@@ -20,11 +21,13 @@
 #include "util/thrift-server.h"
 #include "util/thrift-client.h"
 #include "util/container-util.h"
+#include "sparrow/failure-detector.h"
 #include "gen-cpp/StateStoreService_types.h"
 #include "gen-cpp/StateStoreSubscriberService_types.h"
 #include "gen-cpp/Types_types.h"
 
 using namespace boost;
+using namespace boost::posix_time;
 using namespace std;
 
 using namespace ::apache::thrift::server;
@@ -34,18 +37,24 @@ using impala::THostPort;
 using impala::TStatusCode;
 using impala::ThriftServer;
 using impala::Metrics;
+using impala::MapMetric;
 using impala::SetMetric;
+using impala::FailureDetector;
+using impala::MissedHeartbeatFailureDetector;
 
 DEFINE_int32(state_store_num_server_worker_threads, 4,
              "number of worker threads for the thread manager underlying the "
              "State Store Thrift server");
-DEFINE_int32(state_store_pending_task_count_max, 0,
-             "Maxmimum number of tasks allowed to be pending at the thread manager "
-             "underlying the State Store Thrift server (0 allows infinitely many "
-             "pending tasks)");
+DEFINE_int32(state_store_max_missed_heartbeats, 5, "Maximum number of consecutive "
+             "heartbeats an impalad can miss before being declared failed by the "
+             "state-store.");
+DEFINE_int32(state_store_suspect_heartbeats, 2, "(Advanced) Number of consecutive "
+             "heartbeats an impalad can miss before being suspected of failure by the "
+             "state-store");
 
 const string STATESTORE_LIVE_BACKENDS = "statestore.live.backends";
 const string STATESTORE_LIVE_BACKENDS_LIST = "statestore.live.backends.list";
+const string STATESTORE_BACKEND_STATE_MAP = "statestore.backend.state.map";
 
 namespace sparrow {
 
@@ -53,6 +62,9 @@ StateStore::StateStore(int subscriber_update_frequency_ms, Metrics* metrics)
     : is_updating_(false), 
       next_subscriber_id_(0),
       subscriber_update_frequency_ms_(subscriber_update_frequency_ms),
+      failure_detector_(
+          new MissedHeartbeatFailureDetector(FLAGS_state_store_max_missed_heartbeats, 
+                                             FLAGS_state_store_suspect_heartbeats)),
       metrics_(metrics) {
   DCHECK(metrics);
 }
@@ -201,11 +213,43 @@ void StateStore::UnregisterSubscription(TUnregisterSubscriptionResponse& respons
     RETURN_AND_SET_ERROR(error_message.str(), response);
   }
 
-  if (subscriber.IsZombie()) {
-    subscribers_.erase(request.subscriber_address);
+  if (subscriber.IsZombie()) subscribers_.erase(request.subscriber_address);
+  RETURN_AND_SET_STATUS_OK(response);
+}
+
+void StateStore::UnregisterSubscriberCompletely(const THostPort& address) {
+  // Protect against the subscriber getting removed or updated concurrently
+  lock_guard<recursive_mutex> lock(lock_);
+  Subscribers::iterator subscriber_it = subscribers_.find(address);
+  if (subscriber_it == subscribers_.end()) {
+    // Return quietly if the subscriber has already been removed
+    return;
   }
 
-  RETURN_AND_SET_STATUS_OK(response);
+  Subscriber& subscriber = subscriber_it->second;
+  subscriber.client()->Close();
+  // TODO: Make *Internal version of thrift calls so we don't have to construct
+  // T* structures.
+  BOOST_FOREACH(const Subscriber::Subscriptions::value_type& subscription,
+      subscriber.subscriptions()) {
+    TUnregisterSubscriptionRequest request;
+    request.__set_subscriber_address(address);
+    request.__set_subscription_id(subscription.first);
+    TUnregisterSubscriptionResponse response;
+    UnregisterSubscription(response, request);
+  }
+
+  BOOST_FOREACH(const string& service_id, subscriber.service_ids()) {
+    TUnregisterServiceRequest request;
+    request.__set_subscriber_address(address);
+    request.__set_service_id(service_id);
+    TUnregisterServiceResponse response;
+    UnregisterService(response, request);    
+  }
+
+  // Expect that subscriber is automatically removed after last unregistration.
+  DCHECK(subscribers_.find(address) == subscribers_.end());
+  DCHECK(subscriber.IsZombie());
 }
 
 void StateStore::Start(int port) {
@@ -215,6 +259,9 @@ void StateStore::Start(int port) {
   backend_set_metric_ = 
       metrics_->RegisterMetric(new SetMetric<string>(STATESTORE_LIVE_BACKENDS_LIST,
               set<string>()));
+  backend_state_metric_ = 
+    metrics_->RegisterMetric(new MapMetric<string, string>(
+            STATESTORE_BACKEND_STATE_MAP, map<string, string>()));
 
   set_is_updating(true);
   update_thread_.reset(new thread(&StateStore::UpdateLoop, this));
@@ -229,6 +276,13 @@ void StateStore::Start(int port) {
   server_->Start();
 
   LOG(INFO) << "StateStore listening on " << port;
+}
+
+void StateStore::Stop() {
+  set_is_updating(false);
+  if (update_thread_.get() != NULL) {
+    update_thread_->join();
+  }
 }
 
 void StateStore::WaitForServerToStop() {
@@ -272,9 +326,10 @@ SubscriptionId StateStore::Subscriber::AddSubscription(const set<string>& servic
 
 bool StateStore::Subscriber::RemoveSubscription(SubscriptionId id) {
   Subscriptions::iterator subscription = subscriptions_.find(id);
-  LOG(INFO) << "Remove subscription " << id << " for " << id_ << " on "
-            << join(subscription->second, ", ") << ".";
   if (subscription != subscriptions_.end()) {
+    LOG(INFO) << "Remove subscription " << id << " for " << id_ << " on "
+              << join(subscription->second, ", ") << ".";
+
     // For each subscribed service, decrease the associated count, and remove the
     // service from the list of services that should be updated at this subscriber if
     // the count has reached 0.
@@ -331,40 +386,54 @@ void StateStore::UpdateLoop() {
     // Update each subscriber with the latest state.
     // TODO: Make this multithreaded.
     BOOST_FOREACH(SubscriberUpdate& update, subscriber_updates) {
+      string address;
+      THostPortToString(update.subscriber_address, &address);
+      // Will be set in the following if-else block
+      FailureDetector::PeerState peer_state;
+
       // Open the transport here so that we keep retrying if we don't succeed on the
       // first attempt to open a connection.
       Status status = update.client->Open();
       if (!status.ok()) {
-        // TODO: We currently assume that once a subscriber has joined, it will be part
-        // of the cluster permanently.  Instead, inability to create a client should
-        // transition the subscriber to a CRITICAL state, and if we have multiple failed
-        // attempts to connect to the subscriber, it should be removed from the list of
-        // available subscribers.
-        LOG(ERROR) << "Unable to update client at " << update.client->ipaddress()
-                   << ":" << update.client->port() << "; received error "
-                   << status.GetErrorMsg();
-        continue;
-      }
-      
-      TUpdateStateResponse response;
-      try {
-        update.client->iface()->UpdateState(response, update.request);
-        if (response.status.status_code != TStatusCode::OK) {
-          Status status(response.status);
-          LOG(ERROR) << status.GetErrorMsg();
+        // Log failure messages only when peer state is OK; once it is FAILED or
+        // SUSPECTED suppress messages to avoid log spam.
+        if (failure_detector_->GetPeerState(address) == FailureDetector::OK) {
+          LOG(INFO) << "Unable to update client at " << update.client->ipaddress()
+                    << ":" << update.client->port() << "; received error "
+                    << status.GetErrorMsg();
         }
-      } catch (TTransportException& e) {
-        // TODO: As above, this error should transition the subscriber to a CRITICAL
-        // state.
-        LOG(ERROR) << "Unable to update client at " << update.client->ipaddress()
-                   << ":" << update.client->port() << "; received error "
-                   << e.what();
-      } catch (std::exception& e) {
-        // Make sure Thrift isn't throwing any other exceptions.
-        DCHECK(false) << e.what();
+
+        peer_state = failure_detector_->UpdateHeartbeat(address, false);
+      } else {      
+        TUpdateStateResponse response;
+        try {
+          update.client->iface()->UpdateState(response, update.request);
+          if (response.status.status_code != TStatusCode::OK) {
+            Status status(response.status);
+            LOG(WARNING) << status.GetErrorMsg();
+            peer_state = failure_detector_->UpdateHeartbeat(address, false);
+          } else {
+            peer_state = failure_detector_->UpdateHeartbeat(address, true);
+          }
+          
+        } catch (TTransportException& e) {
+          LOG(INFO) << "Unable to update client at " << update.client 
+                    << "; received error " << e.what();
+          peer_state = failure_detector_->UpdateHeartbeat(address, false);
+        } catch (std::exception& e) {
+          // Make sure Thrift isn't throwing any other exceptions.
+          DCHECK(false) << e.what();
+        }
+      }
+
+      backend_state_metric_->Add(address, FailureDetector::PeerStateToString(peer_state));
+
+      if (peer_state == FailureDetector::FAILED) {
+        LOG(INFO) << "Subscriber at " << address << " has failed, and will be removed.";
+        UnregisterSubscriberCompletely(update.subscriber_address);
       }
     }
-
+    
     if (get_system_time() < next_update_time && is_updating()) {
       posix_time::time_duration duration = next_update_time - get_system_time();
       usleep(duration.total_microseconds());
@@ -381,7 +450,7 @@ void StateStore::GenerateUpdates(vector<StateStore::SubscriberUpdate>* updates) 
   // For each subscriber, generate the corresponding SubscriberUpdate (and fill in the
   // TUpdateRequest).
   BOOST_FOREACH(Subscribers::value_type& subscriber, subscribers_) {
-    updates->push_back(SubscriberUpdate(&subscriber.second));
+    updates->push_back(SubscriberUpdate(subscriber.first, &subscriber.second));
     SubscriberUpdate& subscriber_update = updates->back();
     BOOST_FOREACH(
         const Subscriber::ServiceSubscriptionCounts::value_type& service_subscription,

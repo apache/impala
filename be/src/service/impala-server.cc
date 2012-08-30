@@ -36,6 +36,7 @@
 #include "exec/scan-node.h"
 #include "exec/exec-stats.h"
 #include "exec/ddl-executor.h"
+#include "sparrow/simple-scheduler.h"
 #include "util/debug-util.h"
 #include "util/string-parser.h"
 #include "util/thrift-util.h"
@@ -63,6 +64,7 @@ using namespace apache::thrift::transport;
 using namespace apache::thrift::server;
 using namespace apache::thrift::concurrency;
 using namespace beeswax;
+using sparrow::Scheduler;
 
 DEFINE_bool(use_planservice, false, "Use external planservice if true");
 DECLARE_string(planservice_host);
@@ -663,6 +665,10 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       bind<void>(mem_fn(&ImpalaServer::CatalogPathHandler), this, _1);
   exec_env->webserver()->RegisterPathHandler("/catalog", catalog_callback);
 
+  Webserver::PathHandlerCallback backends_callback =
+      bind<void>(mem_fn(&ImpalaServer::BackendsPathHandler), this, _1);
+  exec_env->webserver()->RegisterPathHandler("/backends", backends_callback);
+
   num_queries_metric_ = 
       exec_env->metrics()->CreateAndRegisterPrimitiveMetric(NUM_QUERIES_METRIC, 0L);
 }
@@ -773,6 +779,17 @@ void ImpalaServer::CatalogPathHandler(stringstream* output) {
     }
     (*output) << "</ul>" << endl;
   }
+}
+
+void ImpalaServer::BackendsPathHandler(stringstream* output) {
+  (*output) << "<h2>Known Backends</h2>";
+  Scheduler::HostList backends;
+  (*output) << "<pre>";
+  exec_env_->scheduler()->GetAllKnownHosts(&backends);
+  BOOST_FOREACH(const Scheduler::HostList::value_type& host, backends) {
+    (*output) << host.ipaddress << ":" << host.port << endl;
+  }
+  (*output) << "</pre>";
 }
 
 ImpalaServer::~ImpalaServer() {}

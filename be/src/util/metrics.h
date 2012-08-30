@@ -60,11 +60,13 @@ class Metrics {
     }
 
     virtual void Print(std::stringstream* out) {
+      boost::lock_guard<boost::mutex> l(lock_);
       (*out) << key_ << ":";
       PrintValue(out);
     }    
 
     virtual void PrintJson(std::stringstream* out) {
+      boost::lock_guard<boost::mutex> l(lock_);
       (*out) << "\"" << key_ << "\": ";
       PrintValueJson(out);
     }
@@ -75,6 +77,8 @@ class Metrics {
    protected:
     // Subclasses are required to implement this to print a string
     // representation of the metric to the supplied stringstream.
+    // Both methods are always called with lock_ taken, so implementations must
+    // not try and take lock_ themselves..
     virtual void PrintValue(std::stringstream* out) = 0;
     virtual void PrintValueJson(std::stringstream* out) = 0;
 
@@ -106,11 +110,11 @@ class Metrics {
 
    protected:
     virtual void PrintValue(std::stringstream* out)  {
-      (*out) << this->value();
+      (*out) << this->value_;
     }    
 
     virtual void PrintValueJson(std::stringstream* out)  {
-      (*out) << "\"" << this->value() << "\"";
+      (*out) << "\"" << this->value_ << "\"";
     }    
   };
 

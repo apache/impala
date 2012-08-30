@@ -110,7 +110,7 @@ void SimpleScheduler::UpdateMembership(const ServiceStateMap& service_state) {
 }
 
 Status SimpleScheduler::GetHosts(
-    const vector<THostPort>& data_locations, vector<pair<string, int> >* hostports) {
+    const vector<THostPort>& data_locations, HostList* hostports) {
   lock_guard<mutex> lock(host_map_lock_);
   if (host_map_.size() == 0) {
     return Status("No backends configured");
@@ -133,7 +133,10 @@ Status SimpleScheduler::GetHosts(
     // Round-robin between impalads on the same ipaddress.
     // Pick the first one, then move it to the back of the queue
     int port = entry->second.front();
-    hostports->push_back(make_pair(entry->first, port));
+    THostPort hostport;
+    hostport.ipaddress = entry->first;
+    hostport.port = port;
+    hostports->push_back(hostport);
     entry->second.pop_front();
     entry->second.push_back(port);
   }
@@ -148,7 +151,7 @@ Status SimpleScheduler::GetHosts(
     for (int i = 0; i < hostports->size(); ++i) {
       stringstream s;
       s << "(" << data_locations[i].ipaddress << ":" << data_locations[i].port 
-        << " -> " << (*hostports)[i].first << ":" << (*hostports)[i].second << ")";
+        << " -> " << (*hostports)[i].ipaddress << ":" << (*hostports)[i].port << ")";
       hostport_strings.push_back(s.str());
     }
     VLOG_QUERY << "SimpleScheduler assignment (data->backend):  "
@@ -164,12 +167,15 @@ Status SimpleScheduler::GetHosts(
   return Status::OK;
 }
 
-void SimpleScheduler::GetAllKnownHosts(vector<pair<string, int> >* hostports) {
+void SimpleScheduler::GetAllKnownHosts(HostList* hostports) {
   lock_guard<mutex> lock(host_map_lock_);
   hostports->clear();
   BOOST_FOREACH(const HostMap::value_type& ipaddress, host_map_) {
     BOOST_FOREACH(int port, ipaddress.second) {
-      hostports->push_back(make_pair(ipaddress.first, port));
+      THostPort hostport;
+      hostport.ipaddress = ipaddress.first;
+      hostport.port = port;
+      hostports->push_back(hostport);
     }
   }
 }
