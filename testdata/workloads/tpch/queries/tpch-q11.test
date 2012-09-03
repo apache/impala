@@ -13,8 +13,8 @@ group by ps_partkey
 RESET tpch.q11_sum_tmp$TABLE
 RELOAD tpch.q11_sum_tmp$TABLE
 ---- RESULTS
----- NUMROWS
-29818
+---- PARTITIONS
+/: 29818
 ====
 insert overwrite table tpch.q11_sum_tmp$TABLE
 select sum(part_value) as total_value
@@ -23,6 +23,6 @@ from tpch.q11_part_tmp$TABLE
 RESET tpch.q11_part_tmp$TABLE
 RELOAD tpch.q11_part_tmp$TABLE
 ---- RESULTS
----- NUMROWS
-1
+---- PARTITIONS
+/: 1
 ====

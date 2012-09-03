@@ -37,10 +37,6 @@ public class TestFileUtils {
       sb.append("---- PARTITIONS\n");
       sb.append(Joiner.on("\n").join(queryResult.getModifiedPartitions()) + "\n");
     }
-    if(queryResult.getNumAppendedRows().size() > 0) {
-      sb.append("---- NUMROWS\n");
-      sb.append(Joiner.on("\n").join(queryResult.getNumAppendedRows()) + "\n");
-    }
   }
 
   /**

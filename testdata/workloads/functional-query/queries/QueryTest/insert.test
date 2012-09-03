@@ -8,8 +8,8 @@ where year=2009 and month=04
 RESET alltypesnopart_insert$TABLE
 RELOAD alltypesnopart_insert$TABLE
 ---- RESULTS
----- NUMROWS
-25
+---- PARTITIONS
+/: 25
 ====
 # search the overwritten table to verify the results
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
@@ -54,8 +54,7 @@ where year=2009 and month=04
 RESET alltypesnopart_insert$TABLE
 ---- RESULTS
 ---- PARTITIONS
----- NUMROWS
-25
+/: 25
 ====
 # search the table to verify it contains 25 rows
 select count(*) from alltypesnopart_insert$TABLE
@@ -73,9 +72,7 @@ from alltypessmall
 where year=2009 and month=4
 ---- RESULTS
 ---- PARTITIONS
-year=2009/month=4/
----- NUMROWS
-25
+/year=2009/month=4/: 25
 ====
 # search the overwritten partition to verify the results
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
@@ -122,9 +119,7 @@ where year=2009 and month=4
 DROP PARTITIONS alltypesinsert$TABLE
 ---- RESULTS
 ---- PARTITIONS
-year=2009/month=4/
----- NUMROWS
-25
+/year=2009/month=4/: 25
 ====
 # search the partition to verify it contains all 25 rows
 select count(*) from alltypesinsert$TABLE
@@ -143,13 +138,9 @@ from alltypessmall
 where year=2009 and month>1 and month<=4
 ---- RESULTS
 ---- PARTITIONS
-year=2009/month=2/
-year=2009/month=3/
-year=2009/month=4/
----- NUMROWS
-25
-25
-25
+/year=2009/month=2/: 25
+/year=2009/month=3/: 25
+/year=2009/month=4/: 25
 ====
 # search the overwritten partition to verify the results
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
@@ -244,15 +235,14 @@ from alltypessmall
 where year=2009 and month>=1 and month<4
 ---- SETUP
 DROP PARTITIONS alltypesinsert$TABLE
----- PARTITIONS
 ---- RESULTS
 year=2009/month=1/
 year=2009/month=2/
 year=2009/month=3/
----- NUMROWS
-25
-25
-25
+---- PARTITIONS
+/year=2009/month=1/: 25
+/year=2009/month=2/: 25
+/year=2009/month=3/: 25
 ====
 # search the partitions to verify they contain all 75 rows
 select count(id) from alltypesinsert$TABLE
@@ -270,15 +260,10 @@ float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 from alltypessmall
 ---- RESULTS
 ---- PARTITIONS
-year=2009/month=1/
-year=2009/month=2/
-year=2009/month=3/
-year=2009/month=4/
----- NUMROWS
-25
-25
-25
-25
+/year=2009/month=1/: 25
+/year=2009/month=2/: 25
+/year=2009/month=3/: 25
+/year=2009/month=4/: 25
 ====
 # search the overwritten partition to verify the results
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
@@ -399,15 +384,10 @@ from alltypessmall
 DROP PARTITIONS alltypesinsert$TABLE
 ---- RESULTS
 ---- PARTITIONS
-year=2009/month=1/
-year=2009/month=2/
-year=2009/month=3/
-year=2009/month=4/
----- NUMROWS
-25
-25
-25
-25
+/year=2009/month=1/: 25
+/year=2009/month=2/: 25
+/year=2009/month=3/: 25
+/year=2009/month=4/: 25
 ====
 # search the partitions to verify they contain all 100 rows
 select count(timestamp_col) from alltypesinsert$TABLE

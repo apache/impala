@@ -7,8 +7,8 @@ where not s_comment like '%Customer%Complaints%'
 RESET tpch.supplier_tmp$TABLE
 RELOAD tpch.supplier_tmp$TABLE
 ---- RESULTS
----- NUMROWS
-9996
+---- PARTITIONS
+/: 9996
 ====
 insert overwrite table tpch.q16_tmp$TABLE
 select p_brand, p_type, p_size, ps_suppkey
@@ -23,8 +23,8 @@ join tpch.supplier_tmp$TABLE s
 RESET tpch.q16_tmp$TABLE
 RELOAD tpch.q16_tmp$TABLE
 ---- RESULTS
----- NUMROWS
-741971
+---- PARTITIONS
+/: 741971
 ====
 # Modifications: Added limit, removed 'DISTINCT' from count due to IMP-132
 select p_brand, p_type, p_size, count(ps_suppkey) as supplier_cnt

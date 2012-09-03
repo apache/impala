@@ -222,7 +222,6 @@ void RawValue::Write(const void* value, void* dst, PrimitiveType type, MemPool* 
     }
     default:
       DCHECK(false) << "RawValue::Write(): bad type: " << TypeToString(type);
-      break;
   }
 }
 

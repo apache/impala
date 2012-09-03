@@ -20,7 +20,7 @@ from thrift.protocol import TBinaryProtocol
 # Then issue queries or other commands. Tab-completion should show the set of
 # available commands.
 # TODO: (amongst others)
-#   - Insert support (implement do_insert)
+#   - Print insert result details (rows per partition)
 #   - Use query rather than executeAndWait, and use Ctrl-C to cancel
 #   - Column headers / metadata support
 class ImpalaShell(cmd.Cmd):
@@ -151,6 +151,22 @@ class ImpalaShell(cmd.Cmd):
     query.query = "describe %s" % (args,)
     query.configuration = self.__options_to_string_list()
     return self.__query_with_results(query)
+
+  def do_insert(self, args):
+    """Executes an INSERT query"""
+    query = BeeswaxService.Query()
+    query.query = "insert %s" % (args,)
+    query.configuration = self.__options_to_string_list()
+    print "Query: %s" % (query.query,)
+    start, end = time.time(), 0
+    (handle, ok) = \
+        self.__do_rpc(lambda: self.imp_service.executeAndWait(query, "ImpalaCLI") )
+    if not ok: return False
+    (insert_result, ok) = self.__do_rpc(lambda: self.imp_service.CloseInsert(handle))
+    end = time.time()
+    if not ok: return False
+    num_rows = sum([int(k) for k in insert_result.rows_appended.values()])
+    print "Inserted %d rows in %2.2fs" % (num_rows, end - start)
     
   def __do_rpc(self, rpc):
     """Executes the RPC lambda provided with some error checking. Returns
@@ -203,5 +219,5 @@ if __name__ == "__main__":
   shell = ImpalaShell(options)
   try:
     shell.cmdloop(WELCOME_STRING)
-  except KeyboardInterrupt:
+  except KeyboardInterrupt:    
     print "Ctrl-C - exiting"

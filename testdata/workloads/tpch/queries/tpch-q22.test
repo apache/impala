@@ -23,8 +23,8 @@ group by
 RESET tpch.q22_customer_tmp1$TABLE
 RELOAD tpch.q22_customer_tmp1$TABLE
 ---- RESULTS
----- NUMROWS
-1
+---- PARTITIONS
+/: 1
 ====
 # Modifications: Updated to use LEFT OUTER JOIN instead of NOT EXISTS,
 # removed subquery by pushing aggregation up a level, added temp table

@@ -56,14 +56,11 @@ enum TImpalaQueryOptions {
 }
 
 // The summary of an insert.
-struct TInsertResult {
-  // List of partitions that were modified by an insert.
-  // Doesn't apply HBase tables.
-  // For non-partitioned table, the list will be empty.
-  1: required list<string> modified_hdfs_partitions,
-  
-  // Number of appended rows per modified partition.
-  2: required list<i64> rows_appended
+struct TInsertResult {  
+  // Number of appended rows per modified partition. Only applies to HDFS tables.
+  // The keys represent partitions to create, coded as k1=v1/k2=v2/k3=v3..., with the 
+  // root in an unpartitioned table being the empty string.
+  1: required map<string, i64> rows_appended
 }
 
 // For all rpc that return a TStatus as part of their result type,

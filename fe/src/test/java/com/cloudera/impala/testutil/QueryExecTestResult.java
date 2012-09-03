@@ -64,14 +64,8 @@ public class QueryExecTestResult {
   }
 
   /**
-   * Number of rows appended by an insert
-   */
-  public ArrayList<String> getNumAppendedRows() {
-    return numAppendedRows;
-  }
-
-  /**
-   * Number of partitions created by an insert
+   * Number of partitions affected by an insert, including the number of rows written,
+   * in the form /k1=v1/k2=v2: <num rows>
    */
   public ArrayList<String> getModifiedPartitions() {
     return modifiedPartitions;

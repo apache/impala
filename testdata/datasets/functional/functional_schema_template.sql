@@ -218,6 +218,26 @@ ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 functional
 ----
+insert_overwrite_nopart
+----
+CREATE TABLE %(table_name)s (col1 int);
+----
+----
+----
+----
+====
+functional
+----
+insert_overwrite_partitioned
+----
+CREATE TABLE %(table_name)s (col1 int) PARTITIONED BY (col2 int);
+----
+----
+----
+----
+====
+functional
+----
 alltypeserror
 ----
 CREATE EXTERNAL TABLE %(table_name)s (
@@ -1036,6 +1056,26 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
   select * FROM %(base_table_name)s"
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/TinyTable/data.csv' OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
+====
+functional
+----
+tinyinttable
+----
+CREATE EXTERNAL TABLE %(table_name)s (
+  int_col int)
+row format delimited fields terminated by ','
+stored as %(file_format)s
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+----
+FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
+----
+${IMPALA_HOME}/bin/run-query.sh --query=" \
+  INSERT OVERWRITE TABLE %(table_name)s \
+  select * FROM %(base_table_name)s"
+----
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/TinyIntTable/data.csv' OVERWRITE INTO TABLE %(table_name)s;
 ----
 ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====

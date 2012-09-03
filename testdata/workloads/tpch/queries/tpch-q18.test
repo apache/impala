@@ -7,8 +7,8 @@ group by l_orderkey
 RESET tpch.q18_tmp$TABLE
 RELOAD tpch.q18_tmp$TABLE
 ---- RESULTS
----- NUMROWS
-1500000
+---- PARTITIONS
+/: 1500000
 ====
 # Modifications: Cast o_totalprice column due to float/double values not
 # allowed in GROUP BY.

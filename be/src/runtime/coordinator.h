@@ -14,7 +14,9 @@
 #include "common/status.h"
 #include "common/global-types.h"
 #include "util/runtime-profile.h"
+#include "runtime/runtime-state.h"
 #include "gen-cpp/Types_types.h"
+#include "gen-cpp/Frontend_types.h"
 
 namespace impala {
 
@@ -86,6 +88,8 @@ class Coordinator {
   // Returns tuples from the coordinator fragment. Any returned tuples are valid until
   // the next GetNext() call. If *batch is NULL, execution has completed and GetNext()
   // must not be called again.
+  // GetNext() will not set *batch=NULL until all backends have
+  // either completed or have failed. 
   // It is safe to call GetNext() even in the case where there is no coordinator fragment
   // (distributed INSERT).
   // '*batch' is owned by the underlying PlanFragmentExecutor and must not be deleted.
@@ -121,6 +125,9 @@ class Coordinator {
 
   ExecStats* exec_stats() { return exec_stats_; }
   const TUniqueId& query_id() const { return query_id_; }
+
+  // This is safe to call only after Wait()
+  const PartitionRowCount& partition_row_counts() { return partition_row_counts_; }
 
   // Gathers all updates to the catalog required once this query has completed execution.
   // Returns true if a catalog update is required, false otherwise.
@@ -162,9 +169,6 @@ class Coordinator {
     bool done;  // if true, execution terminated; do not cancel in that case
     bool profile_created;  // true after the first call to profile->Update()
     RuntimeProfile* profile;  // owned by obj_pool()
-
-    // Lists the Hdfs partitions affected by this query
-    std::set<std::string> updated_hdfs_partitions;
     
     // Throughput counters for this fragment
     ThroughputCounterMap throughput_counters;
@@ -185,6 +189,12 @@ class Coordinator {
   };
   // BackendExecStates owned by obj_pool()
   std::vector<BackendExecState*> backend_exec_states_;
+
+  // True if the query needs a post-execution step to tidy up
+  bool needs_finalization_;
+
+  // Only valid if needs_finalization is true
+  TFinalizeParams finalize_params_;
 
   // ensures single-threaded execution of Wait(); must not hold lock_ when acquiring this
   boost::mutex wait_lock_;
@@ -230,6 +240,21 @@ class Coordinator {
   // Count of the number of backends for which done != true. When this
   // hits 0, any Wait()'ing thread is notified
   int num_remaining_backends_;
+
+  // The following two structures, partition_row_counts_ and files_to_move_ are filled in
+  // as the query completes, and track the results of INSERT queries that alter the
+  // structure of tables. They are either the union of the reports from all backends, or
+  // taken from the coordinator fragment: only one of the two can legitimately produce
+  // updates.
+
+  // The set of partitions that have been written to or updated, along with the number of
+  // rows written (may be 0). For unpartitioned tables, the empty string denotes the
+  // entire table.
+  PartitionRowCount partition_row_counts_;
+
+  // The set of files to move after an INSERT query has run, in (src, dest) form. An empty
+  // string for the destination means that a file is to be deleted.
+  FileMoveMap files_to_move_;
 
   // Object pool used used only if no fragment is executing (otherwise
   // we use the executor's object pool), use obj_pool() to access
@@ -280,6 +305,17 @@ class Coordinator {
   // an error status, and returns the current query_status_.
   // Calls CancelInternal() when switching to an error status.
   Status UpdateStatus(const Status& status);
+
+  // Returns only when either all backends have reported success or the query is in error.
+  // Returns the status of the query.
+  // It is safe to call this concurrently, but any calls must be made only after Exec().
+  // WaitForAllBackends may be called before Wait(), but note that Wait() guarantees
+  // that any coordinator fragment has finished, which this method does not.
+  Status WaitForAllBackends();
+
+  // Perform any post-query cleanup required. Called by Wait() only after all
+  // backends are returned.
+  Status FinalizeQuery();
 };
 
 }

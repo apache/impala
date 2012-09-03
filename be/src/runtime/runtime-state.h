@@ -30,6 +30,17 @@ class Expr;
 class LlvmCodeGen;
 class TimestampValue;
 
+// Counts how many rows an INSERT query has added to a particular partition
+// (partitions are identified by their partition keys: k1=v1/k2=v2
+// etc. Unpartitioned tables have a single 'default' partition which is
+// identified by the empty string.
+typedef std::map<std::string, int64_t> PartitionRowCount;
+
+// Tracks files to move from a temporary (key) to a final destination (value) as
+// part of query finalization. If the destination is empty, the file is to be
+// deleted.
+typedef std::map<std::string, std::string> FileMoveMap;
+
 // A collection of items that are part of the global state of a
 // query and shared across all execution nodes of that query.
 class RuntimeState {
@@ -67,9 +78,9 @@ class RuntimeState {
   HdfsFsCache* fs_cache() { return exec_env_->fs_cache(); }
   HBaseTableCache* htable_cache() { return exec_env_->htable_cache(); }
   DiskIoMgr* io_mgr() { return exec_env_->disk_io_mgr(); }
-  std::vector<std::string>& created_hdfs_files() { return created_hdfs_files_; }
-  std::set<std::string>& updated_hdfs_partitions() { return updated_hdfs_partitions_; }
-  std::vector<int64_t>& num_appended_rows() { return num_appended_rows_; }
+
+  FileMoveMap* hdfs_files_to_move() { return &hdfs_files_to_move_; }
+  PartitionRowCount* num_appended_rows() { return &num_appended_rows_; }
 
   // Returns runtime state profile
   RuntimeProfile* runtime_profile() { return &profile_; }
@@ -128,14 +139,12 @@ class RuntimeState {
   ExecEnv* exec_env_;
   boost::scoped_ptr<LlvmCodeGen> codegen_;
 
-  // Lists the Hdfs files created by this query (e.g., for inserts).
-  std::vector<std::string> created_hdfs_files_;
+  // Temporary Hdfs files created, and where they should be moved to ultimately.
+  // Mapping a filename to a blank destination causes it to be deleted. 
+  FileMoveMap hdfs_files_to_move_;
 
-  // Lists the Hdfs partitions affected by this query
-  std::set<std::string> updated_hdfs_partitions_;
-
-  // Records the total number of appended rows per created Hdfs file.
-  std::vector<int64_t> num_appended_rows_;
+  // Records the total number of appended rows per created Hdfs partition
+  PartitionRowCount num_appended_rows_;
 
   RuntimeProfile profile_;
 

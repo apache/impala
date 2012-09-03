@@ -7,8 +7,8 @@ group by l_partkey
 RESET tpch.lineitem_tmp$TABLE
 RELOAD tpch.lineitem_tmp$TABLE
 ---- RESULTS
----- NUMROWS
-200000
+---- PARTITIONS
+/: 200000
 ====
 # Modifications: Converted selects from multiple tables to joins,
 # added round() call, removed subquery

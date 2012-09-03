@@ -10,7 +10,13 @@ public class InsertQueryTest extends BaseQueryTest {
   @Test
   public void TestInsert() {
     runQueryInAllBatchAndClusterPerms("insert", false, 1000, INSERT_FORMATS,
-        ImmutableList.of(0), ImmutableList.of(1));
+        SMALL_BATCH_SIZES, SMALL_CLUSTER_SIZES);
+  }
+
+  @Test
+  public void TestInsertOverwrite() {
+    runQueryInAllBatchAndClusterPerms("insert_overwrite", false, 1000, TEXT_FORMAT_ONLY,
+        SMALL_BATCH_SIZES, SMALL_CLUSTER_SIZES);
   }
 
   // Because we disagree with hive on what to do on overflow, only

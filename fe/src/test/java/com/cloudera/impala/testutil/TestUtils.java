@@ -285,8 +285,7 @@ public class TestUtils {
     ArrayList<String> colLabels = new ArrayList<String>();
     ArrayList<String> colTypes = new ArrayList<String>();
     TInsertResult insertResult = null;
-    if (expectedExecResults.getModifiedPartitions().size() > 0 ||
-        expectedExecResults.getNumAppendedRows().size() > 0) {
+    if (expectedExecResults.getModifiedPartitions().size() > 0) {
       insertResult = new TInsertResult();
     }
 
@@ -329,29 +328,16 @@ public class TestUtils {
     // Check insert results for insert statements.
     // We check the num rows and the partitions independently,
     // because not all table types create new partition files (e.g., HBase tables).
-    if (expectedExecResults.getNumAppendedRows().size() > 0) {
+    if (expectedExecResults.getModifiedPartitions().size() > 0) {
       ArrayList<String> actualResultsArray = Lists.newArrayList();
-      for (int i = 0; i < insertResult.getRows_appendedSize(); ++i) {
-        actualResultsArray.add(insertResult.getRows_appended().get(i).toString());
+      for (Map.Entry<String, Long> entry: insertResult.getRows_appended().entrySet()) {
+        actualResultsArray.add("/" + entry.getKey() + ": " + entry.getValue());
       }
 
-      actualExecResults.getNumAppendedRows().addAll(actualResultsArray);
+      actualExecResults.getModifiedPartitions().addAll(actualResultsArray);
 
       String result = TestUtils.compareOutput(actualResultsArray,
-          expectedExecResults.getNumAppendedRows(), true);
-      if (!result.isEmpty()) {
-        testErrorLog.append("query:\n" + queryReportString + "\n" + result);
-      }
-    }
-    if (expectedExecResults.getModifiedPartitions().size() > 0) {
-      for (String modifiedPartition : insertResult.getModified_hdfs_partitions()) {
-        actualExecResults.getModifiedPartitions().add(
-            applyHdfsFilePathFilter(modifiedPartition));
-      }
-
-      String result = TestUtils.compareOutput(actualExecResults.getModifiedPartitions(),
           expectedExecResults.getModifiedPartitions(), false);
-
       if (!result.isEmpty()) {
         testErrorLog.append("query:\n" + queryReportString + "\n" + result);
       }
@@ -359,8 +345,7 @@ public class TestUtils {
 
     // We only expect partitions and num rows for insert statements,
     // and we compared them above.
-    if (expectedExecResults.getNumAppendedRows().size() > 0 ||
-        expectedExecResults.getModifiedPartitions().size() > 0) {
+    if (expectedExecResults.getModifiedPartitions().size() > 0) {
       return actualExecResults;
     }
 

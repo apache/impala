@@ -1,0 +1,240 @@
+# insert overwrite into unpartitioned table
+insert overwrite table insert_overwrite_nopart$TABLE 
+select int_col
+from tinyinttable
+---- SETUP
+RESET insert_overwrite_nopart$TABLE
+---- RESULTS
+---- PARTITIONS
+/: 10
+====
+# Check results - note larger limit than expected in case there's more data written than there should be
+select col1 
+from insert_overwrite_nopart$TABLE 
+order by col1 
+limit 20
+---- TYPES
+int
+---- RESULTS
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
+====
+# Now do an overwrite that should delete what was just written
+insert overwrite table insert_overwrite_nopart$TABLE
+select 10
+from tinyinttable
+---- RESULTS
+---- PARTITIONS
+/: 10
+====
+# check results from previous insert
+select col1 
+from insert_overwrite_nopart$TABLE 
+order by col1 
+limit 20
+---- TYPES
+int
+---- RESULTS
+10
+10
+10
+10
+10
+10
+10
+10
+10
+10
+====
+# TODO: IMP-240 - Hive will delete data even for inserts that write nothing. When we fix IMP-240, this test should fail. 
+insert overwrite table insert_overwrite_nopart$TABLE
+select 3
+from tinyinttable
+limit 0
+---- RESULTS
+---- PARTITIONS
+====
+select count(*) from insert_overwrite_nopart$TABLE
+---- TYPES
+bigint
+---- RESULTS
+10
+====
+# Static partitioned insert
+insert overwrite table insert_overwrite_partitioned$TABLE
+PARTITION(col2=5)
+select int_col
+from tinyinttable
+---- SETUP
+RESET insert_overwrite_partitioned$TABLE$TABLE
+---- RESULTS
+---- PARTITIONS
+/col2=5/: 10
+====
+# Check results of previous insert
+select col1, col2 from insert_overwrite_partitioned$TABLE
+order by col1
+limit 20
+---- TYPES
+int,int
+---- RESULTS
+0,5
+1,5
+2,5
+3,5
+4,5
+5,5
+6,5
+7,5
+8,5
+9,5
+====
+# Insert into another partition, to check that original partition stays intact
+insert overwrite table insert_overwrite_partitioned$TABLE
+PARTITION(col2=6)
+select int_col
+from tinyinttable
+---- SETUP
+RESET insert_overwrite_nopart$TABLE
+---- RESULTS
+---- PARTITIONS
+/col2=6/: 10
+====
+# Check results of previous insert
+select col1, col2 from 
+insert_overwrite_partitioned$TABLE 
+order by col2, col1 
+limit 30
+---- TYPES
+int,int
+---- RESULTS
+0,5
+1,5
+2,5
+3,5
+4,5
+5,5
+6,5
+7,5
+8,5
+9,5
+0,6
+1,6
+2,6
+3,6
+4,6
+5,6
+6,6
+7,6
+8,6
+9,6
+====
+# Overwrite one partition, check that the other partition remains intact
+insert overwrite table insert_overwrite_partitioned$TABLE
+partition(col2=5)
+select 10 from tinyinttable
+---- RESULTS
+---- PARTITIONS
+/col2=5/: 10
+====
+# Confirm that one partition is still intact
+select col1, col2 from insert_overwrite_partitioned$TABLE
+order by col2, col1 limit 30
+---- TYPES
+int,int
+---- RESULTS
+10,5
+10,5
+10,5
+10,5
+10,5
+10,5
+10,5
+10,5
+10,5
+10,5
+0,6
+1,6
+2,6
+3,6
+4,6
+5,6
+6,6
+7,6
+8,6
+9,6
+====
+# Dynamic partitions
+insert overwrite table insert_overwrite_partitioned$TABLE
+partition(col2)
+select int_col, int_col 
+from tinyinttable
+---- SETUP
+DROP PARTITIONS insert_overwrite_partitioned$TABLE
+---- RESULTS
+---- PARTITIONS
+/col2=0/: 1
+/col2=1/: 1
+/col2=2/: 1
+/col2=3/: 1
+/col2=4/: 1
+/col2=5/: 1
+/col2=6/: 1
+/col2=7/: 1
+/col2=8/: 1
+/col2=9/: 1
+====
+# Confirm results of previous insert
+select col1, col2
+from insert_overwrite_partitioned$TABLE
+order by col2
+limit 30
+---- TYPES
+int,int
+---- RESULTS
+0,0
+1,1
+2,2
+3,3
+4,4
+5,5
+6,6
+7,7
+8,8
+9,9
+====
+# Overwrite dynamic partition. Limit to 1 row without actually using limit, which forces non-parallel insert
+insert overwrite table insert_overwrite_partitioned$TABLE
+partition(col2)
+select 10, 0 from tinyinttable
+where int_col = 0
+---- RESULTS
+---- PARTITIONS
+/col2=0/: 1
+====
+select col1, col2
+from insert_overwrite_partitioned$TABLE
+order by col2
+limit 30
+---- TYPES
+int,int
+---- RESULTS
+10,0
+1,1
+2,2
+3,3
+4,4
+5,5
+6,6
+7,7
+8,8
+9,9
+====

@@ -7,8 +7,8 @@ where p_name like 'forest%'
 RESET tpch.q20_tmp1$TABLE
 RELOAD tpch.q20_tmp1$TABLE
 ---- RESULTS
----- NUMROWS
-2127
+---- PARTITIONS
+/: 2127
 ====
 insert overwrite table tpch.q20_tmp2$TABLE
 select
@@ -26,8 +26,8 @@ group by
 RESET tpch.q20_tmp2$TABLE
 RELOAD tpch.q20_tmp2$TABLE
 ---- RESULTS
----- NUMROWS
-543210
+---- PARTITIONS
+/: 543210
 ====
 insert overwrite table tpch.q20_tmp3$TABLE
 select
@@ -43,8 +43,8 @@ from tpch.partsupp$TABLE ps
 RESET tpch.q20_tmp3$TABLE
 RELOAD tpch.q20_tmp3$TABLE
 ---- RESULTS
----- NUMROWS
-5843
+---- PARTITIONS
+/: 5843
 ====
 # Modified to use subquery to work around IMP-127
 insert overwrite table tpch.q20_tmp4$TABLE
@@ -59,6 +59,8 @@ from (select
 RESET tpch.q20_tmp4$TABLE
 RELOAD tpch.q20_tmp4$TABLE
 ---- RESULTS
+---- PARTITIONS
+/: 4397
 ====
 # Modifications: Added limit
 select

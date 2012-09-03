@@ -62,7 +62,6 @@ public class TestFileParser {
     PLAN,
     DISTRIBUTEDPLAN,
     FILEERRORS,
-    NUMROWS,
     PARTITIONS,
     SETUP,
     // Each file format has its own ERROR section because each filetype has a different
@@ -184,7 +183,6 @@ public class TestFileParser {
       result.getResultSet().addAll(getSectionContents(Section.RESULTS));
       result.getModifiedPartitions().addAll(
           getSectionContents(Section.PARTITIONS, false, tableSuffix));
-      result.getNumAppendedRows().addAll(getSectionContents(Section.NUMROWS));
 
       // Only load the error of the specified format type.
       if (tableSuffix.equals("")) {

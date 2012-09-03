@@ -186,6 +186,20 @@ struct TExecPlanFragmentResult {
 
 // ReportExecStatus
 
+// The results of an INSERT query, sent to the coordinator as part of 
+// TReportExecStatusParams
+struct TInsertExecStatus {
+  // Number of rows appended by an INSERT, per-partition.
+  // The keys represent partitions to create, coded as k1=v1/k2=v2/k3=v3..., with the 
+  // root in an unpartitioned table being the empty string.
+  // The target table name is recorded in the corresponding TQueryExecRequest
+  1: optional map<string, i64> num_appended_rows
+ 
+  // A map from temporary absolute file path to final absolute destination. The 
+  // coordinator performs these updates after the query completes. 
+  2: required map<string, string> files_to_move;
+}
+
 struct TReportExecStatusParams {
   1: required ImpalaInternalServiceVersion protocol_version
 
@@ -211,10 +225,9 @@ struct TReportExecStatusParams {
   // required in V1
   7: optional RuntimeProfile.TRuntimeProfileTree profile
 
-  // list of partitions that need to be created after an INSERT.
-  // Target table name is recorded in TQueryExecRequest.
-  // optional in V1
-  8: optional list<string> partitions_to_create
+  // Cumulative structural changes made by a table sink
+  // optional in V1 
+  8: optional TInsertExecStatus insert_exec_status;
 }
 
 struct TReportExecStatusResult {

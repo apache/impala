@@ -64,8 +64,25 @@ struct TCatalogUpdate {
   // Database that the table belongs to
   2: required string db_name;
 
-  // List of partitions that are new and need to be created
+  // List of partitions that are new and need to be created. May
+  // include the root partition (represented by the empty string).
   3: required set<string> created_partitions;
+}
+
+// Metadata required to finalize a query - that is, to clean up after the query is done. 
+// Only relevant for INSERT queries.
+struct TFinalizeParams {
+  // True if the INSERT query was OVERWRITE, rather than INTO
+  1: required bool is_overwrite;
+ 
+  // The base directory in hdfs of the table targeted by this INSERT
+  2: required string hdfs_base_dir;
+ 
+  // The target table name
+  3: required string table_name;
+
+  // The target table database
+  4: required string table_db;
 }
 
 // Result of call to ImpalaPlanService/JniFrontend.CreateQueryRequest()
@@ -86,6 +103,9 @@ struct TQueryExecRequest2 {
 
   // Metadata of the query result set (only for select)
   5: optional TResultSetMetadata result_set_metadata
+
+  // Set if the query needs finalization after it executes
+  6: optional TFinalizeParams finalize_params;
 }
 
 enum TDdlType {
@@ -141,10 +161,8 @@ struct TQueryExecRequest {
   // for debugging purposes (to allow backend to log the query string)
   6: optional string sql_stmt;
 
-  // If this query INSERTs data, it is convenient to have to table name and db available
-  // when updating the metastore. 
-  7: optional string insert_table_name;
-  8: optional string insert_table_db;
+  // Set if the query needs finalization after it executes
+  7: optional TFinalizeParams finalize_params;
 }
 
 // Result of call to createExecRequest()

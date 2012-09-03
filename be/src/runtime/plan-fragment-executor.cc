@@ -49,7 +49,13 @@ PlanFragmentExecutor::~PlanFragmentExecutor() {
   // if we try to Close() an HdfsScanNode while still holding
   // DiskIoMgr::BufferDescriptors
   row_batch_.reset(NULL);
-  plan_->Close(runtime_state_.get());
+  // Prepare may not have been called, which sets runtime_state_
+  if (runtime_state_.get() != NULL) {
+    plan_->Close(runtime_state_.get());
+    if (sink_.get() != NULL) {
+      sink_->Close(runtime_state());
+    }
+  }
   StopReportThread();
 }
 
@@ -181,14 +187,23 @@ Status PlanFragmentExecutor::OpenInternal() {
     COUNTER_UPDATE(rows_produced_counter_, batch->num_rows());
     RETURN_IF_ERROR(sink_->Send(runtime_state(), batch));
   }
-  // stop report thread *before* closing sink, so that the final report gets
-  // sent before the coordinator unregisters the query
-  // TODO: there's still a chance that the final report doesn't show up
-  // at the coordinator until after the sink got closed, and preventing that
-  // would require yet more coordination; this might make the coordinator profile
-  // inaccurate, but won't cause logic errors
-  StopReportThread();
+
+  // Close the sink *before* stopping the report thread. Close may
+  // need to add some important information to the last report that
+  // gets sent. (e.g. table sinks record the files they have written
+  // to in this method)
+  // The coordinator report channel waits until all backends are
+  // either in error or have returned a status report with done =
+  // true, so tearing down any data stream state (a separate
+  // channel) in Close is safe.
+
+  // TODO: If this returns an error, the d'tor will call Close again. We should
+  // audit the sinks to check that this is ok, or change that behaviour. 
   RETURN_IF_ERROR(sink_->Close(runtime_state()));
+
+  // Setting to NULL ensures that the d'tor won't double-close the sink. 
+  sink_.reset(NULL);
+  StopReportThread();
 
   return Status::OK;
 }

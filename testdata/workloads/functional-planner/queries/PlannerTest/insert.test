@@ -81,16 +81,11 @@ Plan Fragment 0
       HDFS SPLITS NODE ID: 0
         hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
 ------------ DISTRIBUTEDPLAN
+NO COORDINATOR FRAGMENT
 Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=true
     PARTITIONS: 2009,4
-  EXCHANGE (1)
-    TUPLE IDS: 0 
-
-Plan Fragment 1
-  STREAM DATA SINK
-    EXCHANGE ID: 1
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
 

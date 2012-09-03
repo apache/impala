@@ -23,8 +23,8 @@ from tpch.partsupp$TABLE ps
 RESET tpch.q2_minimum_cost_supplier_tmp1$TABLE
 RELOAD tpch.q2_minimum_cost_supplier_tmp1$TABLE
 ---- RESULTS
----- NUMROWS
-642
+---- PARTITIONS
+/: 642
 ====
 insert overwrite table tpch.q2_minimum_cost_supplier_tmp2$TABLE
 select
@@ -36,8 +36,8 @@ group by p_partkey
 RESET tpch.q2_minimum_cost_supplier_tmp2$TABLE
 RELOAD tpch.q2_minimum_cost_supplier_tmp2$TABLE
 ---- RESULTS
----- NUMROWS
-460
+---- PARTITIONS
+/: 460
 ====
 # Modifications: Fully qualified name of p_partkey column in the ORDER BY clause
 select

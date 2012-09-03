@@ -10,8 +10,8 @@ group by l_suppkey
 RESET tpch.revenue$TABLE
 RELOAD tpch.revenue$TABLE
 ---- RESULTS
----- NUMROWS
-10000
+---- PARTITIONS
+/: 10000
 ====
 insert overwrite table tpch.max_revenue$TABLE
 select max(total_revenue)
@@ -20,8 +20,8 @@ from tpch.revenue$TABLE
 RESET tpch.max_revenue$TABLE
 RELOAD tpch.max_revenue$TABLE
 ---- RESULTS
----- NUMROWS
-1
+---- PARTITIONS
+/: 1
 ====
 # Modifications - Added limit
 select

@@ -97,8 +97,6 @@ public class ImpaladClientExecutor {
     if (insertResult != null) {
       // Insert
       TInsertResult tInsertResult = client.CloseInsert(queryHandle);
-      insertResult.setModified_hdfs_partitions(
-          tInsertResult.getModified_hdfs_partitions());
       insertResult.setRows_appended(tInsertResult.getRows_appended());
       return 0;
     }

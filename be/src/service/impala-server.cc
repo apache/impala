@@ -361,11 +361,7 @@ Status ImpalaServer::QueryExecState::UpdateMetastore() {
 
   DCHECK(exec_request().__isset.queryExecRequest);
   TQueryExecRequest query_exec_request = exec_request().queryExecRequest;
-
-  if (!query_exec_request.__isset.insert_table_name) {
-    // insert_table_name is set iff this is an INSERT query
-    return Status::OK;
-  }
+  DCHECK(query_exec_request.__isset.finalize_params);
 
   // TODO: Doesn't handle INSERT with no FROM
   if (coord() == NULL) {
@@ -381,8 +377,6 @@ Status ImpalaServer::QueryExecState::UpdateMetastore() {
     VLOG_QUERY << "No partitions altered, not updating metastore (query id: " 
                << query_id() << ")";
   } else {
-    DCHECK(query_exec_request.__isset.insert_table_name);
-
     // TODO: We track partitions written to, not created, which means
     // that we do more work than is necessary, because written-to
     // partitions don't always require a metastore change.
@@ -390,14 +384,14 @@ Status ImpalaServer::QueryExecState::UpdateMetastore() {
                << " altered partitions (" 
                << join (catalog_update.created_partitions, ", ") << ")";
     
-    catalog_update.target_table = query_exec_request.insert_table_name;
-    catalog_update.db_name = query_exec_request.insert_table_db;
+    catalog_update.target_table = query_exec_request.finalize_params.table_name;
+    catalog_update.db_name = query_exec_request.finalize_params.table_db;
     RETURN_IF_ERROR(impala_server_->UpdateMetastore(catalog_update));
   }
 
   // TODO: Reset only the updated table
   return impala_server_->ResetCatalogInternal(); 
-}
+} 
 
 Status ImpalaServer::QueryExecState::FetchNextBatch() {
   DCHECK(!eos_);
@@ -573,13 +567,20 @@ void ImpalaServer::FragmentExecState::ReportStatusCb(
   profile->ToThrift(&params.profile);
   params.__isset.profile = true;
 
-  if (executor_.runtime_state()->updated_hdfs_partitions().size() > 0) {
-    params.partitions_to_create.insert(
-        params.partitions_to_create.begin(),
-        executor_.runtime_state()->updated_hdfs_partitions().begin(), 
-        executor_.runtime_state()->updated_hdfs_partitions().end());
+  RuntimeState* runtime_state = executor_.runtime_state();
+  DCHECK(runtime_state != NULL);
+  // Only send updates to insert status if fragment is finished, the coordinator
+  // waits until query execution is done to use them anyhow.
+  if (done && runtime_state->hdfs_files_to_move()->size() > 0) {
+    TInsertExecStatus insert_status;
+    insert_status.__set_files_to_move(*runtime_state->hdfs_files_to_move());
 
-    params.__isset.partitions_to_create = true;
+    if (executor_.runtime_state()->num_appended_rows()->size() > 0) { 
+      insert_status.__set_num_appended_rows(
+          *executor_.runtime_state()->num_appended_rows());
+    }
+
+    params.__set_insert_exec_status(insert_status);
   }
 
   TReportExecStatusResult res;
@@ -1169,14 +1170,8 @@ Status ImpalaServer::CloseInsertInternal(const TUniqueId& query_id,
 
   {
     lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
-    DCHECK(exec_state->coord() != NULL);
-    DCHECK(exec_state->coord()->runtime_state() != NULL);
-    RuntimeState* runtime_state = exec_state->coord()->runtime_state();
-    set<std::string>& updated_partitions = runtime_state->updated_hdfs_partitions();
-    insert_result->modified_hdfs_partitions.insert(
-        insert_result->modified_hdfs_partitions.begin(),
-        updated_partitions.begin(), updated_partitions.end());
-    insert_result->__set_rows_appended(runtime_state->num_appended_rows());
+    DCHECK(exec_state->coord() != NULL);    
+    insert_result->__set_rows_appended(exec_state->coord()->partition_row_counts());
   }
 
   if (!UnregisterQuery(query_id)) {

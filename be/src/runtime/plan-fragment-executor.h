@@ -149,6 +149,14 @@ class PlanFragmentExecutor {
   void UpdateStatus(const Status& status);
 
   // Executes Open() logic and returns resulting status. Does not set status_.
+  // If this plan fragment has no sink, OpenInternal() does nothing. 
+  // If this plan fragment has a sink and OpenInternal() returns without an
+  // error condition all rows will have been sent to the sink, the sink will
+  // have been closed and the report thread will have been stopped, ensuring a
+  // last status report will have been sent to the coordinator. sink_ will be
+  // set to NULL after successful execution.
+  // In the error case, the destructor will clean up the report thread and the
+  // sink.
   Status OpenInternal();
 
   // Executes GetNext() logic and returns resulting status.

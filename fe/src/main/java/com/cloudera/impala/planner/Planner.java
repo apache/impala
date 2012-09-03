@@ -36,12 +36,14 @@ import com.cloudera.impala.analysis.UnionStmt;
 import com.cloudera.impala.analysis.UnionStmt.Qualifier;
 import com.cloudera.impala.analysis.UnionStmt.UnionOperand;
 import com.cloudera.impala.catalog.HdfsTable;
+import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.common.Reference;
 import com.cloudera.impala.thrift.Constants;
+import com.cloudera.impala.thrift.TFinalizeParams;
 import com.cloudera.impala.thrift.THBaseKeyRange;
 import com.cloudera.impala.thrift.THdfsFileSplit;
 import com.cloudera.impala.thrift.THostPort;
@@ -820,26 +822,34 @@ public class Planner {
     List<DataSink> dataSinks = Lists.newArrayList();
     List<PlanNode> planFragments = Lists.newArrayList();
 
-    // Under certain circumstances, we can't do parallel INSERT.  In
-    // particular, OVERWRITE introduces a bug where all backends will
-    // race to delete the existing table data, and may delete each
-    // other's results.
-    boolean coordinatorDoesInsert = (numNodes == 1) 
-      || (analysisResult.isInsertStmt() && analysisResult.getInsertStmt().isOverwrite());
+    boolean coordinatorDoesInsert = (numNodes == 1); 
     
     if (queryStmt instanceof SelectStmt) { // Could be UNION
       SelectStmt selectStmt = (SelectStmt)queryStmt;
       if ((selectStmt.getAggInfo() != null ||
            selectStmt.getHavingPred() != null ||
-           selectStmt.getSortInfo() != null)) {
+           selectStmt.getSortInfo() != null) ||
+           selectStmt.hasOrderByClause() || 
+           selectStmt.hasLimitClause()) {
         coordinatorDoesInsert = true;
       }
     }
 
     if (analysisResult.isInsertStmt()) {
       InsertStmt insertStmt = analysisResult.getInsertStmt();
-      request.setInsert_table_name(insertStmt.getTargetTableName().getTbl());
-      request.setInsert_table_db(insertStmt.getTargetTableName().getDb());
+      TFinalizeParams finalizeParams = new TFinalizeParams();
+      
+      finalizeParams.setIs_overwrite(insertStmt.isOverwrite());
+      finalizeParams.setTable_name(insertStmt.getTargetTableName().getTbl());
+
+      String db = insertStmt.getTargetTableName().getDb();
+      // TODO: Why is this null?
+      finalizeParams.setTable_db(db == null ? "" : db);
+
+      String hdfsBaseDir = ((HdfsTable)insertStmt.getTargetTable()).getHdfsBaseDir();
+      finalizeParams.setHdfs_base_dir(hdfsBaseDir);
+
+      request.setFinalize_params(finalizeParams);
     }
 
     // create TPlanExecRequests and set up data sinks

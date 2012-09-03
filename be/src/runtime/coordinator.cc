@@ -21,6 +21,7 @@
 #include "runtime/data-stream-sender.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/exec-env.h"
+#include "runtime/hdfs-fs-cache.h"
 #include "runtime/plan-fragment-executor.h"
 #include "runtime/row-batch.h"
 #include "runtime/parallel-executor.h"
@@ -29,6 +30,7 @@
 #include "exec/data-sink.h"
 #include "exec/scan-node.h"
 #include "util/debug-util.h"
+#include "util/hdfs-util.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Frontend_types.h"
@@ -89,8 +91,7 @@ int64_t Coordinator::BackendExecState::GetNodeThroughput(int node_id) {
 Coordinator::Coordinator(ExecEnv* exec_env, ExecStats* exec_stats)
   : exec_env_(exec_env),
     has_called_wait_(false),
-    executor_(new PlanFragmentExecutor(
-        exec_env, PlanFragmentExecutor::ReportStatusCallback())),
+    executor_(NULL), // Set in Prepare()
     exec_stats_(exec_stats),
     num_remaining_backends_(0),
     obj_pool_(NULL) {
@@ -100,6 +101,11 @@ Coordinator::~Coordinator() {
 }
 
 Status Coordinator::Exec(TQueryExecRequest* request) {
+  needs_finalization_ = request->__isset.finalize_params;
+  if (needs_finalization_) {
+    finalize_params_ = request->finalize_params;
+  }
+
   query_id_ = request->query_id;
   VLOG_QUERY << "Exec() query_id=" << request->query_id
              << " stmt=" << request->sql_stmt;
@@ -113,6 +119,8 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
   DCHECK_GT(request->node_request_params.size(), 0);
 
   if (request->has_coordinator_fragment) {
+    executor_.reset(new PlanFragmentExecutor(
+            exec_env_, PlanFragmentExecutor::ReportStatusCallback()));
     // If a coordinator fragment is requested (for most queries this
     // will be the case, the exception is parallel INSERT queries), start
     // this before starting any more plan fragments in backend threads,
@@ -233,29 +241,157 @@ Status Coordinator::UpdateStatus(const Status& status) {
   return query_status_;
 }
 
+Status Coordinator::FinalizeQuery() {
+  // All backends must have reported their final statuses before finalization,
+  // which is a post-condition of Wait.
+  DCHECK(has_called_wait_);
+  DCHECK(needs_finalization_);
+
+  hdfsFS hdfs_connection = exec_env_->fs_cache()->GetDefaultConnection();
+
+  // TODO: If this process fails, the state of the table's data is left
+  // undefined. We should do better cleanup: there's probably enough information
+  // here to roll back to the table's previous state.
+
+  // INSERT finalization happens in the four following steps
+  // 1. If OVERWRITE, remove all the files in the target directory
+  // 2. Create all the necessary partition directories.
+  BOOST_FOREACH(const PartitionRowCount::value_type& partition, 
+      partition_row_counts_) {
+    stringstream ss;
+    // Fully-qualified partition path
+    ss << finalize_params_.hdfs_base_dir << "/" << partition.first;
+    if (finalize_params_.is_overwrite) {   
+      if (partition.first.empty()) {
+        // If the root directory is written to, then the table must not be partitioned
+        DCHECK(partition_row_counts_.size() == 1);
+        // We need to be a little more careful, and only delete data files in the root
+        // because the tmp directories the sink(s) wrote are there also. 
+        // So only delete files in the table directory - all files are treated as data 
+        // files by Hive and Impala, but directories are ignored (and may legitimately
+        // be used to store permanent non-table data by other applications). 
+        int num_files = 0;
+        hdfsFileInfo* existing_files = 
+            hdfsListDirectory(hdfs_connection, ss.str().c_str(), &num_files);
+        if (existing_files == NULL) {
+          return AppendHdfsErrorMessage("Could not list directory: ", ss.str());
+        }
+        Status delete_status = Status::OK;
+        for (int i = 0; i < num_files; ++i) {
+          if (existing_files[i].mKind == kObjectKindFile) {
+            VLOG(2) << "Deleting: " << string(existing_files[i].mName);
+            if (hdfsDelete(hdfs_connection, existing_files[i].mName, 1) == -1) {
+              delete_status = Status(AppendHdfsErrorMessage("Failed to delete existing "
+                  "HDFS file as part of INSERT OVERWRITE query: ", 
+                  string(existing_files[i].mName)));
+              break;
+            }
+          }
+        }
+        hdfsFreeFileInfo(existing_files, num_files);
+        RETURN_IF_ERROR(delete_status);
+      } else {
+        // This is a partition directory, not the root directory; we can delete
+        // recursively with abandon, after checking it was ever created. 
+        if (hdfsExists(hdfs_connection, ss.str().c_str()) != -1) {
+          // TODO: There's a potential race here between checking for the directory
+          // and a third-party deleting it. 
+          if (hdfsDelete(hdfs_connection, ss.str().c_str(), 1) == -1) {
+            return Status(AppendHdfsErrorMessage("Failed to delete partition directory "
+                    "as part of INSERT OVERWRITE query: ", ss.str()));
+          }
+        }
+      }
+    }
+    // Ignore error if directory already exists
+    hdfsCreateDirectory(hdfs_connection, ss.str().c_str());
+  }
+
+  // 3. Move all tmp files
+  set<string> tmp_dirs_to_delete;
+  BOOST_FOREACH(FileMoveMap::value_type& move, files_to_move_) {
+    // Empty destination means delete (which we do in a separate
+    // pass because we may not have processed the contents of this
+    // dir yet)
+    if (move.second.empty()) {
+      tmp_dirs_to_delete.insert(move.first);
+    } else {
+      VLOG_ROW << "Moving tmp file: " << move.first << " to " << move.second;
+      if (hdfsRename(hdfs_connection, move.first.c_str(), move.second.c_str()) == -1) {
+        stringstream ss;
+        ss << "Could not move HDFS file: " << move.first << " to desintation: " 
+           << move.second;
+        return AppendHdfsErrorMessage(ss.str());
+      }          
+    }
+  }
+
+  // 4. Delete temp directories
+  BOOST_FOREACH(const string& tmp_path, tmp_dirs_to_delete) {
+    if (hdfsDelete(hdfs_connection, tmp_path.c_str(), 1) == -1) {
+      return Status(AppendHdfsErrorMessage("Failed to delete temporary directory: ", 
+          tmp_path));
+    }
+  }
+
+  return Status::OK;
+}
+
+Status Coordinator::WaitForAllBackends() {
+  unique_lock<mutex> l(lock_);
+  VLOG_QUERY << "Coordinator waiting for backends to finish, " 
+             << num_remaining_backends_ << " remaining";
+  while (num_remaining_backends_ > 0 && query_status_.ok()) {
+    backend_completion_cv_.wait(l);
+  }
+  VLOG_QUERY << "All backends finished or error.";    
+ 
+  return query_status_;
+}
+
 Status Coordinator::Wait() {
   lock_guard<mutex> l(wait_lock_);
   if (has_called_wait_) return Status::OK;
   has_called_wait_ = true;
   if (executor_.get() != NULL) {
     // Open() may block
-    return UpdateStatus(executor_->Open());
+    RETURN_IF_ERROR(UpdateStatus(executor_->Open()));
+
+    // If the coordinator fragment has a sink, it will have finished executing at this
+    // point.  It's safe therefore to copy the set of files to move and updated partitions
+    // into the query-wide set.
+    RuntimeState* state = runtime_state();
+    DCHECK(state != NULL);
+
+    // No other backends should have updated these structures if the coordinator has a
+    // fragment.  (Backends have a sink only if the coordinator does not)
+    DCHECK_EQ(files_to_move_.size(), 0);
+    DCHECK_EQ(partition_row_counts_.size(), 0);
+
+    // Because there are no other updates, safe to copy the maps rather than merge them.
+    files_to_move_ = *state->hdfs_files_to_move();
+    partition_row_counts_ = *state->num_appended_rows();
   } else {
-    unique_lock<mutex> l(lock_);
-    VLOG_QUERY << "Coordinator waiting for backends to finish, " 
-               << num_remaining_backends_ << " remaining";
-    while (num_remaining_backends_ > 0 && query_status_.ok()) {
-      backend_completion_cv_.wait(l);
-    }
-    VLOG_QUERY << "All backends finished or error.";
+    // Query finalization can only happen when all backends have reported
+    // relevant state. They only have relevant state to report in the parallel
+    // INSERT case, otherwise all the relevant state is from the coordinator
+    // fragment which will be available after Open() returns. 
+    RETURN_IF_ERROR(WaitForAllBackends());
   }
-  return query_status_;
+
+  // Query finalization is required only for HDFS table sinks
+  if (needs_finalization_) {
+    return FinalizeQuery();
+  }
+
+  return Status::OK;
 }
 
 Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
   VLOG_ROW << "GetNext() query_id=" << query_id_;
   DCHECK(has_called_wait_);
   SCOPED_TIMER(query_profile_->total_time_counter());
+
   if (executor_.get() == NULL) {
     // If there is no local fragment, we produce no output, and execution will
     // have finished after Wait.
@@ -273,6 +409,13 @@ Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
   RETURN_IF_ERROR(UpdateStatus(status));
 
   if (*batch == NULL) {
+    // Don't return final NULL until all backends have completed.
+    // GetNext must wait for all backends to complete before
+    // ultimately signalling the end of execution via a NULL
+    // batch. After NULL is returned, the coordinator may tear down
+    // query state, and perform post-query finalization which might
+    // depend on the reports from all backends.
+    RETURN_IF_ERROR(WaitForAllBackends());
     if (VLOG_QUERY_IS_ON) {
       stringstream s;
       query_profile_->PrettyPrint(&s);
@@ -512,12 +655,20 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
       CreateThroughputCounters(exec_state->profile, &exec_state->throughput_counters);
     }
     exec_state->profile_created = true;
+  }
 
-    // Gather any metastore operations to be made
-    if (params.done && params.__isset.partitions_to_create) {
-      exec_state->updated_hdfs_partitions.insert(
-          params.partitions_to_create.begin(), params.partitions_to_create.end());
+  if (params.done && params.__isset.insert_exec_status) {
+    lock_guard<mutex> l(lock_);
+    // Merge in table update data (partitions written to, files to be moved as part of
+    // finalization)
+    
+    BOOST_FOREACH(const PartitionRowCount::value_type& partition, 
+        params.insert_exec_status.num_appended_rows) {
+      partition_row_counts_[partition.first] += partition.second;
     }
+    files_to_move_.insert(
+        params.insert_exec_status.files_to_move.begin(),
+        params.insert_exec_status.files_to_move.end());
   }
 
   if (VLOG_QUERY_IS_ON) {
@@ -585,21 +736,10 @@ ObjectPool* Coordinator::obj_pool() {
 bool Coordinator::PrepareCatalogUpdate(TCatalogUpdate* catalog_update) {
   // Assume we are called only after all fragments have completed
   DCHECK(has_called_wait_);
-  BOOST_FOREACH(BackendExecState* exec_state, backend_exec_states_) {
-    catalog_update->created_partitions.insert(
-        exec_state->updated_hdfs_partitions.begin(),
-        exec_state->updated_hdfs_partitions.end());
-  }
 
-  // If the coordinator has a sink, could be that it creates partitions as well
-  RuntimeState* state = runtime_state();
-  if (state != NULL) {
-    // Coordinator and slaves can't both create partitions
-    DCHECK(state->updated_hdfs_partitions().size() == 0
-        || catalog_update->created_partitions.size() == 0);
-    catalog_update->created_partitions.insert(
-        state->updated_hdfs_partitions().begin(),
-        state->updated_hdfs_partitions().end());
+  BOOST_FOREACH(const PartitionRowCount::value_type& partition,
+      partition_row_counts_) {
+    catalog_update->created_partitions.insert(partition.first);
   }
 
   return catalog_update->created_partitions.size() != 0;
