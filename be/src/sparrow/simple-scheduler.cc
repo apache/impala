@@ -97,6 +97,7 @@ Status SimpleScheduler::GetHosts(
     return Status("No backends configured");
   }
   hostports->clear();
+  int num_local_assignments = 0;
   for (int i = 0; i < data_locations.size(); ++i) {
     HostMap::iterator entry = host_map_.find(data_locations[i].host);
     if (entry == host_map_.end()) {
@@ -106,6 +107,8 @@ Status SimpleScheduler::GetHosts(
       if (next_nonlocal_host_entry_ == host_map_.end()) {
         next_nonlocal_host_entry_ = host_map_.begin();
       }
+    } else {
+      ++num_local_assignments;
     }
     DCHECK(!entry->second.empty());
     // Round-robin between impalads on the same host. Pick the first one, then move it
@@ -119,11 +122,18 @@ Status SimpleScheduler::GetHosts(
     vector<string> hostport_strings;
     for (int i = 0; i < hostports->size(); ++i) {
       stringstream s;
-      s << (*hostports)[i].first << ":" << (*hostports)[i].second;
+      s << "(" << data_locations[i].host << ":" << data_locations[i].port 
+        << " -> " << (*hostports)[i].first << ":" << (*hostports)[i].second << ")";
       hostport_strings.push_back(s.str());
     }
-    VLOG_QUERY << "SimpleScheduler: selecting "
+    VLOG_QUERY << "SimpleScheduler assignment (data->backend):  "
                << algorithm::join(hostport_strings, ", ");
+    if (data_locations.size() > 0) {
+      VLOG_QUERY << "SimpleScheduler locality percentage " << setprecision(4) 
+                 << 100.0f * (num_local_assignments / (float)data_locations.size())
+                 << "% (" << num_local_assignments << " out of " << data_locations.size()
+                 << ")";
+    }
   }
   DCHECK_EQ(data_locations.size(), hostports->size());
   return Status::OK;
