@@ -476,13 +476,11 @@ public abstract class BaseQueryTest {
    */
   protected void runTestInExecutionMode(TestExecMode executionMode, String testFile,
       boolean abortOnError, int maxErrors) {
-    // TODO: TPCH Currently has a bug with when LLVM is enabled (IMP-129). This is a
-    // temporary workaround for this problem. Once that is resolved this can be
-    // removed.
+    // TPCH currently takes a long time to run so just run it with one setting.
     if (testFile.trim().startsWith("tpch")) {
       List<TestConfiguration> testConfigs = generateAllConfigurationPermutations(
           TEXT_FORMAT_ONLY, UNCOMPRESSED_ONLY,
-          ImmutableList.of(1024), ImmutableList.of(2),  ImmutableList.of(true));
+          ImmutableList.of(1024), ImmutableList.of(2),  ImmutableList.of(false));
       runQueryWithTestConfigs(testConfigs, testFile, abortOnError, maxErrors);
       return;
     }

@@ -97,7 +97,6 @@ Function* FunctionCall::Codegen(LlvmCodeGen* codegen) {
       break;
     }
     default:
-      LOG(ERROR) << "Unsupported function: " << op();
       return NULL;
   }
 

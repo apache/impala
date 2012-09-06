@@ -54,7 +54,7 @@ DEFINE_int32(num_nodes, 1,
     "0 = run in # of data nodes + 1 for coordinator");
 DECLARE_int32(be_port);
 // TODO: we probably want to add finer grain control of what is codegen'd
-DEFINE_bool(enable_jit, false, "if true, enable codegen for query execution");
+DEFINE_bool(enable_jit, true, "if true, enable codegen for query execution");
 DECLARE_string(host);
 
 using namespace std;

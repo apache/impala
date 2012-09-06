@@ -750,7 +750,7 @@ Status LlvmCodeGen::LoadIntrinsics() {
   return Status::OK;
 }
 
-void LlvmCodeGen::CodegenMemcpy(LlvmBuilder* builder, Value* dst, Value* src, Value* n) {
+void LlvmCodeGen::CodegenMemcpy(LlvmBuilder* builder, Value* dst, Value* src, int size) {
   // Cast src/dst to int8_t*.  If they already are, this will get optimized away
   DCHECK(PointerType::classof(dst->getType()));
   DCHECK(PointerType::classof(src->getType()));
@@ -761,9 +761,12 @@ void LlvmCodeGen::CodegenMemcpy(LlvmBuilder* builder, Value* dst, Value* src, Va
   Function* memcpy_fn = llvm_intrinsics_[Intrinsic::memcpy];
   DCHECK(memcpy_fn != NULL);
 
+  // The fourth argument is the alignment.  For non-zero values, the caller
+  // must guarantee that the src and dst values are aligned to that byte boundary.
+  // TODO: We should try to take advantage of this since our tuples are well aligned.
   Value* args[] = {
-    dst, src, n,
-    GetIntConstant(TYPE_INT, 16),       // alignment.  16 is recommended. Not sure why
+    dst, src, GetIntConstant(TYPE_INT, size),
+    GetIntConstant(TYPE_INT, 0),       
     false_value()                       // is_volatile.
   };
   builder->CreateCall(memcpy_fn, args);
@@ -773,21 +776,7 @@ void LlvmCodeGen::CodegenAssign(LlvmBuilder* builder,
     Value* dst, Value* src, PrimitiveType type) {
   switch (type) {
     case TYPE_STRING:  {
-#if 0
-TODO: why does the memcpy not work???  On release, this segfaults.
-      CodegenMemcpy(builder, dst, src, GetIntConstant(TYPE_INT, sizeof(StringValue)));
-#endif
-      Value* src_ptr = builder->CreateStructGEP(src, 0, "string_ptr");
-      Value* src_len = builder->CreateStructGEP(src, 1, "string_len");
-
-      src_ptr = builder->CreateLoad(src_ptr);
-      src_len = builder->CreateLoad(src_len);
-
-      Value* dst_ptr = builder->CreateStructGEP(dst, 0, "string_ptr");
-      Value* dst_len = builder->CreateStructGEP(dst, 1, "string_len");
-
-      builder->CreateStore(src_ptr, dst_ptr);
-      builder->CreateStore(src_len, dst_len);
+      CodegenMemcpy(builder, dst, src, sizeof(StringValue));
       break;
     }
     case TYPE_TIMESTAMP:

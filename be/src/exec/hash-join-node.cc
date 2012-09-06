@@ -491,8 +491,7 @@ Function* HashJoinNode::CodegenCreateOutputRow(LlvmCodeGen* codegen) {
   Value* build_row_arg = builder.CreateBitCast(args[3], tuple_row_working_type, "build");
 
   // Copy probe row
-  codegen->CodegenMemcpy(&builder, out_row_arg, probe_row_arg, 
-      codegen->GetIntConstant(TYPE_INT, result_tuple_row_size_));
+  codegen->CodegenMemcpy(&builder, out_row_arg, probe_row_arg, result_tuple_row_size_);
 
   // Copy build row.  
   BasicBlock* build_not_null_block = BasicBlock::Create(context, "build_not_null", fn);

@@ -317,9 +317,12 @@ TEST_F(LlvmCodeGenTest, MemcpyTest) {
 
   LlvmCodeGen::LlvmBuilder builder(codegen->context());
 
+  char src[] = "abcd";
+  char dst[] = "aaaa";
+
   Value* args[3];
   Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
-  codegen->CodegenMemcpy(&builder, args[0], args[1], args[2]);
+  codegen->CodegenMemcpy(&builder, args[0], args[1], sizeof(src));
   builder.CreateRetVoid();
 
   fn = codegen->FinalizeFunction(fn);
@@ -330,9 +333,6 @@ TEST_F(LlvmCodeGenTest, MemcpyTest) {
   
   typedef void (*TestMemcpyFn)(char*, char*, int64_t);
   TestMemcpyFn test_fn = reinterpret_cast<TestMemcpyFn>(jitted_fn);
-
-  char src[] = "abcd";
-  char dst[] = "aaaa";
 
   test_fn(dst, src, 4);
 

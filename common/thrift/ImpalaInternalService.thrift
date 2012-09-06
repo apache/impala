@@ -20,7 +20,7 @@ include "JavaConstants.thrift"
 struct TQueryOptions {
   1: required bool abort_on_error = 1
   2: required i32 max_errors = 0
-  3: required bool disable_codegen = 1
+  3: required bool disable_codegen = 0
   4: required i32 batch_size = 0
   
   // return_as_ascii is not listed in ImpalaService.ImpalaQueryOptions because Beeswax

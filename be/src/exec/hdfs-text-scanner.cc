@@ -711,8 +711,7 @@ Function* HdfsTextScanner::CodegenWriteCompleteTuple(LlvmCodeGen* codegen) {
     // TODO: only copy what's necessary from the template tuple.
     Value* template_tuple_ptr =
         codegen->CastPtrToLlvmPtr(codegen->ptr_type(), template_tuple_);
-    codegen->CodegenMemcpy(&builder, tuple_arg, template_tuple_ptr,
-        codegen->GetIntConstant(TYPE_INT, tuple_byte_size_));
+    codegen->CodegenMemcpy(&builder, tuple_arg, template_tuple_ptr, tuple_byte_size_);
   }
 
   // Put tuple in tuple_row

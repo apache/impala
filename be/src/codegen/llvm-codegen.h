@@ -304,8 +304,8 @@ class LlvmCodeGen {
   llvm::Function* CodegenMinMax(PrimitiveType type, bool min);
 
   // Codegen to call llvm memcpy intrinsic at the current builder location
-  // dst & src must be pointer types.  n must be an int type.
-  void CodegenMemcpy(LlvmBuilder*, llvm::Value* dst, llvm::Value* src, llvm::Value* n);
+  // dst & src must be pointer types.  size is the number of bytes to copy.
+  void CodegenMemcpy(LlvmBuilder*, llvm::Value* dst, llvm::Value* src, int size);
 
   // Codegen computing v1 == v2.  Returns the result.  v1 and v2 must be the same type
   llvm::Value* CodegenEquals(LlvmBuilder*, llvm::Value* v1, llvm::Value* v2, 
