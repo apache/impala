@@ -24,7 +24,6 @@ int64_t CpuInfo::original_hardware_flags_;
 long CpuInfo::cache_sizes_[L3_CACHE + 1];
 int64_t CpuInfo::cycles_per_ms_;
 
-
 static struct {
   string name;
   int64_t flag;

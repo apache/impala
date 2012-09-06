@@ -14,6 +14,7 @@ add_library(Util
   debug-util.cc
   decompress.cc
   default-path-handlers.cc
+  disk-info.cc
   hdfs-util.cc
   integer-array.cc
   jni-util.cc

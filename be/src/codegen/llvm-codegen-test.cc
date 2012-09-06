@@ -7,6 +7,7 @@
 #include "codegen/llvm-codegen.h"
 #include "runtime/raw-value.h"
 #include "util/cpu-info.h"
+#include "util/disk-info.h"
 #include "util/hash-util.h"
 #include "util/path-builder.h"
 
@@ -421,6 +422,7 @@ TEST_F(LlvmCodeGenTest, HashTest) {
 
 int main(int argc, char **argv) {
   impala::CpuInfo::Init();
+  impala::DiskInfo::Init();
   ::testing::InitGoogleTest(&argc, argv);
   impala::LlvmCodeGen::InitializeLlvm();
   return RUN_ALL_TESTS();

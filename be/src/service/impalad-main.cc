@@ -26,6 +26,7 @@
 #include "runtime/exec-env.h"
 #include "testutil/test-exec-env.h"
 #include "util/cpu-info.h"
+#include "util/disk-info.h"
 #include "util/jni-util.h"
 #include "util/logging.h"
 #include "util/thrift-util.h"
@@ -57,6 +58,7 @@ int main(int argc, char** argv) {
   InitGoogleLoggingSafe(argv[0]);
   InitThriftLogging();
   CpuInfo::Init();
+  DiskInfo::Init();
   LlvmCodeGen::InitializeLlvm();
   JniUtil::InitLibhdfs();
   EXIT_IF_ERROR(JniUtil::Init());

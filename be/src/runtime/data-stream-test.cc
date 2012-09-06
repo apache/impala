@@ -20,6 +20,7 @@
 #include "testutil/in-process-query-executor.h"
 #include "testutil/test-exec-env.h"
 #include "util/cpu-info.h"
+#include "util/disk-info.h"
 #include "util/debug-util.h"
 #include "util/thrift-server.h"
 #include "gen-cpp/ImpalaInternalService.h"
@@ -321,6 +322,7 @@ int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
   ::testing::InitGoogleTest(&argc, argv);
   impala::CpuInfo::Init();
+  impala::DiskInfo::Init();
   impala::LlvmCodeGen::InitializeLlvm();
   return RUN_ALL_TESTS();
 }

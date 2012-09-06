@@ -32,6 +32,7 @@
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
 #include "util/cpu-info.h"
+#include "util/disk-info.h"
 #include "util/jni-util.h"
 #include "util/perf-counters.h"
 #include "util/runtime-profile.h"
@@ -271,6 +272,7 @@ int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, true);
   CpuInfo::Init();
+  DiskInfo::Init();
   InitThriftLogging();
   LlvmCodeGen::InitializeLlvm();
   JniUtil::InitLibhdfs();
