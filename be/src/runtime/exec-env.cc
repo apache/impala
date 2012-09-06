@@ -14,6 +14,7 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "sparrow/simple-scheduler.h"
 #include "sparrow/subscription-manager.h"
+#include "util/metrics.h"
 #include "util/webserver.h"
 #include "util/default-path-handlers.h"
 #include "gen-cpp/ImpalaInternalService.h"
@@ -38,12 +39,14 @@ ExecEnv::ExecEnv()
     fs_cache_(new HdfsFsCache()),
     htable_cache_(new HBaseTableCache()),
     webserver_(new Webserver()),
+    metrics_(new Metrics()),
     enable_webserver_(FLAGS_enable_webserver),
     tz_database_(TimezoneDatabase()) {
   // Initialize the scheduler either dynamically (with a statestore) or statically (with
   // configured backends)
   if (FLAGS_use_statestore) {
-    scheduler_.reset(new SimpleScheduler(subscription_mgr_.get(), IMPALA_SERVICE_ID));
+    scheduler_.reset(new SimpleScheduler(subscription_mgr_.get(), IMPALA_SERVICE_ID, 
+        metrics_.get()));
   } else if (!FLAGS_backends.empty()) {
     vector<string> backends;
     vector<THostPort> addresses;
@@ -59,7 +62,7 @@ ExecEnv::ExecEnv()
       addr.host = backends[i].substr(0, pos);
       addr.port = atoi(backends[i].substr(pos + 1).c_str());
     }
-    scheduler_.reset(new SimpleScheduler(addresses));
+    scheduler_.reset(new SimpleScheduler(addresses, metrics_.get()));
   } else {
     // No scheduler required if query is not distributed.
     // TODO: Check that num_nodes is correctly set?
@@ -73,14 +76,17 @@ ExecEnv::~ExecEnv() {
 
 Status ExecEnv::StartServices() {
   // Start services in order to ensure that dependencies between them are met
-  if (FLAGS_use_statestore) RETURN_IF_ERROR(subscription_mgr_->Start());
-  if (scheduler_ != NULL) scheduler_->Init();
   if (enable_webserver_) {
     RETURN_IF_ERROR(webserver_->Start());
     AddDefaultPathHandlers(webserver_.get());
   } else {
     LOG(INFO) << "Not starting webserver";
   }
+
+  metrics_->Init(enable_webserver_ ? webserver_.get() : NULL);
+
+  if (FLAGS_use_statestore) RETURN_IF_ERROR(subscription_mgr_->Start());
+  if (scheduler_ != NULL) scheduler_->Init();
 
   return Status::OK;
 }

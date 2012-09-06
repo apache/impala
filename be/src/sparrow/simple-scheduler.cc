@@ -10,6 +10,7 @@
 #include <boost/mem_fn.hpp>
 #include <boost/foreach.hpp>
 
+#include "util/metrics.h"
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
 
@@ -21,23 +22,35 @@ using namespace std;
 using namespace boost;
 using impala::Status;
 using impala::THostPort;
-using impala::ExecEnv;
+using impala::Metrics;
 
 namespace sparrow {
 
+static const string LOCAL_ASSIGNMENTS_KEY("simple-scheduler.local.assignments.total");
+static const string ASSIGNMENTS_KEY("simple-scheduler.assignments.total");
+static const string SCHEDULER_INIT_KEY("simple-scheduler.initialized");
+
 SimpleScheduler::SimpleScheduler(SubscriptionManager* subscription_manager,
-    const ServiceId& backend_service_id)
-  : subscription_manager_(subscription_manager),
+    const ServiceId& backend_service_id, Metrics* metrics)
+  : metrics_(metrics),
+    subscription_manager_(subscription_manager),
     callback_(bind<void>(mem_fn(&SimpleScheduler::UpdateMembership), this, _1)),
     subscription_id_(INVALID_SUBSCRIPTION_ID),
-    backend_service_id_(backend_service_id) {
+    backend_service_id_(backend_service_id),
+    total_assignments_(NULL),
+    total_local_assignments_(NULL),
+    initialised_(NULL) {
   next_nonlocal_host_entry_ = host_map_.begin();
 }
 
-SimpleScheduler::SimpleScheduler(const vector<THostPort>& backends)
-  : subscription_manager_(NULL),
+SimpleScheduler::SimpleScheduler(const vector<THostPort>& backends, Metrics* metrics)
+  : metrics_(metrics),
+    subscription_manager_(NULL),
     callback_(NULL),
-    subscription_id_(INVALID_SUBSCRIPTION_ID) {
+    subscription_id_(INVALID_SUBSCRIPTION_ID),
+    total_assignments_(NULL),
+    total_local_assignments_(NULL),
+    initialised_(NULL) {
   DCHECK(backends.size() > 0);
   for (int i = 0; i < backends.size(); ++i) {
     string host = backends[i].host;
@@ -57,13 +70,17 @@ SimpleScheduler::~SimpleScheduler() {
 }
 
 impala::Status SimpleScheduler::Init() {
-  if (subscription_manager_ == NULL) return Status::OK;
-
-  unordered_set<string> services;
-  services.insert(backend_service_id_);
-  RETURN_IF_ERROR(subscription_manager_->RegisterSubscription(
-      services, &callback_, &subscription_id_));
-
+  if (subscription_manager_ != NULL) {   
+    unordered_set<string> services;
+    services.insert(backend_service_id_);
+    RETURN_IF_ERROR(subscription_manager_->RegisterSubscription(
+            services, &callback_, &subscription_id_));
+  }
+  if (metrics_ != NULL) {
+    total_assignments_ = metrics_->CreateMetric(ASSIGNMENTS_KEY, 0L);
+    total_local_assignments_ = metrics_->CreateMetric(LOCAL_ASSIGNMENTS_KEY, 0L);
+    initialised_ = metrics_->CreateMetric(SCHEDULER_INIT_KEY, true);
+  }
   return Status::OK;
 }
 
@@ -118,6 +135,12 @@ Status SimpleScheduler::GetHosts(
     entry->second.pop_front();
     entry->second.push_back(port);
   }
+
+  if (metrics_ != NULL) {
+    total_assignments_->Increment(data_locations.size());
+    total_local_assignments_->Increment(num_local_assignments);
+  }
+
   if (VLOG_QUERY_IS_ON) {
     vector<string> hostport_strings;
     for (int i = 0; i < hostports->size(); ++i) {

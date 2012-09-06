@@ -29,7 +29,7 @@ class SimpleSchedulerTest : public testing::Test {
       backends.at(i).host = "localhost";
       backends.at(i).port = base_port_ + i;
     }
-    localhost_scheduler_.reset(new SimpleScheduler(backends));
+    localhost_scheduler_.reset(new SimpleScheduler(backends, NULL));
 
     // Setup remote_scheduler
     for (int i = 0; i < num_backends_; ++i) {
@@ -38,7 +38,7 @@ class SimpleSchedulerTest : public testing::Test {
       backends.at(i).host = ss.str();
       backends.at(i).port = base_port_ + i;
     }
-    remote_scheduler_.reset(new SimpleScheduler(backends));
+    remote_scheduler_.reset(new SimpleScheduler(backends, NULL));
 
     // Setup local_remote_scheduler_
     backends.resize(4);
@@ -52,7 +52,7 @@ class SimpleSchedulerTest : public testing::Test {
         ++k;
       }
     }
-    local_remote_scheduler_.reset(new SimpleScheduler(backends));
+    local_remote_scheduler_.reset(new SimpleScheduler(backends, NULL));
   }
 
   virtual void TearDown() {
@@ -128,7 +128,7 @@ TEST_F(SimpleSchedulerTest, NonLocalHost) {
 
  TEST_F(SimpleSchedulerTest, CleanShutdownWithoutInit) {
    SubscriptionManager subscription_manager;
-   SimpleScheduler simple_scheduler(&subscription_manager, "dummy_service_id");
+   SimpleScheduler simple_scheduler(&subscription_manager, "dummy_service_id", NULL);
    // We're checking that the SimpleScheduler destructor finishes cleanly if Init is not
    // called, so just allow simple_scheduler to go out of scope.
  }

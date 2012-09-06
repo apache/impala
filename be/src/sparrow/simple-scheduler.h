@@ -14,6 +14,7 @@
 #include "sparrow/subscription-manager.h"
 #include "sparrow/util.h"
 #include "sparrow/state-store-service.h"
+#include "util/metrics.h"
 #include "gen-cpp/Types_types.h"  // for THostPort
 
 namespace sparrow {
@@ -26,11 +27,12 @@ class SimpleScheduler : public Scheduler {
   // Initialize with a subscription manager that we can register with for updates to the
   // set of available backends.
   SimpleScheduler(SubscriptionManager* subscription_manager,
-      const ServiceId& backend_service_id);
+      const ServiceId& backend_service_id, impala::Metrics* metrics);
 
   // Initialize with a list of <host:port> pairs in 'static' mode - i.e. the set of
   // backends is fixed and will not be updated.
-  SimpleScheduler(const std::vector<impala::THostPort>& backends);
+  SimpleScheduler(const std::vector<impala::THostPort>& backends, 
+      impala::Metrics* metrics);
   
   virtual ~SimpleScheduler();
 
@@ -59,8 +61,11 @@ class SimpleScheduler : public Scheduler {
   typedef boost::unordered_map<std::string, std::list<int> > HostMap;
   HostMap host_map_;
 
+  // Metrics subsystem access
+  impala::Metrics* metrics_;
+
   // Protects access to host_map_, which may be updated asynchronously with respect to
-  // reads.
+  // reads. Also protects the locality counters, which are updated in GetHosts.
   boost::mutex host_map_lock_;
 
   // round robin entry in HostMap for non-local host assignment
@@ -79,6 +84,13 @@ class SimpleScheduler : public Scheduler {
 
   // Service identifier to subscribe to for backend membership information
   ServiceId backend_service_id_;
+
+  // Locality metrics
+  impala::Metrics::IntMetric* total_assignments_;
+  impala::Metrics::IntMetric* total_local_assignments_;
+
+  // Initialisation metric
+  impala::Metrics::BooleanMetric* initialised_;
 
   // Called asynchronously when an update is received from the subscription manager
   void UpdateMembership(const ServiceStateMap& service_state);

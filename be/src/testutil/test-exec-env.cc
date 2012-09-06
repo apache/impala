@@ -14,6 +14,7 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "sparrow/simple-scheduler.h"
 #include "sparrow/state-store-subscriber-service.h"
+#include "util/metrics.h"
 #include "util/thrift-server.h"
 #include "gen-cpp/ImpalaInternalService.h"
 
@@ -101,7 +102,7 @@ Status TestExecEnv::StartBackends() {
   // Coordinator exec env gets both a subscription manager and a scheduler.
   subscription_mgr_.reset(new SubscriptionManager("localhost", next_free_port++,
       "localhost", state_store_port_));
-  scheduler_.reset(new SimpleScheduler(subscription_mgr_.get(), IMPALA_SERVICE_ID));
+  scheduler_.reset(new SimpleScheduler(subscription_mgr_.get(), IMPALA_SERVICE_ID, NULL));
   subscription_mgr_->Start();
   scheduler_->Init();
 

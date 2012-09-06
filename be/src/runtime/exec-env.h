@@ -25,6 +25,7 @@ class HBaseTableCache;
 class HdfsFsCache;
 class TestExecEnv;
 class Webserver;
+class Metrics;
 
 // Execution environment for queries/plan fragments.
 // Contains all required global structures, and handles to
@@ -44,6 +45,7 @@ class ExecEnv {
   HdfsFsCache* fs_cache() { return fs_cache_.get(); }
   HBaseTableCache* htable_cache() { return htable_cache_.get(); }
   Webserver* webserver() { return webserver_.get(); }
+  Metrics* metrics() { return metrics_.get(); }
 
   void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
 
@@ -64,6 +66,7 @@ class ExecEnv {
   boost::scoped_ptr<HdfsFsCache> fs_cache_;
   boost::scoped_ptr<HBaseTableCache> htable_cache_;
   boost::scoped_ptr<Webserver> webserver_;
+  boost::scoped_ptr<Metrics> metrics_;
 
   bool enable_webserver_;
 
