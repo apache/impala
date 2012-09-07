@@ -7,6 +7,8 @@
 #include "common/object-pool.h"
 
 #include <boost/scoped_ptr.hpp>
+#include <boost/thread/locks.hpp>
+#include <boost/thread/mutex.hpp>
 #include <vector>
 #include <string>
 // stringstream is a typedef, so can't forward declare it.
@@ -56,8 +58,6 @@ class RuntimeState {
   const TimestampValue* now() const { return now_.get(); }
   void set_now(const TimestampValue* now);
   const std::vector<std::string>& error_log() const { return error_log_; }
-  boost::mutex& errors_lock() { return errors_lock_; }
-  std::stringstream& error_stream() { return error_stream_; }
   const std::vector<std::pair<std::string, int> >& file_errors() const {
     return file_errors_;
   }
@@ -77,8 +77,8 @@ class RuntimeState {
   // Returns CodeGen object.  Returns NULL if codegen is disabled.
   LlvmCodeGen* llvm_codegen() { return codegen_.get(); }
 
-  // Append contents of error_stream_ as one message to error_log_. Clears error_stream_.
-  void LogErrorStream();
+  // Appends error to the error_log_
+  void LogError(const std::string& error);
 
   // Returns true if the error log has not reached max_errors_.
   bool LogHasSpace() const { return error_log_.size() < query_options_.max_errors; }
@@ -110,12 +110,8 @@ class RuntimeState {
   DescriptorTbl* desc_tbl_;
   boost::scoped_ptr<ObjectPool> obj_pool_;
 
-  // Lock protecting error_stream_ and error_log_
-  boost::mutex errors_lock_;
-
-  // A buffer for error messages.
-  // The entire error stream is written to the error_log_ in log_error_stream().
-  std::stringstream error_stream_;
+  // Lock protecting error_log_
+  boost::mutex error_log_lock_;
 
   // Logs error messages.
   std::vector<std::string> error_log_;

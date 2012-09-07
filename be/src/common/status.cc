@@ -3,6 +3,7 @@
 #include <boost/algorithm/string/join.hpp>
 
 #include "common/status.h"
+#include "util/debug-util.h"
 
 using namespace std;
 using namespace boost::algorithm;
@@ -26,6 +27,11 @@ Status& Status::operator=(const Status& status) {
     error_detail_ = new ErrorDetail(*status.error_detail_);
   }
   return *this;
+}
+  
+Status::Status(const string& error_msg) 
+  : error_detail_(new ErrorDetail(TStatusCode::INTERNAL_ERROR, error_msg)) {
+  VLOG(1) << error_msg << endl << GetStackTrace();
 }
 
 Status::Status(const TStatus& status)

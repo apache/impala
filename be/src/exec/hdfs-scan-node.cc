@@ -690,8 +690,19 @@ void HdfsScanNode::ScannerThread(HdfsScanner* scanner, ScanRangeContext* context
       DCHECK(done_);
       return;
     }
-  
+    
     // This thread hit an error, record it and bail
+    // TODO: better way to report errors?  Maybe via the thrift interface?
+    if (VLOG_QUERY_IS_ON && !runtime_state_->error_log().empty()) {
+      stringstream ss;
+      ss << "Scan node (id=" << id() << ") ran into a parse error for scan range "
+         << context->filename() << "(" << context->scan_range()->offset() << ":" 
+         << context->scan_range()->len() 
+         << ").  Processed " << context->total_bytes_returned() << " bytes." << endl
+         << runtime_state_->ErrorLog();
+      VLOG_QUERY << ss.str();
+    }
+  
     status_ = status;
     done_ = true;
     // Notify the disk which will trigger tear down of all threads.

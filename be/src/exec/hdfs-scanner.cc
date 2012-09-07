@@ -176,12 +176,12 @@ int HdfsScanner::WriteEmptyTuples(ScanRangeContext* context,
   
 void HdfsScanner::ReportColumnParseError(const SlotDescriptor* desc, 
     const char* data, int len) {
-  unique_lock<mutex> l(state_->errors_lock());
   if (state_->LogHasSpace()) {
-    state_->error_stream()
-      << "Error converting column: " 
-      << desc->col_pos() - scan_node_->num_partition_keys()
-      << " TO " << TypeToString(desc->type()) 
-      << " (Data is: " << string(data,len) << ")" << endl;
+    stringstream ss;
+    ss << "Error converting column: " 
+       << desc->col_pos() - scan_node_->num_partition_keys()
+       << " TO " << TypeToString(desc->type()) 
+       << " (Data is: " << string(data,len) << ")" << endl;
+    state_->LogError(ss.str());
   }
 }

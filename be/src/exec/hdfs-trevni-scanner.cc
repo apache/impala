@@ -378,9 +378,9 @@ Status HdfsTrevniScanner::ReadCurrentBlock(TrevniColumnInfo* column) {
 
 Status HdfsTrevniScanner::FileReadError(const string& msg) {
   if (state_->LogHasSpace()) {
-    state_->error_stream() << "file: " <<
-        current_byte_stream_->GetLocation() << ": " << msg << endl;
-    state_->LogErrorStream();
+    stringstream ss;
+    ss << "file: " << current_byte_stream_->GetLocation() << ": " << msg;
+    state_->LogError(ss.str());
   }
   return Status(msg);
 }
@@ -523,9 +523,9 @@ Status HdfsTrevniScanner::GetNext(RowBatch* row_batch, bool* eosr) {
     if (error_in_row) {
       error_in_row = false;
       if (state_->LogHasSpace()) {
-        state_->error_stream() << "file " << current_byte_stream_->GetLocation() <<
-            error_str <<endl;
-        state_->LogErrorStream();
+        stringstream ss;
+        ss << "file " << current_byte_stream_->GetLocation() << error_str <<endl;
+        state_->LogError(ss.str());
       }
       if (state_->abort_on_error()) {
         state_->ReportFileErrors(current_byte_stream_->GetLocation(), 1);

@@ -173,6 +173,7 @@ set (IMPALA_LINK_LIBS
   Opcode
   Exprs
   Util
+  Common
   Webserver
   GlobalFlags
   ${SNAPPY_STATIC_LIB}

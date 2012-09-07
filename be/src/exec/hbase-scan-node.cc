@@ -97,10 +97,12 @@ void HBaseScanNode::WriteTextSlot(
       reinterpret_cast<char*>(value), value_length, true, false, tuple_pool_.get())) {
     *error_in_row = true;
     if (state->LogHasSpace()) {
-      state->error_stream() << "Error converting column " << family
+      stringstream ss;
+      ss << "Error converting column " << family
           << ":" << qualifier << ": "
           << "'" << reinterpret_cast<char*>(value) << "' TO "
           << TypeToString(slot->type()) << endl;
+      state->LogError(ss.str());
     }
   }
 }
@@ -186,13 +188,13 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
       error_in_row = false;
       ++num_errors_;
       if (state->LogHasSpace()) {
-        state->error_stream() << "hbase table: " << table_name_ << endl;
+        stringstream ss;
+        ss << "hbase table: " << table_name_ << endl;
         void* key;
         int key_length;
         hbase_scanner_->GetRowKey(env, &key, &key_length);
-        state->error_stream() << "row key: "
-            << string(reinterpret_cast<const char*>(key), key_length);
-        state->LogErrorStream();
+        ss << "row key: " << string(reinterpret_cast<const char*>(key), key_length);
+        state->LogError(ss.str());
       }
       if (state->abort_on_error()) {
         state->ReportFileErrors(table_name_, 1);

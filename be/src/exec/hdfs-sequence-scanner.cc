@@ -18,9 +18,6 @@ using namespace std;
 using namespace boost;
 using namespace impala;
 
-const char* const HdfsSequenceScanner::SEQFILE_KEY_CLASS_NAME =
-  "org.apache.hadoop.io.BytesWritable";
-
 const char* const HdfsSequenceScanner::SEQFILE_VALUE_CLASS_NAME =
   "org.apache.hadoop.io.Text";
 
@@ -280,14 +277,12 @@ Status HdfsSequenceScanner::ProcessRange() {
 
       if (!WriteFields(pool, tuple_row_mem, num_fields, &add_row).ok()) {
         // Report all the fields that have errors.
-        unique_lock<mutex> l(state_->errors_lock());
         ++num_errors_in_file_;
         if (state_->LogHasSpace()) {
-          state_->error_stream() << "file: " << context_->filename() << endl;
-          state_->error_stream() << "record: ";
-          state_->error_stream()
-              << string(reinterpret_cast<char*>(record_start), record_len);
-          state_->LogErrorStream();
+          stringstream ss;
+          ss << "file: " << context_->filename() << endl
+             << "record: " << string(reinterpret_cast<char*>(record_start), record_len);
+          state_->LogError(ss.str());
         }
         if (state_->abort_on_error()) {
           state_->ReportFileErrors(context_->filename(), 1);
@@ -454,17 +449,16 @@ Status HdfsSequenceScanner::CheckSync() {
   bool sync_compares_equal = memcmp(static_cast<void*>(hash),
       static_cast<void*>(header_->sync), HdfsSequenceScanner::SYNC_HASH_SIZE) == 0;
   if (!sync_compares_equal) {
-    unique_lock<mutex> l(state_->errors_lock());
     if (state_->LogHasSpace()) {
-      state_->error_stream() << "Bad sync hash in current HdfsSequenceScanner: "
-           << context_->filename() << "." << endl
-           << "Expected: '"
-           << SerDeUtils::HexDump(header_->sync, HdfsSequenceScanner::SYNC_HASH_SIZE)
-           << "'" << endl
-           << "Actual:   '"
-           << SerDeUtils::HexDump(hash, HdfsSequenceScanner::SYNC_HASH_SIZE)
-           << "'" << endl;
-      state_->LogErrorStream();
+      stringstream ss;
+      ss << "Bad sync hash in HdfsSequenceScanner at file offset " 
+         << (context_->file_offset() - SYNC_HASH_SIZE) << "." << endl
+         << "Expected: '"
+         << SerDeUtils::HexDump(header_->sync, HdfsSequenceScanner::SYNC_HASH_SIZE)
+         << "'" << endl
+         << "Actual:   '"
+         << SerDeUtils::HexDump(hash, HdfsSequenceScanner::SYNC_HASH_SIZE);
+      state_->LogError(ss.str());
     }
     return Status("Bad sync hash");
   }
@@ -479,7 +473,18 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
   }
 
   // Read the sync indicator and check the sync block.
-  RETURN_IF_ERROR(SerDeUtils::SkipBytes(context_, sizeof(uint32_t)));
+  int sync_indicator;
+  RETURN_IF_ERROR(SerDeUtils::ReadInt(context_, &sync_indicator));
+  if (sync_indicator != -1) {
+    if (state_->LogHasSpace()) {
+      stringstream ss;
+      ss << "Expecting sync indicator (-1) at file offset "
+         << (context_->file_offset() - sizeof(int)) << ".  " 
+         << "Sync indicator found " << sync_indicator << "." << endl;
+      state_->LogError(ss.str());
+    }
+    return Status("Bad sync hash");
+  }
   RETURN_IF_ERROR(CheckSync());
 
   RETURN_IF_ERROR(SerDeUtils::ReadVLong(context_, 

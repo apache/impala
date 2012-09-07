@@ -138,14 +138,7 @@ Status HdfsTextScanner::FinishScanRange() {
         break;
       }
       
-      {
-        unique_lock<mutex> l(state_->errors_lock());
-        if (state_->LogHasSpace()) {
-          state_->error_stream() << ss.str() << endl;
-          state_->LogErrorStream();
-        }
-        LOG(ERROR) << ss.str();
-      }
+      if (state_->LogHasSpace()) state_->LogError(ss.str());
       if (state_->abort_on_error()) return Status(ss.str());
       break;
     }
@@ -341,7 +334,6 @@ bool HdfsTextScanner::ReportTupleParseError(FieldLocation* fields, uint8_t* erro
 }
 
 Status HdfsTextScanner::ReportRowParseError(int row_idx) {
-  unique_lock<mutex> l(state_->errors_lock());
   ++num_errors_in_file_;
   if (state_->LogHasSpace()) {
     DCHECK_LT(row_idx, row_end_locations_.size());
@@ -354,15 +346,15 @@ Status HdfsTextScanner::ReportRowParseError(int row_idx) {
       row_start = row_end_locations_[row_idx - 1] + 1; 
     }
 
-    state_->error_stream() << "file: " << context_->filename() << endl;
-    state_->error_stream() << "record: ";
+    stringstream ss;
+    ss << "file: " << context_->filename() << endl << "line: ";
     if (!boundary_row_.Empty()) {
       // Log the beginning of the line from the previous file buffer(s)
-      state_->error_stream() << boundary_row_.str();
+      ss << boundary_row_.str();
     }
     // Log the erroneous line (or the suffix of a line if !boundary_line.empty()).
-    state_->error_stream() << string(row_start, row_end - row_start);
-    state_->LogErrorStream();
+    ss << string(row_start, row_end - row_start);
+    state_->LogError(ss.str());
   }
 
   if (state_->abort_on_error()) {

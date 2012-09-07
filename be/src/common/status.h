@@ -56,10 +56,7 @@ class Status {
   }
 
   // c'tor for internal error
-  Status(const std::string& error_msg)
-    : error_detail_(new ErrorDetail(TStatusCode::INTERNAL_ERROR, error_msg)) {
-    VLOG(1) << error_msg;
-  }
+  Status(const std::string& error_msg);
 
   ~Status() {
     if (error_detail_ != NULL) delete error_detail_;
@@ -148,7 +145,7 @@ class Status {
     if (UNLIKELY(!__status__.ok())) { \
       string msg; \
       __status__.GetErrorMsg(&msg); \
-      cerr << msg; \
+      cerr << msg << endl; \
       exit(1); \
     } \
   } while (false)

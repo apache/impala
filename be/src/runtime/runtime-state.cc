@@ -23,6 +23,7 @@
 
 DECLARE_int32(max_errors);
 
+using namespace boost;
 using namespace llvm;
 using namespace std;
 using namespace boost::algorithm;
@@ -110,12 +111,9 @@ void RuntimeState::ReportFileErrors(const std::string& file_name, int num_errors
   file_errors_.push_back(make_pair(file_name, num_errors));
 }
 
-void RuntimeState::LogErrorStream() {
-  error_log_.push_back(error_stream_.str());
-  // Clear content of stream.
-  error_stream_.str("");
-  // Clear the ios error flags, if any.
-  error_stream_.clear();
+void RuntimeState::LogError(const string& error) {
+  lock_guard<mutex> l(error_log_lock_);
+  error_log_.push_back(error);
 }
 
 }

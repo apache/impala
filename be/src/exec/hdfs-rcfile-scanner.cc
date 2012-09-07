@@ -245,14 +245,16 @@ Status HdfsRCFileScanner::ReadSync() {
       HdfsRCFileScanner::SYNC_HASH_SIZE, &hash[0]));
   if (memcmp(&hash[0], &sync_hash_[0], HdfsRCFileScanner::SYNC_HASH_SIZE)) {
     if (state_->LogHasSpace()) {
-      state_->error_stream() << "Bad sync hash in current HdfsRCFileScanner: "
-           << current_byte_stream_->GetLocation() << "." << endl
-           << "Expected: '"
-           << SerDeUtils::HexDump(sync_hash_, HdfsRCFileScanner::SYNC_HASH_SIZE)
-           << "'" << endl
-           << "Actual:   '"
-           << SerDeUtils::HexDump(hash, HdfsRCFileScanner::SYNC_HASH_SIZE)
-           << "'" << endl;
+      stringstream ss;
+      ss  << "Bad sync hash in current HdfsRCFileScanner: "
+          << current_byte_stream_->GetLocation() << "." << endl
+          << "Expected: '"
+          << SerDeUtils::HexDump(sync_hash_, HdfsRCFileScanner::SYNC_HASH_SIZE)
+          << "'" << endl
+          << "Actual:   '"
+          << SerDeUtils::HexDump(hash, HdfsRCFileScanner::SYNC_HASH_SIZE)
+          << "'" << endl;
+      state_->LogError(ss.str());
     }
     return Status("bad sync hash block");
   }
@@ -538,6 +540,12 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
         if (!text_converter_->WriteSlot(slot_desc, tuple_, 
               col_start, field_len, !has_noncompact_strings_, false, tuple_pool_)) {
           ReportColumnParseError(slot_desc, col_start, field_len);
+          if (state_->LogHasSpace()) {
+            stringstream ss;
+            ss << "Error converting column: " << rc_column_idx
+               << " TO " << TypeToString(slot_desc->type()) << endl;
+            state_->LogError(ss.str());
+          }
           error_in_row = true;
         }
       }
@@ -545,10 +553,10 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
       if (error_in_row) {
         error_in_row = false;
         if (state_->LogHasSpace()) {
-          state_->error_stream() << "file: " <<
-            current_byte_stream_->GetLocation() << endl;
-          state_->error_stream() << "row index: " << row_idx;
-          state_->LogErrorStream();
+          stringstream ss;
+          ss << "file: " << current_byte_stream_->GetLocation() << endl
+             << "row index: " << row_idx;
+          state_->LogError(ss.str());
         }
         if (state_->abort_on_error()) {
           state_->ReportFileErrors(current_byte_stream_->GetLocation(), 1);

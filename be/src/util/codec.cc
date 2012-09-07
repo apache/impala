@@ -1,12 +1,11 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-#include <boost/assign/list_of.hpp>
 #include "util/codec.h"
+#include <boost/assign/list_of.hpp>
+
 #include "util/compress.h"
 #include "util/decompress.h"
-#include "util/cpu-info.h"
-#include "exec/serde-utils.h"
-#include "runtime/runtime-state.h"
+
 #include "gen-cpp/Descriptors_types.h"
 #include "gen-cpp/JavaConstants_constants.h"
 
@@ -52,10 +51,9 @@ Status Codec::CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
       type = compression_map.find(codec);
 
   if (type == compression_map.end()) {
-    if (runtime_state != NULL && runtime_state->LogHasSpace()) {
-      runtime_state->error_stream() << "Unknown Codec: " << codec;
-    }
-    return Status("Unknown Codec");
+    stringstream ss;
+    ss << "Unknown Codec: " << codec;
+    return Status(ss.str());
   }
   Codec* comp;
   RETURN_IF_ERROR(
@@ -98,10 +96,9 @@ Status Codec::CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
       type = compression_map.find(codec);
 
   if (type == compression_map.end()) {
-    if (runtime_state != NULL && runtime_state->LogHasSpace()) {
-      runtime_state->error_stream() << "Unknown Codec: " << codec;
-    }
-    return Status("Unknown Codec");
+    stringstream ss;
+    ss << "Unknown Codec: " << codec;
+    return Status(ss.str());
   }
   Codec* decom;
   RETURN_IF_ERROR(

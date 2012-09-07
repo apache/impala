@@ -160,10 +160,6 @@ class HdfsSequenceScanner : public HdfsScanner {
   // Size of the sync hash field
   const static int SYNC_HASH_SIZE = 16;
 
-  // The key class name located in the SeqFile Header.
-  // This is always "org.apache.hadoop.io.BytesWritable"
-  static const char* const SEQFILE_KEY_CLASS_NAME;
-
   // The value class name located in the SeqFile Header.
   // This is always "org.apache.hadoop.io.Text"
   static const char* const SEQFILE_VALUE_CLASS_NAME;
