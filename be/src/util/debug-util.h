@@ -29,6 +29,13 @@ std::string PrintBatch(RowBatch* batch);
 std::string PrintId(const TUniqueId& id);
 std::string PrintPlanNodeType(const TPlanNodeType::type& type);
 
+std::string GetVersionString();
+
+// Returns the stack trace as a string from the current location.
+// Note: there is a libc bug that causes this not to work on 64 bit machines
+// for recursive calls.
+std::string GetStackTrace();
+
 class PrettyPrinter {
  public:
   // Prints the 'value' in a human friendly format depending on the data type.

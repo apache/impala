@@ -1,10 +1,13 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+#include "common/logging.h"
 
 #include "util/debug-util.h"
 
 #include <iomanip>
 #include <sstream>
 
+#include "common/logging.h"
+#include "common/version.h"
 #include "runtime/descriptors.h"
 #include "runtime/raw-value.h"
 #include "runtime/tuple-row.h"
@@ -174,14 +177,14 @@ string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
 
     case TCounterType::BYTES: {
       string unit;
-      double output = GetByteUnit(value, &unit); 
+      double output = GetByteUnit(value, &unit);
       ss << setprecision(PRECISION) << output << " " << unit;
       break;
     }
 
     case TCounterType::BYTES_PER_SECOND: {
       string unit;
-      double output = GetByteUnit(value, &unit); 
+      double output = GetByteUnit(value, &unit);
       ss << setprecision(PRECISION) << output << " " << unit << "/sec";
       break;
     }
@@ -199,6 +202,19 @@ string PrintBatch(RowBatch* batch) {
     out << PrintRow(batch->GetRow(i), batch->row_desc()) << "\n";
   }
   return out.str();
+}
+
+string GetVersionString() {
+  stringstream ss;
+  ss << google::ProgramInvocationShortName()
+     << " v" << Version::BUILD_VERSION << " (build " << Version::BUILD_HASH << ")";
+  return ss.str();
+}
+
+string GetStackTrace() {
+  string s;
+  google::glog_internal_namespace_::DumpStackTraceToString(&s);
+  return s;
 }
 
 }

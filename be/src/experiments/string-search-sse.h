@@ -4,6 +4,7 @@
 #define IMPALA_EXPERIMENTS_STRING_SEARCH_SSE_H
 
 #include "common/compiler-util.h"
+#include "common/logging.h"
 #include "runtime/string-value.h"
 
 namespace impala {

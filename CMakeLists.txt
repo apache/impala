@@ -8,21 +8,6 @@ enable_testing()
 # where to find cmake modules
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake_modules")
 
-# find thrift headers and libs
-find_package(Thrift REQUIRED)
-include_directories(${Thrift_INCLUDE_DIR})
-set(LIBS ${LIBS} ${Thrift_LIBS})
-message(STATUS "Thrift include dir: ${Thrift_INCLUDE_DIR}")
-message(STATUS "Thrift library path: ${Thrift_LIBS}")
-message(STATUS "Thrift static library: ${Thrift_STATIC_LIB}")
-message(STATUS "Thrift static non-blocking library: ${Thrift_NB_STATIC_LIB}")
-message(STATUS "Thrift compiler: ${Thrift_COMPILER}")
-# for static linking with Thrift, Thrift_STATIC_LIB is set in FindThrift.cmake
-add_library(thriftstatic STATIC IMPORTED)
-set_target_properties(thriftstatic PROPERTIES IMPORTED_LOCATION ${Thrift_STATIC_LIB})
-add_library(thriftnbstatic STATIC IMPORTED)
-set_target_properties(thriftnbstatic PROPERTIES IMPORTED_LOCATION ${Thrift_NB_STATIC_LIB})
-
 # find boost headers and libs
 set(Boost_DEBUG TRUE)
 # in order to load libbackend.so into the jvm, we need to link against a shared
@@ -52,6 +37,18 @@ set(LIBS ${LIBS} ${HDFS_LIBS})
 find_package(Mongoose REQUIRED)
 include_directories(${MONGOOSE_INCLUDE_DIR})
 
+# find GLog headers and libs.  Must include glog headers before the other
+# google libraries.  They all have a config.h and we want glog's to be picked
+# up first.
+find_package(GLog REQUIRED)
+include_directories(${GLOG_INCLUDE_DIR})
+set(LIBS ${LIBS} ${GLOG_LIBS})
+# for static linking with GLOG, GLOG_STATIC_LIB is set in GLOG's find module
+add_library(glogstatic STATIC IMPORTED)
+set_target_properties(glogstatic PROPERTIES IMPORTED_LOCATION ${GLOG_STATIC_LIB})
+
+message(STATUS ${GLOG_INCLUDE_DIR})
+
 # find GFlags headers and libs (needed for GLog)
 find_package(GFlags REQUIRED)
 include_directories(${GFLAGS_INCLUDE_DIR})
@@ -73,16 +70,6 @@ set_target_properties(tcmallocstatic PROPERTIES IMPORTED_LOCATION "${HEAPPROF_ST
 
 message(STATUS ${PPROF_INCLUDE_DIR})
 
-# find GLog headers and libs
-find_package(GLog REQUIRED)
-include_directories(${GLOG_INCLUDE_DIR})
-set(LIBS ${LIBS} ${GLOG_LIBS})
-# for static linking with GLOG, GLOG_STATIC_LIB is set in GLOG's find module
-add_library(glogstatic STATIC IMPORTED)
-set_target_properties(glogstatic PROPERTIES IMPORTED_LOCATION ${GLOG_STATIC_LIB})
-
-message(STATUS ${GLOG_INCLUDE_DIR})
-
 # find GTest headers and libs
 find_package(GTest REQUIRED)
 include_directories(${GTEST_INCLUDE_DIR})
@@ -97,6 +84,21 @@ message(STATUS ${GTEST_LIBRARY})
 find_package(Llvm REQUIRED)
 include_directories(${LLVM_INCLUDE_DIR})
 set(LIBS ${LIBS} ${LLVM_MODULE_LIBS})
+
+# find thrift headers and libs
+find_package(Thrift REQUIRED)
+include_directories(${Thrift_INCLUDE_DIR})
+set(LIBS ${LIBS} ${Thrift_LIBS})
+message(STATUS "Thrift include dir: ${Thrift_INCLUDE_DIR}")
+message(STATUS "Thrift library path: ${Thrift_LIBS}")
+message(STATUS "Thrift static library: ${Thrift_STATIC_LIB}")
+message(STATUS "Thrift static non-blocking library: ${Thrift_NB_STATIC_LIB}")
+message(STATUS "Thrift compiler: ${Thrift_COMPILER}")
+# for static linking with Thrift, Thrift_STATIC_LIB is set in FindThrift.cmake
+add_library(thriftstatic STATIC IMPORTED)
+set_target_properties(thriftstatic PROPERTIES IMPORTED_LOCATION ${Thrift_STATIC_LIB})
+add_library(thriftnbstatic STATIC IMPORTED)
+set_target_properties(thriftnbstatic PROPERTIES IMPORTED_LOCATION ${Thrift_NB_STATIC_LIB})
 
 # find Snappy headers and libs
 find_package(Snappy REQUIRED)

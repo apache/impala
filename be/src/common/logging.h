@@ -8,7 +8,7 @@
 // issues when we try to dynamically link the codegen'd functions.
 #ifdef IR_COMPILE
 #include <iostream>
-  #define DCHECK(condition) 
+  #define DCHECK(condition)
   #define DCHECK_EQ(a, b)
   #define DCHECK_NE(a, b)
   #define DCHECK_GT(a, b)
@@ -17,11 +17,17 @@
   #define DCHECK_LE(a, b)
   // Similar to how glog defines DCHECK for release.
   #define LOG(level) while(false) std::cout
-  #define VLOG(level) while(false) std::cout 
+  #define VLOG(level) while(false) std::cout
 #else
-// glog MUST be included before gflags.  Instead of including them,
-// our files should include this file instead.
-#include <glog/logging.h>
+  // GLOG defines this based on the system but doesn't check if it's already
+  // been defined.  undef it first to avoid warnings.
+  // glog MUST be included before gflags.  Instead of including them,
+  // our files should include this file instead.
+  #undef _XOPEN_SOURCE
+  // This is including a glog internal file.  We want this to expose the
+  // function to get the stack trace.
+  #include <glog/../utilities.h>
+  #include <gflags/gflags.h>
 #endif
 
 // Define VLOG levels.  We want display per-row info less than per-file which
@@ -37,4 +43,3 @@
 #define VLOG_ROW_IS_ON VLOG_IS_ON(3)
 
 #endif
-
