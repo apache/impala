@@ -24,3 +24,15 @@ bigint, bigint, bigint, bigint, bigint, bigint
 ---- RESULTS
 1,1,1,0,0,0
 ====
+# Test to select from table with additional columns at the end that are not in the 
+# schema
+select * from tblwithcolspastend$TABLE
+---- TYPES
+string, int
+---- RESULTS
+'hello',1
+'foo',2
+'a',3
+'b',4
+'end',0
+====

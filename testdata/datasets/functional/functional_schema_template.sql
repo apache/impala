@@ -1062,7 +1062,6 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
 ----
 ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
-====
 functional
 ----
 nullescapedtable
@@ -1085,3 +1084,25 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
 ----
 ----
 ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
+====
+functional
+----
+TblWithColsPastEnd
+----
+CREATE EXTERNAL TABLE %(table_name)s (
+  str_col string,
+  int_col int)
+row format delimited fields terminated by ','  escaped by '\\'
+stored as %(file_format)s
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+----
+FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
+----
+${IMPALA_HOME}/bin/run-query.sh --query=" \
+  INSERT OVERWRITE TABLE %(table_name)s \
+  select * FROM %(base_table_name)s"
+----
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/TblWithColsPastEnd/data.csv' OVERWRITE INTO TABLE %(table_name)s;
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
+====

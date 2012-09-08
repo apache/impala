@@ -82,8 +82,11 @@ class DelimitedTextParser {
                        sync, ByteStream*  byte_stream);
 
   // Will we return the current column to the query?
+  // Hive allows cols at the end of the table that are not in the schema.  We'll
+  // just ignore those columns
   bool ReturnCurrentColumn() {
-    return scan_node_->GetMaterializedSlotIdx(column_idx_) != HdfsScanNode::SKIP_COLUMN;
+    return column_idx_ < scan_node_->num_cols() && 
+           scan_node_->GetMaterializedSlotIdx(column_idx_) != HdfsScanNode::SKIP_COLUMN;
   }
 
  private:
