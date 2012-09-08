@@ -1039,3 +1039,49 @@ LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/TinyTable/data.csv' OVERWRIT
 ----
 ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+functional
+----
+nulltable
+----
+CREATE TABLE %(table_name)s (
+  a string,
+  b string,
+  c string,
+  d int,
+  e double)
+row format delimited fields terminated by ','
+stored as %(file_format)s;
+INSERT OVERWRITE TABLE nulltable select 'a', '', NULL, NULL, NULL from alltypes limit 1;
+----
+FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
+----
+${IMPALA_HOME}/bin/run-query.sh --query=" \
+  INSERT OVERWRITE TABLE %(table_name)s \
+  select * FROM %(base_table_name)s"
+----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
+====
+====
+functional
+----
+nullescapedtable
+----
+CREATE TABLE %(table_name)s (
+  a string,
+  b string,
+  c string,
+  d int,
+  e double)
+row format delimited fields terminated by ',' escaped by '\\'
+stored as %(file_format)s;
+INSERT OVERWRITE TABLE nullescapedtable select 'a', '', NULL, NULL, NULL from alltypes limit 1;
+----
+FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
+----
+${IMPALA_HOME}/bin/run-query.sh --query=" \
+  INSERT OVERWRITE TABLE %(table_name)s \
+  select * FROM %(base_table_name)s"
+----
+----
+ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;

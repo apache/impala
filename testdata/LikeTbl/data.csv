@@ -12,3 +12,4 @@ beginning of line,begin%,not begin%,^begin.*,^not begin.*
 end of line,%line,%line end,.*line$,.*line end$
 middle of line,%of%,%of,^.*of.*$,.*of$
 ,%,,.*,X
+\N,%,\N,.*,X

@@ -305,6 +305,7 @@ select * from LikeTbl
 string, string, string, string, string
 ---- RESULTS
 'NULL','%','NULL','.*','X'
+'','%','','.*','X'
 'beginning of line','begin%','not begin%','^begin.*','^not begin.*'
 'eight','%eight%','n%eight%','.*eight.*','n.*eight.*'
 'end of line','%line','%line end','.*line$','.*line end$'
@@ -337,6 +338,7 @@ string, string
 'ten','%ten%'
 'three','%three%'
 'two','%two%'
+'','%'
 ====
 select str_col, match_like_col from LikeTbl
 where str_col NOT LIKE match_like_col
@@ -349,6 +351,7 @@ where str_col LIKE no_match_like_col
 ---- TYPES
 string, string
 ---- RESULTS
+'','%'
 ====
 select str_col, no_match_like_col from LikeTbl
 where str_col NOT LIKE no_match_like_col
@@ -387,6 +390,7 @@ string, string
 'ten','.*ten.*'
 'three','.*three.*'
 'two','.*two.*'
+'','.*'
 ====
 select str_col, no_match_regex_col from LikeTbl
 where str_col REGEXP no_match_regex_col
@@ -418,6 +422,7 @@ string, string
 'ten','n.*ten.*'
 'three','n.*three.*'
 'two','n.*two.*'
+'','X'
 ====
 select 1+2
 ---- TYPES

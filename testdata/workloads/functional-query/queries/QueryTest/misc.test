@@ -1,0 +1,26 @@
+# Test for selecting from table with null and empty strings.
+select * from nulltable$TABLE
+---- TYPES
+string, string, string, int, double
+---- RESULTS
+'a','','NULL',NULL,NULL
+====
+select count(*),count(a),count(b),count(c),count(d),count(e) from nulltable$TABLE
+---- TYPES
+bigint, bigint, bigint, bigint, bigint, bigint
+---- RESULTS
+1,1,1,0,0,0
+====
+# Test for selecting from table with '\' escape character with null and empty strings.
+select * from nullescapedtable$TABLE
+---- TYPES
+string, string, string, int, double
+---- RESULTS
+'a','','NULL',NULL,NULL
+====
+select count(*),count(a),count(b),count(c), count(d), count(e) from nullescapedtable$TABLE
+---- TYPES
+bigint, bigint, bigint, bigint, bigint, bigint
+---- RESULTS
+1,1,1,0,0,0
+====

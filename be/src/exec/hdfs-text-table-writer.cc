@@ -55,9 +55,11 @@ Status HdfsTextTableWriter::AppendRowBatch(RowBatch* batch,
     // the first num_non_partition_cols values.
     for (int j = 0; j < num_non_partition_cols; ++j) {
       void* value = output_exprs_[j]->GetValue(current_row);
-      // NULL values become empty strings
       if (value != NULL) {
         output_exprs_[j]->PrintValue(value, &row_stringstream);
+      } else {
+        // NULL values in hive are encoded as '\N'
+        row_stringstream << "\\N";
       }
       // Append field delimiter.
       if (j + 1 < num_non_partition_cols) {
