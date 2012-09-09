@@ -51,6 +51,7 @@ function(THRIFT_GEN VAR)
       OUTPUT ${OUTPUT_BE_FILE}
       COMMAND thrift ${CPP_ARGS} ${FIL}
       COMMAND thrift ${JAVA_ARGS} ${FIL}
+      COMMAND thrift ${PYTHON_ARGS} ${FIL}
       DEPENDS ${ABS_FIL}
       COMMENT "Running thrift compiler on ${FIL}"
       VERBATIM
@@ -63,11 +64,15 @@ endfunction(THRIFT_GEN)
 set(THRIFT_INCLUDE_DIR_OPTION -I ${Thrift_CONTRIB_DIR} -I $ENV{HIVE_HOME}/src/metastore/if)
 set(BE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/be/generated-sources)
 set(FE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/fe/generated-sources)
+set(PYTHON_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/shell/)
+MESSAGE("Found output dir: " ${PYTHON_OUTPUT_DIR})
 file(MAKE_DIRECTORY ${BE_OUTPUT_DIR})
 file(MAKE_DIRECTORY ${FE_OUTPUT_DIR})
+file(MAKE_DIRECTORY ${PYTHON_OUTPUT_DIR})
 
 # Args passed to thrift for Java gen
 set(JAVA_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen java:hashcode -o ${FE_OUTPUT_DIR})
+set(PYTHON_ARGS ${THRIFT_INCLUDE_DIR_OPTION} --gen py -o ${PYTHON_OUTPUT_DIR})
 
 set (GENERATES_SRC_FILES 
   Opcodes.thrift
