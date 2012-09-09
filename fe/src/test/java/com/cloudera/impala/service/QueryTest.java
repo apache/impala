@@ -10,73 +10,82 @@ import com.cloudera.impala.testutil.TestExecContext;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 
+
 public class QueryTest extends BaseQueryTest {
 
   @Test
   public void TestDistinct() {
-    runTestInExecutionMode(EXECUTION_MODE, "distinct", false, 1000);
+    runTestInExecutionMode(EXECUTION_MODE, "distinct", true, 0);
   }
 
   @Test
   public void TestAggregation() {
-    runTestInExecutionMode(EXECUTION_MODE, "aggregation", false, 1000);
+    runTestInExecutionMode(EXECUTION_MODE, "aggregation", true, 0);
   }
 
   @Test
   public void TestExprs() {
-    runTestInExecutionMode(EXECUTION_MODE, "exprs", false, 1000);
+    runTestInExecutionMode(EXECUTION_MODE, "exprs", true, 0);
   }
 
   @Test
   public void TestHdfsScanNode() {
     // Run fully distributed (nodes = 0) with all batch sizes.
-    runPairTestFile("hdfs-scan-node", false, 1000,
+    runPairTestFile("hdfs-scan-node", true, 0,
         ALL_TABLE_FORMATS, ALL_COMPRESSION_FORMATS, ALL_BATCH_SIZES, ALL_NODES_ONLY);
     // Run other node numbers with small batch sizes on text
-    runQueryInAllBatchAndClusterPerms("hdfs-scan-node", false, 1000, TEXT_FORMAT_ONLY,
+    runQueryInAllBatchAndClusterPerms("hdfs-scan-node", true, 0, TEXT_FORMAT_ONLY,
         SMALL_BATCH_SIZES, SMALL_CLUSTER_SIZES);
+  }
+
+  @Test
+  public void TestHdfsScanNodeErrors() {
+    // Set AbortOnError to false because we expect errors
+    runPairTestFile("hdfs-scan-node-errors", false, 1000,
+        ALL_TABLE_FORMATS, ALL_COMPRESSION_FORMATS, ALL_BATCH_SIZES, ALL_NODES_ONLY);
+    runQueryInAllBatchAndClusterPerms("hdfs-scan-node-errors", false, 1000,
+        TEXT_FORMAT_ONLY, SMALL_BATCH_SIZES, SMALL_CLUSTER_SIZES);
   }
 
   @Test
   public void TestFilePartitions() {
     // Run fully distributed with all batch sizes.
-    runPairTestFile("hdfs-partitions", false, 1000,
+    runPairTestFile("hdfs-partitions", true, 0,
         ALL_TABLE_FORMATS, ALL_COMPRESSION_FORMATS, ALL_BATCH_SIZES, ALL_NODES_ONLY);
-
     // Run other node numbers with small batch sizes on text
-    runQueryInAllBatchAndClusterPerms("hdfs-partitions", false, 1000, TEXT_FORMAT_ONLY,
+    runQueryInAllBatchAndClusterPerms("hdfs-partitions", true, 0, TEXT_FORMAT_ONLY,
         SMALL_BATCH_SIZES, SMALL_CLUSTER_SIZES);
   }
 
   @Test
   public void TestLimit() {
-    runTestInExecutionMode(EXECUTION_MODE, "limit", false, 1000);
+    runTestInExecutionMode(EXECUTION_MODE, "limit", true, 0);
   }
 
   @Test
   public void TestTopN() {
-    runTestInExecutionMode(EXECUTION_MODE, "top-n", false, 1000);
+    runTestInExecutionMode(EXECUTION_MODE, "top-n", true, 0);
   }
 
   @Test
   public void TestEmpty() {
-    runTestInExecutionMode(EXECUTION_MODE, "empty", false, 1000);
+    runTestInExecutionMode(EXECUTION_MODE, "empty", true, 0);
   }
 
   @Test
   public void TestSubquery() {
-    runTestInExecutionMode(EXECUTION_MODE, "subquery", false, 1000);
+    runTestInExecutionMode(EXECUTION_MODE, "subquery", true, 0);
   }
 
   @Test
   public void TestUnion() {
-    runQueryInAllBatchAndClusterPerms("union", false, 1000, null,
+    runQueryInAllBatchAndClusterPerms("union", true, 0, null,
         ImmutableList.of(0), ImmutableList.of(1));
   }
 
   @Test
   public void TestMixedFormat() {
-    runTestInExecutionMode(EXECUTION_MODE, "mixed-format", false, 1000);
+    runTestInExecutionMode(EXECUTION_MODE, "mixed-format", true, 0);
   }
 
   @Test
@@ -86,12 +95,12 @@ public class QueryTest extends BaseQueryTest {
     // 1. scan range with no tuple
     // 2. tuple that span across multiple scan ranges
     TestExecContext execContext1 =
-        new TestExecContext(2, 1, true, false, 1000, 1, 0);
+        new TestExecContext(2, 1, true, true, 0, 1, 0);
 
     // We use a very small file buffer to test the HDFS scanner init code that seeks the
     // first tuple delimiter.
     TestExecContext execContext2 =
-        new TestExecContext(2, 1, true, false, 1000, 5, 1);
+        new TestExecContext(2, 1, true, true, 0, 5, 1);
 
     List<TestConfiguration> testConfigs = Lists.newArrayList();
     testConfigs.add(
@@ -99,7 +108,7 @@ public class QueryTest extends BaseQueryTest {
     testConfigs.add(
         new TestConfiguration(execContext2, CompressionFormat.NONE, TableFormat.TEXT));
 
-    runQueryWithTestConfigs(testConfigs, "hdfs-tiny-scan", false, 1000);
+    runQueryWithTestConfigs(testConfigs, "hdfs-tiny-scan", true, 0);
   }
 
 }

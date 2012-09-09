@@ -9,16 +9,21 @@ public class HBaseQueryTest extends BaseQueryTest {
 
   @Test
   public void TestHBaseScanNode() {
-    runQueryUncompressedTextOnly("hbase-scan-node", false, 1000);
+    runQueryUncompressedTextOnly("hbase-scan-node", true, 0);
+  }
+
+  @Test
+  public void TestHBaseScanNodeErrors() {
+    runQueryUncompressedTextOnly("hbase-scan-node-errors", false, 1000);
   }
 
   @Test
   public void TestHBaseRowKeys() {
-    runQueryUncompressedTextOnly("hbase-rowkeys", false, 1000);
+    runQueryUncompressedTextOnly("hbase-rowkeys", true, 1000);
   }
 
   @Test
   public void TestHBaseFilters() {
-    runQueryUncompressedTextOnly("hbase-filters", false, 1000);
+    runQueryUncompressedTextOnly("hbase-filters", true, 1000);
   }
 }

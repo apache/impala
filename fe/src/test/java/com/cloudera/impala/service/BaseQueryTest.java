@@ -369,6 +369,10 @@ public abstract class BaseQueryTest {
     LOG.debug(Joiner.on("\n").join(testConfigs));
 
     for (TestConfiguration config: testConfigs) {
+      // Override config with input paramter abortOnError and maxErrors
+      config.execContext.getTQueryOptions().setAbort_on_error(abortOnError);
+      config.execContext.getTQueryOptions().setMax_errors(maxErrors);
+
       queryFileParser.parseFile(config.getTableSuffix());
       runOneQueryTest(queryFileParser, config, new StringBuilder());
 

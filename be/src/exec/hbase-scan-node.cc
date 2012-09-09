@@ -93,7 +93,7 @@ void HBaseScanNode::WriteTextSlot(
     void* value, int value_length, SlotDescriptor* slot,
     RuntimeState* state, bool* error_in_row) {
   COUNTER_SCOPED_TIMER(materialize_tuple_timer());
-  if (text_converter_->WriteSlot(slot, tuple_,
+  if (!text_converter_->WriteSlot(slot, tuple_,
       reinterpret_cast<char*>(value), value_length, true, false)) {
     *error_in_row = true;
     if (state->LogHasSpace()) {
