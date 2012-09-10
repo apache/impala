@@ -11,7 +11,7 @@ include "beeswax.thrift"
 //     "num_nodes:1", "abort_on_error:false"
 // The valid keys are listed in this enum. They map to TQueryOptions.
 // Note: If you add an option or change the default, please keep
-// DEFAULT_QUERY_OPTIONS in sync. 
+// JavaConstants.DEFAULT_QUERY_OPTIONS in sync. 
 enum TImpalaQueryOptions {
   // if true, abort execution on the first error
   ABORT_ON_ERROR,
@@ -43,17 +43,6 @@ enum TImpalaQueryOptions {
   // file buffer size used by text parsing; size of 0 indicates the backend's default
   // file buffer size
   FILE_BUFFER_SIZE
-}
-
-// Default values for each query option in TImpalaQueryOptions
-const map<TImpalaQueryOptions, string> DEFAULT_QUERY_OPTIONS = {
-  TImpalaQueryOptions.ABORT_ON_ERROR : "true",
-  TImpalaQueryOptions.MAX_ERRORS : "0",
-  TImpalaQueryOptions.DISABLE_CODEGEN : "false",
-  TImpalaQueryOptions.BATCH_SIZE : "0",
-  TImpalaQueryOptions.NUM_NODES : "0",
-  TImpalaQueryOptions.MAX_SCAN_RANGE_LENGTH : "0",
-  TImpalaQueryOptions.FILE_BUFFER_SIZE : "0"
 }
 
 // The summary of an insert.

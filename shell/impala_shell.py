@@ -8,7 +8,7 @@ import sys
 from optparse import OptionParser
 
 from ImpalaService import ImpalaService
-from ImpalaService.constants import DEFAULT_QUERY_OPTIONS
+from JavaConstants.constants import DEFAULT_QUERY_OPTIONS
 from ImpalaService.ImpalaService import TImpalaQueryOptions
 from beeswaxd import BeeswaxService
 from thrift.transport.TSocket import TSocket

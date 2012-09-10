@@ -9,6 +9,7 @@ namespace cpp impala
 namespace java com.cloudera.impala.thrift
 
 include "Descriptors.thrift"
+include "ImpalaService.thrift" // For TImpalaQueryOptions
 
 // constants for TQueryOptions.num_nodes
 const i32 NUM_NODES_ALL = 0
@@ -28,3 +29,13 @@ const map<string, Descriptors.THdfsCompression> COMPRESSION_MAP = {
   "snappy": Descriptors.THdfsCompression.SNAPPY
 }
 
+// Default values for each query option in ImpalaService.TImpalaQueryOptions
+const map<ImpalaService.TImpalaQueryOptions, string> DEFAULT_QUERY_OPTIONS = {
+  ImpalaService.TImpalaQueryOptions.ABORT_ON_ERROR : "true",
+  ImpalaService.TImpalaQueryOptions.MAX_ERRORS : "0",
+  ImpalaService.TImpalaQueryOptions.DISABLE_CODEGEN : "false",
+  ImpalaService.TImpalaQueryOptions.BATCH_SIZE : "0",
+  ImpalaService.TImpalaQueryOptions.NUM_NODES : "0",
+  ImpalaService.TImpalaQueryOptions.MAX_SCAN_RANGE_LENGTH : "0",
+  ImpalaService.TImpalaQueryOptions.FILE_BUFFER_SIZE : "0"
+}
