@@ -11,13 +11,18 @@
 # The input to this script is a benchmark result CSV file which should be generated using
 # the 'run_benchmark.py' script. The input CSV file has the format:
 # <query>|<file_format>|<compression>|<avg exec time>|<std dev>|<hive avg exec time>|
-# <hive stddev>
+# <hive stddev>|<scale factor>
 #
+# TODO: This script should accept two sets of reference results - one for Hive and one
+# for Impala. The reference results for each should be in the same format. Part of that
+# chould would be outputting two result files when running run-workload.py. As part of
+# the change this file should be cleaned up and simplified.
 import csv
 import math
 import os
 import sys
 
+from datetime import date
 from itertools import groupby
 from optparse import OptionParser
 
@@ -45,17 +50,19 @@ RED = '' if options.nocolor else '\033[91m'
 END =  '' if options.nocolor else '\033[0m'
 
 COLUMN_WIDTH = 18
-TOTAL_WIDTH = 122 if options.verbose else 90
+TOTAL_WIDTH = 132 if options.verbose else 96
 
 # These are the indexes in the input row for each column value
 WORKLOAD_IDX = 0
-QUERY_IDX = 1
-FILE_FORMAT_IDX = 2
-COMPRESSION_IDX = 3
-IMPALA_AVG_IDX = 4
-IMPALA_STDDEV_IDX = 5
-HIVE_AVG_IDX = 6
-HIVE_STDDEV_IDX = 7
+QUERY_NAME_IDX = 1
+QUERY_IDX = 2
+FILE_FORMAT_IDX = 3
+COMPRESSION_IDX = 4
+IMPALA_AVG_IDX = 5
+IMPALA_STDDEV_IDX = 6
+HIVE_AVG_IDX = 7
+HIVE_STDDEV_IDX = 8
+SCALE_FACTOR_IDX = 9
 
 # Formats a string so that is is wrapped across multiple lines with no single line
 # being longer than the given width
@@ -108,52 +115,67 @@ def calculate_impala_hive_speedup(row):
   return calculate_speedup(row[HIVE_AVG_IDX], row[IMPALA_AVG_IDX])
 
 # Prints out the given result set in table format, grouped by query
-def print_table(results, verbose, reference_results = None):
-  results.sort(key = lambda x: x[QUERY_IDX])
-  for query, group in groupby(results, lambda x: x[QUERY_IDX]):
-    print 'Query:\n' + wrap_text(query, TOTAL_WIDTH)
-    table_header = ['File Format', 'Compression', 'Impala Avg(s)', 'Impala StdDev(s)']
+def build_table(results, verbose, reference_results = None):
+  output = str()
+  sort_key = lambda x: (x[QUERY_NAME_IDX])
+  results.sort(key = sort_key)
+  for query_group, group in groupby(results, key = sort_key):
+    output += 'Query: ' + wrap_text(query_group, TOTAL_WIDTH) + '\n'
+    table_header = ['File Format', 'Compression', 'Avg(s)', 'StdDev(s)']
     if verbose:
       table_header += ['Hive Avg(s)', 'Hive StdDev(s)']
-    table_header += ['Impala Speedup']
+    table_header += ['Impala Speedup (vs Hive)']
 
-    print build_padded_row_string(table_header, COLUMN_WIDTH)
-    print "-" * TOTAL_WIDTH
+    output += build_padded_row_string(table_header, COLUMN_WIDTH) + '\n'
+    output += "-" * TOTAL_WIDTH + '\n'
     for row in group:
-      full_row = row[2:] + [format_if_float(calculate_impala_hive_speedup(row)) + 'X']
+      # Strip out columns we don't want to display
+      full_row = row[3:len(row) - 1]
+      full_row += [format_if_float(calculate_impala_hive_speedup(row)) + 'X']
       if not verbose:
-        del full_row[HIVE_AVG_IDX - 1]
-        del full_row[HIVE_STDDEV_IDX - 2]
+        del full_row[HIVE_AVG_IDX - 3]
+        del full_row[HIVE_STDDEV_IDX - 4]
       if reference_results is not None:
         comparison_row = find_matching_row_in_reference_results(row, reference_results)
         # There wasn't a matching row
         if comparison_row is None:
-          print build_padded_row_string(full_row, COLUMN_WIDTH)
+          output += build_padded_row_string(full_row, COLUMN_WIDTH) + '\n'
           continue
 
         reference_avg = float(comparison_row[IMPALA_AVG_IDX])
         avg = float(row[IMPALA_AVG_IDX])
         speedup = calculate_speedup(reference_avg, avg)
-        print build_padded_row_string_comparison(full_row, speedup, COLUMN_WIDTH)
+        output += build_padded_row_string_comparison(full_row, speedup, COLUMN_WIDTH)
+        output += '\n'
       else:
-        print build_padded_row_string(full_row, COLUMN_WIDTH)
-    print "-" * TOTAL_WIDTH
-    print " "
+        output += build_padded_row_string(full_row, COLUMN_WIDTH) + '\n'
+    output +=  "-" * TOTAL_WIDTH + '\n'
+    output += " " + '\n'
+  return output
 
 # Returns the sum of the average execution times for the given result
 # collection
 def sum_avg_execution_time(results):
-  return sum(float(row[IMPALA_AVG_IDX]) for row in results)
+  impala_time = 0
+  hive_time = 0
+  for row in results:
+    impala_time += float(row[IMPALA_AVG_IDX])
+    hive_time += float(row[HIVE_AVG_IDX]) if str(row[HIVE_AVG_IDX]) != 'N/A' else 0
+  return impala_time, hive_time
+
+# Returns dictionary of column_value to sum of the average times grouped by the specified
+# key function
+def sum_execution_time_by_key(results, key):
+  results.sort(key = key)
+  execution_results = dict()
+  for key, group in groupby(results, key=key):
+    execution_results[key] = (sum_avg_execution_time(group))
+  return execution_results
 
 # Returns dictionary of column_value to sum of the average times grouped by the specified
 # column index
 def sum_execution_time_by_col_idx(results, column_index):
-  column_key = lambda x: x[column_index]
-  results.sort(key = column_key)
-  execution_results = dict()
-  for file_format, group in groupby(results, column_key):
-    execution_results[file_format] = sum_avg_execution_time(group)
-  return execution_results
+  return sum_execution_time_by_key(results, key=lambda x: x[column_index])
 
 def sum_execution_by_file_format(results):
   return sum_execution_time_by_col_idx(results, FILE_FORMAT_IDX)
@@ -163,6 +185,10 @@ def sum_execution_by_query(results):
 
 def sum_execution_by_compression(results):
   return sum_execution_time_by_col_idx(results, COMPRESSION_IDX)
+
+def sum_execution_by_file_format_compression(results):
+  key = lambda x: (x[FILE_FORMAT_IDX], x[COMPRESSION_IDX])
+  return sum_execution_time_by_key(results, key)
 
 # Writes perf tests results in a "fake" JUnit output format. The main use case for this
 # is so the Jenkins Perf plugin can be leveraged to report results. We create a few
@@ -196,6 +222,14 @@ def read_csv_result_file(file_name):
     results.append(row)
   return results
 
+def filter_sort_results(results, workload, scale_factor, key):
+  filtered_res = [result for result in results if (
+      result[WORKLOAD_IDX] == workload and result[SCALE_FACTOR_IDX] == scale_factor)]
+  return sorted(filtered_res, key=sort_key)
+
+def scale_factor_name(scale_factor):
+  return scale_factor if scale_factor else 'default'
+
 reference_results = []
 results = []
 if os.path.isfile(options.result_file):
@@ -209,17 +243,45 @@ if os.path.isfile(options.reference_result_file):
 else:
   print 'No reference result file found.'
 
-if not options.no_output_table:
-  print_table(results, options.verbose, reference_results)
-  # Print some summary information
-  print 'Sum Average Execution Time: ' + str(sum_avg_execution_time(results))
-  print '\nSum Average Execution Time By File Format:'
-  for file_format, time in sum_execution_by_file_format(results).iteritems():
-    print build_padded_row_string([file_format, time], COLUMN_WIDTH)
 
-  print '\nSum Average Execution Time By Compression:'
-  for compression, time in sum_execution_by_compression(results).iteritems():
-    print build_padded_row_string([compression, time], COLUMN_WIDTH)
+if not options.no_output_table:
+  summary, table_output = str(), str()
+
+  sort_key = lambda k: (k[WORKLOAD_IDX], k[SCALE_FACTOR_IDX])
+  results_sorted = sorted(results, key=sort_key)
+  summary += "Execution Summary (%s)\n" % date.today()
+  summary += "Workload / Scale Factor\n\n"
+
+  # First step is to break the result down into groups or workload/scale factor
+  for workload_scale_factor, group in groupby(results_sorted, key=sort_key):
+    workload, scale_factor = workload_scale_factor
+    summary += '%s / %s\n' % (workload, scale_factor_name(scale_factor))
+
+    # Based on the current workload/scale factor grouping, filter and sort results
+    filtered_results = filter_sort_results(results, workload, scale_factor, sort_key)
+    header = ['File Format', 'Compression', 'Impala Avg(s)', 'Impala Speedup (vs Hive)']
+    summary += '  ' + build_padded_row_string(header, COLUMN_WIDTH) + '\n'
+
+    # Calculate execution details for each workload/scale factor
+    for file_format_compression, times in sum_execution_by_file_format_compression(
+        filtered_results).iteritems():
+      file_format, compression = file_format_compression
+      impala_avg, hive_avg = times
+      impala_speedup = format_if_float(calculate_speedup(hive_avg, impala_avg)) +\
+          'X' if hive_avg != 0 else 'N/A'
+      summary += '  ' + build_padded_row_string(
+          [file_format, compression, impala_avg, impala_speedup], COLUMN_WIDTH) + '\n'
+    summary += '\n'
+
+    table_output += "-" * TOTAL_WIDTH + '\n'
+    table_output += "-- Workload / Scale Factor: %s / %s\n" %\
+        (workload, scale_factor_name(scale_factor))
+    table_output += "-" * TOTAL_WIDTH + '\n'
+    # Build a table with detailed execution results for the workload/scale factor
+    table_output += build_table(filtered_results, options.verbose,
+                                reference_results) + '\n'
+  print summary, table_output
+  print 'Total Avg Execution Time: ' + str(sum_avg_execution_time(results)[0])
 
 if options.junit_output_file:
   write_junit_output_file(results, open(options.junit_output_file, 'w'))

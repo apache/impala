@@ -47,10 +47,10 @@ parser.add_option("--exploration_strategy", dest="exploration_strategy", default
                   help="The exploration strategy to use for running benchmark: 'core', "\
                   "'pairwise', or 'exhaustive'")
 parser.add_option("-w", "--workloads", dest="workloads", default="hive-benchmark",
-                  help="The workload(s) to execute in a comma-separated list format."\
+                  help="The workload(s) and scale factors to run in a comma-separated "\
+                  " list format. Optional scale factors for each workload are specified"\
+                  " using colons. For example: -w tpch:1gb. "\
                   "Some valid workloads: 'hive-benchmark', 'tpch', ...")
-parser.add_option("-s", "--scale_factor", dest="scale_factor", default="",
-                  help="The dataset scale factor to run the workload against.")
 parser.add_option("--impalad", dest="impalad", default="localhost:21000",
                   help="A comma-separated list of impalad instances to run the "\
                   "workload against.")
@@ -107,11 +107,11 @@ class QueryExecutionResult(object):
     self.avg_time = avg_time
     self.stddev = stddev
 
-
 class QueryExecutionDetail(object):
-  def __init__(self, workload, file_format, compression_codec, compression_type,
-               impala_execution_result, hive_execution_result):
+  def __init__(self, workload, scale_factor, file_format, compression_codec,
+               compression_type, impala_execution_result, hive_execution_result):
     self.workload = workload
+    self.scale_factor = scale_factor
     self.file_format = file_format
     self.compression_codec = compression_codec
     self.compression_type = compression_type
@@ -247,7 +247,6 @@ def prime_buffer_cache_local(query):
 
 # Util functions
 # TODO : Move util functions to a common module.
-
 def calculate_avg(values):
   return sum(values) / float(len(values))
 
@@ -439,14 +438,18 @@ def write_to_csv(result_map, output_csv_file):
                           delimiter='|',
                           quoting=csv.QUOTE_MINIMAL)
 
-  for query, execution_results in result_map.iteritems():
+  for query_tuple, execution_results in result_map.iteritems():
     for result in execution_results:
-      csv_writer.writerow([result.workload, query, result.file_format,
-                           '%s/%s' % (result.compression_codec, result.compression_type),
+      compression_str = '%s/%s' % (result.compression_codec, result.compression_type)
+      if compression_str == 'none/none':
+        compression_str = 'none'
+      csv_writer.writerow([result.workload, query_tuple[0], query_tuple[1],
+                           result.file_format, compression_str,
                            result.impala_execution_result.avg_time,
                            result.impala_execution_result.stddev,
                            result.hive_execution_result.avg_time,
                            result.hive_execution_result.stddev,
+                           result.scale_factor,
                            ])
 
 def enumerate_query_files(base_directory):
@@ -512,7 +515,7 @@ def extract_queries_from_test_files(workload):
   return query_map
 
 
-def execute_queries(query_map, workload, vector_row):
+def execute_queries(query_map, workload, scale_factor, vector_row):
   """
   Execute the queries for combinations of file format, compression, etc.
 
@@ -522,21 +525,23 @@ def execute_queries(query_map, workload, vector_row):
   global summary
   global result_map
   file_format, data_group, codec, compression_type = vector_row[:4]
+  LOG.info("Running Test Vector - File Format: %s Compression: %s / %s" %\
+      (file_format, codec, compression_type))
   for test_name in query_map.keys():
     for query_name, query in query_map[test_name]:
       if not query_name:
         query_name = query
       query_string = build_query(query.strip(), file_format, codec, compression_type,
-                                 workload, options.scale_factor)
+                                 workload, scale_factor)
       summary += "\nQuery: %s\n" % query_name
       summary += "Results Using Impala\n"
-      if query_name != query:
-        LOG.info('Query Name: %s\n')
       LOG.debug('Running: \n%s\n' % query)
+      if query_name != query:
+        LOG.info('Query Name: \n%s\n' % query_name)
       output, execution_result = run_impala_query(query_string,
                                                   options.prime_cache,
                                                   options.iterations)
-      if output is not None:
+      if output:
         summary += output
       hive_execution_result = QueryExecutionResult()
 
@@ -545,20 +550,17 @@ def execute_queries(query_map, workload, vector_row):
         output, hive_execution_result = run_hive_query(query_string,
                                                        options.prime_cache,
                                                        options.iterations)
-        if output is not None:
+        if output:
           summary += output
       LOG.debug("-----------------------------------------------------------------------")
 
-      execution_detail = QueryExecutionDetail(workload, file_format, codec,
+      execution_detail = QueryExecutionDetail(workload, scale_factor, file_format, codec,
                                               compression_type, execution_result,
                                               hive_execution_result)
-    if options.verbose:
-      result_map[query].append(execution_detail)
-    else:
-      result_map[query_name].append(execution_detail)
+      result_map[(query_name, query)].append(execution_detail)
   return
 
-def run_workload(workload):
+def run_workload(workload, scale_factor):
   """
     Run queries associated with each workload specified on the commandline.
 
@@ -566,15 +568,25 @@ def run_workload(workload):
     queries in each file and execute them using the specified number of execution
     iterations. Finally, write results to an output CSV file for reporting.
   """
-  LOG.info('Starting running of workload: %s' %  workload)
+  LOG.info('Running workload: %s / Scale factor: %s' % (workload, scale_factor))
   query_map = extract_queries_from_test_files(workload)
   vector_file_path = os.path.join(WORKLOAD_DIR, workload,
                                   vector_file_name(workload, options.exploration_strategy)
                                  )
   test_vector = read_vector_file(vector_file_path)
-  args = [query_map, workload]
+  args = [query_map, workload, scale_factor]
   execute_queries_partial = partial(execute_queries, *args)
   map(execute_queries_partial, test_vector)
+
+def parse_workload_scale_factor(workload_scale_factor):
+  parsed_workload_scale_factor = workload_and_scale_factor.split(':')
+  if len(parsed_workload_scale_factor) == 1:
+    return parsed_workload_scale_factor[0], ''
+  elif len(parsed_workload_scale_factor) == 2:
+    return parsed_workload_scale_factor
+  else:
+    LOG.error("Error parsing workload. Proper format is workload[:scale factor]")
+    sys.exit(1)
 
 if __name__ == "__main__":
   """
@@ -584,7 +596,9 @@ if __name__ == "__main__":
   """
   result_map = defaultdict(list)
   summary = str()
-  map(run_workload, options.workloads.split(','))
+  for workload_and_scale_factor in options.workloads.split(','):
+    workload, scale_factor = parse_workload_scale_factor(workload_and_scale_factor)
+    run_workload(workload, scale_factor)
   LOG.info(summary)
   LOG.info("Results saving to: " + options.results_csv_file)
   write_to_csv(result_map, options.results_csv_file)
