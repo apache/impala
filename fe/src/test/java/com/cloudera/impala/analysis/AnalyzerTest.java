@@ -671,6 +671,8 @@ public class AnalyzerTest {
   @Test
   public void TestDistinct() throws AnalysisException {
     // DISTINCT
+    AnalyzesOk("select count(distinct id) as sum_id from testtbl order by sum_id");
+    AnalyzesOk("select count(distinct id) as sum_id from testtbl order by max(id)");
     AnalyzesOk("select distinct id, zip from testtbl");
     AnalyzesOk("select distinct * from testtbl");
     AnalysisError("select distinct count(*) from testtbl",

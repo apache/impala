@@ -274,7 +274,8 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
   }
 
   /**
-   * Collect all Expr nodes of type 'cl' present in 'input'.
+   * Collect all unique Expr nodes of type 'cl' present in 'input' and add them to
+   * 'output' if they do not exist in 'output'.
    * This can't go into TreeNode<>, because we'd be using the template param
    * NodeType.
    */

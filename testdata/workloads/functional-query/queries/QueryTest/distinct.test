@@ -1,3 +1,17 @@
+# count distinct order by the same agg expr
+select count(distinct id) as count_id from alltypessmall order by count_id limit 100
+---- TYPES
+bigint
+---- RESULTS
+100
+====
+# count distinct order by a diff agg expr
+select count(distinct id) as sum_id from alltypessmall order by max(distinct id) limit 100
+---- TYPES
+bigint
+---- RESULTS
+100
+====
 # distinct *
 select distinct *
 from alltypesagg$TABLE

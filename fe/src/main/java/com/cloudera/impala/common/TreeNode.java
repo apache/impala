@@ -32,11 +32,13 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
     return children;
   }
 
-  // Collect all subnodes of type C (but not of subclasses of C), including
-  // possibly 'this'. If a subnode is collected, none of its own subnodes will
+  // Collect all unique subnodes of type C (but not of subclasses of C), including
+  // possibly 'this' if the subnode does not exist in subNodes.
+  // If a subnode is collected, none of its own subnodes will
   // be.
   public <C extends NodeType> void collect(Class<C> cl, List<C> subNodes) {
-    if (cl.isAssignableFrom(this.getClass()) && this.getClass().isAssignableFrom(cl)) {
+    if (cl.isAssignableFrom(this.getClass()) && this.getClass().isAssignableFrom(cl) &&
+        !subNodes.contains((C) this)) {
       subNodes.add((C) this);
       return;
     }
@@ -45,11 +47,11 @@ public class TreeNode<NodeType extends TreeNode<NodeType>> {
     }
   }
 
-  // Collect all subnodes of type C (or subclasses of C), including
-  // possibly 'this'. If a subnode is collected, none of its own subnodes will
-  // be.
+  // Collect all unique subnodes of type C (or subclasses of C), including
+  // possibly 'this' if the subnode does not exist in subNodes.
+  // If a subnode is collected, none of its own subnodes will be.
   public <C extends NodeType> void collectSubclasses(Class<C> cl, List<C> subNodes) {
-    if (cl.isAssignableFrom(this.getClass())) {
+    if (cl.isAssignableFrom(this.getClass()) && !subNodes.contains((C) this)) {
       subNodes.add((C) this);
       return;
     }
