@@ -52,6 +52,10 @@ Status HdfsTrevniScanner::Prepare() {
   return Status::OK;
 }
 
+Status HdfsTrevniScanner::Close() {
+  return Status::OK;
+}
+
 Status HdfsTrevniScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition,
     DiskIoMgr::ScanRange* scan_range, Tuple* template_tuple, 
     ByteStream* current_byte_stream) {

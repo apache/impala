@@ -69,13 +69,13 @@ Status HdfsSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
       scan_node_->GetFileMetadata(context_->filename()));
   if (header_ == NULL) {
     // This is the initial scan range just to parse the header
+    only_parsing_header_ = true;
     header_ = state_->obj_pool()->Add(new FileHeader());
     RETURN_IF_ERROR(ReadFileHeader());
 
     // Header is parsed, set the metadata in the scan node and issue more ranges
     scan_node_->SetFileMetadata(context_->filename(), header_);
     IssueFileRanges(context_->filename());
-    context->Complete(Status::OK);
     return Status::OK;
   }
 
@@ -89,21 +89,22 @@ Status HdfsSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
   // Process Range
   if (found) {
     RETURN_IF_ERROR(ProcessRange());
-    // Read past end
   }
 
   // All done with this scan range.
-  context->AcquirePool(unparsed_data_buffer_pool_.get());
-  scan_node_->RangeComplete();
-  context->Complete(Status::OK);
+  return Status::OK;
+}
 
-  header_ = NULL;
-
+Status HdfsSequenceScanner::Close() {
+  context_->AcquirePool(unparsed_data_buffer_pool_.get());
+  if (!only_parsing_header_) scan_node_->RangeComplete();
+  context_->Complete();
   return Status::OK;
 }
   
 Status HdfsSequenceScanner::InitNewRange() {
   DCHECK(header_ != NULL);
+  only_parsing_header_ = false;
 
   HdfsPartitionDescriptor* hdfs_partition = context_->partition_descriptor();
   

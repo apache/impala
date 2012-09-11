@@ -20,6 +20,7 @@ class HdfsTrevniScanner : public HdfsScanner {
   virtual ~HdfsTrevniScanner();
   virtual Status Prepare();
   virtual Status GetNext(RowBatch* row_batch, bool* eosr);
+  virtual Status Close();
 
  private:
   // Per-block Information.

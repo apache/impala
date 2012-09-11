@@ -99,6 +99,10 @@ Status HdfsRCFileScanner::Prepare() {
   return Status::OK;
 }
 
+Status HdfsRCFileScanner::Close() {
+  return Status::OK;
+}
+
 Status HdfsRCFileScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
     DiskIoMgr::ScanRange* scan_range, Tuple* template_tuple, 
     ByteStream* current_byte_stream_) {

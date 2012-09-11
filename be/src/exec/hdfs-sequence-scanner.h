@@ -148,6 +148,7 @@ class HdfsSequenceScanner : public HdfsScanner {
   // Implementation of HdfsScanner interface.
   virtual Status Prepare();
   virtual Status ProcessScanRange(ScanRangeContext* context);
+  virtual Status Close();
 
   // Issue the initial scan ranges for all sequence files.
   static void IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>&);
@@ -265,6 +266,9 @@ class HdfsSequenceScanner : public HdfsScanner {
     // End of the header block so we don't have to reparse it.
     int64_t header_size;
   };
+
+  // If true, this scanner is only processing the header bytes.
+  bool only_parsing_header_;
 
   // Header for this scan range.  Memory is owned by the parent scan node.
   FileHeader* header_;

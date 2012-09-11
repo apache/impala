@@ -648,15 +648,10 @@ void HdfsScanNode::DiskThread() {
   // terminate immediately.
   for (ContextMap::iterator it = contexts_.begin(); it != contexts_.end(); ++it) {
     VLOG_QUERY << "Cancelled";
-    it->second->Complete(Status::CANCELLED);
+    it->second->Cancel();
   }
 
   scanner_threads_.join_all();
-
-  // Now all scanners threads have finished, clean up the context objects
-  for (ContextMap::iterator it = contexts_.begin(); it != contexts_.end(); ++it) {
-    it->second->Close();
-  }
   contexts_.clear();
   
   // Wake up thread in GetNext
@@ -679,6 +674,7 @@ void HdfsScanNode::ScannerThread(HdfsScanner* scanner, ScanRangeContext* context
   // Call into the scanner to process the range.  From the scanner's perspective,
   // everything is single threaded.
   Status status = scanner->ProcessScanRange(context);
+  scanner->Close();
 
   // Scanner thread completed. Take a look and update the status 
   unique_lock<recursive_mutex> l(lock_);

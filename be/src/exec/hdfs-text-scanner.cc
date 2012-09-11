@@ -64,14 +64,17 @@ Status HdfsTextScanner::ProcessScanRange(ScanRangeContext* context) {
     RETURN_IF_ERROR(ProcessRange(&dummy_num_tuples, false));
 
     // Finish up reading past the scan range
-    if (!context->done()) RETURN_IF_ERROR(FinishScanRange());
+    RETURN_IF_ERROR(FinishScanRange());
   }
 
   // All done with this scan range.
-  scan_node_->RangeComplete();
-  context->AcquirePool(boundary_mem_pool_.get());
-  context->Complete(Status::OK);
+  return Status::OK;
+}
 
+Status HdfsTextScanner::Close() {
+  context_->AcquirePool(boundary_mem_pool_.get());
+  scan_node_->RangeComplete();
+  context_->Complete();
   return Status::OK;
 }
 
@@ -240,7 +243,7 @@ Status HdfsTextScanner::ProcessRange(int* num_tuples, bool past_scan_range) {
     } 
 
     // Scanning was aborted by main thread
-    if (context_->done()) break;
+    if (context_->cancelled()) break;
   }
 
   return Status::OK;

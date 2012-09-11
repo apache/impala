@@ -224,6 +224,7 @@ class HdfsRCFileScanner : public HdfsScanner {
   virtual Status Prepare();
   virtual Status InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
       DiskIoMgr::ScanRange* scan_range, Tuple* template_tuple, ByteStream* byte_stream);
+  virtual Status Close();
 
   void DebugString(int indentation_level, std::stringstream* out) const;
 

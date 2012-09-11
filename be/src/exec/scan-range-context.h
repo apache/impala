@@ -113,15 +113,23 @@ class ScanRangeContext {
   // (can't have the buffers be queued in non-sequential order).
   void AddBuffer(DiskIoMgr::BufferDescriptor*);
 
-  // This should be called when the scan range is complete.  This can happen because the 
-  // the scan range finished (call this with Status::OK) or cancellation occurred.
-  // The status code will be returned in all subsequent next GetBytes()call.  
-  // This can be called from any thread.
-  void Complete(Status status);
+  // Complete() and Cancel() are used together to coordinate proper cleanup.
+  // Valid call orders are:
+  //  - Complete(): normal case when the scanner finishes
+  //  - Cancel() -> Complete(): scanner is cancelled asynchronously
+  //  - Complete() -> Cancel(): cancel() is ignored, scan range is already complete.
+  // Note that Complete() always called.  Neither function can be called multiple 
+  // times.
 
-  // Call to clean up the scan range context, freeing any resources that are still 
-  // pending.  After this call, it is no longer valid to use this object.
-  void Close();
+  // This function must be called when the scanner is complete and no longer needs
+  // any resources (e.g. tuple memory, io buffers, etc) returned from the scan range
+  // context.  This should be called from the scanner thread.
+  // This must be called even in the error path.
+  void Complete();
+
+  // This function can be called to terminate the scanner thread asychronously.
+  // This can be called from any thread.
+  void Cancel();
 
   // Release all memory in 'pool' to the current row batch.  
   void AcquirePool(MemPool* pool) {
@@ -129,8 +137,8 @@ class ScanRangeContext {
     current_row_batch_->tuple_data_pool()->AcquireData(pool, false);
   }
 
-  // If true, the scanner is done and the scanner thread should finish up
-  bool done() const { return eos_; }
+  // If true, the scanner is cancelled and the scanner thread should finish up
+  bool cancelled() const { return cancelled_; }
 
   // If true, all bytes in this scan range have been returned
   bool eosr() const { return total_bytes_returned_ >= scan_range_->len(); }
@@ -206,19 +214,15 @@ class ScanRangeContext {
   boost::scoped_ptr<MemPool> boundary_pool_;
   boost::scoped_ptr<StringBuffer> boundary_buffer_;
 
-  // Lock to protect fields below.  There are at most two threads using this object
-  // at any time.
+  // Lock to protect fields below.  
   boost::mutex lock_;
 
   // Condition variable (with lock_) for waking up the scanner thread in Read(). This
-  // condition variable is signaled when from EnqueueBuffer() and SetStatus()
+  // condition variable is signaled when from (AddBuffer()) and Cancel()
   boost::condition_variable read_ready_cv_;
 
-  // If true, the context is done (regardless of if there are still queued bytes left)
-  bool eos_;
-
-  // Status from disk thread.
-  Status status_;
+  // If true, the scan range has been cancelled and the scanner thread should abort
+  bool cancelled_;
 
   // Buffers that are ready for the reader
   std::list<DiskIoMgr::BufferDescriptor*> buffers_;

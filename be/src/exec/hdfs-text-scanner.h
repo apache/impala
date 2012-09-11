@@ -23,6 +23,7 @@ class HdfsTextScanner : public HdfsScanner {
   virtual Status Prepare();
   virtual Status GetNext(RowBatch* row_batch, bool* eosr);
   virtual Status ProcessScanRange(ScanRangeContext* context);
+  virtual Status Close();
 
   // Issue io manager byte ranges for 'files'
   static void IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>& files);

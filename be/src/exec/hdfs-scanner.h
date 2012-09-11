@@ -102,6 +102,10 @@ class HdfsScanner {
     // TODO: make this pure virtual when all scanners are updated.
     return Status::OK;
   }
+
+  // Release all resources the scanner has allocated.  This is the last chance for
+  // the scanner to attach any resources to the ScanRangeContext object.
+  virtual Status Close() = 0;
   
  protected:
   // For EvalConjunctsForScanner

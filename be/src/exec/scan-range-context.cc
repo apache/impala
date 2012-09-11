@@ -26,7 +26,7 @@ ScanRangeContext::ScanRangeContext(RuntimeState* state, HdfsScanNode* scan_node,
     read_past_buffer_size_(DEFAULT_READ_PAST_SIZE),
     boundary_pool_(new MemPool()),
     boundary_buffer_(new StringBuffer(boundary_pool_.get())),
-    eos_(false),
+    cancelled_(false),
     current_buffer_(NULL) {
 
   compact_data_ = scan_node->compact_data() || 
@@ -98,13 +98,13 @@ void ScanRangeContext::RemoveFirstBuffer() {
 Status ScanRangeContext::GetRawBytes(uint8_t** out_buffer, int* len, bool* eos) {
   // Wait for first buffer
   unique_lock<mutex> l(lock_);
-  while (!eos_ && buffers_.empty()) {
+  while (!cancelled_ && buffers_.empty()) {
     read_ready_cv_.wait(l);
   }
 
-  if (eos_) {
+  if (cancelled_) {
     DCHECK(*out_buffer == NULL);
-    return status_;
+    return Status::CANCELLED;
   }
   
   DCHECK(current_buffer_ != NULL);
@@ -143,11 +143,11 @@ Status ScanRangeContext::GetBytesInternal(uint8_t** out_buffer, int requested_le
   while (true) {
     unique_lock<mutex> l(lock_);
    
-    while (!eos_ && buffers_.empty() && !eosr()) {
+    while (!cancelled_ && buffers_.empty() && !eosr()) {
       read_ready_cv_.wait(l);
     }
 
-    if (eos_) {
+    if (cancelled_) {
       VLOG_QUERY << "Cancelled";
       return Status::CANCELLED;
     }
@@ -262,40 +262,40 @@ void ScanRangeContext::AddBuffer(DiskIoMgr::BufferDescriptor* buffer) {
   read_ready_cv_.notify_one();
 }
 
-void ScanRangeContext::Complete(Status status) {
+void ScanRangeContext::Complete() {
   {
     unique_lock<mutex> l(lock_);
-    if (eos_) return;
-    eos_ = true;
-    if (!status.ok()) {
-      status_ = status;
-    } 
+    
+    if (current_buffer_ != NULL) RemoveFirstBuffer();
+
+    completed_buffers_.insert(
+        completed_buffers_.end(), buffers_.begin(), buffers_.end());
+    buffers_.clear();
+    AttachCompletedResources(true);
+
+    // There was a row batch in progress, add it to the scan node now.  It might have
+    // resources attached to it that can't be cleaned up until all previous row
+    // batches have been consumed.
+    if (current_row_batch_ != NULL) {
+      scan_node_->AddMaterializedRowBatch(current_row_batch_);
+    }
+
+    // Set variables to NULL to make sure this object is not being used after Complete()
+    current_row_batch_ = NULL;
+    current_buffer_ = NULL;
+    current_buffer_pos_ = NULL;
+  }
+  
+  DCHECK(completed_buffers_.empty());
+  DCHECK(buffers_.empty());
+  COUNTER_UPDATE(scan_node_->bytes_read_counter(), total_bytes_returned_);
+}
+
+void ScanRangeContext::Cancel() {
+  {
+    unique_lock<mutex> l(lock_);
+    cancelled_ = true;
   }
   // Wake up any reading threads.
   read_ready_cv_.notify_one();
-}
-
-void ScanRangeContext::Close() {
-  Complete(status_);
-
-  COUNTER_UPDATE(scan_node_->bytes_read_counter(), total_bytes_returned_);
-  if (current_buffer_ != NULL) {
-    RemoveFirstBuffer();
-  }
-  completed_buffers_.insert(
-      completed_buffers_.end(), buffers_.begin(), buffers_.end());
-  buffers_.clear();
-  AttachCompletedResources(true);
-
-  // There was a row batch in progress, add it to the scan node now.  It might have
-  // resources attached to it that can't be cleaned up until all previous row
-  // batches have been consumed.
-  if (current_row_batch_ != NULL) {
-    scan_node_->AddMaterializedRowBatch(current_row_batch_);
-  }
-
-  // Set variables to NULL to make sure this object is not being used after Close()
-  current_row_batch_ = NULL;
-  current_buffer_ = NULL;
-  current_buffer_pos_ = NULL;
 }
