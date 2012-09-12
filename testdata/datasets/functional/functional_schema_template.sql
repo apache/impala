@@ -1051,9 +1051,15 @@ CREATE TABLE %(table_name)s (
   e double)
 row format delimited fields terminated by ','
 stored as %(file_format)s;
+# Hive on mini-dfs doesn't work with CombineHiveInputFormat, use HiveInputFormat instead
+# IMP-269
+SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
 INSERT OVERWRITE TABLE nulltable select 'a', '', NULL, NULL, NULL from alltypes limit 1;
+SET hive.input.format=org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
 ----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
+SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
+INSERT OVERWRITE TABLE %(table_name)s select 'a', '', NULL, NULL, NULL from alltypes limit 1;
+SET hive.input.format=org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
 ----
 ${IMPALA_HOME}/bin/run-query.sh --query=" \
   INSERT OVERWRITE TABLE %(table_name)s \
@@ -1074,9 +1080,13 @@ CREATE TABLE %(table_name)s (
   e double)
 row format delimited fields terminated by ',' escaped by '\\'
 stored as %(file_format)s;
+SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
 INSERT OVERWRITE TABLE nullescapedtable select 'a', '', NULL, NULL, NULL from alltypes limit 1;
+SET hive.input.format=org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
 ----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
+SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
+INSERT OVERWRITE TABLE %(table_name)s select 'a', '', NULL, NULL, NULL from alltypes limit 1;
+SET hive.input.format=org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
 ----
 ${IMPALA_HOME}/bin/run-query.sh --query=" \
   INSERT OVERWRITE TABLE %(table_name)s \
