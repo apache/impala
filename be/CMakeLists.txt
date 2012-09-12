@@ -21,6 +21,7 @@ PROJECT(ASSEMBLER)
 #  - DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG: enable nanosecond precision for boost
 SET(CXX_COMMON_FLAGS "-msse4.2 -Wall -Wno-sign-compare -pthread")
 SET(CXX_COMMON_FLAGS "${CXX_COMMON_FLAGS} -DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG")
+SET(CXX_COVERAGE_FLAGS "-fprofile-arcs -ftest-coverage")
 
 # compiler flags for different build types (run 'cmake -DCMAKE_BUILD_TYPE=<type> .')
 # For all builds:
@@ -42,7 +43,6 @@ SET(CXX_FLAGS_DEBUG "-ggdb")
 SET(CXX_FLAGS_RELEASE "-O3 -g -DNDEBUG -Wno-strict-aliasing")
 SET(CXX_FLAGS_PROFILE_GEN "${CXX_FLAGS_RELEASE} -fprofile-generate")
 SET(CXX_FLAGS_PROFILE_BUILD "${CXX_FLAGS_RELEASE} -fprofile-use")
-SET(CXX_FLAGS_CODE_COVERAGE "${CXX_FLAGS_DEBUG}  -fprofile-arcs -ftest-coverage")
 
 # if no build build type is specified, default to debug builds
 if (NOT CMAKE_BUILD_TYPE)
@@ -60,8 +60,10 @@ elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "PROFILE_GEN")
   SET(CMAKE_CXX_FLAGS ${CXX_FLAGS_PROFILE_GEN})
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "PROFILE_BUILD")
   SET(CMAKE_CXX_FLAGS ${CXX_FLAGS_PROFILE_BUILD})
-elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE")
-  SET(CMAKE_CXX_FLAGS ${CXX_FLAGS_CODE_COVERAGE})
+elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE_DEBUG")
+  SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_DEBUG} ${CXX_COVERAGE_FLAGS}")
+elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE_RELEASE")
+  SET(CMAKE_CXX_FLAGS "${CXX_FLAGS_RELEASE} ${CXX_COVERAGE_FLAGS}")
 else()
   message(FATAL_ERROR "Unknown build type: ${CMAKE_BUILD_TYPE}")
 endif ()

@@ -8,7 +8,7 @@ for ARG in $*
 do
   case "$ARG" in
     -codecoverage)
-      TARGET_BUILD_TYPE=CODE_COVERAGE
+      TARGET_BUILD_TYPE=CODE_COVERAGE_DEBUG
       ;;
     -help)
       echo "make_debug.sh [-codecoverage]"

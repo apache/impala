@@ -44,8 +44,11 @@ do
     -noformat)
       FORMAT_CLUSTER=0
       ;;
-    -codecoverage)
-      TARGET_BUILD_TYPE=CODE_COVERAGE
+    -codecoverage_debug)
+      TARGET_BUILD_TYPE=CODE_COVERAGE_DEBUG
+      ;;
+    -codecoverage_release)
+      TARGET_BUILD_TYPE=CODE_COVERAGE_RELEASE
       ;;
     -testexhaustive)
       TEST_EXECUTION_MODE=exhaustive

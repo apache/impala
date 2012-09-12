@@ -3,6 +3,7 @@ set -e
 set -u
 
 USE_PGO=1
+TARGET_BUILD_TYPE=RELEASE
 
 # parse command line options
 for ARG in $*
@@ -11,9 +12,13 @@ do
     -nopgo)
       USE_PGO=0
       ;;
+    -codecoverage)
+      TARGET_BUILD_TYPE=CODE_COVERAGE_RELEASE
+      ;;
     -help|*)
-      echo "make_release.sh [-nopgo]"
+      echo "make_release.sh [-nopgo] [-codecoverage]"
       echo "[-nopgo] : do not use performance guided optimizations for building"
+      echo "[-codecoverage] : build with 'gcov' code coverage instrumentation"
       exit 1
       ;;
   esac
@@ -80,7 +85,7 @@ then
   find . -type f -name "*.gcda" -exec rm -rf {} \;
   cmake -DCMAKE_BUILD_TYPE=RELEASE
 else
-  cmake -DCMAKE_BUILD_TYPE=RELEASE
+  cmake -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE
   make clean
 
   cd $IMPALA_HOME/common/function-registry
