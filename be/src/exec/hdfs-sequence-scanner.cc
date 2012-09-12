@@ -168,8 +168,8 @@ Status HdfsSequenceScanner::FindFirstRecord(bool* found) {
 
   *found = false;
   // Look for the first sync block
-  bool eosr;
-  while (!eosr) {
+  bool eosr = false;
+  do {
     uint8_t* buffer;
     int buffer_len;
     
@@ -184,7 +184,7 @@ Status HdfsSequenceScanner::FindFirstRecord(bool* found) {
       *found = true;
       return Status::OK;
     } 
-  }
+  } while (!eosr);
   return Status::OK;
 }
 
