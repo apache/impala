@@ -60,9 +60,9 @@ void Metrics::TextCallback(stringstream* output) {
 }
 
 void Metrics::JsonCallback(stringstream* output) {
-  (*output) << "<pre>{";
+  (*output) << "{";
   vector<string> metrics;
   PrintMetricMapAsJson(&metrics);
   (*output) << join(metrics, ",\n");
-  (*output) << "}</pre>";
+  (*output) << "}";
 }
