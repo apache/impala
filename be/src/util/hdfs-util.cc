@@ -29,5 +29,21 @@ string AppendHdfsErrorMessage(const string& message, const string& file) {
   return ss.str();
 }
 
+Status GetFileSize(const hdfsFS& connection, const char* filename, int64_t* filesize) {
+  hdfsFileInfo* info = hdfsGetPathInfo(connection, filename);
+
+  if (info == NULL) {
+    stringstream msg;
+    msg << "Failed to get info on ." << filename;
+    return Status(AppendHdfsErrorMessage(msg.str()));
+  }
+
+  *filesize = info->mSize;
+  hdfsFreeFileInfo(info, 1);
+
+  return Status::OK;
+}
+
+
 }
 

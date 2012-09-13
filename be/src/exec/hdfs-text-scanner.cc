@@ -35,13 +35,13 @@ const char* HdfsTextScanner::LLVM_CLASS_NAME = "class.impala::HdfsTextScanner";
 
 HdfsTextScanner::HdfsTextScanner(HdfsScanNode* scan_node, RuntimeState* state) 
     : HdfsScanner(scan_node, state, NULL),
+      byte_buffer_ptr_(NULL),
+      byte_buffer_end_(NULL),
+      byte_buffer_read_size_(0),
       boundary_mem_pool_(new MemPool()),
       boundary_row_(boundary_mem_pool_.get()),
       boundary_column_(boundary_mem_pool_.get()),
       slot_idx_(0),
-      byte_buffer_ptr_(NULL),
-      byte_buffer_end_(NULL),
-      byte_buffer_read_size_(0),
       error_in_row_(false) {
 }
 
@@ -62,7 +62,7 @@ Status HdfsTextScanner::ProcessScanRange(ScanRangeContext* context) {
   // Reset state for new scan range
   InitNewRange(context);
 
-  // Find the first tuple.  If eosr is true, it means we went through the entire
+  // Find the first tuple.  If tuple_found is false, it means we went through the entire
   // scan range without finding a single tuple.  The bytes will be picked up
   // by the scan range before.
   bool tuple_found;
@@ -105,6 +105,10 @@ void HdfsTextScanner::InitNewRange(ScanRangeContext* context) {
       hdfs_partition->escape_char()));
   text_converter_.reset(new TextConverter(hdfs_partition->escape_char()));
 
+  ResetScanner();
+}
+
+void HdfsTextScanner::ResetScanner() {
   error_in_row_ = false;
   
   // Note - this initialisation relies on the assumption that N partition keys will occupy
@@ -125,7 +129,8 @@ void HdfsTextScanner::InitNewRange(ScanRangeContext* context) {
       boundary_mem_pool_->Allocate(scan_node_->tuple_desc()->byte_size()));
 
   // Initialize codegen fn
-  InitializeCodegenFn(hdfs_partition, THdfsFileFormat::TEXT, "HdfsTextScanner");
+  InitializeCodegenFn(
+      context_->partition_descriptor(), THdfsFileFormat::TEXT, "HdfsTextScanner");
 }
 
 Status HdfsTextScanner::FinishScanRange() {
@@ -273,7 +278,7 @@ Status HdfsTextScanner::FillByteBuffer(bool* eosr, int num_bytes) {
 
 Status HdfsTextScanner::FindFirstTuple(bool* tuple_found) {
   *tuple_found = true;
-  if (context_->file_offset() != 0) {
+  if (context_->scan_range()->offset() != 0) {
     *tuple_found = false;
     // Offset may not point to tuple boundary, skip ahead to the first full tuple
     // start.

@@ -79,6 +79,8 @@ public abstract class BaseQueryTest {
                        CompressionFormat.BZIP, CompressionFormat.SNAPPY);
   private static final List<CompressionFormat> TREVNI_COMPRESSION_FORMATS =
       ImmutableList.of(CompressionFormat.DEFAULT, CompressionFormat.SNAPPY);
+  protected static final List<CompressionFormat> LZO_COMPRESSION_ONLY =
+      ImmutableList.of(CompressionFormat.LZO);
   protected static final List<CompressionFormat> UNCOMPRESSED_ONLY =
       ImmutableList.of(CompressionFormat.NONE);
 
@@ -114,7 +116,8 @@ public abstract class BaseQueryTest {
     DEFAULT("_def"),
     GZIP("_gzip"),
     BZIP("_bzip"),
-    SNAPPY("_snap");
+    SNAPPY("_snap"),
+    LZO("_lzo");
 
     final String tableSuffix;
     private CompressionFormat(String tableSuffix) { this.tableSuffix = tableSuffix; }
@@ -355,7 +358,8 @@ public abstract class BaseQueryTest {
   private static boolean isValidTestConfiguration(TestConfiguration testConfiguration) {
     // Currently, compression of the 'text' file format is not supported.
     if (testConfiguration.getTableFormat() == TableFormat.TEXT) {
-      return testConfiguration.getCompressionFormat() == CompressionFormat.NONE;
+      return testConfiguration.getCompressionFormat() == CompressionFormat.NONE ||
+          testConfiguration.getCompressionFormat() == CompressionFormat.LZO;
     }
     if (testConfiguration.getTableFormat() == TableFormat.TREVNI){
       return testConfiguration.getCompressionFormat() == CompressionFormat.NONE ||

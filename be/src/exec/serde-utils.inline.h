@@ -25,8 +25,20 @@ using namespace impala;
 // Macro to return false if condition is false. Only defined for this file.
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return false
 
+inline int16_t SerDeUtils::GetSmallInt(const uint8_t* buf) {
+  return (buf[0] << 8) | buf[1];
+}
+
 inline int32_t SerDeUtils::GetInt(const uint8_t* buf) {
   return (buf[0] << 24) | (buf[1] << 16) | (buf[2] << 8) | buf[3];
+}
+
+inline int64_t SerDeUtils::GetLongInt(const uint8_t* buf) {
+  return (static_cast<int64_t>(buf[0]) << 56) |
+      (static_cast<int64_t>(buf[1]) << 48) |
+      (static_cast<int64_t>(buf[2]) << 40) |
+      (static_cast<int64_t>(buf[3]) << 32) |
+      (buf[4] << 24) | (buf[5] << 16) | (buf[6] << 8) | buf[7];
 }
 
 inline void SerDeUtils::PutInt(uint8_t* buf, int32_t integer) {

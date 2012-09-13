@@ -172,8 +172,10 @@ Status HdfsSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
 }
 
 Status HdfsSequenceScanner::Close() {
-  context_->AcquirePool(unparsed_data_buffer_pool_.get());
-  if (!only_parsing_header_) scan_node_->RangeComplete();
+  if (!only_parsing_header_) {
+    context_->AcquirePool(unparsed_data_buffer_pool_.get());
+    scan_node_->RangeComplete();
+  }
   context_->Complete();
   return Status::OK;
 }

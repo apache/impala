@@ -93,6 +93,14 @@ then
   $IMPALA_HOME/bin/build_thirdparty.sh $*
 fi
 
+if [ -e $HADOOP_LZO/build/native/Linux-*-*/lib/libgplcompression.so ]
+then
+  cp $HADOOP_LZO/build/native/Linux-*-*/lib/libgplcompression.* \
+    $IMPALA_HOME/thirdparty/hadoop-*/lib/native/
+else
+  echo "No hadoop-lzo found"
+fi
+
 # option to clean everything first
 if [ $clean_action -eq 1 ]
 then
@@ -166,6 +174,11 @@ cd $IMPALA_HOME/common/thrift
 make
 cd $IMPALA_BE_DIR
 make -j4
+
+if [ -e $IMPALA_LZO ]
+then
+  (cd $IMPALA_LZO; cmake .; make)
+fi
 
 # Get Hadoop dependencies onto the classpath
 cd $IMPALA_FE_DIR

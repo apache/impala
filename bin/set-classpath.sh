@@ -26,7 +26,8 @@ $IMPALA_HOME/fe/target/test-classes:\
 ${HIVE_HOME}/lib/datanucleus-core-2.0.3.jar:\
 ${HIVE_HOME}/lib/datanucleus-enhancer-2.0.3.jar:\
 ${HIVE_HOME}/lib/datanucleus-rdbms-2.0.3.jar:\
-${HIVE_HOME}/lib/datanucleus-connectionpool-2.0.3.jar
+${HIVE_HOME}/lib/datanucleus-connectionpool-2.0.3.jar:${CLASSPATH}
+
 
 for jar in `ls ${IMPALA_HOME}/fe/target/dependency/*.jar`; do
   CLASSPATH=${CLASSPATH}:$jar

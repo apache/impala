@@ -17,6 +17,8 @@
 #define IMPALA_UTIL_HDFS_UTIL_H
 
 #include <string>
+#include <hdfs.h>
+#include "common/status.h"
 
 namespace impala {
 
@@ -25,6 +27,8 @@ namespace impala {
 std::string AppendHdfsErrorMessage(const std::string& message, 
     const std::string& file = "");
 
-}
+// Return the size, in bytes, of a file from the hdfs connection.
+Status GetFileSize(const hdfsFS& connection, const char* filename, int64_t* filesize);
 
+}
 #endif // IMPALA_UTIL_HDFS_UTIL_H

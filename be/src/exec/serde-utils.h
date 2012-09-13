@@ -42,10 +42,12 @@ class SerDeUtils {
  public:
   static const int MAX_VINT_LEN = 9;
 
-  // Get an Integer from a buffer.  The buffer does not have to be word aligned.
+  // Get a big endian integer from a buffer.  The buffer does not have to be word aligned.
   static int32_t GetInt(const uint8_t* buffer);
+  static int16_t GetSmallInt(const uint8_t* buffer);
+  static int64_t GetLongInt(const uint8_t* buffer);
 
-  // Put an Integer into a buffer in "Hadoop format".  The buffer must be at least
+  // Put an Integer into a buffer in big endian order .  The buffer must be at least
   // 4 bytes long.
   static void PutInt(uint8_t* buf, int32_t integer);
 

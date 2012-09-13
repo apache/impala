@@ -25,6 +25,7 @@ add_library(Util
   codec.cc
   compress.cc
   cpu-info.cc
+  dynamic-util.cc
   debug-util.cc
   decompress.cc
   default-path-handlers.cc

@@ -63,6 +63,11 @@ public class QueryTest extends BaseQueryTest {
     // Run other node numbers with small batch sizes on text
     runQueryInAllBatchAndClusterPerms("hdfs-partitions", true, 0, TEXT_FORMAT_ONLY,
         SMALL_BATCH_SIZES, SMALL_CLUSTER_SIZES);
+
+    List<TestConfiguration> testConfigs = generateAllConfigurationPermutations(
+        TEXT_FORMAT_ONLY, LZO_COMPRESSION_ONLY, ALL_BATCH_SIZES,
+        SMALL_CLUSTER_SIZES, ALL_LLVM_OPTIONS);
+    runQueryWithTestConfigs(testConfigs, "hdfs-partitions", true, 0);
   }
 
   @Test

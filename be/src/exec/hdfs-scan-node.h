@@ -361,6 +361,7 @@ class HdfsScanNode : public ScanNode {
   HdfsScanner* GetScanner(HdfsPartitionDescriptor*);
 
   // Create a new scanner for this partition type and initialize it.
+  // If the scanner cannot be created return NULL.
   HdfsScanner* CreateScanner(HdfsPartitionDescriptor*);
 
   // Main function for disk thread which reads from the io mgr and pushes read

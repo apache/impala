@@ -46,6 +46,20 @@ class HdfsTextScanner : public HdfsScanner {
 
   static const char* LLVM_CLASS_NAME;
 
+ protected:
+  // Current position in byte buffer.
+  char* byte_buffer_ptr_;
+
+  // Ending position of HDFS buffer.
+  char* byte_buffer_end_;
+
+  // Actual bytes received from last file read.
+  int byte_buffer_read_size_;
+
+  // Reset the scanner.  This clears any partial state that needs to
+  // be cleared when starting or when restarting after an error.
+  void ResetScanner();
+
  private:
   const static int NEXT_BLOCK_READ_SIZE = 1024; //bytes
 
@@ -75,7 +89,7 @@ class HdfsTextScanner : public HdfsScanner {
   // byte_buffer_read_size_.
   // If num_bytes is 0, the scanner will read whatever is the io mgr buffer size,
   // otherwise it will just read num_bytes.
-  Status FillByteBuffer(bool* eosr, int num_bytes = 0);
+  virtual Status FillByteBuffer(bool* eosr, int num_bytes = 0);
 
   // Prepends field data that was from the previous file buffer (This field straddled two
   // file buffers).  'data' already contains the pointer/len from the current file buffer,
@@ -127,18 +141,9 @@ class HdfsTextScanner : public HdfsScanner {
   // processed in the current batch.  Used to report row errors.
   std::vector<char*> row_end_locations_;
 
-  // Current position in byte buffer.
-  char* byte_buffer_ptr_;
-
   // Pointer into byte_buffer that is the start of the current batch being
   // processed.
   char* batch_start_ptr_;
-
-  // Ending position of HDFS buffer.
-  char* byte_buffer_end_;
-
-  // Actual bytes received from last file read.
-  int byte_buffer_read_size_;
 
   // Whether or not there was a parse error in the current row. Used for counting the
   // number of errors per file.  Once the error log is full, error_in_row will still be

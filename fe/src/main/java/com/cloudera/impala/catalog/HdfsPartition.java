@@ -38,9 +38,11 @@ public class HdfsPartition {
   static public class FileDescriptor {
     private final String filePath;
     private final long fileLength;
+    private HdfsCompression fileCompression;
 
     public String getFilePath() { return filePath; }
     public long getFileLength() { return fileLength; }
+    public HdfsCompression getFileCompression() { return fileCompression; }
 
     public FileDescriptor(String filePath, long fileLength) {
       Preconditions.checkNotNull(filePath);
@@ -53,6 +55,10 @@ public class HdfsPartition {
     public String toString() {
       return Objects.toStringHelper(this).add("Path", filePath)
           .add("Length", fileLength).toString();
+    }
+
+    public void setCompression(HdfsCompression compression) {
+      fileCompression = compression;
     }
   }
 

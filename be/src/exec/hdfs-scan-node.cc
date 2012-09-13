@@ -14,6 +14,7 @@
 
 #include "exec/hdfs-scan-node.h"
 #include "exec/hdfs-text-scanner.h"
+#include "exec/hdfs-lzo-text-scanner.h"
 #include "exec/hdfs-sequence-scanner.h"
 #include "exec/hdfs-rcfile-scanner.h"
 #include "exec/hdfs-trevni-scanner.h"
@@ -21,6 +22,7 @@
 
 #include <sstream>
 #include <boost/algorithm/string.hpp>
+#include <dlfcn.h>
 
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
@@ -250,6 +252,7 @@ Status HdfsScanNode::InitNextScanRange(RuntimeState* state, bool* scan_ranges_fi
 
     // TODO: HACK.  Skip this file if it uses the io mgr, it is handled very differently
     if (partition->file_format() == THdfsFileFormat::TEXT ||
+        partition->file_format() == THdfsFileFormat::LZO_TEXT ||
         partition->file_format() == THdfsFileFormat::SEQUENCE_FILE) {
       ++current_file_scan_ranges_;
       continue;
@@ -319,6 +322,9 @@ HdfsScanner* HdfsScanNode::CreateScanner(HdfsPartitionDescriptor* partition) {
     case THdfsFileFormat::TEXT:
       scanner = new HdfsTextScanner(this, runtime_state_);
       break;
+    case THdfsFileFormat::LZO_TEXT: 
+      scanner = HdfsLzoTextScanner::GetHdfsLzoTextScanner(this, runtime_state_);
+      break;
     case THdfsFileFormat::SEQUENCE_FILE:
       scanner = new HdfsSequenceScanner(this, runtime_state_);
       break;
@@ -332,10 +338,12 @@ HdfsScanner* HdfsScanNode::CreateScanner(HdfsPartitionDescriptor* partition) {
       DCHECK(false) << "Unknown Hdfs file format type:" << partition->file_format();
       return NULL;
   }
-  scanner_pool_->Add(scanner);
-  // TODO better error handling
-  Status status = scanner->Prepare();
-  DCHECK(status.ok());
+  if (scanner != NULL) {
+    scanner_pool_->Add(scanner);
+    // TODO better error handling
+    Status status = scanner->Prepare();
+    DCHECK(status.ok());
+  }
   return scanner;
 }
 
@@ -464,6 +472,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 
     // TODO: remove when all scanners are updated
     if (partition->file_format() == THdfsFileFormat::TEXT ||
+        partition->file_format() == THdfsFileFormat::LZO_TEXT ||
         partition->file_format() == THdfsFileFormat::SEQUENCE_FILE) {
       ++num_unqueued_files_;
       total_scan_ranges += ranges.size();
@@ -507,13 +516,14 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 
   // Issue initial ranges for all file types.
   HdfsTextScanner::IssueInitialRanges(this, per_type_files[THdfsFileFormat::TEXT]);
+  if (!per_type_files[THdfsFileFormat::LZO_TEXT].empty()) {
+    RETURN_IF_ERROR(HdfsLzoTextScanner::IssueInitialRanges(state,
+        this, per_type_files[THdfsFileFormat::LZO_TEXT]));
+  }
   HdfsSequenceScanner::IssueInitialRanges(this, 
       per_type_files[THdfsFileFormat::SEQUENCE_FILE]);
   
-  // scanners have added their initial ranges, issue the first batch to the io mgr.
-  IssueMoreRanges();
-
-  if (ranges_in_flight_ == 0) {
+  if (all_ranges_.empty()) {
     // This is a temporary hack for scanners not using the io mgr.
     done_ = true;
     return Status::OK;
@@ -522,6 +532,12 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   // Start up disk thread which in turn drives the scanner threads.
   disk_read_thread_.reset(new thread(&HdfsScanNode::DiskThread, this));
   
+  // scanners have added their initial ranges, issue the first batch to the io mgr.
+  // TODO: gdb seems to cause a SIGSEGV when the java call this triggers in the
+  // I/O threads when the thread created above appears during that operation. 
+  // We create it first and then wake up the I/O threads. Need to investigate.
+  IssueMoreRanges();
+
   return Status::OK;
 }
 

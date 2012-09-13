@@ -37,6 +37,7 @@ enum TTableType {
 
 enum THdfsFileFormat {
   TEXT,
+  LZO_TEXT,
   RC_FILE,
   SEQUENCE_FILE,
   TREVNI

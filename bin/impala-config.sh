@@ -46,6 +46,8 @@ if [ -z $IMPALA_HOME ]; then
     fi
 fi
 
+export HADOOP_LZO=${HADOOP_LZO-~/hadoop-lzo}
+export IMPALA_LZO=${IMPALA_LZO-~/Impala-lzo}
 
 export IMPALA_FE_DIR=$IMPALA_HOME/fe
 export IMPALA_BE_DIR=$IMPALA_HOME/be
@@ -62,7 +64,11 @@ export PATH=$HADOOP_HOME/bin:$PATH
 export HIVE_HOME=$IMPALA_HOME/thirdparty/hive-0.9.0-cdh4.1.0/
 export PATH=$HIVE_HOME/bin:$PATH
 export HIVE_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
+
+### Hive looks for jar files in a single directory from HIVE_AUX_JARS_PATH plus
+### any jars in AUX_CLASSPATH. (Or a list of jars in HIVE_AUX_JARS_PATH.)
 export HIVE_AUX_JARS_PATH=$IMPALA_FE_DIR/target
+export AUX_CLASSPATH=$HADOOP_LZO/build/hadoop-lzo-0.4.15.jar
 
 export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-0.92.1-cdh4.1.0/
 export PATH=$HBASE_HOME/bin:$PATH
@@ -87,11 +93,12 @@ export JAVA_LIBRARY_PATH=${IMPALA_HOME}/thirdparty/snappy-1.0.5/build/lib
 
 # So that the frontend tests and PlanService can pick up libbackend.so
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/be/build/debug/service"
-export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/thirdparty/snappy-1.0.5/build/lib"
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/thirdparty/snappy-1.0.5/build/lib":$IMPALA_LZO/build
 
 CLASSPATH=$IMPALA_FE_DIR/target/dependency:$CLASSPATH
 CLASSPATH=$IMPALA_FE_DIR/target/classes:$CLASSPATH
 CLASSPATH=$IMPALA_FE_DIR/src/test/resources:$CLASSPATH
+CLASSPATH=$HADOOP_LZO/build/hadoop-lzo-0.4.15.jar:$CLASSPATH
 
 export CLASSPATH
 
@@ -104,4 +111,6 @@ echo "HIVE_CONF_DIR          = $HIVE_CONF_DIR"
 echo "HBASE_HOME             = $HBASE_HOME"
 echo "HBASE_CONF_DIR         = $HBASE_CONF_DIR"
 echo "PYTHONPATH"            = $PYTHONPATH
+echo "HADOOP_LZO             = $HADOOP_LZO"
+echo "IMPALA_LZO             = $IMPALA_LZO"
 echo "CLASSPATH              = $CLASSPATH"

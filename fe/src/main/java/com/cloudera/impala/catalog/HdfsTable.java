@@ -374,6 +374,31 @@ public class HdfsTable extends Table {
     for (HdfsPartition partition: partitions) {
       for (FileDescriptor fileDescriptor: partition.getFileDescriptors()) {
         Path p = new Path(fileDescriptor.getFilePath());
+        // Check to see if the file has a compression suffix.
+        // We only support .lzo on text files that have been declared in
+        // the metastore as TEXT_LZO.  For now, raise an error on any
+        // other type.
+        HdfsCompression compressionType =
+            HdfsCompression.fromFileName(fileDescriptor.getFilePath());
+        fileDescriptor.setCompression(compressionType);
+        if (compressionType == HdfsCompression.LZO_INDEX) {
+          // Skip index files, these are read by the LZO scanner directly.
+          continue;
+        }
+
+        HdfsStorageDescriptor sd = partition.getInputFormatDescriptor();
+        if (compressionType == HdfsCompression.LZO) {
+          if (sd.getFileFormat() != HdfsFileFormat.LZO_TEXT) {
+            throw new RuntimeException(
+                "Compressed file not supported without compression input format: " + p);
+          }
+        } else if (compressionType != HdfsCompression.NONE) {
+          throw new RuntimeException("Compressed file not supported: " + p);
+        } else if (sd.getFileFormat() == HdfsFileFormat.LZO_TEXT) {
+          throw new RuntimeException("Expected file with .lzo suffix: " + p);
+        }
+
+
         BlockLocation[] locations = null;
         try {
           FileStatus fileStatus = dfs.getFileStatus(p);
@@ -388,7 +413,7 @@ public class HdfsTable extends Table {
           endingBlockIndexes.add(blocks.size());
         } catch (IOException e) {
           throw new RuntimeException("couldn't determine block locations for path '"
-              + fileDescriptor.getFilePath() + "':\n" + e.getMessage(), e);
+              + p + "':\n" + e.getMessage(), e);
         }
       }
     }
@@ -400,10 +425,10 @@ public class HdfsTable extends Table {
 
         // Convert block locations to 0 based ids.  The block location ids returned
         // from HDFS are unique but opaque (only defining comparison operators).  We need
-        // to turn them indices.  
-        // TODO: the diskId should be eventually retrievable from Hdfs when 
+        // to turn them indices.
+        // TODO: the diskId should be eventually retrievable from Hdfs when
         // the community agrees this API is useful.
-        
+
         // For each host, this is a mapping of the VolumeId object to a 0 based index.
         Map<String, Map<VolumeId, Integer>> hostDiskIds = Maps.newHashMap();
 
@@ -431,7 +456,7 @@ public class HdfsTable extends Table {
             }
 
             if (!volumeIds[j].isValid()) {
-              // The data node with this block did not respond to the block location 
+              // The data node with this block did not respond to the block location
               // rpc.  Mark it as -1 for the BE which will assign it a random disk.
               diskIds[j] = -1;
             } else if (hostDisks.containsKey(volumeIds[j])) {
@@ -452,7 +477,7 @@ public class HdfsTable extends Table {
         throw new RuntimeException("couldn't determine block storage locations:\n"
             + e.getMessage(), e);
       }
-    } 
+    }
 
     if (result.size() == 0) {
       if (supportsVolumeId) {
@@ -469,6 +494,10 @@ public class HdfsTable extends Table {
     int fileIndex = 0;
     for (HdfsPartition partition: partitions) {
       for (FileDescriptor fileDescriptor: partition.getFileDescriptors()) {
+        if (fileDescriptor.getFileCompression() == HdfsCompression.LZO_INDEX) {
+          // Don't issue scans for the index files for LZO compressed files.
+          continue;
+        }
         int lastBlockIndex = endingBlockIndexes.get(fileIndex);
         for (int i = firstBlockIndex; i < lastBlockIndex; ++i) {
           result.get(i).setFileName(fileDescriptor.getFilePath());

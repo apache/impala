@@ -5,7 +5,7 @@ if [ x${JAVA_HOME} == x ]; then
   echo JAVA_HOME not set
   exit 1
 fi
-
+source ${IMPALA_HOME}/bin/impala-configure.sh
 set -u
 set -e
 
@@ -31,6 +31,15 @@ hadoop fs -cp  /test-warehouse/alltypes_rc/year=2009/month=3/ /tmp/alltypes_rc/y
 hadoop fs -cp  /test-warehouse/alltypes_trevni/year=2009/month=4/ \
   /tmp/alltypes_rc/year=2009
 
+
+# Make compressed data for alltypesaggsmultifiles
+rm -rf /tmp/alltypesaggmultifiles
+hadoop fs -get /test-warehouse/alltypesaggmultifiles /tmp
+(cd /tmp/alltypesaggmultifiles; lzop */*/*/*)
+
+# Create lzo compressed versions of the Alltypes data files.
+(cd ${IMPALA_HOME}/testdata/target/AllTypes; rm -f *.lzo; lzop *.txt)
+
 # For tables that rely on loading data from local fs test-warehouse
 # TODO: Find a good way to integrate this with the normal data loading scripts
 ${HIVE_HOME}/bin/hive -hiveconf hive.root.logger=WARN,console -v \
@@ -39,3 +48,12 @@ if [ $? != 0 ]; then
   echo DEPENDENT LOAD FAILED
   exit 1
 fi
+
+# create the index files for AllTypes_lzo.
+${IMPALA_HOME}/testdata/bin/lzo_indexer.sh /test-warehouse/alltypes_lzo
+${IMPALA_HOME}/testdata/bin/lzo_indexer.sh /test-warehouse/alltypesaggmultifiles_lzo
+
+# Load the index files for lzo data.
+hadoop fs -rm -f /test-warehouse/bad_text_lzo//bad_text.lzo.index
+hadoop fs -put ${IMPALA_HOME}/testdata/bad_text_lzo/bad_text.lzo.index \
+  /test-warehouse/bad_text_lzo/

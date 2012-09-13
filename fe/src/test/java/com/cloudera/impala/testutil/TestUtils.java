@@ -321,6 +321,7 @@ public class TestUtils {
         expectedExecResults.getErrors().size() > 0) {
       testErrorLog.append(
           "Expecting error but no exception is thrown: query '" + queryReportString);
+      return actualExecResults;
     }
 
     // Compare error log against the expected error.

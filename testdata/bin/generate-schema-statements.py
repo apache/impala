@@ -66,7 +66,7 @@ DATASET_DIR = os.environ['IMPALA_HOME'] + '/testdata/datasets'
 COMPRESSION_TYPE = "SET mapred.output.compression.type=%s;"
 COMPRESSION_ENABLED = "SET hive.exec.compress.output=%s;"
 COMPRESSION_CODEC =\
-    "SET mapred.output.compression.codec=org.apache.hadoop.io.compress.%s;"
+    "SET mapred.output.compression.codec=%s;"
 SET_DYNAMIC_PARTITION_STATEMENT = "SET hive.exec.dynamic.partition=true;"
 SET_PARTITION_MODE_NONSTRICT_STATEMENT = "SET hive.exec.dynamic.partition.mode=nonstrict;"
 SET_HIVE_INPUT_FORMAT = "SET mapred.max.split.size=256000000;\n"\
@@ -76,10 +76,11 @@ DATA_SET_IDX = 1
 CODEC_IDX = 2
 COMPRESSION_TYPE_IDX = 3
 
-COMPRESSION_MAP = {'def': 'DefaultCodec',
-                   'gzip': 'GzipCodec',
-                   'bzip': 'BZip2Codec',
-                   'snap': 'SnappyCodec',
+COMPRESSION_MAP = {'def': 'org.apache.hadoop.io.compress.DefaultCodec',
+                   'gzip': 'org.apache.hadoop.io.compress.GzipCodec',
+                   'bzip': 'org.apache.hadoop.io.compress.BZip2Codec',
+                   'snap': 'org.apache.hadoop.io.compress.SnappyCodec',
+                   'lzo': 'com.hadoop.compression.lzo.LzopCodec',
                    'none': ''
                   }
 
@@ -93,13 +94,16 @@ FILE_FORMAT_MAP = {'text': 'TEXTFILE',
                    'rc': 'RCFILE',
                    'trevni': '\n' +
                      'INPUTFORMAT \'org.apache.hadoop.hive.ql.io.TrevniInputFormat\'\n' +
-                     'OUTPUTFORMAT \'org.apache.hadoop.hive.ql.io.TrevniOutputFormat\''
-
+                     'OUTPUTFORMAT \'org.apache.hadoop.hive.ql.io.TrevniOutputFormat\'',
+                   'text_lzo': '\n' +
+                     'INPUTFORMAT \'com.hadoop.mapred.DeprecatedLzoTextInputFormat\'\n' +
+                     'OUTPUTFORMAT ' + 
+                     '\'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat\'\n'
                   }
 
 TREVNI_ALTER_STATEMENT = "ALTER TABLE %(table_name)s SET\n\
      SERDEPROPERTIES ('blocksize' = '1073741824', 'compression' = '%(compression)s');"
-KNOWN_EXPLORATION_STRATEGIES = ['core', 'pairwise', 'exhaustive']
+KNOWN_EXPLORATION_STRATEGIES = ['core', 'pairwise', 'exhaustive', 'lzo']
 
 class SqlGenerationStatement:
   def __init__(self, base_table_name, create, insert, trevni, load_local, compute_stats):
@@ -116,6 +120,8 @@ def build_compute_stats_statement(compute_stats_template, table_name):
 def build_create_statement(table_template, table_name, file_format,
                            compression, scale_factor):
   create_statement = 'DROP TABLE IF EXISTS %s;\n' % table_name
+  if compression == 'lzo':
+    file_format = '%s_%s' % (file_format, compression)
   create_statement += table_template % {'table_name': table_name,
                                         'file_format': FILE_FORMAT_MAP[file_format],
                                         'scale_factor': scale_factor}
@@ -177,7 +183,7 @@ def build_trevni(trevni_template, table_name, base_table_name):
   return trevni_template % {'table_name': table_name, 'base_table_name': base_table_name}
 
 def build_table_suffix(file_format, codec, compression_type):
-  if file_format == 'text' and codec != 'none':
+  if file_format == 'text' and codec != 'none' and codec != 'lzo':
     print 'Unsupported combination of file_format (text) and compression codec.'
     sys.exit(1)
   elif file_format == 'text' and codec == 'none':

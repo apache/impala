@@ -676,6 +676,7 @@ Status DiskIoMgr::GetNext(ReaderContext* reader, BufferDescriptor** buffer, bool
   // Wait until a block is read, all blocks have been read and returned or 
   // reader is cancelled
   while (reader->ready_buffers_.empty() && reader->state_ == ReaderContext::Active) {
+    VLOG_ROW << "GetNext: Waiting " << reader;
     reader->buffer_ready_cond_var_.wait(lock);
   }
   

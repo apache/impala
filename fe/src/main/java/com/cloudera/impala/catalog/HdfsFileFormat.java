@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableMap;
 public enum HdfsFileFormat {
   RC_FILE,
   TEXT,
+  LZO_TEXT,
   SEQUENCE_FILE,
   TREVNI;
 
@@ -36,6 +37,10 @@ public enum HdfsFileFormat {
   // Input format class for Text tables read by Hive.
   private static final String TEXT_INPUT_FORMAT =
       "org.apache.hadoop.mapred.TextInputFormat";
+
+  // Input format class for LZO compressed Text tables read by Hive.
+  private static final String LZO_TEXT_INPUT_FORMAT =
+      "com.hadoop.mapred.DeprecatedLzoTextInputFormat";
 
   //Input format class for Text tables read by Hive.
   private static final String SEQUENCE_INPUT_FORMAT =
@@ -48,6 +53,7 @@ public enum HdfsFileFormat {
   private static final Map<String, HdfsFileFormat> VALID_FORMATS =
       ImmutableMap.of(RCFILE_INPUT_FORMAT, RC_FILE,
                       TEXT_INPUT_FORMAT, TEXT,
+                      LZO_TEXT_INPUT_FORMAT, LZO_TEXT,
                       SEQUENCE_INPUT_FORMAT, SEQUENCE_FILE,
                       TREVNI_INPUT_FORMAT, TREVNI);
 
@@ -76,6 +82,8 @@ public enum HdfsFileFormat {
       return THdfsFileFormat.RC_FILE;
     case TEXT:
       return THdfsFileFormat.TEXT;
+    case LZO_TEXT:
+      return THdfsFileFormat.LZO_TEXT;
     case SEQUENCE_FILE:
       return THdfsFileFormat.SEQUENCE_FILE;
     case TREVNI:
