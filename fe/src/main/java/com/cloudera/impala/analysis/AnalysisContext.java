@@ -31,6 +31,10 @@ public class AnalysisContext {
       return stmt instanceof InsertStmt;
     }
 
+    public boolean isUseStmt() {
+      return stmt instanceof UseStmt;
+    }
+
     public QueryStmt getQueryStmt() {
       return (QueryStmt) stmt;
     }

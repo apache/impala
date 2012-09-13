@@ -9,7 +9,7 @@ include "ImpalaInternalService.thrift"
 // These are supporting structs for JniFrontend.java, which serves as the glue
 // between our C++ execution environment and the Java frontend.
 
-struct TQueryRequest {
+struct TClientRequest {
   // select stmt to be executed
   1: required string stmt
 
@@ -38,11 +38,14 @@ struct TCatalogUpdate {
   3: required set<string> created_partitions;
 }
 
-// Result of call to createQueryExecRequest()
-struct TCreateQueryExecRequestResult {
+// Result of call to createExecRequest()
+struct TCreateExecRequestResult {
+  1: required Types.TStmtType stmt_type;
+
   // TQueryExecRequest for the backend
-  1: required ImpalaInternalService.TQueryExecRequest queryExecRequest
+  // Set iff stmt_type is QUERY
+  2: optional ImpalaInternalService.TQueryExecRequest queryExecRequest
 
   // Metadata of the query result set (only for select)
-  2: optional TResultSetMetadata resultSetMetadata
+  3: optional TResultSetMetadata resultSetMetadata
 }

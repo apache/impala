@@ -128,11 +128,11 @@ Status InProcessQueryExecutor::Exec(const string& query,
   try {
     COUNTER_SCOPED_TIMER(plan_gen_counter);
     CHECK(client_.get() != NULL) << "didn't call InProcessQueryExecutor::Setup()";
-    TQueryRequest query_request;
-    query_request.__set_stmt(query.c_str());
-    query_request.__set_queryOptions(query_options);
-    TCreateQueryExecRequestResult result;
-    client_->CreateQueryExecRequest(result, query_request);
+    TClientRequest client_request;
+    client_request.__set_stmt(query.c_str());
+    client_request.__set_queryOptions(query_options);
+    TCreateExecRequestResult result;
+    client_->CreateExecRequest(result, client_request);
     query_request_ = result.queryExecRequest;
   } catch (TImpalaPlanServiceException& e) {
     return Status(e.what());
@@ -328,11 +328,11 @@ Status InProcessQueryExecutor::Explain(const string& query, string* explain_plan
     query_options.file_buffer_size = FLAGS_file_buffer_size;
     query_options.max_scan_range_length = FLAGS_max_scan_range_length;
 
-    TQueryRequest query_request;
-    query_request.__set_stmt(query.c_str());
-    query_request.__set_queryOptions(query_options);
+    TClientRequest client_request;
+    client_request.__set_stmt(query.c_str());
+    client_request.__set_queryOptions(query_options);
 
-    client_->GetExplainString(*explain_plan, query_request);
+    client_->GetExplainString(*explain_plan, client_request);
     return Status::OK;
   } catch (TImpalaPlanServiceException& e) {
     return Status(e.what());

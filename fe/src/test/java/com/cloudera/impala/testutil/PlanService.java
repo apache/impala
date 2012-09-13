@@ -18,10 +18,10 @@ import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.service.Frontend;
 import com.cloudera.impala.thrift.ImpalaPlanService;
 import com.cloudera.impala.thrift.TCatalogUpdate;
-import com.cloudera.impala.thrift.TCreateQueryExecRequestResult;
+import com.cloudera.impala.thrift.TCreateExecRequestResult;
 import com.cloudera.impala.thrift.TImpalaPlanServiceException;
 import com.cloudera.impala.thrift.TPlanExecRequest;
-import com.cloudera.impala.thrift.TQueryRequest;
+import com.cloudera.impala.thrift.TClientRequest;
 import com.google.common.collect.Sets;
 
 /**
@@ -46,15 +46,15 @@ public class PlanService {
       frontend = new Frontend(lazy);
     }
 
-    public TCreateQueryExecRequestResult CreateQueryExecRequest(TQueryRequest tRequest)
+    public TCreateExecRequestResult CreateExecRequest(TClientRequest tRequest)
         throws TImpalaPlanServiceException {
       LOG.info(
           "Executing '" + tRequest.stmt + "' for " +
           Integer.toString(tRequest.queryOptions.num_nodes) + " nodes");
       StringBuilder explainStringBuilder = new StringBuilder();
-      TCreateQueryExecRequestResult result;
+      TCreateExecRequestResult result;
       try {
-        result = frontend.createQueryExecRequest(tRequest, explainStringBuilder);
+        result = frontend.createExecRequest(tRequest, explainStringBuilder);
       } catch (ImpalaException e) {
         LOG.warn("Error creating query request result", e);
         throw new TImpalaPlanServiceException(e.getMessage());
@@ -66,7 +66,7 @@ public class PlanService {
       // Print explain string.
       LOG.info(explainStringBuilder.toString());
 
-      LOG.info("returned TCreateQueryExecRequestResult: " + result.toString());
+      LOG.info("returned TCreateExecRequestResult: " + result.toString());
       return result;
     }
 
@@ -84,7 +84,7 @@ public class PlanService {
     }
 
     @Override
-    public String GetExplainString(TQueryRequest tRequest)
+    public String GetExplainString(TClientRequest tRequest)
         throws TImpalaPlanServiceException {
       try {
         return frontend.getExplainString(tRequest);

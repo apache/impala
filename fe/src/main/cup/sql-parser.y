@@ -139,8 +139,8 @@ terminal KW_AND, KW_ALL, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW_BIGINT, KW_BOOLEA
   KW_HAVING, KW_IS, KW_IN, KW_INNER, KW_JOIN, KW_INT, KW_LEFT, KW_LIKE, KW_LIMIT, KW_MIN,
   KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_REGEXP,
   KW_RLIKE, KW_RIGHT, KW_SELECT, KW_SEMI, KW_SMALLINT, KW_STRING, KW_SUM,
-  KW_TINYINT, KW_TRUE, KW_UNION, KW_USING, KW_WHEN, KW_WHERE, KW_THEN, KW_TIMESTAMP,
-  KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION, KW_INTERVAL;
+  KW_TINYINT, KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_WHEN, KW_WHERE, KW_THEN, 
+  KW_TIMESTAMP, KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION, KW_INTERVAL;
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
 terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
@@ -152,13 +152,15 @@ terminal Double FLOATINGPOINT_LITERAL;
 terminal String STRING_LITERAL;
 terminal String UNMATCHED_STRING_LITERAL;
 
-nonterminal ParseNodeBase insert_or_query_stmt;
+nonterminal ParseNodeBase stmt;
 // Single select statement.
 nonterminal SelectStmt select_stmt;
 // Select or union statement.
 nonterminal QueryStmt query_stmt;
 // List of select or union blocks connected by UNION operators or a single select block.
 nonterminal List<UnionOperand> union_operands;
+// USE stmt
+nonterminal UseStmt use_stmt;
 // List of select blocks connected by UNION operators, with order by or limit.
 nonterminal QueryStmt union_with_order_by_or_limit;
 nonterminal SelectList select_clause;
@@ -216,13 +218,15 @@ precedence left KW_IN;
 // Support chaining of timestamp arithmetic exprs.
 precedence left KW_INTERVAL;
 
-start with insert_or_query_stmt;
+start with stmt;
 
-insert_or_query_stmt ::= 
+stmt ::= 
     query_stmt:query
     {: RESULT = query; :}
     | insert_stmt:insert
     {: RESULT = insert; :}
+    | use_stmt:use
+    {: RESULT = use; :}
     ;
 
 insert_stmt ::=
@@ -362,6 +366,11 @@ union_op ::=
   {: RESULT = Qualifier.DISTINCT; :}
   | KW_UNION KW_ALL
   {: RESULT = Qualifier.ALL; :}
+  ;
+
+use_stmt ::=
+    KW_USE IDENT:db
+  {: RESULT = new UseStmt(db); :}
   ;
 
 select_stmt ::=

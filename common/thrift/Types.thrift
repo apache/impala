@@ -24,6 +24,12 @@ enum TPrimitiveType {
   STRING
 }
 
+enum TStmtType {
+  QUERY,
+  DDL, // Data definition, e.g. CREATE TABLE (includes read-only functions e.g. SHOW)
+  DML // Data modification e.g. INSERT
+}
+
 struct THostPort {
   1: required string host
   2: required i32 port

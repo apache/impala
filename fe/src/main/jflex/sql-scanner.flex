@@ -96,6 +96,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("partition", new Integer(SqlParserSymbols.KW_PARTITION));
     keywordMap.put("table", new Integer(SqlParserSymbols.KW_TABLE));
     keywordMap.put("tinyint", new Integer(SqlParserSymbols.KW_TINYINT));
+    keywordMap.put("use", new Integer(SqlParserSymbols.KW_USE));
     keywordMap.put("using", new Integer(SqlParserSymbols.KW_USING));
     keywordMap.put("union", new Integer(SqlParserSymbols.KW_UNION));
     keywordMap.put("when", new Integer(SqlParserSymbols.KW_WHEN));

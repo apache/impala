@@ -21,10 +21,11 @@ import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.thrift.TCatalogUpdate;
 import com.cloudera.impala.thrift.TColumnDesc;
-import com.cloudera.impala.thrift.TCreateQueryExecRequestResult;
+import com.cloudera.impala.thrift.TCreateExecRequestResult;
 import com.cloudera.impala.thrift.TPlanExecParams;
 import com.cloudera.impala.thrift.TQueryExecRequest;
-import com.cloudera.impala.thrift.TQueryRequest;
+import com.cloudera.impala.thrift.TClientRequest;
+import com.cloudera.impala.thrift.TStmtType;
 import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TUniqueId;
 import com.google.common.base.Preconditions;
@@ -32,7 +33,7 @@ import com.google.common.base.Preconditions;
 /**
  * Frontend API for the impalad process.
  * This class allows the impala daemon to create TQueryExecRequest
- * in response to TQueryRequests.
+ * in response to TClientRequests.
  * TODO: make this thread-safe by making updates to nextQueryId and catalog thread-safe
  */
 public class Frontend {
@@ -99,14 +100,14 @@ public class Frontend {
   }
 
   /**
-   * Create a populated TCreateQueryExecRequestResult corresponding to the supplied
-   * TQueryRequest.
+   * Create a populated TCreateExecRequestResult corresponding to the supplied
+   * TClientRequest.
    * @param request query request
    * @param explainString if not null, it will contain the explain plan string
-   * @return a TCreateQueryExecRequestResult based on request
+   * @return a TCreateExecRequestResult based on request
    * TODO: make updates to nextQueryId thread-safe
    */
-  public TCreateQueryExecRequestResult createQueryExecRequest(TQueryRequest request,
+  public TCreateExecRequestResult createExecRequest(TClientRequest request,
       StringBuilder explainString) throws ImpalaException {
     AnalysisContext analysisCtxt = new AnalysisContext(catalog);
     AnalysisContext.AnalysisResult analysisResult = null;
@@ -118,29 +119,37 @@ public class Frontend {
     }
     Preconditions.checkNotNull(analysisResult.getStmt());
 
-    // create plan
-    Planner planner = new Planner();
-    TCreateQueryExecRequestResult result = new TCreateQueryExecRequestResult();
-    result.setQueryExecRequest(
-        planner.createPlanFragments(analysisResult, request.queryOptions,
-            explainString));
-    result.queryExecRequest.sql_stmt = request.stmt;
+    TCreateExecRequestResult result = new TCreateExecRequestResult();
 
-    // fill the metadata (for query statement)
-    if (analysisResult.isQueryStmt()) {
-      TResultSetMetadata metadata = new TResultSetMetadata();
-      QueryStmt queryStmt = analysisResult.getQueryStmt();
-      int colCnt = queryStmt.getColLabels().size();
-      for (int i = 0; i < colCnt; ++i) {
-        TColumnDesc colDesc = new TColumnDesc();
-        colDesc.columnName = queryStmt.getColLabels().get(i);
-        colDesc.columnType = queryStmt.getResultExprs().get(i).getType().toThrift();
-        metadata.addToColumnDescs(colDesc);
+    if (analysisResult.isUseStmt()) {
+      result.stmt_type = TStmtType.DDL;
+    } else {
+      // create plan
+      Planner planner = new Planner();
+      result.setQueryExecRequest(
+          planner.createPlanFragments(analysisResult, request.queryOptions,
+                                      explainString));
+      result.queryExecRequest.sql_stmt = request.stmt;
+      
+      // fill the metadata (for query statement)
+      if (analysisResult.isQueryStmt()) {
+        TResultSetMetadata metadata = new TResultSetMetadata();
+        QueryStmt queryStmt = analysisResult.getQueryStmt();
+        int colCnt = queryStmt.getColLabels().size();
+        for (int i = 0; i < colCnt; ++i) {
+          TColumnDesc colDesc = new TColumnDesc();
+          colDesc.columnName = queryStmt.getColLabels().get(i);
+          colDesc.columnType = queryStmt.getResultExprs().get(i).getType().toThrift();
+          metadata.addToColumnDescs(colDesc);
+        }
+        result.resultSetMetadata = metadata;
+        result.stmt_type = TStmtType.QUERY;
+      } else {
+        result.stmt_type = TStmtType.DML;
       }
-      result.resultSetMetadata = metadata;
+      assignIds(result.queryExecRequest);
     }
 
-    assignIds(result.queryExecRequest);
     return result;
   }
 
@@ -148,9 +157,9 @@ public class Frontend {
    * Parses and plans a query in order to generate its explain string. This method does
    * not increase the query id counter.
    */
-  public String getExplainString(TQueryRequest request) throws ImpalaException {
+  public String getExplainString(TClientRequest request) throws ImpalaException {
     StringBuilder stringBuilder = new StringBuilder();
-    createQueryExecRequest(request, stringBuilder);
+    createExecRequest(request, stringBuilder);
     return stringBuilder.toString();
   }
 

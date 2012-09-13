@@ -43,6 +43,7 @@
 #include "util/thrift-server.h"
 #include "util/jni-util.h"
 #include "util/webserver.h"
+#include "gen-cpp/Types_types.h"
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/DataSinks_types.h"
 #include "gen-cpp/Types_types.h"
@@ -85,6 +86,9 @@ namespace impala {
 ThreadManager* fe_tm;
 ThreadManager* be_tm;
 
+// Used for queries that execute instantly and always succeed
+const string NO_QUERY_HANDLE = "no_query_handle";
+
 // Execution state of a query. This captures everything necessary
 // to convert row batches received by the coordinator into results
 // we can return to the client. It also captures all state required for
@@ -95,7 +99,7 @@ ThreadManager* be_tm;
 // while holding the exec state's lock.
 class ImpalaServer::QueryExecState {
  public:
-  QueryExecState(const TQueryRequest& request, const TUniqueId& query_id,
+  QueryExecState(const TClientRequest& request, const TUniqueId& query_id,
       ExecEnv* exec_env, const TResultSetMetadata& metadata, 
       const TQueryExecRequest& exec_request, ImpalaServer* impala_server)
     : request_(request), query_id_(query_id),
@@ -159,7 +163,7 @@ class ImpalaServer::QueryExecState {
   const Status& query_status() const { return query_status_; }
 
  private:
-  TQueryRequest request_;  // the original request
+  TClientRequest request_;  // the original request
   TUniqueId query_id_;
   mutex lock_;  // protects all following fields
   ExecStats exec_stats_;
@@ -531,8 +535,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     jclass fe_class = jni_env->FindClass("com/cloudera/impala/service/JniFrontend");
     jmethodID fe_ctor = jni_env->GetMethodID(fe_class, "<init>", "(Z)V");
     EXIT_IF_EXC(jni_env);
-    create_query_exec_request_id_ =
-        jni_env->GetMethodID(fe_class, "createQueryExecRequest", "([B)[B");
+    create_exec_request_id_ =
+        jni_env->GetMethodID(fe_class, "createExecRequest", "([B)[B");
     EXIT_IF_EXC(jni_env);
     get_explain_plan_id_ = jni_env->GetMethodID(fe_class, "getExplainPlan",
         "([B)Ljava/lang/String;");
@@ -586,16 +590,25 @@ void ImpalaServer::RenderHadoopConfigs(stringstream* output) {
 ImpalaServer::~ImpalaServer() {}
 
 void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
-  TQueryRequest query_request;
-  QueryToTQueryRequest(query, &query_request);
+  TClientRequest query_request;
+  QueryToTClientRequest(query, &query_request);
   shared_ptr<QueryExecState> exec_state;
   Status status = Execute(query_request, &exec_state);
+  
   if (!status.ok()) {
     // raise Syntax error or access violation;
     // it's likely to be syntax/analysis error
     RaiseBeeswaxException(
         status.GetErrorMsg(), SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
   }
+
+  if (exec_state.get() == NULL) {
+    // No execution required for this query (USE)
+    query_handle.id = NO_QUERY_HANDLE;
+    query_handle.log_context = NO_QUERY_HANDLE;
+    return;    
+  }
+
   exec_state->UpdateQueryState(QueryState::RUNNING);
   TUniqueIdToQueryHandle(exec_state->query_id(), &query_handle);
 
@@ -606,8 +619,8 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
 
 void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
     const LogContextId& client_ctx) {
-  TQueryRequest query_request;
-  QueryToTQueryRequest(query, &query_request);
+  TClientRequest query_request;
+  QueryToTClientRequest(query, &query_request);
 
   shared_ptr<QueryExecState> exec_state;
   Status status = Execute(query_request, &exec_state);
@@ -617,6 +630,13 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
     // it's likely to be syntax/analysis error
     RaiseBeeswaxException(
         status.GetErrorMsg(), SQLSTATE_SYNTAX_ERROR_OR_ACCESS_VIOLATION);
+  }
+
+  if (exec_state.get() == NULL) {
+    // No execution required for this query (USE)
+    query_handle.id = NO_QUERY_HANDLE;
+    query_handle.log_context = NO_QUERY_HANDLE;
+    return;
   }
 
   exec_state->UpdateQueryState(QueryState::RUNNING);
@@ -635,10 +655,18 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
   query_handle.log_context = client_ctx.empty() ? query_handle.id : client_ctx;
 }
 
-Status ImpalaServer::Execute(const TQueryRequest& request,
+Status ImpalaServer::Execute(const TClientRequest& request,
     shared_ptr<QueryExecState>* exec_state) {
-  TCreateQueryExecRequestResult result;
+  TCreateExecRequestResult result;
   RETURN_IF_ERROR(GetQueryExecRequest(request, &result));
+
+  if (result.stmt_type == TStmtType::DDL) {
+    // Only DDL command is USE at the moment.
+    LOG(INFO) << "USE command ignored";
+    exec_state = NULL;
+    return Status::OK;
+  }
+
   TQueryExecRequest& exec_request = result.queryExecRequest;
   // we always need at least one plan fragment
   DCHECK_GT(exec_request.fragment_requests.size(), 0);
@@ -732,7 +760,7 @@ Status ImpalaServer::UpdateMetastore(const TCatalogUpdate& catalog_update) {
 
 
 Status ImpalaServer::GetQueryExecRequest(
-    const TQueryRequest& request, TCreateQueryExecRequestResult* result) {
+    const TClientRequest& request, TCreateExecRequestResult* result) {
   if (!FLAGS_use_planservice) {
     // TODO: figure out if repeated calls to
     // JNI_GetCreatedJavaVMs()/AttachCurrentThread() are too expensive
@@ -740,7 +768,7 @@ Status ImpalaServer::GetQueryExecRequest(
     jbyteArray request_bytes;
     RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &request, &request_bytes));
     jbyteArray result_bytes = static_cast<jbyteArray>(
-        jni_env->CallObjectMethod(fe_, create_query_exec_request_id_, request_bytes));
+        jni_env->CallObjectMethod(fe_, create_exec_request_id_, request_bytes));
     RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
     DeserializeThriftMsg(jni_env, result_bytes, result);
     // TODO: dealloc result_bytes?
@@ -748,13 +776,13 @@ Status ImpalaServer::GetQueryExecRequest(
     //RETURN_IF_JNIERROR(jvm_->DetachCurrentThread());
     return Status::OK;
   } else {
-    planservice_client_->CreateQueryExecRequest(*result, request);
+    planservice_client_->CreateExecRequest(*result, request);
     return Status::OK;
   }
 }
 
 Status ImpalaServer::GetExplainPlan(
-    const TQueryRequest& query_request, string* explain_string) {
+    const TClientRequest& query_request, string* explain_string) {
   if (!FLAGS_use_planservice) {
     // TODO: figure out if repeated calls to
     // JNI_GetCreatedJavaVMs()/AttachCurrentThread() are too expensive
@@ -830,8 +858,8 @@ void ImpalaServer::Cancel(impala::TStatus& status,
 void ImpalaServer::explain(QueryExplanation& query_explanation, const Query& query) {
   // Translate Beeswax Query to Impala's QueryRequest and then set the explain plan bool
   // before shipping to FE
-  TQueryRequest query_request;
-  QueryToTQueryRequest(query, &query_request);
+  TClientRequest query_request;
+  QueryToTClientRequest(query, &query_request);
 
   Status status = GetExplainPlan(query_request, &query_explanation.textual);
   if (!status.ok()) {
@@ -851,6 +879,13 @@ void ImpalaServer::fetch(Results& query_results, const QueryHandle& query_handle
     RaiseBeeswaxException(
         "Does not support start over", SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED);
   }
+
+  if (query_handle.id == NO_QUERY_HANDLE) {
+    query_results.ready = true;
+    query_results.has_more = false;    
+    return;
+  }
+
   TUniqueId query_id;
   QueryHandleToTUniqueId(query_handle, &query_id);
   VLOG_ROW << "ImpalaServer::fetch query_id=" << PrintId(query_id)
@@ -946,6 +981,10 @@ void ImpalaServer::get_results_metadata(ResultsMetadata& results_metadata,
 }
 
 void ImpalaServer::close(const QueryHandle& handle) {
+  if (handle.id == NO_QUERY_HANDLE) {
+    return;
+  }
+
   TUniqueId query_id;
   QueryHandleToTUniqueId(handle, &query_id);
   VLOG_QUERY << "ImpalaServer::close: query_id=" << PrintId(query_id);
@@ -993,6 +1032,10 @@ Status ImpalaServer::CloseInsertInternal(const TUniqueId& query_id,
 }
 
 QueryState::type ImpalaServer::get_state(const QueryHandle& handle) {
+  if (handle.id == NO_QUERY_HANDLE) {
+    return QueryState::FINISHED;
+  }
+
   TUniqueId query_id;
   QueryHandleToTUniqueId(handle, &query_id);
   VLOG_QUERY << "ImpalaServer::get_state: query_id=" << PrintId(query_id);
@@ -1022,7 +1065,7 @@ void ImpalaServer::dump_config(string& config) {
 }
 
 void ImpalaServer::get_log(string& log, const LogContextId& context) {
-  log = "logs are distributed. Skip it for now";
+  log = "Distributed log collection not supported.";
 }
 
 void ImpalaServer::get_default_configuration(vector<ConfigVariable> &configurations,
@@ -1031,13 +1074,13 @@ void ImpalaServer::get_default_configuration(vector<ConfigVariable> &configurati
       default_configs_.end());
 }
 
-void ImpalaServer::QueryToTQueryRequest(const Query& query,
-    TQueryRequest* request) {
+void ImpalaServer::QueryToTClientRequest(const Query& query,
+    TClientRequest* request) {
   request->queryOptions.num_nodes = FLAGS_default_num_nodes;
   request->queryOptions.return_as_ascii = true;
   request->stmt = query.query;
 
-  // Convert Query.Configuration to TQueryRequest.queryOptions
+  // Convert Query.Configuration to TClientRequest.queryOptions
   if (query.__isset.configuration) {
     BOOST_FOREACH(string kv_string, query.configuration) {
       trim(kv_string);
@@ -1092,7 +1135,7 @@ void ImpalaServer::QueryToTQueryRequest(const Query& query,
           }
       }
     }
-    VLOG_QUERY << "TQueryRequest.queryOptions: "
+    VLOG_QUERY << "TClientRequest.queryOptions: "
                << ThriftDebugString(request->queryOptions);
   }
 }
@@ -1106,6 +1149,7 @@ void ImpalaServer::TUniqueIdToQueryHandle(const TUniqueId& query_id,
 
 void ImpalaServer::QueryHandleToTUniqueId(const QueryHandle& handle,
     TUniqueId* query_id) {
+  DCHECK_NE(handle.id, NO_QUERY_HANDLE);
   char_separator<char> sep(" ");
   tokenizer< char_separator<char> > tokens(handle.id, sep);
   int i = 0;

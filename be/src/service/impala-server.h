@@ -34,8 +34,8 @@ class TCancelPlanFragmentResult;
 class TTransmitDataArgs;
 class TTransmitDataResult;
 class THostPort;
-class TQueryRequest;
-class TCreateQueryExecRequestResult;
+class TClientRequest;
+class TCreateExecRequestResult;
 class ImpalaPlanServiceClient;
 
 class ThriftServer;
@@ -147,19 +147,19 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   // Return exec state for given fragment_id, or NULL if not found.
   FragmentExecState* GetFragmentExecState(const TUniqueId& fragment_id);
 
-  // Call FE to get TQueryRequestResult.
-  Status GetQueryExecRequest(const TQueryRequest& request,
-      TCreateQueryExecRequestResult* result);
+  // Call FE to get TClientRequestResult.
+  Status GetQueryExecRequest(const TClientRequest& request,
+      TCreateExecRequestResult* result);
 
   // Make any changes required to the metastore as a result of an
   // INSERT query, e.g. newly created partitions.
   Status UpdateMetastore(const TCatalogUpdate& catalog_update);
 
   // Call FE to get explain plan
-  Status GetExplainPlan(const TQueryRequest& query_request, std::string* explain_string);
+  Status GetExplainPlan(const TClientRequest& query_request, std::string* explain_string);
 
   // Helper function to translate between Beeswax and Impala thrift
-  void QueryToTQueryRequest(const beeswax::Query& query, TQueryRequest* request);
+  void QueryToTClientRequest(const beeswax::Query& query, TClientRequest* request);
   void TUniqueIdToQueryHandle(const TUniqueId& query_id, beeswax::QueryHandle* handle);
   void QueryHandleToTUniqueId(const beeswax::QueryHandle& handle, TUniqueId* query_id);
 
@@ -170,7 +170,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   // in exec_state), registers it and calls Coordinator::Execute().
   // If it returns with an error status, exec_state will be NULL and nothing
   // will have been registered in query_exec_state_map_.
-  Status Execute(const TQueryRequest& request,
+  Status Execute(const TClientRequest& request,
                  boost::shared_ptr<QueryExecState>* exec_state);
 
   // Remove exec_state from query_exec_state_map_. Returns true if it found
@@ -200,7 +200,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
 
   // global, per-server state
   jobject fe_;  // instance of com.cloudera.impala.service.JniFrontend
-  jmethodID create_query_exec_request_id_;  // JniFrontend.createQueryExecRequest()
+  jmethodID create_exec_request_id_;  // JniFrontend.createExecRequest()
   jmethodID get_explain_plan_id_;  // JniFrontend.getExplainPlan()
   jmethodID get_hadoop_config_id_;  // JniFrontend.getHadoopConfigAsHtml()
   jmethodID reset_catalog_id_; // JniFrontend.resetCatalog()

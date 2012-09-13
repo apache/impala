@@ -21,6 +21,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
+import com.cloudera.impala.analysis.UseStmt;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.TestSchemaUtils;
@@ -1722,6 +1723,11 @@ public class AnalyzerTest {
         "Target table 'alltypessmall' and result of select statement are not union " +
         "compatible.\n" +
         "Target table expects 11 columns but the select statement returns 13.");
+  }
+
+  @Test
+  public void testUseStatement() {
+    Assert.assertTrue(AnalyzesOk("USE database") instanceof UseStmt);
   }
 
   /**

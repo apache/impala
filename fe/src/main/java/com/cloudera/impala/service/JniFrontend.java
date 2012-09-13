@@ -16,8 +16,8 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TCatalogUpdate;
-import com.cloudera.impala.thrift.TCreateQueryExecRequestResult;
-import com.cloudera.impala.thrift.TQueryRequest;
+import com.cloudera.impala.thrift.TCreateExecRequestResult;
+import com.cloudera.impala.thrift.TClientRequest;
 
 /**
  * JNI-callable interface onto a wrapped Frontend instance. The main point is to serialise
@@ -56,23 +56,23 @@ public class JniFrontend {
 
   /**
    * Create a TQueryExecRequest as well as TResultSetMetadata for a given
-   * serialized TQueryRequest. The result is returned as a serialized
-   * TCreateQueryExecRequestResult.
+   * serialized TClientRequest. The result is returned as a serialized
+   * TCreateExecRequestResult.
    * This call is thread-safe.
    */
-  public byte[] createQueryExecRequest(byte[] thriftQueryRequest) throws ImpalaException {
-    TQueryRequest request = new TQueryRequest();
+  public byte[] createExecRequest(byte[] thriftQueryRequest) throws ImpalaException {
+    TClientRequest request = new TClientRequest();
     deserializeThrift(request, thriftQueryRequest);
 
     // process front end
     StringBuilder explainString = new StringBuilder();
-    TCreateQueryExecRequestResult result =
-        frontend.createQueryExecRequest(request, explainString);
+    TCreateExecRequestResult result =
+        frontend.createExecRequest(request, explainString);
 
     // Print explain string.
     LOG.info(explainString.toString());
 
-    LOG.info("returned TCreateQueryExecRequestResult: " + result.toString());
+    LOG.info("returned TCreateExecRequestResult: " + result.toString());
     // TODO: avoid creating serializer for each query?
     TSerializer serializer = new TSerializer(protocolFactory);
     try {
@@ -83,11 +83,11 @@ public class JniFrontend {
   }
 
   /**
-   * Return an explain plan based on thriftQueryRequest, a serialized TQueryRequest.
+   * Return an explain plan based on thriftQueryRequest, a serialized TClientRequest.
    * This call is thread-safe.
    */
   public String getExplainPlan(byte[] thriftQueryRequest) throws ImpalaException {
-    TQueryRequest request = new TQueryRequest();
+    TClientRequest request = new TClientRequest();
     deserializeThrift(request, thriftQueryRequest);
     String plan = frontend.getExplainString(request);
     LOG.info("Explain plan: " + plan);

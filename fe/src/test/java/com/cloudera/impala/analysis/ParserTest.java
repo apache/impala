@@ -607,6 +607,13 @@ public class ParserTest {
         "select a from src where b > 5");
   }
 
+  @Test
+  public void TestUse() {
+    ParserError("USE");
+    ParserError("USE db1 db2");
+    ParsesOk("USE db1");
+  }
+
   @Test public void TestGetErrorMsg() {
 
     // missing select

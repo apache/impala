@@ -41,7 +41,7 @@ abstract public class ScanNode extends PlanNode {
    * @param maxScanRangeLength the maximum number of bytes each scan range should scan;
    *     only applicable to HDFS; less than or equal to zero means no maximum
    * @param numPartitions number of scan partitions; same semantics as
-   *     TQueryRequest.numNodes; must be >= 1 or one of these special values:
+   *     TClientRequest.numNodes; must be >= 1 or one of these special values:
    *     NUM_NODES_ALL: as many partitions as there are nodes that contain relevant data
    *     NUM_NODES_ALL_RACKS: as many partitions as there are racks that holds relevant
    *     data
