@@ -12,6 +12,7 @@
 #include <boost/thread/thread.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
+#include "util/metrics.h"
 #include "util/thrift-client.h"
 #include "util/thrift-server.h"
 
@@ -44,7 +45,7 @@ class StateStore : public StateStoreServiceIf,
   // Frequency at which subscribers are updated.
   static const int DEFAULT_UPDATE_FREQUENCY_MS = 1000;
 
-  StateStore(int subscriber_update_frequency_ms = DEFAULT_UPDATE_FREQUENCY_MS);
+  StateStore(int subscriber_update_frequency_ms, impala::Metrics* metrics);
 
   // StateStoreServiceIf RPCS.
   virtual void RegisterService(TRegisterServiceResponse& response,
@@ -181,6 +182,15 @@ class StateStore : public StateStoreServiceIf,
 
   // Frequency of updates to subscribers
   int subscriber_update_frequency_ms_;
+
+  // May not be NULL. Not owned by us.
+  impala::Metrics* metrics_;
+
+  // Metric that tracks the number of backends registered and alive.
+  // Should only measure live IMPALAD backends, but because there
+  // aren't any other types right now, so just tracks the total
+  // services registered which is the same thing.
+  impala::Metrics::IntMetric* num_backends_metric_;
 
   // Getter and setter for is_updating_, both are thread safe.
   bool is_updating();

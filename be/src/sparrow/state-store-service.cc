@@ -16,6 +16,7 @@
 #include <transport/TTransportException.h>
 
 #include "common/status.h"
+#include "util/metrics.h"
 #include "util/thrift-server.h"
 #include "util/thrift-client.h"
 #include "gen-cpp/StateStoreService_types.h"
@@ -31,6 +32,7 @@ using impala::Status;
 using impala::THostPort;
 using impala::TStatusCode;
 using impala::ThriftServer;
+using impala::Metrics;
 
 DEFINE_int32(state_store_num_server_worker_threads, 4,
              "number of worker threads for the thread manager underlying the "
@@ -40,12 +42,16 @@ DEFINE_int32(state_store_pending_task_count_max, 0,
              "underlying the State Store Thrift server (0 allows infinitely many "
              "pending tasks)");
 
+const string STATESTORE_LIVE_BACKENDS = "statestore.live.backends";
+
 namespace sparrow {
 
-StateStore::StateStore(int subscriber_update_frequency_ms) 
+StateStore::StateStore(int subscriber_update_frequency_ms, Metrics* metrics) 
     : is_updating_(false), 
       next_subscriber_id_(0),
-      subscriber_update_frequency_ms_(subscriber_update_frequency_ms) {
+      subscriber_update_frequency_ms_(subscriber_update_frequency_ms),
+      metrics_(metrics) {
+  DCHECK(metrics);
 }
 
 void StateStore::RegisterService(TRegisterServiceResponse& response,
@@ -75,6 +81,7 @@ void StateStore::RegisterService(TRegisterServiceResponse& response,
     LOG(INFO) << "Registered service instance (id: " << request.service_id << ", host: "
               << request.service_address.host << ":" << request.service_address.port
               << ")";
+    num_backends_metric_->Increment(1L);
   }
   RETURN_AND_SET_STATUS_OK(response);
 }
@@ -127,6 +134,8 @@ void StateStore::UnregisterService(TUnregisterServiceResponse& response,
                   << request.subscriber_address.port;
     RETURN_AND_SET_ERROR(error_message.str(), response);
   }
+
+  num_backends_metric_->Increment(-1L);
 
   RETURN_AND_SET_STATUS_OK(response);
 }
@@ -184,6 +193,9 @@ void StateStore::UnregisterSubscription(TUnregisterSubscriptionResponse& respons
 }
 
 void StateStore::Start(int port) {
+  // Create metrics
+  num_backends_metric_ = metrics_->CreateMetric(STATESTORE_LIVE_BACKENDS, 0L);
+
   set_is_updating(true);
   update_thread_.reset(new thread(&StateStore::UpdateLoop, this));
 

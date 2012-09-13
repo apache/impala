@@ -10,6 +10,7 @@
 #include "common/status.h"
 #include "sparrow/state-store-service.h"
 #include "util/cpu-info.h"
+#include "util/metrics.h"
 #include "util/webserver.h"
 #include "util/logging.h"
 #include "util/default-path-handlers.h"
@@ -20,7 +21,9 @@ DECLARE_bool(enable_webserver);
 
 using impala::Webserver;
 using impala::Status;
+using impala::Metrics;
 using namespace std;
+using namespace boost;
 
 int main(int argc, char** argv) {
   // Override default for webserver port
@@ -29,9 +32,7 @@ int main(int argc, char** argv) {
   impala::InitGoogleLoggingSafe(argv[0]);
   impala::CpuInfo::Init();
 
-  boost::shared_ptr<sparrow::StateStore> state_store(new sparrow::StateStore());
-
-  boost::scoped_ptr<Webserver> webserver(new Webserver());
+  scoped_ptr<Webserver> webserver(new Webserver());
 
   if (FLAGS_enable_webserver) {
     impala::AddDefaultPathHandlers(webserver.get());
@@ -40,6 +41,12 @@ int main(int argc, char** argv) {
     LOG(INFO) << "Not starting webserver";
   }
 
+  scoped_ptr<Metrics> metrics(new Metrics());
+  metrics->Init(FLAGS_enable_webserver ? webserver.get() : NULL);
+
+  shared_ptr<sparrow::StateStore> state_store(
+      new sparrow::StateStore(sparrow::StateStore::DEFAULT_UPDATE_FREQUENCY_MS, 
+          metrics.get()));
   state_store->Start(FLAGS_state_store_port);
   state_store->WaitForServerToStop();
 }

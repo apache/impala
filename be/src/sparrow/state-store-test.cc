@@ -18,6 +18,7 @@
 #include "sparrow/state-store-subscriber-service.h"
 #include "sparrow/util.h"
 #include "util/cpu-info.h"
+#include "util/metrics.h"
 #include "util/thrift-util.h"
 #include "gen-cpp/SparrowTypes_types.h"
 #include "gen-cpp/Types_types.h"
@@ -28,6 +29,7 @@ using namespace boost;
 using namespace std;
 using impala::Status;
 using impala::THostPort;
+using impala::Metrics;
 
 namespace sparrow {
 
@@ -64,11 +66,13 @@ class StateStoreTest : public testing::Test {
   static const char* host_;
 
   THostPort state_store_host_port_;
+  scoped_ptr<Metrics> metrics_;
   shared_ptr<StateStore> state_store_;
 
   vector<shared_ptr<StateStoreSubscriber> > subscribers_;
 
-  StateStoreTest() : state_store_(new StateStore()) {
+  StateStoreTest() 
+      : metrics_(new Metrics()), state_store_(new StateStore(1000L, metrics_.get())) {
     state_store_host_port_.host = "localhost";
     state_store_host_port_.port = next_port_++;
   }

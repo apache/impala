@@ -64,7 +64,8 @@ Status BackendTestExecEnv::StartServices() {
 TestExecEnv::TestExecEnv(int num_backends, int start_port)
   : num_backends_(num_backends),
     start_port_(start_port),
-    state_store_(new StateStore(500)) {
+    metrics_(new Metrics()),
+    state_store_(new StateStore(500, metrics_.get())) {
 }
 
 TestExecEnv::~TestExecEnv() {

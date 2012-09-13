@@ -19,6 +19,8 @@ namespace sparrow { class StateStore; }
 
 namespace impala {
 
+class Metrics;
+
 // Create environment for single-process distributed query execution.
 class TestExecEnv : public ExecEnv {
  public:
@@ -36,6 +38,9 @@ class TestExecEnv : public ExecEnv {
  private:
   int num_backends_;
   int start_port_;
+
+  // Kept here because the state-store needs a metrics_ object
+  boost::shared_ptr<Metrics> metrics_;
 
   // shared_ptr required to work around the vagaries of Thrift, which
   // requires that we keep a reference to every service handler
