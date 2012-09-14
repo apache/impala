@@ -170,7 +170,6 @@ class ImpalaServer::QueryExecState {
   void set_result_metadata(const TResultSetMetadata& md) { result_metadata_ = md; }
 
  private:
-  //TClientRequest request_;  // the original request
   TUniqueId query_id_;
   mutex lock_;  // protects all following fields
   ExecStats exec_stats_;
@@ -706,7 +705,7 @@ Status ImpalaServer::ExecuteInternal(
     if (result.stmt_type == TStmtType::DDL) {
       // Only DDL command is USE at the moment.
       LOG(INFO) << "USE command ignored";
-      exec_state = NULL;
+      exec_state.reset(NULL);
       return Status::OK;
     }
   }
