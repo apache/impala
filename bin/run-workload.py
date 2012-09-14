@@ -65,6 +65,9 @@ parser.add_option("--compare_with_hive", dest="compare_with_hive", action="store
 parser.add_option("--results_csv_file", dest="results_csv_file",
                   default=os.environ['IMPALA_HOME'] + "/benchmark_results.csv",
                   help="The output file where benchmark results are saved")
+parser.add_option("--hive_results_csv_file", dest="hive_results_csv_file",
+                  default=os.environ['IMPALA_HOME'] + "/hive_benchmark_results.csv",
+                  help="The output file where Hive benchmark results are saved")
 parser.add_option("--hive_cmd", dest="hive_cmd", default="hive -e",
                   help="The command to use for executing hive queries")
 parser.add_option("-i", "--iterations", type="int", dest="iterations", default=5,
@@ -73,6 +76,8 @@ parser.add_option("--prime_cache", dest="prime_cache", action="store_true",
                   default= False, help="Whether or not to prime the buffer cache. ")
 parser.add_option("--num_clients", type="int", dest="num_clients", default=1,
                   help="Number of clients (threads) to use when executing each query.")
+parser.add_option("--skip_impala", dest="skip_impala", action="store_true",
+                  default= False, help="If set, queries will only run against Hive.")
 options, args = parser.parse_args()
 
 # globals
@@ -97,6 +102,8 @@ result_multiple_regex = 'returned (\d*) rows? in (\d*).(\d*) s with stddev (\d*)
 hive_result_regex = 'Time taken: (\d*).(\d*) seconds'
 dev_null = open('/dev/null')
 
+run_using_hive = options.compare_with_hive or options.skip_impala
+
 logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('run-benchmark')
 if options.verbose:
@@ -108,16 +115,15 @@ class QueryExecutionResult(object):
     self.stddev = stddev
 
 class QueryExecutionDetail(object):
-  def __init__(self, workload, scale_factor, file_format, compression_codec,
-               compression_type, impala_execution_result, hive_execution_result):
+  def __init__(self, executor, workload, scale_factor, file_format, compression_codec,
+               compression_type, execution_result):
+    self.executor = executor
     self.workload = workload
     self.scale_factor = scale_factor
     self.file_format = file_format
     self.compression_codec = compression_codec
     self.compression_type = compression_type
-    self.impala_execution_result = impala_execution_result
-    self.hive_execution_result = hive_execution_result
-
+    self.execution_result = execution_result
 
 ## Functions
 class QueryExecutor(threading.Thread):
@@ -321,7 +327,7 @@ def run_query_capture_results(query_results_match_function, cmd, exit_on_error):
   for client in xrange(options.num_clients):
     name = "Client Thread " + str(client)
     target_cmd = cmd.format(impalad=choice(TARGET_IMPALADS))
-    threads.append(QueryExecutor(LOG, name, match_impala_query_results,
+    threads.append(QueryExecutor(LOG, name, query_results_match_function,
                                  target_cmd, exit_on_error=exit_on_error))
 
   for thread in threads:
@@ -430,27 +436,29 @@ def read_vector_file(file_name):
       vector_values.append([value.split(':')[1].strip() for value in line.split(',')])
   return vector_values
 
-def write_to_csv(result_map, output_csv_file):
+def save_results(result_map, output_csv_file, is_impala_result=True):
   """
-  Write the results to a CSV file with '|' as the delimiter.
+  Writes the results to an output CSV files
   """
-  csv_writer = csv.writer(open(output_csv_file, 'wb'),
-                          delimiter='|',
+  csv_writer = csv.writer(open(output_csv_file, 'wb'), delimiter='|',
                           quoting=csv.QUOTE_MINIMAL)
 
   for query_tuple, execution_results in result_map.iteritems():
     for result in execution_results:
-      compression_str = '%s/%s' % (result.compression_codec, result.compression_type)
-      if compression_str == 'none/none':
-        compression_str = 'none'
-      csv_writer.writerow([result.workload, query_tuple[0], query_tuple[1],
-                           result.file_format, compression_str,
-                           result.impala_execution_result.avg_time,
-                           result.impala_execution_result.stddev,
-                           result.hive_execution_result.avg_time,
-                           result.hive_execution_result.stddev,
-                           result.scale_factor,
-                           ])
+      query, query_name = query_tuple
+      append_row_to_csv_file(csv_writer, query, query_name,
+        result[0] if is_impala_result else result[1])
+
+def append_row_to_csv_file(csv_writer, query, query_name, result):
+  """
+  Write the results to a CSV file with '|' as the delimiter.
+  """
+  compression_str = '%s/%s' % (result.compression_codec, result.compression_type)
+  if compression_str == 'none/none':
+    compression_str = 'none'
+  csv_writer.writerow([result.executor, result.workload, result.scale_factor,
+                       query, query_name, result.file_format, compression_str,
+                       result.execution_result.avg_time, result.execution_result.stddev,])
 
 def enumerate_query_files(base_directory):
   """
@@ -534,18 +542,21 @@ def execute_queries(query_map, workload, scale_factor, vector_row):
       query_string = build_query(query.strip(), file_format, codec, compression_type,
                                  workload, scale_factor)
       summary += "\nQuery: %s\n" % query_name
-      summary += "Results Using Impala\n"
-      LOG.debug('Running: \n%s\n' % query)
-      if query_name != query:
-        LOG.info('Query Name: \n%s\n' % query_name)
-      output, execution_result = run_impala_query(query_string,
-                                                  options.prime_cache,
-                                                  options.iterations)
-      if output:
-        summary += output
+
+      execution_result = QueryExecutionResult()
+      if not options.skip_impala:
+        summary += "Results Using Impala\n"
+        LOG.debug('Running: \n%s\n' % query)
+        if query_name != query:
+          LOG.info('Query Name: \n%s\n' % query_name)
+        output, execution_result = run_impala_query(query_string,
+                                                    options.prime_cache,
+                                                    options.iterations)
+        if output:
+          summary += output
       hive_execution_result = QueryExecutionResult()
 
-      if options.compare_with_hive:
+      if run_using_hive:
         summary += "Results Using Hive\n"
         output, hive_execution_result = run_hive_query(query_string,
                                                        options.prime_cache,
@@ -554,11 +565,13 @@ def execute_queries(query_map, workload, scale_factor, vector_row):
           summary += output
       LOG.debug("-----------------------------------------------------------------------")
 
-      execution_detail = QueryExecutionDetail(workload, scale_factor, file_format, codec,
-                                              compression_type, execution_result,
-                                              hive_execution_result)
-      result_map[(query_name, query)].append(execution_detail)
-  return
+      execution_detail = QueryExecutionDetail("runquery", workload, scale_factor,
+          file_format, codec, compression_type, execution_result)
+
+      hive_execution_detail = QueryExecutionDetail("hive", workload, scale_factor,
+          file_format, codec, compression_type, hive_execution_result)
+
+      result_map[(query_name, query)].append((execution_detail, hive_execution_detail))
 
 def run_workload(workload, scale_factor):
   """
@@ -600,5 +613,9 @@ if __name__ == "__main__":
     workload, scale_factor = parse_workload_scale_factor(workload_and_scale_factor)
     run_workload(workload, scale_factor)
   LOG.info(summary)
-  LOG.info("Results saving to: " + options.results_csv_file)
-  write_to_csv(result_map, options.results_csv_file)
+  if not options.skip_impala:
+    LOG.info("Results saving to: %s" % options.results_csv_file)
+    save_results(result_map, options.results_csv_file, is_impala_result=True)
+  if run_using_hive:
+    LOG.info("Hive Results saving to: %s" % options.hive_results_csv_file)
+    save_results(result_map, options.hive_results_csv_file, is_impala_result=False)
