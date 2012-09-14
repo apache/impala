@@ -4,9 +4,6 @@
 #include <iomanip>
 #include <jni.h>
 #include <sys/time.h>
-#include <glog/logging.h>
-#include <gflags/gflags.h>
-#include <glog/vlog_is_on.h>
 #include <google/heap-profiler.h>
 #include <google/profiler.h>
 #include <server/TServer.h>
@@ -15,6 +12,7 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/foreach.hpp>
 
+#include "common/logging.h"
 #include "codegen/llvm-codegen.h"
 #include "common/status.h"
 #include "exec/hbase-table-scanner.h"

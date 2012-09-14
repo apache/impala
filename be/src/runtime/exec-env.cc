@@ -4,9 +4,9 @@
 
 #include <vector>
 
-#include <gflags/gflags.h>
 #include <boost/algorithm/string.hpp>
 
+#include "common/logging.h"
 #include "common/service-ids.h"
 #include "runtime/client-cache.h"
 #include "runtime/data-stream-mgr.h"

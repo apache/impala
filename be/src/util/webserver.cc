@@ -6,9 +6,8 @@
 #include <boost/foreach.hpp>
 #include <boost/bind.hpp>
 #include <boost/mem_fn.hpp>
-#include <glog/logging.h>
-#include <gflags/gflags.h>
 
+#include "common/logging.h"
 #include "util/webserver.h"
 #include "util/logging.h"
 

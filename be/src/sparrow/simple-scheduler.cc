@@ -2,8 +2,6 @@
 
 #include <vector>
 
-#include <glog/logging.h>
-
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/bind.hpp>

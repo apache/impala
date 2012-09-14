@@ -6,8 +6,6 @@
 #include <jni.h>
 #include <boost/scoped_ptr.hpp>
 #include <boost/unordered_map.hpp>
-#include <glog/logging.h>
-#include <gflags/gflags.h>
 
 #include <protocol/TBinaryProtocol.h>
 #include <server/TThreadPoolServer.h>
@@ -16,6 +14,7 @@
 #include <transport/TTransportUtils.h>
 #include <concurrency/PosixThreadFactory.h>
 
+#include "common/logging.h"
 // TODO: fix this: we currently need to include uid-util.h before impala-server.h
 #include "util/uid-util.h"
 #include "exec/hbase-table-scanner.h"

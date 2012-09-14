@@ -3,8 +3,6 @@
 #include <boost/thread/thread.hpp>
 
 #include <gtest/gtest.h>
-#include <glog/logging.h>
-#include <gflags/gflags.h>
 
 #include "codegen/llvm-codegen.h"
 #include "runtime/disk-io-mgr.h"

@@ -2,7 +2,6 @@
 
 #include "int-literal.h"
 
-#include <glog/logging.h>
 #include <sstream>
 
 #include "codegen/llvm-codegen.h"

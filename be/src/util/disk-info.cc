@@ -13,8 +13,6 @@
 #include <fstream>
 #include <sstream>
 
-#include <glog/logging.h>
-
 #include "util/debug-util.h"
 
 using namespace boost;

@@ -1,10 +1,10 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #include "exec/hdfs-byte-stream.h"
+
+#include <sstream>
 #include "util/hdfs-util.h"
 #include "common/status.h"
-#include <glog/logging.h>
-#include <sstream>
 
 using namespace impala;
 using namespace std;

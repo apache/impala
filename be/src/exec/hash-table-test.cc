@@ -5,7 +5,6 @@
 #include <iostream>
 #include <vector>
 
-#include <glog/logging.h>
 #include <gtest/gtest.h>
 
 #include "common/compiler-util.h"

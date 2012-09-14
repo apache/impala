@@ -1,7 +1,6 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 #include <sstream>
-#include <glog/logging.h>
 #include <boost/functional/hash.hpp>
 
 #include "runtime/raw-value.h"

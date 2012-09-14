@@ -3,10 +3,9 @@
 // This file contains the main() function for the state store process,
 // which exports the Thrift service StateStoreService.
 
-#include <glog/logging.h>
-#include <gflags/gflags.h>
 #include <iostream>
 
+#include "common/logging.h"
 #include "common/status.h"
 #include "sparrow/state-store-service.h"
 #include "util/cpu-info.h"

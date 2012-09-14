@@ -4,8 +4,6 @@
 #include <protocol/TDebugProtocol.h>
 #include <transport/TSocket.h>
 #include <transport/TTransportUtils.h>
-#include <glog/logging.h>
-#include <gflags/gflags.h>
 
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
@@ -13,6 +11,7 @@
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/Data_types.h"
 
+#include "common/logging.h"
 #include "util/cpu-info.h"
 #include "util/thrift-client.h"
 

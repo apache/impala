@@ -6,7 +6,6 @@
 #include <boost/functional/hash.hpp>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/thread.hpp>
-#include <glog/logging.h>
 
 #include "runtime/row-batch.h"
 #include "runtime/data-stream-recvr.h"

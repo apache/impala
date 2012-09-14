@@ -3,7 +3,6 @@
 #include "float-literal.h"
 
 #include <sstream>
-#include <glog/logging.h>
 
 #include "codegen/llvm-codegen.h"
 #include "gen-cpp/Exprs_types.h"

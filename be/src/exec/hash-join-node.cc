@@ -3,7 +3,6 @@
 #include "exec/hash-join-node.h"
 
 #include <sstream>
-#include <glog/logging.h>
 
 #include "codegen/llvm-codegen.h"
 #include "exec/hash-table.inline.h"

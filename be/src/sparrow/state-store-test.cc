@@ -9,7 +9,6 @@
 #include <boost/thread/barrier.hpp>
 #include <boost/thread/thread_time.hpp>
 #include <boost/unordered_set.hpp>
-#include <glog/logging.h>
 #include <gtest/gtest.h>
 #include <transport/TSocket.h>
 

@@ -4,9 +4,8 @@
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string.hpp>
-#include <glog/logging.h>
-#include <gflags/gflags.h>
 
+#include "common/logging.h"
 #include "util/thrift-client.h"
 #include "util/thrift-util.h"
 

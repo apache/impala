@@ -19,6 +19,8 @@
   #define LOG(level) while(false) std::cout
   #define VLOG(level) while(false) std::cout 
 #else
+// glog MUST be included before gflags.  Instead of including them,
+// our files should include this file instead.
 #include <glog/logging.h>
 #endif
 

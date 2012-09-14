@@ -1,8 +1,6 @@
 #ifndef IMPALA_EXPERIMENTS_HASHING_STANDARD_HASH_TABLE_H
 #define IMPALA_EXPERIMENTS_HASHING_STANDARD_HASH_TABLE_H
 
-#include <glog/logging.h>
-
 #include "util/hash-util.h"
 #include "tuple-types.h"
 

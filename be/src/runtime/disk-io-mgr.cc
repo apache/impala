@@ -6,8 +6,8 @@
 #include <boost/functional/hash.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread/locks.hpp>
-#include <gflags/gflags.h>
 
+#include "common/logging.h"
 #include "util/disk-info.h"
 #include "util/hdfs-util.h"
 

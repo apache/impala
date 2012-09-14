@@ -3,8 +3,6 @@
 #ifndef IMPALA_EXPERIMENTS_STRING_SEARCH_SSE_H
 #define IMPALA_EXPERIMENTS_STRING_SEARCH_SSE_H
 
-#include <glog/logging.h>
-
 #include "common/compiler-util.h"
 #include "runtime/string-value.h"
 

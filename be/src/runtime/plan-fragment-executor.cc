@@ -6,11 +6,10 @@
 #include <protocol/TBinaryProtocol.h>
 #include <protocol/TDebugProtocol.h>
 #include <transport/TBufferTransports.h>
-#include <glog/logging.h>
-#include <gflags/gflags.h>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 
 #include "codegen/llvm-codegen.h"
+#include "common/logging.h"
 #include "common/object-pool.h"
 #include "exec/data-sink.h"
 #include "exec/exec-node.h"

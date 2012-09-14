@@ -11,10 +11,9 @@
 #include <boost/thread/locks.hpp>
 #include <boost/thread/thread_time.hpp>
 #include <boost/algorithm/string/join.hpp>
-#include <glog/logging.h>
-#include <gflags/gflags.h>
 #include <transport/TTransportException.h>
 
+#include "common/logging.h"
 #include "common/status.h"
 #include "util/metrics.h"
 #include "util/thrift-server.h"

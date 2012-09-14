@@ -7,12 +7,11 @@
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/foreach.hpp>
-#include <glog/logging.h>
-#include <gflags/gflags.h>
 #include <transport/TBufferTransports.h>
 #include "util/thrift-client.h"
 #include "util/thrift-server.h"
 
+#include "common/logging.h"
 #include "common/status.h"
 #include "gen-cpp/StateStoreService_types.h"
 #include "gen-cpp/StateStoreSubscriberService_types.h"

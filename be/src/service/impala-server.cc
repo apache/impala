@@ -14,14 +14,11 @@
 //#include <concurrency/Thread.h>
 #include <concurrency/PosixThreadFactory.h>
 #include <gtest/gtest.h>
-#include <glog/logging.h>
-// include gflags.h *after* logging.h, otherwise the linker will complain about
-// undefined references to FLAGS_v
-#include <gflags/gflags.h>
 #include <boost/foreach.hpp>
 #include <boost/bind.hpp>
 #include <boost/algorithm/string.hpp>
 
+#include "common/logging.h"
 #include "exprs/expr.h"
 #include "exec/hdfs-table-sink.h"
 #include "codegen/llvm-codegen.h"

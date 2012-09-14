@@ -3,8 +3,6 @@
 #include "runtime/coordinator.h"
 
 #include <limits>
-#include <glog/logging.h>
-#include <gflags/gflags.h>
 #include <transport/TTransportUtils.h>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/accumulators/accumulators.hpp>
@@ -17,6 +15,7 @@
 #include <boost/bind.hpp>
 #include <boost/foreach.hpp>
 
+#include "common/logging.h"
 #include "exec/data-sink.h"
 #include "runtime/client-cache.h"
 #include "runtime/data-stream-sender.h"

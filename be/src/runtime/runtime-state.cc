@@ -4,7 +4,8 @@
 #include <sstream>
 
 #include <boost/algorithm/string/join.hpp>
-#include <gflags/gflags.h>
+
+#include "common/logging.h"
 
 #include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"

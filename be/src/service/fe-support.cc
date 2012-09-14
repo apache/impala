@@ -14,10 +14,9 @@
 #include "service/fe-support.h"
 
 #include <boost/scoped_ptr.hpp>
-#include <glog/logging.h>
-#include <gflags/gflags.h>
 #include <server/TServer.h>
 
+#include "common/logging.h"
 #include "util/uid-util.h"  // for some reasoon needed right here for hash<TUniqueId>
 #include "codegen/llvm-codegen.h"
 #include "common/status.h"

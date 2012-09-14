@@ -1,13 +1,10 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #include <gtest/gtest.h>
-#include <glog/logging.h>
-// include gflags.h *after* logging.h, otherwise the linker will complain about
-// undefined references to FLAGS_v
-#include <gflags/gflags.h>
 
 #include <boost/scoped_ptr.hpp>
 
+#include "common/logging.h"
 #include "simple-scheduler.h"
 #include "subscription-manager.h"
 

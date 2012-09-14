@@ -4,7 +4,6 @@
 
 #include <sstream>
 #include <boost/regex.hpp>
-#include <glog/logging.h>
 #include <string.h>
 
 #include "runtime/string-value.h"

@@ -3,7 +3,6 @@
 #include "runtime/parallel-executor.h"
 
 #include <boost/thread/thread.hpp>
-#include <gflags/gflags.h>
 
 using namespace boost;
 using namespace impala;

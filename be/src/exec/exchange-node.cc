@@ -3,7 +3,6 @@
 #include "exec/exchange-node.h"
 
 #include <boost/scoped_ptr.hpp>
-#include <glog/logging.h>
 
 #include "runtime/data-stream-mgr.h"
 #include "runtime/runtime-state.h"

@@ -2,7 +2,6 @@
 
 #include "runtime/mem-pool.h"
 
-#include <glog/logging.h>
 #include <stdio.h>
 #include <sstream>
 

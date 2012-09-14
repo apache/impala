@@ -4,9 +4,9 @@
 
 #include <sstream>
 #include <boost/algorithm/string.hpp>
-#include <glog/logging.h>
-#include <gflags/gflags.h>
 
+#include "common/logging.h"
+#include "common/object-pool.h"
 #include "exec/text-converter.h"
 #include "exec/hdfs-byte-stream.h"
 #include "exec/hdfs-scan-node.h"
@@ -25,7 +25,6 @@
 #include "util/runtime-profile.h"
 #include "util/sse-util.h"
 #include "util/string-parser.h"
-#include "common/object-pool.h"
 #include "gen-cpp/PlanNodes_types.h"
 
 using namespace std;

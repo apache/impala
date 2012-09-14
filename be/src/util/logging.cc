@@ -1,9 +1,11 @@
 // (c) 2012 Cloudera, Inc. All rights reserved.
 
 #include "util/logging.h"
-#include <gflags/gflags.h>
+
 #include <boost/thread/mutex.hpp>
 #include <sstream>
+
+#include "common/logging.h"
 
 DEFINE_string(log_filename, "", 
     "Prefix of log filename - "

@@ -2,10 +2,9 @@
 
 #include "testutil/test-exec-env.h"
 
-#include <glog/logging.h>
-#include <gflags/gflags.h>
 #include <boost/thread/thread.hpp>
 
+#include "common/logging.h"
 #include "common/status.h"
 #include "common/service-ids.h"
 #include "service/impala-server.h"

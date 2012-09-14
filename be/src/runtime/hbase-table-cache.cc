@@ -1,10 +1,11 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #include "runtime/hbase-table-cache.h"
-#include "util/jni-util.h"
+
 #include <boost/thread/locks.hpp>
-#include <glog/logging.h>
-#include <gflags/gflags.h>
+
+#include "common/logging.h"
+#include "util/jni-util.h"
 
 using namespace std;
 using namespace boost;

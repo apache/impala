@@ -3,7 +3,6 @@
 #include "runtime/descriptors.h"
 
 #include <boost/algorithm/string/join.hpp>
-#include <glog/logging.h>
 #include <ios>
 #include <sstream>
 

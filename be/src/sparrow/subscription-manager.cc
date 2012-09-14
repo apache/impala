@@ -4,8 +4,7 @@
 
 #include <string>
 
-#include <gflags/gflags.h>
-
+#include "common/logging.h"
 #include "common/status.h"
 #include "sparrow/state-store-subscriber-service.h"
 #include "gen-cpp/StateStoreService_types.h"

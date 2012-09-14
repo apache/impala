@@ -9,8 +9,8 @@
 
 #include <sstream>
 #include <boost/algorithm/string.hpp>
-#include <glog/logging.h>
 
+#include "common/logging.h"
 #include "common/object-pool.h"
 #include "exec/scan-range-context.h"
 #include "exprs/expr.h"
@@ -25,7 +25,6 @@
 #include "gen-cpp/PlanNodes_types.h"
 
 // TODO: temp change to validate we don't have an incast problem for joins with big tables
-#include <gflags/gflags.h>
 DEFINE_bool(randomize_scan_ranges, false, 
     "if true, randomizes the order of scan ranges");
 

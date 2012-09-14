@@ -9,9 +9,8 @@
 #include <protocol/TDebugProtocol.h>
 #include <transport/TSocket.h>
 #include <transport/TTransportUtils.h>
-#include <glog/logging.h>
-#include <gflags/gflags.h>
 
+#include "common/logging.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
 #include "runtime/tuple-row.h"

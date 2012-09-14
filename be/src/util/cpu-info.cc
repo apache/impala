@@ -4,7 +4,6 @@
 #include "util/debug-util.h"
 
 #include <boost/algorithm/string.hpp>
-#include <glog/logging.h>
 #include <iostream>
 #include <fstream>
 #include <sstream>

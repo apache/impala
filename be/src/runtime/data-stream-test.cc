@@ -5,11 +5,8 @@
 #include <transport/TServerSocket.h>
 #include <transport/TTransportUtils.h>
 #include <gtest/gtest.h>
-#include <glog/logging.h>
-// include gflags.h *after* logging.h, otherwise the linker will complain about
-// undefined references to FLAGS_v
-#include <gflags/gflags.h>
 
+#include "common/logging.h"
 #include "codegen/llvm-codegen.h"
 #include "runtime/row-batch.h"
 #include "runtime/data-stream-mgr.h"

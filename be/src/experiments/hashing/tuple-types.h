@@ -4,7 +4,7 @@
 #include <inttypes.h>
 #include <stdlib.h>
 
-#include <glog/logging.h>
+#include "common/logging.h"
 
 namespace impala {
 

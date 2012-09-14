@@ -1,9 +1,10 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-#include "runtime/runtime-state.h"
 #include "text-converter.h"
+
 #include <boost/algorithm/string.hpp>
-#include <glog/logging.h>
+
+#include "runtime/runtime-state.h"
 #include "runtime/descriptors.h"
 #include "runtime/tuple.h"
 #include "util/string-parser.h"

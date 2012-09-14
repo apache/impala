@@ -3,8 +3,6 @@
 #include <iostream>
 #include <iomanip>
 #include <sys/time.h>
-#include <gflags/gflags.h>
-#include <glog/logging.h>
 #include <google/heap-profiler.h>
 #include <google/profiler.h>
 #include <server/TServer.h>
@@ -12,6 +10,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "codegen/llvm-codegen.h"
+#include "common/logging.h"
 #include "common/status.h"
 #include "exprs/expr.h"
 #include "gen-cpp/ImpalaPlanService.h"

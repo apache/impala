@@ -10,11 +10,6 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/thread.hpp>
-// reversing the include order of the following two results in linker errors:
-// undefined reference to `fLI::FLAGS_v'
-// TODO: figure out why
-#include <glog/logging.h>
-#include <gflags/gflags.h>
 
 #include <protocol/TBinaryProtocol.h>
 #include <protocol/TDebugProtocol.h>
@@ -22,6 +17,7 @@
 #include <transport/TTransportUtils.h>
 
 #include "codegen/llvm-codegen.h"
+#include "common/logging.h"
 #include "common/object-pool.h"
 #include "common/status.h"
 #include "exec/exec-node.h"

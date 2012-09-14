@@ -2,7 +2,6 @@
 
 #include <sstream>
 #include <string>
-#include <glog/logging.h>
 
 #include "codegen/llvm-codegen.h"
 #include "exprs/function-call.h"

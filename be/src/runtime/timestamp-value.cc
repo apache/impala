@@ -3,7 +3,6 @@
 #include "runtime/timestamp-value.h"
 #include "common/status.h"
 #include <cstdio>
-#include <glog/logging.h>
 #include <boost/lexical_cast.hpp>
 
 using namespace std;

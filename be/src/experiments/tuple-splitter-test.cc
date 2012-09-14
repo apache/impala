@@ -5,8 +5,6 @@
 #include <iostream>
 #include <vector>
 
-#include <glog/logging.h>
-
 #include "common/compiler-util.h"
 #include "experiments/data-provider.h"
 #include "runtime/mem-pool.h"

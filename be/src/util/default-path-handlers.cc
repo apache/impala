@@ -1,12 +1,13 @@
 // (c) 2012 Cloudera, Inc. All rights reserved.
-#include <gflags/gflags.h>
 
-#include "util/default-path-handlers.h"
-#include "util/webserver.h"
-#include "util/logging.h"
 #include <sstream>
 #include <fstream>
 #include <sys/stat.h>
+
+#include "common/logging.h"
+#include "util/default-path-handlers.h"
+#include "util/webserver.h"
+#include "util/logging.h"
 
 using namespace std;
 using namespace google;

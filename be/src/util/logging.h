@@ -4,7 +4,7 @@
 #define IMPALA_UTIL_LOGGING_H
 
 #include <string>
-#include <glog/logging.h>
+#include "common/logging.h"
 
 namespace impala {
 

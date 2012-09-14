@@ -5,11 +5,11 @@
 
 #include <map>
 #include <string>
-#include <gflags/gflags.h>
 #include <sstream>
 #include <boost/thread/mutex.hpp>
 #include <boost/scoped_ptr.hpp>
 
+#include "common/logging.h"
 #include "common/status.h"
 #include "common/object-pool.h"
 

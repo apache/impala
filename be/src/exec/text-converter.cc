@@ -1,6 +1,5 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 #include <boost/algorithm/string.hpp>
-#include <glog/logging.h>
 
 #include "codegen/llvm-codegen.h"
 #include "runtime/descriptors.h"

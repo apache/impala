@@ -1,10 +1,10 @@
 // Copyright (c) 2012 Cloudera, Inc.  All right reserved.
 
+#include "codegen/llvm-codegen.h"
+
 #include <fstream>
 #include <iostream>
 #include <sstream>
-#include <glog/logging.h>
-#include <gflags/gflags.h>
 #include <boost/thread/mutex.hpp>
 
 #include <llvm/Analysis/Passes.h>
@@ -23,7 +23,7 @@
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Transforms/Utils/Cloning.h>
 
-#include "codegen/llvm-codegen.h"
+#include "common/logging.h"
 #include "impala-ir/impala-ir-names.h"
 #include "util/cpu-info.h"
 #include "util/path-builder.h"

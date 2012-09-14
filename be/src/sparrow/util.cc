@@ -5,7 +5,6 @@
 #include <utility>
 
 #include <boost/foreach.hpp>
-#include <glog/logging.h>
 
 #include "gen-cpp/StateStoreSubscriberService_types.h"
 

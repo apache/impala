@@ -2,7 +2,6 @@
 
 #include "runtime/string-value.h"
 #include <cstring>
-#include <glog/logging.h>
 #include "util/cpu-info.h"
 #include "util/sse-util.h"
 

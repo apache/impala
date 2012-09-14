@@ -7,10 +7,9 @@
 #include <protocol/TBinaryProtocol.h>
 #include <transport/TSocket.h>
 #include <transport/TTransportUtils.h>
-#include <glog/logging.h>
-#include <gflags/gflags.h>
 #include <memory>
 
+#include "common/logging.h"
 #include "util/thrift-util.h"
 #include "gen-cpp/ImpalaInternalService.h"
 

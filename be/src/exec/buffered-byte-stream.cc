@@ -1,9 +1,9 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #include "exec/buffered-byte-stream.h"
-#include "common/status.h"
-#include <glog/logging.h>
 #include <sstream>
+
+#include "common/status.h"
 
 using namespace impala;
 using namespace std;

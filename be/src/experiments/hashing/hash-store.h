@@ -4,8 +4,6 @@
 #include "tuple-types.h"
 #include "standard-hash-table.h"
 
-#include <glog/logging.h>
-
 #include "standard-hash-table.inline.h"
 #include "hashing-util.h"
 
