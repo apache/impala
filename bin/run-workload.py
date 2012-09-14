@@ -320,7 +320,7 @@ def run_query_capture_results(query_results_match_function, cmd, exit_on_error):
   execution_result = None
   for client in xrange(options.num_clients):
     name = "Client Thread " + str(client)
-    target_cmd = cmd % {'target_impalad' : choice(TARGET_IMPALADS)}
+    target_cmd = cmd.format(impalad=choice(TARGET_IMPALADS))
     threads.append(QueryExecutor(LOG, name, match_impala_query_results,
                                  target_cmd, exit_on_error=exit_on_error))
 
@@ -359,7 +359,7 @@ def run_impala_query(query, prime_cache, iterations):
 
   cmd = '%s -query="%s" -iterations=%d -enable_counters=%d -profile_output_file="%s"' %\
       (query_cmd, query, iterations, enable_counters, gprof_tmp_file)
-  cmd += ' -impalad=%(target_impalad)s'
+  cmd += ' -impalad={impalad}'
   threads = []
   results = run_query_capture_results(match_impala_query_results, cmd, exit_on_error=True)
   if options.profiler:
