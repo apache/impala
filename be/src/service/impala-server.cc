@@ -693,7 +693,7 @@ Status ImpalaServer::Execute(const TClientRequest& request,
 
 Status ImpalaServer::ExecuteInternal(
     const TClientRequest& request, bool* registered_exec_state,
-    boost::shared_ptr<QueryExecState>* exec_state) {
+    shared_ptr<QueryExecState>* exec_state) {
   exec_state->reset(new QueryExecState(exec_env_, this));
   *registered_exec_state = false;
 
@@ -705,7 +705,7 @@ Status ImpalaServer::ExecuteInternal(
     if (result.stmt_type == TStmtType::DDL) {
       // Only DDL command is USE at the moment.
       LOG(INFO) << "USE command ignored";
-      exec_state.reset(NULL);
+      exec_state->reset();
       return Status::OK;
     }
   }

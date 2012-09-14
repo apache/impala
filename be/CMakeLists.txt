@@ -148,8 +148,6 @@ endif()
 #  - Util must come before ImpalaThrift
 #  - Exprs & Opcode have a circular dependency (Exprs is included twice)
 set (IMPALA_LINK_LIBS
-  Runtime
-  Common
   TestUtil
   Service
   TestUtil
@@ -161,7 +159,6 @@ set (IMPALA_LINK_LIBS
   Exprs
   Util
   Runtime
-  Common
   Sparrow
   CodeGen
   Common
@@ -178,7 +175,6 @@ set (IMPALA_LINK_LIBS
   Util
   Webserver
   GlobalFlags
-  Common
   ${SNAPPY_STATIC_LIB}
   ${Boost_LIBRARIES}
   ${LLVM_MODULE_LIBS}
