@@ -84,6 +84,7 @@ void RuntimeProfile::Merge(RuntimeProfile* other) {
         child = j->second;
       } else {
         child = pool_->Add(new RuntimeProfile(pool_, other_child->name_));
+        child->metadata_ = other_child->metadata_;
         bool indent_other_child = other->children_[i].second;
         child_map_[child->name_] = child;
         children_.push_back(make_pair(child, indent_other_child));
@@ -135,6 +136,7 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
         child = j->second;
       } else {
         child = pool_->Add(new RuntimeProfile(pool_, tchild.name));
+        child->metadata_ = tchild.metadata;
         child_map_[tchild.name] = child;
         children_.push_back(make_pair(child, tchild.indent));
       }
