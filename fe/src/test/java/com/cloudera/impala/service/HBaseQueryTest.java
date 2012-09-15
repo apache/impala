@@ -13,11 +13,6 @@ public class HBaseQueryTest extends BaseQueryTest {
   }
 
   @Test
-  public void TestHBaseScanNodeErrors() {
-    runQueryUncompressedTextOnly("hbase-scan-node-errors", false, 1000);
-  }
-
-  @Test
   public void TestHBaseRowKeys() {
     runQueryUncompressedTextOnly("hbase-rowkeys", true, 1000);
   }

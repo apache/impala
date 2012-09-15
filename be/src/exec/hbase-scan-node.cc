@@ -196,9 +196,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
       }
       if (state->abort_on_error()) {
         state->ReportFileErrors(table_name_, 1);
-        return Status(
-            "Aborted HBaseScanNode due to conversion errors. View error log "
-            "for details.");
+        return Status(state->ErrorLog());
       }
     }
 

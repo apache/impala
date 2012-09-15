@@ -365,9 +365,6 @@ class HdfsRCFileScanner : public HdfsScanner {
   // The sync_hash_ from the file header.
   uint8_t sync_hash_[SYNC_HASH_SIZE];
 
-  // index of the current row group in the current file
-  int row_group_idx_;
-
   // number of columns in this rowgroup object
   int num_cols_;
 

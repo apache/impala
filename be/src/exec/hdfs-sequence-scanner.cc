@@ -291,8 +291,7 @@ Status HdfsSequenceScanner::ProcessRange() {
         }
         if (state_->abort_on_error()) {
           state_->ReportFileErrors(context_->filename(), 1);
-          return Status("Aborted HdfsSequenceScanner due to parse errors."
-                        "View error log for details.");
+          return Status(state_->ErrorLog());
         }
       }
     } else {

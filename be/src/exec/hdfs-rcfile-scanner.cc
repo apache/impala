@@ -138,7 +138,6 @@ Status HdfsRCFileScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_par
   }
   int64_t position;
   RETURN_IF_ERROR(current_byte_stream_->GetPosition(&position));
-  row_group_idx_ = -1;
 
   ResetRowGroup();
 
@@ -282,7 +281,6 @@ Status HdfsRCFileScanner::ReadRowGroup() {
   int64_t position;
   bool eof;
 
-  row_group_idx_ = -1;
   while (num_rows_ == 0) {
     RETURN_IF_ERROR(ReadHeader());
     RETURN_IF_ERROR(ReadKeyBuffers());
@@ -539,10 +537,7 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
 
         if (!text_converter_->WriteSlot(slot_desc, tuple_, 
               col_start, field_len, !has_noncompact_strings_, false, tuple_pool_)) {
-          if (state_->LogHasSpace()) {
-            state_->error_stream() << "Error converting column: " << rc_column_idx <<
-                " TO " << TypeToString(slot_desc->type()) << endl;
-          }
+          ReportColumnParseError(slot_desc, col_start, field_len);
           error_in_row = true;
         }
       }
@@ -552,15 +547,12 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
         if (state_->LogHasSpace()) {
           state_->error_stream() << "file: " <<
             current_byte_stream_->GetLocation() << endl;
-          state_->error_stream() << "row group: " << row_group_idx_ << endl;
           state_->error_stream() << "row index: " << row_idx;
           state_->LogErrorStream();
         }
         if (state_->abort_on_error()) {
           state_->ReportFileErrors(current_byte_stream_->GetLocation(), 1);
-          return Status(
-              "Aborted HdfsRCFileScanner due to parse errors. View error log for "
-              "details.");
+          return Status(state_->ErrorLog());
         }
       }
 

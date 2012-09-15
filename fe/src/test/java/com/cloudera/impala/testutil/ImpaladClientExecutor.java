@@ -116,8 +116,11 @@ public class ImpaladClientExecutor {
         break;
       }
     }
-    client.close(queryHandle);
 
+    // TODO: implement Beeswax.get_log to to retrieve logs from all Impalad. Logs should
+    // contain all errors.
+
+    client.close(queryHandle);
     return numRows;
   }
 

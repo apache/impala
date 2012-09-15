@@ -529,9 +529,7 @@ Status HdfsTrevniScanner::GetNext(RowBatch* row_batch, bool* eosr) {
       }
       if (state_->abort_on_error()) {
         state_->ReportFileErrors(current_byte_stream_->GetLocation(), 1);
-        return Status(
-            "Aborted HdfsTrevniScanner due to parse errors. View error log for "
-            "details.");
+        return Status(state_->ErrorLog());
       }
     }
     --row_count_;

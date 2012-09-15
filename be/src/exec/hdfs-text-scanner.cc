@@ -355,7 +355,7 @@ Status HdfsTextScanner::ReportRowParseError(int row_idx) {
     }
 
     state_->error_stream() << "file: " << context_->filename() << endl;
-    state_->error_stream() << "line: ";
+    state_->error_stream() << "record: ";
     if (!boundary_row_.Empty()) {
       // Log the beginning of the line from the previous file buffer(s)
       state_->error_stream() << boundary_row_.str();
@@ -367,8 +367,7 @@ Status HdfsTextScanner::ReportRowParseError(int row_idx) {
 
   if (state_->abort_on_error()) {
     state_->ReportFileErrors(context_->filename(), 1);
-    return Status(
-        "Aborted HdfsTextScanner due to parse errors. View error log for details.");
+    return Status(state_->ErrorLog());
   }
   return Status::OK;
 }

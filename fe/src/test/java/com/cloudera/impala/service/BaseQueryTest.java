@@ -69,6 +69,7 @@ public abstract class BaseQueryTest {
   //protected static final List<Integer> ALL_NODES_ONLY = ImmutableList.of(0);
   protected static final List<Integer> ALL_CLUSTER_SIZES = ImmutableList.of(1, 2);
   protected static final List<Integer> SMALL_CLUSTER_SIZES = ImmutableList.of(1, 2);
+  protected static final List<Integer> SINGLE_NODE_ONLY = ImmutableList.of(1);
   protected static final List<Integer> ALL_NODES_ONLY = ImmutableList.of(2);
   protected static final List<Boolean> ALL_LLVM_OPTIONS = ImmutableList.of(true, false);
   protected static final Set<TableFormat> NON_COMPRESSED_TYPES =

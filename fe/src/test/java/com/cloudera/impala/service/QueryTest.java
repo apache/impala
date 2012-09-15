@@ -39,15 +39,6 @@ public class QueryTest extends BaseQueryTest {
   }
 
   @Test
-  public void TestHdfsScanNodeErrors() {
-    // Set AbortOnError to false because we expect errors
-    runPairTestFile("hdfs-scan-node-errors", false, 1000,
-        ALL_TABLE_FORMATS, ALL_COMPRESSION_FORMATS, ALL_BATCH_SIZES, ALL_NODES_ONLY);
-    runQueryInAllBatchAndClusterPerms("hdfs-scan-node-errors", false, 1000,
-        TEXT_FORMAT_ONLY, SMALL_BATCH_SIZES, SMALL_CLUSTER_SIZES);
-  }
-
-  @Test
   public void TestFilePartitions() {
     // Run fully distributed with all batch sizes.
     runPairTestFile("hdfs-partitions", true, 0,

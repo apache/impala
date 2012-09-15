@@ -4,9 +4,9 @@ package com.cloudera.impala.testutil;
 import static org.junit.Assert.fail;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
@@ -30,7 +30,7 @@ import com.google.common.collect.Lists;
 
 public class TestUtils {
   private final static Logger LOG = LoggerFactory.getLogger(TestUtils.class);
-  private final static String[] expectedFilePrefix = { "hdfs:" };
+  private final static String[] expectedFilePrefix = { "hdfs:", "file: " };
   private final static String[] ignoreContentAfter = { "HOST:" };
   // Special prefix for accepting an actual result if it matches a given regex.
   private final static String regexAgainstActual = "regex:";
@@ -295,31 +295,36 @@ public class TestUtils {
     try {
       executor.runQuery(query, context, resultQueue, colTypes, colLabels, insertResult);
     } catch(Exception e) {
+      // Error message comes from exception
+      errors.add(e.getMessage());
+
       // Compare errors if we are expecting some.
       if (contextQueryOptions.isAbort_on_error() &&
           expectedExecResults.getErrors().size() > 0) {
-        compareErrors(queryReportString, errors, fileErrors,
-            expectedExecResults.getErrors(), expectedExecResults.getFileErrors(),
-            testErrorLog);
+        compareErrors(queryReportString, context.getTQueryOptions().getMax_errors(),
+            errors, expectedExecResults.getErrors(), testErrorLog);
 
-        // Add errors to the results
+        // TODO: this only append one error. We need to append all errors.
         actualExecResults.getErrors().addAll(errors);
-
-        // Enumerate all of the file errors and add them to the results.
-        Iterator iterator = fileErrors.keySet().iterator();
-        while (iterator.hasNext()) {
-          Object key = iterator.next();
-          actualExecResults.getFileErrors().add(
-              String.format("%s,%d", key, fileErrors.get(key)));
-        }
         return actualExecResults;
       } else {
         testErrorLog.append(
-            "Error executing query '" + query + "' on line " + lineNum
+            "Error executing query '" + queryReportString + "' on line " + lineNum
             + ":\n" + e.getMessage());
       }
       return actualExecResults;
     }
+
+    // Check that there is no expected exception
+    if (contextQueryOptions.isAbort_on_error() &&
+        expectedExecResults.getErrors().size() > 0) {
+      testErrorLog.append(
+          "Expecting error but no exception is thrown: query '" + queryReportString);
+    }
+
+    // TODO: Even when no exception is thrown, extract error from the execution log and
+    // compare it against the expected error. Append all errors to
+    // actualExecResults.getErrors()
 
     // Check insert results for insert statements.
     // We check the num rows and the partitions independently,
@@ -488,38 +493,50 @@ public class TestUtils {
         TestUtils.compareOutput(actualResults, expectedResults, containsOrderBy) : "";
   }
 
-  private static void compareErrors(String query,
-      ArrayList<String> actualErrors, SortedMap<String, Integer> actualFileErrors,
-      ArrayList<String> expectedErrors, ArrayList<String> expectedFileErrors,
+  /**
+   * Verify actual error against expected error.
+   * @param query
+   * @param maxError the maximum number of error expected from actualErrors
+   * @param actualErrors the actual errors reported
+   * @param expectedErrors the possible set of errors from actualErrors
+   * @param testErrorLog an empty string if the results are the same, otherwise a string
+   *        describing how the results differ.
+   */
+  private static void compareErrors(String query, int maxError,
+      ArrayList<String> actualErrors, ArrayList<String> expectedErrors,
       StringBuilder testErrorLog) {
-    // Compare expected messages in error log.
-    if (expectedErrors.size() > 0) {
-      // Split the error messages by newline to compare them against the expected errors.
-      ArrayList<String> splitErrors = new ArrayList<String>();
-      for (String err : actualErrors) {
-        String[] lines = err.split("\n");
-        for (String line : lines) {
-          splitErrors.add(line);
+    StringBuilder errorLog = new StringBuilder();
+    String errorPrefix = "query:\n" + query + "\n";
+    int realMaxError = Math.min(maxError, expectedErrors.size());
+    // Number of actual errors should not exceed realMaxError
+    // TODO: it should actually MATCH the expected one.
+    if (actualErrors.size() > realMaxError) {
+      testErrorLog.append(errorPrefix + "got " + actualErrors.size() +
+          " but expect at most" + realMaxError + " errors");
+      return;
+    }
+
+    // Actual errors is a subset of expected errors
+    // Each item in expectedErrors has only one line, but an actualError has multiple
+    // lines where each line should map to an item in expectedErrors.
+    // Break actualError into a lines and check that every line exists in
+    // expectedErrors.
+    for (String actualError: actualErrors) {
+      actualError = applyHdfsFilePathFilter(actualError);
+      ArrayList<String> actualErrorList = Lists.newArrayList();
+      actualErrorList.addAll(Arrays.asList(actualError.split("\n")));
+      for (String actualErrorListItem: actualErrorList) {
+        if (!expectedErrors.contains(actualErrorListItem)) {
+          errorLog.append("Unexpected Error: ").append(actualErrorListItem).append("\n");
         }
       }
-      String result = TestUtils.compareOutput(splitErrors, expectedErrors, true);
-      if (!result.isEmpty()) {
-        testErrorLog.append("query:\n" + query + "\n" + result);
-        return;
-      }
     }
-    // Compare expected errors per file.
-    if (expectedFileErrors.size() > 0) {
-      ArrayList<String> actualFileErrorsArray = Lists.newArrayList();
-      for(SortedMap.Entry<String, Integer> entry : actualFileErrors.entrySet()) {
-        actualFileErrorsArray.add("file: " + entry.getKey() + "," + entry.getValue());
-      }
-      String fileErrorsResult =
-          TestUtils.compareOutput(actualFileErrorsArray, expectedFileErrors, true);
-      if (!fileErrorsResult.isEmpty()) {
-        fail("query:\n" + query + "\n" + fileErrorsResult);
-      }
+
+    if (errorLog.length() > 0) {
+      testErrorLog.append(errorPrefix);
+      testErrorLog.append(errorLog);
     }
+    return;
   }
 
   /**

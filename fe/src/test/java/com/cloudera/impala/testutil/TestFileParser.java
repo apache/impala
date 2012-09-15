@@ -57,14 +57,20 @@ public class TestFileParser {
   public enum Section {
     QUERY,
     TYPES,
+    COLLABELS,
     RESULTS,
     PLAN,
     DISTRIBUTEDPLAN,
-    ERRORS,
     FILEERRORS,
     NUMROWS,
     PARTITIONS,
-    SETUP
+    SETUP,
+    // Each file format has its own ERROR section because each filetype has a different
+    // error message
+    ERRORS, // text
+    ERRORS_RC, // rc file
+    ERRORS_SEQ, // sequence or sequence_record
+    ERRORS_TREVNI // trevni
   }
 
   /**
@@ -127,8 +133,7 @@ public class TestFileParser {
       ArrayList<String> retList = Lists.newArrayList();
       for (String s : ret) {
         if (!(s.startsWith("#") || s.startsWith("//"))) {
-          if (tableSuffix != null && (section == Section.PARTITIONS ||
-                section == Section.SETUP || section == Section.QUERY)) {
+          if (tableSuffix != null) {
             retList.add(s.replaceAll("\\$TABLE", tableSuffix));
           } else {
             retList.add(s);
@@ -171,12 +176,29 @@ public class TestFileParser {
     public QueryExecTestResult getQueryExecTestResult(String tableSuffix) {
       QueryExecTestResult result = new QueryExecTestResult();
       result.getColTypes().addAll(getSectionContents(Section.TYPES));
+      result.getColLabels().addAll(getSectionContents(Section.COLLABELS));
+      result.getFileErrors().addAll(getSectionContents(Section.FILEERRORS, true,
+          tableSuffix));
       result.getSetup().addAll(getSectionContents(Section.SETUP, true, tableSuffix));
       result.getQuery().addAll(getSectionContents(Section.QUERY, true));
       result.getResultSet().addAll(getSectionContents(Section.RESULTS));
       result.getModifiedPartitions().addAll(
           getSectionContents(Section.PARTITIONS, false, tableSuffix));
       result.getNumAppendedRows().addAll(getSectionContents(Section.NUMROWS));
+
+      // Only load the error of the specified format type.
+      if (tableSuffix.equals("")) {
+        result.getErrors().addAll(getSectionContents(Section.ERRORS, true, tableSuffix));
+      } else if (tableSuffix.startsWith("_rc")) {
+        result.getErrors().addAll(getSectionContents(Section.ERRORS_RC, true,
+            tableSuffix));
+      } else if (tableSuffix.startsWith("_seq")) {
+        result.getErrors().addAll(getSectionContents(Section.ERRORS_SEQ, true,
+            tableSuffix));
+      } else if (tableSuffix.startsWith("_trevni")) {
+        result.getErrors().addAll(getSectionContents(Section.ERRORS_TREVNI, true,
+            tableSuffix));
+      }
       return result;
     }
   }
