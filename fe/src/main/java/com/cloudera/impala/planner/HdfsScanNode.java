@@ -169,6 +169,12 @@ public class HdfsScanNode extends ScanNode {
           throw new IllegalStateException(errorMsg);
         }
 
+        if (blockHostPorts.length == 0) {
+          // TODO: can we log more diagnostic info to help the user fix this?
+          LOG.error("skipping block with missing BlockLocation: " + block.toString());
+          continue;
+        }
+
         // greedy block assignment: find host with fewest assigned bytes
         Preconditions.checkState(blockHostPorts.length > 0);
         int chosenHostPortIndex = 0;
