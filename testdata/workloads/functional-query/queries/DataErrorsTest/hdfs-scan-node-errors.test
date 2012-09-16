@@ -10,16 +10,16 @@
 select id, bool_col, tinyint_col, smallint_col from alltypeserror$TABLE
 ---- ERRORS
 Error converting column: 1 TO BOOL (Data is: errfalse)
-file: hdfs: test-warehouse/alltypeserror/year=2009/month=1/0901.txt
+file: hdfs: test-warehouse/alltypeserror/year=2009/month=1
 record: 1,errfalse,,1,1,10,1.000000,10.100000,01/01/09,1,1999-10-10
 ---- ERRORS_RC
 Error converting column: 1 TO BOOL (Data is: errfalse)
-file: hdfs: test-warehouse/alltypeserror$TABLE/year=2009/month=1/000000_0
+file: hdfs: test-warehouse/alltypeserror$TABLE/year=2009/month=1
 row index: 1
 row index: 0
 ---- ERRORS_SEQ
 Error converting column: 1 TO BOOL (Data is: errfalse)
-file: hdfs: test-warehouse/alltypeserror$TABLE/year=2009/month=1/000001_0
+file: hdfs: test-warehouse/alltypeserror$TABLE/year=2009/month=1
 record: 1,errfalse,,1,1,10,1.000000,10.100000,01/01/09,1,1999-10-10
 ---- TYPES
 int, boolean, tinyint, smallint
@@ -59,15 +59,15 @@ select * from alltypeserrornonulls$TABLE
 ---- ERRORS
 Error converting column: 10 TO TIMESTAMP (Data is: 123456)
 record: 0,true,0,0,0,0,0.000000,0.000000,01/01/09,0,123456
-file: hdfs: test-warehouse/alltypeserrornonulls/year=2009/month=1/0901.txt
+file: hdfs: test-warehouse/alltypeserrornonulls/year=2009/month=1
 ---- ERRORS_RC
 Error converting column: 10 TO TIMESTAMP (Data is: 123456)
-file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=1/000000_0
+file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=1
 row index: 1
 row index: 0
 ---- ERRORS_SEQ
 Error converting column: 10 TO TIMESTAMP (Data is: 123456)
-file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=1/000001_0
+file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=1
 record: 0,true,0,0,0,0,0.000000,0.000000,01/01/09,0,123456
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp

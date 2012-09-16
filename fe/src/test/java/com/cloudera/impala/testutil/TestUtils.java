@@ -526,6 +526,12 @@ public class TestUtils {
       ArrayList<String> actualErrorList = Lists.newArrayList();
       actualErrorList.addAll(Arrays.asList(actualError.split("\n")));
       for (String actualErrorListItem: actualErrorList) {
+        // TODO: Strip out the filename because it is non-deterministic but we should
+        // validate that we are reporting the correct filename.
+        if (actualErrorListItem.startsWith("file:")) {
+          actualErrorListItem =
+              actualErrorListItem.substring(0, actualErrorListItem.lastIndexOf("/"));
+        }
         if (!expectedErrors.contains(actualErrorListItem)) {
           errorLog.append("Unexpected Error: ").append(actualErrorListItem).append("\n");
         }
