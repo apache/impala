@@ -27,6 +27,7 @@ ScanRangeContext::ScanRangeContext(RuntimeState* state, HdfsScanNode* scan_node,
     boundary_pool_(new MemPool()),
     boundary_buffer_(new StringBuffer(boundary_pool_.get())),
     cancelled_(false),
+    read_eosr_(false),
     current_buffer_(NULL) {
 
   compact_data_ = scan_node->compact_data() || 
@@ -157,6 +158,7 @@ Status ScanRangeContext::GetBytesInternal(uint8_t** out_buffer, int requested_le
     // Not enough bytes, copy the end of this buffer and combine it wit the next one
     if (requested_len > current_buffer_bytes_left_) {
       if (current_buffer_ != NULL) {
+        read_eosr_ = current_buffer_->eosr();
         boundary_buffer_->Append(current_buffer_pos_, current_buffer_bytes_left_);
         *out_len += current_buffer_bytes_left_;
         requested_len -= current_buffer_bytes_left_;
@@ -177,8 +179,8 @@ Status ScanRangeContext::GetBytesInternal(uint8_t** out_buffer, int requested_le
       range.Reset(filename(), read_past_buffer_size_, 
           file_offset(), scan_range_->disk_id(), NULL);
 
-      RETURN_IF_ERROR(
-          state_->io_mgr()->Read(scan_node_->hdfs_connection(), &range, &current_buffer_));
+      RETURN_IF_ERROR(state_->io_mgr()->Read(scan_node_->hdfs_connection(),
+          &range, &current_buffer_));
       
       current_buffer_bytes_left_ = current_buffer_->len();
       current_buffer_pos_ = reinterpret_cast<uint8_t*>(current_buffer_->buffer());
@@ -280,6 +282,7 @@ void ScanRangeContext::Complete() {
     current_row_batch_ = NULL;
     current_buffer_ = NULL;
     current_buffer_pos_ = NULL;
+    read_eosr_ = false;
   }
   
   DCHECK(completed_buffers_.empty());

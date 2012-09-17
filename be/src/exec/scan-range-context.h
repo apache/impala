@@ -141,7 +141,7 @@ class ScanRangeContext {
   bool cancelled() const { return cancelled_; }
 
   // If true, all bytes in this scan range have been returned
-  bool eosr() const { return total_bytes_returned_ >= scan_range_->len(); }
+  bool eosr() const { return read_eosr_ || total_bytes_returned_ >= scan_range_->len(); }
 
   // Returns the total number of bytes returned
   int64_t total_bytes_returned() { return total_bytes_returned_; }
@@ -223,6 +223,9 @@ class ScanRangeContext {
 
   // If true, the scan range has been cancelled and the scanner thread should abort
   bool cancelled_;
+
+  // Set to true when a buffer returns the end of the scan range.
+  bool read_eosr_;
 
   // Buffers that are ready for the reader
   std::list<DiskIoMgr::BufferDescriptor*> buffers_;
