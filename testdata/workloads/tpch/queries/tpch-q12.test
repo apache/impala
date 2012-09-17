@@ -1,3 +1,4 @@
+# QUERY_NAME : TPCH-Q12
 # Q12 - Shipping Mode and Order Priority Query
 # Modifications: Converted select from multiple tables to joins, added limit
 select l_shipmode,

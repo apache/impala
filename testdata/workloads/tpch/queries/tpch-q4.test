@@ -1,3 +1,4 @@
+# QUERY_NAME : TPCH-Q4
 # Q4 - Order Priority Checking Query
 # Modifications: Converted selects from multiple tables to joins,
 # rewrote 'exists' as an inner join + count(distinct), added

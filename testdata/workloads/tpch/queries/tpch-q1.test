@@ -1,3 +1,4 @@
+# QUERY_NAME : TPCH-Q1
 # Q1 - Pricing Summary Report Query
 # Modifications: Remove ORDER BY, added ROUND() calls
 select

@@ -1,3 +1,4 @@
+# QUERY_NAME : TPCH-Q17_QUERY_1
 # Q17 - Small-Quantity-Order Revenue Query
 insert overwrite table tpch.lineitem_tmp$TABLE
 select l_partkey as t_partkey, 0.2 * avg(l_quantity) as t_avg_quantity
@@ -10,6 +11,7 @@ RELOAD tpch.lineitem_tmp$TABLE
 ---- PARTITIONS
 /: 200000
 ====
+# QUERY_NAME : TPCH-Q17_QUERY_2
 # Modifications: Converted selects from multiple tables to joins,
 # added round() call, removed subquery
 select round(sum(l_extendedprice) / 7.0, 5) as avg_yearly

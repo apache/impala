@@ -1,3 +1,4 @@
+# QUERY_NAME : TPCH-Q20_QUERY_1
 # Q20 - Potential Part Promotion Query
 insert overwrite table tpch.q20_tmp1$TABLE
 select distinct p_partkey
@@ -10,6 +11,7 @@ RELOAD tpch.q20_tmp1$TABLE
 ---- PARTITIONS
 /: 2127
 ====
+# QUERY_NAME : TPCH-Q20_QUERY_2
 insert overwrite table tpch.q20_tmp2$TABLE
 select
   l_partkey,
@@ -29,6 +31,7 @@ RELOAD tpch.q20_tmp2$TABLE
 ---- PARTITIONS
 /: 543210
 ====
+# QUERY_NAME : TPCH-Q20_QUERY_3
 insert overwrite table tpch.q20_tmp3$TABLE
 select
   ps_suppkey,
@@ -46,6 +49,7 @@ RELOAD tpch.q20_tmp3$TABLE
 ---- PARTITIONS
 /: 5843
 ====
+# QUERY_NAME : TPCH-Q20_QUERY_4
 # Modified to use subquery to work around IMP-127
 insert overwrite table tpch.q20_tmp4$TABLE
 select a.ps_suppkey
@@ -62,6 +66,7 @@ RELOAD tpch.q20_tmp4$TABLE
 ---- PARTITIONS
 /: 4397
 ====
+# QUERY_NAME : TPCH-Q20_QUERY_5
 # Modifications: Added limit
 select
   s_name,

@@ -1,3 +1,4 @@
+# QUERY_NAME : TPCH-Q6
 # Q6 - Forecasting Revenue Change Query
 # Modifications: Added round() call
 select round(sum(l_extendedprice * l_discount), 5) as revenue

@@ -1,3 +1,4 @@
+# QUERY_NAME : TPCH-Q18_QUERY_1
 # Q18 - Large Value Customer Query
 insert overwrite table tpch.q18_tmp$TABLE
 select l_orderkey, sum(l_quantity) as t_sum_quantity
@@ -10,6 +11,7 @@ RELOAD tpch.q18_tmp$TABLE
 ---- PARTITIONS
 /: 1500000
 ====
+# QUERY_NAME : TPCH-Q18_QUERY_2
 # Modifications: Cast o_totalprice column due to float/double values not
 # allowed in GROUP BY.
 select

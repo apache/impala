@@ -1,3 +1,4 @@
+# QUERY_NAME : TPCH-Q9
 # Q9 - Product Type Measure Query
 # Modifications: Removed subquery, converted selects from multiple tables to joins,
 # added limit, added round()

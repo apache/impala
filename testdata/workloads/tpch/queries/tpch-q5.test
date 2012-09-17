@@ -1,3 +1,4 @@
+# QUERY_NAME : TPCH-Q5
 # Q5 - Local Supplier Volume Query
 # Modifications: Added round() call, converted selects from multiple tables
 # to joins, added limit

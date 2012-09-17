@@ -1,3 +1,4 @@
+# QUERY_NAME : TPCH-Q2_QUERY_1
 # Q2 - Minimum Cost Supplier Query
 insert overwrite table tpch.q2_minimum_cost_supplier_tmp1$TABLE
 select
@@ -26,6 +27,7 @@ RELOAD tpch.q2_minimum_cost_supplier_tmp1$TABLE
 ---- PARTITIONS
 /: 642
 ====
+# QUERY_NAME : TPCH-Q2_QUERY_2
 insert overwrite table tpch.q2_minimum_cost_supplier_tmp2$TABLE
 select
   p_partkey,
@@ -39,6 +41,7 @@ RELOAD tpch.q2_minimum_cost_supplier_tmp2$TABLE
 ---- PARTITIONS
 /: 460
 ====
+# QUERY_NAME : TPCH-Q2_QUERY_3
 # Modifications: Fully qualified name of p_partkey column in the ORDER BY clause
 select
   t1.s_acctbal,

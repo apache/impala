@@ -1,3 +1,4 @@
+# QUERY_NAME : TPCH-Q13
 # Q13 - Customer Distribution Query
 select
   c_count,

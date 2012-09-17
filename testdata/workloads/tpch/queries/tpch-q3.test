@@ -1,3 +1,4 @@
+# QUERY_NAME : TPCH-Q3
 # Q3 - Shipping Priority Query
 # Modifications: Added round() calls
 select
