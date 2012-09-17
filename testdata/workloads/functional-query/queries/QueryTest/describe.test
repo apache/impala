@@ -1,0 +1,47 @@
+# Simple describe
+describe default.alltypes
+---- TYPES
+string, string
+---- RESULTS
+'id','int'
+'bool_col','boolean'
+'tinyint_col','tinyint'
+'smallint_col','smallint'
+'int_col','int'
+'bigint_col','bigint'
+'float_col','float'
+'double_col','double'
+'date_string_col','string'
+'string_col','string'
+'timestamp_col','timestamp'
+'year','int'
+'month','int'
+====
+# Default database
+describe alltypes
+---- TYPES
+string, string
+---- RESULTS
+'id','int'
+'bool_col','boolean'
+'tinyint_col','tinyint'
+'smallint_col','smallint'
+'int_col','int'
+'bigint_col','bigint'
+'float_col','float'
+'double_col','double'
+'date_string_col','string'
+'string_col','string'
+'timestamp_col','timestamp'
+'year','int'
+'month','int'
+====
+# Different database
+DESCRIBE testdb1.testtbl
+---- TYPES
+string, string
+---- RESULTS
+'id','bigint'
+'name','string'
+'birthday','string'
+====

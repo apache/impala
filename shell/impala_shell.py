@@ -102,11 +102,7 @@ class ImpalaShell(cmd.Cmd):
       self.connected = False
     return self.connected
 
-  def do_select(self, args):
-    """Executes a SELECT... query, fetching all rows"""
-    query = BeeswaxService.Query()
-    query.query = "select %s" % (args,)
-    query.configuration = self.__options_to_string_list()
+  def __query_with_results(self, query):
     print "Query: %s" % (query.query,)
     start, end = time.time(), 0
     (handle, ok) = \
@@ -127,6 +123,34 @@ class ImpalaShell(cmd.Cmd):
     print '\n'.join(result_rows)
     print "Returned %d row(s) in %2.2fs" % (len(result_rows), end - start)
     return False
+
+  def do_select(self, args):
+    """Executes a SELECT... query, fetching all rows"""
+    query = BeeswaxService.Query()
+    query.query = "select %s" % (args,)
+    query.configuration = self.__options_to_string_list()
+    return self.__query_with_results(query)
+
+  def do_use(self, args):
+    """Executes a USE... query"""
+    query = BeeswaxService.Query()
+    query.query = "use %s" % (args,)
+    query.configuration = self.__options_to_string_list()
+    return self.__query_with_results(query)
+
+  def do_show(self, args):
+    """Executes a SHOW... query, fetching all rows"""
+    query = BeeswaxService.Query()
+    query.query = "show %s" % (args,)
+    query.configuration = self.__options_to_string_list()
+    return self.__query_with_results(query)
+
+  def do_describe(self, args):
+    """Executes a DESCRIBE... query, fetching all rows"""
+    query = BeeswaxService.Query()
+    query.query = "describe %s" % (args,)
+    query.configuration = self.__options_to_string_list()
+    return self.__query_with_results(query)
     
   def __do_rpc(self, rpc):
     """Executes the RPC lambda provided with some error checking. Returns

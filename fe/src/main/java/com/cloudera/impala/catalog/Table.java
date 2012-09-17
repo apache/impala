@@ -159,6 +159,24 @@ public abstract class Table {
   }
 
   /**
+   * Returns the list of all columns, but with partition columns at the end of
+   * the list rather than the beginning. This is equivalent to the order in
+   * which Hive enumerates columns.
+   */
+  public ArrayList<Column> getColumnsInHiveOrder() {
+    ArrayList<Column> columns = Lists.newArrayList();
+    for (Column column: colsByPos.subList(numClusteringCols, colsByPos.size())) {
+      columns.add(column);
+    }
+
+    for (Column column: colsByPos.subList(0, numClusteringCols)) {
+      columns.add(column);
+    }
+
+    return columns;
+  }
+
+  /**
    * Case-insensitive lookup.
    */
   public Column getColumn(String name) {

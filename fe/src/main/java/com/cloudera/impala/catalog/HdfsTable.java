@@ -346,7 +346,7 @@ public class HdfsTable extends Table {
       FileSystem fs;
       fs = FileSystem.get(CONF);
       if (!(fs instanceof DistributedFileSystem)) {
-        throw new RuntimeException("HDFS FileSystem should be DistributedFileSystem but"
+        throw new RuntimeException("HDFS FileSystem should be DistributedFileSystem but "
             + "got " + fs.getClass().getName());
       }
       dfs = (DistributedFileSystem)fs;

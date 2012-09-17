@@ -127,7 +127,7 @@ Status InProcessQueryExecutor::Exec(const string& query,
     TClientRequest client_request;
     client_request.__set_stmt(query.c_str());
     client_request.__set_queryOptions(query_options);
-    TCreateExecRequestResult result;
+    TExecRequest result;
     client_->CreateExecRequest(result, client_request);
     query_request_ = result.queryExecRequest;
   } catch (TImpalaPlanServiceException& e) {

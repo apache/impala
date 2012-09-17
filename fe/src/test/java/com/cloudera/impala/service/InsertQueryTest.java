@@ -16,6 +16,7 @@ public class InsertQueryTest extends BaseQueryTest {
   // Because we disagree with hive on what to do on overflow, only
   // test overflow on those types that we can insert.
   // Hive makes them NULL.
+  @Test
   public void TestOverflow() {
     runQueryInAllBatchAndClusterPerms("overflow", false, 1000, INSERT_FORMATS,
         ImmutableList.of(0), ImmutableList.of(1));

@@ -614,6 +614,30 @@ public class ParserTest {
     ParsesOk("USE db1");
   }
 
+  @Test
+  public void TestShow() {
+    // Missing arguments
+    ParserError("SHOW");
+    // Short form ok
+    ParsesOk("SHOW TABLES");
+    // Malformed pattern (no quotes)
+    ParserError("SHOW TABLES tablename");    
+    // Well-formed pattern
+    ParsesOk("SHOW TABLES 'tablename|othername'");
+    // Empty pattern ok
+    ParsesOk("SHOW TABLES ''");
+  }
+
+  @Test
+  public void TestDescribe() {
+    // Missing argument
+    ParserError("DESCRIBE");
+    // Unqualified table ok
+    ParsesOk("DESCRIBE tablename");
+    // Fully-qualified table ok
+    ParsesOk("DESCRIBE databasename.tablename");
+  }
+
   @Test public void TestGetErrorMsg() {
 
     // missing select
@@ -622,7 +646,7 @@ public class ParserTest {
         "c, b, c from t\n" +
         "^\n" +
         "Encountered: IDENTIFIER\n" +
-        "Expected: SELECT, USE, INSERT\n");
+        "Expected: DESCRIBE, SELECT, SHOW, USE, INSERT\n");
 
     // missing select list
     ParserError("select from t",

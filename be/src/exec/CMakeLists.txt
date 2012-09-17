@@ -13,6 +13,7 @@ add_library(Exec STATIC
   aggregation-node-ir.cc
   buffered-byte-stream.cc
   data-sink.cc
+  ddl-executor.cc
   delimited-text-parser.cc
   exec-node.cc
   exchange-node.cc

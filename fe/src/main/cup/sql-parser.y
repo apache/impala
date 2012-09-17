@@ -133,13 +133,13 @@ parser code {:
 :};
 
 terminal KW_AND, KW_ALL, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW_BIGINT, KW_BOOLEAN, KW_BY,
-  KW_CASE, KW_CAST, KW_COUNT, KW_DATE, KW_DATETIME, KW_DESC, KW_DISTINCT,
+  KW_CASE, KW_CAST, KW_COUNT, KW_DATE, KW_DATETIME, KW_DESC, KW_DESCRIBE, KW_DISTINCT,
   KW_DISTINCTPC, KW_DISTINCTPCSA,
   KW_DIV, KW_DOUBLE, KW_ELSE, KW_END, KW_FALSE, KW_FLOAT, KW_FROM, KW_FULL, KW_GROUP,
   KW_HAVING, KW_IS, KW_IN, KW_INNER, KW_JOIN, KW_INT, KW_LEFT, KW_LIKE, KW_LIMIT, KW_MIN,
   KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_REGEXP,
-  KW_RLIKE, KW_RIGHT, KW_SELECT, KW_SEMI, KW_SMALLINT, KW_STRING, KW_SUM,
-  KW_TINYINT, KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_WHEN, KW_WHERE, KW_THEN, 
+  KW_RLIKE, KW_RIGHT, KW_SELECT, KW_SHOW, KW_SEMI, KW_SMALLINT, KW_STRING, KW_SUM, 
+  KW_TABLES, KW_TINYINT, KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_WHEN, KW_WHERE, KW_THEN,
   KW_TIMESTAMP, KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION, KW_INTERVAL;
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
@@ -161,6 +161,9 @@ nonterminal QueryStmt query_stmt;
 nonterminal List<UnionOperand> union_operands;
 // USE stmt
 nonterminal UseStmt use_stmt;
+nonterminal ShowStmt show_stmt;
+nonterminal String show_pattern;
+nonterminal DescribeStmt describe_stmt;
 // List of select blocks connected by UNION operators, with order by or limit.
 nonterminal QueryStmt union_with_order_by_or_limit;
 nonterminal SelectList select_clause;
@@ -227,6 +230,10 @@ stmt ::=
     {: RESULT = insert; :}
     | use_stmt:use
     {: RESULT = use; :}
+    | show_stmt:show
+    {: RESULT = show; :}
+    | describe_stmt:describe
+    {: RESULT = describe; :}
     ;
 
 insert_stmt ::=
@@ -369,8 +376,25 @@ union_op ::=
   ;
 
 use_stmt ::=
-    KW_USE IDENT:db
+  KW_USE IDENT:db
   {: RESULT = new UseStmt(db); :}
+  ;
+
+show_stmt ::=
+  KW_SHOW KW_TABLES
+  {: RESULT = new ShowStmt(); :}
+  | KW_SHOW KW_TABLES show_pattern:showPattern
+  {: RESULT = new ShowStmt(showPattern); :}
+  ;
+
+show_pattern ::=
+  STRING_LITERAL:showPattern
+  {: RESULT = showPattern; :}
+  ;
+
+describe_stmt ::=
+  KW_DESCRIBE table_name:table
+  {: RESULT = new DescribeStmt(table); :}
   ;
 
 select_stmt ::=

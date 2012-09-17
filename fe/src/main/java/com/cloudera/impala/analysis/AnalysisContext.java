@@ -35,12 +35,40 @@ public class AnalysisContext {
       return stmt instanceof UseStmt;
     }
 
+    public boolean isShowStmt() {
+      return stmt instanceof ShowStmt;
+    }
+
+    public boolean isDescribeStmt() {
+      return stmt instanceof DescribeStmt;
+    }
+
+    public boolean isDdlStmt() {
+      return isUseStmt() || isShowStmt() || isDescribeStmt();
+    }
+
+    public boolean isDmlStmt() {
+      return isInsertStmt();
+    }
+
     public QueryStmt getQueryStmt() {
       return (QueryStmt) stmt;
     }
 
     public InsertStmt getInsertStmt() {
       return (InsertStmt) stmt;
+    }
+
+    public UseStmt getUseStmt() {
+      return (UseStmt) stmt;
+    }
+
+    public ShowStmt getShowStmt() {
+      return (ShowStmt) stmt;
+    }
+
+    public DescribeStmt getDescribeStmt() {
+      return (DescribeStmt) stmt;
     }
 
     public ParseNode getStmt() {
@@ -74,7 +102,7 @@ public class AnalysisContext {
       result.stmt.analyze(result.analyzer);
       return result;
     } catch (AnalysisException e) {
-      throw new AnalysisException(e.getMessage() + " (in " + stmt + ")");
+      throw new AnalysisException(e.getMessage() + " (in " + stmt + ")", e);
     } catch (Exception e) {
       e.printStackTrace(System.err);
       throw new AnalysisException(parser.getErrorMsg(stmt));

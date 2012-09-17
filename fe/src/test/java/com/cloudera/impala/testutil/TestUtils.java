@@ -393,7 +393,7 @@ public class TestUtils {
       List<String> colTypes) {
     // Concatenate columns separated by ","
     String[] resultColumns = rawResultRow.split("\t");
-    Assert.assertEquals(resultColumns.length, colTypes.size());
+    Assert.assertEquals(colTypes.size(), resultColumns.length);
     StringBuilder line = new StringBuilder();
     for (int i = 0; i < colTypes.size(); ++i) {
       if (i > 0) {

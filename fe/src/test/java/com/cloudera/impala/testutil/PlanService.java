@@ -18,7 +18,7 @@ import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.service.Frontend;
 import com.cloudera.impala.thrift.ImpalaPlanService;
 import com.cloudera.impala.thrift.TCatalogUpdate;
-import com.cloudera.impala.thrift.TCreateExecRequestResult;
+import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TImpalaPlanServiceException;
 import com.cloudera.impala.thrift.TPlanExecRequest;
 import com.cloudera.impala.thrift.TClientRequest;
@@ -46,13 +46,13 @@ public class PlanService {
       frontend = new Frontend(lazy);
     }
 
-    public TCreateExecRequestResult CreateExecRequest(TClientRequest tRequest)
+    public TExecRequest CreateExecRequest(TClientRequest tRequest)
         throws TImpalaPlanServiceException {
       LOG.info(
           "Executing '" + tRequest.stmt + "' for " +
           Integer.toString(tRequest.queryOptions.num_nodes) + " nodes");
       StringBuilder explainStringBuilder = new StringBuilder();
-      TCreateExecRequestResult result;
+      TExecRequest result;
       try {
         result = frontend.createExecRequest(tRequest, explainStringBuilder);
       } catch (ImpalaException e) {
@@ -66,7 +66,7 @@ public class PlanService {
       // Print explain string.
       LOG.info(explainStringBuilder.toString());
 
-      LOG.info("returned TCreateExecRequestResult: " + result.toString());
+      LOG.info("returned TExecRequest: " + result.toString());
       return result;
     }
 

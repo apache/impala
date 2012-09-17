@@ -13,6 +13,7 @@ import org.apache.log4j.Logger;
 
 import com.cloudera.impala.catalog.Catalog.TableNotFoundException;
 import com.google.common.collect.Sets;
+import com.google.common.collect.Lists;
 
 /**
  * Internal representation of db-related metadata. Owned by Catalog instance.
@@ -153,6 +154,10 @@ public class Db {
       forceLoadAllTables();
     }
     return tables;
+  }
+
+  public List<String> getAllTableNames() {
+    return Lists.newArrayList(tables.keySet());
   }
 
   /**

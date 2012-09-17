@@ -13,6 +13,7 @@
 
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaInternalService.h"
+#include "gen-cpp/Frontend_types.h"
 #include "common/status.h"
 
 namespace impala {
@@ -36,7 +37,7 @@ class TTransmitDataArgs;
 class TTransmitDataResult;
 class THostPort;
 class TClientRequest;
-class TCreateExecRequestResult;
+class TExecRequest;
 class ImpalaPlanServiceClient;
 
 class ThriftServer;
@@ -152,8 +153,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
       const TUniqueId& fragment_id);
 
   // Call FE to get TClientRequestResult.
-  Status GetQueryExecRequest(const TClientRequest& request,
-      TCreateExecRequestResult* result);
+  Status GetExecRequest(const TClientRequest& request, TExecRequest* result);
 
   // Make any changes required to the metastore as a result of an
   // INSERT query, e.g. newly created partitions.
@@ -206,6 +206,24 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   // in the fetch call.
   void InitializeConfigVariables();
 
+  // Returns all matching table names, per Hive's "SHOW TABLES <pattern>". Each
+  // table name is fully-qualified, i.e. of the form db.table_name
+  // If db is NULL, match table names from all databases, otherwise restrict the
+  // search to the named database.
+  // If pattern is NULL, match all tables otherwise match only those tables that
+  // match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
+  // and each pN may contain wildcards denoted by '*' which match all strings.
+  Status GetTableNames(std::string* db, std::string* pattern, 
+      std::vector<std::string>* table_names);
+
+  // Returns (in the output parameter) a list of columns for the specified table
+  // in the specified database.
+  Status DescribeTable(const std::string& db, const std::string& table, 
+      std::vector<TColumnDesc>* columns);
+
+  // For access to GetTableNames and DescribeTable
+  friend class DdlExecutor;
+
   // global, per-server state
   jobject fe_;  // instance of com.cloudera.impala.service.JniFrontend
   jmethodID create_exec_request_id_;  // JniFrontend.createExecRequest()
@@ -213,6 +231,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   jmethodID get_hadoop_config_id_;  // JniFrontend.getHadoopConfigAsHtml()
   jmethodID reset_catalog_id_; // JniFrontend.resetCatalog()
   jmethodID update_metastore_id_; // JniFrontend.updateMetastore()
+  jmethodID get_table_names_id_; // JniFrontend.getTableNames
+  jmethodID describe_table_id_,; // JniFrontend.describeTable
   ExecEnv* exec_env_;  // not owned
 
   // plan service-related - impalad optionally uses a standalone

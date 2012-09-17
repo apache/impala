@@ -34,6 +34,7 @@
 #include "exec/exec-node.h"
 #include "exec/scan-node.h"
 #include "exec/exec-stats.h"
+#include "exec/ddl-executor.h"
 #include "util/debug-util.h"
 #include "util/string-parser.h"
 #include "util/thrift-util.h"
@@ -91,6 +92,7 @@ const string NO_QUERY_HANDLE = "no_query_handle";
 // synchronize access explicitly via lock().
 // To avoid deadlocks, the caller must *not* acquire query_exec_state_map_lock_
 // while holding the exec state's lock.
+// TODO: Consider renaming to RequestExecState for consistency.
 class ImpalaServer::QueryExecState {
  public:
   QueryExecState(ExecEnv* exec_env, ImpalaServer* server)
@@ -113,7 +115,7 @@ class ImpalaServer::QueryExecState {
   // up the output exprs for subsequent calls to FetchRowsAsAscii().
   // Also sets up profile and pre-execution counters.
   // Non-blocking.
-  Status Exec(TQueryExecRequest* exec_request);
+  Status Exec(TExecRequest* exec_request);
 
   // Call this to ensure that rows are ready when calling FetchRowsAsAscii().
   // Must be preceded by call to Exec().
@@ -155,7 +157,8 @@ class ImpalaServer::QueryExecState {
   int current_row() const { return current_row_; }
   const TResultSetMetadata* result_metadata() { return &result_metadata_; }
   const TUniqueId& query_id() const { return query_id_; }
-  const TQueryExecRequest& query_exec_request() const { return exec_request_; }
+  const TExecRequest& exec_request() const { return exec_request_; }
+  TStmtType::type stmt_type() const { return exec_request_.stmt_type; }
   mutex* lock() { return &lock_; }
   const QueryState::type query_state() const { return query_state_; }
   void set_query_state(QueryState::type state) { query_state_ = state; }
@@ -168,7 +171,8 @@ class ImpalaServer::QueryExecState {
   mutex lock_;  // protects all following fields
   ExecStats exec_stats_;
   ExecEnv* exec_env_;
-  scoped_ptr<Coordinator> coord_;  // not set for queries w/o FROM
+  scoped_ptr<Coordinator> coord_;  // not set for queries w/o FROM, or for ddl queries
+  scoped_ptr<DdlExecutor> ddl_executor_; // Runs DDL queries, instead of coord_
   // local runtime_state_ in case we don't have a coord_
   RuntimeState local_runtime_state_;
   ObjectPool profile_pool_;
@@ -178,7 +182,7 @@ class ImpalaServer::QueryExecState {
   bool eos_;  // if true, there are no more rows to return
   QueryState::type query_state_;
   Status query_status_;
-  TQueryExecRequest exec_request_;
+  TExecRequest exec_request_;
 
   TResultSetMetadata result_metadata_; // metadata for select query
   RowBatch* current_batch_; // the current row batch; only applicable if coord is set
@@ -191,7 +195,8 @@ class ImpalaServer::QueryExecState {
   // Core logic of FetchRowsAsAscii(). Does not update query_state_/status_.
   Status FetchRowsAsAsciiInternal(const int32_t max_rows, vector<string>* fetched_rows);
 
-  // Fetch the next row batch and store the results in current_batch_
+  // Fetch the next row batch and store the results in current_batch_. Only
+  // called for non-DDL / DML queries.
   Status FetchNextBatch();
 
   // Evaluates output_exprs_ against at most max_rows in the current_batch_ starting
@@ -216,34 +221,68 @@ class ImpalaServer::QueryExecState {
 
 };
 
-Status ImpalaServer::QueryExecState::Exec(TQueryExecRequest* exec_request) {
+Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
   exec_request_ = *exec_request;
-  profile_.set_name("Query (id=" + PrintId(exec_request->query_id) + ")");
+  profile_.set_name("Query (id=" + PrintId(exec_request->request_id) + ")");
 
-  if (exec_request->has_coordinator_fragment 
-      && !exec_request->fragment_requests[0].__isset.desc_tbl) {
-    // query without a FROM clause
-    // TODO: This does not handle INSERT INTO ... SELECT 1 because there is no
-    // coordinator fragment actually executing to drive the sink. 
-    // Workaround: INSERT INTO ... SELECT 1 FROM tbl LIMIT 1
-    local_runtime_state_.Init(
-        exec_request->query_id, exec_request->fragment_requests[0].query_options,
-        exec_request->fragment_requests[0].query_globals.now_string,
-        NULL /* = we don't expect to be executing anything here */);
-    RETURN_IF_ERROR(PrepareSelectListExprs(&local_runtime_state_,
-        exec_request->fragment_requests[0].output_exprs, RowDescriptor()));
-  } else {
-    coord_.reset(new Coordinator(exec_env_, &exec_stats_));
-    RETURN_IF_ERROR(coord_->Exec(exec_request));
-    if (exec_request->has_coordinator_fragment) {
-      DCHECK(exec_request->fragment_requests[0].__isset.desc_tbl);
-      RETURN_IF_ERROR(PrepareSelectListExprs(coord_->runtime_state(),
-          exec_request->fragment_requests[0].output_exprs, coord_->row_desc()));
+  if (exec_request->stmt_type == TStmtType::QUERY || 
+      exec_request->stmt_type == TStmtType::DML) {
+    DCHECK(exec_request_.__isset.queryExecRequest);
+    TQueryExecRequest& query_exec_request = exec_request_.queryExecRequest;
+
+    // we always need at least one plan fragment
+    DCHECK_GT(query_exec_request.fragment_requests.size(), 0);
+    
+    // If desc_tbl is not set, query has SELECT with no FROM. In that
+    // case, the query must have a coordinator fragment. This check
+    // confirms that. If desc_tbl is set, the query may or may not have
+    // a coordinator fragment.
+    DCHECK(query_exec_request.has_coordinator_fragment || 
+        query_exec_request.fragment_requests[0].__isset.desc_tbl);
+    
+    if (query_exec_request.has_coordinator_fragment) {
+      if (query_exec_request.fragment_requests[0].__isset.desc_tbl) {
+        DCHECK_GT(query_exec_request.node_request_params.size(), 0);
+      } else {
+        // query without a FROM clause, first fragment request has no plan fragment
+        DCHECK(!query_exec_request.fragment_requests[0].__isset.plan_fragment);
+      }
     }
-    profile_.AddChild(coord_->query_profile());
+    
+    // Set the query options across all fragments
+    for (int i = 0; i < query_exec_request.fragment_requests.size(); ++i) {
+      query_exec_request.fragment_requests[i].query_options = exec_request_.query_options;
+    }
+
+    if (query_exec_request.has_coordinator_fragment 
+        && !query_exec_request.fragment_requests[0].__isset.desc_tbl) {
+      // query without a FROM clause
+      // TODO: This does not handle INSERT INTO ... SELECT 1 because there is no
+      // coordinator fragment actually executing to drive the sink. 
+      // Workaround: INSERT INTO ... SELECT 1 FROM tbl LIMIT 1
+      local_runtime_state_.Init(
+          exec_request->request_id, query_exec_request.fragment_requests[0].query_options,
+          query_exec_request.fragment_requests[0].query_globals.now_string,
+          NULL /* = we don't expect to be executing anything here */);
+      RETURN_IF_ERROR(PrepareSelectListExprs(&local_runtime_state_,
+          query_exec_request.fragment_requests[0].output_exprs, RowDescriptor()));
+    } else {
+      coord_.reset(new Coordinator(exec_env_, &exec_stats_));
+      RETURN_IF_ERROR(coord_->Exec(&query_exec_request));
+      if (query_exec_request.has_coordinator_fragment) {
+        DCHECK(query_exec_request.fragment_requests[0].__isset.desc_tbl);
+        RETURN_IF_ERROR(PrepareSelectListExprs(coord_->runtime_state(),
+            query_exec_request.fragment_requests[0].output_exprs, coord_->row_desc()));
+      }
+      profile_.AddChild(coord_->query_profile());
+    }
+  } else {
+    // ODBC-187: Only tab supported as delimiter
+    ddl_executor_.reset(new DdlExecutor(impala_server_, "\t"));
+    RETURN_IF_ERROR(ddl_executor_->Exec(&exec_request_.ddlExecRequest));
   }
 
-  query_id_ = exec_request->query_id;
+  query_id_ = exec_request->request_id;
   return Status::OK;
 }
 
@@ -260,18 +299,37 @@ Status ImpalaServer::QueryExecState::FetchRowsAsAscii(const int32_t max_rows,
 
 Status ImpalaServer::QueryExecState::FetchRowsAsAsciiInternal(const int32_t max_rows,
     vector<string>* fetched_rows) {
-  if (coord_ == NULL) {
+  if (coord_ == NULL && ddl_executor_ == NULL) {
     query_state_ = QueryState::FINISHED;  // results will be ready after this call
     // query without FROM clause: we return exactly one row
     return CreateConstantRowAsAscii(fetched_rows);
   } else {
-    RETURN_IF_ERROR(coord_->Wait());
-    query_state_ = QueryState::FINISHED;  // results will be ready after this call
-    // Fetch the next batch if we've returned the current batch entirely
-    if (current_batch_ == NULL || current_batch_row_ >= current_batch_->num_rows()) {
-      RETURN_IF_ERROR(FetchNextBatch());
+    if (coord_ != NULL) {
+      RETURN_IF_ERROR(coord_->Wait());
     }
-    return ConvertRowBatchToAscii(max_rows, fetched_rows);
+    query_state_ = QueryState::FINISHED;  // results will be ready after this call
+    if (coord_ != NULL) {
+      // Fetch the next batch if we've returned the current batch entirely
+      if (current_batch_ == NULL || current_batch_row_ >= current_batch_->num_rows()) {
+        RETURN_IF_ERROR(FetchNextBatch());
+      }
+      return ConvertRowBatchToAscii(max_rows, fetched_rows);
+    } else {
+      DCHECK(ddl_executor_.get());
+      int num_rows = 0;
+      const vector<string>& all_rows = ddl_executor_->all_rows_ascii();
+
+      // If max_rows < 0, there's no maximum on the number of rows to return
+      while ((num_rows < max_rows || max_rows < 0)
+          && current_row_ < all_rows.size()) {
+        fetched_rows->push_back(all_rows[current_row_++]);
+        ++num_rows;
+      }
+      
+      eos_ = (current_row_ == all_rows.size());
+
+      return Status::OK;
+    }
   }
 }
 
@@ -295,7 +353,14 @@ Status ImpalaServer::QueryExecState::PrepareSelectListExprs(
 }
 
 Status ImpalaServer::QueryExecState::UpdateMetastore() {
-  if (!query_exec_request().__isset.insert_table_name) {
+  if (stmt_type() != TStmtType::DML) {
+    return Status::OK;
+  }
+
+  DCHECK(exec_request().__isset.queryExecRequest);
+  TQueryExecRequest query_exec_request = exec_request().queryExecRequest;
+
+  if (!query_exec_request.__isset.insert_table_name) {
     // insert_table_name is set iff this is an INSERT query
     return Status::OK;
   }
@@ -314,7 +379,7 @@ Status ImpalaServer::QueryExecState::UpdateMetastore() {
     VLOG_QUERY << "No partitions altered, not updating metastore (query id: " 
                << query_id() << ")";
   } else {
-    DCHECK(query_exec_request().__isset.insert_table_name);
+    DCHECK(query_exec_request.__isset.insert_table_name);
 
     // TODO: We track partitions written to, not created, which means
     // that we do more work than is necessary, because written-to
@@ -323,8 +388,8 @@ Status ImpalaServer::QueryExecState::UpdateMetastore() {
                << " altered partitions (" 
                << join (catalog_update.created_partitions, ", ") << ")";
     
-    catalog_update.target_table = query_exec_request().insert_table_name;
-    catalog_update.db_name = query_exec_request().insert_table_db;
+    catalog_update.target_table = query_exec_request.insert_table_name;
+    catalog_update.db_name = query_exec_request.insert_table_db;
     RETURN_IF_ERROR(impala_server_->UpdateMetastore(catalog_update));
   }
 
@@ -334,8 +399,9 @@ Status ImpalaServer::QueryExecState::UpdateMetastore() {
 
 Status ImpalaServer::QueryExecState::FetchNextBatch() {
   DCHECK(!eos_);
-  RETURN_IF_ERROR(coord_->GetNext(&current_batch_, coord_->runtime_state()));
+  DCHECK(coord_.get() != NULL);
 
+  RETURN_IF_ERROR(coord_->GetNext(&current_batch_, coord_->runtime_state()));
   current_batch_row_ = 0;
   eos_ = current_batch_ == NULL;
   return Status::OK;
@@ -564,6 +630,10 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     EXIT_IF_EXC(jni_env);
     update_metastore_id_ = jni_env->GetMethodID(fe_class, "updateMetastore", "([B)V");
     EXIT_IF_EXC(jni_env);
+    get_table_names_id_ = jni_env->GetMethodID(fe_class, "getTableNames", "([B)[B");
+    EXIT_IF_EXC(jni_env);
+    describe_table_id_ = jni_env->GetMethodID(fe_class, "describeTable", "([B)[B");
+    EXIT_IF_EXC(jni_env);
 
     jboolean lazy = (FLAGS_load_catalog_at_startup ? false : true);
     jobject fe = jni_env->NewObject(fe_class, fe_ctor, lazy);
@@ -691,44 +761,21 @@ Status ImpalaServer::ExecuteInternal(
   exec_state->reset(new QueryExecState(exec_env_, this));
   *registered_exec_state = false;
 
-  TCreateExecRequestResult result;
+  TExecRequest result;
   {
     SCOPED_TIMER((*exec_state)->planner_timer());
-    RETURN_IF_ERROR(GetQueryExecRequest(request, &result));
-
-    if (result.stmt_type == TStmtType::DDL) {
-      // Only DDL command is USE at the moment.
-      LOG(INFO) << "USE command ignored";
-      exec_state->reset();
-      return Status::OK;
-    }
+    RETURN_IF_ERROR(GetExecRequest(request, &result));
   }
+
+  if (result.stmt_type == TStmtType::DDL && 
+      result.ddlExecRequest.ddl_type == TDdlType::USE) {
+    LOG(INFO) << "USE command ignored";
+    exec_state->reset();
+    return Status::OK;
+  }
+  
   if (result.__isset.resultSetMetadata) {
     (*exec_state)->set_result_metadata(result.resultSetMetadata);
-  }
-  TQueryExecRequest& exec_request = result.queryExecRequest;
-  // we always need at least one plan fragment
-  DCHECK_GT(exec_request.fragment_requests.size(), 0);
-
-  // If desc_tbl is not set, query has SELECT with no FROM. In that
-  // case, the query must have a coordinator fragment. This check
-  // confirms that. If desc_tbl is set, the query may or may not have
-  // a coordinator fragment.
-  DCHECK(exec_request.has_coordinator_fragment || 
-      exec_request.fragment_requests[0].__isset.desc_tbl);
-
-  if (exec_request.has_coordinator_fragment) {
-    if (exec_request.fragment_requests[0].__isset.desc_tbl) {
-      DCHECK_GT(exec_request.node_request_params.size(), 0);
-    } else {
-      // query without a FROM clause, first fragment request has no plan fragment
-      DCHECK(!exec_request.fragment_requests[0].__isset.plan_fragment);
-    }
-  }
-
-  // Set the query options across all fragments
-  for (int i = 0; i < exec_request.fragment_requests.size(); ++i) {
-    exec_request.fragment_requests[i].query_options = request.queryOptions;
   }
 
   // register exec state before starting execution in order to handle incoming
@@ -739,20 +786,20 @@ Status ImpalaServer::ExecuteInternal(
     // there shouldn't be an active query with that same id
     // (query_id is globally unique)
     QueryExecStateMap::iterator entry =
-        query_exec_state_map_.find(exec_request.query_id);
+        query_exec_state_map_.find(result.request_id);
     if (entry != query_exec_state_map_.end()) {
       stringstream ss;
-      ss << "query id " << PrintId(exec_request.query_id)
+      ss << "query id " << PrintId(result.request_id)
          << " already exists";
       return Status(TStatusCode::INTERNAL_ERROR, ss.str());
     }
 
-    query_exec_state_map_.insert(make_pair(exec_request.query_id, *exec_state));
+    query_exec_state_map_.insert(make_pair(result.request_id, *exec_state));
     *registered_exec_state = true;
   }
 
   // start execution of query; also starts fragment status reports
-  RETURN_IF_ERROR((*exec_state)->Exec(&exec_request));
+  RETURN_IF_ERROR((*exec_state)->Exec(&result));
 
   return Status::OK;
 }
@@ -808,8 +855,64 @@ Status ImpalaServer::UpdateMetastore(const TCatalogUpdate& catalog_update) {
   return Status::OK;
 }
 
-Status ImpalaServer::GetQueryExecRequest(
-    const TClientRequest& request, TCreateExecRequestResult* result) {
+Status ImpalaServer::DescribeTable(const string& db, const string& table, 
+    vector<TColumnDesc>* columns) {
+ if (!FLAGS_use_planservice) {
+    JNIEnv* jni_env = getJNIEnv();
+    jbyteArray request_bytes;
+    TDescribeTableParams params;
+    params.__set_db(db);
+    params.__set_table_name(table);
+
+    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
+    jbyteArray result_bytes = static_cast<jbyteArray>(
+        jni_env->CallObjectMethod(fe_, describe_table_id_, request_bytes));
+
+    RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+
+    TDescribeTableResult result;
+    RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, &result));
+    
+    columns->insert(columns->begin(),
+        result.columns.begin(), result.columns.end());
+    return Status::OK;
+ } else {
+   return Status("DescribeTable not supported with external planservice");
+ }
+}
+
+Status ImpalaServer::GetTableNames(string* db, string* pattern, 
+    vector<string>* table_names) {
+  if (!FLAGS_use_planservice) {
+    JNIEnv* jni_env = getJNIEnv();
+    jbyteArray request_bytes;
+    TGetTablesParams params;
+    if (db != NULL) {
+      params.__set_db(*db);
+    }
+    if (pattern != NULL) {
+      params.__set_pattern(*pattern);
+    }
+
+    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
+    jbyteArray result_bytes = static_cast<jbyteArray>(
+        jni_env->CallObjectMethod(fe_, get_table_names_id_, request_bytes));
+
+    RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+
+    TGetTablesResult result;
+    RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, &result));
+    
+    table_names->insert(table_names->begin(),
+        result.tables.begin(), result.tables.end());
+    return Status::OK;
+  } else {
+    return Status("GetTableNames not supported with external planservice");
+  }
+}
+
+Status ImpalaServer::GetExecRequest(
+    const TClientRequest& request, TExecRequest* result) {
   if (!FLAGS_use_planservice) {
     // TODO: figure out if repeated calls to
     // JNI_GetCreatedJavaVMs()/AttachCurrentThread() are too expensive
