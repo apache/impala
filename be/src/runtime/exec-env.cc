@@ -79,6 +79,7 @@ ExecEnv::~ExecEnv() {
 }
 
 Status ExecEnv::StartServices() {
+  LOG(INFO) << "Starting global services";
   // Start services in order to ensure that dependencies between them are met
   if (enable_webserver_) {
     RETURN_IF_ERROR(webserver_->Start());
@@ -89,8 +90,10 @@ Status ExecEnv::StartServices() {
 
   metrics_->Init(enable_webserver_ ? webserver_.get() : NULL);
 
-  if (FLAGS_use_statestore) RETURN_IF_ERROR(subscription_mgr_->Start());
-  if (scheduler_ != NULL) scheduler_->Init();
+  if (FLAGS_use_statestore) RETURN_IF_ERROR(subscription_mgr_->Start());  
+
+  if (scheduler_ != NULL) RETURN_IF_ERROR(scheduler_->Init());
+
 
   return Status::OK;
 }

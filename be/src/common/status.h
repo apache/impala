@@ -145,7 +145,7 @@ class Status {
     if (UNLIKELY(!__status__.ok())) { \
       string msg; \
       __status__.GetErrorMsg(&msg); \
-      cerr << msg << endl; \
+      LOG(ERROR) << msg;            \
       exit(1); \
     } \
   } while (false)

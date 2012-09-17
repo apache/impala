@@ -59,6 +59,7 @@ Status SubscriptionManager::UnregisterSubscription(SubscriptionId id) {
 }
 
 Status SubscriptionManager::Start() {
+  LOG(INFO) << "Starting subscription manager";
   return state_store_->Start();
 }
 

@@ -51,3 +51,11 @@ void impala::GetFullLogFilename(google::LogSeverity severity, string* filename) 
      << google::GetLogSeverityName(severity);
   *filename = ss.str();
 }
+
+void impala::ShutdownLogging() {
+  // This method may only correctly be called once (which this lock does not
+  // enforce), but this lock protects against concurrent calls with
+  // InitGoogleLoggingSafe
+  mutex::scoped_lock logging_lock(logging_mutex);
+  google::ShutdownGoogleLogging();
+}

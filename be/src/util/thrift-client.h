@@ -34,6 +34,8 @@ class ThriftClient {
   // repeatedly, is idempotent unless there is a failure to connect.
   Status Open();
 
+  Status OpenWithRetry(int num_retries, int wait_ms);
+
   // Close the connection with the remote server. May be called
   // repeatedly.
   Status Close();
@@ -88,6 +90,23 @@ Status ThriftClient<InterfaceType>::Open() {
   }
   return impala::Status::OK;
 }
+
+template <class InterfaceType>
+Status ThriftClient<InterfaceType>::OpenWithRetry(int num_retries, int wait_ms) {
+  DCHECK_GT(num_retries, 0);
+  DCHECK_GE(wait_ms, 0);
+  Status status;
+  for (int i = 0; i < num_retries; ++i) {
+    status = Open();
+    if (status.ok()) return status;
+    LOG(INFO) << "Unable to connect to " << host_ << ":" << port_ 
+              << " (Attempt " << i + 1 << " of " << num_retries << ")";
+    usleep(wait_ms * 1000L);
+  }
+
+  return status;
+}
+
 
 template <class InterfaceType>
 Status ThriftClient<InterfaceType>::Close() {

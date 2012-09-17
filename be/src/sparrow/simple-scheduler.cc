@@ -68,6 +68,7 @@ SimpleScheduler::~SimpleScheduler() {
 }
 
 impala::Status SimpleScheduler::Init() {
+  LOG(INFO) << "Starting simple scheduler";
   if (subscription_manager_ != NULL) {   
     unordered_set<string> services;
     services.insert(backend_service_id_);

@@ -90,7 +90,7 @@
       jboolean is_copy; \
       const char* c_msg = \
           reinterpret_cast<const char*>((env)->GetStringUTFChars(msg, &is_copy)); \
-      LOG(FATAL) << string(c_msg); \
+      LOG(ERROR) << string(c_msg); \
      exit(1); \
     } \
   } while (false)

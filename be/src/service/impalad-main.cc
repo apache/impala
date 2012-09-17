@@ -72,7 +72,12 @@ int main(int argc, char** argv) {
   CreateImpalaServer(&exec_env, FLAGS_fe_port, FLAGS_be_port, &fe_server, &be_server);
   be_server->Start();
 
-  EXIT_IF_ERROR(exec_env.StartServices());
+  Status status = exec_env.StartServices();
+  if (!status.ok()) {
+    LOG(ERROR) << "Impalad services did not start correctly, exiting";
+    ShutdownLogging();
+    exit(1);
+  }
 
   // register be service *after* starting the be server thread and after starting
   // the subscription mgr handler thread
@@ -87,6 +92,8 @@ int main(int argc, char** argv) {
     if (!status.ok()) {
       LOG(ERROR) << "Could not register with state store service: "
                  << status.GetErrorMsg();
+      ShutdownLogging();
+      exit(1);
     }
   }
 

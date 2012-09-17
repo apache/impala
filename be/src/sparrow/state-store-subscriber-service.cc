@@ -35,6 +35,7 @@ StateStoreSubscriber::StateStoreSubscriber(const string& host, int port,
                                            const string& state_store_host,
                                            int state_store_port)
   : server_running_(false) {
+  client_.reset();
   host_port_.host = host;
   host_port_.port = port;
   state_store_host_port_.host = state_store_host;
@@ -269,7 +270,12 @@ Status StateStoreSubscriber::InitClient() {
     client_.reset(new ThriftClient<StateStoreServiceClient>(state_store_host_port_.host,
         state_store_host_port_.port));
 
-    RETURN_IF_ERROR(client_->Open());
+    // 10 retries, waiting 2s between them
+    Status status = client_->OpenWithRetry(10, 2000);    
+    if (!status.ok()) {
+      client_.reset();
+      return status;
+    }
   }
   return Status::OK;
 }
