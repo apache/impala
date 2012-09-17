@@ -91,10 +91,13 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
       // for the limit case but we want to avoid the synchronized writes to 
       // num_rows_returned_
       num_rows_returned_ += row_batch->num_rows();
+      COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+      
       if (ReachedLimit()) {
         int num_rows_over = num_rows_returned_ - limit_;
         row_batch->set_num_rows(row_batch->num_rows() - num_rows_over);
         num_rows_returned_ -= num_rows_over;
+        COUNTER_SET(rows_returned_counter_, num_rows_returned_);
 
         *eos = true;
         // Wake up disk thread notifying it we are done.  This triggers tear down
@@ -123,6 +126,7 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
     RETURN_IF_CANCELLED(state);
 
     num_rows_returned_ += row_batch->num_rows();
+    COUNTER_SET(rows_returned_counter_, num_rows_returned_);
 
     if (ReachedLimit()) {
       *eos = true;
@@ -312,6 +316,7 @@ HdfsScanner* HdfsScanNode::CreateScanner(HdfsPartitionDescriptor* partition) {
 Status HdfsScanNode::Prepare(RuntimeState* state) {
   runtime_state_ = state;
   RETURN_IF_ERROR(ScanNode::Prepare(state));
+
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   DCHECK(tuple_desc_ != NULL);
   current_range_idx_ = 0;
@@ -400,7 +405,9 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 
   RETURN_IF_ERROR(runtime_state_->io_mgr()->RegisterReader(
       hdfs_connection_, state->max_io_buffers(), &reader_context_));
-  
+  runtime_state_->io_mgr()->set_bytes_read_counter(reader_context_, bytes_read_counter());
+  runtime_state_->io_mgr()->set_read_timer(reader_context_, read_timer());
+
   current_file_scan_ranges_ = per_file_scan_ranges_.begin();
 
   // Walk all the files on this node and coalesce all the files with the same
@@ -642,7 +649,6 @@ void HdfsScanNode::DiskThread() {
   // node is complete (e.g. parse error or limit reached()) and the scanner should
   // terminate immediately.
   for (ContextMap::iterator it = contexts_.begin(); it != contexts_.end(); ++it) {
-    VLOG_QUERY << "Cancelled";
     it->second->Cancel();
   }
 

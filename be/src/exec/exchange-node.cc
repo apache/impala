@@ -71,6 +71,7 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
     output_batch->CommitLastRow();
   }
   num_rows_returned_ += i;
+  COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   input_batch->TransferResourceOwnership(output_batch);
   return Status::OK;
 }

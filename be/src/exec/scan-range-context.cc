@@ -119,7 +119,6 @@ Status ScanRangeContext::GetRawBytes(uint8_t** out_buffer, int* len, bool* eos) 
 
 Status ScanRangeContext::GetBytesInternal(uint8_t** out_buffer, int requested_len, 
     int* out_len, bool* eos) {
-  SCOPED_TIMER(scan_node_->read_timer());
   *out_len = 0;
   *out_buffer = NULL;
   *eos = true;
@@ -147,10 +146,7 @@ Status ScanRangeContext::GetBytesInternal(uint8_t** out_buffer, int requested_le
       read_ready_cv_.wait(l);
     }
 
-    if (cancelled_) {
-      VLOG_QUERY << "Cancelled";
-      return Status::CANCELLED;
-    }
+    if (cancelled_) return Status::CANCELLED;
 
     if (requested_len == 0) {
       DCHECK(current_buffer_ != NULL);
@@ -288,7 +284,6 @@ void ScanRangeContext::Complete() {
   
   DCHECK(completed_buffers_.empty());
   DCHECK(buffers_.empty());
-  COUNTER_UPDATE(scan_node_->bytes_read_counter(), total_bytes_returned_);
 }
 
 void ScanRangeContext::Cancel() {

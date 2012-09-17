@@ -170,6 +170,9 @@ Status AggregationNode::Open(RuntimeState* state) {
     } else {
       ProcessRowBatchWithGrouping(&batch);
     }
+    COUNTER_SET(hash_table_buckets_counter_, hash_tbl_->num_buckets());
+    COUNTER_SET(memory_used_counter(), 
+        tuple_pool_->peak_allocated_bytes() + hash_tbl_->byte_size());
     num_agg_rows += (hash_tbl_->size() - agg_rows_before);
     num_input_rows += batch.num_rows();
 
@@ -211,21 +214,19 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
       VLOG_ROW << "output row: " << PrintRow(row, row_desc());
       row_batch->CommitLastRow();
       ++num_rows_returned_;
-      if (ReachedLimit()) {
-        *eos = true;
-        return Status::OK;
-      }
+      if (ReachedLimit()) break;
     }
     output_iterator_.Next<false>();
   }
-  *eos = !output_iterator_.HasNext();
+  *eos = !output_iterator_.HasNext() || ReachedLimit();
+  COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   return Status::OK;
 }
 
 Status AggregationNode::Close(RuntimeState* state) {
-  COUNTER_UPDATE(memory_used_counter(), tuple_pool_->peak_allocated_bytes());
-  COUNTER_UPDATE(memory_used_counter(), hash_tbl_->byte_size());
-  COUNTER_UPDATE(hash_table_buckets_counter_, hash_tbl_->num_buckets());
+  COUNTER_SET(memory_used_counter(), 
+      tuple_pool_->peak_allocated_bytes() + hash_tbl_->byte_size());
+  COUNTER_SET(hash_table_buckets_counter_, hash_tbl_->num_buckets());
   return ExecNode::Close(state);
 }
 

@@ -73,25 +73,6 @@ void Coordinator::BackendExecState::ComputeTotalSplitSize(
   }
 }
 
-void Coordinator::BackendExecState::CreateThroughputCounters() {
-  vector<RuntimeProfile*> children;
-  profile->GetAllChildren(&children);
-  for (int i = 0; i < children.size(); ++i) {
-    RuntimeProfile* p = children[i];
-    RuntimeProfile::Counter* c = p->GetCounter(ScanNode::THROUGHPUT_COUNTER);
-    if (c == NULL) {
-      // this is not a scan node
-      continue;
-    }
-    PlanNodeId id = ExecNode::GetNodeIdFromProfile(p);
-    if (id < 0) {
-      VLOG_QUERY << "couldn't extract a node id from profile name: " << p->name();
-      continue;  // couldn't extract an id from profile name
-    }
-    throughput_counters[id] = c;
-  }
-}
-
 int64_t Coordinator::BackendExecState::GetNodeThroughput(int node_id) {
   RuntimeProfile::Counter* counter = NULL;
   {
@@ -163,6 +144,7 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
   query_profile_->AddChild(agg_throughput_profile_);
   if (executor_.get() != NULL) {
     query_profile_->AddChild(executor_->profile());
+    CreateThroughputCounters(executor_->profile(), &coordinator_throughput_counters_);
   }
   SCOPED_TIMER(query_profile_->total_time_counter());
 
@@ -331,6 +313,26 @@ void Coordinator::PrintBackendInfo() {
   }
 }
 
+void Coordinator::CreateThroughputCounters(RuntimeProfile* profile, 
+    ThroughputCounterMap* throughput_counters) {
+  vector<RuntimeProfile*> children;
+  profile->GetAllChildren(&children);
+  for (int i = 0; i < children.size(); ++i) {
+    RuntimeProfile* p = children[i];
+    RuntimeProfile::Counter* c = p->GetCounter(ScanNode::THROUGHPUT_COUNTER);
+    if (c == NULL) {
+      // this is not a scan node
+      continue;
+    }
+    PlanNodeId id = ExecNode::GetNodeIdFromProfile(p);
+    if (id < 0) {
+      VLOG_QUERY << "couldn't extract a node id from profile name: " << p->name();
+      continue;  // couldn't extract an id from profile name
+    }
+    (*throughput_counters)[id] = c;
+  }
+}
+
 void Coordinator::CreateThroughputCounters(
     const vector<TPlanExecRequest>& fragment_requests) {
   for (int i = 0; i < fragment_requests.size(); ++i) {
@@ -345,7 +347,7 @@ void Coordinator::CreateThroughputCounters(
 
       stringstream s;
       s << PrintPlanNodeType(node.node_type) << " (id=" << node.node_id << ")";
-      agg_throughput_profile_->AddDerivedCounter(s.str(), TCounterType::BYTES,
+      agg_throughput_profile_->AddDerivedCounter(s.str(), TCounterType::BYTES_PER_SECOND,
           bind<int64_t>(mem_fn(&Coordinator::ComputeTotalThroughput),
                         this, node.node_id));
     }
@@ -357,6 +359,11 @@ int64_t Coordinator::ComputeTotalThroughput(int node_id) {
   for (int i = 0; i < backend_exec_states_.size(); ++i) {
     BackendExecState* exec_state = backend_exec_states_[i];
     value += exec_state->GetNodeThroughput(node_id);
+  }
+  // Add up the local fragment throughput counter
+  ThroughputCounterMap::iterator it = coordinator_throughput_counters_.find(node_id);
+  if (it != coordinator_throughput_counters_.end()) {
+    value += it->second->value();
   }
   return value;
 }
@@ -502,7 +509,7 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
     exec_state->done = params.done;
     exec_state->profile->Update(cumulative_profile);
     if (!exec_state->profile_created) {
-      exec_state->CreateThroughputCounters();
+      CreateThroughputCounters(exec_state->profile, &exec_state->throughput_counters);
     }
     exec_state->profile_created = true;
 

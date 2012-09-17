@@ -134,7 +134,6 @@ Status MergeNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
 Status MergeNode::Close(RuntimeState* state) {
   // don't call ExecNode::Close(), it always closes all children
   child_row_batch_.reset(NULL);
-  COUNTER_UPDATE(rows_returned_counter_, num_rows_returned_);
   return ExecNode::Close(state);
 }
 
@@ -175,6 +174,7 @@ bool MergeNode::EvalAndMaterializeExprs(const vector<Expr*>& exprs,
     if (EvalConjuncts(conjuncts, num_conjuncts, row)) {
       row_batch->CommitLastRow();
       ++num_rows_returned_;
+      COUNTER_SET(rows_returned_counter_, num_rows_returned_);
       char* new_tuple = reinterpret_cast<char*>(*tuple);
       new_tuple += tuple_desc_->byte_size();
       *tuple = reinterpret_cast<Tuple*>(new_tuple);

@@ -38,6 +38,12 @@ struct DiskIoMgr::ReaderContext {
   };
   
   friend class DiskIoMgr;
+  
+  // Total bytes read for this reader
+  RuntimeProfile::Counter* bytes_read_counter_;
+
+  // Total time spent in hdfs reading
+  RuntimeProfile::Counter* read_timer_;
 
   // hdfsFS connection handle.  This is set once and never changed for the duration 
   // of the reader.  NULL if this is a local reader.
@@ -130,13 +136,19 @@ struct DiskIoMgr::ReaderContext {
   vector<PerDiskState> disk_states_;
 
   ReaderContext(int num_disks) 
-    : state_(Inactive),
+    : bytes_read_counter_(NULL),
+      read_timer_(NULL),
+      state_(Inactive),
       disk_states_(num_disks) {
   }
 
   // Resets this object for a new reader
   void Reset(hdfsFS hdfs_connection, int per_disk_buffers) {
     DCHECK_EQ(state_, Inactive);
+
+    bytes_read_counter_ = NULL;
+    read_timer_ = NULL;
+
     state_ = Active;
     num_buffers_per_disk_ = per_disk_buffers;
     hdfs_connection_ = hdfs_connection;
@@ -378,6 +390,8 @@ DiskIoMgr::DiskIoMgr() :
     num_threads_per_disk_(FLAGS_num_threads_per_disk),
     max_read_size_(FLAGS_read_size),
     shut_down_(false),
+    total_bytes_read_counter_(TCounterType::BYTES),
+    read_timer_(TCounterType::CPU_TICKS),
     num_allocated_buffers_(0) {
   int num_disks = FLAGS_num_disks;
   if (num_disks == 0) num_disks = DiskInfo::num_disks();
@@ -388,6 +402,8 @@ DiskIoMgr::DiskIoMgr(int num_disks, int threads_per_disk, int max_read_size) :
     num_threads_per_disk_(threads_per_disk),
     max_read_size_(max_read_size),
     shut_down_(false),
+    total_bytes_read_counter_(TCounterType::BYTES),
+    read_timer_(TCounterType::CPU_TICKS),
     num_allocated_buffers_(0) {
   if (num_disks == 0) num_disks = DiskInfo::num_disks();
   disk_queues_.resize(num_disks);
@@ -525,6 +541,18 @@ void DiskIoMgr::CancelReader(ReaderContext* reader) {
 int DiskIoMgr::num_empty_buffers(ReaderContext* reader) {
   unique_lock<mutex> (reader->lock_);
   return reader->num_empty_buffers_;
+}
+
+void DiskIoMgr::set_read_timer(ReaderContext* r, RuntimeProfile::Counter* c) {
+  r->read_timer_ = c;
+}
+
+void DiskIoMgr::set_bytes_read_counter(ReaderContext* r, RuntimeProfile::Counter* c) {
+  r->bytes_read_counter_ = c;
+}
+
+int64_t DiskIoMgr::GetReadThroughput() {
+  return RuntimeProfile::BytesPerSecond(&total_bytes_read_counter_, &read_timer_);
 }
 
 Status DiskIoMgr::AddScanRanges(ReaderContext* reader, const vector<ScanRange*>& ranges) {
@@ -826,7 +854,7 @@ void DiskIoMgr::CloseScanRange(hdfsFS hdfs_connection, ScanRange* range) const {
 // 1MB read into 8 128K reads?
 // TODO: look at linux disk scheduling
 Status DiskIoMgr::ReadFromScanRange(hdfsFS hdfs_connection, ScanRange* range, 
-    char* buffer, int64_t* bytes_read, bool* eosr) const {
+    char* buffer, int64_t* bytes_read, bool* eosr) {
   *eosr = false;
   *bytes_read = 0;
   int bytes_to_read = min(static_cast<int64_t>(max_read_size_), 
@@ -858,7 +886,6 @@ Status DiskIoMgr::ReadFromScanRange(hdfsFS hdfs_connection, ScanRange* range,
       return Status(ss.str());
     }
   }
-
   range->bytes_read_ += *bytes_read;
   DCHECK_LE(range->bytes_read_, range->len_);
   if (range->bytes_read_ == range->len_) {
@@ -1093,10 +1120,19 @@ void DiskIoMgr::ReadLoop(DiskQueue* disk_queue) {
     // lock across the read call.
     buffer_desc->status_ = OpenScanRange(reader->hdfs_connection_, range);
     if (buffer_desc->status_.ok()) {
+      // Update counters.
+      SCOPED_TIMER(&read_timer_);
+      SCOPED_TIMER(reader->read_timer_);
+      
       buffer_desc->status_ = ReadFromScanRange(
           reader->hdfs_connection_, range, buffer, &buffer_desc->len_,
           &buffer_desc->eosr_);
       buffer_desc->scan_range_offset_ = range->bytes_read_ - buffer_desc->len_;
+    
+      if (reader->bytes_read_counter_ != NULL) {
+        COUNTER_UPDATE(reader->bytes_read_counter_, buffer_desc->len_);
+      }
+      COUNTER_UPDATE(&total_bytes_read_counter_, buffer_desc->len_);
     }
 
     // Finished read, update reader/disk based on the results

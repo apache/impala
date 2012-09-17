@@ -117,6 +117,7 @@ Status TopNNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
     ++get_next_iter_;
     row_batch->CommitLastRow();
     ++num_rows_returned_;
+    COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   }
   *eos = get_next_iter_ == sorted_top_n_.end();
   return Status::OK; 

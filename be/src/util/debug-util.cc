@@ -135,8 +135,13 @@ string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
       break;
 
     case TCounterType::CPU_TICKS:
-      value /= CpuInfo::cycles_per_ms();
-      // fall-through
+      if (value < CpuInfo::cycles_per_ms()) {
+        ss << (value / 1000) << "K clock cycles";
+        break;
+      } else {
+        value /= CpuInfo::cycles_per_ms();
+        // fall-through
+      }
     case TCounterType::TIME_MS:
       if (value == 0 ) {
         ss << "0";
@@ -171,6 +176,13 @@ string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
       string unit;
       double output = GetByteUnit(value, &unit); 
       ss << setprecision(PRECISION) << output << " " << unit;
+      break;
+    }
+
+    case TCounterType::BYTES_PER_SECOND: {
+      string unit;
+      double output = GetByteUnit(value, &unit); 
+      ss << setprecision(PRECISION) << output << " " << unit << "/sec";
       break;
     }
 

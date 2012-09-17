@@ -62,7 +62,7 @@ Status ExecNode::Prepare(RuntimeState* state) {
 }
 
 Status ExecNode::Close(RuntimeState* state) {
-  COUNTER_UPDATE(rows_returned_counter_, num_rows_returned_);
+  COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   Status result;
   for (int i = 0; i < children_.size(); ++i) {
     result.AddError(children_[i]->Close(state));

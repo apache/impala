@@ -131,6 +131,9 @@ class Coordinator {
   ExecEnv* exec_env_;
   TUniqueId query_id_;
 
+  // map from id of a scan node to the throughput counter in this->profile
+  typedef std::map<PlanNodeId, RuntimeProfile::Counter*> ThroughputCounterMap;
+  
   // Execution state of a particular fragment.
   // Concurrent accesses:
   // - GetNodeThroughput() called when coordinator's profile is printed
@@ -163,8 +166,7 @@ class Coordinator {
     // Lists the Hdfs partitions affected by this query
     std::set<std::string> updated_hdfs_partitions;
     
-    // map from id of a scan node to the throughput counter in this->profile
-    typedef std::map<PlanNodeId, RuntimeProfile::Counter*> ThroughputCounterMap;
+    // Throughput counters for this fragment
     ThroughputCounterMap throughput_counters;
 
     BackendExecState(const TUniqueId& fragment_id, int backend_num,
@@ -175,9 +177,6 @@ class Coordinator {
 
     // Computes sum of split sizes of leftmost scan
     void ComputeTotalSplitSize(const TPlanExecParams& params);
-
-    // Build throughput_counters from profile. Assumes that lock is held.
-    void CreateThroughputCounters();
 
     // Return value of throughput counter for given plan_node_id, or 0 if that node
     // doesn't exist.
@@ -241,6 +240,9 @@ class Coordinator {
 
   // Profile for aggregate throughput counters; allocated in obj_pool().
   RuntimeProfile* agg_throughput_profile_;
+    
+  // Throughput counters for the coordinator fragment
+  ThroughputCounterMap coordinator_throughput_counters_;
 
   // Wrapper for ExecPlanFragment() rpc.  This function will be called in parallel
   // from multiple threads.
@@ -259,6 +261,10 @@ class Coordinator {
 
   // Create aggregate throughput counters for all scan nodes in any of the fragments
   void CreateThroughputCounters(const std::vector<TPlanExecRequest>& fragment_requests);
+
+  // Build throughput_counters from profile.  Assumes lock protecting profile and result
+  // is held.
+  void CreateThroughputCounters(RuntimeProfile* profile, ThroughputCounterMap* result);
 
   // Derived counter function: aggregates throughput for node_id across all backends
   // (id needs to be for a ScanNode)

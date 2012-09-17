@@ -203,6 +203,7 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
     if (EvalConjuncts(&conjuncts_[0], conjuncts_.size(), row)) {
       row_batch->CommitLastRow();
       ++num_rows_returned_;
+      COUNTER_SET(rows_returned_counter_, num_rows_returned_);
       char* new_tuple = reinterpret_cast<char*>(tuple_);
       new_tuple += tuple_desc_->byte_size();
       tuple_ = reinterpret_cast<Tuple*>(new_tuple);

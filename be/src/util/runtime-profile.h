@@ -215,6 +215,7 @@ class ScopedTimer {
  public:
   ScopedTimer(RuntimeProfile::Counter* counter) :
     counter_(counter) {
+    if (counter == NULL) return;
     DCHECK_EQ(counter->type(), TCounterType::CPU_TICKS);
     sw_.Start();
   }
@@ -222,7 +223,7 @@ class ScopedTimer {
   // Update counter when object is destroyed
   ~ScopedTimer() {
     sw_.Stop();
-    counter_->Update(sw_.Ticks());
+    if (counter_ != NULL) counter_->Update(sw_.Ticks());
   }
 
  private:

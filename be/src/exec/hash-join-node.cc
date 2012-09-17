@@ -265,6 +265,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
         out_batch->CommitLastRow();
         VLOG_ROW << "match row: " << PrintRow(out_row, row_desc());
         ++num_rows_returned_;
+        COUNTER_SET(rows_returned_counter_, num_rows_returned_);
         if (out_batch->IsFull() || ReachedLimit()) {
           *eos = ReachedLimit();
           return Status::OK;
@@ -282,6 +283,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
         out_batch->CommitLastRow();
         VLOG_ROW << "match row: " << PrintRow(out_row, row_desc());
         ++num_rows_returned_;
+        COUNTER_SET(rows_returned_counter_, num_rows_returned_);
         matched_probe_ = true;
         if (out_batch->IsFull() || ReachedLimit()) {
           *eos = ReachedLimit();
@@ -347,6 +349,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
         out_batch->CommitLastRow();
         VLOG_ROW << "match row: " << PrintRow(out_row, row_desc());
         ++num_rows_returned_;
+        COUNTER_SET(rows_returned_counter_, num_rows_returned_);
         if (ReachedLimit()) {
           *eos = true;
           return Status::OK;
@@ -372,10 +375,12 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
     if (process_probe_batch_fn_ == NULL) {
       num_rows_returned_ += 
           ProcessProbeBatch(out_batch, probe_batch_.get(), max_added_rows);
+      COUNTER_SET(rows_returned_counter_, num_rows_returned_);
     } else {
       // Use codegen'd function
       num_rows_returned_ += 
           process_probe_batch_fn_(this, out_batch, probe_batch_.get(), max_added_rows);
+      COUNTER_SET(rows_returned_counter_, num_rows_returned_);
     }
 
     if (ReachedLimit() || out_batch->IsFull()) {

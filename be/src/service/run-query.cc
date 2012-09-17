@@ -232,7 +232,25 @@ static void Exec(ExecEnv* exec_env, const vector<string>& queries) {
       }
 
       RuntimeProfile* profile = executor->query_profile();
-      if (profile != NULL) aggregate_profile.Merge(profile);
+      // Rename the profiles so they merge (they have different query ids)
+      if (profile != NULL) {
+        vector<RuntimeProfile*> children;
+        profile->GetChildren(&children);
+        for (int i = 0; i < children.size(); ++i) {
+          const string& name = children[i]->name();
+          // Parse out the fragment id (e.g. Fragment QueryId:FragmentId) and drop the
+          // QueryId
+          if (name.compare(0, strlen("Fragment"), "Fragment") == 0) {
+            int query_id, fragment_id;
+            if (sscanf(name.c_str(), "Fragment %d:%d:", &query_id, &fragment_id) == 2) {
+              stringstream ss;
+              ss << "Fragment " << fragment_id;
+              children[i]->set_name(ss.str());
+            }
+          }
+        }
+        aggregate_profile.Merge(profile);
+      }
     }
 
     num_rows /= FLAGS_iterations;

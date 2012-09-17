@@ -9,6 +9,7 @@ enum TCounterType {
   TIME_MS,
   CPU_TICKS,
   BYTES
+  BYTES_PER_SECOND,
 }
 
 // Counter data

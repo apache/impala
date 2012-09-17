@@ -21,7 +21,7 @@ Status ScanNode::Prepare(RuntimeState* state) {
   read_timer_ =
       ADD_COUNTER(runtime_profile(), READ_TIMER, TCounterType::CPU_TICKS);
   throughput_counter_ = runtime_profile()->AddDerivedCounter(
-      THROUGHPUT_COUNTER, TCounterType::BYTES,
+      THROUGHPUT_COUNTER, TCounterType::BYTES_PER_SECOND,
       bind<int64_t>(&RuntimeProfile::BytesPerSecond,
                            bytes_read_counter_, read_timer_));
   materialize_tuple_timer_ =

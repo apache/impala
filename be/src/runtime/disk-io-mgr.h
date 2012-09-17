@@ -14,6 +14,7 @@
 #include "common/hdfs.h"
 #include "common/object-pool.h"
 #include "common/status.h"
+#include "util/runtime-profile.h"
 
 namespace impala {
 
@@ -229,6 +230,14 @@ class DiskIoMgr {
   // thread safe.  Multiple threads can be calling Read() per reader at a time.
   Status Read(hdfsFS, ScanRange* range, BufferDescriptor** buffer);
 
+  void set_bytes_read_counter(ReaderContext*, RuntimeProfile::Counter*);
+  void set_read_timer(ReaderContext*, RuntimeProfile::Counter*);
+
+  // Returns the read throughput across all readers.    
+  // TODO: should this be a sliding window?  This should report metrics for the
+  // last minute, hour and since the beginning.
+  int64_t GetReadThroughput();
+
   // Returns the read buffer size
   int read_buffer_size() const { return max_read_size_; }
 
@@ -268,6 +277,12 @@ class DiskIoMgr {
   // True if the io mgr should be torn down.  Worker threads watch for this to
   // know to terminate.  This variable is read/written to by different threads.
   volatile bool shut_down_;
+
+  // Total bytes read by the io mgr.
+  RuntimeProfile::Counter total_bytes_read_counter_;
+
+  // Total time spent in hdfs reading
+  RuntimeProfile::Counter read_timer_;
 
   // Contains all readers that the io mgr is tracking.  This includes readers that are
   // active as well as those in the process of being cancelled.  This is a cache
@@ -336,7 +351,7 @@ class DiskIoMgr {
   // Only modifies local variables and does not need synchronization.
   // if hdfs_connection is NULL, 'range' must be for a local file
   Status ReadFromScanRange(hdfsFS hdfs_connection, ScanRange* range, 
-      char* buffer, int64_t* bytes_read, bool* eosr) const;
+      char* buffer, int64_t* bytes_read, bool* eosr);
 
   // Decrements ref count on the reader for this disk.  If the disk ref count for
   // this reader goes to 0, the disk complete condition variable is signaled.
