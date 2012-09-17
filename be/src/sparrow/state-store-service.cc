@@ -81,6 +81,7 @@ void StateStore::RegisterService(TRegisterServiceResponse& response,
               << request.service_address.host << ":" << request.service_address.port
               << ")";
     num_backends_metric_->Increment(1L);
+    VLOG(2) << "Number of backends registered: " << num_backends_metric_->value();
   }
   RETURN_AND_SET_STATUS_OK(response);
 }
@@ -135,6 +136,7 @@ void StateStore::UnregisterService(TUnregisterServiceResponse& response,
   }
 
   num_backends_metric_->Increment(-1L);
+  VLOG(2) << "Number of backends registered: " << num_backends_metric_->value();
 
   RETURN_AND_SET_STATUS_OK(response);
 }
