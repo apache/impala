@@ -151,57 +151,55 @@ public class HdfsScanNode extends ScanNode {
     // map from host to list of blocks assigned to that host
     Map<String, HostBlockAssignment> assignmentMap = Maps.newHashMap();
 
-    for (HdfsPartition partition: partitions) {
-      List<HdfsTable.BlockMetadata> blockMetadata =
-          HdfsTable.getBlockMetadata(partition);
+    List<HdfsTable.BlockMetadata> blockMetadata =
+        HdfsTable.getBlockMetadata(partitions);
 
-      for (HdfsTable.BlockMetadata block: blockMetadata) {
-        String[] blockHostPorts = null;
-        try {
-          // Use getNames() to get port number as well
-          blockHostPorts = block.getLocation().getNames();
-          // uncomment if you need to see detailed block locations
-          //LOG.info(Arrays.toString(blockHostPorts));
-        } catch (IOException e) {
-          // this shouldn't happen, getHosts() doesn't throw anything
-          String errorMsg = "BlockLocation.getHosts() failed:\n" + e.getMessage();
-          LOG.error(errorMsg);
-          throw new IllegalStateException(errorMsg);
-        }
+    for (HdfsTable.BlockMetadata block: blockMetadata) {
+      String[] blockHostPorts = null;
+      try {
+        // Use getNames() to get port number as well
+        blockHostPorts = block.getLocation().getNames();
+        // uncomment if you need to see detailed block locations
+        //LOG.info(Arrays.toString(blockHostPorts));
+      } catch (IOException e) {
+        // this shouldn't happen, getHosts() doesn't throw anything
+        String errorMsg = "BlockLocation.getHosts() failed:\n" + e.getMessage();
+        LOG.error(errorMsg);
+        throw new IllegalStateException(errorMsg);
+      }
 
-        if (blockHostPorts.length == 0) {
-          // TODO: can we log more diagnostic info to help the user fix this?
-          LOG.error("skipping block with missing BlockLocation: " + block.toString());
-          continue;
-        }
+      if (blockHostPorts.length == 0) {
+        // TODO: can we log more diagnostic info to help the user fix this?
+        LOG.error("skipping block with missing BlockLocation: " + block.toString());
+        continue;
+      }
 
-        // greedy block assignment: find host with fewest assigned bytes
-        Preconditions.checkState(blockHostPorts.length > 0);
-        int chosenHostPortIndex = 0;
-        HostBlockAssignment minHost = assignmentMap.get(blockHostPorts[0]);
-        for (int i = 0; i < blockHostPorts.length; ++i) {
-          String hostPort = blockHostPorts[i];
-          if (assignmentMap.containsKey(hostPort)) {
-            HostBlockAssignment info = assignmentMap.get(hostPort);
-            if (minHost.getAssignedBytes() > info.getAssignedBytes()) {
-              minHost = info;
-              chosenHostPortIndex = i;
-            }
-          } else {
-            // new host with 0 bytes so far
-            THostPort addr = addressToTHostPort(hostPort);
-            minHost = new HostBlockAssignment(addr);
+      // greedy block assignment: find host with fewest assigned bytes
+      Preconditions.checkState(blockHostPorts.length > 0);
+      int chosenHostPortIndex = 0;
+      HostBlockAssignment minHost = assignmentMap.get(blockHostPorts[0]);
+      for (int i = 0; i < blockHostPorts.length; ++i) {
+        String hostPort = blockHostPorts[i];
+        if (assignmentMap.containsKey(hostPort)) {
+          HostBlockAssignment info = assignmentMap.get(hostPort);
+          if (minHost.getAssignedBytes() > info.getAssignedBytes()) {
+            minHost = info;
             chosenHostPortIndex = i;
-            assignmentMap.put(hostPort, minHost);
-            break;
           }
+        } else {
+          // new host with 0 bytes so far
+          THostPort addr = addressToTHostPort(hostPort);
+          minHost = new HostBlockAssignment(addr);
+          chosenHostPortIndex = i;
+          assignmentMap.put(hostPort, minHost);
+          break;
         }
-        minHost.addBlock(block, chosenHostPortIndex);
       }
+      minHost.addBlock(block, chosenHostPortIndex);
+    }
 
-      if (numNodes != Constants.NUM_NODES_ALL) {
-        reassignBlocks(numNodes, assignmentMap);
-      }
+    if (numNodes != Constants.NUM_NODES_ALL) {
+      reassignBlocks(numNodes, assignmentMap);
     }
 
     return Lists.newArrayList(assignmentMap.values());

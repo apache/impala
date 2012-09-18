@@ -323,44 +323,84 @@ public class HdfsTable extends Table {
   }
 
   /**
-   * Return locations for all blocks in all files in a partition.
+   * Return locations for all blocks in all files in the given partitions.
    * @return list of HdfsTable.BlockMetadata objects.
    */
-  public static List<BlockMetadata> getBlockMetadata(HdfsPartition partition) {
+  public static List<BlockMetadata> getBlockMetadata(List<HdfsPartition> partitions) {
     List<BlockMetadata> result = Lists.newArrayList();
+
+    // Block locations for all the files in all the partitions.
+    List<BlockLocation> blocks = Lists.newArrayList();
+
+    // List of ending index in blocks per file. The file index to this list is obtained
+    // traversing the file list in each partitions sequentially. For file i, its block
+    // locations are from blocks[endingBlockIndexes[i-1]] to blocks[endingBlockIndexes[i]]
+    List<Integer> endingBlockIndexes = Lists.newArrayList();
+
     boolean supportVolumeId =
         CONF.getBoolean(DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED, false);
 
-    for (FileDescriptor fileDescriptor: partition.getFileDescriptors()) {
-      Path p = new Path(fileDescriptor.getFilePath());
-      BlockLocation[] locations = null;
+    // TODO: Is DistributedFileSystem thread safe? If so, make it a static final object.
+    DistributedFileSystem dfs;
+    try {
+      FileSystem fs;
+      fs = FileSystem.get(CONF);
+      if (!(fs instanceof DistributedFileSystem)) {
+        throw new RuntimeException("HDFS FileSystem should be DistributedFileSystem but"
+            + "got " + fs.getClass().getName());
+      }
+      dfs = (DistributedFileSystem)fs;
+    } catch (IOException e) {
+      throw new RuntimeException("couldn't retrieve FileSystem:\n" + e.getMessage(), e);
+    }
+
+    for (HdfsPartition partition: partitions) {
+      for (FileDescriptor fileDescriptor: partition.getFileDescriptors()) {
+        Path p = new Path(fileDescriptor.getFilePath());
+        BlockLocation[] locations = null;
+        try {
+          FileStatus fileStatus = dfs.getFileStatus(p);
+          // Ignore directories (and files in them) - if a directory is erroneously
+          // created as a subdirectory of a partition dir we should ignore it and move on
+          // (getFileBlockLocations will throw when
+          // called on a directory). Hive will not recurse into directories.
+          if (!fileStatus.isDirectory()) {
+            locations = dfs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
+            blocks.addAll(Arrays.asList(locations));
+          }
+          endingBlockIndexes.add(blocks.size());
+        } catch (IOException e) {
+          throw new RuntimeException("couldn't determine block locations for path '"
+              + fileDescriptor.getFilePath() + "':\n" + e.getMessage(), e);
+        }
+      }
+    }
+
+    // Get the BlockStorageLocations for all the blocks
+    BlockLocation[] locations;
+    if (supportVolumeId) {
       try {
-        FileSystem fs = p.getFileSystem(CONF);
-        if (!(fs instanceof DistributedFileSystem)) {
-          throw new RuntimeException("HDFS FileSystem should be DistributedFileSystem but"
-              + "got " + fs.getClass().getName());
-        }
-        DistributedFileSystem dfs = (DistributedFileSystem)fs;
-        FileStatus fileStatus = dfs.getFileStatus(p);
-        // Ignore directories (and files in them) - if a directory is erroneously created
-        // as a subdirectory of a partition dir we should ignore it and move on
-        // (getFileBlockLocations will throw when
-        // called on a directory). Hive will not recurse into directories.
-        if (!fileStatus.isDirectory()) {
-          locations = dfs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
-          if (supportVolumeId) {
-            List<BlockLocation> blocks = Arrays.asList(locations);
-            locations = dfs.getFileBlockStorageLocations(blocks);
-          }
-          for (int i = 0; i < locations.length; ++i) {
-            result.add(new BlockMetadata(fileDescriptor.getFilePath(),
-                locations[i], partition));
-          }
-        }
+        locations = dfs.getFileBlockStorageLocations(blocks);
       } catch (IOException e) {
-        throw new RuntimeException(
-            "couldn't determine block locations for path '" + fileDescriptor.getFilePath()
-            + "':\n" + e.getMessage(), e);
+        throw new RuntimeException("couldn't determine block storage locations:\n"
+            + e.getMessage(), e);
+      }
+    } else {
+      locations = blocks.toArray(new BlockLocation[blocks.size()]);
+    }
+
+    // Construct block metadata with block storage locations.
+    int firstBlockIndex = 0;
+    int fileIndex = 0;
+    for (HdfsPartition partition: partitions) {
+      for (FileDescriptor fileDescriptor: partition.getFileDescriptors()) {
+        int lastBlockIndex = endingBlockIndexes.get(fileIndex);
+        for (int i = firstBlockIndex; i < lastBlockIndex; ++i) {
+          result.add(new BlockMetadata(fileDescriptor.getFilePath(), locations[i],
+              partition));
+        }
+        ++fileIndex;
+        firstBlockIndex = lastBlockIndex;
       }
     }
     return result;
