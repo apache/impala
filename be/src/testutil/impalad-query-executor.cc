@@ -92,18 +92,29 @@ Status ImpaladQueryExecutor::FetchResult(RowBatch** batch) {
 }
 
 Status ImpaladQueryExecutor::FetchResult(string* row) {
-  client_->iface()->fetch(query_results_, query_handle_, false, 1);
+  // If we have not fetched any data, or we've returned all the data, fetch more rows
+  // from ImpalaServer
+  if (!query_results_.__isset.data || current_row_ >= query_results_.data.size()) {
+    client_->iface()->fetch(query_results_, query_handle_, false, 0);
+    current_row_ = 0;
+  }
 
-  // We've implemented fetch as sync. So, it always returns with result.
   DCHECK(query_results_.ready);
+
+  // Set the return row if we have data
   if (query_results_.data.size() > 0) {
-    *row = query_results_.data.at(0);
+    *row = query_results_.data.at(current_row_);
+    ++current_row_;
     ++exec_stats_.num_rows_;
   } else {
     *row = "";
   }
 
-  eos_ = !query_results_.has_more;
+  // Set eos_ to true after the we have returned the last row from the last batch.
+  if (current_row_  >= query_results_.data.size() && !query_results_.has_more) {
+    eos_ = true;
+  }
+
   return Status::OK;
 }
 
