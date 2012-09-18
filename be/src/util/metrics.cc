@@ -35,6 +35,7 @@ void Metrics::PrintMetricMap(stringstream* output) {
   lock_guard<mutex> l(lock_);
   BOOST_FOREACH(const MetricMap::value_type& m, metric_map_) {
     m.second->Print(output);
+    (*output) << endl;
   }
 }
 
