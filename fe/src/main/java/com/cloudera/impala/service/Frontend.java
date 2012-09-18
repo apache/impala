@@ -34,12 +34,10 @@ import com.google.common.base.Preconditions;
  * Frontend API for the impalad process.
  * This class allows the impala daemon to create TQueryExecRequest
  * in response to TClientRequests.
- * TODO: make this thread-safe by making updates to nextQueryId and catalog thread-safe
  */
 public class Frontend {
   private final static Logger LOG = LoggerFactory.getLogger(Frontend.class);
   private Catalog catalog;
-  private int nextQueryId;
   final boolean lazyCatalog;
 
   public Frontend() {
@@ -49,7 +47,6 @@ public class Frontend {
 
   public Frontend(boolean lazy) {
     this.catalog = new Catalog(lazy);
-    this.nextQueryId = 0;
     this.lazyCatalog = lazy;
   }
 
@@ -74,7 +71,7 @@ public class Frontend {
    * Also sets TPlanExecParams.dest_fragment_id.
    */
   private void assignIds(TQueryExecRequest request) {
-    UUID queryId = new UUID(nextQueryId++, 0);
+    UUID queryId = UUID.randomUUID();
     request.setQuery_id(
         new TUniqueId(queryId.getMostSignificantBits(),
                       queryId.getLeastSignificantBits()));
@@ -105,7 +102,6 @@ public class Frontend {
    * @param request query request
    * @param explainString if not null, it will contain the explain plan string
    * @return a TCreateExecRequestResult based on request
-   * TODO: make updates to nextQueryId thread-safe
    */
   public TCreateExecRequestResult createExecRequest(TClientRequest request,
       StringBuilder explainString) throws ImpalaException {

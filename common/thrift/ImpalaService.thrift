@@ -10,8 +10,12 @@ include "beeswax.thrift"
 // key:value form. For example, the list of strings could be:
 //     "num_nodes:1", "abort_on_error:false"
 // The valid keys are listed in this enum. They map to TQueryOptions.
-// Note: If you add an option or change the default, please keep
-// JavaConstants.DEFAULT_QUERY_OPTIONS in sync. 
+// Note: If you add an option or change the default, you also need to update:
+// - JavaConstants.DEFAULT_QUERY_OPTIONS
+// - ImpalaInternalService.thrift: TQueryOptions
+// - ImpaladClientExecutor.getBeeswaxQueryConfigurations()
+// - ImpalaServer::QueryToTClientRequest()
+// - ImpalaServer::InitializeConfigVariables()
 enum TImpalaQueryOptions {
   // if true, abort execution on the first error
   ABORT_ON_ERROR,
@@ -49,7 +53,6 @@ enum TImpalaQueryOptions {
 
   // Number of scanner threads.
   NUM_SCANNER_THREADS,
-
 }
 
 // The summary of an insert.

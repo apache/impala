@@ -134,10 +134,12 @@ class RuntimeProfile {
   // Returns the counter for the total elapsed time.
   Counter* total_time_counter() { return &counter_total_time_; }
 
-  // Prints the counters in a name: value format
+  // Prints the counters in a name: value format.
+  // Does not hold locks when it makes any function calls.
   void PrettyPrint(std::ostream* s, const std::string& prefix="");
 
-  // Serializes profile to thrift
+  // Serializes profile to thrift.
+  // Does not hold locks when it makes any function calls.
   void ToThrift(TRuntimeProfileTree* tree);
   void ToThrift(std::vector<TRuntimeProfileNode>* nodes);
 

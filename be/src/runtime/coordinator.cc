@@ -93,10 +93,16 @@ void Coordinator::BackendExecState::CreateThroughputCounters() {
 }
 
 int64_t Coordinator::BackendExecState::GetNodeThroughput(int node_id) {
-  lock_guard<mutex> l(lock);
-  ThroughputCounterMap::iterator i = throughput_counters.find(node_id);
-  if (i == throughput_counters.end()) return 0;
-  return i->second->value();
+  RuntimeProfile::Counter* counter = NULL;
+  {
+    lock_guard<mutex> l(lock);
+    ThroughputCounterMap::iterator i = throughput_counters.find(node_id);
+    if (i == throughput_counters.end()) return 0;
+    counter = i->second;
+  }
+  DCHECK(counter != NULL);
+  // make sure not to hold lock when calling value() to avoid potential deadlocks
+  return counter->value();
 }
 
 Coordinator::Coordinator(ExecEnv* exec_env, ExecStats* exec_stats)

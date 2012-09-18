@@ -223,33 +223,45 @@ void RuntimeProfile::GetCounters(
 
 void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) {
   ostream& stream = *s;
+
+  // create copy of counter_map_ so we don't need to hold lock while we call
+  // value() on the counters (some of those might be DerivedCounters)
+  CounterMap counter_map;
   {
     lock_guard<mutex> l(counter_map_lock_);
-    map<string, Counter*>::const_iterator total_time = counter_map_.find("TotalTime");
-    DCHECK(total_time != counter_map_.end());
-    stream << prefix << name_ << ":";
-    if (total_time->second->value() != 0) {
-      stream << "("
-             << PrettyPrinter::Print(total_time->second->value(),
-                                     TCounterType::CPU_TICKS)
-             << ")";
-     }
-    stream << endl;
-    for (map<string, Counter*>::const_iterator iter = counter_map_.begin();
-         iter != counter_map_.end(); ++iter) {
-      if (iter == total_time) continue;
-      stream << prefix << "   - " << iter->first << ": "
-             << PrettyPrinter::Print(iter->second->value(), iter->second->type())
-             << endl;
-    }
+    counter_map = counter_map_;
   }
+
+  map<string, Counter*>::const_iterator total_time = counter_map.find("TotalTime");
+  DCHECK(total_time != counter_map.end());
+
+  stream << prefix << name_ << ":";
+  if (total_time->second->value() != 0) {
+    stream << "("
+           << PrettyPrinter::Print(total_time->second->value(), TCounterType::CPU_TICKS)
+           << ")";
+   }
+  stream << endl;
+
+  for (map<string, Counter*>::const_iterator iter = counter_map.begin();
+       iter != counter_map.end(); ++iter) {
+    if (iter == total_time) continue;
+    stream << prefix << "   - " << iter->first << ": "
+           << PrettyPrinter::Print(iter->second->value(), iter->second->type())
+           << endl;
+  }
+
+  // create copy of children_ so we don't need to hold lock while we call
+  // PrettyPrint() on the children
+  ChildVector children;
   {
     lock_guard<mutex> l(children_lock_);
-    for (int i = 0; i < children_.size(); ++i) {
-      RuntimeProfile* profile = children_[i].first;
-      bool indent = children_[i].second;
-      profile->PrettyPrint(s, prefix + (indent ? "  " : ""));
-    }
+    children = children_;
+  }
+  for (int i = 0; i < children.size(); ++i) {
+    RuntimeProfile* profile = children[i].first;
+    bool indent = children[i].second;
+    profile->PrettyPrint(s, prefix + (indent ? "  " : ""));
   }
 }
 
@@ -267,28 +279,30 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) {
   node.num_children = children_.size();
   node.indent = true;
 
-  // TODO: we shouldn't need locks here, this shouldn't get called
-  // when there is still registration going on (and we're probably not
-  // getting updates for it, either)
+  CounterMap counter_map;
   {
     lock_guard<mutex> l(counter_map_lock_);
-    for (map<string, Counter*>::const_iterator iter = counter_map_.begin();
-         iter != counter_map_.end(); ++iter) {
-      TCounter counter;
-      counter.name = iter->first;
-      counter.value = iter->second->value();
-      counter.type = iter->second->type();
-      node.counters.push_back(counter);
-    }
+    counter_map = counter_map_;
   }
+  for (map<string, Counter*>::const_iterator iter = counter_map.begin();
+       iter != counter_map.end(); ++iter) {
+    TCounter counter;
+    counter.name = iter->first;
+    counter.value = iter->second->value();
+    counter.type = iter->second->type();
+    node.counters.push_back(counter);
+  }
+
+  ChildVector children;
   {
     lock_guard<mutex> l(children_lock_);
-    for (int i = 0; i < children_.size(); ++i) {
-      int child_idx = nodes->size();
-      children_[i].first->ToThrift(nodes);
-      // fix up indentation flag
-      (*nodes)[child_idx].indent = children_[i].second;
-    }
+    children = children_;
+  }
+  for (int i = 0; i < children.size(); ++i) {
+    int child_idx = nodes->size();
+    children[i].first->ToThrift(nodes);
+    // fix up indentation flag
+    (*nodes)[child_idx].indent = children[i].second;
   }
 }
 
