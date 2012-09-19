@@ -98,28 +98,34 @@ void ScanRangeContext::RemoveFirstBuffer() {
 
 Status ScanRangeContext::GetRawBytes(uint8_t** out_buffer, int* len, bool* eos) {
   // Wait for first buffer
-  unique_lock<mutex> l(lock_);
-  while (!cancelled_ && buffers_.empty()) {
-    read_ready_cv_.wait(l);
+  {
+    unique_lock<mutex> l(lock_);
+    while (!cancelled_ && buffers_.empty()) {
+      read_ready_cv_.wait(l);
+    }
+
+    if (cancelled_) {
+      DCHECK(*out_buffer == NULL);
+      return Status::CANCELLED;
+    }
+    
+    DCHECK(current_buffer_ != NULL);
+    DCHECK(!buffers_.empty());
   }
 
-  if (cancelled_) {
-    DCHECK(*out_buffer == NULL);
-    return Status::CANCELLED;
-  }
-  
-  DCHECK(current_buffer_ != NULL);
-  DCHECK(!buffers_.empty());
+  // If there is no current data, fetch the first available buffer.
+  if (current_buffer_bytes_left_ == 0) {
+    return GetBytesInternal(out_buffer, 0, true, len, eos);
+  } 
 
   *out_buffer = current_buffer_pos_;
   *len = current_buffer_bytes_left_;
   *eos = current_buffer_->eosr();
-
-  return Status::OK;
+return Status::OK;
 }
 
 Status ScanRangeContext::GetBytesInternal(uint8_t** out_buffer, int requested_len, 
-    int* out_len, bool* eos) {
+    bool peek, int* out_len, bool* eos) {
   *out_len = 0;
   *out_buffer = NULL;
   *eos = true;
@@ -182,6 +188,7 @@ Status ScanRangeContext::GetBytesInternal(uint8_t** out_buffer, int requested_le
       RETURN_IF_ERROR(state_->io_mgr()->Read(scan_node_->hdfs_connection(),
           &range, &current_buffer_));
       
+      DCHECK(!peek);
       current_buffer_bytes_left_ = current_buffer_->len();
       current_buffer_pos_ = reinterpret_cast<uint8_t*>(current_buffer_->buffer());
       buffers_.push_back(current_buffer_);
@@ -198,18 +205,23 @@ Status ScanRangeContext::GetBytesInternal(uint8_t** out_buffer, int requested_le
     // We have enough bytes
     int num_bytes = min(current_buffer_bytes_left_, requested_len);
     *out_len += num_bytes;
-    current_buffer_bytes_left_ -= num_bytes;
-    total_bytes_returned_ += num_bytes;
-    DCHECK_GE(current_buffer_bytes_left_, 0);
-
-    if (boundary_buffer_->Empty()) {
-      // No stiching, just return the memory
+    if (peek) {
       *out_buffer = current_buffer_pos_;
     } else {
-      boundary_buffer_->Append(current_buffer_pos_, num_bytes);
-      *out_buffer = reinterpret_cast<uint8_t*>(boundary_buffer_->str().ptr);
+      DCHECK(!peek);
+      current_buffer_bytes_left_ -= num_bytes;
+      total_bytes_returned_ += num_bytes;
+      DCHECK_GE(current_buffer_bytes_left_, 0);
+
+      if (boundary_buffer_->Empty()) {
+        // No stiching, just return the memory
+        *out_buffer = current_buffer_pos_;
+      } else {
+        boundary_buffer_->Append(current_buffer_pos_, num_bytes);
+        *out_buffer = reinterpret_cast<uint8_t*>(boundary_buffer_->str().ptr);
+      }
+      current_buffer_pos_ += num_bytes;
     }
-    current_buffer_pos_ += num_bytes;
 
     *eos = (current_buffer_bytes_left_ == 0) && current_buffer_->eosr();
     return Status::OK;

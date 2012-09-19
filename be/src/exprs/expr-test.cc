@@ -488,8 +488,8 @@ class ExprTest : public testing::Test {
 
 
  private:
-  scoped_ptr<InProcessQueryExecutor> executor_;
   scoped_ptr<ExecEnv> exec_env_;
+  scoped_ptr<InProcessQueryExecutor> executor_;
   ObjectPool pool_;
   vector<Expr*> jit_expr_root_;         // stored in pool_
 };

@@ -22,26 +22,28 @@ inline void SerDeUtils::PutInt(uint8_t* buf, int32_t integer) {
   
 inline Status SerDeUtils::ReadBytes(ScanRangeContext* context, int length,
       uint8_t** buf) {
-  int dummy_len;
+  if (UNLIKELY(length < 0)) return Status("Negative length");
+
+  int bytes_read;
   bool dummy_eos;
-  RETURN_IF_ERROR(context->GetBytes(buf, length, &dummy_len, &dummy_eos));
-  DCHECK_EQ(length, dummy_len);
+  RETURN_IF_ERROR(context->GetBytes(buf, length, &bytes_read, &dummy_eos));
+  if (UNLIKELY(length != bytes_read)) return Status("incomplete read");
   return Status::OK;
 }
 
 inline Status SerDeUtils::SkipBytes(ScanRangeContext* context, int length) {
   uint8_t* dummy_buf;
-  int dummy_len;
+  int bytes_read;
   bool dummy_eos;
-  RETURN_IF_ERROR(context->GetBytes(&dummy_buf, length, &dummy_len, &dummy_eos));
-  DCHECK_EQ(length, dummy_len);
+  RETURN_IF_ERROR(context->GetBytes(&dummy_buf, length, &bytes_read, &dummy_eos));
+  if (UNLIKELY(length != bytes_read)) return Status("incomplete read");
   return Status::OK;
 }
 
 inline Status SerDeUtils::SkipText(ScanRangeContext* context) {
   uint8_t* dummy_buffer;
-  int dummy_len;
-  return SerDeUtils::ReadText(context, &dummy_buffer, &dummy_len);
+  int bytes_read;
+  return SerDeUtils::ReadText(context, &dummy_buffer, &bytes_read);
 }
 
 inline Status SerDeUtils::ReadText(ScanRangeContext* context, uint8_t** buf, int* len) {

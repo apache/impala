@@ -32,7 +32,9 @@ HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* 
       header_(NULL),
       unparsed_data_buffer_pool_(new MemPool()),
       unparsed_data_buffer_(NULL),
-      num_buffered_records_in_compressed_block_(0) {
+      num_buffered_records_in_compressed_block_(0),
+      have_sync_(false),
+      block_start_(0) {
 }
 
 HdfsSequenceScanner::~HdfsSequenceScanner() {
@@ -82,10 +84,59 @@ Status HdfsSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
   // Find the first record
   bool found;
   RETURN_IF_ERROR(FindFirstRecord(&found));
+  if (!found) return Status::OK;
 
-  // Process Range
-  if (found) {
-    RETURN_IF_ERROR(ProcessRange());
+  // Process Range.
+  // We can continue through errors by skipping to to the next SYNC hash.
+  Status status;
+  int64_t first_error_offset = 0;
+  int num_errors = 0;
+
+  do {
+    status = ProcessRange();
+    // Save the offset of any error.
+    if (first_error_offset == 0) first_error_offset = context_->file_offset();
+
+    // Catch errors from file format parsing.  We call some utilities
+    // that do not log errors so generate a reasonable message.
+    // TODO: The utilities should log errors.
+    if (!status.ok()) {
+      if (state_->LogHasSpace()) {
+        stringstream ss;
+        ss << "Format error in record or block header ";
+        if (context_->eosr()) {
+          ss << "at end of file.";
+        } else {
+          ss << "at offset: "  << block_start_;
+        }
+        state_->LogError(ss.str());
+      }
+    }
+
+    // If no errors or we abort on error then exit loop.
+    if (state_->abort_on_error() || status.ok()) break;
+
+    // If we are not at the end of the scan range, try to recover.
+    if (!context_->eosr()) {
+      ++num_errors;
+      status = SkipToSync();
+      if (context_->eosr()) break;
+
+      // If block compressed, reset the number of records.
+      // We will be at the beginning of a block.
+      num_buffered_records_in_compressed_block_ = 0;
+    }
+  } while (!context_->eosr());
+
+  if (num_errors != 0 || !status.ok()) {
+    if (state_->LogHasSpace()) {
+      stringstream ss;
+      ss  << "First error while processing: " << context_->filename()
+          << " at offset: "  << first_error_offset;
+      state_->LogError(ss.str());
+      state_->ReportFileErrors(context_->filename(), num_errors == 0 ? 1 : num_errors);
+    }
+    if (state_->abort_on_error()) return status;
   }
 
   // All done with this scan range.
@@ -163,25 +214,8 @@ Status HdfsSequenceScanner::FindFirstRecord(bool* found) {
     return Status::OK;
   }
 
-  *found = false;
-  // Look for the first sync block
-  bool eosr = false;
-  do {
-    uint8_t* buffer;
-    int buffer_len;
-    
-    RETURN_IF_ERROR(context_->GetRawBytes(&buffer, &buffer_len, &eosr));
-    int offset = FindSyncBlock(buffer, buffer_len, header_->sync, SYNC_HASH_SIZE);
-    DCHECK_LE(offset, buffer_len);
-
-    // Advance to the offset
-    RETURN_IF_ERROR(SerDeUtils::SkipBytes(context_, offset));
-    if (offset < buffer_len) {
-      // Found sync marker, advance to it
-      *found = true;
-      return Status::OK;
-    } 
-  } while (!eosr);
+  RETURN_IF_ERROR(SkipToSync());
+  *found = !context_->eosr();
   return Status::OK;
 }
 
@@ -203,6 +237,7 @@ inline Status HdfsSequenceScanner::GetRecordFromCompressedBlock(
 
 inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr, int64_t* record_len) {
   // If we are past the end of the range we must read to the next sync block.
+  block_start_ = context_->file_offset();
   bool sync;
   Status stat = ReadBlockHeader(&sync);
   if (!stat.ok()) {
@@ -216,6 +251,13 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr, int64_t* reco
 
   if (header_->is_compressed) {
     int in_size = current_block_length_ - current_key_length_;
+    // Check for a reasonable size
+    if (in_size > context_->scan_range()->len() || in_size < 0) {
+      stringstream ss;
+      ss << "Compressed record size is: " << in_size;
+      if (state_->LogHasSpace()) state_->LogError(ss.str());
+      return Status(ss.str());
+    }
     uint8_t* compressed_data;
     RETURN_IF_ERROR(SerDeUtils::ReadBytes(context_, in_size, &compressed_data));
 
@@ -229,6 +271,12 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr, int64_t* reco
   } else {
     // Uncompressed records
     RETURN_IF_ERROR(SerDeUtils::ReadVLong(context_, record_len));
+    if (*record_len > context_->scan_range()->len() || *record_len < 0) {
+      stringstream ss;
+      ss << "Record length is: " << record_len;
+      if (state_->LogHasSpace()) state_->LogError(ss.str());
+      return Status(ss.str());
+    }
     RETURN_IF_ERROR(SerDeUtils::ReadBytes(context_, *record_len, record_ptr));
   }
   return Status::OK;
@@ -349,7 +397,7 @@ Status HdfsSequenceScanner::ReadFileHeader() {
   if (memcmp(header, SEQFILE_VERSION_HEADER, sizeof(SEQFILE_VERSION_HEADER))) {
     stringstream ss;
     ss << "Invalid SEQFILE_VERSION_HEADER: '"
-       << SerDeUtils::HexDump(header, sizeof(SEQFILE_VERSION_HEADER)) << "'" << endl;
+       << SerDeUtils::HexDump(header, sizeof(SEQFILE_VERSION_HEADER)) << "'";
     status.AddErrorMsg(ss.str());
   }
 
@@ -362,7 +410,7 @@ Status HdfsSequenceScanner::ReadFileHeader() {
   if (memcmp(class_name, HdfsSequenceScanner::SEQFILE_VALUE_CLASS_NAME, len)) {
     stringstream ss;
     ss << "Invalid SEQFILE_VALUE_CLASS_NAME: '"
-       << string(reinterpret_cast<char*>(class_name), len) << "'" << endl;
+       << string(reinterpret_cast<char*>(class_name), len) << "'";
     status.AddErrorMsg(ss.str());
   }
 
@@ -423,8 +471,7 @@ Status HdfsSequenceScanner::ReadBlockHeader(bool* sync) {
     stringstream ss;
     int64_t position = context_->file_offset();
     position -= sizeof(int32_t);
-    ss << "Bad block length: " << current_block_length_ << " in file: "
-       << context_->filename() << " at offset: " << position;
+    ss << "Bad block length: " << current_block_length_;
     return Status(ss.str());
   }
   
@@ -433,8 +480,7 @@ Status HdfsSequenceScanner::ReadBlockHeader(bool* sync) {
     stringstream ss;
     int64_t position = context_->file_offset();
     position -= sizeof(int32_t);
-    ss << "Bad key length: " << current_key_length_ << " in file: "
-       << context_->filename() << " at offset: " << position;
+    ss << "Bad key length: " << current_key_length_;
     return Status(ss.str());
   }
 
@@ -443,25 +489,80 @@ Status HdfsSequenceScanner::ReadBlockHeader(bool* sync) {
 
 Status HdfsSequenceScanner::CheckSync() {
   uint8_t* hash;
-  RETURN_IF_ERROR(SerDeUtils::ReadBytes(context_, 
-        HdfsSequenceScanner::SYNC_HASH_SIZE, &hash));
+  RETURN_IF_ERROR(SerDeUtils::ReadBytes(context_, SYNC_HASH_SIZE, &hash));
 
   bool sync_compares_equal = memcmp(static_cast<void*>(hash),
-      static_cast<void*>(header_->sync), HdfsSequenceScanner::SYNC_HASH_SIZE) == 0;
+      static_cast<void*>(header_->sync), SYNC_HASH_SIZE) == 0;
   if (!sync_compares_equal) {
     if (state_->LogHasSpace()) {
       stringstream ss;
       ss << "Bad sync hash in HdfsSequenceScanner at file offset " 
          << (context_->file_offset() - SYNC_HASH_SIZE) << "." << endl
          << "Expected: '"
-         << SerDeUtils::HexDump(header_->sync, HdfsSequenceScanner::SYNC_HASH_SIZE)
+         << SerDeUtils::HexDump(header_->sync, SYNC_HASH_SIZE)
          << "'" << endl
          << "Actual:   '"
-         << SerDeUtils::HexDump(hash, HdfsSequenceScanner::SYNC_HASH_SIZE);
+         << SerDeUtils::HexDump(hash, SYNC_HASH_SIZE) << "'";
       state_->LogError(ss.str());
     }
     return Status("Bad sync hash");
   }
+  return Status::OK;
+}
+
+Status HdfsSequenceScanner::SkipToSync() {
+  bool eosr = false;
+  int offset = SYNC_HASH_SIZE;
+  int buffer_len;
+  do {
+    uint8_t* buffer;
+  
+    RETURN_IF_ERROR(context_->GetRawBytes(&buffer, &buffer_len, &eosr));
+    offset = FindSyncBlock(buffer, buffer_len, header_->sync, SYNC_HASH_SIZE);
+    DCHECK_LE(offset, buffer_len);
+
+    // We need to check for a sync that spans buffers.
+    if (offset == buffer_len) {
+      // The marker (-1) and the sync can start anywhere in the
+      // last 19 bytes of the buffer.  
+      static const int tail_size = SYNC_HASH_SIZE + sizeof(int32_t) - 1;
+      uint8_t* bp = buffer + buffer_len - tail_size;
+      uint8_t save[2 * tail_size];
+
+      // Save the tail of the buffer.
+      memcpy(save, bp, tail_size);
+
+      // Read the next buffer.
+      RETURN_IF_ERROR(SerDeUtils::SkipBytes(context_, offset));
+      RETURN_IF_ERROR(context_->GetRawBytes(&buffer, &buffer_len, &eosr));
+      offset = buffer_len;
+      if (buffer_len >= tail_size) {
+        memcpy(save + tail_size, buffer, tail_size);
+        offset = FindSyncBlock(save, 2 * tail_size, header_->sync, SYNC_HASH_SIZE);
+
+        // The sync mark does not span the buffers search the whole new buffer.
+        if (offset == 2 * tail_size) {
+          offset = buffer_len;
+          continue;
+        }
+
+        have_sync_ = true;
+        // Adjust the offset to be relative to the start of the new buffer
+        offset -= tail_size;
+        // Adjust offset to be past the sync since it spans buffers.
+        offset += SYNC_HASH_SIZE + sizeof(int32_t);
+      }
+    }
+
+    // Advance to the offset.  If have_sync_ is set then this is past the sync block.
+    if (offset != 0) RETURN_IF_ERROR(SerDeUtils::SkipBytes(context_, offset));
+  } while (offset >= buffer_len && !eosr);
+
+  if (!eosr) {
+    VLOG_FILE << "Found sync for: " << context_->filename()
+              << " at " << context_->file_offset() - (have_sync_ ? offset : 0);
+  }
+
   return Status::OK;
 }
 
@@ -472,23 +573,38 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
     context_->AcquirePool(unparsed_data_buffer_pool_.get());
   }
 
-  // Read the sync indicator and check the sync block.
-  int sync_indicator;
-  RETURN_IF_ERROR(SerDeUtils::ReadInt(context_, &sync_indicator));
-  if (sync_indicator != -1) {
-    if (state_->LogHasSpace()) {
-      stringstream ss;
-      ss << "Expecting sync indicator (-1) at file offset "
-         << (context_->file_offset() - sizeof(int)) << ".  " 
-         << "Sync indicator found " << sync_indicator << "." << endl;
-      state_->LogError(ss.str());
+  block_start_ = context_->file_offset();
+  if (have_sync_) {
+    // We skipped ahead on an error and read the sync block.
+    have_sync_ = false;
+  } else {
+    // Read the sync indicator and check the sync block.
+    int sync_indicator;
+    RETURN_IF_ERROR(SerDeUtils::ReadInt(context_, &sync_indicator));
+    if (sync_indicator != -1) {
+      if (state_->LogHasSpace()) {
+        stringstream ss;
+        ss << "Expecting sync indicator (-1) at file offset "
+           << (context_->file_offset() - sizeof(int)) << ".  " 
+           << "Sync indicator found " << sync_indicator << ".";
+        state_->LogError(ss.str());
+      }
+      return Status("Bad sync hash");
     }
-    return Status("Bad sync hash");
+    RETURN_IF_ERROR(CheckSync());
   }
-  RETURN_IF_ERROR(CheckSync());
 
   RETURN_IF_ERROR(SerDeUtils::ReadVLong(context_, 
       &num_buffered_records_in_compressed_block_));
+  if (num_buffered_records_in_compressed_block_ < 0) {
+    if (state_->LogHasSpace()) {
+      stringstream ss;
+      ss << "Bad compressed block record count: "
+         << num_buffered_records_in_compressed_block_;
+      state_->LogError(ss.str());
+    }
+    return Status("bad record count");
+  }
 
   // Read the compressed key length and key buffers, we don't need them.
   RETURN_IF_ERROR(SerDeUtils::SkipText(context_));
@@ -501,6 +617,13 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
   // Read the compressed value buffer from the unbuffered stream.
   int block_size = 0;
   RETURN_IF_ERROR(SerDeUtils::ReadVInt(context_, &block_size));
+  // Check for a reasonable size
+  if (block_size > context_->scan_range()->len() || block_size < 0) {
+    stringstream ss;
+    ss << "Compressed block size is: " << block_size;
+    if (state_->LogHasSpace()) state_->LogError(ss.str());
+    return Status(ss.str());
+  }
   uint8_t* compressed_data = NULL;
   RETURN_IF_ERROR(SerDeUtils::ReadBytes(context_, block_size, &compressed_data));
 

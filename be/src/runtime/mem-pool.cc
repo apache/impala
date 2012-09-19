@@ -112,6 +112,7 @@ void MemPool::FindChunk(int min_size) {
 }
 
 void MemPool::AcquireData(MemPool* src, bool keep_current) {
+  DCHECK(src->CheckIntegrity(false));
   int num_acquired_chunks;
   if (keep_current) {
     num_acquired_chunks = src->current_chunk_idx_;

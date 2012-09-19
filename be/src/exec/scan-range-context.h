@@ -137,6 +137,9 @@ class ScanRangeContext {
     current_row_batch_->tuple_data_pool()->AcquireData(pool, false);
   }
 
+  // Return the number of bytes left in the range.
+  int64_t BytesLeft() { return scan_range_->len() - total_bytes_returned_; }
+
   // If true, the scanner is cancelled and the scanner thread should finish up
   bool cancelled() const { return cancelled_; }
 
@@ -250,7 +253,9 @@ class ScanRangeContext {
   void AttachCompletedResources(bool done);
   
   // GetBytes helper to handle the slow path 
-  Status GetBytesInternal(uint8_t** buffer, int requested_len, int* out_len, bool* eos);
+  // If peek is set then return the data but do not move the current offset.
+  Status GetBytesInternal(uint8_t** buffer, int requested_len,
+                          bool peek, int* out_len, bool* eos);
 };
   
 // Handle the fast common path where all the bytes are in the first buffer.  This
@@ -260,7 +265,7 @@ inline Status ScanRangeContext::GetBytes(uint8_t** buffer, int requested_len,
     int* out_len, bool* eos) {
 
   if (UNLIKELY(requested_len == 0)) {
-    return GetBytesInternal(buffer, requested_len, out_len, eos);
+    return GetBytesInternal(buffer, requested_len, false, out_len, eos);
   }
 
   // Note: the fast path does not grab any locks even though another thread might be 
@@ -282,7 +287,7 @@ inline Status ScanRangeContext::GetBytes(uint8_t** buffer, int requested_len,
     }
     return Status::OK;
   }
-  return GetBytesInternal(buffer, requested_len, out_len, eos);
+  return GetBytesInternal(buffer, requested_len, false, out_len, eos);
 }
 
 

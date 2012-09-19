@@ -87,6 +87,11 @@ class Codec {
   static std::string GetCodecName(THdfsCompression::type);
 
  protected:
+  // Largest block we will compress/decompress: 2GB.
+  // We are dealing with compressed blocks that are never this big but we
+  // want to guard against a corrupt file that has the block length as some
+  // large number.
+  static const int MAX_BLOCK_SIZE = (2L * 1024 * 1024 * 1024) - 1;
   // Create a compression operator
   // Inputs:
   //   mem_pool: memory pool to allocate the output buffer, this implies that the

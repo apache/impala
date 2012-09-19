@@ -15,6 +15,7 @@ using namespace std;
 using namespace boost;
 using namespace impala;
 
+//TODO: Decompressors should log their errors.
 GzipDecompressor::GzipDecompressor(MemPool* mem_pool, bool reuse_buffer)
   : Codec(mem_pool, reuse_buffer) {
   bzero(&stream_, sizeof(stream_));
@@ -44,6 +45,9 @@ Status GzipDecompressor::ProcessBlock(int input_length, uint8_t* input,
   } else if (!reuse_buffer_ || out_buffer_ == NULL) {
     // guess that we will need 2x the input length.
     buffer_length_ = input_length * 2;
+    if (buffer_length_ > MAX_BLOCK_SIZE) {
+      return Status("Decompressor: block size is too big");
+    }
     out_buffer_ = temp_memory_pool_.Allocate(buffer_length_);
     use_temp = true;
   }
@@ -66,6 +70,9 @@ Status GzipDecompressor::ProcessBlock(int input_length, uint8_t* input,
         }
         temp_memory_pool_.Clear();
         buffer_length_ *= 2;
+        if (buffer_length_ > MAX_BLOCK_SIZE) {
+          return Status("Decompressor: block size is too big");
+        }
         out_buffer_ = temp_memory_pool_.Allocate(buffer_length_);
         if (inflateReset(&stream_) != Z_OK) {
           DCHECK(false);
@@ -103,6 +110,9 @@ Status BzipDecompressor::ProcessBlock(int input_length, uint8_t* input,
   } else if (!reuse_buffer_ || out_buffer_ == NULL) {
     // guess that we will need 2x the input length.
     buffer_length_ = input_length * 2;
+    if (buffer_length_ > MAX_BLOCK_SIZE) {
+      return Status("Decompressor: block size is too big");
+    }
     out_buffer_ = temp_memory_pool_.Allocate(buffer_length_);
     use_temp = true;
   }
@@ -114,6 +124,9 @@ Status BzipDecompressor::ProcessBlock(int input_length, uint8_t* input,
       DCHECK_EQ(*output_length, 0);
       temp_memory_pool_.Clear();
       buffer_length_ = buffer_length_ * 2;
+      if (buffer_length_ > MAX_BLOCK_SIZE) {
+        return Status("Decompressor: block size is too big");
+      }
       out_buffer_ = temp_memory_pool_.Allocate(buffer_length_);
     }
     outlen = static_cast<unsigned int>(buffer_length_);
@@ -160,6 +173,9 @@ Status SnappyDecompressor::ProcessBlock(int input_length, uint8_t* input,
     }
     if (!reuse_buffer_ || out_buffer_ == NULL || buffer_length_ < uncompressed_length) {
       buffer_length_ = uncompressed_length;
+      if (buffer_length_ > MAX_BLOCK_SIZE) {
+        return Status("Decompressor: block size is too big");
+      }
       out_buffer_ = memory_pool_->Allocate(buffer_length_);
     }
   }
@@ -190,6 +206,9 @@ Status SnappyBlockDecompressor::ProcessBlock(int input_length, uint8_t* input,
     out_buffer_ = *output;
   } else if (!reuse_buffer_ || out_buffer_ == NULL || buffer_length_ < length) {
     buffer_length_ = length;
+    if (buffer_length_ > MAX_BLOCK_SIZE) {
+      return Status("Decompressor: block size is too big");
+    }
     out_buffer_ = memory_pool_->Allocate(buffer_length_);
   }
 

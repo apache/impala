@@ -49,6 +49,10 @@ target_link_libraries(Exec
   ${HDFS_LIBS}
 )
 
+add_executable(sequence-file-recovery-test sequence-file-recovery-test.cc)
+target_link_libraries(sequence-file-recovery-test ${IMPALA_TEST_LINK_LIBS})
+add_test(sequence-file-recovery-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/sequence-file-recovery-test)
+
 add_executable(zigzag-test zigzag-test.cc)
 target_link_libraries(zigzag-test ${IMPALA_TEST_LINK_LIBS})
 add_test(zigzag-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/zigzag-test)

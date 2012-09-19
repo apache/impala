@@ -236,6 +236,10 @@ class HdfsSequenceScanner : public HdfsScanner {
   // read and verify a sync block.
   Status CheckSync();
 
+  // Find the next sync block to start a scan range or recover from error.
+  // IF the sync block spanned a buffer then set have_sync_ = true.
+  Status SkipToSync();
+
   // Context for this scanner.  The context maps to a single scan range.
   ScanRangeContext* context_;
 
@@ -289,6 +293,14 @@ class HdfsSequenceScanner : public HdfsScanner {
 
   // Next record from block compressed data.
   uint8_t* next_record_in_compressed_block_;
+
+  // If we skip ahead on error and read the sync block this is set to true
+  // so we do not need to look for it in ReadCompressedBlock.
+  bool have_sync_;
+
+  // Record the offset in the file of the start of a block or record
+  // so we can point at it if there is a format error.
+  int block_start_;
 };
 
 } // namespace impala

@@ -48,3 +48,12 @@ ALTER TABLE alltypesmixedformat PARTITION (year=2009, month=2)
   SET FILEFORMAT SEQUENCEFILE;
 ALTER TABLE alltypesmixedformat PARTITION (year=2009, month=3)
   SET FILEFORMAT RCFILE;
+
+-- Not really dependent: this table contains format errors and
+-- is accessed by the unit test: sequence-file-recover-test.
+DROP TABLE IF EXISTS bad_seq_snap;
+CREATE EXTERNAL TABLE bad_seq_snap (field string) stored as SEQUENCEFILE
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/bad_seq_snap';
+
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/bad_seq_snap/bad_file' OVERWRITE INTO TABLE bad_seq_snap;
+
