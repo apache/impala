@@ -38,4 +38,6 @@ const map<ImpalaService.TImpalaQueryOptions, string> DEFAULT_QUERY_OPTIONS = {
   ImpalaService.TImpalaQueryOptions.NUM_NODES : "0",
   ImpalaService.TImpalaQueryOptions.MAX_SCAN_RANGE_LENGTH : "0",
   ImpalaService.TImpalaQueryOptions.FILE_BUFFER_SIZE : "0"
+  ImpalaService.TImpalaQueryOptions.MAX_IO_BUFFERS : "0"
+  ImpalaService.TImpalaQueryOptions.NUM_SCANNER_THREADS : "0"
 }

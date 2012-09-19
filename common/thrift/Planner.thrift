@@ -1,0 +1,57 @@
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+//
+// This file contains structures produced by the planner.
+
+namespace cpp impala
+namespace java com.cloudera.impala.thrift
+
+include "Types.thrift"
+include "Exprs.thrift"
+include "DataSinks.thrift"
+include "PlanNodes.thrift"
+include "Partitions.thrift"
+
+// TPlanFragment encapsulates info needed to execute a particular
+// plan fragment, including how to produce and how to partition its output.
+// It leaves out node-specific parameters neede for the actual execution.
+struct TPlanFragment {
+  // no plan or descriptor table: query without From clause
+  2: optional PlanNodes.TPlan plan_tree
+
+  // exprs that produce values for slots of output tuple (one expr per slot)
+  4: list<Exprs.TExpr> output_exprs
+  
+  // Specifies the destination of this plan fragment's output rows.
+  // For example, the destination could be a stream sink which forwards 
+  // the data to a remote plan fragment, or a sink which writes to a table (for
+  // insert stmts).
+  5: optional DataSinks.TDataSink2 output_sink
+
+  // Partitioning of the data created by all instances of this plan fragment;
+  // partitioning.type has the following meaning:
+  // - UNPARTITIONED: there is only one instance of the plan fragment
+  // - RANDOM: a particular output row is randomly assigned to any of the instances
+  // - HASH_PARTITIONED: output row r is produced by
+  //   hash_value(partitioning.partitioning_exprs(r)) % #partitions
+  // - RANGE_PARTITIONING: currently not supported
+  // This is distinct from the partitioning of each plan fragment's
+  // output, which is specified by output_sink.output_partitioning.
+  6: required Partitions.TPartitioningSpec partitioning
+}
+
+// location information for a single scan range
+struct TScanRangeLocation {
+  1: required Types.THostPort server
+
+  // disk volume identifier of a particular scan range at 'server';
+  // -1 indicates an unknown volume id
+  2: required i32 volume_id = -1
+}
+
+// A single scan range plus the hosts that serve it
+struct TScanRangeLocations {
+  1: required PlanNodes.TScanRange2 scan_range
+
+  // non-empty list
+  2: list<TScanRangeLocation> locations
+}

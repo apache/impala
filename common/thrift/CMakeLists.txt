@@ -90,6 +90,8 @@ set (SRC_FILES
   ImpalaPlanService.thrift
   ImpalaService.thrift
   PlanNodes.thrift
+  Planner.thrift
+  Partitions.thrift
   RuntimeProfile.thrift
   SparrowTypes.thrift
   StateStoreService.thrift

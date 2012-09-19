@@ -30,6 +30,13 @@ enum TStmtType {
   DML // Data modification e.g. INSERT
 }
 
+// level of verboseness for "explain" output
+// TODO: should this go somewhere else?
+enum TExplainLevel {
+  NORMAL,
+  VERBOSE
+}
+
 struct THostPort {
   1: required string host
   2: required i32 port

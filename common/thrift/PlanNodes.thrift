@@ -1,4 +1,9 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+//
+// This file contains all structs, enums, etc., that together make up
+// a plan tree. All information recorded in struct TPlan and below is independent
+// of the execution parameters of any one of the backends on which it is running
+// (those are recorded in TPlanFragmentExecParams).
 
 namespace cpp impala
 namespace java com.cloudera.impala.thrift
@@ -34,14 +39,30 @@ struct THdfsFileSplit {
   // length of split
   3: required i64 length
 
-  // ID of partition in parentTHdfsScanNode. Meaningful only
+  // ID of partition in parent THdfsScanNode. Meaningful only
   // in the context of a single THdfsScanNode, may not be unique elsewhere.
   4: required i64 partitionId
   
-  // Planner has already picked a data node to read this split from. This voluleId
+  // Planner has already picked a data node to read this split from. This volumeId
   // is the disk volume identifier of the chosen data node.
-  // If the Hadoop cluster does not support volumeId, it'll be -1.
+  // If the Hadoop cluster does not support volumeId, it is -1.
   5: required byte volumeId
+}
+
+// Specification of subsection of a single hdfs file.
+struct THdfsFileSplit2 {
+  // file path
+  1: required string path
+
+  // starting offset
+  2: required i64 offset
+
+  // length of split
+  3: required i64 length
+
+  // ID of partition in parent THdfsScanNode. Meaningful only
+  // in the context of a single THdfsScanNode, may not be unique elsewhere.
+  4: required i64 partitionId
 }
 
 // key range for single THBaseScanNode
@@ -67,6 +88,16 @@ struct TScanRange {
   3: optional list<THBaseKeyRange> hbaseKeyRanges
 }
 
+// Specification of an individual data range which is held in its entirety
+// by a storage server
+// TODO: remove TScanRange once the migration to the new planner is complete
+// and rename this to TScanRange
+struct TScanRange2 {
+  // one of these must be set for every TScanRange2
+  1: optional THdfsFileSplit2 hdfsFileSplit
+  2: optional THBaseKeyRange hbaseKeyRange
+}
+
 struct THdfsScanNode {
   1: required Types.TTupleId tuple_id
 }
@@ -83,7 +114,10 @@ struct THBaseFilter {
 
 struct THBaseScanNode {
   1: required Types.TTupleId tuple_id
+
+  // TODO: remove this, we already have THBaseTable.tableName
   2: required string table_name
+
   3: optional list<THBaseFilter> filters
 }
 

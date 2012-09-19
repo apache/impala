@@ -35,6 +35,10 @@ set(SRC_FILES
   Opcodes_types.cpp
   PlanNodes_constants.cpp
   PlanNodes_types.cpp
+  Partitions_constants.cpp
+  Partitions_types.cpp
+  Planner_constants.cpp
+  Planner_types.cpp
   RuntimeProfile_constants.cpp
   RuntimeProfile_types.cpp
   SparrowTypes_constants.cpp

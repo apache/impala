@@ -6,10 +6,25 @@ namespace java com.cloudera.impala.thrift
 include "Exprs.thrift"
 include "Types.thrift"
 include "Descriptors.thrift"
+include "Partitions.thrift"
 
 enum TDataSinkType {
   DATA_STREAM_SINK,
   TABLE_SINK
+}
+
+// Sink which forwards data to a remote plan fragment,
+// according to the given output partition specification
+// (ie, the m:1 part of an m:n data stream)
+// TODO: remove TDataStreamSink when migration to NewPlanner is complete
+struct TDataStreamSink2 {
+  // Specification of how the output of a fragment is partitioned.
+  // If the partitioning type is UNPARTITIONED, the output is broadcast
+  // to each destination host.
+  1: optional Partitions.TPartitioningSpec output_partitioning
+
+  // destination node id
+  2: required Types.TPlanNodeId dest_node_id
 }
 
 // Specification of how plan fragment output is partitioned. If it is hash-partitioned,
@@ -62,5 +77,12 @@ struct TTableSink {
 struct TDataSink {
   1: required TDataSinkType dataSinkType 
   2: optional TDataStreamSink dataStreamSink
+  3: optional TTableSink tableSink
+}
+
+// TODO: remove TDataSink when migration to NewPlanner is complete
+struct TDataSink2 {
+  1: required TDataSinkType dataSinkType 
+  2: optional TDataStreamSink2 dataStreamSink
   3: optional TTableSink tableSink
 }
