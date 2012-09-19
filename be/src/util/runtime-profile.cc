@@ -17,6 +17,7 @@ namespace impala {
 RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name) :
   pool_(pool),
   name_(name),
+  metadata_(-1),
   counter_total_time_(TCounterType::CPU_TICKS) {
   counter_map_["TotalTime"] = &counter_total_time_;
 }
@@ -34,6 +35,7 @@ RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
 
   const TRuntimeProfileNode& node = nodes[*idx];
   RuntimeProfile* profile = pool->Add(new RuntimeProfile(pool, node.name));
+  profile->metadata_ = node.metadata;
   for (int i = 0; i < node.counters.size(); ++i) {
     const TCounter& counter = node.counters[i];
     profile->counter_map_[counter.name] =
@@ -277,6 +279,7 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) {
   TRuntimeProfileNode& node = (*nodes)[index];
   node.name = name_;
   node.num_children = children_.size();
+  node.metadata = metadata_;
   node.indent = true;
 
   CounterMap counter_map;

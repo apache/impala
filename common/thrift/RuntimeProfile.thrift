@@ -24,10 +24,13 @@ struct TRuntimeProfileNode {
   1: required string name
   2: required i32 num_children 
   3: required list<TCounter> counters
+  // TODO: should we make metadata a serializable struct?  We only use it to
+  // store the node id right now so this is sufficient.
+  4: required i64 metadata
 
   // indicates whether the child will be printed with extra indentation;
   // corresponds to indent param of RuntimeProfile::AddChild()
-  4: required bool indent
+  5: required bool indent
 }
 
 // A flattened tree of runtime profiles, obtained by an

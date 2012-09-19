@@ -129,32 +129,32 @@ Status PlanFragmentExecutor::Open() {
 Status PlanFragmentExecutor::OpenInternal() {
   RETURN_IF_ERROR(plan_->Open(runtime_state_.get()));
 
+  if (sink_.get() == NULL) return Status::OK;
+
   // If there is a sink, do all the work of driving it here, so that
   // when this returns the query has actually finished
-  if (sink_.get() != NULL) {
-    RowBatch* batch;
-    while (true) {
-      RETURN_IF_ERROR(GetNextInternal(&batch));
-      if (batch == NULL) break;
-      if (VLOG_ROW_IS_ON) {
-        VLOG_ROW << "OpenInternal: #rows=" << batch->num_rows();
-        for (int i = 0; i < batch->num_rows(); ++i) {
-          TupleRow* row = batch->GetRow(i);
-          VLOG_ROW << PrintRow(row, row_desc());
-        }
+  RowBatch* batch;
+  while (true) {
+    RETURN_IF_ERROR(GetNextInternal(&batch));
+    if (batch == NULL) break;
+    if (VLOG_ROW_IS_ON) {
+      VLOG_ROW << "OpenInternal: #rows=" << batch->num_rows();
+      for (int i = 0; i < batch->num_rows(); ++i) {
+        TupleRow* row = batch->GetRow(i);
+        VLOG_ROW << PrintRow(row, row_desc());
       }
-      COUNTER_UPDATE(rows_produced_counter_, row_batch_->num_rows());
-      RETURN_IF_ERROR(sink_->Send(runtime_state(), batch));
     }
-    // stop report thread *before* closing sink, so that the final report gets
-    // sent before the coordinator unregisters the query
-    // TODO: there's still a chance that the final report doesn't show up
-    // at the coordinator until after the sink got closed, and preventing that
-    // would require yet more coordination; this might make the coordinator profile
-    // inaccurate, but won't cause logic errors
-    StopReportThread();
-    RETURN_IF_ERROR(sink_->Close(runtime_state()));
+    COUNTER_UPDATE(rows_produced_counter_, batch->num_rows());
+    RETURN_IF_ERROR(sink_->Send(runtime_state(), batch));
   }
+  // stop report thread *before* closing sink, so that the final report gets
+  // sent before the coordinator unregisters the query
+  // TODO: there's still a chance that the final report doesn't show up
+  // at the coordinator until after the sink got closed, and preventing that
+  // would require yet more coordination; this might make the coordinator profile
+  // inaccurate, but won't cause logic errors
+  StopReportThread();
+  RETURN_IF_ERROR(sink_->Close(runtime_state()));
 
   return Status::OK;
 }

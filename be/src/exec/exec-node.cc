@@ -30,8 +30,7 @@ using namespace boost;
 namespace impala {
 
 int ExecNode::GetNodeIdFromProfile(RuntimeProfile* p) {
-  int64_t id = reinterpret_cast<int64_t>(p->metadata());
-  return id;
+  return p->metadata();
 }
 
 ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
@@ -307,8 +306,7 @@ void ExecNode::InitRuntimeProfile(const string& name) {
   stringstream ss;
   ss << name << " (id=" << id_ << ")";
   runtime_profile_.reset(new RuntimeProfile(pool_, ss.str()));
-  void* id = reinterpret_cast<void*>(id_);
-  runtime_profile_->set_metadata(id);
+  runtime_profile_->set_metadata(id_);
 }
 
 }

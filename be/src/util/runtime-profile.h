@@ -161,8 +161,8 @@ class RuntimeProfile {
   // (because it doesn't re-file child profiles)
   void set_name(const std::string& name) { name_ = name; }
 
-  void* metadata() const { return metadata_; }
-  void set_metadata(void* md) { metadata_ = md; }
+  int64_t metadata() const { return metadata_; }
+  void set_metadata(int64_t md) { metadata_ = md; }
 
   // Derived counter function: return measured throughput as bytes/second.
   static int64_t BytesPerSecond(
@@ -178,8 +178,8 @@ class RuntimeProfile {
   // Name for this runtime profile.
   std::string name_;
 
-  // user-supplied, uninterpreted metadata
-  void* metadata_;
+  // user-supplied, uninterpreted metadata.  
+  int64_t metadata_;
 
   // Map from counter names to counters.  The profile owns the memory for the
   // counters.
