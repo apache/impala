@@ -52,7 +52,6 @@ DEFINE_bool(explain_plan, false, "if true, print the explain plan only");
 DECLARE_int32(num_nodes);
 DECLARE_int32(fe_port);
 DECLARE_int32(be_port);
-DECLARE_string(backends);
 DECLARE_string(impalad);
 
 using namespace std;
@@ -287,7 +286,7 @@ int main(int argc, char** argv) {
   LlvmCodeGen::InitializeLlvm();
   JniUtil::InitLibhdfs();
   scoped_ptr<ExecEnv> exec_env;
-  if (FLAGS_impalad.empty() && FLAGS_backends.empty()) {
+  if (FLAGS_impalad.empty()) {
     // if we're not running against an existing impalad and don't have
     // backends specified explicitly, start them up
     TestExecEnv* test_exec_env = new TestExecEnv(

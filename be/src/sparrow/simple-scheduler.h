@@ -19,9 +19,9 @@
 
 namespace sparrow {
 
-// Temporary stand-in for a scheduler, while we're waiting for the Sparrow
-// client library.
-// Returns hosts "registered" via FLAGS_backends.
+// Performs simple scheduling by matching between a list of hosts configured
+// either from the state-store, or from a static list of addresses, and a list
+// of target data locations.
 class SimpleScheduler : public Scheduler {
  public:
   // Initialize with a subscription manager that we can register with for updates to the

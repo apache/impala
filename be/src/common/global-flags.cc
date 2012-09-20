@@ -2,7 +2,8 @@
 //
 // This file contains global flags, ie, flags which don't belong to a particular
 // component (and would therefore need to be DEFINE'd in every source file containing
-// a main()).
+// a main()), or flags that are referenced from multiple places and having them here 
+// calms the linker errors that would otherwise ensue.
 
 #include "common/logging.h"
 
@@ -10,3 +11,4 @@ DEFINE_string(classpath, "", "java classpath");
 DEFINE_string(host, "localhost", "The host on which we're running.");
 DEFINE_string(planservice_host, "localhost", "Host on which planservice is running");
 DEFINE_int32(planservice_port, 20000, "Port on which planservice is running");
+DEFINE_int32(be_port, 22000, "port on which ImpalaInternalService is exported");

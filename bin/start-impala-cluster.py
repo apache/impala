@@ -31,7 +31,7 @@ IMPALAD_PATH = os.path.join(os.environ['IMPALA_HOME'],
                             'bin/start-impalad.sh -build_type=%s' % options.build_type)
 STATE_STORE_PATH = os.path.join(os.environ['IMPALA_BE_DIR'], 'build', options.build_type,
                                 'sparrow/state-store-service')
-IMPALAD_ARGS = "-fe_port=%d -be_port=%d -use_statestore -state_store_subscriber_port=%d "\
+IMPALAD_ARGS = "-fe_port=%d -be_port=%d -state_store_subscriber_port=%d "\
                "-webserver_port=%d -default_num_nodes=0 " + options.impalad_args
 STATE_STORE_ARGS = options.state_store_args
 REDIRECT_STR = "> %(file_name)s 2>&1"

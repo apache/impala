@@ -26,10 +26,11 @@ using sparrow::Scheduler;
 using sparrow::SimpleScheduler;
 using sparrow::SubscriptionManager;
 
-DEFINE_string(backends, "", "comma-separated list of <host:port> pairs");
-DEFINE_bool(use_statestore, false,
-    "Use an external state store for membership information");
+DEFINE_bool(standalone, false,
+    "Run imapalad in single-node mode, without using an external state-store");
 DEFINE_bool(enable_webserver, true, "If true, debug webserver is enabled");
+DECLARE_int32(be_port);
+DECLARE_string(host);
 
 namespace impala {
 
@@ -45,31 +46,18 @@ ExecEnv::ExecEnv()
     enable_webserver_(FLAGS_enable_webserver),
     tz_database_(TimezoneDatabase()) {
   // Initialize the scheduler either dynamically (with a statestore) or statically (with
-  // configured backends)
-  if (FLAGS_use_statestore) {
+  // a standalone single backend)
+  if (!FLAGS_standalone) {
     scheduler_.reset(new SimpleScheduler(subscription_mgr_.get(), IMPALA_SERVICE_ID, 
         metrics_.get()));
-  } else if (!FLAGS_backends.empty()) {
-    vector<string> backends;
-    vector<THostPort> addresses;
-    split(backends, FLAGS_backends, is_any_of(","));
-    for (int i = 0; i < backends.size(); ++i) {
-      int pos = backends[i].find(':');
-      if (pos == string::npos) {
-        DCHECK(false) << "ignoring backend " << backends[i] << ": missing ':'";
-        continue;
-      }
-      addresses.push_back(THostPort());
-      THostPort& addr = addresses.back();
-      addr.host = backends[i].substr(0, pos);
-      addr.port = atoi(backends[i].substr(pos + 1).c_str());
-    }
-    scheduler_.reset(new SimpleScheduler(addresses, metrics_.get()));
   } else {
-    // No scheduler required if query is not distributed.
-    // TODO: Check that num_nodes is correctly set?
-    scheduler_.reset(NULL);
-  }
+    vector<THostPort> addresses;
+    THostPort address;
+    address.host = FLAGS_host;
+    address.port = FLAGS_be_port; 
+    addresses.push_back(address);
+    scheduler_.reset(new SimpleScheduler(addresses, metrics_.get()));
+  } 
   Status status = disk_io_mgr_->Init();
   CHECK(status.ok());
 }
@@ -90,7 +78,7 @@ Status ExecEnv::StartServices() {
 
   metrics_->Init(enable_webserver_ ? webserver_.get() : NULL);
 
-  if (FLAGS_use_statestore) RETURN_IF_ERROR(subscription_mgr_->Start());  
+  if (!FLAGS_standalone) RETURN_IF_ERROR(subscription_mgr_->Start());  
 
   if (scheduler_ != NULL) RETURN_IF_ERROR(scheduler_->Init());
 

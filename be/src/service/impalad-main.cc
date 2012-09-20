@@ -48,7 +48,7 @@ using namespace apache::thrift::concurrency;
 
 DECLARE_string(classpath);
 DECLARE_string(host);
-DECLARE_bool(use_statestore);
+DECLARE_bool(standalone);
 DECLARE_int32(fe_port);
 DECLARE_int32(be_port);
 
@@ -81,7 +81,7 @@ int main(int argc, char** argv) {
 
   // register be service *after* starting the be server thread and after starting
   // the subscription mgr handler thread
-  if (FLAGS_use_statestore) {
+  if (!FLAGS_standalone) {
     THostPort host_port;
     host_port.port = FLAGS_be_port;
     host_port.host = FLAGS_host;
