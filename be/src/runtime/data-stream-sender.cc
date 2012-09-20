@@ -16,6 +16,7 @@
 #include "runtime/tuple-row.h"
 #include "runtime/row-batch.h"
 #include "runtime/raw-value.h"
+#include "util/debug-util.h"
 #include "util/thrift-client.h"
 
 #include "gen-cpp/Types_types.h"

@@ -56,8 +56,6 @@ struct NullIndicatorOffset {
 };
 
 std::ostream& operator<<(std::ostream& os, const NullIndicatorOffset& null_indicator);
-// TODO: find a better location for this
-std::ostream& operator<<(std::ostream& os, const TUniqueId& id);
 
 class SlotDescriptor {
  public:

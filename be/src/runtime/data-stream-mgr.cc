@@ -10,6 +10,8 @@
 #include "runtime/row-batch.h"
 #include "runtime/data-stream-recvr.h"
 #include "runtime/raw-value.h"
+#include "util/debug-util.h"
+
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 

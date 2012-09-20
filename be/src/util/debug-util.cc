@@ -50,6 +50,11 @@ ostream& operator<<(ostream& os, const TAggregationOp::type& op) {
   return os;
 }
 
+ostream& operator<<(ostream& os, const TUniqueId& id) {
+  os << PrintId(id);
+  return os;
+}
+
 string PrintId(const TUniqueId& id) {
   stringstream out;
   out << std::hex << id.hi << ":" << id.lo;

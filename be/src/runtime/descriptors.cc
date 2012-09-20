@@ -33,11 +33,6 @@ ostream& operator<<(ostream& os, const NullIndicatorOffset& null_indicator) {
   return os;
 }
 
-ostream& operator<<(ostream& os, const TUniqueId& id) {
-  os << id.hi << ":" << id.lo;
-  return os;
-}
-
 SlotDescriptor::SlotDescriptor(const TSlotDescriptor& tdesc)
   : id_(tdesc.id),
     type_(ThriftToType(tdesc.slotType)),

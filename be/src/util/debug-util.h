@@ -22,6 +22,7 @@ class RowBatch;
 
 std::ostream& operator<<(std::ostream& os, const TExprOpcode::type& op);
 std::ostream& operator<<(std::ostream& os, const TAggregationOp::type& op);
+std::ostream& operator<<(std::ostream& os, const TUniqueId& id);
 
 std::string PrintTuple(const Tuple* t, const TupleDescriptor& d);
 std::string PrintRow(TupleRow* row, const RowDescriptor& d);
