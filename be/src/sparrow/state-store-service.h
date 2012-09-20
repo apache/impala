@@ -13,6 +13,7 @@
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
 #include "util/metrics.h"
+#include "util/non-primitive-metrics.h"
 #include "util/thrift-client.h"
 #include "util/thrift-server.h"
 
@@ -191,6 +192,7 @@ class StateStore : public StateStoreServiceIf,
   // aren't any other types right now, so just tracks the total
   // services registered which is the same thing.
   impala::Metrics::IntMetric* num_backends_metric_;
+  impala::SetMetric<std::string>* backend_set_metric_;
 
   // Getter and setter for is_updating_, both are thread safe.
   bool is_updating();

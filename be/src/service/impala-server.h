@@ -15,6 +15,7 @@
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/Frontend_types.h"
 #include "common/status.h"
+#include "util/metrics.h"
 
 namespace impala {
 
@@ -258,6 +259,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
 
   // Default configurations
   std::vector<beeswax::ConfigVariable> default_configs_;
+
+  // Metrics
+
+  // Total number of queries executed by this server, including failed and cancelled
+  // queries.
+  Metrics::IntMetric* num_queries_metric_;
 };
 
 // Create an ImpalaServer and Thrift servers.

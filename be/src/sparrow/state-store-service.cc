@@ -6,6 +6,7 @@
 #include <utility>
 #include <sstream>
 #include <vector>
+#include <set>
 
 #include <boost/foreach.hpp>
 #include <boost/thread/locks.hpp>
@@ -32,6 +33,7 @@ using impala::THostPort;
 using impala::TStatusCode;
 using impala::ThriftServer;
 using impala::Metrics;
+using impala::SetMetric;
 
 DEFINE_int32(state_store_num_server_worker_threads, 4,
              "number of worker threads for the thread manager underlying the "
@@ -42,6 +44,7 @@ DEFINE_int32(state_store_pending_task_count_max, 0,
              "pending tasks)");
 
 const string STATESTORE_LIVE_BACKENDS = "statestore.live.backends";
+const string STATESTORE_LIVE_BACKENDS_LIST = "statestore.live.backends.list";
 
 namespace sparrow {
 
@@ -81,6 +84,9 @@ void StateStore::RegisterService(TRegisterServiceResponse& response,
               << request.service_address.host << ":" << request.service_address.port
               << ")";
     num_backends_metric_->Increment(1L);
+    stringstream ss;
+    ss << request.service_address.host << ":" << request.service_address.port;
+    backend_set_metric_->Add(ss.str());
     VLOG(2) << "Number of backends registered: " << num_backends_metric_->value();
   }
   RETURN_AND_SET_STATUS_OK(response);
@@ -125,6 +131,10 @@ void StateStore::UnregisterService(TUnregisterServiceResponse& response,
       if (subscriber.IsZombie()) {
         subscribers_.erase(subscriber_iterator);
       }
+
+      stringstream ss;
+      ss << instance->second.host << ":" << instance->second.port;
+      backend_set_metric_->Remove(ss.str());
     }
   }
   if (!instance_unregistered) {
@@ -195,7 +205,11 @@ void StateStore::UnregisterSubscription(TUnregisterSubscriptionResponse& respons
 
 void StateStore::Start(int port) {
   // Create metrics
-  num_backends_metric_ = metrics_->CreateMetric(STATESTORE_LIVE_BACKENDS, 0L);
+  num_backends_metric_ = 
+      metrics_->CreateAndRegisterPrimitiveMetric(STATESTORE_LIVE_BACKENDS, 0L);
+  backend_set_metric_ = 
+      metrics_->RegisterMetric(new SetMetric<string>(STATESTORE_LIVE_BACKENDS_LIST,
+              set<string>()));
 
   set_is_updating(true);
   update_thread_.reset(new thread(&StateStore::UpdateLoop, this));

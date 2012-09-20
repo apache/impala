@@ -76,9 +76,12 @@ impala::Status SimpleScheduler::Init() {
             services, &callback_, &subscription_id_));
   }
   if (metrics_ != NULL) {
-    total_assignments_ = metrics_->CreateMetric(ASSIGNMENTS_KEY, 0L);
-    total_local_assignments_ = metrics_->CreateMetric(LOCAL_ASSIGNMENTS_KEY, 0L);
-    initialised_ = metrics_->CreateMetric(SCHEDULER_INIT_KEY, true);
+    total_assignments_ = 
+        metrics_->CreateAndRegisterPrimitiveMetric(ASSIGNMENTS_KEY, 0L);
+    total_local_assignments_ = 
+        metrics_->CreateAndRegisterPrimitiveMetric(LOCAL_ASSIGNMENTS_KEY, 0L);
+    initialised_ = 
+        metrics_->CreateAndRegisterPrimitiveMetric(SCHEDULER_INIT_KEY, true);
   }
   return Status::OK;
 }

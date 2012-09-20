@@ -84,6 +84,8 @@ ThreadManager* be_tm;
 // Used for queries that execute instantly and always succeed
 const string NO_QUERY_HANDLE = "no_query_handle";
 
+const string NUM_QUERIES_METRIC = "impala-server.num.queries";
+
 // Execution state of a query. This captures everything necessary
 // to convert row batches received by the coordinator into results
 // we can return to the client. It also captures all state required for
@@ -651,6 +653,9 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   Webserver::PathHandlerCallback default_callback =
       bind<void>(mem_fn(&ImpalaServer::RenderHadoopConfigs), this, _1);
   exec_env->webserver()->RegisterPathHandler("/varz", default_callback);
+
+  num_queries_metric_ = 
+      exec_env->metrics()->CreateAndRegisterPrimitiveMetric(NUM_QUERIES_METRIC, 0L);
 }
 
 void ImpalaServer::RenderHadoopConfigs(stringstream* output) {
@@ -748,6 +753,7 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
 Status ImpalaServer::Execute(const TClientRequest& request,
     shared_ptr<QueryExecState>* exec_state) {
   bool registered_exec_state;
+  num_queries_metric_->Increment(1L);
   Status status = ExecuteInternal(request, &registered_exec_state, exec_state);
   if (!status.ok() && registered_exec_state) {
     UnregisterQuery((*exec_state)->query_id());

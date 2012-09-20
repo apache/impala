@@ -53,13 +53,6 @@ class Metrics {
       return value_;
     }
 
-    // Requires that T supports operator+. Returns value of metric after increment
-    T Increment(const T& delta) {
-      boost::lock_guard<boost::mutex> l(lock_);
-      value_ += delta;
-      return value_;
-    }
-
     // Reads the current value under the metric lock
     T value() {
       boost::lock_guard<boost::mutex> l(lock_);
@@ -67,14 +60,24 @@ class Metrics {
     }
 
     virtual void Print(std::stringstream* out) {
-      (*out) << key_ << ":" << value();
+      (*out) << key_ << ":";
+      PrintValue(out);
     }    
 
     virtual void PrintJson(std::stringstream* out) {
-      (*out) << "\"" << key_ << "\": \"" << value() << "\"";
+      (*out) << "\"" << key_ << "\": ";
+      PrintValueJson(out);
     }
 
-   private:
+    Metric(const std::string& key, const T& value) 
+        : value_(value), key_(key) { }
+
+   protected:
+    // Subclasses are required to implement this to print a string
+    // representation of the metric to the supplied stringstream.
+    virtual void PrintValue(std::stringstream* out) = 0;
+    virtual void PrintValueJson(std::stringstream* out) = 0;
+
     // Guards access to value
     boost::mutex lock_;
     T value_;
@@ -82,33 +85,67 @@ class Metrics {
     // Unique key identifying this metric
     const std::string key_;
 
-    // Keep the constructor private so that only Metrics may create Metric instances
-    Metric(const std::string& key, const T& value) 
-        : value_(value), key_(key) { }
-
     friend class Metrics;
   };
 
-  // Convenient typedefs for common metric types.
-  typedef struct Metric<int64_t> IntMetric;
-  typedef struct Metric<double> DoubleMetric;
-  typedef struct Metric<std::string> StringMetric;
-  typedef struct Metric<bool> BooleanMetric;
+  // PrimitiveMetrics are the most common metric type, whose values natively
+  // support operator<< and optionally operator+. 
+  template<typename T>
+  class PrimitiveMetric : public Metric<T> {
+   public:
+    PrimitiveMetric(const std::string& key, const T& value) 
+        : Metric<T>(key, value) {
+    }
+
+    // Requires that T supports operator+. Returns value of metric after increment
+    T Increment(const T& delta) {
+      boost::lock_guard<boost::mutex> l(this->lock_);
+      this->value_ += delta;
+      return this->value_;
+    }
+
+   protected:
+    virtual void PrintValue(std::stringstream* out)  {
+      (*out) << this->value();
+    }    
+
+    virtual void PrintValueJson(std::stringstream* out)  {
+      (*out) << "\"" << this->value() << "\"";
+    }    
+  };
+
+  // Convenient typedefs for common primitive metric types.
+  typedef struct PrimitiveMetric<int64_t> IntMetric;
+  typedef struct PrimitiveMetric<double> DoubleMetric;
+  typedef struct PrimitiveMetric<std::string> StringMetric;
+  typedef struct PrimitiveMetric<bool> BooleanMetric;
 
   Metrics();
 
-  // Create a metric object with given key and initial value (owned by this object)
-  // If a metric is already registered to this name it will be overwritten (in debug
-  // builds it is an error)
+  // Create a primitive metric object with given key and initial value (owned by
+  // this object) If a metric is already registered to this name it will be
+  // overwritten (in debug builds it is an error)
   template<typename T>
-  Metric<T>* CreateMetric(const std::string& key, const T& value) {
-    boost::lock_guard<boost::mutex> l(lock_);
-    DCHECK(!key.empty());
-    DCHECK(metric_map_.find(key) == metric_map_.end()) 
-      << "Multiple registrations of metric key: " << key;
-    Metric<T>* mt = obj_pool_->Add(new Metric<T>(key, value));
-    metric_map_[key] = mt;
-    return mt;
+  PrimitiveMetric<T>* CreateAndRegisterPrimitiveMetric(const std::string& key, 
+      const T& value) {
+    return RegisterMetric(new PrimitiveMetric<T>(key, value));
+  }
+
+  // Registers a new metric. Ownership of the metric will be transferred to this
+  // Metrics object, so callers should take care not to destroy the Metric they
+  // pass in.
+  // If a metric already exists with the supplied metric's key, it is replaced. 
+  // The template parameter M must be a subclass of Metric.
+  template <typename M>
+  M* RegisterMetric(M* metric) {
+    boost::lock_guard<boost::mutex> l(lock_);    
+    DCHECK(!metric->key_.empty());
+    DCHECK(metric_map_.find(metric->key_) == metric_map_.end()) 
+      << "Multiple registrations of metric key: " << metric->key_;
+
+    M* mt = obj_pool_->Add(metric);
+    metric_map_[metric->key_] = mt;
+    return mt;    
   }
 
   // Register page callbacks with the webserver

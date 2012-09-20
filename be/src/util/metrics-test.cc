@@ -1,5 +1,6 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #include "util/metrics.h"
+#include "util/non-primitive-metrics.h"
 #include <gtest/gtest.h>
 #include <boost/scoped_ptr.hpp>
 
@@ -12,18 +13,28 @@ class MetricsTest : public testing::Test {
  public:
   Metrics* metrics() { return metrics_.get(); }
   MetricsTest() : metrics_(new Metrics()) { 
-    bool_metric_ = metrics_->CreateMetric("bool",
+    bool_metric_ = metrics_->CreateAndRegisterPrimitiveMetric("bool",
         false);
-    int_metric_ = metrics_->CreateMetric("int", 0L);
-    double_metric_ = metrics_->CreateMetric("double",
+    int_metric_ = metrics_->CreateAndRegisterPrimitiveMetric("int", 0L);
+    double_metric_ = metrics_->CreateAndRegisterPrimitiveMetric("double",
         1.23);
-    string_metric_ = metrics_->CreateMetric("string", 
+    string_metric_ = metrics_->CreateAndRegisterPrimitiveMetric("string", 
         string("hello world"));
+
+    vector<int> items;
+    items.push_back(1); items.push_back(2); items.push_back(3);
+    list_metric_ = metrics_->RegisterMetric(new ListMetric<int>("list", items));
+    set<int> item_set;
+    item_set.insert(4); item_set.insert(5); item_set.insert(6);
+    set_metric_ = metrics_->RegisterMetric(new SetMetric<int>("set", item_set));
   }
   Metrics::BooleanMetric* bool_metric_;
   Metrics::IntMetric* int_metric_;
   Metrics::DoubleMetric* double_metric_;
   Metrics::StringMetric* string_metric_;
+
+  ListMetric<int>* list_metric_;
+  SetMetric<int>* set_metric_;
  private:
   boost::scoped_ptr<Metrics> metrics_;
 };
@@ -50,6 +61,21 @@ TEST_F(MetricsTest, BooleanMetrics) {
   EXPECT_NE(metrics()->DebugString().find("bool:0"), string::npos);
   bool_metric_->Update(true);
   EXPECT_NE(metrics()->DebugString().find("bool:1"), string::npos);
+}
+
+TEST_F(MetricsTest, ListMetrics) {
+  EXPECT_NE(metrics()->DebugString().find("list:[1, 2, 3]"), string::npos);
+  list_metric_->Update(vector<int>());
+  EXPECT_NE(metrics()->DebugString().find("list:[]"), string::npos);
+}
+
+TEST_F(MetricsTest, SetMetrics) {
+  EXPECT_NE(metrics()->DebugString().find("set:[4, 5, 6]"), string::npos);
+  set_metric_->Add(7);
+  set_metric_->Add(7);
+  set_metric_->Remove(4);
+  set_metric_->Remove(4);
+  EXPECT_NE(metrics()->DebugString().find("set:[5, 6, 7]"), string::npos);
 }
 
 TEST_F(MetricsTest, TestAndSet) {
