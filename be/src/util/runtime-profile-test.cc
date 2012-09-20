@@ -214,7 +214,7 @@ TEST(CountersTest, DerivedCounters) {
 
   RuntimeProfile::DerivedCounter* throughput_counter =
       profile.AddDerivedCounter("throughput", TCounterType::BYTES,
-      bind<int64_t>(&RuntimeProfile::BytesPerSecond, bytes_counter, ticks_counter));
+      bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_counter, ticks_counter));
 
   bytes_counter->Set(10);
   EXPECT_EQ(throughput_counter->value(), 10);
@@ -224,8 +224,44 @@ TEST(CountersTest, DerivedCounters) {
   EXPECT_EQ(throughput_counter->value(), 40);
 }
 
+TEST(CountersTest, RateCounters) {
+  ObjectPool pool;
+  RuntimeProfile profile(&pool, "Profile");
+  
+  RuntimeProfile::Counter* bytes_counter =
+      profile.AddCounter("bytes", TCounterType::BYTES);
+
+  RuntimeProfile::Counter* rate_counter =
+      profile.AddRateCounter("RateCounter", bytes_counter);
+  EXPECT_TRUE(rate_counter->type() == TCounterType::BYTES_PER_SECOND);
+
+  EXPECT_EQ(rate_counter->value(), 0);
+  // set to 100MB.  Use bigger units to avoid truncating to 0 after divides.
+  bytes_counter->Set(100 * 1024 * 1024);  
+
+  // Wait one second.  
+  sleep(1);
+
+  int64_t rate = rate_counter->value();
+
+  // Remove the counter so it no longer gets updates
+  profile.StopRateCounterUpdates(rate_counter);
+
+  // The rate counter is not perfectly accurate.  Currently updated at 500ms intervals,
+  // we should have seen somewhere between 1 and 3 updates (33 - 200 MB/s)
+  EXPECT_GT(rate, 66 * 1024 * 1024);
+  EXPECT_LE(rate, 200 * 1024 * 1024);
+
+  // Wait another second.  The counter has been removed. So the value should not be
+  // changed (much).
+  sleep(2);
+  
+  rate = rate_counter->value();
+  EXPECT_GT(rate, 66 * 1024 * 1024);
+  EXPECT_LE(rate, 200 * 1024 * 1024);
 }
 
+}
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);

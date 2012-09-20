@@ -109,6 +109,9 @@ class ExecNode {
   // Extract node id from p->name().
   static int GetNodeIdFromProfile(RuntimeProfile* p);
 
+  // Names of counters shared by all exec nodes
+  static const std::string ROW_THROUGHPUT_COUNTER;
+
  protected:
   int id_;  // unique w/in single plan tree
   ObjectPool* pool_;
@@ -121,6 +124,7 @@ class ExecNode {
 
   boost::scoped_ptr<RuntimeProfile> runtime_profile_;
   RuntimeProfile::Counter* rows_returned_counter_;
+  RuntimeProfile::Counter* rows_returned_rate_;
   // Account for peak memory used by this node
   RuntimeProfile::Counter* memory_used_counter_;
 

@@ -8,11 +8,19 @@
 
 #include <iostream>
 #include <boost/thread/locks.hpp>
+#include <boost/thread/thread.hpp>
 
 using namespace boost;
 using namespace std;
 
 namespace impala {
+  
+// Period to update rate counters in ms.  
+static const int RATE_COUNTER_UPDATE_PERIOD = 500;
+
+bool RuntimeProfile::rate_update_thread_started_;
+mutex RuntimeProfile::rate_counters_lock_;
+RuntimeProfile::RateCounterMap RuntimeProfile::rate_counters_;
 
 RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name) :
   pool_(pool),
@@ -20,6 +28,13 @@ RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name) :
   metadata_(-1),
   counter_total_time_(TCounterType::CPU_TICKS) {
   counter_map_["TotalTime"] = &counter_total_time_;
+}
+
+RuntimeProfile::~RuntimeProfile() {
+  map<string, Counter*>::const_iterator iter;
+  for (iter = counter_map_.begin(); iter != counter_map_.end(); ++iter) {
+    StopRateCounterUpdates(iter->second);
+  }
 }
 
 RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
@@ -311,15 +326,16 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) {
   }
 }
 
-int64_t RuntimeProfile::BytesPerSecond(
-    const RuntimeProfile::Counter* total_bytes_counter,
+int64_t RuntimeProfile::UnitsPerSecond(
+    const RuntimeProfile::Counter* total_counter,
     const RuntimeProfile::Counter* timer) {
-  DCHECK_EQ(total_bytes_counter->type(), TCounterType::BYTES);
+  DCHECK(total_counter->type() == TCounterType::BYTES ||
+         total_counter->type() == TCounterType::UNIT);
   DCHECK_EQ(timer->type(), TCounterType::CPU_TICKS);
   if (timer->value() == 0) return 0;
   double secs = static_cast<double>(timer->value())
       / static_cast<double>(CpuInfo::cycles_per_ms()) / 1000.0;
-  return total_bytes_counter->value() / secs;
+  return total_counter->value() / secs;
 }
 
 int64_t RuntimeProfile::CounterSum(const std::vector<Counter*>* counters) {
@@ -328,6 +344,60 @@ int64_t RuntimeProfile::CounterSum(const std::vector<Counter*>* counters) {
     value += (*counters)[i]->value();
   }
   return value;
+}
+
+RuntimeProfile::Counter* RuntimeProfile::AddRateCounter(
+    const string& name, Counter* src_counter) {
+  TCounterType::type dst_type;
+  switch (src_counter->type()) {
+    case TCounterType::BYTES:
+      dst_type = TCounterType::BYTES_PER_SECOND;
+      break;
+    case TCounterType::UNIT:
+      dst_type = TCounterType::UNIT_PER_SECOND;
+      break;
+    default:
+      DCHECK(false) << "Unsupported src counter type: " << src_counter->type();
+      return NULL;
+  }
+  Counter* dst_counter = AddCounter(name, dst_type);
+  RegisterRateCounter(src_counter, dst_counter);
+  return dst_counter;
+}
+  
+void RuntimeProfile::RegisterRateCounter(Counter* src_counter, Counter* dst_counter) {
+  lock_guard<mutex> l(rate_counters_lock_);
+  if (!rate_update_thread_started_) {
+    new thread(&RuntimeProfile::RateCounterUpdateLoop);
+    rate_update_thread_started_ = true;
+  }
+  RateCounterInfo counter;
+  counter.src_counter = src_counter;
+  counter.elapsed_ms = 0;
+  rate_counters_[dst_counter] = counter;
+}
+
+void RuntimeProfile::StopRateCounterUpdates(Counter* rate_counter) {
+  lock_guard<mutex> l(rate_counters_lock_);
+  rate_counters_.erase(rate_counter);
+}
+
+void RuntimeProfile::RateCounterUpdateLoop() {
+  while (true) {
+    system_time before_time = get_system_time();
+    usleep(RATE_COUNTER_UPDATE_PERIOD * 1000);
+    posix_time::time_duration elapsed = get_system_time() - before_time;
+    int elapsed_ms = elapsed.total_milliseconds();
+
+    lock_guard<mutex> l(rate_counters_lock_);
+    for (RateCounterMap::iterator it = rate_counters_.begin(); 
+        it != rate_counters_.end(); ++it) {
+      it->second.elapsed_ms += elapsed_ms;
+      int64_t value = it->second.src_counter->value();
+      int64_t rate = value * 1000 / (it->second.elapsed_ms);
+      it->first->Set(rate);
+    }
+  }
 }
 
 }

@@ -462,7 +462,7 @@ void Coordinator::CreateThroughputCounters(RuntimeProfile* profile,
   profile->GetAllChildren(&children);
   for (int i = 0; i < children.size(); ++i) {
     RuntimeProfile* p = children[i];
-    RuntimeProfile::Counter* c = p->GetCounter(ScanNode::THROUGHPUT_COUNTER);
+    RuntimeProfile::Counter* c = p->GetCounter(ScanNode::TOTAL_THROUGHPUT_COUNTER);
     if (c == NULL) {
       // this is not a scan node
       continue;

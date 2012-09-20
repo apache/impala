@@ -29,6 +29,8 @@ using namespace boost;
 
 namespace impala {
 
+const string ExecNode::ROW_THROUGHPUT_COUNTER = "RowsReturnedRate";
+
 int ExecNode::GetNodeIdFromProfile(RuntimeProfile* p) {
   return p->metadata();
 }
@@ -52,6 +54,11 @@ Status ExecNode::Prepare(RuntimeState* state) {
       ADD_COUNTER(runtime_profile_, "RowsReturned", TCounterType::UNIT);
   memory_used_counter_ =
       ADD_COUNTER(runtime_profile_, "MemoryUsed", TCounterType::BYTES);
+  rows_returned_rate_ = runtime_profile()->AddDerivedCounter(
+      ROW_THROUGHPUT_COUNTER, TCounterType::UNIT_PER_SECOND,
+      bind<int64_t>(&RuntimeProfile::UnitsPerSecond, rows_returned_counter_, 
+        runtime_profile()->total_time_counter()));
+
 
   RETURN_IF_ERROR(PrepareConjuncts(state));
   for (int i = 0; i < children_.size(); ++i) {

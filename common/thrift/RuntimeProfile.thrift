@@ -6,6 +6,7 @@ namespace java com.cloudera.impala.thrift
 // Counter data types.
 enum TCounterType {
   UNIT,
+  UNIT_PER_SECOND,
   TIME_MS,
   CPU_TICKS,
   BYTES

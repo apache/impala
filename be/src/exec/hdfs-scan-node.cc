@@ -636,6 +636,7 @@ void HdfsScanNode::DiskThread() {
       }
     }
   }
+  runtime_profile()->StopRateCounterUpdates(total_throughput_counter());
 
   // At this point the disk thread is starting cleanup and will no longer read
   // from the io mgr.  This can happen in one of these conditions:

@@ -556,7 +556,7 @@ void DiskIoMgr::set_bytes_read_counter(ReaderContext* r, RuntimeProfile::Counter
 }
 
 int64_t DiskIoMgr::GetReadThroughput() {
-  return RuntimeProfile::BytesPerSecond(&total_bytes_read_counter_, &read_timer_);
+  return RuntimeProfile::UnitsPerSecond(&total_bytes_read_counter_, &read_timer_);
 }
 
 Status DiskIoMgr::AddScanRanges(ReaderContext* reader, const vector<ScanRange*>& ranges) {

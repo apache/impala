@@ -126,21 +126,43 @@ static double GetByteUnit(int64_t value, string* unit) {
   }
 }
 
+static double GetUnit(int64_t value, string* unit) {
+  if (value >= BILLION) {
+    *unit = "B";
+    return value / (1000*1000*1000.);
+  } else if (value >= MILLION) {
+    *unit = "M";
+    return value / (1000*1000.);
+  } else if (value >= THOUSAND) {
+    *unit = "K";
+    return value / (1000.);
+  } else {
+    *unit = "";
+    return value;
+  }
+}
+
 string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
   stringstream ss;
   ss.flags(ios::fixed);
   switch (type) {
-    case TCounterType::UNIT:
-      if (value >= BILLION) {
-        ss << setprecision(PRECISION) << value / 1000000000. << "B";
-      } else if (value >= MILLION) {
-        ss << setprecision(PRECISION) << value / 1000000. << "M";
-      } else if (value >= THOUSAND) {
-        ss << setprecision(PRECISION) << value / 1000. << "K";
+    case TCounterType::UNIT: {
+      string unit;
+      double output = GetUnit(value, &unit);
+      ss << setprecision(PRECISION) << output << unit;
+      break;
+    }
+
+    case TCounterType::UNIT_PER_SECOND: {
+      string unit;
+      double output = GetUnit(value, &unit); 
+      if (output == 0) {
+        ss << "0";
       } else {
-        ss << value;
+        ss << setprecision(PRECISION) << output << " " << unit << "/sec";
       }
       break;
+    }
 
     case TCounterType::CPU_TICKS:
       if (value < CpuInfo::cycles_per_ms()) {

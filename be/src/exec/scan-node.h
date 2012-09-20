@@ -29,7 +29,12 @@ class ScanNode : public ExecNode {
 
   RuntimeProfile::Counter* bytes_read_counter() const { return bytes_read_counter_; }
   RuntimeProfile::Counter* read_timer() const { return read_timer_; }
-  RuntimeProfile::Counter* throughput_counter() const { return throughput_counter_; }
+  RuntimeProfile::Counter* total_throughput_counter() const { 
+    return total_throughput_counter_; 
+  }
+  RuntimeProfile::Counter* per_thread_throughput_counter() const {
+    return per_thread_throughput_counter_;
+  }
   RuntimeProfile::Counter* materialize_tuple_timer() const { 
     return materialize_tuple_timer_; 
   }
@@ -37,14 +42,17 @@ class ScanNode : public ExecNode {
   // names of ScanNode common counters
   static const std::string BYTES_READ_COUNTER;
   static const std::string READ_TIMER;
-  static const std::string THROUGHPUT_COUNTER;
+  static const std::string TOTAL_THROUGHPUT_COUNTER;
+  static const std::string PER_THREAD_THROUGHPUT_COUNTER;
   static const std::string MATERIALIZE_TUPLE_TIMER;
 
  private:
   RuntimeProfile::Counter* bytes_read_counter_; // # bytes read from the scanner
   RuntimeProfile::Counter* read_timer_; // total read time 
-  RuntimeProfile::Counter* throughput_counter_;
-      // derived counter for read throughput [bytes/sec]
+  // Wall based aggregate read throughput [bytes/sec]
+  RuntimeProfile::Counter* total_throughput_counter_;
+  // Per thread read throughput [bytes/sec]
+  RuntimeProfile::Counter* per_thread_throughput_counter_;
   RuntimeProfile::Counter* materialize_tuple_timer_;  // time writing tuple slots
 };
 
