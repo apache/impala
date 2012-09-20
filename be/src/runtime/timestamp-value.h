@@ -8,6 +8,9 @@
 #include <ctime>
 #include <boost/cstdint.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+using namespace std;
+using namespace boost::posix_time;
+using namespace boost::gregorian;
 
 namespace impala {
 
@@ -55,8 +58,8 @@ class  TimestampValue {
     temp += boost::posix_time::nanoseconds((t-i)/FRACTIONAL);
     *this = temp;
   }
-  TimestampValue(const std::string& strbuf);
-  
+  TimestampValue(const char* str, int len);
+
   TimestampValue(int64_t t) {
     *this = TimestampValue(boost::posix_time::from_time_t(t));
   }
@@ -72,6 +75,9 @@ class  TimestampValue {
   TimestampValue(bool t) {
     *this = TimestampValue(boost::posix_time::from_time_t(t));
   }
+
+  void set_date(boost::gregorian::date d) { date_ = d; }
+  void set_time(boost::posix_time::time_duration t) { time_of_day_ = t; }
 
   std::string DebugString() const {
     std::stringstream ss;
@@ -92,8 +98,8 @@ class  TimestampValue {
     return !(*this == other);
   }
   bool operator<=(const TimestampValue& other) const {
-    return this->date_ < other.date_ ||
-        (this->date_ == other.date_ && this->time_of_day_ <= other.time_of_day_);
+    return this->date_ < other.date_ || (this->date_ == other.date_ &&
+        (this->time_of_day_ <= other.time_of_day_));
   }
   bool operator>=(const TimestampValue& other) const {
     return this->date_ > other.date_ ||
@@ -110,7 +116,6 @@ class  TimestampValue {
 
   // If the date or time of day are valid then this is valid.
   bool NotADateTime() const {
-    boost::posix_time::ptime temp;
     return this->date_.is_special() && this->time_of_day_.is_special();
   }
 
@@ -161,7 +166,27 @@ class  TimestampValue {
  private:
   friend class UnusedClass;
 
+  // Precision of fractional part of the time: nanoseconds.
   static const double FRACTIONAL = 0.000000001;
+
+  // Parse a date string into the object.
+  // strp -- pointer to string to parse, points to character after parsing stopped.
+  // lenp -- pointer to the length of the string.  The length will
+  //         be updated to the count of characters left passed the
+  //         parsed string or where the parsing stopped.
+  // The accpeted format is: YYYY-MM-DD.  All components must be present.
+  // Returns true if the date was sucsessfully parsed.
+  inline bool ParseDate(const char** strp, int* lenp);
+
+  // Parse a time string into the object.
+  // strp -- pointer to string to parse, points to character after parsing stopped.
+  // lenp -- pointer to the length of the string.  The length will
+  //         be updated to the count of characters left passed the
+  //         parsed string or where the parsing stopped.
+  // The accpeted format is: HH:MM:SS[.ssssssss]
+  // Returns true if the time was sucsessfully parsed.
+  inline bool ParseTime(const char** strp, int* lenp);
+
 
   // Boost ptime leaves a gap in the structure, so we swap the order to make it
   // 12 contiguous bytes.  We then must convert to and from the boost ptime data type.

@@ -1792,9 +1792,6 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestIsNull("dayofmonth(cast('09:10:11.000000' as timestamp))", TYPE_INT); 
   TestIsNull("day(cast('09:10:11.000000' as timestamp))", TYPE_INT); 
   TestIsNull("weekofyear(cast('09:10:11.000000' as timestamp))", TYPE_INT); 
-  TestIsNull("hour(cast('2011-12-22' as timestamp))", TYPE_INT); 
-  TestIsNull("minute(cast('2011-12-22' as timestamp))", TYPE_INT); 
-  TestIsNull("second(cast('2011-12-22' as timestamp))", TYPE_INT); 
   TestIsNull("datediff(cast('09:10:11.12345678' as timestamp), "
       "cast('2012-12-22' as timestamp))", TYPE_INT);
 
@@ -1832,9 +1829,9 @@ TEST_F(ExprTest, TimestampFunctions) {
       "cast('1970-01-01 00:00:00' as timestamp), 'FOOBAR') as string)",
       "1970-01-01 00:00:00");
 
-  // There is a boost bug converting from string we need to compensate for, test it
-  // With support of date strings this now generates the proper date.
-  TestStringValue("cast(cast('1999-01-10' as timestamp) as string)", "1999-01-10");
+  // With support of date strings this generates a date and 0 time.
+  TestStringValue(
+      "cast(cast('1999-01-10' as timestamp) as string)", "1999-01-10 00:00:00");
 
   // Test functions with unknown expected value.
   TestValidTimestampValue("now()");

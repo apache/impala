@@ -75,9 +75,8 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
         StringParser::StringToFloat<double>(data, len, &parse_result);
       break;
     case TYPE_TIMESTAMP: {
-      std::string strbuf(data, len);
       TimestampValue* ts_slot = reinterpret_cast<TimestampValue*>(slot);
-      *ts_slot = TimestampValue(strbuf);
+      *ts_slot = TimestampValue(data, len);
       if (ts_slot->NotADateTime()) {
         parse_result = StringParser::PARSE_FAILURE;
       }

@@ -55,7 +55,7 @@ Status RuntimeState::Init(
     ExecEnv* exec_env) {
   fragment_id_ = fragment_id;
   query_options_ = query_options;
-  now_.reset(new TimestampValue(now));
+  now_.reset(new TimestampValue(now.c_str(), now.size()));
   exec_env_ = exec_env;
   if (!query_options.disable_codegen) {
     RETURN_IF_ERROR(CreateCodegen());
