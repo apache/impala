@@ -222,9 +222,10 @@ def write_trevni_file(file_name, array):
   with open(file_name, "w") as f:
     if len(array) != 0:
       # Start a plan service.
+      f.write("#!/bin/bash\n")
       f.write("set -e\nset -u\n")
       f.write("(. ${IMPALA_HOME}/bin/set-classpath.sh; ")
-      f.write("exec $IMPALA_BE_DIR/build/debug/service/impalad) >& /tmp/impalad.out&\n")
+      f.write("exec $IMPALA_BE_DIR/build/debug/service/impalad --use_statestore=false) >& /tmp/impalad.out&\n")
       f.write("PID=$!\n")
       f.write("sleep 5\n");
       f.write('\n\n'.join(array))
