@@ -26,8 +26,8 @@ using sparrow::Scheduler;
 using sparrow::SimpleScheduler;
 using sparrow::SubscriptionManager;
 
-DEFINE_bool(standalone, false,
-    "Run imapalad in single-node mode, without using an external state-store");
+DEFINE_bool(use_statestore, true,
+    "Use an external state-store process to manage cluster membership");
 DEFINE_bool(enable_webserver, true, "If true, debug webserver is enabled");
 DECLARE_int32(be_port);
 DECLARE_string(host);
@@ -47,7 +47,7 @@ ExecEnv::ExecEnv()
     tz_database_(TimezoneDatabase()) {
   // Initialize the scheduler either dynamically (with a statestore) or statically (with
   // a standalone single backend)
-  if (!FLAGS_standalone) {
+  if (FLAGS_use_statestore) {
     scheduler_.reset(new SimpleScheduler(subscription_mgr_.get(), IMPALA_SERVICE_ID, 
         metrics_.get()));
   } else {
@@ -78,10 +78,9 @@ Status ExecEnv::StartServices() {
 
   metrics_->Init(enable_webserver_ ? webserver_.get() : NULL);
 
-  if (!FLAGS_standalone) RETURN_IF_ERROR(subscription_mgr_->Start());  
+  if (FLAGS_use_statestore) RETURN_IF_ERROR(subscription_mgr_->Start());  
 
   if (scheduler_ != NULL) RETURN_IF_ERROR(scheduler_->Init());
-
 
   return Status::OK;
 }

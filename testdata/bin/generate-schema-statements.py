@@ -175,7 +175,7 @@ def build_trevni(trevni_template, table_name, base_table_name):
   retstr =  \
     trevni_template % {'table_name': table_name, 'base_table_name': base_table_name}
   return retstr.replace('run-query.sh',
-      'run-query.sh --exec_options="abort_on_error:false" --impalad=' +
+      'run-query.sh --exec_options="abort_on_error:false" --use_statestore=false --impalad=' +
       options.backend, 1)
 
 def build_table_suffix(file_format, codec, compression_type):

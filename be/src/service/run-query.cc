@@ -53,6 +53,7 @@ DECLARE_int32(num_nodes);
 DECLARE_int32(fe_port);
 DECLARE_int32(be_port);
 DECLARE_string(impalad);
+DECLARE_bool(use_statestore);
 
 using namespace std;
 using namespace impala;
@@ -278,6 +279,8 @@ static void Exec(ExecEnv* exec_env, const vector<string>& queries) {
 }
 
 int main(int argc, char** argv) {
+  // Default for run-query is not to use a state-store when executing queries itself
+  FLAGS_use_statestore = false;
   google::InitGoogleLogging(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, true);
   CpuInfo::Init();
@@ -294,8 +297,6 @@ int main(int argc, char** argv) {
     EXIT_IF_ERROR(test_exec_env->StartBackends());
     exec_env.reset(test_exec_env);
   } else {
-    // TODO: ignore backends flag? It was introduced to let us run run_query
-    // against distributed backends, but we can do that via impalad now.
     exec_env.reset(new ExecEnv());
     exec_env->set_enable_webserver(false);
     EXIT_IF_ERROR(exec_env->StartServices());
