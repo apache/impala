@@ -41,17 +41,17 @@ export IMPALA_DATASET_DIR=$IMPALA_HOME/testdata/datasets
 export IMPALA_COMMON_DIR=$IMPALA_HOME/common
 export PATH=$IMPALA_HOME/bin:$PATH
 
-export HADOOP_HOME=$IMPALA_HOME/thirdparty/hadoop-2.0.0-cdh4.1.0-SNAPSHOT/
+export HADOOP_HOME=$IMPALA_HOME/thirdparty/hadoop-2.0.0-cdh4.1.0/
 export HADOOP_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
 export MINI_DFS_BASE_DATA_DIR=$HADOOP_HOME/build/test/data
 export PATH=$HADOOP_HOME/bin:$PATH
 
-export HIVE_HOME=$IMPALA_HOME/thirdparty/hive-0.8.1-cdh4.0.0-SNAPSHOT/
+export HIVE_HOME=$IMPALA_HOME/thirdparty/hive-0.9.0-cdh4.1.0/
 export PATH=$HIVE_HOME/bin:$PATH
 export HIVE_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
 export HIVE_AUX_JARS_PATH=$IMPALA_FE_DIR/target
 
-export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-0.92.1-cdh4.0.0-SNAPSHOT/
+export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-0.92.1-cdh4.1.0/
 export PATH=$HBASE_HOME/bin:$PATH
 export HBASE_CONF_DIR=$HIVE_CONF_DIR
 

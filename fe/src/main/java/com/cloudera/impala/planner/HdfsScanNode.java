@@ -225,7 +225,7 @@ public class HdfsScanNode extends ScanNode {
       for (int i = 0; i < blockAssignment.blockMetadata.size(); ++i) {
         HdfsTable.BlockMetadata metadata = blockAssignment.blockMetadata.get(i);
         int hostPortIndex = blockAssignment.blockHostPortIndex.get(i).intValue();
-        byte volumnId = metadata.getVolumeId(hostPortIndex);
+        int volumeId = metadata.getVolumeId(hostPortIndex);
         BlockLocation blockLocation = metadata.getLocation();
         long currentOffset = blockLocation.getOffset();
         long remainingLength = blockLocation.getLength();
@@ -235,11 +235,11 @@ public class HdfsScanNode extends ScanNode {
             currentLength = maxScanRangeLength;
           }
           THdfsFileSplit fileSplit =
-              new THdfsFileSplit(metadata.fileName,
+              new THdfsFileSplit(metadata.getFileName(),
                   currentOffset,
                   currentLength,
                   metadata.getPartition().getId(),
-                  volumnId);
+                  volumeId);
           scanRange.addToHdfsFileSplits(fileSplit);
           remainingLength -= currentLength;
           currentOffset += currentLength;

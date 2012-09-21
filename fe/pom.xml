@@ -26,9 +26,9 @@
     <impalad>localhost</impalad>
     <use_external_impalad>false</use_external_impalad>
     <testExecutionMode>reduced</testExecutionMode>
-    <hadoop.version>2.0.0-cdh4.1.0-SNAPSHOT</hadoop.version>
-    <hive.version>0.8.1-cdh4.0.0-SNAPSHOT</hive.version>
-    <hbase.version>0.92.1-cdh4.0.0-SNAPSHOT</hbase.version>
+    <hadoop.version>2.0.0-cdh4.1.0</hadoop.version>
+    <hive.version>0.9.0-cdh4.1.0</hive.version>
+    <hbase.version>0.92.1-cdh4.1.0</hbase.version>
   </properties>
 
   <dependencies>

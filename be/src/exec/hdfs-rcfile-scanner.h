@@ -21,10 +21,10 @@
 //
 // file-header ::=
 //   <file-version-header>
-//   <file-key-class-name>
-//   <file-value-class-name>
+//   <file-key-class-name>              (only exists if version is seq6)
+//   <file-value-class-name>            (only exists if version is seq6)
 //   <file-is-compressed>
-//   <file-is-block-compressed>
+//   <file-is-block-compressed>         (only exists if version is seq6)
 //   [<file-compression-codec-class>]
 //   <file-header-metadata>
 //   <file-sync-field>
@@ -346,6 +346,13 @@ class HdfsRCFileScanner : public HdfsScanner {
 
   // Location (file name) of previous scan range.
   std::string previous_location_;
+
+  enum Version {
+    SEQ6,     // The version pre hive-0.9 which uses the seq header
+    RCF1      // The version post hive-0.9 which uses a new header
+  };
+
+  Version version_;
 
   // Offset to end of file header.
   int64_t header_end_;

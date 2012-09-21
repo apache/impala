@@ -152,48 +152,55 @@ Status HdfsRCFileScanner::ReadFileHeader() {
   vector<uint8_t> head;
   RETURN_IF_ERROR(SerDeUtils::ReadBytes(current_byte_stream_,
       sizeof(RCFILE_VERSION_HEADER), &head));
-  if (memcmp(&head[0], RCFILE_VERSION_HEADER, sizeof(RCFILE_VERSION_HEADER)) &&
-      memcmp(&head[0], HdfsSequenceScanner::SEQFILE_VERSION_HEADER,
-             sizeof(HdfsSequenceScanner::SEQFILE_VERSION_HEADER))) {
+  if (!memcmp(&head[0], HdfsSequenceScanner::SEQFILE_VERSION_HEADER, 
+      sizeof(HdfsSequenceScanner::SEQFILE_VERSION_HEADER))) {
+    version_ = SEQ6;
+  } else if (!memcmp(&head[0], RCFILE_VERSION_HEADER, sizeof(RCFILE_VERSION_HEADER))) {
+    version_ = RCF1;
+  } else {
     stringstream ss;
     ss << "Invalid RCFILE_VERSION_HEADER: '"
        << SerDeUtils::HexDump(&head[0], sizeof(RCFILE_VERSION_HEADER)) << "'";
     return Status(ss.str());
   }
+  
+  if (version_ == SEQ6) {
+    vector<char> buf;
+    RETURN_IF_ERROR(SerDeUtils::ReadText(current_byte_stream_, &buf));
+    if (strncmp(&buf[0], HdfsRCFileScanner::RCFILE_KEY_CLASS_NAME,
+        strlen(HdfsRCFileScanner::RCFILE_KEY_CLASS_NAME))) {
+      stringstream ss;
+      ss << "Invalid RCFILE_KEY_CLASS_NAME: '"
+         << string(&buf[0], strlen(HdfsRCFileScanner::RCFILE_KEY_CLASS_NAME))
+         << "'";
+      return Status(ss.str());
+    }
 
-  vector<char> buf;
-  RETURN_IF_ERROR(SerDeUtils::ReadText(current_byte_stream_, &buf));
-  if (strncmp(&buf[0], HdfsRCFileScanner::RCFILE_KEY_CLASS_NAME,
-      strlen(HdfsRCFileScanner::RCFILE_KEY_CLASS_NAME))) {
-    stringstream ss;
-    ss << "Invalid RCFILE_KEY_CLASS_NAME: '"
-       << string(&buf[0], strlen(HdfsRCFileScanner::RCFILE_KEY_CLASS_NAME))
-       << "'";
-    return Status(ss.str());
-  }
-
-  RETURN_IF_ERROR(SerDeUtils::ReadText(current_byte_stream_, &buf));
-  if (strncmp(&buf[0], HdfsRCFileScanner::RCFILE_VALUE_CLASS_NAME,
-      strlen(HdfsRCFileScanner::RCFILE_VALUE_CLASS_NAME))) {
-    stringstream ss;
-    ss << "Invalid RCFILE_VALUE_CLASS_NAME: '"
-       << string(&buf[0], strlen(HdfsRCFileScanner::RCFILE_VALUE_CLASS_NAME))
-       << "'";
-    return Status(ss.str());
+    RETURN_IF_ERROR(SerDeUtils::ReadText(current_byte_stream_, &buf));
+    if (strncmp(&buf[0], HdfsRCFileScanner::RCFILE_VALUE_CLASS_NAME,
+        strlen(HdfsRCFileScanner::RCFILE_VALUE_CLASS_NAME))) {
+      stringstream ss;
+      ss << "Invalid RCFILE_VALUE_CLASS_NAME: '"
+         << string(&buf[0], strlen(HdfsRCFileScanner::RCFILE_VALUE_CLASS_NAME))
+         << "'";
+      return Status(ss.str());
+    }
   }
 
   RETURN_IF_ERROR(SerDeUtils::ReadBoolean(current_byte_stream_, &is_compressed_));
 
-  // Read the is_blk_compressed header field. This field should *always*
-  // be FALSE, and is the result of a defect in the original RCFile
-  // implementation contained in Hive.
-  bool is_blk_compressed;
-  RETURN_IF_ERROR(SerDeUtils::ReadBoolean(current_byte_stream_, &is_blk_compressed));
-  if (is_blk_compressed) {
-    stringstream ss;
-    ss << "RC files do no support block compression, set in: '"
-       << current_byte_stream_->GetLocation() << "'";
-    return Status(ss.str());
+  if (version_ == SEQ6) {
+    // Read the is_blk_compressed header field. This field should *always*
+    // be FALSE, and is the result of a defect in the original RCFile
+    // implementation contained in Hive.
+    bool is_blk_compressed;
+    RETURN_IF_ERROR(SerDeUtils::ReadBoolean(current_byte_stream_, &is_blk_compressed));
+    if (is_blk_compressed) {
+      stringstream ss;
+      ss << "RC files do no support block compression, set in: '"
+         << current_byte_stream_->GetLocation() << "'";
+      return Status(ss.str());
+    }
   }
 
   vector<char> codec;

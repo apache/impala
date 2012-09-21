@@ -51,6 +51,65 @@ public class HBaseTable extends Table {
     super(id,db, name, owner);
   }
 
+  // Parse the column description string to the column families and column
+  // qualifies.  This is a copy of the HBaseSerDe.parseColumnMapping function
+  // with parts we don't use removed.  The hive function is not public.
+  //  columnsMappingSpec - input string format describing the table
+  //  columnFamilies/columnQualifiers - out parameters that will be filled with the
+  //    column family and column qualifies strings for each column.
+  public void parseColumnMapping(String columnsMappingSpec, List<String> columnFamilies,
+      List<String> columnQualifiers) throws SerDeException {
+
+    if (columnsMappingSpec == null) {
+      throw new SerDeException(
+          "Error: hbase.columns.mapping missing for this HBase table.");
+    }
+
+    if (columnsMappingSpec.equals("") || 
+        columnsMappingSpec.equals(HBaseSerDe.HBASE_KEY_COL)) {
+      throw new SerDeException("Error: hbase.columns.mapping specifies only "
+          + "the HBase table row key. A valid Hive-HBase table must specify at "
+          + "least one additional column.");
+    }
+
+    int rowKeyIndex = -1;
+    String [] columnSpecs = columnsMappingSpec.split(",");
+
+    for (int i = 0; i < columnSpecs.length; i++) {
+      String mappingSpec = columnSpecs[i];
+      String[] mapInfo = mappingSpec.split("#");
+      String colInfo = mapInfo[0];
+
+      int idxFirst = colInfo.indexOf(":");
+      int idxLast = colInfo.lastIndexOf(":");
+
+      if (idxFirst < 0 || !(idxFirst == idxLast)) {
+        throw new SerDeException("Error: the HBase columns mapping contains a "
+            + "badly formed column family, column qualifier specification.");
+      }
+
+      if (colInfo.equals(HBaseSerDe.HBASE_KEY_COL)) {
+        rowKeyIndex = i;
+        columnFamilies.add(colInfo);
+        columnQualifiers.add(null);
+      } else {
+        String [] parts = colInfo.split(":");
+        Preconditions.checkState(parts.length > 0 && parts.length <= 2);
+        columnFamilies.add(parts[0]);
+        if (parts.length == 2) {
+          columnQualifiers.add(parts[1]);
+        } else {
+          columnQualifiers.add(null);
+        }
+      }
+    }
+
+    if (rowKeyIndex == -1) {
+      columnFamilies.add(HBaseSerDe.HBASE_KEY_COL);
+      columnQualifiers.add(null);
+    }
+  }
+
   @Override
   public Table load(HiveMetaStoreClient client,
                     org.apache.hadoop.hive.metastore.api.Table msTbl) {
@@ -63,8 +122,12 @@ public class HBaseTable extends Table {
         throw new MetaException("No hbase.columns.mapping defined in Serde.");
       }
 
+
       // Parse HBase column-mapping string.
-      int keyIndex = HBaseSerDe.parseColumnsMapping(hbaseColumnsMapping);
+      List<String> hbaseColumnFamilies = new ArrayList<String>();
+      List<String> hbaseColumnQualifiers = new ArrayList<String>();
+      parseColumnMapping(hbaseColumnsMapping, hbaseColumnFamilies,
+          hbaseColumnQualifiers);
       Preconditions.checkState(hbaseColumnFamilies.size() == hbaseColumnQualifiers.size());
 
       // Populate tmp cols in the order they appear in the Hive metastore.
@@ -77,11 +140,8 @@ public class HBaseTable extends Table {
         HBaseColumn col = new HBaseColumn(s.getName(), hbaseColumnFamilies.get(i),
             hbaseColumnQualifiers.get(i), getPrimitiveType(s.getType()), -1);
         tmpCols.add(col);
-        if (i == keyIndex) {
-          rowKey = col;
-        }
       }
-
+       
       // HBase columns are ordered by columnFamily,columnQualifier,
       // so the final position depends on the other mapped HBase columns.
       // Sort columns and update positions.

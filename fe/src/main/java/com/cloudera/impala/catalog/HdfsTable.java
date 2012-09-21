@@ -61,38 +61,40 @@ public class HdfsTable extends Table {
    * of the file to which it belongs, and the partition to which that file belongs.
    */
   public static class BlockMetadata {
-    public final String fileName;
+    private String fileName;
+    private HdfsPartition parentPartition;
     private final BlockLocation blockLocation;
-    private final HdfsPartition parentPartition;
+    // For each replica, this is the 0-based disk index for this block.  The BE uses
+    // this information to schedule the order scan ranges are read.
+    private final int[] diskIds;
 
-    public BlockMetadata(String fileName,
-        BlockLocation blockLocation, HdfsPartition parentPartition) {
-      Preconditions.checkNotNull(fileName);
+    public BlockMetadata(BlockLocation blockLocation, int[] diskIds) {
       Preconditions.checkNotNull(blockLocation);
-      Preconditions.checkNotNull(parentPartition);
-      this.fileName = fileName;
       this.blockLocation = blockLocation;
-      this.parentPartition = parentPartition;
+      this.diskIds = diskIds;
     }
 
     public String getFileName() { return fileName; }
     public BlockLocation getLocation() { return blockLocation; }
     public HdfsPartition getPartition() { return parentPartition; }
 
+    public void setFileName(String fileName) {
+      this.fileName = fileName;
+    }
+
+    public void setPartition(HdfsPartition partition) {
+      this.parentPartition = partition;
+    }
+
     /**
      * Return the volume id of the block in BlockLocation.getName()[hostIndex]; -1 if
      * volumn id is not supported.
      */
-    public byte getVolumeId(int hostIndex) {
-      if (blockLocation instanceof BlockStorageLocation) {
-        BlockStorageLocation blockStorageLocation =(BlockStorageLocation)blockLocation;
-        VolumeId[] volumeIds = blockStorageLocation.getVolumeIds();
-        Preconditions.checkArgument(hostIndex >= 0);
-        Preconditions.checkArgument(hostIndex < volumeIds.length);
-        String volumeIdStr = volumeIds[hostIndex].toString();
-        return Byte.parseByte(volumeIdStr);
-      }
-      return -1;
+    public int getVolumeId(int hostIndex) {
+      if (diskIds == null) return -1;
+      Preconditions.checkArgument(hostIndex >= 0);
+      Preconditions.checkArgument(hostIndex < diskIds.length);
+      return diskIds[hostIndex];
     }
   }
 
@@ -337,7 +339,7 @@ public class HdfsTable extends Table {
     // locations are from blocks[endingBlockIndexes[i-1]] to blocks[endingBlockIndexes[i]]
     List<Integer> endingBlockIndexes = Lists.newArrayList();
 
-    boolean supportVolumeId =
+    boolean supportsVolumeId =
         CONF.getBoolean(DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED, false);
 
     // TODO: Is DistributedFileSystem thread safe? If so, make it a static final object.
@@ -376,28 +378,80 @@ public class HdfsTable extends Table {
       }
     }
 
-    // Get the BlockStorageLocations for all the blocks
-    BlockLocation[] locations;
-    if (supportVolumeId) {
+    if (supportsVolumeId) {
       try {
-        locations = dfs.getFileBlockStorageLocations(blocks);
+        // Get the BlockStorageLocations for all the blocks
+        BlockStorageLocation[] locations = dfs.getFileBlockStorageLocations(blocks);
+
+        // Convert block locations to 0 based ids.  The block location ids returned
+        // from HDFS are unique but opaque (only defining comparison operators).  We need
+        // to turn them indices.  
+        // TODO: the diskId should be eventually retrievable from Hdfs when 
+        // the community agrees this API is useful.
+        
+        // For each host, this is a mapping of the VolumeId object to a 0 based index.
+        Map<String, Map<VolumeId, Integer>> hostDiskIds = Maps.newHashMap();
+        for (int i = 0; i < locations.length; ++i) {
+          String[] hosts = locations[i].getHosts();
+          VolumeId[] volumeIds = locations[i].getVolumeIds();
+          Preconditions.checkState(hosts.length == volumeIds.length);
+
+          // For each block replica, the disk id for the block on that host
+          int[] diskIds = new int[volumeIds.length];
+
+          boolean found_null = false;
+          for (int j = 0; j < volumeIds.length; ++j) {
+            if (volumeIds[j] == null) {
+              found_null = true;
+              break;
+            }
+            Map<VolumeId, Integer> hostDisks;
+            if (!hostDiskIds.containsKey(hosts[j])) {
+              hostDisks = Maps.newHashMap();
+              hostDiskIds.put(hosts[j], hostDisks);
+            } else {
+              hostDisks = hostDiskIds.get(hosts[j]);
+            }
+
+            if (hostDisks.containsKey(volumeIds[j])) {
+              // This is a VolumeId we've seen on this host, assign it the id we already
+              // assigned to this VolumeId
+              diskIds[j] = hostDisks.get(volumeIds[j]);
+            } else {
+              // This is a VolumeId we haven't seen.  Give it the next index.
+              int index = hostDisks.size();
+              hostDisks.put(volumeIds[j], index);
+              diskIds[j] = index;
+            }
+          }
+          if (found_null) break;
+          result.add(new BlockMetadata(locations[i], diskIds));
+        }
       } catch (IOException e) {
         throw new RuntimeException("couldn't determine block storage locations:\n"
             + e.getMessage(), e);
       }
-    } else {
-      locations = blocks.toArray(new BlockLocation[blocks.size()]);
+    } 
+
+    if (result.size() == 0) {
+      if (supportsVolumeId) {
+        LOG.warn("Attempted to get block locations but the call returned nulls");
+      }
+      // No disk locations.
+      for (int i = 0; i < blocks.size(); ++i) {
+        result.add(new BlockMetadata(blocks.get(i), null));
+      }
     }
 
-    // Construct block metadata with block storage locations.
+    // Construct block metadata to also include file names and partition information
     int firstBlockIndex = 0;
     int fileIndex = 0;
     for (HdfsPartition partition: partitions) {
       for (FileDescriptor fileDescriptor: partition.getFileDescriptors()) {
         int lastBlockIndex = endingBlockIndexes.get(fileIndex);
         for (int i = firstBlockIndex; i < lastBlockIndex; ++i) {
-          result.add(new BlockMetadata(fileDescriptor.getFilePath(), locations[i],
-              partition));
+          result.get(i).setFileName(fileDescriptor.getFilePath());
+          result.get(i).setPartition(partition);
         }
         ++fileIndex;
         firstBlockIndex = lastBlockIndex;
