@@ -11,29 +11,36 @@ from ImpalaService import ImpalaService
 from JavaConstants.constants import DEFAULT_QUERY_OPTIONS
 from ImpalaService.ImpalaService import TImpalaQueryOptions
 from beeswaxd import BeeswaxService
+from beeswaxd.BeeswaxService import QueryState
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
 from thrift.protocol import TBinaryProtocol
+from thrift.Thrift import TApplicationException
 
 # Simple Impala shell. Can issue queries (with configurable options)
 # Basic usage: type connect <host:port> to connect to an impalad
 # Then issue queries or other commands. Tab-completion should show the set of
 # available commands.
 # TODO: (amongst others)
-#   - Print insert result details (rows per partition)
-#   - Use query rather than executeAndWait, and use Ctrl-C to cancel
 #   - Column headers / metadata support
+#   - Report profiles
+#   - A lot of rpcs return a verbose TStatus from thrift/Status.thrift
+#     This will be useful for better error handling. The next iteration
+#     of the shell should handle this return paramter.
+#   - Make commands case agnostic.
 class ImpalaShell(cmd.Cmd):
   def __init__(self, options):
     cmd.Cmd.__init__(self)
+    self.is_alive = True
     self.disconnected_prompt = "[Not connected] > "
     self.prompt = self.disconnected_prompt
     self.connected = False
+    self.handle = None
     self.impalad = None
     self.imp_service = None
-    self.transport = None    
+    self.transport = None
     self.query_options = {}
-    self.__make_default_options()
+    self.query_state = QueryState._NAMES_TO_VALUES
     if options.impalad != None:
       if self.do_connect(options.impalad) == False:
         sys.exit(1)
@@ -50,8 +57,8 @@ class ImpalaShell(cmd.Cmd):
     return ["%s:%s" % (k,v) for (k,v) in self.query_options.iteritems()]
 
   def do_options(self, args):
-    self.__print_options()      
-    
+    self.__print_options()
+
   def do_set(self, args):
     tokens = args.split(" ")
     if len(tokens) != 2:
@@ -69,6 +76,7 @@ class ImpalaShell(cmd.Cmd):
 
   def do_quit(self, args):
     print "Goodbye"
+    self.is_alive = False
     return True
 
   def do_connect(self, args):
@@ -90,7 +98,7 @@ class ImpalaShell(cmd.Cmd):
     if self.transport is not None:
       self.transport.close()
       self.transport = None
-      
+
     self.transport = TBufferedTransport(TSocket(self.impalad[0], int(self.impalad[1])))
     try:
       self.transport.open()
@@ -105,23 +113,50 @@ class ImpalaShell(cmd.Cmd):
   def __query_with_results(self, query):
     print "Query: %s" % (query.query,)
     start, end = time.time(), 0
-    (handle, ok) = \
-        self.__do_rpc(lambda: self.imp_service.executeAndWait(query, "ImpalaCLI") )
+    (self.handle, ok) = self.__do_rpc(lambda: self.imp_service.query(query))
+    fetching = False
     if not ok: return False
-    print "RESULTS: "
-    result_rows = []
-    while True:
-      results = self.imp_service.fetch(handle, False, -1)
-      if not results.ready:
-        print "Expected results to be ready"
-        return False
-      result_rows.extend(results.data)
-      if not results.has_more:
-        end = time.time()
-        break
+
+    try:
+      while self.__get_query_state() not in [self.query_state["FINISHED"],
+                                             self.query_state["EXCEPTION"]]:
+        time.sleep(0.05)
+
+      # The query finished with an exception, skip fetching results and close the handle.
+      if self.__get_query_state() == self.query_state["EXCEPTION"]:
+        print 'Query aborted, unable to fetch data'
+        return self.__close_query_handle()
+      # Results are ready, fetch them till they're done.
+      print 'Query finished, fetching results ...'
+      result_rows = []
+      fetching = True
+      while True:
+        # TODO: Fetch more than one row at a time.
+        (results, ok) = self.__do_rpc(lambda: self.imp_service.fetch(self.handle,
+                                                                     False, -1))
+        if not ok: return False
+        result_rows.extend(results.data)
+        if not results.has_more:
+          fetching = False
+          break
+      end = time.time()
+    except KeyboardInterrupt:
+      # If Ctrl^C was caught during query execution, cancel the query.
+      # If it was caught during fetching results, return to the prompt.
+      if not fetching:
+        return self.__cancel_query()
+      else:
+        print 'Fetching results aborted.'
+        return self.__close_query_handle()
 
     print '\n'.join(result_rows)
     print "Returned %d row(s) in %2.2fs" % (len(result_rows), end - start)
+    return self.__close_query_handle()
+
+  def __close_query_handle(self):
+    """Close the query handle and get back to the prompt"""
+    self.__do_rpc(lambda: self.imp_service.close(self.handle))
+    self.handle = None
     return False
 
   def do_select(self, args):
@@ -167,7 +202,22 @@ class ImpalaShell(cmd.Cmd):
     if not ok: return False
     num_rows = sum([int(k) for k in insert_result.rows_appended.values()])
     print "Inserted %d rows in %2.2fs" % (num_rows, end - start)
-    
+
+  def __cancel_query(self):
+    """Cancel a query on keyboard interrupt from the shell."""
+    print 'Cancelling query ...'
+    # Cancel sets query_state to EXCEPTION before calling cancel() in the
+    # co-ordinator, so we don't need to wait.
+    self.__do_rpc(lambda: self.imp_service.Cancel(self.handle))
+    return False
+
+  def __get_query_state(self):
+    state, ok = self.__do_rpc(lambda : self.imp_service.get_state(self.handle))
+    if ok:
+      return state
+    else:
+      return self.query_state["EXCEPTION"]
+
   def __do_rpc(self, rpc):
     """Executes the RPC lambda provided with some error checking. Returns
        (rpc_result, True) if request was successful, (None, False) otherwise"""
@@ -176,12 +226,20 @@ class ImpalaShell(cmd.Cmd):
       return (None, False)
     try:
       return (rpc(), True)
+    except BeeswaxService.QueryNotFoundException, q:
+      print 'Error: Stale query handle'
+    # beeswaxException prints out the enture object, printing
+    # just the message a far more readable/helpful.
     except BeeswaxService.BeeswaxException, b:
-      print "ERROR: %s" % (b.message)
+      print "ERROR: %s" % (b.message,)
     except TTransportException, e:
       print "Error communicating with impalad: %s" % (e,)
       self.connected = False
       self.prompt = self.disconnected_prompt
+    except TApplicationException, t:
+      print "Application Exception : %s" % (t,)
+    except Exception, u:
+      print 'Unknown Exception : %s' % (u,)
     return (None, False)
 
   def do_explain(self, args):
@@ -205,19 +263,32 @@ class ImpalaShell(cmd.Cmd):
     print "Unrecognized command"
     return False
 
+  def emptyline(self):
+    """If an empty line is entered, do nothing"""
+    return False
+
+  def do_EOF(self, args):
+    """Exit the shell on Ctrl^d"""
+    print 'Goodbye'
+    self.is_alive = False
+    return True
+
 WELCOME_STRING = """Welcome to the Impala shell. Press TAB twice to see a list of \
 available commands.
 
 Copyright (c) 2012 Cloudera, Inc. All rights reserved."""
-  
+
 if __name__ == "__main__":
   parser = OptionParser()
   parser.add_option("-i", "--impalad", dest="impalad", default=None,
                     help="<host:port> of impalad to connect to")
   (options, args) = parser.parse_args()
 
+  intro = WELCOME_STRING
   shell = ImpalaShell(options)
-  try:
-    shell.cmdloop(WELCOME_STRING)
-  except KeyboardInterrupt:    
-    print "Ctrl-C - exiting"
+  while shell.is_alive:
+    try:
+      shell.cmdloop(intro)
+    except KeyboardInterrupt:
+      intro = '\n'
+      pass
