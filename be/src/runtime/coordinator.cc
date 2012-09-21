@@ -545,8 +545,21 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
   if (params.done) {
     lock_guard<mutex> l(lock_);
     DCHECK_GT(num_remaining_backends_, 0);
-    VLOG_FILE << "Backend [" << params.backend_num << "] completed, " 
-              << num_remaining_backends_ - 1 << " remaining";
+    VLOG_QUERY << "Backend " << params.backend_num << " completed, " 
+               << num_remaining_backends_ - 1 << " remaining: query_id=" << query_id_;
+    if (VLOG_QUERY_IS_ON && num_remaining_backends_ > 1) {
+      // print host/port info for the first backend that's still in progress as a
+      // debugging aid for backend deadlocks
+      for (int i = 0; i < backend_exec_states_.size(); ++i) {
+        BackendExecState* exec_state = backend_exec_states_[i];
+        lock_guard<mutex> l2(exec_state->lock);
+        if (!exec_state->done) {
+          VLOG_QUERY << "query_id=" << query_id_ << ": first in-progress backend: "
+                     << exec_state->hostport.first << ":" << exec_state->hostport.second;
+          break;
+        }
+      }
+    }
     if (--num_remaining_backends_ == 0) {
       backend_completion_cv_.notify_all();
     }

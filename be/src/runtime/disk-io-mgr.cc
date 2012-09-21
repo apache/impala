@@ -218,16 +218,20 @@ struct DiskIoMgr::ReaderContext {
     if (state_ == ReaderContext::Cancelled) ss << "Cancelled";
     if (state_ == ReaderContext::Active) ss << "Active";
     if (state_ != ReaderContext::Inactive) {
-      ss << " num_buffers_per_disk=" << num_buffers_per_disk_;
-      ss << " num_ready_buffers=" << ready_buffers_.size();
-      ss << " num_scan_ranges=" << num_remaining_scan_ranges_;
-      ss << " num_empty_buffers=" << num_empty_buffers_;
-      ss << " num_disks=" << num_disks_with_ranges_;
+      ss << " #buffers_per_disk=" << num_buffers_per_disk_;
+      ss << " #ready_buffers=" << ready_buffers_.size();
+      ss << " #scan_ranges=" << num_remaining_scan_ranges_;
+      ss << " #empty_buffers=" << num_empty_buffers_;
+      ss << " #outstanding_buffers=" << num_outstanding_buffers_;
+      ss << " #remaining_scan_ranges=" << num_remaining_scan_ranges_;
+      ss << " #disk_with_ranges=" << num_disks_with_ranges_;
+      ss << " #disks=" << num_disks_with_ranges_;
       for (int i = 0; i < disk_states_.size(); ++i) {
         ss << endl << "    " << i << ": ";
         ss << "is_on_queue=" << disk_states_[i].is_on_queue
-            << " num_reading_threads=" << disk_states_[i].num_threads_in_read
-            << " num_empty_buffers=" << disk_states_[i].num_empty_buffers;
+            << " #scan_ranges=" << disk_states_[i].num_scan_ranges
+            << " #reading_threads=" << disk_states_[i].num_threads_in_read
+            << " #empty_buffers=" << disk_states_[i].num_empty_buffers;
       }
     }
     ss << ")";
@@ -648,6 +652,9 @@ Status DiskIoMgr::GetNext(ReaderContext* reader, BufferDescriptor** buffer, bool
   *eos = true;
 
   if (reader->state_ == ReaderContext::Cancelled) return Status::CANCELLED;
+
+  // TODO: demote this to VLOG_FILE after we caught the deadlock
+  VLOG_QUERY << "GetNext(): reader=" << reader->DebugString();
 
   // Wait until a block is read, all blocks have been read and returned or 
   // reader is cancelled

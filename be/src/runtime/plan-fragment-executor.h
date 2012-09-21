@@ -158,6 +158,9 @@ class PlanFragmentExecutor {
   // Idempotent.
   void StopReportThread();
 
+  // Print stats about scan ranges for each volumeId in params to info log.
+  void PrintVolumeIds(const TPlanExecParams& params);
+
   const DescriptorTbl& desc_tbl() { return runtime_state_->desc_tbl(); }
 };
 

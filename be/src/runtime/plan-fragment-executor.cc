@@ -7,6 +7,7 @@
 #include <protocol/TDebugProtocol.h>
 #include <transport/TBufferTransports.h>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
+#include <boost/unordered_map.hpp>
 
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
@@ -69,7 +70,8 @@ Status PlanFragmentExecutor::Prepare(
   DCHECK(request.__isset.desc_tbl);
   RETURN_IF_ERROR(DescriptorTbl::Create(obj_pool(), request.desc_tbl, &desc_tbl));
   runtime_state_->set_desc_tbl(desc_tbl);
-  VLOG_QUERY << desc_tbl->DebugString();
+  VLOG_QUERY << "descriptor table for fragment=" << request.fragment_id << "\n"
+             << desc_tbl->DebugString();
 
   // set up plan
   DCHECK(request.__isset.plan_fragment);
@@ -90,6 +92,8 @@ Status PlanFragmentExecutor::Prepare(
     }
   }
 
+  if (VLOG_QUERY_IS_ON) PrintVolumeIds(params);
+
   // set up sink, if required  
   if (request.__isset.data_sink) {
     RETURN_IF_ERROR(DataSink::CreateDataSink(request, params, row_desc(), &sink_));
@@ -106,6 +110,36 @@ Status PlanFragmentExecutor::Prepare(
   VLOG(3) << "plan_root=\n" << plan_->DebugString();
   prepared_ = true;
   return Status::OK;
+}
+
+void PlanFragmentExecutor::PrintVolumeIds(const TPlanExecParams& params) {
+  // map from volume id to (# of splits, total # bytes) on that volume
+  unordered_map<int32_t, pair<int, int64_t> > per_volume_stats;
+  for (int i = 0; i < params.scan_ranges.size(); ++i) {
+    const TScanRange& scan_range = params.scan_ranges[i];
+    if (!scan_range.__isset.hdfsFileSplits) continue;
+    for (int j = 0; j < scan_range.hdfsFileSplits.size(); ++j) {
+      const THdfsFileSplit& split = scan_range.hdfsFileSplits[j];
+      unordered_map<int32_t, pair<int, int64_t> >::iterator entry =
+          per_volume_stats.find(split.volumeId);
+      if (entry == per_volume_stats.end()) {
+        entry = per_volume_stats.insert(make_pair(split.volumeId, make_pair(0, 0))).first;
+      }
+      pair<int, int64_t>& stats = entry->second;
+      ++(stats.first);
+      stats.second += split.length;
+    }
+  }
+
+  stringstream str;
+  str << "Hdfs split stats (<volume id>:<# splits>/<split lengths>) for query="
+      << query_id_ << ":\n";
+  for (unordered_map<int32_t, pair<int, int64_t> >::iterator i = per_volume_stats.begin();
+       i != per_volume_stats.end(); ++i) {
+     str << i->first << ":" << i->second.first << "/"
+         << PrettyPrinter::Print(i->second.second, TCounterType::UNIT) << " ";
+  }
+  VLOG_QUERY << str.str();
 }
 
 Status PlanFragmentExecutor::Open() {
