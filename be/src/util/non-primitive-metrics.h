@@ -18,25 +18,17 @@ namespace impala {
 // it with a new one.
 
 // Utility method to print an iterable type to a stringstream like ["v1", "v2", "v3"] 
+// or [v1, v2, v3], depending on whether quotes are requested via the first parameter
 template <typename T, typename I>
-void PrintQuotedStringList(const I& iterable, std::stringstream* out) {
+void PrintStringList(bool quoted_items, const I& iterable, std::stringstream* out) {
   std::vector<std::string> strings;
   BOOST_FOREACH(const T& item, iterable) {
     std::stringstream ss;
-    ss << "\"" << item << "\"";
-    strings.push_back(ss.str());    
-  }
-
-  (*out) <<"[" << boost::algorithm::join(strings, ", ") << "]";
-}
-
-// Utility method to print an iterable type to a stringstream like [v1, v2, v3] 
-template <typename T, typename I>
-void PrintUnquotedStringList(const I& iterable, std::stringstream* out) {
-  std::vector<std::string> strings;
-  BOOST_FOREACH(const T& item, iterable) {
-    std::stringstream ss;
-    ss << item;
+    if (quoted_items) {
+      ss << "\"" << item << "\"";
+    } else  {
+      ss << item;
+    }
     strings.push_back(ss.str());    
   }
 
@@ -53,11 +45,11 @@ class ListMetric : public Metrics::Metric<std::vector<T> > {
 
  protected:
   virtual void PrintValueJson(std::stringstream* out) {
-    PrintQuotedStringList<T, std::vector<T> >(this->value(), out);
+    PrintStringList<T, std::vector<T> >(true, this->value(), out);
   }
 
   virtual void PrintValue(std::stringstream* out) {
-    PrintUnquotedStringList<T, std::vector<T> >(this->value(), out);
+    PrintStringList<T, std::vector<T> >(false, this->value(), out);
   }
 };
 
@@ -81,11 +73,11 @@ class SetMetric : public Metrics::Metric<std::set<T> > {
 
  protected:
   virtual void PrintValueJson(std::stringstream* out) {    
-    PrintQuotedStringList<T, std::set<T> >(this->value(), out);
+    PrintStringList<T, std::set<T> >(true, this->value(), out);
   }
 
   virtual void PrintValue(std::stringstream* out) {
-    PrintUnquotedStringList<T, std::set<T> >(this->value(), out);
+    PrintStringList<T, std::set<T> >(false, this->value(), out);
   }
 };
 

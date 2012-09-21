@@ -35,6 +35,7 @@ class MetricsTest : public testing::Test {
 
   ListMetric<int>* list_metric_;
   SetMetric<int>* set_metric_;
+
  private:
   boost::scoped_ptr<Metrics> metrics_;
 };
