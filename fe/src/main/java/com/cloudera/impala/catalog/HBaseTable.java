@@ -64,10 +64,7 @@ public class HBaseTable extends Table {
       }
 
       // Parse HBase column-mapping string.
-      List<String> hbaseColumnFamilies = new ArrayList<String>();
-      List<String> hbaseColumnQualifiers = new ArrayList<String>();
-      int keyIndex = HBaseSerDe.parseColumnMapping(hbaseColumnsMapping, hbaseColumnFamilies,
-          null, hbaseColumnQualifiers, null);
+      int keyIndex = HBaseSerDe.parseColumnsMapping(hbaseColumnsMapping);
       Preconditions.checkState(hbaseColumnFamilies.size() == hbaseColumnQualifiers.size());
 
       // Populate tmp cols in the order they appear in the Hive metastore.

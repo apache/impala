@@ -13,13 +13,13 @@ import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.util.Progressable;
 
 /** Dummy Output Format Class so Hive will create Trevni files. */
-public class TrevniOutputFormat
-  implements HiveOutputFormat<WritableComparable, Writable> {
+public class TrevniOutputFormat<K extends WritableComparable<K>, V extends Writable>
+  extends HiveOutputFormatImpl<K,V> implements HiveOutputFormat<K,V> {
 
   @Override
-  public RecordWriter getHiveRecordWriter(JobConf arg0, Path arg1,
-      Class<? extends Writable> arg2,
-      boolean arg3, Properties arg4, Progressable arg5) throws IOException {
+  public RecordWriter getHiveRecordWriter(JobConf jc, Path finalOutPath,
+      final Class<? extends Writable> valueClass, boolean isCompressed,
+      Properties tableProperties, Progressable progress) throws IOException {
     return null;
   }
 
