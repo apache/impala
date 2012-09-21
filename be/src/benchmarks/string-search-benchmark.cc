@@ -26,6 +26,14 @@ using namespace std;
 // Benchmark tests for string search.  This is probably a science of its own
 // but we'll run some simple tests.  (We can't use libc strstr because our 
 // strings are not null-terminated and also, it's not that fast).
+// Results:
+// String Search:        Function                Rate          Comparison
+// ----------------------------------------------------------------------
+//                         Python               81.93                  1X
+//                           LibC               262.2              3.201X
+//            Null Terminated SSE               212.4              2.592X
+//        Non-null Terminated SSE               139.6              1.704X
+
 struct TestData {
   vector<StringValue> needles;
   vector<StringValue> haystacks;
@@ -155,29 +163,12 @@ int main(int argc, char **argv) {
   TestData data;
   InitTestData(&data);
 
-  // Run a warmup to iterate through the data.  
-  Benchmark::Measure(TestLibc, &data);
-
-  double libc_rate = Benchmark::Measure(TestLibc, &data);
-  int libc_matches = data.matches;
-
-  double python_rate = Benchmark::Measure(TestPython, &data);
-  int python_matches = data.matches;
-  
-  double null_terminated_rate = Benchmark::Measure(TestImpalaNullTerminated, &data);
-  int null_terminated_matches = data.matches;
-  
-  double nonnull_terminated_rate = Benchmark::Measure(TestImpalaNonNullTerminated, &data);
-  int nonnull_terminated_matches = data.matches;
-
-  cout << "LibC Matches: " << libc_matches << endl;
-  cout << "Python Matches: " << python_matches << endl;
-  cout << "Null Terminated Matches: " << null_terminated_matches << endl;
-  cout << "Non Null Terminated Matches: " << nonnull_terminated_matches << endl;
-  cout << "LibC Rate: " << libc_rate << endl;
-  cout << "Python Rate: " << python_rate << endl;
-  cout << "Null Terminated Rate: " << null_terminated_rate << endl;
-  cout << "Non Null Terminated Rate: " << nonnull_terminated_rate << endl;
+  Benchmark suite("String Search");
+  suite.AddBenchmark("Python", TestPython, &data);
+  suite.AddBenchmark("LibC", TestLibc, &data);
+  suite.AddBenchmark("Null Terminated SSE", TestImpalaNullTerminated, &data);
+  suite.AddBenchmark("Non-null Terminated SSE", TestImpalaNonNullTerminated, &data);
+  cout << suite.Measure();
 
   return 0;
 }

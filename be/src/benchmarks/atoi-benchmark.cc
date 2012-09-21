@@ -29,13 +29,15 @@ using namespace std;
 // to convert string to int32s.  The data is mostly positive, relatively small
 // numbers.
 // Results:
-//   Strtol Rate (per ms): 57.4257
-//   Atoi Rate (per ms): 57.7821
-//   Impala Rate (per ms): 147.268
-//   Impala Unsafe Rate (per ms): 200.182
-//   Impala Unrolled Rate (per ms): 167.628
-//   Impala Cased Rate (per ms): 169.307
-#define VALIDATE 1
+// atoi:                 Function                Rate          Comparison
+// ----------------------------------------------------------------------
+//                         strtol               58.59                  1X
+//                           atoi               58.75              1.003X
+//                         impala               180.3              3.078X
+//                  impala_unsafe               186.2              3.179X
+//                impala_unrolled               176.1              3.006X
+//                   impala_cased               217.8              3.718X
+#define VALIDATE 0
 
 #if VALIDATE
 #define VALIDATE_RESULT(actual, expected, str) \
@@ -237,25 +239,16 @@ int main(int argc, char **argv) {
 
   // Most data is probably positive
   AddTestData(&data, 1000, -5, 1000);
-
   data.result.resize(data.data.size());
 
-  // Run a warmup to iterate through the data.  
-  TestAtoi(1000, &data);
-
-  double strtol_rate = Benchmark::Measure(TestStrtol, &data);
-  double atoi_rate = Benchmark::Measure(TestAtoi, &data);
-  double impala_rate = Benchmark::Measure(TestImpala, &data);
-  double unsafe_rate = Benchmark::Measure(TestImpalaUnsafe, &data);
-  double unrolled_rate = Benchmark::Measure(TestImpalaUnrolled, &data);
-  double cased_rate = Benchmark::Measure(TestImpalaCased, &data);
-
-  cout << "Strtol Rate (per ms): " << strtol_rate << endl;
-  cout << "Atoi Rate (per ms): " << atoi_rate << endl;
-  cout << "Impala Rate (per ms): " << impala_rate << endl;
-  cout << "Impala Unsafe Rate (per ms): " << unsafe_rate << endl;
-  cout << "Impala Unrolled Rate (per ms): " << unrolled_rate << endl;
-  cout << "Impala Cased Rate (per ms): " << cased_rate << endl;
+  Benchmark suite("atoi");
+  suite.AddBenchmark("strtol", TestStrtol, &data);
+  suite.AddBenchmark("atoi", TestAtoi, &data);
+  suite.AddBenchmark("impala", TestImpala, &data);
+  suite.AddBenchmark("impala_unsafe", TestImpalaUnsafe, &data);
+  suite.AddBenchmark("impala_unrolled", TestImpalaUnrolled, &data);
+  suite.AddBenchmark("impala_cased", TestImpalaCased, &data);
+  cout << suite.Measure();
 
   return 0;
 }

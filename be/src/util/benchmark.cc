@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 
 #include "util/benchmark.h"
 #include "util/cpu-info.h"
@@ -56,6 +58,54 @@ double Benchmark::Measure(BenchmarkFunction function, void* args,
 
   double ms_elapsed = sw.ElapsedTime() / CpuInfo::cycles_per_ms();
   return iters / ms_elapsed;
+}
+
+Benchmark::Benchmark(const string& name) : name_(name) {}
+
+void Benchmark::AddBenchmark(const string& name, BenchmarkFunction fn, void* args) {
+  BenchmarkResult benchmark;
+  benchmark.name = name;
+  benchmark.fn = fn;
+  benchmark.args = args;
+  benchmarks_.push_back(benchmark);
+}
+
+string Benchmark::Measure() {
+  if (benchmarks_.empty()) return "";
+
+  // Run a warmup to iterate through the data
+  benchmarks_[0].fn(10, benchmarks_[0].args);
+
+  stringstream ss;
+  for (int i = 0; i < benchmarks_.size(); ++i) {
+    benchmarks_[i].rate = Measure(benchmarks_[i].fn, benchmarks_[i].args);
+  }
+
+  int function_out_width = 30;
+  int rate_out_width = 20;
+  int comparison_out_width = 20;
+  int padding = 0;
+  int total_width = function_out_width + rate_out_width + comparison_out_width + padding;
+
+  double base_line = benchmarks_[0].rate;
+  
+  ss << name_ << ":"
+     << setw(function_out_width - name_.size() - 1) << "Function" 
+     << setw(rate_out_width) << "Rate" 
+     << setw(comparison_out_width) << "Comparison" << endl;
+  for (int i = 0; i < total_width; ++i) {
+    ss << '-';
+  }
+  ss << endl;
+
+  for (int i = 0; i < benchmarks_.size(); ++i) {
+    ss << setw(function_out_width) << benchmarks_[i].name 
+       << setw(rate_out_width) << setprecision(4) << benchmarks_[i].rate 
+       << setw(comparison_out_width - 1) << setprecision(4) 
+       << (benchmarks_[i].rate / base_line) << "X" << endl;
+  }
+  
+  return ss.str();
 }
 
 }

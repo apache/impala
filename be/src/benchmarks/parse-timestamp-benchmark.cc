@@ -30,15 +30,16 @@ using namespace boost::posix_time;
 using namespace boost::gregorian;
 
 // Benchmark for parsing timestamps.
-// Dates:
-// Impala Rate (per ms): 32.4125
-// Boost String Rate (per ms): 0.683995
-// Boost Rate (per ms): 0.679348
-//
-// Times:
-// Impala Rate (per ms): 29.3199
-// Boost Rate (per ms): 0.491159
-//
+// ParseDate:            Function                Rate          Comparison
+// ----------------------------------------------------------------------
+//                BoostStringDate               0.668                  1X
+//                      BoostDate              0.6456             0.9664X
+//                         Impala               28.84              43.18X
+// 
+// ParseTimestamp:       Function                Rate          Comparison
+// ----------------------------------------------------------------------
+//                      BoostTime              0.4684                  1X
+//                         Impala               28.33              60.49X
 
 #define VALIDATE 0
 
@@ -146,27 +147,18 @@ int main(int argc, char **argv) {
   dates.result.resize(dates.data.size());
   times.result.resize(times.data.size());
 
-  // Run a warmup to iterate through the data.  
-  TestBoostDate(1000, &dates);
-
-  double impala_rate = Benchmark::Measure(TestImpalaDate, &dates);
-  double boostString_rate = Benchmark::Measure(TestBoostStringDate, &dates);
-  double boost_rate = Benchmark::Measure(TestBoostDate, &dates);
-
-  // Run a warmup to iterate through the data.  
-  TestBoostTime(1000, &times);
-  double impala_time_rate = Benchmark::Measure(TestImpalaDate, &times);
-  double boost_time_rate = Benchmark::Measure(TestBoostTime, &times);
-
-  cout << "Dates:" << endl;
-  cout << "Impala Rate (per ms): " << impala_rate << endl;
-  cout << "Boost String Rate (per ms): " << boostString_rate << endl;
-  cout << "Boost Rate (per ms): " << boost_rate << endl;
+  Benchmark date_suite("ParseDate");
+  date_suite.AddBenchmark("BoostStringDate", TestBoostStringDate, &dates);
+  date_suite.AddBenchmark("BoostDate", TestBoostDate, &dates);
+  date_suite.AddBenchmark("Impala", TestImpalaDate, &dates);
+  
+  Benchmark timestamp_suite("ParseTimestamp");
+  timestamp_suite.AddBenchmark("BoostTime", TestBoostTime, &times);
+  timestamp_suite.AddBenchmark("Impala", TestImpalaDate, &times);
+  
+  cout << date_suite.Measure();
   cout << endl;
-  cout << "Times:" << endl;
-  cout << "Impala Rate (per ms): " << impala_time_rate << endl;
-  cout << "Boost Rate (per ms): " << boost_time_rate << endl;
-
+  cout << timestamp_suite.Measure();
 
   return 0;
 }

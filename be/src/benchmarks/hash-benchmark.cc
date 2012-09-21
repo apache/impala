@@ -52,25 +52,20 @@ using namespace std;
 //                      = n / e 
 //                      = 367
 // Results:
-//  FVN Int Rate: 95.6969
-//  Boost Int Rate: 175.069
-//  Crc Int Rate: 372.465
-//  Codegen Int Rate: 886.139
-//  
-//  FVN Int Collisions: 407
-//  Boost Int Collisions: 390
-//  Crc Int Collisions: 387
-//  Codegen Int Collisions: 387
-//  
-//  FVN Mixed Rate: 80.3885
-//  Boost Mixed Rate: 78.4977
-//  Crc Mixed Rate: 270.356
-//  Codegen Mixed Rate: 216.901  // TODO: why is this slower???
-//  
-//  FVN Mixed Collisions: 366
-//  Boost Mixed Collisions: 374
-//  Crc Mixed Collisions: 376
-//  Codegen Mixed Collisions: 376
+// Int Hash:             Function                Rate          Comparison
+// ----------------------------------------------------------------------
+//                            Fvn               96.35                  1X
+//                          Boost               176.2              1.828X
+//                            Crc               375.6              3.898X
+//                        Codegen               890.2               9.24X
+// 
+// Mixed Hash:           Function                Rate          Comparison
+// ----------------------------------------------------------------------
+//                            Fvn               81.21                  1X
+//                          Boost               76.79             0.9455X
+//                            Crc               271.1              3.339X
+//                        Codegen                 215              2.647X
+
 typedef uint32_t (*CodegenHashFn)(int rows, char* data, int32_t* results);
 
 struct TestData {
@@ -414,55 +409,20 @@ int main(int argc, char **argv) {
   mixed_data.results.resize(mixed_data.num_rows);
   mixed_data.jitted_fn = jitted_hash_mixed;
 
-  TestFvnIntHash(10, &int_data);  // warm-up run
-  double fvn_int_rate = Benchmark::Measure(TestFvnIntHash, &int_data);
-  int fvn_int_collisions = NumCollisions(&int_data, NUM_ROWS);
-  
-  double boost_int_rate = Benchmark::Measure(TestBoostIntHash, &int_data);
-  int boost_int_collisions = NumCollisions(&int_data, NUM_ROWS);
-  
-  double crc_int_rate = Benchmark::Measure(TestCrcIntHash, &int_data);
-  int crc_int_collisions = NumCollisions(&int_data, NUM_ROWS);
-  
-  double codegen_int_rate = Benchmark::Measure(TestCodegenIntHash, &int_data);
-  int codegen_int_collisions = NumCollisions(&int_data, NUM_ROWS);
-  
-  TestFvnMixedHash(10, &mixed_data);  // warm-up run
-  double fvn_mixed_rate = Benchmark::Measure(TestFvnMixedHash, &mixed_data);
-  int fvn_mixed_collisions = NumCollisions(&mixed_data, NUM_ROWS);
-  
-  double boost_mixed_rate = Benchmark::Measure(TestBoostMixedHash, &mixed_data);
-  int boost_mixed_collisions = NumCollisions(&mixed_data, NUM_ROWS);
-  
-  double crc_mixed_rate = Benchmark::Measure(TestCrcMixedHash, &mixed_data);
-  int crc_mixed_collisions = NumCollisions(&mixed_data, NUM_ROWS);
-  
-  double codegen_mixed_rate = Benchmark::Measure(TestCodegenMixedHash, &mixed_data);
-  int codegen_mixed_collisions = NumCollisions(&mixed_data, NUM_ROWS);
+  Benchmark int_suite("Int Hash");
+  int_suite.AddBenchmark("Fvn", TestFvnIntHash, &int_data);
+  int_suite.AddBenchmark("Boost", TestBoostIntHash, &int_data);
+  int_suite.AddBenchmark("Crc", TestCrcIntHash, &int_data);
+  int_suite.AddBenchmark("Codegen", TestCodegenIntHash, &int_data);
+  cout << int_suite.Measure() << endl;
 
-  cout << "FVN Int Rate: " << fvn_int_rate << endl;
-  cout << "Boost Int Rate: " << boost_int_rate << endl;
-  cout << "Crc Int Rate: " << crc_int_rate << endl;
-  cout << "Codegen Int Rate: " << codegen_int_rate << endl;
-  cout << endl;
+  Benchmark mixed_suite("Mixed Hash");
+  mixed_suite.AddBenchmark("Fvn", TestFvnMixedHash, &mixed_data);
+  mixed_suite.AddBenchmark("Boost", TestBoostMixedHash, &mixed_data);
+  mixed_suite.AddBenchmark("Crc", TestCrcMixedHash, &mixed_data);
+  mixed_suite.AddBenchmark("Codegen", TestCodegenMixedHash, &mixed_data);
+  cout << mixed_suite.Measure();
   
-  cout << "FVN Int Collisions: " << fvn_int_collisions << endl;
-  cout << "Boost Int Collisions: " << boost_int_collisions << endl;
-  cout << "Crc Int Collisions: " << crc_int_collisions << endl;
-  cout << "Codegen Int Collisions: " << codegen_int_collisions << endl;
-  cout << endl;
-
-  cout << "FVN Mixed Rate: " << fvn_mixed_rate << endl;
-  cout << "Boost Mixed Rate: " << boost_mixed_rate << endl;
-  cout << "Crc Mixed Rate: " << crc_mixed_rate << endl;
-  cout << "Codegen Mixed Rate: " << codegen_mixed_rate << endl;
-  cout << endl;
-  
-  cout << "FVN Mixed Collisions: " << fvn_mixed_collisions << endl;
-  cout << "Boost Mixed Collisions: " << boost_mixed_collisions << endl;
-  cout << "Crc Mixed Collisions: " << crc_mixed_collisions << endl;
-  cout << "Codegen Mixed Collisions: " << codegen_mixed_collisions << endl;
-
   return 0;
 }
 

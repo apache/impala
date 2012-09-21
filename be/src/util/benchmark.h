@@ -16,15 +16,37 @@
 #ifndef IMPALA_UTIL_BENCHMARK_H
 #define IMPALA_UTIL_BENCHMARK_H
 
+#include <string>
+#include <vector>
+
 namespace impala {
 
-// Static utility class for microbenchmarks.
+// Utility class for microbenchmarks.
+// This can be utilized to create a benchmark suite.  For example:
+//  Benchmark suite("benchmark");
+//  suite.AddBenchmark("Implementation #1", Implementation1Fn, data);
+//  suite.AddBenchmark("Implementation #2", Implementation2Fn, data);
+//  ...
+//  string result = suite.Measure();
 class Benchmark {
  public:
+  // Name of the microbenchmark.  This is outputted in the result.  
+  Benchmark(const std::string& name);
+
   // Function to benchmark.  The function should run iters time (to minimize function
   // call overhead).  The second argument is opaque and is whatever data the test 
   // function needs to execute.
   typedef void (*BenchmarkFunction)(int iters, void*);
+
+  // Add a benchmark with 'name' to the suite.  The first benchmark is assumed to
+  // be the baseline.  Reporting will be done relative to that.
+  void AddBenchmark(const std::string& name, BenchmarkFunction fn, void* args);
+
+  // Runs all the benchmarks and returns the result in a formatted string.
+  std::string Measure();
+
+ private:
+  friend class BenchmarkTest;
 
   // Benchmarks the 'function' returning the result as invocations per ms.
   // args is an opaque argument passed as the second argument to the function.
@@ -34,6 +56,16 @@ class Benchmark {
   // will take *at least* initial_batch_size * function invocation time.
   static double Measure(BenchmarkFunction function, void* args,
       int max_time = 1000, int initial_batch_size = 1000);
+
+  struct BenchmarkResult {
+    std::string name;
+    BenchmarkFunction fn; 
+    void* args;
+    double rate;
+  };
+
+  std::string name_;
+  std::vector<BenchmarkResult> benchmarks_;
 };
   
 }

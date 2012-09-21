@@ -30,11 +30,12 @@ using namespace std;
 // is mostly positive numbers with just a couple of them in scientific
 // notation.  
 // Results:
-//   Strtod Rate (per ms): 8.30189
-//   Atof Rate (per ms): 8.33333
-//   Impala Rate (per ms): 58.9649
-
-#define VALIDATE 1
+// atof:                 Function                Rate          Comparison
+// ----------------------------------------------------------------------
+//                         Strtod               8.271                  1X
+//                           Atof               8.224             0.9944X
+//                         Impala               69.51              8.404X
+#define VALIDATE 0
 
 #if VALIDATE
 // Use fabs?
@@ -117,16 +118,11 @@ int main(int argc, char **argv) {
 
   data.result.resize(data.data.size());
 
-  // Run a warmup to iterate through the data.  
-  TestAtof(100, &data);
-
-  double strtod_rate = Benchmark::Measure(TestStrtod, &data);
-  double atof_rate = Benchmark::Measure(TestAtof, &data);
-  double impala_rate = Benchmark::Measure(TestImpala, &data);
-
-  cout << "Strtod Rate (per ms): " << strtod_rate << endl;
-  cout << "Atof Rate (per ms): " << atof_rate << endl;
-  cout << "Impala Rate (per ms): " << impala_rate << endl;
+  Benchmark suite("atof");
+  suite.AddBenchmark("Strtod", TestStrtod, &data);
+  suite.AddBenchmark("Atof", TestAtof, &data);
+  suite.AddBenchmark("Impala", TestImpala, &data);
+  cout << suite.Measure();
 
   return 0;
 }
