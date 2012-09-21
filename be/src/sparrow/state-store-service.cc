@@ -122,6 +122,10 @@ void StateStore::UnregisterService(TUnregisterServiceResponse& response,
     Membership::iterator instance = membership.find(subscriber.id());
     if (instance != membership.end()) {
       instance_unregistered = true;
+      stringstream ss;
+      ss << instance->second.host << ":" << instance->second.port;
+      backend_set_metric_->Remove(ss.str());
+
       membership.erase(instance);
       if (membership.empty()) {
         service_instances_.erase(service_membership);
@@ -131,10 +135,6 @@ void StateStore::UnregisterService(TUnregisterServiceResponse& response,
       if (subscriber.IsZombie()) {
         subscribers_.erase(subscriber_iterator);
       }
-
-      stringstream ss;
-      ss << instance->second.host << ":" << instance->second.port;
-      backend_set_metric_->Remove(ss.str());
     }
   }
   if (!instance_unregistered) {
