@@ -24,6 +24,7 @@ import re
 import sys
 import subprocess
 import tempfile
+from query_executor import *
 from collections import defaultdict
 import threading
 from optparse import OptionParser
@@ -55,11 +56,12 @@ parser.add_option("--impalad", dest="impalad", default="localhost:21000",
                   help="A comma-separated list of impalad instances to run the "\
                   "workload against.")
 parser.add_option("--runquery_path", dest="runquery_path",
-                  default=os.path.join(os.environ['IMPALA_HOME'],
-                      'be/build/release/service/runquery'),
+                  default=os.path.join(os.environ['IMPALA_HOME'], 'bin/run-query.sh'),
                   help="The command to use for executing queries")
 parser.add_option("--runquery_args", dest="runquery_args", default='',
                   help="Additional arguments to pass to runquery.")
+parser.add_option("--exec_options", dest="exec_options", default='',
+                  help="Runquery exec option string.")
 parser.add_option("--compare_with_hive", dest="compare_with_hive", action="store_true",
                   default= False, help="Run all queries using Hive as well as Impala")
 parser.add_option("--results_csv_file", dest="results_csv_file",
@@ -88,8 +90,9 @@ profile_output_file = os.path.join(IMPALA_HOME, 'be/build/release/service/profil
 dev_null = open('/dev/null')
 
 # commands
-query_cmd = "%(runquery)s %(args)s" % {'runquery' : options.runquery_path,
-                                       'args' : options.runquery_args}
+runquery_cmd = "%(runquery)s %(args)s " % {'runquery' : options.runquery_path,
+                                           'args' : options.runquery_args}
+
 gprof_cmd  = 'google-pprof --text ' + options.runquery_path + ' %s | head -n 60'
 prime_cache_cmd = os.path.join(IMPALA_HOME, "testdata/bin/cache_tables.py") + " -q \"%s\""
 
@@ -109,11 +112,6 @@ LOG = logging.getLogger('run-benchmark')
 if options.verbose:
   LOG.setLevel(level=logging.DEBUG)
 
-class QueryExecutionResult(object):
-  def __init__(self, avg_time = 'N/A', stddev = 'N/A'):
-    self.avg_time = avg_time
-    self.stddev = stddev
-
 class QueryExecutionDetail(object):
   def __init__(self, executor, workload, scale_factor, file_format, compression_codec,
                compression_type, execution_result):
@@ -125,67 +123,46 @@ class QueryExecutionDetail(object):
     self.compression_type = compression_type
     self.execution_result = execution_result
 
-## Functions
-class QueryExecutor(threading.Thread):
-  def __init__(self, logger, name, query_results_match_function, cmd, exit_on_error):
-    self.LOG = logger
-    self.query_results_match_function = query_results_match_function
-    self.cmd = cmd
-    self.exit_on_error = exit_on_error
-    self.output_result = None
-    self.execution_result = None
-    threading.Thread.__init__(self)
-    self.name = name
-    self.has_execution_error = False
+def print_file(header, output_file):
+  """
+  Print the contents of the file to the terminal.
+  """
+  output_file.seek(0)
+  output = header + '\n'
+  for line in output_file.readlines():
+    output += line.rstrip() + '\n'
+  LOG.debug(output)
 
-  # Runs the given query command and returns the execution result. Takes in a match
-  # function that is used to parse stderr/stdout to extract the results.
-  def _run_query_capture_results(self):
-    output_stdout = tempfile.TemporaryFile("w+")
-    output_stderr = tempfile.TemporaryFile("w+")
-    self.LOG.info("Executing: %s" % self.cmd)
-    subprocess.call(self.cmd, shell=True, stderr=output_stderr, stdout=output_stdout)
-    output_stdout.seek(0)
-    output_stderr.seek(0)
-    run_success, execution_result =\
-        self.query_results_match_function(output_stdout.readlines(),
-                                          output_stderr.readlines())
-    self._print_file("", output_stderr)
-    self._print_file("", output_stdout)
-    if not run_success:
-      self.has_execution_error = True
-      self.LOG.error("Query did not run successfully")
-      if self.exit_on_error:
-        return
+# Runs the given query command and returns the execution result. Takes in a match
+# function that is used to parse stderr/stdout to extract the results.
+def run_query_capture_results(cmd, query_result_match_function, exit_on_error):
+  output_stdout = tempfile.TemporaryFile("w+")
+  output_stderr = tempfile.TemporaryFile("w+")
+  LOG.info("Executing: %s" % cmd)
+  subprocess.call(cmd, shell=True, stderr=output_stderr, stdout=output_stdout)
+  output_stdout.seek(0)
+  output_stderr.seek(0)
+  execution_result = query_result_match_function(output_stdout.readlines(),
+                                                 output_stderr.readlines())
+  print_file("", output_stderr)
+  print_file("", output_stdout)
+  if not execution_result.success:
+    has_execution_error = True
+    LOG.error("Query did not run successfully")
+    if exit_on_error:
+      return execution_result, None
 
-    output = ''
-    if run_success:
-      output += "  Avg Time: %.02fs\n" % float(execution_result.avg_time)
-      if execution_result.stddev != 'N/A':
-        output += "  Std Dev: %.02fs\n" % float(execution_result.stddev)
-    else:
-      output += '  No Results - Error executing query!\n'
+  output = ''
+  if execution_result.success:
+    output += "  Avg Time: %.02fs\n" % float(execution_result.avg_time)
+    if execution_result.stddev != 'N/A':
+      output += "  Std Dev: %.02fs\n" % float(execution_result.stddev)
+  else:
+    output += '  No Results - Error executing query!\n'
 
-    output_stderr.close()
-    output_stdout.close()
-    self.output_result = output
-    self.execution_result = execution_result
-
-  def run(self):
-    self._run_query_capture_results()
-
-  def get_results(self):
-    return self.output_result, self.execution_result
-
-  def _print_file(self, header, output_file):
-    """
-    Print the contents of the file to the terminal.
-    """
-    output_file.seek(0)
-    output = header + '\n'
-    for line in output_file.readlines():
-      output += line.rstrip() + '\n'
-    self.LOG.debug(output)
+  output_stderr.close()
+  output_stdout.close()
+  return execution_result, output
 
 # Parse for the tables used in this query
 def parse_tables(query):
@@ -228,7 +205,7 @@ def prime_buffer_cache_remote_impala(query):
   subprocess_call_partial = partial()
   for table in tables:
     count_cmd = '%s -query="select count(*) from %s" --iterations=5' % \
-                (query_cmd, table)
+                (runquery_cmd, table)
     subprocess.call(count_cmd, shell=True, stderr=dev_null, stdout=dev_null)
 
 def prime_buffer_cache_remote_hive(query):
@@ -287,7 +264,9 @@ def match_impala_query_results(output_stdout, output_stderr):
         avg_time = ('%s.%s') % (match.group(2), match.group(3))
         stddev = ('%s.%s') % (match.group(4), match.group(5))
         run_success = True
-  return run_success, QueryExecutionResult(str(avg_time), str(stddev))
+  execution_result = QueryExecutionResult(str(avg_time), str(stddev))
+  execution_result.success = run_success
+  return execution_result
 
 def match_hive_query_results(output_stdout, output_stderr):
   """
@@ -311,51 +290,10 @@ def match_hive_query_results(output_stdout, output_stderr):
       stddev = calculate_stddev(execution_times)
     execution_result = QueryExecutionResult(avg_time, stddev)
     run_success = True
-  return run_success, execution_result
+  execution_result.success = run_success
+  return execution_result
 
-def run_query_capture_results(query_results_match_function, cmd, exit_on_error):
-  """
-  Run a query command and return the result.
-
-  Takes in a match functional that is used to parse stderr/stdout to extract the results.
-  """
-  threads = []
-  results = []
-
-  output = None
-  execution_result = None
-  for client in xrange(options.num_clients):
-    name = "Client Thread " + str(client)
-    target_cmd = cmd.format(impalad=choice(TARGET_IMPALADS))
-    threads.append(QueryExecutor(LOG, name, query_results_match_function,
-                                 target_cmd, exit_on_error=exit_on_error))
-
-  for thread in threads:
-    LOG.debug(thread.name + " starting")
-    thread.start()
-
-  for thread in threads:
-    thread.join()
-    if thread.has_execution_error and exit_on_error:
-      LOG.error("Thread: %s returned with error. Exiting." % thread.name)
-      sys.exit(1)
-    results.append((thread.get_results()))
-    LOG.debug(thread.name + " completed")
-  return results
-
-def run_impala_query(query, prime_cache, iterations):
-  """
-  Run an Impala query and report statistics.
-
-  Function which will run the query and report the average time and standard deviation
-   - query: the query to run
-   - prime_buffer_cache: if true, will try to prime buffer cache for all tables in the
-     query. This is not useful for very large (e.g. > 2 GB) data sets
-   - iterations: number of times to run the query
-  """
-  # parse the options and do some setup.
-  if prime_cache:
-    prime_remote_or_local_cache(query, options.remote)
+def execute_using_runquery(query, query_options):
   enable_counters = int(options.verbose)
   gprof_tmp_file = str()
 
@@ -363,26 +301,68 @@ def run_impala_query(query, prime_cache, iterations):
   if options.profiler:
     gprof_tmp_file = profile_output_file
 
-  cmd = '%s -query="%s" -iterations=%d -enable_counters=%d -profile_output_file="%s"' %\
-      (query_cmd, query, iterations, enable_counters, gprof_tmp_file)
-  cmd += ' -impalad={impalad}'
-  threads = []
-  results = run_query_capture_results(match_impala_query_results, cmd, exit_on_error=True)
+
+  cmd = '%(runquery_cmd)s %(args)s --enable_counters=%(enable_counters)d '\
+        '--profile_output_file="%(prof_output_file)s" --query="%(query)s"' % {\
+            'runquery_cmd': runquery_cmd,
+            'args': query_options.build_argument_string(),
+            'prof_output_file': gprof_tmp_file,
+            'enable_counters': int(options.verbose),
+            'query': query
+        }
+
+  results = run_query_capture_results(cmd, match_impala_query_results, exit_on_error=True)
   if options.profiler:
     subprocess.call(gprof_cmd % gprof_tmp_file, shell=True)
-  return results[0]
+  return results
 
-# Similar to run_impala_query except runs the given query against Hive.
-def run_hive_query(query, prime_cache, iterations):
-  """
-  Run a given query against hive.
-  """
-  # prime the cache if the option has been specified.
-  if prime_cache:
-    prime_remote_or_local_cache(query, options.remote, hive=True)
-  query_string = (query + ';') * iterations
+def execute_using_hive(query, query_options):
+  query_string = (query + ';') * query_options.iterations
   cmd = options.hive_cmd + "\" %s\"" % query_string
-  return run_query_capture_results(match_hive_query_results, cmd, exit_on_error=False)[0]
+  return run_query_capture_results(cmd, match_hive_query_results, exit_on_error=False)
+
+def create_executor(executor_name):
+  # Add additional query exec options here
+  query_options = {
+    'runquery': lambda: (execute_using_runquery,
+                                RunQueryExecOptions(options.iterations,
+                                impalad=choice(TARGET_IMPALADS),
+                                exec_options=options.exec_options)),
+    'hive': lambda: (execute_using_hive, HiveQueryExecOptions(options.iterations))
+  } [executor_name]()
+  return query_options
+
+def run_query(executor_name, query, prime_cache, exit_on_error):
+  """
+  Run a query command and return the result.
+
+  Takes in a match functional that is used to parse stderr/stdout to extract the results.
+  """
+  if prime_cache:
+    prime_remote_or_local_cache(query, options.remote, executor_name == 'hive')
+
+  threads = []
+  results = []
+
+  output = None
+  execution_result = None
+  for client in xrange(options.num_clients):
+    name = "Client Thread " + str(client)
+    exec_tuple = create_executor(executor_name)
+    threads.append(QueryExecutor(name, exec_tuple[0], exec_tuple[1], query))
+  for thread in threads:
+    LOG.debug(thread.name + " starting")
+    thread.start()
+
+  for thread in threads:
+    thread.join()
+    if not thread.success() and exit_on_error:
+      LOG.error("Thread: %s returned with error. Exiting." % thread.name)
+      raise RuntimeError, "Error executing query. Aborting"
+
+    results.append((thread.get_results()))
+    LOG.debug(thread.name + " completed")
+  return results[0]
 
 def vector_file_name(workload, exploration_strategy):
   return "%s_%s.csv" % (workload, exploration_strategy)
@@ -440,6 +420,10 @@ def save_results(result_map, output_csv_file, is_impala_result=True):
   """
   Writes the results to an output CSV files
   """
+  if result_map is None:
+    LOG.error('Result map is None')
+    return
+
   csv_writer = csv.writer(open(output_csv_file, 'wb'), delimiter='|',
                           quoting=csv.QUOTE_MINIMAL)
 
@@ -549,18 +533,18 @@ def execute_queries(query_map, workload, scale_factor, vector_row):
         LOG.debug('Running: \n%s\n' % query)
         if query_name != query:
           LOG.info('Query Name: \n%s\n' % query_name)
-        output, execution_result = run_impala_query(query_string,
-                                                    options.prime_cache,
-                                                    options.iterations)
+
+        output, execution_result = run_query('runquery', query_string,
+                                             options.prime_cache, True)
         if output:
           summary += output
       hive_execution_result = QueryExecutionResult()
 
       if run_using_hive:
         summary += "Results Using Hive\n"
-        output, hive_execution_result = run_hive_query(query_string,
-                                                       options.prime_cache,
-                                                       options.iterations)
+        output, hive_execution_result = run_query('hive', query_string,
+                                                   options.prime_cache,
+                                                   False)
         if output:
           summary += output
       LOG.debug("-----------------------------------------------------------------------")
@@ -601,6 +585,16 @@ def parse_workload_scale_factor(workload_scale_factor):
     LOG.error("Error parsing workload. Proper format is workload[:scale factor]")
     sys.exit(1)
 
+def write_results(partial_results = False):
+  suffix = '.partial' if partial_results else ''
+
+  if not options.skip_impala:
+    LOG.info("Results saving to: %s" % options.results_csv_file)
+    save_results(result_map, options.results_csv_file + suffix, is_impala_result=True)
+  if run_using_hive:
+    LOG.info("Hive Results saving to: %s" % options.hive_results_csv_file)
+    save_results(result_map, options.hive_results_csv_file + suffix, is_impala_result=False)
+
 if __name__ == "__main__":
   """
   Driver for the run-benchmark script.
@@ -611,11 +605,10 @@ if __name__ == "__main__":
   summary = str()
   for workload_and_scale_factor in options.workloads.split(','):
     workload, scale_factor = parse_workload_scale_factor(workload_and_scale_factor)
-    run_workload(workload, scale_factor)
+    try:
+      run_workload(workload, scale_factor)
+    except Exception, e:
+      write_results(partial_results=True)
+      raise e
   LOG.info(summary)
-  if not options.skip_impala:
-    LOG.info("Results saving to: %s" % options.results_csv_file)
-    save_results(result_map, options.results_csv_file, is_impala_result=True)
-  if run_using_hive:
-    LOG.info("Hive Results saving to: %s" % options.hive_results_csv_file)
-    save_results(result_map, options.hive_results_csv_file, is_impala_result=False)
+  write_results()
