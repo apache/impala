@@ -391,6 +391,7 @@ public class HdfsTable extends Table {
         
         // For each host, this is a mapping of the VolumeId object to a 0 based index.
         Map<String, Map<VolumeId, Integer>> hostDiskIds = Maps.newHashMap();
+
         for (int i = 0; i < locations.length; ++i) {
           String[] hosts = locations[i].getHosts();
           VolumeId[] volumeIds = locations[i].getVolumeIds();
@@ -405,6 +406,7 @@ public class HdfsTable extends Table {
               found_null = true;
               break;
             }
+
             Map<VolumeId, Integer> hostDisks;
             if (!hostDiskIds.containsKey(hosts[j])) {
               hostDisks = Maps.newHashMap();
@@ -413,7 +415,11 @@ public class HdfsTable extends Table {
               hostDisks = hostDiskIds.get(hosts[j]);
             }
 
-            if (hostDisks.containsKey(volumeIds[j])) {
+            if (!volumeIds[j].isValid()) {
+              // The data node with this block did not respond to the block location 
+              // rpc.  Mark it as -1 for the BE which will assign it a random disk.
+              diskIds[j] = -1;
+            } else if (hostDisks.containsKey(volumeIds[j])) {
               // This is a VolumeId we've seen on this host, assign it the id we already
               // assigned to this VolumeId
               diskIds[j] = hostDisks.get(volumeIds[j]);
