@@ -11,11 +11,17 @@
 #include "util/disk-info.h"
 #include "util/hdfs-util.h"
 
-// Default IO Mgr configs
-DEFINE_int32(max_io_buffers, 10, "number of io buffers per disk");
-DEFINE_int32(num_threads_per_disk, 3, "number of threads per disk");
+// Control the number of disks on the machine.  If 0, this comes from the system 
+// settings.
 DEFINE_int32(num_disks, 0, "Number of disks on data node.");
-DEFINE_int32(read_size, 1024 * 1024, "Read Size (in bytes)");
+// Default IO Mgr configs.
+// The maximum number of the threads per disk is also the max queue depth per disk.
+// The read size is the size of the reads sent to hdfs/os.
+// There is a trade off of latency and throughout, trying to keep disks busy but
+// not introduce seeks.  The literature seems to agree that with 8 MB reads, random
+// io and sequential io perform similarly.
+DEFINE_int32(num_threads_per_disk, 1, "number of threads per disk");
+DEFINE_int32(read_size, 8 * 1024 * 1024, "Read Size (in bytes)");
 
 using namespace boost;
 using namespace impala;
@@ -1055,14 +1061,25 @@ void DiskIoMgr::HandleReadFinished(DiskQueue* disk_queue, ReaderContext* reader,
     } else {
       if (!buffer->eosr_) {
         DCHECK_LT(buffer->scan_range_->bytes_read_, buffer->scan_range_->len_);
-        // Push the scan range to the front of the queue.  This lets us minimize the
-        // number of scan ranges in flight (== to the number of scanner threads).  We
-        // need to do this instead of round robin because it is not possible to keep
-        // all scan ranges in flight (too many open hdfs files).
-        // TODO: this needs to be merged with what the scan node is currently doing
-        // to manage in flight ranges.  The scan node logic should be pushed down
-        // to the io mgr.
-        state.ranges.push_front(buffer->scan_range_);
+        // The order in which scan ranges on a single disk are processed has a significant
+        // effect on performance.  We'd like to keep the minimum number of ranges in
+        // flight while being able to saturate all the cpus.  This is made more 
+        // complicated by the fact that the cpu usage varies tremendously from format
+        // to format and this needs to dynamically deal with that.
+        //
+        // We will round robin through the first N scan ranges queued.  For example,
+        // if N was 3 and the total number of ranges on this disk was 50, we'd
+        // round robin through 1,2,3 until one of them (e.g. 2) finished, and then
+        // round robin between 1, 3, 4.
+        // N is the number of buffers for this reader (per disk).
+        int queue_location = 
+            reader->num_buffers_per_disk_ - 1 - state.num_threads_in_read;
+        DCHECK_GE(queue_location, 0);
+        list<ScanRange*>::iterator it = state.ranges.begin();
+        for (int i = 0; i < queue_location && it != state.ranges.end(); ++i) {
+          ++it;
+        }
+        state.ranges.insert(it, buffer->scan_range_);
       } else {
         CloseScanRange(reader->hdfs_connection_, buffer->scan_range_);
       }

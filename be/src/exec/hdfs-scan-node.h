@@ -178,6 +178,10 @@ class HdfsScanNode : public ScanNode {
   // Set in Prepare, owned by RuntimeState
   const HdfsTableDescriptor* hdfs_table_;
 
+  // If true, the warning that some disk ids are unknown was logged.  Only log
+  // this once per scan node since it can be noisy.
+  bool unknown_disk_id_warned_;
+
   // Mem pool for tuple buffer data. Used by scanners for allocation,
   // but owned here.
   boost::scoped_ptr<MemPool> tuple_pool_;

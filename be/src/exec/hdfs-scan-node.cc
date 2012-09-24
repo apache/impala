@@ -39,6 +39,7 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       tuple_id_(tnode.hdfs_scan_node.tuple_id),
       compact_data_(tnode.compact_data),
       reader_context_(NULL),
+      unknown_disk_id_warned_(false),
       tuple_desc_(NULL),
       tuple_pool_(new MemPool()),
       num_unqueued_files_(0),
@@ -170,6 +171,12 @@ Status HdfsScanNode::SetScanRange(const TScanRange& scan_range) {
     } else {
       desc = desc_it->second;
     }
+      
+    if (split.volumeId == -1 && !unknown_disk_id_warned_) {
+      LOG(WARNING) << "Unknown disk id.  This will negatively affect performance. "
+                   << " Check your hdfs settings to enable block location metadata.";
+      unknown_disk_id_warned_ = true;
+    }
 
     desc->ranges.push_back(AllocateScanRange(desc->filename.c_str(), 
        split.length, split.offset, split.partitionId, split.volumeId));
@@ -182,15 +189,9 @@ DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(const char* file, int64_t 
   DCHECK_GE(disk_id, -1);
   if (disk_id == -1) {
     // disk id is unknown, assign it a random one.
-    static bool warning_logged = false;
     static int next_disk_id = 0;
     disk_id = next_disk_id++;
 
-    if (!warning_logged) {
-      LOG(WARNING) << "Unknown disk id.  This will negatively affect performance. "
-                   << " Check your hdfs settings to enable block location metadata.";
-      warning_logged = true;
-    }
   }
   // TODO: we need to parse the config for the number of dirs configured for this
   // data node.

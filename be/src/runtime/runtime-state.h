@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #ifndef IMPALA_RUNTIME_RUNTIME_STATE_H
 #define IMPALA_RUNTIME_RUNTIME_STATE_H
@@ -116,7 +116,7 @@ class RuntimeState {
   static const int DEFAULT_BATCH_SIZE = 1024;
   static const int DEFAULT_FILE_BUFFER_SIZE = 1024 * 1024;
   // This is the number of buffers per disk.
-  static const int DEFAULT_MAX_IO_BUFFERS = 3;
+  static const int DEFAULT_MAX_IO_BUFFERS = 5;
 
   DescriptorTbl* desc_tbl_;
   boost::scoped_ptr<ObjectPool> obj_pool_;
