@@ -19,6 +19,9 @@ void GetFullLogFilename(google::LogSeverity severity, std::string* filename);
 // Shuts down the google logging library. Call before exit to ensure that log files are 
 // flushed. May only be called once.
 void ShutdownLogging();
+
+// Writes all command-line flags to the log at level INFO. 
+void LogCommandLineFlags();
 }
 
 #endif // IMPALA_UTIL_LOGGING_H

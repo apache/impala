@@ -25,6 +25,7 @@
 #include "runtime/exec-env.h"
 #include "testutil/test-exec-env.h"
 #include "util/cpu-info.h"
+#include "util/debug-util.h"
 #include "util/disk-info.h"
 #include "util/jni-util.h"
 #include "util/logging.h"
@@ -55,6 +56,17 @@ DECLARE_int32(be_port);
 int main(int argc, char** argv) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   InitGoogleLoggingSafe(argv[0]);
+
+  // gflags defines -version already to just print the name of the binary (they have
+  // a TODO to print the build info) so we can't use that.  Furthermore hadoop also
+  // display the version by running 'hadoop version' so we'll just go with that.
+  if (argc == 2 && strcmp(argv[1], "version") == 0) {
+    cout << GetVersionString() << endl;
+    return 0;
+  }
+  LOG(INFO) << GetVersionString();
+  LogCommandLineFlags();
+
   InitThriftLogging();
   CpuInfo::Init();
   DiskInfo::Init();

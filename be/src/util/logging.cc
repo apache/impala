@@ -59,3 +59,8 @@ void impala::ShutdownLogging() {
   mutex::scoped_lock logging_lock(logging_mutex);
   google::ShutdownGoogleLogging();
 }
+
+void impala::LogCommandLineFlags() {
+  LOG(INFO) << "Flags (see also /varz are on debug webserver):" << endl 
+            << google::CommandlineFlagsIntoString();
+}
