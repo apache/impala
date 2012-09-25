@@ -56,7 +56,8 @@ PlanFragmentExecutor::~PlanFragmentExecutor() {
       sink_->Close(runtime_state());
     }
   }
-  StopReportThread();
+  // at this point, the report thread should have been stopped
+  DCHECK(!report_thread_active_);
 }
 
 Status PlanFragmentExecutor::Prepare(
@@ -152,7 +153,9 @@ Status PlanFragmentExecutor::Open() {
   VLOG_QUERY << "Open(): fragment_id=" << runtime_state_->fragment_id();
   // we need to start the profile-reporting thread before calling Open(), since it
   // may block
-  if (!report_status_cb_.empty() && FLAGS_status_report_interval >= 0) {
+  // TODO: if no report thread is started, make sure to send a final profile
+  // at end, otherwise the coordinator hangs in case we finish w/ an error
+  if (!report_status_cb_.empty() && FLAGS_status_report_interval > 0) {
     unique_lock<mutex> l(report_thread_lock_);
     report_thread_ = thread(&PlanFragmentExecutor::ReportProfile, this);
     // make sure the thread started up, otherwise ReportProfile() might get into a race
@@ -203,7 +206,10 @@ Status PlanFragmentExecutor::OpenInternal() {
 
   // Setting to NULL ensures that the d'tor won't double-close the sink. 
   sink_.reset(NULL);
+  done_ = true;
+
   StopReportThread();
+  SendReport(true);
 
   return Status::OK;
 }
@@ -227,18 +233,29 @@ void PlanFragmentExecutor::ReportProfile() {
       VLOG_QUERY << ss.str();
     }
 
-    Status status;
-    {
-      lock_guard<mutex> l2(status_lock_);
-      status = status_;
-    }
-    // notified means someone notified on stop_report_thread_cv_
-    report_status_cb_(status, profile(), notified || !status.ok());
-    if (notified || !status.ok()) {
+    if (notified) {
       VLOG_QUERY << "exiting reporting thread: fragment_id="
                  << runtime_state_->fragment_id();
       return;
+    } else {
+      SendReport(false);
     }
+  }
+}
+
+void PlanFragmentExecutor::SendReport(bool done) {
+  if (report_status_cb_.empty()) return;
+
+  Status status;
+  {
+    lock_guard<mutex> l(status_lock_);
+    status = status_;
+  }
+  // don't send a final report if we got cancelled, nobody's going to look at it
+  // anyway
+  if (!status.IsCancelled()) {
+    // notified means someone notified on stop_report_thread_cv_
+    report_status_cb_(status, profile(), done || !status.ok());
   }
 }
 
@@ -262,6 +279,8 @@ Status PlanFragmentExecutor::GetNext(RowBatch** batch) {
   if (done_) {
     VLOG_QUERY << "Finished executing fragment query_id=" << PrintId(query_id_)
                << " fragment_id=" << PrintId(runtime_state_->fragment_id());
+    StopReportThread();
+    SendReport(true);
   }
   return status;
 }
@@ -290,6 +309,8 @@ void PlanFragmentExecutor::UpdateStatus(const Status& status) {
   if (status.ok()) return;
   lock_guard<mutex> l(status_lock_);
   if (status_.ok()) status_ = status;
+  StopReportThread();
+  SendReport(true);
 }
 
 void PlanFragmentExecutor::Cancel() {

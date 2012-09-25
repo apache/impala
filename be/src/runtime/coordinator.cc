@@ -607,7 +607,8 @@ void Coordinator::CancelInternal() {
     TCancelPlanFragmentResult res;
     try {
       VLOG_QUERY << "sending CancelPlanFragment rpc for fragment_id="
-                 << exec_state->fragment_id;
+                 << exec_state->fragment_id << " backend="
+                 << exec_state->hostport.first << ":" << exec_state->hostport.second;
       backend_client->CancelPlanFragment(res, params);
     } catch (TTransportException& e) {
       stringstream msg;
