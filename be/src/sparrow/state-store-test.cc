@@ -30,6 +30,9 @@ using impala::Status;
 using impala::THostPort;
 using impala::Metrics;
 
+DECLARE_int32(rpc_cnxn_attempts);
+DECLARE_int32(rpc_cnxn_retry_interval_ms);
+
 namespace sparrow {
 
 class StateStoreTest : public testing::Test {
@@ -74,6 +77,8 @@ class StateStoreTest : public testing::Test {
       : metrics_(new Metrics()), state_store_(new StateStore(1000L, metrics_.get())) {
     state_store_host_port_.host = "localhost";
     state_store_host_port_.port = next_port_++;
+    FLAGS_rpc_cnxn_attempts = 1;
+    FLAGS_rpc_cnxn_retry_interval_ms = 100;
   }
 
   virtual void SetUp() {
@@ -81,7 +86,7 @@ class StateStoreTest : public testing::Test {
     state_store_->Start(state_store_host_port_.port);
     Status status =
       impala::WaitForServer(state_store_host_port_.host,
-                            state_store_host_port_.port, 3, 2000);
+                            state_store_host_port_.port, 3, 500);
     EXPECT_TRUE(status.ok());
   }
 

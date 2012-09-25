@@ -26,6 +26,9 @@ using impala::ThriftClient;
 using impala::ThriftServer;
 using impala::TStatusCode;
 
+DECLARE_int32(rpc_cnxn_attempts);
+DECLARE_int32(rpc_cnxn_retry_interval_ms);
+
 namespace sparrow {
 
 const char* StateStoreSubscriber::DISCONNECTED_FROM_STATE_STORE_ERROR =
@@ -270,8 +273,8 @@ Status StateStoreSubscriber::InitClient() {
     client_.reset(new ThriftClient<StateStoreServiceClient>(state_store_host_port_.host,
         state_store_host_port_.port));
 
-    // 10 retries, waiting 2s between them
-    Status status = client_->OpenWithRetry(10, 2000);    
+    Status status = client_->OpenWithRetry(FLAGS_rpc_cnxn_attempts, 
+        FLAGS_rpc_cnxn_retry_interval_ms);    
     if (!status.ok()) {
       client_.reset();
       return status;
