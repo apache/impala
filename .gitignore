@@ -24,3 +24,4 @@ CTestTestfile.cmake
 Testing/
 llvm-ir/
 shell/gen-py/
+shell/build/

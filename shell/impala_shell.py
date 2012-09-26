@@ -17,6 +17,16 @@ from thrift.transport.TTransport import TBufferedTransport, TTransportException
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 
+VERSION_STRING = "Impala v0.1 "
+
+# Tarball / packaging build makes impala_build_version available
+try:
+  from impala_build_version import get_version_string
+  from impala_build_version import get_build_date  
+  VERSION_STRING += "(" + get_version_string()[:7] + ") built on " + get_build_date()
+except Exception:
+  VERSION_STRING += "(build version not available)"
+
 # Simple Impala shell. Can issue queries (with configurable options)
 # Basic usage: type connect <host:port> to connect to an impalad
 # Then issue queries or other commands. Tab-completion should show the set of
@@ -267,6 +277,11 @@ class ImpalaShell(cmd.Cmd):
     """If an empty line is entered, do nothing"""
     return False
 
+  def do_version(self, args):
+    """Prints the Impala build version"""
+    print "Build version: %s" % VERSION_STRING
+    return False
+
   def do_EOF(self, args):
     """Exit the shell on Ctrl^d"""
     print 'Goodbye'
@@ -276,7 +291,8 @@ class ImpalaShell(cmd.Cmd):
 WELCOME_STRING = """Welcome to the Impala shell. Press TAB twice to see a list of \
 available commands.
 
-Copyright (c) 2012 Cloudera, Inc. All rights reserved."""
+Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+(Build version: %s)""" % VERSION_STRING
 
 if __name__ == "__main__":
   parser = OptionParser()

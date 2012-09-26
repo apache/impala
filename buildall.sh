@@ -188,5 +188,9 @@ then
   kill $PID
 fi
 
+# Build the shell tarball
+echo "Creating shell tarball"
+${IMPALA_HOME}/shell/make_shell_tarball.sh
+
 # Generate list of files for Cscope to index
 $IMPALA_HOME/bin/gen-cscope.sh

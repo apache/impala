@@ -1,0 +1,18 @@
+#!/bin/bash
+# Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+
+# This script runs the Impala shell. Python is required. 
+#
+# This script assumes that the supporting library files for the Impala shell are
+# rooted in either the same directory that this script is in, or in a directory
+# in the environment variable ${IMPALA_SHELL_HOME}.
+#
+# The required directories are:
+# gen-py/ -- containing the Python thrift stubs for connecting to Impalad
+# lib/ -- containing the Hive Beeswax libraries, and the Python thrift 0.7 libraries
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+SHELL_HOME=${IMPALA_SHELL_HOME:-${SCRIPT_DIR}}
+
+PYTHONPATH="${SHELL_HOME}/gen-py:${SHELL_HOME}/lib:${PYTHONPATH}" \
+  python ${SHELL_HOME}/impala_shell.py
