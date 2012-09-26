@@ -307,8 +307,10 @@ Status PlanFragmentExecutor::GetNextInternal(RowBatch** batch) {
 
 void PlanFragmentExecutor::UpdateStatus(const Status& status) {
   if (status.ok()) return;
-  lock_guard<mutex> l(status_lock_);
-  if (status_.ok()) status_ = status;
+  {
+    lock_guard<mutex> l(status_lock_);
+    if (status_.ok()) status_ = status;
+  }
   StopReportThread();
   SendReport(true);
 }
