@@ -58,25 +58,33 @@ struct TScanRangeParams {
 
 // Specification of one output destination of a plan fragment
 struct TPlanFragmentDestination {
-  // The unique fragment id
-  1: required Types.TUniqueId fragment_id
+  // the globally unique fragment instance id
+  1: required Types.TUniqueId fragment_instance_id
 
   // ... which is being executed on this server
   2: required Types.THostPort server
 }
 
-// Parameters for the execution of a plan fragment on a particular node.
+// Parameters for a single execution instance of a particular TPlanFragment
 // TODO: remove TPlanExecParams once transition to NewPlanner is complete
 // TODO: for range partitioning, we also need to specify the range boundaries
 struct TPlanFragmentExecParams {
+  // a globally unique id assigned to this particular execution instance of
+  // a TPlanFragment
+  1: required Types.TUniqueId fragment_instance_id
+
   // initial scan ranges for each scan node in TPlanFragment.plan_tree
-  1: map<Types.TPlanNodeId, list<TScanRangeParams>> per_node_scan_ranges
+  2: required map<Types.TPlanNodeId, list<TScanRangeParams>> per_node_scan_ranges
+
+  // number of senders for ExchangeNodes contained in TPlanFragment.plan_tree;
+  // needed to create a DataStreamRecvr
+  3: required map<Types.TPlanNodeId, i32> per_exch_num_senders
 
   // Output destinations, one per output partition.
   // The partitioning of the output is specified by
   // TPlanFragment.output_sink.output_partitioning.
   // The number of output partitions is destinations.size().
-  2: list<TPlanFragmentDestination> destinations
+  4: list<TPlanFragmentDestination> destinations
 }
 
 // Global query parameters assigned by the coordinator.

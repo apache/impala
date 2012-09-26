@@ -89,23 +89,33 @@ struct TFinalizeParams {
 // TODO: move to ImpalaInternalService.thrift
 // TODO: remove existing TQueryExecRequest
 struct TQueryExecRequest2 {
+  // a globally unique id
   1: required Types.TUniqueId query_id
 
   // global descriptor tbl for all fragments
   2: optional Descriptors.TDescriptorTable desc_tbl
 
+  // fragments[i] may consume the output of fragments[j > i];
+  // fragments[0] is the root fragment and will contain the coordinator fragment, if
+  // one exists.
+  // (fragments[0] is executed by the coordinator itself if it is unpartitioned.)
   3: required list<Planner.TPlanFragment> fragments
 
-  // A map from scan node ids to a list of scan range locations
+  // Specifies the destination fragment of the output of each fragment.
+  // parent_fragment_idx.size() == fragments.size() - 1 and
+  // fragments[i] sends its output to fragments[dest_fragment_idx[i-1]]
+  4: required list<i32> dest_fragment_idx
+
+  // A map from scan node ids to a list of scan range locations.
   // The node ids refer to scan nodes in fragments[].plan_tree
-  4: optional map<Types.TPlanNodeId, list<Planner.TScanRangeLocations>>
+  5: required map<Types.TPlanNodeId, list<Planner.TScanRangeLocations>>
       per_node_scan_ranges
 
   // Metadata of the query result set (only for select)
-  5: optional TResultSetMetadata result_set_metadata
+  6: optional TResultSetMetadata result_set_metadata
 
   // Set if the query needs finalization after it executes
-  6: optional TFinalizeParams finalize_params;
+  7: optional TFinalizeParams finalize_params;
 }
 
 enum TDdlType {
