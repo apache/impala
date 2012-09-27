@@ -199,6 +199,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   // Webserver callback. Retrieves Hadoop confs from frontend and writes them to output
   void RenderHadoopConfigs(std::stringstream* output);
 
+  // Webserver callback. Prints a table of current queries, including their
+  // states, types and IDs.
+  void QueryStatePathHandler(std::stringstream* output);
+
   // Wrapper around Coordinator::Wait(); suitable for execution inside thread.
   void Wait(boost::shared_ptr<QueryExecState> exec_state);
 

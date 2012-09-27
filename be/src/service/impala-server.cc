@@ -105,7 +105,7 @@ class ImpalaServer::QueryExecState {
       query_state_(QueryState::CREATED),
       current_batch_(NULL),
       current_batch_row_(0),
-      current_row_(0),
+      num_rows_fetched_(0),
       impala_server_(server) {
     planner_timer_ = ADD_COUNTER(&profile_, "PlanningTime", TCounterType::CPU_TICKS);
   }
@@ -156,7 +156,7 @@ class ImpalaServer::QueryExecState {
 
   bool eos() { return eos_; }
   Coordinator* coord() const { return coord_.get(); }
-  int current_row() const { return current_row_; }
+  int num_rows_fetched() const { return num_rows_fetched_; }
   const TResultSetMetadata* result_metadata() { return &result_metadata_; }
   const TUniqueId& query_id() const { return query_id_; }
   const TExecRequest& exec_request() const { return exec_request_; }
@@ -188,8 +188,8 @@ class ImpalaServer::QueryExecState {
 
   TResultSetMetadata result_metadata_; // metadata for select query
   RowBatch* current_batch_; // the current row batch; only applicable if coord is set
-  int current_batch_row_; // num of rows fetched within the current batch
-  int current_row_; // num of rows that has been fetched for the entire query
+  int current_batch_row_; // number of rows fetched within the current batch
+  int num_rows_fetched_; // number of rows fetched by client for the entire query
 
   // To get access to UpdateMetastore
   ImpalaServer* impala_server_;
@@ -323,12 +323,12 @@ Status ImpalaServer::QueryExecState::FetchRowsAsAsciiInternal(const int32_t max_
 
       // If max_rows < 0, there's no maximum on the number of rows to return
       while ((num_rows < max_rows || max_rows < 0)
-          && current_row_ < all_rows.size()) {
-        fetched_rows->push_back(all_rows[current_row_++]);
+          && num_rows_fetched_ < all_rows.size()) {
+        fetched_rows->push_back(all_rows[num_rows_fetched_++]);
         ++num_rows;
       }
       
-      eos_ = (current_row_ == all_rows.size());
+      eos_ = (num_rows_fetched_ == all_rows.size());
 
       return Status::OK;
     }
@@ -417,7 +417,7 @@ Status ImpalaServer::QueryExecState::ConvertRowBatchToAscii(const int32_t max_ro
   for (int i = 0; i < fetched_count; ++i) {
     TupleRow* row = current_batch_->GetRow(current_batch_row_);
     RETURN_IF_ERROR(ConvertSingleRowToAscii(row, fetched_rows));
-    ++current_row_;
+    ++num_rows_fetched_;
     ++current_batch_row_;
   }
   return Status::OK;
@@ -429,7 +429,7 @@ Status ImpalaServer::QueryExecState::CreateConstantRowAsAscii(
   fetched_rows->reserve(1);
   RETURN_IF_ERROR(ConvertSingleRowToAscii(NULL, fetched_rows));
   eos_ = true;
-  ++current_row_;
+  ++num_rows_fetched_;
   return Status::OK;
 }
 
@@ -655,6 +655,10 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       bind<void>(mem_fn(&ImpalaServer::RenderHadoopConfigs), this, _1);
   exec_env->webserver()->RegisterPathHandler("/varz", default_callback);
 
+  Webserver::PathHandlerCallback query_callback =
+      bind<void>(mem_fn(&ImpalaServer::QueryStatePathHandler), this, _1);
+  exec_env->webserver()->RegisterPathHandler("/queries", query_callback);
+
   num_queries_metric_ = 
       exec_env->metrics()->CreateAndRegisterPrimitiveMetric(NUM_QUERIES_METRIC, 0L);
 }
@@ -677,6 +681,39 @@ void ImpalaServer::RenderHadoopConfigs(stringstream* output) {
   (*output) << "</pre>";
   jni_env->ReleaseStringUTFChars(java_explain_string, str);
   RETURN_IF_EXC(jni_env);
+}
+
+void ImpalaServer::QueryStatePathHandler(stringstream* output) {
+  (*output) << "<h2>Queries</h2>";
+  lock_guard<mutex> l(query_exec_state_map_lock_);
+  (*output) << "This page lists all registered queries, i.e., those that are not closed "
+    " nor cancelled.<br/>" << endl;
+  (*output) << query_exec_state_map_.size() << " queries in flight" << endl;
+  (*output) << "<table border=1><tr><th>Query Id</th>" << endl;
+  (*output) << "<th>Statement</th>" << endl;
+  (*output) << "<th>Query Type</th>" << endl;
+  (*output) << "<th>State</th>" << endl;
+  (*output) << "<th># rows fetched</th>" << endl;
+  (*output) << "</tr>";
+  BOOST_FOREACH(const QueryExecStateMap::value_type& exec_state, query_exec_state_map_) {
+    QueryHandle handle;
+    TUniqueIdToQueryHandle(exec_state.first, &handle);
+    const TExecRequest& request = exec_state.second->exec_request();
+    (*output) << "<tr><td>" << handle.id << "</td>"
+              << "<td>"
+              << (request.stmt_type != TStmtType::DDL ?
+                  request.queryExecRequest.sql_stmt : "N/A")
+              << "</td>"
+              << "<td>"
+              << _TStmtType_VALUES_TO_NAMES.find(request.stmt_type)->second
+              << "</td>"
+              << "<td>" << _QueryState_VALUES_TO_NAMES.find(
+                  exec_state.second->query_state())->second << "</td>"
+              << "<td>" << exec_state.second->num_rows_fetched() << "</td>"
+              << "</tr>" << endl;
+  }
+
+  (*output) << "</table>";
 }
 
 ImpalaServer::~ImpalaServer() {}
@@ -1082,7 +1119,7 @@ Status ImpalaServer::FetchInternal(const TUniqueId& query_id,
   query_results->__set_ready(true);
   // It's likely that ODBC doesn't care about start_row, but Hue needs it. For Hue,
   // start_row starts from zero, not one.
-  query_results->__set_start_row(exec_state->current_row());
+  query_results->__set_start_row(exec_state->num_rows_fetched());
 
   Status fetch_rows_status;
   if (exec_state->eos()) {
