@@ -50,12 +50,14 @@ class ImpalaShell(cmd.Cmd):
     self.imp_service = None
     self.transport = None
     self.query_options = {}
+    self.__make_default_options()
     self.query_state = QueryState._NAMES_TO_VALUES
     if options.impalad != None:
       if self.do_connect(options.impalad) == False:
         sys.exit(1)
 
   def __make_default_options(self):
+    self.query_options = {}
     def get_name(option): return TImpalaQueryOptions._VALUES_TO_NAMES[option]
     for option, default in DEFAULT_QUERY_OPTIONS.iteritems():
       self.query_options[get_name(option)] = default
