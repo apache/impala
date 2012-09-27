@@ -11,6 +11,7 @@ import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.BlockStorageLocation;
+import org.apache.hadoop.fs.CommonConfigurationKeysPublic;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -348,9 +349,11 @@ public class HdfsTable extends Table {
       FileSystem fs;
       fs = FileSystem.get(CONF);
       if (!(fs instanceof DistributedFileSystem)) {
-        throw new RuntimeException("HDFS FileSystem should be DistributedFileSystem but "
-            + "got " + fs.getClass().getName());
-      }
+        String error = "Cannot connect to HDFS. " +
+            CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY +
+            "(" + CONF.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY) + ")" +
+            " might be set incorrectly";
+        throw new RuntimeException(error);      }
       dfs = (DistributedFileSystem)fs;
     } catch (IOException e) {
       throw new RuntimeException("couldn't retrieve FileSystem:\n" + e.getMessage(), e);
