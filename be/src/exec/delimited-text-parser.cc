@@ -119,6 +119,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
     }
 
     if (new_tuple) {
+      FillColumns(num_fields, field_locations);
       column_idx_ = scan_node_->num_partition_keys();
       row_end_locations[*num_tuples] = *byte_buffer_ptr;
       ++(*num_tuples);
@@ -323,4 +324,14 @@ Status DelimitedTextParser::FindSyncBlock(int end_of_range, int sync_size,
   }
   return Status::OK;
 
+}
+
+void DelimitedTextParser:: FinishTuple(int len, char** last_column,
+     int* num_fields, std::vector<FieldLocation>* field_locations) {
+  while (column_idx_ < scan_node_->num_cols()) {
+    AddColumn<true>(len, last_column, num_fields, field_locations);
+
+    // The rest of the columns will be null.
+    len = 0;
+  }
 }

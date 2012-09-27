@@ -129,17 +129,25 @@ Status HdfsTextScanner::FinishScanRange() {
       if (!status.ok()) {
         ss << "Read failed while trying to finish scan range: " << context_->filename() 
            << ":" << context_->file_offset() << endl << status.GetErrorMsg();
+        if (state_->LogHasSpace()) state_->LogError(ss.str());
+        if (state_->abort_on_error()) return Status(ss.str());
       } else if (!partial_tuple_empty_ || !boundary_column_.Empty() || 
           !boundary_row_.Empty()) {
-        ss << "Incomplete tuple at end of file: " << context_->filename() << ":" 
-           << context_->file_offset();
-      } else {
-        // This is the case where this is eof and everything is done.  
-        break;
+        // Missing columns or row delimiter at end of the file is ok, fill the row in.
+        char* col = boundary_column_.str().ptr;
+        int num_fields = 0;
+        delimited_text_parser_->FinishTuple(boundary_column_.Size(),
+            &col, &num_fields, &field_locations_);
+
+        MemPool* pool;
+        TupleRow* tuple_row_mem;
+        int max_tuples = context_->GetMemory(&pool, &tuple_, &tuple_row_mem);
+        DCHECK_GE(max_tuples, 1);
+        int tuples = WriteFields(pool, tuple_row_mem, num_fields, 1);
+        DCHECK_EQ(tuples, 1);
+        context_->CommitRows(tuples);
+        
       }
-      
-      if (state_->LogHasSpace()) state_->LogError(ss.str());
-      if (state_->abort_on_error()) return Status(ss.str());
       break;
     }
 

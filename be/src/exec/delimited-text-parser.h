@@ -89,6 +89,17 @@ class DelimitedTextParser {
            scan_node_->GetMaterializedSlotIdx(column_idx_) != HdfsScanNode::SKIP_COLUMN;
   }
 
+  // Finish a partial tuple when we are at the end of a file.
+  // len and last_column may contain the length and the pointer to the
+  // last column on which the file ended without a delimiter.
+  // If parsing stopped on a delimiter and there is no last column then len will be  0.
+  // Other columns beyond that are filled with 0 length fields.
+  // num_fields points to an initialzed count of fields and will incremented
+  // by the number fileds added.
+  // field_locations will be updated with the start and length of the fields.
+  void FinishTuple(int len, char** last_column, int *num_fields,
+                   std::vector<FieldLocation>* field_locations);
+
  private:
   // Initialize the parser state.
   void ParserInit(HdfsScanNode* scan_node);
@@ -116,6 +127,10 @@ class DelimitedTextParser {
       char** byte_buffer_ptr, char** row_end_locations_,
       std::vector<FieldLocation>* field_locations,
       int* num_tuples, int* num_fields, char** next_column_start);
+
+  // Fill in columns missing at the end of the tuple.
+  // Fills in the offsets in field_locations.
+  void FillColumns(int* num_fields, std::vector<impala::FieldLocation>* field_locations);
 
   // ScanNode reference to map columns in the data to slots in the tuples.
   HdfsScanNode* scan_node_;

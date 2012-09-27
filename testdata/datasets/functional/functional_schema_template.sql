@@ -1135,7 +1135,7 @@ ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 functional
 ----
-TblWithColsPastEnd
+TblWithRaggedColumns
 ----
 CREATE EXTERNAL TABLE %(table_name)s (
   str_col string,
@@ -1150,7 +1150,7 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
   INSERT OVERWRITE TABLE %(table_name)s \
   select * FROM %(base_table_name)s"
 ----
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/TblWithColsPastEnd/data.csv' OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/TblWithRaggedColumns/data.csv' OVERWRITE INTO TABLE %(table_name)s;
 ----
 ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====

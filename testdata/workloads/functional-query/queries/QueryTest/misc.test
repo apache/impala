@@ -25,14 +25,46 @@ bigint, bigint, bigint, bigint, bigint, bigint
 1,1,1,0,0,0
 ====
 # Test to select from table with additional columns at the end that are not in the 
-# schema
-select * from tblwithcolspastend$TABLE
+# schema and with missing columns
+select * from tblwithraggedcolumns$TABLE
 ---- TYPES
 string, int
 ---- RESULTS
-'hello',1
-'foo',2
+'',NULL
+'MissingRowDelimiter',0
 'a',3
 'b',4
-'end',0
+'c',NULL
+'d',NULL
+'foo',2
+'hello',1
+'x',NULL
+====
+select int_col from tblwithraggedcolumns$TABLE
+---- TYPES
+int
+---- RESULTS
+NULL
+0
+3
+4
+NULL
+NULL
+2
+1
+NULL
+====
+select str_col from tblwithraggedcolumns$TABLE
+---- TYPES
+string
+---- RESULTS
+''
+'MissingRowDelimiter'
+'a'
+'b'
+'c'
+'d'
+'foo'
+'hello'
+'x'
 ====

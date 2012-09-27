@@ -52,6 +52,15 @@ inline void DelimitedTextParser::AddColumn(int len, char** next_column_start,
   *next_column_start += len + 1;
   ++column_idx_;
 }
+void inline DelimitedTextParser:: FillColumns(int* num_fields,
+   std::vector<FieldLocation>* field_locations) {
+  // Fill in any columns missing from the end of the tuple.
+  while (column_idx_ < scan_node_->num_cols()) {
+    char* dummy;
+    AddColumn<false>(0, &dummy, num_fields, field_locations);
+  }
+}
+
 
 // SSE optimized raw text file parsing.  SSE4_2 added an instruction (with 3 modes) for
 // text processing.  The modes mimic strchr, strstr and strcmp.  For text parsing, we can
@@ -142,6 +151,7 @@ inline void DelimitedTextParser::ParseSse(int max_tuples,
           next_column_start, num_fields, field_locations);
 
       if ((*byte_buffer_ptr)[n] == tuple_delim_) {
+        FillColumns(num_fields, field_locations);
         column_idx_ = scan_node_->num_partition_keys();
         row_end_locations[*num_tuples] = delim_ptr;
         ++(*num_tuples);

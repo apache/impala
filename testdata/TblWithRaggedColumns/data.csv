@@ -1,5 +1,9 @@
 hello,1
+x
 foo,2,bar
 a,3
+
 b,4,5,6,random
-end,0
+c
+d,
+MissingRowDelimiter,0
