@@ -20,10 +20,8 @@ import csv
 import logging
 import math
 import os
-import re
 import sys
 import subprocess
-import tempfile
 from query_executor import *
 from collections import defaultdict
 import threading
@@ -78,6 +76,12 @@ parser.add_option("--prime_cache", dest="prime_cache", action="store_true",
                   default= False, help="Whether or not to prime the buffer cache. ")
 parser.add_option("--num_clients", type="int", dest="num_clients", default=1,
                   help="Number of clients (threads) to use when executing each query.")
+parser.add_option("--file_formats", dest="file_formats", default=None,
+                  help="A comma-separated list of file fomats to execute. If not "\
+                  "specified all file formats in the test vector will be run.")
+parser.add_option("--compression_codecs", dest="compression_codecs", default=None,
+                  help="A comma-separated list of compression codecs to execute. If not "\
+                  "specified all compression codecs in the test vector will be run.")
 parser.add_option("--skip_impala", dest="skip_impala", action="store_true",
                   default= False, help="If set, queries will only run against Hive.")
 options, args = parser.parse_args()
@@ -96,13 +100,12 @@ runquery_cmd = "%(runquery)s %(args)s " % {'runquery' : options.runquery_path,
 gprof_cmd  = 'google-pprof --text ' + options.runquery_path + ' %s | head -n 60'
 prime_cache_cmd = os.path.join(IMPALA_HOME, "testdata/bin/cache_tables.py") + " -q \"%s\""
 
-# regular expressions
 gprof_cmd = 'google-pprof --text ' + options.runquery_path + ' %s | head -n 60'
+
+# TODO: Consider making cache_tables a module rather than directly calling the script
 prime_cache_cmd = os.path.join(os.environ['IMPALA_HOME'],
                                "testdata/bin/cache_tables.py") + " -q \"%s\""
-result_single_regex = 'returned (\d*) rows? in (\d*).(\d*) s'
-result_multiple_regex = 'returned (\d*) rows? in (\d*).(\d*) s with stddev (\d*).(\d*)'
-hive_result_regex = 'Time taken: (\d*).(\d*) seconds'
+
 dev_null = open('/dev/null')
 
 run_using_hive = options.compare_with_hive or options.skip_impala
@@ -123,46 +126,6 @@ class QueryExecutionDetail(object):
     self.compression_type = compression_type
     self.execution_result = execution_result
 
-def print_file(header, output_file):
-  """
-  Print the contents of the file to the terminal.
-  """
-  output_file.seek(0)
-  output = header + '\n'
-  for line in output_file.readlines():
-    output += line.rstrip() + '\n'
-  LOG.debug(output)
-
-# Runs the given query command and returns the execution result. Takes in a match
-# function that is used to parse stderr/stdout to extract the results.
-def run_query_capture_results(cmd, query_result_match_function, exit_on_error):
-  output_stdout = tempfile.TemporaryFile("w+")
-  output_stderr = tempfile.TemporaryFile("w+")
-  LOG.info("Executing: %s" % cmd)
-  subprocess.call(cmd, shell=True, stderr=output_stderr, stdout=output_stdout)
-  output_stdout.seek(0)
-  output_stderr.seek(0)
-  execution_result = query_result_match_function(output_stdout.readlines(),
-                                                 output_stderr.readlines())
-  print_file("", output_stderr)
-  print_file("", output_stdout)
-  if not execution_result.success:
-    has_execution_error = True
-    LOG.error("Query did not run successfully")
-    if exit_on_error:
-      return execution_result, None
-
-  output = ''
-  if execution_result.success:
-    output += "  Avg Time: %.02fs\n" % float(execution_result.avg_time)
-    if execution_result.stddev != 'N/A':
-      output += "  Std Dev: %.02fs\n" % float(execution_result.stddev)
-  else:
-    output += '  No Results - Error executing query!\n'
-
-  output_stderr.close()
-  output_stdout.close()
-  return execution_result, output
 
 # Parse for the tables used in this query
 def parse_tables(query):
@@ -228,107 +191,22 @@ def prime_buffer_cache_local(query):
   command = prime_cache_cmd % query
   os.system(command)
 
-# Util functions
-# TODO : Move util functions to a common module.
-def calculate_avg(values):
-  return sum(values) / float(len(values))
-
-def calculate_stddev(values):
-  """
-  Return the stardard deviation of a numeric iterable.
-
-  TODO: If more statistical functions are required, consider using numpy/scipy.
-  """
-  avg = calculate_avg(values)
-  return math.sqrt(calculate_avg([(val - avg)**2 for val in values]))
-
-def match_impala_query_results(output_stdout, output_stderr):
-  """
-  Parse query execution details for impala.
-
-  Parses the query execution details (avg time, stddev) from the runquery output.
-  Returns these results as well as whether the query completed successfully.
-  """
-  avg_time = 0
-  stddev = "N/A"
-  run_success = False
-  for line in output_stdout:
-    if options.iterations == 1:
-      match = re.search(result_single_regex, line)
-      if match:
-        avg_time = ('%s.%s') % (match.group(2), match.group(3))
-        run_success = True
-    else:
-      match = re.search(result_multiple_regex, line)
-      if match:
-        avg_time = ('%s.%s') % (match.group(2), match.group(3))
-        stddev = ('%s.%s') % (match.group(4), match.group(5))
-        run_success = True
-  execution_result = QueryExecutionResult(str(avg_time), str(stddev))
-  execution_result.success = run_success
-  return execution_result
-
-def match_hive_query_results(output_stdout, output_stderr):
-  """
-  Parse query execution details for hive.
-
-  Parses the query execution details (avg time, stddev) from the runquery output.
-  Returns these results as well as whether the query completed successfully.
-  """
-  run_success = False
-  execution_times = list()
-  for line in output_stderr:
-    match = re.search(hive_result_regex, line)
-    if match:
-      execution_times.append(float(('%s.%s') % (match.group(1), match.group(2))))
-
-  execution_result = QueryExecutionResult()
-  if len(execution_times) == options.iterations:
-    avg_time = calculate_avg(execution_times)
-    stddev = 'N/A'
-    if options.iterations > 1:
-      stddev = calculate_stddev(execution_times)
-    execution_result = QueryExecutionResult(avg_time, stddev)
-    run_success = True
-  execution_result.success = run_success
-  return execution_result
-
-def execute_using_runquery(query, query_options):
-  enable_counters = int(options.verbose)
-  gprof_tmp_file = str()
-
-  # Call the profiler if the option has been specified.
-  if options.profiler:
-    gprof_tmp_file = profile_output_file
-
-
-  cmd = '%(runquery_cmd)s %(args)s --enable_counters=%(enable_counters)d '\
-        '--profile_output_file="%(prof_output_file)s" --query="%(query)s"' % {\
-            'runquery_cmd': runquery_cmd,
-            'args': query_options.build_argument_string(),
-            'prof_output_file': gprof_tmp_file,
-            'enable_counters': int(options.verbose),
-            'query': query
-        }
-
-  results = run_query_capture_results(cmd, match_impala_query_results, exit_on_error=True)
-  if options.profiler:
-    subprocess.call(gprof_cmd % gprof_tmp_file, shell=True)
-  return results
-
-def execute_using_hive(query, query_options):
-  query_string = (query + ';') * query_options.iterations
-  cmd = options.hive_cmd + "\" %s\"" % query_string
-  return run_query_capture_results(cmd, match_hive_query_results, exit_on_error=False)
-
 def create_executor(executor_name):
   # Add additional query exec options here
   query_options = {
     'runquery': lambda: (execute_using_runquery,
-                                RunQueryExecOptions(options.iterations,
-                                impalad=choice(TARGET_IMPALADS),
-                                exec_options=options.exec_options)),
-    'hive': lambda: (execute_using_hive, HiveQueryExecOptions(options.iterations))
+                            RunQueryExecOptions(options.iterations,
+                            impalad=choice(TARGET_IMPALADS),
+                            exec_options=options.exec_options,
+                            runquery_cmd=runquery_cmd,
+                            enable_counters=int(options.verbose),
+                            profile_output_file=profile_output_file,
+                            profiler=options.profiler,
+                            )),
+    'hive': lambda: (execute_using_hive,
+                            HiveQueryExecOptions(options.iterations,
+                            hive_cmd=options.hive_cmd,
+                            ))
   } [executor_name]()
   return query_options
 
@@ -457,7 +335,6 @@ def enumerate_query_files(base_directory):
       query_files += enumerate_query_files(full_path)
   return query_files
 
-
 def is_comment_or_empty(line):
   """
   Return True of the line is a comment or and empty string.
@@ -517,6 +394,12 @@ def execute_queries(query_map, workload, scale_factor, vector_row):
   global summary
   global result_map
   file_format, data_group, codec, compression_type = vector_row[:4]
+  if (options.file_formats and file_format not in options.file_formats.split(',')) or\
+     (options.compression_codecs and codec not in options.compression_codecs.split(',')):
+    LOG.info("Skipping Test Vector - File Format: %s Compression: %s / %s" %\
+        (file_format, codec, compression_type))
+    return
+
   LOG.info("Running Test Vector - File Format: %s Compression: %s / %s" %\
       (file_format, codec, compression_type))
   for test_name in query_map.keys():
@@ -593,7 +476,8 @@ def write_results(partial_results = False):
     save_results(result_map, options.results_csv_file + suffix, is_impala_result=True)
   if run_using_hive:
     LOG.info("Hive Results saving to: %s" % options.hive_results_csv_file)
-    save_results(result_map, options.hive_results_csv_file + suffix, is_impala_result=False)
+    save_results(result_map, options.hive_results_csv_file + suffix,
+                 is_impala_result=False)
 
 if __name__ == "__main__":
   """
