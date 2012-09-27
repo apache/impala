@@ -31,7 +31,7 @@ const map<string, Descriptors.THdfsCompression> COMPRESSION_MAP = {
 
 // Default values for each query option in ImpalaService.TImpalaQueryOptions
 const map<ImpalaService.TImpalaQueryOptions, string> DEFAULT_QUERY_OPTIONS = {
-  ImpalaService.TImpalaQueryOptions.ABORT_ON_ERROR : "true",
+  ImpalaService.TImpalaQueryOptions.ABORT_ON_ERROR : "false",
   ImpalaService.TImpalaQueryOptions.MAX_ERRORS : "0",
   ImpalaService.TImpalaQueryOptions.DISABLE_CODEGEN : "false",
   ImpalaService.TImpalaQueryOptions.BATCH_SIZE : "0",

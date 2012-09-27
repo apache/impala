@@ -19,7 +19,7 @@ include "JavaConstants.thrift"
 
 // Query options that correspond to ImpalaService.ImpalaQueryOptions
 struct TQueryOptions {
-  1: required bool abort_on_error = 1
+  1: required bool abort_on_error = 0
   2: required i32 max_errors = 0
   3: required bool disable_codegen = 0
   4: required i32 batch_size = 0
