@@ -39,9 +39,6 @@
 DEFINE_int32(batch_size, 0,
     "batch size to be used by backend; a batch size of 0 indicates the "
     "backend's default batch size");
-DEFINE_int32(file_buffer_size, 0,
-    "file buffer size used by text parsing; size of 0 indicates the "
-    "backend's default file buffer size");
 DEFINE_int32(max_scan_range_length, 0,
     "maximum length of the scan range; only applicable to HDFS scan range; a length of 0"
     " indicates backend default");
@@ -117,9 +114,9 @@ Status InProcessQueryExecutor::Exec(const string& query,
   query_options.disable_codegen = !FLAGS_enable_jit;
   query_options.max_errors = FLAGS_max_errors;
   query_options.num_nodes = FLAGS_num_nodes;
-  query_options.file_buffer_size = FLAGS_file_buffer_size;
   query_options.max_scan_range_length = FLAGS_max_scan_range_length;
   query_options.num_scanner_threads = FLAGS_num_scanner_threads;
+  query_options.allow_unsupported_formats = true;
 
   try {
     SCOPED_TIMER(plan_gen_counter);
@@ -325,8 +322,8 @@ Status InProcessQueryExecutor::Explain(const string& query, string* explain_plan
     query_options.disable_codegen = !FLAGS_enable_jit;
     query_options.max_errors = FLAGS_max_errors;
     query_options.num_nodes = FLAGS_num_nodes;
-    query_options.file_buffer_size = FLAGS_file_buffer_size;
     query_options.max_scan_range_length = FLAGS_max_scan_range_length;
+    query_options.allow_unsupported_formats = true;
 
     TClientRequest client_request;
     client_request.__set_stmt(query.c_str());

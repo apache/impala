@@ -33,9 +33,9 @@ struct TQueryOptions {
   
   6: required i32 num_nodes = JavaConstants.NUM_NODES_ALL
   7: required i64 max_scan_range_length = 0
-  8: required i32 file_buffer_size = 0
-  9: required i32 num_scanner_threads = 0
-  10: required i32 max_io_buffers = 0
+  8: required i32 num_scanner_threads = 0
+  9: required i32 max_io_buffers = 0
+  10: required bool allow_unsupported_formats = 0
   11: required bool partition_agg = 0
 }
 

@@ -86,14 +86,12 @@ public class PlannerTest {
     }
   }
 
-  private void RunUnimplementedQuery(String query, int numNodes,
-                                     StringBuilder errorLog) {
+  private void RunUnimplementedQuery(String query, TQueryOptions options,
+      StringBuilder errorLog) {
     try {
       AnalysisContext.AnalysisResult analysisResult = analysisCtxt.analyze(query);
       Planner planner = new Planner();
       explainStringBuilder.setLength(0);
-      TQueryOptions options = new TQueryOptions();
-      options.setNum_nodes(numNodes);
       planner.createPlanFragments(analysisResult, options, explainStringBuilder);
 
       errorLog.append(
@@ -108,7 +106,7 @@ public class PlannerTest {
     }
   }
 
-  private void runPlannerTestFile(String testFile) {
+  private void runPlannerTestFile(String testFile, TQueryOptions options) {
     String fileName = testDir + "/" + testFile + ".test";
     TestFileParser queryFileParser = new TestFileParser(fileName);
     StringBuilder actualOutput = new StringBuilder();
@@ -129,16 +127,19 @@ public class PlannerTest {
       ArrayList<String> singleNodePlan = testCase.getSectionContents(Section.PLAN);
       if (singleNodePlan.size() > 0 &&
           singleNodePlan.get(0).toLowerCase().startsWith("not implemented")) {
-        RunUnimplementedQuery(query, 1, errorLog);
+        options.setNum_nodes(1);
+        RunUnimplementedQuery(query, options, errorLog);
         actualOutput.append("not implemented\n");
       } else {
         // Run single-node query,
         RunQuery(query, 1, testCase, Section.PLAN, errorLog, actualOutput);
         // Check if multi-node query is implemented.
-        ArrayList<String> multiNodePlan = testCase.getSectionContents(Section.DISTRIBUTEDPLAN);
+        ArrayList<String> multiNodePlan =
+            testCase.getSectionContents(Section.DISTRIBUTEDPLAN);
         if (multiNodePlan.size() > 0 &&
             multiNodePlan.get(0).toLowerCase().startsWith("not implemented")) {
-          RunUnimplementedQuery(query, Constants.NUM_NODES_ALL, errorLog);
+          options.setNum_nodes(Constants.NUM_NODES_ALL);
+          RunUnimplementedQuery(query, options, errorLog);
           actualOutput.append("not implemented\n");
         } else {
           actualOutput.append("------------ DISTRIBUTEDPLAN\n");
@@ -172,6 +173,12 @@ public class PlannerTest {
     }
   }
 
+  private void runPlannerTestFile(String testFile) {
+    TQueryOptions options = new TQueryOptions();
+    options.allow_unsupported_formats = true;
+    runPlannerTestFile(testFile, options);
+  }
+
   @Test
   public void testDistinct() {
     runPlannerTestFile("distinct");
@@ -195,6 +202,13 @@ public class PlannerTest {
   @Test
   public void testHdfs() {
     runPlannerTestFile("hdfs");
+  }
+
+  @Test
+  public void testUnsupportedFormat() {
+    TQueryOptions options = new TQueryOptions();
+    options.allow_unsupported_formats = false;
+    runPlannerTestFile("unsupported-hdfs-format", options);
   }
 
   @Test

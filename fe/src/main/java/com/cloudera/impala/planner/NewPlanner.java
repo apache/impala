@@ -100,6 +100,14 @@ public class NewPlanner {
 
     for (PlanFragment fragment: fragments) {
       fragment.finalize(analyzer);
+      if (!queryOptions.allow_unsupported_formats) {
+        // verify that hdfs partitions only use supported format after partition pruning
+        ArrayList<HdfsScanNode> hdfsScans = Lists.newArrayList();
+        fragment.getPlanRoot().collectSubclasses(HdfsScanNode.class, hdfsScans);
+        for (HdfsScanNode hdfsScanNode: hdfsScans) {
+          hdfsScanNode.validateFileFormat();
+        }
+      }
     }
 
     Collections.reverse(fragments);

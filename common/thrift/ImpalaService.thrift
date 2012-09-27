@@ -44,10 +44,6 @@ enum TImpalaQueryOptions {
   // a length of 0 indicates backend default;  
   MAX_SCAN_RANGE_LENGTH,
   
-  // file buffer size used by text parsing; size of 0 indicates the backend's default
-  // file buffer size
-  FILE_BUFFER_SIZE,
-
   // Maximum number of io buffers (per disk)
   MAX_IO_BUFFERS,
 
@@ -58,6 +54,9 @@ enum TImpalaQueryOptions {
   // consumption, but may require an additional repartitioning step on the grouping
   // exprs; ignored if no grouping
   PARTITION_AGG,
+  
+  // If true, Impala will try to execute on file formats that are not fully supported yet
+  ALLOW_UNSUPPORTED_FORMATS
 }
 
 // The summary of an insert.

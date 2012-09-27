@@ -34,11 +34,9 @@ import com.cloudera.impala.thrift.TQueryExecRequest2;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TScanRangeLocation;
 import com.cloudera.impala.thrift.TScanRangeLocations;
-
+import com.cloudera.impala.thrift.TSessionState;
 import com.cloudera.impala.thrift.TStmtType;
 import com.google.common.base.Preconditions;
-import com.cloudera.impala.thrift.TSessionState;
-
 import com.google.common.collect.Lists;
 
 public class NewPlannerTest {
@@ -116,11 +114,10 @@ public class NewPlannerTest {
    * locations to actualScanRangeLocations; compares both to the appropriate sections
    * of 'testCase'.
    */
-  private void RunTestCase(
-      TestCase testCase, StringBuilder errorLog, StringBuilder actualOutput) {
+  private void RunTestCase(TestCase testCase, TQueryOptions options,
+      StringBuilder errorLog, StringBuilder actualOutput) {
     String query = testCase.getQuery();
     LOG.info("running query " + query);
-    TQueryOptions options = new TQueryOptions();
 
     // single-node plan
     ArrayList<String> expectedPlan = testCase.getSectionContents(Section.PLAN);
@@ -227,7 +224,7 @@ public class NewPlannerTest {
       // TODO: check that scan range locations are identical in both cases
   }
 
-  private void runPlannerTestFile(String testFile) {
+  private void runPlannerTestFile(String testFile, TQueryOptions options) {
     String fileName = testDir + "/" + testFile + ".test";
     TestFileParser queryFileParser = new TestFileParser(fileName);
     StringBuilder actualOutput = new StringBuilder();
@@ -237,7 +234,7 @@ public class NewPlannerTest {
     for (TestCase testCase : queryFileParser.getTestCases()) {
       actualOutput.append(testCase.getSectionAsString(Section.QUERY, true, "\n"));
       actualOutput.append("\n");
-      RunTestCase(testCase, errorLog, actualOutput);
+      RunTestCase(testCase, options, errorLog, actualOutput);
       actualOutput.append("====\n");
     }
 
@@ -257,6 +254,12 @@ public class NewPlannerTest {
     if (errorLog.length() != 0) {
       fail(errorLog.toString());
     }
+  }
+
+  private void runPlannerTestFile(String testFile) {
+    TQueryOptions options = new TQueryOptions();
+    options.allow_unsupported_formats = true;
+    runPlannerTestFile(testFile, options);
   }
 
   @Test
@@ -282,6 +285,13 @@ public class NewPlannerTest {
   @Test
   public void testHdfs() {
     runPlannerTestFile("hdfs");
+  }
+
+  @Test
+  public void testUnsupportedFormat() {
+    TQueryOptions options = new TQueryOptions();
+    options.allow_unsupported_formats = false;
+    runPlannerTestFile("unsupported-hdfs-format", options);
   }
 
   @Test

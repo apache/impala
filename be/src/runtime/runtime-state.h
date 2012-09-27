@@ -61,7 +61,6 @@ class RuntimeState {
   const DescriptorTbl& desc_tbl() const { return *desc_tbl_; }
   void set_desc_tbl(DescriptorTbl* desc_tbl) { desc_tbl_ = desc_tbl; }
   int batch_size() const { return query_options_.batch_size; }
-  int file_buffer_size() const { return query_options_.file_buffer_size; }
   bool abort_on_error() const { return query_options_.abort_on_error; }
   int max_errors() const { return query_options_.max_errors; }
   int max_io_buffers() const { return query_options_.max_io_buffers; }
@@ -121,7 +120,6 @@ class RuntimeState {
 
  private:
   static const int DEFAULT_BATCH_SIZE = 1024;
-  static const int DEFAULT_FILE_BUFFER_SIZE = 1024 * 1024;
   // This is the number of buffers per disk.
   static const int DEFAULT_MAX_IO_BUFFERS = 5;
 

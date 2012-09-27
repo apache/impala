@@ -46,7 +46,6 @@ RuntimeState::RuntimeState()
     unreported_error_idx_(0),
     profile_(obj_pool_.get(), "<unnamed>") {
   query_options_.batch_size = DEFAULT_BATCH_SIZE;
-  query_options_.file_buffer_size = DEFAULT_FILE_BUFFER_SIZE;
 }
 
 RuntimeState::~RuntimeState() {
@@ -69,9 +68,6 @@ Status RuntimeState::Init(
   }
   if (query_options_.batch_size <= 0) {
     query_options_.batch_size = DEFAULT_BATCH_SIZE;
-  }
-  if (query_options.file_buffer_size <= 0) {
-    query_options_.file_buffer_size = DEFAULT_FILE_BUFFER_SIZE;
   }
   if (query_options_.max_io_buffers <= 0) {
     query_options_.max_io_buffers = DEFAULT_MAX_IO_BUFFERS;

@@ -167,8 +167,8 @@ public class ImpaladClientExecutor {
         case MAX_SCAN_RANGE_LENGTH:
           optionValue = String.valueOf(queryOptions.getMax_scan_range_length());
           break;
-        case FILE_BUFFER_SIZE:
-          optionValue = String.valueOf(queryOptions.getFile_buffer_size());
+        case ALLOW_UNSUPPORTED_FORMATS:
+          optionValue = String.valueOf(queryOptions.allow_unsupported_formats);
           break;
         case MAX_IO_BUFFERS:
           optionValue = String.valueOf(queryOptions.getMax_io_buffers());

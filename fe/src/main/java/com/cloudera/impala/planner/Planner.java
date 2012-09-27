@@ -783,6 +783,19 @@ public class Planner {
     // don't compute mem layout before marking slots that aren't being referenced
     analyzer.getDescTbl().computeMemLayout();
 
+    if (!queryOptions.allow_unsupported_formats) {
+      // verify that hdfs partitions only use supported format after partition pruning
+      ArrayList<HdfsScanNode> hdfsScans = Lists.newArrayList();
+      if (numNodes == 1) {
+        root.collectSubclasses(HdfsScanNode.class, hdfsScans);
+      } else {
+        slave.collectSubclasses(HdfsScanNode.class, hdfsScans);
+      }
+      for (HdfsScanNode hdfsScanNode: hdfsScans) {
+        hdfsScanNode.validateFileFormat();
+      }
+    }
+
     // TODO: determine if slavePlan produces more slots than are being
     // ref'd by coordPlan; if so, insert MaterializationNode that trims the
     // output

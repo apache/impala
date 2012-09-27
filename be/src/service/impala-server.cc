@@ -1388,16 +1388,18 @@ void ImpalaServer::QueryToTClientRequest(const Query& query,
           case TImpalaQueryOptions::MAX_SCAN_RANGE_LENGTH:
             request->queryOptions.max_scan_range_length = atol(key_value[1].c_str());
             break;
-          case TImpalaQueryOptions::FILE_BUFFER_SIZE:
-            request->queryOptions.file_buffer_size = atoi(key_value[1].c_str());
-            break;
           case TImpalaQueryOptions::MAX_IO_BUFFERS:
             request->queryOptions.max_io_buffers = atoi(key_value[1].c_str());
             break;
           case TImpalaQueryOptions::NUM_SCANNER_THREADS:
             request->queryOptions.num_scanner_threads = atoi(key_value[1].c_str());
+            break;
           case TImpalaQueryOptions::PARTITION_AGG:
             request->queryOptions.partition_agg = 
+                iequals(key_value[1], "true") || iequals(key_value[1], "1");
+            break;
+          case TImpalaQueryOptions::ALLOW_UNSUPPORTED_FORMATS:
+            request->queryOptions.allow_unsupported_formats =
                 iequals(key_value[1], "true") || iequals(key_value[1], "1");
             break;
           default:
@@ -1630,9 +1632,6 @@ void ImpalaServer::InitializeConfigVariables() {
       case TImpalaQueryOptions::MAX_SCAN_RANGE_LENGTH:
         value << default_options.max_scan_range_length;
         break;
-      case TImpalaQueryOptions::FILE_BUFFER_SIZE:
-        value << default_options.file_buffer_size;
-        break;
       case TImpalaQueryOptions::MAX_IO_BUFFERS:
         value << default_options.max_io_buffers;
         break;
@@ -1641,6 +1640,9 @@ void ImpalaServer::InitializeConfigVariables() {
         break;
       case TImpalaQueryOptions::PARTITION_AGG:
         value << default_options.partition_agg;
+        break;
+      case TImpalaQueryOptions::ALLOW_UNSUPPORTED_FORMATS:
+        value << default_options.allow_unsupported_formats;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here

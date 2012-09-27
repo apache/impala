@@ -44,7 +44,7 @@ public class QueryTest extends BaseQueryTest {
     // in the data.  For sequence this is to the next sync mark for text
     // it is the next end of record delimiter.
     TestExecContext execContext1 =
-      new TestExecContext(1, 0, false, true, 0, 5000, 0, false);
+      new TestExecContext(1, 0, false, true, 0, 5000, false, true);
     List<TestConfiguration> testConfigs = Lists.newArrayList();
     testConfigs.add(
         new TestConfiguration(execContext1, CompressionFormat.NONE, TableFormat.TEXT));
@@ -103,12 +103,12 @@ public class QueryTest extends BaseQueryTest {
     // 1. scan range with no tuple
     // 2. tuple that span across multiple scan ranges
     TestExecContext execContext1 =
-        new TestExecContext(2, 1, true, true, 0, 1, 0, false);
+        new TestExecContext(2, 1, true, true, 0, 1, false, false);
 
     // We use a very small file buffer to test the HDFS scanner init code that seeks the
     // first tuple delimiter.
     TestExecContext execContext2 =
-        new TestExecContext(2, 1, true, true, 0, 5, 1, false);
+        new TestExecContext(2, 1, true, true, 0, 5, false, false);
 
     List<TestConfiguration> testConfigs = Lists.newArrayList();
     testConfigs.add(

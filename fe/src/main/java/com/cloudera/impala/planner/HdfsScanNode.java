@@ -16,9 +16,11 @@ import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.TupleDescriptor;
+import com.cloudera.impala.catalog.HdfsFileFormat;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.thrift.Constants;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.THdfsFileSplit;
@@ -434,5 +436,22 @@ public class HdfsScanNode extends ScanNode {
     }
     output.append(super.getExplainString(prefix + "  ", detailLevel));
     return output.toString();
+  }
+
+  /**
+   * Raise NotImplementedException if any of the partitions has unsupported file format
+   * (RC or Trevni).
+   * Can only be called after finalize().
+   */
+  public void validateFileFormat() throws NotImplementedException {
+    for (HdfsPartition partition :partitions) {
+      HdfsFileFormat format = partition.getInputFormatDescriptor().getFileFormat();
+      if (format == HdfsFileFormat.RC_FILE || format == HdfsFileFormat.TREVNI) {
+        StringBuilder error = new StringBuilder();
+        error.append("Table ").append(desc.getTable().getFullName())
+          .append(" has unsupported format ").append(format.name());
+        throw new NotImplementedException(error.toString());
+      }
+    }
   }
 }
