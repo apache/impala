@@ -314,7 +314,7 @@ class HdfsRCFileScanner : public HdfsScanner {
   //   key_buf_pos_[col_idx]
   //   cur_field_length_rep_[col_idx]
   //   cur_field_length_[col_idx]
-  void NextField(int col_idx);
+  Status NextField(int col_idx);
 
   // Read a row group into buffers.
   // Calls:
@@ -327,7 +327,8 @@ class HdfsRCFileScanner : public HdfsScanner {
   // Calls NexField on each column that we are reading.
   // Modifies:
   //   row_pos_
-  bool NextRow();
+  // Returns *eorg = true if there are no more rows.
+  Status NextRow(bool* eorg);
 
   // Reset the Row Group information.
   void ResetRowGroup();

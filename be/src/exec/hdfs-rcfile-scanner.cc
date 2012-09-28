@@ -418,7 +418,7 @@ void HdfsRCFileScanner::GetCurrentKeyBuffer(int col_idx, bool skip_col_data,
   *key_buf_ptr += col_key_buf_len;
 }
 
-inline void HdfsRCFileScanner::NextField(int col_idx) {
+inline Status HdfsRCFileScanner::NextField(int col_idx) {
   col_buf_pos_[col_idx] += cur_field_length_[col_idx];
 
   if (cur_field_length_rep_[col_idx] > 0) {
@@ -430,6 +430,15 @@ inline void HdfsRCFileScanner::NextField(int col_idx) {
     int64_t length = 0;
     uint8_t* col_key_buf = &col_key_bufs_[col_idx][0];
     int bytes_read = SerDeUtils::GetVLong(col_key_buf, key_buf_pos_[col_idx], &length);
+    if (bytes_read == -1) {
+        int64_t position;
+        current_byte_stream_->GetPosition(&position);
+        stringstream ss;
+        ss << "Invalid column length in file: "
+           << current_byte_stream_->GetLocation() << " at offset: " << position;
+        if (state_->LogHasSpace()) state_->LogError(ss.str());
+        return Status(ss.str());
+    }
     key_buf_pos_[col_idx] += bytes_read;
 
     if (length < 0) {
@@ -440,19 +449,24 @@ inline void HdfsRCFileScanner::NextField(int col_idx) {
       cur_field_length_[col_idx] = length;
     }
   }
+  return Status::OK;
 }
 
-inline bool HdfsRCFileScanner::NextRow() {
+inline Status HdfsRCFileScanner::NextRow(bool* eorg) {
   // TODO: Wrap this in an iterator and prevent people from alternating
   // calls to NextField()/NextRow()
-  if (row_pos_ >= num_rows_) return false;
+  if (row_pos_ >= num_rows_) {
+    *eorg = true;
+    return Status::OK;
+  }
   for (int col_idx = 0; col_idx < num_cols_; ++col_idx) {
     if (ReadColumn(col_idx)) {
-      NextField(col_idx);
+      RETURN_IF_ERROR(NextField(col_idx));
     }
   }
   ++row_pos_;
-  return true;
+  *eorg = false;
+  return Status::OK;
 }
 
 Status HdfsRCFileScanner::ReadColumnBuffers() {
@@ -520,7 +534,11 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
 
     SCOPED_TIMER(scan_node_->materialize_tuple_timer());
     // Copy rows out of the current row group into the row_batch
-    while (!scan_node_->ReachedLimit() && !row_batch->IsFull() && NextRow()) {
+    while (!scan_node_->ReachedLimit() && !row_batch->IsFull()) {
+      bool eorg;
+      RETURN_IF_ERROR(NextRow(&eorg));
+      if (eorg) break;
+
       // Index into current row in row_batch.
       int row_idx = row_batch->AddRow();
       DCHECK(row_idx != RowBatch::INVALID_ROW_INDEX);

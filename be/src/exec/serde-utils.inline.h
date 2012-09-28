@@ -81,6 +81,7 @@ inline Status SerDeUtils::ReadVLong(ScanRangeContext* context, int64_t* value) {
         reinterpret_cast<uint8_t**>(&firstbyte)));
 
   int len = DecodeVIntSize(*firstbyte);
+  if (len > MAX_VINT_LEN) return Status("ReadVLong: size is too big");
   if (len == 1) {
     *value = static_cast<int64_t>(*firstbyte);
     return Status::OK;
@@ -116,6 +117,7 @@ inline int SerDeUtils::GetVLong(uint8_t* buf, int64_t offset, int64_t* vlong) {
   int8_t firstbyte = (int8_t) buf[0 + offset];
 
   int len = DecodeVIntSize(firstbyte);
+  if (len > MAX_VINT_LEN) return -1;
   if (len == 1) {
     *vlong = static_cast<int64_t>(firstbyte);
     return len;

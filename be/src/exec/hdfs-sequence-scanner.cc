@@ -227,6 +227,12 @@ inline Status HdfsSequenceScanner::GetRecordFromCompressedBlock(
   }
   // Adjust next_record_ to move past the size of the length indicator.
   int size = SerDeUtils::GetVLong(next_record_in_compressed_block_, record_len);
+  if (size == -1) {
+      stringstream ss;
+      ss << "Invalid record size in compressed block.";
+      if (state_->LogHasSpace()) state_->LogError(ss.str());
+      return Status(ss.str());
+  }
   next_record_in_compressed_block_ += size;
   *record_ptr = next_record_in_compressed_block_;
   // Point to the length of the next record.
@@ -267,6 +273,12 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr, int64_t* reco
     *record_ptr = unparsed_data_buffer_;
     // Read the length of the record.
     int size = SerDeUtils::GetVLong(*record_ptr, record_len);
+    if (size == -1) {
+        stringstream ss;
+        ss << "Invalid record size";
+        if (state_->LogHasSpace()) state_->LogError(ss.str());
+        return Status(ss.str());
+    }
     *record_ptr += size;
   } else {
     // Uncompressed records

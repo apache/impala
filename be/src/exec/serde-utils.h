@@ -36,7 +36,9 @@ class SerDeUtils {
   // 4 bytes long.
   static void PutInt(uint8_t* buf, int32_t integer);
 
-  // Get a variable-length Long value from a byte buffer.
+  // Get a variable-length Long or int value from a byte buffer.
+  // Returns the length of the long/int
+  // If the size byte is corrupted then return -1;
   static int GetVLong(uint8_t* buf, int64_t* vlong);
   static int GetVInt(uint8_t* buf, int32_t* vint);
 
