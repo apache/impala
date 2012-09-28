@@ -69,5 +69,6 @@ CFLAGS="-fPIC -DPIC" CXXFLAGS="-fPIC -DPIC" ./configure \
   --disable-digest --disable-otp  \
   --prefix=$IMPALA_HOME/thirdparty/cyrus-sasl-2.1.23/build \
   --enable-static --enable-staticdlopen
-make
+# the first time you do a make it fails, ignore the error.
+(make || true)
 make install
