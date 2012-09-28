@@ -39,8 +39,8 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       tuple_id_(tnode.hdfs_scan_node.tuple_id),
       compact_data_(tnode.compact_data),
       reader_context_(NULL),
-      unknown_disk_id_warned_(false),
       tuple_desc_(NULL),
+      unknown_disk_id_warned_(false),
       tuple_pool_(new MemPool()),
       num_unqueued_files_(0),
       scanner_pool_(new ObjectPool()),
@@ -446,7 +446,12 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 
   VLOG_QUERY << "Scan ranges assigned to node=" << id() << ": " << total_scan_ranges_;
 
-  num_scanner_threads_ = min(state->num_scanner_threads(), total_scan_ranges_);
+  num_scanner_threads_ = state->num_scanner_threads();
+  if (num_scanner_threads_ == 0) {
+    num_scanner_threads_ = total_scan_ranges_;
+  } else {
+    num_scanner_threads_ = min(state->num_scanner_threads(), total_scan_ranges_);
+  }
   VLOG_QUERY << "Using " << num_scanner_threads_ << " simultaneous scanner threads.";
   DCHECK_GT(num_scanner_threads_, 0);
 
