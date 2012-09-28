@@ -49,12 +49,6 @@ public class QueryTest extends BaseQueryTest {
   }
 
   @Test
-  public void TestMissingColumns() {
-    runPairTestFile("hdfs-column", true, 0,
-        ALL_TABLE_FORMATS, ALL_COMPRESSION_FORMATS, SMALL_BATCH_SIZES, SINGLE_NODE_ONLY);
-  }
-
-  @Test
   public void TestLimit() {
     runTestInExecutionMode(EXECUTION_MODE, "limit", true, 0);
   }
