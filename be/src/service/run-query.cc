@@ -3,7 +3,6 @@
 #include <iostream>
 #include <iomanip>
 #include <jni.h>
-#include <sys/time.h>
 #include <google/heap-profiler.h>
 #include <google/profiler.h>
 #include <server/TServer.h>
@@ -68,15 +67,15 @@ static void ConstructSummaryString(ExecStats::QueryType query_type, int num_rows
   if (FLAGS_iterations == 1) {
     summary_stream << verb << num_rows << (num_rows == 1 ? " row" : " rows")
                    << " in " << setiosflags(ios::fixed) << setprecision(3)
-                   << elapsed_times[0]/1000000.0 << " s" << endl << endl;
+                   << elapsed_times[0]/1000.0 << " s" << endl << endl;
   } else {
     double mean, stddev;
     StatUtil::ComputeMeanStddev<double>(&elapsed_times[0],
                                         elapsed_times.size(), &mean, &stddev);
     summary_stream << verb << num_rows << (num_rows == 1 ? " row" : " rows")
                    << " in " << setiosflags(ios::fixed) << setprecision(3)
-                   << mean/1000000.0 << " s with stddev "
-                   << setiosflags(ios::fixed) << setprecision(3) << stddev/1000000.0
+                   << mean/1000.0 << " s with stddev "
+                   << setiosflags(ios::fixed) << setprecision(3) << stddev/1000.0
                    << " s" << endl << endl;
   }
 
@@ -199,8 +198,8 @@ static void Exec(ExecEnv* exec_env, const vector<string>& queries) {
       scoped_ptr<QueryExecutorIf> executor(CreateExecutor(exec_env));
       EXIT_IF_ERROR(executor->Setup());
 
-      struct timeval start_time;
-      gettimeofday(&start_time, NULL);
+      WallClockStopWatch sw;
+      sw.Start();
 
       EXIT_IF_ERROR(executor->Exec(*iter, NULL));
       while (true) {
@@ -210,14 +209,12 @@ static void Exec(ExecEnv* exec_env, const vector<string>& queries) {
         if (!row.empty() && i == 0) cout << row << endl;
         if (executor->eos()) break;
       }
+      sw.Stop();
+
       num_rows += executor->exec_stats()->num_rows();
       query_type = executor->exec_stats()->query_type();
 
-      struct timeval end_time;
-      gettimeofday(&end_time, NULL);
-      double elapsed_usec = end_time.tv_sec * 1000000 + end_time.tv_usec;
-      elapsed_usec -= start_time.tv_sec * 1000000 + start_time.tv_usec;
-      elapsed_times[i] = elapsed_usec;
+      elapsed_times[i] = sw.ElapsedTime();
 
       if (FLAGS_enable_counters) {
         hw_counters.Snapshot("Query");

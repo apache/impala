@@ -187,7 +187,6 @@ Status PlanFragmentExecutor::OpenInternal() {
         VLOG_ROW << PrintRow(row, row_desc());
       }
     }
-    COUNTER_UPDATE(rows_produced_counter_, batch->num_rows());
     RETURN_IF_ERROR(sink_->Send(runtime_state(), batch));
   }
 

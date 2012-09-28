@@ -224,6 +224,47 @@ TEST(CountersTest, DerivedCounters) {
   EXPECT_EQ(throughput_counter->value(), 40);
 }
 
+TEST(CountersTest, InfoStringTest) {
+  ObjectPool pool;
+  RuntimeProfile profile(&pool, "Profile");
+  EXPECT_TRUE(profile.GetInfoString("Key") == NULL);
+
+  profile.AddInfoString("Key", "Value");
+  const string* value = profile.GetInfoString("Key");
+  EXPECT_TRUE(value != NULL);
+  EXPECT_EQ(*value, "Value");
+  
+  // Convert it to thrift
+  TRuntimeProfileTree tprofile;
+  profile.ToThrift(&tprofile);
+
+  // Convert it back
+  RuntimeProfile* from_thrift = RuntimeProfile::CreateFromThrift(
+      &pool, tprofile);
+  value = from_thrift->GetInfoString("Key");
+  EXPECT_TRUE(value != NULL);
+  EXPECT_EQ(*value, "Value");
+
+  // Test update.
+  RuntimeProfile update_dst_profile(&pool, "Profile2");
+  update_dst_profile.Update(tprofile);
+  value = update_dst_profile.GetInfoString("Key");
+  EXPECT_TRUE(value != NULL);
+  EXPECT_EQ(*value, "Value");
+
+  // Update the original profile, convert it to thrift and update from the dst
+  // profile
+  profile.AddInfoString("Key", "NewValue");
+  profile.AddInfoString("Foo", "Bar");
+  EXPECT_EQ(*profile.GetInfoString("Key"), "NewValue");
+  EXPECT_EQ(*profile.GetInfoString("Foo"), "Bar");
+  profile.ToThrift(&tprofile);
+
+  update_dst_profile.Update(tprofile);
+  EXPECT_EQ(*update_dst_profile.GetInfoString("Key"), "NewValue");
+  EXPECT_EQ(*update_dst_profile.GetInfoString("Foo"), "Bar");
+}
+
 TEST(CountersTest, RateCounters) {
   ObjectPool pool;
   RuntimeProfile profile(&pool, "Profile");

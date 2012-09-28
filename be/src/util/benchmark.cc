@@ -23,8 +23,8 @@ double Benchmark::Measure(BenchmarkFunction function, void* args,
   sw.Stop();
   iters += batch_size;
 
-  if (sw.Ticks() < target_cycles) {
-    int64_t iters_guess = (target_cycles / sw.Ticks()) * batch_size;
+  if (sw.ElapsedTime() < target_cycles) {
+    int64_t iters_guess = (target_cycles / sw.ElapsedTime()) * batch_size;
     // Shoot for 110% of the guess. Going a little over is not a big deal.
     iters_guess *= 1.1;
     // Modify the batch size based on the guess.  We ran the function a small number
@@ -35,14 +35,14 @@ double Benchmark::Measure(BenchmarkFunction function, void* args,
     batch_size = (iters_guess - iters) / 5;
   }
 
-  while (sw.Ticks() < target_cycles) {
+  while (sw.ElapsedTime() < target_cycles) {
     sw.Start();
     function(batch_size, args);
     sw.Stop();
     iters += batch_size;
   }
 
-  double ms_elapsed = sw.Ticks() / CpuInfo::cycles_per_ms();
+  double ms_elapsed = sw.ElapsedTime() / CpuInfo::cycles_per_ms();
   return iters / ms_elapsed;
 }
 

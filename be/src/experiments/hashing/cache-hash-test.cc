@@ -63,15 +63,14 @@ inline void Process(T* ht, const ProbeTuple* probe) {
 // Test ht by aggregating input, which is an array of num_tuples ProbeTuples
 // Templatized on the type of hash table so we can reuse code without virtual calls.
 template<typename T>
-uint64_t Test(T* ht, const ProbeTuple* input, uint64_t num_tuples)
-{
+uint64_t Test(T* ht, const ProbeTuple* input, uint64_t num_tuples) {
   StopWatch time;
   time.Start();
   for (int i = 0; i < num_tuples; ++i) {
     Process<T>(ht, &input[i]);
   }
   time.Stop();
-  return time.Ticks();
+  return time.ElapsedTime();
 }
 
 int main(int argc, char **argv) {

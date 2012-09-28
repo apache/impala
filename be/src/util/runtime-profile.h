@@ -25,7 +25,8 @@ namespace impala {
 
 #if ENABLE_COUNTERS
   #define ADD_COUNTER(profile, name, type) (profile)->AddCounter(name, type)
-  #define SCOPED_TIMER(c) ScopedTimer MACRO_CONCAT(SCOPED_TIMER, __COUNTER__)(c)
+  #define SCOPED_TIMER(c) \
+      ScopedTimer<StopWatch> MACRO_CONCAT(SCOPED_TIMER, __COUNTER__)(c)
   #define COUNTER_UPDATE(c, v) (c)->Update(v)
   #define COUNTER_SET(c, v) (c)->Set(v)
 #else
@@ -109,13 +110,16 @@ class RuntimeProfile {
   void AddChild(RuntimeProfile* child, bool indent = true);
 
   // Merges the src profile into this one, combining counters that have an identical
-  // path. 'src' would be a const if it weren't for locking.
+  // path. Info strings from profiles are not merged. 'src' would be a const if it 
+  // weren't for locking.
   // Calling this concurrently on two RuntimeProfiles in reverse order results in
   // undefined behavior.
   void Merge(RuntimeProfile* src);
 
   // Updates this profile w/ the thrift profile: behaves like Merge(), except
   // that existing counters are updated rather than added up.
+  // Info strings matched up by key and are updated or added, depending on whether
+  // the key has already been registered.
   void Update(const TRuntimeProfileTree& thrift_profile);
 
   // Add a counter with 'name'/'type'.  Returns a counter object that the caller can
@@ -136,6 +140,14 @@ class RuntimeProfile {
   // Adds all counters with 'name' that are registered either in this or
   // in any of the child profiles to 'counters'.
   void GetCounters(const std::string& name, std::vector<Counter*>* counters);
+
+  // Adds a string to the runtime profile.  If a value already exists for 'key',
+  // the value will be updated.
+  void AddInfoString(const std::string& key, const std::string& value);
+
+  // Returns a pointer to the info string value for 'key'.  Returns NULL if
+  // the key does not exist.
+  const std::string* GetInfoString(const std::string& key);
 
   // Returns the counter for the total elapsed time.
   Counter* total_time_counter() { return &counter_total_time_; }
@@ -213,6 +225,10 @@ class RuntimeProfile {
   ChildVector children_;
   boost::mutex children_lock_;  // protects child_map_ and children_
 
+  typedef std::map<std::string, std::string> InfoStrings;
+  InfoStrings info_strings_;
+  boost::mutex info_strings_lock_;
+
   Counter counter_total_time_;
 
   struct RateCounterInfo {
@@ -249,21 +265,24 @@ class RuntimeProfile {
   static void RateCounterUpdateLoop();
 };
 
-// Utility class to update time elapsed when the object goes
-// out of scope.
+// Utility class to update time elapsed when the object goes out of scope.
+// 'T' must implement the Stopwatch "interface" (Start,Stop,ElapsedTime) but
+// we use templates not to not for virtual function overhead.
+template<class T>
 class ScopedTimer {
  public:
   ScopedTimer(RuntimeProfile::Counter* counter) :
     counter_(counter) {
     if (counter == NULL) return;
-    DCHECK_EQ(counter->type(), TCounterType::CPU_TICKS);
+    DCHECK(counter->type() == TCounterType::CPU_TICKS || 
+           counter->type() == TCounterType::TIME_MS);
     sw_.Start();
   }
 
   // Update counter when object is destroyed
   ~ScopedTimer() {
     sw_.Stop();
-    if (counter_ != NULL) counter_->Update(sw_.Ticks());
+    if (counter_ != NULL) counter_->Update(sw_.ElapsedTime());
   }
 
  private:
@@ -271,7 +290,7 @@ class ScopedTimer {
   ScopedTimer(const ScopedTimer& timer);
   ScopedTimer& operator=(const ScopedTimer& timer);
 
-  StopWatch sw_;
+  T sw_;
   RuntimeProfile::Counter* counter_;
 };
 

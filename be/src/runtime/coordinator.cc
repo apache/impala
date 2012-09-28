@@ -154,6 +154,7 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
   query_profile_->AddChild(agg_throughput_profile_);
   if (executor_.get() != NULL) {
     query_profile_->AddChild(executor_->profile());
+    executor_->profile()->set_name("Coordinator Fragment");
     CreateThroughputCounters(executor_->profile(), &coordinator_throughput_counters_);
   }
   SCOPED_TIMER(query_profile_->total_time_counter());
@@ -230,16 +231,25 @@ Status Coordinator::GetStatus() {
   return query_status_;
 }
 
-Status Coordinator::UpdateStatus(const Status& status) {
-  lock_guard<mutex> l(lock_);
-  // nothing to update
-  if (status.ok()) return query_status_;
+Status Coordinator::UpdateStatus(const Status& status, const TUniqueId* id) {
+  {
+    lock_guard<mutex> l(lock_);
+    // nothing to update
+    if (status.ok()) return query_status_;
 
-  // don't override an error status; also, cancellation has already started
-  if (!query_status_.ok()) return query_status_;
+    // don't override an error status; also, cancellation has already started
+    if (!query_status_.ok()) return query_status_;
+  
+    query_status_ = status;
+    CancelInternal();
+  }
 
-  query_status_ = status;
-  CancelInternal();
+  // Log the id of the fragment that first failed so we can track it down easier.
+  if (id != NULL) {
+    VLOG_QUERY << "Query id=" << query_id_ << " failed because fragment id="
+               << *id << " failed.";
+  }
+
   return query_status_;
 }
 
@@ -357,7 +367,7 @@ Status Coordinator::Wait() {
   has_called_wait_ = true;
   if (executor_.get() != NULL) {
     // Open() may block
-    RETURN_IF_ERROR(UpdateStatus(executor_->Open()));
+    RETURN_IF_ERROR(UpdateStatus(executor_->Open(), NULL));
 
     // If the coordinator fragment has a sink, it will have finished executing at this
     // point.  It's safe therefore to copy the set of files to move and updated partitions
@@ -385,7 +395,7 @@ Status Coordinator::Wait() {
   if (needs_finalization_) {
     return FinalizeQuery();
   }
-
+  
   return Status::OK;
 }
 
@@ -407,8 +417,8 @@ Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
 
   // if there was an error, we need to return the query's error status rather than
   // the status we just got back from the local executor (which may well be CANCELLED
-  // in that case).
-  RETURN_IF_ERROR(UpdateStatus(status));
+  // in that case).  Coordinator fragment failed in this case so we log the query_id.
+  RETURN_IF_ERROR(UpdateStatus(status, &runtime_state()->fragment_id()));
 
   if (*batch == NULL) {
     // Don't return final NULL until all backends have completed.
@@ -418,11 +428,9 @@ Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
     // query state, and perform post-query finalization which might
     // depend on the reports from all backends.
     RETURN_IF_ERROR(WaitForAllBackends());
-    if (VLOG_QUERY_IS_ON) {
-      stringstream s;
-      query_profile_->PrettyPrint(&s);
-      VLOG_QUERY << "cumulative profile for query_id=" << query_id_ << "\n"
-                 << s.str();
+    if (query_status_.ok()) {
+      // If the query completed successfully, report aggregate query profiles.
+      ReportQuerySummary();
     }
   } else {
     exec_stats_->num_rows_ += (*batch)->num_rows();
@@ -441,13 +449,16 @@ void Coordinator::PrintBackendInfo() {
   //double median = accumulators::median(acc);
   double mean = accumulators::mean(acc);
   double stddev = sqrt(accumulators::variance(acc));
-  VLOG_QUERY << "split sizes for " << backend_exec_states_.size() << " backends:"
-             << " min: " << PrettyPrinter::Print(min, TCounterType::BYTES)
-             << ", max: " << PrettyPrinter::Print(max, TCounterType::BYTES)
-             //<< ", median: " << PrettyPrinter::Print(median, TCounterType::BYTES)
-             << ", avg: " << PrettyPrinter::Print(mean, TCounterType::BYTES)
-             << ", stddev: " << PrettyPrinter::Print(stddev, TCounterType::BYTES);
+  stringstream ss;
+  ss << " min: " << PrettyPrinter::Print(min, TCounterType::BYTES)
+     << ", max: " << PrettyPrinter::Print(max, TCounterType::BYTES)
+     //<< ", median: " << PrettyPrinter::Print(median, TCounterType::BYTES)
+     << ", avg: " << PrettyPrinter::Print(mean, TCounterType::BYTES)
+     << ", stddev: " << PrettyPrinter::Print(stddev, TCounterType::BYTES);
+  query_profile_->AddInfoString("split sizes", ss.str());
+
   if (VLOG_FILE_IS_ON) {
+    VLOG_FILE << ss.str();
     for (int i = 0; i < backend_exec_states_.size(); ++i) {
       BackendExecState* exec_state = backend_exec_states_[i];
       VLOG_FILE << "data volume for ipaddress " << exec_state->hostport.first
@@ -554,7 +565,10 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
   }
   exec_state->status = thrift_result.status;
   exec_env_->client_cache()->ReleaseClient(backend_client);
-  if (exec_state->status.ok()) exec_state->initiated = true;
+  if (exec_state->status.ok()) {
+    exec_state->initiated = true;
+    exec_state->stopwatch.Start();
+  }
   return exec_state->status;
 }
 
@@ -632,6 +646,9 @@ void Coordinator::CancelInternal() {
 
   // notify that we completed with an error
   backend_completion_cv_.notify_all();
+
+  // Report the summary with whatever progress the query made before being cancelled.
+  ReportQuerySummary();
 }
 
 Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& params) {
@@ -693,12 +710,13 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
   // for now, abort the query if we see any error
   // (UpdateStatus() initiates cancellation, if it hasn't already been initiated)
   if (!status.ok()) {
-    UpdateStatus(status);
+    UpdateStatus(status, &exec_state->fragment_id);
     return Status::OK;
   }
 
   if (params.done) {
     lock_guard<mutex> l(lock_);
+    exec_state->stopwatch.Stop();
     DCHECK_GT(num_remaining_backends_, 0);
     VLOG_QUERY << "Backend " << params.backend_num << " completed, " 
                << num_remaining_backends_ - 1 << " remaining: query_id=" << query_id_;
@@ -747,6 +765,68 @@ bool Coordinator::PrepareCatalogUpdate(TCatalogUpdate* catalog_update) {
   }
 
   return catalog_update->created_partitions.size() != 0;
+}
+
+// This function appends summary information to the query_profile_ before
+// outputting it to VLOG.  It adds:
+//   1. Averaged remote fragment profiles (TODO: add outliers)
+//   2. Summary of remote fragment durations (min, max, mean, stddev)
+//   3. Summary of remote fragment rates (min, max, mean, stddev)
+// TODO: add historgram/percentile
+void Coordinator::ReportQuerySummary() {
+  if (!VLOG_QUERY_IS_ON) return;
+  DCHECK(query_status_.ok());
+  DCHECK(has_called_wait_);
+  
+  stringstream ss;
+  ss << "Final profile for query_id=" << query_id_ << endl;
+  
+  if (!backend_exec_states_.empty()) {
+    accumulator_set<int64_t, features<tag::min, tag::max, tag::mean, tag::variance> > 
+        completion_times;
+    accumulator_set<int64_t, features<tag::min, tag::max, tag::mean, tag::variance> > 
+        rates;
+    
+    RuntimeProfile* avg_profile = obj_pool()->Add(
+        new RuntimeProfile(obj_pool(), "Averaged Remote Fragments"));
+
+    for (int i = 0; i < backend_exec_states_.size(); ++i) {
+      avg_profile->Merge(backend_exec_states_[i]->profile);
+      int64_t completion_time = backend_exec_states_[i]->stopwatch.ElapsedTime();
+      completion_times(completion_time);
+      rates(backend_exec_states_[i]->total_split_size / (completion_time / 1000.0));
+    }
+    avg_profile->Divide(backend_exec_states_.size());
+
+    query_profile_->AddChild(avg_profile);
+
+    stringstream times_label;
+    times_label 
+       << "min:" << PrettyPrinter::Print(
+           accumulators::min(completion_times), TCounterType::TIME_MS)
+       << "  max:" << PrettyPrinter::Print(
+           accumulators::max(completion_times), TCounterType::TIME_MS)
+       << "  mean: " << PrettyPrinter::Print(
+           accumulators::mean(completion_times), TCounterType::TIME_MS)
+       << "  stddev:" << PrettyPrinter::Print(
+           sqrt(accumulators::variance(completion_times)), TCounterType::TIME_MS);
+
+    stringstream rates_label;
+    rates_label 
+       << "min:" << PrettyPrinter::Print(
+           accumulators::min(rates), TCounterType::BYTES_PER_SECOND)
+       << "  max:" << PrettyPrinter::Print(
+           accumulators::max(rates), TCounterType::BYTES_PER_SECOND)
+       << "  mean:" << PrettyPrinter::Print(
+           accumulators::mean(rates), TCounterType::BYTES_PER_SECOND)
+       << "  stddev:" << PrettyPrinter::Print(
+           sqrt(accumulators::variance(rates)), TCounterType::BYTES_PER_SECOND);
+    query_profile_->AddInfoString("completion times", times_label.str());
+    query_profile_->AddInfoString("execution rates", rates_label.str());
+  } 
+
+  query_profile_->PrettyPrint(&ss);
+  VLOG_QUERY << ss.str();
 }
 
 }

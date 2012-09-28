@@ -28,6 +28,7 @@ add_library(Util
   thrift-client.cc
   thrift-server.cc
   static-asserts.cc
+  stopwatch.cc
   url-parser.cc
   )
 

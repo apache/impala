@@ -39,7 +39,7 @@ class GrowingTest : public testing::Test {
     watch.Stop();
     SanityCheck<buffer_size>(hs, num_probe_tuples, num_tables);
     free(tuples);
-    return watch.Ticks();
+    return watch.ElapsedTime();
   }
 
   // Confirm that hs appears to be the correct result of aggregating num_probe_tuples,

@@ -147,6 +147,7 @@ class Coordinator {
   // - updates through UpdateFragmentExecStatus()
   struct BackendExecState {
     TUniqueId fragment_id;
+    WallClockStopWatch stopwatch;  // wall clock timer for this fragment
     int backend_num;  // backend_exec_states_[backend_num] points to us
     const std::pair<std::string, int> hostport;  // of ImpalaInternalService
     int64_t total_split_size;  // summed up across all splits; in bytes
@@ -304,7 +305,9 @@ class Coordinator {
   // Acquires lock_ and updates query_status_ with 'status' if it's not already
   // an error status, and returns the current query_status_.
   // Calls CancelInternal() when switching to an error status.
-  Status UpdateStatus(const Status& status);
+  // If failed_fragment is non-null, it is the fragment_id that has failed, used
+  // for error reporting.
+  Status UpdateStatus(const Status& status, const TUniqueId* failed_fragment);
 
   // Returns only when either all backends have reported success or the query is in error.
   // Returns the status of the query.
@@ -316,6 +319,10 @@ class Coordinator {
   // Perform any post-query cleanup required. Called by Wait() only after all
   // backends are returned.
   Status FinalizeQuery();
+
+  // Outputs aggregate query profile summary.  This is assumed to be called at the
+  // end of a succesfully executed query.
+  void ReportQuerySummary();
 };
 
 }

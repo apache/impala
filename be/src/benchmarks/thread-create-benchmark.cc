@@ -34,7 +34,7 @@ void TimeParallelExecutorStartup(int num_threads) {
   threads.join_all();
   sw.Stop();
   cout << "Time to start up " << num_threads << " threads: " 
-        << PrettyPrinter::Print(sw.Ticks(), TCounterType::CPU_TICKS) << endl;
+        << PrettyPrinter::Print(sw.ElapsedTime(), TCounterType::CPU_TICKS) << endl;
 }
 
 int main(int argc, char **argv) {
@@ -52,7 +52,8 @@ int main(int argc, char **argv) {
   total_time.Stop();
 
   cout << "Total time: "
-        << PrettyPrinter::Print(total_time.Ticks(), TCounterType::CPU_TICKS) << endl;
+        << PrettyPrinter::Print(total_time.ElapsedTime(), TCounterType::CPU_TICKS) 
+        << endl;
 
   return 0;
 }

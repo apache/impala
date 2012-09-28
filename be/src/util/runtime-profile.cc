@@ -56,6 +56,9 @@ RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
     profile->counter_map_[counter.name] =
       pool->Add(new Counter(counter.type, counter.value));
   }
+
+  profile->info_strings_ = node.info_strings;
+  
   ++*idx;
   for (int i = 0; i < node.num_children; ++i) {
     profile->AddChild(RuntimeProfile::CreateFromThrift(pool, nodes, idx));
@@ -64,10 +67,12 @@ RuntimeProfile* RuntimeProfile::CreateFromThrift(ObjectPool* pool,
 }
 
 void RuntimeProfile::Merge(RuntimeProfile* other) {
+  DCHECK(other != NULL);
+
   // Merge this level
-  map<string, Counter*>::iterator dst_iter;
-  map<string, Counter*>::const_iterator src_iter;
   {
+    map<string, Counter*>::iterator dst_iter;
+    map<string, Counter*>::const_iterator src_iter;
     lock_guard<mutex> l(counter_map_lock_);
     lock_guard<mutex> m(other->counter_map_lock_);
     for (src_iter = other->counter_map_.begin();
@@ -77,16 +82,12 @@ void RuntimeProfile::Merge(RuntimeProfile* other) {
         counter_map_[src_iter->first] =
           pool_->Add(new Counter(src_iter->second->type(), src_iter->second->value()));
       } else {
-        if (dst_iter->second->type() != src_iter->second->type()) {
-          LOG(ERROR) << "Cannot merge counters with the same name (" <<
-           dst_iter->first << ") but different types.";
-        } else {
-          dst_iter->second->Update(src_iter->second->value());
-        }
+        DCHECK(dst_iter->second->type() == src_iter->second->type());
+        dst_iter->second->Update(src_iter->second->value());
       }
     }
   }
-
+  
   {
     lock_guard<mutex> l(children_lock_);
     lock_guard<mutex> m(other->children_lock_);
@@ -138,6 +139,15 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
       }
     }
   }
+  
+  {
+    lock_guard<mutex> l(info_strings_lock_);
+    const InfoStrings& info_strings = node.info_strings;
+    for (InfoStrings::const_iterator it = info_strings.begin(); 
+        it != info_strings.end(); ++it) {
+      info_strings_[it->first] = it->second;
+    }
+  }
 
   ++*idx;
   {
@@ -161,6 +171,7 @@ void RuntimeProfile::Update(const vector<TRuntimeProfileNode>& nodes, int* idx) 
 }
 
 void RuntimeProfile::Divide(int n) {
+  DCHECK_GT(n, 0);
   map<string, Counter*>::iterator iter;
   {
     lock_guard<mutex> l(counter_map_lock_);
@@ -197,6 +208,18 @@ void RuntimeProfile::GetAllChildren(vector<RuntimeProfile*>* children) {
     children->push_back(i->second);
     i->second->GetAllChildren(children);
   }
+}
+
+void RuntimeProfile::AddInfoString(const string& key, const string& value) {
+  lock_guard<mutex> l(info_strings_lock_);
+  info_strings_[key] = value;
+}
+
+const string* RuntimeProfile::GetInfoString(const string& key) {
+  lock_guard<mutex> l(info_strings_lock_);
+  InfoStrings::const_iterator it = info_strings_.find(key);
+  if (it == info_strings_.end()) return NULL;
+  return &it->second;
 }
 
 RuntimeProfile::Counter* RuntimeProfile::AddCounter(
@@ -240,6 +263,11 @@ void RuntimeProfile::GetCounters(
   }
 }
 
+// Print the profile:
+//  1. Profile Name
+//  2. Info Strings
+//  3. Counters
+//  4. Children
 void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) {
   ostream& stream = *s;
 
@@ -261,6 +289,14 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) {
            << ")";
    }
   stream << endl;
+  
+  {
+    lock_guard<mutex> l(info_strings_lock_);
+    for (InfoStrings::const_iterator it = info_strings_.begin(); 
+        it != info_strings_.end(); ++it) {
+      stream << prefix << "  " << it->first << ": " << it->second << endl;
+    }
+  }
 
   for (map<string, Counter*>::const_iterator iter = counter_map.begin();
        iter != counter_map.end(); ++iter) {
@@ -285,6 +321,7 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) {
 }
 
 void RuntimeProfile::ToThrift(TRuntimeProfileTree* tree) {
+  tree->nodes.clear();
   ToThrift(&tree->nodes);
 }
 
@@ -311,6 +348,11 @@ void RuntimeProfile::ToThrift(vector<TRuntimeProfileNode>* nodes) {
     counter.value = iter->second->value();
     counter.type = iter->second->type();
     node.counters.push_back(counter);
+  }
+
+  {
+    lock_guard<mutex> l(info_strings_lock_);
+    node.info_strings = info_strings_;
   }
 
   ChildVector children;

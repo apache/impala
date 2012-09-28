@@ -32,6 +32,10 @@ struct TRuntimeProfileNode {
   // indicates whether the child will be printed with extra indentation;
   // corresponds to indent param of RuntimeProfile::AddChild()
   5: required bool indent
+
+  // map of key,value info strings that capture any kind of additional information 
+  // about the profiled object
+  6: required map<string, string> info_strings
 }
 
 // A flattened tree of runtime profiles, obtained by an

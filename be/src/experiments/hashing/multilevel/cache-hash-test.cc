@@ -72,7 +72,7 @@ uint64_t Test(T* ht, const ProbeTuple* input, uint64_t num_tuples)
     Process<T>(ht, &input[i]);
   }
   time.Stop();
-  return time.Ticks();
+  return time.ElapsedTime();
 }
 
 int main(int argc, char **argv) {
