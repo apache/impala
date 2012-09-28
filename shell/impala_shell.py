@@ -47,7 +47,6 @@ class ImpalaShell(cmd.Cmd):
     self.is_alive = True
     self.verbose = options.verbose
     self.impalad = options.impalad
-    self.interactive = options.interactive
     self.disconnected_prompt = "[Not connected] > "
     self.prompt = self.disconnected_prompt
     self.connected = False
@@ -93,7 +92,7 @@ class ImpalaShell(cmd.Cmd):
 
   def precmd(self, args):
     """Convert the command to lower case, so it's recognized"""
-    tokens = args.split(' ')
+    tokens = args.strip().split(' ')
     # The first token should be the command
     # If it's EOF, call do_quit()
     if tokens[0] == 'EOF':
@@ -351,7 +350,6 @@ Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 def execute_queries_non_interactive_mode(options):
   """Run queries in non-interactive mode."""
   queries = []
-  options.interactive = False
   if options.query_file:
     try:
       query_file_handle = open(options.query_file, 'r')
@@ -387,7 +385,6 @@ if __name__ == "__main__":
   if options.query or options.query_file:
     execute_queries_non_interactive_mode(options)
     sys.exit(0)
-  options.interactive = True
   intro = WELCOME_STRING
   shell = ImpalaShell(options)
   while shell.is_alive:
