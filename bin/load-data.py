@@ -14,7 +14,8 @@ from itertools import product
 from optparse import OptionParser
 
 parser = OptionParser()
-parser.add_option("-e", "--exploration_strategy", dest="exploration_strategy", default="core",
+parser.add_option("-e", "--exploration_strategy", dest="exploration_strategy",
+                  default="core",
                   help="The exploration strategy for schema gen: 'core', "\
                   "'pairwise', or 'exhaustive'")
 parser.add_option("--hive_warehouse_dir", dest="hive_warehouse_dir",
@@ -26,8 +27,9 @@ parser.add_option("-s", "--scale_factor", dest="scale_factor", default="",
                   help="An optional scale factor to generate the schema for")
 parser.add_option("-f", "--force_reload", dest="force_reload", action="store_true",
                   default=False, help='Skips HDFS exists check and reloads all tables')
-parser.add_option("--skip_compute_stats", dest="compute_stats", action="store_false",
-                  default= True, help="Skip generation of compute table stat statements")
+parser.add_option("--compute_stats", dest="compute_stats", action="store_true",
+                  default= False, help="Execute COMPUTE STATISTICS statements on the "\
+                  "tables that are loaded")
 
 (options, args) = parser.parse_args()
 
