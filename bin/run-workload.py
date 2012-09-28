@@ -11,37 +11,31 @@
 # can be passed which will enable gprof instrumentation and output the sampled call
 # stacks.  The -v and -p option are used by the perf regression tests.
 #
-# The script parses for output in the specific format in the regex below (result_regex).
-# This is not very robust but probably okay for this script.
-#
-# The planservice or ImpalaD needs to be running before executing any workload.
-# Run with the --help option to see the arguments.
 import csv
 import logging
 import math
 import os
+import pickle
 import sys
 import subprocess
-from query_executor import *
-from collections import defaultdict
 import threading
-from optparse import OptionParser
+from collections import defaultdict
 from functools import partial
+from optparse import OptionParser
 from os.path import isfile, isdir
+from random import choice
 from sys import exit
 from time import sleep
-import pickle
-from random import choice
+from tests.common.workload_runner import WorkloadRunner, QueryExecutionDetail
 
 # Options
+# TODO: Find ways to reduce the number of options.
 parser = OptionParser()
 parser.add_option("-p", "--profiler", dest="profiler",
                   action="store_true", default = False,
                   help="If set, also run google pprof for sample profiling.")
 parser.add_option("-v", "--verbose", dest="verbose", action="store_true",
                   default = False, help="If set, outputs all benchmark diagnostics.")
-parser.add_option("--remote", dest="remote", action="store_true",
-                  default = False, help="Set to true if running on remote cluster.")
 parser.add_option("--exploration_strategy", dest="exploration_strategy", default="core",
                   help="The exploration strategy to use for running benchmark: 'core', "\
                   "'pairwise', or 'exhaustive'")
@@ -89,223 +83,27 @@ parser.add_option("--skip_impala", dest="skip_impala", action="store_true",
 parser.add_option("--beeswax", dest="beeswax", action="store_true", default=False,
                   help="If set, Impala queries will use the beeswax interface.")
 
+# These options are used for configuring failure testing
+parser.add_option("--failure_frequency", type="int", dest="failure_frequency", default=0,
+                  help="Interval (in seconds) to inject each failure or 0 to disable"\
+                  " failure injection.")
+parser.add_option("--cm_cluster_name", dest="cm_cluster_name",
+                  help="The CM name of the cluster under test")
+parser.add_option("--cm_server_host", dest="cm_server_host",
+                  help="The host of the CM server.")
+parser.add_option("--cm_username", dest="cm_username", default='admin',
+                  help="The username to the CM server")
+parser.add_option("--cm_password", dest="cm_password", default='admin',
+                  help="The password to the CM server")
 options, args = parser.parse_args()
 
 # globals
-TARGET_IMPALADS = options.impalad.split(",")
-WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
-IMPALA_HOME = os.environ['IMPALA_HOME']
-profile_output_file = os.path.join(IMPALA_HOME, 'be/build/release/service/profile.tmp')
-dev_null = open('/dev/null')
-
-# commands
 runquery_cmd = "%(runquery)s %(args)s " % {'runquery' : options.runquery_path,
                                            'args' : options.runquery_args}
 
-gprof_cmd  = 'google-pprof --text ' + options.runquery_path + ' %s | head -n 60'
-prime_cache_cmd = os.path.join(IMPALA_HOME, "testdata/bin/cache_tables.py") + " -q \"%s\""
-
-gprof_cmd = 'google-pprof --text ' + options.runquery_path + ' %s | head -n 60'
-
-# TODO: Consider making cache_tables a module rather than directly calling the script
-prime_cache_cmd = os.path.join(os.environ['IMPALA_HOME'],
-                               "testdata/bin/cache_tables.py") + " -q \"%s\""
-
-dev_null = open('/dev/null')
-
-run_using_hive = options.compare_with_hive or options.skip_impala
-
 logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
-LOG = logging.getLogger('run-benchmark')
-if options.verbose:
-  LOG.setLevel(level=logging.DEBUG)
 
-class QueryExecutionDetail(object):
-  def __init__(self, executor, workload, scale_factor, file_format, compression_codec,
-               compression_type, execution_result):
-    self.executor = executor
-    self.workload = workload
-    self.scale_factor = scale_factor
-    self.file_format = file_format
-    self.compression_codec = compression_codec
-    self.compression_type = compression_type
-    self.execution_result = execution_result
-
-
-# Parse for the tables used in this query
-def parse_tables(query):
-  """
-  Parse the tables used in this query.
-  """
-  table_predecessor = ['from', 'join']
-  tokens = query.split(' ')
-  tables = []
-  next_is_table = 0
-  for t in tokens:
-    t = t.lower()
-    if next_is_table == 1:
-      tables.append(t)
-      next_is_table = 0
-    if t in table_predecessor:
-      next_is_table = 1
-  return tables
-
-def prime_remote_or_local_cache(query, remote, hive=False):
-  """
-  Prime either the local cache or buffer cache for a remote machine.
-  """
-  if hive and remote:
-    prime_buffer_cache_remote_hive(query)
-  elif remote:
-    prime_buffer_cache_remote_impala(query)
-  else:
-    prime_buffer_cache_local(query)
-
-def prime_buffer_cache_remote_impala(query):
-  """
-  Prime the buffer cache on remote machines for impala.
-
-  On remote clusters, we'll prime the buffer cache by just running count(*)
-  TODO: does this work well enough? Does having a real cluster and data
-  locality make this more deterministic?
-  """
-  tables = parse_tables(query)
-  subprocess_call_partial = partial()
-  for table in tables:
-    count_cmd = '%s -query="select count(*) from %s" --iterations=5' % \
-                (runquery_cmd, table)
-    subprocess.call(count_cmd, shell=True, stderr=dev_null, stdout=dev_null)
-
-def prime_buffer_cache_remote_hive(query):
-  """
-  Prime the buffer cache on remote machines for hive.
-  """
-  tables = parse_tables(query)
-  for table in tables:
-    for iteration in range(5):
-      count_query = 'select count(*) from %s' % table
-      subprocess.call("hive -e \"%s\"" % count_query, shell=True,
-                      stderr=dev_null, stdout=dev_null)
-
-def prime_buffer_cache_local(query):
-  """
-  Prime the buffer cache on mini-dfs.
-
-  We can prime the buffer cache by accessing the local file system.
-  """
-  command = prime_cache_cmd % query
-  os.system(command)
-
-def create_executor(executor_name):
-  # Add additional query exec options here
-  query_options = {
-    'runquery': lambda: (execute_using_runquery,
-                            RunQueryExecOptions(options.iterations,
-                            impalad=choice(TARGET_IMPALADS),
-                            exec_options=options.exec_options,
-                            runquery_cmd=runquery_cmd,
-                            enable_counters=int(options.verbose),
-                            profile_output_file=profile_output_file,
-                            profiler=options.profiler,
-                            )),
-    'hive': lambda: (execute_using_hive,
-                            HiveQueryExecOptions(options.iterations,
-                            hive_cmd=options.hive_cmd,
-                            )),
-    'impala_beeswax': lambda: (execute_using_impala_beeswax,
-                               ImpalaBeeswaxExecOptions(options.iterations,
-                                                        exec_options=options.exec_options,
-                                                        impalad=choice(TARGET_IMPALADS)))
-  } [executor_name]()
-
-  return query_options
-
-def run_query(executor_name, query, prime_cache, exit_on_error):
-  """
-  Run a query command and return the result.
-
-  Takes in a match functional that is used to parse stderr/stdout to extract the results.
-  """
-  if prime_cache:
-    prime_remote_or_local_cache(query, options.remote, executor_name == 'hive')
-
-  threads = []
-  results = []
-
-  for client in xrange(options.num_clients):
-    name = "Client Thread " + str(client)
-    exec_tuple = create_executor(executor_name)
-    threads.append(QueryExecutor(name, exec_tuple[0], exec_tuple[1], query))
-  for thread in threads:
-    LOG.debug(thread.name + " starting")
-    thread.start()
-
-  for thread in threads:
-    thread.join()
-    if not thread.success() and exit_on_error:
-      LOG.error("Thread: %s returned with error. Exiting." % thread.name)
-      raise RuntimeError("Error executing query. Aborting")
-    results.append(thread.get_results())
-    LOG.debug(thread.name + " completed")
-  return results[0]
-
-def database_name_to_use(workload, scale_factor):
-  """
-  Return the name of the database to use for the specified workload and scale factor.
-  """
-  if workload == 'tpch':
-    return '%s%s.' % (workload, scale_factor)
-  return ''
-
-def build_table_suffix(file_format, codec, compression_type):
-  if file_format == 'text' and codec == 'none':
-    return ''
-  elif codec == 'none':
-    return '_%s' % (file_format)
-  elif compression_type == 'record':
-    return '_%s_record_%s' % (file_format, codec)
-  else:
-    return '_%s_%s' % (file_format, codec)
-
-def build_query(query_format_string, file_format, codec, compression_type,
-                workload, scale_factor):
-  """
-  Build a well formed query.
-
-  Given the various test parameters, construct the query that will be executed.
-  """
-  database_name = database_name_to_use(workload, scale_factor)
-  table_suffix = build_table_suffix(file_format, codec, compression_type)
-
-  # $TABLE is used as a token for table suffix in the queries. Here we replace the token
-  # the proper database name based on the workload and scale factor.
-  # There also may be cases where there is dbname.table_name without a
-  # $TABLE (in the case of insert).
-  replace_from =\
-      '(%(workload)s\.)(?P<table_name>\w+)' % {'workload': workload}
-  replace_by = '%s%s' % (database_name, r'\g<table_name>')
-  query_str = re.sub(replace_from, replace_by, query_format_string)
-
-  replace_from =\
-      '(%(workload)s)(?P<table_name>\w+)\$TABLE' % {'workload': database_name}
-  replace_by = '%s%s%s' % (database_name, r'\g<table_name>', table_suffix)
-  return re.sub(replace_from, replace_by, query_str)
-
-def read_vector_file(file_name):
-  """
-  Parse the test vector file.
-  """
-  if not isfile(file_name):
-    LOG.error('Cannot find vector file: ' + file_name)
-    exit(1)
-
-  vector_values = list()
-  with open(file_name, 'rb') as vector_file:
-    for line in vector_file.readlines():
-      if line.strip().startswith('#'):
-        continue
-      vector_values.append([value.split(':')[1].strip() for value in line.split(',')])
-  return vector_values
+LOG = logging.getLogger('run-workload')
 
 def save_results(result_map, output_csv_file, is_impala_result=True):
   """
@@ -352,137 +150,8 @@ def enumerate_query_files(base_directory):
       query_files += enumerate_query_files(full_path)
   return query_files
 
-def is_comment_or_empty(line):
-  """
-  Return True of the line is a comment or and empty string.
-  """
-  comment = line.strip().startswith('#') or line.strip().startswith('//')
-  return not line or not comment
-
-def extract_queries_from_test_files(workload):
-  """
-  Enumerate all the query files for a workload and extract the query strings.
-  """
-  workload_base_dir = os.path.join(WORKLOAD_DIR, workload)
-  if not isdir(workload_base_dir):
-    LOG.error("Workload '%s' not found at path '%s'" % (workload, workload_base_dir))
-    exit(1)
-
-  query_dir = os.path.join(workload_base_dir, 'queries')
-  if not isdir(query_dir):
-    LOG.error("Workload query directory not found at path '%s'" % (query_dir))
-    exit(1)
-
-  query_map = dict()
-  for query_file_name in enumerate_query_files(query_dir):
-    LOG.debug('Parsing Query Test File: ' + query_file_name)
-    with open(query_file_name, 'rb') as query_file:
-      # Query files are split into sections separated by '=====', with subsections
-      # separeted by '----'. The first item in each subsection is the actual query
-      # to execute
-      # TODO : Use string.replace
-      test_name = re.sub('/', '.', query_file_name.split('.')[0])[1:]
-      query_map[test_name] = []
-      # Some of the read queries are just blank lines, this cleans up the noise.
-      query_sections = [qs for qs in query_file.read().split('====') if qs.strip()]
-      for query_section in query_sections:
-        if not query_section.strip():
-          continue
-        query = query_section.split('----')[0]
-        # TODO : Use re.match
-        query_name = re.findall('QUERY_NAME : .*', query)
-        query = query.split('\n')
-        formatted_query = ('\n').join(filter(is_comment_or_empty, query)).strip()
-        if query_name and formatted_query:
-          query_name = query_name[0].split(':')[-1].strip()
-          query_map[test_name].append((query_name, formatted_query))
-        elif formatted_query:
-          query_map[test_name].append((None, formatted_query))
-  return query_map
-
-def execute_queries(query_map, workload, scale_factor, vector_row):
-  """
-  Execute the queries for combinations of file format, compression, etc.
-
-  The values needed to build the query are stored in the first 4 columns of each row.
-  """
-  global result_map
-  global summary
-  file_format, data_group, codec, compression_type = vector_row[:4]
-  if (options.file_formats and file_format not in options.file_formats.split(',')) or\
-     (options.compression_codecs and codec not in options.compression_codecs.split(',')):
-    LOG.info("Skipping Test Vector - File Format: %s Compression: %s / %s" %\
-        (file_format, codec, compression_type))
-    return
-
-  query_names = None
-  if options.query_names:
-    query_names = [name.lower() for name in options.query_names.split(',')]
-
-  LOG.info("Running Test Vector - File Format: %s Compression: %s / %s" %\
-      (file_format, codec, compression_type))
-  for test_name in query_map.keys():
-    for query_name, query in query_map[test_name]:
-      if not query_name:
-        query_name = query
-
-      if query_names and (query_name.lower() not in query_names):
-        LOG.info("Skipping query '%s'" % query_name)
-        continue
-
-      query_string = build_query(query.strip(), file_format, codec, compression_type,
-                                 workload, scale_factor)
-      execution_result = QueryExecutionResult()
-      if not options.skip_impala:
-        summary += "Results Using Impala:\n"
-        summary += "Query: %s\n" % query_name
-        LOG.debug('\nRunning: \n%s\n' % query_string)
-        if query_name != query:
-          LOG.info('Query Name: %s' % query_name)
-        if options.beeswax:
-          execution_result = run_query('impala_beeswax', query_string,
-                                       options.prime_cache, True)
-        else:
-          execution_result = run_query('runquery', query_string,
-                                       options.prime_cache, True)
-        summary += "  -> %s\n" % execution_result
-
-      hive_execution_result = QueryExecutionResult()
-      if run_using_hive:
-        summary += "Results Using Hive:\n"
-        hive_execution_result = run_query('hive', query_string,
-                                          options.prime_cache, False)
-        summary += "  ->%s\n" % hive_execution_result
-      summary += '\n'
-      LOG.debug("-----------------------------------------------------------------------")
-
-      execution_detail = QueryExecutionDetail("runquery", workload, scale_factor,
-          file_format, codec, compression_type, execution_result)
-
-      hive_execution_detail = QueryExecutionDetail("hive", workload, scale_factor,
-          file_format, codec, compression_type, hive_execution_result)
-
-      result_map[(query_name, query)].append((execution_detail, hive_execution_detail))
-
-def run_workload(workload, scale_factor):
-  """
-    Run queries associated with each workload specified on the commandline.
-
-    For each workload specified in, look up the associated query files. Extract valid
-    queries in each file and execute them using the specified number of execution
-    iterations. Finally, write results to an output CSV file for reporting.
-  """
-  LOG.info('Running workload: %s / Scale factor: %s' % (workload, scale_factor))
-  query_map = extract_queries_from_test_files(workload)
-  vector_file_path = os.path.join(WORKLOAD_DIR, workload,
-                                  "%s_%s.csv" % (workload, options.exploration_strategy))
-  test_vector = read_vector_file(vector_file_path)
-  args = [query_map, workload, scale_factor]
-  execute_queries_partial = partial(execute_queries, *args)
-  map(execute_queries_partial, test_vector)
-
 def parse_workload_scale_factor(workload_scale_factor):
-  parsed_workload_scale_factor = workload_and_scale_factor.split(':')
+  parsed_workload_scale_factor = workload_scale_factor.split(':')
   if len(parsed_workload_scale_factor) == 1:
     return parsed_workload_scale_factor[0], ''
   elif len(parsed_workload_scale_factor) == 2:
@@ -491,17 +160,35 @@ def parse_workload_scale_factor(workload_scale_factor):
     LOG.error("Error parsing workload. Proper format is workload[:scale factor]")
     sys.exit(1)
 
-def write_results(partial_results = False):
+def write_results(result_map, partial_results = False):
   suffix = '.partial' if partial_results else ''
 
   if not options.skip_impala:
     LOG.info("Results saving to: %s" % options.results_csv_file)
     save_results(result_map, options.results_csv_file + suffix, is_impala_result=True)
-  if run_using_hive:
+  if options.skip_impala or options.compare_with_hive:
     LOG.info("Hive Results saving to: %s" % options.hive_results_csv_file)
     save_results(result_map, options.hive_results_csv_file + suffix,
                  is_impala_result=False)
 
+def run_workloads(workload_runner, failure_injector=None):
+  if failure_injector is not None:
+    failure_injector.start()
+
+  for workload_and_scale_factor in options.workloads.split(','):
+    workload, scale_factor = parse_workload_scale_factor(workload_and_scale_factor)
+    workload_runner.run_workload(workload, scale_factor,
+        file_formats=options.file_formats,
+        compression_codecs=options.compression_codecs,
+        exploration_strategy=options.exploration_strategy,
+        stop_on_query_error=failure_injector is None)
+
+  if failure_injector is not None:
+    failure_injector.cancel()
+
+def process_results(workload_runner, is_partial_result=False):
+  write_results(workload_runner.get_results(), is_partial_result)
+  LOG.info(workload_runner.get_summary_str())
 
 if __name__ == "__main__":
   """
@@ -509,14 +196,38 @@ if __name__ == "__main__":
 
   It runs all the workloads specified on the command line and writes them to a csv file.
   """
-  result_map = defaultdict(list)
-  summary = str()
-  for workload_and_scale_factor in options.workloads.split(','):
-    workload, scale_factor = parse_workload_scale_factor(workload_and_scale_factor)
-    try:
-      run_workload(workload, scale_factor)
-    except Exception, e:
-      write_results(partial_results=True)
-      raise e
-  LOG.info('Summary:\n%s' % summary)
-  write_results()
+  workload_runner = WorkloadRunner(
+    beeswax=options.beeswax,
+    runquery_path=options.runquery_path,
+    hive_cmd=options.hive_cmd,
+    impalad=options.impalad,
+    iterations=options.iterations,
+    num_clients=options.num_clients,
+    compare_with_hive=options.compare_with_hive,
+    skip_impala=options.skip_impala,
+    exec_options=options.exec_options,
+    profiler=options.profiler,
+    verbose=options.verbose,
+    prime_cache=options.prime_cache)
+
+  failure_injector = None
+  if options.failure_frequency > 0:
+    # If not doing failure testing there is no reason to import these modules which
+    # have additional dependencies.
+    from common.failure_injector import FailureInjector
+    from common.impala_cluster import ImpalaCluster
+
+    cluster = ImpalaCluster(options.cm_server_host, options.cm_cluster_name,
+       username=options.cm_username, password=options.cm_password)
+    failure_injector = FailureInjector(cluster,
+        failure_frequency=options.failure_frequency,
+        impalad_exclude_list=options.impalad.split(','))
+
+  try:
+    run_workloads(workload_runner, failure_injector)
+  except Exception, e:
+    if failure_injector is not None:
+      failure_injector.cancel()
+    process_results(workload_runner, is_partial_result=True)
+    raise e
+  process_results(workload_runner, is_partial_result=False)
