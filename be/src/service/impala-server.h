@@ -43,6 +43,7 @@ class THostPort;
 class TClientRequest;
 class TExecRequest;
 class TSessionState;
+class TQueryOptions;
 class ImpalaPlanServiceClient;
 
 class ThriftServer;
@@ -112,6 +113,14 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   // Returns the ImpalaQueryOptions enum for the given "key". Input is case in-sensitive.
   // Return -1 if the input is an invalid option.
   static int GetQueryOption(const std::string& key);
+
+  // Parse a "," separated key=value pair of query options and set it in TQueryOptions.
+  // If the same query option is specified more than once, the last one wins.
+  // If input is invalid (bad format or invalid query option), the invalid input is
+  // skipped and a warning is logged. Returned status contains the first parsing error, or
+  // OK if there is no error.
+  static Status ParseQueryOptions(const std::string& options,
+      TQueryOptions* query_options);
 
   // SessionHandlerIf methods
   // Called when a session starts. Registers a new SessionState with the provided key.
@@ -295,7 +304,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   FragmentExecStateMap fragment_exec_state_map_;
   boost::mutex fragment_exec_state_map_lock_;  // protects fragment_exec_state_map_
 
-  // Default configurations
+  // Default query options in the form of TQueryOptions and beeswax::ConfigVariable
+  TQueryOptions default_query_options_;
   std::vector<beeswax::ConfigVariable> default_configs_;
 
   // Per-session state.

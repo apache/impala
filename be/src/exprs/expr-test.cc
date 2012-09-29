@@ -2206,7 +2206,7 @@ int main(int argc, char **argv) {
   if (ret != 0) return ret;
 
   vector<string> options;
-  options.push_back("disable_jit:1");
+  options.push_back("disable_jit=1");
   executor_->setExecOptions(options);
   cout << endl << "Running without Jit" << endl;
   return RUN_ALL_TESTS();

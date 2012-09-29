@@ -82,8 +82,8 @@ DECLARE_int32(be_port);
 DEFINE_int32(be_service_threads, 64,
     "(Advanced) number of threads available to serve backend execution requests");
 DEFINE_bool(load_catalog_at_startup, false, "if true, load all catalog data at startup");
-DEFINE_int32(default_num_nodes, 1, "default degree of parallelism for all queries; query "
-    "can override it by specifying num_nodes in beeswax.Query.Configuration");
+DEFINE_string(default_query_options, "", "key=value pair of default query options for"
+    " impalad, separated by ','");
 
 namespace impala {
 
@@ -1449,7 +1449,7 @@ void ImpalaServer::get_default_configuration(vector<ConfigVariable> &configurati
 
 void ImpalaServer::QueryToTClientRequest(const Query& query,
     TClientRequest* request) {
-  request->queryOptions.num_nodes = FLAGS_default_num_nodes;
+  request->queryOptions = default_query_options_;
   request->queryOptions.return_as_ascii = true;
   request->stmt = query.query;
   {
@@ -1461,70 +1461,90 @@ void ImpalaServer::QueryToTClientRequest(const Query& query,
     it->second.ToThrift(&request->sessionState);
   }
 
-  // Convert Query.Configuration to TClientRequest.queryOptions
+  // Override default query options with Query.Configuration
   if (query.__isset.configuration) {
-    BOOST_FOREACH(string kv_string, query.configuration) {
-      trim(kv_string);
-      vector<string> key_value;
-      split(key_value, kv_string, is_any_of(":"), token_compress_on);
-      if (key_value.size() != 2) {
-        LOG(WARNING) << "ignoring invalid configuration option " << kv_string
-                     << ": bad format (expected key:value)";
-        continue;
-      }
-
-      int option = GetQueryOption(key_value[0]);
-      if (option < 0) {
-        LOG(WARNING) << "ignoring invalid configuration option: " << key_value[0];
-      } else {
-        switch (option) {
-          case TImpalaQueryOptions::ABORT_ON_ERROR:
-            request->queryOptions.abort_on_error =
-                iequals(key_value[1], "true") || iequals(key_value[1], "1");
-            break;
-          case TImpalaQueryOptions::MAX_ERRORS:
-            request->queryOptions.max_errors = atoi(key_value[1].c_str());
-            break;
-          case TImpalaQueryOptions::DISABLE_CODEGEN:
-            request->queryOptions.disable_codegen =
-                iequals(key_value[1], "true") || iequals(key_value[1], "1");
-            break;
-          case TImpalaQueryOptions::BATCH_SIZE:
-            request->queryOptions.batch_size = atoi(key_value[1].c_str());
-            break;
-          case TImpalaQueryOptions::NUM_NODES:
-            request->queryOptions.num_nodes = atoi(key_value[1].c_str());
-            break;
-          case TImpalaQueryOptions::MAX_SCAN_RANGE_LENGTH:
-            request->queryOptions.max_scan_range_length = atol(key_value[1].c_str());
-            break;
-          case TImpalaQueryOptions::MAX_IO_BUFFERS:
-            request->queryOptions.max_io_buffers = atoi(key_value[1].c_str());
-            break;
-          case TImpalaQueryOptions::NUM_SCANNER_THREADS:
-            request->queryOptions.num_scanner_threads = atoi(key_value[1].c_str());
-            break;
-          case TImpalaQueryOptions::PARTITION_AGG:
-            request->queryOptions.partition_agg = 
-                iequals(key_value[1], "true") || iequals(key_value[1], "1");
-            break;
-          case TImpalaQueryOptions::ALLOW_UNSUPPORTED_FORMATS:
-            request->queryOptions.allow_unsupported_formats =
-                iequals(key_value[1], "true") || iequals(key_value[1], "1");
-            break;
-          default:
-            // We hit this DCHECK(false) if we forgot to add the corresponding entry here
-            // when we add a new query option.
-            LOG(ERROR) << "Missing exec option implementation: " << kv_string;
-            DCHECK(false);
-            break;
-          }
-      }
+    BOOST_FOREACH(const string& option, query.configuration) {
+      ParseQueryOptions(option, &request->queryOptions);
     }
     VLOG_QUERY << "TClientRequest.queryOptions: "
                << ThriftDebugString(request->queryOptions);
   }
 }
+
+Status ImpalaServer::ParseQueryOptions(const string& options,
+    TQueryOptions* query_options) {
+  Status result;
+  if (options.length() == 0) return Status::OK;
+  vector<string> kv_pairs;
+  split(kv_pairs, options, is_any_of(";"), token_compress_on );
+  BOOST_FOREACH(string& kv_string, kv_pairs) {
+    trim(kv_string);
+    if (kv_string.length() == 0) continue;
+    vector<string> key_value;
+    split(key_value, kv_string, is_any_of("="), token_compress_on);
+    if (key_value.size() != 2) {
+      stringstream ss;
+      ss << "Ignoring invalid configuration option " << kv_string
+         << ": bad format (expected key=value)";
+      LOG(WARNING) << ss.str();
+      if (result.ok()) result.AddErrorMsg(ss.str());
+      continue;
+    }
+
+    int option = GetQueryOption(key_value[0]);
+    if (option < 0) {
+      stringstream ss;
+      ss << "Ignoring invalid configuration option: " << key_value[0];
+      LOG(WARNING) << ss.str();
+      if (result.ok()) result.AddErrorMsg(ss.str());
+    } else {
+      switch (option) {
+        case TImpalaQueryOptions::ABORT_ON_ERROR:
+          query_options->abort_on_error =
+              iequals(key_value[1], "true") || iequals(key_value[1], "1");
+          break;
+        case TImpalaQueryOptions::MAX_ERRORS:
+          query_options->max_errors = atoi(key_value[1].c_str());
+          break;
+        case TImpalaQueryOptions::DISABLE_CODEGEN:
+          query_options->disable_codegen =
+              iequals(key_value[1], "true") || iequals(key_value[1], "1");
+          break;
+        case TImpalaQueryOptions::BATCH_SIZE:
+          query_options->batch_size = atoi(key_value[1].c_str());
+          break;
+        case TImpalaQueryOptions::NUM_NODES:
+          query_options->num_nodes = atoi(key_value[1].c_str());
+          break;
+        case TImpalaQueryOptions::MAX_SCAN_RANGE_LENGTH:
+          query_options->max_scan_range_length = atol(key_value[1].c_str());
+          break;
+        case TImpalaQueryOptions::MAX_IO_BUFFERS:
+          query_options->max_io_buffers = atoi(key_value[1].c_str());
+          break;
+        case TImpalaQueryOptions::NUM_SCANNER_THREADS:
+          query_options->num_scanner_threads = atoi(key_value[1].c_str());
+          break;
+        case TImpalaQueryOptions::PARTITION_AGG:
+          query_options->partition_agg =
+              iequals(key_value[1], "true") || iequals(key_value[1], "1");
+            break;
+        case TImpalaQueryOptions::ALLOW_UNSUPPORTED_FORMATS:
+          query_options->allow_unsupported_formats =
+              iequals(key_value[1], "true") || iequals(key_value[1], "1");
+            break;
+        default:
+          // We hit this DCHECK(false) if we forgot to add the corresponding entry here
+          // when we add a new query option.
+          LOG(ERROR) << "Missing exec option implementation: " << kv_string;
+          DCHECK(false);
+          break;
+      }
+    }
+  }
+  return result;
+}
+
 
 void ImpalaServer::TUniqueIdToQueryHandle(const TUniqueId& query_id,
     QueryHandle* handle) {
@@ -1540,7 +1560,7 @@ void ImpalaServer::QueryHandleToTUniqueId(const QueryHandle& handle,
   char_separator<char> sep(" ");
   tokenizer< char_separator<char> > tokens(handle.id, sep);
   int i = 0;
-  BOOST_FOREACH(string t, tokens) {
+  BOOST_FOREACH(const string& t, tokens) {
     StringParser::ParseResult parse_result = StringParser::PARSE_SUCCESS;
     int64_t id = StringParser::StringToInt<int64_t>(
         t.c_str(), t.length(), &parse_result);
@@ -1714,7 +1734,15 @@ int ImpalaServer::GetQueryOption(const string& key) {
 }
 
 void ImpalaServer::InitializeConfigVariables() {
-  TQueryOptions default_options;
+  Status status = ParseQueryOptions(FLAGS_default_query_options, &default_query_options_);
+  if (!status.ok()) {
+    // Log error and exit if the default query options are invalid.
+    LOG(ERROR) << "Invalid default query options. Please check -default_query_options.\n"
+               << status.GetErrorMsg();
+    exit(1);
+  }
+  LOG(INFO) << "Default query options:" << ThriftDebugString(default_query_options_);
+
   map<int, const char*>::const_iterator itr =
       _TImpalaQueryOptions_VALUES_TO_NAMES.begin();
   for (; itr != _TImpalaQueryOptions_VALUES_TO_NAMES.end(); ++itr) {
@@ -1722,34 +1750,34 @@ void ImpalaServer::InitializeConfigVariables() {
     stringstream value;
     switch (itr->first) {
       case TImpalaQueryOptions::ABORT_ON_ERROR:
-        value << default_options.abort_on_error;
+        value << default_query_options_.abort_on_error;
         break;
       case TImpalaQueryOptions::MAX_ERRORS:
-        value << default_options.max_errors;
+        value << default_query_options_.max_errors;
         break;
       case TImpalaQueryOptions::DISABLE_CODEGEN:
-        value << default_options.disable_codegen;
+        value << default_query_options_.disable_codegen;
         break;
       case TImpalaQueryOptions::BATCH_SIZE:
-        value << default_options.batch_size;
+        value << default_query_options_.batch_size;
         break;
       case TImpalaQueryOptions::NUM_NODES:
-        value << FLAGS_default_num_nodes;
+        value << default_query_options_.num_nodes;
         break;
       case TImpalaQueryOptions::MAX_SCAN_RANGE_LENGTH:
-        value << default_options.max_scan_range_length;
+        value << default_query_options_.max_scan_range_length;
         break;
       case TImpalaQueryOptions::MAX_IO_BUFFERS:
-        value << default_options.max_io_buffers;
+        value << default_query_options_.max_io_buffers;
         break;
       case TImpalaQueryOptions::NUM_SCANNER_THREADS:
-        value << default_options.num_scanner_threads;
+        value << default_query_options_.num_scanner_threads;
         break;
       case TImpalaQueryOptions::PARTITION_AGG:
-        value << default_options.partition_agg;
+        value << default_query_options_.partition_agg;
         break;
       case TImpalaQueryOptions::ALLOW_UNSUPPORTED_FORMATS:
-        value << default_options.allow_unsupported_formats;
+        value << default_query_options_.allow_unsupported_formats;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here

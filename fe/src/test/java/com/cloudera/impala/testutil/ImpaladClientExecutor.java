@@ -182,7 +182,7 @@ public class ImpaladClientExecutor {
         default:
           Preconditions.checkState(false, "Unhandled option:" + option.toString());
       }
-      result.add(String.format("%s:%s", option.toString(), optionValue));
+      result.add(String.format("%s=%s", option.toString(), optionValue));
     }
     return result;
   }

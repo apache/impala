@@ -87,22 +87,13 @@ static QueryExecutorIf* CreateExecutor() {
   ImpaladQueryExecutor* executor = new ImpaladQueryExecutor();
   if (FLAGS_exec_options.size() > 0) {
     vector<string> exec_options;
-    split(exec_options, FLAGS_exec_options, is_any_of(";"), token_compress_on );
-    // Check the specified option against TImpalaExecutionOption
-    BOOST_FOREACH(string exec_option, exec_options) {
-      trim(exec_option);
-      vector<string> key_value;
-      split(key_value, exec_option, is_any_of(":"), token_compress_on );
-      if (key_value.size() != 2) {
-        cout << "exec_options must be a list of key:value pairs: " << exec_option
-             << endl;
+    TQueryOptions dummy_options;
+    Status status = ImpalaServer::ParseQueryOptions(FLAGS_exec_options, &dummy_options);
+    if (!status.ok()) {
+      cout << "Bad --exec_options: " << status.GetErrorMsg() << endl;
         exit(1);
-      }
-      if (ImpalaServer::GetQueryOption(key_value[0]) < 0) {
-        cout << "invalid exec option: " << key_value[0] << endl;
-        exit(1);
-      }
     }
+    exec_options.push_back(FLAGS_exec_options);
     executor->setExecOptions(exec_options);
   }
   return executor;
