@@ -76,11 +76,16 @@ class DataStreamTest : public testing::Test {
     dest_.back().ipaddress = "127.0.0.1";
     // Need a unique port since backend servers are never stopped
     dest_.back().port = FLAGS_port++;
+    // Ensure that individual sender info addresses don't change
+    sender_info_.reserve(MAX_SENDERS);
     CreateRowDesc();
     CreateRowBatch();
     StartBackend();
   }
 
+  // We reserve contiguous memory for senders in SetUp. If a test uses more
+  // senders, a DCHECK will fail and you should increase this value.
+  static const int MAX_SENDERS = 16;
   static const PlanNodeId DEST_NODE_ID = 1;
   static const int BATCH_CAPACITY = 100;  // rows
   static const int PER_ROW_DATA = 8;
@@ -232,6 +237,7 @@ class DataStreamTest : public testing::Test {
 
   void StartSender(int channel_buffer_size = 1024) {
     int num_senders = sender_info_.size();
+    DCHECK_LT(num_senders, MAX_SENDERS);
     sender_info_.push_back(SenderInfo());
     SenderInfo& info = sender_info_.back();
     info.thread_handle =
