@@ -70,8 +70,8 @@ Status ExecEnv::StartServices() {
   LOG(INFO) << "Starting global services";
   // Start services in order to ensure that dependencies between them are met
   if (enable_webserver_) {
-    RETURN_IF_ERROR(webserver_->Start());
     AddDefaultPathHandlers(webserver_.get());
+    RETURN_IF_ERROR(webserver_->Start());
   } else {
     LOG(INFO) << "Not starting webserver";
   }

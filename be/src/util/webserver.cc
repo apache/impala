@@ -1,5 +1,6 @@
 // (c) 2012 Cloudera, Inc. All rights reserved.
 #include <stdio.h>
+#include <signal.h>
 #include <string>
 #include <map>
 #include <boost/lexical_cast.hpp>
@@ -55,12 +56,20 @@ Status Webserver::Start() {
   string listening_str = listening_spec.str();
   const char* options[] = {"listening_ports", listening_str.c_str(), NULL};
 
+  // mongoose ignores SIGCHLD and we need it to run kinit. This means that since
+  // mongoose does not reap its own children CGI programs must be avoided.
+  // Save the signal handler so we can restore it after mongoose sets it to be ignored.
+  sighandler_t sig_chld = signal(SIGCHLD, SIG_DFL);
+
   // To work around not being able to pass member functions as C callbacks, we store a
   // pointer to this server in the per-server state, and register a static method as the
   // default callback. That method unpacks the pointer to this and calls the real
   // callback.
   context_ = mg_start(&Webserver::MongooseCallbackStatic, reinterpret_cast<void*>(this),
       options);
+
+  // Restore the child signal handler so wait() works properly.
+  signal(SIGCHLD, sig_chld);
 
   if (context_ == NULL) {
     stringstream error_msg;

@@ -55,13 +55,19 @@ class SaslException : public TTransportException {
 class TSasl {
   public:
   /*
-   * Disposes of any system resources or security-sensitive information
-   * this client or server may have.
+   * Called once per application to free resources.`
+   * Note that there is no distinction in the sasl library between being done
+   * with servers or done with clients.  Internally the library maintains a which
+   * is being used.  A call to SaslDone should only happen after all clients
+   * and servers are finished.
    */
-  virtual void dispose() = 0;
+  static void SaslDone() {
+    sasl_done();
+  }
 
   /* Evaluates the challenge or response data and generates a response. */
-  virtual uint8_t* evaluateChallengeOrResponse(uint8_t* challenge, uint32_t& len) = 0;
+  virtual uint8_t* evaluateChallengeOrResponse(const uint8_t* challenge,
+                                               uint32_t len, uint32_t* resLen) = 0;
 
   /* Determines whether the authentication exchange has completed. */
   bool isComplete() {
@@ -69,16 +75,22 @@ class TSasl {
   }
 
   /*
-   * Unwraps a byte array received from the server. Allocate new buffer for result.
-   * The memroy is valid until the next call.
+   * Unwraps a received byte array.
+   * Returns a buffer for unwrapped result, and sets
+   * 'len' to the buffer's length. The buffer is only valid until the next call, or
+   * until the client is closed.
    */
-  uint8_t* unwrap(uint8_t* incoming, int offset, uint32_t& len);
+  uint8_t* unwrap(const uint8_t* incoming, const int offset,
+                  const uint32_t len, uint32_t* outLen);
 
   /*
-   * Wraps a byte array to be sent to the server. Allocate new buffer for result
-   * The memroy is valid until the next call.
+   * Wraps a byte array to be sent.
+   * Returns a buffer of wrapped result, and sets
+   * 'len' to the buffer's length. The buffer is only valid until the next call, or
+   * until the client is closed.
    */
-  uint8_t* wrap(uint8_t* outgoing, int offset, uint32_t& len);
+  uint8_t* wrap(const uint8_t* outgoing, int offset,
+                  const uint32_t len, uint32_t* outLen);
 
   /* Returns the IANA-registered mechanism name. */
   virtual std::string getMechanismName() {  return NULL; }
@@ -102,17 +114,23 @@ class SaslClientImplException : public SaslException {
 
 /* Client sasl implementation class. */
 class TSaslClient : public sasl::TSasl {
-public:
+  public:
     TSaslClient(const std::string& mechanisms, const std::string& authorizationId,
                 const std::string& protocol, const std::string& serverName,
                 const std::map<std::string,std::string>& props,
-                sasl_callback_t* callback);
+                sasl_callback_t* callbacks);
 
     ~TSaslClient(); 
-    virtual void dispose();
+
+    static void SaslInit(sasl_callback_t* callbacks) {
+      int result = sasl_client_init(callbacks);
+      if (result != SASL_OK)
+        throw SaslClientImplException(sasl_errstring(result, NULL, NULL));
+    }
 
     /* Evaluates the challenge data and generates a response. */
-    uint8_t* evaluateChallengeOrResponse(uint8_t* challenge, uint32_t& len);
+    uint8_t* evaluateChallengeOrResponse(const uint8_t* challenge,
+                                         const uint32_t len, uint32_t* outLen);
 
     /* Returns the IANA-registered mechanism name of this SASL client. */
     virtual std::string getMechanismName();
@@ -123,7 +141,7 @@ public:
     /* Determines whether this mechanism has an optional initial response. */
     virtual bool hasInitialResponse();
 
-private :
+  private :
    /* true if sasl_client_start has been called. */
    bool clientStarted;
 
@@ -148,8 +166,10 @@ class TSaslServer : public sasl::TSasl {
               const std::string& userRelm, unsigned flags, sasl_callback_t* callbacks);
 
   ~TSaslServer(); 
-  virtual void dispose();
 
+  /*
+   * This initializes the sasl server library and should be called onece per application
+   */
   static void SaslInit(const sasl_callback_t* callbacks, const std::string& appname) {
     int result = sasl_server_init(callbacks, appname.c_str());
     if (result != SASL_OK) {
@@ -158,9 +178,10 @@ class TSaslServer : public sasl::TSasl {
   }
 
   /* Evaluates the response data and generates a challenge. */
-  virtual uint8_t* evaluateChallengeOrResponse(uint8_t* challenge, uint32_t& len);
+  virtual uint8_t* evaluateChallengeOrResponse(const uint8_t* challenge,
+                                               const uint32_t len, uint32_t* resLen);
  private:
-  /* true if sals_server_start has been called. */
+  /* true if sasl_server_start has been called. */
   bool serverStarted;
 };
 }

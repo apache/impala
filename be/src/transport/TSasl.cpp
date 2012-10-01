@@ -26,10 +26,8 @@
 using namespace std;
 
 namespace sasl {
-/* Unwraps a received byte array.
- * A buffer for result which is only valid till next call.
- */
-uint8_t* TSasl::unwrap(uint8_t* incoming, int offset, uint32_t& len) {
+uint8_t* TSasl::unwrap(const uint8_t* incoming,
+                       const int offset, const uint32_t len, uint32_t* outLen) {
   uint32_t outputlen;
   uint8_t* output;
   int result;
@@ -39,14 +37,12 @@ uint8_t* TSasl::unwrap(uint8_t* incoming, int offset, uint32_t& len) {
   if (result != SASL_OK) {
     throw SaslException(sasl_errdetail(conn));
   }
-  len = outputlen;
+  *outLen = outputlen;
   return output;
 }
 
-/* Wraps a byte array to be sent.
- * A buffer for result which is only valid till next call.
- */
-uint8_t* TSasl::wrap(uint8_t* outgoing, int offset, uint32_t& len) {
+uint8_t* TSasl::wrap(const uint8_t* outgoing,
+                     const int offset, const uint32_t len, uint32_t* outLen) {
   uint32_t outputlen;
   uint8_t* output;
   int result;
@@ -56,30 +52,33 @@ uint8_t* TSasl::wrap(uint8_t* outgoing, int offset, uint32_t& len) {
   if (result != SASL_OK) {
     throw SaslException(sasl_errdetail(conn));
   }
-  len = outputlen;
+  *outLen = outputlen;
   return output;
 }
 
-TSaslClient::TSaslClient(const string& mechanisms, const string& authorizationId,
+TSaslClient::TSaslClient(const string& mechanisms, const string& authenticationId,
     const string& protocol, const string& serverName, const map<string,string>& props, 
     sasl_callback_t* callbacks) {
-  int result;
-
-  result = sasl_client_init(callbacks);
-  if (result != SASL_OK)
-    throw SaslClientImplException(sasl_errdetail(conn));
-
-  result = sasl_client_new(protocol.c_str(), serverName.c_str(),
-			   NULL, NULL, NULL, 0, &conn);
-  if (result != SASL_OK)
-    throw SaslClientImplException(sasl_errdetail(conn));
+  conn = NULL;
+  if (!props.empty()) {
+    throw SaslServerImplException("Properties not yet supported");
+  }
+  int result = sasl_client_new(protocol.c_str(), serverName.c_str(),
+			   NULL, NULL, callbacks, 0, &conn);
+  if (result != SASL_OK) {
+    if (conn) {
+      throw SaslServerImplException(sasl_errdetail(conn));
+    } else {
+      throw SaslServerImplException(sasl_errstring(result, NULL, NULL));
+    }
+  }
   
-  if (!authorizationId.empty()) {
+  if (!authenticationId.empty()) {
     /* TODO: setup security property */
     /*
     sasl_security_properties_t secprops;
     // populate  secprops
-    result = sasl_setprop(conn, SASL_AUTH_EXTERNAL,authorizationId.c_str());
+    result = sasl_setprop(conn, SASL_AUTH_EXTERNAL, authenticationId.c_str());
     */
   }
 
@@ -89,19 +88,18 @@ TSaslClient::TSaslClient(const string& mechanisms, const string& authorizationId
 }
 
 TSaslClient::~TSaslClient() {
+  sasl_dispose(&conn);
 }
 
-void TSaslClient::dispose() {
-  sasl_done();
-}
 
 /* Evaluates the challenge data and generates a response. */
-uint8_t* TSaslClient::evaluateChallengeOrResponse(uint8_t* challenge, uint32_t& len) {
+uint8_t* TSaslClient::evaluateChallengeOrResponse(
+    const uint8_t* challenge, const uint32_t len, uint32_t *resLen) {
   sasl_interact_t* client_interact=NULL;
   uint8_t* out=NULL;
   uint32_t outlen=0;
   uint32_t result;
-  char* mechusing;
+  char* mechUsing;
 
   if (!clientStarted) {
     result=sasl_client_start(conn,
@@ -109,14 +107,14 @@ uint8_t* TSaslClient::evaluateChallengeOrResponse(uint8_t* challenge, uint32_t& 
           &client_interact, /* filled in if an interaction is needed */
           (const char**)&out,      /* filled in on success */
           &outlen,   /* filled in on success */
-          (const char**)&mechusing);
+          (const char**)&mechUsing);
     clientStarted = true;
-    chosenMech = mechusing;
+    chosenMech = mechUsing;
   } else {
     if (len  > 0) {
       result=sasl_client_step(conn,  /* our context */
           (const char*)challenge,    /* the data from the server */
-          len, /* it's length */
+          len, /* its length */
           &client_interact,  /* this should be unallocated and NULL */
           (const char**)&out,     /* filled in on success */
           &outlen); /* filled in on success */
@@ -130,7 +128,7 @@ uint8_t* TSaslClient::evaluateChallengeOrResponse(uint8_t* challenge, uint32_t& 
   } else if (result != SASL_CONTINUE) {
     throw SaslClientImplException(sasl_errdetail(conn));
   }
-  len = outlen;
+  *resLen = outlen;
   return (uint8_t*)out;
 }
 
@@ -138,13 +136,15 @@ uint8_t* TSaslClient::evaluateChallengeOrResponse(uint8_t* challenge, uint32_t& 
 string TSaslClient::getMechanismName() {
   return chosenMech;
 }
-    /* Retrieves the negotiated property */
+
+/* Retrieves the negotiated property */
 string	TSaslClient::getNegotiatedProperty(const string& propName) {
   return NULL;
 }
 
 /* Determines whether this mechanism has an optional initial response. */
 bool TSaslClient::hasInitialResponse() {
+  // TODO: Need to return a value based on the mechanism.
   return true;
 }
 
@@ -168,7 +168,8 @@ TSaslServer::TSaslServer(const string& service, const string& serverFQDN,
   serverStarted = false;
 }
 
-uint8_t* TSaslServer::evaluateChallengeOrResponse(uint8_t* response, uint32_t& len) {
+uint8_t* TSaslServer::evaluateChallengeOrResponse(const uint8_t* response,
+                                                  const uint32_t len, uint32_t* resLen) {
   uint8_t* out = NULL;
   uint32_t outlen = 0;
   uint32_t result;
@@ -188,11 +189,11 @@ uint8_t* TSaslServer::evaluateChallengeOrResponse(uint8_t* response, uint32_t& l
   }
   serverStarted = true;
 
-  len = outlen;
+  *resLen = outlen;
   return out;
 }
 
-void TSaslServer::dispose() {
+TSaslServer::~TSaslServer() {
   sasl_dispose(&conn);
 }
 };

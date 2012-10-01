@@ -63,37 +63,39 @@ void TSaslServerTransport::setSaslServer(sasl::TSasl* saslServer) {
     throw TTransportException(
         TTransportException::INTERNAL_ERROR, "Setting server in client transport");
   }
-  sasl_ = saslServer;
+  sasl_.reset(saslServer);
 }
 
 void TSaslServerTransport::handleSaslStartMessage() {
   uint32_t resLength;
   NegotiationStatus status;
 
-  char* message = reinterpret_cast<char*>(receiveSaslMessage(status, resLength));
+  char* message = reinterpret_cast<char*>(receiveSaslMessage(&status, &resLength));
   if (status != TSASL_START) {
-    throw TTransportException("Expecting START status, received " + status);
+    stringstream ss;
+    ss << "Expecting START status, received " << status;
+    sendSaslMessage(TSASL_ERROR,
+                    reinterpret_cast<const uint8_t*>(ss.str().c_str()), ss.str().size());
+    throw TTransportException(ss.str());
   }
   map<string, TSaslServerDefinition*>::iterator defn =
       TSaslServerTransport::serverDefinitionMap_.find(message);
   if (defn == TSaslServerTransport::serverDefinitionMap_.end()) {
     stringstream ss;
     ss << "Unsupported mechanism type " << message;
+    sendSaslMessage(TSASL_BAD,
+                    reinterpret_cast<const uint8_t*>(ss.str().c_str()), ss.str().size());
     throw TTransportException(TTransportException::BAD_ARGS, ss.str());
   }
   // TODO: when should realm be used?
   string realm;
   TSaslServerDefinition* serverDefinition = defn->second;
-  sasl_ = new TSaslServer(serverDefinition->protocol_,
-                            serverDefinition->serverName_, realm,
-                            serverDefinition->flags_,
-                            &serverDefinition->callbacks_[0]);
-  uint8_t* challenge =
-      sasl_->evaluateChallengeOrResponse( reinterpret_cast<uint8_t*>(message), resLength);
-  if (sasl_->hasInitialResponse()) {
-    sendSaslMessage(
-        sasl_->isComplete() ? TSASL_COMPLETE : TSASL_OK, challenge, resLength);
-  }
+  sasl_.reset(new TSaslServer(serverDefinition->protocol_,
+                              serverDefinition->serverName_, realm,
+                              serverDefinition->flags_,
+                              &serverDefinition->callbacks_[0]));
+  sasl_->evaluateChallengeOrResponse(reinterpret_cast<uint8_t*>(message),
+                                     resLength, &resLength);
 
 }
 
@@ -106,8 +108,7 @@ shared_ptr<TTransport> TSaslServerTransport::Factory::getTransport(
   if (transMap == transportMap_.end()) {
     retTransport.reset(new TSaslServerTransport(serverDefinitionMap_, trans));
     retTransport.get()->open();
-    transportMap_.insert(pair<shared_ptr<TTransport>,
-                         shared_ptr<TSaslServerTransport> >(trans, retTransport));
+    transportMap_[trans] = retTransport;
   } else {
     retTransport = transMap->second;
   }

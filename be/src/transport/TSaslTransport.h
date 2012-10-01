@@ -24,6 +24,7 @@
 #include <string>
 
 #include <boost/shared_ptr.hpp>
+#include <boost/scoped_ptr.hpp>
 #include <transport/TTransport.h>
 #include <transport/TVirtualTransport.h>
 #include <transport/TSasl.h>
@@ -44,18 +45,6 @@ static const int MECHANISM_NAME_BYTES = 1;
 static const int STATUS_BYTES = 1;
 static const int PAYLOAD_LENGTH_BYTES = 4;
 static const int HEADER_LENGTH = STATUS_BYTES + PAYLOAD_LENGTH_BYTES;
-
-class SaslResponse {
- public:
-  SaslResponse(NegotiationStatus status, uint8_t* payload) {
-    this->status = status;
-    this->payload = payload;
-  }
-
-  NegotiationStatus status;
-  uint8_t* payload;
-};
-
 
 /**
  * This transport implements the Simple Authentication and Security Layer (SASL).
@@ -147,13 +136,10 @@ class TSaslTransport : public TVirtualTransport<TSaslTransport> {
   TMemoryBuffer* memBuf_;
 
   // Sasl implimentation class.
-  sasl::TSasl* sasl_;
+  boost::scoped_ptr<sasl::TSasl> sasl_;
 
   // IF true we wrap data in encryption.
   bool shouldWrap_;
-
-  // If true swap bytes to put them in network order.
-  bool needByteSwap_;
 
   // True if this is a client.
   bool isClient_;
@@ -161,17 +147,54 @@ class TSaslTransport : public TVirtualTransport<TSaslTransport> {
   // Buffer to hold protocol info.
   boost::scoped_array<uint8_t> protoBuf_;
 
-  uint8_t* receiveSaslMessage(NegotiationStatus &status , uint32_t& length);
-  void sendSaslMessage(NegotiationStatus status,
-                       uint8_t* payload, uint32_t length, bool flush = true);
-  void encodeInt (uint32_t x, uint8_t* buf, uint32_t offset);
-  uint32_t decodeInt (uint8_t* buf, uint32_t offset);
+  /* store the big endian format int to given buffer */
+  void encodeInt(uint32_t x, uint8_t* buf, uint32_t offset) {
+    *(reinterpret_cast<uint32_t*>(buf + offset)) = htonl(x);
+  }
+
+  /* load the big endian format int to given buffer */
+  uint32_t decodeInt (uint8_t* buf, uint32_t offset) {
+    return ntohl(*(reinterpret_cast<uint32_t*>(buf + offset)));
+  }
+
+  /**
+   * Read a complete Thrift SASL message.
+   * 
+   * @return The SASL status and payload from this message.
+   *    Is valid only to till the next call.
+   * @throws TTransportException
+   *           Thrown if there is a failure reading from the underlying
+   *           transport, or if a status code of BAD or ERROR is encountered.
+   */
+  uint8_t* receiveSaslMessage(NegotiationStatus* status , uint32_t* length);
+
+  /**
+   * send message with SASL transport headers.
+   * status is put before the payload.
+   * If flush is false we delay flushing the underlying transport so
+   * that the following message will be in the same packet if necessary.
+   */
+  void sendSaslMessage(const NegotiationStatus status,
+                       const uint8_t* payload, const uint32_t length, bool flush = true);
+
+  /**
+   * Opens the transport for communications.
+   *
+   * @return bool Whether the transport was successfully opened
+   * @throws TTransportException if opening failed
+   */
   uint32_t readLength();
+
+  /**
+   * Write the given integer as 4 bytes to the underlying transport.
+   * 
+   * @param length
+   *          The length prefix of the next SASL message to write.
+   * @throws TTransportException
+   *           Thrown if writing to the underlying transport fails.
+   */
   void writeLength(uint32_t length);
   virtual void handleSaslStartMessage() = 0;
- 
- private:
-  void TSaslTransportInit();
 };
 
 }}} // apache::thrift::transport

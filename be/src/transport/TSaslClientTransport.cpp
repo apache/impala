@@ -45,7 +45,7 @@ void TSaslClientTransport::handleSaslStartMessage() {
 
   /* Get data to send to the server if the client goes first. */
   if (sasl_->hasInitialResponse()) {
-    initialResponse = sasl_->evaluateChallengeOrResponse(NULL, resLength);
+    initialResponse = sasl_->evaluateChallengeOrResponse(NULL, 0, &resLength);
   }
 
   /* These two calls comprise a single message in the thrift-sasl protocol. */

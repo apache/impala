@@ -1,6 +1,7 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #include <stdio.h>
+#include <signal.h>
 #include <unistd.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/thread/thread.hpp>
@@ -28,6 +29,8 @@ DEFINE_int32(kerberos_ticket_life, 0, \
   "0 implies twice the reinit interval");
 DEFINE_int32(kerberos_reinit_interval, 60, \
     "Number of minutes between reestablishing our ticket with the kerberos server");
+DEFINE_string(sasl_path, "/usr/lib/sasl2:/usr/lib64/sasl2:/usr/local/lib/sasl2",
+    "Colon separated list of paths to look for SASL security library plugins.");
 
 namespace impala {
 
@@ -122,7 +125,6 @@ static int SaslGetOption(void* context, const char* plugin_name, const char* opt
 
 // Sasl Authorize callback.
 // Can be used to restrict access.  Currently used for diagnostics.
-// TODO: This does not actually get called.
 // requsted_user, rlen: The user requesting access and string length.
 // auth_identity, alen: The identity (principal) and length.
 // default_realm, urlen: Realm of the user and length.
@@ -136,6 +138,17 @@ static int SaslAuthorize(sasl_conn_t* conn, void* context,
   string realm(def_realm, urlen);
   VLOG_CONNECTION << "Kerberos User: " << user << " for: " << auth << " from " << realm;
 
+  return SASL_OK;
+}
+
+// Sasl Get Path callback.
+// Returns the list of possible places for the plugins might be.
+// Places we know they might be:
+// UBUNTU:          /usr/lib/sasl2
+// CENTOS:          /usr/lib64/sasl2
+// custom install:  /usr/local/lib/sasl2
+static int SaslGetPath(void* context, const char** path) {
+  *path = FLAGS_sasl_path.c_str();
   return SASL_OK;
 }
 
@@ -171,7 +184,8 @@ static void RunKinit() {
     int ret = pclose(fp);
     if (ret != 0) {
       if (!started) {
-        LOG(ERROR) << "Exiting: failed to register with kerberos: '" << kreturn << "'";
+        LOG(ERROR) << "Exiting: failed to register with kerberos: errno: " << errno
+                   << " '" << kreturn << "'";
         exit(1);
       }
       // Just report the problem, existing report the error.  Existing connections
@@ -192,7 +206,7 @@ static void RunKinit() {
 }
 
 Status InitKerberos(const string& appname) {
-  callbacks.resize(4);
+  callbacks.resize(5);
   callbacks[0].id = SASL_CB_LOG;
   callbacks[0].proc = (int (*)())&SaslLogCallback;
   callbacks[0].context = NULL;
@@ -202,7 +216,10 @@ Status InitKerberos(const string& appname) {
   callbacks[2].id = SASL_CB_PROXY_POLICY;
   callbacks[2].proc = (int (*)())&SaslAuthorize;
   callbacks[2].context = NULL;
-  callbacks[2].id = SASL_CB_LIST_END;
+  callbacks[3].id = SASL_CB_GETPATH;
+  callbacks[3].proc = (int (*)())&SaslGetPath;
+  callbacks[3].context = NULL;
+  callbacks[4].id = SASL_CB_LIST_END;
 
   // Replace the string _HOST with our hostname.
   size_t off = FLAGS_principal.find(HOSTNAME_PATTERN);
@@ -218,7 +235,9 @@ Status InitKerberos(const string& appname) {
   }
 
   try {
+    // We assume all impala processes are both server and client.
     sasl::TSaslServer::SaslInit(&callbacks[0], appname);
+    sasl::TSaslClient::SaslInit(&callbacks[0]);
   } catch (sasl::SaslServerImplException&  e) {
     LOG(ERROR) << "Could not initialize Sasl library: " << e.what();
     return Status(e.what());

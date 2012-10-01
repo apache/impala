@@ -37,6 +37,7 @@
 #include "util/stat-util.h"
 #include "util/thrift-util.h"
 #include "util/thrift-server.h"
+#include "util/authorization.h"
 #include "runtime/data-stream-mgr.h"
 
 DEFINE_string(exec_options, "", "key:value pair of execution options for impalad,"
@@ -57,7 +58,7 @@ DECLARE_bool(use_statestore);
 using namespace std;
 using namespace impala;
 using namespace boost;
-using namespace apache::thrift::server;
+using namespace sasl;
 
 // Creates a summary string for output to stdout once a query has finished
 static void ConstructSummaryString(ExecStats::QueryType query_type, int num_rows,
@@ -285,6 +286,9 @@ int main(int argc, char** argv) {
   InitThriftLogging();
   LlvmCodeGen::InitializeLlvm();
   JniUtil::InitLibhdfs();
+
+  if (!FLAGS_principal.empty()) EXIT_IF_ERROR(InitKerberos("runquery"));
+
   scoped_ptr<ExecEnv> exec_env;
   if (FLAGS_impalad.empty()) {
     // if we're not running against an existing impalad and don't have
