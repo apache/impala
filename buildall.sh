@@ -99,6 +99,9 @@ then
 
   # clean llvm
   rm $IMPALA_HOME/llvm-ir/impala*.ll
+
+  # Cleanup the version.info file so it will be regenerated for the next build.
+  rm -f $IMPALA_HOME/bin/version.info
 fi
 
 # Generate hive-site.xml from template via env var substitution
@@ -194,3 +197,5 @@ ${IMPALA_HOME}/shell/make_shell_tarball.sh
 
 # Generate list of files for Cscope to index
 $IMPALA_HOME/bin/gen-cscope.sh
+
+

@@ -13,6 +13,7 @@ fi
 SHELL_HOME=${IMPALA_HOME}/shell
 BUILD_DIR=${SHELL_HOME}/build
 TARBALL_ROOT=${BUILD_DIR}/impala-shell-0.1
+IMPALA_VERSION_INFO_FILE=${IMPALA_HOME}/bin/version.info
 
 echo "Deleting all files in ${TARBALL_ROOT}/{gen-py,lib}"
 rm -rf ${TARBALL_ROOT}/lib/* 2>&1 > /dev/null
@@ -26,10 +27,19 @@ cp -r ${SHELL_HOME}/gen-py ${TARBALL_ROOT}
 cp ${SHELL_HOME}/impala-shell ${TARBALL_ROOT}
 cp ${SHELL_HOME}/impala_shell.py ${TARBALL_ROOT}
 
-GIT_HASH=$(git rev-parse HEAD)
-BUILD_DATE=$(date)
-rm -f ${TARBALL_ROOT}/lib/impala_build_version.py
+if [ ! -f ${IMPALA_VERSION_INFO_FILE} ]; then
+  echo "No version.info file found. Generating new version info"
+  ${IMPALA_HOME}/bin/save-version.sh
+else
+  echo "Using existing version.info file."
+fi
 
+VERSION=$(grep "VERSION: " ${IMPALA_VERSION_INFO_FILE} | awk '{print $2}')
+GIT_HASH=$(grep "GIT_HASH: " ${IMPALA_VERSION_INFO_FILE} | awk '{print $2}')
+BUILD_DATE=$(grep "BUILD_TIME: " ${IMPALA_VERSION_INFO_FILE} | cut -f 2- -d ' ')
+cat ${IMPALA_VERSION_INFO_FILE}
+
+rm -f ${TARBALL_ROOT}/lib/impala_build_version.py
 cat > ${TARBALL_ROOT}/lib/impala_build_version.py <<EOF
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # Impala version string
