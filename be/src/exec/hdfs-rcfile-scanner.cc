@@ -565,12 +565,6 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
         if (!text_converter_->WriteSlot(slot_desc, tuple_, 
               col_start, field_len, !has_noncompact_strings_, false, tuple_pool_)) {
           ReportColumnParseError(slot_desc, col_start, field_len);
-          if (state_->LogHasSpace()) {
-            stringstream ss;
-            ss << "Error converting column: " << rc_column_idx
-               << " TO " << TypeToString(slot_desc->type()) << endl;
-            state_->LogError(ss.str());
-          }
           error_in_row = true;
         }
       }
@@ -579,8 +573,7 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
         error_in_row = false;
         if (state_->LogHasSpace()) {
           stringstream ss;
-          ss << "file: " << current_byte_stream_->GetLocation() << endl
-             << "row index: " << row_idx;
+          ss << "file: " << current_byte_stream_->GetLocation();
           state_->LogError(ss.str());
         }
         if (state_->abort_on_error()) {

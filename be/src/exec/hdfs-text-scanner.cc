@@ -355,7 +355,7 @@ Status HdfsTextScanner::ReportRowParseError(int row_idx) {
     }
 
     stringstream ss;
-    ss << "file: " << context_->filename() << endl << "line: ";
+    ss << "file: " << context_->filename() << endl << "record: ";
     if (!boundary_row_.Empty()) {
       // Log the beginning of the line from the previous file buffer(s)
       ss << boundary_row_.str();

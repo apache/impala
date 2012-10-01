@@ -181,7 +181,7 @@ void HdfsScanner::ReportColumnParseError(const SlotDescriptor* desc,
     ss << "Error converting column: " 
        << desc->col_pos() - scan_node_->num_partition_keys()
        << " TO " << TypeToString(desc->type()) 
-       << " (Data is: " << string(data,len) << ")" << endl;
+       << " (Data is: " << string(data,len) << ")";
     state_->LogError(ss.str());
   }
 }

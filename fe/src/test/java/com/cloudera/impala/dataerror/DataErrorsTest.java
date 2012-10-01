@@ -20,7 +20,7 @@ public class DataErrorsTest extends BaseQueryTest {
     List<TableFormat> all_format_except_trevni = Lists.newArrayList();
     all_format_except_trevni.addAll(ALL_TABLE_FORMATS);
     all_format_except_trevni.remove(TableFormat.TREVNI);
-    runPairTestFile("hdfs-scan-node-errors", true, 1, all_format_except_trevni,
+    runPairTestFile("hdfs-scan-node-errors", true, 10, all_format_except_trevni,
         ALL_COMPRESSION_FORMATS, ALL_BATCH_SIZES, SINGLE_NODE_ONLY);
 
     // IMP-250: can't use num_nodes=2
@@ -38,7 +38,7 @@ public class DataErrorsTest extends BaseQueryTest {
         TEXT_FORMAT_ONLY, ALL_COMPRESSION_FORMATS, ALL_BATCH_SIZES, SINGLE_NODE_ONLY);
     runPairTestFile("hbase-scan-node-errors", false, 5,
         TEXT_FORMAT_ONLY, ALL_COMPRESSION_FORMATS, ALL_BATCH_SIZES, SINGLE_NODE_ONLY);
-    runPairTestFile("hbase-scan-node-errors", true, 1,
+    runPairTestFile("hbase-scan-node-errors", true, 10,
         TEXT_FORMAT_ONLY, ALL_COMPRESSION_FORMATS, ALL_BATCH_SIZES, SINGLE_NODE_ONLY);
   }
 }
