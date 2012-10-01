@@ -39,8 +39,7 @@ RowBatch* DataStreamMgr::StreamControlBlock::GetBatch(bool* is_cancelled) {
   unique_lock<mutex> l(lock_);
   // wait until something shows up or we know we're done
   while (!is_cancelled_ && batch_queue_.empty() && num_remaining_senders_ > 0) {
-    LOG(INFO) << "wait arrival query=" << fragment_id_ << " node=" << dest_node_id_;
-    //VLOG_ROW << "wait arrival query=" << fragment_id_ << " node=" << dest_node_id_;
+    VLOG_ROW << "wait arrival query=" << fragment_id_ << " node=" << dest_node_id_;
     data_arrival_.wait(l);
   }
   if (is_cancelled_) {
@@ -86,9 +85,9 @@ void DataStreamMgr::StreamControlBlock::DecrementSenders() {
   lock_guard<mutex> l(lock_);
   DCHECK_GT(num_remaining_senders_, 0);
   num_remaining_senders_ = max(0, num_remaining_senders_ - 1);
-  VLOG_QUERY << "decremented senders: fragment_id=" << fragment_id_
-             << " node_id=" << dest_node_id_
-             << " #senders=" << num_remaining_senders_;
+  VLOG_FILE << "decremented senders: fragment_id=" << fragment_id_
+            << " node_id=" << dest_node_id_
+            << " #senders=" << num_remaining_senders_;
   if (num_remaining_senders_ == 0) data_arrival_.notify_one();
 }
 
@@ -111,8 +110,8 @@ inline uint32_t DataStreamMgr::GetHashValue(
 DataStreamRecvr* DataStreamMgr::CreateRecvr(
     const RowDescriptor& row_desc, const TUniqueId& fragment_id, PlanNodeId dest_node_id,
     int num_senders, int buffer_size) {
-  VLOG_QUERY << "creating receiver for fragment="
-             << fragment_id << ", node=" << dest_node_id;
+  VLOG_FILE << "creating receiver for fragment="
+            << fragment_id << ", node=" << dest_node_id;
   StreamControlBlock* cb = pool_.Add(
       new StreamControlBlock(row_desc, fragment_id, dest_node_id, num_senders,
                              buffer_size));
@@ -161,7 +160,7 @@ Status DataStreamMgr::AddData(
 
 Status DataStreamMgr::CloseSender(
     const TUniqueId& fragment_id, PlanNodeId dest_node_id) {
-  VLOG(1) << "CloseSender(): fragment_id=" << fragment_id << ", node=" << dest_node_id;
+  VLOG_FILE << "CloseSender(): fragment_id=" << fragment_id << ", node=" << dest_node_id;
   StreamMap::iterator i = FindControlBlock(fragment_id, dest_node_id);
   if (i == stream_map_.end()) {
     stringstream err;

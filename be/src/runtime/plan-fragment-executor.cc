@@ -120,6 +120,8 @@ Status PlanFragmentExecutor::Prepare(
 }
 
 void PlanFragmentExecutor::PrintVolumeIds(const TPlanExecParams& params) {
+  if (params.scan_ranges.empty()) return;
+
   // map from volume id to (# of splits, total # bytes) on that volume
   unordered_map<int32_t, pair<int, int64_t> > per_volume_stats;
   for (int i = 0; i < params.scan_ranges.size(); ++i) {
@@ -139,14 +141,17 @@ void PlanFragmentExecutor::PrintVolumeIds(const TPlanExecParams& params) {
   }
 
   stringstream str;
-  str << "Hdfs split stats (<volume id>:<# splits>/<split lengths>) for query="
-      << query_id_ << ":\n";
   for (unordered_map<int32_t, pair<int, int64_t> >::iterator i = per_volume_stats.begin();
        i != per_volume_stats.end(); ++i) {
      str << i->first << ":" << i->second.first << "/"
          << PrettyPrinter::Print(i->second.second, TCounterType::UNIT) << " ";
   }
-  VLOG_QUERY << str.str();
+  profile()->AddInfoString("Hdfs split stats (<volume id>:<# splits>/<split lengths>)",
+     str.str());
+  
+  VLOG_FILE << "Hdfs split stats (<volume id>:<# splits>/<split lengths>) for query="
+            << query_id_ << ":\n" 
+            << str.str();
 }
 
 Status PlanFragmentExecutor::Open() {
@@ -214,7 +219,7 @@ Status PlanFragmentExecutor::OpenInternal() {
 }
 
 void PlanFragmentExecutor::ReportProfile() {
-  VLOG_QUERY << "ReportProfile(): fragment_id=" << runtime_state_->fragment_id();
+  VLOG_FILE << "ReportProfile(): fragment_id=" << runtime_state_->fragment_id();
   DCHECK(!report_status_cb_.empty());
   unique_lock<mutex> l(report_thread_lock_);
   // tell Open() that we started
@@ -226,15 +231,15 @@ void PlanFragmentExecutor::ReportProfile() {
     bool notified = stop_report_thread_cv_.timed_wait(l, timeout);
     VLOG_FILE << "Reporting " << (notified ? "final " : " ")
               << "profile for fragment " << runtime_state_->fragment_id();
-    if (VLOG_QUERY_IS_ON) {
+    if (VLOG_FILE_IS_ON) {
       stringstream ss;
       profile()->PrettyPrint(&ss);
-      VLOG_QUERY << ss.str();
+      VLOG_FILE << ss.str();
     }
 
     if (notified) {
-      VLOG_QUERY << "exiting reporting thread: fragment_id="
-                 << runtime_state_->fragment_id();
+      VLOG_FILE << "exiting reporting thread: fragment_id="
+                << runtime_state_->fragment_id();
       return;
     } else {
       SendReport(false);

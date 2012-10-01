@@ -29,8 +29,8 @@ BackendClientCache::BackendClientCache(int max_clients, int max_clients_per_back
 
 Status BackendClientCache::GetClient(
     const pair<string, int>& hostport, ImpalaInternalServiceClient** client) {
-  VLOG_CONNECTION << "GetClient("
-      << hostport.first << ":" << hostport.second << ")";
+  VLOG_RPC << "GetClient("
+           << hostport.first << ":" << hostport.second << ")";
   lock_guard<mutex> l(lock_);
   ClientCache::iterator cache_entry = client_cache_.find(hostport);
   if (cache_entry == client_cache_.end()) {
@@ -42,9 +42,9 @@ Status BackendClientCache::GetClient(
   list<BackendClient*>& info_list = cache_entry->second;
   if (!info_list.empty()) {
     *client = info_list.front()->iface();
-    VLOG_CONNECTION << "GetClient(): adding client for "
-                    << info_list.front()->ipaddress()
-                    << ":" << info_list.front()->port();
+    VLOG_RPC << "GetClient(): adding client for "
+             << info_list.front()->ipaddress()
+             << ":" << info_list.front()->port();
     info_list.pop_front();
   } else {
     auto_ptr<BackendClient> info(
@@ -64,8 +64,8 @@ void BackendClientCache::ReleaseClient(ImpalaInternalServiceClient* client) {
   ClientMap::iterator i = client_map_.find(client);
   DCHECK(i != client_map_.end());
   BackendClient* info = i->second;
-  VLOG_CONNECTION << "releasing client for "
-                  << info->ipaddress() << ":" << info->port();
+  VLOG_RPC << "releasing client for "
+           << info->ipaddress() << ":" << info->port();
   ClientCache::iterator j =
       client_cache_.find(make_pair(info->ipaddress(), info->port()));
   DCHECK(j != client_cache_.end());

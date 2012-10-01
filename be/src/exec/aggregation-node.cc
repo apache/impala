@@ -184,8 +184,8 @@ Status AggregationNode::Open(RuntimeState* state) {
     hash_tbl_->Insert(reinterpret_cast<TupleRow*>(&singleton_output_tuple_));
     ++num_agg_rows;
   }
-  VLOG_QUERY << "aggregated " << num_input_rows << " input rows into "
-             << num_agg_rows << " output rows";
+  VLOG_FILE << "aggregated " << num_input_rows << " input rows into "
+            << num_agg_rows << " output rows";
   output_iterator_ = hash_tbl_->Begin();
   return Status::OK;
 }

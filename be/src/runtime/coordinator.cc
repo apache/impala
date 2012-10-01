@@ -692,10 +692,10 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
         params.insert_exec_status.files_to_move.end());
   }
 
-  if (VLOG_QUERY_IS_ON) {
+  if (VLOG_FILE_IS_ON) {
     stringstream s;
     exec_state->profile->PrettyPrint(&s);
-    VLOG_QUERY << "profile for query_id=" << query_id_
+    VLOG_FILE << "profile for query_id=" << query_id_
                << " fragment_id=" << exec_state->fragment_id << "\n" << s.str();
   }
   // also print the cumulative profile
@@ -772,7 +772,7 @@ bool Coordinator::PrepareCatalogUpdate(TCatalogUpdate* catalog_update) {
 //   1. Averaged remote fragment profiles (TODO: add outliers)
 //   2. Summary of remote fragment durations (min, max, mean, stddev)
 //   3. Summary of remote fragment rates (min, max, mean, stddev)
-// TODO: add historgram/percentile
+// TODO: add histogram/percentile
 void Coordinator::ReportQuerySummary() {
   if (!VLOG_QUERY_IS_ON) return;
   DCHECK(query_status_.ok());

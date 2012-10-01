@@ -41,7 +41,7 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
   SCOPED_TIMER(runtime_profile_->total_time_counter());
   bool is_cancelled;
   scoped_ptr<RowBatch> input_batch(stream_recvr_->GetBatch(&is_cancelled));
-  VLOG_QUERY << "exch: has batch=" << (input_batch.get() == NULL ? "false" : "true")
+  VLOG_FILE << "exch: has batch=" << (input_batch.get() == NULL ? "false" : "true")
             << " #rows=" << (input_batch.get() != NULL ? input_batch->num_rows() : 0)
             << " is_cancelled=" << (is_cancelled ? "true" : "false")
             << " fragment_id=" << state->fragment_id();

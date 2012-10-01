@@ -659,8 +659,7 @@ Status DiskIoMgr::GetNext(ReaderContext* reader, BufferDescriptor** buffer, bool
 
   if (reader->state_ == ReaderContext::Cancelled) return Status::CANCELLED;
 
-  // TODO: demote this to VLOG_FILE after we caught the deadlock
-  VLOG_QUERY << "GetNext(): reader=" << reader->DebugString();
+  VLOG_FILE << "GetNext(): reader=" << reader->DebugString();
 
   // Wait until a block is read, all blocks have been read and returned or 
   // reader is cancelled

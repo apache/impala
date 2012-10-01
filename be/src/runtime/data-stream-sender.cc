@@ -212,9 +212,9 @@ Status DataStreamSender::Channel::GetSendStatus() {
 }
 
 Status DataStreamSender::Channel::Close() {
-  VLOG_QUERY << "Channel::Close() fragment_id=" << fragment_id_
-             << " dest_node=" << dest_node_id_
-             << " #rows= " << batch_->num_rows();
+  VLOG_RPC << "Channel::Close() fragment_id=" << fragment_id_
+           << " dest_node=" << dest_node_id_
+           << " #rows= " << batch_->num_rows();
   if (batch_->num_rows() > 0) {
     // flush
     RETURN_IF_ERROR(SendCurrentBatch());
@@ -228,7 +228,7 @@ Status DataStreamSender::Channel::Close() {
     params.__set_dest_node_id(dest_node_id_);
     params.__set_eos(true);
     TTransmitDataResult res;
-    VLOG_QUERY << "calling TransmitData to close channel";
+    VLOG_RPC << "calling TransmitData to close channel";
     client_->iface()->TransmitData(res, params);
     return Status(res.status);
   } catch (TException& e) {
@@ -296,7 +296,6 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
     // SendBatch() will block if there are still in-flight rpcs (and those will
     // reference the previously written thrift batch)
     for (int i = 0; i < channels_.size(); ++i) {
-      LOG(INFO) << "send on channel " << i;
       RETURN_IF_ERROR(channels_[i]->SendBatch(current_thrift_batch_));
     }
     current_thrift_batch_ =
@@ -317,7 +316,6 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
 Status DataStreamSender::Close(RuntimeState* state) {
   // TODO: only close channels that didn't have any errors
   for (int i = 0; i < channels_.size(); ++i) {
-    LOG(INFO) << "closing channel " << i;
     RETURN_IF_ERROR(channels_[i]->Close());
   }
   return Status::OK;
