@@ -8,6 +8,7 @@
 #include <boost/thread/mutex.hpp>
 
 #include <llvm/Analysis/Passes.h>
+#include <llvm/Analysis/InstructionSimplify.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/JIT.h>
 #include <llvm/PassManager.h>
@@ -20,10 +21,12 @@
 #include <llvm/Support/system_error.h>
 #include <llvm/Target/TargetData.h>
 #include "llvm/Transforms/IPO.h"
+#include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Transforms/Utils/Cloning.h>
 
 #include "common/logging.h"
+#include "codegen/subexpr-elimination.h"
 #include "impala-ir/impala-ir-names.h"
 #include "util/cpu-info.h"
 #include "util/path-builder.h"
@@ -65,7 +68,6 @@ LlvmCodeGen::LlvmCodeGen(ObjectPool* pool, const string& name) :
   name_(name),
   profile_(pool, "CodeGen"),
   optimizations_enabled_(false),
-  verifier_enabled_(true),
   context_(new llvm::LLVMContext()),
   module_(NULL),
   execution_engine_(NULL),
@@ -182,7 +184,7 @@ Status LlvmCodeGen::Init() {
   if (module_ == NULL) {
     module_ = new Module(name_, context());
   }
-  llvm::CodeGenOpt::Level opt_level = CodeGenOpt::Default;
+  llvm::CodeGenOpt::Level opt_level = CodeGenOpt::Aggressive;
 #ifndef NDEBUG
   // For debug builds, don't generate JIT compiled optimized assembly.
   // This takes a non-neglible amount of time (~.5 ms per function) and
@@ -198,81 +200,6 @@ Status LlvmCodeGen::Init() {
     ss << "Could not create ExecutionEngine: " << error_string_;
     return Status(ss.str());
   }
-
-  function_pass_mgr_.reset(new FunctionPassManager(module_));
-
-  const TargetData* target_data = execution_engine_->getTargetData();
-  // The creates below are just wrappers for calling new on the optimization pass object.
-  // The function_pass_mgr_ will take ownership of the object for add, which is
-  // why we don't delete them
-  TargetData* target_data_pass = new TargetData(*target_data);
-  function_pass_mgr_->add(target_data_pass);
-
-  // These optimizations are based on the passes that clang uses with -O3.
-  // clang will set these passes up as module passes to try to optimize the entire
-  // module.  This is not suitable to how we use llvm.  We have "function trees"
-  // (inlined tree of functions) and we can optimize each tree individually.
-  // More details about the passes are here: http://llvm.org/docs/Passes.html
-  // Some passes are repeated since after running some passes, there will be
-  // some benefit with running previous passes again. The order of the passes
-  // is *very* important.
-
-  // Provide basic AliasAnalysis support for GVN.
-  function_pass_mgr_->add(createBasicAliasAnalysisPass());
-  // Rearrange expressions for better constant propagation
-  function_pass_mgr_->add(createReassociatePass());
-  // Remove redundant instructions
-  function_pass_mgr_->add(createGVNPass());
-  // Simplify the control flow graph (deleting unreachable blocks, etc).
-  function_pass_mgr_->add(createCFGSimplificationPass());
-  // Delete dead instructions
-  function_pass_mgr_->add(createAggressiveDCEPass());
-  // Simplify the control flow graph (deleting unreachable blocks, etc).
-  function_pass_mgr_->add(createCFGSimplificationPass());
-  // Collapse dependent blocks based on condition propagation
-  function_pass_mgr_->add(createJumpThreadingPass());
-  function_pass_mgr_->add(createCorrelatedValuePropagationPass());
-  // Simplify the control flow graph (deleting unreachable blocks, etc).
-  function_pass_mgr_->add(createCFGSimplificationPass());
-
-  // Hoist loop invariants
-  function_pass_mgr_->add(createLICMPass());
-  // Loop unswitch optimization
-  function_pass_mgr_->add(createLoopUnswitchPass());
-  // Do simple "peephole" optimizations and bit-twiddling optzns.
-  function_pass_mgr_->add(createInstructionCombiningPass());
-  // Induction var optimization
-  function_pass_mgr_->add(createIndVarSimplifyPass());
-  // Rewrite loop idioms like memset.
-  function_pass_mgr_->add(createLoopIdiomPass());
-  // Remove dead loops
-  function_pass_mgr_->add(createLoopDeletionPass());
-  // Unroll loops
-  function_pass_mgr_->add(createLoopUnrollPass());
-  // Remove redundant instructions
-  function_pass_mgr_->add(createGVNPass());
-  // Remove unnecessary memcpys or collapse stores to memcpy/memset
-  function_pass_mgr_->add(createMemCpyOptPass());
-  // Sparse conditional constant propagation
-  function_pass_mgr_->add(createSCCPPass());
-  // Do simple "peephole" optimizations and bit-twiddling optzns.
-  function_pass_mgr_->add(createInstructionCombiningPass());
-  // Collapse dependent blocks based on condition propagation
-  function_pass_mgr_->add(createJumpThreadingPass());
-  function_pass_mgr_->add(createCorrelatedValuePropagationPass());
-
-  // Dead store elimination
-  function_pass_mgr_->add(createDeadStoreEliminationPass());
-  // Simplify the control flow graph (deleting unreachable blocks, etc).
-  function_pass_mgr_->add(createCFGSimplificationPass());
-  // Delete dead instructions
-  function_pass_mgr_->add(createAggressiveDCEPass());
-  // Simplify the control flow graph (deleting unreachable blocks, etc).
-  function_pass_mgr_->add(createCFGSimplificationPass());
-  // Do simple "peephole" optimizations and bit-twiddling optzns.
-  function_pass_mgr_->add(createInstructionCombiningPass());
-
-  function_pass_mgr_->doInitialization();
 
   void_type_ = Type::getVoidTy(context());
   ptr_type_ = PointerType::get(GetType(TYPE_TINYINT), 0);
@@ -302,10 +229,6 @@ LlvmCodeGen::~LlvmCodeGen() {
 
 void LlvmCodeGen::EnableOptimizations(bool enable) {
   optimizations_enabled_ = enable;
-}
-
-void LlvmCodeGen::EnableVerifier(bool enable) {
-  verifier_enabled_ = enable;
 }
 
 string LlvmCodeGen::GetIR(bool full_module) const {
@@ -403,14 +326,12 @@ Function* LlvmCodeGen::GetFunction(IRFunction::Type function) {
 }
 
 bool LlvmCodeGen::VerifyFunction(Function* function) {
-  if (verifier_enabled()) {
-    // Verify the function is valid;
-    bool corrupt = llvm::verifyFunction(*function, ReturnStatusAction);
-    if (corrupt) {
-      LOG(ERROR) << "Function corrupt.";
-      function->dump();
-      return false;
-    }
+  // Verify the function is valid;
+  bool corrupt = llvm::verifyFunction(*function, ReturnStatusAction);
+  if (corrupt) {
+    LOG(ERROR) << "Function corrupt.";
+    function->dump();
+    return false;
   }
   return true;
 }
@@ -446,7 +367,6 @@ Function* LlvmCodeGen::FnPrototype::GeneratePrototype(
   }
 
   codegen_->codegend_functions_.push_back(fn);
-
   return fn;
 }
 
@@ -495,7 +415,7 @@ Function* LlvmCodeGen::ReplaceCallSites(Function* caller, bool update_in_place,
 // TODO: revisit this.  Inlining all call sites might not be the right call.  We
 // probably need to make this more complicated and somewhat cost based or write
 // our own optimization passes.
-int LlvmCodeGen::InlineAllCallSites(Function* fn) {
+int LlvmCodeGen::InlineAllCallSites(Function* fn, bool skip_registered_fns) {
   int functions_inlined = 0;
   // Collect all call sites
   vector<CallInst*> call_sites;
@@ -510,7 +430,14 @@ int LlvmCodeGen::InlineAllCallSites(Function* fn) {
       Instruction* instr = instr_iter++;
       // look for call instructions
       if (CallInst::classof(instr)) {
-        call_sites.push_back(reinterpret_cast<CallInst*>(instr));
+        CallInst* call_instr = reinterpret_cast<CallInst*>(instr);
+        Function* called_fn = call_instr->getCalledFunction();
+        if (skip_registered_fns) {
+          if (registered_exprs_.find(called_fn) != registered_exprs_.end()) {
+            continue;
+          }
+        }
+        call_sites.push_back(call_instr);
       }
     }
   }
@@ -526,31 +453,45 @@ int LlvmCodeGen::InlineAllCallSites(Function* fn) {
   return functions_inlined;
 }
 
+Function* LlvmCodeGen::OptimizeFunctionWithExprs(Function* fn) {
+  SubExprElimination subexpr_elim(this);
+  subexpr_elim.Run(fn);
+  return FinalizeFunction(fn);
+}
 
 Function* LlvmCodeGen::FinalizeFunction(Function* function) {
   if (!VerifyFunction(function)) return NULL;
-  OptimizeFunction(function);
-  InlineAllCallSites(function);
   return function;
 }
 
-void LlvmCodeGen::OptimizeFunction(Function* function) {
-  if (optimizations_enabled_) {
-    SCOPED_TIMER(compile_timer_);
-    function_pass_mgr_->run(*function);
+Status LlvmCodeGen::OptimizeModule() {
+  SCOPED_TIMER(compile_timer_);
+  if (!optimizations_enabled_) return Status::OK;
+  
+  // This pass manager will construct optimizations passes that are "typical" for
+  // c/c++ programs.  We're relying on llvm to pick the best passes for us.
+  // TODO: we can likely muck with this to get better compile speeds or write
+  // our own passes.  Our subexpression elimination optimization can be rolled into
+  // a pass.
+  PassManagerBuilder pass_builder ;
+  pass_builder.OptLevel = 2;          // 2 maps to -O2
+  pass_builder.Inliner = createFunctionInliningPass() ;
+
+  scoped_ptr<FunctionPassManager> function_pass(new FunctionPassManager(module_));
+  pass_builder.populateFunctionPassManager(*function_pass);
+  for (Module::iterator it = module_->begin(), end = module_->end(); it != end ; ++ it) {
+    if (!it->isDeclaration()) function_pass->run(*it);
   }
+  function_pass->doFinalization() ;
+
+  scoped_ptr<PassManager> module_pass(new PassManager());
+  pass_builder.populateModulePassManager(*module_pass);
+  module_pass->run(*module_);
+
+  return Status::OK;
 }
 
 void* LlvmCodeGen::JitFunction(Function* function, int* scratch_size) {
-  SCOPED_TIMER(compile_timer_);
-  if (optimizations_enabled_) {
-    function_pass_mgr_->run(*function);
-  }
-
-  if (FLAGS_dump_ir) {
-    function->dump();
-  }
-
   if (scratch_size == NULL) {
     DCHECK_EQ(scratch_buffer_offset_, 0);
   } else {

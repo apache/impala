@@ -60,9 +60,7 @@ DECLARE_string(hostname);
 int main(int argc, char** argv) {
   // Set the default hostname.  The user can override this with the hostname flag.
   FLAGS_hostname = GetHostname();
-  if (!FLAGS_hostname.empty()) {
-    LOG(INFO) << "Setting default hostname: " << FLAGS_hostname;
-  }
+
   google::ParseCommandLineFlags(&argc, &argv, true);
   InitGoogleLoggingSafe(argv[0]);
 
@@ -74,6 +72,9 @@ int main(int argc, char** argv) {
     return 0;
   }
   LOG(INFO) << GetVersionString();
+  
+  LOG(INFO) << "Using hostname: " << FLAGS_hostname;
+  
   LogCommandLineFlags();
 
   InitThriftLogging();

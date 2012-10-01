@@ -49,6 +49,8 @@ namespace llvm {
 
 namespace impala {
 
+class SubExprElimination;
+
 // LLVM code generator.  This is the top level object to generate jitted code.  
 //
 // LLVM provides a c++ IR builder interface so IR does not need to be written
@@ -68,8 +70,12 @@ namespace impala {
 // be called directly.  The test interface can be used to load any precompiled 
 // module or none at all (but this class will not validate the module).
 //
-// This class is not threadsafe and intended to be used during the Prepare phase
-// of the BE.  Currently, each query will create and initialize one of these 
+// This class is not threadsafe.  During the Prepare() phase of the fragment
+// execution, nodes should codegen functions.
+// Afterward, OptimizeModule() should be called at which point all codegened functions
+// are optimized.  Subsequently, nodes can get at the jit compiled function pointer
+// (typically during the Open() call).
+// Currently, each query will create and initialize one of these 
 // objects.  This requires loading and parsing the cross compiled modules.
 // TODO: we should be able to do this once per process and let llvm compile
 // functions from across modules.
@@ -103,9 +109,6 @@ class LlvmCodeGen {
 
   // Turns on/off optimization passes
   void EnableOptimizations(bool enable);
-
-  // Turns on/off verifying IR
-  void EnableVerifier(bool enable);
 
   // For debugging. Returns the IR that was generated.  If full_module, the
   // entire module is dumped, including what was loaded from precompiled IR.
@@ -186,6 +189,26 @@ class LlvmCodeGen {
   // Returns whether functions should be verfified
   bool verifier_enabled() { return verifier_enabled_; }
 
+  // Register a expr function with unique id.  It can be subsequently retrieved via
+  // GetRegisteredExprFn with that id.  
+  void RegisterExprFn(int64_t id, llvm::Function* function) {
+    DCHECK(registered_exprs_map_.find(id) == registered_exprs_map_.end());
+    registered_exprs_map_[id] = function;
+    registered_exprs_.insert(function);
+  }
+
+  // Returns a registered expr function for id or NULL if it does not exist.
+  llvm::Function* GetRegisteredExprFn(int64_t id) {
+    std::map<int64_t, llvm::Function*>::iterator it = registered_exprs_map_.find(id);
+    if (it == registered_exprs_map_.end()) return NULL;
+    return it->second;
+  }
+
+  // Optimize the entire module.  LLVM is more built for running its optimization
+  // passes over the entire module (all the functions) rather than individual
+  // functions.
+  Status OptimizeModule();
+
   // Replaces all instructions that call 'target_name' with a call instruction
   // to the new_fn.  Returns the modified function.
   // - target_name is the unmangled function name that should be replaced.
@@ -200,7 +223,7 @@ class LlvmCodeGen {
   //   bad things will happen.
   // - 'num_replaced' returns the number of call sites updated
   //
-  // Most of our use cases will likley not be in place.  We will have one 'template'
+  // Most of our use cases will likely not be in place.  We will have one 'template'
   // version of the function loaded for each type of Node (e.g. AggregationNode).
   // Each instance of the node will clone the function, replacing the inner loop
   // body with the codegened version.  The codegened bodies differ from instance
@@ -208,15 +231,30 @@ class LlvmCodeGen {
   llvm::Function* ReplaceCallSites(llvm::Function* caller, bool update_in_place,
       llvm::Function* new_fn, const std::string& target_name, int* num_replaced);
 
-  // If optimization is enabled, this will run the optimization passes over the
-  // function.  The function is updated in place.
-  void OptimizeFunction(llvm::Function* function);
-
   // Verify and optimize function.  This should be called at the end for each
   // codegen'd function.  If the function does not verify, it will return NULL,
   // otherwise, it will optimize, mark the function for inlining and return the
   // function object.
   llvm::Function* FinalizeFunction(llvm::Function* function);
+  
+  // Inline all function calls for 'fn'.  'fn' is modified in place.  Returns
+  // the number of functions inlined.  This is *not* called recursively
+  // (i.e. second level function calls are not inlined).  This can be called
+  // again to inline those until this returns 0.
+  int InlineAllCallSites(llvm::Function* fn, bool skip_registered_fns);
+
+  // Optimizes the function in place.  This uses a combination of llvm optimization 
+  // passes as well as some custom heuristics.  This should be called for all 
+  // functions which call Exprs.  The exprs will be inlined as much as possible,
+  // and will do basic sub expression elimination.
+  // This should be called before OptimizeModule for functions that want to remove
+  // redundant exprs.  This should be called at the highest level possible to 
+  // maximize the number of redundant exprs that can be found.
+  // TODO: we need to spend more time to output better IR.  Asking llvm to 
+  // remove redundant codeblocks on its own is too difficult for it.
+  // TODO: this should implement the llvm FunctionPass interface and integrated
+  // with the llvm optimization passes.
+  llvm::Function* OptimizeFunctionWithExprs(llvm::Function* fn);
 
   // Jit compile the function.  This will run optimization passes and verify 
   // the function.  The result is a function pointer that is dynamically linked
@@ -231,7 +269,7 @@ class LlvmCodeGen {
   // is invalid.
   bool VerifyFunction(llvm::Function* function);
 
-  // This will generate a printf call instructin to output 'message' at the 
+  // This will generate a printf call instruction to output 'message' at the 
   // builder's insert point.  Only for debugging.
   void CodegenDebugTrace(LlvmBuilder* builder, const char* message);
 
@@ -315,14 +353,9 @@ class LlvmCodeGen {
   // we need to assign the fields one by one
   void CodegenAssign(LlvmBuilder*, llvm::Value* dst, llvm::Value* src, PrimitiveType);
 
-  // Inline all function calls for 'fn'.  'fn' is modified in place.  Returns
-  // the number of functions inlined.  This is *not* called recursively
-  // (i.e. second level function calls are not inlined).  This can be called
-  // again to inline those.
-  int InlineAllCallSites(llvm::Function* fn);
-
  private:
   friend class LlvmCodeGenTest;
+  friend class SubExprElimination;
 
   // Top level codegen object.  'module_name' is only used for debugging when
   // outputting the IR.  module's loaded from disk will be named as the file
@@ -375,9 +408,6 @@ class LlvmCodeGen {
   // Execution/Jitting engine.  
   boost::scoped_ptr<llvm::ExecutionEngine> execution_engine_;
 
-  // Contains multiple optimization passes to optimize functions
-  boost::scoped_ptr<llvm::FunctionPassManager> function_pass_mgr_;
-
   // current offset into scratch buffer 
   int scratch_buffer_offset_;
 
@@ -398,6 +428,12 @@ class LlvmCodeGen {
   // functions, only function that were generated at runtime.  Does not overlap
   // with loaded_functions_.
   std::vector<llvm::Function*> codegend_functions_;
+
+  // A mapping of unique id to registered expr functions
+  std::map<int64_t, llvm::Function*> registered_exprs_map_;
+
+  // A set of all the functions in 'registered_exprs_map_' for quick lookup.
+  std::set<llvm::Function*> registered_exprs_;
 
   // A cache of loaded llvm intrinsics
   std::map<llvm::Intrinsic::ID, llvm::Function*> llvm_intrinsics_;

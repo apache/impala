@@ -245,6 +245,7 @@ static void Exec(ExecEnv* exec_env, const vector<string>& queries) {
               ss << "Fragment " << fragment_id;
               children[i]->set_name(ss.str());
             }
+            children[i]->set_name("Fragment");
           }
         }
         aggregate_profile.Merge(profile);

@@ -492,12 +492,7 @@ Status Expr::Prepare(Expr* root, RuntimeState* state, const RowDescriptor& row_d
 
   // codegen == NULL means jitting is disabled.
   if (codegen != NULL && root->IsJittable(codegen)) {
-    Function* fn = root->CodegenExprTree(codegen);
-    if (fn != NULL) {
-      void* jitted_fn = codegen->JitFunction(fn);
-      DCHECK(jitted_fn != NULL);
-      root->SetComputeFn(jitted_fn, 0);
-    }
+    root->CodegenExprTree(codegen);
   }
   return Status::OK;
 }

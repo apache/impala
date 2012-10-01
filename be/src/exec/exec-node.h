@@ -34,6 +34,9 @@ class ExecNode {
   // Sets up internal structures, etc., without doing any actual work.
   // Must be called prior to Open(). Will only be called once in this
   // node's lifetime.
+  // All code generation (adding functions to the LlvmCodeGen object) must happen
+  // in Prepare().  Retrieving the jit compiled function pointer must happen in
+  // Open().
   // If overridden in subclass, must first call superclass's Prepare().
   virtual Status Prepare(RuntimeState* state);
 

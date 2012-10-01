@@ -88,10 +88,16 @@ class HashJoinNode : public ExecNode {
   // This should be the same size as the probe tuple row.
   int result_tuple_row_size_;
   
+  // llvm function for build batch
+  llvm::Function* codegen_process_build_batch_fn_;
+
   // Function declaration for codegen'd function.  Signature must match
   // HashJoinNode::ProcessBuildBatch
   typedef void (*ProcessBuildBatchFn)(HashJoinNode*, RowBatch*);
   ProcessBuildBatchFn process_build_batch_fn_;
+  
+  // llvm function object for probe batch
+  llvm::Function* codegen_process_probe_batch_fn_;
 
   // HashJoinNode::ProcessProbeBatch() exactly
   typedef int (*ProcessProbeBatchFn)(HashJoinNode*, RowBatch*, RowBatch*, int);

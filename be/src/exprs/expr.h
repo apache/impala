@@ -99,6 +99,96 @@ struct ExprValue {
     string_val.ptr = const_cast<char*>(string_data.data());
     string_val.len = string_data.size();
   }
+
+  // Sets the value for type to '0' and returns a pointer to the data
+  void* SetToZero(PrimitiveType type) {
+    switch (type) {
+      case TYPE_BOOLEAN:
+        bool_val = false;
+        return &bool_val;
+      case TYPE_TINYINT:
+        tinyint_val = 0;
+        return &tinyint_val;
+      case TYPE_SMALLINT:
+        smallint_val = 0;
+        return &smallint_val;
+      case TYPE_INT:
+        int_val = 0;
+        return &int_val;
+      case TYPE_BIGINT:
+        bigint_val = 0;
+        return &bigint_val;
+      case TYPE_FLOAT:
+        float_val = 0;
+        return &float_val;
+      case TYPE_DOUBLE:
+        double_val = 0;
+        return &double_val;
+      default:
+        DCHECK(false);
+        return NULL;
+    }
+  }
+  
+  // Sets the value for type to min and returns a pointer to the data
+  void* SetToMin(PrimitiveType type) {
+    switch (type) {
+      case TYPE_BOOLEAN:
+        bool_val = false;
+        return &bool_val;
+      case TYPE_TINYINT:
+        tinyint_val = std::numeric_limits<int8_t>::min();
+        return &tinyint_val;
+      case TYPE_SMALLINT:
+        smallint_val = std::numeric_limits<int16_t>::min();
+        return &smallint_val;
+      case TYPE_INT:
+        int_val = std::numeric_limits<int32_t>::min();
+        return &int_val;
+      case TYPE_BIGINT:
+        bigint_val = std::numeric_limits<int64_t>::min();
+        return &bigint_val;
+      case TYPE_FLOAT:
+        float_val = std::numeric_limits<float>::min();
+        return &float_val;
+      case TYPE_DOUBLE:
+        double_val = std::numeric_limits<double>::min();
+        return &double_val;
+      default:
+        DCHECK(false);
+        return NULL;
+    }
+  }
+  
+  // Sets the value for type to max and returns a pointer to the data
+  void* SetToMax(PrimitiveType type) {
+    switch (type) {
+      case TYPE_BOOLEAN:
+        bool_val = false;
+        return &bool_val;
+      case TYPE_TINYINT:
+        tinyint_val = std::numeric_limits<int8_t>::max();
+        return &tinyint_val;
+      case TYPE_SMALLINT:
+        smallint_val = std::numeric_limits<int16_t>::max();
+        return &smallint_val;
+      case TYPE_INT:
+        int_val = std::numeric_limits<int32_t>::max();
+        return &int_val;
+      case TYPE_BIGINT:
+        bigint_val = std::numeric_limits<int64_t>::max();
+        return &bigint_val;
+      case TYPE_FLOAT:
+        float_val = std::numeric_limits<float>::max();
+        return &float_val;
+      case TYPE_DOUBLE:
+        double_val = std::numeric_limits<double>::max();
+        return &double_val;
+      default:
+        DCHECK(false);
+        return NULL;
+    }
+  }
 };
 
 // This is the superclass of all expr evaluation nodes.

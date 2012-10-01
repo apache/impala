@@ -87,6 +87,12 @@ Status PlanFragmentExecutor::Prepare(
   runtime_state_->runtime_profile()->AddChild(plan_->runtime_profile());
   RETURN_IF_ERROR(plan_->Prepare(runtime_state_.get()));
   
+  if (runtime_state_->llvm_codegen() != NULL) {
+    // After prepare, all functions should have been codegenerated.  At this point
+    // we optimize all the functions.
+    RETURN_IF_ERROR(runtime_state_->llvm_codegen()->OptimizeModule());
+  }
+
   // set scan ranges
   vector<ExecNode*> scan_nodes;
   plan_->CollectScanNodes(&scan_nodes);

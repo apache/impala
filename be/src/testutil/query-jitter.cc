@@ -25,7 +25,6 @@
 
 DEFINE_string(query, "", "query to jit.");
 DEFINE_bool(enable_optimizations, false, "if true, enable jit optimizations");
-DEFINE_bool(verify_jit, true, "if true, verifys jitted IR");
 DEFINE_bool(benchmark, false, "if true, benchmarks the expr jitting");
 
 using namespace std;
@@ -78,7 +77,6 @@ class QueryJitter {
       return;
     }
     codegen->EnableOptimizations(FLAGS_enable_optimizations);
-    codegen->EnableVerifier(FLAGS_verify_jit);
 
     cout << "Generating IR..." << endl;
     Expr* root = output_exprs[0];

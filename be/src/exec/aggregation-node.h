@@ -70,6 +70,9 @@ class AggregationNode : public ExecNode {
 
   boost::scoped_ptr<MemPool> tuple_pool_;
 
+  // IR for process row batch.  NULL if codegen is disabled.
+  llvm::Function* codegen_process_row_batch_fn_;
+
   typedef void (*ProcessRowBatchFn)(AggregationNode*, RowBatch*);
   // Jitted ProcessRowBatch function pointer.  Null if codegen is disabled.
   ProcessRowBatchFn process_row_batch_fn_;

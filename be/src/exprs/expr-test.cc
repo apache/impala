@@ -1566,8 +1566,8 @@ TEST_F(ExprTest, MathFunctions) {
   TestValue("pow(e(), 2.0)", TYPE_DOUBLE, M_E * M_E);
   TestValue("power(2.0, 10.0)", TYPE_DOUBLE, pow(2.0, 10.0));
   TestValue("power(e(), 2.0)", TYPE_DOUBLE, M_E * M_E);
-  TestValue("sqrt(121.0)", TYPE_DOUBLE, 11.0, true);
-  TestValue("sqrt(2.0)", TYPE_DOUBLE, sqrt(2.0), true);
+  TestValue("sqrt(121.0)", TYPE_DOUBLE, 11.0);
+  TestValue("sqrt(2.0)", TYPE_DOUBLE, sqrt(2.0));
 
   // Run twice to test deterministic behavior.
   uint32_t seed = 0;

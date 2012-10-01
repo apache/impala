@@ -69,6 +69,11 @@ void FunctionCall::SetReplaceStr(const StringValue* str_val) {
 // TODO: this is still prototypey and needs to be made more generic to handle
 // other functions with different signatures.
 Function* FunctionCall::Codegen(LlvmCodeGen* codegen) {
+  return NULL;
+#if 0
+// TODO: This is currently written to bail out halfway through if the function
+// is not supported (only sqrt is).  This leaves zombie functions in the module
+// and llvm does not like that.
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
 
@@ -122,6 +127,7 @@ Function* FunctionCall::Codegen(LlvmCodeGen* codegen) {
   builder.CreateRet(phi_node);
 
   return codegen->FinalizeFunction(function);
+#endif
 }
 
 }

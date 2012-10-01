@@ -120,6 +120,16 @@ string SlotRef::DebugString() const {
 //   ret i8 %tmp_phi
 // }
 Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
+  // SlotRefs are based on the slot_id and tuple_idx.  Combine them to make a
+  // query-wide unique id.
+  // TODO: can we do something better.
+  int64_t unique_slot_id = slot_id_ | ((int64_t)tuple_idx_) << 32;
+  Function* cached_fn = codegen->GetRegisteredExprFn(unique_slot_id);
+  if (cached_fn != NULL) {
+    codegen_fn_ = cached_fn;
+    return cached_fn;
+  }
+
   DCHECK_EQ(GetNumChildren(), 0);
   LLVMContext& context = codegen->context();
   LlvmCodeGen::LlvmBuilder builder(context);
@@ -216,7 +226,9 @@ Function* SlotRef::Codegen(LlvmCodeGen* codegen) {
   phi_node->addIncoming(result, get_slot_block);
   builder.CreateRet(phi_node);
 
-  return codegen->FinalizeFunction(function);
+  function = codegen->FinalizeFunction(function);
+  codegen->RegisterExprFn(unique_slot_id, function);
+  return function;
 }
 
 }

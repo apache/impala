@@ -26,7 +26,9 @@ HashJoinNode::HashJoinNode(
   : ExecNode(pool, tnode, descs),
     join_op_(tnode.hash_join_node.join_op),
     build_pool_(new MemPool()),
+    codegen_process_build_batch_fn_(NULL),
     process_build_batch_fn_(NULL),
+    codegen_process_probe_batch_fn_(NULL),
     process_probe_batch_fn_(NULL) {
   // TODO: log errors in runtime state
   Status status = Init(pool, tnode);
@@ -107,33 +109,11 @@ Status HashJoinNode::Prepare(RuntimeState* state) {
     if (hash_fn == NULL) return Status::OK;
 
     // Codegen for build path
-    Function* process_build_batch_fn = CodegenProcessBuildBatch(codegen, hash_fn);
-    if (process_build_batch_fn == NULL) {
-      LOG(WARNING) << "Codegen for HashJoinNode (node_id=" << id()
-                   << ") was not supported for this query.";
-    } else {
-      void* jitted_process_build_batch = codegen->JitFunction(process_build_batch_fn);
-      DCHECK(jitted_process_build_batch != NULL);
-      process_build_batch_fn_ = 
-          reinterpret_cast<ProcessBuildBatchFn>(jitted_process_build_batch);
-      LOG(INFO) << "HashJoinNode(node_id=" << id() 
-                << ") using llvm codegend function for building hash table.";
-    }
+    codegen_process_build_batch_fn_ = CodegenProcessBuildBatch(codegen, hash_fn);
 
     // Codegen for probe path (only for left joins)
     if (!match_all_build_) {
-      Function* process_probe_batch_fn = CodegenProcessProbeBatch(codegen, hash_fn);
-      if (process_probe_batch_fn == NULL) {
-        LOG(WARNING) << "Codegen for HashJoinNode (node_id=" << id()
-                    << ") was not supported for this query.";
-      } else {
-        void* jitted_process_probe_batch = codegen->JitFunction(process_probe_batch_fn);
-        DCHECK(jitted_process_probe_batch != NULL);
-        process_probe_batch_fn_ = 
-            reinterpret_cast<ProcessProbeBatchFn>(jitted_process_probe_batch);
-        LOG(INFO) << "HashJoinNode(node_id=" << id() 
-                  << ") using llvm codegend function for probing hash table.";
-      }
+      codegen_process_probe_batch_fn_ = CodegenProcessProbeBatch(codegen, hash_fn);
     }
   }
   return Status::OK;
@@ -148,8 +128,35 @@ Status HashJoinNode::Close(RuntimeState* state) {
 }
 
 Status HashJoinNode::Open(RuntimeState* state) {
-  RETURN_IF_CANCELLED(state);
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  RETURN_IF_CANCELLED(state);
+      
+  if (codegen_process_build_batch_fn_ == NULL) {
+    LOG(WARNING) << "Codegen for HashJoinNode (node_id=" << id()
+                 << ") was not supported for this query.";
+  } else {
+    void* jitted_process_build_batch = 
+        state->llvm_codegen()->JitFunction(codegen_process_build_batch_fn_);
+    DCHECK(jitted_process_build_batch != NULL);
+    process_build_batch_fn_ = 
+        reinterpret_cast<ProcessBuildBatchFn>(jitted_process_build_batch);
+    LOG(INFO) << "HashJoinNode(node_id=" << id() 
+              << ") using llvm codegend function for building hash table.";
+  }
+
+  if (codegen_process_probe_batch_fn_ == NULL) {
+    LOG(WARNING) << "Codegen for HashJoinNode (node_id=" << id()
+                << ") was not supported for this query.";
+  } else {
+    void* jitted_process_probe_batch = 
+        state->llvm_codegen()->JitFunction(codegen_process_probe_batch_fn_);
+    DCHECK(jitted_process_probe_batch != NULL);
+    process_probe_batch_fn_ = 
+        reinterpret_cast<ProcessProbeBatchFn>(jitted_process_probe_batch);
+    LOG(INFO) << "HashJoinNode(node_id=" << id() 
+              << ") using llvm codegend function for probing hash table.";
+  }
+
   eos_ = false;
 
   // Do a full scan of child(1) and store everything in hash_tbl_
@@ -556,7 +563,7 @@ Function* HashJoinNode::CodegenProcessBuildBatch(LlvmCodeGen* codegen,
       hash_fn, "HashCurrentRow", &replaced);
   DCHECK_EQ(replaced, 1);
 
-  return codegen->FinalizeFunction(process_build_batch_fn);
+  return codegen->OptimizeFunctionWithExprs(process_build_batch_fn);
 }
 
 Function* HashJoinNode::CodegenProcessProbeBatch(LlvmCodeGen* codegen,
@@ -586,8 +593,8 @@ Function* HashJoinNode::CodegenProcessProbeBatch(LlvmCodeGen* codegen,
   Function* conjuncts_fn = CodegenEvalConjuncts(codegen, conjuncts_);
   if (conjuncts_fn == NULL) return NULL;
 
-  int replaced = 0;
   // Replace all call sites with codegen version
+  int replaced = 0;
   process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, false,
       hash_fn, "HashCurrentRow", &replaced);
   DCHECK_EQ(replaced, 1);
@@ -599,7 +606,7 @@ Function* HashJoinNode::CodegenProcessProbeBatch(LlvmCodeGen* codegen,
   process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, false,
       create_output_row_fn, "CreateOutputRow", &replaced);
   DCHECK_EQ(replaced, 2);
-
+  
   process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, false, 
       conjuncts_fn, "EvalConjuncts", &replaced); 
   DCHECK_EQ(replaced, 2);
@@ -607,6 +614,6 @@ Function* HashJoinNode::CodegenProcessProbeBatch(LlvmCodeGen* codegen,
   process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, false, 
       join_conjuncts_fn, "EvalOtherJoinConjuncts", &replaced); 
   DCHECK_EQ(replaced, 1);
-  
-  return codegen->FinalizeFunction(process_probe_batch_fn);
+
+  return codegen->OptimizeFunctionWithExprs(process_probe_batch_fn);
 }

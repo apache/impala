@@ -8,6 +8,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/codegen")
 
 add_library(CodeGen
   llvm-codegen.cc
+  subexpr-elimination.cc
 )
 
 # output cross compile to ir metadata
