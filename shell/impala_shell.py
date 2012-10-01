@@ -6,6 +6,8 @@ import cmd
 import time
 import sys
 import os
+import signal
+import threading
 from optparse import OptionParser
 
 from ImpalaService import ImpalaService
@@ -28,6 +30,11 @@ try:
 except Exception:
   VERSION_STRING += "(build version not available)"
 
+class RpcStatus:
+  """Convenience enum to describe Rpc return statuses"""
+  OK = 0
+  ERROR = 1
+  
 # Simple Impala shell. Can issue queries (with configurable options)
 # Basic usage: type connect <host:port> to connect to an impalad
 # Then issue queries or other commands. Tab-completion should show the set of
@@ -42,29 +49,35 @@ except Exception:
 #     This will be useful for better error handling. The next iteration
 #     of the shell should handle this return paramter.
 class ImpalaShell(cmd.Cmd):
+  DISCONNECTED_PROMPT = "[Not connected] > "
+  
   def __init__(self, options):
     cmd.Cmd.__init__(self)
     self.is_alive = True
     self.verbose = options.verbose
-    self.impalad = options.impalad
-    self.disconnected_prompt = "[Not connected] > "
-    self.prompt = self.disconnected_prompt
+    self.impalad = None
+    self.prompt = ImpalaShell.DISCONNECTED_PROMPT
     self.connected = False
-    self.handle = None
     self.imp_service = None
     self.transport = None
     self.query_options = {}
     self.__make_default_options()
     self.query_state = QueryState._NAMES_TO_VALUES
-    if self.impalad != None:
-      if self.do_connect(self.impalad) == False:
-        sys.exit(1)
+    if options.impalad != None:
+      self.do_connect(options.impalad)
 
+    # We handle Ctrl-C ourselves, using an Event object to signal cancellation
+    # requests between the handler and the main shell thread
+    self.is_interrupted = threading.Event()
+    signal.signal(signal.SIGINT, self.__signal_handler)
+
+  def __get_option_name(self, option):
+    return TImpalaQueryOptions._VALUES_TO_NAMES[option]
+    
   def __make_default_options(self):
     self.query_options = {}
-    def get_name(option): return TImpalaQueryOptions._VALUES_TO_NAMES[option]
     for option, default in DEFAULT_QUERY_OPTIONS.iteritems():
-      self.query_options[get_name(option)] = default
+      self.query_options[self.__get_option_name(option)] = default
 
   def __print_options(self):
     print '\n'.join(["\t%s: %s" % (k,v) for (k,v) in self.query_options.iteritems()])
@@ -76,7 +89,7 @@ class ImpalaShell(cmd.Cmd):
     """Print query options"""
     self.__print_if_verbose("Impala query options:")
     self.__print_options()
-    return (False, True)
+    return True
 
   def do_shell(self, args):
     """Run a command on the shell
@@ -88,9 +101,9 @@ class ImpalaShell(cmd.Cmd):
       os.system(args)
     except Exception, e:
       print 'Error running command : %s' % e
-    return (False, True)
+    return True
 
-  def precmd(self, args):
+  def sanitise_input(self, args):
     """Convert the command to lower case, so it's recognized"""
     tokens = args.strip().split(' ')
     # The first token should be the command
@@ -100,12 +113,25 @@ class ImpalaShell(cmd.Cmd):
     else:
       tokens[0] = tokens[0].lower()
     return ' '.join(tokens)
-
-  def postcmd(self, return_tuple, args):
+  
+  def __signal_handler(self, signal, frame):
+    self.is_interrupted.set()
+  
+  def precmd(self, args):
+    self.is_interrupted.clear()
+    return self.sanitise_input(args)
+        
+  def postcmd(self, status, args):
     """Hack to make non interactive mode work"""
-    # TODO : Remove in the future, this has to be cleaner.
-    (stop, status) = return_tuple
-    return stop
+    self.is_interrupted.clear()
+    # cmd expects return of False to keep going, and True to quit.
+    # Shell commands return True on success, False on error, and None to quit, so
+    # translate between them.
+    # TODO : Remove in the future once shell and Impala query processing can be separated.
+    if status == None:
+      return True
+    else:
+      return False
 
   def do_set(self, args):
     """Set query options:
@@ -115,23 +141,24 @@ class ImpalaShell(cmd.Cmd):
     tokens = args.split(" ")
     if len(tokens) != 2:
       print "Error: SET <option> <value>"
-      return (False, False)
+      return False
     option_upper = tokens[0].upper()
     if option_upper not in ImpalaService.TImpalaQueryOptions._NAMES_TO_VALUES.keys():
       print "Unknown query option: %s" % (tokens[0],)
       available_options = \
           '\n\t'.join(ImpalaService.TImpalaQueryOptions._NAMES_TO_VALUES.keys())
       print "Available query options are: \n\t%s" % available_options
-      return (False, False)
+      return False
     self.query_options[option_upper] = tokens[1]
     self.__print_if_verbose('%s set to %s' % (option_upper, tokens[1]))
-    return (False, True)
+    return True
 
   def do_quit(self, args):
     """Quit the Impala shell"""
     self.__print_if_verbose("Goodbye")
     self.is_alive = False
-    return (True, True)
+    # None is crutch to tell shell loop to quit
+    return None
 
   def do_connect(self, args):
     """Connect to an Impalad instance:
@@ -141,18 +168,18 @@ class ImpalaShell(cmd.Cmd):
     tokens = args.split(" ")
     if len(tokens) != 1:
       print "CONNECT takes exactly one argument: <hostname:port> of impalad to connect to"
-      return (False, False)
+      return False
     try:
       host, port = tokens[0].split(":")
       self.impalad = (host, port)
     except ValueError:
       print "Connect string must be of form <hostname:port>"
-      return (False, False)
+      return False
 
     if self.__connect():
       self.__print_if_verbose('Connected to %s:%s' % self.impalad)
       self.prompt = "[%s:%s] > " % self.impalad
-    return (False, True)
+    return True
 
   def __connect(self):
     if self.transport is not None:
@@ -173,51 +200,59 @@ class ImpalaShell(cmd.Cmd):
   def __query_with_results(self, query):
     self.__print_if_verbose("Query: %s" % (query.query,))
     start, end = time.time(), 0
-    (self.handle, ok) = self.__do_rpc(lambda: self.imp_service.query(query))
-    fetching = False
-    if not ok: return (False, False)
+    (handle, status) = self.__do_rpc(lambda: self.imp_service.query(query))
 
-    try:
-      while self.__get_query_state() not in [self.query_state["FINISHED"],
-                                             self.query_state["EXCEPTION"]]:
-        time.sleep(0.05)
+    if self.is_interrupted.isSet():
+      if status == RpcStatus.OK:
+        self.__close_query_handle(handle)
+      return False
+    if status != RpcStatus.OK:
+      return False
 
-      # The query finished with an exception, skip fetching results and close the handle.
-      if self.__get_query_state() == self.query_state["EXCEPTION"]:
+    while True:
+      query_state = self.__get_query_state(handle)
+      if query_state == self.query_state["FINISHED"]:
+        break
+      elif query_state == self.query_state["EXCEPTION"]:
         print 'Query aborted, unable to fetch data'
-        return self.__close_query_handle()
-      # Results are ready, fetch them till they're done.
-      self.__print_if_verbose('Query finished, fetching results ...')
-      result_rows = []
-      fetching = True
-      while True:
-        # TODO: Fetch more than one row at a time.
-        (results, ok) = self.__do_rpc(lambda: self.imp_service.fetch(self.handle,
-                                                                     False, -1))
-        if not ok: return (False, False)
-        result_rows.extend(results.data)
-        if not results.has_more:
-          fetching = False
-          break
-      end = time.time()
-    except KeyboardInterrupt:
-      # If Ctrl^C was caught during query execution, cancel the query.
-      # If it was caught during fetching results, return to the prompt.
-      if not fetching:
-        return self.__cancel_query()
-      else:
-        print 'Fetching results aborted.'
-        return self.__close_query_handle()
+        if self.connected:
+          return self.__close_query_handle(handle)
+        else:
+          return False
+      elif self.is_interrupted.isSet():
+        return self.__cancel_query(handle)
+      time.sleep(0.05)
+
+    # Results are ready, fetch them till they're done.
+    self.__print_if_verbose('Query finished, fetching results ...')
+    result_rows = []
+    while True:
+      # TODO: Fetch more than one row at a time.      
+      # Also fetch rows asynchronously, so we can print them to screen without
+      # pausing the fetch process
+      (results, status) = self.__do_rpc(lambda: self.imp_service.fetch(handle,
+                                                                       False, -1))
+
+      if self.is_interrupted.isSet() or status != RpcStatus.OK:
+        # Worth trying to cleanup the query even if fetch failed
+        if self.connected:
+          self.__close_query_handle(handle)
+        return False
+              
+      result_rows.extend(results.data)
+      if not results.has_more:
+        break
+    end = time.time()
 
     print '\n'.join(result_rows)
-    print "Returned %d row(s) in %2.2fs" % (len(result_rows), end - start)
-    return self.__close_query_handle()
+    self.__print_if_verbose(
+      "Returned %d row(s) in %2.2fs" % (len(result_rows), end - start))
+    return self.__close_query_handle(handle)
 
-  def __close_query_handle(self):
-    """Close the query handle and get back to the prompt"""
-    self.__do_rpc(lambda: self.imp_service.close(self.handle))
-    self.handle = None
-    return (False, True)
+  def __close_query_handle(self, handle):
+    """Close the query handle"""
+    self.__do_rpc(lambda: self.imp_service.close(handle))
+    return True
 
   def __print_if_verbose(self, message):
     if self.verbose:
@@ -258,55 +293,86 @@ class ImpalaShell(cmd.Cmd):
     query.configuration = self.__options_to_string_list()
     print "Query: %s" % (query.query,)
     start, end = time.time(), 0
-    (handle, ok) = \
-        self.__do_rpc(lambda: self.imp_service.executeAndWait(query, "ImpalaCLI") )
-    if not ok: return (False, False)
-    (insert_result, ok) = self.__do_rpc(lambda: self.imp_service.CloseInsert(handle))
-    end = time.time()
-    if not ok: return (False, False)
-    num_rows = sum([int(k) for k in insert_result.rows_appended.values()])
-    print "Inserted %d rows in %2.2fs" % (num_rows, end - start)
+    (handle, status) = self.__do_rpc(lambda: self.imp_service.query(query))
 
-  def __cancel_query(self):
+    if status != RpcStatus.OK:
+      return False
+
+    while True:
+      query_state = self.__get_query_state(handle)
+      if query_state == self.query_state["FINISHED"]:
+        break
+      elif query_state == self.query_state["EXCEPTION"]:
+        print 'Remote error'
+        if self.connected:
+          # It's ok to close an INSERT that's failed rather than do the full
+          # CloseInsert. The latter builds an InsertResult which is meaningless
+          # here.        
+          return self.__close_query_handle(handle)
+        else:
+          return False
+      elif self.is_interrupted.isSet():
+        return self.__cancel_query(handle)
+      time.sleep(0.05)
+
+    (insert_result, status) = self.__do_rpc(lambda: self.imp_service.CloseInsert(handle))
+    end = time.time()
+    if status != RpcStatus.OK or self.is_interrupted.isSet():
+      return False
+    
+    num_rows = sum([int(k) for k in insert_result.rows_appended.values()])
+    self.__print_if_verbose("Inserted %d rows in %2.2fs" % (num_rows, end - start))
+    return True
+
+  def __cancel_query(self, handle):
     """Cancel a query on a keyboard interrupt from the shell."""
     print 'Cancelling query ...'
     # Cancel sets query_state to EXCEPTION before calling cancel() in the
     # co-ordinator, so we don't need to wait.
-    self.__do_rpc(lambda: self.imp_service.Cancel(self.handle))
-    return (False, False)
+    (_, status) = self.__do_rpc(lambda: self.imp_service.Cancel(handle))
+    if status != RpcStatus.OK:
+      return False
 
-  def __get_query_state(self):
-    state, ok = self.__do_rpc(lambda : self.imp_service.get_state(self.handle))
-    if ok:
-      return state
-    else:
+    return True
+
+  def __get_query_state(self, handle):
+    state, status = self.__do_rpc(lambda : self.imp_service.get_state(handle))
+    if status != RpcStatus.OK:
       return self.query_state["EXCEPTION"]
+    return state
 
   def __do_rpc(self, rpc):
     """Executes the RPC lambda provided with some error checking. Returns
-       (rpc_result, True) if request was successful, (None, False) otherwise
+       (rpc_result, RpcStatus.OK) if request was successful,
+       (None, RpcStatus.ERROR) otherwise.
+
+       If an exception occurs that cannot be recovered from, the connection will
+       be closed and self.connected will be set to False.
 
     """
     if not self.connected:
       print "Not connected (use CONNECT to establish a connection)"
-      return (None, False)
+      return (None, RpcStatus.ERROR)
     try:
-      return (rpc(), True)
+      ret = rpc()
+      return (ret, RpcStatus.OK)
     except BeeswaxService.QueryNotFoundException, q:
       print 'Error: Stale query handle'
-    # beeswaxException prints out the enture object, printing
+    # beeswaxException prints out the entire object, printing
     # just the message a far more readable/helpful.
     except BeeswaxService.BeeswaxException, b:
       print "ERROR: %s" % (b.message,)
     except TTransportException, e:
       print "Error communicating with impalad: %s" % (e,)
       self.connected = False
-      self.prompt = self.disconnected_prompt
+      self.prompt = ImpalaShell.DISCONNECTED_PROMPT
     except TApplicationException, t:
       print "Application Exception : %s" % (t,)
     except Exception, u:
       print 'Unknown Exception : %s' % (u,)
-    return (None, False)
+      self.connected = False
+      self.prompt = ImpalaShell.DISCONNECTED_PROMPT
+    return (None, RpcStatus.ERROR)
 
   def do_explain(self, args):
     """Explain the query execution plan"""
@@ -315,30 +381,34 @@ class ImpalaShell(cmd.Cmd):
     query.query = args
     query.configuration = self.__options_to_string_list()
     print "Explain query: %s" % (query.query,)
-    (explanation, ok) = self.__do_rpc(lambda: self.imp_service.explain(query))
-    if ok:
-      print explanation.textual
-    return (False, True)
+    (explanation, status) = self.__do_rpc(lambda: self.imp_service.explain(query))
+    if status != RpcStatus.OK:
+      return False
+    
+    print explanation.textual
+    return True
 
   def do_refresh(self, args):
     """Reload the Impalad catalog"""
-    (_, ok) = self.__do_rpc(lambda: self.imp_service.ResetCatalog())
-    if ok:
-      print "Successfully refreshed catalog"
-    return (False, True)
+    (_, status) = self.__do_rpc(lambda: self.imp_service.ResetCatalog())
+    if status != RpcStatus.OK:
+      return False
+    
+    print "Successfully refreshed catalog"
+    return True
 
   def default(self, args):
     print "Unrecognized command"
-    return (False, True)
+    return True
 
   def emptyline(self):
     """If an empty line is entered, do nothing"""
-    return (False, True)
+    return True
 
   def do_version(self, args):
     """Prints the Impala build version"""
     print "Build version: %s" % VERSION_STRING
-    return False
+    return True
 
 
 WELCOME_STRING = """Welcome to the Impala shell. Press TAB twice to see a list of \
@@ -362,10 +432,9 @@ def execute_queries_non_interactive_mode(options):
     queries = [options.query]
   shell = ImpalaShell(options)
   # Deal with case.
-  queries = map(shell.precmd, queries)
+  queries = map(shell.sanitise_input, queries)
   for query in queries:
-    (_, ok) = shell.onecmd(query)
-    if not ok:
+    if not shell.onecmd(query):
       print 'Could not execute command: %s' % query
       return
 
@@ -377,7 +446,7 @@ if __name__ == "__main__":
                     help="Execute a query without the shell")
   parser.add_option("-f", "--query_file", dest="query_file", default=None,
                     help="Execute the queries in the query file, delimited by ;")
-  parser.add_option("-V", dest="verbose", default=False, action="store_true",
+  parser.add_option("-V", dest="verbose", default=True, action="store_true",
                     help="Enable verbose output")
 
   (options, args) = parser.parse_args()
