@@ -84,6 +84,9 @@ parser.add_option("--compression_codecs", dest="compression_codecs", default=Non
                   "specified all compression codecs in the test vector will be run.")
 parser.add_option("--skip_impala", dest="skip_impala", action="store_true",
                   default= False, help="If set, queries will only run against Hive.")
+parser.add_option("--beeswax", dest="beeswax", action="store_true", default=False,
+                  help="If set, Impala queries will use the beeswax interface.")
+
 options, args = parser.parse_args()
 
 # globals
@@ -206,8 +209,13 @@ def create_executor(executor_name):
     'hive': lambda: (execute_using_hive,
                             HiveQueryExecOptions(options.iterations,
                             hive_cmd=options.hive_cmd,
-                            ))
+                            )),
+    'impala_beeswax': lambda: (execute_using_impala_beeswax,
+                               ImpalaBeeswaxExecOptions(options.iterations,
+                                                        exec_options=options.exec_options,
+                                                        impalad=choice(TARGET_IMPALADS)))
   } [executor_name]()
+
   return query_options
 
 def run_query(executor_name, query, prime_cache, exit_on_error):
@@ -222,8 +230,6 @@ def run_query(executor_name, query, prime_cache, exit_on_error):
   threads = []
   results = []
 
-  output = None
-  execution_result = None
   for client in xrange(options.num_clients):
     name = "Client Thread " + str(client)
     exec_tuple = create_executor(executor_name)
@@ -236,14 +242,10 @@ def run_query(executor_name, query, prime_cache, exit_on_error):
     thread.join()
     if not thread.success() and exit_on_error:
       LOG.error("Thread: %s returned with error. Exiting." % thread.name)
-      raise RuntimeError, "Error executing query. Aborting"
-
-    results.append((thread.get_results()))
+      raise RuntimeError("Error executing query. Aborting")
+    results.append(thread.get_results())
     LOG.debug(thread.name + " completed")
   return results[0]
-
-def vector_file_name(workload, exploration_strategy):
-  return "%s_%s.csv" % (workload, exploration_strategy)
 
 def database_name_to_use(workload, scale_factor):
   """
@@ -315,12 +317,16 @@ def append_row_to_csv_file(csv_writer, query, query_name, result):
   """
   Write the results to a CSV file with '|' as the delimiter.
   """
+  # Replace non-existent values with N/A for reporting results.
+  std_dev, avg_time = result.execution_result.std_dev, result.execution_result.avg_time
+  if not std_dev: std_dev = 'N/A'
+  if not avg_time: avg_time = 'N/A'
   compression_str = '%s/%s' % (result.compression_codec, result.compression_type)
   if compression_str == 'none/none':
     compression_str = 'none'
   csv_writer.writerow([result.executor, result.workload, result.scale_factor,
                        query, query_name, result.file_format, compression_str,
-                       result.execution_result.avg_time, result.execution_result.stddev,])
+                       avg_time, std_dev,])
 
 def enumerate_query_files(base_directory):
   """
@@ -383,16 +389,14 @@ def extract_queries_from_test_files(workload):
           query_map[test_name].append((None, formatted_query))
   return query_map
 
-
 def execute_queries(query_map, workload, scale_factor, vector_row):
   """
   Execute the queries for combinations of file format, compression, etc.
 
   The values needed to build the query are stored in the first 4 columns of each row.
   """
-  # TODO : Find a clean way to get rid of globals.
-  global summary
   global result_map
+  global summary
   file_format, data_group, codec, compression_type = vector_row[:4]
   if (options.file_formats and file_format not in options.file_formats.split(',')) or\
      (options.compression_codecs and codec not in options.compression_codecs.split(',')):
@@ -408,28 +412,30 @@ def execute_queries(query_map, workload, scale_factor, vector_row):
         query_name = query
       query_string = build_query(query.strip(), file_format, codec, compression_type,
                                  workload, scale_factor)
-      summary += "\nQuery: %s\n" % query_name
 
       execution_result = QueryExecutionResult()
       if not options.skip_impala:
-        summary += "Results Using Impala\n"
-        LOG.debug('Running: \n%s\n' % query)
+        summary += "Results Using Impala:\n"
+        summary += "Query: %s\n" % query_name
+        LOG.debug('\nRunning: \n%s\n' % query)
         if query_name != query:
-          LOG.info('Query Name: \n%s\n' % query_name)
+          LOG.info('Query Name: %s' % query_name)
+        if options.beeswax:
+          #import pdb; pdb.set_trace()
+          execution_result = run_query('impala_beeswax', query_string,
+                                       options.prime_cache, True)
+        else:
+          execution_result = run_query('runquery', query_string,
+                                       options.prime_cache, True)
+        summary += "->%s\n" % execution_result
 
-        output, execution_result = run_query('runquery', query_string,
-                                             options.prime_cache, True)
-        if output:
-          summary += output
       hive_execution_result = QueryExecutionResult()
-
       if run_using_hive:
-        summary += "Results Using Hive\n"
-        output, hive_execution_result = run_query('hive', query_string,
-                                                   options.prime_cache,
-                                                   False)
-        if output:
-          summary += output
+        summary += "Results Using Hive:\n"
+        hive_execution_result = run_query('hive', query_string,
+                                          options.prime_cache, False)
+        summary += "->%s\n" % hive_execution_result
+      summary += '\n'
       LOG.debug("-----------------------------------------------------------------------")
 
       execution_detail = QueryExecutionDetail("runquery", workload, scale_factor,
@@ -451,8 +457,7 @@ def run_workload(workload, scale_factor):
   LOG.info('Running workload: %s / Scale factor: %s' % (workload, scale_factor))
   query_map = extract_queries_from_test_files(workload)
   vector_file_path = os.path.join(WORKLOAD_DIR, workload,
-                                  vector_file_name(workload, options.exploration_strategy)
-                                 )
+                                  "%s_%s.csv" % (workload, options.exploration_strategy))
   test_vector = read_vector_file(vector_file_path)
   args = [query_map, workload, scale_factor]
   execute_queries_partial = partial(execute_queries, *args)
@@ -479,6 +484,7 @@ def write_results(partial_results = False):
     save_results(result_map, options.hive_results_csv_file + suffix,
                  is_impala_result=False)
 
+
 if __name__ == "__main__":
   """
   Driver for the run-benchmark script.
@@ -494,5 +500,5 @@ if __name__ == "__main__":
     except Exception, e:
       write_results(partial_results=True)
       raise e
-  LOG.info(summary)
+  LOG.info('Summary:\n%s' % summary)
   write_results()
