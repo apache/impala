@@ -1,4 +1,4 @@
-# Simple describe
+# Simple describe (note Hive does not support this)
 describe default.alltypes
 ---- TYPES
 string, string
@@ -36,8 +36,8 @@ string, string
 'year','int'
 'month','int'
 ====
-# Different database
-DESCRIBE testdb1.testtbl
+# Different database. TODO: test USE testdb1 followed by describe <table only in testdb1>, when one exists. 
+describe testdb1.testtbl
 ---- TYPES
 string, string
 ---- RESULTS

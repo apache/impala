@@ -19,4 +19,10 @@ public class DdlQueryTest extends BaseQueryTest {
         ImmutableList.of(0), ImmutableList.of(1));    
   }
 
+
+  @Test
+  public void TestUseTable() {
+    runQueryInAllBatchAndClusterPerms("use", false, 1000, TEXT_FORMAT_ONLY,
+        ImmutableList.of(0), ImmutableList.of(1));    
+  }    
 }

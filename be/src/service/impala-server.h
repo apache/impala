@@ -14,6 +14,7 @@
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/Frontend_types.h"
+#include "util/thrift-server.h"
 #include "common/status.h"
 #include "util/metrics.h"
 
@@ -39,6 +40,7 @@ class TTransmitDataResult;
 class THostPort;
 class TClientRequest;
 class TExecRequest;
+class TSessionState;
 class ImpalaPlanServiceClient;
 
 class ThriftServer;
@@ -55,7 +57,8 @@ class ThriftServer;
 // TODO: The same doesn't apply to the execution state of an individual plan
 // fragment: the originating coordinator might die, but we can get notified of
 // that via sparrow. This still needs to be implemented.
-class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
+class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
+                     public ThriftServer::SessionHandlerIf {
  public:
   ImpalaServer(ExecEnv* exec_env);
   ~ImpalaServer();
@@ -107,6 +110,14 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   // Returns the ImpalaQueryOptions enum for the given "key". Input is case in-sensitive.
   // Return -1 if the input is an invalid option.
   static int GetQueryOption(const std::string& key);
+
+  // SessionHandlerIf methods
+  // Called when a session starts. Registers a new SessionState with the provided key.
+  virtual void SessionStart(const ThriftServer::SessionKey& session_key);
+
+  // Called when a session terminates. Unregisters the SessionState associated
+  // with the provided key.
+  virtual void SessionEnd(const ThriftServer::SessionKey& session_key);
 
  private:
   class QueryExecState;
@@ -203,6 +214,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
   // states, types and IDs.
   void QueryStatePathHandler(std::stringstream* output);
 
+  // Webserver callback that prints a table of active sessions.
+  void SessionPathHandler(std::stringstream* output);
+
   // Wrapper around Coordinator::Wait(); suitable for execution inside thread.
   void Wait(boost::shared_ptr<QueryExecState> exec_state);
 
@@ -263,6 +277,26 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf {
 
   // Default configurations
   std::vector<beeswax::ConfigVariable> default_configs_;
+
+  // Per-session state.
+  struct SessionState {
+    // The default database (changed as a result of 'use' query execution)
+    std::string database;
+    
+    // Time the session was created
+    boost::posix_time::ptime start_time;
+    
+    // Builds a Thrift representation of the session state for serialisation to
+    // the frontend.
+    void ToThrift(TSessionState* session_state);
+  };
+
+  // Protects session_state_map_
+  boost::mutex session_state_map_lock_;
+
+  // A map from session identifier to a structure containing per-session information
+  typedef boost::unordered_map<ThriftServer::SessionKey, SessionState> SessionStateMap;
+  SessionStateMap session_state_map_;
 
   // Metrics
 

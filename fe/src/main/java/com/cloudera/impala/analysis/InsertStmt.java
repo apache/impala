@@ -23,9 +23,10 @@ import com.google.common.base.Preconditions;
  *
  */
 public class InsertStmt extends ParseNodeBase {
-
-  // Target table into which to insert.
-  private final TableName targetTableName;
+  // Target table name as seen by the parser
+  private final TableName originalTableName;
+  // Target table into which to insert. May be qualified by analyze()
+  private TableName targetTableName;
   // Differentiates between INSERT INTO and INSERT OVERWRITE.
   private final boolean overwrite;
   // List of column:value elements from the PARTITION (...) clause.
@@ -41,6 +42,7 @@ public class InsertStmt extends ParseNodeBase {
   public InsertStmt(TableName targetTable, boolean overwrite,
       List<PartitionKeyValue> partitionKeyValues, QueryStmt queryStmt) {
     this.targetTableName = targetTable;
+    this.originalTableName = targetTableName;
     this.overwrite = overwrite;
     this.partitionKeyValues = partitionKeyValues;
     this.queryStmt = queryStmt;
@@ -52,8 +54,13 @@ public class InsertStmt extends ParseNodeBase {
     queryStmt.analyze(analyzer);
     List<Expr> selectListExprs = queryStmt.getResultExprs();
     Catalog catalog = analyzer.getCatalog();
-    table = catalog.getDb(targetTableName.getDb()).getTable(
-        targetTableName.getTbl());
+
+    if (!targetTableName.isFullyQualified()) {
+      this.targetTableName = new TableName(analyzer.getDefaultDb(), 
+                                           targetTableName.getTbl());
+    }
+
+    table = catalog.getDb(targetTableName.getDb()).getTable(targetTableName.getTbl());
     if (table == null) {
       throw new AnalysisException("Unknown table: '" + targetTableName.toString() +
           "' in db: '" + targetTableName.getDb() + "'.");
@@ -324,7 +331,7 @@ public class InsertStmt extends ParseNodeBase {
     } else {
       strBuilder.append("INTO ");
     }
-    strBuilder.append("TABLE " + targetTableName + " ");
+    strBuilder.append("TABLE " + originalTableName + " ");
     if (partitionKeyValues != null) {
       strBuilder.append("PARTITION (");
       for (int i = 0; i < partitionKeyValues.size(); ++i) {

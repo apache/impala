@@ -9,7 +9,7 @@ import com.cloudera.impala.common.InternalException;
  * Representation of a DESCRIBE table statement. 
  */
 public class DescribeStmt extends ParseNodeBase {
-  private final TableName table;
+  private TableName table;
 
   public DescribeStmt(TableName table) {
     this.table = table;
@@ -28,6 +28,8 @@ public class DescribeStmt extends ParseNodeBase {
   }
 
   public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
-    // Nothing to do for analysis
+    if (!table.isFullyQualified()) {
+      table = new TableName(analyzer.getDefaultDb(), table.getTbl());
+    }
   }
 }

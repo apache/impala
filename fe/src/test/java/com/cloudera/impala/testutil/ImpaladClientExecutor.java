@@ -88,6 +88,9 @@ public class ImpaladClientExecutor {
     query.configuration = getBeeswaxQueryConfigurations(execContext.getTQueryOptions());
     QueryHandle queryHandle = client.executeAndWait(query, "1");
 
+    // Some queries (USE) do not register themselves with a handle.
+    if (queryHandle.id.equals("no_query_handle")) { return 0; }
+
     ResultsMetadata resultsMetadata = client.get_results_metadata(queryHandle);
     for (FieldSchema fs : resultsMetadata.schema.getFieldSchemas()) {
       colLabels.add(fs.getName());

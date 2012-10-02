@@ -44,12 +44,21 @@ struct TDescribeTableResult {
   1: required list<TColumnDesc> columns
 }
 
+// Per-client session state
+struct TSessionState {
+  // The default database, changed by USE <database> queries.
+  1: required string database
+}
+
 struct TClientRequest {
   // select stmt to be executed
   1: required string stmt
 
   // query options
   2: required ImpalaInternalService.TQueryOptions queryOptions
+
+  // session state
+  3: required TSessionState sessionState;
 }
 
 struct TResultSetMetadata {

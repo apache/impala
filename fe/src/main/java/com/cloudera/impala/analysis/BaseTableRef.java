@@ -12,7 +12,7 @@ import com.google.common.base.Preconditions;
  * BaseTableRef.
  */
 public class BaseTableRef extends TableRef {
-  private final TableName name;
+  private TableName name;
 
   public BaseTableRef(TableName name, String alias) {
     super(alias);
@@ -21,6 +21,12 @@ public class BaseTableRef extends TableRef {
     this.name = name;
   }
 
+
+  /**
+   * Returns the name of the table referred to. Before analysis, the table name
+   * may not be fully qualified; afterwards it is guaranteed to be fully
+   * qualified.
+   */
   public TableName getName() {
     return name;
   }

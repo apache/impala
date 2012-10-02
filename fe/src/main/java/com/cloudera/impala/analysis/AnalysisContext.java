@@ -14,8 +14,16 @@ import com.cloudera.impala.common.AnalysisException;
 public class AnalysisContext {
   private final Catalog catalog;
 
-  public AnalysisContext(Catalog catalog) {
+  // The name of the database to use if one is not explicitly specified by a query. 
+  private final String defaultDatabase;
+
+  public AnalysisContext(Catalog catalog, String defaultDb) {
     this.catalog = catalog;
+    defaultDatabase = defaultDb;
+  }
+
+  public AnalysisContext(Catalog catalog) {
+    this(catalog, Catalog.DEFAULT_DB);
   }
 
   static public class AnalysisResult {
@@ -98,7 +106,7 @@ public class AnalysisContext {
       if (result.stmt == null) {
         return null;
       }
-      result.analyzer = new Analyzer(catalog);
+      result.analyzer = new Analyzer(catalog, defaultDatabase);
       result.stmt.analyze(result.analyzer);
       return result;
     } catch (AnalysisException e) {

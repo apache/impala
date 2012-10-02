@@ -1,24 +1,16 @@
 # Simple pattern literal
-show tables "default.alltypes"
+show tables "alltypes"
 ---- TYPES
 string
 ---- RESULTS
-'default.alltypes'
+'alltypes'
 ====
 # Pattern with wildcard
-show tables "default*alltypes"
+show tables "all*ypes"
 ---- TYPES
 string
 ---- RESULTS
-'default.alltypes'
-====
-# Choice amongst patterns
-show tables "default.alltypes|default.tinytable"
----- TYPES
-string
----- RESULTS
-'default.alltypes'
-'default.tinytable'
+'alltypes'
 ====
 # Empty string matches nothing
 show tables ""
@@ -27,53 +19,72 @@ string
 ---- RESULTS
 ====
 # Check that regex metacharacters are being escaped
-show tables 'default+.alltypes'
+show tables '+alltypes'
 ---- TYPES
 string
 ---- RESULTS
+====
+# Fully qualified names will not match
+show tables "default.alltypes"
+---- TYPES
+string
+---- RESULTS
+====
+USE testdb1
 ====
 # Different database
 # We have no SHOW TABLES with no pattern test since the set of tables is
 # changing often, and may be different depending on whether benchmark data is
 # loaded, for example.
-show tables 'testdb1*'
+show tables '*'
 ---- TYPES
 string
 ---- RESULTS
-'testdb1.alltypes'
-'testdb1.alltypes_rc'
-'testdb1.alltypes_rc_bzip'
-'testdb1.alltypes_rc_def'
-'testdb1.alltypes_rc_gzip'
-'testdb1.alltypes_rc_snap'
-'testdb1.alltypes_seq'
-'testdb1.alltypes_seq_bzip'
-'testdb1.alltypes_seq_def'
-'testdb1.alltypes_seq_gzip'
-'testdb1.alltypes_seq_record_bzip'
-'testdb1.alltypes_seq_record_def'
-'testdb1.alltypes_seq_record_gzip'
-'testdb1.alltypes_seq_record_snap'
-'testdb1.alltypes_seq_snap'
-'testdb1.alltypes_trevni'
-'testdb1.alltypes_trevni_def'
-'testdb1.alltypes_trevni_snap'
-'testdb1.testtbl'
-'testdb1.testtbl_rc'
-'testdb1.testtbl_rc_bzip'
-'testdb1.testtbl_rc_def'
-'testdb1.testtbl_rc_gzip'
-'testdb1.testtbl_rc_snap'
-'testdb1.testtbl_seq'
-'testdb1.testtbl_seq_bzip'
-'testdb1.testtbl_seq_def'
-'testdb1.testtbl_seq_gzip'
-'testdb1.testtbl_seq_record_bzip'
-'testdb1.testtbl_seq_record_def'
-'testdb1.testtbl_seq_record_gzip'
-'testdb1.testtbl_seq_record_snap'
-'testdb1.testtbl_seq_snap'
-'testdb1.testtbl_trevni'
-'testdb1.testtbl_trevni_def'
-'testdb1.testtbl_trevni_snap'
+'alltypes'
+'alltypes_rc'
+'alltypes_rc_bzip'
+'alltypes_rc_def'
+'alltypes_rc_gzip'
+'alltypes_rc_snap'
+'alltypes_seq'
+'alltypes_seq_bzip'
+'alltypes_seq_def'
+'alltypes_seq_gzip'
+'alltypes_seq_record_bzip'
+'alltypes_seq_record_def'
+'alltypes_seq_record_gzip'
+'alltypes_seq_record_snap'
+'alltypes_seq_snap'
+'alltypes_trevni'
+'alltypes_trevni_def'
+'alltypes_trevni_snap'
+'testtbl'
+'testtbl_rc'
+'testtbl_rc_bzip'
+'testtbl_rc_def'
+'testtbl_rc_gzip'
+'testtbl_rc_snap'
+'testtbl_seq'
+'testtbl_seq_bzip'
+'testtbl_seq_def'
+'testtbl_seq_gzip'
+'testtbl_seq_record_bzip'
+'testtbl_seq_record_def'
+'testtbl_seq_record_gzip'
+'testtbl_seq_record_snap'
+'testtbl_seq_snap'
+'testtbl_trevni'
+'testtbl_trevni_def'
+'testtbl_trevni_snap'
+====
+USE default
+====
+# Choice amongst patterns
+show tables "alltypes|stringpartitionkey|testtbl"
+---- TYPES
+string
+---- RESULTS
+'alltypes'
+'stringpartitionkey'
+'testtbl'
 ====

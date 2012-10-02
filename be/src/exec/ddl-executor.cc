@@ -25,7 +25,8 @@ Status DdlExecutor::Exec(TDdlExecRequest* exec_request) {
         exec_request->__isset.show_pattern ? &(exec_request->show_pattern) : NULL;
     // NULL DB means search all dbs; required until we support USE, and not set
     // in the Thrift request
-    RETURN_IF_ERROR(impala_server_->GetTableNames(NULL, table_name, &ascii_rows_));
+    RETURN_IF_ERROR(impala_server_->GetTableNames(&exec_request->database, table_name, 
+        &ascii_rows_));
     return Status::OK;
   }
 

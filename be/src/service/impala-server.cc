@@ -3,6 +3,7 @@
 #include "service/impala-server.h"
 
 #include <boost/algorithm/string/join.hpp>
+#include "boost/date_time/posix_time/posix_time_types.hpp"
 #include <jni.h>
 #include <protocol/TBinaryProtocol.h>
 #include <protocol/TDebugProtocol.h>
@@ -659,6 +660,10 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       bind<void>(mem_fn(&ImpalaServer::QueryStatePathHandler), this, _1);
   exec_env->webserver()->RegisterPathHandler("/queries", query_callback);
 
+  Webserver::PathHandlerCallback sessions_callback =
+      bind<void>(mem_fn(&ImpalaServer::SessionPathHandler), this, _1);
+  exec_env->webserver()->RegisterPathHandler("/sessions", sessions_callback);
+
   num_queries_metric_ = 
       exec_env->metrics()->CreateAndRegisterPrimitiveMetric(NUM_QUERIES_METRIC, 0L);
 }
@@ -716,12 +721,30 @@ void ImpalaServer::QueryStatePathHandler(stringstream* output) {
   (*output) << "</table>";
 }
 
+void ImpalaServer::SessionPathHandler(stringstream* output) {
+  (*output) << "<h2>Sessions</h2>" << endl;
+  lock_guard<mutex> l_(session_state_map_lock_);
+  (*output) << "There are " << session_state_map_.size() << " active sessions." << endl
+            << "<table border=1><tr><th>Session Key</th>"
+            << "<th>Default Database</th><th>Start Time</th></tr>" << endl;
+  BOOST_FOREACH(const SessionStateMap::value_type& session, session_state_map_) {
+    (*output) << "<tr>"
+              << "<td>" << session.first << "</td>"
+              << "<td>" << session.second.database << "</td>"
+              << "<td>" << to_simple_string(session.second.start_time) << "</td>"
+              << "</tr>";
+  }
+
+  (*output) << "</table>";
+}
+
 ImpalaServer::~ImpalaServer() {}
 
 void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
   TClientRequest query_request;
   QueryToTClientRequest(query, &query_request);
   VLOG_QUERY << "query(): query=" << query.query;
+
   shared_ptr<QueryExecState> exec_state;
   Status status = Execute(query_request, &exec_state);
   
@@ -813,7 +836,13 @@ Status ImpalaServer::ExecuteInternal(
 
   if (result.stmt_type == TStmtType::DDL && 
       result.ddlExecRequest.ddl_type == TDdlType::USE) {
-    LOG(INFO) << "USE command ignored";
+    {
+      lock_guard<mutex> l_(session_state_map_lock_);
+      ThriftServer::SessionKey* key = ThriftServer::GetThreadSessionKey();
+      SessionStateMap::iterator it = session_state_map_.find(*key);
+      DCHECK(it != session_state_map_.end());
+      it->second.database = result.ddlExecRequest.database;
+    }
     exec_state->reset();
     return Status::OK;
   }
@@ -1267,6 +1296,14 @@ void ImpalaServer::QueryToTClientRequest(const Query& query,
   request->queryOptions.num_nodes = FLAGS_default_num_nodes;
   request->queryOptions.return_as_ascii = true;
   request->stmt = query.query;
+  {
+    lock_guard<mutex> l_(session_state_map_lock_);
+    SessionStateMap::iterator it = 
+        session_state_map_.find(*ThriftServer::GetThreadSessionKey());
+    DCHECK(it != session_state_map_.end());
+
+    it->second.ToThrift(&request->sessionState);
+  }
 
   // Convert Query.Configuration to TClientRequest.queryOptions
   if (query.__isset.configuration) {
@@ -1575,6 +1612,25 @@ void ImpalaServer::InitializeConfigVariables() {
 }
 
 
+void ImpalaServer::SessionStart(const ThriftServer::SessionKey& session_key) {
+  lock_guard<mutex> l_(session_state_map_lock_);
+
+  DCHECK(session_state_map_.find(session_key) == session_state_map_.end());
+
+  SessionState& state = session_state_map_[session_key];
+  state.start_time = second_clock::local_time();
+  state.database = "default";
+}
+
+void ImpalaServer::SessionEnd(const ThriftServer::SessionKey& session_key) {
+  lock_guard<mutex> l_(session_state_map_lock_);
+  session_state_map_.erase(session_key);
+}
+
+void ImpalaServer::SessionState::ToThrift(TSessionState* state) {
+  state->database = database;
+}
+
 ImpalaServer* CreateImpalaServer(ExecEnv* exec_env, int fe_port, int be_port,
     ThriftServer** fe_server, ThriftServer** be_server) {
   DCHECK((fe_port == 0) == (fe_server == NULL));
@@ -1591,6 +1647,8 @@ ImpalaServer* CreateImpalaServer(ExecEnv* exec_env, int fe_port, int be_port,
     shared_ptr<TProcessor> fe_processor(new ImpalaServiceProcessor(handler));
     *fe_server = new ThriftServer("ImpalaServer Frontend", fe_processor, fe_port, 
         FLAGS_fe_service_threads, ThriftServer::ThreadPool);
+
+    (*fe_server)->SetSessionHandler(handler.get());
 
     LOG(INFO) << "ImpalaService listening on " << fe_port;
   }

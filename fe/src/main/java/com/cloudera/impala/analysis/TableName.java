@@ -28,6 +28,13 @@ public class TableName {
     return tbl.isEmpty();
   }
 
+  /**
+   * Returns true if this name has a non-empty database field
+   */
+  public boolean isFullyQualified() {
+    return db != null && !db.isEmpty();
+  }
+
   @Override
   public String toString() {
     if (db == null) {

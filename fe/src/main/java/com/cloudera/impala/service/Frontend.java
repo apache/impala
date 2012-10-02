@@ -139,7 +139,9 @@ public class Frontend {
    */
   public TExecRequest createExecRequest(TClientRequest request,
       StringBuilder explainString) throws ImpalaException {
-    AnalysisContext analysisCtxt = new AnalysisContext(catalog);
+    AnalysisContext analysisCtxt = 
+        new AnalysisContext(catalog, request.sessionState.database);
+
     AnalysisContext.AnalysisResult analysisResult = null;
     LOG.info("createExecRequest for query " + request.stmt);
     try {
@@ -204,6 +206,7 @@ public class Frontend {
     } else if (analysis.isShowStmt()) {
       ddl.ddl_type = TDdlType.SHOW;
       ddl.setShow_pattern(analysis.getShowStmt().getPattern());
+      ddl.setDatabase(analysis.getShowStmt().getDb());
       metadata.setColumnDescs(Arrays.asList(
           new TColumnDesc("name", TPrimitiveType.STRING)));
     } else if (analysis.isDescribeStmt()) {

@@ -12,6 +12,9 @@ public class ShowStmt extends ParseNodeBase {
   // Pattern to match tables against. | denotes choice, * matches all strings
   private final String pattern;
 
+  // Set during analysis
+  private String db;
+
   public ShowStmt() {
     pattern = null;
   }
@@ -22,6 +25,10 @@ public class ShowStmt extends ParseNodeBase {
 
   public String getPattern() {
     return pattern;
+  }
+
+  public String getDb() {
+    return db;
   }
 
   public String toSql() {
@@ -37,6 +44,6 @@ public class ShowStmt extends ParseNodeBase {
   }
 
   public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
-    // Nothing to do for analysis
+    db = analyzer.getDefaultDb();
   }
 }

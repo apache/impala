@@ -26,6 +26,7 @@ import com.google.common.collect.Maps;
 public class Analyzer {
   private final DescriptorTable descTbl;
   private final Catalog catalog;
+  private final String defaultDb;
 
   // An analyzer is a repository for a single select block. A select block can be a top
   // level select statement, or a inline view select block. An inline
@@ -34,7 +35,7 @@ public class Analyzer {
   // null.
   private final Analyzer parentAnalyzer;
 
-  // map from lowercase table alias to descriptor
+  // map from lowercase table alias to descriptor. 
   private final Map<String, TupleDescriptor> aliasMap = Maps.newHashMap();
 
   // map from lowercase qualified column name ("alias.col") to descriptor
@@ -66,9 +67,14 @@ public class Analyzer {
    * @param catalog
    */
   public Analyzer(Catalog catalog) {
+    this(catalog, Catalog.DEFAULT_DB);
+  }
+
+  public Analyzer(Catalog catalog, String defaultDb) {
     this.parentAnalyzer = null;
     this.catalog = catalog;
     this.descTbl = new DescriptorTable();
+    this.defaultDb = defaultDb;
   }
 
   /**
@@ -80,6 +86,7 @@ public class Analyzer {
     this.parentAnalyzer = parentAnalyzer;
     this.catalog = parentAnalyzer.catalog;
     this.descTbl = parentAnalyzer.descTbl;
+    this.defaultDb = parentAnalyzer.defaultDb;
   }
 
   /**
@@ -110,7 +117,12 @@ public class Analyzer {
     if (aliasMap.containsKey(lookupAlias)) {
       throw new AnalysisException("duplicate table alias: '" + lookupAlias + "'");
     }
-    Db db = catalog.getDb(ref.getName().getDb());
+
+    // Always register the ref under the unqualified table name (if there's no
+    // explicit alias), but the *table* must be fully qualified.
+    String dbName = 
+        ref.getName().getDb() == null ? getDefaultDb() : ref.getName().getDb();
+    Db db = catalog.getDb(dbName);
     if (db == null) {
       throw new AnalysisException("unknown db: '" + ref.getName().getDb() + "'");
     }
@@ -121,6 +133,7 @@ public class Analyzer {
     TupleDescriptor result = descTbl.createTupleDescriptor();
     result.setTable(tbl);
     aliasMap.put(lookupAlias, result);
+
     return result;
   }
 
@@ -234,24 +247,20 @@ public class Analyzer {
 
   /**
    * Resolves column name in context of any of the registered table aliases.
-   * Returns null if not found or multiple bindings exist, otherwise returns
-   * the table alias.
-   * @param colName
-   * @return
-   * @throws AnalysisException
+   * Returns null if not found or multiple bindings to different tables exist,
+   * otherwise returns the table alias.
    */
   private String resolveColumnRef(String colName) throws AnalysisException {
     int numMatches = 0;
     String result = null;
-    for (String alias: aliasMap.keySet()) {
-      Column col = aliasMap.get(alias).getTable().getColumn(colName);
+    for (Map.Entry<String, TupleDescriptor> entry: aliasMap.entrySet()) {
+      Column col = entry.getValue().getTable().getColumn(colName);
       if (col != null) {
-        result = alias;
-        ++numMatches;
-        if (numMatches > 1) {
+        if (result != null) {
           throw new AnalysisException(
               "Unqualified column reference '" + colName + "' is ambiguous");
         }
+        result = entry.getKey();
       }
     }
     return result;
@@ -460,5 +469,9 @@ public class Analyzer {
       }
     }
     return compatibleType;
+  }
+
+  public String getDefaultDb() { 
+    return defaultDb;
   }
 }

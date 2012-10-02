@@ -1,0 +1,18 @@
+# Simple pattern literal
+use default
+====
+select count(*) from alltypes
+---- TYPES
+bigint
+---- RESULTS
+7300
+====
+use testdb1
+====
+# TODO: Test confirming negative results - i.e. select from unknown table
+select count(*) from alltypes
+---- TYPES
+bigint
+---- RESULTS 
+0
+====

@@ -53,6 +53,17 @@ class ThriftServer::ThriftServerEventProcessor : public TServerEventHandler {
   // From TServerEventHandler. 
   virtual void preServe();
 
+  // Called when a client connects; we create per-client state and call any
+  // SessionHandlerIf handler.
+  virtual void* createContext(shared_ptr<TProtocol> input, shared_ptr<TProtocol> output);
+
+  // Called when a client starts an RPC; we set the thread-local session key.
+  virtual void processContext(void* context, shared_ptr<TTransport> output);
+
+  // Called when a client disconnects; we call any SessionHandlerIf handler.
+  virtual void deleteContext(void* serverContext, shared_ptr<TProtocol> input, 
+      shared_ptr<TProtocol> output);
+
   // Waits for a timeout of TIMEOUT_MS for a server to signal that it has started 
   // correctly.
   Status StartAndWaitForServer();
@@ -155,6 +166,84 @@ void ThriftServer::ThriftServerEventProcessor::preServe() {
   signal_cond_.notify_all();
 }
 
+// This thread-local variable contains the current session key for whichever
+// thrift server is currently serving a request on the current thread.
+__thread ThriftServer::SessionKey* __session_key__;
+
+ThriftServer::SessionKey* ThriftServer::GetThreadSessionKey() {
+  return __session_key__;
+}
+
+void* ThriftServer::ThriftServerEventProcessor::createContext(shared_ptr<TProtocol> input,
+    shared_ptr<TProtocol> output) {
+
+  stringstream ss;
+
+  // TODO: Make work with SASL
+  if (!thrift_server_->kerberos_enabled_) {
+    TTransport* transport = input->getTransport().get();
+    TSocket* socket;
+    switch (thrift_server_->server_type_) {
+      case Nonblocking:
+        socket = static_cast<TSocket*>(
+            static_cast<TFramedTransport*>(transport)->getUnderlyingTransport().get());
+        break;
+      case ThreadPool:
+      case Threaded:
+        socket = static_cast<TSocket*>(
+            static_cast<TBufferedTransport*>(transport)->getUnderlyingTransport().get());
+        break;
+      default:
+        DCHECK(false) << "Unexpected thrift server type";
+    }
+  
+  
+    ss << socket->getPeerAddress() << ":" << socket->getPeerPort();
+  } else {
+    // TODO: Get transport from TSaslTransport
+    ss << "NO_SESSION";
+  }
+
+  {
+    lock_guard<mutex> l_(thrift_server_->session_keys_lock_);
+      
+    shared_ptr<SessionKey> key_ptr(new string(ss.str()));
+
+    __session_key__ = key_ptr.get();
+    thrift_server_->session_keys_[key_ptr.get()] = key_ptr;
+  }
+
+  if (thrift_server_->session_handler_ != NULL) {
+    thrift_server_->session_handler_->SessionStart(*__session_key__);
+  }
+
+  // Store the __session_key__ in the per-client context to avoid recomputing
+  // it. If only this were accessible from RPC method calls, we wouldn't have to
+  // mess around with thread locals.
+  return (void*)__session_key__;
+}
+
+void ThriftServer::ThriftServerEventProcessor::processContext(void* context, 
+    shared_ptr<TTransport> transport) {
+  __session_key__ = reinterpret_cast<SessionKey*>(context);
+}
+
+void ThriftServer::ThriftServerEventProcessor::deleteContext(void* serverContext, 
+    shared_ptr<TProtocol> input, shared_ptr<TProtocol> output) {
+
+  __session_key__ = (SessionKey*)serverContext;
+
+  if (thrift_server_->session_handler_ != NULL) {
+    thrift_server_->session_handler_->SessionEnd(*__session_key__);
+  }
+
+  {
+    lock_guard<mutex> l_(thrift_server_->session_keys_lock_);
+    thrift_server_->session_keys_.erase(__session_key__);
+  }
+}
+
+
 ThriftServer::ThriftServer(const string& name, const shared_ptr<TProcessor>& processor,
     int port, int num_worker_threads, ServerType server_type)
     : started_(false),
@@ -164,7 +253,9 @@ ThriftServer::ThriftServer(const string& name, const shared_ptr<TProcessor>& pro
       name_(name),
       server_thread_(NULL),
       server_(NULL),
-      processor_(processor) {
+      processor_(processor),
+      session_handler_(NULL),
+      kerberos_enabled_(false){
 }
 
 Status ThriftServer::Start() {
@@ -198,6 +289,8 @@ Status ThriftServer::Start() {
     }
     RETURN_IF_ERROR(GetKerberosTransportFactory(FLAGS_principal,
         FLAGS_keytab_file, &transport_factory));
+
+    kerberos_enabled_ = true;
   }
 
   switch (server_type_) {
