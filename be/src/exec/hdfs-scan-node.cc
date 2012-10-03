@@ -205,56 +205,58 @@ DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(const char* file, int64_t 
 
 Status HdfsScanNode::InitNextScanRange(RuntimeState* state, bool* scan_ranges_finished) {
   *scan_ranges_finished = false;
-  if (current_file_scan_ranges_ == per_file_scan_ranges_.end()) {
-    // Defensively return if this gets called after all scan ranges are exhausted.
-    *scan_ranges_finished = true;
-    return Status::OK;
-  } else if (current_range_idx_ == current_file_scan_ranges_->second->ranges.size()) {
-    RETURN_IF_ERROR(current_byte_stream_->Close());
-    current_byte_stream_.reset(NULL);
-    ++current_file_scan_ranges_;
-    current_range_idx_ = 0;
+  while (true) {
     if (current_file_scan_ranges_ == per_file_scan_ranges_.end()) {
+      // Defensively return if this gets called after all scan ranges are exhausted.
       *scan_ranges_finished = true;
-      return Status::OK; // We're done; caller will check for this condition and exit
+      return Status::OK;
+    } else if (current_range_idx_ == current_file_scan_ranges_->second->ranges.size()) {
+      RETURN_IF_ERROR(current_byte_stream_->Close());
+      current_byte_stream_.reset(NULL);
+      ++current_file_scan_ranges_;
+      current_range_idx_ = 0;
+      if (current_file_scan_ranges_ == per_file_scan_ranges_.end()) {
+        *scan_ranges_finished = true;
+        return Status::OK; // We're done; caller will check for this condition and exit
+      }
     }
+
+    DiskIoMgr::ScanRange* range = 
+        current_file_scan_ranges_->second->ranges[current_range_idx_];
+    int64_t partition_id = reinterpret_cast<int64_t>(range->meta_data());
+    HdfsPartitionDescriptor* partition = hdfs_table_->GetPartition(partition_id);
+
+    if (partition == NULL) {
+      stringstream ss;
+      ss << "Could not find partition with id: " << partition_id;
+      return Status(ss.str());
+    }
+
+    // TODO: HACK.  Skip this file if it uses the io mgr, it is handled very differently
+    if (partition->file_format() == THdfsFileFormat::TEXT ||
+        partition->file_format() == THdfsFileFormat::SEQUENCE_FILE) {
+      ++current_file_scan_ranges_;
+      continue;
+    }
+
+    Tuple* template_tuple = NULL;
+    // Only allocate template_tuple_ if there are partition keys.  The scanners
+    // use template_tuple == NULL to determine if partition keys are necessary
+    if (!partition_key_slots_.empty()) {
+      DCHECK(!partition->partition_key_values().empty());
+      template_tuple = InitTemplateTuple(state, partition->partition_key_values());
+    } 
+
+    if (current_byte_stream_ == NULL) {
+      current_byte_stream_.reset(new HdfsByteStream(hdfs_connection_, this));
+      RETURN_IF_ERROR(current_byte_stream_->Open(current_file_scan_ranges_->first));
+      current_scanner_ = GetScanner(partition);
+      DCHECK(current_scanner_ != NULL);
+    }
+
+    RETURN_IF_ERROR(current_scanner_->InitCurrentScanRange(partition, range, 
+        template_tuple, current_byte_stream_.get()));
   }
-
-  DiskIoMgr::ScanRange* range = 
-      current_file_scan_ranges_->second->ranges[current_range_idx_];
-  int64_t partition_id = reinterpret_cast<int64_t>(range->meta_data());
-  HdfsPartitionDescriptor* partition = hdfs_table_->GetPartition(partition_id);
-
-  if (partition == NULL) {
-    stringstream ss;
-    ss << "Could not find partition with id: " << partition_id;
-    return Status(ss.str());
-  }
-
-  // TODO: HACK.  Skip this file if it uses the io mgr, it is handled very differently
-  if (partition->file_format() == THdfsFileFormat::TEXT ||
-      partition->file_format() == THdfsFileFormat::SEQUENCE_FILE) {
-    ++current_file_scan_ranges_;
-    return InitNextScanRange(state, scan_ranges_finished);
-  }
-
-  Tuple* template_tuple = NULL;
-  // Only allocate template_tuple_ if there are partition keys.  The scanners
-  // use template_tuple == NULL to determine if partition keys are necessary
-  if (!partition_key_slots_.empty()) {
-    DCHECK(!partition->partition_key_values().empty());
-    template_tuple = InitTemplateTuple(state, partition->partition_key_values());
-  } 
-
-  if (current_byte_stream_ == NULL) {
-    current_byte_stream_.reset(new HdfsByteStream(hdfs_connection_, this));
-    RETURN_IF_ERROR(current_byte_stream_->Open(current_file_scan_ranges_->first));
-    current_scanner_ = GetScanner(partition);
-    DCHECK(current_scanner_ != NULL);
-  }
-
-  RETURN_IF_ERROR(current_scanner_->InitCurrentScanRange(partition, range, 
-      template_tuple, current_byte_stream_.get()));
   return Status::OK;
 }
 
