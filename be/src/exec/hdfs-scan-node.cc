@@ -256,6 +256,7 @@ Status HdfsScanNode::InitNextScanRange(RuntimeState* state, bool* scan_ranges_fi
 
     RETURN_IF_ERROR(current_scanner_->InitCurrentScanRange(partition, range, 
         template_tuple, current_byte_stream_.get()));
+    return Status::OK;
   }
   return Status::OK;
 }
