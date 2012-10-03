@@ -449,14 +449,14 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 
   VLOG_QUERY << "Scan ranges assigned to node=" << id() << ": " << total_scan_ranges_;
 
-  num_scanner_threads_ = state->num_scanner_threads();
-  if (num_scanner_threads_ == 0) {
-    num_scanner_threads_ = total_scan_ranges_;
+  max_scanner_threads_ = state->num_scanner_threads();
+  if (max_scanner_threads_ == 0) {
+    max_scanner_threads_ = total_scan_ranges_;
   } else {
-    num_scanner_threads_ = min(state->num_scanner_threads(), total_scan_ranges_);
+    max_scanner_threads_ = min(state->num_scanner_threads(), total_scan_ranges_);
   }
-  VLOG_QUERY << "Using " << num_scanner_threads_ << " simultaneous scanner threads.";
-  DCHECK_GT(num_scanner_threads_, 0);
+  VLOG_QUERY << "Using " << max_scanner_threads_ << " simultaneous scanner threads.";
+  DCHECK_GT(max_scanner_threads_, 0);
 
   if (FLAGS_randomize_scan_ranges) {
     unsigned int seed = time(NULL);
@@ -565,7 +565,7 @@ Status HdfsScanNode::IssueMoreRanges() {
   unique_lock<recursive_mutex> lock(lock_);
 
   int num_remaining = all_ranges_.size() - next_range_to_issue_idx_;
-  int threads_remaining = runtime_state_->num_scanner_threads() - ranges_in_flight_;
+  int threads_remaining = max_scanner_threads_ - ranges_in_flight_;
   int ranges_to_issue = min(threads_remaining, num_remaining);
 
   vector<DiskIoMgr::ScanRange*> ranges;

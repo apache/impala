@@ -240,8 +240,15 @@ class HdfsScanNode : public ScanNode {
   // context for that scan range.
   boost::scoped_ptr<boost::thread> disk_read_thread_;
  
-  // Number of scanner threads to use
-  int num_scanner_threads_;
+  // Maximum number of simultaneous scanner threads to use.  The actual number of 
+  // simultaneous scanner threads might be much less.  We have one scanner thread 
+  // per scan range and the io mgr also throttles the number of scan ranges in flight.  
+  // In general, for best performance, we should rely on the io mgr settings and should 
+  // not throttle the query with this value.  In this case, this value is set
+  // to the total number of scan ranges assigned to this node.
+  // This setting should only be used to slow down the query (either for debugging or to 
+  // share resources better before we use c-groups).
+  int max_scanner_threads_;
 
   // Total number of scan ranges assigned to this scan node.  Used to report progress.
   int total_scan_ranges_;     
