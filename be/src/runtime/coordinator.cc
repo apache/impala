@@ -676,6 +676,13 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
       CreateThroughputCounters(exec_state->profile, &exec_state->throughput_counters);
     }
     exec_state->profile_created = true;
+
+    if (params.__isset.error_log && params.error_log.size() > 0) {
+      exec_state->error_log.insert(exec_state->error_log.end(), params.error_log.begin(),
+          params.error_log.end());
+      VLOG_FILE << "fragment_id=" << exec_state->fragment_id << " error log: "
+                << join(exec_state->error_log, "\n");
+    }
   }
 
   if (params.done && params.__isset.insert_exec_status) {
@@ -775,7 +782,6 @@ bool Coordinator::PrepareCatalogUpdate(TCatalogUpdate* catalog_update) {
 // TODO: add histogram/percentile
 void Coordinator::ReportQuerySummary() {
   if (!VLOG_QUERY_IS_ON) return;
-  DCHECK(query_status_.ok());
   DCHECK(has_called_wait_);
   
   stringstream ss;
@@ -829,4 +835,20 @@ void Coordinator::ReportQuerySummary() {
   VLOG_QUERY << ss.str();
 }
 
+string Coordinator::GetErrorLog() {
+  stringstream ss;
+  lock_guard<mutex> l(lock_);
+  if (executor_.get() != NULL && executor_->runtime_state() != NULL &&
+      !executor_->runtime_state()->ErrorLogIsEmpty()) {
+    ss << executor_->runtime_state()->ErrorLog() << "\n";
+  }
+  for (int i = 0; i < backend_exec_states_.size(); ++i) {
+    lock_guard<mutex> l(backend_exec_states_[i]->lock);
+    if (backend_exec_states_[i]->error_log.size() > 0) {
+      ss << "Backend " << i << ":"
+         << join(backend_exec_states_[i]->error_log, "\n") << "\n";
+    }
+  }
+  return ss.str();
+}
 }

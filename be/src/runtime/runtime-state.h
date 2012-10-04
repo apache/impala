@@ -103,8 +103,15 @@ class RuntimeState {
   // Clear the file errors.
   void ClearFileErrors() { file_errors_.clear(); }
 
+  // Return true if error log is empty.
+  bool ErrorLogIsEmpty();
+
   // Returns the error log lines as a string joined with '\n'.
-  std::string ErrorLog() const;
+  std::string ErrorLog();
+
+  // Append all error_log_[unreported_error_idx_+] to new_errors and set
+  // unreported_error_idx_ to errors_log_.size()
+  void GetUnreportedErrors(std::vector<std::string>* new_errors);
 
   // Returns a string representation of the file_errors_.
   std::string FileErrors() const;
@@ -121,11 +128,14 @@ class RuntimeState {
   DescriptorTbl* desc_tbl_;
   boost::scoped_ptr<ObjectPool> obj_pool_;
 
-  // Lock protecting error_log_
+  // Lock protecting error_log_ and unreported_error_idx_
   boost::mutex error_log_lock_;
 
   // Logs error messages.
   std::vector<std::string> error_log_;
+
+  // error_log_[unreported_error_idx_+] has been not reported to the coordinator.
+  int unreported_error_idx_;
 
   // Stores the number of parse errors per file.
   std::vector<std::pair<std::string, int> > file_errors_;

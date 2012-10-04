@@ -293,7 +293,8 @@ public class TestUtils {
     QueryExecTestResult actualExecResults = new QueryExecTestResult();
     TQueryOptions contextQueryOptions = context.getTQueryOptions();
     try {
-      executor.runQuery(query, context, resultQueue, colTypes, colLabels, insertResult);
+      executor.runQuery(query, context, resultQueue, colTypes, colLabels, insertResult,
+          errors);
     } catch(Exception e) {
       // Error message comes from exception
       errors.add(e.getMessage());
@@ -322,9 +323,12 @@ public class TestUtils {
           "Expecting error but no exception is thrown: query '" + queryReportString);
     }
 
-    // TODO: Even when no exception is thrown, extract error from the execution log and
-    // compare it against the expected error. Append all errors to
-    // actualExecResults.getErrors()
+    // Compare error log against the expected error.
+    if (!contextQueryOptions.isAbort_on_error() &&
+        expectedExecResults.getErrors().size() > 0) {
+      compareErrors(queryReportString, context.getTQueryOptions().getMax_errors(),
+          errors, expectedExecResults.getErrors(), testErrorLog);
+    }
 
     // Check insert results for insert statements.
     // We check the num rows and the partitions independently,
@@ -512,11 +516,19 @@ public class TestUtils {
       ArrayList<String> actualErrorList = Lists.newArrayList();
       actualErrorList.addAll(Arrays.asList(actualError.split("\n")));
       for (String actualErrorListItem: actualErrorList) {
+        // Ignore empty line
+        if (actualErrorListItem.isEmpty()) {
+          continue;
+        }
         // TODO: Strip out the filename because it is non-deterministic but we should
         // validate that we are reporting the correct filename.
         if (actualErrorListItem.startsWith("file:")) {
           actualErrorListItem =
               actualErrorListItem.substring(0, actualErrorListItem.lastIndexOf("/"));
+        }
+        // Strip out Backend number
+        if (actualErrorListItem.startsWith("Backend ")) {
+          actualErrorListItem = actualErrorListItem.replaceAll("Backend \\d+:", "");
         }
         if (!expectedErrors.contains(actualErrorListItem)) {
           errorLog.append("Unexpected Error: ").append(actualErrorListItem).append("\n");

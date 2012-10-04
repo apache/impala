@@ -134,6 +134,9 @@ class Coordinator {
   // Must only be called after Wait()
   bool PrepareCatalogUpdate(TCatalogUpdate* catalog_update);
 
+  // Return error log for coord and all the fragments
+  std::string GetErrorLog();
+
  private:
   ExecEnv* exec_env_;
   TUniqueId query_id_;
@@ -170,6 +173,7 @@ class Coordinator {
     bool done;  // if true, execution terminated; do not cancel in that case
     bool profile_created;  // true after the first call to profile->Update()
     RuntimeProfile* profile;  // owned by obj_pool()
+    std::vector<std::string> error_log; // errors reported by this backend
     
     // Throughput counters for this fragment
     ThroughputCounterMap throughput_counters;

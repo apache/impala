@@ -584,6 +584,10 @@ void ImpalaServer::FragmentExecState::ReportStatusCb(
     params.__set_insert_exec_status(insert_status);
   }
 
+  // Send new errors to coordinator
+  runtime_state->GetUnreportedErrors(&(params.error_log));
+  params.__isset.error_log = (params.error_log.size() > 0);
+
   TReportExecStatusResult res;
   Status rpc_status;
   try {
@@ -1309,7 +1313,22 @@ void ImpalaServer::dump_config(string& config) {
 }
 
 void ImpalaServer::get_log(string& log, const LogContextId& context) {
-  log = "Distributed log collection not supported.";
+  // LogContextId is the same as QueryHandle.id
+  QueryHandle handle;
+  handle.__set_id(context);
+  TUniqueId query_id;
+  QueryHandleToTUniqueId(handle, &query_id);
+
+  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, false);
+  if (exec_state.get() == NULL) {
+    stringstream str;
+    str << "unknown query id: " << query_id;
+    LOG(ERROR) << str.str();
+    return;
+  }
+  if (exec_state->coord() != NULL) {
+    log = exec_state->coord()->GetErrorLog();
+  }
 }
 
 void ImpalaServer::get_default_configuration(vector<ConfigVariable> &configurations,
@@ -1399,7 +1418,8 @@ void ImpalaServer::TUniqueIdToQueryHandle(const TUniqueId& query_id,
     QueryHandle* handle) {
   stringstream stringstream;
   stringstream << query_id.hi << " " << query_id.lo;
-  handle->id = stringstream.str();
+  handle->__set_id(stringstream.str());
+  handle->__set_log_context(stringstream.str());
 }
 
 void ImpalaServer::QueryHandleToTUniqueId(const QueryHandle& handle,

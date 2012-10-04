@@ -11,17 +11,32 @@ Error converting column floats:float_col: 'xyz3.000000' TO FLOAT
 hbase table: hbasealltypeserror
 row key: 13
 Error converting column ints:tinyint_col: 'xyz5' TO TINYINT
+Error converting column strings:timestamp_col: '0009-01-01 00:00:00' TO TIMESTAMP
 hbase table: hbasealltypeserror
 row key: 15
+Error converting column strings:timestamp_col: '0' TO TIMESTAMP
+hbase table: hbasealltypeserror
+row key: 16
 Error converting column floats:double_col: 'xyz70.700000' TO DOUBLE
 hbase table: hbasealltypeserror
 row key: 17
 Error converting column ints:tinyint_col: 'err2' TO TINYINT
+Error converting column strings:timestamp_col: '1999-10-10 90:10:10' TO TIMESTAMP
 hbase table: hbasealltypeserror
 row key: 2
+Error converting column strings:timestamp_col: '2020-20-10 10:10:10.123' TO TIMESTAMP
+hbase table: hbasealltypeserror
+row key: 21
+Error converting column strings:timestamp_col: '2020-10-40 10:10:10.123' TO TIMESTAMP
+hbase table: hbasealltypeserror
+row key: 22
 Error converting column ints:smallint_col: 'abc3' TO SMALLINT
+Error converting column strings:timestamp_col: '2020-10-10 60:10:10.123' TO TIMESTAMP
 hbase table: hbasealltypeserror
 row key: 23
+Error converting column strings:timestamp_col: '2020-10-10 10:70:10.123' TO TIMESTAMP
+hbase table: hbasealltypeserror
+row key: 24
 Error converting column ints:int_col: 'abc5' TO INT
 hbase table: hbasealltypeserror
 row key: 25
@@ -32,6 +47,7 @@ Error converting column ints:int_col: 'abc9' TO INT
 hbase table: hbasealltypeserror
 row key: 29
 Error converting column ints:smallint_col: 'err3' TO SMALLINT
+Error converting column strings:timestamp_col: '2002-14-10 00:00:00' TO TIMESTAMP
 hbase table: hbasealltypeserror
 row key: 3
 Error converting column ints:int_col: 'err4' TO INT
@@ -95,8 +111,10 @@ int, boolean, double, float, bigint, int, smallint, tinyint, string, string, tim
 select * from hbasealltypeserrornonulls
 ---- ERRORS
 Error converting column strings:timestamp_col: '123456' TO TIMESTAMP
+hbase table: hbasealltypeserrornonulls
 row key: 0
 Error converting column bools:bool_col: 'errfalse' TO BOOL
+Error converting column strings:timestamp_col: '1990-00-01 10:10:10' TO TIMESTAMP
 hbase table: hbasealltypeserrornonulls
 row key: 1
 Error converting column floats:double_col: 'xyz30.300000' TO DOUBLE
@@ -116,11 +134,15 @@ Error converting column ints:smallint_col: 'abc3' TO SMALLINT
 hbase table: hbasealltypeserrornonulls
 row key: 23
 Error converting column ints:int_col: 'abc5' TO INT
+Error converting column strings:timestamp_col: '2012-Mar-22 11:20:01.123' TO TIMESTAMP
 hbase table: hbasealltypeserrornonulls
 row key: 25
 Error converting column ints:tinyint_col: 'abc7' TO TINYINT
 hbase table: hbasealltypeserrornonulls
 row key: 27
+Error converting column strings:timestamp_col: '11:20:01.123 2012-03-22 ' TO TIMESTAMP
+hbase table: hbasealltypeserrornonulls
+row key: 28
 Error converting column ints:int_col: 'abc9' TO INT
 hbase table: hbasealltypeserrornonulls
 row key: 29

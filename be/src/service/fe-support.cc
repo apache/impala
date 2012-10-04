@@ -63,6 +63,9 @@ static ThriftServer* be_server;
 extern "C"
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
   InitGoogleLoggingSafe("fe-support");
+  // This surpresses printing errors to screen, such as "unknown row batch
+  // destination" in data-stream-mgr.cc. Only affects "mvn test".
+  google::SetStderrLogging(google::FATAL);
   InitThriftLogging();
   CpuInfo::Init();
   DiskInfo::Init();

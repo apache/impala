@@ -70,6 +70,8 @@ public class ImpaladClientExecutor {
    *        List to save column labels to
    * @param insertResult
    *        Summary of the insert
+   * @param errors
+   *        Error logs
    * @return
    *        The number of rows returned
    * @throws BeeswaxException
@@ -79,7 +81,8 @@ public class ImpaladClientExecutor {
   public int runQuery(String queryString, TestExecContext execContext,
                       Queue<String> results,
                       List<String> colTypes, List<String> colLabels,
-                      TInsertResult insertResult)
+                      TInsertResult insertResult,
+                      List<String> errors)
                       throws BeeswaxException, TException, QueryNotFoundException {
     LOG.info("query: " + queryString);
     LOG.info("query option: " + execContext.getTQueryOptions());
@@ -118,8 +121,11 @@ public class ImpaladClientExecutor {
       }
     }
 
-    // TODO: implement Beeswax.get_log to to retrieve logs from all Impalad. Logs should
-    // contain all errors.
+    // Use Beeswax.get_log to to retrieve error logs from Impalad
+    String error = client.get_log(queryHandle.id);
+    if (!error.isEmpty()) {
+      errors.add(error);
+    }
 
     client.close(queryHandle);
     return numRows;

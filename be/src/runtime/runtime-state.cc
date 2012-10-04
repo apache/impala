@@ -34,6 +34,7 @@ RuntimeState::RuntimeState(
     const TUniqueId& fragment_id, const TQueryOptions& query_options, const string& now,
     ExecEnv* exec_env)
   : obj_pool_(new ObjectPool()),
+    unreported_error_idx_(0),
     profile_(obj_pool_.get(), "Fragment " + PrintId(fragment_id)),
     is_cancelled_(false) {
   Status status = Init(fragment_id, query_options, now, exec_env);
@@ -42,6 +43,7 @@ RuntimeState::RuntimeState(
 
 RuntimeState::RuntimeState()
   : obj_pool_(new ObjectPool()),
+    unreported_error_idx_(0),
     profile_(obj_pool_.get(), "<unnamed>") {
   query_options_.batch_size = DEFAULT_BATCH_SIZE;
   query_options_.file_buffer_size = DEFAULT_FILE_BUFFER_SIZE;
@@ -91,7 +93,13 @@ Status RuntimeState::CreateCodegen() {
   return Status::OK;
 }
 
-string RuntimeState::ErrorLog() const {
+bool RuntimeState::ErrorLogIsEmpty() {
+  lock_guard<mutex> l(error_log_lock_);
+  return (error_log_.size() > 0);
+}
+
+string RuntimeState::ErrorLog() {
+  lock_guard<mutex> l(error_log_lock_);
   return join(error_log_, "\n");
 }
 
@@ -110,6 +118,14 @@ void RuntimeState::ReportFileErrors(const std::string& file_name, int num_errors
 void RuntimeState::LogError(const string& error) {
   lock_guard<mutex> l(error_log_lock_);
   error_log_.push_back(error);
+}
+
+void RuntimeState::GetUnreportedErrors(vector<string>* new_errors) {
+  lock_guard<mutex> l(error_log_lock_);
+  if (unreported_error_idx_ < error_log_.size()) {
+    new_errors->assign(error_log_.begin() + unreported_error_idx_, error_log_.end());
+    unreported_error_idx_ = error_log_.size();
+  }
 }
 
 }

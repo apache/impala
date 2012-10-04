@@ -237,6 +237,10 @@ struct TReportExecStatusParams {
   // Cumulative structural changes made by a table sink
   // optional in V1 
   8: optional TInsertExecStatus insert_exec_status;
+  
+  // New errors that have not been reported to the coordinator
+  // optional in V1 
+  9: optional list<string> error_log
 }
 
 struct TReportExecStatusResult {
