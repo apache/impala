@@ -34,7 +34,7 @@ class RpcStatus:
   """Convenience enum to describe Rpc return statuses"""
   OK = 0
   ERROR = 1
-  
+
 # Simple Impala shell. Can issue queries (with configurable options)
 # Basic usage: type connect <host:port> to connect to an impalad
 # Then issue queries or other commands. Tab-completion should show the set of
@@ -50,7 +50,7 @@ class RpcStatus:
 #     of the shell should handle this return paramter.
 class ImpalaShell(cmd.Cmd):
   DISCONNECTED_PROMPT = "[Not connected] > "
-  
+
   def __init__(self, options):
     cmd.Cmd.__init__(self)
     self.is_alive = True
@@ -73,7 +73,7 @@ class ImpalaShell(cmd.Cmd):
 
   def __get_option_name(self, option):
     return TImpalaQueryOptions._VALUES_TO_NAMES[option]
-    
+
   def __make_default_options(self):
     self.query_options = {}
     for option, default in DEFAULT_QUERY_OPTIONS.iteritems():
@@ -105,7 +105,10 @@ class ImpalaShell(cmd.Cmd):
 
   def sanitise_input(self, args):
     """Convert the command to lower case, so it's recognized"""
-    tokens = args.strip().split(' ')
+    # A command terminated by a semi-colon is legal. Check for the trailing
+    # semi-colons and strip them from the end of the command.
+    args = args.strip().rstrip(';')
+    tokens = args.split(' ')
     # The first token should be the command
     # If it's EOF, call do_quit()
     if tokens[0] == 'EOF':
@@ -113,14 +116,14 @@ class ImpalaShell(cmd.Cmd):
     else:
       tokens[0] = tokens[0].lower()
     return ' '.join(tokens)
-  
+
   def __signal_handler(self, signal, frame):
     self.is_interrupted.set()
-  
+
   def precmd(self, args):
     self.is_interrupted.clear()
     return self.sanitise_input(args)
-        
+
   def postcmd(self, status, args):
     """Hack to make non interactive mode work"""
     self.is_interrupted.clear()
@@ -227,7 +230,7 @@ class ImpalaShell(cmd.Cmd):
     self.__print_if_verbose('Query finished, fetching results ...')
     result_rows = []
     while True:
-      # TODO: Fetch more than one row at a time.      
+      # TODO: Fetch more than one row at a time.
       # Also fetch rows asynchronously, so we can print them to screen without
       # pausing the fetch process
       (results, status) = self.__do_rpc(lambda: self.imp_service.fetch(handle,
@@ -238,7 +241,7 @@ class ImpalaShell(cmd.Cmd):
         if self.connected:
           self.__close_query_handle(handle)
         return False
-              
+
       result_rows.extend(results.data)
       if not results.has_more:
         break
@@ -307,7 +310,7 @@ class ImpalaShell(cmd.Cmd):
         if self.connected:
           # It's ok to close an INSERT that's failed rather than do the full
           # CloseInsert. The latter builds an InsertResult which is meaningless
-          # here.        
+          # here.
           return self.__close_query_handle(handle)
         else:
           return False
@@ -319,7 +322,7 @@ class ImpalaShell(cmd.Cmd):
     end = time.time()
     if status != RpcStatus.OK or self.is_interrupted.isSet():
       return False
-    
+
     num_rows = sum([int(k) for k in insert_result.rows_appended.values()])
     self.__print_if_verbose("Inserted %d rows in %2.2fs" % (num_rows, end - start))
     return True
@@ -384,7 +387,7 @@ class ImpalaShell(cmd.Cmd):
     (explanation, status) = self.__do_rpc(lambda: self.imp_service.explain(query))
     if status != RpcStatus.OK:
       return False
-    
+
     print explanation.textual
     return True
 
@@ -393,7 +396,7 @@ class ImpalaShell(cmd.Cmd):
     (_, status) = self.__do_rpc(lambda: self.imp_service.ResetCatalog())
     if status != RpcStatus.OK:
       return False
-    
+
     print "Successfully refreshed catalog"
     return True
 
