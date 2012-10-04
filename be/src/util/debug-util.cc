@@ -155,7 +155,7 @@ string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
 
     case TCounterType::UNIT_PER_SECOND: {
       string unit;
-      double output = GetUnit(value, &unit); 
+      double output = GetUnit(value, &unit);
       if (output == 0) {
         ss << "0";
       } else {
@@ -234,7 +234,9 @@ string PrintBatch(RowBatch* batch) {
 string GetVersionString() {
   stringstream ss;
   ss << google::ProgramInvocationShortName()
-     << " v" << Version::BUILD_VERSION << " (build " << Version::BUILD_HASH << ")";
+     << " v" << Version::BUILD_VERSION
+     << " (build " << Version::BUILD_HASH << ")" << endl
+     << "Built on " << Version::BUILD_TIME;
   return ss.str();
 }
 
