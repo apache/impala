@@ -242,7 +242,6 @@ inline Status HdfsSequenceScanner::GetRecordFromCompressedBlock(
 }
 
 inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr, int64_t* record_len) {
-  // If we are past the end of the range we must read to the next sync block.
   block_start_ = context_->file_offset();
   bool sync;
   Status stat = ReadBlockHeader(&sync);
@@ -250,6 +249,7 @@ inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr, int64_t* reco
     if (context_->eosr()) return Status::OK;
     return stat;
   }
+
   if (sync && context_->eosr()) return Status::OK;
 
   // We don't look at the keys, only the values.
