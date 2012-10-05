@@ -245,6 +245,7 @@ class Expr {
   friend class StringFunctions;
   friend class TimestampFunctions;
   friend class ConditionalFunctions;
+  friend class UtilityFunctions;
   friend class CaseExpr;
   friend class InPredicate;
   friend class FunctionCall;

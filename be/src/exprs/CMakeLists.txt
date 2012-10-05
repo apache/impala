@@ -33,6 +33,7 @@ add_library(Exprs
   timestamp-functions.cc
   timestamp-literal.cc
   timezone_db.cc
+  utility-functions.cc
 )
 
 target_link_libraries(Exprs

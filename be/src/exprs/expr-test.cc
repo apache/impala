@@ -26,6 +26,7 @@
 #include "codegen/llvm-codegen.h"
 #include "util/cpu-info.h"
 #include "util/disk-info.h"
+#include "util/debug-util.h"
 
 using namespace llvm;
 using namespace std;
@@ -1117,6 +1118,8 @@ TEST_F(ExprTest, StringFunctions) {
   TestValue("find_in_set('', 'abc,ad,,ade,cde,')", TYPE_INT, 3);
   // First param contains comma.
   TestValue("find_in_set('abc,def', 'abc,ad,,ade,cde,')", TYPE_INT, 0);
+
+  TestStringValue("version()", GetVersionString());
 
   // TODO: tests with NULL arguments, currently we can't parse them
   // inside function calls.

@@ -67,6 +67,7 @@ cc_registry_preamble = '\
 #include "exprs/string-functions.h"\n\
 #include "exprs/timestamp-functions.h"\n\
 #include "exprs/conditional-functions.h"\n\
+#include "exprs/utility-functions.h"\n\
 #include "opcode/functions.h"\n\
 \n\
 namespace impala { \n\
