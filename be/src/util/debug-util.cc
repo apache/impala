@@ -149,7 +149,11 @@ string PrettyPrinter::Print(int64_t value, TCounterType::type type) {
     case TCounterType::UNIT: {
       string unit;
       double output = GetUnit(value, &unit);
-      ss << setprecision(PRECISION) << output << unit;
+      if (unit.empty()) {
+        ss << value;
+      } else {
+        ss << setprecision(PRECISION) << output << unit;
+      }
       break;
     }
 

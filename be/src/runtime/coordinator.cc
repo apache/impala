@@ -47,47 +47,122 @@ DECLARE_string(hostname);
 
 namespace impala {
 
-Coordinator::BackendExecState::BackendExecState(
-    const TUniqueId& fragment_id, int backend_num,
-    const std::pair<std::string, int>& hostport,
-    const TPlanExecRequest* exec_request,
-    const TPlanExecParams* exec_params,
-    ObjectPool* obj_pool) 
-  : fragment_id(fragment_id),
-    backend_num(backend_num),
-    hostport(hostport),
-    total_split_size(0),
-    exec_request(exec_request),
-    exec_params(exec_params),
-    initiated(false),
-    done(false),
-    profile_created(false) {
-  ComputeTotalSplitSize(*exec_params);
-  profile = obj_pool->Add(
-      new RuntimeProfile(obj_pool, "Fragment " + PrintId(fragment_id)));
-}
+// Execution state of a particular fragment.
+// Concurrent accesses:
+// - GetNodeThroughput() called when coordinator's profile is printed
+// - updates through UpdateFragmentExecStatus()
+class Coordinator::BackendExecState {
+ public:
+  TUniqueId fragment_id;
+  WallClockStopWatch stopwatch;  // wall clock timer for this fragment
+  int backend_num;  // backend_exec_states_[backend_num] points to us
+  const std::pair<std::string, int> hostport;  // of ImpalaInternalService
+  int64_t total_split_size;  // summed up across all splits; in bytes
 
-void Coordinator::BackendExecState::ComputeTotalSplitSize(
-    const TPlanExecParams& params) {
-  if (params.scan_ranges.empty()) return;
-  total_split_size = 0;
-  for (int i = 0; i < params.scan_ranges[0].hdfsFileSplits.size(); ++i) {
-    total_split_size += params.scan_ranges[0].hdfsFileSplits[i].length;
-  }
-}
+  // needed for ParallelExecutor::Exec()
+  const TPlanExecRequest* exec_request;  
+  const TPlanExecParams* exec_params;  
 
-int64_t Coordinator::BackendExecState::GetNodeThroughput(int node_id) {
-  RuntimeProfile::Counter* counter = NULL;
-  {
-    lock_guard<mutex> l(lock);
-    ThroughputCounterMap::iterator i = throughput_counters.find(node_id);
-    if (i == throughput_counters.end()) return 0;
-    counter = i->second;
+  // protects fields below
+  // lock ordering: Coordinator::lock_ can only get obtained *prior*
+  // to lock
+  boost::mutex lock;
+
+  // if the status indicates an error status, execution of this fragment
+  // has either been aborted by the remote backend (which then reported the error)
+  // or cancellation has been initiated; either way, execution must not be cancelled
+  Status status;
+
+  bool initiated; // if true, TPlanExecRequest rpc has been sent
+  bool done;  // if true, execution terminated; do not cancel in that case
+  bool profile_created;  // true after the first call to profile->Update()
+  RuntimeProfile* profile;  // owned by obj_pool()
+  std::vector<std::string> error_log; // errors reported by this backend
+  
+  // Total scan ranges complete across all scan nodes
+  int64_t total_ranges_complete;
+
+  FragmentInstanceCounters aggregate_counters;
+  
+  BackendExecState(
+      const TUniqueId& fragment_id, int backend_num,
+      const std::pair<std::string, int>& hostport,
+      const TPlanExecRequest* exec_request,
+      const TPlanExecParams* exec_params,
+      ObjectPool* obj_pool) 
+    : fragment_id(fragment_id),
+      backend_num(backend_num),
+      hostport(hostport),
+      total_split_size(0),
+      exec_request(exec_request),
+      exec_params(exec_params),
+      initiated(false),
+      done(false),
+      profile_created(false),
+      total_ranges_complete(0) {
+    ComputeTotalSplitSize(*exec_params);
+    profile = obj_pool->Add(
+        new RuntimeProfile(obj_pool, "Fragment " + PrintId(fragment_id)));
   }
-  DCHECK(counter != NULL);
-  // make sure not to hold lock when calling value() to avoid potential deadlocks
-  return counter->value();
-}
+
+  // Computes sum of split sizes of leftmost scan
+  void ComputeTotalSplitSize(const TPlanExecParams& params) {
+    if (params.scan_ranges.empty()) return;
+    total_split_size = 0;
+    for (int i = 0; i < params.scan_ranges[0].hdfsFileSplits.size(); ++i) {
+      total_split_size += params.scan_ranges[0].hdfsFileSplits[i].length;
+    }
+  }
+
+  // Return value of throughput counter for given plan_node_id, or 0 if that node
+  // doesn't exist.
+  // Thread-safe.
+  int64_t GetNodeThroughput(int plan_node_id) {
+    RuntimeProfile::Counter* counter = NULL;
+    {
+      lock_guard<mutex> l(lock);
+      CounterMap& throughput_counters = aggregate_counters.throughput_counters;
+      CounterMap::iterator i = throughput_counters.find(plan_node_id);
+      if (i == throughput_counters.end()) return 0;
+      counter = i->second;
+    }
+    DCHECK(counter != NULL);
+    // make sure not to hold lock when calling value() to avoid potential deadlocks
+    return counter->value();
+  }
+
+  // Return number of completed scan ranges for plan_node_id, or 0 if that node
+  // doesn't exist.
+  // Thread-safe.
+  int64_t GetNumScanRangesCompleted(int plan_node_id) {
+    RuntimeProfile::Counter* counter = NULL;
+    {
+      lock_guard<mutex> l(lock);
+      CounterMap& ranges_complete = aggregate_counters.scan_ranges_complete_counters;
+      CounterMap::iterator i = ranges_complete.find(plan_node_id);
+      if (i == ranges_complete.end()) return 0;
+      counter = i->second;
+    }
+    DCHECK(counter != NULL);
+    // make sure not to hold lock when calling value() to avoid potential deadlocks
+    return counter->value();
+  }
+
+  // Updates the total number of scan ranges complete for this fragment.  Returns
+  // the delta since the last time this was called.
+  // lock must be taken before calling this.
+  int64_t UpdateNumScanRangesCompleted() {
+    int64_t total = 0;
+    CounterMap& complete = aggregate_counters.scan_ranges_complete_counters;
+    for (CounterMap::iterator i = complete.begin(); i != complete.end(); ++i) {
+      total += i->second->value();
+    } 
+    int64_t delta = total - total_ranges_complete;
+    total_ranges_complete = total;
+    DCHECK_GE(delta, 0);
+    return delta;
+  }
+};
 
 Coordinator::Coordinator(ExecEnv* exec_env, ExecStats* exec_stats)
   : exec_env_(exec_env),
@@ -99,6 +174,14 @@ Coordinator::Coordinator(ExecEnv* exec_env, ExecStats* exec_stats)
 }
 
 Coordinator::~Coordinator() {
+}
+
+int GetNumTotalScanRanges(TPlanExecParams* params) {
+  int result = 0;
+  for (int i = 0; i < params->scan_ranges.size(); ++i) {
+    result += params->scan_ranges[i].hdfsFileSplits.size();;
+  }
+  return result;
 }
 
 Status Coordinator::Exec(TQueryExecRequest* request) {
@@ -119,6 +202,8 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
   DCHECK_GT(request->fragment_requests.size(), 0);
   DCHECK_GT(request->node_request_params.size(), 0);
 
+  int total_scan_ranges = 0;
+
   if (request->has_coordinator_fragment) {
     executor_.reset(new PlanFragmentExecutor(
             exec_env_, PlanFragmentExecutor::ReportStatusCallback()));
@@ -130,6 +215,7 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
     // register data streams for coord fragment
     RETURN_IF_ERROR(executor_->Prepare(
             request->fragment_requests[0], request->node_request_params[0][0]));
+    total_scan_ranges += GetNumTotalScanRanges(&request->node_request_params[0][0]);
 
     if (request->node_request_params.size() > 1) {
       // for now, set destinations of 2nd fragment to coord ipaddress/port
@@ -149,13 +235,13 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
   query_profile_.reset(new RuntimeProfile(obj_pool(), "Query " + PrintId(query_id_)));
   // register coordinator's fragment profile now, before those of the backends,
   // so it shows up at the top
-  agg_throughput_profile_ = obj_pool()->Add(
-      new RuntimeProfile(obj_pool(), "AggregateThroughput"));
-  query_profile_->AddChild(agg_throughput_profile_);
+  aggregate_profile_ = obj_pool()->Add(
+      new RuntimeProfile(obj_pool(), "Aggregate Profile"));
+  query_profile_->AddChild(aggregate_profile_);
   if (executor_.get() != NULL) {
     query_profile_->AddChild(executor_->profile());
     executor_->profile()->set_name("Coordinator Fragment");
-    CreateThroughputCounters(executor_->profile(), &coordinator_throughput_counters_);
+    CollectScanNodeCounters(executor_->profile(), &coordinator_counters_);
   }
   SCOPED_TIMER(query_profile_->total_time_counter());
 
@@ -191,6 +277,7 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
           obj_pool()->Add(new BackendExecState(fragment_id, backend_num, hosts[j],
                 &request->fragment_requests[i],
                 &request->node_request_params[i][j], obj_pool()));
+      total_scan_ranges += GetNumTotalScanRanges(&request->node_request_params[i][j]);
       DCHECK_EQ(backend_exec_states_.size(), backend_num);
       backend_exec_states_.push_back(exec_state);
       // add profile now; we'll get periodic updates once it starts executing
@@ -199,9 +286,10 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
     }
     PrintBackendInfo();
   }
+  
   num_remaining_backends_ = backend_exec_states_.size();
 
-  CreateThroughputCounters(request->fragment_requests);
+  CreateAggregateCounters(request->fragment_requests);
   
   // Issue all rpcs in parallel
   Status fragments_exec_status = ParallelExecutor::Exec(
@@ -222,6 +310,11 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
     CancelInternal();
     return fragments_exec_status;
   }
+
+  stringstream ss;
+  ss << "Query " << query_id_;
+  progress_ = ProgressUpdater(ss.str(), total_scan_ranges);
+  progress_.set_logging_level(1);
 
   return Status::OK;
 }
@@ -469,27 +562,31 @@ void Coordinator::PrintBackendInfo() {
   }
 }
 
-void Coordinator::CreateThroughputCounters(RuntimeProfile* profile, 
-    ThroughputCounterMap* throughput_counters) {
+void Coordinator::CollectScanNodeCounters(RuntimeProfile* profile, 
+    FragmentInstanceCounters* counters) {
   vector<RuntimeProfile*> children;
   profile->GetAllChildren(&children);
   for (int i = 0; i < children.size(); ++i) {
     RuntimeProfile* p = children[i];
-    RuntimeProfile::Counter* c = p->GetCounter(ScanNode::TOTAL_THROUGHPUT_COUNTER);
-    if (c == NULL) {
-      // this is not a scan node
-      continue;
-    }
     PlanNodeId id = ExecNode::GetNodeIdFromProfile(p);
-    if (id < 0) {
-      VLOG_QUERY << "couldn't extract a node id from profile name: " << p->name();
-      continue;  // couldn't extract an id from profile name
+    
+    // This profile is not for an exec node.
+    if (id == -1) continue;
+
+    RuntimeProfile::Counter* throughput_counter = 
+        p->GetCounter(ScanNode::TOTAL_THROUGHPUT_COUNTER);
+    if (throughput_counter != NULL) {
+      counters->throughput_counters[id] = throughput_counter;
     }
-    (*throughput_counters)[id] = c;
+    RuntimeProfile::Counter* scan_ranges_counter = 
+        p->GetCounter(ScanNode::SCAN_RANGES_COMPLETE_COUNTER);
+    if (scan_ranges_counter != NULL) {
+      counters->scan_ranges_complete_counters[id] = scan_ranges_counter;
+    }
   }
 }
 
-void Coordinator::CreateThroughputCounters(
+void Coordinator::CreateAggregateCounters(
     const vector<TPlanExecRequest>& fragment_requests) {
   for (int i = 0; i < fragment_requests.size(); ++i) {
     if (!fragment_requests[i].__isset.plan_fragment) continue;
@@ -502,9 +599,16 @@ void Coordinator::CreateThroughputCounters(
       }
 
       stringstream s;
-      s << PrintPlanNodeType(node.node_type) << " (id=" << node.node_id << ")";
-      agg_throughput_profile_->AddDerivedCounter(s.str(), TCounterType::BYTES_PER_SECOND,
+      s << PrintPlanNodeType(node.node_type) << " (id=" 
+        << node.node_id << ") Throughput";
+      aggregate_profile_->AddDerivedCounter(s.str(), TCounterType::BYTES_PER_SECOND,
           bind<int64_t>(mem_fn(&Coordinator::ComputeTotalThroughput),
+                        this, node.node_id));
+      s.str("");
+      s << PrintPlanNodeType(node.node_type) << " (id=" 
+        << node.node_id << ") Completed scan ranges";
+      aggregate_profile_->AddDerivedCounter(s.str(), TCounterType::UNIT,
+          bind<int64_t>(mem_fn(&Coordinator::ComputeTotalScanRangesComplete),
                         this, node.node_id));
     }
   }
@@ -517,8 +621,24 @@ int64_t Coordinator::ComputeTotalThroughput(int node_id) {
     value += exec_state->GetNodeThroughput(node_id);
   }
   // Add up the local fragment throughput counter
-  ThroughputCounterMap::iterator it = coordinator_throughput_counters_.find(node_id);
-  if (it != coordinator_throughput_counters_.end()) {
+  CounterMap& throughput_counters = coordinator_counters_.throughput_counters;
+  CounterMap::iterator it = throughput_counters.find(node_id);
+  if (it != throughput_counters.end()) {
+    value += it->second->value();
+  }
+  return value;
+}
+
+int64_t Coordinator::ComputeTotalScanRangesComplete(int node_id) {
+  int64_t value = 0;
+  for (int i = 0; i < backend_exec_states_.size(); ++i) {
+    BackendExecState* exec_state = backend_exec_states_[i];
+    value += exec_state->GetNumScanRangesCompleted(node_id);
+  }
+  // Add up the local fragment throughput counter
+  CounterMap& scan_ranges_complete = coordinator_counters_.scan_ranges_complete_counters;
+  CounterMap::iterator it = scan_ranges_complete.find(node_id);
+  if (it != scan_ranges_complete.end()) {
     value += it->second->value();
   }
   return value;
@@ -673,7 +793,7 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
     exec_state->done = params.done;
     exec_state->profile->Update(cumulative_profile);
     if (!exec_state->profile_created) {
-      CreateThroughputCounters(exec_state->profile, &exec_state->throughput_counters);
+      CollectScanNodeCounters(exec_state->profile, &exec_state->aggregate_counters);
     }
     exec_state->profile_created = true;
 
@@ -683,6 +803,7 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
       VLOG_FILE << "fragment_id=" << exec_state->fragment_id << " error log: "
                 << join(exec_state->error_log, "\n");
     }
+    progress_.Update(exec_state->UpdateNumScanRangesCompleted());
   }
 
   if (params.done && params.__isset.insert_exec_status) {

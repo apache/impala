@@ -52,7 +52,7 @@ class Status {
   // c'tor for error case
   Status(TStatusCode::type code, const std::string& error_msg)
     : error_detail_(new ErrorDetail(code, error_msg)) {
-    VLOG(1) << error_msg;
+    VLOG(2) << error_msg;
   }
 
   // c'tor for internal error

@@ -37,11 +37,13 @@
 #define VLOG_QUERY      VLOG(1)
 #define VLOG_FILE       VLOG(2)
 #define VLOG_ROW        VLOG(3)
+#define VLOG_PROGRESS   VLOG(2)
 
 #define VLOG_CONNECTION_IS_ON VLOG_IS_ON(1)
 #define VLOG_RPC_IS_ON VLOG_IS_ON(2)
 #define VLOG_QUERY_IS_ON VLOG_IS_ON(1)
 #define VLOG_FILE_IS_ON VLOG_IS_ON(2)
 #define VLOG_ROW_IS_ON VLOG_IS_ON(3)
+#define VLOG_PROGRESS_IS_ON VLOG_IS_ON(2)
 
 #endif

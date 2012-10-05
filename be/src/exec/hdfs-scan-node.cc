@@ -47,8 +47,6 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       current_scanner_(NULL),
       current_byte_stream_(NULL),
       num_partition_keys_(0),
-      total_scan_ranges_(0),
-      num_ranges_finished_(0),
       done_(false),
       partition_key_pool_(new MemPool()),
       next_range_to_issue_idx_(0),
@@ -414,6 +412,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 
   current_file_scan_ranges_ = per_file_scan_ranges_.begin();
 
+  int total_scan_ranges = 0;
   // Walk all the files on this node and coalesce all the files with the same
   // format.
   // Also, initialize all the exprs for all the partition keys.
@@ -435,27 +434,29 @@ Status HdfsScanNode::Open(RuntimeState* state) {
     if (partition->file_format() == THdfsFileFormat::TEXT ||
         partition->file_format() == THdfsFileFormat::SEQUENCE_FILE) {
       ++num_unqueued_files_;
-      total_scan_ranges_ += ranges.size();
+      total_scan_ranges += ranges.size();
     } 
 
     RETURN_IF_ERROR(partition->PrepareExprs(state));
     per_type_files[partition->file_format()].push_back(it->second);
   }
 
-  if (total_scan_ranges_ == 0) {
+  if (total_scan_ranges == 0) {
     done_ = true;
     return Status::OK;
   }
 
-  VLOG_QUERY << "Scan ranges assigned to node=" << id() << ": " << total_scan_ranges_;
+  stringstream ss;
+  ss << "Scan ranges complete (node=" << id() << "):";
+  progress_ = ProgressUpdater(ss.str(), total_scan_ranges);
 
   max_scanner_threads_ = state->num_scanner_threads();
   if (max_scanner_threads_ == 0) {
-    max_scanner_threads_ = total_scan_ranges_;
+    max_scanner_threads_ = total_scan_ranges;
   } else {
-    max_scanner_threads_ = min(state->num_scanner_threads(), total_scan_ranges_);
+    max_scanner_threads_ = min(state->num_scanner_threads(), total_scan_ranges);
   }
-  VLOG_QUERY << "Using " << max_scanner_threads_ << " simultaneous scanner threads.";
+  VLOG_FILE << "Using " << max_scanner_threads_ << " simultaneous scanner threads.";
   DCHECK_GT(max_scanner_threads_, 0);
 
   if (FLAGS_randomize_scan_ranges) {
@@ -654,7 +655,7 @@ void HdfsScanNode::DiskThread() {
   //   3. Error occurred (done_ and status_ not ok).
   DCHECK(done_);
 
-  VLOG_QUERY << "Disk thread done (node=" << id() << ")";
+  VLOG_FILE << "Disk thread done (node=" << id() << ")";
   // Wake up all contexts that are still waiting.  done_ indicates that the
   // node is complete (e.g. parse error or limit reached()) and the scanner should
   // terminate immediately.
@@ -722,7 +723,7 @@ void HdfsScanNode::ScannerThread(HdfsScanner* scanner, ScanRangeContext* context
   }
 
   --ranges_in_flight_;
-  if (num_ranges_finished_ == total_scan_ranges_) {
+  if (progress_.done()) {
     // All ranges are finished.  Indicate we are done.
     {
       unique_lock<mutex> l(row_batches_lock_);
@@ -735,15 +736,6 @@ void HdfsScanNode::ScannerThread(HdfsScanner* scanner, ScanRangeContext* context
 }
 
 void HdfsScanNode::RangeComplete() {
-  int num_ranges = __sync_fetch_and_add(&num_ranges_finished_, 1) + 1;
-  
-  // Print out every 50 ranges when we have more than 50 to parse,
-  // every 10 when we are between [10, 100] and every range after.
-  int num_left = total_scan_ranges_ - num_ranges;
-  if ((num_left >= 50 && (num_ranges % 50 == 0)) ||
-      (num_left >= 10 && (num_ranges % 10 == 0)) ||
-      (num_left < 10)) {
-    VLOG_QUERY << "Scan Ranges finished (node=" << id() << ") = " << num_ranges 
-               << " out of " << total_scan_ranges_;
-  }
+  scan_ranges_complete_counter()->Update(1);
+  progress_.Update(1);
 }

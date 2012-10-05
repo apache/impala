@@ -19,6 +19,8 @@
 #include "runtime/descriptors.h"
 #include "runtime/disk-io-mgr.h"
 #include "runtime/string-buffer.h"
+#include "util/progress-updater.h"
+
 #include "gen-cpp/PlanNodes_types.h"
 
 namespace impala {
@@ -250,11 +252,8 @@ class HdfsScanNode : public ScanNode {
   // share resources better before we use c-groups).
   int max_scanner_threads_;
 
-  // Total number of scan ranges assigned to this scan node.  Used to report progress.
-  int total_scan_ranges_;     
-
-  // The number of scan ranges that have finished.  Used to report progress.
-  int num_ranges_finished_;
+  // Keeps track of total scan ranges and the number finished.
+  ProgressUpdater progress_;
 
   // Scanner specific per file metadata (e.g. header information) and associated lock.
   boost::mutex metadata_lock_;

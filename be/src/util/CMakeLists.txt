@@ -23,6 +23,7 @@ add_library(Util
   metrics.cc
   path-builder.cc
   perf-counters.cc
+  progress-updater.cc
   runtime-profile.cc
   thrift-util.cc
   thrift-client.cc

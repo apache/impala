@@ -14,6 +14,7 @@ const string ScanNode::READ_TIMER = "TotalThreadReadTime";
 const string ScanNode::TOTAL_THROUGHPUT_COUNTER = "TotalReadThroughput";
 const string ScanNode::MATERIALIZE_TUPLE_TIMER = "MaterializeTupleTime";
 const string ScanNode::PER_THREAD_THROUGHPUT_COUNTER = "PerThreadReadThroughput";
+const string ScanNode::SCAN_RANGES_COMPLETE_COUNTER = "ScanRangesComplete";
 
 Status ScanNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
@@ -29,6 +30,8 @@ Status ScanNode::Prepare(RuntimeState* state) {
   per_thread_throughput_counter_ = runtime_profile()->AddDerivedCounter(
        PER_THREAD_THROUGHPUT_COUNTER, TCounterType::BYTES_PER_SECOND,
        bind<int64_t>(&RuntimeProfile::UnitsPerSecond, bytes_read_counter_, read_timer_));
+  scan_ranges_complete_counter_ =
+      ADD_COUNTER(runtime_profile(), SCAN_RANGES_COMPLETE_COUNTER, TCounterType::UNIT);
 
   return Status::OK;
 }

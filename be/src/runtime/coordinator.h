@@ -13,6 +13,7 @@
 
 #include "common/status.h"
 #include "common/global-types.h"
+#include "util/progress-updater.h"
 #include "util/runtime-profile.h"
 #include "runtime/runtime-state.h"
 #include "gen-cpp/Types_types.h"
@@ -138,60 +139,23 @@ class Coordinator {
   std::string GetErrorLog();
 
  private:
+  class BackendExecState;
+  
   ExecEnv* exec_env_;
   TUniqueId query_id_;
 
-  // map from id of a scan node to the throughput counter in this->profile
-  typedef std::map<PlanNodeId, RuntimeProfile::Counter*> ThroughputCounterMap;
+  // map from id of a scan node to a specific counter in the node's profile
+  typedef std::map<PlanNodeId, RuntimeProfile::Counter*> CounterMap;
   
-  // Execution state of a particular fragment.
-  // Concurrent accesses:
-  // - GetNodeThroughput() called when coordinator's profile is printed
-  // - updates through UpdateFragmentExecStatus()
-  struct BackendExecState {
-    TUniqueId fragment_id;
-    WallClockStopWatch stopwatch;  // wall clock timer for this fragment
-    int backend_num;  // backend_exec_states_[backend_num] points to us
-    const std::pair<std::string, int> hostport;  // of ImpalaInternalService
-    int64_t total_split_size;  // summed up across all splits; in bytes
+  // Struct for per fragment instance counters that will be aggregated by the coordinator.
+  struct FragmentInstanceCounters {
+    // Throughput counters per node
+    CounterMap throughput_counters;
 
-    // needed for ParallelExecutor::Exec()
-    const TPlanExecRequest* exec_request;  
-    const TPlanExecParams* exec_params;  
-
-    // protects fields below
-    // lock ordering: Coordinator::lock_ can only get obtained *prior*
-    // to lock
-    boost::mutex lock;
-
-    // if the status indicates an error status, execution of this fragment
-    // has either been aborted by the remote backend (which then reported the error)
-    // or cancellation has been initiated; either way, execution must not be cancelled
-    Status status;
-
-    bool initiated; // if true, TPlanExecRequest rpc has been sent
-    bool done;  // if true, execution terminated; do not cancel in that case
-    bool profile_created;  // true after the first call to profile->Update()
-    RuntimeProfile* profile;  // owned by obj_pool()
-    std::vector<std::string> error_log; // errors reported by this backend
-    
-    // Throughput counters for this fragment
-    ThroughputCounterMap throughput_counters;
-
-    BackendExecState(const TUniqueId& fragment_id, int backend_num,
-                     const std::pair<std::string, int>& hostport,
-                     const TPlanExecRequest* exec_request,
-                     const TPlanExecParams* exec_params,
-                     ObjectPool* obj_pool);
-
-    // Computes sum of split sizes of leftmost scan
-    void ComputeTotalSplitSize(const TPlanExecParams& params);
-
-    // Return value of throughput counter for given plan_node_id, or 0 if that node
-    // doesn't exist.
-    // Thread-safe.
-    int64_t GetNodeThroughput(int plan_node_id);
+    // Total finished scan ranges per node
+    CounterMap scan_ranges_complete_counters;
   };
+  
   // BackendExecStates owned by obj_pool()
   std::vector<BackendExecState*> backend_exec_states_;
 
@@ -205,6 +169,9 @@ class Coordinator {
   boost::mutex wait_lock_;
 
   bool has_called_wait_;  // if true, Wait() was called; protected by wait_lock_
+
+  // Keeps track of number of completed ranges and total scan ranges.
+  ProgressUpdater progress_;
 
   // protects all fields below
   boost::mutex lock_;
@@ -268,11 +235,11 @@ class Coordinator {
   // Aggregate counters for the entire query.
   boost::scoped_ptr<RuntimeProfile> query_profile_;
 
-  // Profile for aggregate throughput counters; allocated in obj_pool().
-  RuntimeProfile* agg_throughput_profile_;
+  // Profile for aggregate counters; allocated in obj_pool().
+  RuntimeProfile* aggregate_profile_;
     
   // Throughput counters for the coordinator fragment
-  ThroughputCounterMap coordinator_throughput_counters_;
+  FragmentInstanceCounters coordinator_counters_;
 
   // Wrapper for ExecPlanFragment() rpc.  This function will be called in parallel
   // from multiple threads.
@@ -289,16 +256,20 @@ class Coordinator {
   // Print hdfs split size stats to VLOG_QUERY and details to VLOG_FILE
   void PrintBackendInfo();
 
-  // Create aggregate throughput counters for all scan nodes in any of the fragments
-  void CreateThroughputCounters(const std::vector<TPlanExecRequest>& fragment_requests);
+  // Create aggregate counters for all scan nodes in any of the fragments
+  void CreateAggregateCounters(const std::vector<TPlanExecRequest>& fragment_requests);
 
-  // Build throughput_counters from profile.  Assumes lock protecting profile and result
-  // is held.
-  void CreateThroughputCounters(RuntimeProfile* profile, ThroughputCounterMap* result);
+  // Collect scan node counters from the profile.
+  // Assumes lock protecting profile and result is held.
+  void CollectScanNodeCounters(RuntimeProfile*, FragmentInstanceCounters* result);
 
   // Derived counter function: aggregates throughput for node_id across all backends
   // (id needs to be for a ScanNode)
   int64_t ComputeTotalThroughput(int node_id);
+  
+  // Derived counter function: aggregates total completed scan ranges for node_id 
+  // across all backends(id needs to be for a ScanNode)
+  int64_t ComputeTotalScanRangesComplete(int node_id);
 
   // Runs cancel logic. Assumes that lock_ is held.
   void CancelInternal();

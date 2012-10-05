@@ -57,7 +57,7 @@ void Status::AddErrorMsg(TStatusCode::type code, const std::string& msg) {
   } else {
     error_detail_->error_msgs.push_back(msg);
   }
-  VLOG(1) << msg;
+  VLOG(2) << msg;
 }
 
 void Status::AddErrorMsg(const std::string& msg) {
