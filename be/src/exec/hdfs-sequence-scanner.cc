@@ -220,9 +220,13 @@ Status HdfsSequenceScanner::FindFirstRecord(bool* found) {
 }
 
 inline Status HdfsSequenceScanner::GetRecordFromCompressedBlock(
-    uint8_t** record_ptr, int64_t* record_len) {
+    uint8_t** record_ptr, int64_t* record_len, bool* eosr) {
   if (num_buffered_records_in_compressed_block_ == 0) {
-    if (context_->eosr()) return Status::OK;
+    if (context_->eosr()) {
+      *record_ptr = NULL;
+      *eosr = true;
+      return Status::OK;
+    }
     RETURN_IF_ERROR(ReadCompressedBlock());
   }
   // Adjust next_record_ to move past the size of the length indicator.
@@ -241,16 +245,26 @@ inline Status HdfsSequenceScanner::GetRecordFromCompressedBlock(
   return Status::OK;
 }
 
-inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr, int64_t* record_len) {
+inline Status HdfsSequenceScanner::GetRecord(uint8_t** record_ptr,
+                                             int64_t* record_len, bool *eosr) {
   block_start_ = context_->file_offset();
   bool sync;
+  *eosr = context_->eosr();
   Status stat = ReadBlockHeader(&sync);
   if (!stat.ok()) {
-    if (context_->eosr()) return Status::OK;
+    *record_ptr = NULL;
+    if (*eosr) return Status::OK;
     return stat;
   }
 
-  if (sync && context_->eosr()) return Status::OK;
+  // If we read a sync mark and are past the end of the scan range we are done.
+  if (sync && *eosr) {
+    *record_ptr = NULL;
+    return Status::OK;
+  }
+
+  // If we have not read the end the next sync mark keep going.
+  *eosr = false;
 
   // We don't look at the keys, only the values.
   RETURN_IF_ERROR(SerDeUtils::SkipBytes(context_, current_key_length_));
@@ -299,7 +313,8 @@ Status HdfsSequenceScanner::ProcessRange() {
   // this on each record.
   SCOPED_TIMER(scan_node_->materialize_tuple_timer());
   
-  while (!context_->eosr() || num_buffered_records_in_compressed_block_ > 0) {
+  bool eosr = false;
+  while (!eosr || num_buffered_records_in_compressed_block_ > 0) {
     // Current record to process and its length.
     uint8_t* record = NULL;
     int64_t record_len;
@@ -309,10 +324,15 @@ Status HdfsSequenceScanner::ProcessRange() {
     //  Record-compressed -- like a regular record, but the data is compressed.
     //  Uncompressed.
     if (header_->is_blk_compressed) {
-      RETURN_IF_ERROR(GetRecordFromCompressedBlock(&record, &record_len));
+      RETURN_IF_ERROR(GetRecordFromCompressedBlock(&record, &record_len, &eosr));
     } else {
       // Get the next compressed or uncompressed record.
-      RETURN_IF_ERROR(GetRecord(&record, &record_len));
+      RETURN_IF_ERROR(GetRecord(&record, &record_len, &eosr));
+    }
+
+    if (eosr) {
+      DCHECK(record == NULL);
+      break;
     }
 
     MemPool* pool;
@@ -366,7 +386,6 @@ Status HdfsSequenceScanner::ProcessRange() {
 Status HdfsSequenceScanner::WriteFields(MemPool* pool, TupleRow* row, 
     int num_fields, bool* add_row) {
   DCHECK_EQ(num_fields, scan_node_->materialized_slots().size());
-
   // Keep track of where lines begin as we write out fields for error reporting
   int next_line_offset = 0;
 
@@ -630,7 +649,7 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
   int block_size = 0;
   RETURN_IF_ERROR(SerDeUtils::ReadVInt(context_, &block_size));
   // Check for a reasonable size
-  if (block_size > context_->scan_range()->len() || block_size < 0) {
+  if (block_size > MAX_BLOCK_SIZE || block_size < 0) {
     stringstream ss;
     ss << "Compressed block size is: " << block_size;
     if (state_->LogHasSpace()) state_->LogError(ss.str());

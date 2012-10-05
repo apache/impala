@@ -160,6 +160,10 @@ class HdfsSequenceScanner : public HdfsScanner {
   // Size of the sync hash field
   const static int SYNC_HASH_SIZE = 16;
 
+  // Maximum size of a compressed block.  This is used to check for corrupted
+  // block size so w do not read the whole file before we detect the error.
+  const static int MAX_BLOCK_SIZE = (1024 * 1024 * 1024);
+
   // The value class name located in the SeqFile Header.
   // This is always "org.apache.hadoop.io.Text"
   static const char* const SEQFILE_VALUE_CLASS_NAME;
@@ -218,8 +222,9 @@ class HdfsSequenceScanner : public HdfsScanner {
   // Output:
   //   record_ptr: ponter to the record.
   //   record_len: length of the record
-  //   eors: set to true if we are at the end of the scan range.
-  Status GetRecordFromCompressedBlock(uint8_t** record_ptr, int64_t *record_len);
+  //   eosr: set to true if we are at the end of the scan range.
+  Status GetRecordFromCompressedBlock(uint8_t** record_ptr,
+                                      int64_t *record_len, bool* eosr);
 
   // Read compressed or uncompressed records from the byte stream into memory
   // in unparsed_data_buffer_pool_.
@@ -227,7 +232,7 @@ class HdfsSequenceScanner : public HdfsScanner {
   //   record_ptr: ponter to the record.
   //   record_len: length of the record
   //   eors: set to true if we are at the end of the scan range.
-  Status GetRecord(uint8_t** record_ptr, int64_t *record_len);
+  Status GetRecord(uint8_t** record_ptr, int64_t *record_len, bool* eosr);
 
   // Read a compressed block.
   // Decompress to unparsed_data_buffer_ allocated from unparsed_data_buffer_pool_.

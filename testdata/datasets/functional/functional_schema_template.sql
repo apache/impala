@@ -1091,9 +1091,6 @@ CREATE TABLE %(table_name)s (
   e double)
 row format delimited fields terminated by ','
 stored as %(file_format)s;
-SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
-INSERT OVERWRITE TABLE nulltable select 'a', '', NULL, NULL, NULL from alltypes limit 1;
-SET hive.input.format=org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
 ----
 SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
 INSERT OVERWRITE TABLE %(table_name)s select 'a', '', NULL, NULL, NULL from alltypes limit 1;
@@ -1103,6 +1100,9 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
   INSERT OVERWRITE TABLE %(table_name)s \
   select * FROM %(base_table_name)s"
 ----
+SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
+INSERT OVERWRITE TABLE %(table_name)s select 'a', '', NULL, NULL, NULL from alltypes limit 1;
+SET hive.input.format=org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
 ----
 ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
@@ -1118,9 +1118,6 @@ CREATE TABLE %(table_name)s (
   e double)
 row format delimited fields terminated by ',' escaped by '\\'
 stored as %(file_format)s;
-SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
-INSERT OVERWRITE TABLE nullescapedtable select 'a', '', NULL, NULL, NULL from alltypes limit 1;
-SET hive.input.format=org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
 ----
 SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
 INSERT OVERWRITE TABLE %(table_name)s select 'a', '', NULL, NULL, NULL from alltypes limit 1;
@@ -1130,6 +1127,9 @@ ${IMPALA_HOME}/bin/run-query.sh --query=" \
   INSERT OVERWRITE TABLE %(table_name)s \
   select * FROM %(base_table_name)s"
 ----
+SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
+INSERT OVERWRITE TABLE %(table_name)s select 'a', '', NULL, NULL, NULL from alltypes limit 1;
+SET hive.input.format=org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
 ----
 ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
@@ -1144,7 +1144,23 @@ row format delimited fields terminated by ','  escaped by '\\'
 stored as %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
+DROP TABLE IF EXISTS tmp_txt;
+DROP TABLE IF EXISTS TblWithRaggedColumns_tmp;
+CREATE EXTERNAL TABLE TblWithRaggedColumns_tmp (
+  col_1 string)
+row format delimited fields terminated by '|'  escaped by '\\'
+stored as %(file_format)s
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+
+CREATE EXTERNAL TABLE tmp_txt (
+  col_1 string)
+row format delimited fields terminated by '|'  escaped by '\\'
+stored as textfile
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(base_table_name)s';
+
+INSERT OVERWRITE TABLE TblWithRaggedColumns_tmp select * from tmp_txt;
+DROP TABLE tmp_txt;
+DROP TABLE TblWithRaggedColumns_tmp;
 ----
 ${IMPALA_HOME}/bin/run-query.sh --query=" \
   INSERT OVERWRITE TABLE %(table_name)s \

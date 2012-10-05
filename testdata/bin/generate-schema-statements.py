@@ -145,7 +145,7 @@ def build_codec_enabled_statement(codec):
   compression_enabled = 'false' if codec == 'none' else 'true'
   return COMPRESSION_ENABLED % compression_enabled
 
-def build_insert_into_statement(insert, base_table_name, table_name):
+def build_insert_into_statement(insert, base_table_name, table_name, file_format):
   tmp_load_template = insert.replace(' % ', ' *** ')
   statement = SET_PARTITION_MODE_NONSTRICT_STATEMENT + "\n"
   statement += SET_DYNAMIC_PARTITION_STATEMENT + "\n"
@@ -156,14 +156,16 @@ def build_insert_into_statement(insert, base_table_name, table_name):
   else:
     statement += SET_HIVE_INPUT_FORMAT % "HiveInputFormat"
   statement += tmp_load_template % {'base_table_name': base_table_name,
-                                    'table_name': table_name}
+                                    'table_name': table_name,
+                                    'file_format': FILE_FORMAT_MAP[file_format]}
   return statement.replace(' *** ', ' % ')
 
-def build_insert(insert, table_name, base_table_name, codec, compression_type):
+def build_insert(insert, table_name, file_format,
+    base_table_name, codec, compression_type):
   output = build_codec_enabled_statement(codec) + "\n"
   output += build_compression_codec_statement(codec, compression_type) + "\n"
   output += build_insert_into_statement(insert, base_table_name,
-                                        table_name) + "\n"
+                                        table_name, file_format) + "\n"
   return output
 
 def build_load_statement(load_template, table_name, scale_factor):
@@ -290,8 +292,8 @@ def write_statements_to_file_based_on_input_vector(output_name, test_vectors,
                 'Empty trevni load for table %s. Skipping insert generation' % table_name
         else:
           if insert:
-            output_load.append(build_insert(insert, table_name, base_table_name,
-                                            codec, compression_type))
+            output_load.append(build_insert(insert, table_name, file_format,
+              base_table_name, codec, compression_type))
           else:
               print 'Empty insert for table %s. Skipping insert generation' % table_name
   # Make sure we create the base tables first and compute stats last

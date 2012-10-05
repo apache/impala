@@ -39,6 +39,23 @@ public class QueryTest extends BaseQueryTest {
   }
 
   @Test
+  public void TestScanRange() {
+    // Testing short scan ranges exercises reading to the next logical break
+    // in the data.  For sequence this is to the next sync mark for text
+    // it is the next end of record delimiter.
+    TestExecContext execContext1 =
+      new TestExecContext(1, 0, false, true, 0, 5000, 0, false);
+    List<TestConfiguration> testConfigs = Lists.newArrayList();
+    testConfigs.add(
+        new TestConfiguration(execContext1, CompressionFormat.NONE, TableFormat.TEXT));
+    testConfigs.add(new TestConfiguration(execContext1,
+          CompressionFormat.NONE, TableFormat.SEQUENCEFILE));
+    testConfigs.add(new TestConfiguration(execContext1,
+          CompressionFormat.SNAPPY, TableFormat.SEQUENCEFILE));
+    runQueryWithTestConfigs(testConfigs, "hdfs-partitions", true, 0);
+  }
+
+  @Test
   public void TestFilePartitions() {
     // Run fully distributed with all batch sizes.
     runPairTestFile("hdfs-partitions", true, 0,

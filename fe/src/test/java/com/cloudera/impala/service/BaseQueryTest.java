@@ -88,6 +88,9 @@ public abstract class BaseQueryTest {
   protected static final List<TableFormat> TEXT_FORMAT_ONLY =
       ImmutableList.of(TableFormat.TEXT);
 
+  protected static final List<TableFormat> SEQUENCE_FORMAT_ONLY =
+      ImmutableList.of(TableFormat.SEQUENCEFILE, TableFormat.SEQUENCEFILE_RECORD);
+
   protected static final List<TableFormat> INSERT_FORMATS =
       ImmutableList.of(TableFormat.TEXT, TableFormat.TREVNI);
 
@@ -323,7 +326,7 @@ public abstract class BaseQueryTest {
    * Generates a list of all valid permutations of table format, compression format,
    * batch size and cluster size. Permutations which don't make sense are filtered out.
    */
-  private static List<TestConfiguration> generateAllConfigurationPermutations(
+  protected static List<TestConfiguration> generateAllConfigurationPermutations(
       List<TableFormat> tableFormats, List<CompressionFormat> compressionFormats,
       List<Integer> batchSizes, List<Integer> clusterSizes, List<Boolean> llvmOptions) {
     List<TestConfiguration> configs = Lists.newArrayList();

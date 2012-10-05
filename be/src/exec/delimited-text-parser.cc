@@ -139,6 +139,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
     DCHECK(remaining_len == 0);
     AddColumn<true>(*byte_buffer_ptr - *next_column_start,
         next_column_start, num_fields, field_locations);
+    FillColumns(num_fields, field_locations);
     column_idx_ = scan_node_->num_partition_keys();
     ++(*num_tuples);
   }
