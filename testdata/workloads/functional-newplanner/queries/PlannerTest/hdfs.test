@@ -27,6 +27,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: COUNT(*)
   GROUP BY: zip
@@ -54,6 +56,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -124,6 +128,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -170,6 +176,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -215,6 +223,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -260,6 +270,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -306,6 +318,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -332,6 +346,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -356,6 +372,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -389,6 +407,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -421,6 +441,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -453,6 +475,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -484,6 +508,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     PREDICATES: year < 2009
     TUPLE IDS: 0 
@@ -520,6 +546,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     PREDICATES: month > 8
     TUPLE IDS: 0 
@@ -555,6 +583,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -583,6 +613,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -612,6 +644,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     PREDICATES: year - 1 = 2009
     TUPLE IDS: 0 
@@ -683,6 +717,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypesaggmultifilesnopart (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -713,6 +749,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypesaggmultifiles (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS

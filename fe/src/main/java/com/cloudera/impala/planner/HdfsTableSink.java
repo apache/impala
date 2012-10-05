@@ -9,6 +9,7 @@ import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.thrift.TDataSink;
 import com.cloudera.impala.thrift.TDataSink2;
 import com.cloudera.impala.thrift.TDataSinkType;
+import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.THdfsFileFormat;
 import com.cloudera.impala.thrift.THdfsTableSink;
 import com.cloudera.impala.thrift.TTableSink;
@@ -32,7 +33,7 @@ public class HdfsTableSink extends TableSink {
   }
 
   @Override
-  public String getExplainString(String prefix) {
+  public String getExplainString(String prefix, TExplainLevel explainLevel) {
     StringBuilder output = new StringBuilder();
     output.append(prefix + "WRITE TO HDFS table=" + targetTable.getFullName() + "\n");
     output.append(prefix + "  OVERWRITE=" + (overwrite ? "true" : "false") + "\n");

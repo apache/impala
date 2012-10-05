@@ -37,6 +37,8 @@ import com.cloudera.impala.thrift.THostPort;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TScanRange;
+import com.cloudera.impala.thrift.TScanRange2;
+import com.cloudera.impala.thrift.TScanRangeLocation;
 import com.cloudera.impala.thrift.TScanRangeLocations;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -157,11 +159,73 @@ public class HBaseScanNode extends ScanNode {
   }
 
   /**
-   * TODO: Return scan ranges
+   * We create a TScanRange for each region server that contains at least one
+   * relevant region, and the created TScanRange will contain all the relevant regions
+   * of that region server.
    */
   @Override
   public List<TScanRangeLocations> getScanRangeLocations(long maxScanRangeLength) {
-    return null;
+    // Retrieve relevant HBase regions and their region servers
+    HBaseTable tbl = (HBaseTable) desc.getTable();
+    HTable hbaseTbl = null;
+    List<HRegionLocation> regionsLoc;
+    try {
+      hbaseTbl   = new HTable(hbaseConf, tbl.getHBaseTableName());
+      regionsLoc = getRegionsInRange(hbaseTbl, startKey, stopKey);
+    } catch (IOException e) {
+      throw new RuntimeException(
+          "couldn't retrieve HBase table (" + tbl.getHBaseTableName() + ") info:\n"
+          + e.getMessage());
+    }
+
+    // Convert list of HRegionLocation to Map<hostport, List<HRegionLocation>>.
+    // The List<HRegionLocations>'s end up being sorted by start key/end key, because 
+    // regionsLoc is sorted that way.
+    Map<String, List<HRegionLocation>> locationMap = Maps.newHashMap();
+    for (HRegionLocation regionLoc: regionsLoc) {
+      String locHostPort = regionLoc.getHostnamePort();
+      if (locationMap.containsKey(locHostPort)) {
+        locationMap.get(locHostPort).add(regionLoc);
+      } else {
+        locationMap.put(locHostPort, Lists.newArrayList(regionLoc));
+      }
+    }
+
+    List<TScanRangeLocations> result = Lists.newArrayList();
+    for (Map.Entry<String, List<HRegionLocation>> locEntry: locationMap.entrySet()) {
+      // HBaseTableScanner(backend) initializes a result scanner for each key range.
+      // To minimize # of result scanner re-init, create only a single HBaseKeyRange
+      // for all adjacent regions on this server.
+      THBaseKeyRange keyRange = null;
+      byte[] prevEndKey = null;
+      for (HRegionLocation regionLoc: locEntry.getValue()) {
+        byte[] curRegStartKey = regionLoc.getRegionInfo().getStartKey();
+        byte[] curRegEndKey   = regionLoc.getRegionInfo().getEndKey();
+        if (prevEndKey != null &&
+            Bytes.compareTo(prevEndKey, curRegStartKey) == 0) {
+          // the current region starts where the previous one left off;
+          // extend the key range
+          setKeyRangeEnd(keyRange, curRegEndKey);
+        } else {
+          // create a new HBaseKeyRange (and TScanRange2/TScanRangeLocations to go
+          // with it).
+          keyRange = new THBaseKeyRange();
+          setKeyRangeStart(keyRange, curRegStartKey);
+          setKeyRangeEnd(keyRange, curRegEndKey);
+
+          TScanRangeLocations scanRangeLocation = new TScanRangeLocations();
+          scanRangeLocation.addToLocations(
+              new TScanRangeLocation(addressToTHostPort(locEntry.getKey())));
+          result.add(scanRangeLocation);
+        
+          TScanRange2 scanRange = new TScanRange2();
+          scanRange.setHbaseKeyRange(keyRange);
+          scanRangeLocation.setScan_range(scanRange);
+        }
+        prevEndKey = curRegEndKey;
+      }
+    }
+    return result;
   }
 
   /**

@@ -62,6 +62,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -76,6 +78,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypessmall (1) compact
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS
@@ -123,6 +127,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypessmall (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -161,6 +167,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypessmall (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS

@@ -588,7 +588,7 @@ public class Planner {
         Preconditions.checkState(planFragIdx == 0);
         expString = fragment.getExplainString("  ", explainLevel);
       } else {
-        expString = dataSink.getExplainString("  ") +
+        expString = dataSink.getExplainString("  ", explainLevel) +
             fragment.getExplainString("  ", explainLevel);
       }
       explainStr.append(expString);

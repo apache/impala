@@ -24,6 +24,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: 
   GROUP BY: testtbl.id, testtbl.name, testtbl.zip
@@ -59,6 +61,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: 
   GROUP BY: id, zip
@@ -102,6 +106,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: 
   GROUP BY: id, zip
@@ -146,6 +152,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: 
   GROUP BY: tinyint_col, int_col, bigint_col
@@ -210,6 +218,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: 
   GROUP BY: tinyint_col, int_col
@@ -275,6 +285,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: MIN(smallint_col), MAX(string_col)
   GROUP BY: tinyint_col, int_col
@@ -339,6 +351,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: COUNT(*), SUM(int_col), MIN(smallint_col), MAX(bigint_col)
   GROUP BY: tinyint_col, int_col

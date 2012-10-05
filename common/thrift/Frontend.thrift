@@ -102,7 +102,7 @@ struct TQueryExecRequest2 {
   // Specifies the destination fragment of the output of each fragment.
   // parent_fragment_idx.size() == fragments.size() - 1 and
   // fragments[i] sends its output to fragments[dest_fragment_idx[i-1]]
-  4: required list<i32> dest_fragment_idx
+  4: optional list<i32> dest_fragment_idx
 
   // A map from scan node ids to a list of scan range locations.
   // The node ids refer to scan nodes in fragments[].plan_tree
@@ -187,7 +187,9 @@ struct TExecRequest {
 
   // TQueryExecRequest for the backend
   // Set iff stmt_type is QUERY or DML
+  // TODO: remove after transition to new planner is complete
   4: optional TQueryExecRequest queryExecRequest
+  7: optional TQueryExecRequest2 queryExecRequest2
 
   // Set iff stmt_type is DDL
   5: optional TDdlExecRequest ddlExecRequest

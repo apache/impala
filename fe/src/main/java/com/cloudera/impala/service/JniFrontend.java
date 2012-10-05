@@ -23,7 +23,6 @@ import com.cloudera.impala.thrift.TDescribeTableResult;
 import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TGetTablesParams;
 import com.cloudera.impala.thrift.TGetTablesResult;
-import com.cloudera.impala.thrift.TQueryExecRequest2;
 
 /**
  * JNI-callable interface onto a wrapped Frontend instance. The main point is to serialise
@@ -91,14 +90,13 @@ public class JniFrontend {
    * Jni wrapper for Frontend.createQueryExecRequest2(). Accepts a serialized
    * TClientRequest; returns a serialized TQueryExecRequest2.
    */
-  public byte[] createQueryExecRequest2(byte[] thriftClientRequest)
+  public byte[] createExecRequest2(byte[] thriftClientRequest)
       throws ImpalaException {
     TClientRequest request = new TClientRequest();
     deserializeThrift(request, thriftClientRequest);
 
     StringBuilder explainString = new StringBuilder();
-    TQueryExecRequest2 result =
-        frontend.createQueryExecRequest2(request, explainString);
+    TExecRequest result = frontend.createExecRequest2(request, explainString);
     LOG.info(explainString.toString());
 
     LOG.info("returned TQueryExecRequest2: " + result.toString());

@@ -15,10 +15,14 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HBASE table=hbasealltypessmall (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
+  HBASE KEYRANGE <unbounded>:<unbounded>
+  LOCATIONS:
 ====
 # subquery doing join
 select * from (select t2.*
@@ -47,6 +51,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
+    UNPARTITIONED
+
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -62,6 +68,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
+    UNPARTITIONED
+
   SCAN HDFS table=default.testtbl (1) compact
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS
@@ -105,6 +113,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
+    UNPARTITIONED
+
   HASH JOIN
     JOIN OP: RIGHT OUTER JOIN
     HASH PREDICATES:
@@ -122,6 +132,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypessmall (1) compact
     PREDICATES: b.string_col = '15'
     TUPLE IDS: 1 
@@ -161,11 +173,15 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HBASE table=hbasealltypessmall (0)
     PREDICATES: hbasealltypessmall.id < 5
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
+  HBASE KEYRANGE <unbounded>:<unbounded>
+  LOCATIONS:
 ====
 # subquery join
 # multiple join predicates;
@@ -205,6 +221,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
+    UNPARTITIONED
+
   HASH JOIN
     JOIN OP: RIGHT OUTER JOIN
     HASH PREDICATES:
@@ -222,6 +240,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypessmall (1) compact
     PREDICATES: string_col = '15'
     TUPLE IDS: 2 
@@ -283,6 +303,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
+    UNPARTITIONED
+
   HASH JOIN
     JOIN OP: RIGHT OUTER JOIN
     HASH PREDICATES:
@@ -300,6 +322,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypessmall (1) compact
     PREDICATES: string_col = '15'
     TUPLE IDS: 3 
@@ -370,6 +394,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -386,6 +412,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -401,6 +429,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypessmall (2) compact
     PREDICATES: b.float_col > 4.5
     TUPLE IDS: 3 
@@ -455,6 +485,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: COUNT(*), MIN(alltypesagg.tinyint_col), MAX(alltypesagg.tinyint_col), SUM(alltypesagg.tinyint_col), COUNT(alltypesagg.tinyint_col)
   GROUP BY: alltypesagg.tinyint_col
@@ -514,6 +546,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
   GROUP BY: tinyint_col
@@ -585,6 +619,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: SUM(float_col), MIN(float_col)
   GROUP BY: int_col
@@ -593,6 +629,8 @@ Plan Fragment 1
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
+  HBASE KEYRANGE <unbounded>:<unbounded>
+  LOCATIONS:
 ====
 select c1, x2
 from (
@@ -658,6 +696,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: MIN(float_col)
   GROUP BY: int_col, tinyint_col
@@ -666,6 +706,8 @@ Plan Fragment 1
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
+  HBASE KEYRANGE <unbounded>:<unbounded>
+  LOCATIONS:
 ====
 # distinct *
 select distinct *
@@ -701,6 +743,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: 
   GROUP BY: testtbl.id, testtbl.name, testtbl.zip
@@ -744,6 +788,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: 
   GROUP BY: testtbl.id, testtbl.name, testtbl.zip
@@ -790,6 +836,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: COUNT(*), SUM(alltypesagg.int_col), COUNT(alltypesagg.int_col)
   GROUP BY: alltypesagg.int_col % 7
@@ -855,6 +903,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
+    UNPARTITIONED
+
   HASH JOIN
     JOIN OP: LEFT OUTER JOIN
     HASH PREDICATES:
@@ -870,6 +920,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
+    UNPARTITIONED
+
   SCAN HDFS table=default.dimtbl (1) compact
     TUPLE IDS: 2 
 ---- SCANRANGELOCATIONS
@@ -935,6 +987,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 8
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: COUNT(b.id)
   GROUP BY: a.smallint_col
@@ -953,6 +1007,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -967,6 +1023,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypessmall (2) compact
     TUPLE IDS: 3 
 ---- SCANRANGELOCATIONS
@@ -1067,6 +1125,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -1090,6 +1150,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypessmall (3) compact
     PREDICATES: c.string_col < '7'
     TUPLE IDS: 4 
@@ -1098,6 +1160,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypessmall (1) compact
     PREDICATES: b.float_col > 4.5
     TUPLE IDS: 2 
@@ -1176,6 +1240,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 11
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: SUM(<slot 31>)
   GROUP BY: <slot 30>
@@ -1194,6 +1260,8 @@ Plan Fragment 2
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 10
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: SUM(<slot 31>)
   GROUP BY: <slot 30>
@@ -1205,6 +1273,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 8
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: COUNT(a.id)
   GROUP BY: b.smallint_col
@@ -1223,6 +1293,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypessmall (2) compact
     TUPLE IDS: 3 
 ---- SCANRANGELOCATIONS

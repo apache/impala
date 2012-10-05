@@ -84,7 +84,18 @@ public class NewPlanner {
       // single-node execution; we're almost done
       fragments.add(new PlanFragment(singleNodePlan, queryStmt.getResultExprs()));
     } else {
-      createPlanFragments(singleNodePlan, false, queryOptions.partition_agg, fragments);
+      // leave the root fragment partitioned if we end up writing to a table;
+      // otherwise merge everything into a single coordinator fragment, so we can
+      // pass it back to the client
+      createPlanFragments(
+          singleNodePlan, analysisResult.isInsertStmt(), queryOptions.partition_agg,
+          fragments);
+    }
+
+    if (analysisResult.isInsertStmt()) {
+      // set up table sink for root fragment
+      PlanFragment rootFragment = fragments.get(fragments.size() - 1);
+      rootFragment.setSink(analysisResult.getInsertStmt().createDataSink());
     }
 
     for (PlanFragment fragment: fragments) {

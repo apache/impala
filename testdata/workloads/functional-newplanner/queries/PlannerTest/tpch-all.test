@@ -41,6 +41,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: SUM(l_quantity), SUM(l_extendedprice), SUM(l_extendedprice * 1.0 - l_discount), SUM(l_extendedprice * 1.0 - l_discount * 1.0 + l_tax), COUNT(l_quantity), COUNT(l_extendedprice), SUM(l_discount), COUNT(l_discount), COUNT(1)
   GROUP BY: l_returnflag, l_linestatus
@@ -398,6 +400,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 9
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: SUM(l_extendedprice * 1.0 - l_discount)
   GROUP BY: l_orderkey, o_orderdate, o_shippriority
@@ -425,6 +429,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 8
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.customer (3) compact
     PREDICATES: c.c_mktsegment = 'BUILDING'
     TUPLE IDS: 2 
@@ -433,6 +439,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.orders (1) compact
     PREDICATES: o_orderdate < '1995-03-15'
     TUPLE IDS: 1 
@@ -541,6 +549,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: 
   GROUP BY: o_orderpriority, l_orderkey
@@ -561,6 +571,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.orders (1) compact
     PREDICATES: o_orderdate >= '1993-07-01', o_orderdate < '1993-10-01'
     TUPLE IDS: 1 
@@ -693,6 +705,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 18
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: SUM(l_extendedprice * 1.0 - l_discount)
   GROUP BY: n_name
@@ -740,6 +754,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 17
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.region (9) compact
     PREDICATES: r_name = 'ASIA'
     TUPLE IDS: 5 
@@ -748,6 +764,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 16
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.nation (7) compact
     TUPLE IDS: 4 
 
@@ -755,6 +773,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 15
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.customer (5) compact
     TUPLE IDS: 3 
 
@@ -762,6 +782,8 @@ Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 14
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.supplier (3) compact
     TUPLE IDS: 2 
 
@@ -769,6 +791,8 @@ Plan Fragment 6
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 13
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.orders (1) compact
     PREDICATES: o_orderdate >= '1994-01-01', o_orderdate < '1995-01-01'
     TUPLE IDS: 1 
@@ -851,6 +875,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: SUM(l_extendedprice * l_discount)
   GROUP BY: 
@@ -1000,6 +1026,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 24
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: SUM(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * 1.0 - l_discount ELSE 0.0 END), SUM(l_extendedprice * 1.0 - l_discount)
   GROUP BY: year(o_orderdate)
@@ -1060,6 +1088,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 23
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.nation (13) compact
     TUPLE IDS: 7 
 
@@ -1067,6 +1097,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 22
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.region (11) compact
     PREDICATES: r_name = 'AMERICA'
     TUPLE IDS: 6 
@@ -1075,6 +1107,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 21
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.nation (9) compact
     TUPLE IDS: 5 
 
@@ -1082,6 +1116,8 @@ Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 20
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.customer (7) compact
     TUPLE IDS: 4 
 
@@ -1089,6 +1125,8 @@ Plan Fragment 6
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 19
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.supplier (5) compact
     TUPLE IDS: 3 
 
@@ -1096,6 +1134,8 @@ Plan Fragment 7
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 18
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.part (3) compact
     PREDICATES: p_type = 'ECONOMY ANODIZED STEEL'
     TUPLE IDS: 2 
@@ -1104,6 +1144,8 @@ Plan Fragment 8
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 17
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.orders (1) compact
     PREDICATES: o_orderdate >= '1995-01-01', o_orderdate < '1996-12-31'
     TUPLE IDS: 1 
@@ -1255,6 +1297,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 18
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: SUM(l.l_extendedprice * 1.0 - l.l_discount - ps.ps_supplycost * l.l_quantity)
   GROUP BY: n.n_name, year(o.o_orderdate)
@@ -1302,6 +1346,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 17
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.nation (9) compact
     TUPLE IDS: 5 
 
@@ -1309,6 +1355,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 16
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.supplier (7) compact
     TUPLE IDS: 4 
 
@@ -1316,6 +1364,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 15
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.partsupp (5) compact
     TUPLE IDS: 3 
 
@@ -1323,6 +1373,8 @@ Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 14
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.orders (3) compact
     TUPLE IDS: 2 
 
@@ -1330,6 +1382,8 @@ Plan Fragment 6
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 13
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.part (1) compact
     PREDICATES: p.p_name LIKE '%green%'
     TUPLE IDS: 1 
@@ -1470,6 +1524,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 12
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: SUM(l_extendedprice * 1.0 - l_discount)
   GROUP BY: c_custkey, c_name, CAST(c_acctbal AS BIGINT), c_phone, n_name, c_address, c_comment
@@ -1503,6 +1559,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 11
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.nation (5) compact
     TUPLE IDS: 3 
 
@@ -1510,6 +1568,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 10
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.customer (3) compact
     TUPLE IDS: 2 
 
@@ -1517,6 +1577,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 9
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.orders (1) compact
     PREDICATES: o.o_orderdate >= '1993-10-01', o.o_orderdate < '1994-01-01'
     TUPLE IDS: 1 
@@ -1769,6 +1831,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: SUM(CASE WHEN o_orderpriority = '1-URGENT' OR o_orderpriority = '2-HIGH' THEN 1 ELSE 0 END), SUM(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END)
   GROUP BY: l_shipmode
@@ -1789,6 +1853,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.orders (1) compact
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS
@@ -1893,6 +1959,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: COUNT(o_orderkey)
   GROUP BY: c_custkey
@@ -1913,6 +1981,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.customer (1) compact
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS
@@ -1970,6 +2040,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: SUM(CASE WHEN p_type LIKE 'PROMO%' THEN l_extendedprice * 1.0 - l_discount ELSE 0.0 END), SUM(l_extendedprice * 1.0 - l_discount)
   GROUP BY: 
@@ -1990,6 +2062,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.part (1) compact
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS
@@ -2863,6 +2937,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: SUM(l_extendedprice * 1.0 - l_discount)
   GROUP BY: 
@@ -2882,6 +2958,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
+    UNPARTITIONED
+
   SCAN HDFS table=tpch.part (1) compact
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS

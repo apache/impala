@@ -46,7 +46,7 @@ struct THdfsFileSplit {
   // Planner has already picked a data node to read this split from. This volumeId
   // is the disk volume identifier of the chosen data node.
   // If the Hadoop cluster does not support volumeId, it is -1.
-  5: required i32 volumeId
+  5: optional i32 volumeId = -1
 }
 
 // Specification of subsection of a single hdfs file.

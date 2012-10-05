@@ -4,6 +4,7 @@ package com.cloudera.impala.planner;
 
 import com.cloudera.impala.thrift.TDataSink;
 import com.cloudera.impala.thrift.TDataSink2;
+import com.cloudera.impala.thrift.TExplainLevel;
 
 /**
  * A DataSink describes the destination of a plan fragment's output rows.
@@ -19,7 +20,7 @@ public abstract class DataSink {
    * @param prefix each explain line will be started with the given prefix
    * @return
    */
-  public abstract String getExplainString(String prefix);
+  public abstract String getExplainString(String prefix, TExplainLevel explainLevel);
 
   protected abstract TDataSink toThrift();
   protected abstract TDataSink2 toThrift2();

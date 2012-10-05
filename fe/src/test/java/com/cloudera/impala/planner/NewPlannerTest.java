@@ -27,12 +27,15 @@ import com.cloudera.impala.testutil.TestFileParser.TestCase;
 import com.cloudera.impala.testutil.TestUtils;
 import com.cloudera.impala.thrift.Constants;
 import com.cloudera.impala.thrift.TClientRequest;
+import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.THBaseKeyRange;
 import com.cloudera.impala.thrift.THdfsFileSplit2;
 import com.cloudera.impala.thrift.TQueryExecRequest2;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TScanRangeLocation;
 import com.cloudera.impala.thrift.TScanRangeLocations;
+import com.cloudera.impala.thrift.TStmtType;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
 public class NewPlannerTest {
@@ -124,11 +127,13 @@ public class NewPlannerTest {
     TClientRequest request = new TClientRequest(query, options);
     StringBuilder explainBuilder = new StringBuilder();
 
-    TQueryExecRequest2 execRequest = null;
+    TExecRequest execRequest = null;
     String locationsStr = null;
     actualOutput.append(Section.PLAN.getHeader() + "\n");
     try {
-      execRequest = frontend.createQueryExecRequest2(request, explainBuilder);
+      execRequest = frontend.createExecRequest2(request, explainBuilder);
+      Preconditions.checkState(execRequest.stmt_type == TStmtType.DML
+          || execRequest.stmt_type == TStmtType.QUERY);
       String explainStr = explainBuilder.toString();
       actualOutput.append(explainStr);
       if (!isImplemented) {
@@ -142,7 +147,7 @@ public class NewPlannerTest {
           errorLog.append("section " + Section.PLAN.toString() + " of query:\n" + query
               + "\n" + result);
         }
-        locationsStr = PrintScanRangeLocations(execRequest).toString();
+        locationsStr = PrintScanRangeLocations(execRequest.queryExecRequest2).toString();
       }
     } catch (AnalysisException e) {
       errorLog.append("query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
@@ -170,7 +175,9 @@ public class NewPlannerTest {
     actualOutput.append(Section.DISTRIBUTEDPLAN.getHeader() + "\n");
     try {
       // distributed plan
-      execRequest = frontend.createQueryExecRequest2(request, explainBuilder);
+      execRequest = frontend.createExecRequest2(request, explainBuilder);
+      Preconditions.checkState(execRequest.stmt_type == TStmtType.DML
+          || execRequest.stmt_type == TStmtType.QUERY);
       String explainStr = explainBuilder.toString();
       actualOutput.append(explainStr);
       if (!isImplemented) {
@@ -258,7 +265,6 @@ public class NewPlannerTest {
     runPlannerTestFile("aggregation");
   }
 
-  /*
   @Test
   public void testHbase() {
     runPlannerTestFile("hbase");
@@ -268,7 +274,6 @@ public class NewPlannerTest {
   public void testInsert() {
     runPlannerTestFile("insert");
   }
-  */
 
   @Test
   public void testHdfs() {

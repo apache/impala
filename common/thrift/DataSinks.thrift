@@ -25,7 +25,6 @@ struct TDataStreamSink2 {
   // If the partitioning type is UNPARTITIONED, the output is broadcast
   // to each destination host.
   2: optional Partitions.TDataPartition output_partition
-
 }
 
 // Specification of how plan fragment output is partitioned. If it is hash-partitioned,

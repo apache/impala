@@ -25,6 +25,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
+    UNPARTITIONED
+
   MERGE (7)
     TUPLE IDS: 3 
     SCAN HDFS table=default.alltypestiny (3)
@@ -34,6 +36,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
+    UNPARTITIONED
+
   MERGE (6)
     TUPLE IDS: 3 
     SCAN HDFS table=default.alltypestiny (2)
@@ -43,6 +47,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
+    UNPARTITIONED
+
   MERGE (5)
     TUPLE IDS: 3 
     SCAN HDFS table=default.alltypestiny (1)
@@ -91,6 +97,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (9)
     TUPLE IDS: 3 
     SCAN HDFS table=default.alltypestiny (4)
@@ -101,6 +109,8 @@ Plan Fragment 2
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (8)
     TUPLE IDS: 3 
     TOP-N
@@ -114,6 +124,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypestiny (2)
     TUPLE IDS: 1 
 
@@ -121,6 +133,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (7)
     TUPLE IDS: 3 
     SCAN HDFS table=default.alltypestiny (1)
@@ -172,6 +186,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   MERGE (8)
     TUPLE IDS: 3 
     SCAN HDFS table=default.alltypestiny (3)
@@ -181,6 +197,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   MERGE (7)
     TUPLE IDS: 3 
     SCAN HDFS table=default.alltypestiny (2)
@@ -190,6 +208,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   MERGE (6)
     TUPLE IDS: 3 
     SCAN HDFS table=default.alltypestiny (1)
@@ -316,6 +336,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   MERGE (11)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (4)
@@ -325,6 +347,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   MERGE (10)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (3)
@@ -334,6 +358,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   MERGE (9)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (2)
@@ -343,6 +369,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   MERGE (8)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (1)
@@ -407,6 +435,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 11
+    UNPARTITIONED
+
   MERGE (14)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (6)
@@ -416,6 +446,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 11
+    UNPARTITIONED
+
   MERGE (13)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (5)
@@ -425,6 +457,8 @@ Plan Fragment 3
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 11
+    UNPARTITIONED
+
   MERGE (12)
     TUPLE IDS: 4 
     AGGREGATE
@@ -438,6 +472,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 8
+    UNPARTITIONED
+
   MERGE (10)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (2)
@@ -447,6 +483,8 @@ Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 8
+    UNPARTITIONED
+
   MERGE (9)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (1)
@@ -511,6 +549,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 12
+    UNPARTITIONED
+
   MERGE (14)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (6)
@@ -520,6 +560,8 @@ Plan Fragment 2
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 12
+    UNPARTITIONED
+
   MERGE (13)
     TUPLE IDS: 4 
     AGGREGATE
@@ -533,6 +575,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 8
+    UNPARTITIONED
+
   MERGE (11)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (3)
@@ -542,6 +586,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 8
+    UNPARTITIONED
+
   MERGE (10)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (2)
@@ -551,6 +597,8 @@ Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 8
+    UNPARTITIONED
+
   MERGE (9)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (1)
@@ -596,6 +644,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
+    UNPARTITIONED
+
   MERGE (7)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (3)
@@ -605,6 +655,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
+    UNPARTITIONED
+
   MERGE (6)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (2)
@@ -614,6 +666,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
+    UNPARTITIONED
+
   MERGE (5)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (1)
@@ -656,6 +710,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
+    UNPARTITIONED
+
   MERGE (7)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (3)
@@ -665,6 +721,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
+    UNPARTITIONED
+
   MERGE (6)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (2)
@@ -674,6 +732,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
+    UNPARTITIONED
+
   MERGE (5)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (1)
@@ -724,6 +784,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   MERGE (8)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (3)
@@ -733,6 +795,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   MERGE (7)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (2)
@@ -742,6 +806,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   MERGE (6)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (1)
@@ -792,6 +858,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   MERGE (8)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (3)
@@ -801,6 +869,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   MERGE (7)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (2)
@@ -810,6 +880,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   MERGE (6)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (1)
@@ -859,6 +931,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 9
+    UNPARTITIONED
+
   MERGE (11)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (5)
@@ -868,6 +942,8 @@ Plan Fragment 2
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 9
+    UNPARTITIONED
+
   MERGE (10)
     TUPLE IDS: 4 
     AGGREGATE
@@ -881,6 +957,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (8)
     TUPLE IDS: 2 
     SCAN HDFS table=default.alltypestiny (3)
@@ -890,6 +968,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (7)
     TUPLE IDS: 2 
     SCAN HDFS table=default.alltypestiny (2)
@@ -939,6 +1019,8 @@ Plan Fragment 1
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 9
+    UNPARTITIONED
+
   MERGE (11)
     TUPLE IDS: 4 
     AGGREGATE
@@ -952,6 +1034,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (8)
     TUPLE IDS: 3 
     SCAN HDFS table=default.alltypestiny (4)
@@ -961,6 +1045,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (7)
     TUPLE IDS: 3 
     SCAN HDFS table=default.alltypestiny (3)
@@ -970,6 +1056,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 9
+    UNPARTITIONED
+
   MERGE (10)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (1)
@@ -1023,6 +1111,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 11
+    UNPARTITIONED
+
   MERGE (14)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (7)
@@ -1032,6 +1122,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 11
+    UNPARTITIONED
+
   MERGE (13)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (6)
@@ -1041,6 +1133,8 @@ Plan Fragment 3
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 11
+    UNPARTITIONED
+
   MERGE (12)
     TUPLE IDS: 5 
     AGGREGATE
@@ -1054,6 +1148,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 8
+    UNPARTITIONED
+
   MERGE (10)
     TUPLE IDS: 3 
     SCAN HDFS table=default.alltypestiny (3)
@@ -1063,6 +1159,8 @@ Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 8
+    UNPARTITIONED
+
   MERGE (9)
     TUPLE IDS: 3 
     SCAN HDFS table=default.alltypestiny (2)
@@ -1119,6 +1217,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 11
+    UNPARTITIONED
+
   MERGE (14)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (7)
@@ -1128,6 +1228,8 @@ Plan Fragment 2
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 11
+    UNPARTITIONED
+
   MERGE (13)
     TUPLE IDS: 5 
     AGGREGATE
@@ -1141,6 +1243,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 8
+    UNPARTITIONED
+
   MERGE (10)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (4)
@@ -1150,6 +1254,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 8
+    UNPARTITIONED
+
   MERGE (9)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (3)
@@ -1159,6 +1265,8 @@ Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 11
+    UNPARTITIONED
+
   MERGE (12)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (1)
@@ -1219,6 +1327,8 @@ Plan Fragment 1
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 14
+    UNPARTITIONED
+
   MERGE (16)
     TUPLE IDS: 5 
     EXCHANGE (11)
@@ -1229,6 +1339,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 11
+    UNPARTITIONED
+
   MERGE (13)
     LIMIT: 10
     TUPLE IDS: 4 
@@ -1239,6 +1351,8 @@ Plan Fragment 3
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 11
+    UNPARTITIONED
+
   MERGE (12)
     LIMIT: 10
     TUPLE IDS: 4 
@@ -1253,6 +1367,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 8
+    UNPARTITIONED
+
   MERGE (10)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (4)
@@ -1262,6 +1378,8 @@ Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 8
+    UNPARTITIONED
+
   MERGE (9)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (3)
@@ -1271,6 +1389,8 @@ Plan Fragment 6
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 14
+    UNPARTITIONED
+
   MERGE (15)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (1)
@@ -1324,6 +1444,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 9
+    UNPARTITIONED
+
   MERGE (11)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (5)
@@ -1333,6 +1455,8 @@ Plan Fragment 2
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 9
+    UNPARTITIONED
+
   MERGE (10)
     TUPLE IDS: 4 
     TOP-N
@@ -1346,6 +1470,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (8)
     TUPLE IDS: 2 
     SCAN HDFS table=default.alltypestiny (3)
@@ -1355,6 +1481,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (7)
     TUPLE IDS: 2 
     SCAN HDFS table=default.alltypestiny (2)
@@ -1405,6 +1533,8 @@ Plan Fragment 1
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 9
+    UNPARTITIONED
+
   MERGE (11)
     TUPLE IDS: 4 
     TOP-N
@@ -1418,6 +1548,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (8)
     TUPLE IDS: 3 
     SCAN HDFS table=default.alltypestiny (4)
@@ -1427,6 +1559,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (7)
     TUPLE IDS: 3 
     SCAN HDFS table=default.alltypestiny (3)
@@ -1436,6 +1570,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 9
+    UNPARTITIONED
+
   MERGE (10)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (1)
@@ -1487,6 +1623,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   MERGE (8)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (3)
@@ -1496,6 +1634,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   MERGE (7)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (2)
@@ -1505,6 +1645,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   MERGE (6)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (1)
@@ -1556,6 +1698,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   MERGE (8)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (3)
@@ -1565,6 +1709,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   MERGE (7)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (2)
@@ -1574,6 +1720,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
+    UNPARTITIONED
+
   MERGE (6)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (1)
@@ -1629,6 +1777,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (10)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (4)
@@ -1638,6 +1788,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (9)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (3)
@@ -1647,6 +1799,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (8)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (2)
@@ -1656,6 +1810,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (7)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (1)
@@ -1714,6 +1870,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (10)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (4)
@@ -1723,6 +1881,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (9)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (3)
@@ -1732,6 +1892,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (8)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (2)
@@ -1741,6 +1903,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (7)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (1)
@@ -1802,6 +1966,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 10
+    UNPARTITIONED
+
   MERGE (12)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (5)
@@ -1811,6 +1977,8 @@ Plan Fragment 2
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 10
+    UNPARTITIONED
+
   MERGE (11)
     TUPLE IDS: 4 
     TOP-N
@@ -1824,6 +1992,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   MERGE (9)
     TUPLE IDS: 2 
     SCAN HDFS table=default.alltypestiny (3)
@@ -1833,6 +2003,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   MERGE (8)
     TUPLE IDS: 2 
     SCAN HDFS table=default.alltypestiny (2)
@@ -1891,6 +2063,8 @@ Plan Fragment 1
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 10
+    UNPARTITIONED
+
   MERGE (12)
     TUPLE IDS: 4 
     TOP-N
@@ -1904,6 +2078,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   MERGE (9)
     TUPLE IDS: 3 
     SCAN HDFS table=default.alltypestiny (4)
@@ -1913,6 +2089,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   MERGE (8)
     TUPLE IDS: 3 
     SCAN HDFS table=default.alltypestiny (3)
@@ -1922,6 +2100,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 10
+    UNPARTITIONED
+
   MERGE (11)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (1)
@@ -1972,6 +2152,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (11)
     TUPLE IDS: 8 
     SCAN HDFS table=default.alltypestiny (5)
@@ -1981,6 +2163,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (10)
     TUPLE IDS: 8 
     SCAN HDFS table=default.alltypestiny (4)
@@ -1990,6 +2174,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (9)
     TUPLE IDS: 8 
     SCAN HDFS table=default.alltypestiny (3)
@@ -1999,6 +2185,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (8)
     TUPLE IDS: 8 
     SCAN HDFS table=default.alltypestiny (2)
@@ -2008,6 +2196,8 @@ Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (7)
     TUPLE IDS: 8 
     SCAN HDFS table=default.alltypestiny (1)
@@ -2072,6 +2262,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   MERGE (12)
     TUPLE IDS: 8 
     SCAN HDFS table=default.alltypestiny (5)
@@ -2081,6 +2273,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   MERGE (11)
     TUPLE IDS: 8 
     SCAN HDFS table=default.alltypestiny (4)
@@ -2090,6 +2284,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   MERGE (10)
     TUPLE IDS: 8 
     SCAN HDFS table=default.alltypestiny (3)
@@ -2099,6 +2295,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   MERGE (9)
     TUPLE IDS: 8 
     SCAN HDFS table=default.alltypestiny (2)
@@ -2108,6 +2306,8 @@ Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
+    UNPARTITIONED
+
   MERGE (8)
     TUPLE IDS: 8 
     SCAN HDFS table=default.alltypestiny (1)
@@ -2181,6 +2381,8 @@ Plan Fragment 1
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 18
+    UNPARTITIONED
+
   MERGE (20)
     TUPLE IDS: 8 
     AGGREGATE
@@ -2194,6 +2396,8 @@ Plan Fragment 2
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 14
+    UNPARTITIONED
+
   MERGE (17)
     TUPLE IDS: 7 
     TOP-N
@@ -2211,6 +2415,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 11
+    UNPARTITIONED
+
   MERGE (13)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (7)
@@ -2220,6 +2426,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 11
+    UNPARTITIONED
+
   MERGE (12)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (6)
@@ -2229,6 +2437,8 @@ Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 14
+    UNPARTITIONED
+
   MERGE (16)
     TUPLE IDS: 7 
     SCAN HDFS table=default.alltypestiny (4)
@@ -2238,6 +2448,8 @@ Plan Fragment 6
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 14
+    UNPARTITIONED
+
   MERGE (15)
     TUPLE IDS: 7 
     SCAN HDFS table=default.alltypestiny (3)
@@ -2247,6 +2459,8 @@ Plan Fragment 7
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 18
+    UNPARTITIONED
+
   MERGE (19)
     TUPLE IDS: 8 
     SCAN HDFS table=default.alltypestiny (1)
@@ -2322,6 +2536,8 @@ Plan Fragment 1
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 13
+    UNPARTITIONED
+
   MERGE (17)
     TUPLE IDS: 8 
     TOP-N
@@ -2339,6 +2555,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 10
+    UNPARTITIONED
+
   MERGE (12)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (6)
@@ -2348,6 +2566,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 10
+    UNPARTITIONED
+
   MERGE (11)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (5)
@@ -2357,6 +2577,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 13
+    UNPARTITIONED
+
   MERGE (16)
     TUPLE IDS: 8 
     SCAN HDFS table=default.alltypestiny (3)
@@ -2366,6 +2588,8 @@ Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 13
+    UNPARTITIONED
+
   MERGE (15)
     TUPLE IDS: 8 
     SCAN HDFS table=default.alltypestiny (2)
@@ -2375,6 +2599,8 @@ Plan Fragment 6
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 13
+    UNPARTITIONED
+
   MERGE (14)
     TUPLE IDS: 8 
     SCAN HDFS table=default.alltypestiny (1)
@@ -2467,6 +2693,8 @@ Plan Fragment 1
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 27
+    UNPARTITIONED
+
   MERGE (31)
     TUPLE IDS: 13 
     TOP-N
@@ -2480,6 +2708,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 24
+    UNPARTITIONED
+
   MERGE (26)
     TUPLE IDS: 12 
     SCAN HDFS table=default.alltypestiny (14)
@@ -2489,6 +2719,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 24
+    UNPARTITIONED
+
   MERGE (25)
     TUPLE IDS: 12 
     SCAN HDFS table=default.alltypestiny (13)
@@ -2498,6 +2730,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 27
+    UNPARTITIONED
+
   MERGE (30)
     TUPLE IDS: 13 
     SCAN HDFS table=default.alltypestiny (11)
@@ -2507,6 +2741,8 @@ Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 27
+    UNPARTITIONED
+
   MERGE (29)
     TUPLE IDS: 13 
     SCAN HDFS table=default.alltypestiny (10)
@@ -2516,6 +2752,8 @@ Plan Fragment 6
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 27
+    UNPARTITIONED
+
   MERGE (28)
     TUPLE IDS: 13 
     AGGREGATE
@@ -2529,6 +2767,8 @@ Plan Fragment 7
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 19
+    UNPARTITIONED
+
   MERGE (23)
     TUPLE IDS: 13 
     TOP-N
@@ -2542,6 +2782,8 @@ Plan Fragment 8
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 16
+    UNPARTITIONED
+
   MERGE (18)
     TUPLE IDS: 6 
     SCAN HDFS table=default.alltypestiny (6)
@@ -2551,6 +2793,8 @@ Plan Fragment 9
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 16
+    UNPARTITIONED
+
   MERGE (17)
     TUPLE IDS: 6 
     SCAN HDFS table=default.alltypestiny (5)
@@ -2560,6 +2804,8 @@ Plan Fragment 10
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 19
+    UNPARTITIONED
+
   MERGE (22)
     TUPLE IDS: 13 
     SCAN HDFS table=default.alltypestiny (3)
@@ -2569,6 +2815,8 @@ Plan Fragment 11
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 19
+    UNPARTITIONED
+
   MERGE (21)
     TUPLE IDS: 13 
     SCAN HDFS table=default.alltypestiny (2)
@@ -2578,6 +2826,8 @@ Plan Fragment 12
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 19
+    UNPARTITIONED
+
   MERGE (20)
     TUPLE IDS: 13 
     SCAN HDFS table=default.alltypestiny (1)
@@ -2648,6 +2898,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 9
+    UNPARTITIONED
+
   MERGE (11)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (4)
@@ -2657,6 +2909,8 @@ Plan Fragment 2
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 9
+    UNPARTITIONED
+
   MERGE (10)
     TUPLE IDS: 5 
     EXCHANGE (6)
@@ -2666,6 +2920,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (8)
     TUPLE IDS: 2 
     SCAN HDFS table=default.alltypestiny (3)
@@ -2675,6 +2931,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
+    UNPARTITIONED
+
   MERGE (7)
     TUPLE IDS: 2 
     SCAN HDFS table=default.alltypestiny (2)
@@ -2741,6 +2999,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 11
+    UNPARTITIONED
+
   MERGE (13)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (5)
@@ -2750,6 +3010,8 @@ Plan Fragment 2
   UNPARTITIONED
   STREAM DATA SINK
     EXCHANGE ID: 11
+    UNPARTITIONED
+
   MERGE (12)
     TUPLE IDS: 5 
     AGGREGATE
@@ -2763,6 +3025,8 @@ Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 8
+    UNPARTITIONED
+
   MERGE (10)
     TUPLE IDS: 2 
     SCAN HDFS table=default.alltypestiny (3)
@@ -2772,6 +3036,8 @@ Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 8
+    UNPARTITIONED
+
   MERGE (9)
     TUPLE IDS: 2 
     SCAN HDFS table=default.alltypestiny (2)
@@ -2813,6 +3079,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
+    UNPARTITIONED
+
   MERGE (5)
     TUPLE IDS: 2 
     PREDICATES: <slot 32> < 5, <slot 29> = FALSE
@@ -2823,6 +3091,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
+    UNPARTITIONED
+
   MERGE (4)
     TUPLE IDS: 2 
     PREDICATES: <slot 32> < 5, <slot 29> = FALSE
@@ -2870,6 +3140,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
+    UNPARTITIONED
+
   MERGE (6)
     TUPLE IDS: 2 
     PREDICATES: <slot 32> < 5, <slot 29> = FALSE
@@ -2880,6 +3152,8 @@ Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
+    UNPARTITIONED
+
   MERGE (5)
     TUPLE IDS: 2 
     PREDICATES: <slot 32> < 5, <slot 29> = FALSE

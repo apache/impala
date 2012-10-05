@@ -54,7 +54,7 @@ struct TPlanExecParams {
 // A scan range plus the parameters needed to execute that scan.
 struct TScanRangeParams {
   1: required PlanNodes.TScanRange2 scan_range
-  2: required i32 volume_id
+  2: optional i32 volume_id
 }
 
 // Specification of one output destination of a plan fragment
@@ -83,7 +83,7 @@ struct TPlanFragmentExecParams {
 
   // Output destinations, one per output partition.
   // The partitioning of the output is specified by
-  // TPlanFragment.output_sink.output_partitioning.
+  // TPlanFragment.output_sink.output_partition.
   // The number of output partitions is destinations.size().
   4: list<TPlanFragmentDestination> destinations
 }

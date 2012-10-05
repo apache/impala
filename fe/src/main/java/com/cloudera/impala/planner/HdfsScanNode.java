@@ -308,8 +308,8 @@ public class HdfsScanNode extends ScanNode {
               new THdfsFileSplit(metadata.getFileName(),
                   currentOffset,
                   currentLength,
-                  metadata.getPartition().getId(),
-                  volumeId);
+                  metadata.getPartition().getId());
+          fileSplit.setVolumeId(volumeId);
           scanRange.addToHdfsFileSplits(fileSplit);
           remainingLength -= currentLength;
           currentOffset += currentLength;

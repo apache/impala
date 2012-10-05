@@ -25,6 +25,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
+    UNPARTITIONED
+
   SCAN HDFS table=default.testtbl (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -68,6 +70,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: COUNT(*)
   GROUP BY: zip
@@ -116,6 +120,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: SUM(float_col)
   GROUP BY: int_col
@@ -125,6 +131,8 @@ Plan Fragment 1
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
+  HBASE KEYRANGE <unbounded>:<unbounded>
+  LOCATIONS:
 ====
 select int_col, sum(float_col), min(float_col) 
 from hbasealltypessmall
@@ -162,6 +170,8 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: SUM(float_col), MIN(float_col)
   GROUP BY: int_col
@@ -170,4 +180,6 @@ Plan Fragment 1
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
+  HBASE KEYRANGE <unbounded>:<unbounded>
+  LOCATIONS:
 ====

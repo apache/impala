@@ -56,7 +56,7 @@ public class PlanFragment {
   // if null, outputs the entire row produced by planRoot
   private ArrayList<Expr> outputExprs;
 
-  // created in finalize() */
+  // created in finalize() or set in setSink()
   private DataSink sink;
 
   // specification of the partition of the input of this fragment;
@@ -93,18 +93,17 @@ public class PlanFragment {
   }
 
   /**
-   * Set output sink.
+   * Finalize plan tree and create stream sink, if needed.
    */
   public void finalize(Analyzer analyzer) throws InternalException {
     markRefdSlots(analyzer);
     planRoot.finalize(analyzer);
     if (destNodeId != null) {
+      Preconditions.checkState(sink == null);
       // we're streaming to an exchange node
       DataStreamSink streamSink = new DataStreamSink(destNodeId);
       streamSink.setPartition(outputPartition);
       sink = streamSink;
-    } else {
-      // TODO: add table sinks for insert
     }
   }
 
@@ -128,7 +127,7 @@ public class PlanFragment {
     Preconditions.checkState(dataPartition != null);
     str.append("  " + dataPartition.getExplainString(explainLevel));
     if (sink != null) {
-      str.append(sink.getExplainString("  "));
+      str.append(sink.getExplainString("  ", explainLevel));
     }
     str.append(planRoot.getExplainString("  ", explainLevel));
     return str.toString();
@@ -147,6 +146,12 @@ public class PlanFragment {
     destFragment = fragment;
     destNodeId = exchangeId;
     // TODO: check that fragment contains node w/ exchangeId
+  }
+
+  public void setSink(DataSink sink) {
+    Preconditions.checkState(this.sink == null);
+    Preconditions.checkNotNull(sink);
+    this.sink = sink;
   }
 
   public PlanNodeId getDestNodeId() {

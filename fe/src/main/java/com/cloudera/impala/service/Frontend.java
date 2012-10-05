@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.AnalysisContext;
+import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Column;
@@ -38,6 +39,7 @@ import com.cloudera.impala.thrift.TDdlExecRequest;
 import com.cloudera.impala.thrift.TDdlType;
 import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TExplainLevel;
+import com.cloudera.impala.thrift.TFinalizeParams;
 import com.cloudera.impala.thrift.TPlanExecParams;
 import com.cloudera.impala.thrift.TPlanFragment;
 import com.cloudera.impala.thrift.TPrimitiveType;
@@ -267,14 +269,15 @@ public class Frontend {
 
   /**
    * new planner interface:
-   * Return plan fragments for the given request.stmt, taking into account
-   * whether distributed execution is requested.
+   * Create a populated TExecRequest corresponding to the supplied
+   * TClientRequest.
    */
-  public TQueryExecRequest2 createQueryExecRequest2(
+  public TExecRequest createExecRequest2(
       TClientRequest request, StringBuilder explainString)
       throws InternalException, AnalysisException, NotImplementedException {
     AnalysisContext analysisCtxt = new AnalysisContext(catalog);
     AnalysisContext.AnalysisResult analysisResult = null;
+    LOG.info("createExecRequest for query " + request.stmt);
     try {
       analysisResult = analysisCtxt.analyze(request.stmt);
     } catch (AnalysisException e) {
@@ -283,47 +286,66 @@ public class Frontend {
     }
     Preconditions.checkNotNull(analysisResult.getStmt());
 
-    // assign query_id
-    TQueryExecRequest2 result = new TQueryExecRequest2();
-    UUID queryId = UUID.randomUUID();
-    result.query_id =
-        new TUniqueId(queryId.getMostSignificantBits(),
-                      queryId.getLeastSignificantBits());
+    TExecRequest result = new TExecRequest();
+    result.setQuery_options(request.getQueryOptions());
+
+    // assign request_id
+    UUID requestId = UUID.randomUUID();
+    result.setRequest_id(
+        new TUniqueId(requestId.getMostSignificantBits(),
+                      requestId.getLeastSignificantBits()));
+
+    if (analysisResult.isDdlStmt()) {
+      result.stmt_type = TStmtType.DDL;
+      createDdlExecRequest(analysisResult, result);
+      return result;
+    }
+
+    // create TQueryExecRequest2
+    Preconditions.checkState(
+        analysisResult.isQueryStmt() || analysisResult.isDmlStmt());
+    TQueryExecRequest2 queryExecRequest = new TQueryExecRequest2();
+    result.setQueryExecRequest2(queryExecRequest);
+
     // create plan
     NewPlanner planner = new NewPlanner();
     ArrayList<PlanFragment> fragments =
         planner.createPlanFragments(analysisResult, request.queryOptions);
     List<ScanNode> scanNodes = Lists.newArrayList();
-    // map from fragment to its index in result.fragments; needed for
-    // result.dest_fragment_idx
+    // map from fragment to its index in queryExecRequest.fragments; needed for
+    // queryExecRequest.dest_fragment_idx
     Map<PlanFragment, Integer> fragmentIdx = Maps.newHashMap();
     for (PlanFragment fragment: fragments) {
       TPlanFragment thriftFragment = fragment.toThrift();
-      result.addToFragments(thriftFragment);
+      queryExecRequest.addToFragments(thriftFragment);
       fragment.getPlanRoot().collectSubclasses(ScanNode.class, scanNodes);
-      fragmentIdx.put(fragment, result.fragments.size());
+      fragmentIdx.put(fragment, queryExecRequest.fragments.size() - 1);
     }
     explainString.append(planner.getExplainString(fragments, TExplainLevel.VERBOSE));
     LOG.info("desc tbl:\n" + analysisResult.getAnalyzer().getDescTbl().debugString());
-    result.desc_tbl = analysisResult.getAnalyzer().getDescTbl().toThrift();
+    queryExecRequest.desc_tbl = analysisResult.getAnalyzer().getDescTbl().toThrift();
 
     // set fragment destinations
     for (int i = 1; i < fragments.size(); ++i) {
       PlanFragment dest = fragments.get(i).getDestFragment();
       Integer idx = fragmentIdx.get(dest);
       Preconditions.checkState(idx != null);
-      result.addToDest_fragment_idx(idx.intValue());
+      queryExecRequest.addToDest_fragment_idx(idx.intValue());
     }
 
     // set scan ranges/locations for scan nodes
     for (ScanNode scanNode: scanNodes) {
-      result.putToPer_node_scan_ranges(
+      queryExecRequest.putToPer_node_scan_ranges(
           scanNode.getId().asInt(),
           scanNode.getScanRangeLocations(request.queryOptions.getMax_scan_range_length()));
     }
 
-    // fill the metadata (for query statement)
+    // Global query parameters to be set in each TPlanExecRequest.
+    queryExecRequest.query_globals = createQueryGlobals();
+
     if (analysisResult.isQueryStmt()) {
+      // fill in the metadata
+      result.stmt_type = TStmtType.QUERY;
       TResultSetMetadata metadata = new TResultSetMetadata();
       QueryStmt queryStmt = analysisResult.getQueryStmt();
       int colCnt = queryStmt.getColLabels().size();
@@ -333,11 +355,22 @@ public class Frontend {
         colDesc.columnType = queryStmt.getResultExprs().get(i).getType().toThrift();
         metadata.addToColumnDescs(colDesc);
       }
-      result.result_set_metadata = metadata;
+      result.resultSetMetadata = metadata;
+    } else {
+      Preconditions.checkState(analysisResult.isInsertStmt());
+      result.stmt_type = TStmtType.DML;
+      // create finalization params of insert stmt
+      InsertStmt insertStmt = analysisResult.getInsertStmt();
+      TFinalizeParams finalizeParams = new TFinalizeParams();
+      finalizeParams.setIs_overwrite(insertStmt.isOverwrite());
+      finalizeParams.setTable_name(insertStmt.getTargetTableName().getTbl());
+      String db = insertStmt.getTargetTableName().getDb();
+      // TODO: fix up after Henry's session cl goes in
+      finalizeParams.setTable_db(db == null ? "" : db);
+      finalizeParams.setHdfs_base_dir(
+        ((HdfsTable)insertStmt.getTargetTable()).getHdfsBaseDir());
+      queryExecRequest.setFinalize_params(finalizeParams);
     }
-
-    // Global query parameters to be set in each TPlanExecRequest.
-    result.query_globals = createQueryGlobals();
 
     return result;
   }

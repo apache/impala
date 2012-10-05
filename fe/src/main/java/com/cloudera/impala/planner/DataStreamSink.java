@@ -7,6 +7,7 @@ import com.cloudera.impala.thrift.TDataSink2;
 import com.cloudera.impala.thrift.TDataSinkType;
 import com.cloudera.impala.thrift.TDataStreamSink;
 import com.cloudera.impala.thrift.TDataStreamSink2;
+import com.cloudera.impala.thrift.TExplainLevel;
 
 /**
  * Data sink that forwards data to an exchange node.
@@ -25,10 +26,14 @@ public class DataStreamSink extends DataSink {
   }
 
   @Override
-  public String getExplainString(String prefix) {
+  public String getExplainString(String prefix, TExplainLevel explainLevel) {
     StringBuilder strBuilder = new StringBuilder();
     strBuilder.append(prefix + "STREAM DATA SINK\n");
     strBuilder.append(prefix + "  EXCHANGE ID: " + exchNodeId + "\n");
+    if (outputPartition != null) {
+      strBuilder.append(prefix + "  "
+          + outputPartition.getExplainString(explainLevel) + "\n");
+    }
     return strBuilder.toString();
   }
 
