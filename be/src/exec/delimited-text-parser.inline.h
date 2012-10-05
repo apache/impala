@@ -55,15 +55,19 @@ inline void DelimitedTextParser::AddColumn(int len, char** next_column_start,
   *next_column_start += len + 1;
   ++column_idx_;
 }
-void inline DelimitedTextParser:: FillColumns(int* num_fields,
-   std::vector<FieldLocation>* field_locations) {
+
+template <bool process_escapes>
+void inline DelimitedTextParser:: FillColumns(int len, char** last_column,
+    int* num_fields, std::vector<FieldLocation>* field_locations) {
   // Fill in any columns missing from the end of the tuple.
+  char* dummy;
+  if (last_column == NULL) last_column = &dummy;
   while (column_idx_ < scan_node_->num_cols()) {
-    char* dummy;
-    AddColumn<false>(0, &dummy, num_fields, field_locations);
+    AddColumn<process_escapes>(len, last_column, num_fields, field_locations);
+    // The rest of the columns will be null.
+    len = 0;
   }
 }
-
 
 // SSE optimized raw text file parsing.  SSE4_2 added an instruction (with 3 modes) for
 // text processing.  The modes mimic strchr, strstr and strcmp.  For text parsing, we can
@@ -150,21 +154,38 @@ inline void DelimitedTextParser::ParseSse(int max_tuples,
 
       char* delim_ptr = *byte_buffer_ptr + n;
 
-      AddColumn<process_escapes>(delim_ptr - *next_column_start,
-          next_column_start, num_fields, field_locations);
+      if (*delim_ptr == field_delim_ || *delim_ptr == collection_item_delim_) {
+        AddColumn<process_escapes>(delim_ptr - *next_column_start,
+            next_column_start, num_fields, field_locations);
+        continue;
+      }
 
-      if ((*byte_buffer_ptr)[n] == tuple_delim_) {
-        FillColumns(num_fields, field_locations);
+      if (*delim_ptr == tuple_delim_ || (tuple_delim_ == '\n' && *delim_ptr == '\r')) {
+        if (UNLIKELY(
+                last_row_delim_offset_ == *remaining_len - n && *delim_ptr == '\n')) {
+          // If the row ended in \r\n then move the next start past the \n
+          ++*next_column_start;
+          last_row_delim_offset_ = -1;
+          continue;
+        }
+        AddColumn<process_escapes>(delim_ptr - *next_column_start,
+            next_column_start, num_fields, field_locations);
+        FillColumns<false>(0, NULL, num_fields, field_locations);
         column_idx_ = scan_node_->num_partition_keys();
         row_end_locations[*num_tuples] = delim_ptr;
         ++(*num_tuples);
+        // Remember where we saw the last \r.
+        last_row_delim_offset_ = *delim_ptr == '\r' ? *remaining_len - n - 1 : -1;
         if (UNLIKELY(*num_tuples == max_tuples)) {
           (*byte_buffer_ptr) += (n + 1);
           if (process_escapes) last_char_is_escape_ = false;
-          *remaining_len += (n + 1);
+          *remaining_len -= (n + 1);
+          // If the last character we processed was \r then set the offset to 0
+          // so that we will use it at the beginning of the next batch.
+          if (last_row_delim_offset_ == *remaining_len) last_row_delim_offset_ = 0;
           return;
         }
-      }
+      } 
     }
 
     if (process_escapes) {

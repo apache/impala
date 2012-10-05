@@ -21,6 +21,7 @@ DelimitedTextParser::DelimitedTextParser(HdfsScanNode* scan_node,
       tuple_delim_(tuple_delim),
       current_column_has_escape_(false),
       last_char_is_escape_(false),
+      last_row_delim_offset_(-1),
       column_idx_(0) {
 
   // Initialize the sse search registers.
@@ -50,6 +51,9 @@ DelimitedTextParser::DelimitedTextParser(HdfsScanNode* scan_node,
   int num_delims = 0;
   if (tuple_delim != '\0') {
     search_chars[num_delims++] = tuple_delim_;
+    // Hive will treats \r (^M) as an alternate tuple delimiter, but \r\n is a
+    // single tuple delimiter.
+    if (tuple_delim_ == '\n') search_chars[num_delims++] = '\r';
     xmm_tuple_search_ = _mm_loadu_si128(reinterpret_cast<__m128i*>(search_chars));
   }
 
@@ -68,6 +72,7 @@ DelimitedTextParser::DelimitedTextParser(HdfsScanNode* scan_node,
 void DelimitedTextParser::ParserReset() {
   current_column_has_escape_ = false;
   last_char_is_escape_ = false;
+  last_row_delim_offset_ = -1;
   column_idx_ = scan_node_->num_partition_keys();
 }
 
@@ -78,6 +83,13 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
     int* num_tuples, int* num_fields, char** next_column_start) {
   // Start of this batch.
   *next_column_start = *byte_buffer_ptr;
+  // If there was a '\r' at the end of the last batch, set the offset to
+  // just before the begining. Otherwise make it invalid.
+  if (last_row_delim_offset_ == 0) {
+    last_row_delim_offset_ = remaining_len;
+  } else {
+    last_row_delim_offset_ = -1;
+  }
 
   if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
     if (escape_char_ == '\0') {
@@ -97,7 +109,8 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
     bool new_col = false;
 
     if (!last_char_is_escape_) {
-      if (tuple_delim_ != '\0' && **byte_buffer_ptr == tuple_delim_) {
+      if (tuple_delim_ != '\0' && (**byte_buffer_ptr == tuple_delim_ ||
+           (tuple_delim_ == '\n' && **byte_buffer_ptr == '\r'))) {
         new_tuple = true;
         new_col = true;
       } else if (**byte_buffer_ptr == field_delim_
@@ -113,20 +126,30 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
       last_char_is_escape_ = false;
     }
 
-    if (new_col) {
-      AddColumn<true>(*byte_buffer_ptr - *next_column_start,
-          next_column_start, num_fields, field_locations);
-    }
 
     if (new_tuple) {
-      FillColumns(num_fields, field_locations);
-      column_idx_ = scan_node_->num_partition_keys();
-      row_end_locations[*num_tuples] = *byte_buffer_ptr;
-      ++(*num_tuples);
+      if (last_row_delim_offset_ == remaining_len && **byte_buffer_ptr == '\n') {
+        // If the row ended in \r\n then move to the \n
+        --remaining_len;
+        ++*byte_buffer_ptr;
+        ++*next_column_start;
+      } else {
+        AddColumn<true>(*byte_buffer_ptr - *next_column_start,
+            next_column_start, num_fields, field_locations);
+        FillColumns<false>(0, NULL, num_fields, field_locations);
+        column_idx_ = scan_node_->num_partition_keys();
+        row_end_locations[*num_tuples] = *byte_buffer_ptr;
+        ++(*num_tuples);
+      }
+      last_row_delim_offset_ = **byte_buffer_ptr == '\r' ? remaining_len - 1 : -1;
       if (*num_tuples == max_tuples) {
         ++*byte_buffer_ptr;
+        if (last_row_delim_offset_ == remaining_len) last_row_delim_offset_ = 0;
         return Status::OK;
       }
+    } else if (new_col) {
+      AddColumn<true>(*byte_buffer_ptr - *next_column_start,
+          next_column_start, num_fields, field_locations);
     }
 
     --remaining_len;
@@ -139,7 +162,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
     DCHECK(remaining_len == 0);
     AddColumn<true>(*byte_buffer_ptr - *next_column_start,
         next_column_start, num_fields, field_locations);
-    FillColumns(num_fields, field_locations);
+    FillColumns<false>(0, NULL, num_fields, field_locations);
     column_idx_ = scan_node_->num_partition_keys();
     ++(*num_tuples);
   }
@@ -154,6 +177,13 @@ int DelimitedTextParser::FindFirstInstance(const char* buffer, int len) {
   int tuple_start = 0;
   const char* buffer_start = buffer;
   bool found = false;
+
+  // If the last char in the previous buffer was \r then either return the start of 
+  // this buffer or skip a \n at the beginning of the buffer.
+  if (last_row_delim_offset_ != -1) {
+    if (*buffer_start == '\n') return 1;
+    return 0;
+  }
 restart:
   if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
     __m128i xmm_buffer, xmm_tuple_mask;
@@ -166,6 +196,8 @@ restart:
         chr_count = SSEUtil::CHARS_PER_128_BIT_REGISTER;
       }
       xmm_buffer = _mm_loadu_si128(reinterpret_cast<const __m128i*>(buffer));
+      // This differs from ParseSse by using the slower cmpestrm instruction which
+      // takes a chr_count and can search less than 16 bytes at a time.
       xmm_tuple_mask =
           _mm_cmpestrm(xmm_tuple_search_, 1, xmm_buffer, chr_count, SSEUtil::STRCHR_MODE);
       int tuple_mask = _mm_extract_epi16(xmm_tuple_mask, 0);
@@ -186,7 +218,7 @@ restart:
   } else {
     for (int i = tuple_start; i < len; ++i) {
       char c = *buffer++;
-      if (c == tuple_delim_) {
+      if (c == tuple_delim_ || (c == '\r' && tuple_delim_ == '\n')) {
         tuple_start = i + 1;
         found = true;
         break;
@@ -231,6 +263,15 @@ restart:
   }
 
   if (!found) return -1;
+  if (tuple_start == len - 1 && buffer_start[tuple_start] == '\r') {
+    // If \r is the last char we need to wait to see if the next one is \n or not.
+    last_row_delim_offset_ = 0;
+    return -1;
+  }
+  if (buffer_start[tuple_start] == '\n' && buffer_start[tuple_start - 1] == '\r') {
+    // We have \r\n, move to the next character.
+    ++tuple_start;
+  }
   return tuple_start;
 }
 
@@ -325,14 +366,4 @@ Status DelimitedTextParser::FindSyncBlock(int end_of_range, int sync_size,
   }
   return Status::OK;
 
-}
-
-void DelimitedTextParser:: FinishTuple(int len, char** last_column,
-     int* num_fields, std::vector<FieldLocation>* field_locations) {
-  while (column_idx_ < scan_node_->num_cols()) {
-    AddColumn<true>(len, last_column, num_fields, field_locations);
-
-    // The rest of the columns will be null.
-    len = 0;
-  }
 }

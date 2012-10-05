@@ -89,23 +89,27 @@ class DelimitedTextParser {
            scan_node_->GetMaterializedSlotIdx(column_idx_) != HdfsScanNode::SKIP_COLUMN;
   }
 
-  // Finish a partial tuple when we are at the end of a file.
+  // Fill in columns missing at the end of the tuple.
   // len and last_column may contain the length and the pointer to the
   // last column on which the file ended without a delimiter.
+  // Fills in the offsets and lengths in field_locations.
   // If parsing stopped on a delimiter and there is no last column then len will be  0.
   // Other columns beyond that are filled with 0 length fields.
   // num_fields points to an initialzed count of fields and will incremented
   // by the number fileds added.
   // field_locations will be updated with the start and length of the fields.
-  void FinishTuple(int len, char** last_column, int *num_fields,
-                   std::vector<FieldLocation>* field_locations);
+  template <bool process_escapes>
+  void FillColumns(int len, char** last_column, 
+                   int* num_fields, std::vector<impala::FieldLocation>* field_locations);
 
  private:
   // Initialize the parser state.
   void ParserInit(HdfsScanNode* scan_node);
 
   // Helper routine to add a column to the field_locations vector.
-  // Input:
+  // Template parameter:
+  //   process_escapes -- if true the the column may have escape characters
+  //                      and the negative of the len will be stored.
   //   len: lenght of the current column.
   // Input/Output:
   //   next_column_start: Start of the current column, moved to the start of the next.
@@ -127,10 +131,6 @@ class DelimitedTextParser {
       char** byte_buffer_ptr, char** row_end_locations_,
       std::vector<FieldLocation>* field_locations,
       int* num_tuples, int* num_fields, char** next_column_start);
-
-  // Fill in columns missing at the end of the tuple.
-  // Fills in the offsets in field_locations.
-  void FillColumns(int* num_fields, std::vector<impala::FieldLocation>* field_locations);
 
   // ScanNode reference to map columns in the data to slots in the tuples.
   HdfsScanNode* scan_node_;
@@ -162,6 +162,15 @@ class DelimitedTextParser {
 
   // Whether or not the previous character was the escape character
   bool last_char_is_escape_;
+
+  // Used for special processing of \r.  
+  // This will be the offset of the last instance of \r from the end of the
+  // current buffer being searched unless the last row delimiter was not a \r in which
+  // case it will be -1.  If the last character in a buffer is \r then the value
+  // will be 0.  At the start of processing a new buffer if last_row_delim_offset_ is 0
+  // then it is set to be one more than the size of the buffer so that if the buffer
+  // starts with \n it is processed as \r\n.
+  int32_t last_row_delim_offset_;
   
   // Precomputed masks to process escape characters
   uint16_t low_mask_[16];

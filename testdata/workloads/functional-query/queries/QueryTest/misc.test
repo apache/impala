@@ -31,27 +31,33 @@ select * from tblwithraggedcolumns$TABLE
 string, int
 ---- RESULTS
 '',NULL
-'MissingRowDelimiter',0
+'',NULL
+'ColumnWithCarriageReturn',123
+'NoDelimiter',0
+'\r\r\n',NULL
 'a',3
+'at16bytes',NULL
 'b',4
 'c',NULL
 'd',NULL
 'foo',2
 'hello',1
-'x',NULL
 ====
 select int_col from tblwithraggedcolumns$TABLE
 ---- TYPES
 int
 ---- RESULTS
-NULL
 0
+1
+123
+2
 3
 4
 NULL
 NULL
-2
-1
+NULL
+NULL
+NULL
 NULL
 ====
 select str_col from tblwithraggedcolumns$TABLE
@@ -59,14 +65,17 @@ select str_col from tblwithraggedcolumns$TABLE
 string
 ---- RESULTS
 ''
-'MissingRowDelimiter'
+''
+'ColumnWithCarriageReturn'
+'NoDelimiter'
+'\r\r\n'
 'a'
+'at16bytes'
 'b'
 'c'
 'd'
 'foo'
 'hello'
-'x'
 ====
 # Quoting test
 SELECT `table_alias`.`int_col` AS `default_int_col` 

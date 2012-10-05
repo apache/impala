@@ -3,6 +3,7 @@
 #include "codegen/llvm-codegen.h"
 #include "exec/byte-stream.h"
 #include "exec/delimited-text-parser.h"
+#include "exec/delimited-text-parser.inline.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/hdfs-text-scanner.h"
 #include "exec/scan-range-context.h"
@@ -147,7 +148,7 @@ Status HdfsTextScanner::FinishScanRange() {
         // Missing columns or row delimiter at end of the file is ok, fill the row in.
         char* col = boundary_column_.str().ptr;
         int num_fields = 0;
-        delimited_text_parser_->FinishTuple(boundary_column_.Size(),
+        delimited_text_parser_->FillColumns<true>(boundary_column_.Size(),
             &col, &num_fields, &field_locations_);
 
         MemPool* pool;
@@ -157,7 +158,6 @@ Status HdfsTextScanner::FinishScanRange() {
         int tuples = WriteFields(pool, tuple_row_mem, num_fields, 1);
         DCHECK_EQ(tuples, 1);
         context_->CommitRows(tuples);
-        
       }
       break;
     }
@@ -280,6 +280,7 @@ Status HdfsTextScanner::FindFirstTuple(bool* tuple_found) {
       bool eosr = false;
       RETURN_IF_ERROR(FillByteBuffer(&eosr));
 
+      delimited_text_parser_->ParserReset();
       SCOPED_TIMER(parse_delimiter_timer_);
       int first_tuple_offset = delimited_text_parser_->FindFirstInstance(
           byte_buffer_ptr_, byte_buffer_read_size_);
