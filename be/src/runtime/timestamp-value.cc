@@ -5,7 +5,6 @@
 #include "common/compiler-util.h"
 #include "util/string-parser.h"
 #include <cstdio>
-#include <boost/lexical_cast.hpp>
 
 using namespace std;
 using namespace boost::posix_time;
@@ -176,20 +175,6 @@ TimestampValue::TimestampValue(const char* str, int len) {
     
 ostream& operator<<(ostream& os, const TimestampValue& timestamp_value) {
   return os << timestamp_value.DebugString();
-}
-
-istream& operator>>(istream& is, TimestampValue& timestamp_value) {
-  char buf[32];
-  memset(buf, '\0', sizeof(buf));
-  int len = is.readsome(buf, 32);
-  timestamp_value = TimestampValue(buf, len);
-  if (timestamp_value.NotADateTime()) {
-    LOG(WARNING) << "Invalid timestamp string: '" << buf << "'";
-    // This is called by auto generated functions that detect invalid
-    // conversions from text via this exception.
-    throw boost::bad_lexical_cast();
-  }
-  return is;
 }
 
 }

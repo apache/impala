@@ -55,17 +55,36 @@ void* ComputeFunctions::${fn_signature}(Expr* e, TupleRow* row) {\n\
   return &e->result_.${result_field};\n\
 }\n\n")
 
-string_to_numeric = Template("\
+string_to_int = Template("\
 void* ComputeFunctions::${fn_signature}(Expr* e, TupleRow* row) {\n\
   Expr* op = e->children()[0];\n\
   ${native_type1}* val = reinterpret_cast<${native_type1}*>(op->GetValue(row));\n\
   if (val == NULL) return NULL;\n\
-  string tmp(val->ptr, val->len);\n\
-  try {\n\
-    e->result_.${result_field} = lexical_cast<${native_type2}>(tmp);\n\
-  } catch (bad_lexical_cast &) {\n\
-    return NULL;\n\
-  }\n\
+  StringParser::ParseResult result;\n\
+  e->result_.${result_field} = \
+      StringParser::StringToInt<${native_type2}>(val->ptr, val->len, &result);\n\
+  if (UNLIKELY(result != StringParser::PARSE_SUCCESS)) return NULL;\n\
+  return &e->result_.${result_field};\n\
+}\n\n")
+
+string_to_float = Template("\
+void* ComputeFunctions::${fn_signature}(Expr* e, TupleRow* row) {\n\
+  Expr* op = e->children()[0];\n\
+  ${native_type1}* val = reinterpret_cast<${native_type1}*>(op->GetValue(row));\n\
+  if (val == NULL) return NULL;\n\
+  StringParser::ParseResult result;\n\
+  e->result_.${result_field} = \
+      StringParser::StringToFloat<${native_type2}>(val->ptr, val->len, &result);\n\
+  if (UNLIKELY(result != StringParser::PARSE_SUCCESS)) return NULL;\n\
+  return &e->result_.${result_field};\n\
+}\n\n")
+
+string_to_timestamp = Template("\
+void* ComputeFunctions::${fn_signature}(Expr* e, TupleRow* row) {\n\
+  Expr* op = e->children()[0];\n\
+  ${native_type1}* val = reinterpret_cast<${native_type1}*>(op->GetValue(row));\n\
+  if (val == NULL) return NULL;\n\
+  e->result_.${result_field} = TimestampValue(val->ptr, val->len);\n\
   return &e->result_.${result_field};\n\
 }\n\n")
 
@@ -175,6 +194,7 @@ types = {
   'STRING'        : ['STRING'],
   'TIMESTAMP'     : ['TIMESTAMP'],
   'INT_TYPES'     : ['TINYINT', 'SMALLINT', 'INT', 'BIGINT'],
+  'FLOAT_TYPES'   : ['FLOAT', 'DOUBLE'],
   'NUMERIC_TYPES' : ['TINYINT', 'SMALLINT', 'INT', 'BIGINT', 'FLOAT', 'DOUBLE'],
   'NATIVE_TYPES'  : ['BOOLEAN', 'TINYINT', 'SMALLINT', 'INT', 'BIGINT', 'FLOAT', 'DOUBLE'],
   'STRCAST_TYPES' : ['BOOLEAN', 'SMALLINT', 'INT', 'BIGINT', 'FLOAT', 'DOUBLE'],
@@ -225,13 +245,13 @@ functions = [
   ['Cast', ['BIGINT'], [['NATIVE_TYPES'], ['BIGINT']] ],
   ['Cast', ['FLOAT'], [['NATIVE_TYPES'], ['FLOAT']] ],
   ['Cast', ['DOUBLE'], [['NATIVE_TYPES'], ['DOUBLE']] ],
-  ['Cast', ['STRCAST_TYPES'], [['STRING'], ['STRCAST_TYPES']], string_to_numeric ],
-  ['Cast', ['TINYINT'], [['STRING'], ['TINYINT']], string_to_tinyint ],
+  ['Cast', ['INT_TYPES'], [['STRING'], ['INT_TYPES']], string_to_int ],
+  ['Cast', ['FLOAT_TYPES'], [['STRING'], ['FLOAT_TYPES']], string_to_float ],
   ['Cast', ['STRING'], [['STRCAST_TYPES'], ['STRING']], numeric_to_string ],
   ['Cast', ['STRING'], [['TINYINT'], ['STRING']], tinyint_to_string ],
   ['Cast', ['NATIVE_TYPES'], [['TIMESTAMP'], ['NATIVE_TYPES']]],
   ['Cast', ['STRING'], [['TIMESTAMP'], ['STRING']], numeric_to_string ],
-  ['Cast', ['TIMESTAMP'], [['STRING'], ['TIMESTAMP']], string_to_numeric],
+  ['Cast', ['TIMESTAMP'], [['STRING'], ['TIMESTAMP']], string_to_timestamp],
   ['Cast', ['TIMESTAMP'], [['NATIVE_TYPES'], ['TIMESTAMP']], ],
 
   # Case
@@ -316,6 +336,7 @@ cc_preamble = '\
 #include "exprs/expr.h"\n\
 #include "exprs/case-expr.h"\n\
 #include "runtime/tuple-row.h"\n\
+#include "util/string-parser.h"\n\
 #include <boost/lexical_cast.hpp>\n\
 \n\
 using namespace boost;\n\

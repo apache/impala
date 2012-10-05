@@ -195,7 +195,6 @@ class  TimestampValue {
 };
 
 std::ostream& operator<<(std::ostream& os, const TimestampValue& timestamp_value);
-std::istream& operator>>(std::istream& is, TimestampValue& timestamp_value);
 }
 
 #endif
