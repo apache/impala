@@ -18,9 +18,7 @@ namespace impala {
 // Period to update rate counters in ms.  
 static const int RATE_COUNTER_UPDATE_PERIOD = 500;
 
-bool RuntimeProfile::rate_update_thread_started_;
-mutex RuntimeProfile::rate_counters_lock_;
-RuntimeProfile::RateCounterMap RuntimeProfile::rate_counters_;
+RuntimeProfile::RateCounterUpdateState RuntimeProfile::rate_counters_state_;
 
 RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name) :
   pool_(pool),
@@ -408,32 +406,48 @@ RuntimeProfile::Counter* RuntimeProfile::AddRateCounter(
 }
   
 void RuntimeProfile::RegisterRateCounter(Counter* src_counter, Counter* dst_counter) {
-  lock_guard<mutex> l(rate_counters_lock_);
-  if (!rate_update_thread_started_) {
-    new thread(&RuntimeProfile::RateCounterUpdateLoop);
-    rate_update_thread_started_ = true;
-  }
   RateCounterInfo counter;
   counter.src_counter = src_counter;
   counter.elapsed_ms = 0;
-  rate_counters_[dst_counter] = counter;
+  
+  lock_guard<mutex> l(rate_counters_state_.lock);
+  if (rate_counters_state_.update_thread.get() == NULL) {
+    rate_counters_state_.update_thread.reset(
+        new thread(&RuntimeProfile::RateCounterUpdateLoop));
+  }
+  rate_counters_state_.counters[dst_counter] = counter;
 }
 
 void RuntimeProfile::StopRateCounterUpdates(Counter* rate_counter) {
-  lock_guard<mutex> l(rate_counters_lock_);
-  rate_counters_.erase(rate_counter);
+  lock_guard<mutex> l(rate_counters_state_.lock);
+  rate_counters_state_.counters.erase(rate_counter);
+}
+
+RuntimeProfile::RateCounterUpdateState::RateCounterUpdateState() : done_(false) {
+}
+
+RuntimeProfile::RateCounterUpdateState::~RateCounterUpdateState() {
+  if (rate_counters_state_.update_thread.get() != NULL) {
+    {
+      // Lock to ensure the update thread will see the update to done_
+      lock_guard<mutex> l(rate_counters_state_.lock);
+      done_ = true;
+    }
+    rate_counters_state_.update_thread->join();
+  }
 }
 
 void RuntimeProfile::RateCounterUpdateLoop() {
-  while (true) {
+  while (!rate_counters_state_.done_) {
     system_time before_time = get_system_time();
     usleep(RATE_COUNTER_UPDATE_PERIOD * 1000);
     posix_time::time_duration elapsed = get_system_time() - before_time;
     int elapsed_ms = elapsed.total_milliseconds();
 
-    lock_guard<mutex> l(rate_counters_lock_);
-    for (RateCounterMap::iterator it = rate_counters_.begin(); 
-        it != rate_counters_.end(); ++it) {
+    lock_guard<mutex> l(rate_counters_state_.lock);
+    for (RateCounterUpdateState::RateCounterMap::iterator it = 
+        rate_counters_state_.counters.begin(); 
+        it != rate_counters_state_.counters.end(); ++it) {
       it->second.elapsed_ms += elapsed_ms;
       int64_t value = it->second.src_counter->value();
       int64_t rate = value * 1000 / (it->second.elapsed_ms);

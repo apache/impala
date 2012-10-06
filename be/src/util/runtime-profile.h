@@ -3,8 +3,10 @@
 #ifndef IMPALA_UTIL_COUNTERS_H
 #define IMPALA_UTIL_COUNTERS_H
 
-#include <boost/thread/mutex.hpp>
 #include <boost/function.hpp>
+#include <boost/scoped_ptr.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/thread.hpp>
 #include <iostream>
 
 #include "common/logging.h"
@@ -236,17 +238,31 @@ class RuntimeProfile {
     int64_t elapsed_ms;
   };
 
-  // Lock protecting rate_update_thread_started_ and rate_counters_
-  static boost::mutex rate_counters_lock_;
-  
-  // If true, the rate counter update thread has been started.  This thread is
-  // started lazily when the first rate counter is added.
-  static bool rate_update_thread_started_;
-  
-  // A map of the dst (rate) counter to the src counter and elapsed time.
-  typedef std::map<Counter*, RateCounterInfo> RateCounterMap;
-  static RateCounterMap rate_counters_;
+  // This is a static singleton object that is used to update all rate counters.
+  struct RateCounterUpdateState {
+    RateCounterUpdateState();
 
+    // Tears down the update thread.
+    ~RateCounterUpdateState();
+
+    // Lock protecting state below
+    boost::mutex lock;
+    
+    // If true, tear down the update thread.
+    volatile bool done_;
+
+    // Thread performing asynchronous updates.
+    boost::scoped_ptr<boost::thread> update_thread;
+
+    // A map of the dst (rate) counter to the src counter and elapsed time.
+    typedef std::map<Counter*, RateCounterInfo> RateCounterMap;
+    RateCounterMap counters;
+  };
+
+  // Singleton object that keeps track of all rate counters and the thread
+  // for updating them.
+  static RateCounterUpdateState rate_counters_state_;
+  
   // Create a subtree of runtime profiles from nodes, starting at *node_idx.
   // On return, *node_idx is the index one past the end of this subtree
   static RuntimeProfile* CreateFromThrift(ObjectPool* pool,
