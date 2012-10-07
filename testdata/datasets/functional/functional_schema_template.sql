@@ -1083,7 +1083,7 @@ functional
 ----
 nulltable
 ----
-CREATE TABLE %(table_name)s (
+CREATE EXTERNAL TABLE %(table_name)s (
   a string,
   b string,
   c string,
@@ -1110,7 +1110,7 @@ functional
 ----
 nullescapedtable
 ----
-CREATE TABLE %(table_name)s (
+CREATE EXTERNAL TABLE %(table_name)s (
   a string,
   b string,
   c string,

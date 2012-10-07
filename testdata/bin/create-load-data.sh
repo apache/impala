@@ -12,7 +12,6 @@ set -e
 # Load the data set
 pushd ${IMPALA_HOME}/bin
 ./load-data.py --workloads functional-query --exploration_strategy exhaustive
-./load-data.py --workloads functional-planner --exploration_strategy exhaustive
 ./load-data.py --workloads tpch --exploration_strategy core
 popd
 
