@@ -9,6 +9,7 @@
 #include "common/status.h"
 #include "runtime/descriptors.h"  // for RowDescriptor
 #include "util/runtime-profile.h"
+#include "gen-cpp/PlanNodes_types.h"
 
 namespace impala {
 
@@ -18,7 +19,6 @@ class Counters;
 class RowBatch;
 struct RuntimeState;
 class TPlan;
-class TPlanNode;
 class TupleRow;
 class DataSink;
 
@@ -71,8 +71,12 @@ class ExecNode {
   static Status CreateTree(ObjectPool* pool, const TPlan& plan,
                            const DescriptorTbl& descs, ExecNode** root);
 
-  // Collect all scan nodes that are part of this subtree, and return in 'scan_nodes'.
-  void CollectScanNodes(std::vector<ExecNode*>* scan_nodes);
+  // Collect all nodes of given 'node_type' that are part of this subtree, and return in
+  // 'nodes'.
+  void CollectNodes(TPlanNodeType::type node_type, std::vector<ExecNode*>* nodes);
+
+  // Collect all scan node types.
+  void CollectScanNodes(std::vector<ExecNode*>* nodes);
 
   // Evaluate exprs over row.  Returns true if all exprs return true.
   // TODO: This doesn't use the vector<Expr*> signature because I haven't figured
@@ -101,6 +105,7 @@ class ExecNode {
   const std::vector<Expr*>& conjuncts() const { return conjuncts_; }
 
   int id() const { return id_; }
+  TPlanNodeType::type type() const { return type_; }
   const RowDescriptor& row_desc() const { return row_descriptor_; }
   int64_t rows_returned() const { return num_rows_returned_; }
   int64_t limit() const { return limit_; }
@@ -117,6 +122,7 @@ class ExecNode {
 
  protected:
   int id_;  // unique w/in single plan tree
+  TPlanNodeType::type type_;
   ObjectPool* pool_;
   std::vector<Expr*> conjuncts_;
   std::vector<ExecNode*> children_;

@@ -3,7 +3,6 @@
 package com.cloudera.impala.planner;
 
 import com.cloudera.impala.thrift.TDataSink;
-import com.cloudera.impala.thrift.TDataSink2;
 import com.cloudera.impala.thrift.TExplainLevel;
 
 /**
@@ -23,5 +22,4 @@ public abstract class DataSink {
   public abstract String getExplainString(String prefix, TExplainLevel explainLevel);
 
   protected abstract TDataSink toThrift();
-  protected abstract TDataSink2 toThrift2();
 }

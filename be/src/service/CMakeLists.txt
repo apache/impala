@@ -24,7 +24,7 @@ add_library(fesupport SHARED
 target_link_libraries(fesupport ${IMPALA_LINK_LIBS})
 
 add_executable(runquery
-  run-query.cc
+run-query.cc
 )
 
 message(STATUS, "IMPALA_LINK_LIBS: ${IMPALA_LINK_LIBS}")

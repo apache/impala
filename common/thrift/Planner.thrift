@@ -16,7 +16,7 @@ include "Partitions.thrift"
 // It leaves out node-specific parameters neede for the actual execution.
 struct TPlanFragment {
   // no plan or descriptor table: query without From clause
-  2: optional PlanNodes.TPlan plan_tree
+  2: optional PlanNodes.TPlan plan
 
   // exprs that produce values for slots of output tuple (one expr per slot);
   // if not set, plan fragment materializes full rows of plan_tree
@@ -26,7 +26,7 @@ struct TPlanFragment {
   // For example, the destination could be a stream sink which forwards 
   // the data to a remote plan fragment, or a sink which writes to a table (for
   // insert stmts).
-  5: optional DataSinks.TDataSink2 output_sink
+  5: optional DataSinks.TDataSink output_sink
 
   // Partitioning of the data created by all instances of this plan fragment;
   // partitioning.type has the following meaning:
@@ -46,13 +46,13 @@ struct TScanRangeLocation {
 
   // disk volume identifier of a particular scan range at 'server';
   // -1 indicates an unknown volume id;
-  // only set for TScanRange2.hdfsFileSplit
+  // only set for TScanRange.hdfs_file_split
   2: optional i32 volume_id = -1
 }
 
 // A single scan range plus the hosts that serve it
 struct TScanRangeLocations {
-  1: required PlanNodes.TScanRange2 scan_range
+  1: required PlanNodes.TScanRange scan_range
   // non-empty list
   2: list<TScanRangeLocation> locations
 }

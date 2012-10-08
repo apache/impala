@@ -19,6 +19,7 @@
 #include "util/metrics.h"
 #include "util/thrift-server.h"
 #include "util/thrift-client.h"
+#include "util/container-util.h"
 #include "gen-cpp/StateStoreService_types.h"
 #include "gen-cpp/StateStoreSubscriberService_types.h"
 #include "gen-cpp/Types_types.h"

@@ -2,17 +2,14 @@
 
 package com.cloudera.impala.planner;
 
-import java.util.ArrayList;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.cloudera.impala.analysis.TupleId;
-import com.cloudera.impala.thrift.TExchangeNode;
+import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
-import com.cloudera.impala.thrift.TExplainLevel;
 import com.google.common.base.Objects;
+import com.google.common.collect.Lists;
 
 /**
  * Receiver side of a 1:n data stream.
@@ -29,21 +26,19 @@ public class ExchangeNode extends PlanNode {
     this.numSenders = numSenders;
   }
 
-  public ExchangeNode(PlanNodeId id, ArrayList<TupleId> tupleIds) {
-    super(id, tupleIds);
-  }
-
   /**
-   * Create ExchangeNode with same parameters as 'node'.
+   * Create ExchangeNode that consumes output of inputNode.
    */
-  public ExchangeNode(PlanNodeId id, PlanNode node) {
-    super(id, node);
+  public ExchangeNode(PlanNodeId id, PlanNode inputNode, boolean copyConjuncts) {
+    super(id, inputNode);
+    if (!copyConjuncts) {
+      this.conjuncts = Lists.newArrayList();
+    }
   }
 
   @Override
   protected void toThrift(TPlanNode msg) {
     msg.node_type = TPlanNodeType.EXCHANGE_NODE;
-    msg.exchange_node = new TExchangeNode(numSenders);
   }
 
   @Override

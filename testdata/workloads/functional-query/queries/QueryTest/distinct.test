@@ -1,98 +1,97 @@
-# all distributed count(distinct) plans are broken
-# TODO: re-enable when switching to new planner
 # count(distinct)
-#select count(distinct smallint_col, tinyint_col)
-#from alltypesagg$TABLE
-#---- TYPES
-#bigint
-#---- RESULTS
-#100
-#====
+select count(distinct smallint_col, tinyint_col)
+from alltypesagg$TABLE
+---- TYPES
+bigint
+---- RESULTS
+100
+====
 # count(distinct) w/ grouping and non-distinct count()
-#select tinyint_col, count(distinct smallint_col), count(smallint_col)
-#from alltypesagg$TABLE group by 1
-#---- TYPES
-#tinyint, bigint, bigint
-#---- RESULTS
-#1,10,1000
-#2,10,1000
-#3,10,1000
-#4,10,1000
-#5,10,1000
-#6,10,1000
-#7,10,1000
-#8,10,1000
-#9,10,1000
-#NULL,10,900
-#====
-## count(distinct) w/ grouping and non-distinct count()
-#select tinyint_col, count(distinct int_col, smallint_col), count(smallint_col)
-#from alltypesagg$TABLE group by 1
-#---- TYPES
-#tinyint, bigint, bigint
-#---- RESULTS
-#1,100,1000
-#2,100,1000
-#3,100,1000
-#4,100,1000
-#5,100,1000
-#6,100,1000
-#7,100,1000
-#8,100,1000
-#9,100,1000
-#NULL,100,900
-#====
-## count(distinct) and sum(distinct) w/ grouping and non-distinct count()
-#select tinyint_col, count(distinct smallint_col), sum(distinct smallint_col),
-#count(smallint_col)
-#from alltypesagg$TABLE group by 1
-#---- TYPES
-#tinyint, bigint, bigint, bigint
-#---- RESULTS
-#1,10,460,1000
-#2,10,470,1000
-#3,10,480,1000
-#4,10,490,1000
-#5,10,500,1000
-#6,10,510,1000
-#7,10,520,1000
-#8,10,530,1000
-#9,10,540,1000
-#NULL,10,450,900
-#====
-## count(distinct) and sum(distinct) w/ grouping; distinct in min() and max()
-## ignored
-#select tinyint_col, count(distinct smallint_col), sum(distinct smallint_col),
-#count(smallint_col), min(distinct int_col), max(distinct float_col)
-#from alltypesagg$TABLE group by 1
-#---- TYPES
-#tinyint, bigint, bigint, bigint, int, float
-#---- RESULTS
-#1,10,460,1000,1,1090.099975585938
-#2,10,470,1000,2,1091.199951171875
-#3,10,480,1000,3,1092.300048828125
-#4,10,490,1000,4,1093.400024414062
-#5,10,500,1000,5,1094.5
-#6,10,510,1000,6,1095.599975585938
-#7,10,520,1000,7,1096.699951171875
-#8,10,530,1000,8,1097.800048828125
-#9,10,540,1000,9,1098.900024414062
-#NULL,10,450,900,10,1089
-#====
+select tinyint_col, count(distinct smallint_col), count(smallint_col)
+from alltypesagg$TABLE group by 1
+---- TYPES
+tinyint, bigint, bigint
+---- RESULTS
+1,10,1000
+2,10,1000
+3,10,1000
+4,10,1000
+5,10,1000
+6,10,1000
+7,10,1000
+8,10,1000
+9,10,1000
+NULL,10,900
+====
+# count(distinct) w/ grouping and non-distinct count()
+select tinyint_col, count(distinct int_col, smallint_col), count(smallint_col)
+from alltypesagg$TABLE group by 1
+---- TYPES
+tinyint, bigint, bigint
+---- RESULTS
+1,100,1000
+2,100,1000
+3,100,1000
+4,100,1000
+5,100,1000
+6,100,1000
+7,100,1000
+8,100,1000
+9,100,1000
+NULL,100,900
+====
+# count(distinct) and sum(distinct) w/ grouping and non-distinct count()
+select tinyint_col, count(distinct smallint_col), sum(distinct smallint_col),
+count(smallint_col)
+from alltypesagg$TABLE group by 1
+---- TYPES
+tinyint, bigint, bigint, bigint
+---- RESULTS
+1,10,460,1000
+2,10,470,1000
+3,10,480,1000
+4,10,490,1000
+5,10,500,1000
+6,10,510,1000
+7,10,520,1000
+8,10,530,1000
+9,10,540,1000
+NULL,10,450,900
+====
+# count(distinct) and sum(distinct) w/ grouping; distinct in min() and max()
+# ignored
+select tinyint_col, count(distinct smallint_col), sum(distinct smallint_col),
+count(smallint_col), min(distinct int_col), max(distinct float_col)
+from alltypesagg$TABLE group by 1
+---- TYPES
+tinyint, bigint, bigint, bigint, int, float
+---- RESULTS
+1,10,460,1000,1,1090.099975585938
+2,10,470,1000,2,1091.199951171875
+3,10,480,1000,3,1092.300048828125
+4,10,490,1000,4,1093.400024414062
+5,10,500,1000,5,1094.5
+6,10,510,1000,6,1095.599975585938
+7,10,520,1000,7,1096.699951171875
+8,10,530,1000,8,1097.800048828125
+9,10,540,1000,9,1098.900024414062
+NULL,10,450,900,10,1089
+====
 # count distinct order by the same agg expr
-#select count(distinct id) as count_id from alltypessmall order by count_id limit 100
-#---- TYPES
-#bigint
-#---- RESULTS
-#100
-#====
-## count distinct order by a diff agg expr
-#select count(distinct id) as sum_id from alltypessmall order by max(distinct id) limit 100
-#---- TYPES
-#bigint
-#---- RESULTS
-#100
-#====
+select count(distinct id) as count_id from alltypessmall order by count_id limit 100
+---- TYPES
+bigint
+---- RESULTS
+100
+====
+# count distinct order by a diff agg expr
+select count(distinct id) as sum_id from alltypessmall order by max(distinct id)
+limit 100
+---- TYPES
+bigint
+---- RESULTS
+100
+====
 # distinct *
 select distinct *
 from alltypesagg$TABLE

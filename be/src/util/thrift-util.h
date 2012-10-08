@@ -17,10 +17,6 @@ namespace impala {
 class THostPort;
 class ThriftServer;
 
-// Hash function for THostPort. This function must be called hash_value to be picked
-// up properly by boost.
-std::size_t hash_value(const THostPort& host_port);
-
 template <class T>
 Status SerializeThriftMsg(JNIEnv* env, T* msg, jbyteArray* serialized_msg) {
   int buffer_size = 100 * 1024;  // start out with 100KB

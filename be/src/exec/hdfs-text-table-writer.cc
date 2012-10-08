@@ -24,8 +24,7 @@ HdfsTextTableWriter::HdfsTextTableWriter(RuntimeState* state, OutputPartition* o
                                          const HdfsPartitionDescriptor* partition,
                                          const HdfsTableDescriptor* table_desc,
                                          const vector<Expr*>& output_exprs) 
-    : HdfsTableWriter::HdfsTableWriter(state,
-                                       output, partition, table_desc, output_exprs) {
+    : HdfsTableWriter(state, output, partition, table_desc, output_exprs) {
   tuple_delim_ = partition->line_delim();
   field_delim_ = partition->field_delim();
   escape_char_ = partition->escape_char();

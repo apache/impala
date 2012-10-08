@@ -47,14 +47,14 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   // (the same RowBatch passes through multiple nodes; for instances, join nodes
   // form a left-deep chain and pass RowBatches on to their left children).
   // rowTupleIds[0] is the first tuple in the row, rowTupleIds[1] the second, etc.
-  protected ArrayList<TupleId> rowTupleIds;
+  protected ArrayList<TupleId> rowTupleIds = Lists.newArrayList();
 
   // A set of nullable TupleId produced by this node. It is a subset of tupleIds.
   // A tuple is nullable if it's the "nullable" side of an outer join, and it has nothing
   // to do with the schema.
-  protected Set<TupleId> nullableTupleIds;
+  protected Set<TupleId> nullableTupleIds = Sets.newHashSet();
 
-  protected List<Predicate> conjuncts;
+  protected List<Predicate> conjuncts = Lists.newArrayList();
 
   //  Node should compact data.
   protected boolean compactData;
@@ -64,18 +64,12 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     this.limit = -1;
     // make a copy, just to be on the safe side
     this.tupleIds = Lists.newArrayList(tupleIds);
-    this.conjuncts = Lists.newArrayList();
-    this.rowTupleIds = Lists.newArrayList();
-    this.nullableTupleIds = Sets.newHashSet();
   }
 
   protected PlanNode(PlanNodeId id) {
     this.id = id;
     this.limit = -1;
     this.tupleIds = Lists.newArrayList();
-    this.conjuncts = Lists.newArrayList();
-    this.rowTupleIds = Lists.newArrayList();
-    this.nullableTupleIds = Sets.newHashSet();
   }
 
   /**
@@ -124,6 +118,10 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     if (this.limit == -1 || (limit != -1 && this.limit > limit)) {
       this.limit = limit;
     }
+  }
+
+  public void unsetLimit() {
+    limit = -1;
   }
 
   public ArrayList<TupleId> getTupleIds() {

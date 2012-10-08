@@ -24,13 +24,11 @@ import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.thrift.Constants;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.THdfsFileSplit;
-import com.cloudera.impala.thrift.THdfsFileSplit2;
 import com.cloudera.impala.thrift.THdfsScanNode;
 import com.cloudera.impala.thrift.THostPort;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TScanRange;
-import com.cloudera.impala.thrift.TScanRange2;
 import com.cloudera.impala.thrift.TScanRangeLocation;
 import com.cloudera.impala.thrift.TScanRangeLocations;
 import com.google.common.base.Objects;
@@ -159,10 +157,10 @@ public class HdfsScanNode extends ScanNode {
         if (maxScanRangeLength > 0 && remainingLength > maxScanRangeLength) {
           currentLength = maxScanRangeLength;
         }
-        TScanRange2 scanRange = new TScanRange2();
-        scanRange.hdfsFileSplit =
-            new THdfsFileSplit2(block.getFileName(), currentOffset,
-              currentLength, block.getPartition().getId());
+        TScanRange scanRange = new TScanRange();
+        scanRange.setHdfs_file_split(
+            new THdfsFileSplit(block.getFileName(), currentOffset,
+              currentLength, block.getPartition().getId()));
         TScanRangeLocations scanRangeLocations = new TScanRangeLocations();
         scanRangeLocations.scan_range = scanRange;
         scanRangeLocations.locations = locations;
@@ -275,57 +273,6 @@ public class HdfsScanNode extends ScanNode {
     }
 
     return Lists.newArrayList(assignmentMap.values());
-  }
-
-  @Override
-  public void getScanParams(long maxScanRangeLength,
-      int numNodes, List<TScanRange> scanRanges, List<THostPort> hostPorts) {
-    Preconditions.checkState(numNodes != Constants.NUM_NODES_ALL_RACKS);
-
-    List<HostBlockAssignment> hostBlockAssignments =
-      computeHostBlockAssignments(numNodes);
-
-    if (partitions.size() > 0 && hostPorts != null) {
-      hostPorts.clear();
-    }
-
-    LOG.info(hostBlockAssignments.toString());
-
-    // Build a TScanRange for each host, with one file split per block range.
-    for (HostBlockAssignment blockAssignment: hostBlockAssignments) {
-      TScanRange scanRange = new TScanRange(id.asInt());
-      for (int i = 0; i < blockAssignment.blockMetadata.size(); ++i) {
-        HdfsTable.BlockMetadata metadata = blockAssignment.blockMetadata.get(i);
-        int hostPortIndex = blockAssignment.blockHostPortIndex.get(i).intValue();
-        int volumeId = metadata.getVolumeId(hostPortIndex);
-        BlockLocation blockLocation = metadata.getLocation();
-        long currentOffset = blockLocation.getOffset();
-        long remainingLength = blockLocation.getLength();
-        while (remainingLength > 0) {
-          long currentLength = remainingLength;
-          if (maxScanRangeLength > 0 && remainingLength > maxScanRangeLength) {
-            currentLength = maxScanRangeLength;
-          }
-          THdfsFileSplit fileSplit =
-              new THdfsFileSplit(metadata.getFileName(),
-                  currentOffset,
-                  currentLength,
-                  metadata.getPartition().getId());
-          fileSplit.setVolumeId(volumeId);
-          scanRange.addToHdfsFileSplits(fileSplit);
-          remainingLength -= currentLength;
-          currentOffset += currentLength;
-        }
-      }
-      scanRanges.add(scanRange);
-      if (hostPorts != null) {
-        hostPorts.add(blockAssignment.getAddress());
-      }
-    }
-
-    if (hostPorts != null) {
-      LOG.info(hostPorts.toString());
-    }
   }
 
   private static final Comparator<Entry<String, HostBlockAssignment>>

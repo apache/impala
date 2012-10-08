@@ -21,11 +21,10 @@ import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TDescribeTableParams;
 import com.cloudera.impala.thrift.TDescribeTableResult;
 import com.cloudera.impala.thrift.TExecRequest;
-import com.cloudera.impala.thrift.TGetTablesParams;
-import com.cloudera.impala.thrift.TGetTablesResult;
 import com.cloudera.impala.thrift.TGetDbsParams;
 import com.cloudera.impala.thrift.TGetDbsResult;
-import com.cloudera.impala.thrift.TQueryExecRequest2;
+import com.cloudera.impala.thrift.TGetTablesParams;
+import com.cloudera.impala.thrift.TGetTablesResult;
 
 /**
  * JNI-callable interface onto a wrapped Frontend instance. The main point is to serialise
@@ -63,43 +62,16 @@ public class JniFrontend {
   }
 
   /**
-   * Create a TExecRequest as well as TResultSetMetadata for a given
-   * serialized TClientRequest. The result is returned as a serialized
-   * TExecRequest.
-   * This call is thread-safe.
-   */
-  public byte[] createExecRequest(byte[] thriftQueryRequest) throws ImpalaException {
-    TClientRequest request = new TClientRequest();
-    deserializeThrift(request, thriftQueryRequest);
-
-    // process front end
-    StringBuilder explainString = new StringBuilder();
-    TExecRequest result =
-        frontend.createExecRequest(request, explainString);
-
-    // Print explain string.
-    LOG.info(explainString.toString());
-
-    // TODO: avoid creating serializer for each query?
-    TSerializer serializer = new TSerializer(protocolFactory);
-    try {
-      return serializer.serialize(result);
-    } catch (TException e) {
-      throw new InternalException(e.getMessage());
-    }
-  }
-
-  /**
    * Jni wrapper for Frontend.createQueryExecRequest2(). Accepts a serialized
    * TClientRequest; returns a serialized TQueryExecRequest2.
    */
-  public byte[] createExecRequest2(byte[] thriftClientRequest)
+  public byte[] createExecRequest(byte[] thriftClientRequest)
       throws ImpalaException {
     TClientRequest request = new TClientRequest();
     deserializeThrift(request, thriftClientRequest);
 
     StringBuilder explainString = new StringBuilder();
-    TExecRequest result = frontend.createExecRequest2(request, explainString);
+    TExecRequest result = frontend.createExecRequest(request, explainString);
     LOG.info(explainString.toString());
 
     LOG.info("returned TQueryExecRequest2: " + result.toString());

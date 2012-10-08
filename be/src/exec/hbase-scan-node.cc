@@ -1,7 +1,10 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #include "hbase-scan-node.h"
+
 #include <algorithm>
+#include <boost/foreach.hpp>
+
 #include "runtime/runtime-state.h"
 #include "runtime/row-batch.h"
 #include "runtime/string-value.h"
@@ -244,10 +247,10 @@ void HBaseScanNode::DebugString(int indentation_level, stringstream* out) const 
   }
 }
 
-Status HBaseScanNode::SetScanRange(const TScanRange& scan_range) {
-  DCHECK(scan_range.__isset.hbaseKeyRanges);
-  for(int i = 0; i < scan_range.hbaseKeyRanges.size(); i++) {
-    const THBaseKeyRange& key_range = scan_range.hbaseKeyRanges[i];
+Status HBaseScanNode::SetScanRanges(const vector<TScanRangeParams>& scan_ranges) {
+  BOOST_FOREACH(const TScanRangeParams& params, scan_ranges) {
+    DCHECK(params.scan_range.__isset.hbase_key_range);
+    const THBaseKeyRange& key_range = params.scan_range.hbase_key_range;
     scan_range_vector_.push_back(HBaseTableScanner::ScanRange());
     HBaseTableScanner::ScanRange& sr = scan_range_vector_.back();
     if (key_range.__isset.startKey) {
@@ -257,6 +260,5 @@ Status HBaseScanNode::SetScanRange(const TScanRange& scan_range) {
       sr.set_stop_key(key_range.stopKey);
     }
   }
-
   return Status::OK;
 }

@@ -3,9 +3,8 @@
 #include <string>
 #include <sstream>
 
-#include <boost/algorithm/string/join.hpp>
-
 #include "common/logging.h"
+#include <boost/algorithm/string/join.hpp>
 
 #include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
@@ -52,9 +51,9 @@ RuntimeState::~RuntimeState() {
 }
 
 Status RuntimeState::Init(
-    const TUniqueId& fragment_id, const TQueryOptions& query_options, const string& now,
-    ExecEnv* exec_env) {
-  fragment_id_ = fragment_id;
+    const TUniqueId& fragment_instance_id, const TQueryOptions& query_options,
+    const string& now, ExecEnv* exec_env) {
+  fragment_instance_id_ = fragment_instance_id;
   query_options_ = query_options;
   now_.reset(new TimestampValue(now.c_str(), now.size()));
   exec_env_ = exec_env;
@@ -64,7 +63,9 @@ Status RuntimeState::Init(
     codegen_.reset(NULL);
   }
   if (query_options_.max_errors <= 0) {
-    query_options_.max_errors = FLAGS_max_errors;
+    // TODO: fix linker error and uncomment this
+    //query_options_.max_errors = FLAGS_max_errors;
+    query_options_.max_errors = 100;
   }
   if (query_options_.batch_size <= 0) {
     query_options_.batch_size = DEFAULT_BATCH_SIZE;

@@ -10,7 +10,6 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/testutil")
 
 add_library(TestUtil STATIC
   query-executor-if.cc
-  in-process-query-executor.cc  
   impalad-query-executor.cc  
   test-exec-env.cc
 )
@@ -19,10 +18,3 @@ add_library(TestUtil STATIC
 target_link_libraries(TestUtil
   ImpalaThrift
 )
-
-add_executable(query-jitter
-  query-jitter.cc
-)
-
-target_link_libraries(query-jitter ${IMPALA_LINK_LIBS})
-

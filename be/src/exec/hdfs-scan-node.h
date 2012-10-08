@@ -74,9 +74,7 @@ class HdfsScanNode : public ScanNode {
   ~HdfsScanNode();
 
   // ExecNode methods
-
   virtual Status Prepare(RuntimeState* state);
-
   virtual Status Open(RuntimeState* state);
 
   // Checks for cancellation at the very beginning and then again after
@@ -86,11 +84,9 @@ class HdfsScanNode : public ScanNode {
   virtual Status Close(RuntimeState* state);
 
   // ScanNode methods
-
-  virtual Status SetScanRange(const TScanRange& scan_range);
+  virtual Status SetScanRanges(const std::vector<TScanRangeParams>& scan_ranges);
 
   // Methods for the scanners to use
-
   Status CreateConjuncts(std::vector<Expr*>* exprs);
 
   int limit() const { return limit_; }

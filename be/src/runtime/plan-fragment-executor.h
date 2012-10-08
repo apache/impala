@@ -23,6 +23,8 @@ class RuntimeProfile;
 class RuntimeState;
 class TRowBatch;
 class TPlanExecRequest;
+class TPlanFragment;
+class TPlanFragmentExecParams;
 class TPlanExecParams;
 
 // PlanFragmentExecutor handles all aspects of the execution of a single plan fragment,
@@ -70,7 +72,7 @@ class PlanFragmentExecutor {
   // Prepare for execution. Call this prior to Open().
   // This call won't block.
   // runtime_state() and row_desc() will not be valid until Prepare() is called.
-  Status Prepare(const TPlanExecRequest& request, const TPlanExecParams& params);
+  Status Prepare(const TExecPlanFragmentParams& request);
 
   // Start execution. Call this prior to GetNext().
   // If this fragment has a sink, Open() will send all rows produced
@@ -147,6 +149,9 @@ class PlanFragmentExecutor {
 
   ObjectPool* obj_pool() { return runtime_state_->obj_pool(); }
 
+  // typedef for TPlanFragmentExecParams.per_node_scan_ranges
+  typedef std::map<TPlanNodeId, std::vector<TScanRangeParams> > PerNodeScanRanges;
+
   // Main loop of profile reporting thread.
   // Exits when notified on done_cv_.
   // On exit, *no report is sent*, ie, this will not send the final report.
@@ -181,6 +186,7 @@ class PlanFragmentExecutor {
 
   // Print stats about scan ranges for each volumeId in params to info log.
   void PrintVolumeIds(const TPlanExecParams& params);
+  void PrintVolumeIds(const PerNodeScanRanges& per_node_scan_ranges);
 
   const DescriptorTbl& desc_tbl() { return runtime_state_->desc_tbl(); }
 };

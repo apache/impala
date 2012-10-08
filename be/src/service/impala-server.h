@@ -28,7 +28,7 @@ class RowDescriptor;
 class TCatalogUpdate;
 class TPlanExecRequest;
 class TPlanExecParams;
-class TExecPlanFragmentArgs;
+class TExecPlanFragmentParams;
 class TExecPlanFragmentResult;
 class TInsertResult;
 class TReportExecStatusArgs;
@@ -134,9 +134,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
 
   // Initiate execution of plan fragment in newly created thread.
   // Creates new FragmentExecState and registers it in fragment_exec_state_map_.
-  Status StartPlanFragmentExecution(
-      const TPlanExecRequest& request, const TPlanExecParams& params,
-      const THostPort& coord_hostport, int backend_num);
+  Status StartPlanFragmentExecution(const TExecPlanFragmentParams& exec_params);
 
   // Top-level loop for synchronously executing plan fragment, which runs in
   // exec_state's thread. Repeatedly calls GetNext() on the executor
@@ -160,9 +158,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   boost::shared_ptr<QueryExecState> GetQueryExecState(
       const TUniqueId& query_id, bool lock);
 
-  // Return exec state for given fragment_id, or NULL if not found.
+  // Return exec state for given fragment_instance_id, or NULL if not found.
   boost::shared_ptr<FragmentExecState> GetFragmentExecState(
-      const TUniqueId& fragment_id);
+      const TUniqueId& fragment_instance_id);
 
   // Call FE to get TClientRequestResult.
   Status GetExecRequest(const TClientRequest& request, TExecRequest* result);

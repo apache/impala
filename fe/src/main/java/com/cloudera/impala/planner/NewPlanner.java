@@ -49,7 +49,7 @@ import com.google.common.collect.Lists;
  *
  */
 public class NewPlanner {
-  private final static Logger LOG = LoggerFactory.getLogger(Planner.class);
+  private final static Logger LOG = LoggerFactory.getLogger(NewPlanner.class);
 
   // For generating a string of the current time.
   private final SimpleDateFormat formatter =
@@ -80,9 +80,9 @@ public class NewPlanner {
     //LOG.info("single-node plan:"
         //+ singleNodePlan.getExplainString("", TExplainLevel.VERBOSE));
     ArrayList<PlanFragment> fragments = Lists.newArrayList();
-    if (queryOptions.num_nodes == 1) {
+    if (queryOptions.num_nodes == 1 || singleNodePlan == null) {
       // single-node execution; we're almost done
-      fragments.add(new PlanFragment(singleNodePlan, queryStmt.getResultExprs()));
+      fragments.add(new PlanFragment(singleNodePlan, DataPartition.UNPARTITIONED));
     } else {
       // leave the root fragment partitioned if we end up writing to a table;
       // otherwise merge everything into a single coordinator fragment, so we can
@@ -92,23 +92,19 @@ public class NewPlanner {
           fragments);
     }
 
+    PlanFragment rootFragment = fragments.get(fragments.size() - 1);
     if (analysisResult.isInsertStmt()) {
       // set up table sink for root fragment
-      PlanFragment rootFragment = fragments.get(fragments.size() - 1);
       rootFragment.setSink(analysisResult.getInsertStmt().createDataSink());
     }
+    // set output exprs before calling finalize()
+    rootFragment.setOutputExprs(queryStmt.getResultExprs());
 
     for (PlanFragment fragment: fragments) {
-      fragment.finalize(analyzer);
-      if (!queryOptions.allow_unsupported_formats) {
-        // verify that hdfs partitions only use supported format after partition pruning
-        ArrayList<HdfsScanNode> hdfsScans = Lists.newArrayList();
-        fragment.getPlanRoot().collectSubclasses(HdfsScanNode.class, hdfsScans);
-        for (HdfsScanNode hdfsScanNode: hdfsScans) {
-          hdfsScanNode.validateFileFormat();
-        }
-      }
+      fragment.finalize(analyzer, !queryOptions.allow_unsupported_formats);
     }
+    // compute mem layout after finalize()
+    analyzer.getDescTbl().computeMemLayout();
 
     Collections.reverse(fragments);
     return fragments;
@@ -194,7 +190,7 @@ public class NewPlanner {
     Preconditions.checkState(!(inputFragment.getPlanRoot() instanceof SortNode));
 
     PlanNode mergePlan = new ExchangeNode(
-        new PlanNodeId(nodeIdGenerator), inputFragment.getPlanRoot().getTupleIds());
+        new PlanNodeId(nodeIdGenerator), inputFragment.getPlanRoot(), false);
     PlanNodeId exchId = mergePlan.getId();
     if (inputFragment.getPlanRoot() instanceof AggregationNode) {
       // insert merge aggregation
@@ -275,7 +271,8 @@ public class NewPlanner {
 
     // create an ExchangeNode to perform the merge operation of mergeNode;
     // the ExchangeNode retains the generic PlanNode parameters of mergeNode
-    ExchangeNode exchNode = new ExchangeNode(new PlanNodeId(nodeIdGenerator), mergeNode);
+    ExchangeNode exchNode =
+        new ExchangeNode(new PlanNodeId(nodeIdGenerator), mergeNode, true);
     PlanFragment parentFragment =
         new PlanFragment(exchNode, DataPartition.UNPARTITIONED);
 
@@ -297,8 +294,8 @@ public class NewPlanner {
   private void connectChildFragment(PlanNode node, int childIdx,
       PlanFragment parentFragment, PlanFragment childFragment) {
     PlanNode child = node.getChild(childIdx);
-    PlanNode exchangeNode = new ExchangeNode(
-        new PlanNodeId(nodeIdGenerator), child.getTupleIds());
+    PlanNode exchangeNode =
+        new ExchangeNode(new PlanNodeId(nodeIdGenerator), child, false);
     node.setChild(childIdx, exchangeNode);
     childFragment.setDestination(parentFragment, exchangeNode.getId());
   }
@@ -310,7 +307,7 @@ public class NewPlanner {
   private PlanFragment createParentFragment(
       PlanFragment childFragment, DataPartition partition) {
     PlanNode exchangeNode = new ExchangeNode(
-        new PlanNodeId(nodeIdGenerator), childFragment.getPlanRoot().getTupleIds());
+        new PlanNodeId(nodeIdGenerator), childFragment.getPlanRoot(), false);
     PlanFragment parentFragment = new PlanFragment(exchangeNode, partition);
     childFragment.setDestination(parentFragment, exchangeNode.getId());
     return parentFragment;
@@ -371,7 +368,9 @@ public class NewPlanner {
           new AggregationNode(
             new PlanNodeId(nodeIdGenerator), node.getChild(0), mergeAggInfo);
       aggFragment.addPlanRoot(mergeAggNode);
-      // the 2nd-phase aggregation consumes the output of the merge agg
+      // the 2nd-phase aggregation consumes the output of the merge agg;
+      // if there is a limit, it had already been placed with the 2nd aggregation
+      // step (which is where it should be)
       aggFragment.addPlanRoot(node);
 
       // TODO: transfer having predicates
@@ -379,12 +378,17 @@ public class NewPlanner {
     } else {
       // place the original aggregation in the child fragment
       childFragment.addPlanRoot(node);
+      // if there is a limit, we need to transfer it from the pre-aggregation
+      // node in the child fragment to the merge aggregation node in the parent
+      long limit = node.getLimit();
+      node.unsetLimit();
       // place a merge aggregation step in a new fragment
       PlanFragment aggFragment = createParentFragment(childFragment, partition);
       AggregationNode mergeAggNode =
           new AggregationNode(
             new PlanNodeId(nodeIdGenerator), aggFragment.getPlanRoot(),
             node.getAggInfo().getMergeAggInfo());
+      mergeAggNode.setLimit(limit);
       aggFragment.addPlanRoot(mergeAggNode);
 
       // HAVING predicates can only be evaluated after the merge agg step

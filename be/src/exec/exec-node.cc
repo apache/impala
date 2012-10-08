@@ -21,7 +21,6 @@
 #include "runtime/runtime-state.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile.h"
-#include "gen-cpp/PlanNodes_types.h"
 
 using namespace llvm;
 using namespace std;
@@ -37,6 +36,7 @@ int ExecNode::GetNodeIdFromProfile(RuntimeProfile* p) {
 
 ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : id_(tnode.node_id),
+    type_(tnode.node_type),
     pool_(pool),
     row_descriptor_(descs, tnode.row_tuples, tnode.nullable_tuples),
     limit_(tnode.limit),
@@ -302,11 +302,16 @@ Function* ExecNode::CodegenEvalConjuncts(LlvmCodeGen* codegen,
   return codegen->FinalizeFunction(fn);
 }
 
-void ExecNode::CollectScanNodes(vector<ExecNode*>* scan_nodes) {
-  if (IsScanNode()) scan_nodes->push_back(this);
+void ExecNode::CollectNodes(TPlanNodeType::type node_type, vector<ExecNode*>* nodes) {
+  if (type_ == node_type) nodes->push_back(this);
   for (int i = 0; i < children_.size(); ++i) {
-    children_[i]->CollectScanNodes(scan_nodes);
+    children_[i]->CollectNodes(node_type, nodes);
   }
+}
+
+void ExecNode::CollectScanNodes(vector<ExecNode*>* nodes) {
+  CollectNodes(TPlanNodeType::HDFS_SCAN_NODE, nodes);
+  CollectNodes(TPlanNodeType::HBASE_SCAN_NODE, nodes);
 }
 
 void ExecNode::InitRuntimeProfile(const string& name) {

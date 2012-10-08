@@ -31,10 +31,11 @@ HdfsTableSink::HdfsTableSink(const RowDescriptor& row_desc,
     const TUniqueId& unique_id, const vector<TExpr>& select_list_texprs,
     const TDataSink& tsink)
     :  row_desc_(row_desc),
-       table_id_(tsink.tableSink.targetTableId),
+       table_id_(tsink.table_sink.target_table_id),
        select_list_texprs_(select_list_texprs),
-       partition_key_texprs_(tsink.tableSink.hdfsTableSink.partitionKeyExprs),
-       overwrite_(tsink.tableSink.hdfsTableSink.overwrite) {
+       partition_key_texprs_(tsink.table_sink.hdfs_table_sink.partition_key_exprs),
+       overwrite_(tsink.table_sink.hdfs_table_sink.overwrite) {
+  DCHECK(tsink.__isset.table_sink);
   stringstream unique_id_ss;
   unique_id_ss << unique_id.hi << "-" << unique_id.lo;
   unique_id_str_ = unique_id_ss.str();

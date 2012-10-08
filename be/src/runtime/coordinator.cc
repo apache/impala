@@ -3,6 +3,9 @@
 #include "runtime/coordinator.h"
 
 #include <limits>
+#include <map>
+#include <protocol/TBinaryProtocol.h>
+#include <protocol/TDebugProtocol.h>
 #include <transport/TTransportUtils.h>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/accumulators/accumulators.hpp>
@@ -14,6 +17,7 @@
 #include <boost/accumulators/statistics/variance.hpp>
 #include <boost/bind.hpp>
 #include <boost/foreach.hpp>
+#include <boost/unordered_set.hpp>
 
 #include "common/logging.h"
 #include "exec/data-sink.h"
@@ -31,15 +35,19 @@
 #include "exec/scan-node.h"
 #include "util/debug-util.h"
 #include "util/hdfs-util.h"
+#include "util/container-util.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/PlanNodes_types.h"
+#include "gen-cpp/Partitions_types.h"
+#include "gen-cpp/JavaConstants_constants.h"
 
 using namespace std;
 using namespace boost;
 using namespace boost::accumulators;
 using namespace apache::thrift::transport;
+using namespace apache::thrift;
 
 DECLARE_int32(be_port);
 DECLARE_string(ipaddress);
@@ -47,21 +55,26 @@ DECLARE_string(hostname);
 
 namespace impala {
 
+static void SetHostport(
+    const pair<string, int>& hostport, THostPort* thostport) {
+  thostport->hostname = hostport.first;
+  thostport->ipaddress = hostport.first;
+  thostport->port = hostport.second;
+}
+
 // Execution state of a particular fragment.
 // Concurrent accesses:
 // - GetNodeThroughput() called when coordinator's profile is printed
 // - updates through UpdateFragmentExecStatus()
 class Coordinator::BackendExecState {
  public:
-  TUniqueId fragment_id;
+  TUniqueId fragment_instance_id;
   WallClockStopWatch stopwatch;  // wall clock timer for this fragment
-  int backend_num;  // backend_exec_states_[backend_num] points to us
   const std::pair<std::string, int> hostport;  // of ImpalaInternalService
   int64_t total_split_size;  // summed up across all splits; in bytes
 
-  // needed for ParallelExecutor::Exec()
-  const TPlanExecRequest* exec_request;  
-  const TPlanExecParams* exec_params;  
+  // assembled in c'tor
+  TExecPlanFragmentParams rpc_params;
 
   // protects fields below
   // lock ordering: Coordinator::lock_ can only get obtained *prior*
@@ -84,127 +97,145 @@ class Coordinator::BackendExecState {
 
   FragmentInstanceCounters aggregate_counters;
   
-  BackendExecState(
-      const TUniqueId& fragment_id, int backend_num,
-      const std::pair<std::string, int>& hostport,
-      const TPlanExecRequest* exec_request,
-      const TPlanExecParams* exec_params,
-      ObjectPool* obj_pool) 
-    : fragment_id(fragment_id),
-      backend_num(backend_num),
-      hostport(hostport),
+  BackendExecState(Coordinator* coord, const THostPort& coord_hostport,
+      int backend_num, const TPlanFragment& fragment, int fragment_idx,
+      const FragmentExecParams& params, int instance_idx, ObjectPool* obj_pool) 
+    : fragment_instance_id(params.instance_ids[instance_idx]),
+      hostport(params.hosts[instance_idx]),
       total_split_size(0),
-      exec_request(exec_request),
-      exec_params(exec_params),
       initiated(false),
       done(false),
       profile_created(false),
       total_ranges_complete(0) {
-    ComputeTotalSplitSize(*exec_params);
     profile = obj_pool->Add(
-        new RuntimeProfile(obj_pool, "Fragment " + PrintId(fragment_id)));
+        new RuntimeProfile(obj_pool, "Instance " + PrintId(fragment_instance_id)));
+    LOG(INFO) << "backend hostport: " << hostport.first << ":" << hostport.second;
+    coord->SetExecPlanFragmentParams(backend_num, fragment, fragment_idx, params,
+        instance_idx, coord_hostport, &rpc_params);
+    ComputeTotalSplitSize();
   }
 
-  // Computes sum of split sizes of leftmost scan
-  void ComputeTotalSplitSize(const TPlanExecParams& params) {
-    if (params.scan_ranges.empty()) return;
-    total_split_size = 0;
-    for (int i = 0; i < params.scan_ranges[0].hdfsFileSplits.size(); ++i) {
-      total_split_size += params.scan_ranges[0].hdfsFileSplits[i].length;
-    }
-  }
+  // Computes sum of split sizes of leftmost scan. Call only after setting
+  // exec_params.
+  void ComputeTotalSplitSize();
 
   // Return value of throughput counter for given plan_node_id, or 0 if that node
   // doesn't exist.
   // Thread-safe.
-  int64_t GetNodeThroughput(int plan_node_id) {
-    RuntimeProfile::Counter* counter = NULL;
-    {
-      lock_guard<mutex> l(lock);
-      CounterMap& throughput_counters = aggregate_counters.throughput_counters;
-      CounterMap::iterator i = throughput_counters.find(plan_node_id);
-      if (i == throughput_counters.end()) return 0;
-      counter = i->second;
-    }
-    DCHECK(counter != NULL);
-    // make sure not to hold lock when calling value() to avoid potential deadlocks
-    return counter->value();
-  }
+  int64_t GetNodeThroughput(int plan_node_id);
 
   // Return number of completed scan ranges for plan_node_id, or 0 if that node
   // doesn't exist.
   // Thread-safe.
-  int64_t GetNumScanRangesCompleted(int plan_node_id) {
-    RuntimeProfile::Counter* counter = NULL;
-    {
-      lock_guard<mutex> l(lock);
-      CounterMap& ranges_complete = aggregate_counters.scan_ranges_complete_counters;
-      CounterMap::iterator i = ranges_complete.find(plan_node_id);
-      if (i == ranges_complete.end()) return 0;
-      counter = i->second;
-    }
-    DCHECK(counter != NULL);
-    // make sure not to hold lock when calling value() to avoid potential deadlocks
-    return counter->value();
-  }
+  int64_t GetNumScanRangesCompleted(int plan_node_id);
 
   // Updates the total number of scan ranges complete for this fragment.  Returns
   // the delta since the last time this was called.
   // lock must be taken before calling this.
-  int64_t UpdateNumScanRangesCompleted() {
-    int64_t total = 0;
-    CounterMap& complete = aggregate_counters.scan_ranges_complete_counters;
-    for (CounterMap::iterator i = complete.begin(); i != complete.end(); ++i) {
-      total += i->second->value();
-    } 
-    int64_t delta = total - total_ranges_complete;
-    total_ranges_complete = total;
-    DCHECK_GE(delta, 0);
-    return delta;
-  }
+  int64_t UpdateNumScanRangesCompleted();
 };
+
+void Coordinator::BackendExecState::ComputeTotalSplitSize() {
+  const PerNodeScanRanges& per_node_scan_ranges = rpc_params.params.per_node_scan_ranges;
+  total_split_size = 0;
+  BOOST_FOREACH(const PerNodeScanRanges::value_type& entry, per_node_scan_ranges) {
+    BOOST_FOREACH(const TScanRangeParams& scan_range_params, entry.second) {
+      if (!scan_range_params.scan_range.__isset.hdfs_file_split) continue;
+      total_split_size += scan_range_params.scan_range.hdfs_file_split.length;
+    }
+  }
+}
+
+int64_t Coordinator::BackendExecState::GetNodeThroughput(int plan_node_id) {
+  RuntimeProfile::Counter* counter = NULL;
+  {
+    lock_guard<mutex> l(lock);
+    CounterMap& throughput_counters = aggregate_counters.throughput_counters;
+    CounterMap::iterator i = throughput_counters.find(plan_node_id);
+    if (i == throughput_counters.end()) return 0;
+    counter = i->second;
+  }
+  DCHECK(counter != NULL);
+  // make sure not to hold lock when calling value() to avoid potential deadlocks
+  return counter->value();
+}
+
+int64_t Coordinator::BackendExecState::GetNumScanRangesCompleted(int plan_node_id) {
+  RuntimeProfile::Counter* counter = NULL;
+  {
+    lock_guard<mutex> l(lock);
+    CounterMap& ranges_complete = aggregate_counters.scan_ranges_complete_counters;
+    CounterMap::iterator i = ranges_complete.find(plan_node_id);
+    if (i == ranges_complete.end()) return 0;
+    counter = i->second;
+  }
+  DCHECK(counter != NULL);
+  // make sure not to hold lock when calling value() to avoid potential deadlocks
+  return counter->value();
+}
+
+int64_t Coordinator::BackendExecState::UpdateNumScanRangesCompleted() {
+  int64_t total = 0;
+  CounterMap& complete = aggregate_counters.scan_ranges_complete_counters;
+  for (CounterMap::iterator i = complete.begin(); i != complete.end(); ++i) {
+    total += i->second->value();
+  } 
+  int64_t delta = total - total_ranges_complete;
+  total_ranges_complete = total;
+  DCHECK_GE(delta, 0);
+  return delta;
+}
 
 Coordinator::Coordinator(ExecEnv* exec_env, ExecStats* exec_stats)
   : exec_env_(exec_env),
     has_called_wait_(false),
     executor_(NULL), // Set in Prepare()
     exec_stats_(exec_stats),
+    num_backends_(0),
     num_remaining_backends_(0),
+    num_scan_ranges_(0),
     obj_pool_(NULL) {
 }
 
 Coordinator::~Coordinator() {
 }
 
-int GetNumTotalScanRanges(TPlanExecParams* params) {
-  int result = 0;
-  for (int i = 0; i < params->scan_ranges.size(); ++i) {
-    result += params->scan_ranges[i].hdfsFileSplits.size();;
-  }
-  return result;
-}
-
-Status Coordinator::Exec(TQueryExecRequest* request) {
+Status Coordinator::Exec(
+    const TUniqueId& query_id, TQueryExecRequest* request,
+    const TQueryOptions& query_options) {
+  DCHECK_GT(request->fragments.size(), 0);
   needs_finalization_ = request->__isset.finalize_params;
   if (needs_finalization_) {
     finalize_params_ = request->finalize_params;
   }
 
-  query_id_ = request->query_id;
-  VLOG_QUERY << "Exec() query_id=" << request->query_id
-             << " stmt=" << request->sql_stmt;
+  query_id_ = query_id;
+  VLOG_QUERY << "Exec() query_id=" << query_id_;
+  desc_tbl_ = request->desc_tbl;
+  query_globals_ = request->query_globals;
+  query_options_ = query_options;
+
+  query_profile_.reset(new RuntimeProfile(obj_pool(), "Query " + PrintId(query_id_)));
+  SCOPED_TIMER(query_profile_->total_time_counter());
+
+  ComputeFragmentExecParams(*request);
+  ComputeScanRangeAssignment(*request);
+
+  THostPort coord;
+  coord.__set_hostname(FLAGS_hostname);
+  coord.__set_ipaddress(FLAGS_ipaddress);
+  coord.__set_port(FLAGS_be_port);
 
   // to keep things simple, make async Cancel() calls wait until plan fragment
   // execution has been initiated, otherwise we might try to cancel fragment
   // execution at backends where it hasn't even started
   lock_guard<mutex> l(lock_);
 
-  DCHECK_GT(request->fragment_requests.size(), 0);
-  DCHECK_GT(request->node_request_params.size(), 0);
+  // we run the root fragment ourselves if it is unpartitioned
+  bool has_coordinator_fragment =
+      request->fragments[0].partition.type == TPartitionType::UNPARTITIONED;
 
-  int total_scan_ranges = 0;
-
-  if (request->has_coordinator_fragment) {
+  if (has_coordinator_fragment) {
     executor_.reset(new PlanFragmentExecutor(
             exec_env_, PlanFragmentExecutor::ReportStatusCallback()));
     // If a coordinator fragment is requested (for most queries this
@@ -212,27 +243,15 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
     // this before starting any more plan fragments in backend threads,
     // otherwise they start sending data before the local exchange node
     // had a chance to register with the stream mgr
-    // register data streams for coord fragment
-    RETURN_IF_ERROR(executor_->Prepare(
-            request->fragment_requests[0], request->node_request_params[0][0]));
-    total_scan_ranges += GetNumTotalScanRanges(&request->node_request_params[0][0]);
-
-    if (request->node_request_params.size() > 1) {
-      // for now, set destinations of 2nd fragment to coord ipaddress/port
-      // TODO: determine execution hosts first, then set destinations to those hosts
-      for (int i = 0; i < request->node_request_params[1].size(); ++i) {
-        DCHECK_EQ(request->node_request_params[1][i].destinations.size(), 1);
-        request->node_request_params[1][i].destinations[0].hostname = FLAGS_hostname;
-        request->node_request_params[1][i].destinations[0].ipaddress = FLAGS_ipaddress;
-        request->node_request_params[1][i].destinations[0].port = FLAGS_be_port;
-      }
-    }
+    TExecPlanFragmentParams rpc_params;
+    SetExecPlanFragmentParams(
+        0, request->fragments[0], 0, fragment_exec_params_[0], 0, coord, &rpc_params);
+    RETURN_IF_ERROR(executor_->Prepare(rpc_params));
   } else {
     executor_.reset(NULL);
     obj_pool_.reset(new ObjectPool());
   }
 
-  query_profile_.reset(new RuntimeProfile(obj_pool(), "Query " + PrintId(query_id_)));
   // register coordinator's fragment profile now, before those of the backends,
   // so it shows up at the top
   aggregate_profile_ = obj_pool()->Add(
@@ -243,77 +262,50 @@ Status Coordinator::Exec(TQueryExecRequest* request) {
     executor_->profile()->set_name("Coordinator Fragment");
     CollectScanNodeCounters(executor_->profile(), &coordinator_counters_);
   }
-  SCOPED_TIMER(query_profile_->total_time_counter());
 
-  // Start non-coord fragments on remote nodes;
-  // fragment_requests[i] can receive data from fragment_requests[>i],
-  // so start fragments in ascending order.
+  // start fragment instances from left to right, so that receivers have
+  // Prepare()'d before senders start sending
+  backend_exec_states_.resize(num_backends_);
+  num_remaining_backends_ = num_backends_;
+  LOG(INFO) << "starting " << num_backends_ << " backends for query " << query_id_;
   int backend_num = 0;
-  int first_remote_fragment_idx = request->has_coordinator_fragment ? 1 : 0;
-  for (int i = first_remote_fragment_idx; i < request->fragment_requests.size(); ++i) {
-    DCHECK(exec_env_ != NULL);
-    // TODO: change this in the following way:
-    // * add locations to request->node_request_params.scan_ranges
-    // * pass in request->node_request_params and let the scheduler figure out where
-    // we should be doing those scans, rather than the frontend
-    vector<pair<string, int> > hosts;
-    RETURN_IF_ERROR(
-        exec_env_->scheduler()->GetHosts(
-            request->data_locations[i - first_remote_fragment_idx], &hosts));
-    DCHECK_EQ(hosts.size(), request->node_request_params[i].size());
+  for (int fragment_idx = (has_coordinator_fragment ? 1 : 0);
+       fragment_idx < request->fragments.size(); ++fragment_idx) {
+    FragmentExecParams& params = fragment_exec_params_[fragment_idx];
 
-    // start individual plan exec requests
-    for (int j = 0; j < hosts.size(); ++j) {
-      // assign fragment id that's unique across all fragment executions;
-      // backend_num + 1: backend_num starts at 0, and the coordinator fragment 
-      // is already assigned the query id
-      TUniqueId fragment_id;
-      fragment_id.hi = request->query_id.hi;
-      DCHECK_LT(request->query_id.lo, numeric_limits<int64_t>::max() - backend_num - 1);
-      fragment_id.lo = request->query_id.lo + backend_num + 1;
-
+    // set up exec states
+    int num_hosts = params.hosts.size();
+    DCHECK_GT(num_hosts, 0);
+    for (int instance_idx = 0; instance_idx < num_hosts; ++instance_idx) {
       // TODO: pool of pre-formatted BackendExecStates?
       BackendExecState* exec_state =
-          obj_pool()->Add(new BackendExecState(fragment_id, backend_num, hosts[j],
-                &request->fragment_requests[i],
-                &request->node_request_params[i][j], obj_pool()));
-      total_scan_ranges += GetNumTotalScanRanges(&request->node_request_params[i][j]);
-      DCHECK_EQ(backend_exec_states_.size(), backend_num);
-      backend_exec_states_.push_back(exec_state);
-      // add profile now; we'll get periodic updates once it starts executing
-      query_profile_->AddChild(exec_state->profile);
+          obj_pool()->Add(new BackendExecState(this, coord, backend_num,
+              request->fragments[fragment_idx], fragment_idx,
+              params, instance_idx, obj_pool()));
+      backend_exec_states_[backend_num] = exec_state;
       ++backend_num;
+      LOG(INFO) << "Exec(): starting instance: fragment_idx=" << fragment_idx
+          << " instance_id=" << params.instance_ids[instance_idx];
     }
-    PrintBackendInfo();
-  }
-  
-  num_remaining_backends_ = backend_exec_states_.size();
 
-  CreateAggregateCounters(request->fragment_requests);
-  
-  // Issue all rpcs in parallel
-  Status fragments_exec_status = ParallelExecutor::Exec(
-      bind<Status>(mem_fn(&Coordinator::ExecRemoteFragment), this, _1), 
-      reinterpret_cast<void**>(&backend_exec_states_[0]), backend_exec_states_.size());
+    // Issue all rpcs in parallel
+    Status fragments_exec_status = ParallelExecutor::Exec(
+        bind<Status>(mem_fn(&Coordinator::ExecRemoteFragment), this, _1), 
+        reinterpret_cast<void**>(&backend_exec_states_[backend_num - num_hosts]),
+        num_hosts);
 
-  // Clear state in backend_exec_states_ that is only guaranteed to exist for the
-  // duration of this function
-  for (int i = 0; i < backend_exec_states_.size(); ++i) {
-    backend_exec_states_[i]->exec_request = NULL;
-    backend_exec_states_[i]->exec_params = NULL;
-  }
-
-  if (!fragments_exec_status.ok()) {
-    DCHECK(query_status_.ok());  // nobody should have been able to cancel
-    query_status_ = fragments_exec_status;
-    // tear down running fragments and return
-    CancelInternal();
-    return fragments_exec_status;
+    if (!fragments_exec_status.ok()) {
+      DCHECK(query_status_.ok());  // nobody should have been able to cancel
+      query_status_ = fragments_exec_status;
+      // tear down running fragments and return
+      CancelInternal();
+      return fragments_exec_status;
+    }
   }
 
   stringstream ss;
   ss << "Query " << query_id_;
-  progress_ = ProgressUpdater(ss.str(), total_scan_ranges);
+  progress_ = ProgressUpdater(ss.str(), num_scan_ranges_);
   progress_.set_logging_level(1);
 
   return Status::OK;
@@ -511,7 +503,7 @@ Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
   // if there was an error, we need to return the query's error status rather than
   // the status we just got back from the local executor (which may well be CANCELLED
   // in that case).  Coordinator fragment failed in this case so we log the query_id.
-  RETURN_IF_ERROR(UpdateStatus(status, &runtime_state()->fragment_id()));
+  RETURN_IF_ERROR(UpdateStatus(status, &runtime_state()->fragment_instance_id()));
 
   if (*batch == NULL) {
     // Don't return final NULL until all backends have completed.
@@ -571,7 +563,7 @@ void Coordinator::CollectScanNodeCounters(RuntimeProfile* profile,
     PlanNodeId id = ExecNode::GetNodeIdFromProfile(p);
     
     // This profile is not for an exec node.
-    if (id == -1) continue;
+    if (id == g_JavaConstants_constants.INVALID_PLAN_NODE_ID) continue;
 
     RuntimeProfile::Counter* throughput_counter = 
         p->GetCounter(ScanNode::TOTAL_THROUGHPUT_COUNTER);
@@ -587,12 +579,11 @@ void Coordinator::CollectScanNodeCounters(RuntimeProfile* profile,
 }
 
 void Coordinator::CreateAggregateCounters(
-    const vector<TPlanExecRequest>& fragment_requests) {
-  for (int i = 0; i < fragment_requests.size(); ++i) {
-    if (!fragment_requests[i].__isset.plan_fragment) continue;
-    const vector<TPlanNode>& nodes = fragment_requests[i].plan_fragment.nodes;
-    for (int j = 0; j < nodes.size(); ++j) {
-      const TPlanNode& node = nodes[j];
+    const vector<TPlanFragment>& fragments) {
+  BOOST_FOREACH(const TPlanFragment& fragment, fragments) {
+    if (!fragment.__isset.plan) continue;
+    const vector<TPlanNode>& nodes = fragment.plan.nodes;
+    BOOST_FOREACH(const TPlanNode& node, nodes) {
       if (node.node_type != TPlanNodeType::HDFS_SCAN_NODE
           && node.node_type != TPlanNodeType::HBASE_SCAN_NODE) {
         continue;
@@ -647,7 +638,7 @@ int64_t Coordinator::ComputeTotalScanRangesComplete(int node_id) {
 Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
   BackendExecState* exec_state = reinterpret_cast<BackendExecState*>(exec_state_arg);
   VLOG_FILE << "making rpc: ExecPlanFragment query_id=" << query_id_
-            << " fragment_id=" << exec_state->fragment_id
+            << " instance_id=" << exec_state->fragment_instance_id
             << " ipaddress=" << exec_state->hostport.first
             << " port=" << exec_state->hostport.second;
   lock_guard<mutex> l(exec_state->lock);
@@ -658,25 +649,13 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
       exec_state->hostport, &backend_client));
   DCHECK(backend_client != NULL);
 
-  TExecPlanFragmentParams params;
-  params.protocol_version = ImpalaInternalServiceVersion::V1;
-  // TODO: is this yet another copy? find a way to avoid those.
-  params.__set_request(*exec_state->exec_request);
-  params.request.fragment_id = exec_state->fragment_id;
-  params.__set_params(*exec_state->exec_params);
-  params.coord.hostname = FLAGS_hostname;
-  params.coord.ipaddress = FLAGS_ipaddress;
-  params.coord.port = FLAGS_be_port;
-  params.__isset.coord = true;
-  params.__set_backend_num(exec_state->backend_num);
-
   TExecPlanFragmentResult thrift_result;
   try {
-    backend_client->ExecPlanFragment(thrift_result, params);
+    backend_client->ExecPlanFragment(thrift_result, exec_state->rpc_params);
   } catch (TTransportException& e) {
     stringstream msg;
     msg << "ExecPlanRequest rpc query_id=" << query_id_
-        << " fragment_id=" << exec_state->fragment_id 
+        << " instance_id=" << exec_state->fragment_instance_id 
         << " failed: " << e.what();
     VLOG_QUERY << msg.str();
     exec_state->status = Status(msg.str());
@@ -740,17 +719,17 @@ void Coordinator::CancelInternal() {
 
     TCancelPlanFragmentParams params;
     params.protocol_version = ImpalaInternalServiceVersion::V1;
-    params.__set_fragment_id(exec_state->fragment_id);
+    params.__set_fragment_instance_id(exec_state->fragment_instance_id);
     TCancelPlanFragmentResult res;
     try {
-      VLOG_QUERY << "sending CancelPlanFragment rpc for fragment_id="
-                 << exec_state->fragment_id << " backend="
+      VLOG_QUERY << "sending CancelPlanFragment rpc for instance_id="
+                 << exec_state->fragment_instance_id << " backend="
                  << exec_state->hostport.first << ":" << exec_state->hostport.second;
       backend_client->CancelPlanFragment(res, params);
     } catch (TTransportException& e) {
       stringstream msg;
       msg << "CancelPlanFragment rpc query_id=" << query_id_
-          << " fragment_id=" << exec_state->fragment_id 
+          << " instance_id=" << exec_state->fragment_instance_id 
           << " failed: " << e.what();
       // make a note of the error status, but keep on cancelling the other fragments
       exec_state->status.AddErrorMsg(msg.str());
@@ -787,10 +766,14 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
     // make sure we don't go from error status to OK
     DCHECK(!status.ok() || exec_state->status.ok())
         << "fragment is transitioning from error status to OK:"
-        << " query_id=" << query_id_ << " fragment_id=" << exec_state->fragment_id
+        << " query_id=" << query_id_ << " instance_id="
+        << exec_state->fragment_instance_id
         << " status=" << exec_state->status.GetErrorMsg();
     exec_state->status = status;
     exec_state->done = params.done;
+    RuntimeProfile* p = RuntimeProfile::CreateFromThrift(obj_pool(), cumulative_profile);
+    stringstream str;
+    p->PrettyPrint(&str);
     exec_state->profile->Update(cumulative_profile);
     if (!exec_state->profile_created) {
       CollectScanNodeCounters(exec_state->profile, &exec_state->aggregate_counters);
@@ -800,8 +783,8 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
     if (params.__isset.error_log && params.error_log.size() > 0) {
       exec_state->error_log.insert(exec_state->error_log.end(), params.error_log.begin(),
           params.error_log.end());
-      VLOG_FILE << "fragment_id=" << exec_state->fragment_id << " error log: "
-                << join(exec_state->error_log, "\n");
+      VLOG_FILE << "instance_id=" << exec_state->fragment_instance_id
+                << " error log: " << join(exec_state->error_log, "\n");
     }
     progress_.Update(exec_state->UpdateNumScanRangesCompleted());
   }
@@ -824,7 +807,8 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
     stringstream s;
     exec_state->profile->PrettyPrint(&s);
     VLOG_FILE << "profile for query_id=" << query_id_
-               << " fragment_id=" << exec_state->fragment_id << "\n" << s.str();
+               << " instance_id=" << exec_state->fragment_instance_id
+               << "\n" << s.str();
   }
   // also print the cumulative profile
   // TODO: fix the coordinator/PlanFragmentExecutor, so this isn't needed
@@ -838,7 +822,7 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
   // for now, abort the query if we see any error
   // (UpdateStatus() initiates cancellation, if it hasn't already been initiated)
   if (!status.ok()) {
-    UpdateStatus(status, &exec_state->fragment_id);
+    UpdateStatus(status, &exec_state->fragment_instance_id);
     return Status::OK;
   }
 
@@ -972,4 +956,293 @@ string Coordinator::GetErrorLog() {
   }
   return ss.str();
 }
+
+void Coordinator::ComputeFragmentExecParams(const TQueryExecRequest& exec_request) {
+  fragment_exec_params_.resize(exec_request.fragments.size());
+  ComputeFragmentHosts(exec_request);
+
+  // assign instance ids
+  BOOST_FOREACH(FragmentExecParams& params, fragment_exec_params_) {
+    for (int j = 0; j < params.hosts.size(); ++j) {
+      int instance_num = num_backends_ + j;
+      // we add instance_num to query_id.lo to create a globally-unique instance id
+      TUniqueId instance_id;
+      instance_id.hi = query_id_.hi;
+      DCHECK_LT(
+          query_id_.lo, numeric_limits<int64_t>::max() - instance_num - 1);
+      instance_id.lo = query_id_.lo + instance_num + 1;
+      params.instance_ids.push_back(instance_id);
+    }
+    num_backends_ += params.hosts.size();
+  }
+  if (exec_request.fragments[0].partition.type == TPartitionType::UNPARTITIONED) {
+    // the root fragment is executed directly by the coordinator
+    --num_backends_;
+  }
+
+  // compute destinations and # senders per exchange node
+  // (the root fragment doesn't have a destination)
+  for (int i = 1; i < fragment_exec_params_.size(); ++i) {
+    FragmentExecParams& params = fragment_exec_params_[i];
+    int dest_fragment_idx = exec_request.dest_fragment_idx[i - 1];
+    DCHECK_LT(dest_fragment_idx, fragment_exec_params_.size());
+    FragmentExecParams& dest_params = fragment_exec_params_[dest_fragment_idx];
+
+    // set # of senders
+    DCHECK(exec_request.fragments[i].output_sink.__isset.stream_sink);
+    const TDataStreamSink& sink = exec_request.fragments[i].output_sink.stream_sink;
+    // we can only handle unpartitioned (= broadcast) output at the moment
+    DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED);
+    PlanNodeId exch_id = sink.dest_node_id;
+    // we might have multiple fragments sending to this exchange node 
+    // (distributed MERGE), which is why we need to add up the #senders
+    dest_params.per_exch_num_senders[exch_id] += params.hosts.size();
+    LOG(INFO) << "#exch for fragment " << dest_fragment_idx << "/node " << exch_id
+        << ": " << dest_params.per_exch_num_senders[exch_id];
+
+    // create one TPlanFragmentDestination per destination host
+    params.destinations.resize(dest_params.hosts.size());
+    for (int j = 0; j < dest_params.hosts.size(); ++j) {
+      TPlanFragmentDestination& dest = params.destinations[j];
+      dest.fragment_instance_id = dest_params.instance_ids[j];
+      SetHostport(dest_params.hosts[j], &dest.server);
+      LOG(INFO) << "dest for fragment " << i << ":"
+                << " instance_id=" << dest.fragment_instance_id 
+                << " server=" << dest.server.ipaddress << ":" << dest.server.port;
+    }
+  }
+}
+
+Status Coordinator::ComputeFragmentHosts(const TQueryExecRequest& exec_request) {
+  pair<string, int> coord(FLAGS_ipaddress, FLAGS_be_port);
+  DCHECK_EQ(fragment_exec_params_.size(), exec_request.fragments.size());
+  vector<TPlanNodeType::type> scan_node_types;
+  scan_node_types.push_back(TPlanNodeType::HDFS_SCAN_NODE);
+  scan_node_types.push_back(TPlanNodeType::HBASE_SCAN_NODE);
+
+  // compute hosts of producer fragment before those of consumer fragment(s),
+  // the latter might inherit the set of hosts from the former
+  for (int i = exec_request.fragments.size() - 1; i >= 0; --i) {
+    const TPlanFragment& fragment = exec_request.fragments[i];
+    FragmentExecParams& params = fragment_exec_params_[i];
+    if (fragment.partition.type == TPartitionType::UNPARTITIONED) {
+      // all single-node fragments run on the coordinator host
+      params.hosts.push_back(coord);
+      continue;
+    }
+
+    PlanNodeId leftmost_scan_id = FindLeftmostNode(fragment.plan, scan_node_types);
+    if (leftmost_scan_id == g_JavaConstants_constants.INVALID_PLAN_NODE_ID) {
+      // there is no leftmost scan; we assign the same hosts as those of our
+      // leftmost input fragment (so that a partitioned aggregation fragment
+      // runs on the hosts that provide the input data)
+      int input_fragment_idx = FindLeftmostInputFragment(i, exec_request);
+      DCHECK_GE(input_fragment_idx, 0);
+      DCHECK_LT(input_fragment_idx, fragment_exec_params_.size());
+      params.hosts = fragment_exec_params_[input_fragment_idx].hosts;
+      // TODO: switch to unpartitioned/coord execution if our input fragment
+      // is executed that way (could have been downgraded from distributed)
+      continue;
+    }
+
+    map<TPlanNodeId, vector<TScanRangeLocations> >::const_iterator entry =
+        exec_request.per_node_scan_ranges.find(leftmost_scan_id);
+    if (entry == exec_request.per_node_scan_ranges.end() || entry->second.empty()) {
+      // this scan node doesn't have any scan ranges; run it on the coordinator
+      // TODO: we'll need to revisit this strategy once we can partition joins
+      // (in which case this fragment might be executing a right outer join
+      // with a large build table)
+      params.hosts.push_back(coord);
+      continue;
+    }
+    const vector<TScanRangeLocations>& scan_range_locations = entry->second;
+
+    // collect unique set of data hosts
+    unordered_set<const THostPort*, HashTHostPortPtr, THostPortPtrEquals> data_hosts;
+    BOOST_FOREACH(const TScanRangeLocations& locations, scan_range_locations) {
+      BOOST_FOREACH(const TScanRangeLocation& location, locations.locations) {
+        data_hosts.insert(&(location.server));
+      }
+    }
+    vector<THostPort> data_hostports;
+    BOOST_FOREACH(const THostPort* host_port, data_hosts) {
+      data_hostports.push_back(*host_port);
+    }
+
+    // find execution hosts for data hosts
+    RETURN_IF_ERROR(exec_env_->scheduler()->GetHosts(data_hostports, &params.hosts));
+    DCHECK_EQ(data_hostports.size(), params.hosts.size());
+    for (int j = 0; j < data_hostports.size(); ++j) {
+      params.data_server_map[data_hostports[j]] = params.hosts[j];
+    }
+
+    // de-dup
+    sort(params.hosts.begin(), params.hosts.end());
+    vector<pair<string, int> >::iterator start_duplicates = 
+        unique(params.hosts.begin(), params.hosts.end());
+    params.hosts.erase(start_duplicates, params.hosts.end());
+  }
+  return Status::OK;
+}
+
+PlanNodeId Coordinator::FindLeftmostNode(
+    const TPlan& plan, const std::vector<TPlanNodeType::type>& types) {
+  // the first node with num_children == 0 is the leftmost node
+  int node_idx = 0;
+  while (node_idx < plan.nodes.size() && plan.nodes[node_idx].num_children != 0) {
+    ++node_idx;
+  }
+  if (node_idx == plan.nodes.size()) {
+    return g_JavaConstants_constants.INVALID_PLAN_NODE_ID;
+  }
+  const TPlanNode& node = plan.nodes[node_idx];
+
+  for (int i = 0; i < types.size(); ++i) {
+    if (node.node_type == types[i]) return node.node_id;
+  }
+  return g_JavaConstants_constants.INVALID_PLAN_NODE_ID;
+}
+
+int Coordinator::FindLeftmostInputFragment(
+    int fragment_idx, const TQueryExecRequest& exec_request) {
+  // find the leftmost node, which we expect to be an exchage node
+  vector<TPlanNodeType::type> exch_node_type;
+  exch_node_type.push_back(TPlanNodeType::EXCHANGE_NODE);
+  PlanNodeId exch_id =
+      FindLeftmostNode(exec_request.fragments[fragment_idx].plan, exch_node_type);
+  if (exch_id == g_JavaConstants_constants.INVALID_PLAN_NODE_ID) {
+    return g_JavaConstants_constants.INVALID_PLAN_NODE_ID;
+  }
+
+  // find the fragment that sends to this exchange node
+  for (int i = 0; i < exec_request.dest_fragment_idx.size(); ++i) {
+    if (exec_request.dest_fragment_idx[i] != fragment_idx) continue;
+    const TPlanFragment& input_fragment = exec_request.fragments[i + 1];
+    DCHECK(input_fragment.__isset.output_sink);
+    DCHECK(input_fragment.output_sink.__isset.stream_sink);
+    if (input_fragment.output_sink.stream_sink.dest_node_id == exch_id) return i + 1;
+  }
+  // this shouldn't happen
+  DCHECK(false) << "no fragment sends to exch id " << exch_id;
+  return g_JavaConstants_constants.INVALID_PLAN_NODE_ID;
+}
+
+void Coordinator::ComputeScanRangeAssignment(const TQueryExecRequest& exec_request) {
+  // map from node id to fragment index in exec_request.fragments
+  vector<PlanNodeId> per_node_fragment_idx;
+  for (int i = 0; i < exec_request.fragments.size(); ++i) {
+    BOOST_FOREACH(const TPlanNode& node, exec_request.fragments[i].plan.nodes) {
+      if (per_node_fragment_idx.size() < node.node_id + 1) {
+        per_node_fragment_idx.resize(node.node_id + 1);
+      }
+      per_node_fragment_idx[node.node_id] = i;
+    }
+  }
+  for (int i = 0; i < per_node_fragment_idx.size(); ++i) {
+    LOG(INFO) << "idx(" << i << "): " << per_node_fragment_idx[i];
+  }
+
+  scan_range_assignment_.resize(exec_request.fragments.size());
+  map<TPlanNodeId, vector<TScanRangeLocations> >::const_iterator  entry;
+  for (entry = exec_request.per_node_scan_ranges.begin();
+      entry != exec_request.per_node_scan_ranges.end(); ++entry) {
+    int fragment_idx = per_node_fragment_idx[entry->first];
+    LOG(INFO) << "fragment_idx(" << entry->first << "): " << fragment_idx;
+    FragmentScanRangeAssignment* assignment = &scan_range_assignment_[fragment_idx];
+    ComputeScanRangeAssignment(
+        entry->first, entry->second, fragment_exec_params_[fragment_idx], assignment);
+    num_scan_ranges_ += entry->second.size();
+  }
+}
+
+int64_t GetScanRangeLength(const TScanRange& scan_range) {
+  if (scan_range.__isset.hdfs_file_split) {
+    return scan_range.hdfs_file_split.length;
+  } else {
+    return 0;
+  }
+}
+
+void Coordinator::ComputeScanRangeAssignment(
+    PlanNodeId node_id, const vector<TScanRangeLocations>& locations,
+    const FragmentExecParams& params, FragmentScanRangeAssignment* assignment) {
+  unordered_map<THostPort, int64_t> assigned_bytes_per_host;  // total assigned
+  BOOST_FOREACH(const TScanRangeLocations& scan_range_locations, locations) {
+    // assign this scan range to the host w/ the fewest assigned bytes
+    int64_t min_assigned_bytes = numeric_limits<int64_t>::max();
+    const THostPort* data_host = NULL;  // data server; not necessarily backend
+    int volume_id;
+    BOOST_FOREACH(const TScanRangeLocation& location, scan_range_locations.locations) {
+      int64_t* assigned_bytes =
+          FindOrInsert(&assigned_bytes_per_host, location.server, 0L);
+      if (*assigned_bytes < min_assigned_bytes) {
+        min_assigned_bytes = *assigned_bytes;
+        data_host = &location.server;
+        volume_id = location.volume_id;
+      }
+    }
+    assigned_bytes_per_host[*data_host] +=
+        GetScanRangeLength(scan_range_locations.scan_range);
+
+    // translate data host to backend host
+    DCHECK(data_host != NULL);
+    THostPort exec_hostport;
+    DCHECK_GT(params.hosts.size(), 0);
+    if (params.hosts.size() == 1) {
+      // this is only running on the coordinator anyway
+      SetHostport(params.hosts[0], &exec_hostport);
+    } else {
+      FragmentExecParams::DataServerMap::const_iterator it =
+          params.data_server_map.find(*data_host);
+      DCHECK(it != params.data_server_map.end());
+      const pair<string, int>& exec_host = it->second;
+      SetHostport(exec_host, &exec_hostport);
+    }
+    PerNodeScanRanges* scan_ranges =
+        FindOrInsert(assignment, exec_hostport, PerNodeScanRanges());
+    vector<TScanRangeParams>* scan_range_params_list =
+        FindOrInsert(scan_ranges, node_id, vector<TScanRangeParams>());
+    // add scan range
+    TScanRangeParams scan_range_params;
+    scan_range_params.scan_range = scan_range_locations.scan_range;
+    scan_range_params.volume_id = volume_id;
+    scan_range_params_list->push_back(scan_range_params);
+  }
+
+  BOOST_FOREACH(FragmentScanRangeAssignment::value_type& entry, *assignment) {
+    LOG(INFO) << "ScanRangeAssignment: server=" << ThriftDebugString(entry.first);
+    BOOST_FOREACH(PerNodeScanRanges::value_type& per_node_scan_ranges, entry.second) {
+      stringstream str;
+      BOOST_FOREACH(TScanRangeParams& params, per_node_scan_ranges.second) {
+        str << ThriftDebugString(params) << " ";
+      }
+      LOG(INFO) << "node_id=" << per_node_scan_ranges.first << " ranges=" << str.str();
+    }
+  }
+}
+
+void Coordinator::SetExecPlanFragmentParams(
+    int backend_num, const TPlanFragment& fragment, int fragment_idx,
+    const FragmentExecParams& params, int instance_idx, const THostPort& coord,
+    TExecPlanFragmentParams* rpc_params) {
+  rpc_params->__set_protocol_version(ImpalaInternalServiceVersion::V1);
+  rpc_params->__set_fragment(fragment);
+  rpc_params->__set_desc_tbl(desc_tbl_);
+  rpc_params->params.__set_query_id(query_id_);
+  rpc_params->params.__set_fragment_instance_id(params.instance_ids[instance_idx]);
+  THostPort exec_host;
+  SetHostport(params.hosts[instance_idx], &exec_host);
+  PerNodeScanRanges& scan_ranges = scan_range_assignment_[fragment_idx][exec_host];
+  rpc_params->params.__set_per_node_scan_ranges(scan_ranges);
+  rpc_params->params.__set_per_exch_num_senders(params.per_exch_num_senders);
+  rpc_params->params.__set_destinations(params.destinations);
+  rpc_params->__isset.params = true;
+  rpc_params->__set_coord(coord);
+  rpc_params->__set_backend_num(backend_num);
+  rpc_params->__set_query_globals(query_globals_);
+  rpc_params->__set_query_options(query_options_);
+
+  //LOG(INFO) << "params: " << ThriftDebugString(rpc_params->fragment);
+}
+
 }

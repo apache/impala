@@ -26,12 +26,6 @@ using namespace boost;
 
 namespace impala {
 
-std::size_t hash_value(const THostPort& host_port) {
-  uint32_t hash =
-      HashUtil::Hash(host_port.ipaddress.c_str(), host_port.ipaddress.length(), 0);
-  return HashUtil::Hash(&host_port.port, sizeof(host_port.port), hash);
-}
-
 // Comparator for THostPorts. Thrift declares this (in gen-cpp/Types_types.h) but
 // never defines it.
 bool THostPort::operator<(const THostPort& that) const {

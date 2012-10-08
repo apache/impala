@@ -49,17 +49,19 @@ class DataStreamSender::Channel {
   // how much tuple data is getting accumulated before being sent; it only applies
   // when data is added via AddRow() and not sent directly via SendBatch().
   Channel(const RowDescriptor& row_desc, const THostPort& destination,
-          const TUniqueId& fragment_id, PlanNodeId dest_node_id, int buffer_size)
+          const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id, int buffer_size)
     : row_desc_(row_desc),
       ipaddress_(destination.ipaddress),
       port_(destination.port),
-      fragment_id_(fragment_id),
+      fragment_instance_id_(fragment_instance_id),
       dest_node_id_(dest_node_id),
       num_data_bytes_sent_(0),
       in_flight_batch_(NULL) {
       // TODO: figure out how to size batch_
     int capacity = max(1, buffer_size / max(row_desc.GetRowSize(), 1));
     batch_.reset(new RowBatch(row_desc, capacity));
+    LOG(INFO) << "Channel: '" << destination.hostname << "' "
+              << destination.ipaddress << ":" << destination.port;
   }
 
   // Initialize channel.
@@ -93,7 +95,7 @@ class DataStreamSender::Channel {
   const RowDescriptor& row_desc_;
   string ipaddress_;
   int port_;
-  TUniqueId fragment_id_;
+  TUniqueId fragment_instance_id_;
   PlanNodeId dest_node_id_;
 
   // the number of TRowBatch.data bytes sent successfully
@@ -134,7 +136,7 @@ Status DataStreamSender::Channel::Init() {
 }
 
 Status DataStreamSender::Channel::SendBatch(TRowBatch* batch) {
-  VLOG_ROW << "Channel::SendBatch() fragment_id=" << fragment_id_
+  VLOG_ROW << "Channel::SendBatch() instance_id=" << fragment_instance_id_
            << " dest_node=" << dest_node_id_ << " #rows=" << batch->num_rows;
   // return if the previous batch saw an error
   RETURN_IF_ERROR(GetSendStatus());
@@ -147,12 +149,12 @@ Status DataStreamSender::Channel::SendBatch(TRowBatch* batch) {
 void DataStreamSender::Channel::TransmitData() {
   DCHECK(in_flight_batch_ != NULL);
   try {
-    VLOG_ROW << "Channel::TransmitData() fragment_id=" << fragment_id_
+    VLOG_ROW << "Channel::TransmitData() instance_id=" << fragment_instance_id_
              << " dest_node=" << dest_node_id_
              << " #rows=" << in_flight_batch_->num_rows;
     TTransmitDataParams params;
     params.protocol_version = ImpalaInternalServiceVersion::V1;
-    params.__set_dest_fragment_id(fragment_id_);
+    params.__set_dest_fragment_instance_id(fragment_instance_id_);
     params.__set_dest_node_id(dest_node_id_);
     params.__set_row_batch(*in_flight_batch_);  // yet another copy
     params.__set_eos(false);
@@ -212,7 +214,7 @@ Status DataStreamSender::Channel::GetSendStatus() {
 }
 
 Status DataStreamSender::Channel::Close() {
-  VLOG_RPC << "Channel::Close() fragment_id=" << fragment_id_
+  VLOG_RPC << "Channel::Close() instance_id=" << fragment_instance_id_
            << " dest_node=" << dest_node_id_
            << " #rows= " << batch_->num_rows();
   if (batch_->num_rows() > 0) {
@@ -224,7 +226,7 @@ Status DataStreamSender::Channel::Close() {
   try {
     TTransmitDataParams params;
     params.protocol_version = ImpalaInternalServiceVersion::V1;
-    params.__set_dest_fragment_id(fragment_id_);
+    params.__set_dest_fragment_instance_id(fragment_instance_id_);
     params.__set_dest_node_id(dest_node_id_);
     params.__set_eos(true);
     TTransmitDataResult res;
@@ -241,34 +243,19 @@ Status DataStreamSender::Channel::Close() {
 }
 
 DataStreamSender::DataStreamSender(
-    const RowDescriptor& row_desc, const TUniqueId& fragment_id,
-    const TDataStreamSink& sink, const vector<THostPort>& destinations,
+    const RowDescriptor& row_desc, const TDataStreamSink& sink,
+    const vector<TPlanFragmentDestination>& destinations,
     int per_channel_buffer_size)
   : current_thrift_batch_(&thrift_batch1_) {
   DCHECK_GT(destinations.size(), 0);
-  // TODO: get rid of this when we re-enable the multiple-receiver case
-  DCHECK_EQ(destinations.size(), 1);
-  // broadcast on all channels if there's no partitioning
-  broadcast_ = !sink.__isset.outputPartitionSpec;
-  if (sink.__isset.outputPartitionSpec) {
-    // for now, we can only do hash partitioning
-    const TOutputPartitionSpec& partition_spec = sink.outputPartitionSpec;
-    DCHECK(partition_spec.isHashPartitioned);
-    if (!partition_spec.partitionBoundaries.empty()) {
-      LOG(INFO) << "partition boundaries not empty for hash-partitioned output; "
-                   "ignoring";
-    }
-    // we need a partitioning expr if we send to more than one ipaddress
-    DCHECK(partition_spec.__isset.partitionExpr || destinations.size() == 1);
-    // TODO: switch to Init() function that returns Status
-    DCHECK(Expr::CreateExprTree(
-        &pool_, partition_spec.partitionExpr, &partition_expr_).ok());
-  }
+  DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED);
+  broadcast_ = true;
   // TODO: use something like google3's linked_ptr here (scoped_ptr isn't copyable)
   for (int i = 0; i < destinations.size(); ++i) {
     channels_.push_back(
-        new Channel(row_desc, destinations[i], fragment_id, sink.destNodeId,
-                    per_channel_buffer_size));
+        new Channel(row_desc, destinations[i].server,
+                    destinations[i].fragment_instance_id,
+                    sink.dest_node_id, per_channel_buffer_size));
   }
 }
 

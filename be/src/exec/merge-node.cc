@@ -54,11 +54,15 @@ Status MergeNode::Prepare(RuntimeState* state) {
   // Prepare const expr lists.
   for (int i = 0; i < const_result_expr_lists_.size(); ++i) {
     RETURN_IF_ERROR(Expr::Prepare(const_result_expr_lists_[i], state, row_desc()));
+    LOG(INFO) << "const result exprs " << i << ": "
+        << Expr::DebugString(const_result_expr_lists_[i]);
     DCHECK_EQ(const_result_expr_lists_[i].size(), tuple_desc_->slots().size());
   }
   // Prepare result expr lists.
   for (int i = 0; i < result_expr_lists_.size(); ++i) {
     RETURN_IF_ERROR(Expr::Prepare(result_expr_lists_[i], state, child(i)->row_desc()));
+    LOG(INFO) << "result exprs " << i << ": "
+        << Expr::DebugString(result_expr_lists_[i]);
     DCHECK_EQ(result_expr_lists_[i].size(), tuple_desc_->slots().size());
   }
   return Status::OK;

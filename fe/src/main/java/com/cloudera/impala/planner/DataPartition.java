@@ -25,7 +25,7 @@ import com.google.common.collect.Lists;
  * TODO: better name? just Partitioning?
  */
 public class DataPartition {
-  private final static Logger LOG = LoggerFactory.getLogger(Planner.class);
+  private final static Logger LOG = LoggerFactory.getLogger(DataPartition.class);
 
   private final TPartitionType type;
 

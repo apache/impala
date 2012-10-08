@@ -16,6 +16,7 @@ import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPartitionType;
 import com.cloudera.impala.thrift.TPlanFragment;
@@ -42,7 +43,7 @@ import com.google.common.collect.Sets;
  * - toThrift()
  */
 public class PlanFragment {
-  private final static Logger LOG = LoggerFactory.getLogger(Planner.class);
+  private final static Logger LOG = LoggerFactory.getLogger(PlanFragment.class);
 
   // root of plan tree executed by this fragment
   private PlanNode planRoot;
@@ -92,12 +93,19 @@ public class PlanFragment {
     this.outputPartition = DataPartition.UNPARTITIONED;
   }
 
+  public void setOutputExprs(ArrayList<Expr> outputExprs) {
+    this.outputExprs = Expr.cloneList(outputExprs, null);
+  }
+
   /**
    * Finalize plan tree and create stream sink, if needed.
    */
-  public void finalize(Analyzer analyzer) throws InternalException {
+  public void finalize(Analyzer analyzer, boolean validateFileFormats)
+      throws InternalException, NotImplementedException {
     markRefdSlots(analyzer);
-    planRoot.finalize(analyzer);
+    if (planRoot != null) {
+      planRoot.finalize(analyzer);
+    }
     if (destNodeId != null) {
       Preconditions.checkState(sink == null);
       // we're streaming to an exchange node
@@ -105,18 +113,27 @@ public class PlanFragment {
       streamSink.setPartition(outputPartition);
       sink = streamSink;
     }
+
+    if (planRoot != null && validateFileFormats) {
+      // verify that after partition pruning hdfs partitions only use supported formats
+      ArrayList<HdfsScanNode> hdfsScans = Lists.newArrayList();
+      planRoot.collectSubclasses(HdfsScanNode.class, hdfsScans);
+      for (HdfsScanNode hdfsScanNode: hdfsScans) {
+        hdfsScanNode.validateFileFormat();
+      }
+    }
   }
 
   public TPlanFragment toThrift() {
     TPlanFragment result = new TPlanFragment();
     if (planRoot != null) {
-      result.setPlan_tree(planRoot.treeToThrift());
+      result.setPlan(planRoot.treeToThrift());
     }
     if (outputExprs != null) {
       result.setOutput_exprs(Expr.treesToThrift(outputExprs));
     }
     if (sink != null) {
-      result.setOutput_sink(sink.toThrift2());
+      result.setOutput_sink(sink.toThrift());
     }
     result.setPartition(dataPartition.toThrift());
     return result;
@@ -129,7 +146,9 @@ public class PlanFragment {
     if (sink != null) {
       str.append(sink.getExplainString("  ", explainLevel));
     }
-    str.append(planRoot.getExplainString("  ", explainLevel));
+    if (planRoot != null) {
+      str.append(planRoot.getExplainString("  ", explainLevel));
+    }
     return str.toString();
   }
 
@@ -199,6 +218,9 @@ public class PlanFragment {
    * TODO 2: should the materialization decision be cost-based?
    */
   private void markRefdSlots(Analyzer analyzer) {
+    if (planRoot == null) {
+      return;
+    }
     List<SlotId> refdIdList = Lists.newArrayList();
     planRoot.getMaterializedIds(refdIdList);
 

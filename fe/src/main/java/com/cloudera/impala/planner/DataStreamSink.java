@@ -3,10 +3,8 @@
 package com.cloudera.impala.planner;
 
 import com.cloudera.impala.thrift.TDataSink;
-import com.cloudera.impala.thrift.TDataSink2;
 import com.cloudera.impala.thrift.TDataSinkType;
 import com.cloudera.impala.thrift.TDataStreamSink;
-import com.cloudera.impala.thrift.TDataStreamSink2;
 import com.cloudera.impala.thrift.TExplainLevel;
 
 /**
@@ -39,16 +37,9 @@ public class DataStreamSink extends DataSink {
 
   @Override
   protected TDataSink toThrift() {
-    TDataSink tdataSink = new TDataSink(TDataSinkType.DATA_STREAM_SINK);
-    tdataSink.setDataStreamSink(new TDataStreamSink(exchNodeId.asInt()));
-    return tdataSink;
-  }
-
-  @Override
-  protected TDataSink2 toThrift2() {
-    TDataSink2 result = new TDataSink2(TDataSinkType.DATA_STREAM_SINK);
-    TDataStreamSink2 tStreamSink = new TDataStreamSink2(exchNodeId.asInt());
-    tStreamSink.setOutput_partition(outputPartition.toThrift());
+    TDataSink result = new TDataSink(TDataSinkType.DATA_STREAM_SINK);
+    TDataStreamSink tStreamSink =
+        new TDataStreamSink(exchNodeId.asInt(), outputPartition.toThrift());
     result.setStream_sink(tStreamSink);
     return result;
   }

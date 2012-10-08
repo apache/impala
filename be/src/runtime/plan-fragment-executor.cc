@@ -8,12 +8,14 @@
 #include <transport/TBufferTransports.h>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/unordered_map.hpp>
+#include <boost/foreach.hpp>
 
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
 #include "common/object-pool.h"
 #include "exec/data-sink.h"
 #include "exec/exec-node.h"
+#include "exec/exchange-node.h"
 #include "exec/scan-node.h"
 #include "exec/hbase-table-scanner.h"
 #include "exprs/expr.h"
@@ -22,6 +24,7 @@
 #include "runtime/row-batch.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
+#include "util/container-util.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
 
 DEFINE_bool(serialize_batch, false, "serialize and deserialize each returned row batch");
@@ -60,16 +63,16 @@ PlanFragmentExecutor::~PlanFragmentExecutor() {
   DCHECK(!report_thread_active_);
 }
 
-Status PlanFragmentExecutor::Prepare(
-    const TPlanExecRequest& request, const TPlanExecParams& params) {
-  query_id_ = request.query_id;
+Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
+  const TPlanFragmentExecParams& params = request.params;
+  query_id_ = params.query_id;
 
   VLOG_QUERY << "Prepare(): query_id=" << PrintId(query_id_)
-             << " fragment_id=" << PrintId(request.fragment_id);
+             << " instance_id=" << PrintId(params.fragment_instance_id);
   VLOG(3) << "params:\n" << ThriftDebugString(params);
 
   runtime_state_.reset(
-      new RuntimeState(request.fragment_id, request.query_options,
+      new RuntimeState(params.fragment_instance_id, request.query_options,
           request.query_globals.now_string, exec_env_));
 
   // set up desc tbl
@@ -77,14 +80,25 @@ Status PlanFragmentExecutor::Prepare(
   DCHECK(request.__isset.desc_tbl);
   RETURN_IF_ERROR(DescriptorTbl::Create(obj_pool(), request.desc_tbl, &desc_tbl));
   runtime_state_->set_desc_tbl(desc_tbl);
-  VLOG_QUERY << "descriptor table for fragment=" << request.fragment_id << "\n"
+  VLOG_QUERY << "descriptor table for fragment=" << params.fragment_instance_id << "\n"
              << desc_tbl->DebugString();
 
   // set up plan
-  DCHECK(request.__isset.plan_fragment);
+  DCHECK(request.__isset.fragment);
   RETURN_IF_ERROR(
-      ExecNode::CreateTree(obj_pool(), request.plan_fragment, *desc_tbl, &plan_));
+      ExecNode::CreateTree(obj_pool(), request.fragment.plan, *desc_tbl, &plan_));
   runtime_state_->runtime_profile()->AddChild(plan_->runtime_profile());
+
+  // set #senders of exchange nodes before calling Prepare()
+  vector<ExecNode*> exch_nodes;
+  plan_->CollectNodes(TPlanNodeType::EXCHANGE_NODE, &exch_nodes);
+  BOOST_FOREACH(ExecNode* exch_node, exch_nodes) {
+    DCHECK_EQ(exch_node->type(), TPlanNodeType::EXCHANGE_NODE);
+    int num_senders = FindWithDefault(params.per_exch_num_senders, exch_node->id(), 0);
+    DCHECK_GT(num_senders, 0);
+    static_cast<ExchangeNode*>(exch_node)->set_num_senders(num_senders);
+  }
+
   RETURN_IF_ERROR(plan_->Prepare(runtime_state_.get()));
   
   if (runtime_state_->llvm_codegen() != NULL) {
@@ -101,21 +115,22 @@ Status PlanFragmentExecutor::Prepare(
 
   // set scan ranges
   vector<ExecNode*> scan_nodes;
+  vector<TScanRangeParams> no_scan_ranges;
   plan_->CollectScanNodes(&scan_nodes);
   for (int i = 0; i < scan_nodes.size(); ++i) {
-    for (int j = 0; j < params.scan_ranges.size(); ++j) {
-      if (scan_nodes[i]->id() == params.scan_ranges[j].nodeId) {
-        RETURN_IF_ERROR(static_cast<ScanNode*>(
-            scan_nodes[i])->SetScanRange(params.scan_ranges[j]));
-      }
-    }
+    ScanNode* scan_node = static_cast<ScanNode*>(scan_nodes[i]);
+    const vector<TScanRangeParams>& scan_ranges =
+        FindWithDefault(params.per_node_scan_ranges, scan_node->id(), no_scan_ranges);
+    scan_node->SetScanRanges(scan_ranges);
   }
 
-  if (VLOG_QUERY_IS_ON) PrintVolumeIds(params);
+  if (VLOG_QUERY_IS_ON) PrintVolumeIds(params.per_node_scan_ranges);
 
   // set up sink, if required  
-  if (request.__isset.data_sink) {
-    RETURN_IF_ERROR(DataSink::CreateDataSink(request, params, row_desc(), &sink_));
+  if (request.fragment.__isset.output_sink) {
+    RETURN_IF_ERROR(DataSink::CreateDataSink(
+        request.fragment.output_sink, request.fragment.output_exprs, params,
+        row_desc(), &sink_));
     RETURN_IF_ERROR(sink_->Init(runtime_state()));
   } else {
     sink_.reset(NULL);
@@ -131,24 +146,22 @@ Status PlanFragmentExecutor::Prepare(
   return Status::OK;
 }
 
-void PlanFragmentExecutor::PrintVolumeIds(const TPlanExecParams& params) {
-  if (params.scan_ranges.empty()) return;
+void PlanFragmentExecutor::PrintVolumeIds(
+    const PerNodeScanRanges& per_node_scan_ranges) {
+  if (per_node_scan_ranges.empty()) return;
 
   // map from volume id to (# of splits, total # bytes) on that volume
   unordered_map<int32_t, pair<int, int64_t> > per_volume_stats;
-  for (int i = 0; i < params.scan_ranges.size(); ++i) {
-    const TScanRange& scan_range = params.scan_ranges[i];
-    if (!scan_range.__isset.hdfsFileSplits) continue;
-    for (int j = 0; j < scan_range.hdfsFileSplits.size(); ++j) {
-      const THdfsFileSplit& split = scan_range.hdfsFileSplits[j];
-      unordered_map<int32_t, pair<int, int64_t> >::iterator entry =
-          per_volume_stats.find(split.volumeId);
-      if (entry == per_volume_stats.end()) {
-        entry = per_volume_stats.insert(make_pair(split.volumeId, make_pair(0, 0))).first;
-      }
-      pair<int, int64_t>& stats = entry->second;
-      ++(stats.first);
-      stats.second += split.length;
+  pair<int, int64_t> init_value(0, 0);
+  BOOST_FOREACH(const PerNodeScanRanges::value_type& entry, per_node_scan_ranges) {
+    BOOST_FOREACH(const TScanRangeParams& scan_range_params, entry.second) {
+      const TScanRange& scan_range = scan_range_params.scan_range;
+      if (!scan_range.__isset.hdfs_file_split) continue;
+      const THdfsFileSplit& split = scan_range.hdfs_file_split;
+      pair<int, int64_t>* stats =
+          FindOrInsert(&per_volume_stats, scan_range_params.volume_id, init_value);
+      ++(stats->first);
+      stats->second += split.length;
     }
   }
 
@@ -167,7 +180,7 @@ void PlanFragmentExecutor::PrintVolumeIds(const TPlanExecParams& params) {
 }
 
 Status PlanFragmentExecutor::Open() {
-  VLOG_QUERY << "Open(): fragment_id=" << runtime_state_->fragment_id();
+  VLOG_QUERY << "Open(): instance_id=" << runtime_state_->fragment_instance_id();
   // we need to start the profile-reporting thread before calling Open(), since it
   // may block
   // TODO: if no report thread is started, make sure to send a final profile
@@ -231,7 +244,8 @@ Status PlanFragmentExecutor::OpenInternal() {
 }
 
 void PlanFragmentExecutor::ReportProfile() {
-  VLOG_FILE << "ReportProfile(): fragment_id=" << runtime_state_->fragment_id();
+  VLOG_FILE << "ReportProfile(): instance_id="
+            << runtime_state_->fragment_instance_id();
   DCHECK(!report_status_cb_.empty());
   unique_lock<mutex> l(report_thread_lock_);
   // tell Open() that we started
@@ -242,7 +256,7 @@ void PlanFragmentExecutor::ReportProfile() {
         get_system_time() + posix_time::seconds(FLAGS_status_report_interval);
     bool notified = stop_report_thread_cv_.timed_wait(l, timeout);
     VLOG_FILE << "Reporting " << (notified ? "final " : " ")
-              << "profile for fragment " << runtime_state_->fragment_id();
+              << "profile for instance " << runtime_state_->fragment_instance_id();
     if (VLOG_FILE_IS_ON) {
       stringstream ss;
       profile()->PrettyPrint(&ss);
@@ -250,8 +264,8 @@ void PlanFragmentExecutor::ReportProfile() {
     }
 
     if (notified) {
-      VLOG_FILE << "exiting reporting thread: fragment_id="
-                << runtime_state_->fragment_id();
+      VLOG_FILE << "exiting reporting thread: instance_id="
+                << runtime_state_->fragment_instance_id();
       return;
     } else {
       SendReport(false);
@@ -289,12 +303,12 @@ void PlanFragmentExecutor::StopReportThread() {
 }
 
 Status PlanFragmentExecutor::GetNext(RowBatch** batch) {
-  VLOG_FILE << "GetNext(): fragment_id=" << runtime_state_->fragment_id();
+  VLOG_FILE << "GetNext(): instance_id=" << runtime_state_->fragment_instance_id();
   Status status = GetNextInternal(batch);
   UpdateStatus(status);
   if (done_) {
     VLOG_QUERY << "Finished executing fragment query_id=" << PrintId(query_id_)
-               << " fragment_id=" << PrintId(runtime_state_->fragment_id());
+               << " instance_id=" << PrintId(runtime_state_->fragment_instance_id());
     StopReportThread();
     SendReport(true);
   }
@@ -332,10 +346,10 @@ void PlanFragmentExecutor::UpdateStatus(const Status& status) {
 }
 
 void PlanFragmentExecutor::Cancel() {
-  VLOG_QUERY << "Cancel(): fragment_id=" << runtime_state_->fragment_id();
+  VLOG_QUERY << "Cancel(): instance_id=" << runtime_state_->fragment_instance_id();
   DCHECK(prepared_);
   runtime_state_->set_is_cancelled(true);
-  runtime_state_->stream_mgr()->Cancel(runtime_state_->fragment_id());
+  runtime_state_->stream_mgr()->Cancel(runtime_state_->fragment_instance_id());
 }
 
 const RowDescriptor& PlanFragmentExecutor::row_desc() {

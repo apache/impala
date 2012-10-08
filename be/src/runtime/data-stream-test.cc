@@ -14,7 +14,6 @@
 #include "runtime/data-stream-sender.h"
 #include "runtime/data-stream-recvr.h"
 #include "runtime/descriptors.h"
-#include "testutil/in-process-query-executor.h"
 #include "testutil/test-exec-env.h"
 #include "util/authorization.h"
 #include "util/cpu-info.h"
@@ -22,6 +21,7 @@
 #include "util/debug-util.h"
 #include "util/thrift-server.h"
 #include "gen-cpp/ImpalaInternalService.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/Descriptors_types.h"
 
@@ -56,10 +56,10 @@ class ImpalaTestBackend : public ImpalaInternalServiceIf {
   virtual void TransmitData(
       TTransmitDataResult& return_val, const TTransmitDataParams& params) {
     if (!params.eos) {
-      mgr_->AddData(params.dest_fragment_id, params.dest_node_id, params.row_batch)
-          .SetTStatus(&return_val);
+      mgr_->AddData(params.dest_fragment_instance_id, params.dest_node_id,
+                    params.row_batch).SetTStatus(&return_val);
     } else {
-      mgr_->CloseSender(params.dest_fragment_id, params.dest_node_id)
+      mgr_->CloseSender(params.dest_fragment_instance_id, params.dest_node_id)
           .SetTStatus(&return_val);
     }
   }
@@ -73,16 +73,14 @@ class DataStreamTest : public testing::Test {
   DataStreamTest(): next_val_(0) {}
 
   virtual void SetUp() {
-    fragment_id_.lo = 0;
-    fragment_id_.hi = 0;
+    next_instance_id_.lo = 0;
+    next_instance_id_.hi = 0;
     stream_mgr_ = new DataStreamMgr();
-    sink_.destNodeId = DEST_NODE_ID;
-    dest_.push_back(THostPort());
-    dest_.back().ipaddress = "127.0.0.1";
-    // Need a unique port since backend servers are never stopped
-    dest_.back().port = FLAGS_port++;
+    sink_.dest_node_id = DEST_NODE_ID;
+    sink_.output_partition.type = TPartitionType::UNPARTITIONED;
     // Ensure that individual sender info addresses don't change
     sender_info_.reserve(MAX_SENDERS);
+    receiver_info_.reserve(MAX_RECEIVERS);
     CreateRowDesc();
     CreateRowBatch();
     StartBackend();
@@ -91,6 +89,7 @@ class DataStreamTest : public testing::Test {
   // We reserve contiguous memory for senders in SetUp. If a test uses more
   // senders, a DCHECK will fail and you should increase this value.
   static const int MAX_SENDERS = 16;
+  static const int MAX_RECEIVERS = 16;
   static const PlanNodeId DEST_NODE_ID = 1;
   static const int BATCH_CAPACITY = 100;  // rows
   static const int PER_ROW_DATA = 8;
@@ -100,7 +99,7 @@ class DataStreamTest : public testing::Test {
   ObjectPool obj_pool_;
   DescriptorTbl* desc_tbl_;
   const RowDescriptor* row_desc_;
-  TUniqueId fragment_id_;
+  TUniqueId next_instance_id_;
   string stmt_;
 
   // RowBatch generation
@@ -110,14 +109,11 @@ class DataStreamTest : public testing::Test {
 
   // receiving node
   DataStreamMgr* stream_mgr_;
-  DataStreamRecvr* stream_recvr_;
-  thread recvr_thread_;
-  Status recvr_status_;
   ThriftServer* server_;
 
   // sending node(s)
   TDataStreamSink sink_;
-  vector<THostPort> dest_;
+  vector<TPlanFragmentDestination> dest_;
 
   struct SenderInfo {
     thread* thread_handle;
@@ -126,8 +122,28 @@ class DataStreamTest : public testing::Test {
 
     SenderInfo(): thread_handle(NULL), num_bytes_sent(0) {}
   };
-
   vector<SenderInfo> sender_info_;
+
+  struct ReceiverInfo {
+    thread* thread_handle;
+    DataStreamRecvr* stream_recvr;
+    Status status;
+    int num_rows_received;
+
+    ReceiverInfo(): thread_handle(NULL), num_rows_received(0) {}
+  };
+  vector<ReceiverInfo> receiver_info_;
+
+  // Create an instance id and add it to dest_
+  void GetNextInstanceId(TUniqueId* instance_id) {
+    dest_.push_back(TPlanFragmentDestination());
+    TPlanFragmentDestination& dest = dest_.back();
+    dest.fragment_instance_id = next_instance_id_;
+    dest.server.ipaddress = "127.0.0.1";
+    dest.server.port = FLAGS_port;
+    *instance_id = next_instance_id_;
+    ++next_instance_id_.lo;
+  }
 
   // RowDescriptor to mimic "select bigint_col from alltypesagg", except the slot
   // isn't nullable
@@ -183,25 +199,35 @@ class DataStreamTest : public testing::Test {
   }
 
   // Start receiver (expecting given number of senders) in separate thread.
-  void StartReceiver(int num_senders, int buffer_size) {
-    stream_recvr_ =
-        stream_mgr_->CreateRecvr(*row_desc_, fragment_id_, DEST_NODE_ID, num_senders,
-                                 buffer_size);
-    recvr_thread_ = thread(&DataStreamTest::ReadStream, this, num_senders);
+  void StartReceiver(int num_senders, int buffer_size, TUniqueId* out_id = NULL) {
+    TUniqueId instance_id;
+    GetNextInstanceId(&instance_id);
+    receiver_info_.push_back(ReceiverInfo());
+    ReceiverInfo& info = receiver_info_.back();
+    info.stream_recvr =
+        stream_mgr_->CreateRecvr(
+            *row_desc_, instance_id, DEST_NODE_ID, num_senders, buffer_size);
+    info.thread_handle =
+        new thread(&DataStreamTest::ReadStream, this, num_senders, &info);
+    if (out_id != NULL) *out_id = instance_id;
   }
 
-  void JoinReceiver() {
-    recvr_thread_.join();
+  void JoinReceivers() {
+    for (int i = 0; i < receiver_info_.size(); ++i) {
+      receiver_info_[i].thread_handle->join();
+    }
   }
 
   // Deplete stream and print batches
-  void ReadStream(int num_senders) {
+  void ReadStream(int num_senders, ReceiverInfo* info) {
     RowBatch* batch;
     VLOG_QUERY <<  "start reading";
     bool is_cancelled;
     multiset<int64_t> data_values;
-    while ((batch = stream_recvr_->GetBatch(&is_cancelled)) != NULL && !is_cancelled) {
+    while ((batch = info->stream_recvr->GetBatch(&is_cancelled)) != NULL
+        && !is_cancelled) {
       VLOG_QUERY << "read batch #rows=" << (batch != NULL ? batch->num_rows() : 0);
+      info->num_rows_received += batch->num_rows();
       for (int i = 0; i < batch->num_rows(); ++i) {
         TupleRow* row = batch->GetRow(i);
         data_values.insert(*static_cast<int64_t*>(row->GetTuple(0)->GetSlot(0)));
@@ -209,7 +235,7 @@ class DataStreamTest : public testing::Test {
       usleep(100000);  // slow down receiver to exercise buffering logic
     }
     if (is_cancelled) VLOG_QUERY << "reader is cancelled";
-    recvr_status_ = (is_cancelled ? Status::CANCELLED : Status::OK);
+    info->status = (is_cancelled ? Status::CANCELLED : Status::OK);
 
     if (!is_cancelled) {
       // check contents of batches
@@ -231,8 +257,7 @@ class DataStreamTest : public testing::Test {
   void StartBackend() {
     shared_ptr<ImpalaTestBackend> handler(new ImpalaTestBackend(stream_mgr_));
     shared_ptr<TProcessor> processor(new ImpalaInternalServiceProcessor(handler));
-
-    server_ = new ThriftServer("DataStreamTest backend", processor, dest_.back().port);
+    server_ = new ThriftServer("DataStreamTest backend", processor, FLAGS_port);
     server_->Start();
   }
 
@@ -258,7 +283,7 @@ class DataStreamTest : public testing::Test {
   void Sender(int sender_num, int channel_buffer_size) {
     VLOG_QUERY << "create sender " << sender_num;
     DataStreamSender sender(
-        *row_desc_, fragment_id_, sink_, dest_, channel_buffer_size);
+        *row_desc_, sink_, dest_, channel_buffer_size);
     EXPECT_TRUE(sender.Init(NULL).ok());
     scoped_ptr<RowBatch> batch(CreateRowBatch());
     SenderInfo& info = sender_info_[sender_num];
@@ -285,7 +310,28 @@ TEST_F(DataStreamTest, SingleSenderSmallBuffer) {
   EXPECT_TRUE(sender_info_[0].status.ok());
   EXPECT_GT(sender_info_[0].num_bytes_sent, 0);
   VLOG_QUERY << "join receiver\n";
-  JoinReceiver();
+  JoinReceivers();
+  EXPECT_TRUE(receiver_info_[0].status.ok());
+  EXPECT_EQ(receiver_info_[0].num_rows_received, NUM_BATCHES * BATCH_CAPACITY);
+  VLOG_QUERY << "stop backend\n";
+  StopBackend();
+}
+
+TEST_F(DataStreamTest, MultipleReceiversSmallBuffer) {
+  TUniqueId instance1, instance2;
+  StartReceiver(1, 1024);
+  StartReceiver(1, 1024);
+  StartSender();
+  VLOG_QUERY << "join senders\n";
+  JoinSenders();
+  EXPECT_TRUE(sender_info_[0].status.ok());
+  EXPECT_GT(sender_info_[0].num_bytes_sent, 0);
+  VLOG_QUERY << "join receiver\n";
+  JoinReceivers();
+  EXPECT_TRUE(receiver_info_[0].status.ok());
+  EXPECT_EQ(receiver_info_[0].num_rows_received, NUM_BATCHES * BATCH_CAPACITY);
+  EXPECT_TRUE(receiver_info_[1].status.ok());
+  EXPECT_EQ(receiver_info_[1].num_rows_received, NUM_BATCHES * BATCH_CAPACITY);
   VLOG_QUERY << "stop backend\n";
   StopBackend();
 }
@@ -300,7 +346,9 @@ TEST_F(DataStreamTest, SingleSenderLargeBuffer) {
   EXPECT_TRUE(sender_info_[0].status.ok());
   EXPECT_GT(sender_info_[0].num_bytes_sent, 0);
   VLOG_QUERY << "join receiver\n";
-  JoinReceiver();
+  JoinReceivers();
+  EXPECT_TRUE(receiver_info_[0].status.ok());
+  EXPECT_EQ(receiver_info_[0].num_rows_received, NUM_BATCHES * BATCH_CAPACITY);
   VLOG_QUERY << "stop backend\n";
   StopBackend();
 }
@@ -324,7 +372,9 @@ TEST_F(DataStreamTest, MultipleSendersSmallBuffer) {
   EXPECT_TRUE(sender_info_[3].status.ok());
   EXPECT_GT(sender_info_[3].num_bytes_sent, 0);
   VLOG_QUERY << "join receiver\n";
-  JoinReceiver();
+  JoinReceivers();
+  EXPECT_TRUE(receiver_info_[0].status.ok());
+  EXPECT_EQ(receiver_info_[0].num_rows_received, 4 * NUM_BATCHES * BATCH_CAPACITY);
   VLOG_QUERY << "stop backend\n";
   StopBackend();
 }
@@ -348,7 +398,9 @@ TEST_F(DataStreamTest, MultipleSendersLargeBuffer) {
   EXPECT_TRUE(sender_info_[3].status.ok());
   EXPECT_GT(sender_info_[3].num_bytes_sent, 0);
   VLOG_QUERY << "join receiver\n";
-  JoinReceiver();
+  JoinReceivers();
+  EXPECT_TRUE(receiver_info_[0].status.ok());
+  EXPECT_EQ(receiver_info_[0].num_rows_received, 4 * NUM_BATCHES * BATCH_CAPACITY);
   VLOG_QUERY << "stop backend\n";
   StopBackend();
 }
@@ -357,6 +409,8 @@ TEST_F(DataStreamTest, UnknownSenderSmallResult) {
   // starting a sender w/o a corresponding receiver should result in an error
   // on the sending side
   // case 1: entire query result fits in single buffer, close() returns error status
+  TUniqueId dummy_id;
+  GetNextInstanceId(&dummy_id);
   StartSender(TOTAL_DATA_SIZE + 1024);
   JoinSenders();
   EXPECT_FALSE(sender_info_[0].status.ok());
@@ -365,6 +419,8 @@ TEST_F(DataStreamTest, UnknownSenderSmallResult) {
 
 TEST_F(DataStreamTest, UnknownSenderLargeResult) {
   // case 2: query result requires multiple buffers, send() returns error status
+  TUniqueId dummy_id;
+  GetNextInstanceId(&dummy_id);
   StartSender();
   JoinSenders();
   EXPECT_FALSE(sender_info_[0].status.ok());
@@ -372,10 +428,11 @@ TEST_F(DataStreamTest, UnknownSenderLargeResult) {
 }
 
 TEST_F(DataStreamTest, Cancel) {
-  StartReceiver(1, 1024);
-  stream_mgr_->Cancel(fragment_id_);
-  JoinReceiver();
-  EXPECT_TRUE(recvr_status_.IsCancelled());
+  TUniqueId instance_id;
+  StartReceiver(1, 1024, &instance_id);
+  stream_mgr_->Cancel(instance_id);
+  JoinReceivers();
+  EXPECT_TRUE(receiver_info_[0].status.IsCancelled());
 }
 
 // TODO: more tests:

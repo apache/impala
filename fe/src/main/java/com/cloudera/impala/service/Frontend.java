@@ -20,7 +20,6 @@ import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.catalog.Catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.HdfsTable;
@@ -31,7 +30,6 @@ import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.planner.NewPlanner;
 import com.cloudera.impala.planner.PlanFragment;
-import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.planner.ScanNode;
 import com.cloudera.impala.thrift.TCatalogUpdate;
 import com.cloudera.impala.thrift.TClientRequest;
@@ -41,11 +39,9 @@ import com.cloudera.impala.thrift.TDdlType;
 import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TFinalizeParams;
-import com.cloudera.impala.thrift.TPlanExecParams;
 import com.cloudera.impala.thrift.TPlanFragment;
 import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TQueryExecRequest;
-import com.cloudera.impala.thrift.TQueryExecRequest2;
 import com.cloudera.impala.thrift.TQueryGlobals;
 import com.cloudera.impala.thrift.TResultSetMetadata;
 import com.cloudera.impala.thrift.TStmtType;
@@ -92,107 +88,6 @@ public class Frontend {
   }
 
   /**
-   * Assigns request id and id of the coordinator fragment, which is set to be the same
-   * as the request id. Fragment ids need to be globally unique across all plan fragment
-   * executions, and therefore need to be assigned by the coordinator when initiating
-   * fragment execution.
-   * Also sets TPlanExecParams.dest_fragment_id.
-   */
-  private void assignIds(TExecRequest request) {
-    UUID requestId = UUID.randomUUID();
-    request.setRequest_id(
-        new TUniqueId(requestId.getMostSignificantBits(),
-                      requestId.getLeastSignificantBits()));
-
-    if (request.getQueryExecRequest() != null) {
-      TQueryExecRequest queryExecRequest = request.getQueryExecRequest();
-      queryExecRequest.setQuery_id(request.getRequest_id());
-      for (int fragmentNum = 0; fragmentNum < queryExecRequest.fragment_requests.size();
-           ++fragmentNum) {
-        // we only need to assign the coordinator fragment's id (= query id), the
-        // rest is done by the coordinator as it issues fragment execution rpcs,
-        // but fragment_id is required, so we give it a dummy value
-        queryExecRequest.fragment_requests.get(fragmentNum).
-            setFragment_id(request.request_id);
-        queryExecRequest.fragment_requests.get(fragmentNum).
-            setQuery_id(request.request_id);
-      }
-
-      if (queryExecRequest.node_request_params != null &&
-          queryExecRequest.node_request_params.size() == 2) {
-        Preconditions.checkState(queryExecRequest.has_coordinator_fragment);
-        // we only have two fragments (1st one: coord); the destination
-        // of the 2nd fragment is the coordinator fragment
-        TUniqueId coordFragmentId = queryExecRequest.fragment_requests.get(0).fragment_id;
-        for (TPlanExecParams execParams: queryExecRequest.node_request_params.get(1)) {
-          execParams.setDest_fragment_id(coordFragmentId);
-        }
-      }
-    }
-  }
-
-  /**
-   * Create a populated TExecRequest corresponding to the supplied
-   * TClientRequest.
-   * @param request query request
-   * @param explainString if not null, it will contain the explain plan string
-   * @return a TExecRequest based on request
-   */
-  public TExecRequest createExecRequest(TClientRequest request,
-      StringBuilder explainString) throws ImpalaException {
-    AnalysisContext analysisCtxt = 
-        new AnalysisContext(catalog, request.sessionState.database);
-
-    AnalysisContext.AnalysisResult analysisResult = null;
-    LOG.info("createExecRequest for query " + request.stmt);
-    try {
-      analysisResult = analysisCtxt.analyze(request.stmt);
-    } catch (AnalysisException e) {
-      LOG.info(e.getMessage());
-      throw e;
-    }
-    Preconditions.checkNotNull(analysisResult.getStmt());
-
-    LOG.info("desc tbl:\n" + analysisResult.getAnalyzer().getDescTbl().debugString());
-
-    TExecRequest result = new TExecRequest();
-
-    if (analysisResult.isDdlStmt()) {
-      result.stmt_type = TStmtType.DDL;
-      createDdlExecRequest(analysisResult, result);
-    } else {
-      // create plan
-      Planner planner = new Planner();
-      result.setQueryExecRequest(
-          planner.createPlanFragments(analysisResult, request.queryOptions,
-                                      explainString));
-      result.queryExecRequest.sql_stmt = request.stmt;
-
-      // fill the metadata (for query statement)
-      if (analysisResult.isQueryStmt()) {
-        TResultSetMetadata metadata = new TResultSetMetadata();
-        QueryStmt queryStmt = analysisResult.getQueryStmt();
-        int colCnt = queryStmt.getColLabels().size();
-        for (int i = 0; i < colCnt; ++i) {
-          TColumnDesc colDesc = new TColumnDesc();
-          colDesc.columnName = queryStmt.getColLabels().get(i);
-          colDesc.columnType = queryStmt.getResultExprs().get(i).getType().toThrift();
-          metadata.addToColumnDescs(colDesc);
-        }
-        result.resultSetMetadata = metadata;
-        result.stmt_type = TStmtType.QUERY;
-      } else {
-        Preconditions.checkState(analysisResult.isDmlStmt());
-        result.stmt_type = TStmtType.DML;
-      }
-    }
-
-    result.setQuery_options(request.getQueryOptions());
-    assignIds(result);
-    return result;
-  }
-
-  /**
    * Constructs a TDdlExecRequest and attaches it, plus any metadata, to the
    * result argument.
    */
@@ -224,8 +119,8 @@ public class Frontend {
           new TColumnDesc("type", TPrimitiveType.STRING)));
     }
 
-    result.setResultSetMetadata(metadata);
-    result.setDdlExecRequest(ddl);
+    result.setResult_set_metadata(metadata);
+    result.setDdl_exec_request(ddl);
   }
 
   /**
@@ -253,7 +148,7 @@ public class Frontend {
    * pattern is null, matches all tables. If db is null, all databases are
    * searched for matches.
    */
-  public List<String> getDbNames(String dbPattern) 
+  public List<String> getDbNames(String dbPattern)
       throws ImpalaException {
     return catalog.getDbNames(dbPattern);
   }
@@ -291,10 +186,11 @@ public class Frontend {
    * Create a populated TExecRequest corresponding to the supplied
    * TClientRequest.
    */
-  public TExecRequest createExecRequest2(
+  public TExecRequest createExecRequest(
       TClientRequest request, StringBuilder explainString)
       throws InternalException, AnalysisException, NotImplementedException {
-    AnalysisContext analysisCtxt = new AnalysisContext(catalog);
+    AnalysisContext analysisCtxt =
+        new AnalysisContext(catalog, request.sessionState.database);
     AnalysisContext.AnalysisResult analysisResult = null;
     LOG.info("createExecRequest for query " + request.stmt);
     try {
@@ -323,8 +219,8 @@ public class Frontend {
     // create TQueryExecRequest2
     Preconditions.checkState(
         analysisResult.isQueryStmt() || analysisResult.isDmlStmt());
-    TQueryExecRequest2 queryExecRequest = new TQueryExecRequest2();
-    result.setQueryExecRequest2(queryExecRequest);
+    TQueryExecRequest queryExecRequest = new TQueryExecRequest();
+    result.setQuery_exec_request(queryExecRequest);
 
     // create plan
     NewPlanner planner = new NewPlanner();
@@ -337,12 +233,17 @@ public class Frontend {
     for (PlanFragment fragment: fragments) {
       TPlanFragment thriftFragment = fragment.toThrift();
       queryExecRequest.addToFragments(thriftFragment);
-      fragment.getPlanRoot().collectSubclasses(ScanNode.class, scanNodes);
+      if (fragment.getPlanRoot() != null) {
+        fragment.getPlanRoot().collectSubclasses(ScanNode.class, scanNodes);
+      }
       fragmentIdx.put(fragment, queryExecRequest.fragments.size() - 1);
     }
     explainString.append(planner.getExplainString(fragments, TExplainLevel.VERBOSE));
-    LOG.info("desc tbl:\n" + analysisResult.getAnalyzer().getDescTbl().debugString());
-    queryExecRequest.desc_tbl = analysisResult.getAnalyzer().getDescTbl().toThrift();
+    if (fragments.get(0).getPlanRoot() != null) {
+      // a SELECT without FROM clause will only have a single fragment, which won't
+      // have a plan tree
+      queryExecRequest.setDesc_tbl(analysisResult.getAnalyzer().getDescTbl().toThrift());
+    }
 
     // set fragment destinations
     for (int i = 1; i < fragments.size(); ++i) {
@@ -356,7 +257,8 @@ public class Frontend {
     for (ScanNode scanNode: scanNodes) {
       queryExecRequest.putToPer_node_scan_ranges(
           scanNode.getId().asInt(),
-          scanNode.getScanRangeLocations(request.queryOptions.getMax_scan_range_length()));
+          scanNode.getScanRangeLocations(
+            request.queryOptions.getMax_scan_range_length()));
     }
 
     // Global query parameters to be set in each TPlanExecRequest.
@@ -374,7 +276,7 @@ public class Frontend {
         colDesc.columnType = queryStmt.getResultExprs().get(i).getType().toThrift();
         metadata.addToColumnDescs(colDesc);
       }
-      result.resultSetMetadata = metadata;
+      result.setResult_set_metadata(metadata);
     } else {
       Preconditions.checkState(analysisResult.isInsertStmt());
       result.stmt_type = TStmtType.DML;
@@ -384,8 +286,7 @@ public class Frontend {
       finalizeParams.setIs_overwrite(insertStmt.isOverwrite());
       finalizeParams.setTable_name(insertStmt.getTargetTableName().getTbl());
       String db = insertStmt.getTargetTableName().getDb();
-      // TODO: fix up after Henry's session cl goes in
-      finalizeParams.setTable_db(db == null ? "" : db);
+      finalizeParams.setTable_db(db == null ? request.sessionState.database : db);
       finalizeParams.setHdfs_base_dir(
         ((HdfsTable)insertStmt.getTargetTable()).getHdfsBaseDir());
       queryExecRequest.setFinalize_params(finalizeParams);

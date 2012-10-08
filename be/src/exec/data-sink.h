@@ -3,10 +3,12 @@
 #ifndef IMPALA_EXEC_DATA_SINK_H
 #define IMPALA_EXEC_DATA_SINK_H
 
+#include <vector>
 #include "common/status.h"
 
 #include <boost/scoped_ptr.hpp>
 #include "gen-cpp/DataSinks_types.h"
+#include "gen-cpp/Exprs_types.h"
 
 namespace impala {
 
@@ -14,6 +16,7 @@ class RowBatch;
 class RuntimeState;
 class TPlanExecRequest;
 class TPlanExecParams;
+class TPlanFragmentExecParams;
 class RowDescriptor;
 
 // Superclass of all data sinks.
@@ -31,10 +34,11 @@ class DataSink {
   // Further Send() calls are illegal after calling Close().
   virtual Status Close(RuntimeState* state) = 0;
 
-  // Creates a new data sink from the specification of request.dataSink. A pointer to the
+  // Creates a new data sink from thrift_sink. A pointer to the
   // new sink is written to *sink, and is owned by the caller.
   static Status CreateDataSink(
-    const TPlanExecRequest& request, const TPlanExecParams& params,
+    const TDataSink& thrift_sink, const std::vector<TExpr>& output_exprs,
+    const TPlanFragmentExecParams& params,
     const RowDescriptor& row_desc, boost::scoped_ptr<DataSink>* sink);
 };
 

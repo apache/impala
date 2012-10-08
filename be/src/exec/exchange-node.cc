@@ -18,7 +18,7 @@ using namespace boost;
 ExchangeNode::ExchangeNode(
     ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs)
   : ExecNode(pool, tnode, descs),
-    num_senders_(tnode.exchange_node.num_senders),
+    num_senders_(0),
     stream_recvr_(NULL) {
 }
 
@@ -27,8 +27,9 @@ Status ExchangeNode::Prepare(RuntimeState* state) {
   
   // TODO: figure out appropriate buffer size
   // row descriptor of this node and the incoming stream should be the same.
+  DCHECK_GT(num_senders_, 0);
   stream_recvr_.reset(state->stream_mgr()->CreateRecvr(
-    row_descriptor_, state->fragment_id(), id_, num_senders_, 1024 * 1024));
+    row_descriptor_, state->fragment_instance_id(), id_, num_senders_, 1024 * 1024));
   return Status::OK;
 }
 
@@ -44,7 +45,7 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
   VLOG_FILE << "exch: has batch=" << (input_batch.get() == NULL ? "false" : "true")
             << " #rows=" << (input_batch.get() != NULL ? input_batch->num_rows() : 0)
             << " is_cancelled=" << (is_cancelled ? "true" : "false")
-            << " fragment_id=" << state->fragment_id();
+            << " instance_id=" << state->fragment_instance_id();
   if (is_cancelled) return Status(TStatusCode::CANCELLED);
   output_batch->Reset();
   *eos = (input_batch.get() == NULL);

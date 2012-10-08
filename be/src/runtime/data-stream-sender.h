@@ -18,6 +18,7 @@ class RowBatch;
 class RowDescriptor;
 class TDataStreamSink;
 class THostPort;
+class TPlanFragmentDestination;
 
 // Single sender of an m:n data stream.
 // Row batch data is routed to destinations based on the provided
@@ -26,12 +27,14 @@ class THostPort;
 class DataStreamSender : public DataSink {
  public:
   // Construct a sender according to the output specification (sink),
-  // sending to the given hosts.
+  // sending to the given destinations.
   // Per_channel_buffer_size is the buffer size allocated to each channel
   // and is specified in bytes.
+  // NOTE: This can only do broadcasting right now
+  // (sink.output_partition.type == UNPARTITIONED)
   DataStreamSender(
-    const RowDescriptor& row_desc, const TUniqueId& fragment_id,
-    const TDataStreamSink& sink, const std::vector<THostPort>& destinations,
+    const RowDescriptor& row_desc, const TDataStreamSink& sink,
+    const std::vector<TPlanFragmentDestination>& destinations,
     int per_channel_buffer_size);
   virtual ~DataStreamSender();
 

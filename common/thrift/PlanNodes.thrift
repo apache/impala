@@ -41,28 +41,7 @@ struct THdfsFileSplit {
 
   // ID of partition in parent THdfsScanNode. Meaningful only
   // in the context of a single THdfsScanNode, may not be unique elsewhere.
-  4: required i64 partitionId
-  
-  // Planner has already picked a data node to read this split from. This volumeId
-  // is the disk volume identifier of the chosen data node.
-  // If the Hadoop cluster does not support volumeId, it is -1.
-  5: optional i32 volumeId = -1
-}
-
-// Specification of subsection of a single hdfs file.
-struct THdfsFileSplit2 {
-  // file path
-  1: required string path
-
-  // starting offset
-  2: required i64 offset
-
-  // length of split
-  3: required i64 length
-
-  // ID of partition in parent THdfsScanNode. Meaningful only
-  // in the context of a single THdfsScanNode, may not be unique elsewhere.
-  4: required i64 partitionId
+  4: required i64 partition_id
 }
 
 // key range for single THBaseScanNode
@@ -76,26 +55,12 @@ struct THBaseKeyRange {
   2: optional string stopKey
 }
 
-// Specification of data range for a particular scan node
-struct TScanRange {
-  // id of scan node
-  1: required Types.TPlanNodeId nodeId
-
-  // THdfsScanNode: range consists of a collection of splits
-  2: optional list<THdfsFileSplit> hdfsFileSplits
-
-  // THBaseScanNode
-  3: optional list<THBaseKeyRange> hbaseKeyRanges
-}
-
 // Specification of an individual data range which is held in its entirety
 // by a storage server
-// TODO: remove TScanRange once the migration to the new planner is complete
-// and rename this to TScanRange
-struct TScanRange2 {
+struct TScanRange {
   // one of these must be set for every TScanRange2
-  1: optional THdfsFileSplit2 hdfsFileSplit
-  2: optional THBaseKeyRange hbaseKeyRange
+  1: optional THdfsFileSplit hdfs_file_split
+  2: optional THBaseKeyRange hbase_key_range
 }
 
 struct THdfsScanNode {
@@ -164,10 +129,6 @@ struct TSortNode {
   3: required bool use_top_n;
 }
 
-struct TExchangeNode {
-  1: required i32 num_senders
-}
-
 struct TMergeNode {
   // List or expr lists materialized by this node.
   // There is one list of exprs per query stmt feeding into this merge node.
@@ -199,8 +160,7 @@ struct TPlanNode {
   11: optional THashJoinNode hash_join_node
   12: optional TAggregationNode agg_node
   13: optional TSortNode sort_node
-  14: optional TExchangeNode exchange_node
-  15: optional TMergeNode merge_node
+  14: optional TMergeNode merge_node
 }
 
 // A flattened representation of a tree of PlanNodes, obtained by depth-first

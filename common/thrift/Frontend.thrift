@@ -107,36 +107,32 @@ struct TFinalizeParams {
 }
 
 // Result of call to ImpalaPlanService/JniFrontend.CreateQueryRequest()
-// TODO: remove existing TQueryExecRequest
-struct TQueryExecRequest2 {
-  // a globally unique id
-  1: required Types.TUniqueId query_id
-
+struct TQueryExecRequest {
   // global descriptor tbl for all fragments
-  2: optional Descriptors.TDescriptorTable desc_tbl
+  1: optional Descriptors.TDescriptorTable desc_tbl
 
   // fragments[i] may consume the output of fragments[j > i];
   // fragments[0] is the root fragment and also the coordinator fragment, if
   // it is unpartitioned.
-  3: required list<Planner.TPlanFragment> fragments
+  2: required list<Planner.TPlanFragment> fragments
 
   // Specifies the destination fragment of the output of each fragment.
   // parent_fragment_idx.size() == fragments.size() - 1 and
   // fragments[i] sends its output to fragments[dest_fragment_idx[i-1]]
-  4: optional list<i32> dest_fragment_idx
+  3: optional list<i32> dest_fragment_idx
 
   // A map from scan node ids to a list of scan range locations.
   // The node ids refer to scan nodes in fragments[].plan_tree
-  5: required map<Types.TPlanNodeId, list<Planner.TScanRangeLocations>>
+  4: optional map<Types.TPlanNodeId, list<Planner.TScanRangeLocations>>
       per_node_scan_ranges
 
   // Metadata of the query result set (only for select)
-  6: optional TResultSetMetadata result_set_metadata
+  5: optional TResultSetMetadata result_set_metadata
 
   // Set if the query needs finalization after it executes
-  7: optional TFinalizeParams finalize_params
+  6: optional TFinalizeParams finalize_params
 
-  8: required ImpalaInternalService.TQueryGlobals query_globals
+  7: required ImpalaInternalService.TQueryGlobals query_globals
 }
 
 enum TDdlType {
@@ -159,64 +155,26 @@ struct TDdlExecRequest {
   4: optional string show_pattern;
 }
 
-// TQueryExecRequest encapsulates everything needed to execute all plan fragments
-// for a single query. 
-// If only a single plan fragment is present, it is executed by the coordinator itself.
-struct TQueryExecRequest {
-  // Globally unique id for this query. Assigned by the planner. Same as 
-  // TExecRequest.request_id.
-  1: required Types.TUniqueId query_id
-
-  // True if the coordinator should execute a fragment, located in fragment_requests[0]
-  2: required bool has_coordinator_fragment;
-
-  // one request per plan fragment;
-  // fragmentRequests[i] may consume the output of fragmentRequests[j > i];
-  // fragmentRequests[0] will contain the coordinator fragment if one exists
-  3: list<ImpalaInternalService.TPlanExecRequest> fragment_requests
-
-  // list of host/port pairs that serve the data for the plan fragments
-  // If has_coordinator_fragment == true then:
-  //   data_locations.size() == fragment_requests.size() - 1, and fragment_requests[i+1]
-  //   is executed on data_locations[i], since (fragment_requests[0] is the coordinator
-  //   fragment, which is executed by the coordinator itself) 
-  // else: 
-  //   data_locations.size() == fragment_requests.size(), and fragment_requests[i]
-  // is executed on data_locations[i]
-  4: list<list<Types.THostPort>> data_locations
-
-  // node-specific request parameters;
-  // nodeRequestParams[i][j] is the parameter for fragmentRequests[i] executed on 
-  // execNodes[i][j]
-  5: list<list<ImpalaInternalService.TPlanExecParams>> node_request_params
-
-  // for debugging purposes (to allow backend to log the query string)
-  6: optional string sql_stmt;
-
-  // Set if the query needs finalization after it executes
-  7: optional TFinalizeParams finalize_params;
-}
-
 // Result of call to createExecRequest()
 struct TExecRequest {
   1: required Types.TStmtType stmt_type;
 
+  2: optional string sql_stmt;
+
   // Globally unique id for this request. Assigned by the planner.
-  2: required Types.TUniqueId request_id
+  3: required Types.TUniqueId request_id
 
   // Copied from the corresponding TClientRequest
-  3: required ImpalaInternalService.TQueryOptions query_options;
+  4: required ImpalaInternalService.TQueryOptions query_options;
 
   // TQueryExecRequest for the backend
   // Set iff stmt_type is QUERY or DML
-  // TODO: remove after transition to new planner is complete
-  4: optional TQueryExecRequest queryExecRequest
-  7: optional TQueryExecRequest2 queryExecRequest2
+  5: optional TQueryExecRequest query_exec_request
 
   // Set iff stmt_type is DDL
-  5: optional TDdlExecRequest ddlExecRequest
+  6: optional TDdlExecRequest ddl_exec_request
 
   // Metadata of the query result set (not set for DML)
-  6: optional TResultSetMetadata resultSetMetadata
+  7: optional TResultSetMetadata result_set_metadata
 }
 

@@ -20,7 +20,6 @@
 // TODO: fix this: we need to include uid-util.h apparently right before
 // in-process-query-executor.h, it's not clear why
 #include "util/uid-util.h"
-#include "testutil/in-process-query-executor.h"
 #include "testutil/impalad-query-executor.h"
 #include "runtime/exec-env.h"
 #include "exec/exec-stats.h"
@@ -83,33 +82,30 @@ static void ConstructSummaryString(ExecStats::QueryType query_type, int num_rows
   summary->append(summary_stream.str());
 }
 
-static QueryExecutorIf* CreateExecutor(ExecEnv* exec_env) {
-  if (!FLAGS_impalad.empty()) {
-    ImpaladQueryExecutor* executor = new ImpaladQueryExecutor();
-    if (FLAGS_exec_options.size() > 0) {
-      vector<string> exec_options;
-      split(exec_options, FLAGS_exec_options, is_any_of(";"), token_compress_on );
-      // Check the specified option against TImpalaExecutionOption
-      BOOST_FOREACH(string exec_option, exec_options) {
-        trim(exec_option);
-        vector<string> key_value;
-        split(key_value, exec_option, is_any_of(":"), token_compress_on );
-        if (key_value.size() != 2) {
-          cout << "exec_options must be a list of key:value pairs: " << exec_option
-               << endl;
-          exit(1);
-        }
-        if (ImpalaServer::GetQueryOption(key_value[0]) < 0) {
-          cout << "invalid exec option: " << key_value[0] << endl;
-          exit(1);
-        }
+static QueryExecutorIf* CreateExecutor() {
+  CHECK(!FLAGS_impalad.empty());
+  ImpaladQueryExecutor* executor = new ImpaladQueryExecutor();
+  if (FLAGS_exec_options.size() > 0) {
+    vector<string> exec_options;
+    split(exec_options, FLAGS_exec_options, is_any_of(";"), token_compress_on );
+    // Check the specified option against TImpalaExecutionOption
+    BOOST_FOREACH(string exec_option, exec_options) {
+      trim(exec_option);
+      vector<string> key_value;
+      split(key_value, exec_option, is_any_of(":"), token_compress_on );
+      if (key_value.size() != 2) {
+        cout << "exec_options must be a list of key:value pairs: " << exec_option
+             << endl;
+        exit(1);
       }
-      executor->setExecOptions(exec_options);
+      if (ImpalaServer::GetQueryOption(key_value[0]) < 0) {
+        cout << "invalid exec option: " << key_value[0] << endl;
+        exit(1);
+      }
     }
-    return executor;
-  } else {
-    return new InProcessQueryExecutor(exec_env);
+    executor->setExecOptions(exec_options);
   }
+  return executor;
 }
 
 static void GetQueries(vector<string>* queries) {
@@ -140,8 +136,8 @@ static void GetQueries(vector<string>* queries) {
   }
 }
 
-static void Explain(ExecEnv* exec_env, const vector<string>& queries) {
-  scoped_ptr<QueryExecutorIf> executor(CreateExecutor(exec_env));
+static void Explain(const vector<string>& queries) {
+  scoped_ptr<QueryExecutorIf> executor(CreateExecutor());
   EXIT_IF_ERROR(executor->Setup());
   string explain_plan;
 
@@ -153,7 +149,7 @@ static void Explain(ExecEnv* exec_env, const vector<string>& queries) {
   }
 }
 
-static void Exec(ExecEnv* exec_env, const vector<string>& queries) {
+static void Exec(const vector<string>& queries) {
   bool enable_profiling = false;
   if (FLAGS_enable_counters && FLAGS_profile_output_file.size() != 0) {
     ProfilerStart(FLAGS_profile_output_file.c_str());
@@ -165,7 +161,7 @@ static void Exec(ExecEnv* exec_env, const vector<string>& queries) {
 
   // If the number of iterations is greater than 1, run once to Ignore JVM startup time.
   if (FLAGS_iterations > 1) {
-    scoped_ptr<QueryExecutorIf> executor(CreateExecutor(exec_env));
+    scoped_ptr<QueryExecutorIf> executor(CreateExecutor());
     EXIT_IF_ERROR(executor->Setup());
     EXIT_IF_ERROR(executor->Exec(queries[0], NULL));
     while (true) {
@@ -196,7 +192,7 @@ static void Exec(ExecEnv* exec_env, const vector<string>& queries) {
     ExecStats::QueryType query_type;
 
     for (int i = 0; i < FLAGS_iterations; ++i) {
-      scoped_ptr<QueryExecutorIf> executor(CreateExecutor(exec_env));
+      scoped_ptr<QueryExecutorIf> executor(CreateExecutor());
       EXIT_IF_ERROR(executor->Setup());
 
       WallClockStopWatch sw;
@@ -289,28 +285,6 @@ int main(int argc, char** argv) {
   JniUtil::InitLibhdfs();
 
   if (!FLAGS_principal.empty()) EXIT_IF_ERROR(InitKerberos("runquery"));
-
-  scoped_ptr<ExecEnv> exec_env;
-  if (FLAGS_impalad.empty()) {
-    // if we're not running against an existing impalad and don't have
-    // backends specified explicitly, start them up
-    TestExecEnv* test_exec_env = new TestExecEnv(
-        FLAGS_num_nodes > 1 ? FLAGS_num_nodes - 1 : 4, FLAGS_be_port + 1);
-    EXIT_IF_ERROR(test_exec_env->StartBackends());
-    exec_env.reset(test_exec_env);
-  } else {
-    exec_env.reset(new ExecEnv());
-    exec_env->set_enable_webserver(false);
-    EXIT_IF_ERROR(exec_env->StartServices());
-  }
-  if (FLAGS_num_nodes != 1 && FLAGS_impalad.empty()) {
-    // start backend service to feed stream_mgr
-    ThriftServer* fe_server;
-    ThriftServer* be_server;
-    CreateImpalaServer(exec_env.get(), FLAGS_fe_port, FLAGS_be_port, &fe_server,
-        &be_server);
-    be_server->Start();
-  }
   EXIT_IF_ERROR(JniUtil::Init());
   if (FLAGS_init_hbase) {
     EXIT_IF_ERROR(HBaseTableScanner::Init());
@@ -325,9 +299,9 @@ int main(int argc, char** argv) {
   }
 
   if (FLAGS_explain_plan) {
-    Explain(exec_env.get(), queries);
+    Explain(queries);
   } else {
-    Exec(exec_env.get(), queries);
+    Exec(queries);
   }
 
   // Delete all global JNI references.

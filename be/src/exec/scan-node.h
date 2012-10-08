@@ -6,6 +6,7 @@
 #include <string>
 #include "exec/exec-node.h"
 #include "util/runtime-profile.h"
+#include "gen-cpp/ImpalaInternalService_types.h"
 
 namespace impala {
 
@@ -21,9 +22,9 @@ class ScanNode : public ExecNode {
   // Set up counters
   virtual Status Prepare(RuntimeState* state);
 
-  // Convert scan_range into node-specific scan restrictions.  This should be 
+  // Convert scan_ranges into node-specific scan restrictions.  This should be 
   // called after Prepare()
-  virtual Status SetScanRange(const TScanRange& scan_range) = 0;
+  virtual Status SetScanRanges(const std::vector<TScanRangeParams>& scan_ranges) = 0;
 
   virtual bool IsScanNode() const { return true; }
 

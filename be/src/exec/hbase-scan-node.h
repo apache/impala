@@ -33,7 +33,7 @@ class HBaseScanNode : public ScanNode {
   // Close the hbase_scanner_, and report errors.
   virtual Status Close(RuntimeState* state);
 
-  virtual Status SetScanRange(const TScanRange& scan_range);
+  virtual Status SetScanRanges(const std::vector<TScanRangeParams>& scan_ranges);
 
  protected:
   // Write debug string of this into out.

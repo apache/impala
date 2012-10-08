@@ -71,7 +71,7 @@ Plan Fragment 0
 Plan Fragment 0
   UNPARTITIONED
   EXCHANGE (4)
-    TUPLE IDS: 0 1 
+    TUPLE IDS: 0 1N 
 
 Plan Fragment 1
   RANDOM
@@ -132,7 +132,7 @@ Plan Fragment 0
 Plan Fragment 0
   UNPARTITIONED
   EXCHANGE (4)
-    TUPLE IDS: 0 1 
+    TUPLE IDS: 0N 1 
 
 Plan Fragment 1
   RANDOM
@@ -223,7 +223,7 @@ Plan Fragment 0
 Plan Fragment 0
   UNPARTITIONED
   EXCHANGE (7)
-    TUPLE IDS: 0 1 2 
+    TUPLE IDS: 0N 1N 2 
 
 Plan Fragment 1
   RANDOM
@@ -523,7 +523,7 @@ Plan Fragment 0
       LIMIT: 10
       TUPLE IDS: 0N 1N 2 3 
         EXCHANGE (13)
-          TUPLE IDS: 0 1 2 3 
+          TUPLE IDS: 0N 1N 2 3 
 
 Plan Fragment 1
   RANDOM
@@ -645,6 +645,7 @@ Plan Fragment 0
 Plan Fragment 0
   UNPARTITIONED
   EXCHANGE (4)
+    LIMIT: 1
     TUPLE IDS: 0 1 
 
 Plan Fragment 1

@@ -21,8 +21,6 @@ import com.cloudera.impala.thrift.TCatalogUpdate;
 import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TImpalaPlanServiceException;
-import com.cloudera.impala.thrift.TPlanExecRequest;
-import com.cloudera.impala.thrift.TQueryExecRequest2;
 import com.google.common.collect.Sets;
 
 /**
@@ -61,19 +59,11 @@ public class PlanService {
         throw new TImpalaPlanServiceException(e.getMessage());
       }
 
-      TPlanExecRequest planExecRequest = result.queryExecRequest.fragment_requests.get(0);
-      planExecRequest.query_options.setReturn_as_ascii(false);
-
       // Print explain string.
       LOG.info(explainStringBuilder.toString());
 
       LOG.info("returned TExecRequest: " + result.toString());
       return result;
-    }
-
-    public TQueryExecRequest2 CreateQueryExecRequest2(TClientRequest tRequest)
-        throws TImpalaPlanServiceException {
-      return null;
     }
 
     public void ShutdownServer() {

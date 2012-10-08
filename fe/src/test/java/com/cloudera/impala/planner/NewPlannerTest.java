@@ -29,8 +29,8 @@ import com.cloudera.impala.thrift.Constants;
 import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.THBaseKeyRange;
-import com.cloudera.impala.thrift.THdfsFileSplit2;
-import com.cloudera.impala.thrift.TQueryExecRequest2;
+import com.cloudera.impala.thrift.THdfsFileSplit;
+import com.cloudera.impala.thrift.TQueryExecRequest;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TScanRangeLocation;
 import com.cloudera.impala.thrift.TScanRangeLocations;
@@ -56,7 +56,7 @@ public class NewPlannerTest {
   public static void cleanUp() {
   }
 
-  private StringBuilder PrintScanRangeLocations(TQueryExecRequest2 execRequest) {
+  private StringBuilder PrintScanRangeLocations(TQueryExecRequest execRequest) {
     StringBuilder result = new StringBuilder();
     for (Map.Entry<Integer, List<TScanRangeLocations>> entry:
         execRequest.per_node_scan_ranges.entrySet()) {
@@ -68,13 +68,13 @@ public class NewPlannerTest {
       for (TScanRangeLocations locations: entry.getValue()) {
         // print scan range
         result.append("  ");
-        if (locations.scan_range.isSetHdfsFileSplit()) {
-          THdfsFileSplit2 split = locations.scan_range.getHdfsFileSplit();
+        if (locations.scan_range.isSetHdfs_file_split()) {
+          THdfsFileSplit split = locations.scan_range.getHdfs_file_split();
           result.append("HDFS SPLIT " + split.path + " "
               + Long.toString(split.offset) + ":" + Long.toString(split.length));
         }
-        if (locations.scan_range.isSetHbaseKeyRange()) {
-          THBaseKeyRange keyRange = locations.scan_range.getHbaseKeyRange();
+        if (locations.scan_range.isSetHbase_key_range()) {
+          THBaseKeyRange keyRange = locations.scan_range.getHbase_key_range();
           result.append("HBASE KEYRANGE ");
           if (keyRange.isSetStartKey()) {
             result.append(HBaseScanNode.printKey(keyRange.getStartKey().getBytes()));
@@ -132,7 +132,7 @@ public class NewPlannerTest {
     String locationsStr = null;
     actualOutput.append(Section.PLAN.getHeader() + "\n");
     try {
-      execRequest = frontend.createExecRequest2(request, explainBuilder);
+      execRequest = frontend.createExecRequest(request, explainBuilder);
       Preconditions.checkState(execRequest.stmt_type == TStmtType.DML
           || execRequest.stmt_type == TStmtType.QUERY);
       String explainStr = explainBuilder.toString();
@@ -148,7 +148,7 @@ public class NewPlannerTest {
           errorLog.append("section " + Section.PLAN.toString() + " of query:\n" + query
               + "\n" + result);
         }
-        locationsStr = PrintScanRangeLocations(execRequest.queryExecRequest2).toString();
+        locationsStr = PrintScanRangeLocations(execRequest.query_exec_request).toString();
       }
     } catch (AnalysisException e) {
       errorLog.append("query:\n" + query + "\nanalysis error: " + e.getMessage() + "\n");
@@ -176,7 +176,7 @@ public class NewPlannerTest {
     actualOutput.append(Section.DISTRIBUTEDPLAN.getHeader() + "\n");
     try {
       // distributed plan
-      execRequest = frontend.createExecRequest2(request, explainBuilder);
+      execRequest = frontend.createExecRequest(request, explainBuilder);
       Preconditions.checkState(execRequest.stmt_type == TStmtType.DML
           || execRequest.stmt_type == TStmtType.QUERY);
       String explainStr = explainBuilder.toString();

@@ -28,16 +28,13 @@ import com.cloudera.impala.catalog.HBaseColumn;
 import com.cloudera.impala.catalog.HBaseTable;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.common.InternalException;
-import com.cloudera.impala.thrift.Constants;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.THBaseFilter;
 import com.cloudera.impala.thrift.THBaseKeyRange;
 import com.cloudera.impala.thrift.THBaseScanNode;
-import com.cloudera.impala.thrift.THostPort;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TScanRange;
-import com.cloudera.impala.thrift.TScanRange2;
 import com.cloudera.impala.thrift.TScanRangeLocation;
 import com.cloudera.impala.thrift.TScanRangeLocations;
 import com.google.common.base.Objects;
@@ -179,7 +176,7 @@ public class HBaseScanNode extends ScanNode {
     }
 
     // Convert list of HRegionLocation to Map<hostport, List<HRegionLocation>>.
-    // The List<HRegionLocations>'s end up being sorted by start key/end key, because 
+    // The List<HRegionLocations>'s end up being sorted by start key/end key, because
     // regionsLoc is sorted that way.
     Map<String, List<HRegionLocation>> locationMap = Maps.newHashMap();
     for (HRegionLocation regionLoc: regionsLoc) {
@@ -217,9 +214,9 @@ public class HBaseScanNode extends ScanNode {
           scanRangeLocation.addToLocations(
               new TScanRangeLocation(addressToTHostPort(locEntry.getKey())));
           result.add(scanRangeLocation);
-        
-          TScanRange2 scanRange = new TScanRange2();
-          scanRange.setHbaseKeyRange(keyRange);
+
+          TScanRange scanRange = new TScanRange();
+          scanRange.setHbase_key_range(keyRange);
           scanRangeLocation.setScan_range(scanRange);
         }
         prevEndKey = curRegEndKey;
@@ -294,88 +291,6 @@ public class HBaseScanNode extends ScanNode {
             rangeEndKey : stopKey;
         keyRange.setStopKey(Bytes.toString(partEnd));
       }
-    }
-  }
-
-  @Override
-  public void getScanParams(long maxScanRangeLength,
-      int numPartitions, List<TScanRange> scanRanges, List<THostPort> hostPorts) {
-    // No usage of NUM_NODES_ALL_RACKS yet. The condition on numPartition depends on this
-    // check.
-    Preconditions.checkState(numPartitions != Constants.NUM_NODES_ALL_RACKS);
-
-    // Retrieve relevant HBase regions and their region servers
-    HBaseTable tbl = (HBaseTable) desc.getTable();
-    HTable hbaseTbl = null;
-    List<HRegionLocation> regionsLoc;
-    try {
-      hbaseTbl   = new HTable(hbaseConf, tbl.getHBaseTableName());
-      regionsLoc = getRegionsInRange(hbaseTbl, startKey, stopKey);
-    } catch (IOException e) {
-      throw new RuntimeException(
-          "couldn't retrieve HBase table (" + tbl.getHBaseTableName() + ") info:\n"
-          + e.getMessage());
-    }
-
-    // We try to create a TScanRange for each region server that contains at least one
-    // relevant region, and the created TScanRange will contain all the relevant regions
-    // of the region server.
-    //
-    // If numPartition < number of region servers with relevant partitions and also
-    // numPartition != NUM_NODES_ALL, the first numPartition TScanRanges
-    // will be created as said for the first numPartition region servers. For each
-    // remaining region server, all its relevant regions will be assigned to a
-    // TScanRange, in a round robin fashion.
-
-    // Convert list of HRegionLocation to Map<hostport, List<HRegionLocation>>
-    Map<String, List<HRegionLocation>> locationMap = Maps.newHashMap();
-    for (HRegionLocation regionLoc: regionsLoc) {
-      String locHostPort = regionLoc.getHostnamePort();
-      if (locationMap.containsKey(locHostPort)) {
-        locationMap.get(locHostPort).add(regionLoc);
-      } else {
-        locationMap.put(locHostPort, Lists.newArrayList(regionLoc));
-      }
-    }
-
-    int curPartIdx = 0;
-    int actualNumPart = (numPartitions == Constants.NUM_NODES_ALL) ?
-        locationMap.size() : numPartitions;
-    for (Map.Entry<String, List<HRegionLocation>> locEntry: locationMap.entrySet()) {
-      TScanRange scanRange =
-          curPartIdx < actualNumPart
-            ? new TScanRange(id.asInt())
-            : scanRanges.get(curPartIdx % actualNumPart);
-
-      // HBaseTableScanner(backend) initializes a result scanner for each key range.
-      // To minimize # of result scanner re-init, reduce the number of key ranges by
-      // extending keyRange if the next region is right after the current one.
-      THBaseKeyRange keyRange = null;
-      byte[] prevEndKey = null;
-      for (HRegionLocation regionLoc: locEntry.getValue()) {
-        byte[] curRegStartKey = regionLoc.getRegionInfo().getStartKey();
-        byte[] curRegEndKey   = regionLoc.getRegionInfo().getEndKey();
-        if (prevEndKey != null &&
-            Bytes.compareTo(prevEndKey, curRegStartKey) == 0) {
-          setKeyRangeEnd(keyRange, curRegEndKey);
-        } else {
-          keyRange = new THBaseKeyRange();
-          setKeyRangeStart(keyRange, curRegStartKey);
-          setKeyRangeEnd(keyRange, curRegEndKey);
-          scanRange.addToHbaseKeyRanges(keyRange);
-        }
-        prevEndKey = curRegEndKey;
-      }
-
-      if (curPartIdx < actualNumPart) {
-        scanRanges.add(scanRange);
-        if (hostPorts != null) {
-          THostPort addr = addressToTHostPort(locEntry.getKey());
-          hostPorts.add(addr);
-        }
-      }
-
-      ++curPartIdx;
     }
   }
 

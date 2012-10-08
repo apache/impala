@@ -39,22 +39,10 @@ struct TQueryOptions {
   11: required bool partition_agg = 0
 }
 
-// Parameters for the execution of a plan fragment on a particular node.
-struct TPlanExecParams {
-  // scan ranges for each of the scan nodes
-  1: list<PlanNodes.TScanRange> scan_ranges
-
-  // id of fragment that receives the output of this fragment
-  2: optional Types.TUniqueId dest_fragment_id
-
-  // (host, port) pairs of output destinations, one per output partition
-  3: list<Types.THostPort> destinations
-}
-
 // A scan range plus the parameters needed to execute that scan.
 struct TScanRangeParams {
-  1: required PlanNodes.TScanRange2 scan_range
-  2: optional i32 volume_id
+  1: required PlanNodes.TScanRange scan_range
+  2: optional i32 volume_id = -1
 }
 
 // Specification of one output destination of a plan fragment
@@ -67,25 +55,27 @@ struct TPlanFragmentDestination {
 }
 
 // Parameters for a single execution instance of a particular TPlanFragment
-// TODO: remove TPlanExecParams once transition to NewPlanner is complete
 // TODO: for range partitioning, we also need to specify the range boundaries
 struct TPlanFragmentExecParams {
+  // a globally unique id assigned to the entire query
+  1: required Types.TUniqueId query_id
+  
   // a globally unique id assigned to this particular execution instance of
   // a TPlanFragment
-  1: required Types.TUniqueId fragment_instance_id
+  2: required Types.TUniqueId fragment_instance_id
 
   // initial scan ranges for each scan node in TPlanFragment.plan_tree
-  2: required map<Types.TPlanNodeId, list<TScanRangeParams>> per_node_scan_ranges
+  3: required map<Types.TPlanNodeId, list<TScanRangeParams>> per_node_scan_ranges
 
   // number of senders for ExchangeNodes contained in TPlanFragment.plan_tree;
   // needed to create a DataStreamRecvr
-  3: required map<Types.TPlanNodeId, i32> per_exch_num_senders
+  4: required map<Types.TPlanNodeId, i32> per_exch_num_senders
 
   // Output destinations, one per output partition.
   // The partitioning of the output is specified by
   // TPlanFragment.output_sink.output_partition.
   // The number of output partitions is destinations.size().
-  4: list<TPlanFragmentDestination> destinations
+  5: list<TPlanFragmentDestination> destinations
 }
 
 // Global query parameters assigned by the coordinator.
@@ -94,35 +84,6 @@ struct TQueryGlobals {
   1: required string now_string
 }
 
-// TPlanExecRequest encapsulates info needed to execute a particular
-// plan fragment, including how to produce and how to partition its output.
-// It leaves out node-specific parameters (see TPlanExecParams).
-struct TPlanExecRequest {
-  // Globally unique id for each fragment. Assigned by coordinator.
-  1: required Types.TUniqueId fragment_id
-
-  // same as TQueryExecRequest.query_id
-  2: required Types.TUniqueId query_id
-
-  // no plan or descriptor table: query without From clause
-  3: optional PlanNodes.TPlan plan_fragment
-  4: optional Descriptors.TDescriptorTable desc_tbl
-
-  // exprs that produce values for slots of output tuple (one expr per slot)
-  5: list<Exprs.TExpr> output_exprs
-  
-  // Specifies the destination of this plan fragment's output rows.
-  // For example, the destination could be a stream sink which forwards 
-  // the data to a remote plan fragment, or a sink which writes to a table (for
-  // insert stmts).
-  6: optional DataSinks.TDataSink data_sink
-  
-  // Global query parameters assigned by planner
-  7: required TQueryGlobals query_globals
-  
-  // query options for the query
-  8: required TQueryOptions query_options
-}
 
 // Service Protocol Details
 
@@ -137,54 +98,30 @@ struct TExecPlanFragmentParams {
   1: required ImpalaInternalServiceVersion protocol_version
 
   // required in V1
-  2: optional TPlanExecRequest request
+  2: optional Planner.TPlanFragment fragment
 
   // required in V1
-  3: optional TPlanExecParams params
+  3: optional Descriptors.TDescriptorTable desc_tbl
+
+  // required in V1
+  4: optional TPlanFragmentExecParams params
 
   // Initiating coordinator.
   // TODO: determine whether we can get this somehow via the Thrift rpc mechanism.
   // required in V1
-  4: optional Types.THostPort coord
+  5: optional Types.THostPort coord
 
   // backend number assigned by coord to identify backend
   // required in V1
-  5: optional i32 backend_num
-}
-
-// TODO: remove TExecPlanFragmentParams once migration to NewPlanner is complete
-struct TExecPlanFragmentParams2 {
-  1: required ImpalaInternalServiceVersion protocol_version
-
-  // Globally unique id for each fragment. Assigned by coordinator.
-  // Required in V1.
-  2: optional Types.TUniqueId fragment_id
-
-  // required in V1
-  3: optional Planner.TPlanFragment fragment
-
-  // required in V1
-  4: optional Descriptors.TDescriptorTable desc_tbl
-
-  // required in V1
-  5: optional TPlanFragmentExecParams params
-
-  // Initiating coordinator.
-  // TODO: determine whether we can get this somehow via the Thrift rpc mechanism.
-  // required in V1
-  6: optional Types.THostPort coord
-
-  // backend number assigned by coord to identify backend
-  // required in V1
-  7: optional i32 backend_num
+  6: optional i32 backend_num
 
   // Global query parameters assigned by coordinator.
   // required in V1
-  8: optional TQueryGlobals query_globals
+  7: optional TQueryGlobals query_globals
   
   // options for the query
   // required in V1
-  9: optional TQueryOptions query_options
+  8: optional TQueryOptions query_options
 }
 
 struct TExecPlanFragmentResult {
@@ -220,7 +157,7 @@ struct TReportExecStatusParams {
   3: optional i32 backend_num
 
   // required in V1
-  4: optional Types.TUniqueId fragment_id
+  4: optional Types.TUniqueId fragment_instance_id
 
   // Status of fragment execution; any error status means it's done.
   // required in V1
@@ -255,7 +192,7 @@ struct TCancelPlanFragmentParams {
   1: required ImpalaInternalServiceVersion protocol_version
 
   // required in V1
-  2: optional Types.TUniqueId fragment_id
+  2: optional Types.TUniqueId fragment_instance_id
 }
 
 struct TCancelPlanFragmentResult {
@@ -270,10 +207,10 @@ struct TTransmitDataParams {
   1: required ImpalaInternalServiceVersion protocol_version
 
   // required in V1
-  2: optional Types.TUniqueId dest_fragment_id
+  2: optional Types.TUniqueId dest_fragment_instance_id
 
   // for debugging purposes; currently ignored
-  //3: optional Types.TUniqueId src_fragment_id
+  //3: optional Types.TUniqueId src_fragment_instance_id
 
   // required in V1
   4: optional Types.TPlanNodeId dest_node_id

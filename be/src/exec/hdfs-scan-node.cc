@@ -157,11 +157,11 @@ Status HdfsScanNode::CreateConjuncts(vector<Expr*>* expr) {
   return Status::OK;
 }
 
-Status HdfsScanNode::SetScanRange(const TScanRange& scan_range) {
-  DCHECK(scan_range.__isset.hdfsFileSplits);
+Status HdfsScanNode::SetScanRanges(const vector<TScanRangeParams>& scan_range_params) {
   // Convert the input ranges into per file DiskIO::ScanRange objects
-  for (int i = 0; i < scan_range.hdfsFileSplits.size(); ++i) {
-    const THdfsFileSplit& split = scan_range.hdfsFileSplits[i];
+  for (int i = 0; i < scan_range_params.size(); ++i) {
+    DCHECK(scan_range_params[i].scan_range.__isset.hdfs_file_split);
+    const THdfsFileSplit& split = scan_range_params[i].scan_range.hdfs_file_split;
     const string& path = split.path;
 
     HdfsFileDesc* desc = NULL;
@@ -173,14 +173,14 @@ Status HdfsScanNode::SetScanRange(const TScanRange& scan_range) {
       desc = desc_it->second;
     }
       
-    if (split.volumeId == -1 && !unknown_disk_id_warned_) {
+    if (scan_range_params[i].volume_id == -1 && !unknown_disk_id_warned_) {
       LOG(WARNING) << "Unknown disk id.  This will negatively affect performance. "
                    << " Check your hdfs settings to enable block location metadata.";
       unknown_disk_id_warned_ = true;
     }
 
     desc->ranges.push_back(AllocateScanRange(desc->filename.c_str(), 
-       split.length, split.offset, split.partitionId, split.volumeId));
+       split.length, split.offset, split.partition_id, scan_range_params[i].volume_id));
   }
   return Status::OK;
 }

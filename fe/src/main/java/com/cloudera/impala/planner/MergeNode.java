@@ -5,6 +5,7 @@ package com.cloudera.impala.planner;
 import java.util.List;
 
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.analysis.SlotDescriptor;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.thrift.TExplainLevel;
@@ -110,6 +111,13 @@ public class MergeNode extends PlanNode {
 
     for (List<Expr> resultExprs: resultExprLists) {
       Expr.getIds(resultExprs, null, ids);
+    }
+
+    // for now, also mark all of our output slots as materialized
+    // TODO: fix this, it's not really necessary, but it breaks the logic
+    // in MergeNode (c++)
+    for (SlotDescriptor desc: tupleDesc.getSlots()) {
+      ids.add(desc.getId());
     }
   }
 }
