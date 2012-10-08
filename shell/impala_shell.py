@@ -10,11 +10,12 @@ import signal
 import threading
 from optparse import OptionParser
 
-from ImpalaService import ImpalaService
-from JavaConstants.constants import DEFAULT_QUERY_OPTIONS
-from ImpalaService.ImpalaService import TImpalaQueryOptions
 from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
+from ImpalaService import ImpalaService
+from ImpalaService.ImpalaService import TImpalaQueryOptions
+from JavaConstants.constants import DEFAULT_QUERY_OPTIONS
+from thrift_sasl import TSaslClientTransport
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
 from thrift.protocol import TBinaryProtocol
@@ -54,6 +55,7 @@ class ImpalaShell(cmd.Cmd):
   def __init__(self, options):
     cmd.Cmd.__init__(self)
     self.is_alive = True
+    self.use_kerberos = options.use_kerberos
     self.verbose = options.verbose
     self.impalad = None
     self.prompt = ImpalaShell.DISCONNECTED_PROMPT
@@ -189,16 +191,35 @@ class ImpalaShell(cmd.Cmd):
       self.transport.close()
       self.transport = None
 
-    self.transport = TBufferedTransport(TSocket(self.impalad[0], int(self.impalad[1])))
     try:
+      self.transport = self.__get_transport()
       self.transport.open()
       protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
       self.imp_service = ImpalaService.Client(protocol)
       self.connected = True
-    except TTransportException, e:
-      print "Error connecting: %s" % (e,)
+    except Exception, e:
+      print "Error connecting: %s, %s" % (type(e),e)
       self.connected = False
     return self.connected
+
+  def __get_transport(self):
+    """Create a Transport.
+
+       A non-kerberized impalad just needs a simple buffered transport. For
+       the kerberized version, a sasl transport is created.
+    """
+    sock = TSocket(self.impalad[0], int(self.impalad[1]))
+    if not self.use_kerberos:
+      return TBufferedTransport(sock)
+    # Initializes a sasl client
+    def sasl_factory():
+      sasl_client = sasl.Client()
+      sasl_client.setAttr("host", self.impalad[0])
+      sasl_client.setAttr("service", "impala")
+      sasl_client.init()
+      return sasl_client
+    # GSSASPI is the underlying mechanism used by kerberos to authenticate.
+    return TSaslClientTransport(sasl_factory, "GSSAPI", sock)
 
   def __query_with_results(self, query):
     self.__print_if_verbose("Query: %s" % (query.query,))
@@ -449,11 +470,15 @@ if __name__ == "__main__":
                     help="Execute a query without the shell")
   parser.add_option("-f", "--query_file", dest="query_file", default=None,
                     help="Execute the queries in the query file, delimited by ;")
-  parser.add_option("-V", dest="verbose", default=True, action="store_true",
+  parser.add_option("-k", "--kerberos", dest="use_kerberos", default=False,
+                    action="store_true",help="Connect to a kerberized impalad.")
+  parser.add_option("-V", "--verbose", dest="verbose", default=False, action="store_true",
                     help="Enable verbose output")
 
   (options, args) = parser.parse_args()
 
+  if options.use_kerberos:
+    import sasl
   if options.query or options.query_file:
     execute_queries_non_interactive_mode(options)
     sys.exit(0)

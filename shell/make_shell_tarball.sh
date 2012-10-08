@@ -24,6 +24,7 @@ mkdir -p ${TARBALL_ROOT}/lib
 cp -r ${HIVE_HOME}/lib/py/* ${TARBALL_ROOT}/lib
 cp -r ${IMPALA_HOME}/thirdparty/python-thrift-0.7.0/thrift ${TARBALL_ROOT}/lib
 cp -r ${SHELL_HOME}/gen-py ${TARBALL_ROOT}
+cp ${SHELL_HOME}/thrift_sasl.py ${TARBALL_ROOT}/lib
 cp ${SHELL_HOME}/impala-shell ${TARBALL_ROOT}
 cp ${SHELL_HOME}/impala_shell.py ${TARBALL_ROOT}
 
