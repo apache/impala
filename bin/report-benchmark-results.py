@@ -20,8 +20,8 @@ import csv
 import math
 import os
 import sys
-
-from datetime import date
+from perf_result_datastore import PerfResultDataStore
+from datetime import date, datetime
 from itertools import groupby
 from optparse import OptionParser
 
@@ -41,9 +41,28 @@ parser.add_option("--no_output_table", dest="no_output_table", action="store_tru
                   default= False, help='Outputs results in table format to the console')
 parser.add_option("--report_description", dest="report_description", default=None,
                   help='Optional description for the report.')
+parser.add_option("--cluster_name", dest="cluster_name", default='UNKNOWN',
+                  help="Name of the cluster the results are from (ex. Bolt)")
 parser.add_option("--verbose", "-v", dest="verbose", action="store_true",
                   default= False, help='Outputs to console with with increased verbosity')
-(options, args) = parser.parse_args()
+parser.add_option("--build_version", dest="build_version", default='UNKNOWN',
+                  help="Build/version info about the Impalad instance results are from.")
+parser.add_option("--lab_run_info", dest="lab_run_info", default='UNKNOWN',
+                  help="Information about the lab run (name/id) that published "\
+                  "the results.")
+
+# These parameters are specific to recording results in a database. This is optional
+parser.add_option("--save_to_db", dest="save_to_db", action="store_true",
+                  default= False, help='Saves results to the specified database.')
+parser.add_option("--db_host", dest="db_host", default='localhost',
+                  help="Machine hosting the database")
+parser.add_option("--db_name", dest="db_name", default='perf_results',
+                  help="Name of the perf database.")
+parser.add_option("--db_username", dest="db_username", default='hiveuser',
+                  help="Username used to connect to the database.")
+parser.add_option("--db_password", dest="db_password", default='password',
+                  help="Password used to connect to the the database.")
+options, args = parser.parse_args()
 
 COL_WIDTH = 18
 TOTAL_WIDTH = 132 if options.verbose else 96
@@ -226,6 +245,55 @@ def merge_hive_results(results, hive_results):
       new_results.append(row + ['N/A', 'N/A'])
   return new_results
 
+def write_results_to_datastore(results):
+  """ Saves results to a database """
+  current_date = datetime.now()
+  data_store = PerfResultDataStore(host=options.db_host, username=options.db_username,
+      password=options.db_password, database_name=options.db_name)
+
+  run_info_id = data_store.insert_run_info(options.lab_run_info)
+  for row in results:
+    # We ignore everything aver the stddev column
+    executor, workload, scale_factor, query_name, query, file_format,\
+        compression, avg_time, stddev = row[0:STDDEV_IDX + 1]
+
+    # Instead of storing 'N/A' in the database we want to store NULL
+    avg_time = avg_time if avg_time and avg_time != 'N/A' else 'NULL'
+    stddev = stddev if stddev and stddev != 'N/A' else 'NULL'
+
+    file_type_id = data_store.get_file_format_id(file_format, compression)
+    if file_type_id is None:
+      print 'Skipping unkown file type: %s / %s' % (file_format, compression)
+      continue
+
+    workload_id = data_store.get_workload_id(workload, scale_factor)
+    if workload_id is None:
+      print 'Skipping unkown workload: %s / %s' % (workload, scale_factor)
+      continue
+
+    query_id = data_store.get_query_id(query_name, query)
+    if query_id is None:
+      print 'Skipping unkown query: %s / %s' % (query_name, query)
+      continue
+
+    data_store.insert_execution_result(
+        query_id=query_id, workload_id=workload_id, file_type_id=file_type_id,
+        cluster_name=options.cluster_name, executor_name=executor, avg_time=avg_time,
+        stddev=stddev, run_date=current_date, version=options.build_version,
+        notes=options.report_description, run_info_id=run_info_id)
+
+def build_summary_header():
+  summary = "Execution Summary (%s)\n" % date.today()
+  if options.report_description:
+    summary += 'Run Description: %s\n' % options.report_description
+  if options.cluster_name:
+    summary += '\nCluster Name: %s\n' % options.cluster_name
+  if options.build_version:
+    summary += 'Impala Build Version: %s\n' % options.build_version
+  if options.lab_run_info:
+    summary += 'Lab Run Info: %s\n' % options.lab_run_info
+  return summary
+
 reference_results = []
 hive_reference_results = []
 results = []
@@ -253,11 +321,9 @@ if not options.no_output_table:
 
   sort_key = lambda k: (k[WORKLOAD_IDX], k[SCALE_FACTOR_IDX])
   results_sorted = sorted(results, key=sort_key)
-  if options.report_description:
-    summary += '\nDescription: %s\n\n' % options.report_description
 
-  summary += "Execution Summary (%s)\n" % date.today()
-  summary += "Workload / Scale Factor\n\n"
+  summary += build_summary_header()
+  summary += "\nWorkload / Scale Factor\n\n"
 
   # First step is to break the result down into groups or workload/scale factor
   for workload_scale_factor, group in groupby(results_sorted, key=sort_key):
@@ -293,3 +359,7 @@ if not options.no_output_table:
 
 if options.junit_output_file:
   write_junit_output_file(results, open(options.junit_output_file, 'w'))
+
+if options.save_to_db:
+  print 'Saving perf results to database'
+  write_results_to_datastore(results)
