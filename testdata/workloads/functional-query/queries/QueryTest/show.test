@@ -88,3 +88,111 @@ string
 'stringpartitionkey'
 'testtbl'
 ====
+# Show tables in
+show tables in testdb1
+---- TYPES
+string
+---- RESULTS
+'alltypes'
+'alltypes_rc'
+'alltypes_rc_bzip'
+'alltypes_rc_def'
+'alltypes_rc_gzip'
+'alltypes_rc_snap'
+'alltypes_seq'
+'alltypes_seq_bzip'
+'alltypes_seq_def'
+'alltypes_seq_gzip'
+'alltypes_seq_record_bzip'
+'alltypes_seq_record_def'
+'alltypes_seq_record_gzip'
+'alltypes_seq_record_snap'
+'alltypes_seq_snap'
+'alltypes_trevni'
+'alltypes_trevni_def'
+'alltypes_trevni_snap'
+'testtbl'
+'testtbl_rc'
+'testtbl_rc_bzip'
+'testtbl_rc_def'
+'testtbl_rc_gzip'
+'testtbl_rc_snap'
+'testtbl_seq'
+'testtbl_seq_bzip'
+'testtbl_seq_def'
+'testtbl_seq_gzip'
+'testtbl_seq_record_bzip'
+'testtbl_seq_record_def'
+'testtbl_seq_record_gzip'
+'testtbl_seq_record_snap'
+'testtbl_seq_snap'
+'testtbl_trevni'
+'testtbl_trevni_def'
+'testtbl_trevni_snap'
+====
+# Show tables in with a pattern
+show tables in testdb1 like 'alltype*'
+---- TYPES
+string
+---- RESULTS
+'alltypes'
+'alltypes_rc'
+'alltypes_rc_bzip'
+'alltypes_rc_def'
+'alltypes_rc_gzip'
+'alltypes_rc_snap'
+'alltypes_seq'
+'alltypes_seq_bzip'
+'alltypes_seq_def'
+'alltypes_seq_gzip'
+'alltypes_seq_record_bzip'
+'alltypes_seq_record_def'
+'alltypes_seq_record_gzip'
+'alltypes_seq_record_snap'
+'alltypes_seq_snap'
+'alltypes_trevni'
+'alltypes_trevni_def'
+'alltypes_trevni_snap'
+====
+USE testdb1
+====
+# Coverage of syntax variations.
+show tables in testdb1 'alltypes'
+---- TYPES
+string
+---- RESULTS
+'alltypes'
+====
+show tables in testdb1 like 'alltypes'
+---- TYPES
+string
+---- RESULTS
+'alltypes'
+====
+show tables 'alltypes'
+---- TYPES
+string
+---- RESULTS
+'alltypes'
+====
+show tables like 'alltypes'
+---- TYPES
+string
+---- RESULTS
+'alltypes'
+====
+# Show databases
+show databases
+---- TYPES
+string
+---- RESULTS
+'default'
+'testdb1'
+'tpch'
+====
+show databases like 'def*'
+---- TYPES
+string
+---- RESULTS
+'default'
+====

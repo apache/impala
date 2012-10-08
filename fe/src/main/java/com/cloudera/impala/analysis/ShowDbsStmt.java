@@ -6,20 +6,32 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 
 /**
- * Representation of a SHOW TABLES [pattern] statement. 
+ * Representation of a SHOW DATABASES [pattern] statement. 
+ * Acceptable syntax:
+ *
+ * SHOW DATABASES
+ * SHOW SCHEMAS
+ * SHOW DATABASES LIKE 'pattern'
+ * SHOW SCHEMAS LIKE 'pattern'
+ *
  */
-public class ShowStmt extends ParseNodeBase {
+public class ShowDbsStmt extends ParseNodeBase {
   // Pattern to match tables against. | denotes choice, * matches all strings
   private final String pattern;
 
-  // Set during analysis
-  private String db;
-
-  public ShowStmt() {
-    pattern = null;
+  /**
+   * Default constructor, which creates a show statement which returns all
+   * databases.
+   */
+  public ShowDbsStmt() {
+    this(null);
   }
 
-  public ShowStmt(String pattern) {
+  /**
+   * Constructs a show statement which matches all databases against the
+   * supplied pattern.
+   */
+  public ShowDbsStmt(String pattern) {
     this.pattern = pattern;
   }
 
@@ -27,15 +39,11 @@ public class ShowStmt extends ParseNodeBase {
     return pattern;
   }
 
-  public String getDb() {
-    return db;
-  }
-
   public String toSql() {
     if (pattern == null) {
-      return "SHOW TABLES";
+        return "SHOW DATABASES";
     } else {
-      return "SHOW TABLES \"" + pattern + "\"";
+        return "SHOW DATABASES LIKE '" + pattern + "'";
     }
   }
 
@@ -44,6 +52,6 @@ public class ShowStmt extends ParseNodeBase {
   }
 
   public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
-    db = analyzer.getDefaultDb();
+    // Nothing to do here
   }
 }

@@ -226,7 +226,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   void InitializeConfigVariables();
 
   // Returns all matching table names, per Hive's "SHOW TABLES <pattern>". Each
-  // table name is fully-qualified, i.e. of the form db.table_name
+  // table name returned is unqualified.
   // If db is NULL, match table names from all databases, otherwise restrict the
   // search to the named database.
   // If pattern is NULL, match all tables otherwise match only those tables that
@@ -234,6 +234,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   // and each pN may contain wildcards denoted by '*' which match all strings.
   Status GetTableNames(std::string* db, std::string* pattern, 
       std::vector<std::string>* table_names);
+
+  // Return all databases matching the optional argument 'pattern'.
+  // If pattern is NULL, match all databases otherwise match only those databases that
+  // match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
+  // and each pN may contain wildcards denoted by '*' which match all strings.
+  Status GetDbNames(std::string* pattern, std::vector<std::string>* table_names);
 
   // Returns (in the output parameter) a list of columns for the specified table
   // in the specified database.
@@ -252,6 +258,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   jmethodID update_metastore_id_; // JniFrontend.updateMetastore()
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
   jmethodID describe_table_id_,; // JniFrontend.describeTable
+  jmethodID get_db_names_id_; // JniFrontend.getDbNames
   ExecEnv* exec_env_;  // not owned
 
   // plan service-related - impalad optionally uses a standalone

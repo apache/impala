@@ -17,7 +17,7 @@ DdlExecutor::DdlExecutor(ImpalaServer* impala_server, const string& delimiter)
 }
 
 Status DdlExecutor::Exec(TDdlExecRequest* exec_request) {
-  if (exec_request->ddl_type == TDdlType::SHOW) {
+  if (exec_request->ddl_type == TDdlType::SHOW_TABLES) {
     // A NULL pattern means match all tables. However, Thrift string types can't
     // be NULL in C++, so we have to test if it's set rather than just blindly
     // using the value.
@@ -27,6 +27,13 @@ Status DdlExecutor::Exec(TDdlExecRequest* exec_request) {
     // in the Thrift request
     RETURN_IF_ERROR(impala_server_->GetTableNames(&exec_request->database, table_name, 
         &ascii_rows_));
+    return Status::OK;
+  }
+
+  if (exec_request->ddl_type == TDdlType::SHOW_DBS) {
+    string* db_pattern = 
+      exec_request->__isset.show_pattern ? (&exec_request->show_pattern) : NULL;
+    RETURN_IF_ERROR(impala_server_->GetDbNames(db_pattern, &ascii_rows_));
     return Status::OK;
   }
 

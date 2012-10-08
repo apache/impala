@@ -22,9 +22,21 @@ struct TGetTablesParams {
   2: optional string pattern 
 }
 
-// getTableNames returns a list of fully-qualified table names
+// getTableNames returns a list of unqualified table names
 struct TGetTablesResult {
   1: list<string> tables
+}
+
+// Arguments to getDbNames, which returns a list of dbs that match an optional
+// pattern
+struct TGetDbsParams {
+  // If not set, match every database
+  1: optional string pattern
+}
+
+// getDbNames returns a list of database names
+struct TGetDbsResult {
+  1: list<string> dbs
 }
 
 struct TColumnDesc {
@@ -128,7 +140,8 @@ struct TQueryExecRequest2 {
 }
 
 enum TDdlType {
-  SHOW,
+  SHOW_TABLES,
+  SHOW_DBS,
   USE,
   DESCRIBE
 }

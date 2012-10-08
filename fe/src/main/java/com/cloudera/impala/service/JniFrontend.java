@@ -23,6 +23,9 @@ import com.cloudera.impala.thrift.TDescribeTableResult;
 import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TGetTablesParams;
 import com.cloudera.impala.thrift.TGetTablesResult;
+import com.cloudera.impala.thrift.TGetDbsParams;
+import com.cloudera.impala.thrift.TGetDbsResult;
+import com.cloudera.impala.thrift.TQueryExecRequest2;
 
 /**
  * JNI-callable interface onto a wrapped Frontend instance. The main point is to serialise
@@ -145,6 +148,28 @@ public class JniFrontend {
 
     TGetTablesResult result = new TGetTablesResult();
     result.setTables(tables);
+
+    TSerializer serializer = new TSerializer(protocolFactory);
+    try {
+      return serializer.serialize(result);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
+  /**
+   * Returns a list of table names matching an optional pattern.
+   * The argument is a serialized TGetTablesParams object.
+   * The return type is a serialised TGetTablesResult object.
+   * @see Frontend#getTableNames
+   */
+  public byte[] getDbNames(byte[] thriftGetTablesParams) throws ImpalaException {
+    TGetDbsParams params = new TGetDbsParams();
+    deserializeThrift(params, thriftGetTablesParams);
+    List<String> dbs = frontend.getDbNames(params.pattern);
+
+    TGetDbsResult result = new TGetDbsResult();
+    result.setDbs(dbs);
 
     TSerializer serializer = new TSerializer(protocolFactory);
     try {

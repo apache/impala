@@ -133,14 +133,15 @@ parser code {:
 :};
 
 terminal KW_AND, KW_ALL, KW_AS, KW_ASC, KW_AVG, KW_BETWEEN, KW_BIGINT, KW_BOOLEAN, KW_BY,
-  KW_CASE, KW_CAST, KW_COUNT, KW_DATE, KW_DATETIME, KW_DESC, KW_DESCRIBE, KW_DISTINCT,
-  KW_DISTINCTPC, KW_DISTINCTPCSA,
+  KW_CASE, KW_CAST, KW_COUNT, KW_DATABASES, KW_DATE, KW_DATETIME, KW_DESC, KW_DESCRIBE, 
+  KW_DISTINCT, KW_DISTINCTPC, KW_DISTINCTPCSA,
   KW_DIV, KW_DOUBLE, KW_ELSE, KW_END, KW_FALSE, KW_FLOAT, KW_FROM, KW_FULL, KW_GROUP,
   KW_HAVING, KW_IS, KW_IN, KW_INNER, KW_JOIN, KW_INT, KW_LEFT, KW_LIKE, KW_LIMIT, KW_MIN,
   KW_MAX, KW_NOT, KW_NULL, KW_ON, KW_OR, KW_ORDER, KW_OUTER, KW_REGEXP,
-  KW_RLIKE, KW_RIGHT, KW_SELECT, KW_SHOW, KW_SEMI, KW_SMALLINT, KW_STRING, KW_SUM, 
-  KW_TABLES, KW_TINYINT, KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_WHEN, KW_WHERE, KW_THEN,
-  KW_TIMESTAMP, KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION, KW_INTERVAL;
+  KW_RLIKE, KW_RIGHT, KW_SCHEMAS, KW_SELECT, KW_SHOW, KW_SEMI, KW_SMALLINT, KW_STRING, 
+  KW_SUM, KW_TABLES, KW_TINYINT, KW_TRUE, KW_UNION, KW_USE, KW_USING, KW_WHEN, KW_WHERE, 
+  KW_THEN, KW_TIMESTAMP, KW_INSERT, KW_INTO, KW_OVERWRITE, KW_TABLE, KW_PARTITION, 
+  KW_INTERVAL;
 terminal COMMA, DOT, STAR, LPAREN, RPAREN, DIVIDE, MOD, ADD, SUBTRACT;
 terminal BITAND, BITOR, BITXOR, BITNOT;
 terminal EQUAL, NOT, LESSTHAN, GREATERTHAN;
@@ -161,7 +162,8 @@ nonterminal QueryStmt query_stmt;
 nonterminal List<UnionOperand> union_operands;
 // USE stmt
 nonterminal UseStmt use_stmt;
-nonterminal ShowStmt show_stmt;
+nonterminal ShowTablesStmt show_tables_stmt;
+nonterminal ShowDbsStmt show_dbs_stmt;
 nonterminal String show_pattern;
 nonterminal DescribeStmt describe_stmt;
 // List of select blocks connected by UNION operators, with order by or limit.
@@ -230,8 +232,10 @@ stmt ::=
     {: RESULT = insert; :}
     | use_stmt:use
     {: RESULT = use; :}
-    | show_stmt:show
-    {: RESULT = show; :}
+    | show_tables_stmt:show_tables
+    {: RESULT = show_tables; :}
+    | show_dbs_stmt:show_dbs
+    {: RESULT = show_dbs; :}
     | describe_stmt:describe
     {: RESULT = describe; :}
     ;
@@ -380,15 +384,34 @@ use_stmt ::=
   {: RESULT = new UseStmt(db); :}
   ;
 
-show_stmt ::=
+show_tables_stmt ::=
   KW_SHOW KW_TABLES
-  {: RESULT = new ShowStmt(); :}
+  {: RESULT = new ShowTablesStmt(); :}
   | KW_SHOW KW_TABLES show_pattern:showPattern
-  {: RESULT = new ShowStmt(showPattern); :}
+  {: RESULT = new ShowTablesStmt(showPattern); :}
+  | KW_SHOW KW_TABLES KW_IN IDENT:db
+  {: RESULT = new ShowTablesStmt(db, null); :}
+  | KW_SHOW KW_TABLES KW_IN IDENT:db show_pattern:showPattern
+  {: RESULT = new ShowTablesStmt(db, showPattern); :}
+  ;
+
+// TODO: No obvious way in CUP to create a rule that returns nothing (needed to
+// make choice between DATABASES and SCHEMAS less ugly below).
+show_dbs_stmt ::=
+  KW_SHOW KW_DATABASES
+  {: RESULT = new ShowDbsStmt(); :}
+  | KW_SHOW KW_DATABASES show_pattern:showPattern
+  {: RESULT = new ShowDbsStmt(showPattern); :}
+  | KW_SHOW KW_SCHEMAS
+  {: RESULT = new ShowDbsStmt(); :}
+  | KW_SHOW KW_SCHEMAS show_pattern:showPattern
+  {: RESULT = new ShowDbsStmt(showPattern); :}
   ;
 
 show_pattern ::=
   STRING_LITERAL:showPattern
+  {: RESULT = showPattern; :}
+  | KW_LIKE STRING_LITERAL:showPattern
   {: RESULT = showPattern; :}
   ;
 

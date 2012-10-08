@@ -17,6 +17,8 @@ string, string
 'year','int'
 'month','int'
 ====
+USE default
+====
 # Default database
 describe alltypes
 ---- TYPES

@@ -50,6 +50,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("case", new Integer(SqlParserSymbols.KW_CASE));
     keywordMap.put("cast", new Integer(SqlParserSymbols.KW_CAST));    
     keywordMap.put("count", new Integer(SqlParserSymbols.KW_COUNT));
+    keywordMap.put("databases", new Integer(SqlParserSymbols.KW_DATABASES));
     keywordMap.put("date", new Integer(SqlParserSymbols.KW_DATE));
     keywordMap.put("datetime", new Integer(SqlParserSymbols.KW_DATETIME));
     keywordMap.put("desc", new Integer(SqlParserSymbols.KW_DESC));
@@ -89,6 +90,7 @@ import com.cloudera.impala.analysis.SqlParserSymbols;
     keywordMap.put("regexp", new Integer(SqlParserSymbols.KW_REGEXP));
     keywordMap.put("rlike", new Integer(SqlParserSymbols.KW_RLIKE));
     keywordMap.put("right", new Integer(SqlParserSymbols.KW_RIGHT));
+    keywordMap.put("schemas", new Integer(SqlParserSymbols.KW_SCHEMAS));
     keywordMap.put("select", new Integer(SqlParserSymbols.KW_SELECT));
     keywordMap.put("semi", new Integer(SqlParserSymbols.KW_SEMI));
     keywordMap.put("show", new Integer(SqlParserSymbols.KW_SHOW));
@@ -166,7 +168,7 @@ Whitespace = {LineTerminator} | [ \t\f]
 
 IdentifierOrKw = [:jletter:][:jletterdigit:]* | "&&" | "||"
 IntegerLiteral = [:digit:][:digit:]*
-SingleQuoteStringLiteral = \'([^\n\r\']|\\\\|\\\')*\'
+SingleQuoteStringLiteral = (\'([^\n\r\']|\\\\|\\\')*\')|(\`([^\n\r\`]|\\\\|\\\`)*\`)
 DoubleQuoteStringLiteral = \"([^\n\r\"]|\\\\|\\\")*\"
 
 FLit1 = [0-9]+ \. [0-9]*
@@ -201,6 +203,7 @@ EndOfLineComment = "--" {NonTerminator}* {LineTerminator}?
 ">" { return newToken(SqlParserSymbols.GREATERTHAN, null); }
 "\"" { return newToken(SqlParserSymbols.UNMATCHED_STRING_LITERAL, null); }
 "'" { return newToken(SqlParserSymbols.UNMATCHED_STRING_LITERAL, null); }
+"`" { return newToken(SqlParserSymbols.UNMATCHED_STRING_LITERAL, null); }
 
 {IdentifierOrKw} {
   Integer kw_id = keywordMap.get(yytext().toLowerCase());

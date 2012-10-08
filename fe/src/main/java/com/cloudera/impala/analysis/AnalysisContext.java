@@ -43,8 +43,12 @@ public class AnalysisContext {
       return stmt instanceof UseStmt;
     }
 
-    public boolean isShowStmt() {
-      return stmt instanceof ShowStmt;
+    public boolean isShowTablesStmt() {
+      return stmt instanceof ShowTablesStmt;
+    }
+
+    public boolean isShowDbsStmt() {
+      return stmt instanceof ShowDbsStmt;
     }
 
     public boolean isDescribeStmt() {
@@ -52,7 +56,7 @@ public class AnalysisContext {
     }
 
     public boolean isDdlStmt() {
-      return isUseStmt() || isShowStmt() || isDescribeStmt();
+      return isUseStmt() || isShowTablesStmt() || isShowDbsStmt() || isDescribeStmt();
     }
 
     public boolean isDmlStmt() {
@@ -71,8 +75,12 @@ public class AnalysisContext {
       return (UseStmt) stmt;
     }
 
-    public ShowStmt getShowStmt() {
-      return (ShowStmt) stmt;
+    public ShowTablesStmt getShowTablesStmt() {
+      return (ShowTablesStmt) stmt;
+    }
+
+    public ShowDbsStmt getShowDbsStmt() {
+      return (ShowDbsStmt) stmt;
     }
 
     public DescribeStmt getDescribeStmt() {

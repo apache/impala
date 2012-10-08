@@ -20,6 +20,7 @@ import com.cloudera.impala.analysis.AnalysisContext;
 import com.cloudera.impala.analysis.InsertStmt;
 import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.catalog.Catalog;
+import com.cloudera.impala.catalog.Catalog.DatabaseNotFoundException;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
 import com.cloudera.impala.catalog.HdfsTable;
@@ -203,10 +204,15 @@ public class Frontend {
       ddl.ddl_type = TDdlType.USE;
       ddl.setDatabase(analysis.getUseStmt().getDatabase());
       metadata.setColumnDescs(Collections.<TColumnDesc>emptyList());
-    } else if (analysis.isShowStmt()) {
-      ddl.ddl_type = TDdlType.SHOW;
-      ddl.setShow_pattern(analysis.getShowStmt().getPattern());
-      ddl.setDatabase(analysis.getShowStmt().getDb());
+    } else if (analysis.isShowTablesStmt()) {
+      ddl.ddl_type = TDdlType.SHOW_TABLES;
+      ddl.setShow_pattern(analysis.getShowTablesStmt().getPattern());
+      ddl.setDatabase(analysis.getShowTablesStmt().getDb());
+      metadata.setColumnDescs(Arrays.asList(
+          new TColumnDesc("name", TPrimitiveType.STRING)));
+    } else if (analysis.isShowDbsStmt()) {
+      ddl.ddl_type = TDdlType.SHOW_DBS;
+      ddl.setShow_pattern(analysis.getShowDbsStmt().getPattern());
       metadata.setColumnDescs(Arrays.asList(
           new TColumnDesc("name", TPrimitiveType.STRING)));
     } else if (analysis.isDescribeStmt()) {
@@ -240,6 +246,16 @@ public class Frontend {
   public List<String> getTableNames(String dbName, String tablePattern)
       throws ImpalaException {
     return catalog.getTableNames(dbName, tablePattern);
+  }
+
+  /**
+   * Returns all tables that match the specified database and pattern.  If
+   * pattern is null, matches all tables. If db is null, all databases are
+   * searched for matches.
+   */
+  public List<String> getDbNames(String dbPattern) 
+      throws ImpalaException {
+    return catalog.getDbNames(dbPattern);
   }
 
   /**

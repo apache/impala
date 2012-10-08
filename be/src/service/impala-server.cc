@@ -638,6 +638,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     EXIT_IF_EXC(jni_env);
     describe_table_id_ = jni_env->GetMethodID(fe_class, "describeTable", "([B)[B");
     EXIT_IF_EXC(jni_env);
+    get_db_names_id_ = jni_env->GetMethodID(fe_class, "getDbNames", "([B)[B");
+    EXIT_IF_EXC(jni_env);
 
     jboolean lazy = (FLAGS_load_catalog_at_startup ? false : true);
     jobject fe = jni_env->NewObject(fe_class, fe_ctor, lazy);
@@ -981,6 +983,31 @@ Status ImpalaServer::GetTableNames(string* db, string* pattern,
     return Status::OK;
   } else {
     return Status("GetTableNames not supported with external planservice");
+  }
+}
+
+Status ImpalaServer::GetDbNames(string* pattern, vector<string>* db_names) {
+  if (!FLAGS_use_planservice) {
+    JNIEnv* jni_env = getJNIEnv();
+    jbyteArray request_bytes;
+    TGetDbsParams params;
+    if (pattern != NULL) {
+      params.__set_pattern(*pattern);
+    }
+
+    RETURN_IF_ERROR(SerializeThriftMsg(jni_env, &params, &request_bytes));
+    jbyteArray result_bytes = static_cast<jbyteArray>(
+        jni_env->CallObjectMethod(fe_, get_db_names_id_, request_bytes));
+
+    RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+
+    TGetDbsResult result;
+    RETURN_IF_ERROR(DeserializeThriftMsg(jni_env, result_bytes, &result));
+    
+    db_names->insert(db_names->begin(), result.dbs.begin(), result.dbs.end());
+    return Status::OK;
+  } else {
+    return Status("GetDbNames not supported with external planservice");
   }
 }
 

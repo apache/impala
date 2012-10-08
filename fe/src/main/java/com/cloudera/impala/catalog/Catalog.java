@@ -19,6 +19,8 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Lists;
 import com.google.common.base.Preconditions;
 
+import com.cloudera.impala.common.ImpalaException;
+
 /**
  * Interface to metadata stored in MetaStore instance.
  * Caches all db-, table- and column-related md during construction.
@@ -93,53 +95,85 @@ public class Catalog {
     return msClient;
   }
 
+  public static class DatabaseNotFoundException extends ImpalaException {
+    // Dummy serial ID to satisfy Eclipse
+    private static final long serialVersionUID = -2203080667446640542L;
+
+    public DatabaseNotFoundException(String s) { super(s); }
+  }
+
   /**
-   * Implement Hive's pattern-matching getTables call. The only metacharacters
-   * are '*' which matches any string of characters, and '|' which denotes
-   * choice.  Doing the work here saves loading the tables from the metastore
-   * (which Hive would do if we passed the call through to the metastore client).
+   * Returns a list of tables in the supplied database that match
+   * tablePattern. See filterStringsByPattern for details of the pattern match
+   * semantics.
    *
-   * If tablePattern is null, all tables are considered to match. If it is the
-   * empty string, no tables match.
+   * dbName must not be null. tablePattern may be null (and thus matches
+   * everything).
    *
    * Table names are returned unqualified. 
    */
-  public List<String> getTableNames(String dbName, String tablePattern) {
+  public List<String> getTableNames(String dbName, String tablePattern) 
+      throws DatabaseNotFoundException {
     Preconditions.checkNotNull(dbName);
     List<String> matchingTables = Lists.newArrayList();
 
     Db db = getDb(dbName);
     if (db == null) {
-      return matchingTables;
+      throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
     }
       
-    List<String> patterns = Lists.newArrayList();
-    // Hive ignores pretty much all metacharacters, so we have to escape them.
-    final String metaCharacters = "+?.^()]\\/{}";
-    final Pattern regex = Pattern.compile("([" + Pattern.quote(metaCharacters) + "])");
-    if (tablePattern != null) {
-      for (String pattern: Arrays.asList(tablePattern.split("\\|"))) {
+    return filterStringsByPattern(db.getAllTableNames(), tablePattern);
+  }
+
+  /**
+   * Returns a list of databases that match dbPattern. See
+   * filterStringsByPattern for details of the pattern match semantics.
+   *
+   * dbPattern may be null (and thus matches
+   * everything).
+   */
+  public List<String> getDbNames(String dbPattern) {    
+    return filterStringsByPattern(dbs.keySet(), dbPattern);
+  }
+
+  /**
+   * Implement Hive's pattern-matching semantics for SHOW statements. The only
+   * metacharacters are '*' which matches any string of characters, and '|'
+   * which denotes choice.  Doing the work here saves loading tables or
+   * databases from the metastore (which Hive would do if we passed the call
+   * through to the metastore client).
+   *
+   * If matchPattern is null, all strings are considered to match. If it is the
+   * empty string, no strings match.
+   */
+  private List<String> filterStringsByPattern(Iterable<String> candidates, 
+      String matchPattern) {
+    List<String> filtered = Lists.newArrayList();
+    if (matchPattern == null) {
+      filtered = Lists.newArrayList(candidates);
+    } else {
+      List<String> patterns = Lists.newArrayList();
+      // Hive ignores pretty much all metacharacters, so we have to escape them.
+      final String metaCharacters = "+?.^()]\\/{}";
+      final Pattern regex = Pattern.compile("([" + Pattern.quote(metaCharacters) + "])");
+      
+      for (String pattern: Arrays.asList(matchPattern.split("\\|"))) {
         Matcher matcher = regex.matcher(pattern);
         pattern = matcher.replaceAll("\\\\$1").replace("*", ".*");
         patterns.add(pattern);
       }
-    }
-
-    for (String table: db.getAllTableNames()) {
-      if (tablePattern == null) {          
-        matchingTables.add(table);
-      } else {
+      
+      for (String candidate: candidates) {
         for (String pattern: patterns) {
           // Empty string matches nothing in Hive's implementation
-          if (!pattern.isEmpty() && table.matches(pattern)) {
-            matchingTables.add(table);
+          if (!pattern.isEmpty() && candidate.matches(pattern)) {
+            filtered.add(candidate);
           }
         }
       }
     }
-
-    Collections.sort(matchingTables);
-    return matchingTables;
+    Collections.sort(filtered, String.CASE_INSENSITIVE_ORDER);
+    return filtered;
   }
 
   /**
@@ -150,7 +184,7 @@ public class Catalog {
     invalidateTable(DEFAULT_DB, tableName);
   }
 
-  public static class TableNotFoundException extends Exception {
+  public static class TableNotFoundException extends ImpalaException {
     private static final long serialVersionUID = -2203080667446640542L;
 
     public TableNotFoundException(String s) { super(s); }

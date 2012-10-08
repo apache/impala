@@ -318,10 +318,12 @@ public class ParserTest {
     ParsesOk("select \"\\\"five\\\"\" from t\n");
     ParsesOk("select \"\'five\'\" from t\n");
     ParsesOk("select \"\'five\" from t\n");
+
     // missing quotes
     ParserError("select \'5 from t");
     ParserError("select \"5 from t");
     ParserError("select '5 from t");
+    ParserError("select `5 from t");
     ParserError("select \"\"five\"\" from t\n");
     ParserError("select 5.0.5 from t");
     // NULL literal in arithmetic expr
@@ -626,6 +628,11 @@ public class ParserTest {
     ParsesOk("SHOW TABLES 'tablename|othername'");
     // Empty pattern ok
     ParsesOk("SHOW TABLES ''");
+    // Databases
+    ParsesOk("SHOW DATABASES");
+    ParsesOk("SHOW SCHEMAS");
+    ParsesOk("SHOW DATABASES LIKE 'pattern'");
+    ParsesOk("SHOW SCHEMAS LIKE 'p*ttern'");
   }
 
   @Test
