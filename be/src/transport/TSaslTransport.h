@@ -66,7 +66,8 @@ class TSaslTransport : public TVirtualTransport<TSaslTransport> {
    * Constructs a new TSaslTransport to act as a client.
    *
    */
-  TSaslTransport(sasl::TSasl* saslClient, boost::shared_ptr<TTransport> transport);
+  TSaslTransport(boost::shared_ptr<sasl::TSasl> saslClient,
+                 boost::shared_ptr<TTransport> transport);
 
   /**
    * Destroys the TSasl object.
@@ -135,8 +136,9 @@ class TSaslTransport : public TVirtualTransport<TSaslTransport> {
   // Buffer for reading and writing.
   TMemoryBuffer* memBuf_;
 
-  // Sasl implimentation class.
-  boost::scoped_ptr<sasl::TSasl> sasl_;
+  // Sasl implementation class. This is passed in to the transport constructor
+  // initialized for either a client or a server.
+  boost::shared_ptr<sasl::TSasl> sasl_;
 
   // IF true we wrap data in encryption.
   bool shouldWrap_;

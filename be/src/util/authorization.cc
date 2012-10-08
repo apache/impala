@@ -38,7 +38,10 @@ namespace impala {
 static vector<sasl_callback_t> callbacks;
 
 // Pattern for hostname substitution.
-static string HOSTNAME_PATTERN = "_HOST";
+static const string HOSTNAME_PATTERN = "_HOST";
+
+// The Impala service name.
+static string impala_service_name;
 
 // Output Sasl messages.
 // context: not used.
@@ -234,6 +237,15 @@ Status InitKerberos(const string& appname) {
     FLAGS_principal.replace(off, HOSTNAME_PATTERN.size(), hostname);
   }
 
+  off = FLAGS_principal.find("/");
+  if (off == string::npos) {
+    stringstream ss;
+    ss << "--principal must contain '/': " << FLAGS_principal;
+    LOG(ERROR) << ss;
+    return Status(ss.str());
+  }
+  impala_service_name = FLAGS_principal.substr(0, off);
+
   try {
     // We assume all impala processes are both server and client.
     sasl::TSaslServer::SaslInit(&callbacks[0], appname);
@@ -285,15 +297,14 @@ Status GetKerberosTransportFactory(const string& principal,
   return Status::OK;
 }
 
-Status GetTSaslClient(const string& service,
-                      const string& hostname, shared_ptr<sasl::TSasl>* saslClient) {
+Status GetTSaslClient(const string& hostname, shared_ptr<sasl::TSasl>* saslClient) {
   map<string, string> props;
   // We do not set this.
   string auth_id;
 
   try {
-    saslClient->reset(new sasl::TSaslClient(
-        KERBEROS_MECHANISM, auth_id, service, hostname, props, &callbacks[0]));
+    saslClient->reset(new sasl::TSaslClient(KERBEROS_MECHANISM,
+        auth_id, impala_service_name, hostname, props, &callbacks[0]));
   } catch (sasl::SaslClientImplException& e) {
     LOG(ERROR) << "Kerberos client create failed: " << e.what();
     return Status(e.what());

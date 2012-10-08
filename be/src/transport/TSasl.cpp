@@ -87,11 +87,6 @@ TSaslClient::TSaslClient(const string& mechanisms, const string& authenticationI
   clientStarted = false;
 }
 
-TSaslClient::~TSaslClient() {
-  sasl_dispose(&conn);
-}
-
-
 /* Evaluates the challenge data and generates a response. */
 uint8_t* TSaslClient::evaluateChallengeOrResponse(
     const uint8_t* challenge, const uint32_t len, uint32_t *resLen) {
@@ -191,10 +186,6 @@ uint8_t* TSaslServer::evaluateChallengeOrResponse(const uint8_t* response,
 
   *resLen = outlen;
   return out;
-}
-
-TSaslServer::~TSaslServer() {
-  sasl_dispose(&conn);
 }
 };
 #endif

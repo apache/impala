@@ -44,7 +44,8 @@ class TSaslClientTransport : public TSaslTransport {
    * saslClient: the sasl object implimenting the underlying authentication handshake
    * transport: the transport to read and write data.
    */
-  TSaslClientTransport(sasl::TSasl* saslClient, boost::shared_ptr<TTransport> transport);
+  TSaslClientTransport(boost::shared_ptr<sasl::TSasl> saslClient,
+                       boost::shared_ptr<TTransport> transport);
 
  protected:
   // Handle any startup messages.

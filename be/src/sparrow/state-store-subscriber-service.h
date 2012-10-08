@@ -116,8 +116,7 @@ class StateStoreSubscriber
   boost::scoped_ptr<impala::ThriftServer> server_;
 
   // Client to use to connect to the StateStore.
-  boost::shared_ptr<impala::ThriftClient<StateStoreServiceClient,
-      impala::SPARROW_SERVER> > client_;
+  boost::shared_ptr<impala::ThriftClient<StateStoreServiceClient> > client_;
 
   // Callback for all services that have registered for updates (indexed by the
   // associated SubscriptionId), and associated lock.

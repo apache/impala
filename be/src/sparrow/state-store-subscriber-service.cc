@@ -271,7 +271,7 @@ void StateStoreSubscriber::UnregisterAll() {
 Status StateStoreSubscriber::InitClient() {
   DCHECK(server_running_);
   if (client_.get() == NULL) {
-    client_.reset(new ThriftClient<StateStoreServiceClient, impala::SPARROW_SERVER>(
+    client_.reset(new ThriftClient<StateStoreServiceClient>(
         state_store_host_port_.ipaddress, state_store_host_port_.port));
 
     Status status = client_->OpenWithRetry(FLAGS_rpc_cnxn_attempts, 

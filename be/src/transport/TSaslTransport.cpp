@@ -21,11 +21,14 @@
 #include "config.h"
 #ifdef HAVE_SASL_SASL_H
 #include <stdint.h>
+#include <sstream>
 #include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
 
 #include <transport/TBufferTransports.h>
 #include <transport/TSaslTransport.h>
+
+using namespace std;
 
 namespace apache { namespace thrift { namespace transport {
 
@@ -36,7 +39,7 @@ namespace apache { namespace thrift { namespace transport {
         isClient_(false) {
   }
 
-  TSaslTransport::TSaslTransport(sasl::TSasl* saslClient,
+  TSaslTransport::TSaslTransport(boost::shared_ptr<sasl::TSasl> saslClient,
                                  boost::shared_ptr<TTransport> transport)
       : transport_(transport),
         memBuf_(new TMemoryBuffer()),
@@ -88,7 +91,9 @@ namespace apache { namespace thrift { namespace transport {
       if (status == TSASL_COMPLETE) {
         if (isClient_) break; // handshake complete
       } else if (status != TSASL_OK) {
-        throw TTransportException("Expected COMPLETE or OK, got " + status);
+        stringstream ss;
+        ss << "Expected COMPLETE or OK, got " << status;
+        throw TTransportException(ss.str());
       }
       uint32_t challengeLength;
       uint8_t* challenge = sasl_->evaluateChallengeOrResponse(
@@ -103,7 +108,9 @@ namespace apache { namespace thrift { namespace transport {
     if ((isClient_ && (status == TSASL_INVALID)) || status == TSASL_OK) {
       receiveSaslMessage(&status, &resLength);
       if (status != TSASL_COMPLETE) {
-        throw TTransportException("Expected SASL COMPLETE, but got " + status);
+        stringstream ss;
+        ss << "Expected COMPLETE or OK, got " << status;
+        throw TTransportException(ss.str());
       }
     }
 

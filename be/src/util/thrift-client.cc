@@ -8,11 +8,6 @@ using namespace boost;
 
 namespace impala {
 
-const map<ServiceName, string> SERVICE_NAME_MAP =
-    boost::assign::map_list_of
-      (IMPALA_SERVER, "impala")
-      (SPARROW_SERVER, "sparrow");
-
 Status ThriftClientImpl::Open() {
   try {
     if (!transport_->isOpen()) {

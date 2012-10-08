@@ -23,16 +23,6 @@ DECLARE_string(hostname);
 DECLARE_bool(use_nonblocking);
 
 namespace impala {
-// Names of the servers, used for Kerberos.
-enum ServiceName {
-  NON_KERBEROS_SERVER, // Any unknown server that is not secure.
-  // Servers we know about.
-  IMPALA_SERVER,
-  SPARROW_SERVER
-};
-
-extern const std::map<ServiceName, std::string> SERVICE_NAME_MAP;
-
 // Super class for templatized thrift clients.
 class ThriftClientImpl {
  public:
@@ -75,8 +65,7 @@ class ThriftClientImpl {
 
 // Utility client to a Thrift server. The parameter type is the
 // Thrift interface type that the server implements.
-// The ServiceName is the enum of the service the client talks to.
-template <class InterfaceType, ServiceName>
+template <class InterfaceType>
 class ThriftClient : public ThriftClientImpl{
  public:
   ThriftClient(const std::string& ipaddress, int port,
@@ -90,20 +79,17 @@ class ThriftClient : public ThriftClientImpl{
 
 };
 
-template <class InterfaceType, ServiceName service_name>
-ThriftClient<InterfaceType, service_name>::ThriftClient(
+template <class InterfaceType>
+ThriftClient<InterfaceType>::ThriftClient(
     const std::string& ipaddress, int port, ThriftServer::ServerType server_type)
       : ThriftClientImpl(ipaddress, port),
         iface_(new InterfaceType(protocol_)) {
   transport_ = socket_;
   // Check to enable kerberos
-  if (!FLAGS_principal.empty() && service_name != NON_KERBEROS_SERVER) {
-    std::map<ServiceName, std::string>::const_iterator service =
-        SERVICE_NAME_MAP.find(service_name);
-    DCHECK(service != SERVICE_NAME_MAP.end());
-    GetTSaslClient(service->second, ipaddress_, &sasl_client_);
+  if (!FLAGS_principal.empty()) {
+    GetTSaslClient(ipaddress_, &sasl_client_);
     transport_.reset(new apache::thrift::transport::TSaslClientTransport(
-        sasl_client_.get(), socket_));
+        sasl_client_, socket_));
   }
 
   // Switch to Nonblocking as the default.

@@ -54,6 +54,10 @@ class SaslException : public TTransportException {
  */
 class TSasl {
   public:
+   ~TSasl() {
+    sasl_dispose(&conn);
+   }
+
   /*
    * Called once per application to free resources.`
    * Note that there is no distinction in the sasl library between being done
@@ -120,8 +124,6 @@ class TSaslClient : public sasl::TSasl {
                 const std::map<std::string,std::string>& props,
                 sasl_callback_t* callbacks);
 
-    ~TSaslClient(); 
-
     static void SaslInit(sasl_callback_t* callbacks) {
       int result = sasl_client_init(callbacks);
       if (result != SASL_OK)
@@ -164,8 +166,6 @@ class TSaslServer : public sasl::TSasl {
  public:
   TSaslServer(const std::string& service, const std::string& serverFQDN,
               const std::string& userRelm, unsigned flags, sasl_callback_t* callbacks);
-
-  ~TSaslServer(); 
 
   /*
    * This initializes the sasl server library and should be called onece per application

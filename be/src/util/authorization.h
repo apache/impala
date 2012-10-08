@@ -37,8 +37,8 @@ Status GetKerberosTransportFactory(const std::string& principal,
 // service: service to talk to, e.g. impala
 // hostname: fully qualified host name that service runs on.
 // saslClient: the returned sasl client.
-Status GetTSaslClient(const std::string& service,
-    const std::string& hostname, boost::shared_ptr<sasl::TSasl>* saslClient);
+Status GetTSaslClient(const std::string& hostname,
+    boost::shared_ptr<sasl::TSasl>* saslClient);
 
 // Returns the system defined hostname on which the process is running.
 // If the name cannot be found a warning is issued and an empty string is returned.

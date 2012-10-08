@@ -87,7 +87,7 @@ class DataStreamSender::Channel {
   int64_t num_data_bytes_sent() const { return num_data_bytes_sent_; }
 
  private:
-  typedef ThriftClient<ImpalaInternalServiceClient, IMPALA_SERVER> BackendThriftClient;
+  typedef ThriftClient<ImpalaInternalServiceClient> BackendThriftClient;
   scoped_ptr<BackendThriftClient> client_;
 
   const RowDescriptor& row_desc_;
