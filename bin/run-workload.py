@@ -274,10 +274,14 @@ def build_query(query_format_string, file_format, codec, compression_type,
   """
   database_name = database_name_to_use(workload, scale_factor)
   table_suffix = build_table_suffix(file_format, codec, compression_type)
-  # $TABLE is used as a token for table suffix in the queries. Here we insert the proper
-  # database name based on the workload and query.
-  replace_from = '(\w+\.){0,1}(?P<table_name>\w+)\$TABLE'
-  replace_by = '%s%s%s' % (database_name, r'\g<table_name>', table_suffix)
+
+  # $TABLE is used as a token for table suffix in the queries. Here we replace the token
+  # the proper database name based on the workload and scale factor.
+  # There also may be cases where there is dbname.table_name without a
+  # $TABLE (in the case of insert).
+  replace_from =\
+      '(%(workload)s\.)(?P<table_name>\w+)(\$TABLE){0,1}' % {'workload': workload}
+  replace_by = '%s%s' % (database_name, r'\g<table_name>')
   return re.sub(replace_from, replace_by, query_format_string)
 
 def read_vector_file(file_name):
@@ -412,7 +416,6 @@ def execute_queries(query_map, workload, scale_factor, vector_row):
         query_name = query
       query_string = build_query(query.strip(), file_format, codec, compression_type,
                                  workload, scale_factor)
-
       execution_result = QueryExecutionResult()
       if not options.skip_impala:
         summary += "Results Using Impala:\n"

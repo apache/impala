@@ -57,8 +57,7 @@ export HBASE_CONF_DIR=$HIVE_CONF_DIR
 
 # set the python path for test modules and beeswax
 PYTHONPATH=$IMPALA_HOME:$IMPALA_HOME/shell/gen-py:$HIVE_HOME/lib/py
-PYTHONPATH=$IMPALA_HOME/thirdparty/python-thrift-0.7.0:$PYTHONPATH
-export PYTHONPATH
+export PYTHONPATH=$PYTHONPATH:$IMPALA_HOME/thirdparty/python-thrift-0.7.0
 
 # These arguments are, despite the name, passed to every JVM created
 # by an impalad. So they must point to the location of
