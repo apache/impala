@@ -125,8 +125,11 @@ Status InProcessQueryExecutor::Exec(const string& query,
     SCOPED_TIMER(plan_gen_counter);
     CHECK(client_.get() != NULL) << "didn't call InProcessQueryExecutor::Setup()";
     TClientRequest client_request;
+    TSessionState session_state;
     client_request.__set_stmt(query.c_str());
     client_request.__set_queryOptions(query_options);
+    session_state.__set_database("default");
+    client_request.__set_sessionState(session_state);
     TExecRequest result;
     client_->CreateExecRequest(result, client_request);
     query_request_ = result.queryExecRequest;
