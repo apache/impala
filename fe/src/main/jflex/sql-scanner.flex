@@ -166,9 +166,11 @@ LineTerminator = \r|\n|\r\n
 NonTerminator = [^\r\n]
 Whitespace = {LineTerminator} | [ \t\f]
 
-IdentifierOrKw = [:jletter:][:jletterdigit:]* | "&&" | "||"
+IdentifierOrKwContents = [:jletter:][:jletterdigit:]* | "&&" | "||"
+
+IdentifierOrKw = \`{IdentifierOrKwContents}\` | {IdentifierOrKwContents}
 IntegerLiteral = [:digit:][:digit:]*
-SingleQuoteStringLiteral = (\'([^\n\r\']|\\\\|\\\')*\')|(\`([^\n\r\`]|\\\\|\\\`)*\`)
+SingleQuoteStringLiteral = (\'([^\n\r\']|\\\\|\\\')*\')
 DoubleQuoteStringLiteral = \"([^\n\r\"]|\\\\|\\\")*\"
 
 FLit1 = [0-9]+ \. [0-9]*
@@ -206,11 +208,16 @@ EndOfLineComment = "--" {NonTerminator}* {LineTerminator}?
 "`" { return newToken(SqlParserSymbols.UNMATCHED_STRING_LITERAL, null); }
 
 {IdentifierOrKw} {
-  Integer kw_id = keywordMap.get(yytext().toLowerCase());
+  if (yytext().startsWith("`")) {
+    return newToken(SqlParserSymbols.IDENT, yytext().substring(1, yytext().length() - 1));
+  }
+
+  String text = yytext();
+  Integer kw_id = keywordMap.get(text.toLowerCase());
   if (kw_id != null) {
-    return newToken(kw_id.intValue(), yytext());
+    return newToken(kw_id.intValue(), text);
   } else {
-    return newToken(SqlParserSymbols.IDENT, yytext());
+    return newToken(SqlParserSymbols.IDENT, text);
   }
 }
 

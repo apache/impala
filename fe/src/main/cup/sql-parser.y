@@ -15,7 +15,7 @@ parser code {:
   // list of expected tokens ids from current parsing state 
   // for generating syntax error message
   private final List<Integer> expectedTokenIds = new ArrayList<Integer>();
-  
+
   // to avoid reporting trivial tokens as expected tokens in error messages
   private boolean reportExpectedToken(Integer tokenId) {
     if (SqlScanner.isKeyword(tokenId) || 

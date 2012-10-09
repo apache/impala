@@ -34,12 +34,11 @@ import com.cloudera.impala.thrift.TQueryExecRequest2;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.cloudera.impala.thrift.TScanRangeLocation;
 import com.cloudera.impala.thrift.TScanRangeLocations;
-<<<<<<< HEAD
+
 import com.cloudera.impala.thrift.TStmtType;
 import com.google.common.base.Preconditions;
-=======
 import com.cloudera.impala.thrift.TSessionState;
->>>>>>> aa06a6e... Add session key handling to ThriftServer, and session support to the frontend
+
 import com.google.common.collect.Lists;
 
 public class NewPlannerTest {

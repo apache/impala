@@ -298,6 +298,38 @@ public class ParserTest {
     ParsesOk("select a from t where false AND true");
   }
 
+  @Test  
+  public void TestIdentQuoting() {
+    ParsesOk("select a from `t`");
+    ParsesOk("select a from `default`.`t`");
+    ParsesOk("select a from `default`.t");
+    ParsesOk("select a from default.`t`");
+
+    ParsesOk("select `a` from default.t");
+    ParsesOk("select `tbl`.`a` from default.t");
+    ParsesOk("select `db`.`tbl`.`a` from default.t");
+
+    // Mixed quoting
+    ParsesOk("select `db`.tbl.`a` from default.t");
+    ParserError("select `db.table.a` from default.t");
+
+    // Invalid identifiers in table names
+    ParserError("select a from `all types`");
+    ParserError("select a from `default`.`all types`");
+
+    // Wrong quotes
+    ParserError("select a from 'default'.'t'");
+
+    // Lots of quoting
+    ParsesOk(
+        "select `db`.`tbl`.`a` from `default`.`t` `alias` where `alias`.`col` = 'string'" 
+        + " group by `alias`.`col`");
+
+    // Quoting keywords should fail
+    ParserError("select `col` `from` tbl");
+  }
+
+
   @Test public void TestLiteralExprs() {
     // negative integer literal
     ParsesOk("select -1 from t");

@@ -68,3 +68,22 @@ string
 'hello'
 'x'
 ====
+# Quoting test
+SELECT `table_alias`.`int_col` AS `default_int_col` 
+FROM `default`.`alltypes` `table_alias` 
+GROUP BY `default_int_col` 
+LIMIT 10
+---- TYPES
+int
+---- RESULTS
+0
+7
+3       
+9       
+4       
+6       
+1       
+5       
+2       
+8
+====
