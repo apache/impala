@@ -1,5 +1,8 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
+#ifndef IMPALA_EXEC_TEXT_CONVERTER_INLINE_H
+#define IMPALA_EXEC_TEXT_CONVERTER_INLINE_H
+
 #include "text-converter.h"
 
 #include <boost/algorithm/string.hpp>
@@ -14,6 +17,8 @@
 
 namespace impala {
 
+// Note: this function has a codegen'd version.  Changing this function requires
+// corresponding changes to CodegenWriteSlot.
 inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tuple,
     const char* data, int len, bool copy_string, bool need_escape, MemPool* pool) {
   if (len == 0 && slot_desc->type() != TYPE_STRING) {
@@ -98,3 +103,4 @@ inline bool TextConverter::WriteSlot(const SlotDescriptor* slot_desc, Tuple* tup
 
 }
 
+#endif

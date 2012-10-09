@@ -11,6 +11,8 @@ using namespace impala;
 const int MemPool::DEFAULT_INITIAL_CHUNK_SIZE;
 const int MemPool::MAX_CHUNK_SIZE;
 
+const char* MemPool::LLVM_CLASS_NAME = "class.impala::MemPool";
+
 MemPool::MemPool()
   : current_chunk_idx_(-1),
     last_offset_conversion_chunk_idx_(-1),

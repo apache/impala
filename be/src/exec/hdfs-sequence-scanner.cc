@@ -2,7 +2,7 @@
 
 #include "exec/hdfs-sequence-scanner.h"
 
-#include "exec/buffered-byte-stream.h"
+#include "codegen/llvm-codegen.h"
 #include "exec/delimited-text-parser.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/scan-range-context.h"
@@ -14,9 +14,10 @@
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
 
-using namespace std;
 using namespace boost;
 using namespace impala;
+using namespace llvm;
+using namespace std;
 
 const char* const HdfsSequenceScanner::SEQFILE_VALUE_CLASS_NAME =
   "org.apache.hadoop.io.Text";
@@ -30,6 +31,7 @@ static const uint8_t SEQUENCE_FILE_RECORD_DELIMITER = 0xff;
 HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state) 
     : HdfsScanner(scan_node, state, NULL),
       header_(NULL),
+      write_tuple_fn_(NULL),
       unparsed_data_buffer_pool_(new MemPool()),
       unparsed_data_buffer_(NULL),
       num_buffered_records_in_compressed_block_(0),
@@ -59,6 +61,17 @@ void HdfsSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node,
 void HdfsSequenceScanner::IssueFileRanges(const char* filename) {
   HdfsFileDesc* file_desc = scan_node_->GetFileDesc(filename);
   scan_node_->AddDiskIoRange(file_desc);
+}
+
+// Codegen for materialized parsed data into tuples.  
+// TODO: sequence file scanner needs to be split into a cross compiled ir file,
+// probably just for the block compressed path.  WriteCompleteTuple should be 
+// injected into that function.
+Function* HdfsSequenceScanner::Codegen(HdfsScanNode* node) {
+  LlvmCodeGen* codegen = node->runtime_state()->llvm_codegen();
+  if (codegen == NULL) return NULL;
+  Function* write_complete_tuple_fn = CodegenWriteCompleteTuple(node, codegen);
+  return write_complete_tuple_fn;
 }
 
 Status HdfsSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
@@ -174,6 +187,21 @@ Status HdfsSequenceScanner::InitNewRange() {
         unparsed_data_buffer_pool_.get(), context_->compact_data(),
         header_->codec, &decompressor_));
   }
+  
+  // Initialize codegen fn
+  // Cannot codegen if it has strings slots and we need to compact (i.e. copy) the data.
+  Function* codegen_fn = scan_node_->GetCodegenFn(THdfsFileFormat::SEQUENCE_FILE);
+  if (codegen_fn == NULL) return Status::OK;
+  if (!scan_node_->tuple_desc()->string_slots().empty() && 
+        ((hdfs_partition->escape_char() != '\0') || context_->compact_data())) {
+    return Status::OK;
+  }
+  
+  write_tuple_fn_ = reinterpret_cast<WriteCompleteTupleFn>(
+      state_->llvm_codegen()->JitFunction(codegen_fn));
+  VLOG(2) << "HdfsSequenceScanner(node_id=" << scan_node_->id()
+          << ") using llvm codegend functions.";
+
   return Status::OK;
 }
 
@@ -342,6 +370,7 @@ Status HdfsSequenceScanner::ProcessRange() {
     
     // Parse the current record.
     bool add_row = false;
+
     // Parse the current record.
     if (scan_node_->materialized_slots().size() != 0) {
       char* col_start;
@@ -349,13 +378,33 @@ Status HdfsSequenceScanner::ProcessRange() {
       int num_tuples = 0;
       int num_fields = 0;
       char* row_end_loc;
+      uint8_t error_in_row = false;
 
       RETURN_IF_ERROR(delimited_text_parser_->ParseFieldLocations(
           1, record_len, reinterpret_cast<char**>(&record), &row_end_loc,
           &field_locations_, &num_tuples, &num_fields, &col_start));
       DCHECK(num_tuples == 1);
+      
+      uint8_t errors[num_fields];
+      memset(errors, 0, sizeof(errors));
 
-      if (!WriteFields(pool, tuple_row_mem, num_fields, &add_row).ok()) {
+      // Call codegen write tuple if possible
+      if (write_tuple_fn_ != NULL) {
+        add_row = write_tuple_fn_(this, pool, &field_locations_[0], tuple_, tuple_row_mem,
+            template_tuple_, &errors[0], &error_in_row);
+      } else {
+        add_row = WriteCompleteTuple(pool, &field_locations_[0], tuple_, tuple_row_mem,
+            template_tuple_, &errors[0], &error_in_row);
+      }
+
+      if (UNLIKELY(error_in_row)) {
+        for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
+          if (errors[i]) {
+            const SlotDescriptor* desc = scan_node_->materialized_slots()[i];
+            ReportColumnParseError(
+                desc, field_locations_[i].start, field_locations_[i].len);
+          }
+        }
         // Report all the fields that have errors.
         ++num_errors_in_file_;
         if (state_->LogHasSpace()) {
@@ -378,45 +427,6 @@ Status HdfsSequenceScanner::ProcessRange() {
     if (scan_node_->ReachedLimit()) break;
   }
 
-  return Status::OK;
-}
-
-// TODO: apply conjuncts as slots get materialized and skip to the end of the row
-// if we determine it's not a match.
-Status HdfsSequenceScanner::WriteFields(MemPool* pool, TupleRow* row, 
-    int num_fields, bool* add_row) {
-  DCHECK_EQ(num_fields, scan_node_->materialized_slots().size());
-  // Keep track of where lines begin as we write out fields for error reporting
-  int next_line_offset = 0;
-
-  // Initialize tuple_ from the partition key template tuple before writing the slots
-  InitTuple(template_tuple_, tuple_);
-
-  // Loop through all the parsed_data and parse out the values to slots
-  bool error_in_row = false;
-  for (int n = 0; n < num_fields; ++n) {
-    int need_escape = false;
-    int len = field_locations_[n].len;
-    if (len < 0) {
-      len = -len;
-      need_escape = true;
-    }
-    next_line_offset += (len + 1);
-
-    const SlotDescriptor* desc = scan_node_->materialized_slots()[n];
-    if (!text_converter_->WriteSlot(desc, tuple_,
-        reinterpret_cast<char*>(field_locations_[n].start),
-        len, context_->compact_data(), need_escape, pool)) {
-      ReportColumnParseError(desc, field_locations_[n].start, len);
-      error_in_row = true;
-    }
-  }
-
-  // Set tuple in tuple row and evaluate the conjuncts
-  row->SetTuple(tuple_idx_, tuple_);
-  *add_row = ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, row);
-
-  if (error_in_row) return Status("Conversion from string failed");
   return Status::OK;
 }
 

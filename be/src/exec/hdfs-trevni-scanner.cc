@@ -541,7 +541,7 @@ Status HdfsTrevniScanner::GetNext(RowBatch* row_batch, bool* eosr) {
       row_idx = row_batch->AddRow();
     }
     TupleRow* current_row = row_batch->GetRow(row_idx);
-    current_row->SetTuple(tuple_idx_, tuple_);
+    current_row->SetTuple(scan_node_->tuple_idx(), tuple_);
 
     // Evaluate the conjuncts and add the row to the batch
     if (ExecNode::EvalConjuncts(conjuncts_, num_conjuncts_, current_row)) {

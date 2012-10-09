@@ -543,7 +543,7 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
       int row_idx = row_batch->AddRow();
       DCHECK(row_idx != RowBatch::INVALID_ROW_INDEX);
       TupleRow* current_row = row_batch->GetRow(row_idx);
-      current_row->SetTuple(tuple_idx_, tuple_);
+      current_row->SetTuple(scan_node_->tuple_idx(), tuple_);
       // Initialize tuple_ from the partition key template tuple before writing the
       // slots
       InitTuple(template_tuple_, tuple_);
@@ -622,7 +622,7 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
 void HdfsRCFileScanner::DebugString(int indentation_level, stringstream* out) const {
   // TODO: Add more details of internal state.
   *out << string(indentation_level * 2, ' ');
-  *out << "HdfsRCFileScanner(tupleid=" << tuple_idx_ <<
+  *out << "HdfsRCFileScanner(tupleid=" << scan_node_->tuple_idx() <<
     " file=" << current_byte_stream_->GetLocation();
   // TODO: Scanner::DebugString
   //  ExecNode::DebugString(indentation_level, out);

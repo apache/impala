@@ -28,6 +28,9 @@ class HdfsTextScanner : public HdfsScanner {
   // Issue io manager byte ranges for 'files'
   static void IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>& files);
 
+  // Codegen writing tuples and evaluating predicates
+  static llvm::Function* Codegen(HdfsScanNode*);
+
   static const char* LLVM_CLASS_NAME;
 
  private:
@@ -78,31 +81,6 @@ class HdfsTextScanner : public HdfsScanner {
   // Returns the number of tuples added to the row batch.
   int WriteFields(MemPool*, TupleRow* tuple_row_mem, int num_fields, int num_tuples);
 
-  // Writes out all slots for 'tuple' from 'fields'. 'fields' must be aligned
-  // to the start of the tuple (e.g. fields[0] maps to slots[0]).
-  // After writing the tuple, it will be evaluated against the conjuncts.
-  //  - error_fields is an out array.  error_fields[i] will be set to true if the ith
-  //    field had a parse error
-  //  - error_in_row is an out bool.  It is set to true if any field had parse errors
-  // Returns whether the resulting tuplerow passed the conjuncts.
-  //
-  // The parsing of the fields and evaluating against conjuncts is combined in this
-  // function.  This is done so it can be possible to evaluate conjuncts as slots
-  // are materialized (on partial tuples).  
-  //
-  // This function is replaced by a codegen'd function at runtime.  This is
-  // the reason that the out error parameters are typed uint8_t instead of bool. We need
-  // to be able to match this function's signature identically for the codegen'd function.
-  // Bool's as out parameters can get converted to bytes by the compiler and rather than
-  // implicitly depending on that to happen, we will explicitly type them to bytes.
-  // TODO: revisit this
-  bool WriteCompleteTuple(MemPool* pool, FieldLocation* fields, Tuple* tuple, 
-      TupleRow* tuple_row, uint8_t* error_fields, uint8_t* error_in_row);
-
-  // Codegen function to replace WriteCompleteTuple. Should behave identically
-  // to WriteCompleteTuple.
-  llvm::Function* CodegenWriteCompleteTuple(LlvmCodeGen* codegen);
-
   // Processes batches of fields and writes them out to tuple_row_mem.
   // - 'pool' mempool to allocate from for auxiliary tuple memory
   // - tuple_row_mem preallocated tuple_row memory this function must use.
@@ -121,20 +99,15 @@ class HdfsTextScanner : public HdfsScanner {
   // Codegen function to replace WriteAlignedTuples.  WriteAlignedTuples is cross compiled
   // to IR.  This function loads the precompiled IR function, modifies it and returns the
   // resulting function.
-  llvm::Function* CodegenWriteAlignedTuples(LlvmCodeGen*, llvm::Function* write_tuple_fn);
+  // TODO: this should be merged with sequence file function to write tuples after
+  // a bit of sequence file refactoring.  
+  static llvm::Function* CodegenWriteAlignedTuples(HdfsScanNode*, LlvmCodeGen*, 
+      llvm::Function* write_tuple_fn);
 
   // Utility function to write out 'num_fields' to 'tuple_'.  This is used to parse
   // partial tuples.  Returns bytes processed.  If copy_strings is true, strings
   // from fields will be copied into the boundary pool.
   int WritePartialTuple(FieldLocation*, int num_fields, bool copy_strings);
-
-  // Utility function to compute the order to materialize slots to allow  for
-  // computing conjuncts as slots get materialized (on partial tuples).
-  // 'order' will contain for each slot, the first conjunct it is associated with.
-  // e.g. order[2] = 1 indicates materialized_slots[2] must be materialized before
-  // evaluating conjuncts[1].  Slots that are not referenced by any conjuncts will have
-  // order set to conjuncts.size()
-  void ComputeSlotMaterializationOrder(std::vector<int>* order);
 
   // Utility function to report parse errors for each field.
   // If errors[i] is nonzero, fields[i] had a parse error.
@@ -146,9 +119,6 @@ class HdfsTextScanner : public HdfsScanner {
   // Also, increments num_errors_in_file_.
   // row_idx is 0-based (in current batch) where the parse error occured.
   Status ReportRowParseError(int row_idx);
-
-  // Context for this scan range
-  ScanRangeContext* context_;
 
   // Memory pool for allocations into the boundary row / column
   boost::scoped_ptr<MemPool> boundary_mem_pool_;
@@ -173,9 +143,6 @@ class HdfsTextScanner : public HdfsScanner {
   // Pointers into 'byte_buffer_' for the end ptr locations for each row
   // processed in the current batch.  Used to report row errors.
   std::vector<char*> row_end_locations_;
-
-  // Helper class for converting text to other types;
-  boost::scoped_ptr<TextConverter> text_converter_;
 
   // Current position in byte buffer.
   char* byte_buffer_ptr_;
@@ -204,15 +171,10 @@ class HdfsTextScanner : public HdfsScanner {
 
   // Matching typedef for WriteAlignedTuples for codegen.  Refer to comments for
   // that function.
-  typedef int (*WriteTuplesFn)(HdfsTextScanner*, RowBatch*, FieldLocation*, int, int,
-      int, int);
+  typedef int (*WriteTuplesFn)(HdfsTextScanner*, MemPool*, TupleRow*, int, FieldLocation*, 
+      int, int, int, int);
   // Jitted write tuples function pointer.  Null if codegen is disabled.
   WriteTuplesFn write_tuples_fn_;
-
-  // Keep track of the current escape char to decide whether or not to use codegen for
-  // tuple writes.
-  // TODO(henry / nong): Remove this once we support codegen for escape characters.
-  char escape_char_;
 
   // Memory to store partial tuples split across buffers.  Memory comes from 
   // boundary_pool_.  There is only one tuple allocated for this object and reused

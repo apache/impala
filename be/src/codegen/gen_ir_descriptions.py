@@ -35,6 +35,7 @@ ir_functions = [
   ["STRING_TO_INT64", "IrStringToInt64"],
   ["STRING_TO_FLOAT", "IrStringToFloat"],
   ["STRING_TO_DOUBLE", "IrStringToDouble"],
+  ["STRING_IS_NULL", "IrIsNullString"],
 ]
 
 enums_preamble = '\

@@ -50,19 +50,23 @@ void TextConverter::UnescapeString(const char* src, char* dest, int* len) {
 // define i1 @WriteSlot({ i8, i32 }* %tuple_arg, i8* %data, i32 %len) {
 // entry:
 //   %parse_result = alloca i32
-//   %0 = icmp eq i32 %len, 0
-//   br i1 %0, label %set_null, label %parse_slot
+//   %0 = call i1 @IsNullString(i8* %data, i32 %len)
+//   br i1 %0, label %set_null, label %check_zero
 // 
-// set_null:                                         ; preds = %entry
+// set_null:                                         ; preds = %check_zero, %entry
 //   call void @SetNull({ i8, i32 }* %tuple_arg)
 //   ret i1 true
 // 
-// parse_slot:                                       ; preds = %entry
+// parse_slot:                                       ; preds = %check_zero
 //   %slot = getelementptr inbounds { i8, i32 }* %tuple_arg, i32 0, i32 1
 //   %1 = call i32 @IrStringToInt32(i8* %data, i32 %len, i32* %parse_result)
 //   %parse_result1 = load i32* %parse_result
 //   %failed = icmp eq i32 %parse_result1, 1
 //   br i1 %failed, label %parse_fail, label %parse_success
+// 
+// check_zero:                                       ; preds = %entry
+//   %2 = icmp eq i32 %len, 0
+//   br i1 %2, label %set_null, label %parse_slot
 // 
 // parse_success:                                    ; preds = %parse_slot
 //   store i32 %1, i32* %slot
@@ -76,13 +80,9 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     TupleDescriptor* tuple_desc, SlotDescriptor* slot_desc) {
   SCOPED_TIMER(codegen->codegen_timer());
 
-  // Don't codegen with escape characters.  
-  // TODO: handle this case and also the case to copy strings for data compaction
-  if (slot_desc->type() == TYPE_STRING && escape_char_ != '\0') {
-    LOG(WARNING) << "Could not codegen WriteSlot because escape characters "
-                 << "are not yet supported.";
-    return NULL;
-  }
+  // Codegen is_null_string 
+  Function* is_null_string_fn = codegen->GetFunction(IRFunction::STRING_IS_NULL);
+  if (is_null_string_fn == NULL) return NULL;
 
   StructType* tuple_type = tuple_desc->GenerateLlvmStruct(codegen);
   if (tuple_type == NULL) return NULL;
@@ -104,12 +104,25 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
   Value* args[3];
   Function* fn = prototype.GeneratePrototype(&builder, &args[0]);
 
-  // If len == 0, set slot to NULL
-  BasicBlock* set_null_block, *parse_slot_block;
+  BasicBlock* set_null_block, *parse_slot_block, *check_zero_block = NULL;
   codegen->CreateIfElseBlocks(fn, "set_null", "parse_slot", 
       &set_null_block, &parse_slot_block);
-  Value* len_zero = builder.CreateICmpEQ(args[2], codegen->GetIntConstant(TYPE_INT, 0));
-  builder.CreateCondBr(len_zero, set_null_block, parse_slot_block);
+  
+  if (slot_desc->type() != TYPE_STRING) {
+    check_zero_block = BasicBlock::Create(codegen->context(), "check_zero", fn);
+  }
+
+  // Check if the data is '\N'
+  Value* is_null = builder.CreateCall2(is_null_string_fn, args[1], args[2]);
+  builder.CreateCondBr(is_null, set_null_block, 
+      slot_desc->type() == TYPE_STRING ? parse_slot_block : check_zero_block);
+  
+  if (slot_desc->type() != TYPE_STRING) {
+    builder.SetInsertPoint(check_zero_block);
+    // If len == 0 and it is not a string col, set slot to NULL
+    Value* len_zero = builder.CreateICmpEQ(args[2], codegen->GetIntConstant(TYPE_INT, 0));
+    builder.CreateCondBr(len_zero, set_null_block, parse_slot_block);
+  } 
 
   // Codegen parse slot block
   builder.SetInsertPoint(parse_slot_block);
@@ -180,7 +193,7 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
     builder.CreateRet(codegen->false_value());
   }
 
-  // Case where len == 0
+  // Case where data is \N or len == 0 and it is not a string col
   builder.SetInsertPoint(set_null_block);
   builder.CreateCall(set_null_fn, args[0]);
   builder.CreateRet(codegen->true_value());

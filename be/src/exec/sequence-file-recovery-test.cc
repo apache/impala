@@ -4,25 +4,13 @@
 #include <math.h>
 #include <gtest/gtest.h>
 #include <boost/assign/list_of.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/random/mersenne_twister.hpp>
 #include <boost/unordered_map.hpp>
 
 #include "common/object-pool.h"
 #include "runtime/raw-value.h"
 #include "runtime/primitive-type.h"
-#include "runtime/string-value.h"
 #include "testutil/in-process-query-executor.h"
 #include "gen-cpp/Exprs_types.h"
-#include "exprs/bool-literal.h"
-#include "exprs/float-literal.h"
-#include "exprs/function-call.h"
-#include "exprs/int-literal.h"
-#include "exprs/is-null-predicate.h"
-#include "exprs/like-predicate.h"
-#include "exprs/literal-predicate.h"
-#include "exprs/null-literal.h"
-#include "exprs/string-literal.h"
 #include "codegen/llvm-codegen.h"
 #include "util/cpu-info.h"
 #include "util/disk-info.h"

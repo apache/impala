@@ -100,13 +100,23 @@ class HdfsScanNode : public ScanNode {
   const std::vector<SlotDescriptor*>& materialized_slots()
       const { return materialized_slots_; }
 
+  // Returns the tuple idx into the row for this scan node to output to.
+  // Currently this is always 0.
+  int tuple_idx() const { return 0; }
+
+  // Returns number of partition keys in the schema, including non-materialized slots
   int num_partition_keys() const { return num_partition_keys_; }
+
+  // Returns number of materialized partition key slots
+  int num_materialized_partition_keys() const { return partition_key_slots_.size(); }
 
   int num_cols() const { return column_idx_to_materialized_slot_idx_.size(); }
   
   const TupleDescriptor* tuple_desc() { return tuple_desc_; }
 
   hdfsFS hdfs_connection() { return hdfs_connection_; }
+
+  RuntimeState* runtime_state() { return runtime_state_; }
  
   DiskIoMgr::ReaderContext* reader_context() { return reader_context_; }
 
@@ -115,6 +125,10 @@ class HdfsScanNode : public ScanNode {
   int GetMaterializedSlotIdx(int col_idx) const {
     return column_idx_to_materialized_slot_idx_[col_idx];
   }
+
+  // Returns the per format codegen'd function.  Returns NULL if codegen is not
+  // possible.
+  llvm::Function* GetCodegenFn(THdfsFileFormat::type);
 
   // Adds a materialized row batch for the scan node.  This is called from scanner
   // threads.
@@ -153,6 +167,14 @@ class HdfsScanNode : public ScanNode {
   // Called by the scanner when a range is complete.  Used to log progress.
   void RangeComplete();
 
+  // Utility function to compute the order in which to materialize slots to allow  for
+  // computing conjuncts as slots get materialized (on partial tuples).
+  // 'order' will contain for each slot, the first conjunct it is associated with.
+  // e.g. order[2] = 1 indicates materialized_slots[2] must be materialized before
+  // evaluating conjuncts[1].  Slots that are not referenced by any conjuncts will have
+  // order set to conjuncts.size()
+  void ComputeSlotMaterializationOrder(std::vector<int>* order) const;
+  
   const static int SKIP_COLUMN = -1;
 
  private:
@@ -208,6 +230,11 @@ class HdfsScanNode : public ScanNode {
   // created for each file type.  Objects stored in scanner_pool_.
   typedef std::map<THdfsFileFormat::type, HdfsScanner*> ScannerMap;
   ScannerMap scanner_map_;
+
+  // Per scanner type codegen'd fn.  This is written to by the main thread and only
+  // read from scanner threads so does not need locks.
+  typedef std::map<THdfsFileFormat::type, llvm::Function*> CodegendFnMap;
+  CodegendFnMap codegend_fn_map_;
 
   // Pool for storing allocated scanner objects.  We don't want to use the 
   // runtime pool to ensure that the scanner objects are deleted before this

@@ -53,7 +53,9 @@ class TextConverter {
   // bool WriteSlot(Tuple* tuple, const char* data, int len);
   // The codegen function returns true if the slot could be written and false
   // otherwise.
-  llvm::Function* CodegenWriteSlot(LlvmCodeGen*, 
+  // The codegenerated function does not support escape characters and should not
+  // be used for partitions that contain escapes.
+  static llvm::Function* CodegenWriteSlot(LlvmCodeGen*, 
       TupleDescriptor* tuple_desc, SlotDescriptor* slot_desc);
 
  private:

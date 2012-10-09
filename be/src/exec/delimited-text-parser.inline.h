@@ -1,5 +1,8 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
+#ifndef IMPALA_EXEC_DELIMITED_TEXT_PARSER_INLINE_H
+#define IMPALA_EXEC_DELIMITED_TEXT_PARSER_INLINE_H
+
 #include "delimited-text-parser.h"
 #include "util/cpu-info.h"
 
@@ -176,4 +179,6 @@ inline void DelimitedTextParser::ParseSse(int max_tuples,
 }
 
 }
+
+#endif
 

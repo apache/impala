@@ -10,6 +10,7 @@
 #include <sstream>
 #include <boost/algorithm/string.hpp>
 
+#include "codegen/llvm-codegen.h"
 #include "common/logging.h"
 #include "common/object-pool.h"
 #include "exec/scan-range-context.h"
@@ -22,15 +23,17 @@
 #include "runtime/row-batch.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile.h"
+
 #include "gen-cpp/PlanNodes_types.h"
 
 // TODO: temp change to validate we don't have an incast problem for joins with big tables
 DEFINE_bool(randomize_scan_ranges, false, 
     "if true, randomizes the order of scan ranges");
 
-using namespace std;
 using namespace boost;
 using namespace impala;
+using namespace llvm;
+using namespace std;
 
 HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
                            const DescriptorTbl& descs)
@@ -277,6 +280,12 @@ void* HdfsScanNode::GetFileMetadata(const string& filename) {
   return it->second;
 }
 
+Function* HdfsScanNode::GetCodegenFn(THdfsFileFormat::type type) {
+  CodegendFnMap::iterator it = codegend_fn_map_.find(type);
+  if (it == codegend_fn_map_.end()) return NULL;
+  return it->second;
+}
+
 HdfsScanner* HdfsScanNode::GetScanner(HdfsPartitionDescriptor* partition) {
   ScannerMap::iterator scanner_it = scanner_map_.find(partition->file_format());
   if (scanner_it != scanner_map_.end()) {
@@ -361,6 +370,14 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
       column_idx_to_materialized_slot_idx_[i] = materialized_slots_.size();
       materialized_slots_.push_back(slot_desc);
     }
+  }
+
+  // Codegen scanner specific functions
+  if (state->llvm_codegen() != NULL) {
+    Function* text_fn = HdfsTextScanner::Codegen(this);
+    Function* seq_fn = HdfsSequenceScanner::Codegen(this);
+    if (text_fn != NULL) codegend_fn_map_[THdfsFileFormat::TEXT] = text_fn;
+    if (seq_fn != NULL) codegend_fn_map_[THdfsFileFormat::SEQUENCE_FILE] = seq_fn;
   }
 
   return Status::OK;
@@ -739,3 +756,30 @@ void HdfsScanNode::RangeComplete() {
   scan_ranges_complete_counter()->Update(1);
   progress_.Update(1);
 }
+
+void HdfsScanNode::ComputeSlotMaterializationOrder(vector<int>* order) const {
+  const vector<Expr*>& conjuncts = ExecNode::conjuncts();
+  // Initialize all order to be conjuncts.size() (after the last conjunct)
+  order->insert(order->begin(), materialized_slots().size(), conjuncts.size());
+
+  const DescriptorTbl& desc_tbl = runtime_state_->desc_tbl();
+
+  vector<SlotId> slot_ids;
+  for (int conjunct_idx = 0; conjunct_idx < conjuncts.size(); ++conjunct_idx) {
+    slot_ids.clear();
+    int num_slots = conjuncts[conjunct_idx]->GetSlotIds(&slot_ids);
+    for (int j = 0; j < num_slots; ++j) {
+      SlotDescriptor* slot_desc = desc_tbl.GetSlotDescriptor(slot_ids[j]);
+      int slot_idx = GetMaterializedSlotIdx(slot_desc->col_pos());
+      // slot_idx == -1 means this was a partition key slot which is always
+      // materialized before any slots.
+      if (slot_idx == -1) continue;
+      // If this slot hasn't been assigned an order, assign it be materialized
+      // before evaluating conjuncts[i]
+      if ((*order)[slot_idx] == conjuncts.size()) {
+        (*order)[slot_idx] = conjunct_idx;
+      }
+    }
+  }
+}
+

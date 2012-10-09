@@ -12,6 +12,11 @@ namespace impala {
 // This scanner parses Sequence file located in HDFS, and writes the
 // content as tuples in the Impala in-memory representation of data, e.g.
 // (tuples, rows, row batches).
+//
+// TODO: The underlying parsing should be more like text and move to a batch at a time
+// instead of row at a time approach.  This lets the two scanners share more code.  All
+// the code, including the codegen, for materializing tuples can be shared.
+//
 // org.apache.hadoop.io.SequenceFile is the original SequenceFile implementation
 // and should be viewed as the canonical definition of this format. If
 // anything is unclear in this file you should consult the code in
@@ -152,6 +157,9 @@ class HdfsSequenceScanner : public HdfsScanner {
 
   // Issue the initial scan ranges for all sequence files.
   static void IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>&);
+  
+  // Codegen writing tuples and evaluating predicates
+  static llvm::Function* Codegen(HdfsScanNode*);
 
  private:
   // Sync indicator
@@ -179,16 +187,6 @@ class HdfsSequenceScanner : public HdfsScanner {
 
   Status InitNewRange();
   Status ProcessRange();
-
-  // Writes the intermediate parsed data in to slots, outputting
-  // tuples to row_batch as they complete.
-  // Input Parameters:
-  //  state: Runtime state into which we log errors
-  //  row_batch: Row batch into which to write new tuples
-  //  num_fields: Total number of fields contained in parsed_data_
-  // Input/Output Parameters
-  //  row_idx: Index of current row in row_batch.
-  Status WriteFields(MemPool*, TupleRow*, int num_fields, bool* add_row);
 
   // Find the first record of a scan range.
   // If the scan range is not at the beginning of the file then this is called to
@@ -245,15 +243,9 @@ class HdfsSequenceScanner : public HdfsScanner {
   // IF the sync block spanned a buffer then set have_sync_ = true.
   Status SkipToSync();
 
-  // Context for this scanner.  The context maps to a single scan range.
-  ScanRangeContext* context_;
-
   // Helper class for picking fields and rows from delimited text.
   boost::scoped_ptr<DelimitedTextParser> delimited_text_parser_;
   std::vector<FieldLocation> field_locations_;
-
-  // Helper class for converting text fields to internal types.
-  boost::scoped_ptr<TextConverter> text_converter_;
 
   // Data that is fixed across headers.  This struct is shared between scan ranges.
   struct FileHeader {
@@ -277,6 +269,13 @@ class HdfsSequenceScanner : public HdfsScanner {
 
   // Header for this scan range.  Memory is owned by the parent scan node.
   FileHeader* header_;
+
+  // Matching typedef for WriteCompleteTuple for codegen.  Refer to comments for
+  // that function.
+  typedef bool (*WriteCompleteTupleFn)(HdfsScanner*, MemPool*, FieldLocation*, 
+      Tuple*, TupleRow*, Tuple*, uint8_t*, uint8_t*);
+  // Jitted write tuples function pointer.  Null if codegen is disabled.
+  WriteCompleteTupleFn write_tuple_fn_;
 
   // The decompressor class to use.
   boost::scoped_ptr<Codec> decompressor_;

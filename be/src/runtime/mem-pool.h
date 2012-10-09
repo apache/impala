@@ -143,6 +143,10 @@ class MemPool {
 
   // Print allocated bytes from all chunks.
   std::string DebugPrint();
+  
+  // TODO: make a macro for doing this
+  // For C++/IR interop, we need to be able to look up types by name.
+  static const char* LLVM_CLASS_NAME;
 
  private:
   static const int DEFAULT_INITIAL_CHUNK_SIZE = 4 * 1024;

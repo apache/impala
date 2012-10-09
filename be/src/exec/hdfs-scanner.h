@@ -64,6 +64,14 @@ struct FieldLocation {
 //   3. GetNext
 //   4. Repeat 3 until scan range is exhausted
 //   5. Repeat from 2., if there are more scan ranges in the current file.
+// For codegen, the functionality is split into two parts.  
+//   1. During the Prepare() phase, the scanner subclass's Codegen() function will be
+//      called to perform codegen for that scanner type for the specific tuple desc.
+//      This codegen'd function is cached in the HdfsScanNode.
+//   2. During the GetNext() phase (where we create one Scanner for each scan range),
+//      the created scanner subclass can retreive, from the scan node, the codegen'd
+//      function to use.  
+// This way, we only codegen once per scanner type, rather than once per scanner object.
 class HdfsScanner {
  public:
   // Assumed size of a OS file block.  Used mostly when reading file format headers, etc.
@@ -88,7 +96,19 @@ class HdfsScanner {
   }
 
   // One-time initialisation of state that is constant across scan ranges.
+  // TODO: update comment when all scanners are using the io mgr.
   virtual Status Prepare();
+
+  // Scanner subclasses must implement these static functions as well.  Unfortunately,
+  // c++ does not allow static virtual functions.
+
+  // Issue the initial ranges for 'files'
+  // void IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>& files);
+
+  // Codegen all functions for this scanner.  The codegen'd function is specific to
+  // the scanner subclass but not specific to each scanner object.  We don't want to
+  // codegen the functions for each scanner object.
+  // llvm::Function* Codegen(HdfsScanNode*);
 
   // One-time initialisation of per-scan-range state.  The scanner objects are
   // reused for different scan ranges so this function must reset all state.
@@ -106,6 +126,8 @@ class HdfsScanner {
   // Release all resources the scanner has allocated.  This is the last chance for
   // the scanner to attach any resources to the ScanRangeContext object.
   virtual Status Close() = 0;
+
+  static const char* LLVM_CLASS_NAME;
   
  protected:
   // For EvalConjunctsForScanner
@@ -113,6 +135,9 @@ class HdfsScanner {
 
   // RuntimeState for error reporting
   RuntimeState* state_;
+  
+  // Context for this scan range
+  ScanRangeContext* context_;
 
   // Conjuncts for this scanner.  Multiple scanners from multiple threads can
   // be scanning and Exprs are currently not thread safe.
@@ -136,9 +161,6 @@ class HdfsScanner {
   // Fixed size of each tuple, in bytes
   int tuple_byte_size_;
 
-  // Tuple index in tuple row.
-  int tuple_idx_;
-
   // Contains all memory for tuple data, including string data which
   // we can't reference in the file buffers (because it needs to be
   // unescaped or straddles two file buffers). Owned by the parent
@@ -154,6 +176,9 @@ class HdfsScanner {
   // The current provider of bytes to parse. Usually only changes
   // between files, so is active for the lifetime of a scanner.
   ByteStream* current_byte_stream_;
+ 
+  // Helper class for converting text to other types;
+  boost::scoped_ptr<TextConverter> text_converter_;
 
   // A partially materialized tuple with only partition key slots set.
   // The non-partition key slots are set to NULL.  The template tuple
@@ -186,6 +211,32 @@ class HdfsScanner {
   // Write empty tuples and commit them to the context object
   int WriteEmptyTuples(ScanRangeContext* context, TupleRow* tuple_row, int num_tuples);
 
+  // Writes out all slots for 'tuple' from 'fields'. 'fields' must be aligned
+  // to the start of the tuple (e.g. fields[0] maps to slots[0]).
+  // After writing the tuple, it will be evaluated against the conjuncts.
+  //  - error_fields is an out array.  error_fields[i] will be set to true if the ith
+  //    field had a parse error
+  //  - error_in_row is an out bool.  It is set to true if any field had parse errors
+  // Returns whether the resulting tuplerow passed the conjuncts.
+  //
+  // The parsing of the fields and evaluating against conjuncts is combined in this
+  // function.  This is done so it can be possible to evaluate conjuncts as slots
+  // are materialized (on partial tuples).  
+  //
+  // This function is replaced by a codegen'd function at runtime.  This is
+  // the reason that the out error parameters are typed uint8_t instead of bool. We need
+  // to be able to match this function's signature identically for the codegen'd function.
+  // Bool's as out parameters can get converted to bytes by the compiler and rather than
+  // implicitly depending on that to happen, we will explicitly type them to bytes.
+  // TODO: revisit this
+  bool WriteCompleteTuple(MemPool* pool, FieldLocation* fields, Tuple* tuple, 
+      TupleRow* tuple_row, Tuple* template_tuple, uint8_t* error_fields, 
+      uint8_t* error_in_row);
+
+  // Codegen function to replace WriteCompleteTuple. Should behave identically
+  // to WriteCompleteTuple.
+  static llvm::Function* CodegenWriteCompleteTuple(HdfsScanNode*, LlvmCodeGen*);
+  
   // Report parse error for column @ desc
   void ReportColumnParseError(const SlotDescriptor* desc, const char* data, int len);
 

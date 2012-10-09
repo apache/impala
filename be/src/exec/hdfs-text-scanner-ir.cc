@@ -24,6 +24,7 @@ int HdfsTextScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row, int 
   uint8_t* tuple_row_mem = reinterpret_cast<uint8_t*>(tuple_row);
   uint8_t* tuple_mem = reinterpret_cast<uint8_t*>(tuple_);
   Tuple* tuple = reinterpret_cast<Tuple*>(tuple_mem);
+  Tuple* template_tuple = template_tuple_;
 
   uint8_t error[slots_per_tuple];
   memset(error, 0, sizeof(error));
@@ -35,7 +36,8 @@ int HdfsTextScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row, int 
     uint8_t error_in_row = false;
     // Materialize a single tuple.  This function will be replaced by a codegen'd
     // function.
-    if (WriteCompleteTuple(pool, fields, tuple, tuple_row, error, &error_in_row)) {
+    if (WriteCompleteTuple(pool, fields, tuple, tuple_row, template_tuple, 
+          error, &error_in_row)) {
       ++tuples_returned;
       tuple_mem += tuple_byte_size_;
       tuple_row_mem += row_size;
@@ -96,6 +98,11 @@ float IrStringToFloat(const char* s, int len, StringParser::ParseResult* result)
 extern "C"
 double IrStringToDouble(const char* s, int len, StringParser::ParseResult* result) {
   return StringParser::StringToFloat<double>(s, len, result);
+}
+
+extern "C"
+bool IrIsNullString(const char* data, int len) {
+  return len >= 2 && data[0] == '\\' && data[1] == 'N';
 }
 #endif
 
