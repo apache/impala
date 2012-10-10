@@ -670,6 +670,10 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       bind<void>(mem_fn(&ImpalaServer::SessionPathHandler), this, _1);
   exec_env->webserver()->RegisterPathHandler("/sessions", sessions_callback);
 
+  Webserver::PathHandlerCallback catalog_callback =
+      bind<void>(mem_fn(&ImpalaServer::CatalogPathHandler), this, _1);
+  exec_env->webserver()->RegisterPathHandler("/catalog", catalog_callback);
+
   num_queries_metric_ = 
       exec_env->metrics()->CreateAndRegisterPrimitiveMetric(NUM_QUERIES_METRIC, 0L);
 }
@@ -742,6 +746,44 @@ void ImpalaServer::SessionPathHandler(stringstream* output) {
   }
 
   (*output) << "</table>";
+}
+
+void ImpalaServer::CatalogPathHandler(stringstream* output) {
+  (*output) << "<h2>Catalog</h2>" << endl;
+  vector<string> db_names;
+  Status status = GetDbNames(NULL, &db_names);
+  if (!status.ok()) {
+    (*output) << "Error: " << status.GetErrorMsg();
+    return;
+  }
+
+  // Build a navigation string like [ default | tpch | ... ]
+  vector<string> links;
+  BOOST_FOREACH(const string& db, db_names) {
+    stringstream ss;
+    ss << "<a href='#" << db << "'>" << db << "</a>";
+    links.push_back(ss.str());
+  }
+  (*output) << "[ " <<  join(links, " | ") << " ] ";
+
+  BOOST_FOREACH(const string& db, db_names) {
+    (*output) << "<a id='" << db << "'><h3>" << db << "</h3></a>";
+    vector<string> table_names;
+    Status status = GetTableNames(&db, NULL, &table_names);
+    if (!status.ok()) {
+      (*output) << "Error: " << status.GetErrorMsg();
+      continue;
+    }
+
+    (*output) << "<p>" << db << " contains <b>" << table_names.size() 
+              << "</b> tables</p>";
+
+    (*output) << "<ul>" << endl;
+    BOOST_FOREACH(const string& table, table_names) {
+      (*output) << "<li>" << table << "</li>" << endl;
+    }
+    (*output) << "</ul>" << endl;
+  }
 }
 
 ImpalaServer::~ImpalaServer() {}
@@ -960,7 +1002,7 @@ Status ImpalaServer::DescribeTable(const string& db, const string& table,
  }
 }
 
-Status ImpalaServer::GetTableNames(string* db, string* pattern, 
+Status ImpalaServer::GetTableNames(const string* db, const string* pattern, 
     vector<string>* table_names) {
   if (!FLAGS_use_planservice) {
     JNIEnv* jni_env = getJNIEnv();
@@ -990,7 +1032,7 @@ Status ImpalaServer::GetTableNames(string* db, string* pattern,
   }
 }
 
-Status ImpalaServer::GetDbNames(string* pattern, vector<string>* db_names) {
+Status ImpalaServer::GetDbNames(const string* pattern, vector<string>* db_names) {
   if (!FLAGS_use_planservice) {
     JNIEnv* jni_env = getJNIEnv();
     jbyteArray request_bytes;

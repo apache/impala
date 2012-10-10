@@ -217,6 +217,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   // Webserver callback that prints a table of active sessions.
   void SessionPathHandler(std::stringstream* output);
 
+  // Webserver callback that prints a list of all known databases and tables
+  void CatalogPathHandler(std::stringstream* output);
+
   // Wrapper around Coordinator::Wait(); suitable for execution inside thread.
   void Wait(boost::shared_ptr<QueryExecState> exec_state);
 
@@ -232,14 +235,14 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   // If pattern is NULL, match all tables otherwise match only those tables that
   // match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
   // and each pN may contain wildcards denoted by '*' which match all strings.
-  Status GetTableNames(std::string* db, std::string* pattern, 
+  Status GetTableNames(const std::string* db, const std::string* pattern, 
       std::vector<std::string>* table_names);
 
   // Return all databases matching the optional argument 'pattern'.
   // If pattern is NULL, match all databases otherwise match only those databases that
   // match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
   // and each pN may contain wildcards denoted by '*' which match all strings.
-  Status GetDbNames(std::string* pattern, std::vector<std::string>* table_names);
+  Status GetDbNames(const std::string* pattern, std::vector<std::string>* table_names);
 
   // Returns (in the output parameter) a list of columns for the specified table
   // in the specified database.
