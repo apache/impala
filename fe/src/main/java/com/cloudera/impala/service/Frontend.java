@@ -34,6 +34,7 @@ import com.cloudera.impala.analysis.QueryStmt;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.catalog.HdfsTable;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
@@ -177,7 +178,13 @@ public class Frontend {
       throw new AnalysisException("Unknown database: " + dbName);
     }
 
-    Table table = db.getTable(tableName);
+    Table table = null;
+    try {
+      table = db.getTable(tableName);
+    } catch (TableLoadingException e) {
+      throw new AnalysisException("Failed to load table metadata for: " + tableName, e);
+    }
+
     if (table == null) {
       throw new AnalysisException("Unknown table: " + db.getName() + "." + tableName);
     }

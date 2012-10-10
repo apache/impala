@@ -24,6 +24,7 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.thrift.TException;
 
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.google.common.collect.Lists;
@@ -80,25 +81,25 @@ public abstract class Table {
    */
   public abstract Table load(
       HiveMetaStoreClient client,
-      org.apache.hadoop.hive.metastore.api.Table msTbl);
+      org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException;
 
 
   /**
    * Creates the Impala representation of Hive/HBase metadata for one table.
    * Calls load() on the appropriate instance of Table subclass.
-   * @param client
-   * @param db
-   * @param tblName
-   * @return
-   *         new instance of HdfsTable or HBaseTable
-   *         null if loading table failed
+   * @return new instance of HdfsTable or HBaseTable
+   *         null if the table does not exist
+   * @throws TableLoadingException if there was an error loading the table. 
    */
   public static Table load(TableId id, HiveMetaStoreClient client, Db db,
-                           String tblName) {
-    // turn all exceptions into unchecked exception
+      String tblName) throws TableLoadingException {
+    // turn all exceptions into TableLoadingException
     try {
       org.apache.hadoop.hive.metastore.api.Table msTbl =
           client.getTable(db.getName(), tblName);
+      if (msTbl == null) {
+        return null;
+      }
 
       // Determine the table type
       Table table = null;
@@ -107,16 +108,14 @@ public abstract class Table {
       } else if (HdfsTable.isHdfsTable(msTbl)) {
         table = new HdfsTable(id, db, tblName, msTbl.getOwner());
       } else {
-        throw new UnsupportedOperationException("Unrecognized table type");
+        throw new TableLoadingException("Unrecognized table type for table: " + tblName);
       }
       // Have the table load itself.
       return table.load(client, msTbl);
-    } catch (TException e) {
-      throw new UnsupportedOperationException(e.toString());
-    } catch (NoSuchObjectException e) {
-      throw new UnsupportedOperationException(e.toString());
-    } catch (MetaException e) {
-      throw new UnsupportedOperationException(e.toString());
+    } catch (TableLoadingException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new TableLoadingException("Failed to load metadata for table: " + tblName, e);
     }
   }
 

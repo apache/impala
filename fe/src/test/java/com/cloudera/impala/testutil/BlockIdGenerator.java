@@ -14,6 +14,7 @@ import org.apache.hadoop.hdfs.protocol.LocatedBlocks;
 
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.catalog.HdfsPartition;
 import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
 import com.cloudera.impala.catalog.HdfsTable;
@@ -46,10 +47,14 @@ public class BlockIdGenerator {
       Catalog catalog = new Catalog(false);
       Db database = catalog.getDb(null);
 
-      Map<String,Table> tables = database.getTables();
-      for (String tableName: tables.keySet()) {
+      for (String tableName: database.getAllTableNames()) {
 
-        Table table = database.getTable(tableName);
+        Table table = null;
+        try {
+          table = database.getTable(tableName);
+        } catch (TableLoadingException e) {
+          continue;
+        }
         // Only do this for hdfs tables
         if (table == null || !(table instanceof HdfsTable)) {
           continue;

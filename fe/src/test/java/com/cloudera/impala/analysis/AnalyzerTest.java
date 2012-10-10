@@ -467,7 +467,7 @@ public class AnalyzerTest {
   @Test
   public void TestFromClause() throws AnalysisException {
     AnalyzesOk("select int_col from alltypes");
-    AnalysisError("select int_col from badtbl", "unknown table");
+    AnalysisError("select int_col from badtbl", "Unknown table");
     // case-insensitive
     AnalyzesOk("SELECT INT_COL FROM ALLTYPES");
     AnalyzesOk("select AllTypes.Int_Col from alltypes");
@@ -477,9 +477,9 @@ public class AnalyzerTest {
     AnalyzesOk("select int_col, zip from alltypes, testtbl");
     // duplicate alias
     AnalysisError("select a.int_col, a.id from alltypes a, testtbl a",
-        "duplicate table alias");
+        "Duplicate table alias");
     // duplicate implicit alias
-    AnalysisError("select int_col from alltypes, alltypes", "duplicate table alias");
+    AnalysisError("select int_col from alltypes, alltypes", "Duplicate table alias");
 
     // resolves dbs correctly
     AnalyzesOk("select zip from testtbl");

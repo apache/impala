@@ -24,6 +24,7 @@ import java.util.Set;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
+import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.catalog.InlineView;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
@@ -127,7 +128,7 @@ public class Analyzer {
   public TupleDescriptor registerBaseTableRef(BaseTableRef ref) throws AnalysisException {
     String lookupAlias = ref.getAlias().toLowerCase();
     if (aliasMap.containsKey(lookupAlias)) {
-      throw new AnalysisException("duplicate table alias: '" + lookupAlias + "'");
+      throw new AnalysisException("Duplicate table alias: '" + lookupAlias + "'");
     }
 
     // Always register the ref under the unqualified table name (if there's no
@@ -138,9 +139,16 @@ public class Analyzer {
     if (db == null) {
       throw new AnalysisException("unknown db: '" + ref.getName().getDb() + "'");
     }
-    Table tbl = db.getTable(ref.getName().getTbl());
+    
+    Table tbl = null;
+    try {
+      tbl = db.getTable(ref.getName().getTbl());
+    } catch (TableLoadingException e) {
+      throw new AnalysisException("Failed to load metadata for table: " +
+          ref.getName().getTbl(), e);
+    }
     if (tbl == null) {
-      throw new AnalysisException("unknown table: '" + ref.getName().getTbl() + "'");
+      throw new AnalysisException("Unknown table: '" + ref.getName().getTbl() + "'");
     }
     TupleDescriptor result = descTbl.createTupleDescriptor();
     result.setTable(tbl);

@@ -26,6 +26,7 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.serde2.SerDeException;
 
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.thrift.THBaseTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
@@ -124,7 +125,7 @@ public class HBaseTable extends Table {
 
   @Override
   public Table load(HiveMetaStoreClient client,
-                    org.apache.hadoop.hive.metastore.api.Table msTbl) {
+      org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
     try {
       hbaseTableName = getHBaseTableName(msTbl);
       Map<String, String> serdeParam = msTbl.getSd().getSerdeInfo().getParameters();
@@ -170,10 +171,9 @@ public class HBaseTable extends Table {
       numClusteringCols = 1;
 
       return this;
-    } catch (SerDeException e) {
-      throw new UnsupportedOperationException(e.toString());
-    } catch (MetaException e) {
-      throw new UnsupportedOperationException(e.toString());
+    } catch (Exception e) {
+      throw new TableLoadingException("Failed to load metadata for HBase table: " + name, 
+          e);
     }
   }
 

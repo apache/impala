@@ -18,6 +18,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
@@ -51,6 +52,27 @@ public class Catalog {
   private final Map<String, Db> dbs;
 
   private final HiveMetaStoreClient msClient;
+
+  /**
+   * Thrown by some methods when a table can't be found in the metastore
+   */
+  public static class TableNotFoundException extends ImpalaException {
+    // Dummy serial UID to avoid warnings
+    private static final long serialVersionUID = -2203080667446640542L;
+
+    public TableNotFoundException(String s) { super(s); }
+  }
+
+  /**
+   * Thrown by some methods when a database is not found in the metastore
+   */
+  public static class DatabaseNotFoundException extends ImpalaException {
+    // Dummy serial ID to satisfy Eclipse
+    private static final long serialVersionUID = -2203080667446640542L;
+
+    public DatabaseNotFoundException(String s) { super(s); }
+  }
+
 
   public Catalog() {
     this(false);
@@ -124,7 +146,9 @@ public class Catalog {
   }
 
   public Collection<Db> getDbs() {
-    return dbs.values();
+    // Take a copy so that caller doesn't have to worry about accidentally
+    // changing the collection, or iterating over it concurrently with a writer.
+    return new ArrayList<Db>(dbs.values());
   }
 
   public TableId getNextTableId() {
@@ -132,7 +156,7 @@ public class Catalog {
   }
 
   /**
-   * Case-insensitive lookup. 
+   * Case-insensitive lookup. Returns null if the database does not exist.
    */
   public Db getDb(String db) {
     Preconditions.checkState(db != null && !db.isEmpty(),
@@ -143,13 +167,6 @@ public class Catalog {
 
   public HiveMetaStoreClient getMetaStoreClient() {
     return msClient;
-  }
-
-  public static class DatabaseNotFoundException extends ImpalaException {
-    // Dummy serial ID to satisfy Eclipse
-    private static final long serialVersionUID = -2203080667446640542L;
-
-    public DatabaseNotFoundException(String s) { super(s); }
   }
 
   /**
@@ -232,12 +249,6 @@ public class Catalog {
    */
   public void invalidateTable(String tableName) throws TableNotFoundException {
     invalidateTable(DEFAULT_DB, tableName);
-  }
-
-  public static class TableNotFoundException extends ImpalaException {
-    private static final long serialVersionUID = -2203080667446640542L;
-
-    public TableNotFoundException(String s) { super(s); }
   }
 
   public void invalidateTable(String dbName, String tableName)

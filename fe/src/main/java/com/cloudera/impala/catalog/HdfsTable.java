@@ -45,6 +45,7 @@ import org.slf4j.LoggerFactory;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.cloudera.impala.analysis.NullLiteral;
+import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.catalog.HdfsPartition.FileDescriptor;
 import com.cloudera.impala.catalog.HdfsStorageDescriptor.InvalidStorageDescriptorException;
 import com.cloudera.impala.common.AnalysisException;
@@ -150,27 +151,24 @@ public class HdfsTable extends Table {
   }
 
   /**
-   * Create columns corresponding to fieldSchemas.
-   * @param fieldSchemas
-   * @return true if success, false otherwise
+   * Create columns corresponding to fieldSchemas. Throws a
+   * TableLoadingException if the metadata is incompatible with what we support.
    */
-  private boolean loadColumns(List<FieldSchema> fieldSchemas) {
+  private void loadColumns(List<FieldSchema> fieldSchemas) 
+      throws TableLoadingException {
     int pos = 0;
     for (FieldSchema s : fieldSchemas) {
       // catch currently unsupported hive schema elements
       if (!Constants.PrimitiveTypes.contains(s.getType())) {
-        LOG.warn("Ignoring table {} because column {} " +
-            "contains a field of unsupported type {}. " +
-            "Only primitive types are currently supported.",
-            new Object[] {getName(), s.getName(), s.getType()});
-        return false;
+        throw new TableLoadingException("Failed to load metadata for table: " +
+            getName() + " due to unsupported column type " + s.getType() + " in column " +
+            s.getName());
       }
       Column col = new Column(s.getName(), getPrimitiveType(s.getType()), pos);
       colsByPos.add(col);
       colsByName.put(s.getName(), col);
       ++pos;
     }
-    return true;
   }
 
   /**
@@ -265,8 +263,8 @@ public class HdfsTable extends Table {
 
   @Override
   public Table load(HiveMetaStoreClient client,
-      org.apache.hadoop.hive.metastore.api.Table msTbl) {
-    // turn all exceptions into unchecked exception
+      org.apache.hadoop.hive.metastore.api.Table msTbl) throws TableLoadingException {
+    // turn all exceptions into TableLoadingException
     try {
       // set nullPartitionKeyValue from the hive conf.
       nullPartitionKeyValue =
@@ -280,30 +278,15 @@ public class HdfsTable extends Table {
           partKeys.size() + tblFields.size());
       fieldSchemas.addAll(partKeys);
       fieldSchemas.addAll(tblFields);
-      if (!loadColumns(fieldSchemas)) {
-        return null;
-      }
+      loadColumns(fieldSchemas);
 
       // The number of clustering columns is the number of partition keys.
       numClusteringCols = partKeys.size();
-      try {
-        loadPartitions(client.listPartitions(db.getName(), name, Short.MAX_VALUE), msTbl);
-      } catch (Exception ex) {
-        // TODO: Do we want this behaviour for all possible exceptions?
-        LOG.warn("Ignoring HDFS table '" + msTbl.getTableName() +
-            "' due to errors loading metadata", ex);
-        return null;
-      }
-    } catch (TException e) {
-      throw new UnsupportedOperationException(e);
-    } catch (UnknownDBException e) {
-      throw new UnsupportedOperationException(e);
-    } catch (MetaException e) {
-      throw new UnsupportedOperationException(e);
-    } catch (UnknownTableException e) {
-      throw new UnsupportedOperationException(e);
-    } catch (ConfigValSecurityException e) {
-      throw new UnsupportedOperationException(e);
+      loadPartitions(client.listPartitions(db.getName(), name, Short.MAX_VALUE), msTbl);
+    } catch (TableLoadingException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new TableLoadingException("Failed to load metadata for table: " + name, e);
     }
     return this;
   }

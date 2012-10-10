@@ -130,10 +130,9 @@ public class AnalysisContext {
       result.stmt.analyze(result.analyzer);
       return result;
     } catch (AnalysisException e) {
-      throw new AnalysisException(e.getMessage() + " (in " + stmt + ")", e);
+      throw new AnalysisException("Analysis exception (in " + stmt + ")", e);
     } catch (Exception e) {
-      e.printStackTrace(System.err);
-      throw new AnalysisException(parser.getErrorMsg(stmt));
+      throw new AnalysisException(parser.getErrorMsg(stmt), e);
     }
   }
 }
