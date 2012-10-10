@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #
 # This modules allows for querying and inserting perf result data into the
