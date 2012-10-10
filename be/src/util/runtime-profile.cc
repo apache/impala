@@ -6,6 +6,7 @@
 #include "util/debug-util.h"
 #include "util/cpu-info.h"
 
+#include <iomanip>
 #include <iostream>
 #include <boost/thread/locks.hpp>
 #include <boost/thread/thread.hpp>
@@ -24,7 +25,8 @@ RuntimeProfile::RuntimeProfile(ObjectPool* pool, const string& name) :
   pool_(pool),
   name_(name),
   metadata_(-1),
-  counter_total_time_(TCounterType::CPU_TICKS) {
+  counter_total_time_(TCounterType::CPU_TICKS),
+  local_time_percent_(0) {
   counter_map_["TotalTime"] = &counter_total_time_;
 }
 
@@ -98,6 +100,7 @@ void RuntimeProfile::Merge(RuntimeProfile* other) {
         child = j->second;
       } else {
         child = pool_->Add(new RuntimeProfile(pool_, other_child->name_));
+        child->local_time_percent_ = other_child->local_time_percent_;
         child->metadata_ = other_child->metadata_;
         bool indent_other_child = other->children_[i].second;
         child_map_[child->name_] = child;
@@ -185,11 +188,46 @@ void RuntimeProfile::Divide(int n) {
   }
 }
 
-void RuntimeProfile::AddChild(RuntimeProfile* child, bool indent) {
+void RuntimeProfile::ComputeTimeInProfile() {
+  ComputeTimeInProfile(total_time_counter()->value());
+}
+
+void RuntimeProfile::ComputeTimeInProfile(int64_t total) {
+  if (total == 0) return;
+
+  // Add all the total times in all the children
+  int64_t total_child_time = 0;
+  for (int i = 0; i < children_.size(); ++i) {
+    total_child_time += children_[i].first->total_time_counter()->value();
+  }
+
+  int64_t local_time = total_time_counter()->value() - total_child_time;
+  // Counters have some margin, set to 0 if it was negative.
+  local_time = ::max(0L, local_time); 
+  local_time_percent_ = static_cast<double>(local_time) / total;
+  local_time_percent_ = ::min(1.0, local_time_percent_) * 100;
+
+  // Recurse on children
+  for (int i = 0; i < children_.size(); ++i) {
+    children_[i].first->ComputeTimeInProfile(total);
+  }
+}
+
+void RuntimeProfile::AddChild(RuntimeProfile* child, bool indent, RuntimeProfile* loc) {
   DCHECK(child != NULL);
   lock_guard<mutex> l(children_lock_);
   child_map_[child->name_] = child;
-  children_.push_back(make_pair(child, indent));
+  if (loc == NULL) {
+    children_.push_back(make_pair(child, indent));
+  } else {
+    for (ChildVector::iterator it = children_.begin(); it != children_.end(); ++it) {
+      if (it->first == loc) {
+        children_.insert(++it, make_pair(child, indent));
+        return;
+      }
+    }
+    DCHECK(false) << "Invalid loc";
+  }
 }
 
 void RuntimeProfile::GetChildren(vector<RuntimeProfile*>* children) {
@@ -280,12 +318,14 @@ void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) {
   map<string, Counter*>::const_iterator total_time = counter_map.find("TotalTime");
   DCHECK(total_time != counter_map.end());
 
+  stream.flags(ios::fixed);
   stream << prefix << name_ << ":";
   if (total_time->second->value() != 0) {
     stream << "("
            << PrettyPrinter::Print(total_time->second->value(), TCounterType::CPU_TICKS)
-           << ")";
-   }
+           << " " << setprecision(2) << local_time_percent_ 
+           << "%)";
+  }
   stream << endl;
   
   {

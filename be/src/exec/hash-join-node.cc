@@ -166,10 +166,10 @@ Status HashJoinNode::Open(RuntimeState* state) {
   RowBatch build_batch(child(1)->row_desc(), state->batch_size());
   RETURN_IF_ERROR(child(1)->Open(state));
   while (true) {
-    SCOPED_TIMER(build_timer_);
     RETURN_IF_CANCELLED(state);
     bool eos;
     RETURN_IF_ERROR(child(1)->GetNext(state, &build_batch, &eos));
+    SCOPED_TIMER(build_timer_);
     // take ownership of tuple data of build_batch
     build_pool_->AcquireData(build_batch.tuple_data_pool(), false);
 
@@ -189,7 +189,6 @@ Status HashJoinNode::Open(RuntimeState* state) {
 
   VLOG_ROW << hash_tbl_->DebugString(true, &child(1)->row_desc());
 
-  SCOPED_TIMER(probe_timer_);
   RETURN_IF_ERROR(child(0)->Open(state));
 
   // seed probe batch and current_probe_row_, etc.
@@ -226,7 +225,6 @@ Status HashJoinNode::Open(RuntimeState* state) {
 Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos) {
   RETURN_IF_CANCELLED(state);
   SCOPED_TIMER(runtime_profile_->total_time_counter());
-  SCOPED_TIMER(probe_timer_);
   if (ReachedLimit()) {
     *eos = true;
     return Status::OK;
@@ -246,6 +244,10 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
 
   Expr* const* conjuncts = &conjuncts_[0];
   int num_conjuncts = conjuncts_.size();
+
+  // Explicitly manage the timer counter to avoid measuring time in the child
+  // GetNext call.
+  ScopedTimer<StopWatch> probe_timer(probe_timer_);
 
   while (!eos_) {
     // create output rows as long as:
@@ -308,7 +310,9 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
       if (!probe_eos_) {
         probe_batch_->ClearBatch();
         while (true) {
+          probe_timer.Stop();
           RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_eos_));
+          probe_timer.Start();
           if (probe_batch_->num_rows() == 0) {
             if (probe_eos_) {
               eos_ = true;
@@ -373,6 +377,7 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
     RowBatch* out_batch, bool* eos) {
   *eos = eos_;
 
+  ScopedTimer<StopWatch> probe_timer(probe_timer_);
   while (!eos_) {
     // Compute max rows that should be added to out_batch
     int64_t max_added_rows = out_batch->capacity() - out_batch->num_rows();
@@ -405,7 +410,9 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
         break;
       } else {
         probe_batch_->ClearBatch();
+        probe_timer.Stop();
         RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_eos_));
+        probe_timer.Start();
         COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
       }
     }

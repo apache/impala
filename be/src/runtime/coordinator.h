@@ -277,6 +277,23 @@ class Coordinator {
 
   // Profile for aggregate counters; allocated in obj_pool().
   RuntimeProfile* aggregate_profile_;
+
+  // Per fragment profile information
+  struct PerFragmentProfileData {
+    // Averaged profile for this fragment.  Stored in obj_pool.
+    RuntimeProfile* averaged_profile;
+
+    // Number of instances running this fragment.
+    int num_instances;
+
+    // Root profile for all fragment instances for this fragment
+    RuntimeProfile* root_profile;
+  };
+
+  // This is indexed by fragment_idx.
+  // This array is only modified at coordinator startup and query completion and
+  // does not need locks.
+  std::vector<PerFragmentProfileData> fragment_profiles_;
     
   // Throughput counters for the coordinator fragment
   FragmentInstanceCounters coordinator_counters_;

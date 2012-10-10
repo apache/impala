@@ -76,6 +76,9 @@ class Coordinator::BackendExecState {
   // assembled in c'tor
   TExecPlanFragmentParams rpc_params;
 
+  // Fragment idx for this ExecState
+  int fragment_idx;
+
   // protects fields below
   // lock ordering: Coordinator::lock_ can only get obtained *prior*
   // to lock
@@ -103,13 +106,13 @@ class Coordinator::BackendExecState {
     : fragment_instance_id(params.instance_ids[instance_idx]),
       hostport(params.hosts[instance_idx]),
       total_split_size(0),
+      fragment_idx(fragment_idx),
       initiated(false),
       done(false),
       profile_created(false),
       total_ranges_complete(0) {
     profile = obj_pool->Add(
         new RuntimeProfile(obj_pool, "Instance " + PrintId(fragment_instance_id)));
-    LOG(INFO) << "backend hostport: " << hostport.first << ":" << hostport.second;
     coord->SetExecPlanFragmentParams(backend_num, fragment, fragment_idx, params,
         instance_idx, coord_hostport, &rpc_params);
     ComputeTotalSplitSize();
@@ -262,13 +265,39 @@ Status Coordinator::Exec(
     executor_->profile()->set_name("Coordinator Fragment");
     CollectScanNodeCounters(executor_->profile(), &coordinator_counters_);
   }
+  
+  // Initialize per fragment profile data
+  fragment_profiles_.resize(request->fragments.size());
+  for (int i = 0; i < request->fragments.size(); ++i) {
+    stringstream ss;
+    ss << "Averaged Fragment " << i;
+    fragment_profiles_[i].averaged_profile = 
+        obj_pool()->Add(new RuntimeProfile(obj_pool(), ss.str()));
+    // Insert the avg profile after the coordinator one or the aggregate
+    // profile if there is no coordinator.
+    if (executor_.get() != NULL) {
+      query_profile_->AddChild(
+          fragment_profiles_[i].averaged_profile, true, executor_->profile());
+    } else {
+      query_profile_->AddChild(
+          fragment_profiles_[i].averaged_profile, true, aggregate_profile_);
+    }
+    
+    ss.str("");
+    ss << "Fragment " << i;
+    fragment_profiles_[i].root_profile = 
+        obj_pool()->Add(new RuntimeProfile(obj_pool(), ss.str()));
+    query_profile_->AddChild(fragment_profiles_[i].root_profile);
+    fragment_profiles_[i].num_instances = 0;
+  }
 
   // start fragment instances from left to right, so that receivers have
   // Prepare()'d before senders start sending
   backend_exec_states_.resize(num_backends_);
   num_remaining_backends_ = num_backends_;
-  LOG(INFO) << "starting " << num_backends_ << " backends for query " << query_id_;
+  VLOG_QUERY << "starting " << num_backends_ << " backends for query " << query_id_;
   int backend_num = 0;
+  
   for (int fragment_idx = (has_coordinator_fragment ? 1 : 0);
        fragment_idx < request->fragments.size(); ++fragment_idx) {
     FragmentExecParams& params = fragment_exec_params_[fragment_idx];
@@ -284,9 +313,10 @@ Status Coordinator::Exec(
               params, instance_idx, obj_pool()));
       backend_exec_states_[backend_num] = exec_state;
       ++backend_num;
-      LOG(INFO) << "Exec(): starting instance: fragment_idx=" << fragment_idx
-          << " instance_id=" << params.instance_ids[instance_idx];
+      VLOG(2) << "Exec(): starting instance: fragment_idx=" << fragment_idx
+              << " instance_id=" << params.instance_ids[instance_idx];
     }
+    fragment_profiles_[fragment_idx].num_instances = num_hosts;
 
     // Issue all rpcs in parallel
     Status fragments_exec_status = ParallelExecutor::Exec(
@@ -886,30 +916,40 @@ bool Coordinator::PrepareCatalogUpdate(TCatalogUpdate* catalog_update) {
 //   3. Summary of remote fragment rates (min, max, mean, stddev)
 // TODO: add histogram/percentile
 void Coordinator::ReportQuerySummary() {
-  if (!VLOG_QUERY_IS_ON) return;
   DCHECK(has_called_wait_);
   
-  stringstream ss;
-  ss << "Final profile for query_id=" << query_id_ << endl;
-  
+  // The fragment has finished executing.  Update the profile to compute the 
+  // fraction of time spent in each node.
+  if (executor_.get() != NULL) executor_->profile()->ComputeTimeInProfile();
+
   if (!backend_exec_states_.empty()) {
     accumulator_set<int64_t, features<tag::min, tag::max, tag::mean, tag::variance> > 
         completion_times;
     accumulator_set<int64_t, features<tag::min, tag::max, tag::mean, tag::variance> > 
         rates;
-    
-    RuntimeProfile* avg_profile = obj_pool()->Add(
-        new RuntimeProfile(obj_pool(), "Averaged Remote Fragments"));
+
+    // Average all remote fragments for each fragment.  
 
     for (int i = 0; i < backend_exec_states_.size(); ++i) {
-      avg_profile->Merge(backend_exec_states_[i]->profile);
+      backend_exec_states_[i]->profile->ComputeTimeInProfile();
       int64_t completion_time = backend_exec_states_[i]->stopwatch.ElapsedTime();
       completion_times(completion_time);
       rates(backend_exec_states_[i]->total_split_size / (completion_time / 1000.0));
-    }
-    avg_profile->Divide(backend_exec_states_.size());
+      
+      int fragment_idx = backend_exec_states_[i]->fragment_idx;
+      DCHECK_GE(fragment_idx, 0);
+      DCHECK_LT(fragment_idx, fragment_profiles_.size());
+      PerFragmentProfileData& data = fragment_profiles_[fragment_idx];
 
-    query_profile_->AddChild(avg_profile);
+      data.averaged_profile->Merge(backend_exec_states_[i]->profile);
+      data.root_profile->AddChild(backend_exec_states_[i]->profile);
+    }
+    
+    // Add the non-coordinator averages to the top of the query profile
+    for (int i = (executor_.get() != NULL ? 1 : 0); i < fragment_profiles_.size(); ++i) {
+      RuntimeProfile* profile = fragment_profiles_[i].averaged_profile;
+      profile->Divide(fragment_profiles_[i].num_instances);
+    }
 
     stringstream times_label;
     times_label 
@@ -936,8 +976,12 @@ void Coordinator::ReportQuerySummary() {
     query_profile_->AddInfoString("execution rates", rates_label.str());
   } 
 
-  query_profile_->PrettyPrint(&ss);
-  VLOG_QUERY << ss.str();
+  if (VLOG_QUERY_IS_ON) {
+    stringstream ss;
+    ss << "Final profile for query_id=" << query_id_ << endl;
+    query_profile_->PrettyPrint(&ss);
+    VLOG_QUERY << ss.str();
+  }
 }
 
 string Coordinator::GetErrorLog() {
@@ -997,8 +1041,6 @@ void Coordinator::ComputeFragmentExecParams(const TQueryExecRequest& exec_reques
     // we might have multiple fragments sending to this exchange node 
     // (distributed MERGE), which is why we need to add up the #senders
     dest_params.per_exch_num_senders[exch_id] += params.hosts.size();
-    LOG(INFO) << "#exch for fragment " << dest_fragment_idx << "/node " << exch_id
-        << ": " << dest_params.per_exch_num_senders[exch_id];
 
     // create one TPlanFragmentDestination per destination host
     params.destinations.resize(dest_params.hosts.size());
@@ -1006,7 +1048,7 @@ void Coordinator::ComputeFragmentExecParams(const TQueryExecRequest& exec_reques
       TPlanFragmentDestination& dest = params.destinations[j];
       dest.fragment_instance_id = dest_params.instance_ids[j];
       SetHostport(dest_params.hosts[j], &dest.server);
-      LOG(INFO) << "dest for fragment " << i << ":"
+      VLOG_RPC  << "dest for fragment " << i << ":"
                 << " instance_id=" << dest.fragment_instance_id 
                 << " server=" << dest.server.ipaddress << ":" << dest.server.port;
     }
@@ -1138,16 +1180,12 @@ void Coordinator::ComputeScanRangeAssignment(const TQueryExecRequest& exec_reque
       per_node_fragment_idx[node.node_id] = i;
     }
   }
-  for (int i = 0; i < per_node_fragment_idx.size(); ++i) {
-    LOG(INFO) << "idx(" << i << "): " << per_node_fragment_idx[i];
-  }
 
   scan_range_assignment_.resize(exec_request.fragments.size());
   map<TPlanNodeId, vector<TScanRangeLocations> >::const_iterator  entry;
   for (entry = exec_request.per_node_scan_ranges.begin();
       entry != exec_request.per_node_scan_ranges.end(); ++entry) {
     int fragment_idx = per_node_fragment_idx[entry->first];
-    LOG(INFO) << "fragment_idx(" << entry->first << "): " << fragment_idx;
     FragmentScanRangeAssignment* assignment = &scan_range_assignment_[fragment_idx];
     ComputeScanRangeAssignment(
         entry->first, entry->second, fragment_exec_params_[fragment_idx], assignment);
@@ -1211,13 +1249,11 @@ void Coordinator::ComputeScanRangeAssignment(
   }
 
   BOOST_FOREACH(FragmentScanRangeAssignment::value_type& entry, *assignment) {
-    LOG(INFO) << "ScanRangeAssignment: server=" << ThriftDebugString(entry.first);
     BOOST_FOREACH(PerNodeScanRanges::value_type& per_node_scan_ranges, entry.second) {
       stringstream str;
       BOOST_FOREACH(TScanRangeParams& params, per_node_scan_ranges.second) {
         str << ThriftDebugString(params) << " ";
       }
-      LOG(INFO) << "node_id=" << per_node_scan_ranges.first << " ranges=" << str.str();
     }
   }
 }
@@ -1242,8 +1278,6 @@ void Coordinator::SetExecPlanFragmentParams(
   rpc_params->__set_backend_num(backend_num);
   rpc_params->__set_query_globals(query_globals_);
   rpc_params->__set_query_options(query_options_);
-
-  //LOG(INFO) << "params: " << ThriftDebugString(rpc_params->fragment);
 }
 
 }

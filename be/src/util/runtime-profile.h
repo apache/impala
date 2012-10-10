@@ -109,7 +109,10 @@ class RuntimeProfile {
   // Adds a child profile.  This is thread safe.
   // 'indent' indicates whether the child will be printed w/ extra indentation
   // relative to the parent.
-  void AddChild(RuntimeProfile* child, bool indent = true);
+  // If location is non-null, child will be inserted after location.  Location must
+  // already be added to the profile.
+  void AddChild(RuntimeProfile* child, 
+      bool indent = true, RuntimeProfile* location = NULL);
 
   // Merges the src profile into this one, combining counters that have an identical
   // path. Info strings from profiles are not merged. 'src' would be a const if it 
@@ -201,6 +204,11 @@ class RuntimeProfile {
   // no longer going to change.
   void StopRateCounterUpdates(Counter* rate_counter);
 
+  // Recursively compute the fraction of the 'total_time' spent in this profile and
+  // its children.
+  // This function updates local_time_percent_ for each profile.
+  void ComputeTimeInProfile();
+
  private:
   // Pool for allocated counters
   ObjectPool* pool_;
@@ -232,6 +240,9 @@ class RuntimeProfile {
   boost::mutex info_strings_lock_;
 
   Counter counter_total_time_;
+  // Time spent in just in this profile (i.e. not the children) as a fraction
+  // of the total time in the entire profile tree.
+  double local_time_percent_;
 
   struct RateCounterInfo {
     Counter* src_counter;
@@ -271,6 +282,11 @@ class RuntimeProfile {
   // Update a subtree of profiles from nodes, rooted at *idx.
   // On return, *idx points to the node immediately following this subtree.
   void Update(const std::vector<TRuntimeProfileNode>& nodes, int* idx);
+  
+  // Helper function to compute compute the fraction of the total time spent in 
+  // this profile and its children.
+  // Called recusively.
+  void ComputeTimeInProfile(int64_t total_time);
 
   // Registers a rate counter to be updated by the update thread.
   // dst/src is assumed to be of compatible types.
@@ -292,6 +308,14 @@ class ScopedTimer {
     if (counter == NULL) return;
     DCHECK(counter->type() == TCounterType::CPU_TICKS || 
            counter->type() == TCounterType::TIME_MS);
+    sw_.Start();
+  }
+
+  void Stop() {
+    sw_.Stop();
+  }
+
+  void Start() {
     sw_.Start();
   }
 

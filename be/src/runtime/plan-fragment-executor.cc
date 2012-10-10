@@ -87,7 +87,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   DCHECK(request.__isset.fragment);
   RETURN_IF_ERROR(
       ExecNode::CreateTree(obj_pool(), request.fragment.plan, *desc_tbl, &plan_));
-  runtime_state_->runtime_profile()->AddChild(plan_->runtime_profile());
+  profile()->AddChild(plan_->runtime_profile());
 
   // set #senders of exchange nodes before calling Prepare()
   vector<ExecNode*> exch_nodes;
@@ -137,8 +137,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   }
 
   // set up profile counters
-  rows_produced_counter_ = ADD_COUNTER(runtime_state_->runtime_profile(), "RowsProduced",
-      TCounterType::UNIT);
+  rows_produced_counter_ = ADD_COUNTER(profile(), "RowsProduced", TCounterType::UNIT);
 
   row_batch_.reset(new RowBatch(plan_->row_desc(), runtime_state_->batch_size()));
   VLOG(3) << "plan_root=\n" << plan_->DebugString();
@@ -200,7 +199,10 @@ Status PlanFragmentExecutor::Open() {
 }
 
 Status PlanFragmentExecutor::OpenInternal() {
-  RETURN_IF_ERROR(plan_->Open(runtime_state_.get()));
+  {
+    SCOPED_TIMER(profile()->total_time_counter());
+    RETURN_IF_ERROR(plan_->Open(runtime_state_.get()));
+  }
 
   if (sink_.get() == NULL) return Status::OK;
 
@@ -323,6 +325,7 @@ Status PlanFragmentExecutor::GetNextInternal(RowBatch** batch) {
 
   while (!done_) {
     row_batch_->Reset();
+    SCOPED_TIMER(profile()->total_time_counter());
     RETURN_IF_ERROR(plan_->GetNext(runtime_state_.get(), row_batch_.get(), &done_));
     if (row_batch_->num_rows() > 0) {
       COUNTER_UPDATE(rows_produced_counter_, row_batch_->num_rows());

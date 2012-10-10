@@ -143,7 +143,7 @@ static void Explain(const vector<string>& queries) {
 
   for (int i = 0; i < queries.size(); ++i) {
     EXIT_IF_ERROR(executor->Explain(queries[i], &explain_plan));
-    cout << "Explan Plan: ";
+    cout << "Explain Plan: ";
     if (queries.size() > 1)  cout << queries[i];
     cout << endl << explain_plan << endl;
   }

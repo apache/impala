@@ -60,8 +60,6 @@ class DataStreamSender::Channel {
       // TODO: figure out how to size batch_
     int capacity = max(1, buffer_size / max(row_desc.GetRowSize(), 1));
     batch_.reset(new RowBatch(row_desc, capacity));
-    LOG(INFO) << "Channel: '" << destination.hostname << "' "
-              << destination.ipaddress << ":" << destination.port;
   }
 
   // Initialize channel.

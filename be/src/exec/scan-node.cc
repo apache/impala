@@ -10,10 +10,10 @@ using namespace boost;
 namespace impala {
 
 const string ScanNode::BYTES_READ_COUNTER = "BytesRead";
-const string ScanNode::READ_TIMER = "TotalThreadReadTime";
+const string ScanNode::READ_TIMER = "ScannerThreadsReadTime";
 const string ScanNode::TOTAL_THROUGHPUT_COUNTER = "TotalReadThroughput";
 const string ScanNode::MATERIALIZE_TUPLE_TIMER = "MaterializeTupleTime";
-const string ScanNode::PER_THREAD_THROUGHPUT_COUNTER = "PerThreadReadThroughput";
+const string ScanNode::PER_THREAD_THROUGHPUT_COUNTER = "PerDiskReadThroughput";
 const string ScanNode::SCAN_RANGES_COMPLETE_COUNTER = "ScanRangesComplete";
 
 Status ScanNode::Prepare(RuntimeState* state) {
