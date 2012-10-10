@@ -13,6 +13,9 @@ NullLiteral::NullLiteral(const TExprNode& node)
   : Expr(node) {
 }
 
+NullLiteral::NullLiteral(PrimitiveType type) : Expr(type) {
+}
+
 void* NullLiteral::ReturnValue(Expr* e, TupleRow* row) {
   return NULL;
 }
@@ -37,6 +40,7 @@ Function* NullLiteral::Codegen(LlvmCodeGen* codegen) {
   Function* function = CreateComputeFnPrototype(codegen, "NullLiteral");
   BasicBlock* entry_block = BasicBlock::Create(context, "entry", function);
 
+  builder.SetInsertPoint(entry_block);
   CodegenSetIsNullArg(codegen, entry_block, true);
   builder.CreateRet(GetNullReturnValue(codegen));
   

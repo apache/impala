@@ -11,11 +11,12 @@ class TExprNode;
 
 class NullLiteral: public Expr {
  public:
+  NullLiteral(PrimitiveType type);
   virtual llvm::Function* Codegen(LlvmCodeGen* code_gen);
 
  protected:
   friend class Expr;
-
+  
   NullLiteral(const TExprNode& node);
 
   virtual Status Prepare(RuntimeState* state, const RowDescriptor& row_desc);

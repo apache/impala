@@ -88,9 +88,15 @@ Status PlanFragmentExecutor::Prepare(
   RETURN_IF_ERROR(plan_->Prepare(runtime_state_.get()));
   
   if (runtime_state_->llvm_codegen() != NULL) {
-    // After prepare, all functions should have been codegenerated.  At this point
+    // After prepare, all functions should have been code-generated.  At this point
     // we optimize all the functions.
-    RETURN_IF_ERROR(runtime_state_->llvm_codegen()->OptimizeModule());
+    Status status = runtime_state_->llvm_codegen()->OptimizeModule();
+    if (!status.ok()) {
+      LOG(ERROR) << "Error with codegen for this query: " << status.GetErrorMsg();
+      // TODO: propagate this to the coordinator and user?  Not really actionable
+      // for them but we'd like them to let us know.
+    }
+    // If codegen failed, we automatically fall back to not using codegen.
   }
 
   // set scan ranges

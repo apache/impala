@@ -186,9 +186,6 @@ class LlvmCodeGen {
   // Returns the underlying llvm module
   llvm::Module* module() { return module_; }
 
-  // Returns whether functions should be verfified
-  bool verifier_enabled() { return verifier_enabled_; }
-
   // Register a expr function with unique id.  It can be subsequently retrieved via
   // GetRegisteredExprFn with that id.  
   void RegisterExprFn(int64_t id, llvm::Function* function) {
@@ -391,8 +388,11 @@ class LlvmCodeGen {
   // whether or not optimizations are enabled
   bool optimizations_enabled_;
 
-  // whether or not generated IR should be verified. 
-  bool verifier_enabled_;
+  // If true, the module is corrupt and we cannot codegen this query. 
+  // TODO: we could consider just removing the offending function and attempting to
+  // codegen the rest of the query.  This requires more testing though to make sure
+  // that the error is recoverable.
+  bool is_corrupt_;
 
   // Error string that llvm will write to
   std::string error_string_;

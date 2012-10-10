@@ -126,22 +126,25 @@ class ExprTest : public testing::Test {
     *interpreted_value = result_row[0];
 
     if (jitted_value != NULL) {
-      scoped_ptr<LlvmCodeGen> codegen;
-      Status status = LlvmCodeGen::LoadImpalaIR(&pool_, &codegen);
-      ASSERT_TRUE(status.ok());
-      int scratch_size = 0;
-    
       Expr* root = executor_->select_list_exprs()[0];
-      ASSERT_TRUE(jit_expr_root_[root->type()] != NULL);
-
-      Function* fn = root->CodegenExprTree(codegen.get());
-      EXPECT_TRUE(fn != NULL);
-      void* func = codegen->JitFunction(fn, &scratch_size);
-      EXPECT_TRUE(func != NULL);
-      EXPECT_EQ(scratch_size, 0);
-      jit_expr_root_[root->type()]->SetComputeFn(func, scratch_size);
-      *jitted_value = jit_expr_root_[root->type()]->GetValue(NULL);
+      *jitted_value = GetCodegenValue(root);
     }
+  }
+
+  void* GetCodegenValue(Expr* root) {
+    scoped_ptr<LlvmCodeGen> codegen;
+    Status status = LlvmCodeGen::LoadImpalaIR(&pool_, &codegen);
+    EXPECT_TRUE(status.ok());
+    int scratch_size = 0;
+  
+    EXPECT_TRUE(jit_expr_root_[root->type()] != NULL);
+    Function* fn = root->CodegenExprTree(codegen.get());
+    EXPECT_TRUE(fn != NULL);
+    void* func = codegen->JitFunction(fn, &scratch_size);
+    EXPECT_TRUE(func != NULL);
+    EXPECT_EQ(scratch_size, 0);
+    jit_expr_root_[root->type()]->SetComputeFn(func, scratch_size);
+    return jit_expr_root_[root->type()]->GetValue(NULL);
   }
 
   void TestStringValue(const string& expr, const string& expected_result) {
@@ -556,6 +559,21 @@ void TestSingleLiteralConstruction(PrimitiveType type, void* value, const string
   Expr::Prepare(expr, NULL, desc);
   EXPECT_EQ(RawValue::Compare(expr->GetValue(NULL), value, type), 0);
 }
+
+TEST_F(ExprTest, NullLiteral) {
+  // TODO: how do we get the planner to use null literal vs literal predicate?
+  // For now, just make it manually.  It is used by the partition creation code.
+  RuntimeState state;
+  
+  for (int type = TYPE_BOOLEAN; type != TYPE_DATE; ++type) {
+    NullLiteral expr(static_cast<PrimitiveType>(type));
+    Status status = Expr::Prepare(&expr, &state, RowDescriptor());
+    EXPECT_TRUE(status.ok());
+    EXPECT_TRUE(expr.GetValue(NULL) == NULL);
+    if (type != TYPE_TIMESTAMP) EXPECT_TRUE(GetCodegenValue(&expr) == NULL);
+  }
+}
+
 
 TEST_F(ExprTest, LiteralConstruction) {
   bool b_val = true;

@@ -68,6 +68,7 @@ LlvmCodeGen::LlvmCodeGen(ObjectPool* pool, const string& name) :
   name_(name),
   profile_(pool, "CodeGen"),
   optimizations_enabled_(false),
+  is_corrupt_(false),
   context_(new llvm::LLVMContext()),
   module_(NULL),
   execution_engine_(NULL),
@@ -325,12 +326,28 @@ Function* LlvmCodeGen::GetFunction(IRFunction::Type function) {
   return loaded_functions_[function];
 }
 
-bool LlvmCodeGen::VerifyFunction(Function* function) {
-  // Verify the function is valid;
-  bool corrupt = llvm::verifyFunction(*function, ReturnStatusAction);
-  if (corrupt) {
-    LOG(ERROR) << "Function corrupt.";
-    function->dump();
+// There is an llvm bug (#10957) that causes the first step of the verifier to always 
+// abort the process if it runs into an issue and ignores ReturnStatusAction.  This 
+// would cause impalad to go down if one query has a problem.
+// To work around this, we will copy that step here and not abort on error.
+// TODO: doesn't seem there is much traction in getting this fixed but we'll see
+bool LlvmCodeGen::VerifyFunction(Function* fn) {
+  if (is_corrupt_) return false;
+
+  // Verify the function is valid. Adapted from the pre-verifier function pass.
+  for (Function::iterator i = fn->begin(), e = fn->end(); i != e; ++i) {
+    if (i->empty() || !i->back().isTerminator()) {
+      is_corrupt_ = true;
+      break;
+    }
+  }
+  
+  if (!is_corrupt_) is_corrupt_ = llvm::verifyFunction(*fn, ReturnStatusAction);
+
+  if (is_corrupt_) {
+    string fn_name = fn->getName(); // llvm has some fancy operator overloading
+    LOG(ERROR) << "Function corrupt: " << fn_name;
+    fn->dump();
     return false;
   }
   return true;
@@ -465,6 +482,7 @@ Function* LlvmCodeGen::FinalizeFunction(Function* function) {
 }
 
 Status LlvmCodeGen::OptimizeModule() {
+  if (is_corrupt_) return Status("Module is corrupt.");
   SCOPED_TIMER(compile_timer_);
   if (!optimizations_enabled_) return Status::OK;
   
@@ -492,6 +510,8 @@ Status LlvmCodeGen::OptimizeModule() {
 }
 
 void* LlvmCodeGen::JitFunction(Function* function, int* scratch_size) {
+  if (is_corrupt_) return NULL;
+
   if (scratch_size == NULL) {
     DCHECK_EQ(scratch_buffer_offset_, 0);
   } else {
