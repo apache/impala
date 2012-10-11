@@ -84,14 +84,6 @@ ThriftClient<InterfaceType>::ThriftClient(
     const std::string& ipaddress, int port, ThriftServer::ServerType server_type)
       : ThriftClientImpl(ipaddress, port),
         iface_(new InterfaceType(protocol_)) {
-  transport_ = socket_;
-  // Check to enable kerberos
-  if (!FLAGS_principal.empty()) {
-    GetTSaslClient(ipaddress_, &sasl_client_);
-    transport_.reset(new apache::thrift::transport::TSaslClientTransport(
-        sasl_client_, socket_));
-  }
-
   // Switch to Nonblocking as the default.
   if (FLAGS_use_nonblocking && server_type == ThriftServer::Threaded) {
     server_type = ThriftServer::Nonblocking;
@@ -102,10 +94,11 @@ ThriftClient<InterfaceType>::ThriftClient(
       if (!FLAGS_principal.empty()) {
         LOG(ERROR) << "Nonblocking servers cannot be used with Kerberos";
       }
-      transport_.reset(new apache::thrift::transport::TFramedTransport(transport_));
+      transport_.reset(new apache::thrift::transport::TFramedTransport(socket_));
       break;
     case ThriftServer::ThreadPool:
     case ThriftServer::Threaded:
+      transport_.reset(new apache::thrift::transport::TBufferedTransport(socket_));
       break;
     default:
       std::stringstream error_msg;
@@ -114,6 +107,13 @@ ThriftClient<InterfaceType>::ThriftClient(
       DCHECK(false);
       break;
   }
+  // Check to enable kerberos
+  if (!FLAGS_principal.empty()) {
+    GetTSaslClient(ipaddress_, &sasl_client_);
+    transport_.reset(new apache::thrift::transport::TSaslClientTransport(
+        sasl_client_, transport_));
+  }
+
   protocol_.reset(new apache::thrift::protocol::TBinaryProtocol(transport_));
   iface_.reset(new InterfaceType(protocol_));
 }
