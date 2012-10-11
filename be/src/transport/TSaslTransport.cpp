@@ -105,7 +105,7 @@ namespace apache { namespace thrift { namespace transport {
     // If the server isn't complete yet, we need to wait for its response.
     // This will occur with ANONYMOUS auth, for example, where we send an
     // initial response and are immediately complete.
-    if ((isClient_ && (status == TSASL_INVALID)) || status == TSASL_OK) {
+    if (isClient_ && (status == TSASL_INVALID || status == TSASL_OK)) {
       receiveSaslMessage(&status, &resLength);
       if (status != TSASL_COMPLETE) {
         stringstream ss;
