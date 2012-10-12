@@ -34,8 +34,6 @@ DEFINE_int32(rpc_cnxn_retry_interval_ms, 2000,
     "Advanced: The interval, in ms, between retrying connections to an RPC server");
 DECLARE_string(principal);
 DECLARE_string(keytab_file);
-DEFINE_bool(use_nonblocking, false, \
-     "Use nonblocking servers if true. Only valid if security is not enabled.");
 
 namespace impala {
 
@@ -263,8 +261,6 @@ Status ThriftServer::Start() {
   shared_ptr<ThreadFactory> thread_factory(new PosixThreadFactory());
   shared_ptr<TServerTransport> fe_server_transport;
   shared_ptr<TTransportFactory> transport_factory;
-
-  if (FLAGS_use_nonblocking && server_type_ == Threaded) server_type_ = Nonblocking;
 
   // TODO: The thrift non-blocking server needs to be fixed.
   if (server_type_ == Nonblocking && !FLAGS_principal.empty()) {

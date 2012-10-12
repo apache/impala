@@ -130,7 +130,11 @@ namespace apache { namespace thrift { namespace transport {
     uint8_t lenBuf[PAYLOAD_LENGTH_BYTES];
 
     transport_->readAll(lenBuf, PAYLOAD_LENGTH_BYTES);
-    return decodeInt(lenBuf, 0);
+    int32_t len = decodeInt(lenBuf, 0);
+    if (len < 0) {
+      throw TTransportException("Frame size has negative value");
+    }
+    return static_cast<uint32_t>(len);
   }
 
   uint32_t TSaslTransport::read(uint8_t* buf, uint32_t len) {
@@ -141,11 +145,12 @@ namespace apache { namespace thrift { namespace transport {
 
       // Fast path
       if (len == dataLength && !shouldWrap_) {
-        return transport_->read(buf, len);
+        transport_->readAll(buf, len);
+        return len;
       }
 
       uint8_t* tmpBuf = new uint8_t[dataLength];
-      dataLength = transport_->read(tmpBuf, dataLength);
+      transport_->readAll(tmpBuf, dataLength);
       if (shouldWrap_) {
         tmpBuf = sasl_->unwrap(tmpBuf, 0, dataLength, &dataLength);
       }

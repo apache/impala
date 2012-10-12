@@ -20,7 +20,6 @@
 
 DECLARE_string(principal);
 DECLARE_string(hostname);
-DECLARE_bool(use_nonblocking);
 
 namespace impala {
 // Super class for templatized thrift clients.
@@ -84,13 +83,12 @@ ThriftClient<InterfaceType>::ThriftClient(
     const std::string& ipaddress, int port, ThriftServer::ServerType server_type)
       : ThriftClientImpl(ipaddress, port),
         iface_(new InterfaceType(protocol_)) {
-  // Switch to Nonblocking as the default.
-  if (FLAGS_use_nonblocking && server_type == ThriftServer::Threaded) {
-    server_type = ThriftServer::Nonblocking;
-  }
 
   switch (server_type) {
     case ThriftServer::Nonblocking:
+      // The Nonblocking server is disabled at this time.  There are
+      // issues with the framed protocol throwing negative frame size errors.
+      LOG(WARNING) << "Nonblocking server usage is experimental";
       if (!FLAGS_principal.empty()) {
         LOG(ERROR) << "Nonblocking servers cannot be used with Kerberos";
       }

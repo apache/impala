@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 
 #include "common/logging.h"
+#include "common/status.h"
 #include "codegen/llvm-codegen.h"
 #include "runtime/row-batch.h"
 #include "runtime/data-stream-mgr.h"
@@ -15,6 +16,7 @@
 #include "runtime/descriptors.h"
 #include "testutil/in-process-query-executor.h"
 #include "testutil/test-exec-env.h"
+#include "util/authorization.h"
 #include "util/cpu-info.h"
 #include "util/disk-info.h"
 #include "util/debug-util.h"
@@ -27,10 +29,13 @@ using namespace std;
 using namespace tr1;
 using namespace boost;
 
+using namespace impala;
 using namespace apache::thrift;
 using namespace apache::thrift::protocol;
 
 DECLARE_int32(port);
+DEFINE_string(principal, "", "Kerberos principal");
+DEFINE_string(keytab_file, "", "Kerberos keytab");
 
 namespace impala {
 
@@ -382,10 +387,15 @@ TEST_F(DataStreamTest, Cancel) {
 }
 
 int main(int argc, char **argv) {
+  google::ParseCommandLineFlags(&argc, &argv, true);
   google::InitGoogleLogging(argv[0]);
   ::testing::InitGoogleTest(&argc, argv);
   impala::CpuInfo::Init();
   impala::DiskInfo::Init();
   impala::LlvmCodeGen::InitializeLlvm();
+  if (!FLAGS_principal.empty()) {
+    EXIT_IF_ERROR(InitKerberos("data-stream-test"));
+  }
+
   return RUN_ALL_TESTS();
 }
