@@ -55,6 +55,11 @@ export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-0.92.1-cdh4.1.0/
 export PATH=$HBASE_HOME/bin:$PATH
 export HBASE_CONF_DIR=$HIVE_CONF_DIR
 
+# set the python path for test modules and beeswax
+PYTHONPATH=$IMPALA_HOME:$IMPALA_HOME/shell/gen-py:$HIVE_HOME/lib/py
+PYTHONPATH=$IMPALA_HOME/thirdparty/python-thrift-0.7.0:$PYTHONPATH
+export PYTHONPATH
+
 # These arguments are, despite the name, passed to every JVM created
 # by an impalad. So they must point to the location of
 # libbackend.so. 
@@ -86,4 +91,5 @@ echo "HIVE_HOME              = $HIVE_HOME"
 echo "HIVE_CONF_DIR          = $HIVE_CONF_DIR"
 echo "HBASE_HOME             = $HBASE_HOME"
 echo "HBASE_CONF_DIR         = $HBASE_CONF_DIR"
+echo "PYTHONPATH"            = $PYTHONPATH
 echo "CLASSPATH              = $CLASSPATH"
