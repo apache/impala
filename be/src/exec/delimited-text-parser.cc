@@ -22,6 +22,7 @@ DelimitedTextParser::DelimitedTextParser(HdfsScanNode* scan_node,
       current_column_has_escape_(false),
       last_char_is_escape_(false),
       last_row_delim_offset_(-1),
+      is_materialized_col_(NULL),
       column_idx_(0) {
 
   // Initialize the sse search registers.
@@ -65,8 +66,21 @@ DelimitedTextParser::DelimitedTextParser(HdfsScanNode* scan_node,
   DCHECK_GT(num_delims, 0);
   xmm_delim_search_ = _mm_loadu_si128(reinterpret_cast<__m128i*>(search_chars));
 
-  // scan_node_ can only be NULL in test setups
-  if (scan_node_ != NULL) ParserReset();
+  // scan_node_ can be NULL in test setups
+  if (scan_node_ == NULL) return;
+  
+  ParserReset();
+
+  num_cols_ = scan_node_->num_cols();
+  is_materialized_col_ = new bool[num_cols_];
+  for (int i = 0; i < num_cols_; ++i) {
+    is_materialized_col_[i] = 
+        scan_node_->GetMaterializedSlotIdx(i) != HdfsScanNode::SKIP_COLUMN;
+  }
+}
+
+DelimitedTextParser::~DelimitedTextParser() {
+  delete[] is_materialized_col_;
 }
 
 void DelimitedTextParser::ParserReset() {
@@ -79,7 +93,7 @@ void DelimitedTextParser::ParserReset() {
 // Parsing raw csv data into FieldLocation descriptors.
 Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remaining_len,
     char** byte_buffer_ptr, char** row_end_locations, 
-    vector<FieldLocation>* field_locations,
+    FieldLocation* field_locations,
     int* num_tuples, int* num_fields, char** next_column_start) {
   // Start of this batch.
   *next_column_start = *byte_buffer_ptr;
@@ -102,7 +116,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
   }
 
   if (*num_tuples == max_tuples) return Status::OK;
-
+  
   // Handle the remaining characters
   while (remaining_len > 0) {
     bool new_tuple = false;
@@ -125,7 +139,6 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
     } else {
       last_char_is_escape_ = false;
     }
-
 
     if (new_tuple) {
       if (last_row_delim_offset_ == remaining_len && **byte_buffer_ptr == '\n') {
@@ -158,14 +171,13 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
   // For formats that store the length of the row, the row is not delimited:
   // e.g. Sequence files.
   if (tuple_delim_ == '\0') {
-    DCHECK(remaining_len == 0);
+    DCHECK_EQ(remaining_len, 0);
     AddColumn<true>(*byte_buffer_ptr - *next_column_start,
         next_column_start, num_fields, field_locations);
     FillColumns<false>(0, NULL, num_fields, field_locations);
     column_idx_ = scan_node_->num_partition_keys();
     ++(*num_tuples);
   }
-
   return Status::OK;
 }
 
@@ -366,3 +378,4 @@ Status DelimitedTextParser::FindSyncBlock(int end_of_range, int sync_size,
   return Status::OK;
 
 }
+

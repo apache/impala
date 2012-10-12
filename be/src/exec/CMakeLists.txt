@@ -23,12 +23,12 @@ add_library(Exec STATIC
   hdfs-byte-stream.cc
   hdfs-scan-node.cc
   hdfs-scanner.cc
+  hdfs-scanner-ir.cc
   hdfs-table-sink.cc
   hdfs-table-writer.cc
   hdfs-rcfile-scanner.cc
   hdfs-sequence-scanner.cc
   hdfs-text-scanner.cc
-  hdfs-text-scanner-ir.cc
   hdfs-text-table-writer.cc
   merge-node.cc
   hdfs-trevni-scanner.cc

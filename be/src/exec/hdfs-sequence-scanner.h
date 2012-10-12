@@ -13,9 +13,9 @@ namespace impala {
 // content as tuples in the Impala in-memory representation of data, e.g.
 // (tuples, rows, row batches).
 //
-// TODO: The underlying parsing should be more like text and move to a batch at a time
-// instead of row at a time approach.  This lets the two scanners share more code.  All
-// the code, including the codegen, for materializing tuples can be shared.
+// TODO: Make the various sequence file formats behave more similarly.  They should
+// all have a structure similar to block compressed operating in batches rather than
+// row at a time.  
 //
 // org.apache.hadoop.io.SequenceFile is the original SequenceFile implementation
 // and should be viewed as the canonical definition of this format. If
@@ -216,25 +216,21 @@ class HdfsSequenceScanner : public HdfsScanner {
   //   current_block_length_
   Status ReadBlockHeader(bool* sync);
 
-  // Read compressed blocks and iterate through the records in each block.
-  // Output:
-  //   record_ptr: ponter to the record.
-  //   record_len: length of the record
-  //   eosr: set to true if we are at the end of the scan range.
-  Status GetRecordFromCompressedBlock(uint8_t** record_ptr,
-                                      int64_t *record_len, bool* eosr);
+  // Process an entire block compressed scan range.  Block compressed ranges are 
+  // more common and can be parsed more efficiently in larger pieces.
+  Status ProcessBlockCompressedScanRange();
+
+  // Read a compressed block.
+  // Decompress to unparsed_data_buffer_ allocated from unparsed_data_buffer_pool_.
+  Status ReadCompressedBlock();
 
   // Read compressed or uncompressed records from the byte stream into memory
-  // in unparsed_data_buffer_pool_.
+  // in unparsed_data_buffer_pool_.  Not used for block compressed files.
   // Output:
   //   record_ptr: ponter to the record.
   //   record_len: length of the record
   //   eors: set to true if we are at the end of the scan range.
   Status GetRecord(uint8_t** record_ptr, int64_t *record_len, bool* eosr);
-
-  // Read a compressed block.
-  // Decompress to unparsed_data_buffer_ allocated from unparsed_data_buffer_pool_.
-  Status ReadCompressedBlock();
 
   // read and verify a sync block.
   Status CheckSync();
@@ -243,6 +239,10 @@ class HdfsSequenceScanner : public HdfsScanner {
   // IF the sync block spanned a buffer then set have_sync_ = true.
   Status SkipToSync();
 
+  // Appends the current file and line to the RuntimeState's error log.
+  // row_idx is 0-based (in current batch) where the parse error occured.
+  virtual void LogRowParseError(std::stringstream*, int row_idx);
+  
   // Helper class for picking fields and rows from delimited text.
   boost::scoped_ptr<DelimitedTextParser> delimited_text_parser_;
   std::vector<FieldLocation> field_locations_;
@@ -264,18 +264,23 @@ class HdfsSequenceScanner : public HdfsScanner {
     int64_t header_size;
   };
 
+  // Struct for record locations and lens in compressed blocks.  
+  struct RecordLocation {
+    uint8_t* record;
+    int64_t len;
+  };
+
+  // Records are processed in batches.  This vector stores batches of record locations
+  // that are being processed.  Currently this is only used for block compression.
+  // TODO: no reason we can't do this for record compressed/uncompressed.  
+  // TODO: better perf not to use vector?
+  std::vector<RecordLocation> record_locations_;
+
   // If true, this scanner is only processing the header bytes.
   bool only_parsing_header_;
 
   // Header for this scan range.  Memory is owned by the parent scan node.
   FileHeader* header_;
-
-  // Matching typedef for WriteCompleteTuple for codegen.  Refer to comments for
-  // that function.
-  typedef bool (*WriteCompleteTupleFn)(HdfsScanner*, MemPool*, FieldLocation*, 
-      Tuple*, TupleRow*, Tuple*, uint8_t*, uint8_t*);
-  // Jitted write tuples function pointer.  Null if codegen is disabled.
-  WriteCompleteTupleFn write_tuple_fn_;
 
   // The decompressor class to use.
   boost::scoped_ptr<Codec> decompressor_;
@@ -305,6 +310,9 @@ class HdfsSequenceScanner : public HdfsScanner {
   // Record the offset in the file of the start of a block or record
   // so we can point at it if there is a format error.
   int block_start_;
+  
+  // Time spent decompressing bytes
+  RuntimeProfile::Counter* decompress_timer_;
 };
 
 } // namespace impala

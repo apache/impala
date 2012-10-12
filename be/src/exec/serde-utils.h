@@ -47,14 +47,14 @@ class SerDeUtils {
   static int GetVLong(uint8_t* buf, int64_t offset, int64_t* vlong);
 
   // Case 2 functions
-  static Status ReadBoolean(ScanRangeContext* context, bool* boolean);
-  static Status ReadInt(ScanRangeContext* context, int32_t* val);
-  static Status ReadVLong(ScanRangeContext* context, int64_t* val);
-  static Status ReadVInt(ScanRangeContext* context, int32_t* val);
-  static Status ReadBytes(ScanRangeContext* context, int length, uint8_t** buf);
-  static Status SkipBytes(ScanRangeContext* context, int length);
-  static Status ReadText(ScanRangeContext* context, uint8_t** buf, int* length);
-  static Status SkipText(ScanRangeContext* context);
+  static bool ReadBoolean(ScanRangeContext* context, bool* boolean, Status*);
+  static bool ReadInt(ScanRangeContext* context, int32_t* val, Status*);
+  static bool ReadVLong(ScanRangeContext* context, int64_t* val, Status*);
+  static bool ReadVInt(ScanRangeContext* context, int32_t* val, Status*);
+  static bool ReadBytes(ScanRangeContext* context, int length, uint8_t** buf, Status*);
+  static bool SkipBytes(ScanRangeContext* context, int length, Status*);
+  static bool ReadText(ScanRangeContext* context, uint8_t** buf, int* length, Status*);
+  static bool SkipText(ScanRangeContext* context, Status*);
 
   // Read a Boolean primitive value written using Java serialization.
   // Equivalent to java.io.DataInput.readBoolean()

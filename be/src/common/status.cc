@@ -19,16 +19,6 @@ Status::ErrorDetail::ErrorDetail(const TStatus& status)
   DCHECK_NE(error_code, TStatusCode::OK);
 }
 
-Status& Status::operator=(const Status& status) {
-  delete error_detail_;
-  if (status.error_detail_ == NULL) {
-    error_detail_ = NULL;
-  } else {
-    error_detail_ = new ErrorDetail(*status.error_detail_);
-  }
-  return *this;
-}
-  
 Status::Status(const string& error_msg) 
   : error_detail_(new ErrorDetail(TStatusCode::INTERNAL_ERROR, error_msg)) {
   VLOG(1) << error_msg << endl << GetStackTrace();

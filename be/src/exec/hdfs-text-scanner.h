@@ -81,44 +81,14 @@ class HdfsTextScanner : public HdfsScanner {
   // Returns the number of tuples added to the row batch.
   int WriteFields(MemPool*, TupleRow* tuple_row_mem, int num_fields, int num_tuples);
 
-  // Processes batches of fields and writes them out to tuple_row_mem.
-  // - 'pool' mempool to allocate from for auxiliary tuple memory
-  // - tuple_row_mem preallocated tuple_row memory this function must use.
-  // - 'fields' must start at the beginning of a tuple.
-  // - num_tuples: number of tuples to process
-  // - max_added_tuples: the maximum number of tuples that should be added to the batch.
-  // - row_start_index is the number of rows that have already been processed
-  //   as part of WritePartialTuple.  
-  // Returns the number of tuples added to the row batch.  This can be less than
-  // num_tuples/tuples_till_limit because of failed conjuncts.
-  // Returns -1 if parsing should be aborted due to parse errors.
-  int WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row_mem, int row_size, 
-      FieldLocation* fields, int num_tuples,
-      int max_added_tuples, int slots_per_tuple, int row_start_indx);
-
-  // Codegen function to replace WriteAlignedTuples.  WriteAlignedTuples is cross compiled
-  // to IR.  This function loads the precompiled IR function, modifies it and returns the
-  // resulting function.
-  // TODO: this should be merged with sequence file function to write tuples after
-  // a bit of sequence file refactoring.  
-  static llvm::Function* CodegenWriteAlignedTuples(HdfsScanNode*, LlvmCodeGen*, 
-      llvm::Function* write_tuple_fn);
-
   // Utility function to write out 'num_fields' to 'tuple_'.  This is used to parse
   // partial tuples.  Returns bytes processed.  If copy_strings is true, strings
   // from fields will be copied into the boundary pool.
   int WritePartialTuple(FieldLocation*, int num_fields, bool copy_strings);
 
-  // Utility function to report parse errors for each field.
-  // If errors[i] is nonzero, fields[i] had a parse error.
-  // row_idx is the idx of the row in the current batch that had the parse error
-  // Returns false if parsing should be aborted.
-  bool ReportTupleParseError(FieldLocation* fields, uint8_t* errors, int row_idx);
-
-  // Appends the current file and line to the RuntimeState's error log (if there's space).
-  // Also, increments num_errors_in_file_.
+  // Appends the current file and line to the RuntimeState's error log.
   // row_idx is 0-based (in current batch) where the parse error occured.
-  Status ReportRowParseError(int row_idx);
+  virtual void LogRowParseError(std::stringstream*, int row_idx);
 
   // Memory pool for allocations into the boundary row / column
   boost::scoped_ptr<MemPool> boundary_mem_pool_;
@@ -157,24 +127,11 @@ class HdfsTextScanner : public HdfsScanner {
   // Actual bytes received from last file read.
   int byte_buffer_read_size_;
 
-  // Contains current parse status to minimize the number of Status objects returned.
-  // This significantly minimizes the cross compile dependencies for llvm since status
-  // objects inline a bunch of string functions.  Also, status objects aren't extremely
-  // cheap.
-  Status parse_status_;
-
   // Whether or not there was a parse error in the current row. Used for counting the
   // number of errors per file.  Once the error log is full, error_in_row will still be
   // set, in order to be able to record the errors per file, even if the details are not
   // logged.
   bool error_in_row_;
-
-  // Matching typedef for WriteAlignedTuples for codegen.  Refer to comments for
-  // that function.
-  typedef int (*WriteTuplesFn)(HdfsTextScanner*, MemPool*, TupleRow*, int, FieldLocation*, 
-      int, int, int, int);
-  // Jitted write tuples function pointer.  Null if codegen is disabled.
-  WriteTuplesFn write_tuples_fn_;
 
   // Memory to store partial tuples split across buffers.  Memory comes from 
   // boundary_pool_.  There is only one tuple allocated for this object and reused

@@ -85,8 +85,11 @@ class ScanRangeContext {
   //    if requested_len is 0, the next complete buffer will be returned
   //  - *out_len is the number of bytes returned.
   //  - *eos is set to true if all the bytes in this scan range are returned
+  //  - *status is set if there is an error.  
+  // Returns true if the call was success (i.e. status->ok())
   // This should only be called from the scanner thread.
-  Status GetBytes(uint8_t** buffer, int requested_len, int* out_len, bool* eos);
+  bool GetBytes(uint8_t** buffer, int requested_len, int* out_len, 
+      bool* eos, Status* status);
 
   // Gets the bytes from the first available buffer without advancing the scan
   // range location (e.g. repeated calls to this function will return the same thing).
@@ -261,11 +264,12 @@ class ScanRangeContext {
 // Handle the fast common path where all the bytes are in the first buffer.  This
 // is the path used by sequence/rc/trevni file formats to read a very small number
 // (i.e. single int) of bytes.
-inline Status ScanRangeContext::GetBytes(uint8_t** buffer, int requested_len, 
-    int* out_len, bool* eos) {
+inline bool ScanRangeContext::GetBytes(uint8_t** buffer, int requested_len, 
+    int* out_len, bool* eos, Status* status) {
 
   if (UNLIKELY(requested_len == 0)) {
-    return GetBytesInternal(buffer, requested_len, false, out_len, eos);
+    *status = GetBytesInternal(buffer, requested_len, false, out_len, eos);
+    return status->ok();
   }
 
   // Note: the fast path does not grab any locks even though another thread might be 
@@ -285,9 +289,10 @@ inline Status ScanRangeContext::GetBytes(uint8_t** buffer, int requested_len,
     if (UNLIKELY(current_buffer_bytes_left_ == 0)) {
       *eos = current_buffer_->eosr();
     }
-    return Status::OK;
+    return true;
   }
-  return GetBytesInternal(buffer, requested_len, false, out_len, eos);
+  *status = GetBytesInternal(buffer, requested_len, false, out_len, eos);
+  return status->ok();
 }
 
 

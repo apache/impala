@@ -193,10 +193,26 @@ class HdfsScanner {
   // string slots and we are not compacting data. This is used to decide
   // how to treat buffer memory that contains slot data.
   bool has_noncompact_strings_;
-
+  
   // The scan range currently being read
   DiskIoMgr::ScanRange* current_scan_range_;
   
+  // Number of null bytes in the tuple.
+  int32_t num_null_bytes_;
+
+  // Contains current parse status to minimize the number of Status objects returned.
+  // This significantly minimizes the cross compile dependencies for llvm since status
+  // objects inline a bunch of string functions.  Also, status objects aren't extremely
+  // cheap to create and destroy.
+  Status parse_status_;
+
+  // Matching typedef for WriteAlignedTuples for codegen.  Refer to comments for
+  // that function.
+  typedef int (*WriteTuplesFn)(HdfsScanner*, MemPool*, TupleRow*, int, FieldLocation*, 
+      int, int, int, int);
+  // Jitted write tuples function pointer.  Null if codegen is disabled.
+  WriteTuplesFn write_tuples_fn_;
+
   // Allocates a buffer from tuple_pool_ large enough to hold one
   // tuple for every remaining row in row_batch.  The tuple memory
   // is uninitialized.
@@ -210,6 +226,36 @@ class HdfsScanner {
 
   // Write empty tuples and commit them to the context object
   int WriteEmptyTuples(ScanRangeContext* context, TupleRow* tuple_row, int num_tuples);
+
+  // Processes batches of fields and writes them out to tuple_row_mem.
+  // - 'pool' mempool to allocate from for auxiliary tuple memory
+  // - 'tuple_row_mem' preallocated tuple_row memory this function must use.
+  // - 'fields' must start at the beginning of a tuple.
+  // - 'num_tuples' number of tuples to process
+  // - 'max_added_tuples' the maximum number of tuples that should be added to the batch.
+  // - 'row_start_index' is the number of rows that have already been processed
+  //   as part of WritePartialTuple.  
+  // Returns the number of tuples added to the row batch.  This can be less than
+  // num_tuples/tuples_till_limit because of failed conjuncts.
+  // Returns -1 if parsing should be aborted due to parse errors.
+  int WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row_mem, int row_size, 
+      FieldLocation* fields, int num_tuples,
+      int max_added_tuples, int slots_per_tuple, int row_start_indx);
+
+  // Utility function to report parse errors for each field.
+  // If errors[i] is nonzero, fields[i] had a parse error.
+  // row_idx is the idx of the row in the current batch that had the parse error
+  // Returns false if parsing should be aborted.  In this case parse_status_ is set
+  // to the error.
+  // This is called from WriteAlignedTuples.  
+  bool ReportTupleParseError(FieldLocation* fields, uint8_t* errors, int row_idx);
+
+  // Utility function to append an error message for an invalid row.  This is called
+  // from ReportTupleParseError()
+  // row_idx is the index of the row in the current batch.  Subclasses should override
+  // this function (i.e. text needs to join boundary rows).  Since this is only in the
+  // error path, vtable overhead is acceptable.
+  virtual void LogRowParseError(std::stringstream*, int row_idx);
 
   // Writes out all slots for 'tuple' from 'fields'. 'fields' must be aligned
   // to the start of the tuple (e.g. fields[0] maps to slots[0]).
@@ -237,11 +283,14 @@ class HdfsScanner {
   // to WriteCompleteTuple.
   static llvm::Function* CodegenWriteCompleteTuple(HdfsScanNode*, LlvmCodeGen*);
   
+  // Codegen function to replace WriteAlignedTuples.  WriteAlignedTuples is cross compiled
+  // to IR.  This function loads the precompiled IR function, modifies it and returns the
+  // resulting function.
+  static llvm::Function* CodegenWriteAlignedTuples(HdfsScanNode*, LlvmCodeGen*, 
+      llvm::Function* write_tuple_fn);
+  
   // Report parse error for column @ desc
   void ReportColumnParseError(const SlotDescriptor* desc, const char* data, int len);
-
-  // Number of null bytes in the tuple.
-  int32_t num_null_bytes_;
 
   // Initialize a tuple.
   // TODO: only copy over non-null slots.

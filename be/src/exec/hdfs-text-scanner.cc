@@ -30,8 +30,7 @@ HdfsTextScanner::HdfsTextScanner(HdfsScanNode* scan_node, RuntimeState* state)
       byte_buffer_ptr_(NULL),
       byte_buffer_end_(NULL),
       byte_buffer_read_size_(0),
-      error_in_row_(false),
-      write_tuples_fn_(NULL) {
+      error_in_row_(false) {
 }
 
 HdfsTextScanner::~HdfsTextScanner() {
@@ -149,7 +148,7 @@ Status HdfsTextScanner::FinishScanRange() {
         char* col = boundary_column_.str().ptr;
         int num_fields = 0;
         delimited_text_parser_->FillColumns<true>(boundary_column_.Size(),
-            &col, &num_fields, &field_locations_);
+            &col, &num_fields, &field_locations_[0]);
 
         MemPool* pool;
         TupleRow* tuple_row_mem;
@@ -204,7 +203,7 @@ Status HdfsTextScanner::ProcessRange(int* num_tuples, bool past_scan_range) {
       RETURN_IF_ERROR(delimited_text_parser_->ParseFieldLocations(max_tuples,
           byte_buffer_end_ - byte_buffer_ptr_, &byte_buffer_ptr_, 
           &row_end_locations_[0],
-          &field_locations_, num_tuples, &num_fields, &col_start));
+          &field_locations_[0], num_tuples, &num_fields, &col_start));
     }
 
     // Materialize the tuples into the in memory format for this query
@@ -263,11 +262,12 @@ Status HdfsTextScanner::ProcessRange(int* num_tuples, bool past_scan_range) {
 
 Status HdfsTextScanner::FillByteBuffer(bool* eosr, int num_bytes) {
   *eosr = false;
-  RETURN_IF_ERROR(context_->GetBytes(
+  Status status;
+  context_->GetBytes(
       reinterpret_cast<uint8_t**>(&byte_buffer_ptr_), num_bytes, 
-          &byte_buffer_read_size_, eosr));
+          &byte_buffer_read_size_, eosr, &status);
   byte_buffer_end_ = byte_buffer_ptr_ + byte_buffer_read_size_;
-  return Status::OK;
+  return status;
 }
 
 Status HdfsTextScanner::FindFirstTuple(bool* tuple_found) {
@@ -331,48 +331,24 @@ Status HdfsTextScanner::GetNext(RowBatch* row_batch, bool* eosr) {
   return Status::OK;
 }
 
-bool HdfsTextScanner::ReportTupleParseError(FieldLocation* fields, uint8_t* errors,
-    int row_idx) {
-  for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
-    if (errors[i]) {
-      const SlotDescriptor* desc = scan_node_->materialized_slots()[i];
-      ReportColumnParseError(desc, fields[i].start, fields[i].len);
-      errors[i] = false;
-    }
-  }
-  parse_status_ = ReportRowParseError(row_idx);
-  return parse_status_.ok();
-}
-
-Status HdfsTextScanner::ReportRowParseError(int row_idx) {
-  ++num_errors_in_file_;
-  if (state_->LogHasSpace()) {
-    DCHECK_LT(row_idx, row_end_locations_.size());
-    char* row_end = row_end_locations_[row_idx];
-    char* row_start;
-    if (row_idx == 0) {
-      row_start = batch_start_ptr_;
-    } else {
-      // Row start at 1 past the row end (i.e. the row delimiter) for the previous row
-      row_start = row_end_locations_[row_idx - 1] + 1; 
-    }
-
-    stringstream ss;
-    ss << "file: " << context_->filename() << endl << "record: ";
-    if (!boundary_row_.Empty()) {
-      // Log the beginning of the line from the previous file buffer(s)
-      ss << boundary_row_.str();
-    }
-    // Log the erroneous line (or the suffix of a line if !boundary_line.empty()).
-    ss << string(row_start, row_end - row_start);
-    state_->LogError(ss.str());
+void HdfsTextScanner::LogRowParseError(stringstream* ss, int row_idx) {
+  DCHECK(state_->LogHasSpace());
+  DCHECK_LT(row_idx, row_end_locations_.size());
+  char* row_end = row_end_locations_[row_idx];
+  char* row_start;
+  if (row_idx == 0) {
+    row_start = batch_start_ptr_;
+  } else {
+    // Row start at 1 past the row end (i.e. the row delimiter) for the previous row
+    row_start = row_end_locations_[row_idx - 1] + 1; 
   }
 
-  if (state_->abort_on_error()) {
-    state_->ReportFileErrors(context_->filename(), 1);
-    return Status(state_->ErrorLog());
+  if (!boundary_row_.Empty()) {
+    // Log the beginning of the line from the previous file buffer(s)
+    *ss << boundary_row_.str();
   }
-  return Status::OK;
+  // Log the erroneous line (or the suffix of a line if !boundary_line.empty()).
+  *ss << string(row_start, row_end - row_start);
 }
 
 
@@ -408,7 +384,13 @@ int HdfsTextScanner::WriteFields(MemPool* pool, TupleRow* tuple_row,
     // it will get picked up the next time around
     if (slot_idx_ == scan_node_->materialized_slots().size() && num_tuples > 0) {
       if (UNLIKELY(error_in_row_)) {
-        parse_status_ = ReportRowParseError(0);
+        if (state_->LogHasSpace()) {
+          stringstream ss;
+          ss << "file: " << context_->filename() << endl << "record: ";
+          LogRowParseError(&ss, 0);
+          state_->LogError(ss.str());
+        }
+        if (state_->abort_on_error()) parse_status_ = Status(state_->ErrorLog());
         if (!parse_status_.ok()) return 0;
         error_in_row_ = false;
       }
@@ -506,20 +488,3 @@ int HdfsTextScanner::WritePartialTuple(FieldLocation* fields,
   return next_line_offset;
 }
 
-Function* HdfsTextScanner::CodegenWriteAlignedTuples(HdfsScanNode* node, 
-    LlvmCodeGen* codegen, Function* write_complete_tuple_fn) {
-  SCOPED_TIMER(codegen->codegen_timer());
-  DCHECK(write_complete_tuple_fn != NULL);
-
-  Function* write_tuples_fn =
-      codegen->GetFunction(IRFunction::HDFS_TEXT_SCANNER_WRITE_ALIGNED_TUPLES);
-  DCHECK(write_tuples_fn != NULL);
-
-  int replaced = 0;
-  write_tuples_fn = codegen->ReplaceCallSites(write_tuples_fn, false,
-      write_complete_tuple_fn, "WriteCompleteTuple", &replaced);
-  DCHECK_EQ(replaced, 1) << "One call site should be replaced.";
-  DCHECK(write_tuples_fn != NULL);
-
-  return codegen->FinalizeFunction(write_tuples_fn);
-}

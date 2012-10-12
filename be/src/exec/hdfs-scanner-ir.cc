@@ -1,6 +1,6 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-#include "exec/hdfs-text-scanner.h"
+#include "exec/hdfs-scanner.h"
 #include "runtime/row-batch.h"
 #include "util/string-parser.h"
 
@@ -16,7 +16,7 @@ using namespace impala;
 // This function takes more arguments that is strictly necessary (they could be
 // computed inside this function) but this is done to minimize the clang dependencies,
 // specifically, calling function on the scan node.
-int HdfsTextScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row, int row_size, 
+int HdfsScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row, int row_size, 
     FieldLocation* fields, int num_tuples, int max_added_tuples, 
     int slots_per_tuple, int row_idx_start) {
   
@@ -51,7 +51,6 @@ int HdfsTextScanner::WriteAlignedTuples(MemPool* pool, TupleRow* tuple_row, int 
         return -1;
       }
     }
-    boundary_row_.Clear();
     
     // Advance to the start of the next tuple
     fields += slots_per_tuple;

@@ -52,7 +52,8 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state,
       has_noncompact_strings_(!scan_node->compact_data() &&
                               !scan_node->tuple_desc()->string_slots().empty()),
       current_scan_range_(NULL),
-      num_null_bytes_(scan_node->tuple_desc()->num_null_bytes()) {
+      num_null_bytes_(scan_node->tuple_desc()->num_null_bytes()),
+      write_tuples_fn_(NULL) {
 }
 
 HdfsScanner::~HdfsScanner() {
@@ -450,7 +451,56 @@ Function* HdfsScanner::CodegenWriteCompleteTuple(
   codegen->OptimizeFunctionWithExprs(fn);
   return codegen->FinalizeFunction(fn);
 }
+
+Function* HdfsScanner::CodegenWriteAlignedTuples(HdfsScanNode* node, 
+    LlvmCodeGen* codegen, Function* write_complete_tuple_fn) {
+  SCOPED_TIMER(codegen->codegen_timer());
+  DCHECK(write_complete_tuple_fn != NULL);
+
+  Function* write_tuples_fn =
+      codegen->GetFunction(IRFunction::HDFS_SCANNER_WRITE_ALIGNED_TUPLES);
+  DCHECK(write_tuples_fn != NULL);
+
+  int replaced = 0;
+  write_tuples_fn = codegen->ReplaceCallSites(write_tuples_fn, false,
+      write_complete_tuple_fn, "WriteCompleteTuple", &replaced);
+  DCHECK_EQ(replaced, 1) << "One call site should be replaced.";
+  DCHECK(write_tuples_fn != NULL);
+
+  return codegen->FinalizeFunction(write_tuples_fn);
+}
+
+bool HdfsScanner::ReportTupleParseError(FieldLocation* fields, uint8_t* errors,
+    int row_idx) {
+  for (int i = 0; i < scan_node_->materialized_slots().size(); ++i) {
+    if (errors[i]) {
+      const SlotDescriptor* desc = scan_node_->materialized_slots()[i];
+      ReportColumnParseError(desc, fields[i].start, fields[i].len);
+      errors[i] = false;
+    }
+  }
+
+  // Call into subclass to log a more accurate error message.
+  if (state_->LogHasSpace()) {
+    stringstream ss;
+    ss << "file: " << context_->filename() << endl << "record: ";
+    LogRowParseError(&ss, row_idx);
+    state_->LogError(ss.str());
+  }
   
+  ++num_errors_in_file_;
+  if (state_->abort_on_error()) {
+    state_->ReportFileErrors(context_->filename(), 1);
+    parse_status_ = Status(state_->ErrorLog());
+  }
+  return parse_status_.ok();
+}
+
+void HdfsScanner::LogRowParseError(stringstream* ss, int row_idx) {
+  // This is only called for text and seq files which should override this function.
+  DCHECK(false);
+}
+
 void HdfsScanner::ReportColumnParseError(const SlotDescriptor* desc, 
     const char* data, int len) {
   if (state_->LogHasSpace()) {

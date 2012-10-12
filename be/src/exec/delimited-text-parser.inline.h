@@ -6,8 +6,6 @@
 #include "delimited-text-parser.h"
 #include "util/cpu-info.h"
 
-#include "util/cpu-info.h"
-
 namespace impala {
 
 // Updates the values in the field and tuple masks, escaping them if necessary.
@@ -39,15 +37,14 @@ inline void ProcessEscapeMask(uint16_t escape_mask, bool* last_char_is_escape,
 
 template <bool process_escapes>
 inline void DelimitedTextParser::AddColumn(int len, char** next_column_start, 
-    int* num_fields, std::vector<FieldLocation>* field_locations) {
+    int* num_fields, FieldLocation* field_locations) {
   if (ReturnCurrentColumn()) {
-    DCHECK_LT(*num_fields, field_locations->size());
     // Found a column that needs to be parsed, write the start/len to 'field_locations'
-    (*field_locations)[*num_fields].start = *next_column_start;
+    field_locations[*num_fields].start = *next_column_start;
     if (process_escapes && current_column_has_escape_) {
-      (*field_locations)[*num_fields].len = -len;
+      field_locations[*num_fields].len = -len;
     } else {
-      (*field_locations)[*num_fields].len = len;
+      field_locations[*num_fields].len = len;
     }
     ++(*num_fields);
   } 
@@ -58,7 +55,7 @@ inline void DelimitedTextParser::AddColumn(int len, char** next_column_start,
 
 template <bool process_escapes>
 void inline DelimitedTextParser:: FillColumns(int len, char** last_column,
-    int* num_fields, std::vector<FieldLocation>* field_locations) {
+    int* num_fields, FieldLocation* field_locations) {
   // Fill in any columns missing from the end of the tuple.
   char* dummy;
   if (last_column == NULL) last_column = &dummy;
@@ -86,7 +83,7 @@ template <bool process_escapes>
 inline void DelimitedTextParser::ParseSse(int max_tuples, 
     int64_t* remaining_len, char** byte_buffer_ptr, 
     char** row_end_locations, 
-    std::vector<FieldLocation>* field_locations,
+    FieldLocation* field_locations,
     int* num_tuples, int* num_fields, char** next_column_start) {
   DCHECK(CpuInfo::IsSupported(CpuInfo::SSE4_2));
 
@@ -197,6 +194,94 @@ inline void DelimitedTextParser::ParseSse(int max_tuples,
     *remaining_len -= SSEUtil::CHARS_PER_128_BIT_REGISTER;
     *byte_buffer_ptr += SSEUtil::CHARS_PER_128_BIT_REGISTER;
   }
+}
+
+// Simplified version of ParseSSE which does not handle tuple delimiters.
+template <bool process_escapes>
+inline void DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* buffer,
+    FieldLocation* field_locations, int* num_fields) {
+  char* next_column_start = buffer;
+  __m128i xmm_buffer, xmm_delim_mask, xmm_escape_mask;
+
+  column_idx_ = scan_node_->num_partition_keys();
+  current_column_has_escape_ = false;
+
+  if (LIKELY(CpuInfo::IsSupported(CpuInfo::SSE4_2))) {
+    while (LIKELY(remaining_len >= SSEUtil::CHARS_PER_128_BIT_REGISTER)) {
+      // Load the next 16 bytes into the xmm register
+      xmm_buffer = _mm_loadu_si128(reinterpret_cast<__m128i*>(buffer));
+
+      xmm_delim_mask =
+          _mm_cmpistrm(xmm_delim_search_, xmm_buffer, SSEUtil::STRCHR_MODE);
+      uint16_t delim_mask = _mm_extract_epi16(xmm_delim_mask, 0);
+
+      uint16_t escape_mask = 0;
+      // If the table does not use escape characters, skip processing for it.
+      if (process_escapes) {
+        DCHECK(escape_char_ != '\0');
+        xmm_escape_mask = _mm_cmpistrm(xmm_escape_search_, xmm_buffer,
+                                      SSEUtil::STRCHR_MODE);
+        escape_mask = _mm_extract_epi16(xmm_escape_mask, 0);
+        ProcessEscapeMask(escape_mask, &last_char_is_escape_, &delim_mask);
+      }
+
+      int last_col_idx;
+      // Process all non-zero bits in the delim_mask from lsb->msb.  If a bit
+      // is set, the character in that spot is a field.
+      while (delim_mask != 0) {
+        // ffs is a libc function that returns the index of the first set bit (1-indexed)
+        int n = ffs(delim_mask) - 1;
+        DCHECK_GE(n, 0);
+        DCHECK_LT(n, 16);
+      
+        if (process_escapes) {
+          // Determine if there was an escape character between [last_col_idx, n]
+          bool escaped = (escape_mask & low_mask_[last_col_idx] & high_mask_[n]) != 0;
+          current_column_has_escape_ |= escaped;
+          last_col_idx = n;
+        }
+        
+        // clear current bit
+        delim_mask &= ~(SSEUtil::SSE_BITMASK[n]);
+
+        AddColumn<process_escapes>(buffer + n - next_column_start,
+            &next_column_start, num_fields, field_locations);
+      }
+    
+      if (process_escapes) {
+        // Determine if there was an escape character between (last_col_idx, 15)
+        bool unprocessed_escape = escape_mask & low_mask_[last_col_idx] & high_mask_[15];
+        current_column_has_escape_ |= unprocessed_escape;
+      }
+
+      remaining_len -= SSEUtil::CHARS_PER_128_BIT_REGISTER;
+      buffer += SSEUtil::CHARS_PER_128_BIT_REGISTER;
+    }
+  }
+  
+  while (remaining_len > 0) {
+    
+    if (*buffer == escape_char_) {
+      current_column_has_escape_ = true;
+      last_char_is_escape_ = !last_char_is_escape_;
+    } else {
+      last_char_is_escape_ = false;
+    }
+    
+    if (!last_char_is_escape_ && 
+          (*buffer == field_delim_ || *buffer == collection_item_delim_)) {
+      AddColumn<process_escapes>(buffer - next_column_start,
+          &next_column_start, num_fields, field_locations);
+    }
+
+    --remaining_len;
+    ++buffer;
+  }
+    
+  // Last column does not have a delimiter after it.  Add that column and also
+  // pad with empty cols if the input is ragged.
+  FillColumns<process_escapes>(buffer - next_column_start,
+        &next_column_start, num_fields, field_locations);
 }
 
 }

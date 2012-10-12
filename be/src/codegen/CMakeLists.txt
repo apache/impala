@@ -34,7 +34,7 @@ set(IR_DEPENDENT_FILES
   impala-ir.cc
   ../exec/aggregation-node-ir.cc
   ../exec/hash-join-node-ir.cc
-  ../exec/hdfs-text-scanner-ir.cc
+  ../exec/hdfs-scanner-ir.cc
   ../runtime/string-value-ir.cc
   ../util/hash-util-ir.cc
 )

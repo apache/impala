@@ -21,7 +21,7 @@ ir_functions = [
   ["HASH_FVN", "IrFvnHash"],
   ["HASH_JOIN_PROCESS_BUILD_BATCH", "ProcessBuildBatch"],
   ["HASH_JOIN_PROCESS_PROBE_BATCH", "ProcessProbeBatch"],
-  ["HDFS_TEXT_SCANNER_WRITE_ALIGNED_TUPLES", "WriteAlignedTuples"],
+  ["HDFS_SCANNER_WRITE_ALIGNED_TUPLES", "WriteAlignedTuples"],
   ["STRING_VALUE_EQ", "StringValueEQ"],
   ["STRING_VALUE_NE", "StringValueNE"],
   ["STRING_VALUE_GE", "StringValueGE"],

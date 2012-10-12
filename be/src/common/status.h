@@ -62,9 +62,16 @@ class Status {
     if (error_detail_ != NULL) delete error_detail_;
   }
 
-
   // same as copy c'tor
-  Status& operator=(const Status& status);
+  Status& operator=(const Status& status) {
+    delete error_detail_;
+    if (LIKELY(status.error_detail_ == NULL)) {
+      error_detail_ = NULL;
+    } else {
+      error_detail_ = new ErrorDetail(*status.error_detail_);
+    }
+    return *this;
+  }
 
   // "Copy" c'tor from TStatus.
   Status(const TStatus& status);
