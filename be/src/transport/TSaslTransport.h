@@ -129,6 +129,13 @@ class TSaslTransport : public TVirtualTransport<TSaslTransport> {
    */
   virtual void flush();
 
+  /**
+   * Returns the transport underlying this one
+   */
+  boost::shared_ptr<TTransport> getUnderlyingTransport() {
+    return transport_;
+  }
+
  protected:
   // Underlying transport
   boost::shared_ptr<TTransport> transport_;

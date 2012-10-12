@@ -179,10 +179,9 @@ void* ThriftServer::ThriftServerEventProcessor::createContext(shared_ptr<TProtoc
 
   stringstream ss;
 
-  // TODO: Make work with SASL
+  TSocket* socket;
+  TTransport* transport = input->getTransport().get();
   if (!thrift_server_->kerberos_enabled_) {
-    TTransport* transport = input->getTransport().get();
-    TSocket* socket;
     switch (thrift_server_->server_type_) {
       case Nonblocking:
         socket = static_cast<TSocket*>(
@@ -196,13 +195,12 @@ void* ThriftServer::ThriftServerEventProcessor::createContext(shared_ptr<TProtoc
       default:
         DCHECK(false) << "Unexpected thrift server type";
     }
-  
-  
-    ss << socket->getPeerAddress() << ":" << socket->getPeerPort();
   } else {
-    // TODO: Get transport from TSaslTransport
-    ss << "NO_SESSION";
-  }
+    socket = static_cast<TSocket*>(
+        static_cast<TSaslServerTransport*>(transport)->getUnderlyingTransport().get());
+  }    
+    
+  ss << socket->getPeerAddress() << ":" << socket->getPeerPort();
 
   {
     lock_guard<mutex> l_(thrift_server_->session_keys_lock_);
@@ -293,6 +291,8 @@ Status ThriftServer::Start() {
     kerberos_enabled_ = true;
   }
 
+  // Note - if you change the transport types here, you must check that the
+  // logic in createContext is still accurate.
   switch (server_type_) {
     case Nonblocking:
       if (transport_factory.get() == NULL) {
