@@ -21,6 +21,7 @@ from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 
 VERSION_STRING = "Impala v0.1 "
+COMMENT_TOKEN = '--'
 
 # Tarball / packaging build makes impala_build_version available
 try:
@@ -456,13 +457,42 @@ available commands.
 Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 (Build version: %s)""" % VERSION_STRING
 
+def parse_query_text(query_text):
+  """Parse query file text and filter out the queries.
+
+  This method filters comments. Comments can be of 3 types:
+  (a) select foo --comment
+      from bar;
+  (b) select foo
+      from bar --comment;
+  (c) --comment
+  The semi-colon takes precedence over everything else. As such,
+  it's not permitted within a comment, and cannot be escaped.
+  """
+  # queries are split by a semi-colon.
+  raw_queries = query_text.split(';')
+  queries = []
+  for raw_query in raw_queries:
+    query = []
+    for line in raw_query.split('\n'):
+      line = line.split(COMMENT_TOKEN)[0].strip()
+      if len(line) > 0:
+        # anything before the comment is legal.
+        query.append(line)
+    queries.append('\n'.join(query))
+  # The last query need not be demilited by a semi-colon.
+  # If it is, get rid of the last element.
+  if len(queries[-1]) == 0:
+    queries = queries[:-1]
+  return queries
+
 def execute_queries_non_interactive_mode(options):
   """Run queries in non-interactive mode."""
   queries = []
   if options.query_file:
     try:
       query_file_handle = open(options.query_file, 'r')
-      queries = query_file_handle.read().split(';')
+      queries = parse_query_text(query_file_handle.read())
       query_file_handle.close()
     except Exception, e:
       print 'Error: %s' % e
@@ -488,7 +518,7 @@ if __name__ == "__main__":
   parser.add_option("-k", "--kerberos", dest="use_kerberos", default=False,
                     action="store_true", help="Connect to a kerberized impalad")
   parser.add_option("-s", "--kerberos_service_name",
-                    dest="kerberos_service_name", default='impala',
+                    dest="kerberos_service_name", default=None,
                     help="Service name of a kerberized impalad, default is 'impala'")
   parser.add_option("-V", "--verbose", dest="verbose", default=False, action="store_true",
                     help="Enable verbose output")
@@ -498,6 +528,7 @@ if __name__ == "__main__":
   if options.kerberos_service_name and not options.use_kerberos:
     print 'Kerberos not enabled, ignoring service name'
   elif options.use_kerberos:
+    if not options.kerberos_service_name: options.kerberos_service_name = 'impala'
     print "Using service name '%s' for kerberos" % options.kerberos_service_name
 
   if options.use_kerberos:
