@@ -68,26 +68,26 @@ class SubscriptionManager {
 
   // Registers an instance of the given service type at the given
   // address with the state store.
-  impala::Status RegisterService(const std::string& service_id,
+  impala::Status RegisterService(const ServiceId& service_id,
       const impala::THostPort& address);
 
   // Unregisters an instance of the given service type with the state store.
-  impala::Status UnregisterService(const std::string& service_id);
+  impala::Status UnregisterService(const ServiceId& service_id);
 
   // Registers with the state store to receive updates for the given services.
-  // Fills in the given id with an id identifying the subscription, which should be
-  // used when unregistering.  The given UpdateCallback will be called with updates and
-  // takes a single ServiceStateMap as a parameter, which contains a mapping of service
-  // ids to the relevant state for that service. update_callback is owned by the caller.
-  // The caller must not deallocate the memory until after calling
+  // The given id will be the unique identifier for this subscription, and may
+  // take on any non-empty value as long as it is unique within this subscription
+  // manager. The given UpdateCallback will be called with updates and takes a
+  // single ServiceStateMap as a parameter, which contains a mapping of service
+  // ids to the relevant state for that service. update_callback is owned by the
+  // caller.  The caller must not deallocate the memory until after calling
   // UnregisterSubscription().
-  impala::Status RegisterSubscription(
-      const boost::unordered_set<std::string>& services, UpdateCallback* update_callback,
-      SubscriptionId* id);
+  impala::Status RegisterSubscription(const boost::unordered_set<ServiceId>& services,
+      const SubscriptionId& subscription, UpdateCallback* update_callback);
 
   // Unregisters the subscription identified by the given id with the state store. Also
   // unregisters the associated callback, so that it will no longer be called.
-  impala::Status UnregisterSubscription(SubscriptionId id);
+  impala::Status UnregisterSubscription(const SubscriptionId& id);
 
   // Starts the underlying server, which receives updates from the StateStore.
   impala::Status Start();
@@ -101,7 +101,7 @@ class SubscriptionManager {
   // lifetime of the state store subscriber (otherwise if the thrift server gets stopped
   // and the reference count gets decremented, the referent will be destroyed before other
   // references are done with it).
-  boost::shared_ptr<StateStoreSubscriber> state_store_;
+  boost::shared_ptr<StateStoreSubscriber> state_store_subscriber_;
 };
 
 }

@@ -580,8 +580,7 @@ void Coordinator::PrintBackendInfo() {
       for (int j = 0; j < backend_exec_states_.size(); ++j) {
         BackendExecState* exec_state = backend_exec_states_[j];
         if (exec_state->fragment_idx != i) continue;
-        VLOG_FILE << "data volume for ipaddress " << exec_state->hostport.first
-                  << ":" << exec_state->hostport.second << ": "
+        VLOG_FILE << "data volume for ipaddress " << exec_state << ": "
                   << PrettyPrinter::Print(
                     exec_state->total_split_size, TCounterType::BYTES);
       }
@@ -674,12 +673,12 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
   BackendExecState* exec_state = reinterpret_cast<BackendExecState*>(exec_state_arg);
   VLOG_FILE << "making rpc: ExecPlanFragment query_id=" << query_id_
             << " instance_id=" << exec_state->fragment_instance_id
-            << " ipaddress=" << exec_state->hostport.ipaddress
-            << " port=" << exec_state->hostport.port;
+            << " host=" << exec_state->hostport;
   lock_guard<mutex> l(exec_state->lock);
 
   // this client needs to have been released when this function finishes
   ImpalaInternalServiceClient* backend_client;
+  // TODO: Fix the THostPort mess, make the client cache use the same type.
   pair<string, int> hostport = make_pair(exec_state->hostport.ipaddress, 
                                          exec_state->hostport.port);
   RETURN_IF_ERROR(exec_env_->client_cache()->GetClient(hostport, &backend_client));
@@ -762,7 +761,7 @@ void Coordinator::CancelInternal() {
     try {
       VLOG_QUERY << "sending CancelPlanFragment rpc for instance_id="
                  << exec_state->fragment_instance_id << " backend="
-                 << exec_state->hostport.ipaddress << ":" << exec_state->hostport.port;
+                 << exec_state->hostport;
       backend_client->CancelPlanFragment(res, params);
     } catch (TTransportException& e) {
       stringstream msg;

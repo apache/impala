@@ -12,7 +12,7 @@
 #include "runtime/data-stream-mgr.h"
 #include "runtime/hdfs-fs-cache.h"
 #include "sparrow/simple-scheduler.h"
-#include "sparrow/state-store-subscriber-service.h"
+#include "sparrow/state-store-subscriber.h"
 #include "util/metrics.h"
 #include "util/thrift-server.h"
 #include "gen-cpp/ImpalaInternalService.h"

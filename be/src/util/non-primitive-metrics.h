@@ -16,6 +16,7 @@ namespace impala {
 // primitive types. Therefore they need specialist PrintValue methods, and
 // perhaps update methods that alter the value in place, rather than replacing
 // it with a new one.
+// TODO: StructuredMetrics or ContainerMetrics are probably better names here.
 
 // Utility method to print an iterable type to a stringstream like ["v1", "v2", "v3"] 
 // or [v1, v2, v3], depending on whether quotes are requested via the first parameter

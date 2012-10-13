@@ -90,7 +90,7 @@ Status WaitForServer(const std::string& host, int port, int num_retries,
 void THostPortToString(const THostPort& address, std::string* out);
 
 // Prints a hostport as ipaddress:port
-std::ostream& operator<<(std::ostream& out, THostPort& hostport);
+std::ostream& operator<<(std::ostream& out, const THostPort& hostport);
 
 }
 

@@ -10,8 +10,8 @@ add_library(Sparrow STATIC
   util.cc
   failure-detector.cc
   simple-scheduler.cc
-  state-store-service.cc
-  state-store-subscriber-service.cc
+  state-store.cc
+  state-store-subscriber.cc
   subscription-manager.cc
 )
 

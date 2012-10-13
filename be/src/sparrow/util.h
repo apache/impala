@@ -19,7 +19,7 @@ namespace sparrow {
 class TUpdateStateRequest;
 
 // Identifier for services
-typedef char const* ServiceId;
+typedef std::string ServiceId;
 
 // Identifer for a StateStoreSubscriber.
 typedef int SubscriberId;
@@ -27,7 +27,7 @@ typedef int SubscriberId;
 // Identifier for a particular subscription to the state store. Note that there is not
 // a one to one mapping between subscriptions and subscribers; a given subscriber
 // may facilitate more than one subscription to the state store.
-typedef int64_t SubscriptionId;
+typedef std::string SubscriptionId;
 
 // Subscribers can use this SubscriptionId to distinguish between a not-yet-made
 // subscription and an active one.

@@ -13,7 +13,7 @@
 #include "sparrow/scheduler.h"
 #include "sparrow/subscription-manager.h"
 #include "sparrow/util.h"
-#include "sparrow/state-store-service.h"
+#include "sparrow/state-store.h"
 #include "util/metrics.h"
 #include "gen-cpp/Types_types.h"  // for THostPort
 

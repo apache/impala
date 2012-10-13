@@ -56,15 +56,17 @@ struct TRegisterSubscriptionRequest {
 
   // Services for which updates should be pushed to the given subscriber. Required in V1.
   3: optional set<string> services
+
+  // The subscription ID to use for this request. All IDs are local to the
+  // subscriber, so as long as a single subscriber does not reuse IDs there is no
+  // danger of collision.
+  // Required in V1
+  4: optional string subscription_id;
 }
 
 struct TRegisterSubscriptionResponse {
   // Required in V1.
   1: optional Status.TStatus status
-
-  // Unique identifier for the subscription, which is needed to unsubscribe.
-  // Required in V1.
-  2: optional i64 subscription_id
 }
 
 struct TUnregisterSubscriptionRequest {
@@ -75,7 +77,7 @@ struct TUnregisterSubscriptionRequest {
   2: optional Types.THostPort subscriber_address
 
   // Identifier for the subscription that should be unregistered. Required in V1.
-  3: optional i64 subscription_id
+  3: optional string subscription_id
 }
 
 struct TUnregisterSubscriptionResponse {

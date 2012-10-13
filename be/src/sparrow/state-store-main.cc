@@ -8,7 +8,7 @@
 
 #include "common/logging.h"
 #include "common/status.h"
-#include "sparrow/state-store-service.h"
+#include "sparrow/state-store.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
 #include "util/metrics.h"
@@ -67,6 +67,7 @@ int main(int argc, char** argv) {
   shared_ptr<sparrow::StateStore> state_store(
       new sparrow::StateStore(sparrow::StateStore::DEFAULT_UPDATE_FREQUENCY_MS,
           metrics.get()));
+  state_store->RegisterWebpages(webserver.get());
   state_store->Start(FLAGS_state_store_port);
   state_store->WaitForServerToStop();
 }

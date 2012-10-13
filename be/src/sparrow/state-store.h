@@ -1,7 +1,7 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-#ifndef SPARROW_STATE_STORE_SERVICE_H
-#define SPARROW_STATE_STORE_SERVICE_H
+#ifndef SPARROW_STATE_STORE_H
+#define SPARROW_STATE_STORE_H
 
 #include <string>
 
@@ -28,6 +28,7 @@ namespace impala {
 
 class Status;
 class THostPort;
+class Webserver;
 }
 
 namespace sparrow {
@@ -65,6 +66,7 @@ class StateStore : public StateStoreServiceIf,
   void Start(int port);
 
   // Stops the server. Once the server is stopped it may not be restarted.
+  // Should only be used for testing. 
   void Stop();
 
   // Blocks until the server stops (which will occur if the server
@@ -74,6 +76,8 @@ class StateStore : public StateStoreServiceIf,
 
   int subscriber_update_frequency_ms() { return subscriber_update_frequency_ms_; }
 
+  impala::Status RegisterWebpages(impala::Webserver* server);
+
  private:
   typedef impala::ThriftClient<StateStoreSubscriberServiceClient> SubscriberClient;
 
@@ -82,28 +86,28 @@ class StateStore : public StateStoreServiceIf,
   class Subscriber {
    public:
     // Count of the number of registered subscriptions for each service id.
-    typedef boost::unordered_map<std::string, int> ServiceSubscriptionCounts;
+    typedef boost::unordered_map<ServiceId, int> ServiceSubscriptionCounts;
 
     // Mapping between a subscription id, and a list of service ids for which updates
     // should be pushed.
-    typedef boost::unordered_map<SubscriptionId, boost::unordered_set<std::string> >
+    typedef boost::unordered_map<SubscriptionId, boost::unordered_set<ServiceId> >
         Subscriptions;
 
-    Subscriber(SubscriberId id) : id_(id), next_subscription_id_(0) {};
+    Subscriber(SubscriberId id) : id_(id) {};
 
     // Initializes the underlying thrift transport and StateStoreSubscriberServiceClient,
     // but doesn't open the transport.
     void Init(const impala::THostPort& address);
 
     // Adds an instance of the given service.
-    void AddService(const std::string& service_id);
+    void AddService(const ServiceId& service_id);
 
     // Removes the instance of the given service.
-    void RemoveService(const std::string& service_id);
+    void RemoveService(const ServiceId& service_id);
 
-    // Add a subscription for the given services. Returns a identifier for the
-    // subscription that's unique within this subscriber.
-    SubscriptionId AddSubscription(const std::set<std::string>& services);
+    // Add a subscription for the given services. The subscription will have the
+    // id given, and any existing subscription with this ID will be overwritten.
+    void AddSubscription(const std::set<ServiceId>& services, const SubscriptionId& id);
 
     // Removes the subscription with the given identifier. Returns true if the
     // subscription was removed, and false if the subscription did not exist.
@@ -127,7 +131,7 @@ class StateStore : public StateStoreServiceIf,
       return subscriptions_;
     }
 
-    const boost::unordered_set<std::string>& service_ids() const {
+    const boost::unordered_set<ServiceId>& service_ids() const {
       return service_ids_;
     }
 
@@ -136,13 +140,10 @@ class StateStore : public StateStoreServiceIf,
     // Unique identifier for the subscriber.
     SubscriberId id_;
 
-    // Next identifier to use for a subscription.
-    SubscriptionId next_subscription_id_;
-
     // Exported services that are associated with the subscriber (needed when a subscriber
     // become unreachable, to determine which service instances should also be marked
     // as unreachable).
-    boost::unordered_set<std::string> service_ids_;
+    boost::unordered_set<ServiceId> service_ids_;
 
     Subscriptions subscriptions_;
 
@@ -168,7 +169,7 @@ class StateStore : public StateStoreServiceIf,
   };
 
   // Mapping of service ids to the corresponding membership.
-  typedef boost::unordered_map<std::string, Membership> ServiceMemberships;
+  typedef boost::unordered_map<ServiceId, Membership> ServiceMemberships;
 
   // Information about each subscriber, indexed by the address of the subscriber.
   typedef boost::unordered_map<impala::THostPort, Subscriber> Subscribers;
@@ -212,7 +213,9 @@ class StateStore : public StateStoreServiceIf,
   // services registered which is the same thing.
   impala::Metrics::IntMetric* num_backends_metric_;
   impala::SetMetric<std::string>* backend_set_metric_;
-  impala::MapMetric<std::string, std::string>* backend_state_metric_;
+
+  // Tracks the failed / ok state of each subscriber
+  impala::MapMetric<std::string, std::string>* subscriber_state_metric_;
 
   // Getter and setter for is_updating_, both are thread safe.
   bool is_updating();
@@ -232,7 +235,20 @@ class StateStore : public StateStoreServiceIf,
 
   // Removes all subscriptions and registered services for the subscriber with
   // the given address.
-  void UnregisterSubscriberCompletely(const impala::THostPort& address);
+  impala::Status UnregisterSubscriberCompletely(const impala::THostPort& address);
+
+  // Webserver callback to write a list of active subscriptions
+  void SubscriptionsCallback(std::stringstream* output);
+
+  // Unregisters the given subscription associated with the subscriber at the
+  // given address.
+  impala::Status UnregisterSubscriptionInternal(const impala::THostPort& address, 
+                                                const SubscriptionId& id);
+
+  // Unregisters the service instance of the given type at the given address
+  impala::Status UnregisterServiceInternal(const impala::THostPort& address, 
+                                           const ServiceId& service_id);
+
 
   // Friend class so that tests can manipulate internal data structures
   friend class StateStoreTest;

@@ -787,7 +787,7 @@ void ImpalaServer::BackendsPathHandler(stringstream* output) {
   (*output) << "<pre>";
   exec_env_->scheduler()->GetAllKnownHosts(&backends);
   BOOST_FOREACH(const Scheduler::HostList::value_type& host, backends) {
-    (*output) << host.ipaddress << ":" << host.port << endl;
+    (*output) << host << endl;
   }
   (*output) << "</pre>";
 }
@@ -959,6 +959,7 @@ void ImpalaServer::Wait(boost::shared_ptr<QueryExecState> exec_state) {
   if (status.ok()) {
     exec_state->UpdateQueryState(QueryState::FINISHED);
   } else {
+    UnregisterQuery(exec_state->query_id());
     exec_state->SetErrorStatus(status);
   }
 }

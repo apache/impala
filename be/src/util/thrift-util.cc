@@ -80,7 +80,7 @@ void THostPortToString(const THostPort& address, string* out) {
   *out = ss.str();
 }
 
-std::ostream& operator<<(std::ostream& out, THostPort& hostport) {
+std::ostream& operator<<(std::ostream& out, const THostPort& hostport) {
   out << hostport.ipaddress << ":" << hostport.port;
   return out;
 }

@@ -6,6 +6,7 @@
 #include <boost/thread/thread_time.hpp>
 #include <string>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
+#include <boost/thread/mutex.hpp>
 
 namespace impala {
 
@@ -58,6 +59,9 @@ class TimeoutFailureDetector : public FailureDetector {
   virtual PeerState GetPeerState(const std::string& peer); 
 
  private:
+  // Protects all members
+  boost::mutex lock_;
+
   // Record of last time a successful heartbeat was received
   std::map<std::string, boost::system_time> peer_heartbeat_record_;
 
@@ -74,8 +78,8 @@ class TimeoutFailureDetector : public FailureDetector {
 // before a peer is considered failed. Clients must call 
 // UpdateHeartbeat(..., false) to indicate that a heartbeat has been missed.
 // The MissedHeartbeatFailureDetector is most appropriate when heartbeats are
-// being sent, not being received, because it is easy in that situation tell
-// when a heartbeat has not been successful..
+// being sent, not being received, because it is easy in that situation to tell
+// when a heartbeat has not been successful.
 // Not thread safe.
 class MissedHeartbeatFailureDetector : public FailureDetector {
  public:
@@ -93,6 +97,9 @@ class MissedHeartbeatFailureDetector : public FailureDetector {
   virtual PeerState GetPeerState(const std::string& peer); 
 
  private:
+  // Protects all members
+  boost::mutex lock_;
+
   // The maximum number of heartbeats that can be missed consecutively before a
   // peer is considered failed.
   int32_t max_missed_heartbeats_;

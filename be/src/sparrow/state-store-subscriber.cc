@@ -1,21 +1,26 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-#include "sparrow/state-store-subscriber-service.h"
+#include "sparrow/state-store-subscriber.h"
 
 #include <sstream>
 #include <utility>
 
 #include <boost/algorithm/string/join.hpp>
 #include <boost/foreach.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/thread/shared_mutex.hpp>
 #include <transport/TBufferTransports.h>
 
 #include "common/logging.h"
 #include "common/status.h"
+#include "sparrow/failure-detector.h"
 #include "gen-cpp/StateStoreService_types.h"
 #include "gen-cpp/StateStoreSubscriberService_types.h"
+#include "util/thrift-util.h"
 
 using namespace std;
 using namespace boost;
+using namespace boost::posix_time;
 using namespace ::apache::thrift;
 using namespace ::apache::thrift::transport;
 using impala::Status;
@@ -23,9 +28,13 @@ using impala::THostPort;
 using impala::ThriftClient;
 using impala::ThriftServer;
 using impala::TStatusCode;
+using impala::TimeoutFailureDetector;
+using impala::FailureDetector;
 
 DECLARE_int32(rpc_cnxn_attempts);
 DECLARE_int32(rpc_cnxn_retry_interval_ms);
+DEFINE_int32(statestore_subscriber_timeout_seconds, 10, "The amount of time (in seconds) "
+    "that may elapse before the connection with the state-store is considered lost.");
 
 namespace sparrow {
 
@@ -36,7 +45,10 @@ StateStoreSubscriber::StateStoreSubscriber(const string& hostname,
                                            const string& ipaddress, int port,
                                            const string& state_store_host,
                                            int state_store_port)
-  : server_running_(false) {
+  : server_running_(false),
+    failure_detector_(new TimeoutFailureDetector(
+        seconds(FLAGS_statestore_subscriber_timeout_seconds), 
+        seconds(FLAGS_statestore_subscriber_timeout_seconds / 2))) {
   client_.reset();
   host_port_.ipaddress = ipaddress;
   host_port_.port = port;
@@ -49,10 +61,10 @@ StateStoreSubscriber::StateStoreSubscriber(const string& hostname,
 StateStoreSubscriber::~StateStoreSubscriber() {
 }
 
-Status StateStoreSubscriber::RegisterService(const string& service_id,
-                                             const THostPort& address) {
+Status StateStoreSubscriber::RegisterServiceInternal(const ServiceId& service_id,
+                                                     const THostPort& address) {
+  // Precondition: lock_ is held entering this method
   RETURN_IF_ERROR(InitClient());
-
   TRegisterServiceRequest request;
   request.__set_subscriber_address(host_port_);
   request.__set_service_id(service_id);
@@ -72,14 +84,21 @@ Status StateStoreSubscriber::RegisterService(const string& service_id,
     return status;
   }
   Status status(response.status);
-  if (status.ok()) {
-    services_.insert(service_id);
-  }
-  return status;
+  if (status.ok()) services_[service_id] = address; 
+  return status;  
 }
 
-Status StateStoreSubscriber::UnregisterService(const string& service_id) {
-  unordered_set<string>::iterator service = services_.find(service_id);
+Status StateStoreSubscriber::RegisterService(const ServiceId& service_id,
+                                             const THostPort& address) {
+  lock_guard<mutex> l(lock_);
+  return RegisterServiceInternal(service_id, address);
+}
+
+Status StateStoreSubscriber::UnregisterService(const ServiceId& service_id) {
+  // TODO: Consider moving registration / unregistration into RecoveryChecker
+  // loop and performing asynchronously.
+  lock_guard<mutex> l(lock_);
+  ServiceRegistrations::iterator service = services_.find(service_id);
   if (service == services_.end()) {
     stringstream error_message;
     error_message << "Service id " << service_id
@@ -87,22 +106,21 @@ Status StateStoreSubscriber::UnregisterService(const string& service_id) {
     return Status(error_message.str());
   }
 
-  Status status = UnregisterServiceWithStateStore(service_id);
-  if (status.ok()) {
-    services_.erase(service);
-  }
+  Status status = UnregisterServiceInternal(service_id);
+  if (status.ok()) services_.erase(service);
   return status;
 }
 
-Status StateStoreSubscriber::RegisterSubscription(
-    const unordered_set<string>& update_services,
-    SubscriptionManager::UpdateCallback* update_callback, SubscriptionId* id) {
+Status StateStoreSubscriber::RegisterSubscriptionInternal(
+    const unordered_set<ServiceId>& update_services, const SubscriptionId& id,
+    SubscriptionManager::UpdateCallback* update_callback) {
+  // Precondition: lock_ is held entering this method
   RETURN_IF_ERROR(InitClient());
-
   TRegisterSubscriptionRequest request;
   request.__set_subscriber_address(host_port_);
   request.services.insert(update_services.begin(), update_services.end());
   request.__isset.services = true;
+  request.__set_subscription_id(id);
   TRegisterSubscriptionResponse response;
   VLOG_CONNECTION << "Attempting to register subscriber for services "
                   << algorithm::join(update_services, ", ") << " at "
@@ -122,23 +140,24 @@ Status StateStoreSubscriber::RegisterSubscription(
   if (!status.ok()) {
     return status;
   }
-  if (!response.__isset.subscription_id) {
-    status.AddErrorMsg("Invalid response: subscription_id not set.");
-    return status;
-  }
+  subscriptions_[id] = update_services;
 
-  *id = response.subscription_id;
-  CheckNotInCallbackThread();
-  lock_guard<mutex> lock(update_callbacks_lock_);
-  update_callbacks_.insert(make_pair(response.subscription_id, update_callback));
+  update_callbacks_.insert(make_pair(id, update_callback));
   update_callback->currently_registered_ = true;
   return status;
 }
 
+
+Status StateStoreSubscriber::RegisterSubscription(
+    const unordered_set<string>& update_services, const SubscriptionId& id,
+    SubscriptionManager::UpdateCallback* update_callback) {
+  lock_guard<mutex> l(lock_);
+  return RegisterSubscriptionInternal(update_services, id, update_callback);
+}
+
 Status StateStoreSubscriber::UnregisterSubscription(const SubscriptionId& id) {
+  lock_guard<mutex> l(lock_);
   {
-    CheckNotInCallbackThread();
-    lock_guard<mutex> lock(update_callbacks_lock_);
     UpdateCallbacks::iterator callback = update_callbacks_.find(id);
     if (callback == update_callbacks_.end()) {
       stringstream error_message;
@@ -148,10 +167,10 @@ Status StateStoreSubscriber::UnregisterSubscription(const SubscriptionId& id) {
     }
   }
 
-  Status status = UnregisterSubscriptionWithStateStore(id);
+  Status status = UnregisterSubscriptionInternal(id);
 
-  CheckNotInCallbackThread();
-  lock_guard<mutex> lock(update_callbacks_lock_);
+  if (status.ok()) subscriptions_.erase(id);
+
   // Don't save the old iterator and use it to erase, because it may have been
   // invalidated by now.
   UpdateCallbacks::iterator callback = update_callbacks_.find(id);
@@ -169,6 +188,7 @@ void StateStoreSubscriber::UpdateState(TUpdateStateResponse& response,
 
   ServiceStateMap state;
   StateFromThrift(request, &state);
+  failure_detector_->UpdateHeartbeat(state_store_host_port_.ipaddress, true);
 
   // Log all of the new state we just got.
   stringstream new_state;
@@ -184,26 +204,13 @@ void StateStoreSubscriber::UpdateState(TUpdateStateResponse& response,
   }
   VLOG(4) << "Received new state:\n" << new_state.str();
 
-  {
-    lock_guard<mutex> lock(callback_thread_id_lock_);
-    callback_thread_id_ = boost::this_thread::get_id();
-  }
+  lock_guard<mutex> l(lock_);
 
-  lock_guard<mutex> lock(update_callbacks_lock_);
-  // callback_thread_id_lock_ cannot be held while executing the callbacks,
-  // otherwise the deadlock that it helps prevent (on update_callbacks_lock_) would
-  // occur on callback_thread_id_lock_ instead.
-  // TODO: This is problematic if any of the callbacks take a long time. Eventually,
-  // we'll probably want to execute the callbacks asynchronously in a different thread.  
   BOOST_FOREACH(UpdateCallbacks::value_type& update, update_callbacks_) {
     DCHECK(update.second->currently_registered_);
     update.second->callback_function_(state);
   }
 
-  {
-    lock_guard<mutex> lock(callback_thread_id_lock_);
-    callback_thread_id_ = thread::id();
-  }
   RETURN_AND_SET_STATUS_OK(response);
 }
 
@@ -221,6 +228,10 @@ Status StateStoreSubscriber::Start() {
   RETURN_IF_ERROR(impala::WaitForServer(host_port_.ipaddress, host_port_.port, 40, 50));
 
   LOG(INFO) << "StateStoreSubscriber listening on " << host_port_.port;
+
+  recovery_mode_thread_.reset(
+      new thread(&StateStoreSubscriber::RecoveryModeChecker, this));
+
   return Status::OK;
 }
 
@@ -229,15 +240,17 @@ bool StateStoreSubscriber::IsRunning() {
 }
 
 void StateStoreSubscriber::UnregisterAll() {
+  lock_guard<mutex> l(lock_);
   Status status = InitClient();
   if (status.ok()) {
     // Unregister all services.
-    BOOST_FOREACH(const string& service_id, services_) {
-      Status unregister_status = UnregisterServiceWithStateStore(service_id);
+    LOG(INFO) << "SERVICE HAS: " << services_.size();
+    BOOST_FOREACH(const ServiceRegistrations::value_type& service, services_) {
+      Status unregister_status = UnregisterServiceInternal(service.first);
       if (!unregister_status.ok()) {
         string error_msg;
         unregister_status.GetErrorMsg(&error_msg);
-        LOG(ERROR) << "Error when unregistering service " << service_id << ":"
+        LOG(ERROR) << "Error when unregistering service " << service.first << ":"
                    << error_msg;
         // Add the unregistration error message to status, which contains all error
         // messages. Keep going, rather than failing here, so we make a best-effort
@@ -246,15 +259,12 @@ void StateStoreSubscriber::UnregisterAll() {
       }
     }
     services_.clear();
-
     // Unregister all subscriptions.
-    CheckNotInCallbackThread();
-    lock_guard<mutex> lock(update_callbacks_lock_);
     BOOST_FOREACH(const UpdateCallbacks::value_type& callback_pair,
                   update_callbacks_) {
       DCHECK(callback_pair.second->currently_registered_);
       SubscriptionId id = callback_pair.first;
-      Status unregister_status = UnregisterSubscriptionWithStateStore(id);
+      Status unregister_status = UnregisterSubscriptionInternal(id);
       if (!unregister_status.ok()) {
         string error_msg;
         unregister_status.GetErrorMsg(&error_msg);
@@ -284,15 +294,9 @@ Status StateStoreSubscriber::InitClient() {
   return Status::OK;
 }
 
-void StateStoreSubscriber::CheckNotInCallbackThread() {
-  lock_guard<mutex> lock(callback_thread_id_lock_);
-  DCHECK_NE(callback_thread_id_, this_thread::get_id());
-}
-
-
-Status StateStoreSubscriber::UnregisterServiceWithStateStore(const string& service_id) {
+Status StateStoreSubscriber::UnregisterServiceInternal(const ServiceId& service_id) {
+  // Precondition: lock_ is held entering this method
   RETURN_IF_ERROR(InitClient());
-
   TUnregisterServiceRequest request;
   request.__set_subscriber_address(host_port_);
   request.__set_service_id(service_id);
@@ -300,7 +304,7 @@ Status StateStoreSubscriber::UnregisterServiceWithStateStore(const string& servi
 
   try {
     client_->iface()->UnregisterService(response, request);
-  } catch ( TTransportException& e) {
+  } catch (TTransportException& e) {
     Status status(e.what());
     status.AddErrorMsg(DISCONNECTED_FROM_STATE_STORE_ERROR);
     return status;
@@ -308,8 +312,9 @@ Status StateStoreSubscriber::UnregisterServiceWithStateStore(const string& servi
   return Status(response.status);
 }
 
-Status StateStoreSubscriber::UnregisterSubscriptionWithStateStore(
+Status StateStoreSubscriber::UnregisterSubscriptionInternal(
     const SubscriptionId& id) {
+  // Precondition: lock_ is held entering this method
   RETURN_IF_ERROR(InitClient());
 
   TUnregisterSubscriptionRequest request;
@@ -325,6 +330,74 @@ Status StateStoreSubscriber::UnregisterSubscriptionWithStateStore(
   }
 
   return Status(response.status);
+}
+
+Status StateStoreSubscriber::Reregister() {
+  RETURN_IF_ERROR(InitClient());
+  BOOST_FOREACH(const ServiceRegistrations::value_type& service, services_) {
+    RETURN_IF_ERROR(RegisterServiceInternal(service.first, service.second));
+  }      
+  BOOST_FOREACH(const SubscriptionRegistrations::value_type& subscription,
+                subscriptions_) {      
+    UpdateCallbacks::iterator cb;
+    cb = update_callbacks_.find(subscription.first);
+    if (cb == update_callbacks_.end()) {
+      continue;
+    }
+    RETURN_IF_ERROR(RegisterSubscriptionInternal(subscription.second,
+                                                 subscription.first, cb->second));
+  }
+  return Status::OK;
+}
+
+void StateStoreSubscriber::RecoveryModeChecker() {
+  static const int SLEEP_INTERVAL_MS = 1000;
+  // TODO: Should only start this when first connection is made
+  failure_detector_->UpdateHeartbeat(state_store_host_port_.ipaddress, true);
+  // Every few seconds, wake up and check if the failure detector has determined
+  // that the state-store has failed from our perspective. If so, enter recovery
+  // mode and try to reconnect, followed by reregistering all subscriptions and
+  // services.
+  // When entering recovery mode, the class-wide lock_ is taken to
+  // ensure mutual exclusion with any operations in flight. 
+  while (true) {
+    FailureDetector::PeerState peer_state = 
+        failure_detector_->GetPeerState(state_store_host_port_.ipaddress);
+    if (peer_state == FailureDetector::FAILED) {
+      // Take class-wide lock so that any client operations that start after this
+      // will block     
+      lock_guard<mutex> l(lock_);
+      // TODO: Metric
+      LOG(WARNING) << "Lost connection to the state-store, entering recovery mode";
+
+      // Need an interior loop so that it's easy to hang on to the scoped
+      // recovery_mode_lock_ writer
+      while (true) {
+        // Force to be null so that InitClient will try to reopen
+        client_.reset();
+                
+        // We're recovering. Try to open a client and re-register
+        // TODO: Random sleep +/- to avoid correlated reconnects
+        Status status = Reregister();
+        if (status.ok()) {
+          // Make sure to update failure detector so that we don't
+          // immediately fail on the next loop while we're waiting for
+          // heartbeats to resume.
+          failure_detector_->UpdateHeartbeat(state_store_host_port_.ipaddress, true);
+          // Break out of enclosing while (true) to top of outer-scope loop.
+          break;
+        } else {
+          // Don't exit recovery mode, continue
+          LOG(WARNING) << "Failed to re-register with state-store: " 
+                       << status.GetErrorMsg();
+          usleep(SLEEP_INTERVAL_MS * 1000);
+        }
+      }
+    } else { // peer_state == OK
+      // Back to sleep 
+      usleep(SLEEP_INTERVAL_MS * 1000);
+    }
+  }
 }
 
 }

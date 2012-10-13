@@ -20,6 +20,7 @@
 
 namespace impala {
 
+class TimeoutFailureDetector;
 class Status;
 class THostPort;
 class ThriftServer;
@@ -35,11 +36,9 @@ class StateStoreTest;
 // updates from the central state store.  It also allows local
 // services to register with and register for updates from the
 // StateStore through implementing StateStoreSubcriberInternalIf.
-// The class is generally not thread safe; however, the UpdateState() method
-// (which is part of the StateStoreSubscriberIf) may be called concurrently
-// with any other class method.
-// TODO: Make this class thread safe, so it can be used by multiple in-process threads
-// that all wish to register and unregister subscriptions and services.
+// This class is thread-safe. It is always wrapped by a SubscriptionManager from
+// the local client's perspective, which exposes only the APIs suitable for
+// client use (other public methods in this class are invoked by RPC calls).
 class StateStoreSubscriber
   : public StateStoreSubscriberServiceIf,
     public boost::enable_shared_from_this<StateStoreSubscriber> {
@@ -73,8 +72,8 @@ class StateStoreSubscriber
   // ids to the relevant state for that service. The callback may not Register() or
   // Unregister() any subscriptions.
   impala::Status RegisterSubscription(
-      const boost::unordered_set<std::string>& update_services,
-      SubscriptionManager::UpdateCallback* update, SubscriptionId* id);
+      const boost::unordered_set<std::string>& update_services, const SubscriptionId& id,
+      SubscriptionManager::UpdateCallback* update);
 
   // Unregisters the subscription identified by the given id with the state store. Also
   // unregisters the associated callback, so that it will no longer be called.
@@ -82,11 +81,12 @@ class StateStoreSubscriber
 
   // Registers an instance of the given service type at the given
   // address with the state store.
-  impala::Status RegisterService(const std::string& service_id,
+  // TODO: Make it a condition that this can be called only before Start()
+  impala::Status RegisterService(const ServiceId& service_id,
       const impala::THostPort& address);
 
   // Unregisters an instance of the given service type with the state store.
-  virtual impala::Status UnregisterService(const std::string& service_id);
+  virtual impala::Status UnregisterService(const ServiceId& service_id);
 
   // StateStoreSubscriberServiceIf implementation
 
@@ -96,6 +96,10 @@ class StateStoreSubscriber
       const TUpdateStateRequest& request);
 
  private:
+  // Class-wide lock. Protects all subsequent members. Most private methods must
+  // be called holding this lock; this is noted in the method comments.
+  boost::mutex lock_;
+
  // Mapping of subscription ids to the associated callback. Because this mapping
  // stores a pointer to an UpdateCallback, memory errors will occur if an UpdateCallback
  // is deleted before being unregistered. The UpdateCallback destructor checks for
@@ -123,44 +127,62 @@ class StateStoreSubscriber
   // Callback for all services that have registered for updates (indexed by the
   // associated SubscriptionId), and associated lock.
   UpdateCallbacks update_callbacks_;
-  boost::mutex update_callbacks_lock_;
 
-  // The thread that the callbacks are being executed in. If the callbacks are
-  // not currently executing in any thread, calblack_thread_id_ will be set to the
-  // default boost::thread::id value, which does not refer to any thread.
-  boost::thread::id callback_thread_id_;
-
-  // Lock for callback_thread_id_.  A lock is necessary because boost::thread::id may
-  // not be an atomic value.
-  boost::mutex callback_thread_id_lock_;
+  // Subscriptions registered from this subscriber. Used to properly reregister
+  // if recovery mode is entered.
+  typedef boost::unordered_map<SubscriptionId, boost::unordered_set<ServiceId> > 
+      SubscriptionRegistrations;
+  SubscriptionRegistrations subscriptions_;
 
   // Services registered with this subscriber. Used to properly unregister if the
-  // subscriber is Stop()ed.
-  boost::unordered_set<std::string> services_;
+  // subscriber is Stop()ed, and to reregister if recovery mode is entered
+  typedef boost::unordered_map<ServiceId, impala::THostPort> ServiceRegistrations;
+  ServiceRegistrations services_;
 
-  // Initializes client_, if it hasn't been intialized already.
+  // Thread in which RecoveryModeChecker runs. 
+  boost::scoped_ptr<boost::thread> recovery_mode_thread_;
+
+  // Failure detector that monitors heartbeats from the state-store. 
+  boost::scoped_ptr<impala::TimeoutFailureDetector> failure_detector_;
+
+  // Initializes client_, if it hasn't been initialized already. Returns an
+  // error if in recovery mode. Must be called with lock_ held. 
   impala::Status InitClient();
 
-  // Verifies that the current thread of execution is not the thread that is executing
-  // callbacks. This function should be called before attempting to acquire
-  // update_callbacks_lock_, and is used to ensure that UpdateCallbacks don't register
-  // or unregister subscritions, which leads to deadlock.
-  //
-  // Since this function expects to be called before the update_callbacks_lock_ is
-  // acquired, there is a possible race condition between verifiying that the current
-  // thread is not the callback thread and acquiring update_callbacks_lock_. This is not
-  // a problem because the race condition only occurs when this function and
-  // UpdateState() are called from different threads, so it doesn't effect the case
-  // we're trying to check for (when this function and UpdateState are called from the
-  // same thread).
-  void CheckNotInCallbackThread();
+  // Executes an RPC to unregister the given service with the state store. Must
+  // be called with lock_ held.
+  impala::Status UnregisterServiceInternal(const ServiceId& service_id);
 
-  // Executes an RPC to unregister the given service with the state store.
-  impala::Status UnregisterServiceWithStateStore(const std::string& service_id);
+  // Executes an RPC to unregister the given subscription with the state
+  // store. Must be called with lock_ held.
+  impala::Status UnregisterSubscriptionInternal(const SubscriptionId& id);
 
-  // Executes an RPC to unregister the given subscription with the state store.
-  impala::Status UnregisterSubscriptionWithStateStore(const SubscriptionId& id);
+  // Must be called with lock_
+  impala::Status RegisterServiceInternal(const ServiceId& service_id,
+                                         const impala::THostPort& address);
 
+  // Registers a subscription with the given ID to all services
+  // Must be called with lock_
+  impala::Status RegisterSubscriptionInternal(
+      const boost::unordered_set<std::string>& update_services, const SubscriptionId& id, 
+      SubscriptionManager::UpdateCallback* update);
+
+  // Run in a separate thread. In a loop, check failure_detector_ to see if the
+  // state-store is still sending heartbeats. If not, enter 'recovery mode'
+  // where a reconnection is repeatedly attempted. Once reconnected, all
+  // existing subscriptions and services are reregistered and normal operation
+  // resumes. 
+  // During recovery mode, any public methods that are started will block on
+  // lock_, which is only released when recovery finishes. In practice, all
+  // registrations are made early in the life of an impalad before the
+  // state-store could be detected as failed.
+  void RecoveryModeChecker();
+
+  // Once the state-store is reconnected to after a failure, this method
+  // re-registers all subscriptions and service instances. Must be called with
+  // lock_ held.
+  impala::Status Reregister();
+  
   // Friend so that tests can force shutdown to simulate failure. 
   friend class StateStoreTest;
 };

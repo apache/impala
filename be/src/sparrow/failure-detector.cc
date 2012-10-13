@@ -24,11 +24,15 @@ const string& FailureDetector::PeerStateToString(FailureDetector::PeerState peer
 
 FailureDetector::PeerState TimeoutFailureDetector::UpdateHeartbeat(
     const string& peer, bool seen) {
-  if (seen) peer_heartbeat_record_[peer] = get_system_time();
+  {
+    lock_guard<mutex> l(lock_);
+    if (seen) peer_heartbeat_record_[peer] = get_system_time();
+  }
   return GetPeerState(peer);
 }
 
 FailureDetector::PeerState TimeoutFailureDetector::GetPeerState(const std::string& peer) {
+  lock_guard<mutex> l(lock_);
   map<string, system_time>::iterator heartbeat_record = peer_heartbeat_record_.find(peer);
   if (heartbeat_record == peer_heartbeat_record_.end()) return UNKNOWN;
 
@@ -44,11 +48,14 @@ FailureDetector::PeerState TimeoutFailureDetector::GetPeerState(const std::strin
 
 FailureDetector::PeerState MissedHeartbeatFailureDetector::UpdateHeartbeat(
     const string& peer, bool seen) {
-  if (seen) {
-    missed_heartbeat_counts_[peer] = 0;
-    return OK;
-  } else {
-    ++missed_heartbeat_counts_[peer];
+  {
+    lock_guard<mutex> l(lock_);
+    if (seen) {
+      missed_heartbeat_counts_[peer] = 0;
+      return OK;
+    } else {
+      ++missed_heartbeat_counts_[peer];
+    }
   }
 
   return GetPeerState(peer);
@@ -56,13 +63,12 @@ FailureDetector::PeerState MissedHeartbeatFailureDetector::UpdateHeartbeat(
 
 FailureDetector::PeerState MissedHeartbeatFailureDetector::GetPeerState(
     const std::string& peer) {
+  lock_guard<mutex> l(lock_);
   map<string, int32_t>::iterator heartbeat_record = missed_heartbeat_counts_.find(peer);
 
   if (heartbeat_record == missed_heartbeat_counts_.end()) {
     return UNKNOWN;
-  }
-
-  if (heartbeat_record->second > max_missed_heartbeats_) {
+  } else if (heartbeat_record->second > max_missed_heartbeats_) {
     return FAILED;
   } else if (heartbeat_record->second > suspect_missed_heartbeats_) {
     return SUSPECTED;

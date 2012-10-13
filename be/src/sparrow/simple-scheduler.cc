@@ -13,7 +13,7 @@
 #include "runtime/exec-env.h"
 
 #include "sparrow/simple-scheduler.h"
-#include "sparrow/state-store-subscriber-service.h"
+#include "sparrow/state-store-subscriber.h"
 #include "gen-cpp/Types_types.h"
 
 using namespace std;
@@ -27,6 +27,8 @@ namespace sparrow {
 static const string LOCAL_ASSIGNMENTS_KEY("simple-scheduler.local.assignments.total");
 static const string ASSIGNMENTS_KEY("simple-scheduler.assignments.total");
 static const string SCHEDULER_INIT_KEY("simple-scheduler.initialized");
+
+static const string SUBSCRIPTION_ID("simple.scheduler");
 
 SimpleScheduler::SimpleScheduler(SubscriptionManager* subscription_manager,
     const ServiceId& backend_service_id, Metrics* metrics)
@@ -73,7 +75,7 @@ impala::Status SimpleScheduler::Init() {
     unordered_set<string> services;
     services.insert(backend_service_id_);
     RETURN_IF_ERROR(subscription_manager_->RegisterSubscription(
-            services, &callback_, &subscription_id_));
+        services, SUBSCRIPTION_ID, &callback_));
   }
   if (metrics_ != NULL) {
     total_assignments_ = 

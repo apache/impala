@@ -18,6 +18,7 @@ namespace impala {
 class Webserver;
 
 // Publishes execution metrics to a webserver page
+// TODO: Reconsider naming here; Metrics is too general.
 class Metrics {
  private:
   // Superclass for metric types, to allow for a single container to hold all metrics
