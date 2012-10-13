@@ -187,4 +187,4 @@ class ImpalaBeeswaxClient(object):
     except TApplicationException, t:
       raise ImpalaBeeswaxException(self.__build_error_message(t), t)
     except Exception, u:
-      raise ImpalaBeeswaxException(self.__build_error_message(u), t)
+      raise ImpalaBeeswaxException(self.__build_error_message(u), u)
