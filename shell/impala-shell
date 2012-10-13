@@ -15,4 +15,4 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SHELL_HOME=${IMPALA_SHELL_HOME:-${SCRIPT_DIR}}
 
 PYTHONPATH="${SHELL_HOME}/gen-py:${SHELL_HOME}/lib:${PYTHONPATH}" \
-  python ${SHELL_HOME}/impala_shell.py $@
+  python ${SHELL_HOME}/impala_shell.py "$@"
