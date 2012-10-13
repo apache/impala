@@ -15,7 +15,6 @@ from beeswaxd.BeeswaxService import QueryState
 from ImpalaService import ImpalaService
 from ImpalaService.ImpalaService import TImpalaQueryOptions
 from JavaConstants.constants import DEFAULT_QUERY_OPTIONS
-from thrift_sasl import TSaslClientTransport
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
 from thrift.protocol import TBinaryProtocol
@@ -478,6 +477,7 @@ if __name__ == "__main__":
   (options, args) = parser.parse_args()
 
   if options.use_kerberos:
+    from thrift_sasl import TSaslClientTransport
     import sasl
   if options.query or options.query_file:
     execute_queries_non_interactive_mode(options)
