@@ -176,10 +176,10 @@ def geometric_mean_execution_time(results):
   for row in results:
     impala_avg, hive_avg = (row[AVG_IDX], row[HIVE_AVG_IDX])
     if impala_avg != 'N/A':
-      impala_avgs.append(impala_avg)
+      impala_avgs.append(float(impala_avg))
       if hive_avg != 'N/A':
-        impala_avgs_with_hive_match.append(impala_avg)
-        hive_avgs.append(hive_avg)
+        impala_avgs_with_hive_match.append(float(impala_avg))
+        hive_avgs.append(float(hive_avg))
 
   return calculate_geomean(impala_avgs),\
          calculate_geomean(impala_avgs_with_hive_match),\

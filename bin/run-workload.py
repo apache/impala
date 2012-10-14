@@ -79,6 +79,8 @@ parser.add_option("--num_clients", type="int", dest="num_clients", default=1,
 parser.add_option("--file_formats", dest="file_formats", default=None,
                   help="A comma-separated list of file fomats to execute. If not "\
                   "specified all file formats in the test vector will be run.")
+parser.add_option("--query_names", dest="query_names", default=None,
+                  help="A comma-separated list of query names to execute.")
 parser.add_option("--compression_codecs", dest="compression_codecs", default=None,
                   help="A comma-separated list of compression codecs to execute. If not "\
                   "specified all compression codecs in the test vector will be run.")
@@ -280,9 +282,14 @@ def build_query(query_format_string, file_format, codec, compression_type,
   # There also may be cases where there is dbname.table_name without a
   # $TABLE (in the case of insert).
   replace_from =\
-      '(%(workload)s\.)(?P<table_name>\w+)(\$TABLE){0,1}' % {'workload': workload}
+      '(%(workload)s\.)(?P<table_name>\w+)' % {'workload': workload}
   replace_by = '%s%s' % (database_name, r'\g<table_name>')
-  return re.sub(replace_from, replace_by, query_format_string)
+  query_str = re.sub(replace_from, replace_by, query_format_string)
+
+  replace_from =\
+      '(%(workload)s)(?P<table_name>\w+)\$TABLE' % {'workload': database_name}
+  replace_by = '%s%s%s' % (database_name, r'\g<table_name>', table_suffix)
+  return re.sub(replace_from, replace_by, query_str)
 
 def read_vector_file(file_name):
   """
@@ -408,36 +415,44 @@ def execute_queries(query_map, workload, scale_factor, vector_row):
         (file_format, codec, compression_type))
     return
 
+  query_names = None
+  if options.query_names:
+    query_names = [name.lower() for name in options.query_names.split(',')]
+
   LOG.info("Running Test Vector - File Format: %s Compression: %s / %s" %\
       (file_format, codec, compression_type))
   for test_name in query_map.keys():
     for query_name, query in query_map[test_name]:
       if not query_name:
         query_name = query
+
+      if query_names and (query_name.lower() not in query_names):
+        LOG.info("Skipping query '%s'" % query_name)
+        continue
+
       query_string = build_query(query.strip(), file_format, codec, compression_type,
                                  workload, scale_factor)
       execution_result = QueryExecutionResult()
       if not options.skip_impala:
         summary += "Results Using Impala:\n"
         summary += "Query: %s\n" % query_name
-        LOG.debug('\nRunning: \n%s\n' % query)
+        LOG.debug('\nRunning: \n%s\n' % query_string)
         if query_name != query:
           LOG.info('Query Name: %s' % query_name)
         if options.beeswax:
-          #import pdb; pdb.set_trace()
           execution_result = run_query('impala_beeswax', query_string,
                                        options.prime_cache, True)
         else:
           execution_result = run_query('runquery', query_string,
                                        options.prime_cache, True)
-        summary += "->%s\n" % execution_result
+        summary += "  -> %s\n" % execution_result
 
       hive_execution_result = QueryExecutionResult()
       if run_using_hive:
         summary += "Results Using Hive:\n"
         hive_execution_result = run_query('hive', query_string,
                                           options.prime_cache, False)
-        summary += "->%s\n" % hive_execution_result
+        summary += "  ->%s\n" % hive_execution_result
       summary += '\n'
       LOG.debug("-----------------------------------------------------------------------")
 

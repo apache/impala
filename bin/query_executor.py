@@ -152,6 +152,7 @@ class QueryExecutor(threading.Thread):
 
   def _execute_query(self):
     self.execution_result = self.query_exec_func(self.query, self.query_exec_options)
+    LOG.debug('Result:\n  -> %s\n' % self.execution_result)
 
   def success(self):
     return self.execution_result.success
