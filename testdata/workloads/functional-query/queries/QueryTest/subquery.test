@@ -176,7 +176,7 @@ where x.day=1
 and   x.int_col > 899
 and   x.float_col > 4.5
 and   c.string_col < '7'
-and   x.int_col + x.float_col + c.string_col < 1000
+and   x.int_col + x.float_col + cast(c.string_col as float) < 1000
 ---- TYPES
 smallint, int, tinyint, int, int, float, string
 ---- RESULTS
@@ -224,7 +224,7 @@ where x.day=1
 and   x.int_col > 899
 and   x.float_col > 4.5
 and   c.string_col < '7'
-and   x.int_col + x.float_col + c.string_col < 1000
+and   x.int_col + x.float_col + cast(c.string_col as float) < 1000
 ---- TYPES
 smallint, int, tinyint, int, int, float, string
 ---- RESULTS

@@ -318,7 +318,7 @@ and a.day=1
 and a.int_col > 899
 and b.float_col > 4.5
 and c.string_col < '7'
-and a.int_col + b.float_col + c.string_col < 1000
+and a.int_col + b.float_col + cast(c.string_col as float) < 1000
 order by c.string_col desc, a.smallint_col
 limit 10
 ---- TYPES

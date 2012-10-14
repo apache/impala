@@ -376,7 +376,8 @@ NODE 1:
 ====
 # hbase-hdfs join with scan filtering
 select *
-from alltypesagg a join hbasestringids b using (id, int_col)
+from alltypesagg a join hbasestringids b
+       on (a.id = cast(b.id as int) and a.int_col = b.int_col)
 where a.day >= 6
 and a.tinyint_col = 15
 and b.id = '5'
@@ -389,7 +390,7 @@ Plan Fragment 0
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
-      a.id = b.id
+      a.id = CAST(b.id AS INT)
       a.int_col = b.int_col
     OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
     TUPLE IDS: 0 1 
@@ -416,7 +417,7 @@ Plan Fragment 1
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
-      a.id = b.id
+      a.id = CAST(b.id AS INT)
       a.int_col = b.int_col
     OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
     TUPLE IDS: 0 1 

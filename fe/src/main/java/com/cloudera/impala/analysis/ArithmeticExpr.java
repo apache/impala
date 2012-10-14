@@ -96,9 +96,9 @@ public class ArithmeticExpr extends Expr {
     super.analyze(analyzer);
     for (Expr child: children) {
       Expr operand = (Expr) child;
-      if (!operand.type.isNumericType() && !operand.type.isStringType()) {
+      if (!operand.type.isNumericType()) {
         throw new AnalysisException("Arithmetic operation requires " +
-            "numeric or string operands: " + toSql());
+            "numeric operands: " + toSql());
       }
     }
 

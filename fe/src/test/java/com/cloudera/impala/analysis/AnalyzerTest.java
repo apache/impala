@@ -21,7 +21,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.analysis.TimestampArithmeticExpr.TimeUnit;
-import com.cloudera.impala.analysis.UseStmt;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.TestSchemaUtils;
@@ -888,8 +887,8 @@ public class AnalyzerTest {
     AnalyzesOk("select * from alltypes where int_col = smallint_col");
     AnalyzesOk("select * from alltypes where bigint_col = float_col");
     AnalyzesOk("select * from alltypes where bool_col = 0");
-    AnalyzesOk("select * from alltypes where int_col = '0'");
-    AnalyzesOk("select * from alltypes where string_col = 15");
+    AnalyzesOk("select * from alltypes where int_col = cast('0' as int)");
+    AnalyzesOk("select * from alltypes where cast(string_col as int) = 15");
     // invalid casts
     AnalysisError("select * from alltypes where bool_col = '15'",
         "operands are not comparable: bool_col = '15'");
@@ -901,46 +900,53 @@ public class AnalyzerTest {
 
   @Test
   public void TestStringCasts() throws AnalysisException {
-    AnalyzesOk("select * from alltypes where tinyint_col = '0.5'");
-    AnalyzesOk("select * from alltypes where tinyint_col = '0.5'");
-    AnalyzesOk("select * from alltypes where smallint_col = '0.5'");
-    AnalyzesOk("select * from alltypes where int_col = '0.5'");
-    AnalyzesOk("select * from alltypes where bigint_col = '0.5'");
-    AnalyzesOk("select 1.0 = '" + Double.toString(Double.MIN_VALUE) + "'");
-    AnalyzesOk("select 1.0 = '-" + Double.toString(Double.MIN_VALUE) + "'");
-    AnalyzesOk("select 1.0 = '" + Double.toString(Double.MAX_VALUE) + "'");
-    AnalyzesOk("select 1.0 = '-" + Double.toString(Double.MAX_VALUE) + "'");
+    // No implicit cast from STRING to numeric and boolean
+    AnalysisError("select * from alltypes where tinyint_col = '1'");
+    AnalysisError("select * from alltypes where bool_col = '0'");
+
+    AnalyzesOk("select * from alltypes where tinyint_col = cast('0.5' as float)");
+    AnalyzesOk("select * from alltypes where smallint_col = cast('0.5' as float)");
+    AnalyzesOk("select * from alltypes where int_col = cast('0.5' as float)");
+    AnalyzesOk("select * from alltypes where bigint_col = cast('0.5' as float)");
+    AnalyzesOk("select 1.0 = cast('" + Double.toString(Double.MIN_VALUE) +
+        "' as double)");
+    AnalyzesOk("select 1.0 = cast('-" + Double.toString(Double.MIN_VALUE) +
+        "' as double)");
+    AnalyzesOk("select 1.0 = cast('" + Double.toString(Double.MAX_VALUE) +
+        "' as double)");
+    AnalyzesOk("select 1.0 = cast('-" + Double.toString(Double.MAX_VALUE) +
+        "' as double)");
     // Test chains of minus. Note that "--" is the a comment symbol.
-    AnalyzesOk("select * from alltypes where tinyint_col = '-1'");
-    AnalyzesOk("select * from alltypes where tinyint_col = '- -1'");
-    AnalyzesOk("select * from alltypes where tinyint_col = '- - -1'");
-    AnalyzesOk("select * from alltypes where tinyint_col = '- - - -1'");
+    AnalyzesOk("select * from alltypes where tinyint_col = cast('-1' as tinyint)");
+    AnalyzesOk("select * from alltypes where tinyint_col = cast('- -1' as tinyint)");
+    AnalyzesOk("select * from alltypes where tinyint_col = cast('- - -1' as tinyint)");
+    AnalyzesOk("select * from alltypes where tinyint_col = cast('- - - -1' as tinyint)");
     // Test correct casting to compatible type on bitwise ops.
-    AnalyzesOk("select 1 | '" + Byte.toString(Byte.MIN_VALUE) + "'");
-    AnalyzesOk("select 1 | '" + Byte.toString(Byte.MAX_VALUE) + "'");
-    AnalyzesOk("select 1 | '" + Short.toString(Short.MIN_VALUE) + "'");
-    AnalyzesOk("select 1 | '" + Short.toString(Short.MAX_VALUE) + "'");
-    AnalyzesOk("select 1 | '" + Integer.toString(Integer.MIN_VALUE) + "'");
-    AnalyzesOk("select 1 | '" + Integer.toString(Integer.MAX_VALUE) + "'");
+    AnalyzesOk("select 1 | cast('" + Byte.toString(Byte.MIN_VALUE) + "' as int)");
+    AnalyzesOk("select 1 | cast('" + Byte.toString(Byte.MAX_VALUE) + "' as int)");
+    AnalyzesOk("select 1 | cast('" + Short.toString(Short.MIN_VALUE) + "' as int)");
+    AnalyzesOk("select 1 | cast('" + Short.toString(Short.MAX_VALUE) + "' as int)");
+    AnalyzesOk("select 1 | cast('" + Integer.toString(Integer.MIN_VALUE) + "' as int)");
+    AnalyzesOk("select 1 | cast('" + Integer.toString(Integer.MAX_VALUE) + "' as int)");
     // We need to add 1 to MIN_VALUE because there are no negative integer literals.
     // The reason is that whether a minus belongs to an
     // arithmetic expr or a literal must be decided by the parser, not the lexer.
-    AnalyzesOk("select 1 | '" + Long.toString(Long.MIN_VALUE+1)  + "'");
-    AnalyzesOk("select 1 | '" + Long.toString(Long.MAX_VALUE) + "'");
-    // Numeric overflow
-    AnalysisError("select * from alltypes where tinyint_col = " +
-                "'" + Long.toString(Long.MIN_VALUE) + "1'");
-    AnalysisError("select * from alltypes where tinyint_col = " +
-        "'" + Long.toString(Long.MAX_VALUE) + "1'");
-    AnalysisError("select * from alltypes where tinyint_col = " +
-        "'" + Double.toString(Double.MAX_VALUE) + "1'");
+    AnalyzesOk("select 1 | cast('" + Long.toString(Long.MIN_VALUE+1)  + "' as bigint)");
+    AnalyzesOk("select 1 | cast('" + Long.toString(Long.MAX_VALUE) + "' as bigint)");
+    // Cast to numeric never overflow
+    AnalyzesOk("select * from alltypes where tinyint_col = " +
+                "cast('" + Long.toString(Long.MIN_VALUE) + "1' as tinyint)");
+    AnalyzesOk("select * from alltypes where tinyint_col = " +
+        "cast('" + Long.toString(Long.MAX_VALUE) + "1' as tinyint)");
+    AnalyzesOk("select * from alltypes where tinyint_col = " +
+        "cast('" + Double.toString(Double.MAX_VALUE) + "1' as tinyint)");
     // Java converts a float underflow to 0.0.
     // Since there is no easy, reliable way to detect underflow,
     // we don't consider it an error.
     AnalyzesOk("select * from alltypes where tinyint_col = " +
-        "'" + Double.toString(Double.MIN_VALUE) + "1'");
-    // Failure to convert a comment.
-    AnalysisError("select * from alltypes where tinyint_col = '--1'");
+        "cast('" + Double.toString(Double.MIN_VALUE) + "1' as tinyint)");
+    // Cast never raise analysis exception
+    AnalyzesOk("select * from alltypes where tinyint_col = cast('--1' as tinyint)");
   }
 
   @Test
@@ -967,7 +973,7 @@ public class AnalyzerTest {
     AnalyzesOk("select * from alltypes where (string_col = '5' " +
                "or int_col = 5) and string_col > '1'");
     AnalyzesOk("select * from alltypes where not string_col = '5'");
-    AnalyzesOk("select * from alltypes where int_col = '5'");
+    AnalyzesOk("select * from alltypes where int_col = cast('5' as int)");
   }
 
   @Test
@@ -1034,12 +1040,8 @@ public class AnalyzerTest {
    */
   @Test
   public void TestArithmeticTypeCasts() throws AnalysisException {
-    List<PrimitiveType> numericPlusString =
-        (List<PrimitiveType>) PrimitiveType.getNumericTypes().clone();
-    numericPlusString.add(PrimitiveType.STRING);
-
     for (PrimitiveType type1 : PrimitiveType.getNumericTypes()) {
-      for (PrimitiveType type2 : numericPlusString) {
+      for (PrimitiveType type2 : PrimitiveType.getNumericTypes()) {
         PrimitiveType compatibleType =
             PrimitiveType.getAssignmentCompatibleType(type1, type2);
         PrimitiveType promotedType = compatibleType.getMaxResolutionType();
@@ -1198,7 +1200,7 @@ public class AnalyzerTest {
     AnalysisError("select double_col | bigint_col from alltypes",
         "Invalid floating point argument to operation |");
     AnalysisError("select int_col from alltypes where float_col & bool_col > 5",
-        "Arithmetic operation requires numeric or string operands");
+        "Arithmetic operation requires numeric operands");
   }
 
   /**
@@ -1271,8 +1273,13 @@ public class AnalyzerTest {
         "Operand 'bigint_col' of timestamp arithmetic expression " +
         "'timestamp_col + INTERVAL bigint_col years' returns type 'BIGINT' " +
         "which is incompatible with expected type 'INT'.");
-    // Implicit cast from STRING to INT.
-    AnalyzesOk("select timestamp_col + interval '10' years from alltypes");
+
+    // No implicit cast from STRING to INT
+    AnalysisError("select timestamp_col + interval '10' years from alltypes");
+    AnalysisError("select date_add(timestamp_col, interval '10' years) from alltypes");
+
+    // Cast from STRING to INT.
+    AnalyzesOk("select timestamp_col + interval cast('10' as int) years from alltypes");
     // Reversed interval and timestamp using addition.
     AnalysisError("select interval 5.2 years + timestamp_col from alltypes",
         "Operand '5.2' of timestamp arithmetic expression " +
@@ -1282,8 +1289,8 @@ public class AnalyzerTest {
         "Operand 'bigint_col' of timestamp arithmetic expression " +
         "'INTERVAL bigint_col years + timestamp_col' returns type 'BIGINT' " +
         "which is incompatible with expected type 'INT'.");
-    // Implicit cast from STRING to INT.
-    AnalyzesOk("select interval '10' years + timestamp_col from alltypes");
+    // Cast from STRING to INT.
+    AnalyzesOk("select interval cast('10' as int) years + timestamp_col from alltypes");
     // Second operand is not compatible with type INT. Function-call like version.
     AnalysisError("select date_add(timestamp_col, interval 5.2 years) from alltypes",
         "Operand '5.2' of timestamp arithmetic expression " +
@@ -1294,8 +1301,9 @@ public class AnalyzerTest {
         "Operand 'bigint_col' of timestamp arithmetic expression " +
         "'date_add(timestamp_col, INTERVAL bigint_col years)' returns type 'BIGINT' " +
         "which is incompatible with expected type 'INT'.");
-    // Implicit cast from STRING to INT.
-    AnalyzesOk("select date_add(timestamp_col, interval '10' years) from alltypes");
+    // Cast from STRING to INT.
+    AnalyzesOk("select date_add(timestamp_col, interval cast('10' as int) years) " +
+       " from alltypes");
 
     // Invalid time unit. Non-function-call like version.
     AnalysisError("select timestamp_col + interval 10 error from alltypes",
@@ -1488,11 +1496,11 @@ public class AnalyzerTest {
         "ORDER BY: ordinal exceeds number of items in select list: 2");
     // Ambiguous order by.
     AnalysisError("(select int_col a, string_col a from alltypes) " +
-        "union (select int_col a, int_col a from alltypessmall) order by a",
+        "union (select int_col a, string_col a from alltypessmall) order by a",
         "Column a in order clause is ambiguous");
     // Ambiguous alias in the second union operand should work.
     AnalyzesOk("(select int_col a, string_col b from alltypes) " +
-        "union (select int_col a, int_col a from alltypessmall) order by a");
+        "union (select int_col a, string_col a from alltypessmall) order by a");
 
     // Column labels are inherited from first select block.
     // Order by references an invalid column
@@ -1617,7 +1625,7 @@ public class AnalyzerTest {
         "select * from alltypes",
         "Target table 'alltypessmall' and result of select statement are not union " +
         "compatible.\n" +
-        "Incompatible types 'INT' and 'TIMESTAMP' in column 'alltypes.timestamp_col'.");
+        "Incompatible types 'INT' and 'STRING' in column 'alltypes.string_col'.");
   }
 
   /**

@@ -360,7 +360,7 @@ where x.day=1
 and x.int_col > 899
 and x.float_col > 4.5
 and c.string_col < '7'
-and x.int_col + x.float_col + c.string_col < 1000
+and x.int_col + x.float_col + cast(c.string_col as float) < 1000
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -368,7 +368,7 @@ Plan Fragment 0
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       c.id = a.tinyint_col
-    OTHER PREDICATES: a.int_col + b.float_col + c.string_col < 1000.0
+    OTHER PREDICATES: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000.0
     TUPLE IDS: 0 1 3 
       SCAN HDFS table=default.alltypessmall (0)
         PREDICATES: c.string_col < '7'
@@ -400,7 +400,7 @@ Plan Fragment 1
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       c.id = a.tinyint_col
-    OTHER PREDICATES: a.int_col + b.float_col + c.string_col < 1000.0
+    OTHER PREDICATES: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000.0
     TUPLE IDS: 0 1 3 
       SCAN HDFS table=default.alltypessmall (0)
         PREDICATES: c.string_col < '7'
@@ -1091,7 +1091,7 @@ where x.day=1
 and x.int_col > 899
 and x.float_col > 4.5
 and c.string_col < '7'
-and x.int_col + x.float_col + c.string_col < 1000
+and x.int_col + x.float_col + CAST(c.string_col AS FLOAT) < 1000
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -1099,7 +1099,7 @@ Plan Fragment 0
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       a.tinyint_col = c.id
-    OTHER PREDICATES: a.int_col + b.float_col + c.string_col < 1000.0
+    OTHER PREDICATES: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000.0
     TUPLE IDS: 0 2 4 
       HASH JOIN
         JOIN OP: INNER JOIN
@@ -1131,7 +1131,7 @@ Plan Fragment 1
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       a.tinyint_col = c.id
-    OTHER PREDICATES: a.int_col + b.float_col + c.string_col < 1000.0
+    OTHER PREDICATES: a.int_col + b.float_col + CAST(c.string_col AS FLOAT) < 1000.0
     TUPLE IDS: 0 2 4 
       HASH JOIN
         JOIN OP: INNER JOIN

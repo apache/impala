@@ -652,12 +652,12 @@ NODE 0:
   LOCATIONS:
 ====
 # predicates involving casts (ie, non-string comparisons) cannot be turned into filters
-select * from hbasealltypessmall where string_col >= 4
+select * from hbasealltypessmall where cast(string_col as int) >= 4
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
   SCAN HBASE table=hbasealltypessmall (0)
-    PREDICATES: string_col >= 4
+    PREDICATES: CAST(string_col AS INT) >= 4
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -672,7 +672,7 @@ Plan Fragment 1
     UNPARTITIONED
 
   SCAN HBASE table=hbasealltypessmall (0)
-    PREDICATES: string_col >= 4
+    PREDICATES: CAST(string_col AS INT) >= 4
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
