@@ -242,7 +242,7 @@ class WorkloadRunner(object):
     query_str = re.sub(replace_from, replace_by, query_format_string)
 
     replace_from =\
-        '(%(workload)s)(?P<table_name>\w+)\$TABLE' % {'workload': database_name}
+        '(%(workload)s){0,1}(?P<table_name>\w+)\$TABLE' % {'workload': database_name}
     replace_by = '%s%s%s' % (database_name, r'\g<table_name>', table_suffix)
     return re.sub(replace_from, replace_by, query_str)
 
@@ -350,14 +350,12 @@ class WorkloadRunner(object):
     if query_names:
       query_name_filter = [name.lower() for name in query_names.split(',')]
 
-
     LOG.info("Running Test Vector - File Format: %s Compression: %s / %s" %\
         (file_format, codec, compression_type))
     for test_name in query_map.keys():
       for query_name, query in query_map[test_name]:
         if not query_name:
           query_name = query
-
         if query_name_filter and (query_name.lower() not in query_name_filter):
           LOG.info("Skipping query '%s'" % query_name)
           continue

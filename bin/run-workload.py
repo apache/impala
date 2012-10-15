@@ -97,10 +97,6 @@ parser.add_option("--cm_password", dest="cm_password", default='admin',
                   help="The password to the CM server")
 options, args = parser.parse_args()
 
-# globals
-runquery_cmd = "%(runquery)s %(args)s " % {'runquery' : options.runquery_path,
-                                           'args' : options.runquery_args}
-
 logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
 
 LOG = logging.getLogger('run-workload')
@@ -199,6 +195,7 @@ if __name__ == "__main__":
   workload_runner = WorkloadRunner(
     beeswax=options.beeswax,
     runquery_path=options.runquery_path,
+    runquery_args=options.runquery_args,
     hive_cmd=options.hive_cmd,
     impalad=options.impalad,
     iterations=options.iterations,
