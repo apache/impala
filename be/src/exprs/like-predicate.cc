@@ -28,6 +28,37 @@ void* LikePredicate::ConstantSubstringFn(Expr* e, TupleRow* row) {
   return &p->result_.bool_val;
 }
 
+void* LikePredicate::ConstantStartsWithFn(Expr* e, TupleRow* row) {
+  LikePredicate* p = static_cast<LikePredicate*>(e);
+  DCHECK_EQ(p->GetNumChildren(), 2);
+  StringValue* val = static_cast<StringValue*>(e->GetChild(0)->GetValue(row));
+  if (val == NULL) return NULL;
+  if (val->len < p->search_string_sv_.len) {
+    p->result_.bool_val = false;
+  } else {
+    StringValue v = *val;
+    v.len = p->search_string_sv_.len;
+    p->result_.bool_val = p->search_string_sv_.Eq(v);
+  }
+  return &p->result_.bool_val;
+}
+
+void* LikePredicate::ConstantEndsWithFn(Expr* e, TupleRow* row) {
+  LikePredicate* p = static_cast<LikePredicate*>(e);
+  DCHECK_EQ(p->GetNumChildren(), 2);
+  StringValue* val = static_cast<StringValue*>(e->GetChild(0)->GetValue(row));
+  if (val == NULL) return NULL;
+  if (val->len < p->search_string_sv_.len) {
+    p->result_.bool_val = false;
+  } else {
+    StringValue v = *val;
+    v.ptr = v.ptr + (v.len - p->search_string_sv_.len);
+    v.len = p->search_string_sv_.len;
+    p->result_.bool_val = p->search_string_sv_.Eq(v);
+  }
+  return &p->result_.bool_val;
+}
+
 void* LikePredicate::ConstantRegexFn(Expr* e, TupleRow* row) {
   LikePredicate* p = static_cast<LikePredicate*>(e);
   DCHECK_EQ(p->GetNumChildren(), 2);
@@ -77,33 +108,50 @@ Status LikePredicate::Prepare(RuntimeState* state, const RowDescriptor& row_desc
     // determine pattern and decide on eval fn
     StringValue* pattern = static_cast<StringValue*>(GetChild(1)->GetValue(NULL));
     string pattern_str(pattern->ptr, pattern->len);
-    // Generate a regex search to look for the pattern: "%anything%".
-    // This maps to a fast substring search implementation. Regex marks
-    // the "anything" so it can be extracted for the pattern.
+    // Generate a regex search to look for simple patterns: 
+    // - "%anything%": This maps to a fast substring search implementation. 
+    // - anything%: This maps to a strncmp implementation
+    // - %anything: This maps to a strncmp implementation
+    // Regex marks the "anything" so it can be extracted for the pattern.
     regex substring_re("(%+)([^%_]*)(%+)", regex::extended);
+    regex ends_with_re("(%+)([^%_]*)", regex::extended);
+    regex starts_with_re("([^%_]*)(%+)", regex::extended);
     smatch match_res;
-    if (opcode_ == TExprOpcode::LIKE
-        && regex_match(pattern_str, match_res, substring_re)) {
-      // match_res.str(0) is the whole string, match_res.str(1) the first group, etc.
-      substring_ = match_res.str(2);
-      substring_sv_ =
-          StringValue(const_cast<char*>(substring_.c_str()), substring_.size());
-      substring_pattern_ = StringSearch(&substring_sv_);
-      compute_fn_ = ConstantSubstringFn;
+    if (opcode_ == TExprOpcode::LIKE) {
+      if (regex_match(pattern_str, match_res, substring_re)) {
+        // match_res.str(0) is the whole string, match_res.str(1) the first group, etc.
+        search_string_ = match_res.str(2);
+        search_string_sv_ =
+            StringValue(const_cast<char*>(search_string_.c_str()), search_string_.size());
+        substring_pattern_ = StringSearch(&search_string_sv_);
+        compute_fn_ = ConstantSubstringFn;
+        return Status::OK;
+      } else if (regex_match(pattern_str, match_res, starts_with_re)) {
+        search_string_ = match_res.str(1);
+        search_string_sv_ =
+            StringValue(const_cast<char*>(search_string_.c_str()), search_string_.size());
+        compute_fn_ = ConstantStartsWithFn;
+        return Status::OK;
+      } else if (regex_match(pattern_str, match_res, ends_with_re)) {
+        search_string_ = match_res.str(2);
+        search_string_sv_ =
+            StringValue(const_cast<char*>(search_string_.c_str()), search_string_.size());
+        compute_fn_ = ConstantEndsWithFn;
+        return Status::OK;
+      } 
+    } 
+    string re_pattern;
+    if (opcode_ == TExprOpcode::LIKE) {
+      ConvertLikePattern(pattern, &re_pattern);
     } else {
-      string re_pattern;
-      if (opcode_ == TExprOpcode::LIKE) {
-        ConvertLikePattern(pattern, &re_pattern);
-      } else {
-        re_pattern = pattern_str;
-      }
-      try {
-        regex_.reset(new regex(re_pattern, regex_constants::extended));
-      } catch (bad_expression& e) {
-        return Status("Invalid regular expression: " + pattern_str);
-      }
-      compute_fn_ = ConstantRegexFn;
+      re_pattern = pattern_str;
     }
+    try {
+      regex_.reset(new regex(re_pattern, regex_constants::extended));
+    } catch (bad_expression& e) {
+      return Status("Invalid regular expression: " + pattern_str);
+    }
+    compute_fn_ = ConstantRegexFn;
   } else {
     switch (opcode_) {
       case TExprOpcode::LIKE:

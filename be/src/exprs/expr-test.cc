@@ -855,6 +855,11 @@ TEST_F(ExprTest, IsNullPredicate) {
 
 TEST_F(ExprTest, LikePredicate) {
   TestValue("'a' LIKE '%a%'", TYPE_BOOLEAN, true);
+  TestValue("'a' LIKE '%abcde'", TYPE_BOOLEAN, false);
+  TestValue("'a' LIKE 'abcde%'", TYPE_BOOLEAN, false);
+  TestValue("'abcde' LIKE 'abcde%'", TYPE_BOOLEAN, true);
+  TestValue("'abcde' LIKE '%abcde'", TYPE_BOOLEAN, true);
+  TestValue("'abcde' LIKE '%abcde%'", TYPE_BOOLEAN, true);
   // IMP-117
   TestValue("'ab' LIKE '%a'", TYPE_BOOLEAN, false);
   TestValue("'ab' NOT LIKE '%a'", TYPE_BOOLEAN, true);
@@ -868,6 +873,9 @@ TEST_F(ExprTest, LikePredicate) {
   TestValue("'a' NOT LIKE 'b'", TYPE_BOOLEAN, true);
   // IMP-117 -- initial part of pattern appears earlier in string.
   TestValue("'LARGE BRUSHED BRASS' LIKE '%BRASS'", TYPE_BOOLEAN, true);
+  TestValue("'BRASS LARGE BRUSHED' LIKE '%BRASS'", TYPE_BOOLEAN, false);
+  TestValue("'BRASS LARGE BRUSHED' LIKE 'BRUSHED%'", TYPE_BOOLEAN, false);
+  TestValue("'BRASS LARGE BRUSHED' LIKE 'BRASS%'", TYPE_BOOLEAN, true);
   TestValue("'prefix1234' LIKE 'prefix%'", TYPE_BOOLEAN, true);
   TestValue("'1234suffix' LIKE '%suffix'", TYPE_BOOLEAN, true);
   TestValue("'1234substr5678' LIKE '%substr%'", TYPE_BOOLEAN, true);
