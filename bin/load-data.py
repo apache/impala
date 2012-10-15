@@ -30,6 +30,8 @@ parser.add_option("-f", "--force_reload", dest="force_reload", action="store_tru
 parser.add_option("--compute_stats", dest="compute_stats", action="store_true",
                   default= False, help="Execute COMPUTE STATISTICS statements on the "\
                   "tables that are loaded")
+parser.add_option("--impalad", dest="impala_shell_args", default="localhost:21000",
+                  help="Impala daemon to connect to")
 
 (options, args) = parser.parse_args()
 
@@ -41,6 +43,8 @@ GENERATE_SCHEMA_CMD = "generate-schema-statements.py --exploration_strategy=%s "
                       "--workload=%s --scale_factor=%s --verbose"
 HIVE_CMD = os.path.join(os.environ['HIVE_HOME'], 'bin/hive')
 HIVE_ARGS = "-hiveconf hive.root.logger=WARN,console -v"
+
+IMPALA_SHELL_CMD = os.path.join(os.environ['IMPALA_HOME'], 'bin/impala-shell.sh')
 
 def available_workloads(workload_dir):
   return [subdir for subdir in os.listdir(workload_dir)
@@ -59,6 +63,14 @@ def exec_hive_query_from_file(file_name):
   ret_val = subprocess.call(hive_cmd, shell = True)
   if ret_val != 0:
     print 'Error executing file from Hive: ' + file_name
+    sys.exit(ret_val)
+
+def exec_impala_query_from_file(file_name):
+  impala_cmd = "%s --impalad=%s -f %s" % (IMPALA_SHELL_CMD, options.impala_shell_args, file_name)
+  print 'Executing Impala Command: ' + impala_cmd
+  ret_val = subprocess.call(impala_cmd, shell = True)
+  if ret_val != 0:
+    print 'Error executing file from Impala: ' + file_name
     sys.exit(ret_val)
 
 def exec_bash_script(file_name):
@@ -124,8 +136,8 @@ for workload in workloads:
   exec_hive_query_from_file(os.path.join(dataset_dir,
      'load-%s-%s-generated.sql' % (workload, options.exploration_strategy)))
 
-  exec_bash_script(os.path.join(dataset_dir,
-     'load-trevni-%s-%s-generated.sh' % (workload, options.exploration_strategy)))
+  exec_impala_query_from_file(os.path.join(dataset_dir,
+     'load-trevni-%s-%s-generated.sql' % (workload, options.exploration_strategy)))
   loading_time_map[workload] = time.time() - start_time
 
 total_time = 0.0

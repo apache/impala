@@ -49,11 +49,10 @@ INSERT OVERWRITE TABLE %(table_name)s partition (year, month)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 FROM %(base_table_name)s;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  partition (year, month) \
-  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month \
-  FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  partition (year, month) 
+  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month 
+  FROM %(base_table_name)s;
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypes/090101.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=1);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypes/090201.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=2);
@@ -138,11 +137,10 @@ INSERT OVERWRITE TABLE %(table_name)s partition (year, month)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 FROM %(base_table_name)s;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  partition (year, month) \
-  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month \
-  FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  partition (year, month) 
+  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month 
+  FROM %(base_table_name)s;
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesSmall/090101.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=1);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesSmall/090201.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=2);
@@ -181,11 +179,10 @@ INSERT OVERWRITE TABLE %(table_name)s partition (year, month)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 FROM %(base_table_name)s;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  partition (year, month) \
-  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month \
-  FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  partition (year, month) 
+  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month 
+  FROM %(base_table_name)s;
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesTiny/090101.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=1);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesTiny/090201.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=2);
@@ -318,11 +315,10 @@ SELECT * FROM %(base_table_name)s_tmp;
 DROP TABLE %(base_table_name)s_tmp;
 DROP TABLE %(table_name)s_tmp;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  partition (year, month) \
-  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month \
-  FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  partition (year, month) 
+  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month 
+  FROM %(base_table_name)s;
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesError/0901.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=1);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesError/0902.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=2);
@@ -412,11 +408,10 @@ SELECT * FROM %(base_table_name)s_tmp;
 DROP TABLE %(base_table_name)s_tmp;
 DROP TABLE %(table_name)s_tmp;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  partition (year, month) \
-  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month \
-  FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  partition (year, month) 
+  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month 
+  FROM %(base_table_name)s;
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesErrorNoNulls/0901.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=1);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesErrorNoNulls/0902.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=2);
@@ -458,11 +453,10 @@ INSERT OVERWRITE TABLE %(table_name)s partition (year, month, day)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day
 FROM %(base_table_name)s;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  partition (year, month, day) \
-  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day \
-  FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  partition (year, month, day) 
+  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day 
+  FROM %(base_table_name)s;
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAgg/100101.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=1);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAgg/100102.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=2);
@@ -512,11 +506,10 @@ INSERT OVERWRITE TABLE %(table_name)s partition (year, month, day)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day
 FROM %(base_table_name)s;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  partition (year, month, day) \
-  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day \
-  FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  partition (year, month, day) 
+  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day 
+  FROM %(base_table_name)s;
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAggNoNulls/100101.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=1);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAggNoNulls/100102.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=2);
@@ -563,9 +556,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  select * FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  select * FROM %(base_table_name)s;
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/DimTbl/data.csv' OVERWRITE INTO TABLE %(table_name)s;
 ----
@@ -586,9 +578,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  select * FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  select * FROM %(base_table_name)s;
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/JoinTbl/data.csv' OVERWRITE INTO TABLE %(table_name)s;
 ----
@@ -654,9 +645,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  select * FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  select * FROM %(base_table_name)s;
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/LikeTbl/data.csv' OVERWRITE INTO TABLE %(table_name)s;
 ----
@@ -818,9 +808,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  select * FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  select * FROM %(base_table_name)s;
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/escape-no-quotes.txt' OVERWRITE INTO TABLE %(table_name)s;
 ----
@@ -843,9 +832,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  select * FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  select * FROM %(base_table_name)s;
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/overflow.txt' OVERWRITE INTO TABLE %(table_name)s;
 ----
@@ -860,9 +848,8 @@ CREATE EXTERNAL TABLE %(table_name)s (
 ----
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  select * FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  select * FROM %(base_table_name)s;
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/grepTiny/part-00000' OVERWRITE INTO TABLE %(table_name)s;
 ----
@@ -882,9 +869,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  select * FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  select * FROM %(base_table_name)s;
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/htmlTiny/Rankings.dat' OVERWRITE INTO TABLE %(table_name)s;
 ----
@@ -910,9 +896,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  select * FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  select * FROM %(base_table_name)s;
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/htmlTiny/UserVisits.dat' OVERWRITE INTO TABLE %(table_name)s;
 ----
@@ -967,11 +952,10 @@ insert into table %(table_name)s partition (year, month, day) SELECT id, bool_co
 insert into table %(table_name)s partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM %(base_table_name)s where id % 4 = 2;
 insert into table %(table_name)s partition (year, month, day) SELECT  id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM %(base_table_name)s where id % 4 = 3;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  partition (year, month, day) \
-  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day \
-  FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  partition (year, month, day) 
+  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day 
+  FROM %(base_table_name)s;
 ----
 SET hive.exec.dynamic.partition.mode=nonstrict;
 SET hive.exec.dynamic.partition=true;
@@ -1006,9 +990,8 @@ insert into table %(table_name)s SELECT id, bool_col, tinyint_col, smallint_col,
 insert into table %(table_name)s SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM %(base_table_name)s where id % 4 = 2;
 insert into table %(table_name)s SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM %(base_table_name)s where id % 4 = 3;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  select * FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  select * FROM %(base_table_name)s;
 ----
 SET hive.exec.dynamic.partition.mode=nonstrict;
 SET hive.exec.dynamic.partition=true;
@@ -1051,9 +1034,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  select * FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  select * FROM %(base_table_name)s;
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/TinyTable/data.csv' OVERWRITE INTO TABLE %(table_name)s;
 ----
@@ -1071,9 +1053,8 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
 FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  select * FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  select * FROM %(base_table_name)s;
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/TinyIntTable/data.csv' OVERWRITE INTO TABLE %(table_name)s;
 ----
@@ -1096,9 +1077,8 @@ SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
 INSERT OVERWRITE TABLE %(table_name)s select 'a', '', NULL, NULL, NULL from alltypes limit 1;
 SET hive.input.format=org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  select * FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  select * FROM %(base_table_name)s;
 ----
 SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
 INSERT OVERWRITE TABLE %(table_name)s select 'a', '', NULL, NULL, NULL from alltypes limit 1;
@@ -1123,9 +1103,8 @@ SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
 INSERT OVERWRITE TABLE %(table_name)s select 'a', '', NULL, NULL, NULL from alltypes limit 1;
 SET hive.input.format=org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  select * FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  select * FROM %(base_table_name)s;
 ----
 SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
 INSERT OVERWRITE TABLE %(table_name)s select 'a', '', NULL, NULL, NULL from alltypes limit 1;
@@ -1162,9 +1141,8 @@ INSERT OVERWRITE TABLE TblWithRaggedColumns_tmp select * from tmp_txt;
 DROP TABLE tmp_txt;
 DROP TABLE TblWithRaggedColumns_tmp;
 ----
-${IMPALA_HOME}/bin/run-query.sh --query=" \
-  INSERT OVERWRITE TABLE %(table_name)s \
-  select * FROM %(base_table_name)s"
+  INSERT OVERWRITE TABLE %(table_name)s 
+  select * FROM %(base_table_name)s;
 ----
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/TblWithRaggedColumns/data.csv' OVERWRITE INTO TABLE %(table_name)s;
 ----

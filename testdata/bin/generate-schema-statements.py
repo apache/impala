@@ -174,11 +174,7 @@ def build_load_statement(load_template, table_name, scale_factor):
                                'scale_factor': scale_factor}).replace(' *** ', ' % ')
 
 def build_trevni(trevni_template, table_name, base_table_name):
-  retstr =  \
-    trevni_template % {'table_name': table_name, 'base_table_name': base_table_name}
-  return retstr.replace('run-query.sh',
-      'run-query.sh --exec_options="abort_on_error:false" --use_statestore=false --impalad=' +
-      options.backend, 1)
+  return trevni_template % {'table_name': table_name, 'base_table_name': base_table_name}
 
 def build_table_suffix(file_format, codec, compression_type):
   if file_format == 'text' and codec != 'none':
@@ -219,20 +215,6 @@ def list_hdfs_subdir_names(path):
   # <acls> -  <user> <group> <date> /directory/subdirectory
   # So to get subdirectory names just return everything after the last '/'
   return [line[line.rfind('/') + 1:].strip() for line in tmp_file.readlines()]
-
-def write_trevni_file(file_name, array):
-  with open(file_name, "w") as f:
-    if len(array) != 0:
-      # Start a plan service.
-      f.write("#!/bin/bash\n")
-      f.write("set -e\nset -u\n")
-      f.write("(. ${IMPALA_HOME}/bin/set-classpath.sh; ")
-      f.write("exec $IMPALA_BE_DIR/build/debug/service/impalad --use_statestore=false) >& /tmp/impalad.out&\n")
-      f.write("PID=$!\n")
-      f.write("sleep 5\n");
-      f.write('\n\n'.join(array))
-      # Kill off the plan service.
-      f.write("\nkill -9 $PID\n")
 
 def write_statements_to_file_based_on_input_vector(output_name, test_vectors,
                                                    statements):
@@ -299,7 +281,7 @@ def write_statements_to_file_based_on_input_vector(output_name, test_vectors,
   # Make sure we create the base tables first and compute stats last
   output_load = output_create + output_load_base + output_load + output_stats
   write_array_to_file('load-' + output_name + '-generated.sql', output_load)
-  write_trevni_file('load-trevni-' + output_name + '-generated.sh', output_trevni);
+  write_array_to_file('load-trevni-' + output_name + '-generated.sql', output_trevni);
 
 def parse_benchmark_file(file_name):
   template = open(file_name, 'rb')

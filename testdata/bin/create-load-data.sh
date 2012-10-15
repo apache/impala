@@ -11,8 +11,11 @@ set -e
 
 # Load the data set
 pushd ${IMPALA_HOME}/bin
+./start-impala-cluster.py
+sleep 5
 ./load-data.py --workloads functional-query --exploration_strategy exhaustive
 ./load-data.py --workloads tpch --exploration_strategy core
+./start-impala-cluster.py --kill_only
 popd
 
 # TODO: The multi-format table will move these files. So we need to copy them to a

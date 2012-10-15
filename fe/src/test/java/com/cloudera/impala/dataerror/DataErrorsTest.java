@@ -41,4 +41,16 @@ public class DataErrorsTest extends BaseQueryTest {
     runPairTestFile("hbase-scan-node-errors", true, 10,
         TEXT_FORMAT_ONLY, ALL_COMPRESSION_FORMATS, ALL_BATCH_SIZES, ALL_CLUSTER_SIZES);
   }
+
+  @Test
+  public void TestSequnceNodeErrors() {
+    List<TestConfiguration> testConfigs = generateAllConfigurationPermutations(
+        SEQUENCE_FORMAT_ONLY, ALL_COMPRESSION_FORMATS, ALL_BATCH_SIZES,
+        SMALL_CLUSTER_SIZES, ALL_LLVM_OPTIONS);
+
+    // TODO: Need to set the read size to 10240 to hit a SYNC split across buffers.
+    // This must be done when the impala server is started so either this needs
+    // to run on its own server or all tests need to run with that size.
+    runQueryWithTestConfigs(testConfigs, "hdfs-sequence-scan-errors", false, 20);
+  }
 }
