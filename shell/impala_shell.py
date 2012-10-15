@@ -220,6 +220,17 @@ class ImpalaShell(cmd.Cmd):
     # GSSASPI is the underlying mechanism used by kerberos to authenticate.
     return TSaslClientTransport(sasl_factory, "GSSAPI", sock)
 
+  def __get_sleep_interval(self, start_time):
+    """Returns a step function of time to sleep in seconds before polling
+    again. Maximum sleep is 1s, minimum is 0.1s"""
+    elapsed = time.time() - start_time
+    if elapsed < 10.0:
+      return 0.1
+    elif elapsed < 60.0:
+      return 0.5
+
+    return 1.0
+
   def __query_with_results(self, query):
     self.__print_if_verbose("Query: %s" % (query.query,))
     start, end = time.time(), 0
@@ -232,6 +243,7 @@ class ImpalaShell(cmd.Cmd):
     if status != RpcStatus.OK:
       return False
 
+    loop_start = time.time()
     while True:
       query_state = self.__get_query_state(handle)
       if query_state == self.query_state["FINISHED"]:
@@ -244,7 +256,7 @@ class ImpalaShell(cmd.Cmd):
           return False
       elif self.is_interrupted.isSet():
         return self.__cancel_query(handle)
-      time.sleep(0.05)
+      time.sleep(self.__get_sleep_interval(loop_start))
 
     # Results are ready, fetch them till they're done.
     self.__print_if_verbose('Query finished, fetching results ...')
