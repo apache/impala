@@ -72,6 +72,7 @@ class WorkloadRunner(object):
     self.prime_cache = kwargs.get('prime_cache', False)
     self.remote = not self.TARGET_IMPALADS[0].startswith('localhost')
     self.profiler = kwargs.get('profiler', False)
+    self.use_kerberos = kwargs.get('use_kerberos', False)
     self.runquery_cmd = RUNQUERY_CMD % {'runquery' : self.runquery_path,
                                         'args' : kwargs.get('runquery_args', str())}
     self.run_using_hive = kwargs.get('compare_with_hive', False) or self.skip_impala
@@ -164,6 +165,7 @@ class WorkloadRunner(object):
       'impala_beeswax': lambda: (execute_using_impala_beeswax,
           ImpalaBeeswaxExecOptions(self.iterations,
           exec_options=self.exec_options,
+          use_kerberos=self.use_kerberos,
           impalad=choice(self.TARGET_IMPALADS)))
     } [executor_name]()
     return query_options

@@ -72,11 +72,12 @@ class QueryResult(object):
 
 # Interface to beeswax. Responsible for executing queries, fetching results.
 class ImpalaBeeswaxClient(object):
-  def __init__(self, impalad):
+  def __init__(self, impalad, use_kerberos=False):
     self.connected = False
     self.impalad = impalad
     self.imp_service = None
     self.transport = None
+    self.use_kerberos = use_kerberos
     self.query_options = {}
     self.query_state = QueryState._NAMES_TO_VALUES
     self.__make_default_options()
@@ -98,14 +99,40 @@ class ImpalaBeeswaxClient(object):
     Raises an exception if the connection is unsuccesful.
     """
     try:
-      host, port = self.impalad.split(":")
-      self.transport = TBufferedTransport(TSocket(host, int(port)))
+      self.impalad = self.impalad.split(':')
+      self.transport = self.__get_transport()
       self.transport.open()
       protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
       self.imp_service = ImpalaService.Client(protocol)
       self.connected = True
     except Exception, e:
       raise ImpalaBeeswaxException(self.__build_error_message(e), e)
+
+  def close_connection(self):
+    """Close the transport if it's still open"""
+    if self.transport:
+      self.transport.close()
+
+  def __get_transport(self):
+    """Create a Transport.
+
+       A non-kerberized impalad just needs a simple buffered transport. For
+       the kerberized version, a sasl transport is created.
+    """
+    sock = TSocket(self.impalad[0], int(self.impalad[1]))
+    if not self.use_kerberos:
+      return TBufferedTransport(sock)
+    # Initializes a sasl client
+    from shell.thrift_sasl import TSaslClientTransport
+    def sasl_factory():
+      import sasl
+      sasl_client = sasl.Client()
+      sasl_client.setAttr("host", self.impalad[0])
+      sasl_client.setAttr("service", "impala")
+      sasl_client.init()
+      return sasl_client
+    # GSSASPI is the underlying mechanism used by kerberos to authenticate.
+    return TSaslClientTransport(sasl_factory, "GSSAPI", sock)
 
   def execute(self, query_string):
     """Re-directs the query to its appropriate handler, returns QueryResult"""

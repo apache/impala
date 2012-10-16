@@ -105,6 +105,7 @@ class RunQueryExecOptions(ImpalaQueryExecOptions):
 class ImpalaBeeswaxExecOptions(ImpalaQueryExecOptions):
   def __init__(self, iterations, **kwargs):
     ImpalaQueryExecOptions.__init__(self, iterations, **kwargs)
+    self.use_kerberos = kwargs.get('use_kerberos', False)
     self._build_exec_options(kwargs.get('exec_options', None))
 
   def _build_exec_options(self, exec_options):
@@ -168,7 +169,8 @@ class QueryExecutor(threading.Thread):
 # Standalone Functions
 def establish_beeswax_connection(query, query_options):
   # TODO: Make this generic, for hive etc.
-  client = ImpalaBeeswaxClient(query_options.impalad)
+  use_kerberos = query_options.use_kerberos
+  client = ImpalaBeeswaxClient(query_options.impalad, use_kerberos=use_kerberos)
   # Try connect
   client.connect()
   LOG.debug('Connected to %s' % query_options.impalad)
@@ -203,10 +205,12 @@ def execute_using_impala_beeswax(query, query_options):
       result = client.execute(query)
     except Exception, e:
       LOG.error(e)
+      client.close_connection()
       return exec_result
     results.append(result)
   # We only need to print the results for a successfull run, not all.
   LOG.debug('Data:\n%s\n' % results[0].get_data())
+  client.close_connection()
   # get rid of the client object
   del client
   # construct the execution result.

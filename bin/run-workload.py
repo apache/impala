@@ -82,6 +82,8 @@ parser.add_option("--skip_impala", dest="skip_impala", action="store_true",
                   default= False, help="If set, queries will only run against Hive.")
 parser.add_option("--beeswax", dest="beeswax", action="store_true", default=False,
                   help="If set, Impala queries will use the beeswax interface.")
+parser.add_option("--use_kerberos", dest="use_kerberos", action="store_true",
+                  default=False, help="If set, enables talking to a kerberized impalad")
 
 # These options are used for configuring failure testing
 parser.add_option("--failure_frequency", type="int", dest="failure_frequency", default=0,
@@ -193,6 +195,13 @@ if __name__ == "__main__":
 
   It runs all the workloads specified on the command line and writes them to a csv file.
   """
+  if options.use_kerberos:
+    try:
+      import sasl
+    except ImportError:
+      print 'The sasl module is needed to query a kerberized impalad'
+      sys.exit(1)
+
   workload_runner = WorkloadRunner(
     beeswax=options.beeswax,
     runquery_path=options.runquery_path,
@@ -206,7 +215,8 @@ if __name__ == "__main__":
     exec_options=options.exec_options,
     profiler=options.profiler,
     verbose=options.verbose,
-    prime_cache=options.prime_cache)
+    prime_cache=options.prime_cache,
+    use_kerberos=options.use_kerberos)
 
   failure_injector = None
   if options.failure_frequency > 0:
