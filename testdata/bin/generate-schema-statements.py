@@ -200,8 +200,13 @@ def read_vector_file(file_name):
       vector_values.append([value.split(':')[1].strip() for value in line.split(',')])
   return vector_values
 
-def write_array_to_file(file_name, array):
+def write_trevni_to_file(file_name, array):
   with open(file_name, 'w') as f:
+    f.write('refresh;\n')
+  write_array_to_file(file_name, 'a', array)
+
+def write_array_to_file(file_name, mode, array):
+  with open(file_name, mode) as f:
     f.write('\n\n'.join(array))
 
 # Does a hdfs directory listing and returns array with all the subdir names.
@@ -280,8 +285,8 @@ def write_statements_to_file_based_on_input_vector(output_name, test_vectors,
               print 'Empty insert for table %s. Skipping insert generation' % table_name
   # Make sure we create the base tables first and compute stats last
   output_load = output_create + output_load_base + output_load + output_stats
-  write_array_to_file('load-' + output_name + '-generated.sql', output_load)
-  write_array_to_file('load-trevni-' + output_name + '-generated.sql', output_trevni);
+  write_array_to_file('load-' + output_name + '-generated.sql', 'w', output_load)
+  write_trevni_to_file('load-trevni-' + output_name + '-generated.sql', output_trevni);
 
 def parse_benchmark_file(file_name):
   template = open(file_name, 'rb')
