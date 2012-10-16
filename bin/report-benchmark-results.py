@@ -156,6 +156,7 @@ def build_table(results, verbose, reference_results = None):
           continue
 
         speedup = calculate_speedup(float(comparison_row[AVG_IDX]), float(row[AVG_IDX]))
+        full_row[AVG_IDX] = format_if_float(full_row[AVG_IDX])
         full_row[AVG_IDX] = full_row[AVG_IDX] + ' (%sX)' % format_if_float(speedup)
         output += build_padded_row_string(full_row[FILE_FORMAT_IDX:], COL_WIDTH) + '\n'
       else:
