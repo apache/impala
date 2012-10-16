@@ -176,6 +176,7 @@ def run_workloads(workload_runner, failure_injector=None):
     workload_runner.run_workload(workload, scale_factor,
         file_formats=options.file_formats,
         compression_codecs=options.compression_codecs,
+        query_names=options.query_names,
         exploration_strategy=options.exploration_strategy,
         stop_on_query_error=failure_injector is None)
 

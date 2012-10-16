@@ -1,29 +1,29 @@
 # QUERY_NAME : TPCH-Q16_QUERY_1
 # Q16 - Parts/Supplier Relation Query
-insert overwrite table tpch.supplier_tmp$TABLE
+insert overwrite table tpch.supplier_tmp
 select s_suppkey
 from tpch.supplier$TABLE
 where not s_comment like '%Customer%Complaints%'
 ---- SETUP
-RESET tpch.supplier_tmp$TABLE
-RELOAD tpch.supplier_tmp$TABLE
+RESET tpch.supplier_tmp
+RELOAD tpch.supplier_tmp
 ---- RESULTS
 ---- PARTITIONS
 /: 9996
 ====
 # QUERY_NAME : TPCH-Q16_QUERY_2
-insert overwrite table tpch.q16_tmp$TABLE
+insert overwrite table tpch.q16_tmp
 select p_brand, p_type, p_size, ps_suppkey
 from tpch.partsupp$TABLE ps
 join tpch.part$TABLE p
   on p.p_partkey = ps.ps_partkey and
      p.p_brand <> 'Brand#45' and
      not p.p_type like 'MEDIUM POLISHED%'
-join tpch.supplier_tmp$TABLE s
+join tpch.supplier_tmp s
   on ps.ps_suppkey = s.s_suppkey
 ---- SETUP
-RESET tpch.q16_tmp$TABLE
-RELOAD tpch.q16_tmp$TABLE
+RESET tpch.q16_tmp
+RELOAD tpch.q16_tmp
 ---- RESULTS
 ---- PARTITIONS
 /: 741971
@@ -32,7 +32,7 @@ RELOAD tpch.q16_tmp$TABLE
 # Modifications: Added limit, removed 'DISTINCT' from count due to IMP-132
 select p_brand, p_type, p_size, count(ps_suppkey) as supplier_cnt
 from
-( select * from tpch.q16_tmp$TABLE
+( select * from tpch.q16_tmp
   where p_size = 49 or p_size = 14 or
         p_size = 23 or p_size = 45 or
         p_size = 19 or p_size = 3 or

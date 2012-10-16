@@ -1,12 +1,12 @@
 # QUERY_NAME : TPCH-Q18_QUERY_1
 # Q18 - Large Value Customer Query
-insert overwrite table tpch.q18_tmp$TABLE
+insert overwrite table tpch.q18_tmp
 select l_orderkey, sum(l_quantity) as t_sum_quantity
 from tpch.lineitem$TABLE
 group by l_orderkey
 ---- SETUP
-RESET tpch.q18_tmp$TABLE
-RELOAD tpch.q18_tmp$TABLE
+RESET tpch.q18_tmp
+RELOAD tpch.q18_tmp
 ---- RESULTS
 ---- PARTITIONS
 /: 1500000
@@ -26,7 +26,7 @@ from tpch.lineitem$TABLE l
     on (o.o_orderkey = l.l_orderkey)
   join tpch.customer$TABLE c
     on (c.c_custkey = o.o_custkey)
-  join tpch.q18_tmp$TABLE t
+  join tpch.q18_tmp t
     on (o.o_orderkey = t.l_orderkey and t.t_sum_quantity > 300)
 group by
   c_name,

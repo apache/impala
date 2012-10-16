@@ -1,18 +1,18 @@
 # QUERY_NAME : TPCH-Q20_QUERY_1
 # Q20 - Potential Part Promotion Query
-insert overwrite table tpch.q20_tmp1$TABLE
+insert overwrite table tpch.q20_tmp1
 select distinct p_partkey
 from tpch.part$TABLE
 where p_name like 'forest%'
 ---- SETUP
-RESET tpch.q20_tmp1$TABLE
-RELOAD tpch.q20_tmp1$TABLE
+RESET tpch.q20_tmp1
+RELOAD tpch.q20_tmp1
 ---- RESULTS
 ---- PARTITIONS
 /: 2127
 ====
 # QUERY_NAME : TPCH-Q20_QUERY_2
-insert overwrite table tpch.q20_tmp2$TABLE
+insert overwrite table tpch.q20_tmp2
 select
   l_partkey,
   l_suppkey,
@@ -25,43 +25,43 @@ group by
   l_partkey,
   l_suppkey
 ---- SETUP
-RESET tpch.q20_tmp2$TABLE
-RELOAD tpch.q20_tmp2$TABLE
+RESET tpch.q20_tmp2
+RELOAD tpch.q20_tmp2
 ---- RESULTS
 ---- PARTITIONS
 /: 543210
 ====
 # QUERY_NAME : TPCH-Q20_QUERY_3
-insert overwrite table tpch.q20_tmp3$TABLE
+insert overwrite table tpch.q20_tmp3
 select
   ps_suppkey,
   ps_availqty,
   sum_quantity
 from tpch.partsupp$TABLE ps
-  join tpch.q20_tmp2$TABLE t2
+  join tpch.q20_tmp2 t2
     on (ps.ps_partkey = t2.l_partkey and ps.ps_suppkey = t2.l_suppkey)
-  join tpch.q20_tmp1$TABLE t1
+  join tpch.q20_tmp1 t1
     on (ps.ps_partkey = t1.p_partkey)
 ---- SETUP
-RESET tpch.q20_tmp3$TABLE
-RELOAD tpch.q20_tmp3$TABLE
+RESET tpch.q20_tmp3
+RELOAD tpch.q20_tmp3
 ---- RESULTS
 ---- PARTITIONS
 /: 5843
 ====
 # QUERY_NAME : TPCH-Q20_QUERY_4
 # Modified to use subquery to work around IMP-127
-insert overwrite table tpch.q20_tmp4$TABLE
+insert overwrite table tpch.q20_tmp4
 select a.ps_suppkey
 from (select
         ps_suppkey,
-        count(1) from tpch.q20_tmp3$TABLE
+        count(1) from tpch.q20_tmp3
       where ps_availqty > sum_quantity
       group by ps_suppkey
      ) a
 ---- SETUP
-RESET tpch.q20_tmp4$TABLE
-RELOAD tpch.q20_tmp4$TABLE
+RESET tpch.q20_tmp4
+RELOAD tpch.q20_tmp4
 ---- RESULTS
 ---- PARTITIONS
 /: 4397
@@ -75,7 +75,7 @@ from tpch.supplier$TABLE s
   join tpch.nation$TABLE n
     on (s.s_nationkey = n.n_nationkey and
         n.n_name = 'CANADA')
-join tpch.q20_tmp4$TABLE t4
+join tpch.q20_tmp4 t4
   on (s.s_suppkey = t4.ps_suppkey)
 order by
   s_name

@@ -2,7 +2,7 @@
 # Q11 - Important Stock Identification
 # NOTE: Alan is re-writing part of this query set
 # so it is missing for now
-insert overwrite table tpch.q11_part_tmp$TABLE
+insert overwrite table tpch.q11_part_tmp
 select ps_partkey, sum(ps_supplycost * ps_availqty) as part_value
 from tpch.nation$TABLE n
 join tpch.supplier$TABLE s
@@ -11,19 +11,19 @@ join tpch.partsupp$TABLE ps
   on ps.ps_suppkey = s.s_suppkey
 group by ps_partkey
 ---- SETUP
-RESET tpch.q11_sum_tmp$TABLE
-RELOAD tpch.q11_sum_tmp$TABLE
+RESET tpch.q11_sum_tmp
+RELOAD tpch.q11_sum_tmp
 ---- RESULTS
 ---- PARTITIONS
 /: 29818
 ====
 # QUERY_NAME : TPCH-Q11_QUERY_2
-insert overwrite table tpch.q11_sum_tmp$TABLE
+insert overwrite table tpch.q11_sum_tmp
 select sum(part_value) as total_value
-from tpch.q11_part_tmp$TABLE
+from tpch.q11_part_tmp
 ---- SETUP
-RESET tpch.q11_part_tmp$TABLE
-RELOAD tpch.q11_part_tmp$TABLE
+RESET tpch.q11_part_tmp
+RELOAD tpch.q11_part_tmp
 ---- RESULTS
 ---- PARTITIONS
 /: 1
