@@ -4,6 +4,7 @@
 #include "exec/hash-table.inline.h"
 #include "exprs/expr.h"
 #include "runtime/raw-value.h"
+#include "runtime/string-value.inline.h"
 #include "util/debug-util.h"
 
 using namespace impala;

@@ -1,7 +1,7 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-#ifndef IMPALA_EXEC_DECOMPRESS_H
-#define IMPALA_EXEC_DECOMPRESS_H
+#ifndef IMPALA_UTIL_DECOMPRESS_H
+#define IMPALA_UTIL_DECOMPRESS_H
 
 // We need zlib.h here to declare stream_ below.
 #include <zlib.h>

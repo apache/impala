@@ -1,7 +1,7 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-#ifndef IMPALA_EXEC_CODEC_H
-#define IMPALA_EXEC_CODEC_H
+#ifndef IMPALA_UTIL_CODEC_H
+#define IMPALA_UTIL_CODEC_H
 
 #include "common/status.h"
 #include "runtime/mem-pool.h"

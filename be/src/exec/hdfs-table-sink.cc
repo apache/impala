@@ -7,10 +7,11 @@
 #include "gen-cpp/JavaConstants_constants.h"
 #include "util/hdfs-util.h"
 #include "exprs/expr.h"
+#include "runtime/hdfs-fs-cache.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
-#include "runtime/hdfs-fs-cache.h"
+#include "runtime/string-value.inline.h"
 
 #include <vector>
 #include <sstream>

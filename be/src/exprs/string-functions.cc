@@ -1,10 +1,13 @@
 // Copyright (c) 2011 Cloudera, Inc. All rights reserved.
 
 #include "exprs/string-functions.h"
-#include "exprs/function-call.h"
-#include "exprs/expr.h"
-#include "runtime/tuple-row.h"
+
 #include <boost/regex.hpp>
+
+#include "exprs/expr.h"
+#include "exprs/function-call.h"
+#include "runtime/string-value.inline.h"
+#include "runtime/tuple-row.h"
 #include "util/url-parser.h"
 
 using namespace std;

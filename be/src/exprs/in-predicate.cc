@@ -4,6 +4,7 @@
 
 #include "exprs/in-predicate.h"
 #include "runtime/raw-value.h"
+#include "runtime/string-value.inline.h"
 
 using namespace std;
 
