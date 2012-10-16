@@ -24,20 +24,97 @@ namespace impala {
 local_time::tz_database TimezoneDatabase::tz_database_;
 vector<string> TimezoneDatabase::tz_region_list_;
 
-// Implementation of UNIX_TIMESTAMP
-//   int unix_timestamp(timestamp input)
-// Just returns the internal representation. Not sure why this is different than
-// cast to int.
-void* TimestampFunctions::Unix(Expr* e, TupleRow* row) {
-  DCHECK_EQ(e->GetNumChildren(), 1);
+void* TimestampFunctions::FromUnix(Expr* e, TupleRow* row) {
+  DCHECK_LE(e->GetNumChildren(), 2);
+  DCHECK_NE(e->GetNumChildren(), 0);
+  
   Expr* op = e->children()[0];
-  TimestampValue* tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
-  if (tv == NULL) return NULL;
+  uint32_t* intp = reinterpret_cast<uint32_t*>(op->GetValue(row));
+  if (intp == NULL) return NULL;
+  TimestampValue t(boost::posix_time::from_time_t(*intp));
+
+  // If there is a second argument then it's a format statement.
+  // Otherwise the string is in the default format.
+  if (e->GetNumChildren() == 2) {
+    Expr* fmtop = e->children()[1];
+    StringValue* format = reinterpret_cast<StringValue*>(fmtop->GetValue(row));
+    if (CheckFormat(format) == NULL) return NULL;
+    if (format->len == 10) {
+      // If the format is yyyy-MM-dd then set the time to invalid.
+      t.set_time(time_duration(not_a_date_time));
+    } 
+  }
+
+  e->result_.SetStringVal(lexical_cast<string>(t));
+  return &e->result_.string_val;
+}
+
+void* TimestampFunctions::Unix(Expr* e, TupleRow* row) {
+  DCHECK_LE(e->GetNumChildren(), 2);
+  TimestampValue* tv;
+  if (e->GetNumChildren() == 0) {
+    // Expr::Prepare put the current timestamp here.
+    tv = &e->result_.timestamp_val;
+  } else if (e->GetNumChildren() == 1) {
+    Expr* op = e->children()[0];
+    tv = reinterpret_cast<TimestampValue*>(op->GetValue(row));
+    if (tv == NULL) return NULL;
+  } else {
+    Expr* op = e->children()[0];
+    StringValue* value = reinterpret_cast<StringValue*>(op->GetValue(row));
+    Expr* fmtop = e->children()[1];
+    StringValue* format = reinterpret_cast<StringValue*>(fmtop->GetValue(row));
+
+    if (value == NULL || format == NULL || CheckFormat(format) == NULL) return NULL;
+
+    // Trim the value of blank space to be more user friendly.
+    StringValue tvalue = value->Trim();
+
+    // Check to see that the string roughly matches the format.  TimestampValue
+    // will kick out bad internal format but will accept things that don't 
+    // match what we have here.
+    if (format->len != tvalue.len) {
+      string fmt(format->ptr, format->len);
+      string str(tvalue.ptr, tvalue.len);
+      LOG(WARNING) << "Timestamp: " << str << " does not match format: " << fmt;
+      return NULL;
+    }
+
+    TimestampValue val(tvalue.ptr, tvalue.len);
+    tv = &val;
+    if (tv->date().is_special()) return NULL;
+  }
 
   ptime temp;
   tv->ToPtime(&temp);
   e->result_.int_val = static_cast<int32_t>(to_time_t(temp));
   return &e->result_.int_val;
+}
+
+// TODO: accept Java data/time format strings:
+// http://docs.oracle.com/javase/1.4.2/docs/api/java/text/SimpleDateFormat.html
+// Convert them to boost format strings.
+StringValue* TimestampFunctions::CheckFormat(StringValue* format) {
+  // For now the format  must be of the form: yyyy-MM-dd HH:mm:ss
+  // where the time part is optional.
+  switch(format->len) {
+    case 10:
+      if (strncmp(format->ptr, "yyyy-MM-dd", 10) == 0) return format;
+      break;
+    case 19:
+      if (strncmp(format->ptr, "yyyy-MM-dd HH:mm:ss", 19) == 0) return format;
+      break;
+    default: 
+      break;
+  }
+  ReportBadFormat(format);
+  return NULL;
+}
+
+void TimestampFunctions::ReportBadFormat(StringValue* format) {
+  string format_str(format->ptr, format->len);
+  LOG(WARNING) << "Bad date/time conversion format: " << format_str 
+               << " Format must be: 'yyyy-MM-dd[ HH:mm:ss]'";
 }
 
 void* TimestampFunctions::Year(Expr* e, TupleRow* row) {

@@ -8,6 +8,7 @@
 #include <boost/date_time/time_zone_base.hpp>
 #include <boost/date_time/local_time/local_time.hpp>
 #include <boost/thread/thread.hpp>
+#include "runtime/string-value.h"
 
 namespace impala {
 
@@ -18,7 +19,14 @@ class TupleRow;
 class TimestampFunctions {
  public:
   // Return the unix time_t, seconds from 1970
+  // With 0 argments, returns the current time.
+  // With 1 arument, converts it to a unix time_t
+  // With 2 aruments, the second argument is the format of the timestamp string.
   static void* Unix(Expr* e, TupleRow* row);
+
+  // Return a timestamp string from a unix time_t
+  // Optional second argument is the format of the string.
+  static void* FromUnix(Expr* e, TupleRow* row);
 
   // Functions to extract parts of the timestamp, return integers.
   static void* Year(Expr* e, TupleRow* row);
@@ -66,6 +74,13 @@ class TimestampFunctions {
   // Convert a timestamp to or from a particular timezone based time.
   static void* FromUtc(Expr* e, TupleRow* row);
   static void* ToUtc(Expr* e, TupleRow* row);
+
+  // Helper function to check date/time format strings.
+  // TODO: eventually return format converted from Java to Boost.
+  static StringValue* CheckFormat(StringValue* format);
+
+  // Issue a warning for a bad format string.
+  static void ReportBadFormat(StringValue* format);
 
 };
 

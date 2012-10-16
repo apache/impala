@@ -21,7 +21,7 @@ FunctionCall::FunctionCall(const TExprNode& node)
 Status FunctionCall::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
   RETURN_IF_ERROR(Expr::Prepare(state, row_desc));
   // Set now timestamp from runtime state.
-  if (opcode_ == TExprOpcode::TIMESTAMP_NOW) {
+  if (opcode_ == TExprOpcode::TIMESTAMP_NOW || opcode_ == TExprOpcode::UNIX_TIMESTAMP) {
     DCHECK_NOTNULL(state);
     DCHECK(!state->now()->NotADateTime());
     result_.timestamp_val = *(state->now());

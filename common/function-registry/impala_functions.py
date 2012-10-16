@@ -109,8 +109,16 @@ functions = [
   ['Utility_Version', 'STRING', [], 'UtilityFunctions::Version', ['version']],
 
 # Timestamp Functions
+  ['Unix_Timestamp', 'INT', [], \
+        'TimestampFunctions::Unix', ['unix_timestamp']],
   ['Unix_Timestamp', 'INT', ['TIMESTAMP'], \
         'TimestampFunctions::Unix', ['unix_timestamp']],
+  ['Unix_Timestamp', 'INT', ['STRING', 'STRING'], \
+        'TimestampFunctions::Unix', ['unix_timestamp']],
+  ['From_UnixTime', 'STRING', ['INT'], \
+        'TimestampFunctions::FromUnix', ['from_unixtime']],
+  ['From_UnixTime', 'STRING', ['INT', 'STRING'], \
+        'TimestampFunctions::FromUnix', ['from_unixtime']],
   ['Timestamp_year', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Year', ['year']],
   ['Timestamp_month', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Month', ['month']],
   ['Timestamp_day', 'INT', ['TIMESTAMP'], 'TimestampFunctions::Day', ['day']],

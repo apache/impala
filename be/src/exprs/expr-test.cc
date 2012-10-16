@@ -1788,7 +1788,18 @@ TEST_F(ExprTest, TimestampFunctions) {
       "2001-01-01 00:00:00");
 
   TestValue("unix_timestamp(cast('1970-01-01 00:00:00' as timestamp))", TYPE_INT, 0);
+  TestValue("unix_timestamp('1970-01-01 00:00:00')", TYPE_INT, 0);
+  TestValue("unix_timestamp('1970-01-01 00:00:00', 'yyyy-MM-dd HH:mm:ss')", TYPE_INT, 0);
+  TestValue("unix_timestamp('1970-01-01', 'yyyy-MM-dd')", TYPE_INT, 0);
+  TestValue("unix_timestamp('   1970-01-01 ', 'yyyy-MM-dd')", TYPE_INT, 0);
   TestStringValue("cast(cast(0 as timestamp) as string)", "1970-01-01 00:00:00");
+  TestStringValue("from_unixtime(0)", "1970-01-01 00:00:00");
+  TestStringValue("from_unixtime(0, 'yyyy-MM-dd HH:mm:ss')", "1970-01-01 00:00:00");
+  TestStringValue("from_unixtime(0, 'yyyy-MM-dd')", "1970-01-01");
+  TestStringValue("from_unixtime(unix_timestamp('1999-01-01 10:10:10'), \
+      'yyyy-MM-dd')", "1999-01-01");
+  TestStringValue("from_unixtime(unix_timestamp('1999-01-01 10:10:10'), \
+      'yyyy-MM-dd HH:mm:ss')", "1999-01-01 10:10:10");
   TestValue("cast('2011-12-22 09:10:11.123456789' as timestamp) > \
       cast('2011-12-22 09:10:11.12345678' as timestamp)", TYPE_BOOLEAN, true);
   TestValue("cast('2011-12-22 08:10:11.123456789' as timestamp) > \
@@ -1864,6 +1875,19 @@ TEST_F(ExprTest, TimestampFunctions) {
 
   // Test functions with unknown expected value.
   TestValidTimestampValue("now()");
+  TestValidTimestampValue("cast(unix_timestamp() as timestamp)");
+
+  // Test invalid formats returnning NULL
+  TestIsNull("unix_timestamp('1970-01-01 0:00:00', 'yyyy-MM-dd HH:mm:ss')", TYPE_INT);
+  TestIsNull("unix_timestamp('1970-01-01 00:00:00', 'yyyy-MM-dd hh:mm:ss')", TYPE_INT);
+  TestIsNull("unix_timestamp('1970-01-01 00:00:00', 'yy-MM-dd HH:mm:ss')", TYPE_INT);
+  TestIsNull("unix_timestamp('1970-01-01 00:00:00', 'yyyy-MM-dd')", TYPE_INT);
+  TestIsNull("unix_timestamp('1970-01-01', 'yyyy-MM-dd HH:mm:ss')", TYPE_INT);
+  TestIsNull("unix_timestamp('1970-01-01 00:00:00', 'yyyy-MM-dd')", TYPE_INT);
+
+  TestIsNull("from_unixtime(0, 'yy-MM-dd HH:mm:dd')", TYPE_STRING);
+  TestIsNull("from_unixtime(0, 'yyyy-MM-dd HH::dd')", TYPE_STRING);
+  TestIsNull("from_unixtime(0, 'HH:mm:dd')", TYPE_STRING);
 }
 
 // TODO: Since we currently can't analyze NULL literals as function parameters,
