@@ -1,6 +1,7 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
-#include "url-parser.h"
+#include "util/url-parser.h"
+#include "runtime/string-value.inline.h"
 
 using namespace std;
 

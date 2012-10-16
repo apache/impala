@@ -6,7 +6,7 @@
 #include <boost/regex.hpp>
 #include <string.h>
 
-#include "runtime/string-value.h"
+#include "runtime/string-value.inline.h"
 
 using namespace boost;
 using namespace std;

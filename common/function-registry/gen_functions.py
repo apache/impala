@@ -335,6 +335,7 @@ cc_preamble = '\
 #include "opcode/functions.h"\n\
 #include "exprs/expr.h"\n\
 #include "exprs/case-expr.h"\n\
+#include "runtime/string-value.inline.h"\n\
 #include "runtime/tuple-row.h"\n\
 #include "util/string-parser.h"\n\
 #include <boost/lexical_cast.hpp>\n\

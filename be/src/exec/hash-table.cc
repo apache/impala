@@ -146,7 +146,7 @@ Function* HashTable::CodegenEvalTupleRow(LlvmCodeGen* codegen, bool build) {
   if (!Expr::IsCodegenAvailable(build_exprs_) || 
       !Expr::IsCodegenAvailable(probe_exprs_)) {
     LOG(WARNING) << "Could not codegen EvalTupleRow because one of the exprs "
-                  << "could not be codegen'd.";
+                 << "could not be codegen'd.";
     return NULL;
   }
 
@@ -199,6 +199,13 @@ Function* HashTable::CodegenEvalTupleRow(LlvmCodeGen* codegen, bool build) {
       Value* result = builder.CreateCall(exprs[i]->codegen_fn(), expr_args, "eval");
       Value* is_null = builder.CreateLoad(is_null_ptr);
 
+      // Set null-byte result
+      Value* null_byte = builder.CreateZExt(is_null, codegen->GetType(TYPE_TINYINT));
+      uint8_t* null_byte_loc = &expr_value_null_bits_[i];
+      Value* llvm_null_byte_loc = 
+          codegen->CastPtrToLlvmPtr(codegen->ptr_type(), null_byte_loc);
+      builder.CreateStore(null_byte, llvm_null_byte_loc);
+      
       builder.CreateCondBr(is_null, null_block, not_null_block);
 
       // Null block
@@ -209,13 +216,6 @@ Function* HashTable::CodegenEvalTupleRow(LlvmCodeGen* codegen, bool build) {
       } else {
         CodegenAssignNullValue(codegen, &builder, llvm_loc, exprs[i]->type());
         has_null = codegen->true_value();
-      
-        // Set null-byte result
-        Value* null_byte = builder.CreateZExt(is_null, codegen->GetType(TYPE_TINYINT));
-        uint8_t* null_byte_loc = &expr_value_null_bits_[i];
-        Value* llvm_null_byte_loc = 
-            codegen->CastPtrToLlvmPtr(codegen->ptr_type(), null_byte_loc);
-        builder.CreateStore(null_byte, llvm_null_byte_loc);
         builder.CreateBr(continue_block);
       }
 

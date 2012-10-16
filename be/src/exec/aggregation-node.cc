@@ -17,6 +17,7 @@
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
+#include "runtime/string-value.inline.h"
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"
 #include "util/debug-util.h"
@@ -862,11 +863,19 @@ Function* AggregationNode::CodegenProcessRowBatch(
     Function* eval_build_row_fn = hash_tbl_->CodegenEvalTupleRow(codegen, true);
     if (eval_build_row_fn == NULL) return NULL;
 
+    // Codegen for evaluating probe rows
+    Function* eval_probe_row_fn = hash_tbl_->CodegenEvalTupleRow(codegen, false);
+    if (eval_probe_row_fn == NULL) return NULL;
+
     // Replace call sites
     process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
         eval_build_row_fn, "EvalBuildRow", &replaced);
     DCHECK_EQ(replaced, 1);
     
+    process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
+        eval_probe_row_fn, "EvalProbeRow", &replaced);
+    DCHECK_EQ(replaced, 1);
+
     process_batch_fn = codegen->ReplaceCallSites(process_batch_fn, false,
         hash_fn, "HashCurrentRow", &replaced);
     DCHECK_EQ(replaced, 2);
@@ -881,7 +890,7 @@ Function* AggregationNode::CodegenProcessRowBatch(
   DCHECK_EQ(replaced, 1) << "One call site should be replaced."; 
   DCHECK(process_batch_fn != NULL);
 
-  return codegen->FinalizeFunction(process_batch_fn);
+  return codegen->OptimizeFunctionWithExprs(process_batch_fn);
 }
 
 void AggregationNode::ConstructDistinctEstimateSlot(AggregationTuple* agg_tuple,

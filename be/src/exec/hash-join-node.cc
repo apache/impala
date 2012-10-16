@@ -614,6 +614,10 @@ Function* HashJoinNode::CodegenProcessProbeBatch(LlvmCodeGen* codegen,
   process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, false, 
       join_conjuncts_fn, "EvalOtherJoinConjuncts", &replaced); 
   DCHECK_EQ(replaced, 1);
+    
+  process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, false,
+      equals_fn, "Equals", &replaced);
+  DCHECK_EQ(replaced, 1);
 
   return codegen->OptimizeFunctionWithExprs(process_probe_batch_fn);
 }

@@ -4,7 +4,7 @@
 #include <boost/functional/hash.hpp>
 
 #include "runtime/raw-value.h"
-#include "runtime/string-value.h"
+#include "runtime/string-value.inline.h"
 #include "runtime/tuple.h"
 
 using namespace boost;
