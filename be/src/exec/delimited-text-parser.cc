@@ -130,8 +130,6 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
     if (new_tuple) {
       if (last_row_delim_offset_ == remaining_len && **byte_buffer_ptr == '\n') {
         // If the row ended in \r\n then move to the \n
-        --remaining_len;
-        ++*byte_buffer_ptr;
         ++*next_column_start;
       } else {
         AddColumn<true>(*byte_buffer_ptr - *next_column_start,
@@ -144,6 +142,7 @@ Status DelimitedTextParser::ParseFieldLocations(int max_tuples, int64_t remainin
       last_row_delim_offset_ = **byte_buffer_ptr == '\r' ? remaining_len - 1 : -1;
       if (*num_tuples == max_tuples) {
         ++*byte_buffer_ptr;
+        --remaining_len;
         if (last_row_delim_offset_ == remaining_len) last_row_delim_offset_ = 0;
         return Status::OK;
       }
