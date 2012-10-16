@@ -11,7 +11,7 @@ set -e
 
 # Load the data set
 pushd ${IMPALA_HOME}/bin
-./start-impala-cluster.py
+./start-impala-cluster.py -s 1
 sleep 5
 ./load-data.py --workloads functional-query --exploration_strategy exhaustive
 ./load-data.py --workloads tpch --exploration_strategy core
