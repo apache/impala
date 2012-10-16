@@ -26,6 +26,9 @@ done
 
 cd $IMPALA_HOME
 
+rm -f $IMPALA_HOME/llvm-ir/impala-nosse.ll
+rm -f $IMPALA_HOME/llvm-ir/impala-sse.ll
+
 if [ $USE_PGO -eq 1 ]
 then
 

@@ -617,7 +617,7 @@ Function* HashJoinNode::CodegenProcessProbeBatch(LlvmCodeGen* codegen,
     
   process_probe_batch_fn = codegen->ReplaceCallSites(process_probe_batch_fn, false,
       equals_fn, "Equals", &replaced);
-  DCHECK_EQ(replaced, 1);
+  DCHECK_EQ(replaced, 2);
 
   return codegen->OptimizeFunctionWithExprs(process_probe_batch_fn);
 }

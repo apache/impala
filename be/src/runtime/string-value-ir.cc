@@ -1,7 +1,7 @@
 // Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #ifdef IR_COMPILE
-#include "runtime/string-value.h"
+#include "runtime/string-value.inline.h"
 
 using namespace impala;
 

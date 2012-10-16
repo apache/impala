@@ -22,6 +22,9 @@ cd $IMPALA_HOME
 cmake -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE .
 make clean
 
+rm -f $IMPALA_HOME/llvm-ir/impala-nosse.ll
+rm -f $IMPALA_HOME/llvm-ir/impala-sse.ll
+
 cd $IMPALA_HOME/common/function-registry
 make
 cd $IMPALA_HOME/common/thrift
