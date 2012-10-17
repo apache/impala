@@ -39,13 +39,13 @@ import com.cloudera.impala.thrift.TStmtType;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 
-public class NewPlannerTest {
-  private final static Logger LOG = LoggerFactory.getLogger(NewPlannerTest.class);
+public class PlannerTest {
+  private final static Logger LOG = LoggerFactory.getLogger(PlannerTest.class);
   private final static boolean GENERATE_OUTPUT_FILE = true;
 
   private static Frontend frontend;
-  private final String testDir = "functional-newplanner/queries/PlannerTest";
-  private final String outDir = "/tmp/NewPlannerTest/";
+  private final String testDir = "functional-planner/queries/PlannerTest";
+  private final String outDir = "/tmp/PlannerTest/";
 
   @BeforeClass
   public static void setUp() throws Exception {

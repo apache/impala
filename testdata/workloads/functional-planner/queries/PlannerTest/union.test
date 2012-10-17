@@ -6,6 +6,7 @@ union all
 select * from alltypestiny where year=2009 and month=2
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   MERGE (0)
     TUPLE IDS: 3 
     SCAN HDFS table=default.alltypestiny (1)
@@ -14,17 +15,54 @@ Plan Fragment 0
       TUPLE IDS: 1 
     SCAN HDFS table=default.alltypestiny (3)
       TUPLE IDS: 2 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (4)
+    TUPLE IDS: 3 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
+  MERGE (7)
+    TUPLE IDS: 3 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 2 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
+  MERGE (6)
+    TUPLE IDS: 3 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
+  MERGE (5)
+    TUPLE IDS: 3 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
 ====
 // Only UNION ALL with limit inside operands. One of the operands also has an order by.
 select * from alltypestiny where year=2009 and month=1 limit 1
@@ -34,6 +72,7 @@ union all
 select * from alltypestiny where year=2009 and month=2 limit 1
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   MERGE (0)
     TUPLE IDS: 3 
     SCAN HDFS table=default.alltypestiny (1)
@@ -48,17 +87,69 @@ Plan Fragment 0
     SCAN HDFS table=default.alltypestiny (4)
       LIMIT: 1
       TUPLE IDS: 2 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (6)
+    TUPLE IDS: 3 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 4
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (9)
+    TUPLE IDS: 3 
+    SCAN HDFS table=default.alltypestiny (4)
+      LIMIT: 1
+      TUPLE IDS: 2 
+
+Plan Fragment 2
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (8)
+    TUPLE IDS: 3 
+    TOP-N
+    ORDER BY: int_col ASC
+    LIMIT: 1
+    TUPLE IDS: 1 
+      EXCHANGE (5)
+        TUPLE IDS: 1 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  SCAN HDFS table=default.alltypestiny (2)
+    TUPLE IDS: 1 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (7)
+    TUPLE IDS: 3 
+    SCAN HDFS table=default.alltypestiny (1)
+      LIMIT: 1
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 4:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
 ====
 // Only UNION DISTINCT, no nested unions
 select * from alltypestiny where year=2009 and month=1
@@ -68,6 +159,7 @@ union distinct
 select * from alltypestiny where year=2009 and month=2
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   AGGREGATE
   OUTPUT: 
   GROUP BY: <slot 39>, <slot 40>, <slot 41>, <slot 42>, <slot 43>, <slot 44>, <slot 45>, <slot 46>, <slot 47>, <slot 48>, <slot 49>, <slot 50>, <slot 51>
@@ -80,17 +172,58 @@ Plan Fragment 0
         TUPLE IDS: 1 
       SCAN HDFS table=default.alltypestiny (3)
         TUPLE IDS: 2 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 39>, <slot 40>, <slot 41>, <slot 42>, <slot 43>, <slot 44>, <slot 45>, <slot 46>, <slot 47>, <slot 48>, <slot 49>, <slot 50>, <slot 51>
+  TUPLE IDS: 3 
+    EXCHANGE (5)
+      TUPLE IDS: 3 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  MERGE (8)
+    TUPLE IDS: 3 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 2 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  MERGE (7)
+    TUPLE IDS: 3 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  MERGE (6)
+    TUPLE IDS: 3 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
 ====
 // Only UNION ALL, mixed selects with and without from clauses, no nested unions
 select * from alltypestiny where year=2009 and month=1
@@ -102,6 +235,7 @@ union all
 select 2009,1,1,false,1,1,1,10,1.1,10.1,'01/01/09','1',cast('2009-01-01 00:01:00' as timestamp)
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   MERGE (0)
     TUPLE IDS: 2 
     SELECT CONSTANT
@@ -110,15 +244,15 @@ Plan Fragment 0
       TUPLE IDS: 0 
     SCAN HDFS table=default.alltypestiny (2)
       TUPLE IDS: 1 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 not implemented
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
 ====
 // Only UNION DISTINCT, mixed selects with and without from clauses, no nested unions
 select * from alltypestiny where year=2009 and month=1
@@ -130,6 +264,7 @@ union distinct
 select 2009,1,1,false,1,1,1,10,1.1,10.1,'01/01/09','1',cast('2009-01-01 00:01:00' as timestamp)
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   AGGREGATE
   OUTPUT: 
   GROUP BY: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
@@ -142,15 +277,15 @@ Plan Fragment 0
         TUPLE IDS: 0 
       SCAN HDFS table=default.alltypestiny (2)
         TUPLE IDS: 1 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 not implemented
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
 ====
 // Mixed UNION ALL/DISTINCT but effectively only UNION DISTINCT, no nested unions,
 // with order by and limit
@@ -164,6 +299,7 @@ union distinct
 order by 3 limit 3 
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   TOP-N
   ORDER BY: <slot 54> ASC
   LIMIT: 3
@@ -182,19 +318,76 @@ Plan Fragment 0
           TUPLE IDS: 2 
         SCAN HDFS table=default.alltypestiny (4)
           TUPLE IDS: 3 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  TOP-N
+  ORDER BY: <slot 54> ASC
+  LIMIT: 3
+  TUPLE IDS: 4 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+    TUPLE IDS: 4 
+      EXCHANGE (7)
+        TUPLE IDS: 4 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 4
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  MERGE (11)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (4)
+      TUPLE IDS: 3 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  MERGE (10)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 2 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  MERGE (9)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  MERGE (8)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 4:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
 ====
 // Mixed UNION ALL/DISTINCT, no nested unions, with order by and limit
 select * from alltypestiny where year=2009 and month=1
@@ -207,6 +400,7 @@ union all
 order by 3,4 limit 3
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   TOP-N
   ORDER BY: <slot 54> ASC, <slot 55> ASC
   LIMIT: 3
@@ -227,19 +421,87 @@ Plan Fragment 0
         TUPLE IDS: 2 
       SCAN HDFS table=default.alltypestiny (6)
         TUPLE IDS: 3 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  TOP-N
+  ORDER BY: <slot 54> ASC, <slot 55> ASC
+  LIMIT: 3
+  TUPLE IDS: 4 
+    EXCHANGE (11)
+      TUPLE IDS: 4 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 5
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 6
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  MERGE (14)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (6)
+      TUPLE IDS: 3 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  MERGE (13)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (5)
+      TUPLE IDS: 2 
+
+Plan Fragment 3
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  MERGE (12)
+    TUPLE IDS: 4 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+    TUPLE IDS: 4 
+      EXCHANGE (8)
+        TUPLE IDS: 4 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  MERGE (10)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 5
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  MERGE (9)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 5:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 6:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
 ====
 // Mixed UNION ALL/DISTINCT, no nested unions, with order by and limit
 select * from alltypestiny where year=2009 and month=1
@@ -252,6 +514,7 @@ union all
 order by 3,4 limit 4
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   TOP-N
   ORDER BY: <slot 54> ASC, <slot 55> ASC
   LIMIT: 4
@@ -272,19 +535,87 @@ Plan Fragment 0
             TUPLE IDS: 2 
       SCAN HDFS table=default.alltypestiny (6)
         TUPLE IDS: 3 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  TOP-N
+  ORDER BY: <slot 54> ASC, <slot 55> ASC
+  LIMIT: 4
+  TUPLE IDS: 4 
+    EXCHANGE (12)
+      TUPLE IDS: 4 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 6
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 12
+    UNPARTITIONED
+
+  MERGE (14)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (6)
+      TUPLE IDS: 3 
+
+Plan Fragment 2
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 12
+    UNPARTITIONED
+
+  MERGE (13)
+    TUPLE IDS: 4 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+    TUPLE IDS: 4 
+      EXCHANGE (8)
+        TUPLE IDS: 4 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  MERGE (11)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 2 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  MERGE (10)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 5
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  MERGE (9)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 6:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
 ====
 // Union unnesting: Only UNION ALL, first operand is nested
 (select * from alltypestiny where year=2009 and month=1
@@ -294,6 +625,7 @@ union all
 select * from alltypestiny where year=2009 and month=1
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   MERGE (0)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (1)
@@ -302,17 +634,54 @@ Plan Fragment 0
       TUPLE IDS: 1 
     SCAN HDFS table=default.alltypestiny (3)
       TUPLE IDS: 3 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (4)
+    TUPLE IDS: 4 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
+  MERGE (7)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 3 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
+  MERGE (6)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
+  MERGE (5)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
 ====
 // Union unnesting: Only UNION ALL, second operand is nested
 select * from alltypestiny where year=2009 and month=1
@@ -322,6 +691,7 @@ union all
    select * from alltypestiny where year=2009 and month=2)
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   MERGE (0)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (1)
@@ -330,17 +700,54 @@ Plan Fragment 0
       TUPLE IDS: 1 
     SCAN HDFS table=default.alltypestiny (3)
       TUPLE IDS: 2 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (4)
+    TUPLE IDS: 4 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
+  MERGE (7)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 2 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
+  MERGE (6)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
+  MERGE (5)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
 ====
 // Union unnesting: Only UNION DISTINCT, first operand is nested
 (select * from alltypestiny where year=2009 and month=1
@@ -350,6 +757,7 @@ union distinct
 select * from alltypestiny where year=2009 and month=1
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   AGGREGATE
   OUTPUT: 
   GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
@@ -362,17 +770,58 @@ Plan Fragment 0
         TUPLE IDS: 1 
       SCAN HDFS table=default.alltypestiny (3)
         TUPLE IDS: 3 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  TUPLE IDS: 4 
+    EXCHANGE (5)
+      TUPLE IDS: 4 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  MERGE (8)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 3 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  MERGE (7)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  MERGE (6)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
 ====
 // Union unnesting: Only UNION DISTINCT, second operand is nested
 select * from alltypestiny where year=2009 and month=1
@@ -382,6 +831,7 @@ union distinct
    select * from alltypestiny where year=2009 and month=2)
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   AGGREGATE
   OUTPUT: 
   GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
@@ -394,17 +844,58 @@ Plan Fragment 0
         TUPLE IDS: 1 
       SCAN HDFS table=default.alltypestiny (3)
         TUPLE IDS: 2 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  TUPLE IDS: 4 
+    EXCHANGE (5)
+      TUPLE IDS: 4 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  MERGE (8)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 2 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  MERGE (7)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  MERGE (6)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
 ====
 // Union unnesting: UNION ALL doesn't absorb nested union with DISTINCT, 
 // first operand is nested
@@ -415,6 +906,7 @@ union all
 select * from alltypestiny where year=2009 and month=1  
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   MERGE (0)
     TUPLE IDS: 4 
     AGGREGATE
@@ -429,17 +921,69 @@ Plan Fragment 0
           TUPLE IDS: 1 
     SCAN HDFS table=default.alltypestiny (5)
       TUPLE IDS: 3 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (9)
+    TUPLE IDS: 4 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 5
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  MERGE (11)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (5)
+      TUPLE IDS: 3 
+
+Plan Fragment 2
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  MERGE (10)
+    TUPLE IDS: 4 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
+    TUPLE IDS: 2 
+      EXCHANGE (6)
+        TUPLE IDS: 2 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (8)
+    TUPLE IDS: 2 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 1 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (7)
+    TUPLE IDS: 2 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 5:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
 ====
 // Union unnesting: UNION ALL doesn't absorb nested union with DISTINCT,
 // second operand is nested
@@ -450,6 +994,7 @@ union all
    select * from alltypestiny where year=2009 and month=2)
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   MERGE (0)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (1)
@@ -464,17 +1009,69 @@ Plan Fragment 0
           TUPLE IDS: 1 
         SCAN HDFS table=default.alltypestiny (4)
           TUPLE IDS: 2 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (9)
+    TUPLE IDS: 4 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 4
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  MERGE (11)
+    TUPLE IDS: 4 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 39>, <slot 40>, <slot 41>, <slot 42>, <slot 43>, <slot 44>, <slot 45>, <slot 46>, <slot 47>, <slot 48>, <slot 49>, <slot 50>, <slot 51>
+    TUPLE IDS: 3 
+      EXCHANGE (6)
+        TUPLE IDS: 3 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (8)
+    TUPLE IDS: 3 
+    SCAN HDFS table=default.alltypestiny (4)
+      TUPLE IDS: 2 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (7)
+    TUPLE IDS: 3 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 1 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  MERGE (10)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 4:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
 ====
 // Union unnesting: UNION ALL absorbs the children but not directly the operands 
 // of a nested union with mixed ALL/DISTINCT, first operand is nested
@@ -487,6 +1084,7 @@ union all
 select * from alltypestiny where year=2009 and month=1
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   MERGE (0)
     TUPLE IDS: 5 
     AGGREGATE
@@ -503,19 +1101,83 @@ Plan Fragment 0
       TUPLE IDS: 2 
     SCAN HDFS table=default.alltypestiny (7)
       TUPLE IDS: 4 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (11)
+    TUPLE IDS: 5 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 6
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 7
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  MERGE (14)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypestiny (7)
+      TUPLE IDS: 4 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  MERGE (13)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypestiny (6)
+      TUPLE IDS: 2 
+
+Plan Fragment 3
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  MERGE (12)
+    TUPLE IDS: 5 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 39>, <slot 40>, <slot 41>, <slot 42>, <slot 43>, <slot 44>, <slot 45>, <slot 46>, <slot 47>, <slot 48>, <slot 49>, <slot 50>, <slot 51>
+    TUPLE IDS: 3 
+      EXCHANGE (8)
+        TUPLE IDS: 3 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  MERGE (10)
+    TUPLE IDS: 3 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 1 
+
+Plan Fragment 5
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  MERGE (9)
+    TUPLE IDS: 3 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 6:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 7:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
 ====
 // Union unnesting: UNION ALL absorbs the children but not directly the operands 
 // of a nested union with mixed ALL/DISTINCT, second operand is nested
@@ -528,6 +1190,7 @@ union all
    select * from alltypestiny where year=2009 and month=2)
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   MERGE (0)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (1)
@@ -544,19 +1207,83 @@ Plan Fragment 0
           TUPLE IDS: 2 
     SCAN HDFS table=default.alltypestiny (7)
       TUPLE IDS: 3 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (11)
+    TUPLE IDS: 5 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 4
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 7
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  MERGE (14)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypestiny (7)
+      TUPLE IDS: 3 
+
+Plan Fragment 2
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  MERGE (13)
+    TUPLE IDS: 5 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+    TUPLE IDS: 4 
+      EXCHANGE (8)
+        TUPLE IDS: 4 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  MERGE (10)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (4)
+      TUPLE IDS: 2 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  MERGE (9)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 1 
+
+Plan Fragment 5
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  MERGE (12)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 4:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 7:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
 ====
 // Union unnesting: UNION ALL doesn't absorb the children of a nested union  
 // with mixed ALL/DISTINCT and limit, second operand is nested
@@ -570,6 +1297,7 @@ union all
    limit 10)
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   MERGE (0)
     TUPLE IDS: 5 
     SCAN HDFS table=default.alltypestiny (1)
@@ -589,19 +1317,97 @@ Plan Fragment 0
             TUPLE IDS: 2 
       SCAN HDFS table=default.alltypestiny (7)
         TUPLE IDS: 3 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (14)
+    TUPLE IDS: 5 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 4
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 7
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 14
+    UNPARTITIONED
+
+  MERGE (16)
+    TUPLE IDS: 5 
+    EXCHANGE (11)
+      LIMIT: 10
+      TUPLE IDS: 4 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  MERGE (13)
+    LIMIT: 10
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (7)
+      TUPLE IDS: 3 
+
+Plan Fragment 3
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  MERGE (12)
+    LIMIT: 10
+    TUPLE IDS: 4 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+    TUPLE IDS: 4 
+      EXCHANGE (8)
+        TUPLE IDS: 4 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  MERGE (10)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (4)
+      TUPLE IDS: 2 
+
+Plan Fragment 5
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  MERGE (9)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 1 
+
+Plan Fragment 6
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 14
+    UNPARTITIONED
+
+  MERGE (15)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 4:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 7:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
 ====
 // Union unnesting: UNION ALL doesn't absorb nested union with order by and limit,
 // first operand is nested
@@ -613,6 +1419,7 @@ union all
 select * from alltypestiny where year=2009 and month=1  
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   MERGE (0)
     TUPLE IDS: 4 
     TOP-N
@@ -627,17 +1434,69 @@ Plan Fragment 0
           TUPLE IDS: 1 
     SCAN HDFS table=default.alltypestiny (5)
       TUPLE IDS: 3 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (9)
+    TUPLE IDS: 4 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 5
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  MERGE (11)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (5)
+      TUPLE IDS: 3 
+
+Plan Fragment 2
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  MERGE (10)
+    TUPLE IDS: 4 
+    TOP-N
+    ORDER BY: <slot 28> ASC
+    LIMIT: 3
+    TUPLE IDS: 2 
+      EXCHANGE (6)
+        TUPLE IDS: 2 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (8)
+    TUPLE IDS: 2 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 1 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (7)
+    TUPLE IDS: 2 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 5:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
 ====
 // Union unnesting: UNION ALL doesn't absorb nested union with order by and limit,
 // second operand is nested
@@ -649,6 +1508,7 @@ union all
    order by 3 limit 3)
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   MERGE (0)
     TUPLE IDS: 4 
     SCAN HDFS table=default.alltypestiny (1)
@@ -663,17 +1523,69 @@ Plan Fragment 0
           TUPLE IDS: 1 
         SCAN HDFS table=default.alltypestiny (4)
           TUPLE IDS: 2 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (9)
+    TUPLE IDS: 4 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 4
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  MERGE (11)
+    TUPLE IDS: 4 
+    TOP-N
+    ORDER BY: <slot 41> ASC
+    LIMIT: 3
+    TUPLE IDS: 3 
+      EXCHANGE (6)
+        TUPLE IDS: 3 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (8)
+    TUPLE IDS: 3 
+    SCAN HDFS table=default.alltypestiny (4)
+      TUPLE IDS: 2 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (7)
+    TUPLE IDS: 3 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 1 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  MERGE (10)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 4:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
 ====
 // Union unnesting: UNION DISTINCT absorbs nested union with ALL
 // first operand is nested
@@ -684,6 +1596,7 @@ union distinct
 select * from alltypestiny where year=2009 and month=1
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   AGGREGATE
   OUTPUT: 
   GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
@@ -696,17 +1609,58 @@ Plan Fragment 0
         TUPLE IDS: 1 
       SCAN HDFS table=default.alltypestiny (3)
         TUPLE IDS: 3 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  TUPLE IDS: 4 
+    EXCHANGE (5)
+      TUPLE IDS: 4 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  MERGE (8)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 3 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  MERGE (7)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  MERGE (6)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
 ====
 // Union unnesting: UNION DISTINCT absorbs nested union with ALL,
 // second operand is nested
@@ -717,6 +1671,7 @@ union distinct
    select * from alltypestiny where year=2009 and month=2)
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   AGGREGATE
   OUTPUT: 
   GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
@@ -729,17 +1684,58 @@ Plan Fragment 0
         TUPLE IDS: 1 
       SCAN HDFS table=default.alltypestiny (3)
         TUPLE IDS: 2 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  TUPLE IDS: 4 
+    EXCHANGE (5)
+      TUPLE IDS: 4 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  MERGE (8)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 2 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  MERGE (7)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  MERGE (6)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
 ====
 // Union unnesting: UNION DISTINCT absorbs nested union with mixed ALL/DISTINCT,
 // first operand is nested
@@ -752,6 +1748,7 @@ union distinct
 select * from alltypestiny where year=2009 and month=1
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   AGGREGATE
   OUTPUT: 
   GROUP BY: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
@@ -766,19 +1763,72 @@ Plan Fragment 0
         TUPLE IDS: 2 
       SCAN HDFS table=default.alltypestiny (4)
         TUPLE IDS: 4 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+  TUPLE IDS: 5 
+    EXCHANGE (6)
+      TUPLE IDS: 5 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 4
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (10)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypestiny (4)
+      TUPLE IDS: 4 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (9)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 2 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (8)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (7)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 4:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
 ====
 // Union unnesting: UNION DISTINCT absorbs nested union with mixed ALL/DISTINCT,
 // second operand is nested
@@ -791,6 +1841,7 @@ union distinct
    select * from alltypestiny where year=2009 and month=2)
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   AGGREGATE
   OUTPUT: 
   GROUP BY: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
@@ -805,19 +1856,72 @@ Plan Fragment 0
         TUPLE IDS: 2 
       SCAN HDFS table=default.alltypestiny (4)
         TUPLE IDS: 3 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+  TUPLE IDS: 5 
+    EXCHANGE (6)
+      TUPLE IDS: 5 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 4
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (10)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypestiny (4)
+      TUPLE IDS: 3 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (9)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 2 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (8)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (7)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 4:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
 ====
 // Union unnesting: UNION DISTINCT doesn't absorb nested union with order by and limit,
 // first operand is nested
@@ -829,6 +1933,7 @@ union distinct
 select * from alltypestiny where year=2009 and month=1  
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   AGGREGATE
   OUTPUT: 
   GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
@@ -847,17 +1952,73 @@ Plan Fragment 0
             TUPLE IDS: 1 
       SCAN HDFS table=default.alltypestiny (5)
         TUPLE IDS: 3 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  TUPLE IDS: 4 
+    EXCHANGE (10)
+      TUPLE IDS: 4 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 5
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 10
+    UNPARTITIONED
+
+  MERGE (12)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (5)
+      TUPLE IDS: 3 
+
+Plan Fragment 2
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 10
+    UNPARTITIONED
+
+  MERGE (11)
+    TUPLE IDS: 4 
+    TOP-N
+    ORDER BY: <slot 28> ASC
+    LIMIT: 3
+    TUPLE IDS: 2 
+      EXCHANGE (7)
+        TUPLE IDS: 2 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  MERGE (9)
+    TUPLE IDS: 2 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 1 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  MERGE (8)
+    TUPLE IDS: 2 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 5:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
 ====
 // Union unnesting: UNION DISTINCT doesn't absorb nested union with order by and limit
 // second operand is nested
@@ -869,6 +2030,7 @@ union distinct
    order by 3 limit 3)
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   AGGREGATE
   OUTPUT: 
   GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
@@ -887,17 +2049,73 @@ Plan Fragment 0
             TUPLE IDS: 1 
           SCAN HDFS table=default.alltypestiny (4)
             TUPLE IDS: 2 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 52>, <slot 53>, <slot 54>, <slot 55>, <slot 56>, <slot 57>, <slot 58>, <slot 59>, <slot 60>, <slot 61>, <slot 62>, <slot 63>, <slot 64>
+  TUPLE IDS: 4 
+    EXCHANGE (10)
+      TUPLE IDS: 4 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 4
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 10
+    UNPARTITIONED
+
+  MERGE (12)
+    TUPLE IDS: 4 
+    TOP-N
+    ORDER BY: <slot 41> ASC
+    LIMIT: 3
+    TUPLE IDS: 3 
+      EXCHANGE (7)
+        TUPLE IDS: 3 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  MERGE (9)
+    TUPLE IDS: 3 
+    SCAN HDFS table=default.alltypestiny (4)
+      TUPLE IDS: 2 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  MERGE (8)
+    TUPLE IDS: 3 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 1 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 10
+    UNPARTITIONED
+
+  MERGE (11)
+    TUPLE IDS: 4 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 4:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
 ====
 // Complex union unnesting: Multiple levels of UNION ALL, fully unnestable
 select * from alltypestiny where year=2009 and month=1
@@ -911,6 +2129,7 @@ union all
          select * from alltypestiny where year=2009 and month=3)))
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   MERGE (0)
     TUPLE IDS: 8 
     SCAN HDFS table=default.alltypestiny (1)
@@ -923,21 +2142,82 @@ Plan Fragment 0
       TUPLE IDS: 3 
     SCAN HDFS table=default.alltypestiny (5)
       TUPLE IDS: 4 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (6)
+    TUPLE IDS: 8 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 4
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 5
-        hdfs:alltypestiny/year=2009/month=3/090301.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (11)
+    TUPLE IDS: 8 
+    SCAN HDFS table=default.alltypestiny (5)
+      TUPLE IDS: 4 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (10)
+    TUPLE IDS: 8 
+    SCAN HDFS table=default.alltypestiny (4)
+      TUPLE IDS: 3 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (9)
+    TUPLE IDS: 8 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 2 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (8)
+    TUPLE IDS: 8 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 5
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (7)
+    TUPLE IDS: 8 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 4:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 5:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=3/090301.txt 0:115
+  LOCATIONS:
 ====
 // Complex union unnesting: Multiple levels of UNION DISTINCT, fully unnestable
 select * from alltypestiny where year=2009 and month=1
@@ -951,6 +2231,7 @@ union distinct
          select * from alltypestiny where year=2009 and month=3)))
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   AGGREGATE
   OUTPUT: 
   GROUP BY: <slot 104>, <slot 105>, <slot 106>, <slot 107>, <slot 108>, <slot 109>, <slot 110>, <slot 111>, <slot 112>, <slot 113>, <slot 114>, <slot 115>, <slot 116>
@@ -967,21 +2248,86 @@ Plan Fragment 0
         TUPLE IDS: 3 
       SCAN HDFS table=default.alltypestiny (5)
         TUPLE IDS: 4 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 104>, <slot 105>, <slot 106>, <slot 107>, <slot 108>, <slot 109>, <slot 110>, <slot 111>, <slot 112>, <slot 113>, <slot 114>, <slot 115>, <slot 116>
+  TUPLE IDS: 8 
+    EXCHANGE (7)
+      TUPLE IDS: 8 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 4
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 5
-        hdfs:alltypestiny/year=2009/month=3/090301.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  MERGE (12)
+    TUPLE IDS: 8 
+    SCAN HDFS table=default.alltypestiny (5)
+      TUPLE IDS: 4 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  MERGE (11)
+    TUPLE IDS: 8 
+    SCAN HDFS table=default.alltypestiny (4)
+      TUPLE IDS: 3 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  MERGE (10)
+    TUPLE IDS: 8 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 2 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  MERGE (9)
+    TUPLE IDS: 8 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 5
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  MERGE (8)
+    TUPLE IDS: 8 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 4:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 5:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=3/090301.txt 0:115
+  LOCATIONS:
 ====
 // Complex union unnesting: Partially unnestable up to 2nd level
 select * from alltypestiny where year=2009 and month=1
@@ -996,6 +2342,7 @@ union all
          order by 3 limit 3)))
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   MERGE (0)
     TUPLE IDS: 8 
     SCAN HDFS table=default.alltypestiny (1)
@@ -1024,21 +2371,116 @@ Plan Fragment 0
                 TUPLE IDS: 3 
               SCAN HDFS table=default.alltypestiny (7)
                 TUPLE IDS: 4 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (18)
+    TUPLE IDS: 8 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 4
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 6
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 7
-        hdfs:alltypestiny/year=2009/month=3/090301.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 18
+    UNPARTITIONED
+
+  MERGE (20)
+    TUPLE IDS: 8 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 91>, <slot 92>, <slot 93>, <slot 94>, <slot 95>, <slot 96>, <slot 97>, <slot 98>, <slot 99>, <slot 100>, <slot 101>, <slot 102>, <slot 103>
+    TUPLE IDS: 7 
+      EXCHANGE (14)
+        TUPLE IDS: 7 
+
+Plan Fragment 2
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 14
+    UNPARTITIONED
+
+  MERGE (17)
+    TUPLE IDS: 7 
+    TOP-N
+    ORDER BY: <slot 67> ASC
+    LIMIT: 3
+    TUPLE IDS: 5 
+      AGGREGATE
+      OUTPUT: 
+      GROUP BY: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+      TUPLE IDS: 5 
+        EXCHANGE (11)
+          TUPLE IDS: 5 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  MERGE (13)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypestiny (7)
+      TUPLE IDS: 4 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  MERGE (12)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypestiny (6)
+      TUPLE IDS: 3 
+
+Plan Fragment 5
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 14
+    UNPARTITIONED
+
+  MERGE (16)
+    TUPLE IDS: 7 
+    SCAN HDFS table=default.alltypestiny (4)
+      TUPLE IDS: 2 
+
+Plan Fragment 6
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 14
+    UNPARTITIONED
+
+  MERGE (15)
+    TUPLE IDS: 7 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 1 
+
+Plan Fragment 7
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 18
+    UNPARTITIONED
+
+  MERGE (19)
+    TUPLE IDS: 8 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 4:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 6:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 7:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=3/090301.txt 0:115
+  LOCATIONS:
 ====
 // Complex union unnesting: Partially unnestable up to 1st level
 select * from alltypestiny where year=2009 and month=1
@@ -1053,6 +2495,7 @@ union distinct
          order by 3 limit 3)))
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   AGGREGATE
   OUTPUT: 
   GROUP BY: <slot 104>, <slot 105>, <slot 106>, <slot 107>, <slot 108>, <slot 109>, <slot 110>, <slot 111>, <slot 112>, <slot 113>, <slot 114>, <slot 115>, <slot 116>
@@ -1079,21 +2522,105 @@ Plan Fragment 0
               TUPLE IDS: 3 
             SCAN HDFS table=default.alltypestiny (6)
               TUPLE IDS: 4 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 104>, <slot 105>, <slot 106>, <slot 107>, <slot 108>, <slot 109>, <slot 110>, <slot 111>, <slot 112>, <slot 113>, <slot 114>, <slot 115>, <slot 116>
+  TUPLE IDS: 8 
+    EXCHANGE (13)
+      TUPLE IDS: 8 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 5
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 6
-        hdfs:alltypestiny/year=2009/month=3/090301.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 13
+    UNPARTITIONED
+
+  MERGE (17)
+    TUPLE IDS: 8 
+    TOP-N
+    ORDER BY: <slot 67> ASC
+    LIMIT: 3
+    TUPLE IDS: 5 
+      AGGREGATE
+      OUTPUT: 
+      GROUP BY: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+      TUPLE IDS: 5 
+        EXCHANGE (10)
+          TUPLE IDS: 5 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 10
+    UNPARTITIONED
+
+  MERGE (12)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypestiny (6)
+      TUPLE IDS: 4 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 10
+    UNPARTITIONED
+
+  MERGE (11)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypestiny (5)
+      TUPLE IDS: 3 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 13
+    UNPARTITIONED
+
+  MERGE (16)
+    TUPLE IDS: 8 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 2 
+
+Plan Fragment 5
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 13
+    UNPARTITIONED
+
+  MERGE (15)
+    TUPLE IDS: 8 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 6
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 13
+    UNPARTITIONED
+
+  MERGE (14)
+    TUPLE IDS: 8 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 5:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 6:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=3/090301.txt 0:115
+  LOCATIONS:
 ====
 // Complex union unnesting: Multiple nested unions to test all rules in a single query
 select * from alltypestiny where year=2009 and month=1
@@ -1117,6 +2644,7 @@ union all
    order by 3 limit 3)        
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   MERGE (9)
     TUPLE IDS: 13 
     AGGREGATE
@@ -1132,7 +2660,7 @@ Plan Fragment 0
         SCAN HDFS table=default.alltypestiny (3)
           TUPLE IDS: 2 
         TOP-N
-         ORDER BY: <slot 80> ASC
+        ORDER BY: <slot 80> ASC
         LIMIT: 3
         TUPLE IDS: 6 
           MERGE (4)
@@ -1155,27 +2683,181 @@ Plan Fragment 0
           TUPLE IDS: 10 
         SCAN HDFS table=default.alltypestiny (14)
           TUPLE IDS: 11 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (27)
+    TUPLE IDS: 13 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 5
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
-      HDFS SPLITS NODE ID: 6
-        hdfs:alltypestiny/year=2009/month=3/090301.txt 0:115
-      HDFS SPLITS NODE ID: 10
-        hdfs:alltypestiny/year=2009/month=3/090301.txt 0:115
-      HDFS SPLITS NODE ID: 11
-        hdfs:alltypestiny/year=2009/month=4/090401.txt 0:115
-      HDFS SPLITS NODE ID: 13
-        hdfs:alltypestiny/year=2009/month=4/090401.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 27
+    UNPARTITIONED
+
+  MERGE (31)
+    TUPLE IDS: 13 
+    TOP-N
+    ORDER BY: <slot 158> ASC
+    LIMIT: 3
+    TUPLE IDS: 12 
+      EXCHANGE (24)
+        TUPLE IDS: 12 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 24
+    UNPARTITIONED
+
+  MERGE (26)
+    TUPLE IDS: 12 
+    SCAN HDFS table=default.alltypestiny (14)
+      TUPLE IDS: 11 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 24
+    UNPARTITIONED
+
+  MERGE (25)
+    TUPLE IDS: 12 
+    SCAN HDFS table=default.alltypestiny (13)
+      TUPLE IDS: 10 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 27
+    UNPARTITIONED
+
+  MERGE (30)
+    TUPLE IDS: 13 
+    SCAN HDFS table=default.alltypestiny (11)
+      TUPLE IDS: 8 
+
+Plan Fragment 5
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 27
+    UNPARTITIONED
+
+  MERGE (29)
+    TUPLE IDS: 13 
+    SCAN HDFS table=default.alltypestiny (10)
+      TUPLE IDS: 7 
+
+Plan Fragment 6
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 27
+    UNPARTITIONED
+
+  MERGE (28)
+    TUPLE IDS: 13 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 169>, <slot 170>, <slot 171>, <slot 172>, <slot 173>, <slot 174>, <slot 175>, <slot 176>, <slot 177>, <slot 178>, <slot 179>, <slot 180>, <slot 181>
+    TUPLE IDS: 13 
+      EXCHANGE (19)
+        TUPLE IDS: 13 
+
+Plan Fragment 7
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 19
+    UNPARTITIONED
+
+  MERGE (23)
+    TUPLE IDS: 13 
+    TOP-N
+    ORDER BY: <slot 80> ASC
+    LIMIT: 3
+    TUPLE IDS: 6 
+      EXCHANGE (16)
+        TUPLE IDS: 6 
+
+Plan Fragment 8
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 16
+    UNPARTITIONED
+
+  MERGE (18)
+    TUPLE IDS: 6 
+    SCAN HDFS table=default.alltypestiny (6)
+      TUPLE IDS: 5 
+
+Plan Fragment 9
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 16
+    UNPARTITIONED
+
+  MERGE (17)
+    TUPLE IDS: 6 
+    SCAN HDFS table=default.alltypestiny (5)
+      TUPLE IDS: 4 
+
+Plan Fragment 10
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 19
+    UNPARTITIONED
+
+  MERGE (22)
+    TUPLE IDS: 13 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 2 
+
+Plan Fragment 11
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 19
+    UNPARTITIONED
+
+  MERGE (21)
+    TUPLE IDS: 13 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 12
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 19
+    UNPARTITIONED
+
+  MERGE (20)
+    TUPLE IDS: 13 
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 5:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
+NODE 6:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=3/090301.txt 0:115
+  LOCATIONS:
+NODE 10:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=3/090301.txt 0:115
+  LOCATIONS:
+NODE 11:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=4/090401.txt 0:115
+  LOCATIONS:
+NODE 13:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=4/090401.txt 0:115
+  LOCATIONS:
+NODE 14:
 ====
 // UNION ALL in subquery
 select x.* from
@@ -1187,6 +2869,7 @@ union all
 order by 3 limit 5
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   TOP-N
   ORDER BY: <slot 67> ASC
   LIMIT: 5
@@ -1201,17 +2884,69 @@ Plan Fragment 0
           TUPLE IDS: 1 
       SCAN HDFS table=default.alltypestiny (4)
         TUPLE IDS: 4 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  TOP-N
+  ORDER BY: <slot 67> ASC
+  LIMIT: 5
+  TUPLE IDS: 5 
+    EXCHANGE (9)
+      TUPLE IDS: 5 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 4
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  MERGE (11)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypestiny (4)
+      TUPLE IDS: 4 
+
+Plan Fragment 2
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  MERGE (10)
+    TUPLE IDS: 5 
+    EXCHANGE (6)
+      TUPLE IDS: 2 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (8)
+    TUPLE IDS: 2 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 1 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  MERGE (7)
+    TUPLE IDS: 2 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 4:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
 ====
 // UNION DISTINCT in subquery
 select x.* from
@@ -1223,6 +2958,7 @@ union distinct
 order by 3 limit 3
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   TOP-N
   ORDER BY: <slot 67> ASC
   LIMIT: 3
@@ -1245,17 +2981,77 @@ Plan Fragment 0
               TUPLE IDS: 1 
         SCAN HDFS table=default.alltypestiny (5)
           TUPLE IDS: 4 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  TOP-N
+  ORDER BY: <slot 67> ASC
+  LIMIT: 3
+  TUPLE IDS: 5 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 65>, <slot 66>, <slot 67>, <slot 68>, <slot 69>, <slot 70>, <slot 71>, <slot 72>, <slot 73>, <slot 74>, <slot 75>, <slot 76>, <slot 77>
+    TUPLE IDS: 5 
+      EXCHANGE (11)
+        TUPLE IDS: 5 
 
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 5
-        hdfs:alltypestiny/year=2009/month=2/090201.txt 0:115
------------- DISTRIBUTEDPLAN
-not implemented
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  MERGE (13)
+    TUPLE IDS: 5 
+    SCAN HDFS table=default.alltypestiny (5)
+      TUPLE IDS: 4 
+
+Plan Fragment 2
+  UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  MERGE (12)
+    TUPLE IDS: 5 
+    AGGREGATE
+    OUTPUT: 
+    GROUP BY: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
+    TUPLE IDS: 2 
+      EXCHANGE (8)
+        TUPLE IDS: 2 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  MERGE (10)
+    TUPLE IDS: 2 
+    SCAN HDFS table=default.alltypestiny (3)
+      TUPLE IDS: 1 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  MERGE (9)
+    TUPLE IDS: 2 
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 5:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=2/090201.txt 0:115
+  LOCATIONS:
 ====
 // UNION ALL in subquery with a WHERE condition in the outer select.
 select x.* from
@@ -1265,42 +3061,50 @@ select x.* from
 where x.int_col < 5 and x.bool_col = false
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   MERGE (0)
     TUPLE IDS: 2 
     PREDICATES: <slot 32> < 5, <slot 29> = FALSE
     SCAN HDFS table=default.alltypestiny (1)
       TUPLE IDS: 0 
     SCAN HDFS table=default.alltypestiny (2)
-      TUPLE IDS: 1     
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
------------- DISTRIBUTEDPLAN
+      TUPLE IDS: 1 
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   EXCHANGE (3)
     TUPLE IDS: 2 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
-  MERGE (0)
+    UNPARTITIONED
+
+  MERGE (5)
+    TUPLE IDS: 2 
+    PREDICATES: <slot 32> < 5, <slot 29> = FALSE
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
+  MERGE (4)
     TUPLE IDS: 2 
     PREDICATES: <slot 32> < 5, <slot 29> = FALSE
     SCAN HDFS table=default.alltypestiny (1)
       TUPLE IDS: 0 
-    SCAN HDFS table=default.alltypestiny (2)
-      TUPLE IDS: 1     
-
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
 ====
 // UNION DISTINCT in subquery with a WHERE condition in the outer select.
 select x.* from
@@ -1310,6 +3114,7 @@ select x.* from
 where x.int_col < 5 and x.bool_col = false
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   AGGREGATE
   OUTPUT: 
   GROUP BY: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
@@ -1320,38 +3125,45 @@ Plan Fragment 0
       SCAN HDFS table=default.alltypestiny (1)
         TUPLE IDS: 0 
       SCAN HDFS table=default.alltypestiny (2)
-        TUPLE IDS: 1       
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
------------- DISTRIBUTEDPLAN
+        TUPLE IDS: 1 
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
-  EXCHANGE (4)
-    TUPLE IDS: 2 
+  UNPARTITIONED
+  AGGREGATE
+  OUTPUT: 
+  GROUP BY: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
+  TUPLE IDS: 2 
+    EXCHANGE (4)
+      TUPLE IDS: 2 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
-  AGGREGATE
-  OUTPUT: 
-  GROUP BY: <slot 26>, <slot 27>, <slot 28>, <slot 29>, <slot 30>, <slot 31>, <slot 32>, <slot 33>, <slot 34>, <slot 35>, <slot 36>, <slot 37>, <slot 38>
-  TUPLE IDS: 2 
-    MERGE (0)
-      TUPLE IDS: 2 
-      PREDICATES: <slot 32> < 5, <slot 29> = FALSE
-      SCAN HDFS table=default.alltypestiny (1)
-        TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypestiny (2)
-        TUPLE IDS: 1       
+    UNPARTITIONED
 
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
-      HDFS SPLITS NODE ID: 2
-        hdfs:alltypestiny/year=2009/month=1/090101.txt 0:115
+  MERGE (6)
+    TUPLE IDS: 2 
+    PREDICATES: <slot 32> < 5, <slot 29> = FALSE
+    SCAN HDFS table=default.alltypestiny (2)
+      TUPLE IDS: 1 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
+  MERGE (5)
+    TUPLE IDS: 2 
+    PREDICATES: <slot 32> < 5, <slot 29> = FALSE
+    SCAN HDFS table=default.alltypestiny (1)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
+NODE 2:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypestiny/year=2009/month=1/090101.txt 0:115
+  LOCATIONS:
 ====

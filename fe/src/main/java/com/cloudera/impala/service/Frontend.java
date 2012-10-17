@@ -28,7 +28,7 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
-import com.cloudera.impala.planner.NewPlanner;
+import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.planner.PlanFragment;
 import com.cloudera.impala.planner.ScanNode;
 import com.cloudera.impala.thrift.TCatalogUpdate;
@@ -216,14 +216,14 @@ public class Frontend {
       return result;
     }
 
-    // create TQueryExecRequest2
+    // create TQueryExecRequest
     Preconditions.checkState(
         analysisResult.isQueryStmt() || analysisResult.isDmlStmt());
     TQueryExecRequest queryExecRequest = new TQueryExecRequest();
     result.setQuery_exec_request(queryExecRequest);
 
     // create plan
-    NewPlanner planner = new NewPlanner();
+    Planner planner = new Planner();
     ArrayList<PlanFragment> fragments =
         planner.createPlanFragments(analysisResult, request.queryOptions);
     List<ScanNode> scanNodes = Lists.newArrayList();

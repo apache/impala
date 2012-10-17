@@ -3,6 +3,7 @@ from testtbl t1 join testtbl t2 using(id)
 where t1.zip = 94611
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -13,14 +14,18 @@ Plan Fragment 0
         TUPLE IDS: 0 
       SCAN HDFS table=default.testtbl (1) compact
         TUPLE IDS: 1 
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
-  EXCHANGE (3)
+  UNPARTITIONED
+  EXCHANGE (4)
     TUPLE IDS: 0 1 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 3
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -29,8 +34,20 @@ Plan Fragment 1
       SCAN HDFS table=default.testtbl (0)
         PREDICATES: t1.zip = 94611
         TUPLE IDS: 0 
-      SCAN HDFS table=default.testtbl (1) compact
+      EXCHANGE (3)
         TUPLE IDS: 1 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
+  SCAN HDFS table=default.testtbl (1) compact
+    TUPLE IDS: 1 
+---- SCANRANGELOCATIONS
+NODE 0:
+NODE 1:
 ====
 # general exprs on both sides of equi-join predicates
 select *
@@ -39,6 +56,7 @@ on (t1.id - 1 = t2.id + 1)
 where t1.zip = 94611
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   HASH JOIN
     JOIN OP: LEFT OUTER JOIN
     HASH PREDICATES:
@@ -49,14 +67,18 @@ Plan Fragment 0
         TUPLE IDS: 0 
       SCAN HDFS table=default.testtbl (1) compact
         TUPLE IDS: 1 
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
-  EXCHANGE (3)
+  UNPARTITIONED
+  EXCHANGE (4)
     TUPLE IDS: 0 1N 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 3
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
   HASH JOIN
     JOIN OP: LEFT OUTER JOIN
     HASH PREDICATES:
@@ -65,8 +87,20 @@ Plan Fragment 1
       SCAN HDFS table=default.testtbl (0)
         PREDICATES: t1.zip = 94611
         TUPLE IDS: 0 
-      SCAN HDFS table=default.testtbl (1) compact
+      EXCHANGE (3)
         TUPLE IDS: 1 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
+  SCAN HDFS table=default.testtbl (1) compact
+    TUPLE IDS: 1 
+---- SCANRANGELOCATIONS
+NODE 0:
+NODE 1:
 ====
 # multiple join predicates;
 # scan predicates get propagated correctly;
@@ -80,6 +114,7 @@ and b.string_col = '15'
 and a.tinyint_col + b.tinyint_col < 15
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   HASH JOIN
     JOIN OP: RIGHT OUTER JOIN
     HASH PREDICATES:
@@ -93,26 +128,18 @@ Plan Fragment 0
       SCAN HDFS table=default.alltypessmall (1) compact
         PREDICATES: b.string_col = '15'
         TUPLE IDS: 1 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
-  EXCHANGE (3)
+  UNPARTITIONED
+  EXCHANGE (4)
     TUPLE IDS: 0N 1 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 3
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
   HASH JOIN
     JOIN OP: RIGHT OUTER JOIN
     HASH PREDICATES:
@@ -123,21 +150,35 @@ Plan Fragment 1
       SCAN HDFS table=default.alltypesagg (0)
         PREDICATES: a.tinyint_col = 15
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypessmall (1) compact
-        PREDICATES: b.string_col = '15'
+      EXCHANGE (3)
         TUPLE IDS: 1 
 
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
+  SCAN HDFS table=default.alltypessmall (1) compact
+    PREDICATES: b.string_col = '15'
+    TUPLE IDS: 1 
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+  LOCATIONS:
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
+  LOCATIONS:
 ====
 # same as before, with 3 tables;
 # non-eq join predicates are evaluated at the correct join node
@@ -155,6 +196,7 @@ and a.float_col - c.double_col < 0
 and (b.double_col * c.tinyint_col > 1000 or c.tinyint_col < 1000)
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   HASH JOIN
     JOIN OP: RIGHT OUTER JOIN
     HASH PREDICATES:
@@ -177,29 +219,18 @@ Plan Fragment 0
             TUPLE IDS: 1 
       SCAN HDFS table=default.alltypesaggnonulls (3) compact
         TUPLE IDS: 2 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypesaggnonulls/year=2010/month=1/day=1/100101.txt 0:75271
-        hdfs:alltypesaggnonulls/year=2010/month=1/day=2/100102.txt 0:76381
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
-  EXCHANGE (5)
+  UNPARTITIONED
+  EXCHANGE (7)
     TUPLE IDS: 0N 1N 2 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 5
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
   HASH JOIN
     JOIN OP: RIGHT OUTER JOIN
     HASH PREDICATES:
@@ -217,26 +248,51 @@ Plan Fragment 1
           SCAN HDFS table=default.alltypesagg (0)
             PREDICATES: a.tinyint_col = 15
             TUPLE IDS: 0 
-          SCAN HDFS table=default.alltypessmall (1) compact
-            PREDICATES: b.string_col = '15'
+          EXCHANGE (5)
             TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypesaggnonulls (3) compact
+      EXCHANGE (6)
         TUPLE IDS: 2 
 
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
-      HDFS SPLITS NODE ID: 3
-        hdfs:alltypesaggnonulls/year=2010/month=1/day=1/100101.txt 0:75271
-        hdfs:alltypesaggnonulls/year=2010/month=1/day=2/100102.txt 0:76381
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  SCAN HDFS table=default.alltypesaggnonulls (3) compact
+    TUPLE IDS: 2 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  SCAN HDFS table=default.alltypessmall (1) compact
+    PREDICATES: b.string_col = '15'
+    TUPLE IDS: 1 
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+  LOCATIONS:
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesaggnonulls/year=2010/month=1/day=1/100101.txt 0:75271
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesaggnonulls/year=2010/month=1/day=2/100102.txt 0:76381
+  LOCATIONS:
 ====
 # non-equi join predicate not supported
 select *
@@ -250,6 +306,7 @@ select *
 from alltypesagg join hbasealltypessmall using (id, int_col)
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -260,30 +317,18 @@ Plan Fragment 0
         TUPLE IDS: 0 
       SCAN HBASE table=hbasealltypessmall (1)
         TUPLE IDS: 1 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
-      HBASE KEY RANGES NODE ID: 1
-        <unbounded>:<unbounded>
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
-  EXCHANGE (3)
+  UNPARTITIONED
+  EXCHANGE (4)
     TUPLE IDS: 0 1 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 3
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -292,24 +337,42 @@ Plan Fragment 1
     TUPLE IDS: 0 1 
       SCAN HDFS table=default.alltypesagg (0)
         TUPLE IDS: 0 
-      SCAN HBASE table=hbasealltypessmall (1)
+      EXCHANGE (3)
         TUPLE IDS: 1 
 
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
-      HBASE KEY RANGES NODE ID: 1
-        <unbounded>:<unbounded>
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
+  SCAN HBASE table=hbasealltypessmall (1)
+    TUPLE IDS: 1 
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+  LOCATIONS:
+NODE 1:
+  HBASE KEYRANGE <unbounded>:<unbounded>
+  LOCATIONS:
 ====
 # hbase-hdfs join with scan filtering
 select *
@@ -322,6 +385,7 @@ and b.tinyint_col > 123
 and a.tinyint_col + b.tinyint_col < 15
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -337,25 +401,18 @@ Plan Fragment 0
         STOP KEY: 5\0
         PREDICATES: b.tinyint_col = 5, b.tinyint_col > 123
         TUPLE IDS: 1 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
-      HBASE KEY RANGES NODE ID: 1
-        5:5\0
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
-  EXCHANGE (3)
+  UNPARTITIONED
+  EXCHANGE (4)
     TUPLE IDS: 0 1 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 3
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -366,22 +423,35 @@ Plan Fragment 1
       SCAN HDFS table=default.alltypesagg (0)
         PREDICATES: a.tinyint_col = 15
         TUPLE IDS: 0 
-      SCAN HBASE table=hbasestringids (1)
-        START KEY: 5
-        STOP KEY: 5\0
-        PREDICATES: b.tinyint_col = 5, b.tinyint_col > 123
+      EXCHANGE (3)
         TUPLE IDS: 1 
 
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
-      HBASE KEY RANGES NODE ID: 1
-        5:5\0
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
+  SCAN HBASE table=hbasestringids (1)
+    START KEY: 5
+    STOP KEY: 5\0
+    PREDICATES: b.tinyint_col = 5, b.tinyint_col > 123
+    TUPLE IDS: 1 
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+  LOCATIONS:
+NODE 1:
+  HBASE KEYRANGE 5:5\0
+  LOCATIONS:
 ====
 # left join followed by right join and then aggregate 
 select x.tinyint_col, count(x.day)
@@ -400,6 +470,7 @@ order by 2
 limit 5
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   TOP-N
   ORDER BY: <slot 11> ASC
   LIMIT: 5
@@ -436,109 +507,130 @@ Plan Fragment 0
                   TUPLE IDS: 2 
             SCAN HDFS table=default.alltypesagg (5) compact
               TUPLE IDS: 3 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
-      HDFS SPLITS NODE ID: 5
-        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   TOP-N
   ORDER BY: <slot 11> ASC
   LIMIT: 5
   TUPLE IDS: 5 
     AGGREGATE
-    OUTPUT: SUM(<slot 11>)
-    GROUP BY: <slot 10>
+    OUTPUT: COUNT(a.day)
+    GROUP BY: c.tinyint_col
     TUPLE IDS: 5 
-      EXCHANGE (9)
-        TUPLE IDS: 5 
+      TOP-N
+      ORDER BY: a.day ASC, c.tinyint_col ASC
+      LIMIT: 10
+      TUPLE IDS: 0N 1N 2 3 
+        EXCHANGE (13)
+          TUPLE IDS: 0N 1N 2 3 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 9
-  AGGREGATE
-  OUTPUT: COUNT(a.day)
-  GROUP BY: c.tinyint_col
-  TUPLE IDS: 5 
-    TOP-N
-    ORDER BY: a.day ASC, c.tinyint_col ASC
-    LIMIT: 10
+    EXCHANGE ID: 13
+    UNPARTITIONED
+
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      a.id = d.id
     TUPLE IDS: 0N 1N 2 3 
       HASH JOIN
-        JOIN OP: INNER JOIN
+        JOIN OP: RIGHT OUTER JOIN
         HASH PREDICATES:
-          a.id = d.id
-        TUPLE IDS: 0N 1N 2 3 
+          b.id = c.id
+        TUPLE IDS: 0N 1N 2 
           HASH JOIN
-            JOIN OP: RIGHT OUTER JOIN
+            JOIN OP: INNER JOIN
             HASH PREDICATES:
-              b.id = c.id
-            TUPLE IDS: 0N 1N 2 
-              HASH JOIN
-                JOIN OP: INNER JOIN
-                HASH PREDICATES:
-                  a.id = b.id
-                  a.int_col = b.int_col
-                TUPLE IDS: 0 1 
-                  SCAN HDFS table=default.alltypesagg (0)
-                    TUPLE IDS: 0 
-                  SCAN HDFS table=default.alltypessmall (1) compact
-                    TUPLE IDS: 1 
-              SCAN HDFS table=default.alltypesnopart (3) compact
-                TUPLE IDS: 2 
-          SCAN HDFS table=default.alltypesagg (5) compact
-            TUPLE IDS: 3 
+              a.id = b.id
+              a.int_col = b.int_col
+            TUPLE IDS: 0 1 
+              SCAN HDFS table=default.alltypesagg (0)
+                TUPLE IDS: 0 
+              EXCHANGE (10)
+                TUPLE IDS: 1 
+          EXCHANGE (11)
+            TUPLE IDS: 2 
+      EXCHANGE (12)
+        TUPLE IDS: 3 
 
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
-      HDFS SPLITS NODE ID: 5
-        hdfs:alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
-        hdfs:alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
-        hdfs:alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 12
+    UNPARTITIONED
+
+  SCAN HDFS table=default.alltypesagg (5) compact
+    TUPLE IDS: 3 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  SCAN HDFS table=default.alltypesnopart (3) compact
+    TUPLE IDS: 2 
+
+Plan Fragment 4
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 10
+    UNPARTITIONED
+
+  SCAN HDFS table=default.alltypessmall (1) compact
+    TUPLE IDS: 1 
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+  LOCATIONS:
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
+  LOCATIONS:
+NODE 3:
+NODE 5:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=7/100107.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=8/100108.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=9/100109.txt 0:76263
+  LOCATIONS:
 ====
 # join without "other join conjuncts"
 select * from alltypessmall a, alltypessmall b where a.id = b.id limit 1
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -549,28 +641,19 @@ Plan Fragment 0
         TUPLE IDS: 0 
       SCAN HDFS table=default.alltypessmall (1) compact
         TUPLE IDS: 1 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
-  EXCHANGE (3)
+  UNPARTITIONED
+  EXCHANGE (4)
     LIMIT: 1
     TUPLE IDS: 0 1 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 3
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
@@ -579,19 +662,34 @@ Plan Fragment 1
     TUPLE IDS: 0 1 
       SCAN HDFS table=default.alltypessmall (0)
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypessmall (1) compact
+      EXCHANGE (3)
         TUPLE IDS: 1 
 
-  EXEC PARAMS
-    HOST: 
-      HDFS SPLITS NODE ID: 0
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
-      HDFS SPLITS NODE ID: 1
-        hdfs:alltypessmall/year=2009/month=1/090101.txt 0:1610
-        hdfs:alltypessmall/year=2009/month=2/090201.txt 0:1621
-        hdfs:alltypessmall/year=2009/month=3/090301.txt 0:1620
-        hdfs:alltypessmall/year=2009/month=4/090401.txt 0:1621
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
+  SCAN HDFS table=default.alltypessmall (1) compact
+    TUPLE IDS: 1 
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
+  LOCATIONS:
+NODE 1:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=2/090201.txt 0:1621
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=3/090301.txt 0:1620
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=4/090401.txt 0:1621
+  LOCATIONS:
 ====

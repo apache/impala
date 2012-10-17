@@ -5,6 +5,7 @@ where name like 'm%'
 group by 1
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   AGGREGATE
   OUTPUT: COUNT(*)
   GROUP BY: zip
@@ -12,8 +13,9 @@ Plan Fragment 0
     SCAN HDFS table=default.testtbl (0)
       PREDICATES: name LIKE 'm%'
       TUPLE IDS: 0 
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   AGGREGATE
   OUTPUT: SUM(<slot 3>)
   GROUP BY: <slot 2>
@@ -22,8 +24,11 @@ Plan Fragment 0
       TUPLE IDS: 1 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: COUNT(*)
   GROUP BY: zip
@@ -31,755 +36,739 @@ Plan Fragment 1
     SCAN HDFS table=default.testtbl (0)
       PREDICATES: name LIKE 'm%'
       TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 0:
 ====
 # all partitions are selected
 select * from alltypes
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=1/100101.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=10/101001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=11/101101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=12/101201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=2/100201.txt 0:18835
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=3/100301.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=4/100401.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=5/100501.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=6/100601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=7/100701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=8/100801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=9/100901.txt 0:20179
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   EXCHANGE (1)
     TUPLE IDS: 0 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=1/100101.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=10/101001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=11/101101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=12/101201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=2/100201.txt 0:18835
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=3/100301.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=4/100401.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=5/100501.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=6/100601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=7/100701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=8/100801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=9/100901.txt 0:20179
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=1/100101.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=10/101001.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=11/101101.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=12/101201.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=2/100201.txt 0:18835
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=3/100301.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=4/100401.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=5/100501.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=6/100601.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=7/100701.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=8/100801.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=9/100901.txt 0:20179
+  LOCATIONS:
 ====
 # predicate on first partition key
 select * from alltypes where year = 2009
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   EXCHANGE (1)
     TUPLE IDS: 0 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
+  LOCATIONS:
 ====
 # same predicate, phrased differently
 select * from alltypes where year = 2009.0
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   EXCHANGE (1)
     TUPLE IDS: 0 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
+  LOCATIONS:
 ====
 select * from alltypes where 2009 = year
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   EXCHANGE (1)
     TUPLE IDS: 0 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
+  LOCATIONS:
 ====
 select * from alltypes where 2009.0 = year
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   EXCHANGE (1)
     TUPLE IDS: 0 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
+  LOCATIONS:
 ====
 # predicate on second partition key
 select * from alltypes where month=1
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=1/100101.txt 0:20853
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   EXCHANGE (1)
     TUPLE IDS: 0 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=1/100101.txt 0:20853
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=1/100101.txt 0:20853
+  LOCATIONS:
 ====
 # predicate on both partition keys
 select * from alltypes where year=2009 and month=1
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   EXCHANGE (1)
     TUPLE IDS: 0 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
+  LOCATIONS:
 ====
 # single-sided range on 2nd key
 select * from alltypes where year=2009 and month > 6
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   EXCHANGE (1)
     TUPLE IDS: 0 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
+  LOCATIONS:
 ====
 select * from alltypes where year=2009 and month < 6
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   EXCHANGE (1)
     TUPLE IDS: 0 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+  LOCATIONS:
 ====
 # single-sided ranges on both keys
 select * from alltypes where year<=2009 and month < 6
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   EXCHANGE (1)
     TUPLE IDS: 0 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+  LOCATIONS:
 ====
 # range on 2nd key
 select * from alltypes where month < 9 and month > 6
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=7/100701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=8/100801.txt 0:20853
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   EXCHANGE (1)
     TUPLE IDS: 0 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=7/100701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=8/100801.txt 0:20853
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=7/100701.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=8/100801.txt 0:20853
+  LOCATIONS:
 ====
 # multiple predicates on first key; 2nd one applied as predicate
 select * from alltypes where year < 2010 and year < 2009 and month > 6
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   SCAN HDFS table=default.alltypes (0)
     PREDICATES: year < 2009
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   EXCHANGE (1)
     TUPLE IDS: 0 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     PREDICATES: year < 2009
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
+  LOCATIONS:
 ====
 # multiple predicates on second key; 2nd one applied as predicate
 select * from alltypes where year < 2010 and month > 6 and month > 8
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   SCAN HDFS table=default.alltypes (0)
     PREDICATES: month > 8
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   EXCHANGE (1)
     TUPLE IDS: 0 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     PREDICATES: month > 8
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
+  LOCATIONS:
 ====
 # between predicate on second key
 select * from alltypes where year = 2009 and month between 6 and 8
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   EXCHANGE (1)
     TUPLE IDS: 0 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
+  LOCATIONS:
 ====
 # between predicates on first and second keys
 select * from alltypes where year between 2009 and 2009 and month between 6 and 8
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   EXCHANGE (1)
     TUPLE IDS: 0 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
+  LOCATIONS:
 ====
 # slot binding can't be determined
 select * from alltypes where year - 1 = 2009
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   SCAN HDFS table=default.alltypes (0)
     PREDICATES: year - 1 = 2009
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=1/100101.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=10/101001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=11/101101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=12/101201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=2/100201.txt 0:18835
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=3/100301.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=4/100401.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=5/100501.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=6/100601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=7/100701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=8/100801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=9/100901.txt 0:20179
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   EXCHANGE (1)
     TUPLE IDS: 0 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypes (0)
     PREDICATES: year - 1 = 2009
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=1/100101.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=10/101001.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=11/101101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=12/101201.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=2/100201.txt 0:18835
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=3/100301.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=4/100401.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=5/100501.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=6/100601.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=7/100701.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=8/100801.txt 0:20853
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=9/100901.txt 0:20179
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=1/100101.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=10/101001.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=11/101101.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=12/101201.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=2/100201.txt 0:18835
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=3/100301.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=4/100401.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=5/100501.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=6/100601.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=7/100701.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=8/100801.txt 0:20853
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=9/100901.txt 0:20179
+  LOCATIONS:
 ====
 # multi files non-partitioned table test
 select * from alltypesaggmultifilesNoPart
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   SCAN HDFS table=default.alltypesaggmultifilesnopart (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0 0:186852
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0_copy_1 0:188412
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0_copy_2 0:187323
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0_copy_3 0:189213
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   EXCHANGE (1)
     TUPLE IDS: 0 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypesaggmultifilesnopart (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0 0:186852
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0_copy_1 0:188412
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0_copy_2 0:187323
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0_copy_3 0:189213
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0 0:186852
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0_copy_1 0:188412
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0_copy_2 0:187323
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesaggmultifilesnopart/000000_0_copy_3 0:189213
+  LOCATIONS:
 ====
 # multi files partitioned table test
 select * from alltypesaggmultifiles where day<=2
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   SCAN HDFS table=default.alltypesaggmultifiles (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0 0:18435
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_1 0:18591
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_2 0:18483
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_3 0:18672
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0 0:18713
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_1 0:18869
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_2 0:18760
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_3 0:18949
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   EXCHANGE (1)
     TUPLE IDS: 0 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 1
+    UNPARTITIONED
+
   SCAN HDFS table=default.alltypesaggmultifiles (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0 0:18435
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_1 0:18591
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_2 0:18483
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_3 0:18672
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0 0:18713
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_1 0:18869
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_2 0:18760
-        hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_3 0:18949
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0 0:18435
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_1 0:18591
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_2 0:18483
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=1/000000_0_copy_3 0:18672
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0 0:18713
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_1 0:18869
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_2 0:18760
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesaggmultifiles/year=2010/month=1/day=2/000000_0_copy_3 0:18949
+  LOCATIONS:
 ====

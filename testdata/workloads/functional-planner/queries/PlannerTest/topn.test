@@ -4,26 +4,33 @@ order by name
 limit 1
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   TOP-N
   ORDER BY: name ASC
   LIMIT: 1
   TUPLE IDS: 0 
     SCAN HDFS table=default.testtbl (0)
       TUPLE IDS: 0 
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   TOP-N
   ORDER BY: name ASC
   LIMIT: 1
   TUPLE IDS: 0 
-    EXCHANGE (1)
+    EXCHANGE (2)
       TUPLE IDS: 0 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 1
+    EXCHANGE ID: 2
+    UNPARTITIONED
+
   SCAN HDFS table=default.testtbl (0)
     TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 0:
 ====
 select zip, count(*)
 from testtbl
@@ -33,6 +40,7 @@ order by 2 desc
 limit 10
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   TOP-N
   ORDER BY: <slot 3> DESC
   LIMIT: 10
@@ -44,8 +52,9 @@ Plan Fragment 0
       SCAN HDFS table=default.testtbl (0)
         PREDICATES: name LIKE 'm%'
         TUPLE IDS: 0 
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   TOP-N
   ORDER BY: <slot 3> DESC
   LIMIT: 10
@@ -54,12 +63,15 @@ Plan Fragment 0
     OUTPUT: SUM(<slot 3>)
     GROUP BY: <slot 2>
     TUPLE IDS: 1 
-      EXCHANGE (2)
+      EXCHANGE (3)
         TUPLE IDS: 1 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 2
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: COUNT(*)
   GROUP BY: zip
@@ -67,6 +79,8 @@ Plan Fragment 1
     SCAN HDFS table=default.testtbl (0)
       PREDICATES: name LIKE 'm%'
       TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 0:
 ====
 select int_col, sum(float_col) 
 from hbasealltypessmall
@@ -76,6 +90,7 @@ order by 2
 limit 4
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   TOP-N
   ORDER BY: <slot 4> ASC
   LIMIT: 4
@@ -87,13 +102,9 @@ Plan Fragment 0
       SCAN HBASE table=hbasealltypessmall (0)
         PREDICATES: id < 5
         TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HBASE KEY RANGES NODE ID: 0
-        <unbounded>:<unbounded>
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   TOP-N
   ORDER BY: <slot 4> ASC
   LIMIT: 4
@@ -102,12 +113,15 @@ Plan Fragment 0
     OUTPUT: SUM(<slot 4>)
     GROUP BY: <slot 3>
     TUPLE IDS: 1 
-      EXCHANGE (2)
+      EXCHANGE (3)
         TUPLE IDS: 1 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 2
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: SUM(float_col)
   GROUP BY: int_col
@@ -115,11 +129,10 @@ Plan Fragment 1
     SCAN HBASE table=hbasealltypessmall (0)
       PREDICATES: id < 5
       TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HBASE KEY RANGES NODE ID: 0
-        <unbounded>:<unbounded>
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE <unbounded>:<unbounded>
+  LOCATIONS:
 ====
 select int_col, sum(float_col), min(float_col) 
 from hbasealltypessmall
@@ -128,6 +141,7 @@ order by 2,3 desc
 limit 0
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   TOP-N
   ORDER BY: <slot 3> ASC, <slot 4> DESC
   LIMIT: 0
@@ -138,13 +152,9 @@ Plan Fragment 0
     TUPLE IDS: 1 
       SCAN HBASE table=hbasealltypessmall (0)
         TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HBASE KEY RANGES NODE ID: 0
-        <unbounded>:<unbounded>
------------- DISTRIBUTEDPLAN
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  UNPARTITIONED
   TOP-N
   ORDER BY: <slot 3> ASC, <slot 4> DESC
   LIMIT: 0
@@ -153,21 +163,23 @@ Plan Fragment 0
     OUTPUT: SUM(<slot 3>), MIN(<slot 4>)
     GROUP BY: <slot 2>
     TUPLE IDS: 1 
-      EXCHANGE (2)
+      EXCHANGE (3)
         TUPLE IDS: 1 
 
 Plan Fragment 1
+  RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 2
+    EXCHANGE ID: 3
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: SUM(float_col), MIN(float_col)
   GROUP BY: int_col
   TUPLE IDS: 1 
     SCAN HBASE table=hbasealltypessmall (0)
       TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HBASE KEY RANGES NODE ID: 0
-        <unbounded>:<unbounded>
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE <unbounded>:<unbounded>
+  LOCATIONS:
 ====

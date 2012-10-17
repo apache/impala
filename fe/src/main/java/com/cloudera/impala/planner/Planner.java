@@ -48,8 +48,8 @@ import com.google.common.collect.Lists;
  * can be shipped off to backends for execution.
  *
  */
-public class NewPlanner {
-  private final static Logger LOG = LoggerFactory.getLogger(NewPlanner.class);
+public class Planner {
+  private final static Logger LOG = LoggerFactory.getLogger(Planner.class);
 
   // For generating a string of the current time.
   private final SimpleDateFormat formatter =

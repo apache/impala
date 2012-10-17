@@ -6,27 +6,22 @@ from alltypes
 where year=2009 and month=05
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   WRITE TO HDFS table=default.alltypesnopart
     OVERWRITE=false
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
------------- DISTRIBUTEDPLAN
-NO COORDINATOR FRAGMENT
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  RANDOM
   WRITE TO HDFS table=default.alltypesnopart
-    OVERWRITE=false    
+    OVERWRITE=false
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+  LOCATIONS:
 ====
 # insert into a static partition
 insert into table alltypessmall
@@ -37,29 +32,24 @@ from alltypes
 where year=2009 and month=05
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
     PARTITIONS: 2009,4
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
------------- DISTRIBUTEDPLAN
-NO COORDINATOR FRAGMENT
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  RANDOM
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
     PARTITIONS: 2009,4
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+  LOCATIONS:
 ====
 # overwrite a static partition
 insert overwrite table alltypessmall
@@ -70,29 +60,24 @@ from alltypes
 where year=2009 and month=05
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=true
     PARTITIONS: 2009,4
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
------------- DISTRIBUTEDPLAN
-NO COORDINATOR FRAGMENT
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  RANDOM
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=true
     PARTITIONS: 2009,4
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
+  LOCATIONS:
 ====
 # insert into a fully dynamic partition
 insert into table alltypessmall
@@ -103,31 +88,26 @@ from alltypes
 where year=2009 and month>10
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
     PARTITIONS: year,month
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
------------- DISTRIBUTEDPLAN
-NO COORDINATOR FRAGMENT
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  RANDOM
   WRITE TO HDFS table=default.alltypessmall
-    OVERWRITE=false      
+    OVERWRITE=false
     PARTITIONS: year,month
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
+  LOCATIONS:
 ====
 # insert into a partially dynamic partition
 insert into table alltypessmall
@@ -138,31 +118,26 @@ from alltypes
 where year=2009 and month>10
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
     PARTITIONS: 2009,month
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
------------- DISTRIBUTEDPLAN
-NO COORDINATOR FRAGMENT
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  RANDOM
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
     PARTITIONS: 2009,month
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
+  LOCATIONS:
 ====
 # insert into a partially dynamic partition
 insert into table alltypessmall
@@ -173,27 +148,22 @@ from alltypes
 where year>2009 and month=4
 ---- PLAN
 Plan Fragment 0
+  UNPARTITIONED
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
     PARTITIONS: year,4
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST: coordinator
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=4/100401.txt 0:20179
------------- DISTRIBUTEDPLAN
-NO COORDINATOR FRAGMENT
+---- DISTRIBUTEDPLAN
 Plan Fragment 0
+  RANDOM
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
     PARTITIONS: year,4
   SCAN HDFS table=default.alltypes (0)
     TUPLE IDS: 0 
-
-  EXEC PARAMS
-    HOST:
-      HDFS SPLITS NODE ID: 0
-        hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=4/100401.txt 0:20179
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=4/100401.txt 0:20179
+  LOCATIONS:
 ====
