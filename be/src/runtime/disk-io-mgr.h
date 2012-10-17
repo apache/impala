@@ -222,6 +222,10 @@ class DiskIoMgr {
   // If *buffer is non-null, the caller must call Return() on the returned buffer.
   // *eos will be set to true if all scan ranges for this reader have been 
   // returned.
+  // On non-cancelled errors, *buffer will be not contain a byte buffer but
+  // will contain the description of the read that it was trying to do that
+  // caused the error (file, offset, etc).  The buffer descriptor must be
+  // returned in this case.
   Status GetNext(ReaderContext* reader, BufferDescriptor** buffer, bool* eos);
 
   // Reads the range and returns the result in bufer.  

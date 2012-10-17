@@ -133,7 +133,7 @@ Status ScanRangeContext::GetBytesInternal(uint8_t** out_buffer, int requested_le
   boundary_buffer_->Clear();
 
   // Any previously allocated boundary buffers must have been processed by the
-  // scanner.  Attach the the boundary pool and io buffers to the current row batch.
+  // scanner. Attach the boundary pool and io buffers to the current row batch.
   {
     unique_lock<mutex> l(lock_);
     if (current_buffer_bytes_left_ == 0 && current_buffer_ != NULL) {
@@ -185,10 +185,16 @@ Status ScanRangeContext::GetBytesInternal(uint8_t** out_buffer, int requested_le
       range.Reset(filename(), read_past_buffer_size_, 
           file_offset(), scan_range_->disk_id(), NULL);
 
-      RETURN_IF_ERROR(state_->io_mgr()->Read(scan_node_->hdfs_connection(),
-          &range, &current_buffer_));
+      DiskIoMgr::BufferDescriptor* buffer_desc;
+      Status status = state_->io_mgr()->Read(scan_node_->hdfs_connection(),
+          &range, &buffer_desc);
+      if (!status.ok()) {
+        if (buffer_desc != NULL) buffer_desc->Return();
+        return status;
+      }
       
       DCHECK(!peek);
+      current_buffer_ = buffer_desc;
       current_buffer_bytes_left_ = current_buffer_->len();
       current_buffer_pos_ = reinterpret_cast<uint8_t*>(current_buffer_->buffer());
       buffers_.push_back(current_buffer_);
