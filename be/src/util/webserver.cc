@@ -16,7 +16,7 @@ using namespace std;
 using namespace boost;
 using namespace google;
 
-DEFINE_int32(webserver_port, 9090, "Port to start debug webserver on");
+DEFINE_int32(webserver_port, 25000, "Port to start debug webserver on");
 DEFINE_string(webserver_interface, "",
     "Interface to start debug webserver on. If blank, webserver binds to 0.0.0.0");
 
