@@ -1132,6 +1132,7 @@ Status Coordinator::ComputeFragmentHosts(const TQueryExecRequest& exec_request) 
     vector<THostPort >::iterator start_duplicates = 
         unique(params.hosts.begin(), params.hosts.end());
     params.hosts.erase(start_duplicates, params.hosts.end());
+    unique_hosts_.insert(params.hosts.begin(), params.hosts.end());
   }
   return Status::OK;
 }

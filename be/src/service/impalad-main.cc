@@ -97,7 +97,8 @@ int main(int argc, char** argv) {
   ExecEnv exec_env;
   ThriftServer* fe_server = NULL;
   ThriftServer* be_server = NULL;
-  CreateImpalaServer(&exec_env, FLAGS_fe_port, FLAGS_be_port, &fe_server, &be_server);
+  ImpalaServer* server = 
+      CreateImpalaServer(&exec_env, FLAGS_fe_port, FLAGS_be_port, &fe_server, &be_server);
   be_server->Start();
 
   Status status = exec_env.StartServices();
@@ -109,6 +110,7 @@ int main(int argc, char** argv) {
 
   // register be service *after* starting the be server thread and after starting
   // the subscription mgr handler thread
+  scoped_ptr<SubscriptionManager::UpdateCallback> cb;
   if (FLAGS_use_statestore) {
     THostPort host_port;
     host_port.port = FLAGS_be_port;
@@ -118,6 +120,13 @@ int main(int argc, char** argv) {
     Status status =
         exec_env.subscription_mgr()->RegisterService(IMPALA_SERVICE_ID, host_port);
 
+    unordered_set<ServiceId> services;
+    services.insert(IMPALA_SERVICE_ID);
+    cb.reset(new SubscriptionManager::UpdateCallback(
+        bind<void>(mem_fn(&ImpalaServer::MembershipCallback), server, _1)));
+    exec_env.subscription_mgr()->RegisterSubscription(services, "impala.server", 
+        cb.get());
+                                                      
     if (!status.ok()) {
       LOG(ERROR) << "Could not register with state store service: "
                  << status.GetErrorMsg();

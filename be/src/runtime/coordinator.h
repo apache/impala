@@ -145,6 +145,9 @@ class Coordinator {
   // Return error log for coord and all the fragments
   std::string GetErrorLog();
 
+  // The set of hosts on which this query will run. Only valid after Exec.
+  const boost::unordered_set<THostPort>& unique_hosts() { return unique_hosts_; }
+
  private:
   class BackendExecState;
     
@@ -323,6 +326,9 @@ class Coordinator {
     
   // Throughput counters for the coordinator fragment
   FragmentInstanceCounters coordinator_counters_;
+
+  // The set of hosts that the query will run on. Populated in Exec.
+  boost::unordered_set<THostPort> unique_hosts_;
 
   // Populates fragment_exec_params_.
   void ComputeFragmentExecParams(const TQueryExecRequest& exec_request);

@@ -5,11 +5,12 @@
 
 #include <jni.h>
 
-#include "util/uid-util.h"  // for some reasoon needed right here for hash<TUniqueId>
+#include "util/uid-util.h"  // for some reason needed right here for hash<TUniqueId>
 #include <boost/thread/mutex.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/unordered_map.hpp>
+#include <boost/unordered_set.hpp>
 
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaInternalService.h"
@@ -17,6 +18,7 @@
 #include "util/thrift-server.h"
 #include "common/status.h"
 #include "util/metrics.h"
+#include "sparrow/util.h"
 
 namespace impala {
 
@@ -119,6 +121,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   // with the provided key.
   virtual void SessionEnd(const ThriftServer::SessionKey& session_key);
 
+  // Called when a membership update is received from the state-store. Looks for
+  // active nodes that have failed, and cancels any queries running on them.
+  void MembershipCallback(const sparrow::ServiceStateMap& service_state);
+
  private:
   class QueryExecState;
   class FragmentExecState;
@@ -204,6 +210,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
 
   // Non-thrift callable version of ResetCatalog
   Status ResetCatalogInternal();
+
+  // Initiates query cancellation. Returns OK unless query_id is not found. 
+  Status CancelInternal(const TUniqueId& query_id);
 
   // Webserver callback. Retrieves Hadoop confs from frontend and writes them to output
   void RenderHadoopConfigs(std::stringstream* output);
@@ -308,6 +317,18 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   // A map from session identifier to a structure containing per-session information
   typedef boost::unordered_map<ThriftServer::SessionKey, SessionState> SessionStateMap;
   SessionStateMap session_state_map_;
+
+  // protects query_locations_. Must always be taken after
+  // query_exec_state_map_lock_ if both are required.
+  boost::mutex query_locations_lock_;
+  
+  // A map from backend to the list of queries currently running there. 
+  typedef boost::unordered_map<THostPort, boost::unordered_set<TUniqueId> > 
+      QueryLocations;
+  QueryLocations query_locations_;
+
+  // The set of backends last reported by the state-store, used for failure detection.
+  std::vector<THostPort> last_membership_;
 
   // Metrics
 

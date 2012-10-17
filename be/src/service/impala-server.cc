@@ -2,8 +2,10 @@
 
 #include "service/impala-server.h"
 
+#include <algorithm>
 #include <boost/algorithm/string/join.hpp>
-#include "boost/date_time/posix_time/posix_time_types.hpp"
+#include <boost/date_time/posix_time/posix_time_types.hpp>
+#include <boost/unordered_set.hpp>
 #include <jni.h>
 #include <protocol/TBinaryProtocol.h>
 #include <protocol/TDebugProtocol.h>
@@ -20,6 +22,7 @@
 #include <boost/algorithm/string.hpp>
 
 #include "common/logging.h"
+#include "common/service-ids.h"
 #include "exprs/expr.h"
 #include "exec/hdfs-table-sink.h"
 #include "codegen/llvm-codegen.h"
@@ -37,6 +40,7 @@
 #include "exec/exec-stats.h"
 #include "exec/ddl-executor.h"
 #include "sparrow/simple-scheduler.h"
+#include "util/container-util.h"
 #include "util/debug-util.h"
 #include "util/string-parser.h"
 #include "util/thrift-util.h"
@@ -65,6 +69,8 @@ using namespace apache::thrift::server;
 using namespace apache::thrift::concurrency;
 using namespace beeswax;
 using sparrow::Scheduler;
+using sparrow::ServiceStateMap;
+using sparrow::Membership;
 
 DEFINE_bool(use_planservice, false, "Use external planservice if true");
 DECLARE_string(planservice_host);
@@ -264,6 +270,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       coord_.reset(new Coordinator(exec_env_, &exec_stats_));
       RETURN_IF_ERROR(coord_->Exec(
           exec_request->request_id, &query_exec_request, exec_request->query_options));
+
       if (has_coordinator_fragment) {
         RETURN_IF_ERROR(PrepareSelectListExprs(coord_->runtime_state(),
             query_exec_request.fragments[0].output_exprs, coord_->row_desc()));
@@ -606,7 +613,7 @@ const char* ImpalaServer::SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED = "HYC00";
 const int ImpalaServer::ASCII_PRECISION = 16; // print 16 digits for double/float
 
 ImpalaServer::ImpalaServer(ExecEnv* exec_env)
-  : exec_env_(exec_env) {
+    : exec_env_(exec_env) {
   // Initialize default config
   InitializeConfigVariables();
 
@@ -723,6 +730,18 @@ void ImpalaServer::QueryStatePathHandler(stringstream* output) {
               << "</tr>" << endl;
   }
 
+  (*output) << "</table>";
+
+  // Print the query location counts.
+  (*output) << "<h2>Query Locations</h2>";
+  (*output) << "<table border=1><tr><th>Location</th><th>Query Ids</th></tr>" << endl;
+  {
+    lock_guard<mutex> l(query_locations_lock_);
+    BOOST_FOREACH(const QueryLocations::value_type& location, query_locations_) {
+      (*output) << "<tr><td>" << location.first.ipaddress << ":" << location.first.port 
+                << "<td><b>" << location.second.size() << "</b></td></tr>";
+    }
+  }
   (*output) << "</table>";
 }
 
@@ -928,6 +947,16 @@ Status ImpalaServer::ExecuteInternal(
   // start execution of query; also starts fragment status reports
   RETURN_IF_ERROR((*exec_state)->Exec(&result));
 
+  if ((*exec_state)->coord() != NULL) {
+    const unordered_set<THostPort>& unique_hosts = (*exec_state)->coord()->unique_hosts();
+    if (!unique_hosts.empty()) {
+      lock_guard<mutex> l(query_locations_lock_);
+      BOOST_FOREACH(const THostPort& port, unique_hosts) {
+        query_locations_[port].insert((*exec_state)->query_id());
+      }
+    }
+  }
+
   return Status::OK;
 }
 
@@ -942,7 +971,27 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id) {
       return false;
     } else {
       exec_state = entry->second;
-      query_exec_state_map_.erase(entry);
+    }      
+    query_exec_state_map_.erase(entry);
+  }
+  
+
+  if (exec_state->coord() != NULL) {
+    const unordered_set<THostPort>& unique_hosts = 
+        exec_state->coord()->unique_hosts();
+    if (!unique_hosts.empty()) {
+      lock_guard<mutex> l(query_locations_lock_);
+      BOOST_FOREACH(const THostPort& hostport, unique_hosts) {
+        // Query may have been removed already by cancellation path. In
+        // particular, if node to fail was last sender to an exchange, the
+        // coordinator will realise and fail the query at the same time the
+        // failure detection path does the same thing. They will harmlessly race
+        // to remove the query from this map.
+        QueryLocations::iterator it = query_locations_.find(hostport);
+        if (it != query_locations_.end()) {
+          it->second.erase(exec_state->query_id());
+        }
+      }
     }
   }
 
@@ -1139,20 +1188,28 @@ void ImpalaServer::ResetCatalog(impala::TStatus& status) {
   ResetCatalogInternal().ToThrift(&status);
 }
 
-void ImpalaServer::Cancel(impala::TStatus& status,
+Status ImpalaServer::CancelInternal(const TUniqueId& query_id) {
+  VLOG_QUERY << "Cancel(): query_id=" << PrintId(query_id);
+  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
+  if (exec_state == NULL) return Status("Invalid or unknown query handle");
+
+  lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
+  // TODO: can we call Coordinator::Cancel() here while holding lock?
+  exec_state->Cancel();
+  return Status::OK;
+}
+
+void ImpalaServer::Cancel(impala::TStatus& tstatus,
     const beeswax::QueryHandle& query_handle) {
   // Convert QueryHandle to TUniqueId and get the query exec state.
   TUniqueId query_id;
   QueryHandleToTUniqueId(query_handle, &query_id);
-  VLOG_QUERY << "Cancel(): query_id=" << PrintId(query_id);
-  shared_ptr<QueryExecState> exec_state = GetQueryExecState(query_id, true);
-  if (exec_state == NULL) {
-    RaiseBeeswaxException("Invalid query handle", SQLSTATE_GENERAL_ERROR);
+  Status status = CancelInternal(query_id);
+  if (status.ok()) {
+    tstatus.status_code = TStatusCode::OK;
+  } else {
+    RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
   }
-  status.status_code = TStatusCode::OK;
-  lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
-  // TODO: can we call Coordinator::Cancel() here while holding lock?
-  exec_state->Cancel();
 }
 
 void ImpalaServer::explain(QueryExplanation& query_explanation, const Query& query) {
@@ -1728,6 +1785,48 @@ void ImpalaServer::SessionEnd(const ThriftServer::SessionKey& session_key) {
 
 void ImpalaServer::SessionState::ToThrift(TSessionState* state) {
   state->database = database;
+}
+
+void ImpalaServer::MembershipCallback(const ServiceStateMap& service_state) {
+  // TODO: Consider rate-limiting this. In the short term, best to have
+  // state-store heartbeat less frequently.
+  ServiceStateMap::const_iterator it = service_state.find(IMPALA_SERVICE_ID);
+  if (it != service_state.end()) {
+    vector<THostPort> current_membership(it->second.membership.size());;
+    // TODO: Why is Membership not just a set? Would save a copy.
+    BOOST_FOREACH(const Membership::value_type& member, it->second.membership) {
+      // This is ridiculous: have to clear out hostname so that THostPorts match. 
+      current_membership.push_back(member.second);
+      current_membership.back().hostname = "";
+    }
+    
+    vector<THostPort> difference;
+    sort(current_membership.begin(), current_membership.end());
+    set_difference(last_membership_.begin(), last_membership_.end(),
+                   current_membership.begin(), current_membership.end(), 
+                   std::inserter(difference, difference.begin()));
+    vector<TUniqueId> to_cancel;
+    {
+      lock_guard<mutex> l(query_locations_lock_);
+      // Build a list of hosts that have currently executing queries but aren't
+      // in the membership list. Cancel them in a separate loop to avoid holding
+      // on to the location map lock too long.
+      BOOST_FOREACH(const THostPort& hostport, difference) {        
+        QueryLocations::iterator it = query_locations_.find(hostport);
+        if (it != query_locations_.end()) {          
+          to_cancel.insert(to_cancel.begin(), it->second.begin(), it->second.end());
+        }
+        // We can remove the location wholesale once we know it's failed. 
+        query_locations_.erase(hostport);
+      }
+    }
+
+    BOOST_FOREACH(const TUniqueId& query_id, to_cancel) {
+      CancelInternal(query_id);
+    }
+    // shared_ptr assignment; only pointers copied
+    last_membership_ = current_membership;
+  }
 }
 
 ImpalaServer* CreateImpalaServer(ExecEnv* exec_env, int fe_port, int be_port,
