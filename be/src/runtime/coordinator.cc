@@ -1205,7 +1205,8 @@ void Coordinator::ComputeScanRangeAssignment(
     // add scan range
     TScanRangeParams scan_range_params;
     scan_range_params.scan_range = scan_range_locations.scan_range;
-    scan_range_params.volume_id = volume_id;
+    // Volume is is optional, so we need to set the value and the is-set bit
+    scan_range_params.__set_volume_id(volume_id);
     scan_range_params_list->push_back(scan_range_params);
   }
 

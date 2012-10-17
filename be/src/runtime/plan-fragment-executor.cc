@@ -69,7 +69,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
 
   VLOG_QUERY << "Prepare(): query_id=" << PrintId(query_id_)
              << " instance_id=" << PrintId(params.fragment_instance_id);
-  VLOG(3) << "params:\n" << ThriftDebugString(params);
+  VLOG(2) << "params:\n" << ThriftDebugString(params);
 
   runtime_state_.reset(
       new RuntimeState(params.fragment_instance_id, request.query_options,
@@ -124,7 +124,7 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
     scan_node->SetScanRanges(scan_ranges);
   }
 
-  if (VLOG_QUERY_IS_ON) PrintVolumeIds(params.per_node_scan_ranges);
+  PrintVolumeIds(params.per_node_scan_ranges);
 
   // set up sink, if required  
   if (request.fragment.__isset.output_sink) {
