@@ -7,19 +7,20 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
+import java.util.Random;
+import java.util.UUID;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.log4j.Logger;
 
-import com.google.common.collect.Maps;
-import com.google.common.collect.Lists;
-import com.google.common.base.Preconditions;
-
 import com.cloudera.impala.common.ImpalaException;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
 
 /**
  * Interface to metadata stored in MetaStore instance.
@@ -29,7 +30,8 @@ import com.cloudera.impala.common.ImpalaException;
 public class Catalog {
   public static final String DEFAULT_DB = "default";
   private static final Logger LOG = Logger.getLogger(Catalog.class);
-
+  private static final int MAX_METASTORE_CLIENT_INIT_RETRIES = 5;
+  private static final int MAX_METASTORE_RETRY_INTERVAL_IN_SECONDS = 5;
   private boolean closed = false;
   private int nextTableId;
 
@@ -50,7 +52,7 @@ public class Catalog {
     this.nextTableId = 0;
     this.dbs = Maps.newHashMap();
     try {
-      this.msClient = new HiveMetaStoreClient(new HiveConf(Catalog.class));
+      this.msClient = createHiveMetaStoreClient(new HiveConf(Catalog.class));
       List<String> msDbs = msClient.getAllDatabases();
       for (String dbName: msDbs) {
         Db db = Db.loadDb(this, msClient, dbName, lazy);
@@ -60,6 +62,42 @@ public class Catalog {
       // turn into unchecked exception
       throw new UnsupportedOperationException(e);
     }
+  }
+
+  /**
+   * Creates a HiveMetaStoreClient with the given configuration, retrying the operation
+   * if MetaStore exceptions occur. A random sleep is injected between retries to help
+   * reduce the likelihood of flooding the Meta Store with many requests at once.
+   */
+  static HiveMetaStoreClient createHiveMetaStoreClient(HiveConf conf)
+      throws MetaException {
+    // Ensure numbers are random across nodes.
+    Random randomGen = new Random(UUID.randomUUID().hashCode());
+    int maxRetries = MAX_METASTORE_CLIENT_INIT_RETRIES;
+    for (int retryAttempt = 0; retryAttempt <= maxRetries; ++retryAttempt) {
+      try {
+        return new HiveMetaStoreClient(conf);
+      } catch (MetaException e) {
+        LOG.error("Error initializing Hive Meta Store client", e);
+        if (retryAttempt == maxRetries) {
+          throw e;
+        }
+
+        // Randomize the retry interval so the meta store isn't flooded with attempts.
+        int retryInterval =
+          randomGen.nextInt(MAX_METASTORE_RETRY_INTERVAL_IN_SECONDS) + 1;
+        LOG.info(String.format("On retry attempt %d of %d. Sleeping %d seconds.",
+            retryAttempt + 1, maxRetries, retryInterval));
+        try {
+          Thread.sleep(retryInterval * 1000);
+        } catch (InterruptedException ie) {
+          // Do nothing
+        }
+      }
+    }
+    // Should never make it to here. 
+    throw new UnsupportedOperationException(
+        "Unexpected error creating Hive Meta Store client");
   }
 
   /**
