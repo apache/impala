@@ -42,6 +42,6 @@ target_link_libraries(Exprs
   boost_regex-mt
 )
 
-#add_executable(expr-test expr-test.cc)
-#target_link_libraries(expr-test ${IMPALA_TEST_LINK_LIBS})
-#add_test(expr-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/exprs/expr-test)
+add_executable(expr-test expr-test.cc)
+target_link_libraries(expr-test ${IMPALA_TEST_LINK_LIBS})
+add_test(expr-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/exprs/expr-test)

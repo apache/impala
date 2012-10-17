@@ -32,8 +32,8 @@ class QueryExecutorIf {
 
   // Start running query. Call this prior to FetchResult().
   // If 'col_types' is non-NULL, returns the types of the select list items.
-  virtual Status Exec(
-      const std::string& query, std::vector<PrimitiveType>* col_types) = 0;
+  virtual Status Exec(const std::string& query,
+      std::vector<Apache::Hadoop::Hive::FieldSchema>* col_types) = 0;
 
   // Return the explain plan for the query
   virtual Status Explain(const std::string& query, std::string* explain_plan) = 0;

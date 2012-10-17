@@ -31,8 +31,8 @@ class ImpaladQueryExecutor : public QueryExecutorIf {
 
   // Start running query. Call this prior to FetchResult().
   // If 'col_types' is non-NULL, returns the types of the select list items.
-  virtual Status Exec(
-      const std::string& query_string, std::vector<PrimitiveType>* col_types);
+  virtual Status Exec(const std::string& query_string,
+      std::vector<Apache::Hadoop::Hive::FieldSchema>* col_types);
 
   // Return the explain plan for the query
   virtual Status Explain(const std::string& query_string, std::string* explain_plan);

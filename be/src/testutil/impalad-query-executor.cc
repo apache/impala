@@ -18,6 +18,7 @@ using namespace boost::algorithm;
 using namespace apache::thrift;
 using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
+using namespace Apache::Hadoop::Hive;
 using namespace beeswax;
 
 namespace impala {
@@ -65,18 +66,21 @@ Status ImpaladQueryExecutor::Close() {
 }
 
 Status ImpaladQueryExecutor::Exec(
-    const string& query_string, vector<PrimitiveType>* col_types) {
+    const string& query_string, vector<FieldSchema>* col_schema) {
   // close anything that ran previously
   Close();
   Query query;
   query.query = query_string;
   query.configuration = exec_options_;
+  query_results_.data.clear();
 
   // TODO: catch exception and return error code
   // LogContextId of "" will ask the Beeswax service to assign a new id but Beeswax
   // does not provide a constant for it.
+  ResultsMetadata resultsMetadata;
   try {
     client_->iface()->executeAndWait(query_handle_, query, "");
+    client_->iface()->get_results_metadata(resultsMetadata, query_handle_);
   } catch (BeeswaxException& e) {
     stringstream ss;
     ss << e.SQLState << ": " << e.message;
@@ -84,6 +88,7 @@ Status ImpaladQueryExecutor::Exec(
   }
   current_row_ = 0;
   query_in_progress_ = true;
+  if (col_schema != NULL) *col_schema = resultsMetadata.schema.fieldSchemas;
   return Status::OK;
 }
 
