@@ -1248,11 +1248,15 @@ void Coordinator::ComputeScanRangeAssignment(
     scan_range_params_list->push_back(scan_range_params);
   }
 
-  BOOST_FOREACH(FragmentScanRangeAssignment::value_type& entry, *assignment) {
-    BOOST_FOREACH(PerNodeScanRanges::value_type& per_node_scan_ranges, entry.second) {
-      stringstream str;
-      BOOST_FOREACH(TScanRangeParams& params, per_node_scan_ranges.second) {
-        str << ThriftDebugString(params) << " ";
+  if (VLOG_FILE_IS_ON) {
+    BOOST_FOREACH(FragmentScanRangeAssignment::value_type& entry, *assignment) {
+      VLOG_FILE << "ScanRangeAssignment: server=" << ThriftDebugString(entry.first);
+      BOOST_FOREACH(PerNodeScanRanges::value_type& per_node_scan_ranges, entry.second) {
+        stringstream str;
+        BOOST_FOREACH(TScanRangeParams& params, per_node_scan_ranges.second) {
+          str << ThriftDebugString(params) << " ";
+        }
+        VLOG_FILE << "node_id=" << per_node_scan_ranges.first << " ranges=" << str.str();
       }
     }
   }
