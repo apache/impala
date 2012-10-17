@@ -262,6 +262,7 @@ class DataStreamTest : public testing::Test {
   }
 
   void StopBackend() {
+    server_->StopForTesting();
     delete server_;
   }
 
@@ -415,6 +416,7 @@ TEST_F(DataStreamTest, UnknownSenderSmallResult) {
   JoinSenders();
   EXPECT_FALSE(sender_info_[0].status.ok());
   EXPECT_EQ(sender_info_[0].num_bytes_sent, 0);
+  StopBackend();
 }
 
 TEST_F(DataStreamTest, UnknownSenderLargeResult) {
@@ -425,6 +427,7 @@ TEST_F(DataStreamTest, UnknownSenderLargeResult) {
   JoinSenders();
   EXPECT_FALSE(sender_info_[0].status.ok());
   EXPECT_EQ(sender_info_[0].num_bytes_sent, 0);
+  StopBackend();
 }
 
 TEST_F(DataStreamTest, Cancel) {
@@ -433,6 +436,7 @@ TEST_F(DataStreamTest, Cancel) {
   stream_mgr_->Cancel(instance_id);
   JoinReceivers();
   EXPECT_TRUE(receiver_info_[0].status.IsCancelled());
+  StopBackend();
 }
 
 // TODO: more tests:

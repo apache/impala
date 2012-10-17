@@ -61,6 +61,10 @@ class ThriftServer {
   // Blocks until the server stops and exits its main thread.
   void Join();
 
+  // FOR TESTING ONLY; stop the server and block until the server is stopped; use it
+  // only if it is a Threaded server.
+  void StopForTesting();
+
   // Starts the main server thread. Once this call returns, clients
   // may connect to this server and issue RPCs. May not be called more
   // than once.

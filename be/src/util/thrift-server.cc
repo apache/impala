@@ -338,4 +338,12 @@ void ThriftServer::Join() {
   server_thread_->join();
 }
 
+void ThriftServer::StopForTesting() {
+  DCHECK(server_thread_ != NULL);
+  DCHECK(started_);
+  DCHECK(server_);
+  DCHECK_EQ(server_type_, Threaded);
+  server_->stop();
+  Join();
+}
 }
