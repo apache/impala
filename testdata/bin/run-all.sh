@@ -16,3 +16,4 @@ $IMPALA_HOME/testdata/bin/kill-all.sh
 $IMPALA_HOME/testdata/bin/run-mini-dfs.sh ${HDFS_FORMAT_CLUSTER}
 $IMPALA_HOME/testdata/bin/run-hbase.sh
 
+$IMPALA_HOME/testdata/bin/run-hive-server.sh

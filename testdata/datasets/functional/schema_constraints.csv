@@ -1,0 +1,11 @@
+# Table level constraints:
+# Allows for defining constraints on which file formats to generate for an individual
+# table. The table name should match the base table name defined in the schema template
+# file.
+table_name:hbasealltypessmall, constraint:restrict_to, file_format:text
+table_name:hbasealltypesagg, constraint:restrict_to, file_format:text
+table_name:hbasealltypeserror, constraint:restrict_to, file_format:text
+table_name:hbasealltypeserrornonulls, constraint:restrict_to, file_format:text
+table_name:hbasestringids, constraint:restrict_to, file_format:text
+
+table_name:TblWithRaggedColumns, constraint:exclude, file_format:trevni

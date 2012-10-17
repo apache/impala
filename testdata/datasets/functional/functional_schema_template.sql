@@ -1,7 +1,9 @@
+====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 alltypes
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   id int,
   bool_col boolean,
@@ -44,16 +46,11 @@ ALTER TABLE %(table_name)s ADD PARTITION(year=2010, month=9);
 ALTER TABLE %(table_name)s ADD PARTITION(year=2010, month=10);
 ALTER TABLE %(table_name)s ADD PARTITION(year=2010, month=11);
 ALTER TABLE %(table_name)s ADD PARTITION(year=2010, month=12);
-----
+---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE %(table_name)s partition (year, month)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 FROM %(base_table_name)s;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  partition (year, month) 
-  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month 
-  FROM %(base_table_name)s;
-----
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypes/090101.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=1);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypes/090201.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=2);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypes/090301.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=3);
@@ -79,13 +76,12 @@ LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypes/100901.txt' 
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypes/101001.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=10);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypes/101101.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=11);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypes/101201.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=12);
-----
-ANALYZE TABLE %(table_name)s PARTITION(year, month) COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 alltypesnopart
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   id int,
   bool_col boolean,
@@ -101,16 +97,12 @@ CREATE EXTERNAL TABLE %(table_name)s (
 row format delimited fields terminated by ','  escaped by '\\'
 stored as %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 alltypessmall
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   id int,
   bool_col boolean,
@@ -132,27 +124,21 @@ ALTER TABLE %(table_name)s ADD PARTITION(year=2009, month=1);
 ALTER TABLE %(table_name)s ADD PARTITION(year=2009, month=2);
 ALTER TABLE %(table_name)s ADD PARTITION(year=2009, month=3);
 ALTER TABLE %(table_name)s ADD PARTITION(year=2009, month=4);
-----
+---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE %(table_name)s partition (year, month)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 FROM %(base_table_name)s;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  partition (year, month) 
-  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month 
-  FROM %(base_table_name)s;
-----
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesSmall/090101.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=1);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesSmall/090201.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=2);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesSmall/090301.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=3);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesSmall/090401.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=4);
-----
-ANALYZE TABLE %(table_name)s PARTITION(year, month) COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 alltypestiny
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   id int,
   bool_col boolean,
@@ -174,69 +160,49 @@ ALTER TABLE %(table_name)s ADD PARTITION(year=2009, month=1);
 ALTER TABLE %(table_name)s ADD PARTITION(year=2009, month=2);
 ALTER TABLE %(table_name)s ADD PARTITION(year=2009, month=3);
 ALTER TABLE %(table_name)s ADD PARTITION(year=2009, month=4);
-----
+---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE %(table_name)s partition (year, month)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
 FROM %(base_table_name)s;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  partition (year, month) 
-  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month 
-  FROM %(base_table_name)s;
-----
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesTiny/090101.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=1);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesTiny/090201.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=2);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesTiny/090301.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=3);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesTiny/090401.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=4);
-----
-ANALYZE TABLE %(table_name)s PARTITION(year, month) COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 alltypesinsert
-----
+---- CREATE
 CREATE TABLE %(table_name)s LIKE AllTypes;
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s PARTITION(year, month) COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 alltypesnopart_insert
-----
+---- CREATE
 CREATE TABLE %(table_name)s like AllTypesNoPart;
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 insert_overwrite_nopart
-----
+---- CREATE
 CREATE TABLE %(table_name)s (col1 int);
-----
-----
-----
-----
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 insert_overwrite_partitioned
-----
+---- CREATE
 CREATE TABLE %(table_name)s (col1 int) PARTITIONED BY (col2 int);
-----
-----
-----
-----
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 alltypeserror
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   id int,
   bool_col boolean,
@@ -280,7 +246,7 @@ ROW FORMAT DELIMITED
   FIELDS TERMINATED BY ','
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
+---- DEPENDENT_LOAD
 -- Create a temp table in text format that interprets the data as strings
 DROP TABLE IF EXISTS %(base_table_name)s_tmp;
 CREATE EXTERNAL TABLE %(base_table_name)s_tmp (
@@ -314,21 +280,21 @@ SELECT * FROM %(base_table_name)s_tmp;
 -- Cleanup the temp tables
 DROP TABLE %(base_table_name)s_tmp;
 DROP TABLE %(table_name)s_tmp;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  partition (year, month) 
-  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month 
-  FROM %(base_table_name)s;
-----
+---- LOAD_TREVNI
+INSERT OVERWRITE TABLE %(table_name)s
+partition (year, month)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesError/0901.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=1);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesError/0902.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=2);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesError/0903.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=3);
-----
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 alltypeserrornonulls
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   id int,
   bool_col boolean,
@@ -372,7 +338,7 @@ ROW FORMAT DELIMITED
   ESCAPED BY '\\'
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
+---- DEPENDENT_LOAD
 -- Create a temp table in text format that interprets the data as strings
 DROP TABLE IF EXISTS %(base_table_name)s_tmp;
 CREATE EXTERNAL TABLE %(base_table_name)s_tmp (
@@ -407,21 +373,21 @@ SELECT * FROM %(base_table_name)s_tmp;
 -- Cleanup the temp tables
 DROP TABLE %(base_table_name)s_tmp;
 DROP TABLE %(table_name)s_tmp;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  partition (year, month) 
-  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month 
-  FROM %(base_table_name)s;
-----
+---- LOAD_TREVNI
+INSERT OVERWRITE TABLE %(table_name)s
+partition (year, month)
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month
+FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesErrorNoNulls/0901.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=1);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesErrorNoNulls/0902.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=2);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/AllTypesErrorNoNulls/0903.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2009, month=3);
-----
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 alltypesagg
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   id int,
   bool_col boolean,
@@ -448,16 +414,11 @@ ALTER TABLE %(table_name)s ADD PARTITION(year=2010, month=1, day=7);
 ALTER TABLE %(table_name)s ADD PARTITION(year=2010, month=1, day=8);
 ALTER TABLE %(table_name)s ADD PARTITION(year=2010, month=1, day=9);
 ALTER TABLE %(table_name)s ADD PARTITION(year=2010, month=1, day=10);
-----
+---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE %(table_name)s partition (year, month, day)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day
 FROM %(base_table_name)s;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  partition (year, month, day) 
-  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day 
-  FROM %(base_table_name)s;
-----
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAgg/100101.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=1);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAgg/100102.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=2);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAgg/100103.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=3);
@@ -468,13 +429,12 @@ LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAgg/100107.tx
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAgg/100108.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=8);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAgg/100109.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=9);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAgg/100110.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=10);
-----
-ANALYZE TABLE %(table_name)s PARTITION(year, month, day) COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 alltypesaggnonulls
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   id int,
   bool_col boolean,
@@ -501,16 +461,11 @@ ALTER TABLE %(table_name)s ADD PARTITION(year=2010, month=1, day=7);
 ALTER TABLE %(table_name)s ADD PARTITION(year=2010, month=1, day=8);
 ALTER TABLE %(table_name)s ADD PARTITION(year=2010, month=1, day=9);
 ALTER TABLE %(table_name)s ADD PARTITION(year=2010, month=1, day=10);
-----
+---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE %(table_name)s partition (year, month, day)
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day
 FROM %(base_table_name)s;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  partition (year, month, day) 
-  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day 
-  FROM %(base_table_name)s;
-----
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAggNoNulls/100101.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=1);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAggNoNulls/100102.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=2);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAggNoNulls/100103.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=3);
@@ -521,13 +476,12 @@ LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAggNoNulls/10
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAggNoNulls/100108.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=8);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAggNoNulls/100109.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=9);
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/target/AllTypesAggNoNulls/100110.txt' OVERWRITE INTO TABLE %(table_name)s PARTITION(year=2010, month=1, day=10);
-----
-ANALYZE TABLE %(table_name)s PARTITION(year, month, day) COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 testtbl
-----
+---- CREATE
 -- testtbl is empty
 CREATE EXTERNAL TABLE %(table_name)s (
   id bigint,
@@ -536,16 +490,12 @@ CREATE EXTERNAL TABLE %(table_name)s (
 row format delimited fields terminated by ','  escaped by '\\'
 stored as %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 dimtbl
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   id bigint,
   name string,
@@ -553,20 +503,16 @@ CREATE EXTERNAL TABLE %(table_name)s (
 row format delimited fields terminated by ','  escaped by '\\'
 stored as %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s;
-----
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/DimTbl/data.csv' OVERWRITE INTO TABLE %(table_name)s;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 jointbl
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   test_id bigint,
   test_name string,
@@ -575,20 +521,16 @@ CREATE EXTERNAL TABLE %(table_name)s (
 row format delimited fields terminated by ','  escaped by '\\'
 stored as %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s;
-----
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/JoinTbl/data.csv' OVERWRITE INTO TABLE %(table_name)s;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 testdb1.alltypes
-----
+---- CREATE
 CREATE DATABASE IF NOT EXISTS testdb1;
 CREATE EXTERNAL TABLE %(table_name)s (
   id int,
@@ -605,16 +547,12 @@ CREATE EXTERNAL TABLE %(table_name)s (
 row format delimited fields terminated by ','  escaped by '\\'
 stored as %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 testdb1.testtbl
-----
+---- CREATE
 CREATE DATABASE IF NOT EXISTS testdb1;
 CREATE EXTERNAL TABLE %(table_name)s (
   id bigint,
@@ -623,16 +561,12 @@ CREATE EXTERNAL TABLE %(table_name)s (
 row format delimited fields terminated by ','  escaped by '\\'
 stored as %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 liketbl
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   str_col string,
   match_like_col string,
@@ -642,20 +576,16 @@ CREATE EXTERNAL TABLE %(table_name)s (
 row format delimited fields terminated by ','  escaped by '\\'
 stored as %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s;
-----
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/LikeTbl/data.csv' OVERWRITE INTO TABLE %(table_name)s;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 hbasealltypessmall
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   id int,
   bool_col boolean,
@@ -674,18 +604,16 @@ WITH SERDEPROPERTIES (
   ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col,strings:timestamp_col"
 )
 TBLPROPERTIES("hbase.table.name" = "hbasealltypessmall");
-----
-----
-----
+---- LOAD
 INSERT OVERWRITE TABLE %(table_name)s
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
 FROM alltypessmall;
-----
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 hbasealltypeserror
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   id int,
   bool_col boolean,
@@ -704,15 +632,12 @@ WITH SERDEPROPERTIES (
   ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col,strings:timestamp_col"
 )
 TBLPROPERTIES("hbase.table.name" = "hbasealltypeserror");
-----
-----
-----
-----
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 hbasealltypeserrornonulls
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   id int,
   bool_col boolean,
@@ -731,15 +656,12 @@ WITH SERDEPROPERTIES (
   ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col,strings:timestamp_col"
 )
 TBLPROPERTIES("hbase.table.name" = "hbasealltypeserrornonulls");
-----
-----
-----
-----
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 hbasealltypesagg
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   id int,
   bool_col boolean,
@@ -758,18 +680,16 @@ WITH SERDEPROPERTIES (
   ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col,strings:timestamp_col"
 )
 TBLPROPERTIES("hbase.table.name" = "hbasealltypesagg");
-----
-----
-----
+---- LOAD
 INSERT OVERWRITE TABLE %(table_name)s
 SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col
 FROM alltypesagg;
-----
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 hbasestringids
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   id string,
   bool_col boolean,
@@ -788,15 +708,12 @@ WITH SERDEPROPERTIES (
   ":key,bools:bool_col,ints:tinyint_col,ints:smallint_col,ints:int_col,ints:bigint_col,floats:float_col,floats:double_col,strings:date_string_col,strings:string_col,strings:timestamp_col"
 )
 TBLPROPERTIES("hbase.table.name" = "hbasealltypesagg");
-----
-----
-----
-----
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 escapenoquotes
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   col1 string,
   col2 string,
@@ -805,20 +722,16 @@ CREATE EXTERNAL TABLE %(table_name)s (
 row format delimited fields terminated by ','  escaped by '\\'
 stored as %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s;
-----
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/escape-no-quotes.txt' OVERWRITE INTO TABLE %(table_name)s;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 overflow
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   tinyint_col tinyint,
   smallint_col smallint,
@@ -829,36 +742,28 @@ CREATE EXTERNAL TABLE %(table_name)s (
 row format delimited fields terminated by ','  escaped by '\\'
 stored as %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s;
-----
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/data/overflow.txt' OVERWRITE INTO TABLE %(table_name)s;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 greptiny
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   field string);
-----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s;
-----
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/grepTiny/part-00000' OVERWRITE INTO TABLE %(table_name)s;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 rankingssmall
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   pageRank int,
   pageURL string,
@@ -866,20 +771,16 @@ CREATE EXTERNAL TABLE %(table_name)s (
 row format delimited fields terminated by '|'
 stored as %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s;
-----
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/htmlTiny/Rankings.dat' OVERWRITE INTO TABLE %(table_name)s;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 uservisitssmall
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   sourceIP string,
   destURL string,
@@ -893,33 +794,25 @@ CREATE EXTERNAL TABLE %(table_name)s (
 row format delimited fields terminated by '|'
 stored as %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s;
-----
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/hive_benchmark/htmlTiny/UserVisits.dat' OVERWRITE INTO TABLE %(table_name)s;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 emptytable
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   field string)
 partitioned by (f2 int);
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s PARTITION(f2) COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 alltypesaggmultifiles
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   id int,
   bool_col boolean,
@@ -946,30 +839,24 @@ ALTER TABLE %(table_name)s ADD PARTITION(year=2010, month=1, day=7);
 ALTER TABLE %(table_name)s ADD PARTITION(year=2010, month=1, day=8);
 ALTER TABLE %(table_name)s ADD PARTITION(year=2010, month=1, day=9);
 ALTER TABLE %(table_name)s ADD PARTITION(year=2010, month=1, day=10);
-----
+---- DEPENDENT_LOAD
 insert into table %(table_name)s partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM %(base_table_name)s where id % 4 = 0;
 insert into table %(table_name)s partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM %(base_table_name)s where id % 4 = 1;
 insert into table %(table_name)s partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM %(base_table_name)s where id % 4 = 2;
 insert into table %(table_name)s partition (year, month, day) SELECT  id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM %(base_table_name)s where id % 4 = 3;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  partition (year, month, day) 
-  select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day 
-  FROM %(base_table_name)s;
-----
+---- LOAD
 SET hive.exec.dynamic.partition.mode=nonstrict;
 SET hive.exec.dynamic.partition=true;
 insert into table %(table_name)s partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 0;
 insert into table %(table_name)s partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 1;
 insert into table %(table_name)s partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 2;
 insert into table %(table_name)s partition (year, month, day) SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col, year, month, day FROM alltypesagg where id % 4 = 3;
-----
-ANALYZE TABLE %(table_name)s PARTITION(year, month, day) COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 alltypesaggmultifilesnopart
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   id int,
   bool_col boolean,
@@ -984,15 +871,12 @@ CREATE EXTERNAL TABLE %(table_name)s (
   timestamp_col timestamp)
 stored as %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
+---- DEPENDENT_LOAD
 insert into table %(table_name)s SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM %(base_table_name)s where id % 4 = 0;
 insert into table %(table_name)s SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM %(base_table_name)s where id % 4 = 1;
 insert into table %(table_name)s SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM %(base_table_name)s where id % 4 = 2;
 insert into table %(table_name)s SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM %(base_table_name)s where id % 4 = 3;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s;
-----
+---- LOAD
 SET hive.exec.dynamic.partition.mode=nonstrict;
 SET hive.exec.dynamic.partition=true;
 SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
@@ -1000,13 +884,12 @@ insert into table %(table_name)s SELECT id, bool_col, tinyint_col, smallint_col,
 insert into table %(table_name)s SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 1;
 insert into table %(table_name)s SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 2;
 insert into table %(table_name)s SELECT id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col, timestamp_col FROM alltypesagg where id % 4 = 3;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 stringpartitionkey
-----
+---- CREATE
 -- Regression for IMP-163, failure to load tables partitioned by string column
 CREATE EXTERNAL TABLE %(table_name)s (
   id int) 
@@ -1015,55 +898,43 @@ STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 
 ALTER TABLE %(table_name)s ADD PARTITION (string_col = "partition1");
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s PARTITION(string_col) COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 tinytable
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   a string,
   b string)
 row format delimited fields terminated by ','
 stored as %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s;
-----
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/TinyTable/data.csv' OVERWRITE INTO TABLE %(table_name)s;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 tinyinttable
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   int_col int)
 row format delimited fields terminated by ','
 stored as %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s;
-----
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/TinyIntTable/data.csv' OVERWRITE INTO TABLE %(table_name)s;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 nulltable
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   a string,
   b string,
@@ -1072,24 +943,16 @@ CREATE EXTERNAL TABLE %(table_name)s (
   e double)
 row format delimited fields terminated by ','
 stored as %(file_format)s;
-----
-SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
+---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE %(table_name)s select 'a', '', NULL, NULL, NULL from alltypes limit 1;
-SET hive.input.format=org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s;
-----
-SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
+---- LOAD
 INSERT OVERWRITE TABLE %(table_name)s select 'a', '', NULL, NULL, NULL from alltypes limit 1;
-SET hive.input.format=org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 nullescapedtable
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   a string,
   b string,
@@ -1098,54 +961,43 @@ CREATE EXTERNAL TABLE %(table_name)s (
   e double)
 row format delimited fields terminated by ',' escaped by '\\'
 stored as %(file_format)s;
-----
-SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
+---- DEPENDENT_LOAD
 INSERT OVERWRITE TABLE %(table_name)s select 'a', '', NULL, NULL, NULL from alltypes limit 1;
-SET hive.input.format=org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s;
-----
-SET hive.input.format=org.apache.hadoop.hive.ql.io.HiveInputFormat;
+---- LOAD
 INSERT OVERWRITE TABLE %(table_name)s select 'a', '', NULL, NULL, NULL from alltypes limit 1;
-SET hive.input.format=org.apache.hadoop.hive.ql.io.CombineHiveInputFormat;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 escapechartesttable
-----
+---- CREATE
 -- Create a test data with the escape character as the same as the tuple delimiter
 CREATE EXTERNAL TABLE %(table_name)s (bool_col boolean)
 partitioned by (id int)
 row format delimited fields terminated by ',' escaped by '\n'
 stored as %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
+----  DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s partition (id)
+select bool_col,id FROM alltypesagg where id < 10;
+---- LOAD
 SET hive.exec.dynamic.partition.mode=nonstrict;
 SET hive.exec.dynamic.partition=true;
 INSERT OVERWRITE TABLE %(table_name)s partition (id)
 select bool_col,id FROM alltypesagg where id < 10;
-----
-----
-SET hive.exec.dynamic.partition.mode=nonstrict;
-SET hive.exec.dynamic.partition=true;
-INSERT OVERWRITE TABLE %(table_name)s partition (id)
-select bool_col,id FROM alltypesagg where id < 10;
-----
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 TblWithRaggedColumns
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
   str_col string,
   int_col int)
 row format delimited fields terminated by ','  escaped by '\\'
 stored as %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
+---- DEPENDENT_LOAD
 DROP TABLE IF EXISTS tmp_txt;
 DROP TABLE IF EXISTS TblWithRaggedColumns_tmp;
 CREATE EXTERNAL TABLE TblWithRaggedColumns_tmp (
@@ -1163,18 +1015,14 @@ LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(base_table_name)s';
 INSERT OVERWRITE TABLE TblWithRaggedColumns_tmp select * from tmp_txt;
 DROP TABLE tmp_txt;
 DROP TABLE TblWithRaggedColumns_tmp;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s;
-----
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/TblWithRaggedColumns/data.csv' OVERWRITE INTO TABLE %(table_name)s;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 functional
-----
+---- BASE_TABLE_NAME
 nullinsert
-----
+---- CREATE
 -- Must not be external
 CREATE TABLE %(table_name)s (
   str_col1 string,
@@ -1194,8 +1042,23 @@ CREATE EXTERNAL TABLE alt_%(table_name)s(
 row format delimited fields terminated by '|'
 stored as %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
+zipcode_incomes
+---- CREATE
+CREATE EXTERNAL TABLE %(table_name)s (
+  id STRING,
+  zip STRING,
+  description1 STRING,
+  description2 STRING,
+  income int)
+ROW FORMAT DELIMITED FIELDS TERMINATED BY ','
+STORED AS %(file_format)s
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+---- LOAD
+LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/ImpalaDemoDataset/DEC_00_SF3_P077_with_ann_noheader.csv' OVERWRITE INTO TABLE %(table_name)s;
 ====

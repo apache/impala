@@ -57,3 +57,6 @@ ${IMPALA_HOME}/testdata/bin/lzo_indexer.sh /test-warehouse/alltypesaggmultifiles
 hadoop fs -rm -f /test-warehouse/bad_text_lzo//bad_text.lzo.index
 hadoop fs -put ${IMPALA_HOME}/testdata/bad_text_lzo/bad_text.lzo.index \
   /test-warehouse/bad_text_lzo/
+
+# When we want to start computing table stats after data loading uncomment this line
+# python ${IMPALA_HOME}/tests/util/compute_table_stats.py

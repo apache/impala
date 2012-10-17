@@ -32,7 +32,9 @@ parser.add_option("--compute_stats", dest="compute_stats", action="store_true",
                   "tables that are loaded")
 parser.add_option("--impalad", dest="impala_shell_args", default="localhost:21000",
                   help="Impala daemon to connect to")
-
+parser.add_option("--table_names", dest="table_names", default=None,
+                  help="Only load the specified tables - specified as a comma-seperated "\
+                  "list of base table names")
 (options, args) = parser.parse_args()
 
 WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
@@ -66,7 +68,8 @@ def exec_hive_query_from_file(file_name):
     sys.exit(ret_val)
 
 def exec_impala_query_from_file(file_name):
-  impala_cmd = "%s --impalad=%s -f %s" % (IMPALA_SHELL_CMD, options.impala_shell_args, file_name)
+  impala_cmd = "%s --impalad=%s -f %s" %\
+      (IMPALA_SHELL_CMD, options.impala_shell_args, file_name)
   print 'Executing Impala Command: ' + impala_cmd
   ret_val = subprocess.call(impala_cmd, shell = True)
   if ret_val != 0:
@@ -84,12 +87,12 @@ def exec_bash_script(file_name):
 def generate_schema_statements(workload):
   generate_cmd = GENERATE_SCHEMA_CMD % (options.exploration_strategy, workload,
                                         options.scale_factor)
+  if options.table_names:
+    generate_cmd += " --table_names=%s" % options.table_names
   if options.force_reload:
     generate_cmd += " --force_reload"
   if options.hive_warehouse_dir is not None:
     generate_cmd += " --hive_warehouse_dir=%s" % options.hive_warehouse_dir
-  if not options.compute_stats:
-    generate_cmd += " --skip_compute_stats"
   print 'Executing Generate Schema Command: ' + generate_cmd
   ret_val = subprocess.call(os.path.join(TESTDATA_BIN_DIR, generate_cmd), shell = True)
   if ret_val != 0:
@@ -110,39 +113,40 @@ def get_dataset_for_workload(workload):
       print 'Dimension file does not contain dataset for workload \'%s\'' % (workload)
       sys.exit(1)
 
-all_workloads = available_workloads(WORKLOAD_DIR)
-workloads = []
-if options.workloads is None:
-  print "At least one workload name must be specified."
-  parser.print_help()
-  sys.exit(1)
-elif options.workloads == 'all':
-  print 'Loading data for all workloads.'
-  workloads = all_workloads
-else:
-  workloads = options.workloads.split(",")
-  validate_workloads(all_workloads, workloads)
+if __name__ == "__main__":
+  all_workloads = available_workloads(WORKLOAD_DIR)
+  workloads = []
+  if options.workloads is None:
+    print "At least one workload name must be specified."
+    parser.print_help()
+    sys.exit(1)
+  elif options.workloads == 'all':
+    print 'Loading data for all workloads.'
+    workloads = all_workloads
+  else:
+    workloads = options.workloads.split(",")
+    validate_workloads(all_workloads, workloads)
 
-print 'Starting data load for the following workloads: ' + ', '.join(workloads)
+  print 'Starting data load for the following workloads: ' + ', '.join(workloads)
 
-loading_time_map = collections.defaultdict(float)
-for workload in workloads:
-  start_time = time.time()
-  dataset = get_dataset_for_workload(workload)
-  print "Dataset for workload '%s' is '%s'" % (workload, dataset)
-  dataset_dir = os.path.join(DATASET_DIR, dataset)
-  os.chdir(dataset_dir)
-  generate_schema_statements(workload)
-  exec_hive_query_from_file(os.path.join(dataset_dir,
-     'load-%s-%s-generated.sql' % (workload, options.exploration_strategy)))
+  loading_time_map = collections.defaultdict(float)
+  for workload in workloads:
+    start_time = time.time()
+    dataset = get_dataset_for_workload(workload)
+    print "Dataset for workload '%s' is '%s'" % (workload, dataset)
+    dataset_dir = os.path.join(DATASET_DIR, dataset)
+    os.chdir(dataset_dir)
+    generate_schema_statements(workload)
+    exec_hive_query_from_file(os.path.join(dataset_dir,
+       'load-%s-%s-generated.sql' % (workload, options.exploration_strategy)))
 
-  exec_impala_query_from_file(os.path.join(dataset_dir,
-     'load-trevni-%s-%s-generated.sql' % (workload, options.exploration_strategy)))
-  loading_time_map[workload] = time.time() - start_time
+    exec_impala_query_from_file(os.path.join(dataset_dir,
+       'load-trevni-%s-%s-generated.sql' % (workload, options.exploration_strategy)))
+    loading_time_map[workload] = time.time() - start_time
 
-total_time = 0.0
-for workload, load_time in loading_time_map.iteritems():
-  total_time += load_time
-  print 'Data loading for workload \'%s\' completed in: %.2fs'\
-      % (workload, load_time)
-print 'Total load time: %.2fs\n' % total_time
+  total_time = 0.0
+  for workload, load_time in loading_time_map.iteritems():
+    total_time += load_time
+    print 'Data loading for workload \'%s\' completed in: %.2fs'\
+        % (workload, load_time)
+  print 'Total load time: %.2fs\n' % total_time

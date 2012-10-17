@@ -1,10 +1,11 @@
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # For details on this file format please see hive-benchmark_schema_template.sql
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.lineitem
-----
+---- CREATE
 CREATE DATABASE IF NOT EXISTS tpch%(scale_factor)s;
 CREATE EXTERNAL TABLE %(table_name)s (
 L_ORDERKEY INT,
@@ -26,21 +27,17 @@ L_COMMENT STRING)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s
-----
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/lineitem/'
 OVERWRITE INTO TABLE %(table_name)s;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.part
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
 P_PARTKEY INT,
 P_NAME STRING,
@@ -55,21 +52,17 @@ P_COMMENT STRING)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s
-----
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/part/'
 OVERWRITE INTO TABLE %(table_name)s;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.partsupp
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
 PS_PARTKEY INT,
 PS_SUPPKEY INT,
@@ -79,21 +72,17 @@ PS_COMMENT STRING)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s
-----
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/partsupp/'
 OVERWRITE INTO TABLE %(table_name)s;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.supplier
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
 S_SUPPKEY INT,
 S_NAME STRING,
@@ -105,21 +94,17 @@ S_COMMENT STRING)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s
-----
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/supplier/'
 OVERWRITE INTO TABLE %(table_name)s;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.nation
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
 N_NATIONKEY INT,
 N_NAME STRING,
@@ -128,21 +113,17 @@ N_COMMENT STRING)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s
-----
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/nation/'
 OVERWRITE INTO TABLE %(table_name)s;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.region
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
 R_REGIONKEY INT,
 R_NAME STRING,
@@ -150,21 +131,17 @@ R_COMMENT STRING)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s
-----
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/region/'
 OVERWRITE INTO TABLE %(table_name)s;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.orders
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
 O_ORDERKEY INT,
 O_CUSTKEY INT,
@@ -178,21 +155,17 @@ O_COMMENT STRING)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s
-----
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/orders/'
 OVERWRITE INTO TABLE %(table_name)s;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.customer
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
 C_CUSTKEY INT,
 C_NAME STRING,
@@ -205,21 +178,17 @@ C_COMMENT STRING)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-FROM %(base_table_name)s INSERT OVERWRITE TABLE %(table_name)s SELECT *;
-----
-  INSERT OVERWRITE TABLE %(table_name)s 
-  select * FROM %(base_table_name)s
-----
+---- DEPENDENT_LOAD
+INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+---- LOAD
 LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/customer/'
 OVERWRITE INTO TABLE %(table_name)s;
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.q2_minimum_cost_supplier_tmp1
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
 s_acctbal double,
 s_name string,
@@ -232,31 +201,23 @@ s_phone string,
 s_comment string)
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.q2_minimum_cost_supplier_tmp2
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
 p_partkey int,
 ps_min_supplycost double)
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.q7_volume_shipping_tmp
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
 supp_nation string,
 cust_nation string,
@@ -264,85 +225,61 @@ s_nationkey int,
 c_nationkey int)
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.q11_part_tmp
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
 ps_partkey int,
 part_value double)
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.q11_sum_tmp
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (total_value double)
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.revenue
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
 supplier_no int,
 total_revenue double)
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.max_revenue
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (max_revenue double)
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.supplier_tmp
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (s_suppkey int)
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.q16_tmp
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
 p_brand string,
 p_type string,
@@ -350,110 +287,77 @@ p_size int,
 ps_suppkey int)
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.lineitem_tmp
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
 t_partkey int,
 t_avg_quantity double)
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.q18_tmp
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
 l_orderkey int,
 t_sum_quantity double)
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.q20_tmp1
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (p_partkey int)
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.q20_tmp2
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
 l_partkey int,
 l_suppkey int,
 sum_quantity double)
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.q20_tmp3
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (
 ps_suppkey int,
 ps_availqty int,
 sum_quantity double)
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.q20_tmp4
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (ps_suppkey int)
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+---- DATASET
 tpch
-----
+---- BASE_TABLE_NAME
 tpch%(scale_factor)s.q22_customer_tmp1
-----
+---- CREATE
 CREATE EXTERNAL TABLE %(table_name)s (avg_acctbal double, cust_name_char string)
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
-----
-----
-----
-----
-ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
