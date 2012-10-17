@@ -1174,8 +1174,8 @@ void ImpalaServer::fetch(Results& query_results, const QueryHandle& query_handle
   VLOG_ROW << "fetch(): query_id=" << PrintId(query_id) << " fetch_size=" << fetch_size;
 
   Status status = FetchInternal(query_id, start_over, fetch_size, &query_results);
-  VLOG(ROW) << "fetch result: #results=" << query_results.data.size()
-            << " has_more=" << (query_results.has_more ? "true" : "false");
+  VLOG_ROW << "fetch result: #results=" << query_results.data.size()
+           << " has_more=" << (query_results.has_more ? "true" : "false");
   if (!status.ok()) {
     UnregisterQuery(query_id);
     RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
