@@ -519,6 +519,7 @@ void* LlvmCodeGen::JitFunction(Function* function, int* scratch_size) {
   }
   // TODO: log a warning if the jitted function is too big (larger than I cache)
   void* jitted_function = execution_engine_->getPointerToFunction(function);
+  lock_guard<mutex> l(jitted_functions_lock_);
   if (jitted_function != NULL) {
     jitted_functions_[function] = true;
   }

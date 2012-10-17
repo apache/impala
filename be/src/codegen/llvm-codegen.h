@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <boost/scoped_ptr.hpp>
+#include <boost/thread/mutex.hpp>
 
 #include <llvm/DerivedTypes.h>
 #include <llvm/Intrinsics.h>
@@ -70,11 +71,14 @@ class SubExprElimination;
 // be called directly.  The test interface can be used to load any precompiled 
 // module or none at all (but this class will not validate the module).
 //
-// This class is not threadsafe.  During the Prepare() phase of the fragment
+// This class is mostly not threadsafe.  During the Prepare() phase of the fragment
 // execution, nodes should codegen functions.
 // Afterward, OptimizeModule() should be called at which point all codegened functions
-// are optimized.  Subsequently, nodes can get at the jit compiled function pointer
-// (typically during the Open() call).
+// are optimized.  
+// Subsequently, nodes can get at the jit compiled function pointer (typically during the 
+// Open() call).  Getting the jit compiled function (JitFunction()) is the only thread 
+// safe function.
+//
 // Currently, each query will create and initialize one of these 
 // objects.  This requires loading and parsing the cross compiled modules.
 // TODO: we should be able to do this once per process and let llvm compile
@@ -260,6 +264,7 @@ class LlvmCodeGen {
   // scratch_size will be set to the buffer size required to call the function
   // scratch_size is the total size from all LlvmCodeGen::GetScratchBuffer
   // calls (with some additional bytes for alignment)
+  // This function is thread safe.
   void* JitFunction(llvm::Function* function, int* scratch_size = NULL);
 
   // Verfies the function if the verfier is enabled.  Returns false if function
@@ -415,6 +420,9 @@ class LlvmCodeGen {
   // the process. Special care needs to be taken if we need to modify these functions.
   // bool is unused.
   std::map<llvm::Function*, bool> jitted_functions_;
+  
+  // Lock protecting jitted_functions_
+  boost::mutex jitted_functions_lock_;
 
   // Keeps track of the external functions that have been included in this module
   // e.g libc functions or non-jitted impala functions.
