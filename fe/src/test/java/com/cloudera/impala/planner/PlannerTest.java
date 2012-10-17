@@ -212,16 +212,18 @@ public class PlannerTest {
     LOG.info("scan range locations: " + locationsStr);
     ArrayList<String> expectedLocations =
         testCase.getSectionContents(Section.SCANRANGELOCATIONS);
-    String result = TestUtils.compareOutput(
-        Lists.newArrayList(locationsStr.split("\n")), expectedLocations, true);
-    if (!result.isEmpty()) {
-      errorLog.append("section " + Section.SCANRANGELOCATIONS + " of query:\n"
-          + query + "\n" + result);
-    }
-    actualOutput.append(Section.SCANRANGELOCATIONS.getHeader() + "\n");
-    actualOutput.append(locationsStr);
 
+    if (expectedLocations.size() > 0) {
+      String result = TestUtils.compareOutput(
+          Lists.newArrayList(locationsStr.split("\n")), expectedLocations, true);
+      if (!result.isEmpty()) {
+        errorLog.append("section " + Section.SCANRANGELOCATIONS + " of query:\n"
+            + query + "\n" + result);
+      }
+      actualOutput.append(Section.SCANRANGELOCATIONS.getHeader() + "\n");
+      actualOutput.append(locationsStr);
       // TODO: check that scan range locations are identical in both cases
+    }
   }
 
   private void runPlannerTestFile(String testFile, TQueryOptions options) {

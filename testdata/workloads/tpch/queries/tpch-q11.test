@@ -1,7 +1,6 @@
 # QUERY_NAME : TPCH-Q11_QUERY_1
 # Q11 - Important Stock Identification
-# NOTE: Alan is re-writing part of this query set
-# so it is missing for now
+# TODO: Need to add part 2 of this query. It required some more advanced modifications.
 insert overwrite table tpch.q11_part_tmp
 select ps_partkey, sum(ps_supplycost * ps_availqty) as part_value
 from tpch.nation$TABLE n

@@ -25,13 +25,10 @@ public class TpchQueryTest extends BaseQueryTest {
     runTestInExecutionMode(EXECUTION_MODE, "tpch-q3", false, 1000);
   }
 
-  /* The distributed plan is broken.
-   * TODO: re-enable after the switch to the new planner.
   @Test
   public void TestTpchQ4() {
     runTestInExecutionMode(EXECUTION_MODE, "tpch-q4", false, 1000);
   }
-  */
 
   @Test
   public void TestTpchQ5() {

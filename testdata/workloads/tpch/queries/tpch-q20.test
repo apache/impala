@@ -52,13 +52,10 @@ RELOAD tpch.q20_tmp3
 # QUERY_NAME : TPCH-Q20_QUERY_4
 # Modified to use subquery to work around IMP-127
 insert overwrite table tpch.q20_tmp4
-select a.ps_suppkey
-from (select
-        ps_suppkey,
-        count(1) from tpch.q20_tmp3
-      where ps_availqty > sum_quantity
-      group by ps_suppkey
-     ) a
+select ps_suppkey
+from tpch.q20_tmp3
+where ps_availqty > sum_quantity
+group by ps_suppkey
 ---- SETUP
 RESET tpch.q20_tmp4
 RELOAD tpch.q20_tmp4

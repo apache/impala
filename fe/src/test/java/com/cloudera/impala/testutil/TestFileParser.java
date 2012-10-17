@@ -98,8 +98,8 @@ public class TestFileParser {
     }
 
     /**
-     * Returns a section corresponding to the given key, or null if one does not exist.
-     * Comments are not included.
+     * Returns a section corresponding to the given key, or an empty list if one does not
+     * exist. Comments are not included.
      */
     public ArrayList<String> getSectionContents(Section section) {
       return getSectionContents(section, false);
