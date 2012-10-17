@@ -10,6 +10,7 @@
 #include "runtime/tuple-row.h"
 #include "runtime/timestamp-value.h"
 #include "util/path-builder.h"
+#include "runtime/string-value.inline.h"
 
 #define TIMEZONE_DATABASE "be/files/date_time_zonespec.csv"
 
