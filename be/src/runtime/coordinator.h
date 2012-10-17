@@ -6,6 +6,13 @@
 #include <vector>
 #include <string>
 #include <boost/scoped_ptr.hpp>
+#include <boost/accumulators/accumulators.hpp>
+#include <boost/accumulators/statistics/stats.hpp>
+#include <boost/accumulators/statistics/min.hpp>
+#include <boost/accumulators/statistics/mean.hpp>
+#include <boost/accumulators/statistics/median.hpp>
+#include <boost/accumulators/statistics/max.hpp>
+#include <boost/accumulators/statistics/variance.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/mutex.hpp>
@@ -139,7 +146,17 @@ class Coordinator {
 
  private:
   class BackendExecState;
-  
+    
+  // Typedef for boost utility to compute averaged stats
+  // TODO: including the median doesn't compile, looks like some includes are missing
+  typedef boost::accumulators::accumulator_set<int64_t, 
+      boost::accumulators::features<
+      boost::accumulators::tag::min, 
+      boost::accumulators::tag::max, 
+      boost::accumulators::tag::mean, 
+      boost::accumulators::tag::variance> 
+  > SummaryStats;
+
   ExecEnv* exec_env_;
   TUniqueId query_id_;
 
@@ -288,6 +305,15 @@ class Coordinator {
 
     // Root profile for all fragment instances for this fragment
     RuntimeProfile* root_profile;
+    
+    // Bytes assigned for instances of this fragment
+    SummaryStats bytes_assigned;
+
+    // Completion times for instances of this fragment
+    SummaryStats completion_times;
+
+    // Execution rates for instances of this fragment
+    SummaryStats rates;
   };
 
   // This is indexed by fragment_idx.
@@ -343,6 +369,7 @@ class Coordinator {
   int GetFragmentNum(const TUniqueId& fragment_id);
 
   // Print hdfs split size stats to VLOG_QUERY and details to VLOG_FILE
+  // Attaches split size summary to the appropriate runtime profile
   void PrintBackendInfo();
 
   // Create aggregate counters for all scan nodes in any of the fragments

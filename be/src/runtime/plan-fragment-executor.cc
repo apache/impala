@@ -253,6 +253,13 @@ void PlanFragmentExecutor::ReportProfile() {
   // tell Open() that we started
   report_thread_started_cv_.notify_one();
 
+  // Jitter the reporting time of remote fragments by a random amount between
+  // 0 and the report_interval.  This way, the coordinator doesn't get all the
+  // updates at once so its better for contention as well as smoother progress
+  // reporting.
+  int report_fragment_offset = rand() % FLAGS_status_report_interval;
+  sleep(report_fragment_offset);
+
   while (true) {
     system_time timeout =
         get_system_time() + posix_time::seconds(FLAGS_status_report_interval);

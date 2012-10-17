@@ -269,6 +269,14 @@ Status Coordinator::Exec(
   // Initialize per fragment profile data
   fragment_profiles_.resize(request->fragments.size());
   for (int i = 0; i < request->fragments.size(); ++i) {
+    fragment_profiles_[i].num_instances = 0;
+    
+    // Special case fragment idx 0 if there is a coordinator. There is only one
+    // instance of this profile so the average is just the coordinator profile. 
+    if (i == 0 && has_coordinator_fragment) {
+      fragment_profiles_[i].averaged_profile = executor_->profile();
+      continue;
+    }
     stringstream ss;
     ss << "Averaged Fragment " << i;
     fragment_profiles_[i].averaged_profile = 
@@ -288,7 +296,6 @@ Status Coordinator::Exec(
     fragment_profiles_[i].root_profile = 
         obj_pool()->Add(new RuntimeProfile(obj_pool(), ss.str()));
     query_profile_->AddChild(fragment_profiles_[i].root_profile);
-    fragment_profiles_[i].num_instances = 0;
   }
 
   // start fragment instances from left to right, so that receivers have
@@ -332,6 +339,8 @@ Status Coordinator::Exec(
       return fragments_exec_status;
     }
   }
+
+  PrintBackendInfo();
 
   stringstream ss;
   ss << "Query " << query_id_;
@@ -554,32 +563,35 @@ Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
 }
 
 void Coordinator::PrintBackendInfo() {
-  accumulator_set<int64_t, features<tag::min, tag::max, tag::mean, tag::variance> > acc;
   for (int i = 0; i < backend_exec_states_.size(); ++i) {
+    SummaryStats& acc = 
+        fragment_profiles_[backend_exec_states_[i]->fragment_idx].bytes_assigned;
     acc(backend_exec_states_[i]->total_split_size);
   }
-  double min = accumulators::min(acc);
-  double max = accumulators::max(acc);
-  // TODO: including the median doesn't compile, looks like some includes are missing
-  //double median = accumulators::median(acc);
-  double mean = accumulators::mean(acc);
-  double stddev = sqrt(accumulators::variance(acc));
-  stringstream ss;
-  ss << " min: " << PrettyPrinter::Print(min, TCounterType::BYTES)
-     << ", max: " << PrettyPrinter::Print(max, TCounterType::BYTES)
-     //<< ", median: " << PrettyPrinter::Print(median, TCounterType::BYTES)
-     << ", avg: " << PrettyPrinter::Print(mean, TCounterType::BYTES)
-     << ", stddev: " << PrettyPrinter::Print(stddev, TCounterType::BYTES);
-  query_profile_->AddInfoString("split sizes", ss.str());
 
-  if (VLOG_FILE_IS_ON) {
-    VLOG_FILE << ss.str();
-    for (int i = 0; i < backend_exec_states_.size(); ++i) {
-      BackendExecState* exec_state = backend_exec_states_[i];
-      VLOG_FILE << "data volume for ipaddress " << exec_state->hostport.first
-                << ":" << exec_state->hostport.second << ": "
-                << PrettyPrinter::Print(
-                  exec_state->total_split_size, TCounterType::BYTES);
+  for (int i = (executor_.get() == NULL ? 0 : 1); i < fragment_profiles_.size(); ++i) {
+    SummaryStats& acc = fragment_profiles_[i].bytes_assigned;
+    double min = accumulators::min(acc);
+    double max = accumulators::max(acc);
+    double mean = accumulators::mean(acc);
+    double stddev = sqrt(accumulators::variance(acc));
+    stringstream ss;
+    ss << " min: " << PrettyPrinter::Print(min, TCounterType::BYTES)
+      << ", max: " << PrettyPrinter::Print(max, TCounterType::BYTES)
+      << ", avg: " << PrettyPrinter::Print(mean, TCounterType::BYTES)
+      << ", stddev: " << PrettyPrinter::Print(stddev, TCounterType::BYTES);
+    fragment_profiles_[i].averaged_profile->AddInfoString("split sizes", ss.str());
+
+    if (VLOG_FILE_IS_ON) {
+      VLOG_FILE << "Byte split for fragment " << i << " " << ss.str();
+      for (int j = 0; j < backend_exec_states_.size(); ++j) {
+        BackendExecState* exec_state = backend_exec_states_[j];
+        if (exec_state->fragment_idx != i) continue;
+        VLOG_FILE << "data volume for ipaddress " << exec_state->hostport.first
+                  << ":" << exec_state->hostport.second << ": "
+                  << PrettyPrinter::Print(
+                    exec_state->total_split_size, TCounterType::BYTES);
+      }
     }
   }
 }
@@ -923,57 +935,57 @@ void Coordinator::ReportQuerySummary() {
   if (executor_.get() != NULL) executor_->profile()->ComputeTimeInProfile();
 
   if (!backend_exec_states_.empty()) {
-    accumulator_set<int64_t, features<tag::min, tag::max, tag::mean, tag::variance> > 
-        completion_times;
-    accumulator_set<int64_t, features<tag::min, tag::max, tag::mean, tag::variance> > 
-        rates;
-
     // Average all remote fragments for each fragment.  
-
     for (int i = 0; i < backend_exec_states_.size(); ++i) {
       backend_exec_states_[i]->profile->ComputeTimeInProfile();
-      int64_t completion_time = backend_exec_states_[i]->stopwatch.ElapsedTime();
-      completion_times(completion_time);
-      rates(backend_exec_states_[i]->total_split_size / (completion_time / 1000.0));
       
       int fragment_idx = backend_exec_states_[i]->fragment_idx;
       DCHECK_GE(fragment_idx, 0);
       DCHECK_LT(fragment_idx, fragment_profiles_.size());
       PerFragmentProfileData& data = fragment_profiles_[fragment_idx];
 
+      int64_t completion_time = backend_exec_states_[i]->stopwatch.ElapsedTime();
+      data.completion_times(completion_time);
+      data.rates(backend_exec_states_[i]->total_split_size / (completion_time / 1000.0));
       data.averaged_profile->Merge(backend_exec_states_[i]->profile);
       data.root_profile->AddChild(backend_exec_states_[i]->profile);
     }
     
-    // Add the non-coordinator averages to the top of the query profile
+    // Per fragment instances have been collected, output summaries
     for (int i = (executor_.get() != NULL ? 1 : 0); i < fragment_profiles_.size(); ++i) {
       RuntimeProfile* profile = fragment_profiles_[i].averaged_profile;
       profile->Divide(fragment_profiles_[i].num_instances);
+
+      SummaryStats& completion_times = fragment_profiles_[i].completion_times;
+      SummaryStats& rates = fragment_profiles_[i].rates;
+      
+      stringstream times_label;
+      times_label 
+        << "min:" << PrettyPrinter::Print(
+            accumulators::min(completion_times), TCounterType::TIME_MS)
+        << "  max:" << PrettyPrinter::Print(
+            accumulators::max(completion_times), TCounterType::TIME_MS)
+        << "  mean: " << PrettyPrinter::Print(
+            accumulators::mean(completion_times), TCounterType::TIME_MS)
+        << "  stddev:" << PrettyPrinter::Print(
+            sqrt(accumulators::variance(completion_times)), TCounterType::TIME_MS);
+
+      stringstream rates_label;
+      rates_label 
+        << "min:" << PrettyPrinter::Print(
+            accumulators::min(rates), TCounterType::BYTES_PER_SECOND)
+        << "  max:" << PrettyPrinter::Print(
+            accumulators::max(rates), TCounterType::BYTES_PER_SECOND)
+        << "  mean:" << PrettyPrinter::Print(
+            accumulators::mean(rates), TCounterType::BYTES_PER_SECOND)
+        << "  stddev:" << PrettyPrinter::Print(
+            sqrt(accumulators::variance(rates)), TCounterType::BYTES_PER_SECOND);
+
+      fragment_profiles_[i].averaged_profile->AddInfoString(
+          "completion times", times_label.str());
+      fragment_profiles_[i].averaged_profile->AddInfoString(
+          "execution rates", rates_label.str());
     }
-
-    stringstream times_label;
-    times_label 
-       << "min:" << PrettyPrinter::Print(
-           accumulators::min(completion_times), TCounterType::TIME_MS)
-       << "  max:" << PrettyPrinter::Print(
-           accumulators::max(completion_times), TCounterType::TIME_MS)
-       << "  mean: " << PrettyPrinter::Print(
-           accumulators::mean(completion_times), TCounterType::TIME_MS)
-       << "  stddev:" << PrettyPrinter::Print(
-           sqrt(accumulators::variance(completion_times)), TCounterType::TIME_MS);
-
-    stringstream rates_label;
-    rates_label 
-       << "min:" << PrettyPrinter::Print(
-           accumulators::min(rates), TCounterType::BYTES_PER_SECOND)
-       << "  max:" << PrettyPrinter::Print(
-           accumulators::max(rates), TCounterType::BYTES_PER_SECOND)
-       << "  mean:" << PrettyPrinter::Print(
-           accumulators::mean(rates), TCounterType::BYTES_PER_SECOND)
-       << "  stddev:" << PrettyPrinter::Print(
-           sqrt(accumulators::variance(rates)), TCounterType::BYTES_PER_SECOND);
-    query_profile_->AddInfoString("completion times", times_label.str());
-    query_profile_->AddInfoString("execution rates", rates_label.str());
   } 
 
   if (VLOG_QUERY_IS_ON) {

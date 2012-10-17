@@ -75,7 +75,7 @@ public class InlineViewRef extends TableRef {
       sMap.rhs.add(colexpr);
     }
 
-    LOG.info("inline view smap: " + sMap.debugString());
+    LOG.debug("inline view smap: " + sMap.debugString());
 
     isAnalyzed = true;
   }

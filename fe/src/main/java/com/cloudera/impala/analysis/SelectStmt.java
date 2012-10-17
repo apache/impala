@@ -146,7 +146,7 @@ public class SelectStmt extends QueryStmt {
     substituteInlineViewExprs(analyzer);
 
     if (aggInfo != null) {
-      LOG.info("post-analysis " + aggInfo.debugString());
+      LOG.debug("post-analysis " + aggInfo.debugString());
     }
   }
 
@@ -347,17 +347,17 @@ public class SelectStmt extends QueryStmt {
           : aggInfo;
     Expr.SubstitutionMap combinedSMap =
         Expr.SubstitutionMap.combine(avgSMap, finalAggInfo.getSMap());
-    LOG.info("combined smap: " + combinedSMap.debugString());
+    LOG.debug("combined smap: " + combinedSMap.debugString());
 
     // change select list, having and ordering exprs to point to agg output
     Expr.substituteList(resultExprs, combinedSMap);
-    LOG.info("post-agg selectListExprs: " + Expr.debugString(resultExprs));
+    LOG.debug("post-agg selectListExprs: " + Expr.debugString(resultExprs));
     if (havingPred != null) {
       havingPred = (Predicate) havingPred.substitute(combinedSMap);
-      LOG.info("post-agg havingPred: " + havingPred.debugString());
+      LOG.debug("post-agg havingPred: " + havingPred.debugString());
     }
     Expr.substituteList(orderingExprs, combinedSMap);
-    LOG.info("post-agg orderingExprs: " + Expr.debugString(orderingExprs));
+    LOG.debug("post-agg orderingExprs: " + Expr.debugString(orderingExprs));
 
     // check that all post-agg exprs point to agg output
     for (int i = 0; i < selectList.getItems().size(); ++i) {
@@ -438,7 +438,7 @@ public class SelectStmt extends QueryStmt {
       }
       result.lhs.add(aggExpr);
     }
-    LOG.info("avg smap: " + result.debugString());
+    LOG.debug("avg smap: " + result.debugString());
     return result;
   }
 
