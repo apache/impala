@@ -202,6 +202,7 @@ public class Frontend {
     Preconditions.checkNotNull(analysisResult.getStmt());
 
     TExecRequest result = new TExecRequest();
+    result.setSql_stmt(request.stmt);
     result.setQuery_options(request.getQueryOptions());
 
     // assign request_id

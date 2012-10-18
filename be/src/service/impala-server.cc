@@ -716,11 +716,11 @@ void ImpalaServer::QueryStatePathHandler(stringstream* output) {
     QueryHandle handle;
     TUniqueIdToQueryHandle(exec_state.first, &handle);
     const TExecRequest& request = exec_state.second->exec_request();
+    const string& query_stmt = 
+        (request.stmt_type != TStmtType::DDL && request.__isset.sql_stmt) ?
+        request.sql_stmt : "N/A";
     (*output) << "<tr><td>" << handle.id << "</td>"
-              << "<td>"
-              << (request.stmt_type != TStmtType::DDL ?
-                  request.sql_stmt : "N/A")
-              << "</td>"
+              << "<td>" << query_stmt << "</td>"
               << "<td>"
               << _TStmtType_VALUES_TO_NAMES.find(request.stmt_type)->second
               << "</td>"
