@@ -121,7 +121,7 @@ inline bool SerDeUtils::ReadVLong(ScanRangeContext* context, int64_t* value,
 }
 
 inline int SerDeUtils::GetVInt(uint8_t* buf, int32_t* vint) {
-  int64_t vlong;
+  int64_t vlong = 0;
   int len = GetVLong(buf, &vlong);
   *vint = static_cast<int32_t>(vlong);
   return len;

@@ -424,7 +424,7 @@ void StateStore::UpdateLoop() {
       string address;
       THostPortToString(update.subscriber_address, &address);
       // Will be set in the following if-else block
-      FailureDetector::PeerState peer_state;
+      FailureDetector::PeerState peer_state = FailureDetector::FAILED;
 
       // Open the transport here so that we keep retrying if we don't succeed on the
       // first attempt to open a connection.

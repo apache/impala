@@ -57,7 +57,7 @@ template <bool process_escapes>
 void inline DelimitedTextParser:: FillColumns(int len, char** last_column,
     int* num_fields, FieldLocation* field_locations) {
   // Fill in any columns missing from the end of the tuple.
-  char* dummy;
+  char* dummy = NULL;
   if (last_column == NULL) last_column = &dummy;
   while (column_idx_ < scan_node_->num_cols()) {
     AddColumn<process_escapes>(len, last_column, num_fields, field_locations);

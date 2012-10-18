@@ -118,7 +118,7 @@ static void GetQueries(vector<string>* queries) {
     }
     FILE *input_file = fopen(FLAGS_input_file.c_str(), "r");
     if (input_file == NULL) {
-      cerr << "Unable top open file: " << FLAGS_input_file.c_str() << endl;
+      cerr << "Unable to open file: " << FLAGS_input_file.c_str() << endl;
       return;
     }
 
@@ -127,7 +127,11 @@ static void GetQueries(vector<string>* queries) {
     rewind(input_file);
 
     char* buffer = new char[(sizeof(char) * file_size + 1)];
-    fread(buffer, 1, file_size, input_file);
+    size_t read_bytes = fread(buffer, 1, file_size, input_file);
+    if (read_bytes != file_size) {
+      cerr << "Unable to read file: " << FLAGS_input_file.c_str() << endl;
+      return;
+    }
 
     string str(buffer, file_size);
     split(*queries, str, is_any_of(";"), token_compress_on );
@@ -189,7 +193,7 @@ static void Exec(const vector<string>& queries) {
     RuntimeProfile aggregate_profile(&profile_pool, "RunQuery");
     int num_rows = 0;
 
-    ExecStats::QueryType query_type;
+    ExecStats::QueryType query_type = ExecStats::SELECT;
 
     for (int i = 0; i < FLAGS_iterations; ++i) {
       scoped_ptr<QueryExecutorIf> executor(CreateExecutor());

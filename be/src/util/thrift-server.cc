@@ -176,7 +176,7 @@ void* ThriftServer::ThriftServerEventProcessor::createContext(shared_ptr<TProtoc
 
   stringstream ss;
 
-  TSocket* socket;
+  TSocket* socket = NULL;
   TTransport* transport = input->getTransport().get();
   if (!thrift_server_->kerberos_enabled_) {
     switch (thrift_server_->server_type_) {

@@ -1222,7 +1222,7 @@ void Coordinator::ComputeScanRangeAssignment(
     // assign this scan range to the host w/ the fewest assigned bytes
     int64_t min_assigned_bytes = numeric_limits<int64_t>::max();
     const THostPort* data_host = NULL;  // data server; not necessarily backend
-    int volume_id;
+    int volume_id = -1;
     BOOST_FOREACH(const TScanRangeLocation& location, scan_range_locations.locations) {
       int64_t* assigned_bytes =
           FindOrInsert(&assigned_bytes_per_host, location.server, 0L);

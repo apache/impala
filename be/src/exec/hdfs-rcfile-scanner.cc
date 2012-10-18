@@ -535,7 +535,7 @@ Status HdfsRCFileScanner::GetNext(RowBatch* row_batch, bool* eosr) {
     SCOPED_TIMER(scan_node_->materialize_tuple_timer());
     // Copy rows out of the current row group into the row_batch
     while (!scan_node_->ReachedLimit() && !row_batch->IsFull()) {
-      bool eorg;
+      bool eorg = false;
       RETURN_IF_ERROR(NextRow(&eorg));
       if (eorg) break;
 
