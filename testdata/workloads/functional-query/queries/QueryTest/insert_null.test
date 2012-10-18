@@ -1,0 +1,26 @@
+insert overwrite table nullinsert$TABLE
+select NULL, "", "NULL", "\\N", NULL from alltypes where id = 0
+---- SETUP
+RESET nullinsert$TABLE
+---- RESULTS
+---- PARTITIONS
+/: 1
+====
+select * from nullinsert$TABLE
+---- SETUP
+RELOAD nullinsert$TABLE
+---- TYPES
+string, string, string, string, int
+---- PARTITIONS
+---- RESULTS
+'NULL','','NULL','\N',NULL
+====
+select * from alt_nullinsert$TABLE
+---- SETUP
+RELOAD alt_nullinsert$TABLE
+---- TYPES
+string
+---- PARTITIONS
+---- RESULTS
+'\N,,NULL,\\N,\N'
+====

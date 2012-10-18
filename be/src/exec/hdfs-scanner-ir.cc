@@ -101,7 +101,7 @@ double IrStringToDouble(const char* s, int len, StringParser::ParseResult* resul
 
 extern "C"
 bool IrIsNullString(const char* data, int len) {
-  return len >= 2 && data[0] == '\\' && data[1] == 'N';
+  return len == 2 && data[0] == '\\' && data[1] == 'N';
 }
 #endif
 

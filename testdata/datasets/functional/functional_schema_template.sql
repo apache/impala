@@ -1148,3 +1148,31 @@ LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/TblWithRaggedColumns/data.cs
 ----
 ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
+functional
+----
+nullinsert
+----
+-- Must not be external
+CREATE TABLE %(table_name)s (
+  str_col1 string,
+  str_col2 string,
+  str_col3 string,
+  str_col4 string,
+  int_cal int
+)
+row format delimited fields terminated by ','  escaped by '\\'
+stored as %(file_format)s
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+ 
+DROP TABLE IF EXISTS alt_%(table_name)s;
+CREATE EXTERNAL TABLE alt_%(table_name)s(
+  whole_row string
+)
+row format delimited fields terminated by '|'
+stored as %(file_format)s
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+----
+----
+----
+----
+====
