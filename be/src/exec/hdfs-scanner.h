@@ -213,6 +213,19 @@ class HdfsScanner {
   // Jitted write tuples function pointer.  Null if codegen is disabled.
   WriteTuplesFn write_tuples_fn_;
 
+  // Create a copy of the conjuncts. Exprs are not thread safe (they store results 
+  // inside the expr) so each scanner needs its own copy.  This is not needed for
+  // codegen'd scanners since they evaluate exprs with a different mechanism.
+  // TODO: fix exprs
+  Status CreateConjunctsCopy();
+
+  // Initializes write_tuples_fn_ to the jitted function if codegen is possible.
+  // - partition - partition descriptor for this scanner/scan range
+  // - type - type for this scanner
+  // - scanner_name - debug string name for this scanner (e.g. HdfsTextScanner)
+  Status InitializeCodegenFn(HdfsPartitionDescriptor* partition, 
+      THdfsFileFormat::type type, const std::string& scanner_name);
+
   // Allocates a buffer from tuple_pool_ large enough to hold one
   // tuple for every remaining row in row_batch.  The tuple memory
   // is uninitialized.

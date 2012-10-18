@@ -96,7 +96,8 @@ Status HdfsPartitionDescriptor::PrepareExprs(RuntimeState* state) {
   if (exprs_prepared_ == false) {
     // TODO: RowDescriptor should arguably be optional in Prepare for known literals
     exprs_prepared_ = true;
-    RETURN_IF_ERROR(Expr::Prepare(partition_key_values_, state, RowDescriptor()));
+    // Partition exprs are not used in the codegen case.  Don't codegen them.
+    RETURN_IF_ERROR(Expr::Prepare(partition_key_values_, state, RowDescriptor(), true));
   }
   return Status::OK;
 }

@@ -348,7 +348,9 @@ Status ImpalaServer::QueryExecState::PrepareSelectListExprs(
   RETURN_IF_ERROR(
       Expr::CreateExprTrees(runtime_state->obj_pool(), exprs, &output_exprs_));
   for (int i = 0; i < output_exprs_.size(); ++i) {
-    RETURN_IF_ERROR(Expr::Prepare(output_exprs_[i], runtime_state, row_desc));
+    // Don't codegen these, they are unused anyway.
+    // TODO: codegen this and the write values path
+    RETURN_IF_ERROR(Expr::Prepare(output_exprs_[i], runtime_state, row_desc, true));
   }
   return Status::OK;
 }

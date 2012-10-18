@@ -69,6 +69,7 @@ LlvmCodeGen::LlvmCodeGen(ObjectPool* pool, const string& name) :
   profile_(pool, "CodeGen"),
   optimizations_enabled_(false),
   is_corrupt_(false),
+  is_compiled_(false),
   context_(new llvm::LLVMContext()),
   module_(NULL),
   execution_engine_(NULL),
@@ -356,6 +357,7 @@ bool LlvmCodeGen::VerifyFunction(Function* fn) {
 LlvmCodeGen::FnPrototype::FnPrototype(
     LlvmCodeGen* gen, const string& name, Type* ret_type) :
   codegen_(gen), name_(name), ret_type_(ret_type) {
+  DCHECK(!codegen_->is_compiled_) << "Not valid to add additional functions";
 }
 
 Function* LlvmCodeGen::FnPrototype::GeneratePrototype(
@@ -482,6 +484,9 @@ Function* LlvmCodeGen::FinalizeFunction(Function* function) {
 }
 
 Status LlvmCodeGen::OptimizeModule() {
+  DCHECK(!is_compiled_);
+  is_compiled_ = true;
+
   if (is_corrupt_) return Status("Module is corrupt.");
   SCOPED_TIMER(compile_timer_);
   if (!optimizations_enabled_) return Status::OK;

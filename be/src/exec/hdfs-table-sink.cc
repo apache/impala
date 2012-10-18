@@ -43,8 +43,10 @@ HdfsTableSink::HdfsTableSink(const RowDescriptor& row_desc,
 
 Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
   // Prepare select list expressions.
-  RETURN_IF_ERROR(Expr::Prepare(output_exprs_, state, row_desc_));
-  RETURN_IF_ERROR(Expr::Prepare(partition_key_exprs_, state, row_desc_));
+  // Disable codegen for these - they would be unused anyway.
+  // TODO: codegen table sink
+  RETURN_IF_ERROR(Expr::Prepare(output_exprs_, state, row_desc_, true));
+  RETURN_IF_ERROR(Expr::Prepare(partition_key_exprs_, state, row_desc_, true));
 
   // Prepare partition key exprs and gather dynamic partition key exprs.
   for (size_t i = 0; i < partition_key_exprs_.size(); ++i) {

@@ -399,6 +399,10 @@ class LlvmCodeGen {
   // that the error is recoverable.
   bool is_corrupt_;
 
+  // If true, the module has been compiled.  It is not valid to add additional
+  // functions after this point.
+  bool is_compiled_;
+
   // Error string that llvm will write to
   std::string error_string_;
 

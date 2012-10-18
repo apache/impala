@@ -149,10 +149,13 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
 }
 
 Status HdfsScanNode::CreateConjuncts(vector<Expr*>* expr) {
+  // This is only used when codegen is not possible for this node.  We don't want to
+  // codegen the copy of the expr.  
+  // TODO: we really need to stop having to create copies of exprs
   RETURN_IF_ERROR(Expr::CreateExprTrees(runtime_state_->obj_pool(), 
       thrift_plan_node_->conjuncts, expr));
   for (int i = 0; i < expr->size(); ++i) {
-    RETURN_IF_ERROR(Expr::Prepare((*expr)[i], runtime_state_, row_desc()));
+    RETURN_IF_ERROR(Expr::Prepare((*expr)[i], runtime_state_, row_desc(), true));
   }
   return Status::OK;
 }

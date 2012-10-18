@@ -213,7 +213,6 @@ class StateStoreTest : public testing::Test {
 
     // Now kill the running subscriber
     running_subscriber->server_->StopForTesting();
-    running_subscriber->server_->Join();
 
     {
       // Update the expected condition to show no backends

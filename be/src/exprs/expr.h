@@ -255,11 +255,14 @@ class Expr {
   // Prepare expr tree for evaluation, setting the compute_fn_ for each node
   // in the tree. If codegen is enabled, this function will also codegen each node
   // in the expr tree.
-  static Status Prepare(Expr* root, RuntimeState* state, const RowDescriptor& row_desc);
+  // disable_codegen can be set for a particular Prepare() call to disable codegen for
+  // a specific expr tree.
+  static Status Prepare(Expr* root, RuntimeState* state, const RowDescriptor& row_desc,
+      bool disable_codegen = false);
 
   // Prepare all exprs.
   static Status Prepare(const std::vector<Expr*>& exprs, RuntimeState* state,
-                        const RowDescriptor& row_desc);
+                        const RowDescriptor& row_desc, bool disable_codegen = false);
 
   // Create a new literal expr of 'type' with initial 'data'.
   // data should match the PrimitiveType (i.e. type == TYPE_INT, data is a int*)

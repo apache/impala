@@ -42,6 +42,8 @@ HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state,
     : scan_node_(scan_node),
       state_(state),
       context_(NULL),
+      conjuncts_(NULL),
+      num_conjuncts_(0),
       tuple_buffer_(NULL),
       tuple_byte_size_(scan_node->tuple_desc()->byte_size()),
       tuple_pool_(tuple_pool),
@@ -60,14 +62,36 @@ HdfsScanner::~HdfsScanner() {
 }
 
 Status HdfsScanner::Prepare() {
-  // Create a copy of the conjuncts. Exprs are not thread safe (they store results 
-  // inside the expr) so each scanner needs its own copy.
-  // TODO: fix exprs
+  RETURN_IF_ERROR(CreateConjunctsCopy());
+  return Status::OK;
+}
+
+Status HdfsScanner::CreateConjunctsCopy() {
+  DCHECK(conjuncts_ == NULL);
   RETURN_IF_ERROR(scan_node_->CreateConjuncts(&conjuncts_mem_));
   if (conjuncts_mem_.size() > 0) {
     conjuncts_ = &conjuncts_mem_[0];
   }
   num_conjuncts_ = conjuncts_mem_.size();
+  return Status::OK;
+}
+
+Status HdfsScanner::InitializeCodegenFn(HdfsPartitionDescriptor* partition,
+    THdfsFileFormat::type type, const string& scanner_name) {
+  Function* codegen_fn = scan_node_->GetCodegenFn(type);
+  
+  if (codegen_fn == NULL) return Status::OK;
+  if (!scan_node_->tuple_desc()->string_slots().empty() && 
+        ((partition->escape_char() != '\0') || context_->compact_data())) {
+    // Cannot use codegen if there are strings slots and we need to 
+    // compact (i.e. copy) the data.
+    return Status::OK;
+  }
+
+  write_tuples_fn_ = reinterpret_cast<WriteTuplesFn>(
+      state_->llvm_codegen()->JitFunction(codegen_fn));
+  VLOG(2) << scanner_name << "(node_id=" << scan_node_->id() 
+          << ") using llvm codegend functions.";
   return Status::OK;
 }
 

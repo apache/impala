@@ -192,19 +192,8 @@ Status HdfsSequenceScanner::InitNewRange() {
   }
   
   // Initialize codegen fn
-  // Cannot codegen if it has strings slots and we need to compact (i.e. copy) the data.
-  Function* codegen_fn = scan_node_->GetCodegenFn(THdfsFileFormat::SEQUENCE_FILE);
-  if (codegen_fn == NULL) return Status::OK;
-  if (!scan_node_->tuple_desc()->string_slots().empty() && 
-        ((hdfs_partition->escape_char() != '\0') || context_->compact_data())) {
-    return Status::OK;
-  }
-  
-  write_tuples_fn_ = reinterpret_cast<WriteTuplesFn>(
-      state_->llvm_codegen()->JitFunction(codegen_fn));
-  VLOG(2) << "HdfsSequenceScanner(node_id=" << scan_node_->id()
-          << ") using llvm codegend functions.";
-
+  RETURN_IF_ERROR(InitializeCodegenFn(hdfs_partition, 
+      THdfsFileFormat::SEQUENCE_FILE, "HdfsSequenceScanner"));
   return Status::OK;
 }
 

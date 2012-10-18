@@ -484,14 +484,15 @@ Status Expr::PrepareChildren(RuntimeState* state, const RowDescriptor& row_desc)
   return Status::OK;
 }
 
-Status Expr::Prepare(Expr* root, RuntimeState* state, const RowDescriptor& row_desc) {
+Status Expr::Prepare(Expr* root, RuntimeState* state, const RowDescriptor& row_desc,
+    bool disable_codegen) {
   RETURN_IF_ERROR(root->Prepare(state, row_desc));
   LlvmCodeGen* codegen = NULL;
   // state might be NULL when called from Expr-test
   if (state != NULL) codegen = state->llvm_codegen();
 
   // codegen == NULL means jitting is disabled.
-  if (codegen != NULL && root->IsJittable(codegen)) {
+  if (!disable_codegen && codegen != NULL && root->IsJittable(codegen)) {
     root->CodegenExprTree(codegen);
   }
   return Status::OK;
@@ -511,9 +512,9 @@ Status Expr::Prepare(RuntimeState* state, const RowDescriptor& row_desc) {
 }
 
 Status Expr::Prepare(const vector<Expr*>& exprs, RuntimeState* state,
-                     const RowDescriptor& row_desc) {
+                     const RowDescriptor& row_desc, bool disable_codegen) {
   for (int i = 0; i < exprs.size(); ++i) {
-    RETURN_IF_ERROR(Prepare(exprs[i], state, row_desc));
+    RETURN_IF_ERROR(Prepare(exprs[i], state, row_desc, disable_codegen));
   }
   return Status::OK;
 }

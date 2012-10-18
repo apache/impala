@@ -129,7 +129,8 @@ Java_com_cloudera_impala_service_FeSupport_NativeEvalPredicate(
   Expr* e;
   Status status = Expr::CreateExprTree(&obj_pool, thrift_predicate, &e);
   if (status.ok()) {
-    status = Expr::Prepare(e, NULL, RowDescriptor());
+    // TODO: codegen this as well.
+    status = Expr::Prepare(e, NULL, RowDescriptor(), true);
   }
   if (!status.ok()) {
     string error_msg;
