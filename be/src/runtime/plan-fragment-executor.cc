@@ -258,28 +258,30 @@ void PlanFragmentExecutor::ReportProfile() {
   // updates at once so its better for contention as well as smoother progress
   // reporting.
   int report_fragment_offset = rand() % FLAGS_status_report_interval;
-  sleep(report_fragment_offset);
+  system_time timeout =
+      get_system_time() + posix_time::seconds(report_fragment_offset);
+  // We don't want to wait longer than it takes to run the entire fragment.
+  bool notified = stop_report_thread_cv_.timed_wait(l, timeout);
 
-  while (true) {
+  while (!notified) {
     system_time timeout =
         get_system_time() + posix_time::seconds(FLAGS_status_report_interval);
-    bool notified = stop_report_thread_cv_.timed_wait(l, timeout);
-    VLOG_FILE << "Reporting " << (notified ? "final " : " ")
-              << "profile for instance " << runtime_state_->fragment_instance_id();
+    notified = stop_report_thread_cv_.timed_wait(l, timeout);
+
     if (VLOG_FILE_IS_ON) {
+      VLOG_FILE << "Reporting " << (notified ? "final " : " ")
+                << "profile for instance " << runtime_state_->fragment_instance_id();
       stringstream ss;
       profile()->PrettyPrint(&ss);
       VLOG_FILE << ss.str();
     }
 
-    if (notified) {
-      VLOG_FILE << "exiting reporting thread: instance_id="
-                << runtime_state_->fragment_instance_id();
-      return;
-    } else {
-      SendReport(false);
-    }
+    if (notified) break;
+    SendReport(false);
   }
+  
+  VLOG_FILE << "exiting reporting thread: instance_id="
+            << runtime_state_->fragment_instance_id();
 }
 
 void PlanFragmentExecutor::SendReport(bool done) {
