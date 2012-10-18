@@ -75,12 +75,12 @@ using sparrow::Membership;
 DEFINE_bool(use_planservice, false, "Use external planservice if true");
 DECLARE_string(planservice_host);
 DECLARE_int32(planservice_port);
-DEFINE_int32(fe_port, 21000, "port on which ImpalaService is exported");
-DEFINE_int32(fe_service_threads, 10,
-    "number of threads servicing ImpalaService requests");
+DEFINE_int32(fe_port, 21000, "port on which client requests are served");
+DEFINE_int32(fe_service_threads, 1024,
+    "number of threads servicing client requests");
 DECLARE_int32(be_port);
-DEFINE_int32(be_service_threads, 10,
-    "number of threads servicing ImpalaInternalService requests");
+DEFINE_int32(be_service_threads, 1024,
+    "(Advanced) number of threads servicing backend execution requests");
 DEFINE_bool(load_catalog_at_startup, false, "if true, load all catalog data at startup");
 DEFINE_int32(default_num_nodes, 1, "default degree of parallelism for all queries; query "
     "can override it by specifying num_nodes in beeswax.Query.Configuration");
