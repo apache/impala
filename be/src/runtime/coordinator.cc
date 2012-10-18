@@ -923,7 +923,10 @@ bool Coordinator::PrepareCatalogUpdate(TCatalogUpdate* catalog_update) {
 //   3. Summary of remote fragment rates (min, max, mean, stddev)
 // TODO: add histogram/percentile
 void Coordinator::ReportQuerySummary() {
-  DCHECK(has_called_wait_);
+  // In this case, the query did not even get to start on all the remote nodes,
+  // some of the state that is used below might be uninitialized.  In this case,
+  // the query has made so little progress, reporting a summary is not very useful.
+  if (!has_called_wait_) return;
   
   // The fragment has finished executing.  Update the profile to compute the 
   // fraction of time spent in each node.
