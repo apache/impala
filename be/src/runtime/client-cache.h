@@ -23,6 +23,8 @@ class ImpalaInternalServiceClient;
 // TODO: in order to reduce locking overhead when getting/releasing clients,
 // add call to hand back pointer to list stored in ClientCache and add separate lock
 // to list (or change to lock-free list)
+// TODO: More graceful handling of clients that have failed (maybe better
+// handled by a wrapper of ImpalaInternalServiceClient).
 class BackendClientCache {
  public:
   // Create cache with given upper limits for the total number of cached
@@ -36,8 +38,15 @@ class BackendClientCache {
       const std::pair<std::string, int>& hostport,
       ImpalaInternalServiceClient** client);
 
+  // Reopens the underlying transport in case of error.
+  Status ReopenClient(ImpalaInternalServiceClient* client);
+
   // Hand client back.
   void ReleaseClient(ImpalaInternalServiceClient* client);
+
+  // Close all connections to a host (e.g., in case of failure) so that on their
+  // next use they will have to be Reopen'ed.
+  void CloseConnections(const std::pair<std::string, int>& hostport);
 
   std::string DebugString();
 

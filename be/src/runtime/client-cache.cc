@@ -9,6 +9,8 @@
 #include <transport/TTransportUtils.h>
 #include <memory>
 
+#include <boost/foreach.hpp>
+
 #include "common/logging.h"
 #include "util/thrift-util.h"
 #include "gen-cpp/ImpalaInternalService.h"
@@ -59,6 +61,16 @@ Status BackendClientCache::GetClient(
   return Status::OK;
 }
 
+Status BackendClientCache::ReopenClient(ImpalaInternalServiceClient* client) {
+  lock_guard<mutex> l(lock_);
+  ClientMap::iterator i = client_map_.find(client);
+  DCHECK(i != client_map_.end());
+  BackendClient* info = i->second;
+  RETURN_IF_ERROR(info->Close());
+  RETURN_IF_ERROR(info->Open());
+  return Status::OK;
+}
+
 void BackendClientCache::ReleaseClient(ImpalaInternalServiceClient* client) {
   lock_guard<mutex> l(lock_);
   ClientMap::iterator i = client_map_.find(client);
@@ -70,6 +82,17 @@ void BackendClientCache::ReleaseClient(ImpalaInternalServiceClient* client) {
       client_cache_.find(make_pair(info->ipaddress(), info->port()));
   DCHECK(j != client_cache_.end());
   j->second.push_back(info);
+}
+
+void BackendClientCache::CloseConnections(const pair<string, int>& hostport) {
+  lock_guard<mutex> l(lock_);
+  ClientCache::iterator cache_entry = client_cache_.find(hostport);
+  if (cache_entry == client_cache_.end()) return;
+  VLOG_RPC << "Invalidating all " << cache_entry->second.size() << " clients for: " 
+           << hostport.first << ":" << hostport.second;
+  BOOST_FOREACH(BackendClient* client, cache_entry->second) {
+    client->Close();
+  }
 }
 
 string BackendClientCache::DebugString() {

@@ -686,7 +686,22 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
 
   TExecPlanFragmentResult thrift_result;
   try {
-    backend_client->ExecPlanFragment(thrift_result, exec_state->rpc_params);
+    try {
+      backend_client->ExecPlanFragment(thrift_result, exec_state->rpc_params);
+    } catch (TTransportException& e) {
+      // If a backend has stopped and restarted (without the failure detector
+      // picking it up) an existing backend client may still think it is
+      // connected. To avoid failing the first query after every failure, catch
+      // the first failure and force a reopen of the transport.
+      // TODO: Improve client-cache so that we don't need to do this.
+      VLOG_RPC << "Retrying ExecPlanFragment: " << e.what();
+      Status status = exec_env_->client_cache()->ReopenClient(backend_client);
+      if (!status.ok()) {
+        exec_env_->client_cache()->ReleaseClient(backend_client);
+        return status;
+      }
+      backend_client->ExecPlanFragment(thrift_result, exec_state->rpc_params);
+    }
   } catch (TTransportException& e) {
     stringstream msg;
     msg << "ExecPlanRequest rpc query_id=" << query_id_
@@ -762,7 +777,18 @@ void Coordinator::CancelInternal() {
       VLOG_QUERY << "sending CancelPlanFragment rpc for instance_id="
                  << exec_state->fragment_instance_id << " backend="
                  << exec_state->hostport;
-      backend_client->CancelPlanFragment(res, params);
+      try { 
+        backend_client->CancelPlanFragment(res, params);
+      } catch (TTransportException& e) {
+        VLOG_RPC << "Retrying CancelPlanFragment: " << e.what();
+        Status status = exec_env_->client_cache()->ReopenClient(backend_client);
+        if (!status.ok()) {
+          exec_state->status.AddError(status);
+          exec_env_->client_cache()->ReleaseClient(backend_client);
+          continue;
+        }
+        backend_client->CancelPlanFragment(res, params);
+      }
     } catch (TTransportException& e) {
       stringstream msg;
       msg << "CancelPlanFragment rpc query_id=" << query_id_

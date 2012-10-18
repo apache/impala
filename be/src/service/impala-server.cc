@@ -1820,13 +1820,14 @@ void ImpalaServer::MembershipCallback(const ServiceStateMap& service_state) {
         }
         // We can remove the location wholesale once we know it's failed. 
         query_locations_.erase(hostport);
+        exec_env_->client_cache()->CloseConnections(
+            make_pair(hostport.ipaddress, hostport.port));
       }
     }
 
     BOOST_FOREACH(const TUniqueId& query_id, to_cancel) {
       CancelInternal(query_id);
     }
-    // shared_ptr assignment; only pointers copied
     last_membership_ = current_membership;
   }
 }
