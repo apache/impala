@@ -261,22 +261,28 @@ void PlanFragmentExecutor::ReportProfile() {
   system_time timeout =
       get_system_time() + posix_time::seconds(report_fragment_offset);
   // We don't want to wait longer than it takes to run the entire fragment.
-  bool notified = stop_report_thread_cv_.timed_wait(l, timeout);
+  stop_report_thread_cv_.timed_wait(l, timeout);
 
-  while (!notified) {
+  while (report_thread_active_) {
     system_time timeout =
         get_system_time() + posix_time::seconds(FLAGS_status_report_interval);
-    notified = stop_report_thread_cv_.timed_wait(l, timeout);
+
+    // timed_wait can return because the timeout occurred or the condition variable
+    // was signaled.  We can't rely on its return value to distinguish between the
+    // two cases (e.g. there is a race here where the wait timed out but before grabbing 
+    // the lock, the condition variable was signaled).  Instead, we will use an external
+    // flag, report_thread_active_, to coordinate this.
+    stop_report_thread_cv_.timed_wait(l, timeout);
 
     if (VLOG_FILE_IS_ON) {
-      VLOG_FILE << "Reporting " << (notified ? "final " : " ")
+      VLOG_FILE << "Reporting " << (!report_thread_active_ ? "final " : " ")
                 << "profile for instance " << runtime_state_->fragment_instance_id();
       stringstream ss;
       profile()->PrettyPrint(&ss);
       VLOG_FILE << ss.str();
     }
 
-    if (notified) break;
+    if (!report_thread_active_) break;
     SendReport(false);
   }
   
@@ -295,7 +301,6 @@ void PlanFragmentExecutor::SendReport(bool done) {
   // don't send a final report if we got cancelled, nobody's going to look at it
   // anyway
   if (!status.IsCancelled()) {
-    // notified means someone notified on stop_report_thread_cv_
     report_status_cb_(status, profile(), done || !status.ok());
   }
 }
@@ -304,13 +309,10 @@ void PlanFragmentExecutor::StopReportThread() {
   if (!report_thread_active_) return;
   {
     lock_guard<mutex> l(report_thread_lock_);
-    // notify with lock held: ReportProfile() does a timed_wait() on the cond
-    // var, we need to make sure it really is sitting in timed_wait() while
-    // we notify()
-    stop_report_thread_cv_.notify_one();
+    report_thread_active_ = false;
   }
+  stop_report_thread_cv_.notify_one();
   report_thread_.join();
-  report_thread_active_ = false;
 }
 
 Status PlanFragmentExecutor::GetNext(RowBatch** batch) {
