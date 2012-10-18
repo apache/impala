@@ -225,7 +225,7 @@ inline void DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* b
         ProcessEscapeMask(escape_mask, &last_char_is_escape_, &delim_mask);
       }
 
-      int last_col_idx;
+      int last_col_idx = 0;
       // Process all non-zero bits in the delim_mask from lsb->msb.  If a bit
       // is set, the character in that spot is a field.
       while (delim_mask != 0) {
@@ -260,7 +260,6 @@ inline void DelimitedTextParser::ParseSingleTuple(int64_t remaining_len, char* b
   }
   
   while (remaining_len > 0) {
-    
     if (*buffer == escape_char_) {
       current_column_has_escape_ = true;
       last_char_is_escape_ = !last_char_is_escape_;
