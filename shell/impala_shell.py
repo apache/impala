@@ -56,6 +56,7 @@ class ImpalaShell(cmd.Cmd):
     self.is_alive = True
     self.use_kerberos = options.use_kerberos
     self.verbose = options.verbose
+    self.kerberos_service_name = options.kerberos_service_name
     self.impalad = None
     self.prompt = ImpalaShell.DISCONNECTED_PROMPT
     self.connected = False
@@ -214,7 +215,7 @@ class ImpalaShell(cmd.Cmd):
     def sasl_factory():
       sasl_client = sasl.Client()
       sasl_client.setAttr("host", self.impalad[0])
-      sasl_client.setAttr("service", "impala")
+      sasl_client.setAttr("service", self.kerberos_service_name)
       sasl_client.init()
       return sasl_client
     # GSSASPI is the underlying mechanism used by kerberos to authenticate.
@@ -482,11 +483,19 @@ if __name__ == "__main__":
   parser.add_option("-f", "--query_file", dest="query_file", default=None,
                     help="Execute the queries in the query file, delimited by ;")
   parser.add_option("-k", "--kerberos", dest="use_kerberos", default=False,
-                    action="store_true",help="Connect to a kerberized impalad.")
+                    action="store_true", help="Connect to a kerberized impalad")
+  parser.add_option("-s", "--kerberos_service_name",
+                    dest="kerberos_service_name", default='impala',
+                    help="Service name of a kerberized impalad, default is 'impala'")
   parser.add_option("-V", "--verbose", dest="verbose", default=False, action="store_true",
                     help="Enable verbose output")
 
   (options, args) = parser.parse_args()
+
+  if options.kerberos_service_name and not options.use_kerberos:
+    print 'Kerberos not enabled, ignoring service name'
+  elif options.use_kerberos:
+    print "Using service name '%s' for kerberos" % options.kerberos_service_name
 
   if options.use_kerberos:
     from thrift_sasl import TSaslClientTransport
