@@ -464,8 +464,8 @@ void StateStore::UpdateLoop() {
           }
           
         } catch (TTransportException& e) {
-          LOG(INFO) << "Unable to update client at " << update.client 
-                    << "; received error " << e.what();
+          LOG(INFO) << "Unable to update client at " << update.client->ipaddress() << ":"
+                    << update.client->port() << "; received error " << e.what();
           peer_state = failure_detector_->UpdateHeartbeat(address, false);
         } catch (std::exception& e) {
           // Make sure Thrift isn't throwing any other exceptions.
