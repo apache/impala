@@ -133,14 +133,14 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
-  EXCHANGE (8)
+  EXCHANGE (10)
     LIMIT: 5
     TUPLE IDS: 0 2 
 
 Plan Fragment 1
   RANDOM
   STREAM DATA SINK
-    EXCHANGE ID: 8
+    EXCHANGE ID: 10
     UNPARTITIONED
 
   HASH JOIN
@@ -152,12 +152,25 @@ Plan Fragment 1
     TUPLE IDS: 0 2 
       SCAN HDFS table=functional.alltypes #partitions=24 size=478.45KB (0)
         TUPLE IDS: 0 
-      EXCHANGE (7)
+      EXCHANGE (9)
         LIMIT: 5
         TUPLE IDS: 2 
 
 Plan Fragment 2
   UNPARTITIONED
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  TOP-N
+  ORDER BY: <slot 2> ASC
+  LIMIT: 5
+  TUPLE IDS: 2 
+    EXCHANGE (7)
+      TUPLE IDS: 2 
+
+Plan Fragment 3
+  HASH_PARTITIONED: <slot 1>
   STREAM DATA SINK
     EXCHANGE ID: 7
     UNPARTITIONED
@@ -173,11 +186,11 @@ Plan Fragment 2
       EXCHANGE (5)
         TUPLE IDS: 2 
 
-Plan Fragment 3
+Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 1>
 
   AGGREGATE
   OUTPUT: COUNT(*)

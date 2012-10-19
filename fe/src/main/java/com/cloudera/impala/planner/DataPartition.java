@@ -74,6 +74,10 @@ public class DataPartition {
     return type;
   }
 
+  public ImmutableList<Expr> getPartitionExprs() {
+    return partitionExprs;
+  }
+
   public TDataPartition toThrift() {
     TDataPartition result = new TDataPartition(type);
     if (partitionExprs != null) {

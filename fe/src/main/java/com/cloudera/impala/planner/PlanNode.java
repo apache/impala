@@ -120,7 +120,7 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   }
 
   public boolean hasLimit() {
-    return limit > 0;
+    return limit > -1;
   }
 
   /** Set the value of compactData in all children. */

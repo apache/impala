@@ -63,6 +63,19 @@ Plan Fragment 0
   ORDER BY: <slot 3> DESC
   LIMIT: 10
   TUPLE IDS: 1 
+    EXCHANGE (5)
+      TUPLE IDS: 1 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 2>
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  TOP-N
+  ORDER BY: <slot 3> DESC
+  LIMIT: 10
+  TUPLE IDS: 1 
     AGGREGATE
     OUTPUT: SUM(<slot 3>)
     GROUP BY: <slot 2>
@@ -70,11 +83,11 @@ Plan Fragment 0
       EXCHANGE (3)
         TUPLE IDS: 1 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 2>
 
   AGGREGATE
   OUTPUT: COUNT(*)
@@ -113,6 +126,19 @@ Plan Fragment 0
   ORDER BY: <slot 4> ASC
   LIMIT: 4
   TUPLE IDS: 1 
+    EXCHANGE (5)
+      TUPLE IDS: 1 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 3>
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  TOP-N
+  ORDER BY: <slot 4> ASC
+  LIMIT: 4
+  TUPLE IDS: 1 
     AGGREGATE
     OUTPUT: SUM(<slot 4>)
     GROUP BY: <slot 3>
@@ -120,11 +146,11 @@ Plan Fragment 0
       EXCHANGE (3)
         TUPLE IDS: 1 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 3>
 
   AGGREGATE
   OUTPUT: SUM(float_col)
@@ -163,6 +189,19 @@ Plan Fragment 0
   ORDER BY: <slot 3> ASC, <slot 4> DESC
   LIMIT: 0
   TUPLE IDS: 1 
+    EXCHANGE (5)
+      TUPLE IDS: 1 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 2>
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  TOP-N
+  ORDER BY: <slot 3> ASC, <slot 4> DESC
+  LIMIT: 0
+  TUPLE IDS: 1 
     AGGREGATE
     OUTPUT: SUM(<slot 3>), MIN(<slot 4>)
     GROUP BY: <slot 2>
@@ -170,11 +209,11 @@ Plan Fragment 0
       EXCHANGE (3)
         TUPLE IDS: 1 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 2>
 
   AGGREGATE
   OUTPUT: SUM(float_col), MIN(float_col)

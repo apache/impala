@@ -373,7 +373,7 @@ class DataStreamTest : public testing::Test {
 
   void StartSender(TPartitionType::type partition_type = TPartitionType::UNPARTITIONED,
                    int channel_buffer_size = 1024) {
-    VLOG_QUERY << "start sender\n";
+    VLOG_QUERY << "start sender";
     int num_senders = sender_info_.size();
     DCHECK_LT(num_senders, MAX_SENDERS);
     sender_info_.push_back(SenderInfo());

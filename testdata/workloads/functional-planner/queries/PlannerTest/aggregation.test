@@ -57,38 +57,47 @@ NODE 0:
   LOCATIONS:
 ====
 # with grouping
-select tinyint_col, count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col),
+select tinyint_col, bigint_col, count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col),
 avg(tinyint_col)
 from functional.alltypesagg
-group by 1
+group by 2, 1
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
   AGGREGATE
   OUTPUT: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
-  GROUP BY: tinyint_col
+  GROUP BY: bigint_col, tinyint_col
   TUPLE IDS: 1 
     SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
+  EXCHANGE (4)
+    TUPLE IDS: 1 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 2>, <slot 3>
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
   AGGREGATE
-  OUTPUT: SUM(<slot 2>), MIN(<slot 3>), MAX(<slot 4>), SUM(<slot 5>), SUM(<slot 6>)
-  GROUP BY: <slot 1>
+  OUTPUT: SUM(<slot 4>), MIN(<slot 5>), MAX(<slot 6>), SUM(<slot 7>), SUM(<slot 8>)
+  GROUP BY: <slot 2>, <slot 3>
   TUPLE IDS: 1 
     EXCHANGE (2)
       TUPLE IDS: 1 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 2>, <slot 3>
 
   AGGREGATE
   OUTPUT: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
-  GROUP BY: tinyint_col
+  GROUP BY: bigint_col, tinyint_col
   TUPLE IDS: 1 
     SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
       TUPLE IDS: 0 

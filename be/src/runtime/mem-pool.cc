@@ -213,7 +213,6 @@ bool MemPool::Contains(uint8_t* ptr, int size) {
     const ChunkInfo& info = chunks_[i];
     if (ptr >= info.data && ptr < info.data + info.allocated_bytes) {
       if (ptr + size > info.data + info.allocated_bytes) {
-          LOG(ERROR) << DebugString();
         DCHECK_LE(reinterpret_cast<size_t>(ptr + size),
                   reinterpret_cast<size_t>(info.data + info.allocated_bytes));
         return false;

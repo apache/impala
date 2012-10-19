@@ -212,6 +212,17 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     return true;
   }
 
+  /**
+   * Return true if l1 equals l2 when both lists are interpreted as sets.
+   * TODO: come up with something better than O(n^2)?
+   */
+  public static <C extends Expr> boolean equalSets(List<C> l1, List<C> l2) {
+    if (l1.size() != l2.size()) {
+      return false;
+    }
+    return l1.containsAll(l2) && l2.containsAll(l1);
+  }
+
   @Override
   public int hashCode() {
     if (id == null) {

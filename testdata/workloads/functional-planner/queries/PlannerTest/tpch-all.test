@@ -30,6 +30,15 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
+  EXCHANGE (4)
+    TUPLE IDS: 1 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 7>, <slot 8>
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: SUM(<slot 9>), SUM(<slot 10>), SUM(<slot 11>), SUM(<slot 12>), SUM(<slot 13>), SUM(<slot 14>), SUM(<slot 15>), SUM(<slot 16>), SUM(<slot 17>)
   GROUP BY: <slot 7>, <slot 8>
@@ -37,11 +46,11 @@ Plan Fragment 0
     EXCHANGE (2)
       TUPLE IDS: 1 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 7>, <slot 8>
 
   AGGREGATE
   OUTPUT: SUM(l_quantity), SUM(l_extendedprice), SUM(l_extendedprice * 1.0 - l_discount), SUM(l_extendedprice * 1.0 - l_discount * 1.0 + l_tax), COUNT(l_quantity), COUNT(l_extendedprice), SUM(l_discount), COUNT(l_discount), COUNT(1)
@@ -228,7 +237,7 @@ Plan Fragment 0
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
-  UNPARTITIONED
+  HASH_PARTITIONED: <slot 2>
   WRITE TO HDFS table=tpch.q2_minimum_cost_supplier_tmp2
     OVERWRITE=true
   AGGREGATE
@@ -242,7 +251,7 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 2>
 
   AGGREGATE
   OUTPUT: MIN(ps_supplycost)
@@ -387,6 +396,19 @@ Plan Fragment 0
   ORDER BY: round(<slot 13>, 5) DESC, <slot 11> ASC
   LIMIT: 10
   TUPLE IDS: 3 
+    EXCHANGE (11)
+      TUPLE IDS: 3 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 10>, <slot 11>, <slot 12>
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  TOP-N
+  ORDER BY: round(<slot 13>, 5) DESC, <slot 11> ASC
+  LIMIT: 10
+  TUPLE IDS: 3 
     AGGREGATE
     OUTPUT: SUM(<slot 13>)
     GROUP BY: <slot 10>, <slot 11>, <slot 12>
@@ -394,11 +416,11 @@ Plan Fragment 0
       EXCHANGE (9)
         TUPLE IDS: 3 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 9
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 10>, <slot 11>, <slot 12>
 
   AGGREGATE
   OUTPUT: SUM(l_extendedprice * 1.0 - l_discount)
@@ -422,7 +444,7 @@ Plan Fragment 1
         EXCHANGE (8)
           TUPLE IDS: 2 
 
-Plan Fragment 2
+Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 8
@@ -432,7 +454,7 @@ Plan Fragment 2
     PREDICATES: c.c_mktsegment = 'BUILDING'
     TUPLE IDS: 2 
 
-Plan Fragment 3
+Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
@@ -530,6 +552,19 @@ Plan Fragment 0
   ORDER BY: <slot 8> ASC
   LIMIT: 10
   TUPLE IDS: 3 
+    EXCHANGE (9)
+      TUPLE IDS: 3 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 6>
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    UNPARTITIONED
+
+  TOP-N
+  ORDER BY: <slot 8> ASC
+  LIMIT: 10
+  TUPLE IDS: 3 
     AGGREGATE
     OUTPUT: COUNT(*)
     GROUP BY: <slot 6>
@@ -541,11 +576,11 @@ Plan Fragment 0
         EXCHANGE (7)
           TUPLE IDS: 2 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 6>
 
   AGGREGATE
   OUTPUT: 
@@ -562,7 +597,7 @@ Plan Fragment 1
         EXCHANGE (6)
           TUPLE IDS: 1 
 
-Plan Fragment 2
+Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
@@ -689,6 +724,19 @@ Plan Fragment 0
   ORDER BY: round(<slot 17>, 5) DESC
   LIMIT: 100
   TUPLE IDS: 6 
+    EXCHANGE (20)
+      TUPLE IDS: 6 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 16>
+  STREAM DATA SINK
+    EXCHANGE ID: 20
+    UNPARTITIONED
+
+  TOP-N
+  ORDER BY: round(<slot 17>, 5) DESC
+  LIMIT: 100
+  TUPLE IDS: 6 
     AGGREGATE
     OUTPUT: SUM(<slot 17>)
     GROUP BY: <slot 16>
@@ -696,11 +744,11 @@ Plan Fragment 0
       EXCHANGE (18)
         TUPLE IDS: 6 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 18
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 16>
 
   AGGREGATE
   OUTPUT: SUM(l_extendedprice * 1.0 - l_discount)
@@ -745,7 +793,7 @@ Plan Fragment 1
         EXCHANGE (17)
           TUPLE IDS: 5 
 
-Plan Fragment 2
+Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 17
@@ -755,7 +803,7 @@ Plan Fragment 2
     PREDICATES: r_name = 'ASIA'
     TUPLE IDS: 5 
 
-Plan Fragment 3
+Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 16
@@ -764,7 +812,7 @@ Plan Fragment 3
   SCAN HDFS table=tpch.nation #partitions=1 size=2.15KB (7) compact
     TUPLE IDS: 4 
 
-Plan Fragment 4
+Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 15
@@ -773,7 +821,7 @@ Plan Fragment 4
   SCAN HDFS table=tpch.customer #partitions=1 size=23.08MB (5) compact
     TUPLE IDS: 3 
 
-Plan Fragment 5
+Plan Fragment 6
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 14
@@ -782,7 +830,7 @@ Plan Fragment 5
   SCAN HDFS table=tpch.supplier #partitions=1 size=1.33MB (3) compact
     TUPLE IDS: 2 
 
-Plan Fragment 6
+Plan Fragment 7
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 13
@@ -1010,6 +1058,19 @@ Plan Fragment 0
   ORDER BY: <slot 20> ASC
   LIMIT: 100
   TUPLE IDS: 8 
+    EXCHANGE (26)
+      TUPLE IDS: 8 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 20>
+  STREAM DATA SINK
+    EXCHANGE ID: 26
+    UNPARTITIONED
+
+  TOP-N
+  ORDER BY: <slot 20> ASC
+  LIMIT: 100
+  TUPLE IDS: 8 
     AGGREGATE
     OUTPUT: SUM(<slot 21>), SUM(<slot 22>)
     GROUP BY: <slot 20>
@@ -1017,11 +1078,11 @@ Plan Fragment 0
       EXCHANGE (24)
         TUPLE IDS: 8 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 24
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 20>
 
   AGGREGATE
   OUTPUT: SUM(CASE WHEN n2.n_name = 'BRAZIL' THEN l_extendedprice * 1.0 - l_discount ELSE 0.0 END), SUM(l_extendedprice * 1.0 - l_discount)
@@ -1079,7 +1140,7 @@ Plan Fragment 1
         EXCHANGE (23)
           TUPLE IDS: 7 
 
-Plan Fragment 2
+Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 23
@@ -1088,7 +1149,7 @@ Plan Fragment 2
   SCAN HDFS table=tpch.nation #partitions=1 size=2.15KB (13) compact
     TUPLE IDS: 7 
 
-Plan Fragment 3
+Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 22
@@ -1098,7 +1159,7 @@ Plan Fragment 3
     PREDICATES: r_name = 'AMERICA'
     TUPLE IDS: 6 
 
-Plan Fragment 4
+Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 21
@@ -1107,7 +1168,7 @@ Plan Fragment 4
   SCAN HDFS table=tpch.nation #partitions=1 size=2.15KB (9) compact
     TUPLE IDS: 5 
 
-Plan Fragment 5
+Plan Fragment 6
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 20
@@ -1116,7 +1177,7 @@ Plan Fragment 5
   SCAN HDFS table=tpch.customer #partitions=1 size=23.08MB (7) compact
     TUPLE IDS: 4 
 
-Plan Fragment 6
+Plan Fragment 7
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 19
@@ -1125,7 +1186,7 @@ Plan Fragment 6
   SCAN HDFS table=tpch.supplier #partitions=1 size=1.33MB (5) compact
     TUPLE IDS: 3 
 
-Plan Fragment 7
+Plan Fragment 8
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 18
@@ -1135,7 +1196,7 @@ Plan Fragment 7
     PREDICATES: p_type = 'ECONOMY ANODIZED STEEL'
     TUPLE IDS: 2 
 
-Plan Fragment 8
+Plan Fragment 9
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 17
@@ -1281,6 +1342,19 @@ Plan Fragment 0
   ORDER BY: <slot 17> ASC, <slot 18> DESC
   LIMIT: 200
   TUPLE IDS: 6 
+    EXCHANGE (20)
+      TUPLE IDS: 6 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 17>, <slot 18>
+  STREAM DATA SINK
+    EXCHANGE ID: 20
+    UNPARTITIONED
+
+  TOP-N
+  ORDER BY: <slot 17> ASC, <slot 18> DESC
+  LIMIT: 200
+  TUPLE IDS: 6 
     AGGREGATE
     OUTPUT: SUM(<slot 19>)
     GROUP BY: <slot 17>, <slot 18>
@@ -1288,11 +1362,11 @@ Plan Fragment 0
       EXCHANGE (18)
         TUPLE IDS: 6 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 18
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 17>, <slot 18>
 
   AGGREGATE
   OUTPUT: SUM(l.l_extendedprice * 1.0 - l.l_discount - ps.ps_supplycost * l.l_quantity)
@@ -1337,7 +1411,7 @@ Plan Fragment 1
         EXCHANGE (17)
           TUPLE IDS: 5 
 
-Plan Fragment 2
+Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 17
@@ -1346,7 +1420,7 @@ Plan Fragment 2
   SCAN HDFS table=tpch.nation #partitions=1 size=2.15KB (9) compact
     TUPLE IDS: 5 
 
-Plan Fragment 3
+Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 16
@@ -1355,7 +1429,7 @@ Plan Fragment 3
   SCAN HDFS table=tpch.supplier #partitions=1 size=1.33MB (7) compact
     TUPLE IDS: 4 
 
-Plan Fragment 4
+Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 15
@@ -1364,7 +1438,7 @@ Plan Fragment 4
   SCAN HDFS table=tpch.partsupp #partitions=1 size=112.71MB (5) compact
     TUPLE IDS: 3 
 
-Plan Fragment 5
+Plan Fragment 6
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 14
@@ -1373,7 +1447,7 @@ Plan Fragment 5
   SCAN HDFS table=tpch.orders #partitions=1 size=162.56MB (3) compact
     TUPLE IDS: 2 
 
-Plan Fragment 6
+Plan Fragment 7
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 13
@@ -1508,6 +1582,19 @@ Plan Fragment 0
   ORDER BY: round(<slot 23>, 5) DESC
   LIMIT: 20
   TUPLE IDS: 4 
+    EXCHANGE (14)
+      TUPLE IDS: 4 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 16>, <slot 17>, <slot 18>, <slot 19>, <slot 20>, <slot 21>, <slot 22>
+  STREAM DATA SINK
+    EXCHANGE ID: 14
+    UNPARTITIONED
+
+  TOP-N
+  ORDER BY: round(<slot 23>, 5) DESC
+  LIMIT: 20
+  TUPLE IDS: 4 
     AGGREGATE
     OUTPUT: SUM(<slot 23>)
     GROUP BY: <slot 16>, <slot 17>, <slot 18>, <slot 19>, <slot 20>, <slot 21>, <slot 22>
@@ -1515,11 +1602,11 @@ Plan Fragment 0
       EXCHANGE (12)
         TUPLE IDS: 4 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 12
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 16>, <slot 17>, <slot 18>, <slot 19>, <slot 20>, <slot 21>, <slot 22>
 
   AGGREGATE
   OUTPUT: SUM(l_extendedprice * 1.0 - l_discount)
@@ -1550,7 +1637,7 @@ Plan Fragment 1
         EXCHANGE (11)
           TUPLE IDS: 3 
 
-Plan Fragment 2
+Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 11
@@ -1559,7 +1646,7 @@ Plan Fragment 2
   SCAN HDFS table=tpch.nation #partitions=1 size=2.15KB (5) compact
     TUPLE IDS: 3 
 
-Plan Fragment 3
+Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 10
@@ -1568,7 +1655,7 @@ Plan Fragment 3
   SCAN HDFS table=tpch.customer #partitions=1 size=23.08MB (3) compact
     TUPLE IDS: 2 
 
-Plan Fragment 4
+Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 9
@@ -1655,7 +1742,7 @@ Plan Fragment 0
           TUPLE IDS: 2 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
-  UNPARTITIONED
+  HASH_PARTITIONED: <slot 8>
   WRITE TO HDFS table=tpch.q11_part_tmp
     OVERWRITE=true
   AGGREGATE
@@ -1669,7 +1756,7 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 8
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 8>
 
   AGGREGATE
   OUTPUT: SUM(ps_supplycost * ps_availqty)
@@ -1809,6 +1896,19 @@ Plan Fragment 0
   ORDER BY: <slot 7> ASC
   LIMIT: 10
   TUPLE IDS: 2 
+    EXCHANGE (8)
+      TUPLE IDS: 2 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 7>
+  STREAM DATA SINK
+    EXCHANGE ID: 8
+    UNPARTITIONED
+
+  TOP-N
+  ORDER BY: <slot 7> ASC
+  LIMIT: 10
+  TUPLE IDS: 2 
     AGGREGATE
     OUTPUT: SUM(<slot 8>), SUM(<slot 9>)
     GROUP BY: <slot 7>
@@ -1816,11 +1916,11 @@ Plan Fragment 0
       EXCHANGE (6)
         TUPLE IDS: 2 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 7>
 
   AGGREGATE
   OUTPUT: SUM(CASE WHEN o_orderpriority = '1-URGENT' OR o_orderpriority = '2-HIGH' THEN 1 ELSE 0 END), SUM(CASE WHEN o_orderpriority != '1-URGENT' AND o_orderpriority != '2-HIGH' THEN 1 ELSE 0 END)
@@ -1837,7 +1937,7 @@ Plan Fragment 1
         EXCHANGE (5)
           TUPLE IDS: 1 
 
-Plan Fragment 2
+Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 5
@@ -1931,22 +2031,48 @@ Plan Fragment 0
   ORDER BY: <slot 9> DESC, <slot 8> DESC
   LIMIT: 100
   TUPLE IDS: 4 
-    AGGREGATE
-    OUTPUT: COUNT(1)
-    GROUP BY: <slot 5>
-    TUPLE IDS: 4 
-      AGGREGATE
-      OUTPUT: SUM(<slot 5>)
-      GROUP BY: <slot 4>
-      TUPLE IDS: 2 
-        EXCHANGE (7)
-          TUPLE IDS: 2 
+    EXCHANGE (11)
+      TUPLE IDS: 4 
 
 Plan Fragment 1
+  HASH_PARTITIONED: <slot 8>
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  TOP-N
+  ORDER BY: <slot 9> DESC, <slot 8> DESC
+  LIMIT: 100
+  TUPLE IDS: 4 
+    AGGREGATE
+    OUTPUT: SUM(<slot 9>)
+    GROUP BY: <slot 8>
+    TUPLE IDS: 4 
+      EXCHANGE (9)
+        TUPLE IDS: 4 
+
+Plan Fragment 2
+  HASH_PARTITIONED: <slot 4>
+  STREAM DATA SINK
+    EXCHANGE ID: 9
+    HASH_PARTITIONED: <slot 8>
+
+  AGGREGATE
+  OUTPUT: COUNT(1)
+  GROUP BY: <slot 5>
+  TUPLE IDS: 4 
+    AGGREGATE
+    OUTPUT: SUM(<slot 5>)
+    GROUP BY: <slot 4>
+    TUPLE IDS: 2 
+      EXCHANGE (7)
+        TUPLE IDS: 2 
+
+Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 4>
 
   AGGREGATE
   OUTPUT: COUNT(o_orderkey)
@@ -1963,7 +2089,7 @@ Plan Fragment 1
         EXCHANGE (6)
           TUPLE IDS: 1 
 
-Plan Fragment 2
+Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 6
@@ -2102,7 +2228,7 @@ Plan Fragment 0
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
-  UNPARTITIONED
+  HASH_PARTITIONED: <slot 4>
   WRITE TO HDFS table=tpch.revenue
     OVERWRITE=true
   AGGREGATE
@@ -2116,7 +2242,7 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 4>
 
   AGGREGATE
   OUTPUT: SUM(l_extendedprice * 1.0 - l_discount)
@@ -2388,6 +2514,19 @@ Plan Fragment 0
   ORDER BY: <slot 15> DESC, <slot 12> ASC, <slot 13> ASC, <slot 14> ASC
   LIMIT: 1000
   TUPLE IDS: 3 
+    EXCHANGE (6)
+      TUPLE IDS: 3 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 8>, <slot 9>, <slot 10>
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  TOP-N
+  ORDER BY: <slot 15> DESC, <slot 12> ASC, <slot 13> ASC, <slot 14> ASC
+  LIMIT: 1000
+  TUPLE IDS: 3 
     AGGREGATE
     OUTPUT: COUNT(*)
     GROUP BY: <slot 8>, <slot 9>, <slot 10>
@@ -2399,11 +2538,11 @@ Plan Fragment 0
         EXCHANGE (4)
           TUPLE IDS: 2 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 4
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 8>, <slot 9>, <slot 10>
 
   AGGREGATE
   OUTPUT: 
@@ -2431,7 +2570,7 @@ Plan Fragment 0
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
-  UNPARTITIONED
+  HASH_PARTITIONED: <slot 2>
   WRITE TO HDFS table=tpch.lineitem_tmp
     OVERWRITE=true
   AGGREGATE
@@ -2445,7 +2584,7 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 2>
 
   AGGREGATE
   OUTPUT: SUM(l_quantity), COUNT(l_quantity)
@@ -2566,7 +2705,7 @@ Plan Fragment 0
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
-  UNPARTITIONED
+  HASH_PARTITIONED: <slot 2>
   WRITE TO HDFS table=tpch.q18_tmp
     OVERWRITE=true
   AGGREGATE
@@ -2580,7 +2719,7 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 2>
 
   AGGREGATE
   OUTPUT: SUM(l_quantity)
@@ -2657,6 +2796,19 @@ Plan Fragment 0
   ORDER BY: <slot 14> ASC, <slot 13> ASC
   LIMIT: 100
   TUPLE IDS: 4 
+    EXCHANGE (14)
+      TUPLE IDS: 4 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 10>, <slot 11>, <slot 12>, <slot 13>, <slot 14>
+  STREAM DATA SINK
+    EXCHANGE ID: 14
+    UNPARTITIONED
+
+  TOP-N
+  ORDER BY: <slot 14> ASC, <slot 13> ASC
+  LIMIT: 100
+  TUPLE IDS: 4 
     AGGREGATE
     OUTPUT: SUM(<slot 15>)
     GROUP BY: <slot 10>, <slot 11>, <slot 12>, <slot 13>, <slot 14>
@@ -2664,11 +2816,11 @@ Plan Fragment 0
       EXCHANGE (12)
         TUPLE IDS: 4 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 12
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 10>, <slot 11>, <slot 12>, <slot 13>, <slot 14>
 
   AGGREGATE
   OUTPUT: SUM(l_quantity)
@@ -2698,7 +2850,7 @@ Plan Fragment 1
         EXCHANGE (11)
           TUPLE IDS: 3 
 
-Plan Fragment 2
+Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 11
@@ -2708,7 +2860,7 @@ Plan Fragment 2
     PREDICATES: t.t_sum_quantity > 300.0
     TUPLE IDS: 3 
 
-Plan Fragment 3
+Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 10
@@ -2717,7 +2869,7 @@ Plan Fragment 3
   SCAN HDFS table=tpch.customer #partitions=1 size=23.08MB (3) compact
     TUPLE IDS: 2 
 
-Plan Fragment 4
+Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 9
@@ -2865,7 +3017,7 @@ Plan Fragment 0
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
-  UNPARTITIONED
+  HASH_PARTITIONED: <slot 2>
   WRITE TO HDFS table=tpch.q20_tmp1
     OVERWRITE=true
   AGGREGATE
@@ -2879,7 +3031,7 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 2>
 
   AGGREGATE
   OUTPUT: 
@@ -2916,7 +3068,7 @@ Plan Fragment 0
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
-  UNPARTITIONED
+  HASH_PARTITIONED: <slot 4>, <slot 5>
   WRITE TO HDFS table=tpch.q20_tmp2
     OVERWRITE=true
   AGGREGATE
@@ -2930,7 +3082,7 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 4>, <slot 5>
 
   AGGREGATE
   OUTPUT: SUM(l_quantity)
@@ -3035,7 +3187,7 @@ Plan Fragment 0
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
-  UNPARTITIONED
+  HASH_PARTITIONED: <slot 3>
   WRITE TO HDFS table=tpch.q20_tmp4
     OVERWRITE=true
   AGGREGATE
@@ -3049,7 +3201,7 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 3>
 
   AGGREGATE
   OUTPUT: 
@@ -3246,6 +3398,19 @@ Plan Fragment 0
   ORDER BY: <slot 16> DESC, <slot 15> ASC
   LIMIT: 100
   TUPLE IDS: 6 
+    EXCHANGE (20)
+      TUPLE IDS: 6 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 15>
+  STREAM DATA SINK
+    EXCHANGE ID: 20
+    UNPARTITIONED
+
+  TOP-N
+  ORDER BY: <slot 16> DESC, <slot 15> ASC
+  LIMIT: 100
+  TUPLE IDS: 6 
     AGGREGATE
     OUTPUT: SUM(<slot 16>)
     GROUP BY: <slot 15>
@@ -3253,11 +3418,11 @@ Plan Fragment 0
       EXCHANGE (18)
         TUPLE IDS: 6 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 18
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 15>
 
   AGGREGATE
   OUTPUT: COUNT(*)
@@ -3304,7 +3469,7 @@ Plan Fragment 1
         EXCHANGE (17)
           TUPLE IDS: 5 
 
-Plan Fragment 2
+Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 17
@@ -3314,7 +3479,7 @@ Plan Fragment 2
     PREDICATES: l3.l_receiptdate > l3.l_commitdate
     TUPLE IDS: 5 
 
-Plan Fragment 3
+Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 16
@@ -3323,7 +3488,7 @@ Plan Fragment 3
   SCAN HDFS table=tpch.lineitem #partitions=1 size=718.94MB (7) compact
     TUPLE IDS: 4 
 
-Plan Fragment 4
+Plan Fragment 5
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 15
@@ -3333,7 +3498,7 @@ Plan Fragment 4
     PREDICATES: n_name = 'SAUDI ARABIA'
     TUPLE IDS: 3 
 
-Plan Fragment 5
+Plan Fragment 6
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 14
@@ -3343,7 +3508,7 @@ Plan Fragment 5
     PREDICATES: o_orderstatus = 'F'
     TUPLE IDS: 2 
 
-Plan Fragment 6
+Plan Fragment 7
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 13
@@ -3388,7 +3553,7 @@ Plan Fragment 0
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
-  UNPARTITIONED
+  HASH_PARTITIONED: <slot 3>
   WRITE TO HDFS table=tpch.q22_customer_tmp1
     OVERWRITE=true
   AGGREGATE
@@ -3402,7 +3567,7 @@ Plan Fragment 1
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 3>
 
   AGGREGATE
   OUTPUT: SUM(c_acctbal), COUNT(c_acctbal)
@@ -3478,6 +3643,19 @@ Plan Fragment 0
   ORDER BY: <slot 7> ASC
   LIMIT: 100
   TUPLE IDS: 3 
+    EXCHANGE (11)
+      TUPLE IDS: 3 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 7>
+  STREAM DATA SINK
+    EXCHANGE ID: 11
+    UNPARTITIONED
+
+  TOP-N
+  ORDER BY: <slot 7> ASC
+  LIMIT: 100
+  TUPLE IDS: 3 
     AGGREGATE
     OUTPUT: SUM(<slot 8>), SUM(<slot 9>)
     GROUP BY: <slot 7>
@@ -3485,11 +3663,11 @@ Plan Fragment 0
       EXCHANGE (9)
         TUPLE IDS: 3 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 9
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 7>
 
   AGGREGATE
   OUTPUT: COUNT(*), SUM(c_acctbal)
@@ -3515,7 +3693,7 @@ Plan Fragment 1
         EXCHANGE (8)
           TUPLE IDS: 2 
 
-Plan Fragment 2
+Plan Fragment 3
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 8
@@ -3524,7 +3702,7 @@ Plan Fragment 2
   SCAN HDFS table=tpch.orders #partitions=1 size=162.56MB (3) compact
     TUPLE IDS: 2 
 
-Plan Fragment 3
+Plan Fragment 4
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 7

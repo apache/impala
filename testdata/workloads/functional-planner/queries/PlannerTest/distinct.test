@@ -13,6 +13,15 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
+  EXCHANGE (4)
+    TUPLE IDS: 1 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 3>, <slot 4>, <slot 5>
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: 
   GROUP BY: <slot 3>, <slot 4>, <slot 5>
@@ -20,11 +29,11 @@ Plan Fragment 0
     EXCHANGE (2)
       TUPLE IDS: 1 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 3>, <slot 4>, <slot 5>
 
   AGGREGATE
   OUTPUT: 
@@ -50,6 +59,15 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
+  EXCHANGE (4)
+    TUPLE IDS: 1 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 2>, <slot 3>
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: 
   GROUP BY: <slot 2>, <slot 3>
@@ -57,11 +75,11 @@ Plan Fragment 0
     EXCHANGE (2)
       TUPLE IDS: 1 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 2>, <slot 3>
 
   AGGREGATE
   OUTPUT: 
@@ -92,6 +110,19 @@ Plan Fragment 0
 Plan Fragment 0
   UNPARTITIONED
   AGGREGATE
+  OUTPUT: SUM(<slot 4>)
+  GROUP BY: 
+  TUPLE IDS: 2 
+    EXCHANGE (5)
+      TUPLE IDS: 2 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 2>, <slot 3>
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  AGGREGATE
   OUTPUT: COUNT(*)
   GROUP BY: 
   TUPLE IDS: 2 
@@ -102,11 +133,11 @@ Plan Fragment 0
       EXCHANGE (3)
         TUPLE IDS: 1 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 2>, <slot 3>
 
   AGGREGATE
   OUTPUT: 
@@ -137,6 +168,15 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
+  EXCHANGE (5)
+    TUPLE IDS: 2 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 3>
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: COUNT(*)
   GROUP BY: <slot 3>
@@ -148,11 +188,11 @@ Plan Fragment 0
       EXCHANGE (3)
         TUPLE IDS: 1 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 3>
 
   AGGREGATE
   OUTPUT: 
@@ -203,6 +243,15 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
+  EXCHANGE (5)
+    TUPLE IDS: 2 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 2>
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: COUNT(*), SUM(<slot 3>)
   GROUP BY: <slot 2>
@@ -214,11 +263,11 @@ Plan Fragment 0
       EXCHANGE (3)
         TUPLE IDS: 1 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 2>
 
   AGGREGATE
   OUTPUT: 
@@ -270,6 +319,15 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
+  EXCHANGE (5)
+    TUPLE IDS: 2 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 4>
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: COUNT(*), MIN(<slot 6>), MAX(<slot 7>)
   GROUP BY: <slot 4>
@@ -281,11 +339,11 @@ Plan Fragment 0
       EXCHANGE (3)
         TUPLE IDS: 1 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 4>
 
   AGGREGATE
   OUTPUT: MIN(smallint_col), MAX(string_col)
@@ -336,6 +394,15 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
+  EXCHANGE (5)
+    TUPLE IDS: 2 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 4>
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: COUNT(*), SUM(<slot 5>), SUM(<slot 6>), SUM(<slot 7>), MIN(<slot 8>), MAX(<slot 9>)
   GROUP BY: <slot 4>
@@ -347,11 +414,11 @@ Plan Fragment 0
       EXCHANGE (3)
         TUPLE IDS: 1 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 3
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 4>
 
   AGGREGATE
   OUTPUT: COUNT(*), SUM(int_col), MIN(smallint_col), MAX(bigint_col)

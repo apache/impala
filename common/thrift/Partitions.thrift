@@ -20,13 +20,15 @@ include "Exprs.thrift"
 enum TPartitionType {
   UNPARTITIONED,
 
-  // round-robin partitioning
+  // round-robin partition
   RANDOM,
 
-  // unordered partitioning on a set of exprs
+  // unordered partition on a set of exprs
+  // (partition bounds overlap)
   HASH_PARTITIONED,
 
-  // ordered partitioning on a list of exprs
+  // ordered partition on a list of exprs
+  // (partition bounds don't overlap)
   RANGE_PARTITIONED
 }
 

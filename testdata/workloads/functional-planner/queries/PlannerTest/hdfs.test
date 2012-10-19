@@ -16,6 +16,15 @@ Plan Fragment 0
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
+  EXCHANGE (4)
+    TUPLE IDS: 1 
+
+Plan Fragment 1
+  HASH_PARTITIONED: <slot 2>
+  STREAM DATA SINK
+    EXCHANGE ID: 4
+    UNPARTITIONED
+
   AGGREGATE
   OUTPUT: SUM(<slot 3>)
   GROUP BY: <slot 2>
@@ -23,11 +32,11 @@ Plan Fragment 0
     EXCHANGE (2)
       TUPLE IDS: 1 
 
-Plan Fragment 1
+Plan Fragment 2
   RANDOM
   STREAM DATA SINK
     EXCHANGE ID: 2
-    UNPARTITIONED
+    HASH_PARTITIONED: <slot 2>
 
   AGGREGATE
   OUTPUT: COUNT(*)
