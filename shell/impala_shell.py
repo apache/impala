@@ -87,12 +87,6 @@ class ImpalaShell(cmd.Cmd):
   def __options_to_string_list(self):
     return ["%s:%s" % (k,v) for (k,v) in self.query_options.iteritems()]
 
-  def do_options(self, args):
-    """Print query options"""
-    self.__print_if_verbose("Impala query options:")
-    self.__print_options()
-    return True
-
   def do_shell(self, args):
     """Run a command on the shell
     Usage: shell <cmd>
@@ -139,13 +133,22 @@ class ImpalaShell(cmd.Cmd):
       return False
 
   def do_set(self, args):
-    """Set query options:
-    Usage: SET <option> <value>
+    """Set or display query options.
+
+    Display query options:
+    Usage: SET
+    Set query options:
+    Usage: SET <option>=<value>
 
     """
-    tokens = args.split(" ")
+    if len(args) == 0:
+      self.__print_if_verbose("Impala query options:")
+      self.__print_options()
+      return True
+
+    tokens = args.split("=")
     if len(tokens) != 2:
-      print "Error: SET <option> <value>"
+      print "Error: SET <option>=<value>"
       return False
     option_upper = tokens[0].upper()
     if option_upper not in ImpalaService.TImpalaQueryOptions._NAMES_TO_VALUES.keys():
