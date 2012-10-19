@@ -1,4 +1,4 @@
-// (c) 2012 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #include "common/service-ids.h"
 
 namespace impala {

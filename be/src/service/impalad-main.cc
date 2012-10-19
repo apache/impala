@@ -1,4 +1,4 @@
-// (c) 2012 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 //
 // This file contains the main() function for the impala daemon process,
 // which exports the Thrift services ImpalaService and ImpalaInternalService.

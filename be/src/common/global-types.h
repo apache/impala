@@ -1,4 +1,4 @@
-// (c) 2012 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 //
 // This file contains type definitions that are used throughout the code base.
 

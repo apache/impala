@@ -1,4 +1,4 @@
-// (c) 2012 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 //
 // This file contains global flags, ie, flags which don't belong to a particular
 // component (and would therefore need to be DEFINE'd in every source file containing

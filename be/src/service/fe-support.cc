@@ -1,4 +1,4 @@
-// (c) 2012 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 //
 // This file contains implementations for the JNI FeSupport interface. Avoid loading the
 // code more than once as each loading will invoke the initialization function

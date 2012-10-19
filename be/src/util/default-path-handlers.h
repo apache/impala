@@ -1,4 +1,4 @@
-// (c) 2012 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #ifndef IMPALA_UTIL_DEFAULT_PATH_HANDLERS_H
 #define IMPALA_UTIL_DEFAULT_PATH_HANDLERS_H
 

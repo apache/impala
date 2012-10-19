@@ -1,4 +1,4 @@
-// (c) 2012 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #ifndef IMPALA_EXEC_EXEC_STATS_H
 #define IMPALA_EXEC_EXEC_STATS_H
