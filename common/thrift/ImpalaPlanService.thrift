@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 namespace cpp impala
 namespace java com.cloudera.impala.thrift

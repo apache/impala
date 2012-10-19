@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #ifndef IMPALA_EXPERIMENTS_STRING_SEARCH_SSE_H
 #define IMPALA_EXPERIMENTS_STRING_SEARCH_SSE_H

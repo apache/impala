@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #include "exec/data-sink.h"
 #include "exec/hdfs-table-sink.h"

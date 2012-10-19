@@ -1,4 +1,4 @@
-#  Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+#  Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 # Source this file from the $IMPALA_HOME directory to
 # setup your environment. If $IMPALA_HOME is undefined

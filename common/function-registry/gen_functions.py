@@ -328,7 +328,7 @@ native_funcs = {
 }
 
 cc_preamble = '\
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.\n\
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.\n\
 // This is a generated file, DO NOT EDIT.\n\
 // To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
 \n\
@@ -350,7 +350,7 @@ cc_epilogue = '\
 }\n'
 
 h_preamble = '\
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.\n\
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.\n\
 // This is a generated file, DO NOT EDIT IT.\n\
 // To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
 \n\
@@ -374,7 +374,7 @@ h_epilogue = '\
 
 python_preamble = '\
 #!/usr/bin/env python\n\
-# Copyright (c) 2011 Cloudera, Inc. All rights reserved.\n\
+# Copyright (c) 2012 Cloudera, Inc. All rights reserved.\n\
 # This is a generated file, DO NOT EDIT IT.\n\
 # To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
 \n\

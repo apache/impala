@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+# Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`

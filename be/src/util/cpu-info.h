@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Cloudera, Inc.  All right reserved.
+// Copyright (c) 2012 Cloudera, Inc.  All right reserved.
 
 #ifndef IMPALA_UTIL_CPU_INFO_H
 #define IMPALA_UTIL_CPU_INFO_H

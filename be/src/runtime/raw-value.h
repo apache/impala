@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #ifndef IMPALA_RUNTIME_RAW_VALUE_H
 #define IMPALA_RUNTIME_RAW_VALUE_H

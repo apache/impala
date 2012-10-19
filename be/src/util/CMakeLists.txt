@@ -1,4 +1,4 @@
-# Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+# Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 # where to put generated libraries
 set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/util")

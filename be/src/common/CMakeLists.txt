@@ -1,4 +1,4 @@
-# Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+# Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 message (STATUS "Common ${BUILD_OUTPUT_ROOT_DIRECTORY}")
 # where to put generated libraries

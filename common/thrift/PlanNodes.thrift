@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 //
 // This file contains all structs, enums, etc., that together make up
 // a plan tree. All information recorded in struct TPlan and below is independent

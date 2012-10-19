@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Cloudera, Inc.  All right reserved.
+// Copyright (c) 2012 Cloudera, Inc.  All right reserved.
 
 #include "util/cpu-info.h"
 #include "util/debug-util.h"

@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #ifndef IMPALA_EXPRS_LIKE_PREDICATE_H_
 #define IMPALA_EXPRS_LIKE_PREDICATE_H_

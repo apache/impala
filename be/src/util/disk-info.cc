@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Cloudera, Inc.  All right reserved.
+// Copyright (c) 2012 Cloudera, Inc.  All right reserved.
 
 #include "util/disk-info.h"
 

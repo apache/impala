@@ -1,4 +1,4 @@
-# Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+# Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 cmake_minimum_required(VERSION 2.6)
 

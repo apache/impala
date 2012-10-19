@@ -1,4 +1,4 @@
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 #ifndef IMPALA_EXEC_HDFS_TEXT_TABLE_WRITER_H
 #define IMPALA_EXEC_HDFS_TEXT_TABLE_WRITER_H

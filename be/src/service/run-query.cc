@@ -1,4 +1,4 @@
-// (c) 2011 Cloudera, Inc. All rights reserved.
+// (c) 2012 Cloudera, Inc. All rights reserved.
 
 #include <iostream>
 #include <iomanip>

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copyright (c) 2011 Cloudera, Inc. All rights reserved.
+# Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 cd $IMPALA_FE_DIR
 mvn exec:java -Dexec.mainClass=com.cloudera.impala.testutil.PlanService \

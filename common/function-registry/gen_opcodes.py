@@ -41,7 +41,7 @@ native_types = {
 }
 
 thrift_preamble = '\
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.\n\
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.\n\
 // This is a generated file, DO NOT EDIT.\n\
 // To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
 \n\
@@ -55,7 +55,7 @@ thrift_epilogue = '\
 \n'
 
 cc_registry_preamble = '\
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.\n\
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.\n\
 // This is a generated file, DO NOT EDIT.\n\
 // To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
 \n\
@@ -80,7 +80,7 @@ cc_registry_epilogue = '\
 }\n'
 
 operator_file_preamble = '\
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.\n\
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.\n\
 // This is a generated file, DO NOT EDIT.\n\
 // To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
 \n\
@@ -92,7 +92,7 @@ operator_file_epilogue = '\
 }\n'
 
 java_registry_preamble = '\
-// Copyright (c) 2011 Cloudera, Inc. All rights reserved.\n\
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.\n\
 // This is a generated file, DO NOT EDIT.\n\
 // To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
 \n\
