@@ -1,3 +1,4 @@
+// Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #include "timestamp-functions.h"
 
 namespace impala {

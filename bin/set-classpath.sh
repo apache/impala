@@ -1,4 +1,5 @@
 #!/bin/sh
+# Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 # This script explicitly sets the CLASSPATH for embedded JVMs (e.g. in
 # Impalad or in runquery) Because embedded JVMs do not honour
 # CLASSPATH wildcard expansion, we have to add every dependency jar

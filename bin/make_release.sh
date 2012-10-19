@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Copyright (c) 2012 Cloudera, Inc. All rights reserved
 set -e
 set -u
 

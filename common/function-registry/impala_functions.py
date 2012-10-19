@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
 # This is a list of all the functions that are not auto-generated.
 # It contains all the meta data that describes the function.  The format is:
@@ -7,7 +8,7 @@
 # 'function name' is the base of what the opcode enum will be generated from.  It does not
 # have to be unique, the script will mangle the name with the signature if necessary.
 #
-# 'sql aliases' are the function names that can be used from sql.  They are 
+# 'sql aliases' are the function names that can be used from sql.  They are
 # optional and there can be multiple aliases for a function.
 #
 # This is combined with the list in generated_functions to code-gen the opcode
