@@ -496,16 +496,20 @@ def execute_queries_non_interactive_mode(options):
       query_file_handle.close()
     except Exception, e:
       print 'Error: %s' % e
-      return
+      sys.exit(1)
   elif options.query:
     queries = [options.query]
   shell = ImpalaShell(options)
+  # The impalad was specified on the command line and the connection failed.
+  # Return with an error, no need to process the query.
+  if options.impalad and shell.connected == False:
+    sys.exit(1)
   # Deal with case.
   queries = map(shell.sanitise_input, queries)
   for query in queries:
     if not shell.onecmd(query):
       print 'Could not execute command: %s' % query
-      return
+      sys.exit(1)
 
 if __name__ == "__main__":
   parser = OptionParser()
