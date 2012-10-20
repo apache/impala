@@ -21,9 +21,9 @@ import com.cloudera.impala.analysis.AggregateInfo;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.thrift.TAggregationNode;
+import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
-import com.cloudera.impala.thrift.TExplainLevel;
 import com.google.common.base.Objects;
 
 /**
@@ -46,7 +46,6 @@ public class AggregationNode extends PlanNode {
     super(id, aggInfo.getAggTupleId().asList());
     this.aggInfo = aggInfo;
     this.children.add(input);
-    this.rowTupleIds.add(aggInfo.getAggTupleId());
     needsFinalize = false;
     if (!isIntermediate) {
       for (AggregateExpr expr: aggInfo.getAggregateExprs()) {

@@ -25,9 +25,9 @@ import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.TreeNode;
+import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlan;
 import com.cloudera.impala.thrift.TPlanNode;
-import com.cloudera.impala.thrift.TExplainLevel;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -62,8 +62,8 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
   protected ArrayList<TupleId> rowTupleIds = Lists.newArrayList();
 
   // A set of nullable TupleId produced by this node. It is a subset of tupleIds.
-  // A tuple is nullable if it's the "nullable" side of an outer join, and it has nothing
-  // to do with the schema.
+  // A tuple is nullable within a particular plan tree if it's the "nullable" side of
+  // an outer join, which has nothing to do with the schema.
   protected Set<TupleId> nullableTupleIds = Sets.newHashSet();
 
   protected List<Predicate> conjuncts = Lists.newArrayList();
@@ -223,14 +223,6 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
    * on the children.
    */
   public void finalize(Analyzer analyzer) throws InternalException {
-    if (this instanceof HashJoinNode && children.get(0) instanceof HdfsScanNode) {
-      PlanNode leftChild = children.get(0);
-      for (TupleId tid: rowTupleIds) {
-        if (!leftChild.rowTupleIds.contains(tid)) {
-          leftChild.rowTupleIds.add(tid);
-        }
-      }
-    }
     for (PlanNode child: children) {
       child.finalize(analyzer);
     }

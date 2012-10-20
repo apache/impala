@@ -253,6 +253,7 @@ public class Planner {
       rightChildFragment = createMergeFragment(rightChildFragment);
       fragments.add(rightChildFragment);
     }
+    node.setChild(0, leftChildFragment.getPlanRoot());
     connectChildFragment(node, 1, leftChildFragment, rightChildFragment);
     leftChildFragment.setPlanRoot(node);
     return leftChildFragment;
@@ -274,7 +275,7 @@ public class Planner {
    * to be sent to the parent; augment the planner to decide whether that would
    * reduce the runtime.
    * TODO: since the fragment that does the merge is unpartitioned, it can absorb
-   * any child fragments that are also unpartitioned
+   * all child fragments that are also unpartitioned
    */
   private PlanFragment createMergeNodeFragment(MergeNode mergeNode,
       ArrayList<PlanFragment> childFragments)
@@ -321,10 +322,10 @@ public class Planner {
    * of childFragment, and set the destination of childFragment to the new parent.
    */
   private PlanFragment createParentFragment(
-      PlanFragment childFragment, DataPartition partition) {
+      PlanFragment childFragment, DataPartition parentPartition) {
     PlanNode exchangeNode = new ExchangeNode(
         new PlanNodeId(nodeIdGenerator), childFragment.getPlanRoot(), false);
-    PlanFragment parentFragment = new PlanFragment(exchangeNode, partition);
+    PlanFragment parentFragment = new PlanFragment(exchangeNode, parentPartition);
     childFragment.setDestination(parentFragment, exchangeNode.getId());
     return parentFragment;
   }
@@ -362,11 +363,11 @@ public class Planner {
       partitionAgg = false;
     }
 
-    DataPartition partition = null;
+    DataPartition parentPartition = null;
     if (partitionAgg) {
-      partition = new DataPartition(TPartitionType.HASH_PARTITIONED, groupingExprs);
+      parentPartition = new DataPartition(TPartitionType.HASH_PARTITIONED, groupingExprs);
     } else {
-      partition = DataPartition.UNPARTITIONED;
+      parentPartition = DataPartition.UNPARTITIONED;
     }
 
     // is 'node' the 2nd phase of a DISTINCT aggregation?
@@ -377,7 +378,7 @@ public class Planner {
     if (is2ndPhaseDistinctAgg) {
       Preconditions.checkState(node.getChild(0) == childFragment.getPlanRoot());
       // place a merge aggregation step for the 1st phase in a new fragment
-      PlanFragment aggFragment = createParentFragment(childFragment, partition);
+      PlanFragment aggFragment = createParentFragment(childFragment, parentPartition);
       AggregateInfo mergeAggInfo =
           ((AggregationNode)(node.getChild(0))).getAggInfo().getMergeAggInfo();
       AggregationNode mergeAggNode =
@@ -399,7 +400,7 @@ public class Planner {
       long limit = node.getLimit();
       node.unsetLimit();
       // place a merge aggregation step in a new fragment
-      PlanFragment aggFragment = createParentFragment(childFragment, partition);
+      PlanFragment aggFragment = createParentFragment(childFragment, parentPartition);
       AggregationNode mergeAggNode =
           new AggregationNode(
             new PlanNodeId(nodeIdGenerator), aggFragment.getPlanRoot(),
@@ -478,11 +479,9 @@ public class Planner {
     // create left-deep sequence of binary hash joins; assign node ids as we go along
     TableRef tblRef = selectStmt.getTableRefs().get(0);
     PlanNode root = createTableRefNode(analyzer, tblRef);
-    root.rowTupleIds = rowTuples;
     for (int i = 1; i < selectStmt.getTableRefs().size(); ++i) {
       TableRef innerRef = selectStmt.getTableRefs().get(i);
       root = createHashJoinNode(analyzer, root, innerRef);
-      root.rowTupleIds = rowTuples;
       // Have the build side of a join copy data to a compact representation
       // in the tuple buffer.
       root.getChildren().get(1).setCompactData(true);
@@ -743,7 +742,6 @@ public class Planner {
     // the rows coming from the build node only need to have space for the tuple
     // materialized by that node
     PlanNode inner = createTableRefNode(analyzer, innerRef);
-    inner.rowTupleIds = Lists.newArrayList(innerRef.getMaterializedTupleIds());
 
     List<Pair<Expr, Expr>> eqJoinConjuncts = Lists.newArrayList();
     List<Predicate> eqJoinPredicates = Lists.newArrayList();

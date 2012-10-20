@@ -47,7 +47,6 @@ public class MergeNode extends PlanNode {
   protected MergeNode(PlanNodeId id, TupleDescriptor tupleDesc) {
     super(id, tupleDesc.getId().asList());
     this.tupleDesc = tupleDesc;
-    this.rowTupleIds.clear();
     this.rowTupleIds.addAll(tupleDesc.getId().asList());
   }
 

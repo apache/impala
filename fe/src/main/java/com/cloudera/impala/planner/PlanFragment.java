@@ -116,6 +116,7 @@ public class PlanFragment {
       throws InternalException, NotImplementedException {
     markRefdSlots(analyzer);
     if (planRoot != null) {
+      setRowTupleIds(planRoot, null);
       planRoot.finalize(analyzer);
     }
     if (destNodeId != null) {
@@ -133,6 +134,41 @@ public class PlanFragment {
       for (HdfsScanNode hdfsScanNode: hdfsScans) {
         hdfsScanNode.validateFileFormat();
       }
+    }
+  }
+
+  /**
+   * Sets node.rowTupleIds, which is either the parent's rowTupleIds or the 
+   * list of materialized ids. Propagates row tuple ids to the children according
+   * to the requirements of the particular node.
+   */
+  private void setRowTupleIds(PlanNode node, ArrayList<TupleId> parentRowTupleIds) {
+    if (parentRowTupleIds != null) {
+      // we don't output less than we materialize
+      // TODO: check subset relationship
+      node.rowTupleIds = parentRowTupleIds;
+    } else {
+      node.rowTupleIds = node.tupleIds;
+    }
+
+    if (node instanceof ScanNode || node instanceof ExchangeNode) {
+      // nothing to propagate for leaves
+      return;
+    } else if (node instanceof AggregationNode || node instanceof MergeNode) {
+      for (PlanNode child: node.getChildren()) {
+        // row composition changes at an aggregation node
+        setRowTupleIds(child, null);
+      }
+    } else if (node instanceof SortNode) {
+      Preconditions.checkState(node.getChildren().size() == 1);
+      // top-n only materializes rows as wide as the input
+      node.rowTupleIds = node.tupleIds;
+      setRowTupleIds(node.getChild(0), null);
+    } else if (node instanceof HashJoinNode) {
+      // propagate parent's row composition only to left child
+      Preconditions.checkState(node.getChildren().size() == 2);
+      setRowTupleIds(node.getChild(0), node.rowTupleIds);
+      setRowTupleIds(node.getChild(1), null);
     }
   }
 

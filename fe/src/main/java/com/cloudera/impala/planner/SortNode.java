@@ -20,10 +20,10 @@ import java.util.List;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.analysis.SortInfo;
+import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TSortNode;
-import com.cloudera.impala.thrift.TExplainLevel;
 import com.google.common.base.Joiner;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -44,8 +44,8 @@ public class SortNode extends PlanNode {
     this.tupleIds.addAll(input.getTupleIds());
     this.nullableTupleIds.addAll(input.getNullableTupleIds());
     this.children.add(input);
-    this.rowTupleIds.addAll(input.getRowTupleIds());
-    Preconditions.checkArgument(info.getOrderingExprs().size() == info.getIsAscOrder().size());
+    Preconditions.checkArgument(
+        info.getOrderingExprs().size() == info.getIsAscOrder().size());
   }
 
   @Override

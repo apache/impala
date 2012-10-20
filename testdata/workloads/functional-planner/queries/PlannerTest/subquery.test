@@ -1,3 +1,90 @@
+# subquery with aggregation and order by/limit, as left-hand side of join;
+# having clause in subquery is transfered to merge agg step in distrib plan
+select *
+from (
+  select int_col, count(*)
+  from alltypessmall
+  where month = 1
+  group by int_col
+  having count(*) > 1
+  order by count(*) desc limit 5
+  ) t1
+join alltypes t2 on (t1.int_col = t2.int_col)
+where month = 1
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      <slot 2> = t2.int_col
+    TUPLE IDS: 1 3 
+      TOP-N
+      ORDER BY: <slot 3> DESC
+      LIMIT: 5
+      TUPLE IDS: 1 
+        AGGREGATE
+        OUTPUT: COUNT(*)
+        GROUP BY: int_col
+        HAVING: <slot 3> > 1
+        TUPLE IDS: 1 
+          SCAN HDFS table=default.alltypessmall (0)
+            TUPLE IDS: 0 
+      SCAN HDFS table=default.alltypes (3) compact
+        TUPLE IDS: 3 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  HASH JOIN
+    JOIN OP: INNER JOIN
+    HASH PREDICATES:
+      <slot 2> = t2.int_col
+    TUPLE IDS: 1 3 
+      TOP-N
+      ORDER BY: <slot 3> DESC
+      LIMIT: 5
+      TUPLE IDS: 1 
+        AGGREGATE
+        OUTPUT: SUM(<slot 3>)
+        GROUP BY: <slot 2>
+        HAVING: <slot 3> > 1
+        TUPLE IDS: 1 
+          EXCHANGE (5)
+            TUPLE IDS: 1 
+      EXCHANGE (7)
+        TUPLE IDS: 3 
+
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  SCAN HDFS table=default.alltypes (3) compact
+    TUPLE IDS: 3 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  AGGREGATE
+  OUTPUT: COUNT(*)
+  GROUP BY: int_col
+  TUPLE IDS: 1 
+    SCAN HDFS table=default.alltypessmall (0)
+      TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypessmall/year=2009/month=1/090101.txt 0:1610
+  LOCATIONS:
+NODE 3:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=1/100101.txt 0:20853
+  LOCATIONS:
+====
 # simple full scan subquery
 select * from (select y x from (select id y from hbasealltypessmall) a) b
 ---- PLAN

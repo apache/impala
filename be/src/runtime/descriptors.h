@@ -312,6 +312,12 @@ class DescriptorTbl {
 };
 
 // Records positions of tuples within row produced by ExecNode.
+// TODO: this needs to differentiate between tuples contained in row
+// and tuples produced by ExecNode (parallel to PlanNode.rowTupleIds and
+// PlanNode.tupleIds); right now, we conflate the two (and distinguish based on
+// context; for instance, HdfsScanNode uses these tids to create row batches, ie, the
+// first case, whereas TopNNode uses these tids to copy output rows, ie, the second
+// case)
 class RowDescriptor {
  public:
   RowDescriptor(const DescriptorTbl& desc_tbl, const std::vector<TTupleId>& row_tuples,
