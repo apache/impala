@@ -19,6 +19,7 @@
 #include <list>
 #include <set>
 #include <boost/thread/mutex.hpp>
+#include <boost/shared_ptr.hpp>
 #include <boost/thread/condition_variable.hpp>
 #include <boost/unordered_map.hpp>
 
@@ -57,7 +58,8 @@ class DataStreamMgr {
       const RowDescriptor& row_desc, const TUniqueId& fragment_id,
       PlanNodeId dest_node_id, int num_senders, int buffer_size);
   
-  // Adds a row batch to the stream identified by fragment_id/dest_node_id.
+  // Adds a row batch to the stream identified by fragment_id/dest_node_id if the stream
+  // has not been cancelled.
   // The call blocks if this ends up pushing the stream over its buffering limit;
   // it unblocks when the stream consumer removed enough data to make space for
   // row_batch.
@@ -93,8 +95,8 @@ class DataStreamMgr {
     // The caller owns the batch.
     RowBatch* GetBatch(bool* is_cancelled);
 
-    // Adds a row batch to this stream's queue; blocks if this will
-    // make the stream exceed its buffer limit.
+    // Adds a row batch to this stream's queue if this stream has not been cancelled;
+    // blocks if this will make the stream exceed its buffer limit.
     void AddBatch(const TRowBatch& batch);
 
     // Decrement the number of remaining senders and signal eos ("new data")
@@ -149,7 +151,8 @@ class DataStreamMgr {
   // map from hash value of fragment id/node id pair to control blocks;
   // we don't want to create a map<pair<TUniqueId, PlanNodeId>, StreamControlBlock*>,
   // because that requires a bunch of copying of ids for lookup
-  typedef boost::unordered_multimap<uint32_t, StreamControlBlock*> StreamMap;
+  typedef boost::unordered_multimap<uint32_t,
+      boost::shared_ptr<StreamControlBlock> > StreamMap;
   StreamMap stream_map_;
 
   // less-than ordering for pair<TUniqueId, PlanNodeId>
@@ -173,12 +176,11 @@ class DataStreamMgr {
   typedef std::set<std::pair<TUniqueId, PlanNodeId>, ComparisonOp > FragmentStreamSet;
   FragmentStreamSet fragment_stream_set_;
 
-  // Return iterator into stream_map_ for given fragment_id/node_id, or stream_map_.end()
-  // if not found.
+  // Return the StreamControlBlock for given fragment_id/node_id, or NULL if not found.
   // If 'acquire_lock' is false, assumes lock_ is already being held and won't try to
   // acquire it.
-  StreamMap::iterator FindControlBlock(const TUniqueId& fragment_id, PlanNodeId node_id,
-                                       bool acquire_lock = true);
+  boost::shared_ptr<StreamControlBlock> FindControlBlock(const TUniqueId& fragment_id,
+      PlanNodeId node_id, bool acquire_lock = true);
 
   // Remove control block for fragment_id/node_id.
   Status DeregisterRecvr(const TUniqueId& fragment_id, PlanNodeId node_id);

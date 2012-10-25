@@ -74,9 +74,10 @@ RowBatch* DataStreamMgr::StreamControlBlock::GetBatch(bool* is_cancelled) {
 }
 
 void DataStreamMgr::StreamControlBlock::AddBatch(const TRowBatch& thrift_batch) {
+  unique_lock<mutex> l(lock_);
+  if (is_cancelled_) return;
   int batch_size = RowBatch::GetBatchSize(thrift_batch);
   RowBatch* batch = new RowBatch(row_desc_, thrift_batch);
-  unique_lock<mutex> l(lock_);
   DCHECK_GT(num_remaining_senders_, 0);
   // if there's something in the queue and this batch will push us over the
   // buffer limit we need to wait until the batch gets drained
@@ -124,7 +125,7 @@ DataStreamRecvr* DataStreamMgr::CreateRecvr(
     int num_senders, int buffer_size) {
   VLOG_FILE << "creating receiver for fragment="
             << fragment_id << ", node=" << dest_node_id;
-  StreamControlBlock* cb = pool_.Add(
+  shared_ptr<StreamControlBlock> cb(
       new StreamControlBlock(row_desc, fragment_id, dest_node_id, num_senders,
                              buffer_size));
   size_t hash_value = GetHashValue(fragment_id, dest_node_id);
@@ -134,7 +135,7 @@ DataStreamRecvr* DataStreamMgr::CreateRecvr(
   return new DataStreamRecvr(this, cb);
 }
 
-DataStreamMgr::StreamMap::iterator DataStreamMgr::FindControlBlock(
+shared_ptr<DataStreamMgr::StreamControlBlock> DataStreamMgr::FindControlBlock(
     const TUniqueId& fragment_id, PlanNodeId node_id, bool acquire_lock) {
   VLOG_ROW << "looking up fragment_id=" << fragment_id << ", node=" << node_id;
   size_t hash_value = GetHashValue(fragment_id, node_id);
@@ -142,15 +143,15 @@ DataStreamMgr::StreamMap::iterator DataStreamMgr::FindControlBlock(
   pair<StreamMap::iterator, StreamMap::iterator> range =
       stream_map_.equal_range(hash_value);
   while (range.first != range.second) {
-    StreamControlBlock* cb = range.first->second;
+    const shared_ptr<StreamControlBlock>& cb = range.first->second;
     if (cb->fragment_id() == fragment_id && cb->dest_node_id() == node_id) {
       if (acquire_lock) lock_.unlock();
-      return range.first;
+      return cb;
     }
     ++range.first;
   }
   if (acquire_lock) lock_.unlock();
-  return stream_map_.end();
+  return shared_ptr<StreamControlBlock>();
 }
 
 Status DataStreamMgr::AddData(
@@ -158,48 +159,54 @@ Status DataStreamMgr::AddData(
     const TRowBatch& thrift_batch) {
   VLOG_ROW << "AddData(): fragment_id=" << fragment_id << " node=" << dest_node_id
           << " size=" << RowBatch::GetBatchSize(thrift_batch);
-  StreamMap::iterator i = FindControlBlock(fragment_id, dest_node_id);
-  if (i == stream_map_.end()) {
+  shared_ptr<StreamControlBlock> cb = FindControlBlock(fragment_id, dest_node_id);
+  if (cb == NULL) {
     stringstream err;
     err << "unknown row batch destination: fragment_id=" << fragment_id
         << " node_id=" << dest_node_id;
     LOG(ERROR) << err.str();
     return Status(err.str());
   }
-  i->second->AddBatch(thrift_batch);
+  cb->AddBatch(thrift_batch);
   return Status::OK;
 }
 
 Status DataStreamMgr::CloseSender(
     const TUniqueId& fragment_id, PlanNodeId dest_node_id) {
   VLOG_FILE << "CloseSender(): fragment_id=" << fragment_id << ", node=" << dest_node_id;
-  StreamMap::iterator i = FindControlBlock(fragment_id, dest_node_id);
-  if (i == stream_map_.end()) {
+  shared_ptr<StreamControlBlock> cb = FindControlBlock(fragment_id, dest_node_id);
+  if (cb == NULL) {
     stringstream err;
     err << "unknown row batch destination: fragment_id=" << fragment_id
         << " node_id=" << dest_node_id;
     LOG(ERROR) << err.str();
     return Status(err.str());
   }
-  i->second->DecrementSenders();
+  cb->DecrementSenders();
   return Status::OK;
 }
 
 Status DataStreamMgr::DeregisterRecvr(const TUniqueId& fragment_id, PlanNodeId node_id) {
   VLOG_QUERY << "DeregisterRecvr(): fragment_id=" << fragment_id << ", node=" << node_id;
-  StreamMap::iterator i = FindControlBlock(fragment_id, node_id);
-  if (i == stream_map_.end()) {
-    stringstream err;
-    err << "unknown row receiver id: fragment_id=" << fragment_id
-        << " node_id=" << node_id;
-    LOG(ERROR) << err.str();
-    return Status(err.str());
-  }
+  size_t hash_value = GetHashValue(fragment_id, node_id);
   lock_guard<mutex> l(lock_);
-  StreamControlBlock* cb = i->second;
-  fragment_stream_set_.erase(make_pair(cb->fragment_id(), cb->dest_node_id()));
-  stream_map_.erase(i);
-  return Status::OK;
+  pair<StreamMap::iterator, StreamMap::iterator> range =
+      stream_map_.equal_range(hash_value);
+  while (range.first != range.second) {
+    const shared_ptr<StreamControlBlock>& cb = range.first->second;
+    if (cb->fragment_id() == fragment_id && cb->dest_node_id() == node_id) {
+      fragment_stream_set_.erase(make_pair(cb->fragment_id(), cb->dest_node_id()));
+      stream_map_.erase(range.first);
+      return Status::OK;
+    }
+    ++range.first;
+  }
+
+  stringstream err;
+  err << "unknown row receiver id: fragment_id=" << fragment_id
+      << " node_id=" << node_id;
+  LOG(ERROR) << err.str();
+  return Status(err.str());
 }
 
 void DataStreamMgr::Cancel(const TUniqueId& fragment_id) {
@@ -208,15 +215,15 @@ void DataStreamMgr::Cancel(const TUniqueId& fragment_id) {
   FragmentStreamSet::iterator i =
       fragment_stream_set_.lower_bound(make_pair(fragment_id, 0));
   while (i != fragment_stream_set_.end() && i->first == fragment_id) {
-    StreamMap::iterator j = FindControlBlock(i->first, i->second, false);
-    if (j == stream_map_.end()) {
+    shared_ptr<StreamControlBlock> cb = FindControlBlock(i->first, i->second, false);
+    if (cb == NULL) {
       // keep going but at least log it
       stringstream err;
       err << "Cancel(): missing in stream_map: fragment=" << i->first
           << " node=" << i->second;
       LOG(ERROR) << err.str();
     } else {
-      j->second->CancelStream();
+      cb->CancelStream();
     }
     ++i;
   }

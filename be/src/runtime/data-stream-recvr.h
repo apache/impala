@@ -46,9 +46,10 @@ class DataStreamRecvr {
  private:
   friend class DataStreamMgr;
   DataStreamMgr* mgr_;
-  DataStreamMgr::StreamControlBlock* cb_;
+  boost::shared_ptr<DataStreamMgr::StreamControlBlock> cb_;
 
-  DataStreamRecvr(DataStreamMgr* mgr, DataStreamMgr::StreamControlBlock* cb)
+  DataStreamRecvr(DataStreamMgr* mgr,
+      boost::shared_ptr<DataStreamMgr::StreamControlBlock> cb)
     : mgr_(mgr), cb_(cb) {}
 };
 
