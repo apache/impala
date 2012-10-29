@@ -1,5 +1,5 @@
 insert overwrite table nullinsert$TABLE
-select NULL, "", "NULL", "\\N", NULL from alltypes where id = 0
+select NULL, "", "NULL", "\\N", NULL from alltypes limit 1
 ---- SETUP
 RESET nullinsert$TABLE
 ---- RESULTS

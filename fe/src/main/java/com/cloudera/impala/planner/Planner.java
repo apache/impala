@@ -96,11 +96,16 @@ public class Planner {
       // single-node execution; we're almost done
       fragments.add(new PlanFragment(singleNodePlan, DataPartition.UNPARTITIONED));
     } else {
-      // leave the root fragment partitioned if we end up writing to a table;
+      // leave the root fragment partitioned if we end up writing to a table unless
+      // there a limit;
       // otherwise merge everything into a single coordinator fragment, so we can
       // pass it back to the client
+      boolean isPartitioned = false;
+      if (analysisResult.isInsertStmt() && !queryStmt.hasLimitClause()) {
+          isPartitioned = true;
+      }
       createPlanFragments(
-          singleNodePlan, analysisResult.isInsertStmt(), queryOptions.partition_agg,
+          singleNodePlan, isPartitioned, queryOptions.partition_agg,
           fragments);
     }
 
