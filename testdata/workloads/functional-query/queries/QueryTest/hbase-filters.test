@@ -1,3 +1,19 @@
+# Reference the string row key but do not create a predicate on the key.
+select distinct id from hbasestringids where int_col = 1
+---- TYPES
+string
+---- RESULTS
+'5001'
+'2001'
+'8001'
+'6001'
+'1001'
+'3001'
+'9001'
+'1'
+'4001'
+'7001'
+====
 select * from hbasealltypessmall where string_col = '4'
 ---- TYPES
 int, boolean, double, float, bigint, int, smallint, tinyint, string, string, timestamp

@@ -81,12 +81,14 @@ public class HBaseScanNode extends ScanNode {
 
   @Override
   public void finalize(Analyzer analyzer) throws InternalException {
-    Preconditions.checkState(keyRanges == null || keyRanges.size() == 1);
-    if (keyRanges != null) {
-      // Transform ValueRange into start-/stoprow by printing the values.
-      // At present, we only do that for string-mapped keys because the hbase
-      // data is stored as text.
-      ValueRange rowRange = keyRanges.get(0);
+    Preconditions.checkNotNull(keyRanges);
+    Preconditions.checkState(keyRanges.size() == 1);
+    // If ValueRange is not null, transform it into start/stopKey by printing the values.
+    // At present, we only do that for string-mapped keys because the hbase
+    // data is stored as text.
+    // ValueRange is null if there is no qualification on the row-key.
+    ValueRange rowRange = keyRanges.get(0);
+    if (rowRange != null) {
       if (rowRange.lowerBound != null) {
         Preconditions.checkState(rowRange.lowerBound.isConstant());
         Preconditions.checkState(rowRange.lowerBound instanceof StringLiteral);

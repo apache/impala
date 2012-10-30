@@ -83,6 +83,8 @@ public class HdfsScanNode extends ScanNode {
    */
   @Override
   public void finalize(Analyzer analyzer) throws InternalException {
+    Preconditions.checkNotNull(keyRanges);
+
     for (HdfsPartition p: tbl.getPartitions()) {
       if (p.getFileDescriptors().size() == 0) {
         // No point scanning partitions that have no data
@@ -91,22 +93,20 @@ public class HdfsScanNode extends ScanNode {
 
       Preconditions.checkState(p.getPartitionValues().size() ==
         tbl.getNumClusteringCols());
-      if (keyRanges != null) {
-        // check partition key values against key ranges, if set
-        Preconditions.checkState(keyRanges.size() <= p.getPartitionValues().size());
-        boolean matchingPartition = true;
-        for (int i = 0; i < keyRanges.size(); ++i) {
-          ValueRange keyRange = keyRanges.get(i);
-          if (keyRange != null &&
-              !keyRange.isInRange(analyzer, p.getPartitionValues().get(i))) {
-            matchingPartition = false;
-            break;
-          }
+      // check partition key values against key ranges, if set
+      Preconditions.checkState(keyRanges.size() == p.getPartitionValues().size());
+      boolean matchingPartition = true;
+      for (int i = 0; i < keyRanges.size(); ++i) {
+        ValueRange keyRange = keyRanges.get(i);
+        if (keyRange != null &&
+            !keyRange.isInRange(analyzer, p.getPartitionValues().get(i))) {
+          matchingPartition = false;
+          break;
         }
-        if (!matchingPartition) {
-          // skip this partition, it's outside the key ranges
-          continue;
-        }
+      }
+      if (!matchingPartition) {
+        // skip this partition, it's outside the key ranges
+        continue;
       }
       // HdfsPartition is immutable, so it's ok to copy by reference
       partitions.add(p);

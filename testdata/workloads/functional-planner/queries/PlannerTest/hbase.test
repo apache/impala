@@ -1,3 +1,29 @@
+# full scan of string typed row-key
+select * from hbasestringids
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  SCAN HBASE table=hbasestringids (0)
+    TUPLE IDS: 0 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (1)
+    TUPLE IDS: 0 
+
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 1
+    UNPARTITIONED
+
+  SCAN HBASE table=hbasestringids (0)
+    TUPLE IDS: 0 
+---- SCANRANGELOCATIONS
+NODE 0:
+  HBASE KEYRANGE <unbounded>:<unbounded>
+  LOCATIONS:
+====
 # full scan
 select * from hbasealltypessmall
 ---- PLAN

@@ -648,7 +648,6 @@ public class Planner {
     List<Predicate> conjuncts = analyzer.getBoundConjuncts(tblRef.getId().asList());
     analyzer.markConjunctsAssigned(conjuncts);
     ArrayList<ValueRange> keyRanges = Lists.newArrayList();
-    boolean addedRange = false;  // added non-null range
     // determine scan predicates for clustering cols
     for (int i = 0; i < tblRef.getTable().getNumClusteringCols(); ++i) {
       SlotDescriptor slotDesc =
@@ -663,15 +662,11 @@ public class Planner {
         // and non-string comparisons won't work)
         keyRanges.add(null);
       } else {
-        ValueRange keyRange = createScanRange(slotDesc, conjuncts);
-        keyRanges.add(keyRange);
-        addedRange = true;
+        keyRanges.add(createScanRange(slotDesc, conjuncts));
       }
     }
 
-    if (addedRange) {
-      scanNode.setKeyRanges(keyRanges);
-    }
+    scanNode.setKeyRanges(keyRanges);
     scanNode.setConjuncts(conjuncts);
 
     return scanNode;

@@ -20,6 +20,7 @@ import com.cloudera.impala.analysis.TupleDescriptor;
 import com.cloudera.impala.thrift.THostPort;
 import com.cloudera.impala.thrift.TScanRangeLocations;
 import com.google.common.base.Objects;
+import com.google.common.base.Preconditions;
 
 /**
  * Representation of the common elements of all scan nodes.
@@ -30,8 +31,8 @@ abstract public class ScanNode extends PlanNode {
   /**
    * One range per clustering column. The range bounds are expected to be constants.
    * A null entry means there's no range restriction for that particular key.
-   * Might contain fewer entries than there are keys (ie, there are no trailing
-   * null entries).
+   * If keyRanges is non-null it always contains as many entries as there are clustering
+   * cols.
    */
   protected List<ValueRange> keyRanges;
 
@@ -41,9 +42,8 @@ abstract public class ScanNode extends PlanNode {
   }
 
   public void setKeyRanges(List<ValueRange> keyRanges) {
-    if (!keyRanges.isEmpty()) {
-      this.keyRanges = keyRanges;
-    }
+    Preconditions.checkNotNull(keyRanges);
+    this.keyRanges = keyRanges;
   }
 
   /**
