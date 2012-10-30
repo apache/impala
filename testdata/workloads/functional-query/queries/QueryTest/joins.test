@@ -1,3 +1,5 @@
+====
+---- QUERY
 # Test join on timestamp, hashing was not working properly
 select a.timestamp_col from alltypessmall a inner join alltypessmall b on
 (a.timestamp_col = b.timestamp_col)
@@ -31,6 +33,7 @@ timestamp
 2009-01-03 00:23:00.930000000
 2009-01-03 00:24:00.960000000
 ====
+---- QUERY
 # Joins with multiple exprs
 select j.*, d.* from JoinTbl j inner join DimTbl d on 
 (j.test_name = d.name AND j.test_zip = d.zip) 
@@ -40,6 +43,7 @@ bigint, string, int, int, bigint, string, int
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
 ====
+---- QUERY
 select j.*, d.* from JoinTbl j inner join DimTbl d on 
 (j.test_zip = d.zip AND j.test_name = d.name) 
 ---- TYPES
@@ -48,6 +52,7 @@ bigint, string, int, int, bigint, string, int
 1001,'Name1',94611,5000,1001,'Name1',94611
 1002,'Name2',94611,5000,1002,'Name2',94611
 ====
+---- QUERY
 # join between hdfs and hbase, extra join predicate, extra scan predicates, nulls in
 # joins cols and non-equality join predicate
 # (alltypesagg.tinyint_col contains nulls instead of 0s)
@@ -76,6 +81,7 @@ tinyint, int, string, bigint
 1,1,'981',2
 1,1,'991',2
 ====
+---- QUERY
 # join between hdfs and hbase, extra join predicate, extra scan predicates, nulls in joins cols
 # (alltypesagg.tinyint_col contains nulls instead of 0s)
 # Should be same result as the test below
@@ -103,6 +109,7 @@ tinyint, int, string
 1,1,'981'
 1,1,'991'
 ====
+---- QUERY
 
 # join between two tables, extra join predicate, extra scan predicates, nulls in joins cols
 # (alltypesagg.tinyint_col contains nulls instead of 0s)
@@ -130,6 +137,7 @@ tinyint, int, string
 1,1,'981'
 1,1,'991'
 ====
+---- QUERY
 # reversing the order of the tables produces the same result
 select a.tinyint_col, b.id, a.string_col
 from alltypessmall$TABLE b join alltypesagg$TABLE a on (a.tinyint_col = b.id)
@@ -155,6 +163,7 @@ tinyint, int, string
 1,1,'981'
 1,1,'991'
 ====
+---- QUERY
 # join between three tables, extra join predicates, extra scan predicates, nulls in joins cols
 # (alltypesagg.tinyint_col contains nulls instead of 0s)
 select a.smallint_col, b.id, a.tinyint_col, c.id, a.int_col, b.float_col, c.string_col
@@ -192,6 +201,7 @@ smallint, int, tinyint, int, int, float, string
 84,84,4,4,984,9.899999618530273,'4'
 91,91,1,1,991,6.599999904632568,'1'
 ====
+---- QUERY
 # reversing the order produces the same results
 select a.smallint_col, b.id, a.tinyint_col, c.id, a.int_col, b.float_col, c.string_col
 from alltypessmall$TABLE b
@@ -228,17 +238,20 @@ smallint, int, tinyint, int, int, float, string
 84,84,4,4,984,9.899999618530273,'4'
 91,91,1,1,991,6.599999904632568,'1'
 ====
+---- QUERY
 # joins on empty tables
 select * from emptytable t1 join emptytable t2 on (t1.field=t2.field)
 ---- TYPES
 int, string, int, string
 ---- RESULTS
 ====
+---- QUERY
 select * from emptytable t1 join greptiny t2 on (t1.field=t2.field)
 ---- TYPES
 int, string, string
 ---- RESULTS
 ====
+---- QUERY
 select * from greptiny t1 join emptytable t2 on (t1.field=t2.field)
 ---- TYPES
 string, int, string

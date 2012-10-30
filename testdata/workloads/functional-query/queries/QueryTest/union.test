@@ -1,4 +1,6 @@
-// Showing contents of alltypestiny for convenience
+====
+---- QUERY
+# Showing contents of alltypestiny for convenience
 select * from alltypestiny
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
@@ -12,7 +14,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,4,6,true,0,0,0,0,0,0,'04/01/09','0',2009-04-01 00:00:00
 2009,4,7,false,1,1,1,10,1.100000023841858,10.1,'04/01/09','1',2009-04-01 00:01:00
 ====
-// Only UNION ALL, no nested unions
+---- QUERY
+# Only UNION ALL, no nested unions
 select * from alltypestiny where year=2009 and month=1
 union all
 select * from alltypestiny where year=2009 and month=1
@@ -28,7 +31,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 ====
-// Only UNION ALL with limit inside operands. One of the operands also has an order by.
+---- QUERY
+# Only UNION ALL with limit inside operands. One of the operands also has an order by.
 select * from alltypestiny where year=2009 and month=1 limit 1
 union all
 select * from alltypestiny where year=2009 and month=1 order by int_col limit 1
@@ -41,7 +45,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 ====
-// Only UNION DISTINCT, no nested unions
+---- QUERY
+# Only UNION DISTINCT, no nested unions
 select * from alltypestiny where year=2009 and month=1
 union distinct
 select * from alltypestiny where year=2009 and month=1
@@ -55,7 +60,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 ====
-// Only UNION ALL, mixed selects with and without from clauses, no nested unions
+---- QUERY
+# Only UNION ALL, mixed selects with and without from clauses, no nested unions
 select * from alltypestiny where year=2009 and month=1
 union all
 select 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',cast('2009-01-01 00:00:00' as timestamp)
@@ -73,7 +79,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, double, double, string, 
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 ====
-// Only UNION DISTINCT, mixed selects with and without from clauses, no nested unions
+---- QUERY
+# Only UNION DISTINCT, mixed selects with and without from clauses, no nested unions
 select * from alltypestiny where year=2009 and month=1
 union distinct
 select 2009,1,0,true,0,0,0,0,cast(0 as float),0,'01/01/09','0',cast('2009-01-01 00:00:00' as timestamp)
@@ -87,8 +94,9 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 ====
-// Mixed UNION ALL/DISTINCT but effectively only UNION DISTINCT, no nested unions,
-// with order by and limit
+---- QUERY
+# Mixed UNION ALL/DISTINCT but effectively only UNION DISTINCT, no nested unions,
+# with order by and limit
 select * from alltypestiny where year=2009 and month=1
 union all
 select * from alltypestiny where year=2009 and month=1
@@ -104,7 +112,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 ====
-// Mixed UNION ALL/DISTINCT, no nested unions, with order by and limit
+---- QUERY
+# Mixed UNION ALL/DISTINCT, no nested unions, with order by and limit
 select * from alltypestiny where year=2009 and month=1
 union distinct
 select * from alltypestiny where year=2009 and month=1
@@ -120,7 +129,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 ====
-// Mixed UNION ALL/DISTINCT, no nested unions, with order by and limit
+---- QUERY
+# Mixed UNION ALL/DISTINCT, no nested unions, with order by and limit
 select * from alltypestiny where year=2009 and month=1
 union all
 select * from alltypestiny where year=2009 and month=1
@@ -137,7 +147,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 ====
-// Union unnesting: Only UNION ALL, first operand is nested
+---- QUERY
+# Union unnesting: Only UNION ALL, first operand is nested
 (select * from alltypestiny where year=2009 and month=1
  union all
  select * from alltypestiny where year=2009 and month=2)
@@ -153,7 +164,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 ====
-// Union unnesting: Only UNION ALL, second operand is nested
+---- QUERY
+# Union unnesting: Only UNION ALL, second operand is nested
 select * from alltypestiny where year=2009 and month=1
 union all
   (select * from alltypestiny where year=2009 and month=1
@@ -169,7 +181,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 ====
-// Union unnesting: Only UNION DISTINCT, first operand is nested
+---- QUERY
+# Union unnesting: Only UNION DISTINCT, first operand is nested
 (select * from alltypestiny where year=2009 and month=1
  union distinct
  select * from alltypestiny where year=2009 and month=2)
@@ -183,7 +196,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 ====
-// Union unnesting: Only UNION DISTINCT, second operand is nested
+---- QUERY
+# Union unnesting: Only UNION DISTINCT, second operand is nested
 select * from alltypestiny where year=2009 and month=1
 union distinct
   (select * from alltypestiny where year=2009 and month=1
@@ -197,8 +211,9 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 ====
-// Union unnesting: UNION ALL doesn't absorb nested union with DISTINCT, 
-// first operand is nested
+---- QUERY
+# Union unnesting: UNION ALL doesn't absorb nested union with DISTINCT, 
+# first operand is nested
 (select * from alltypestiny where year=2009 and month=1
  union distinct
  select * from alltypestiny where year=2009 and month=2)
@@ -214,8 +229,9 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 ====
-// Union unnesting: UNION ALL doesn't absorb nested union with DISTINCT,
-// second operand is nested
+---- QUERY
+# Union unnesting: UNION ALL doesn't absorb nested union with DISTINCT,
+# second operand is nested
 select * from alltypestiny where year=2009 and month=1
 union all
   (select * from alltypestiny where year=2009 and month=1
@@ -231,8 +247,9 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 ====
-// Union unnesting: UNION ALL absorbs the children but not directly the operands 
-// of a nested union with mixed ALL/DISTINCT, first operand is nested
+---- QUERY
+# Union unnesting: UNION ALL absorbs the children but not directly the operands 
+# of a nested union with mixed ALL/DISTINCT, first operand is nested
 (select * from alltypestiny where year=2009 and month=1
  union distinct
  select * from alltypestiny where year=2009 and month=2
@@ -252,8 +269,9 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 ====
-// Union unnesting: UNION ALL absorbs the children but not directly the operands 
-// of a nested union with mixed ALL/DISTINCT, second operand is nested
+---- QUERY
+# Union unnesting: UNION ALL absorbs the children but not directly the operands 
+# of a nested union with mixed ALL/DISTINCT, second operand is nested
 select * from alltypestiny where year=2009 and month=1
 union all
   (select * from alltypestiny where year=2009 and month=1
@@ -273,8 +291,9 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 ====
-// Union unnesting: UNION ALL doesn't absorb the children of a nested union  
-// with mixed ALL/DISTINCT and limit, second operand is nested
+---- QUERY
+# Union unnesting: UNION ALL doesn't absorb the children of a nested union  
+# with mixed ALL/DISTINCT and limit, second operand is nested
 select * from alltypestiny where year=2009 and month=1
 union all
   (select * from alltypestiny where year=2009 and month=1
@@ -295,8 +314,9 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 ====
-// Union unnesting: UNION ALL doesn't absorb nested union with order by and limit,
-// first operand is nested
+---- QUERY
+# Union unnesting: UNION ALL doesn't absorb nested union with order by and limit,
+# first operand is nested
 (select * from alltypestiny where year=2009 and month=1
  union all
  (select * from alltypestiny where year=2009 and month=2)
@@ -312,8 +332,9 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 ====
-// Union unnesting: UNION ALL doesn't absorb nested union with order by and limit,
-// second operand is nested
+---- QUERY
+# Union unnesting: UNION ALL doesn't absorb nested union with order by and limit,
+# second operand is nested
 select * from alltypestiny where year=2009 and month=1
 union all
   (select * from alltypestiny where year=2009 and month=1
@@ -329,8 +350,9 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 ====
-// Union unnesting: UNION DISTINCT absorbs nested union with ALL
-// first operand is nested
+---- QUERY
+# Union unnesting: UNION DISTINCT absorbs nested union with ALL
+# first operand is nested
 (select * from alltypestiny where year=2009 and month=1
  union all
  select * from alltypestiny where year=2009 and month=2)
@@ -344,8 +366,9 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 ====
-// Union unnesting: UNION DISTINCT absorbs nested union with ALL,
-// second operand is nested
+---- QUERY
+# Union unnesting: UNION DISTINCT absorbs nested union with ALL,
+# second operand is nested
 select * from alltypestiny where year=2009 and month=1
 union distinct
   (select * from alltypestiny where year=2009 and month=1
@@ -359,8 +382,9 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 ====
-// Union unnesting: UNION DISTINCT absorbs nested union with mixed ALL/DISTINCT,
-// first operand is nested
+---- QUERY
+# Union unnesting: UNION DISTINCT absorbs nested union with mixed ALL/DISTINCT,
+# first operand is nested
 (select * from alltypestiny where year=2009 and month=1
  union distinct
  select * from alltypestiny where year=2009 and month=2
@@ -376,8 +400,9 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 ====
-// Union unnesting: UNION DISTINCT absorbs nested union with mixed ALL/DISTINCT,
-// second operand is nested
+---- QUERY
+# Union unnesting: UNION DISTINCT absorbs nested union with mixed ALL/DISTINCT,
+# second operand is nested
 select * from alltypestiny where year=2009 and month=1
 union distinct
   (select * from alltypestiny where year=2009 and month=1
@@ -393,8 +418,9 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 ====
-// Union unnesting: UNION DISTINCT doesn't absorb nested union with order by and limit,
-// first operand is nested
+---- QUERY
+# Union unnesting: UNION DISTINCT doesn't absorb nested union with order by and limit,
+# first operand is nested
 (select * from alltypestiny where year=2009 and month=1
  union all
  (select * from alltypestiny where year=2009 and month=2)
@@ -408,8 +434,9 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 ====
-// Union unnesting: UNION DISTINCT doesn't absorb nested union with order by and limit,
-// first operand is nested
+---- QUERY
+# Union unnesting: UNION DISTINCT doesn't absorb nested union with order by and limit,
+# first operand is nested
 (select * from alltypestiny where year=2009 and month=1
  union all
  (select * from alltypestiny where year=2009 and month=2)
@@ -423,7 +450,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 ====
-// Complex union unnesting: Multiple levels of UNION ALL, fully unnestable
+---- QUERY
+# Complex union unnesting: Multiple levels of UNION ALL, fully unnestable
 select * from alltypestiny where year=2009 and month=1
 union all
   (select * from alltypestiny where year=2009 and month=1
@@ -447,7 +475,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,3,4,true,0,0,0,0,0,0,'03/01/09','0',2009-03-01 00:00:00
 2009,3,5,false,1,1,1,10,1.100000023841858,10.1,'03/01/09','1',2009-03-01 00:01:00
 ====
-// Complex union unnesting: Multiple levels of UNION DISTINCT, fully unnestable
+---- QUERY
+# Complex union unnesting: Multiple levels of UNION DISTINCT, fully unnestable
 select * from alltypestiny where year=2009 and month=1
 union distinct
   (select * from alltypestiny where year=2009 and month=1
@@ -467,7 +496,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,3,4,true,0,0,0,0,0,0,'03/01/09','0',2009-03-01 00:00:00
 2009,3,5,false,1,1,1,10,1.100000023841858,10.1,'03/01/09','1',2009-03-01 00:01:00
 ====
-// Complex union unnesting: Partially unnestable up to 2nd level
+---- QUERY
+# Complex union unnesting: Partially unnestable up to 2nd level
 select * from alltypestiny where year=2009 and month=1
 union all
   (select * from alltypestiny where year=2009 and month=1
@@ -489,7 +519,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 2009,3,4,true,0,0,0,0,0,0,'03/01/09','0',2009-03-01 00:00:00
 ====
-// Complex union unnesting: Partially unnestable up to 1st level
+---- QUERY
+# Complex union unnesting: Partially unnestable up to 1st level
 select * from alltypestiny where year=2009 and month=1
 union distinct
   (select * from alltypestiny where year=2009 and month=1
@@ -509,7 +540,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,2,3,false,1,1,1,10,1.100000023841858,10.1,'02/01/09','1',2009-02-01 00:01:00
 2009,3,4,true,0,0,0,0,0,0,'03/01/09','0',2009-03-01 00:00:00
 ====
-// Complex union unnesting: Multiple nested unions to test all rules in a single query
+---- QUERY
+# Complex union unnesting: Multiple nested unions to test all rules in a single query
 select * from alltypestiny where year=2009 and month=1
 union distinct
   (select * from alltypestiny where year=2009 and month=1
@@ -544,7 +576,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,4,7,false,1,1,1,10,1.100000023841858,10.1,'04/01/09','1',2009-04-01 00:01:00
 2009,4,7,false,1,1,1,10,1.100000023841858,10.1,'04/01/09','1',2009-04-01 00:01:00
 ====
-// UNION ALL in subquery
+---- QUERY
+# UNION ALL in subquery
 select x.* from
   (select * from alltypestiny where year=2009 and month=1
    union all
@@ -561,7 +594,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 ====
-// UNION DISTINCT in subquery
+---- QUERY
+# UNION DISTINCT in subquery
 select x.* from
   (select * from alltypestiny where year=2009 and month=1
    union distinct
@@ -576,7 +610,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 ====
-// UNION ALL in subquery with a WHERE condition in the outer select.
+---- QUERY
+# UNION ALL in subquery with a WHERE condition in the outer select.
 select x.* from
   (select * from alltypestiny where year=2009 and month=1
    union all
@@ -588,7 +623,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 ====
-// UNION DISTINCT in subquery with a WHERE condition in the outer select.
+---- QUERY
+# UNION DISTINCT in subquery with a WHERE condition in the outer select.
 select x.* from
   (select * from alltypestiny where year=2009 and month=1
    union distinct
@@ -599,7 +635,8 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 ---- RESULTS
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 ====
-// Test UNION ALL with only constant selects (no table descriptors).
+---- QUERY
+# Test UNION ALL with only constant selects (no table descriptors).
 select 1, 1.0, 'hello'
 union all
 select 2, 2.0, 'world'
@@ -615,7 +652,8 @@ tinyint, float, string
 3,3,'bar'
 3,3,'foo'
 ====
-// Test UNION ALL with mixed constant and non-constant selects. Also tests implicit casts.
+---- QUERY
+# Test UNION ALL with mixed constant and non-constant selects. Also tests implicit casts.
 select 10, 10.0, "abcde"
 union all
 select int_col, float_col, string_col
@@ -635,7 +673,8 @@ int, double, string
 10,10,'abcde'
 20,20,'fghijkl'
 ====
-// Test UNION ALL on large tables with a few constant selects to excercise backend logic.
+---- QUERY
+# Test UNION ALL on large tables with a few constant selects to excercise backend logic.
 select count(*) from (  
   select * from alltypes
   union all
@@ -652,7 +691,8 @@ bigint
 ---- RESULTS
 14603
 ====
-// Test UNION DISTINCT on large tables with a few constant selects to excercise backend logic.
+---- QUERY
+# Test UNION DISTINCT on large tables with a few constant selects to excercise backend logic.
 select count(*) from (  
   select * from alltypes
   union distinct

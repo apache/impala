@@ -1,3 +1,5 @@
+====
+---- QUERY
 select * from hbasealltypeserror
 ---- ERRORS
 Error converting column strings:timestamp_col: '0' TO TIMESTAMP
@@ -109,6 +111,7 @@ int, boolean, double, float, bigint, int, smallint, tinyint, string, string, tim
 8,false,80.8,8,80,8,NULL,NULL,'01/01/09','8',1970-01-01 00:00:00
 9,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'01/01/09','9',NULL
 ====
+---- QUERY
 select * from hbasealltypeserrornonulls
 ---- ERRORS
 Error converting column strings:timestamp_col: '123456' TO TIMESTAMP

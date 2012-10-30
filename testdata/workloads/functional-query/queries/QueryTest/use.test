@@ -1,14 +1,19 @@
+====
+---- QUERY
 # Simple pattern literal
 use default
 ====
+---- QUERY
 select count(*) from alltypes
 ---- TYPES
 bigint
 ---- RESULTS
 7300
 ====
+---- QUERY
 use testdb1
 ====
+---- QUERY
 # TODO: Test confirming negative results - i.e. select from unknown table
 select count(*) from alltypes
 ---- TYPES

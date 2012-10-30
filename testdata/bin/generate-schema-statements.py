@@ -205,35 +205,6 @@ def read_vector_file(file_name):
       vector_values.append([value.split(':')[1].strip() for value in line.split(',')])
   return vector_values
 
-def read_table_constraints(constraints_file):
-  """
-  Reads a table contraints file, if one exists
-
-  TODO: once the python test frame changes are committed this can be moved to a common
-  utility function so the tests themselves can make use of this code.
-  """
-  schema_include = defaultdict(list)
-  schema_exclude = defaultdict(list)
-  if not os.path.isfile(constraints_file):
-    print 'No schema constraints file file found'
-  else:
-    with open(constraints_file, 'rb') as constraints_file:
-      for line in constraints_file.readlines():
-        line = line.strip()
-        if not line or line.startswith('#'):
-          continue
-        # Format: table_name:<name>, contraint_type:<type>, file_format:<t1>,<t2>,...
-        table_name, constraint_type, file_types =\
-            [value.split(':')[1].strip() for value in line.split(',', 2)]
-        if constraint_type == 'restrict_to':
-          schema_include[table_name.lower()] += file_types.split(',')
-        elif constraint_type == 'exclude':
-          schema_exclude[table_name.lower()] += file_types.split(',')
-        else:
-          print 'Unknown constraint type: ' % constraint_type
-          sys.exit(1)
-  return schema_include, schema_exclude
-
 def write_trevni_to_file(file_name, array):
   # Strip out all the hive SET statements
   array.insert(0, 'refresh;\n')
@@ -367,7 +338,7 @@ if __name__ == "__main__":
     sys.exit(1)
 
   constraints_file = os.path.join(DATASET_DIR, target_dataset, 'schema_constraints.csv')
-  include_constraints, exclude_constraints = read_table_constraints(constraints_file)
+  include_constraints, exclude_constraints = parse_table_constraints(constraints_file)
 
   sections = parse_schema_template_file(schema_template_file)
   generate_statements('%s-%s' % (options.workload, options.exploration_strategy),

@@ -1,3 +1,5 @@
+====
+---- QUERY
 select count(*) from bad_seq_snap
 ---- ERRORS
 Bad sync hash in HdfsSequenceScanner at file offset 899498.

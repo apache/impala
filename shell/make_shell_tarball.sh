@@ -32,7 +32,6 @@ cat ${IMPALA_VERSION_INFO_FILE}
 SHELL_HOME=${IMPALA_HOME}/shell
 BUILD_DIR=${SHELL_HOME}/build
 TARBALL_ROOT=${BUILD_DIR}/impala-shell-${VERSION}
-echo $TARBALL_ROOT
 
 echo "Deleting all files in ${TARBALL_ROOT}/{gen-py,lib}"
 rm -rf ${TARBALL_ROOT}/lib/* 2>&1 > /dev/null

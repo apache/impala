@@ -32,17 +32,16 @@ LOG = logging.getLogger('query_executor')
 LOG.setLevel(level=logging.DEBUG)
 
 # globals.
-result_single_regex = 'returned (\d*) rows? in (\d*).(\d*) s'
-result_multiple_regex = 'returned (\d*) rows? in (\d*).(\d*) s with stddev (\d*).(\d*)'
 hive_result_regex = 'Time taken: (\d*).(\d*) seconds'
 
 # Contains details about the execution result of a query
 class QueryExecutionResult(object):
-  def __init__(self, avg_time=None, std_dev=None, note=None):
+  def __init__(self, avg_time=None, std_dev=None, data=None, note=None):
     self.avg_time = avg_time
     self.std_dev = std_dev
     self.__note = note
     self.success = False
+    self.data = data
 
   def set_result_note(self, note):
     self.__note = note
@@ -67,37 +66,6 @@ class ImpalaQueryExecOptions(QueryExecOptions):
   def __init__(self, iterations, **kwargs):
     QueryExecOptions.__init__(self, iterations, **kwargs)
     self.impalad = self.options.get('impalad', 'localhost:21000')
-    self.disable_codegen = self.options.get('disable_codegen', False)
-    self.num_scanner_threads = self.options.get('num_scanner_threads', 0)
-
-
-# Execution options specific to runquery
-class RunQueryExecOptions(ImpalaQueryExecOptions):
-  def __init__(self, iterations, **kwargs):
-    ImpalaQueryExecOptions.__init__(self, iterations, **kwargs)
-    self.runquery_cmd = self.options.get('runquery_cmd', 'runquery ')
-    self.profiler = self.options.get('profiler', False)
-    self.enable_counters = self.options.get('enable_counters', False)
-    self.profile_output_file = self.options.get('profile_output_file', str())
-
-  def _build_exec_options(self):
-    additional_exec_options = self.options.get('exec_options', '')
-    exec_options = additional_exec_options.split(';')
-    if additional_exec_options:
-      additional_exec_options = ';' + additional_exec_options
-    # Make sure to add additional exec options to the end in case they are duplicates
-    # of some of the default (last defined value is what is applied)
-    return 'num_scanner_threads:%s;disable_codegen:%s%s' %\
-        (self.num_scanner_threads, self.disable_codegen, additional_exec_options)
-
-  def build_argument_string(self):
-    """ Builds the actual argument string that is passed to runquery """
-    arg_str = ' --impalad=%(impalad)s --iterations=%(iterations)d '\
-              '--exec_options="%(exec_options)s" '
-
-    return arg_str % {'impalad': self.impalad,
-                      'iterations': self.iterations,
-                      'exec_options': self._build_exec_options(), }
 
 
 # constructs exec_options for query execution through beeswax
@@ -223,6 +191,8 @@ def construct_execution_result(iterations, results):
   """
   # Use the output from the first result.
   exec_result = QueryExecutionResult()
+  exec_result.data = results[0].data
+  exec_result.beeswax_result = results[0]
   exec_result.set_result_note(results[0].summary)
   runtimes = [r.time_taken for r in results]
   exec_result.success = True
@@ -240,38 +210,6 @@ def execute_shell_cmd(cmd):
   stdout, stderr = p.communicate()
   rc = p.returncode
   return rc, stdout, stderr
-
-def execute_using_runquery(query, query_options):
-  """Executes a query via runquery"""
-  LOG.debug(query_options.options)
-  enable_counters = query_options.enable_counters
-  gprof_tmp_file = str()
-
-  # Call the profiler if the option has been specified.
-  if query_options.profiler:
-    gprof_tmp_file = query_options.profile_output_file
-
-  cmd = '%(runquery_cmd)s %(args)s --enable_counters=%(enable_counters)d '\
-        '--profile_output_file="%(prof_output_file)s" --query="%(query)s"' % {\
-            'runquery_cmd': query_options.runquery_cmd,
-            'args': query_options.build_argument_string(),
-            'prof_output_file': gprof_tmp_file,
-            'enable_counters': enable_counters,
-            'query': query
-        }
-
-  execution_result = run_query_capture_results(cmd, match_impala_query_results,
-                                               query_options.iterations,
-                                               exit_on_error=True)
-  if query_options.profiler:
-    gprof_cmd = gprof_cmd % gprof_temp_file
-    try:
-      rc, stdout, stderr = execute_shell_cmd(gprof_cmd)
-    except Exception, e:
-      LOG.error('Error in trying to execute profiler: %s' % e)
-    if rc != 0:
-      LOG.error('Profiler returned with an error: \nrc: %s\nSTDERR: %s' % (rc, stderr))
-  return execution_result
 
 def execute_using_hive(query, query_options):
   """Executes a query via hive"""
@@ -305,32 +243,6 @@ def run_query_capture_results(cmd, query_result_match_function, iterations,
   if not execution_result.success:
     LOG.error("Query did not run successfully")
     LOG.error("STDERR:\n%s\nSTDOUT:\n%s" % (stderr, stdout))
-  return execution_result
-
-def match_impala_query_results(stdout, stderr, iterations):
-  """
-  Parse query execution details for impala.
-
-  Parses the query execution details (avg time, stddev) from the runquery output.
-  Returns a QueryExecutionResult object.
-  """
-  avg_time = 0
-  std_dev = None
-  run_success = False
-  stdout = stdout.strip()
-  if iterations == 1:
-    match = re.search(result_single_regex, stdout)
-    if match:
-      avg_time = ('%s.%s') % (match.group(2), match.group(3))
-      run_success = True
-  else:
-    match = re.search(result_multiple_regex, stdout)
-    if match:
-      avg_time = ('%s.%s') % (match.group(2), match.group(3))
-      std_dev = ('%s.%s') % (match.group(4), match.group(5))
-      run_success = True
-  execution_result = QueryExecutionResult(avg_time=avg_time, std_dev=std_dev)
-  execution_result.success = run_success
   return execution_result
 
 def match_hive_query_results(stdout, stderr, iterations):

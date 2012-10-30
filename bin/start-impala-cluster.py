@@ -41,13 +41,15 @@ parser.add_option("-v", "--verbose", dest="verbose", action="store_true", defaul
                   help="Prints all output to stderr/stdout.")
 options, args = parser.parse_args()
 
+IMPALA_HOME = os.environ['IMPALA_HOME']
 KNOWN_BUILD_TYPES = ['debug', 'release']
-IMPALAD_PATH = os.path.join(os.environ['IMPALA_HOME'],
+IMPALAD_PATH = os.path.join(IMPALA_HOME,
                             'bin/start-impalad.sh -build_type=%s' % options.build_type)
-STATE_STORE_PATH = os.path.join(os.environ['IMPALA_BE_DIR'], 'build', options.build_type,
+STATE_STORE_PATH = os.path.join(IMPALA_HOME, 'be/build', options.build_type,
                                 'sparrow/statestored')
-MINI_IMPALA_CLUSTER_PATH = os.path.join(os.environ['IMPALA_BE_DIR'], 'build',
-                                        options.build_type, 'testutil/mini-impala-cluster')
+MINI_IMPALA_CLUSTER_PATH = os.path.join(IMPALA_HOME, 'be/build', options.build_type,
+                                        'testutil/mini-impala-cluster')
+SET_CLASSPATH_SCRIPT_PATH = os.path.join(IMPALA_HOME, 'bin/set-classpath.sh')
 IMPALAD_ARGS = "-fe_port=%d -be_port=%d -state_store_subscriber_port=%d "\
                "-webserver_port=%d " + options.impalad_args
 STATE_STORE_ARGS = options.state_store_args
@@ -56,7 +58,7 @@ REDIRECT_STR = "> %(file_name)s 2>&1"
 def kill_all():
   os.system("killall mini-impala-cluster")
   os.system("killall impalad")
-  os.system("killall state-store-service")
+  os.system("killall statestored")
 
 def start_statestore():
   output_file = os.path.join(options.log_dir, 'statestored.out')
@@ -67,7 +69,8 @@ def start_mini_impala_cluster(cluster_size):
   output_file = os.path.join(options.log_dir, 'mini-impala-cluster.out')
   args = "--num_backends=%d" % cluster_size
   print "Starting Mini Impala Cluster with logging to %s" % (output_file)
-  execute_cmd_with_redirect(MINI_IMPALA_CLUSTER_PATH, args, output_file)
+  execute_cmd_with_redirect(
+      '. %s;%s' % (SET_CLASSPATH_SCRIPT_PATH, MINI_IMPALA_CLUSTER_PATH), args, output_file)
 
 def start_impalad_instances(cluster_size):
   BASE_FE_PORT = 21000

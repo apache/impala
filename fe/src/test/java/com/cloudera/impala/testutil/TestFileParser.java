@@ -245,7 +245,7 @@ public class TestFileParser {
     while (scanner.hasNextLine()) {
       String line = scanner.nextLine();
       ++lineNum;
-      if (line.startsWith("====")) {
+      if (line.startsWith("====") && sectionCount > 0) {
         currentTestCase.addSection(currentSection, sectionContents);
         return currentTestCase; // done with this test case
       }
@@ -259,7 +259,7 @@ public class TestFileParser {
         // Check for section header - a missing header probably means an old test file.
         if (!line.endsWith("----")) {
           for (Section s : Section.values()) {
-            if (line.endsWith(" " + s.toString().toLowerCase())) {
+            if (line.contains(s.toString().toLowerCase())) {
               currentSection = s;
               if (s == Section.SETUP) {
                 hasSetupSection = true;

@@ -1,3 +1,5 @@
+====
+---- QUERY
 # insert overwrite unpartitioned table
 insert overwrite table alltypesnopart_insert$TABLE
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
@@ -11,6 +13,7 @@ RELOAD alltypesnopart_insert$TABLE
 ---- PARTITIONS
 /: 25
 ====
+---- QUERY
 # search the overwritten table to verify the results
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
@@ -44,6 +47,7 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 98,true,3,3,3,30,3.299999952316284,30.3,'04/03/09','3'
 99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4'
 ====
+---- QUERY
 # insert into unpartitioned table
 insert into table alltypesnopart_insert$TABLE
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
@@ -56,6 +60,7 @@ RESET alltypesnopart_insert$TABLE
 ---- PARTITIONS
 /: 25
 ====
+---- QUERY
 # search the table to verify it contains 25 rows
 select count(*) from alltypesnopart_insert$TABLE
 ---- TYPES
@@ -63,6 +68,7 @@ bigint
 ---- RESULTS
 25
 ====
+---- QUERY
 # static partition overwrite
 insert overwrite table alltypesinsert$TABLE
 partition (year=2009, month=4) 
@@ -74,6 +80,7 @@ where year=2009 and month=4
 ---- PARTITIONS
 /year=2009/month=4/: 25
 ====
+---- QUERY
 # search the overwritten partition to verify the results
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
@@ -108,6 +115,7 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 98,true,3,3,3,30,3.299999952316284,30.3,'04/03/09','3'
 99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4'
 ====
+---- QUERY
 # static partition insert$TABLE, test creation of partitions
 insert into table alltypesinsert$TABLE
 partition (year=2009, month=4) 
@@ -121,6 +129,7 @@ DROP PARTITIONS alltypesinsert$TABLE
 ---- PARTITIONS
 /year=2009/month=4/: 25
 ====
+---- QUERY
 # search the partition to verify it contains all 25 rows
 select count(*) from alltypesinsert$TABLE
 where year=2009 and month=4
@@ -129,6 +138,7 @@ bigint
 ---- RESULTS
 25
 ====
+---- QUERY
 # partially dynamic partition overwrite
 insert overwrite table alltypesinsert$TABLE
 partition (year=2009, month) 
@@ -142,6 +152,7 @@ where year=2009 and month>1 and month<=4
 /year=2009/month=3/: 25
 /year=2009/month=4/: 25
 ====
+---- QUERY
 # search the overwritten partition to verify the results
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
@@ -226,6 +237,7 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 98,true,3,3,3,30,3.299999952316284,30.3,'04/03/09','3'
 99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4'
 ====
+---- QUERY
 # partially dynamic partition insert$TABLE, check partition creation
 insert into table alltypesinsert$TABLE
 partition (year=2009, month) 
@@ -244,6 +256,7 @@ year=2009/month=3/
 /year=2009/month=2/: 25
 /year=2009/month=3/: 25
 ====
+---- QUERY
 # search the partitions to verify they contain all 75 rows
 select count(id) from alltypesinsert$TABLE
 where year=2009 and month>=1 and month<4
@@ -252,6 +265,7 @@ bigint
 ---- RESULTS
 75
 ====
+---- QUERY
 # fully dynamic partition overwrite
 insert overwrite table alltypesinsert$TABLE
 partition (year, month) 
@@ -265,6 +279,7 @@ from alltypessmall
 /year=2009/month=3/: 25
 /year=2009/month=4/: 25
 ====
+---- QUERY
 # search the overwritten partition to verify the results
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
@@ -374,6 +389,7 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 98,true,3,3,3,30,3.299999952316284,30.3,'04/03/09','3'
 99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4'
 ====
+---- QUERY
 # fully dynamic partition insert$TABLE, check partition creation
 insert into table alltypesinsert$TABLE
 partition (year, month) 
@@ -389,6 +405,7 @@ DROP PARTITIONS alltypesinsert$TABLE
 /year=2009/month=3/: 25
 /year=2009/month=4/: 25
 ====
+---- QUERY
 # search the partitions to verify they contain all 100 rows
 select count(timestamp_col) from alltypesinsert$TABLE
 where year=2009 and month>=1 and month<=4

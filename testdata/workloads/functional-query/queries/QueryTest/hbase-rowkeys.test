@@ -1,3 +1,5 @@
+====
+---- QUERY
 # predicate on row key col is applied to scan if row key is mapped as string col
 select count(*)
 from hbasestringids
@@ -7,6 +9,7 @@ bigint
 ---- RESULTS
 1
 ====
+---- QUERY
 # predicate on row key col is not applied to scan if row key is mapped as non-string col
 # but the result is still correct
 select count(*)
@@ -17,6 +20,7 @@ bigint
 ---- RESULTS
 1
 ====
+---- QUERY
 # ids are stored in ascii and ordered lexicographically
 # exclusive upper bound
 select count(*)
@@ -27,6 +31,7 @@ bigint
 ---- RESULTS
 4445
 ====
+---- QUERY
 # inclusive upper bound
 select count(*)
 from hbasestringids
@@ -36,6 +41,7 @@ bigint
 ---- RESULTS
 4446
 ====
+---- QUERY
 # inclusive lower bound
 select count(*)
 from hbasestringids
@@ -45,6 +51,7 @@ bigint
 ---- RESULTS
 4444
 ====
+---- QUERY
 # exclusive lower bound
 select count(*)
 from hbasestringids
@@ -54,6 +61,7 @@ bigint
 ---- RESULTS
 4443
 ====
+---- QUERY
 # combinations
 select count(*)
 from hbasestringids
@@ -64,6 +72,7 @@ bigint
 ---- RESULTS
 1110
 ====
+---- QUERY
 select count(*)
 from hbasestringids
 where id >= '5'
@@ -73,6 +82,7 @@ bigint
 ---- RESULTS
 1111
 ====
+---- QUERY
 select count(*)
 from hbasestringids
 where id > '5'
@@ -82,6 +92,7 @@ bigint
 ---- RESULTS
 1111
 ====
+---- QUERY
 select count(*)
 from hbasestringids
 where id >= '5'
@@ -91,6 +102,7 @@ bigint
 ---- RESULTS
 1112
 ====
+---- QUERY
 # predicates on non-key cols are evaluated in the executor
 # and non-string comparisons work
 select count(*)

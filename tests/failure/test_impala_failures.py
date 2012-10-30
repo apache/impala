@@ -62,9 +62,6 @@ class TestImpalaFailures(unittest.TestCase):
     workload_runner = WorkloadRunner(impalad='%s:21000' % impalad_proc.hostname)
     workload_runner.run_workload('tpch', scale_factor='')
 
-
-  def test_state_store_failure_detection(self):
-
   def __execute_query_kill_process(self, coordinator_impalad,  impala_process_to_kill,
                                    query, iterations):
     executor = create_executor(coordinator_impalad, iterations, query)

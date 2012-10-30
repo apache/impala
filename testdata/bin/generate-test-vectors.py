@@ -80,9 +80,7 @@ def is_valid_combination(vector):
         (vector[COMPRESSION_IDX] != 'none' and vector[COMPRESSION_TYPE_IDX] == 'none') or
         (vector[FILE_FORMAT_IDX] != 'seq' and vector[COMPRESSION_TYPE_IDX] == 'record') or
         (vector[FILE_FORMAT_IDX] == 'trevni' and
-        (vector[COMPRESSION_IDX] == 'gzip' or vector[COMPRESSION_IDX] == 'bzip')) or
-        (vector[DATASET_IDX] == 'tpch' and
-        (vector[FILE_FORMAT_IDX] != 'text' and vector[FILE_FORMAT_IDX] != 'trevni')))
+        (vector[COMPRESSION_IDX] == 'gzip' or vector[COMPRESSION_IDX] == 'bzip')))
 
   # The pairwise generator may call this with different vector lengths. In that case this
   # should always return true.

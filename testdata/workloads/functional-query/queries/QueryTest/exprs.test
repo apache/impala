@@ -1,3 +1,5 @@
+====
+---- QUERY
 # IS NULL predicate
 select count(*) from alltypesagg$TABLE
 ---- TYPES
@@ -5,18 +7,21 @@ bigint
 ---- RESULTS
 10000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where tinyint_col is null
 ---- TYPES
 bigint
 ---- RESULTS
 1000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where tinyint_col is not null
 ---- TYPES
 bigint
 ---- RESULTS
 9000
 ====
+---- QUERY
 # =
 select count(*) from alltypesagg$TABLE where tinyint_col = 1
 ---- TYPES
@@ -24,42 +29,49 @@ bigint
 ---- RESULTS
 1000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where smallint_col = 1
 ---- TYPES
 bigint
 ---- RESULTS
 100
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where int_col = 1
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where bigint_col = 10
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where float_col = cast(1.1 as float)
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where double_col = 10.1
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where date_string_col = '01/01/10'
 ---- TYPES
 bigint
 ---- RESULTS
 1000
 ====
+---- QUERY
 # <>
 select count(*) from alltypesagg$TABLE where tinyint_col <> 1
 ---- TYPES
@@ -67,36 +79,42 @@ bigint
 ---- RESULTS
 8000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where smallint_col <> 1
 ---- TYPES
 bigint
 ---- RESULTS
 9800
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where int_col <> 1
 ---- TYPES
 bigint
 ---- RESULTS
 9980
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where bigint_col <> 1
 ---- TYPES
 bigint
 ---- RESULTS
 9990
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where float_col <> cast(1.1 as float)
 ---- TYPES
 bigint
 ---- RESULTS
 9980
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where double_col <> 10.1
 ---- TYPES
 bigint
 ---- RESULTS
 9980
 ====
+---- QUERY
 # <
 select count(*) from alltypesagg$TABLE where tinyint_col < 2
 ---- TYPES
@@ -104,36 +122,42 @@ bigint
 ---- RESULTS
 1000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where smallint_col < 2
 ---- TYPES
 bigint
 ---- RESULTS
 100
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where int_col < 2
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where bigint_col < 20
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where float_col < 2.2
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where double_col < 20.2
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
+---- QUERY
 # >
 select count(*) from alltypesagg$TABLE where tinyint_col > 1
 ---- TYPES
@@ -141,36 +165,42 @@ bigint
 ---- RESULTS
 8000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where smallint_col > 1
 ---- TYPES
 bigint
 ---- RESULTS
 9800
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where int_col > 1
 ---- TYPES
 bigint
 ---- RESULTS
 9980
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where bigint_col > 10
 ---- TYPES
 bigint
 ---- RESULTS
 9980
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where float_col > cast(1.1 as float) 
 ---- TYPES
 bigint
 ---- RESULTS
 9980
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where double_col > 10.1
 ---- TYPES
 bigint
 ---- RESULTS
 9980
 ====
+---- QUERY
 # <=
 select count(*) from alltypesagg$TABLE where tinyint_col <= 1
 ---- TYPES
@@ -178,36 +208,42 @@ bigint
 ---- RESULTS
 1000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where smallint_col <= 1
 ---- TYPES
 bigint
 ---- RESULTS
 100
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where int_col <= 1
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where bigint_col <= 10
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where float_col <= cast(1.1 as float)
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where double_col <= 10.1
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
+---- QUERY
 # >=
 select count(*) from alltypesagg$TABLE where tinyint_col >= 2
 ---- TYPES
@@ -215,36 +251,42 @@ bigint
 ---- RESULTS
 8000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where smallint_col >= 2
 ---- TYPES
 bigint
 ---- RESULTS
 9800
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where int_col >= 2
 ---- TYPES
 bigint
 ---- RESULTS
 9980
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where bigint_col >= 20
 ---- TYPES
 bigint
 ---- RESULTS
 9980
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where float_col >= 2.2
 ---- TYPES
 bigint
 ---- RESULTS
 9980
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where double_col >= 20.2
 ---- TYPES
 bigint
 ---- RESULTS
 9980
 ====
+---- QUERY
 # TODO: figure out why the last col has a diff
 # result: 111428999.9997675
 # +
@@ -322,6 +364,7 @@ string, string, string, string, string
 'three','%three%','n%three%','.*three.*','n.*three.*'
 'two','%two%','n%two%','.*two.*','n.*two.*'
 ====
+---- QUERY
 select str_col, match_like_col from LikeTbl
 where str_col LIKE match_like_col
 ---- TYPES
@@ -342,12 +385,14 @@ string, string
 'two','%two%'
 '','%'
 ====
+---- QUERY
 select str_col, match_like_col from LikeTbl
 where str_col NOT LIKE match_like_col
 ---- TYPES
 string, string
 ---- RESULTS
 ====
+---- QUERY
 select str_col, match_like_col from LikeTbl
 where str_col LIKE no_match_like_col
 ---- TYPES
@@ -355,6 +400,7 @@ string, string
 ---- RESULTS
 '','%'
 ====
+---- QUERY
 select str_col, no_match_like_col from LikeTbl
 where str_col NOT LIKE no_match_like_col
 ---- TYPES
@@ -374,6 +420,7 @@ string, string
 'three','n%three%'
 'two','n%two%'
 ====
+---- QUERY
 select str_col, match_regex_col from LikeTbl
 where str_col REGEXP match_regex_col
 ---- TYPES
@@ -394,18 +441,21 @@ string, string
 'two','.*two.*'
 '','.*'
 ====
+---- QUERY
 select str_col, no_match_regex_col from LikeTbl
 where str_col REGEXP no_match_regex_col
 ---- TYPES
 string, string
 ---- RESULTS
 ====
+---- QUERY
 select str_col, match_regex_col from LikeTbl
 where str_col NOT REGEXP match_regex_col
 ---- TYPES
 string, string
 ---- RESULTS
 ====
+---- QUERY
 select str_col, no_match_regex_col from LikeTbl
 where str_col NOT REGEXP no_match_regex_col
 ---- TYPES
@@ -426,12 +476,14 @@ string, string
 'two','n.*two.*'
 '','X'
 ====
+---- QUERY
 select 1+2
 ---- TYPES
 bigint
 ---- RESULTS
 3
 ====
+---- QUERY
 select timestamp_col, to_date(timestamp_col), year(timestamp_col), month(timestamp_col),
 dayofmonth(timestamp_col), day(timestamp_col), weekofyear(timestamp_col),
 hour(timestamp_col), minute(timestamp_col), second(timestamp_col)
@@ -540,149 +592,172 @@ timestamp, string, int, int, int, int, int, int, int, int
 2009-04-03 00:23:00.930000000,'2009-04-03',2009,4,3,93,14,0,23,0
 2009-04-03 00:24:00.960000000,'2009-04-03',2009,4,3,93,14,0,24,0
 ====
+---- QUERY
 # IN predicate
 select NULL in (1, 2, 3)
-----
+---- TYPES
 boolean
-----
+---- RESULTS
 NULL
 ====
+---- QUERY
 select NULL in (1, NULL, 3)
-----
+---- TYPES
 boolean
-----
+---- RESULTS
 NULL
 ====
+---- QUERY
 select 1 in (2, NULL, 1)
-----
+---- TYPES
 boolean
-----
+---- RESULTS
 true
 ====
+---- QUERY
 select 1 in (1, NULL, 2)
-----
+---- TYPES
 boolean
-----
+---- RESULTS
 true
 ====
+---- QUERY
 select 1 in (2, NULL, 3)
-----
+---- TYPES
 boolean
-----
+---- RESULTS
 NULL
 ====
+---- QUERY
 select 1 in (2, 3, 4)
-----
+---- TYPES
 boolean
-----
+---- RESULTS
 false
 ====
+---- QUERY
 select NULL not in (1, 2, 3)
-----
+---- TYPES
 boolean
-----
+---- RESULTS
 NULL
 ====
+---- QUERY
 select NULL not in (1, NULL, 3)
 ----
 boolean
-----
+---- RESULTS
 NULL
 ====
+---- QUERY
 select 1 not in (2, NULL, 1)
-----
+---- TYPES
 boolean
-----
+---- RESULTS
 false
 ====
+---- QUERY
 select 1 not in (1, NULL, 2)
-----
+---- TYPES
 boolean
-----
+---- RESULTS
 false
 ====
+---- QUERY
 select 1 not in (2, NULL, 3)
-----
+---- TYPES
 boolean
-----
+---- RESULTS
 NULL
 ====
+---- QUERY
 select 1 not in (2, 3, 4)
-----
+---- TYPES
 boolean
-----
+---- RESULTS
 true
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE
 where true in (bool_col, tinyint_col)
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 6000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE
 where true not in (bool_col, tinyint_col)
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 4000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE
 where 1 in (tinyint_col, smallint_col, int_col, bigint_col)
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 1000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE
 where 1 not in (tinyint_col, smallint_col, int_col, bigint_col) 
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 8000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE
 where 10.1 in (tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col) 
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 10
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE
 where 10.1 not in (tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col) 
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 8990
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE
 where '01/01/10' in (date_string_col, string_col, 'abc') 
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 1000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE
 where '01/01/10' not in (date_string_col, string_col, 'abc')
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 9000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE 
 where cast('2010-01-01 00:00:00' as timestamp) in (timestamp_col)
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 1
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE 
 where cast('2010-01-01 00:00:00' as timestamp) not in (timestamp_col)
-----
+---- TYPES
 bigint
-----
+---- RESULTS
 9999
 ====
+---- QUERY
 # BETWEEN predicate
 select count(*) from alltypesagg$TABLE where tinyint_col between 1 and 2
 ---- TYPES
@@ -690,48 +765,56 @@ bigint
 ---- RESULTS
 2000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where tinyint_col not between 1 and 2
 ---- TYPES
 bigint
 ---- RESULTS
 7000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where smallint_col between 1 and 20
 ---- TYPES
 bigint
 ---- RESULTS
 2000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where smallint_col not between 1 and 20
 ---- TYPES
 bigint
 ---- RESULTS
 7900
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where int_col between 1 and 200
 ---- TYPES
 bigint
 ---- RESULTS
 2000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where int_col not between 1 and 200
 ---- TYPES
 bigint
 ---- RESULTS
 7990
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where bigint_col between 1 and 2000
 ---- TYPES
 bigint
 ---- RESULTS
 2000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where bigint_col not between 1 and 2000
 ---- TYPES
 bigint
 ---- RESULTS
 7990
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE
 where float_col between cast(1.0 as float) and cast(110.0 as float)
 ---- TYPES
@@ -739,6 +822,7 @@ bigint
 ---- RESULTS
 1000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE
 where float_col not between cast(1.0 as float) and cast(110.0 as float)
 ---- TYPES
@@ -746,18 +830,21 @@ bigint
 ---- RESULTS
 8990
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where double_col between 1.0 and 110.0
 ---- TYPES
 bigint
 ---- RESULTS
 100
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where double_col not between 1.0 and 110.0
 ---- TYPES
 bigint
 ---- RESULTS
 9890
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where date_string_col
 between '01/01/10' and '01/05/10'
 ---- TYPES
@@ -765,6 +852,7 @@ bigint
 ---- RESULTS
 5000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where date_string_col
 not between '01/01/10' and '01/05/10'
 ---- TYPES
@@ -772,6 +860,7 @@ bigint
 ---- RESULTS
 5000
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where timestamp_col
 between cast('2010-01-01 00:00:00' as timestamp) 
 and cast('2010-01-01 01:40:00' as timestamp)
@@ -780,6 +869,7 @@ bigint
 ---- RESULTS
 100
 ====
+---- QUERY
 select count(*) from alltypesagg$TABLE where timestamp_col
 not between cast('2010-01-01 00:00:00' as timestamp) 
 and cast('2010-01-01 01:40:00' as timestamp)
@@ -788,27 +878,30 @@ bigint
 ---- RESULTS
 9900
 ====
-// Test NOW() function.
+---- QUERY
+# Test NOW() function.
 select now()
 ---- TYPES
 timestamp
 ---- RESULTS
-// Matches a single date of the form 'yyyy-MM-dd HH:mm:ss' 
-// or 'yyyy-MM-dd HH:mm:ss.SSSSSS'
+# Matches a single date of the form 'yyyy-MM-dd HH:mm:ss' 
+# or 'yyyy-MM-dd HH:mm:ss.SSSSSS'
 regex: \d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?
 ====
+---- QUERY
 select now(), now(), now(), now()
 ---- TYPES
 timestamp, timestamp, timestamp, timestamp
 ---- RESULTS
-// Matches four identical timestamps separated by commas.
+# Matches four identical timestamps separated by commas.
 regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
 ====
+---- QUERY
 select now(), now(), now(), now() from alltypestiny
 ---- TYPES
 timestamp, timestamp, timestamp, timestamp
 ---- RESULTS
-// Matches four identical timestamps separated by commas.
+# Matches four identical timestamps separated by commas.
 regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
 regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
 regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
@@ -818,15 +911,17 @@ regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
 regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
 regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
 ====
-// Check that now() returns the same value when evaluated on different nodes
-// (alltypessmall is partitioned)
+---- QUERY
+# Check that now() returns the same value when evaluated on different nodes
+# (alltypessmall is partitioned)
 select min(now()), max(now()) from alltypessmall
 ---- TYPES
 timestamp, timestamp
 ---- RESULTS
-// Matches two identical timestamps separated by commas.
+# Matches two identical timestamps separated by commas.
 regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1
 ====
+---- QUERY
 # Timestamp arithmetic tests (lowest timestamp_col has value 2009-01-01 00:00:00).
 # Add/sub years, non-function-call like version.
 select timestamp_col + interval 10 years,
@@ -838,6 +933,7 @@ timestamp,timestamp,timestamp
 ---- RESULTS
 2019-01-01 00:00:00,2019-01-01 00:00:00,1999-01-01 00:00:00
 ====
+---- QUERY
 # Add/sub years, function-call like version.
 select date_add(timestamp_col, interval 10 years),
        date_sub(timestamp_col, interval 10 years)
@@ -847,6 +943,7 @@ timestamp,timestamp
 ---- RESULTS
 2019-01-01 00:00:00,1999-01-01 00:00:00
 ====
+---- QUERY
 # Add/sub months, non-function-call like version.
 select timestamp_col + interval 13 months,
        timestamp_col + interval 1 month,
@@ -860,6 +957,7 @@ timestamp,timestamp,timestamp,timestamp,timestamp,timestamp
 ---- RESULTS
 2010-02-01 00:00:00,2009-02-01 00:00:00,2010-02-01 00:00:00,2009-02-01 00:00:00,2007-12-01 00:00:00,2008-12-01 00:00:00
 ====
+---- QUERY
 # Add/sub months, function-call like version.
 select date_add(timestamp_col, interval 13 months),
        date_add(timestamp_col, interval 1 month),
@@ -871,6 +969,7 @@ timestamp,timestamp,timestamp,timestamp
 ---- RESULTS
 2010-02-01 00:00:00,2009-02-01 00:00:00,2007-12-01 00:00:00,2008-12-01 00:00:00
 ====
+---- QUERY
 # Add/sub weeks, non-function-call like version.
 select timestamp_col + interval 2 weeks,       
        timestamp_col + interval 53 weeks,
@@ -884,6 +983,7 @@ timestamp,timestamp,timestamp,timestamp,timestamp,timestamp
 ---- RESULTS
 2009-01-15 00:00:00,2010-01-07 00:00:00,2009-01-15 00:00:00,2010-01-07 00:00:00,2008-12-18 00:00:00,2007-12-27 00:00:00
 ====
+---- QUERY
 # Add/sub weeks, function-call like version.
 select date_add(timestamp_col, interval 2 weeks),       
        date_add(timestamp_col, interval 53 weeks),
@@ -895,6 +995,7 @@ timestamp,timestamp,timestamp,timestamp
 ---- RESULTS
 2009-01-15 00:00:00,2010-01-07 00:00:00,2008-12-18 00:00:00,2007-12-27 00:00:00
 ====
+---- QUERY
 # Add/sub days, non-function-call like version.
 select timestamp_col + interval 10 days,       
        timestamp_col + interval 10 days,
@@ -908,6 +1009,7 @@ timestamp,timestamp,timestamp,timestamp,timestamp,timestamp
 ---- RESULTS
 2009-01-11 00:00:00,2009-01-11 00:00:00,2009-01-11 00:00:00,2009-01-11 00:00:00,2008-12-22 00:00:00,2008-01-02 00:00:00
 ====
+---- QUERY
 # Add/sub days, function-call like version.
 select date_add(timestamp_col, interval 10 days),
        date_add(timestamp_col, interval 10 days),
@@ -919,6 +1021,7 @@ timestamp,timestamp,timestamp,timestamp
 ---- RESULTS
 2009-01-11 00:00:00,2009-01-11 00:00:00,2008-12-22 00:00:00,2008-01-02 00:00:00
 ====
+---- QUERY
 # Add/sub hours, non-function-call like version.
 select timestamp_col + interval 25 hours,
        interval 25 hours + timestamp_col,
@@ -929,6 +1032,7 @@ timestamp,timestamp,timestamp
 ---- RESULTS
 2009-01-02 01:00:00,2009-01-02 01:00:00,2008-12-30 23:00:00
 ====
+---- QUERY
 # Add/sub hours, function-call like version.
 select date_add(timestamp_col, interval 25 hours),
        date_sub(timestamp_col, interval 25 hours)
@@ -938,6 +1042,7 @@ timestamp,timestamp
 ---- RESULTS
 2009-01-02 01:00:00,2008-12-30 23:00:00
 ====
+---- QUERY
 # Add/sub minutes (1533 minutes are 25h33m), non-function-call like version.
 select timestamp_col + interval 1533 minutes,
        interval 1533 minutes + timestamp_col,
@@ -948,6 +1053,7 @@ timestamp,timestamp,timestamp
 ---- RESULTS
 2009-01-02 01:33:00,2009-01-02 01:33:00,2008-12-30 22:27:00
 ====
+---- QUERY
 # Add/sub minutes (1533 minutes are 25h33m), function-call like version.
 select date_add(timestamp_col, interval 1533 minutes),
        date_sub(timestamp_col, interval 1533 minutes)
@@ -957,6 +1063,7 @@ timestamp,timestamp
 ---- RESULTS
 2009-01-02 01:33:00,2008-12-30 22:27:00
 ====
+---- QUERY
 # Add/sub seconds (90033 seconds are 25h33s), non-function-call like version.
 select timestamp_col + interval 90033 seconds,
        interval 90033 seconds + timestamp_col,
@@ -967,6 +1074,7 @@ timestamp,timestamp,timestamp
 ---- RESULTS
 2009-01-02 01:00:33,2009-01-02 01:00:33,2008-12-30 22:59:27
 ====
+---- QUERY
 # Add/sub seconds (90033 seconds are 25h33s), function-call like version.
 select date_add(timestamp_col, interval 90033 seconds),
        date_sub(timestamp_col, interval 90033 seconds)
@@ -976,6 +1084,7 @@ timestamp,timestamp
 ---- RESULTS
 2009-01-02 01:00:33,2008-12-30 22:59:27
 ====
+---- QUERY
 # Add/sub milliseconds (90000033 seconds are 25h33ms), non-function-call like version.
 select timestamp_col + interval 90000033 milliseconds,
        interval 90000033 milliseconds + timestamp_col,
@@ -986,6 +1095,7 @@ timestamp,timestamp,timestamp
 ---- RESULTS
 2009-01-02 01:00:00.033000000,2009-01-02 01:00:00.033000000,2008-12-30 22:59:59.967000000
 ====
+---- QUERY
 # Add/sub milliseconds (90000033 seconds are 25h33ms), function-call like version.
 select date_add(timestamp_col, interval 90000033 milliseconds),
        date_sub(timestamp_col, interval 90000033 milliseconds)
@@ -995,6 +1105,7 @@ timestamp,timestamp
 ---- RESULTS
 2009-01-02 01:00:00.033000000,2008-12-30 22:59:59.967000000
 ====
+---- QUERY
 # Add/sub microseconds, non-function-call like version.
 select timestamp_col + interval 1033 microseconds,
        interval 1033 microseconds + timestamp_col,
@@ -1005,6 +1116,7 @@ timestamp,timestamp,timestamp
 ---- RESULTS
 2009-01-01 00:00:00.001033000,2009-01-01 00:00:00.001033000,2008-12-31 23:59:59.998967000
 ====
+---- QUERY
 # Add/sub microseconds, function-call like version.
 select date_add(timestamp_col, interval 1033 microseconds),
        date_sub(timestamp_col, interval 1033 microseconds)
@@ -1014,6 +1126,7 @@ timestamp,timestamp
 ---- RESULTS
 2009-01-01 00:00:00.001033000,2008-12-31 23:59:59.998967000
 ====
+---- QUERY
 # Add/sub nanoseconds, non-function-call like version.
 select timestamp_col + interval 1033 nanoseconds,
        interval 1033 nanoseconds + timestamp_col,
@@ -1024,6 +1137,7 @@ timestamp,timestamp,timestamp
 ---- RESULTS
 2009-01-01 00:00:00.000001033,2009-01-01 00:00:00.000001033,2008-12-31 23:59:59.999998967
 ====
+---- QUERY
 # Add/sub nanoseconds, function-call like version.
 select date_add(timestamp_col, interval 1033 nanoseconds),
        date_sub(timestamp_col, interval 1033 nanoseconds)
@@ -1033,6 +1147,7 @@ timestamp,timestamp
 ---- RESULTS
 2009-01-01 00:00:00.000001033,2008-12-31 23:59:59.999998967
 ====
+---- QUERY
 # Chaining of arithmetic operations (only non-function-call like version).
 select timestamp_col + interval 10 years + interval 2 months + interval 5 days,
        interval 10 years + timestamp_col + interval 2 months + interval 5 days,       
@@ -1045,6 +1160,7 @@ timestamp,timestamp,timestamp,timestamp,timestamp
 ---- RESULTS
 2019-03-06 00:00:00,2019-03-06 00:00:00,2018-11-06 00:00:00,2018-11-06 00:00:00,1998-10-27 00:00:00
 ====
+---- QUERY
 select timestamp_col + interval 10 hours + interval 2 minutes + interval 5 seconds
             + interval 3 milliseconds + interval 3 microseconds + interval 3 nanoseconds,
        interval 10 hours + timestamp_col + interval 2 minutes + interval 5 seconds
@@ -1061,6 +1177,7 @@ timestamp,timestamp,timestamp,timestamp,timestamp
 ---- RESULTS
 2009-01-01 10:02:05.003003003,2009-01-01 10:02:05.003003003,2009-01-01 09:58:04.997002997,2009-01-01 10:02:04.997002997,2008-12-31 13:57:54.996996997
 ====
+---- QUERY
 # Test corner cases and also timestamp arithmetic without from clause.
 select cast("2012-02-29 00:00:00" as timestamp) + interval 1 year,
        cast("2013-02-28 00:00:00" as timestamp) - interval 1 year,
@@ -1071,6 +1188,7 @@ timestamp,timestamp,timestamp,timestamp
 ---- RESULTS
 2013-02-28 00:00:00,2012-02-29 00:00:00,2012-12-31 00:00:00,2012-01-01 00:00:00
 ====
+---- QUERY
 # Test overflow (2147483647 is MAX_INT).
 select cast("2012-01-01 00:00:00" as timestamp) + interval 2147483647 years,
        cast("2012-01-01 00:00:00" as timestamp) - interval 2147483647 years
@@ -1079,6 +1197,7 @@ timestamp,timestamp
 ---- RESULTS
 2011-01-01 00:00:00,2013-01-01 00:00:00
 ====
+---- QUERY
 # Timestamp arithmetic inside a predicate.
 select year, month from alltypes$TABLE
 where year = year((cast('2012-01-01 09:10:11' as timestamp) - interval 3 years))
@@ -1091,6 +1210,7 @@ int,int
 2009,4
 2009,4
 ====
+---- QUERY
 # Test NULLs in second operand
 select count(*) from alltypesagg$TABLE
 where (cast('2012-01-01 09:10:11' as timestamp) + interval tinyint_col seconds) IS NULL
@@ -1099,6 +1219,7 @@ bigint
 ---- RESULTS
 1000
 ====
+---- QUERY
 # Test NULLs in first operand
 select count(*) from alltypesagg$TABLE
 where (cast('2012-01-01 09:10:11' as timestamp) + interval tinyint_col seconds)

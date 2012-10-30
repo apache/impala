@@ -1,4 +1,5 @@
-# QUERY_NAME : TPCH-Q19
+====
+---- QUERY : TPCH-Q19
 # Q19 - Discounted Revenue Query
 # Modifications: Added round() calls
 select round(sum(l_extendedprice * (1 - l_discount) ), 5) as revenue

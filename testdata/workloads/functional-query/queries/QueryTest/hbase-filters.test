@@ -1,3 +1,5 @@
+====
+---- QUERY
 # Reference the string row key but do not create a predicate on the key.
 select distinct id from hbasestringids where int_col = 1
 ---- TYPES
@@ -14,6 +16,7 @@ string
 '4001'
 '7001'
 ====
+---- QUERY
 select * from hbasealltypessmall where string_col = '4'
 ---- TYPES
 int, boolean, double, float, bigint, int, smallint, tinyint, string, string, timestamp
@@ -31,6 +34,7 @@ int, boolean, double, float, bigint, int, smallint, tinyint, string, string, tim
 89,false,40.4,4.400000095367432,40,4,4,4,'04/02/09','4',2009-04-02 00:14:00.510000000
 99,false,40.4,4.400000095367432,40,4,4,4,'04/03/09','4',2009-04-03 00:24:00.960000000
 ====
+---- QUERY
 # make sure this works even when not requesting the col family w/ the predicate
 select tinyint_col from hbasealltypessmall where string_col = '4'
 ---- TYPES
@@ -49,42 +53,49 @@ tinyint
 4
 4
 ====
+---- QUERY
 select count(*) from hbasealltypessmall where string_col = '4'
 ---- TYPES
 bigint
 ---- RESULTS
 12
 ====
+---- QUERY
 select count(*) from hbasealltypessmall where string_col != '4'
 ---- TYPES
 bigint
 ---- RESULTS
 88
 ====
+---- QUERY
 select count(*) from hbasealltypessmall where string_col < '4'
 ---- TYPES
 bigint
 ---- RESULTS
 48
 ====
+---- QUERY
 select count(*) from hbasealltypessmall where string_col > '4'
 ---- TYPES
 bigint
 ---- RESULTS
 40
 ====
+---- QUERY
 select count(*) from hbasealltypessmall where string_col <= '4'
 ---- TYPES
 bigint
 ---- RESULTS
 60
 ====
+---- QUERY
 select count(*) from hbasealltypessmall where string_col >= '4'
 ---- TYPES
 bigint
 ---- RESULTS
 52
 ====
+---- QUERY
 # empty result
 select count(*) from hbasealltypessmall where string_col = '100'
 ---- TYPES
@@ -92,6 +103,7 @@ bigint
 ---- RESULTS
 0
 ====
+---- QUERY
 # multiple filters
 select * from hbasealltypessmall where string_col = '4' and date_string_col = '01/01/09'
 ---- TYPES
@@ -99,6 +111,7 @@ int, boolean, double, float, bigint, int, smallint, tinyint, string, string, tim
 ---- RESULTS
 4,true,40.4,4.400000095367432,40,4,4,4,'01/01/09','4',2009-01-01 00:04:00.600000000
 ====
+---- QUERY
 # hbase filter with regular predicate
 select * from hbasealltypessmall where string_col <= '4' and int_col >= 4
 ---- TYPES
@@ -117,6 +130,7 @@ int, boolean, double, float, bigint, int, smallint, tinyint, string, string, tim
 89,false,40.4,4.400000095367432,40,4,4,4,'04/02/09','4',2009-04-02 00:14:00.510000000
 99,false,40.4,4.400000095367432,40,4,4,4,'04/03/09','4',2009-04-03 00:24:00.960000000
 ====
+---- QUERY
 # hbase filter with regular predicate and start/stop keys
 select * from hbasestringids where string_col <= '4' and int_col >= 4 and id > '390' and id < '400'
 ---- TYPES
@@ -133,6 +147,7 @@ string, boolean, double, float, bigint, int, smallint, tinyint, string, string, 
 '399',false,4029.9,438.8999938964844,3990,399,99,9,'01/01/10','399',2010-01-01 06:52:14.100000000
 '4',true,40.4,4.400000095367432,40,4,4,4,'01/01/10','4',2010-01-01 00:04:00.600000000
 ====
+---- QUERY
 # TODO: fix this, this shouldn't match every row
 # comparison w/ cast doesn't turn into a predicate
 #select count(*) from hbasealltypessmall where string_col >= 4

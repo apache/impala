@@ -1,4 +1,5 @@
-# QUERY_NAME : TPCH-Q15_QUERY_1
+====
+---- QUERY : TPCH-Q15_QUERY_1
 # Q15 - Top Supplier Query
 insert overwrite table tpch.revenue
 select
@@ -14,7 +15,7 @@ RELOAD tpch.revenue
 ---- PARTITIONS
 /: 10000
 ====
-# QUERY_NAME : TPCH-Q15_QUERY_2
+---- QUERY : TPCH-Q15_QUERY_2
 insert overwrite table tpch.max_revenue
 select max(total_revenue)
 from tpch.revenue
@@ -25,7 +26,7 @@ RELOAD tpch.max_revenue
 ---- PARTITIONS
 /: 1
 ====
-# QUERY_NAME : TPCH-Q15_QUERY_3
+---- QUERY : TPCH-Q15_QUERY_3
 # Modifications - Added limit
 select
   s_suppkey,

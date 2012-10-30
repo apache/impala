@@ -1,15 +1,19 @@
+====
+---- QUERY
 # limit 0 on hdfs table
 select * from alltypesagg$TABLE where day = 1 limit 0
 ---- TYPES
 int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
 ---- RESULTS
 ====
+---- QUERY
 # limit 0 on hbase table
 select * from hbasealltypessmall where string_col = '4' limit 0
 ---- TYPES
 int, boolean, double, float, bigint, int, smallint, tinyint, string, string, timestamp
 ---- RESULTS
 ====
+---- QUERY
 # limit 0 on complex subquery join
 select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col
 from (
@@ -35,6 +39,7 @@ limit 0
 smallint, int, tinyint, int, int, float, string
 ---- RESULTS
 ====
+---- QUERY
 # We need to specify the day here, otherwise files get opened in random order
 select * from alltypesagg$TABLE where day = 1 limit 10
 ---- TYPES
@@ -51,6 +56,7 @@ int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, stri
 2010,1,1,8,true,8,8,8,80,8.800000190734863,80.8,'01/01/10','8',2010-01-01 00:08:00.280000000
 2010,1,1,9,false,9,9,9,90,9.899999618530273,90.90000000000001,'01/01/10','9',2010-01-01 00:09:00.360000000
 ====
+---- QUERY
 # limit is applied after where clause
 select * from alltypesagg$TABLE where tinyint_col is null and day = 1 limit 10
 ---- TYPES
@@ -67,6 +73,7 @@ int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, stri
 2010,1,1,80,true,NULL,80,80,800,88,808,'01/01/10','80',2010-01-01 01:20:31.600000000
 2010,1,1,90,true,NULL,90,90,900,99,909,'01/01/10','90',2010-01-01 01:30:40.500000000
 ====
+---- QUERY
 select tinyint_col, count(*) from alltypesagg$TABLE group by 1
 ---- TYPES
 tinyint, bigint
@@ -82,6 +89,7 @@ tinyint, bigint
 9,1000
 NULL,1000
 ====
+---- QUERY
 select tinyint_col, count(*) from alltypesagg$TABLE group by 1 limit 10
 ---- TYPES
 tinyint, bigint
@@ -97,6 +105,7 @@ tinyint, bigint
 9,1000
 NULL,1000
 ====
+---- QUERY
 # limit and where clause don't interact
 select tinyint_col, count(*) from alltypesagg$TABLE where smallint_col > 49 group by 1 
 limit 10
@@ -114,6 +123,7 @@ tinyint, bigint
 9,500
 NULL,500
 ====
+---- QUERY
 # limit is applied after having
 select tinyint_col, count(*) from alltypesagg$TABLE group by 1 having tinyint_col > 5 
 limit 5
@@ -125,6 +135,7 @@ tinyint, bigint
 8,1000
 9,1000
 ====
+---- QUERY
 select j.*, d.*
 from JoinTbl j inner join DimTbl d on (j.test_id = d.id)
 ---- TYPES
@@ -142,6 +153,7 @@ bigint, string, int, int, bigint, string, int
 1006,'Name6',94616,15000,1006,'Name6',94613
 1006,'Name6',94616,5000,1006,'Name6',94613
 ====
+---- QUERY
 # limit is applied to join
 select j.*, d.*
 from JoinTbl j inner join DimTbl d on (j.test_id = d.id)
@@ -158,6 +170,7 @@ bigint, string, int, int, bigint, string, int
 1006,'Name16',94616,5000,1006,'Name6',94613
 1006,'Name6',94616,5000,1006,'Name6',94613
 ====
+---- QUERY
 # limit is not pushed down past join
 select j.*, d.*
 from JoinTbl j right outer join DimTbl d on (j.test_id = d.id)
@@ -180,6 +193,7 @@ NULL,'NULL',NULL,NULL,1008,'Name8',94614
 NULL,'NULL',NULL,NULL,1009,'Name9',94615
 NULL,'NULL',NULL,NULL,1010,'Name10',94615
 ====
+---- QUERY
 select j.*, d.*
 from JoinTbl j right outer join DimTbl d on (j.test_id = d.id)
 limit 5
@@ -192,6 +206,7 @@ bigint, string, int, int, bigint, string, int
 1004,'Name4',94611,5000,1004,'Name4',94612
 1005,'Name5',94611,5000,1005,'Name5',94613
 ====
+---- QUERY
 # Test that query without referencing any column should work
 select 1 from alltypessmall limit 2
 ---- TYPES

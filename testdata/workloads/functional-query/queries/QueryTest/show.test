@@ -1,3 +1,5 @@
+====
+---- QUERY
 # Simple pattern literal
 show tables "alltypes"
 ---- TYPES
@@ -5,6 +7,7 @@ string
 ---- RESULTS
 'alltypes'
 ====
+---- QUERY
 # Pattern with wildcard
 show tables "all*ypes"
 ---- TYPES
@@ -12,26 +15,31 @@ string
 ---- RESULTS
 'alltypes'
 ====
+---- QUERY
 # Empty string matches nothing
 show tables ""
 ---- TYPES
 string
 ---- RESULTS
 ====
+---- QUERY
 # Check that regex metacharacters are being escaped
 show tables '+alltypes'
 ---- TYPES
 string
 ---- RESULTS
 ====
+---- QUERY
 # Fully qualified names will not match
 show tables "default.alltypes"
 ---- TYPES
 string
 ---- RESULTS
 ====
+---- QUERY
 USE testdb1
 ====
+---- QUERY
 # Different database
 # We have no SHOW TABLES with no pattern test since the set of tables is
 # changing often, and may be different depending on whether benchmark data is
@@ -77,8 +85,10 @@ string
 'testtbl_trevni_def'
 'testtbl_trevni_snap'
 ====
+---- QUERY
 USE default
 ====
+---- QUERY
 # Choice amongst patterns
 show tables "alltypes|stringpartitionkey|testtbl"
 ---- TYPES
@@ -88,6 +98,7 @@ string
 'stringpartitionkey'
 'testtbl'
 ====
+---- QUERY
 # Show tables in
 show tables in testdb1
 ---- TYPES
@@ -130,6 +141,7 @@ string
 'testtbl_trevni_def'
 'testtbl_trevni_snap'
 ====
+---- QUERY
 # Show tables in with a pattern
 show tables in testdb1 like 'alltype*'
 ---- TYPES
@@ -154,8 +166,10 @@ string
 'alltypes_trevni_def'
 'alltypes_trevni_snap'
 ====
+---- QUERY
 USE testdb1
 ====
+---- QUERY
 # Coverage of syntax variations.
 show tables in testdb1 'alltypes'
 ---- TYPES
@@ -163,24 +177,28 @@ string
 ---- RESULTS
 'alltypes'
 ====
+---- QUERY
 show tables in testdb1 like 'alltypes'
 ---- TYPES
 string
 ---- RESULTS
 'alltypes'
 ====
+---- QUERY
 show tables 'alltypes'
 ---- TYPES
 string
 ---- RESULTS
 'alltypes'
 ====
+---- QUERY
 show tables like 'alltypes'
 ---- TYPES
 string
 ---- RESULTS
 'alltypes'
 ====
+---- QUERY
 # Show databases
 show databases
 ---- TYPES
@@ -190,6 +208,7 @@ string
 'testdb1'
 'tpch'
 ====
+---- QUERY
 show databases like 'def*'
 ---- TYPES
 string

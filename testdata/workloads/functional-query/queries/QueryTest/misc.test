@@ -1,3 +1,5 @@
+====
+---- QUERY
 # Test for selecting from table with null and empty strings.
 select * from nulltable$TABLE
 ---- TYPES
@@ -5,12 +7,14 @@ string, string, string, int, double
 ---- RESULTS
 'a','','NULL',NULL,NULL
 ====
+---- QUERY
 select count(*),count(a),count(b),count(c),count(d),count(e) from nulltable$TABLE
 ---- TYPES
 bigint, bigint, bigint, bigint, bigint, bigint
 ---- RESULTS
 1,1,1,0,0,0
 ====
+---- QUERY
 # Test for selecting from table with '\' escape character with null and empty strings.
 select * from nullescapedtable$TABLE
 ---- TYPES
@@ -18,12 +22,14 @@ string, string, string, int, double
 ---- RESULTS
 'a','','NULL',NULL,NULL
 ====
+---- QUERY
 select count(*),count(a),count(b),count(c), count(d), count(e) from nullescapedtable$TABLE
 ---- TYPES
 bigint, bigint, bigint, bigint, bigint, bigint
 ---- RESULTS
 1,1,1,0,0,0
 ====
+---- QUERY
 # Test to select from table with additional columns at the end that are not in the 
 # schema and with missing columns
 select * from tblwithraggedcolumns$TABLE
@@ -43,6 +49,7 @@ string, int
 'foo',2
 'hello',1
 ====
+---- QUERY
 select int_col from tblwithraggedcolumns$TABLE
 ---- TYPES
 int
@@ -60,6 +67,7 @@ NULL
 NULL
 NULL
 ====
+---- QUERY
 select str_col from tblwithraggedcolumns$TABLE
 ---- TYPES
 string
@@ -77,6 +85,7 @@ string
 'foo'
 'hello'
 ====
+---- QUERY
 # Quoting test
 SELECT `table_alias`.`int_col` AS `default_int_col` 
 FROM `default`.`alltypes` `table_alias` 

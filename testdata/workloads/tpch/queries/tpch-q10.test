@@ -1,4 +1,5 @@
-# QUERY_NAME : TPCH-Q10
+====
+---- QUERY : TPCH-Q10
 # Q10 - Returned Item Reporting Query
 # Modifications: Cast c_acctbal to bigint due to float/double values not allowed in
 # GROUP BY clause, added round() calls, converted select from multiple tables to

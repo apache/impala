@@ -1,3 +1,5 @@
+====
+---- QUERY
 # count(distinct)
 select count(distinct smallint_col, tinyint_col)
 from alltypesagg$TABLE
@@ -6,6 +8,7 @@ bigint
 ---- RESULTS
 100
 ====
+---- QUERY
 select count(distinct bool_col)
 from alltypesagg$TABLE
 ---- TYPES
@@ -13,6 +16,7 @@ bigint
 ---- RESULTS
 2
 ====
+---- QUERY
 select count(distinct int_col)
 from alltypesagg$TABLE
 ---- TYPES
@@ -20,6 +24,7 @@ bigint
 ---- RESULTS
 1000
 ====
+---- QUERY
 select count(distinct float_col)
 from alltypesagg$TABLE
 ---- TYPES
@@ -27,6 +32,7 @@ bigint
 ---- RESULTS
 1000
 ====
+---- QUERY
 select count(distinct double_col)
 from alltypesagg$TABLE
 ---- TYPES
@@ -34,6 +40,7 @@ bigint
 ---- RESULTS
 1000
 ====
+---- QUERY
 select count(distinct string_col)
 from alltypesagg$TABLE
 ---- TYPES
@@ -41,6 +48,7 @@ bigint
 ---- RESULTS
 1000
 ====
+---- QUERY
 select count(distinct string_col)
 from alltypesagg$TABLE
 ---- TYPES
@@ -48,6 +56,7 @@ bigint
 ---- RESULTS
 1000
 ====
+---- QUERY
 select count(distinct timestamp_col)
 from alltypesagg$TABLE
 ---- TYPES
@@ -55,6 +64,7 @@ bigint
 ---- RESULTS
 10000
 ====
+---- QUERY
 # count(distinct) w/ grouping and non-distinct count()
 select tinyint_col, count(distinct smallint_col), count(smallint_col)
 from alltypesagg$TABLE group by 1
@@ -72,6 +82,7 @@ tinyint, bigint, bigint
 9,10,1000
 NULL,10,900
 ====
+---- QUERY
 # count(distinct) w/ grouping and non-distinct count()
 select tinyint_col, count(distinct int_col, smallint_col), count(smallint_col)
 from alltypesagg$TABLE group by 1
@@ -89,6 +100,7 @@ tinyint, bigint, bigint
 9,100,1000
 NULL,100,900
 ====
+---- QUERY
 # count(distinct) and sum(distinct) w/ grouping and non-distinct count()
 select tinyint_col, count(distinct smallint_col), sum(distinct smallint_col),
 count(smallint_col)
@@ -107,6 +119,7 @@ tinyint, bigint, bigint, bigint
 9,10,540,1000
 NULL,10,450,900
 ====
+---- QUERY
 # count(distinct) and sum(distinct) w/ grouping; distinct in min() and max()
 # ignored
 select tinyint_col, count(distinct smallint_col), sum(distinct smallint_col),
@@ -126,6 +139,7 @@ tinyint, bigint, bigint, bigint, int, float
 9,10,540,1000,9,1098.900024414062
 NULL,10,450,900,10,1089
 ====
+---- QUERY
 # count distinct order by the same agg expr
 select count(distinct id) as count_id from alltypessmall order by count_id limit 100
 ---- TYPES
@@ -133,6 +147,7 @@ bigint
 ---- RESULTS
 100
 ====
+---- QUERY
 # count distinct order by a diff agg expr
 select count(distinct id) as sum_id from alltypessmall order by max(distinct id)
 limit 100
@@ -141,6 +156,7 @@ bigint
 ---- RESULTS
 100
 ====
+---- QUERY
 # distinct *
 select distinct *
 from alltypesagg$TABLE
@@ -169,6 +185,7 @@ int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, stri
 2010,1,1,8,true,8,8,8,80,8.800000190734863,80.8,'01/01/10','8',2010-01-01 00:08:00.280000000
 2010,1,1,9,false,9,9,9,90,9.899999618530273,90.90000000000001,'01/01/10','9',2010-01-01 00:09:00.360000000
 ====
+---- QUERY
 # distinct w/ explicit select list
 select distinct bool_col, tinyint_col
 from alltypesagg$TABLE

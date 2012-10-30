@@ -1,3 +1,5 @@
+====
+---- QUERY
 # join cols aren't part of select list (and still get materialized)
 select j.test_name, d.name
 from JoinTbl j inner join DimTbl d on (j.test_id = d.id)
@@ -16,6 +18,7 @@ string, string
 'Name6','Name6'
 'Name6','Name6'
 ====
+---- QUERY
 # join on bigint
 select j.*, d.*
 from JoinTbl j inner join DimTbl d on (j.test_id = d.id)
@@ -34,6 +37,7 @@ bigint, string, int, int, bigint, string, int
 1006,'Name6',94616,15000,1006,'Name6',94613
 1006,'Name6',94616,5000,1006,'Name6',94613
 ====
+---- QUERY
 select j.*, d.*
 from JoinTbl j left outer join DimTbl d on (j.test_id = d.id)
 ---- TYPES
@@ -59,6 +63,7 @@ bigint, string, int, int, bigint, string, int
 1106,'Name6',94616,15000,NULL,'NULL',NULL
 1106,'Name6',94616,5000,NULL,'NULL',NULL
 ====
+---- QUERY
 select j.*, d.*
 from JoinTbl j right outer join DimTbl d on (j.test_id = d.id)
 ---- TYPES
@@ -80,6 +85,7 @@ NULL,'NULL',NULL,NULL,1008,'Name8',94614
 NULL,'NULL',NULL,NULL,1009,'Name9',94615
 NULL,'NULL',NULL,NULL,1010,'Name10',94615
 ====
+---- QUERY
 select j.*, d.*
 from JoinTbl j full outer join DimTbl d on (j.test_id = d.id)
 ---- TYPES
@@ -109,6 +115,7 @@ NULL,'NULL',NULL,NULL,1008,'Name8',94614
 NULL,'NULL',NULL,NULL,1009,'Name9',94615
 NULL,'NULL',NULL,NULL,1010,'Name10',94615
 ====
+---- QUERY
 # join on string
 select j.*, d.*
 from JoinTbl j inner join DimTbl d on (j.test_name = d.name)
@@ -127,6 +134,7 @@ bigint, string, int, int, bigint, string, int
 1106,'Name6',94616,15000,1006,'Name6',94613
 1106,'Name6',94616,5000,1006,'Name6',94613
 ====
+---- QUERY
 select j.*, d.*
 from JoinTbl j left outer join DimTbl d on (j.test_name = d.name)
 ---- TYPES
@@ -152,6 +160,7 @@ bigint, string, int, int, bigint, string, int
 1106,'Name6',94616,15000,1006,'Name6',94613
 1106,'Name6',94616,5000,1006,'Name6',94613
 ====
+---- QUERY
 select j.*, d.*
 from JoinTbl j right outer join DimTbl d on (j.test_name = d.name)
 ---- TYPES
@@ -173,6 +182,7 @@ NULL,'NULL',NULL,NULL,1008,'Name8',94614
 NULL,'NULL',NULL,NULL,1009,'Name9',94615
 NULL,'NULL',NULL,NULL,1010,'Name10',94615
 ====
+---- QUERY
 select j.*, d.*
 from JoinTbl j full outer join DimTbl d on (j.test_name = d.name)
 ---- TYPES
@@ -202,6 +212,7 @@ NULL,'NULL',NULL,NULL,1008,'Name8',94614
 NULL,'NULL',NULL,NULL,1009,'Name9',94615
 NULL,'NULL',NULL,NULL,1010,'Name10',94615
 ====
+---- QUERY
 # join on int
 select j.*, d.*
 from JoinTbl j inner join DimTbl d on (j.test_zip = d.zip)
@@ -231,6 +242,7 @@ bigint, string, int, int, bigint, string, int
 1106,'Name6',94612,5000,1003,'Name3',94612
 1106,'Name6',94612,5000,1004,'Name4',94612
 ====
+---- QUERY
 select j.*, d.*
 from JoinTbl j left outer join DimTbl d on (j.test_zip = d.zip)
 ---- TYPES
@@ -267,6 +279,7 @@ bigint, string, int, int, bigint, string, int
 1106,'Name6',94616,15000,NULL,'NULL',NULL
 1106,'Name6',94616,5000,NULL,'NULL',NULL
 ====
+---- QUERY
 select j.*, d.*
 from JoinTbl j right outer join DimTbl d on (j.test_zip = d.zip)
 ---- TYPES
@@ -301,6 +314,7 @@ NULL,'NULL',NULL,NULL,1008,'Name8',94614
 NULL,'NULL',NULL,NULL,1009,'Name9',94615
 NULL,'NULL',NULL,NULL,1010,'Name10',94615
 ====
+---- QUERY
 select j.*, d.*
 from JoinTbl j full outer join DimTbl d on (j.test_zip = d.zip)
 ---- TYPES
@@ -343,6 +357,7 @@ NULL,'NULL',NULL,NULL,1008,'Name8',94614
 NULL,'NULL',NULL,NULL,1009,'Name9',94615
 NULL,'NULL',NULL,NULL,1010,'Name10',94615
 ====
+---- QUERY
 # semi-join on bigint
 select d.*
 from DimTbl d left semi join JoinTbl j on (d.id = j.test_id)
@@ -356,6 +371,7 @@ bigint, string, int
 1005,'Name5',94613
 1006,'Name6',94613
 ====
+---- QUERY
 # semi-join on string
 select d.*
 from DimTbl d left semi join JoinTbl j on (j.test_name = d.name)
@@ -369,6 +385,7 @@ bigint, string, int
 1005,'Name5',94613
 1006,'Name6',94613
 ====
+---- QUERY
 # semi-join on int
 select d.*
 from DimTbl d left semi join JoinTbl j on (j.test_zip = d.zip)
@@ -380,23 +397,27 @@ bigint, string, int
 1003,'Name3',94612
 1004,'Name4',94612
 ====
+---- QUERY
 # joins on empty tables
 select * from emptytable t1 full outer join emptytable t2 on (t1.field=t2.field)
 ---- TYPES
 int, string, int, string
 ---- RESULTS
 ====
+---- QUERY
 select * from emptytable t1 right outer join greptiny t2 on (t1.field=t2.field)
 ---- TYPES
 int, string, string
 ---- RESULTS
 ====
+---- QUERY
 select count(*) from greptiny t1 left outer join emptytable t2 on (t1.field=t2.field)
 ---- TYPES
 bigint
 ---- RESULTS
 100
 ====
+---- QUERY
 # test nested joins
 select a.id, b.id, c.id, a.day, b.day, c.month, a.month, b.month 
 from alltypesagg a join alltypesagg b on 

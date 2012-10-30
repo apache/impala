@@ -1,3 +1,5 @@
+====
+---- QUERY
 # Tests overflow
 select * from Overflow
 ---- TYPES

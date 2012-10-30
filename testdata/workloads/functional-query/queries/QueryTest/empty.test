@@ -1,15 +1,19 @@
+====
+---- QUERY
 # testtbl is empty
 select * from testtbl$TABLE
 ---- TYPES
 bigint, string, int
 ---- RESULTS
 ====
+---- QUERY
 # month ends at 12
 select int_col from alltypessmall$TABLE where month > 100
 ---- TYPES
 int
 ---- RESULTS
 ====
+---- QUERY
 # Empty partitioned table test
 select field from emptytable
 ---- TYPES

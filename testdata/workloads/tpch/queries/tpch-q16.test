@@ -1,4 +1,5 @@
-# QUERY_NAME : TPCH-Q16_QUERY_1
+====
+---- QUERY : TPCH-Q16_QUERY_1
 # Q16 - Parts/Supplier Relation Query
 insert overwrite table tpch.supplier_tmp
 select s_suppkey
@@ -11,7 +12,7 @@ RELOAD tpch.supplier_tmp
 ---- PARTITIONS
 /: 9996
 ====
-# QUERY_NAME : TPCH-Q16_QUERY_2
+---- QUERY : TPCH-Q16_QUERY_2
 insert overwrite table tpch.q16_tmp
 select p_brand, p_type, p_size, ps_suppkey
 from tpch.partsupp$TABLE ps
@@ -28,7 +29,7 @@ RELOAD tpch.q16_tmp
 ---- PARTITIONS
 /: 741971
 ====
-# QUERY_NAME : TPCH-Q16_QUERY_3
+---- QUERY : TPCH-Q16_QUERY_3
 # Modifications: Added limit
 select p_brand, p_type, p_size, count(distinct ps_suppkey) as supplier_cnt
 from

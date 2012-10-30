@@ -1,3 +1,5 @@
+====
+---- QUERY
 # insert overwrite into unpartitioned table
 insert overwrite table insert_overwrite_nopart$TABLE 
 select int_col
@@ -8,6 +10,7 @@ RESET insert_overwrite_nopart$TABLE
 ---- PARTITIONS
 /: 10
 ====
+---- QUERY
 # Check results - note larger limit than expected in case there's more data written than there should be
 select col1 
 from insert_overwrite_nopart$TABLE 
@@ -27,6 +30,7 @@ int
 8
 9
 ====
+---- QUERY
 # Now do an overwrite that should delete what was just written
 insert overwrite table insert_overwrite_nopart$TABLE
 select 10
@@ -35,6 +39,7 @@ from tinyinttable
 ---- PARTITIONS
 /: 10
 ====
+---- QUERY
 # check results from previous insert
 select col1 
 from insert_overwrite_nopart$TABLE 
@@ -54,6 +59,7 @@ int
 10
 10
 ====
+---- QUERY
 # TODO: IMP-240 - Hive will delete data even for inserts that write nothing. When we fix IMP-240, this test should fail. 
 insert overwrite table insert_overwrite_nopart$TABLE
 select 3
@@ -62,23 +68,26 @@ limit 0
 ---- RESULTS
 ---- PARTITIONS
 ====
+---- QUERY
 select count(*) from insert_overwrite_nopart$TABLE
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
+---- QUERY
 # Static partitioned insert
 insert overwrite table insert_overwrite_partitioned$TABLE
 PARTITION(col2=5)
 select int_col
 from tinyinttable
 ---- SETUP
-RESET insert_overwrite_partitioned$TABLE$TABLE
+RESET insert_overwrite_partitioned$TABLE
 ---- RESULTS
 ---- PARTITIONS
 /col2=5/: 10
 ====
+---- QUERY
 # Check results of previous insert
 select col1, col2 from insert_overwrite_partitioned$TABLE
 order by col1
@@ -97,6 +106,7 @@ int,int
 8,5
 9,5
 ====
+---- QUERY
 # Insert into another partition, to check that original partition stays intact
 insert overwrite table insert_overwrite_partitioned$TABLE
 PARTITION(col2=6)
@@ -108,6 +118,7 @@ RESET insert_overwrite_nopart$TABLE
 ---- PARTITIONS
 /col2=6/: 10
 ====
+---- QUERY
 # Check results of previous insert
 select col1, col2 from 
 insert_overwrite_partitioned$TABLE 
@@ -137,6 +148,7 @@ int,int
 8,6
 9,6
 ====
+---- QUERY
 # Overwrite one partition, check that the other partition remains intact
 insert overwrite table insert_overwrite_partitioned$TABLE
 partition(col2=5)
@@ -145,6 +157,7 @@ select 10 from tinyinttable
 ---- PARTITIONS
 /col2=5/: 10
 ====
+---- QUERY
 # Confirm that one partition is still intact
 select col1, col2 from insert_overwrite_partitioned$TABLE
 order by col2, col1 limit 30
@@ -172,6 +185,7 @@ int,int
 8,6
 9,6
 ====
+---- QUERY
 # Dynamic partitions
 insert overwrite table insert_overwrite_partitioned$TABLE
 partition(col2)
@@ -192,6 +206,7 @@ DROP PARTITIONS insert_overwrite_partitioned$TABLE
 /col2=8/: 1
 /col2=9/: 1
 ====
+---- QUERY
 # Confirm results of previous insert
 select col1, col2
 from insert_overwrite_partitioned$TABLE
@@ -211,6 +226,7 @@ int,int
 8,8
 9,9
 ====
+---- QUERY
 # Overwrite dynamic partition. Limit to 1 row without actually using limit, which forces non-parallel insert
 insert overwrite table insert_overwrite_partitioned$TABLE
 partition(col2)
@@ -220,6 +236,7 @@ where int_col = 0
 ---- PARTITIONS
 /col2=0/: 1
 ====
+---- QUERY
 select col1, col2
 from insert_overwrite_partitioned$TABLE
 order by col2

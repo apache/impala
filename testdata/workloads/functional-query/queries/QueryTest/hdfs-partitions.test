@@ -1,3 +1,5 @@
+====
+---- QUERY
 select year, count(*) from alltypes$TABLE group by 1 order by 1 limit 10
 ---- TYPES
 int, bigint
@@ -5,6 +7,7 @@ int, bigint
 2009,3650
 2010,3650
 ====
+---- QUERY
 select month, count(*) from alltypes$TABLE group by 1 order by 1 limit 100
 ---- TYPES
 int, bigint
@@ -22,6 +25,7 @@ int, bigint
 8,620
 9,600
 ====
+---- QUERY
 select year, month, count(*) from alltypes$TABLE group by 1, 2 order by 1, 2 limit 100
 ---- TYPES
 int, int, bigint
@@ -51,12 +55,14 @@ int, int, bigint
 2010,8,310
 2010,9,300
 ====
+---- QUERY
 select count(*) from alltypes$TABLE where year=2009
 ---- TYPES
 bigint
 ---- RESULTS
 3650
 ====
+---- QUERY
 # still works if 'year' needs a cast
 select count(*) from alltypes$TABLE where year = 2009.0
 ---- TYPES
@@ -64,6 +70,7 @@ bigint
 ---- RESULTS
 3650
 ====
+---- QUERY
 # finds bindings for partition keys regardless of order of operands
 select count(*) from alltypes$TABLE where 2009 = year
 ---- TYPES
@@ -71,60 +78,70 @@ bigint
 ---- RESULTS
 3650
 ====
+---- QUERY
 select count(*) from alltypes$TABLE where 2009.0 = year
 ---- TYPES
 bigint
 ---- RESULTS
 3650
 ====
+---- QUERY
 select count(*) from alltypes$TABLE where month=1
 ---- TYPES
 bigint
 ---- RESULTS
 620
 ====
+---- QUERY
 select count(*) from alltypes$TABLE where year=2009 and month=1
 ---- TYPES
 bigint
 ---- RESULTS
 310
 ====
+---- QUERY
 select count(*) from alltypes$TABLE where year=2009 and month > 6
 ---- TYPES
 bigint
 ---- RESULTS
 1840
 ====
+---- QUERY
 select count(*) from alltypes$TABLE where year=2009 and month < 6
 ---- TYPES
 bigint
 ---- RESULTS
 1510
 ====
+---- QUERY
 select count(*) from alltypes$TABLE where year<=2009 and month < 6
 ---- TYPES
 bigint
 ---- RESULTS
 1510
 ====
+---- QUERY
 select count(*) from alltypes$TABLE where month < 9 and month > 6
 ---- TYPES
 bigint
 ---- RESULTS
 1240
 ====
+---- QUERY
 select count(*) from alltypes$TABLE where year < 2010 and year < 2009 and month > 6
 ---- TYPES
 bigint
 ---- RESULTS
 0
 ====
+---- QUERY
 select count(*) from alltypes$TABLE where year < 2010 and month > 6 and month > 12
 ---- TYPES
 bigint
 ---- RESULTS
 0
 ====
+---- QUERY
 # Test multi files partitioned table (hdfs)
 select count(*) from alltypesaggmultifiles$TABLE
 ---- TYPES
@@ -132,6 +149,7 @@ bigint
 ---- RESULTS
 10000
 ====
+---- QUERY
 # Test multi files partitioned table (text)
 select count(*) from alltypesaggmultifiles
 ---- TYPES

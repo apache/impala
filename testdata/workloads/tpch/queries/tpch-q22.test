@@ -1,4 +1,5 @@
-# QUERY_NAME : TPCH-Q22_QUERY_1
+====
+---- QUERY : TPCH-Q22_QUERY_1
 # Q22 - Global Sales Opportunity Query
 # Modifications: Added a cust_name_char column that will always have
 # a constant value ('C') so that we can do a join between this table
@@ -27,7 +28,7 @@ RELOAD tpch.q22_customer_tmp1
 ---- PARTITIONS
 /: 1
 ====
-# QUERY_NAME : TPCH-Q22_QUERY_2
+---- QUERY : TPCH-Q22_QUERY_2
 # Modifications: Updated to use LEFT OUTER JOIN instead of NOT EXISTS,
 # removed subquery by pushing aggregation up a level, added temp table
 # to remove another subquery that computed the average account balance,

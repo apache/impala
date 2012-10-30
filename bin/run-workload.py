@@ -47,11 +47,6 @@ parser.add_option("-w", "--workloads", dest="workloads", default="hive-benchmark
 parser.add_option("--impalad", dest="impalad", default="localhost:21000",
                   help="A comma-separated list of impalad instances to run the "\
                   "workload against.")
-parser.add_option("--runquery_path", dest="runquery_path",
-                  default=os.path.join(os.environ['IMPALA_HOME'], 'bin/run-query.sh'),
-                  help="The command to use for executing queries")
-parser.add_option("--runquery_args", dest="runquery_args", default='',
-                  help="Additional arguments to pass to runquery.")
 parser.add_option("--exec_options", dest="exec_options", default='',
                   help="Runquery exec option string.")
 parser.add_option("--compare_with_hive", dest="compare_with_hive", action="store_true",
@@ -80,7 +75,7 @@ parser.add_option("--compression_codecs", dest="compression_codecs", default=Non
                   "specified all compression codecs in the test vector will be run.")
 parser.add_option("--skip_impala", dest="skip_impala", action="store_true",
                   default= False, help="If set, queries will only run against Hive.")
-parser.add_option("--beeswax", dest="beeswax", action="store_true", default=False,
+parser.add_option("--beeswax", dest="beeswax", action="store_true", default=True,
                   help="If set, Impala queries will use the beeswax interface.")
 parser.add_option("--use_kerberos", dest="use_kerberos", action="store_true",
                   default=False, help="If set, enables talking to a kerberized impalad")
@@ -204,8 +199,6 @@ if __name__ == "__main__":
 
   workload_runner = WorkloadRunner(
     beeswax=options.beeswax,
-    runquery_path=options.runquery_path,
-    runquery_args=options.runquery_args,
     hive_cmd=options.hive_cmd,
     impalad=options.impalad,
     iterations=options.iterations,

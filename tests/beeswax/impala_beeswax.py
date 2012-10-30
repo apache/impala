@@ -41,7 +41,9 @@ class ImpalaBeeswaxException(Exception):
 
 # Encapsulates a typical query result.
 class QueryResult(object):
-  def __init__(self, success=False, data=None, time_taken=0, summary=''):
+  def __init__(self, query=None, success=False, data=None, schema=None,
+               time_taken=0, summary=''):
+    self.query = query
     self.success = success
     # Insert returns an int, convert into list to have a uniform data type.
     # TODO: We shold revisit this if we have more datatypes to deal with.
@@ -51,6 +53,7 @@ class QueryResult(object):
       self.data = [self.data]
     self.time_taken = time_taken
     self.summary = summary
+    self.schema = schema
 
   def get_data(self):
     return self.__format_data()
@@ -138,12 +141,20 @@ class ImpalaBeeswaxClient(object):
     """Re-directs the query to its appropriate handler, returns QueryResult"""
     # Take care of leading/trailing whitespaces.
     query_string = query_string.strip()
-    query_type = shlex.split(query_string)[0]
+    query_type = shlex.split(query_string)[0].lower()
     handle, time_taken = self.__execute_query(query_string)
+
+    if query_type == 'use':
+      return QueryResult(query=query_string, success=True, data=[''])
+
     # Result fetching for insert is different from other queries.
-    if query_type.lower() == 'insert':
-      return self.__fetch_insert_results(handle, time_taken)
-    return self.__fetch_results(handle, time_taken)
+    exec_result = None
+    if query_type == 'insert':
+      exec_result = self.__fetch_insert_results(handle, time_taken)
+    else:
+      exec_result = self.__fetch_results(handle, time_taken)
+    exec_result.query = query_string
+    return exec_result
 
   def __execute_query(self, query_string):
     """Executes a query, returns the query handle and time taken for further processing."""
@@ -164,8 +175,14 @@ class ImpalaBeeswaxClient(object):
     end = time.time()
     return (handle, end - start)
 
+  def refresh(self):
+    """Reload the Impalad catalog"""
+    return self.__do_rpc(lambda: self.imp_service.ResetCatalog()) == 0
+
   def __fetch_results(self, handle, time_taken):
     """Handles query results, returns a QueryResult object"""
+
+    schema = self.__do_rpc(lambda: self.imp_service.get_results_metadata(handle)).schema
     # The query has finished, we can fetch the results
     result_rows = []
     while True:
@@ -173,11 +190,13 @@ class ImpalaBeeswaxClient(object):
       result_rows.extend(results.data)
       if not results.has_more:
         break
+
     self.__do_rpc(lambda: self.imp_service.close(handle))
     # The query executed successfully and all the data was fetched.
     exec_result = QueryResult(success=True,
                               time_taken=time_taken,
-                              data = result_rows)
+                              data = result_rows,
+                              schema = schema)
     exec_result.summary = 'Returned %d rows' % (len(result_rows))
     return exec_result
 

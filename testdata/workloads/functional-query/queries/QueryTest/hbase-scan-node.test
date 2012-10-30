@@ -1,3 +1,5 @@
+====
+---- QUERY
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col, timestamp_col
 from hbasealltypessmall
@@ -105,6 +107,7 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
 98,true,3,3,3,30,3.299999952316284,30.3,'04/03/09','3',2009-04-03 00:23:00.930000000
 99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4',2009-04-03 00:24:00.960000000
 ====
+---- QUERY
 select id from hbasealltypessmall
 ---- TYPES
 int
@@ -210,6 +213,7 @@ int
 98
 99
 ====
+---- QUERY
 # Notice the columns are ordered by family/qualifier
 # and are not in the order declared in the DDL
 select * from hbasealltypessmall
@@ -317,12 +321,14 @@ int, boolean, double, float, bigint, int, smallint, tinyint, string, string, tim
 98,true,30.3,3.299999952316284,30,3,3,3,'04/03/09','3',2009-04-03 00:23:00.930000000
 99,false,40.4,4.400000095367432,40,4,4,4,'04/03/09','4',2009-04-03 00:24:00.960000000
 ====
+---- QUERY
 select count(*) from hbasealltypesagg where smallint_col is null and string_col is not null
 ---- TYPES
 bigint
 ---- RESULTS
 100
 ====
+---- QUERY
 # show that the hdfs table has identical results
 select count(*) from alltypesagg where smallint_col is null and string_col is not null
 ---- TYPES
@@ -330,6 +336,7 @@ bigint
 ---- RESULTS
 100
 ====
+---- QUERY
 # HBase does not return rows if the selected columns don't exist.
 # Since only smallint_col is selected, those expected NULLs don't appear.
 # Therefore, the result returned by this query is zero. 
@@ -339,6 +346,7 @@ bigint
 ---- RESULTS
 0
 ====
+---- QUERY
 # Compare this hdfs-equivalent query with the above one.
 select count(*) from alltypesagg where smallint_col is null
 ---- TYPES
@@ -346,6 +354,7 @@ bigint
 ---- RESULTS
 100
 ====
+---- QUERY
 # test adapted from aggregation.test but using the hbase equivalent table
 select tinyint_col, count(bool_col) from hbasealltypesagg group by 1
 ---- TYPES
@@ -362,6 +371,7 @@ tinyint, bigint
 9,1000
 NULL,1000
 ====
+---- QUERY
 # test adapted from aggregation.test but using the hbase equivalent table
 # notice that the NULL value is missing because HBase does not
 # return those rows where tinyint_col does not exist 
@@ -379,6 +389,7 @@ tinyint, bigint
 8,1000
 9,1000
 ====
+---- QUERY
 select tinyint_col, int_col % 10, count(*) from hbasealltypesagg group by 1, 2
 ---- TYPES
 tinyint, int, bigint
@@ -394,6 +405,7 @@ tinyint, int, bigint
 9,9,1000
 NULL,0,990
 ====
+---- QUERY
 select tinyint_col, count(*) from hbasealltypesagg where (int_col % 10) = 0 group by tinyint_col
 ---- TYPES
 tinyint, bigint

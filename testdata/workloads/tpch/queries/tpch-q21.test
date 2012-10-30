@@ -1,4 +1,5 @@
-# QUERY_NAME : TPCH-Q21
+====
+---- QUERY : TPCH-Q21
 # Q21 - Suppliers Who Kept Orders Waiting Query
 # Modifications: Converted 'EXISTS' into LEFT SEMI JOIN, converted
 # NOT EXISTS into LEFT OUTER JOIN, changed selectes from multiple tables to
