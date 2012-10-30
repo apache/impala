@@ -1,12 +1,25 @@
 #!/usr/bin/env python
+# Copyright 2012 Cloudera Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-# This script generates the necessary files to coordinate function calls between the FE 
-# and BE. In the FE, this creates a mapping between function signature (Operation & 
-# Arguments) to an opcode. The opcode is a thrift enum which is passed to the backend. 
-# The backend has all the information from just the opcode and does not need to worry 
+# This script generates the necessary files to coordinate function calls between the FE
+# and BE. In the FE, this creates a mapping between function signature (Operation &
+# Arguments) to an opcode. The opcode is a thrift enum which is passed to the backend.
+# The backend has all the information from just the opcode and does not need to worry
 # about type checking.
 #
-# This scripts pulls function metadata input from 
+# This scripts pulls function metadata input from
 #   - impala/common/function-registry/impala_functions.py (manually maintained)
 #   - impala/common/function-registry/generated_functions.py (auto-generated metadata)
 #
@@ -41,7 +54,20 @@ native_types = {
 }
 
 thrift_preamble = '\
-// Copyright (c) 2012 Cloudera, Inc. All rights reserved.\n\
+// Copyright 2012 Cloudera Inc.\n\
+//\n\
+// Licensed under the Apache License, Version 2.0 (the "License");\n\
+// you may not use this file except in compliance with the License.\n\
+// You may obtain a copy of the License at\n\
+//\n\
+// http://www.apache.org/licenses/LICENSE-2.0\n\
+//\n\
+// Unless required by applicable law or agreed to in writing, software\n\
+// distributed under the License is distributed on an "AS IS" BASIS,\n\
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n\
+// See the License for the specific language governing permissions and\n\
+// limitations under the License.\n\
+\n\
 // This is a generated file, DO NOT EDIT.\n\
 // To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
 \n\
@@ -55,7 +81,20 @@ thrift_epilogue = '\
 \n'
 
 cc_registry_preamble = '\
-// Copyright (c) 2012 Cloudera, Inc. All rights reserved.\n\
+// Copyright 2012 Cloudera Inc.\n\
+//\n\
+// Licensed under the Apache License, Version 2.0 (the "License");\n\
+// you may not use this file except in compliance with the License.\n\
+// You may obtain a copy of the License at\n\
+//\n\
+// http://www.apache.org/licenses/LICENSE-2.0\n\
+//\n\
+// Unless required by applicable law or agreed to in writing, software\n\
+// distributed under the License is distributed on an "AS IS" BASIS,\n\
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n\
+// See the License for the specific language governing permissions and\n\
+// limitations under the License.\n\
+\n\
 // This is a generated file, DO NOT EDIT.\n\
 // To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
 \n\
@@ -80,7 +119,20 @@ cc_registry_epilogue = '\
 }\n'
 
 operator_file_preamble = '\
-// Copyright (c) 2012 Cloudera, Inc. All rights reserved.\n\
+//  Copyright 2012 Cloudera Inc.\n\
+// \n\
+//  Licensed under the Apache License, Version 2.0 (the "License");\n\
+//  you may not use this file except in compliance with the License.\n\
+//  You may obtain a copy of the License at\n\
+// \n\
+//  http://www.apache.org/licenses/LICENSE-2.0\n\
+// \n\
+//  Unless required by applicable law or agreed to in writing, software\n\
+//  distributed under the License is distributed on an "AS IS" BASIS,\n\
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n\
+//  See the License for the specific language governing permissions and\n\
+//  limitations under the License.\n\
+\n\
 // This is a generated file, DO NOT EDIT.\n\
 // To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
 \n\
@@ -92,7 +144,20 @@ operator_file_epilogue = '\
 }\n'
 
 java_registry_preamble = '\
-// Copyright (c) 2012 Cloudera, Inc. All rights reserved.\n\
+//  Copyright 2012 Cloudera Inc.\n\
+// \n\
+//  Licensed under the Apache License, Version 2.0 (the "License");\n\
+//  you may not use this file except in compliance with the License.\n\
+//  You may obtain a copy of the License at\n\
+// \n\
+//  http://www.apache.org/licenses/LICENSE-2.0\n\
+// \n\
+//  Unless required by applicable law or agreed to in writing, software\n\
+//  distributed under the License is distributed on an "AS IS" BASIS,\n\
+//  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n\
+//  See the License for the specific language governing permissions and\n\
+//  limitations under the License.\n\
+\n\
 // This is a generated file, DO NOT EDIT.\n\
 // To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
 \n\
@@ -116,7 +181,7 @@ java_registry_epilogue = '\
 
 def initialize_sub(op, return_type, arg_types):
   sub = {}
-  java_args = "PrimitiveType." + return_type 
+  java_args = "PrimitiveType." + return_type
   sub["fn_class"] = "GetValueFunctions"
   sub["fn_signature"] = op
   sub["num_args"] = len(arg_types)
@@ -126,7 +191,7 @@ def initialize_sub(op, return_type, arg_types):
     sub["native_type" + repr(idx + 1)] = native_types[arg]
     java_args += ", PrimitiveType." + arg
   sub["thrift_enum"] = sub["fn_signature"].upper()
-  sub["java_output"] = "FunctionOperator." + op.upper() + ", TExprOpcode." + sub["thrift_enum"] 
+  sub["java_output"] = "FunctionOperator." + op.upper() + ", TExprOpcode." + sub["thrift_enum"]
   sub["java_output"] += ", " + java_args
   return sub
 
@@ -168,11 +233,11 @@ def add_function(fn_meta_data):
     fn_list = [entry]
     meta_data_entries[fn_name] = fn_list
     operators.append(fn_name.upper())
-  
+
 # Iterate over entries in the meta_data_entries map and generate opcodes.  Some
 # entries will have the same name at this stage, quality the name withe the
 # signature  to generate unique enums.
-# Resulting opcode list is sorted with INVALID_OPCODE at beginning and LAST_OPCODE 
+# Resulting opcode list is sorted with INVALID_OPCODE at beginning and LAST_OPCODE
 # at end.
 def generate_opcodes():
   for fn in meta_data_entries:
@@ -199,7 +264,7 @@ def generate_opcodes():
 def generate_be_registry_init(filename):
   cc_registry_file = open(filename, "w")
   cc_registry_file.write(cc_registry_preamble)
-  
+
   for fn in meta_data_entries:
     entries = meta_data_entries[fn]
     for entry in entries:
@@ -222,7 +287,7 @@ def generate_fe_registry_init(filename):
     for entry in entries:
       java_output = "FunctionOperator." + fn.upper()
       java_output += ", TExprOpcode." + entry["opcode"]
-      # Check the last entry for varargs indicator.      
+      # Check the last entry for varargs indicator.
       if entry["args"] and entry["args"][-1] == "...":
         entry["args"].pop()
         java_output += ", true"
@@ -233,7 +298,7 @@ def generate_fe_registry_init(filename):
         java_output += ", PrimitiveType." + arg
       java_registry_file.write("    result &= registry.add(%s);\n" % java_output)
   java_registry_file.write("\n")
-  
+
   mappings = {}
 
   for fn in meta_data_entries:
@@ -295,4 +360,3 @@ for op in operators:
   operator_java_file.write("  %s,\n" % op)
 operator_java_file.write(operator_file_epilogue)
 operator_java_file.close()
-

@@ -1,4 +1,17 @@
 #!/usr/bin/env python
+# Copyright 2012 Cloudera Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 from string import Template
 import os
@@ -10,9 +23,9 @@ import os
 #   - Cast functions
 #
 # The script outputs (run: 'impala/common/function-registry/gen_functions.py')
-#   - header and implemention for above functions: 
+#   - header and implemention for above functions:
 #     - impala/be/src/generated-sources/opcode/functions.[h/cc]
-#   - python file that contains the metadata for those functions: 
+#   - python file that contains the metadata for those functions:
 #     - impala/common/function-registry/generated_functions.py
 
 unary_op = Template("\
@@ -215,27 +228,27 @@ functions = [
   ['BitAnd', ['INT_TYPES'], [['INT_TYPES'], ['INT_TYPES']] ],
   ['BitXor', ['INT_TYPES'], [['INT_TYPES'], ['INT_TYPES']] ],
   ['BitOr', ['INT_TYPES'], [['INT_TYPES'], ['INT_TYPES']] ],
-  ['BitNot', ['INT_TYPES'], [['INT_TYPES']] ], 
-  
+  ['BitNot', ['INT_TYPES'], [['INT_TYPES']] ],
+
   # BinaryPredicates
-  ['Eq', ['BOOLEAN'], [['NATIVE_TYPES'], ['NATIVE_TYPES']] ], 
-  ['Ne', ['BOOLEAN'], [['NATIVE_TYPES'], ['NATIVE_TYPES']] ], 
-  ['Gt', ['BOOLEAN'], [['NATIVE_TYPES'], ['NATIVE_TYPES']] ], 
-  ['Lt', ['BOOLEAN'], [['NATIVE_TYPES'], ['NATIVE_TYPES']] ], 
-  ['Ge', ['BOOLEAN'], [['NATIVE_TYPES'], ['NATIVE_TYPES']] ], 
-  ['Le', ['BOOLEAN'], [['NATIVE_TYPES'], ['NATIVE_TYPES']] ], 
-  ['Eq', ['BOOLEAN'], [['STRING'], ['STRING']], binary_func ], 
-  ['Ne', ['BOOLEAN'], [['STRING'], ['STRING']], binary_func ], 
-  ['Gt', ['BOOLEAN'], [['STRING'], ['STRING']], binary_func ], 
-  ['Lt', ['BOOLEAN'], [['STRING'], ['STRING']], binary_func ], 
-  ['Ge', ['BOOLEAN'], [['STRING'], ['STRING']], binary_func ], 
-  ['Le', ['BOOLEAN'], [['STRING'], ['STRING']], binary_func ], 
-  ['Eq', ['BOOLEAN'], [['TIMESTAMP'], ['TIMESTAMP']], ], 
-  ['Ne', ['BOOLEAN'], [['TIMESTAMP'], ['TIMESTAMP']], ], 
-  ['Gt', ['BOOLEAN'], [['TIMESTAMP'], ['TIMESTAMP']], ], 
-  ['Lt', ['BOOLEAN'], [['TIMESTAMP'], ['TIMESTAMP']], ], 
-  ['Ge', ['BOOLEAN'], [['TIMESTAMP'], ['TIMESTAMP']], ], 
-  ['Le', ['BOOLEAN'], [['TIMESTAMP'], ['TIMESTAMP']], ], 
+  ['Eq', ['BOOLEAN'], [['NATIVE_TYPES'], ['NATIVE_TYPES']] ],
+  ['Ne', ['BOOLEAN'], [['NATIVE_TYPES'], ['NATIVE_TYPES']] ],
+  ['Gt', ['BOOLEAN'], [['NATIVE_TYPES'], ['NATIVE_TYPES']] ],
+  ['Lt', ['BOOLEAN'], [['NATIVE_TYPES'], ['NATIVE_TYPES']] ],
+  ['Ge', ['BOOLEAN'], [['NATIVE_TYPES'], ['NATIVE_TYPES']] ],
+  ['Le', ['BOOLEAN'], [['NATIVE_TYPES'], ['NATIVE_TYPES']] ],
+  ['Eq', ['BOOLEAN'], [['STRING'], ['STRING']], binary_func ],
+  ['Ne', ['BOOLEAN'], [['STRING'], ['STRING']], binary_func ],
+  ['Gt', ['BOOLEAN'], [['STRING'], ['STRING']], binary_func ],
+  ['Lt', ['BOOLEAN'], [['STRING'], ['STRING']], binary_func ],
+  ['Ge', ['BOOLEAN'], [['STRING'], ['STRING']], binary_func ],
+  ['Le', ['BOOLEAN'], [['STRING'], ['STRING']], binary_func ],
+  ['Eq', ['BOOLEAN'], [['TIMESTAMP'], ['TIMESTAMP']], ],
+  ['Ne', ['BOOLEAN'], [['TIMESTAMP'], ['TIMESTAMP']], ],
+  ['Gt', ['BOOLEAN'], [['TIMESTAMP'], ['TIMESTAMP']], ],
+  ['Lt', ['BOOLEAN'], [['TIMESTAMP'], ['TIMESTAMP']], ],
+  ['Ge', ['BOOLEAN'], [['TIMESTAMP'], ['TIMESTAMP']], ],
+  ['Le', ['BOOLEAN'], [['TIMESTAMP'], ['TIMESTAMP']], ],
 
   # Casts
   ['Cast', ['BOOLEAN'], [['NATIVE_TYPES'], ['BOOLEAN']] ],
@@ -258,7 +271,7 @@ functions = [
   # The case expr is special because it has a variable number of function args,
   # but we guarantee that all of them are of the same type during query analysis,
   # so we just list exactly one here.
-  # In addition, the return type given here is a dummy, because it is 
+  # In addition, the return type given here is a dummy, because it is
   # not necessarily the same as the function args type.
   ['Case', ['ALL_TYPES'], [['ALL_TYPES']], case],
 ]
@@ -304,14 +317,14 @@ native_ops = {
   'BITNOT'     : '~',
   'BITOR'      : '|',
   'BITXOR'     : '^',
-  'DIVIDE'     : '/', 
+  'DIVIDE'     : '/',
   'EQ'         : '==',
   'GT'         : '>',
   'GE'         : '>=',
   'INT_DIVIDE' : '/',
-  'SUBTRACT'   : '-', 
+  'SUBTRACT'   : '-',
   'MOD'        : '%',
-  'MULTIPLY'   : '*', 
+  'MULTIPLY'   : '*',
   'LT'         : '<',
   'LE'         : '<=',
   'NE'         : '!=',
@@ -328,7 +341,20 @@ native_funcs = {
 }
 
 cc_preamble = '\
-// Copyright (c) 2012 Cloudera, Inc. All rights reserved.\n\
+// Copyright 2012 Cloudera Inc.\n\
+//\n\
+// Licensed under the Apache License, Version 2.0 (the "License");\n\
+// you may not use this file except in compliance with the License.\n\
+// You may obtain a copy of the License at\n\
+//\n\
+// http://www.apache.org/licenses/LICENSE-2.0\n\
+//\n\
+// Unless required by applicable law or agreed to in writing, software\n\
+// distributed under the License is distributed on an "AS IS" BASIS,\n\
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n\
+// See the License for the specific language governing permissions and\n\
+// limitations under the License.\n\
+\n\
 // This is a generated file, DO NOT EDIT.\n\
 // To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
 \n\
@@ -350,7 +376,20 @@ cc_epilogue = '\
 }\n'
 
 h_preamble = '\
-// Copyright (c) 2012 Cloudera, Inc. All rights reserved.\n\
+// Copyright 2012 Cloudera Inc.\n\
+//\n\
+// Licensed under the Apache License, Version 2.0 (the "License");\n\
+// you may not use this file except in compliance with the License.\n\
+// You may obtain a copy of the License at\n\
+//\n\
+// http://www.apache.org/licenses/LICENSE-2.0\n\
+//\n\
+// Unless required by applicable law or agreed to in writing, software\n\
+// distributed under the License is distributed on an "AS IS" BASIS,\n\
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n\
+// See the License for the specific language governing permissions and\n\
+// limitations under the License.\n\
+\n\
 // This is a generated file, DO NOT EDIT IT.\n\
 // To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
 \n\
@@ -374,7 +413,20 @@ h_epilogue = '\
 
 python_preamble = '\
 #!/usr/bin/env python\n\
-# Copyright (c) 2012 Cloudera, Inc. All rights reserved.\n\
+# Copyright 2012 Cloudera Inc.\n\
+#\n\
+# Licensed under the Apache License, Version 2.0 (the "License");\n\
+# you may not use this file except in compliance with the License.\n\
+# You may obtain a copy of the License at\n\
+#\n\
+# http://www.apache.org/licenses/LICENSE-2.0\n\
+#\n\
+# Unless required by applicable law or agreed to in writing, software\n\
+# distributed under the License is distributed on an "AS IS" BASIS,\n\
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n\
+# See the License for the specific language governing permissions and\n\
+# limitations under the License.\n\
+\n\
 # This is a generated file, DO NOT EDIT IT.\n\
 # To add new functions, see impala/common/function-registry/gen_opcodes.py\n\
 \n\
@@ -389,7 +441,7 @@ BE_PATH = "../../be/generated-sources/opcode/"
 if not os.path.exists(BE_PATH):
   os.makedirs(BE_PATH)
 
-# Expand the signature data for template substitution.  Returns 
+# Expand the signature data for template substitution.  Returns
 # a dictionary with all the entries for all the templates used in this script
 def initialize_sub(op, return_type, arg_types):
   sub = {}
@@ -417,7 +469,7 @@ if __name__ == "__main__":
 
   # Generate functions and headers
   for func_data in functions:
-    
+
     op = func_data[0]
     # If a specific template has been specified, use that one.
     if len(func_data) >= 4 :
@@ -427,7 +479,7 @@ if __name__ == "__main__":
       if not op in templates:
         continue
       template = templates[op]
-    
+
     # Expand all arguments
     return_types = []
     for ret in func_data[1]:
@@ -452,12 +504,12 @@ if __name__ == "__main__":
     if len(return_types) != 1 and len(return_types) != num_functions:
       print "Invalid Declaration: " + func_data
       sys.exit(1)
-    
+
     for args in signatures:
       if len(args) != 1 and len(args) != num_functions:
         print "Invalid Declaration: " + func_data
         sys.exit(1)
-    
+
     # Iterate over every function signature to generate
     for i in range(0, num_functions):
       if len(return_types) == 1:
@@ -471,7 +523,7 @@ if __name__ == "__main__":
           arg_types.append(signatures[j][0])
         else:
           arg_types.append(signatures[j][i])
-      
+
       # At this point, 'return_type' is a single type and 'arg_types'
       # is a list of single types
       sub = initialize_sub(op, return_type, arg_types)
@@ -488,4 +540,3 @@ if __name__ == "__main__":
   h_file.close()
   cc_file.close()
   python_file.close()
-
