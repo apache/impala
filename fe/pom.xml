@@ -158,12 +158,6 @@
       <artifactId>datanucleus-rdbms</artifactId>
       <version>2.0.3</version>
     </dependency>
-    <!-- TODO: DO NOT SHIP THE MYSQL JAR - it's not license compatible -->
-    <dependency>
-      <groupId>mysql</groupId>
-      <artifactId>mysql-connector-java</artifactId>
-      <version>5.1.9</version>
-    </dependency>
     <!-- This driver supports PostgreSQL 7.2 and newer -->
     <dependency>
       <groupId>postgresql</groupId>

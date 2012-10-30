@@ -20,7 +20,10 @@ root=`dirname "$0"`
 root=`cd "$root"; pwd`
 
 export IMPALA_HOME=$root
-export METASTORE_DB=`basename $root | sed -e "s/\\./_/g" | sed -e "s/[.-]/_/g"`
+# Create unique metastore DB name based on the directory we're in.  The result
+# must be lower case.
+METASTORE_DB=`basename $root | sed -e "s/\\./_/g" | sed -e "s/[.-]/_/g"`
+export METASTORE_DB=`tr '[A-Z]' '[a-z]' $METASTORE_DB`
 export CURRENT_USER=`whoami`
 
 . "$root"/bin/impala-config.sh
@@ -126,12 +129,17 @@ then
   perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
     derby-hive-site.xml.template > hive-site.xml
 else
-  echo "using mysql for metastore"
+  echo "using postgresql for metastore"
   if [ $FORMAT_CLUSTER -eq 1 ]; then
-    echo "drop database hive_$METASTORE_DB;" | mysql --user=hiveuser --password=password
+    echo "Creating postgresql databases"
+    dropdb -U hiveuser hive_$METASTORE_DB
+    createdb -U hiveuser hive_$METASTORE_DB
+    # TODO: Change location of the sql file when Hive release contains this script
+    psql -U hiveuser -d hive_$METASTORE_DB \
+        -f ${IMPALA_HOME}/bin/hive-schema-0.9.0.postgres.sql
   fi
   perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
-    mysql-hive-site.xml.template > hive-site.xml
+    postgresql-hive-site.xml.template > hive-site.xml
 fi
 
 # Generate hbase-site.xml from template via env var substitution
