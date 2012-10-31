@@ -1,3 +1,4 @@
+# Test that we properly write null values to text tables.
 insert overwrite table nullinsert$TABLE
 select NULL, "", "NULL", "\\N", NULL from alltypes limit 1
 ---- SETUP

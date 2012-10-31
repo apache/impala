@@ -167,10 +167,10 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=4/100401.txt 0:20179
   LOCATIONS:
 ====
-# insert with limit from paritioned table.
+# insert with limit from partitioned table.
 insert into table alltypesnopart
 select * 
-from alltypes limit 10
+from alltypes where year=2009 and month=1 limit 10
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -200,51 +200,5 @@ Plan Fragment 1
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=10/091001.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=11/091101.txt 0:20179
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=12/091201.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=2/090201.txt 0:18555
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=3/090301.txt 0:20543
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=4/090401.txt 0:20079
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=5/090501.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=6/090601.txt 0:20179
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=7/090701.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=8/090801.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=1/100101.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=10/101001.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=11/101101.txt 0:20179
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=12/101201.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=2/100201.txt 0:18835
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=3/100301.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=4/100401.txt 0:20179
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=5/100501.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=6/100601.txt 0:20179
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=7/100701.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=8/100801.txt 0:20853
-  LOCATIONS:
-  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2010/month=9/100901.txt 0:20179
   LOCATIONS:
 ====
