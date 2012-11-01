@@ -31,3 +31,13 @@ add_library(TestUtil STATIC
 target_link_libraries(TestUtil
   ImpalaThrift
 )
+
+add_executable(mini-impala-cluster
+  mini-impala-cluster.cc
+)
+
+target_link_libraries(mini-impala-cluster
+  TestUtil
+  ${IMPALA_LINK_LIBS}
+)
+
