@@ -23,7 +23,7 @@ export IMPALA_HOME=$root
 # Create unique metastore DB name based on the directory we're in.  The result
 # must be lower case.
 METASTORE_DB=`basename $root | sed -e "s/\\./_/g" | sed -e "s/[.-]/_/g"`
-export METASTORE_DB=`tr '[A-Z]' '[a-z]' $METASTORE_DB`
+export METASTORE_DB=`echo $METASTORE_DB | tr '[A-Z]' '[a-z]'`
 export CURRENT_USER=`whoami`
 
 . "$root"/bin/impala-config.sh
