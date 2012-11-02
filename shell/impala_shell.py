@@ -540,8 +540,14 @@ if __name__ == "__main__":
                     help="Service name of a kerberized impalad, default is 'impala'")
   parser.add_option("-V", "--verbose", dest="verbose", default=False, action="store_true",
                     help="Enable verbose output")
+  parser.add_option("-v", "--version", dest="version", default=False, action="store_true",
+                    help="Print version information")
 
-  (options, args) = parser.parse_args()
+  options, args = parser.parse_args()
+
+  if options.version:
+    print VERSION_STRING
+    sys.exit(0)
 
   if options.kerberos_service_name and not options.use_kerberos:
     print 'Kerberos not enabled, ignoring service name'
