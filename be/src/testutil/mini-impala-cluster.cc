@@ -18,8 +18,11 @@
 
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
+#include "exec/hbase-table-scanner.h"
+#include "service/fe-support.h"
 #include "service/impala-server.h"
 #include "testutil/test-exec-env.h"
+#include "util/authorization.h"
 #include "util/cpu-info.h"
 #include "util/disk-info.h"
 #include "util/jni-util.h"
@@ -30,6 +33,7 @@
 DEFINE_int32(num_backends, 3, "The number of backends to start");
 DECLARE_int32(be_port);
 DECLARE_int32(fe_port);
+DECLARE_string(principal);
 
 using namespace impala;
 using namespace std;
@@ -53,7 +57,16 @@ int main(int argc, char** argv) {
   CpuInfo::Init();
   DiskInfo::Init();
   LlvmCodeGen::InitializeLlvm();
+  // Enable Kerberos security, if requested.
+  if (!FLAGS_principal.empty()) {
+    EXIT_IF_ERROR(InitKerberos("Impalad"));
+  }
+  JniUtil::InitLibhdfs();
+
   EXIT_IF_ERROR(JniUtil::Init());
+  EXIT_IF_ERROR(HBaseTableScanner::Init());
+  EXIT_IF_ERROR(HBaseTableCache::Init());
+  InitFeSupport();
 
   // Create an in-process Impala server and in-process backends for test environment.
   LOG(INFO) << "Creating test env with " << FLAGS_num_backends << " backends";
