@@ -21,7 +21,7 @@
 #include "util/thrift-client.h"
 #include "util/thrift-util.h"
 
-DEFINE_string(impalad, "", "host:port of impalad process");
+DEFINE_string(impalad, "localhost:21000", "host:port of impalad process");
 DECLARE_int32(num_nodes);
 
 using namespace std;

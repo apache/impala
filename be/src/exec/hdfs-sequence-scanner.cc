@@ -114,13 +114,14 @@ Status HdfsSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
   if (!found) return Status::OK;
 
   // Process Range.
-  // We can continue through errors by skipping to to the next SYNC hash.
   Status status;
   int64_t first_error_offset = 0;
   int num_errors = 0;
 
+  // We can continue through errors by skipping to to the next SYNC hash. 
   do {
     status = ProcessRange();
+    if (status.IsCancelled()) return status;
     // Save the offset of any error.
     if (first_error_offset == 0) first_error_offset = context_->file_offset();
 
@@ -140,15 +141,19 @@ Status HdfsSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
       }
     }
 
-    // If no errors or we abort on error then exit loop.
+    // If no errors or we abort on error then exit loop, otherwise try to recover.
     if (state_->abort_on_error() || status.ok()) break;
 
-    // If we are not at the end of the scan range, try to recover.
     if (!context_->eosr()) {
       parse_status_ = Status::OK;
       ++num_errors;
+      // Recover by skipping to the next sync.
       status = SkipToSync();
+      if (status.IsCancelled()) return status;
       if (context_->eosr()) break;
+
+      // An error status is explicitly ignored here so we can skip over bad blocks.
+      // We will continue through this loop again looking for the next sync.
 
       // If block compressed, reset the number of records.
       // We will be at the beginning of a block.

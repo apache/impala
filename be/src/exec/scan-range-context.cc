@@ -109,6 +109,9 @@ void ScanRangeContext::RemoveFirstBuffer() {
 }
 
 Status ScanRangeContext::GetRawBytes(uint8_t** out_buffer, int* len, bool* eos) {
+  *out_buffer = NULL;
+  *len = 0;
+
   // Wait for first buffer
   {
     unique_lock<mutex> l(lock_);
@@ -133,7 +136,7 @@ Status ScanRangeContext::GetRawBytes(uint8_t** out_buffer, int* len, bool* eos) 
   *out_buffer = current_buffer_pos_;
   *len = current_buffer_bytes_left_;
   *eos = current_buffer_->eosr();
-return Status::OK;
+  return Status::OK;
 }
 
 Status ScanRangeContext::GetBytesInternal(uint8_t** out_buffer, int requested_len, 
