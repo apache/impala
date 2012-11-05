@@ -54,8 +54,8 @@ class Webserver {
 
  private:
   // Static so that it can act as a function pointer, and then call the next method
-  static void* MongooseCallbackStatic(enum mg_event event,
-      struct mg_connection* connection, const struct mg_request_info* request_info);
+  static void* MongooseCallbackStatic(enum mg_event event, 
+      struct mg_connection* connection);
 
   // Dispatch point for all incoming requests.
   void* MongooseCallback(enum mg_event event, struct mg_connection* connection,

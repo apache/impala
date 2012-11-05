@@ -104,8 +104,10 @@ void Webserver::Stop() {
 }
 
 void* Webserver::MongooseCallbackStatic(enum mg_event event,
-    struct mg_connection* connection, const struct mg_request_info* request_info) {
-  Webserver* instance = reinterpret_cast<Webserver*>(request_info->user_data);
+    struct mg_connection* connection) {
+  const struct mg_request_info* request_info = mg_get_request_info(connection);
+  Webserver* instance = 
+      reinterpret_cast<Webserver*>(mg_get_user_data(connection));
   return instance->MongooseCallback(event, connection, request_info);
 }
 
