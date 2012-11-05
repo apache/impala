@@ -88,7 +88,7 @@ class ImpalaBeeswaxClient(object):
       self.query_options[get_name(option)] = default
 
   def __options_to_string_list(self):
-    return ["%s:%s" % (k,v) for (k,v) in self.query_options.iteritems()]
+    return ["%s=%s" % (k,v) for (k,v) in self.query_options.iteritems()]
 
   def get_query_options(self):
     return '\n'.join(["\t%s: %s" % (k,v) for (k,v) in self.query_options.iteritems()])

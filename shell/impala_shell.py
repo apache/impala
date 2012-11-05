@@ -99,7 +99,7 @@ class ImpalaShell(cmd.Cmd):
     print '\n'.join(["\t%s: %s" % (k,v) for (k,v) in self.query_options.iteritems()])
 
   def __options_to_string_list(self):
-    return ["%s:%s" % (k,v) for (k,v) in self.query_options.iteritems()]
+    return ["%s=%s" % (k,v) for (k,v) in self.query_options.iteritems()]
 
   def do_shell(self, args):
     """Run a command on the shell

@@ -1488,7 +1488,7 @@ Status ImpalaServer::ParseQueryOptions(const string& options,
   Status result;
   if (options.length() == 0) return Status::OK;
   vector<string> kv_pairs;
-  split(kv_pairs, options, is_any_of(";"), token_compress_on );
+  split(kv_pairs, options, is_any_of(","), token_compress_on );
   BOOST_FOREACH(string& kv_string, kv_pairs) {
     trim(kv_string);
     if (kv_string.length() == 0) continue;
