@@ -6,11 +6,11 @@
 #  GFLAGS_FOUND, whether gflags has been found
 
 set(GFLAGS_SEARCH_HEADER_PATHS  
-  ${CMAKE_SOURCE_DIR}/thirdparty/gflags-1.5/src
+  ${CMAKE_SOURCE_DIR}/thirdparty/gflags-$ENV{IMPALA_GFLAGS_VERSION}/src
 )
 
 set(GFLAGS_SEARCH_LIB_PATH
-  ${CMAKE_SOURCE_DIR}/thirdparty/gflags-1.5/.libs
+  ${CMAKE_SOURCE_DIR}/thirdparty/gflags-$ENV{IMPALA_GFLAGS_VERSION}/.libs
 )
 
 find_path(GFLAGS_INCLUDE_DIR gflags/gflags.h PATHS
@@ -31,11 +31,12 @@ endif ()
 
 if (GFLAGS_FOUND)
   if (NOT GFLAGS_FIND_QUIETLY)
-    message(STATUS "GFlags Found in ${GFLAGS_SEARCH_LIB_PATH}")
+    message(STATUS "GFlags found in ${GFLAGS_SEARCH_LIB_PATH}")
+    message(STATUS "GFlags headers found in ${GFLAGS_SEARCH_HEADER_PATHS}")
   endif ()
 else ()
   message(STATUS "GFlags includes and libraries NOT found. "
-    "Looked for headers in ${GFLAGS_SEARCH_HEADER_PATH}, "
+    "Looked for headers in ${GFLAGS_SEARCH_HEADER_PATHS}, "
     "and for libs in ${GFLAGS_SEARCH_LIB_PATH}")
 endif ()
 

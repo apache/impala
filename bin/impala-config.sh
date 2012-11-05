@@ -49,6 +49,19 @@ fi
 export HADOOP_LZO=${HADOOP_LZO-~/hadoop-lzo}
 export IMPALA_LZO=${IMPALA_LZO-~/Impala-lzo}
 
+export IMPALA_GFLAGS_VERSION=2.0
+export IMPALA_GPERFTOOLS_VERSION=2.0
+export IMPALA_GLOG_VERSION=0.3.2
+export IMPALA_GTEST_VERSION=1.6.0
+export IMPALA_SNAPPY_VERSION=1.0.5
+export IMPALA_CYRUS_SASL_VERSION=2.1.23
+export IMPALA_MONGOOSE_VERSION=3.3
+
+export IMPALA_HADOOP_VERSION=2.0.0-cdh4.1.0
+export IMPALA_HIVE_VERSION=0.9.0-cdh4.1.0
+export IMPALA_HBASE_VERSION=0.92.1-cdh4.1.0
+export IMPALA_THRIFT_VERSION=0.7.0
+
 export IMPALA_FE_DIR=$IMPALA_HOME/fe
 export IMPALA_BE_DIR=$IMPALA_HOME/be
 export IMPALA_WORKLOAD_DIR=$IMPALA_HOME/testdata/workloads
@@ -56,12 +69,12 @@ export IMPALA_DATASET_DIR=$IMPALA_HOME/testdata/datasets
 export IMPALA_COMMON_DIR=$IMPALA_HOME/common
 export PATH=$IMPALA_HOME/bin:$PATH
 
-export HADOOP_HOME=$IMPALA_HOME/thirdparty/hadoop-2.0.0-cdh4.1.0/
+export HADOOP_HOME=$IMPALA_HOME/thirdparty/hadoop-${IMPALA_HADOOP_VERSION}/
 export HADOOP_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
 export MINI_DFS_BASE_DATA_DIR=$HADOOP_HOME/build/test/data
 export PATH=$HADOOP_HOME/bin:$PATH
 
-export HIVE_HOME=$IMPALA_HOME/thirdparty/hive-0.9.0-cdh4.1.0/
+export HIVE_HOME=$IMPALA_HOME/thirdparty/hive-${IMPALA_HIVE_VERSION}/
 export PATH=$HIVE_HOME/bin:$PATH
 export HIVE_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
 
@@ -70,13 +83,13 @@ export HIVE_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
 export HIVE_AUX_JARS_PATH=$IMPALA_FE_DIR/target
 export AUX_CLASSPATH=$HADOOP_LZO/build/hadoop-lzo-0.4.15.jar
 
-export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-0.92.1-cdh4.1.0/
+export HBASE_HOME=$IMPALA_HOME/thirdparty/hbase-${IMPALA_HBASE_VERSION}/
 export PATH=$HBASE_HOME/bin:$PATH
 export HBASE_CONF_DIR=$HIVE_CONF_DIR
 
 # set the python path for test modules and beeswax
 PYTHONPATH=$IMPALA_HOME:$IMPALA_HOME/shell/gen-py:$HIVE_HOME/lib/py
-export PYTHONPATH=$PYTHONPATH:$IMPALA_HOME/thirdparty/python-thrift-0.7.0
+export PYTHONPATH=$PYTHONPATH:$IMPALA_HOME/thirdparty/python-thrift-${IMPALA_THRIFT_VERSION}
 
 # These arguments are, despite the name, passed to every JVM created
 # by an impalad. So they must point to the location of
@@ -89,11 +102,11 @@ export LIBHDFS_OPTS="${LIBHDFS_OPTS}:${IMPALA_HOME}/be/build/debug/service"
 
 export ARTISTIC_STYLE_OPTIONS=$IMPALA_BE_DIR/.astylerc
 
-export JAVA_LIBRARY_PATH=${IMPALA_HOME}/thirdparty/snappy-1.0.5/build/lib
+export JAVA_LIBRARY_PATH=${IMPALA_HOME}/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}/build/lib
 
 # So that the frontend tests and PlanService can pick up libbackend.so
 LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/be/build/debug/service"
-export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/thirdparty/snappy-1.0.5/build/lib":$IMPALA_LZO/build
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${IMPALA_HOME}/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}/build/lib":$IMPALA_LZO/build
 
 CLASSPATH=$IMPALA_FE_DIR/target/dependency:$CLASSPATH
 CLASSPATH=$IMPALA_FE_DIR/target/classes:$CLASSPATH
@@ -114,3 +127,4 @@ echo "PYTHONPATH"            = $PYTHONPATH
 echo "HADOOP_LZO             = $HADOOP_LZO"
 echo "IMPALA_LZO             = $IMPALA_LZO"
 echo "CLASSPATH              = $CLASSPATH"
+

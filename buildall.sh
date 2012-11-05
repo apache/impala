@@ -87,7 +87,7 @@ do
 done
 
 # Sanity check that thirdparty is built.
-if [ ! -e $IMPALA_HOME/thirdparty/gflags-1.5/libgflags.la ]
+if [ ! -e $IMPALA_HOME/thirdparty/gflags-${IMPALA_GFLAGS_VERSION}/libgflags.la ]
 then
   echo "Couldn't find thirdparty build files.  Building thirdparty."
   $IMPALA_HOME/bin/build_thirdparty.sh $*

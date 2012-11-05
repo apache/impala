@@ -196,8 +196,8 @@ set (IMPALA_LINK_LIBS
   ${SNAPPY_STATIC_LIB}
   ${Boost_LIBRARIES}
   ${LLVM_MODULE_LIBS}
-  gflagsstatic
   glogstatic
+  gflagsstatic
 #  tcmallocstatic  This crashes the FE tests.
   pprofstatic
   -lz -lbz2 -lboost_date_time

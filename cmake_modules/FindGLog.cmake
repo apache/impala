@@ -6,11 +6,11 @@
 #  GLOG_FOUND, whether glog has been found
 
 set(GLOG_SEARCH_HEADER_PATHS
-  ${CMAKE_SOURCE_DIR}/thirdparty/glog-0.3.1/src
+  ${CMAKE_SOURCE_DIR}/thirdparty/glog-$ENV{IMPALA_GLOG_VERSION}/src
 )
 
 set(GLOG_SEARCH_LIB_PATH
-  ${CMAKE_SOURCE_DIR}/thirdparty/glog-0.3.1/.libs
+  ${CMAKE_SOURCE_DIR}/thirdparty/glog-$ENV{IMPALA_GLOG_VERSION}/.libs
 )
 
 find_path(GLOG_INCLUDE_DIR glog/logging.h PATHS

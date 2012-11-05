@@ -38,9 +38,9 @@
     <impalad>localhost</impalad>
     <use_external_impalad>false</use_external_impalad>
     <testExecutionMode>reduced</testExecutionMode>
-    <hadoop.version>2.0.0-cdh4.1.0</hadoop.version>
-    <hive.version>0.9.0-cdh4.1.0</hive.version>
-    <hbase.version>0.92.1-cdh4.1.0</hbase.version>
+    <hadoop.version>${env.IMPALA_HADOOP_VERSION}</hadoop.version>
+    <hive.version>${env.IMPALA_HIVE_VERSION}</hive.version>
+    <hbase.version>${env.IMPALA_HBASE_VERSION}</hbase.version>
   </properties>
 
   <dependencies>
@@ -92,12 +92,12 @@
     <dependency>
       <groupId>org.apache.thrift</groupId>
       <artifactId>libthrift</artifactId>
-      <version>0.7.0</version>
+      <version>${env.IMPALA_THRIFT_VERSION}</version>
     </dependency>
     <dependency>
       <groupId>org.apache.thrift</groupId>
       <artifactId>libfb303</artifactId>
-      <version>0.7.0</version>
+      <version>${env.IMPALA_THRIFT_VERSION}</version>
     </dependency>
 
     <dependency>
