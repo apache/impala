@@ -18,6 +18,7 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/unordered_set.hpp>
+#include <string>
 
 #include "exec/exec-node.h"
 #include "exec/hash-table.h"
@@ -144,6 +145,14 @@ class HashJoinNode : public ExecNode {
   // Write combined row, consisting of probe_row and build_row, to out_row.
   // This is replaced by codegen.
   void CreateOutputRow(TupleRow* out_row, TupleRow* probe_row, TupleRow* build_row);
+
+  // Returns a debug string for probe_rows.  Probe rows have tuple ptrs that are
+  // uninitialized; the left hand child only populates the tuple ptrs it is responsible
+  // for.  This function outputs just the probe row values and leaves the build
+  // side values as NULL.
+  // This is only used for debugging and outputting the left child rows before
+  // doing the join.
+  std::string GetProbeRowOutputString(TupleRow* probe_row);
 
   // Codegen function to create output row
   llvm::Function* CodegenCreateOutputRow(LlvmCodeGen* codegen);

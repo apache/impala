@@ -204,13 +204,6 @@ Status HashJoinNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(child(0)->Open(state));
 
   // seed probe batch and current_probe_row_, etc.
-  // The child node will only assign tuples to the tuple row for the tuples it
-  // computes.  The other tuple ptrs must be set to NULL.
-  // TODO: we only need this for debugging (printing out the rows).  Any
-  // operation we do only touches the tuples that have been assigned.  Doesn't
-  // show up as a perf hit.
-  probe_batch_->ClearBatch();
-  
   while (true) {
     RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_eos_));
     COUNTER_UPDATE(probe_row_counter_, probe_batch_->num_rows());
@@ -224,7 +217,7 @@ Status HashJoinNode::Open(RuntimeState* state) {
       continue;
     } else {
       current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
-      VLOG_ROW << "probe row: " << PrintRow(current_probe_row_, child(0)->row_desc());
+      VLOG_ROW << "probe row: " << GetProbeRowOutputString(current_probe_row_);
       matched_probe_ = false;
       hash_tbl_iterator_ = hash_tbl_->Find(current_probe_row_);
       break;
@@ -320,7 +313,6 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
       if (out_batch->IsFull()) return Status::OK;
       // get new probe batch
       if (!probe_eos_) {
-        probe_batch_->ClearBatch();
         while (true) {
           probe_timer.Stop();
           RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_eos_));
@@ -350,7 +342,7 @@ Status HashJoinNode::GetNext(RuntimeState* state, RowBatch* out_batch, bool* eos
 
     // join remaining rows in probe batch_
     current_probe_row_ = probe_batch_->GetRow(probe_batch_pos_++);
-    VLOG_ROW << "probe row: " << PrintRow(current_probe_row_, child(0)->row_desc());
+    VLOG_ROW << "probe row: " << GetProbeRowOutputString(current_probe_row_);
     matched_probe_ = false;
     hash_tbl_iterator_ = hash_tbl_->Find(current_probe_row_);
   }
@@ -421,7 +413,6 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
         *eos = eos_ = true;
         break;
       } else {
-        probe_batch_->ClearBatch();
         probe_timer.Stop();
         RETURN_IF_ERROR(child(0)->GetNext(state, probe_batch_.get(), &probe_eos_));
         probe_timer.Start();
@@ -431,6 +422,26 @@ Status HashJoinNode::LeftJoinGetNext(RuntimeState* state,
   }
 
   return Status::OK;
+}
+
+string HashJoinNode::GetProbeRowOutputString(TupleRow* probe_row) {
+  stringstream out;
+  out << "[";
+  int* build_tuple_idx_ptr_ = &build_tuple_idx_[0];
+  for (int i = 0; i < row_desc().tuple_descriptors().size(); ++i) {
+    if (i != 0) out << " ";
+
+    int* is_build_tuple = 
+        ::find(build_tuple_idx_ptr_, build_tuple_idx_ptr_ + build_tuple_size_, i);
+
+    if (is_build_tuple != build_tuple_idx_ptr_ + build_tuple_size_) {
+      out << PrintTuple(NULL, *row_desc().tuple_descriptors()[i]);
+    } else {
+      out << PrintTuple(probe_row->GetTuple(i), *row_desc().tuple_descriptors()[i]);
+    }
+  }
+  out << "]";
+  return out.str();
 }
 
 void HashJoinNode::DebugString(int indentation_level, stringstream* out) const {
