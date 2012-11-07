@@ -192,7 +192,11 @@ class ImpalaShell(cmd.Cmd):
       print "CONNECT takes exactly one argument: <hostname:port> of impalad to connect to"
       return False
     try:
-      host, port = tokens[0].split(":")
+      connection_params = tokens[0].split(':')
+      if len(connection_params) > 1:
+        host, port = connection_params
+      else:
+        host, port = connection_params[0], 21000
       self.impalad = (host, port)
     except ValueError:
       print "Connect string must be of form <hostname:port>"
