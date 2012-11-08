@@ -35,7 +35,7 @@ public class HdfsStorageDescriptor {
   // hive by default uses ctrl-a as field delim
   private static final char DEFAULT_FIELD_DELIM = '\u0001';
   // hive by default has no escape char
-  private static final char DEFAULT_ESCAPE_CHAR = '\u0000';
+  public static final char DEFAULT_ESCAPE_CHAR = '\u0000';
 
   private final HdfsFileFormat fileFormat;
 
@@ -138,7 +138,7 @@ public class HdfsStorageDescriptor {
     return compression;
   }
 
-  public HdfsStorageDescriptor(HdfsFileFormat fileFormat, char lineDelim,
+  public HdfsStorageDescriptor(String tblName, HdfsFileFormat fileFormat, char lineDelim,
       char fieldDelim, char collectionDelim, char mapKeyDelim, char escapeChar,
       char quoteChar, int blockSize, THdfsCompression compression) {
     this.fileFormat = fileFormat;
@@ -146,10 +146,22 @@ public class HdfsStorageDescriptor {
     this.fieldDelim = fieldDelim;
     this.collectionDelim = collectionDelim;
     this.mapKeyDelim = mapKeyDelim;
-    this.escapeChar = escapeChar;
     this.quoteChar = quoteChar;
     this.blockSize = blockSize;
     this.compression = compression;
+
+    // You can set the escape character as a tuple or row delim.  Empirically,
+    // this is ignored by hive.
+    if (escapeChar == fieldDelim ||
+        escapeChar == lineDelim ||
+        escapeChar == collectionDelim) {
+      // TODO: we should output the table name here but it's hard to get to now.
+      this.escapeChar = DEFAULT_ESCAPE_CHAR;
+      LOG.warn("Escape character for table, " + tblName + " is set to "
+          + "the same character as one of the delimiters.  Ignoring escape character.");
+    } else {
+      this.escapeChar = escapeChar;
+    }
   }
 
   /**
@@ -170,7 +182,8 @@ public class HdfsStorageDescriptor {
    * @throws InvalidStorageDescriptorException - if the storage descriptor has invalid
    * delimiters, or an unknown file format.
    */
-  public static HdfsStorageDescriptor fromStorageDescriptor(StorageDescriptor sd)
+  public static HdfsStorageDescriptor fromStorageDescriptor(String tblName,
+      StorageDescriptor sd)
       throws InvalidStorageDescriptorException {
     Map<String, Character> delimMap = extractDelimiters(sd.getSerdeInfo());
 
@@ -195,7 +208,7 @@ public class HdfsStorageDescriptor {
     }
 
     try {
-      return new HdfsStorageDescriptor(
+      return new HdfsStorageDescriptor(tblName,
           HdfsFileFormat.fromJavaClassName(sd.getInputFormat()),
           delimMap.get(Constants.LINE_DELIM), delimMap.get(Constants.FIELD_DELIM),
           delimMap.get(Constants.COLLECTION_DELIM), delimMap.get(Constants.MAPKEY_DELIM),

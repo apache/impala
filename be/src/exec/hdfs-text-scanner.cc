@@ -160,6 +160,9 @@ Status HdfsTextScanner::FinishScanRange() {
         TupleRow* tuple_row_mem;
         int max_tuples = context_->GetMemory(&pool, &tuple_, &tuple_row_mem);
         DCHECK_GE(max_tuples, 1);
+        // Set variables for proper error outputting on boundary tuple
+        batch_start_ptr_ = boundary_row_.str().ptr;
+        row_end_locations_[0] = batch_start_ptr_ + boundary_row_.str().len;
         int tuples = WriteFields(pool, tuple_row_mem, num_fields, 1);
         DCHECK_EQ(tuples, 1);
         context_->CommitRows(tuples);

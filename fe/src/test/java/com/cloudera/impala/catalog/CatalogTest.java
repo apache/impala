@@ -146,10 +146,10 @@ public class CatalogTest {
           {"id", "bool_col", "tinyint_col", "smallint_col", "int_col", "bigint_col",
            "float_col", "double_col", "date_string_col", "string_col", "timestamp_col"},
         new PrimitiveType[]
-          {PrimitiveType.INT, PrimitiveType.BOOLEAN, PrimitiveType.TINYINT, PrimitiveType.SMALLINT,
-           PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.FLOAT,
-           PrimitiveType.DOUBLE, PrimitiveType.STRING, PrimitiveType.STRING,
-           PrimitiveType.TIMESTAMP});
+          {PrimitiveType.INT, PrimitiveType.BOOLEAN, PrimitiveType.TINYINT,
+           PrimitiveType.SMALLINT, PrimitiveType.INT, PrimitiveType.BIGINT,
+           PrimitiveType.FLOAT, PrimitiveType.DOUBLE, PrimitiveType.STRING,
+           PrimitiveType.STRING, PrimitiveType.TIMESTAMP});
     checkTableCols(defaultDb, "testtbl", 0,
         new String[] {"id", "name", "zip"},
         new PrimitiveType[]
@@ -323,6 +323,19 @@ public class CatalogTest {
     }
   }
 
+  // This table has metadata set so the escape is \n, which is also the tuple delim. This
+  // test validates that our representation of the catalog fixes this and removes the
+  // escape char.
+  @Test public void TestTableWithBadEscapeChar() {
+    HdfsTable table =
+        (HdfsTable) catalog.getDb("default").getTable("escapechartesttable");
+    List<HdfsPartition> partitions = table.getPartitions();
+    for (HdfsPartition p: partitions) {
+      HdfsStorageDescriptor desc = p.getInputFormatDescriptor();
+      assertEquals(desc.getEscapeChar(), HdfsStorageDescriptor.DEFAULT_ESCAPE_CHAR);
+    }
+  }
+
   @Test public void TestHiveMetaStoreClientCreationRetry() throws MetaException {
     HiveConf conf = new HiveConf(CatalogTest.class);
     // Set the Metastore warehouse to an empty string to trigger a MetaException
@@ -335,7 +348,7 @@ public class CatalogTest {
     }
     conf.setVar(HiveConf.ConfVars.METASTOREWAREHOUSE, "/some/valid/path");
     assertNotNull(Catalog.createHiveMetaStoreClient(conf));
-    
+
     // TODO: This doesn't fully validate the retry logic. In the future we
     // could throw an exception when the retry attempts maxed out. This exception
     // would have details on the number of retries, etc. We also need coverage for the

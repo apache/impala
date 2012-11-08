@@ -1114,6 +1114,29 @@ ANALYZE TABLE %(table_name)s COMPUTE STATISTICS;
 ====
 functional
 ----
+escapechartesttable
+----
+-- Create a test data with the escape character as the same as the tuple delimiter
+CREATE EXTERNAL TABLE %(table_name)s (bool_col boolean)
+partitioned by (id int)
+row format delimited fields terminated by ',' escaped by '\n'
+stored as %(file_format)s
+LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+----
+SET hive.exec.dynamic.partition.mode=nonstrict;
+SET hive.exec.dynamic.partition=true;
+INSERT OVERWRITE TABLE %(table_name)s partition (id)
+select bool_col,id FROM alltypesagg where id < 10;
+----
+----
+SET hive.exec.dynamic.partition.mode=nonstrict;
+SET hive.exec.dynamic.partition=true;
+INSERT OVERWRITE TABLE %(table_name)s partition (id)
+select bool_col,id FROM alltypesagg where id < 10;
+----
+====
+functional
+----
 TblWithRaggedColumns
 ----
 CREATE EXTERNAL TABLE %(table_name)s (

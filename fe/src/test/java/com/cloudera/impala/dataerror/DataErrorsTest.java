@@ -43,7 +43,7 @@ public class DataErrorsTest extends BaseQueryTest {
   }
 
   @Test
-  public void TestSequnceNodeErrors() {
+  public void TestSequenceNodeErrors() {
     List<TestConfiguration> testConfigs = generateAllConfigurationPermutations(
         SEQUENCE_FORMAT_ONLY, ALL_COMPRESSION_FORMATS, ALL_BATCH_SIZES,
         SMALL_CLUSTER_SIZES, ALL_LLVM_OPTIONS);

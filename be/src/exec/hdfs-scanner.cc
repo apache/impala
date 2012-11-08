@@ -539,6 +539,10 @@ void HdfsScanner::LogRowParseError(stringstream* ss, int row_idx) {
 
 void HdfsScanner::ReportColumnParseError(const SlotDescriptor* desc, 
     const char* data, int len) {
+  // len < 0 is used to indicate the data contains escape characters.  We don't care
+  // about that here and can just output the raw string.
+  if (len < 0) len = -len;
+
   if (state_->LogHasSpace()) {
     stringstream ss;
     ss << "Error converting column: " 

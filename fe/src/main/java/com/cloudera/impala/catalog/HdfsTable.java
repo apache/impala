@@ -234,7 +234,7 @@ public class HdfsTable extends Table {
       List<LiteralExpr> partitionKeyExprs)
       throws IOException, InvalidStorageDescriptorException {
     HdfsStorageDescriptor fileFormatDescriptor =
-        HdfsStorageDescriptor.fromStorageDescriptor(storageDescriptor);
+        HdfsStorageDescriptor.fromStorageDescriptor(this.name, storageDescriptor);
     Path path = new Path(storageDescriptor.getLocation());
     List<FileDescriptor> fileDescriptors = Lists.newArrayList();
     FileSystem fs = path.getFileSystem(new Configuration());
@@ -258,7 +258,7 @@ public class HdfsTable extends Table {
     // Default partition has no files and is not referred to by scan nodes. Data sinks
     // refer to this to understand how to create new partitions
     HdfsStorageDescriptor hdfsStorageDescriptor =
-        HdfsStorageDescriptor.fromStorageDescriptor(storageDescriptor);
+        HdfsStorageDescriptor.fromStorageDescriptor(this.name, storageDescriptor);
     HdfsPartition partition = HdfsPartition.defaultPartition(hdfsStorageDescriptor);
     partitions.add(partition);
   }

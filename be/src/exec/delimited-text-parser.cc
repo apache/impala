@@ -36,6 +36,11 @@ DelimitedTextParser::DelimitedTextParser(HdfsScanNode* scan_node,
       last_row_delim_offset_(-1),
       is_materialized_col_(NULL),
       column_idx_(0) {
+  // Escape character should not be the same as tuple or col delim unless it is the
+  // empty delimiter.
+  DCHECK(escape_char == '\0' || escape_char != tuple_delim);
+  DCHECK(escape_char == '\0' || escape_char != field_delim);
+  DCHECK(escape_char == '\0' || escape_char != collection_item_delim);
 
   // Initialize the sse search registers.
   char search_chars[SSEUtil::CHARS_PER_128_BIT_REGISTER];

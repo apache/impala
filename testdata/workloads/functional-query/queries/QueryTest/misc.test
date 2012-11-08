@@ -96,3 +96,19 @@ int
 2       
 8
 ====
+# Select from table with escape char that is same as delim char
+SELECT * FROM escapechartesttable$TABLE
+---- TYPES
+int, boolean
+---- RESULTS
+0,true
+1,false
+2,true
+3,false
+4,true
+5,false
+6,true
+7,false
+8,true
+9,false
+====
