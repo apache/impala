@@ -194,7 +194,11 @@ class ImpalaServer::QueryExecState {
   mutex lock_;  // protects all following fields
   ExecStats exec_stats_;
   ExecEnv* exec_env_;
-  scoped_ptr<Coordinator> coord_;  // not set for queries w/o FROM, or for ddl queries
+
+  // not set for queries w/o FROM, ddl queries, or short-circuited (i.e. queries with
+  // "limit 0")
+  scoped_ptr<Coordinator> coord_;
+
   scoped_ptr<DdlExecutor> ddl_executor_; // Runs DDL queries, instead of coord_
   // local runtime_state_ in case we don't have a coord_
   RuntimeState local_runtime_state_;
@@ -247,6 +251,7 @@ class ImpalaServer::QueryExecState {
 Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
   exec_request_ = *exec_request;
   profile_.set_name("Query (id=" + PrintId(exec_request->request_id) + ")");
+  query_id_ = exec_request->request_id;
 
   if (exec_request->stmt_type == TStmtType::QUERY || 
       exec_request->stmt_type == TStmtType::DML) {
@@ -255,7 +260,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
 
     // we always need at least one plan fragment
     DCHECK_GT(query_exec_request.fragments.size(), 0);
-    
+
     // If desc_tbl is not set, query has SELECT with no FROM. In that
     // case, the query can only have a single fragment, and that fragment needs to be
     // executed by the coordinator. This check confirms that.
@@ -279,6 +284,13 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
       RETURN_IF_ERROR(PrepareSelectListExprs(&local_runtime_state_,
           query_exec_request.fragments[0].output_exprs, RowDescriptor()));
     } else {
+      // If the first fragment has a "limit 0", simply set EOS to true and return.
+      DCHECK(query_exec_request.fragments[0].__isset.plan);
+      if (query_exec_request.fragments[0].plan.nodes[0].limit == 0) {
+        eos_ = true;
+        return Status::OK;
+      }
+
       coord_.reset(new Coordinator(exec_env_, &exec_stats_));
       RETURN_IF_ERROR(coord_->Exec(
           exec_request->request_id, &query_exec_request, exec_request->query_options));
@@ -295,7 +307,6 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
     RETURN_IF_ERROR(ddl_executor_->Exec(&exec_request_.ddl_exec_request));
   }
 
-  query_id_ = exec_request->request_id;
   return Status::OK;
 }
 
@@ -351,7 +362,7 @@ void ImpalaServer::QueryExecState::Cancel() {
   // Coordinator::Cancel() multiple times
   if (query_state_ == QueryState::EXCEPTION) return;
   query_state_ = QueryState::EXCEPTION;
-  coord_->Cancel();
+  if (coord_.get() != NULL) coord_->Cancel();
 }
 
 Status ImpalaServer::QueryExecState::PrepareSelectListExprs(

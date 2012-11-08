@@ -1,3 +1,40 @@
+# limit 0 on hdfs table
+select * from alltypesagg$TABLE where day = 1 limit 0
+---- TYPES
+int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
+---- RESULTS
+====
+# limit 0 on hbase table
+select * from hbasealltypessmall where string_col = '4' limit 0
+---- TYPES
+int, boolean, double, float, bigint, int, smallint, tinyint, string, string, timestamp
+---- RESULTS
+====
+# limit 0 on complex subquery join
+select x.smallint_col, x.id, x.tinyint_col, c.id, x.int_col, x.float_col, c.string_col
+from (
+       select a.smallint_col smallint_col, a.tinyint_col tinyint_col, a.day day,
+              a.int_col int_col, a.month month,
+              b.float_col float_col, b.id id
+       from (
+              select *
+              from alltypesagg$TABLE a
+              where month=1
+            ) a
+            join alltypessmall$TABLE b
+            on (a.smallint_col = b.id)
+     ) x
+join alltypessmall$TABLE c on (x.tinyint_col = c.id)
+where x.day=1
+and   x.int_col > 899
+and   x.float_col > 4.5
+and   c.string_col < '7'
+and   x.int_col + x.float_col + cast(c.string_col as float) < 1000
+limit 0
+---- TYPES
+smallint, int, tinyint, int, int, float, string
+---- RESULTS
+====
 # We need to specify the day here, otherwise files get opened in random order
 select * from alltypesagg$TABLE where day = 1 limit 10
 ---- TYPES
