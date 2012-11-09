@@ -234,10 +234,15 @@ Status HBaseScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eo
 
 Status HBaseScanNode::Close(RuntimeState* state) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
-  COUNTER_UPDATE(memory_used_counter(), tuple_pool_->peak_allocated_bytes());
+  if (memory_used_counter() != NULL) {
+    COUNTER_UPDATE(memory_used_counter(), tuple_pool_->peak_allocated_bytes());
+  }
 
-  JNIEnv* env = getJNIEnv();
-  hbase_scanner_->Close(env);
+  if (hbase_scanner_.get() != NULL) {
+    JNIEnv* env = getJNIEnv();
+    hbase_scanner_->Close(env);
+  }
+
   // Report total number of errors.
   if (num_errors_ > 0) {
     state->ReportFileErrors(table_name_, num_errors_);

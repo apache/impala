@@ -563,7 +563,9 @@ Status HdfsScanNode::Close(RuntimeState* state) {
 
   scanner_pool_.reset(NULL);
 
-  COUNTER_UPDATE(memory_used_counter_, tuple_pool_->peak_allocated_bytes());
+  if (memory_used_counter_ != NULL) {
+    COUNTER_UPDATE(memory_used_counter_, tuple_pool_->peak_allocated_bytes());
+  }
   return ExecNode::Close(state);
 }
 

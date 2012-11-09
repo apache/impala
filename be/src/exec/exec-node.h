@@ -68,10 +68,15 @@ class ExecNode {
   // In other words, if the memory holding the tuple data will be referenced
   // by the callee in subsequent GetNext() calls, it must *not* be attached to the
   // row_batch's tuple_data_pool.
+  // TODO: AggregationNode and HashJoinNode cannot be "re-opened" yet.
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) = 0;
 
-  // Close() is called once for every call to Open(), and must release all resources
-  // that were allocated in Open()/GetNext(), even if the latter ended with an error.
+  // Close() will get called for every exec node, regardless of what else is called and
+  // the status of these calls (i.e. Prepare() may never have been called, or
+  // Prepare()/Open()/GetNext() returned with an error).
+  // Close() releases all resources that were allocated in Open()/GetNext(), even if the
+  // latter ended with an error. Close() can be called if the node has been prepared or
+  // the node is closed.
   // After calling Close(), the caller calls Open() again prior to subsequent calls to
   // GetNext(). The default implementation updates runtime profile counters and calls
   // Close() on the children. To ensure that Close() is called on the entire plan tree,

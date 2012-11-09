@@ -52,7 +52,10 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
     pool_(pool),
     row_descriptor_(descs, tnode.row_tuples, tnode.nullable_tuples),
     limit_(tnode.limit),
-    num_rows_returned_(0) {
+    num_rows_returned_(0),
+    rows_returned_counter_(NULL),
+    rows_returned_rate_(NULL),
+    memory_used_counter_(NULL) {
   Status status = Expr::CreateExprTrees(pool, tnode.conjuncts, &conjuncts_);
   DCHECK(status.ok())
       << "ExecNode c'tor: deserialization of conjuncts failed:\n"

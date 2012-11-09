@@ -94,7 +94,10 @@ AggregationNode::AggregationNode(ObjectPool* pool, const TPlanNode& tnode,
     tuple_pool_(new MemPool()),
     codegen_process_row_batch_fn_(NULL),
     process_row_batch_fn_(NULL),
-    needs_finalize_(tnode.agg_node.need_finalize) {
+    needs_finalize_(tnode.agg_node.need_finalize),
+    build_timer_(NULL),
+    get_results_timer_(NULL),
+    hash_table_buckets_counter_(NULL) {
   // ignore return status for now
   Expr::CreateExprTrees(pool, tnode.agg_node.grouping_exprs, &probe_exprs_);
   Expr::CreateExprTrees(pool, tnode.agg_node.aggregate_exprs, &aggregate_exprs_);
@@ -243,9 +246,12 @@ Status AggregationNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* 
 }
 
 Status AggregationNode::Close(RuntimeState* state) {
-  COUNTER_SET(memory_used_counter(), 
-      tuple_pool_->peak_allocated_bytes() + hash_tbl_->byte_size());
-  COUNTER_SET(hash_table_buckets_counter_, hash_tbl_->num_buckets());
+  if (memory_used_counter() != NULL && hash_tbl_.get() != NULL &&
+      hash_table_buckets_counter_ != NULL) {
+    COUNTER_SET(memory_used_counter(),
+        tuple_pool_->peak_allocated_bytes() + hash_tbl_->byte_size());
+    COUNTER_SET(hash_table_buckets_counter_, hash_tbl_->num_buckets());
+  }
   return ExecNode::Close(state);
 }
 
