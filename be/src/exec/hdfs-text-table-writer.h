@@ -28,7 +28,7 @@ class Expr;
 class TupleDescriptor;
 class TupleRow;
 class RuntimeState;
-class OutputPartition;
+struct OutputPartition;
 
 // The writer consumes all rows passed to it and writes the evaluated output_exprs_
 // as delimited text into Hdfs files.

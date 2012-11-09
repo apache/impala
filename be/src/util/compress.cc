@@ -68,8 +68,10 @@ Status GzipCompressor::ProcessBlock(int input_length, uint8_t* input,
 
   int ret = 0;
   if ((ret = deflate(&stream_, Z_FINISH)) != Z_STREAM_END) {
-    return Status("zlib deflate failed: " +
-        (ret == Z_OK) ? "buffer too small" : string(stream_.msg));
+    stringstream ss;
+    ss << "zlib deflate failed: "
+       << (ret == Z_OK ? "buffer too small" : string(stream_.msg));
+    return Status(ss.str());
   }
 
   *output = out_buffer_;

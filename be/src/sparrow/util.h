@@ -104,8 +104,8 @@ void SetInvalidRequest(T* response, const std::string& missing_field_name) {
 // error message.
 #define RETURN_AND_SET_ERROR(error_msg, response) \
   do { \
-    Status status(error_msg); \
-    status.ToThrift(&response.status); \
+    Status __status__(error_msg); \
+    __status__.ToThrift(&response.status); \
     LOG(ERROR) << error_msg; \
     return; \
   } while (false)

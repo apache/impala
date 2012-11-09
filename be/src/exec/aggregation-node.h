@@ -35,7 +35,7 @@ class AggregateExpr;
 class AggregationTuple;
 class LlvmCodeGen;
 class RowBatch;
-struct RuntimeState;
+class RuntimeState;
 struct StringValue;
 class Tuple;
 class TupleDescriptor;

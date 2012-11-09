@@ -210,6 +210,9 @@ class Expr {
   // typedef for compute functions.
   typedef void* (*ComputeFn)(Expr*, TupleRow*);
 
+  // Empty virtual destructor
+  virtual ~Expr() {}
+
   // Evaluate expr and return pointer to result. The result is
   // valid as long as 'row' doesn't change.
   // TODO: stop having the result cached in this Expr object 

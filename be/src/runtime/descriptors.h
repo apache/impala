@@ -129,6 +129,7 @@ class SlotDescriptor {
 class TableDescriptor {
  public:
   TableDescriptor(const TTableDescriptor& tdesc);
+  virtual ~TableDescriptor() {}
   int num_cols() const { return num_cols_; }
   int num_clustering_cols() const { return num_clustering_cols_; }
   virtual std::string DebugString() const;

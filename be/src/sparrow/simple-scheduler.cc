@@ -68,11 +68,11 @@ SimpleScheduler::SimpleScheduler(const vector<THostPort>& backends, Metrics* met
     string ipaddress = backends[i].ipaddress;
     int port = backends[i].port;
 
-    HostMap::iterator i = host_map_.find(ipaddress);
-    if (i == host_map_.end()) {
-      i = host_map_.insert(make_pair(ipaddress, list<int>())).first;
+    HostMap::iterator it = host_map_.find(ipaddress);
+    if (it == host_map_.end()) {
+      it = host_map_.insert(make_pair(ipaddress, list<int>())).first;
     }
-    i->second.push_back(port);
+    it->second.push_back(port);
   }
   next_nonlocal_host_entry_ = host_map_.begin();
 }

@@ -118,7 +118,7 @@ class HashStore {
     }
 
     bool Full() const {
-      return count >= BUFFER_SIZE;
+      return static_cast<int32_t>(count) >= BUFFER_SIZE;
     }
 
     bool BottomLevel() const {

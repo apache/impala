@@ -37,6 +37,9 @@ class Metrics {
   // Superclass for metric types, to allow for a single container to hold all metrics
   class GenericMetric {
    public:
+    // Empty virtual destructor
+    virtual ~GenericMetric() {}
+
     // Print key and value to a string
     virtual void Print(std::stringstream* out) = 0;
 
@@ -133,10 +136,10 @@ class Metrics {
   };
 
   // Convenient typedefs for common primitive metric types.
-  typedef struct PrimitiveMetric<int64_t> IntMetric;
-  typedef struct PrimitiveMetric<double> DoubleMetric;
-  typedef struct PrimitiveMetric<std::string> StringMetric;
-  typedef struct PrimitiveMetric<bool> BooleanMetric;
+  typedef class PrimitiveMetric<int64_t> IntMetric;
+  typedef class PrimitiveMetric<double> DoubleMetric;
+  typedef class PrimitiveMetric<std::string> StringMetric;
+  typedef class PrimitiveMetric<bool> BooleanMetric;
 
   Metrics();
 

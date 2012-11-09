@@ -23,7 +23,7 @@ namespace impala {
 
 class DelimitedTextParser;
 class ScanRangeContext;
-class HdfsFileDesc;
+struct HdfsFileDesc;
 
 // HdfsScanner implementation that understands text-formatted
 // records. Uses SSE instructions, if available, for performance.

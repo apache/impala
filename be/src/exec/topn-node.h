@@ -25,7 +25,7 @@
 namespace impala {
 
 class MemPool;
-struct RuntimeState;
+class RuntimeState;
 class Tuple;
 
 // Node for in-memory TopN (ORDER BY ... LIMIT)

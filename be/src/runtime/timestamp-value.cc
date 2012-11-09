@@ -23,6 +23,8 @@ using namespace boost::posix_time;
 using namespace boost::gregorian;
 
 namespace impala {
+  
+const double TimestampValue::FRACTIONAL = 0.000000001;
 
 time_t to_time_t(ptime t) {
   if (t == not_a_date_time) {

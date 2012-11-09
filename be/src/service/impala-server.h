@@ -292,7 +292,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   jmethodID reset_catalog_id_; // JniFrontend.resetCatalog()
   jmethodID update_metastore_id_; // JniFrontend.updateMetastore()
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
-  jmethodID describe_table_id_,; // JniFrontend.describeTable
+  jmethodID describe_table_id_; // JniFrontend.describeTable
   jmethodID get_db_names_id_; // JniFrontend.getDbNames
   ExecEnv* exec_env_;  // not owned
 

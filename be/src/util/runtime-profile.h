@@ -69,6 +69,7 @@ class RuntimeProfile {
       value_(value),
       type_(type) {
     }
+    virtual ~Counter(){}
 
     void Update(int64_t delta) {
       __sync_fetch_and_add(&value_, delta);

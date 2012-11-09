@@ -23,7 +23,7 @@
 namespace impala {
 
 class Expr;
-class ExprValue;
+struct ExprValue;
 class TupleRow;
 
 class MathFunctions {

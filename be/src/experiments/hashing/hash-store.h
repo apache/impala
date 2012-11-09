@@ -96,7 +96,7 @@ class HashStore {
     }
 
     bool Full() {
-      return count >= BUFFER_SIZE;
+      return static_cast<int32_t>(count) >= BUFFER_SIZE;
     }
   } __attribute__((__packed__)) __attribute__((aligned(64)));
 

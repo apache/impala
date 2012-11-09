@@ -180,7 +180,7 @@ class  TimestampValue {
   friend class UnusedClass;
 
   // Precision of fractional part of the time: nanoseconds.
-  static const double FRACTIONAL = 0.000000001;
+  static const double FRACTIONAL;
 
   // Parse a date string into the object.
   // strp -- pointer to string to parse, points to character after parsing stopped.

@@ -30,7 +30,7 @@ class Expr;
 class ObjectPool;
 class Counters;
 class RowBatch;
-struct RuntimeState;
+class RuntimeState;
 class TPlan;
 class TupleRow;
 class DataSink;
@@ -43,6 +43,8 @@ class ExecNode {
  public:
   // Init conjuncts.
   ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
+
+  virtual ~ExecNode() {}
 
   // Sets up internal structures, etc., without doing any actual work.
   // Must be called prior to Open(). Will only be called once in this
