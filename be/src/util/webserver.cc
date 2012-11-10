@@ -24,6 +24,7 @@
 #include "common/logging.h"
 #include "util/webserver.h"
 #include "util/logging.h"
+#include "util/debug-util.h"
 
 using namespace std;
 using namespace boost;
@@ -54,6 +55,9 @@ Webserver::~Webserver() {
 
 void Webserver::RootHandler(stringstream* output) {
   // path_handler_lock_ already held by MongooseCallback
+  (*output) << "<h2>Version</h2>";
+  (*output) << "<pre>" << GetVersionString() << "</pre>" << endl;
+  (*output) << "<h2>Status Pages</h2>";
   BOOST_FOREACH(const PathHandlerMap::value_type& handler, path_handlers_) {
     (*output) << "<a href=\"" << handler.first << "\">" << handler.first << "</a><br/>";
   }
