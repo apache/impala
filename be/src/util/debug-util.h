@@ -43,6 +43,11 @@ std::string PrintBatch(RowBatch* batch);
 std::string PrintId(const TUniqueId& id);
 std::string PrintPlanNodeType(const TPlanNodeType::type& type);
 
+// Returns a string "<product version number> (build <build hash>)\nBuilt on <build time>"
+// This is used to set gflags build version
+std::string GetBuildVersion();
+
+// Returns "<program short name> version <GetBuildVersion()>"
 std::string GetVersionString();
 
 // Returns the stack trace as a string from the current location.

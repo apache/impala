@@ -248,12 +248,18 @@ string PrintBatch(RowBatch* batch) {
   return out.str();
 }
 
+string GetBuildVersion() {
+  stringstream ss;
+  ss << Version::BUILD_VERSION
+     << " (build " << Version::BUILD_HASH << ")" << endl
+     << "Built on " << Version::BUILD_TIME;
+  return ss.str();
+}
+
 string GetVersionString() {
   stringstream ss;
   ss << google::ProgramInvocationShortName()
-     << " v" << Version::BUILD_VERSION
-     << " (build " << Version::BUILD_HASH << ")" << endl
-     << "Built on " << Version::BUILD_TIME;
+     << " version " << google::VersionString();
   return ss.str();
 }
 
