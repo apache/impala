@@ -22,10 +22,10 @@ import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SlotId;
 import com.cloudera.impala.common.Pair;
 import com.cloudera.impala.thrift.TEqJoinCondition;
+import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.THashJoinNode;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
-import com.cloudera.impala.thrift.TExplainLevel;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 
@@ -45,11 +45,10 @@ public class HashJoinNode extends PlanNode {
 
   public HashJoinNode(
       PlanNodeId id, PlanNode outer, PlanNode inner, JoinOperator joinOp,
-      List<Pair<Expr, Expr> > eqJoinConjuncts,
-      List<Predicate> otherJoinConjuncts) {
+      List<Pair<Expr, Expr> > eqJoinConjuncts, List<Predicate> otherJoinConjuncts) {
     super(id);
-    Preconditions.checkArgument(otherJoinConjuncts != null);
     Preconditions.checkArgument(eqJoinConjuncts != null);
+    Preconditions.checkArgument(otherJoinConjuncts != null);
     tupleIds.addAll(outer.getTupleIds());
     tupleIds.addAll(inner.getTupleIds());
     this.joinOp = joinOp;

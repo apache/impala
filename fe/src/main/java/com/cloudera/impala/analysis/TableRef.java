@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.analysis;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import com.cloudera.impala.catalog.Table;
@@ -44,12 +45,6 @@ public abstract class TableRef extends ParseNodeBase {
 
   // analysis output
   protected TupleDescriptor desc;
-
-  // conjuncts from the JOIN clause:
-  // 1. equi-join predicates
-  final protected List<Predicate> eqJoinConjuncts = Lists.newArrayList();;
-  // 2. the rest
-  final protected List<Predicate> otherJoinConjuncts = Lists.newArrayList();;
 
   public TableRef(String alias) {
     super();
@@ -92,6 +87,21 @@ public abstract class TableRef extends ParseNodeBase {
    */
   abstract public List<TupleId> getMaterializedTupleIds();
 
+  /**
+   * Return the list of tuple ids materialized by the full sequence of
+   * table refs up to this one.
+   */
+  public List<TupleId> getAllMaterializedTupleIds() {
+    if (leftTblRef != null) {
+      List<TupleId> result =
+          Lists.newArrayList(leftTblRef.getAllMaterializedTupleIds());
+      result.addAll(getMaterializedTupleIds());
+      return result;
+    } else {
+      return getMaterializedTupleIds();
+    }
+  }
+
   public String getExplicitAlias() {
     return alias;
   }
@@ -112,20 +122,16 @@ public abstract class TableRef extends ParseNodeBase {
     this.usingColNames = colNames;
   }
 
+  public TableRef getLeftTblRef() {
+    return leftTblRef;
+  }
+
   public void setLeftTblRef(TableRef leftTblRef) {
     this.leftTblRef = leftTblRef;
   }
 
-  public List<Predicate> getEqJoinConjuncts() {
-    return eqJoinConjuncts;
-  }
-
-  public List<Predicate> getOtherJoinConjuncts() {
-    return otherJoinConjuncts;
-  }
-
   /**
-   * Analyze the join clause
+   * Analyze the join clause.
    * The join clause can only be analyzed after the left table has been analyzed
    * and the TupleDescriptor (desc) of this table has been created.
    */
@@ -163,30 +169,44 @@ public abstract class TableRef extends ParseNodeBase {
       }
     }
 
+    // at this point, both 'this' and leftTblRef have been analyzed
+    // and registered
+    boolean lhsIsNullable = false;
+    boolean rhsIsNullable = false;
+    if (joinOp == JoinOperator.LEFT_OUTER_JOIN
+        || joinOp == JoinOperator.FULL_OUTER_JOIN) {
+      analyzer.registerOuterJoinedTids(getMaterializedTupleIds(), this);
+      rhsIsNullable = true;
+    }
+    if (joinOp == JoinOperator.RIGHT_OUTER_JOIN
+        || joinOp == JoinOperator.FULL_OUTER_JOIN) {
+      analyzer.registerOuterJoinedTids(leftTblRef.getAllMaterializedTupleIds(), this);
+      lhsIsNullable = true;
+    }
+
     if (onClause != null) {
       onClause.analyze(analyzer);
-      // need to register conjuncts before being able to call isEqJoinConjunct()
-      analyzer.registerConjuncts(onClause);
       for (Predicate p: onClause.getConjuncts()) {
-        if (p.isEqJoinConjunct()) {
-          eqJoinConjuncts.add(p);
+        // Outer join clause conjuncts are registered for this particular table ref
+        // (ie, can only be evaluated by the plan node that implements this join).
+        // The exception are conjuncts that only pertain to the nullable side
+        // of the outer join; those can be evaluated directly when materializing tuples
+        // without violating outer join semantics.
+        if (getJoinOp().isOuterJoin()) {
+          if (lhsIsNullable && p.isBound(leftTblRef.getId())
+              || rhsIsNullable && p.isBound(getId())) {
+            analyzer.registerConjuncts(p, null, false);
+          } else {
+            analyzer.registerConjuncts(p, this, false);
+          }
         } else {
-          otherJoinConjuncts.add(p);
+          analyzer.registerConjuncts(p, null, false);
         }
       }
     } else if (getJoinOp().isOuterJoin() || getJoinOp() == JoinOperator.LEFT_SEMI_JOIN) {
       throw new AnalysisException(joinOpToSql() + " requires an ON or USING clause.");
     }
-  }
 
-  /**
-   * Substitute the JOIN expressions according to the substitution map
-   * @param subtsMap
-   */
-  public void substitute(Expr.SubstitutionMap subtsMap) {
-    // Substitute eqJoin and otherJoinConjuncts
-    Expr.substituteList(eqJoinConjuncts, subtsMap);
-    Expr.substituteList(otherJoinConjuncts, subtsMap);
   }
 
   private String joinOpToSql() {

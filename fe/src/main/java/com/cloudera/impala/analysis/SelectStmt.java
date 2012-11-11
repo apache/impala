@@ -148,7 +148,7 @@ public class SelectStmt extends QueryStmt {
         throw new AnalysisException(
             "aggregation function not allowed in WHERE clause");
       }
-      analyzer.registerConjuncts(whereClause);
+      analyzer.registerConjuncts(whereClause, null, true);
     }
 
     createSortInfo(analyzer);
@@ -167,11 +167,9 @@ public class SelectStmt extends QueryStmt {
    * Substitute all exprs (result of the analysis) of this select block referencing any
    * of our inlined views, including everything registered with the analyzer.
    * Expressions created during parsing (such as whereClause) are not touched.
-   * @param analyzer The analyzer of the current select block.
-   * @throws AnalysisException
    */
   protected void substituteInlineViewExprs(Analyzer analyzer) {
-    // Gather all the inline view substitution map from all the enclosed inline views
+    // Gather the inline view substitution maps from the enclosed inline views
     Expr.SubstitutionMap sMap = new Expr.SubstitutionMap();
     for (TableRef tblRef: tableRefs) {
       if (tblRef instanceof InlineViewRef) {
@@ -190,11 +188,6 @@ public class SelectStmt extends QueryStmt {
 
     // select
     Expr.substituteList(resultExprs, sMap);
-
-    // join clause
-    for (TableRef tblRef: tableRefs) {
-      tblRef.substitute(sMap);
-    }
 
     // aggregation (group by and aggregation expr)
     if (aggInfo != null) {
@@ -335,6 +328,7 @@ public class SelectStmt extends QueryStmt {
       // substitute aliases in place (ordinals not allowed in having clause)
       havingPred = (Predicate) havingClause.clone(aliasSMap);
       havingPred.analyze(analyzer);
+      analyzer.registerConjuncts(havingPred, null, false);
     }
 
     List<Expr> orderingExprs = null;

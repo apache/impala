@@ -37,6 +37,11 @@ import com.google.common.collect.Lists;
  *
  */
 abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneable {
+  // id that's unique across the entire query statement and is assigned by
+  // Analyzer.registerConjuncts(); only assigned for the top-level terms of a
+  // conjunction, and therefore null for most Exprs
+  protected ExprId id;
+
   protected PrimitiveType type;  // result of analysis
   protected boolean isAnalyzed;  // true after analyze() has been called
   protected TExprOpcode opcode;  // opcode for this expr
@@ -45,6 +50,14 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
     super();
     type = PrimitiveType.INVALID_TYPE;
     opcode = TExprOpcode.INVALID_OPCODE;
+  }
+
+  public ExprId getId() {
+    return id;
+  }
+
+  protected void setId(ExprId id) {
+    this.id = id;
   }
 
   public PrimitiveType getType() {
@@ -201,7 +214,11 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   @Override
   public int hashCode() {
-    throw new UnsupportedOperationException("Expr.hashCode() is not implemented");
+    if (id == null) {
+      throw new UnsupportedOperationException("Expr.hashCode() is not implemented");
+    } else {
+      return id.asInt();
+    }
   }
 
   /**
@@ -239,6 +256,14 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
       // substitutions from f and g
       result.lhs.addAll(Expr.cloneList(g.lhs, null));
       result.rhs.addAll(Expr.cloneList(g.rhs, null));
+
+      // check that we don't have duplicate entries, ie, that all lhs entries are
+      // unique
+      for (int i = 0; i < result.lhs.size(); ++i) {
+        for (int j = i + 1; j < result.lhs.size(); ++j) {
+          Preconditions.checkState(!result.lhs.get(i).equals(result.lhs.get(j)));
+        }
+      }
       return result;
     }
 
@@ -317,13 +342,17 @@ abstract public class Expr extends TreeNode<Expr> implements ParseNode, Cloneabl
 
   /**
    * Return 'this' with all sub-exprs substituted according to
-   * sMap.
+   * sMap. Ids of 'this' and its children are retained.
    */
   public Expr substitute(SubstitutionMap sMap) {
     Preconditions.checkNotNull(sMap);
     for (int i = 0; i < sMap.lhs.size(); ++i) {
       if (this.equals(sMap.lhs.get(i))) {
-        return sMap.rhs.get(i).clone(null);
+        Expr result = sMap.rhs.get(i).clone(null);
+        if (id != null) {
+          result.id = id;
+        }
+        return result;
       }
     }
     for (int i = 0; i < children.size(); ++i) {

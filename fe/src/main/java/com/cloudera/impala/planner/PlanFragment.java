@@ -138,14 +138,14 @@ public class PlanFragment {
   }
 
   /**
-   * Sets node.rowTupleIds, which is either the parent's rowTupleIds or the 
+   * Sets node.rowTupleIds, which is either the parent's rowTupleIds or the
    * list of materialized ids. Propagates row tuple ids to the children according
    * to the requirements of the particular node.
    */
   private void setRowTupleIds(PlanNode node, ArrayList<TupleId> parentRowTupleIds) {
     if (parentRowTupleIds != null) {
       // we don't output less than we materialize
-      // TODO: check subset relationship
+      Preconditions.checkState(parentRowTupleIds.containsAll(node.tupleIds));
       node.rowTupleIds = parentRowTupleIds;
     } else {
       node.rowTupleIds = node.tupleIds;

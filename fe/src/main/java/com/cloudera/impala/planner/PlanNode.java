@@ -18,10 +18,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.cloudera.impala.analysis.Analyzer;
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.Predicate;
 import com.cloudera.impala.analysis.SlotId;
+import com.cloudera.impala.analysis.TableRef;
 import com.cloudera.impala.analysis.TupleId;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.TreeNode;
@@ -48,6 +52,8 @@ import com.google.common.collect.Sets;
  * its children (= are bound by tupleIds).
  */
 abstract public class PlanNode extends TreeNode<PlanNode> {
+  private final static Logger LOG = LoggerFactory.getLogger(PlanNode.class);
+
   protected final PlanNodeId id;  // unique w/in plan tree; assigned by planner
   protected PlanFragmentId fragmentId;  // assigned by planner after fragmentation step
   protected long limit; // max. # of rows to be returned; 0: no limit
@@ -155,9 +161,14 @@ abstract public class PlanNode extends TreeNode<PlanNode> {
     return conjuncts;
   }
 
-  public void setConjuncts(List<Predicate> conjuncts) {
-    if (!conjuncts.isEmpty()) {
-      this.conjuncts = conjuncts;
+  public void addConjuncts(List<Predicate> conjuncts) {
+    if (conjuncts == null) {
+      return;
+    }
+    this.conjuncts.addAll(conjuncts);
+    //LOG.info("added conjuncts to " + getExplainString());
+    for (Predicate p: conjuncts) {
+      //LOG.info(p.toSql());
     }
   }
 

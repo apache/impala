@@ -37,7 +37,7 @@ public class SlotRef extends Expr {
     return desc;
   }
 
-  public SlotId getId() {
+  public SlotId getSlotId() {
     Preconditions.checkState(isAnalyzed);
     Preconditions.checkNotNull(desc);
     return desc.getId();

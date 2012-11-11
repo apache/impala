@@ -88,7 +88,7 @@ public class Planner {
     }
     Analyzer analyzer = analysisResult.getAnalyzer();
 
-    PlanNode singleNodePlan = createSingleNodePlan(queryStmt, analyzer);
+    PlanNode singleNodePlan = createQueryPlan(queryStmt, analyzer);
     //LOG.info("single-node plan:"
         //+ singleNodePlan.getExplainString("", TExplainLevel.VERBOSE));
     ArrayList<PlanFragment> fragments = Lists.newArrayList();
@@ -448,7 +448,7 @@ public class Planner {
   /**
    * Create plan tree for single-node execution.
    */
-  private PlanNode createSingleNodePlan(QueryStmt stmt, Analyzer analyzer)
+  private PlanNode createQueryPlan(QueryStmt stmt, Analyzer analyzer)
       throws NotImplementedException, InternalException {
     if (stmt instanceof SelectStmt) {
       return createSelectPlan((SelectStmt) stmt, analyzer);
@@ -485,6 +485,7 @@ public class Planner {
       // Have the build side of a join copy data to a compact representation
       // in the tuple buffer.
       root.getChildren().get(1).setCompactData(true);
+      assignConjuncts(root, analyzer);
     }
 
     if (selectStmt.getSortInfo() != null && selectStmt.getLimit() == -1) {
@@ -505,12 +506,8 @@ public class Planner {
             new PlanNodeId(nodeIdGenerator), root,
             aggInfo.getSecondPhaseDistinctAggInfo());
       }
-    }
-    // add Having clause, if required
-    if (selectStmt.getHavingPred() != null) {
-      Preconditions.checkState(root instanceof AggregationNode);
-      root.setConjuncts(selectStmt.getHavingPred().getConjuncts());
-      analyzer.markConjunctsAssigned(selectStmt.getHavingPred().getConjuncts());
+      // add Having clause
+      assignConjuncts(root, analyzer);
     }
 
     // add order by and limit
@@ -518,13 +515,79 @@ public class Planner {
     if (sortInfo != null) {
       Preconditions.checkState(selectStmt.getLimit() != -1);
       root = new SortNode(new PlanNodeId(nodeIdGenerator), root, sortInfo, true);
+      // Don't assign conjuncts here. If this is the tree for an inline view, and
+      // it contains a limit clause, we need to evaluate the conjuncts inherited
+      // from the enclosing select block *after* the limit.
+      // TODO: have HashJoinNode evaluate those conjuncts after receiving rows
+      // from the build tree
     }
     root.setLimit(selectStmt.getLimit());
 
-    // All the conjuncts in the inline view analyzer should be assigned
+    // All the conjuncts should be assigned at this point.
     Preconditions.checkState(!analyzer.hasUnassignedConjuncts());
 
     return root;
+  }
+
+  /**
+   * Returns true if predicate can be correctly evaluated by a tree materializing
+   * 'tupleIds', otherwise false:
+   * - the predicate needs to be bound by the materialized tuple ids
+   * - a Where clause predicate can only be correctly evaluated if for all outer-joined
+   *   referenced tids the last join to outer-join this tid has been materialized
+   */
+  private boolean canEvalPredicate(
+      List<TupleId> tupleIds, Predicate pred, Analyzer analyzer) {
+    if (!pred.isBound(tupleIds)) {
+      //LOG.info("canEvalPredicate() is false: pred: " + pred.toSql());
+      return false;
+    }
+    if (!analyzer.isWhereClauseConjunct(pred)) {
+      //LOG.info("canEvalPredicate() is true: pred: " + pred.toSql());
+      return true;
+    }
+    ArrayList<TupleId> tids = Lists.newArrayList();
+    pred.getIds(tids, null);
+    for (TupleId tid: tids) {
+      TableRef rhsRef = analyzer.getLastOjClause(tid);
+      if (rhsRef == null) {
+        // this is not outer-joined; ignore
+        continue;
+      }
+      if (!tupleIds.containsAll(rhsRef.getMaterializedTupleIds())
+          || !tupleIds.containsAll(rhsRef.getLeftTblRef().getMaterializedTupleIds())) {
+        // the last join to outer-join this tid hasn't been materialized yet
+        //LOG.info("canEvalPredicate() is false: pred: " + pred.toSql());
+        return false;
+      }
+    }
+    //LOG.info("canEvalPredicate() is true: pred: " + pred.toSql());
+    return true;
+  }
+
+
+  /**
+   * Assign all unassigned conjuncts to node which can be correctly evaluated
+   * by node. Ignores OJ conjuncts.
+   */
+  private void assignConjuncts(PlanNode node, Analyzer analyzer) {
+    List<Predicate> conjuncts = getUnassignedConjuncts(node, analyzer);
+    node.addConjuncts(conjuncts);
+    analyzer.markConjunctsAssigned(conjuncts);
+  }
+
+  /**
+   * Return all unassigned conjuncts which can be correctly evaluated by node.
+   * Ignores OJ conjuncts.
+   */
+  private List<Predicate> getUnassignedConjuncts(PlanNode node, Analyzer analyzer) {
+    List<Predicate> conjuncts = Lists.newArrayList();
+    for (Predicate p: analyzer.getUnassignedConjuncts(node.getTupleIds())) {
+      if (canEvalPredicate(node.getTupleIds(), p, analyzer)) {
+        conjuncts.add(p);
+      }
+    }
+    return conjuncts;
   }
 
   /**
@@ -581,51 +644,25 @@ public class Planner {
   }
 
   /**
-   * Create a tree of nodes for the inline view ref
-   * @param analyzer
-   * @param inlineViewRef the inline view ref
-   * @return a tree of nodes for the inline view
+   * Returns plan tree for an inline view ref.
    */
   private PlanNode createInlineViewPlan(Analyzer analyzer, InlineViewRef inlineViewRef)
       throws NotImplementedException, InternalException {
-    // Get the list of fully bound predicates
-    List<Predicate> boundConjuncts =
-        analyzer.getBoundConjuncts(inlineViewRef.getMaterializedTupleIds());
-
-    // TODO (alan): this is incorrect for left outer join. Predicate should not be
-    // evaluated after the join.
-
-    if (inlineViewRef.getViewStmt() instanceof UnionStmt) {
-      // Register predicates with the inline view's analyzer
-      // such that the topmost merge node evaluates them.
-      inlineViewRef.getAnalyzer().registerConjuncts(boundConjuncts);
-      analyzer.markConjunctsAssigned(boundConjuncts);
-      return createUnionPlan((UnionStmt) inlineViewRef.getViewStmt(),
-          inlineViewRef.getAnalyzer());
+    // determine which conjuncts can be evaluated inside the subquery tree
+    List<Predicate> conjuncts = Lists.newArrayList();
+    for (Predicate p: 
+        analyzer.getUnassignedConjuncts(inlineViewRef.getMaterializedTupleIds())) {
+      //LOG.info("view pred: " + p.toSql());
+      if (canEvalPredicate(inlineViewRef.getMaterializedTupleIds(), p, analyzer)) {
+        conjuncts.add(p);
+      }
     }
 
-    Preconditions.checkState(inlineViewRef.getViewStmt() instanceof SelectStmt);
-    SelectStmt selectStmt = (SelectStmt) inlineViewRef.getViewStmt();
-
-    // If the view select statement does not compute aggregates, predicates are
-    // registered with the inline view's analyzer for predicate pushdown.
-    if (selectStmt.getAggInfo() == null) {
-      inlineViewRef.getAnalyzer().registerConjuncts(boundConjuncts);
-      analyzer.markConjunctsAssigned(boundConjuncts);
-    }
-
-    // Create a tree of plan node for the inline view, using inline view's analyzer.
-    PlanNode result = createSelectPlan(selectStmt, inlineViewRef.getAnalyzer());
-
-    // If the view select statement has aggregates, predicates aren't pushed into the
-    // inline view. The predicates have to be evaluated at the root of the plan node
-    // for the inline view (which should be an aggregate node).
-    if (selectStmt.getAggInfo() != null) {
-      result.getConjuncts().addAll(boundConjuncts);
-      analyzer.markConjunctsAssigned(boundConjuncts);
-    }
-
-    return result;
+    // TODO: it's not correct to have the view plan evaluate predicates
+    // from the enclosing scope if it contains a limit clause
+    inlineViewRef.getAnalyzer().registerConjuncts(conjuncts);
+    analyzer.markConjunctsAssigned(conjuncts);
+    return createQueryPlan(inlineViewRef.getViewStmt(), inlineViewRef.getAnalyzer());
   }
 
   /**
@@ -642,10 +679,9 @@ public class Planner {
       scanNode = new HBaseScanNode(new PlanNodeId(nodeIdGenerator), tblRef.getDesc());
     }
 
-    // TODO (alan): this is incorrect for left outer joins. Predicate should not be
-    // evaluated after the join.
-
-    List<Predicate> conjuncts = analyzer.getBoundConjuncts(tblRef.getId().asList());
+    List<Predicate> conjuncts = getUnassignedConjuncts(scanNode, analyzer);
+    // mark conjuncts assigned here; they will either end up as ValueRanges
+    // or will be evaluated directly by the node
     analyzer.markConjunctsAssigned(conjuncts);
     ArrayList<ValueRange> keyRanges = Lists.newArrayList();
     // determine scan predicates for clustering cols
@@ -662,12 +698,14 @@ public class Planner {
         // and non-string comparisons won't work)
         keyRanges.add(null);
       } else {
+        // create ValueRange from conjuncts for slot; also removes conjuncts
+        // that were used as input for ValueRange
         keyRanges.add(createScanRange(slotDesc, conjuncts));
       }
     }
 
     scanNode.setKeyRanges(keyRanges);
-    scanNode.setConjuncts(conjuncts);
+    scanNode.addConjuncts(conjuncts);
 
     return scanNode;
   }
@@ -694,14 +732,14 @@ public class Planner {
     if (rhs.getJoinOp().isOuterJoin()) {
       // TODO: create test for this
       Preconditions.checkState(rhs.getOnClause() != null);
-      candidates = rhs.getEqJoinConjuncts();
-      Preconditions.checkState(candidates != null);
+      candidates = analyzer.getEqJoinConjuncts(rhsId, rhs);
     } else {
-      candidates = analyzer.getEqJoinPredicates(rhsId);
+      candidates = analyzer.getEqJoinConjuncts(rhsId, null);
     }
     if (candidates == null) {
       return;
     }
+
     for (Predicate p: candidates) {
       Expr rhsExpr = null;
       if (p.getChild(0).isBound(rhsIds)) {
@@ -746,18 +784,20 @@ public class Planner {
       throw new NotImplementedException(
           "Join requires at least one equality predicate between the two tables.");
     }
+    analyzer.markConjunctsAssigned(eqJoinPredicates);
+
+    List<Predicate> ojConjuncts = Lists.newArrayList();
+    if (innerRef.getJoinOp().isOuterJoin()) {
+      // Also assign conjuncts from On clause. All remaining unassigned conjuncts
+      // that can be evaluated by this join are assigned in createSelectPlan().
+      ojConjuncts = analyzer.getUnassignedOjConjuncts(innerRef);
+      analyzer.markConjunctsAssigned(ojConjuncts);
+    }
+
     HashJoinNode result =
         new HashJoinNode(
             new PlanNodeId(nodeIdGenerator), outer, inner, innerRef.getJoinOp(),
-            eqJoinConjuncts, innerRef.getOtherJoinConjuncts());
-    analyzer.markConjunctsAssigned(eqJoinPredicates);
-
-    // The remaining conjuncts that are bound by result.getTupleIds()
-    // need to be evaluated explicitly by the hash join.
-    ArrayList<Predicate> conjuncts =
-      new ArrayList<Predicate>(analyzer.getBoundConjuncts(result.getTupleIds()));
-    result.setConjuncts(conjuncts);
-    analyzer.markConjunctsAssigned(conjuncts);
+            eqJoinConjuncts, ojConjuncts);
     return result;
   }
 
@@ -849,14 +889,14 @@ public class Planner {
     // A MergeNode may have predicates if a union is used inside an inline view,
     // and the enclosing select stmt has predicates on its columns.
     List<Predicate> conjuncts =
-        analyzer.getBoundConjuncts(unionStmt.getTupleId().asList());
+        analyzer.getUnassignedConjuncts(unionStmt.getTupleId().asList());
     // If the topmost node is an agg node, then set the conjuncts on its first child
     // (which must be a MergeNode), to evaluate the conjuncts as early as possible.
     if (!conjuncts.isEmpty() && result instanceof AggregationNode) {
       Preconditions.checkState(result.getChild(0) instanceof MergeNode);
-      result.getChild(0).setConjuncts(conjuncts);
+      result.getChild(0).addConjuncts(conjuncts);
     } else {
-      result.setConjuncts(conjuncts);
+      result.addConjuncts(conjuncts);
     }
 
     // Add order by and limit if present.

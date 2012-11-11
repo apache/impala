@@ -16,14 +16,13 @@ from tpch.lineitem$TABLE l1
   join tpch.nation$TABLE n
     on (s.s_nationkey = n.n_nationkey)
   left semi join tpch.lineitem$TABLE l2
-    on (l2.l_orderkey = l1.l_orderkey)
+    on (l2.l_orderkey = l1.l_orderkey and
+        l2.l_suppkey <> l1.l_suppkey)
   left outer join tpch.lineitem$TABLE l3
     on (l3.l_orderkey = l1.l_orderkey and
-        l3.l_receiptdate > l3.l_commitdate
-       )
+        l3.l_suppkey <> l1.l_suppkey and
+        l3.l_receiptdate > l3.l_commitdate)
 where
-  l2.l_suppkey <> l1.l_suppkey and
-  l3.l_suppkey <> l1.l_suppkey and
   l3.l_orderkey is null and
   n_name = 'SAUDI ARABIA' and
   o_orderstatus = 'F'

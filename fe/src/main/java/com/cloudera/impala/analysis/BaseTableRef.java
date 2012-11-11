@@ -24,7 +24,7 @@ import com.google.common.base.Preconditions;
  * BaseTableRef.
  */
 public class BaseTableRef extends TableRef {
-  private TableName name;
+  private final TableName name;
 
   public BaseTableRef(TableName name, String alias) {
     super(alias);
@@ -49,8 +49,8 @@ public class BaseTableRef extends TableRef {
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException {
     desc = analyzer.registerBaseTableRef(this);
+    isAnalyzed = true;  // true that we have assigned desc
     analyzeJoin(analyzer);
-    isAnalyzed = true;
   }
 
   @Override

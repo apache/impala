@@ -302,6 +302,11 @@ public class PlannerTest {
   }
 
   @Test
+  public void testOuterJoins() {
+    runPlannerTestFile("outer-joins");
+  }
+
+  @Test
   public void testOrder() {
     runPlannerTestFile("order");
   }

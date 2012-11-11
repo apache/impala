@@ -107,7 +107,6 @@ Plan Fragment 0
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       n.n_regionkey = r.r_regionkey
-    OTHER JOIN PREDICATES: r.r_name = 'EUROPE'
     TUPLE IDS: 0 1 2 3 4 
       HASH JOIN
         JOIN OP: INNER JOIN
@@ -123,7 +122,6 @@ Plan Fragment 0
                 JOIN OP: INNER JOIN
                 HASH PREDICATES:
                   ps.ps_partkey = p.p_partkey
-                OTHER JOIN PREDICATES: p.p_size = 15, p.p_type LIKE '%BRASS'
                 TUPLE IDS: 0 1 
                   SCAN HDFS table=tpch.partsupp (0)
                     TUPLE IDS: 0 
@@ -146,7 +144,6 @@ Plan Fragment 0
     JOIN OP: INNER JOIN
     HASH PREDICATES:
       n.n_regionkey = r.r_regionkey
-    OTHER JOIN PREDICATES: r.r_name = 'EUROPE'
     TUPLE IDS: 0 1 2 3 4 
       HASH JOIN
         JOIN OP: INNER JOIN
@@ -162,7 +159,6 @@ Plan Fragment 0
                 JOIN OP: INNER JOIN
                 HASH PREDICATES:
                   ps.ps_partkey = p.p_partkey
-                OTHER JOIN PREDICATES: p.p_size = 15, p.p_type LIKE '%BRASS'
                 TUPLE IDS: 0 1 
                   SCAN HDFS table=tpch.partsupp (0)
                     TUPLE IDS: 0 
@@ -365,7 +361,6 @@ Plan Fragment 0
         JOIN OP: INNER JOIN
         HASH PREDICATES:
           o.o_custkey = c.c_custkey
-        OTHER JOIN PREDICATES: c.c_mktsegment = 'BUILDING'
         TUPLE IDS: 0 1 2 
           HASH JOIN
             JOIN OP: INNER JOIN
@@ -409,7 +404,6 @@ Plan Fragment 1
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         o.o_custkey = c.c_custkey
-      OTHER JOIN PREDICATES: c.c_mktsegment = 'BUILDING'
       TUPLE IDS: 0 1 2 
         HASH JOIN
           JOIN OP: INNER JOIN
@@ -518,7 +512,6 @@ Plan Fragment 0
           JOIN OP: INNER JOIN
           HASH PREDICATES:
             l.l_orderkey = o.o_orderkey
-          OTHER JOIN PREDICATES: l.l_commitdate < l.l_receiptdate
           TUPLE IDS: 0 1 
             SCAN HDFS table=tpch.lineitem (0)
               PREDICATES: l.l_commitdate < l.l_receiptdate
@@ -558,7 +551,6 @@ Plan Fragment 1
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         l.l_orderkey = o.o_orderkey
-      OTHER JOIN PREDICATES: l.l_commitdate < l.l_receiptdate
       TUPLE IDS: 0 1 
         SCAN HDFS table=tpch.lineitem (0)
           PREDICATES: l.l_commitdate < l.l_receiptdate
@@ -1649,7 +1641,6 @@ Plan Fragment 0
           JOIN OP: INNER JOIN
           HASH PREDICATES:
             n.n_nationkey = s.s_nationkey
-          OTHER JOIN PREDICATES: n.n_name = 'GERMANY'
           TUPLE IDS: 0 1 
             SCAN HDFS table=tpch.nation (0)
               PREDICATES: n.n_name = 'GERMANY'
@@ -1689,7 +1680,6 @@ Plan Fragment 1
           JOIN OP: INNER JOIN
           HASH PREDICATES:
             n.n_nationkey = s.s_nationkey
-          OTHER JOIN PREDICATES: n.n_name = 'GERMANY'
           TUPLE IDS: 0 1 
             SCAN HDFS table=tpch.nation (0)
               PREDICATES: n.n_name = 'GERMANY'
@@ -1802,7 +1792,6 @@ Plan Fragment 0
         JOIN OP: INNER JOIN
         HASH PREDICATES:
           l.l_orderkey = o.o_orderkey
-        OTHER JOIN PREDICATES: l.l_commitdate < l.l_receiptdate, l.l_shipdate < l.l_commitdate
         TUPLE IDS: 0 1 
           SCAN HDFS table=tpch.lineitem (0)
             PREDICATES: l.l_commitdate < l.l_receiptdate, l.l_shipdate < l.l_commitdate, l.l_shipmode = 'MAIL' OR l.l_shipmode = 'SHIP', l.l_receiptdate >= '1994-01-01', l.l_receiptdate < '1995-01-01'
@@ -1837,7 +1826,6 @@ Plan Fragment 1
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         l.l_orderkey = o.o_orderkey
-      OTHER JOIN PREDICATES: l.l_commitdate < l.l_receiptdate, l.l_shipdate < l.l_commitdate
       TUPLE IDS: 0 1 
         SCAN HDFS table=tpch.lineitem (0)
           PREDICATES: l.l_commitdate < l.l_receiptdate, l.l_shipdate < l.l_commitdate, l.l_shipmode = 'MAIL' OR l.l_shipmode = 'SHIP', l.l_receiptdate >= '1994-01-01', l.l_receiptdate < '1995-01-01'
@@ -1926,7 +1914,6 @@ Plan Fragment 0
           JOIN OP: RIGHT OUTER JOIN
           HASH PREDICATES:
             o.o_custkey = c.c_custkey
-          OTHER JOIN PREDICATES: NOT o.o_comment LIKE '%special%requests%'
           TUPLE IDS: 0N 1 
             SCAN HDFS table=tpch.orders (0)
               PREDICATES: NOT o.o_comment LIKE '%special%requests%'
@@ -1965,7 +1952,6 @@ Plan Fragment 1
       JOIN OP: RIGHT OUTER JOIN
       HASH PREDICATES:
         o.o_custkey = c.c_custkey
-      OTHER JOIN PREDICATES: NOT o.o_comment LIKE '%special%requests%'
       TUPLE IDS: 0N 1 
         SCAN HDFS table=tpch.orders (0)
           PREDICATES: NOT o.o_comment LIKE '%special%requests%'
@@ -2015,7 +2001,6 @@ Plan Fragment 0
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         l.l_partkey = p.p_partkey
-      OTHER JOIN PREDICATES: l.l_shipdate >= '1995-09-01', l.l_shipdate < '1995-10-01'
       TUPLE IDS: 0 1 
         SCAN HDFS table=tpch.lineitem (0)
           PREDICATES: l.l_shipdate >= '1995-09-01', l.l_shipdate < '1995-10-01'
@@ -2046,7 +2031,6 @@ Plan Fragment 1
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         l.l_partkey = p.p_partkey
-      OTHER JOIN PREDICATES: l.l_shipdate >= '1995-09-01', l.l_shipdate < '1995-10-01'
       TUPLE IDS: 0 1 
         SCAN HDFS table=tpch.lineitem (0)
           PREDICATES: l.l_shipdate >= '1995-09-01', l.l_shipdate < '1995-10-01'
@@ -2310,7 +2294,6 @@ Plan Fragment 0
         JOIN OP: INNER JOIN
         HASH PREDICATES:
           ps.ps_partkey = p.p_partkey
-        OTHER JOIN PREDICATES: p.p_brand != 'Brand#45', NOT p.p_type LIKE 'MEDIUM POLISHED%'
         TUPLE IDS: 0 1 
           SCAN HDFS table=tpch.partsupp (0)
             TUPLE IDS: 0 
@@ -2333,7 +2316,6 @@ Plan Fragment 0
         JOIN OP: INNER JOIN
         HASH PREDICATES:
           ps.ps_partkey = p.p_partkey
-        OTHER JOIN PREDICATES: p.p_brand != 'Brand#45', NOT p.p_type LIKE 'MEDIUM POLISHED%'
         TUPLE IDS: 0 1 
           SCAN HDFS table=tpch.partsupp (0)
             TUPLE IDS: 0 
@@ -2640,7 +2622,6 @@ Plan Fragment 0
         JOIN OP: INNER JOIN
         HASH PREDICATES:
           o.o_orderkey = t.l_orderkey
-        OTHER JOIN PREDICATES: t.t_sum_quantity > 300.0
         TUPLE IDS: 0 1 2 3 
           HASH JOIN
             JOIN OP: INNER JOIN
@@ -2689,7 +2670,6 @@ Plan Fragment 1
       JOIN OP: INNER JOIN
       HASH PREDICATES:
         o.o_orderkey = t.l_orderkey
-      OTHER JOIN PREDICATES: t.t_sum_quantity > 300.0
       TUPLE IDS: 0 1 2 3 
         HASH JOIN
           JOIN OP: INNER JOIN
@@ -3101,7 +3081,6 @@ Plan Fragment 0
           JOIN OP: INNER JOIN
           HASH PREDICATES:
             s.s_nationkey = n.n_nationkey
-          OTHER JOIN PREDICATES: n.n_name = 'CANADA'
           TUPLE IDS: 0 1 
             SCAN HDFS table=tpch.supplier (0)
               TUPLE IDS: 0 
@@ -3135,7 +3114,6 @@ Plan Fragment 1
         JOIN OP: INNER JOIN
         HASH PREDICATES:
           s.s_nationkey = n.n_nationkey
-        OTHER JOIN PREDICATES: n.n_name = 'CANADA'
         TUPLE IDS: 0 1 
           SCAN HDFS table=tpch.supplier (0)
             TUPLE IDS: 0 
@@ -3168,7 +3146,6 @@ Plan Fragment 3
 # Modifications: Converted 'EXISTS' into LEFT SEMI JOIN, converted
 # NOT EXISTS into LEFT OUTER JOIN, changed selects from multiple tables to
 # joins, added limit
-# TODO: Impala returning wrong results due to bug IMP-137
 select
   s_name,
   count(*) as numwait
@@ -3180,14 +3157,13 @@ from tpch.lineitem l1
   join tpch.nation n
     on (s.s_nationkey = n.n_nationkey)
   left semi join tpch.lineitem l2
-    on (l2.l_orderkey = l1.l_orderkey)
+    on (l2.l_orderkey = l1.l_orderkey and
+        l2.l_suppkey <> l1.l_suppkey)
   left outer join tpch.lineitem l3
     on (l3.l_orderkey = l1.l_orderkey and
-        l3.l_receiptdate > l3.l_commitdate
-       )
+        l3.l_suppkey <> l1.l_suppkey and
+        l3.l_receiptdate > l3.l_commitdate)
 where
-  l2.l_suppkey <> l1.l_suppkey and
-  l3.l_suppkey <> l1.l_suppkey and
   l3.l_orderkey is null and
   n_name = 'SAUDI ARABIA' and
   o_orderstatus = 'F'
@@ -3212,8 +3188,8 @@ Plan Fragment 0
         JOIN OP: LEFT OUTER JOIN
         HASH PREDICATES:
           l1.l_orderkey = l3.l_orderkey
-        OTHER JOIN PREDICATES: l3.l_receiptdate > l3.l_commitdate
-        OTHER PREDICATES: l3.l_suppkey != l1.l_suppkey
+        OTHER JOIN PREDICATES: l3.l_suppkey != l1.l_suppkey
+        OTHER PREDICATES: l3.l_orderkey IS NULL
         TUPLE IDS: 0 1 2 3 4 5N 
           HASH JOIN
             JOIN OP: LEFT SEMI JOIN
@@ -3249,7 +3225,7 @@ Plan Fragment 0
               SCAN HDFS table=tpch.lineitem (7) compact
                 TUPLE IDS: 4 
           SCAN HDFS table=tpch.lineitem (9) compact
-            PREDICATES: l3.l_receiptdate > l3.l_commitdate, l3.l_orderkey IS NULL
+            PREDICATES: l3.l_receiptdate > l3.l_commitdate
             TUPLE IDS: 5 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -3279,8 +3255,8 @@ Plan Fragment 1
       JOIN OP: LEFT OUTER JOIN
       HASH PREDICATES:
         l1.l_orderkey = l3.l_orderkey
-      OTHER JOIN PREDICATES: l3.l_receiptdate > l3.l_commitdate
-      OTHER PREDICATES: l3.l_suppkey != l1.l_suppkey
+      OTHER JOIN PREDICATES: l3.l_suppkey != l1.l_suppkey
+      OTHER PREDICATES: l3.l_orderkey IS NULL
       TUPLE IDS: 0 1 2 3 4 5N 
         HASH JOIN
           JOIN OP: LEFT SEMI JOIN
@@ -3323,7 +3299,7 @@ Plan Fragment 2
     UNPARTITIONED
 
   SCAN HDFS table=tpch.lineitem (9) compact
-    PREDICATES: l3.l_receiptdate > l3.l_commitdate, l3.l_orderkey IS NULL
+    PREDICATES: l3.l_receiptdate > l3.l_commitdate
     TUPLE IDS: 5 
 
 Plan Fragment 3
@@ -3429,8 +3405,6 @@ Plan Fragment 1
 # removed subquery by pushing aggregation up a level, added temp table
 # to remove another subquery that computed the average account balance,
 # added limit, added round()
-# TODO: Results are from Hive, Impala returning wrong results due to
-# bug IMP-137
 select
   substring(c_phone, 1, 2) as cntrycode,
   count(*) as numcust,
@@ -3470,6 +3444,7 @@ Plan Fragment 0
         JOIN OP: LEFT OUTER JOIN
         HASH PREDICATES:
           c.c_custkey = o.o_custkey
+        OTHER PREDICATES: o_custkey IS NULL
         TUPLE IDS: 0 1 2N 
           HASH JOIN
             JOIN OP: INNER JOIN
@@ -3483,7 +3458,6 @@ Plan Fragment 0
               SCAN HDFS table=tpch.q22_customer_tmp1 (1) compact
                 TUPLE IDS: 1 
           SCAN HDFS table=tpch.orders (3) compact
-            PREDICATES: o_custkey IS NULL
             TUPLE IDS: 2 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -3513,6 +3487,7 @@ Plan Fragment 1
       JOIN OP: LEFT OUTER JOIN
       HASH PREDICATES:
         c.c_custkey = o.o_custkey
+      OTHER PREDICATES: o_custkey IS NULL
       TUPLE IDS: 0 1 2N 
         HASH JOIN
           JOIN OP: INNER JOIN
@@ -3535,7 +3510,6 @@ Plan Fragment 2
     UNPARTITIONED
 
   SCAN HDFS table=tpch.orders (3) compact
-    PREDICATES: o_custkey IS NULL
     TUPLE IDS: 2 
 
 Plan Fragment 3

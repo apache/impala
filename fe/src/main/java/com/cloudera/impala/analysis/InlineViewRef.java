@@ -69,27 +69,25 @@ public class InlineViewRef extends TableRef {
    */
   @Override
   public void analyze(Analyzer analyzer) throws AnalysisException, InternalException {
-    // Analyze the inline view query statement with its own Analyzer
+    // Analyze the inline view query statement with its own analyzer
     inlineViewAnalyzer = new Analyzer(analyzer);
     queryStmt.analyze(inlineViewAnalyzer);
-    desc = analyzer.registerInlineViewRef(this);
     queryStmt.getMaterializedTupleIds(materializedTupleIds);
+    desc = analyzer.registerInlineViewRef(this);
+    isAnalyzed = true;  // true now that we have assigned desc
 
     // Now do the remaining join analysis
     analyzeJoin(analyzer);
 
-    // SlotRef of this inline view is mapped to the underlying expression
+    // create sMap
     for (int i = 0; i < queryStmt.getColLabels().size(); ++i) {
       String colName = queryStmt.getColLabels().get(i);
       SlotDescriptor slotD = analyzer.registerColumnRef(getAliasAsName(), colName);
-      Expr colexpr = queryStmt.getResultExprs().get(i);
+      Expr colExpr = queryStmt.getResultExprs().get(i);
       sMap.lhs.add(new SlotRef(slotD));
-      sMap.rhs.add(colexpr);
+      sMap.rhs.add(colExpr);
     }
-
     LOG.debug("inline view smap: " + sMap.debugString());
-
-    isAnalyzed = true;
   }
 
   @Override

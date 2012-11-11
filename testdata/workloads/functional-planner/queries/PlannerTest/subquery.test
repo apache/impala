@@ -182,10 +182,9 @@ Plan Fragment 0
     HASH PREDICATES:
       a.id = b.id
       a.int_col = b.int_col
-    OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
+    OTHER PREDICATES: a.day >= 6, a.tinyint_col = 15, a.tinyint_col + b.tinyint_col < 15
     TUPLE IDS: 0N 1 
       SCAN HDFS table=default.alltypesagg (0)
-        PREDICATES: a.tinyint_col = 15
         TUPLE IDS: 0 
       SCAN HDFS table=default.alltypessmall (1) compact
         PREDICATES: b.string_col = '15'
@@ -207,10 +206,9 @@ Plan Fragment 1
     HASH PREDICATES:
       a.id = b.id
       a.int_col = b.int_col
-    OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
+    OTHER PREDICATES: a.day >= 6, a.tinyint_col = 15, a.tinyint_col + b.tinyint_col < 15
     TUPLE IDS: 0N 1 
       SCAN HDFS table=default.alltypesagg (0)
-        PREDICATES: a.tinyint_col = 15
         TUPLE IDS: 0 
       EXCHANGE (3)
         TUPLE IDS: 1 
@@ -226,7 +224,17 @@ Plan Fragment 2
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS
 NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+  LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
   LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
   LOCATIONS:
@@ -290,10 +298,9 @@ Plan Fragment 0
     HASH PREDICATES:
       id = id
       int_col = int_col
-    OTHER PREDICATES: tinyint_col + tinyint_col < 15
+    OTHER PREDICATES: day >= 6, tinyint_col = 15, tinyint_col + tinyint_col < 15
     TUPLE IDS: 0N 2 
       SCAN HDFS table=default.alltypesagg (0)
-        PREDICATES: tinyint_col = 15
         TUPLE IDS: 0 
       SCAN HDFS table=default.alltypessmall (1) compact
         PREDICATES: string_col = '15'
@@ -315,10 +322,9 @@ Plan Fragment 1
     HASH PREDICATES:
       id = id
       int_col = int_col
-    OTHER PREDICATES: tinyint_col + tinyint_col < 15
+    OTHER PREDICATES: day >= 6, tinyint_col = 15, tinyint_col + tinyint_col < 15
     TUPLE IDS: 0N 2 
       SCAN HDFS table=default.alltypesagg (0)
-        PREDICATES: tinyint_col = 15
         TUPLE IDS: 0 
       EXCHANGE (3)
         TUPLE IDS: 2 
@@ -334,7 +340,17 @@ Plan Fragment 2
     TUPLE IDS: 2 
 ---- SCANRANGELOCATIONS
 NODE 0:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=1/100101.txt 0:75153
+  LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=10/100110.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=2/100102.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=3/100103.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=4/100104.txt 0:76263
+  LOCATIONS:
+  HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=5/100105.txt 0:76263
   LOCATIONS:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypesagg/year=2010/month=1/day=6/100106.txt 0:76263
   LOCATIONS:
@@ -372,10 +388,9 @@ Plan Fragment 0
     HASH PREDICATES:
       id = id
       int_col = int_col
-    OTHER PREDICATES: tinyint_col + tinyint_col < 15
+    OTHER PREDICATES: tinyint_col = 15, tinyint_col + tinyint_col < 15
     TUPLE IDS: 0N 3 
       SCAN HDFS table=default.alltypesagg (0)
-        PREDICATES: tinyint_col = 15
         TUPLE IDS: 0 
       SCAN HDFS table=default.alltypessmall (1) compact
         PREDICATES: string_col = '15'
@@ -397,10 +412,9 @@ Plan Fragment 1
     HASH PREDICATES:
       id = id
       int_col = int_col
-    OTHER PREDICATES: tinyint_col + tinyint_col < 15
+    OTHER PREDICATES: tinyint_col = 15, tinyint_col + tinyint_col < 15
     TUPLE IDS: 0N 3 
       SCAN HDFS table=default.alltypesagg (0)
-        PREDICATES: tinyint_col = 15
         TUPLE IDS: 0 
       EXCHANGE (3)
         TUPLE IDS: 3 

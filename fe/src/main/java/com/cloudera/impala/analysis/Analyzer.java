@@ -21,6 +21,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
@@ -29,17 +32,26 @@ import com.cloudera.impala.catalog.InlineView;
 import com.cloudera.impala.catalog.PrimitiveType;
 import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
+import com.cloudera.impala.common.IdGenerator;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 /**
- * Repository of analysis state for single select block..
+ * Repository of analysis state for single select block.
  *
+ * All conjuncts are assigned a unique id when initially registered, and all registered
+ * conjuncts are referenced by their id (ie, there are no containers other than the one
+ * holding the referenced conjuncts), to make substitute() simple.
  */
 public class Analyzer {
+  private final static Logger LOG = LoggerFactory.getLogger(Analyzer.class);
+
   private final DescriptorTable descTbl;
   private final Catalog catalog;
   private final String defaultDb;
+  private final IdGenerator<ExprId> conjunctIdGenerator;
 
   // An analyzer is a repository for a single select block. A select block can be a top
   // level select statement, or a inline view select block. An inline
@@ -48,32 +60,48 @@ public class Analyzer {
   // null.
   private final Analyzer parentAnalyzer;
 
-  // map from lowercase table alias to descriptor. 
+  // map from lowercase table alias to descriptor.
   private final Map<String, TupleDescriptor> aliasMap = Maps.newHashMap();
 
   // map from lowercase qualified column name ("alias.col") to descriptor
   private final Map<String, SlotDescriptor> slotRefMap = Maps.newHashMap();
 
-  // map from tuple id to list of predicates referencing tuple
-  private final Map<TupleId, List<Predicate> > tuplePredicates = Maps.newHashMap();
+  // all registered conjuncts (map from id to Predicate)
+  private final Map<ExprId, Predicate> conjuncts = Maps.newHashMap();
 
-  // map from slot id to list of predicates referencing slot
-  private final Map<SlotId, List<Predicate> > slotPredicates = Maps.newHashMap();
+  // map from tuple id to list of conjuncts referencing tuple
+  private final Map<TupleId, List<ExprId> > tuplePredicates = Maps.newHashMap();
 
-  // eqJoinPredicates[tid] contains all predicates of the form
+  // map from slot id to list of conjuncts referencing slot
+  private final Map<SlotId, List<ExprId> > slotPredicates = Maps.newHashMap();
+
+  // eqJoinPredicates[tid] contains all conjuncts of the form
   // "<lhs> = <rhs>" in which either lhs or rhs is fully bound by tid
   // and the other side is not bound by tid (ie, predicates that express equi-join
   // conditions between two tablerefs).
   // A predicate such as "t1.a = t2.b" has two entries, one for 't1' and
   // another one for 't2'.
-  private final Map<TupleId, List<Predicate> > eqJoinPredicates = Maps.newHashMap();
-
-  // list of all registered conjuncts
-  private final List<Predicate> conjuncts = Lists.newArrayList();
+  private final Map<TupleId, List<ExprId> > eqJoinConjuncts = Maps.newHashMap();
 
   // set of conjuncts that have been assigned to some PlanNode
-  private final Set<Predicate> assignedConjuncts =
-      Collections.newSetFromMap(new IdentityHashMap<Predicate, Boolean>());
+  private final Set<ExprId> assignedConjuncts =
+      Collections.newSetFromMap(new IdentityHashMap<ExprId, Boolean>());
+
+  // map from outer-joined tuple id, ie, one that is nullable in this select block,
+  // to the last Join clause (represented by its rhs table ref) that outer-joined it
+  private final Map<TupleId, TableRef> outerJoinedTupleIds = Maps.newHashMap();
+
+  // map from right-hand side table ref of an outer join to the list of
+  // conjuncts in its On clause
+  private final Map<TableRef, List<ExprId>> conjunctsByOjClause = Maps.newHashMap();
+
+  // map from registered conjunct to its containing outer join On clause (represented
+  // by its right-hand side table ref); only conjuncts that can only be correctly
+  // evaluated by the originating outer join are registered here
+  private final Map<ExprId, TableRef> ojClauseByConjunct = Maps.newHashMap();
+
+  // all conjuncts of the Where clause
+  private final Set<ExprId> whereClauseConjuncts = Sets.newHashSet();
 
   /**
    * Analyzer constructor for top level statement.
@@ -88,6 +116,7 @@ public class Analyzer {
     this.catalog = catalog;
     this.descTbl = new DescriptorTable();
     this.defaultDb = defaultDb;
+    this.conjunctIdGenerator = new IdGenerator<ExprId>();
   }
 
   /**
@@ -100,19 +129,17 @@ public class Analyzer {
     this.catalog = parentAnalyzer.catalog;
     this.descTbl = parentAnalyzer.descTbl;
     this.defaultDb = parentAnalyzer.defaultDb;
+    // make sure we don't create duplicate ids across entire stmt
+    this.conjunctIdGenerator = parentAnalyzer.conjunctIdGenerator;
   }
 
   /**
-   * Substitute analyzer's internal expressions (eqJoinPredicates and conjuncts) with the
-   * given substitution map
+   * Substitute analyzer's internal expressions (conjuncts) with the given substitution
+   * map
    */
   public void substitute(Expr.SubstitutionMap sMap) {
-    Expr.substituteList(conjuncts, sMap);
-
-    // conjuncts list is substituted, but the original list element might not be.
-    // so, we need to substitute eqJoinPredicates.
-    for (List<Predicate> eqJoinPred: eqJoinPredicates.values()) {
-      Expr.substituteList(eqJoinPred, sMap);
+    for (ExprId id: conjuncts.keySet()) {
+      conjuncts.put(id, (Predicate) conjuncts.get(id).substitute(sMap));
     }
   }
 
@@ -133,13 +160,13 @@ public class Analyzer {
 
     // Always register the ref under the unqualified table name (if there's no
     // explicit alias), but the *table* must be fully qualified.
-    String dbName = 
+    String dbName =
         ref.getName().getDb() == null ? getDefaultDb() : ref.getName().getDb();
     Db db = catalog.getDb(dbName);
     if (db == null) {
       throw new AnalysisException("unknown db: '" + ref.getName().getDb() + "'");
     }
-    
+
     Table tbl = null;
     try {
       tbl = db.getTable(ref.getName().getTbl());
@@ -153,8 +180,17 @@ public class Analyzer {
     TupleDescriptor result = descTbl.createTupleDescriptor();
     result.setTable(tbl);
     aliasMap.put(lookupAlias, result);
-
     return result;
+  }
+
+  /**
+   * Register tids as being outer-joined by Join clause represented by rhsRef.
+   */
+  public void registerOuterJoinedTids(List<TupleId> tids, TableRef rhsRef) {
+    for (TupleId tid: tids) {
+      outerJoinedTupleIds.put(tid, rhsRef);
+    }
+    //LOG.info("outerJoinedTids: " + outerJoinedTupleIds.toString());
   }
 
   /**
@@ -200,7 +236,6 @@ public class Analyzer {
     result.setIsMaterialized(false);
     result.setTable(inlineView);
     aliasMap.put(lookupAlias, result);
-
     return result;
   }
 
@@ -271,7 +306,6 @@ public class Analyzer {
    * otherwise returns the table alias.
    */
   private String resolveColumnRef(String colName) throws AnalysisException {
-    int numMatches = 0;
     String result = null;
     for (Map.Entry<String, TupleDescriptor> entry: aliasMap.entrySet()) {
       Column col = entry.getValue().getTable().getColumn(colName);
@@ -287,21 +321,40 @@ public class Analyzer {
   }
 
   /**
-   * Register all conjuncts in a list of predicates.
+   * Register all conjuncts in a list of predicates as Where clause conjuncts.
    */
   public void registerConjuncts(List<Predicate> l) {
     for (Predicate p: l) {
-      registerConjuncts(p);
+      registerConjuncts(p, null, true);
     }
   }
 
   /**
-   * Register all conjuncts that make up the predicate.
+   * Register all conjuncts that make up the predicate and assign each conjunct an id.
+   * If ref != null, ref is expected to be the right-hand side of an outer join,
+   * and the conjuncts of p can only be evaluated by the node implementing that join
+   * (p is the On clause).
    */
-  public void registerConjuncts(Predicate p) {
-    List<Predicate> conjuncts = p.getConjuncts();
-    for (Predicate conjunct: conjuncts) {
+  public void registerConjuncts(Predicate p, TableRef rhsRef, boolean fromWhereClause) {
+    List<ExprId> ojConjuncts = null;
+    if (rhsRef != null) {
+      Preconditions.checkState(rhsRef.getJoinOp().isOuterJoin());
+      ojConjuncts = conjunctsByOjClause.get(rhsRef);
+      if (ojConjuncts == null) {
+        ojConjuncts = Lists.newArrayList();
+        conjunctsByOjClause.put(rhsRef, ojConjuncts);
+      }
+    }
+    for (Predicate conjunct: p.getConjuncts()) {
       registerConjunct(conjunct);
+      if (rhsRef != null) {
+        ojClauseByConjunct.put(conjunct.getId(), rhsRef);
+        ojConjuncts.add(conjunct.getId());
+        //LOG.info(conjunctsByOjClause.toString());
+      }
+      if (fromWhereClause) {
+        whereClauseConjuncts.add(conjunct.getId());
+      }
     }
   }
 
@@ -310,7 +363,13 @@ public class Analyzer {
    * and with the global conjunct list.
    */
   private void registerConjunct(Predicate p) {
-    conjuncts.add(p);
+    // this conjunct would already have an id assigned if it is being re-registered
+    // in a subqery analyzer
+    if (p.getId() == null) {
+      p.setId(new ExprId(conjunctIdGenerator));
+    }
+    conjuncts.put(p.getId(), p);
+    //LOG.info("registered conjunct " + p.getId().toString() + ": " + p.toSql());
 
     ArrayList<TupleId> tupleIds = Lists.newArrayList();
     ArrayList<SlotId> slotIds = Lists.newArrayList();
@@ -319,26 +378,28 @@ public class Analyzer {
     // update tuplePredicates
     for (TupleId id : tupleIds) {
       if (!tuplePredicates.containsKey(id)) {
-        List<Predicate> predList = Lists.newLinkedList();
-        predList.add(p);
-        tuplePredicates.put(id, predList);
+        List<ExprId> conjunctIds = Lists.newArrayList();
+        conjunctIds.add(p.getId());
+        tuplePredicates.put(id, conjunctIds);
       } else {
-        tuplePredicates.get(id).add(p);
+        tuplePredicates.get(id).add(p.getId());
       }
     }
 
     // update slotPredicates
     for (SlotId id : slotIds) {
       if (!slotPredicates.containsKey(id)) {
-        List<Predicate> predList = Lists.newLinkedList();
-        predList.add(p);
-        slotPredicates.put(id, predList);
+        List<ExprId> conjunctIds = Lists.newArrayList();
+        conjunctIds.add(p.getId());
+        slotPredicates.put(id, conjunctIds);
       } else {
-        slotPredicates.get(id).add(p);
+        slotPredicates.get(id).add(p.getId());
       }
     }
 
-    // update eqJoinPredicates
+    // check whether this is an equi-join predicate, ie, something of the
+    // form <expr1> = <expr2> where at least one of the exprs is bound by
+    // exactly one tuple id
     if (!(p instanceof BinaryPredicate)) {
       return;
     }
@@ -350,17 +411,17 @@ public class Analyzer {
       return;
     }
 
-    // examine children
+    // examine children and update eqJoinConjuncts
     for (int i = 0; i < 2; ++i) {
       List<TupleId> lhsTupleIds = Lists.newArrayList();
       binaryPred.getChild(i).getIds(lhsTupleIds, null);
       if (lhsTupleIds.size() == 1) {
-        if (!eqJoinPredicates.containsKey(lhsTupleIds.get(0))) {
-          List<Predicate> predList = Lists.newLinkedList();
-          predList.add(p);
-          eqJoinPredicates.put(lhsTupleIds.get(0), predList);
+        if (!eqJoinConjuncts.containsKey(lhsTupleIds.get(0))) {
+          List<ExprId> conjunctIds = Lists.newArrayList();
+          conjunctIds.add(p.getId());
+          eqJoinConjuncts.put(lhsTupleIds.get(0), conjunctIds);
         } else {
-          eqJoinPredicates.get(lhsTupleIds.get(0)).add(p);
+          eqJoinConjuncts.get(lhsTupleIds.get(0)).add(p.getId());
         }
         binaryPred.setIsEqJoinConjunct(true);
       }
@@ -369,18 +430,55 @@ public class Analyzer {
 
   /**
    * Return all unassigned registered conjuncts that are fully bound by given
-   * list of tuple ids.
+   * list of tuple ids and are not tied to an Outer Join clause.
    * @return possibly empty list of Predicates
    */
-  public List<Predicate> getBoundConjuncts(List<TupleId> tupleIds) {
+  public List<Predicate> getUnassignedConjuncts(List<TupleId> tupleIds) {
+    //LOG.info("getUnassignedConjuncts()");
+    //LOG.info("ojconjuncts:" + ojClauseByConjunct.toString());
     List<Predicate> result = Lists.newArrayList();
-    for (int i = 0; i < conjuncts.size(); ++i) {
-      Predicate pred = conjuncts.get(i);
-      if (pred.isBound(tupleIds) && !assignedConjuncts.contains(pred)) {
+    for (Predicate pred: conjuncts.values()) {
+      //LOG.info("check pred: " + pred.toSql());
+      if (pred.isBound(tupleIds) && !assignedConjuncts.contains(pred.getId())
+          && !ojClauseByConjunct.containsKey(pred.getId())) {
         result.add(pred);
       }
     }
     return result;
+  }
+
+  /**
+   * Return all unassigned conjuncts of the outer join referenced by right-hand side
+   * table ref.
+   */
+  public List<Predicate> getUnassignedOjConjuncts(TableRef ref) {
+    //LOG.info("getUnassignedOjConjuncts()");
+    Preconditions.checkState(ref.getJoinOp().isOuterJoin());
+    List<Predicate> result = Lists.newArrayList();
+    //LOG.info(conjunctsByOjClause.toString());
+    List<ExprId> candidates = conjunctsByOjClause.get(ref);
+    if (candidates == null) {
+      return result;
+    }
+    for (ExprId conjunctId: candidates) {
+      if (!assignedConjuncts.contains(conjunctId)) {
+        Predicate p = conjuncts.get(conjunctId);
+        Preconditions.checkState(p != null);
+        result.add(p);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Return rhs ref of last Join clause that outer-joined id.
+   */
+  public TableRef getLastOjClause(TupleId id) {
+    return outerJoinedTupleIds.get(id);
+  }
+
+  public boolean isWhereClauseConjunct(Predicate p) {
+    return whereClauseConjuncts.contains(p.getId());
   }
 
   /**
@@ -408,24 +506,66 @@ public class Analyzer {
     return aliasMap.keySet();
   }
 
-  public List<Predicate> getEqJoinPredicates(TupleId id) {
-    return eqJoinPredicates.get(id);
+  /**
+   * Return list of equi-join conjuncts that reference tid. If rhsRef != null, it is
+   * assumed to be for an outer join, and only equi-join conjuncts from that outer join's
+   * On clause are returned.
+   */
+  public List<Predicate> getEqJoinConjuncts(TupleId id, TableRef rhsRef) {
+    List<ExprId> conjunctIds = eqJoinConjuncts.get(id);
+    if (conjunctIds == null) return null;
+    List<Predicate> result = Lists.newArrayList();
+    List<ExprId> ojClauseConjuncts = null;
+    if (rhsRef != null) {
+      Preconditions.checkState(rhsRef.getJoinOp().isOuterJoin());
+      ojClauseConjuncts = conjunctsByOjClause.get(rhsRef);
+    }
+    for (ExprId conjunctId: conjunctIds) {
+      Predicate p = conjuncts.get(conjunctId);
+      Preconditions.checkState(p != null);
+      if (ojClauseConjuncts != null) {
+        if (ojClauseConjuncts.contains(conjunctId)) {
+          result.add(p);
+        }
+      } else {
+        result.add(p);
+      }
+    }
+    return result;
   }
 
   /**
-   * Mark those predicates as assigned.
-   * @param predicates mark the given list of predicate as assigned
+   * Mark predicates as assigned.
    */
   public void markConjunctsAssigned(List<Predicate> predicates) {
-    assignedConjuncts.addAll(predicates);
+    if (predicates == null) {
+      return;
+    }
+    for (Predicate p: predicates) {
+      assignedConjuncts.add(p.getId());
+    }
+    //LOG.info("mark assigned: " + assignedConjuncts.toString());
+  }
+
+  /**
+   * Mark predicate as assigned.
+   */
+  public void markConjunctAssigned(Predicate conjunct) {
+    assignedConjuncts.add(conjunct.getId());
+    //LOG.info("mark assigned: " + assignedConjuncts.toString());
   }
 
   /**
    * Return true if there's at least one unassigned conjunct.
-   * @return true if there's at least one unassigned conjunct
    */
   public boolean hasUnassignedConjuncts() {
-    return !assignedConjuncts.containsAll(conjuncts);
+    //LOG.info("assigned: " + assignedConjuncts.toString());
+    //LOG.info("conjuncts: " + conjuncts.keySet().toString());
+    boolean result = !assignedConjuncts.containsAll(conjuncts.keySet());
+    if (result) {
+      //LOG.info("has unassigned conjuncts");
+    }
+    return result;
   }
 
   /**
@@ -491,7 +631,7 @@ public class Analyzer {
     return compatibleType;
   }
 
-  public String getDefaultDb() { 
+  public String getDefaultDb() {
     return defaultDb;
   }
 }

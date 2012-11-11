@@ -122,7 +122,7 @@ public class BinaryPredicate extends Predicate {
                && getChild(0).getChild(0) instanceof SlotRef) {
       slotRef = (SlotRef) getChild(0).getChild(0);
     }
-    if (slotRef != null && slotRef.getId() == id) {
+    if (slotRef != null && slotRef.getSlotId() == id) {
       return getChild(1);
     }
 
@@ -133,7 +133,7 @@ public class BinaryPredicate extends Predicate {
                && getChild(1).getChild(0) instanceof SlotRef) {
       slotRef = (SlotRef) getChild(1).getChild(0);
     }
-    if (slotRef != null && slotRef.getId() == id) {
+    if (slotRef != null && slotRef.getSlotId() == id) {
       return getChild(0);
     }
 

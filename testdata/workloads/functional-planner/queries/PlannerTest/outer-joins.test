@@ -1,0 +1,405 @@
+# correct placement of predicates with left outer joins; t2 and t3 are nullable
+select *
+from testtbl t1 left outer join testtbl t2 on (
+    t1.id - 1 = t2.id + 1
+# lhs predicate is join predicate
+    and t1.zip = 94611
+# rhs predicate applied by rhs scan
+    and t2.zip = 94104)
+  left outer join testtbl t3 on (
+    t1.id = t3.id
+# predicate on t2 is join predicate
+    and t2.id = 15
+# predicate on t1 and t2 is join predicate
+    and t1.id - t2.id = 0
+# rhs predicate applied by rhs scan
+    and t3.zip = 94720
+  )
+where
+# t1 predicate in where clause is applied by scan
+t1.id > 0
+# t2 predicate in where clause is applied after join
+and t2.id is null
+# t3 predicate in where clause is applied after join
+and t3.id is not null
+# join predicate between t1 and t2 applied after t2 join
+and t1.zip + t2.zip = 10
+# join predicate between t1, t2 and t3 applied after last join
+and t1.zip + t2.zip + t3.zip= 20
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  HASH JOIN
+    JOIN OP: LEFT OUTER JOIN
+    HASH PREDICATES:
+      t1.id = t3.id
+    OTHER JOIN PREDICATES: t2.id = 15, t1.id - t2.id = 0
+    OTHER PREDICATES: t3.id IS NOT NULL, t1.zip + t2.zip + t3.zip = 20
+    TUPLE IDS: 0 1N 2N 
+      HASH JOIN
+        JOIN OP: LEFT OUTER JOIN
+        HASH PREDICATES:
+          t1.id - 1 = t2.id + 1
+        OTHER JOIN PREDICATES: t1.zip = 94611
+        OTHER PREDICATES: t2.id IS NULL, t1.zip + t2.zip = 10
+        TUPLE IDS: 0 1N 
+          SCAN HDFS table=default.testtbl (0)
+            PREDICATES: t1.id > 0
+            TUPLE IDS: 0 
+          SCAN HDFS table=default.testtbl (1) compact
+            PREDICATES: t2.zip = 94104
+            TUPLE IDS: 1 
+      SCAN HDFS table=default.testtbl (3) compact
+        PREDICATES: t3.zip = 94720
+        TUPLE IDS: 2 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (7)
+    TUPLE IDS: 0 1N 2N 
+
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  HASH JOIN
+    JOIN OP: LEFT OUTER JOIN
+    HASH PREDICATES:
+      t1.id = t3.id
+    OTHER JOIN PREDICATES: t2.id = 15, t1.id - t2.id = 0
+    OTHER PREDICATES: t3.id IS NOT NULL, t1.zip + t2.zip + t3.zip = 20
+    TUPLE IDS: 0 1N 2N 
+      HASH JOIN
+        JOIN OP: LEFT OUTER JOIN
+        HASH PREDICATES:
+          t1.id - 1 = t2.id + 1
+        OTHER JOIN PREDICATES: t1.zip = 94611
+        OTHER PREDICATES: t2.id IS NULL, t1.zip + t2.zip = 10
+        TUPLE IDS: 0 1N 
+          SCAN HDFS table=default.testtbl (0)
+            PREDICATES: t1.id > 0
+            TUPLE IDS: 0 
+          EXCHANGE (5)
+            TUPLE IDS: 1 
+      EXCHANGE (6)
+        TUPLE IDS: 2 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  SCAN HDFS table=default.testtbl (3) compact
+    PREDICATES: t3.zip = 94720
+    TUPLE IDS: 2 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  SCAN HDFS table=default.testtbl (1) compact
+    PREDICATES: t2.zip = 94104
+    TUPLE IDS: 1 
+---- SCANRANGELOCATIONS
+NODE 0:
+NODE 1:
+NODE 3:
+====
+# the same thing with subqueries; should produce the same result
+select *
+from (select * from testtbl a1) t1 left outer join (select * from testtbl a2) t2 on (
+    t1.id - 1 = t2.id + 1 and t1.zip = 94611 and t2.zip = 94104)
+  left outer join (select * from testtbl a3) t3 on (
+    t1.id = t3.id and t2.id = 15 and t1.id - t2.id = 0 and t3.zip = 94720)
+where t1.id > 0 and t2.id is null and t3.id is not null
+and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  HASH JOIN
+    JOIN OP: LEFT OUTER JOIN
+    HASH PREDICATES:
+      a1.id = a3.id
+    OTHER JOIN PREDICATES: a2.id = 15, a1.id - a2.id = 0
+    OTHER PREDICATES: a3.id IS NOT NULL, a1.zip + a2.zip + a3.zip = 20
+    TUPLE IDS: 0 2N 4N 
+      HASH JOIN
+        JOIN OP: LEFT OUTER JOIN
+        HASH PREDICATES:
+          a1.id - 1 = a2.id + 1
+        OTHER JOIN PREDICATES: a1.zip = 94611
+        OTHER PREDICATES: a2.id IS NULL, a1.zip + a2.zip = 10
+        TUPLE IDS: 0 2N 
+          SCAN HDFS table=default.testtbl (0)
+            PREDICATES: a1.id > 0
+            TUPLE IDS: 0 
+          SCAN HDFS table=default.testtbl (1) compact
+            PREDICATES: a2.zip = 94104
+            TUPLE IDS: 2 
+      SCAN HDFS table=default.testtbl (3) compact
+        PREDICATES: a3.zip = 94720
+        TUPLE IDS: 4 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (7)
+    TUPLE IDS: 0 2N 4N 
+
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  HASH JOIN
+    JOIN OP: LEFT OUTER JOIN
+    HASH PREDICATES:
+      a1.id = a3.id
+    OTHER JOIN PREDICATES: a2.id = 15, a1.id - a2.id = 0
+    OTHER PREDICATES: a3.id IS NOT NULL, a1.zip + a2.zip + a3.zip = 20
+    TUPLE IDS: 0 2N 4N 
+      HASH JOIN
+        JOIN OP: LEFT OUTER JOIN
+        HASH PREDICATES:
+          a1.id - 1 = a2.id + 1
+        OTHER JOIN PREDICATES: a1.zip = 94611
+        OTHER PREDICATES: a2.id IS NULL, a1.zip + a2.zip = 10
+        TUPLE IDS: 0 2N 
+          SCAN HDFS table=default.testtbl (0)
+            PREDICATES: a1.id > 0
+            TUPLE IDS: 0 
+          EXCHANGE (5)
+            TUPLE IDS: 2 
+      EXCHANGE (6)
+        TUPLE IDS: 4 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  SCAN HDFS table=default.testtbl (3) compact
+    PREDICATES: a3.zip = 94720
+    TUPLE IDS: 4 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  SCAN HDFS table=default.testtbl (1) compact
+    PREDICATES: a2.zip = 94104
+    TUPLE IDS: 2 
+---- SCANRANGELOCATIONS
+NODE 0:
+NODE 1:
+NODE 3:
+====
+# correct placement of predicates with right outer joins; t1 and t2 are nullable
+select *
+from testtbl t1 right outer join testtbl t2 on (
+    t1.id - 1 = t2.id + 1
+# lhs predicate is scan predicate
+    and t1.zip = 94611
+# rhs predicate is join predicate
+    and t2.zip = 94104)
+  right outer join testtbl t3 on (
+    t1.id = t3.id
+# predicate on t2 is scan predicate
+    and t2.id = 15
+# predicate on t1 and t2 could be applied by previous join
+# but the planner doesn't recognize that case and makes it a join predicate
+    and t1.id - t2.id = 0
+# rhs predicate is join predicate
+    and t3.zip = 94720
+  )
+where
+# t1 predicate in where clause is applied by last last
+t1.id > 0
+# t2 predicate in where clause is applied by last last
+and t2.id is null
+# t3 predicate in where clause is applied by scan
+and t3.id is not null
+# join predicate between t1 and t2 applied after last join
+and t1.zip + t2.zip = 10
+# join predicate between t1, t2 and t3 applied after last join
+and t1.zip + t2.zip + t3.zip= 20
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  HASH JOIN
+    JOIN OP: RIGHT OUTER JOIN
+    HASH PREDICATES:
+      t1.id = t3.id
+    OTHER JOIN PREDICATES: t1.id - t2.id = 0, t3.zip = 94720
+    OTHER PREDICATES: t1.id > 0, t2.id IS NULL, t1.zip + t2.zip = 10, t1.zip + t2.zip + t3.zip = 20
+    TUPLE IDS: 0N 1N 2 
+      HASH JOIN
+        JOIN OP: RIGHT OUTER JOIN
+        HASH PREDICATES:
+          t1.id - 1 = t2.id + 1
+        OTHER JOIN PREDICATES: t2.zip = 94104
+        TUPLE IDS: 0N 1 
+          SCAN HDFS table=default.testtbl (0)
+            PREDICATES: t1.zip = 94611
+            TUPLE IDS: 0 
+          SCAN HDFS table=default.testtbl (1) compact
+            PREDICATES: t2.id = 15
+            TUPLE IDS: 1 
+      SCAN HDFS table=default.testtbl (3) compact
+        PREDICATES: t3.id IS NOT NULL
+        TUPLE IDS: 2 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (7)
+    TUPLE IDS: 0N 1N 2 
+
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  HASH JOIN
+    JOIN OP: RIGHT OUTER JOIN
+    HASH PREDICATES:
+      t1.id = t3.id
+    OTHER JOIN PREDICATES: t1.id - t2.id = 0, t3.zip = 94720
+    OTHER PREDICATES: t1.id > 0, t2.id IS NULL, t1.zip + t2.zip = 10, t1.zip + t2.zip + t3.zip = 20
+    TUPLE IDS: 0N 1N 2 
+      HASH JOIN
+        JOIN OP: RIGHT OUTER JOIN
+        HASH PREDICATES:
+          t1.id - 1 = t2.id + 1
+        OTHER JOIN PREDICATES: t2.zip = 94104
+        TUPLE IDS: 0N 1 
+          SCAN HDFS table=default.testtbl (0)
+            PREDICATES: t1.zip = 94611
+            TUPLE IDS: 0 
+          EXCHANGE (5)
+            TUPLE IDS: 1 
+      EXCHANGE (6)
+        TUPLE IDS: 2 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  SCAN HDFS table=default.testtbl (3) compact
+    PREDICATES: t3.id IS NOT NULL
+    TUPLE IDS: 2 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  SCAN HDFS table=default.testtbl (1) compact
+    PREDICATES: t2.id = 15
+    TUPLE IDS: 1 
+---- SCANRANGELOCATIONS
+NODE 0:
+NODE 1:
+NODE 3:
+====
+# the same thing with subqueries; should produce the same result
+select *
+from (select * from testtbl a1) t1 right outer join (select * from testtbl a2) t2 on (
+    t1.id - 1 = t2.id + 1 and t1.zip = 94611 and t2.zip = 94104)
+  right outer join (select * from testtbl a3) t3 on (
+    t1.id = t3.id and t2.id = 15 and t1.id - t2.id = 0 and t3.zip = 94720 )
+where t1.id > 0 and t2.id is null and t3.id is not null
+and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
+---- PLAN
+Plan Fragment 0
+  UNPARTITIONED
+  HASH JOIN
+    JOIN OP: RIGHT OUTER JOIN
+    HASH PREDICATES:
+      a1.id = a3.id
+    OTHER JOIN PREDICATES: a1.id - a2.id = 0, a3.zip = 94720
+    OTHER PREDICATES: a1.id > 0, a2.id IS NULL, a1.zip + a2.zip = 10, a1.zip + a2.zip + a3.zip = 20
+    TUPLE IDS: 0N 2N 4 
+      HASH JOIN
+        JOIN OP: RIGHT OUTER JOIN
+        HASH PREDICATES:
+          a1.id - 1 = a2.id + 1
+        OTHER JOIN PREDICATES: a2.zip = 94104
+        TUPLE IDS: 0N 2 
+          SCAN HDFS table=default.testtbl (0)
+            PREDICATES: a1.zip = 94611
+            TUPLE IDS: 0 
+          SCAN HDFS table=default.testtbl (1) compact
+            PREDICATES: a2.id = 15
+            TUPLE IDS: 2 
+      SCAN HDFS table=default.testtbl (3) compact
+        PREDICATES: a3.id IS NOT NULL
+        TUPLE IDS: 4 
+---- DISTRIBUTEDPLAN
+Plan Fragment 0
+  UNPARTITIONED
+  EXCHANGE (7)
+    TUPLE IDS: 0N 2N 4 
+
+Plan Fragment 1
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 7
+    UNPARTITIONED
+
+  HASH JOIN
+    JOIN OP: RIGHT OUTER JOIN
+    HASH PREDICATES:
+      a1.id = a3.id
+    OTHER JOIN PREDICATES: a1.id - a2.id = 0, a3.zip = 94720
+    OTHER PREDICATES: a1.id > 0, a2.id IS NULL, a1.zip + a2.zip = 10, a1.zip + a2.zip + a3.zip = 20
+    TUPLE IDS: 0N 2N 4 
+      HASH JOIN
+        JOIN OP: RIGHT OUTER JOIN
+        HASH PREDICATES:
+          a1.id - 1 = a2.id + 1
+        OTHER JOIN PREDICATES: a2.zip = 94104
+        TUPLE IDS: 0N 2 
+          SCAN HDFS table=default.testtbl (0)
+            PREDICATES: a1.zip = 94611
+            TUPLE IDS: 0 
+          EXCHANGE (5)
+            TUPLE IDS: 2 
+      EXCHANGE (6)
+        TUPLE IDS: 4 
+
+Plan Fragment 2
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 6
+    UNPARTITIONED
+
+  SCAN HDFS table=default.testtbl (3) compact
+    PREDICATES: a3.id IS NOT NULL
+    TUPLE IDS: 4 
+
+Plan Fragment 3
+  RANDOM
+  STREAM DATA SINK
+    EXCHANGE ID: 5
+    UNPARTITIONED
+
+  SCAN HDFS table=default.testtbl (1) compact
+    PREDICATES: a2.id = 15
+    TUPLE IDS: 2 
+---- SCANRANGELOCATIONS
+NODE 0:
+NODE 1:
+NODE 3:
+====
