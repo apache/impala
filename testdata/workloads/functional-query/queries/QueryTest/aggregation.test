@@ -101,7 +101,14 @@
 #---- RESULTS
 #'0'
 #====
-# no grouping exprs, cols contain nulls
+# no grouping exprs, cols contain nulls except for bool cols
+select count(bool_col), min(bool_col), max(bool_col)
+from alltypesagg$TABLE
+---- TYPES
+bigint, boolean, boolean
+---- RESULTS
+10000,false,true
+====
 select count(*), count(tinyint_col), min(tinyint_col), max(tinyint_col), sum(tinyint_col),
 avg(tinyint_col)
 from alltypesagg$TABLE
@@ -182,6 +189,13 @@ tinyint, bigint
 NULL,1000
 ====
 # grouping by different data types, with NULLs, grouping expr missing from select list
+select bool_col,min(bool_col),max(bool_col) from alltypesagg$TABLE group by 1
+---- TYPES
+boolean,boolean,boolean
+---- RESULTS
+false,false,false
+true,true,true
+====
 select count(*) from alltypesagg$TABLE group by tinyint_col
 ---- TYPES
 bigint

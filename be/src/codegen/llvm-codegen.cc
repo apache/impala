@@ -627,6 +627,15 @@ Function* LlvmCodeGen::CodegenMinMax(PrimitiveType type, bool min) {
 
   Value* compare = NULL;
   switch (type) {
+    case TYPE_BOOLEAN:
+      if (min) {
+        // For min, return x && y
+        compare = builder.CreateAnd(params[0], params[1]);
+      } else {
+        // For max, return x || y
+        compare = builder.CreateOr(params[0], params[1]);
+      }
+      break;
     case TYPE_TINYINT:
     case TYPE_SMALLINT:
     case TYPE_INT:
@@ -649,14 +658,18 @@ Function* LlvmCodeGen::CodegenMinMax(PrimitiveType type, bool min) {
       DCHECK(false);
   }
 
-  BasicBlock* ret_v1, *ret_v2;
-  CreateIfElseBlocks(fn, "ret_v1", "ret_v2", &ret_v1, &ret_v2);
+  if (type == TYPE_BOOLEAN) {
+    builder.CreateRet(compare);
+  } else {
+    BasicBlock* ret_v1, *ret_v2;
+    CreateIfElseBlocks(fn, "ret_v1", "ret_v2", &ret_v1, &ret_v2);
 
-  builder.CreateCondBr(compare, ret_v1, ret_v2);
-  builder.SetInsertPoint(ret_v1);
-  builder.CreateRet(params[0]);
-  builder.SetInsertPoint(ret_v2);
-  builder.CreateRet(params[1]);
+    builder.CreateCondBr(compare, ret_v1, ret_v2);
+    builder.SetInsertPoint(ret_v1);
+    builder.CreateRet(params[0]);
+    builder.SetInsertPoint(ret_v2);
+    builder.CreateRet(params[1]);
+  }
 
   if (!VerifyFunction(fn)) return NULL;
   return fn;

@@ -177,7 +177,7 @@ struct ExprValue {
   void* SetToMax(PrimitiveType type) {
     switch (type) {
       case TYPE_BOOLEAN:
-        bool_val = false;
+        bool_val = true;
         return &bool_val;
       case TYPE_TINYINT:
         tinyint_val = std::numeric_limits<int8_t>::max();
