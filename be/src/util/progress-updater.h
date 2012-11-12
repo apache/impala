@@ -49,6 +49,9 @@ class ProgressUpdater {
   // Returns if all tasks are done.
   bool done() const { return num_complete_ >= total_; }
 
+  int64_t total() const { return total_; }
+  int64_t num_complete() const { return num_complete_; }
+
  private:
   std::string label_;
   int logging_level_;

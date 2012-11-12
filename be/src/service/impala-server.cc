@@ -734,6 +734,7 @@ void ImpalaServer::QueryStatePathHandler(stringstream* output) {
   (*output) << "<table border=1><tr><th>Query Id</th>" << endl;
   (*output) << "<th>Statement</th>" << endl;
   (*output) << "<th>Query Type</th>" << endl;
+  (*output) << "<th>Backend Progress</th>" << endl;
   (*output) << "<th>State</th>" << endl;
   (*output) << "<th># rows fetched</th>" << endl;
   (*output) << "</tr>";
@@ -749,6 +750,23 @@ void ImpalaServer::QueryStatePathHandler(stringstream* output) {
               << "<td>"
               << _TStmtType_VALUES_TO_NAMES.find(request.stmt_type)->second
               << "</td>"
+              << "<td>";
+
+    Coordinator* coord = exec_state.second->coord(); 
+    if (coord == NULL) {
+      (*output) << "N/A";
+    } else {
+      int64_t num_complete = coord->progress().num_complete();
+      int64_t total = coord->progress().total();
+      (*output) << num_complete << " / " << total << " (" << setw(4);
+      if (total == 0) {
+        (*output) << " (0%)";
+      } else {
+        (*output) << (100.0 * num_complete / (1.f * total)) << "%)";
+      }
+    }
+
+    (*output) << "</td>"
               << "<td>" << _QueryState_VALUES_TO_NAMES.find(
                   exec_state.second->query_state())->second << "</td>"
               << "<td>" << exec_state.second->num_rows_fetched() << "</td>"

@@ -161,6 +161,8 @@ class Coordinator {
   // The set of hosts on which this query will run. Only valid after Exec.
   const boost::unordered_set<THostPort>& unique_hosts() { return unique_hosts_; }
 
+  const ProgressUpdater& progress() { return progress_; }
+
  private:
   class BackendExecState;
     
