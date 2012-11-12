@@ -16,9 +16,6 @@
 # This scrips generates be/src/common/version.cc which contains the build version based
 # on the git hash.
 
-# Current impala version.
-VERSION = "0.2"
-
 import os
 import time;
 from commands import getstatusoutput
