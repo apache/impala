@@ -17,7 +17,7 @@
 # on the git hash.
 
 # Current impala version.
-VERSION = "0.1"
+VERSION = "0.2"
 
 import os
 import time;
