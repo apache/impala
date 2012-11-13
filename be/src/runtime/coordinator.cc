@@ -42,7 +42,6 @@
 #include "runtime/row-batch.h"
 #include "runtime/parallel-executor.h"
 #include "sparrow/scheduler.h"
-#include "exec/exec-stats.h"
 #include "exec/data-sink.h"
 #include "exec/scan-node.h"
 #include "util/debug-util.h"
@@ -194,11 +193,10 @@ int64_t Coordinator::BackendExecState::UpdateNumScanRangesCompleted() {
   return delta;
 }
 
-Coordinator::Coordinator(ExecEnv* exec_env, ExecStats* exec_stats)
+Coordinator::Coordinator(ExecEnv* exec_env)
   : exec_env_(exec_env),
     has_called_wait_(false),
     executor_(NULL), // Set in Prepare()
-    exec_stats_(exec_stats),
     num_backends_(0),
     num_remaining_backends_(0),
     num_scan_ranges_(0),
@@ -561,8 +559,6 @@ Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
       // If the query completed successfully, report aggregate query profiles.
       ReportQuerySummary();
     }
-  } else {
-    exec_stats_->num_rows_ += (*batch)->num_rows();
   }
   return Status::OK;
 }

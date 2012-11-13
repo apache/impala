@@ -34,7 +34,6 @@
 #include "codegen/llvm-codegen.h"
 #include "common/status.h"
 #include "exec/exec-node.h"
-#include "exec/exec-stats.h"
 #include "exec/hbase-table-scanner.h"
 #include "exprs/expr.h"
 #include "runtime/coordinator.h"
@@ -65,7 +64,6 @@ using namespace boost;
 using namespace apache::thrift::server;
 
 static TestExecEnv* test_env;
-static scoped_ptr<ExecStats> exec_stats;
 static ThriftServer* fe_server;
 static ThriftServer* be_server;
 
@@ -104,7 +102,6 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
   // Create an in-process Impala server and in-process backends for test environment.
   VLOG_CONNECTION << "creating test env";
   test_env = new TestExecEnv(2, FLAGS_be_port + 1);
-  exec_stats.reset(new ExecStats());
   VLOG_CONNECTION << "starting backends";
   test_env->StartBackends();
 

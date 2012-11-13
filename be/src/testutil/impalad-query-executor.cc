@@ -122,7 +122,6 @@ Status ImpaladQueryExecutor::FetchResult(string* row) {
   if (query_results_.data.size() > 0) {
     *row = query_results_.data.at(current_row_);
     ++current_row_;
-    ++exec_stats_.num_rows_;
   } else {
     *row = "";
   }

@@ -25,7 +25,6 @@
 #include "runtime/primitive-type.h"
 #include "runtime/string-value.h"
 #include "gen-cpp/Exprs_types.h"
-#include "exec/exec-stats.h"
 #include "exprs/bool-literal.h"
 #include "exprs/float-literal.h"
 #include "exprs/function-call.h"
@@ -64,7 +63,6 @@ using namespace Apache::Hadoop::Hive;
 namespace impala {
 ImpaladQueryExecutor* executor_;
 TestExecEnv* test_env_;
-ExecStats* exec_stats_;
 ThriftServer* fe_server_;
 ThriftServer* be_server_;
 
@@ -2199,7 +2197,6 @@ int main(int argc, char **argv) {
   FLAGS_impalad = "localhost:21000";
   VLOG_CONNECTION << "creating test env";
   test_env_ = new TestExecEnv(2, FLAGS_be_port + 1);
-  exec_stats_ = new ExecStats();
   VLOG_CONNECTION << "starting backends";
   test_env_->StartBackends();
 

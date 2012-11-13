@@ -36,22 +36,7 @@ add_library(fesupport SHARED
 
 target_link_libraries(fesupport ${IMPALA_LINK_LIBS})
 
-add_executable(runquery
-run-query.cc
-)
-
 message(STATUS, "IMPALA_LINK_LIBS: ${IMPALA_LINK_LIBS}")
-
-target_link_libraries(runquery
-  # Library intercepts signal handlers and sets them properly for running the JVM.
-  # Must be before other libraries.
-  ${JAVA_JSIG_LIBRARY}
-  ${IMPALA_LINK_LIBS}
-  # this is commented out from IMPALA_LINK_LIBS because it causes crashes in
-  # libfesupport.so
-  # see Imp-39
-  tcmallocstatic
-)
 
 add_executable(impalad
   impalad-main.cc

@@ -44,7 +44,6 @@ namespace impala {
 
 class DataStreamMgr;
 class DataSink;
-class ExecStats;
 class RowBatch;
 class RowDescriptor;
 class PlanFragmentExecutor;
@@ -88,7 +87,7 @@ class RuntimeProfile;
 // - add profile counters for coordinator (how much time do we spend in startup?)
 class Coordinator {
  public:
-  Coordinator(ExecEnv* exec_env, ExecStats* exec_stats);
+  Coordinator(ExecEnv* exec_env);
   ~Coordinator();
 
   // Initiate asynchronous execution of query. Returns as soon as all plan fragments
@@ -144,7 +143,6 @@ class Coordinator {
   // the future if not all fragments have finished execution.
   RuntimeProfile* query_profile() const { return query_profile_.get(); }
 
-  ExecStats* exec_stats() { return exec_stats_; }
   const TUniqueId& query_id() const { return query_id_; }
 
   // This is safe to call only after Wait()
@@ -266,10 +264,6 @@ class Coordinator {
   
   // Number of remote fragments that have completed
   int num_remote_fragements_complete_;
-
-  // Repository for statistics gathered during the execution of a
-  // single query. Not owned by us.
-  ExecStats* exec_stats_;
 
   // If there is no coordinator fragment, Wait simply waits until all
   // backends report completion by notifying on backend_completion_cv_.

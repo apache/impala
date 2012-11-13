@@ -49,7 +49,6 @@
 #include "runtime/coordinator.h"
 #include "exec/exec-node.h"
 #include "exec/scan-node.h"
-#include "exec/exec-stats.h"
 #include "exec/ddl-executor.h"
 #include "sparrow/simple-scheduler.h"
 #include "util/container-util.h"
@@ -192,7 +191,6 @@ class ImpalaServer::QueryExecState {
  private:
   TUniqueId query_id_;
   mutex lock_;  // protects all following fields
-  ExecStats exec_stats_;
   ExecEnv* exec_env_;
 
   // not set for queries w/o FROM, ddl queries, or short-circuited (i.e. queries with
@@ -291,7 +289,7 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
         return Status::OK;
       }
 
-      coord_.reset(new Coordinator(exec_env_, &exec_stats_));
+      coord_.reset(new Coordinator(exec_env_));
       RETURN_IF_ERROR(coord_->Exec(
           exec_request->request_id, &query_exec_request, exec_request->query_options));
 
