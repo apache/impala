@@ -19,7 +19,7 @@
 
 set -e
 # First run all the tests that need to be executed serially (namely insert tests)
-py.test -v -x -m "execute_serially" --ignore="failure" "$@"
+py.test -v -x -m "execute_serially" --ignore="failure" "$@" -n 1
 
 # Run the remaining tests in parallel
 py.test -v -x -m "not execute_serially" --ignore="failure" -n 8 "$@"

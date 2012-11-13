@@ -1,0 +1,21 @@
+====
+---- QUERY : TPCDS-Q96
+SELECT
+  COUNT(*) AS total
+FROM tpcds.store_sales$TABLE ss
+JOIN tpcds.time_dim$TABLE td
+  ON (ss.ss_sold_time_sk = td.t_time_sk)
+JOIN tpcds.household_demographics$TABLE hd
+  ON (ss.ss_hdemo_sk = hd.hd_demo_sk)
+JOIN tpcds.store$TABLE s
+  ON (ss.ss_store_sk = s.s_store_sk)
+WHERE
+  td.t_hour = 8
+  AND td.t_minute >= 30
+  AND hd.hd_dep_count = 5
+  AND s.s_store_name = 'ese';
+---- RESULTS
+949
+---- TYPES
+BIGINT
+====

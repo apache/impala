@@ -75,7 +75,7 @@ def verify_raw_results(test_section, exec_result):
 
 def contains_order_by(query):
   """Returns true of the query contains an 'order by' clause"""
-  return re.search( r'order\s\+by\s', query, re.M|re.I) is not None
+  return re.search( r'order\s+by\b', query, re.M|re.I) is not None
 
 def parse_column_types(schema):
   """Enumerates all field schemas and returns a list of column type strings"""

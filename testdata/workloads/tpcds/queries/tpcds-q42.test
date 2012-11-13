@@ -1,0 +1,40 @@
+====
+---- QUERY : TPCDS-Q42
+SELECT
+  d.d_year,
+  i.i_category_id,
+  i.i_category,
+  SUM(ss_ext_sales_price) total_sales
+FROM tpcds.store_sales$TABLE ss
+JOIN tpcds.date_dim$TABLE d
+  ON (ss.ss_sold_date_sk = d.d_date_sk)
+JOIN tpcds.item$TABLE i
+  ON (ss.ss_item_sk = i.i_item_sk)
+WHERE
+  i.i_manager_id = 1
+  AND d.d_moy = 12
+  AND d.d_year = 1998
+GROUP BY
+  d.d_year,
+  i.i_category_id,
+  i.i_category
+ORDER BY
+  total_sales DESC,
+  d_year,
+  i_category_id,
+  i_category
+LIMIT 100;
+---- RESULTS
+1998,1,'Women',485053.8593244553
+1998,5,'Music',429901.0716336332
+1998,3,'Children',349537.8592653275
+1998,6,'Jewelry',342518.189658165
+1998,2,'Men',292191.2293226719
+1998,7,'Home',252045.0304946899
+1998,10,'Electronics',247818.2889566422
+1998,4,'Shoes',230919.730348587
+1998,9,'Books',199259.9304695129
+1998,8,'Sports',155578.67927742
+---- TYPES
+INT, INT, STRING, DOUBLE
+====

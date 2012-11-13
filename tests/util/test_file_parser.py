@@ -161,7 +161,7 @@ def parse_test_file(test_file_name, valid_section_names, skip_unknown_sections=T
       if subsection_name == 'QUERY' and subsection_comment:
         parsed_sections['QUERY_NAME'] = subsection_comment
 
-      parsed_sections[subsection_name] = '\n'.join([line.strip() for line in lines[1:-1]])
+      parsed_sections[subsection_name] = '\n'.join([line for line in lines[1:-1]])
 
     if parsed_sections:
       sections.append(parsed_sections)
