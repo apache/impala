@@ -35,6 +35,7 @@ add_library(Runtime STATIC
   plan-fragment-executor.cc
   primitive-type.cc
   raw-value.cc
+  raw-value-test.cc
   row-batch.cc
   runtime-state.cc
   string-value.cc
@@ -51,6 +52,7 @@ add_executable(timestamp-test timestamp-test.cc)
 add_executable(disk-io-mgr-test disk-io-mgr-test.cc)
 add_executable(disk-io-mgr-stress-test disk-io-mgr-stress-test.cc)
 add_executable(parallel-executor-test parallel-executor-test.cc)
+add_executable(raw-value-test raw-value-test.cc)
 
 target_link_libraries(mem-pool-test ${IMPALA_TEST_LINK_LIBS})
 target_link_libraries(free-list-test ${IMPALA_TEST_LINK_LIBS})
@@ -60,6 +62,7 @@ target_link_libraries(timestamp-test ${IMPALA_TEST_LINK_LIBS})
 target_link_libraries(disk-io-mgr-test ${IMPALA_TEST_LINK_LIBS})
 target_link_libraries(disk-io-mgr-stress-test ${IMPALA_TEST_LINK_LIBS})
 target_link_libraries(parallel-executor-test ${IMPALA_TEST_LINK_LIBS})
+target_link_libraries(raw-value-test ${IMPALA_TEST_LINK_LIBS})
 
 add_test(mem-pool-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/mem-pool-test)
 add_test(free-list-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/free-list-test)
@@ -68,3 +71,4 @@ add_test(data-stream-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/data-stream-tes
 add_test(timestamp-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/timestamp-test)
 add_test(disk-io-mgr-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/disk-io-mgr-test)
 add_test(parallel-executor-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/parallel-executor-test)
+add_test(raw-value-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/runtime/raw-value-test)

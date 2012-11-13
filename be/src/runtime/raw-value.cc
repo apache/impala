@@ -148,18 +148,24 @@ int RawValue::Compare(const void* v1, const void* v2, PrimitiveType type) {
   const TimestampValue* ts_value2;
   float f1, f2;
   double d1, d2;
+  int32_t i1, i2;
+  int64_t b1, b2;
   switch (type) {
     case TYPE_BOOLEAN:
       return *reinterpret_cast<const bool*>(v1) - *reinterpret_cast<const bool*>(v2);
     case TYPE_TINYINT:
       return *reinterpret_cast<const int8_t*>(v1) - *reinterpret_cast<const int8_t*>(v2);
     case TYPE_SMALLINT:
-      return *reinterpret_cast<const int16_t*>(v1) - *reinterpret_cast<const int16_t*>(v2);
+      return *reinterpret_cast<const int16_t*>(v1) -
+             *reinterpret_cast<const int16_t*>(v2);
     case TYPE_INT:
-      return *reinterpret_cast<const int32_t*>(v1) - *reinterpret_cast<const int32_t*>(v2);
+      i1 = *reinterpret_cast<const int32_t*>(v1);
+      i2 = *reinterpret_cast<const int32_t*>(v2);
+      return i1 > i2 ? 1 : (i1 < i2 ? -1 : 0);
     case TYPE_BIGINT:
-      // TODO: overflow issues?
-      return *reinterpret_cast<const int64_t*>(v1) - *reinterpret_cast<const int64_t*>(v2);
+      b1 = *reinterpret_cast<const int64_t*>(v1);
+      b2 = *reinterpret_cast<const int64_t*>(v2); 
+      return b1 > b2 ? 1 : (b1 < b2 ? -1 : 0);
     case TYPE_FLOAT:
       // TODO: can this be faster? (just returning the difference has underflow problems)
       f1 = *reinterpret_cast<const float*>(v1);
