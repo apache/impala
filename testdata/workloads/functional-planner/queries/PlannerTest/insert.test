@@ -169,7 +169,8 @@ NODE 0:
 ====
 # insert with limit from partitioned table.
 insert into table alltypesnopart
-select * 
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
+float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypes where year=2009 and month=1 limit 10
 ---- PLAN
 Plan Fragment 0

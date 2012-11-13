@@ -69,7 +69,7 @@ public class InsertStmt extends ParseNodeBase {
     Catalog catalog = analyzer.getCatalog();
 
     if (!targetTableName.isFullyQualified()) {
-      this.targetTableName = new TableName(analyzer.getDefaultDb(), 
+      this.targetTableName = new TableName(analyzer.getDefaultDb(),
                                            targetTableName.getTbl());
     }
 
@@ -83,30 +83,42 @@ public class InsertStmt extends ParseNodeBase {
       throw new AnalysisException("Unknown table: '" + targetTableName.toString() +
           "' in db: '" + targetTableName.getDb() + "'.");
     }
+
+    if (table instanceof HBaseTable) {
+      throw new AnalysisException("INSERT into HBase tables is not supported");
+    }
+
     // Add target table to descriptor table.
     analyzer.getDescTbl().addReferencedTable(table);
 
-    // Deal with unpartitioned tables. We expect no partition clause.
     int numClusteringCols = table.getNumClusteringCols();
-    if (partitionKeyValues == null) {
-      // Unpartitioned table and no partition clause.
-      if (numClusteringCols == 0) {
-        return;
-      }
-      // Partitioned table but no partition clause.
-      throw new AnalysisException("No PARTITION clause given for insertion into " +
-          "partitioned table '" + targetTableName.getTbl() + "'.");
-    }
-    // Specifying partitions for an HBase table does not make sense.
-    if (table instanceof HBaseTable) {
-      Preconditions.checkState(partitionKeyValues != null);
-      throw new AnalysisException("PARTITION clause is not allowed for HBase tables.");
-    }
+    int numDynamicPartKeys = 0;
 
-    // Check that the partition clause mentions all the table's partitioning columns.
-    checkPartitionClauseCompleteness();
-    // Check that all dynamic partition keys are at the end of the selectListExprs.
-    int numDynamicPartKeys = fillPartitionKeyExprs();
+    // TODO: When we do add HBase table sink support, the logic below will need
+    // to change. Each HBase table has a single clustering column (see
+    // HBaseTable), but INSERTs into that table should not have a PARTITION
+    // clause.
+    if (partitionKeyValues == null) {
+      if (numClusteringCols != 0) {
+        // Partitioned table but no partition clause.
+        throw new AnalysisException("No PARTITION clause given for INSERT into " +
+            "partitioned table '" + targetTableName.getTbl() + "'.");
+      }
+    } else {
+      if (numClusteringCols == 0) {
+        // Unpartitioned table, but INSERT has PARTITION clause
+        throw new AnalysisException("PARTITION clause is only valid for INSERT into " +
+            "partitioned table. '" + targetTableName.getTbl() + "' is not partitioned");
+      }
+
+      // Check that the partition clause mentions all the table's partitioning
+      // columns, and that no non-partition columns are mentioned in the
+      // partition clause.
+      checkPartitionClauseCompleteness();
+
+      // Check that all dynamic partition keys are at the end of the selectListExprs.
+      numDynamicPartKeys = fillPartitionKeyExprs();
+    }
 
     // Check union compatibility, ignoring partitioning columns for dynamic partitions.
     checkUnionCompatibility(table, selectListExprs, numDynamicPartKeys);

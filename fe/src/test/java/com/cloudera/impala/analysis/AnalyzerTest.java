@@ -28,6 +28,7 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.thrift.TExpr;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 
 public class AnalyzerTest {
   private final static Logger LOG = LoggerFactory.getLogger(AnalyzerTest.class);
@@ -1520,26 +1521,17 @@ public class AnalyzerTest {
 
   @Test
   public void TestInsert() throws AnalysisException {
-    testInsertStatic(true);
-    testInsertStatic(false);
-    testInsertDynamic(true);
-    testInsertDynamic(false);
+    for (String qualifier: ImmutableList.of("INTO", "OVERWRITE")) {
+      testInsertStatic(qualifier);
+      testInsertDynamic(qualifier);
+      testInsertUnpartitioned(qualifier);
+    }
   }
 
   /**
    * Run tests for dynamic partitions for INSERT INTO/OVERWRITE:
-   *
-   * @param overwrite
-   *          If true, tests INSERT OVERWRITE, else tests INSERT INTO.
-   * @throws AnalysisException
    */
-  private void testInsertDynamic(boolean overwrite) throws AnalysisException {
-    String qualifier = null;
-    if (overwrite) {
-      qualifier = "overwrite";
-    } else {
-      qualifier = "into";
-    }
+  private void testInsertDynamic(String qualifier) throws AnalysisException {
     // Fully dynamic partitions.
     AnalyzesOk("insert " + qualifier + " table alltypessmall " +
         "partition (year, month)" +
@@ -1585,7 +1577,7 @@ public class AnalyzerTest {
         "alltypes");
     // Partially dynamic partitions with NULL literal in partition clause.
     AnalyzesOk("insert " + qualifier + " table alltypessmall " +
-        "partition (year=2009, month=NULL)" +
+        "Partition (year=2009, month=NULL)" +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes");
     // Partially dynamic partitions with NULL literal in partition clause.
@@ -1634,23 +1626,35 @@ public class AnalyzerTest {
   }
 
   /**
-   * Run general tests and tests using static partitions for INSERT INTO/OVERWRITE:
-   *
-   * @param overwrite
-   *          If true, tests INSERT OVERWRITE, else tests INSERT INTO.
-   * @throws AnalysisException
+   * Tests for inserting into unpartitioned tables
    */
-  private void testInsertStatic(boolean overwrite) throws AnalysisException {
-    String qualifier = null;
-    if (overwrite) {
-      qualifier = "overwrite";
-    } else {
-      qualifier = "into";
-    }
+  private void testInsertUnpartitioned(String qualifier) throws AnalysisException {
+    // Non-insertable tables
+    AnalysisError("INSERT " + qualifier + 
+        " TABLE hbasealltypesagg SELECT * FROM alltypesagg", 
+        "INSERT into HBase tables is not supported");
+
+    // Wrong number of columns.
+    AnalysisError("insert " + qualifier + " table alltypesnopart " +
+        "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
+        "float_col, double_col, date_string_col, string_col from alltypes");
+
     // Unpartitioned table without partition clause.
     AnalyzesOk("insert " + qualifier + " table alltypesnopart " +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col from alltypes");
+        "float_col, double_col, date_string_col, string_col, timestamp_col from " + 
+        "alltypes");
+
+    // Unpartitioned table with partition clause
+    AnalysisError("INSERT " + qualifier + " TABLE alltypesnopart PARTITION(year=2009) " +
+        "SELECT * FROM alltypes", "PARTITION clause is only valid for INSERT" +
+        " into partitioned table. 'alltypesnopart' is not partitioned");
+  }
+
+  /**
+   * Run general tests and tests using static partitions for INSERT INTO/OVERWRITE:
+   */
+  private void testInsertStatic(String qualifier) throws AnalysisException {
     // Static partition.
     AnalyzesOk("insert " + qualifier + " table alltypessmall " +
         "partition (year=2009, month=4)" +
@@ -1680,7 +1684,7 @@ public class AnalyzerTest {
     AnalysisError("insert " + qualifier + " table alltypessmall " +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes",
-        "No PARTITION clause given for insertion into partitioned table 'alltypessmall'.");
+        "No PARTITION clause given for INSERT into partitioned table 'alltypessmall'.");
     // Not union compatible, unequal number of columns.
     AnalysisError("insert " + qualifier + " table alltypessmall " +
         "partition (year=2009, month=4)" +
@@ -1715,13 +1719,6 @@ public class AnalyzerTest {
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
         "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes",
         "Missing partition column 'month' from PARTITION clause.");
-    // Partition clause given for insertion into HBase table.
-    AnalysisError("insert " + qualifier + " table hbasealltypessmall " +
-        "partition (year=2009, bigint_col=10)" +
-        "select bool_col, double_col, float_col, bigint_col, int_col, " +
-        "smallint_col, tinyint_col, date_string_col, string_col, timestamp_col from " +
-        "alltypes",
-        "PARTITION clause is not allowed for HBase tables.");
     // Loss of precision when casting in column 6 (double_col -> float).
     AnalysisError("insert " + qualifier + " table alltypessmall " +
     		"partition (year=2009, month=4)" +

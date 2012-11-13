@@ -185,17 +185,17 @@ public class ToSqlTest {
     // Insert into unpartitioned table without partition clause.
     testToSql("insert into table alltypesnopart " +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col from alltypes",
+        "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes",
         "INSERT INTO TABLE alltypesnopart SELECT id, bool_col, tinyint_col, " +
         "smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, " +
-        "string_col FROM alltypes");
+        "string_col, timestamp_col FROM alltypes");
     // Insert into overwrite unpartitioned table without partition clause.
     testToSql("insert overwrite table alltypesnopart " +
         "select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, " +
-        "float_col, double_col, date_string_col, string_col from alltypes",
+        "float_col, double_col, date_string_col, string_col, timestamp_col from alltypes",
         "INSERT OVERWRITE TABLE alltypesnopart SELECT id, bool_col, tinyint_col, " +
         "smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, " +
-        "string_col FROM alltypes");
+        "string_col, timestamp_col FROM alltypes");
     // Static partition.
     testToSql("insert into table alltypessmall " +
         "partition (year=2009, month=4)" +

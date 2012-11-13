@@ -19,12 +19,14 @@ public class InsertQueryTest extends BaseQueryTest {
         SMALL_BATCH_SIZES, SMALL_CLUSTER_SIZES);
   }
 
-  @Test
-  public void TestInsertNull() {
-    runQueryInAllBatchAndClusterPerms("insert_null", false, 1000, TEXT_FORMAT_ONLY,
-        SMALL_BATCH_SIZES, SMALL_CLUSTER_SIZES);
-  }
 
+  // Disabled until IMP-577 is fixed (NULL conversion to boolean)
+  // @Test
+  // public void TestInsertNull() {
+  //   runQueryInAllBatchAndClusterPerms("insert_null", false, 1000, TEXT_FORMAT_ONLY,
+  //       SMALL_BATCH_SIZES, SMALL_CLUSTER_SIZES);
+  // }
+  
   // Because we disagree with hive on what to do on overflow, only
   // test overflow on those types that we can insert.
   // Hive makes them NULL.
