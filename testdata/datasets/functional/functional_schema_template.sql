@@ -260,6 +260,8 @@ PARTITION (year=2009, month=2)
 PARTITION (year=2009, month=3);
 
 -- Create external temp table with desired file format with same data file location
+-- Tmp tables must not specify an escape character; we don't want any
+-- data transformation to happen when inserting it into tmp tables.
 DROP TABLE IF EXISTS %(table_name)s_tmp;
 CREATE EXTERNAL TABLE %(table_name)s_tmp (
   id STRING,
@@ -276,7 +278,6 @@ CREATE EXTERNAL TABLE %(table_name)s_tmp (
 PARTITIONED BY (year INT, month INT)
 ROW FORMAT DELIMITED
   FIELDS TERMINATED BY ','
-  ESCAPED BY '\\'
 STORED AS %(file_format)s
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
 ----
@@ -297,7 +298,6 @@ CREATE EXTERNAL TABLE %(base_table_name)s_tmp (
 PARTITIONED BY (year INT, month INT)
 ROW FORMAT DELIMITED
   FIELDS TERMINATED BY ','
-  ESCAPED BY '\\'
 STORED AS TEXTFILE
 LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(base_table_name)s';
 

@@ -167,18 +167,18 @@ class StringParser {
   static inline bool StringToBool(const char* s, int len, ParseResult* result) {
     *result = PARSE_SUCCESS;
     if (len == 4) {
-      bool val = (s[0] == 't' || s[0] == 'T') &&
-                 (s[1] == 'r' || s[1] == 'R') &&
-                 (s[2] == 'u' || s[2] == 'U') &&
-                 (s[3] == 'e' || s[3] == 'E');
-      if (val) return val;
+      bool match = (s[0] == 't' || s[0] == 'T') &&
+                   (s[1] == 'r' || s[1] == 'R') &&
+                   (s[2] == 'u' || s[2] == 'U') &&
+                   (s[3] == 'e' || s[3] == 'E');
+      if (match) return true;
     } else if (len == 5) {
-      bool val = (s[0] == 'f' || s[0] == 'F') &&
-                 (s[1] == 'a' || s[1] == 'A') &&
-                 (s[2] == 'l' || s[2] == 'L') &&
-                 (s[3] == 's' || s[3] == 'S') &&
-                 (s[4] == 'e' || s[4] == 'E');
-      if (val) return !val;
+      bool match = (s[0] == 'f' || s[0] == 'F') &&
+                   (s[1] == 'a' || s[1] == 'A') &&
+                   (s[2] == 'l' || s[2] == 'L') &&
+                   (s[3] == 's' || s[3] == 'S') &&
+                   (s[4] == 'e' || s[4] == 'E');
+      if (match) return false;
     }
     *result = PARSE_FAILURE;
     return false;

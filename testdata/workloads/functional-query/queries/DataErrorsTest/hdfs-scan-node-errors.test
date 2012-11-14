@@ -33,6 +33,12 @@ record: 23,false,3,abc3,3,30,3.000000,30.300000,03/01/09,3,2020-10-10 60:10:10.1
 Error converting column: 2 TO TINYINT (Data is: abc7)
 file: hdfs: test-warehouse/alltypeserror$TABLE/year=2009/month=3
 record: 27,false,abc7,7,7,70,7.000000,70.700000,03/01/09,7,2020-10-10 10:10:10.123
+
+Error converting column: 1 TO BOOL (Data is: t\rue)
+Error converting column: 2 TO TINYINT (Data is: err30)
+Error converting column: 3 TO SMALLINT (Data is: err30)
+file: hdfs: test-warehouse/alltypeserror$TABLE/year=2009/month=3
+record: 30,t\rue,err30,err30,err30,err300,err30..000000,err300.900000,01/01/10,10,0000-01-01 00:00:00
 ---- TYPES
 int, boolean, tinyint, smallint
 ---- RESULTS
@@ -60,6 +66,7 @@ int, boolean, tinyint, smallint
 28,true,8,8
 29,false,9,9
 3,false,3,NULL
+30,NULL,NULL,NULL
 4,true,4,4
 5,false,5,5
 6,true,6,6
