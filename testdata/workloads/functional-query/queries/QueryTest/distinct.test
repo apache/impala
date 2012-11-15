@@ -6,6 +6,55 @@ bigint
 ---- RESULTS
 100
 ====
+select count(distinct bool_col)
+from alltypesagg$TABLE
+---- TYPES
+bigint
+---- RESULTS
+2
+====
+select count(distinct int_col)
+from alltypesagg$TABLE
+---- TYPES
+bigint
+---- RESULTS
+1000
+====
+select count(distinct float_col)
+from alltypesagg$TABLE
+---- TYPES
+bigint
+---- RESULTS
+1000
+====
+select count(distinct double_col)
+from alltypesagg$TABLE
+---- TYPES
+bigint
+---- RESULTS
+1000
+====
+select count(distinct string_col)
+from alltypesagg$TABLE
+---- TYPES
+bigint
+---- RESULTS
+1000
+====
+select count(distinct string_col)
+from alltypesagg$TABLE
+---- TYPES
+bigint
+---- RESULTS
+1000
+====
+select count(distinct timestamp_col)
+from alltypesagg$TABLE
+---- TYPES
+bigint
+---- RESULTS
+10000
+====
 # count(distinct) w/ grouping and non-distinct count()
 select tinyint_col, count(distinct smallint_col), count(smallint_col)
 from alltypesagg$TABLE group by 1

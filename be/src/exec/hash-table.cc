@@ -117,7 +117,7 @@ static void CodegenAssignNullValue(LlvmCodeGen* codegen,
       }
       case TYPE_DOUBLE: {
         // Don't care about the value, just the bit pattern
-        float fvn_seed_double = *reinterpret_cast<double*>(&fvn_seed);
+        double fvn_seed_double = *reinterpret_cast<double*>(&fvn_seed);
         null_value = ConstantFP::get(codegen->context(), APFloat(fvn_seed_double));
         break;
       }
