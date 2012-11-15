@@ -45,7 +45,7 @@ KNOWN_BUILD_TYPES = ['debug', 'release']
 IMPALAD_PATH = os.path.join(os.environ['IMPALA_HOME'],
                             'bin/start-impalad.sh -build_type=%s' % options.build_type)
 STATE_STORE_PATH = os.path.join(os.environ['IMPALA_BE_DIR'], 'build', options.build_type,
-                                'sparrow/state-store-service')
+                                'sparrow/statestored')
 MINI_IMPALA_CLUSTER_PATH = os.path.join(os.environ['IMPALA_BE_DIR'], 'build',
                                         options.build_type, 'testutil/mini-impala-cluster')
 IMPALAD_ARGS = "-fe_port=%d -be_port=%d -state_store_subscriber_port=%d "\
@@ -59,7 +59,7 @@ def kill_all():
   os.system("killall state-store-service")
 
 def start_statestore():
-  output_file = os.path.join(options.log_dir, 'state-store-service.out')
+  output_file = os.path.join(options.log_dir, 'statestored.out')
   print "Starting State Store with logging to %s" % (output_file)
   execute_cmd_with_redirect(STATE_STORE_PATH, STATE_STORE_ARGS, output_file)
 
