@@ -468,6 +468,11 @@ public class AnalyzerTest {
   public void TestFromClause() throws AnalysisException {
     AnalyzesOk("select int_col from alltypes");
     AnalysisError("select int_col from badtbl", "Unknown table");
+
+    // Bad table metadata
+    AnalysisError("select * from map_table", 
+        "Failed to load metadata for table: map_table");
+
     // case-insensitive
     AnalyzesOk("SELECT INT_COL FROM ALLTYPES");
     AnalyzesOk("select AllTypes.Int_Col from alltypes");

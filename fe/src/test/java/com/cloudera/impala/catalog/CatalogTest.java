@@ -313,22 +313,23 @@ public class CatalogTest {
     assertEquals(months.size(), 24);
   }
 
-  // TODO: Re-enable when array_tbl etc. are reloaded.
-  // See IMP-401
-  // @Test 
-  // public void TestIgnored() {
-  //   Db defaultDb = catalog.getDb("default");
-  //   // check that tables with unsupported types don't load correctly
-  //   for (String collectionType : Constants.CollectionTypes) {
-  //     String tableName = TestSchemaUtils.getComplexTypeTableName(collectionType);
-  //     try {
-  //       assertNull(defaultDb.getTable(tableName));
-  //       fail("Table: " + tableName + " should throw an exception on load");
-  //     } catch (TableLoadingException e) {
-  //       // Expected
-  //     }
-  //   }
-  // }
+  @Test
+  public void testInternalHBaseTable() throws TableLoadingException {
+    // Cast will fail if table not an HBaseTable
+    HBaseTable table = 
+        (HBaseTable)catalog.getDb("default").getTable("internal_hbase_table");
+    assertNotNull("internal_hbase_table was not found", table);
+  }
+
+  @Test(expected = TableLoadingException.class)
+  public void testMapColumnsFails() throws TableLoadingException {
+    Table table = catalog.getDb("default").getTable("map_table");
+  }
+
+  @Test(expected = TableLoadingException.class)
+  public void testArrayColumnsFails() throws TableLoadingException {
+    Table table = catalog.getDb("default").getTable("array_table");
+  }
 
   // This table has metadata set so the escape is \n, which is also the tuple delim. This
   // test validates that our representation of the catalog fixes this and removes the

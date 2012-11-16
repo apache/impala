@@ -218,3 +218,19 @@ LOAD DATA LOCAL INPATH '/tmp/alltypesaggmultifiles/year=2010/month=1/day=10/0000
 LOAD DATA LOCAL INPATH '/tmp/alltypesaggmultifiles/year=2010/month=1/day=10/000000_0_copy_2.lzo' INTO TABLE alltypesaggmultifiles_lzo PARTITION(year=2010, month=1, day=10);
 LOAD DATA LOCAL INPATH '/tmp/alltypesaggmultifiles/year=2010/month=1/day=10/000000_0_copy_3.lzo' INTO TABLE alltypesaggmultifiles_lzo PARTITION(year=2010, month=1, day=10);
 
+----
+-- Used by CatalogTest to confirm that non-external HBase tables are identified
+-- correctly (IMP-581) 
+DROP TABLE IF EXISTS internal_hbase_table;
+-- Note that the usual 'hbase.table.name' property is not specified to avoid
+-- creating tables in HBase as a side-effect.
+CREATE TABLE internal_hbase_table(key int, value string)
+STORED BY 'org.apache.hadoop.hive.hbase.HBaseStorageHandler'
+WITH SERDEPROPERTIES ("hbase.columns.mapping" = ":key,cf1:val");
+----
+-- For structured-type testing
+DROP TABLE IF EXISTS map_table;
+CREATE TABLE map_table(map_col map<int, string>);
+DROP TABLE IF EXISTS array_table;
+CREATE TABLE array_table(array_col array<int>);
+

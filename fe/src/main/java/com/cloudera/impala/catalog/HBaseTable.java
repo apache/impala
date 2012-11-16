@@ -221,8 +221,7 @@ public class HBaseTable extends Table {
   }
 
   public static boolean isHBaseTable(org.apache.hadoop.hive.metastore.api.Table msTbl) {
-    return (msTbl.getTableType().equals("EXTERNAL_TABLE") &&
-        msTbl.getSd().getInputFormat().equals(hbaseInputFormat));
+    return msTbl.getSd().getInputFormat().equals(hbaseInputFormat);
   }
 
   @Override
