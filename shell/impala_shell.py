@@ -529,7 +529,8 @@ def execute_queries_non_interactive_mode(options):
   for query in queries:
     if not shell.onecmd(query):
       print 'Could not execute command: %s' % query
-      sys.exit(1)
+      if not options.ignore_query_failure:
+        sys.exit(1)
 
 if __name__ == "__main__":
   parser = OptionParser()
@@ -548,6 +549,8 @@ if __name__ == "__main__":
                     help="Enable verbose output")
   parser.add_option("-v", "--version", dest="version", default=False, action="store_true",
                     help="Print version information")
+  parser.add_option("-c", "--ignore_query_failure", dest="ignore_query_failure",
+                    default=False, action="store_true", help="Continue on query failure")
 
   options, args = parser.parse_args()
 
