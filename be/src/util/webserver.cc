@@ -37,7 +37,10 @@ DEFINE_string(webserver_interface, "",
     "Interface to start debug webserver on. If blank, webserver binds to 0.0.0.0");
 DEFINE_string(webserver_doc_root, GetDefaultDocumentRoot(), 
     "Files under <webserver_doc_root>/www are accessible via the debug webserver. "
-    "Defaults to $IMPALA_HOME, or /tmp/impala_www if $IMPALA_HOME not set"); 
+    "Defaults to $IMPALA_HOME, or if $IMPALA_HOME is not set, disables the document "
+    "root");
+DEFINE_bool(enable_webserver_doc_root, false, 
+    "If true, webserver may serve static files from the webserver_doc_root");
 
 // Mongoose requires a non-null return from the callback to signify successful processing
 static void* PROCESSING_COMPLETE = reinterpret_cast<void*>(1);
@@ -50,7 +53,7 @@ const char* GetDefaultDocumentRoot() {
   stringstream ss;
   char* impala_home = getenv("IMPALA_HOME");
   if (impala_home == NULL) {
-    ss << "/tmp/impala_www";
+    return ""; // Empty document root means don't serve static files
   } else {
     ss << impala_home;
   }
@@ -91,15 +94,27 @@ void Webserver::RootHandler(stringstream* output) {
 
 Status Webserver::Start() {
   LOG(INFO) << "Starting webserver on " << interface_
-              << (interface_.empty() ? "all interfaces, port " : ":") << port_;
+            << (interface_.empty() ? "all interfaces, port " : ":") << port_;
 
   string port_as_string = boost::lexical_cast<string>(port_);
   stringstream listening_spec;
   listening_spec << interface_ << (interface_.empty() ? "" : ":") << port_as_string;
   string listening_str = listening_spec.str();
-  VLOG(1) << "Document root: " << FLAGS_webserver_doc_root;
-  const char* options[] = {"document_root", FLAGS_webserver_doc_root.c_str(), 
-                           "listening_ports", listening_str.c_str(), NULL};
+  vector<const char*> options;
+
+  if (!FLAGS_webserver_doc_root.empty() && FLAGS_enable_webserver_doc_root) {
+    LOG(INFO) << "Document root: " << FLAGS_webserver_doc_root;
+    options.push_back("document_root");
+    options.push_back(FLAGS_webserver_doc_root.c_str());
+  } else {
+    LOG(INFO)<< "Document root disabled";
+  }
+
+  options.push_back("listening_ports");
+  options.push_back(listening_str.c_str());
+
+  // Options must be a NULL-terminated list
+  options.push_back(NULL);
 
   // mongoose ignores SIGCHLD and we need it to run kinit. This means that since
   // mongoose does not reap its own children CGI programs must be avoided.
@@ -111,7 +126,7 @@ Status Webserver::Start() {
   // default callback. That method unpacks the pointer to this and calls the real
   // callback.
   context_ = mg_start(&Webserver::MongooseCallbackStatic, reinterpret_cast<void*>(this),
-      options);
+      &options[0]);
 
   // Restore the child signal handler so wait() works properly.
   signal(SIGCHLD, sig_chld);
@@ -146,11 +161,13 @@ void* Webserver::MongooseCallbackStatic(enum mg_event event,
 void* Webserver::MongooseCallback(enum mg_event event, struct mg_connection* connection,
     const struct mg_request_info* request_info) {
   if (event == MG_NEW_REQUEST) {
-    if (strncmp(DOC_FOLDER, request_info->uri, DOC_FOLDER_LEN) == 0) {
-      VLOG(2) << "HTTP File access: " << request_info->uri;
-      // Let Mongoose deal with this request; returning NULL will fall through
-      // to the default handler which will serve files.
-      return NULL;
+    if (!FLAGS_webserver_doc_root.empty() && FLAGS_enable_webserver_doc_root) {
+      if (strncmp(DOC_FOLDER, request_info->uri, DOC_FOLDER_LEN) == 0) {
+        VLOG(2) << "HTTP File access: " << request_info->uri;
+        // Let Mongoose deal with this request; returning NULL will fall through
+        // to the default handler which will serve files.
+        return NULL;
+      }
     }
     mutex::scoped_lock lock(path_handlers_lock_);
     PathHandlerMap::const_iterator it = path_handlers_.find(request_info->uri);
