@@ -33,16 +33,18 @@ from thrift.transport.TTransport import TBufferedTransport, TTransportException
 from thrift.protocol import TBinaryProtocol
 from thrift.Thrift import TApplicationException
 
-VERSION_STRING = "Impala v0.1 "
+VERSION_FORMAT = "Impala v%(version)s (%(git_hash)s) built on %(build_date)s"
 COMMENT_TOKEN = '--'
+VERSION_STRING = "build version not available"
 
 # Tarball / packaging build makes impala_build_version available
 try:
-  from impala_build_version import get_version_string
-  from impala_build_version import get_build_date
-  VERSION_STRING += "(" + get_version_string()[:7] + ") built on " + get_build_date()
+  from impala_build_version import get_git_hash, get_build_date, get_version
+  VERSION_STRING = VERSION_FORMAT % {'version': get_version(),
+                                     'git_hash': get_git_hash()[:7],
+                                     'build_date': get_build_date()}
 except Exception:
-  VERSION_STRING += "(build version not available)"
+  pass
 
 class RpcStatus:
   """Convenience enum to describe Rpc return statuses"""
