@@ -283,6 +283,9 @@ Status ImpalaServer::QueryExecState::Exec(TExecRequest* exec_request) {
           query_exec_request.fragments[0].output_exprs, RowDescriptor()));
     } else {
       // If the first fragment has a "limit 0", simply set EOS to true and return.
+      // TODO: Remove this check if this is an INSERT. To be compatible with
+      // Hive, OVERWRITE inserts must clear out target tables / static
+      // partitions even if no rows are written.
       DCHECK(query_exec_request.fragments[0].__isset.plan);
       if (query_exec_request.fragments[0].plan.nodes[0].limit == 0) {
         eos_ = true;
@@ -1416,8 +1419,13 @@ Status ImpalaServer::CloseInsertInternal(const TUniqueId& query_id,
 
   {
     lock_guard<mutex> l(*exec_state->lock(), adopt_lock_t());
-    DCHECK(exec_state->coord() != NULL);    
-    insert_result->__set_rows_appended(exec_state->coord()->partition_row_counts());
+    // Coord may be NULL for a SELECT with LIMIT 0.
+    // Note that when IMP-231 is fixed (INSERT without WHERE clause) we might
+    // need to revisit this, since that might lead us to insert a row without a
+    // coordinator, depending on how we choose to drive the table sink.
+    if (exec_state->coord() != NULL) {
+      insert_result->__set_rows_appended(exec_state->coord()->partition_row_counts());
+    }
   }
 
   if (!UnregisterQuery(query_id)) {
