@@ -53,6 +53,8 @@ parser.add_option("--lab_run_info", dest="lab_run_info", default='UNKNOWN',
 # These parameters are specific to recording results in a database. This is optional
 parser.add_option("--save_to_db", dest="save_to_db", action="store_true",
                   default= False, help='Saves results to the specified database.')
+parser.add_option("--is_official", dest="is_official", action="store_true",
+                  default= False, help='Indicates this is an official perf run result')
 parser.add_option("--db_host", dest="db_host", default='localhost',
                   help="Machine hosting the database")
 parser.add_option("--db_name", dest="db_name", default='perf_results',
@@ -315,7 +317,8 @@ def write_results_to_datastore(results):
         query_id=query_id, workload_id=workload_id, file_type_id=file_type_id,
         cluster_name=options.cluster_name, executor_name=executor, avg_time=avg_time,
         stddev=stddev, run_date=current_date, version=options.build_version,
-        notes=options.report_description, run_info_id=run_info_id)
+        notes=options.report_description, run_info_id=run_info_id,
+        is_official=options.is_official)
 
 def build_summary_header():
   summary = "Execution Summary (%s)\n" % date.today()

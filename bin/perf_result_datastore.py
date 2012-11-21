@@ -37,11 +37,12 @@ class PerfResultDataStore(object):
     return self.__insert_run_info(run_info)
 
   def insert_execution_result(self, query_id, workload_id, file_type_id, cluster_name,
-        executor_name, avg_time, stddev, run_date, version, notes, run_info_id):
+        executor_name, avg_time, stddev, run_date, version, notes, run_info_id,
+        is_official=False):
     """ Inserts a perf execution result record """
     return self.__insert_execution_result(query_id, workload_id, file_type_id,
         cluster_name, executor_name, avg_time, stddev, run_date, version, notes,
-        run_info_id)
+        run_info_id, is_official)
 
   def print_execution_results(self, run_info_id):
     """ Prints results that were inserted for the given run_info_id """
@@ -97,13 +98,13 @@ class PerfResultDataStore(object):
   @cursor_wrapper
   def __insert_execution_result(self, query_id, workload_id, file_type_id, cluster_name,
                              executor_name, avg_time, stddev, run_date, version, notes,
-                             run_info_id, cursor):
+                             run_info_id, is_official, cursor):
     result = cursor.execute("insert into ExecutionResults (run_info_id, query_id, "\
         "workload_id, file_type_id, cluster_name, executor_name,  avg_time, stddev, "\
-        "run_date, version, notes) values (%d, %d, %d, %d, '%s', '%s', %s, %s, '%s', "\
-        "'%s', '%s')" %\
+        "run_date, version, notes, is_official) values (%d, %d, %d, %d, '%s', '%s', %s,"\
+        " %s, '%s', '%s', '%s', %s)" %\
         (run_info_id, query_id, workload_id, file_type_id, cluster_name, executor_name,
-         avg_time, stddev, run_date, version, notes))
+         avg_time, stddev, run_date, version, notes, is_official))
 
   @cursor_wrapper
   def __print_execution_results(self, run_info_id, cursor):
