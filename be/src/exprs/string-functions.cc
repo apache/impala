@@ -25,6 +25,7 @@
 using namespace std;
 using namespace boost;
 
+// NOTE: be careful not to use string::append.  It is not performant.
 namespace impala {
 
 // Implementation of Substr.  The signature is
@@ -239,11 +240,14 @@ void* StringFunctions::Repeat(Expr* e, TupleRow* row) {
     e->result_.string_val.len = 0;
     return &e->result_.string_val;
   }
-  e->result_.string_data.reserve(str->len * (*num));
-  for (int32_t i = 0; i < *num; ++i) {
-    e->result_.string_data.append(str->ptr, str->len);
-  }
+  e->result_.string_data.resize(str->len * (*num));
   e->result_.SyncStringVal();
+
+  char* ptr = e->result_.string_val.ptr;
+  for (int32_t i = 0; i < *num; ++i) {
+    memcpy(ptr, str->ptr, str->len);
+    ptr += str->len;
+  }
   return &e->result_.string_val;
 }
 
@@ -270,18 +274,21 @@ void* StringFunctions::Lpad(Expr* e, TupleRow* row) {
     e->result_.string_val.len = *len;
     return &e->result_.string_val;
   }
-  e->result_.string_data.reserve(*len);
+  e->result_.string_data.resize(*len);
+  e->result_.SyncStringVal();
+
   // Prepend chars of pad.
   int padded_prefix_len = *len - str->len;
   int pad_index = 0;
-  while (e->result_.string_data.length() < padded_prefix_len) {
-    e->result_.string_data.append(1, pad->ptr[pad_index]);
-    ++pad_index;
+  int result_index = 0;
+  char* ptr = e->result_.string_val.ptr;
+
+  while (result_index < padded_prefix_len) {
+    ptr[result_index++] = pad->ptr[pad_index++];
     pad_index = pad_index % pad->len;
   }
   // Append given string.
-  e->result_.string_data.append(str->ptr, str->len);
-  e->result_.SyncStringVal();
+  memcpy(ptr, str->ptr, str->len);
   return &e->result_.string_val;
 }
 
@@ -299,16 +306,18 @@ void* StringFunctions::Rpad(Expr* e, TupleRow* row) {
     e->result_.string_val.len = *len;
     return &e->result_.string_val;
   }
-  e->result_.string_data.reserve(*len);
-  e->result_.string_data.append(str->ptr, str->len);
+  e->result_.string_data.resize(*len);
+  e->result_.SyncStringVal();
+  char* ptr = e->result_.string_val.ptr;
+
+  memcpy(ptr, str->ptr, str->len);
   // Append chars of pad until desired length.
   int pad_index = 0;
-  while (e->result_.string_data.length() < *len) {
-    e->result_.string_data.append(1, pad->ptr[pad_index]);
-    ++pad_index;
+  int result_len = str->len;
+  while (result_len < *len) {
+    ptr[result_len++] = pad->ptr[pad_index++];
     pad_index = pad_index % pad->len;
   }
-  e->result_.SyncStringVal();
   return &e->result_.string_val;
 }
 
@@ -441,14 +450,16 @@ void* StringFunctions::Concat(Expr* e, TupleRow* row) {
     if (str == NULL) return NULL;
     total_size += str->len;
   }
-  e->result_.string_data.reserve(total_size);
-  // Loop again to append the data.
-  for (int32_t i = 0; i < e->GetNumChildren(); ++i) {
-    StringValue* str = reinterpret_cast<StringValue*>(e->children()[i]->GetValue(row));
-    if (str == NULL) return NULL;
-    e->result_.string_data.append(str->ptr, str->len);
-  }
+  e->result_.string_data.resize(total_size);
   e->result_.SyncStringVal();
+  char* ptr = e->result_.string_val.ptr;
+  
+  // Loop again to append the data.
+  for (int32_t i = 0; i < num_children; ++i) {
+    StringValue* str = reinterpret_cast<StringValue*>(e->children()[i]->GetValue(row));
+    memcpy(ptr, str->ptr, str->len);
+    ptr += str->len;
+  }
   return &e->result_.string_val;
 }
 
@@ -467,16 +478,20 @@ void* StringFunctions::ConcatWs(Expr* e, TupleRow* row) {
       if (str == NULL) return NULL;
       total_size += sep->len + str->len;
     }
-  e->result_.string_data.reserve(total_size);
+  e->result_.string_data.resize(total_size);
+  e->result_.SyncStringVal();
+  char* ptr = e->result_.string_val.ptr;
+  
   // Loop again to append the data.
-  e->result_.string_data.append(first->ptr, first->len);
+  memcpy(ptr, first->ptr, first->len);
+  ptr += first->len;
   for (int32_t i = 2; i < num_children; ++i) {
     StringValue* str = reinterpret_cast<StringValue*>(e->children()[i]->GetValue(row));
-    if (str == NULL) return NULL;
-    e->result_.string_data.append(sep->ptr, sep->len);
-    e->result_.string_data.append(str->ptr, str->len);
+    memcpy(ptr, sep->ptr, sep->len);
+    ptr += sep->len;
+    memcpy(ptr, str->ptr, str->len);
+    ptr += str->len;
   }
-  e->result_.SyncStringVal();
   return &e->result_.string_val;
 }
 

@@ -25,8 +25,6 @@ class Expr;
 class OpcodeRegistry;
 class TupleRow;
 
-// TODO: We use std::string::append() in a few places despite reserving
-// enough space. Look into whether that is a performance issue.
 class StringFunctions {
  public:
   static void* Substring(Expr* e, TupleRow* row);

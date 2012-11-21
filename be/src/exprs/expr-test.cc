@@ -502,9 +502,6 @@ class ExprTest : public testing::Test {
     TestStringValue("cast(" + stmt + " as string)", 
         lexical_cast<string>(val));
   }
-
-
- private:
 };
 
 // TODO: Remove this specialization once the parser supports
@@ -1886,7 +1883,7 @@ TEST_F(ExprTest, TimestampFunctions) {
   TestValidTimestampValue("now()");
   TestValidTimestampValue("cast(unix_timestamp() as timestamp)");
 
-  // Test invalid formats returnning NULL
+  // Test invalid formats returning NULL
   TestIsNull("unix_timestamp('1970-01-01 0:00:00', 'yyyy-MM-dd HH:mm:ss')", TYPE_INT);
   TestIsNull("unix_timestamp('1970-01-01 00:00:00', 'yyyy-MM-dd hh:mm:ss')", TYPE_INT);
   TestIsNull("unix_timestamp('1970-01-01 00:00:00', 'yy-MM-dd HH:mm:ss')", TYPE_INT);
