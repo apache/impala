@@ -259,7 +259,7 @@ public class TestFileParser {
         // Check for section header - a missing header probably means an old test file.
         if (!line.endsWith("----")) {
           for (Section s : Section.values()) {
-            if (line.contains(s.toString().toLowerCase())) {
+            if (line.matches("----\\s+" + s.toString().toLowerCase() + "\\b.*")) {
               currentSection = s;
               if (s == Section.SETUP) {
                 hasSetupSection = true;
