@@ -20,26 +20,15 @@ root=`dirname "$0"`
 root=`cd "$root"; pwd`
 
 export IMPALA_HOME=$root
-# Create unique metastore DB name based on the directory we're in.  The result
-# must be lower case.
-METASTORE_DB=`basename $root | sed -e "s/\\./_/g" | sed -e "s/[.-]/_/g"`
-export METASTORE_DB=`echo $METASTORE_DB | tr '[A-Z]' '[a-z]'`
-export CURRENT_USER=`whoami`
-
 . "$root"/bin/impala-config.sh
 
 clean_action=1
 testdata_action=1
 tests_action=1
-metastore_is_derby=0
 
 FORMAT_CLUSTER=1
 TARGET_BUILD_TYPE=Debug
 TEST_EXECUTION_MODE=reduced
-
-if [[ ${METASTORE_IS_DERBY} ]]; then
-  metastore_is_derby=1
-fi
 
 # Exit on reference to uninitialized variable
 set -u
@@ -111,10 +100,8 @@ then
   # don't use git clean because we need to retain Eclipse conf files
   cd $IMPALA_FE_DIR
   rm -rf target
-  rm -f src/test/resources/hbase-site.xml
-  rm -f src/test/resources/hive-site.xml
+  rm -f src/test/resources/{core,hbase,hive}-site.xml
   rm -rf src/generated-sources/*
-  rm -f derby.log
 
   # clean be
   cd $IMPALA_HOME/be
@@ -128,37 +115,13 @@ then
   rm -f $IMPALA_HOME/bin/version.info
 fi
 
-# Generate hive-site.xml from template via env var substitution
-# TODO: Throw an error if the template references an undefined environment variable
-cd ${IMPALA_FE_DIR}/src/test/resources
-if [ $metastore_is_derby -eq 1 ]
-then
-  echo "using derby for metastore"
-  perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
-    derby-hive-site.xml.template > hive-site.xml
+# Generate the Hadoop configs needed by Impala
+if [ $FORMAT_CLUSTER -eq 1 ]; then
+  ${IMPALA_HOME}/bin/create-test-configuration.sh -create_metastore
 else
-  echo "using postgresql for metastore"
-  if [ $FORMAT_CLUSTER -eq 1 ]; then
-    echo "Creating postgresql databases"
-    dropdb -U hiveuser hive_$METASTORE_DB
-    createdb -U hiveuser hive_$METASTORE_DB
-    # TODO: Change location of the sql file when Hive release contains this script
-    psql -U hiveuser -d hive_$METASTORE_DB \
-        -f ${IMPALA_HOME}/bin/hive-schema-0.9.0.postgres.sql
-  fi
-  perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
-    postgresql-hive-site.xml.template > hive-site.xml
+  ${IMPALA_HOME}/bin/create-test-configuration.sh
 fi
 
-# Generate hbase-site.xml from template via env var substitution
-# TODO: Throw an error if the template references an undefined environment variable
-cd ${IMPALA_FE_DIR}/src/test/resources
-perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
-hbase-site.xml.template > hbase-site.xml
-
-# Update dfs.block.local-path-access.user with the current user
-perl -wpl -e 's/\$\{([^}]+)\}/defined $ENV{$1} ? $ENV{$1} : $&/eg' \
-core-site.xml.template > core-site.xml
 # Exit on non-true return value
 set -e
 
@@ -212,12 +175,6 @@ fi
 if [ $tests_action -eq 1 ]
 then
   cd $IMPALA_FE_DIR
-  if [ $metastore_is_derby -eq 1 ]
-  then
-    echo "Cleaning up locks from previous test runs for derby for metastore"
-    ls target/test_metastore_db/*.lck
-    rm -f target/test_metastore_db/{db,dbex}.lck
-  fi
   mvn exec:java -Dexec.mainClass=com.cloudera.impala.testutil.PlanService \
               -Dexec.classpathScope=test &
   PID=$!
@@ -231,5 +188,3 @@ ${IMPALA_HOME}/shell/make_shell_tarball.sh
 
 # Generate list of files for Cscope to index
 $IMPALA_HOME/bin/gen-cscope.sh
-
-

@@ -1,13 +1,30 @@
 #!/bin/bash
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
+#
+# This script can be executed in two ways:
+# 1) Without any command line parameters - A normal data load will happen where data is
+# generated as needed, generally by issuing 'INSERT INTO <table> SELECT *' commands.
+# 2) With a command line parameter pointing to a test-warehouse snapshot file - In this
+# case the snapshot file contents will be copied into HDFS prior to calling the data load
+# scripts. This speeds up overall data loading time because it usually means only the
+# table metadata needs to be created.
+#
+# For more information look at testdata/bin/load-test-warehouse-snapshot.sh and
+# bin/load-data.py
 
 if [ x${JAVA_HOME} == x ]; then
   echo JAVA_HOME not set
   exit 1
 fi
 . ${IMPALA_HOME}/bin/impala-config.sh
-set -u
 set -e
+
+# If the user has specified a command line argument, treat it as the test-warehouse
+# snapshot file and pass it to the load-test-warehouse-snapshot.sh script for processing.
+if [[ $1 ]]; then
+  ${IMPALA_HOME}/testdata/bin/load-test-warehouse-snapshot.sh "$1"
+fi
+set -u
 
 # Load the data set
 pushd ${IMPALA_HOME}/bin

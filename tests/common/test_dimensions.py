@@ -70,7 +70,7 @@ def create_exec_option_dimension(cluster_sizes=ALL_CLUSTER_SIZES,
       for disable_codegen in disable_codegen_options:
         exec_option = {'batch_size': batch_size,
                        'num_nodes': cluster_size,
-                       'disable_codgen': disable_codegen,
+                       'disable_codegen': disable_codegen,
                       }
         exec_option_vectors.append(exec_option)
 

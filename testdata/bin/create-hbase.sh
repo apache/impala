@@ -5,8 +5,8 @@
 HADOOP_HOME=
 
 # create the HBase tables
-$HBASE_HOME/bin/hbase shell $IMPALA_HOME/testdata/bin/create.hbase
+yes exit | $HBASE_HOME/bin/hbase shell $IMPALA_HOME/testdata/bin/create.hbase
 
 # load the HBase data
-$HBASE_HOME/bin/hbase shell $IMPALA_HOME/testdata/HBaseAllTypesError/hbasealltypeserror.hbase
-$HBASE_HOME/bin/hbase shell $IMPALA_HOME/testdata/HBaseAllTypesErrorNoNulls/hbasealltypeserrornonulls.hbase
+yes exit | $HBASE_HOME/bin/hbase shell $IMPALA_HOME/testdata/HBaseAllTypesError/hbasealltypeserror.hbase
+yes exit | $HBASE_HOME/bin/hbase shell $IMPALA_HOME/testdata/HBaseAllTypesErrorNoNulls/hbasealltypeserrornonulls.hbase

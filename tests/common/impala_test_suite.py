@@ -38,7 +38,7 @@ def pytest_generate_tests(metafunc):
     vectors = metafunc.cls.TestMatrix.generate_test_vectors(
         metafunc.config.option.exploration_strategy)
     if len(vectors) == 0:
-      assert 0, 'No test vectors generated. Check constraints and input vectors'
+      LOG.warning('No test vectors generated. Check constraints and input vectors')
 
     vector_names = ['%s' % vector for vector in vectors]
 
@@ -195,7 +195,8 @@ class ImpalaTestSuite(object):
         self.client.set_query_option(exec_option, query_exec_options[exec_option])
     else:
       self.client.clear_query_options()
-
+    # TODO: Remove this in the future for negative testing
+    self.client.set_query_option('allow_unsupported_formats', True)
     return self.client.execute(query)
 
   def __load_query_test_file(self, workload, file_name):

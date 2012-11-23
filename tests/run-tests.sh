@@ -12,14 +12,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-# Starts up a single Impalad with the specified command line arguments. An optional
-# -build_type parameter can be passed to determine the build type to use for the
-# impalad instance.
+#
+# Runs the Impala query tests, first executing the tests that cannot be run in parallel
+# and then executing the remaining tests in parallel. Additional command line options
+# are passed to py.test.
 
 set -e
+set -u
+
+RESULTS_DIR=${IMPALA_HOME}/tests/results
+
+mkdir -p ${RESULTS_DIR}
+
 # First run all the tests that need to be executed serially (namely insert tests)
-py.test -v -x -m "execute_serially" --ignore="failure" "$@" -n 1
+py.test -v -m "execute_serially" --ignore="failure"\
+    --junitxml=${RESULTS_DIR}/TEST-impala-serial.xml "$@" -n 1
 
 # Run the remaining tests in parallel
-py.test -v -x -m "not execute_serially" --ignore="failure" -n 8 "$@"
+py.test -v -m "not execute_serially" --ignore="failure"\
+    --junitxml=${RESULTS_DIR}/TEST-impala-parallel.xml -n 8 "$@"

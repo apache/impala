@@ -19,7 +19,8 @@ class TestTpchQuery(ImpalaTestSuite):
     # execute over
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').file_format == 'seq' and\
-        v.get_value('table_format').compression_codec == 'snap')
+        v.get_value('table_format').compression_codec == 'snap' and\
+        v.get_value('table_format').compression_type != 'record')
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('exec_option')['batch_size'] == 0 and\
         v.get_value('exec_option')['disable_codgen'] == False and\
@@ -94,11 +95,11 @@ class TestTpchQuery(ImpalaTestSuite):
     self.run_test_case('tpch-q20', vector)
 
   # TODO: Disabled due to outer join bug
-  @pytest.mark.xfail
+  @pytest.mark.xfail(run=False)
   def test_tpch_q21(self, vector):
     self.run_test_case('tpch-q21', vector)
 
   # TODO: Disabled due to outer join bug
-  @pytest.mark.xfail
+  @pytest.mark.xfail(run=False)
   def test_tpch_q22(self, vector):
     self.run_test_case('tpch-q22', vector)
