@@ -146,11 +146,11 @@ def establish_beeswax_connection(query, query_options):
   exec_options = query_options.exec_options
   for exec_option in exec_options.keys():
     # TODO: Move the validation to the ImpalaBeeswaxExecOptions.
-    if not client.query_options.get(exec_option):
+    if not client.get_query_option(exec_option):
       LOG.error('Illegal exec_option: %s' % exec_option)
       return (False, None)
     # change the default value to the user specified value.
-    client.query_options[exec_option] = exec_options[exec_option]
+    client.set_query_option(exec_option, exec_options[exec_option])
   return (True, client)
 
 def execute_using_impala_beeswax(query, query_options):

@@ -192,11 +192,9 @@ class ImpalaTestSuite(object):
     # Set the specified query exec options, if specified
     if query_exec_options is not None and len(query_exec_options.keys()) > 0:
       for exec_option in query_exec_options.keys():
-        if not self.client.query_options.get(exec_option):
-          assert 'Invalid query options'
-        self.client.query_options[exec_option] = query_exec_options[exec_option]
+        self.client.set_query_option(exec_option, query_exec_options[exec_option])
     else:
-      self.client.query_options.clear()
+      self.client.clear_query_options()
 
     return self.client.execute(query)
 

@@ -17,7 +17,7 @@ from optparse import OptionParser
 from functools import partial
 from os.path import isfile, isdir
 from tests.common.query_executor import *
-from tests.common.test_vector import *
+from tests.common.test_dimensions import *
 from tests.util.test_file_parser import *
 from time import sleep
 from random import choice
@@ -285,10 +285,10 @@ class WorkloadRunner(object):
     """
     LOG.info('Running workload: %s / Scale factor: %s' % (workload, scale_factor))
     query_map = WorkloadRunner.__extract_queries_from_test_files(workload)
-    test_vectors = load_test_vectors(workload, exploration_strategy,
+    test_dimension = load_table_info_dimension(workload, exploration_strategy,
         file_formats.split(',') if file_formats is not None else None,
         compression_codecs.split(',') if compression_codecs is not None else None)
 
     args = [query_map, workload, scale_factor, query_names, stop_on_query_error]
     execute_queries_partial = partial(self.execute_queries, *args)
-    map(execute_queries_partial, test_vectors)
+    map(execute_queries_partial, [dimension.value for dimension in test_dimension])

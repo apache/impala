@@ -81,20 +81,33 @@ class ImpalaBeeswaxClient(object):
     self.imp_service = None
     self.transport = None
     self.use_kerberos = use_kerberos
-    self.query_options = {}
+    self.__query_options = {}
     self.query_state = QueryState._NAMES_TO_VALUES
-    self.__make_default_options()
+    self.set_default_query_options()
 
   def __make_default_options(self):
     def get_name(option): return TImpalaQueryOptions._VALUES_TO_NAMES[option]
     for option, default in DEFAULT_QUERY_OPTIONS.iteritems():
-      self.query_options[get_name(option)] = default
+      self.set_query_option(get_name(option), default)
 
   def __options_to_string_list(self):
-    return ["%s=%s" % (k,v) for (k,v) in self.query_options.iteritems()]
+    return ["%s=%s" % (k,v) for (k,v) in self.__query_options.iteritems()]
 
   def get_query_options(self):
-    return '\n'.join(["\t%s: %s" % (k,v) for (k,v) in self.query_options.iteritems()])
+    return '\n'.join(["\t%s: %s" % (k,v) for (k,v) in self.__query_options.iteritems()])
+
+  def set_query_option(self, name, value):
+    self.__query_options[name.upper()] = value
+
+  def set_default_query_options(self):
+    self.clear_query_options()
+    self.__make_default_options()
+
+  def get_query_option(self, name):
+    return self.__query_options.get(name.upper())
+
+  def clear_query_options(self):
+    self.__query_options.clear()
 
   def connect(self):
     """Connect to impalad specified in intializing this object

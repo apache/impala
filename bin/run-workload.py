@@ -79,6 +79,10 @@ parser.add_option("--beeswax", dest="beeswax", action="store_true", default=True
                   help="If set, Impala queries will use the beeswax interface.")
 parser.add_option("--use_kerberos", dest="use_kerberos", action="store_true",
                   default=False, help="If set, enables talking to a kerberized impalad")
+parser.add_option("--continue_on_query_error", dest="continue_on_query_error",
+                  action="store_true", default=False, help="If set, continue execution "\
+                  "on each query error.")
+
 
 # These options are used for configuring failure testing
 parser.add_option("--failure_frequency", type="int", dest="failure_frequency", default=0,
@@ -165,6 +169,7 @@ def write_results(result_map, partial_results = False):
                  is_impala_result=False)
 
 def run_workloads(workload_runner, failure_injector=None):
+  stop_on_error = (failure_injector is None) and (not options.continue_on_query_error)
   if failure_injector is not None:
     failure_injector.start()
 
@@ -175,7 +180,7 @@ def run_workloads(workload_runner, failure_injector=None):
         compression_codecs=options.compression_codecs,
         query_names=options.query_names,
         exploration_strategy=options.exploration_strategy,
-        stop_on_query_error=failure_injector is None)
+        stop_on_query_error=stop_on_error)
 
   if failure_injector is not None:
     failure_injector.cancel()
