@@ -17,10 +17,7 @@
 #include <iostream>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/thread.hpp>
-#include <protocol/TBinaryProtocol.h>
-#include <protocol/TDebugProtocol.h>
-#include <transport/TSocket.h>
-#include <transport/TTransportUtils.h>
+#include <thrift/protocol/TDebugProtocol.h>
 
 #include "common/logging.h"
 #include "exprs/expr.h"

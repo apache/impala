@@ -22,7 +22,6 @@
 #include <boost/thread/thread_time.hpp>
 #include <boost/unordered_set.hpp>
 #include <gtest/gtest.h>
-#include <transport/TSocket.h>
 
 #include "common/status.h"
 #include "statestore/state-store.h"

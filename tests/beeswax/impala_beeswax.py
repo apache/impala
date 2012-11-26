@@ -18,7 +18,7 @@ import traceback
 
 from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
-from JavaConstants.constants import DEFAULT_QUERY_OPTIONS
+from ImpalaService.constants import DEFAULT_QUERY_OPTIONS
 from ImpalaService import ImpalaService
 from ImpalaService.ImpalaService import TImpalaQueryOptions
 from thrift.transport.TSocket import TSocket

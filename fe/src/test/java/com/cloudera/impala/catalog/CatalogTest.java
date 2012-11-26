@@ -2,7 +2,7 @@
 
 package com.cloudera.impala.catalog;
 
-import static com.cloudera.impala.thrift.Constants.DEFAULT_PARTITION_ID;
+import static com.cloudera.impala.thrift.ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;

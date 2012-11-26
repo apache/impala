@@ -17,9 +17,9 @@
 #define IMPALA_SERVICE_AUTHORIZATION_H_
 
 #include <string>
+#include <thrift/transport/TTransport.h>
 
 #include "sasl/sasl.h"
-#include "transport/TTransport.h"
 #include "transport/TSaslServerTransport.h"
 #include "transport/TSasl.h"
 #include "common/status.h"

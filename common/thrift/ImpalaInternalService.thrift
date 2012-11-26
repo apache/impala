@@ -28,7 +28,16 @@ include "DataSinks.thrift"
 include "Data.thrift"
 include "RuntimeProfile.thrift"
 include "ImpalaService.thrift"
-include "JavaConstants.thrift"
+
+// constants for TQueryOptions.num_nodes
+const i32 NUM_NODES_ALL = 0
+const i32 NUM_NODES_ALL_RACKS = -1
+
+// constants for TPlanNodeId
+const i32 INVALID_PLAN_NODE_ID = -1
+
+// Constant default partition ID, must be < 0 to avoid collisions
+const i64 DEFAULT_PARTITION_ID = -1;
 
 // Query options that correspond to ImpalaService.ImpalaQueryOptions
 // TODO: make all of these optional, otherwise it will be impossible to
@@ -46,7 +55,7 @@ struct TQueryOptions {
   // uses the field corresponding to the column's native type). 
   5: required bool return_as_ascii = 1
   
-  6: required i32 num_nodes = JavaConstants.NUM_NODES_ALL
+  6: required i32 num_nodes = NUM_NODES_ALL
   7: required i64 max_scan_range_length = 0
   8: required i32 num_scanner_threads = 0
   9: required i32 max_io_buffers = 0

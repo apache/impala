@@ -36,7 +36,7 @@
 #include <sasl/saslutil.h>
 #endif
 
-#include <transport/TTransportException.h>
+#include <thrift/transport/TTransportException.h>
 
 using namespace apache::thrift::transport;
 

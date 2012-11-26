@@ -27,7 +27,7 @@ from beeswaxd import BeeswaxService
 from beeswaxd.BeeswaxService import QueryState
 from ImpalaService import ImpalaService
 from ImpalaService.ImpalaService import TImpalaQueryOptions
-from JavaConstants.constants import DEFAULT_QUERY_OPTIONS
+from ImpalaService.constants import DEFAULT_QUERY_OPTIONS
 from Status.ttypes import TStatus, TStatusCode
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException

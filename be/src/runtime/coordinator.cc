@@ -16,9 +16,7 @@
 
 #include <limits>
 #include <map>
-#include <protocol/TBinaryProtocol.h>
-#include <protocol/TDebugProtocol.h>
-#include <transport/TTransportUtils.h>
+#include <thrift/protocol/TDebugProtocol.h>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/accumulators/accumulators.hpp>
 #include <boost/accumulators/statistics/stats.hpp>
@@ -52,7 +50,7 @@
 #include "gen-cpp/Frontend_types.h"
 #include "gen-cpp/PlanNodes_types.h"
 #include "gen-cpp/Partitions_types.h"
-#include "gen-cpp/JavaConstants_constants.h"
+#include "gen-cpp/ImpalaInternalService_constants.h"
 
 using namespace std;
 using namespace boost;
@@ -625,7 +623,7 @@ void Coordinator::CollectScanNodeCounters(RuntimeProfile* profile,
     PlanNodeId id = ExecNode::GetNodeIdFromProfile(p);
 
     // This profile is not for an exec node.
-    if (id == g_JavaConstants_constants.INVALID_PLAN_NODE_ID) continue;
+    if (id == g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID) continue;
 
     RuntimeProfile::Counter* throughput_counter =
         p->GetCounter(ScanNode::TOTAL_THROUGHPUT_COUNTER);
@@ -1145,7 +1143,7 @@ Status Coordinator::ComputeFragmentHosts(const TQueryExecRequest& exec_request) 
     }
 
     PlanNodeId leftmost_scan_id = FindLeftmostNode(fragment.plan, scan_node_types);
-    if (leftmost_scan_id == g_JavaConstants_constants.INVALID_PLAN_NODE_ID) {
+    if (leftmost_scan_id == g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID) {
       // there is no leftmost scan; we assign the same hosts as those of our
       // leftmost input fragment (so that a partitioned aggregation fragment
       // runs on the hosts that provide the input data)
@@ -1207,14 +1205,14 @@ PlanNodeId Coordinator::FindLeftmostNode(
     ++node_idx;
   }
   if (node_idx == plan.nodes.size()) {
-    return g_JavaConstants_constants.INVALID_PLAN_NODE_ID;
+    return g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID;
   }
   const TPlanNode& node = plan.nodes[node_idx];
 
   for (int i = 0; i < types.size(); ++i) {
     if (node.node_type == types[i]) return node.node_id;
   }
-  return g_JavaConstants_constants.INVALID_PLAN_NODE_ID;
+  return g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID;
 }
 
 int Coordinator::FindLeftmostInputFragment(
@@ -1224,8 +1222,8 @@ int Coordinator::FindLeftmostInputFragment(
   exch_node_type.push_back(TPlanNodeType::EXCHANGE_NODE);
   PlanNodeId exch_id =
       FindLeftmostNode(exec_request.fragments[fragment_idx].plan, exch_node_type);
-  if (exch_id == g_JavaConstants_constants.INVALID_PLAN_NODE_ID) {
-    return g_JavaConstants_constants.INVALID_PLAN_NODE_ID;
+  if (exch_id == g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID) {
+    return g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID;
   }
 
   // find the fragment that sends to this exchange node
@@ -1238,7 +1236,7 @@ int Coordinator::FindLeftmostInputFragment(
   }
   // this shouldn't happen
   DCHECK(false) << "no fragment sends to exch id " << exch_id;
-  return g_JavaConstants_constants.INVALID_PLAN_NODE_ID;
+  return g_ImpalaInternalService_constants.INVALID_PLAN_NODE_ID;
 }
 
 void Coordinator::ComputeScanRangeAssignment(const TQueryExecRequest& exec_request) {

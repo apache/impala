@@ -24,10 +24,10 @@
 #include <string>
 
 #include <boost/shared_ptr.hpp>
-#include <transport/TTransport.h>
-#include <transport/TVirtualTransport.h>
-#include <transport/TSaslTransport.h>
-#include <transport/TSasl.h>
+#include <thrift/transport/TTransport.h>
+#include <thrift/transport/TVirtualTransport.h>
+#include "transport/TSaslTransport.h"
+#include "transport/TSasl.h"
 
 namespace apache { namespace thrift { namespace transport {
 

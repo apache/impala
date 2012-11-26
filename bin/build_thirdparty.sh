@@ -45,6 +45,21 @@ then
   git clean -dfx
 fi
 
+# build thrift
+cd ${THRIFT_SRC_DIR}
+JAVA_PREFIX=${THRIFT_HOME}/java PY_PREFIX=${THRIFT_HOME}/python \
+  ./configure --with-pic --prefix=${THRIFT_HOME}
+make # Make with -j fails
+make install
+cd ${THRIFT_SRC_DIR}/contrib/fb303
+chmod 755 ./bootstrap.sh
+./bootstrap.sh
+chmod 755 configure
+CPPFLAGS="-I${THRIFT_HOME}/include" PY_PREFIX=${THRIFT_HOME}/python ./configure \
+  --prefix=${THRIFT_HOME} --with-thriftpath=${THRIFT_HOME}
+make
+make install
+
 # build gflags
 cd $IMPALA_HOME/thirdparty/gflags-${IMPALA_GFLAGS_VERSION}
 ./configure --with-pic

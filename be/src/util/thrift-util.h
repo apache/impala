@@ -17,10 +17,10 @@
 #define IMPALA_UTIL_THRIFT_UTIL_H
 
 #include <boost/shared_ptr.hpp>
-#include <protocol/TBinaryProtocol.h>
+#include <thrift/protocol/TBinaryProtocol.h>
 #include <sstream>
-#include <TApplicationException.h>
-#include <transport/TBufferTransports.h>
+#include <thrift/TApplicationException.h>
+#include <thrift/transport/TBufferTransports.h>
 
 #include "common/status.h"
 #include "util/jni-util.h"

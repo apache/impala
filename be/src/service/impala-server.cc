@@ -19,15 +19,7 @@
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/unordered_set.hpp>
 #include <jni.h>
-#include <protocol/TBinaryProtocol.h>
-#include <protocol/TDebugProtocol.h>
-#include <transport/TSocket.h>
-#include <server/TThreadPoolServer.h>
-#include <transport/TServerSocket.h>
-#include <transport/TTransportUtils.h>
-#include <server/TServer.h>
-//#include <concurrency/Thread.h>
-#include <concurrency/PosixThreadFactory.h>
+#include <thrift/protocol/TDebugProtocol.h>
 #include <gtest/gtest.h>
 #include <boost/foreach.hpp>
 #include <boost/bind.hpp>
@@ -72,7 +64,6 @@
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
 #include "gen-cpp/Frontend_types.h"
-#include "gen-cpp/JavaConstants_constants.h"
 
 using namespace std;
 using namespace boost;

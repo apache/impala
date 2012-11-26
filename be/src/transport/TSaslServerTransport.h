@@ -26,9 +26,9 @@
 
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
-#include <transport/TTransport.h>
-#include <transport/TSasl.h>
-#include <transport/TSaslTransport.h>
+#include <thrift/transport/TTransport.h>
+#include "transport/TSasl.h"
+#include "transport/TSaslTransport.h"
 
 namespace apache { namespace thrift { namespace transport {
 

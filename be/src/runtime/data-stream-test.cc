@@ -13,9 +13,6 @@
 // limitations under the License.
 
 #include <boost/thread/thread.hpp>
-#include <protocol/TBinaryProtocol.h>
-#include <transport/TServerSocket.h>
-#include <transport/TTransportUtils.h>
 #include <gtest/gtest.h>
 
 #include "common/logging.h"

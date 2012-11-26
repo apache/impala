@@ -14,10 +14,7 @@
 
 #include "runtime/plan-fragment-executor.h"
 
-#include <Thrift.h>
-#include <protocol/TBinaryProtocol.h>
-#include <protocol/TDebugProtocol.h>
-#include <transport/TBufferTransports.h>
+#include <thrift/protocol/TDebugProtocol.h>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/foreach.hpp>

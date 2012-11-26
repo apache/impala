@@ -62,9 +62,9 @@ function(THRIFT_GEN VAR)
     
     add_custom_command(
       OUTPUT ${OUTPUT_BE_FILE}
-      COMMAND thrift ${CPP_ARGS} ${FIL}
-      COMMAND thrift ${JAVA_ARGS} ${FIL}
-      COMMAND thrift ${PYTHON_ARGS} ${FIL}
+      COMMAND ${THRIFT_COMPILER} ${CPP_ARGS} ${FIL}
+      COMMAND ${THRIFT_COMPILER} ${JAVA_ARGS} ${FIL}
+      COMMAND ${THRIFT_COMPILER} ${PYTHON_ARGS} ${FIL}
       DEPENDS ${ABS_FIL}
       COMMENT "Running thrift compiler on ${FIL}"
       VERBATIM
@@ -74,7 +74,8 @@ function(THRIFT_GEN VAR)
   set(${VAR} ${${VAR}} PARENT_SCOPE)
 endfunction(THRIFT_GEN)
 
-set(THRIFT_INCLUDE_DIR_OPTION -I ${Thrift_CONTRIB_DIR} -I $ENV{HIVE_HOME}/src/metastore/if)
+message("Using Thrift compiler: ${THRIFT_COMPILER}")
+set(THRIFT_INCLUDE_DIR_OPTION -I ${THRIFT_CONTRIB_DIR} -I $ENV{HIVE_HOME}/src/metastore/if)
 set(BE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/be/generated-sources)
 set(FE_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/fe/generated-sources)
 set(PYTHON_OUTPUT_DIR ${CMAKE_SOURCE_DIR}/shell/)
@@ -97,7 +98,6 @@ set (SRC_FILES
   Data.thrift
   Descriptors.thrift
   Frontend.thrift
-  JavaConstants.thrift
   Exprs.thrift
   ImpalaInternalService.thrift
   ImpalaPlanService.thrift

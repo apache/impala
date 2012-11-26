@@ -16,7 +16,7 @@
 #include "exec/hdfs-text-table-writer.h"
 #include "exec/hdfs-trevni-table-writer.h"
 #include "exec/exec-node.h"
-#include "gen-cpp/JavaConstants_constants.h"
+#include "gen-cpp/ImpalaInternalService_constants.h"
 #include "util/hdfs-util.h"
 #include "exprs/expr.h"
 #include "runtime/hdfs-fs-cache.h"
@@ -107,7 +107,7 @@ Status HdfsTableSink::Init(RuntimeState* state) {
   for (it = table_desc_->partition_descriptors().begin();
        it != table_desc_->partition_descriptors().end();
        ++it) {
-    if (it->first == g_JavaConstants_constants.DEFAULT_PARTITION_ID) {
+    if (it->first == g_ImpalaInternalService_constants.DEFAULT_PARTITION_ID) {
       default_partition_ = it->second;
     } else {
       // Evaluate non-constant partition keys and build a map from hash value to

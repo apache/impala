@@ -15,16 +15,16 @@
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
-#include <concurrency/PosixThreadFactory.h>
-#include <concurrency/Thread.h>
-#include <concurrency/ThreadManager.h>
-#include <protocol/TBinaryProtocol.h>
-#include <server/TNonblockingServer.h>
-#include <server/TThreadPoolServer.h>
-#include <server/TThreadedServer.h>
-#include <transport/TSocket.h>
-#include <server/TThreadPoolServer.h>
-#include <transport/TServerSocket.h>
+#include <thrift/concurrency/PosixThreadFactory.h>
+#include <thrift/concurrency/Thread.h>
+#include <thrift/concurrency/ThreadManager.h>
+#include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/server/TNonblockingServer.h>
+#include <thrift/server/TThreadPoolServer.h>
+#include <thrift/server/TThreadedServer.h>
+#include <thrift/transport/TSocket.h>
+#include <thrift/server/TThreadPoolServer.h>
+#include <thrift/transport/TServerSocket.h>
 #include <gflags/gflags.h>
 
 #include "util/thrift-server.h"

@@ -25,7 +25,7 @@ import com.cloudera.impala.testutil.TestFileParser;
 import com.cloudera.impala.testutil.TestFileParser.Section;
 import com.cloudera.impala.testutil.TestFileParser.TestCase;
 import com.cloudera.impala.testutil.TestUtils;
-import com.cloudera.impala.thrift.Constants;
+import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TClientRequest;
 import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.THBaseKeyRange;
@@ -171,7 +171,7 @@ public class PlannerTest {
     expectedPlan = testCase.getSectionContents(Section.DISTRIBUTEDPLAN);
     isImplemented = expectedPlan.size() > 0
         && !expectedPlan.get(0).toLowerCase().startsWith("not implemented");
-    options.setNum_nodes(Constants.NUM_NODES_ALL);
+    options.setNum_nodes(ImpalaInternalServiceConstants.NUM_NODES_ALL);
     explainBuilder = new StringBuilder();
     actualOutput.append(Section.DISTRIBUTEDPLAN.getHeader() + "\n");
     try {

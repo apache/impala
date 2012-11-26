@@ -18,7 +18,7 @@ import java.util.List;
 
 import com.cloudera.impala.analysis.Expr;
 import com.cloudera.impala.analysis.LiteralExpr;
-import com.cloudera.impala.thrift.Constants;
+import com.cloudera.impala.thrift.ImpalaInternalServiceConstants;
 import com.cloudera.impala.thrift.TExpr;
 import com.cloudera.impala.thrift.THdfsPartition;
 import com.google.common.base.Objects;
@@ -122,7 +122,8 @@ public class HdfsPartition {
     List<LiteralExpr> emptyExprList = Lists.newArrayList();
     List<FileDescriptor> emptyFileDescriptorList = Lists.newArrayList();
     HdfsPartition partition = new HdfsPartition(table, emptyExprList,
-        storageDescriptor, emptyFileDescriptorList, Constants.DEFAULT_PARTITION_ID);
+        storageDescriptor, emptyFileDescriptorList,
+        ImpalaInternalServiceConstants.DEFAULT_PARTITION_ID);
     return partition;
   }
 

@@ -27,7 +27,6 @@
 #include "service/fe-support.h"
 
 #include <boost/scoped_ptr.hpp>
-#include <server/TServer.h>
 
 #include "common/logging.h"
 #include "util/uid-util.h"  // for some reasoon needed right here for hash<TUniqueId>

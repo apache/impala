@@ -73,7 +73,7 @@ EOF
 
 # Copy all the shell files into the build dir
 cp -r ${HIVE_HOME}/lib/py/* ${TARBALL_ROOT}/lib
-cp -r ${IMPALA_HOME}/thirdparty/python-thrift-${IMPALA_THRIFT_VERSION}/thrift\
+cp -r ${THRIFT_HOME}/python/lib/python*/site-packages/thrift\
     ${TARBALL_ROOT}/lib
 cp -r ${SHELL_HOME}/gen-py ${TARBALL_ROOT}
 cp ${SHELL_HOME}/thrift_sasl.py ${TARBALL_ROOT}/lib

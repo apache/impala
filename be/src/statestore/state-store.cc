@@ -25,7 +25,7 @@
 #include <boost/thread/thread_time.hpp>
 #include <boost/algorithm/string/join.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
-#include <transport/TTransportException.h>
+#include <thrift/transport/TTransportException.h>
 
 #include "common/logging.h"
 #include "common/status.h"

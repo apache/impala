@@ -33,7 +33,7 @@
 #include "exec/serde-utils.h"
 #include "exec/text-converter.inline.h"
 #include "gen-cpp/Descriptors_types.h"
-#include "gen-cpp/JavaConstants_constants.h"
+#include "gen-cpp/Descriptors_constants.h"
 
 using namespace std;
 using namespace boost;
@@ -278,8 +278,8 @@ Status HdfsTrevniScanner::CreateDecompressor(const vector<uint8_t>& value,
                                              Codec** decompressor) {
   const string strval(reinterpret_cast<const char*>(&value[0]), value.size());
   map<string, THdfsCompression::type>::const_iterator codec =
-      g_JavaConstants_constants.COMPRESSION_MAP.find(strval);
-  if (codec == g_JavaConstants_constants.COMPRESSION_MAP.end()) {
+      g_Descriptors_constants.COMPRESSION_MAP.find(strval);
+  if (codec == g_Descriptors_constants.COMPRESSION_MAP.end()) {
     return FileReadError("Unknown compression codec" + strval);
   }
   if (codec->second == THdfsCompression::NONE) {

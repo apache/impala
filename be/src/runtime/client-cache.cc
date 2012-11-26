@@ -15,10 +15,10 @@
 #include "runtime/client-cache.h"
 
 #include <sstream>
-#include <server/TServer.h>
-#include <protocol/TBinaryProtocol.h>
-#include <transport/TSocket.h>
-#include <transport/TTransportUtils.h>
+#include <thrift/server/TServer.h>
+#include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/transport/TSocket.h>
+#include <thrift/transport/TTransportUtils.h>
 #include <memory>
 
 #include <boost/foreach.hpp>

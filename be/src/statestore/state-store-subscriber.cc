@@ -21,7 +21,6 @@
 #include <boost/foreach.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/shared_mutex.hpp>
-#include <transport/TBufferTransports.h>
 
 #include "common/logging.h"
 #include "common/status.h"

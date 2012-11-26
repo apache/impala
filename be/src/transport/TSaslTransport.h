@@ -25,10 +25,11 @@
 
 #include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
-#include <transport/TTransport.h>
-#include <transport/TVirtualTransport.h>
-#include <transport/TSasl.h>
-#include <transport/TBufferTransports.h>
+#include <thrift/transport/TTransport.h>
+#include <thrift/transport/TVirtualTransport.h>
+#include <thrift/transport/TBufferTransports.h>
+
+#include "transport/TSasl.h"
 
 namespace apache { namespace thrift { namespace transport {
 

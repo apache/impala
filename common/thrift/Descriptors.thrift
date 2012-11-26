@@ -52,6 +52,17 @@ enum THdfsCompression {
   SNAPPY_BLOCKED // Used by sequence and rc files but not stored in the metadata.
 }
 
+// Mapping from names defined by Trevni to the enum.
+// We permit gzip and bzip2 in addition.
+const map<string, THdfsCompression> COMPRESSION_MAP = {
+  "": THdfsCompression.NONE,
+  "none": THdfsCompression.NONE,
+  "deflate": THdfsCompression.DEFAULT,
+  "gzip": THdfsCompression.GZIP,
+  "bzip2": THdfsCompression.BZIP2,
+  "snappy": THdfsCompression.SNAPPY
+}
+
 struct THdfsPartition {
   1: required byte lineDelim
   2: required byte fieldDelim

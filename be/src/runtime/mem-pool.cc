@@ -15,6 +15,7 @@
 #include "runtime/mem-pool.h"
 #include "util/impalad-metrics.h"
 
+#include <algorithm>
 #include <stdio.h>
 #include <sstream>
 
@@ -71,7 +72,7 @@ MemPool::MemPool(const vector<string>& chunks)
     ImpaladMetrics::MEM_POOL_TOTAL_BYTES->Increment(total_bytes_allocated);
   }
 }
-    
+
 MemPool::ChunkInfo::ChunkInfo(int size)
   : owns_data(true),
     data(new uint8_t[size]),
@@ -108,7 +109,7 @@ void MemPool::FindChunk(int min_size) {
     if (chunks_[current_chunk_idx_].size >= min_size) {
       // This chunk is big enough.  Move it before the other free chunks.
       if (current_chunk_idx_ != first_free_idx) {
-        swap(chunks_[current_chunk_idx_], chunks_[first_free_idx]);
+        std::swap(chunks_[current_chunk_idx_], chunks_[first_free_idx]);
         current_chunk_idx_ = first_free_idx;
       }
       break;

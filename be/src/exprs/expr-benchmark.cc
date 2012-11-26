@@ -2,8 +2,8 @@
 #include <iostream>
 
 #include <jni.h>
-#include <Thrift.h>
-#include <protocol/TDebugProtocol.h>
+#include <thrift/Thrift.h>
+#include <thrift/protocol/TDebugProtocol.h>
 
 #include "exprs/expr.h"
 #include "util/benchmark.h"
@@ -22,7 +22,6 @@
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"
 #include "gen-cpp/Frontend_types.h"
-#include "gen-cpp/JavaConstants_constants.h"
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/Frontend_types.h"

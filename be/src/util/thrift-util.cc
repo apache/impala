@@ -14,15 +14,14 @@
 
 #include "util/thrift-util.h"
 
-#include <Thrift.h>
-#include <transport/TSocket.h>
-
 #include <boost/shared_ptr.hpp>
 #include <boost/thread.hpp>
-#include <server/TNonblockingServer.h>
-#include <transport/TServerSocket.h>
-#include <concurrency/ThreadManager.h>
-#include <concurrency/PosixThreadFactory.h>
+#include <thrift/Thrift.h>
+#include <thrift/transport/TSocket.h>
+#include <thrift/server/TNonblockingServer.h>
+#include <thrift/transport/TServerSocket.h>
+#include <thrift/concurrency/ThreadManager.h>
+#include <thrift/concurrency/PosixThreadFactory.h>
 
 #include "util/hash-util.h"
 #include "util/thrift-server.h"

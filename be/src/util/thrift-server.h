@@ -20,8 +20,8 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/unordered_map.hpp>
-#include <server/TNonblockingServer.h>
-#include <TProcessor.h>
+#include <thrift/server/TNonblockingServer.h>
+#include <thrift/TProcessor.h>
 
 #include "common/status.h"
 

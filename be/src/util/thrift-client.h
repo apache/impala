@@ -20,15 +20,16 @@
 #include <sstream>
 #include <boost/shared_ptr.hpp>
 #include <common/status.h>
-#include <transport/TSocket.h>
-#include <transport/TBufferTransports.h>
-#include <transport/TSaslClientTransport.h>
-#include <transport/TSasl.h>
-#include <protocol/TBinaryProtocol.h>
+#include <thrift/Thrift.h>
+#include <thrift/transport/TSocket.h>
+#include <thrift/transport/TBufferTransports.h>
+#include <thrift/protocol/TBinaryProtocol.h>
 #include <sstream>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
 
+#include "transport/TSaslClientTransport.h"
+#include "transport/TSasl.h"
 #include "util/thrift-server.h"
 #include "util/authorization.h"
 #include "gen-cpp/Types_types.h"

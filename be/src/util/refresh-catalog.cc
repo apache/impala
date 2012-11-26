@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <protocol/TBinaryProtocol.h>
-#include <protocol/TDebugProtocol.h>
-#include <transport/TSocket.h>
-#include <transport/TTransportUtils.h>
+#include <thrift/protocol/TBinaryProtocol.h>
+#include <thrift/protocol/TDebugProtocol.h>
+#include <thrift/transport/TSocket.h>
+#include <thrift/transport/TTransportUtils.h>
 
 #include "gen-cpp/ImpalaPlanService.h"
 #include "gen-cpp/ImpalaPlanService_types.h"

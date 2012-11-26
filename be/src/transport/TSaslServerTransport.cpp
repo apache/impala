@@ -25,9 +25,9 @@
 #include <boost/shared_ptr.hpp>
 #include <boost/scoped_ptr.hpp>
 
-#include <transport/TBufferTransports.h>
-#include <transport/TSaslTransport.h>
-#include <transport/TSaslServerTransport.h>
+#include <thrift/transport/TBufferTransports.h>
+#include "transport/TSaslTransport.h"
+#include "transport/TSaslServerTransport.h"
 
 using namespace std;
 using namespace boost;

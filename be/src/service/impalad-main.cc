@@ -21,13 +21,6 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/unordered_map.hpp>
 
-#include <protocol/TBinaryProtocol.h>
-#include <server/TThreadPoolServer.h>
-#include <transport/TServerSocket.h>
-#include <server/TServer.h>
-#include <transport/TTransportUtils.h>
-#include <concurrency/PosixThreadFactory.h>
-
 #include "common/logging.h"
 #include "common/daemon.h"
 // TODO: fix this: we currently need to include uid-util.h before impala-server.h
