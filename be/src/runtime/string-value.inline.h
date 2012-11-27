@@ -74,9 +74,16 @@ static inline int StringCompare(const char* s1, int n1, const char* s2, int n2, 
 
 inline int StringValue::Compare(const StringValue& other) const {
   int l = std::min(len, other.len);
-  if (l == 0) return 0;
-  if (len == 0) return -1;
-  if (other.len == 0) return 1;
+  if (l == 0) {
+    if (len == other.len) {
+      return 0;
+    } else if (len == 0) {
+      return -1;
+    } else {
+      DCHECK_EQ(other.len, 0);
+      return 1;
+    }
+  }
   return StringCompare(this->ptr, this->len, other.ptr, other.len, l);
 }
 
