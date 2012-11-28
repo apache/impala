@@ -288,7 +288,7 @@ void* StringFunctions::Lpad(Expr* e, TupleRow* row) {
     pad_index = pad_index % pad->len;
   }
   // Append given string.
-  memcpy(ptr, str->ptr, str->len);
+  memcpy(ptr + result_index, str->ptr, str->len);
   return &e->result_.string_val;
 }
 
