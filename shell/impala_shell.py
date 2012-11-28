@@ -82,6 +82,7 @@ class ImpalaShell(cmd.Cmd):
     self.query_options = {}
     self.__make_default_options()
     self.query_state = QueryState._NAMES_TO_VALUES
+    self.refresh_after_connect = options.refresh_after_connect
     if options.impalad != None:
       self.do_connect(options.impalad)
 
@@ -208,6 +209,8 @@ class ImpalaShell(cmd.Cmd):
     if self.__connect():
       self.__print_if_verbose('Connected to %s:%s' % self.impalad)
       self.prompt = "[%s:%s] > " % self.impalad
+      if self.refresh_after_connect:
+        self.cmdqueue.append('refresh')
     return True
 
   def __connect(self):
@@ -560,6 +563,9 @@ if __name__ == "__main__":
                     help="Print version information")
   parser.add_option("-c", "--ignore_query_failure", dest="ignore_query_failure",
                     default=False, action="store_true", help="Continue on query failure")
+  parser.add_option("-r", "--refresh_after_connect", dest="refresh_after_connect",
+                    default=False, action="store_true",
+                    help="Refresh Impala catalog after connecting")
 
   options, args = parser.parse_args()
 
