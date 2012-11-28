@@ -215,7 +215,7 @@ class ImpalaTestSuite(object):
 
   def __update_results(self, test_file_name, test_section, exec_result):
     if 'PARTITIONS' in test_section:
-      test_section['PARTITIONS'] = parse_result_rows(exec_result)
+      test_section['PARTITIONS'] = '\n'.join(parse_result_rows(exec_result))
     else:
       test_section['RESULTS'] = '\n'.join(parse_result_rows(exec_result))
 
