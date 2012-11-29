@@ -351,7 +351,7 @@ from (
   where month = 1
   group by int_col
   having count(*) > 2
-  order by count(*) desc limit 5
+  order by count(*) desc, int_col limit 5
   ) t1
 join alltypes t2 on (t1.int_col = t2.id)
 where month = 1

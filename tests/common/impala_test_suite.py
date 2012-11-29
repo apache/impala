@@ -117,7 +117,7 @@ class ImpalaTestSuite(object):
       query = QueryTestSectionReader.build_query(
           test_section['QUERY'], table_format_info, scale_factor='')
 
-      if test_section['QUERY_NAME']:
+      if 'QUERY_NAME' in test_section:
         LOG.info('Query Name: \n%s\n' % test_section['QUERY_NAME'])
 
       # Support running multiple queries within the same test section, only verifying the
@@ -136,7 +136,8 @@ class ImpalaTestSuite(object):
         verify_raw_results(test_section, result)
 
     if pytest.config.option.update_results:
-      write_test_file(os.path.join('/tmp', test_file_name), updated_sections)
+      output_file = os.path.join('/tmp', test_file_name.replace('/','_') + ".test")
+      write_test_file(output_file, updated_sections)
 
   def execute_test_case_setup(self, setup_section, vector):
     """
@@ -149,6 +150,7 @@ class ImpalaTestSuite(object):
     DROP PARTITIONS <table name> - Drop all partitions from the table
     RELOAD - Reload the catalog
     """
+    setup_section = remove_comments(setup_section)
     for row in setup_section.split('\n'):
       row = row.lstrip()
       if row.startswith('RESET'):
@@ -195,8 +197,10 @@ class ImpalaTestSuite(object):
         self.client.set_query_option(exec_option, query_exec_options[exec_option])
     else:
       self.client.clear_query_options()
+
     # TODO: Remove this in the future for negative testing
     self.client.set_query_option('allow_unsupported_formats', True)
+
     return self.client.execute(query)
 
   def __load_query_test_file(self, workload, file_name):

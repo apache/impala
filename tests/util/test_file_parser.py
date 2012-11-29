@@ -36,6 +36,7 @@ class QueryTestSectionReader(object):
     does more work than replace_table_suffix because it needs to properly replace the
     database name based on the given scale factor
     """
+    query_section_text = remove_comments(query_section_text)
     dataset = table_format_info.dataset
     file_format, codec, compression_type = (table_format_info.file_format,
                                             table_format_info.compression_codec,
@@ -77,6 +78,9 @@ class QueryTestSectionReader(object):
       return '_%s_record_%s' % (file_format, codec)
     else:
       return '_%s_%s' % (file_format, codec)
+
+def remove_comments(section_text):
+  return '\n'.join([l for l in section_text.split('\n') if not l.strip().startswith('#')])
 
 
 def parse_query_test_file(file_name):
@@ -137,12 +141,12 @@ def parse_test_file(test_file_name, valid_section_names, skip_unknown_sections=T
   sections = list()
 
   # Read test file, stripping out all comments
-  file_lines = [l for l in test_file.read().split('\n') if not l.strip().startswith('#')]
+  file_lines = [l for l in test_file.read().split('\n')]
 
   # Split the test file up into sections. For each section parse all subsections.
-  for section in '\n'.join(file_lines).split('===='):
+  for section in re.split(r'^====', '\n'.join(file_lines), maxsplit=0, flags=re.M):
     parsed_sections = collections.defaultdict(str)
-    for sub_section in section.split('----')[1:]:
+    for sub_section in re.split(r'^----', section, maxsplit=0, flags=re.M)[1:]:
       lines = sub_section.split('\n')
       subsection_name = lines[0].strip()
       subsection_comment = None

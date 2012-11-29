@@ -8,6 +8,7 @@ import os
 import pytest
 import sys
 import re
+from tests.util.test_file_parser import remove_comments
 
 logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('test_result_verfier')
@@ -66,7 +67,7 @@ def verify_raw_results(test_section, exec_result):
     # basis.
     expected_results = str(sum([int(p_count) for p_count in partition_results]))
   else:
-    expected_results = test_section['RESULTS']
+    expected_results = remove_comments(test_section['RESULTS'])
 
   if 'TYPES' in test_section:
     verify_column_types(test_section['TYPES'], exec_result.schema)

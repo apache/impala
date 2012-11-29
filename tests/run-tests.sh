@@ -23,7 +23,7 @@ set -u
 RESULTS_DIR=${IMPALA_HOME}/tests/results
 
 mkdir -p ${RESULTS_DIR}
-
+cd ${IMPALA_HOME}/tests
 # First run all the tests that need to be executed serially (namely insert tests)
 py.test -v -m "execute_serially" --ignore="failure"\
     --junitxml=${RESULTS_DIR}/TEST-impala-serial.xml "$@" -n 1
@@ -31,3 +31,4 @@ py.test -v -m "execute_serially" --ignore="failure"\
 # Run the remaining tests in parallel
 py.test -v -m "not execute_serially" --ignore="failure"\
     --junitxml=${RESULTS_DIR}/TEST-impala-parallel.xml -n 8 "$@"
+cd ~
