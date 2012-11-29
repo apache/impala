@@ -28,6 +28,7 @@ from beeswaxd.BeeswaxService import QueryState
 from ImpalaService import ImpalaService
 from ImpalaService.ImpalaService import TImpalaQueryOptions
 from JavaConstants.constants import DEFAULT_QUERY_OPTIONS
+from Status.ttypes import TStatus, TStatusCode
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
 from thrift.protocol import TBinaryProtocol
@@ -414,7 +415,16 @@ class ImpalaShell(cmd.Cmd):
       return (None, RpcStatus.ERROR)
     try:
       ret = rpc()
-      return (ret, RpcStatus.OK)
+      status = RpcStatus.OK
+      # TODO: In the future more advanced error detection/handling can be done based on
+      # the TStatus return value. For now, just print any error(s) that were encountered
+      # and validate the result of the operation was a succes.
+      if ret is not None and isinstance(ret, TStatus):
+        if ret.status_code != TStatusCode.OK:
+          if ret.error_msgs:
+            print 'RPC Error: %s' % '\n'.join(ret.error_msgs)
+          status = RpcStatus.ERROR
+      return (ret, status)
     except BeeswaxService.QueryNotFoundException, q:
       print 'Error: Stale query handle'
     # beeswaxException prints out the entire object, printing
