@@ -151,13 +151,9 @@ void TopNNode::InsertTupleRow(TupleRow* input_row) {
   } else {
     TupleRow* top_tuple_row = priority_queue_.top();
     if (tuple_row_less_than_(input_row, top_tuple_row)) {
-      for (int i = 0; i < tuple_descs_.size(); ++i) {
-        Tuple* dst_tuple = top_tuple_row->GetTuple(i);
-        Tuple* src_tuple = input_row->GetTuple(i);
-        // TODO: DeepCopy will allocate new buffers for the string data.  This needs
-        // to be fixed to use a freelist
-        src_tuple->DeepCopy(dst_tuple, *(tuple_descs_[i]), tuple_pool_.get());
-      }
+      // TODO: DeepCopy will allocate new buffers for the string data.  This needs
+      // to be fixed to use a freelist
+      input_row->DeepCopy(top_tuple_row, tuple_descs_, tuple_pool_.get(), true);
       insert_tuple_row = top_tuple_row;
       priority_queue_.pop();
     }

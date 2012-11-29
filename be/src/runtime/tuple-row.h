@@ -34,19 +34,34 @@ class TupleRow {
     tuples_[tuple_idx] = tuple;
   }
 
-  // Create a deep copy of this TupleRow.  DeepCopy will allocate from the MemPool and copy
-  // the tuple pointers, the tuples and the string data in the tuples.
+  // Create a deep copy of this TupleRow.  DeepCopy will allocate from  the pool.
   TupleRow* DeepCopy(const std::vector<TupleDescriptor*> descs, MemPool* pool) {
     int size = descs.size() * sizeof(Tuple*);
     TupleRow* result = reinterpret_cast<TupleRow*>(pool->Allocate(size));
+    DeepCopy(result, descs, pool, false);
+    return result;
+  }
+
+  // Create a deep copy of this TupleRow into 'dst'.  DeepCopy will allocate from 
+  // the MemPool and coyp the tuple pointers, the tuples and the string data in the tuples.
+  // If reuse_tuple_mem is true, it is assumed the dst TupleRow has already allocated
+  // tuple memory and that memory will be reused.  Otherwise, new tuples will be allocated
+  // and stored in 'dst'.
+  void DeepCopy(TupleRow* dst, const std::vector<TupleDescriptor*> descs, MemPool* pool,
+      bool reuse_tuple_mem) {
     for (int i = 0; i < descs.size(); ++i) {
       if (this->GetTuple(i) != NULL) {
-        result->SetTuple(i, this->GetTuple(i)->DeepCopy(*descs[i], pool));
+        if (reuse_tuple_mem && dst->GetTuple(i) != NULL) {
+          this->GetTuple(i)->DeepCopy(dst->GetTuple(i), *descs[i], pool);
+        } else {
+          dst->SetTuple(i, this->GetTuple(i)->DeepCopy(*descs[i], pool));
+        }
       } else {
-        result->SetTuple(i, NULL);
+        // TODO: this is wasteful.  If we have 'reuse_tuple_mem', we should be able
+        // to save the tuple buffer and reuse it (i.e. freelist).
+        dst->SetTuple(i, NULL);
       }
     }
-    return result;
   }
  
   // TODO: make a macro for doing this

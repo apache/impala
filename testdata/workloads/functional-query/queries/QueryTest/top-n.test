@@ -649,3 +649,24 @@ from alltypessmall order by 1  limit 20
 ---- TYPES
 TIMESTAMP, TIMESTAMP, INT
 ====
+---- QUERY
+# Test of order by with NULL tuple rows (from an outer join)
+select t1.id, t1.int_col, t2.id, t2.int_col 
+from alltypesagg t1 
+left outer join alltypessmall t2 
+  on (t1.int_col = t2.int_col)
+order by t1.id,t2.id limit 10
+---- TYPES
+int,int,int,int
+---- RESULTS
+0,NULL,NULL,NULL
+1,1,1,1
+1,1,11,1
+1,1,21,1
+1,1,26,1
+1,1,36,1
+1,1,46,1
+1,1,51,1
+1,1,61,1
+1,1,71,1
+====
