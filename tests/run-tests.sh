@@ -16,19 +16,29 @@
 # Runs the Impala query tests, first executing the tests that cannot be run in parallel
 # and then executing the remaining tests in parallel. Additional command line options
 # are passed to py.test.
-
-set -e
 set -u
 
 RESULTS_DIR=${IMPALA_HOME}/tests/results
-
 mkdir -p ${RESULTS_DIR}
+
 cd ${IMPALA_HOME}/tests
 # First run all the tests that need to be executed serially (namely insert tests)
-py.test -v -m "execute_serially" --ignore="failure"\
-    --junitxml=${RESULTS_DIR}/TEST-impala-serial.xml "$@" -n 1
+# TODO: Support different log files for each test directory
+py.test -v --tb=short -m "execute_serially" --ignore="failure"\
+    --junitxml="${RESULTS_DIR}/TEST-impala-serial.xml" \
+    --resultlog="${RESULTS_DIR}/TEST-impala-serial.log" "$@" -n 1
+EXIT_CODE=$?
 
 # Run the remaining tests in parallel
-py.test -v -m "not execute_serially" --ignore="failure"\
-    --junitxml=${RESULTS_DIR}/TEST-impala-parallel.xml -n 8 "$@"
+py.test -v --tb=short -m "not execute_serially" --ignore="failure"\
+    --junitxml="${RESULTS_DIR}/TEST-impala-parallel.xml" -n 8  \
+    --resultlog="${RESULTS_DIR}/TEST-impala-parallel.log" "$@"
+
+# The exit code of this script needs to indicated whether either of the py.test
+# executions had any failed tests
+if [ $? != 0 ]; then
+  EXIT_CODE=$?
+fi
+
 cd ~
+exit $EXIT_CODE

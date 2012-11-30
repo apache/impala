@@ -23,7 +23,7 @@ class TestTpchQuery(ImpalaTestSuite):
         v.get_value('table_format').compression_type != 'record')
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('exec_option')['batch_size'] == 0 and\
-        v.get_value('exec_option')['disable_codgen'] == False and\
+        v.get_value('exec_option')['disable_codegen'] == False and\
         v.get_value('exec_option')['num_nodes'] != 1)
 
   def test_tpch_q1(self, vector):
