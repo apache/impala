@@ -141,12 +141,12 @@ def parse_test_file(test_file_name, valid_section_names, skip_unknown_sections=T
   sections = list()
 
   # Read test file, stripping out all comments
-  file_lines = [l for l in test_file.read().split('\n')]
+  file_lines = [l for l in test_file.read().split('\n') if not l.strip().startswith('#')]
 
   # Split the test file up into sections. For each section parse all subsections.
-  for section in re.split(r'^====', '\n'.join(file_lines), maxsplit=0, flags=re.M):
+  for section in '\n'.join(file_lines).split('===='):
     parsed_sections = collections.defaultdict(str)
-    for sub_section in re.split(r'^----', section, maxsplit=0, flags=re.M)[1:]:
+    for sub_section in section.split('----')[1:]:
       lines = sub_section.split('\n')
       subsection_name = lines[0].strip()
       subsection_comment = None
