@@ -201,7 +201,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   Status GetExplainPlan(const TClientRequest& query_request, std::string* explain_string);
 
   // Helper function to translate between Beeswax and Impala thrift
-  void QueryToTClientRequest(const beeswax::Query& query, TClientRequest* request);
+  Status QueryToTClientRequest(const beeswax::Query& query, TClientRequest* request);
   void TUniqueIdToQueryHandle(const TUniqueId& query_id, beeswax::QueryHandle* handle);
   void QueryHandleToTUniqueId(const beeswax::QueryHandle& handle, TUniqueId* query_id);
 

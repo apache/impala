@@ -858,12 +858,16 @@ void ImpalaServer::BackendsPathHandler(stringstream* output) {
 ImpalaServer::~ImpalaServer() {}
 
 void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
-  TClientRequest query_request;
-  QueryToTClientRequest(query, &query_request);
   VLOG_QUERY << "query(): query=" << query.query;
+  TClientRequest query_request;
+  Status status = QueryToTClientRequest(query, &query_request);
+  if (!status.ok()) {
+    // raise general error for request conversion error;
+    RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
+  }
 
   shared_ptr<QueryExecState> exec_state;
-  Status status = Execute(query_request, &exec_state);
+  status = Execute(query_request, &exec_state);
   
   if (!status.ok()) {
     // raise Syntax error or access violation;
@@ -890,12 +894,16 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
 
 void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
     const LogContextId& client_ctx) {
-  TClientRequest query_request;
-  QueryToTClientRequest(query, &query_request);
   VLOG_QUERY << "executeAndWait(): query=" << query.query;
+  TClientRequest query_request;
+  Status status = QueryToTClientRequest(query, &query_request);
+  if (!status.ok()) {
+    // raise general error for request conversion error;
+    RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
+  }
 
   shared_ptr<QueryExecState> exec_state;
-  Status status = Execute(query_request, &exec_state);
+  status = Execute(query_request, &exec_state);
 
   if (!status.ok()) {
     // raise Syntax error or access violation;
@@ -1259,11 +1267,15 @@ void ImpalaServer::Cancel(impala::TStatus& tstatus,
 void ImpalaServer::explain(QueryExplanation& query_explanation, const Query& query) {
   // Translate Beeswax Query to Impala's QueryRequest and then set the explain plan bool
   // before shipping to FE
-  TClientRequest query_request;
-  QueryToTClientRequest(query, &query_request);
   VLOG_QUERY << "explain(): query=" << query.query;
+  TClientRequest query_request;
+  Status status = QueryToTClientRequest(query, &query_request);
+  if (!status.ok()) {
+    // raise general error for request conversion error;
+    RaiseBeeswaxException(status.GetErrorMsg(), SQLSTATE_GENERAL_ERROR);
+  }
 
-  Status status = GetExplainPlan(query_request, &query_explanation.textual);
+  status = GetExplainPlan(query_request, &query_explanation.textual);
   if (!status.ok()) {
     // raise Syntax error or access violation; this is the closest.
     RaiseBeeswaxException(
@@ -1494,7 +1506,7 @@ void ImpalaServer::get_default_configuration(vector<ConfigVariable> &configurati
       default_configs_.end());
 }
 
-void ImpalaServer::QueryToTClientRequest(const Query& query,
+Status ImpalaServer::QueryToTClientRequest(const Query& query,
     TClientRequest* request) {
   request->queryOptions = default_query_options_;
   request->queryOptions.return_as_ascii = true;
@@ -1511,16 +1523,16 @@ void ImpalaServer::QueryToTClientRequest(const Query& query,
   // Override default query options with Query.Configuration
   if (query.__isset.configuration) {
     BOOST_FOREACH(const string& option, query.configuration) {
-      ParseQueryOptions(option, &request->queryOptions);
+      RETURN_IF_ERROR(ParseQueryOptions(option, &request->queryOptions));
     }
     VLOG_QUERY << "TClientRequest.queryOptions: "
                << ThriftDebugString(request->queryOptions);
   }
+  return Status::OK;
 }
 
 Status ImpalaServer::ParseQueryOptions(const string& options,
     TQueryOptions* query_options) {
-  Status result;
   if (options.length() == 0) return Status::OK;
   vector<string> kv_pairs;
   split(kv_pairs, options, is_any_of(","), token_compress_on );
@@ -1533,9 +1545,7 @@ Status ImpalaServer::ParseQueryOptions(const string& options,
       stringstream ss;
       ss << "Ignoring invalid configuration option " << kv_string
          << ": bad format (expected key=value)";
-      LOG(WARNING) << ss.str();
-      if (result.ok()) result.AddErrorMsg(ss.str());
-      continue;
+      return Status(ss.str());
     }
 
     int option = GetQueryOption(key_value[0]);
@@ -1543,7 +1553,7 @@ Status ImpalaServer::ParseQueryOptions(const string& options,
       stringstream ss;
       ss << "Ignoring invalid configuration option: " << key_value[0];
       LOG(WARNING) << ss.str();
-      if (result.ok()) result.AddErrorMsg(ss.str());
+      return Status(ss.str());
     } else {
       switch (option) {
         case TImpalaQueryOptions::ABORT_ON_ERROR:
@@ -1589,7 +1599,7 @@ Status ImpalaServer::ParseQueryOptions(const string& options,
       }
     }
   }
-  return result;
+  return Status::OK;
 }
 
 
