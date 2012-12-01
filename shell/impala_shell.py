@@ -479,7 +479,6 @@ class ImpalaShell(cmd.Cmd):
     print "Build version: %s" % VERSION_STRING
     return True
 
-
 WELCOME_STRING = """Welcome to the Impala shell. Press TAB twice to see a list of \
 available commands.
 
@@ -568,18 +567,31 @@ if __name__ == "__main__":
     print VERSION_STRING
     sys.exit(0)
 
-  if options.kerberos_service_name and not options.use_kerberos:
-    print 'Kerberos not enabled, ignoring service name'
-  elif options.use_kerberos:
-    if not options.kerberos_service_name: options.kerberos_service_name = 'impala'
-    print "Using service name '%s' for kerberos" % options.kerberos_service_name
-
   if options.use_kerberos:
+    # The saslwrapper module has the same API as sasl, and is easier
+    # to install on CentOS / RHEL. Look for saslwrapper first before
+    # looking for the sasl module.
+    try:
+      import saslwrapper as sasl
+    except ImportError:
+      try:
+        import sasl
+      except ImportError:
+        print 'Neither saslwrapper nor sasl module found'
+        sys.exit(1)
     from thrift_sasl import TSaslClientTransport
-    import sasl
+
+    # The service name defaults to 'impala' if not specified by the user.
+    if not options.kerberos_service_name:
+      options.kerberos_service_name = 'impala'
+    print "Using service name '%s' for kerberos" % options.kerberos_service_name
+  elif options.kerberos_service_name:
+    print 'Kerberos not enabled, ignoring service name'
+
   if options.query or options.query_file:
     execute_queries_non_interactive_mode(options)
     sys.exit(0)
+
   intro = WELCOME_STRING
   shell = ImpalaShell(options)
   while shell.is_alive:

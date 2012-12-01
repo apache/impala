@@ -26,7 +26,10 @@ from cStringIO import StringIO
 from thrift.transport import TTransport
 from thrift.transport.TTransport import *
 from thrift.protocol import TBinaryProtocol
-import sasl
+try:
+  import saslwrapper as sasl
+except ImportError:
+  import sasl
 import struct
 
 class TSaslClientTransport(TTransportBase, CReadableTransport):
