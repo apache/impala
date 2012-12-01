@@ -42,8 +42,8 @@ parser.add_option("--exploration_strategy", dest="exploration_strategy", default
 parser.add_option("-w", "--workloads", dest="workloads", default="hive-benchmark",
                   help="The workload(s) and scale factors to run in a comma-separated "\
                   " list format. Optional scale factors for each workload are specified"\
-                  " using colons. For example: -w tpch:1gb. "\
-                  "Some valid workloads: 'hive-benchmark', 'tpch', ...")
+                  " using colons. For example: -w tpcds,tpch:400gb,tpch:1gb. "\
+                  "Some valid workloads: 'hive-benchmark', 'tpch', 'tpcds', ...")
 parser.add_option("--impalad", dest="impalad", default="localhost:21000",
                   help="A comma-separated list of impalad instances to run the "\
                   "workload against.")
