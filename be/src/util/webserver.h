@@ -31,7 +31,7 @@ namespace impala {
 class Webserver {
  public:
   typedef boost::function<void (std::stringstream* output)> PathHandlerCallback;
-
+  
   // If interface is set to the empty string the socket will bind to all available
   // interfaces.
   Webserver(const std::string& interface, const int port);
@@ -48,11 +48,18 @@ class Webserver {
   // Stops the webserver synchronously.
   void Stop();
 
-  // Register a handler with a particular URL path. Path should not include the
+  // Register a callback for a URL path. Path should not include the
   // http://hostname/ prefix.
   void RegisterPathHandler(const std::string& path, const PathHandlerCallback& callback);
 
  private:
+  // Renders a common Bootstrap-styled header 
+  void BootstrapPageHeader(std::stringstream* output);
+
+  // Renders a common Bootstrap-styled footer. Must be used in conjunction with
+  // BootstrapPageHeader.
+  void BootstrapPageFooter(std::stringstream* output);
+
   // Static so that it can act as a function pointer, and then call the next method
   static void* MongooseCallbackStatic(enum mg_event event, 
       struct mg_connection* connection);
@@ -67,8 +74,9 @@ class Webserver {
   // Lock guarding the path_handlers_ map
   boost::mutex path_handlers_lock_;
 
-  // Map of path to a list of handlers. More than one handler may register itself with a
-  // path so that many components may contribute to a single page.
+  // Map of path to a list of handlers for that path. More than one handler may
+  // register itself with a path so that many components may contribute to a
+  // single page.
   typedef std::map<std::string, std::vector<PathHandlerCallback> > PathHandlerMap;
   PathHandlerMap path_handlers_;
 

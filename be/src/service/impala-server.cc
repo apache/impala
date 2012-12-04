@@ -712,7 +712,6 @@ void ImpalaServer::RenderHadoopConfigs(stringstream* output) {
     (*output) << "Using external PlanService, no Hadoop configs available";
     return;
   }
-  (*output) << "<pre>";
   JNIEnv* jni_env = getJNIEnv();
   jstring java_explain_string =
       static_cast<jstring>(jni_env->CallObjectMethod(fe_, get_hadoop_config_id_));
@@ -721,7 +720,6 @@ void ImpalaServer::RenderHadoopConfigs(stringstream* output) {
   const char *str = jni_env->GetStringUTFChars(java_explain_string, &is_copy);
   RETURN_IF_EXC(jni_env);
   (*output) << str;
-  (*output) << "</pre>";
   jni_env->ReleaseStringUTFChars(java_explain_string, str);
   RETURN_IF_EXC(jni_env);
 }
@@ -732,7 +730,7 @@ void ImpalaServer::QueryStatePathHandler(stringstream* output) {
   (*output) << "This page lists all registered queries, i.e., those that are not closed "
     " nor cancelled.<br/>" << endl;
   (*output) << query_exec_state_map_.size() << " queries in flight" << endl;
-  (*output) << "<table border=1><tr><th>Query Id</th>" << endl;
+  (*output) << "<table class='table table-hover table-border'><tr><th>Query Id</th>" << endl;
   (*output) << "<th>Statement</th>" << endl;
   (*output) << "<th>Query Type</th>" << endl;
   (*output) << "<th>Backend Progress</th>" << endl;
@@ -778,7 +776,8 @@ void ImpalaServer::QueryStatePathHandler(stringstream* output) {
 
   // Print the query location counts.
   (*output) << "<h2>Query Locations</h2>";
-  (*output) << "<table border=1><tr><th>Location</th><th>Query Ids</th></tr>" << endl;
+  (*output) << "<table class='table table-hover table-bordered'>";
+  (*output) << "<tr><th>Location</th><th>Number of Fragments</th></tr>" << endl;
   {
     lock_guard<mutex> l(query_locations_lock_);
     BOOST_FOREACH(const QueryLocations::value_type& location, query_locations_) {
@@ -793,7 +792,8 @@ void ImpalaServer::SessionPathHandler(stringstream* output) {
   (*output) << "<h2>Sessions</h2>" << endl;
   lock_guard<mutex> l_(session_state_map_lock_);
   (*output) << "There are " << session_state_map_.size() << " active sessions." << endl
-            << "<table border=1><tr><th>Session Key</th>"
+            << "<table class='table table-bordered table-hover'>"
+            << "<tr><th>Session Key</th>"
             << "<th>Default Database</th><th>Start Time</th></tr>" << endl;
   BOOST_FOREACH(const SessionStateMap::value_type& session, session_state_map_) {
     (*output) << "<tr>"

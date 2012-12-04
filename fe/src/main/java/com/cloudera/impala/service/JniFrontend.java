@@ -197,9 +197,10 @@ public class JniFrontend {
     output.append("\n\n");
 
     // Write a table of key, value pairs
-    output.append("<table><tr><th>Key</th><th>Value</th></tr>");
+    output.append("<table class='table table-bordered table-hover'>");
+    output.append("<tr><th>Key</th><th>Value</th></tr>");
     for (Map.Entry<String, String> e : CONF) {
-      output.append("<tr><td>" + e.getKey() + "</td><td>" + e.getValue() + "</td</tr>");
+      output.append("<tr><td>" + e.getKey() + "</td><td>" + e.getValue() + "</td></tr>");
     }
     output.append("</table>");
     return output.toString();

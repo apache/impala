@@ -39,7 +39,7 @@ DEFINE_string(webserver_doc_root, GetDefaultDocumentRoot(),
     "Files under <webserver_doc_root>/www are accessible via the debug webserver. "
     "Defaults to $IMPALA_HOME, or if $IMPALA_HOME is not set, disables the document "
     "root");
-DEFINE_bool(enable_webserver_doc_root, false, 
+DEFINE_bool(enable_webserver_doc_root, true, 
     "If true, webserver may serve static files from the webserver_doc_root");
 
 // Mongoose requires a non-null return from the callback to signify successful processing
@@ -178,11 +178,22 @@ void* Webserver::MongooseCallback(enum mg_event event, struct mg_connection* con
       return PROCESSING_COMPLETE;
     }
 
-    // TODO: Consider adding simple HTML boilerplate, e.g. <html><body> ... </body></html>
-    stringstream output;
-    BOOST_FOREACH(const PathHandlerCallback& callback, it->second) {
-      callback(&output);
+    // Should we render with css styles?
+    bool use_style = true;
+    if (request_info->query_string != NULL) {
+      char style_arg[16];
+      if (mg_get_var(request_info->query_string, strlen(request_info->query_string),
+                     "raw", style_arg, 16) >= 0) {
+        use_style = false;
+      }
     }
+
+    stringstream output;
+    if (use_style) BootstrapPageHeader(&output);
+    BOOST_FOREACH(const PathHandlerCallback& callback_, it->second) {
+      callback_(&output);
+    }
+    if (use_style) BootstrapPageFooter(&output);
 
     string str = output.str();
     mg_printf(connection, "HTTP/1.1 200 OK\r\n"
@@ -201,8 +212,54 @@ void* Webserver::MongooseCallback(enum mg_event event, struct mg_connection* con
 void Webserver::RegisterPathHandler(const std::string& path,
    const PathHandlerCallback& callback) {
   mutex::scoped_lock lock(path_handlers_lock_);
-  // operator [] constructs an entry if one does not exist
   path_handlers_[path].push_back(callback);
+}
+
+const string PAGE_HEADER = "<!DOCTYPE html>"
+" <html>"
+"   <head><title>Cloudera Impala</title>"
+" <link href='www/bootstrap/css/bootstrap.min.css' rel='stylesheet' media='screen'>"
+"  <style>"
+"  body {"
+"    padding-top: 60px; "
+"  }"
+"  </style>"
+" </head>"
+" <body>";
+
+const string PAGE_FOOTER = "</div></body></html>";
+
+const string NAVIGATION_BAR_PREFIX = "<div class='navbar navbar-inverse navbar-fixed-top'>"
+"      <div class='navbar-inner'>"
+"        <div class='container'>"
+"          <a class='btn btn-navbar' data-toggle='collapse' data-target='.nav-collapse'>"
+"            <span class='icon-bar'></span>"
+"            <span class='icon-bar'></span>"
+"            <span class='icon-bar'></span>"
+"          </a>"
+"          <a class='brand' href='/'>Impala</a>"
+"          <div class='nav-collapse collapse'>"
+"            <ul class='nav'>";
+
+const string NAVIGATION_BAR_SUFFIX = "</ul>"
+"          </div>"
+"        </div>"
+"      </div>"
+"    </div>"
+"    <div class='container'>";
+
+void Webserver::BootstrapPageHeader(stringstream* output) {
+  (*output) << PAGE_HEADER;
+  (*output) << NAVIGATION_BAR_PREFIX;
+  BOOST_FOREACH(const PathHandlerMap::value_type& handler, path_handlers_) {
+    (*output) << "<li><a href=\"" << handler.first << "\">" << handler.first 
+              << "</a></li>";
+  }  
+  (*output) << NAVIGATION_BAR_SUFFIX;
+}
+
+void Webserver::BootstrapPageFooter(stringstream* output) {
+  (*output) << PAGE_FOOTER;
 }
 
 }
