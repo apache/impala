@@ -125,9 +125,6 @@ fi
 # Exit on non-true return value
 set -e
 
-# cleanup FE process
-$IMPALA_HOME/bin/clean-fe-processes.py
-
 # build common and backend
 cd $IMPALA_HOME
 cmake -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE .
@@ -174,12 +171,7 @@ fi
 
 if [ $tests_action -eq 1 ]
 then
-  cd $IMPALA_FE_DIR
-  mvn exec:java -Dexec.mainClass=com.cloudera.impala.testutil.PlanService \
-              -Dexec.classpathScope=test &
-  PID=$!
   ${IMPALA_HOME}/bin/run-backend-tests.sh
-  kill $PID
 fi
 
 # Build the shell tarball
