@@ -20,6 +20,7 @@
 
 #include "common/logging.h"
 #include "gen-cpp/Types_types.h"  // for TPrimitiveType
+#include "gen-cpp/cli_service_types.h"  // for HiveServer2 Type
 
 namespace impala {
 
@@ -69,6 +70,7 @@ PrimitiveType ThriftToType(TPrimitiveType::type ttype);
 TPrimitiveType::type ToThrift(PrimitiveType ptype);
 std::string TypeToString(PrimitiveType t);
 std::string TypeToOdbcString(PrimitiveType t);
+apache::hive::service::cli::thrift::TType::type TypeToHiveServer2Type(PrimitiveType t);
 }
 
 #endif

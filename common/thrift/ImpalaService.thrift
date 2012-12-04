@@ -17,6 +17,7 @@ namespace java com.cloudera.impala.thrift
 
 include "Status.thrift"
 include "beeswax.thrift"
+include "cli_service.thrift"
 
 // ImpalaService accepts query execution options through beeswax.Query.configuration in
 // key:value form. For example, the list of strings could be:
@@ -115,3 +116,10 @@ service ImpalaService extends beeswax.BeeswaxService {
   // Client calls this RPC to verify that the server is an ImpalaService.
   void PingImpalaService();
 }
+
+// Impala HiveServer2 service
+service ImpalaHiveServer2Service extends cli_service.TCLIService {
+  // Invalidates all catalog metadata, forcing a reload
+  Status.TStatus ResetCatalog(); 
+}
+

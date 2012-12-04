@@ -25,6 +25,9 @@ import java.util.UUID;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
+import org.apache.hive.service.cli.thrift.TGetColumnsReq;
+import org.apache.hive.service.cli.thrift.TGetSchemasReq;
+import org.apache.hive.service.cli.thrift.TGetTablesReq;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,6 +55,8 @@ import com.cloudera.impala.thrift.TDdlType;
 import com.cloudera.impala.thrift.TExecRequest;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.TFinalizeParams;
+import com.cloudera.impala.thrift.TMetadataOpRequest;
+import com.cloudera.impala.thrift.TMetadataOpResponse;
 import com.cloudera.impala.thrift.TPlanFragment;
 import com.cloudera.impala.thrift.TPrimitiveType;
 import com.cloudera.impala.thrift.TQueryExecRequest;
@@ -316,6 +321,37 @@ public class Frontend {
     }
 
     return result;
+  }
+
+  /**
+   * Executes a HiveServer2 metadata operation and returns a TMetadataOpResponse
+   * TODO: add unit test in FrontendTest.java
+   */
+  public TMetadataOpResponse execHiveServer2MetadataOp(TMetadataOpRequest request)
+      throws ImpalaException {
+    switch (request.opcode) {
+      case GET_TYPE_INFO: return MetadataOp.getTypeInfo();
+      case GET_SCHEMAS:
+      {
+        TGetSchemasReq req = request.getGet_schemas_req();
+        return MetadataOp.getSchemas(catalog, req.getCatalogName(), req.getSchemaName());
+      }
+      case GET_TABLES:
+      {
+        TGetTablesReq req = request.getGet_tables_req();
+        return MetadataOp.getTables(catalog, req.getCatalogName(), req.getSchemaName(),
+            req.getTableName(), req.getTableTypes());
+      }
+      case GET_COLUMNS:
+      {
+        TGetColumnsReq req = request.getGet_columns_req();
+        return MetadataOp.getColumns(catalog, req.getCatalogName(), req.getSchemaName(),
+            req.getTableName(), req.getColumnName());
+      }
+      case GET_CATALOGS: return MetadataOp.getCatalogs();
+      default:
+        throw new NotImplementedException(request.opcode + " has not been implemented.");
+    }
   }
 
   /**

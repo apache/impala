@@ -53,6 +53,7 @@ struct TQueryOptions {
   // if true, return query results in ASCII format (TColumnValue.stringVal),
   // otherwise return results in their native format (each TColumnValue
   // uses the field corresponding to the column's native type). 
+  // TODO: this is not used in the backend at all. Remove this option.
   5: required bool return_as_ascii = 1
   
   6: required i32 num_nodes = NUM_NODES_ALL

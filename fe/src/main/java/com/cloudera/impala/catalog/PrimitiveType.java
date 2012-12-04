@@ -261,5 +261,115 @@ public enum PrimitiveType {
         return INVALID_TYPE;
     }
   }
+
+  /**
+   * JDBC data type description
+   * Returns the column size for this type.
+   * For numeric data this is the maximum precision.
+   * For character data this is the length in characters.
+   * For datetime types this is the length in characters of the String representation
+   * (assuming the maximum allowed precision of the fractional seconds component).
+   * For binary data this is the length in bytes.
+   * Null is returned for for data types where the column size is not applicable.
+   */
+  public Integer getColumnSize() {
+    if (isNumericType()) {
+      return getPrecision();
+    }
+    switch (this) {
+      case STRING:
+        return Integer.MAX_VALUE;
+      case TIMESTAMP:
+        return 30;
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * JDBC data type description
+   * For numeric types, returns the maximum precision for this type.
+   * For non-numeric types, returns null.
+   */
+  public Integer getPrecision() {
+    switch (this) {
+      case TINYINT:
+        return 3;
+      case SMALLINT:
+        return 5;
+      case INT:
+        return 10;
+      case BIGINT:
+        return 19;
+      case FLOAT:
+        return 7;
+      case DOUBLE:
+        return 15;
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * JDBC data type description
+   * Returns the number of fractional digits for this type, or null if not applicable.
+   */
+  public Integer getDecimalDigits() {
+    switch (this) {
+      case BOOLEAN:
+      case TINYINT:
+      case SMALLINT:
+      case INT:
+      case BIGINT:
+        return 0;
+      case FLOAT:
+        return 7;
+      case DOUBLE:
+        return 15;
+      default:
+        return null;
+    }
+  }
+
+  /**
+   * JDBC data type description
+   * Returns the radix for this type (typically either 2 or 10) or null if not applicable.
+   */
+  public Integer getNumPrecRadix() {
+    switch (this) {
+      case TINYINT:
+      case SMALLINT:
+      case INT:
+      case BIGINT:
+        return 10;
+      case FLOAT:
+      case DOUBLE:
+        return 2;
+      default:
+        // everything else (including boolean and string) is null
+        return null;
+    }
+  }
+
+  /**
+   * JDBC data type description
+   * Returns the java SQL type enum
+   */
+  public int getJavaSQLType() {
+    switch (this) {
+      case BOOLEAN: return java.sql.Types.BOOLEAN;
+      case TINYINT: return java.sql.Types.TINYINT;
+      case SMALLINT: return java.sql.Types.SMALLINT;
+      case INT: return java.sql.Types.INTEGER;
+      case BIGINT: return java.sql.Types.BIGINT;
+      case FLOAT: return java.sql.Types.FLOAT;
+      case DOUBLE: return java.sql.Types.DOUBLE;
+      case TIMESTAMP: return java.sql.Types.TIMESTAMP;
+      case STRING: return java.sql.Types.VARCHAR;
+      default:
+        Preconditions.checkArgument(false, "Invalid type " + name());
+        return 0;
+    }
+  }
 }
 

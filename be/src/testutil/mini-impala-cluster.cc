@@ -33,6 +33,7 @@
 DEFINE_int32(num_backends, 3, "The number of backends to start");
 DECLARE_int32(be_port);
 DECLARE_int32(fe_port);
+DECLARE_int32(hs2_port);
 DECLARE_string(principal);
 
 using namespace impala;
@@ -40,7 +41,8 @@ using namespace std;
 
 namespace impala {
 TestExecEnv* test_env_;
-ThriftServer* fe_server_;
+ThriftServer* beeswax_server_;
+ThriftServer* hs2_server_;
 ThriftServer* be_server_;
 }
 
@@ -74,10 +76,14 @@ int main(int argc, char** argv) {
   LOG(INFO) << "Starting backends";
   test_env_->StartBackends();
 
-  CreateImpalaServer(test_env_, FLAGS_fe_port, FLAGS_be_port, &fe_server_, &be_server_);
+  CreateImpalaServer(test_env_, FLAGS_fe_port, FLAGS_hs2_port, FLAGS_be_port,
+      &beeswax_server_, &hs2_server_, &be_server_);
   be_server_->Start();
-  fe_server_->Start();
-  fe_server_->Join();
-  delete fe_server_;
+  beeswax_server_->Start();
+  hs2_server_->Start();
+  beeswax_server_->Join();
+  hs2_server_->Join();
+  delete beeswax_server_;
+  delete hs2_server_;
   delete be_server_;
 }

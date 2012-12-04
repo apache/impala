@@ -22,6 +22,8 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/service")
 add_library(Service
   fe-support.cc
   impala-server.cc
+  impala-hs2-server.cc
+  impala-beeswax-server.cc
 )
 
 # this shared library provides Impala executor functionality to FE test and planservice

@@ -63,7 +63,7 @@ using namespace boost;
 using namespace apache::thrift::server;
 
 static TestExecEnv* test_env;
-static ThriftServer* fe_server;
+static ThriftServer* beeswax_server;
 static ThriftServer* be_server;
 
 // calling the c'tor of the contained HdfsFsCache crashes
@@ -73,7 +73,7 @@ static ThriftServer* be_server;
 extern "C"
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
   InitGoogleLoggingSafe("fe-support");
-  // This surpresses printing errors to screen, such as "unknown row batch
+  // This supresses printing errors to screen, such as "unknown row batch
   // destination" in data-stream-mgr.cc. Only affects "mvn test".
   google::SetStderrLogging(google::FATAL);
   InitThriftLogging();
@@ -104,8 +104,9 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
   VLOG_CONNECTION << "starting backends";
   test_env->StartBackends();
 
-  CreateImpalaServer(test_env, FLAGS_fe_port, FLAGS_be_port, &fe_server, &be_server);
-  fe_server->Start();
+  CreateImpalaServer(test_env, FLAGS_fe_port, 0, FLAGS_be_port, &beeswax_server, NULL,
+      &be_server);
+  beeswax_server->Start();
   be_server->Start();
   return JNI_VERSION_1_4;
 }

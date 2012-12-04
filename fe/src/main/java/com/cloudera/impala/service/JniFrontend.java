@@ -37,6 +37,9 @@ import com.cloudera.impala.thrift.TGetDbsParams;
 import com.cloudera.impala.thrift.TGetDbsResult;
 import com.cloudera.impala.thrift.TGetTablesParams;
 import com.cloudera.impala.thrift.TGetTablesResult;
+import com.cloudera.impala.thrift.TMetadataOpRequest;
+import com.cloudera.impala.thrift.TMetadataOpResponse;
+
 
 /**
  * JNI-callable interface onto a wrapped Frontend instance. The main point is to serialise
@@ -174,6 +177,23 @@ public class JniFrontend {
     deserializeThrift(params, thriftDescribeTableParams);
     TDescribeTableResult result = new TDescribeTableResult();
     result.setColumns(frontend.describeTable(params.getDb(), params.getTable_name()));
+
+    TSerializer serializer = new TSerializer(protocolFactory);
+    try {
+      return serializer.serialize(result);
+    } catch (TException e) {
+      throw new InternalException(e.getMessage());
+    }
+  }
+
+  /**
+   * Executes a HiveServer2 metadata operation and returns a TMetadataOpResponse
+   */
+  public byte[] execHiveServer2MetadataOp(byte[] metadataOpsParams)
+      throws ImpalaException {
+    TMetadataOpRequest params = new TMetadataOpRequest();
+    deserializeThrift(params, metadataOpsParams);
+    TMetadataOpResponse result = frontend.execHiveServer2MetadataOp(params);
 
     TSerializer serializer = new TSerializer(protocolFactory);
     try {

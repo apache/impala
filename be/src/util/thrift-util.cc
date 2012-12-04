@@ -26,6 +26,7 @@
 #include "util/hash-util.h"
 #include "util/thrift-server.h"
 #include "gen-cpp/Types_types.h"
+#include "gen-cpp/Data_types.h"
 
 using namespace std;
 using namespace apache::thrift;
@@ -93,6 +94,23 @@ void THostPortToString(const THostPort& address, string* out) {
 
 std::ostream& operator<<(std::ostream& out, const THostPort& hostport) {
   out << hostport.ipaddress << ":" << hostport.port;
+  return out;
+}
+
+std::ostream& operator<<(std::ostream& out, const TColumnValue& colval) {
+  if (colval.__isset.boolVal) {
+    out << ((colval.boolVal) ? "true" : "false");
+  } else if (colval.__isset.doubleVal) {
+    out << colval.doubleVal;
+  } else if (colval.__isset.intVal) {
+    out << colval.intVal;
+  } else if (colval.__isset.longVal) {
+    out << colval.longVal;
+  } else if (colval.__isset.stringVal) {
+    out << colval.stringVal;
+  } else {
+    out << "NULL";
+  }
   return out;
 }
 

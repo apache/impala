@@ -27,31 +27,44 @@ class Status;
 class ImpalaServer;
 
 // The DdlExecutor is responsible for executing statements that modify or query table
-// metadata explicitly. These include SHOW and DESCRIBE statements, and may in the future
-// include CREATE and ALTER.
+// metadata explicitly. These include SHOW and DESCRIBE statements, HiveServer2 metadata
+// operations and may in the future include CREATE and ALTER.
 // One DdlExecutor is typically created per query statement. 
-// Rows are returned in text format, rather than the row batches and tuple descriptors
-// returned by query statements.
+// Rows are returned in result_set.
 // All rows are available to be read after Exec() returns.
 class DdlExecutor {
  public:
-  // Delimiter is the string to use to separate columns values when printed to text.
-  DdlExecutor(ImpalaServer* impala_server, const std::string& delimiter);
+  DdlExecutor(ImpalaServer* impala_server);
 
-  // Runs a DDL query to completion. Once Exec() returns, all rows are available to be
-  // read in all_rows_ascii()
+  // Runs a DDL query to completion. Once Exec() returns, all rows are available in
+  // result_set().
   Status Exec(TDdlExecRequest* exec_request);
 
-  // Returns the list of rows retrieved in Exec(). Rows are formatted as columnn values
-  // printed as text, separated by the class delimiter.
-  const std::vector<std::string>& all_rows_ascii() { return ascii_rows_; }
+  // Runs a metadata operation to completion. This will assign a unique request
+  // id which can be retrieved from request_id(). Once Exec() returns, all rows are
+  // available in result_set() and the result set schema can be retrieved from
+  // result_set_metadata().
+  Status Exec(const TMetadataOpRequest& exec_request);
+
+  // Returns the list of rows retrieved in Exec().
+  const std::vector<TResultRow>& result_set() { return result_set_; }
+
+  // Returns the unique request id. Only available if using Exec(TMetadataOpRequest)
+  const TUniqueId& request_id() { return request_id_; }
+
+  // Returns the metadata of the result set. Only available if using
+  // Exec(TMetadataOpRequest)
+  const TResultSetMetadata& result_set_metadata() { return result_set_metadata_; }
 
  private:
-  // Column separator
-  const std::string delimiter_;
+  // The list of all materialized rows after Exec() has been called; empty before that.
+  std::vector<TResultRow> result_set_;
 
-  // The list of all materialised rows after Exec() has been called; empty before that. 
-  std::vector<std::string> ascii_rows_;
+  // Unique Id of the medata operation. Only available if using Exec(TMetadataOpRequest)
+  TUniqueId request_id_;
+
+  // Schema of result_set_. Only available if using Exec(TMetadataOpRequest)
+  TResultSetMetadata result_set_metadata_;
 
   // Used to execute catalog queries to the Frontend via JNI. Not owned here.
   ImpalaServer* impala_server_;

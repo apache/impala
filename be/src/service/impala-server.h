@@ -24,15 +24,24 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
-
+// TODO: use boost::uuids when we move to boost 1.42+ in the build
+//#include <boost/uuid/uuid.hpp>
+//#include <boost/uuid/uuid_generators.hpp>
+//#include <boost/uuid/uuid_io.hpp>
 #include "gen-cpp/ImpalaService.h"
+#include "gen-cpp/ImpalaHiveServer2Service.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/Frontend_types.h"
 #include "util/thrift-server.h"
 #include "common/status.h"
+#include "exec/ddl-executor.h"
 #include "util/metrics.h"
+#include "util/runtime-profile.h"
 #include "statestore/util.h"
+#include "runtime/coordinator.h"
+#include "runtime/primitive-type.h"
 #include "runtime/timestamp-value.h"
+#include "runtime/runtime-state.h"
 
 namespace impala {
 
@@ -40,7 +49,6 @@ class ExecEnv;
 class DataSink;
 class Coordinator;
 class RowDescriptor;
-
 class TCatalogUpdate;
 class TPlanExecRequest;
 class TPlanExecParams;
@@ -63,7 +71,8 @@ class ImpalaPlanServiceClient;
 class ThriftServer;
 
 // An ImpalaServer contains both frontend and backend functionality;
-// it implements both the ImpalaService and ImpalaInternalService APIs.
+// it implements ImpalaService (Beeswax), ImpalaHiveServer2Service (HiveServer2)
+// and ImpalaInternalService APIs.
 // This class is partially thread-safe. To ensure freedom from deadlock,
 // locks on the maps are obtained before locks on the items contained in the maps.
 //
@@ -74,13 +83,14 @@ class ThriftServer;
 // TODO: The same doesn't apply to the execution state of an individual plan
 // fragment: the originating coordinator might die, but we can get notified of
 // that via the statestore. This still needs to be implemented.
-class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
+class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
+                     public ImpalaInternalServiceIf,
                      public ThriftServer::SessionHandlerIf {
  public:
   ImpalaServer(ExecEnv* exec_env);
   ~ImpalaServer();
 
-  // ImpalaService rpcs: Beeswax API
+  // ImpalaService rpcs: Beeswax API (implemented in impala-beeswax-server.cc)
   virtual void query(beeswax::QueryHandle& query_handle, const beeswax::Query& query);
   virtual void executeAndWait(beeswax::QueryHandle& query_handle,
       const beeswax::Query& query, const beeswax::LogContextId& client_ctx);
@@ -95,6 +105,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   virtual beeswax::QueryState::type get_state(const beeswax::QueryHandle& handle);
   virtual void echo(std::string& echo_string, const std::string& input_string);
   virtual void clean(const beeswax::LogContextId& log_context);
+  virtual void get_log(std::string& log, const beeswax::LogContextId& context);
 
   // Return ImpalaQueryOptions default values and "support_start_over/false" to indicate
   // that Impala does not support start over in the fetch call. Hue relies on this not to
@@ -106,14 +117,65 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   // ImpalaService rpcs: unimplemented parts of Beeswax API.
   // These APIs will not be implemented because ODBC driver does not use them.
   virtual void dump_config(std::string& config);
-  virtual void get_log(std::string& log, const beeswax::LogContextId& context);
 
-  // ImpalaService rpcs: extensions over Beeswax
+  // ImpalaService rpcs: extensions over Beeswax (implemented in impala-beeswax-server.cc)
   virtual void Cancel(impala::TStatus& status, const beeswax::QueryHandle& query_id);
-  virtual void ResetCatalog(impala::TStatus& status);
   virtual void CloseInsert(impala::TInsertResult& insert_result,
       const beeswax::QueryHandle& query_handle);
   virtual void PingImpalaService();
+
+  // ImpalaHiveServer2Service rpcs: HiveServer2 API (implemented in impala-hs2-server.cc)
+  virtual void OpenSession(
+      apache::hive::service::cli::thrift::TOpenSessionResp& return_val,
+      const apache::hive::service::cli::thrift::TOpenSessionReq& request);
+  virtual void CloseSession(
+      apache::hive::service::cli::thrift::TCloseSessionResp& return_val,
+      const apache::hive::service::cli::thrift::TCloseSessionReq& request);
+  virtual void GetInfo(
+      apache::hive::service::cli::thrift::TGetInfoResp& return_val,
+      const apache::hive::service::cli::thrift::TGetInfoReq& request);
+  virtual void ExecuteStatement(
+      apache::hive::service::cli::thrift::TExecuteStatementResp& return_val,
+      const apache::hive::service::cli::thrift::TExecuteStatementReq& request);
+  virtual void GetTypeInfo(
+      apache::hive::service::cli::thrift::TGetTypeInfoResp& return_val,
+      const apache::hive::service::cli::thrift::TGetTypeInfoReq& request);
+  virtual void GetCatalogs(
+      apache::hive::service::cli::thrift::TGetCatalogsResp& return_val,
+      const apache::hive::service::cli::thrift::TGetCatalogsReq& request);
+  virtual void GetSchemas(
+      apache::hive::service::cli::thrift::TGetSchemasResp& return_val,
+      const apache::hive::service::cli::thrift::TGetSchemasReq& request);
+  virtual void GetTables(
+      apache::hive::service::cli::thrift::TGetTablesResp& return_val,
+      const apache::hive::service::cli::thrift::TGetTablesReq& request);
+  virtual void GetTableTypes(
+      apache::hive::service::cli::thrift::TGetTableTypesResp& return_val,
+      const apache::hive::service::cli::thrift::TGetTableTypesReq& request);
+  virtual void GetColumns(
+      apache::hive::service::cli::thrift::TGetColumnsResp& return_val,
+      const apache::hive::service::cli::thrift::TGetColumnsReq& request);
+  virtual void GetFunctions(
+      apache::hive::service::cli::thrift::TGetFunctionsResp& return_val,
+      const apache::hive::service::cli::thrift::TGetFunctionsReq& request);
+  virtual void GetOperationStatus(
+      apache::hive::service::cli::thrift::TGetOperationStatusResp& return_val,
+      const apache::hive::service::cli::thrift::TGetOperationStatusReq& request);
+  virtual void CancelOperation(
+      apache::hive::service::cli::thrift::TCancelOperationResp& return_val,
+      const apache::hive::service::cli::thrift::TCancelOperationReq& request);
+  virtual void CloseOperation(
+      apache::hive::service::cli::thrift::TCloseOperationResp& return_val,
+      const apache::hive::service::cli::thrift::TCloseOperationReq& request);
+  virtual void GetResultSetMetadata(
+      apache::hive::service::cli::thrift::TGetResultSetMetadataResp& return_val,
+      const apache::hive::service::cli::thrift::TGetResultSetMetadataReq& request);
+  virtual void FetchResults(
+      apache::hive::service::cli::thrift::TFetchResultsResp& return_val,
+      const apache::hive::service::cli::thrift::TFetchResultsReq& request);
+
+  // ImpalaService common extensions (implemented in impala-server.cc)
+  virtual void ResetCatalog(impala::TStatus& status);
 
   // ImpalaInternalService rpcs
   virtual void ExecPlanFragment(
@@ -131,17 +193,21 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
 
   // Parse a "," separated key=value pair of query options and set it in TQueryOptions.
   // If the same query option is specified more than once, the last one wins.
-  // If input is invalid (bad format or invalid query option), the invalid input is
-  // skipped and a warning is logged. Returned status contains the first parsing error, or
-  // OK if there is no error.
+  // Return an error if the input is invalid (bad format or invalid query option).
   static Status ParseQueryOptions(const std::string& options,
       TQueryOptions* query_options);
 
+  // Set the key/value pair in TQueryOptions. It will override existing setting in
+  // query_options.
+  static Status SetQueryOptions(const std::string& key, const std::string& value,
+      TQueryOptions* query_options);
+
   // SessionHandlerIf methods
-  // Called when a session starts. Registers a new SessionState with the provided key.
+  // Called when a Beeswax session starts. Registers a new SessionState with the provided
+  // key.
   virtual void SessionStart(const ThriftServer::SessionKey& session_key);
 
-  // Called when a session terminates. Unregisters the SessionState associated
+  // Called when a Beeswax session terminates. Unregisters the SessionState associated
   // with the provided key.
   virtual void SessionEnd(const ThriftServer::SessionKey& session_key);
 
@@ -150,8 +216,151 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   void MembershipCallback(const ServiceStateMap& service_state);
 
  private:
-  class QueryExecState;
   class FragmentExecState;
+
+  // Query result set stores converted rows returned by QueryExecState.fetchRows(). It
+  // provides an interface to convert Impala rows to external API rows.
+  // It is an abstract class. Subclass must implement AddOneRow().
+  class QueryResultSet {
+   public:
+    QueryResultSet() {}
+    virtual ~QueryResultSet() {}
+
+    // Add the row (list of expr value) from a select query to this result set. When a
+    // row comes from a select query, the row is in the form of expr values (void*).
+    virtual Status AddOneRow(const vector<void*>& row) = 0;
+
+    // Add the TResultRow to this result set. When a row comes from a DDL/metadata
+    // operation, the row in the form of TResultRow.
+    virtual Status AddOneRow(const TResultRow& row) = 0;
+  };
+
+  class AsciiQueryResultSet; // extends QueryResultSet
+  class TRowQueryResultSet; // extends QueryResultSet
+
+  // Execution state of a query. This captures everything necessary
+  // to convert row batches received by the coordinator into results
+  // we can return to the client. It also captures all state required for
+  // servicing query-related requests from the client.
+  // Thread safety: this class is generally not thread-safe, callers need to
+  // synchronize access explicitly via lock().
+  // To avoid deadlocks, the caller must *not* acquire query_exec_state_map_lock_
+  // while holding the exec state's lock.
+  // TODO: Consider renaming to RequestExecState for consistency.
+  class QueryExecState {
+   public:
+    QueryExecState(ExecEnv* exec_env, ImpalaServer* server)
+      : exec_env_(exec_env),
+        coord_(NULL),
+        profile_(&profile_pool_, "Query"),  // assign name w/ id after planning
+        eos_(false),
+        query_state_(beeswax::QueryState::CREATED),
+        current_batch_(NULL),
+        current_batch_row_(0),
+        num_rows_fetched_(0),
+        impala_server_(server),
+        start_time_(TimestampValue::local_time()) {
+      planner_timer_ = ADD_COUNTER(&profile_, "PlanningTime", TCounterType::CPU_TICKS);
+    }
+
+    ~QueryExecState() {
+    }
+
+    // Initiates execution of plan fragments, if there are any, and sets
+    // up the output exprs for subsequent calls to FetchRows().
+    // Also sets up profile and pre-execution counters.
+    // Non-blocking.
+    Status Exec(TExecRequest* exec_request);
+
+    // Execute a HiveServer2 metadata operation
+    Status Exec(const TMetadataOpRequest& exec_request);
+
+    // Call this to ensure that rows are ready when calling FetchRows().
+    // Must be preceded by call to Exec().
+    Status Wait();
+
+    // Return at most max_rows from the current batch. If the entire current batch has
+    // been returned, fetch another batch first.
+    // Caller should verify that EOS has not be reached before calling.
+    // Always calls coord()->Wait() prior to getting a batch.
+    // Also updates query_state_/status_ in case of error.
+    Status FetchRows(const int32_t max_rows, QueryResultSet* fetched_rows);
+
+    // Update query state if the requested state isn't already obsolete.
+    void UpdateQueryState(beeswax::QueryState::type query_state);
+
+    void SetErrorStatus(const Status& status);
+
+    // Sets state to EXCEPTION and cancels coordinator.
+    // Caller needs to hold lock().
+    void Cancel();
+
+    bool eos() { return eos_; }
+    Coordinator* coord() const { return coord_.get(); }
+    int num_rows_fetched() const { return num_rows_fetched_; }
+    const TResultSetMetadata* result_metadata() { return &result_metadata_; }
+    const TUniqueId& query_id() const { return query_id_; }
+    const TExecRequest& exec_request() const { return exec_request_; }
+    TStmtType::type stmt_type() const { return exec_request_.stmt_type; }
+    boost::mutex* lock() { return &lock_; }
+    const beeswax::QueryState::type query_state() const { return query_state_; }
+    void set_query_state(beeswax::QueryState::type state) { query_state_ = state; }
+    const Status& query_status() const { return query_status_; }
+    RuntimeProfile::Counter* planner_timer() { return planner_timer_; }
+    void set_result_metadata(const TResultSetMetadata& md) { result_metadata_ = md; }
+    const RuntimeProfile& profile() const { return profile_; }
+    const TimestampValue& start_time() const { return start_time_; }
+
+   private:
+    TUniqueId query_id_;
+    boost::mutex lock_;  // protects all following fields
+    ExecEnv* exec_env_;
+
+    // not set for queries w/o FROM, ddl queries, or short-circuited (i.e. queries with
+    // "limit 0")
+    boost::scoped_ptr<Coordinator> coord_;
+
+    boost::scoped_ptr<DdlExecutor> ddl_executor_; // Runs DDL queries, instead of coord_
+    // local runtime_state_ in case we don't have a coord_
+    RuntimeState local_runtime_state_;
+    ObjectPool profile_pool_;
+    RuntimeProfile profile_;
+    RuntimeProfile::Counter* planner_timer_;
+    vector<Expr*> output_exprs_;
+    bool eos_;  // if true, there are no more rows to return
+    beeswax::QueryState::type query_state_;
+    Status query_status_;
+    TExecRequest exec_request_;
+
+    TResultSetMetadata result_metadata_; // metadata for select query
+    RowBatch* current_batch_; // the current row batch; only applicable if coord is set
+    int current_batch_row_; // number of rows fetched within the current batch
+    int num_rows_fetched_; // number of rows fetched by client for the entire query
+
+    // To get access to UpdateMetastore
+    ImpalaServer* impala_server_;
+
+    // Start time of the query
+    TimestampValue start_time_;
+
+    // Core logic of FetchRows(). Does not update query_state_/status_.
+    Status FetchRowsInternal(const int32_t max_rows, QueryResultSet* fetched_rows);
+
+    // Fetch the next row batch and store the results in current_batch_. Only
+    // called for non-DDL / DML queries.
+    Status FetchNextBatch();
+
+    // Evaluates output_exprs_ against row and output the evaluated row in result.
+    // result must have been resized to the number of columns before call.
+    Status GetRowValue(TupleRow* row, vector<void*>* result);
+
+    // Set output_exprs_, based on exprs.
+    Status PrepareSelectListExprs(RuntimeState* runtime_state,
+        const vector<TExpr>& exprs, const RowDescriptor& row_desc);
+
+    // Gather and publish all required updates to the metastore
+    Status UpdateMetastore();
+  };
 
   // Relevant ODBC SQL State code; for more info,
   // goto http://msdn.microsoft.com/en-us/library/ms714687.aspx
@@ -202,35 +411,29 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   // Call FE to get explain plan
   Status GetExplainPlan(const TClientRequest& query_request, std::string* explain_string);
 
-  // Helper function to translate between Beeswax and Impala thrift
-  Status QueryToTClientRequest(const beeswax::Query& query, TClientRequest* request);
-  void TUniqueIdToQueryHandle(const TUniqueId& query_id, beeswax::QueryHandle* handle);
-  void QueryHandleToTUniqueId(const beeswax::QueryHandle& handle, TUniqueId* query_id);
-
-  // Helper function to raise BeeswaxException
-  void RaiseBeeswaxException(const std::string& msg, const char* sql_state);
-
   // Starts asynchronous execution of query. Creates QueryExecState (returned
   // in exec_state), registers it and calls Coordinator::Execute().
   // If it returns with an error status, exec_state will be NULL and nothing
   // will have been registered in query_exec_state_map_.
+  // session_key identifies the current session.
   Status Execute(const TClientRequest& request,
+                 const ThriftServer::SessionKey& session_key,
                  boost::shared_ptr<QueryExecState>* exec_state);
 
   // Implements Execute() logic, but doesn't unregister query on error.
-  Status ExecuteInternal(const TClientRequest& request, bool* registered_exec_state,
+  Status ExecuteInternal(const TClientRequest& request,
+                         const ThriftServer::SessionKey& session_key,
+                         bool* registered_exec_state,
                          boost::shared_ptr<QueryExecState>* exec_state);
+
+  // Registers the query exec state with query_exec_state_map_ using the globally
+  // unique query_id.
+  Status RegisterQuery(const TUniqueId& query_id,
+      const boost::shared_ptr<QueryExecState>& exec_state);
 
   // Removes exec_state from query_exec_state_map_ and cancels execution.
   // Returns true if it found a registered exec_state, otherwise false.
   bool UnregisterQuery(const TUniqueId& query_id);
-
-  // Executes the fetch logic. Doesn't clean up the exec state if an error occurs.
-  Status FetchInternal(const TUniqueId& query_id, bool start_over,
-      int32_t fetch_size, beeswax::Results* query_results);
-
-  // Populate insert_result and clean up exec state
-  Status CloseInsertInternal(const TUniqueId& query_id, TInsertResult* insert_result);
 
   // Non-thrift callable version of ResetCatalog
   Status ResetCatalogInternal();
@@ -274,18 +477,18 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   // match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
   // and each pN may contain wildcards denoted by '*' which match all strings.
   Status GetTableNames(const std::string* db, const std::string* pattern,
-      std::vector<std::string>* table_names);
+      TGetTablesResult* table_names);
 
   // Return all databases matching the optional argument 'pattern'.
   // If pattern is NULL, match all databases otherwise match only those databases that
   // match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
   // and each pN may contain wildcards denoted by '*' which match all strings.
-  Status GetDbNames(const std::string* pattern, std::vector<std::string>* table_names);
+  Status GetDbNames(const std::string* pattern, TGetDbsResult* table_names);
 
   // Returns (in the output parameter) a list of columns for the specified table
   // in the specified database.
   Status DescribeTable(const std::string& db, const std::string& table,
-      std::vector<TColumnDesc>* columns);
+      TDescribeTableResult* columns);
 
   // Copies a query's state into the query log. Called immediately prior to a
   // QueryExecState's deletion.
@@ -335,6 +538,68 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   void RenderSingleQueryTableRow(const QueryStateRecord& record, bool render_end_time,
       std::stringstream* output);
 
+  // Beeswax private methods
+
+  // Helper functions to translate between Beeswax and Impala structs
+  Status QueryToTClientRequest(const beeswax::Query& query, TClientRequest* request);
+  void TUniqueIdToQueryHandle(const TUniqueId& query_id, beeswax::QueryHandle* handle);
+  void QueryHandleToTUniqueId(const beeswax::QueryHandle& handle, TUniqueId* query_id);
+
+  // Helper function to raise BeeswaxException
+  void RaiseBeeswaxException(const std::string& msg, const char* sql_state);
+
+  // Executes the fetch logic. Doesn't clean up the exec state if an error occurs.
+  Status FetchInternal(const TUniqueId& query_id, bool start_over,
+      int32_t fetch_size, beeswax::Results* query_results);
+
+  // Populate insert_result and clean up exec state
+  Status CloseInsertInternal(const TUniqueId& query_id, TInsertResult* insert_result);
+
+  // HiveServer2 private methods (implemented in impala-hs2-server.cc)
+
+  // Starts the synchronous execution of a HiverServer2 metadata operation.
+  // If the execution succeeds, an QueryExecState will be created and registered in
+  // query_exec_state_map_. Otherwise, nothing will be registered in query_exec_state_map_
+  // and an error status will be returned.
+  // Returns a TOperationHandle and TStatus.
+  void ExecuteMetadataOp(const TMetadataOpRequest& request,
+      apache::hive::service::cli::thrift::TOperationHandle* handle,
+      apache::hive::service::cli::thrift::TStatus* status);
+
+  // Calls FE to execute HiveServer2 metadata operation.
+  Status ExecHiveServer2MetadataOp(const TMetadataOpRequest& request,
+      TMetadataOpResponse* result);
+
+  // Executes the fetch logic for HiveServer2 FetchResults.
+  // Doesn't clean up the exec state if an error occurs.
+  Status FetchInternal(const TUniqueId& query_id, int32_t fetch_size,
+      apache::hive::service::cli::thrift::TFetchResultsResp* fetch_results);
+
+  // Helper functions to translate between HiveServer2 and Impala structs
+  static void THandleIdentifierToTUniqueId(
+      const apache::hive::service::cli::thrift::THandleIdentifier &handle,
+      TUniqueId* unique_id, TUniqueId* secret);
+  static void TUniqueIdToTHandleIdentifier(
+      const TUniqueId& unique_id, const TUniqueId& secret,
+      apache::hive::service::cli::thrift::THandleIdentifier* handle);
+  Status TExecuteStatementReqToTClientRequest(
+      const apache::hive::service::cli::thrift::TExecuteStatementReq execute_request,
+      TClientRequest* client_request);
+  static void TColumnValueToHiveServer2TColumnValue(const TColumnValue& value,
+      const TPrimitiveType::type& type,
+      apache::hive::service::cli::thrift::TColumnValue* hs2_col_val);
+  static void TQueryOptionsToMap(const TQueryOptions& query_option,
+      std::map<std::string, std::string>* configuration);
+
+  // Convert an expr value to HiveServer2 TColumnValue
+  static void ExprValueToHiveServer2TColumnValue(const void* value,
+      const TPrimitiveType::type& type,
+      apache::hive::service::cli::thrift::TColumnValue* hs2_col_val);
+
+  // Helper function to translate between Beeswax and HiveServer2 type
+  static apache::hive::service::cli::thrift::TOperationState::type
+      QueryStateToTOperationState(const beeswax::QueryState::type& query_state);
+
   // For access to GetTableNames and DescribeTable
   friend class DdlExecutor;
 
@@ -348,7 +613,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   // Index that allows lookup via TUniqueId into the query log
   typedef boost::unordered_map<TUniqueId, QueryLog::iterator> QueryLogIndex;
   QueryLogIndex query_log_index_;
-
+  
   // global, per-server state
   jobject fe_;  // instance of com.cloudera.impala.service.JniFrontend
   jmethodID create_exec_request_id_;  // JniFrontend.createExecRequest()
@@ -359,6 +624,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
   jmethodID describe_table_id_; // JniFrontend.describeTable
   jmethodID get_db_names_id_; // JniFrontend.getDbNames
+  // JniFrontend.execHiveServer2MetadataOp
+  jmethodID exec_hs2_metadata_op_id_;
   ExecEnv* exec_env_;  // not owned
 
   // plan service-related - impalad optionally uses a standalone
@@ -386,15 +653,26 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   TQueryOptions default_query_options_;
   std::vector<beeswax::ConfigVariable> default_configs_;
 
+  // Impala has two types of sessions: Beeswax and HiveServer2
+  enum SessionType {
+    BEESWAX,
+    HIVESERVER2
+  };
+
   // Per-session state.
   struct SessionState {
+    SessionType session_type;
+
     // The default database (changed as a result of 'use' query execution)
     std::string database;
 
     // Time the session was created
     boost::posix_time::ptime start_time;
+    
+    // The default query options of this session
+    TQueryOptions default_query_options;
 
-    // Builds a Thrift representation of the session state for serialisation to
+    // Builds a Thrift representation of the default database for serialisation to
     // the frontend.
     void ToThrift(TSessionState* session_state);
   };
@@ -417,18 +695,25 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
 
   // The set of backends last reported by the state-store, used for failure detection.
   std::vector<THostPort> last_membership_;
+
+  // Generate unique session id for HiveServer2 session
+  // TODO: use boost uuid when the build has moved to boost 1.42+
+  // boost::uuids::random_generator uuid_generator_;
 };
 
 // Create an ImpalaServer and Thrift servers.
-// If fe_port != 0 (and fe_server != NULL), creates a ThriftServer exporting ImpalaService
-// on fe_port (returned via fe_server).
+// If beeswax_port != 0 (and fe_server != NULL), creates a ThriftServer exporting
+// ImpalaService (Beeswax) on beeswax_port (returned via beeswax_server).
+// If hs2_port != 0 (and hs2_server != NULL), creates a ThriftServer exporting
+// ImpalaHiveServer2Service on hs2_port (returned via hs2_server).
 // If be_port != 0 (and be_server != NULL), create a ThriftServer exporting
 // ImpalaInternalService on be_port (returned via be_server).
 // Returns created ImpalaServer. The caller owns fe_server and be_server.
 // The returned ImpalaServer is referenced by both of these via shared_ptrs and will be
 // deleted automatically.
-ImpalaServer* CreateImpalaServer(ExecEnv* exec_env, int fe_port, int be_port,
-    ThriftServer** fe_server, ThriftServer** be_server);
+ImpalaServer* CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
+    int be_port, ThriftServer** beeswax_server, ThriftServer** hs2_server,
+    ThriftServer** be_server);
 
 }
 

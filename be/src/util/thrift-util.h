@@ -27,6 +27,7 @@
 
 namespace impala {
 
+class TColumnValue;
 class THostPort;
 class ThriftServer;
 
@@ -104,6 +105,9 @@ void THostPortToString(const THostPort& address, std::string* out);
 
 // Prints a hostport as ipaddress:port
 std::ostream& operator<<(std::ostream& out, const THostPort& hostport);
+
+// Print a TColumnValue. If null, print "NULL".
+std::ostream& operator<<(std::ostream& out, const TColumnValue& colval);
 
 }
 

@@ -56,6 +56,7 @@ DECLARE_string(classpath);
 DECLARE_string(ipaddress);
 DECLARE_bool(use_statestore);
 DECLARE_int32(fe_port);
+DECLARE_int32(hs2_port);
 DECLARE_int32(be_port);
 DECLARE_string(principal);
 
@@ -77,10 +78,12 @@ int main(int argc, char** argv) {
 
   // start backend service for the coordinator on be_port
   ExecEnv exec_env;
-  ThriftServer* fe_server = NULL;
+  ThriftServer* beeswax_server = NULL;
+  ThriftServer* hs2_server = NULL;
   ThriftServer* be_server = NULL;
-  ImpalaServer* server =
-      CreateImpalaServer(&exec_env, FLAGS_fe_port, FLAGS_be_port, &fe_server, &be_server);
+  ImpalaServer* server = 
+      CreateImpalaServer(&exec_env, FLAGS_fe_port, FLAGS_hs2_port, FLAGS_be_port,
+          &beeswax_server, &hs2_server, &be_server);
   be_server->Start();
 
   Status status = exec_env.StartServices();
@@ -117,10 +120,13 @@ int main(int argc, char** argv) {
     }
   }
 
-  // this blocks until the fe server terminates
-  fe_server->Start();
-  fe_server->Join();
+  // this blocks until the beeswax and hs2 servers terminate
+  beeswax_server->Start();
+  hs2_server->Start();
+  beeswax_server->Join();
+  hs2_server->Join();
 
   delete be_server;
-  delete fe_server;
+  delete beeswax_server;
+  delete hs2_server;
 }

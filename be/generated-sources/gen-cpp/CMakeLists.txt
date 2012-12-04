@@ -29,9 +29,13 @@ set(SRC_FILES
   ImpalaService.cpp
   ImpalaService_constants.cpp
   ImpalaService_types.cpp
+  ImpalaHiveServer2Service.cpp
   beeswax_constants.cpp
   beeswax_types.cpp
   BeeswaxService.cpp
+  TCLIService.cpp
+  cli_service_constants.cpp
+  cli_service_types.cpp
   Data_constants.cpp
   Data_types.cpp
   DataSinks_constants.cpp

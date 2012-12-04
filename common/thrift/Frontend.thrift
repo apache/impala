@@ -20,6 +20,8 @@ include "ImpalaInternalService.thrift"
 include "PlanNodes.thrift"
 include "Planner.thrift"
 include "Descriptors.thrift"
+include "Data.thrift"
+include "cli_service.thrift"
 
 // These are supporting structs for JniFrontend.java, which serves as the glue
 // between our C++ execution environment and the Java frontend.
@@ -167,6 +169,46 @@ struct TDdlExecRequest {
   4: optional string show_pattern;
 }
 
+// HiveServer2 Metadata operations (JniFrontend.hiveServer2MetadataOperation)
+enum TMetadataOpcode {
+  GET_TYPE_INFO,
+  GET_CATALOGS,
+  GET_SCHEMAS,
+  GET_TABLES,
+  GET_TABLE_TYPES,
+  GET_COLUMNS,
+  GET_FUNCTIONS
+}
+
+// Input parameter to JniFrontend.hiveServer2MetadataOperation
+// Each request has an opcode and a corresponding TGet*Req input parameter
+struct TMetadataOpRequest {
+  // opcode
+  1: required TMetadataOpcode opcode
+  
+  // input parameter
+  2: optional cli_service.TGetInfoReq get_info_req
+  3: optional cli_service.TGetTypeInfoReq get_type_info_req
+  4: optional cli_service.TGetCatalogsReq get_catalogs_req
+  5: optional cli_service.TGetSchemasReq get_schemas_req
+  6: optional cli_service.TGetTablesReq get_tables_req
+  7: optional cli_service.TGetTableTypesReq get_table_types_req
+  8: optional cli_service.TGetColumnsReq get_columns_req
+  9: optional cli_service.TGetFunctionsReq get_functions_req
+}
+
+// Output of JniFrontend.hiveServer2MetadataOperation
+struct TMetadataOpResponse {
+  // Globally unique id for this request.
+  1: required Types.TUniqueId request_id
+  
+  // Schema of the result
+  2: required TResultSetMetadata result_set_metadata
+  
+  // Result set
+  3: required list<Data.TResultRow> results
+}
+
 // Result of call to createExecRequest()
 struct TExecRequest {
   1: required Types.TStmtType stmt_type;
@@ -189,4 +231,3 @@ struct TExecRequest {
   // Metadata of the query result set (not set for DML)
   7: optional TResultSetMetadata result_set_metadata
 }
-

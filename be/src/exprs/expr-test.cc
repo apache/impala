@@ -63,7 +63,7 @@ using namespace Apache::Hadoop::Hive;
 namespace impala {
 ImpaladQueryExecutor* executor_;
 TestExecEnv* test_env_;
-ThriftServer* fe_server_;
+ThriftServer* beeswax_server_;
 ThriftServer* be_server_;
 
 class ExprTest : public testing::Test {
@@ -2207,8 +2207,8 @@ int main(int argc, char **argv) {
   test_env_->StartBackends();
 
   CreateImpalaServer(test_env_,
-      FLAGS_fe_port, FLAGS_be_port, &fe_server_, &be_server_);
-  fe_server_->Start();
+      FLAGS_fe_port, 0, FLAGS_be_port, &beeswax_server_, NULL, &be_server_);
+  beeswax_server_->Start();
   be_server_->Start();
 
   // exec_env_.reset(new ExecEnv());

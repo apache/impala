@@ -467,6 +467,10 @@ void Expr::GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val) {
       col_val->stringVal.swap(tmp);
       col_val->__isset.stringVal = true;
       break;
+    case TYPE_TIMESTAMP:
+      RawValue::PrintValue(value, type(), &col_val->stringVal);
+      col_val->__isset.stringVal = true;
+      break;
     default:
       DCHECK(false) << "bad GetValue() type: " << TypeToString(type_);
   }

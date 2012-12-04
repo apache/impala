@@ -230,6 +230,9 @@ class Expr {
   // TYPE_BIGINT: longVal
   // TYPE_FLOAT/DOUBLE: doubleVal
   // TYPE_STRING: stringVal
+  // TYPE_TIMESTAMP: stringVal
+  // Note: timestamp is converted to string via RawValue::PrintValue because HiveServer2
+  // requires timestamp in a string format.
   void GetValue(TupleRow* row, bool as_ascii, TColumnValue* col_val);
 
   // Convenience functions: print value into 'str' or 'stream'.

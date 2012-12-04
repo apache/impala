@@ -55,7 +55,7 @@ MINI_IMPALA_CLUSTER_PATH = os.path.join(IMPALA_HOME, 'be/build', options.build_t
                                         'testutil/mini-impala-cluster')
 IMPALA_SHELL = os.path.join(IMPALA_HOME, 'bin/impala-shell.sh')
 SET_CLASSPATH_SCRIPT_PATH = os.path.join(IMPALA_HOME, 'bin/set-classpath.sh')
-IMPALAD_ARGS = "-fe_port=%d -be_port=%d -state_store_subscriber_port=%d "\
+IMPALAD_ARGS = "-fe_port=%d -hs2_port=%d -be_port=%d -state_store_subscriber_port=%d "\
                "-webserver_port=%d " + options.impalad_args
 STATE_STORE_ARGS = options.state_store_args
 REDIRECT_STR = "> %(file_name)s 2>&1"
@@ -79,7 +79,8 @@ def start_mini_impala_cluster(cluster_size):
       '. %s;%s' % (SET_CLASSPATH_SCRIPT_PATH, MINI_IMPALA_CLUSTER_PATH), args, output_file)
 
 def start_impalad_instances(cluster_size):
-  BASE_FE_PORT = 21000
+  BASE_BEESWAX_PORT = 21000
+  BASE_HS2_PORT = 21050
   BASE_BE_PORT = 22000
   BASE_STATE_STORE_SUBSCRIBER_PORT = 23000
   BASE_WEBSERVER_PORT = 25000
@@ -88,7 +89,7 @@ def start_impalad_instances(cluster_size):
   for i in range(options.cluster_size):
     output_file = os.path.join(options.log_dir, 'impalad.node%d.out' % i)
     print "Starting ImpalaD %d logging to %s" % (i, output_file)
-    args = IMPALAD_ARGS % (BASE_FE_PORT + i, BASE_BE_PORT + i,
+    args = IMPALAD_ARGS % (BASE_BEESWAX_PORT + i, BASE_HS2_PORT + i, BASE_BE_PORT + i,
                            BASE_STATE_STORE_SUBSCRIBER_PORT + i, BASE_WEBSERVER_PORT + i)
     execute_cmd_with_redirect(IMPALAD_PATH, args, output_file)
 

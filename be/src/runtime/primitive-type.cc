@@ -15,6 +15,7 @@
 #include "runtime/primitive-type.h"
 
 using namespace std;
+using namespace apache::hive::service::cli::thrift;
 
 namespace impala {
 
@@ -89,6 +90,24 @@ string TypeToOdbcString(PrimitiveType t) {
     case TYPE_STRING: return "string";
   };
   return "unknown";
+}
+
+TType::type TypeToHiveServer2Type(PrimitiveType t) {
+  switch (t) {
+    case TYPE_BOOLEAN: return TType::BOOLEAN_TYPE;
+    case TYPE_TINYINT: return TType::TINYINT_TYPE;
+    case TYPE_SMALLINT: return TType::SMALLINT_TYPE;
+    case TYPE_INT: return TType::INT_TYPE;
+    case TYPE_BIGINT: return TType::BIGINT_TYPE;
+    case TYPE_FLOAT: return TType::FLOAT_TYPE;
+    case TYPE_DOUBLE: return TType::DOUBLE_TYPE;
+    case TYPE_TIMESTAMP: return TType::TIMESTAMP_TYPE;
+    case TYPE_STRING: return TType::STRING_TYPE;
+    default:
+      // HiveServer2 does not have a type for invalid, date and datetime.
+      DCHECK(false) << "bad TypeToTValueType() type: " << TypeToString(t);
+      return TType::STRING_TYPE;
+  };
 }
 
 }
