@@ -30,7 +30,9 @@ namespace impala {
 // methods which produce output for a given URL path
 class Webserver {
  public:
-  typedef boost::function<void (std::stringstream* output)> PathHandlerCallback;
+  typedef std::map<std::string, std::string> ArgumentMap;
+  typedef boost::function<void (const ArgumentMap& args, std::stringstream* output)> 
+      PathHandlerCallback;
   
   // If interface is set to the empty string the socket will bind to all available
   // interfaces.
@@ -69,7 +71,12 @@ class Webserver {
       const struct mg_request_info* request_info);
 
   // Registered to handle "/", and prints a list of available URIs
-  void RootHandler(std::stringstream* output);
+  void RootHandler(const ArgumentMap& args, std::stringstream* output);
+
+  // Builds a map of argument name to argument value from a typical URL argument
+  // string (that is, "key1=value1&key2=value2.."). If no value is given for a
+  // key, it is entered into the map as (key, "").
+  void BuildArgumentMap(const std::string& args, ArgumentMap* output);
 
   // Lock guarding the path_handlers_ map
   boost::mutex path_handlers_lock_;

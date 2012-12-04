@@ -237,20 +237,24 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   Status CancelInternal(const TUniqueId& query_id);
 
   // Webserver callback. Retrieves Hadoop confs from frontend and writes them to output
-  void RenderHadoopConfigs(std::stringstream* output);
+  void RenderHadoopConfigs(const Webserver::ArgumentMap& args, std::stringstream* output);
 
   // Webserver callback. Prints a table of current queries, including their
   // states, types and IDs.
-  void QueryStatePathHandler(std::stringstream* output);
+  void QueryStatePathHandler(const Webserver::ArgumentMap& args, 
+      std::stringstream* output);
+
+  void QueryProfilePathHandler(const Webserver::ArgumentMap& args, 
+      std::stringstream* output);
 
   // Webserver callback that prints a table of active sessions.
-  void SessionPathHandler(std::stringstream* output);
+  void SessionPathHandler(const Webserver::ArgumentMap& args, std::stringstream* output);
 
   // Webserver callback that prints a list of all known databases and tables
-  void CatalogPathHandler(std::stringstream* output);
+  void CatalogPathHandler(const Webserver::ArgumentMap& args, std::stringstream* output);
 
   // Webserver callback that prints a list of known backends
-  void BackendsPathHandler(std::stringstream* output);
+  void BackendsPathHandler(const Webserver::ArgumentMap& args, std::stringstream* output);
 
   // Wrapper around Coordinator::Wait(); suitable for execution inside thread.
   void Wait(boost::shared_ptr<QueryExecState> exec_state);
@@ -281,9 +285,65 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   Status DescribeTable(const std::string& db, const std::string& table, 
       std::vector<TColumnDesc>* columns);
 
+  // Copies a query's state into the query log. Called immediately prior to a
+  // QueryExecState's deletion.
+  // Must be called with query_exec_state_map_lock_ held
+  void ArchiveQuery(const QueryExecState& query);
+
+  // Snapshot of a query's state, archived in the query log.
+  struct QueryStateRecord {
+    // Pretty-printed runtime profile. TODO: Copy actual profile object
+    std::string profile_str;
+
+    // Query id
+    TUniqueId id;
+
+    // SQL statement text
+    std::string stmt;
+
+    // DDL, DML etc.
+    TStmtType::type stmt_type;
+
+    // True if the query required a coordinator fragment
+    bool has_coord;
+
+    // The number of fragments that have completed
+    int64_t num_complete_fragments;
+
+    // The total number of fragments
+    int64_t total_fragments;
+
+    // The number of rows fetched by the client
+    int64_t num_rows_fetched;
+
+    // The state of the query as of this snapshot
+    beeswax::QueryState::type query_state;
+
+    // Initialise from an exec_state. If copy_profile is true, print the query
+    // profile to a string and copy that into this.profile (which is expensive),
+    // otherwise leave this.profile empty.
+    QueryStateRecord(const QueryExecState& exec_state, bool copy_profile=true);
+  };
+
+  // Helper method to render a single QueryStateRecord as an HTML table
+  // row. Used by QueryStatePathHandler.
+  void RenderSingleQueryTableRow(const QueryStateRecord& record, 
+      std::stringstream* output);
+
   // For access to GetTableNames and DescribeTable
   friend class DdlExecutor;
 
+  // Guards query_log_ and query_log_index_
+  boost::mutex query_log_lock_;
+
+  // FIFO list of query records, which are written after the query finishes executing
+  typedef std::list<QueryStateRecord> QueryLog;
+  QueryLog query_log_;
+
+  // Index that allows lookup via TUniqueId into the query log
+  typedef boost::unordered_map<TUniqueId, QueryLog::iterator> QueryLogIndex;
+  QueryLogIndex query_log_index_;
+  
   // global, per-server state
   jobject fe_;  // instance of com.cloudera.impala.service.JniFrontend
   jmethodID create_exec_request_id_;  // JniFrontend.createExecRequest()

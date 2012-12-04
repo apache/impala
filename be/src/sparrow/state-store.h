@@ -251,7 +251,8 @@ class StateStore : public StateStoreServiceIf,
   impala::Status UnregisterSubscriberCompletely(const impala::THostPort& address);
 
   // Webserver callback to write a list of active subscriptions
-  void SubscriptionsCallback(std::stringstream* output);
+  void SubscriptionsCallback(const impala::Webserver::ArgumentMap& args, 
+                             std::stringstream* output);
 
   // Unregisters the given subscription associated with the subscriber at the
   // given address.

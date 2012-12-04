@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #include "common/logging.h"
-#include "util/webserver.h"
 #include "util/metrics.h"
 #include <sstream>
 #include <boost/algorithm/string/join.hpp>
@@ -32,11 +31,11 @@ Metrics::Metrics()
 Status Metrics::Init(Webserver* webserver) {
   if (webserver != NULL) {
     Webserver::PathHandlerCallback default_callback =
-        bind<void>(mem_fn(&Metrics::TextCallback), this, _1);    
+        bind<void>(mem_fn(&Metrics::TextCallback), this, _1, _2);    
     webserver->RegisterPathHandler("/metrics", default_callback);
 
     Webserver::PathHandlerCallback json_callback =
-        bind<void>(mem_fn(&Metrics::JsonCallback), this, _1);    
+        bind<void>(mem_fn(&Metrics::JsonCallback), this, _1, _2);    
     webserver->RegisterPathHandler("/jsonmetrics", json_callback);
   }
 
@@ -62,17 +61,18 @@ void Metrics::PrintMetricMapAsJson(vector<string>* metrics) {
 
 string Metrics::DebugString() {
   stringstream ss;
-  TextCallback(&ss);
+  Webserver::ArgumentMap empty_map;
+  TextCallback(empty_map, &ss);
   return ss.str();
 }
 
-void Metrics::TextCallback(stringstream* output) {
+void Metrics::TextCallback(const Webserver::ArgumentMap& args, stringstream* output) {
   (*output) << "<pre>";
   PrintMetricMap(output);
   (*output) << "</pre>";
 }
 
-void Metrics::JsonCallback(stringstream* output) {
+void Metrics::JsonCallback(const Webserver::ArgumentMap& args, stringstream* output) {
   (*output) << "{";
   vector<string> metrics;
   PrintMetricMapAsJson(&metrics);

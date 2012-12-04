@@ -316,7 +316,7 @@ void RuntimeProfile::GetCounters(
 //  2. Info Strings
 //  3. Counters
 //  4. Children
-void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) {
+void RuntimeProfile::PrettyPrint(ostream* s, const string& prefix) const {
   ostream& stream = *s;
 
   // create copy of counter_map_ so we don't need to hold lock while we call

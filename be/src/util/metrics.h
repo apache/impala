@@ -25,10 +25,10 @@
 #include "common/logging.h"
 #include "common/status.h"
 #include "common/object-pool.h"
+#include "util/webserver.h"
 
 namespace impala {
 
-class Webserver;
 
 // Publishes execution metrics to a webserver page
 // TODO: Reconsider naming here; Metrics is too general.
@@ -193,10 +193,10 @@ class Metrics {
   void PrintMetricMapAsJson(std::vector<std::string>* metrics);
 
   // Webserver callback (on /metrics), renders metrics as single text page
-  void TextCallback(std::stringstream* output);
+  void TextCallback(const Webserver::ArgumentMap& args, std::stringstream* output);
 
   // Webserver callback (on /jsonmetrics), renders metrics as a single json document
-  void JsonCallback(std::stringstream* output);
+  void JsonCallback(const Webserver::ArgumentMap& args, std::stringstream* output);
 };
 
 }

@@ -86,12 +86,13 @@ StateStore::StateStore(int subscriber_update_frequency_ms, Metrics* metrics)
 
 Status StateStore::RegisterWebpages(Webserver* server) {
   Webserver::PathHandlerCallback subscriptions_callback =
-      bind<void>(mem_fn(&StateStore::SubscriptionsCallback), this, _1);
+      bind<void>(mem_fn(&StateStore::SubscriptionsCallback), this, _1, _2);
   server->RegisterPathHandler("/subscriptions", subscriptions_callback);
   return Status::OK;
 }
 
-void StateStore::SubscriptionsCallback(stringstream* output) {
+void StateStore::SubscriptionsCallback(const Webserver::ArgumentMap& args,
+                                       stringstream* output) {
   (*output) << "<h2>Subscriptions</h2><pre>" << endl;
   lock_guard<recursive_mutex> l(lock_);
 

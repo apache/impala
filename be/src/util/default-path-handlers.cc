@@ -30,7 +30,7 @@ DEFINE_int64(web_log_bytes, 1024 * 1024,
 
 // Writes the last FLAGS_web_log_bytes of the INFO logfile to a webpage
 // Note to get best performance, set GLOG_logbuflevel=-1 to prevent log buffering
-void LogsHandler(stringstream* output) {
+void LogsHandler(const Webserver::ArgumentMap& args, stringstream* output) {
   string logfile;
   impala::GetFullLogFilename(google::INFO, &logfile);
   (*output) << "<h2>INFO logs</h2>" << endl;
@@ -56,7 +56,7 @@ void LogsHandler(stringstream* output) {
 }
 
 // Registered to handle "/flags", and prints out all command-line flags and their values
-void FlagsHandler(stringstream* output) {
+void FlagsHandler(const Webserver::ArgumentMap& args, stringstream* output) {
   (*output) << "<h2>Command-line Flags</h2>";
   (*output) << "<pre>" << CommandlineFlagsIntoString() << "</pre>";
 }

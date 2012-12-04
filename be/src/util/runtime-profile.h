@@ -173,7 +173,7 @@ class RuntimeProfile {
 
   // Prints the counters in a name: value format.
   // Does not hold locks when it makes any function calls.
-  void PrettyPrint(std::ostream* s, const std::string& prefix="");
+  void PrettyPrint(std::ostream* s, const std::string& prefix="") const;
 
   // Serializes profile to thrift.
   // Does not hold locks when it makes any function calls.
@@ -237,7 +237,7 @@ class RuntimeProfile {
   // counters.
   typedef std::map<std::string, Counter*> CounterMap;
   CounterMap counter_map_;
-  boost::mutex counter_map_lock_;  // protects counter_map_
+  mutable boost::mutex counter_map_lock_;  // protects counter_map_
 
   // Child profiles.  Does not own memory.
   // We record children in both a map (to facilitate updates) and a vector
@@ -247,11 +247,11 @@ class RuntimeProfile {
   // vector of (profile, indentation flag)
   typedef std::vector<std::pair<RuntimeProfile*, bool> > ChildVector;
   ChildVector children_;
-  boost::mutex children_lock_;  // protects child_map_ and children_
+  mutable boost::mutex children_lock_;  // protects child_map_ and children_
 
   typedef std::map<std::string, std::string> InfoStrings;
   InfoStrings info_strings_;
-  boost::mutex info_strings_lock_;
+  mutable boost::mutex info_strings_lock_;
 
   Counter counter_total_time_;
   // Time spent in just in this profile (i.e. not the children) as a fraction

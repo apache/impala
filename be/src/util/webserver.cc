@@ -20,6 +20,7 @@
 #include <boost/foreach.hpp>
 #include <boost/bind.hpp>
 #include <boost/mem_fn.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include "common/logging.h"
 #include "util/webserver.h"
@@ -65,6 +66,37 @@ const char* GetDefaultDocumentRoot() {
 
 namespace impala {
 
+// Utility method to decode a string that was base64 encoded.
+// Adapted from
+// http://www.boost.org/doc/libs/1_40_0/doc/html/boost_asio/
+//   example/http/server3/request_handler.cpp
+// See http://www.boost.org/LICENSE_1_0.txt for license for this method.
+bool UrlDecode(const std::string& in, std::string* out) {
+  out->clear();
+  out->reserve(in.size());
+  for (size_t i = 0; i < in.size(); ++i) {
+    if (in[i] == '%') {
+      if (i + 3 <= in.size()) {
+        int value = 0;
+        istringstream is(in.substr(i + 1, 2));
+        if (is >> hex >> value) {
+          (*out) += static_cast<char>(value);
+          i += 2;
+        } else {
+          return false;
+        }
+      } else {
+        return false;
+      }
+    } else if (in[i] == '+') {
+      (*out) += ' ';
+    } else {
+      (*out) += in[i];
+    }
+  }
+  return true;
+}
+
 Webserver::Webserver()
   : port_(FLAGS_webserver_port),
     interface_(FLAGS_webserver_interface),
@@ -82,13 +114,30 @@ Webserver::~Webserver() {
   Stop();
 }
 
-void Webserver::RootHandler(stringstream* output) {
+void Webserver::RootHandler(const Webserver::ArgumentMap& args, stringstream* output) {
   // path_handler_lock_ already held by MongooseCallback
   (*output) << "<h2>Version</h2>";
   (*output) << "<pre>" << GetVersionString() << "</pre>" << endl;
   (*output) << "<h2>Status Pages</h2>";
   BOOST_FOREACH(const PathHandlerMap::value_type& handler, path_handlers_) {
     (*output) << "<a href=\"" << handler.first << "\">" << handler.first << "</a><br/>";
+  }
+}
+
+void Webserver::BuildArgumentMap(const string& args, ArgumentMap* output) {
+  vector<string> arg_pairs;
+  split(arg_pairs, args, boost::is_any_of("&"));
+
+  BOOST_FOREACH(const string& arg_pair, arg_pairs) {
+    vector<string> key_value;
+    split(key_value, arg_pair, is_any_of("="));
+    if (key_value.empty()) continue;
+    
+    string key;
+    if (!UrlDecode(key_value[0], &key)) continue;
+    string value;
+    if (!UrlDecode((key_value.size() >= 2 ? key_value[1] : ""), &value)) continue;
+    (*output)[key] = value;
   }
 }
 
@@ -138,7 +187,7 @@ Status Webserver::Start() {
   }
 
   PathHandlerCallback default_callback =
-      bind<void>(mem_fn(&Webserver::RootHandler), this, _1);
+      bind<void>(mem_fn(&Webserver::RootHandler), this, _1, _2);
 
   RegisterPathHandler("/", default_callback);
 
@@ -180,18 +229,19 @@ void* Webserver::MongooseCallback(enum mg_event event, struct mg_connection* con
 
     // Should we render with css styles?
     bool use_style = true;
+
+    map<string, string> arguments;
     if (request_info->query_string != NULL) {
-      char style_arg[16];
-      if (mg_get_var(request_info->query_string, strlen(request_info->query_string),
-                     "raw", style_arg, 16) >= 0) {
-        use_style = false;
-      }
+      BuildArgumentMap(request_info->query_string, &arguments);
+    }
+    if (arguments.find("raw") != arguments.end()) {
+      use_style = false;
     }
 
     stringstream output;
     if (use_style) BootstrapPageHeader(&output);
     BOOST_FOREACH(const PathHandlerCallback& callback_, it->second) {
-      callback_(&output);
+      callback_(arguments, &output);
     }
     if (use_style) BootstrapPageFooter(&output);
 
@@ -209,7 +259,7 @@ void* Webserver::MongooseCallback(enum mg_event event, struct mg_connection* con
   }
 }
 
-void Webserver::RegisterPathHandler(const std::string& path,
+void Webserver::RegisterPathHandler(const string& path,
    const PathHandlerCallback& callback) {
   mutex::scoped_lock lock(path_handlers_lock_);
   path_handlers_[path].push_back(callback);
@@ -227,9 +277,10 @@ const string PAGE_HEADER = "<!DOCTYPE html>"
 " </head>"
 " <body>";
 
-const string PAGE_FOOTER = "</div></body></html>";
+static const string PAGE_FOOTER = "</div></body></html>";
 
-const string NAVIGATION_BAR_PREFIX = "<div class='navbar navbar-inverse navbar-fixed-top'>"
+static const string NAVIGATION_BAR_PREFIX = 
+"<div class='navbar navbar-inverse navbar-fixed-top'>"
 "      <div class='navbar-inner'>"
 "        <div class='container'>"
 "          <a class='btn btn-navbar' data-toggle='collapse' data-target='.nav-collapse'>"
@@ -241,7 +292,8 @@ const string NAVIGATION_BAR_PREFIX = "<div class='navbar navbar-inverse navbar-f
 "          <div class='nav-collapse collapse'>"
 "            <ul class='nav'>";
 
-const string NAVIGATION_BAR_SUFFIX = "</ul>"
+static const string NAVIGATION_BAR_SUFFIX = 
+"            </ul>"
 "          </div>"
 "        </div>"
 "      </div>"
