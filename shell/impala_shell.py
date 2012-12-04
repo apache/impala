@@ -37,6 +37,7 @@ from thrift.Thrift import TApplicationException
 VERSION_FORMAT = "Impala v%(version)s (%(git_hash)s) built on %(build_date)s"
 COMMENT_TOKEN = '--'
 VERSION_STRING = "build version not available"
+HISTORY_LENGTH = 100
 
 # Tarball / packaging build makes impala_build_version available
 try:
@@ -85,6 +86,12 @@ class ImpalaShell(cmd.Cmd):
     self.query_state = QueryState._NAMES_TO_VALUES
     self.refresh_after_connect = options.refresh_after_connect
     self.default_db = options.default_db
+    self.history_file = os.path.expanduser("~/.impalahistory")
+    try:
+      self.readline = __import__('readline')
+      self.readline.set_history_length(HISTORY_LENGTH)
+    except ImportError:
+      self.readline = None
     if options.impalad != None:
       self.do_connect(options.impalad)
 
@@ -123,7 +130,7 @@ class ImpalaShell(cmd.Cmd):
     """Convert the command to lower case, so it's recognized"""
     # A command terminated by a semi-colon is legal. Check for the trailing
     # semi-colons and strip them from the end of the command.
-    args = args.strip().rstrip(';')
+    args = args.strip()
     tokens = args.split(' ')
     # The first token should be the command
     # If it's EOF, call do_quit()
@@ -131,7 +138,7 @@ class ImpalaShell(cmd.Cmd):
       return 'quit'
     else:
       tokens[0] = tokens[0].lower()
-    return ' '.join(tokens)
+    return ' '.join(tokens).rstrip(';')
 
   def __signal_handler(self, signal, frame):
     self.is_interrupted.set()
@@ -474,6 +481,33 @@ class ImpalaShell(cmd.Cmd):
 
     print "Successfully refreshed catalog"
     return True
+
+  def do_history(self, args):
+    """Display command history"""
+    # Deal with readline peculiarity. When history does not exists,
+    # readline returns 1 as the history length and stores 'None' at index 0.
+    if self.readline and self.readline.get_current_history_length() > 0:
+      for index in xrange(1, self.readline.get_current_history_length() + 1):
+        print '[%d]: %s' % (index, self.readline.get_history_item(index))
+    else:
+      print 'readline module not found, history is not supported.'
+    return True
+
+  def preloop(self):
+    """Load the history file if it exists"""
+    if self.readline:
+      try:
+        self.readline.read_history_file(self.history_file)
+      except IOError, i:
+        print 'Unable to load history: %s' % i
+
+  def postloop(self):
+    """Save session commands in history."""
+    if self.readline:
+      try:
+        self.readline.write_history_file(self.history_file)
+      except IOError, i:
+        print 'Unable to save history: %s' % i
 
   def default(self, args):
     print "Unrecognized command"
