@@ -37,7 +37,7 @@ class ImpalaBeeswaxException(Exception):
       self.inner_exception = inner_exception
 
   def __str__(self):
-    return "%s: %s" % (self.__class__, self.__message)
+    return "%s:\n %s" % (self.__class__, self.__message)
 
 # Encapsulates a typical query result.
 class QueryResult(object):
@@ -226,7 +226,10 @@ class ImpalaBeeswaxClient(object):
 
   def __build_error_message(self, exception):
     """Construct a meaningful exception string"""
-    return 'ERROR: %s, %s' % (type(exception), exception)
+    message = '%s' % exception
+    if isinstance(exception, BeeswaxService.BeeswaxException):
+      message = exception.message
+    return 'INNER EXCEPTION: %s\n MESSAGE: %s' % (type(exception), message)
 
   def __do_rpc(self, rpc):
     """Executes the RPC lambda provided with some error checking.

@@ -327,10 +327,10 @@ select * from alltypestiny where year=2009 and month=1
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
 ---- RESULTS
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
-2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
-2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
+2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
+2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 ====
 ---- QUERY
 # Union unnesting: UNION ALL doesn't absorb nested union with order by and limit,
@@ -345,8 +345,8 @@ union all
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
 ---- RESULTS
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
-2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
+2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
 2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 ====
@@ -430,9 +430,9 @@ select * from alltypestiny where year=2009 and month=1
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
 ---- RESULTS
+2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
-2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 ====
 ---- QUERY
 # Union unnesting: UNION DISTINCT doesn't absorb nested union with order by and limit,
@@ -446,9 +446,9 @@ select * from alltypestiny where year=2009 and month=1
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
 ---- RESULTS
+2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 2009,1,0,true,0,0,0,0,0,0,'01/01/09','0',2009-01-01 00:00:00
 2009,1,1,false,1,1,1,10,1.100000023841858,10.1,'01/01/09','1',2009-01-01 00:01:00
-2009,2,2,true,0,0,0,0,0,0,'02/01/09','0',2009-02-01 00:00:00
 ====
 ---- QUERY
 # Complex union unnesting: Multiple levels of UNION ALL, fully unnestable
@@ -508,6 +508,8 @@ union all
          union distinct
          (select * from alltypestiny where year=2009 and month=3)
          order by 3 limit 3)))
+order by 1, 2, 3
+limit 20
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
 ---- RESULTS
@@ -531,6 +533,8 @@ union distinct
          union distinct
          (select * from alltypestiny where year=2009 and month=3)
          order by 3 limit 3)))
+order by 1, 2, 3
+limit 20
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
 ---- RESULTS
@@ -561,6 +565,8 @@ union all
    union all
    (select * from alltypestiny where year=2009 and month=5)
    order by 3 limit 3)
+order by 1, 2, 3
+limit 20
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
 ---- RESULTS

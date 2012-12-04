@@ -28,7 +28,7 @@ tests_action=1
 
 FORMAT_CLUSTER=1
 TARGET_BUILD_TYPE=Debug
-TEST_EXECUTION_MODE=reduced
+EXPLORATION_STRATEGY=core
 
 # Exit on reference to uninitialized variable
 set -u
@@ -55,8 +55,11 @@ do
     -codecoverage_release)
       TARGET_BUILD_TYPE=CODE_COVERAGE_RELEASE
       ;;
+    -testpairwise)
+      EXPLORATION_STRATEGY=pairwise
+      ;;
     -testexhaustive)
-      TEST_EXECUTION_MODE=exhaustive
+      EXPLORATION_STRATEGY=exhaustive
       ;;
     -help|*)
       echo "buildall.sh [-noclean] [-notestdata] [-noformat] [-codecoverage]"\
@@ -68,6 +71,8 @@ do
       echo "[-codecoverage] : build with 'gcov' code coverage instrumentation at the"\
            "cost of performance"
       echo "[-skiptests] : skips execution of all tests"
+      echo "[-testpairwise] : run tests in 'pairwise' mode (increases"\
+           "test execution time)"
       echo "[-testexhaustive] : run tests in 'exhaustive' mode (significantly increases"\
            "test execution time)"
       exit 1
@@ -165,13 +170,19 @@ fi
 
 if [ $tests_action -eq 1 ]
 then
-    # also run frontend tests
-    mvn test -DtestExecutionMode=$TEST_EXECUTION_MODE
-fi
+    # Run JUnit frontend tests
+    mvn test
 
-if [ $tests_action -eq 1 ]
-then
-  ${IMPALA_HOME}/bin/run-backend-tests.sh
+    # Run end-to-end tests using an in-process impala test cluster
+    LOG_DIR=${IMPALA_HOME}/tests/results
+    mkdir -p ${LOG_DIR}
+    ${IMPALA_HOME}/bin/start-impala-cluster.py --in-process --log_dir=${LOG_DIR}\
+        --wait_for_cluster --cluster_size=3
+    ${IMPALA_HOME}/tests/run-tests.sh --exploration_strategy=$EXPLORATION_STRATEGY
+    ${IMPALA_HOME}/bin/start-impala-cluster.py --kill_only
+
+    # Run backend tests
+    ${IMPALA_HOME}/bin/run-backend-tests.sh
 fi
 
 # Build the shell tarball

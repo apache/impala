@@ -96,15 +96,16 @@ int
 ---- RESULTS
 0
 7
-3       
-9       
-4       
-6       
-1       
-5       
-2       
+3
+9
+4
+6
+1
+5
+2
 8
 ====
+---- QUERY
 # Select from table with escape char that is same as delim char
 SELECT * FROM escapechartesttable$TABLE
 ---- TYPES

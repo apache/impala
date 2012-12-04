@@ -161,8 +161,8 @@ bigint, bigint, float, float, double, double
 10000,9990,1.100000023841858,1098.900024414062,5494499.999767542,549.9999999767309
 ====
 ---- QUERY
-select count(*), count(double_col), min(double_col), max(double_col), sum(double_col),
-avg(double_col)
+select count(*), count(double_col), min(double_col), max(double_col), round(sum(double_col), 0),
+round(avg(double_col), 0)
 from alltypesagg$TABLE
 ---- TYPES
 bigint, bigint, double, double, double, double

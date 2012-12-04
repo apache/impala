@@ -16,6 +16,13 @@
 # Runs the Impala query tests, first executing the tests that cannot be run in parallel
 # and then executing the remaining tests in parallel. Additional command line options
 # are passed to py.test.
+
+# If the number of concurrent tests to run is specified, use that. Otherwise use the
+# number of CPU cores.
+
+if [ -z "${NUM_CONCURRENT_TESTS}" ]; then
+  NUM_CONCURRENT_TESTS=`grep "^processor\s\+:" /proc/cpuinfo | sort -u | wc -l`
+fi
 set -u
 
 RESULTS_DIR=${IMPALA_HOME}/tests/results
@@ -26,12 +33,12 @@ cd ${IMPALA_HOME}/tests
 # TODO: Support different log files for each test directory
 py.test -v --tb=short -m "execute_serially" --ignore="failure"\
     --junitxml="${RESULTS_DIR}/TEST-impala-serial.xml" \
-    --resultlog="${RESULTS_DIR}/TEST-impala-serial.log" "$@" -n 1
+    --resultlog="${RESULTS_DIR}/TEST-impala-serial.log" "$@"
 EXIT_CODE=$?
 
 # Run the remaining tests in parallel
 py.test -v --tb=short -m "not execute_serially" --ignore="failure"\
-    --junitxml="${RESULTS_DIR}/TEST-impala-parallel.xml" -n 8  \
+    --junitxml="${RESULTS_DIR}/TEST-impala-parallel.xml" -n ${NUM_CONCURRENT_TESTS}  \
     --resultlog="${RESULTS_DIR}/TEST-impala-parallel.log" "$@"
 
 # The exit code of this script needs to indicated whether either of the py.test

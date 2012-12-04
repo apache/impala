@@ -5,7 +5,7 @@
 import logging
 import pytest
 from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
+from tests.common.impala_test_suite import ImpalaTestSuite
 
 class TestQueries(ImpalaTestSuite):
   @classmethod
@@ -42,11 +42,11 @@ class TestQueries(ImpalaTestSuite):
   def test_subquery(self, vector):
     self.run_test_case('QueryTest/subquery', vector)
 
-  def test_union(self, vector):
-    # TODO: Some queries are NYI - How did this work before?
-    return
-    self.run_test_case('QueryTest/union', vector)
-
   def test_misc(self, vector):
-    return
+    table_format = vector.get_value('table_format')
+
+    # TODO: Skip these vector combinations due to IMP-624
+    if table_format.file_format in ['trevni', 'rc'] or\
+       (table_format.file_format == 'seq' and table_format.compression_codec == 'none'):
+      return
     self.run_test_case('QueryTest/misc', vector)

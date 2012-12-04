@@ -32,6 +32,9 @@ class TestInsertQueries(ImpalaTestSuite):
 
   @pytest.mark.execute_serially
   def test_insert_null(self, vector):
+    # TODO: Disable this test on Trevni due to IMP-613
+    if vector.get_value('table_format').file_format == 'trevni':
+      return
     self.run_test_case('QueryTest/insert_null', vector)
 
   @pytest.mark.execute_serially

@@ -206,6 +206,7 @@ string
 ---- RESULTS
 'default'
 'testdb1'
+'tpcds'
 'tpch'
 ====
 ---- QUERY

@@ -18,6 +18,7 @@
 # on a single machine.
 import os
 import sys
+from time import sleep, time
 from optparse import OptionParser
 
 # Options
@@ -30,15 +31,18 @@ parser.add_option("--impalad_args", dest="impalad_args", default="",
                   help="Additional arguments to pass to each Impalad during startup")
 parser.add_option("--state_store_args", dest="state_store_args", default="",
                   help="Additional arguments to pass to State Store during startup")
-parser.add_option("--kill_only", dest="kill_only", action="store_true", default = False,
+parser.add_option("--kill_only", dest="kill_only", action="store_true", default=False,
                   help="Instead of starting the cluster, just kill all running Impalad"\
                   " and State Store processes.")
-parser.add_option("--in-process", dest="inprocess", action="store_true", default = False,
+parser.add_option("--in-process", dest="inprocess", action="store_true", default=False,
                   help="Start all Impala backends and state store in a single process.")
 parser.add_option("--log_dir", dest="log_dir", default="/tmp",
                   help="Directory to store output logs to.")
-parser.add_option("-v", "--verbose", dest="verbose", action="store_true", default = False,
+parser.add_option("-v", "--verbose", dest="verbose", action="store_true", default=False,
                   help="Prints all output to stderr/stdout.")
+parser.add_option("--wait_for_cluster", dest="wait_for_cluster", action="store_true",
+                  default=False, help="Wait until the cluster is ready to accept "\
+                  "queries before returning.")
 options, args = parser.parse_args()
 
 IMPALA_HOME = os.environ['IMPALA_HOME']
@@ -49,11 +53,13 @@ STATE_STORE_PATH = os.path.join(IMPALA_HOME, 'be/build', options.build_type,
                                 'sparrow/statestored')
 MINI_IMPALA_CLUSTER_PATH = os.path.join(IMPALA_HOME, 'be/build', options.build_type,
                                         'testutil/mini-impala-cluster')
+IMPALA_SHELL = os.path.join(IMPALA_HOME, 'bin/impala-shell.sh')
 SET_CLASSPATH_SCRIPT_PATH = os.path.join(IMPALA_HOME, 'bin/set-classpath.sh')
 IMPALAD_ARGS = "-fe_port=%d -be_port=%d -state_store_subscriber_port=%d "\
                "-webserver_port=%d " + options.impalad_args
 STATE_STORE_ARGS = options.state_store_args
 REDIRECT_STR = "> %(file_name)s 2>&1"
+DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECONDS = 120
 
 def kill_all():
   os.system("killall mini-impala-cluster")
@@ -90,6 +96,15 @@ def execute_cmd_with_redirect(cmd, args, output_file):
   redirect_str = '' if options.verbose else REDIRECT_STR % {'file_name': output_file}
   os.system("%s %s %s &" % (cmd, args, redirect_str))
 
+def wait_for_cluster(timeout_in_seconds=DEFAULT_CLUSTER_WAIT_TIMEOUT_IN_SECONDS):
+  """Checks if the cluster is "ready" by executing a simple query in a loop"""
+  start_time = time()
+  while os.system('%s -i localhost:21000 -q "%s"' %  (IMPALA_SHELL, 'select 1')) != 0:
+    if time() - timeout_in_seconds > start_time:
+      raise RuntimeError, 'Cluster did not start within %d seconds' % timeout_in_seconds
+    print 'Cluster not yet available. Sleeping...'
+    sleep(2)
+
 if __name__ == "__main__":
   if options.build_type not in KNOWN_BUILD_TYPES:
     print 'Invalid build type %s. Valid values: %s' % (options.build_type,
@@ -107,4 +122,7 @@ if __name__ == "__main__":
     else:
       start_statestore()
       start_impalad_instances(options.cluster_size)
+    if options.wait_for_cluster:
+      wait_for_cluster()
+
     print 'ImpalaD Cluster Running with %d nodes.' % options.cluster_size

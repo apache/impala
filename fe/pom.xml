@@ -347,6 +347,15 @@
               <value>${use_external_impalad}</value>
             </property>
           </systemProperties>
+          <excludes>
+            <exclude>**/DdlQueryTest.java</exclude>
+            <exclude>**/HBaseQueryTest.java</exclude>
+            <exclude>**/InsertQueryTest.java</exclude>
+            <exclude>**/JoinQueryTest.java</exclude>
+            <exclude>**/MiscQueryTest.java</exclude>
+            <exclude>**/QueryTest.java</exclude>
+            <exclude>**/TpchQueryTest.java</exclude>
+          </excludes>
         </configuration>
       </plugin>
 

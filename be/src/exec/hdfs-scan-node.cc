@@ -138,13 +138,18 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   *eos = false;
   do {
     bool eosr = false;
+    int rows_before = row_batch->num_rows();
     RETURN_IF_ERROR(current_scanner_->GetNext(row_batch, &eosr));
     RETURN_IF_CANCELLED(state);
 
-    num_rows_returned_ += row_batch->num_rows();
+    num_rows_returned_ += row_batch->num_rows() - rows_before;
     COUNTER_SET(rows_returned_counter_, num_rows_returned_);
 
     if (ReachedLimit()) {
+      int num_rows_over = num_rows_returned_ - limit_;
+      row_batch->set_num_rows(row_batch->num_rows() - num_rows_over);
+      num_rows_returned_ -= num_rows_over;
+      COUNTER_SET(rows_returned_counter_, num_rows_returned_);
       *eos = true;
       return Status::OK;
     }

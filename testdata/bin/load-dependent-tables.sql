@@ -221,7 +221,6 @@ LOAD DATA LOCAL INPATH '/tmp/alltypesaggmultifiles/year=2010/month=1/day=10/0000
 ----
 -- Used by CatalogTest to confirm that non-external HBase tables are identified
 -- correctly (IMP-581) 
-DROP TABLE IF EXISTS internal_hbase_table;
 -- Note that the usual 'hbase.table.name' property is not specified to avoid
 -- creating tables in HBase as a side-effect.
 CREATE TABLE internal_hbase_table(key int, value string)

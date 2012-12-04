@@ -28,10 +28,11 @@ set -u
 
 # Load the data set
 pushd ${IMPALA_HOME}/bin
-./start-impala-cluster.py -s 1
-sleep 5
-./load-data.py --workloads functional-query --exploration_strategy exhaustive
-./load-data.py --workloads tpch --exploration_strategy core
+./start-impala-cluster.py -s 1 --wait_for_cluster
+# Use unbuffered logging by executing these data loading steps with 'python -u'
+python -u ./load-data.py --workloads functional-query --exploration_strategy exhaustive
+python -u ./load-data.py --workloads tpcds --exploration_strategy core
+python -u ./load-data.py --workloads tpch --exploration_strategy core
 ./start-impala-cluster.py --kill_only
 popd
 
@@ -56,6 +57,14 @@ hadoop fs -get /test-warehouse/alltypesaggmultifiles /tmp
 
 # Create lzo compressed versions of the Alltypes data files.
 (cd ${IMPALA_HOME}/testdata/target/AllTypes; rm -f *.lzo; lzop *.txt)
+
+# TODO: For some reason DROP TABLE IF EXISTS sometimes fails on HBase if the table does
+# not exist. To work around this, disable exit on error before executing this command.
+# Need to investigate this more, but this works around the problem to unblock automation.
+set +o errexit
+${HIVE_HOME}/bin/hive -hiveconf hive.root.logger=WARN,console -v \
+    -e "DROP TABLE IF EXISTS internal_hbase_table"
+set -e
 
 # For tables that rely on loading data from local fs test-warehouse
 # TODO: Find a good way to integrate this with the normal data loading scripts

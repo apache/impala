@@ -5,7 +5,7 @@
 import logging
 import pytest
 from tests.common.test_vector import *
-from tests.common.impala_test_suite import *
+from tests.common.impala_test_suite import ImpalaTestSuite
 
 agg_functions = ['sum', 'count', 'min', 'max', 'avg']
 
