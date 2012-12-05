@@ -83,6 +83,7 @@ class ImpalaShell(cmd.Cmd):
     self.__make_default_options()
     self.query_state = QueryState._NAMES_TO_VALUES
     self.refresh_after_connect = options.refresh_after_connect
+    self.default_db = options.default_db
     if options.impalad != None:
       self.do_connect(options.impalad)
 
@@ -211,6 +212,8 @@ class ImpalaShell(cmd.Cmd):
       self.prompt = "[%s:%s] > " % self.impalad
       if self.refresh_after_connect:
         self.cmdqueue.append('refresh')
+      if self.default_db:
+        self.cmdqueue.append('use %s' % self.default_db)
     return True
 
   def __connect(self):
@@ -536,6 +539,7 @@ def execute_queries_non_interactive_mode(options):
   # Return with an error, no need to process the query.
   if options.impalad and shell.connected == False:
     sys.exit(1)
+  queries = shell.cmdqueue + queries
   # Deal with case.
   queries = map(shell.sanitise_input, queries)
   for query in queries:
@@ -566,6 +570,8 @@ if __name__ == "__main__":
   parser.add_option("-r", "--refresh_after_connect", dest="refresh_after_connect",
                     default=False, action="store_true",
                     help="Refresh Impala catalog after connecting")
+  parser.add_option("-d", "--database", dest="default_db", default=None,
+                    help="Issue a use database command on startup.")
 
   options, args = parser.parse_args()
 
