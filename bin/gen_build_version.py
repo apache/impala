@@ -36,9 +36,12 @@ else:
 # GIT_HASH: <git has>
 # BUILD_TIME: <build time>
 version, git_hash, build_time = [None, None, None]
-with open(VERSION_FILE_NAME) as version_file:
+version_file = open(VERSION_FILE_NAME)
+try:
   version, git_hash, build_time = [line.split(':',1)[-1].strip() \
       for line in version_file.readlines() if not line.startswith('#') ]
+finally:
+  version_file.close()
 
 print '\n'.join([version, git_hash, build_time])
 
