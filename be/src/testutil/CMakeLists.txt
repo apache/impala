@@ -26,17 +26,9 @@ add_library(TestUtil STATIC
   test-exec-env.cc
 )
 
-# TODO why do we need this
-target_link_libraries(TestUtil
-  ImpalaThrift
-)
-
 add_executable(mini-impala-cluster
   mini-impala-cluster.cc
 )
 
-target_link_libraries(mini-impala-cluster
-  TestUtil
-  ${IMPALA_LINK_LIBS}
-)
+target_link_libraries(mini-impala-cluster ${IMPALA_LINK_LIBS})
 

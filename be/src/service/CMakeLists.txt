@@ -24,11 +24,6 @@ add_library(Service
   impala-server.cc
 )
 
-# fe-support.cc uses TestExecEnv from TestUtil
-target_link_libraries(Service
-  TestUtil
-)
-
 # this shared library provides Impala executor functionality to FE test and planservice
 add_library(fesupport SHARED
   fe-support.cc

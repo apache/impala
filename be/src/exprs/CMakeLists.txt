@@ -49,12 +49,6 @@ add_library(Exprs
   utility-functions.cc
 )
 
-target_link_libraries(Exprs
-  Util
-  ThriftSaslTransport
-  boost_regex-mt
-)
-
 add_executable(expr-test expr-test.cc)
 add_executable(expr-benchmark expr-benchmark.cc)
 

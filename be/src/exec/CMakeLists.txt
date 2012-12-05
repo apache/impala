@@ -57,12 +57,6 @@ add_library(Exec STATIC
   topn-node.cc
 )
 
-target_link_libraries(Exec
-  Runtime
-  ${JAVA_JVM_LIBRARY}
-  ${HDFS_LIBS}
-)
-
 #add_executable(sequence-file-recovery-test sequence-file-recovery-test.cc)
 #target_link_libraries(sequence-file-recovery-test ${IMPALA_TEST_LINK_LIBS})
 #add_test(sequence-file-recovery-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/sequence-file-recovery-test)

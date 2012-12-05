@@ -28,7 +28,7 @@ PROJECT(ASSEMBLER)
 # compiler flags that are common across debug/release builds
 #  - msse4.2: Enable sse4.2 compiler intrinsics.
 #  - Wall: Enable all warnings.
-#  - Wno-sign-compare: suppress warnings for comparison between signed and unsigned 
+#  - Wno-sign-compare: suppress warnings for comparison between signed and unsigned
 #    integers
 #  - pthread: enable multithreaded malloc
 #  - DBOOST_DATE_TIME_POSIX_TIME_STD_CONFIG: enable nanosecond precision for boost
@@ -82,7 +82,7 @@ else()
 endif ()
 
 # Add flags that are common across build types
-#  - fverboase-asm creates better annotated assembly.  This doesn't seem to affect 
+#  - fverboase-asm creates better annotated assembly.  This doesn't seem to affect
 #    when building the binary.
 # LLMV_CFLAGS - Adding llvm compile flags
 SET(CMAKE_CXX_FLAGS "${CXX_COMMON_FLAGS} ${CMAKE_CXX_FLAGS}")
@@ -149,6 +149,8 @@ else()
   set(BUILD_OUTPUT_ROOT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/build/release/")
 endif()
 
+# This is an ordered list of impala library dependencies. Individual libraries
+# must not specify library dependencies in their own CMakeLists.txt file.
 # Make sure to specify link libraries in reverse order of dependency
 # (ie, if libA uses symbols from libB, libA must precede libB), otherwise
 # when linking statically the linker won't look for the needed symbols.
@@ -156,7 +158,6 @@ endif()
 # list all included libs for each specific binary? any gcc flags to help with this?
 # multiple alternating includes of Opcode and Exprs libs necessary to get symbols
 # resolve (why?)
-# TODO: remove TestUtil dependency as soon as we have our scheduler library in place
 #
 # The order of link libararies matter.
 #  - Util must come before ImpalaThrift
@@ -177,12 +178,6 @@ set (IMPALA_LINK_LIBS
   Sparrow
   CodeGen
   Common
-  Util
-  thriftstatic
-  thriftnbstatic
-  ${SASL_LIBRARY}
-  ThriftSaslTransport
-  event # event required for thriftnbstatic
   ImpalaThrift
   Service
   Exec
@@ -190,19 +185,29 @@ set (IMPALA_LINK_LIBS
   Opcode
   Exprs
   Util
+  ImpalaThrift
+  Runtime
   Common
   Webserver
   GlobalFlags
+# Below are all external dependencies.  They should some after the impala libs.
   ${SNAPPY_STATIC_LIB}
   ${Boost_LIBRARIES}
   ${LLVM_MODULE_LIBS}
+  thriftstatic
+  thriftnbstatic
+  ${SASL_LIBRARY}
+  ThriftSaslTransport
+  event # event required for thriftnbstatic
+  ${JAVA_JVM_LIBRARY}
+  ${HDFS_LIBS}
   glogstatic
   gflagsstatic
-#  tcmallocstatic  This crashes the FE tests.
   pprofstatic
   -lz -lbz2 -lboost_date_time
 )
 MESSAGE(STATUS, "${IMPALA_LINK_LIBS}")
+
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE")
   set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} -lgcov)

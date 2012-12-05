@@ -29,6 +29,3 @@ add_library(Common STATIC
 add_library(GlobalFlags STATIC
   global-flags.cc
 )
-
-add_library(glog STATIC IMPORTED)
-add_library(gflags STATIC IMPORTED)
