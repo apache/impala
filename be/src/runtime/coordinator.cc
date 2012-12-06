@@ -834,13 +834,13 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
   Status status(params.status);
   {
     lock_guard<mutex> l(exec_state->lock);
-    // make sure we don't go from error status to OK
-    DCHECK(!status.ok() || exec_state->status.ok())
-        << "fragment is transitioning from error status to OK:"
-        << " query_id=" << query_id_ << " instance_id="
-        << exec_state->fragment_instance_id
-        << " status=" << exec_state->status.GetErrorMsg();
-    exec_state->status = status;
+    if (!status.ok() || exec_state->status.ok()) {
+      // During query cancellation, exec_state is set to CANCELLED. However, we might
+      // process a non-error message from a fragment executor that is sent
+      // before query cancellation is invoked. Make sure we don't go from error status to
+      // OK.
+      exec_state->status = status;
+    }
     exec_state->done = params.done;
     RuntimeProfile* p = RuntimeProfile::CreateFromThrift(obj_pool(), cumulative_profile);
     stringstream str;
