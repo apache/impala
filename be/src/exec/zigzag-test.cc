@@ -66,7 +66,7 @@ TEST(ZigzagTest, Basic) {
   // Test somewhat random bit patterns.
   int32_t value = 0xa2a2a2a2;
   for (int i = 0; i < 1000; ++i) {
-    value = HashUtil::CrcHash(&value, sizeof (value), i);
+    value = HashUtil::Hash(&value, sizeof (value), i);
     TestZInt(value);
     TestZLong(value);
     TestZLong((static_cast<int64_t>(value) << 32) | value);
