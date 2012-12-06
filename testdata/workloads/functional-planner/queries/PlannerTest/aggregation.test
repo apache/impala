@@ -9,7 +9,7 @@ Plan Fragment 0
   OUTPUT: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
   GROUP BY: 
   TUPLE IDS: 1 
-    SCAN HDFS table=default.alltypesagg (0)
+    SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -31,7 +31,7 @@ Plan Fragment 1
   OUTPUT: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
   GROUP BY: 
   TUPLE IDS: 1 
-    SCAN HDFS table=default.alltypesagg (0)
+    SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -68,7 +68,7 @@ Plan Fragment 0
   OUTPUT: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
   GROUP BY: tinyint_col
   TUPLE IDS: 1 
-    SCAN HDFS table=default.alltypesagg (0)
+    SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -90,7 +90,7 @@ Plan Fragment 1
   OUTPUT: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
   GROUP BY: tinyint_col
   TUPLE IDS: 1 
-    SCAN HDFS table=default.alltypesagg (0)
+    SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:

@@ -44,9 +44,9 @@ Plan Fragment 0
       HASH PREDICATES:
         t1.id = t2.id
       TUPLE IDS: 0 1 
-        SCAN HDFS table=default.alltypessmall (0)
+        SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (0)
           TUPLE IDS: 0 
-        SCAN HDFS table=default.alltypessmall (1) compact
+        SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (1) compact
           TUPLE IDS: 1 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -69,7 +69,7 @@ Plan Fragment 1
     HASH PREDICATES:
       t1.id = t2.id
     TUPLE IDS: 0 1 
-      SCAN HDFS table=default.alltypessmall (0)
+      SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (0)
         TUPLE IDS: 0 
       EXCHANGE (4)
         TUPLE IDS: 1 
@@ -80,7 +80,7 @@ Plan Fragment 2
     EXCHANGE ID: 4
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypessmall (1) compact
+  SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (1) compact
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -111,7 +111,7 @@ Plan Fragment 0
   ORDER BY: int_col ASC
   LIMIT: 2
   TUPLE IDS: 0 
-    SCAN HDFS table=default.alltypessmall (0)
+    SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (0)
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -129,7 +129,7 @@ Plan Fragment 1
     EXCHANGE ID: 2
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypessmall (0)
+  SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -151,7 +151,7 @@ Plan Fragment 0
   ORDER BY: alltypessmall.id ASC
   LIMIT: 2
   TUPLE IDS: 0 
-    SCAN HDFS table=default.alltypessmall (0)
+    SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (0)
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -169,7 +169,7 @@ Plan Fragment 1
     EXCHANGE ID: 2
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypessmall (0)
+  SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:

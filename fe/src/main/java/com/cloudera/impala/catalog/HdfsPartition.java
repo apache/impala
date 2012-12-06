@@ -122,6 +122,18 @@ public class HdfsPartition {
     return partition;
   }
 
+  /**
+   * Return the size (in bytes) of all the files inside this partition
+   * @return
+   */
+  public long getSize() {
+    long result = 0;
+    for (HdfsPartition.FileDescriptor fileDescriptor: fileDescriptors) {
+      result += fileDescriptor.getFileLength();
+    }
+    return result;
+  }
+
   @Override
   public String toString() {
     return Objects.toStringHelper(this)

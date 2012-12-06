@@ -61,6 +61,9 @@ public class HdfsScanNode extends ScanNode {
   // Partitions that are filtered in for scanning by the key ranges
   private final ArrayList<HdfsPartition> partitions = Lists.newArrayList();
 
+  // Total number of bytes from partitions
+  private long totalBytes = 0;
+
   /**
    * Constructs node to scan given data files of table 'tbl'.
    */
@@ -110,6 +113,8 @@ public class HdfsScanNode extends ScanNode {
       }
       // HdfsPartition is immutable, so it's ok to copy by reference
       partitions.add(p);
+
+      totalBytes += p.getSize();
     }
   }
 
@@ -188,6 +193,8 @@ public class HdfsScanNode extends ScanNode {
   protected String getExplainString(String prefix, TExplainLevel detailLevel) {
     StringBuilder output = new StringBuilder();
     output.append(prefix + "SCAN HDFS table=" + desc.getTable().getFullName());
+    output.append(" #partitions=" + partitions.size());
+    output.append(" size=" + printBytes(totalBytes));
     output.append(" (" + id + ")");
     if (compactData) {
       output.append(" compact\n");
@@ -199,6 +206,34 @@ public class HdfsScanNode extends ScanNode {
     }
     output.append(super.getExplainString(prefix + "  ", detailLevel));
     return output.toString();
+  }
+
+  /**
+   * Return the number in TB, GB, MB, KB with 2 decimal points. For example 5000 will be
+   * returned as 4.88KB.
+   * @param num
+   * @return
+   */
+  static private String printBytes(long value) {
+    long kb = 1024;
+    long mb = kb * 1024;
+    long gb = mb * 1024;
+    long tb = gb * 1024;
+
+    double result = value;
+    if (value > tb) {
+      return String.format("%.2f", result / tb) + "TB";
+    }
+    if (value > gb) {
+      return String.format("%.2f", result / gb) + "GB";
+    }
+    if (value > mb) {
+      return String.format("%.2f", result / mb) + "MB";
+    }
+    if (value > kb) {
+      return String.format("%.2f", result / kb) + "KB";
+    }
+    return value + "B";
   }
 
   /**

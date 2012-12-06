@@ -2,21 +2,15 @@
 select * from alltypes_rc
 ---- PLAN
 not implemented
----- DISTRIBUTEDPLAN
-not implemented
 ====
 // Trevni is not supported
 select * from alltypes_rc
 ---- PLAN
-not implemented
----- DISTRIBUTEDPLAN
 not implemented
 ====
 // alltypesmixedformat has RC
 // Trevni is not supported
 select * from alltypesmixedformat
 ---- PLAN
-not implemented
----- DISTRIBUTEDPLAN
 not implemented
 ====

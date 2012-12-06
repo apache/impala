@@ -9,14 +9,14 @@ Plan Fragment 0
   UNPARTITIONED
   WRITE TO HDFS table=default.alltypesnopart
     OVERWRITE=false
-  SCAN HDFS table=default.alltypes (0)
+  SCAN HDFS table=default.alltypes #partitions=1 size=20.36KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   RANDOM
   WRITE TO HDFS table=default.alltypesnopart
     OVERWRITE=false
-  SCAN HDFS table=default.alltypes (0)
+  SCAN HDFS table=default.alltypes #partitions=1 size=20.36KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -36,7 +36,7 @@ Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
     PARTITIONS: 2009,4
-  SCAN HDFS table=default.alltypes (0)
+  SCAN HDFS table=default.alltypes #partitions=1 size=20.36KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -44,7 +44,7 @@ Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
     PARTITIONS: 2009,4
-  SCAN HDFS table=default.alltypes (0)
+  SCAN HDFS table=default.alltypes #partitions=1 size=20.36KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -64,7 +64,7 @@ Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=true
     PARTITIONS: 2009,4
-  SCAN HDFS table=default.alltypes (0)
+  SCAN HDFS table=default.alltypes #partitions=1 size=20.36KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -72,7 +72,7 @@ Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=true
     PARTITIONS: 2009,4
-  SCAN HDFS table=default.alltypes (0)
+  SCAN HDFS table=default.alltypes #partitions=1 size=20.36KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -92,7 +92,7 @@ Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
     PARTITIONS: year,month
-  SCAN HDFS table=default.alltypes (0)
+  SCAN HDFS table=default.alltypes #partitions=2 size=40.07KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -100,7 +100,7 @@ Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
     PARTITIONS: year,month
-  SCAN HDFS table=default.alltypes (0)
+  SCAN HDFS table=default.alltypes #partitions=2 size=40.07KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -122,7 +122,7 @@ Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
     PARTITIONS: 2009,month
-  SCAN HDFS table=default.alltypes (0)
+  SCAN HDFS table=default.alltypes #partitions=2 size=40.07KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -130,7 +130,7 @@ Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
     PARTITIONS: 2009,month
-  SCAN HDFS table=default.alltypes (0)
+  SCAN HDFS table=default.alltypes #partitions=2 size=40.07KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -152,7 +152,7 @@ Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
     PARTITIONS: year,4
-  SCAN HDFS table=default.alltypes (0)
+  SCAN HDFS table=default.alltypes #partitions=1 size=19.71KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -160,7 +160,7 @@ Plan Fragment 0
   WRITE TO HDFS table=default.alltypessmall
     OVERWRITE=false
     PARTITIONS: year,4
-  SCAN HDFS table=default.alltypes (0)
+  SCAN HDFS table=default.alltypes #partitions=1 size=19.71KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -176,9 +176,9 @@ Plan Fragment 0
   UNPARTITIONED
   WRITE TO HDFS table=default.alltypesnopart
     OVERWRITE=false
-  SCAN HDFS table=default.alltypes (0)
+  SCAN HDFS table=default.alltypes #partitions=1 size=19.95KB (0)
     LIMIT: 10
-    TUPLE IDS: 0  
+    TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -193,10 +193,10 @@ Plan Fragment 1
   STREAM DATA SINK
     EXCHANGE ID: 1
     UNPARTITIONED
-        
-  SCAN HDFS table=default.alltypes (0)
+
+  SCAN HDFS table=default.alltypes #partitions=1 size=19.95KB (0)
     LIMIT: 10
-    TUPLE IDS: 0
+    TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=1/090101.txt 0:20433

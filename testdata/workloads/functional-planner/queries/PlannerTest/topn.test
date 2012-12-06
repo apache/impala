@@ -9,7 +9,7 @@ Plan Fragment 0
   ORDER BY: name ASC
   LIMIT: 1
   TUPLE IDS: 0 
-    SCAN HDFS table=default.testtbl (0)
+    SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -27,7 +27,7 @@ Plan Fragment 1
     EXCHANGE ID: 2
     UNPARTITIONED
 
-  SCAN HDFS table=default.testtbl (0)
+  SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -49,7 +49,7 @@ Plan Fragment 0
     OUTPUT: COUNT(*)
     GROUP BY: zip
     TUPLE IDS: 1 
-      SCAN HDFS table=default.testtbl (0)
+      SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
         PREDICATES: name LIKE 'm%'
         TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
@@ -76,7 +76,7 @@ Plan Fragment 1
   OUTPUT: COUNT(*)
   GROUP BY: zip
   TUPLE IDS: 1 
-    SCAN HDFS table=default.testtbl (0)
+    SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
       PREDICATES: name LIKE 'm%'
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS

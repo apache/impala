@@ -9,10 +9,10 @@ Plan Fragment 0
     HASH PREDICATES:
       t1.id = t2.id
     TUPLE IDS: 0 1 
-      SCAN HDFS table=default.testtbl (0)
+      SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
         PREDICATES: t1.zip = 94611
         TUPLE IDS: 0 
-      SCAN HDFS table=default.testtbl (1) compact
+      SCAN HDFS table=default.testtbl #partitions=0 size=0B (1) compact
         TUPLE IDS: 1 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -31,7 +31,7 @@ Plan Fragment 1
     HASH PREDICATES:
       t1.id = t2.id
     TUPLE IDS: 0 1 
-      SCAN HDFS table=default.testtbl (0)
+      SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
         PREDICATES: t1.zip = 94611
         TUPLE IDS: 0 
       EXCHANGE (3)
@@ -43,7 +43,7 @@ Plan Fragment 2
     EXCHANGE ID: 3
     UNPARTITIONED
 
-  SCAN HDFS table=default.testtbl (1) compact
+  SCAN HDFS table=default.testtbl #partitions=0 size=0B (1) compact
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -62,10 +62,10 @@ Plan Fragment 0
     HASH PREDICATES:
       t1.id - 1 = t2.id + 1
     TUPLE IDS: 0 1N 
-      SCAN HDFS table=default.testtbl (0)
+      SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
         PREDICATES: t1.zip = 94611
         TUPLE IDS: 0 
-      SCAN HDFS table=default.testtbl (1) compact
+      SCAN HDFS table=default.testtbl #partitions=0 size=0B (1) compact
         TUPLE IDS: 1 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -84,7 +84,7 @@ Plan Fragment 1
     HASH PREDICATES:
       t1.id - 1 = t2.id + 1
     TUPLE IDS: 0 1N 
-      SCAN HDFS table=default.testtbl (0)
+      SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
         PREDICATES: t1.zip = 94611
         TUPLE IDS: 0 
       EXCHANGE (3)
@@ -96,7 +96,7 @@ Plan Fragment 2
     EXCHANGE ID: 3
     UNPARTITIONED
 
-  SCAN HDFS table=default.testtbl (1) compact
+  SCAN HDFS table=default.testtbl #partitions=0 size=0B (1) compact
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -122,9 +122,9 @@ Plan Fragment 0
       a.int_col = b.int_col
     OTHER PREDICATES: a.day >= 6, a.tinyint_col = 15, a.tinyint_col + b.tinyint_col < 15
     TUPLE IDS: 0N 1 
-      SCAN HDFS table=default.alltypesagg (0)
+      SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypessmall (1) compact
+      SCAN HDFS table=default.alltypessmall #partitions=2 size=3.17KB (1) compact
         PREDICATES: b.string_col = '15'
         TUPLE IDS: 1 
 ---- DISTRIBUTEDPLAN
@@ -146,7 +146,7 @@ Plan Fragment 1
       a.int_col = b.int_col
     OTHER PREDICATES: a.day >= 6, a.tinyint_col = 15, a.tinyint_col + b.tinyint_col < 15
     TUPLE IDS: 0N 1 
-      SCAN HDFS table=default.alltypesagg (0)
+      SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
         TUPLE IDS: 0 
       EXCHANGE (3)
         TUPLE IDS: 1 
@@ -157,7 +157,7 @@ Plan Fragment 2
     EXCHANGE ID: 3
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypessmall (1) compact
+  SCAN HDFS table=default.alltypessmall #partitions=2 size=3.17KB (1) compact
     PREDICATES: b.string_col = '15'
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS
@@ -218,11 +218,11 @@ Plan Fragment 0
           a.id = b.id
           a.int_col = b.int_col
         TUPLE IDS: 0N 1N 
-          SCAN HDFS table=default.alltypesagg (0)
+          SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
             TUPLE IDS: 0 
-          SCAN HDFS table=default.alltypessmall (1) compact
+          SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (1) compact
             TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypesaggnonulls (3) compact
+      SCAN HDFS table=default.alltypesaggnonulls #partitions=2 size=148.10KB (3) compact
         TUPLE IDS: 2 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -249,7 +249,7 @@ Plan Fragment 1
           a.id = b.id
           a.int_col = b.int_col
         TUPLE IDS: 0N 1N 
-          SCAN HDFS table=default.alltypesagg (0)
+          SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
             TUPLE IDS: 0 
           EXCHANGE (5)
             TUPLE IDS: 1 
@@ -262,7 +262,7 @@ Plan Fragment 2
     EXCHANGE ID: 6
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypesaggnonulls (3) compact
+  SCAN HDFS table=default.alltypesaggnonulls #partitions=2 size=148.10KB (3) compact
     TUPLE IDS: 2 
 
 Plan Fragment 3
@@ -271,7 +271,7 @@ Plan Fragment 3
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypessmall (1) compact
+  SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (1) compact
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -329,7 +329,7 @@ Plan Fragment 0
       alltypesagg.id = hbasealltypessmall.id
       alltypesagg.int_col = hbasealltypessmall.int_col
     TUPLE IDS: 0 1 
-      SCAN HDFS table=default.alltypesagg (0)
+      SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
         TUPLE IDS: 0 
       SCAN HBASE table=hbasealltypessmall (1)
         TUPLE IDS: 1 
@@ -351,7 +351,7 @@ Plan Fragment 1
       alltypesagg.id = hbasealltypessmall.id
       alltypesagg.int_col = hbasealltypessmall.int_col
     TUPLE IDS: 0 1 
-      SCAN HDFS table=default.alltypesagg (0)
+      SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
         TUPLE IDS: 0 
       EXCHANGE (3)
         TUPLE IDS: 1 
@@ -410,7 +410,7 @@ Plan Fragment 0
       a.int_col = b.int_col
     OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
     TUPLE IDS: 0 1 
-      SCAN HDFS table=default.alltypesagg (0)
+      SCAN HDFS table=default.alltypesagg #partitions=5 size=372.38KB (0)
         PREDICATES: a.tinyint_col = 15
         TUPLE IDS: 0 
       SCAN HBASE table=hbasestringids (1)
@@ -437,7 +437,7 @@ Plan Fragment 1
       a.int_col = b.int_col
     OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
     TUPLE IDS: 0 1 
-      SCAN HDFS table=default.alltypesagg (0)
+      SCAN HDFS table=default.alltypesagg #partitions=5 size=372.38KB (0)
         PREDICATES: a.tinyint_col = 15
         TUPLE IDS: 0 
       EXCHANGE (3)
@@ -657,9 +657,9 @@ Plan Fragment 0
       a.id = b.id
     LIMIT: 1
     TUPLE IDS: 0 1 
-      SCAN HDFS table=default.alltypessmall (0)
+      SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (0)
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypessmall (1) compact
+      SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (1) compact
         TUPLE IDS: 1 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -680,7 +680,7 @@ Plan Fragment 1
       a.id = b.id
     LIMIT: 1
     TUPLE IDS: 0 1 
-      SCAN HDFS table=default.alltypessmall (0)
+      SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (0)
         TUPLE IDS: 0 
       EXCHANGE (3)
         TUPLE IDS: 1 
@@ -691,7 +691,7 @@ Plan Fragment 2
     EXCHANGE ID: 3
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypessmall (1) compact
+  SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (1) compact
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS
 NODE 0:
