@@ -41,9 +41,6 @@ using namespace apache::thrift;
 using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
 
-// TODO: move this to backend-main.cc (which we don't have yet)
-DEFINE_int32(port, 20001, "port on which to run Impala backend");
-
 namespace impala {
 
 // A channel sends data asynchronously via calls to TransmitData
@@ -60,9 +57,11 @@ class DataStreamSender::Channel {
   // combination. buffer_size is specified in bytes and a soft limit on
   // how much tuple data is getting accumulated before being sent; it only applies
   // when data is added via AddRow() and not sent directly via SendBatch().
-  Channel(const RowDescriptor& row_desc, const THostPort& destination,
-          const TUniqueId& fragment_instance_id, PlanNodeId dest_node_id, int buffer_size)
-    : row_desc_(row_desc),
+  Channel(DataStreamSender* parent, const RowDescriptor& row_desc, 
+          const THostPort& destination, const TUniqueId& fragment_instance_id, 
+          PlanNodeId dest_node_id, int buffer_size)
+    : parent_(parent),
+      row_desc_(row_desc),
       ipaddress_(destination.ipaddress),
       port_(destination.port),
       fragment_instance_id_(fragment_instance_id),
@@ -99,6 +98,8 @@ class DataStreamSender::Channel {
   int64_t num_data_bytes_sent() const { return num_data_bytes_sent_; }
 
  private:
+  DataStreamSender* parent_;
+
   typedef ThriftClient<ImpalaInternalServiceClient> BackendThriftClient;
   scoped_ptr<BackendThriftClient> client_;
 
@@ -162,12 +163,14 @@ void DataStreamSender::Channel::TransmitData() {
     VLOG_ROW << "Channel::TransmitData() instance_id=" << fragment_instance_id_
              << " dest_node=" << dest_node_id_
              << " #rows=" << in_flight_batch_->num_rows;
+    SCOPED_TIMER(parent_->thrift_transmit_timer_);
     TTransmitDataParams params;
     params.protocol_version = ImpalaInternalServiceVersion::V1;
     params.__set_dest_fragment_instance_id(fragment_instance_id_);
     params.__set_dest_node_id(dest_node_id_);
     params.__set_row_batch(*in_flight_batch_);  // yet another copy
     params.__set_eos(false);
+
     TTransmitDataResult res;
     client_->iface()->TransmitData(res, params);
     if (res.status.status_code != TStatusCode::OK) {
@@ -209,7 +212,11 @@ Status DataStreamSender::Channel::SendCurrentBatch() {
   // make sure there's no in-flight TransmitData() call that might still want to
   // access thrift_batch_
   rpc_thread_.join();
-  batch_->Serialize(&thrift_batch_);
+  {
+    SCOPED_TIMER(parent_->serialize_batch_timer_);
+    int num_bytes = batch_->Serialize(&thrift_batch_);
+    COUNTER_UPDATE(parent_->bytes_sent_counter_, num_bytes);
+  }
   batch_->Reset();
   RETURN_IF_ERROR(SendBatch(&thrift_batch_));
   return Status::OK;
@@ -252,18 +259,20 @@ Status DataStreamSender::Channel::Close() {
   return Status::OK;
 }
 
-DataStreamSender::DataStreamSender(
+DataStreamSender::DataStreamSender(ObjectPool* pool,
     const RowDescriptor& row_desc, const TDataStreamSink& sink,
     const vector<TPlanFragmentDestination>& destinations,
     int per_channel_buffer_size)
-  : current_thrift_batch_(&thrift_batch1_) {
+  : pool_(pool), 
+    current_thrift_batch_(&thrift_batch1_),
+    profile_(NULL) {
   DCHECK_GT(destinations.size(), 0);
   DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED);
   broadcast_ = true;
   // TODO: use something like google3's linked_ptr here (scoped_ptr isn't copyable)
   for (int i = 0; i < destinations.size(); ++i) {
     channels_.push_back(
-        new Channel(row_desc, destinations[i].server,
+        new Channel(this, row_desc, destinations[i].server,
                     destinations[i].fragment_instance_id,
                     sink.dest_node_id, per_channel_buffer_size));
   }
@@ -281,6 +290,15 @@ Status DataStreamSender::Init(RuntimeState* state) {
   for (int i = 0; i < channels_.size(); ++i) {
     RETURN_IF_ERROR(channels_[i]->Init());
   }
+  
+  profile_ = pool_->Add(new RuntimeProfile(pool_, "DataStreamSender"));
+  bytes_sent_counter_ = 
+      ADD_COUNTER(profile(), "BytesSent", TCounterType::BYTES);
+  serialize_batch_timer_ = 
+      ADD_COUNTER(profile(), "SerializeBatchTime", TCounterType::CPU_TICKS);
+  thrift_transmit_timer_ = 
+      ADD_COUNTER(profile(), "ThriftTransmitTime", TCounterType::CPU_TICKS);
+
   return Status::OK;
 }
 
@@ -289,7 +307,12 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
     // current_thrift_batch_ is *not* the one that was written by the last call
     // to Serialize()
     VLOG_ROW << "serializing " << batch->num_rows() << " rows";
-    batch->Serialize(current_thrift_batch_);
+    {
+      SCOPED_TIMER(serialize_batch_timer_);
+      int num_bytes = batch->Serialize(current_thrift_batch_);
+      COUNTER_UPDATE(bytes_sent_counter_, num_bytes);
+    }
+    
     // SendBatch() will block if there are still in-flight rpcs (and those will
     // reference the previously written thrift batch)
     for (int i = 0; i < channels_.size(); ++i) {

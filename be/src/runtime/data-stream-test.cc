@@ -45,7 +45,7 @@ using namespace impala;
 using namespace apache::thrift;
 using namespace apache::thrift::protocol;
 
-DECLARE_int32(port);
+DEFINE_int32(port, 20001, "port on which to run Impala test backend");
 DEFINE_string(principal, "", "Kerberos principal");
 DEFINE_string(keytab_file, "", "Kerberos keytab");
 
@@ -212,13 +212,15 @@ class DataStreamTest : public testing::Test {
 
   // Start receiver (expecting given number of senders) in separate thread.
   void StartReceiver(int num_senders, int buffer_size, TUniqueId* out_id = NULL) {
+    RuntimeProfile* profile = 
+        obj_pool_.Add(new RuntimeProfile(&obj_pool_, "TestReceiver"));
     TUniqueId instance_id;
     GetNextInstanceId(&instance_id);
     receiver_info_.push_back(ReceiverInfo());
     ReceiverInfo& info = receiver_info_.back();
     info.stream_recvr =
         stream_mgr_->CreateRecvr(
-            *row_desc_, instance_id, DEST_NODE_ID, num_senders, buffer_size);
+            *row_desc_, instance_id, DEST_NODE_ID, num_senders, buffer_size, profile);
     info.thread_handle =
         new thread(&DataStreamTest::ReadStream, this, num_senders, &info);
     if (out_id != NULL) *out_id = instance_id;
@@ -296,7 +298,7 @@ class DataStreamTest : public testing::Test {
   void Sender(int sender_num, int channel_buffer_size) {
     VLOG_QUERY << "create sender " << sender_num;
     DataStreamSender sender(
-        *row_desc_, sink_, dest_, channel_buffer_size);
+        &obj_pool_, *row_desc_, sink_, dest_, channel_buffer_size);
     EXPECT_TRUE(sender.Init(NULL).ok());
     scoped_ptr<RowBatch> batch(CreateRowBatch());
     SenderInfo& info = sender_info_[sender_num];

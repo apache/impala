@@ -43,6 +43,12 @@ class ExchangeNode : public ExecNode {
  private:
   int num_senders_;  // needed for stream_recvr_ construction
   boost::scoped_ptr<DataStreamRecvr> stream_recvr_;
+  
+  // number of bytes received from the network
+  RuntimeProfile::Counter* bytes_received_counter_;   
+
+  // time spent reconstructing received rows
+  RuntimeProfile::Counter* convert_row_batch_timer_;   
 };
 
 };

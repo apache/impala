@@ -56,7 +56,8 @@ PlanFragmentExecutor::PlanFragmentExecutor(
     report_status_cb_(report_status_cb),
     report_thread_active_(false),
     done_(false),
-    prepared_(false) {
+    prepared_(false),
+    data_sink_timer_(NULL) {
 }
 
 PlanFragmentExecutor::~PlanFragmentExecutor() {
@@ -99,7 +100,6 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   DCHECK(request.__isset.fragment);
   RETURN_IF_ERROR(
       ExecNode::CreateTree(obj_pool(), request.fragment.plan, *desc_tbl, &plan_));
-  profile()->AddChild(plan_->runtime_profile());
 
   // set #senders of exchange nodes before calling Prepare()
   vector<ExecNode*> exch_nodes;
@@ -140,15 +140,23 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
 
   // set up sink, if required  
   if (request.fragment.__isset.output_sink) {
-    RETURN_IF_ERROR(DataSink::CreateDataSink(
+    RETURN_IF_ERROR(DataSink::CreateDataSink(obj_pool(),
         request.fragment.output_sink, request.fragment.output_exprs, params,
         row_desc(), &sink_));
     RETURN_IF_ERROR(sink_->Init(runtime_state()));
+    
+    RuntimeProfile* sink_profile = sink_->profile();
+    if (sink_profile != NULL) {
+      profile()->AddChild(sink_profile);
+      data_sink_timer_ = 
+          ADD_COUNTER(sink_profile, "DataSinkTime", TCounterType::CPU_TICKS);
+    }
   } else {
     sink_.reset(NULL);
   }
 
   // set up profile counters
+  profile()->AddChild(plan_->runtime_profile());
   rows_produced_counter_ = ADD_COUNTER(profile(), "RowsProduced", TCounterType::UNIT);
 
   row_batch_.reset(new RowBatch(plan_->row_desc(), runtime_state_->batch_size()));
@@ -231,6 +239,7 @@ Status PlanFragmentExecutor::OpenInternal() {
         VLOG_ROW << PrintRow(row, row_desc());
       }
     }
+    SCOPED_TIMER(data_sink_timer_);
     RETURN_IF_ERROR(sink_->Send(runtime_state(), batch));
   }
 

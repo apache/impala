@@ -183,7 +183,8 @@ class RowBatch {
   // If this batch is self-contained, it simply does an in-place conversion of the
   // string pointers contained in the tuple data into offsets and resets the batch
   // after copying the data to TRowBatch.
-  void Serialize(TRowBatch* output_batch);
+  // Returns the number of bytes in the result.
+  int Serialize(TRowBatch* output_batch);
 
   // utility function: return total tuple data size of 'batch'.
   static int GetBatchSize(const TRowBatch& batch);

@@ -22,6 +22,7 @@
 #include "exec/data-sink.h"
 #include "common/object-pool.h"
 #include "common/status.h"
+#include "util/runtime-profile.h"
 #include "gen-cpp/Data_types.h"  // for TRowBatch
 
 namespace impala {
@@ -45,7 +46,7 @@ class DataStreamSender : public DataSink {
   // and is specified in bytes.
   // NOTE: This can only do broadcasting right now
   // (sink.output_partition.type == UNPARTITIONED)
-  DataStreamSender(
+  DataStreamSender(ObjectPool* pool,
     const RowDescriptor& row_desc, const TDataStreamSink& sink,
     const std::vector<TPlanFragmentDestination>& destinations,
     int per_channel_buffer_size);
@@ -59,7 +60,6 @@ class DataStreamSender : public DataSink {
   // Blocks until all rows in batch are placed in their appropriate outgoing
   // buffers (ie, blocks if there are still in-flight rpcs from the last
   // Send() call).
-  // TODO: do we need reuse_batch?
   virtual Status Send(RuntimeState* state, RowBatch* batch);
 
   // Flush all buffered data and close all existing channels to destination
@@ -70,8 +70,12 @@ class DataStreamSender : public DataSink {
   // broadcast to multiple receivers, they are counted once per receiver.
   int64_t GetNumDataBytesSent() const;
 
+  virtual RuntimeProfile* profile() { return profile_; }
+
  private:
   class Channel;
+
+  ObjectPool* pool_;
 
   bool broadcast_;  // if true, send all rows on all channels
 
@@ -81,9 +85,13 @@ class DataStreamSender : public DataSink {
   TRowBatch thrift_batch2_;
   TRowBatch* current_thrift_batch_;  // the next one to fill in Send()
 
-  ObjectPool pool_;  // TODO: reuse RuntimeState's pool
   Expr* partition_expr_;  // computes per-row partitioning value
   std::vector<Channel*> channels_;
+
+  RuntimeProfile* profile_; // Allocated from pool_
+  RuntimeProfile::Counter* serialize_batch_timer_;
+  RuntimeProfile::Counter* thrift_transmit_timer_;
+  RuntimeProfile::Counter* bytes_sent_counter_;
 };
 
 }

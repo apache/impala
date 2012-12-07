@@ -37,11 +37,15 @@ ExchangeNode::ExchangeNode(
 Status ExchangeNode::Prepare(RuntimeState* state) {
   RETURN_IF_ERROR(ExecNode::Prepare(state));
   
+  convert_row_batch_timer_ = 
+      ADD_COUNTER(runtime_profile(), "ConvertRowBatchTime", TCounterType::CPU_TICKS);
+
   // TODO: figure out appropriate buffer size
   // row descriptor of this node and the incoming stream should be the same.
   DCHECK_GT(num_senders_, 0);
   stream_recvr_.reset(state->stream_mgr()->CreateRecvr(
-    row_descriptor_, state->fragment_instance_id(), id_, num_senders_, 1024 * 1024));
+    row_descriptor_, state->fragment_instance_id(), id_, num_senders_, 1024 * 1024,
+    runtime_profile()));
   return Status::OK;
 }
 
@@ -62,6 +66,8 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
   output_batch->Reset();
   *eos = (input_batch.get() == NULL);
   if (*eos) return Status::OK;
+
+  SCOPED_TIMER(convert_row_batch_timer_);
 
   // We assume that we can always move the entire input batch into the output batch
   // (if that weren't the case, the code would be more complicated).

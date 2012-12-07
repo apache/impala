@@ -25,7 +25,9 @@
 
 namespace impala {
 
+class ObjectPool;
 class RowBatch;
+class RuntimeProfile;
 class RuntimeState;
 class TPlanExecRequest;
 class TPlanExecParams;
@@ -49,10 +51,15 @@ class DataSink {
 
   // Creates a new data sink from thrift_sink. A pointer to the
   // new sink is written to *sink, and is owned by the caller.
-  static Status CreateDataSink(
+  static Status CreateDataSink(ObjectPool* pool,
     const TDataSink& thrift_sink, const std::vector<TExpr>& output_exprs,
     const TPlanFragmentExecParams& params,
     const RowDescriptor& row_desc, boost::scoped_ptr<DataSink>* sink);
+
+  // Returns the runtime profile for the sink.  
+  // TODO: All data sinks should return profiles.  Change this when table sinks
+  // have profiles.
+  virtual RuntimeProfile* profile() { return NULL; }
 };
 
 }

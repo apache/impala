@@ -37,7 +37,8 @@ namespace impala {
 
 DataStreamMgr::StreamControlBlock::StreamControlBlock(
     const RowDescriptor& row_desc, const TUniqueId& fragment_id,
-    PlanNodeId dest_node_id, int num_senders, int buffer_size)
+    PlanNodeId dest_node_id, int num_senders, int buffer_size,
+    RuntimeProfile* profile) 
   : fragment_id_(fragment_id),
     dest_node_id_(dest_node_id),
     row_desc_(row_desc),
@@ -45,6 +46,10 @@ DataStreamMgr::StreamControlBlock::StreamControlBlock(
     buffer_limit_(buffer_size),
     num_buffered_bytes_(0),
     num_remaining_senders_(num_senders) {
+  bytes_received_counter_ = 
+      ADD_COUNTER(profile, "BytesReceived", TCounterType::BYTES);
+  deserialize_row_batch_timer_ = 
+      ADD_COUNTER(profile, "DeserializeRowBatchTimer", TCounterType::CPU_TICKS);
 }
 
 RowBatch* DataStreamMgr::StreamControlBlock::GetBatch(bool* is_cancelled) {
@@ -77,7 +82,12 @@ void DataStreamMgr::StreamControlBlock::AddBatch(const TRowBatch& thrift_batch) 
   unique_lock<mutex> l(lock_);
   if (is_cancelled_) return;
   int batch_size = RowBatch::GetBatchSize(thrift_batch);
-  RowBatch* batch = new RowBatch(row_desc_, thrift_batch);
+  RowBatch* batch = NULL;
+  {
+    SCOPED_TIMER(deserialize_row_batch_timer_);
+    batch = new RowBatch(row_desc_, thrift_batch);
+  }
+  COUNTER_UPDATE(bytes_received_counter_, batch_size);
   DCHECK_GT(num_remaining_senders_, 0);
   // if there's something in the queue and this batch will push us over the
   // buffer limit we need to wait until the batch gets drained
@@ -122,12 +132,13 @@ inline uint32_t DataStreamMgr::GetHashValue(
 
 DataStreamRecvr* DataStreamMgr::CreateRecvr(
     const RowDescriptor& row_desc, const TUniqueId& fragment_id, PlanNodeId dest_node_id,
-    int num_senders, int buffer_size) {
+    int num_senders, int buffer_size, RuntimeProfile* profile) {
+  DCHECK(profile != NULL);
   VLOG_FILE << "creating receiver for fragment="
             << fragment_id << ", node=" << dest_node_id;
   shared_ptr<StreamControlBlock> cb(
       new StreamControlBlock(row_desc, fragment_id, dest_node_id, num_senders,
-                             buffer_size));
+                             buffer_size, profile));
   size_t hash_value = GetHashValue(fragment_id, dest_node_id);
   lock_guard<mutex> l(lock_);
   fragment_stream_set_.insert(make_pair(fragment_id, dest_node_id));

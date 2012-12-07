@@ -26,6 +26,7 @@
 #include "common/status.h"
 #include "common/object-pool.h"
 #include "runtime/descriptors.h"  // for PlanNodeId
+#include "util/runtime-profile.h"
 #include "gen-cpp/Types_types.h"  // for TUniqueId
 
 namespace impala {
@@ -56,7 +57,8 @@ class DataStreamMgr {
   // TODO: create receivers in someone's pool
   DataStreamRecvr* CreateRecvr(
       const RowDescriptor& row_desc, const TUniqueId& fragment_id,
-      PlanNodeId dest_node_id, int num_senders, int buffer_size);
+      PlanNodeId dest_node_id, int num_senders, int buffer_size,
+      RuntimeProfile* profile);
   
   // Adds a row batch to the stream identified by fragment_id/dest_node_id if the stream
   // has not been cancelled.
@@ -84,7 +86,8 @@ class DataStreamMgr {
    public:
     StreamControlBlock(
         const RowDescriptor& row_desc, const TUniqueId& fragment_id,
-        PlanNodeId dest_node_id, int num_senders, int buffer_size);
+        PlanNodeId dest_node_id, int num_senders, int buffer_size,
+        RuntimeProfile* profile);
 
     // Returns next available batch or NULL if end-of-stream or stream got
     // cancelled (sets 'is_cancelled' accordingly).
@@ -141,6 +144,9 @@ class DataStreamMgr {
     // queue of (batch length, batch) pairs
     typedef std::list<std::pair<int, RowBatch*> > RowBatchQueue;
     RowBatchQueue batch_queue_;
+
+    RuntimeProfile::Counter* bytes_received_counter_;
+    RuntimeProfile::Counter* deserialize_row_batch_timer_;
   };
 
   ObjectPool pool_;  // holds control blocks

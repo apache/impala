@@ -158,7 +158,10 @@ class PlanFragmentExecutor {
   boost::scoped_ptr<RowBatch> row_batch_;
   boost::scoped_ptr<TRowBatch> thrift_batch_;
 
+  // Number of rows returned by this fragment 
   RuntimeProfile::Counter* rows_produced_counter_;
+  // Time spent in data sink.
+  RuntimeProfile::Counter* data_sink_timer_;
 
   ObjectPool* obj_pool() { return runtime_state_->obj_pool(); }
 
