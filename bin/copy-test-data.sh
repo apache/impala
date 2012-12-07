@@ -10,7 +10,7 @@ echo "Copying data files from the share.  If the file already exists locally, th
      "IMPALA_HOME/testdata/impala-data"
 
 # TODO: Waiting on helpdesk ticket (HD-2861) to move this to a better location
-DATASRC="c1326.hal.cloudera.com:/data/1/workspace/impala-data"
+DATASRC="a2226.halxg.cloudera.com:/data/1/workspace/impala-data"
 DATADST=$IMPALA_HOME/testdata/impala-data
 mkdir -p $DATADST
 
