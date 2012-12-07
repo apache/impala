@@ -82,7 +82,7 @@ class ImpalaBeeswaxClient(object):
     self.transport = None
     self.use_kerberos = use_kerberos
     self.__query_options = {}
-    self.query_state = QueryState._NAMES_TO_VALUES
+    self.query_states = QueryState._NAMES_TO_VALUES
     self.set_default_query_options()
 
   def __make_default_options(self):
@@ -98,6 +98,14 @@ class ImpalaBeeswaxClient(object):
 
   def set_query_option(self, name, value):
     self.__query_options[name.upper()] = value
+
+  def set_query_options(self, query_option_dict):
+    if query_option_dict is None:
+      raise ValueError, 'Cannot pass None value for query options'
+    self.clear_query_options()
+    if len(query_option_dict.keys()) > 0:
+      for name in query_option_dict.keys():
+        self.set_query_option(name, query_option_dict[name])
 
   def set_default_query_options(self):
     self.clear_query_options()
@@ -154,47 +162,70 @@ class ImpalaBeeswaxClient(object):
     """Re-directs the query to its appropriate handler, returns QueryResult"""
     # Take care of leading/trailing whitespaces.
     query_string = query_string.strip()
-    query_type = shlex.split(query_string)[0].lower()
-    handle, time_taken = self.__execute_query(query_string)
+    start, end = time.time(), 0
+    handle = self.__execute_query(query_string.strip())
+    result = self.fetch_results(query_string,  handle)
+    result.time_taken = end - start
+    return result
 
-    if query_type == 'use':
-      return QueryResult(query=query_string, success=True, data=[''])
+  def execute_query_async(self, query_string):
+    """
+    Executes a query asynchronously
 
-    # Result fetching for insert is different from other queries.
-    exec_result = None
-    if query_type == 'insert':
-      exec_result = self.__fetch_insert_results(handle, time_taken)
-    else:
-      exec_result = self.__fetch_results(handle, time_taken)
-    exec_result.query = query_string
-    return exec_result
-
-  def __execute_query(self, query_string):
-    """Executes a query, returns the query handle and time taken for further processing."""
+    Issues a query and returns the query handle to the caller for processing.
+    """
     query = BeeswaxService.Query()
     query.query = query_string
     query.configuration = self.__options_to_string_list()
-    handle = self.__do_rpc(lambda: self.imp_service.query(query,))
-    start, end = time.time(), 0
+    return self.__do_rpc(lambda: self.imp_service.query(query,))
+
+  def __execute_query(self, query_string):
+    """Executes a query and waits for completion"""
+    handle = self.execute_query_async(query_string)
     # Wait for the query to finish execution.
+    self.wait_for_completion(handle)
+    return handle
+
+  def cancel_query(self, query_id):
+    return self.__do_rpc(lambda: self.imp_service.Cancel(query_id))
+
+  def wait_for_completion(self, query_handle):
+    """Given a query handle, polls the coordinator waiting for the query to complete"""
     while True:
-      query_state = self.__do_rpc(lambda: self.imp_service.get_state(handle))
+      query_state = self.get_state(query_handle)
       # if the rpc succeeded, the output is the query state
-      if query_state == self.query_state["FINISHED"]:
+      if query_state == self.query_states["FINISHED"]:
         break
-      elif query_state == self.query_state["EXCEPTION"]:
+      elif query_state == self.query_states["EXCEPTION"]:
         raise ImpalaBeeswaxException("Query aborted", None)
       time.sleep(0.05)
-    end = time.time()
-    return (handle, end - start)
+
+  def get_state(self, query_handle):
+    return self.__do_rpc(lambda: self.imp_service.get_state(query_handle))
 
   def refresh(self):
     """Reload the Impalad catalog"""
     return self.__do_rpc(lambda: self.imp_service.ResetCatalog()) == 0
 
-  def __fetch_results(self, handle, time_taken):
-    """Handles query results, returns a QueryResult object"""
+  def fetch_results(self, query_string, query_handle):
+    """Fetches query results given a handle and query type (insert, use, other)"""
+    query_type = self.__get_query_type(query_string)
+    if query_type == 'use':
+      # TODO: "use <database>" does not currently throw an error. Need to update this
+      # to handle the error case once that behavior has been changed.
+      return QueryResult(query=query_string, success=True, data=[''])
 
+    # Result fetching for insert is different from other queries.
+    exec_result = None
+    if query_type == 'insert':
+      exec_result = self.__fetch_insert_results(query_handle)
+    else:
+      exec_result = self.__fetch_results(query_handle)
+    exec_result.query = query_string
+    return exec_result
+
+  def __fetch_results(self, handle):
+    """Handles query results, returns a QueryResult object"""
     schema = self.__do_rpc(lambda: self.imp_service.get_results_metadata(handle)).schema
     # The query has finished, we can fetch the results
     result_rows = []
@@ -207,22 +238,23 @@ class ImpalaBeeswaxClient(object):
     self.__do_rpc(lambda: self.imp_service.close(handle))
     # The query executed successfully and all the data was fetched.
     exec_result = QueryResult(success=True,
-                              time_taken=time_taken,
                               data = result_rows,
                               schema = schema)
     exec_result.summary = 'Returned %d rows' % (len(result_rows))
     return exec_result
 
-  def __fetch_insert_results(self, handle, time_taken):
+  def __fetch_insert_results(self, handle):
     """Executes an insert query"""
     result = self.__do_rpc(lambda: self.imp_service.CloseInsert(handle))
     # The insert was successfull
     num_rows = sum(map(int, result.rows_appended.values()))
     exec_result = QueryResult(success=True,
-                              time_taken=time_taken,
                               data = num_rows)
     exec_result.summary = "Inserted %d rows" % (num_rows,)
     return exec_result
+
+  def __get_query_type(self, query_string):
+    return shlex.split(query_string.lstrip())[0].lower()
 
   def __build_error_message(self, exception):
     """Construct a meaningful exception string"""

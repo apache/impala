@@ -49,9 +49,8 @@ class ImpalaTestSuite(BaseTestSuite):
     cls.hive_client = ThriftHiveMetastore.Client(protocol)
     cls.hive_transport.open()
 
-    # The ImpalaBeeswaxClient is used to execute all queries in the test suite
-    cls.client = ImpalaBeeswaxClient(IMPALAD, use_kerberos=False)
-    cls.client.connect()
+    # The ImpalaBeeswaxClient is used to execute queries in the test suite
+    cls.client = cls.create_impala_client()
 
   @classmethod
   def teardown_class(cls):
@@ -62,6 +61,12 @@ class ImpalaTestSuite(BaseTestSuite):
 
     if cls.client:
       cls.client.close_connection()
+
+  @classmethod
+  def create_impala_client(cls):
+    client = ImpalaBeeswaxClient(IMPALAD, use_kerberos=False)
+    client.connect()
+    return client
 
   def run_test_case(self, test_file_name, vector):
     """
@@ -147,9 +152,13 @@ class ImpalaTestSuite(BaseTestSuite):
   def execute_query(self, query, query_exec_options=None, use_kerberos=False):
     return self.__execute_query(IMPALAD, query, query_exec_options, use_kerberos)
 
+  def execute_query_async(self, query, query_exec_options=None, use_kerberos=False):
+    self.__set_exec_options(query_exec_options)
+    return self.client.execute_query_async(query)
+
   def execute_scalar(self, query, query_exec_options=None, use_kerberos=False):
     result = self.__execute_query(IMPALAD, query, query_exec_options, use_kerberos)
-    assert len(result.data) <= 1, 'Multiple values returned from scaler'
+    assert len(result.data) <= 1, 'Multiple values returned from scalar'
     return result.data[0] if len(result.data) == 1 else None
 
   def __drop_partitions(self, table_name):
@@ -160,8 +169,11 @@ class ImpalaTestSuite(BaseTestSuite):
 
   def __execute_query(self, impalad, query, query_exec_options=None, use_kerberos=False):
     """Executes the given query against the specified Impalad"""
-
     LOG.info('Executing Query: \n%s\n' % query)
+    self.__set_exec_options(query_exec_options)
+    return self.client.execute(query)
+
+  def __set_exec_options(self, query_exec_options):
     # Set the specified query exec options, if specified
     self.client.clear_query_options()
     if query_exec_options is not None and len(query_exec_options.keys()) > 0:
@@ -170,8 +182,6 @@ class ImpalaTestSuite(BaseTestSuite):
 
     # TODO: Remove this in the future for negative testing
     self.client.set_query_option('allow_unsupported_formats', True)
-
-    return self.client.execute(query)
 
   def __load_query_test_file(self, workload, file_name):
     """Loads/Reads the specified query test file"""
