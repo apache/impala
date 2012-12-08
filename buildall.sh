@@ -170,9 +170,6 @@ fi
 
 if [ $tests_action -eq 1 ]
 then
-    # Run JUnit frontend tests
-    mvn test
-
     # Run end-to-end tests using an in-process impala test cluster
     LOG_DIR=${IMPALA_HOME}/tests/results
     mkdir -p ${LOG_DIR}
@@ -180,6 +177,13 @@ then
         --wait_for_cluster --cluster_size=3
     ${IMPALA_HOME}/tests/run-tests.sh --exploration_strategy=$EXPLORATION_STRATEGY
     ${IMPALA_HOME}/bin/start-impala-cluster.py --kill_only
+
+    # Run JUnit frontend tests
+    # TODO: Currently planner tests require running the end-to-end tests first
+    # so data is inserted into tables. This will go away once we move the planner
+    # tests to the new framework.
+    cd $IMPALA_FE_DIR
+    mvn test
 
     # Run backend tests
     ${IMPALA_HOME}/bin/run-backend-tests.sh

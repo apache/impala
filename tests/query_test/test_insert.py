@@ -30,7 +30,9 @@ class TestInsertQueries(ImpalaTestSuite):
   def test_insert_overwrite(self, vector):
     self.run_test_case('QueryTest/insert_overwrite', vector)
 
+  # Disabled until IMP-577 is fixed (NULL conversion to boolean)
   @pytest.mark.execute_serially
+  @pytest.mark.xfail(run=False)
   def test_insert_null(self, vector):
     # TODO: Disable this test on Trevni due to IMP-613
     if vector.get_value('table_format').file_format == 'trevni':
