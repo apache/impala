@@ -79,6 +79,7 @@ class ImpalaShell(cmd.Cmd):
     self.connected = False
     self.imp_service = None
     self.transport = None
+    self.fetch_batch_size = 1024
     self.query_options = {}
     self.__make_default_options()
     self.query_state = QueryState._NAMES_TO_VALUES
@@ -160,6 +161,7 @@ class ImpalaShell(cmd.Cmd):
     Usage: SET <option>=<value>
 
     """
+    # TODO: Expand set to allow for setting more than just query options.
     if len(args) == 0:
       self.__print_if_verbose("Impala query options:")
       self.__print_options()
@@ -292,27 +294,28 @@ class ImpalaShell(cmd.Cmd):
     # Results are ready, fetch them till they're done.
     self.__print_if_verbose('Query finished, fetching results ...')
     result_rows = []
+    num_rows_fetched = 0
     while True:
-      # TODO: Fetch more than one row at a time.
-      # Also fetch rows asynchronously, so we can print them to screen without
-      # pausing the fetch process
-      (results, status) = self.__do_rpc(lambda: self.imp_service.fetch(handle,
-                                                                       False, -1))
+      # Fetch rows in batches of at most fetch_batch_size
+      (results, status) = self.__do_rpc(lambda: self.imp_service.fetch(
+                                                  handle, False, self.fetch_batch_size))
 
       if self.is_interrupted.isSet() or status != RpcStatus.OK:
         # Worth trying to cleanup the query even if fetch failed
         if self.connected:
           self.__close_query_handle(handle)
         return False
-
+      num_rows_fetched += len(results.data)
       result_rows.extend(results.data)
-      if not results.has_more:
-        break
+      if len(result_rows) >= self.fetch_batch_size or not results.has_more:
+        print '\n'.join(result_rows)
+        result_rows = []
+        if not results.has_more:
+          break
     end = time.time()
 
-    print '\n'.join(result_rows)
     self.__print_if_verbose(
-      "Returned %d row(s) in %2.2fs" % (len(result_rows), end - start))
+      "Returned %d row(s) in %2.2fs" % (num_rows_fetched, end - start))
     return self.__close_query_handle(handle)
 
   def __close_query_handle(self, handle):
