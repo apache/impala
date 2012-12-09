@@ -8,4 +8,7 @@ table_name:hbasealltypeserror, constraint:restrict_to, file_format:text
 table_name:hbasealltypeserrornonulls, constraint:restrict_to, file_format:text
 table_name:hbasestringids, constraint:restrict_to, file_format:text
 
+table_name:escapechartesttable, constraint:exclude, file_format:trevni
+table_name:nulltable, constraint:exclude, file_format:trevni
+table_name:nullescapedtable, constraint:exclude, file_format:trevni
 table_name:TblWithRaggedColumns, constraint:exclude, file_format:trevni
