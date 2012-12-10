@@ -163,9 +163,10 @@ Status HdfsTextScanner::FinishScanRange() {
         // Set variables for proper error outputting on boundary tuple
         batch_start_ptr_ = boundary_row_.str().ptr;
         row_end_locations_[0] = batch_start_ptr_ + boundary_row_.str().len;
-        int tuples = WriteFields(pool, tuple_row_mem, num_fields, 1);
-        DCHECK_EQ(tuples, 1);
-        context_->CommitRows(tuples);
+        int num_tuples = WriteFields(pool, tuple_row_mem, num_fields, 1);
+        DCHECK_LE(num_tuples, 1);
+        DCHECK_GE(num_tuples, 0);
+        context_->CommitRows(num_tuples);
       }
       break;
     }
