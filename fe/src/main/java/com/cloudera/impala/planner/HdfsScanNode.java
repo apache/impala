@@ -30,6 +30,7 @@ import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.thrift.TExplainLevel;
 import com.cloudera.impala.thrift.THdfsFileSplit;
 import com.cloudera.impala.thrift.THdfsScanNode;
+import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TPlanNode;
 import com.cloudera.impala.thrift.TPlanNodeType;
 import com.cloudera.impala.thrift.TScanRange;
@@ -141,7 +142,7 @@ public class HdfsScanNode extends ScanNode {
         for (int i = 0; i < blockHostPorts.length; ++i) {
           TScanRangeLocation location = new TScanRangeLocation();
           String hostPort = blockHostPorts[i];
-          location.setServer(addressToTHostPort(hostPort));
+          location.setServer(addressToTNetworkAddress(hostPort));
           location.setVolume_id(block.getDiskId(i));
           locations.add(location);
         }

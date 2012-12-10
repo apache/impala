@@ -47,6 +47,7 @@
 #include "util/debug-util.h"
 #include "util/hdfs-util.h"
 #include "util/container-util.h"
+#include "util/network-util.h"
 #include "gen-cpp/ImpalaInternalService.h"
 #include "gen-cpp/ImpalaInternalService_types.h"
 #include "gen-cpp/Frontend_types.h"
@@ -61,7 +62,6 @@ using namespace apache::thrift::transport;
 using namespace apache::thrift;
 
 DECLARE_int32(be_port);
-DECLARE_string(ipaddress);
 DECLARE_string(hostname);
 
 namespace impala {
@@ -87,7 +87,7 @@ class Coordinator::BackendExecState {
  public:
   TUniqueId fragment_instance_id;
   MonotonicStopWatch stopwatch;  // wall clock timer for this fragment
-  const THostPort hostport;  // of ImpalaInternalService
+  const TNetworkAddress backend_address;  // of ImpalaInternalService
   int64_t total_split_size;  // summed up across all splits; in bytes
 
   // assembled in c'tor
@@ -117,12 +117,12 @@ class Coordinator::BackendExecState {
 
   FragmentInstanceCounters aggregate_counters;
 
-  BackendExecState(Coordinator* coord, const THostPort& coord_hostport,
+  BackendExecState(Coordinator* coord, const TNetworkAddress& coord_address,
       int backend_num, const TPlanFragment& fragment, int fragment_idx,
       const FragmentExecParams& params, int instance_idx,
       DebugOptions* debug_options, ObjectPool* obj_pool)
     : fragment_instance_id(params.instance_ids[instance_idx]),
-      hostport(params.hosts[instance_idx]),
+      backend_address(params.hosts[instance_idx]),
       total_split_size(0),
       fragment_idx(fragment_idx),
       initiated(false),
@@ -132,7 +132,7 @@ class Coordinator::BackendExecState {
     profile = obj_pool->Add(
         new RuntimeProfile(obj_pool, "Instance " + PrintId(fragment_instance_id)));
     coord->SetExecPlanFragmentParams(backend_num, fragment, fragment_idx, params,
-        instance_idx, coord_hostport, &rpc_params);
+        instance_idx, coord_address, &rpc_params);
     if (debug_options != NULL) {
       rpc_params.params.__set_debug_node_id(debug_options->node_id);
       rpc_params.params.__set_debug_action(debug_options->action);
@@ -293,10 +293,7 @@ Status Coordinator::Exec(
   ComputeFragmentExecParams(*request);
   ComputeScanRangeAssignment(*request);
 
-  THostPort coord;
-  coord.__set_hostname(FLAGS_hostname);
-  coord.__set_ipaddress(FLAGS_ipaddress);
-  coord.__set_port(FLAGS_be_port);
+  TNetworkAddress coord = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
 
   // to keep things simple, make async Cancel() calls wait until plan fragment
   // execution has been initiated, otherwise we might try to cancel fragment
@@ -775,15 +772,13 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
   BackendExecState* exec_state = reinterpret_cast<BackendExecState*>(exec_state_arg);
   VLOG_FILE << "making rpc: ExecPlanFragment query_id=" << query_id_
             << " instance_id=" << exec_state->fragment_instance_id
-            << " host=" << exec_state->hostport;
+            << " host=" << exec_state->backend_address;
   lock_guard<mutex> l(exec_state->lock);
 
   // this client needs to have been released when this function finishes
   ImpalaInternalServiceClient* backend_client;
-  // TODO: Fix the THostPort mess, make the client cache use the same type.
-  pair<string, int> hostport = make_pair(exec_state->hostport.ipaddress,
-                                         exec_state->hostport.port);
-  RETURN_IF_ERROR(exec_env_->client_cache()->GetClient(hostport, &backend_client));
+  RETURN_IF_ERROR(exec_env_->client_cache()->GetClient(exec_state->backend_address,
+                                                       &backend_client));
   DCHECK(backend_client != NULL);
 
   TExecPlanFragmentResult thrift_result;
@@ -874,10 +869,8 @@ void Coordinator::CancelRemoteFragments() {
     // if we get an error while trying to get a connection to the backend,
     // keep going
     ImpalaInternalServiceClient* backend_client;
-    pair<string, int> hostport = make_pair(exec_state->hostport.ipaddress,
-                                           exec_state->hostport.port);
-    Status status =
-        exec_env_->client_cache()->GetClient(hostport, &backend_client);
+    Status status = exec_env_->client_cache()->GetClient(exec_state->backend_address,
+                                                         &backend_client);
     if (!status.ok()) {
       continue;
     }
@@ -890,7 +883,7 @@ void Coordinator::CancelRemoteFragments() {
     try {
       VLOG_QUERY << "sending CancelPlanFragment rpc for instance_id="
                  << exec_state->fragment_instance_id << " backend="
-                 << exec_state->hostport;
+                 << exec_state->backend_address;
       try {
         backend_client->CancelPlanFragment(res, params);
       } catch (TTransportException& e) {
@@ -1014,7 +1007,7 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
         lock_guard<mutex> l2(exec_state->lock);
         if (!exec_state->done) {
           VLOG_QUERY << "query_id=" << query_id_ << ": first in-progress backend: "
-                     << exec_state->hostport.ipaddress << ":" << exec_state->hostport.port;
+                     << exec_state->backend_address;
           break;
         }
       }
@@ -1195,18 +1188,16 @@ void Coordinator::ComputeFragmentExecParams(const TQueryExecRequest& exec_reques
     for (int j = 0; j < dest_params.hosts.size(); ++j) {
       TPlanFragmentDestination& dest = params.destinations[j];
       dest.fragment_instance_id = dest_params.instance_ids[j];
-      dest.server = THostPort(dest_params.hosts[j]);
+      dest.server = TNetworkAddress(dest_params.hosts[j]);
       VLOG_RPC  << "dest for fragment " << i << ":"
                 << " instance_id=" << dest.fragment_instance_id
-                << " server=" << dest.server.ipaddress << ":" << dest.server.port;
+                << " server=" << dest.server;
     }
   }
 }
 
 Status Coordinator::ComputeFragmentHosts(const TQueryExecRequest& exec_request) {
-  THostPort coord;
-  coord.ipaddress = coord.hostname = FLAGS_ipaddress;
-  coord.port = FLAGS_be_port;
+  TNetworkAddress coord = MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port);
   DCHECK_EQ(fragment_exec_params_.size(), exec_request.fragments.size());
   vector<TPlanNodeType::type> scan_node_types;
   scan_node_types.push_back(TPlanNodeType::HDFS_SCAN_NODE);
@@ -1250,27 +1241,28 @@ Status Coordinator::ComputeFragmentHosts(const TQueryExecRequest& exec_request) 
     const vector<TScanRangeLocations>& scan_range_locations = entry->second;
 
     // collect unique set of data hosts
-    unordered_set<const THostPort*, HashTHostPortPtr, THostPortPtrEquals> data_hosts;
+    unordered_set<const TNetworkAddress*, HashTNetworkAddressPtr,
+        TNetworkAddressPtrEquals> data_hosts;
     BOOST_FOREACH(const TScanRangeLocations& locations, scan_range_locations) {
       BOOST_FOREACH(const TScanRangeLocation& location, locations.locations) {
         data_hosts.insert(&(location.server));
       }
     }
-    vector<THostPort> data_hostports;
-    BOOST_FOREACH(const THostPort* host_port, data_hosts) {
-      data_hostports.push_back(*host_port);
+    vector<TNetworkAddress> data_locations;
+    BOOST_FOREACH(const TNetworkAddress* datanode_address, data_hosts) {
+      data_locations.push_back(*datanode_address);
     }
 
     // find execution hosts for data hosts
-    RETURN_IF_ERROR(exec_env_->scheduler()->GetHosts(data_hostports, &params.hosts));
-    DCHECK_EQ(data_hostports.size(), params.hosts.size());
-    for (int j = 0; j < data_hostports.size(); ++j) {
-      params.data_server_map[data_hostports[j]] = params.hosts[j];
+    RETURN_IF_ERROR(exec_env_->scheduler()->GetHosts(data_locations, &params.hosts));
+    DCHECK_EQ(data_locations.size(), params.hosts.size());
+    for (int j = 0; j < data_locations.size(); ++j) {
+      params.data_server_map[data_locations[j]] = params.hosts[j];
     }
 
     // de-dup
     sort(params.hosts.begin(), params.hosts.end());
-    vector<THostPort >::iterator start_duplicates =
+    vector<TNetworkAddress >::iterator start_duplicates =
         unique(params.hosts.begin(), params.hosts.end());
     params.hosts.erase(start_duplicates, params.hosts.end());
     unique_hosts_.insert(params.hosts.begin(), params.hosts.end());
@@ -1355,11 +1347,11 @@ int64_t GetScanRangeLength(const TScanRange& scan_range) {
 void Coordinator::ComputeScanRangeAssignment(
     PlanNodeId node_id, const vector<TScanRangeLocations>& locations,
     const FragmentExecParams& params, FragmentScanRangeAssignment* assignment) {
-  unordered_map<THostPort, int64_t> assigned_bytes_per_host;  // total assigned
+  unordered_map<TNetworkAddress, int64_t> assigned_bytes_per_host;  // total assigned
   BOOST_FOREACH(const TScanRangeLocations& scan_range_locations, locations) {
     // assign this scan range to the host w/ the fewest assigned bytes
     int64_t min_assigned_bytes = numeric_limits<int64_t>::max();
-    const THostPort* data_host = NULL;  // data server; not necessarily backend
+    const TNetworkAddress* data_host = NULL;  // data server; not necessarily backend
     int volume_id = -1;
     BOOST_FOREACH(const TScanRangeLocation& location, scan_range_locations.locations) {
       int64_t* assigned_bytes =
@@ -1375,19 +1367,19 @@ void Coordinator::ComputeScanRangeAssignment(
 
     // translate data host to backend host
     DCHECK(data_host != NULL);
-    THostPort exec_hostport;
+    TNetworkAddress exec_address;
     DCHECK_GT(params.hosts.size(), 0);
     if (params.hosts.size() == 1) {
       // this is only running on the coordinator anyway
-      exec_hostport = params.hosts[0];
+      exec_address = params.hosts[0];
     } else {
       FragmentExecParams::DataServerMap::const_iterator it =
           params.data_server_map.find(*data_host);
       DCHECK(it != params.data_server_map.end());
-      exec_hostport = it->second;
+      exec_address = it->second;
     }
     PerNodeScanRanges* scan_ranges =
-        FindOrInsert(assignment, exec_hostport, PerNodeScanRanges());
+        FindOrInsert(assignment, exec_address, PerNodeScanRanges());
     vector<TScanRangeParams>* scan_range_params_list =
         FindOrInsert(scan_ranges, node_id, vector<TScanRangeParams>());
     // add scan range
@@ -1414,14 +1406,14 @@ void Coordinator::ComputeScanRangeAssignment(
 
 void Coordinator::SetExecPlanFragmentParams(
     int backend_num, const TPlanFragment& fragment, int fragment_idx,
-    const FragmentExecParams& params, int instance_idx, const THostPort& coord,
+    const FragmentExecParams& params, int instance_idx, const TNetworkAddress& coord,
     TExecPlanFragmentParams* rpc_params) {
   rpc_params->__set_protocol_version(ImpalaInternalServiceVersion::V1);
   rpc_params->__set_fragment(fragment);
   rpc_params->__set_desc_tbl(desc_tbl_);
   rpc_params->params.__set_query_id(query_id_);
   rpc_params->params.__set_fragment_instance_id(params.instance_ids[instance_idx]);
-  THostPort exec_host = params.hosts[instance_idx];;
+  TNetworkAddress exec_host = params.hosts[instance_idx];;
   PerNodeScanRanges& scan_ranges = scan_range_assignment_[fragment_idx][exec_host];
   rpc_params->params.__set_per_node_scan_ranges(scan_ranges);
   rpc_params->params.__set_per_exch_num_senders(params.per_exch_num_senders);

@@ -29,6 +29,7 @@
 #include "statestore/simple-scheduler.h"
 #include "statestore/subscription-manager.h"
 #include "util/metrics.h"
+#include "util/network-util.h"
 #include "util/webserver.h"
 #include "util/default-path-handlers.h"
 #include "gen-cpp/ImpalaInternalService.h"
@@ -40,7 +41,6 @@ DEFINE_bool(use_statestore, true,
     "Use an external state-store process to manage cluster membership");
 DEFINE_bool(enable_webserver, true, "If true, debug webserver is enabled");
 DECLARE_int32(be_port);
-DECLARE_string(ipaddress);
 DECLARE_int64(mem_limit);
 
 namespace impala {
@@ -63,11 +63,8 @@ ExecEnv::ExecEnv()
     scheduler_.reset(new SimpleScheduler(subscription_mgr_.get(), IMPALA_SERVICE_ID,
         metrics_.get()));
   } else {
-    vector<THostPort> addresses;
-    THostPort address;
-    address.ipaddress = FLAGS_ipaddress;
-    address.port = FLAGS_be_port;
-    addresses.push_back(address);
+    vector<TNetworkAddress> addresses;
+    addresses.push_back(MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
     scheduler_.reset(new SimpleScheduler(addresses, metrics_.get()));
   }
   Status status = disk_io_mgr_->Init();

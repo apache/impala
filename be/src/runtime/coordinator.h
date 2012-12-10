@@ -157,7 +157,7 @@ class Coordinator {
   std::string GetErrorLog();
 
   // The set of hosts on which this query will run. Only valid after Exec.
-  const boost::unordered_set<THostPort>& unique_hosts() { return unique_hosts_; }
+  const boost::unordered_set<TNetworkAddress>& unique_hosts() { return unique_hosts_; }
 
   const ProgressUpdater& progress() { return progress_; }
 
@@ -201,7 +201,7 @@ class Coordinator {
     SimpleScheduler::HostList hosts; // execution backends
 
     // map from scan range server (from TScanRangeLocations) to host in 'hosts'
-    typedef boost::unordered_map<THostPort, THostPort> DataServerMap;
+    typedef boost::unordered_map<TNetworkAddress, TNetworkAddress> DataServerMap;
     DataServerMap data_server_map;
 
     std::vector<TUniqueId> instance_ids;
@@ -215,7 +215,8 @@ class Coordinator {
   typedef std::map<TPlanNodeId, std::vector<TScanRangeParams> > PerNodeScanRanges;
   // map from an impalad host address to the per-node assigned scan ranges;
   // records scan range assignment for a single fragment
-  typedef boost::unordered_map<THostPort, PerNodeScanRanges> FragmentScanRangeAssignment;
+  typedef boost::unordered_map<TNetworkAddress, PerNodeScanRanges>
+      FragmentScanRangeAssignment;
   // vector is indexed by fragment index from TQueryExecRequest.fragments;
   // populated in ComputeScanRangeAssignment()
   std::vector<FragmentScanRangeAssignment> scan_range_assignment_;
@@ -343,7 +344,7 @@ class Coordinator {
   FragmentInstanceCounters coordinator_counters_;
 
   // The set of hosts that the query will run on. Populated in Exec.
-  boost::unordered_set<THostPort> unique_hosts_;
+  boost::unordered_set<TNetworkAddress> unique_hosts_;
 
   // Populates fragment_exec_params_.
   void ComputeFragmentExecParams(const TQueryExecRequest& exec_request);
@@ -375,7 +376,7 @@ class Coordinator {
   // Fill in rpc_params based on parameters.
   void SetExecPlanFragmentParams(int backend_num, const TPlanFragment& fragment,
       int fragment_idx, const FragmentExecParams& params, int instance_idx,
-      const THostPort& coord, TExecPlanFragmentParams* rpc_params);
+      const TNetworkAddress& coord, TExecPlanFragmentParams* rpc_params);
 
   // Wrapper for ExecPlanFragment() rpc.  This function will be called in parallel
   // from multiple threads.

@@ -60,7 +60,7 @@ class TCancelPlanFragmentArgs;
 class TCancelPlanFragmentResult;
 class TTransmitDataArgs;
 class TTransmitDataResult;
-class THostPort;
+class TNetworkAddress;
 class TClientRequest;
 class TExecRequest;
 class TSessionState;
@@ -731,12 +731,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   boost::mutex query_locations_lock_;
 
   // A map from backend to the list of queries currently running there.
-  typedef boost::unordered_map<THostPort, boost::unordered_set<TUniqueId> >
+  typedef boost::unordered_map<TNetworkAddress, boost::unordered_set<TUniqueId> >
       QueryLocations;
   QueryLocations query_locations_;
 
   // The set of backends last reported by the state-store, used for failure detection.
-  std::vector<THostPort> last_membership_;
+  std::vector<TNetworkAddress> last_membership_;
 
   // Generate unique session id for HiveServer2 session
   boost::uuids::random_generator uuid_generator_;

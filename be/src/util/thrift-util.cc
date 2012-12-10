@@ -38,12 +38,12 @@ using namespace boost;
 
 namespace impala {
 
-// Comparator for THostPorts. Thrift declares this (in gen-cpp/Types_types.h) but
+// Comparator for TNetworkAddresss. Thrift declares this (in gen-cpp/Types_types.h) but
 // never defines it.
-bool THostPort::operator<(const THostPort& that) const {
-  if (this->ipaddress < that.ipaddress) {
+bool TNetworkAddress::operator<(const TNetworkAddress& that) const {
+  if (this->hostname < that.hostname) {
     return true;
-  } else if ((this->ipaddress == that.ipaddress) && (this->port < that.port)) {
+  } else if ((this->hostname == that.hostname) && (this->port < that.port)) {
     return true;
   }
   return false;
@@ -86,14 +86,14 @@ Status WaitForServer(const string& host, int port, int num_retries,
   return Status("Server did not come up");
 }
 
-void THostPortToString(const THostPort& address, string* out) {
+void TNetworkAddressToString(const TNetworkAddress& address, string* out) {
   stringstream ss;
-  ss << address.ipaddress << ":" << address.port;
+  ss << address;
   *out = ss.str();
 }
 
-std::ostream& operator<<(std::ostream& out, const THostPort& hostport) {
-  out << hostport.ipaddress << ":" << hostport.port;
+std::ostream& operator<<(std::ostream& out, const TNetworkAddress& hostport) {
+  out << hostport.hostname << ":" << hostport.port;
   return out;
 }
 

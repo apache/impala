@@ -28,7 +28,7 @@
 #include "statestore/util.h"
 #include "statestore/state-store.h"
 #include "util/metrics.h"
-#include "gen-cpp/Types_types.h"  // for THostPort
+#include "gen-cpp/Types_types.h"  // for TNetworkAddress
 
 namespace impala {
 
@@ -44,7 +44,7 @@ class SimpleScheduler : public Scheduler {
 
   // Initialize with a list of <host:port> pairs in 'static' mode - i.e. the set of
   // backends is fixed and will not be updated.
-  SimpleScheduler(const std::vector<impala::THostPort>& backends,
+  SimpleScheduler(const std::vector<impala::TNetworkAddress>& backends,
       impala::Metrics* metrics);
 
   virtual ~SimpleScheduler();
@@ -67,10 +67,12 @@ class SimpleScheduler : public Scheduler {
   virtual void Close();
 
  private:
-  // map from host name to list of ports on which ImpalaServiceBackends
-  // are listening
-  typedef boost::unordered_map<std::string, std::list<int> > HostMap;
-  HostMap host_map_;
+  // Map from IP to a list of addresses of Impala daemons that are
+  // local for that address. Keys in this map must not be hostnames,
+  // since they are compared to the block location IP addresses
+  // returned by the namenode.
+  typedef boost::unordered_map<std::string, std::list<TNetworkAddress> > HostLocalityMap;
+  HostLocalityMap host_map_;
 
   // Metrics subsystem access
   impala::Metrics* metrics_;
@@ -79,8 +81,8 @@ class SimpleScheduler : public Scheduler {
   // reads. Also protects the locality counters, which are updated in GetHosts.
   boost::mutex host_map_lock_;
 
-  // round robin entry in HostMap for non-local host assignment
-  HostMap::iterator next_nonlocal_host_entry_;
+  // round robin entry in HostLocalityMap for non-local host assignment
+  HostLocalityMap::iterator next_nonlocal_host_entry_;
 
   // Pointer to a subscription manager (which we do not own) which is used to register
   // for dynamic updates to the set of available backends. May be NULL if the set of

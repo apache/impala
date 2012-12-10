@@ -18,21 +18,21 @@
 #include "util/debug-util.h"
 #include "util/disk-info.h"
 #include "util/logging.h"
-#include "util/authorization.h"
+#include "util/network-util.h"
 #include "util/thrift-util.h"
 
 DECLARE_string(hostname);
 
 void impala::InitDaemon(int argc, char** argv) {
   // Set the default hostname.  The user can override this with the hostname flag.
-  FLAGS_hostname = GetHostname();
+  GetHostname(&FLAGS_hostname);
 
   google::SetVersionString(impala::GetBuildVersion());
   google::ParseCommandLineFlags(&argc, &argv, true);
   impala::InitGoogleLoggingSafe(argv[0]);
-  
+
   LOG(INFO) << impala::GetVersionString();
-  LOG(INFO) << "Using hostname: " << FLAGS_hostname;  
+  LOG(INFO) << "Using hostname: " << FLAGS_hostname;
   impala::LogCommandLineFlags();
 
   InitThriftLogging();

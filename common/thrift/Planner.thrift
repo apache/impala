@@ -55,7 +55,7 @@ struct TPlanFragment {
 
 // location information for a single scan range
 struct TScanRangeLocation {
-  1: required Types.THostPort server
+  1: required Types.TNetworkAddress server
 
   // disk volume identifier of a particular scan range at 'server';
   // -1 indicates an unknown volume id;

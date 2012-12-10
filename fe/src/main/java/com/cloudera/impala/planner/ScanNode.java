@@ -17,7 +17,7 @@ package com.cloudera.impala.planner;
 import java.util.List;
 
 import com.cloudera.impala.analysis.TupleDescriptor;
-import com.cloudera.impala.thrift.THostPort;
+import com.cloudera.impala.thrift.TNetworkAddress;
 import com.cloudera.impala.thrift.TScanRangeLocations;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
@@ -65,16 +65,13 @@ abstract public class ScanNode extends PlanNode {
   }
 
   /**
-   * Helper function to parse a "host:port" address string into THostPort
+   * Helper function to parse a "host:port" address string into TNetworkAddress
    * This is called with ipaddress:port when doing scan range assigment.
    */
-  protected static THostPort addressToTHostPort(String address) {
-    THostPort result = new THostPort();
+  protected static TNetworkAddress addressToTNetworkAddress(String address) {
+    TNetworkAddress result = new TNetworkAddress();
     String[] hostPort = address.split(":");
-    // In this context we don't have or need a hostname,
-    // so we just set it to the ipaddress.
     result.hostname = hostPort[0];
-    result.ipaddress = hostPort[0];
     result.port = Integer.parseInt(hostPort[1]);
     return result;
   }

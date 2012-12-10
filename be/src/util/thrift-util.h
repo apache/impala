@@ -28,7 +28,7 @@
 namespace impala {
 
 class TColumnValue;
-class THostPort;
+class TNetworkAddress;
 class ThriftServer;
 
 template <class T>
@@ -66,7 +66,7 @@ Status DeserializeThriftMsg(JNIEnv* env, jbyteArray serialized_msg, T* deseriali
   jboolean is_copy = false;
   int buf_size = env->GetArrayLength(serialized_msg);
   jbyte* buf = env->GetByteArrayElements(serialized_msg, &is_copy);
-  
+
   // Deserialize msg bytes into c++ thrift msg using memory transport.
   boost::shared_ptr<apache::thrift::transport::TTransport> tmem_transport(
       new apache::thrift::transport::TMemoryBuffer(
@@ -101,10 +101,10 @@ Status WaitForServer(const std::string& host, int port, int num_retries,
    int retry_interval_ms);
 
 // Utility method to print address as address:port
-void THostPortToString(const THostPort& address, std::string* out);
+void TNetworkAddressToString(const TNetworkAddress& address, std::string* out);
 
 // Prints a hostport as ipaddress:port
-std::ostream& operator<<(std::ostream& out, const THostPort& hostport);
+std::ostream& operator<<(std::ostream& out, const TNetworkAddress& hostport);
 
 // Print a TColumnValue. If null, print "NULL".
 std::ostream& operator<<(std::ostream& out, const TColumnValue& colval);

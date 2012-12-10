@@ -200,7 +200,7 @@ class DataStreamTest : public testing::Test {
     dest_.push_back(TPlanFragmentDestination());
     TPlanFragmentDestination& dest = dest_.back();
     dest.fragment_instance_id = next_instance_id_;
-    dest.server.ipaddress = "127.0.0.1";
+    dest.server.hostname = "127.0.0.1";
     dest.server.port = FLAGS_port;
     *instance_id = next_instance_id_;
     ++next_instance_id_.lo;
@@ -264,7 +264,7 @@ class DataStreamTest : public testing::Test {
   void StartReceiver(TPartitionType::type stream_type, int num_senders, int receiver_num,
                      int buffer_size, TUniqueId* out_id = NULL) {
     VLOG_QUERY << "start receiver";
-    RuntimeProfile* profile = 
+    RuntimeProfile* profile =
         obj_pool_.Add(new RuntimeProfile(&obj_pool_, "TestReceiver"));
     TUniqueId instance_id;
     GetNextInstanceId(&instance_id);

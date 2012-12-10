@@ -49,7 +49,7 @@ extern const SubscriptionId INVALID_SUBSCRIPTION_ID;
 // Describes a set of running instances.  The key is the ID of the StateStoreSubscriber
 // associated with the running instance, and the value is the network address of the
 // running instance.
-typedef boost::unordered_map<SubscriberId, impala::THostPort> Membership;
+typedef boost::unordered_map<SubscriberId, TNetworkAddress> Membership;
 
 // Information about a particular service, including the full membership information
 // and a delta for objects.

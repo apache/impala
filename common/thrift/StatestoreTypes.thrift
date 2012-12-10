@@ -38,7 +38,7 @@ struct TServiceInstance {
   // Unique identifier for the corresponding StateStoreSubscriber.
   1: required i32 subscriber_id
 
-  2: required Types.THostPort host_port
+  2: required Types.TNetworkAddress host_port
 }
 
 // Information about all running instances of the service identified by service_id. 

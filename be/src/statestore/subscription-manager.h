@@ -26,7 +26,7 @@
 namespace impala {
 
 class Status;
-class THostPort;
+class TNetworkAddress;
 
 class StateStoreSubscriber;
 
@@ -78,7 +78,7 @@ class SubscriptionManager {
   // Registers an instance of the given service type at the given
   // address with the state store.
   impala::Status RegisterService(const ServiceId& service_id,
-      const impala::THostPort& address);
+      const impala::TNetworkAddress& address);
 
   // Unregisters an instance of the given service type with the state store.
   impala::Status UnregisterService(const ServiceId& service_id);

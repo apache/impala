@@ -40,7 +40,7 @@
 namespace impala {
 
 class Status;
-class THostPort;
+class TNetworkAddress;
 class Webserver;
 }
 
@@ -110,7 +110,7 @@ class StateStore : public StateStoreServiceIf,
 
     // Initializes the underlying thrift transport and StateStoreSubscriberServiceClient,
     // but doesn't open the transport.
-    void Init(const impala::THostPort& address);
+    void Init(const impala::TNetworkAddress& address);
 
     // Adds an instance of the given service.
     void AddService(const ServiceId& service_id);
@@ -171,12 +171,12 @@ class StateStore : public StateStoreServiceIf,
   // Subscriber gets deleted before this SubscriberUpdate is used.
   struct SubscriberUpdate {
     // Address of the subscriber to receive this update
-    impala::THostPort subscriber_address;
+    impala::TNetworkAddress subscriber_address;
 
     boost::shared_ptr<SubscriberClient> client;
     TUpdateStateRequest request;
 
-    SubscriberUpdate(const impala::THostPort& address, Subscriber* subscriber)
+    SubscriberUpdate(const impala::TNetworkAddress& address, Subscriber* subscriber)
       : subscriber_address(address),
         client(subscriber->client()) {}
   };
@@ -185,7 +185,7 @@ class StateStore : public StateStoreServiceIf,
   typedef boost::unordered_map<ServiceId, Membership> ServiceMemberships;
 
   // Information about each subscriber, indexed by the address of the subscriber.
-  typedef boost::unordered_map<impala::THostPort, Subscriber> Subscribers;
+  typedef boost::unordered_map<impala::TNetworkAddress, Subscriber> Subscribers;
   Subscribers subscribers_;
 
   // Lock for is_updating_. This lock is necessary for visibility: it ensures that the
@@ -234,9 +234,10 @@ class StateStore : public StateStoreServiceIf,
   bool is_updating();
   void set_is_updating(bool is_updating);
 
-  // Adds a subscriber corresponding to the given THostPort to subscribers_, if it is
-  // not there already, and returns a reference to the Subscriber.
-  Subscriber& GetOrCreateSubscriber(const impala::THostPort& host_port);
+  // Adds a subscriber corresponding to the given TNetworkAddress to
+  // subscribers_, if it is not there already, and returns a reference
+  // to the Subscriber.
+  Subscriber& GetOrCreateSubscriber(const impala::TNetworkAddress& host_port);
 
   // Begins updating all StateStoreSubscriberServices with the new state.  Should be
   // called in its own thread, because this method blocks until is_updating_ is false.
@@ -248,7 +249,7 @@ class StateStore : public StateStoreServiceIf,
 
   // Removes all subscriptions and registered services for the subscriber with
   // the given address.
-  impala::Status UnregisterSubscriberCompletely(const impala::THostPort& address);
+  impala::Status UnregisterSubscriberCompletely(const impala::TNetworkAddress& address);
 
   // Webserver callback to write a list of active subscriptions
   void SubscriptionsCallback(const impala::Webserver::ArgumentMap& args,
@@ -256,11 +257,11 @@ class StateStore : public StateStoreServiceIf,
 
   // Unregisters the given subscription associated with the subscriber at the
   // given address.
-  impala::Status UnregisterSubscriptionInternal(const impala::THostPort& address,
+  impala::Status UnregisterSubscriptionInternal(const impala::TNetworkAddress& address,
                                                 const SubscriptionId& id);
 
   // Unregisters the service instance of the given type at the given address
-  impala::Status UnregisterServiceInternal(const impala::THostPort& address,
+  impala::Status UnregisterServiceInternal(const impala::TNetworkAddress& address,
                                            const ServiceId& service_id);
 
 

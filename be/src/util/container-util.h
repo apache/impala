@@ -26,22 +26,22 @@ using namespace std;
 
 namespace impala {
 
-// Hash function for THostPort. This function must be called hash_value to be picked
+// Hash function for TNetworkAddress. This function must be called hash_value to be picked
 // up properly by boost.
-inline std::size_t hash_value(const THostPort& host_port) {
+inline std::size_t hash_value(const TNetworkAddress& host_port) {
   uint32_t hash =
-      HashUtil::Hash(host_port.ipaddress.c_str(), host_port.ipaddress.length(), 0);
+      HashUtil::Hash(host_port.hostname.c_str(), host_port.hostname.length(), 0);
   return HashUtil::Hash(&host_port.port, sizeof(host_port.port), hash);
 }
 
-struct HashTHostPortPtr : public std::unary_function<THostPort*, size_t> {
-  size_t operator()(const THostPort* const& p) const { return hash_value(*p); }
+struct HashTNetworkAddressPtr : public std::unary_function<TNetworkAddress*, size_t> {
+  size_t operator()(const TNetworkAddress* const& p) const { return hash_value(*p); }
 };
 
-struct THostPortPtrEquals : public std::unary_function<THostPort*, bool> {
-  bool operator()(const THostPort* const& p1, const THostPort* const& p2) const {
-    return p1->hostname == p2->hostname && p1->ipaddress == p2->ipaddress
-        && p1->port == p2->port;
+struct TNetworkAddressPtrEquals : public std::unary_function<TNetworkAddress*, bool> {
+  bool operator()(const TNetworkAddress* const& p1,
+                  const TNetworkAddress* const& p2) const {
+    return p1->hostname == p2->hostname && p1->port == p2->port;
   }
 };
 

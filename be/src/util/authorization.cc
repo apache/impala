@@ -14,7 +14,6 @@
 
 #include <stdio.h>
 #include <signal.h>
-#include <unistd.h>
 #include <boost/algorithm/string.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/scoped_ptr.hpp>
@@ -29,6 +28,7 @@
 #include <gflags/gflags.h>
 
 #include "authorization.h"
+#include "util/network-util.h"
 
 using namespace std;
 using namespace boost;
@@ -248,8 +248,9 @@ Status InitKerberos(const string& appname) {
   // Replace the string _HOST with our hostname.
   size_t off = FLAGS_principal.find(HOSTNAME_PATTERN);
   if (off != string::npos) {
-    string hostname = GetHostname();
-    if (hostname.empty()) {
+    string hostname;
+    Status status = GetHostname(&hostname);
+    if (status.ok()) {
       stringstream ss;
       ss << "InitKerberos call to gethostname failed: errno " << errno;
       LOG(ERROR) << ss;
@@ -334,15 +335,4 @@ Status GetTSaslClient(const string& hostname, shared_ptr<sasl::TSasl>* saslClien
   return Status::OK;
 }
 
-string GetHostname() {
-  char name[HOST_NAME_MAX];
-  string ret_name;
-  int ret = gethostname(name, HOST_NAME_MAX);
-  if (ret == 0) {
-    ret_name = string(name);
-  } else {
-    LOG(WARNING) << "Could not get hostname: errno: " << errno;
-  }
-  return ret_name;
-}
 }

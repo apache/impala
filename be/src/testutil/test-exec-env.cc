@@ -102,8 +102,8 @@ Status TestExecEnv::StartBackends() {
     backend_info_.push_back(info);
     info->exec_env.StartServices();
     info->server->Start();
-    THostPort address;
-    address.ipaddress = "127.0.0.1";
+    TNetworkAddress address;
+    address.hostname = "127.0.0.1";
     address.port = backend_port;
     RETURN_IF_ERROR(
         info->exec_env.subscription_mgr()->RegisterService(

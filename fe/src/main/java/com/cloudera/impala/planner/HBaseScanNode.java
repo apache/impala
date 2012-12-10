@@ -226,7 +226,7 @@ public class HBaseScanNode extends ScanNode {
 
           TScanRangeLocations scanRangeLocation = new TScanRangeLocations();
           scanRangeLocation.addToLocations(
-              new TScanRangeLocation(addressToTHostPort(locEntry.getKey())));
+              new TScanRangeLocation(addressToTNetworkAddress(locEntry.getKey())));
           result.add(scanRangeLocation);
 
           TScanRange scanRange = new TScanRange();

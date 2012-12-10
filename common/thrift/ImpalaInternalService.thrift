@@ -79,7 +79,7 @@ struct TPlanFragmentDestination {
   1: required Types.TUniqueId fragment_instance_id
 
   // ... which is being executed on this server
-  2: required Types.THostPort server
+  2: required Types.TNetworkAddress server
 }
 
 // Parameters for a single execution instance of a particular TPlanFragment
@@ -142,7 +142,7 @@ struct TExecPlanFragmentParams {
   // Initiating coordinator.
   // TODO: determine whether we can get this somehow via the Thrift rpc mechanism.
   // required in V1
-  5: optional Types.THostPort coord
+  5: optional Types.TNetworkAddress coord
 
   // backend number assigned by coord to identify backend
   // required in V1

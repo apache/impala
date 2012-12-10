@@ -28,6 +28,7 @@
 #include "runtime/runtime-state.h"
 #include "runtime/client-cache.h"
 #include "util/debug-util.h"
+#include "util/network-util.h"
 #include "util/thrift-client.h"
 
 #include "gen-cpp/Types_types.h"
@@ -57,13 +58,13 @@ class DataStreamSender::Channel {
   // how much tuple data is getting accumulated before being sent; it only applies
   // when data is added via AddRow() and not sent directly via SendBatch().
   Channel(DataStreamSender* parent, const RowDescriptor& row_desc,
-          const THostPort& destination, const TUniqueId& fragment_instance_id,
+          const TNetworkAddress& destination, const TUniqueId& fragment_instance_id,
           PlanNodeId dest_node_id, int buffer_size)
     : parent_(parent),
       client_(NULL),
       client_cache_(NULL),
       row_desc_(row_desc),
-      ipaddress_(destination.ipaddress),
+      ipaddress_(destination.hostname),
       port_(destination.port),
       fragment_instance_id_(fragment_instance_id),
       dest_node_id_(dest_node_id),
@@ -140,7 +141,7 @@ class DataStreamSender::Channel {
 
 Status DataStreamSender::Channel::Init(RuntimeState* state) {
   client_cache_ = state->client_cache();
-  return client_cache_->GetClient(make_pair(ipaddress_, port_), &client_);
+  return client_cache_->GetClient(MakeNetworkAddress(ipaddress_, port_), &client_);
 }
 
 Status DataStreamSender::Channel::SendBatch(TRowBatch* batch) {
@@ -325,7 +326,7 @@ Status DataStreamSender::Init(RuntimeState* state) {
   profile_ = pool_->Add(new RuntimeProfile(pool_, "DataStreamSender"));
   bytes_sent_counter_ =
       ADD_COUNTER(profile(), "BytesSent", TCounterType::BYTES);
-  serialize_batch_timer_ = 
+  serialize_batch_timer_ =
       ADD_TIMER(profile(), "SerializeBatchTime");
   thrift_transmit_timer_ = ADD_TIMER(profile(), "ThriftTransmitTime");
 

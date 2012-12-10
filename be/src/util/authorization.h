@@ -53,8 +53,5 @@ Status GetKerberosTransportFactory(const std::string& principal,
 Status GetTSaslClient(const std::string& hostname,
     boost::shared_ptr<sasl::TSasl>* saslClient);
 
-// Returns the system defined hostname on which the process is running.
-// If the name cannot be found a warning is issued and an empty string is returned.
-std::string GetHostname();
 }
 #endif

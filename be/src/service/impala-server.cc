@@ -351,7 +351,7 @@ class ImpalaServer::FragmentExecState {
  public:
   FragmentExecState(const TUniqueId& query_id, int backend_num,
                     const TUniqueId& fragment_instance_id, ExecEnv* exec_env,
-                    const pair<string, int>& coord_hostport)
+                    const TNetworkAddress& coord_hostport)
     : query_id_(query_id),
       backend_num_(backend_num),
       fragment_instance_id_(fragment_instance_id),
@@ -392,7 +392,7 @@ class ImpalaServer::FragmentExecState {
 
   // initiating coordinator to which we occasionally need to report back
   // (it's exported ImpalaInternalService)
-  const pair<string, int> coord_hostport_;
+  const TNetworkAddress coord_hostport_;
 
   // the thread executing this plan fragment
   scoped_ptr<thread> exec_thread_;
@@ -450,8 +450,7 @@ void ImpalaServer::FragmentExecState::ReportStatusCb(
   ImpalaInternalServiceClient* coord;
   if (!client_cache_->GetClient(coord_hostport_, &coord).ok()) {
     stringstream s;
-    s << "couldn't get a client for " << coord_hostport_.first
-      << ":" << coord_hostport_.second;
+    s << "couldn't get a client for " << coord_hostport_;
     UpdateStatus(Status(TStatusCode::INTERNAL_ERROR, s.str()));
     return;
   }
@@ -506,8 +505,7 @@ void ImpalaServer::FragmentExecState::ReportStatusCb(
     rpc_status = Status(res.status);
   } catch (TException& e) {
     stringstream msg;
-    msg << "ReportExecStatus() to " << coord_hostport_.first << ":"
-        << coord_hostport_.second << " failed:\n" << e.what();
+    msg << "ReportExecStatus() to " << coord_hostport_ << " failed:\n" << e.what();
     VLOG_QUERY << msg.str();
     rpc_status = Status(TStatusCode::INTERNAL_ERROR, msg.str());
   }
@@ -803,8 +801,8 @@ void ImpalaServer::QueryStatePathHandler(const Webserver::ArgumentMap& args,
   {
     lock_guard<mutex> l(query_locations_lock_);
     BOOST_FOREACH(const QueryLocations::value_type& location, query_locations_) {
-      (*output) << "<tr><td>" << location.first.ipaddress << ":" << location.first.port
-                << "<td><b>" << location.second.size() << "</b></td></tr>";
+      (*output) << "<tr><td>" << location.first << "<td><b>" << location.second.size()
+		<< "</b></td></tr>";
     }
   }
   (*output) << "</table>";
@@ -997,10 +995,11 @@ Status ImpalaServer::ExecuteInternal(
   RETURN_IF_ERROR((*exec_state)->Exec(&result));
 
   if ((*exec_state)->coord() != NULL) {
-    const unordered_set<THostPort>& unique_hosts = (*exec_state)->coord()->unique_hosts();
+    const unordered_set<TNetworkAddress>& unique_hosts =
+        (*exec_state)->coord()->unique_hosts();
     if (!unique_hosts.empty()) {
       lock_guard<mutex> l(query_locations_lock_);
-      BOOST_FOREACH(const THostPort& port, unique_hosts) {
+      BOOST_FOREACH(const TNetworkAddress& port, unique_hosts) {
         query_locations_[port].insert((*exec_state)->query_id());
       }
     }
@@ -1044,11 +1043,11 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id) {
   ArchiveQuery(*exec_state);
 
   if (exec_state->coord() != NULL) {
-    const unordered_set<THostPort>& unique_hosts =
+    const unordered_set<TNetworkAddress>& unique_hosts =
         exec_state->coord()->unique_hosts();
     if (!unique_hosts.empty()) {
       lock_guard<mutex> l(query_locations_lock_);
-      BOOST_FOREACH(const THostPort& hostport, unique_hosts) {
+      BOOST_FOREACH(const TNetworkAddress& hostport, unique_hosts) {
         // Query may have been removed already by cancellation path. In
         // particular, if node to fail was last sender to an exchange, the
         // coordinator will realise and fail the query at the same time the
@@ -1396,8 +1395,7 @@ inline shared_ptr<ImpalaServer::FragmentExecState> ImpalaServer::GetFragmentExec
 void ImpalaServer::ExecPlanFragment(
     TExecPlanFragmentResult& return_val, const TExecPlanFragmentParams& params) {
   VLOG_QUERY << "ExecPlanFragment() instance_id=" << params.params.fragment_instance_id
-             << " coord=" << params.coord.ipaddress << ":" << params.coord.port
-             << " backend#=" << params.backend_num;
+             << " coord=" << params.coord << " backend#=" << params.backend_num;
   StartPlanFragmentExecution(params).SetTStatus(&return_val);
 }
 
@@ -1475,7 +1473,7 @@ Status ImpalaServer::StartPlanFragmentExecution(
   shared_ptr<FragmentExecState> exec_state(
       new FragmentExecState(
         params.query_id, exec_params.backend_num, params.fragment_instance_id,
-        exec_env_, make_pair(exec_params.coord.ipaddress, exec_params.coord.port)));
+        exec_env_, exec_params.coord));
   // Call Prepare() now, before registering the exec state, to avoid calling
   // exec_state->Cancel().
   // We might get an async cancellation, and the executor requires that Cancel() not
@@ -1646,15 +1644,13 @@ void ImpalaServer::MembershipCallback(const ServiceStateMap& service_state) {
   // state-store heartbeat less frequently.
   ServiceStateMap::const_iterator it = service_state.find(IMPALA_SERVICE_ID);
   if (it != service_state.end()) {
-    vector<THostPort> current_membership(it->second.membership.size());;
+    vector<TNetworkAddress> current_membership(it->second.membership.size());;
     // TODO: Why is Membership not just a set? Would save a copy.
     BOOST_FOREACH(const Membership::value_type& member, it->second.membership) {
-      // This is ridiculous: have to clear out hostname so that THostPorts match.
       current_membership.push_back(member.second);
-      current_membership.back().hostname = "";
     }
 
-    vector<THostPort> difference;
+    vector<TNetworkAddress> difference;
     sort(current_membership.begin(), current_membership.end());
     set_difference(last_membership_.begin(), last_membership_.end(),
                    current_membership.begin(), current_membership.end(),
@@ -1665,15 +1661,14 @@ void ImpalaServer::MembershipCallback(const ServiceStateMap& service_state) {
       // Build a list of hosts that have currently executing queries but aren't
       // in the membership list. Cancel them in a separate loop to avoid holding
       // on to the location map lock too long.
-      BOOST_FOREACH(const THostPort& hostport, difference) {
+      BOOST_FOREACH(const TNetworkAddress& hostport, difference) {
         QueryLocations::iterator it = query_locations_.find(hostport);
         if (it != query_locations_.end()) {
           to_cancel.insert(to_cancel.begin(), it->second.begin(), it->second.end());
         }
         // We can remove the location wholesale once we know it's failed.
         query_locations_.erase(hostport);
-        exec_env_->client_cache()->CloseConnections(
-            make_pair(hostport.ipaddress, hostport.port));
+        exec_env_->client_cache()->CloseConnections(hostport);
       }
     }
 

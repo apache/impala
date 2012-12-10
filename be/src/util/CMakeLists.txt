@@ -36,6 +36,7 @@ add_library(Util
   jni-util.cc
   logging.cc
   metrics.cc
+  network-util.cc
   path-builder.cc
 # TODO: not supported on RHEL 5
 #  perf-counters.cc

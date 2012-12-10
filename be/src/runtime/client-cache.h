@@ -56,12 +56,12 @@ class ClientCacheHelper {
  public:
   // Callback method which produces a client object when one cannot be
   // found in the cache. Supplied by the ClientCache wrapper.
-  typedef boost::function<ThriftClientImpl* (const std::pair<std::string, int>& hostport,
+  typedef boost::function<ThriftClientImpl* (const TNetworkAddress& hostport,
                                              void** client_key)> ClientFactory;
 
   // Return client for specific host/port in 'client'. If a client
   // is not available, the client parameter is set to NULL.
-  Status GetClient(const std::pair<std::string, int>& hostport,
+  Status GetClient(const TNetworkAddress& hostport,
       ClientFactory factory_method, void** client_key);
 
   // Close and delete the underlying transport and remove the client from client_map_.
@@ -75,7 +75,7 @@ class ClientCacheHelper {
 
   // Close all connections to a host (e.g., in case of failure) so that on their
   // next use they will have to be Reopen'ed.
-  void CloseConnections(const std::pair<std::string, int>& hostport);
+  void CloseConnections(const TNetworkAddress& address);
 
   std::string DebugString();
 
@@ -95,7 +95,7 @@ class ClientCacheHelper {
 
   // map from (host, port) to list of client keys for that address
   typedef boost::unordered_map<
-      std::pair<std::string, int>, std::list<void*> > ClientCacheMap;
+      TNetworkAddress, std::list<void*> > ClientCacheMap;
   ClientCacheMap client_cache_;
 
   // Map from client key back to its associated ThriftClientImpl transport
@@ -112,8 +112,8 @@ class ClientCacheHelper {
   Metrics::IntMetric* total_clients_metric_;
 
   // Create a new client for specific host/port in 'client' and put it in client_map_
-  Status CreateClient(const std::pair<std::string, int>& hostport,
-      ClientFactory factory_method, void** client_key);
+  Status CreateClient(const TNetworkAddress& hostport, ClientFactory factory_method,
+      void** client_key);
 };
 
 // Generic cache of Thrift clients for a given service type.
@@ -131,12 +131,12 @@ class ClientCache {
   // Obtains a pointer to a Thrift interface object (of type T),
   // backed by a live transport which is already open. Returns
   // Status::OK unless there was an error opening the transport.
-  Status GetClient(const std::pair<std::string, int>& hostport, T** iface) {
+  Status GetClient(const TNetworkAddress& hostport, T** iface) {
     return client_cache_helper_.GetClient(hostport, client_factory_,
         reinterpret_cast<void**>(iface));
   }
 
-  // Close and delete the underlying transport. Return a new client connecting to the 
+  // Close and delete the underlying transport. Return a new client connecting to the
   // same host/port.
   // Return an error status if a new connection cannot be established and *client will be
   // NULL in that case.
@@ -153,7 +153,7 @@ class ClientCache {
   // Close all clients connected to the supplied address, (e.g., in
   // case of failure) so that on their next use they will have to be
   // Reopen'ed.
-  void CloseConnections(const std::pair<std::string, int>& hostport) {
+  void CloseConnections(const TNetworkAddress& hostport) {
     return client_cache_helper_.CloseConnections(hostport);
   }
 
@@ -185,9 +185,8 @@ class ClientCache {
   ClientCacheHelper::ClientFactory client_factory_;
 
   // Factory method to produce a new ThriftClient<T> for the wrapped cache
-  ThriftClientImpl* MakeClient(const std::pair<std::string, int>& hostport,
-      void** client_key) {
-    Client* client = new Client(hostport.first, hostport.second);
+  ThriftClientImpl* MakeClient(const TNetworkAddress& hostport, void** client_key) {
+    Client* client = new Client(hostport.hostname, hostport.port);
     *client_key = reinterpret_cast<void*>(client->iface());
     return client;
   }

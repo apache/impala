@@ -28,14 +28,14 @@ struct TRegisterServiceRequest {
       StateStoreServiceVersion.V1
 
   // Address where the StateStoreSubscriberService is running. Required in V1.
-  2: optional Types.THostPort subscriber_address
+  2: optional Types.TNetworkAddress subscriber_address
 
   // Service running on the node. Multiple services can be registered using multiple
   // RegisterService() calls from the same subscriber. Currently, we assume that at most
   // one instance of a particular service will be registered with each subscriber.
   // Required in V1.
   3: optional string service_id
-  4: optional Types.THostPort service_address
+  4: optional Types.TNetworkAddress service_address
 }
 
 struct TRegisterServiceResponse {
@@ -48,7 +48,7 @@ struct TUnregisterServiceRequest {
       StateStoreServiceVersion.V1
 
   // Address of the subscriber. Required in V1.
-  2: optional Types.THostPort subscriber_address
+  2: optional Types.TNetworkAddress subscriber_address
 
   // Service that should be unregistered. Required in V1.
   3: optional string service_id
@@ -64,7 +64,7 @@ struct TRegisterSubscriptionRequest {
       StateStoreServiceVersion.V1
 
   // Address where the StateStoreSubscriberService is running. Required in V1.
-  2: optional Types.THostPort subscriber_address
+  2: optional Types.TNetworkAddress subscriber_address
 
   // Services for which updates should be pushed to the given subscriber. Required in V1.
   3: optional set<string> services
@@ -86,7 +86,7 @@ struct TUnregisterSubscriptionRequest {
       StateStoreServiceVersion.V1
 
   // Address of the subscriber. Required in V1.
-  2: optional Types.THostPort subscriber_address
+  2: optional Types.TNetworkAddress subscriber_address
 
   // Identifier for the subscription that should be unregistered. Required in V1.
   3: optional string subscription_id

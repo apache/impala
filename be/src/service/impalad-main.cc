@@ -34,6 +34,7 @@
 #include "testutil/test-exec-env.h"
 #include "util/jni-util.h"
 #include "util/logging.h"
+#include "util/network-util.h"
 #include "util/thrift-util.h"
 #include "statestore/subscription-manager.h"
 #include "util/thrift-server.h"
@@ -54,7 +55,6 @@ using namespace apache::thrift::transport;
 using namespace apache::thrift::concurrency;
 
 DECLARE_string(classpath);
-DECLARE_string(ipaddress);
 DECLARE_bool(use_statestore);
 DECLARE_int32(beeswax_port);
 DECLARE_int32(hs2_port);
@@ -99,13 +99,13 @@ int main(int argc, char** argv) {
   // the subscription mgr handler thread
   scoped_ptr<SubscriptionManager::UpdateCallback> cb;
   if (FLAGS_use_statestore) {
-    THostPort host_port;
+    TNetworkAddress host_port;
     host_port.port = FLAGS_be_port;
-    host_port.ipaddress = FLAGS_ipaddress;
     host_port.hostname = FLAGS_hostname;
     // TODO: Unregister on tear-down (after impala service changes)
     Status status =
-        exec_env.subscription_mgr()->RegisterService(IMPALA_SERVICE_ID, host_port);
+        exec_env.subscription_mgr()->RegisterService(IMPALA_SERVICE_ID,
+          MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
 
     unordered_set<ServiceId> services;
     services.insert(IMPALA_SERVICE_ID);

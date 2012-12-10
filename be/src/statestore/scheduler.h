@@ -20,7 +20,7 @@
 #include <string>
 
 #include "common/status.h"
-#include "gen-cpp/Types_types.h"  // for THostPort
+#include "gen-cpp/Types_types.h"  // for TNetworkAddress
 
 namespace impala {
 
@@ -33,9 +33,9 @@ class Scheduler {
  public:
   virtual ~Scheduler() { }
 
-  // List of server addresses. THostPort.ipdaddress is set, THostPort.hostname
+  // List of server addresses. TNetworkAddress.ipdaddress is set, TNetworkAddress.hostname
   // may not be. See IMP-261 for plans to sort this out.
-  typedef std::vector<impala::THostPort> HostList;
+  typedef std::vector<TNetworkAddress> HostList;
 
   // Given a list of host / port pairs that represent data locations,
   // fills in hostports with host/port pairs of known ImpalaInternalServices

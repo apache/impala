@@ -35,7 +35,7 @@ namespace impala {
 
 class TimeoutFailureDetector;
 class Status;
-class THostPort;
+class TNetworkAddress;
 class ThriftServer;
 
 } // namespace impala
@@ -56,8 +56,7 @@ class StateStoreSubscriber
   : public StateStoreSubscriberServiceIf,
     public boost::enable_shared_from_this<StateStoreSubscriber> {
  public:
-  StateStoreSubscriber(const std::string& hostname, const std::string& ipaddress,
-                       int port,
+  StateStoreSubscriber(const std::string& hostname, int port,
                        const std::string& state_store_host, int state_store_port);
 
   ~StateStoreSubscriber();
@@ -96,7 +95,7 @@ class StateStoreSubscriber
   // address with the state store.
   // TODO: Make it a condition that this can be called only before Start()
   impala::Status RegisterService(const ServiceId& service_id,
-      const impala::THostPort& address);
+      const impala::TNetworkAddress& address);
 
   // Unregisters an instance of the given service type with the state store.
   virtual impala::Status UnregisterService(const ServiceId& service_id);
@@ -126,10 +125,10 @@ class StateStoreSubscriber
   bool server_running_;
 
   // Address where the StateStoreSubscriberService is running.
-  impala::THostPort host_port_;
+  impala::TNetworkAddress host_port_;
 
   // Address of state store.
-  impala::THostPort state_store_host_port_;
+  impala::TNetworkAddress state_store_host_port_;
 
   // Thrift server.
   boost::scoped_ptr<impala::ThriftServer> server_;
@@ -149,7 +148,7 @@ class StateStoreSubscriber
 
   // Services registered with this subscriber. Used to properly unregister if the
   // subscriber is Stop()ed, and to reregister if recovery mode is entered
-  typedef boost::unordered_map<ServiceId, impala::THostPort> ServiceRegistrations;
+  typedef boost::unordered_map<ServiceId, impala::TNetworkAddress> ServiceRegistrations;
   ServiceRegistrations services_;
 
   // Thread in which RecoveryModeChecker runs.
@@ -172,7 +171,7 @@ class StateStoreSubscriber
 
   // Must be called with lock_
   impala::Status RegisterServiceInternal(const ServiceId& service_id,
-                                         const impala::THostPort& address);
+                                         const impala::TNetworkAddress& address);
 
   // Registers a subscription with the given ID to all services
   // Must be called with lock_

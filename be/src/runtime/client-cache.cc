@@ -24,8 +24,11 @@
 #include <boost/foreach.hpp>
 
 #include "common/logging.h"
+#include "util/container-util.h"
+#include "util/network-util.h"
 #include "util/thrift-util.h"
 #include "gen-cpp/ImpalaInternalService.h"
+
 using namespace std;
 using namespace boost;
 using namespace apache::thrift;
@@ -35,11 +38,10 @@ using namespace apache::thrift::protocol;
 
 namespace impala {
 
-Status ClientCacheHelper::GetClient(const pair<string, int>& hostport,
+Status ClientCacheHelper::GetClient(const TNetworkAddress& hostport,
     ClientFactory factory_method, void** client_key) {
   lock_guard<mutex> lock(lock_);
-  VLOG_RPC << "GetClient("
-           << hostport.first << ":" << hostport.second << ")";
+  VLOG_RPC << "GetClient(" << hostport << ")";
   ClientCacheMap::iterator cache_entry = client_cache_.find(hostport);
   if (cache_entry == client_cache_.end()) {
     cache_entry =
@@ -50,9 +52,7 @@ Status ClientCacheHelper::GetClient(const pair<string, int>& hostport,
   list<void*>& info_list = cache_entry->second;
   if (!info_list.empty()) {
     *client_key = info_list.front();
-    VLOG_RPC << "GetClient(): cached client for "
-             << hostport.first
-             << ":" << hostport.second;
+    VLOG_RPC << "GetClient(): cached client for " << hostport;
     info_list.pop_front();
   } else {
     RETURN_IF_ERROR(CreateClient(hostport, factory_method, client_key));
@@ -88,13 +88,13 @@ Status ClientCacheHelper::ReopenClient(ClientFactory factory_method, void** clie
   if (metrics_enabled_) {
     total_clients_metric_->Increment(-1);
   }
-  RETURN_IF_ERROR(CreateClient(make_pair(ipaddress, port), factory_method, client_key));
+  RETURN_IF_ERROR(
+      CreateClient(MakeNetworkAddress(ipaddress, port), factory_method, client_key));
   return Status::OK;
 }
 
-Status ClientCacheHelper::CreateClient(
-    const pair<string, int>& hostport, ClientFactory factory_method,
-    void** client_key) {
+Status ClientCacheHelper::CreateClient(const TNetworkAddress& hostport,
+    ClientFactory factory_method, void** client_key) {
   auto_ptr<ThriftClientImpl> client_impl(factory_method(hostport, client_key));
   VLOG_CONNECTION << "CreateClient(): adding new client for "
                   << client_impl->ipaddress() << ":" << client_impl->port();
@@ -116,7 +116,7 @@ void ClientCacheHelper::ReleaseClient(void* client_key) {
   VLOG_RPC << "releasing client for "
            << info->ipaddress() << ":" << info->port();
   ClientCacheMap::iterator j =
-      client_cache_.find(make_pair(info->ipaddress(), info->port()));
+      client_cache_.find(MakeNetworkAddress(info->ipaddress(), info->port()));
   DCHECK(j != client_cache_.end());
   j->second.push_back(client_key);
   if (metrics_enabled_) {
@@ -124,12 +124,12 @@ void ClientCacheHelper::ReleaseClient(void* client_key) {
   }
 }
 
-void ClientCacheHelper::CloseConnections(const pair<string, int>& hostport) {
+void ClientCacheHelper::CloseConnections(const TNetworkAddress& hostport) {
   lock_guard<mutex> lock(lock_);
   ClientCacheMap::iterator cache_entry = client_cache_.find(hostport);
   if (cache_entry == client_cache_.end()) return;
   VLOG_RPC << "Invalidating all " << cache_entry->second.size() << " clients for: "
-           << hostport.first << ":" << hostport.second;
+           << hostport;
   BOOST_FOREACH(void* client_key, cache_entry->second) {
     ClientMap::iterator client_map_entry = client_map_.find(client_key);
     DCHECK(client_map_entry != client_map_.end());
@@ -143,21 +143,21 @@ string ClientCacheHelper::DebugString() {
       << " [";
   for (ClientCacheMap::iterator i = client_cache_.begin(); i != client_cache_.end(); ++i) {
     if (i != client_cache_.begin()) out << " ";
-    out << i->first.first << ":" << i->first.second << ":" << i->second.size();
+    out << i->first << ":" << i->second.size();
   }
   out << "])";
   return out.str();
 }
 
 void ClientCacheHelper::TestShutdown() {
-  vector<pair<string, int> > hostports;
+  vector<TNetworkAddress> hostports;
   {
     lock_guard<mutex> lock(lock_);
     BOOST_FOREACH(const ClientCacheMap::value_type& i, client_cache_) {
       hostports.push_back(i.first);
     }
   }
-  for (vector<pair<string, int> >::iterator it = hostports.begin(); it != hostports.end();
+  for (vector<TNetworkAddress>::iterator it = hostports.begin(); it != hostports.end();
       ++it) {
     CloseConnections(*it);
   }

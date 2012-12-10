@@ -28,6 +28,8 @@
 #include "statestore/state-store-subscriber.h"
 #include "gen-cpp/Types_types.h"
 
+#include "util/network-util.h"
+
 using namespace std;
 using namespace boost;
 
@@ -52,7 +54,8 @@ SimpleScheduler::SimpleScheduler(SubscriptionManager* subscription_manager,
   next_nonlocal_host_entry_ = host_map_.begin();
 }
 
-SimpleScheduler::SimpleScheduler(const vector<THostPort>& backends, Metrics* metrics)
+SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
+                                 Metrics* metrics)
   : metrics_(metrics),
     subscription_manager_(NULL),
     callback_(NULL),
@@ -62,14 +65,23 @@ SimpleScheduler::SimpleScheduler(const vector<THostPort>& backends, Metrics* met
     initialised_(NULL) {
   DCHECK(backends.size() > 0);
   for (int i = 0; i < backends.size(); ++i) {
-    string ipaddress = backends[i].ipaddress;
-    int port = backends[i].port;
-
-    HostMap::iterator it = host_map_.find(ipaddress);
-    if (it == host_map_.end()) {
-      it = host_map_.insert(make_pair(ipaddress, list<int>())).first;
+    vector<string> addresses;
+    Status status = HostnameToIpAddrs(backends[i].hostname, &addresses);
+    if (!status.ok()) {
+      VLOG(1) << "Failed to resolve " << backends[i].hostname << ": "
+              << status.GetErrorMsg();
+      continue;
     }
-    it->second.push_back(port);
+
+    string ipaddr = addresses[0];
+    if (!FindFirstNonLocalhost(addresses, &ipaddr)) {
+      VLOG(1) << "Only localhost addresses found for " << backends[i].hostname;
+    }
+    HostLocalityMap::iterator it = host_map_.find(ipaddr);
+    if (it == host_map_.end()) {
+      it = host_map_.insert(make_pair(ipaddr, list<TNetworkAddress>())).first;
+    }
+    it->second.push_back(backends[i]);
   }
   next_nonlocal_host_entry_ = host_map_.begin();
 }
@@ -98,30 +110,51 @@ impala::Status SimpleScheduler::Init() {
 }
 
 void SimpleScheduler::UpdateMembership(const ServiceStateMap& service_state) {
-  lock_guard<mutex> lock(host_map_lock_);
+  // Build a local hostmap without taking the lock, since name
+  // resolution might be expensive.  In the future, the statestore
+  // will record the ipaddress of each backend.
+  HostLocalityMap host_map_copy;
   VLOG(4) << "Received update from subscription manager" << endl;
-  host_map_.clear();
   ServiceStateMap::const_iterator it = service_state.find(backend_service_id_);
   if (it != service_state.end()) {
     VLOG(4) << "Found membership information for " << backend_service_id_;
     ServiceState service_state = it->second;
     BOOST_FOREACH(const Membership::value_type& member, service_state.membership) {
-      VLOG(4) << "Got member: " << member.second.ipaddress << ":" << member.second.port;
-      HostMap::iterator host_it = host_map_.find(member.second.ipaddress);
-      if (host_it == host_map_.end()) {
-        host_it = host_map_.insert(make_pair(member.second.ipaddress, list<int>())).first;
+      VLOG(4) << "Got member: " << member.second;
+      vector<string> addresses;
+      Status status = HostnameToIpAddrs(member.second.hostname, &addresses);
+      if (!status.ok()) {
+        string s;
+        status.GetErrorMsg(&s);
+        VLOG(1) << "Failed to resolve " << member.second.hostname << ": " << s;
+        continue;
       }
-      host_it->second.push_back(member.second.port);
+      string ipaddr = addresses[0];
+      if (!FindFirstNonLocalhost(addresses, &ipaddr)) {
+        // Someone *might* be running this on localhost with no
+        // external interface (for debugging); keep going.
+        VLOG(2) << "Only localhost addresses found for " << member.second.hostname;
+      }
+
+      HostLocalityMap::iterator host_it = host_map_copy.find(ipaddr);
+      if (host_it == host_map_copy.end()) {
+        host_it = host_map_copy.insert(make_pair(ipaddr, list<TNetworkAddress>())).first;
+      }
+      host_it->second.push_back(member.second);
     }
   } else {
     VLOG(4) << "No membership information found.";
   }
 
-  next_nonlocal_host_entry_ = host_map_.begin();
+  {
+    lock_guard<mutex> lock(host_map_lock_);
+    host_map_ = host_map_copy;
+    next_nonlocal_host_entry_ = host_map_.begin();
+  }
 }
 
 Status SimpleScheduler::GetHosts(
-    const vector<THostPort>& data_locations, HostList* hostports) {
+    const vector<TNetworkAddress>& data_locations, HostList* hostports) {
   lock_guard<mutex> lock(host_map_lock_);
   if (host_map_.size() == 0) {
     return Status("No backends configured");
@@ -129,7 +162,7 @@ Status SimpleScheduler::GetHosts(
   hostports->clear();
   int num_local_assignments = 0;
   for (int i = 0; i < data_locations.size(); ++i) {
-    HostMap::iterator entry = host_map_.find(data_locations[i].ipaddress);
+    HostLocalityMap::iterator entry = host_map_.find(data_locations[i].hostname);
     if (entry == host_map_.end()) {
       // round robin the ipaddress
       entry = next_nonlocal_host_entry_;
@@ -143,13 +176,10 @@ Status SimpleScheduler::GetHosts(
     DCHECK(!entry->second.empty());
     // Round-robin between impalads on the same ipaddress.
     // Pick the first one, then move it to the back of the queue
-    int port = entry->second.front();
-    THostPort hostport;
-    hostport.ipaddress = entry->first;
-    hostport.port = port;
+    TNetworkAddress hostport = entry->second.front();
     hostports->push_back(hostport);
     entry->second.pop_front();
-    entry->second.push_back(port);
+    entry->second.push_back(hostport);
   }
 
   if (metrics_ != NULL) {
@@ -161,8 +191,7 @@ Status SimpleScheduler::GetHosts(
     vector<string> hostport_strings;
     for (int i = 0; i < hostports->size(); ++i) {
       stringstream s;
-      s << "(" << data_locations[i].ipaddress << ":" << data_locations[i].port
-        << " -> " << (*hostports)[i].ipaddress << ":" << (*hostports)[i].port << ")";
+      s << "(" << data_locations[i] << " -> " << (*hostports)[i] << ")";
       hostport_strings.push_back(s.str());
     }
     VLOG_QUERY << "SimpleScheduler assignment (data->backend):  "
@@ -181,12 +210,9 @@ Status SimpleScheduler::GetHosts(
 void SimpleScheduler::GetAllKnownHosts(HostList* hostports) {
   lock_guard<mutex> lock(host_map_lock_);
   hostports->clear();
-  BOOST_FOREACH(const HostMap::value_type& ipaddress, host_map_) {
-    BOOST_FOREACH(int port, ipaddress.second) {
-      THostPort hostport;
-      hostport.ipaddress = ipaddress.first;
-      hostport.port = port;
-      hostports->push_back(hostport);
+  BOOST_FOREACH(const HostLocalityMap::value_type& host, host_map_) {
+    BOOST_FOREACH(const TNetworkAddress& address, host.second) {
+      hostports->push_back(address);
     }
   }
 }

@@ -87,7 +87,7 @@ void StateStore::SubscriptionsCallback(const Webserver::ArgumentMap& args,
   lock_guard<recursive_mutex> l(lock_);
 
   BOOST_FOREACH(const Subscribers::value_type& subscriber, subscribers_) {
-    (*output) << "Subscriber: " << subscriber.first.ipaddress << ":" << subscriber.first.port << endl;
+    (*output) << "Subscriber: " << subscriber.first;
     BOOST_FOREACH(const Subscriber::Subscriptions::value_type& subscription,
                   subscriber.second.subscriptions()) {
       (*output) << subscription.first << " :: ";
@@ -123,20 +123,17 @@ void StateStore::RegisterService(TRegisterServiceResponse& response,
     subscriber.AddService(request.service_id);
     LOG(INFO) << "Registered service instance (id: "
               << request.service_id << ", for: "
-              << request.service_address.hostname << "("
-              << request.service_address.ipaddress << "):"
-              << request.service_address.port
-              << ")";
+              << request.service_address << ")";
     num_backends_metric_->Increment(1L);
     stringstream ss;
-    ss << request.service_address.ipaddress << ":" << request.service_address.port;
+    ss << request.service_address;
     backend_set_metric_->Add(ss.str());
     VLOG(2) << "Number of backends registered: " << num_backends_metric_->value();
   }
   RETURN_AND_SET_STATUS_OK(response);
 }
 
-Status StateStore::UnregisterServiceInternal(const THostPort& address,
+Status StateStore::UnregisterServiceInternal(const TNetworkAddress& address,
                                              const ServiceId& service_id) {
 
   lock_guard<recursive_mutex> lock(lock_);
@@ -163,7 +160,7 @@ Status StateStore::UnregisterServiceInternal(const THostPort& address,
     if (instance != membership.end()) {
       instance_unregistered = true;
       stringstream ss;
-      ss << instance->second.ipaddress << ":" << instance->second.port;
+      ss << instance->second;
       backend_set_metric_->Remove(ss.str());
 
       membership.erase(instance);
@@ -211,15 +208,14 @@ void StateStore::RegisterSubscription(TRegisterSubscriptionResponse& response,
   subscriber.AddSubscription(request.services, request.subscription_id);
 
   LOG(INFO) << "Registered subscription (id: " << request.subscription_id << ", for: "
-            << request.subscriber_address.ipaddress
-            << ":" << request.subscriber_address.port
+            << request.subscriber_address
             << ") for " << request.services.size() << " topics ("
             << join(request.services, ", ") << ")";
 
   RETURN_AND_SET_STATUS_OK(response);
 }
 
-Status StateStore::UnregisterSubscriptionInternal(const THostPort& address,
+Status StateStore::UnregisterSubscriptionInternal(const TNetworkAddress& address,
                                                   const SubscriptionId& id) {
 
   lock_guard<recursive_mutex> lock(lock_);
@@ -259,7 +255,7 @@ void StateStore::UnregisterSubscription(TUnregisterSubscriptionResponse& respons
   RETURN_AND_SET_ERROR(status.GetErrorMsg(), response);
 }
 
-Status StateStore::UnregisterSubscriberCompletely(const THostPort& address) {
+Status StateStore::UnregisterSubscriberCompletely(const TNetworkAddress& address) {
   // Protect against the subscriber getting removed or updated concurrently
   lock_guard<recursive_mutex> lock(lock_);
   Subscribers::iterator subscriber_it = subscribers_.find(address);
@@ -335,7 +331,7 @@ void StateStore::WaitForServerToStop() {
   server_->Join();
 }
 
-void StateStore::Subscriber::Init(const THostPort& address) {
+void StateStore::Subscriber::Init(const TNetworkAddress& address) {
   client_.reset(new SubscriberClient(address.hostname, address.port));
 }
 
@@ -401,7 +397,7 @@ void StateStore::set_is_updating(bool is_updating) {
   is_updating_ = is_updating;
 }
 
-StateStore::Subscriber& StateStore::GetOrCreateSubscriber(const THostPort& host_port) {
+StateStore::Subscriber& StateStore::GetOrCreateSubscriber(const TNetworkAddress& host_port) {
   lock_guard<recursive_mutex> lock(lock_);
   Subscribers::iterator subscriber = subscribers_.find(host_port);
   if (subscriber == subscribers_.end()) {
@@ -425,7 +421,7 @@ void StateStore::UpdateLoop() {
     // TODO: Make this multithreaded.
     BOOST_FOREACH(SubscriberUpdate& update, subscriber_updates) {
       string address;
-      THostPortToString(update.subscriber_address, &address);
+      TNetworkAddressToString(update.subscriber_address, &address);
       // Will be set in the following if-else block
       FailureDetector::PeerState peer_state = FailureDetector::FAILED;
 

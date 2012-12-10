@@ -31,7 +31,7 @@ class Expr;
 class RowBatch;
 class RowDescriptor;
 class TDataStreamSink;
-class THostPort;
+class TNetworkAddress;
 class TPlanFragmentDestination;
 
 // Single sender of an m:n data stream.
