@@ -123,4 +123,6 @@ LIMIT 100;
 'Clearly actual places would supply apparently only rats.','Books','computers',4563.270193099976
 'Clients would win at all public arms. Fresh, great plans could get. Findings sit th','Books','computers',7492.039855957031
 'Complete, head ways entail additional books; social letters drive perfect ends. Supporters should undermine therefore relat','Books','computers',406.8199882507324
+---- TYPES
+STRING, STRING, STRING, DOUBLE
 ====
