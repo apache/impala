@@ -53,29 +53,29 @@ def create_exec_option_dimension(cluster_sizes=ALL_CLUSTER_SIZES,
                                  disable_codegen_options=ALL_DISABLE_CODEGEN_OPTIONS,
                                  batch_sizes=ALL_BATCH_SIZES):
   """
-  Builds a query exec_option test vector
+  Builds a query exec option test dimension
 
-  Exhaustively goes through all the given values for cluster size, llvm options.
-  For each combination create an exec option dictionary and return a list of
-  all the dictionaries. Each dictionary can be passed via Beeswax to control Impala
-  query execution behavior.
-  TODO: This has some problems right now - for example if no batch sizes are
-  specified then no values will be generated. We can also be smarted about the
-  exploration - instead of exhaustively going through the values we could do a pairwise
-  exploration based on the given exploration strategy.
+  Exhaustively goes through all combinations of the given query option values.
+  For each combination create an exec option dictionary and add it as a value in the
+  exec option test dimension. Each dictionary can then be passed via Beeswax to control
+  Impala query execution behavior.
+
+  TODO: In the future we could generate these values using pairwise to reduce total
+  execution time.
   """
-  exec_option_vectors = list()
-  for batch_size in batch_sizes:
-    for cluster_size in cluster_sizes:
-      for disable_codegen in disable_codegen_options:
-        exec_option = {'batch_size': batch_size,
-                       'num_nodes': cluster_size,
-                       'disable_codegen': disable_codegen,
-                      }
-        exec_option_vectors.append(exec_option)
+  exec_option_dimensions = {
+      'batch_size': batch_sizes,
+      'disable_codegen': disable_codegen_options,
+      'num_nodes': cluster_sizes}
 
-  return TestDimension('exec_option', *exec_option_vectors)
-  return exec_option_vectors
+  # Generate the cross product (all combinations) of the exec options specified. Then
+  # store them in exec_option dictionary format.
+  keys = sorted(exec_option_dimensions)
+  combinations = product(*(exec_option_dimensions[name] for name in keys))
+  exec_option_dimension_values = [dict(zip(keys, prod)) for prod in combinations]
+
+  # Build a test vector out of it
+  return TestDimension('exec_option', *exec_option_dimension_values)
 
 def load_table_info_dimension(workload, exploration_strategy, file_formats=None,
                       compression_codecs=None):

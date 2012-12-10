@@ -17,3 +17,11 @@ string
 'ccccc'
 'eeeeeeee'
 ====
+# This fails due to IMP-636. Re-enable it once that bug gets fixed.
+#---- QUERY
+# select description1 from zipcode_incomes limit 10
+#---- TYPES
+#string
+#---- RESULTS
+#
+#====
