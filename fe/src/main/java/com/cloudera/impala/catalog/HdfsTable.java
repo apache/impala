@@ -31,14 +31,9 @@ import org.apache.hadoop.fs.VolumeId;
 import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
-import org.apache.hadoop.hive.metastore.api.ConfigValSecurityException;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
-import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
-import org.apache.hadoop.hive.metastore.api.UnknownDBException;
-import org.apache.hadoop.hive.metastore.api.UnknownTableException;
 import org.apache.hadoop.hive.serde.Constants;
-import org.apache.thrift.TException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -154,7 +149,7 @@ public class HdfsTable extends Table {
    * Create columns corresponding to fieldSchemas. Throws a
    * TableLoadingException if the metadata is incompatible with what we support.
    */
-  private void loadColumns(List<FieldSchema> fieldSchemas) 
+  private void loadColumns(List<FieldSchema> fieldSchemas)
       throws TableLoadingException {
     int pos = 0;
     for (FieldSchema s : fieldSchemas) {
@@ -336,7 +331,8 @@ public class HdfsTable extends Table {
     List<Integer> endingBlockIndexes = Lists.newArrayList();
 
     boolean supportsVolumeId =
-        CONF.getBoolean(DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED, false);
+        CONF.getBoolean(DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED,
+                        DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED_DEFAULT);
 
     // TODO: Is DistributedFileSystem thread safe? If so, make it a static final object.
     DistributedFileSystem dfs;
