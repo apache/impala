@@ -16,7 +16,7 @@
 set -e
 set -u
 
-USE_PGO=1
+USE_PGO=0
 TARGET_BUILD_TYPE=RELEASE
 
 # parse command line options
@@ -60,6 +60,7 @@ then
   cd $IMPALA_HOME
 
   # Run sample queries - outputs .gcda files
+  # TODO: this is no longer the way to run queries.
   be/build/release/service/runquery -query="\
     select count(field) from grep1gb where field like '%xyz%';\
     select count(field) from grep1gb_rc_def where field like '%xyz%';\
