@@ -38,8 +38,7 @@ const char* const Codec::BZIP2_COMPRESSION =
 const char* const Codec::SNAPPY_COMPRESSION =
      "org.apache.hadoop.io.compress.SnappyCodec";
 
-static const map<const string, const THdfsCompression::type>
-     compression_map = map_list_of
+const Codec::CodecMap Codec::CODEC_MAP = map_list_of
   ("", THdfsCompression::NONE)
   (Codec::DEFAULT_COMPRESSION, THdfsCompression::DEFAULT)
   (Codec::GZIP_COMPRESSION, THdfsCompression::GZIP)
@@ -60,9 +59,9 @@ Status Codec::CreateCompressor(RuntimeState* runtime_state, MemPool* mem_pool,
                                      bool reuse, const string& codec,
                                      scoped_ptr<Codec>* compressor) {
   map<const string, const THdfsCompression::type>::const_iterator
-      type = compression_map.find(codec);
+      type = CODEC_MAP.find(codec);
 
-  if (type == compression_map.end()) {
+  if (type == CODEC_MAP.end()) {
     stringstream ss;
     ss << "Unknown Codec: " << codec;
     return Status(ss.str());
@@ -105,9 +104,9 @@ Status Codec::CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
                                        bool reuse, const string& codec,
                                        scoped_ptr<Codec>* decompressor) {
   map<const string, const THdfsCompression::type>::const_iterator
-      type = compression_map.find(codec);
+      type = CODEC_MAP.find(codec);
 
-  if (type == compression_map.end()) {
+  if (type == CODEC_MAP.end()) {
     stringstream ss;
     ss << "Unknown Codec: " << codec;
     return Status(ss.str());

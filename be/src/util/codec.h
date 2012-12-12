@@ -43,7 +43,8 @@ class Codec {
   static const char* const SNAPPY_COMPRESSION;
 
   // Map from codec string to compression format
-  static const std::map<const std::string, const THdfsCompression> CODEC_MAP;
+  typedef std::map<const std::string, const THdfsCompression::type> CodecMap;
+  static const CodecMap CODEC_MAP;
 
   // Create a decompressor.
   // Input: 

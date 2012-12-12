@@ -175,7 +175,8 @@ class HdfsScanNode : public ScanNode {
   void SetFileMetadata(const std::string& filename, void* metadata);
 
   // Called by the scanner when a range is complete.  Used to log progress.
-  void RangeComplete();
+  void RangeComplete(const THdfsFileFormat::type& file_type, 
+      const THdfsCompression::type& compression_type);
 
   // Utility function to compute the order in which to materialize slots to allow  for
   // computing conjuncts as slots get materialized (on partial tuples).
@@ -352,6 +353,16 @@ class HdfsScanNode : public ScanNode {
   // status triggers cleanup of the disk and scanner threads.
   Status status_;
 
+  // Mapping of file formats (file type, compression type) to the number of
+  // scan ranges of that type and the lock protecting it.
+  boost::mutex file_type_counts_lock_;
+  typedef std::map<
+      std::pair<THdfsFileFormat::type, THdfsCompression::type>, int> FileTypeCountsMap;
+  FileTypeCountsMap file_type_counts_;
+
+  // If true, counters have already been reported in the runtime profile.
+  bool counters_reported_;
+
   // Issue the next set of queued ranges to the io mgr.  This is used to throttle
   // the number of scan ranges being parsed to the number of scanner threads.
   Status IssueMoreRanges();
@@ -381,6 +392,11 @@ class HdfsScanNode : public ScanNode {
   // to process the range.  This thread terminates when the scan range is complete
   // or an error occurred.
   void ScannerThread(HdfsScanner* scanner, ScanRangeContext*);
+
+  // Updates the counters for the entire scan node.  This should be called as soon
+  // as the scan node is complete (before all the spawned threads terminate) to get
+  // the most accurate results.
+  void UpdateCounters();
 };
 
 }

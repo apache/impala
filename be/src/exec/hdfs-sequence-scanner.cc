@@ -179,7 +179,7 @@ Status HdfsSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
 Status HdfsSequenceScanner::Close() {
   if (!only_parsing_header_) {
     context_->AcquirePool(unparsed_data_buffer_pool_.get());
-    scan_node_->RangeComplete();
+    scan_node_->RangeComplete(THdfsFileFormat::SEQUENCE_FILE, header_->compression_type);
   }
   context_->Complete();
   return Status::OK;
@@ -208,6 +208,12 @@ Status HdfsSequenceScanner::InitNewRange() {
     RETURN_IF_ERROR(Codec::CreateDecompressor(state_,
         unparsed_data_buffer_pool_.get(), context_->compact_data(),
         header_->codec, &decompressor_));
+
+    Codec::CodecMap::const_iterator it = Codec::CODEC_MAP.find(header_->codec);
+    DCHECK(it != Codec::CODEC_MAP.end());
+    header_->compression_type = it->second;
+  } else {
+    header_->compression_type = THdfsCompression::NONE;
   }
   
   // Initialize codegen fn

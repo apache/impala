@@ -272,6 +272,9 @@ class HdfsSequenceScanner : public HdfsScanner {
 
     // Codec name if it is compressed.
     std::string codec;
+
+    // Enum for compression type.
+    THdfsCompression::type compression_type;
   
     // End of the header block so we don't have to reparse it.
     int64_t header_size;

@@ -45,23 +45,23 @@ using namespace std;
 
 namespace impala {
 
-ostream& operator<<(ostream& os, const TExprOpcode::type& op) {
-  map<int, const char*>::const_iterator i;
-  i = _TExprOpcode_VALUES_TO_NAMES.find(op);
-  if (i != _TExprOpcode_VALUES_TO_NAMES.end()) {
-    os << i->second;
+#define THRIFT_ENUM_OUTPUT_FN_IMPL(E, MAP) \
+  ostream& operator<<(ostream& os, const E::type& e) {\
+    map<int, const char*>::const_iterator i;\
+    i = MAP.find(e);\
+    if (i != MAP.end()) {\
+      os << i->second;\
+    }\
+    return os;\
   }
-  return os;
-}
 
-ostream& operator<<(ostream& os, const TAggregationOp::type& op) {
-  map<int, const char*>::const_iterator i;
-  i = _TAggregationOp_VALUES_TO_NAMES.find(op);
-  if (i != _TAggregationOp_VALUES_TO_NAMES.end()) {
-    os << i->second;
-  }
-  return os;
-}
+// Macro to stamp out operator<< for thrift enums.  Why doesn't thrift do this?
+#define THRIFT_ENUM_OUTPUT_FN(E) THRIFT_ENUM_OUTPUT_FN_IMPL(E , _##E##_VALUES_TO_NAMES)
+
+THRIFT_ENUM_OUTPUT_FN(TExprOpcode);
+THRIFT_ENUM_OUTPUT_FN(TAggregationOp);
+THRIFT_ENUM_OUTPUT_FN(THdfsFileFormat);
+THRIFT_ENUM_OUTPUT_FN(THdfsCompression);
 
 ostream& operator<<(ostream& os, const TUniqueId& id) {
   os << PrintId(id);
