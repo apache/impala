@@ -234,13 +234,13 @@ void* Webserver::MongooseCallback(enum mg_event event, struct mg_connection* con
     if (request_info->query_string != NULL) {
       BuildArgumentMap(request_info->query_string, &arguments);
     }
-    if (arguments.find("raw") != arguments.end()) {
+    if (!it->second.is_styled() || arguments.find("raw") != arguments.end()) {
       use_style = false;
     }
 
     stringstream output;
     if (use_style) BootstrapPageHeader(&output);
-    BOOST_FOREACH(const PathHandlerCallback& callback_, it->second) {
+    BOOST_FOREACH(const PathHandlerCallback& callback_, it->second.callbacks()) {
       callback_(arguments, &output);
     }
     if (use_style) BootstrapPageFooter(&output);
@@ -260,9 +260,13 @@ void* Webserver::MongooseCallback(enum mg_event event, struct mg_connection* con
 }
 
 void Webserver::RegisterPathHandler(const string& path,
-   const PathHandlerCallback& callback) {
+    const PathHandlerCallback& callback, bool is_styled) {
   mutex::scoped_lock lock(path_handlers_lock_);
-  path_handlers_[path].push_back(callback);
+  PathHandlerMap::iterator it = path_handlers_.find(path);
+  if (it == path_handlers_.end()) {
+    it = path_handlers_.insert(make_pair(path, PathHandler(is_styled))).first;
+  }
+  it->second.AddCallback(callback);
 }
 
 const string PAGE_HEADER = "<!DOCTYPE html>"
@@ -304,8 +308,10 @@ void Webserver::BootstrapPageHeader(stringstream* output) {
   (*output) << PAGE_HEADER;
   (*output) << NAVIGATION_BAR_PREFIX;
   BOOST_FOREACH(const PathHandlerMap::value_type& handler, path_handlers_) {
-    (*output) << "<li><a href=\"" << handler.first << "\">" << handler.first 
-              << "</a></li>";
+    if (handler.second.is_styled()) {
+      (*output) << "<li><a href=\"" << handler.first << "\">" << handler.first 
+                << "</a></li>";
+    }
   }  
   (*output) << NAVIGATION_BAR_SUFFIX;
 }

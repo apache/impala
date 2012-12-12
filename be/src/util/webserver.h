@@ -51,10 +51,37 @@ class Webserver {
   void Stop();
 
   // Register a callback for a URL path. Path should not include the
-  // http://hostname/ prefix.
-  void RegisterPathHandler(const std::string& path, const PathHandlerCallback& callback);
+  // http://hostname/ prefix. If is_styled is true, a link to this page is
+  // printed in the navigation bar at the top of each debug page. Otherwise the
+  // link does not appear, and the page is rendered without HTML headers and
+  // footers. This option is used for pages that are typically read by machine.
+  // The first registration's choice of is_styled overrides all
+  // subsequent registrations for that URL.
+  void RegisterPathHandler(const std::string& path, const PathHandlerCallback& callback,
+                           bool is_styled = true);
 
  private:
+  // Container class for a list of path handler callbacks for a single URL.
+  class PathHandler {
+   public:
+    PathHandler(bool is_styled) 
+        : is_styled_(is_styled) {};
+
+    void AddCallback(const PathHandlerCallback& callback) {
+      callbacks_.push_back(callback);
+    }
+
+    bool is_styled() const { return is_styled_; }
+    const std::vector<PathHandlerCallback>& callbacks() const { return callbacks_; }
+
+   private:
+    // If true, the page appears in the navigation bar.
+    bool is_styled_;
+
+    // List of callbacks to render output for this page, called in order.
+    std::vector<PathHandlerCallback> callbacks_;
+  };
+
   // Renders a common Bootstrap-styled header 
   void BootstrapPageHeader(std::stringstream* output);
 
@@ -81,10 +108,10 @@ class Webserver {
   // Lock guarding the path_handlers_ map
   boost::mutex path_handlers_lock_;
 
-  // Map of path to a list of handlers for that path. More than one handler may
-  // register itself with a path so that many components may contribute to a
-  // single page.
-  typedef std::map<std::string, std::vector<PathHandlerCallback> > PathHandlerMap;
+  // Map of path to a PathHandler containing a list of handlers for that
+  // path. More than one handler may register itself with a path so that many
+  // components may contribute to a single page.
+  typedef std::map<std::string, PathHandler> PathHandlerMap;
   PathHandlerMap path_handlers_;
 
   const int port_;
