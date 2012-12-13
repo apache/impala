@@ -598,8 +598,10 @@ if __name__ == "__main__":
   parser.add_option("-s", "--kerberos_service_name",
                     dest="kerberos_service_name", default=None,
                     help="Service name of a kerberized impalad, default is 'impala'")
-  parser.add_option("-V", "--verbose", dest="verbose", default=False, action="store_true",
+  parser.add_option("-V", "--verbose", dest="verbose", default=True, action="store_true",
                     help="Enable verbose output")
+  parser.add_option("--quiet", dest="verbose", default=True, action="store_false",
+                    help="Disable verbose output")
   parser.add_option("-v", "--version", dest="version", default=False, action="store_true",
                     help="Print version information")
   parser.add_option("-c", "--ignore_query_failure", dest="ignore_query_failure",
