@@ -372,7 +372,7 @@ public class HdfsTable extends Table {
                 "Compressed file not supported without compression input format: " + p);
           }
         } else if (compressionType != HdfsCompression.NONE) {
-          throw new RuntimeException("Compressed file not supported: " + p);
+          throw new RuntimeException("Compressed text files are not supported: " + p);
         } else if (sd.getFileFormat() == HdfsFileFormat.LZO_TEXT) {
           throw new RuntimeException("Expected file with .lzo suffix: " + p);
         }

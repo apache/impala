@@ -86,6 +86,9 @@ class TestMatrix(object):
   def add_dimension(self, vector_value_list):
     self.vector_value_lists[vector_value_list.name] = vector_value_list
 
+  def clear(self):
+    self.vector_value_lists.clear()
+
   def generate_test_vectors(self, exploration_strategy):
     # TODO: Check valid exploration strategies, provide more options for exploration
     if exploration_strategy == 'exhaustive':
