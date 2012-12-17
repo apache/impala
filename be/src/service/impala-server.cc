@@ -1631,6 +1631,7 @@ Status ImpalaServer::QueryToTClientRequest(const Query& query,
   request->queryOptions = default_query_options_;
   request->queryOptions.return_as_ascii = true;
   request->stmt = query.query;
+  VLOG_QUERY << "query: " << ThriftDebugString(query);
   {
     lock_guard<mutex> l_(session_state_map_lock_);
     SessionStateMap::iterator it = 
@@ -1675,6 +1676,7 @@ Status ImpalaServer::ParseQueryOptions(const string& options,
       LOG(WARNING) << ss.str();
       return Status(ss.str());
     } else {
+      VLOG_QUERY << "option " << option << " value " << key_value[1];
       switch (option) {
         case TImpalaQueryOptions::ABORT_ON_ERROR:
           query_options->abort_on_error =
@@ -1702,13 +1704,12 @@ Status ImpalaServer::ParseQueryOptions(const string& options,
         case TImpalaQueryOptions::NUM_SCANNER_THREADS:
           query_options->num_scanner_threads = atoi(key_value[1].c_str());
           break;
-        case TImpalaQueryOptions::PARTITION_AGG:
-          query_options->partition_agg =
-              iequals(key_value[1], "true") || iequals(key_value[1], "1");
-            break;
         case TImpalaQueryOptions::ALLOW_UNSUPPORTED_FORMATS:
           query_options->allow_unsupported_formats =
               iequals(key_value[1], "true") || iequals(key_value[1], "1");
+            break;
+        case TImpalaQueryOptions::DEFAULT_ORDER_BY_LIMIT:
+          query_options->__set_default_order_by_limit(atoi(key_value[1].c_str()));
             break;
         default:
           // We hit this DCHECK(false) if we forgot to add the corresponding entry here
@@ -1951,11 +1952,11 @@ void ImpalaServer::InitializeConfigVariables() {
       case TImpalaQueryOptions::NUM_SCANNER_THREADS:
         value << default_query_options_.num_scanner_threads;
         break;
-      case TImpalaQueryOptions::PARTITION_AGG:
-        value << default_query_options_.partition_agg;
-        break;
       case TImpalaQueryOptions::ALLOW_UNSUPPORTED_FORMATS:
         value << default_query_options_.allow_unsupported_formats;
+        break;
+      case TImpalaQueryOptions::DEFAULT_ORDER_BY_LIMIT:
+        value << default_query_options_.default_order_by_limit;
         break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here

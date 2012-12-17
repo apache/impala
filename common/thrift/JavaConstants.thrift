@@ -54,6 +54,6 @@ const map<ImpalaService.TImpalaQueryOptions, string> DEFAULT_QUERY_OPTIONS = {
   ImpalaService.TImpalaQueryOptions.MAX_SCAN_RANGE_LENGTH : "0",
   ImpalaService.TImpalaQueryOptions.MAX_IO_BUFFERS : "0"
   ImpalaService.TImpalaQueryOptions.NUM_SCANNER_THREADS : "0"
-  ImpalaService.TImpalaQueryOptions.PARTITION_AGG : "false"
   ImpalaService.TImpalaQueryOptions.ALLOW_UNSUPPORTED_FORMATS : "false"
+  ImpalaService.TImpalaQueryOptions.DEFAULT_ORDER_BY_LIMIT : "-1"
 }

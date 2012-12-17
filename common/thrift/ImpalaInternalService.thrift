@@ -31,6 +31,8 @@ include "ImpalaService.thrift"
 include "JavaConstants.thrift"
 
 // Query options that correspond to ImpalaService.ImpalaQueryOptions
+// TODO: make all of these optional, otherwise it will be impossible to
+// retire options and do rolling upgrades between releases
 struct TQueryOptions {
   1: required bool abort_on_error = 0
   2: required i32 max_errors = 0
@@ -49,7 +51,7 @@ struct TQueryOptions {
   8: required i32 num_scanner_threads = 0
   9: required i32 max_io_buffers = 0
   10: required bool allow_unsupported_formats = 0
-  11: required bool partition_agg = 0
+  11: optional i64 default_order_by_limit = -1
 }
 
 // A scan range plus the parameters needed to execute that scan.

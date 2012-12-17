@@ -62,13 +62,13 @@ enum TImpalaQueryOptions {
   // Number of scanner threads.
   NUM_SCANNER_THREADS,
 
-  // boolean; if true, do a distributed aggregation, which reduces the per-node memory
-  // consumption, but may require an additional repartitioning step on the grouping
-  // exprs; ignored if no grouping
-  PARTITION_AGG,
-  
   // If true, Impala will try to execute on file formats that are not fully supported yet
-  ALLOW_UNSUPPORTED_FORMATS
+  ALLOW_UNSUPPORTED_FORMATS,
+
+  // if set and > -1, specifies the default limit applied to a top-level SELECT statement
+  // with an ORDER BY but without a LIMIT clause (ie, if the SELECT statement also has
+  // a LIMIT clause, this default is ignored)
+  DEFAULT_ORDER_BY_LIMIT,
 }
 
 // The summary of an insert.

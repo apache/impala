@@ -33,7 +33,7 @@ public class TestExecContext {
     queryOptions.num_scanner_threads = 1;
     queryOptions.max_io_buffers = 0;
     queryOptions.allow_unsupported_formats = allowUnsupportedFormats;
-    queryOptions.partition_agg = partitionAgg;
+    queryOptions.default_order_by_limit = -1;
   }
 
   public TestExecContext(int numNodes, int batchSize, boolean disableCodegen,
