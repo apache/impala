@@ -251,7 +251,13 @@ string PrintBatch(RowBatch* batch) {
 string GetBuildVersion() {
   stringstream ss;
   ss << Version::BUILD_VERSION
-     << " (build " << Version::BUILD_HASH << ")" << endl
+#ifdef NDEBUG
+     << " release"
+#else
+     << " debug"
+#endif
+     << " (build " << Version::BUILD_HASH
+     << ")" << endl
      << "Built on " << Version::BUILD_TIME;
   return ss.str();
 }
