@@ -53,6 +53,7 @@
 #include "sparrow/simple-scheduler.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
+#include "util/impalad-metric-keys.h"
 #include "util/string-parser.h"
 #include "util/thrift-util.h"
 #include "util/thrift-server.h"
@@ -105,8 +106,6 @@ ThreadManager* be_tm;
 
 // Used for queries that execute instantly and always succeed
 const string NO_QUERY_HANDLE = "no_query_handle";
-
-const string NUM_QUERIES_METRIC = "impala-server.num.queries";
 
 // Execution state of a query. This captures everything necessary
 // to convert row batches received by the coordinator into results
@@ -709,8 +708,12 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       bind<void>(mem_fn(&ImpalaServer::QueryProfilePathHandler), this, _1, _2);
   exec_env->webserver()->RegisterPathHandler("/query_profile", profile_callback);
 
-  num_queries_metric_ = 
-      exec_env->metrics()->CreateAndRegisterPrimitiveMetric(NUM_QUERIES_METRIC, 0L);
+  num_queries_metric_ = exec_env->metrics()->CreateAndRegisterPrimitiveMetric(
+      ImpaladMetricKeys::NUM_QUERIES, 0L);
+  exec_env->metrics()->CreateAndRegisterPrimitiveMetric(
+      ImpaladMetricKeys::TOTAL_SCAN_RANGES_PROCESSED, 0L);
+  exec_env->metrics()->CreateAndRegisterPrimitiveMetric(
+      ImpaladMetricKeys::NUM_SCAN_RANGES_MISSING_VOLUME_ID, 0L);
 }
 
 void ImpalaServer::RenderHadoopConfigs(const Webserver::ArgumentMap& args,
