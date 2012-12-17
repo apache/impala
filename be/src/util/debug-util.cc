@@ -252,9 +252,9 @@ string GetBuildVersion() {
   stringstream ss;
   ss << Version::BUILD_VERSION
 #ifdef NDEBUG
-     << " release"
+     << " RELEASE"
 #else
-     << " debug"
+     << " DEBUG"
 #endif
      << " (build " << Version::BUILD_HASH
      << ")" << endl
