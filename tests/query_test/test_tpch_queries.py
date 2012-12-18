@@ -94,12 +94,8 @@ class TestTpchQuery(ImpalaTestSuite):
   def test_tpch_q20(self, vector):
     self.run_test_case('tpch-q20', vector)
 
-  # TODO: Disabled due to outer join bug
-  @pytest.mark.xfail(run=False)
   def test_tpch_q21(self, vector):
     self.run_test_case('tpch-q21', vector)
 
-  # TODO: Disabled due to outer join bug
-  @pytest.mark.xfail(run=False)
   def test_tpch_q22(self, vector):
     self.run_test_case('tpch-q22', vector)

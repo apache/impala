@@ -33,8 +33,6 @@ RELOAD tpch.q22_customer_tmp1
 # removed subquery by pushing aggregation up a level, added temp table
 # to remove another subquery that computed the average account balance,
 # added limit, added round()
-# TODO: Results are from Hive, Impala returning wrong results due to
-# bug IMP-137
 select
   substring(c_phone, 1, 2) as cntrycode,
   count(*) as numcust,
