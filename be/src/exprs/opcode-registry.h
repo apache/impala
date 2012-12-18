@@ -18,6 +18,7 @@
 
 #include <string>
 #include <vector>
+#include <boost/thread/mutex.hpp>
 #include "common/logging.h"
 #include "exprs/expr.h"   // For ComputeFn typedef
 #include "gen-cpp/Opcodes_types.h"
@@ -41,8 +42,11 @@ class OpcodeRegistry {
   // Registry is a singleton
   static OpcodeRegistry* Instance() {
     if (instance_ == NULL) {
-      instance_ = new OpcodeRegistry();
-      instance_->Init();
+      boost::lock_guard<boost::mutex> l(instance_lock_);
+      if (instance_ == NULL) {
+        instance_ = new OpcodeRegistry();
+        instance_->Init();
+      }
     }
     return instance_;
   }
@@ -67,6 +71,7 @@ class OpcodeRegistry {
   }
 
   static OpcodeRegistry* instance_;
+  static boost::mutex instance_lock_;
   std::vector<Expr::ComputeFn> functions_;
 };
 

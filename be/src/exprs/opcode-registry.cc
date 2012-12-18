@@ -14,9 +14,12 @@
 
 #include "exprs/opcode-registry.h"
 
+using namespace boost;
+
 namespace impala {
 
 OpcodeRegistry* OpcodeRegistry::instance_ = NULL;
+mutex OpcodeRegistry::instance_lock_;
 
 }
 
