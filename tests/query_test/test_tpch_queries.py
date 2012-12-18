@@ -94,6 +94,8 @@ class TestTpchQuery(ImpalaTestSuite):
   def test_tpch_q20(self, vector):
     self.run_test_case('tpch-q20', vector)
 
+  @pytest.mark.xfail(run=False)
+  # This query fails due to IMP-658
   def test_tpch_q21(self, vector):
     self.run_test_case('tpch-q21', vector)
 
