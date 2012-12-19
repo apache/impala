@@ -2,17 +2,8 @@
 
 package com.cloudera.impala.service;
 
-import static org.junit.Assert.fail;
-
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
-
-import org.junit.Assert;
-import org.junit.Test;
-
-import com.cloudera.impala.catalog.Catalog;
-import com.cloudera.impala.common.ImpalaException;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.junit.Test;
 
 public class FrontendTest {
 

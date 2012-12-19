@@ -100,7 +100,9 @@ public class HdfsTable extends Table {
      * volumn id is not supported.
      */
     public int getVolumeId(int hostIndex) {
-      if (diskIds == null) return -1;
+      if (diskIds == null) {
+        return -1;
+      }
       Preconditions.checkArgument(hostIndex >= 0);
       Preconditions.checkArgument(hostIndex < diskIds.length);
       return diskIds[hostIndex];
@@ -350,6 +352,7 @@ public class HdfsTable extends Table {
       throw new RuntimeException("couldn't retrieve FileSystem:\n" + e.getMessage(), e);
     }
 
+    LOG.info("getting file block locations");
     for (HdfsPartition partition: partitions) {
       for (FileDescriptor fileDescriptor: partition.getFileDescriptors()) {
         Path p = new Path(fileDescriptor.getFilePath());
@@ -397,6 +400,7 @@ public class HdfsTable extends Table {
       }
     }
 
+    LOG.info("getting  block storage locations");
     if (supportsVolumeId) {
       try {
         // Get the BlockStorageLocations for all the blocks
@@ -449,7 +453,9 @@ public class HdfsTable extends Table {
               diskIds[j] = index;
             }
           }
-          if (found_null) break;
+          if (found_null) {
+            break;
+          }
           result.add(new BlockMetadata(locations[i], diskIds));
         }
       } catch (IOException e) {
@@ -469,6 +475,7 @@ public class HdfsTable extends Table {
     }
 
     // Construct block metadata to also include file names and partition information
+    LOG.info("setting per-block file names and partitions");
     int firstBlockIndex = 0;
     int fileIndex = 0;
     for (HdfsPartition partition: partitions) {

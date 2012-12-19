@@ -88,6 +88,7 @@ public class Planner {
     }
     Analyzer analyzer = analysisResult.getAnalyzer();
 
+    LOG.info("create single-node plan");
     PlanNode singleNodePlan = createQueryPlan(queryStmt, analyzer);
     //LOG.info("single-node plan:"
         //+ singleNodePlan.getExplainString("", TExplainLevel.VERBOSE));
@@ -103,6 +104,7 @@ public class Planner {
       if (analysisResult.isInsertStmt() && !queryStmt.hasLimitClause()) {
           isPartitioned = true;
       }
+      LOG.info("create plan fragments");
       createPlanFragments(
           singleNodePlan, isPartitioned, queryOptions.partition_agg,
           fragments);
@@ -116,6 +118,7 @@ public class Planner {
     // set output exprs before calling finalize()
     rootFragment.setOutputExprs(queryStmt.getResultExprs());
 
+    LOG.info("finalize plan fragments");
     for (PlanFragment fragment: fragments) {
       fragment.finalize(analyzer, !queryOptions.allow_unsupported_formats);
     }
@@ -650,7 +653,7 @@ public class Planner {
       throws NotImplementedException, InternalException {
     // determine which conjuncts can be evaluated inside the subquery tree
     List<Predicate> conjuncts = Lists.newArrayList();
-    for (Predicate p: 
+    for (Predicate p:
         analyzer.getUnassignedConjuncts(inlineViewRef.getMaterializedTupleIds())) {
       //LOG.info("view pred: " + p.toSql());
       if (canEvalPredicate(inlineViewRef.getMaterializedTupleIds(), p, analyzer)) {

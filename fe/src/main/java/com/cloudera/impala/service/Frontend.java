@@ -41,8 +41,8 @@ import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
 import com.cloudera.impala.common.NotImplementedException;
-import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.planner.PlanFragment;
+import com.cloudera.impala.planner.Planner;
 import com.cloudera.impala.planner.ScanNode;
 import com.cloudera.impala.thrift.TCatalogUpdate;
 import com.cloudera.impala.thrift.TClientRequest;
@@ -211,7 +211,7 @@ public class Frontend {
     AnalysisContext analysisCtxt =
         new AnalysisContext(catalog, request.sessionState.database);
     AnalysisContext.AnalysisResult analysisResult = null;
-    LOG.info("createExecRequest for query " + request.stmt);
+    LOG.info("analyze query " + request.stmt);
     try {
       analysisResult = analysisCtxt.analyze(request.stmt);
     } catch (AnalysisException e) {
@@ -243,6 +243,7 @@ public class Frontend {
     result.setQuery_exec_request(queryExecRequest);
 
     // create plan
+    LOG.info("create plan");
     Planner planner = new Planner();
     ArrayList<PlanFragment> fragments =
         planner.createPlanFragments(analysisResult, request.queryOptions);
@@ -274,6 +275,7 @@ public class Frontend {
     }
 
     // set scan ranges/locations for scan nodes
+    LOG.info("get scan range locations");
     for (ScanNode scanNode: scanNodes) {
       queryExecRequest.putToPer_node_scan_ranges(
           scanNode.getId().asInt(),
@@ -286,6 +288,7 @@ public class Frontend {
 
     if (analysisResult.isQueryStmt()) {
       // fill in the metadata
+      LOG.info("create result set metadata");
       result.stmt_type = TStmtType.QUERY;
       TResultSetMetadata metadata = new TResultSetMetadata();
       QueryStmt queryStmt = analysisResult.getQueryStmt();
