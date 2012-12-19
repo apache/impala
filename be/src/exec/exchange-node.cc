@@ -56,6 +56,11 @@ Status ExchangeNode::Open(RuntimeState* state) {
 
 Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* eos) {
   SCOPED_TIMER(runtime_profile_->total_time_counter());
+  if (ReachedLimit()) {
+    *eos = true;
+    return Status::OK;
+  }
+
   bool is_cancelled;
   scoped_ptr<RowBatch> input_batch(stream_recvr_->GetBatch(&is_cancelled));
   VLOG_FILE << "exch: has batch=" << (input_batch.get() == NULL ? "false" : "true")
@@ -77,10 +82,6 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
   DCHECK(input_batch->row_desc().IsPrefixOf(output_batch->row_desc()));
   int i = 0;
   for (; i < input_batch->num_rows(); ++i) {
-    if (ReachedLimit()) {
-      *eos = true;
-      break;
-    }
     TupleRow* src = input_batch->GetRow(i);
     int j = output_batch->AddRow();
     DCHECK_EQ(i, j);
@@ -89,8 +90,12 @@ Status ExchangeNode::GetNext(RuntimeState* state, RowBatch* output_batch, bool* 
     // rows in output_batch
     input_batch->CopyRow(src, dest);
     output_batch->CommitLastRow();
+    ++num_rows_returned_;
+    if (ReachedLimit()) {
+      *eos = true;
+      break;
+    }
   }
-  num_rows_returned_ += i;
   COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   input_batch->TransferResourceOwnership(output_batch);
   return Status::OK;
