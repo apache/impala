@@ -1,4 +1,4 @@
-file_format: text,seq,rc,trevni
+file_format: text,seq,rc
 dataset: tpcds
 compression_codec: none,def,gzip,bzip,snap
 compression_type: none,block,record
