@@ -298,6 +298,7 @@ class HdfsScanNode : public ScanNode {
   ProgressUpdater progress_;
 
   // Scanner specific per file metadata (e.g. header information) and associated lock.
+  // This lock cannot be taken together with any other locks except lock_.
   boost::mutex metadata_lock_;
   std::map<std::string, void*> per_file_metadata_;
 
@@ -307,6 +308,7 @@ class HdfsScanNode : public ScanNode {
   // Lock and condition variable protecting materialized_row_batches_.  Row batches
   // are produced by the scanner threads and consumed by the main thread in GetNext
   // Lock to protect materialized_row_batches_
+  // This lock cannot be taken together with any other locks except lock_.
   boost::mutex row_batches_lock_;
   boost::condition_variable row_batch_added_cv_;
   std::list<RowBatch*> materialized_row_batches_;
@@ -317,8 +319,8 @@ class HdfsScanNode : public ScanNode {
   bool done_;
 
   // Lock protects access between scanner thread and main query thread (the one calling
-  // GetNext()) for all fields below.  If this lock and one of the condition variable
-  // locks needs to be take together, this lock must be taken first.
+  // GetNext()) for all fields below.  If this lock and any other locks needs to be taken
+  // together, this lock must be taken first.
   // This lock is recursive since some of the functions provided to the scanner are
   // also called from internal functions.
   // TODO: we can split out 'external' functions for internal functions and make this
@@ -355,6 +357,7 @@ class HdfsScanNode : public ScanNode {
 
   // Mapping of file formats (file type, compression type) to the number of
   // scan ranges of that type and the lock protecting it.
+  // This lock cannot be taken together with any other locks except lock_.
   boost::mutex file_type_counts_lock_;
   typedef std::map<
       std::pair<THdfsFileFormat::type, THdfsCompression::type>, int> FileTypeCountsMap;

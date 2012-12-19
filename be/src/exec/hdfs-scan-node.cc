@@ -91,7 +91,8 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
   }
 
   *eos = false;
-  while (true) {
+  RowBatch* materialized_batch = NULL;
+  {
     unique_lock<mutex> l(row_batches_lock_);
     while (materialized_row_batches_.empty() && !done_) {
       row_batch_added_cv_.wait(l);
@@ -101,36 +102,36 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
     if (!status_.ok()) return status_;
 
     if (!materialized_row_batches_.empty()) {
-      RowBatch* materialized_batch = materialized_row_batches_.front();
+      materialized_batch = materialized_row_batches_.front();
       materialized_row_batches_.pop_front();
-
-      row_batch->Swap(materialized_batch);
-      // Update the number of materialized rows instead of when they are materialized.
-      // This means that scanners might process and queue up more rows that are necessary
-      // for the limit case but we want to avoid the synchronized writes to 
-      // num_rows_returned_
-      num_rows_returned_ += row_batch->num_rows();
-      COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-      
-      if (ReachedLimit()) {
-        int num_rows_over = num_rows_returned_ - limit_;
-        row_batch->set_num_rows(row_batch->num_rows() - num_rows_over);
-        num_rows_returned_ -= num_rows_over;
-        COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-
-        *eos = true;
-        UpdateCounters();
-        // Wake up disk thread notifying it we are done.  This triggers tear down
-        // of the scanner threads.
-        done_ = true;
-        state->io_mgr()->CancelReader(reader_context_);
-      }
-      delete materialized_batch;
-      return Status::OK;
-    } else {
-      break;
     }
-  } 
+  }
+
+  if (materialized_batch != NULL) {
+    row_batch->Swap(materialized_batch);
+    // Update the number of materialized rows instead of when they are materialized.
+    // This means that scanners might process and queue up more rows that are necessary
+    // for the limit case but we want to avoid the synchronized writes to
+    // num_rows_returned_
+    num_rows_returned_ += row_batch->num_rows();
+    COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+
+    if (ReachedLimit()) {
+      int num_rows_over = num_rows_returned_ - limit_;
+      row_batch->set_num_rows(row_batch->num_rows() - num_rows_over);
+      num_rows_returned_ -= num_rows_over;
+      COUNTER_SET(rows_returned_counter_, num_rows_returned_);
+
+      *eos = true;
+      UpdateCounters();
+      // Wake up disk thread notifying it we are done.  This triggers tear down
+      // of the scanner threads.
+      done_ = true;
+      state->io_mgr()->CancelReader(reader_context_);
+    }
+    delete materialized_batch;
+    return Status::OK;
+  }
 
   // TODO: remove when all scanners are updated to use io mgr.
   if (current_scanner_ == NULL) {
