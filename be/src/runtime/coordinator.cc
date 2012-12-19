@@ -196,6 +196,7 @@ int64_t Coordinator::BackendExecState::UpdateNumScanRangesCompleted() {
 Coordinator::Coordinator(ExecEnv* exec_env)
   : exec_env_(exec_env),
     has_called_wait_(false),
+    returned_all_results_(false),
     executor_(NULL), // Set in Prepare()
     num_backends_(0),
     num_remaining_backends_(0),
@@ -358,9 +359,14 @@ Status Coordinator::GetStatus() {
   return query_status_;
 }
 
-Status Coordinator::UpdateStatus(const Status& status, const TUniqueId* id) {
+Status Coordinator::UpdateStatus(const Status& status, const TUniqueId* instance_id) {
   {
     lock_guard<mutex> l(lock_);
+  
+    // The query is done and we are just waiting for remote fragments to clean up.
+    // Ignore their cancelled updates.
+    if (returned_all_results_ && status.IsCancelled()) return query_status_;
+
     // nothing to update
     if (status.ok()) return query_status_;
 
@@ -372,9 +378,9 @@ Status Coordinator::UpdateStatus(const Status& status, const TUniqueId* id) {
   }
 
   // Log the id of the fragment that first failed so we can track it down easier.
-  if (id != NULL) {
+  if (instance_id != NULL) {
     VLOG_QUERY << "Query id=" << query_id_ << " failed because fragment id="
-               << *id << " failed.";
+               << *instance_id << " failed.";
   }
 
   return query_status_;
@@ -548,6 +554,20 @@ Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
   RETURN_IF_ERROR(UpdateStatus(status, &runtime_state()->fragment_instance_id()));
 
   if (*batch == NULL) {
+    returned_all_results_ = true;
+    if (executor_->ReachedLimit()) {
+      // We've reached the query limit, cancel the remote fragments.  The
+      // Exchange node on our fragment is no longer receiving rows so the 
+      // remote fragments must be explicitly cancelled.
+      CancelRemoteFragments();
+      RuntimeState* state = runtime_state();
+      if (state != NULL) {
+        // Cancel the streams receiving batches.  The exchange nodes that would
+        // normally read from the streams are done.
+        state->stream_mgr()->Cancel(state->fragment_instance_id());
+      }
+    }
+
     // Don't return final NULL until all backends have completed.
     // GetNext must wait for all backends to complete before
     // ultimately signalling the end of execution via a NULL
@@ -744,7 +764,14 @@ void Coordinator::CancelInternal() {
 
   // cancel local fragment
   if (executor_.get() != NULL) executor_->Cancel();
+  
+  CancelRemoteFragments();
 
+  // Report the summary with whatever progress the query made before being cancelled.
+  ReportQuerySummary();
+}
+
+void Coordinator::CancelRemoteFragments() {
   for (int i = 0; i < backend_exec_states_.size(); ++i) {
     BackendExecState* exec_state = backend_exec_states_[i];
 
@@ -756,14 +783,14 @@ void Coordinator::CancelInternal() {
     // no need to cancel if we already know it terminated w/ an error status
     if (!exec_state->status.ok()) continue;
 
-    // set an error status to make sure we only cancel this once
-    exec_state->status = Status::CANCELLED;
-
     // Nothing to cancel if the exec rpc was not sent
     if (!exec_state->initiated) continue;
 
     // don't cancel if it already finished
     if (exec_state->done) continue;
+    
+    // set an error status to make sure we only cancel this once
+    exec_state->status = Status::CANCELLED;
 
     // if we get an error while trying to get a connection to the backend,
     // keep going
@@ -816,9 +843,6 @@ void Coordinator::CancelInternal() {
 
   // notify that we completed with an error
   backend_completion_cv_.notify_all();
-
-  // Report the summary with whatever progress the query made before being cancelled.
-  ReportQuerySummary();
 }
 
 Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& params) {
@@ -890,9 +914,10 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
               << "\n" << s.str();
   }
 
-  // for now, abort the query if we see any error
+  // for now, abort the query if we see any error except if the error is cancelled
+  // and returned_all_results_ is true.
   // (UpdateStatus() initiates cancellation, if it hasn't already been initiated)
-  if (!status.ok()) {
+  if (!(returned_all_results_ && status.IsCancelled()) && !status.ok()) {
     UpdateStatus(status, &exec_state->fragment_instance_id);
     return Status::OK;
   }

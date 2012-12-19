@@ -106,7 +106,8 @@ class DataStreamMgr {
     // if the count drops to 0.
     void DecrementSenders();
 
-    // Set cancellation flag and signal cancellation to receiver.
+    // Set cancellation flag and signal cancellation to receiver and sender. Subsequent
+    // incoming batches will be dropped.
     void CancelStream();
 
     const TUniqueId& fragment_id() const { return fragment_id_; }

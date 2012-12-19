@@ -11,8 +11,7 @@ from tests.common.test_vector import *
 from tests.util.test_file_parser import QueryTestSectionReader
 
 class TestLimit(ImpalaTestSuite):
-  # TODO: add larger limits when IMP-660 is fixed
-  LIMIT_VALUES = [0, 1, 2, 3, 4, 5, 10] 
+  LIMIT_VALUES = [0, 1, 2, 3, 4, 5, 10, 100, 5000] 
   QUERIES = ["select * from tpch.lineitem$TABLE limit %d"]
 
   # TODO: we should be able to run count(*) in setup rather than hardcoding the values
@@ -31,9 +30,12 @@ class TestLimit(ImpalaTestSuite):
     cls.TestMatrix.add_dimension(
         TestDimension('limit_value', *TestLimit.LIMIT_VALUES))
     cls.TestMatrix.add_dimension(TestDimension('query', *TestLimit.QUERIES))
+    
+    # Don't run with large limits and tiny batch sizes.  This generates excessive
+    # network traffic and makes the machine run very slowly.
+    cls.TestMatrix.add_constraint(lambda v:\
+        v.get_value('limit_value') < 100 or v.get_value('exec_option')['batch_size'] == 0)
 
-  # Disable test due to IMP-660
-  @pytest.mark.xfail(run=False)
   def test_limit(self, vector):
     # We can't validate the rows that are returned since that is non-deterministic.
     # This is why this is a python test rather than a .test.

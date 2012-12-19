@@ -23,7 +23,7 @@ using namespace boost::algorithm;
 namespace impala {
 
 const Status Status::OK;
-const Status Status::CANCELLED(TStatusCode::CANCELLED);
+const Status Status::CANCELLED(TStatusCode::CANCELLED, "Cancelled");
 
 Status::ErrorDetail::ErrorDetail(const TStatus& status)
   : error_code(status.status_code),

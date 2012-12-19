@@ -244,6 +244,12 @@ class Coordinator {
   // status or to CANCELLED, if Cancel() is called.
   Status query_status_;
 
+  // If true, the query is done returning all results.  It is possible that the 
+  // coordinator still needs to wait for cleanup on remote fragments (e.g. queries 
+  // with limit)
+  // Once this is set to true, errors from remote fragments are ignored.
+  bool returned_all_results_;
+
   // execution state of coordinator fragment
   boost::scoped_ptr<PlanFragmentExecutor> executor_;
 
@@ -404,6 +410,11 @@ class Coordinator {
 
   // Runs cancel logic. Assumes that lock_ is held.
   void CancelInternal();
+
+  // Cancels remote fragments. Assumes that lock_ is held.  This can be called when
+  // the query is not being cancelled in the case where the query limit is
+  // reached.
+  void CancelRemoteFragments();
 
   // Returns query_status_.
   Status GetStatus();

@@ -91,12 +91,18 @@ void DataStreamMgr::StreamControlBlock::AddBatch(const TRowBatch& thrift_batch) 
   DCHECK_GT(num_remaining_senders_, 0);
   // if there's something in the queue and this batch will push us over the
   // buffer limit we need to wait until the batch gets drained
-  while (!batch_queue_.empty() && num_buffered_bytes_ + batch_size > buffer_limit_) {
+  while (!batch_queue_.empty() && num_buffered_bytes_ + batch_size > buffer_limit_ &&
+      !is_cancelled_) {
     VLOG_ROW << " wait removal: empty=" << (batch_queue_.empty() ? 1 : 0)
              << " #buffered=" << num_buffered_bytes_
              << " batch_size=" << batch_size << "\n";
     data_removal_.wait(l);
   }
+
+  // If we've been cancelled, just return and drop the incoming row batch.  This lets
+  // senders (remote fragments) get unblocked.
+  if (is_cancelled_) return;
+
   VLOG_ROW << "added #rows=" << batch->num_rows()
            << " batch_size=" << batch_size << "\n";
   batch_queue_.push_back(make_pair(batch_size, batch));
@@ -115,11 +121,16 @@ void DataStreamMgr::StreamControlBlock::DecrementSenders() {
 }
 
 void DataStreamMgr::StreamControlBlock::CancelStream() {
-  lock_guard<mutex> l(lock_);
-  is_cancelled_ = true;
-  VLOG_QUERY << "cancelled stream: fragment_id=" << fragment_id_
-             << " node_id=" << dest_node_id_;
-  data_arrival_.notify_one();
+  {
+    lock_guard<mutex> l(lock_);
+    is_cancelled_ = true;
+    VLOG_QUERY << "cancelled stream: fragment_id=" << fragment_id_
+              << " node_id=" << dest_node_id_;
+  }
+  // Wake up all threads waiting to produce/consume batches.  They will all
+  // notice that the stream is cancelled and handle it.
+  data_arrival_.notify_all();
+  data_removal_.notify_all();
 }
 
 inline uint32_t DataStreamMgr::GetHashValue(
@@ -187,11 +198,9 @@ Status DataStreamMgr::CloseSender(
   VLOG_FILE << "CloseSender(): fragment_id=" << fragment_id << ", node=" << dest_node_id;
   shared_ptr<StreamControlBlock> cb = FindControlBlock(fragment_id, dest_node_id);
   if (cb == NULL) {
-    stringstream err;
-    err << "unknown row batch destination: fragment_id=" << fragment_id
-        << " node_id=" << dest_node_id;
-    LOG(ERROR) << err.str();
-    return Status(err.str());
+    // TODO: it is possible that the control block has been torn down by another
+    // thread so this is innocuous.  How can we determine if this is a real issue? 
+    return Status::OK;
   }
   cb->DecrementSenders();
   return Status::OK;

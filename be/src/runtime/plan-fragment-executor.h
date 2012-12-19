@@ -108,6 +108,9 @@ class PlanFragmentExecutor {
   // Initiate cancellation. Must not be called until after Prepare() returned.
   void Cancel();
 
+  // Returns true if this query has a limit and it has been reached.
+  bool ReachedLimit();
+
   // call these only after Prepare()
   RuntimeState* runtime_state() { return runtime_state_.get(); }
   const RowDescriptor& row_desc();

@@ -319,11 +319,10 @@ void PlanFragmentExecutor::SendReport(bool done) {
     lock_guard<mutex> l(status_lock_);
     status = status_;
   }
-  // don't send a final report if we got cancelled, nobody's going to look at it
-  // anyway
-  if (!status.IsCancelled()) {
-    report_status_cb_(status, profile(), done || !status.ok());
-  }
+  // This will send a report even if we are cancelled.  If the query completed correctly
+  // but fragments still need to be cancelled (e.g. limit reached), the coordinator will
+  // be waiting for a final report and profile.
+  report_status_cb_(status, profile(), done || !status.ok());
 }
 
 void PlanFragmentExecutor::StopReportThread() {
@@ -393,6 +392,10 @@ const RowDescriptor& PlanFragmentExecutor::row_desc() {
 
 RuntimeProfile* PlanFragmentExecutor::profile() {
   return runtime_state_->runtime_profile();
+}
+
+bool PlanFragmentExecutor::ReachedLimit() {
+  return plan_->ReachedLimit();
 }
 
 }
