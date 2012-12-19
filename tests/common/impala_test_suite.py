@@ -163,11 +163,10 @@ class ImpalaTestSuite(BaseTestSuite):
 
     LOG.info('Executing Query: \n%s\n' % query)
     # Set the specified query exec options, if specified
+    self.client.clear_query_options()
     if query_exec_options is not None and len(query_exec_options.keys()) > 0:
       for exec_option in query_exec_options.keys():
         self.client.set_query_option(exec_option, query_exec_options[exec_option])
-    else:
-      self.client.clear_query_options()
 
     # TODO: Remove this in the future for negative testing
     self.client.set_query_option('allow_unsupported_formats', True)

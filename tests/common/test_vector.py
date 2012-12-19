@@ -78,16 +78,20 @@ class TestVector(object):
 # Vector -> Call to get specific values
 class TestMatrix(object):
   def __init__(self, *args):
-    self.vector_value_lists = dict()
-    for arg in args:
-      self.vector_value_lists[arg.name] = arg
+    self.dimensions = dict({arg.name for arg in args})
     self.constraint_list = list()
 
   def add_dimension(self, vector_value_list):
-    self.vector_value_lists[vector_value_list.name] = vector_value_list
+    self.dimensions[vector_value_list.name] = vector_value_list
 
   def clear(self):
-    self.vector_value_lists.clear()
+    self.dimensions.clear()
+
+  def clear_dimension(self, dimension_name):
+    del self.dimensions[dimension_name]
+
+  def has_dimension(self, dimension_name):
+    return self.dimensions.has_key(dimension_name)
 
   def generate_test_vectors(self, exploration_strategy):
     # TODO: Check valid exploration strategies, provide more options for exploration
@@ -108,7 +112,7 @@ class TestMatrix(object):
 
     # Pairwise fails if the number of inputs == 1. Use exhaustive in this case the
     # results will be the same.
-    if len(self.vector_value_lists) == 1:
+    if len(self.dimensions) == 1:
       return self.__generate_exhaustive_combinations()
     return [TestVector(vec) for vec in all_pairs(self.__extract_vector_values(),
                                                  filter_func = self.is_valid)]
@@ -119,15 +123,14 @@ class TestMatrix(object):
   def __extract_vector_values(self):
     # The data is stored as a tuple of (name, [val1, val2, val3]). So extract the actual
     # values from this
-    return [v[1] for v in self.vector_value_lists.items()]
+    return [v[1] for v in self.dimensions.items()]
 
   def is_valid(self, vector):
     for constraint in self.constraint_list:
-      if (type(vector) == list or type(vector) == tuple) and\
-          len(vector) == len(self.vector_value_lists):
+      if (isinstance(vector, list) or isinstance(vector, tuple)) and\
+          len(vector) == len(self.dimensions):
         valid = constraint(TestVector(vector))
         if valid:
           continue
-        else:
-          return False
+        return False
     return True

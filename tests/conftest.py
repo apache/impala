@@ -35,8 +35,9 @@ def pytest_generate_tests(metafunc):
     metafunc.cls.add_test_dimensions()
     if metafunc.config.option.file_format_filter:
       file_formats = metafunc.config.option.file_format_filter.split(',')
-      metafunc.cls.TestMatrix.add_constraint(lambda v:\
-          v.get_value('table_format').file_format in file_formats)
+      if metafunc.cls.TestMatrix.has_dimension('table_format'):
+        metafunc.cls.TestMatrix.add_constraint(lambda v:\
+            v.get_value('table_format').file_format in file_formats)
     vectors = metafunc.cls.TestMatrix.generate_test_vectors(
         metafunc.config.option.exploration_strategy)
     if len(vectors) == 0:
