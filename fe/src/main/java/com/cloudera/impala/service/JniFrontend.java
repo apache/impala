@@ -86,7 +86,7 @@ public class JniFrontend {
     TExecRequest result = frontend.createExecRequest(request, explainString);
     LOG.info(explainString.toString());
 
-    LOG.info("returned TQueryExecRequest2: " + result.toString());
+    //LOG.info("returned TQueryExecRequest2: " + result.toString());
     // TODO: avoid creating serializer for each query?
     TSerializer serializer = new TSerializer(protocolFactory);
     try {

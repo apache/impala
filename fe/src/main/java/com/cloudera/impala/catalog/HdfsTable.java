@@ -17,8 +17,12 @@ package com.cloudera.impala.catalog;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.BlockLocation;
@@ -50,7 +54,11 @@ import com.cloudera.impala.thrift.THdfsPartition;
 import com.cloudera.impala.thrift.THdfsTable;
 import com.cloudera.impala.thrift.TTableDescriptor;
 import com.cloudera.impala.thrift.TTableType;
+import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
@@ -66,40 +74,41 @@ public class HdfsTable extends Table {
   private String nullPartitionKeyValue;
 
   /**
-   * Captures three important pieces of information for a block: its location, the path
-   * of the file to which it belongs, and the partition to which that file belongs.
+   * Block metadata used for scheduling.
    */
   public static class BlockMetadata {
-    private String fileName;
-    private HdfsPartition parentPartition;
-    private final BlockLocation blockLocation;
-    // For each replica, this is the 0-based disk index for this block.  The BE uses
-    // this information to schedule the order scan ranges are read.
-    private final int[] diskIds;
+    private final String fileName;
+    private final long offset;
+    private final long length;
 
-    public BlockMetadata(BlockLocation blockLocation, int[] diskIds) {
+    // result of BlockLocation.getNames(): list of (IP:port) hosting this block
+    private final String[] hostPorts;
+
+    // hostPorts[i] stores this block on diskId[i]; the BE uses this information to
+    // schedule scan ranges
+    private int[] diskIds;
+
+    public BlockMetadata(String fileName, BlockLocation blockLocation,
+                         String[] hostPorts) {
       Preconditions.checkNotNull(blockLocation);
-      this.blockLocation = blockLocation;
-      this.diskIds = diskIds;
+      this.fileName = fileName;
+      this.offset = blockLocation.getOffset();
+      this.length = blockLocation.getLength();
+      this.hostPorts = hostPorts;
     }
 
     public String getFileName() { return fileName; }
-    public BlockLocation getLocation() { return blockLocation; }
-    public HdfsPartition getPartition() { return parentPartition; }
+    public long getOffset() { return offset; }
+    public long getLength() { return length; }
+    public String[] getHostPorts() { return hostPorts; }
 
-    public void setFileName(String fileName) {
-      this.fileName = fileName;
-    }
-
-    public void setPartition(HdfsPartition partition) {
-      this.parentPartition = partition;
-    }
+    public void setDiskIds(int[] diskIds) { this.diskIds = diskIds; }
 
     /**
-     * Return the volume id of the block in BlockLocation.getNames()[hostIndex]; -1 if
-     * volumn id is not supported.
+     * Return the disk id of the block in BlockLocation.getNames()[hostIndex]; -1 if
+     * disk id is not supported.
      */
-    public int getVolumeId(int hostIndex) {
+    public int getDiskId(int hostIndex) {
       if (diskIds == null) {
         return -1;
       }
@@ -107,9 +116,104 @@ public class HdfsTable extends Table {
       Preconditions.checkArgument(hostIndex < diskIds.length);
       return diskIds[hostIndex];
     }
+
+    @Override
+    public String toString() {
+      return Objects.toStringHelper(this)
+          .add("offset", offset)
+          .add("length", length)
+          .add("#disks", diskIds.length)
+          .toString();
+    }
+  }
+
+  /**
+   * All of the block metadata for a single partition.
+   *
+   * Tries to be as compact as possible by maintaining central pools of unique String
+   * objects (file names, hostports) that are referenced in BlockMetadata.
+   */
+  public static class PartitionBlockMetadata {
+    private final HdfsPartition partition;
+
+    private final ArrayList<BlockMetadata> blockMetadata = Lists.newArrayList();
+
+    // unique file names across all blockMetadata
+    // (this is really a set, but HashSet does not have a get() function; this maps
+    // each entry to itself)
+    private final HashMap<String, String> uniqueFileNames = Maps.newHashMap();
+
+    private long totalStringLengths = 0;
+
+    public PartitionBlockMetadata(HdfsPartition partition) {
+      this.partition = partition;
+    }
+
+    /**
+     * Add metadata for a single block and update uniqueHostPorts/-FileNames.
+     */
+    public void addBlock(String fileName, BlockLocation location,
+        ConcurrentHashMap<String, String> uniqueHostPorts) {
+      // update uniqueFileNames
+      String recordedFileName = uniqueFileNames.get(fileName);
+      if (recordedFileName == null) {
+        uniqueFileNames.put(fileName, fileName);
+        totalStringLengths += fileName.length();
+        recordedFileName = fileName;
+      }
+
+      // update uniqueHostPorts
+      String[] hostPorts;
+      try {
+        hostPorts = location.getNames();
+      } catch (IOException e) {
+        // this shouldn't happen, getNames() doesn't throw anything
+        String errorMsg = "BlockLocation.getNames() failed:\n" + e.getMessage();
+        LOG.error(errorMsg);
+        throw new IllegalStateException(errorMsg);
+      }
+      String[] recordedHostPorts = new String[hostPorts.length];
+      for (int i = 0; i < hostPorts.length; ++i) {
+        recordedHostPorts[i] = uniqueHostPorts.get(hostPorts[i]);
+        if (recordedHostPorts[i] == null) {
+          uniqueHostPorts.put(hostPorts[i], hostPorts[i]);
+          totalStringLengths += hostPorts[i].length();
+          recordedHostPorts[i] = hostPorts[i];
+        }
+      }
+
+      blockMetadata.add(new BlockMetadata(recordedFileName, location, recordedHostPorts));
+    }
+
+    /**
+     * Set diskIds for blockMetadata[blockIdx].
+     */
+    protected void setBlockDiskIds(int blockIdx, int[] diskIds) {
+      Preconditions.checkArgument(blockIdx >= 0);
+      Preconditions.checkArgument(blockIdx < blockMetadata.size());
+      blockMetadata.get(blockIdx).setDiskIds(diskIds);
+    }
+
+    public ArrayList<BlockMetadata> getBlockMetadata() { return blockMetadata; }
+
+    public HdfsPartition getPartition() { return partition; }
+
+    @Override
+    public String toString() {
+      return Objects.toStringHelper(this)
+          .add("#blocks", blockMetadata.size())
+          .add("#filenames", uniqueFileNames.size())
+          .add("totalStringLen", totalStringLengths)
+          .toString();
+    }
   }
 
   private final List<HdfsPartition> partitions; // these are only non-empty partitions
+
+  // use concurrent hash map, LoadingCache can load multiple entries in parallel
+  // TODO: keep a per-database pool of unique hosts/ports
+  private final ConcurrentHashMap<String, String> uniqueHostPorts =
+      new ConcurrentHashMap<String, String>();
 
   // Base Hdfs directory where files of this table are stored.
   // For unpartitioned tables it is simply the path where all files live.
@@ -124,6 +228,197 @@ public class HdfsTable extends Table {
   // TODO(henry): confirm that this is thread safe - cursory inspection of the class
   // and its usage in getFileSystem suggests it should be.
   private static final Configuration CONF = new Configuration();
+
+  private static final DistributedFileSystem DFS;
+
+  private static final boolean SUPPORTS_VOLUME_ID;
+
+  static {
+    try {
+      // call newInstance() instead of using a shared instance from a cache
+      // to avoid accidentally having it closed by someone else
+      FileSystem fs = FileSystem.newInstance(FileSystem.getDefaultUri(CONF), CONF);
+      if (!(fs instanceof DistributedFileSystem)) {
+        String error = "Cannot connect to HDFS. " +
+            CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY +
+            "(" + CONF.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY) + ")" +
+            " might be set incorrectly";
+        throw new RuntimeException(error);
+      }
+      DFS = (DistributedFileSystem)fs;
+    } catch (IOException e) {
+      throw new RuntimeException("couldn't retrieve FileSystem:\n" + e.getMessage(), e);
+    }
+
+    SUPPORTS_VOLUME_ID =
+        CONF.getBoolean(DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED,
+                        DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED_DEFAULT);
+  }
+
+  // cache for our block metadata;
+  // TODO: eviction policy, which should maximize the # of saved
+  // getFileStatus()/getFileBlockLocations() calls per byte;
+  // in other words, hit rate * #files / total storage size;
+  // not clear how to accomplish that with LoadingCache
+  private final static LoadingCache<HdfsPartition, PartitionBlockMetadata>
+      blockMdCache = CacheBuilder.newBuilder()
+        // 32K entries
+        // TODO: make this configurable; better yet, make the total amount of memory
+        // set aside for this cache configurable
+        .maximumSize(32 * 1024)
+        // entries are automatically retired after 1 hour
+        .expireAfterWrite(60, TimeUnit.MINUTES)
+        // we expect at least a moderate amount of concurrency
+        .concurrencyLevel(64)
+        .build(
+          new CacheLoader<HdfsPartition, PartitionBlockMetadata>() {
+
+  // purposely violating indentation rules here in order to avoid having this
+  // function be quasi-flush right
+  @Override
+  public PartitionBlockMetadata load(HdfsPartition partition)
+      throws RuntimeException {
+    PartitionBlockMetadata result = new PartitionBlockMetadata(partition);
+
+    // Block locations for all the files in all the partitions.
+    List<BlockLocation> blocks = Lists.newArrayList();
+
+    // loop over all files and record their block metadata, minus volume ids
+    for (FileDescriptor fileDescriptor: partition.getFileDescriptors()) {
+      Path p = new Path(fileDescriptor.getFilePath());
+      // Check to see if the file has a compression suffix.
+      // We only support .lzo on text files that have been declared in
+      // the metastore as TEXT_LZO.  For now, raise an error on any
+      // other type.
+      HdfsCompression compressionType =
+          HdfsCompression.fromFileName(fileDescriptor.getFilePath());
+      fileDescriptor.setCompression(compressionType);
+      if (compressionType == HdfsCompression.LZO_INDEX) {
+        // Skip index files, these are read by the LZO scanner directly.
+        continue;
+      }
+
+      HdfsStorageDescriptor sd = partition.getInputFormatDescriptor();
+      if (compressionType == HdfsCompression.LZO) {
+        if (sd.getFileFormat() != HdfsFileFormat.LZO_TEXT) {
+          throw new RuntimeException(
+              "Compressed file not supported without compression input format: " + p);
+        }
+      } else if (sd.getFileFormat() == HdfsFileFormat.LZO_TEXT) {
+        throw new RuntimeException("Expected file with .lzo suffix: " + p);
+      } else if (sd.getFileFormat() == HdfsFileFormat.TEXT
+                 && compressionType != HdfsCompression.NONE) {
+        throw new RuntimeException("Compressed text files are not supported: " + p);
+      }
+
+
+      BlockLocation[] locations = null;
+      try {
+        FileStatus fileStatus = DFS.getFileStatus(p);
+        // Ignore directories (and files in them) - if a directory is erroneously
+        // created as a subdirectory of a partition dir we should ignore it and move on
+        // (getFileBlockLocations will throw when
+        // called on a directory). Hive will not recurse into directories.
+        if (!fileStatus.isDirectory()) {
+          locations = DFS.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
+        }
+        if (locations != null) {
+          blocks.addAll(Arrays.asList(locations));
+          for (int i = 0; i < locations.length; ++i) {
+            result.addBlock(fileDescriptor.getFilePath(), locations[i],
+                            partition.getTable().uniqueHostPorts);
+          }
+        }
+      } catch (IOException e) {
+        throw new RuntimeException("couldn't determine block locations for path '"
+            + p + "':\n" + e.getMessage(), e);
+      }
+    }
+
+    LOG.info("loaded partiton " + result.toString());
+
+    if (!SUPPORTS_VOLUME_ID) {
+      return result;
+    }
+
+    try {
+      // Get the BlockStorageLocations for all the blocks
+      BlockStorageLocation[] locations = DFS.getFileBlockStorageLocations(blocks);
+
+      if (locations.length == 0) {
+        LOG.warn("Attempted to get block locations but the call returned nulls");
+        return result;
+      }
+
+      if (locations.length != blocks.size()) {
+        // blocks and locations don't match up
+        LOG.error("Number of block locations not equal to number of blocks: "
+            + "#locations=" + Long.toString(locations.length)
+            + " #blocks=" + Long.toString(blocks.size()));
+        return result;
+      }
+
+      // Convert block locations to 0 based ids.  The block location ids returned
+      // from HDFS are unique but opaque (only defining comparison operators).  We need
+      // to turn them into indices.
+      // TODO: the diskId should be eventually retrievable from Hdfs when
+      // the community agrees this API is useful.
+
+      // For each host, this is a mapping of the VolumeId object to a 0 based index.
+      Map<String, Map<VolumeId, Integer>> hostDiskIds = Maps.newHashMap();
+
+      for (int i = 0; i < locations.length; ++i) {
+        String[] hosts = locations[i].getHosts();
+        VolumeId[] volumeIds = locations[i].getVolumeIds();
+        Preconditions.checkState(hosts.length == volumeIds.length);
+
+        // For each block replica, the disk id for the block on that host
+        int[] diskIds = new int[volumeIds.length];
+
+        boolean found_null = false;
+        for (int j = 0; j < volumeIds.length; ++j) {
+          if (volumeIds[j] == null) {
+            found_null = true;
+            break;
+          }
+
+          Map<VolumeId, Integer> hostDisks;
+          if (!hostDiskIds.containsKey(hosts[j])) {
+            hostDisks = Maps.newHashMap();
+            hostDiskIds.put(hosts[j], hostDisks);
+          } else {
+            hostDisks = hostDiskIds.get(hosts[j]);
+          }
+
+          if (!volumeIds[j].isValid()) {
+            // The data node with this block did not respond to the block location
+            // rpc.  Mark it as -1 for the BE which will assign it a random disk.
+            diskIds[j] = -1;
+          } else if (hostDisks.containsKey(volumeIds[j])) {
+            // This is a VolumeId we've seen on this host, assign it the id we already
+            // assigned to this VolumeId
+            diskIds[j] = hostDisks.get(volumeIds[j]);
+          } else {
+            // This is a VolumeId we haven't seen.  Give it the next index.
+            int index = hostDisks.size();
+            hostDisks.put(volumeIds[j], index);
+            diskIds[j] = index;
+          }
+        }
+        if (found_null) {
+          break;
+        }
+        result.setBlockDiskIds(i, diskIds);
+      }
+    } catch (IOException e) {
+      throw new RuntimeException("couldn't determine block storage locations:\n"
+          + e.getMessage(), e);
+    }
+    LOG.info("loaded disk ids for " + result.toString());
+
+    return result;
+  }
+          });
 
   /**
    * Returns true if the Hive table represents an Hdfs table that Impala understands,
@@ -241,7 +536,8 @@ public class HdfsTable extends Table {
       }
 
       HdfsPartition partition =
-          new HdfsPartition(partitionKeyExprs, fileFormatDescriptor, fileDescriptors);
+          new HdfsPartition(this, partitionKeyExprs, fileFormatDescriptor,
+                            fileDescriptors);
       partitions.add(partition);
     } else {
       LOG.warn("Path " + path + " does not exist for partition. Ignoring.");
@@ -254,7 +550,7 @@ public class HdfsTable extends Table {
     // refer to this to understand how to create new partitions
     HdfsStorageDescriptor hdfsStorageDescriptor =
         HdfsStorageDescriptor.fromStorageDescriptor(this.name, storageDescriptor);
-    HdfsPartition partition = HdfsPartition.defaultPartition(hdfsStorageDescriptor);
+    HdfsPartition partition = HdfsPartition.defaultPartition(this, hdfsStorageDescriptor);
     partitions.add(partition);
   }
 
@@ -319,182 +615,19 @@ public class HdfsTable extends Table {
 
   /**
    * Return locations for all blocks in all files in the given partitions.
-   * @return list of HdfsTable.BlockMetadata objects.
    */
-  public static List<BlockMetadata> getBlockMetadata(List<HdfsPartition> partitions) {
-    List<BlockMetadata> result = Lists.newArrayList();
-
-    // Block locations for all the files in all the partitions.
-    List<BlockLocation> blocks = Lists.newArrayList();
-
-    // List of ending index in blocks per file. The file index to this list is obtained
-    // traversing the file list in each partitions sequentially. For file i, its block
-    // locations are from blocks[endingBlockIndexes[i-1]] to blocks[endingBlockIndexes[i]]
-    List<Integer> endingBlockIndexes = Lists.newArrayList();
-
-    boolean supportsVolumeId =
-        CONF.getBoolean(DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED,
-                        DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED_DEFAULT);
-
-    // TODO: Is DistributedFileSystem thread safe? If so, make it a static final object.
-    DistributedFileSystem dfs;
+  public static List<PartitionBlockMetadata> getBlockMetadata(
+      List<HdfsPartition> partitions) {
     try {
-      FileSystem fs;
-      fs = FileSystem.get(CONF);
-      if (!(fs instanceof DistributedFileSystem)) {
-        String error = "Cannot connect to HDFS. " +
-            CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY +
-            "(" + CONF.get(CommonConfigurationKeysPublic.FS_DEFAULT_NAME_KEY) + ")" +
-            " might be set incorrectly";
-        throw new RuntimeException(error);      }
-      dfs = (DistributedFileSystem)fs;
-    } catch (IOException e) {
-      throw new RuntimeException("couldn't retrieve FileSystem:\n" + e.getMessage(), e);
-    }
-
-    LOG.info("getting file block locations");
-    for (HdfsPartition partition: partitions) {
-      for (FileDescriptor fileDescriptor: partition.getFileDescriptors()) {
-        Path p = new Path(fileDescriptor.getFilePath());
-        // Check to see if the file has a compression suffix.
-        // We only support .lzo on text files that have been declared in
-        // the metastore as TEXT_LZO.  For now, raise an error on any
-        // other type.
-        HdfsCompression compressionType =
-            HdfsCompression.fromFileName(fileDescriptor.getFilePath());
-        fileDescriptor.setCompression(compressionType);
-        if (compressionType == HdfsCompression.LZO_INDEX) {
-          // Skip index files, these are read by the LZO scanner directly.
-          continue;
-        }
-
-        HdfsStorageDescriptor sd = partition.getInputFormatDescriptor();
-        if (compressionType == HdfsCompression.LZO) {
-          if (sd.getFileFormat() != HdfsFileFormat.LZO_TEXT) {
-            throw new RuntimeException(
-                "Compressed file not supported without compression input format: " + p);
-          }
-        } else if (sd.getFileFormat() == HdfsFileFormat.LZO_TEXT) {
-          throw new RuntimeException("Expected file with .lzo suffix: " + p);
-        } else if (sd.getFileFormat() == HdfsFileFormat.TEXT &&
-                   compressionType != HdfsCompression.NONE) {
-          throw new RuntimeException("Compressed text files are not supported: " + p);
-        }
-
-
-        BlockLocation[] locations = null;
-        try {
-          FileStatus fileStatus = dfs.getFileStatus(p);
-          // Ignore directories (and files in them) - if a directory is erroneously
-          // created as a subdirectory of a partition dir we should ignore it and move on
-          // (getFileBlockLocations will throw when
-          // called on a directory). Hive will not recurse into directories.
-          if (!fileStatus.isDirectory()) {
-            locations = dfs.getFileBlockLocations(fileStatus, 0, fileStatus.getLen());
-            blocks.addAll(Arrays.asList(locations));
-          }
-          endingBlockIndexes.add(blocks.size());
-        } catch (IOException e) {
-          throw new RuntimeException("couldn't determine block locations for path '"
-              + p + "':\n" + e.getMessage(), e);
-        }
+      List<PartitionBlockMetadata> result = Lists.newArrayList();
+      for (HdfsPartition partition: partitions) {
+        result.add(blockMdCache.get(partition));
       }
+      LOG.info("block metadata cache: " + blockMdCache.stats().toString());
+      return result;
+    } catch (ExecutionException e) {
+      throw new RuntimeException(e);
     }
-
-    LOG.info("getting  block storage locations");
-    if (supportsVolumeId) {
-      try {
-        // Get the BlockStorageLocations for all the blocks
-        BlockStorageLocation[] locations = dfs.getFileBlockStorageLocations(blocks);
-
-        // Convert block locations to 0 based ids.  The block location ids returned
-        // from HDFS are unique but opaque (only defining comparison operators).  We need
-        // to turn them indices.
-        // TODO: the diskId should be eventually retrievable from Hdfs when
-        // the community agrees this API is useful.
-
-        // For each host, this is a mapping of the VolumeId object to a 0 based index.
-        Map<String, Map<VolumeId, Integer>> hostDiskIds = Maps.newHashMap();
-
-        for (int i = 0; i < locations.length; ++i) {
-          String[] hosts = locations[i].getHosts();
-          VolumeId[] volumeIds = locations[i].getVolumeIds();
-          Preconditions.checkState(hosts.length == volumeIds.length);
-
-          // For each block replica, the disk id for the block on that host
-          int[] diskIds = new int[volumeIds.length];
-
-          boolean found_null = false;
-          for (int j = 0; j < volumeIds.length; ++j) {
-            if (volumeIds[j] == null) {
-              found_null = true;
-              break;
-            }
-
-            Map<VolumeId, Integer> hostDisks;
-            if (!hostDiskIds.containsKey(hosts[j])) {
-              hostDisks = Maps.newHashMap();
-              hostDiskIds.put(hosts[j], hostDisks);
-            } else {
-              hostDisks = hostDiskIds.get(hosts[j]);
-            }
-
-            if (!volumeIds[j].isValid()) {
-              // The data node with this block did not respond to the block location
-              // rpc.  Mark it as -1 for the BE which will assign it a random disk.
-              diskIds[j] = -1;
-            } else if (hostDisks.containsKey(volumeIds[j])) {
-              // This is a VolumeId we've seen on this host, assign it the id we already
-              // assigned to this VolumeId
-              diskIds[j] = hostDisks.get(volumeIds[j]);
-            } else {
-              // This is a VolumeId we haven't seen.  Give it the next index.
-              int index = hostDisks.size();
-              hostDisks.put(volumeIds[j], index);
-              diskIds[j] = index;
-            }
-          }
-          if (found_null) {
-            break;
-          }
-          result.add(new BlockMetadata(locations[i], diskIds));
-        }
-      } catch (IOException e) {
-        throw new RuntimeException("couldn't determine block storage locations:\n"
-            + e.getMessage(), e);
-      }
-    }
-
-    if (result.size() == 0) {
-      if (supportsVolumeId) {
-        LOG.warn("Attempted to get block locations but the call returned nulls");
-      }
-      // No disk locations.
-      for (int i = 0; i < blocks.size(); ++i) {
-        result.add(new BlockMetadata(blocks.get(i), null));
-      }
-    }
-
-    // Construct block metadata to also include file names and partition information
-    LOG.info("setting per-block file names and partitions");
-    int firstBlockIndex = 0;
-    int fileIndex = 0;
-    for (HdfsPartition partition: partitions) {
-      for (FileDescriptor fileDescriptor: partition.getFileDescriptors()) {
-        if (fileDescriptor.getFileCompression() == HdfsCompression.LZO_INDEX) {
-          // Don't issue scans for the index files for LZO compressed files.
-          continue;
-        }
-        int lastBlockIndex = endingBlockIndexes.get(fileIndex);
-        for (int i = firstBlockIndex; i < lastBlockIndex; ++i) {
-          result.get(i).setFileName(fileDescriptor.getFilePath());
-          result.get(i).setPartition(partition);
-        }
-        ++fileIndex;
-        firstBlockIndex = lastBlockIndex;
-      }
-    }
-    return result;
   }
 
   public String getHdfsBaseDir() {

@@ -62,6 +62,7 @@ public class HdfsPartition {
     }
   }
 
+  private final HdfsTable table;
   private final List<LiteralExpr> partitionKeyValues;
 
   private static long partitionIdCounter = 0;
@@ -84,6 +85,8 @@ public class HdfsPartition {
 
   public long getId() { return id; }
 
+  public HdfsTable getTable() { return table; }
+
   /**
    * Returns an immutable list of partition key expressions
    */
@@ -97,27 +100,28 @@ public class HdfsPartition {
     return partitionKeyValues;
   }
 
-  private HdfsPartition(List<LiteralExpr> partitionKeyValues,
+  private HdfsPartition(HdfsTable table, List<LiteralExpr> partitionKeyValues,
       HdfsStorageDescriptor fileFormatDescriptor,
       List<HdfsPartition.FileDescriptor> fileDescriptors, long id) {
+    this.table = table;
     this.partitionKeyValues = ImmutableList.copyOf(partitionKeyValues);
     this.fileDescriptors = ImmutableList.copyOf(fileDescriptors);
     this.fileFormatDescriptor = fileFormatDescriptor;
     this.id = id;
   }
 
-  public HdfsPartition(List<LiteralExpr> partitionKeyValues,
+  public HdfsPartition(HdfsTable table, List<LiteralExpr> partitionKeyValues,
       HdfsStorageDescriptor fileFormatDescriptor,
       List<HdfsPartition.FileDescriptor> fileDescriptors) {
-    this(partitionKeyValues, fileFormatDescriptor, fileDescriptors,
+    this(table, partitionKeyValues, fileFormatDescriptor, fileDescriptors,
         partitionIdCounter++);
   }
 
   public static HdfsPartition defaultPartition(
-      HdfsStorageDescriptor storageDescriptor) {
+      HdfsTable table, HdfsStorageDescriptor storageDescriptor) {
     List<LiteralExpr> emptyExprList = Lists.newArrayList();
     List<FileDescriptor> emptyFileDescriptorList = Lists.newArrayList();
-    HdfsPartition partition = new HdfsPartition(emptyExprList,
+    HdfsPartition partition = new HdfsPartition(table, emptyExprList,
         storageDescriptor, emptyFileDescriptorList, Constants.DEFAULT_PARTITION_ID);
     return partition;
   }
