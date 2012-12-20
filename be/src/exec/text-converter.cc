@@ -132,9 +132,12 @@ Function* TextConverter::CodegenWriteSlot(LlvmCodeGen* codegen,
   
   if (slot_desc->type() != TYPE_STRING) {
     builder.SetInsertPoint(check_zero_block);
-    // If len == 0 and it is not a string col, set slot to NULL
-    Value* len_zero = builder.CreateICmpEQ(args[2], codegen->GetIntConstant(TYPE_INT, 0));
-    builder.CreateCondBr(len_zero, set_null_block, parse_slot_block);
+    // If len <= 0 and it is not a string col, set slot to NULL
+    // The len can be less than 0 if the field contained an escape character which
+    // is only valid for string cols.
+    Value* null_len = builder.CreateICmpSLE(
+        args[2], codegen->GetIntConstant(TYPE_INT, 0));
+    builder.CreateCondBr(null_len, set_null_block, parse_slot_block);
   } 
 
   // Codegen parse slot block
