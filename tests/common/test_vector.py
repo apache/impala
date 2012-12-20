@@ -78,7 +78,7 @@ class TestVector(object):
 # Vector -> Call to get specific values
 class TestMatrix(object):
   def __init__(self, *args):
-    self.dimensions = dict({arg.name for arg in args})
+    self.dimensions = dict((arg.name, arg) for arg in args)
     self.constraint_list = list()
 
   def add_dimension(self, vector_value_list):
