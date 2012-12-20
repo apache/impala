@@ -32,6 +32,8 @@ class TestLimit(ImpalaTestSuite):
         TestDimension('limit_value', *TestLimit.LIMIT_VALUES))
     cls.TestMatrix.add_dimension(TestDimension('query', *TestLimit.QUERIES))
 
+  # Disable test due to IMP-660
+  @pytest.mark.xfail(run=False)
   def test_limit(self, vector):
     # We can't validate the rows that are returned since that is non-deterministic.
     # This is why this is a python test rather than a .test.
