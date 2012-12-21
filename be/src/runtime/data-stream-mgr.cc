@@ -154,7 +154,7 @@ shared_ptr<DataStreamMgr::StreamControlBlock> DataStreamMgr::FindControlBlock(
   pair<StreamMap::iterator, StreamMap::iterator> range =
       stream_map_.equal_range(hash_value);
   while (range.first != range.second) {
-    const shared_ptr<StreamControlBlock>& cb = range.first->second;
+    shared_ptr<StreamControlBlock> cb = range.first->second;
     if (cb->fragment_id() == fragment_id && cb->dest_node_id() == node_id) {
       if (acquire_lock) lock_.unlock();
       return cb;
