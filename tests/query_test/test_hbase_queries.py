@@ -9,7 +9,7 @@ from tests.common.impala_test_suite import *
 
 class TestHBaseQueries(ImpalaTestSuite):
   @classmethod
-  def get_dataset(self):
+  def get_workload(self):
     return 'functional-query'
 
   @classmethod

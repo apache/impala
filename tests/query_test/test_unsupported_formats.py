@@ -11,7 +11,7 @@ compressed_text_extensions = ['snappy', 'deflate', 'gz', 'bz2']
 # This is test to validate that unsupported formats fail gracefully
 class TestUnsupportedFormats(ImpalaTestSuite):
   @classmethod
-  def get_dataset(self):
+  def get_workload(self):
     return 'functional-query'
 
   @classmethod

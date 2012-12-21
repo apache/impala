@@ -10,7 +10,7 @@ from tests.common.impala_test_suite import *
 # the tests should be modified to remove that requirement.
 class TestMetadataQueryStatements(ImpalaTestSuite):
   @classmethod
-  def get_dataset(self):
+  def get_workload(self):
     return 'functional-query'
 
   @classmethod

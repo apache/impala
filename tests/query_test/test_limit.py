@@ -20,7 +20,7 @@ class TestLimit(ImpalaTestSuite):
   TOTAL_ROWS = 6001215
 
   @classmethod
-  def get_dataset(self):
+  def get_workload(self):
     return 'tpch'
 
   @classmethod
@@ -52,7 +52,7 @@ class TestDefaultOrderByLimitValue(ImpalaTestSuite):
   DEFAULT_ORDER_BY_LIMIT_VALUES = [None, -1, 0, 1, 10, 100]
 
   @classmethod
-  def get_dataset(self):
+  def get_workload(self):
     return 'functional-query'
 
   @classmethod

@@ -9,7 +9,7 @@ from tests.common.impala_test_suite import *
 
 class TestTpchQuery(ImpalaTestSuite):
   @classmethod
-  def get_dataset(self):
+  def get_workload(self):
     return 'tpch'
 
   @classmethod
@@ -17,10 +17,12 @@ class TestTpchQuery(ImpalaTestSuite):
     super(TestTpchQuery, cls).add_test_dimensions()
     # The tpch tests take a long time to execute so restrict the combinations they
     # execute over
-    cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'seq' and\
-        v.get_value('table_format').compression_codec == 'snap' and\
-        v.get_value('table_format').compression_type != 'record')
+    if cls.exploration_strategy() == 'core':
+      cls.TestMatrix.add_constraint(lambda v:\
+          v.get_value('table_format').file_format == 'seq' and\
+          v.get_value('table_format').compression_codec == 'snap' and\
+          v.get_value('table_format').compression_type != 'record')
+
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('exec_option')['batch_size'] == 0 and\
         v.get_value('exec_option')['disable_codegen'] == False and\
@@ -94,7 +96,7 @@ class TestTpchQuery(ImpalaTestSuite):
   def test_tpch_q20(self, vector):
     self.run_test_case('tpch-q20', vector)
 
-  @pytest.mark.xfail(run=False)
+  @pytest.mark.xfail(run=False, reason='IMP-658')
   # This query fails due to IMP-658
   def test_tpch_q21(self, vector):
     self.run_test_case('tpch-q21', vector)

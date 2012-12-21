@@ -14,11 +14,54 @@ WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
 # of what specific table format to target along with the exec options (num_nodes, etc)
 # to use when running the query.
 class TableFormatInfo(object):
+  KNOWN_FILE_FORMATS = ['text', 'seq', 'rc', 'trevni']
+  KNOWN_COMPRESSION_CODECS = ['none', 'snap', 'gzip', 'bzip', 'def']
+  KNOWN_COMPRESSION_TYPES = ['none', 'block', 'record']
+
   def __init__(self, **kwargs):
     self.dataset = kwargs.get('dataset', 'UNKNOWN')
     self.file_format = kwargs.get('file_format', 'text')
     self.compression_codec = kwargs.get('compression_codec', 'none')
     self.compression_type = kwargs.get('compression_type', 'none')
+    self.__validate()
+
+  def __validate(self):
+    if self.file_format not in TableFormatInfo.KNOWN_FILE_FORMATS:
+      raise ValueError, 'Unknown file format: %s' % self.file_format
+    if self.compression_codec not in TableFormatInfo.KNOWN_COMPRESSION_CODECS:
+      raise ValueError, 'Unknown compression codec: %s' % self.compression_codec
+    if self.compression_type not in TableFormatInfo.KNOWN_COMPRESSION_TYPES:
+      raise ValueError, 'Unknown compression type: %s' % self.compression_type
+    if (self.compression_codec == 'none' or self.compression_type == 'none') and\
+        self.compression_codec != self.compression_type:
+      raise ValueError, 'Invalid combination of compression codec/type: %s' % str(self)
+
+  @staticmethod
+  def create_from_string(dataset, table_format_string):
+    """
+    Parses a table format string and creates a table format info object from the string
+
+    Expected  input is file_format/compression_codec/[compression_type]. The
+    compression_type is optional, defaulting to 'block' if the table is compressed
+    or 'none' if the table is uncompressed.
+    """
+    if table_format_string is None:
+      raise ValueError, 'Table format string cannot be None'
+
+    format_parts = table_format_string.strip().split('/')
+    if len(format_parts) not in range(2, 4):
+      raise ValueError, 'Invalid table format %s' % table_format_string
+
+    file_format, compression_codec = format_parts[:2]
+    if len(format_parts) == 3:
+      compression_type = format_parts[2]
+    else:
+      # Assume the default compression type is block (of the table is compressed)
+      compression_type = 'none' if compression_codec == 'none' else 'block'
+
+    return TableFormatInfo(dataset=dataset, file_format=file_format,
+                           compression_codec=compression_codec,
+                           compression_type=compression_type)
 
   def __str__(self):
     compression_str = '%s/%s' % (self.compression_codec, self.compression_type)
@@ -76,6 +119,11 @@ def create_exec_option_dimension(cluster_sizes=ALL_CLUSTER_SIZES,
 
   # Build a test vector out of it
   return TestDimension('exec_option', *exec_option_dimension_values)
+
+def get_dataset_from_workload(workload):
+  # TODO: We need a better way to define the workload -> dataset mapping so we can
+  # extract it without reading the actual test vector file
+  return load_table_info_dimension(workload, 'exhaustive')[0].value.dataset
 
 def load_table_info_dimension(workload, exploration_strategy, file_formats=None,
                       compression_codecs=None):

@@ -33,6 +33,7 @@ import tempfile
 from itertools import product
 from optparse import OptionParser
 from tests.util.test_file_parser import *
+from tests.common.test_dimensions import TableFormatInfo, load_table_info_dimension
 
 parser = OptionParser()
 parser.add_option("-e", "--exploration_strategy", dest="exploration_strategy",
@@ -54,6 +55,9 @@ parser.add_option("-b", "--backend", dest="backend", default="localhost:21000",
 parser.add_option("--table_names", dest="table_names", default=None,
                   help="Only load the specified tables - specified as a comma-seperated "\
                   "list of base table names")
+parser.add_option("--table_formats", dest="table_formats", default=None,
+                  help="Override the test vectors and load using the specified table "\
+                  "formats. Ex. --table_formats=seq/snap/block,text/none")
 (options, args) = parser.parse_args()
 
 if options.workload is None:
@@ -194,17 +198,6 @@ def build_table_suffix(file_format, codec, compression_type):
   else:
     return '_%s_%s' % (file_format, codec)
 
-# Vector files have the format:
-# dimension_name1:value1, dimension_name2:value2, ...
-def read_vector_file(file_name):
-  vector_values = []
-  with open(file_name, 'rb') as vector_file:
-    for line in vector_file.readlines():
-      if line.strip().startswith('#'):
-        continue
-      vector_values.append([value.split(':')[1].strip() for value in line.split(',')])
-  return vector_values
-
 def write_trevni_to_file(file_name, array):
   # Strip out all the hive SET statements
   array.insert(0, 'refresh;\n')
@@ -239,7 +232,9 @@ def generate_statements(output_name, test_vectors,
 
   existing_tables = get_hdfs_subdirs_with_data(options.hive_warehouse_dir)
   for row in test_vectors:
-    file_format, data_set, codec, compression_type = row[:4]
+    file_format, data_set, codec, compression_type =\
+        [row.file_format, row.dataset, row.compression_codec, row.compression_type]
+
     for section in sections:
       create = section['CREATE']
       insert = section['DEPENDENT_LOAD']
@@ -309,26 +304,20 @@ def parse_schema_template_file(file_name):
   return parse_test_file(file_name, VALID_SECTION_NAMES, skip_unknown_sections=False)
 
 if __name__ == "__main__":
-  if options.exploration_strategy not in KNOWN_EXPLORATION_STRATEGIES:
-    print 'Invalid exploration strategy:', options.exploration_strategy
-    print 'Valid values:', ', '.join(KNOWN_EXPLORATION_STRATEGIES)
-    sys.exit(1)
+  if options.table_formats is None:
+    if options.exploration_strategy not in KNOWN_EXPLORATION_STRATEGIES:
+      print 'Invalid exploration strategy:', options.exploration_strategy
+      print 'Valid values:', ', '.join(KNOWN_EXPLORATION_STRATEGIES)
+      sys.exit(1)
 
-  test_vector_file = os.path.join(WORKLOAD_DIR, options.workload,
-                                  '%s_%s.csv' % (options.workload,
-                                                 options.exploration_strategy))
+    test_vectors = [vector.value for vector in\
+        load_table_info_dimension(options.workload, options.exploration_strategy)]
+  else:
+    table_formats = options.table_formats.split(',')
+    test_vectors =\
+        [TableFormatInfo.create_from_string(options.workload, tf) for tf in table_formats]
 
-  if not os.path.isfile(test_vector_file):
-    print 'Vector file not found: ' + test_vector_file
-    sys.exit(1)
-
-  test_vectors = read_vector_file(test_vector_file)
-
-  if len(test_vectors) == 0:
-    print 'No test vectors found in file: ' + test_vector_file
-    sys.exit(1)
-
-  target_dataset = test_vectors[0][DATASET_IDX]
+  target_dataset = test_vectors[0].dataset
   print 'Target Dataset: ' + target_dataset
   schema_template_file = os.path.join(DATASET_DIR, target_dataset,
                                       '%s_schema_template.sql' % target_dataset)

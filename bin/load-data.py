@@ -35,6 +35,10 @@ parser.add_option("--impalad", dest="impala_shell_args", default="localhost:2100
 parser.add_option("--table_names", dest="table_names", default=None,
                   help="Only load the specified tables - specified as a comma-seperated "\
                   "list of base table names")
+parser.add_option("--table_formats", dest="table_formats", default=None,
+                  help="Override the test vectors and load using the specified table "\
+                  "formats. Ex. --table_formats=seq/snap/block,text/none")
+
 (options, args) = parser.parse_args()
 
 WORKLOAD_DIR = os.environ['IMPALA_WORKLOAD_DIR']
@@ -91,6 +95,8 @@ def generate_schema_statements(workload):
     generate_cmd += " --table_names=%s" % options.table_names
   if options.force_reload:
     generate_cmd += " --force_reload"
+  if options.table_formats:
+    generate_cmd += " --table_formats=%s" % options.table_formats
   if options.hive_warehouse_dir is not None:
     generate_cmd += " --hive_warehouse_dir=%s" % options.hive_warehouse_dir
   print 'Executing Generate Schema Command: ' + generate_cmd

@@ -9,7 +9,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite
 
 class TestQueries(ImpalaTestSuite):
   @classmethod
-  def get_dataset(cls):
+  def get_workload(cls):
     return 'functional-query'
 
   def test_distinct(self, vector):

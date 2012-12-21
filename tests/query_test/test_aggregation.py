@@ -26,7 +26,7 @@ result_lut = {
 
 class TestAggregation(ImpalaTestSuite):
   @classmethod
-  def get_dataset(self):
+  def get_workload(self):
     return 'functional-query'
 
   @classmethod

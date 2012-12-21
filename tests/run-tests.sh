@@ -31,13 +31,23 @@ mkdir -p ${RESULTS_DIR}
 cd ${IMPALA_HOME}/tests
 # First run all the tests that need to be executed serially (namely insert tests)
 # TODO: Support different log files for each test directory
-py.test -v --tb=short -m "execute_serially" --ignore="failure"\
+py.test -r xfE -v --tb=short -m "execute_serially" --ignore="failure"\
     --junitxml="${RESULTS_DIR}/TEST-impala-serial.xml" \
     --resultlog="${RESULTS_DIR}/TEST-impala-serial.log" "$@"
 EXIT_CODE=$?
 
+# If there was a test failure and exit after the first error was specified (using -x)
+# then exit before running the parallel tests.
+if [ $EXIT_CODE != 0 ]; then
+  for var in "$@"; do
+    if [ "$var" = "-x" ]; then
+      exit $EXIT_CODE
+    fi
+  done
+fi
+
 # Run the remaining tests in parallel
-py.test -v --tb=short -m "not execute_serially" --ignore="failure"\
+py.test -r xfE -v --tb=short -m "not execute_serially" --ignore="failure"\
     --junitxml="${RESULTS_DIR}/TEST-impala-parallel.xml" -n ${NUM_CONCURRENT_TESTS}  \
     --resultlog="${RESULTS_DIR}/TEST-impala-parallel.log" "$@"
 

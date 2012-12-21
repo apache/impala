@@ -8,8 +8,12 @@ LOG = logging.getLogger('test_configuration')
 
 def pytest_addoption(parser):
   """Adds a new command line options to py.test"""
-  parser.addoption("--exploration_strategy", default="core", help=\
-                   "Exploration strategy for tests - core, pairwise, or exhaustive.")
+  parser.addoption("--exploration_strategy", default="core", help="Default exploration "\
+                   "strategy for all tests. Valid values: core, pairwise, exhaustive.")
+
+  parser.addoption("--workload_exploration_strategy", default=None, help=\
+                   "Override exploration strategy for specific workloads using the "\
+                   "format: workload:exploration_strategy. Ex: tpch:core,tpcds:pairwise.")
 
   parser.addoption("--impalad", default="localhost:21000", help=\
                    "The impalad host:port to run tests against.")
@@ -21,8 +25,9 @@ def pytest_addoption(parser):
                    "If set, will generate new results for all tests run instead of "\
                    "verifying the results.")
 
-  parser.addoption("--file_format_filter", default=None, help=\
-                   "Run tests only using the specified file format")
+  parser.addoption("--table_formats", dest="table_formats", default=None, help=\
+                   "Override the test vectors and run only using the specified table "\
+                   "formats. Ex. --table_formats=seq/snap/block,text/none")
 
 def pytest_generate_tests(metafunc):
   """
@@ -33,17 +38,12 @@ def pytest_generate_tests(metafunc):
   """
   if 'vector' in metafunc.fixturenames:
     metafunc.cls.add_test_dimensions()
-    if metafunc.config.option.file_format_filter:
-      file_formats = metafunc.config.option.file_format_filter.split(',')
-      if metafunc.cls.TestMatrix.has_dimension('table_format'):
-        metafunc.cls.TestMatrix.add_constraint(lambda v:\
-            v.get_value('table_format').file_format in file_formats)
     vectors = metafunc.cls.TestMatrix.generate_test_vectors(
         metafunc.config.option.exploration_strategy)
     if len(vectors) == 0:
       LOG.warning('No test vectors generated. Check constraints and input vectors')
 
-    vector_names = ['%s' % vector for vector in vectors]
+    vector_names = map(str, vectors)
     # In the case this is a test result update, just select a single test vector to run
     # the results are expected to be the same in all cases
     if metafunc.config.option.update_results:

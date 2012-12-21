@@ -9,7 +9,7 @@ from tests.common.impala_test_suite import *
 
 class TestJoinQueries(ImpalaTestSuite):
   @classmethod
-  def get_dataset(cls):
+  def get_workload(cls):
     return 'functional-query'
 
   def test_joins(self, vector):

@@ -9,7 +9,7 @@ from tests.common.impala_test_suite import ImpalaTestSuite, SINGLE_NODE_ONLY
 
 class TestUnion(ImpalaTestSuite):
   @classmethod
-  def get_dataset(self):
+  def get_workload(self):
     return 'functional-query'
 
   @classmethod

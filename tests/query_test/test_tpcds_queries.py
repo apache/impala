@@ -9,7 +9,7 @@ from tests.common.impala_test_suite import *
 
 class TestTpcdsQuery(ImpalaTestSuite):
   @classmethod
-  def get_dataset(self):
+  def get_workload(self):
     return 'tpcds'
 
   @classmethod

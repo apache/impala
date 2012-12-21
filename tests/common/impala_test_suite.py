@@ -73,7 +73,7 @@ class ImpalaTestSuite(BaseTestSuite):
     table_format_info = vector.get_value('table_format')
     exec_options = vector.get_value('exec_option')
 
-    sections = self.__load_query_test_file(self.get_dataset(), test_file_name)
+    sections = self.__load_query_test_file(self.get_workload(), test_file_name)
     updated_sections = list()
     for test_section in sections:
       if 'QUERY' not in test_section:
@@ -201,20 +201,41 @@ class ImpalaTestSuite(BaseTestSuite):
 
   @classmethod
   def __create_table_info_dimension(cls):
-    return load_table_info_dimension(cls.get_dataset(),
-                                     pytest.config.option.exploration_strategy)
+    # If the user has specified a specific set of table formats to run against, then
+    # use those. Otherwise, load from the workload test vectors.
+    if pytest.config.option.table_formats:
+      table_formats = list()
+      for tf in pytest.config.option.table_formats.split(','):
+        dataset = get_dataset_from_workload(cls.get_workload())
+        table_formats.append(TableFormatInfo.create_from_string(dataset, tf))
+      return TestDimension('table_format', *table_formats)
+    else:
+      return load_table_info_dimension(cls.get_workload(), cls.exploration_strategy())
 
   @classmethod
   def __create_exec_option_dimension(cls):
     cluster_sizes = ALL_CLUSTER_SIZES
     disable_codegen_options = ALL_DISABLE_CODEGEN_OPTIONS
     batch_sizes = ALL_BATCH_SIZES
-    if pytest.config.option.exploration_strategy == 'core':
+    if cls.exploration_strategy() == 'core':
       disable_codegen_options = [False]
       batch_sizes = [0, 1]
       cluster_sizes = ALL_NODES_ONLY
     return create_exec_option_dimension(cluster_sizes, disable_codegen_options,
                                         batch_sizes)
+
+  @classmethod
+  def exploration_strategy(cls):
+    default_strategy = pytest.config.option.exploration_strategy
+    if pytest.config.option.workload_exploration_strategy:
+      workload_strategies = pytest.config.option.workload_exploration_strategy.split(',')
+      for workload_strategy in workload_strategies:
+        workload_strategy = workload_strategy.split(':')
+        if len(workload_strategy) != 2:
+          raise ValueError, 'Invalid workload:strategy format: %s' % workload_strategy
+        if cls.get_workload() == workload_strategy[0]:
+          return workload_strategy[1]
+    return default_strategy
 
   @staticmethod
   def __get_database_from_table_name(table_name):

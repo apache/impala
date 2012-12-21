@@ -9,7 +9,7 @@ from tests.common.impala_test_suite import *
 
 class TestInsertQueries(ImpalaTestSuite):
   @classmethod
-  def get_dataset(self):
+  def get_workload(self):
     return 'functional-query'
 
   @classmethod
@@ -32,11 +32,8 @@ class TestInsertQueries(ImpalaTestSuite):
 
   # Disabled until IMP-577 is fixed (NULL conversion to boolean)
   @pytest.mark.execute_serially
-  @pytest.mark.xfail(run=False)
+  @pytest.mark.xfail(run=False, reason="IMP-613")
   def test_insert_null(self, vector):
-    # TODO: Disable this test on Trevni due to IMP-613
-    if vector.get_value('table_format').file_format == 'trevni':
-      return
     self.run_test_case('QueryTest/insert_null', vector)
 
   @pytest.mark.execute_serially
