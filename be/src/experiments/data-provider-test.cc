@@ -6,7 +6,6 @@
 
 #include "experiments/data-provider.h"
 #include "util/cpu-info.h"
-#include "util/perf-counters.h"
 #include "runtime/mem-pool.h"
 #include "runtime/string-value.h"
 

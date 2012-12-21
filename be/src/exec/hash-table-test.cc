@@ -25,7 +25,6 @@
 #include "runtime/mem-pool.h"
 #include "runtime/string-value.h"
 #include "util/cpu-info.h"
-#include "util/perf-counters.h"
 #include "util/runtime-profile.h"
 
 using namespace std;

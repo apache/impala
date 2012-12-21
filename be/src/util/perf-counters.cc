@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// TODO: "Performance Counters for Linux" is not supported in Linux < 2.6.31.
+//       This file will not compile under RHEL 5 or any of it's derivitives.
+
 #include "util/perf-counters.h"
 #include "util/debug-util.h"
 
