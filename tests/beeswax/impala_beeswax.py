@@ -162,10 +162,10 @@ class ImpalaBeeswaxClient(object):
     """Re-directs the query to its appropriate handler, returns QueryResult"""
     # Take care of leading/trailing whitespaces.
     query_string = query_string.strip()
-    start, end = time.time(), 0
+    start = time.time()
     handle = self.__execute_query(query_string.strip())
     result = self.fetch_results(query_string,  handle)
-    result.time_taken = end - start
+    result.time_taken = time.time() - start
     return result
 
   def execute_query_async(self, query_string):
