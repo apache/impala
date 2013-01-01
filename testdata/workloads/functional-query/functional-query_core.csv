@@ -2,3 +2,4 @@
 file_format:text, dataset:functional, compression_codec:none, compression_type:none
 file_format:seq, dataset:functional, compression_codec:none, compression_type:none
 file_format:seq, dataset:functional, compression_codec:snap, compression_type:block
+file_format:rc, dataset: functional, compression_codec: snap, compression_type: block

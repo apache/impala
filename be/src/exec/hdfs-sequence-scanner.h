@@ -16,12 +16,6 @@
 #ifndef IMPALA_EXEC_HDFS_SEQUENCE_SCANNER_H
 #define IMPALA_EXEC_HDFS_SEQUENCE_SCANNER_H
 
-#include "util/codec.h"
-#include "exec/hdfs-scanner.h"
-#include "exec/delimited-text-parser.h"
-
-namespace impala {
-
 // This scanner parses Sequence file located in HDFS, and writes the
 // content as tuples in the Impala in-memory representation of data, e.g.
 // (tuples, rows, row batches).
@@ -153,7 +147,14 @@ namespace impala {
 //
 // Text ::= VInt, Chars (Length prefixed UTF-8 characters)
 
-class HdfsSequenceScanner : public HdfsScanner {
+#include "exec/base-sequence-scanner.h"
+
+namespace impala {
+
+class Codec;
+class DelimitedTextParser;
+
+class HdfsSequenceScanner : public BaseSequenceScanner {
  public:
   // The four byte SeqFile version header present at the beginning of every
   // SeqFile file: {'S', 'E', 'Q', 6}
@@ -165,64 +166,25 @@ class HdfsSequenceScanner : public HdfsScanner {
   
   // Implementation of HdfsScanner interface.
   virtual Status Prepare();
-  virtual Status ProcessScanRange(ScanRangeContext* context);
-  virtual Status Close();
 
-  // Issue the initial scan ranges for all sequence files.
-  static void IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>&);
-  
   // Codegen writing tuples and evaluating predicates
   static llvm::Function* Codegen(HdfsScanNode*);
 
+ protected:
+  // Implementation of sequence container super class methods
+  virtual FileHeader* AllocateFileHeader();
+  virtual Status ReadFileHeader();
+  virtual Status InitNewRange();
+  virtual Status ProcessRange();
+
  private:
-  // Sync indicator
-  const static int SYNC_MARKER = -1;
-
-  // Size of the sync hash field
-  const static int SYNC_HASH_SIZE = 16;
-
   // Maximum size of a compressed block.  This is used to check for corrupted
-  // block size so w do not read the whole file before we detect the error.
+  // block size so we do not read the whole file before we detect the error.
   const static int MAX_BLOCK_SIZE = (1024 * 1024 * 1024);
 
   // The value class name located in the SeqFile Header.
   // This is always "org.apache.hadoop.io.Text"
   static const char* const SEQFILE_VALUE_CLASS_NAME;
-
-  // The key should always be 4 bytes.
-  static const int SEQFILE_KEY_LENGTH;
-
-  // Estimate of header size in bytes.  Headers are likely on remote nodes.  If
-  // this is not big enough, the scanner will read more as necessary.
-  static const int HEADER_SIZE;
-
-  void IssueFileRanges(const char* filename);
-
-  Status InitNewRange();
-  Status ProcessRange();
-
-  // Find the first record of a scan range.
-  // If the scan range is not at the beginning of the file then this is called to
-  // move the buffered_byte_stream_ seek point to before the next sync field.
-  Status FindFirstRecord(bool* found);
-
-  // Read the current Sequence file header from the begining of the file.
-  // Verifies:
-  //   version number
-  //   key and data classes
-  // Sets:
-  //   is_compressed_
-  //   is_blk_compressed_
-  //   compression_codec_
-  //   sync_
-  Status ReadFileHeader();
-
-  // Read the Sequence file Header Metadata section in the current file.
-  // We don't use this information, so it is just skipped.
-  Status ReadFileHeaderMetadata();
-
-  // Read and validate a RowGroup sync field.
-  Status ReadSync();
 
   // Read the record header, return if there was a sync block.
   // Sets:
@@ -244,16 +206,9 @@ class HdfsSequenceScanner : public HdfsScanner {
   //   record_len: length of the record
   //   eors: set to true if we are at the end of the scan range.
   Status GetRecord(uint8_t** record_ptr, int64_t *record_len, bool* eosr);
-
-  // read and verify a sync block.
-  Status CheckSync();
-
-  // Find the next sync block to start a scan range or recover from error.
-  // IF the sync block spanned a buffer then set have_sync_ = true.
-  Status SkipToSync();
-
+  
   // Appends the current file and line to the RuntimeState's error log.
-  // row_idx is 0-based (in current batch) where the parse error occured.
+  // row_idx is 0-based (in current batch) where the parse error occurred.
   virtual void LogRowParseError(std::stringstream*, int row_idx);
   
   // Helper class for picking fields and rows from delimited text.
@@ -261,23 +216,9 @@ class HdfsSequenceScanner : public HdfsScanner {
   std::vector<FieldLocation> field_locations_;
 
   // Data that is fixed across headers.  This struct is shared between scan ranges.
-  struct FileHeader {
-    // The sync hash read in from the file header.
-    uint8_t sync[SYNC_HASH_SIZE];
-
-    // File compression or not.
-    bool is_compressed;
-    // Block compression or not.
-    bool is_blk_compressed;
-
-    // Codec name if it is compressed.
-    std::string codec;
-
-    // Enum for compression type.
-    THdfsCompression::type compression_type;
-  
-    // End of the header block so we don't have to reparse it.
-    int64_t header_size;
+  struct SeqFileHeader : public BaseSequenceScanner::FileHeader {
+    // If true, the file uses row compression
+    bool is_row_compressed;
   };
 
   // Struct for record locations and lens in compressed blocks.  
@@ -292,23 +233,11 @@ class HdfsSequenceScanner : public HdfsScanner {
   // TODO: better perf not to use vector?
   std::vector<RecordLocation> record_locations_;
 
-  // If true, this scanner is only processing the header bytes.
-  bool only_parsing_header_;
-
-  // Header for this scan range.  Memory is owned by the parent scan node.
-  FileHeader* header_;
-
-  // The decompressor class to use.
-  boost::scoped_ptr<Codec> decompressor_;
-
   // Length of the current sequence file block (or record).
   int current_block_length_;
 
-  // Length of the current key.  This should always be SEQFILE_KEY_LENGTH.
+  // Length of the current key.  This is specified as 4 bytes in the format description.
   int current_key_length_;
-
-  // Pool for allocating the unparsed_data_buffer_.
-  boost::scoped_ptr<MemPool> unparsed_data_buffer_pool_;
 
   // Buffer for data read from HDFS or from decompressing the HDFS data.
   uint8_t* unparsed_data_buffer_;
@@ -319,14 +248,6 @@ class HdfsSequenceScanner : public HdfsScanner {
   // Next record from block compressed data.
   uint8_t* next_record_in_compressed_block_;
 
-  // If we skip ahead on error and read the sync block this is set to true
-  // so we do not need to look for it in ReadCompressedBlock.
-  bool have_sync_;
-
-  // Record the offset in the file of the start of a block or record
-  // so we can point at it if there is a format error.
-  int block_start_;
-  
   // Time spent decompressing bytes
   RuntimeProfile::Counter* decompress_timer_;
 };

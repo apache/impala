@@ -290,13 +290,6 @@ public class PlannerTest {
   }
 
   @Test
-  public void testUnsupportedFormat() {
-    TQueryOptions options = new TQueryOptions();
-    options.allow_unsupported_formats = false;
-    runPlannerTestFile("unsupported-hdfs-format", options);
-  }
-
-  @Test
   public void testJoins() {
     runPlannerTestFile("joins");
   }

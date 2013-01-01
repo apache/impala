@@ -16,10 +16,6 @@
 #ifndef IMPALA_EXEC_HDFS_RCFILE_SCANNER_H
 #define IMPALA_EXEC_HDFS_RCFILE_SCANNER_H
 
-#include "util/codec.h"
-#include "exec/hdfs-scanner.h"
-#include "exec/delimited-text-parser.h"
-
 // org.apache.hadoop.hive.ql.io.RCFile is the original RCFile implementation
 // and should be viewed as the canonical definition of this format. If
 // anything is unclear in this file you should consult the code in
@@ -219,35 +215,29 @@
 // within those blocks.  Using this information the column "buffers" (data)
 // that are needed by the query are read into a single buffer.  Column data that
 // is not used by the query is skipped and not read from the file.  The key data
-// and the column data my be compressed.  The key data is compressed in a single
+// and the column data may be compressed.  The key data is compressed in a single
 // block while the column data is compressed separately by column.
+
+#include "exec/base-sequence-scanner.h"
 
 namespace impala {
 
+struct HdfsFileDesc;
 class HdfsScanNode;
 class TupleDescriptor;
 class Tuple;
 
 // A scanner for reading RCFiles into tuples. 
-class HdfsRCFileScanner : public HdfsScanner {
+class HdfsRCFileScanner : public BaseSequenceScanner {
  public:
-  HdfsRCFileScanner(HdfsScanNode* scan_node, RuntimeState* state, MemPool* tuple_pool);
+  HdfsRCFileScanner(HdfsScanNode* scan_node, RuntimeState* state);
   virtual ~HdfsRCFileScanner();
-  virtual Status GetNext(RowBatch* row_batch, bool* eos);
+  
   virtual Status Prepare();
-  virtual Status InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
-      DiskIoMgr::ScanRange* scan_range, Tuple* template_tuple, ByteStream* byte_stream);
-  virtual Status Close();
 
   void DebugString(int indentation_level, std::stringstream* out) const;
 
  private:
-  // Sync indicator.
-  const static int SYNC_MARKER = -1;
-
-  // Size of the sync hash field.
-  const static int SYNC_HASH_SIZE = 16;
-
   // The key class name located in the RCFile Header.
   // This is always "org.apache.hadoop.hive.ql.io.RCFile$KeyBuffer"
   static const char* const RCFILE_KEY_CLASS_NAME;
@@ -264,23 +254,15 @@ class HdfsRCFileScanner : public HdfsScanner {
   // of the file {'R', 'C', 'F' 1} 
   static const uint8_t RCFILE_VERSION_HEADER[4];
 
-  // read the current RCFile header
-  // Verifies:
-  //   version
-  //   key class
-  //   value class
-  //   number of columns
-  // Sets:
-  //   is_compressed_
-  //   decompressor_
-  //   sync_hash_
-  Status ReadFileHeader();
+  // Implementation of superclass functions.
+  virtual FileHeader* AllocateFileHeader();
+  virtual Status ReadFileHeader();
+  virtual Status InitNewRange();
+  virtual Status ProcessRange();
 
-  // read the RCFile Header Metadata section in the current file
-  // Mostly ignored.
-  // Verifies:
-  //   hive.io.rcfile.column.number
-  Status ReadFileHeaderMetadata();
+  // read the RCFile Header Metadata section in the current file verifying the
+  // number of columns is correct.  Other pieces of the metadata are ignored.
+  Status VerifyNumColumnsMetadata();
 
   // Read the rowgroup header
   // Verifies:
@@ -289,10 +271,7 @@ class HdfsRCFileScanner : public HdfsScanner {
   //   key_length_
   //   compressed_key_length_
   //   num_rows_
-  Status ReadHeader();
-
-  // Read and validate the rowgroup sync field
-  Status ReadSync();
+  Status ReadRowGroupHeader();
 
   // Read the rowgroup key buffers, decompress if necessary.
   // The "keys" are really the lengths for the column values.  They
@@ -335,57 +314,63 @@ class HdfsRCFileScanner : public HdfsScanner {
   //   ReadKeyBuffers
   //   ReadColumnBuffers
   Status ReadRowGroup();
-
-  // Move to next row. Return false if we were at the last row.
-  // Calls NexField on each column that we are reading.
-  // Modifies:
-  //   row_pos_
-  // Returns *eorg = true if there are no more rows.
-  Status NextRow(bool* eorg);
-
-  // Reset the Row Group information.
+  
+  // Reset state for a new row group
   void ResetRowGroup();
 
-  // Returns whether or not column at col_idx should be read
-  bool ReadColumn(int col_idx) {
-    col_idx += scan_node_->num_partition_keys();
-    return scan_node_->GetMaterializedSlotIdx(col_idx) != HdfsScanNode::SKIP_COLUMN;
-  }
-
-  // Helper class for converting text to other types;
-  boost::scoped_ptr<TextConverter> text_converter_;
-
-  // Parser to find the first record block.
-  boost::scoped_ptr<DelimitedTextParser> find_first_parser_;
-
-  // Location (file name) of previous scan range.
-  std::string previous_location_;
+  // Move to next row. Calls NextField on each column that we are reading.
+  // Modifies:
+  //   row_pos_
+  Status NextRow();
 
   enum Version {
-    SEQ6,     // The version pre hive-0.9 which uses the seq header
+    SEQ6,     // Version for sequence file and pre hive-0.9 rc files
     RCF1      // The version post hive-0.9 which uses a new header
   };
 
-  Version version_;
+  // Data that is fixed across headers.  This struct is shared between scan ranges.
+  struct RcFileHeader : public BaseSequenceScanner::FileHeader {
+    // RC file version
+    Version version;
+  };
 
-  // Offset to end of file header.
-  int64_t header_end_;
+  // Struct encapsulating all the state for parsing a single column from a row
+  // group
+  struct ColumnInfo {
+    // If true, this column should be materialized, otherwise, it can be skipped
+    bool materialize_column;
 
-  // End of the scan range.
-  int end_of_scan_range_;
+    // Uncompressed and compressed byte lengths for this column
+    int32_t buffer_len;
+    int32_t uncompressed_buffer_len;
 
-  // Guard variable to prevent reading again from RCFileReader when
-  // the file is exhausted but not all rows have been materialised
-  // from the row group. Reset to false with every
-  // InitCurrentScanRange.
-  bool scan_range_fully_buffered_;
+    // Length and start of the key for this column.
+    int32_t key_buffer_len;
+    // This is a ptr into the scanner's key_buffer_ for this column.
+    uint8_t* key_buffer;
+    
+    // Current position in the key buffer
+    int32_t key_buffer_pos;
+  
+    // Offset into row_group_buffer_ for the start of this column.
+    int32_t start_offset;
 
-  // true if the current RCFile is compressed
-  bool is_compressed_;
+    // Offset from the start of the column for the next field in the column
+    int32_t buffer_pos;
 
-  // The sync_hash_ from the file header.
-  uint8_t sync_hash_[SYNC_HASH_SIZE];
+    // RLE: Length of the current field
+    int32_t current_field_len;
+    // RLE: Repetition count of the current field
+    int32_t current_field_len_rep;
+  };
+  
+  // Vector of of all (non-partition key) column descriptions.  Indexed by column
+  // index, including non-materialized columns.
+  std::vector<ColumnInfo> columns_;
 
+  // Buffer for copying key buffers.  This buffer is reused between row groups.
+  std::vector<uint8_t> key_buffer_;
+  
   // number of columns in this rowgroup object
   int num_cols_;
 
@@ -404,61 +389,17 @@ class HdfsRCFileScanner : public HdfsScanner {
   // Read from the row group header.
   int compressed_key_length_;
 
-  // Decompressor class to use, if any.
-  boost::scoped_ptr<Codec> decompressor_;
+  // Buffer containing the entire row group.  We allocate a buffer for the entire
+  // row group, skipping non-materialized columns.
+  uint8_t* row_group_buffer_;
 
-  // Row Group Key Buffer data, indexed by column number.
-  // Arrays of lengths.
-  int32_t* col_buf_len_;
-  int32_t* col_buf_uncompressed_len_;
+  // Sum of the bytes lengths of the materialized columns in the current row group.  This
+  // is the number of valid bytes in row_group_buffer_.
+  int row_group_length_;
 
-  // Arrays of lengths and pointers to the start the key for each column.
-  uint8_t** col_key_bufs_;
-  int32_t* col_key_bufs_len_;
-
-  // Memory pool for key buffer information
-  // This must be separate from the column_buffer_pool_ since it gets passed to
-  // the row memory pool.  This memory is local to this code and is not acquired.
-  boost::scoped_ptr<MemPool> key_buffer_pool_;
-
-  // Buffer for reading key data.
-  uint8_t* key_buffer_;
-
-  // Length of key_buffer_.
-  int key_buffer_length_;
-
-  // Temporary buffer for compressed data. Allocated from key_buffer_pool_.
-  uint8_t* compressed_data_buffer_;
-
-  // Length of the compressed data buffer.
-  int compressed_data_buffer_length_;
-
-  // Current position in the key buffer, by column
-  int32_t* key_buf_pos_;
-
-  // RLE: Length of the current field, by column
-  int32_t* cur_field_length_;
-
-  // RLE: Repetition count of the current field, by column
-  int32_t* cur_field_length_rep_;
-
-  // Column data buffer
-  uint8_t* column_buffer_;
-
-  // Memory pool for column buffer
-  boost::scoped_ptr<MemPool> column_buffer_pool_;
-
-  // Sum of the lenghts of the column data to be read from the file.
-  int total_col_length_;
-
-  // Previous total length of the column data.
-  int previous_total_length_;
-
-  // Offsets into column data buffer, by column.
-  int32_t* col_bufs_off_;
-
-  // Column buffer byte offset, by column.
-  int32_t* col_buf_pos_;
+  // This is the allocated size of 'row_group_buffer_'.  'row_group_buffer_' is reused
+  // across row groups and will grow as necessary.
+  int row_group_buffer_size_;
 };
 
 }

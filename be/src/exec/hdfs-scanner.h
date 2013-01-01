@@ -58,32 +58,22 @@ struct FieldLocation {
   static const char* LLVM_CLASS_NAME;
 };
 
-// TODO: Remove this comment when all scanners are updated to use IO mgr.  See
-// ScanRangeContext comments for how the io mgr based scanners work.
-// HdfsScanners are instantiated by an HdfsScanNode to parse file data in a particular
-// format into Impala's Tuple structures. They are an abstract class; the actual mechanism
-// for parsing bytes into tuples is format specific and supplied by subclasses.  This
-// class provides methods to allocate tuple buffer data to write tuples to, and access to
-// the parent scan node to retrieve information that is constant across scan range
-// boundaries. The scan node provides a ByteStream* for reading bytes from (usually) an
-// HdfsByteStream. Management of any buffer space to stage those bytes is the
-// responsibility of the subclass.  The scan node also provides a template tuple
-// containing pre-materialised slots to initialise each tuple.
-// Subclasses must implement GetNext. They must also call 
-// scan_node_->IncrNumRowsReturned() for every row they write.
-// The typical lifecycle is:
-//   1. Prepare
-//   2. InitCurrentScanRange
-//   3. GetNext
-//   4. Repeat 3 until scan range is exhausted
-//   5. Repeat from 2., if there are more scan ranges in the current file.
-// For codegen, the functionality is split into two parts.  
-//   1. During the Prepare() phase, the scanner subclass's Codegen() function will be
-//      called to perform codegen for that scanner type for the specific tuple desc.
-//      This codegen'd function is cached in the HdfsScanNode.
-//   2. During the GetNext() phase (where we create one Scanner for each scan range),
-//      the created scanner subclass can retreive, from the scan node, the codegen'd
-//      function to use.  
+// HdfsScanner is the superclass for different hdfs file format parsers.  There is
+// an instance of the scanner object created for each scan range, each driven in
+// a different thread created by the scan node.  The scan node calls:
+// 1. Prepare
+// 2. ProcessScanRange
+// 3. Close
+// ProcessScanRange does not return until the scan range is complete (or an error)
+// occurred.  The HdfsScanner works in tandem with the ScanRangeContext to parallelize IO
+// and parsing.
+// For codegen, the implementation is split into two parts.  
+// 1. During the Prepare() phase of the ScanNode, the scanner subclass's static 
+//    Codegen() function will be called to perform codegen for that scanner type 
+//    for the specific tuple desc. This codegen'd function is cached in the HdfsScanNode.
+// 2. During the GetNext() phase (where we create one Scanner for each scan range),
+//    the created scanner subclass can retrieve, from the scan node, the codegen'd
+//    function to use.  
 // This way, we only codegen once per scanner type, rather than once per scanner object.
 class HdfsScanner {
  public:
@@ -91,54 +81,41 @@ class HdfsScanner {
   // This probably ought to be a derived number from the environment.
   const static int FILE_BLOCK_SIZE = 4096;
 
-  // scan_node - parent scan node
-  // filling materialized slots
-  // tuple_pool - mem pool owned by parent scan node for allocation
-  // of tuple buffer data
-  HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state, MemPool* tuple_pool);
+  HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state);
 
   virtual ~HdfsScanner();
 
-  // Writes parsed tuples into tuple buffer,
-  // and sets pointers in row_batch to point to them.
-  // row_batch may be non-full when all scan ranges have been read
-  virtual Status GetNext(RowBatch* row_batch, bool* eos) { 
-    // TODO: remove when all scanners are updated
-    DCHECK(false);
-    return Status::OK;
-  }
-
   // One-time initialisation of state that is constant across scan ranges.
-  // TODO: update comment when all scanners are using the io mgr.
   virtual Status Prepare();
+
+  // Process an entire scan range reading bytes from context.  Context is initialized
+  // with the scan range meta data (e.g. template tuple, partition descriptor, etc).
+  // This function should only return on error or end of scan range.
+  virtual Status ProcessScanRange(ScanRangeContext* context) = 0;
+
+  // Release all resources the scanner has allocated.  This is the last chance for
+  // the scanner to attach any resources to the ScanRangeContext object.
+  virtual Status Close() = 0;
 
   // Scanner subclasses must implement these static functions as well.  Unfortunately,
   // c++ does not allow static virtual functions.
 
-  // Issue the initial ranges for 'files'
+  // Issue the initial ranges for 'files'.  HdfsFileDesc groups all the scan ranges
+  // assigned to this scan node by file.  This is called before any of the scanner
+  // subclasses are created to process scan ranges in 'files'.
+  // The strategy on how to parse the scan ranges depends on the file format.
+  // - For simple text files, all the ranges are simply issued to the io mgr.
+  // - For formats with a header, the header is first parsed, and then the ranges are
+  // issued to the io mgr.
+  // - For columnar formats, the header is parsed and only the relevant byte ranges
+  // should be issued to the io mgr.
+  // This function is how scanners can pick their strategy.
   // void IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>& files);
 
   // Codegen all functions for this scanner.  The codegen'd function is specific to
   // the scanner subclass but not specific to each scanner object.  We don't want to
   // codegen the functions for each scanner object.
   // llvm::Function* Codegen(HdfsScanNode*);
-
-  // One-time initialisation of per-scan-range state.  The scanner objects are
-  // reused for different scan ranges so this function must reset all state.
-  virtual Status InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
-      DiskIoMgr::ScanRange* scan_range, Tuple* template_tuple, ByteStream* byte_stream);
-
-  // Process an entire scan range reading bytes from context.  Context is initialized
-  // with the scan range meta data (e.g. template tuple, partition descriptor, etc).
-  // This function should only return on error or end of scan range.
-  virtual Status ProcessScanRange(ScanRangeContext* context) {
-    // TODO: make this pure virtual when all scanners are updated.
-    return Status::OK;
-  }
-
-  // Release all resources the scanner has allocated.  This is the last chance for
-  // the scanner to attach any resources to the ScanRangeContext object.
-  virtual Status Close() = 0;
 
   static const char* LLVM_CLASS_NAME;
   
@@ -162,23 +139,8 @@ class HdfsScanner {
   // Cache of conjuncts_mem_.size()
   int num_conjuncts_;
 
-  // Contiguous block of memory into which tuples are written, allocated
-  // from tuple_pool_. We don't allocate individual tuples from tuple_pool_ directly,
-  // because MemPool::Allocate() always rounds up to the next 8 bytes
-  // (ie, would be wasteful if we had 2-byte tuples).
-  uint8_t* tuple_buffer_;
-
-  // Size of tuple_buffer_.
-  int tuple_buffer_size_;
-
   // Fixed size of each tuple, in bytes
   int tuple_byte_size_;
-
-  // Contains all memory for tuple data, including string data which
-  // we can't reference in the file buffers (because it needs to be
-  // unescaped or straddles two file buffers). Owned by the parent
-  // scan node, since the data in it may need to outlive this scanner.
-  MemPool* tuple_pool_;
 
   // Current tuple.
   Tuple* tuple_;
@@ -186,10 +148,6 @@ class HdfsScanner {
   // number of errors in current file
   int num_errors_in_file_;
 
-  // The current provider of bytes to parse. Usually only changes
-  // between files, so is active for the lifetime of a scanner.
-  ByteStream* current_byte_stream_;
- 
   // Helper class for converting text to other types;
   boost::scoped_ptr<TextConverter> text_converter_;
 
@@ -238,11 +196,6 @@ class HdfsScanner {
   // - scanner_name - debug string name for this scanner (e.g. HdfsTextScanner)
   Status InitializeCodegenFn(HdfsPartitionDescriptor* partition, 
       THdfsFileFormat::type type, const std::string& scanner_name);
-
-  // Allocates a buffer from tuple_pool_ large enough to hold one
-  // tuple for every remaining row in row_batch.  The tuple memory
-  // is uninitialized.
-  void AllocateTupleBuffer(RowBatch* row_batch);
 
   // Utility method to write out tuples when there are no materialized
   // fields (e.g. select count(*) or only partition keys).
@@ -317,6 +270,9 @@ class HdfsScanner {
   
   // Report parse error for column @ desc
   void ReportColumnParseError(const SlotDescriptor* desc, const char* data, int len);
+  
+  // Issue all the scan ranges for 'filename' assigned to scan_node_.
+  void IssueFileRanges(const char* filename);
 
   // Initialize a tuple.
   // TODO: only copy over non-null slots.

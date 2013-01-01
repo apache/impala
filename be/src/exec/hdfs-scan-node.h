@@ -78,8 +78,6 @@ struct HdfsFileDesc {
 // a better way.
 // TODO: this needs to be moved into the io mgr.  RegisterReader needs to take
 // another argument for max parallel ranges or something like that.
-// TODO: this class supports two types of scanners, TEXT and SEQUENCE which use
-// the io mgr and RCFILE and TREVNI which don't.  Remove the non io mgr path.
 class HdfsScanNode : public ScanNode {
  public:
   HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
@@ -253,14 +251,6 @@ class HdfsScanNode : public ScanNode {
   // object is.
   boost::scoped_ptr<ObjectPool> scanner_pool_;
 
-  // The scanner in use for the current file / scan-range
-  // combination.
-  HdfsScanner* current_scanner_;
-
-  // The source of byte data for consumption by the scanner for the
-  // current file / scan-range combination.
-  boost::scoped_ptr<ByteStream> current_byte_stream_;
-
   // Total number of partition slot descriptors, including non-materialized ones.
   int num_partition_keys_;
 
@@ -367,15 +357,6 @@ class HdfsScanNode : public ScanNode {
   // the number of scan ranges being parsed to the number of scanner threads.
   Status IssueMoreRanges();
   
-  // Called once per scan-range to initialise (potentially) a new byte
-  // stream and to call the same method on the current scanner.
-  Status InitNextScanRange(RuntimeState* state, bool* scan_ranges_finished);
-
-  // Gets a scanner for the file type for this partition, creating one if none
-  // exists.
-  // TODO: remove when all scanners are updated.
-  HdfsScanner* GetScanner(HdfsPartitionDescriptor*);
-
   // Create a new scanner for this partition type and initialize it.
   // If the scanner cannot be created return NULL.
   HdfsScanner* CreateScanner(HdfsPartitionDescriptor*);

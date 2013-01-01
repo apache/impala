@@ -15,10 +15,9 @@ class TestInsertQueries(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestInsertQueries, cls).add_test_dimensions()
-    # Insert is currently only supported for text and trevni
+    # Insert is currently only supported for text
     cls.TestMatrix.add_constraint(lambda v:\
-        v.get_value('table_format').file_format == 'text' or\
-        v.get_value('table_format').file_format == 'trevni')
+        v.get_value('table_format').file_format == 'text')
     cls.TestMatrix.add_constraint(lambda v:\
         v.get_value('table_format').compression_codec == 'none')
 

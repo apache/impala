@@ -96,19 +96,6 @@ class DelimitedTextParser {
   // If no tuple delimiter is found within the buffer, return -1;
   int FindFirstInstance(const char* buffer, int len);
 
-  // Find a sync block if jumping into the middle of a Sequence or RC file.
-  // The sync block is always proceeded by an indicator of 4 bytes of -1 (0xff).
-  // This will move the Bytestream to the beginning of the sync indicator (the -1).
-  // If no sync block is found we will be at or beyond the end of the
-  // scan range.
-  // Inputs:
-  //   end_of_range: the end of the scan range we are searching.
-  //   sync_size: the size of the sync block.
-  //   sync: the sync bytes to look for.
-  //   byte_stream: the byte stream to read.
-  Status FindSyncBlock(int end_of_range, int sync_size, uint8_t*
-                       sync, ByteStream*  byte_stream);
-
   // Will we return the current column to the query?
   // Hive allows cols at the end of the table that are not in the schema.  We'll
   // just ignore those columns

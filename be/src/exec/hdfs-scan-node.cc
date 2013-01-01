@@ -13,12 +13,12 @@
 // limitations under the License.
 
 #include "exec/hdfs-scan-node.h"
+#include "exec/base-sequence-scanner.h"
 #include "exec/hdfs-text-scanner.h"
 #include "exec/hdfs-lzo-text-scanner.h"
 #include "exec/hdfs-sequence-scanner.h"
 #include "exec/hdfs-rcfile-scanner.h"
 #include "exec/hdfs-trevni-scanner.h"
-#include "exec/hdfs-byte-stream.h"
 
 #include <sstream>
 #include <boost/algorithm/string.hpp>
@@ -62,8 +62,6 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       tuple_pool_(new MemPool()),
       num_unqueued_files_(0),
       scanner_pool_(new ObjectPool()),
-      current_scanner_(NULL),
-      current_byte_stream_(NULL),
       num_partition_keys_(0),
       done_(false),
       partition_key_pool_(new MemPool()),
@@ -90,7 +88,6 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
     }
   }
 
-  *eos = false;
   RowBatch* materialized_batch = NULL;
   {
     unique_lock<mutex> l(row_batches_lock_);
@@ -130,49 +127,12 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
       state->io_mgr()->CancelReader(reader_context_);
     }
     delete materialized_batch;
+    *eos = false;
     return Status::OK;
   }
 
-  // TODO: remove when all scanners are updated to use io mgr.
-  if (current_scanner_ == NULL) {
-    RETURN_IF_ERROR(InitNextScanRange(state, eos));
-    if (*eos) {
-      UpdateCounters();
-      return Status::OK;
-    }
-  }
-
-  // Loops until all the scan ranges are complete or batch is full
-  *eos = false;
-  do {
-    bool eosr = false;
-    int rows_before = row_batch->num_rows();
-    RETURN_IF_ERROR(current_scanner_->GetNext(row_batch, &eosr));
-    RETURN_IF_CANCELLED(state);
-
-    num_rows_returned_ += row_batch->num_rows() - rows_before;
-    COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-
-    if (ReachedLimit()) {
-      int num_rows_over = num_rows_returned_ - limit_;
-      row_batch->set_num_rows(row_batch->num_rows() - num_rows_over);
-      num_rows_returned_ -= num_rows_over;
-      COUNTER_SET(rows_returned_counter_, num_rows_returned_);
-      *eos = true;
-      break;
-    }
-
-    if (eosr) { // Current scan range is finished
-      ++current_range_idx_;
-
-      // Will update file and current_file_scan_ranges_ so that subsequent check passes
-      RETURN_IF_ERROR(InitNextScanRange(state, eos));
-      // Done with all files
-      if (*eos) break;
-    }
-  } while (!row_batch->IsFull());
-
-  if (*eos) UpdateCounters();
+  *eos = true;
+  UpdateCounters();
 
   return Status::OK;
 }
@@ -245,65 +205,6 @@ DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(const char* file, int64_t 
   return range;
 }
 
-Status HdfsScanNode::InitNextScanRange(RuntimeState* state, bool* scan_ranges_finished) {
-  *scan_ranges_finished = false;
-  while (true) {
-    if (current_file_scan_ranges_ == per_file_scan_ranges_.end()) {
-      // Defensively return if this gets called after all scan ranges are exhausted.
-      *scan_ranges_finished = true;
-      return Status::OK;
-    } else if (current_range_idx_ == current_file_scan_ranges_->second->ranges.size()) {
-      RETURN_IF_ERROR(current_byte_stream_->Close());
-      current_byte_stream_.reset(NULL);
-      ++current_file_scan_ranges_;
-      current_range_idx_ = 0;
-      if (current_file_scan_ranges_ == per_file_scan_ranges_.end()) {
-        *scan_ranges_finished = true;
-        return Status::OK; // We're done; caller will check for this condition and exit
-      }
-    }
-
-    DiskIoMgr::ScanRange* range = 
-        current_file_scan_ranges_->second->ranges[current_range_idx_];
-    int64_t partition_id = reinterpret_cast<int64_t>(range->meta_data());
-    HdfsPartitionDescriptor* partition = hdfs_table_->GetPartition(partition_id);
-
-    if (partition == NULL) {
-      stringstream ss;
-      ss << "Could not find partition with id: " << partition_id;
-      return Status(ss.str());
-    }
-
-    // TODO: HACK.  Skip this file if it uses the io mgr, it is handled very differently
-    if (partition->file_format() == THdfsFileFormat::TEXT ||
-        partition->file_format() == THdfsFileFormat::LZO_TEXT ||
-        partition->file_format() == THdfsFileFormat::SEQUENCE_FILE) {
-      ++current_file_scan_ranges_;
-      continue;
-    }
-
-    Tuple* template_tuple = NULL;
-    // Only allocate template_tuple_ if there are partition keys.  The scanners
-    // use template_tuple == NULL to determine if partition keys are necessary
-    if (!partition_key_slots_.empty()) {
-      DCHECK(!partition->partition_key_values().empty());
-      template_tuple = InitTemplateTuple(state, partition->partition_key_values());
-    } 
-
-    if (current_byte_stream_ == NULL) {
-      current_byte_stream_.reset(new HdfsByteStream(hdfs_connection_, this));
-      RETURN_IF_ERROR(current_byte_stream_->Open(current_file_scan_ranges_->first));
-      current_scanner_ = GetScanner(partition);
-      DCHECK(current_scanner_ != NULL);
-    }
-
-    RETURN_IF_ERROR(current_scanner_->InitCurrentScanRange(partition, range, 
-        template_tuple, current_byte_stream_.get()));
-    return Status::OK;
-  }
-  return Status::OK;
-}
-
 HdfsFileDesc* HdfsScanNode::GetFileDesc(const string& filename) {
   DCHECK(per_file_scan_ranges_.find(filename) != per_file_scan_ranges_.end());
   return per_file_scan_ranges_[filename];
@@ -328,16 +229,6 @@ Function* HdfsScanNode::GetCodegenFn(THdfsFileFormat::type type) {
   return it->second;
 }
 
-HdfsScanner* HdfsScanNode::GetScanner(HdfsPartitionDescriptor* partition) {
-  ScannerMap::iterator scanner_it = scanner_map_.find(partition->file_format());
-  if (scanner_it != scanner_map_.end()) {
-    return scanner_it->second;
-  }
-  HdfsScanner* scanner = CreateScanner(partition);
-  scanner_map_[partition->file_format()] = scanner;
-  return scanner;
-}
-
 HdfsScanner* HdfsScanNode::CreateScanner(HdfsPartitionDescriptor* partition) {
   HdfsScanner* scanner = NULL;
 
@@ -353,11 +244,13 @@ HdfsScanner* HdfsScanNode::CreateScanner(HdfsPartitionDescriptor* partition) {
       scanner = new HdfsSequenceScanner(this, runtime_state_);
       break;
     case THdfsFileFormat::RC_FILE:
-      scanner = new HdfsRCFileScanner(this, runtime_state_, tuple_pool_.get());
+      scanner = new HdfsRCFileScanner(this, runtime_state_);
       break;
+#if 0
     case THdfsFileFormat::TREVNI:
       scanner = new HdfsTrevniScanner(this, runtime_state_, tuple_pool_.get());
       break;
+#endif
     default:
       DCHECK(false) << "Unknown Hdfs file format type:" << partition->file_format();
       return NULL;
@@ -494,13 +387,8 @@ Status HdfsScanNode::Open(RuntimeState* state) {
       return Status(ss.str());
     }
 
-    // TODO: remove when all scanners are updated
-    if (partition->file_format() == THdfsFileFormat::TEXT ||
-        partition->file_format() == THdfsFileFormat::LZO_TEXT ||
-        partition->file_format() == THdfsFileFormat::SEQUENCE_FILE) {
-      ++num_unqueued_files_;
-      total_scan_ranges += ranges.size();
-    } 
+    ++num_unqueued_files_;
+    total_scan_ranges += ranges.size();
 
     RETURN_IF_ERROR(partition->PrepareExprs(state));
     per_type_files[partition->file_format()].push_back(it->second);
@@ -540,17 +428,14 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 
   // Issue initial ranges for all file types.
   HdfsTextScanner::IssueInitialRanges(this, per_type_files[THdfsFileFormat::TEXT]);
+  BaseSequenceScanner::IssueInitialRanges(this, 
+      per_type_files[THdfsFileFormat::SEQUENCE_FILE]);
+  BaseSequenceScanner::IssueInitialRanges(this,
+      per_type_files[THdfsFileFormat::RC_FILE]);
   if (!per_type_files[THdfsFileFormat::LZO_TEXT].empty()) {
+    // This will dlopen the lzo binary and can fail if it is not present
     RETURN_IF_ERROR(HdfsLzoTextScanner::IssueInitialRanges(state,
         this, per_type_files[THdfsFileFormat::LZO_TEXT]));
-  }
-  HdfsSequenceScanner::IssueInitialRanges(this, 
-      per_type_files[THdfsFileFormat::SEQUENCE_FILE]);
-  
-  if (all_ranges_.empty()) {
-    // This is a temporary hack for scanners not using the io mgr.
-    done_ = true;
-    return Status::OK;
   }
   
   // Start up disk thread which in turn drives the scanner threads.

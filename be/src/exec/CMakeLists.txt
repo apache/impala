@@ -24,6 +24,7 @@ set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/exec")
 add_library(Exec STATIC
   aggregation-node.cc
   aggregation-node-ir.cc
+  base-sequence-scanner.cc
   buffered-byte-stream.cc
   data-sink.cc
   ddl-executor.cc
@@ -45,7 +46,7 @@ add_library(Exec STATIC
   hdfs-lzo-text-scanner.cc
   hdfs-text-table-writer.cc
   merge-node.cc
-  hdfs-trevni-scanner.cc
+#  hdfs-trevni-scanner.cc
   hdfs-trevni-table-writer.cc
   hbase-scan-node.cc
   hbase-table-scanner.cc

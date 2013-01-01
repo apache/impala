@@ -27,9 +27,11 @@ public class DataErrorsTest extends BaseQueryTest {
     // IMP-251: max_errors doesn't really have any effect because we cannot retrieve
     // any conversion error at this moment.
     runPairTestFile("hdfs-scan-node-errors", false, 100,
-        ALL_TABLE_FORMATS, ALL_COMPRESSION_FORMATS, ALL_BATCH_SIZES, ALL_NODES_ONLY);
+        all_format_except_trevni, ALL_COMPRESSION_FORMATS, 
+        ALL_BATCH_SIZES, ALL_NODES_ONLY);
     runPairTestFile("hdfs-scan-node-errors", false, 5,
-        ALL_TABLE_FORMATS, ALL_COMPRESSION_FORMATS, ALL_BATCH_SIZES, ALL_CLUSTER_SIZES);
+        all_format_except_trevni, ALL_COMPRESSION_FORMATS, 
+        ALL_BATCH_SIZES, ALL_CLUSTER_SIZES);
   }
 
   @Test

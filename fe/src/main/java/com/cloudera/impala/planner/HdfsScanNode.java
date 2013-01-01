@@ -244,7 +244,7 @@ public class HdfsScanNode extends ScanNode {
   public void validateFileFormat() throws NotImplementedException {
     for (HdfsPartition partition :partitions) {
       HdfsFileFormat format = partition.getInputFormatDescriptor().getFileFormat();
-      if (format == HdfsFileFormat.RC_FILE || format == HdfsFileFormat.TREVNI) {
+      if (format == HdfsFileFormat.TREVNI) {
         StringBuilder error = new StringBuilder();
         error.append("Table ").append(desc.getTable().getFullName())
           .append(" has unsupported format ").append(format.name());

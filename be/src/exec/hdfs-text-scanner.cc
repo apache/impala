@@ -34,7 +34,7 @@ using namespace std;
 const char* HdfsTextScanner::LLVM_CLASS_NAME = "class.impala::HdfsTextScanner";
 
 HdfsTextScanner::HdfsTextScanner(HdfsScanNode* scan_node, RuntimeState* state) 
-    : HdfsScanner(scan_node, state, NULL),
+    : HdfsScanner(scan_node, state),
       byte_buffer_ptr_(NULL),
       byte_buffer_end_(NULL),
       byte_buffer_read_size_(0),

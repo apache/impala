@@ -4,7 +4,6 @@
 #include <dlfcn.h>
 #include <boost/algorithm/string.hpp>
 #include "exec/hdfs-lzo-text-scanner.h"
-#include "exec/byte-stream.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/scan-range-context.h"
 #include "exec/serde-utils.h"

@@ -1,16 +1,5 @@
-// RC is not supported
-select * from alltypes_rc
----- PLAN
-not implemented
-====
 // Trevni is not supported
-select * from alltypes_rc
----- PLAN
-not implemented
-====
-// alltypesmixedformat has RC
-// Trevni is not supported
-select * from alltypesmixedformat
+select * from alltypes_trevni
 ---- PLAN
 not implemented
 ====

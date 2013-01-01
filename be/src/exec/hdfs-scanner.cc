@@ -21,9 +21,9 @@
 #include "common/logging.h"
 #include "common/object-pool.h"
 #include "exec/text-converter.h"
-#include "exec/hdfs-byte-stream.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/scan-range-context.h"
+#include "exec/serde-utils.inline.h"
 #include "exec/text-converter.inline.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
@@ -32,9 +32,9 @@
 #include "runtime/mem-pool.h"
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
+#include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
 #include "runtime/tuple.h"
-#include "runtime/string-value.h"
 #include "util/debug-util.h"
 #include "util/runtime-profile.h"
 #include "util/sse-util.h"
@@ -49,23 +49,18 @@ using namespace std;
 const char* FieldLocation::LLVM_CLASS_NAME = "struct.impala::FieldLocation";
 const char* HdfsScanner::LLVM_CLASS_NAME = "class.impala::HdfsScanner";
 
-HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state, 
-                         MemPool* tuple_pool)
+HdfsScanner::HdfsScanner(HdfsScanNode* scan_node, RuntimeState* state)
     : scan_node_(scan_node),
       state_(state),
       context_(NULL),
       conjuncts_(NULL),
       num_conjuncts_(0),
-      tuple_buffer_(NULL),
       tuple_byte_size_(scan_node->tuple_desc()->byte_size()),
-      tuple_pool_(tuple_pool),
       tuple_(NULL),
       num_errors_in_file_(0),
-      current_byte_stream_(NULL),
       template_tuple_(NULL),
       has_noncompact_strings_(!scan_node->compact_data() &&
                               !scan_node->tuple_desc()->string_slots().empty()),
-      current_scan_range_(NULL),
       num_null_bytes_(scan_node->tuple_desc()->num_null_bytes()),
       write_tuples_fn_(NULL) {
 }
@@ -104,37 +99,6 @@ Status HdfsScanner::InitializeCodegenFn(HdfsPartitionDescriptor* partition,
       state_->llvm_codegen()->JitFunction(codegen_fn));
   VLOG(2) << scanner_name << "(node_id=" << scan_node_->id() 
           << ") using llvm codegend functions.";
-  return Status::OK;
-}
-
-void HdfsScanner::AllocateTupleBuffer(RowBatch* row_batch) {
-  if (tuple_byte_size_ == 0) {
-    tuple_byte_size_ = 0;
-  } else if (tuple_ == NULL) {
-    // create new tuple buffer for row_batch
-    tuple_buffer_size_ = row_batch->capacity() * tuple_byte_size_;
-    tuple_buffer_ = tuple_pool_->Allocate(tuple_buffer_size_);
-    tuple_ = reinterpret_cast<Tuple*>(tuple_buffer_);
-  }
-}
-
-Status HdfsScanner::InitCurrentScanRange(HdfsPartitionDescriptor* hdfs_partition, 
-    DiskIoMgr::ScanRange* range, Tuple* template_tuple, ByteStream* byte_stream) {
-  // There is only one case where the scanner would get a new template_tuple
-  // memory location.  Most of the time, the template_tuple is copied into
-  // the tuple being materialized so the template tuple memory can be reused.  
-  // However, if there are no materialized slots (partition key only), then the 
-  // template tuple address is directly put into the tuplerows.  In this case we need
-  // a new memory location for the template tuple.  The memory savings is
-  // not important but the address of template_tuple is baked into the codegen
-  // functions.  In the case with no materialized slots, there is no codegen
-  // function so it is not a problem.
-  DCHECK(byte_stream != NULL);
-  current_scan_range_ = range;
-  template_tuple_ = template_tuple;
-  current_byte_stream_ = byte_stream;
-  has_noncompact_strings_ = (!scan_node_->compact_data() &&
-                             !scan_node_->tuple_desc()->string_slots().empty());
   return Status::OK;
 }
 
@@ -552,3 +516,9 @@ void HdfsScanner::ReportColumnParseError(const SlotDescriptor* desc,
     state_->LogError(ss.str());
   }
 }
+
+void HdfsScanner::IssueFileRanges(const char* filename) {
+  HdfsFileDesc* file_desc = scan_node_->GetFileDesc(filename);
+  scan_node_->AddDiskIoRange(file_desc);
+}
+
