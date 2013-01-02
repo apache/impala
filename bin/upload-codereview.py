@@ -82,7 +82,7 @@ AUTH_ACCOUNT_TYPE = "HOSTED"
 # URL of the default review server. As for AUTH_ACCOUNT_TYPE, this line could be
 # changed by the review server (see handler for upload.py).
 #DEFAULT_REVIEW_SERVER = "127.0.0.1:8000"
-DEFAULT_REVIEW_SERVER = "http://c0305.hal.cloudera.com:31111"
+DEFAULT_REVIEW_SERVER = "http://a1205.halxg.cloudera.com:31111"
 
 # Max size of patch or base file.
 MAX_UPLOAD_SIZE = 900 * 1024
