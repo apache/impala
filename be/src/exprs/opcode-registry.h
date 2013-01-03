@@ -44,8 +44,9 @@ class OpcodeRegistry {
     if (instance_ == NULL) {
       boost::lock_guard<boost::mutex> l(instance_lock_);
       if (instance_ == NULL) {
+        // Make sure not to assign instance_ (and make it visible to other threads)
+        // until it is fully initialized.  Note the fast path does not lock.
         instance_ = new OpcodeRegistry();
-        instance_->Init();
       }
     }
     return instance_;
@@ -56,6 +57,7 @@ class OpcodeRegistry {
   OpcodeRegistry() {
     int num_opcodes = static_cast<int>(TExprOpcode::LAST_OPCODE);
     functions_.resize(num_opcodes);
+    Init();
   }
 
   // Populates all of the registered functions. Implemented in
