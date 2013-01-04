@@ -1881,7 +1881,11 @@ TEST_F(ExprTest, TimestampFunctions) {
 
   // Test functions with unknown expected value.
   TestValidTimestampValue("now()");
+  TestValidTimestampValue("current_timestamp()");
   TestValidTimestampValue("cast(unix_timestamp() as timestamp)");
+
+  // Test alias
+  TestValue("now() = current_timestamp()", TYPE_BOOLEAN, true);
 
   // Test invalid formats returning NULL
   TestIsNull("unix_timestamp('1970-01-01 0:00:00', 'yyyy-MM-dd HH:mm:ss')", TYPE_INT);
