@@ -32,12 +32,17 @@
 #include <boost/foreach.hpp>
 #include <boost/bind.hpp>
 #include <boost/algorithm/string.hpp>
+#include <google/heap-profiler.h>
+#include <google/malloc_extension.h>
 
+#include "codegen/llvm-codegen.h"
 #include "common/logging.h"
 #include "common/service-ids.h"
-#include "exprs/expr.h"
+#include "exec/ddl-executor.h"
+#include "exec/exec-node.h"
 #include "exec/hdfs-table-sink.h"
-#include "codegen/llvm-codegen.h"
+#include "exec/scan-node.h"
+#include "exprs/expr.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/client-cache.h"
 #include "runtime/descriptors.h"
@@ -47,13 +52,10 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/exec-env.h"
 #include "runtime/coordinator.h"
-#include "exec/exec-node.h"
-#include "exec/scan-node.h"
-#include "exec/ddl-executor.h"
 #include "sparrow/simple-scheduler.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
-#include "util/impalad-metric-keys.h"
+#include "util/impalad-metrics.h"
 #include "util/string-parser.h"
 #include "util/thrift-util.h"
 #include "util/thrift-server.h"
@@ -98,6 +100,11 @@ DEFINE_string(default_query_options, "", "key=value pair of default query option
     " impalad, separated by ','");
 DEFINE_int32(query_log_size, 25, "Number of queries to retain in the query log. If -1, "
                                  "the query log has unbounded size.");
+// TODO: this logging should go into a per query log.
+DEFINE_int32(log_mem_usage_interval, 0, "If non-zero, impalad will output memory usage "
+    "every log_mem_usage_interval'th fragment completion.");
+DEFINE_string(heap_profile_dir, "", "if non-empty, enable heap profiling and output "
+    " to specified directory.");
 
 namespace impala {
 
@@ -645,6 +652,10 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   // Initialize default config
   InitializeConfigVariables();
 
+  if (!FLAGS_heap_profile_dir.empty()) {
+    HeapProfilerStart(FLAGS_heap_profile_dir.c_str());
+  }
+
   if (!FLAGS_use_planservice) {
     JNIEnv* jni_env = getJNIEnv();
     // create instance of java class JniFrontend
@@ -708,12 +719,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
       bind<void>(mem_fn(&ImpalaServer::QueryProfilePathHandler), this, _1, _2);
   exec_env->webserver()->RegisterPathHandler("/query_profile", profile_callback);
 
-  num_queries_metric_ = exec_env->metrics()->CreateAndRegisterPrimitiveMetric(
-      ImpaladMetricKeys::NUM_QUERIES, 0L);
-  exec_env->metrics()->CreateAndRegisterPrimitiveMetric(
-      ImpaladMetricKeys::TOTAL_SCAN_RANGES_PROCESSED, 0L);
-  exec_env->metrics()->CreateAndRegisterPrimitiveMetric(
-      ImpaladMetricKeys::NUM_SCAN_RANGES_MISSING_VOLUME_ID, 0L);
+  // Initialize impalad metrics
+  ImpaladMetrics::CreateMetrics(exec_env->metrics());
 }
 
 void ImpalaServer::RenderHadoopConfigs(const Webserver::ArgumentMap& args,
@@ -1058,7 +1065,7 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
 Status ImpalaServer::Execute(const TClientRequest& request,
     shared_ptr<QueryExecState>* exec_state) {
   bool registered_exec_state;
-  num_queries_metric_->Increment(1L);
+  ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES->Increment(1L);
   Status status = ExecuteInternal(request, &registered_exec_state, exec_state);
   if (!status.ok() && registered_exec_state) {
     UnregisterQuery((*exec_state)->query_id());
@@ -1167,10 +1174,6 @@ bool ImpalaServer::UnregisterQuery(const TUniqueId& query_id) {
     }
   }
 
-  {
-    lock_guard<mutex> l(*exec_state->lock());
-    //exec_state->Cancel();
-  }
   return true;
 }
 
@@ -1884,6 +1887,7 @@ Status ImpalaServer::StartPlanFragmentExecution(
 }
 
 void ImpalaServer::RunExecPlanFragment(FragmentExecState* exec_state) {
+  ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS->Increment(1L);
   exec_state->Exec();
 
   // we're done with this plan fragment
@@ -1897,6 +1901,15 @@ void ImpalaServer::RunExecPlanFragment(FragmentExecState* exec_state) {
     } else {
       LOG(ERROR) << "missing entry in fragment exec state map: instance_id="
                  << exec_state->fragment_instance_id();
+    }
+  }
+  if (FLAGS_log_mem_usage_interval > 0) {
+    uint64_t num_complete = ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS->value();
+    if (num_complete % FLAGS_log_mem_usage_interval == 0) {
+      char buf[2048];
+      // This outputs how much memory is currently being used by this impalad
+      MallocExtension::instance()->GetStats(buf, 2048);
+      LOG(INFO) << buf;
     }
   }
 }

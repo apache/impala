@@ -52,7 +52,7 @@ SET(CXX_COVERAGE_FLAGS "-fprofile-arcs -ftest-coverage")
 #   2. Run the benchmarks (generates *.gcda profiling data).
 #   3. Build again with CMAKE_BUILD_TYPE_PROFILE_BUILD
 #     -fprofile-use: Compiler will use the profile outputs for optimizations
-SET(CXX_FLAGS_DEBUG "-ggdb")
+SET(CXX_FLAGS_DEBUG "-g -ggdb")
 SET(CXX_FLAGS_RELEASE "-O3 -g -DNDEBUG -Wno-strict-aliasing")
 SET(CXX_FLAGS_PROFILE_GEN "${CXX_FLAGS_RELEASE} -fprofile-generate")
 SET(CXX_FLAGS_PROFILE_BUILD "${CXX_FLAGS_RELEASE} -fprofile-use")
@@ -175,6 +175,7 @@ set (IMPALA_LINK_LIBS
   Util
   ThriftSaslTransport
   Runtime
+  Util
   Sparrow
   CodeGen
   Common
@@ -187,6 +188,7 @@ set (IMPALA_LINK_LIBS
   Util
   ImpalaThrift
   Runtime
+  Util
   Common
   Webserver
   GlobalFlags
@@ -212,6 +214,13 @@ MESSAGE(STATUS, "${IMPALA_LINK_LIBS}")
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "CODE_COVERAGE")
   set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} -lgcov)
 endif ()
+
+# The above link list does not include tcmalloc.  This is because libfesupport
+# cannot use tcmalloc in all cases.  When it is started up by the FE (for tests)
+# the jvm has already made allocations before tcmalloc can be loaded.  In all
+# other binaries, we can use tcmalloc
+set (IMPALA_FE_SUPPORT_LINK_LIBS ${IMPALA_LINK_LIBS})
+set (IMPALA_LINK_LIBS ${IMPALA_LINK_LIBS} tcmallocstatic)
 
 # Link libs for test executables.  Although not all tests need all libs,
 # the build time for the tests is rather small and not worth the trouble.

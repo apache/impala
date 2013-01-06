@@ -178,12 +178,7 @@ class MemPool {
     // bytes allocated via Allocate() in this chunk
     int allocated_bytes;
 
-    explicit ChunkInfo(int size)
-      : owns_data(true),
-        data(new uint8_t[size]),
-        size(size),
-        cumulative_allocated_bytes(0),
-        allocated_bytes(0) {}
+    explicit ChunkInfo(int size);
 
     ChunkInfo()
       : owns_data(true),

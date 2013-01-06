@@ -412,12 +412,6 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
 
   // The set of backends last reported by the state-store, used for failure detection.
   std::vector<THostPort> last_membership_;
-
-  // Metrics
-
-  // Total number of queries executed by this server, including failed and cancelled
-  // queries.
-  Metrics::IntMetric* num_queries_metric_;
 };
 
 // Create an ImpalaServer and Thrift servers.

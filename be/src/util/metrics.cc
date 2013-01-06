@@ -24,7 +24,7 @@ using namespace impala;
 using namespace std;
 using namespace boost;
 using namespace boost::algorithm;
-
+  
 Metrics::Metrics() 
   : obj_pool_(new ObjectPool()) { }
 

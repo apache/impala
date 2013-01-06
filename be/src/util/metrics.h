@@ -213,6 +213,13 @@ class Metrics {
   // Webserver callback (on /jsonmetrics), renders metrics as a single json document
   void JsonCallback(const Webserver::ArgumentMap& args, std::stringstream* output);
 };
+  
+// Specialize int metrics to use atomics and avoid locking
+template<>
+inline int64_t Metrics::PrimitiveMetric<int64_t>::Increment(const int64_t& delta) {
+  return __sync_add_and_fetch(&value_, delta);
+}
+
 
 }
 

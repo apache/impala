@@ -22,6 +22,7 @@
 #include "common/logging.h"
 #include "util/disk-info.h"
 #include "util/hdfs-util.h"
+#include "util/impalad-metrics.h"
 
 // Control the number of disks on the machine.  If 0, this comes from the system 
 // settings.
@@ -793,6 +794,9 @@ char* DiskIoMgr::GetFreeBuffer() {
   unique_lock<mutex> lock(free_buffers_lock_);
   if (free_buffers_.empty()) {
     ++num_allocated_buffers_;
+    if (ImpaladMetrics::IO_MGR_NUM_BUFFERS != NULL) {
+      ImpaladMetrics::IO_MGR_NUM_BUFFERS->Increment(1L);
+    }
     return new char[max_read_size_];
   } else {
     char* buffer = free_buffers_.front();
@@ -869,6 +873,9 @@ Status DiskIoMgr::OpenScanRange(hdfsFS hdfs_connection, ScanRange* range) const 
       return Status(ss.str());
     }
   } 
+  if (ImpaladMetrics::IO_MGR_NUM_OPEN_FILES != NULL) {
+    ImpaladMetrics::IO_MGR_NUM_OPEN_FILES->Increment(1L);
+  }
   return Status::OK;
 }
 
@@ -883,6 +890,9 @@ void DiskIoMgr::CloseScanRange(hdfsFS hdfs_connection, ScanRange* range) const {
     if (range->local_file_ == NULL) return;
     fclose(range->local_file_);
     range->local_file_ = NULL;
+  }
+  if (ImpaladMetrics::IO_MGR_NUM_OPEN_FILES != NULL) {
+    ImpaladMetrics::IO_MGR_NUM_OPEN_FILES->Increment(-1L);
   }
 }
 

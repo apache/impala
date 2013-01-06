@@ -36,7 +36,7 @@
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "util/debug-util.h"
-#include "util/impalad-metric-keys.h"
+#include "util/impalad-metrics.h"
 #include "util/runtime-profile.h"
 
 #include "gen-cpp/PlanNodes_types.h"
@@ -220,8 +220,8 @@ Status HdfsScanNode::SetScanRanges(const vector<TScanRangeParams>& scan_range_pa
 
   // Update server wide metrics for number of scan ranges and ranges that have 
   // incomplete metadata.
-  total_ranges_metric_->Increment(scan_range_params.size());
-  missing_volume_id_count_metric_->Increment(num_ranges_missing_volume_id);
+  ImpaladMetrics::NUM_RANGES_PROCESSED->Increment(scan_range_params.size());
+  ImpaladMetrics::NUM_RANGES_MISSING_VOLUME_ID->Increment(num_ranges_missing_volume_id);
 
   return Status::OK;
 }
@@ -427,16 +427,6 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
     if (seq_fn != NULL) codegend_fn_map_[THdfsFileFormat::SEQUENCE_FILE] = seq_fn;
   }
   
-  Metrics* metrics = runtime_state_->exec_env()->metrics();
-  DCHECK(metrics != NULL);
-
-  total_ranges_metric_ = metrics->GetMetric<Metrics::IntMetric>(
-      ImpaladMetricKeys::TOTAL_SCAN_RANGES_PROCESSED);
-  missing_volume_id_count_metric_ = metrics->GetMetric<Metrics::IntMetric>(
-      ImpaladMetricKeys::NUM_SCAN_RANGES_MISSING_VOLUME_ID);
-  DCHECK(total_ranges_metric_ != NULL);
-  DCHECK(missing_volume_id_count_metric_ != NULL);
-
   return Status::OK;
 }
 

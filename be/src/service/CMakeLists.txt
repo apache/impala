@@ -29,9 +29,7 @@ add_library(fesupport SHARED
   fe-support.cc
 )
 
-target_link_libraries(fesupport ${IMPALA_LINK_LIBS})
-
-message(STATUS, "IMPALA_LINK_LIBS: ${IMPALA_LINK_LIBS}")
+target_link_libraries(fesupport ${IMPALA_FE_SUPPORT_LINK_LIBS})
 
 add_executable(impalad
   impalad-main.cc
@@ -43,5 +41,4 @@ set_target_properties(impalad PROPERTIES LINK_FLAGS -rdynamic)
 target_link_libraries(impalad
   ${JAVA_JSIG_LIBRARY}
   ${IMPALA_LINK_LIBS}
-  tcmallocstatic
 )

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "runtime/mem-pool.h"
+#include "util/impalad-metrics.h"
 
 #include <stdio.h>
 #include <sstream>
@@ -51,11 +52,13 @@ MemPool::MemPool(const vector<string>& chunks)
     peak_allocated_bytes_(0) {
   if (chunks.empty()) return;
   chunks_.reserve(chunks.size());
+  int64_t total_bytes_allocated = 0;
   for (int i = 0; i < chunks.size(); ++i) {
     chunks_.push_back(ChunkInfo());
     ChunkInfo& chunk = chunks_.back();
     chunk.owns_data = true;
     chunk.data = new uint8_t[chunks[i].size()];
+    total_bytes_allocated += chunks[i].size();
     memcpy(chunk.data, chunks[i].data(), chunks[i].size());
     chunk.size = chunks[i].size();
     chunk.allocated_bytes = chunk.size;
@@ -63,12 +66,32 @@ MemPool::MemPool(const vector<string>& chunks)
     total_allocated_bytes_ += chunk.size;
   }
   current_chunk_idx_ = chunks_.size() - 1;
+
+  if (ImpaladMetrics::MEM_POOL_TOTAL_BYTES != NULL) {
+    ImpaladMetrics::MEM_POOL_TOTAL_BYTES->Increment(total_bytes_allocated);
+  }
+}
+    
+MemPool::ChunkInfo::ChunkInfo(int size)
+  : owns_data(true),
+    data(new uint8_t[size]),
+    size(size),
+    cumulative_allocated_bytes(0),
+    allocated_bytes(0) {
+  if (ImpaladMetrics::MEM_POOL_TOTAL_BYTES != NULL) {
+    ImpaladMetrics::MEM_POOL_TOTAL_BYTES->Increment(size);
+  }
 }
 
 MemPool::~MemPool() {
+  int64_t total_bytes_released = 0;
   for (size_t i = 0; i < chunks_.size(); ++i) {
     if (!chunks_[i].owns_data) continue;
+    total_bytes_released += chunks_[i].size;
     delete [] chunks_[i].data;
+  }
+  if (ImpaladMetrics::MEM_POOL_TOTAL_BYTES != NULL) {
+    ImpaladMetrics::MEM_POOL_TOTAL_BYTES->Increment(-total_bytes_released);
   }
 }
 

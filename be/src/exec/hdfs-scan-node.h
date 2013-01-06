@@ -32,7 +32,6 @@
 #include "runtime/descriptors.h"
 #include "runtime/disk-io-mgr.h"
 #include "runtime/string-buffer.h"
-#include "util/metrics.h"
 #include "util/progress-updater.h"
 
 #include "gen-cpp/PlanNodes_types.h"
@@ -219,10 +218,6 @@ class HdfsScanNode : public ScanNode {
   // this once per scan node since it can be noisy.
   bool unknown_disk_id_warned_;
   
-  // ImpalaD-wide metrics that are updated by this scan node
-  Metrics::IntMetric* total_ranges_metric_;
-  Metrics::IntMetric* missing_volume_id_count_metric_;
-
   // Mem pool for tuple buffer data. Used by scanners for allocation,
   // but owned here.
   boost::scoped_ptr<MemPool> tuple_pool_;
