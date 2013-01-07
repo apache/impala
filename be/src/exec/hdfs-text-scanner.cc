@@ -83,8 +83,10 @@ Status HdfsTextScanner::ProcessScanRange(ScanRangeContext* context) {
 
 Status HdfsTextScanner::Close() {
   context_->AcquirePool(boundary_mem_pool_.get());
+  // We must flush any pending batches in the row batch before telling the scan node
+  // the range is complete. 
+  context_->Flush();
   scan_node_->RangeComplete(THdfsFileFormat::TEXT, THdfsCompression::NONE);
-  context_->Complete();
   return Status::OK;
 }
 

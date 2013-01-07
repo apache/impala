@@ -177,11 +177,13 @@ Status HdfsSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
 }
 
 Status HdfsSequenceScanner::Close() {
+  context_->AcquirePool(unparsed_data_buffer_pool_.get());
+  // We must flush any pending batches in the row batch before telling the scan node
+  // the range is complete. 
+  context_->Flush();
   if (!only_parsing_header_) {
-    context_->AcquirePool(unparsed_data_buffer_pool_.get());
     scan_node_->RangeComplete(THdfsFileFormat::SEQUENCE_FILE, header_->compression_type);
   }
-  context_->Complete();
   return Status::OK;
 }
   
@@ -233,7 +235,6 @@ Status HdfsSequenceScanner::Prepare() {
   
   decompress_timer_ = ADD_COUNTER(
       scan_node_->runtime_profile(), "DecompressionTime", TCounterType::CPU_TICKS);
-
   return Status::OK;
 }
 

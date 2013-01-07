@@ -129,21 +129,21 @@ class ScanRangeContext {
   // (can't have the buffers be queued in non-sequential order).
   void AddBuffer(DiskIoMgr::BufferDescriptor*);
 
-  // Complete() and Cancel() are used together to coordinate proper cleanup.
+  // Flush() and Cancel() are used together to coordinate proper cleanup.
   // Valid call orders are:
-  //  - Complete(): normal case when the scanner finishes
-  //  - Cancel() -> Complete(): scanner is cancelled asynchronously
-  //  - Complete() -> Cancel(): cancel() is ignored, scan range is already complete.
-  // Note that Complete() always called.  Neither function can be called multiple 
+  //  - Flush(): normal case when the scanner finishes
+  //  - Cancel() -> Flush(): scanner is cancelled asynchronously
+  //  - Flush() -> Cancel(): cancel() is ignored, scan range is already complete.
+  // Note that Flush() always called.  Neither function can be called multiple 
   // times.
 
   // This function must be called when the scanner is complete and no longer needs
   // any resources (e.g. tuple memory, io buffers, etc) returned from the scan range
   // context.  This should be called from the scanner thread.
-  // This must be called even in the error path.
-  void Complete();
+  // This must be called even in the error path to clean up any pending resources.
+  void Flush();
 
-  // This function can be called to terminate the scanner thread asychronously.
+  // This function can be called to terminate the scanner thread asynchronously.
   // This can be called from any thread.
   void Cancel();
 

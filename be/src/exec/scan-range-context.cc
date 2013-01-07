@@ -293,7 +293,7 @@ void ScanRangeContext::AddBuffer(DiskIoMgr::BufferDescriptor* buffer) {
   read_ready_cv_.notify_one();
 }
 
-void ScanRangeContext::Complete() {
+void ScanRangeContext::Flush() {
   {
     unique_lock<mutex> l(lock_);
     

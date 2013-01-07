@@ -174,7 +174,9 @@ class HdfsScanNode : public ScanNode {
   // This is thread safe.
   void SetFileMetadata(const std::string& filename, void* metadata);
 
-  // Called by the scanner when a range is complete.  Used to log progress.
+  // Called by the scanner when a range is complete.  Used to trigger done_ and
+  // to log progress.  This *must* only be called after the scanner has completely
+  // finished the scan range (i.e. context->Flush()).
   void RangeComplete(const THdfsFileFormat::type& file_type, 
       const THdfsCompression::type& compression_type);
 
