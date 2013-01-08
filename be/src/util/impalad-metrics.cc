@@ -14,8 +14,12 @@
 
 #include "util/impalad-metrics.h"
 
+using namespace std;
+
 namespace impala {
 
+const char* ImpaladMetricKeys::IMPALA_SERVER_START_TIME = 
+    "impala-server.start-time";
 const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_QUERIES = 
     "impala-server.num.queries";
 const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS = 
@@ -32,6 +36,7 @@ const char* ImpaladMetricKeys::IO_MGR_NUM_BUFFERS =
     "impala-server.io.mgr.num.buffers";
 
 // These are created by impala-server during startup.
+Metrics::StringMetric* ImpaladMetrics::IMPALA_SERVER_START_TIME = NULL;
 Metrics::IntMetric* ImpaladMetrics::IMPALA_SERVER_NUM_QUERIES = NULL;
 Metrics::IntMetric* ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS = NULL;
 Metrics::IntMetric* ImpaladMetrics::NUM_RANGES_PROCESSED = NULL;
@@ -42,6 +47,8 @@ Metrics::IntMetric* ImpaladMetrics::IO_MGR_NUM_BUFFERS = NULL;
 
 void ImpaladMetrics::CreateMetrics(Metrics* m) {
   // Initialize impalad metrics
+  IMPALA_SERVER_START_TIME = m->CreateAndRegisterPrimitiveMetric<string>(
+      ImpaladMetricKeys::IMPALA_SERVER_START_TIME, "");
   IMPALA_SERVER_NUM_QUERIES = m->CreateAndRegisterPrimitiveMetric(
       ImpaladMetricKeys::IMPALA_SERVER_NUM_QUERIES, 0L);
   IMPALA_SERVER_NUM_FRAGMENTS = m->CreateAndRegisterPrimitiveMetric(

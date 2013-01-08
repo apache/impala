@@ -32,6 +32,7 @@
 #include "common/status.h"
 #include "util/metrics.h"
 #include "statestore/util.h"
+#include "runtime/timestamp-value.h"
 
 namespace impala {
 
@@ -319,6 +320,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
     // The state of the query as of this snapshot
     beeswax::QueryState::type query_state;
 
+    // Start and end time of the query
+    TimestampValue start_time, end_time;
+
     // Initialise from an exec_state. If copy_profile is true, print the query
     // profile to a string and copy that into this.profile (which is expensive),
     // otherwise leave this.profile empty.
@@ -327,7 +331,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
 
   // Helper method to render a single QueryStateRecord as an HTML table
   // row. Used by QueryStatePathHandler.
-  void RenderSingleQueryTableRow(const QueryStateRecord& record,
+  void RenderSingleQueryTableRow(const QueryStateRecord& record, bool render_end_time,
       std::stringstream* output);
 
   // For access to GetTableNames and DescribeTable

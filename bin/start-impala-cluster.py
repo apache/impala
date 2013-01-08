@@ -82,7 +82,7 @@ def start_impalad_instances(cluster_size):
   BASE_FE_PORT = 21000
   BASE_BE_PORT = 22000
   BASE_STATE_STORE_SUBSCRIBER_PORT = 23000
-  BASE_WEBSERVER_PORT = 9090
+  BASE_WEBSERVER_PORT = 25000
 
   # Start each impalad instance and optionally redirect the output to a log file.
   for i in range(options.cluster_size):

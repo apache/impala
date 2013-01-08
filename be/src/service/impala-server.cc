@@ -52,6 +52,7 @@
 #include "runtime/hdfs-fs-cache.h"
 #include "runtime/exec-env.h"
 #include "runtime/coordinator.h"
+#include "runtime/timestamp-value.h"
 #include "statestore/simple-scheduler.h"
 #include "util/container-util.h"
 #include "util/debug-util.h"
@@ -131,7 +132,8 @@ class ImpalaServer::QueryExecState {
       current_batch_(NULL),
       current_batch_row_(0),
       num_rows_fetched_(0),
-      impala_server_(server) {
+      impala_server_(server),
+      start_time_(TimestampValue::local_time()) {
     planner_timer_ = ADD_COUNTER(&profile_, "PlanningTime", TCounterType::CPU_TICKS);
   }
 
@@ -193,6 +195,7 @@ class ImpalaServer::QueryExecState {
   RuntimeProfile::Counter* planner_timer() { return planner_timer_; }
   void set_result_metadata(const TResultSetMetadata& md) { result_metadata_ = md; }
   const RuntimeProfile& profile() const { return profile_; }
+  const TimestampValue& start_time() const { return start_time_; }
 
  private:
   TUniqueId query_id_;
@@ -222,6 +225,9 @@ class ImpalaServer::QueryExecState {
 
   // To get access to UpdateMetastore
   ImpalaServer* impala_server_;
+
+  // Start time of the query
+  TimestampValue start_time_;
 
   // Core logic of FetchRowsAsAscii(). Does not update query_state_/status_.
   Status FetchRowsAsAsciiInternal(const int32_t max_rows, vector<string>* fetched_rows);
@@ -718,6 +724,8 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
 
   // Initialize impalad metrics
   ImpaladMetrics::CreateMetrics(exec_env->metrics());
+  ImpaladMetrics::IMPALA_SERVER_START_TIME->Update(
+      TimestampValue::local_time().DebugString());
 }
 
 void ImpalaServer::RenderHadoopConfigs(const Webserver::ArgumentMap& args,
@@ -800,17 +808,22 @@ void ImpalaServer::QueryProfilePathHandler(const Webserver::ArgumentMap& args,
   }
 }
 
-void ImpalaServer::RenderSingleQueryTableRow(
-    const ImpalaServer::QueryStateRecord& record, stringstream* output) {
-  QueryHandle handle;
-  TUniqueIdToQueryHandle(record.id, &handle);
-  (*output) << "<tr><td>" << handle.id << "</td>"
+void ImpalaServer::RenderSingleQueryTableRow(const ImpalaServer::QueryStateRecord& record,
+    bool render_end_time, stringstream* output) {
+  (*output) << "<tr><td>" << record.id << "</td>"
             << "<td>" << record.stmt << "</td>"
             << "<td>"
             << _TStmtType_VALUES_TO_NAMES.find(record.stmt_type)->second
-            << "</td>"
-            << "<td>";
+            << "</td>";
 
+  // Output start/end times
+  (*output) << "<td>" << record.start_time.DebugString() << "</td>";
+  if (render_end_time) {
+    (*output) << "<td>" << record.end_time.DebugString() << "</td>";
+  }
+  
+  // Output progress
+  (*output) << "<td>";
   if (record.has_coord == false) {
     (*output) << "N/A";
   } else {
@@ -824,12 +837,14 @@ void ImpalaServer::RenderSingleQueryTableRow(
                 << "%)";
     }
   }
-
+  
+  // Output state and rows fetched
   (*output) << "</td>"
             << "<td>" << _QueryState_VALUES_TO_NAMES.find(record.query_state)->second
             << "</td><td>" << record.num_rows_fetched << "</td>";
-
-  (*output) << "<td><a href='/query_profile?hi=" << record.id.hi << "&lo="
+  
+  // Output profile
+  (*output) << "<td><a href='/query_profile?hi=" << record.id.hi << "&lo=" 
             << record.id.lo << "'>Profile</a></td>";
   (*output) << "</tr>" << endl;
 }
@@ -845,6 +860,7 @@ void ImpalaServer::QueryStatePathHandler(const Webserver::ArgumentMap& args,
             << endl;
   (*output) << "<th>Statement</th>" << endl;
   (*output) << "<th>Query Type</th>" << endl;
+  (*output) << "<th>Start Time</th>" << endl;
   (*output) << "<th>Backend Progress</th>" << endl;
   (*output) << "<th>State</th>" << endl;
   (*output) << "<th># rows fetched</th>" << endl;
@@ -852,7 +868,7 @@ void ImpalaServer::QueryStatePathHandler(const Webserver::ArgumentMap& args,
   (*output) << "</tr>";
   BOOST_FOREACH(const QueryExecStateMap::value_type& exec_state, query_exec_state_map_) {
     QueryStateRecord record(*exec_state.second, false);
-    RenderSingleQueryTableRow(record, output);
+    RenderSingleQueryTableRow(record, false, output);
   }
 
   (*output) << "</table>";
@@ -876,6 +892,8 @@ void ImpalaServer::QueryStatePathHandler(const Webserver::ArgumentMap& args,
             << endl;
   (*output) << "<th>Statement</th>" << endl;
   (*output) << "<th>Query Type</th>" << endl;
+  (*output) << "<th>Start Time</th>" << endl;
+  (*output) << "<th>End Time</th>" << endl;
   (*output) << "<th>Backend Progress</th>" << endl;
   (*output) << "<th>State</th>" << endl;
   (*output) << "<th># rows fetched</th>" << endl;
@@ -885,7 +903,7 @@ void ImpalaServer::QueryStatePathHandler(const Webserver::ArgumentMap& args,
   {
     lock_guard<mutex> l(query_log_lock_);
     BOOST_FOREACH(const QueryStateRecord& log_entry, query_log_) {
-      RenderSingleQueryTableRow(log_entry, output);
+      RenderSingleQueryTableRow(log_entry, true, output);
     }
   }
 
@@ -2057,6 +2075,8 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
   stmt = (request.stmt_type != TStmtType::DDL && request.__isset.sql_stmt) ?
       request.sql_stmt : "N/A";
   stmt_type = request.stmt_type;
+  start_time = exec_state.start_time();
+  end_time = TimestampValue::local_time();
   has_coord = false;
 
   Coordinator* coord = exec_state.coord();

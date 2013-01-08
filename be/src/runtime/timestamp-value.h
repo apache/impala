@@ -176,6 +176,11 @@ class  TimestampValue {
   boost::posix_time::time_duration time_of_day() { return time_of_day_; }
   boost::gregorian::date date() { return date_;}
 
+  // Returns the local time
+  static TimestampValue local_time() {
+    return TimestampValue(boost::posix_time::second_clock::local_time());
+  }
+
  private:
   friend class UnusedClass;
 

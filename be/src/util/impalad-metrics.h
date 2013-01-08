@@ -23,6 +23,9 @@ namespace impala {
 // Contains the keys (strings) for impala metrics.
 class ImpaladMetricKeys {
  public:
+  // Local time that the server started
+  static const char* IMPALA_SERVER_START_TIME;
+
   // Number of queries executed by this server, including failed and cancelled
   // queries
   static const char* IMPALA_SERVER_NUM_QUERIES;
@@ -53,6 +56,7 @@ class ImpaladMetricKeys {
 // ImpaladServer starts up.
 class ImpaladMetrics {
  public:
+  static Metrics::StringMetric* IMPALA_SERVER_START_TIME;
   static Metrics::IntMetric* IMPALA_SERVER_NUM_QUERIES;
   static Metrics::IntMetric* IMPALA_SERVER_NUM_FRAGMENTS;
   static Metrics::IntMetric* NUM_RANGES_PROCESSED;
