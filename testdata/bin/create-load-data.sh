@@ -46,9 +46,6 @@ hadoop fs -mkdir -p /tmp/alltypes_seq/year=2009
 hadoop fs -mkdir -p /tmp/alltypes_rc/year=2009
 hadoop fs -cp  /test-warehouse/alltypes_seq/year=2009/month=2/ /tmp/alltypes_seq/year=2009
 hadoop fs -cp  /test-warehouse/alltypes_rc/year=2009/month=3/ /tmp/alltypes_rc/year=2009
-hadoop fs -cp  /test-warehouse/alltypes_trevni/year=2009/month=4/ \
-  /tmp/alltypes_rc/year=2009
-
 
 # Make compressed data for alltypesaggsmultifiles
 rm -rf /tmp/alltypesaggmultifiles

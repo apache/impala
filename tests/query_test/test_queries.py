@@ -42,6 +42,9 @@ class TestQueries(ImpalaTestSuite):
   def test_subquery(self, vector):
     self.run_test_case('QueryTest/subquery', vector)
 
+  def test_mixed_format(self, vector):
+    self.run_test_case('QueryTest/mixed-format', vector)
+
   def test_misc(self, vector):
     table_format = vector.get_value('table_format')
 

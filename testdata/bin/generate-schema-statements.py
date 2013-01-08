@@ -33,7 +33,7 @@ import tempfile
 from itertools import product
 from optparse import OptionParser
 from tests.util.test_file_parser import *
-from tests.common.test_dimensions import TableFormatInfo, load_table_info_dimension
+from tests.common.test_dimensions import *
 
 parser = OptionParser()
 parser.add_option("-e", "--exploration_strategy", dest="exploration_strategy",
@@ -314,8 +314,9 @@ if __name__ == "__main__":
         load_table_info_dimension(options.workload, options.exploration_strategy)]
   else:
     table_formats = options.table_formats.split(',')
+    dataset = get_dataset_from_workload(options.workload)
     test_vectors =\
-        [TableFormatInfo.create_from_string(options.workload, tf) for tf in table_formats]
+        [TableFormatInfo.create_from_string(dataset, tf) for tf in table_formats]
 
   target_dataset = test_vectors[0].dataset
   print 'Target Dataset: ' + target_dataset
