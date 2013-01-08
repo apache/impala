@@ -36,7 +36,7 @@
 #include "util/progress-updater.h"
 #include "util/runtime-profile.h"
 #include "runtime/runtime-state.h"
-#include "sparrow/simple-scheduler.h"
+#include "statestore/simple-scheduler.h"
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/Frontend_types.h"
 
@@ -109,7 +109,7 @@ class Coordinator {
   // the next GetNext() call. If *batch is NULL, execution has completed and GetNext()
   // must not be called again.
   // GetNext() will not set *batch=NULL until all backends have
-  // either completed or have failed. 
+  // either completed or have failed.
   // It is safe to call GetNext() even in the case where there is no coordinator fragment
   // (distributed INSERT).
   // '*batch' is owned by the underlying PlanFragmentExecutor and must not be deleted.
@@ -163,15 +163,15 @@ class Coordinator {
 
  private:
   class BackendExecState;
-    
+
   // Typedef for boost utility to compute averaged stats
   // TODO: including the median doesn't compile, looks like some includes are missing
-  typedef boost::accumulators::accumulator_set<int64_t, 
+  typedef boost::accumulators::accumulator_set<int64_t,
       boost::accumulators::features<
-      boost::accumulators::tag::min, 
-      boost::accumulators::tag::max, 
-      boost::accumulators::tag::mean, 
-      boost::accumulators::tag::variance> 
+      boost::accumulators::tag::min,
+      boost::accumulators::tag::max,
+      boost::accumulators::tag::mean,
+      boost::accumulators::tag::variance>
   > SummaryStats;
 
   ExecEnv* exec_env_;
@@ -193,12 +193,12 @@ class Coordinator {
     // Total finished scan ranges per node
     CounterMap scan_ranges_complete_counters;
   };
-  
+
   // execution parameters for a single fragment; used to assemble the
   // per-fragment instance TPlanFragmentExecParams;
   // hosts.size() == instance_ids.size()
   struct FragmentExecParams {
-    sparrow::SimpleScheduler::HostList hosts; // execution backends
+    SimpleScheduler::HostList hosts; // execution backends
 
     // map from scan range server (from TScanRangeLocations) to host in 'hosts'
     typedef boost::unordered_map<THostPort, THostPort> DataServerMap;
@@ -219,7 +219,7 @@ class Coordinator {
   // vector is indexed by fragment index from TQueryExecRequest.fragments;
   // populated in ComputeScanRangeAssignment()
   std::vector<FragmentScanRangeAssignment> scan_range_assignment_;
-  
+
   // BackendExecStates owned by obj_pool()
   std::vector<BackendExecState*> backend_exec_states_;
 
@@ -244,8 +244,8 @@ class Coordinator {
   // status or to CANCELLED, if Cancel() is called.
   Status query_status_;
 
-  // If true, the query is done returning all results.  It is possible that the 
-  // coordinator still needs to wait for cleanup on remote fragments (e.g. queries 
+  // If true, the query is done returning all results.  It is possible that the
+  // coordinator still needs to wait for cleanup on remote fragments (e.g. queries
   // with limit)
   // Once this is set to true, errors from remote fragments are ignored.
   bool returned_all_results_;
@@ -267,7 +267,7 @@ class Coordinator {
 
   // True if execution has completed, false otherwise.
   bool execution_completed_;
-  
+
   // Number of remote fragments that have completed
   int num_remote_fragements_complete_;
 
@@ -323,7 +323,7 @@ class Coordinator {
 
     // Root profile for all fragment instances for this fragment
     RuntimeProfile* root_profile;
-    
+
     // Bytes assigned for instances of this fragment
     SummaryStats bytes_assigned;
 
@@ -338,7 +338,7 @@ class Coordinator {
   // This array is only modified at coordinator startup and query completion and
   // does not need locks.
   std::vector<PerFragmentProfileData> fragment_profiles_;
-    
+
   // Throughput counters for the coordinator fragment
   FragmentInstanceCounters coordinator_counters_;
 
@@ -403,8 +403,8 @@ class Coordinator {
   // Derived counter function: aggregates throughput for node_id across all backends
   // (id needs to be for a ScanNode)
   int64_t ComputeTotalThroughput(int node_id);
-  
-  // Derived counter function: aggregates total completed scan ranges for node_id 
+
+  // Derived counter function: aggregates total completed scan ranges for node_id
   // across all backends(id needs to be for a ScanNode)
   int64_t ComputeTotalScanRangesComplete(int node_id);
 

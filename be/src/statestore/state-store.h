@@ -13,8 +13,8 @@
 // limitations under the License.
 
 
-#ifndef SPARROW_STATE_STORE_H
-#define SPARROW_STATE_STORE_H
+#ifndef STATESTORE_STATE_STORE_H
+#define STATESTORE_STATE_STORE_H
 
 #include <string>
 
@@ -30,12 +30,12 @@
 #include "util/thrift-client.h"
 #include "util/thrift-server.h"
 
-#include "sparrow/util.h"
+#include "statestore/util.h"
 #include "util/thrift-util.h"
-#include "gen-cpp/SparrowTypes_types.h"
+#include "gen-cpp/StatestoreTypes_types.h"
 #include "gen-cpp/StateStoreService.h"
 #include "gen-cpp/StateStoreSubscriberService.h"
-#include "sparrow/failure-detector.h"
+#include "statestore/failure-detector.h"
 
 namespace impala {
 
@@ -44,7 +44,7 @@ class THostPort;
 class Webserver;
 }
 
-namespace sparrow {
+namespace impala {
 
 class TUpdateStateRequest;
 class StateStoreTest;
@@ -79,7 +79,7 @@ class StateStore : public StateStoreServiceIf,
   void Start(int port);
 
   // Stops the server. Once the server is stopped it may not be restarted.
-  // Should only be used for testing. 
+  // Should only be used for testing.
   void Stop();
 
   // Blocks until the server stops (which will occur if the server
@@ -251,16 +251,16 @@ class StateStore : public StateStoreServiceIf,
   impala::Status UnregisterSubscriberCompletely(const impala::THostPort& address);
 
   // Webserver callback to write a list of active subscriptions
-  void SubscriptionsCallback(const impala::Webserver::ArgumentMap& args, 
+  void SubscriptionsCallback(const impala::Webserver::ArgumentMap& args,
                              std::stringstream* output);
 
   // Unregisters the given subscription associated with the subscriber at the
   // given address.
-  impala::Status UnregisterSubscriptionInternal(const impala::THostPort& address, 
+  impala::Status UnregisterSubscriptionInternal(const impala::THostPort& address,
                                                 const SubscriptionId& id);
 
   // Unregisters the service instance of the given type at the given address
-  impala::Status UnregisterServiceInternal(const impala::THostPort& address, 
+  impala::Status UnregisterServiceInternal(const impala::THostPort& address,
                                            const ServiceId& service_id);
 
 

@@ -24,7 +24,7 @@ using namespace std;
 using namespace boost;
 using namespace impala;
 
-namespace sparrow {
+namespace impala {
 
 class SimpleSchedulerTest : public testing::Test {
  protected:

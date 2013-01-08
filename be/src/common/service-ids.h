@@ -16,10 +16,10 @@
 // This file contains names for service IDs that can be registered and subscribed to the
 // state store.
 
-#include "sparrow/util.h"
+#include "statestore/util.h"
 
 namespace impala {
 
-extern sparrow::ServiceId IMPALA_SERVICE_ID;
+extern ServiceId IMPALA_SERVICE_ID;
 
 };

@@ -23,8 +23,8 @@
 #include "runtime/client-cache.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/hdfs-fs-cache.h"
-#include "sparrow/simple-scheduler.h"
-#include "sparrow/state-store-subscriber.h"
+#include "statestore/simple-scheduler.h"
+#include "statestore/state-store-subscriber.h"
 #include "util/metrics.h"
 #include "util/thrift-server.h"
 #include "gen-cpp/ImpalaInternalService.h"
@@ -32,10 +32,6 @@
 using namespace boost;
 using namespace std;
 using namespace apache::thrift::server;
-using sparrow::SimpleScheduler;
-using sparrow::SubscriptionManager;
-using sparrow::StateStore;
-using sparrow::Scheduler;
 
 namespace impala {
 
@@ -128,7 +124,7 @@ Status TestExecEnv::StartBackends() {
     scheduler_->GetAllKnownHosts(&host_ports);
 
     if (host_ports.size() == num_backends_) {
-      VLOG(1) << "Complete set of backends observed in under " 
+      VLOG(1) << "Complete set of backends observed in under "
               << i * POLL_INTERVAL_MS << "ms";
       break;
     } else if (i == NUM_RETRIES) {

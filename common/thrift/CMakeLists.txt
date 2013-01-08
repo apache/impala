@@ -106,7 +106,7 @@ set (SRC_FILES
   Planner.thrift
   Partitions.thrift
   RuntimeProfile.thrift
-  SparrowTypes.thrift
+  StatestoreTypes.thrift
   StateStoreService.thrift
   StateStoreSubscriberService.thrift
   Status.thrift

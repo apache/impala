@@ -14,12 +14,12 @@
 
 
 # where to put generated libraries
-set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/sparrow")
+set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/statestore")
 
 # where to put generated binaries
-set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/sparrow")
+set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/statestore")
 
-add_library(Sparrow STATIC
+add_library(Statestore STATIC
   util.cc
   failure-detector.cc
   simple-scheduler.cc
@@ -36,7 +36,7 @@ add_executable(state-store-test state-store-test.cc)
 
 target_link_libraries(state-store-test ${IMPALA_TEST_LINK_LIBS})
 
-add_test(state-store-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/sparrow/state-store-test)
+add_test(state-store-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/statestore/state-store-test)
 
 add_executable(simple-scheduler-test simple-scheduler-test.cc)
 
@@ -48,4 +48,4 @@ target_link_libraries(simple-scheduler-test
   ${IMPALA_TEST_LINK_LIBS}
 )
 
-add_test(simple-scheduler-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/sparrow/simple-scheduler-test)
+add_test(simple-scheduler-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/statestore/simple-scheduler-test)

@@ -42,7 +42,7 @@
 #include "util/jni-util.h"
 #include "util/logging.h"
 #include "util/thrift-util.h"
-#include "sparrow/subscription-manager.h"
+#include "statestore/subscription-manager.h"
 #include "util/thrift-server.h"
 #include "common/service-ids.h"
 #include "util/authorization.h"
@@ -53,7 +53,6 @@
 
 using namespace impala;
 using namespace std;
-using namespace sparrow;
 using namespace boost;
 using namespace apache::thrift::server;
 using namespace apache::thrift::protocol;

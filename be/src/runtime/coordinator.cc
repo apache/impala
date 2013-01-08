@@ -41,7 +41,7 @@
 #include "runtime/plan-fragment-executor.h"
 #include "runtime/row-batch.h"
 #include "runtime/parallel-executor.h"
-#include "sparrow/scheduler.h"
+#include "statestore/scheduler.h"
 #include "exec/data-sink.h"
 #include "exec/scan-node.h"
 #include "util/debug-util.h"
@@ -98,15 +98,15 @@ class Coordinator::BackendExecState {
   bool profile_created;  // true after the first call to profile->Update()
   RuntimeProfile* profile;  // owned by obj_pool()
   std::vector<std::string> error_log; // errors reported by this backend
-  
+
   // Total scan ranges complete across all scan nodes
   int64_t total_ranges_complete;
 
   FragmentInstanceCounters aggregate_counters;
-  
+
   BackendExecState(Coordinator* coord, const THostPort& coord_hostport,
       int backend_num, const TPlanFragment& fragment, int fragment_idx,
-      const FragmentExecParams& params, int instance_idx, ObjectPool* obj_pool) 
+      const FragmentExecParams& params, int instance_idx, ObjectPool* obj_pool)
     : fragment_instance_id(params.instance_ids[instance_idx]),
       hostport(params.hosts[instance_idx]),
       total_split_size(0),
@@ -186,7 +186,7 @@ int64_t Coordinator::BackendExecState::UpdateNumScanRangesCompleted() {
   CounterMap& complete = aggregate_counters.scan_ranges_complete_counters;
   for (CounterMap::iterator i = complete.begin(); i != complete.end(); ++i) {
     total += i->second->value();
-  } 
+  }
   int64_t delta = total - total_ranges_complete;
   total_ranges_complete = total;
   DCHECK_GE(delta, 0);
@@ -269,21 +269,21 @@ Status Coordinator::Exec(
     executor_->profile()->set_name("Coordinator Fragment");
     CollectScanNodeCounters(executor_->profile(), &coordinator_counters_);
   }
-  
+
   // Initialize per fragment profile data
   fragment_profiles_.resize(request->fragments.size());
   for (int i = 0; i < request->fragments.size(); ++i) {
     fragment_profiles_[i].num_instances = 0;
-    
+
     // Special case fragment idx 0 if there is a coordinator. There is only one
-    // instance of this profile so the average is just the coordinator profile. 
+    // instance of this profile so the average is just the coordinator profile.
     if (i == 0 && has_coordinator_fragment) {
       fragment_profiles_[i].averaged_profile = executor_->profile();
       continue;
     }
     stringstream ss;
     ss << "Averaged Fragment " << i;
-    fragment_profiles_[i].averaged_profile = 
+    fragment_profiles_[i].averaged_profile =
         obj_pool()->Add(new RuntimeProfile(obj_pool(), ss.str()));
     // Insert the avg profile after the coordinator one or the aggregate
     // profile if there is no coordinator.
@@ -294,10 +294,10 @@ Status Coordinator::Exec(
       query_profile_->AddChild(
           fragment_profiles_[i].averaged_profile, true, aggregate_profile_);
     }
-    
+
     ss.str("");
     ss << "Fragment " << i;
-    fragment_profiles_[i].root_profile = 
+    fragment_profiles_[i].root_profile =
         obj_pool()->Add(new RuntimeProfile(obj_pool(), ss.str()));
     query_profile_->AddChild(fragment_profiles_[i].root_profile);
   }
@@ -308,7 +308,7 @@ Status Coordinator::Exec(
   num_remaining_backends_ = num_backends_;
   VLOG_QUERY << "starting " << num_backends_ << " backends for query " << query_id_;
   int backend_num = 0;
-  
+
   for (int fragment_idx = (has_coordinator_fragment ? 1 : 0);
        fragment_idx < request->fragments.size(); ++fragment_idx) {
     FragmentExecParams& params = fragment_exec_params_[fragment_idx];
@@ -331,7 +331,7 @@ Status Coordinator::Exec(
 
     // Issue all rpcs in parallel
     Status fragments_exec_status = ParallelExecutor::Exec(
-        bind<Status>(mem_fn(&Coordinator::ExecRemoteFragment), this, _1), 
+        bind<Status>(mem_fn(&Coordinator::ExecRemoteFragment), this, _1),
         reinterpret_cast<void**>(&backend_exec_states_[backend_num - num_hosts]),
         num_hosts);
 
@@ -362,7 +362,7 @@ Status Coordinator::GetStatus() {
 Status Coordinator::UpdateStatus(const Status& status, const TUniqueId* instance_id) {
   {
     lock_guard<mutex> l(lock_);
-  
+
     // The query is done and we are just waiting for remote fragments to clean up.
     // Ignore their cancelled updates.
     if (returned_all_results_ && status.IsCancelled()) return query_status_;
@@ -372,7 +372,7 @@ Status Coordinator::UpdateStatus(const Status& status, const TUniqueId* instance
 
     // don't override an error status; also, cancellation has already started
     if (!query_status_.ok()) return query_status_;
-  
+
     query_status_ = status;
     CancelInternal();
   }
@@ -401,22 +401,22 @@ Status Coordinator::FinalizeQuery() {
   // INSERT finalization happens in the four following steps
   // 1. If OVERWRITE, remove all the files in the target directory
   // 2. Create all the necessary partition directories.
-  BOOST_FOREACH(const PartitionRowCount::value_type& partition, 
+  BOOST_FOREACH(const PartitionRowCount::value_type& partition,
       partition_row_counts_) {
     stringstream ss;
     // Fully-qualified partition path
     ss << finalize_params_.hdfs_base_dir << "/" << partition.first;
-    if (finalize_params_.is_overwrite) {   
+    if (finalize_params_.is_overwrite) {
       if (partition.first.empty()) {
         // If the root directory is written to, then the table must not be partitioned
         DCHECK(partition_row_counts_.size() == 1);
         // We need to be a little more careful, and only delete data files in the root
-        // because the tmp directories the sink(s) wrote are there also. 
-        // So only delete files in the table directory - all files are treated as data 
+        // because the tmp directories the sink(s) wrote are there also.
+        // So only delete files in the table directory - all files are treated as data
         // files by Hive and Impala, but directories are ignored (and may legitimately
-        // be used to store permanent non-table data by other applications). 
+        // be used to store permanent non-table data by other applications).
         int num_files = 0;
-        hdfsFileInfo* existing_files = 
+        hdfsFileInfo* existing_files =
             hdfsListDirectory(hdfs_connection, ss.str().c_str(), &num_files);
         if (existing_files == NULL) {
           return AppendHdfsErrorMessage("Could not list directory: ", ss.str());
@@ -427,7 +427,7 @@ Status Coordinator::FinalizeQuery() {
             VLOG(2) << "Deleting: " << string(existing_files[i].mName);
             if (hdfsDelete(hdfs_connection, existing_files[i].mName, 1) == -1) {
               delete_status = Status(AppendHdfsErrorMessage("Failed to delete existing "
-                  "HDFS file as part of INSERT OVERWRITE query: ", 
+                  "HDFS file as part of INSERT OVERWRITE query: ",
                   string(existing_files[i].mName)));
               break;
             }
@@ -437,10 +437,10 @@ Status Coordinator::FinalizeQuery() {
         RETURN_IF_ERROR(delete_status);
       } else {
         // This is a partition directory, not the root directory; we can delete
-        // recursively with abandon, after checking it was ever created. 
+        // recursively with abandon, after checking it was ever created.
         if (hdfsExists(hdfs_connection, ss.str().c_str()) != -1) {
           // TODO: There's a potential race here between checking for the directory
-          // and a third-party deleting it. 
+          // and a third-party deleting it.
           if (hdfsDelete(hdfs_connection, ss.str().c_str(), 1) == -1) {
             return Status(AppendHdfsErrorMessage("Failed to delete partition directory "
                     "as part of INSERT OVERWRITE query: ", ss.str()));
@@ -464,17 +464,17 @@ Status Coordinator::FinalizeQuery() {
       VLOG_ROW << "Moving tmp file: " << move.first << " to " << move.second;
       if (hdfsRename(hdfs_connection, move.first.c_str(), move.second.c_str()) == -1) {
         stringstream ss;
-        ss << "Could not move HDFS file: " << move.first << " to desintation: " 
+        ss << "Could not move HDFS file: " << move.first << " to desintation: "
            << move.second;
         return AppendHdfsErrorMessage(ss.str());
-      }          
+      }
     }
   }
 
   // 4. Delete temp directories
   BOOST_FOREACH(const string& tmp_path, tmp_dirs_to_delete) {
     if (hdfsDelete(hdfs_connection, tmp_path.c_str(), 1) == -1) {
-      return Status(AppendHdfsErrorMessage("Failed to delete temporary directory: ", 
+      return Status(AppendHdfsErrorMessage("Failed to delete temporary directory: ",
           tmp_path));
     }
   }
@@ -484,13 +484,13 @@ Status Coordinator::FinalizeQuery() {
 
 Status Coordinator::WaitForAllBackends() {
   unique_lock<mutex> l(lock_);
-  VLOG_QUERY << "Coordinator waiting for backends to finish, " 
+  VLOG_QUERY << "Coordinator waiting for backends to finish, "
              << num_remaining_backends_ << " remaining";
   while (num_remaining_backends_ > 0 && query_status_.ok()) {
     backend_completion_cv_.wait(l);
   }
-  VLOG_QUERY << "All backends finished or error.";    
- 
+  VLOG_QUERY << "All backends finished or error.";
+
   return query_status_;
 }
 
@@ -520,7 +520,7 @@ Status Coordinator::Wait() {
     // Query finalization can only happen when all backends have reported
     // relevant state. They only have relevant state to report in the parallel
     // INSERT case, otherwise all the relevant state is from the coordinator
-    // fragment which will be available after Open() returns. 
+    // fragment which will be available after Open() returns.
     RETURN_IF_ERROR(WaitForAllBackends());
   }
 
@@ -528,7 +528,7 @@ Status Coordinator::Wait() {
   if (needs_finalization_) {
     return FinalizeQuery();
   }
-  
+
   return Status::OK;
 }
 
@@ -557,7 +557,7 @@ Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
     returned_all_results_ = true;
     if (executor_->ReachedLimit()) {
       // We've reached the query limit, cancel the remote fragments.  The
-      // Exchange node on our fragment is no longer receiving rows so the 
+      // Exchange node on our fragment is no longer receiving rows so the
       // remote fragments must be explicitly cancelled.
       CancelRemoteFragments();
       RuntimeState* state = runtime_state();
@@ -585,7 +585,7 @@ Status Coordinator::GetNext(RowBatch** batch, RuntimeState* state) {
 
 void Coordinator::PrintBackendInfo() {
   for (int i = 0; i < backend_exec_states_.size(); ++i) {
-    SummaryStats& acc = 
+    SummaryStats& acc =
         fragment_profiles_[backend_exec_states_[i]->fragment_idx].bytes_assigned;
     acc(backend_exec_states_[i]->total_split_size);
   }
@@ -616,23 +616,23 @@ void Coordinator::PrintBackendInfo() {
   }
 }
 
-void Coordinator::CollectScanNodeCounters(RuntimeProfile* profile, 
+void Coordinator::CollectScanNodeCounters(RuntimeProfile* profile,
     FragmentInstanceCounters* counters) {
   vector<RuntimeProfile*> children;
   profile->GetAllChildren(&children);
   for (int i = 0; i < children.size(); ++i) {
     RuntimeProfile* p = children[i];
     PlanNodeId id = ExecNode::GetNodeIdFromProfile(p);
-    
+
     // This profile is not for an exec node.
     if (id == g_JavaConstants_constants.INVALID_PLAN_NODE_ID) continue;
 
-    RuntimeProfile::Counter* throughput_counter = 
+    RuntimeProfile::Counter* throughput_counter =
         p->GetCounter(ScanNode::TOTAL_THROUGHPUT_COUNTER);
     if (throughput_counter != NULL) {
       counters->throughput_counters[id] = throughput_counter;
     }
-    RuntimeProfile::Counter* scan_ranges_counter = 
+    RuntimeProfile::Counter* scan_ranges_counter =
         p->GetCounter(ScanNode::SCAN_RANGES_COMPLETE_COUNTER);
     if (scan_ranges_counter != NULL) {
       counters->scan_ranges_complete_counters[id] = scan_ranges_counter;
@@ -652,13 +652,13 @@ void Coordinator::CreateAggregateCounters(
       }
 
       stringstream s;
-      s << PrintPlanNodeType(node.node_type) << " (id=" 
+      s << PrintPlanNodeType(node.node_type) << " (id="
         << node.node_id << ") Throughput";
       aggregate_profile_->AddDerivedCounter(s.str(), TCounterType::BYTES_PER_SECOND,
           bind<int64_t>(mem_fn(&Coordinator::ComputeTotalThroughput),
                         this, node.node_id));
       s.str("");
-      s << PrintPlanNodeType(node.node_type) << " (id=" 
+      s << PrintPlanNodeType(node.node_type) << " (id="
         << node.node_id << ") Completed scan ranges";
       aggregate_profile_->AddDerivedCounter(s.str(), TCounterType::UNIT,
           bind<int64_t>(mem_fn(&Coordinator::ComputeTotalScanRangesComplete),
@@ -707,7 +707,7 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
   // this client needs to have been released when this function finishes
   ImpalaInternalServiceClient* backend_client;
   // TODO: Fix the THostPort mess, make the client cache use the same type.
-  pair<string, int> hostport = make_pair(exec_state->hostport.ipaddress, 
+  pair<string, int> hostport = make_pair(exec_state->hostport.ipaddress,
                                          exec_state->hostport.port);
   RETURN_IF_ERROR(exec_env_->client_cache()->GetClient(hostport, &backend_client));
   DCHECK(backend_client != NULL);
@@ -733,7 +733,7 @@ Status Coordinator::ExecRemoteFragment(void* exec_state_arg) {
   } catch (TTransportException& e) {
     stringstream msg;
     msg << "ExecPlanRequest rpc query_id=" << query_id_
-        << " instance_id=" << exec_state->fragment_instance_id 
+        << " instance_id=" << exec_state->fragment_instance_id
         << " failed: " << e.what();
     VLOG_QUERY << msg.str();
     exec_state->status = Status(msg.str());
@@ -764,7 +764,7 @@ void Coordinator::CancelInternal() {
 
   // cancel local fragment
   if (executor_.get() != NULL) executor_->Cancel();
-  
+
   CancelRemoteFragments();
 
   // Report the summary with whatever progress the query made before being cancelled.
@@ -788,14 +788,14 @@ void Coordinator::CancelRemoteFragments() {
 
     // don't cancel if it already finished
     if (exec_state->done) continue;
-    
+
     // set an error status to make sure we only cancel this once
     exec_state->status = Status::CANCELLED;
 
     // if we get an error while trying to get a connection to the backend,
     // keep going
     ImpalaInternalServiceClient* backend_client;
-    pair<string, int> hostport = make_pair(exec_state->hostport.ipaddress, 
+    pair<string, int> hostport = make_pair(exec_state->hostport.ipaddress,
                                            exec_state->hostport.port);
     Status status =
         exec_env_->client_cache()->GetClient(hostport, &backend_client);
@@ -812,7 +812,7 @@ void Coordinator::CancelRemoteFragments() {
       VLOG_QUERY << "sending CancelPlanFragment rpc for instance_id="
                  << exec_state->fragment_instance_id << " backend="
                  << exec_state->hostport;
-      try { 
+      try {
         backend_client->CancelPlanFragment(res, params);
       } catch (TTransportException& e) {
         VLOG_RPC << "Retrying CancelPlanFragment: " << e.what();
@@ -827,7 +827,7 @@ void Coordinator::CancelRemoteFragments() {
     } catch (TTransportException& e) {
       stringstream msg;
       msg << "CancelPlanFragment rpc query_id=" << query_id_
-          << " instance_id=" << exec_state->fragment_instance_id 
+          << " instance_id=" << exec_state->fragment_instance_id
           << " failed: " << e.what();
       // make a note of the error status, but keep on cancelling the other fragments
       exec_state->status.AddErrorMsg(msg.str());
@@ -888,8 +888,8 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
     lock_guard<mutex> l(lock_);
     // Merge in table update data (partitions written to, files to be moved as part of
     // finalization)
-    
-    BOOST_FOREACH(const PartitionRowCount::value_type& partition, 
+
+    BOOST_FOREACH(const PartitionRowCount::value_type& partition,
         params.insert_exec_status.num_appended_rows) {
       partition_row_counts_[partition.first] += partition.second;
     }
@@ -910,7 +910,7 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
   if (VLOG_FILE_IS_ON) {
     stringstream s;
     query_profile_->PrettyPrint(&s);
-    VLOG_FILE << "cumulative profile for query_id=" << query_id_ 
+    VLOG_FILE << "cumulative profile for query_id=" << query_id_
               << "\n" << s.str();
   }
 
@@ -926,7 +926,7 @@ Status Coordinator::UpdateFragmentExecStatus(const TReportExecStatusParams& para
     lock_guard<mutex> l(lock_);
     exec_state->stopwatch.Stop();
     DCHECK_GT(num_remaining_backends_, 0);
-    VLOG_QUERY << "Backend " << params.backend_num << " completed, " 
+    VLOG_QUERY << "Backend " << params.backend_num << " completed, "
                << num_remaining_backends_ - 1 << " remaining: query_id=" << query_id_;
     if (VLOG_QUERY_IS_ON && num_remaining_backends_ > 1) {
       // print host/port info for the first backend that's still in progress as a
@@ -959,7 +959,7 @@ RuntimeState* Coordinator::runtime_state() {
 }
 
 ObjectPool* Coordinator::obj_pool() {
-  return executor_.get() == NULL ? obj_pool_.get() : 
+  return executor_.get() == NULL ? obj_pool_.get() :
     executor_->runtime_state()->obj_pool();
 }
 
@@ -986,16 +986,16 @@ void Coordinator::ReportQuerySummary() {
   // some of the state that is used below might be uninitialized.  In this case,
   // the query has made so little progress, reporting a summary is not very useful.
   if (!has_called_wait_) return;
-  
-  // The fragment has finished executing.  Update the profile to compute the 
+
+  // The fragment has finished executing.  Update the profile to compute the
   // fraction of time spent in each node.
   if (executor_.get() != NULL) executor_->profile()->ComputeTimeInProfile();
 
   if (!backend_exec_states_.empty()) {
-    // Average all remote fragments for each fragment.  
+    // Average all remote fragments for each fragment.
     for (int i = 0; i < backend_exec_states_.size(); ++i) {
       backend_exec_states_[i]->profile->ComputeTimeInProfile();
-      
+
       int fragment_idx = backend_exec_states_[i]->fragment_idx;
       DCHECK_GE(fragment_idx, 0);
       DCHECK_LT(fragment_idx, fragment_profiles_.size());
@@ -1007,7 +1007,7 @@ void Coordinator::ReportQuerySummary() {
       data.averaged_profile->Merge(backend_exec_states_[i]->profile);
       data.root_profile->AddChild(backend_exec_states_[i]->profile);
     }
-    
+
     // Per fragment instances have been collected, output summaries
     for (int i = (executor_.get() != NULL ? 1 : 0); i < fragment_profiles_.size(); ++i) {
       RuntimeProfile* profile = fragment_profiles_[i].averaged_profile;
@@ -1015,9 +1015,9 @@ void Coordinator::ReportQuerySummary() {
 
       SummaryStats& completion_times = fragment_profiles_[i].completion_times;
       SummaryStats& rates = fragment_profiles_[i].rates;
-      
+
       stringstream times_label;
-      times_label 
+      times_label
         << "min:" << PrettyPrinter::Print(
             accumulators::min(completion_times), TCounterType::TIME_MS)
         << "  max:" << PrettyPrinter::Print(
@@ -1028,7 +1028,7 @@ void Coordinator::ReportQuerySummary() {
             sqrt(accumulators::variance(completion_times)), TCounterType::TIME_MS);
 
       stringstream rates_label;
-      rates_label 
+      rates_label
         << "min:" << PrettyPrinter::Print(
             accumulators::min(rates), TCounterType::BYTES_PER_SECOND)
         << "  max:" << PrettyPrinter::Print(
@@ -1043,7 +1043,7 @@ void Coordinator::ReportQuerySummary() {
       fragment_profiles_[i].averaged_profile->AddInfoString(
           "execution rates", rates_label.str());
     }
-  } 
+  }
 
   if (VLOG_QUERY_IS_ON) {
     stringstream ss;
@@ -1107,7 +1107,7 @@ void Coordinator::ComputeFragmentExecParams(const TQueryExecRequest& exec_reques
     // we can only handle unpartitioned (= broadcast) output at the moment
     DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED);
     PlanNodeId exch_id = sink.dest_node_id;
-    // we might have multiple fragments sending to this exchange node 
+    // we might have multiple fragments sending to this exchange node
     // (distributed MERGE), which is why we need to add up the #senders
     dest_params.per_exch_num_senders[exch_id] += params.hosts.size();
 
@@ -1118,7 +1118,7 @@ void Coordinator::ComputeFragmentExecParams(const TQueryExecRequest& exec_reques
       dest.fragment_instance_id = dest_params.instance_ids[j];
       dest.server = THostPort(dest_params.hosts[j]);
       VLOG_RPC  << "dest for fragment " << i << ":"
-                << " instance_id=" << dest.fragment_instance_id 
+                << " instance_id=" << dest.fragment_instance_id
                 << " server=" << dest.server.ipaddress << ":" << dest.server.port;
     }
   }
@@ -1191,7 +1191,7 @@ Status Coordinator::ComputeFragmentHosts(const TQueryExecRequest& exec_request) 
 
     // de-dup
     sort(params.hosts.begin(), params.hosts.end());
-    vector<THostPort >::iterator start_duplicates = 
+    vector<THostPort >::iterator start_duplicates =
         unique(params.hosts.begin(), params.hosts.end());
     params.hosts.erase(start_duplicates, params.hosts.end());
     unique_hosts_.insert(params.hosts.begin(), params.hosts.end());

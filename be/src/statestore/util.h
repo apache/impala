@@ -25,9 +25,9 @@
 #include "common/compiler-util.h"
 #include "common/logging.h"
 #include "gen-cpp/Status_types.h"
-#include "gen-cpp/SparrowTypes_types.h"
+#include "gen-cpp/StatestoreTypes_types.h"
 
-namespace sparrow {
+namespace impala {
 
 class TUpdateStateRequest;
 

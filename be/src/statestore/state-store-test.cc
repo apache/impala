@@ -25,28 +25,25 @@
 #include <transport/TSocket.h>
 
 #include "common/status.h"
-#include "sparrow/state-store.h"
-#include "sparrow/state-store-subscriber.h"
-#include "sparrow/util.h"
+#include "statestore/state-store.h"
+#include "statestore/state-store-subscriber.h"
+#include "statestore/util.h"
 #include "util/cpu-info.h"
 #include "util/metrics.h"
 #include "util/thrift-util.h"
-#include "gen-cpp/SparrowTypes_types.h"
+#include "gen-cpp/StatestoreTypes_types.h"
 #include "gen-cpp/Types_types.h"
 
 using namespace apache::thrift;
 using namespace apache::thrift::transport;
 using namespace boost;
 using namespace std;
-using impala::Status;
-using impala::THostPort;
-using impala::Metrics;
 
 DECLARE_int32(rpc_cnxn_attempts);
 DECLARE_int32(rpc_cnxn_retry_interval_ms);
 DECLARE_int32(statestore_max_missed_heartbeats);
 
-namespace sparrow {
+namespace impala {
 
 class StateStoreTest : public testing::Test {
  public:
@@ -86,7 +83,7 @@ class StateStoreTest : public testing::Test {
 
   vector<shared_ptr<StateStoreSubscriber> > subscribers_;
 
-  StateStoreTest() 
+  StateStoreTest()
       : metrics_(new Metrics()), state_store_(new StateStore(250L, metrics_.get())) {
     state_store_host_port_.ipaddress = "127.0.0.1";
     state_store_host_port_.port = next_port_++;
@@ -234,7 +231,7 @@ class StateStoreTest : public testing::Test {
     }
 
     {
-      // Wait for the backend to be removed. 
+      // Wait for the backend to be removed.
       unique_lock<mutex> lock(update_condition.mut);
       system_time timeout = get_system_time() + posix_time::seconds(30);
       while (!update_condition.correctly_called) {
@@ -464,7 +461,7 @@ TEST_F(StateStoreTest, UnregisterSubscription) {
     {
       lock_guard<mutex> lock(register_condition.mut);
       if (current_time - register_condition.time_last_called >
-          posix_time::seconds(state_store_->subscriber_update_frequency_ms() 
+          posix_time::seconds(state_store_->subscriber_update_frequency_ms()
               * 2 / 1000 )) {
         break;
       }
@@ -671,19 +668,19 @@ TEST_F(StateStoreTest, SubscriberFailure) {
   // Pick a random-esque exit id, so we can make sure the child didn't exit for a
   // reason other than it committing suicide.
   int expected_child_exit_id = 23;
-  
+
   pid_t child_pid = fork();
   if (child_pid == 0) {
     // This is the child thread. Start a subscriber and register a subscription.
     shared_ptr<StateStoreSubscriber> subscriber = StartStateStoreSubscriber();
     unordered_set<string> update_services;
     update_services.insert("test_service");
-    
+
     UpdateCondition update_condition;
     SubscriptionManager::UpdateCallback update_callback(
         bind(&StateStoreTest::Update, &update_condition, _1));
     SubscriptionId id;
-    Status status = subscriber->RegisterSubscription(update_services, "test", 
+    Status status = subscriber->RegisterSubscription(update_services, "test",
                                                      &update_callback);
 
     EXPECT_TRUE(status.ok());
@@ -709,7 +706,7 @@ TEST_F(StateStoreTest, SubscriberFailure) {
   }
 };
 
-} // namespace sparrow
+} // namespace statestore
 
 int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);

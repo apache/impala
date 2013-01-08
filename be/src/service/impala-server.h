@@ -31,7 +31,7 @@
 #include "util/thrift-server.h"
 #include "common/status.h"
 #include "util/metrics.h"
-#include "sparrow/util.h"
+#include "statestore/util.h"
 
 namespace impala {
 
@@ -72,7 +72,7 @@ class ThriftServer;
 // query execution states after a timeout period.
 // TODO: The same doesn't apply to the execution state of an individual plan
 // fragment: the originating coordinator might die, but we can get notified of
-// that via sparrow. This still needs to be implemented.
+// that via the statestore. This still needs to be implemented.
 class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
                      public ThriftServer::SessionHandlerIf {
  public:
@@ -145,7 +145,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
 
   // Called when a membership update is received from the state-store. Looks for
   // active nodes that have failed, and cancels any queries running on them.
-  void MembershipCallback(const sparrow::ServiceStateMap& service_state);
+  void MembershipCallback(const ServiceStateMap& service_state);
 
  private:
   class QueryExecState;
@@ -214,7 +214,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   // will have been registered in query_exec_state_map_.
   Status Execute(const TClientRequest& request,
                  boost::shared_ptr<QueryExecState>* exec_state);
-  
+
   // Implements Execute() logic, but doesn't unregister query on error.
   Status ExecuteInternal(const TClientRequest& request, bool* registered_exec_state,
                          boost::shared_ptr<QueryExecState>* exec_state);
@@ -233,7 +233,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   // Non-thrift callable version of ResetCatalog
   Status ResetCatalogInternal();
 
-  // Initiates query cancellation. Returns OK unless query_id is not found. 
+  // Initiates query cancellation. Returns OK unless query_id is not found.
   Status CancelInternal(const TUniqueId& query_id);
 
   // Webserver callback. Retrieves Hadoop confs from frontend and writes them to output
@@ -241,10 +241,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
 
   // Webserver callback. Prints a table of current queries, including their
   // states, types and IDs.
-  void QueryStatePathHandler(const Webserver::ArgumentMap& args, 
+  void QueryStatePathHandler(const Webserver::ArgumentMap& args,
       std::stringstream* output);
 
-  void QueryProfilePathHandler(const Webserver::ArgumentMap& args, 
+  void QueryProfilePathHandler(const Webserver::ArgumentMap& args,
       std::stringstream* output);
 
   // Webserver callback that prints a table of active sessions.
@@ -271,7 +271,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   // If pattern is NULL, match all tables otherwise match only those tables that
   // match the pattern string. Patterns are "p1|p2|p3" where | denotes choice,
   // and each pN may contain wildcards denoted by '*' which match all strings.
-  Status GetTableNames(const std::string* db, const std::string* pattern, 
+  Status GetTableNames(const std::string* db, const std::string* pattern,
       std::vector<std::string>* table_names);
 
   // Return all databases matching the optional argument 'pattern'.
@@ -282,7 +282,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
 
   // Returns (in the output parameter) a list of columns for the specified table
   // in the specified database.
-  Status DescribeTable(const std::string& db, const std::string& table, 
+  Status DescribeTable(const std::string& db, const std::string& table,
       std::vector<TColumnDesc>* columns);
 
   // Copies a query's state into the query log. Called immediately prior to a
@@ -327,7 +327,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
 
   // Helper method to render a single QueryStateRecord as an HTML table
   // row. Used by QueryStatePathHandler.
-  void RenderSingleQueryTableRow(const QueryStateRecord& record, 
+  void RenderSingleQueryTableRow(const QueryStateRecord& record,
       std::stringstream* output);
 
   // For access to GetTableNames and DescribeTable
@@ -343,7 +343,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   // Index that allows lookup via TUniqueId into the query log
   typedef boost::unordered_map<TUniqueId, QueryLog::iterator> QueryLogIndex;
   QueryLogIndex query_log_index_;
-  
+
   // global, per-server state
   jobject fe_;  // instance of com.cloudera.impala.service.JniFrontend
   jmethodID create_exec_request_id_;  // JniFrontend.createExecRequest()
@@ -385,10 +385,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   struct SessionState {
     // The default database (changed as a result of 'use' query execution)
     std::string database;
-    
+
     // Time the session was created
     boost::posix_time::ptime start_time;
-    
+
     // Builds a Thrift representation of the session state for serialisation to
     // the frontend.
     void ToThrift(TSessionState* session_state);
@@ -404,9 +404,9 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   // protects query_locations_. Must always be taken after
   // query_exec_state_map_lock_ if both are required.
   boost::mutex query_locations_lock_;
-  
-  // A map from backend to the list of queries currently running there. 
-  typedef boost::unordered_map<THostPort, boost::unordered_set<TUniqueId> > 
+
+  // A map from backend to the list of queries currently running there.
+  typedef boost::unordered_map<THostPort, boost::unordered_set<TUniqueId> >
       QueryLocations;
   QueryLocations query_locations_;
 

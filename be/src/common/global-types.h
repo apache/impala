@@ -15,7 +15,7 @@
 //
 // This file contains type definitions that are used throughout the code base.
 
-#include "sparrow/util.h"
+#include "statestore/util.h"
 
 namespace impala {
 

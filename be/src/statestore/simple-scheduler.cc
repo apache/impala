@@ -24,17 +24,14 @@
 #include "runtime/coordinator.h"
 #include "runtime/exec-env.h"
 
-#include "sparrow/simple-scheduler.h"
-#include "sparrow/state-store-subscriber.h"
+#include "statestore/simple-scheduler.h"
+#include "statestore/state-store-subscriber.h"
 #include "gen-cpp/Types_types.h"
 
 using namespace std;
 using namespace boost;
-using impala::Status;
-using impala::THostPort;
-using impala::Metrics;
 
-namespace sparrow {
+namespace impala {
 
 static const string LOCAL_ASSIGNMENTS_KEY("simple-scheduler.local.assignments.total");
 static const string ASSIGNMENTS_KEY("simple-scheduler.assignments.total");
@@ -83,18 +80,18 @@ SimpleScheduler::~SimpleScheduler() {
 
 impala::Status SimpleScheduler::Init() {
   LOG(INFO) << "Starting simple scheduler";
-  if (subscription_manager_ != NULL) {   
+  if (subscription_manager_ != NULL) {
     unordered_set<string> services;
     services.insert(backend_service_id_);
     RETURN_IF_ERROR(subscription_manager_->RegisterSubscription(
         services, SUBSCRIPTION_ID, &callback_));
   }
   if (metrics_ != NULL) {
-    total_assignments_ = 
+    total_assignments_ =
         metrics_->CreateAndRegisterPrimitiveMetric(ASSIGNMENTS_KEY, 0L);
-    total_local_assignments_ = 
+    total_local_assignments_ =
         metrics_->CreateAndRegisterPrimitiveMetric(LOCAL_ASSIGNMENTS_KEY, 0L);
-    initialised_ = 
+    initialised_ =
         metrics_->CreateAndRegisterPrimitiveMetric(SCHEDULER_INIT_KEY, true);
   }
   return Status::OK;
@@ -164,14 +161,14 @@ Status SimpleScheduler::GetHosts(
     vector<string> hostport_strings;
     for (int i = 0; i < hostports->size(); ++i) {
       stringstream s;
-      s << "(" << data_locations[i].ipaddress << ":" << data_locations[i].port 
+      s << "(" << data_locations[i].ipaddress << ":" << data_locations[i].port
         << " -> " << (*hostports)[i].ipaddress << ":" << (*hostports)[i].port << ")";
       hostport_strings.push_back(s.str());
     }
     VLOG_QUERY << "SimpleScheduler assignment (data->backend):  "
                << algorithm::join(hostport_strings, ", ");
     if (data_locations.size() > 0) {
-      VLOG_QUERY << "SimpleScheduler locality percentage " << setprecision(4) 
+      VLOG_QUERY << "SimpleScheduler locality percentage " << setprecision(4)
                  << 100.0f * (num_local_assignments / (float)data_locations.size())
                  << "% (" << num_local_assignments << " out of " << data_locations.size()
                  << ")";

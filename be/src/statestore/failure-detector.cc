@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "sparrow/failure-detector.h"
+#include "statestore/failure-detector.h"
 #include <boost/assign.hpp>
 #include "common/logging.h"
 
@@ -29,7 +29,7 @@ static const map<FailureDetector::PeerState, string> PEER_STATE_TO_STRING =
       (FailureDetector::FAILED, "FAILED");
 
 const string& FailureDetector::PeerStateToString(FailureDetector::PeerState peer_state) {
-  map<FailureDetector::PeerState, string>::const_iterator it = 
+  map<FailureDetector::PeerState, string>::const_iterator it =
       PEER_STATE_TO_STRING.find(peer_state);
   DCHECK(it != PEER_STATE_TO_STRING.end());
   return it->second;
@@ -89,4 +89,3 @@ FailureDetector::PeerState MissedHeartbeatFailureDetector::GetPeerState(
 
   return OK;
 }
-

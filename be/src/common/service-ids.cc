@@ -17,6 +17,6 @@
 namespace impala {
 
 // Service IDs must be unique and human readable.
-sparrow::ServiceId IMPALA_SERVICE_ID = "impala_backend_service";
+ServiceId IMPALA_SERVICE_ID = "impala_backend_service";
 
 }

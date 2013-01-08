@@ -13,28 +13,24 @@
 // limitations under the License.
 
 
-#ifndef SPARROW_SUBSCRIPTION_MANAGER_H
-#define SPARROW_SUBSCRIPTION_MANAGER_H
+#ifndef STATESTORE_SUBSCRIPTION_MANAGER_H
+#define STATESTORE_SUBSCRIPTION_MANAGER_H
 
 #include <string>
 
 #include <boost/function.hpp>
 #include <boost/unordered_set.hpp>
 
-#include "sparrow/util.h"
+#include "statestore/util.h"
 
 namespace impala {
 
 class Status;
 class THostPort;
 
-} // namespace impala
-
-namespace sparrow {
-
 class StateStoreSubscriber;
 
-// The SubscriptionManager is the local interface to Sparrow's state store. Clients of
+// The SubscriptionManager is the local interface to the state store. Clients of
 // this class may register and unregister service instances, and subscribe to and
 // unsubscribe from notifications about service membership and state changes.
 class SubscriptionManager {
@@ -60,7 +56,7 @@ class SubscriptionManager {
     friend class StateStoreSubscriber;
 
     UpdateCallbackFunction callback_function_;
-    
+
     // Whether the callback function is currently registered with the subscription
     // manager.
     bool currently_registered_;

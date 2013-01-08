@@ -107,7 +107,7 @@ if (DOXYGEN_FOUND)
     ${CMAKE_SOURCE_DIR}/be/src/exprs/
     ${CMAKE_SOURCE_DIR}/be/src/runtime/
     ${CMAKE_SOURCE_DIR}/be/src/service/
-    ${CMAKE_SOURCE_DIR}/be/src/sparrow/
+    ${CMAKE_SOURCE_DIR}/be/src/statestore/
     ${CMAKE_SOURCE_DIR}/be/src/testutil/
     ${CMAKE_SOURCE_DIR}/be/src/thrift/
     ${CMAKE_SOURCE_DIR}/be/src/util/
@@ -176,7 +176,7 @@ set (IMPALA_LINK_LIBS
   ThriftSaslTransport
   Runtime
   Util
-  Sparrow
+  Statestore
   CodeGen
   Common
   ImpalaThrift
@@ -235,7 +235,7 @@ add_subdirectory(src/common)
 add_subdirectory(src/exec)
 add_subdirectory(src/exprs)
 add_subdirectory(src/runtime)
-add_subdirectory(src/sparrow)
+add_subdirectory(src/statestore)
 add_subdirectory(src/service)
 add_subdirectory(src/testutil)
 add_subdirectory(src/util)
@@ -252,7 +252,7 @@ link_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/build/exec
   ${CMAKE_CURRENT_SOURCE_DIR}/build/exprs
   ${CMAKE_CURRENT_SOURCE_DIR}/build/runtime
-  ${CMAKE_CURRENT_SOURCE_DIR}/build/sparrow
+  ${CMAKE_CURRENT_SOURCE_DIR}/build/statestore
   ${CMAKE_CURRENT_SOURCE_DIR}/build/service
   ${CMAKE_CURRENT_SOURCE_DIR}/build/testutil
   ${CMAKE_CURRENT_SOURCE_DIR}/build/thrift

@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-namespace cpp sparrow
-namespace java com.cloudera.sparrow.thrift
+namespace cpp impala
+namespace java com.cloudera.impala.thrift
 
-include "SparrowTypes.thrift"
+include "StatestoreTypes.thrift"
 include "Status.thrift"
 include "Types.thrift"
 

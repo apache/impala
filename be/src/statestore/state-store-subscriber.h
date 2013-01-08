@@ -13,8 +13,8 @@
 // limitations under the License.
 
 
-#ifndef SPARROW_STATE_STORE_SUBSCRIBER_SERVICE_H
-#define SPARROW_STATE_STORE_SUBSCRIBER_SERVICE_H
+#ifndef STATESTORE_STATE_STORE_SUBSCRIBER_SERVICE_H
+#define STATESTORE_STATE_STORE_SUBSCRIBER_SERVICE_H
 
 #include <string>
 
@@ -24,8 +24,8 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
 
-#include "sparrow/util.h"
-#include "sparrow/subscription-manager.h"
+#include "statestore/util.h"
+#include "statestore/subscription-manager.h"
 #include "util/thrift-util.h"
 #include "util/thrift-client.h"
 #include "gen-cpp/StateStoreService.h"
@@ -40,7 +40,7 @@ class ThriftServer;
 
 } // namespace impala
 
-namespace sparrow {
+namespace impala {
 
 class StateStoreTest;
 
@@ -143,7 +143,7 @@ class StateStoreSubscriber
 
   // Subscriptions registered from this subscriber. Used to properly reregister
   // if recovery mode is entered.
-  typedef boost::unordered_map<SubscriptionId, boost::unordered_set<ServiceId> > 
+  typedef boost::unordered_map<SubscriptionId, boost::unordered_set<ServiceId> >
       SubscriptionRegistrations;
   SubscriptionRegistrations subscriptions_;
 
@@ -152,14 +152,14 @@ class StateStoreSubscriber
   typedef boost::unordered_map<ServiceId, impala::THostPort> ServiceRegistrations;
   ServiceRegistrations services_;
 
-  // Thread in which RecoveryModeChecker runs. 
+  // Thread in which RecoveryModeChecker runs.
   boost::scoped_ptr<boost::thread> recovery_mode_thread_;
 
-  // Failure detector that monitors heartbeats from the state-store. 
+  // Failure detector that monitors heartbeats from the state-store.
   boost::scoped_ptr<impala::TimeoutFailureDetector> failure_detector_;
 
   // Initializes client_, if it hasn't been initialized already. Returns an
-  // error if in recovery mode. Must be called with lock_ held. 
+  // error if in recovery mode. Must be called with lock_ held.
   impala::Status InitClient();
 
   // Executes an RPC to unregister the given service with the state store. Must
@@ -177,14 +177,14 @@ class StateStoreSubscriber
   // Registers a subscription with the given ID to all services
   // Must be called with lock_
   impala::Status RegisterSubscriptionInternal(
-      const boost::unordered_set<std::string>& update_services, const SubscriptionId& id, 
+      const boost::unordered_set<std::string>& update_services, const SubscriptionId& id,
       SubscriptionManager::UpdateCallback* update);
 
   // Run in a separate thread. In a loop, check failure_detector_ to see if the
   // state-store is still sending heartbeats. If not, enter 'recovery mode'
   // where a reconnection is repeatedly attempted. Once reconnected, all
   // existing subscriptions and services are reregistered and normal operation
-  // resumes. 
+  // resumes.
   // During recovery mode, any public methods that are started will block on
   // lock_, which is only released when recovery finishes. In practice, all
   // registrations are made early in the life of an impalad before the
@@ -195,8 +195,8 @@ class StateStoreSubscriber
   // re-registers all subscriptions and service instances. Must be called with
   // lock_ held.
   impala::Status Reregister();
-  
-  // Friend so that tests can force shutdown to simulate failure. 
+
+  // Friend so that tests can force shutdown to simulate failure.
   friend class StateStoreTest;
 };
 

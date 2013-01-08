@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-namespace cpp sparrow
-namespace java com.cloudera.sparrow.thrift
+namespace cpp impala
+namespace java com.cloudera.impala.thrift
 
-include "SparrowTypes.thrift"
+include "StatestoreTypes.thrift"
 include "Status.thrift"
 include "Types.thrift"
 
@@ -29,10 +29,10 @@ struct TUpdateStateRequest {
  
   // Membership information for each service that the subscriber subscribed to. 
   // Required in V1.
-  2: optional list<SparrowTypes.TServiceMembership> service_memberships
+  2: optional list<StatestoreTypes.TServiceMembership> service_memberships
   
   // Object updates for each service that the subscriber subscribed to.  Required in V1.
-  3: optional list<SparrowTypes.TVersionedObject> updated_objects
+  3: optional list<StatestoreTypes.TVersionedObject> updated_objects
 
   // Objects that have been deleted, for each service that the subscriber has subscribed
   // to. Required in V1.
@@ -45,7 +45,7 @@ struct TUpdateStateResponse {
 
   // For each service running on the subscriber, the object updates.  Required in V1,
   // but not yet implemented.
-  2: optional list<SparrowTypes.TVersionedObject> updated_objects
+  2: optional list<StatestoreTypes.TVersionedObject> updated_objects
 
   // Objects that have been deleted, for each service that the subscriber has subscribed
   // to. Required in V1, but not yet implemented.

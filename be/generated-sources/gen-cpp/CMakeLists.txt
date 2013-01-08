@@ -54,8 +54,8 @@ set(SRC_FILES
   Planner_types.cpp
   RuntimeProfile_constants.cpp
   RuntimeProfile_types.cpp
-  SparrowTypes_constants.cpp
-  SparrowTypes_types.cpp
+  StatestoreTypes_constants.cpp
+  StatestoreTypes_types.cpp
   StateStoreService.cpp
   StateStoreService_constants.cpp
   StateStoreService_types.cpp

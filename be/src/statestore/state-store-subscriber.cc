@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "sparrow/state-store-subscriber.h"
+#include "statestore/state-store-subscriber.h"
 
 #include <sstream>
 #include <utility>
@@ -25,7 +25,7 @@
 
 #include "common/logging.h"
 #include "common/status.h"
-#include "sparrow/failure-detector.h"
+#include "statestore/failure-detector.h"
 #include "gen-cpp/StateStoreService_types.h"
 #include "gen-cpp/StateStoreSubscriberService_types.h"
 #include "util/thrift-util.h"
@@ -35,20 +35,13 @@ using namespace boost;
 using namespace boost::posix_time;
 using namespace ::apache::thrift;
 using namespace ::apache::thrift::transport;
-using impala::Status;
-using impala::THostPort;
-using impala::ThriftClient;
-using impala::ThriftServer;
-using impala::TStatusCode;
-using impala::TimeoutFailureDetector;
-using impala::FailureDetector;
 
 DECLARE_int32(rpc_cnxn_attempts);
 DECLARE_int32(rpc_cnxn_retry_interval_ms);
 DEFINE_int32(statestore_subscriber_timeout_seconds, 10, "The amount of time (in seconds) "
     "that may elapse before the connection with the state-store is considered lost.");
 
-namespace sparrow {
+namespace impala {
 
 const char* StateStoreSubscriber::DISCONNECTED_FROM_STATE_STORE_ERROR =
     "Client disconnected from state store";
@@ -59,7 +52,7 @@ StateStoreSubscriber::StateStoreSubscriber(const string& hostname,
                                            int state_store_port)
   : server_running_(false),
     failure_detector_(new TimeoutFailureDetector(
-        seconds(FLAGS_statestore_subscriber_timeout_seconds), 
+        seconds(FLAGS_statestore_subscriber_timeout_seconds),
         seconds(FLAGS_statestore_subscriber_timeout_seconds / 2))) {
   client_.reset();
   host_port_.ipaddress = ipaddress;
@@ -96,8 +89,8 @@ Status StateStoreSubscriber::RegisterServiceInternal(const ServiceId& service_id
     return status;
   }
   Status status(response.status);
-  if (status.ok()) services_[service_id] = address; 
-  return status;  
+  if (status.ok()) services_[service_id] = address;
+  return status;
 }
 
 Status StateStoreSubscriber::RegisterService(const ServiceId& service_id,
@@ -296,8 +289,8 @@ Status StateStoreSubscriber::InitClient() {
     client_.reset(new ThriftClient<StateStoreServiceClient>(
         state_store_host_port_.ipaddress, state_store_host_port_.port));
 
-    Status status = client_->OpenWithRetry(FLAGS_rpc_cnxn_attempts, 
-        FLAGS_rpc_cnxn_retry_interval_ms);    
+    Status status = client_->OpenWithRetry(FLAGS_rpc_cnxn_attempts,
+        FLAGS_rpc_cnxn_retry_interval_ms);
     if (!status.ok()) {
       client_.reset();
       return status;
@@ -348,9 +341,9 @@ Status StateStoreSubscriber::Reregister() {
   RETURN_IF_ERROR(InitClient());
   BOOST_FOREACH(const ServiceRegistrations::value_type& service, services_) {
     RETURN_IF_ERROR(RegisterServiceInternal(service.first, service.second));
-  }      
+  }
   BOOST_FOREACH(const SubscriptionRegistrations::value_type& subscription,
-                subscriptions_) {      
+                subscriptions_) {
     UpdateCallbacks::iterator cb;
     cb = update_callbacks_.find(subscription.first);
     if (cb == update_callbacks_.end()) {
@@ -371,13 +364,13 @@ void StateStoreSubscriber::RecoveryModeChecker() {
   // mode and try to reconnect, followed by reregistering all subscriptions and
   // services.
   // When entering recovery mode, the class-wide lock_ is taken to
-  // ensure mutual exclusion with any operations in flight. 
+  // ensure mutual exclusion with any operations in flight.
   while (true) {
-    FailureDetector::PeerState peer_state = 
+    FailureDetector::PeerState peer_state =
         failure_detector_->GetPeerState(state_store_host_port_.ipaddress);
     if (peer_state == FailureDetector::FAILED) {
       // Take class-wide lock so that any client operations that start after this
-      // will block     
+      // will block
       lock_guard<mutex> l(lock_);
       // TODO: Metric
       LOG(WARNING) << "Lost connection to the state-store, entering recovery mode";
@@ -387,7 +380,7 @@ void StateStoreSubscriber::RecoveryModeChecker() {
       while (true) {
         // Force to be null so that InitClient will try to reopen
         client_.reset();
-                
+
         // We're recovering. Try to open a client and re-register
         // TODO: Random sleep +/- to avoid correlated reconnects
         Status status = Reregister();
@@ -400,13 +393,13 @@ void StateStoreSubscriber::RecoveryModeChecker() {
           break;
         } else {
           // Don't exit recovery mode, continue
-          LOG(WARNING) << "Failed to re-register with state-store: " 
+          LOG(WARNING) << "Failed to re-register with state-store: "
                        << status.GetErrorMsg();
           usleep(SLEEP_INTERVAL_MS * 1000);
         }
       }
     } else { // peer_state == OK
-      // Back to sleep 
+      // Back to sleep
       usleep(SLEEP_INTERVAL_MS * 1000);
     }
   }

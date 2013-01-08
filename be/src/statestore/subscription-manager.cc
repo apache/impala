@@ -12,19 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "sparrow/subscription-manager.h"
+#include "statestore/subscription-manager.h"
 
 #include <string>
 
 #include "common/logging.h"
 #include "common/status.h"
-#include "sparrow/state-store-subscriber.h"
+#include "statestore/state-store-subscriber.h"
 #include "gen-cpp/StateStoreService_types.h"
 
 using namespace std;
 using namespace boost;
-using impala::Status;
-using impala::THostPort;
 
 DEFINE_string(state_store_host, "localhost",
               "hostname where StateStoreService is running");
@@ -34,7 +32,7 @@ DECLARE_string(hostname);
 DEFINE_int32(state_store_subscriber_port, 23000,
              "port where StateStoreSubscriberService should be exported");
 
-namespace sparrow {
+namespace impala {
 
 SubscriptionManager::UpdateCallback::~UpdateCallback() {
   DCHECK(!currently_registered_);
@@ -62,7 +60,7 @@ Status SubscriptionManager::UnregisterService(const ServiceId& service_id) {
   return state_store_subscriber_->UnregisterService(service_id);
 }
 
-Status SubscriptionManager::RegisterSubscription(const unordered_set<ServiceId>& services, 
+Status SubscriptionManager::RegisterSubscription(const unordered_set<ServiceId>& services,
     const SubscriptionId& id, UpdateCallback* update) {
   return state_store_subscriber_->RegisterSubscription(services, id, update);
 }

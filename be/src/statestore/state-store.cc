@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "sparrow/state-store.h"
+#include "statestore/state-store.h"
 
 #include <exception>
 #include <utility>
@@ -35,7 +35,7 @@
 #include "util/thrift-util.h"
 #include "util/container-util.h"
 #include "util/webserver.h"
-#include "sparrow/failure-detector.h"
+#include "statestore/failure-detector.h"
 #include "gen-cpp/StateStoreService_types.h"
 #include "gen-cpp/StateStoreSubscriberService_types.h"
 #include "gen-cpp/Types_types.h"
@@ -46,16 +46,6 @@ using namespace std;
 
 using namespace ::apache::thrift::server;
 using namespace ::apache::thrift::transport;
-using impala::Status;
-using impala::THostPort;
-using impala::TStatusCode;
-using impala::ThriftServer;
-using impala::Metrics;
-using impala::MapMetric;
-using impala::SetMetric;
-using impala::FailureDetector;
-using impala::MissedHeartbeatFailureDetector;
-using impala::Webserver;
 
 DEFINE_int32(statestore_num_server_worker_threads, 4,
              "number of worker threads for the thread manager underlying the "
@@ -71,14 +61,14 @@ const string STATESTORE_LIVE_BACKENDS = "statestore.live.backends";
 const string STATESTORE_LIVE_BACKENDS_LIST = "statestore.live.backends.list";
 const string STATESTORE_SUBSCRIBER_STATE_MAP = "statestore.backend.state.map";
 
-namespace sparrow {
+namespace impala {
 
-StateStore::StateStore(int subscriber_update_frequency_ms, Metrics* metrics) 
-    : is_updating_(false), 
+StateStore::StateStore(int subscriber_update_frequency_ms, Metrics* metrics)
+    : is_updating_(false),
       next_subscriber_id_(0),
       subscriber_update_frequency_ms_(subscriber_update_frequency_ms),
       failure_detector_(
-          new MissedHeartbeatFailureDetector(FLAGS_statestore_max_missed_heartbeats, 
+          new MissedHeartbeatFailureDetector(FLAGS_statestore_max_missed_heartbeats,
                                              FLAGS_statestore_suspect_heartbeats)),
       metrics_(metrics) {
   DCHECK(metrics);
@@ -146,7 +136,7 @@ void StateStore::RegisterService(TRegisterServiceResponse& response,
   RETURN_AND_SET_STATUS_OK(response);
 }
 
-Status StateStore::UnregisterServiceInternal(const THostPort& address, 
+Status StateStore::UnregisterServiceInternal(const THostPort& address,
                                              const ServiceId& service_id) {
 
   lock_guard<recursive_mutex> lock(lock_);
@@ -204,7 +194,7 @@ void StateStore::UnregisterService(TUnregisterServiceResponse& response,
                                    const TUnregisterServiceRequest& request) {
   RETURN_IF_UNSET(request, subscriber_address, response);
   RETURN_IF_UNSET(request, service_id, response);
-  Status status = UnregisterServiceInternal(request.subscriber_address, 
+  Status status = UnregisterServiceInternal(request.subscriber_address,
                                             request.service_id);
   if (status.ok()) RETURN_AND_SET_STATUS_OK(response);
 
@@ -223,13 +213,13 @@ void StateStore::RegisterSubscription(TRegisterSubscriptionResponse& response,
   LOG(INFO) << "Registered subscription (id: " << request.subscription_id << ", for: "
             << request.subscriber_address.ipaddress
             << ":" << request.subscriber_address.port
-            << ") for " << request.services.size() << " topics (" 
+            << ") for " << request.services.size() << " topics ("
             << join(request.services, ", ") << ")";
 
-  RETURN_AND_SET_STATUS_OK(response);  
+  RETURN_AND_SET_STATUS_OK(response);
 }
 
-Status StateStore::UnregisterSubscriptionInternal(const THostPort& address, 
+Status StateStore::UnregisterSubscriptionInternal(const THostPort& address,
                                                   const SubscriptionId& id) {
 
   lock_guard<recursive_mutex> lock(lock_);
@@ -262,7 +252,7 @@ void StateStore::UnregisterSubscription(TUnregisterSubscriptionResponse& respons
                                         const TUnregisterSubscriptionRequest& request) {
   RETURN_IF_UNSET(request, subscriber_address, response);
   RETURN_IF_UNSET(request, subscription_id, response);
-  Status status = UnregisterSubscriptionInternal(request.subscriber_address, 
+  Status status = UnregisterSubscriptionInternal(request.subscriber_address,
                                                  request.subscription_id);
   if (status.ok()) RETURN_AND_SET_STATUS_OK(response);
 
@@ -296,7 +286,7 @@ Status StateStore::UnregisterSubscriberCompletely(const THostPort& address) {
   BOOST_FOREACH(const SubscriptionId& subscription, subscriptions_to_unregister) {
     RETURN_IF_ERROR(UnregisterSubscriptionInternal(address, subscription));
   }
-  
+
   BOOST_FOREACH(const ServiceId& service_id, services_to_unregister) {
     RETURN_IF_ERROR(UnregisterServiceInternal(address, service_id));
   }
@@ -310,12 +300,12 @@ Status StateStore::UnregisterSubscriberCompletely(const THostPort& address) {
 
 void StateStore::Start(int port) {
   // Create metrics
-  num_backends_metric_ = 
+  num_backends_metric_ =
       metrics_->CreateAndRegisterPrimitiveMetric(STATESTORE_LIVE_BACKENDS, 0L);
-  backend_set_metric_ = 
+  backend_set_metric_ =
       metrics_->RegisterMetric(new SetMetric<string>(STATESTORE_LIVE_BACKENDS_LIST,
               set<string>()));
-  subscriber_state_metric_ = 
+  subscriber_state_metric_ =
       metrics_->RegisterMetric(new MapMetric<string, string>(
             STATESTORE_SUBSCRIBER_STATE_MAP, map<string, string>()));
 
@@ -357,7 +347,7 @@ void StateStore::Subscriber::RemoveService(const ServiceId& service_id) {
   service_ids_.erase(service_id);
 }
 
-void StateStore::Subscriber::AddSubscription(const set<ServiceId>& services, 
+void StateStore::Subscriber::AddSubscription(const set<ServiceId>& services,
                                              const SubscriptionId& id) {
   // If there was an existing subscription, remove it and make sure
   // service_subscription_counts_ is correct.
@@ -452,7 +442,7 @@ void StateStore::UpdateLoop() {
         }
 
         peer_state = failure_detector_->UpdateHeartbeat(address, false);
-      } else {      
+      } else {
         TUpdateStateResponse response;
         try {
           update.client->iface()->UpdateState(response, update.request);
@@ -463,7 +453,7 @@ void StateStore::UpdateLoop() {
           } else {
             peer_state = failure_detector_->UpdateHeartbeat(address, true);
           }
-          
+
         } catch (TTransportException& e) {
           LOG(INFO) << "Unable to update client at " << update.client->ipaddress() << ":"
                     << update.client->port() << "; received error " << e.what();
@@ -474,7 +464,7 @@ void StateStore::UpdateLoop() {
         }
       }
 
-      subscriber_state_metric_->Add(address, 
+      subscriber_state_metric_->Add(address,
                                     FailureDetector::PeerStateToString(peer_state));
 
       if (peer_state == FailureDetector::FAILED) {
@@ -484,18 +474,18 @@ void StateStore::UpdateLoop() {
           // Should never happen; if the subscriber was removed concurrently
           // status will be OK and otherwise lock_ is held during
           // UnregisterSusbcriberCompletely, so this signifies a concurrency bug.
-          // We can recover from it but it might leave zombie subscriptions around. 
-          LOG(ERROR) << "Could not unregister subscriber on failure: " 
+          // We can recover from it but it might leave zombie subscriptions around.
+          LOG(ERROR) << "Could not unregister subscriber on failure: "
                      << status.GetErrorMsg();
         }
       }
     }
-    
+
     if (get_system_time() < next_update_time && is_updating()) {
       posix_time::time_duration duration = next_update_time - get_system_time();
       usleep(duration.total_microseconds());
     }
-    next_update_time = 
+    next_update_time =
       get_system_time() + posix_time::milliseconds(subscriber_update_frequency_ms_);
   }
 }

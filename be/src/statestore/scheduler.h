@@ -22,7 +22,7 @@
 #include "common/status.h"
 #include "gen-cpp/Types_types.h"  // for THostPort
 
-namespace sparrow {
+namespace impala {
 
 // Abstract scheduler and nameservice class.
 // Given a list of resources and locations returns a list of hosts on which
@@ -34,7 +34,7 @@ class Scheduler {
   virtual ~Scheduler() { }
 
   // List of server addresses. THostPort.ipdaddress is set, THostPort.hostname
-  // may not be. See IMP-261 for plans to sort this out. 
+  // may not be. See IMP-261 for plans to sort this out.
   typedef std::vector<impala::THostPort> HostList;
 
   // Given a list of host / port pairs that represent data locations,

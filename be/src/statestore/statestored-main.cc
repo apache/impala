@@ -22,7 +22,7 @@
 #include "common/daemon.h"
 #include "common/logging.h"
 #include "common/status.h"
-#include "sparrow/state-store.h"
+#include "statestore/state-store.h"
 #include "util/metrics.h"
 #include "util/webserver.h"
 #include "util/default-path-handlers.h"
@@ -32,17 +32,14 @@ DECLARE_int32(webserver_port);
 DECLARE_bool(enable_webserver);
 DECLARE_string(principal);
 
-using impala::Webserver;
-using impala::Status;
-using impala::Metrics;
-using namespace impala;
 using namespace std;
 using namespace boost;
+using namespace impala;
 
 int main(int argc, char** argv) {
   // Override default for webserver port
   FLAGS_webserver_port = 25010;
-  impala::InitDaemon(argc, argv);
+  InitDaemon(argc, argv);
 
   if (!FLAGS_principal.empty()) {
     EXIT_IF_ERROR(InitKerberos("StateStore"));
@@ -51,7 +48,7 @@ int main(int argc, char** argv) {
   scoped_ptr<Webserver> webserver(new Webserver());
 
   if (FLAGS_enable_webserver) {
-    impala::AddDefaultPathHandlers(webserver.get());
+    AddDefaultPathHandlers(webserver.get());
     EXIT_IF_ERROR(webserver->Start());
   } else {
     LOG(INFO) << "Not starting webserver";
@@ -60,8 +57,8 @@ int main(int argc, char** argv) {
   scoped_ptr<Metrics> metrics(new Metrics());
   metrics->Init(FLAGS_enable_webserver ? webserver.get() : NULL);
 
-  shared_ptr<sparrow::StateStore> state_store(
-      new sparrow::StateStore(sparrow::StateStore::DEFAULT_UPDATE_FREQUENCY_MS,
+  shared_ptr<StateStore> state_store(
+      new StateStore(StateStore::DEFAULT_UPDATE_FREQUENCY_MS,
           metrics.get()));
   state_store->RegisterWebpages(webserver.get());
   state_store->Start(FLAGS_state_store_port);

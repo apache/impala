@@ -23,14 +23,14 @@
 #include <boost/thread/mutex.hpp>
 
 #include "common/status.h"
-#include "sparrow/scheduler.h"
-#include "sparrow/subscription-manager.h"
-#include "sparrow/util.h"
-#include "sparrow/state-store.h"
+#include "statestore/scheduler.h"
+#include "statestore/subscription-manager.h"
+#include "statestore/util.h"
+#include "statestore/state-store.h"
 #include "util/metrics.h"
 #include "gen-cpp/Types_types.h"  // for THostPort
 
-namespace sparrow {
+namespace impala {
 
 // Performs simple scheduling by matching between a list of hosts configured
 // either from the state-store, or from a static list of addresses, and a list
@@ -44,9 +44,9 @@ class SimpleScheduler : public Scheduler {
 
   // Initialize with a list of <host:port> pairs in 'static' mode - i.e. the set of
   // backends is fixed and will not be updated.
-  SimpleScheduler(const std::vector<impala::THostPort>& backends, 
+  SimpleScheduler(const std::vector<impala::THostPort>& backends,
       impala::Metrics* metrics);
-  
+
   virtual ~SimpleScheduler();
 
   // Returns a list of backends such that the impalad at hostports[i] should be used to

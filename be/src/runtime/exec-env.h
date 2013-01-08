@@ -23,13 +23,6 @@
 #include "exprs/timestamp-functions.h"
 #include "common/status.h"
 
-namespace sparrow {
-
-class Scheduler;
-class SubscriptionManager;
-
-} // namespace sparrow
-
 namespace impala {
 
 class BackendClientCache;
@@ -37,6 +30,8 @@ class DataStreamMgr;
 class DiskIoMgr;
 class HBaseTableCache;
 class HdfsFsCache;
+class Scheduler;
+class SubscriptionManager;
 class TestExecEnv;
 class Webserver;
 class Metrics;
@@ -50,7 +45,7 @@ class ExecEnv {
   ExecEnv();
   virtual ~ExecEnv();
 
-  sparrow::SubscriptionManager* subscription_mgr() {
+  SubscriptionManager* subscription_mgr() {
     return subscription_mgr_.get();
   }
 
@@ -64,7 +59,7 @@ class ExecEnv {
 
   void set_enable_webserver(bool enable) { enable_webserver_ = enable; }
 
-  sparrow::Scheduler* scheduler() {
+  Scheduler* scheduler() {
     DCHECK(scheduler_.get() != NULL);
     return scheduler_.get();
   }
@@ -75,8 +70,8 @@ class ExecEnv {
  protected:
   // Leave protected so that subclasses can override
   boost::scoped_ptr<DataStreamMgr> stream_mgr_;
-  boost::scoped_ptr<sparrow::Scheduler> scheduler_;
-  boost::scoped_ptr<sparrow::SubscriptionManager> subscription_mgr_;
+  boost::scoped_ptr<Scheduler> scheduler_;
+  boost::scoped_ptr<SubscriptionManager> subscription_mgr_;
   boost::scoped_ptr<BackendClientCache> client_cache_;
   boost::scoped_ptr<HdfsFsCache> fs_cache_;
   boost::scoped_ptr<HBaseTableCache> htable_cache_;

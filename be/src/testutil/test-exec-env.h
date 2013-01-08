@@ -28,11 +28,10 @@
 
 namespace apache { namespace thrift { namespace server { class TServer; } } }
 
-namespace sparrow { class StateStore; }
-
 namespace impala {
 
 class Metrics;
+class StateStore;
 
 // Create environment for single-process distributed query execution.
 class TestExecEnv : public ExecEnv {
@@ -60,7 +59,7 @@ class TestExecEnv : public ExecEnv {
   // implementation. Otherwise Thrift takes sole ownership of this
   // object when we pass it to a Processor to initialise, and will
   // delete it when it is finished with it.
-  boost::shared_ptr<sparrow::StateStore> state_store_;
+  boost::shared_ptr<StateStore> state_store_;
 
   int state_store_port_;
 

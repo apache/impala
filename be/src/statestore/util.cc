@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "sparrow/util.h"
+#include "statestore/util.h"
 
 #include <utility>
 
@@ -22,9 +22,8 @@
 
 using namespace boost;
 using namespace std;
-using impala::THostPort;
 
-namespace sparrow {
+namespace impala {
 
 const SubscriptionId INVALID_SUBSCRIPTION_ID = "";
 
