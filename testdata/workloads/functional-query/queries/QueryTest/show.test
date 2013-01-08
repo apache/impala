@@ -2,42 +2,47 @@
 ---- QUERY
 # Simple pattern literal
 show tables "alltypes"
----- TYPES
-string
 ---- RESULTS
 'alltypes'
+---- TYPES
+STRING
 ====
 ---- QUERY
 # Pattern with wildcard
 show tables "all*ypes"
----- TYPES
-string
 ---- RESULTS
 'alltypes'
+---- TYPES
+STRING
 ====
 ---- QUERY
 # Empty string matches nothing
 show tables ""
----- TYPES
-string
 ---- RESULTS
+
+---- TYPES
+STRING
 ====
 ---- QUERY
 # Check that regex metacharacters are being escaped
 show tables '+alltypes'
----- TYPES
-string
 ---- RESULTS
+
+---- TYPES
+STRING
 ====
 ---- QUERY
 # Fully qualified names will not match
 show tables "default.alltypes"
----- TYPES
-string
 ---- RESULTS
+
+---- TYPES
+STRING
 ====
 ---- QUERY
 USE testdb1
+---- RESULTS
+
 ====
 ---- QUERY
 # Different database
@@ -45,8 +50,6 @@ USE testdb1
 # changing often, and may be different depending on whether benchmark data is
 # loaded, for example.
 show tables '*'
----- TYPES
-string
 ---- RESULTS
 'alltypes'
 'alltypes_rc'
@@ -63,9 +66,6 @@ string
 'alltypes_seq_record_gzip'
 'alltypes_seq_record_snap'
 'alltypes_seq_snap'
-'alltypes_trevni'
-'alltypes_trevni_def'
-'alltypes_trevni_snap'
 'testtbl'
 'testtbl_rc'
 'testtbl_rc_bzip'
@@ -81,28 +81,27 @@ string
 'testtbl_seq_record_gzip'
 'testtbl_seq_record_snap'
 'testtbl_seq_snap'
-'testtbl_trevni'
-'testtbl_trevni_def'
-'testtbl_trevni_snap'
+---- TYPES
+STRING
 ====
 ---- QUERY
 USE default
+---- RESULTS
+
 ====
 ---- QUERY
 # Choice amongst patterns
 show tables "alltypes|stringpartitionkey|testtbl"
----- TYPES
-string
 ---- RESULTS
 'alltypes'
 'stringpartitionkey'
 'testtbl'
+---- TYPES
+STRING
 ====
 ---- QUERY
 # Show tables in
 show tables in testdb1
----- TYPES
-string
 ---- RESULTS
 'alltypes'
 'alltypes_rc'
@@ -119,9 +118,6 @@ string
 'alltypes_seq_record_gzip'
 'alltypes_seq_record_snap'
 'alltypes_seq_snap'
-'alltypes_trevni'
-'alltypes_trevni_def'
-'alltypes_trevni_snap'
 'testtbl'
 'testtbl_rc'
 'testtbl_rc_bzip'
@@ -137,15 +133,12 @@ string
 'testtbl_seq_record_gzip'
 'testtbl_seq_record_snap'
 'testtbl_seq_snap'
-'testtbl_trevni'
-'testtbl_trevni_def'
-'testtbl_trevni_snap'
+---- TYPES
+STRING
 ====
 ---- QUERY
 # Show tables in with a pattern
 show tables in testdb1 like 'alltype*'
----- TYPES
-string
 ---- RESULTS
 'alltypes'
 'alltypes_rc'
@@ -162,57 +155,58 @@ string
 'alltypes_seq_record_gzip'
 'alltypes_seq_record_snap'
 'alltypes_seq_snap'
-'alltypes_trevni'
-'alltypes_trevni_def'
-'alltypes_trevni_snap'
+---- TYPES
+STRING
 ====
 ---- QUERY
 USE testdb1
+---- RESULTS
+
 ====
 ---- QUERY
 # Coverage of syntax variations.
 show tables in testdb1 'alltypes'
----- TYPES
-string
 ---- RESULTS
 'alltypes'
+---- TYPES
+STRING
 ====
 ---- QUERY
 show tables in testdb1 like 'alltypes'
----- TYPES
-string
 ---- RESULTS
 'alltypes'
+---- TYPES
+STRING
 ====
 ---- QUERY
 show tables 'alltypes'
----- TYPES
-string
 ---- RESULTS
 'alltypes'
+---- TYPES
+STRING
 ====
 ---- QUERY
 show tables like 'alltypes'
----- TYPES
-string
 ---- RESULTS
 'alltypes'
+---- TYPES
+STRING
 ====
 ---- QUERY
 # Show databases
 show databases
----- TYPES
-string
 ---- RESULTS
 'default'
 'testdb1'
 'tpcds'
 'tpch'
+---- TYPES
+STRING
 ====
 ---- QUERY
 show databases like 'def*'
----- TYPES
-string
 ---- RESULTS
 'default'
+---- TYPES
+STRING
 ====
