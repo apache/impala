@@ -1196,7 +1196,7 @@ Status ImpalaServer::ParseQueryOptions(const string& options,
     TQueryOptions* query_options) {
   if (options.length() == 0) return Status::OK;
   vector<string> kv_pairs;
-  split(kv_pairs, options, is_any_of(","), token_compress_on );
+  split(kv_pairs, options, is_any_of(","), token_compress_on);
   BOOST_FOREACH(string& kv_string, kv_pairs) {
     trim(kv_string);
     if (kv_string.length() == 0) continue;
@@ -1252,10 +1252,13 @@ Status ImpalaServer::SetQueryOptions(const string& key, const string& value,
       case TImpalaQueryOptions::ALLOW_UNSUPPORTED_FORMATS:
         query_options->allow_unsupported_formats =
             iequals(value, "true") || iequals(value, "1");
-          break;
+        break;
       case TImpalaQueryOptions::DEFAULT_ORDER_BY_LIMIT:
         query_options->__set_default_order_by_limit(atoi(value.c_str()));
-          break;
+        break;
+      case TImpalaQueryOptions::DEBUG_ACTION:
+        query_options->__set_debug_action(value.c_str());
+        break;
       default:
         // We hit this DCHECK(false) if we forgot to add the corresponding entry here
         // when we add a new query option.
@@ -1445,6 +1448,56 @@ void ImpalaServer::InitializeConfigVariables() {
   support_start_over.__set_key("support_start_over");
   support_start_over.__set_value("false");
   default_configs_.push_back(support_start_over);
+}
+
+void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
+    map<string, string>* configuration) {
+  map<int, const char*>::const_iterator itr =
+      _TImpalaQueryOptions_VALUES_TO_NAMES.begin();
+  for (; itr != _TImpalaQueryOptions_VALUES_TO_NAMES.end(); ++itr) {
+    stringstream val;
+    switch (itr->first) {
+      case TImpalaQueryOptions::ABORT_ON_ERROR:
+        val << query_option.abort_on_error;
+        break;
+      case TImpalaQueryOptions::MAX_ERRORS:
+        val << query_option.max_errors;
+        break;
+      case TImpalaQueryOptions::DISABLE_CODEGEN:
+        val << query_option.disable_codegen;
+        break;
+      case TImpalaQueryOptions::BATCH_SIZE:
+        val << query_option.batch_size;
+        break;
+      case TImpalaQueryOptions::NUM_NODES:
+        val << query_option.num_nodes;
+        break;
+      case TImpalaQueryOptions::MAX_SCAN_RANGE_LENGTH:
+        val << query_option.max_scan_range_length;
+        break;
+      case TImpalaQueryOptions::MAX_IO_BUFFERS:
+        val << query_option.max_io_buffers;
+        break;
+      case TImpalaQueryOptions::NUM_SCANNER_THREADS:
+        val << query_option.num_scanner_threads;
+        break;
+      case TImpalaQueryOptions::ALLOW_UNSUPPORTED_FORMATS:
+        val << query_option.allow_unsupported_formats;
+        break;
+      case TImpalaQueryOptions::DEFAULT_ORDER_BY_LIMIT:
+        val << query_option.default_order_by_limit;
+        break;
+      case TImpalaQueryOptions::DEBUG_ACTION:
+        val << query_option.debug_action;
+        break;
+      default:
+        // We hit this DCHECK(false) if we forgot to add the corresponding entry here
+        // when we add a new query option.
+        LOG(ERROR) << "Missing exec option implementation: " << itr->second;
+        DCHECK(false);
+    }
+    (*configuration)[itr->second] = val.str();
+  }
 }
 
 void ImpalaServer::SessionState::ToThrift(TSessionState* state) {

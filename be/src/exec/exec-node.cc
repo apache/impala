@@ -15,6 +15,7 @@
 #include "exec/exec-node.h"
 
 #include <sstream>
+#include <unistd.h>  // for sleep()
 
 #include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
@@ -51,6 +52,8 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
     type_(tnode.node_type),
     pool_(pool),
     row_descriptor_(descs, tnode.row_tuples, tnode.nullable_tuples),
+    debug_phase_(TExecNodePhase::INVALID),
+    debug_action_(TDebugAction::WAIT),
     limit_(tnode.limit),
     num_rows_returned_(0),
     rows_returned_counter_(NULL),
@@ -64,6 +67,7 @@ ExecNode::ExecNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl
 }
 
 Status ExecNode::Prepare(RuntimeState* state) {
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::PREPARE));
   DCHECK(runtime_profile_.get() != NULL);
   rows_returned_counter_ =
       ADD_COUNTER(runtime_profile_, "RowsReturned", TCounterType::UNIT);
@@ -74,7 +78,6 @@ Status ExecNode::Prepare(RuntimeState* state) {
       bind<int64_t>(&RuntimeProfile::UnitsPerSecond, rows_returned_counter_, 
         runtime_profile()->total_time_counter()));
 
-
   RETURN_IF_ERROR(PrepareConjuncts(state));
   for (int i = 0; i < children_.size(); ++i) {
     RETURN_IF_ERROR(children_[i]->Prepare(state));
@@ -83,6 +86,7 @@ Status ExecNode::Prepare(RuntimeState* state) {
 }
 
 Status ExecNode::Close(RuntimeState* state) {
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::CLOSE));
   if (rows_returned_counter_ != NULL) {
     COUNTER_SET(rows_returned_counter_, num_rows_returned_);
   }
@@ -196,6 +200,19 @@ Status ExecNode::CreateNode(ObjectPool* pool, const TPlanNode& tnode,
       return Status(error_msg.str());
   }
   return Status::OK;
+}
+
+void ExecNode::SetDebugOptions(
+    int node_id, TExecNodePhase::type phase, TDebugAction::type action,
+    ExecNode* root) {
+  if (root->id_ == node_id) {
+    root->debug_phase_ = phase;
+    root->debug_action_ = action;
+    return;
+  }
+  for (int i = 0; i < root->children_.size(); ++i) {
+    SetDebugOptions(node_id, phase, action, root->children_[i]);
+  }
 }
 
 string ExecNode::DebugString() const {
@@ -336,6 +353,18 @@ void ExecNode::InitRuntimeProfile(const string& name) {
   ss << name << " (id=" << id_ << ")";
   runtime_profile_.reset(new RuntimeProfile(pool_, ss.str()));
   runtime_profile_->set_metadata(id_);
+}
+
+Status ExecNode::ExecDebugAction(TExecNodePhase::type phase) {
+  DCHECK(phase != TExecNodePhase::INVALID);
+  if (debug_phase_ != phase) return Status::OK;
+  if (debug_action_ == TDebugAction::FAIL) return Status(TStatusCode::INTERNAL_ERROR);
+  if (debug_action_ == TDebugAction::WAIT) {
+    while (true) {
+      sleep(1);
+    }
+  }
+  return Status::OK;
 }
 
 }

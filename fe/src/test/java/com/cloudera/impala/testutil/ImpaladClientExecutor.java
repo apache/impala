@@ -179,6 +179,9 @@ public class ImpaladClientExecutor {
         case DEFAULT_ORDER_BY_LIMIT:
           optionValue = String.valueOf(queryOptions.getDefault_order_by_limit());
           break;
+        case DEBUG_ACTION:
+          optionValue = String.valueOf(queryOptions.getDebug_action());
+          break;
         default:
           Preconditions.checkState(false, "Unhandled option:" + option.toString());
       }

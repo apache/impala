@@ -91,6 +91,10 @@ class ExecNode {
   static Status CreateTree(ObjectPool* pool, const TPlan& plan,
                            const DescriptorTbl& descs, ExecNode** root);
 
+  // Set debug action for node with given id in 'tree'
+  static void SetDebugOptions(int node_id, TExecNodePhase::type phase,
+                              TDebugAction::type action, ExecNode* tree);
+
   // Collect all nodes of given 'node_type' that are part of this subtree, and return in
   // 'nodes'.
   void CollectNodes(TPlanNodeType::type node_type, std::vector<ExecNode*>* nodes);
@@ -141,12 +145,19 @@ class ExecNode {
   static const std::string ROW_THROUGHPUT_COUNTER;
 
  protected:
+  friend class DataSink;
+
   int id_;  // unique w/in single plan tree
   TPlanNodeType::type type_;
   ObjectPool* pool_;
   std::vector<Expr*> conjuncts_;
   std::vector<ExecNode*> children_;
   RowDescriptor row_descriptor_;
+
+  // debug-only: if debug_action_ is not INVALID, node will perform action in
+  // debug_phase_
+  TExecNodePhase::type debug_phase_;
+  TDebugAction::type debug_action_;
 
   int64_t limit_;  // -1: no limit
   int64_t num_rows_returned_;
@@ -172,7 +183,9 @@ class ExecNode {
 
   void InitRuntimeProfile(const std::string& name);
 
-  friend class DataSink;
+  // Executes debug_action_ if phase matches debug_phase_.
+  // 'phase' must not be INVALID.
+  Status ExecDebugAction(TExecNodePhase::type phase);
 };
 
 }

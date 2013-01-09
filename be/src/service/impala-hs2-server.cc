@@ -215,53 +215,6 @@ Status ImpalaServer::TExecuteStatementReqToTClientRequest(
   return Status::OK;
 }
 
-void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
-    map<string, string>* configuration) {
-  map<int, const char*>::const_iterator itr =
-      _TImpalaQueryOptions_VALUES_TO_NAMES.begin();
-  for (; itr != _TImpalaQueryOptions_VALUES_TO_NAMES.end(); ++itr) {
-    stringstream val;
-    switch (itr->first) {
-      case TImpalaQueryOptions::ABORT_ON_ERROR:
-        val << query_option.abort_on_error;
-        break;
-      case TImpalaQueryOptions::MAX_ERRORS:
-        val << query_option.max_errors;
-        break;
-      case TImpalaQueryOptions::DISABLE_CODEGEN:
-        val << query_option.disable_codegen;
-        break;
-      case TImpalaQueryOptions::BATCH_SIZE:
-        val << query_option.batch_size;
-        break;
-      case TImpalaQueryOptions::NUM_NODES:
-        val << query_option.num_nodes;
-        break;
-      case TImpalaQueryOptions::MAX_SCAN_RANGE_LENGTH:
-        val << query_option.max_scan_range_length;
-        break;
-      case TImpalaQueryOptions::MAX_IO_BUFFERS:
-        val << query_option.max_io_buffers;
-        break;
-      case TImpalaQueryOptions::NUM_SCANNER_THREADS:
-        val << query_option.num_scanner_threads;
-        break;
-      case TImpalaQueryOptions::ALLOW_UNSUPPORTED_FORMATS:
-        val << query_option.allow_unsupported_formats;
-        break;
-      case TImpalaQueryOptions::DEFAULT_ORDER_BY_LIMIT:
-        val << query_option.default_order_by_limit;
-        break;
-      default:
-        // We hit this DCHECK(false) if we forgot to add the corresponding entry here
-        // when we add a new query option.
-        LOG(ERROR) << "Missing exec option implementation: " << itr->second;
-        DCHECK(false);
-    }
-    (*configuration)[itr->second] = val.str();
-  }
-}
-
 // HiveServer2 API
 void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
     const TOpenSessionReq& request) {

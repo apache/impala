@@ -76,6 +76,7 @@ HdfsScanNode::~HdfsScanNode() {
 }
 
 Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos) {
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::GETNEXT));
   RETURN_IF_CANCELLED(state);
   SCOPED_TIMER(runtime_profile_->total_time_counter());
 
@@ -350,6 +351,8 @@ Tuple* HdfsScanNode::InitTemplateTuple(RuntimeState* state,
 // the initial ranges.  Scanners are expected to queue up a non-zero number of
 // those ranges to the io mgr (via the ScanNode).
 Status HdfsScanNode::Open(RuntimeState* state) {
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN));
+
   if (per_file_scan_ranges_.empty()) {
     done_ = true;
     return Status::OK;
@@ -451,6 +454,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 }
 
 Status HdfsScanNode::Close(RuntimeState* state) {
+  RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::CLOSE));
   done_ = true;
   if (reader_context_ != NULL) {
     runtime_state_->io_mgr()->CancelReader(reader_context_);

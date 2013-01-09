@@ -34,6 +34,21 @@ enum TPlanNodeType {
   MERGE_NODE
 }
 
+// phases of an execution node
+enum TExecNodePhase {
+  PREPARE,
+  OPEN,
+  GETNEXT,
+  CLOSE,
+  INVALID
+}
+
+// what to do when hitting a debug point (TImpalaQueryOptions.DEBUG_ACTION)
+enum TDebugAction {
+  WAIT,
+  FAIL
+}
+
 // The information contained in subclasses of ScanNode captured in two separate
 // Thrift structs:
 // - TScanRange: the data range that's covered by the scan (which varies with the

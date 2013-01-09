@@ -39,7 +39,8 @@ const i32 INVALID_PLAN_NODE_ID = -1
 // Constant default partition ID, must be < 0 to avoid collisions
 const i64 DEFAULT_PARTITION_ID = -1;
 
-// Query options that correspond to ImpalaService.ImpalaQueryOptions
+// Query options that correspond to ImpalaService.ImpalaQueryOptions,
+// with their respective defaults
 // TODO: make all of these optional, otherwise it will be impossible to
 // retire options and do rolling upgrades between releases
 struct TQueryOptions {
@@ -62,6 +63,7 @@ struct TQueryOptions {
   9: required i32 max_io_buffers = 0
   10: required bool allow_unsupported_formats = 0
   11: optional i64 default_order_by_limit = -1
+  12: optional string debug_action = ""
 }
 
 // A scan range plus the parameters needed to execute that scan.
@@ -101,6 +103,11 @@ struct TPlanFragmentExecParams {
   // TPlanFragment.output_sink.output_partition.
   // The number of output partitions is destinations.size().
   5: list<TPlanFragmentDestination> destinations
+
+  // Debug options: perform some action in a particular phase of a particular node
+  6: optional Types.TPlanNodeId debug_node_id
+  7: optional PlanNodes.TExecNodePhase debug_phase
+  8: optional PlanNodes.TDebugAction debug_action
 }
 
 // Global query parameters assigned by the coordinator.

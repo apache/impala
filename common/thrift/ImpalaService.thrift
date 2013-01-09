@@ -70,6 +70,17 @@ enum TImpalaQueryOptions {
   // with an ORDER BY but without a LIMIT clause (ie, if the SELECT statement also has
   // a LIMIT clause, this default is ignored)
   DEFAULT_ORDER_BY_LIMIT,
+
+  // DEBUG ONLY:
+  // If set to
+  //   "[<backend number>:]<node id>:<TExecNodePhase>:<TDebugAction>",
+  // the exec node with the given id will perform the specified action in the given
+  // phase. If the optional backend number (starting from 0) is specified, only that
+  // backend instance will perform the debug action, otherwise all backends will behave
+  // in that way.
+  // If the string doesn't have the required format or if any of its components is
+  // invalid, the option is ignored. 
+  DEBUG_ACTION,
 }
 
 // Default values for each query option in ImpalaService.TImpalaQueryOptions
@@ -83,6 +94,8 @@ const map<TImpalaQueryOptions, string> DEFAULT_QUERY_OPTIONS = {
   TImpalaQueryOptions.MAX_IO_BUFFERS : "0"
   TImpalaQueryOptions.NUM_SCANNER_THREADS : "0"
   TImpalaQueryOptions.ALLOW_UNSUPPORTED_FORMATS : "false"
+  TImpalaQueryOptions.DEFAULT_ORDER_BY_LIMIT : "-1"
+  TImpalaQueryOptions.DEBUG_ACTION : ""
 }
 
 // The summary of an insert.

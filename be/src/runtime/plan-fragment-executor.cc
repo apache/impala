@@ -98,6 +98,14 @@ Status PlanFragmentExecutor::Prepare(const TExecPlanFragmentParams& request) {
   RETURN_IF_ERROR(
       ExecNode::CreateTree(obj_pool(), request.fragment.plan, *desc_tbl, &plan_));
 
+  if (request.params.__isset.debug_node_id) {
+    DCHECK(request.params.__isset.debug_action);
+    DCHECK(request.params.__isset.debug_phase);
+    ExecNode::SetDebugOptions(
+        request.params.debug_node_id, request.params.debug_phase,
+        request.params.debug_action, plan_);
+  }
+
   // set #senders of exchange nodes before calling Prepare()
   vector<ExecNode*> exch_nodes;
   plan_->CollectNodes(TPlanNodeType::EXCHANGE_NODE, &exch_nodes);

@@ -36,7 +36,7 @@ class MergeNode : public ExecNode {
   MergeNode(ObjectPool* pool, const TPlanNode& tnode, const DescriptorTbl& descs);
 
   virtual Status Prepare(RuntimeState* state);
-  virtual Status Open(RuntimeState* state) { return Status::OK; }
+  virtual Status Open(RuntimeState* state);
   virtual Status GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos);
   virtual Status Close(RuntimeState* state);
 

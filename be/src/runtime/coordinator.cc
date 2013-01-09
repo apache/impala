@@ -28,6 +28,8 @@
 #include <boost/bind.hpp>
 #include <boost/foreach.hpp>
 #include <boost/unordered_set.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string.hpp>
 
 #include "common/logging.h"
 #include "exec/data-sink.h"
@@ -63,6 +65,19 @@ DECLARE_string(ipaddress);
 DECLARE_string(hostname);
 
 namespace impala {
+
+// container for debug options in TPlanFragmentExecParams (debug_node, debug_action,
+// debug_phase)
+struct DebugOptions {
+  int backend_num;
+  int node_id;
+  TDebugAction::type action;
+  TExecNodePhase::type phase;  // INVALID: debug options invalid
+
+  DebugOptions()
+    : backend_num(-1), node_id(-1), action(TDebugAction::WAIT),
+      phase(TExecNodePhase::INVALID) {}
+};
 
 // Execution state of a particular fragment.
 // Concurrent accesses:
@@ -104,7 +119,8 @@ class Coordinator::BackendExecState {
 
   BackendExecState(Coordinator* coord, const THostPort& coord_hostport,
       int backend_num, const TPlanFragment& fragment, int fragment_idx,
-      const FragmentExecParams& params, int instance_idx, ObjectPool* obj_pool)
+      const FragmentExecParams& params, int instance_idx, 
+      DebugOptions* debug_options, ObjectPool* obj_pool)
     : fragment_instance_id(params.instance_ids[instance_idx]),
       hostport(params.hosts[instance_idx]),
       total_split_size(0),
@@ -117,6 +133,11 @@ class Coordinator::BackendExecState {
         new RuntimeProfile(obj_pool, "Instance " + PrintId(fragment_instance_id)));
     coord->SetExecPlanFragmentParams(backend_num, fragment, fragment_idx, params,
         instance_idx, coord_hostport, &rpc_params);
+    if (debug_options != NULL) {
+      rpc_params.params.__set_debug_node_id(debug_options->node_id);
+      rpc_params.params.__set_debug_action(debug_options->action);
+      rpc_params.params.__set_debug_phase(debug_options->phase);
+    }
     ComputeTotalSplitSize();
   }
 
@@ -203,6 +224,52 @@ Coordinator::Coordinator(ExecEnv* exec_env)
 }
 
 Coordinator::~Coordinator() {
+}
+
+TExecNodePhase::type GetExecNodePhase(const string& key) {
+  map<int, const char*>::const_iterator entry =
+      _TExecNodePhase_VALUES_TO_NAMES.begin();
+  for (; entry != _TExecNodePhase_VALUES_TO_NAMES.end(); ++entry) {
+    if (iequals(key, (*entry).second)) {
+      return static_cast<TExecNodePhase::type>(entry->first);
+    }
+  }
+  return TExecNodePhase::INVALID;
+}
+
+// TODO: templatize this
+TDebugAction::type GetDebugAction(const string& key) {
+  map<int, const char*>::const_iterator entry =
+      _TDebugAction_VALUES_TO_NAMES.begin();
+  for (; entry != _TDebugAction_VALUES_TO_NAMES.end(); ++entry) {
+    if (iequals(key, (*entry).second)) {
+      return static_cast<TDebugAction::type>(entry->first);
+    }
+  }
+  return TDebugAction::WAIT;
+}
+
+static void ProcessQueryOptions(
+    const TQueryOptions& query_options, DebugOptions* debug_options) {
+  DCHECK(debug_options != NULL);
+  if (!query_options.__isset.debug_action || query_options.debug_action.empty()) {
+    debug_options->phase = TExecNodePhase::INVALID;  // signal not set
+    return;
+  }
+  vector<string> components;
+  split(components, query_options.debug_action, is_any_of(":"), token_compress_on);
+  if (components.size() < 3 || components.size() > 4) return;
+  if (components.size() == 3) {
+    debug_options->backend_num = -1;
+    debug_options->node_id = atoi(components[0].c_str());
+    debug_options->phase = GetExecNodePhase(components[1]);
+    debug_options->action = GetDebugAction(components[2]);
+  } else {
+    debug_options->backend_num = atoi(components[0].c_str());
+    debug_options->node_id = atoi(components[1].c_str());
+    debug_options->phase = GetExecNodePhase(components[2]);
+    debug_options->action = GetDebugAction(components[3]);
+  }
 }
 
 Status Coordinator::Exec(
@@ -300,6 +367,9 @@ Status Coordinator::Exec(
     query_profile_->AddChild(fragment_profiles_[i].root_profile);
   }
 
+  DebugOptions debug_options;
+  ProcessQueryOptions(query_options, &debug_options);
+
   // start fragment instances from left to right, so that receivers have
   // Prepare()'d before senders start sending
   backend_exec_states_.resize(num_backends_);
@@ -315,11 +385,17 @@ Status Coordinator::Exec(
     int num_hosts = params.hosts.size();
     DCHECK_GT(num_hosts, 0);
     for (int instance_idx = 0; instance_idx < num_hosts; ++instance_idx) {
+      DebugOptions* backend_debug_options =
+          (debug_options.phase != TExecNodePhase::INVALID 
+            && (debug_options.backend_num == -1
+                || debug_options.backend_num == backend_num)
+            ? &debug_options
+            : NULL);
       // TODO: pool of pre-formatted BackendExecStates?
       BackendExecState* exec_state =
           obj_pool()->Add(new BackendExecState(this, coord, backend_num,
               request->fragments[fragment_idx], fragment_idx,
-              params, instance_idx, obj_pool()));
+              params, instance_idx, backend_debug_options, obj_pool()));
       backend_exec_states_[backend_num] = exec_state;
       ++backend_num;
       VLOG(2) << "Exec(): starting instance: fragment_idx=" << fragment_idx
