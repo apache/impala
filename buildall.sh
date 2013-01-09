@@ -175,7 +175,7 @@ then
     mkdir -p ${LOG_DIR}
     ${IMPALA_HOME}/bin/start-impala-cluster.py --in-process --log_dir=${LOG_DIR}\
         --wait_for_cluster --cluster_size=3
-    ${IMPALA_HOME}/tests/run-tests.sh --exploration_strategy=$EXPLORATION_STRATEGY
+    ${IMPALA_HOME}/tests/run-tests.py --exploration_strategy=$EXPLORATION_STRATEGY -x
     ${IMPALA_HOME}/bin/start-impala-cluster.py --kill_only
 
     # Run JUnit frontend tests

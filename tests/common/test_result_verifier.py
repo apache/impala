@@ -180,8 +180,11 @@ def verify_raw_results(test_section, exec_result):
     # rows per partition. This should be updated to validated on a per-partition
     # basis.
     expected_results = str(sum([int(p_count) for p_count in partition_results]))
-  else:
+  elif 'RESULTS' in test_section:
     expected_results = remove_comments(test_section['RESULTS'])
+  else:
+    LOG.info("No results found. Skipping verification");
+    return
 
   if 'TYPES' in test_section:
     verify_column_types(test_section['TYPES'], exec_result.schema)

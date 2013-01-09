@@ -1,0 +1,4 @@
+file_format: text,seq
+dataset: tpch
+compression_codec: none,def,gzip,bzip,snap
+compression_type: none,block,record
