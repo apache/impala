@@ -655,9 +655,12 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   // Initialize default config
   InitializeConfigVariables();
 
+#ifndef ADDRESS_SANITIZER
+  // tcmalloc and address sanitizer can not be used together
   if (!FLAGS_heap_profile_dir.empty()) {
     HeapProfilerStart(FLAGS_heap_profile_dir.c_str());
   }
+#endif
 
   if (!FLAGS_use_planservice) {
     JNIEnv* jni_env = getJNIEnv();
@@ -1918,6 +1921,8 @@ void ImpalaServer::RunExecPlanFragment(FragmentExecState* exec_state) {
                  << exec_state->fragment_instance_id();
     }
   }
+#ifndef ADDRESS_SANITIZER
+  // tcmalloc and address sanitizer can not be used together
   if (FLAGS_log_mem_usage_interval > 0) {
     uint64_t num_complete = ImpaladMetrics::IMPALA_SERVER_NUM_FRAGMENTS->value();
     if (num_complete % FLAGS_log_mem_usage_interval == 0) {
@@ -1927,6 +1932,7 @@ void ImpalaServer::RunExecPlanFragment(FragmentExecState* exec_state) {
       LOG(INFO) << buf;
     }
   }
+#endif
 }
 
 int ImpalaServer::GetQueryOption(const string& key) {

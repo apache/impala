@@ -34,7 +34,7 @@ TEST(StringValueTest, TestCompare) {
   string str2_str = "abcdef";
   string str3_str = "xyz";
 
-  int NUM_STRINGS = 4;
+  const int NUM_STRINGS = 4;
 
   // Must be in lexical order
   StringValue svs[NUM_STRINGS];

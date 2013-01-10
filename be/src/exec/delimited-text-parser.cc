@@ -212,21 +212,19 @@ int DelimitedTextParser::FindFirstInstance(const char* buffer, int len) {
     return 0;
   }
 restart:
+  found = false;
+
   if (CpuInfo::IsSupported(CpuInfo::SSE4_2)) {
     __m128i xmm_buffer, xmm_tuple_mask;
-    while (tuple_start < len) {
+    while (len - tuple_start >= SSEUtil::CHARS_PER_128_BIT_REGISTER) {
       // TODO: can we parallelize this as well?  Are there multiple sse execution units?
       // Load the next 16 bytes into the xmm register and do strchr for the
       // tuple delimiter.
-      int chr_count = len - tuple_start;
-      if (chr_count > SSEUtil::CHARS_PER_128_BIT_REGISTER) {
-        chr_count = SSEUtil::CHARS_PER_128_BIT_REGISTER;
-      }
       xmm_buffer = _mm_loadu_si128(reinterpret_cast<const __m128i*>(buffer));
       // This differs from ParseSse by using the slower cmpestrm instruction which
       // takes a chr_count and can search less than 16 bytes at a time.
-      xmm_tuple_mask =
-          _mm_cmpestrm(xmm_tuple_search_, 1, xmm_buffer, chr_count, SSEUtil::STRCHR_MODE);
+      xmm_tuple_mask = _mm_cmpestrm(xmm_tuple_search_, 1, xmm_buffer, 
+          SSEUtil::CHARS_PER_128_BIT_REGISTER, SSEUtil::STRCHR_MODE);
       int tuple_mask = _mm_extract_epi16(xmm_tuple_mask, 0);
       if (tuple_mask != 0) {
         found = true;
@@ -239,14 +237,15 @@ restart:
         }
         break;
       }
-      tuple_start += chr_count;
-      buffer += chr_count;
+      tuple_start += SSEUtil::CHARS_PER_128_BIT_REGISTER;
+      buffer += SSEUtil::CHARS_PER_128_BIT_REGISTER;
     }
-  } else {
-    for (int i = tuple_start; i < len; ++i) {
+  } 
+  if (!found) {
+    for (; tuple_start < len; ++tuple_start) {
       char c = *buffer++;
       if (c == tuple_delim_ || (c == '\r' && tuple_delim_ == '\n')) {
-        tuple_start = i + 1;
+        ++tuple_start;
         found = true;
         break;
       }
