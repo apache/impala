@@ -113,6 +113,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaInternalServiceIf,
   virtual void ResetCatalog(impala::TStatus& status);
   virtual void CloseInsert(impala::TInsertResult& insert_result,
       const beeswax::QueryHandle& query_handle);
+  virtual void PingImpalaService();
 
   // ImpalaInternalService rpcs
   virtual void ExecPlanFragment(

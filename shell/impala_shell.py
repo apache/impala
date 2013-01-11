@@ -230,15 +230,23 @@ class ImpalaShell(cmd.Cmd):
       self.transport.close()
       self.transport = None
 
+    self.connected = False
     try:
       self.transport = self.__get_transport()
       self.transport.open()
       protocol = TBinaryProtocol.TBinaryProtocol(self.transport)
       self.imp_service = ImpalaService.Client(protocol)
-      self.connected = True
+      try:
+        self.imp_service.PingImpalaService()
+        self.connected = True
+      except Exception, e:
+        print ("Error: Unable to communicate with impalad service. This service may not "
+               "be an impalad instance. Check host:port and try again.")
+        self.transport.close()
+        raise
     except Exception, e:
       print "Error connecting: %s, %s" % (type(e),e)
-      self.connected = False
+
     return self.connected
 
   def __get_transport(self):

@@ -98,4 +98,7 @@ service ImpalaService extends beeswax.BeeswaxService {
   // Closes the query handle and return the result summary of the insert.
   TInsertResult CloseInsert(1:beeswax.QueryHandle handle)
       throws(1:beeswax.QueryNotFoundException error, 2:beeswax.BeeswaxException error2);
+      
+  // Client calls this RPC to verify that the server is an ImpalaService.
+  void PingImpalaService();
 }

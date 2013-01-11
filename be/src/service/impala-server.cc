@@ -2101,6 +2101,9 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
   }
 }
 
+void ImpalaServer::PingImpalaService() {
+}
+
 ImpalaServer* CreateImpalaServer(ExecEnv* exec_env, int fe_port, int be_port,
     ThriftServer** fe_server, ThriftServer** be_server) {
   DCHECK((fe_port == 0) == (fe_server == NULL));
