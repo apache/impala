@@ -214,6 +214,12 @@ Status PlanFragmentExecutor::Open() {
   }
 
   Status status = OpenInternal();
+  if (!status.ok() && runtime_state_->LogHasSpace()) {
+    // Log error message in addition to returning in Status. Queries that do not
+    // fetch results (e.g. insert) may not receive the message directly and can
+    // only retrieve the log.
+    runtime_state_->LogError(status.GetErrorMsg());
+  }
   UpdateStatus(status);
   return status;
 }

@@ -1201,7 +1201,6 @@ void ImpalaServer::Wait(boost::shared_ptr<QueryExecState> exec_state) {
   if (status.ok()) {
     exec_state->UpdateQueryState(QueryState::FINISHED);
   } else {
-    UnregisterQuery(exec_state->query_id());
     exec_state->SetErrorStatus(status);
   }
 }
