@@ -21,15 +21,13 @@ enable_testing()
 # where to find cmake modules
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake_modules")
 
+# find libraries that will be statically linked if they were compiled with -fPIC
+find_package(PICLibs REQUIRED)
+
 # find boost headers and libs
 set(Boost_DEBUG TRUE)
-# in order to load libbackend.so into the jvm, we need to link against a shared
-# libboost_thread-mt.so
-#set(Boost_USE_STATIC_LIBS ON)
-set(Boost_USE_STATIC_LIBS OFF)
 set(Boost_USE_MULTITHREADED ON)
-set(Boost_USE_STATIC_RUNTIME OFF)
-find_package(Boost REQUIRED COMPONENTS thread regex-mt)
+find_package(Boost REQUIRED COMPONENTS thread regex-mt system-mt filesystem-mt)
 include_directories(${Boost_INCLUDE_DIRS})
 set(LIBS ${LIBS} ${Boost_LIBRARIES})
 message(STATUS ${Boost_INCLUDE_DIRS})

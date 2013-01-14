@@ -208,13 +208,15 @@ set (IMPALA_LINK_LIBS
   thriftnbstatic
   ${SASL_LIBRARY}
   ThriftSaslTransport
-  event # event required for thriftnbstatic
   ${JAVA_JVM_LIBRARY}
   ${HDFS_LIBS}
   glogstatic
   gflagsstatic
   pprofstatic
-  -lz -lbz2 -lboost_date_time
+  ${LIBEVENT}
+  ${LIBZ}
+  ${LIBBZ2}
+  -lrt -lboost_date_time
 )
 
 
