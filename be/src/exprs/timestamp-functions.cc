@@ -83,10 +83,15 @@ void* TimestampFunctions::Unix(Expr* e, TupleRow* row) {
     // Trim the value of blank space to be more user friendly.
     StringValue tvalue = value->Trim();
 
-    // Check to see that the string roughly matches the format.  TimestampValue
-    // will kick out bad internal format but will accept things that don't 
-    // match what we have here.
-    if (format->len != tvalue.len) {
+    // Emulate hive by truncating the value to be the same length as the format
+    // (i.e. allow extra text beyond expected format).
+    if (tvalue.len > format->len) {
+      tvalue = tvalue.Substring(0, format->len);
+    }
+
+    // TimestampValue will accept just a date when format specifies date and
+    // time, so check that the value is at least as long as the format.
+    if (tvalue.len < format->len) {
       string fmt(format->ptr, format->len);
       string str(tvalue.ptr, tvalue.len);
       LOG(WARNING) << "Timestamp: " << str << " does not match format: " << fmt;
