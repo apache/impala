@@ -2,12 +2,12 @@
 ---- QUERY : TPCDS-Q96
 SELECT
   COUNT(*) AS total
-FROM tpcds.store_sales$TABLE ss
-JOIN tpcds.time_dim$TABLE td
+FROM store_sales ss
+JOIN time_dim td
   ON (ss.ss_sold_time_sk = td.t_time_sk)
-JOIN tpcds.household_demographics$TABLE hd
+JOIN household_demographics hd
   ON (ss.ss_hdemo_sk = hd.hd_demo_sk)
-JOIN tpcds.store$TABLE s
+JOIN store s
   ON (ss.ss_store_sk = s.s_store_sk)
 WHERE
   td.t_hour = 8

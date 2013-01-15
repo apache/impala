@@ -3,7 +3,7 @@
 # Q20 - Potential Part Promotion Query
 insert overwrite table tpch.q20_tmp1
 select distinct p_partkey
-from tpch.part$TABLE
+from part
 where p_name like 'forest%'
 ---- SETUP
 RESET tpch.q20_tmp1
@@ -18,7 +18,7 @@ select
   l_partkey,
   l_suppkey,
   0.5 * sum(l_quantity)
-from tpch.lineitem$TABLE
+from lineitem
 where
   l_shipdate >= '1994-01-01' and
   l_shipdate < '1995-01-01'
@@ -38,7 +38,7 @@ select
   ps_suppkey,
   ps_availqty,
   sum_quantity
-from tpch.partsupp$TABLE ps
+from partsupp ps
   join tpch.q20_tmp2 t2
     on (ps.ps_partkey = t2.l_partkey and ps.ps_suppkey = t2.l_suppkey)
   join tpch.q20_tmp1 t1
@@ -69,8 +69,8 @@ RELOAD tpch.q20_tmp4
 select
   s_name,
   s_address
-from tpch.supplier$TABLE s
-  join tpch.nation$TABLE n
+from supplier s
+  join nation n
     on (s.s_nationkey = n.n_nationkey and
         n.n_name = 'CANADA')
 join tpch.q20_tmp4 t4

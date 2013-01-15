@@ -58,7 +58,7 @@ bigint, string, int, int, bigint, string, int
 # (alltypesagg.tinyint_col contains nulls instead of 0s)
 # Should be same result as the test below
 select a.tinyint_col, b.id, a.string_col, a.tinyint_col + b.tinyint_col
-from alltypesagg$TABLE a join hbasealltypessmall b
+from alltypesagg a join functional.hbasealltypessmall b
      on (a.tinyint_col = b.id and a.tinyint_col + b.tinyint_col < 5)
 where a.month=1
 and a.day=1
@@ -86,7 +86,7 @@ tinyint, int, string, bigint
 # (alltypesagg.tinyint_col contains nulls instead of 0s)
 # Should be same result as the test below
 select a.tinyint_col, b.id, a.string_col
-from alltypesagg$TABLE a join hbasealltypessmall b on (a.tinyint_col = b.id)
+from alltypesagg a join functional.hbasealltypessmall b on (a.tinyint_col = b.id)
 where a.month=1
 and a.day=1
 and a.tinyint_col + b.tinyint_col < 5
@@ -114,7 +114,7 @@ tinyint, int, string
 # join between two tables, extra join predicate, extra scan predicates, nulls in joins cols
 # (alltypesagg.tinyint_col contains nulls instead of 0s)
 select a.tinyint_col, b.id, a.string_col
-from alltypesagg$TABLE a join alltypessmall$TABLE b on (a.tinyint_col = b.id)
+from alltypesagg a join alltypessmall b on (a.tinyint_col = b.id)
 where a.month=1
 and a.day=1
 and a.tinyint_col + b.tinyint_col < 5
@@ -140,7 +140,7 @@ tinyint, int, string
 ---- QUERY
 # reversing the order of the tables produces the same result
 select a.tinyint_col, b.id, a.string_col
-from alltypessmall$TABLE b join alltypesagg$TABLE a on (a.tinyint_col = b.id)
+from alltypessmall b join alltypesagg a on (a.tinyint_col = b.id)
 where a.month=1
 and a.day=1
 and a.tinyint_col + b.tinyint_col < 5
@@ -167,9 +167,9 @@ tinyint, int, string
 # join between three tables, extra join predicates, extra scan predicates, nulls in joins cols
 # (alltypesagg.tinyint_col contains nulls instead of 0s)
 select a.smallint_col, b.id, a.tinyint_col, c.id, a.int_col, b.float_col, c.string_col
-from alltypesagg$TABLE a
-join alltypessmall$TABLE b on (a.smallint_col = b.id)
-join alltypessmall$TABLE c on (a.tinyint_col = c.id)
+from alltypesagg a
+join alltypessmall b on (a.smallint_col = b.id)
+join alltypessmall c on (a.tinyint_col = c.id)
 where a.month=1
 and a.day=1
 and a.int_col > 899
@@ -204,9 +204,9 @@ smallint, int, tinyint, int, int, float, string
 ---- QUERY
 # reversing the order produces the same results
 select a.smallint_col, b.id, a.tinyint_col, c.id, a.int_col, b.float_col, c.string_col
-from alltypessmall$TABLE b
-join alltypesagg$TABLE a on (a.smallint_col = b.id)
-join alltypessmall$TABLE c on (a.tinyint_col = c.id)
+from alltypessmall b
+join alltypesagg a on (a.smallint_col = b.id)
+join alltypessmall c on (a.tinyint_col = c.id)
 where a.month=1
 and a.day=1
 and a.int_col > 899

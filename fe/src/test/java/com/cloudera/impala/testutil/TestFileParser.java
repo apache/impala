@@ -116,25 +116,25 @@ public class TestFileParser {
      *          The Section to get
      * @param withComments
      *          If set, all comment lines are included.
-     * @param tableSuffix
-     *          If set, table names that contain the string $TABLE will be replaced with
-     *          the specified table suffix
+     * @param dbSuffix
+     *          If set, table names that contain the string $DATABASE will be replaced
+     *          with the specified table suffix
      * @return Collection of strings mapping to lines in the test file
      */
     public ArrayList<String> getSectionContents(Section section, boolean withComments,
-                                                String tableSuffix) {
+                                                String dbSuffix) {
       ArrayList<String> ret = expectedResultSections.get(section);
       if (ret == null) {
         return Lists.newArrayList();
-      } else if (withComments && tableSuffix == null) {
+      } else if (withComments && dbSuffix == null) {
         return ret;
       }
 
       ArrayList<String> retList = Lists.newArrayList();
       for (String s : ret) {
         if (!(s.startsWith("#") || s.startsWith("//"))) {
-          if (tableSuffix != null) {
-            retList.add(s.replaceAll("\\$TABLE", tableSuffix));
+          if (dbSuffix != null) {
+            retList.add(s.replaceAll("\\$DATABASE", dbSuffix));
           } else {
             retList.add(s);
           }
@@ -156,8 +156,8 @@ public class TestFileParser {
      * used to separate each line.
      */
     public String getSectionAsString(Section section, boolean withComments,
-                                     String delimiter, String tableSuffix) {
-      List<String> sectionList = getSectionContents(section, withComments, tableSuffix);
+                                     String delimiter, String dbSuffix) {
+      List<String> sectionList = getSectionContents(section, withComments, dbSuffix);
       if (sectionList == null) {
         return null;
       }
@@ -173,18 +173,18 @@ public class TestFileParser {
     }
 
 
-    public QueryExecTestResult getQueryExecTestResult(String tableSuffix) {
+    public QueryExecTestResult getQueryExecTestResult(String dbSuffix) {
       QueryExecTestResult result = new QueryExecTestResult();
       result.getColTypes().addAll(getSectionContents(Section.TYPES));
       result.getColLabels().addAll(getSectionContents(Section.COLLABELS));
       result.getFileErrors().addAll(getSectionContents(Section.FILEERRORS, true,
-          tableSuffix));
-      result.getSetup().addAll(getSectionContents(Section.SETUP, true, tableSuffix));
+          dbSuffix));
+      result.getSetup().addAll(getSectionContents(Section.SETUP, true, dbSuffix));
       result.getQuery().addAll(getSectionContents(Section.QUERY, true));
       result.getResultSet().addAll(getSectionContents(Section.RESULTS));
       result.getModifiedPartitions().addAll(
-          getSectionContents(Section.PARTITIONS, false, tableSuffix));
-      result.getErrors().addAll(getSectionContents(Section.ERRORS, true, tableSuffix));
+          getSectionContents(Section.PARTITIONS, false, dbSuffix));
+      result.getErrors().addAll(getSectionContents(Section.ERRORS, true, dbSuffix));
       return result;
     }
   }

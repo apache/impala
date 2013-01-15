@@ -13,7 +13,7 @@ select
   round(avg(l_extendedprice), 1),
   round(avg(l_discount), 1), count(1)
 from
-  tpch.lineitem$TABLE
+  lineitem
 where
   l_shipdate<='1998-09-02'
 group by

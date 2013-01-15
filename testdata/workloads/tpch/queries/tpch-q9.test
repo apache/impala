@@ -8,16 +8,16 @@ select
   year(o.o_orderdate) as o_year,
   round(sum(l.l_extendedprice * (1 - l.l_discount) -
             ps.ps_supplycost * l.l_quantity), 1) as sum_profit
-from tpch.lineitem$TABLE l
-  join tpch.part$TABLE p
+from lineitem l
+  join part p
     on (p.p_partkey = l.l_partkey)
-  join tpch.orders$TABLE o
+  join orders o
     on (o.o_orderkey = l.l_orderkey)
-  join tpch.partsupp$TABLE ps
+  join partsupp ps
     on (ps.ps_suppkey = l.l_suppkey and ps.ps_partkey = l.l_partkey)
-  join tpch.supplier$TABLE s
+  join supplier s
     on (s.s_suppkey = l.l_suppkey)
-  join tpch.nation$TABLE n
+  join nation n
     on (s.s_nationkey = n.n_nationkey)
 where
   p.p_name like '%green%'

@@ -13,12 +13,12 @@ select
   c_address,
   c_phone,
   c_comment
-from tpch.lineitem$TABLE l
-  join tpch.orders$TABLE o
+from lineitem l
+  join orders o
     on (l.l_orderkey = o.o_orderkey)
-  join tpch.customer$TABLE c
+  join customer c
     on (c.c_custkey = o.o_custkey)
-  join tpch.nation$TABLE n
+  join nation n
     on (c.c_nationkey = n.n_nationkey)
 where
   o.o_orderdate >= '1993-10-01' and

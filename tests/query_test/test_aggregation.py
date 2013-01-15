@@ -6,6 +6,7 @@ import logging
 import pytest
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import ImpalaTestSuite
+from tests.util.test_file_parser import QueryTestSectionReader
 
 agg_functions = ['sum', 'count', 'min', 'max', 'avg']
 
@@ -36,10 +37,6 @@ class TestAggregation(ImpalaTestSuite):
     # Add two more dimensions
     cls.TestMatrix.add_dimension(TestDimension('agg_func', *agg_functions))
     cls.TestMatrix.add_dimension(TestDimension('data_type', *data_types))
-
-    # Only execute against text format, restrict bool types to min/max
-    cls.TestMatrix.add_constraint(\
-        lambda v: v.get_value('table_format').file_format == 'text')
     cls.TestMatrix.add_constraint(lambda v: v.get_value('exec_option')['batch_size'] == 0)
     cls.TestMatrix.add_constraint(lambda v: v.get_value('agg_func') in ['min', 'max'] if\
                                             v.get_value('data_type') == 'bool' else True)
@@ -47,7 +44,8 @@ class TestAggregation(ImpalaTestSuite):
   def test_aggregation(self, vector):
     data_type, agg_func = (vector.get_value('data_type'), vector.get_value('agg_func'))
     query = 'select %s(%s_col) from alltypesagg' % (agg_func, data_type)
-    result = self.execute_scalar(query, vector.get_value('exec_option'))
+    result = self.execute_scalar(query, vector.get_value('exec_option'),
+                                 table_format=vector.get_value('table_format'))
     if 'int' in data_type:
       assert result_lut['%s-%s' % (agg_func, data_type)] == int(result)
 

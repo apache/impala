@@ -1,27 +1,27 @@
 ====
 ---- QUERY
 # Test that we properly write null values to text tables.
-insert overwrite table nullinsert$TABLE
+insert overwrite table nullinsert
 select NULL, "", "NULL", "\\N", NULL from alltypes limit 1
 ---- SETUP
-RESET nullinsert$TABLE
+RESET nullinsert
 ---- RESULTS
 ---- PARTITIONS
 /: 1
 ====
 ---- QUERY
-select * from nullinsert$TABLE
+select * from nullinsert
 ---- SETUP
-RELOAD nullinsert$TABLE
+RELOAD nullinsert
 ---- TYPES
 string, string, string, string, int
 ---- RESULTS
 'NULL','','NULL','\N',NULL
 ====
 ---- QUERY
-select * from alt_nullinsert$TABLE
+select * from alt_nullinsert
 ---- SETUP
-RELOAD alt_nullinsert$TABLE
+RELOAD alt_nullinsert
 ---- TYPES
 string
 ---- RESULTS

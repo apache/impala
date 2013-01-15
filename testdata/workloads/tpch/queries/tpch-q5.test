@@ -6,16 +6,16 @@
 select
   n_name,
   round(sum(l_extendedprice * (1 - l_discount)), 5) as revenue
-from tpch.lineitem$TABLE l
-join tpch.orders$TABLE o
+from lineitem l
+join orders o
   on (l_orderkey = o_orderkey)
-join tpch.supplier$TABLE s
+join supplier s
   on (l_suppkey = s_suppkey)
-join tpch.customer$TABLE
+join customer
   on (c_nationkey = s_nationkey and c_custkey = o_custkey)
-join tpch.nation$TABLE
+join nation
   on (s_nationkey = n_nationkey)
-join tpch.region$TABLE
+join region
   on (n_regionkey = r_regionkey)
 where
   r_name = 'ASIA'

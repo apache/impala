@@ -8,8 +8,8 @@ from
   ( select
       c_custkey,
       count(o_orderkey) as c_count
-    from tpch.orders$TABLE o
-    right outer join tpch.customer$TABLE c
+    from orders o
+    right outer join customer c
       on (c.c_custkey = o.o_custkey and o.o_comment not like '%special%requests%')
     group by
       c_custkey

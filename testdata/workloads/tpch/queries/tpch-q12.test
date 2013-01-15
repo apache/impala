@@ -17,8 +17,8 @@ sum(case
       else 0
     end
 ) as low_line_count
-from tpch.lineitem$TABLE l
-  join tpch.orders$TABLE o
+from lineitem l
+  join orders o
     on (o.o_orderkey = l.l_orderkey and
         l.l_commitdate < l.l_receiptdate and
         l.l_shipdate < l.l_commitdate)

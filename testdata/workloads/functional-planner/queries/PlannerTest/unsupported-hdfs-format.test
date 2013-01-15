@@ -1,5 +1,0 @@
-// Trevni is not supported
-select * from alltypes_trevni
----- PLAN
-not implemented
-====

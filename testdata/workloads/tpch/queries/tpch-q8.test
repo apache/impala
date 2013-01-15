@@ -7,20 +7,20 @@ select
   year(o_orderdate) as o_year,
   round(sum(case when n2.n_name = 'BRAZIL' then l_extendedprice * (1 - l_discount)
                  else 0 end) / sum(l_extendedprice * (1 - l_discount)), 5) as mkt_share
-from tpch.lineitem$TABLE l
-  join tpch.orders$TABLE o
+from lineitem l
+  join orders o
     on (l_orderkey = o_orderkey)
-  join tpch.part$TABLE p
+  join part p
     on (p_partkey = l_partkey)
-  join tpch.supplier$TABLE s
+  join supplier s
     on (s_suppkey = l_suppkey)
-  join tpch.customer$TABLE c
+  join customer c
     on (o_custkey = c_custkey)
-  join tpch.nation$TABLE n1
+  join nation n1
     on (c_nationkey = n1.n_nationkey)
-  join tpch.region$TABLE r
+  join region r
     on (n1.n_regionkey = r_regionkey)
-  join tpch.nation$TABLE n2
+  join nation n2
     on (s_nationkey = n2.n_nationkey)
 where
   r_name = 'AMERICA' and

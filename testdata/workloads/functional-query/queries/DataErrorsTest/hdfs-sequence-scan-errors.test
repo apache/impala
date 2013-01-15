@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-select count(*) from bad_seq_snap
+select count(*) from functional_seq_snap.bad_seq_snap
 ---- ERRORS
 Bad sync hash at file offset 899498.
 Expected: '6e 91 6 ec be 78 a0 ac 72 10 7e 41 b4 da 93 3c '

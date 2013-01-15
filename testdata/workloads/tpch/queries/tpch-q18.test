@@ -3,11 +3,11 @@
 # Q18 - Large Value Customer Query
 insert overwrite table tpch.q18_tmp
 select l_orderkey, sum(l_quantity) as t_sum_quantity
-from tpch.lineitem$TABLE
+from lineitem
 group by l_orderkey
 ---- SETUP
-RESET tpch.q18_tmp
-RELOAD tpch.q18_tmp
+RESET q18_tmp
+RELOAD q18_tmp
 ---- RESULTS
 ---- PARTITIONS
 /: 1500000
@@ -22,10 +22,10 @@ select
   o_orderdate,
   cast(o_totalprice as bigint) as total_price_bigint,
   round(sum(l_quantity), 5)
-from tpch.lineitem$TABLE l
-  join tpch.orders$TABLE o
+from lineitem l
+  join orders o
     on (o.o_orderkey = l.l_orderkey)
-  join tpch.customer$TABLE c
+  join customer c
     on (c.c_custkey = o.o_custkey)
   join tpch.q18_tmp t
     on (o.o_orderkey = t.l_orderkey and t.t_sum_quantity > 300)

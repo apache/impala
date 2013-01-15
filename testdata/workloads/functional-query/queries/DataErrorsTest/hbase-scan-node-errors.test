@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-select * from hbasealltypeserror
+select * from functional.hbasealltypeserror
 ---- ERRORS
 Error converting column strings:timestamp_col: '0' TO TIMESTAMP
 hbase table: hbasealltypeserror
@@ -112,7 +112,7 @@ int, boolean, double, float, bigint, int, smallint, tinyint, string, string, tim
 9,NULL,NULL,NULL,NULL,NULL,NULL,NULL,'01/01/09','9',NULL
 ====
 ---- QUERY
-select * from hbasealltypeserrornonulls
+select * from functional.hbasealltypeserrornonulls
 ---- ERRORS
 Error converting column strings:timestamp_col: '123456' TO TIMESTAMP
 hbase table: hbasealltypeserrornonulls

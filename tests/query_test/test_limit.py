@@ -11,8 +11,8 @@ from tests.common.test_vector import *
 from tests.util.test_file_parser import QueryTestSectionReader
 
 class TestLimit(ImpalaTestSuite):
-  LIMIT_VALUES = [0, 1, 2, 3, 4, 5, 10, 100, 5000] 
-  QUERIES = ["select * from tpch.lineitem$TABLE limit %d"]
+  LIMIT_VALUES = [1, 2, 3, 4, 5, 10, 100, 5000]
+  QUERIES = ["select * from lineitem limit %d"]
 
   # TODO: we should be able to run count(*) in setup rather than hardcoding the values
   # but I have no idea how to do this with this framework.
@@ -30,7 +30,7 @@ class TestLimit(ImpalaTestSuite):
     cls.TestMatrix.add_dimension(
         TestDimension('limit_value', *TestLimit.LIMIT_VALUES))
     cls.TestMatrix.add_dimension(TestDimension('query', *TestLimit.QUERIES))
-    
+
     # Don't run with large limits and tiny batch sizes.  This generates excessive
     # network traffic and makes the machine run very slowly.
     cls.TestMatrix.add_constraint(lambda v:\
@@ -42,9 +42,8 @@ class TestLimit(ImpalaTestSuite):
     limit = vector.get_value('limit_value')
     expected_num_rows = min(limit, TestLimit.TOTAL_ROWS)
     query_string = vector.get_value('query') % limit
-    query_string = QueryTestSectionReader.replace_table_suffix(
-        query_string, vector.get_value('table_format'))
-    result = self.execute_query(query_string, vector.get_value('exec_option'))
+    result = self.execute_query(query_string, vector.get_value('exec_option'),
+                                table_format=vector.get_value('table_format'))
     assert(len(result.data) == expected_num_rows)
 
 
@@ -79,15 +78,15 @@ class TestDefaultOrderByLimitValue(ImpalaTestSuite):
     no_limit_should_succeed = limit_value not in [None, -1]
 
     # Validate the default order by limit option kicks on when no limit is specified.
-    query_no_limit = "select * from alltypes order by int_col"
+    query_no_limit = "select * from functional.alltypes order by int_col"
     self.exec_query_validate(query_no_limit, exec_options,
         no_limit_should_succeed, limit_value)
 
     # Validate that user specified limits override the default limit value.
-    query_with_limit = "select * from alltypes order by int_col limit 20"
+    query_with_limit = "select * from functional.alltypes order by int_col limit 20"
     self.exec_query_validate(query_with_limit, exec_options, True, 20)
 
-    query_no_orderby = "select * from alltypes limit 25"
+    query_no_orderby = "select * from functional.alltypes limit 25"
     self.exec_query_validate(query_no_orderby, exec_options, True, 25)
 
   def exec_query_validate(self, query, exec_options, should_succeed, expected_rows):

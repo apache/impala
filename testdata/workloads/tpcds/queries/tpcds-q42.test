@@ -5,10 +5,10 @@ SELECT
   i.i_category_id,
   i.i_category,
   SUM(ss_ext_sales_price) total_sales
-FROM tpcds.store_sales$TABLE ss
-JOIN tpcds.date_dim$TABLE d
+FROM store_sales ss
+JOIN date_dim d
   ON (ss.ss_sold_date_sk = d.d_date_sk)
-JOIN tpcds.item$TABLE i
+JOIN item i
   ON (ss.ss_item_sk = i.i_item_sk)
 WHERE
   i.i_manager_id = 1
@@ -23,7 +23,7 @@ ORDER BY
   d_year,
   i_category_id,
   i_category
-LIMIT 100;
+LIMIT 100
 ---- RESULTS
 1998,1,'Women',485053.8593244553
 1998,5,'Music',429901.0716336332

@@ -1,6 +1,7 @@
 ====
 ---- QUERY
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col from alltypeserror_rc
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
+double_col, date_string_col, string_col from functional_rc.alltypeserror
 ---- ERRORS
 Error converting column: 1 TO BOOL
 file: alltypeserror_rc/year=2009/month=1/000001_0
@@ -61,7 +62,8 @@ file: alltypeserror_rc/year=2009/month=2/000002_0,3
 file: alltypeserror_rc/year=2009/month=3/000000_0,4
 ====
 ---- QUERY
-select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col, date_string_col, string_col from alltypeserrornonulls_rc
+select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
+double_col, date_string_col, string_col from functional_rc.alltypeserrornonulls
 ---- ERRORS
 Error converting column: 1 TO BOOL
 file: alltypeserrornonulls_rc/year=2009/month=1/000001_0

@@ -74,9 +74,9 @@ hadoop fs -cp  /test-warehouse/zipcode_incomes/DEC_00_SF3_P077_with_ann_noheader
 # Need to investigate this more, but this works around the problem to unblock automation.
 set +o errexit
 ${HIVE_HOME}/bin/hive -hiveconf hive.root.logger=WARN,console -v \
-    -e "DROP TABLE IF EXISTS internal_hbase_table"
-echo "disable 'internal_hbase_table'" | hbase shell
-echo "drop 'internal_hbase_table'" | hbase shell
+    -e "DROP TABLE IF EXISTS functional.internal_hbase_table"
+echo "disable 'functional.internal_hbase_table'" | hbase shell
+echo "drop 'functional.internal_hbase_table'" | hbase shell
 set -e
 
 # For tables that rely on loading data from local fs test-warehouse

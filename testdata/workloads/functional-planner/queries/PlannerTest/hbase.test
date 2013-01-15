@@ -1,5 +1,5 @@
 # full scan of string typed row-key
-select * from hbasestringids
+select * from functional.hbasestringids
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -25,7 +25,7 @@ NODE 0:
   LOCATIONS:
 ====
 # full scan
-select * from hbasealltypessmall
+select * from functional.hbasealltypessmall
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -52,7 +52,7 @@ NODE 0:
 ====
 # predicate on row key doesn't get transformed into scan parameter, because
 # it's mapped as an int (but stored in ascii and ordered lexicographically)
-select * from hbasealltypessmall
+select * from functional.hbasealltypessmall
 where id < 5
 ---- PLAN
 Plan Fragment 0
@@ -81,7 +81,7 @@ NODE 0:
   LOCATIONS:
 ====
 # if the row key is mapped as a string col, range predicates are applied to the scan
-select * from hbasestringids
+select * from functional.hbasestringids
 where id = '5'
 and tinyint_col = 5
 ---- PLAN
@@ -114,7 +114,7 @@ NODE 0:
   HBASE KEYRANGE 5:5\0
   LOCATIONS:
 ====
-select * from hbasestringids
+select * from functional.hbasestringids
 where id > '5'
 and tinyint_col = 5
 ---- PLAN
@@ -145,7 +145,7 @@ NODE 0:
   HBASE KEYRANGE 5\0:<unbounded>
   LOCATIONS:
 ====
-select * from hbasestringids
+select * from functional.hbasestringids
 where id >= '5'
 and tinyint_col = 5
 ---- PLAN
@@ -176,7 +176,7 @@ NODE 0:
   HBASE KEYRANGE 5:<unbounded>
   LOCATIONS:
 ====
-select * from hbasestringids
+select * from functional.hbasestringids
 where id < '5'
 and tinyint_col = 5
 ---- PLAN
@@ -207,7 +207,7 @@ NODE 0:
   HBASE KEYRANGE <unbounded>:5
   LOCATIONS:
 ====
-select * from hbasestringids
+select * from functional.hbasestringids
 where id <= '5'
 and tinyint_col = 5
 ---- PLAN
@@ -238,7 +238,7 @@ NODE 0:
   HBASE KEYRANGE <unbounded>:5\0
   LOCATIONS:
 ====
-select * from hbasestringids
+select * from functional.hbasestringids
 where id > '4' and id < '5'
 and tinyint_col = 5
 ---- PLAN
@@ -271,7 +271,7 @@ NODE 0:
   HBASE KEYRANGE 4\0:5
   LOCATIONS:
 ====
-select * from hbasestringids
+select * from functional.hbasestringids
 where id >= '4' and id < '5'
 and tinyint_col = 5
 ---- PLAN
@@ -304,7 +304,7 @@ NODE 0:
   HBASE KEYRANGE 4:5
   LOCATIONS:
 ====
-select * from hbasestringids
+select * from functional.hbasestringids
 where id > '4' and id <= '5'
 and tinyint_col = 5
 ---- PLAN
@@ -337,7 +337,7 @@ NODE 0:
   HBASE KEYRANGE 4\0:5\0
   LOCATIONS:
 ====
-select * from hbasestringids
+select * from functional.hbasestringids
 where id >= '4' and id <= '5'
 and tinyint_col = 5
 ---- PLAN
@@ -372,7 +372,7 @@ NODE 0:
 ====
 # with aggregation
 select int_col, count(*) 
-from hbasealltypessmall
+from functional.hbasealltypessmall
 where id < 5
 group by 1
 ---- PLAN
@@ -414,7 +414,7 @@ NODE 0:
   LOCATIONS:
 ====
 # predicates on string columns against a constant string are converted to HBase filters
-select * from hbasealltypessmall where string_col = '4'
+select * from functional.hbasealltypessmall where string_col = '4'
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -442,7 +442,7 @@ NODE 0:
   LOCATIONS:
 ====
 # test all comparison ops
-select * from hbasealltypessmall where string_col != '4'
+select * from functional.hbasealltypessmall where string_col != '4'
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -469,7 +469,7 @@ NODE 0:
   HBASE KEYRANGE <unbounded>:<unbounded>
   LOCATIONS:
 ====
-select * from hbasealltypessmall where string_col < '4'
+select * from functional.hbasealltypessmall where string_col < '4'
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -496,7 +496,7 @@ NODE 0:
   HBASE KEYRANGE <unbounded>:<unbounded>
   LOCATIONS:
 ====
-select * from hbasealltypessmall where string_col > '4'
+select * from functional.hbasealltypessmall where string_col > '4'
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -523,7 +523,7 @@ NODE 0:
   HBASE KEYRANGE <unbounded>:<unbounded>
   LOCATIONS:
 ====
-select * from hbasealltypessmall where string_col <= '4'
+select * from functional.hbasealltypessmall where string_col <= '4'
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -550,7 +550,7 @@ NODE 0:
   HBASE KEYRANGE <unbounded>:<unbounded>
   LOCATIONS:
 ====
-select * from hbasealltypessmall where string_col >= '4'
+select * from functional.hbasealltypessmall where string_col >= '4'
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -578,7 +578,7 @@ NODE 0:
   LOCATIONS:
 ====
 # test multiple filters
-select * from hbasealltypessmall
+select * from functional.hbasealltypessmall
 where string_col >= '4' and string_col != '2' and date_string_col = '04/03/09'
 ---- PLAN
 Plan Fragment 0
@@ -612,8 +612,8 @@ NODE 0:
   HBASE KEYRANGE <unbounded>:<unbounded>
   LOCATIONS:
 ====
-# mix of predicates and hbase filters
-select * from hbasealltypessmall where string_col = '4' and tinyint_col = 5
+# mix of predicates and functional.hbase filters
+select * from functional.hbasealltypessmall where string_col = '4' and tinyint_col = 5
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -642,8 +642,8 @@ NODE 0:
   HBASE KEYRANGE <unbounded>:<unbounded>
   LOCATIONS:
 ====
-# mix of predicates, hbase filters and start/stop keys
-select * from hbasestringids 
+# mix of predicates, functional.hbase filters and start/stop keys
+select * from functional.hbasestringids 
 where string_col = '4' and tinyint_col = 5 and id >= '4' and id <= '5'
 ---- PLAN
 Plan Fragment 0
@@ -678,7 +678,7 @@ NODE 0:
   LOCATIONS:
 ====
 # predicates involving casts (ie, non-string comparisons) cannot be turned into filters
-select * from hbasealltypessmall where cast(string_col as int) >= 4
+select * from functional.hbasealltypessmall where cast(string_col as int) >= 4
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -706,7 +706,7 @@ NODE 0:
   LOCATIONS:
 ====
 # non-const comparisons cannot be turned into filters
-select * from hbasealltypessmall where string_col >= date_string_col
+select * from functional.hbasealltypessmall where string_col >= date_string_col
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED

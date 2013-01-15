@@ -9,7 +9,7 @@ insert overwrite table tpch.q22_customer_tmp1
 select
   avg(c_acctbal) avg_acctbal,
   substr(c_name, 1, 1) as cust_name_char
-from tpch.customer$TABLE c
+from customer c
 where
    c.c_acctbal > 0.00 and
    (substr(c.c_phone, 1, 2) = '13' or
@@ -37,10 +37,10 @@ select
   substring(c_phone, 1, 2) as cntrycode,
   count(*) as numcust,
   round(sum(c_acctbal), 4) as totacctbal
-from tpch.customer$TABLE c
+from customer c
   join tpch.q22_customer_tmp1 ct
     on (substr(c.c_name, 1, 1) = ct.cust_name_char)
-  left outer join tpch.orders$TABLE o
+  left outer join orders o
     on (o.o_custkey = c.c_custkey)
 where
   o_custkey is null and

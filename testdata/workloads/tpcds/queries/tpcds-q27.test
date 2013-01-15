@@ -7,14 +7,14 @@ SELECT
   AVG(ss_list_price) agg2,
   AVG(ss_coupon_amt) agg3,
   AVG(ss_sales_price) agg4
-FROM tpcds.store_sales$TABLE ss
-JOIN tpcds.date_dim$TABLE d
+FROM store_sales ss
+JOIN date_dim d
   ON (ss.ss_sold_date_sk = d.d_date_sk)
-JOIN tpcds.item$TABLE i
+JOIN item i
   ON (ss.ss_item_sk = i.i_item_sk)
-JOIN tpcds.customer_demographics$TABLE cd
+JOIN customer_demographics cd
   ON (ss.ss_cdemo_sk = cd.cd_demo_sk)
-JOIN tpcds.store$TABLE s
+JOIN store s
   ON (ss.ss_store_sk = s.s_store_sk)
 WHERE
   cd_gender = 'M'

@@ -67,7 +67,7 @@ public class JdbcTest {
     tests.put("%all_ypes", "alltypes");
 
     for (String tblNamePattern: tests.keySet()) {
-      ResultSet rs = con.getMetaData().getTables("", "default", tblNamePattern, null);
+      ResultSet rs = con.getMetaData().getTables("", "functional", tblNamePattern, null);
       assertTrue(rs.next());
       // TABLE_NAME is the 3rd column.
       String resultTableName = rs.getString("TABLE_NAME");
@@ -118,7 +118,7 @@ public class JdbcTest {
   @Test
   public void testMetaDataGetColumns() throws SQLException {
     // It should return alltypessmall.string_col.
-    ResultSet rs = con.getMetaData().getColumns(null, null, "alltypessmall", "s%rin%");
+    ResultSet rs = con.getMetaData().getColumns(null, "functional", "alltypessmall", "s%rin%");
 
     // validate the metadata for the getColumns result set
     ResultSetMetaData rsmd = rs.getMetaData();
@@ -133,56 +133,56 @@ public class JdbcTest {
     rs.close();
 
     // validate bool_col
-    rs = con.getMetaData().getColumns(null, null, "alltypessmall", "bool_col");
+    rs = con.getMetaData().getColumns(null, "functional", "alltypessmall", "bool_col");
     assertTrue(rs.next());
     assertEquals("Incorrect type", java.sql.Types.BOOLEAN, rs.getInt("DATA_TYPE"));
     assertFalse(rs.next());
     rs.close();
 
     // validate tinyint_col
-    rs = con.getMetaData().getColumns(null, null, "alltypessmall", "tinyint_col");
+    rs = con.getMetaData().getColumns(null, "functional", "alltypessmall", "tinyint_col");
     assertTrue(rs.next());
     assertEquals("Incorrect type", java.sql.Types.TINYINT, rs.getInt("DATA_TYPE"));
     assertFalse(rs.next());
     rs.close();
 
     // validate smallint_col
-    rs = con.getMetaData().getColumns(null, null, "alltypessmall", "smallint_col");
+    rs = con.getMetaData().getColumns(null, "functional", "alltypessmall", "smallint_col");
     assertTrue(rs.next());
     assertEquals("Incorrect type", java.sql.Types.SMALLINT, rs.getInt("DATA_TYPE"));
     assertFalse(rs.next());
     rs.close();
 
     // validate int_col
-    rs = con.getMetaData().getColumns(null, null, "alltypessmall", "int_col");
+    rs = con.getMetaData().getColumns(null, "functional", "alltypessmall", "int_col");
     assertTrue(rs.next());
     assertEquals("Incorrect type", java.sql.Types.INTEGER, rs.getInt("DATA_TYPE"));
     assertFalse(rs.next());
     rs.close();
 
     // validate bigint_col
-    rs = con.getMetaData().getColumns(null, null, "alltypessmall", "bigint_col");
+    rs = con.getMetaData().getColumns(null, "functional", "alltypessmall", "bigint_col");
     assertTrue(rs.next());
     assertEquals("Incorrect type", java.sql.Types.BIGINT, rs.getInt("DATA_TYPE"));
     assertFalse(rs.next());
     rs.close();
 
     // validate float_col
-    rs = con.getMetaData().getColumns(null, null, "alltypessmall", "float_col");
+    rs = con.getMetaData().getColumns(null, "functional", "alltypessmall", "float_col");
     assertTrue(rs.next());
     assertEquals("Incorrect type", java.sql.Types.FLOAT, rs.getInt("DATA_TYPE"));
     assertFalse(rs.next());
     rs.close();
 
     // validate double_col
-    rs = con.getMetaData().getColumns(null, null, "alltypessmall", "double_col");
+    rs = con.getMetaData().getColumns(null, "functional", "alltypessmall", "double_col");
     assertTrue(rs.next());
     assertEquals("Incorrect type", java.sql.Types.DOUBLE, rs.getInt("DATA_TYPE"));
     assertFalse(rs.next());
     rs.close();
 
     // validate timestamp_col
-    rs = con.getMetaData().getColumns(null, null, "alltypessmall", "timestamp_col");
+    rs = con.getMetaData().getColumns(null, "functional", "alltypessmall", "timestamp_col");
     assertTrue(rs.next());
     assertEquals("Incorrect type", java.sql.Types.TIMESTAMP, rs.getInt("DATA_TYPE"));
     assertFalse(rs.next());
@@ -194,7 +194,7 @@ public class JdbcTest {
    */
   @Test
   public void testMetaDataGetColumnsMetaData() throws SQLException {
-    ResultSet rs = con.getMetaData().getColumns(null, null, "alltypes", null);
+    ResultSet rs = con.getMetaData().getColumns(null, "functional", "alltypes", null);
 
     ResultSetMetaData rsmd = rs.getMetaData();
     assertEquals("TABLE_CAT", rsmd.getColumnName(1));

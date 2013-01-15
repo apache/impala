@@ -1,5 +1,5 @@
 select name, zip
-from testtbl
+from functional.testtbl
 order by name
 limit 1
 ---- PLAN
@@ -9,7 +9,7 @@ Plan Fragment 0
   ORDER BY: name ASC
   LIMIT: 1
   TUPLE IDS: 0 
-    SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+    SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -27,13 +27,13 @@ Plan Fragment 1
     EXCHANGE ID: 2
     UNPARTITIONED
 
-  SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
 select zip, count(*)
-from testtbl
+from functional.testtbl
 where name like 'm%'
 group by 1
 order by 2 desc
@@ -49,7 +49,7 @@ Plan Fragment 0
     OUTPUT: COUNT(*)
     GROUP BY: zip
     TUPLE IDS: 1 
-      SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
         PREDICATES: name LIKE 'm%'
         TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
@@ -76,14 +76,14 @@ Plan Fragment 1
   OUTPUT: COUNT(*)
   GROUP BY: zip
   TUPLE IDS: 1 
-    SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+    SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
       PREDICATES: name LIKE 'm%'
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
 select int_col, sum(float_col) 
-from hbasealltypessmall
+from functional.hbasealltypessmall
 where id < 5
 group by 1
 order by 2
@@ -135,7 +135,7 @@ NODE 0:
   LOCATIONS:
 ====
 select int_col, sum(float_col), min(float_col) 
-from hbasealltypessmall
+from functional.hbasealltypessmall
 group by 1
 order by 2,3 desc
 limit 0

@@ -119,25 +119,28 @@ class WorkloadRunner(object):
     command = PRIME_CACHE_CMD % query
     os.system(command)
 
-  def create_executor(self, executor_name):
+  def create_executor(self, db_name, executor_name):
     # Add additional query exec options here
     query_options = {
         'hive': lambda: (execute_using_hive,
           HiveQueryExecOptions(self.iterations,
           hive_cmd=self.hive_cmd,
+          db_name=db_name,
           )),
         'impala_beeswax': lambda: (execute_using_impala_beeswax,
           ImpalaBeeswaxExecOptions(self.iterations,
           exec_options=self.exec_options,
           use_kerberos=self.use_kerberos,
+          db_name=db_name,
           impalad=choice(self.TARGET_IMPALADS))),
         'jdbc': lambda: (execute_using_jdbc,
           JdbcQueryExecOptions(self.iterations,
-          impalad=choice(self.TARGET_IMPALADS))),
+          impalad=choice(self.TARGET_IMPALADS),
+          db_name=db_name)),
     } [executor_name]()
     return query_options
 
-  def run_query(self, executor_name, query, prime_cache, exit_on_error):
+  def run_query(self, executor_name, db_name, query, prime_cache, exit_on_error):
     """
     Run a query command and return the result.
 
@@ -153,7 +156,7 @@ class WorkloadRunner(object):
     execution_result = None
     for client in xrange(self.num_clients):
       name = "Client Thread " + str(client)
-      exec_tuple = self.create_executor(executor_name)
+      exec_tuple = self.create_executor(db_name, executor_name)
       threads.append(QueryExecutor(name, exec_tuple[0], exec_tuple[1], query))
     for thread in threads:
       LOG.debug(thread.name + " starting")
@@ -229,7 +232,6 @@ class WorkloadRunner(object):
     query_name_filter = None
     if query_names:
       query_name_filter = [name.lower() for name in query_names.split(',')]
-
     LOG.info("Running Test Vector - File Format: %s Compression: %s / %s" %\
         (file_format, codec, compression_type))
     for test_name in query_map.keys():
@@ -241,11 +243,8 @@ class WorkloadRunner(object):
           LOG.info("Skipping query '%s'" % query_name)
           continue
 
-        query_string =\
-            QueryTestSectionReader.build_query(query.strip(), test_vector, scale_factor)
-        if query_string.endswith(';'):
-          query_string = query_string[0:-1]
-
+        db_name = QueryTestSectionReader.get_db_name(test_vector, scale_factor)
+        query_string = QueryTestSectionReader.build_query(query.strip(), test_vector, '')
         table_format_str = '%s/%s/%s' % (file_format, codec, compression_type)
         self.__summary += "\nQuery (%s): %s\n" % (table_format_str, query_name)
         execution_result = QueryExecutionResult()
@@ -255,7 +254,7 @@ class WorkloadRunner(object):
           if query_name != query:
             LOG.info('Query Name: \n%s\n' % query_name)
 
-          execution_result = self.run_query(executor_name, query_string,
+          execution_result = self.run_query(executor_name, db_name, query_string,
                                             self.prime_cache, stop_on_query_error)
 
           # Don't verify insert results and allow user to continue on error if there is
@@ -275,7 +274,8 @@ class WorkloadRunner(object):
         hive_execution_result = QueryExecutionResult()
         if self.compare_with_hive or self.skip_impala:
           self.__summary += " Hive Results: "
-          hive_execution_result = self.run_query('hive', query_string,
+          hive_execution_result = self.run_query('hive', db_name,
+                                                         query_string,
                                                          self.prime_cache,
                                                          False)
           self.__summary += "%s\n" % hive_execution_result

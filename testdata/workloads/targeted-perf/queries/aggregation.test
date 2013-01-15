@@ -2,7 +2,7 @@
 ---- QUERY: PERF_AGG-Q1
 # Simple aggregations across a few different data types
 SELECT count(*), min(l_linenumber), max(l_quantity), round(sum(l_tax), 2)
-FROM tpch.lineitem$TABLE
+FROM lineitem
 ---- RESULTS
 6001215,1,50,240129.67
 ---- TYPES
@@ -11,7 +11,7 @@ BIGINT, INT, DOUBLE, DOUBLE
 ---- QUERY: PERF_AGG-Q2
 # Group by l_shipmode - 7 groups
 SELECT l_shipmode, count(*)
-FROM tpch.lineitem$TABLE
+FROM lineitem
 GROUP BY l_shipmode
 ---- RESULTS
 'RAIL',856484
@@ -27,7 +27,7 @@ STRING, BIGINT
 ---- QUERY: PERF_AGG-Q3
 # Group by l_receiptdate ~ 2500 groups
 SELECT  l_receiptdate, count(*)
-FROM tpch.lineitem$TABLE
+FROM lineitem
 GROUP BY l_receiptdate
 ---- RESULTS
 '1995-01-21',2508

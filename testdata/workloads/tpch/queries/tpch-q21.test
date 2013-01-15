@@ -7,17 +7,17 @@
 select
   s_name,
   count(*) as numwait
-from tpch.lineitem$TABLE l1
-  join tpch.supplier$TABLE s
+from lineitem l1
+  join supplier s
     on (s.s_suppkey = l1.l_suppkey)
-  join tpch.orders$TABLE o
+  join orders o
     on (o.o_orderkey = l1.l_orderkey)
-  join tpch.nation$TABLE n
+  join nation n
     on (s.s_nationkey = n.n_nationkey)
-  left semi join tpch.lineitem$TABLE l2
+  left semi join lineitem l2
     on (l2.l_orderkey = l1.l_orderkey and
         l2.l_suppkey <> l1.l_suppkey)
-  left outer join tpch.lineitem$TABLE l3
+  left outer join lineitem l3
     on (l3.l_orderkey = l1.l_orderkey and
         l3.l_suppkey <> l1.l_suppkey and
         l3.l_receiptdate > l3.l_commitdate)

@@ -4,10 +4,9 @@
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.lineitem
+lineitem
 ---- CREATE
-CREATE DATABASE IF NOT EXISTS tpch%(scale_factor)s;
-CREATE EXTERNAL TABLE %(table_name)s (
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 L_ORDERKEY BIGINT,
 L_PARTKEY BIGINT,
 L_SUPPKEY BIGINT,
@@ -25,20 +24,20 @@ L_SHIPINSTRUCT STRING,
 L_SHIPMODE STRING,
 L_COMMENT STRING)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/lineitem/'
-OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/{table_name}'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.part
+part
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 P_PARTKEY BIGINT,
 P_NAME STRING,
 P_MFGR STRING,
@@ -50,40 +49,40 @@ P_CONTAINER STRING,
 P_RETAILPRICE DOUBLE,
 P_COMMENT STRING)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/part/'
-OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/{table_name}'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.partsupp
+partsupp
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 PS_PARTKEY BIGINT,
 PS_SUPPKEY BIGINT,
 PS_AVAILQTY INT,
 PS_SUPPLYCOST DOUBLE,
 PS_COMMENT STRING)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/partsupp/'
-OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/{table_name}'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.supplier
+supplier
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 S_SUPPKEY BIGINT,
 S_NAME STRING,
 S_ADDRESS STRING,
@@ -92,57 +91,57 @@ S_PHONE STRING,
 S_ACCTBAL DOUBLE,
 S_COMMENT STRING)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/supplier/'
-OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/{table_name}'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.nation
+nation
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 N_NATIONKEY SMALLINT,
 N_NAME STRING,
 N_REGIONKEY SMALLINT,
 N_COMMENT STRING)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/nation/'
-OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/{table_name}'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.region
+region
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 R_REGIONKEY SMALLINT,
 R_NAME STRING,
 R_COMMENT STRING)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/region/'
-OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/{table_name}'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.orders
+orders
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 O_ORDERKEY BIGINT,
 O_CUSTKEY BIGINT,
 O_ORDERSTATUS STRING,
@@ -153,20 +152,20 @@ O_CLERK STRING,
 O_SHIPPRIORITY INT,
 O_COMMENT STRING)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/orders/'
-OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/{table_name}'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.customer
+customer
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 C_CUSTKEY BIGINT,
 C_NAME STRING,
 C_ADDRESS STRING,
@@ -176,20 +175,20 @@ C_ACCTBAL DOUBLE,
 C_MKTSEGMENT STRING,
 C_COMMENT STRING)
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpch%(scale_factor)s/customer/'
-OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/{table_name}'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.q2_minimum_cost_supplier_tmp1
+q2_minimum_cost_supplier_tmp1
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 s_acctbal double,
 s_name string,
 n_name string,
@@ -199,165 +198,165 @@ p_mfgr string,
 s_address string,
 s_phone string,
 s_comment string)
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.q2_minimum_cost_supplier_tmp2
+q2_minimum_cost_supplier_tmp2
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 p_partkey bigint,
 ps_min_supplycost double)
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.q7_volume_shipping_tmp
+q7_volume_shipping_tmp
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 supp_nation string,
 cust_nation string,
 s_nationkey smallint,
 c_nationkey smallint)
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.q11_part_tmp
+q11_part_tmp
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 ps_partkey bigint,
 part_value double)
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.q11_sum_tmp
+q11_sum_tmp
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (total_value double)
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (total_value double)
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.revenue
+revenue
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 supplier_no bigint,
 total_revenue double)
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.max_revenue
+max_revenue
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (max_revenue double)
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (max_revenue double)
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.supplier_tmp
+supplier_tmp
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (s_suppkey bigint)
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (s_suppkey bigint)
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.q16_tmp
+q16_tmp
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 p_brand string,
 p_type string,
 p_size int,
 ps_suppkey bigint)
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.lineitem_tmp
+lineitem_tmp
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 t_partkey bigint,
 t_avg_quantity double)
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.q18_tmp
+q18_tmp
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 l_orderkey bigint,
 t_sum_quantity double)
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.q20_tmp1
+q20_tmp1
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (p_partkey bigint)
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (p_partkey bigint)
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.q20_tmp2
+q20_tmp2
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 l_partkey bigint,
 l_suppkey bigint,
 sum_quantity double)
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.q20_tmp3
+q20_tmp3
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
 ps_suppkey bigint,
 ps_availqty int,
 sum_quantity double)
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.q20_tmp4
+q20_tmp4
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (ps_suppkey bigint)
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (ps_suppkey bigint)
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ====
 ---- DATASET
 tpch
 ---- BASE_TABLE_NAME
-tpch%(scale_factor)s.q22_customer_tmp1
+q22_customer_tmp1
 ---- CREATE
-CREATE EXTERNAL TABLE %(table_name)s (avg_acctbal double, cust_name_char string)
-STORED AS %(file_format)s
-LOCATION '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (avg_acctbal double, cust_name_char string)
+STORED AS {file_format}
+LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ====

@@ -18,12 +18,12 @@ FAILPOINT_LOCATION = ['PREPARE', 'OPEN', 'GETNEXT', 'CLOSE']
 # The goal of this query is to use all of the node types.
 # TODO: This query could be simplified a bit...
 QUERY = """
-select a.int_col, count(b.int_col) int_sum from hbasealltypesagg a
+select a.int_col, count(b.int_col) int_sum from functional.hbasealltypesagg a
 join
-  (select * from alltypes$TABLE
+  (select * from alltypes
    where year=2009 and month=1 order by int_col limit 2500
    union all
-   select * from alltypes$TABLE
+   select * from alltypes
    where year=2009 and month=2 limit 3000) b
 on (a.int_col = b.int_col)
 group by a.int_col
@@ -62,8 +62,7 @@ class TestFailpoints(ImpalaTestSuite):
         v.get_value('target_node')[0] == 'HASH_JOIN_NODE'))
 
   def test_failpoints(self, vector):
-    query = QueryTestSectionReader.build_query(QUERY, vector.get_value('table_format'),
-      scale_factor='')
+    query = QUERY
     node_type, node_ids = vector.get_value('target_node')
     action = vector.get_value('action')
     location = vector.get_value('location')
@@ -98,14 +97,16 @@ class TestFailpoints(ImpalaTestSuite):
 
   def __execute_fail_action(self, query, vector):
     try:
-      self.execute_query(query, vector.get_value('exec_option'))
+      self.execute_query(query, vector.get_value('exec_option'),
+                         table_format=vector.get_value('table_format'))
       assert 'Expected Failure'
     except ImpalaBeeswaxException as e:
       print e
 
   def __execute_cancel_action(self, query, vector):
     print 'Starting async query execution'
-    handle = self.execute_query_async(query, vector.get_value('exec_option'))
+    handle = self.execute_query_async(query, vector.get_value('exec_option'),
+                                      table_format=vector.get_value('table_format'))
     print 'Sleeping'
     sleep(3)
     print 'Issuing Cancel'

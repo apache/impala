@@ -4,42 +4,42 @@
 # offset
 # TODO: printing the entire record will break column level security (when it is
 # implemented).
-select id, bool_col, tinyint_col, smallint_col from alltypeserror$TABLE
+select id, bool_col, tinyint_col, smallint_col from functional$DATABASE.alltypeserror
 ---- ERRORS
 Error converting column: 1 TO BOOL (Data is: errfalse)
-file: hdfs: test-warehouse/alltypeserror$TABLE/year=2009/month=1
+file: hdfs: test-warehouse/alltypeserror$DATABASE/year=2009/month=1
 record: 1,errfalse,,1,1,10,1.000000,10.100000,01/01/09,1,1999-10-10
 
 Error converting column: 2 TO TINYINT (Data is: err2)
-file: hdfs: test-warehouse/alltypeserror$TABLE/year=2009/month=1
+file: hdfs: test-warehouse/alltypeserror$DATABASE/year=2009/month=1
 record: 2,true,err2,,2,20,2.000000,20.200000,01/01/09,2,1999-10-10 90:10:10
 
 Error converting column: 3 TO SMALLINT (Data is: err3)
-file: hdfs: test-warehouse/alltypeserror$TABLE/year=2009/month=1
+file: hdfs: test-warehouse/alltypeserror$DATABASE/year=2009/month=1
 record: 3,false,3,err3,,30,3.000000,30.300000,01/01/09,3,2002-14-10 00:00:00
 
 Error converting column: 1 TO BOOL (Data is: errtrue)
 Error converting column: 2 TO TINYINT (Data is: err9)
 Error converting column: 3 TO SMALLINT (Data is: err9)
-file: hdfs: test-warehouse/alltypeserror$TABLE/year=2009/month=1
+file: hdfs: test-warehouse/alltypeserror$DATABASE/year=2009/month=1
 record: 9,errtrue,err9,err9,err9,err90,err9.000000,err90.900000,01/01/09,9,0000-01-01 00:00:00
 
 Error converting column: 2 TO TINYINT (Data is: xyz5)
-file: hdfs: test-warehouse/alltypeserror$TABLE/year=2009/month=2
+file: hdfs: test-warehouse/alltypeserror$DATABASE/year=2009/month=2
 record: 15,false,xyz5,5,5,50,5.000000,50.500000,02/01/09,5,0009-01-01 00:00:00
 
 Error converting column: 3 TO SMALLINT (Data is: abc3)
-file: hdfs: test-warehouse/alltypeserror$TABLE/year=2009/month=3
+file: hdfs: test-warehouse/alltypeserror$DATABASE/year=2009/month=3
 record: 23,false,3,abc3,3,30,3.000000,30.300000,03/01/09,3,2020-10-10 60:10:10.123
 
 Error converting column: 2 TO TINYINT (Data is: abc7)
-file: hdfs: test-warehouse/alltypeserror$TABLE/year=2009/month=3
+file: hdfs: test-warehouse/alltypeserror$DATABASE/year=2009/month=3
 record: 27,false,abc7,7,7,70,7.000000,70.700000,03/01/09,7,2020-10-10 10:10:10.123
 
 Error converting column: 1 TO BOOL (Data is: t\rue)
 Error converting column: 2 TO TINYINT (Data is: err30)
 Error converting column: 3 TO SMALLINT (Data is: err30)
-file: hdfs: test-warehouse/alltypeserror$TABLE/year=2009/month=3
+file: hdfs: test-warehouse/alltypeserror$DATABASE/year=2009/month=3
 record: 30,t\rue,err30,err30,err30,err300,err30..000000,err300.900000,01/01/10,10,0000-01-01 00:00:00
 ---- TYPES
 int, boolean, tinyint, smallint
@@ -77,32 +77,32 @@ int, boolean, tinyint, smallint
 9,NULL,NULL,NULL
 ====
 ---- QUERY
-select * from alltypeserrornonulls$TABLE
+select * from functional$DATABASE.alltypeserrornonulls
 ---- ERRORS
 Error converting column: 10 TO TIMESTAMP (Data is: 123456)
-file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=1
+file: hdfs: test-warehouse/alltypeserrornonulls$DATABASE/year=2009/month=1
 record: 0,true,0,0,0,0,0.000000,0.000000,01/01/09,0,123456
 Error converting column: 1 TO BOOL (Data is: errfalse)
 Error converting column: 10 TO TIMESTAMP (Data is: 1990-00-01 10:10:10)
-file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=1
+file: hdfs: test-warehouse/alltypeserrornonulls$DATABASE/year=2009/month=1
 record: 1,errfalse,1,1,1,10,1.000000,10.100000,01/01/09,1,1990-00-01 10:10:10
 Error converting column: 2 TO TINYINT (Data is: err2)
-file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=1
+file: hdfs: test-warehouse/alltypeserrornonulls$DATABASE/year=2009/month=1
 record: 2,true,err2,2,2,20,2.000000,20.200000,01/01/09,2,2012-03-22 11:20:01.123
 Error converting column: 3 TO SMALLINT (Data is: err3)
-file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=1
+file: hdfs: test-warehouse/alltypeserrornonulls$DATABASE/year=2009/month=1
 record: 3,false,3,err3,3,30,3.000000,30.300000,01/01/09,3,2012-03-22 11:20:01.123
 Error converting column: 4 TO INT (Data is: err4)
-file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=1
+file: hdfs: test-warehouse/alltypeserrornonulls$DATABASE/year=2009/month=1
 record: 4,true,4,4,err4,40,4.000000,40.400000,01/01/09,4,2012-03-22 11:20:01.123
 Error converting column: 5 TO BIGINT (Data is: err50)
-file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=1
+file: hdfs: test-warehouse/alltypeserrornonulls$DATABASE/year=2009/month=1
 record: 5,false,5,5,5,err50,5.000000,50.500000,01/01/09,5,2012-03-22 11:20:01.123
 Error converting column: 6 TO FLOAT (Data is: err6.000000)
-file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=1
+file: hdfs: test-warehouse/alltypeserrornonulls$DATABASE/year=2009/month=1
 record: 6,true,6,6,6,60,err6.000000,60.600000,01/01/09,6,2012-03-22 11:20:01.123
 Error converting column: 7 TO DOUBLE (Data is: err70.700000)
-file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=1
+file: hdfs: test-warehouse/alltypeserrornonulls$DATABASE/year=2009/month=1
 record: 7,false,7,7,7,70,7.000000,err70.700000,01/01/09,7,2012-03-22 11:20:01.123
 Error converting column: 1 TO BOOL (Data is: errtrue)
 Error converting column: 2 TO TINYINT (Data is: err9)
@@ -111,33 +111,33 @@ Error converting column: 4 TO INT (Data is: err9)
 Error converting column: 5 TO BIGINT (Data is: err90)
 Error converting column: 6 TO FLOAT (Data is: err9.000000)
 Error converting column: 7 TO DOUBLE (Data is: err90.900000)
-file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=1
+file: hdfs: test-warehouse/alltypeserrornonulls$DATABASE/year=2009/month=1
 record: 9,errtrue,err9,err9,err9,err90,err9.000000,err90.900000,01/01/09,9,2012-03-22 11:20:01.123
 Error converting column: 6 TO FLOAT (Data is: xyz3.000000)
 Error converting column: 7 TO DOUBLE (Data is: xyz30.300000)
-file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=2
+file: hdfs: test-warehouse/alltypeserrornonulls$DATABASE/year=2009/month=2
 record: 13,false,3,3,3,30,xyz3.000000,xyz30.300000,02/01/09,3,2012-03-22 11:20:01.123
 Error converting column: 2 TO TINYINT (Data is: xyz5)
-file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=2
+file: hdfs: test-warehouse/alltypeserrornonulls$DATABASE/year=2009/month=2
 record: 15,false,xyz5,5,5,50,5.000000,50.500000,02/01/09,5,2012-03-22 11:20:01.123
 Error converting column: 7 TO DOUBLE (Data is: xyz70.700000)
-file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=2
+file: hdfs: test-warehouse/alltypeserrornonulls$DATABASE/year=2009/month=2
 record: 17,false,7,7,7,70,7.000000,xyz70.700000,02/01/09,7,2012-03-22 11:20:01.123
 Error converting column: 3 TO SMALLINT (Data is: abc3)
-file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=3
+file: hdfs: test-warehouse/alltypeserrornonulls$DATABASE/year=2009/month=3
 record: 23,false,3,abc3,3,30,3.000000,30.300000,03/01/09,3,2012-03-22 11:20:01.123
 Error converting column: 4 TO INT (Data is: abc5)
 Error converting column: 10 TO TIMESTAMP (Data is: 2012-Mar-22 11:20:01.123)
-file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=3
+file: hdfs: test-warehouse/alltypeserrornonulls$DATABASE/year=2009/month=3
 record: 25,false,5,5,abc5,50,5.000000,50.500000,03/01/09,5,2012-Mar-22 11:20:01.123
 Error converting column: 2 TO TINYINT (Data is: abc7)
-file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=3
+file: hdfs: test-warehouse/alltypeserrornonulls$DATABASE/year=2009/month=3
 record: 27,false,abc7,7,7,70,7.000000,70.700000,03/01/09,7,2012-03-22 11:20:01.123
 Error converting column: 10 TO TIMESTAMP (Data is: 11:20:01.123 2012-03-22 )
-file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=3
+file: hdfs: test-warehouse/alltypeserrornonulls$DATABASE/year=2009/month=3
 record: 28,true,8,8,8,80,8.000000,80.800000,03/01/09,8,11:20:01.123 2012-03-22 
 Error converting column: 4 TO INT (Data is: abc9)
-file: hdfs: test-warehouse/alltypeserrornonulls$TABLE/year=2009/month=3
+file: hdfs: test-warehouse/alltypeserrornonulls$DATABASE/year=2009/month=3
 record: 29,false,9,9,abc9,90,9.000000,90.900000,03/01/09,9,2012-03-22
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
@@ -174,7 +174,7 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,3,29,false,9,9,NULL,90,9,90.90000000000001,'03/01/09','9',2012-03-22 00:00:00
 ====
 ---- QUERY
-select count(*) from bad_text_lzo
+select count(*) from functional_lzo.bad_text
 ---- ERRORS
 Blocksize: 536870911 is greater than MAX_BLOCK_SIZE: 67108864
 ---- TYPES

@@ -60,6 +60,7 @@ class QueryExecOptions(object):
   def __init__(self, iterations, **kwargs):
     self.options = kwargs
     self.iterations = iterations
+    self.db_name = self.options.get('db_name', None)
 
 
 # Base class for Impala query exec options
@@ -173,7 +174,10 @@ def execute_using_impala_beeswax(query, query_options):
   (success, client) = establish_beeswax_connection(query, query_options)
   if not success:
     return exec_result
-
+  # we need to issue a use database here.
+  if query_options.db_name:
+    use_query = 'use %s' % query_options.db_name
+    client.execute(use_query)
   # execute the query
   results = []
   for i in xrange(query_options.iterations):
@@ -224,6 +228,8 @@ def execute_shell_cmd(cmd):
 def execute_using_hive(query, query_options):
   """Executes a query via hive"""
   query_string = (query + ';') * query_options.iterations
+  if query_options.db_name:
+    query_string = 'use %s;' % query_options.db_name + query_string
   cmd = query_options.hive_cmd + " \"%s\"" % query_string
   return run_query_capture_results(cmd, parse_hive_query_results,
                                    query_options.iterations, exit_on_error=False)
@@ -248,6 +254,8 @@ def parse_hive_query_results(stdout, stderr, iterations):
 def execute_using_jdbc(query, query_options):
   """Executes a query using JDBC"""
   query_string = (query + ';') * query_options.iterations
+  if query_options.db_name:
+    query_string = 'use %s; %s' % (query_options.db_name, query_string)
   cmd = query_options.jdbc_client_cmd + " -q \"%s\"" % query_string
   return run_query_capture_results(cmd, parse_jdbc_query_results,
       query_options.iterations, exit_on_error=False)

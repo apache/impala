@@ -3,8 +3,8 @@
 # Q19 - Discounted Revenue Query
 # Modifications: Added round() calls
 select round(sum(l_extendedprice * (1 - l_discount) ), 5) as revenue
-from tpch.lineitem$TABLE l
-join tpch.part$TABLE p
+from lineitem l
+join part p
   on p.p_partkey = l.l_partkey
 where
 (

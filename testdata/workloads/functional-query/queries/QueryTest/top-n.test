@@ -2,7 +2,7 @@
 ---- QUERY
 # Based on Aggregation Queries
 select int_col, sum(float_col) 
-from hbasealltypessmall
+from functional.hbasealltypessmall
 where id < 5
 group by 1
 order by 2
@@ -17,7 +17,7 @@ INT, DOUBLE
 ---- QUERY
 # Run query without order by
 select tinyint_col, count(*) 
-from alltypesagg$TABLE 
+from alltypesagg 
 group by 1 
 limit 10
 ---- RESULTS
@@ -37,7 +37,7 @@ TINYINT, BIGINT
 ---- QUERY
 # Same query order by asc first col
 select tinyint_col, count(*) 
-from alltypesagg$TABLE 
+from alltypesagg 
 group by 1 
 order by 1
 limit 10
@@ -58,7 +58,7 @@ TINYINT, BIGINT
 ---- QUERY
 # Same query order by asc first desc
 select tinyint_col, count(*) 
-from alltypesagg$TABLE 
+from alltypesagg 
 group by 1 
 order by 1 desc
 limit 20
@@ -78,7 +78,7 @@ TINYINT, BIGINT
 ====
 ---- QUERY
 select date_string_col,int_col
-from alltypesagg$TABLE
+from alltypesagg
 order by date_string_col, int_col desc
 limit 10
 ---- RESULTS
@@ -131,7 +131,7 @@ BIGINT, STRING, INT, INT, BIGINT, STRING, INT
 ---- QUERY
 # order by multiple cols with nulls 
 select tinyint_col % 3, smallint_col % 3, count(*) 
-from alltypesagg$TABLE 
+from alltypesagg 
 where day = 1 
 group by 1, 2
 order by 1, 2
@@ -155,7 +155,7 @@ TINYINT, SMALLINT, BIGINT
 ====
 ---- QUERY
 select tinyint_col % 3, smallint_col % 3, count(*) 
-from alltypesagg$TABLE 
+from alltypesagg 
 where day = 1 
 group by 1, 2
 order by 1, 2 desc
@@ -179,7 +179,7 @@ TINYINT, SMALLINT, BIGINT
 ====
 ---- QUERY
 select tinyint_col % 3, smallint_col % 3, count(*) 
-from alltypesagg$TABLE 
+from alltypesagg 
 where day = 1 
 group by 1, 2
 order by 1 desc, 2
@@ -203,7 +203,7 @@ TINYINT, SMALLINT, BIGINT
 ====
 ---- QUERY
 select tinyint_col % 3, smallint_col % 3, count(*) 
-from alltypesagg$TABLE 
+from alltypesagg 
 where day = 1 
 group by 1, 2
 order by 1 desc, 2 desc
@@ -227,7 +227,7 @@ TINYINT, SMALLINT, BIGINT
 ====
 ---- QUERY
 select date_string_col
-from alltypessmall$TABLE
+from alltypessmall
 order by date_string_col desc
 limit 50
 ---- RESULTS
@@ -287,7 +287,7 @@ STRING
 ---- QUERY
 # Based on join queries
 select a.tinyint_col, b.id, a.string_col
-from alltypesagg$TABLE a join alltypessmall$TABLE b on (a.tinyint_col = b.id)
+from alltypesagg a join alltypessmall b on (a.tinyint_col = b.id)
 where a.month=1
 and a.day=1
 and a.tinyint_col + b.tinyint_col < 5
@@ -306,7 +306,7 @@ TINYINT, INT, STRING
 ====
 ---- QUERY
 select a.tinyint_col, b.id, a.string_col
-from alltypesagg$TABLE a join alltypessmall$TABLE b on (a.tinyint_col = b.id)
+from alltypesagg a join alltypessmall b on (a.tinyint_col = b.id)
 where a.month=1
 and a.day=1
 and a.tinyint_col + b.tinyint_col < 5
@@ -325,9 +325,9 @@ TINYINT, INT, STRING
 ====
 ---- QUERY
 select a.smallint_col, b.id, a.tinyint_col, c.id, a.int_col, b.float_col, c.string_col
-from alltypesagg$TABLE a
-join alltypessmall$TABLE b on (a.smallint_col = b.id)
-join alltypessmall$TABLE c on (a.tinyint_col = c.id)
+from alltypesagg a
+join alltypessmall b on (a.smallint_col = b.id)
+join alltypessmall c on (a.tinyint_col = c.id)
 where a.month=1
 and a.day=1
 and a.int_col > 899
@@ -355,7 +355,7 @@ SMALLINT, INT, TINYINT, INT, INT, FLOAT, STRING
 # Query with ordering column in select list
 # Don't include date_string_col, it comes back in random order.
 select int_col, tinyint_col
-from alltypessmall$TABLE
+from alltypessmall
 order by int_col desc
 limit 20
 ---- RESULTS
@@ -385,7 +385,7 @@ INT, TINYINT
 ---- QUERY
 # Same query with ordering col not in select list
 select tinyint_col
-from alltypessmall$TABLE
+from alltypessmall
 order by int_col desc
 limit 20
 ---- RESULTS
@@ -450,7 +450,7 @@ INT, INT, BIGINT
 ---- QUERY
 # More Complex Ordering Exprs
 select int_col % 7, count(*), avg(tinyint_col)
-from alltypesagg$TABLE
+from alltypesagg
 group by 1
 order by avg(tinyint_col)
 limit 10
@@ -468,7 +468,7 @@ INT, BIGINT, DOUBLE
 ====
 ---- QUERY
 select int_col % 7, count(*), max(int_col)
-from alltypesagg$TABLE
+from alltypesagg
 group by 1
 order by max(int_col)
 limit 10
@@ -486,7 +486,7 @@ INT, BIGINT, INT
 ====
 ---- QUERY
 select int_col % 5, count(*), avg(tinyint_col) - avg(float_col)
-from alltypesagg$TABLE
+from alltypesagg
 group by 1
 order by avg(tinyint_col) - avg(float_col) desc
 limit 10
@@ -502,7 +502,7 @@ INT, BIGINT, DOUBLE
 ====
 ---- QUERY
 select int_col
-from alltypessmall$TABLE
+from alltypessmall
 order by int_col % 5, int_col
 limit 100
 ---- RESULTS

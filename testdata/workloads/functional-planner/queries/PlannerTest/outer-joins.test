@@ -1,12 +1,12 @@
 # correct placement of predicates with left outer joins; t2 and t3 are nullable
 select *
-from testtbl t1 left outer join testtbl t2 on (
+from functional.testtbl t1 left outer join functional.testtbl t2 on (
     t1.id - 1 = t2.id + 1
 # lhs predicate is join predicate
     and t1.zip = 94611
 # rhs predicate applied by rhs scan
     and t2.zip = 94104)
-  left outer join testtbl t3 on (
+  left outer join functional.testtbl t3 on (
     t1.id = t3.id
 # predicate on t2 is join predicate
     and t2.id = 15
@@ -43,13 +43,13 @@ Plan Fragment 0
         OTHER JOIN PREDICATES: t1.zip = 94611
         OTHER PREDICATES: t2.id IS NULL, t1.zip + t2.zip = 10
         TUPLE IDS: 0 1N 
-          SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
             PREDICATES: t1.id > 0
             TUPLE IDS: 0 
-          SCAN HDFS table=default.testtbl #partitions=0 size=0B (1) compact
+          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
             PREDICATES: t2.zip = 94104
             TUPLE IDS: 1 
-      SCAN HDFS table=default.testtbl #partitions=0 size=0B (3) compact
+      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
         PREDICATES: t3.zip = 94720
         TUPLE IDS: 2 
 ---- DISTRIBUTEDPLAN
@@ -78,7 +78,7 @@ Plan Fragment 1
         OTHER JOIN PREDICATES: t1.zip = 94611
         OTHER PREDICATES: t2.id IS NULL, t1.zip + t2.zip = 10
         TUPLE IDS: 0 1N 
-          SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
             PREDICATES: t1.id > 0
             TUPLE IDS: 0 
           EXCHANGE (5)
@@ -92,7 +92,7 @@ Plan Fragment 2
     EXCHANGE ID: 6
     UNPARTITIONED
 
-  SCAN HDFS table=default.testtbl #partitions=0 size=0B (3) compact
+  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
     PREDICATES: t3.zip = 94720
     TUPLE IDS: 2 
 
@@ -102,7 +102,7 @@ Plan Fragment 3
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  SCAN HDFS table=default.testtbl #partitions=0 size=0B (1) compact
+  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
     PREDICATES: t2.zip = 94104
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS
@@ -112,9 +112,9 @@ NODE 3:
 ====
 # the same thing with subqueries; should produce the same result
 select *
-from (select * from testtbl a1) t1 left outer join (select * from testtbl a2) t2 on (
+from (select * from functional.testtbl a1) t1 left outer join (select * from functional.testtbl a2) t2 on (
     t1.id - 1 = t2.id + 1 and t1.zip = 94611 and t2.zip = 94104)
-  left outer join (select * from testtbl a3) t3 on (
+  left outer join (select * from functional.testtbl a3) t3 on (
     t1.id = t3.id and t2.id = 15 and t1.id - t2.id = 0 and t3.zip = 94720)
 where t1.id > 0 and t2.id is null and t3.id is not null
 and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
@@ -135,13 +135,13 @@ Plan Fragment 0
         OTHER JOIN PREDICATES: a1.zip = 94611
         OTHER PREDICATES: a2.id IS NULL, a1.zip + a2.zip = 10
         TUPLE IDS: 0 2N 
-          SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
             PREDICATES: a1.id > 0
             TUPLE IDS: 0 
-          SCAN HDFS table=default.testtbl #partitions=0 size=0B (1) compact
+          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
             PREDICATES: a2.zip = 94104
             TUPLE IDS: 2 
-      SCAN HDFS table=default.testtbl #partitions=0 size=0B (3) compact
+      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
         PREDICATES: a3.zip = 94720
         TUPLE IDS: 4 
 ---- DISTRIBUTEDPLAN
@@ -170,7 +170,7 @@ Plan Fragment 1
         OTHER JOIN PREDICATES: a1.zip = 94611
         OTHER PREDICATES: a2.id IS NULL, a1.zip + a2.zip = 10
         TUPLE IDS: 0 2N 
-          SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
             PREDICATES: a1.id > 0
             TUPLE IDS: 0 
           EXCHANGE (5)
@@ -184,7 +184,7 @@ Plan Fragment 2
     EXCHANGE ID: 6
     UNPARTITIONED
 
-  SCAN HDFS table=default.testtbl #partitions=0 size=0B (3) compact
+  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
     PREDICATES: a3.zip = 94720
     TUPLE IDS: 4 
 
@@ -194,7 +194,7 @@ Plan Fragment 3
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  SCAN HDFS table=default.testtbl #partitions=0 size=0B (1) compact
+  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
     PREDICATES: a2.zip = 94104
     TUPLE IDS: 2 
 ---- SCANRANGELOCATIONS
@@ -204,13 +204,13 @@ NODE 3:
 ====
 # correct placement of predicates with right outer joins; t1 and t2 are nullable
 select *
-from testtbl t1 right outer join testtbl t2 on (
+from functional.testtbl t1 right outer join functional.testtbl t2 on (
     t1.id - 1 = t2.id + 1
 # lhs predicate is scan predicate
     and t1.zip = 94611
 # rhs predicate is join predicate
     and t2.zip = 94104)
-  right outer join testtbl t3 on (
+  right outer join functional.testtbl t3 on (
     t1.id = t3.id
 # predicate on t2 is scan predicate
     and t2.id = 15
@@ -247,13 +247,13 @@ Plan Fragment 0
           t1.id - 1 = t2.id + 1
         OTHER JOIN PREDICATES: t2.zip = 94104
         TUPLE IDS: 0N 1 
-          SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
             PREDICATES: t1.zip = 94611
             TUPLE IDS: 0 
-          SCAN HDFS table=default.testtbl #partitions=0 size=0B (1) compact
+          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
             PREDICATES: t2.id = 15
             TUPLE IDS: 1 
-      SCAN HDFS table=default.testtbl #partitions=0 size=0B (3) compact
+      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
         PREDICATES: t3.id IS NOT NULL
         TUPLE IDS: 2 
 ---- DISTRIBUTEDPLAN
@@ -281,7 +281,7 @@ Plan Fragment 1
           t1.id - 1 = t2.id + 1
         OTHER JOIN PREDICATES: t2.zip = 94104
         TUPLE IDS: 0N 1 
-          SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
             PREDICATES: t1.zip = 94611
             TUPLE IDS: 0 
           EXCHANGE (5)
@@ -295,7 +295,7 @@ Plan Fragment 2
     EXCHANGE ID: 6
     UNPARTITIONED
 
-  SCAN HDFS table=default.testtbl #partitions=0 size=0B (3) compact
+  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
     PREDICATES: t3.id IS NOT NULL
     TUPLE IDS: 2 
 
@@ -305,7 +305,7 @@ Plan Fragment 3
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  SCAN HDFS table=default.testtbl #partitions=0 size=0B (1) compact
+  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
     PREDICATES: t2.id = 15
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS
@@ -315,9 +315,9 @@ NODE 3:
 ====
 # the same thing with subqueries; should produce the same result
 select *
-from (select * from testtbl a1) t1 right outer join (select * from testtbl a2) t2 on (
+from (select * from functional.testtbl a1) t1 right outer join (select * from functional.testtbl a2) t2 on (
     t1.id - 1 = t2.id + 1 and t1.zip = 94611 and t2.zip = 94104)
-  right outer join (select * from testtbl a3) t3 on (
+  right outer join (select * from functional.testtbl a3) t3 on (
     t1.id = t3.id and t2.id = 15 and t1.id - t2.id = 0 and t3.zip = 94720 )
 where t1.id > 0 and t2.id is null and t3.id is not null
 and t1.zip + t2.zip = 10 and t1.zip + t2.zip + t3.zip= 20
@@ -337,13 +337,13 @@ Plan Fragment 0
           a1.id - 1 = a2.id + 1
         OTHER JOIN PREDICATES: a2.zip = 94104
         TUPLE IDS: 0N 2 
-          SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
             PREDICATES: a1.zip = 94611
             TUPLE IDS: 0 
-          SCAN HDFS table=default.testtbl #partitions=0 size=0B (1) compact
+          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
             PREDICATES: a2.id = 15
             TUPLE IDS: 2 
-      SCAN HDFS table=default.testtbl #partitions=0 size=0B (3) compact
+      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
         PREDICATES: a3.id IS NOT NULL
         TUPLE IDS: 4 
 ---- DISTRIBUTEDPLAN
@@ -371,7 +371,7 @@ Plan Fragment 1
           a1.id - 1 = a2.id + 1
         OTHER JOIN PREDICATES: a2.zip = 94104
         TUPLE IDS: 0N 2 
-          SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+          SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
             PREDICATES: a1.zip = 94611
             TUPLE IDS: 0 
           EXCHANGE (5)
@@ -385,7 +385,7 @@ Plan Fragment 2
     EXCHANGE ID: 6
     UNPARTITIONED
 
-  SCAN HDFS table=default.testtbl #partitions=0 size=0B (3) compact
+  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (3) compact
     PREDICATES: a3.id IS NOT NULL
     TUPLE IDS: 4 
 
@@ -395,7 +395,7 @@ Plan Fragment 3
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  SCAN HDFS table=default.testtbl #partitions=0 size=0B (1) compact
+  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
     PREDICATES: a2.id = 15
     TUPLE IDS: 2 
 ---- SCANRANGELOCATIONS

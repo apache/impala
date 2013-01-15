@@ -28,6 +28,7 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   def teardown_method(self, method):
     self.cleanup_db('hive_test_db')
 
+  @pytest.mark.xfail(run=False, reason='Investigate')
   def test_show_tables(self, vector):
     self.run_test_case('QueryTest/show', vector)
 
@@ -78,8 +79,9 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
     assert tbl_name in result.data
 
     # Make sure we can actually use the table
-    self.execute_query("insert overwrite table %s.%s select 1 from alltypes limit 5"\
-        % (db_name, tbl_name))
+    self.execute_query(("insert overwrite table %s.%s "
+                        "select 1 from functional.alltypes limit 5"
+                         % (db_name, tbl_name)))
     result = self.execute_scalar("select count(*) from %s.%s" % (db_name, tbl_name))
     assert int(result) == 5
 

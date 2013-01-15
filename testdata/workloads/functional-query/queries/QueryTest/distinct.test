@@ -2,7 +2,7 @@
 ---- QUERY
 # count(distinct)
 select count(distinct smallint_col, tinyint_col)
-from alltypesagg$TABLE
+from alltypesagg
 ---- TYPES
 bigint
 ---- RESULTS
@@ -10,7 +10,7 @@ bigint
 ====
 ---- QUERY
 select count(distinct bool_col)
-from alltypesagg$TABLE
+from alltypesagg
 ---- TYPES
 bigint
 ---- RESULTS
@@ -18,7 +18,7 @@ bigint
 ====
 ---- QUERY
 select count(distinct int_col)
-from alltypesagg$TABLE
+from alltypesagg
 ---- TYPES
 bigint
 ---- RESULTS
@@ -26,7 +26,7 @@ bigint
 ====
 ---- QUERY
 select count(distinct float_col)
-from alltypesagg$TABLE
+from alltypesagg
 ---- TYPES
 bigint
 ---- RESULTS
@@ -34,7 +34,7 @@ bigint
 ====
 ---- QUERY
 select count(distinct double_col)
-from alltypesagg$TABLE
+from alltypesagg
 ---- TYPES
 bigint
 ---- RESULTS
@@ -42,7 +42,7 @@ bigint
 ====
 ---- QUERY
 select count(distinct string_col)
-from alltypesagg$TABLE
+from alltypesagg
 ---- TYPES
 bigint
 ---- RESULTS
@@ -50,7 +50,7 @@ bigint
 ====
 ---- QUERY
 select count(distinct string_col)
-from alltypesagg$TABLE
+from alltypesagg
 ---- TYPES
 bigint
 ---- RESULTS
@@ -58,7 +58,7 @@ bigint
 ====
 ---- QUERY
 select count(distinct timestamp_col)
-from alltypesagg$TABLE
+from alltypesagg
 ---- TYPES
 bigint
 ---- RESULTS
@@ -67,7 +67,7 @@ bigint
 ---- QUERY
 # count(distinct) w/ grouping and non-distinct count()
 select tinyint_col, count(distinct smallint_col), count(smallint_col)
-from alltypesagg$TABLE group by 1
+from alltypesagg group by 1
 ---- TYPES
 tinyint, bigint, bigint
 ---- RESULTS
@@ -85,7 +85,7 @@ NULL,10,900
 ---- QUERY
 # count(distinct) w/ grouping and non-distinct count()
 select tinyint_col, count(distinct int_col, smallint_col), count(smallint_col)
-from alltypesagg$TABLE group by 1
+from alltypesagg group by 1
 ---- TYPES
 tinyint, bigint, bigint
 ---- RESULTS
@@ -104,7 +104,7 @@ NULL,100,900
 # count(distinct) and sum(distinct) w/ grouping and non-distinct count()
 select tinyint_col, count(distinct smallint_col), sum(distinct smallint_col),
 count(smallint_col)
-from alltypesagg$TABLE group by 1
+from alltypesagg group by 1
 ---- TYPES
 tinyint, bigint, bigint, bigint
 ---- RESULTS
@@ -124,7 +124,7 @@ NULL,10,450,900
 # ignored
 select tinyint_col, count(distinct smallint_col), sum(distinct smallint_col),
 count(smallint_col), min(distinct int_col), max(distinct float_col)
-from alltypesagg$TABLE group by 1
+from alltypesagg group by 1
 ---- TYPES
 tinyint, bigint, bigint, bigint, int, float
 ---- RESULTS
@@ -141,7 +141,7 @@ NULL,10,450,900,10,1089
 ====
 ---- QUERY
 # count distinct order by the same agg expr
-select count(distinct id) as count_id from alltypessmall order by count_id limit 100
+select count(distinct id) as count_id from functional.alltypessmall order by count_id limit 100
 ---- TYPES
 bigint
 ---- RESULTS
@@ -149,7 +149,7 @@ bigint
 ====
 ---- QUERY
 # count distinct order by a diff agg expr
-select count(distinct id) as sum_id from alltypessmall order by max(distinct id)
+select count(distinct id) as sum_id from functional.alltypessmall order by max(distinct id)
 limit 100
 ---- TYPES
 bigint
@@ -159,7 +159,7 @@ bigint
 ---- QUERY
 # distinct *
 select distinct *
-from alltypesagg$TABLE
+from alltypesagg
 where id < 20
 ---- TYPES
 int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
@@ -188,7 +188,7 @@ int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, stri
 ---- QUERY
 # distinct w/ explicit select list
 select distinct bool_col, tinyint_col
-from alltypesagg$TABLE
+from alltypesagg
 ---- TYPES
 boolean, tinyint
 ---- RESULTS

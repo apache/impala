@@ -7,8 +7,8 @@
 select
   o_orderpriority,
   count(distinct l_orderkey) as order_count
-from tpch.lineitem$TABLE l
-inner join tpch.orders$TABLE o
+from lineitem l
+inner join orders o
   on (o.o_orderkey = l.l_orderkey and
       l.l_commitdate < l.l_receiptdate)
 where

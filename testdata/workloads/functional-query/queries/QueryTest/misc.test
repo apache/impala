@@ -1,14 +1,14 @@
 ====
 ---- QUERY
 # Test for selecting from table with null and empty strings.
-select * from nulltable$TABLE
+select * from nulltable
 ---- TYPES
 string, string, string, int, double
 ---- RESULTS
 'a','','NULL',NULL,NULL
 ====
 ---- QUERY
-select count(*),count(a),count(b),count(c),count(d),count(e) from nulltable$TABLE
+select count(*),count(a),count(b),count(c),count(d),count(e) from nulltable
 ---- TYPES
 bigint, bigint, bigint, bigint, bigint, bigint
 ---- RESULTS
@@ -16,14 +16,14 @@ bigint, bigint, bigint, bigint, bigint, bigint
 ====
 ---- QUERY
 # Test for selecting from table with '\' escape character with null and empty strings.
-select * from nullescapedtable$TABLE
+select * from nullescapedtable
 ---- TYPES
 string, string, string, int, double
 ---- RESULTS
 'a','','NULL',NULL,NULL
 ====
 ---- QUERY
-select count(*),count(a),count(b),count(c), count(d), count(e) from nullescapedtable$TABLE
+select count(*),count(a),count(b),count(c), count(d), count(e) from nullescapedtable
 ---- TYPES
 bigint, bigint, bigint, bigint, bigint, bigint
 ---- RESULTS
@@ -32,7 +32,7 @@ bigint, bigint, bigint, bigint, bigint, bigint
 ---- QUERY
 # Test to select from table with additional columns at the end that are not in the 
 # schema and with missing columns
-select * from tblwithraggedcolumns$TABLE
+select * from tblwithraggedcolumns
 ---- TYPES
 string, int
 ---- RESULTS
@@ -50,7 +50,7 @@ string, int
 'hello',1
 ====
 ---- QUERY
-select int_col from tblwithraggedcolumns$TABLE
+select int_col from tblwithraggedcolumns
 ---- TYPES
 int
 ---- RESULTS
@@ -68,7 +68,7 @@ NULL
 NULL
 ====
 ---- QUERY
-select str_col from tblwithraggedcolumns$TABLE
+select str_col from tblwithraggedcolumns
 ---- TYPES
 string
 ---- RESULTS
@@ -88,7 +88,7 @@ string
 ---- QUERY
 # Quoting test
 SELECT `table_alias`.`int_col` AS `default_int_col` 
-FROM `default`.`alltypes` `table_alias` 
+FROM `functional`.`alltypes` `table_alias` 
 GROUP BY `default_int_col` 
 LIMIT 10
 ---- TYPES
@@ -107,7 +107,7 @@ int
 ====
 ---- QUERY
 # Select from table with escape char that is same as delim char
-SELECT * FROM escapechartesttable$TABLE
+SELECT * FROM escapechartesttable
 ---- TYPES
 int, boolean
 ---- RESULTS

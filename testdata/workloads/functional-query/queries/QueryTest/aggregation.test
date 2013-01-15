@@ -109,7 +109,7 @@
 #====
 # no grouping exprs, cols contain nulls except for bool cols
 select count(bool_col), min(bool_col), max(bool_col)
-from alltypesagg$TABLE
+from alltypesagg
 ---- TYPES
 bigint, boolean, boolean
 ---- RESULTS
@@ -119,7 +119,7 @@ bigint, boolean, boolean
 # no grouping exprs, cols contain nulls
 select count(*), count(tinyint_col), min(tinyint_col), max(tinyint_col), sum(tinyint_col),
 avg(tinyint_col)
-from alltypesagg$TABLE
+from alltypesagg
 ---- TYPES
 bigint, bigint, tinyint, tinyint, bigint, double
 ---- RESULTS
@@ -128,7 +128,7 @@ bigint, bigint, tinyint, tinyint, bigint, double
 ---- QUERY
 select count(*), count(smallint_col), min(smallint_col), max(smallint_col), sum(smallint_col),
 avg(smallint_col)
-from alltypesagg$TABLE
+from alltypesagg
 ---- TYPES
 bigint, bigint, smallint, smallint, bigint, double
 ---- RESULTS
@@ -136,7 +136,7 @@ bigint, bigint, smallint, smallint, bigint, double
 ====
 ---- QUERY
 select count(*), count(int_col), min(int_col), max(int_col), sum(int_col), avg(int_col)
-from alltypesagg$TABLE
+from alltypesagg
 ---- TYPES
 bigint, bigint, int, int, bigint, double
 ---- RESULTS
@@ -145,7 +145,7 @@ bigint, bigint, int, int, bigint, double
 ---- QUERY
 select count(*), count(bigint_col), min(bigint_col), max(bigint_col), sum(bigint_col),
 avg(bigint_col)
-from alltypesagg$TABLE
+from alltypesagg
 ---- TYPES
 bigint, bigint, bigint, bigint, bigint, double
 ---- RESULTS
@@ -154,7 +154,7 @@ bigint, bigint, bigint, bigint, bigint, double
 ---- QUERY
 select count(*), count(float_col), min(float_col), max(float_col), sum(float_col),
 avg(float_col)
-from alltypesagg$TABLE
+from alltypesagg
 ---- TYPES
 bigint, bigint, float, float, double, double
 ---- RESULTS
@@ -163,7 +163,7 @@ bigint, bigint, float, float, double, double
 ---- QUERY
 select count(*), count(double_col), min(double_col), max(double_col), round(sum(double_col), 0),
 round(avg(double_col), 0)
-from alltypesagg$TABLE
+from alltypesagg
 ---- TYPES
 bigint, bigint, double, double, double, double
 ---- RESULTS
@@ -172,7 +172,7 @@ bigint, bigint, double, double, double, double
 ---- QUERY
 select count(*), min(string_col), max(string_col), min(date_string_col),
 max(date_string_col) 
-from alltypesagg$TABLE
+from alltypesagg
 ---- TYPES
 bigint, string, string, string, string
 ---- RESULTS
@@ -181,7 +181,7 @@ bigint, string, string, string, string
 #---- QUERY
 # TODO: figure out why I'm getting a diff on the avg(timestamp_col) expr
 # 2010-01-05 20:47:11.705094575
-#select min(timestamp_col), max(timestamp_col), avg(timestamp_col) from alltypesagg$TABLE
+#select min(timestamp_col), max(timestamp_col), avg(timestamp_col) from alltypesagg
 #---- TYPES
 #timestamp, timestamp, timestamp
 #---- RESULTS
@@ -189,7 +189,7 @@ bigint, string, string, string, string
 ====
 ---- QUERY
 # grouping by different data types, with NULLs
-select tinyint_col, count(*) from alltypesagg$TABLE group by 1
+select tinyint_col, count(*) from alltypesagg group by 1
 ---- TYPES
 tinyint, bigint
 ---- RESULTS
@@ -206,7 +206,7 @@ NULL,1000
 ====
 ---- QUERY
 # grouping by different data types, with NULLs, grouping expr missing from select list
-select bool_col,min(bool_col),max(bool_col) from alltypesagg$TABLE group by 1
+select bool_col,min(bool_col),max(bool_col) from alltypesagg group by 1
 ---- TYPES
 boolean,boolean,boolean
 ---- RESULTS
@@ -214,7 +214,7 @@ false,false,false
 true,true,true
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE group by tinyint_col
+select count(*) from alltypesagg group by tinyint_col
 ---- TYPES
 bigint
 ---- RESULTS
@@ -230,7 +230,7 @@ bigint
 1000
 ====
 ---- QUERY
-select smallint_col % 10, count(*) from alltypesagg$TABLE group by 1
+select smallint_col % 10, count(*) from alltypesagg group by 1
 ---- TYPES
 smallint, bigint
 ---- RESULTS
@@ -247,7 +247,7 @@ smallint, bigint
 NULL,100
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE group by smallint_col % 10
+select count(*) from alltypesagg group by smallint_col % 10
 ---- TYPES
 bigint
 ---- RESULTS
@@ -264,7 +264,7 @@ bigint
 900
 ====
 ---- QUERY
-select int_col % 10, count(*) from alltypesagg$TABLE group by 1
+select int_col % 10, count(*) from alltypesagg group by 1
 ---- TYPES
 int, bigint
 ---- RESULTS
@@ -281,7 +281,7 @@ int, bigint
 NULL,10
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE group by int_col % 10
+select count(*) from alltypesagg group by int_col % 10
 ---- TYPES
 bigint
 ---- RESULTS
@@ -298,7 +298,7 @@ bigint
 990
 ====
 ---- QUERY
-select bigint_col % 100, count(*) from alltypesagg$TABLE group by 1
+select bigint_col % 100, count(*) from alltypesagg group by 1
 ---- TYPES
 bigint, bigint
 ---- RESULTS
@@ -315,7 +315,7 @@ bigint, bigint
 NULL,10
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE group by bigint_col % 100
+select count(*) from alltypesagg group by bigint_col % 100
 ---- TYPES
 bigint
 ---- RESULTS
@@ -332,7 +332,7 @@ bigint
 990
 ====
 ---- QUERY
-select date_string_col, count(*) from alltypesagg$TABLE group by 1
+select date_string_col, count(*) from alltypesagg group by 1
 ---- TYPES
 string, bigint
 ---- RESULTS
@@ -348,7 +348,7 @@ string, bigint
 '01/10/10',1000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE group by date_string_col
+select count(*) from alltypesagg group by date_string_col
 ---- TYPES
 bigint
 ---- RESULTS
@@ -365,7 +365,7 @@ bigint
 ====
 ---- QUERY
 # grouping by multiple exprs, with nulls
-select tinyint_col % 3, smallint_col % 3, count(*) from alltypesagg$TABLE
+select tinyint_col % 3, smallint_col % 3, count(*) from alltypesagg
 where day = 1 group by 1, 2
 ---- TYPES
 tinyint, smallint, bigint
@@ -385,7 +385,7 @@ NULL,2,30
 NULL,NULL,10
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE
+select count(*) from alltypesagg
 where day = 1 group by tinyint_col % 3, smallint_col % 3
 ---- TYPES
 bigint
@@ -406,7 +406,7 @@ bigint
 ====
 ---- QUERY
 # same result as previous query
-select tinyint_col % 3, smallint_col % 3, count(*) from alltypesagg$TABLE where day = 1 group by 2, 1
+select tinyint_col % 3, smallint_col % 3, count(*) from alltypesagg where day = 1 group by 2, 1
 ---- TYPES
 tinyint, smallint, bigint
 ---- RESULTS
@@ -426,7 +426,7 @@ NULL,NULL,10
 ====
 ---- QUERY
 select tinyint_col % 2, smallint_col % 2, int_col % 2, bigint_col % 2, date_string_col, count(*)
-from alltypesagg$TABLE
+from alltypesagg
 where date_string_col = '01/01/10' or date_string_col = '01/02/10'
 group by 1, 2, 3, 4, 5
 ---- TYPES
@@ -445,7 +445,7 @@ NULL,NULL,NULL,NULL,'01/02/10',1
 ====
 ---- QUERY
 select count(*)
-from alltypesagg$TABLE
+from alltypesagg
 where date_string_col = '01/01/10' or date_string_col = '01/02/10'
 group by tinyint_col % 2, smallint_col % 2, int_col % 2, bigint_col % 2, date_string_col
 ---- TYPES
@@ -465,7 +465,7 @@ bigint
 ---- QUERY
 # no grouping cols, no matching rows
 select count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col), avg(tinyint_col)
-from alltypesagg$TABLE
+from alltypesagg
 where tinyint_col = -1
 ---- TYPES
 bigint, tinyint, tinyint, bigint, double
@@ -474,7 +474,7 @@ bigint, tinyint, tinyint, bigint, double
 ====
 ---- QUERY
 select count(*), min(smallint_col), max(smallint_col), sum(smallint_col), avg(smallint_col)
-from alltypesagg$TABLE
+from alltypesagg
 where smallint_col = -1
 ---- TYPES
 bigint, smallint, smallint, bigint, double
@@ -483,7 +483,7 @@ bigint, smallint, smallint, bigint, double
 ====
 ---- QUERY
 select count(*), min(int_col), max(int_col), sum(int_col), avg(int_col)
-from alltypesagg$TABLE
+from alltypesagg
 where int_col = -1
 ---- TYPES
 bigint, int, int, bigint, double
@@ -492,7 +492,7 @@ bigint, int, int, bigint, double
 ====
 ---- QUERY
 select count(*), min(bigint_col), max(bigint_col), sum(bigint_col), avg(bigint_col)
-from alltypesagg$TABLE
+from alltypesagg
 where bigint_col = -1
 ---- TYPES
 bigint, bigint, bigint, bigint, double
@@ -501,7 +501,7 @@ bigint, bigint, bigint, bigint, double
 ====
 ---- QUERY
 select count(*), min(float_col), max(float_col), sum(float_col), avg(float_col)
-from alltypesagg$TABLE
+from alltypesagg
 where float_col < -1.0
 ---- TYPES
 bigint, float, float, double, double
@@ -510,7 +510,7 @@ bigint, float, float, double, double
 ====
 ---- QUERY
 select count(*), min(double_col), max(double_col), sum(double_col), avg(double_col)
-from alltypesagg$TABLE
+from alltypesagg
 where double_col < -1.0
 ---- TYPES
 bigint, double, double, double, double
@@ -519,7 +519,7 @@ bigint, double, double, double, double
 ====
 ---- QUERY
 # HAVING clauses over all aggregation functions, plus compound HAVING clauses
-select int_col % 7, count(*), max(int_col) from alltypesagg$TABLE group by 1
+select int_col % 7, count(*), max(int_col) from alltypesagg group by 1
 ---- TYPES
 int, bigint, int
 ---- RESULTS
@@ -533,7 +533,7 @@ int, bigint, int
 NULL,10,NULL
 ====
 ---- QUERY
-select int_col % 7, count(*) from alltypesagg$TABLE group by 1 having max(int_col) > 991
+select int_col % 7, count(*) from alltypesagg group by 1 having max(int_col) > 991
 ---- TYPES
 int, bigint
 ---- RESULTS
@@ -546,7 +546,7 @@ int, bigint
 6,1420
 ====
 ---- QUERY
-select int_col % 7, count(*) from alltypesagg$TABLE group by 1
+select int_col % 7, count(*) from alltypesagg group by 1
 having max(int_col) > 991 and count(*) > 1420
 ---- TYPES
 int, bigint
@@ -558,7 +558,7 @@ int, bigint
 5,1430
 ====
 ---- QUERY
-select int_col % 7, count(*) from alltypesagg$TABLE group by 1
+select int_col % 7, count(*) from alltypesagg group by 1
 having min(int_col) < 7
 ---- TYPES
 int, bigint
@@ -571,7 +571,7 @@ int, bigint
 6,1420
 ====
 ---- QUERY
-select int_col % 7, count(*) from alltypesagg$TABLE group by 1
+select int_col % 7, count(*) from alltypesagg group by 1
 having min(int_col) < 7 and count(*) > 1420
 ---- TYPES
 int, bigint
@@ -583,7 +583,7 @@ int, bigint
 5,1430
 ====
 ---- QUERY
-select int_col % 7, count(*), sum(int_col) from alltypesagg$TABLE group by 1
+select int_col % 7, count(*), sum(int_col) from alltypesagg group by 1
 ---- TYPES
 int, bigint, bigint
 ---- RESULTS
@@ -597,7 +597,7 @@ int, bigint, bigint
 NULL,10,NULL
 ====
 ---- QUERY
-select int_col % 7, count(*), sum(int_col) from alltypesagg$TABLE group by 1
+select int_col % 7, count(*), sum(int_col) from alltypesagg group by 1
 having sum(int_col) >= 715000
 ---- TYPES
 int, bigint, bigint
@@ -607,7 +607,7 @@ int, bigint, bigint
 5,1430,717860
 ====
 ---- QUERY
-select int_col % 7, count(*), sum(int_col) from alltypesagg$TABLE group by 1
+select int_col % 7, count(*), sum(int_col) from alltypesagg group by 1
 having sum(int_col) >= 715000 or count(*) > 1420
 ---- TYPES
 int, bigint, bigint
@@ -619,7 +619,7 @@ int, bigint, bigint
 5,1430,717860
 ====
 ---- QUERY
-select int_col % 7, count(*), sum(int_col) from alltypesagg$TABLE group by 1
+select int_col % 7, count(*), sum(int_col) from alltypesagg group by 1
 having sum(int_col) is null
 ---- TYPES
 int, bigint, bigint
@@ -627,7 +627,7 @@ int, bigint, bigint
 NULL,10,NULL
 ====
 ---- QUERY
-select int_col % 7, count(*), avg(int_col) from alltypesagg$TABLE group by 1
+select int_col % 7, count(*), avg(int_col) from alltypesagg group by 1
 ---- TYPES
 int, bigint, double
 ---- RESULTS
@@ -641,7 +641,7 @@ int, bigint, double
 NULL,10,NULL
 ====
 ---- QUERY
-select int_col % 7, count(*), avg(int_col) from alltypesagg$TABLE group by 1
+select int_col % 7, count(*), avg(int_col) from alltypesagg group by 1
 having avg(int_col) > 500
 ---- TYPES
 int, bigint, double
@@ -651,7 +651,7 @@ int, bigint, double
 5,1430,502
 ====
 ---- QUERY
-select int_col % 7, count(*), avg(int_col) from alltypesagg$TABLE group by 1
+select int_col % 7, count(*), avg(int_col) from alltypesagg group by 1
 having avg(int_col) > 500 or count(*) = 10
 ---- TYPES
 int, bigint, double
@@ -662,7 +662,7 @@ int, bigint, double
 NULL,10,NULL
 ====
 ---- QUERY
-select timestamp_col, count(*) from alltypesagg$TABLE
+select timestamp_col, count(*) from alltypesagg
 group by timestamp_col having timestamp_col < cast('2010-01-01 01:05:20' as timestamp)
 ---- TYPES
 timestamp, bigint

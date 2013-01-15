@@ -1,14 +1,14 @@
 ====
 ---- QUERY
 # insert overwrite unpartitioned table
-insert overwrite table alltypesnopart_insert$TABLE
+insert overwrite table alltypesnopart_insert
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypessmall
 where year=2009 and month=04
 ---- SETUP
-RESET alltypesnopart_insert$TABLE
-RELOAD alltypesnopart_insert$TABLE
+RESET alltypesnopart_insert
+RELOAD alltypesnopart_insert
 ---- RESULTS
 ---- PARTITIONS
 /: 25
@@ -17,7 +17,7 @@ RELOAD alltypesnopart_insert$TABLE
 # search the overwritten table to verify the results
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
-from alltypesnopart_insert$TABLE
+from alltypesnopart_insert
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 ---- RESULTS
@@ -49,20 +49,20 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 ====
 ---- QUERY
 # insert into unpartitioned table
-insert into table alltypesnopart_insert$TABLE
+insert into table alltypesnopart_insert
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col
 from alltypessmall
 where year=2009 and month=04
 ---- SETUP
-RESET alltypesnopart_insert$TABLE
+RESET alltypesnopart_insert
 ---- RESULTS
 ---- PARTITIONS
 /: 25
 ====
 ---- QUERY
 # search the table to verify it contains 25 rows
-select count(*) from alltypesnopart_insert$TABLE
+select count(*) from alltypesnopart_insert
 ---- TYPES
 bigint
 ---- RESULTS
@@ -70,15 +70,15 @@ bigint
 ====
 ---- QUERY
 # static partition overwrite
-insert overwrite table alltypesinsert$TABLE
+insert overwrite table alltypesinsert
 partition (year=2009, month=4) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col
-from alltypessmall
+from functional.alltypessmall
 where year=2009 and month=4
 ---- SETUP
-DROP PARTITIONS alltypesinsert$TABLE
-RESET alltypesinsert$TABLE
+DROP PARTITIONS alltypesinsert
+RESET alltypesinsert
 ---- RESULTS
 ---- PARTITIONS
 /year=2009/month=4/: 25
@@ -87,7 +87,7 @@ RESET alltypesinsert$TABLE
 # search the overwritten partition to verify the results
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
-from alltypesinsert$TABLE
+from alltypesinsert
 where year=2009 and month=4
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string
@@ -120,21 +120,21 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 ====
 ---- QUERY
 # static partition insert$TABLE, test creation of partitions
-insert into table alltypesinsert$TABLE
+insert into table alltypesinsert
 partition (year=2009, month=4) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col
-from alltypessmall
+from functional.alltypessmall
 where year=2009 and month=4
 ---- SETUP
-DROP PARTITIONS alltypesinsert$TABLE
+DROP PARTITIONS alltypesinsert
 ---- RESULTS
 ---- PARTITIONS
 /year=2009/month=4/: 25
 ====
 ---- QUERY
 # search the partition to verify it contains all 25 rows
-select count(*) from alltypesinsert$TABLE
+select count(*) from alltypesinsert
 where year=2009 and month=4
 ---- TYPES
 bigint
@@ -143,14 +143,14 @@ bigint
 ====
 ---- QUERY
 # partially dynamic partition overwrite
-insert overwrite table alltypesinsert$TABLE
+insert overwrite table alltypesinsert
 partition (year=2009, month) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col, month
-from alltypessmall
+from functional.alltypessmall
 where year=2009 and month>1 and month<=4
 ---- SETUP
-DROP PARTITIONS alltypesinsert$TABLE
+DROP PARTITIONS alltypesinsert
 ---- RESULTS
 ---- PARTITIONS
 /year=2009/month=2/: 25
@@ -161,7 +161,7 @@ DROP PARTITIONS alltypesinsert$TABLE
 # search the overwritten partition to verify the results
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
-from alltypesinsert$TABLE
+from alltypesinsert
 where year=2009 and month>1 and month<=4
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string
@@ -244,14 +244,14 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 ====
 ---- QUERY
 # partially dynamic partition insert$TABLE, check partition creation
-insert into table alltypesinsert$TABLE
+insert into table alltypesinsert
 partition (year=2009, month) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col, month
-from alltypessmall
+from functional.alltypessmall
 where year=2009 and month>=1 and month<4
 ---- SETUP
-DROP PARTITIONS alltypesinsert$TABLE
+DROP PARTITIONS alltypesinsert
 ---- RESULTS
 year=2009/month=1/
 year=2009/month=2/
@@ -263,7 +263,7 @@ year=2009/month=3/
 ====
 ---- QUERY
 # search the partitions to verify they contain all 75 rows
-select count(id) from alltypesinsert$TABLE
+select count(id) from alltypesinsert
 where year=2009 and month>=1 and month<4
 ---- TYPES
 bigint
@@ -272,13 +272,13 @@ bigint
 ====
 ---- QUERY
 # fully dynamic partition overwrite
-insert overwrite table alltypesinsert$TABLE
+insert overwrite table alltypesinsert
 partition (year, month) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-from alltypessmall
+from functional.alltypessmall
 ---- SETUP
-DROP PARTITIONS alltypesinsert$TABLE
+DROP PARTITIONS alltypesinsert
 ---- RESULTS
 ---- PARTITIONS
 /year=2009/month=1/: 25
@@ -290,7 +290,7 @@ DROP PARTITIONS alltypesinsert$TABLE
 # search the overwritten partition to verify the results
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col
-from alltypesinsert$TABLE
+from alltypesinsert
 where year=2009 and month>=1 and month<=4
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string
@@ -398,13 +398,13 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string
 ====
 ---- QUERY
 # fully dynamic partition insert$TABLE, check partition creation
-insert into table alltypesinsert$TABLE
+insert into table alltypesinsert
 partition (year, month) 
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, 
 float_col, double_col, date_string_col, string_col, timestamp_col, year, month
-from alltypessmall
+from functional.alltypessmall
 ---- SETUP
-DROP PARTITIONS alltypesinsert$TABLE
+DROP PARTITIONS alltypesinsert
 ---- RESULTS
 ---- PARTITIONS
 /year=2009/month=1/: 25
@@ -414,7 +414,7 @@ DROP PARTITIONS alltypesinsert$TABLE
 ====
 ---- QUERY
 # search the partitions to verify they contain all 100 rows
-select count(timestamp_col) from alltypesinsert$TABLE
+select count(timestamp_col) from alltypesinsert
 where year=2009 and month>=1 and month<=4
 ---- TYPES
 bigint

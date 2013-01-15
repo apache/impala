@@ -1,7 +1,7 @@
 ====
 ---- QUERY
 # Reference the string row key but do not create a predicate on the key.
-select distinct id from hbasestringids where int_col = 1
+select distinct id from functional.hbasestringids where int_col = 1
 ---- TYPES
 string
 ---- RESULTS
@@ -17,7 +17,7 @@ string
 '7001'
 ====
 ---- QUERY
-select * from hbasealltypessmall where string_col = '4'
+select * from functional.hbasealltypessmall where string_col = '4'
 ---- TYPES
 int, boolean, double, float, bigint, int, smallint, tinyint, string, string, timestamp
 ---- RESULTS
@@ -36,7 +36,7 @@ int, boolean, double, float, bigint, int, smallint, tinyint, string, string, tim
 ====
 ---- QUERY
 # make sure this works even when not requesting the col family w/ the predicate
-select tinyint_col from hbasealltypessmall where string_col = '4'
+select tinyint_col from functional.hbasealltypessmall where string_col = '4'
 ---- TYPES
 tinyint
 ---- RESULTS
@@ -54,42 +54,42 @@ tinyint
 4
 ====
 ---- QUERY
-select count(*) from hbasealltypessmall where string_col = '4'
+select count(*) from functional.hbasealltypessmall where string_col = '4'
 ---- TYPES
 bigint
 ---- RESULTS
 12
 ====
 ---- QUERY
-select count(*) from hbasealltypessmall where string_col != '4'
+select count(*) from functional.hbasealltypessmall where string_col != '4'
 ---- TYPES
 bigint
 ---- RESULTS
 88
 ====
 ---- QUERY
-select count(*) from hbasealltypessmall where string_col < '4'
+select count(*) from functional.hbasealltypessmall where string_col < '4'
 ---- TYPES
 bigint
 ---- RESULTS
 48
 ====
 ---- QUERY
-select count(*) from hbasealltypessmall where string_col > '4'
+select count(*) from functional.hbasealltypessmall where string_col > '4'
 ---- TYPES
 bigint
 ---- RESULTS
 40
 ====
 ---- QUERY
-select count(*) from hbasealltypessmall where string_col <= '4'
+select count(*) from functional.hbasealltypessmall where string_col <= '4'
 ---- TYPES
 bigint
 ---- RESULTS
 60
 ====
 ---- QUERY
-select count(*) from hbasealltypessmall where string_col >= '4'
+select count(*) from functional.hbasealltypessmall where string_col >= '4'
 ---- TYPES
 bigint
 ---- RESULTS
@@ -97,7 +97,7 @@ bigint
 ====
 ---- QUERY
 # empty result
-select count(*) from hbasealltypessmall where string_col = '100'
+select count(*) from functional.hbasealltypessmall where string_col = '100'
 ---- TYPES
 bigint
 ---- RESULTS
@@ -105,7 +105,7 @@ bigint
 ====
 ---- QUERY
 # multiple filters
-select * from hbasealltypessmall where string_col = '4' and date_string_col = '01/01/09'
+select * from functional.hbasealltypessmall where string_col = '4' and date_string_col = '01/01/09'
 ---- TYPES
 int, boolean, double, float, bigint, int, smallint, tinyint, string, string, timestamp
 ---- RESULTS
@@ -113,7 +113,7 @@ int, boolean, double, float, bigint, int, smallint, tinyint, string, string, tim
 ====
 ---- QUERY
 # hbase filter with regular predicate
-select * from hbasealltypessmall where string_col <= '4' and int_col >= 4
+select * from functional.hbasealltypessmall where string_col <= '4' and int_col >= 4
 ---- TYPES
 int, boolean, double, float, bigint, int, smallint, tinyint, string, string, timestamp
 ---- RESULTS
@@ -132,7 +132,7 @@ int, boolean, double, float, bigint, int, smallint, tinyint, string, string, tim
 ====
 ---- QUERY
 # hbase filter with regular predicate and start/stop keys
-select * from hbasestringids where string_col <= '4' and int_col >= 4 and id > '390' and id < '400'
+select * from functional.hbasestringids where string_col <= '4' and int_col >= 4 and id > '390' and id < '400'
 ---- TYPES
 string, boolean, double, float, bigint, int, smallint, tinyint, string, string, timestamp
 ---- RESULTS
@@ -150,14 +150,14 @@ string, boolean, double, float, bigint, int, smallint, tinyint, string, string, 
 ---- QUERY
 # TODO: fix this, this shouldn't match every row
 # comparison w/ cast doesn't turn into a predicate
-#select count(*) from hbasealltypessmall where string_col >= 4
+#select count(*) from functional.hbasealltypessmall where string_col >= 4
 #-----
 #bigint
 #-----
 #12
 #=====
 # non-const comparison doesn't turn into a predicate
-select count(*) from hbasealltypessmall where string_col != date_string_col
+select count(*) from functional.hbasealltypessmall where string_col != date_string_col
 ---- TYPES
 bigint
 ---- RESULTS

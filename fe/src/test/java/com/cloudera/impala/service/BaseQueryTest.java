@@ -119,9 +119,9 @@ public abstract class BaseQueryTest {
     SNAPPY("_snap"),
     LZO("_lzo");
 
-    final String tableSuffix;
-    private CompressionFormat(String tableSuffix) { this.tableSuffix = tableSuffix; }
-    public String getTableSuffix() { return tableSuffix; }
+    private final String dbSuffix;
+    private CompressionFormat(String dbSuffix) { this.dbSuffix = dbSuffix; }
+    public String getDbSuffix() { return dbSuffix; }
   }
 
   protected enum TableFormat {
@@ -131,9 +131,9 @@ public abstract class BaseQueryTest {
     SEQUENCEFILE_RECORD("_seq_record"),
     TREVNI("_trevni");
 
-    final String tableSuffix;
-    private TableFormat(String tableSuffix) { this.tableSuffix = tableSuffix; }
-    public String getTableSuffix() { return tableSuffix; }
+    private final String dbSuffix;
+    private TableFormat(String dbSuffix) { this.dbSuffix = dbSuffix; }
+    public String getDbSuffix() { return dbSuffix; }
   }
 
   static protected class TestConfiguration {
@@ -154,8 +154,8 @@ public abstract class BaseQueryTest {
       this.tableFormat = tableFormat;
     }
 
-    public String getTableSuffix() {
-      return tableFormat.getTableSuffix() + compressionFormat.getTableSuffix();
+    public String getDbSuffix() {
+      return tableFormat.getDbSuffix() + compressionFormat.getDbSuffix();
     }
 
     public TestExecContext getTestExecContext() { return execContext; };
@@ -383,7 +383,7 @@ public abstract class BaseQueryTest {
       config.execContext.getTQueryOptions().setAbort_on_error(abortOnError);
       config.execContext.getTQueryOptions().setMax_errors(maxErrors);
 
-      queryFileParser.parseFile(config.getTableSuffix());
+      queryFileParser.parseFile(config.getDbSuffix());
       runOneQueryTest(queryFileParser, config, new StringBuilder());
 
       // Don't need to (or want to) run multiple test configurations if we are generating
@@ -432,14 +432,14 @@ public abstract class BaseQueryTest {
     for (TestCase testCase: queryFileParser.getTestCases()) {
 
       QueryExecTestResult expectedResult =
-          testCase.getQueryExecTestResult(config.getTableSuffix());
+          testCase.getQueryExecTestResult(config.getDbSuffix());
 
       try {
         // We have to run the setup section once per query, not once per test. Therefore
         // they can be very expensive.
         if (expectedResult.getSetup().size() > 0) {
           runSetupSection(testCase.getSectionContents(Section.SETUP, false,
-                                                      config.getTableSuffix()));
+                                                      config.getDbSuffix()));
         }
 
         // Always reset the catalog if the test file has a setup section
@@ -451,7 +451,7 @@ public abstract class BaseQueryTest {
       }
 
       String queryString = testCase.getSectionAsString(
-          Section.QUERY, false, " ", config.getTableSuffix());
+          Section.QUERY, false, " ", config.getDbSuffix());
 
       QueryExecTestResult result = TestUtils.runQuery(impaladClientExecutor,
           queryString, config.getTestExecContext(), testCase.getStartingLineNum(),

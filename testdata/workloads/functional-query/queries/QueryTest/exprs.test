@@ -1,21 +1,21 @@
 ====
 ---- QUERY
 # IS NULL predicate
-select count(*) from alltypesagg$TABLE
+select count(*) from alltypesagg
 ---- TYPES
 bigint
 ---- RESULTS
 10000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where tinyint_col is null
+select count(*) from alltypesagg where tinyint_col is null
 ---- TYPES
 bigint
 ---- RESULTS
 1000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where tinyint_col is not null
+select count(*) from alltypesagg where tinyint_col is not null
 ---- TYPES
 bigint
 ---- RESULTS
@@ -23,49 +23,49 @@ bigint
 ====
 ---- QUERY
 # =
-select count(*) from alltypesagg$TABLE where tinyint_col = 1
+select count(*) from alltypesagg where tinyint_col = 1
 ---- TYPES
 bigint
 ---- RESULTS
 1000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where smallint_col = 1
+select count(*) from alltypesagg where smallint_col = 1
 ---- TYPES
 bigint
 ---- RESULTS
 100
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where int_col = 1
+select count(*) from alltypesagg where int_col = 1
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where bigint_col = 10
+select count(*) from alltypesagg where bigint_col = 10
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where float_col = cast(1.1 as float)
+select count(*) from alltypesagg where float_col = cast(1.1 as float)
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where double_col = 10.1
+select count(*) from alltypesagg where double_col = 10.1
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where date_string_col = '01/01/10'
+select count(*) from alltypesagg where date_string_col = '01/01/10'
 ---- TYPES
 bigint
 ---- RESULTS
@@ -73,42 +73,42 @@ bigint
 ====
 ---- QUERY
 # <>
-select count(*) from alltypesagg$TABLE where tinyint_col <> 1
+select count(*) from alltypesagg where tinyint_col <> 1
 ---- TYPES
 bigint
 ---- RESULTS
 8000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where smallint_col <> 1
+select count(*) from alltypesagg where smallint_col <> 1
 ---- TYPES
 bigint
 ---- RESULTS
 9800
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where int_col <> 1
+select count(*) from alltypesagg where int_col <> 1
 ---- TYPES
 bigint
 ---- RESULTS
 9980
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where bigint_col <> 1
+select count(*) from alltypesagg where bigint_col <> 1
 ---- TYPES
 bigint
 ---- RESULTS
 9990
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where float_col <> cast(1.1 as float)
+select count(*) from alltypesagg where float_col <> cast(1.1 as float)
 ---- TYPES
 bigint
 ---- RESULTS
 9980
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where double_col <> 10.1
+select count(*) from alltypesagg where double_col <> 10.1
 ---- TYPES
 bigint
 ---- RESULTS
@@ -116,42 +116,42 @@ bigint
 ====
 ---- QUERY
 # <
-select count(*) from alltypesagg$TABLE where tinyint_col < 2
+select count(*) from alltypesagg where tinyint_col < 2
 ---- TYPES
 bigint
 ---- RESULTS
 1000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where smallint_col < 2
+select count(*) from alltypesagg where smallint_col < 2
 ---- TYPES
 bigint
 ---- RESULTS
 100
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where int_col < 2
+select count(*) from alltypesagg where int_col < 2
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where bigint_col < 20
+select count(*) from alltypesagg where bigint_col < 20
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where float_col < 2.2
+select count(*) from alltypesagg where float_col < 2.2
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where double_col < 20.2
+select count(*) from alltypesagg where double_col < 20.2
 ---- TYPES
 bigint
 ---- RESULTS
@@ -159,42 +159,42 @@ bigint
 ====
 ---- QUERY
 # >
-select count(*) from alltypesagg$TABLE where tinyint_col > 1
+select count(*) from alltypesagg where tinyint_col > 1
 ---- TYPES
 bigint
 ---- RESULTS
 8000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where smallint_col > 1
+select count(*) from alltypesagg where smallint_col > 1
 ---- TYPES
 bigint
 ---- RESULTS
 9800
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where int_col > 1
+select count(*) from alltypesagg where int_col > 1
 ---- TYPES
 bigint
 ---- RESULTS
 9980
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where bigint_col > 10
+select count(*) from alltypesagg where bigint_col > 10
 ---- TYPES
 bigint
 ---- RESULTS
 9980
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where float_col > cast(1.1 as float) 
+select count(*) from alltypesagg where float_col > cast(1.1 as float) 
 ---- TYPES
 bigint
 ---- RESULTS
 9980
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where double_col > 10.1
+select count(*) from alltypesagg where double_col > 10.1
 ---- TYPES
 bigint
 ---- RESULTS
@@ -202,42 +202,42 @@ bigint
 ====
 ---- QUERY
 # <=
-select count(*) from alltypesagg$TABLE where tinyint_col <= 1
+select count(*) from alltypesagg where tinyint_col <= 1
 ---- TYPES
 bigint
 ---- RESULTS
 1000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where smallint_col <= 1
+select count(*) from alltypesagg where smallint_col <= 1
 ---- TYPES
 bigint
 ---- RESULTS
 100
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where int_col <= 1
+select count(*) from alltypesagg where int_col <= 1
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where bigint_col <= 10
+select count(*) from alltypesagg where bigint_col <= 10
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where float_col <= cast(1.1 as float)
+select count(*) from alltypesagg where float_col <= cast(1.1 as float)
 ---- TYPES
 bigint
 ---- RESULTS
 10
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where double_col <= 10.1
+select count(*) from alltypesagg where double_col <= 10.1
 ---- TYPES
 bigint
 ---- RESULTS
@@ -245,42 +245,42 @@ bigint
 ====
 ---- QUERY
 # >=
-select count(*) from alltypesagg$TABLE where tinyint_col >= 2
+select count(*) from alltypesagg where tinyint_col >= 2
 ---- TYPES
 bigint
 ---- RESULTS
 8000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where smallint_col >= 2
+select count(*) from alltypesagg where smallint_col >= 2
 ---- TYPES
 bigint
 ---- RESULTS
 9800
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where int_col >= 2
+select count(*) from alltypesagg where int_col >= 2
 ---- TYPES
 bigint
 ---- RESULTS
 9980
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where bigint_col >= 20
+select count(*) from alltypesagg where bigint_col >= 20
 ---- TYPES
 bigint
 ---- RESULTS
 9980
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where float_col >= 2.2
+select count(*) from alltypesagg where float_col >= 2.2
 ---- TYPES
 bigint
 ---- RESULTS
 9980
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where double_col >= 20.2
+select count(*) from alltypesagg where double_col >= 20.2
 ---- TYPES
 bigint
 ---- RESULTS
@@ -301,7 +301,7 @@ bigint
 #SUM(tinyint_col + smallint_col + int_col + bigint_col + float_col),
 #SUM(tinyint_col) + SUM(smallint_col) + SUM(int_col) + SUM(bigint_col) + SUM(float_col) + SUM(double_col),
 #SUM(tinyint_col + smallint_col + int_col + bigint_col + float_col + double_col)
-#from alltypesaggnonulls$TABLE
+#from alltypesaggnonulls
 #---- TYPES
 #bigint, bigint, bigint, bigint, bigint, bigint, double, double, double, double
 #---- RESULTS
@@ -319,7 +319,7 @@ bigint
 #SUM(-1 * tinyint_col - smallint_col - int_col - bigint_col - float_col),
 #-1 * SUM(tinyint_col) - SUM(smallint_col) - SUM(int_col) - SUM(bigint_col) - SUM(float_col) - SUM(double_col),
 #SUM(-1 * tinyint_col - smallint_col - int_col - bigint_col - float_col - double_col)
-#from alltypesaggnonulls$TABLE
+#from alltypesaggnonulls
 #---- TYPES
 #bigint, bigint, bigint, bigint, bigint, bigint, double, double, double, double
 #---- RESULTS
@@ -337,14 +337,14 @@ bigint
 #MAX(tinyint_col * smallint_col * int_col * bigint_col * float_col),
 #MAX(tinyint_col) * MAX(smallint_col) * MAX(int_col) * MAX(bigint_col) * MAX(float_col) * MAX(double_col),
 #MAX(tinyint_col * smallint_col * int_col * bigint_col * float_col * double_col)
-#from alltypesaggnonulls$TABLE
+#from alltypesaggnonulls
 #---- TYPES
 #bigint, bigint, bigint, bigint, bigint, bigint, double, double, double, double
 #---- RESULTS
 #891,891,890109,890109,8892188910,8892188910,9771626610293.455,9771626610293.455,9.859473533519994e+16,9.859473533519994e+16
 #====
 # LIKE exprs w/ the like/regex pattern coming from a column
-select * from LikeTbl
+select * from functional.LikeTbl
 ---- TYPES
 string, string, string, string, string
 ---- RESULTS
@@ -365,7 +365,7 @@ string, string, string, string, string
 'two','%two%','n%two%','.*two.*','n.*two.*'
 ====
 ---- QUERY
-select str_col, match_like_col from LikeTbl
+select str_col, match_like_col from functional.LikeTbl
 where str_col LIKE match_like_col
 ---- TYPES
 string, string
@@ -386,14 +386,14 @@ string, string
 '','%'
 ====
 ---- QUERY
-select str_col, match_like_col from LikeTbl
+select str_col, match_like_col from functional.LikeTbl
 where str_col NOT LIKE match_like_col
 ---- TYPES
 string, string
 ---- RESULTS
 ====
 ---- QUERY
-select str_col, match_like_col from LikeTbl
+select str_col, match_like_col from functional.LikeTbl
 where str_col LIKE no_match_like_col
 ---- TYPES
 string, string
@@ -401,7 +401,7 @@ string, string
 '','%'
 ====
 ---- QUERY
-select str_col, no_match_like_col from LikeTbl
+select str_col, no_match_like_col from functional.LikeTbl
 where str_col NOT LIKE no_match_like_col
 ---- TYPES
 string, string
@@ -421,7 +421,7 @@ string, string
 'two','n%two%'
 ====
 ---- QUERY
-select str_col, match_regex_col from LikeTbl
+select str_col, match_regex_col from functional.LikeTbl
 where str_col REGEXP match_regex_col
 ---- TYPES
 string, string
@@ -442,21 +442,21 @@ string, string
 '','.*'
 ====
 ---- QUERY
-select str_col, no_match_regex_col from LikeTbl
+select str_col, no_match_regex_col from functional.LikeTbl
 where str_col REGEXP no_match_regex_col
 ---- TYPES
 string, string
 ---- RESULTS
 ====
 ---- QUERY
-select str_col, match_regex_col from LikeTbl
+select str_col, match_regex_col from functional.LikeTbl
 where str_col NOT REGEXP match_regex_col
 ---- TYPES
 string, string
 ---- RESULTS
 ====
 ---- QUERY
-select str_col, no_match_regex_col from LikeTbl
+select str_col, no_match_regex_col from functional.LikeTbl
 where str_col NOT REGEXP no_match_regex_col
 ---- TYPES
 string, string
@@ -487,7 +487,7 @@ bigint
 select timestamp_col, to_date(timestamp_col), year(timestamp_col), month(timestamp_col),
 dayofmonth(timestamp_col), day(timestamp_col), weekofyear(timestamp_col),
 hour(timestamp_col), minute(timestamp_col), second(timestamp_col)
-from alltypessmall$TABLE
+from alltypessmall
 ---- TYPES
 timestamp, string, int, int, int, int, int, int, int, int
 ---- RESULTS
@@ -678,7 +678,7 @@ boolean
 true
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE
+select count(*) from alltypesagg
 where true in (bool_col, tinyint_col)
 ---- TYPES
 bigint
@@ -686,7 +686,7 @@ bigint
 6000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE
+select count(*) from alltypesagg
 where true not in (bool_col, tinyint_col)
 ---- TYPES
 bigint
@@ -694,7 +694,7 @@ bigint
 4000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE
+select count(*) from alltypesagg
 where 1 in (tinyint_col, smallint_col, int_col, bigint_col)
 ---- TYPES
 bigint
@@ -702,7 +702,7 @@ bigint
 1000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE
+select count(*) from alltypesagg
 where 1 not in (tinyint_col, smallint_col, int_col, bigint_col) 
 ---- TYPES
 bigint
@@ -710,7 +710,7 @@ bigint
 8000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE
+select count(*) from alltypesagg
 where 10.1 in (tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col) 
 ---- TYPES
 bigint
@@ -718,7 +718,7 @@ bigint
 10
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE
+select count(*) from alltypesagg
 where 10.1 not in (tinyint_col, smallint_col, int_col, bigint_col, float_col, double_col) 
 ---- TYPES
 bigint
@@ -726,7 +726,7 @@ bigint
 8990
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE
+select count(*) from alltypesagg
 where '01/01/10' in (date_string_col, string_col, 'abc') 
 ---- TYPES
 bigint
@@ -734,7 +734,7 @@ bigint
 1000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE
+select count(*) from alltypesagg
 where '01/01/10' not in (date_string_col, string_col, 'abc')
 ---- TYPES
 bigint
@@ -742,7 +742,7 @@ bigint
 9000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE 
+select count(*) from alltypesagg 
 where cast('2010-01-01 00:00:00' as timestamp) in (timestamp_col)
 ---- TYPES
 bigint
@@ -750,7 +750,7 @@ bigint
 1
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE 
+select count(*) from alltypesagg 
 where cast('2010-01-01 00:00:00' as timestamp) not in (timestamp_col)
 ---- TYPES
 bigint
@@ -759,63 +759,63 @@ bigint
 ====
 ---- QUERY
 # BETWEEN predicate
-select count(*) from alltypesagg$TABLE where tinyint_col between 1 and 2
+select count(*) from alltypesagg where tinyint_col between 1 and 2
 ---- TYPES
 bigint
 ---- RESULTS
 2000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where tinyint_col not between 1 and 2
+select count(*) from alltypesagg where tinyint_col not between 1 and 2
 ---- TYPES
 bigint
 ---- RESULTS
 7000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where smallint_col between 1 and 20
+select count(*) from alltypesagg where smallint_col between 1 and 20
 ---- TYPES
 bigint
 ---- RESULTS
 2000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where smallint_col not between 1 and 20
+select count(*) from alltypesagg where smallint_col not between 1 and 20
 ---- TYPES
 bigint
 ---- RESULTS
 7900
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where int_col between 1 and 200
+select count(*) from alltypesagg where int_col between 1 and 200
 ---- TYPES
 bigint
 ---- RESULTS
 2000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where int_col not between 1 and 200
+select count(*) from alltypesagg where int_col not between 1 and 200
 ---- TYPES
 bigint
 ---- RESULTS
 7990
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where bigint_col between 1 and 2000
+select count(*) from alltypesagg where bigint_col between 1 and 2000
 ---- TYPES
 bigint
 ---- RESULTS
 2000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where bigint_col not between 1 and 2000
+select count(*) from alltypesagg where bigint_col not between 1 and 2000
 ---- TYPES
 bigint
 ---- RESULTS
 7990
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE
+select count(*) from alltypesagg
 where float_col between cast(1.0 as float) and cast(110.0 as float)
 ---- TYPES
 bigint
@@ -823,7 +823,7 @@ bigint
 1000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE
+select count(*) from alltypesagg
 where float_col not between cast(1.0 as float) and cast(110.0 as float)
 ---- TYPES
 bigint
@@ -831,21 +831,21 @@ bigint
 8990
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where double_col between 1.0 and 110.0
+select count(*) from alltypesagg where double_col between 1.0 and 110.0
 ---- TYPES
 bigint
 ---- RESULTS
 100
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where double_col not between 1.0 and 110.0
+select count(*) from alltypesagg where double_col not between 1.0 and 110.0
 ---- TYPES
 bigint
 ---- RESULTS
 9890
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where date_string_col
+select count(*) from alltypesagg where date_string_col
 between '01/01/10' and '01/05/10'
 ---- TYPES
 bigint
@@ -853,7 +853,7 @@ bigint
 5000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where date_string_col
+select count(*) from alltypesagg where date_string_col
 not between '01/01/10' and '01/05/10'
 ---- TYPES
 bigint
@@ -861,7 +861,7 @@ bigint
 5000
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where timestamp_col
+select count(*) from alltypesagg where timestamp_col
 between cast('2010-01-01 00:00:00' as timestamp) 
 and cast('2010-01-01 01:40:00' as timestamp)
 ---- TYPES
@@ -870,7 +870,7 @@ bigint
 100
 ====
 ---- QUERY
-select count(*) from alltypesagg$TABLE where timestamp_col
+select count(*) from alltypesagg where timestamp_col
 not between cast('2010-01-01 00:00:00' as timestamp) 
 and cast('2010-01-01 01:40:00' as timestamp)
 ---- TYPES
@@ -897,7 +897,7 @@ timestamp, timestamp, timestamp, timestamp
 regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
 ====
 ---- QUERY
-select now(), now(), now(), now() from alltypestiny
+select now(), now(), now(), now() from functional.alltypestiny
 ---- TYPES
 timestamp, timestamp, timestamp, timestamp
 ---- RESULTS
@@ -914,7 +914,7 @@ regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1,\1,\1
 ---- QUERY
 # Check that now() returns the same value when evaluated on different nodes
 # (alltypessmall is partitioned)
-select min(now()), max(now()) from alltypessmall
+select min(now()), max(now()) from functional.alltypessmall
 ---- TYPES
 timestamp, timestamp
 ---- RESULTS
@@ -927,7 +927,7 @@ regex: (\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}(\.\d{9})?),\1
 select timestamp_col + interval 10 years,
        interval 10 years + timestamp_col,
        timestamp_col - interval 10 years
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp,timestamp
 ---- RESULTS
@@ -937,7 +937,7 @@ timestamp,timestamp,timestamp
 # Add/sub years, function-call like version.
 select date_add(timestamp_col, interval 10 years),
        date_sub(timestamp_col, interval 10 years)
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp
 ---- RESULTS
@@ -951,7 +951,7 @@ select timestamp_col + interval 13 months,
        interval 1 month + timestamp_col,
        timestamp_col - interval 13 months,
        timestamp_col - interval 1 month
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp,timestamp,timestamp,timestamp,timestamp
 ---- RESULTS
@@ -963,7 +963,7 @@ select date_add(timestamp_col, interval 13 months),
        date_add(timestamp_col, interval 1 month),
        date_sub(timestamp_col, interval 13 months),
        date_sub(timestamp_col, interval 1 month)
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp,timestamp,timestamp
 ---- RESULTS
@@ -977,7 +977,7 @@ select timestamp_col + interval 2 weeks,
        interval 53 weeks + timestamp_col,
        timestamp_col - interval 2 weeks,
        timestamp_col - interval 53 weeks
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp,timestamp,timestamp,timestamp,timestamp
 ---- RESULTS
@@ -989,7 +989,7 @@ select date_add(timestamp_col, interval 2 weeks),
        date_add(timestamp_col, interval 53 weeks),
        date_sub(timestamp_col, interval 2 weeks),
        date_sub(timestamp_col, interval 53 weeks)
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp,timestamp,timestamp
 ---- RESULTS
@@ -1003,7 +1003,7 @@ select timestamp_col + interval 10 days,
        interval 10 days + timestamp_col,
        timestamp_col - interval 10 days,
        timestamp_col - interval 365 days
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp,timestamp,timestamp,timestamp,timestamp
 ---- RESULTS
@@ -1015,7 +1015,7 @@ select date_add(timestamp_col, interval 10 days),
        date_add(timestamp_col, interval 10 days),
        date_sub(timestamp_col, interval 10 days),
        date_sub(timestamp_col, interval 365 days)
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp,timestamp,timestamp
 ---- RESULTS
@@ -1026,7 +1026,7 @@ timestamp,timestamp,timestamp,timestamp
 select timestamp_col + interval 25 hours,
        interval 25 hours + timestamp_col,
        timestamp_col - interval 25 hours
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp,timestamp
 ---- RESULTS
@@ -1036,7 +1036,7 @@ timestamp,timestamp,timestamp
 # Add/sub hours, function-call like version.
 select date_add(timestamp_col, interval 25 hours),
        date_sub(timestamp_col, interval 25 hours)
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp
 ---- RESULTS
@@ -1047,7 +1047,7 @@ timestamp,timestamp
 select timestamp_col + interval 1533 minutes,
        interval 1533 minutes + timestamp_col,
        timestamp_col - interval 1533 minutes
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp,timestamp
 ---- RESULTS
@@ -1057,7 +1057,7 @@ timestamp,timestamp,timestamp
 # Add/sub minutes (1533 minutes are 25h33m), function-call like version.
 select date_add(timestamp_col, interval 1533 minutes),
        date_sub(timestamp_col, interval 1533 minutes)
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp
 ---- RESULTS
@@ -1068,7 +1068,7 @@ timestamp,timestamp
 select timestamp_col + interval 90033 seconds,
        interval 90033 seconds + timestamp_col,
        timestamp_col - interval 90033 seconds
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp,timestamp
 ---- RESULTS
@@ -1078,7 +1078,7 @@ timestamp,timestamp,timestamp
 # Add/sub seconds (90033 seconds are 25h33s), function-call like version.
 select date_add(timestamp_col, interval 90033 seconds),
        date_sub(timestamp_col, interval 90033 seconds)
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp
 ---- RESULTS
@@ -1089,7 +1089,7 @@ timestamp,timestamp
 select timestamp_col + interval 90000033 milliseconds,
        interval 90000033 milliseconds + timestamp_col,
        timestamp_col - interval 90000033 milliseconds
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp,timestamp
 ---- RESULTS
@@ -1099,7 +1099,7 @@ timestamp,timestamp,timestamp
 # Add/sub milliseconds (90000033 seconds are 25h33ms), function-call like version.
 select date_add(timestamp_col, interval 90000033 milliseconds),
        date_sub(timestamp_col, interval 90000033 milliseconds)
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp
 ---- RESULTS
@@ -1110,7 +1110,7 @@ timestamp,timestamp
 select timestamp_col + interval 1033 microseconds,
        interval 1033 microseconds + timestamp_col,
        timestamp_col - interval 1033 microseconds
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp,timestamp
 ---- RESULTS
@@ -1120,7 +1120,7 @@ timestamp,timestamp,timestamp
 # Add/sub microseconds, function-call like version.
 select date_add(timestamp_col, interval 1033 microseconds),
        date_sub(timestamp_col, interval 1033 microseconds)
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp
 ---- RESULTS
@@ -1131,7 +1131,7 @@ timestamp,timestamp
 select timestamp_col + interval 1033 nanoseconds,
        interval 1033 nanoseconds + timestamp_col,
        timestamp_col - interval 1033 nanoseconds
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp,timestamp
 ---- RESULTS
@@ -1141,7 +1141,7 @@ timestamp,timestamp,timestamp
 # Add/sub nanoseconds, function-call like version.
 select date_add(timestamp_col, interval 1033 nanoseconds),
        date_sub(timestamp_col, interval 1033 nanoseconds)
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp
 ---- RESULTS
@@ -1154,7 +1154,7 @@ select timestamp_col + interval 10 years + interval 2 months + interval 5 days,
        timestamp_col + interval 10 years - interval 2 months + interval 5 days,
        interval 10 years + timestamp_col - interval 2 months + interval 5 days,
        timestamp_col - interval 10 years - interval 2 months - interval 5 days
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp,timestamp,timestamp,timestamp
 ---- RESULTS
@@ -1171,7 +1171,7 @@ select timestamp_col + interval 10 hours + interval 2 minutes + interval 5 secon
             - interval 3 milliseconds + interval 3 microseconds - interval 3 nanoseconds,
        timestamp_col - interval 10 hours - interval 2 minutes - interval 5 seconds
             - interval 3 milliseconds - interval 3 microseconds - interval 3 nanoseconds
-from alltypes$TABLE order by id limit 1
+from alltypes order by id limit 1
 ---- TYPES
 timestamp,timestamp,timestamp,timestamp,timestamp
 ---- RESULTS
@@ -1199,7 +1199,7 @@ timestamp,timestamp
 ====
 ---- QUERY
 # Timestamp arithmetic inside a predicate.
-select year, month from alltypes$TABLE
+select year, month from alltypes
 where year = year((cast('2012-01-01 09:10:11' as timestamp) - interval 3 years))
 and month = month((cast('2012-01-01 09:10:11' as timestamp) + interval 3 months))
 limit 3
@@ -1212,7 +1212,7 @@ int,int
 ====
 ---- QUERY
 # Test NULLs in second operand
-select count(*) from alltypesagg$TABLE
+select count(*) from alltypesagg
 where (cast('2012-01-01 09:10:11' as timestamp) + interval tinyint_col seconds) IS NULL
 ---- TYPES
 bigint
@@ -1221,7 +1221,7 @@ bigint
 ====
 ---- QUERY
 # Test NULLs in first operand
-select count(*) from alltypesagg$TABLE
+select count(*) from alltypesagg
 where (cast('2012-01-01 09:10:11' as timestamp) + interval tinyint_col seconds)
       + interval 10 years IS NULL
 ---- TYPES

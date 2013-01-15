@@ -1,5 +1,5 @@
 select *
-from testtbl t1 join testtbl t2 using(id)
+from functional.testtbl t1 join functional.testtbl t2 using(id)
 where t1.zip = 94611
 ---- PLAN
 Plan Fragment 0
@@ -9,10 +9,10 @@ Plan Fragment 0
     HASH PREDICATES:
       t1.id = t2.id
     TUPLE IDS: 0 1 
-      SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
         PREDICATES: t1.zip = 94611
         TUPLE IDS: 0 
-      SCAN HDFS table=default.testtbl #partitions=0 size=0B (1) compact
+      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
         TUPLE IDS: 1 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -31,7 +31,7 @@ Plan Fragment 1
     HASH PREDICATES:
       t1.id = t2.id
     TUPLE IDS: 0 1 
-      SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
         PREDICATES: t1.zip = 94611
         TUPLE IDS: 0 
       EXCHANGE (3)
@@ -43,7 +43,7 @@ Plan Fragment 2
     EXCHANGE ID: 3
     UNPARTITIONED
 
-  SCAN HDFS table=default.testtbl #partitions=0 size=0B (1) compact
+  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -51,7 +51,7 @@ NODE 1:
 ====
 # general exprs on both sides of equi-join predicates
 select *
-from testtbl t1 left outer join testtbl t2 
+from functional.testtbl t1 left outer join functional.testtbl t2 
 on (t1.id - 1 = t2.id + 1)
 where t1.zip = 94611
 ---- PLAN
@@ -62,10 +62,10 @@ Plan Fragment 0
     HASH PREDICATES:
       t1.id - 1 = t2.id + 1
     TUPLE IDS: 0 1N 
-      SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
         PREDICATES: t1.zip = 94611
         TUPLE IDS: 0 
-      SCAN HDFS table=default.testtbl #partitions=0 size=0B (1) compact
+      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
         TUPLE IDS: 1 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -84,7 +84,7 @@ Plan Fragment 1
     HASH PREDICATES:
       t1.id - 1 = t2.id + 1
     TUPLE IDS: 0 1N 
-      SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
         PREDICATES: t1.zip = 94611
         TUPLE IDS: 0 
       EXCHANGE (3)
@@ -96,7 +96,7 @@ Plan Fragment 2
     EXCHANGE ID: 3
     UNPARTITIONED
 
-  SCAN HDFS table=default.testtbl #partitions=0 size=0B (1) compact
+  SCAN HDFS table=functional.testtbl #partitions=0 size=0B (1) compact
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -106,7 +106,7 @@ NODE 1:
 # scan predicates get propagated correctly;
 # non-eq join predicates are evaluated as extra conjuncts by the join node
 select *
-from alltypesagg a right outer join alltypessmall b using (id, int_col)
+from functional.alltypesagg a right outer join functional.alltypessmall b using (id, int_col)
 where a.day >= 6
 and b.month > 2
 and a.tinyint_col = 15
@@ -122,9 +122,9 @@ Plan Fragment 0
       a.int_col = b.int_col
     OTHER PREDICATES: a.day >= 6, a.tinyint_col = 15, a.tinyint_col + b.tinyint_col < 15
     TUPLE IDS: 0N 1 
-      SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
+      SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypessmall #partitions=2 size=3.17KB (1) compact
+      SCAN HDFS table=functional.alltypessmall #partitions=2 size=3.17KB (1) compact
         PREDICATES: b.string_col = '15'
         TUPLE IDS: 1 
 ---- DISTRIBUTEDPLAN
@@ -146,7 +146,7 @@ Plan Fragment 1
       a.int_col = b.int_col
     OTHER PREDICATES: a.day >= 6, a.tinyint_col = 15, a.tinyint_col + b.tinyint_col < 15
     TUPLE IDS: 0N 1 
-      SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
+      SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
         TUPLE IDS: 0 
       EXCHANGE (3)
         TUPLE IDS: 1 
@@ -157,7 +157,7 @@ Plan Fragment 2
     EXCHANGE ID: 3
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypessmall #partitions=2 size=3.17KB (1) compact
+  SCAN HDFS table=functional.alltypessmall #partitions=2 size=3.17KB (1) compact
     PREDICATES: b.string_col = '15'
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS
@@ -191,9 +191,9 @@ NODE 1:
 # same as before, with 3 tables;
 # non-eq join predicates are evaluated at the correct join node
 select *
-from alltypesagg a
-full outer join alltypessmall b using (id, int_col)
-right join alltypesaggnonulls c on (a.id = c.id and b.string_col = c.string_col)
+from functional.alltypesagg a
+full outer join functional.alltypessmall b using (id, int_col)
+right join functional.alltypesaggnonulls c on (a.id = c.id and b.string_col = c.string_col)
 where a.day >= 6
 and b.month > 2
 and c.day < 3
@@ -218,11 +218,11 @@ Plan Fragment 0
           a.id = b.id
           a.int_col = b.int_col
         TUPLE IDS: 0N 1N 
-          SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
+          SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
             TUPLE IDS: 0 
-          SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (1) compact
+          SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (1) compact
             TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypesaggnonulls #partitions=2 size=148.10KB (3) compact
+      SCAN HDFS table=functional.alltypesaggnonulls #partitions=2 size=148.10KB (3) compact
         TUPLE IDS: 2 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -249,7 +249,7 @@ Plan Fragment 1
           a.id = b.id
           a.int_col = b.int_col
         TUPLE IDS: 0N 1N 
-          SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
+          SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
             TUPLE IDS: 0 
           EXCHANGE (5)
             TUPLE IDS: 1 
@@ -262,7 +262,7 @@ Plan Fragment 2
     EXCHANGE ID: 6
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypesaggnonulls #partitions=2 size=148.10KB (3) compact
+  SCAN HDFS table=functional.alltypesaggnonulls #partitions=2 size=148.10KB (3) compact
     TUPLE IDS: 2 
 
 Plan Fragment 3
@@ -271,7 +271,7 @@ Plan Fragment 3
     EXCHANGE ID: 5
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (1) compact
+  SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (1) compact
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -312,24 +312,24 @@ NODE 3:
 ====
 # non-equi join predicate not supported
 select *
-from testtbl t1 join testtbl t2
+from functional.testtbl t1 join functional.testtbl t2
 where t1.zip < t2.zip
 ---- PLAN
 not implemented
 ====
 # hbas-hdfs join
 select *
-from alltypesagg join hbasealltypessmall using (id, int_col)
+from functional.alltypesagg join functional.hbasealltypessmall using (id, int_col)
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
-      alltypesagg.id = hbasealltypessmall.id
-      alltypesagg.int_col = hbasealltypessmall.int_col
+      functional.alltypesagg.id = functional.hbasealltypessmall.id
+      functional.alltypesagg.int_col = functional.hbasealltypessmall.int_col
     TUPLE IDS: 0 1 
-      SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
+      SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
         TUPLE IDS: 0 
       SCAN HBASE table=hbasealltypessmall (1)
         TUPLE IDS: 1 
@@ -348,10 +348,10 @@ Plan Fragment 1
   HASH JOIN
     JOIN OP: INNER JOIN
     HASH PREDICATES:
-      alltypesagg.id = hbasealltypessmall.id
-      alltypesagg.int_col = hbasealltypessmall.int_col
+      functional.alltypesagg.id = functional.hbasealltypessmall.id
+      functional.alltypesagg.int_col = functional.hbasealltypessmall.int_col
     TUPLE IDS: 0 1 
-      SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
+      SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
         TUPLE IDS: 0 
       EXCHANGE (3)
         TUPLE IDS: 1 
@@ -392,7 +392,7 @@ NODE 1:
 ====
 # hbase-hdfs join with scan filtering
 select *
-from alltypesagg a join hbasestringids b
+from functional.alltypesagg a join functional.hbasestringids b
        on (a.id = cast(b.id as int) and a.int_col = b.int_col)
 where a.day >= 6
 and a.tinyint_col = 15
@@ -410,7 +410,7 @@ Plan Fragment 0
       a.int_col = b.int_col
     OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
     TUPLE IDS: 0 1 
-      SCAN HDFS table=default.alltypesagg #partitions=5 size=372.38KB (0)
+      SCAN HDFS table=functional.alltypesagg #partitions=5 size=372.38KB (0)
         PREDICATES: a.tinyint_col = 15
         TUPLE IDS: 0 
       SCAN HBASE table=hbasestringids (1)
@@ -437,7 +437,7 @@ Plan Fragment 1
       a.int_col = b.int_col
     OTHER PREDICATES: a.tinyint_col + b.tinyint_col < 15
     TUPLE IDS: 0 1 
-      SCAN HDFS table=default.alltypesagg #partitions=5 size=372.38KB (0)
+      SCAN HDFS table=functional.alltypesagg #partitions=5 size=372.38KB (0)
         PREDICATES: a.tinyint_col = 15
         TUPLE IDS: 0 
       EXCHANGE (3)
@@ -477,10 +477,10 @@ NODE 1:
 #select x.tinyint_col, count(x.day)
 #from (
 #       select a.day day, c.tinyint_col tinyint_col
-#       from alltypesagg a 
-#            join alltypessmall b using (id, int_col)
-#            right outer join alltypesnopart c on (b.id = c.id)
-#            join alltypesagg d on (a.id = d.id)
+#       from functional.alltypesagg a 
+#            join functional.alltypessmall b using (id, int_col)
+#            right outer join functional.alltypesnopart c on (b.id = c.id)
+#            join functional.alltypesagg d on (a.id = d.id)
 #       order by 1,2
 #       limit 10
 #     ) x 
@@ -519,13 +519,13 @@ NODE 1:
 #                    a.id = b.id
 #                    a.int_col = b.int_col
 #                  TUPLE IDS: 0 1 
-#                    SCAN HDFS table=default.alltypesagg (0)
+#                    SCAN HDFS table=functional.alltypesagg (0)
 #                      TUPLE IDS: 0 
-#                    SCAN HDFS table=default.alltypessmall (1) compact
+#                    SCAN HDFS table=functional.alltypessmall (1) compact
 #                      TUPLE IDS: 1 
-#                SCAN HDFS table=default.alltypesnopart (3) compact
+#                SCAN HDFS table=functional.alltypesnopart (3) compact
 #                  TUPLE IDS: 2 
-#            SCAN HDFS table=default.alltypesagg (5) compact
+#            SCAN HDFS table=functional.alltypesagg (5) compact
 #              TUPLE IDS: 3 
 #---- DISTRIBUTEDPLAN
 #Plan Fragment 0
@@ -567,7 +567,7 @@ NODE 1:
 #              a.id = b.id
 #              a.int_col = b.int_col
 #            TUPLE IDS: 0 1 
-#              SCAN HDFS table=default.alltypesagg (0)
+#              SCAN HDFS table=functional.alltypesagg (0)
 #                TUPLE IDS: 0 
 #              EXCHANGE (10)
 #                TUPLE IDS: 1 
@@ -582,7 +582,7 @@ NODE 1:
 #    EXCHANGE ID: 12
 #    UNPARTITIONED
 #
-#  SCAN HDFS table=default.alltypesagg (5) compact
+#  SCAN HDFS table=functional.alltypesagg (5) compact
 #    TUPLE IDS: 3 
 #
 #Plan Fragment 3
@@ -591,7 +591,7 @@ NODE 1:
 #    EXCHANGE ID: 11
 #    UNPARTITIONED
 #
-#  SCAN HDFS table=default.alltypesnopart (3) compact
+#  SCAN HDFS table=functional.alltypesnopart (3) compact
 #    TUPLE IDS: 2 
 #
 #Plan Fragment 4
@@ -600,7 +600,7 @@ NODE 1:
 #    EXCHANGE ID: 10
 #    UNPARTITIONED
 #
-#  SCAN HDFS table=default.alltypessmall (1) compact
+#  SCAN HDFS table=functional.alltypessmall (1) compact
 #    TUPLE IDS: 1 
 #---- SCANRANGELOCATIONS
 #NODE 0:
@@ -647,7 +647,7 @@ NODE 1:
 #  LOCATIONS:
 #====
 # join without "other join conjuncts"
-select * from alltypessmall a, alltypessmall b where a.id = b.id limit 1
+select * from functional.alltypessmall a, functional.alltypessmall b where a.id = b.id limit 1
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -657,9 +657,9 @@ Plan Fragment 0
       a.id = b.id
     LIMIT: 1
     TUPLE IDS: 0 1 
-      SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (0)
+      SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
         TUPLE IDS: 0 
-      SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (1) compact
+      SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (1) compact
         TUPLE IDS: 1 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -680,7 +680,7 @@ Plan Fragment 1
       a.id = b.id
     LIMIT: 1
     TUPLE IDS: 0 1 
-      SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (0)
+      SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (0)
         TUPLE IDS: 0 
       EXCHANGE (3)
         TUPLE IDS: 1 
@@ -691,7 +691,7 @@ Plan Fragment 2
     EXCHANGE ID: 3
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypessmall #partitions=4 size=6.32KB (1) compact
+  SCAN HDFS table=functional.alltypessmall #partitions=4 size=6.32KB (1) compact
     TUPLE IDS: 1 
 ---- SCANRANGELOCATIONS
 NODE 0:

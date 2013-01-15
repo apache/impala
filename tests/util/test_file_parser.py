@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 #
 # This module is used for common utilities related to parsing test files
@@ -16,18 +15,6 @@ LOG = logging.getLogger('impala_test_suite')
 # from a query test file
 class QueryTestSectionReader(object):
   @staticmethod
-  def replace_table_suffix(section_text, table_format_info):
-    """
-    Replaces the $TABLE suffix that is append to all table names
-
-    $TABLE is replaced with the values in the table format info (file_format, etc)
-    TODO: This will be updated when we move a naming schedule based on database
-    """
-    table_suffix = QueryTestSectionReader.__build_table_suffix(table_format_info.file_format,
-        table_format_info.compression_codec, table_format_info.compression_type)
-    return section_text.replace('$TABLE', table_suffix)
-
-  @staticmethod
   def build_query(query_section_text, table_format_info, scale_factor):
     """
     Build a well formed query.
@@ -37,51 +24,32 @@ class QueryTestSectionReader(object):
     database name based on the given scale factor
     """
     query_section_text = remove_comments(query_section_text)
-    dataset = table_format_info.dataset
-    file_format, codec, compression_type = (table_format_info.file_format,
-                                            table_format_info.compression_codec,
-                                            table_format_info.compression_type)
-    database_name =\
-        QueryTestSectionReader.__database_name_to_use(dataset, scale_factor)
-    table_suffix = QueryTestSectionReader.__build_table_suffix(file_format, codec,
-                                                               compression_type)
-
-    # $TABLE is used as a token for table suffix in the queries. Here we replace the token
-    # the proper database name based on the dataset and scale factor.
-    # There also may be cases where there is dbname.table_name without a $TABLE (in the
-    # case of insert). These still need to be fixed up with the proper scale factor
-    replace_from =\
-        '(%(dataset)s\.)(?P<table_name>\w+)' % {'dataset': dataset}
-    replace_by = '%s%s' % (database_name, r'\g<table_name>')
-    query_str = re.sub(replace_from, replace_by, query_section_text)
-    replace_from =\
-        '(%(dataset)s){0,1}(?P<table_name>\w+)\$TABLE' % {'dataset': database_name}
-    replace_by = '%s%s%s' % (database_name, r'\g<table_name>', table_suffix)
-    return re.sub(replace_from, replace_by, query_str).strip().rstrip(';')
+    return query_section_text.rstrip(';')
 
   @staticmethod
-  def __database_name_to_use(workload, scale_factor):
+  def get_db_name(table_format, scale_factor=''):
     """
-    Return the name of the database to use for the specified workload and scale factor.
-    """
-    if workload != 'functional':
-      return '%s%s.' % (workload, scale_factor)
-    return ''
+    Get the database name to use.
 
-  @staticmethod
-  def __build_table_suffix(file_format, codec, compression_type):
-    if file_format == 'text' and codec == 'none':
-      return ''
-    elif codec == 'none':
-      return '_%s' % (file_format)
-    elif compression_type == 'record':
-      return '_%s_record_%s' % (file_format, codec)
+    Database names are dependent on the scale factor, file format, compression type
+    and compression codec. This method returns the appropriate database name to the
+    caller based on the table format information provided.
+    """
+    if table_format.file_format == 'text' and table_format.compression_codec == 'none':
+      suffix = ''
+    elif table_format.compression_codec == 'none':
+      suffix = '_%s' % (table_format.file_format)
+    elif table_format.compression_type == 'record':
+      suffix =  '_%s_record_%s' % (table_format.file_format,
+                                   table_format.compression_codec)
     else:
-      return '_%s_%s' % (file_format, codec)
+      suffix =  '_%s_%s' % (table_format.file_format, table_format.compression_codec)
+    dataset = table_format.dataset.replace('-', '')
+    return dataset + scale_factor + suffix
+
 
 def remove_comments(section_text):
   return '\n'.join([l for l in section_text.split('\n') if not l.strip().startswith('#')])
-
 
 def parse_query_test_file(file_name):
   """

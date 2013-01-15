@@ -1,7 +1,7 @@
 ====
 ---- QUERY
 # Simple describe (note Hive does not support this)
-describe default.alltypes
+describe functional.alltypes
 ---- TYPES
 string, string
 ---- RESULTS
@@ -20,7 +20,7 @@ string, string
 'month','int'
 ====
 ---- QUERY
-USE default
+USE functional
 ====
 ---- QUERY
 # Default database
@@ -42,13 +42,4 @@ string, string
 'year','int'
 'month','int'
 ====
----- QUERY
-# Different database. TODO: test USE testdb1 followed by describe <table only in testdb1>, when one exists. 
-describe testdb1.testtbl
----- TYPES
-string, string
----- RESULTS
-'id','bigint'
-'name','string'
-'birthday','string'
-====
+

@@ -77,30 +77,23 @@ public class CatalogTest {
   }
 
   @Test public void TestColSchema() throws TableLoadingException {
-    Db defaultDb = catalog.getDb("default");
-    Db testDb = catalog.getDb("testdb1");
+    Db defaultDb = catalog.getDb("functional");
+    Db testDb = catalog.getDb("functional_seq");
 
     assertNotNull(defaultDb);
-    assertEquals(defaultDb.getName(), "default");
+    assertEquals(defaultDb.getName(), "functional");
     assertNotNull(testDb);
-    assertEquals(testDb.getName(), "testdb1");
+    assertEquals(testDb.getName(), "functional_seq");
 
     assertNotNull(defaultDb.getTable("alltypes"));
-    assertNotNull(defaultDb.getTable("alltypes_rc"));
     assertNotNull(defaultDb.getTable("alltypessmall"));
-    assertNotNull(defaultDb.getTable("alltypessmall_rc"));
     assertNotNull(defaultDb.getTable("alltypeserror"));
-    assertNotNull(defaultDb.getTable("alltypeserror_rc"));
     assertNotNull(defaultDb.getTable("alltypeserrornonulls"));
-    assertNotNull(defaultDb.getTable("alltypeserrornonulls_rc"));
     assertNotNull(defaultDb.getTable("alltypesagg"));
-    assertNotNull(defaultDb.getTable("alltypesagg_rc"));
     assertNotNull(defaultDb.getTable("alltypesaggnonulls"));
-    assertNotNull(defaultDb.getTable("alltypesaggnonulls_rc"));
     assertNotNull(defaultDb.getTable("alltypesnopart"));
     assertNotNull(defaultDb.getTable("alltypesinsert"));
     assertNotNull(defaultDb.getTable("testtbl"));
-    assertNotNull(defaultDb.getTable("testtbl_rc"));
     assertNotNull(defaultDb.getTable("dimtbl"));
     assertNotNull(defaultDb.getTable("jointbl"));
     assertNotNull(defaultDb.getTable("liketbl"));
@@ -116,7 +109,7 @@ public class CatalogTest {
     // IMP-163 - table with string partition column does not load if there are partitions
     assertNotNull(defaultDb.getTable("StringPartitionKey"));
 
-    // testdb contains tables alltypes and testtbl.
+    // functional_seq contains the same tables as functional
     assertNotNull(testDb.getTable("alltypes"));
     assertNotNull(testDb.getTable("testtbl"));
 
@@ -134,23 +127,14 @@ public class CatalogTest {
            PrimitiveType.INT, PrimitiveType.BIGINT, PrimitiveType.FLOAT,
            PrimitiveType.DOUBLE, PrimitiveType.STRING, PrimitiveType.STRING,
            PrimitiveType.TIMESTAMP});
-    checkTableCols(testDb, "alltypes", 0,
-        new String[]
-          {"id", "bool_col", "tinyint_col", "smallint_col", "int_col", "bigint_col",
-           "float_col", "double_col", "date_string_col", "string_col", "timestamp_col"},
-        new PrimitiveType[]
-          {PrimitiveType.INT, PrimitiveType.BOOLEAN, PrimitiveType.TINYINT,
-           PrimitiveType.SMALLINT, PrimitiveType.INT, PrimitiveType.BIGINT,
-           PrimitiveType.FLOAT, PrimitiveType.DOUBLE, PrimitiveType.STRING,
-           PrimitiveType.STRING, PrimitiveType.TIMESTAMP});
     checkTableCols(defaultDb, "testtbl", 0,
         new String[] {"id", "name", "zip"},
         new PrimitiveType[]
           {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.INT});
     checkTableCols(testDb, "testtbl", 0,
-        new String[] {"id", "name", "birthday"},
+        new String[] {"id", "name", "zip"},
         new PrimitiveType[]
-          {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.STRING});
+          {PrimitiveType.BIGINT, PrimitiveType.STRING, PrimitiveType.INT});
     checkTableCols(defaultDb, "liketbl", 0,
         new String[] {
             "str_col", "match_like_col", "no_match_like_col", "match_regex_col",
@@ -274,7 +258,7 @@ public class CatalogTest {
   }
 
   @Test public void TestPartitions() throws TableLoadingException {
-    HdfsTable table = (HdfsTable) catalog.getDb("default").getTable("AllTypes");
+    HdfsTable table = (HdfsTable) catalog.getDb("functional").getTable("AllTypes");
     List<HdfsPartition> partitions = table.getPartitions();
 
     // check that partition keys cover the date range 1/1/2009-12/31/2010
@@ -309,18 +293,18 @@ public class CatalogTest {
   public void testInternalHBaseTable() throws TableLoadingException {
     // Cast will fail if table not an HBaseTable
     HBaseTable table = 
-        (HBaseTable)catalog.getDb("default").getTable("internal_hbase_table");
+        (HBaseTable)catalog.getDb("functional").getTable("internal_hbase_table");
     assertNotNull("internal_hbase_table was not found", table);
   }
 
   @Test(expected = TableLoadingException.class)
   public void testMapColumnsFails() throws TableLoadingException {
-    Table table = catalog.getDb("default").getTable("map_table");
+    Table table = catalog.getDb("functional").getTable("map_table");
   }
 
   @Test(expected = TableLoadingException.class)
   public void testArrayColumnsFails() throws TableLoadingException {
-    Table table = catalog.getDb("default").getTable("array_table");
+    Table table = catalog.getDb("functional").getTable("array_table");
   }
 
   @Test
@@ -334,7 +318,7 @@ public class CatalogTest {
   // escape char.
   @Test public void TestTableWithBadEscapeChar() throws TableLoadingException {
     HdfsTable table =
-        (HdfsTable) catalog.getDb("default").getTable("escapechartesttable");
+        (HdfsTable) catalog.getDb("functional").getTable("escapechartesttable");
     List<HdfsPartition> partitions = table.getPartitions();
     for (HdfsPartition p: partitions) {
       HdfsStorageDescriptor desc = p.getInputFormatDescriptor();

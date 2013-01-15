@@ -12,14 +12,14 @@ select
   s.s_address,
   s.s_phone,
   s.s_comment
-from tpch.partsupp$TABLE ps
-  join tpch.part$TABLE p
+from partsupp ps
+  join part p
     on (p.p_partkey = ps.ps_partkey and p.p_size = 15 and p.p_type like '%BRASS')
-  join tpch.supplier$TABLE s
+  join supplier s
     on (s.s_suppkey = ps.ps_suppkey)
-  join tpch.nation$TABLE n
+  join nation n
     on (s.s_nationkey = n.n_nationkey)
-  join tpch.region$TABLE r
+  join region r
     on (n.n_regionkey = r.r_regionkey and r.r_name = 'EUROPE')
 ---- SETUP
 RESET tpch.q2_minimum_cost_supplier_tmp1

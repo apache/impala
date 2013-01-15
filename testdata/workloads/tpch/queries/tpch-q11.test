@@ -4,10 +4,10 @@
 # TODO: Need to add part 2 of this query. It required some more advanced modifications.
 insert overwrite table tpch.q11_part_tmp
 select ps_partkey, sum(ps_supplycost * ps_availqty) as part_value
-from tpch.nation$TABLE n
-join tpch.supplier$TABLE s
+from nation n
+join supplier s
   on s.s_nationkey = n.n_nationkey and n.n_name = 'GERMANY'
-join tpch.partsupp$TABLE ps
+join partsupp ps
   on ps.ps_suppkey = s.s_suppkey
 group by ps_partkey
 ---- SETUP

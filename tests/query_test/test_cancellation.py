@@ -10,9 +10,9 @@ from tests.util.test_file_parser import QueryTestSectionReader
 
 # Queries to execute. Use the TPC-H dataset because tables are large so queries take some
 # time to execute.
-QUERIES = ['select l_returnflag from tpch.lineitem$TABLE',
-           'select count(l_returnflag) from tpch.lineitem$TABLE',
-           'select * from tpch.lineitem$TABLE limit 50',
+QUERIES = ['select l_returnflag from lineitem',
+           'select count(l_returnflag) from lineitem',
+           'select * from lineitem limit 50',
            ]
 
 # Time to sleep between issuing query and canceling
@@ -36,12 +36,12 @@ class TestCancellation(ImpalaTestSuite):
       NUM_CANCELATION_ITERATIONS = 3
 
   def test_basic_cancel(self, vector):
-    query = QueryTestSectionReader.replace_table_suffix(vector.get_value('query'),
-                                                        vector.get_value('table_format'))
+    query = vector.get_value('query')
 
     # Execute the query multiple times, each time canceling it
     for i in xrange(NUM_CANCELATION_ITERATIONS):
-      handle = self.execute_query_async(query, vector.get_value('exec_option'))
+      handle = self.execute_query_async(query, vector.get_value('exec_option'),
+                                        table_format=vector.get_value('table_format'))
       sleep(vector.get_value('cancel_delay'))
       assert self.client.get_state(handle) != self.client.query_states['EXCEPTION']
       cancel_result = self.client.cancel_query(handle)

@@ -1,7 +1,7 @@
 # basic aggregation
 select count(*), count(tinyint_col), min(tinyint_col), max(tinyint_col), sum(tinyint_col),
 avg(tinyint_col)
-from alltypesagg
+from functional.alltypesagg
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -9,7 +9,7 @@ Plan Fragment 0
   OUTPUT: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
   GROUP BY: 
   TUPLE IDS: 1 
-    SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
+    SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -31,7 +31,7 @@ Plan Fragment 1
   OUTPUT: COUNT(*), COUNT(tinyint_col), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col)
   GROUP BY: 
   TUPLE IDS: 1 
-    SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
+    SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -59,7 +59,7 @@ NODE 0:
 # with grouping
 select tinyint_col, count(*), min(tinyint_col), max(tinyint_col), sum(tinyint_col),
 avg(tinyint_col)
-from alltypesagg
+from functional.alltypesagg
 group by 1
 ---- PLAN
 Plan Fragment 0
@@ -68,7 +68,7 @@ Plan Fragment 0
   OUTPUT: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
   GROUP BY: tinyint_col
   TUPLE IDS: 1 
-    SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
+    SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -90,7 +90,7 @@ Plan Fragment 1
   OUTPUT: COUNT(*), MIN(tinyint_col), MAX(tinyint_col), SUM(tinyint_col), COUNT(tinyint_col)
   GROUP BY: tinyint_col
   TUPLE IDS: 1 
-    SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
+    SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:

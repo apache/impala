@@ -1,7 +1,7 @@
 ====
 ---- QUERY
 # Simple pattern literal
-use default
+use functional
 ====
 ---- QUERY
 select count(*) from alltypes
@@ -11,7 +11,7 @@ bigint
 7300
 ====
 ---- QUERY
-use testdb1
+use functional_seq_snap
 ====
 ---- QUERY
 # TODO: Test confirming negative results - i.e. select from unknown table
@@ -19,5 +19,5 @@ select count(*) from alltypes
 ---- TYPES
 bigint
 ---- RESULTS 
-0
+7300
 ====

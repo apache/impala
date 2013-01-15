@@ -139,15 +139,11 @@ if __name__ == "__main__":
   for workload in workloads:
     start_time = time.time()
     dataset = get_dataset_for_workload(workload)
-    print "Dataset for workload '%s' is '%s'" % (workload, dataset)
     dataset_dir = os.path.join(DATASET_DIR, dataset)
     os.chdir(dataset_dir)
     generate_schema_statements(workload)
     exec_hive_query_from_file(os.path.join(dataset_dir,
        'load-%s-%s-generated.sql' % (workload, options.exploration_strategy)))
-
-    exec_impala_query_from_file(os.path.join(dataset_dir,
-       'load-trevni-%s-%s-generated.sql' % (workload, options.exploration_strategy)))
     loading_time_map[workload] = time.time() - start_time
 
   total_time = 0.0

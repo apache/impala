@@ -3,7 +3,7 @@
 # Q16 - Parts/Supplier Relation Query
 insert overwrite table tpch.supplier_tmp
 select s_suppkey
-from tpch.supplier$TABLE
+from supplier
 where not s_comment like '%Customer%Complaints%'
 ---- SETUP
 RESET tpch.supplier_tmp
@@ -15,8 +15,8 @@ RELOAD tpch.supplier_tmp
 ---- QUERY : TPCH-Q16_QUERY_2
 insert overwrite table tpch.q16_tmp
 select p_brand, p_type, p_size, ps_suppkey
-from tpch.partsupp$TABLE ps
-join tpch.part$TABLE p
+from partsupp ps
+join part p
   on p.p_partkey = ps.ps_partkey and
      p.p_brand <> 'Brand#45' and
      not p.p_type like 'MEDIUM POLISHED%'

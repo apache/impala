@@ -1,14 +1,14 @@
 # distinct *
 select distinct *
-from testtbl
+from functional.testtbl
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
   AGGREGATE
   OUTPUT: 
-  GROUP BY: testtbl.id, testtbl.name, testtbl.zip
+  GROUP BY: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
   TUPLE IDS: 1 
-    SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+    SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -28,16 +28,16 @@ Plan Fragment 1
 
   AGGREGATE
   OUTPUT: 
-  GROUP BY: testtbl.id, testtbl.name, testtbl.zip
+  GROUP BY: functional.testtbl.id, functional.testtbl.name, functional.testtbl.zip
   TUPLE IDS: 1 
-    SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+    SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
 # distinct w/ explicit select list
 select distinct id, zip
-from testtbl
+from functional.testtbl
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -45,7 +45,7 @@ Plan Fragment 0
   OUTPUT: 
   GROUP BY: id, zip
   TUPLE IDS: 1 
-    SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+    SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -67,14 +67,14 @@ Plan Fragment 1
   OUTPUT: 
   GROUP BY: id, zip
   TUPLE IDS: 1 
-    SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+    SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
 # count(distinct)
 select count(distinct id, zip)
-from testtbl
+from functional.testtbl
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -86,7 +86,7 @@ Plan Fragment 0
     OUTPUT: 
     GROUP BY: id, zip
     TUPLE IDS: 1 
-      SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+      SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
         TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -112,14 +112,14 @@ Plan Fragment 1
   OUTPUT: 
   GROUP BY: id, zip
   TUPLE IDS: 1 
-    SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+    SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
 # count(distinct) w/ grouping
 select tinyint_col, count(distinct int_col, bigint_col)
-from alltypesagg
+from functional.alltypesagg
 group by 1
 ---- PLAN
 Plan Fragment 0
@@ -132,7 +132,7 @@ Plan Fragment 0
     OUTPUT: 
     GROUP BY: tinyint_col, int_col, bigint_col
     TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
+      SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
         TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -158,7 +158,7 @@ Plan Fragment 1
   OUTPUT: 
   GROUP BY: tinyint_col, int_col, bigint_col
   TUPLE IDS: 1 
-    SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
+    SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -185,7 +185,7 @@ NODE 0:
 ====
 # count(distinct) and sum(distinct) w/ grouping
 select tinyint_col, count(distinct int_col), sum(distinct int_col)
-from alltypesagg
+from functional.alltypesagg
 group by 1
 ---- PLAN
 Plan Fragment 0
@@ -198,7 +198,7 @@ Plan Fragment 0
     OUTPUT: 
     GROUP BY: tinyint_col, int_col
     TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
+      SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
         TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -224,7 +224,7 @@ Plan Fragment 1
   OUTPUT: 
   GROUP BY: tinyint_col, int_col
   TUPLE IDS: 1 
-    SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
+    SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -253,7 +253,7 @@ NODE 0:
 # is ignored
 select tinyint_col, count(distinct int_col),
 min(distinct smallint_col), max(distinct string_col)
-from alltypesagg group by 1
+from functional.alltypesagg group by 1
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -265,7 +265,7 @@ Plan Fragment 0
     OUTPUT: MIN(smallint_col), MAX(string_col)
     GROUP BY: tinyint_col, int_col
     TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
+      SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
         TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -291,7 +291,7 @@ Plan Fragment 1
   OUTPUT: MIN(smallint_col), MAX(string_col)
   GROUP BY: tinyint_col, int_col
   TUPLE IDS: 1 
-    SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
+    SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -319,7 +319,7 @@ NODE 0:
 # aggregate fns with and without distinct
 select tinyint_col, count(distinct int_col), count(*), sum(distinct int_col),
 sum(int_col), min(smallint_col), max(bigint_col)
-from alltypesagg group by 1
+from functional.alltypesagg group by 1
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
@@ -331,7 +331,7 @@ Plan Fragment 0
     OUTPUT: COUNT(*), SUM(int_col), MIN(smallint_col), MAX(bigint_col)
     GROUP BY: tinyint_col, int_col
     TUPLE IDS: 1 
-      SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
+      SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
         TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -357,7 +357,7 @@ Plan Fragment 1
   OUTPUT: COUNT(*), SUM(int_col), MIN(smallint_col), MAX(bigint_col)
   GROUP BY: tinyint_col, int_col
   TUPLE IDS: 1 
-    SCAN HDFS table=default.alltypesagg #partitions=10 size=743.67KB (0)
+    SCAN HDFS table=functional.alltypesagg #partitions=10 size=743.67KB (0)
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:

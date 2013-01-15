@@ -1,7 +1,7 @@
 ====
 ---- QUERY
 select a.id, b.date_string_col from
-  alltypessmall$TABLE a join alltypessmall$TABLE b on (a.id = b.id)
+  alltypessmall a join alltypessmall b on (a.id = b.id)
 ---- TYPES
 int, string
 ---- RESULTS
@@ -108,8 +108,8 @@ int, string
 ====
 ---- QUERY
 select c.id, d.date_string_col from
-  alltypessmall$TABLE d join (select a.id as id, b.date_string_col from
-    alltypessmall$TABLE a join alltypessmall$TABLE b on (a.id = b.id)) c on c.id = d.id
+  alltypessmall d join (select a.id as id, b.date_string_col from
+    alltypessmall a join alltypessmall b on (a.id = b.id)) c on c.id = d.id
 ---- TYPES
 int, string
 ---- RESULTS
@@ -217,7 +217,7 @@ int, string
 ---- QUERY
 select id, bool_col, tinyint_col, smallint_col, int_col, bigint_col, float_col,
 double_col, date_string_col, string_col, timestamp_col
-from alltypessmall$TABLE
+from alltypessmall
 ---- TYPES
 int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
 ---- RESULTS
@@ -323,7 +323,7 @@ int, boolean, tinyint, smallint, int, bigint, float, double, string, string, tim
 99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4',2009-04-03 00:24:00.960000000
 ====
 ---- QUERY
-select id from alltypessmall$TABLE
+select id from alltypessmall
 ---- TYPES
 int
 ---- RESULTS
@@ -429,7 +429,7 @@ int
 99
 ====
 ---- QUERY
-select * from alltypessmall$TABLE
+select * from alltypessmall
 ---- TYPES
 int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
 ---- RESULTS
@@ -535,7 +535,7 @@ int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, s
 2009,4,99,false,4,4,4,40,4.400000095367432,40.4,'04/03/09','4',2009-04-03 00:24:00.960000000
 ====
 ---- QUERY
-select month, date_string_col, year from alltypessmall$TABLE
+select month, date_string_col, year from alltypessmall
 ---- TYPES
 int, string, int
 ---- RESULTS
@@ -641,7 +641,7 @@ int, string, int
 4,'04/03/09',2009
 ====
 ---- QUERY
-select id from alltypessmall$TABLE where id = 10
+select id from alltypessmall where id = 10
 ---- TYPES
 int
 ---- RESULTS
@@ -650,7 +650,7 @@ int
 ---- QUERY
 # partition key values are materialized correctly across file boundaries
 select day, month, year, string_col
-from alltypesagg$TABLE
+from alltypesagg
 where string_col = '0'
 ---- TYPES
 int, int, int, string
@@ -668,7 +668,7 @@ int, int, int, string
 ====
 ---- QUERY
 # Tests escape characters
-select * from EscapeNoQuotes
+select * from functional.EscapeNoQuotes
 ---- TYPES
 string, string, int, int
 ---- RESULTS
@@ -680,7 +680,7 @@ string, string, int, int
 ====
 ---- QUERY
 # Test multi files non-partitioned table (hdfs)
-select count(*) from AllTypesAggMultiFilesNoPart$TABLE
+select count(*) from AllTypesAggMultiFilesNoPart
 ---- TYPES
 bigint
 ---- RESULTS
@@ -688,7 +688,7 @@ bigint
 ====
 ---- QUERY
 # Test multi files non-partitioned table (text)
-select count(*) from AllTypesAggMultiFilesNoPart
+select count(*) from functional.AllTypesAggMultiFilesNoPart
 ---- TYPES
 bigint
 ---- RESULTS

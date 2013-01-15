@@ -1,14 +1,14 @@
 ====
 ---- QUERY
 # testtbl is empty
-select * from testtbl$TABLE
+select * from testtbl
 ---- TYPES
 bigint, string, int
 ---- RESULTS
 ====
 ---- QUERY
 # month ends at 12
-select int_col from alltypessmall$TABLE where month > 100
+select int_col from alltypessmall where month > 100
 ---- TYPES
 int
 ---- RESULTS

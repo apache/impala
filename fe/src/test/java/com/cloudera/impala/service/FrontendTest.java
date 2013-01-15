@@ -62,7 +62,7 @@ public class FrontendTest {
   }
 
   @Test
-  public void TestGeSchema() throws ImpalaException {
+  public void TestGetSchema() throws ImpalaException {
     // "default%" should return schema "default"
     TMetadataOpRequest req = new TMetadataOpRequest();
     req.opcode = TMetadataOpcode.GET_SCHEMAS;
@@ -82,15 +82,14 @@ public class FrontendTest {
     TMetadataOpRequest req = new TMetadataOpRequest();
     req.opcode = TMetadataOpcode.GET_TABLES;
     req.get_tables_req = new TGetTablesReq();
-    req.get_tables_req.setSchemaName("%");
+    req.get_tables_req.setSchemaName("functional");
     req.get_tables_req.setTableName("all_ypes");
     TMetadataOpResponse resp = fe.execHiveServer2MetadataOp(req);
     // HiveServer2 GetTables has 5 columns.
     assertEquals(5, resp.result_set_metadata.columnDescs.size());
     assertEquals(5, resp.results.get(0).colVals.size());
-    assertEquals(2, resp.results.size());
+    assertEquals(1, resp.results.size());
     assertEquals("alltypes", resp.results.get(0).colVals.get(2).stringVal.toLowerCase());
-    assertEquals("alltypes", resp.results.get(1).colVals.get(2).stringVal.toLowerCase());
   }
 
   @Test
@@ -99,7 +98,7 @@ public class FrontendTest {
     TMetadataOpRequest req = new TMetadataOpRequest();
     req.opcode = TMetadataOpcode.GET_COLUMNS;
     req.get_columns_req = new TGetColumnsReq();
-    req.get_columns_req.setSchemaName("%defa%");
+    req.get_columns_req.setSchemaName("functional");
     req.get_columns_req.setTableName("alltypes");
     req.get_columns_req.setColumnName("stri%");
     TMetadataOpResponse resp = fe.execHiveServer2MetadataOp(req);
@@ -111,7 +110,7 @@ public class FrontendTest {
     assertEquals(23, resp.results.get(0).colVals.size());
     assertEquals(1, resp.results.size());
     TResultRow row = resp.results.get(0);
-    assertEquals("default", row.colVals.get(1).stringVal.toLowerCase());
+    assertEquals("functional", row.colVals.get(1).stringVal.toLowerCase());
     assertEquals("alltypes", row.colVals.get(2).stringVal.toLowerCase());
     assertEquals("string_col", row.colVals.get(3).stringVal.toLowerCase());
   }

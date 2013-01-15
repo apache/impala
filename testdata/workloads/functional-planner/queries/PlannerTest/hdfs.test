@@ -1,6 +1,6 @@
 # predicate is evaluated by the scan node
 select zip, count(*)
-from testtbl
+from functional.testtbl
 where name like 'm%'
 group by 1
 ---- PLAN
@@ -10,7 +10,7 @@ Plan Fragment 0
   OUTPUT: COUNT(*)
   GROUP BY: zip
   TUPLE IDS: 1 
-    SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+    SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
       PREDICATES: name LIKE 'm%'
       TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
@@ -33,18 +33,18 @@ Plan Fragment 1
   OUTPUT: COUNT(*)
   GROUP BY: zip
   TUPLE IDS: 1 
-    SCAN HDFS table=default.testtbl #partitions=0 size=0B (0)
+    SCAN HDFS table=functional.testtbl #partitions=0 size=0B (0)
       PREDICATES: name LIKE 'm%'
       TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
 ====
 # all partitions are selected
-select * from alltypes
+select * from functional.alltypes
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=default.alltypes #partitions=24 size=478.45KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=24 size=478.45KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -58,7 +58,7 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypes #partitions=24 size=478.45KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=24 size=478.45KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -112,11 +112,11 @@ NODE 0:
   LOCATIONS:
 ====
 # predicate on first partition key
-select * from alltypes where year = 2009
+select * from functional.alltypes where year = 2009
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=default.alltypes #partitions=12 size=238.68KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=12 size=238.68KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -130,7 +130,7 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypes #partitions=12 size=238.68KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=12 size=238.68KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -160,11 +160,11 @@ NODE 0:
   LOCATIONS:
 ====
 # same predicate, phrased differently
-select * from alltypes where year = 2009.0
+select * from functional.alltypes where year = 2009.0
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=default.alltypes #partitions=12 size=238.68KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=12 size=238.68KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -178,7 +178,7 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypes #partitions=12 size=238.68KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=12 size=238.68KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -207,11 +207,11 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
   LOCATIONS:
 ====
-select * from alltypes where 2009 = year
+select * from functional.alltypes where 2009 = year
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=default.alltypes #partitions=12 size=238.68KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=12 size=238.68KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -225,7 +225,7 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypes #partitions=12 size=238.68KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=12 size=238.68KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -254,11 +254,11 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
   LOCATIONS:
 ====
-select * from alltypes where 2009.0 = year
+select * from functional.alltypes where 2009.0 = year
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=default.alltypes #partitions=12 size=238.68KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=12 size=238.68KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -272,7 +272,7 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypes #partitions=12 size=238.68KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=12 size=238.68KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -302,11 +302,11 @@ NODE 0:
   LOCATIONS:
 ====
 # predicate on second partition key
-select * from alltypes where month=1
+select * from functional.alltypes where month=1
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=default.alltypes #partitions=2 size=40.32KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=2 size=40.32KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -320,7 +320,7 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypes #partitions=2 size=40.32KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=2 size=40.32KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -330,11 +330,11 @@ NODE 0:
   LOCATIONS:
 ====
 # predicate on both partition keys
-select * from alltypes where year=2009 and month=1
+select * from functional.alltypes where year=2009 and month=1
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=default.alltypes #partitions=1 size=19.95KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=1 size=19.95KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -348,7 +348,7 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypes #partitions=1 size=19.95KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=1 size=19.95KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -356,11 +356,11 @@ NODE 0:
   LOCATIONS:
 ====
 # single-sided range on 2nd key
-select * from alltypes where year=2009 and month > 6
+select * from functional.alltypes where year=2009 and month > 6
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=default.alltypes #partitions=6 size=120.87KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=6 size=120.87KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -374,7 +374,7 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypes #partitions=6 size=120.87KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=6 size=120.87KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -391,11 +391,11 @@ NODE 0:
   HDFS SPLIT hdfs://localhost:20500/test-warehouse/alltypes/year=2009/month=9/090901.txt 0:20179
   LOCATIONS:
 ====
-select * from alltypes where year=2009 and month < 6
+select * from functional.alltypes where year=2009 and month < 6
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=default.alltypes #partitions=5 size=98.11KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=5 size=98.11KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -409,7 +409,7 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypes #partitions=5 size=98.11KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=5 size=98.11KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -425,11 +425,11 @@ NODE 0:
   LOCATIONS:
 ====
 # single-sided ranges on both keys
-select * from alltypes where year<=2009 and month < 6
+select * from functional.alltypes where year<=2009 and month < 6
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=default.alltypes #partitions=5 size=98.11KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=5 size=98.11KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -443,7 +443,7 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypes #partitions=5 size=98.11KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=5 size=98.11KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -459,11 +459,11 @@ NODE 0:
   LOCATIONS:
 ====
 # range on 2nd key
-select * from alltypes where month < 9 and month > 6
+select * from functional.alltypes where month < 9 and month > 6
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=default.alltypes #partitions=4 size=81.46KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=4 size=81.46KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -477,7 +477,7 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypes #partitions=4 size=81.46KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=4 size=81.46KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -491,11 +491,11 @@ NODE 0:
   LOCATIONS:
 ====
 # multiple predicates on first key; 2nd one applied as predicate
-select * from alltypes where year < 2010 and year < 2009 and month > 6
+select * from functional.alltypes where year < 2010 and year < 2009 and month > 6
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=default.alltypes #partitions=6 size=120.87KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=6 size=120.87KB (0)
     PREDICATES: year < 2009
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
@@ -510,7 +510,7 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypes #partitions=6 size=120.87KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=6 size=120.87KB (0)
     PREDICATES: year < 2009
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -529,11 +529,11 @@ NODE 0:
   LOCATIONS:
 ====
 # multiple predicates on second key; 2nd one applied as predicate
-select * from alltypes where year < 2010 and month > 6 and month > 8
+select * from functional.alltypes where year < 2010 and month > 6 and month > 8
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=default.alltypes #partitions=6 size=120.87KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=6 size=120.87KB (0)
     PREDICATES: month > 8
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
@@ -548,7 +548,7 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypes #partitions=6 size=120.87KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=6 size=120.87KB (0)
     PREDICATES: month > 8
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -567,11 +567,11 @@ NODE 0:
   LOCATIONS:
 ====
 # between predicate on second key
-select * from alltypes where year = 2009 and month between 6 and 8
+select * from functional.alltypes where year = 2009 and month between 6 and 8
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=default.alltypes #partitions=3 size=60.43KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=3 size=60.43KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -585,7 +585,7 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypes #partitions=3 size=60.43KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=3 size=60.43KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -597,11 +597,11 @@ NODE 0:
   LOCATIONS:
 ====
 # between predicates on first and second keys
-select * from alltypes where year between 2009 and 2009 and month between 6 and 8
+select * from functional.alltypes where year between 2009 and 2009 and month between 6 and 8
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=default.alltypes #partitions=3 size=60.43KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=3 size=60.43KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -615,7 +615,7 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypes #partitions=3 size=60.43KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=3 size=60.43KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -627,11 +627,11 @@ NODE 0:
   LOCATIONS:
 ====
 # slot binding can't be determined
-select * from alltypes where year - 1 = 2009
+select * from functional.alltypes where year - 1 = 2009
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=default.alltypes #partitions=24 size=478.45KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=24 size=478.45KB (0)
     PREDICATES: year - 1 = 2009
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
@@ -646,7 +646,7 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypes #partitions=24 size=478.45KB (0)
+  SCAN HDFS table=functional.alltypes #partitions=24 size=478.45KB (0)
     PREDICATES: year - 1 = 2009
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
@@ -701,11 +701,11 @@ NODE 0:
   LOCATIONS:
 ====
 # multi files non-partitioned table test
-select * from alltypesaggmultifilesNoPart
+select * from functional.alltypesaggmultifilesNoPart
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=default.alltypesaggmultifilesnopart #partitions=1 size=734.18KB (0)
+  SCAN HDFS table=functional.alltypesaggmultifilesnopart #partitions=1 size=734.18KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -719,7 +719,7 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypesaggmultifilesnopart #partitions=1 size=734.18KB (0)
+  SCAN HDFS table=functional.alltypesaggmultifilesnopart #partitions=1 size=734.18KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:
@@ -733,11 +733,11 @@ NODE 0:
   LOCATIONS:
 ====
 # multi files partitioned table test
-select * from alltypesaggmultifiles where day<=2
+select * from functional.alltypesaggmultifiles where day<=2
 ---- PLAN
 Plan Fragment 0
   UNPARTITIONED
-  SCAN HDFS table=default.alltypesaggmultifiles #partitions=2 size=145.97KB (0)
+  SCAN HDFS table=functional.alltypesaggmultifiles #partitions=2 size=145.97KB (0)
     TUPLE IDS: 0 
 ---- DISTRIBUTEDPLAN
 Plan Fragment 0
@@ -751,7 +751,7 @@ Plan Fragment 1
     EXCHANGE ID: 1
     UNPARTITIONED
 
-  SCAN HDFS table=default.alltypesaggmultifiles #partitions=2 size=145.97KB (0)
+  SCAN HDFS table=functional.alltypesaggmultifiles #partitions=2 size=145.97KB (0)
     TUPLE IDS: 0 
 ---- SCANRANGELOCATIONS
 NODE 0:

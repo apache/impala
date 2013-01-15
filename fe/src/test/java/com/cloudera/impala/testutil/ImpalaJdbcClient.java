@@ -63,6 +63,20 @@ public class ImpalaJdbcClient {
     this.connString = connString;
   }
 
+  private void validateConnection() throws SQLException {
+    if (conn == null) {
+      throw new RuntimeException("Connection not initialized.");
+    } else if (conn.isClosed()) {
+      throw new RuntimeException("Connection not open.");
+    }
+    Preconditions.checkNotNull(stmt);
+
+    // Re-open if the statement if it has been closed.
+    if (stmt.isClosed()) {
+      stmt = conn.createStatement();
+    }
+  }
+
   public void connect() throws ClassNotFoundException, SQLException {
     LOG.info("Using JDBC Driver Name: " + driverName);
     LOG.info("Connecting to: " + connString);
@@ -93,20 +107,15 @@ public class ImpalaJdbcClient {
    * if needed.
    */
   public ResultSet execQuery(String query) throws SQLException {
-    if (conn == null) {
-      throw new RuntimeException("Connection not initialized.");
-    } else if (conn.isClosed()) {
-      throw new RuntimeException("Connection not open.");
-    }
-    Preconditions.checkNotNull(stmt);
-
-    // Re-open if the statement if it has been closed.
-    if (stmt.isClosed()) {
-      stmt = conn.createStatement();
-    }
-
+    validateConnection();
     LOG.info("Executing: " + query);
     return stmt.executeQuery(query);
+  }
+
+  public void changeDatabase(String db_name) throws SQLException {
+    validateConnection();
+    LOG.info("Using: " + db_name);
+    stmt.execute("use " + db_name);
   }
 
   public Connection getConnection() {
@@ -208,6 +217,14 @@ public class ImpalaJdbcClient {
 
     String[] queries = queryString.trim().split(";");
     for (String query: queries) {
+      query = query.trim().toLowerCase();
+      if (query.startsWith("use")) {
+        String[] split_query = query.split(" ");
+        String db_name = split_query[split_query.length - 1];
+        client.changeDatabase(db_name);
+        client.getStatement().close();
+        continue;
+      }
       long startTime = System.currentTimeMillis();
       ResultSet res = client.execQuery(query);
       ResultSetMetaData meta = res.getMetaData();

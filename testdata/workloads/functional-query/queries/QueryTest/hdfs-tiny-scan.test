@@ -1,6 +1,6 @@
 ====
 ---- QUERY
-select * from tinytable$TABLE
+select * from tinytable
 ---- TYPES
 string, string
 ---- RESULTS
@@ -9,7 +9,7 @@ string, string
 'eeeeeeee','f'
 ====
 ---- QUERY
-select a from tinytable$TABLE
+select a from tinytable
 ---- TYPES
 string
 ---- RESULTS

@@ -1,5 +1,9 @@
 ====
 ---- QUERY
+# use functional
+use functional
+====
+---- QUERY
 # Simple pattern literal
 show tables "alltypes"
 ---- RESULTS
@@ -33,7 +37,9 @@ STRING
 ====
 ---- QUERY
 # Fully qualified names will not match
-show tables "default.alltypes"
+show tables "functional.alltypes"
+---- TYPES
+string
 ---- RESULTS
 
 ---- TYPES
@@ -41,7 +47,7 @@ STRING
 ====
 ---- QUERY
 # Database names are case insensitive.
-USE TESTDB1
+USE FUNCTIONAL
 ---- RESULTS
 
 ====
@@ -53,42 +59,50 @@ USE TESTDB1
 show tables '*'
 ---- RESULTS
 'alltypes'
-'alltypes_rc'
-'alltypes_rc_bzip'
-'alltypes_rc_def'
-'alltypes_rc_gzip'
-'alltypes_rc_snap'
-'alltypes_seq'
-'alltypes_seq_bzip'
-'alltypes_seq_def'
-'alltypes_seq_gzip'
-'alltypes_seq_record_bzip'
-'alltypes_seq_record_def'
-'alltypes_seq_record_gzip'
-'alltypes_seq_record_snap'
-'alltypes_seq_snap'
+'alltypesagg'
+'alltypesaggmultifiles'
+'alltypesaggmultifilesnopart'
+'alltypesaggnonulls'
+'alltypeserror'
+'alltypeserrornonulls'
+'alltypesinsert'
+'alltypesmixedformat'
+'alltypesnopart'
+'alltypesnopart_insert'
+'alltypessmall'
+'alltypestiny'
+'array_table'
+'dimtbl'
+'emptytable'
+'escapechartesttable'
+'escapenoquotes'
+'greptiny'
+'hbasealltypesagg'
+'hbasealltypeserror'
+'hbasealltypeserrornonulls'
+'hbasealltypessmall'
+'hbasestringids'
+'insert_overwrite_nopart'
+'insert_overwrite_partitioned'
+'internal_hbase_table'
+'jointbl'
+'liketbl'
+'map_table'
+'nullescapedtable'
+'nullinsert'
+'nullinsert_alt'
+'nulltable'
+'overflow'
+'rankingssmall'
+'stringpartitionkey'
+'tblwithraggedcolumns'
 'testtbl'
-'testtbl_rc'
-'testtbl_rc_bzip'
-'testtbl_rc_def'
-'testtbl_rc_gzip'
-'testtbl_rc_snap'
-'testtbl_seq'
-'testtbl_seq_bzip'
-'testtbl_seq_def'
-'testtbl_seq_gzip'
-'testtbl_seq_record_bzip'
-'testtbl_seq_record_def'
-'testtbl_seq_record_gzip'
-'testtbl_seq_record_snap'
-'testtbl_seq_snap'
+'tinyinttable'
+'tinytable'
+'uservisitssmall'
+'zipcode_incomes'
 ---- TYPES
 STRING
-====
----- QUERY
-USE default
----- RESULTS
-
 ====
 ---- QUERY
 # Choice amongst patterns
@@ -102,112 +116,106 @@ STRING
 ====
 ---- QUERY
 # Show tables in
-show tables in testdb1
+show tables in functional
 ---- RESULTS
 'alltypes'
-'alltypes_rc'
-'alltypes_rc_bzip'
-'alltypes_rc_def'
-'alltypes_rc_gzip'
-'alltypes_rc_snap'
-'alltypes_seq'
-'alltypes_seq_bzip'
-'alltypes_seq_def'
-'alltypes_seq_gzip'
-'alltypes_seq_record_bzip'
-'alltypes_seq_record_def'
-'alltypes_seq_record_gzip'
-'alltypes_seq_record_snap'
-'alltypes_seq_snap'
+'alltypesagg'
+'alltypesaggmultifiles'
+'alltypesaggmultifilesnopart'
+'alltypesaggnonulls'
+'alltypeserror'
+'alltypeserrornonulls'
+'alltypesinsert'
+'alltypesmixedformat'
+'alltypesnopart'
+'alltypesnopart_insert'
+'alltypessmall'
+'alltypestiny'
+'array_table'
+'dimtbl'
+'emptytable'
+'escapechartesttable'
+'escapenoquotes'
+'greptiny'
+'hbasealltypesagg'
+'hbasealltypeserror'
+'hbasealltypeserrornonulls'
+'hbasealltypessmall'
+'hbasestringids'
+'insert_overwrite_nopart'
+'insert_overwrite_partitioned'
+'internal_hbase_table'
+'jointbl'
+'liketbl'
+'map_table'
+'nullescapedtable'
+'nullinsert'
+'nullinsert_alt'
+'nulltable'
+'overflow'
+'rankingssmall'
+'stringpartitionkey'
+'tblwithraggedcolumns'
 'testtbl'
-'testtbl_rc'
-'testtbl_rc_bzip'
-'testtbl_rc_def'
-'testtbl_rc_gzip'
-'testtbl_rc_snap'
-'testtbl_seq'
-'testtbl_seq_bzip'
-'testtbl_seq_def'
-'testtbl_seq_gzip'
-'testtbl_seq_record_bzip'
-'testtbl_seq_record_def'
-'testtbl_seq_record_gzip'
-'testtbl_seq_record_snap'
-'testtbl_seq_snap'
+'tinyinttable'
+'tinytable'
+'uservisitssmall'
+'zipcode_incomes'
 ---- TYPES
 STRING
 ====
 ---- QUERY
 # Show tables in with a pattern
-show tables in testdb1 like 'alltype*'
+show tables in functional like 'alltypesagg*'
 ---- RESULTS
-'alltypes'
-'alltypes_rc'
-'alltypes_rc_bzip'
-'alltypes_rc_def'
-'alltypes_rc_gzip'
-'alltypes_rc_snap'
-'alltypes_seq'
-'alltypes_seq_bzip'
-'alltypes_seq_def'
-'alltypes_seq_gzip'
-'alltypes_seq_record_bzip'
-'alltypes_seq_record_def'
-'alltypes_seq_record_gzip'
-'alltypes_seq_record_snap'
-'alltypes_seq_snap'
+'alltypesagg'
+'alltypesaggmultifiles'
+'alltypesaggmultifilesnopart'
+'alltypesaggnonulls'
 ---- TYPES
 STRING
-====
----- QUERY
-USE testdb1
----- RESULTS
-
 ====
 ---- QUERY
 # Coverage of syntax variations.
-show tables in testdb1 'alltypes'
+show tables in functional 'alltypesagg'
 ---- RESULTS
-'alltypes'
+'alltypesagg'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-show tables in testdb1 like 'alltypes'
+show tables in functional like 'alltypesagg'
 ---- RESULTS
-'alltypes'
+'alltypesagg'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-show tables 'alltypes'
+show tables 'alltypesagg'
 ---- RESULTS
-'alltypes'
+'alltypesagg'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-show tables like 'alltypes'
+show tables like 'alltypesagg'
 ---- RESULTS
-'alltypes'
+'alltypesagg'
 ---- TYPES
 STRING
 ====
 ---- QUERY
 # Show databases
-show databases
+show databases like 'tpcds'
 ---- RESULTS
-'default'
-'testdb1'
 'tpcds'
-'tpch'
 ---- TYPES
 STRING
 ====
 ---- QUERY
-show databases like 'def*'
+show databases like 'functional'
 ---- RESULTS
-'default'
+'functional'
 ---- TYPES
 STRING
 ====

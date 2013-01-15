@@ -10,10 +10,10 @@ SELECT
   SUM(CASE WHEN (d_day_name='Thursday') THEN ss_sales_price ELSE NULL END) AS thu_sales,
   SUM(CASE WHEN (d_day_name='Friday') THEN ss_sales_price ELSE NULL END) AS fri_sales,
   SUM(CASE WHEN (d_day_name='Saturday') THEN ss_sales_price ELSE NULL END) AS sat_sales
-FROM tpcds.store_sales$TABLE ss
-JOIN tpcds.date_dim$TABLE d
+FROM store_sales ss
+JOIN date_dim d
   ON (ss.ss_sold_date_sk = d.d_date_sk)
-JOIN tpcds.store$TABLE s
+JOIN store s
   ON (ss.ss_store_sk = s.s_store_sk)
 WHERE
   s_gmt_offset = -5

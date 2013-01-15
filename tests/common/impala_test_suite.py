@@ -6,6 +6,7 @@ import logging
 import os
 import pprint
 import pytest
+from functools import wraps
 from tests.beeswax.impala_beeswax import ImpalaBeeswaxClient
 from tests.common.test_dimensions import *
 from tests.common.test_result_verifier import *
@@ -77,7 +78,8 @@ class ImpalaTestSuite(BaseTestSuite):
     """
     table_format_info = vector.get_value('table_format')
     exec_options = vector.get_value('exec_option')
-
+    # Change the database to reflect the file_format, compression codec etc.
+    self.change_database(table_format_info, exec_options)
     sections = self.__load_query_test_file(self.get_workload(), test_file_name)
     updated_sections = list()
     for test_section in sections:
@@ -126,22 +128,48 @@ class ImpalaTestSuite(BaseTestSuite):
     DROP PARTITIONS <table name> - Drop all partitions from the table
     RELOAD - Reload the catalog
     """
-    setup_section = remove_comments(setup_section)
+    setup_section = QueryTestSectionReader.build_query(setup_section, vector, '')
     for row in setup_section.split('\n'):
       row = row.lstrip()
       if row.startswith('RESET'):
-        table_name = QueryTestSectionReader.replace_table_suffix(
-            row.split('RESET')[1], vector)
-        self.__reset_table(table_name.strip())
+        table_name = row.split('RESET')[1]
+        self.__reset_table(table_name.strip(), vector)
       elif row.startswith('DROP PARTITIONS'):
-        table_name = QueryTestSectionReader.replace_table_suffix(
-            row.split('DROP PARTITIONS')[1], vector)
-        self.__drop_partitions(table_name.strip())
+        table_name = row.split('DROP PARTITIONS')[1]
+        self.__drop_partitions(table_name.strip(), vector)
       elif row.startswith('RELOAD'):
         self.client.refresh()
       else:
         assert False, 'Unsupported setup command: %s' % row
 
+  def change_database(self, table_format, exec_options):
+    db_name =  QueryTestSectionReader.get_db_name(table_format)
+    query = 'use %s' % db_name
+    self.__execute_query(IMPALAD, query, exec_options, False)
+
+  def execute_wrapper(function):
+    """
+    Issues a use database query before executing queries.
+
+    Database names are dependent on the input format for table, which the table names
+    remaining the same. A use database is issued before query execution. As such,
+    dabase names need to be build pre execution, this method wraps around the different
+    execute methods and provides a common interface to issue the proper use command.
+    """
+    @wraps(function)
+    def wrapper(*args, **kwargs):
+      if kwargs.get('table_format'):
+        table_format = kwargs.get('table_format')
+        # Make sure the table_format is not None
+        assert table_format is not None
+        del kwargs['table_format']
+        query_exec_options = kwargs.get('query_exec_options')
+        # self is the implicit first argument
+        args[0].change_database(table_format, query_exec_options)
+      return function(*args, **kwargs)
+    return wrapper
+
+  @execute_wrapper
   def execute_query_expect_success(self, impalad, query, query_exec_options=None,
                                    use_kerberos=False):
     """Executes a query and asserts if the query fails"""
@@ -149,21 +177,24 @@ class ImpalaTestSuite(BaseTestSuite):
     assert result.success
     return result
 
+  @execute_wrapper
   def execute_query(self, query, query_exec_options=None, use_kerberos=False):
     return self.__execute_query(IMPALAD, query, query_exec_options, use_kerberos)
 
+  @execute_wrapper
   def execute_query_async(self, query, query_exec_options=None, use_kerberos=False):
     self.__set_exec_options(query_exec_options)
     return self.client.execute_query_async(query)
 
+  @execute_wrapper
   def execute_scalar(self, query, query_exec_options=None, use_kerberos=False):
     result = self.__execute_query(IMPALAD, query, query_exec_options, use_kerberos)
     assert len(result.data) <= 1, 'Multiple values returned from scalar'
     return result.data[0] if len(result.data) == 1 else None
 
-  def __drop_partitions(self, table_name):
+  def __drop_partitions(self, table_name, vector):
     """Drops all partitions in the given table"""
-    db_name, table_name = ImpalaTestSuite.__get_database_from_table_name(table_name)
+    db_name, table_name = ImpalaTestSuite.__get_db_from_table_name(table_name, vector)
     for partition in self.hive_client.get_partition_names(db_name, table_name, 0):
       self.hive_client.drop_partition_by_name(db_name, table_name, partition, True)
 
@@ -190,9 +221,9 @@ class ImpalaTestSuite(BaseTestSuite):
       assert False, 'Test file not found: %s' % file_name
     return parse_query_test_file(test_file_path)
 
-  def __reset_table(self, table_name):
+  def __reset_table(self, table_name, vector):
     """Resets a table (drops and recreates the table)"""
-    db_name, table_name = ImpalaTestSuite.__get_database_from_table_name(table_name)
+    db_name, table_name = ImpalaTestSuite.__get_db_from_table_name(table_name, vector)
     table = self.hive_client.get_table(db_name, table_name)
     assert table is not None
     self.hive_client.drop_table(db_name, table_name, True)
@@ -248,12 +279,14 @@ class ImpalaTestSuite(BaseTestSuite):
     return default_strategy
 
   @staticmethod
-  def __get_database_from_table_name(table_name):
+  def __get_db_from_table_name(table_name, vector):
     """
     Given a fully qualified table name, returns the database name and table name
 
-    If the table name is not fully qualified, then assume 'default' as the database
+    If the table name is not fully qualified, then retrieve the appropriate database.
     """
     split = table_name.split('.')
     assert len(split) <= 2, 'Unexpected table format: %s' % table_name
-    return (split[0], split[1]) if len(split) == 2 else ('default', split[0])
+    db_name = split[0] if len(split) == 2 else QueryTestSectionReader.get_db_name(vector)
+    return (db_name, split[-1])
+

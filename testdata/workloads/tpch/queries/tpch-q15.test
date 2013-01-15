@@ -5,7 +5,7 @@ insert overwrite table tpch.revenue
 select
   l_suppkey as supplier_no,
   sum(l_extendedprice * (1 - l_discount)) as total_revenue
-from tpch.lineitem$TABLE
+from lineitem
 where l_shipdate >= '1996-01-01' and l_shipdate < '1996-04-01'
 group by l_suppkey
 ---- SETUP
@@ -34,7 +34,7 @@ select
   s_address,
   s_phone,
   total_revenue
-from tpch.supplier$TABLE s
+from supplier s
 join tpch.revenue r
   on (s.s_suppkey = r.supplier_no)
 join tpch.max_revenue m

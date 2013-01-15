@@ -1,14 +1,14 @@
 ====
 ---- QUERY
 # limit 0 on hdfs table
-select * from alltypesagg$TABLE where day = 1 limit 0
+select * from alltypesagg where day = 1 limit 0
 ---- TYPES
 int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
 ---- RESULTS
 ====
 ---- QUERY
 # limit 0 on hbase table
-select * from hbasealltypessmall where string_col = '4' limit 0
+select * from functional.hbasealltypessmall where string_col = '4' limit 0
 ---- TYPES
 int, boolean, double, float, bigint, int, smallint, tinyint, string, string, timestamp
 ---- RESULTS
@@ -22,13 +22,13 @@ from (
               b.float_col float_col, b.id id
        from (
               select *
-              from alltypesagg$TABLE a
+              from alltypesagg a
               where month=1
             ) a
-            join alltypessmall$TABLE b
+            join alltypessmall b
             on (a.smallint_col = b.id)
      ) x
-join alltypessmall$TABLE c on (x.tinyint_col = c.id)
+join alltypessmall c on (x.tinyint_col = c.id)
 where x.day=1
 and   x.int_col > 899
 and   x.float_col > 4.5
@@ -41,7 +41,7 @@ smallint, int, tinyint, int, int, float, string
 ====
 ---- QUERY
 # We need to specify the day here, otherwise files get opened in random order
-select * from alltypesagg$TABLE where day = 1 limit 10
+select * from alltypesagg where day = 1 limit 10
 ---- TYPES
 int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
 ---- RESULTS
@@ -58,7 +58,7 @@ int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, stri
 ====
 ---- QUERY
 # limit is applied after where clause
-select * from alltypesagg$TABLE where tinyint_col is null and day = 1 limit 10
+select * from alltypesagg where tinyint_col is null and day = 1 limit 10
 ---- TYPES
 int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, string, string, timestamp
 ---- RESULTS
@@ -74,7 +74,7 @@ int, int, int, int, boolean, tinyint, smallint, int, bigint, float, double, stri
 2010,1,1,90,true,NULL,90,90,900,99,909,'01/01/10','90',2010-01-01 01:30:40.500000000
 ====
 ---- QUERY
-select tinyint_col, count(*) from alltypesagg$TABLE group by 1
+select tinyint_col, count(*) from alltypesagg group by 1
 ---- TYPES
 tinyint, bigint
 ---- RESULTS
@@ -90,7 +90,7 @@ tinyint, bigint
 NULL,1000
 ====
 ---- QUERY
-select tinyint_col, count(*) from alltypesagg$TABLE group by 1 limit 10
+select tinyint_col, count(*) from alltypesagg group by 1 limit 10
 ---- TYPES
 tinyint, bigint
 ---- RESULTS
@@ -107,7 +107,7 @@ NULL,1000
 ====
 ---- QUERY
 # limit and where clause don't interact
-select tinyint_col, count(*) from alltypesagg$TABLE where smallint_col > 49 group by 1 
+select tinyint_col, count(*) from alltypesagg where smallint_col > 49 group by 1 
 limit 10
 ---- TYPES
 tinyint, bigint
@@ -125,7 +125,7 @@ NULL,500
 ====
 ---- QUERY
 # limit is applied after having
-select tinyint_col, count(*) from alltypesagg$TABLE group by 1 having tinyint_col > 5 
+select tinyint_col, count(*) from alltypesagg group by 1 having tinyint_col > 5 
 limit 5
 ---- TYPES
 tinyint, bigint

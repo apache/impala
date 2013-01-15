@@ -97,42 +97,26 @@ TREVNI_COMPRESSION_MAP = {'def': 'deflate',
 FILE_FORMAT_MAP = {'text': 'TEXTFILE',
                    'seq': 'SEQUENCEFILE',
                    'rc': 'RCFILE',
-                   'trevni': '\n' +
-                     'INPUTFORMAT \'org.apache.hadoop.hive.ql.io.TrevniInputFormat\'\n' +
-                     'OUTPUTFORMAT \'org.apache.hadoop.hive.ql.io.TrevniOutputFormat\'',
                    'text_lzo': '\n' +
                      'INPUTFORMAT \'com.hadoop.mapred.DeprecatedLzoTextInputFormat\'\n' +
-                     'OUTPUTFORMAT ' + 
+                     'OUTPUTFORMAT ' +
                      '\'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat\'\n'
                   }
 
-TREVNI_ALTER_STATEMENT = "ALTER TABLE %(table_name)s SET\n\
-     SERDEPROPERTIES ('blocksize' = '1073741824', 'compression' = '%(compression)s');"
 KNOWN_EXPLORATION_STRATEGIES = ['core', 'pairwise', 'exhaustive', 'lzo']
 
-
-def build_create_statement(table_template, table_name, file_format,
-                           compression, scale_factor):
-  create_statement = 'DROP TABLE IF EXISTS %s;\n' % table_name
+def build_create_statement(table_template, table_name, db_name, db_suffix,
+                           file_format, compression, hdfs_location):
+  create_statement = 'DROP TABLE IF EXISTS %s%s.%s;\n' % (db_name, db_suffix, table_name)
+  create_statement += 'CREATE DATABASE IF NOT EXISTS %s%s;\n' % (db_name, db_suffix)
   if compression == 'lzo':
     file_format = '%s_%s' % (file_format, compression)
-  create_statement += table_template % {'table_name': table_name,
-                                        'file_format': FILE_FORMAT_MAP[file_format],
-                                        'scale_factor': scale_factor}
-  if file_format != 'trevni':
-    return create_statement
-
-  # Hive does not support a two part name in ALTER statements.
-  parts = table_name.split('.')
-  if len(parts) == 1:
-    return create_statement + '\n\n' + \
-                      (TREVNI_ALTER_STATEMENT % {'table_name': table_name,
-                      'compression': TREVNI_COMPRESSION_MAP[compression]})
-  else:
-    return create_statement + '\n\n' + 'use ' + parts[0] + ';\n' + \
-                      (TREVNI_ALTER_STATEMENT % {'table_name': parts[1],
-                      'compression': TREVNI_COMPRESSION_MAP[compression]}) + \
-                      'use default;\n'
+  create_statement += table_template.format(db_name=db_name,
+                                            db_suffix=db_suffix,
+                                            table_name=table_name,
+                                            file_format=FILE_FORMAT_MAP[file_format],
+                                            hdfs_location=hdfs_location)
+  return create_statement
 
 def build_compression_codec_statement(codec, compression_type):
   compression_codec = COMPRESSION_MAP[codec]
@@ -145,13 +129,11 @@ def build_codec_enabled_statement(codec):
   compression_enabled = 'false' if codec == 'none' else 'true'
   return COMPRESSION_ENABLED % compression_enabled
 
-def build_insert_into_statement(insert, base_table_name, table_name, file_format,
+def build_insert_into_statement(insert, db_name, db_suffix, table_name, file_format,
                                 for_impala=False):
-  tmp_load_template = insert.replace(' % ', ' *** ')
-  insert_statement = tmp_load_template % {'base_table_name': base_table_name,
-                                          'table_name': table_name,
-                                          'file_format': FILE_FORMAT_MAP[file_format]}
-  insert_statement = insert_statement.replace(' *** ', ' % ')
+  insert_statement = insert.format(db_name=db_name,
+                                   db_suffix=db_suffix,
+                                   table_name=table_name)
   if for_impala:
     return insert_statement
 
@@ -159,33 +141,34 @@ def build_insert_into_statement(insert, base_table_name, table_name, file_format
   statement += SET_DYNAMIC_PARTITION_STATEMENT + "\n"
   # For some reason (hive bug?) we need to have the CombineHiveInputFormat set for cases
   # where we are compressing in bzip on certain tables that have multiple files.
-  if 'bzip' in table_name and 'multi' in table_name:
+  if 'bzip' in db_suffix and 'multi' in table_name:
     statement += SET_HIVE_INPUT_FORMAT % "CombineHiveInputFormat"
   else:
     statement += SET_HIVE_INPUT_FORMAT % "HiveInputFormat"
   return statement + insert_statement
 
-def build_insert(insert, table_name, file_format,
-    base_table_name, codec, compression_type):
+def build_insert(insert, db_name, db_suffix, file_format,
+                 codec, compression_type, table_name):
   output = build_codec_enabled_statement(codec) + "\n"
   output += build_compression_codec_statement(codec, compression_type) + "\n"
-  output += build_insert_into_statement(insert, base_table_name,
+  output += build_insert_into_statement(insert, db_name, db_suffix,
                                         table_name, file_format) + "\n"
   return output
 
-def build_load_statement(load_template, table_name, scale_factor):
-  tmp_load_template = load_template.replace(' % ', ' *** ')
-  return (tmp_load_template % {'table_name': table_name,
-                               'scale_factor': scale_factor}).replace(' *** ', ' % ')
+def build_load_statement(load_template, db_name, db_suffix, table_name):
+  # hbase does not need the hdfs path.
+  if table_name.startswith('hbase'):
+    load_template = load_template.format(table_name=table_name,
+                                         db_name=db_name,
+                                         db_suffix=db_suffix)
+  else:
+    load_template = load_template.format(table_name=table_name,
+                                         db_name=db_name,
+                                         db_suffix=db_suffix,
+                                         impala_home = os.environ['IMPALA_HOME'])
+  return load_template
 
-def build_trevni(trevni_template, table_name, base_table_name):
-  statement =\
-      trevni_template % {'table_name': table_name, 'base_table_name': base_table_name}
-  # Filter out Impala unsupported 'SET' statements.
-  return '\n'.join([line for line in statement.split('\n') if 'set ' not in line.lower()])
-
-
-def build_table_suffix(file_format, codec, compression_type):
+def build_db_suffix(file_format, codec, compression_type):
   if file_format == 'text' and codec != 'none' and codec != 'lzo':
     print 'Unsupported combination of file_format (text) and compression codec.'
     sys.exit(1)
@@ -197,11 +180,6 @@ def build_table_suffix(file_format, codec, compression_type):
     return '_%s_record_%s' % (file_format, codec)
   else:
     return '_%s_%s' % (file_format, codec)
-
-def write_trevni_to_file(file_name, array):
-  # Strip out all the hive SET statements
-  array.insert(0, 'refresh;\n')
-  write_array_to_file(file_name, 'w', array)
 
 def write_array_to_file(file_name, mode, array):
   with open(file_name, mode) as f:
@@ -219,38 +197,48 @@ def get_hdfs_subdirs_with_data(path):
   # So to get subdirectory names just return everything after the last '/'
   return [line[line.rfind('/') + 1:].strip() for line in tmp_file.readlines()]
 
-def generate_statements(output_name, test_vectors,
-    sections, schema_include_constraints, schema_exclude_constraints):
+def generate_statements(output_name, test_vectors, sections,
+                        schema_include_constraints, schema_exclude_constraints):
   output_stats = [SET_HIVE_INPUT_FORMAT % "HiveInputFormat"]
   output_create = []
   output_load = []
   output_load_base = []
-  output_trevni = []
   table_names = None
   if options.table_names:
     table_names = [name.lower() for name in options.table_names.split(',')]
-
   existing_tables = get_hdfs_subdirs_with_data(options.hive_warehouse_dir)
   for row in test_vectors:
     file_format, data_set, codec, compression_type =\
         [row.file_format, row.dataset, row.compression_codec, row.compression_type]
 
     for section in sections:
+      alter = section.get('ALTER')
       create = section['CREATE']
       insert = section['DEPENDENT_LOAD']
       load_local = section['LOAD']
       base_table_name = section['BASE_TABLE_NAME']
+      table_name = base_table_name
+      db_suffix = build_db_suffix(file_format, codec, compression_type)
+      db_name = '{0}{1}'.format(data_set, options.scale_factor)
+      hdfs_location = '{0}.{1}{2}'.format(db_name, table_name, db_suffix)
+      # hdfs file names for hive-benchmark and functional datasets are stored
+      # directly under /test-warehouse
+      # TODO: We should not need to specify the hdfs file path in the schema file.
+      # This needs to be done programmatically.
+      if data_set in ['hive-benchmark', 'functional']:
+        hdfs_location = hdfs_location.split('.')[-1]
+      # hive does not allow hyphenated table names.
+      if data_set == 'hive-benchmark':
+        db_name = '{0}{1}'.format('hivebenchmark', options.scale_factor)
 
-      base_table_name = base_table_name % {'scale_factor' : options.scale_factor}
-      table_name = base_table_name + \
-                       build_table_suffix(file_format, codec, compression_type)
+      data_path = os.path.join(options.hive_warehouse_dir, hdfs_location)
 
-      if table_names and (base_table_name.lower() not in table_names):
-        print 'Skipping table: %s' % base_table_name
+      if table_names and (table_name.lower() not in table_names):
+        print 'Skipping table: %s' % table_name
         continue
 
-      if schema_include_constraints[base_table_name.lower()] and \
-         file_format not in schema_include_constraints[base_table_name.lower()]:
+      if schema_include_constraints[table_name.lower()] and \
+         file_format not in schema_include_constraints[table_name.lower()]:
         print 'Skipping \'%s\' due to include constraint match' % table_name
         continue
 
@@ -259,48 +247,42 @@ def generate_statements(output_name, test_vectors,
         print 'Skipping \'%s\' due to exclude constraint match' % table_name
         continue
 
-      output_create.append(build_create_statement(create, table_name, file_format, codec,
-                                                  options.scale_factor))
+      output_create.append(build_create_statement(create, table_name, db_name, db_suffix,
+                                                  file_format, codec, hdfs_location))
+      # The ALTER statement in hive does not accept fully qualified table names.
+      # We need the use statement.
+      if alter:
+        use_table = 'USE {db_name}{db_suffix};\n'.format(db_name=db_name,
+                                                         db_suffix=db_suffix)
+        output_create.append(use_table + alter.format(table_name=table_name))
 
       # If the directory already exists in HDFS, assume that data files already exist
       # and skip loading the data. Otherwise, the data is generated using either an
       # INSERT INTO statement or a LOAD statement.
-      data_path = os.path.join(options.hive_warehouse_dir, table_name)
-      if not options.force_reload and table_name in existing_tables:
+      if not options.force_reload and hdfs_location in existing_tables:
         print 'HDFS path:', data_path, 'contains data. Data loading can be skipped.'
       else:
         print 'HDFS path:', data_path, 'does not exists or is empty. Data will be loaded.'
-        if table_name == base_table_name:
+        if not db_suffix:
           if load_local:
-            output_load_base.append(build_load_statement(load_local, table_name,
-                                                         options.scale_factor))
+            output_load_base.append(build_load_statement(load_local, db_name,
+                                                         db_suffix, table_name))
           else:
             print 'Empty base table load for %s. Skipping load generation' % table_name
-        elif file_format == 'trevni':
-          if insert:
-            # In most cases the same load logic can be used for the trevni and non-trevi
-            # case, but sometimes it needs to be special cased.
-            insert = insert if 'LOAD_TREVNI' not in section else section['LOAD_TREVNI']
-            output_trevni.append(build_insert_into_statement(
-                insert, base_table_name, table_name, 'trevni', for_impala=True))
-          else:
-            print \
-                'Empty trevni load for table %s. Skipping insert generation' % table_name
         else:
           if insert:
-            output_load.append(build_insert(insert, table_name, file_format,
-              base_table_name, codec, compression_type))
+            output_load.append(build_insert(insert, db_name, db_suffix, file_format,
+                                            codec, compression_type, table_name))
           else:
               print 'Empty insert for table %s. Skipping insert generation' % table_name
 
   # Make sure we create the base tables first
   output_load = output_create + output_load_base + output_load
   write_array_to_file('load-' + output_name + '-generated.sql', 'w', output_load)
-  write_trevni_to_file('load-trevni-' + output_name + '-generated.sql', output_trevni);
 
 def parse_schema_template_file(file_name):
   VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'CREATE', 'DEPENDENT_LOAD',
-                         'LOAD', 'LOAD_TREVNI']
+                         'LOAD', 'ALTER']
   return parse_test_file(file_name, VALID_SECTION_NAMES, skip_unknown_sections=False)
 
 if __name__ == "__main__":
@@ -329,7 +311,6 @@ if __name__ == "__main__":
 
   constraints_file = os.path.join(DATASET_DIR, target_dataset, 'schema_constraints.csv')
   include_constraints, exclude_constraints = parse_table_constraints(constraints_file)
-
   sections = parse_schema_template_file(schema_template_file)
   generate_statements('%s-%s' % (options.workload, options.exploration_strategy),
       test_vectors, sections, include_constraints, exclude_constraints)

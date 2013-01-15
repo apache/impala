@@ -4,10 +4,9 @@
 ---- DATASET
 tpcds
 ---- BASE_TABLE_NAME
-tpcds%(scale_factor)s.store_sales
+store_sales
 ---- CREATE
-create database if not exists tpcds%(scale_factor)s;
-create external table %(table_name)s
+create external table {db_name}{db_suffix}.{table_name}
 (
     ss_sold_date_sk           int,
     ss_sold_time_sk           int,
@@ -34,20 +33,20 @@ create external table %(table_name)s
     ss_net_profit             float
 )
 row format delimited fields terminated by '|'
-STORED AS %(file_format)s
-location '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+location '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpcds%(scale_factor)s/store_sales/'
-OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/store_sales/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 tpcds
 ---- BASE_TABLE_NAME
-tpcds%(scale_factor)s.customer_demographics
+customer_demographics
 ---- CREATE
-create external table %(table_name)s
+create external table {db_name}{db_suffix}.{table_name}
 (
     cd_demo_sk                int,
     cd_gender                 string,
@@ -60,20 +59,20 @@ create external table %(table_name)s
     cd_dep_college_count      int
 )
 row format delimited fields terminated by '|'
-STORED AS %(file_format)s
-location '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+location '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpcds%(scale_factor)s/customer_demographics/'
-OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/customer_demographics/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 tpcds
 ---- BASE_TABLE_NAME
-tpcds%(scale_factor)s.date_dim
+date_dim
 ---- CREATE
-create external table %(table_name)s
+create external table {db_name}{db_suffix}.{table_name}
 (
     d_date_sk                 int,
     d_date_id                 string,
@@ -105,20 +104,20 @@ create external table %(table_name)s
     d_current_year            string
 )
 row format delimited fields terminated by '|'
-STORED AS %(file_format)s
-location '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+location '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpcds%(scale_factor)s/date_dim/'
-OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/date_dim/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 tpcds
 ---- BASE_TABLE_NAME
-tpcds%(scale_factor)s.time_dim
+time_dim
 ---- CREATE
-create external table %(table_name)s
+create external table {db_name}{db_suffix}.{table_name}
 (
     t_time_sk                 int,
     t_time_id                 string,
@@ -132,20 +131,20 @@ create external table %(table_name)s
     t_meal_time               string
 )
 row format delimited fields terminated by '|'
-STORED AS %(file_format)s
-location '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+location '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpcds%(scale_factor)s/time_dim/'
-OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/time_dim/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 tpcds
 ---- BASE_TABLE_NAME
-tpcds%(scale_factor)s.item
+item
 ---- CREATE
-create external table %(table_name)s
+create external table {db_name}{db_suffix}.{table_name}
 (
     i_item_sk                 int,
     i_item_id                 string,
@@ -171,20 +170,20 @@ create external table %(table_name)s
     i_product_name            string
 )
 row format delimited fields terminated by '|'
-STORED AS %(file_format)s
-location '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+location '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpcds%(scale_factor)s/item/'
-OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/item/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 tpcds
 ---- BASE_TABLE_NAME
-tpcds%(scale_factor)s.store
+store
 ---- CREATE
-create external table %(table_name)s
+create external table {db_name}{db_suffix}.{table_name}
 (
     s_store_sk                int,
     s_store_id                string,
@@ -217,20 +216,20 @@ create external table %(table_name)s
     s_tax_precentage          float
 )
 row format delimited fields terminated by '|'
-STORED AS %(file_format)s
-location '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+location '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpcds%(scale_factor)s/store/'
-OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/store/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 tpcds
 ---- BASE_TABLE_NAME
-tpcds%(scale_factor)s.customer
+customer
 ---- CREATE
-create external table %(table_name)s
+create external table {db_name}{db_suffix}.{table_name}
 (
     c_customer_sk             int,
     c_customer_id             string,
@@ -252,20 +251,20 @@ create external table %(table_name)s
     c_last_review_date        string
 )
 row format delimited fields terminated by '|'
-STORED AS %(file_format)s
-location '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+location '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpcds%(scale_factor)s/customer/'
-OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/customer/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 tpcds
 ---- BASE_TABLE_NAME
-tpcds%(scale_factor)s.promotion
+promotion
 ---- CREATE
-create external table %(table_name)s
+create external table {db_name}{db_suffix}.{table_name}
 (
     p_promo_sk                int,
     p_promo_id                string,
@@ -288,20 +287,20 @@ create external table %(table_name)s
     p_discount_active         string
 )
 row format delimited fields terminated by '|'
-STORED AS %(file_format)s
-location '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+location '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpcds%(scale_factor)s/promotion/'
-OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/promotion/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 tpcds
 ---- BASE_TABLE_NAME
-tpcds%(scale_factor)s.household_demographics
+household_demographics
 ---- CREATE
-create external table %(table_name)s
+create external table {db_name}{db_suffix}.{table_name}
 (
     hd_demo_sk                int,
     hd_income_band_sk         int,
@@ -310,20 +309,20 @@ create external table %(table_name)s
     hd_vehicle_count          int
 )
 row format delimited fields terminated by '|'
-STORED AS %(file_format)s
-location '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+location '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpcds%(scale_factor)s/household_demographics/'
-OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/household_demographics/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
 ---- DATASET
 tpcds
 ---- BASE_TABLE_NAME
-tpcds%(scale_factor)s.customer_address
+customer_address
 ---- CREATE
-create external table %(table_name)s
+create external table {db_name}{db_suffix}.{table_name}
 (
     ca_address_sk             int,
     ca_address_id             string,
@@ -340,11 +339,11 @@ create external table %(table_name)s
     ca_location_type          string
 )
 row format delimited fields terminated by '|'
-STORED AS %(file_format)s
-location '${hiveconf:hive.metastore.warehouse.dir}/%(table_name)s';
+STORED AS {file_format}
+location '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
 ---- DEPENDENT_LOAD
-INSERT OVERWRITE TABLE %(table_name)s SELECT * FROM %(base_table_name)s;
+INSERT OVERWRITE TABLE {db_name}{db_suffix}.{table_name} SELECT * FROM {db_name}.{table_name};
 ---- LOAD
-LOAD DATA LOCAL INPATH '${env:IMPALA_HOME}/testdata/impala-data/tpcds%(scale_factor)s/customer_address/'
-OVERWRITE INTO TABLE %(table_name)s;
+LOAD DATA LOCAL INPATH '{impala_home}/testdata/impala-data/{db_name}/customer_address/'
+OVERWRITE INTO TABLE {db_name}{db_suffix}.{table_name};
 ====
