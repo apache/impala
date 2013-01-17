@@ -47,7 +47,7 @@ add_library(Exec STATIC
   hdfs-text-table-writer.cc
   merge-node.cc
 #  hdfs-trevni-scanner.cc
-  hdfs-trevni-table-writer.cc
+  hdfs-parquet-table-writer.cc
   hbase-scan-node.cc
   hbase-table-scanner.cc
   read-write-util.cc

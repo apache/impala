@@ -7,8 +7,7 @@ table_name:hbasealltypesagg, constraint:restrict_to, table_format:text/none/none
 table_name:hbasealltypeserror, constraint:restrict_to, table_format:text/none/none
 table_name:hbasealltypeserrornonulls, constraint:restrict_to, table_format:text/none/none
 table_name:hbasestringids, constraint:restrict_to, table_format:text/none/none
-
-table_name:escapechartesttable, constraint:exclude, table_format:trevni
-table_name:nulltable, constraint:exclude, table_format:trevni
-table_name:nullescapedtable, constraint:exclude, table_format:trevni
-table_name:TblWithRaggedColumns, constraint:exclude, table_format:trevni
+table_name:escapechartesttable, constraint:exclude, file_format:parquet
+table_name:nulltable, constraint:exclude, file_format:parquet
+table_name:nullescapedtable, constraint:exclude, file_format:parquet
+table_name:TblWithRaggedColumns, constraint:exclude, file_format:parquet

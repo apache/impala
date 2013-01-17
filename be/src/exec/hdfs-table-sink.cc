@@ -14,7 +14,7 @@
 
 #include "exec/hdfs-table-sink.h"
 #include "exec/hdfs-text-table-writer.h"
-#include "exec/hdfs-trevni-table-writer.h"
+#include "exec/hdfs-parquet-table-writer.h"
 #include "exec/exec-node.h"
 #include "gen-cpp/ImpalaInternalService_constants.h"
 #include "util/hdfs-util.h"
@@ -69,7 +69,7 @@ Status HdfsTableSink::PrepareExprs(RuntimeState* state) {
     }
   }
   // Sanity check.
-  DCHECK_EQ(partition_key_exprs_.size(), table_desc_->partition_key_names().size());
+  DCHECK_LE(partition_key_exprs_.size(), table_desc_->col_names().size());
 
   return Status::OK;
 }
@@ -159,6 +159,15 @@ Status HdfsTableSink::Init(RuntimeState* state) {
     return Status(AppendHdfsErrorMessage("Failed to connect to HDFS."));
   }
 
+  runtime_profile_ = state->obj_pool()->Add(
+      new RuntimeProfile(state->obj_pool(), "HdfsTableSink"));
+  rows_inserted_counter_ =
+      ADD_COUNTER(profile(), "RowsInserted", TCounterType::UNIT);
+  memory_used_counter_ =
+      ADD_COUNTER(profile(), "MemoryUsed", TCounterType::BYTES);
+  encode_timer_ = ADD_TIMER(profile(), "EncodeTimer");
+  hdfs_write_timer_ = ADD_TIMER(profile(), "HdfsWriteTimer");
+
   return Status::OK;
 }
 
@@ -187,7 +196,7 @@ void HdfsTableSink::BuildHdfsFileNames(OutputPartition* output_partition) {
   stringstream common_suffix;
 
   for (int j = 0; j < partition_key_exprs_.size(); ++j) {
-    common_suffix << table_desc_->partition_key_names()[j] << "=";
+    common_suffix << table_desc_->col_names()[j] << "=";
     void* value = partition_key_exprs_[j]->GetValue(current_row_);
     // NULL partition keys get a special value to be compatible with Hive.
     if (value == NULL) {
@@ -240,9 +249,11 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
     return Status(AppendHdfsErrorMessage("Temporary HDFS file already exists: ",
         output_partition->current_file_name));
   }
+  uint64_t block_size = output_partition->partition_descriptor->block_size();
+  if (block_size == 0) block_size = output_partition->writer->default_block_size();
+
   output_partition->tmp_hdfs_file = hdfsOpenFile(hdfs_connection_,
-      tmp_hdfs_file_name_template_cstr, O_WRONLY, 0, 0,
-      output_partition->partition_descriptor->block_size());
+      tmp_hdfs_file_name_template_cstr, O_WRONLY, 0, 0, block_size);
   if (output_partition->tmp_hdfs_file == NULL) {
     return Status(AppendHdfsErrorMessage("Failed to open HDFS file for writing: ",
         output_partition->current_file_name));
@@ -255,6 +266,7 @@ Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
 
   ++output_partition->num_files;
   output_partition->num_rows = 0;
+  RETURN_IF_ERROR(output_partition->writer->InitNewFile());
   return Status::OK;
 }
 
@@ -266,13 +278,13 @@ Status HdfsTableSink::InitOutputPartition(RuntimeState* state,
   switch (partition_descriptor.file_format()) {
     case THdfsFileFormat::TEXT: {
       output_partition->writer.reset(
-          new HdfsTextTableWriter(state, output_partition,
+          new HdfsTextTableWriter(this, state, output_partition,
                                   &partition_descriptor, table_desc_, output_exprs_));
       break;
     }
-    case THdfsFileFormat::TREVNI: {
+    case THdfsFileFormat::PARQUET: {
       output_partition->writer.reset(
-          new HdfsTrevniTableWriter(state, output_partition,
+          new HdfsParquetTableWriter(this, state, output_partition,
                                     &partition_descriptor, table_desc_, output_exprs_));
       break;
     }
@@ -391,7 +403,7 @@ Status HdfsTableSink::Send(RuntimeState* state, RowBatch* batch) {
 
 Status HdfsTableSink::FinalizePartitionFile(RuntimeState* state,
                                             OutputPartition* partition) {
-  partition->writer->Finalize();
+  RETURN_IF_ERROR(partition->writer->Finalize());
 
   // Track total number of appended rows per partition in runtime
   // state. partition->num_rows counts number of rows appended is per-file.

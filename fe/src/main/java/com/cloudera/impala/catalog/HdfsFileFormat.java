@@ -28,8 +28,8 @@ public enum HdfsFileFormat {
   TEXT,
   LZO_TEXT,
   SEQUENCE_FILE,
-  TREVNI,
-  AVRO;
+  AVRO,
+  PARQUET;
 
   // Input format class for RCFile tables read by Hive.
   private static final String RCFILE_INPUT_FORMAT =
@@ -43,13 +43,13 @@ public enum HdfsFileFormat {
   private static final String LZO_TEXT_INPUT_FORMAT =
       "com.hadoop.mapred.DeprecatedLzoTextInputFormat";
 
-  //Input format class for Text tables read by Hive.
+  // Input format class for Sequence file tables read by Hive.
   private static final String SEQUENCE_INPUT_FORMAT =
       "org.apache.hadoop.mapred.SequenceFileInputFormat";
 
-  // Input format class for Trevni tables read by Hive.
-  private static final String TREVNI_INPUT_FORMAT =
-      "org.apache.hadoop.hive.ql.io.TrevniInputFormat";
+  // Input format class for Parquet tables read by Hive.
+  private static final String PARQUET_INPUT_FORMAT =
+      "com.cloudera.impala.hive.serde.ParquetInputFormat";
 
   // Input format class for Avro tables read by hive.
   private static final String AVRO_INPUT_FORMAT =
@@ -61,8 +61,8 @@ public enum HdfsFileFormat {
           .put(TEXT_INPUT_FORMAT, TEXT)
           .put(LZO_TEXT_INPUT_FORMAT, LZO_TEXT)
           .put(SEQUENCE_INPUT_FORMAT, SEQUENCE_FILE)
-          .put(TREVNI_INPUT_FORMAT, TREVNI)
           .put(AVRO_INPUT_FORMAT, AVRO)
+          .put(PARQUET_INPUT_FORMAT, PARQUET)
           .build();
 
   /**
@@ -94,10 +94,10 @@ public enum HdfsFileFormat {
       return THdfsFileFormat.LZO_TEXT;
     case SEQUENCE_FILE:
       return THdfsFileFormat.SEQUENCE_FILE;
-    case TREVNI:
-      return THdfsFileFormat.TREVNI;
     case AVRO:
       return THdfsFileFormat.AVRO;
+    case PARQUET:
+      return THdfsFileFormat.PARQUET;
     default:
       throw new RuntimeException("Unknown HdfsFormat: "
           + this + " - should never happen!");

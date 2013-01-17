@@ -602,9 +602,9 @@ public class HdfsTable extends Table {
         new TTableDescriptor(
             id.asInt(), TTableType.HDFS_TABLE, colsByPos.size(), numClusteringCols, name,
             db.getName());
-    List<String> partitionKeyNames = new ArrayList<String>();
-    for (int i = 0; i < numClusteringCols; ++i) {
-      partitionKeyNames.add(colsByPos.get(i).getName());
+    List<String> colNames = new ArrayList<String>();
+    for (int i = 0; i < colsByPos.size(); ++i) {
+      colNames.add(colsByPos.get(i).getName());
     }
 
     // TODO: Remove unused partitions (according to scan node / data sink usage) from
@@ -614,7 +614,7 @@ public class HdfsTable extends Table {
       idToValue.put(partition.getId(), partition.toThrift());
     }
     THdfsTable tHdfsTable = new THdfsTable(hdfsBaseDir,
-        partitionKeyNames, nullPartitionKeyValue, idToValue);
+        colNames, nullPartitionKeyValue, idToValue);
 
     TTableDescriptor.setHdfsTable(tHdfsTable);
     return TTableDescriptor;

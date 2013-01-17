@@ -193,7 +193,7 @@ class  TimestampValue {
   //         be updated to the count of characters left passed the
   //         parsed string or where the parsing stopped.
   // The accpeted format is: YYYY-MM-DD.  All components must be present.
-  // Returns true if the date was sucsessfully parsed.
+  // Returns true if the date was successfully parsed.
   inline bool ParseDate(const char** strp, int* lenp);
 
   // Parse a time string into the object.
@@ -201,8 +201,8 @@ class  TimestampValue {
   // lenp -- pointer to the length of the string.  The length will
   //         be updated to the count of characters left passed the
   //         parsed string or where the parsing stopped.
-  // The accpeted format is: HH:MM:SS[.ssssssss]
-  // Returns true if the time was sucsessfully parsed.
+  // The accepted format is: HH:MM:SS[.ssssssss]
+  // Returns true if the time was successfully parsed.
   inline bool ParseTime(const char** strp, int* lenp);
 
 

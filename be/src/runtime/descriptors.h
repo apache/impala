@@ -200,9 +200,7 @@ class HdfsTableDescriptor : public TableDescriptor {
  public:
   HdfsTableDescriptor(const TTableDescriptor& tdesc, ObjectPool* pool);
   const std::string& hdfs_base_dir() const { return hdfs_base_dir_; }
-  const std::vector<std::string>& partition_key_names() const {
-    return partition_key_names_;
-  }
+  const std::vector<std::string>& col_names() const { return col_names_; }
   const std::string& null_partition_key_value() const {
     return null_partition_key_value_;
   }
@@ -224,7 +222,7 @@ class HdfsTableDescriptor : public TableDescriptor {
 
  protected:
   std::string hdfs_base_dir_;
-  std::vector<std::string> partition_key_names_;
+  std::vector<std::string> col_names_;
   std::string null_partition_key_value_;
   PartitionIdToDescriptorMap partition_descriptors_;
   // Owned by DescriptorTbl

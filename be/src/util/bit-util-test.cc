@@ -12,27 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <iostream>
 
-#ifndef IMPALA_COMMON_COMPILER_UTIL_H
-#define IMPALA_COMMON_COMPILER_UTIL_H
+#include <gtest/gtest.h>
+#include "util/bit-util.h"
 
-// Compiler hint that this branch is likely or unlikely to
-// be taken. Take from the "What all programmers should know
-// about memory" paper.
-// example: if (LIKELY(size > 0)) { ... }
-// example: if (UNLIKELY(!status.ok())) { ... }
-#ifdef LIKELY 
-#undef LIKELY
-#endif
+using namespace std;
 
-#ifdef UNLIKELY 
-#undef UNLIKELY
-#endif
+namespace impala {
 
-#define LIKELY(expr) __builtin_expect(!!(expr), 1)
-#define UNLIKELY(expr) __builtin_expect(!!(expr), 0)
+TEST(BitUtil, Test) { 
+  EXPECT_EQ(BitUtil::Ceil(0, 1), 0);
+  EXPECT_EQ(BitUtil::Ceil(1, 1), 1);
+  EXPECT_EQ(BitUtil::Ceil(1, 2), 1);
+  EXPECT_EQ(BitUtil::Ceil(1, 8), 1);
+  EXPECT_EQ(BitUtil::Ceil(7, 8), 1);
+  EXPECT_EQ(BitUtil::Ceil(8, 8), 1);
+  EXPECT_EQ(BitUtil::Ceil(9, 8), 2);
+}
 
-#define PREFETCH(addr) __builtin_prefetch(addr)
+}
 
-#endif
+int main(int argc, char **argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}
 

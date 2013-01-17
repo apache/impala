@@ -18,22 +18,25 @@ using namespace std;
 
 namespace impala {
 
-HdfsTableWriter::HdfsTableWriter(RuntimeState* state, OutputPartition* output,
+HdfsTableWriter::HdfsTableWriter(HdfsTableSink* parent,
+                                 RuntimeState* state, OutputPartition* output,
                                  const HdfsPartitionDescriptor* partition_desc,
                                  const HdfsTableDescriptor* table_desc,
                                  const vector<Expr*>& output_exprs)
-  : state_(state),
+  : parent_(parent),
+    state_(state),
     output_(output),
     table_desc_(table_desc),
     output_exprs_(output_exprs) {
 }
 
 Status HdfsTableWriter::Write(const uint8_t* data, int32_t len) {
+  DCHECK_GE(len, 0);
   int ret = hdfsWrite(output_->hdfs_connection, output_->tmp_hdfs_file, data, len);
   if (ret == -1) {
     stringstream msg;
     msg << "Failed to write row (length: " << len
-        << " to Hdfs file: " << output_->current_file_name;
+        << ") to Hdfs file: " << output_->current_file_name;
     return Status(AppendHdfsErrorMessage(msg.str()));
   }
   return Status::OK;

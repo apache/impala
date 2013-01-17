@@ -13,26 +13,21 @@
 // limitations under the License.
 
 
-#ifndef IMPALA_COMMON_COMPILER_UTIL_H
-#define IMPALA_COMMON_COMPILER_UTIL_H
+#ifndef IMPALA_BIT_UTIL_H
+#define IMPALA_BIT_UTIL_H
 
-// Compiler hint that this branch is likely or unlikely to
-// be taken. Take from the "What all programmers should know
-// about memory" paper.
-// example: if (LIKELY(size > 0)) { ... }
-// example: if (UNLIKELY(!status.ok())) { ... }
-#ifdef LIKELY 
-#undef LIKELY
-#endif
+namespace impala {
 
-#ifdef UNLIKELY 
-#undef UNLIKELY
-#endif
+// Utility class to do standard bit tricks
+// TODO: is this in boost or something else like that?
+class BitUtil {
+ public:
+  // Returns the ceil of value/divisor
+  static inline int Ceil(int value, int divisor) {
+    return value / divisor + (value % divisor != 0);
+  }
+};
 
-#define LIKELY(expr) __builtin_expect(!!(expr), 1)
-#define UNLIKELY(expr) __builtin_expect(!!(expr), 0)
-
-#define PREFETCH(addr) __builtin_prefetch(addr)
+}
 
 #endif
-

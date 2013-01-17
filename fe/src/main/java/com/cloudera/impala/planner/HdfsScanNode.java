@@ -225,19 +225,10 @@ public class HdfsScanNode extends ScanNode {
   }
 
   /**
-   * Raise NotImplementedException if any of the partitions has unsupported file format
-   * (RC or Trevni).
+   * Raises NotImplementedException if any of the partitions uses an unsupported file 
+   * format.  This is useful for experimental formats, which we currently don't have.
    * Can only be called after finalize().
    */
   public void validateFileFormat() throws NotImplementedException {
-    for (HdfsPartition partition :partitions) {
-      HdfsFileFormat format = partition.getInputFormatDescriptor().getFileFormat();
-      if (format == HdfsFileFormat.TREVNI) {
-        StringBuilder error = new StringBuilder();
-        error.append("Table ").append(desc.getTable().getFullName())
-          .append(" has unsupported format ").append(format.name());
-        throw new NotImplementedException(error.toString());
-      }
-    }
   }
 }

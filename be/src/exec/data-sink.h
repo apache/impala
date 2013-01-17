@@ -57,9 +57,7 @@ class DataSink {
     const RowDescriptor& row_desc, boost::scoped_ptr<DataSink>* sink);
 
   // Returns the runtime profile for the sink.  
-  // TODO: All data sinks should return profiles.  Change this when table sinks
-  // have profiles.
-  virtual RuntimeProfile* profile() { return NULL; }
+  virtual RuntimeProfile* profile() = 0;
 };
 
 }

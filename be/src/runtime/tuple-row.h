@@ -43,7 +43,8 @@ class TupleRow {
   }
 
   // Create a deep copy of this TupleRow into 'dst'.  DeepCopy will allocate from 
-  // the MemPool and coyp the tuple pointers, the tuples and the string data in the tuples.
+  // the MemPool and copy the tuple pointers, the tuples and the string data in the 
+  // tuples.
   // If reuse_tuple_mem is true, it is assumed the dst TupleRow has already allocated
   // tuple memory and that memory will be reused.  Otherwise, new tuples will be allocated
   // and stored in 'dst'.

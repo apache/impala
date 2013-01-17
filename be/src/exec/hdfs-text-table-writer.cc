@@ -32,11 +32,12 @@ using namespace std;
 using namespace boost::posix_time;
 
 namespace impala {
-HdfsTextTableWriter::HdfsTextTableWriter(RuntimeState* state, OutputPartition* output,
+HdfsTextTableWriter::HdfsTextTableWriter(HdfsTableSink* parent,
+                                         RuntimeState* state, OutputPartition* output,
                                          const HdfsPartitionDescriptor* partition,
                                          const HdfsTableDescriptor* table_desc,
                                          const vector<Expr*>& output_exprs) 
-    : HdfsTableWriter(state, output, partition, table_desc, output_exprs) {
+    : HdfsTableWriter(parent, state, output, partition, table_desc, output_exprs) {
   tuple_delim_ = partition->line_delim();
   field_delim_ = partition->field_delim();
   escape_char_ = partition->escape_char();
@@ -45,12 +46,17 @@ HdfsTextTableWriter::HdfsTextTableWriter(RuntimeState* state, OutputPartition* o
 Status HdfsTextTableWriter::AppendRowBatch(RowBatch* batch,
                                            const vector<int32_t>& row_group_indices,
                                            bool* new_file) {
+  // TODO: encoding and writing a interleaved per row.  We can't measure at
+  // that fine granularity.
+  SCOPED_TIMER(parent_->hdfs_write_timer());
+
   int32_t limit;
   if (row_group_indices.empty()) {
     limit = batch->num_rows();
   } else {
     limit = row_group_indices.size();
   }
+  COUNTER_UPDATE(parent_->rows_inserted_counter(), limit);
       
   bool all_rows = row_group_indices.empty();
   int num_non_partition_cols =

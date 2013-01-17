@@ -120,6 +120,7 @@ set (SRC_FILES
   PlanNodes.thrift
   Planner.thrift
   Partitions.thrift
+  parquet.thrift
   RuntimeProfile.thrift
   StatestoreTypes.thrift
   StateStoreService.thrift

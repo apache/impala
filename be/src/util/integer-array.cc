@@ -36,7 +36,7 @@ IntegerArray::IntegerArray(int bit_size, int count, uint8_t* array)
       array_(array),
       current_(reinterpret_cast<uint32_t*>(array)),
       mask_((1 << bit_size_) - 1),
-  shift_(0) { 
+      shift_(0) { 
 }
 
 uint32_t IntegerArray::GetNextValue() {
@@ -86,6 +86,12 @@ IntegerArrayBuilder::IntegerArrayBuilder(int bit_size, int max_count, MemPool* m
   array_size_ = IntegerArray::ArraySize(bit_size, max_count);
   integer_array_ = IntegerArray(bit_size, 0, mempool->Allocate(array_size_)); 
   memset(integer_array_.array_, 0, array_size_);
+}
+
+void IntegerArrayBuilder::Clear() {
+  integer_array_.count_ = 0;
+  integer_array_.shift_ = 0;
+  integer_array_.mask_ = (1 << integer_array_.bit_size_) - 1;
 }
 
 bool IntegerArrayBuilder::Put(uint32_t integer) {

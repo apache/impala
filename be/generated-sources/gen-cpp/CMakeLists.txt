@@ -59,6 +59,8 @@ set(SRC_FILES
   Partitions_types.cpp
   Planner_constants.cpp
   Planner_types.cpp
+  parquet_constants.cpp
+  parquet_types.cpp
   RuntimeProfile_constants.cpp
   RuntimeProfile_types.cpp
   StatestoreTypes_constants.cpp

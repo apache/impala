@@ -128,7 +128,7 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc,
     ObjectPool* pool)
   : TableDescriptor(tdesc),
     hdfs_base_dir_(tdesc.hdfsTable.hdfsBaseDir),
-    partition_key_names_(tdesc.hdfsTable.partitionKeyNames),
+    col_names_(tdesc.hdfsTable.colNames),
     null_partition_key_value_(tdesc.hdfsTable.nullPartitionKeyValue),
     object_pool_(pool) {
   map<int64_t, THdfsPartition>::const_iterator it;
@@ -138,16 +138,15 @@ HdfsTableDescriptor::HdfsTableDescriptor(const TTableDescriptor& tdesc,
     object_pool_->Add(partition);
     partition_descriptors_[it->first] =  partition;
   }
-
 }
 
 string HdfsTableDescriptor::DebugString() const {
   stringstream out;
   out << "HdfsTable(" << TableDescriptor::DebugString()
       << " hdfs_base_dir='" << hdfs_base_dir_ << "'"
-      << " partition_key_names=[";
+      << " col_names=[";
 
-  out << join(partition_key_names_, ":");
+  out << join(col_names_, ":");
 
   out << "]";
   out << " partitions=[";
@@ -160,7 +159,7 @@ string HdfsTableDescriptor::DebugString() const {
   }
   out << join(partition_strings, ",") << "]";
 
-  out << "null_partition_key_value='" << null_partition_key_value_ << "'";
+  out << " null_partition_key_value='" << null_partition_key_value_ << "'";
   return out.str();
 }
 

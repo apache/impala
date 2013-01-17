@@ -21,7 +21,7 @@
 # ---- <- End sub-section
 # INSERT/SELECT * - The INSERT/SELECT * command for loading from the base table
 # ---- <- End sub-section
-# Trevni loading code executed by bash.
+# Parquet loading code executed by bash.
 # ---- <- End sub-section
 # LOAD from LOCAL - How to load data for the the base table
 #----- <- End sub-section

@@ -38,7 +38,6 @@
 
 namespace impala {
 
-class ByteStream;
 class DescriptorTbl;
 class HdfsScanner;
 class RowBatch;
@@ -140,7 +139,7 @@ class HdfsScanNode : public ScanNode {
   // Adds a materialized row batch for the scan node.  This is called from scanner
   // threads.
   // If the scan node is done, the row batch will be discarded.
-  // This function will block if materailized_row_batches_ is full.
+  // This function will block if materialized_row_batches_ is full.
   void AddMaterializedRowBatch(RowBatch* row_batch);
 
   // Allocate a new scan range object.  This is thread safe.

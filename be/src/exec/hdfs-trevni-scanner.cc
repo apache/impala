@@ -38,7 +38,6 @@
 using namespace std;
 using namespace boost;
 using namespace impala;
-
 HdfsTrevniScanner::HdfsTrevniScanner(HdfsScanNode* scan_node, RuntimeState* state,
                                      MemPool* mem_pool)
     : HdfsScanner(scan_node, state, mem_pool),

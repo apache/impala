@@ -28,6 +28,16 @@
 #include "gen-cpp/Types_types.h"
 #include "gen-cpp/Data_types.h"
 
+// TCompactProtocol requires some #defines to work right.  They also define UNLIKLEY
+// so we need to undef this.
+// TODO: is there a better include to use?
+#ifdef UNLIKELY
+#undef UNLIKELY
+#endif
+#define SIGNED_RIGHT_SHIFT_IS 1
+#define ARITHMETIC_RIGHT_SHIFT 1
+#include <thrift/protocol/TCompactProtocol.h>
+
 using namespace std;
 using namespace apache::thrift;
 using namespace apache::thrift::transport;
@@ -38,7 +48,29 @@ using namespace boost;
 
 namespace impala {
 
-// Comparator for TNetworkAddresss. Thrift declares this (in gen-cpp/Types_types.h) but
+ThriftSerializer::ThriftSerializer(bool compact, int initial_buffer_size) :  
+    mem_buffer_(new TMemoryBuffer(initial_buffer_size)) {
+  if (compact) {
+    TCompactProtocolFactoryT<TMemoryBuffer> factory;
+    protocol_ = factory.getProtocol(mem_buffer_);
+  } else {
+    TBinaryProtocolFactoryT<TMemoryBuffer> factory;
+    protocol_ = factory.getProtocol(mem_buffer_);
+  }
+}
+
+shared_ptr<TProtocol> CreateDeserializeProtocol(
+    shared_ptr<TMemoryBuffer> mem, bool compact) {
+  if (compact) {
+    TCompactProtocolFactoryT<TMemoryBuffer> tproto_factory;
+    return tproto_factory.getProtocol(mem);
+  } else {
+    TBinaryProtocolFactoryT<TMemoryBuffer> tproto_factory;
+    return tproto_factory.getProtocol(mem);
+  }
+}
+
+// Comparator for THostPorts. Thrift declares this (in gen-cpp/Types_types.h) but
 // never defines it.
 bool TNetworkAddress::operator<(const TNetworkAddress& that) const {
   if (this->hostname < that.hostname) {

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package org.apache.hadoop.hive.ql.io;
+package com.cloudera.impala.hive.serde;
 
 import java.io.IOException;
 import java.util.Properties;
@@ -20,13 +20,14 @@ import java.util.Properties;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
 import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
+import org.apache.hadoop.hive.ql.io.HiveOutputFormatImpl;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.util.Progressable;
 
-/** Dummy Output Format Class so Hive will create Trevni files. */
-public class TrevniOutputFormat<K extends WritableComparable<K>, V extends Writable>
+/** Dummy Output Format Class so Hive will create Parquet files. */
+public class ParquetOutputFormat<K extends WritableComparable<K>, V extends Writable>
   extends HiveOutputFormatImpl<K,V> implements HiveOutputFormat<K,V> {
 
   @Override

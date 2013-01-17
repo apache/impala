@@ -15,9 +15,12 @@
 package com.cloudera.impala.catalog;
 
 import java.util.HashMap;
-import com.cloudera.impala.catalog.FileFormat;
-import com.google.common.base.Preconditions;
+
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
+
+import com.cloudera.impala.hive.serde.ParquetInputFormat;
+import com.cloudera.impala.hive.serde.ParquetOutputFormat;
+import com.google.common.base.Preconditions;
 
 class HiveStorageDescriptorFactory {
   /**
@@ -39,7 +42,7 @@ class HiveStorageDescriptorFactory {
       default: throw new UnsupportedOperationException(
           "Unsupported file format: " + fileFormat);
     }
-  
+
     if (rowFormat.getFieldDelimiter() != null) {
       sd.getSerdeInfo().putToParameters(
           "serialization.format", rowFormat.getFieldDelimiter());
@@ -54,9 +57,8 @@ class HiveStorageDescriptorFactory {
 
   private static StorageDescriptor createParquetFileSd() {
     StorageDescriptor sd = createGenericSd();
-    // TODO: Change the Parquet input/output formats to use class.getName()
-    sd.setInputFormat("org.apache.hadoop.hive.ql.io.ParquetInputFormat");
-    sd.setOutputFormat("org.apache.hadoop.hive.ql.io.ParquetOutputFormat");
+    sd.setInputFormat(ParquetInputFormat.class.getName());
+    sd.setOutputFormat(ParquetOutputFormat.class.getName());
     sd.getSerdeInfo().setSerializationLib(
         org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe.class.getName());
     sd.setCompressed(false);

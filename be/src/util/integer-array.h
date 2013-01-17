@@ -85,6 +85,9 @@ class IntegerArrayBuilder {
   // returns false if the array is full.
   bool Put(uint32_t integer);
 
+  // Clear the underlying integer array buffer.
+  void Clear();
+
   // Return the number of bytes occupied by the data in the array.
   int CurrentByteCount() {
     return IntegerArray::ArraySize(integer_array_.count_, integer_array_.bit_size_);

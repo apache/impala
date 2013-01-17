@@ -59,8 +59,11 @@ target_link_libraries(Webserver pthread dl Util)
 
 add_executable(refresh-catalog refresh-catalog.cc)
 add_executable(network-perf-benchmark network-perf-benchmark.cc)
+add_executable(parquet-reader parquet-reader.cc)
+
 target_link_libraries(refresh-catalog ${IMPALA_LINK_LIBS})
 target_link_libraries(network-perf-benchmark ${IMPALA_LINK_LIBS})
+target_link_libraries(parquet-reader ${IMPALA_LINK_LIBS})
 
 ADD_BE_TEST(integer-array-test)
 ADD_BE_TEST(runtime-profile-test)
@@ -69,5 +72,7 @@ ADD_BE_TEST(decompress-test)
 ADD_BE_TEST(metrics-test)
 ADD_BE_TEST(debug-util-test)
 ADD_BE_TEST(url-coding-test)
+ADD_BE_TEST(thrift-util-test)
+ADD_BE_TEST(bit-util-test)
+ADD_BE_TEST(rle-test)
 #ADD_BE_TEST(perf-counters-test)
-

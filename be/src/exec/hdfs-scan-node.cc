@@ -19,7 +19,6 @@
 #include "exec/hdfs-sequence-scanner.h"
 #include "exec/hdfs-rcfile-scanner.h"
 #include "exec/hdfs-avro-scanner.h"
-#include "exec/hdfs-trevni-scanner.h"
 
 #include <sstream>
 #include <boost/algorithm/string.hpp>

@@ -88,20 +88,20 @@ COMPRESSION_MAP = {'def': 'org.apache.hadoop.io.compress.DefaultCodec',
                    'none': ''
                   }
 
-TREVNI_COMPRESSION_MAP = {'def': 'deflate',
-                          'snap': 'snappy',
-                          'none': 'none'
-                         }
-
 FILE_FORMAT_MAP = {'text': 'TEXTFILE',
                    'seq': 'SEQUENCEFILE',
                    'rc': 'RCFILE',
+                   'parquet': '\n' +
+                     'INPUTFORMAT \'com.cloudera.impala.hive.serde.ParquetInputFormat\'\n' +
+                     'OUTPUTFORMAT \'com.cloudera.impala.hive.serde.ParquetOutputFormat\'',
                    'text_lzo': '\n' +
                      'INPUTFORMAT \'com.hadoop.mapred.DeprecatedLzoTextInputFormat\'\n' +
                      'OUTPUTFORMAT ' +
                      '\'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat\'\n'
                   }
 
+PARQUET_ALTER_STATEMENT = "ALTER TABLE %(table_name)s SET\n\
+     SERDEPROPERTIES ('blocksize' = '1073741824', 'compression' = '%(compression)s');"
 KNOWN_EXPLORATION_STRATEGIES = ['core', 'pairwise', 'exhaustive', 'lzo']
 
 def build_create_statement(table_template, table_name, db_name, db_suffix,
@@ -180,6 +180,11 @@ def build_db_suffix(file_format, codec, compression_type):
   else:
     return '_%s_%s' % (file_format, codec)
 
+def write_parquet_to_file(file_name, array):
+  # Strip out all the hive SET statements
+  array.insert(0, 'refresh;\n')
+  write_array_to_file(file_name, 'w', array)
+
 def write_array_to_file(file_name, mode, array):
   with open(file_name, mode) as f:
     f.write('\n\n'.join(array))
@@ -202,6 +207,7 @@ def generate_statements(output_name, test_vectors, sections,
   output_create = []
   output_load = []
   output_load_base = []
+  output_parquet = []
   table_names = None
   if options.table_names:
     table_names = [name.lower() for name in options.table_names.split(',')]
@@ -269,6 +275,16 @@ def generate_statements(output_name, test_vectors, sections,
                                                          db_suffix, table_name))
           else:
             print 'Empty base table load for %s. Skipping load generation' % table_name
+        elif file_format == 'parquet':
+          if insert:
+            # In most cases the same load logic can be used for the parquet and 
+            # non-parquet case, but sometimes it needs to be special cased.
+            insert = insert if 'LOAD_PARQUET' not in section else section['LOAD_PARQUET']
+            output_parquet.append(build_insert_into_statement(
+                insert, db_name, db_suffix, table_name, 'parquet', for_impala=True))
+          else:
+            print \
+                'Empty parquet load for table %s. Skipping insert generation' % table_name
         else:
           if insert:
             output_load.append(build_insert(insert, db_name, db_suffix, file_format,
@@ -279,10 +295,11 @@ def generate_statements(output_name, test_vectors, sections,
   # Make sure we create the base tables first
   output_load = output_create + output_load_base + output_load
   write_array_to_file('load-' + output_name + '-generated.sql', 'w', output_load)
+  write_parquet_to_file('load-parquet-' + output_name + '-generated.sql', output_parquet);
 
 def parse_schema_template_file(file_name):
   VALID_SECTION_NAMES = ['DATASET', 'BASE_TABLE_NAME', 'CREATE', 'DEPENDENT_LOAD',
-                         'LOAD', 'ALTER']
+                         'LOAD', 'LOAD_PARQUET']
   return parse_test_file(file_name, VALID_SECTION_NAMES, skip_unknown_sections=False)
 
 if __name__ == "__main__":

@@ -38,15 +38,29 @@ class HdfsTableWriter {
   // partition -- the descriptor for the partition being written
   // table_desc -- the descriptor for the table being written.
   // output_exprs -- expressions which generate the output values.
-  HdfsTableWriter(RuntimeState* state, OutputPartition* output_partition,
+  HdfsTableWriter(HdfsTableSink* parent,
+                  RuntimeState* state, OutputPartition* output_partition,
                   const HdfsPartitionDescriptor* partition_desc,
                   const HdfsTableDescriptor* table_desc,
                   const std::vector<Expr*>& output_exprs);
 
   virtual ~HdfsTableWriter() { }
 
+  // The sequence of calls to this object are:
+  // 1. Init()
+  // 2. InitNewFile()
+  // 3. AppendRowBatch() - called repeatdly
+  // 4. Finalize()
+  // For files formats that are splittable (and therefore can be written to an 
+  // arbitraryly large file), 1-4 is called once.
+  // For files formats that are not splittable (i.e. columnar formats, compressed
+  // text), 1) is called once and 2-4) is called repeatedly for each file.
+
   // Do initialization of writer.
   virtual Status Init() = 0;
+  
+  // Called when a new file is started.
+  virtual Status InitNewFile() = 0;
 
   // Appends the current batch of rows to the partition.  If there are multiple
   // partitions then row_group_indices will contain the rows that are for this
@@ -62,7 +76,12 @@ class HdfsTableWriter {
 
   // Finalize this partition. The writer needs to finish processing
   // all data have written out after the return from this call.
+  // This is called once for each call to InitNewFile()
   virtual Status Finalize() = 0;
+
+  // Default block size to use for this file format.  If the file format doesn't
+  // care, it should return 0 and the hdfs config default will be used.
+  virtual uint64_t default_block_size() = 0;
 
  protected:
   // Write to the current hdfs file.
@@ -70,6 +89,14 @@ class HdfsTableWriter {
     return Write(reinterpret_cast<const uint8_t*>(data), len);
   }
   Status Write(const uint8_t* data, int32_t len);
+
+  template<typename T>
+  Status Write(T v) {
+    return Write(reinterpret_cast<uint8_t*>(&v), sizeof(T));
+  }
+
+  // Parent table sink object
+  HdfsTableSink* parent_;
 
   // Runtime state.
   RuntimeState* state_;

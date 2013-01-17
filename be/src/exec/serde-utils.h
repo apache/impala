@@ -21,7 +21,6 @@
 
 namespace impala {
 
-class ByteStream;
 class ScanRangeContext;
 
 // SerDeUtils:
@@ -32,12 +31,10 @@ class ScanRangeContext;
 // Ref: http://download.oracle.com/javase/6/docs/api/java/io/DataInput.html
 // Ref: http://hadoop.apache.org/common/docs/current/api/org/apache/hadoop/io/Writable.html
 //
-// There are 3 version of some of the serde utilities.
+// There are 2 version of some of the serde utilities.
 //  1. The buffer is known to be big enough, simply parse it for the value.
 //  2. The buffer if read from scan range context.  This blocks and waits for more
 //     bytes as needed (bytes are provided asynchronously by another thread).
-//  3. The operation is over a byte stream and the function will read more bytes as
-//     needed (synchronously).  TODO: this should be removed.
 class SerDeUtils {
  public:
   static const int MAX_VINT_LEN = 9;
@@ -61,49 +58,37 @@ class SerDeUtils {
   // starting at the specified byte offset.
   static int GetVLong(uint8_t* buf, int64_t offset, int64_t* vlong);
 
-  // Case 2 functions
-  static bool ReadBoolean(ScanRangeContext* context, bool* boolean, Status*);
-  static bool ReadInt(ScanRangeContext* context, int32_t* val, Status*);
-  static bool ReadVLong(ScanRangeContext* context, int64_t* val, Status*);
-  static bool ReadVInt(ScanRangeContext* context, int32_t* val, Status*);
-  static bool ReadZLong(ScanRangeContext* context, int64_t* val, Status*);
-  static bool ReadBytes(ScanRangeContext* context, int length, uint8_t** buf, Status*);
-  static bool SkipBytes(ScanRangeContext* context, int length, Status*);
-  static bool ReadText(ScanRangeContext* context, uint8_t** buf, int* length, Status*);
-  static bool SkipText(ScanRangeContext* context, Status*);
-
   // Read a Boolean primitive value written using Java serialization.
   // Equivalent to java.io.DataInput.readBoolean()
-  static Status ReadBoolean(ByteStream* byte_stream, bool* boolean);
-
+  static bool ReadBoolean(ScanRangeContext* context, bool* boolean, Status*);
+  
   // Read an Integer primitive value written using Java serialization.
   // Equivalent to java.io.DataInput.readInt()
-  static Status ReadInt(ByteStream* byte_stream, int32_t* integer);
-
+  static bool ReadInt(ScanRangeContext* context, int32_t* val, Status*);
+  
   // Read a variable-length Long value written using Writable serialization.
   // Ref: org.apache.hadoop.io.WritableUtils.readVLong()
-  static Status ReadVLong(ByteStream* byte_stream, int64_t* vlong);
-
+  static bool ReadVLong(ScanRangeContext* context, int64_t* val, Status*);
+  
   // Read a variable length Integer value written using Writable serialization.
   // Ref: org.apache.hadoop.io.WritableUtils.readVInt()
-  static Status ReadVInt(ByteStream* byte_stream, int32_t* vint);
-
-  // Read length bytes from an HDFS file into the supplied buffer.
-  static Status ReadBytes(ByteStream* byte_stream, int64_t length,
-      std::vector<uint8_t>* buf);
-
-  static Status ReadBytes(ByteStream* byte_stream, int64_t length,
-      uint8_t* buf);
-
+  static bool ReadVInt(ScanRangeContext* context, int32_t* val, Status*);
+  
+  // Read a zigzag encoded long
+  static bool ReadZLong(ScanRangeContext* context, int64_t* val, Status*);
+  
+  // Read length bytes into the supplied buffer.
+  static bool ReadBytes(ScanRangeContext* context, int length, uint8_t** buf, Status*);
+  
   // Skip over the next length bytes in the specified HDFS file.
-  static Status SkipBytes(ByteStream* byte_stream, int64_t length);
-
+  static bool SkipBytes(ScanRangeContext* context, int length, Status*);
+  
   // Read a Writable Text value from the supplied file.
   // Ref: org.apache.hadoop.io.WritableUtils.readString()
-  static Status ReadText(ByteStream* byte_stream, std::vector<char>* text);
-
+  static bool ReadText(ScanRangeContext* context, uint8_t** buf, int* length, Status*);
+  
   // Skip this text object.
-  static Status SkipText(ByteStream* byte_stream);
+  static bool SkipText(ScanRangeContext* context, Status*);
 
   // Dump the first length bytes of buf to a Hex string.
   static std::string HexDump(const uint8_t* buf, int64_t length);

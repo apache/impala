@@ -64,7 +64,7 @@ CREATE TABLE RunInfo (
 INSERT INTO FileType (format, compression_codec, compression_type) VALUES('text', 'none', 'none');
 INSERT INTO FileType (format, compression_codec, compression_type) VALUES('seq', 'none', 'none');
 INSERT INTO FileType (format, compression_codec, compression_type) VALUES('rc', 'none', 'none');
-INSERT INTO FileType (format, compression_codec, compression_type) VALUES('trevni', 'none', 'none');
+INSERT INTO FileType (format, compression_codec, compression_type) VALUES('parquet', 'none', 'none');
 
 INSERT INTO FileType (format, compression_codec, compression_type) VALUES('seq', 'snap', 'block');
 INSERT INTO FileType (format, compression_codec, compression_type) VALUES('seq', 'gzip', 'block');

@@ -27,7 +27,6 @@
 
 namespace impala {
 
-class ByteStream;
 class Compression;
 class DescriptorTbl;
 class Expr;

@@ -1,0 +1,62 @@
+# convert all the tpch tables into parquet 
+====
+---- QUERY
+insert overwrite table customer
+select * from tpch.customer
+---- PARTITIONS
+: 150000
+====
+---- QUERY
+insert overwrite table lineitem
+select * from tpch.lineitem
+---- PARTITIONS
+: 6001215
+====
+---- QUERY
+insert overwrite table max_revenue
+select * from tpch.max_revenue
+---- PARTITIONS
+: 1
+====
+---- QUERY
+insert overwrite table nation
+select * from tpch.nation
+---- PARTITIONS
+: 25
+====
+---- QUERY
+insert overwrite table orders
+select * from tpch.orders
+---- PARTITIONS
+: 1500000
+====
+---- QUERY
+insert overwrite table part
+select * from tpch.part
+---- PARTITIONS
+: 200000
+====
+---- QUERY
+insert overwrite table partsupp
+select * from tpch.partsupp
+---- PARTITIONS
+: 800000
+====
+---- QUERY
+insert overwrite table region
+select * from tpch.region
+---- PARTITIONS
+: 5
+====
+---- QUERY
+insert overwrite table revenue
+select * from tpch.revenue
+---- PARTITIONS
+: 10000
+====
+---- QUERY
+insert overwrite table supplier
+select * from tpch.supplier
+---- PARTITIONS
+: 10000
+====

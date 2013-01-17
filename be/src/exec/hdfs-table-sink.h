@@ -22,8 +22,9 @@
 
 // needed for scoped_ptr to work on ObjectPool
 #include "common/object-pool.h"
-#include "runtime/descriptors.h"
 #include "exec/data-sink.h"
+#include "runtime/descriptors.h"
+#include "util/runtime-profile.h"
 
 namespace impala {
 
@@ -132,8 +133,15 @@ class HdfsTableSink : public DataSink {
   // writers.  Currently used by the Trevni writer.
   static Status GetFileBlockSize(OutputPartition* output_partition, int64_t* size);
 
-  std::string DebugString() const;
+  virtual RuntimeProfile* profile() { return runtime_profile_; }
 
+  RuntimeProfile::Counter* rows_inserted_counter() { return rows_inserted_counter_; }
+  RuntimeProfile::Counter* memory_used_counter() { return memory_used_counter_; }
+  RuntimeProfile::Counter* encode_timer() { return encode_timer_; }
+  RuntimeProfile::Counter* hdfs_write_timer() { return hdfs_write_timer_; }
+
+  std::string DebugString() const;
+  
  private:
   // Initialises the filenames of a given output partition, and opens the temporary file.
   Status InitOutputPartition(RuntimeState* state,
@@ -237,6 +245,16 @@ class HdfsTableSink : public DataSink {
   typedef boost::unordered_map<std::string, HdfsPartitionDescriptor*>
       PartitionDescriptorMap;
   PartitionDescriptorMap partition_descriptor_map_;
+  
+  // Allocated from runtime state's pool.
+  RuntimeProfile* runtime_profile_;
+  RuntimeProfile::Counter* rows_inserted_counter_;
+  RuntimeProfile::Counter* memory_used_counter_;
+
+  // Time spent converting tuple to on disk format.
+  RuntimeProfile::Counter* encode_timer_;
+  // Time spent writing to hdfs
+  RuntimeProfile::Counter* hdfs_write_timer_;
 };
 }
 #endif

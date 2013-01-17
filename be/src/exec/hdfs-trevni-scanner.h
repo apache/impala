@@ -18,7 +18,6 @@
 
 #include "exec/hdfs-scanner.h"
 #include "exec/delimited-text-parser.h"
-#include "exec/trevni-def.h"
 #include "util/integer-array.h"
 
 namespace impala {
@@ -220,28 +219,6 @@ class HdfsTrevniScanner : public HdfsScanner {
   // Number of rows in file.
   int64_t row_count_;
 
-  // Number of columns in file.
-  int32_t column_count_;
-
-  // Memory pool for compressed data.  We need to hold on to this till
-  // the scan is done.
-  boost::scoped_ptr<MemPool> compressed_data_pool_;
-
-  // One entry for each column.
-  // The columns are ordered in the column_info_ vector by their slot index.
-  std::vector<TrevniColumnInfo> column_info_;
-
-  // True if file has checksums.
-  bool file_checksum_;
-
-  // Buffer for compressed data.
-  uint8_t* compressed_buffer_;
-
-  // Size of compressed_buffer_
-  uint32_t compressed_buffer_size_;
-
-  // Object pool for holding decompressors.
-  boost::scoped_ptr<ObjectPool> object_pool_;
 };
 
 } // namespace impala
