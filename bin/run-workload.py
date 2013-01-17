@@ -59,20 +59,17 @@ parser.add_option("--hive_results_csv_file", dest="hive_results_csv_file",
                   help="The output file where Hive benchmark results are saved")
 parser.add_option("--hive_cmd", dest="hive_cmd", default="hive -e",
                   help="The command to use for executing hive queries")
-parser.add_option("-i", "--iterations", type="int", dest="iterations", default=5,
+parser.add_option("-i", "--iterations", type="int", dest="iterations", default=1,
                   help="Number of times to run each query.")
 parser.add_option("--prime_cache", dest="prime_cache", action="store_true",
                   default= False, help="Whether or not to prime the buffer cache. ")
 parser.add_option("--num_clients", type="int", dest="num_clients", default=1,
                   help="Number of clients (threads) to use when executing each query.")
-parser.add_option("--file_formats", dest="file_formats", default=None,
-                  help="A comma-separated list of file fomats to execute. If not "\
-                  "specified all file formats in the test vector will be run.")
 parser.add_option("--query_names", dest="query_names", default=None,
                   help="A comma-separated list of query names to execute.")
-parser.add_option("--compression_codecs", dest="compression_codecs", default=None,
-                  help="A comma-separated list of compression codecs to execute. If not "\
-                  "specified all compression codecs in the test vector will be run.")
+parser.add_option("--table_formats", dest="table_formats", default=None, help=\
+                  "Override the default test vectors and run using only the specified "\
+                  "table formats. Ex. --table_formats=seq/snap/block,text/none")
 parser.add_option("--skip_impala", dest="skip_impala", action="store_true",
                   default= False, help="If set, queries will only run against Hive.")
 parser.add_option("--beeswax", dest="beeswax", action="store_true", default=True,
@@ -82,7 +79,6 @@ parser.add_option("--use_kerberos", dest="use_kerberos", action="store_true",
 parser.add_option("--continue_on_query_error", dest="continue_on_query_error",
                   action="store_true", default=False, help="If set, continue execution "\
                   "on each query error.")
-
 
 # These options are used for configuring failure testing
 parser.add_option("--failure_frequency", type="int", dest="failure_frequency", default=0,
@@ -176,8 +172,7 @@ def run_workloads(workload_runner, failure_injector=None):
   for workload_and_scale_factor in options.workloads.split(','):
     workload, scale_factor = parse_workload_scale_factor(workload_and_scale_factor)
     workload_runner.run_workload(workload, scale_factor,
-        file_formats=options.file_formats,
-        compression_codecs=options.compression_codecs,
+        table_formats=options.table_formats,
         query_names=options.query_names,
         exploration_strategy=options.exploration_strategy,
         stop_on_query_error=stop_on_error)
@@ -235,5 +230,5 @@ if __name__ == "__main__":
     if failure_injector is not None:
       failure_injector.cancel()
     process_results(workload_runner, is_partial_result=True)
-    raise e
+    raise
   process_results(workload_runner, is_partial_result=False)

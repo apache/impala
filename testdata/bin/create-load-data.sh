@@ -61,6 +61,8 @@ hadoop fs -get /test-warehouse/alltypesaggmultifiles /tmp
 set +o errexit
 ${HIVE_HOME}/bin/hive -hiveconf hive.root.logger=WARN,console -v \
     -e "DROP TABLE IF EXISTS internal_hbase_table"
+echo "disable 'internal_hbase_table'" | hbase shell
+echo "drop 'internal_hbase_table'" | hbase shell
 set -e
 
 # For tables that rely on loading data from local fs test-warehouse

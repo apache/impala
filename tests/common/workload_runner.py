@@ -273,8 +273,8 @@ class WorkloadRunner(object):
   def get_results(self):
     return self.__result_map
 
-  def run_workload(self, workload, scale_factor=str(), file_formats=None,
-                   compression_codecs=None,query_names=None, exploration_strategy='core',
+  def run_workload(self, workload, scale_factor=str(), table_formats=None,
+                   query_names=None, exploration_strategy='core',
                    stop_on_query_error=True):
     """
       Run queries associated with each workload specified on the commandline.
@@ -285,10 +285,17 @@ class WorkloadRunner(object):
     """
     LOG.info('Running workload: %s / Scale factor: %s' % (workload, scale_factor))
     query_map = WorkloadRunner.__extract_queries_from_test_files(workload)
-    test_dimension = load_table_info_dimension(workload, exploration_strategy,
-        file_formats.split(',') if file_formats is not None else None,
-        compression_codecs.split(',') if compression_codecs is not None else None)
+
+    test_vectors = None
+    if table_formats:
+      table_formats = table_formats.split(',')
+      dataset = get_dataset_from_workload(workload)
+      test_vectors =\
+          [TableFormatInfo.create_from_string(dataset, tf) for tf in table_formats]
+    else:
+      test_vectors = [vector.value for vector in\
+          load_table_info_dimension(workload, exploration_strategy)]
 
     args = [query_map, workload, scale_factor, query_names, stop_on_query_error]
     execute_queries_partial = partial(self.execute_queries, *args)
-    map(execute_queries_partial, [dimension.value for dimension in test_dimension])
+    map(execute_queries_partial, test_vectors)
