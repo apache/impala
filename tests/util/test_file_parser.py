@@ -105,16 +105,20 @@ def parse_test_file(test_file_name, valid_section_names, skip_unknown_sections=T
 
   The valid section names are passed in to this function.
   """
-  test_file = open(test_file_name, 'rb')
+  with open(test_file_name, 'rb') as test_file:
+    return parse_test_file_text(test_file.read(), valid_section_names,
+                                skip_unknown_sections)
+
+def parse_test_file_text(text, valid_section_names, skip_unknown_sections=True):
   sections = list()
-
-  # Read test file, stripping out all comments
-  file_lines = [l for l in test_file.read().split('\n') if not l.strip().startswith('#')]
-
-  # Split the test file up into sections. For each section parse all subsections.
-  for section in '\n'.join(file_lines).split('===='):
+  # Split the test file up into sections. For each section, parse all subsections.
+  for section in re.split(r'(?m)^====', text):
     parsed_sections = collections.defaultdict(str)
-    for sub_section in section.split('----')[1:]:
+    for sub_section in re.split(r'(?m)^----', section[1:]):
+      # Skip empty subsections
+      if not sub_section:
+        continue
+
       lines = sub_section.split('\n')
       subsection_name = lines[0].strip()
       subsection_comment = None
@@ -125,6 +129,7 @@ def parse_test_file(test_file_name, valid_section_names, skip_unknown_sections=T
 
       if subsection_name not in valid_section_names:
         if skip_unknown_sections or not subsection_name:
+          print sub_section
           print 'Unknown section %s' % subsection_name
           continue
         else:
@@ -137,7 +142,6 @@ def parse_test_file(test_file_name, valid_section_names, skip_unknown_sections=T
 
     if parsed_sections:
       sections.append(parsed_sections)
-  test_file.close()
   return sections
 
 
