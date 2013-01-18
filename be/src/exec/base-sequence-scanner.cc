@@ -46,13 +46,13 @@ void BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node,
   }
 }
   
-BaseSequenceScanner::BaseSequenceScanner(HdfsScanNode* node, 
-    RuntimeState* state) : 
+BaseSequenceScanner::BaseSequenceScanner(HdfsScanNode* node, RuntimeState* state,
+                                         bool marker_precedes_sync) :
   HdfsScanner(node, state),
   header_(NULL),
-  have_sync_(false),
   block_start_(0),
-  data_buffer_pool_(new MemPool()) {
+  data_buffer_pool_(new MemPool()),
+  marker_precedes_sync_(marker_precedes_sync) {
 }
 
 BaseSequenceScanner::~BaseSequenceScanner() {
@@ -95,6 +95,7 @@ Status BaseSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
   }
   
   // Initialize state for new scan range
+  finished_ = false;
   RETURN_IF_ERROR(InitNewRange());
 
   Status status;
@@ -105,8 +106,13 @@ Status BaseSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
     // the header size.
     if (!SerDeUtils::SkipBytes(context_, header_->header_size, &status)) return status;
   } else {
-    RETURN_IF_ERROR(SkipToSync(header_->sync, SYNC_HASH_SIZE, &have_sync_));
-    if (context_->eosr()) return Status::OK;
+    status = SkipToSync(header_->sync, SYNC_HASH_SIZE);
+    if (context_->eosr()) {
+      // We don't care about status here -- OK if we can't find the sync but
+      // we're at the end of the scan range
+      return Status::OK;
+    }
+    RETURN_IF_ERROR(status);
   }
 
   // Process Range.
@@ -142,7 +148,7 @@ Status BaseSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
       parse_status_ = Status::OK;
       ++num_errors;
       // Recover by skipping to the next sync.
-      status = SkipToSync(header_->sync, SYNC_HASH_SIZE, &have_sync_);
+      status = SkipToSync(header_->sync, SYNC_HASH_SIZE);
       if (status.IsCancelled()) return status;
       if (context_->eosr()) break;
 
@@ -167,9 +173,16 @@ Status BaseSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
 }
 
 Status BaseSequenceScanner::ReadSync() {
+  // We are finished when we read a sync marker occurring completely in the next
+  // scan range
+  finished_ = context_->eosr();
+
   uint8_t* hash;
-  RETURN_IF_FALSE(SerDeUtils::ReadBytes(context_, SYNC_HASH_SIZE, &hash, &parse_status_));
-  if (memcmp(hash, header_->sync, SYNC_HASH_SIZE)) {
+  int out_len;
+  bool eos;
+  RETURN_IF_FALSE(
+      context_->GetBytes(&hash, SYNC_HASH_SIZE, &out_len, &eos, &parse_status_));
+  if (out_len != SYNC_HASH_SIZE || memcmp(hash, header_->sync, SYNC_HASH_SIZE)) {
     if (state_->LogHasSpace()) {
       stringstream ss;
       ss  << "Bad sync hash at file offset "
@@ -184,85 +197,91 @@ Status BaseSequenceScanner::ReadSync() {
     }
     return Status("bad sync hash block");
   }
+  // TODO: finished_ |= end of file (this will prevent us from reading off
+  // the end of the file)
   return Status::OK;
 }
 
-// Utility function to look for 'sync' in buffer.  Sync markers are preceded with
-// 4 bytes of 0xFFFFFFFF.  Returns the offset into buffer if it is found, otherwise, 
-// returns buffer_len.
-static int FindSyncBlock(const uint8_t* buffer, int buffer_len, 
-    const uint8_t* sync, int sync_len) {
+int BaseSequenceScanner::FindSyncBlock(const uint8_t* buffer, int buffer_len,
+                                       const uint8_t* sync, int sync_len) {
+  StringValue needle;
   char marker_and_sync[4 + sync_len];
-  marker_and_sync[0] = marker_and_sync[1] = 
-      marker_and_sync[2] = marker_and_sync[3] = 0xff;
-  memcpy(marker_and_sync + 4, sync, sync_len);
+  if (marker_precedes_sync_) {
+    marker_and_sync[0] = marker_and_sync[1] =
+        marker_and_sync[2] = marker_and_sync[3] = 0xff;
+    memcpy(marker_and_sync + 4, sync, sync_len);
+    needle = StringValue(marker_and_sync, 4 + sync_len);
+  } else {
+    char* sync_str = reinterpret_cast<char*>(const_cast<uint8_t*>(sync));
+    needle = StringValue(sync_str, sync_len);
+  }
 
-  StringValue needle(marker_and_sync, 4 + sync_len);
   StringValue haystack(
       const_cast<char*>(reinterpret_cast<const char*>(buffer)), buffer_len);
 
   StringSearch search(&needle);
   int offset = search.Search(&haystack);
-  if (offset == -1) return buffer_len;
+
+  if (offset != -1) {
+    // Advance offset past sync
+    offset += sync_len;
+    if (marker_precedes_sync_) {
+      offset += 4;
+    }
+  }
   return offset;
 }
 
-Status BaseSequenceScanner::SkipToSync(const uint8_t* sync, int sync_size, 
-    bool* sync_found) {
-  bool eosr = false;
-  int offset = sync_size;
+Status BaseSequenceScanner::SkipToSync(const uint8_t* sync, int sync_size) {
+  // offset into current buffer of end of sync (once found, -1 until then)
+  int offset = -1;
+  uint8_t* buffer;
   int buffer_len;
+  bool eosr;
   Status status;
-  do {
-    uint8_t* buffer;
-  
-    RETURN_IF_ERROR(context_->GetRawBytes(&buffer, &buffer_len, &eosr));
+
+  // Read buffers until we find a sync or reach end of scan range
+  RETURN_IF_ERROR(context_->GetRawBytes(&buffer, &buffer_len, &eosr));
+  while (true) {
+    // Check if sync fully contained in current buffer
     offset = FindSyncBlock(buffer, buffer_len, sync, sync_size);
     DCHECK_LE(offset, buffer_len);
+    if (offset != -1) break;
 
-    // We need to check for a sync that spans buffers.
-    if (offset == buffer_len) {
-      // The marker (-1) and the sync can start anywhere in the
-      // last 19 bytes of the buffer.  
-      int tail_size = sync_size + sizeof(int32_t) - 1;
-      uint8_t* bp = buffer + buffer_len - tail_size;
-      uint8_t save[2 * tail_size];
+    // We need to check for a sync that spans buffers.  The -1 marker (if
+    // present) and the sync can start anywhere in the last 19 bytes of the
+    // buffer, so we save the 19-byte tail of the buffer.
+    int tail_size = sync_size + sizeof(int32_t) - 1;
+    uint8_t* bp = buffer + buffer_len - tail_size;
+    uint8_t save[2 * tail_size];
+    memcpy(save, bp, tail_size);
 
-      // Save the tail of the buffer.
-      memcpy(save, bp, tail_size);
+    // Read the next buffer
+    if (!SerDeUtils::SkipBytes(context_, buffer_len, &status)) return status;
+    RETURN_IF_ERROR(context_->GetRawBytes(&buffer, &buffer_len, &eosr));
+    if (buffer_len < tail_size) continue;
 
-      // Read the next buffer.
-      if (!SerDeUtils::SkipBytes(context_, offset, &status)) return status;
-      RETURN_IF_ERROR(context_->GetRawBytes(&buffer, &buffer_len, &eosr));
-      offset = buffer_len;
-      if (buffer_len >= tail_size) {
-        memcpy(save + tail_size, buffer, tail_size);
-        offset = FindSyncBlock(save, 2 * tail_size, sync, sync_size);
-
-        // The sync mark does not span the buffers search the whole new buffer.
-        if (offset == 2 * tail_size) {
-          offset = buffer_len;
-          continue;
-        }
-
-        *sync_found = true;
-        // Adjust the offset to be relative to the start of the new buffer
-        offset -= tail_size;
-        // Adjust offset to be past the sync since it spans buffers.
-        offset += sync_size + sizeof(int32_t);
-      }
+    // Check if sync spans buffers
+    memcpy(save + tail_size, buffer, tail_size);
+    offset = FindSyncBlock(save, 2 * tail_size, sync, sync_size);
+    if (offset != -1) {
+      DCHECK_GE(offset, tail_size);
+      // Adjust the offset to be relative to the start of the new buffer
+      offset -= tail_size;
+      break;
     }
 
-    // Advance to the offset.  If sync_found is set then this is past the sync block.
-    if (offset != 0) {
-      if (!SerDeUtils::SkipBytes(context_, offset, &status)) return status;
+    if (eosr) {
+      // No sync marker found in this scan range
+      return Status::OK;
     }
-  } while (offset >= buffer_len && !eosr);
-
-  if (!eosr) {
-    VLOG_FILE << "Found sync for: " << context_->filename()
-              << " at " << context_->file_offset() - (*sync_found ? offset : 0);
   }
 
+  // We found a sync at offset. offset cannot be 0 since it points to the end of
+  // the sync in the current buffer.
+  DCHECK_GT(offset, 0);
+  if (!SerDeUtils::SkipBytes(context_, offset, &status)) return status;
+  VLOG_FILE << "Found sync for: " << context_->filename()
+            << " at " << context_->file_offset() - sync_size;
   return Status::OK;
 }

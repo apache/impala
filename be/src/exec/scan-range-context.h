@@ -97,10 +97,12 @@ class ScanRangeContext {
   //    those number of bytes unless end of file or an error occurred.  
   //    if requested_len is 0, the next complete buffer will be returned
   //  - *out_len is the number of bytes returned.
-  //  - *eos is set to true if all the bytes in this scan range are returned
+  //  - *eos is set to true if all the bytes in this scan range are returned.
   //  - *status is set if there is an error.  
   // Returns true if the call was success (i.e. status->ok())
   // This should only be called from the scanner thread.
+  // Note that this will return bytes past the end of the scan range if
+  // requested (e.g., this can be called again after *eos is set to true).
   bool GetBytes(uint8_t** buffer, int requested_len, int* out_len, 
       bool* eos, Status* status);
 
@@ -115,12 +117,14 @@ class ScanRangeContext {
   // Returns the maximum number of tuples/tuple rows that can be output (before the
   // current row batch is complete and a new one is allocated).
   // This should only be called from the scanner thread.
+  // Memory returned from this call is invalidated after calling CommitRows or
+  // GetBytes. Callers must call GetMemory again after calling either of these
+  // functions.
   int GetMemory(MemPool** pool, Tuple** tuple_mem, TupleRow** tuple_row_mem);
 
   // Commit num_rows to the current row batch.  If this completes the row batch, the
   // row batch is enqueued with the scan node.
   // This should only be called from the scanner thread.
-  // Returns true if the scanner should finish (i.e. limit was reached).
   void CommitRows(int num_rows);
 
   // Enqueue a buffer for this context.  This will wake up the thread in GetBytes() if

@@ -75,6 +75,8 @@ class SlotDescriptor {
   SlotId id() const { return id_; }
   PrimitiveType type() const { return type_; }
   TupleId parent() const { return parent_; }
+  // Returns the column index of this slot, including partition keys.
+  // (e.g., col_pos - num_partition_keys = the table column this slot corresponds to)
   int col_pos() const { return col_pos_; }
   // Returns the field index in the generated llvm struct for this slot's tuple
   int field_idx() const { return field_idx_; }

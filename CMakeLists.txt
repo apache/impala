@@ -129,6 +129,16 @@ set_target_properties(snappy PROPERTIES IMPORTED_LOCATION "${SNAPPY_LIBRARY}")
 message(STATUS ${SNAPPY_INCLUDE_DIR})
 message(STATUS ${SNAPPY_LIBRARY})
 
+# find Avro headers and libs
+find_package(Avro REQUIRED)
+include_directories(${AVRO_INCLUDE_DIR})
+set(LIBS ${LIBS} ${AVRO_STATIC_LIB})
+add_library(avro STATIC IMPORTED)
+set_target_properties(avro PROPERTIES IMPORTED_LOCATION "${AVRO_STATIC_LIB}")
+
+message(STATUS ${AVRO_INCLUDE_DIR})
+message(STATUS ${AVRO_STATIC_LIB})
+
 # compile these subdirs using their own CMakeLists.txt
 add_subdirectory(common/function-registry)
 add_subdirectory(common/thrift)

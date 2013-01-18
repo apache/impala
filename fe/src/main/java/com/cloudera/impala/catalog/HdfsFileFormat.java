@@ -28,7 +28,8 @@ public enum HdfsFileFormat {
   TEXT,
   LZO_TEXT,
   SEQUENCE_FILE,
-  TREVNI;
+  TREVNI,
+  AVRO;
 
   // Input format class for RCFile tables read by Hive.
   private static final String RCFILE_INPUT_FORMAT =
@@ -50,12 +51,19 @@ public enum HdfsFileFormat {
   private static final String TREVNI_INPUT_FORMAT =
       "org.apache.hadoop.hive.ql.io.TrevniInputFormat";
 
+  // Input format class for Avro tables read by hive.
+  private static final String AVRO_INPUT_FORMAT =
+      "org.apache.hadoop.hive.ql.io.avro.AvroContainerInputFormat";
+
   private static final Map<String, HdfsFileFormat> VALID_FORMATS =
-      ImmutableMap.of(RCFILE_INPUT_FORMAT, RC_FILE,
-                      TEXT_INPUT_FORMAT, TEXT,
-                      LZO_TEXT_INPUT_FORMAT, LZO_TEXT,
-                      SEQUENCE_INPUT_FORMAT, SEQUENCE_FILE,
-                      TREVNI_INPUT_FORMAT, TREVNI);
+      ImmutableMap.<String, HdfsFileFormat>builder()
+          .put(RCFILE_INPUT_FORMAT, RC_FILE)
+          .put(TEXT_INPUT_FORMAT, TEXT)
+          .put(LZO_TEXT_INPUT_FORMAT, LZO_TEXT)
+          .put(SEQUENCE_INPUT_FORMAT, SEQUENCE_FILE)
+          .put(TREVNI_INPUT_FORMAT, TREVNI)
+          .put(AVRO_INPUT_FORMAT, AVRO)
+          .build();
 
   /**
    * Returns true if the string describes an input format class that we support.
@@ -88,6 +96,8 @@ public enum HdfsFileFormat {
       return THdfsFileFormat.SEQUENCE_FILE;
     case TREVNI:
       return THdfsFileFormat.TREVNI;
+    case AVRO:
+      return THdfsFileFormat.AVRO;
     default:
       throw new RuntimeException("Unknown HdfsFormat: "
           + this + " - should never happen!");

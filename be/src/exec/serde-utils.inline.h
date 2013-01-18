@@ -192,6 +192,20 @@ inline int SerDeUtils::DecodeVIntSize(int8_t byte) {
   return -111 - byte;
 }
 
+inline bool SerDeUtils::ReadZLong(ScanRangeContext* context, int64_t* value, 
+    Status* status) {
+  uint32_t zlong = 0;
+  int shift = 0;
+  uint8_t* byte;
+  do {
+    DCHECK_LE(shift, 64);
+    RETURN_IF_FALSE(SerDeUtils::ReadBytes(context, 1, &byte, status));
+    zlong |= static_cast<uint64_t>(*byte & 0x7f) << shift;
+    shift += 7;
+  } while (*byte & 0x80);
+  *value = (zlong >> 1) ^ -(zlong & 1);
+  return true;
+}
 #undef RETURN_IF_FALSE
 
 #endif

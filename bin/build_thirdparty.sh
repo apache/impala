@@ -119,3 +119,8 @@ if [ -z "$USE_PIC_LIB_PATH" ]; then
   (make || true)
   make install
 fi
+
+# Build Avro
+cd $IMPALA_HOME/thirdparty/avro-${IMPALA_AVRO_VERSION}/lang/c++
+cmake -G "Unix Makefiles"
+make -j4

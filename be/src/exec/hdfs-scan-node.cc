@@ -18,6 +18,7 @@
 #include "exec/hdfs-lzo-text-scanner.h"
 #include "exec/hdfs-sequence-scanner.h"
 #include "exec/hdfs-rcfile-scanner.h"
+#include "exec/hdfs-avro-scanner.h"
 #include "exec/hdfs-trevni-scanner.h"
 
 #include <sstream>
@@ -258,6 +259,9 @@ HdfsScanner* HdfsScanNode::CreateScanner(HdfsPartitionDescriptor* partition) {
     case THdfsFileFormat::RC_FILE:
       scanner = new HdfsRCFileScanner(this, runtime_state_);
       break;
+    case THdfsFileFormat::AVRO:
+      scanner = new HdfsAvroScanner(this, runtime_state_);
+      break;
 #if 0
     case THdfsFileFormat::TREVNI:
       scanner = new HdfsTrevniScanner(this, runtime_state_, tuple_pool_.get());
@@ -446,6 +450,8 @@ Status HdfsScanNode::Open(RuntimeState* state) {
       per_type_files[THdfsFileFormat::SEQUENCE_FILE]);
   BaseSequenceScanner::IssueInitialRanges(this,
       per_type_files[THdfsFileFormat::RC_FILE]);
+  BaseSequenceScanner::IssueInitialRanges(this,
+      per_type_files[THdfsFileFormat::AVRO]);
   if (!per_type_files[THdfsFileFormat::LZO_TEXT].empty()) {
     // This will dlopen the lzo binary and can fail if it is not present
     RETURN_IF_ERROR(HdfsLzoTextScanner::IssueInitialRanges(state,

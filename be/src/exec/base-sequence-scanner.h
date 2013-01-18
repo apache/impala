@@ -72,12 +72,12 @@ class BaseSequenceScanner : public HdfsScanner {
   
   // Subclasses must implement these functions.  The order for calls will be
   //  1. AllocateFileHeader() - called once per file
-  //  2. InitNewRange()
-  //  3. ReadFileHeader()
+  //  2. ReadFileHeader() - called once per file
+  //  3. InitNewRange()
   //  4. ProcessRange()
-  // In the normal case, 2-4 is called for each range once.  In the case of
-  // errors and skipped bytes, 4 is repeatedly called, each time starting
-  // right after the sync marker.
+  // In the normal case, 3 and 4 are called for each scan range once.  In the
+  // case of errors and skipped bytes, 4 is repeatedly called, each time
+  // starting right after the sync marker.
 
   // Allocate a file header object for this scanner.  If the scanner needs 
   // additional header information, it should subclass FileHeader.
@@ -99,18 +99,22 @@ class BaseSequenceScanner : public HdfsScanner {
   // at the start of a data block (i.e. right after the sync marker).
   virtual Status ProcessRange() = 0;
   
-  BaseSequenceScanner(HdfsScanNode*, RuntimeState*);
+  // - marker_precedes_sync: if true, sync markers are preceded by 4 bytes of
+  //   0xFFFFFFFF.
+  BaseSequenceScanner(HdfsScanNode*, RuntimeState*, bool marker_precedes_sync);
   
   // Read and validate sync marker against header_->sync.  Returns non-ok if the
-  // sync marker did not match.
+  // sync marker did not match. Scanners should always use this function to read
+  // sync markers, otherwise finished() might not be updated correctly.
   Status ReadSync();
   
-  // Utility function to advance to the next sync marker, reading bytes from context_.
+  // Utility function to advance past the next sync marker, reading bytes from
+  // context_.
   // - sync: sync marker (does not include 0xFFFFFFFF prefix)
   // - sync_size: number of bytes for sync
-  // - sync_found: returns if the sync marker was found before the end of the scan range
-  Status SkipToSync(
-      const uint8_t* sync, int sync_size, bool* sync_found);
+  Status SkipToSync(const uint8_t* sync, int sync_size);
+
+  bool finished() { return finished_; }
 
   // Estimate of header size in bytes.  This is initial number of bytes to issue
   // per file.  If the estimate is too low, more bytes will be read as necessary.
@@ -125,10 +129,6 @@ class BaseSequenceScanner : public HdfsScanner {
   // If true, this scanner object is only for processing the header.
   bool only_parsing_header_;
   
-  // If we skip ahead on error and read the sync block this is set to true
-  // so we do not need to look for it in ProcessRange
-  bool have_sync_;
-  
   // Byte offset from start of file for current block.  Used for error reporting.
   int block_start_;
 
@@ -141,6 +141,29 @@ class BaseSequenceScanner : public HdfsScanner {
 
   // Time spent decompressing bytes
   RuntimeProfile::Counter* decompress_timer_;
+
+ private:
+  // Set to true when this scanner has processed all the bytes it is responsible
+  // for, i.e., when it reads a sync occurring completely in the next scan
+  // range, as this is the first sync that the next scan range will be able to
+  // locate. (Each scan range is responsible for the first complete sync in the
+  // range through the first complete sync in the next range.)
+  //
+  // We need this variable because checking context_->eosr() after reading each
+  // sync is insufficient.  If a sync marker spans two scan ranges, the first
+  // scan range must process the following block since the second scan range
+  // cannot find the incomplete sync. context_->eosr() will not alert us to this
+  // situation, causing the block to be skipped.
+  // TODO(skye): update other scanners to use finished() instead of eosr
+  bool finished_;
+
+  // See constructor.
+  bool marker_precedes_sync_;
+
+  // Utility function to look for 'sync' in buffer.  Returns the offset into
+  // buffer of the _end_ of sync if it is found, otherwise, returns -1.
+  int FindSyncBlock(const uint8_t* buffer, int buffer_len, const uint8_t* sync,
+                    int sync_len);
 };
 
 }

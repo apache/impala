@@ -111,7 +111,7 @@
 //   <key>
 //   <compressed-value>
 //
-// block-compessed-record ::=
+// block-compressed-record ::=
 //   <file-sync-field>
 //   <key-lengths-block-size>
 //   <key-lengths-block>
@@ -195,9 +195,13 @@ class HdfsSequenceScanner : public BaseSequenceScanner {
   // more common and can be parsed more efficiently in larger pieces.
   Status ProcessBlockCompressedScanRange();
 
-  // Read a compressed block.
+  // Read a compressed block. Does NOT read sync or -1 marker preceding sync.
   // Decompress to unparsed_data_buffer_ allocated from unparsed_data_buffer_pool_.
   Status ReadCompressedBlock();
+
+  // Utility function for parsing next_record_in_compressed_block_. Called by
+  // ProcessBlockCompressedScanRange.
+  Status ProcessDecompressedBlock();
 
   // Read compressed or uncompressed records from the byte stream into memory
   // in unparsed_data_buffer_pool_.  Not used for block compressed files.

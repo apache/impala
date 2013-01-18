@@ -66,6 +66,7 @@ class SerDeUtils {
   static bool ReadInt(ScanRangeContext* context, int32_t* val, Status*);
   static bool ReadVLong(ScanRangeContext* context, int64_t* val, Status*);
   static bool ReadVInt(ScanRangeContext* context, int32_t* val, Status*);
+  static bool ReadZLong(ScanRangeContext* context, int64_t* val, Status*);
   static bool ReadBytes(ScanRangeContext* context, int length, uint8_t** buf, Status*);
   static bool SkipBytes(ScanRangeContext* context, int length, Status*);
   static bool ReadText(ScanRangeContext* context, uint8_t** buf, int* length, Status*);

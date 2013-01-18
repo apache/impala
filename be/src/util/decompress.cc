@@ -193,7 +193,10 @@ Status SnappyDecompressor::ProcessBlock(int input_length, uint8_t* input,
       static_cast<size_t>(input_length), reinterpret_cast<char*>(out_buffer_))) {
     return Status("Snappy: RawUncompress failed");
   }
-  if (*output_length == 0) *output_length = uncompressed_length;
+  if (*output_length == 0) {
+    *output_length = uncompressed_length;
+    *output = out_buffer_;
+  }
   return Status::OK;
 }
 

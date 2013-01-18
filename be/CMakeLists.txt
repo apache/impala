@@ -218,6 +218,7 @@ set (IMPALA_LINK_LIBS
   ${LIBEVENT}
   ${LIBZ}
   ${LIBBZ2}
+  ${AVRO_STATIC_LIB}
   -lrt -lboost_date_time
 )
 

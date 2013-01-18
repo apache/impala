@@ -119,6 +119,16 @@ Status Codec::CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
 }
 
 Status Codec::CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
+                                 bool reuse, THdfsCompression::type format,
+                                 scoped_ptr<Codec>* decompressor) {
+  Codec* decom;
+  RETURN_IF_ERROR(
+      CreateDecompressor(runtime_state, mem_pool, reuse, format, &decom));
+  decompressor->reset(decom);
+  return Status::OK;
+}
+
+Status Codec::CreateDecompressor(RuntimeState* runtime_state, MemPool* mem_pool,
                                        bool reuse, THdfsCompression::type format,
                                        Codec** decompressor) {
   switch (format) {

@@ -40,6 +40,7 @@ enum THdfsFileFormat {
   LZO_TEXT,
   RC_FILE,
   SEQUENCE_FILE,
+  AVRO,
   TREVNI
 }
 

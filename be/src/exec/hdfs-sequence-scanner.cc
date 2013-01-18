@@ -39,7 +39,7 @@ const uint8_t HdfsSequenceScanner::SEQFILE_VERSION_HEADER[4] = {'S', 'E', 'Q', 6
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return parse_status_
 
 HdfsSequenceScanner::HdfsSequenceScanner(HdfsScanNode* scan_node, RuntimeState* state) 
-    : BaseSequenceScanner(scan_node, state),
+    : BaseSequenceScanner(scan_node, state, /* marker_precedes_sync */ true),
       unparsed_data_buffer_(NULL),
       num_buffered_records_in_compressed_block_(0) {
 }
@@ -195,76 +195,118 @@ Status HdfsSequenceScanner::ProcessBlockCompressedScanRange() {
       RETURN_IF_ERROR(ReadCompressedBlock());
       if (num_buffered_records_in_compressed_block_ < 0) return parse_status_;
     }
-    
-    MemPool* pool;
-    TupleRow* tuple_row;
-    int64_t max_tuples = context_->GetMemory(&pool, &tuple_, &tuple_row);
-    int num_to_commit = min(max_tuples, num_buffered_records_in_compressed_block_);
-    num_buffered_records_in_compressed_block_ -= num_to_commit;
 
-    if (scan_node_->materialized_slots().empty()) {
-      // Handle case where there are no slots to materialize (e.g. count(*))
-      num_to_commit = WriteEmptyTuples(context_, tuple_row, num_to_commit);
-      if (num_to_commit > 0) context_->CommitRows(num_to_commit);
-      continue;
-    }
+    // Step 2
+    RETURN_IF_ERROR(ProcessDecompressedBlock());
 
-    // 2a. Parse record starts and lengths
-    int field_location_offset = 0;
-    for (int i = 0; i < num_to_commit; ++i) {
-      DCHECK_LT(i, record_locations_.size());
-      int bytes_read = SerDeUtils::GetVLong(
-          next_record_in_compressed_block_, &record_locations_[i].len);
-      if (UNLIKELY(bytes_read == -1)) {
-        stringstream ss;
-        ss << "Invalid record size in compressed block.";
-        if (state_->LogHasSpace()) state_->LogError(ss.str());
-        return Status(ss.str());
+    // If we're finished processing the current block, read the marker + sync of
+    // the next block. We don't do this at the beginning of the loop since
+    // BaseSequenceScanner starts us after a sync, meaning we start by reading
+    // data.
+    if (num_buffered_records_in_compressed_block_ == 0) {
+      // If we are exactly at the end of the scan range, we don't attempt to
+      // read a sync marker because we may be at the end of file, and we don't
+      // want to trigger an "incomplete read" parse status and abort the
+      // query. This is safe to do even if we're not at the end of the file
+      // since we'll be finished after reading this sync.
+      // TODO: check EOF instead
+      if (context_->BytesLeft() == 0) return Status::OK;
+
+      // Read the sync indicator and check the sync block.
+      int sync_indicator;
+      if (!SerDeUtils::ReadInt(context_, &sync_indicator, &parse_status_)) {
+        // We've reached the end of the file
+        // TODO: check that we actually reached the end of the file
+        DCHECK(context_->eosr());
+        return Status::OK;
       }
-      next_record_in_compressed_block_ += bytes_read;
-      record_locations_[i].record = next_record_in_compressed_block_;
-      next_record_in_compressed_block_ += record_locations_[i].len;
-    }
-      
-    // 2b. Parse records to find field locations.
-    for (int i = 0; i < num_to_commit; ++i) {
-      int num_fields = 0;
-      if (delimited_text_parser_->escape_char() == '\0') {
-        delimited_text_parser_->ParseSingleTuple<false>(record_locations_[i].len, 
-            reinterpret_cast<char*>(record_locations_[i].record), 
-            &field_locations_[field_location_offset], &num_fields);
-      } else {
-        delimited_text_parser_->ParseSingleTuple<true>(record_locations_[i].len, 
-            reinterpret_cast<char*>(record_locations_[i].record), 
-            &field_locations_[field_location_offset], &num_fields);
+      if (sync_indicator != -1) {
+        if (state_->LogHasSpace()) {
+          stringstream ss;
+          ss << "Expecting sync indicator (-1) at file offset "
+             << (context_->file_offset() - sizeof(int)) << ".  "
+             << "Sync indicator found " << sync_indicator << ".";
+          state_->LogError(ss.str());
+        }
+        return Status("Bad sync hash");
       }
-      DCHECK_EQ(num_fields, scan_node_->materialized_slots().size());
-      field_location_offset += num_fields;
-      DCHECK_LE(field_location_offset, field_locations_.size());
+      RETURN_IF_ERROR(ReadSync());
     }
-
-    int max_added_tuples = (scan_node_->limit() == -1) ?
-          num_to_commit : scan_node_->limit() - scan_node_->rows_returned();
-
-    // Materialize parsed cols to tuples
-    SCOPED_TIMER(scan_node_->materialize_tuple_timer());
-    // Call jitted function if possible
-    int tuples_returned;
-    if (write_tuples_fn_ != NULL) {
-      // last argument: seq always starts at record_location[0]
-      tuples_returned = write_tuples_fn_(this, pool, tuple_row, 
-          context_->row_byte_size(), &field_locations_[0], num_to_commit, 
-          max_added_tuples, scan_node_->materialized_slots().size(), 0); 
-    } else {
-      tuples_returned = WriteAlignedTuples(pool, tuple_row, 
-          context_->row_byte_size(), &field_locations_[0], num_to_commit, 
-          max_added_tuples, scan_node_->materialized_slots().size(), 0);
-    }
-
-    if (tuples_returned == -1) return parse_status_;
-    context_->CommitRows(tuples_returned);
   }
 
+  return Status::OK;
+}
+
+Status HdfsSequenceScanner::ProcessDecompressedBlock() {
+  MemPool* pool;
+  TupleRow* tuple_row;
+  int64_t max_tuples = context_->GetMemory(&pool, &tuple_, &tuple_row);
+  int num_to_commit = min(max_tuples, num_buffered_records_in_compressed_block_);
+  num_buffered_records_in_compressed_block_ -= num_to_commit;
+
+  if (scan_node_->materialized_slots().empty()) {
+    // Handle case where there are no slots to materialize (e.g. count(*))
+    num_to_commit = WriteEmptyTuples(context_, tuple_row, num_to_commit);
+    if (num_to_commit > 0) context_->CommitRows(num_to_commit);
+    return Status::OK;
+  }
+
+  // Parse record starts and lengths
+  int field_location_offset = 0;
+  for (int i = 0; i < num_to_commit; ++i) {
+    DCHECK_LT(i, record_locations_.size());
+    int bytes_read = SerDeUtils::GetVLong(
+        next_record_in_compressed_block_, &record_locations_[i].len);
+    if (UNLIKELY(bytes_read == -1)) {
+      stringstream ss;
+      ss << "Invalid record size in compressed block.";
+      if (state_->LogHasSpace()) state_->LogError(ss.str());
+      return Status(ss.str());
+    }
+    next_record_in_compressed_block_ += bytes_read;
+    record_locations_[i].record = next_record_in_compressed_block_;
+    next_record_in_compressed_block_ += record_locations_[i].len;
+  }
+
+  // Parse records to find field locations.
+  for (int i = 0; i < num_to_commit; ++i) {
+    int num_fields = 0;
+    if (delimited_text_parser_->escape_char() == '\0') {
+      delimited_text_parser_->ParseSingleTuple<false>(
+          record_locations_[i].len,
+          reinterpret_cast<char*>(record_locations_[i].record),
+          &field_locations_[field_location_offset], &num_fields);
+    } else {
+      delimited_text_parser_->ParseSingleTuple<true>(
+          record_locations_[i].len,
+          reinterpret_cast<char*>(record_locations_[i].record),
+          &field_locations_[field_location_offset], &num_fields);
+    }
+    DCHECK_EQ(num_fields, scan_node_->materialized_slots().size());
+    field_location_offset += num_fields;
+    DCHECK_LE(field_location_offset, field_locations_.size());
+  }
+
+  int max_added_tuples = (scan_node_->limit() == -1) ?
+                         num_to_commit : scan_node_->limit() - scan_node_->rows_returned();
+
+  // Materialize parsed cols to tuples
+  SCOPED_TIMER(scan_node_->materialize_tuple_timer());
+  // Call jitted function if possible
+  int tuples_returned;
+  if (write_tuples_fn_ != NULL) {
+    // last argument: seq always starts at record_location[0]
+    tuples_returned = write_tuples_fn_(this, pool, tuple_row, 
+                                       context_->row_byte_size(), &field_locations_[0], num_to_commit, 
+                                       max_added_tuples, scan_node_->materialized_slots().size(), 0); 
+  } else {
+    tuples_returned = WriteAlignedTuples(pool, tuple_row, 
+                                         context_->row_byte_size(), &field_locations_[0], num_to_commit, 
+                                         max_added_tuples, scan_node_->materialized_slots().size(), 0);
+  }
+
+  if (tuples_returned == -1) return parse_status_;
+  context_->CommitRows(tuples_returned);
   return Status::OK;
 }
 
@@ -418,6 +460,22 @@ Status HdfsSequenceScanner::ReadFileHeader() {
   RETURN_IF_FALSE(SerDeUtils::ReadBytes(context_, SYNC_HASH_SIZE, &sync, &parse_status_));
   memcpy(header_->sync, sync, SYNC_HASH_SIZE);
 
+  if (header_->is_compressed && !seq_header->is_row_compressed) {
+    // With block compression, record blocks have a leading -1 marker and sync
+    // (i.e., we just read the sync in the file header, but there is another
+    // sync immediately following it which is the beginning of the first
+    // block). We include this extra marker and sync in the header so that
+    // BaseSequenceScanner skips directly to the actual data in the first record
+    // block.
+    // TODO: this will cause the entire query to fail if this sync is corrupt
+    int marker;
+    RETURN_IF_FALSE(SerDeUtils::ReadInt(context_, &marker, &parse_status_));
+    if (marker != HdfsSequenceScanner::SYNC_MARKER) {
+      return Status("Didn't find sync marker after file header");
+    }
+    RETURN_IF_ERROR(ReadSync());
+  }
+
   header_->header_size = context_->total_bytes_returned();
   header_->file_type = THdfsFileFormat::SEQUENCE_FILE;
   return Status::OK;
@@ -428,7 +486,8 @@ Status HdfsSequenceScanner::ReadBlockHeader(bool* sync) {
   *sync = false;
   if (current_block_length_ == HdfsSequenceScanner::SYNC_MARKER) {
     RETURN_IF_ERROR(ReadSync());
-    RETURN_IF_FALSE(SerDeUtils::ReadInt(context_, &current_block_length_, &parse_status_));
+    RETURN_IF_FALSE(
+        SerDeUtils::ReadInt(context_, &current_block_length_, &parse_status_));
     *sync = true;
   }
   if (current_block_length_ < 0) {
@@ -459,25 +518,6 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
   }
 
   block_start_ = context_->file_offset();
-  if (have_sync_) {
-    // We skipped ahead on an error and read the sync block.
-    have_sync_ = false;
-  } else {
-    // Read the sync indicator and check the sync block.
-    int sync_indicator;
-    RETURN_IF_FALSE(SerDeUtils::ReadInt(context_, &sync_indicator, &parse_status_));
-    if (sync_indicator != -1) {
-      if (state_->LogHasSpace()) {
-        stringstream ss;
-        ss << "Expecting sync indicator (-1) at file offset "
-           << (context_->file_offset() - sizeof(int)) << ".  " 
-           << "Sync indicator found " << sync_indicator << ".";
-        state_->LogError(ss.str());
-      }
-      return Status("Bad sync hash");
-    }
-    RETURN_IF_ERROR(ReadSync());
-  }
 
   RETURN_IF_FALSE(SerDeUtils::ReadVLong(context_, 
       &num_buffered_records_in_compressed_block_, &parse_status_));
@@ -514,11 +554,14 @@ Status HdfsSequenceScanner::ReadCompressedBlock() {
   RETURN_IF_FALSE(
       SerDeUtils::ReadBytes(context_, block_size, &compressed_data, &parse_status_));
 
-  int len = 0;
-  SCOPED_TIMER(decompress_timer_);
-  RETURN_IF_ERROR(decompressor_->ProcessBlock(block_size, compressed_data,
-      &len, &unparsed_data_buffer_));
-  next_record_in_compressed_block_ = unparsed_data_buffer_;
+  {
+    int len = 0;
+    SCOPED_TIMER(decompress_timer_);
+    RETURN_IF_ERROR(decompressor_->ProcessBlock(block_size, compressed_data,
+                                                &len, &unparsed_data_buffer_));
+    next_record_in_compressed_block_ = unparsed_data_buffer_;
+  }
+
   return Status::OK;
 }
 

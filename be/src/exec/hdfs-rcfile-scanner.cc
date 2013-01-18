@@ -51,7 +51,7 @@ const uint8_t HdfsRCFileScanner::RCFILE_VERSION_HEADER[4] = {'R', 'C', 'F', 1};
 #define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return parse_status_
 
 HdfsRCFileScanner::HdfsRCFileScanner(HdfsScanNode* scan_node, RuntimeState* state)
-    : BaseSequenceScanner(scan_node, state) {
+    : BaseSequenceScanner(scan_node, state, /* marker_precedes_sync */ true) {
 }
 
 HdfsRCFileScanner::~HdfsRCFileScanner() {
