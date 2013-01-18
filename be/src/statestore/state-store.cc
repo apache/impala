@@ -57,9 +57,9 @@ DEFINE_int32(statestore_suspect_heartbeats, 2, "(Advanced) Number of consecutive
              "heartbeats an impalad can miss before being suspected of failure by the "
              "state-store");
 
-const string STATESTORE_LIVE_BACKENDS = "statestore.live.backends";
-const string STATESTORE_LIVE_BACKENDS_LIST = "statestore.live.backends.list";
-const string STATESTORE_SUBSCRIBER_STATE_MAP = "statestore.backend.state.map";
+const string STATESTORE_LIVE_BACKENDS = "statestore.live-backends";
+const string STATESTORE_LIVE_BACKENDS_LIST = "statestore.live-backends.list";
+const string STATESTORE_SUBSCRIBER_STATE_MAP = "statestore.backend-state-map";
 
 namespace impala {
 

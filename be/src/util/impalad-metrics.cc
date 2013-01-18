@@ -18,24 +18,26 @@ using namespace std;
 
 namespace impala {
 
-const char* ImpaladMetricKeys::IMPALA_SERVER_START_TIME =
+// Naming convention: Components should be separated by '.' and words should
+// be separated by '-'.
+const char* ImpaladMetricKeys::IMPALA_SERVER_START_TIME = 
     "impala-server.start-time";
 const char* ImpaladMetricKeys::IMPALA_SERVER_READY =
     "impala-server.ready";
-const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_QUERIES =
-    "impala-server.num.queries";
-const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS =
-    "impala-server.num.fragments";
-const char* ImpaladMetricKeys::TOTAL_SCAN_RANGES_PROCESSED =
-    "impala-server.scan.ranges.total";
-const char* ImpaladMetricKeys::NUM_SCAN_RANGES_MISSING_VOLUME_ID =
-    "impala-server.scan_ranges.num-missing-volume-id";
-const char* ImpaladMetricKeys::MEM_POOL_TOTAL_BYTES =
-    "impala-server.mem.pool.total-bytes";
-const char* ImpaladMetricKeys::IO_MGR_NUM_OPEN_FILES =
-    "impala-server.io.mgr.num.open-files";
-const char* ImpaladMetricKeys::IO_MGR_NUM_BUFFERS =
-    "impala-server.io.mgr.num.buffers";
+const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_QUERIES = 
+    "impala-server.num-queries";
+const char* ImpaladMetricKeys::IMPALA_SERVER_NUM_FRAGMENTS = 
+    "impala-server.num-fragments";
+const char* ImpaladMetricKeys::TOTAL_SCAN_RANGES_PROCESSED = 
+    "impala-server.scan-ranges.total";
+const char* ImpaladMetricKeys::NUM_SCAN_RANGES_MISSING_VOLUME_ID = 
+    "impala-server.scan-ranges.num-missing-volume-id";
+const char* ImpaladMetricKeys::MEM_POOL_TOTAL_BYTES = 
+    "impala-server.mem-pool.total-bytes";
+const char* ImpaladMetricKeys::IO_MGR_NUM_OPEN_FILES = 
+    "impala-server.io-mgr.num-open-files";
+const char* ImpaladMetricKeys::IO_MGR_NUM_BUFFERS = 
+    "impala-server.io-mgr.num-buffers";
 
 // These are created by impala-server during startup.
 Metrics::StringMetric* ImpaladMetrics::IMPALA_SERVER_START_TIME = NULL;

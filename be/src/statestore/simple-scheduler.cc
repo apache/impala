@@ -33,7 +33,7 @@ using namespace boost;
 
 namespace impala {
 
-static const string LOCAL_ASSIGNMENTS_KEY("simple-scheduler.local.assignments.total");
+static const string LOCAL_ASSIGNMENTS_KEY("simple-scheduler.local-assignments.total");
 static const string ASSIGNMENTS_KEY("simple-scheduler.assignments.total");
 static const string SCHEDULER_INIT_KEY("simple-scheduler.initialized");
 
