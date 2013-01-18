@@ -49,10 +49,7 @@ add_library(Exprs
   utility-functions.cc
 )
 
-add_executable(expr-test expr-test.cc)
 add_executable(expr-benchmark expr-benchmark.cc)
-
-target_link_libraries(expr-test ${IMPALA_TEST_LINK_LIBS})
 target_link_libraries(expr-benchmark ${IMPALA_TEST_LINK_LIBS})
 
-add_test(expr-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/exprs/expr-test)
+ADD_BE_TEST(expr-test)

@@ -29,23 +29,7 @@ add_library(Statestore STATIC
 )
 
 add_executable(statestored statestored-main.cc)
-
 target_link_libraries(statestored ${IMPALA_LINK_LIBS})
 
-add_executable(state-store-test state-store-test.cc)
-
-target_link_libraries(state-store-test ${IMPALA_TEST_LINK_LIBS})
-
-add_test(state-store-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/statestore/state-store-test)
-
-add_executable(simple-scheduler-test simple-scheduler-test.cc)
-
-target_link_libraries(simple-scheduler-test
-  Common
-  Runtime
-  Common
-  Runtime
-  ${IMPALA_TEST_LINK_LIBS}
-)
-
-add_test(simple-scheduler-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/statestore/simple-scheduler-test)
+ADD_BE_TEST(state-store-test)
+ADD_BE_TEST(simple-scheduler-test)

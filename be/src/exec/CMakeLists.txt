@@ -58,18 +58,9 @@ add_library(Exec STATIC
   topn-node.cc
 )
 
-#add_executable(sequence-file-recovery-test sequence-file-recovery-test.cc)
-#target_link_libraries(sequence-file-recovery-test ${IMPALA_TEST_LINK_LIBS})
-#add_test(sequence-file-recovery-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/sequence-file-recovery-test)
+# TODO: why is this test disabled?
+#ADD_BE_TEST(sequence-file-recovery-test)
 
-add_executable(zigzag-test zigzag-test.cc)
-target_link_libraries(zigzag-test ${IMPALA_TEST_LINK_LIBS})
-add_test(zigzag-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/zigzag-test)
-
-add_executable(hash-table-test hash-table-test.cc)
-target_link_libraries(hash-table-test ${IMPALA_TEST_LINK_LIBS})
-add_test(hash-table-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/hash-table-test)
-
-add_executable(delimited-text-parser-test delimited-text-parser-test.cc)
-target_link_libraries(delimited-text-parser-test ${IMPALA_TEST_LINK_LIBS})
-add_test(delimited-text-parser-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/exec/delimited-text-parser-test)
+ADD_BE_TEST(zigzag-test)
+ADD_BE_TEST(hash-table-test)
+ADD_BE_TEST(delimited-text-parser-test)

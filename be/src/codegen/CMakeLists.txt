@@ -82,7 +82,5 @@ add_custom_command(
 add_custom_target(compile_to_ir_sse ALL DEPENDS ${IR_SSE_OUTPUT_FILE})
 add_custom_target(compile_to_ir_no_sse ALL DEPENDS ${IR_NO_SSE_OUTPUT_FILE})
 
-add_executable(llvm-codegen-test llvm-codegen-test.cc)
-target_link_libraries(llvm-codegen-test ${IMPALA_TEST_LINK_LIBS})
-add_test(llvm-codegen-test ${BUILD_OUTPUT_ROOT_DIRECTORY}/codegen/llvm-codegen-test)
+ADD_BE_TEST(llvm-codegen-test)
 
