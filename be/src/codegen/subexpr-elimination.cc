@@ -28,7 +28,6 @@
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/system_error.h>
-#include <llvm/Target/TargetData.h>
 #include "llvm/Transforms/IPO.h"
 #include <llvm/Transforms/Scalar.h>
 #include <llvm/Transforms/Utils/SSAUpdater.h>

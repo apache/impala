@@ -90,7 +90,7 @@ static void CodegenAssignNullValue(LlvmCodeGen* codegen,
     Value* dst_ptr = builder->CreateStructGEP(dst, 0, "string_ptr");
     Value* dst_len = builder->CreateStructGEP(dst, 1, "string_len");
     Value* null_len = codegen->GetIntConstant(TYPE_INT, fvn_seed);
-    Value* null_ptr = builder->CreateBitCast(null_len, codegen->ptr_type());
+    Value* null_ptr = builder->CreateIntToPtr(null_len, codegen->ptr_type());
     builder->CreateStore(null_ptr, dst_ptr);
     builder->CreateStore(null_len, dst_len);
     return;

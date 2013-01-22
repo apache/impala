@@ -19,6 +19,7 @@
 #include <sstream>
 #include <boost/thread/mutex.hpp>
 
+#include <llvm/DataLayout.h>
 #include <llvm/Analysis/Passes.h>
 #include <llvm/Analysis/InstructionSimplify.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
@@ -31,7 +32,6 @@
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/system_error.h>
-#include <llvm/Target/TargetData.h>
 #include "llvm/Transforms/IPO.h"
 #include <llvm/Transforms/IPO/PassManagerBuilder.h>
 #include <llvm/Transforms/Scalar.h>
@@ -148,9 +148,9 @@ Status LlvmCodeGen::LoadImpalaIR(ObjectPool* pool, scoped_ptr<LlvmCodeGen>* code
   // TODO: get type for Timestamp
 
   // Verify size is correct
-  const TargetData* target_data = codegen->execution_engine()->getTargetData();
+  const DataLayout* data_layout = codegen->execution_engine()->getDataLayout();
   const StructLayout* layout =
-      target_data->getStructLayout(static_cast<StructType*>(codegen->string_val_type_));
+      data_layout->getStructLayout(static_cast<StructType*>(codegen->string_val_type_));
   if (layout->getSizeInBytes() != sizeof(StringValue)) {
     DCHECK_EQ(layout->getSizeInBytes(), sizeof(StringValue));
     return Status("Could not create llvm struct type for StringVal");
@@ -407,7 +407,8 @@ Function* LlvmCodeGen::ReplaceCallSites(Function* caller, bool update_in_place,
 
   if (!update_in_place) {
     // Clone the function and add it to the module
-    Function* new_caller = llvm::CloneFunction(caller);
+    ValueToValueMapTy dummy_vmap;
+    Function* new_caller = llvm::CloneFunction(caller, dummy_vmap, false);
     new_caller->copyAttributesFrom(caller);
     module_->getFunctionList().push_back(new_caller);
     caller = new_caller;

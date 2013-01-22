@@ -19,7 +19,7 @@
 #include <sstream>
 
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
-#include <llvm/Target/TargetData.h>
+#include <llvm/DataLayout.h>
 
 #include "codegen/llvm-codegen.h"
 #include "common/object-pool.h"
@@ -495,8 +495,8 @@ StructType* TupleDescriptor::GenerateLlvmStruct(LlvmCodeGen* codegen) {
   // identically.  If the layout does not match, return NULL indicating the
   // struct could not be codegen'd.  This will trigger codegen for anything using
   // the tuple to be disabled.
-  const TargetData* target_data = codegen->execution_engine()->getTargetData();
-  const StructLayout* layout = target_data->getStructLayout(tuple_struct);
+  const DataLayout* data_layout = codegen->execution_engine()->getDataLayout();
+  const StructLayout* layout = data_layout->getStructLayout(tuple_struct);
   if (layout->getSizeInBytes() != byte_size()) {
     DCHECK_EQ(layout->getSizeInBytes(), byte_size());
     return NULL;

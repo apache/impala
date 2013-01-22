@@ -32,6 +32,8 @@ do
 done
 
 cd $IMPALA_HOME
+bin/gen_build_version.py
+rm ./CMakeCache.txt
 cmake -DCMAKE_BUILD_TYPE=$TARGET_BUILD_TYPE .
 make clean
 

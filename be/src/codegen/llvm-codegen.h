@@ -26,9 +26,9 @@
 
 #include <llvm/DerivedTypes.h>
 #include <llvm/Intrinsics.h>
+#include <llvm/IRBuilder.h>
 #include <llvm/LLVMContext.h>
 #include <llvm/Module.h>
-#include <llvm/Support/IRBuilder.h>
 #include <llvm/Analysis/Verifier.h>
 
 #include "exprs/expr.h"
