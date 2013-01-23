@@ -78,7 +78,8 @@ class ResultRow(object):
   def __eq__(self, other):
     if not isinstance(other, self.__class__):
       return False
-    return (self.skip_comparison or other.skip_comparison) or (self.columns == other.columns)
+    return (self.skip_comparison or other.skip_comparison) or\
+        (self.columns == other.columns)
 
   def __ne__(self, other):
     return not self.__eq__(other)
@@ -141,11 +142,13 @@ def verify_results(expected_results, actual_results, order_matters):
     expected_results = sorted(expected_results)
     actual_results = sorted(actual_results)
 
-
   if len(expected_results) > 0 and 'regex:' in expected_results[0]:
     return
 
-  assert expected_results == actual_results, '%s%s' % (expected_results, actual_results)
+  failure_str = '\nExpected:\n%s\n\nActual:\n%s' %\
+      ('\n'.join(expected_results), '\n'.join(actual_results))
+
+  assert expected_results == actual_results, failure_str
 
 def verify_column_types(actual_col_types, exec_result_schema):
   actual_col_types = [c.strip().upper() for c in actual_col_types.split(',')]

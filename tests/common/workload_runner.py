@@ -18,6 +18,7 @@ from functools import partial
 from os.path import isfile, isdir
 from tests.common.query_executor import *
 from tests.common.test_dimensions import *
+from tests.common.test_result_verifier import *
 from tests.util.test_file_parser import *
 from time import sleep
 from random import choice
@@ -60,7 +61,7 @@ class WorkloadRunner(object):
     if self.verbose:
       LOG.setLevel(level=logging.DEBUG)
 
-    self.beeswax = kwargs.get('beeswax', True)
+    self.client_type = kwargs.get('client_type', 'beeswax')
     self.skip_impala = kwargs.get('skip_impala', False)
     self.compare_with_hive = kwargs.get('compare_with_hive', False)
     self.hive_cmd = kwargs.get('hive_cmd', 'hive -e ')
@@ -73,6 +74,7 @@ class WorkloadRunner(object):
     self.profiler = kwargs.get('profiler', False)
     self.use_kerberos = kwargs.get('use_kerberos', False)
     self.run_using_hive = kwargs.get('compare_with_hive', False) or self.skip_impala
+    self.verify_results = kwargs.get('verify_results', False)
     # TODO: Need to find a way to get this working without runquery
     #self.gprof_cmd = 'google-pprof --text ' + self.runquery_path + ' %s | head -n 60'
     self.__summary = str()
@@ -124,11 +126,14 @@ class WorkloadRunner(object):
           HiveQueryExecOptions(self.iterations,
           hive_cmd=self.hive_cmd,
           )),
-      'impala_beeswax': lambda: (execute_using_impala_beeswax,
+        'impala_beeswax': lambda: (execute_using_impala_beeswax,
           ImpalaBeeswaxExecOptions(self.iterations,
           exec_options=self.exec_options,
           use_kerberos=self.use_kerberos,
-          impalad=choice(self.TARGET_IMPALADS)))
+          impalad=choice(self.TARGET_IMPALADS))),
+        'jdbc': lambda: (execute_using_jdbc,
+          JdbcQueryExecOptions(self.iterations,
+          impalad=choice(self.TARGET_IMPALADS))),
     } [executor_name]()
     return query_options
 
@@ -202,7 +207,8 @@ class WorkloadRunner(object):
                                  skip_unknown_sections=True)
       test_name = re.sub('/', '.', query_file_name.split('.')[0])[1:]
       for section in sections:
-        query_map[test_name].append((section['QUERY_NAME'], section['QUERY']))
+        query_map[test_name].append((section['QUERY_NAME'],
+                                     (section['QUERY'], section['RESULTS'])))
     return query_map
 
   def execute_queries(self, query_map, workload, scale_factor, query_names,
@@ -216,7 +222,10 @@ class WorkloadRunner(object):
     file_format, data_group, codec, compression_type = [test_vector.file_format,
         test_vector.dataset, test_vector.compression_codec, test_vector.compression_type]
 
-    executor_name = 'impala_beeswax' if self.beeswax else 'UNKNOWN'
+    executor_name = self.client_type
+    # We want to indicate this is IMPALA beeswax (currently dont' support hive beeswax)
+    executor_name = 'impala_beeswax' if executor_name == 'beeswax' else executor_name
+
     query_name_filter = None
     if query_names:
       query_name_filter = [name.lower() for name in query_names.split(',')]
@@ -224,7 +233,8 @@ class WorkloadRunner(object):
     LOG.info("Running Test Vector - File Format: %s Compression: %s / %s" %\
         (file_format, codec, compression_type))
     for test_name in query_map.keys():
-      for query_name, query in query_map[test_name]:
+      for query_name, query_and_expected_result in query_map[test_name]:
+        query, results = query_and_expected_result
         if not query_name:
           query_name = query
         if query_name_filter and (query_name.lower() not in query_name_filter):
@@ -247,6 +257,19 @@ class WorkloadRunner(object):
 
           execution_result = self.run_query(executor_name, query_string,
                                             self.prime_cache, stop_on_query_error)
+
+          # Don't verify insert results and allow user to continue on error if there is
+          # a verification failure
+          if execution_result is not None and\
+             self.verify_results and 'insert' not in query.lower():
+            try:
+              verify_results(results.split('\n'), execution_result.data,
+                             contains_order_by(query))
+            except AssertionError, e:
+              if stop_on_query_error:
+                raise
+              LOG.error(e)
+
           self.__summary += "%s\n" % execution_result
 
         hive_execution_result = QueryExecutionResult()

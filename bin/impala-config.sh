@@ -59,6 +59,7 @@ export IMPALA_MONGOOSE_VERSION=3.3
 
 export IMPALA_HADOOP_VERSION=2.0.0-cdh4.1.0
 export IMPALA_HIVE_VERSION=0.9.0-cdh4.1.0
+export IMPALA_HIVE_JDBC_VERSION=0.10.0-cdh4.2.0
 export IMPALA_HBASE_VERSION=0.92.1-cdh4.1.0
 export IMPALA_THRIFT_VERSION=0.9.0
 
@@ -77,6 +78,8 @@ export PATH=$HADOOP_HOME/bin:$PATH
 export HIVE_HOME=$IMPALA_HOME/thirdparty/hive-${IMPALA_HIVE_VERSION}/
 export PATH=$HIVE_HOME/bin:$PATH
 export HIVE_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
+export HIVE_JDBC_DRIVER_CLASSPATH=${HIVE_JDBC_DRIVER_CLASSPATH-\
+$IMPALA_HOME/thirdparty/hive-${IMPALA_HIVE_JDBC_VERSION}/lib/*}
 
 ### Hive looks for jar files in a single directory from HIVE_AUX_JARS_PATH plus
 ### any jars in AUX_CLASSPATH. (Or a list of jars in HIVE_AUX_JARS_PATH.)
@@ -124,7 +127,6 @@ CLASSPATH=$IMPALA_FE_DIR/target/dependency:$CLASSPATH
 CLASSPATH=$IMPALA_FE_DIR/target/classes:$CLASSPATH
 CLASSPATH=$IMPALA_FE_DIR/src/test/resources:$CLASSPATH
 CLASSPATH=$HADOOP_LZO/build/hadoop-lzo-0.4.15.jar:$CLASSPATH
-
 export CLASSPATH
 
 echo "IMPALA_HOME            = $IMPALA_HOME"

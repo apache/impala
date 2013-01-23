@@ -1,0 +1,260 @@
+// Copyright 2012 Cloudera Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package com.cloudera.impala.testutil;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.Enumeration;
+
+import org.apache.log4j.Appender;
+import org.apache.log4j.ConsoleAppender;
+import org.apache.log4j.Logger;
+import org.apache.log4j.PatternLayout;
+import org.apache.commons.cli.BasicParser;
+import org.apache.commons.cli.CommandLine;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
+
+import com.google.common.base.Joiner;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
+
+/**
+ * Basic tool for executing queries and and displaying results using Impala
+ * over JDBC.
+ */
+public class ImpalaJdbcClient {
+  private static final Logger LOG = Logger.getLogger(ImpalaJdbcClient.class);
+
+  // Note: The older Hive Server JDBC driver (Hive .9 and earlier) is named similarly:
+  // "org.apache.hadoop.hive.jdbc.HiveDriver". However, Impala currently only supports
+  // the Hive Server 2 JDBC driver (Hive .10 and later).
+  private final static String HIVE_SERVER2_DRIVER_NAME =
+      "org.apache.hive.jdbc.HiveDriver";
+
+  private final String driverName;
+  private final String connString;
+  private Connection conn;
+  private Statement stmt;
+
+  private ImpalaJdbcClient(String driverName, String connString) {
+    this.driverName = driverName;
+    this.connString = connString;
+  }
+
+  public void connect() throws ClassNotFoundException, SQLException {
+    LOG.info("Using JDBC Driver Name: " + driverName);
+    LOG.info("Connecting to: " + connString);
+
+    // Make sure the driver can be found, throws a ClassNotFoundException if
+    // it is not available.
+    Class.forName(driverName);
+    conn = DriverManager.getConnection(connString, "", "");
+    stmt = conn.createStatement();
+  }
+
+  /*
+   * Closes the internal Statement and Connection objects. If they are already closed
+   * this is a no-op.
+   */
+  public void close() throws SQLException {
+    if (stmt != null) {
+      stmt.close();
+    }
+
+    if (conn != null) {
+      conn.close();
+    }
+  }
+
+  /*
+   * Executes the given query and returns the ResultSet. Will re-open the Statement
+   * if needed.
+   */
+  public ResultSet execQuery(String query) throws SQLException {
+    if (conn == null) {
+      throw new RuntimeException("Connection not initialized.");
+    } else if (conn.isClosed()) {
+      throw new RuntimeException("Connection not open.");
+    }
+    Preconditions.checkNotNull(stmt);
+
+    // Re-open if the statement if it has been closed.
+    if (stmt.isClosed()) {
+      stmt = conn.createStatement();
+    }
+
+    LOG.info("Executing: " + query);
+    return stmt.executeQuery(query);
+  }
+
+  public Connection getConnection() {
+    return conn;
+  }
+
+  public Statement getStatement() {
+    return stmt;
+  }
+
+  public static ImpalaJdbcClient createClientUsingHiveJdbcDriver(String connString) {
+    return new ImpalaJdbcClient(HIVE_SERVER2_DRIVER_NAME, connString);
+  }
+
+  /**
+   * Used to store the execution options passed via command line
+   */
+  private static class ClientExecOptions {
+    private final String connStr;
+    private final String query;
+
+    public ClientExecOptions(String connStr, String query) {
+      this.connStr = connStr;
+      this.query = query;
+    }
+
+    public String getQuery() {
+      return query;
+    }
+
+    public String getConnStr() {
+      return connStr;
+    }
+  }
+
+  /**
+   * Parses command line options
+   */
+  private static ClientExecOptions parseOptions(String [] args) throws ParseException {
+    Options options = new Options();
+    options.addOption("i", true, "host:port of target machine impalad is listening on");
+    options.addOption("c", true,
+        "Full connection string to use. Overrides host/port value");
+    options.addOption("q", true, "Query String");
+    options.addOption("help", false, "Help");
+
+    BasicParser optionParser = new BasicParser();
+    CommandLine cmdArgs = optionParser.parse(options, args);
+
+    String connStr = cmdArgs.getOptionValue("c", null);
+
+    // If the user didn't specify a custom connection string, build a connection
+    // string using HiveServer 2 JDBC driver and no security.
+    if (connStr == null) {
+      String hostPort = cmdArgs.getOptionValue("i", "localhost:21050");
+      connStr = "jdbc:hive2://" + hostPort + "/;auth=noSasl";
+    }
+
+    String query = cmdArgs.getOptionValue("q");
+    if (query == null) {
+      LOG.error("Must specify a query to execute.");
+      LOG.error("Usage: " + options.toString());
+      System.exit(1);
+    }
+
+    return new ClientExecOptions(connStr, query);
+  }
+
+  private static String formatColumnValue(String colVal, String columnType)
+      throws NumberFormatException {
+    columnType = columnType.toLowerCase();
+    if (colVal == null) {
+      return columnType.equals("string") ? "'NULL'" : "NULL";
+    }
+
+    if (columnType.equals("string")) {
+      return "'" + colVal + "'";
+    } else if (columnType.equals("float") || columnType.equals("double")) {
+      // Fixup formatting of float/double values to match the expected test
+      // results
+      DecimalFormat df = new DecimalFormat("#.##################################");
+      double doubleVal = Double.parseDouble(colVal);
+      return df.format(doubleVal);
+    }
+    return colVal;
+  }
+
+  /**
+   * Executes one or more queries using the given ImpalaJdbcClient. Multiple queries
+   * should be seperated using semi-colons.
+   * @throws SQLException
+   */
+  private static void execQuery(ImpalaJdbcClient client, String queryString)
+      throws SQLException, NumberFormatException {
+
+    String[] queries = queryString.trim().split(";");
+    for (String query: queries) {
+      long startTime = System.currentTimeMillis();
+      ResultSet res = client.execQuery(query);
+      ResultSetMetaData meta = res.getMetaData();
+      ArrayList<String> arrayList = Lists.newArrayList();
+
+      // This token (and the [END] token) are used to help parsing the result output
+      // for test verification purposes.
+      LOG.info("----[START]----");
+      int rowCount = 0;
+      while (res.next()) {
+        arrayList.clear();
+        for (int i = 1; i <= meta.getColumnCount(); ++i) {
+          // Format the value based on the column type
+          String colVal = formatColumnValue(res.getString(i), meta.getColumnTypeName(i));
+          arrayList.add(colVal);
+        }
+        LOG.info(Joiner.on(",").join(arrayList));
+        ++rowCount;
+      }
+      LOG.info("----[END]----");
+      long endTime = System.currentTimeMillis();
+      float seconds = (endTime - startTime) / 1000F;
+      LOG.info("Returned " + rowCount + " row(s) in " + seconds + "s");
+
+      // TODO: To work around a JDBC driver issue (CDH-10035), make sure the Statement
+      // is closed after every query.
+      client.getStatement().close();
+    }
+  }
+
+  /**
+   * Executes a query over JDBC. Multiple queries can be passed in if they are semi-colon
+   * separated.
+   */
+  public static void main(String[] args) throws SQLException, ClassNotFoundException,
+        ParseException {
+    ClientExecOptions execOptions = parseOptions(args);
+
+    // Remove all prefixes from the logging output to make it easier to parse and disable
+    // the root logger from spewing anything. This is done to make it easier to parse
+    // the output.
+    PatternLayout layout = new PatternLayout("%m%n");
+    ConsoleAppender consoleAppender = new ConsoleAppender(layout);
+    LOG.addAppender(consoleAppender);
+    LOG.setAdditivity(false);
+
+    ImpalaJdbcClient client =
+      ImpalaJdbcClient.createClientUsingHiveJdbcDriver(execOptions.getConnStr());
+
+    try {
+      client.connect();
+      execQuery(client, execOptions.getQuery());
+    } finally {
+      client.close();
+    }
+  }
+}

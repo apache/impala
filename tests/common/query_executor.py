@@ -16,6 +16,7 @@
 # execution_result qe.get_results()
 #
 import logging
+import os
 import math
 import re
 import threading
@@ -66,6 +67,15 @@ class ImpalaQueryExecOptions(QueryExecOptions):
   def __init__(self, iterations, **kwargs):
     QueryExecOptions.__init__(self, iterations, **kwargs)
     self.impalad = self.options.get('impalad', 'localhost:21000')
+
+
+class JdbcQueryExecOptions(QueryExecOptions):
+  def __init__(self, iterations, **kwargs):
+    QueryExecOptions.__init__(self, iterations, **kwargs)
+    self.impalad = self.options.get('impalad', 'localhost:21050')
+    self.jdbc_client_cmd = \
+        os.path.join(os.environ['IMPALA_HOME'], 'bin/run-jdbc-client.sh')
+    self.jdbc_client_cmd += ' -i "%s"' % self.impalad
 
 
 # constructs exec_options for query execution through beeswax
@@ -124,7 +134,7 @@ class QueryExecutor(threading.Thread):
     LOG.debug('Result:\n  -> %s\n' % self.execution_result)
 
   def success(self):
-    return self.execution_result.success
+    return self.execution_result is not None and self.execution_result.success
 
   def run(self):
     """ Runs the actual query """
@@ -215,10 +225,70 @@ def execute_using_hive(query, query_options):
   """Executes a query via hive"""
   query_string = (query + ';') * query_options.iterations
   cmd = query_options.hive_cmd + " \"%s\"" % query_string
-  return run_query_capture_results(cmd, match_hive_query_results,
+  return run_query_capture_results(cmd, parse_hive_query_results,
                                    query_options.iterations, exit_on_error=False)
 
-def run_query_capture_results(cmd, query_result_match_function, iterations,
+def parse_hive_query_results(stdout, stderr, iterations):
+  """
+  Parse query execution details for hive.
+
+  Parses the query execution details (avg time, stddev) from the runquery output.
+  Returns a QueryExecutionResult object.
+  """
+  run_success = False
+  execution_times = list()
+  std_dev = None
+  for line in stderr.split('\n'):
+    match = re.search(hive_result_regex, line)
+    if match:
+      execution_times.append(float(('%s.%s') % (match.group(1), match.group(2))))
+  # TODO: Get hive results
+  return create_execution_result(execution_times, iterations, None)
+
+def execute_using_jdbc(query, query_options):
+  """Executes a query using JDBC"""
+  query_string = (query + ';') * query_options.iterations
+  cmd = query_options.jdbc_client_cmd + " -q \"%s\"" % query_string
+  return run_query_capture_results(cmd, parse_jdbc_query_results,
+      query_options.iterations, exit_on_error=False)
+
+def parse_jdbc_query_results(stdout, stderr, iterations):
+  """
+  Parse query execution results for the Impala JDBC client
+
+  Parses the query execution details (avg time, stddev) from the output of the Impala
+  JDBC test client.
+  """
+  run_success = False
+  execution_times = list()
+  std_dev = None
+  jdbc_result_regex = 'row\(s\) in (\d*).(\d*)s'
+  for line in stdout.split('\n'):
+    match = re.search(jdbc_result_regex, line)
+    if match:
+      execution_times.append(float(('%s.%s') % (match.group(1), match.group(2))))
+
+  result_data = re.findall(r'\[START\]----\n(.*?)\n----\[END\]', stdout, re.DOTALL)
+  return create_execution_result(execution_times, iterations, result_data)
+
+def create_execution_result(execution_times, iterations, result_data):
+  execution_result = QueryExecutionResult()
+  execution_result.success = False
+
+  if result_data:
+    # Just print the first result returned. There may be additional results if
+    # there were multiple iterations executed.
+    LOG.debug('Data:\n%s\n' % result_data[0])
+    execution_result.data = result_data[0].split('\n')
+
+  if len(execution_times) == iterations:
+    execution_result.avg_time = calculate_avg(execution_times)
+    if iterations > 1:
+      execution_result.std_dev = calculate_stddev(execution_times)
+    execution_result.success = True
+  return execution_result
+
+def run_query_capture_results(cmd, query_result_parse_function, iterations,
                               exit_on_error):
   """
   Runs the given query command and returns the execution result.
@@ -239,32 +309,10 @@ def run_query_capture_results(cmd, query_result_match_function, iterations,
                 % (rc, stderr, stdout)))
     return execution_result
   # The command completed
-  execution_result = query_result_match_function(stdout, stderr, iterations)
+  execution_result = query_result_parse_function(stdout, stderr, iterations)
   if not execution_result.success:
     LOG.error("Query did not run successfully")
     LOG.error("STDERR:\n%s\nSTDOUT:\n%s" % (stderr, stdout))
-  return execution_result
-
-def match_hive_query_results(stdout, stderr, iterations):
-  """
-  Parse query execution details for hive.
-
-  Parses the query execution details (avg time, stddev) from the runquery output.
-  Returns a QueryExecutionResult object.
-  """
-  run_success = False
-  execution_times = list()
-  std_dev = None
-  match = re.search(hive_result_regex, stderr)
-  if match:
-    execution_times.append(float(('%s.%s') % (match.group(1), match.group(2))))
-
-  execution_result = QueryExecutionResult()
-  if len(execution_times) == iterations:
-    execution_result.avg_time = calculate_avg(execution_times)
-    if iterations > 1:
-      execution_result.std_dev = calculate_stddev(execution_times)
-    execution_result.success = True
   return execution_result
 
 # Util functions

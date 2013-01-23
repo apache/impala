@@ -72,13 +72,16 @@ parser.add_option("--table_formats", dest="table_formats", default=None, help=\
                   "table formats. Ex. --table_formats=seq/snap/block,text/none")
 parser.add_option("--skip_impala", dest="skip_impala", action="store_true",
                   default= False, help="If set, queries will only run against Hive.")
-parser.add_option("--beeswax", dest="beeswax", action="store_true", default=True,
-                  help="If set, Impala queries will use the beeswax interface.")
+
 parser.add_option("--use_kerberos", dest="use_kerberos", action="store_true",
                   default=False, help="If set, enables talking to a kerberized impalad")
 parser.add_option("--continue_on_query_error", dest="continue_on_query_error",
                   action="store_true", default=False, help="If set, continue execution "\
                   "on each query error.")
+parser.add_option("-V", "--verify_results", dest="verify_results", action="store_true",
+                  default=False, help="If set, verifies query results")
+parser.add_option("-c", "--client_type", dest="client_type", default='beeswax',
+                  help="Client type. Valid options are 'beeswax' or 'jdbc'")
 
 # These options are used for configuring failure testing
 parser.add_option("--failure_frequency", type="int", dest="failure_frequency", default=0,
@@ -197,8 +200,13 @@ if __name__ == "__main__":
       print 'The sasl module is needed to query a kerberized impalad'
       sys.exit(1)
 
+  VALID_CLIENT_TYPES = ['beeswax', 'jdbc']
+  if options.client_type not in VALID_CLIENT_TYPES:
+    LOG.error("Invalid client type %s" % options.client_type)
+    sys.exit(1);
+
   workload_runner = WorkloadRunner(
-    beeswax=options.beeswax,
+    client_type=options.client_type,
     hive_cmd=options.hive_cmd,
     impalad=options.impalad,
     iterations=options.iterations,
@@ -209,7 +217,8 @@ if __name__ == "__main__":
     profiler=options.profiler,
     verbose=options.verbose,
     prime_cache=options.prime_cache,
-    use_kerberos=options.use_kerberos)
+    use_kerberos=options.use_kerberos,
+    verify_results=options.verify_results)
 
   failure_injector = None
   if options.failure_frequency > 0:
