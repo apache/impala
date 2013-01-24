@@ -63,6 +63,8 @@ class BackendClientCache {
 
   std::string DebugString();
 
+  void TestShutdown();
+
  private:
   int max_clients_;
   int max_clients_per_backend_;

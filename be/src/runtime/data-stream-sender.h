@@ -38,14 +38,17 @@ class TPlanFragmentDestination;
 // Row batch data is routed to destinations based on the provided
 // partitioning specification.
 // *Not* thread-safe.
+//
+// TODO: capture stats that describe distribution of rows/data volume
+// across channels.
 class DataStreamSender : public DataSink {
  public:
   // Construct a sender according to the output specification (sink),
   // sending to the given destinations.
   // Per_channel_buffer_size is the buffer size allocated to each channel
   // and is specified in bytes.
-  // NOTE: This can only do broadcasting right now
-  // (sink.output_partition.type == UNPARTITIONED)
+  // The RowDescriptor must live until Close() is called.
+  // NOTE: supported partition types are UNPARTITIONED (broadcast) and HASH_PARTITIONED
   DataStreamSender(ObjectPool* pool,
     const RowDescriptor& row_desc, const TDataStreamSink& sink,
     const std::vector<TPlanFragmentDestination>& destinations,
@@ -76,7 +79,7 @@ class DataStreamSender : public DataSink {
   class Channel;
 
   ObjectPool* pool_;
-
+  const RowDescriptor& row_desc_;
   bool broadcast_;  // if true, send all rows on all channels
 
   // serialized batches for broadcasting; we need two so we can write
@@ -85,7 +88,7 @@ class DataStreamSender : public DataSink {
   TRowBatch thrift_batch2_;
   TRowBatch* current_thrift_batch_;  // the next one to fill in Send()
 
-  Expr* partition_expr_;  // computes per-row partitioning value
+  std::vector<Expr*> partition_exprs_;  // compute per-row partition values
   std::vector<Channel*> channels_;
 
   RuntimeProfile* profile_; // Allocated from pool_

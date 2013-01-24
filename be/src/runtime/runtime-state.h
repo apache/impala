@@ -91,6 +91,7 @@ class RuntimeState {
   DataStreamMgr* stream_mgr() { return exec_env_->stream_mgr(); }
   HdfsFsCache* fs_cache() { return exec_env_->fs_cache(); }
   HBaseTableCache* htable_cache() { return exec_env_->htable_cache(); }
+  BackendClientCache* client_cache() { return exec_env_->client_cache(); }
   DiskIoMgr* io_mgr() { return exec_env_->disk_io_mgr(); }
 
   FileMoveMap* hdfs_files_to_move() { return &hdfs_files_to_move_; }

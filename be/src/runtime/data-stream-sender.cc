@@ -25,6 +25,8 @@
 #include "runtime/tuple-row.h"
 #include "runtime/row-batch.h"
 #include "runtime/raw-value.h"
+#include "runtime/runtime-state.h"
+#include "runtime/client-cache.h"
 #include "util/debug-util.h"
 #include "util/thrift-client.h"
 
@@ -58,6 +60,8 @@ class DataStreamSender::Channel {
           const THostPort& destination, const TUniqueId& fragment_instance_id, 
           PlanNodeId dest_node_id, int buffer_size)
     : parent_(parent),
+      client_(NULL),
+      client_cache_(NULL),
       row_desc_(row_desc),
       ipaddress_(destination.ipaddress),
       port_(destination.port),
@@ -70,9 +74,15 @@ class DataStreamSender::Channel {
     batch_.reset(new RowBatch(row_desc, capacity));
   }
 
+  ~Channel() {
+    if (client_cache_ != NULL && client_ != NULL) {
+      client_cache_->ReleaseClient(client_);
+    }
+  }
+
   // Initialize channel.
   // Returns OK if successful, error indication otherwise.
-  Status Init();
+  Status Init(RuntimeState* state);
 
   // Copies a single row into this channel's output buffer and flushes buffer
   // if it reaches capacity.
@@ -97,8 +107,8 @@ class DataStreamSender::Channel {
  private:
   DataStreamSender* parent_;
 
-  typedef ThriftClient<ImpalaInternalServiceClient> BackendThriftClient;
-  scoped_ptr<BackendThriftClient> client_;
+  ImpalaInternalServiceClient* client_;
+  BackendClientCache* client_cache_;  // the one to which to return client_
 
   const RowDescriptor& row_desc_;
   string ipaddress_;
@@ -128,19 +138,9 @@ class DataStreamSender::Channel {
   Status SendCurrentBatch();
 };
 
-Status DataStreamSender::Channel::Init() {
-  client_.reset(new BackendThriftClient(ipaddress_, port_));
-
-  try {
-    client_->Open();
-  } catch (TTransportException& e) {
-    stringstream msg;
-    msg << "couldn't create ImpalaInternalService client for " << ipaddress_ << ":"
-        << port_ << ":\n" << e.what();
-    return Status(msg.str());
-  }
-
-  return Status::OK;
+Status DataStreamSender::Channel::Init(RuntimeState* state) {
+  client_cache_ = state->client_cache();
+  return client_cache_->GetClient(make_pair(ipaddress_, port_), &client_);
 }
 
 Status DataStreamSender::Channel::SendBatch(TRowBatch* batch) {
@@ -169,7 +169,7 @@ void DataStreamSender::Channel::TransmitData() {
     params.__set_eos(false);
 
     TTransmitDataResult res;
-    client_->iface()->TransmitData(res, params);
+    client_->TransmitData(res, params);
     if (res.status.status_code != TStatusCode::OK) {
       rpc_status_ = res.status;
     } else {
@@ -202,6 +202,7 @@ Status DataStreamSender::Channel::AddRow(TupleRow* row) {
   for (int i = 0; i < descs.size(); ++i) {
     dest->SetTuple(i, row->GetTuple(i)->DeepCopy(*descs[i], batch_->tuple_data_pool()));
   }
+  batch_->CommitLastRow();
   return Status::OK;
 }
 
@@ -245,7 +246,7 @@ Status DataStreamSender::Channel::Close() {
     params.__set_eos(true);
     TTransmitDataResult res;
     VLOG_RPC << "calling TransmitData to close channel";
-    client_->iface()->TransmitData(res, params);
+    client_->TransmitData(res, params);
     return Status(res.status);
   } catch (TException& e) {
     stringstream msg;
@@ -261,17 +262,30 @@ DataStreamSender::DataStreamSender(ObjectPool* pool,
     const vector<TPlanFragmentDestination>& destinations,
     int per_channel_buffer_size)
   : pool_(pool), 
+    row_desc_(row_desc),
     current_thrift_batch_(&thrift_batch1_),
-    profile_(NULL) {
+    profile_(NULL),
+    serialize_batch_timer_(NULL),
+    thrift_transmit_timer_(NULL),
+    bytes_sent_counter_(NULL) {
   DCHECK_GT(destinations.size(), 0);
-  DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED);
-  broadcast_ = true;
+  DCHECK(sink.output_partition.type == TPartitionType::UNPARTITIONED
+      || sink.output_partition.type == TPartitionType::HASH_PARTITIONED);
+  broadcast_ = sink.output_partition.type == TPartitionType::UNPARTITIONED;
   // TODO: use something like google3's linked_ptr here (scoped_ptr isn't copyable)
   for (int i = 0; i < destinations.size(); ++i) {
     channels_.push_back(
         new Channel(this, row_desc, destinations[i].server,
                     destinations[i].fragment_instance_id,
                     sink.dest_node_id, per_channel_buffer_size));
+  }
+
+  if (sink.output_partition.type == TPartitionType::HASH_PARTITIONED) {
+    // TODO: move this to Init()? would need to save 'sink' somewhere
+    Status status = 
+        Expr::CreateExprTrees(pool, sink.output_partition.partitioning_exprs,
+                              &partition_exprs_);
+    DCHECK(status.ok());
   }
 }
 
@@ -284,9 +298,11 @@ DataStreamSender::~DataStreamSender() {
 }
 
 Status DataStreamSender::Init(RuntimeState* state) {
+  DCHECK(state != NULL);
   for (int i = 0; i < channels_.size(); ++i) {
-    RETURN_IF_ERROR(channels_[i]->Init());
+    RETURN_IF_ERROR(channels_[i]->Init(state));
   }
+  RETURN_IF_ERROR(Expr::Prepare(partition_exprs_, state, row_desc_));
   
   profile_ = pool_->Add(new RuntimeProfile(pool_, "DataStreamSender"));
   bytes_sent_counter_ = 
@@ -318,12 +334,17 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
     current_thrift_batch_ =
         (current_thrift_batch_ == &thrift_batch1_ ? &thrift_batch2_ : &thrift_batch1_);
   } else {
-    // hash-partition batch's rows across channelS
+    // hash-partition batch's rows across channels
     int num_channels = channels_.size();
     for (int i = 0; i < batch->num_rows(); ++i) {
       TupleRow* row = batch->GetRow(i);
-      void* partition_val = partition_expr_->GetValue(row);
-      size_t hash_val = RawValue::GetHashValue(partition_val, partition_expr_->type());
+      size_t hash_val = 0;
+      for (vector<Expr*>::iterator expr = partition_exprs_.begin();
+           expr != partition_exprs_.end(); ++expr) {
+        void* partition_val = (*expr)->GetValue(row);
+        hash_val =
+            RawValue::GetHashValue(partition_val, (*expr)->type(), hash_val);
+      }
       RETURN_IF_ERROR(channels_[hash_val % num_channels]->AddRow(row));
     }
   }

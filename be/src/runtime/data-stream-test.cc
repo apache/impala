@@ -19,10 +19,13 @@
 #include "common/status.h"
 #include "codegen/llvm-codegen.h"
 #include "runtime/row-batch.h"
+#include "runtime/runtime-state.h"
 #include "runtime/data-stream-mgr.h"
 #include "runtime/data-stream-sender.h"
 #include "runtime/data-stream-recvr.h"
 #include "runtime/descriptors.h"
+#include "runtime/client-cache.h"
+#include "runtime/raw-value.h"
 #include "testutil/test-exec-env.h"
 #include "util/authorization.h"
 #include "util/cpu-info.h"
@@ -43,8 +46,7 @@ using namespace apache::thrift;
 using namespace apache::thrift::protocol;
 
 DEFINE_int32(port, 20001, "port on which to run Impala test backend");
-DEFINE_string(principal, "", "Kerberos principal");
-DEFINE_string(keytab_file, "", "Kerberos keytab");
+DECLARE_string(principal);
 
 namespace impala {
 
@@ -79,20 +81,51 @@ class ImpalaTestBackend : public ImpalaInternalServiceIf {
 
 class DataStreamTest : public testing::Test {
  protected:
-  DataStreamTest(): next_val_(0) {}
+  DataStreamTest()
+    : runtime_state_(TUniqueId(), TQueryOptions(), "", &exec_env_),
+      next_val_(0) {}
 
   virtual void SetUp() {
+    CreateRowDesc();
+    CreateRowBatch();
+
     next_instance_id_.lo = 0;
     next_instance_id_.hi = 0;
     stream_mgr_ = new DataStreamMgr();
-    sink_.dest_node_id = DEST_NODE_ID;
-    sink_.output_partition.type = TPartitionType::UNPARTITIONED;
+
+    broadcast_sink_.dest_node_id = DEST_NODE_ID;
+    broadcast_sink_.output_partition.type = TPartitionType::UNPARTITIONED;
+
+    hash_sink_.dest_node_id = DEST_NODE_ID;
+    hash_sink_.output_partition.type = TPartitionType::HASH_PARTITIONED;
+    // there's only one column to partition on
+    TExprNode expr_node;
+    expr_node.node_type = TExprNodeType::SLOT_REF;
+    expr_node.type = TPrimitiveType::BIGINT;
+    expr_node.num_children = 0;
+    TSlotRef slot_ref;
+    slot_ref.slot_id = 0;
+    expr_node.__set_slot_ref(slot_ref);
+    TExpr expr;
+    expr.nodes.push_back(expr_node);
+    hash_sink_.output_partition.__isset.partitioning_exprs = true;
+    hash_sink_.output_partition.partitioning_exprs.push_back(expr);
+
     // Ensure that individual sender info addresses don't change
     sender_info_.reserve(MAX_SENDERS);
     receiver_info_.reserve(MAX_RECEIVERS);
-    CreateRowDesc();
-    CreateRowBatch();
     StartBackend();
+  }
+
+  virtual void TearDown() {
+    exec_env_.client_cache()->TestShutdown();
+    StopBackend();
+  }
+
+  void Reset() {
+    sender_info_.clear();
+    receiver_info_.clear();
+    dest_.clear();
   }
 
   // We reserve contiguous memory for senders in SetUp. If a test uses more
@@ -108,6 +141,8 @@ class DataStreamTest : public testing::Test {
   ObjectPool obj_pool_;
   DescriptorTbl* desc_tbl_;
   const RowDescriptor* row_desc_;
+  ExecEnv exec_env_;
+  RuntimeState runtime_state_;
   TUniqueId next_instance_id_;
   string stmt_;
 
@@ -121,7 +156,8 @@ class DataStreamTest : public testing::Test {
   ThriftServer* server_;
 
   // sending node(s)
-  TDataStreamSink sink_;
+  TDataStreamSink broadcast_sink_;
+  TDataStreamSink hash_sink_;
   vector<TPlanFragmentDestination> dest_;
 
   struct SenderInfo {
@@ -134,12 +170,28 @@ class DataStreamTest : public testing::Test {
   vector<SenderInfo> sender_info_;
 
   struct ReceiverInfo {
+    TPartitionType::type stream_type;
+    int num_senders;
+    int receiver_num;
+
     thread* thread_handle;
     DataStreamRecvr* stream_recvr;
     Status status;
     int num_rows_received;
+    multiset<int64_t> data_values;
 
-    ReceiverInfo(): thread_handle(NULL), num_rows_received(0) {}
+    ReceiverInfo(TPartitionType::type stream_type, int num_senders, int receiver_num)
+      : stream_type(stream_type),
+        num_senders(num_senders),
+        receiver_num(receiver_num),
+        thread_handle(NULL),
+        stream_recvr(NULL),
+        num_rows_received(0) {}
+
+    ~ReceiverInfo() {
+      delete thread_handle;
+      delete stream_recvr;
+    }
   };
   vector<ReceiverInfo> receiver_info_;
 
@@ -176,6 +228,7 @@ class DataStreamTest : public testing::Test {
     slot_desc.__set_isMaterialized(true);
     thrift_desc_tbl.slotDescriptors.push_back(slot_desc);
     EXPECT_TRUE(DescriptorTbl::Create(&obj_pool_, thrift_desc_tbl, &desc_tbl_).ok());
+    runtime_state_.set_desc_tbl(desc_tbl_);
 
     vector<TTupleId> row_tids;
     row_tids.push_back(0);
@@ -208,61 +261,101 @@ class DataStreamTest : public testing::Test {
   }
 
   // Start receiver (expecting given number of senders) in separate thread.
-  void StartReceiver(int num_senders, int buffer_size, TUniqueId* out_id = NULL) {
+  void StartReceiver(TPartitionType::type stream_type, int num_senders, int receiver_num,
+                     int buffer_size, TUniqueId* out_id = NULL) {
+    VLOG_QUERY << "start receiver";
     RuntimeProfile* profile = 
         obj_pool_.Add(new RuntimeProfile(&obj_pool_, "TestReceiver"));
     TUniqueId instance_id;
     GetNextInstanceId(&instance_id);
-    receiver_info_.push_back(ReceiverInfo());
+    receiver_info_.push_back(ReceiverInfo(stream_type, num_senders, receiver_num));
     ReceiverInfo& info = receiver_info_.back();
     info.stream_recvr =
         stream_mgr_->CreateRecvr(
             *row_desc_, instance_id, DEST_NODE_ID, num_senders, buffer_size, profile);
     info.thread_handle =
-        new thread(&DataStreamTest::ReadStream, this, num_senders, &info);
+        new thread(&DataStreamTest::ReadStream, this, &info);
     if (out_id != NULL) *out_id = instance_id;
   }
 
   void JoinReceivers() {
+    VLOG_QUERY << "join receiver\n";
     for (int i = 0; i < receiver_info_.size(); ++i) {
       receiver_info_[i].thread_handle->join();
     }
   }
 
   // Deplete stream and print batches
-  void ReadStream(int num_senders, ReceiverInfo* info) {
+  void ReadStream(ReceiverInfo* info) {
     RowBatch* batch;
     VLOG_QUERY <<  "start reading";
     bool is_cancelled;
-    multiset<int64_t> data_values;
     while ((batch = info->stream_recvr->GetBatch(&is_cancelled)) != NULL
         && !is_cancelled) {
       VLOG_QUERY << "read batch #rows=" << (batch != NULL ? batch->num_rows() : 0);
-      info->num_rows_received += batch->num_rows();
       for (int i = 0; i < batch->num_rows(); ++i) {
         TupleRow* row = batch->GetRow(i);
-        data_values.insert(*static_cast<int64_t*>(row->GetTuple(0)->GetSlot(0)));
+        info->data_values.insert(*static_cast<int64_t*>(row->GetTuple(0)->GetSlot(0)));
       }
       usleep(100000);  // slow down receiver to exercise buffering logic
     }
     if (is_cancelled) VLOG_QUERY << "reader is cancelled";
     info->status = (is_cancelled ? Status::CANCELLED : Status::OK);
-
-    if (!is_cancelled) {
-      // check contents of batches
-      int64_t expected_val;
-      EXPECT_EQ(data_values.size(), NUM_BATCHES * BATCH_CAPACITY * num_senders);
-      int j = 0;
-      for (multiset<int64_t>::iterator i = data_values.begin(); i != data_values.end();
-           ++i, ++j) {
-        expected_val = j / num_senders;
-        EXPECT_EQ(expected_val, *i);
-      }
-    }
-
     VLOG_QUERY << "done reading";
   }
 
+  // Verify correctness of receivers' data values.
+  void CheckReceivers(TPartitionType::type stream_type, int num_senders) {
+    int64_t total = 0;
+    multiset<int64_t> all_data_values;
+    for (int i = 0; i < receiver_info_.size(); ++i) {
+      ReceiverInfo& info = receiver_info_[i];
+      EXPECT_TRUE(info.status.ok());
+      total += info.data_values.size();
+      DCHECK_EQ(info.stream_type, stream_type);
+      DCHECK_EQ(info.num_senders, num_senders);
+      if (stream_type == TPartitionType::UNPARTITIONED) {
+        EXPECT_EQ(
+            NUM_BATCHES * BATCH_CAPACITY * num_senders, info.data_values.size());
+      }
+      all_data_values.insert(info.data_values.begin(), info.data_values.end());
+
+      int k = 0;
+      for (multiset<int64_t>::iterator j = info.data_values.begin();
+           j != info.data_values.end(); ++j, ++k) {
+        if (stream_type == TPartitionType::UNPARTITIONED) {
+          // unpartitioned streams contain all values as many times as there are
+          // senders
+          EXPECT_EQ(k / num_senders, *j);
+        } else if (stream_type == TPartitionType::HASH_PARTITIONED) {
+          // hash-partitioned streams send values to the right partition
+          int64_t value = *j;
+          EXPECT_EQ(
+              RawValue::GetHashValue(&value, TYPE_BIGINT, 0) % receiver_info_.size(),
+              info.receiver_num);
+        }
+      }
+    }
+
+    if (stream_type == TPartitionType::HASH_PARTITIONED) {
+      EXPECT_EQ(NUM_BATCHES * BATCH_CAPACITY * num_senders, total);
+
+      int k = 0;
+      for (multiset<int64_t>::iterator j = all_data_values.begin();
+           j != all_data_values.end(); ++j, ++k) {
+        // each sender sent all values
+        EXPECT_EQ(k / num_senders, *j);
+        if (k/num_senders != *j) break;
+      }
+    }
+  }
+
+  void CheckSenders() {
+    for (int i = 0; i < sender_info_.size(); ++i) {
+      EXPECT_TRUE(sender_info_[i].status.ok());
+      EXPECT_GT(sender_info_[i].num_bytes_sent, 0);
+    }
+  }
 
   // Start backend in separate thread.
   void StartBackend() {
@@ -273,30 +366,38 @@ class DataStreamTest : public testing::Test {
   }
 
   void StopBackend() {
+    VLOG_QUERY << "stop backend\n";
     server_->StopForTesting();
     delete server_;
   }
 
-  void StartSender(int channel_buffer_size = 1024) {
+  void StartSender(TPartitionType::type partition_type = TPartitionType::UNPARTITIONED,
+                   int channel_buffer_size = 1024) {
+    VLOG_QUERY << "start sender\n";
     int num_senders = sender_info_.size();
     DCHECK_LT(num_senders, MAX_SENDERS);
     sender_info_.push_back(SenderInfo());
     SenderInfo& info = sender_info_.back();
     info.thread_handle =
-        new thread(&DataStreamTest::Sender, this, num_senders, channel_buffer_size);
+        new thread(&DataStreamTest::Sender, this, num_senders, channel_buffer_size,
+                   partition_type);
   }
 
   void JoinSenders() {
+    VLOG_QUERY << "join senders\n";
     for (int i = 0; i < sender_info_.size(); ++i) {
       sender_info_[i].thread_handle->join();
     }
   }
 
-  void Sender(int sender_num, int channel_buffer_size) {
+  void Sender(int sender_num, int channel_buffer_size,
+              TPartitionType::type partition_type) {
     VLOG_QUERY << "create sender " << sender_num;
+    const TDataStreamSink& sink =
+        (partition_type == TPartitionType::UNPARTITIONED ? broadcast_sink_ : hash_sink_);
     DataStreamSender sender(
-        &obj_pool_, *row_desc_, sink_, dest_, channel_buffer_size);
-    EXPECT_TRUE(sender.Init(NULL).ok());
+        &obj_pool_, *row_desc_, sink, dest_, channel_buffer_size);
+    EXPECT_TRUE(sender.Init(&runtime_state_).ok());
     scoped_ptr<RowBatch> batch(CreateRowBatch());
     SenderInfo& info = sender_info_[sender_num];
     int next_val = 0;
@@ -310,112 +411,24 @@ class DataStreamTest : public testing::Test {
     info.status = sender.Close(NULL);
     info.num_bytes_sent = sender.GetNumDataBytesSent();
   }
+
+  void TestStream(TPartitionType::type stream_type, int num_senders,
+                  int num_receivers, int buffer_size) {
+    LOG(INFO) << "Testing stream=" << stream_type << " #senders=" << num_senders
+              << " #receivers=" << num_receivers << " buffer_size=" << buffer_size;
+    Reset();
+    for (int i = 0; i < num_receivers; ++i) {
+      StartReceiver(stream_type, num_senders, i, buffer_size);
+    }
+    for (int i = 0; i < num_senders; ++i) {
+      StartSender(stream_type, buffer_size);
+    }
+    JoinSenders();
+    CheckSenders();
+    JoinReceivers();
+    CheckReceivers(stream_type, num_senders);
+  }
 };
-
-TEST_F(DataStreamTest, SingleSenderSmallBuffer) {
-  VLOG_QUERY << "start receiver\n";
-  StartReceiver(1, 1024);
-  VLOG_QUERY << "start sender\n";
-  StartSender();
-  VLOG_QUERY << "join senders\n";
-  JoinSenders();
-  EXPECT_TRUE(sender_info_[0].status.ok());
-  EXPECT_GT(sender_info_[0].num_bytes_sent, 0);
-  VLOG_QUERY << "join receiver\n";
-  JoinReceivers();
-  EXPECT_TRUE(receiver_info_[0].status.ok());
-  EXPECT_EQ(receiver_info_[0].num_rows_received, NUM_BATCHES * BATCH_CAPACITY);
-  VLOG_QUERY << "stop backend\n";
-  StopBackend();
-}
-
-TEST_F(DataStreamTest, MultipleReceiversSmallBuffer) {
-  TUniqueId instance1, instance2;
-  StartReceiver(1, 1024);
-  StartReceiver(1, 1024);
-  StartSender();
-  VLOG_QUERY << "join senders\n";
-  JoinSenders();
-  EXPECT_TRUE(sender_info_[0].status.ok());
-  EXPECT_GT(sender_info_[0].num_bytes_sent, 0);
-  VLOG_QUERY << "join receiver\n";
-  JoinReceivers();
-  EXPECT_TRUE(receiver_info_[0].status.ok());
-  EXPECT_EQ(receiver_info_[0].num_rows_received, NUM_BATCHES * BATCH_CAPACITY);
-  EXPECT_TRUE(receiver_info_[1].status.ok());
-  EXPECT_EQ(receiver_info_[1].num_rows_received, NUM_BATCHES * BATCH_CAPACITY);
-  VLOG_QUERY << "stop backend\n";
-  StopBackend();
-}
-
-TEST_F(DataStreamTest, SingleSenderLargeBuffer) {
-  VLOG_QUERY << "start receiver\n";
-  StartReceiver(1, 1024 * 1024);
-  VLOG_QUERY << "start sender\n";
-  StartSender();
-  VLOG_QUERY << "join senders\n";
-  JoinSenders();
-  EXPECT_TRUE(sender_info_[0].status.ok());
-  EXPECT_GT(sender_info_[0].num_bytes_sent, 0);
-  VLOG_QUERY << "join receiver\n";
-  JoinReceivers();
-  EXPECT_TRUE(receiver_info_[0].status.ok());
-  EXPECT_EQ(receiver_info_[0].num_rows_received, NUM_BATCHES * BATCH_CAPACITY);
-  VLOG_QUERY << "stop backend\n";
-  StopBackend();
-}
-
-TEST_F(DataStreamTest, MultipleSendersSmallBuffer) {
-  VLOG_QUERY << "start receiver\n";
-  StartReceiver(4, 4 * 1024);
-  VLOG_QUERY << "start senders\n";
-  StartSender();
-  StartSender();
-  StartSender();
-  StartSender();
-  VLOG_QUERY << "join senders\n";
-  JoinSenders();
-  EXPECT_TRUE(sender_info_[0].status.ok());
-  EXPECT_GT(sender_info_[0].num_bytes_sent, 0);
-  EXPECT_TRUE(sender_info_[1].status.ok());
-  EXPECT_GT(sender_info_[1].num_bytes_sent, 0);
-  EXPECT_TRUE(sender_info_[2].status.ok());
-  EXPECT_GT(sender_info_[2].num_bytes_sent, 0);
-  EXPECT_TRUE(sender_info_[3].status.ok());
-  EXPECT_GT(sender_info_[3].num_bytes_sent, 0);
-  VLOG_QUERY << "join receiver\n";
-  JoinReceivers();
-  EXPECT_TRUE(receiver_info_[0].status.ok());
-  EXPECT_EQ(receiver_info_[0].num_rows_received, 4 * NUM_BATCHES * BATCH_CAPACITY);
-  VLOG_QUERY << "stop backend\n";
-  StopBackend();
-}
-
-TEST_F(DataStreamTest, MultipleSendersLargeBuffer) {
-  VLOG_QUERY << "start receiver\n";
-  StartReceiver(4, 4 * 1024 * 1024);
-  VLOG_QUERY << "start senders\n";
-  StartSender();
-  StartSender();
-  StartSender();
-  StartSender();
-  VLOG_QUERY << "join senders\n";
-  JoinSenders();
-  EXPECT_TRUE(sender_info_[0].status.ok());
-  EXPECT_GT(sender_info_[0].num_bytes_sent, 0);
-  EXPECT_TRUE(sender_info_[1].status.ok());
-  EXPECT_GT(sender_info_[1].num_bytes_sent, 0);
-  EXPECT_TRUE(sender_info_[2].status.ok());
-  EXPECT_GT(sender_info_[2].num_bytes_sent, 0);
-  EXPECT_TRUE(sender_info_[3].status.ok());
-  EXPECT_GT(sender_info_[3].num_bytes_sent, 0);
-  VLOG_QUERY << "join receiver\n";
-  JoinReceivers();
-  EXPECT_TRUE(receiver_info_[0].status.ok());
-  EXPECT_EQ(receiver_info_[0].num_rows_received, 4 * NUM_BATCHES * BATCH_CAPACITY);
-  VLOG_QUERY << "stop backend\n";
-  StopBackend();
-}
 
 TEST_F(DataStreamTest, UnknownSenderSmallResult) {
   // starting a sender w/o a corresponding receiver should result in an error
@@ -423,11 +436,10 @@ TEST_F(DataStreamTest, UnknownSenderSmallResult) {
   // case 1: entire query result fits in single buffer, close() returns error status
   TUniqueId dummy_id;
   GetNextInstanceId(&dummy_id);
-  StartSender(TOTAL_DATA_SIZE + 1024);
+  StartSender(TPartitionType::UNPARTITIONED, TOTAL_DATA_SIZE + 1024);
   JoinSenders();
   EXPECT_FALSE(sender_info_[0].status.ok());
   EXPECT_EQ(sender_info_[0].num_bytes_sent, 0);
-  StopBackend();
 }
 
 TEST_F(DataStreamTest, UnknownSenderLargeResult) {
@@ -438,21 +450,36 @@ TEST_F(DataStreamTest, UnknownSenderLargeResult) {
   JoinSenders();
   EXPECT_FALSE(sender_info_[0].status.ok());
   EXPECT_EQ(sender_info_[0].num_bytes_sent, 0);
-  StopBackend();
 }
 
 TEST_F(DataStreamTest, Cancel) {
   TUniqueId instance_id;
-  StartReceiver(1, 1024, &instance_id);
+  StartReceiver(TPartitionType::UNPARTITIONED, 1, 1, 1024, &instance_id);
   stream_mgr_->Cancel(instance_id);
   JoinReceivers();
   EXPECT_TRUE(receiver_info_[0].status.IsCancelled());
-  StopBackend();
+}
+
+TEST_F(DataStreamTest, BasicTest) {
+  // TODO: also test that all client connections have been returned
+  TPartitionType::type stream_types[] =
+      {TPartitionType::UNPARTITIONED, TPartitionType::HASH_PARTITIONED};
+  int sender_nums[] = {1, 4};
+  int receiver_nums[] = {1, 4};
+  int buffer_sizes[] = {1024, 1024 * 1024};
+  for (int i = 0; i < sizeof(stream_types) / sizeof(*stream_types); ++i) {
+    for (int j = 0; j < sizeof(sender_nums) / sizeof(int); ++j) {
+      for (int k = 0; k < sizeof(receiver_nums) / sizeof(int); ++k) {
+        for (int l = 0; l < sizeof(buffer_sizes) / sizeof(int); ++l) {
+          TestStream(stream_types[i], sender_nums[j], receiver_nums[k],
+                     buffer_sizes[l]);
+        }
+      }
+    }
+  }
 }
 
 // TODO: more tests:
-// - TEST_F(DataStreamTest, SingleSenderMultipleReceivers)
-// - TEST_F(DataStreamTest, MultipleSendersMultipleReceivers)
 // - test case for transmission error in last batch
 // - receivers getting created concurrently
 

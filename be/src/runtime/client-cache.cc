@@ -120,4 +120,19 @@ string BackendClientCache::DebugString() {
   return out.str();
 }
 
+void BackendClientCache::TestShutdown() {
+  vector<pair<string, int> > hostports;
+  {
+    lock_guard<mutex> l(lock_);
+    for (ClientCache::iterator i = client_cache_.begin(); i != client_cache_.end();
+         ++i) {
+      hostports.push_back(i->first);
+    }
+  }
+
+  for (int i = 0; i < hostports.size(); ++i) {
+    CloseConnections(hostports[i]);
+  }
+}
+
 }
