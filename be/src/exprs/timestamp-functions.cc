@@ -369,7 +369,7 @@ void* TimestampFunctions::DateDiff(Expr* e, TupleRow* row) {
   if (tv1->date().is_special()) return NULL;
   if (tv2->date().is_special()) return NULL;
 
-  e->result_.int_val = (tv2->date() - tv1->date()).days();
+  e->result_.int_val = (tv1->date() - tv2->date()).days();
   return &e->result_.int_val;
 }
 
