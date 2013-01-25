@@ -27,7 +27,6 @@ using namespace std;
 using namespace boost;
 using namespace impala;
 
-//TODO: Decompressors should log their errors.
 GzipDecompressor::GzipDecompressor(MemPool* mem_pool, bool reuse_buffer)
   : Codec(mem_pool, reuse_buffer) {
   bzero(&stream_, sizeof(stream_));
@@ -87,7 +86,6 @@ Status GzipDecompressor::ProcessBlock(int input_length, uint8_t* input,
         }
         out_buffer_ = temp_memory_pool_.Allocate(buffer_length_);
         if (inflateReset(&stream_) != Z_OK) {
-          DCHECK(false);
           return Status("zlib inflateEnd failed: " + string(stream_.msg));
         }
         continue;
@@ -96,7 +94,6 @@ Status GzipDecompressor::ProcessBlock(int input_length, uint8_t* input,
     }
   }
   if (inflateReset(&stream_) != Z_OK) {
-          DCHECK(false);
     return Status("zlib inflateEnd failed: " + string(stream_.msg));
   }
 
@@ -204,57 +201,121 @@ SnappyBlockDecompressor::SnappyBlockDecompressor(MemPool* mem_pool, bool reuse_b
   : Codec(mem_pool, reuse_buffer) {
 }
 
-Status SnappyBlockDecompressor::ProcessBlock(int input_length, uint8_t* input,
-                                        int* output_length, uint8_t** output) {
-  // Hadoop uses a block compression scheme on top of snappy.  First there is
-  // an integer which is the size of the decompressed data followed by a
-  // sequence of compressed blocks each preceded with an integer size.
-  int32_t length = SerDeUtils::GetInt(input);
-  DCHECK(*output_length == 0 || length == *output_length);
+// Hadoop uses a block compression scheme on top of snappy.  As per the hadoop docs
+// the input is split into blocks.  Each block "contains the uncompressed length for
+// the block followed by one of more length-prefixed blocks of compressed data."
+// This is essentially blocks of blocks.  
+// The outer block consists of:
+//   - 4 byte little endian uncompressed_size
+//   < inner blocks >
+//   ... repeated until input_len is consumed ..
+// The inner blocks have:
+//   - 4-byte little endian compressed_size
+//   < snappy compressed block >
+//   - 4-byte little endian compressed_size
+//   < snappy compressed block >
+//   ... repeated until uncompressed_size from outer block is consumed ...
 
-  // If length is non-zero then the output has been allocated.
-  if (*output_length != 0) {
-    buffer_length_ = *output_length;
-    out_buffer_ = *output;
-  } else if (!reuse_buffer_ || out_buffer_ == NULL || buffer_length_ < length) {
-    buffer_length_ = length;
-    if (buffer_length_ > MAX_BLOCK_SIZE) {
-      return Status("Decompressor: block size is too big");
+// Utility function to decompress snappy block compressed data.  If size_only is true,
+// this function does not decompress but only computes the output size and writes 
+// the result to *output_len.  
+// If size_only is false, output must be preallocated to output_len and this needs to 
+// be exactly big enough to hold the decompressed output.
+// size_only is a O(1) operations (just reads a single varint for each snappy block).
+static Status SnappyBlockDecompress(int input_len, uint8_t* input, bool size_only,
+    int* output_len, char* output) {
+  
+  int uncompressed_total_len = 0;
+  while (input_len > 0) {
+    size_t uncompressed_block_len = SerDeUtils::GetInt(input);
+    input += sizeof(int32_t);
+    input_len -= sizeof(int32_t);
+
+    if (uncompressed_block_len > Codec::MAX_BLOCK_SIZE || uncompressed_block_len == 0) {
+      if (uncompressed_total_len == 0) {
+        return Status("Decompressor: block size is too big.  Data is likely corrupt.");
+      }
+      break;
     }
-    out_buffer_ = memory_pool_->Allocate(buffer_length_);
+
+    if (!size_only) {
+      int remaining_output_size = *output_len - uncompressed_total_len;
+      DCHECK_GE(remaining_output_size, uncompressed_block_len);
+    }
+
+    while (uncompressed_block_len > 0) {
+      // Read the length of the next snappy compressed block.
+      size_t compressed_len = SerDeUtils::GetInt(input);
+      input += sizeof(int32_t);
+      input_len -= sizeof(int32_t);
+
+      if (compressed_len == 0 || compressed_len > input_len) {
+        if (uncompressed_total_len == 0) {
+          return Status(
+              "Decompressor: invalid compressed length.  Data is likely corrupt.");
+        }
+        input_len =0;
+        break;
+      }
+    
+      // Read how big the output will be.
+      size_t uncompressed_len;
+      if (!snappy::GetUncompressedLength(reinterpret_cast<char*>(input), 
+            input_len, &uncompressed_len)) {
+        if (uncompressed_total_len == 0) {
+          return Status("Snappy: GetUncompressedLength failed");
+        }
+        input_len =0;
+        break;
+      }
+      DCHECK_GT(uncompressed_len, 0);
+    
+      if (!size_only) {
+        // Decompress this snappy block
+        if (!snappy::RawUncompress(reinterpret_cast<char*>(input), 
+              compressed_len, output)) {
+          return Status("Snappy: RawUncompress failed");
+        }
+        output += uncompressed_len;
+      }
+    
+      input += compressed_len;
+      input_len -= compressed_len;
+      uncompressed_block_len -= uncompressed_len;
+      uncompressed_total_len += uncompressed_len;
+    }
   }
 
-  input += sizeof(length);
-  input_length -= sizeof(length);
+  if (size_only) {
+    *output_len = uncompressed_total_len;
+  } else if (*output_len != uncompressed_total_len) {
+    return Status("Snappy: Decompressed size is not correct.");
+  }
+  return Status::OK;
+}
 
-  uint8_t* outp = out_buffer_;
-  do {
-    // Read the length of the next block.
-    length = SerDeUtils::GetInt(input);
-
-    if (length == 0) break;
-
-    input += sizeof(length);
-    input_length -= sizeof(length);
-
-    // Read how big the output will be.
-    size_t uncompressed_length;
-    if (!snappy::GetUncompressedLength(reinterpret_cast<const char*>(input),
-        input_length, &uncompressed_length)) {
-      return Status("Snappy: GetUncompressedLength failed");
-    }
-
-    DCHECK_GT(uncompressed_length, 0);
-    if (!snappy::RawUncompress(reinterpret_cast<const char*>(input),
-        static_cast<size_t>(length), reinterpret_cast<char*>(outp))) {
-      return Status("Snappy: RawUncompress failed");
-    }
-    input += length;
-    input_length -= length;
-    outp += uncompressed_length;
-  } while (input_length > 0);
-
-  *output = out_buffer_;
-  if (*output_length == 0) *output_length = outp - out_buffer_;
+Status SnappyBlockDecompressor::ProcessBlock(int input_len, uint8_t* input,
+    int* output_len, uint8_t** output) {
+  if (*output_len == 0) {
+    // If we don't know the size beforehand, compute it.
+    RETURN_IF_ERROR(SnappyBlockDecompress(input_len, input, true, output_len, NULL));
+    DCHECK_NE(*output_len, 0);
+    
+    if (!reuse_buffer_ || out_buffer_ == NULL || buffer_length_ < *output_len) {
+      // Need to allocate a new buffer
+      buffer_length_ = *output_len;
+      out_buffer_ = memory_pool_->Allocate(buffer_length_);
+    } 
+    *output = out_buffer_;
+  }
+  DCHECK(*output != NULL);
+  
+  if (*output_len > MAX_BLOCK_SIZE) {
+    // TODO: is this check really robust?
+    return Status("Decompressor: block size is too big.  Data is likely corrupt.");
+  }
+    
+  char* out_ptr = reinterpret_cast<char*>(*output);
+  RETURN_IF_ERROR(SnappyBlockDecompress(input_len, input, false, output_len, out_ptr));
   return Status::OK;
 }

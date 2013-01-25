@@ -30,7 +30,7 @@ class GzipDecompressor : public Codec {
   GzipDecompressor(MemPool* mem_pool, bool reuse_buffer);
   virtual ~GzipDecompressor();
 
-  //Process a block of data.
+  // Process a block of data.
   virtual Status ProcessBlock(int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
 
@@ -51,13 +51,12 @@ class BzipDecompressor : public Codec {
   BzipDecompressor(MemPool* mem_pool, bool reuse_buffer);
   virtual ~BzipDecompressor() { }
 
-  //Process a block of data.
+  // Process a block of data.
   virtual Status ProcessBlock(int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
  protected:
   // Bzip does not need initialization
-  virtual Status Init() { return Status::OK;  }
-
+  virtual Status Init() { return Status::OK; }
 };
 
 class SnappyDecompressor : public Codec {
@@ -65,7 +64,7 @@ class SnappyDecompressor : public Codec {
   SnappyDecompressor(MemPool* mem_pool, bool reuse_buffer);
   virtual ~SnappyDecompressor() { }
 
-  //Process a block of data.
+  // Process a block of data.
   virtual Status ProcessBlock(int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
 
@@ -74,6 +73,7 @@ class SnappyDecompressor : public Codec {
   virtual Status Init() { return Status::OK; }
 
 };
+
 class SnappyBlockDecompressor : public Codec {
  public:
   SnappyBlockDecompressor(MemPool* mem_pool, bool reuse_buffer);
@@ -86,7 +86,6 @@ class SnappyBlockDecompressor : public Codec {
  protected:
   // Snappy does not need initialization
   virtual Status Init() { return Status::OK; }
-
 };
 
 }

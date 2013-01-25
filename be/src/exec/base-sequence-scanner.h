@@ -38,6 +38,7 @@ class BaseSequenceScanner : public HdfsScanner {
   // Issue the initial ranges for all sequence container files.
   static void IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>&);
 
+  virtual Status Prepare();
   virtual Status Close();
   virtual Status ProcessScanRange(ScanRangeContext* context);
 
@@ -137,6 +138,9 @@ class BaseSequenceScanner : public HdfsScanner {
   // Pool to allocate per data block memory.  This should be used with the 
   // decompressor and any other per data block allocations.
   boost::scoped_ptr<MemPool> data_buffer_pool_;
+
+  // Time spent decompressing bytes
+  RuntimeProfile::Counter* decompress_timer_;
 };
 
 }

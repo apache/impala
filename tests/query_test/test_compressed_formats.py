@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # Copyright (c) 2012 Cloudera, Inc. All rights reserved.
 
+import pytest
 from os.path import join
 from subprocess import call
 from tests.common.test_vector import *
@@ -33,6 +34,7 @@ class TestCompressedFormats(ImpalaTestSuite):
     cls.TestMatrix.add_dimension(\
         TestDimension('compression_format', *compression_formats))
 
+  @pytest.mark.execute_serially
   def test_compressed_formats(self, vector):
     file_format = vector.get_value('file_format')
     extension, suffix = vector.get_value('compression_format')

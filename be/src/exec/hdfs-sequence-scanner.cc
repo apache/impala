@@ -92,16 +92,13 @@ Status HdfsSequenceScanner::InitNewRange() {
 }
 
 Status HdfsSequenceScanner::Prepare() {
-  RETURN_IF_ERROR(HdfsScanner::Prepare());
+  RETURN_IF_ERROR(BaseSequenceScanner::Prepare());
 
   // Allocate the scratch space for two pass parsing.  The most fields we can go
   // through in one parse pass is the batch size (tuples) * the number of fields per tuple
   // TODO: This should probably be based on L2/L3 cache sizes (as should the batch size)
   record_locations_.resize(state_->batch_size());
   field_locations_.resize(state_->batch_size() * scan_node_->materialized_slots().size());
-  
-  decompress_timer_ = ADD_COUNTER(
-      scan_node_->runtime_profile(), "DecompressionTime", TCounterType::CPU_TICKS);
   return Status::OK;
 }
 

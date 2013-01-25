@@ -139,7 +139,7 @@
 //
 // rowgroup-key-length ::= Int
 //
-// -- Total compressed length in bytes of the rowgroup's key sections.
+// -- Total compressed length in bytes of the rowgroup's key sections.  
 //
 // rowgroup-compressed-key-length ::= Int
 //

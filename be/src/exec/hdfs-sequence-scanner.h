@@ -247,9 +247,6 @@ class HdfsSequenceScanner : public BaseSequenceScanner {
 
   // Next record from block compressed data.
   uint8_t* next_record_in_compressed_block_;
-
-  // Time spent decompressing bytes
-  RuntimeProfile::Counter* decompress_timer_;
 };
 
 } // namespace impala

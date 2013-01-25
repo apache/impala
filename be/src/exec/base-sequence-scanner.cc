@@ -61,6 +61,13 @@ BaseSequenceScanner::~BaseSequenceScanner() {
       data_buffer_pool_->peak_allocated_bytes());
 }
 
+Status BaseSequenceScanner::Prepare() {
+  RETURN_IF_ERROR(HdfsScanner::Prepare());
+  decompress_timer_ = ADD_COUNTER(
+      scan_node_->runtime_profile(), "DecompressionTime", TCounterType::CPU_TICKS);
+  return Status::OK;
+}
+
 Status BaseSequenceScanner::Close() {
   context_->AcquirePool(data_buffer_pool_.get());
   context_->Flush();

@@ -84,14 +84,15 @@ class Codec {
 
   virtual ~Codec() {}
 
-  // Process a block of data.  The operator will allocate the output buffer
-  // if output_length is passed as 0 and return the length in output_length.
-  // If it is non-zero the length must be the correct size to hold the transformed output.
+  // Process a block of data, either compressing or decompressing it.  
+  // If *output_length is 0, the function will allocate from its mempool.  
+  // If *output_length is non-zero, it should be the length of *output and must
+  // be exactly the size of the transformed output.  
   // Inputs:
   //   input_length: length of the data to process
   //   input: data to process
   // In/Out:
-  //   output_length: Length of the output, if known, 0 otherwise.
+  //   output_length: Length of the output, if known, 0 otherwise.  
   // Output:
   //   output: Pointer to processed data
   virtual Status ProcessBlock(int input_length, uint8_t* input,
@@ -99,13 +100,14 @@ class Codec {
 
   // Return the name of a compression algorithm.
   static std::string GetCodecName(THdfsCompression::type);
-
- protected:
+  
   // Largest block we will compress/decompress: 2GB.
   // We are dealing with compressed blocks that are never this big but we
   // want to guard against a corrupt file that has the block length as some
   // large number.
   static const int MAX_BLOCK_SIZE = (2L * 1024 * 1024 * 1024) - 1;
+
+ protected:
   // Create a compression operator
   // Inputs:
   //   mem_pool: memory pool to allocate the output buffer, this implies that the

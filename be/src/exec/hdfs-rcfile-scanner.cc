@@ -58,7 +58,7 @@ HdfsRCFileScanner::~HdfsRCFileScanner() {
 }
 
 Status HdfsRCFileScanner::Prepare() {
-  RETURN_IF_ERROR(HdfsScanner::Prepare());
+  RETURN_IF_ERROR(BaseSequenceScanner::Prepare());
 
   text_converter_.reset(new TextConverter(0));
 
@@ -228,6 +228,12 @@ void HdfsRCFileScanner::ResetRowGroup() {
     columns_[i].current_field_len = 0;
     columns_[i].current_field_len_rep = 0;
   }
+
+  if (!context_->compact_data()) {
+    // We are done with this row group, pass along non-compact external buffers
+    context_->AcquirePool(data_buffer_pool_.get());
+    row_group_buffer_size_ = 0;
+  }
 }
 
 Status HdfsRCFileScanner::ReadRowGroup() {
@@ -236,7 +242,7 @@ Status HdfsRCFileScanner::ReadRowGroup() {
   while (num_rows_ == 0) {
     RETURN_IF_ERROR(ReadRowGroupHeader());
     RETURN_IF_ERROR(ReadKeyBuffers());
-    if (has_noncompact_strings_ || row_group_buffer_size_ < row_group_length_) {
+    if (context_->compact_data() || row_group_buffer_size_ < row_group_length_) {
       // Allocate a new buffer for reading the row group.  Row groups have a
       // fixed number of rows so take a guess at how big it will be based on
       // the previous row group size.
@@ -491,7 +497,7 @@ Status HdfsRCFileScanner::ProcessRange() {
             reinterpret_cast<const char*>(row_group_buffer_ + row_group_length_));
 
         if (!text_converter_->WriteSlot(slot_desc, tuple, 
-              col_start, field_len, !has_noncompact_strings_, false, pool)) {
+              col_start, field_len, context_->compact_data(), false, pool)) {
           ReportColumnParseError(slot_desc, col_start, field_len);
           error_in_row = true;
         }

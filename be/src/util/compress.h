@@ -33,7 +33,7 @@ class GzipCompressor : public Codec {
   GzipCompressor(MemPool* mem_pool, bool reuse_buffer, bool is_gzip);
   virtual ~GzipCompressor();
 
-  //Process a block of data.
+  // Process a block of data.
   virtual Status ProcessBlock(int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
 
@@ -51,7 +51,6 @@ class GzipCompressor : public Codec {
   // These are magic numbers from zlib.h.  Not clear why they are not defined there.
   const static int WINDOW_BITS = 15;    // Maximum window size
   const static int GZIP_CODEC = 16;     // Output Gzip.
-  
 };
 
 class BzipCompressor : public Codec {
@@ -59,12 +58,11 @@ class BzipCompressor : public Codec {
   BzipCompressor(MemPool* mem_pool, bool reuse_buffer);
   virtual ~BzipCompressor() { }
 
-  //Process a block of data.
+  // Process a block of data.
   virtual Status ProcessBlock(int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
   // Initialize the compressor.
   virtual Status Init() { return Status::OK; }
-
 };
 
 class SnappyBlockCompressor : public Codec {
@@ -72,14 +70,13 @@ class SnappyBlockCompressor : public Codec {
   SnappyBlockCompressor(MemPool* mem_pool, bool reuse_buffer);
   virtual ~SnappyBlockCompressor() { }
 
-  //Process a block of data.
+  // Process a block of data.
   virtual Status ProcessBlock(int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
 
  protected:
   // Snappy does not need initialization
   virtual Status Init() { return Status::OK; }
-
 };
 
 class SnappyCompressor : public Codec {
@@ -87,14 +84,13 @@ class SnappyCompressor : public Codec {
   SnappyCompressor(MemPool* mem_pool, bool reuse_buffer);
   virtual ~SnappyCompressor() { }
 
-  //Process a block of data.
+  // Process a block of data.
   virtual Status ProcessBlock(int input_length, uint8_t* input,
                               int* output_length, uint8_t** output);
 
  protected:
   // Snappy does not need initialization
   virtual Status Init() { return Status::OK; }
-
 };
 
 }
