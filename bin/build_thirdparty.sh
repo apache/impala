@@ -48,7 +48,8 @@ fi
 # build thrift
 cd ${THRIFT_SRC_DIR}
 JAVA_PREFIX=${THRIFT_HOME}/java PY_PREFIX=${THRIFT_HOME}/python \
-  ./configure --with-pic --prefix=${THRIFT_HOME}
+  ./configure --with-pic --prefix=${THRIFT_HOME} --with-php=no --with-java=no \
+  --with-erlang=no --with-ruby=no --with-haskell=no --with-erlang=no --with-d=no
 make # Make with -j fails
 make install
 cd ${THRIFT_SRC_DIR}/contrib/fb303
@@ -68,7 +69,7 @@ make -j4
 # Build pprof
 cd $IMPALA_HOME/thirdparty/gperftools-${IMPALA_GPERFTOOLS_VERSION}
 # TODO: google perf tools indicates this might be necessary on 64 bit systems.
-# we're not compiling the rest of our code to not omit frame pointers but it 
+# we're not compiling the rest of our code to not omit frame pointers but it
 # still seems to generate useful profiling data.
 ./configure --enable-frame-pointers --with-pic
 make -j4
