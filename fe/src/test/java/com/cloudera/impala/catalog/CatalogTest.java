@@ -31,7 +31,7 @@ public class CatalogTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    catalog = new Catalog();
+    catalog = new Catalog(true);
   }
 
   @AfterClass
@@ -77,17 +77,9 @@ public class CatalogTest {
   }
 
   @Test public void TestColSchema() throws TableLoadingException {
-    Collection<Db> dbs = catalog.getDbs();
-    Db defaultDb = null;
-    Db testDb = null;
-    for (Db db: dbs) {
-      if (db.getName().equals("default")) {
-        defaultDb = db;
-      }
-      if (db.getName().equals("testdb1")) {
-        testDb = db;
-      }
-    }
+    Db defaultDb = catalog.getDb("default");
+    Db testDb = catalog.getDb("testdb1");
+
     assertNotNull(defaultDb);
     assertEquals(defaultDb.getName(), "default");
     assertNotNull(testDb);
@@ -329,6 +321,12 @@ public class CatalogTest {
   @Test(expected = TableLoadingException.class)
   public void testArrayColumnsFails() throws TableLoadingException {
     Table table = catalog.getDb("default").getTable("array_table");
+  }
+
+  @Test
+  public void testDatabaseDoesNotExist() {
+    Db nonExistentDb = catalog.getDb("doesnotexist");
+    assertNull(nonExistentDb);
   }
 
   // This table has metadata set so the escape is \n, which is also the tuple delim. This

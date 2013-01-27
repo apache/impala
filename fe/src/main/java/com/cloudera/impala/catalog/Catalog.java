@@ -15,12 +15,14 @@
 package com.cloudera.impala.catalog;
 
 import java.util.Arrays;
+import java.util.concurrent.ConcurrentMap;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -32,8 +34,11 @@ import org.apache.log4j.Logger;
 
 import com.cloudera.impala.common.ImpalaException;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ComputationException;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.common.collect.MapMaker;
+import com.google.common.base.Function;
 
 /**
  * Interface to metadata stored in MetaStore instance.
@@ -45,13 +50,122 @@ public class Catalog {
   private static final Logger LOG = Logger.getLogger(Catalog.class);
   private static final int MAX_METASTORE_CLIENT_INIT_RETRIES = 5;
   private static final int MAX_METASTORE_RETRY_INTERVAL_IN_SECONDS = 5;
+  private final boolean lazy;
   private boolean closed = false;
   private int nextTableId;
 
   // map from db name to DB
-  private final Map<String, Db> dbs;
+  private final LazyDbMap dbs;
 
   private final HiveMetaStoreClient msClient;
+
+  // Tracks whether a Table/Db has all of its metadata loaded.
+  enum MetadataLoadState {
+    LOADED,
+    UNINITIALIZED,
+  }
+
+  /**
+   * Lazily loads database metadata on read (through 'get') and tracks the valid/known
+   * database names.
+   *
+   * If a database has not yet been loaded successfully, get() will attempt to load it.
+   * It is only possible to load metadata for databases that are in the known db name
+   * map.
+   *
+   * Getting all the metadata is a heavy-weight operation, but Impala still needs
+   * to know what databases exist (one use case is for SHOW commands). To support this,
+   * there is a parallel mapping of known database names to their metadata load state.
+   * When Impala starts up (and on refresh commands) the database name map is populated
+   * with all database names available.
+   *
+   * Before loading any metadata, the database name map is checked to ensure the given
+   * database is "known". If it is not, no metadata is loaded and an exception
+   * is thrown.
+   */
+  private class LazyDbMap {
+    // Map of database name to Db metadata
+    private final ConcurrentMap<String, Db> dbMetadataMap = new MapMaker()
+        .makeComputingMap(
+        new Function<String, Db>() {
+          public Db apply(String dbName) {
+            return loadDb(dbName.toLowerCase());
+          }
+        });
+
+    // Map of database names to their metadata load state. It is only possible to load
+    // metadata for databases that exist in this map.
+    private final ConcurrentMap<String, MetadataLoadState> dbNameMap = new MapMaker()
+        .makeMap();
+
+    /**
+     * Initializes the class with a list of valid database names and marks each
+     * database's metadata as uninitialized.
+     */
+     public LazyDbMap(List<String> dbNames) {
+       for (String dbName: dbNames) {
+         dbNameMap.put(dbName.toLowerCase(), MetadataLoadState.UNINITIALIZED);
+       }
+     }
+
+    /**
+     * Returns all known database names.
+     */
+    public Set<String> getAllDbNames() {
+      return dbNameMap.keySet();
+    }
+
+    /**
+     * Returns the Db object corresponding to the supplied database name. The database
+     * name must exist in the database name map for the metadata load to succeed. Returns
+     * null if the database does not exist.
+     *
+     * The exact behavior is:
+     * - If the database already exists in the metadata map, its value will be returned.
+     * - If the database is not present in the metadata map AND the database exists in the
+     *   known database map the metadata will be loaded
+     * - If the database is not present the database name map, null is returned.
+     */
+    public Db get(String dbName) {
+      try {
+        return dbMetadataMap.get(dbName);
+      } catch (ComputationException e) {
+        // Search for the cause of the exception. If a load failed due to the database not
+        // being found, callers should get 'null' instead of having to handle the
+        // exception.
+        Throwable cause = e.getCause();
+        while(cause != null) {
+          if (cause instanceof DatabaseNotFoundException) {
+            return null;
+          }
+          cause = cause.getCause();
+        }
+        throw e;
+      }
+    }
+
+    private Db loadDb(String dbName) {
+      try {
+        MetadataLoadState metadataState = dbNameMap.get(dbName);
+
+        // This database doesn't exist in the database name cache. Throw an exception.
+        if (metadataState == null) {
+          throw new DatabaseNotFoundException("Database not found: " + dbName);
+        }
+
+        // We should never have a case where we make it here and the metadata is marked
+        // as already loaded.
+        Preconditions.checkState(metadataState != MetadataLoadState.LOADED);
+
+        Db db = Db.loadDb(Catalog.this, msClient, dbName, lazy);
+        dbNameMap.put(dbName, MetadataLoadState.LOADED);
+        return db;
+      } catch (DatabaseNotFoundException e) {
+        // Convert to an unchecked exception
+        throw new ComputationException(e);
+      }
+    }
+  }
 
   /**
    * Thrown by some methods when a table can't be found in the metastore
@@ -61,6 +175,8 @@ public class Catalog {
     private static final long serialVersionUID = -2203080667446640542L;
 
     public TableNotFoundException(String s) { super(s); }
+
+    public TableNotFoundException(String s, Exception cause) { super(s, cause); }
   }
 
   /**
@@ -75,7 +191,7 @@ public class Catalog {
 
 
   public Catalog() {
-    this(false);
+    this(true);
   }
 
   /**
@@ -84,13 +200,15 @@ public class Catalog {
    */
   public Catalog(boolean lazy) {
     this.nextTableId = 0;
-    this.dbs = Maps.newHashMap();
+    this.lazy = lazy;
     try {
       this.msClient = createHiveMetaStoreClient(new HiveConf(Catalog.class));
-      List<String> msDbs = msClient.getAllDatabases();
-      for (String dbName: msDbs) {
-        Db db = Db.loadDb(this, msClient, dbName, lazy);
-        dbs.put(dbName, db);
+      this.dbs = new LazyDbMap(msClient.getAllDatabases());
+      if (!lazy) {
+        // Load all the metadata
+        for (String dbName: dbs.getAllDbNames()) {
+          dbs.get(dbName);
+        }
       }
     } catch (MetaException e) {
       // turn into unchecked exception
@@ -145,12 +263,6 @@ public class Catalog {
     }
   }
 
-  public Collection<Db> getDbs() {
-    // Take a copy so that caller doesn't have to worry about accidentally
-    // changing the collection, or iterating over it concurrently with a writer.
-    return new ArrayList<Db>(dbs.values());
-  }
-
   public TableId getNextTableId() {
     return new TableId(nextTableId++);
   }
@@ -161,8 +273,7 @@ public class Catalog {
   public Db getDb(String db) {
     Preconditions.checkState(db != null && !db.isEmpty(),
         "Null or empty database name given as argument to Catalog.getDb");
-      
-    return dbs.get(db.toLowerCase());
+    return dbs.get(db);
   }
 
   public HiveMetaStoreClient getMetaStoreClient() {
@@ -177,9 +288,9 @@ public class Catalog {
    * dbName must not be null. tablePattern may be null (and thus matches
    * everything).
    *
-   * Table names are returned unqualified. 
+   * Table names are returned unqualified.
    */
-  public List<String> getTableNames(String dbName, String tablePattern) 
+  public List<String> getTableNames(String dbName, String tablePattern)
       throws DatabaseNotFoundException {
     Preconditions.checkNotNull(dbName);
     List<String> matchingTables = Lists.newArrayList();
@@ -188,7 +299,6 @@ public class Catalog {
     if (db == null) {
       throw new DatabaseNotFoundException("Database '" + dbName + "' not found");
     }
-      
     return filterStringsByPattern(db.getAllTableNames(), tablePattern);
   }
 
@@ -199,8 +309,15 @@ public class Catalog {
    * dbPattern may be null (and thus matches
    * everything).
    */
-  public List<String> getDbNames(String dbPattern) {    
-    return filterStringsByPattern(dbs.keySet(), dbPattern);
+  public List<String> getDbNames(String dbPattern) {
+    return filterStringsByPattern(dbs.getAllDbNames(), dbPattern);
+  }
+
+  /**
+   * Returns a list of all known databases in the Catalog.
+   */
+  public List<String> getAllDbNames() {
+    return getDbNames(null);
   }
 
   /**
@@ -241,24 +358,5 @@ public class Catalog {
     }
     Collections.sort(filtered, String.CASE_INSENSITIVE_ORDER);
     return filtered;
-  }
-
-  /**
-   * Marks a table metadata as invalid, to be reloaded
-   * the next time it is read.
-   */
-  public void invalidateTable(String tableName) throws TableNotFoundException {
-    invalidateTable(DEFAULT_DB, tableName);
-  }
-
-  public void invalidateTable(String dbName, String tableName)
-      throws TableNotFoundException {
-    Db db = getDb(dbName);
-    // If no db known by that name, silently do nothing.
-    if (db == null) {
-      return;
-    }
-
-    db.invalidateTable(tableName);
   }
 }

@@ -205,12 +205,13 @@ public class MetadataOp {
     Pattern tablePattern = Pattern.compile(convertedTablePattern);
     Pattern columnPattern = Pattern.compile(convertedColumnPattern);
 
-    for (Db db: catalog.getDbs()) {
-      String dbName = db.getName();
+    for (String dbName: catalog.getAllDbNames()) {
       if (!schemaPattern.matcher(dbName).matches()) {
         LOG.debug("DB " + dbName + " does not match " + convertedSchemaPattern);
         continue;
       }
+
+      Db db = catalog.getDb(dbName);
 
       for (String tabName: db.getAllTableNames()) {
         if (!tablePattern.matcher(tabName).matches()) {
@@ -282,14 +283,14 @@ public class MetadataOp {
     String convertedSchemaPattern = convertPattern(schemaName);
     Pattern schemaPattern = Pattern.compile(convertedSchemaPattern);
 
-    for (Db db: catalog.getDbs()) {
-      if (!schemaPattern.matcher(db.getName()).matches()) {
-        LOG.debug("DB " + db.getName() + " does not match " + convertedSchemaPattern);
+    for (String dbName: catalog.getAllDbNames()) {
+      if (!schemaPattern.matcher(dbName).matches()) {
+        LOG.debug("DB " + dbName + " does not match " + convertedSchemaPattern);
         continue;
       }
       TResultRow row = new TResultRow();
       row.colVals = Lists.newArrayList();
-      row.colVals.add(createTColumnValue(db.getName())); // TABLE_SCHEMA
+      row.colVals.add(createTColumnValue(dbName)); // TABLE_SCHEMA
       row.colVals.add(EMPTY_COL_VAL); // default Hive catalog is an empty string.
       result.results.add(row);
     }
@@ -335,13 +336,15 @@ public class MetadataOp {
     Pattern schemaPattern = Pattern.compile(convertedSchemaPattern);
     Pattern tablePattern =  Pattern.compile(convertedTablePattern);
 
-    for (Db db: catalog.getDbs()) {
-      if (!schemaPattern.matcher(db.getName()).matches()) {
-        LOG.debug("DB " + db.getName() + " does not match " + convertedSchemaPattern);
+    for (String dbName: catalog.getAllDbNames()) {
+      if (!schemaPattern.matcher(dbName).matches()) {
+        LOG.debug("DB " + dbName + " does not match " + convertedSchemaPattern);
         continue;
       }
+
+      Db db = catalog.getDb(dbName);
       TColumnValue schemaColVal = new TColumnValue();
-      schemaColVal.setStringVal(db.getName());
+      schemaColVal.setStringVal(dbName);
 
       for (String tabName: db.getAllTableNames()) {
         if (!tablePattern.matcher(tabName).matches()) {

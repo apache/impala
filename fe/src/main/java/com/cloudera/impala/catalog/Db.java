@@ -14,6 +14,7 @@
 
 package com.cloudera.impala.catalog;
 
+import java.util.concurrent.ConcurrentMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
@@ -22,14 +23,20 @@ import java.util.Set;
 
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
+import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.log4j.Logger;
 
+import com.cloudera.impala.catalog.Catalog.MetadataLoadState;
 import com.cloudera.impala.catalog.Catalog.TableNotFoundException;
-import com.google.common.collect.Sets;
-import com.google.common.collect.Maps;
-import com.google.common.collect.Lists;
-
 import com.cloudera.impala.common.ImpalaException;
+
+import com.google.common.base.Function;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ComputationException;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Maps;
+import com.google.common.collect.MapMaker;
+import com.google.common.collect.Maps;
 
 /**
  * Internal representation of db-related metadata. Owned by Catalog instance.
@@ -76,91 +83,132 @@ public class Db {
    * correctly.
    */
   private void forceLoadAllTables() {
-    // Need to copy the keyset to avoid concurrent modification exceptions
-    // if we try to remove a table in error
-    Set<String> keys = Sets.newHashSet(tables.keySet());
-    for (String s: keys) {
+    for (String tableName: getAllTableNames()) {
       try {
-        tables.get(s);
+        tables.get(tableName);
       } catch (Exception ex) {
-        LOG.warn("Ignoring table: " + s + " due to error when loading", ex);
+        LOG.warn("Ignoring table: " + tableName + " due to error when loading", ex);
       }
     }
   }
 
   /**
-   * Lazily loads tables on read (through 'get'). 
+   * Lazily loads table metadata on read (through 'get') and tracks the valid/known
+   * table names.
    *
-   * From the caller's perspective, a table never has a null value; either the
-   * table is successfully loaded or an exception is thrown by
-   * get(). Internally, however, backingMap tracks all table names and those
-   * that have not yet been loaded successfully have a null value in that map.
+   * If a table has not yet been loaded successfully, get() will attempt to load it.
+   * It is only possible to load metadata for tables in the known table name map.
    *
-   * If a table has not yet been loaded successfully, get() will attempt to load it. 
+   * Getting all the table metadata is a heavy-weight operation, but Impala still needs
+   * to know what tables exist in each database (one use case is for SHOW commands). To
+   * support this, there is a parallel mapping of the known table names to their metadata
+   * load state. When Impala starts up (and on refresh commands) the table name map is
+   * populated with all tables names available.
    *
-   * Tables may be invalidated, which means the next get() will reload the table metadata.
-   *
-   * This class is not thread safe.
+   * Before loading any metadata, the table name map is checked to ensure the given
+   * table is "known". If it is not, no metadata is loaded and an exception
+   * is thrown.
    */
   private class LazyTableMap {
-    private final Map<String, Table> backingMap = Maps.newHashMap();
-    
+    // Map of table name to Table metadata
+    private final ConcurrentMap<String, Table> tableMetadataMap = new MapMaker()
+        .makeComputingMap(
+        new Function<String, Table>() {
+          public Table apply(String tableName) {
+            return loadTable(tableName);
+          }
+        });
+
+    // Map of table names to the metadata load state. It is only possible to load metadata
+    // for tables that exist in this map.
+    private final ConcurrentMap<String, MetadataLoadState> tableNameMap = new MapMaker()
+        .makeMap();
+
     /**
-     * Resets the table for the given table name to null, effectively removing
-     * it from the cache. If the table is not in the map, nothing is done and
-     * false is returned, otherwise returns true.
+     * Initializes the class with a list of valid table names and marks each table's
+     * metadata as uninitialized.
      */
-    public boolean invalidate(String name) {
-      if (containsKey(name)) {
-        put(name, null);
-        return true;
+    public LazyTableMap(List<String> tableNames) {
+      for (String tableName: tableNames) {
+        tableNameMap.put(tableName.toLowerCase(), MetadataLoadState.UNINITIALIZED);
       }
-      return false;
-    }
-
-    public void put(String name, Table table) {
-      backingMap.put(name, table);
-    }
-
-    public Set<String> keySet() {
-      return backingMap.keySet();
-    }
-
-    public boolean containsKey(String key) {
-      return backingMap.containsKey(key);
     }
 
     /**
-     * Returns the table object corresponding to the supplied table name. 
-     * If a table name is present in the map, but its associated value is null,
-     * try and load the table from the metastore and populate the map. 
-     * Throws an exception if the table metadata cannot be loaded.
+     * Returns all known table names.
+     */
+    public Set<String> getAllTableNames() {
+      return tableNameMap.keySet();
+    }
+
+    /**
+     * Returns the Table object corresponding to the supplied table name. The table
+     * name must exist in the table name map for the metadata load to succeed.
+     * The exact behavior is:
+     * - If the table already exists in the metadata map, its value will be returned.
+     * - If the table is not present in the metadata map and the table exists in the
+     *   known table map, its metadata is loaded.
+     * - If the table is not present the table name map, null is returned.
+     *
+     * throws a TableLoadingException if there are errors loading the table metadata
+     * unless the error is a TableNotFound error in which case null is returned.
      */
     public Table get(String tableName) throws TableLoadingException {
-      if (!backingMap.containsKey(tableName)) {
-        return null;
+      try {
+        // There is no need to check the tableNameMap here because it is done within
+        // the loadTable(...) function.
+        return tableMetadataMap.get(tableName.toLowerCase());
+      } catch (ComputationException e) {
+        // Search for the cause of this exception and throw the correct inner exception
+        // type. In the case of a TableNotFoundException, return null.
+        Throwable cause = e.getCause();
+        while(cause != null) {
+          if (cause instanceof TableLoadingException) {
+            throw (TableLoadingException) cause;
+          } else if (cause instanceof TableNotFoundException) {
+            return null;
+          }
+          cause = cause.getCause();
+        }
+        throw e;
       }
+    }
 
-      Table ret = backingMap.get(tableName);
-      if (ret != null) {
-        // Already loaded
-        return ret;
+    private Table loadTable(String tableName) {
+      try {
+        MetadataLoadState metadataState = tableNameMap.get(tableName);
+
+        // This table doesn't exist in the table name cache. Throw an exception.
+        if (metadataState == null) {
+          throw new TableNotFoundException("Table not found: " + tableName);
+        }
+
+        // We should never have a case where we make it here and the metadata is marked
+        // as already loaded.
+        Preconditions.checkState(metadataState != MetadataLoadState.LOADED);
+
+        // Try to load the table Metadata
+        Table table =
+            Table.load(parentCatalog.getNextTableId(), client, Db.this, tableName);
+        tableNameMap.put(tableName, MetadataLoadState.LOADED);
+        return table;
+      } catch (TableLoadingException e) {
+        // Convert to an unchecked exception
+        throw new ComputationException(e);
+      } catch (TableNotFoundException e) {
+        // Convert to an unchecked exception
+        throw new ComputationException(e);
       }
-
-      // May throw TableLoadingException
-      ret = Table.load(parentCatalog.getNextTableId(), client, Db.this, tableName);
-      put(tableName, ret);
-      return ret;
     }
   }
 
   private Db(String name, Catalog catalog, HiveMetaStoreClient hiveClient,
-      boolean lazy) {
+      boolean lazy) throws MetaException {
     this.name = name;
     this.lazy = lazy;
-    this.tables = new LazyTableMap();
     this.parentCatalog = catalog;
     this.client = hiveClient;
+    this.tables = new LazyTableMap(client.getAllTables(name));
   }
 
   /**
@@ -183,18 +231,7 @@ public class Db {
   public static Db loadDb(Catalog catalog, HiveMetaStoreClient client, String dbName,
       boolean lazy) {
     try {
-      Db db = new Db(dbName, catalog, client, lazy);
-      List<String> tblNames = null;
-      tblNames = client.getTables(dbName, "*");
-      for (String s: tblNames) {
-        db.tables.put(s, null);
-      }
-
-      if (!lazy) {
-        db.forceLoadAllTables();
-      }
-
-      return db;
+      return new Db(dbName, catalog, client, lazy);
     } catch (MetaException e) {
       // turn into unchecked exception
       throw new UnsupportedOperationException(e);
@@ -206,7 +243,7 @@ public class Db {
   }
 
   public List<String> getAllTableNames() {
-    return Lists.newArrayList(tables.keySet());
+    return Lists.newArrayList(tables.getAllTableNames());
   }
 
   /**
@@ -214,17 +251,6 @@ public class Db {
    * exception if the table metadata could not be loaded.
    */
   public Table getTable(String tbl) throws TableLoadingException {
-    return tables.get(tbl.toLowerCase());
-  }
-
-  /**
-   * Forces reload of named table on next access. Throws TableNotFoundException
-   * if the requested table can't be found.
-   */
-  public void invalidateTable(String table) throws TableNotFoundException {
-    if (!tables.invalidate(table)) {
-      throw new TableNotFoundException("Could not invalidate non-existent table: "
-          + table);
-    }
+      return tables.get(tbl);
   }
 }

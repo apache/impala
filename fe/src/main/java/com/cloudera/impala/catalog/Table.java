@@ -24,6 +24,7 @@ import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
 import org.apache.thrift.TException;
 
 import com.cloudera.impala.analysis.Expr;
+import com.cloudera.impala.catalog.Catalog.TableNotFoundException;
 import com.cloudera.impala.catalog.Db.TableLoadingException;
 import com.cloudera.impala.planner.DataSink;
 import com.cloudera.impala.thrift.TTableDescriptor;
@@ -90,16 +91,14 @@ public abstract class Table {
    * @return new instance of HdfsTable or HBaseTable
    *         null if the table does not exist
    * @throws TableLoadingException if there was an error loading the table. 
+   * @throws TableNotFoundException if the table was not found
    */
   public static Table load(TableId id, HiveMetaStoreClient client, Db db,
-      String tblName) throws TableLoadingException {
+      String tblName) throws TableLoadingException, TableNotFoundException {
     // turn all exceptions into TableLoadingException
     try {
       org.apache.hadoop.hive.metastore.api.Table msTbl =
           client.getTable(db.getName(), tblName);
-      if (msTbl == null) {
-        return null;
-      }
 
       // Determine the table type
       Table table = null;
@@ -114,6 +113,8 @@ public abstract class Table {
       return table.load(client, msTbl);
     } catch (TableLoadingException e) {
       throw e;
+    } catch (NoSuchObjectException e) {
+      throw new TableNotFoundException("Table not found: " + tblName, e);
     } catch (Exception e) {
       throw new TableLoadingException("Failed to load metadata for table: " + tblName, e);
     }

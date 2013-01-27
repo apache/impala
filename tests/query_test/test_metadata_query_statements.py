@@ -3,6 +3,7 @@
 # Impala tests for queries that query metadata and set session settings
 import logging
 import pytest
+from subprocess import call
 from tests.common.test_vector import *
 from tests.common.impala_test_suite import *
 
@@ -29,3 +30,55 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
 
   def test_use_table(self, vector):
     self.run_test_case('QueryTest/use', vector)
+
+  @pytest.mark.execute_serially
+  def test_impala_sees_hive_created_tables_and_databases(self, vector):
+    db_name = 'hive_test_db'
+    tbl_name = 'testtbl'
+    self.client.refresh()
+    result = self.execute_query("show databases");
+    assert db_name not in result.data
+
+    call(["hive", "-e", "DROP DATABASE %s" % db_name])
+    call(["hive", "-e", "CREATE DATABASE %s" % db_name])
+
+    result = self.execute_query("show databases");
+    assert db_name not in result.data
+
+    self.client.refresh()
+    result = self.execute_query("show databases");
+    assert db_name in result.data
+
+    # Make sure no tables show up in the new database
+    result = self.execute_query("show tables in %s" % db_name);
+    assert len(result.data) == 0
+
+    self.client.refresh()
+    result = self.execute_query("show tables in %s" % db_name);
+    assert len(result.data) == 0
+
+    call(["hive", "-e", "CREATE TABLE %s.%s (i int)" % (db_name, tbl_name)])
+
+    result = self.execute_query("show tables in %s" % db_name)
+    assert tbl_name not in result.data
+
+    self.client.refresh()
+    result = self.execute_query("show tables in %s" % db_name)
+    assert tbl_name in result.data
+
+    # Make sure we can actually use the table
+    self.execute_query("insert overwrite table %s.%s select 1 from alltypes limit 5"\
+        % (db_name, tbl_name))
+    result = self.execute_scalar("select count(*) from %s.%s" % (db_name, tbl_name))
+    assert int(result) == 5
+
+    call(["hive", "-e", "DROP TABLE %s.%s " % (db_name, tbl_name)])
+    call(["hive", "-e", "DROP DATABASE %s" % db_name])
+
+    # Requires a refresh to see the dropped database
+    result = self.execute_query("show databases");
+    assert db_name in result.data
+
+    self.client.refresh()
+    result = self.execute_query("show databases");
+    assert db_name not in result.data
