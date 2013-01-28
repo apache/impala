@@ -1,0 +1,11 @@
+# Generated File.
+file_format: text, dataset: tpch, compression_codec: none, compression_type: none
+file_format: seq, dataset: tpch, compression_codec: none, compression_type: none
+file_format: seq, dataset: tpch, compression_codec: def, compression_type: block
+file_format: seq, dataset: tpch, compression_codec: def, compression_type: record
+file_format: seq, dataset: tpch, compression_codec: gzip, compression_type: block
+file_format: seq, dataset: tpch, compression_codec: gzip, compression_type: record
+file_format: seq, dataset: tpch, compression_codec: bzip, compression_type: block
+file_format: seq, dataset: tpch, compression_codec: bzip, compression_type: record
+file_format: seq, dataset: tpch, compression_codec: snap, compression_type: block
+file_format: seq, dataset: tpch, compression_codec: snap, compression_type: record
