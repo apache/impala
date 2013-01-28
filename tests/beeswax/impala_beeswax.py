@@ -149,7 +149,11 @@ class ImpalaBeeswaxClient(object):
     # Initializes a sasl client
     from shell.thrift_sasl import TSaslClientTransport
     def sasl_factory():
-      import sasl
+      try:
+        import saslwrapper as sasl
+      except ImportError:
+        print 'saslwrapper not found, trying to import sasl'
+        import sasl
       sasl_client = sasl.Client()
       sasl_client.setAttr("host", self.impalad[0])
       sasl_client.setAttr("service", "impala")

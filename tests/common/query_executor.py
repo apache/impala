@@ -115,7 +115,7 @@ class QueryExecutor(threading.Thread):
     self.query_exec_options = exec_options
     self.query = query
     self.output_result = None
-    self.execution_result = None
+    self.execution_result = QueryExecutionResult()
     threading.Thread.__init__(self)
     self.name = name
 
