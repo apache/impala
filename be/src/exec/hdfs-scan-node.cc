@@ -388,7 +388,8 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   } 
 
   RETURN_IF_ERROR(runtime_state_->io_mgr()->RegisterReader(
-      hdfs_connection_, state->max_io_buffers(), &reader_context_));
+      hdfs_connection_, state->max_io_buffers(), state->num_scanner_threads(), 
+      &reader_context_));
   runtime_state_->io_mgr()->set_bytes_read_counter(reader_context_, bytes_read_counter());
   runtime_state_->io_mgr()->set_read_timer(reader_context_, read_timer());
 

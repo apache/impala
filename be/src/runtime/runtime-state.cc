@@ -27,6 +27,7 @@
 #include "runtime/timestamp-value.h"
 #include "util/cpu-info.h"
 #include "util/debug-util.h"
+#include "util/disk-info.h"
 #include "util/jni-util.h"
 
 #include <jni.h>
@@ -83,7 +84,8 @@ Status RuntimeState::Init(
     query_options_.batch_size = DEFAULT_BATCH_SIZE;
   }
   if (query_options_.max_io_buffers <= 0) {
-    query_options_.max_io_buffers = DEFAULT_MAX_IO_BUFFERS;
+    // TODO: how to tune this?
+    query_options_.max_io_buffers = 5 * DiskInfo::num_disks();
   }
   
   DCHECK_GT(query_options_.max_io_buffers, 0);

@@ -138,8 +138,6 @@ class RuntimeState {
 
  private:
   static const int DEFAULT_BATCH_SIZE = 1024;
-  // This is the number of buffers per disk.
-  static const int DEFAULT_MAX_IO_BUFFERS = 5;
 
   DescriptorTbl* desc_tbl_;
   boost::scoped_ptr<ObjectPool> obj_pool_;

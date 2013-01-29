@@ -19,6 +19,7 @@
 #include "codegen/llvm-codegen.h"
 #include "runtime/disk-io-mgr.h"
 #include "runtime/disk-io-mgr-stress.h"
+#include "util/cpu-info.h"
 
 using namespace std;
 using namespace boost;
@@ -29,8 +30,7 @@ namespace impala {
 
 class DiskIoMgrTest : public testing::Test {
  protected:
-  
-   void CreateTempFile(const char* filename, const char* data) {
+  void CreateTempFile(const char* filename, const char* data) {
     FILE* file = fopen(filename, "w");
     EXPECT_TRUE(file != NULL);
     fwrite(data, 1, strlen(data), file);
@@ -72,9 +72,9 @@ class DiskIoMgrTest : public testing::Test {
   }
 
   DiskIoMgr::ScanRange* InitRange(const char* file_path, int offset, 
-      int len, int disk_id) {
+      int len, int disk_id, void* meta_data = NULL) {
     DiskIoMgr::ScanRange* range = pool_.Add(new DiskIoMgr::ScanRange());
-    range->Reset(file_path, len, offset, disk_id);
+    range->Reset(file_path, len, offset, disk_id, meta_data);
     return range;
   }
 
@@ -84,28 +84,29 @@ class DiskIoMgrTest : public testing::Test {
 // Basic test with a single reader, testing multiple threads, disks and a different
 // number of buffers.
 TEST_F(DiskIoMgrTest, SingleReader) {
-  return;
+  const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
+  const char* data = "abcdefghjijklm";
+  CreateTempFile(tmp_file, data);
+
+  int64_t iters = 0;
   for (int num_threads_per_disk = 1; num_threads_per_disk <= 5; ++num_threads_per_disk) {
-    for (int num_disks = 1; num_disks <= 3; num_disks += 2) {
-      for (int num_buffers = 1; num_buffers <= 5; num_buffers += 2) {
-        LOG(ERROR) << "Starting test with num_threads_per_disk=" << num_threads_per_disk
+    for (int num_disks = 1; num_disks <= 5; num_disks += 2) {
+      for (int num_buffers = 1; num_buffers <= 11; num_buffers += 2) {
+        LOG(INFO) << "Starting test with num_threads_per_disk=" << num_threads_per_disk
                   << " num_disk=" << num_disks << " num_buffers=" << num_buffers;
+        
+        if (++iters % 10000 == 0) LOG(ERROR) << "Starting iteration " << iters;
 
         DiskIoMgr io_mgr(num_disks, num_threads_per_disk, BUFFER_SIZE);
         Status status = io_mgr.Init();
         ASSERT_TRUE(status.ok());
-
         DiskIoMgr::ReaderContext* reader;
-        status = io_mgr.RegisterReader(NULL, num_buffers, &reader);
+        status = io_mgr.RegisterReader(NULL, num_buffers, 0, &reader);
         ASSERT_TRUE(status.ok());
-
-        const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
-        const char* data = "abcd";
-        CreateTempFile(tmp_file, data);
 
         vector<DiskIoMgr::ScanRange*> ranges;
         for (int i = 0; i < strlen(data); ++i) {
-          int disk_id = ranges.size() % num_disks;
+          int disk_id = i % num_disks;
           ranges.push_back(InitRange(tmp_file, i, 1, disk_id));
         }
       
@@ -123,26 +124,29 @@ TEST_F(DiskIoMgrTest, SingleReader) {
 
 // Tests a single reader cancelling half way through scan ranges.  
 TEST_F(DiskIoMgrTest, SingleReaderCancel) {
+  const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
+  const char* data = "abcdefghjijklm";
+  CreateTempFile(tmp_file, data);
+          
+  int64_t iters = 0;
   for (int num_threads_per_disk = 1; num_threads_per_disk <= 5; ++num_threads_per_disk) {
-    for (int num_disks = 1; num_disks <= 3; num_disks += 2) {
-      for (int num_buffers = 1; num_buffers <= 5; num_buffers += 2) {
+    for (int num_disks = 1; num_disks <= 5; num_disks += 2) {
+      for (int num_buffers = 1; num_buffers <= 11; num_buffers += 2) {
         LOG(INFO) << "Starting test with num_threads_per_disk=" << num_threads_per_disk
                   << " num_disk=" << num_disks << " num_buffers=" << num_buffers;
+        if (++iters % 10000 == 0) LOG(ERROR) << "Starting iteration " << iters;
 
         DiskIoMgr io_mgr(num_disks, num_threads_per_disk, BUFFER_SIZE);
         DiskIoMgr::ReaderContext* reader;
         Status status = io_mgr.Init();
         ASSERT_TRUE(status.ok());
-        status = io_mgr.RegisterReader(NULL, num_buffers, &reader);
+        status = io_mgr.RegisterReader(NULL, num_buffers, 0, &reader);
         ASSERT_TRUE(status.ok());
 
-        const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
-        const char* data = "abcdefg";
-        CreateTempFile(tmp_file, data);
-          
         vector<DiskIoMgr::ScanRange*> ranges;
         for (int i = 0; i < strlen(data); ++i) {
-          ranges.push_back(InitRange(tmp_file, i, 1, 0));
+          int disk_id = i % num_disks;
+          ranges.push_back(InitRange(tmp_file, i, 1, disk_id));
         }
         io_mgr.AddScanRanges(reader, ranges);
 
@@ -169,36 +173,39 @@ TEST_F(DiskIoMgrTest, SingleReaderCancel) {
   }
 }
 
-// This test issues additional scan ranges while there are some still in flight.
+// This test issues adding additional scan ranges while there are some still in flight.
 TEST_F(DiskIoMgrTest, AddScanRangeTest) {
+  const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
+  const char* data = "abcdefghijklm";
+  CreateTempFile(tmp_file, data);
+  
+  char result[strlen(data)];
+
+  int64_t iters = 0;
   for (int num_threads_per_disk = 1; num_threads_per_disk <= 5; ++num_threads_per_disk) {
-    for (int num_disks = 1; num_disks <= 3; num_disks += 2) {
-      for (int num_buffers = 1; num_buffers <= 5; num_buffers += 2) {
+    for (int num_disks = 1; num_disks <= 5; num_disks += 2) {
+      for (int num_buffers = 1; num_buffers <= 11; num_buffers += 2) {
         LOG(INFO) << "Starting test with num_threads_per_disk=" << num_threads_per_disk
                   << " num_disk=" << num_disks << " num_buffers=" << num_buffers;
+        if (++iters % 10000 == 0) LOG(ERROR) << "Starting iteration " << iters;
         
         DiskIoMgr io_mgr(num_disks, num_threads_per_disk, BUFFER_SIZE);
         Status status = io_mgr.Init();
         ASSERT_TRUE(status.ok());
-
         DiskIoMgr::ReaderContext* reader;
-        status = io_mgr.RegisterReader(NULL, num_buffers, &reader);
+        status = io_mgr.RegisterReader(NULL, num_buffers, 0, &reader);
         ASSERT_TRUE(status.ok());
           
-        const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
-        const char* data = "abcdefghijklm";
-        CreateTempFile(tmp_file, data);
-        
-        char result[strlen(data)];
         memset(result, 0, strlen(data));
           
         vector<DiskIoMgr::ScanRange*> ranges_first_half;
         vector<DiskIoMgr::ScanRange*> ranges_second_half;
         for (int i = 0; i < strlen(data); ++i) {
+          int disk_id = i % num_disks;
           if (i > strlen(data) / 2) {
-            ranges_second_half.push_back(InitRange(tmp_file, i, 1, 0));
+            ranges_second_half.push_back(InitRange(tmp_file, i, 1, disk_id));
           } else {
-            ranges_first_half.push_back(InitRange(tmp_file, i, 1, 0));
+            ranges_first_half.push_back(InitRange(tmp_file, i, 1, disk_id));
           }
         }
         // Issue first half the scan ranges.
@@ -247,23 +254,24 @@ TEST_F(DiskIoMgrTest, AddScanRangeTest) {
 // Note: this test is constructed so the number of buffers is greater than the
 // number of scan ranges.
 TEST_F(DiskIoMgrTest, SyncReadTest) {
+  const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
+  const char* data = "abcde";
+  CreateTempFile(tmp_file, data);
+          
+  int64_t iters = 0;
   for (int num_threads_per_disk = 1; num_threads_per_disk <= 5; ++num_threads_per_disk) {
-    for (int num_disks = 1; num_disks <= 3; num_disks += 2) {
-      for (int num_buffers = 1; num_buffers <= 5; num_buffers += 2) {
+    for (int num_disks = 1; num_disks <= 5; num_disks += 2) {
+      for (int num_buffers = 1; num_buffers <= 11; num_buffers += 2) {
         LOG(INFO) << "Starting test with num_threads_per_disk=" << num_threads_per_disk
                   << " num_disk=" << num_disks << " num_buffers=" << num_buffers;
+        if (++iters % 10000 == 0) LOG(ERROR) << "Starting iteration " << iters;
         
         DiskIoMgr io_mgr(num_disks, num_threads_per_disk, BUFFER_SIZE);
         Status status = io_mgr.Init();
         ASSERT_TRUE(status.ok());
-
         DiskIoMgr::ReaderContext* reader;
-        status = io_mgr.RegisterReader(NULL, num_buffers, &reader);
+        status = io_mgr.RegisterReader(NULL, num_buffers, 0, &reader);
         ASSERT_TRUE(status.ok());
-          
-        const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
-        const char* data = "abcde";
-        CreateTempFile(tmp_file, data);
           
         DiskIoMgr::ScanRange* complete_range = InitRange(tmp_file, 0, strlen(data), 0);
 
@@ -273,7 +281,8 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
 
         vector<DiskIoMgr::ScanRange*> ranges;
         for (int i = 0; i < strlen(data); ++i) {
-          ranges.push_back(InitRange(tmp_file, i, 1, 0));
+          int disk_id = i % num_disks;
+          ranges.push_back(InitRange(tmp_file, i, 1, disk_id));
         }
         io_mgr.AddScanRanges(reader, ranges);
 
@@ -320,7 +329,7 @@ TEST_F(DiskIoMgrTest, SyncReadTest) {
         // Validate async read result
         EXPECT_TRUE(strncmp(data, result, strlen(data)) == 0);
 
-        // One additiona buffer could have been allocated for the sync read
+        // One additional buffer could have been allocated for the sync read
         ASSERT_LE(io_mgr.num_allocated_buffers(), num_buffers * num_disks + 1);
         io_mgr.UnregisterReader(reader);
       }
@@ -334,47 +343,51 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
   const int DATA_LEN = 50;
   const int ITERATIONS = 25;
 
+  vector<string> file_names;
+  vector<string> data;
+  vector<DiskIoMgr::ReaderContext*> readers;
+  file_names.resize(NUM_THREADS);
+  readers.resize(NUM_THREADS);
+  data.resize(NUM_THREADS);
+
+  // Initialize data for each thread.  The data will be 
+  // 'abcd...' for thread one, 'bcde...' for thread two (wrapping around at 'z')
+  for (int i = 0; i < NUM_THREADS; ++i) {
+    char buf[DATA_LEN];
+    for (int j = 0; j < DATA_LEN; ++j) {
+      int c = (j + i) % 26;
+      buf[j] = 'a' + c;
+    }
+    data[i] = string(buf, DATA_LEN);
+            
+    stringstream ss;
+    ss << "/tmp/disk_io_mgr_test" << i << ".txt";
+    file_names[i] = ss.str();
+    CreateTempFile(ss.str().c_str(), data[i].c_str());
+  }
+
   // This exercises concurrency, run the test multiple times
+  int64_t iters = 0;
   for (int iteration = 0; iteration < ITERATIONS; ++iteration) {
     for (int num_threads_per_disk = 1; num_threads_per_disk <= 5; ++num_threads_per_disk) {
-      for (int num_disks = 1; num_disks <= 3; num_disks += 2) {
-        for (int num_buffers = 1; num_buffers <= 5; num_buffers += 2) {
+      for (int num_disks = 1; num_disks <= 5; num_disks += 2) {
+        for (int num_buffers = 1; num_buffers <= 11; num_buffers += 2) {
           LOG(INFO) << "Starting test with num_threads_per_disk=" << num_threads_per_disk
                     << " num_disk=" << num_disks << " num_buffers=" << num_buffers;
+          if (++iters % 2500 == 0) LOG(ERROR) << "Starting iteration " << iters;
         
           DiskIoMgr io_mgr(num_disks, num_threads_per_disk, BUFFER_SIZE);
-
           Status status = io_mgr.Init();
           ASSERT_TRUE(status.ok());
 
-          vector<string> file_names;
-          vector<string> data;
-          vector<DiskIoMgr::ReaderContext*> readers;
-
-          file_names.resize(NUM_THREADS);
-          data.resize(NUM_THREADS);
-          readers.resize(NUM_THREADS);
-
           for (int i = 0; i < NUM_THREADS; ++i) {
-            // Initialize data for each thread.  The data will be 
-            // 'abcd...' for thread one, 'bcde...' for thread two (wrapping around at 'z')
-            char buf[DATA_LEN];
-            for (int j = 0; j < DATA_LEN; ++j) {
-              int c = (j + i) % 26;
-              buf[j] = 'a' + c;
-            }
-            data[i] = string(buf, DATA_LEN);
-            stringstream ss;
-            ss << "/tmp/disk_io_mgr_test" << i << ".txt";
-            file_names[i] = ss.str();
-            CreateTempFile(ss.str().c_str(), data[i].c_str());
-
-            status = io_mgr.RegisterReader(NULL, num_buffers, &readers[i]);
+            status = io_mgr.RegisterReader(NULL, num_buffers, 0, &readers[i]);
             ASSERT_TRUE(status.ok());
           
             vector<DiskIoMgr::ScanRange*> ranges;
             for (int j = 0; j < DATA_LEN; ++j) {
-              ranges.push_back(InitRange(file_names[i].c_str(), j, 1, 0));
+              int disk_id = j % num_disks;
+              ranges.push_back(InitRange(file_names[i].c_str(), j, 1, disk_id));
             }
             status = io_mgr.AddScanRanges(readers[i], ranges);
             ASSERT_TRUE(status.ok());
@@ -382,15 +395,200 @@ TEST_F(DiskIoMgrTest, MultipleReader) {
 
           thread_group threads;
           for (int i = 0; i < NUM_THREADS; ++i) {
-            threads.add_thread(
-                new thread(&DiskIoMgrTest::ValidateRead, &io_mgr, 
-                    readers[i], data[i].c_str()));
+            threads.add_thread(new thread(&DiskIoMgrTest::ValidateRead, &io_mgr, 
+                readers[i], data[i].c_str()));
           }
           threads.join_all();
 
           for (int i = 0; i < NUM_THREADS; ++i) {
             io_mgr.UnregisterReader(readers[i]);
           }
+        }
+      }
+    }
+  }
+}
+
+// This test is going to dynamically adjust the number of buffers assigned to
+// a reader.
+TEST_F(DiskIoMgrTest, UpdateBufferQuotaTest) {
+  int MAX_BUFFERS = 7;
+  const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
+  const char* data = "abcdefghijklmnopqrstuvwxyz";
+  CreateTempFile(tmp_file, data);
+
+  int64_t iters = 0;
+  for (int num_threads_per_disk = 1; num_threads_per_disk <= 5; ++num_threads_per_disk) {
+    for (int num_disks = 1; num_disks <= 5; num_disks += 2) {
+      for (int adding = 0; adding < 1; ++adding) {
+        LOG(INFO) << "Starting test with num_threads_per_disk=" << num_threads_per_disk
+                  << " num_disk=" << num_disks << " adding=" << adding;
+        if (++iters % 1000 == 0) LOG(ERROR) << "Starting iteration " << iters;
+
+        DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1);
+        Status status = io_mgr.Init();
+        ASSERT_TRUE(status.ok());
+        
+        // Start with one buffer and work our way up or the max buffers and go down.
+        int num_buffers = adding ? 1 : MAX_BUFFERS;
+        DiskIoMgr::ReaderContext* reader;
+        status = io_mgr.RegisterReader(NULL, num_buffers, 0, &reader);
+        ASSERT_TRUE(status.ok());
+          
+        vector<DiskIoMgr::ScanRange*> ranges;
+        for (int i = 0; i < strlen(data); ++i) {
+          int disk_id = i % num_disks;
+          ranges.push_back(InitRange(tmp_file, i, 1, disk_id));
+        }
+        status = io_mgr.AddScanRanges(reader, ranges);
+        ASSERT_TRUE(status.ok());
+
+        bool eos = false;
+        while (!eos) {
+          // Should be able to read once for each buffer
+          list<DiskIoMgr::BufferDescriptor*> buffers;
+          DiskIoMgr::BufferDescriptor* buffer;
+          for (int i = 0; i < num_buffers; ++i) {
+            status = io_mgr.GetNext(reader, &buffer, &eos);
+            EXPECT_TRUE(status.ok());
+            ASSERT_TRUE(buffer != NULL);
+            ASSERT_TRUE(buffer->buffer() != NULL);
+            EXPECT_TRUE(buffer->eosr());
+            ASSERT_EQ(buffer->len(), 1);
+            EXPECT_EQ(buffer->buffer()[0], data[buffer->scan_range()->offset()]);
+            buffers.push_back(buffer);
+            if (eos) break;
+          }
+          num_buffers += (adding ? 1 : -1);
+          num_buffers = ::min(num_buffers, MAX_BUFFERS);
+          num_buffers = ::max(num_buffers, 1);
+          bool ok = io_mgr.SetMaxIoBuffers(reader, num_buffers);
+          EXPECT_TRUE(ok);
+
+          for (list<DiskIoMgr::BufferDescriptor*>::iterator it = buffers.begin();
+              it != buffers.end(); ++it) {
+            (*it)->Return();
+          }
+        }
+        io_mgr.UnregisterReader(reader);
+      }
+    }
+  }
+}
+
+// This tests exercises the grouped scan range functionality.
+TEST_F(DiskIoMgrTest, ScanRangeGroupTest) {
+  return; // TODO
+  int64_t return_buffer_idx = 0;
+  const char* tmp_file = "/tmp/disk_io_mgr_test.txt";
+  const char* data = "abcd";
+  CreateTempFile(tmp_file, data);
+
+  int data_len = strlen(data);
+  char result[data_len];
+
+  for (int num_threads_per_disk = 1; num_threads_per_disk <= 5; ++num_threads_per_disk) {
+    for (int num_disks = 1; num_disks <= 3; num_disks += 2) {
+      for (int group_size = 1; group_size < 2; ++group_size) {
+        // There are two interesting num_buffer settings.  
+        // 1) The number of buffers is less than the group.  The IO mgr needs to increase 
+        // the number to at least the group size.
+        // 2) The number is more, in which case the IO mgr can buffer some ranges in a 
+        // group more.
+        for (int num_buffers = data_len; num_buffers < data_len + group_size; 
+            num_buffers += group_size) {
+          LOG(INFO) << "Starting test with num_threads_per_disk=" << num_threads_per_disk
+                    << " num_disk=" << num_disks << "num_buffers=" << num_buffers
+                    << " group-size=" << group_size;
+          DiskIoMgr io_mgr(num_disks, num_threads_per_disk, 1);
+          Status status = io_mgr.Init();
+          ASSERT_TRUE(status.ok());
+
+          DiskIoMgr::ReaderContext* reader;
+          status = io_mgr.RegisterReader(NULL, num_buffers, 0, &reader);
+          ASSERT_TRUE(status.ok());
+            
+          memset(result, 0, strlen(data));
+
+          vector<DiskIoMgr::ScanRange*> ranges;
+          for (int i = 0; i < group_size; ++i) {
+            int disk_id = ranges.size() % num_disks;
+            ranges.push_back(
+                InitRange(tmp_file, 0, data_len, disk_id, reinterpret_cast<void*>(i)));
+          }
+
+          // Create a vector of list of buffers.  There is a list per column.
+          vector<list<DiskIoMgr::BufferDescriptor*> > buffers;
+          buffers.resize(group_size);
+        
+          // All ranges in group are added.  
+          status = io_mgr.AddScanRanges(reader, ranges, true);
+          ASSERT_TRUE(status.ok());
+
+          // Until all the ranges are read, call TryGetNext until all the buffers are
+          // exhausted.  Then return one buffer and repeat.  Whenever TryGetNext
+          // fails to return a buffer, we verify that at least one buffer has been
+          // returned for each scan range.  This guarantees the grouping functionality
+          // is correct.
+          while (true) {
+            bool eos;
+            DiskIoMgr::BufferDescriptor* buffer;
+            status = io_mgr.TryGetNext(reader, &buffer, &eos);
+            ASSERT_TRUE(status.ok());
+            if (buffer != NULL) {
+              EXPECT_EQ(buffer->len(), 1);
+              result[buffer->scan_range_offset()] = buffer->buffer()[0];
+              
+              long group_idx = reinterpret_cast<long>(buffer->scan_range()->meta_data());
+              ASSERT_GE(group_idx, 0);
+              ASSERT_LT(group_idx, group_size);
+              buffers[group_idx].push_back(buffer);
+
+              if (eos) {
+                EXPECT_TRUE(strncmp(data, result, strlen(data)) == 0);
+                // Clean up.  Return all buffers.
+                for (int i = 0; i < buffers.size(); ++i) {
+                  int num_buffers = buffers[i].size();
+                  EXPECT_GT(num_buffers, 0);
+                  for (int j = 0; j < num_buffers; ++j) {
+                    DiskIoMgr::BufferDescriptor* return_buffer = buffers[i].front();
+                    buffers[i].pop_front();
+                    if (return_buffer != NULL) return_buffer->Return();
+                  }
+                }
+                break;
+              }
+            } else {
+              EXPECT_TRUE(strncmp(data, result, data_len) == 0);
+              // Validate all ranges have at least one buffer.
+              for (int i = 0; i < buffers.size(); ++i) {
+                EXPECT_GT(buffers[i].size(), 0);
+              }
+
+              // Return a "random" buffer
+              int return_idx = return_buffer_idx % group_size;
+              ++return_buffer_idx;
+
+              for (int i = 0; i < buffers.size(); ++i) {
+                int idx = (return_idx + i) % group_size;
+                list<DiskIoMgr::BufferDescriptor*>& l = buffers[idx];
+                DiskIoMgr::BufferDescriptor* return_buffer = l.front();
+                // This scan range is all done, return the next one.
+                if (return_buffer == NULL) continue;
+                l.pop_front();
+                if (return_buffer->eosr()) {
+                  // Push a NULL as a sentinel that this range is done.
+                  l.push_back(NULL);
+                }
+                // Return the buffer which should trigger the IO mgr to read the 
+                // next thing.
+                return_buffer->Return();
+              }
+            }
+          }
+        
+          // End of test case for these configs
+          io_mgr.UnregisterReader(reader);
         }
       }
     }
@@ -411,5 +609,7 @@ TEST_F(DiskIoMgrTest, StressTest) {
 int main(int argc, char **argv) {
   google::InitGoogleLogging(argv[0]);
   ::testing::InitGoogleTest(&argc, argv);
+  impala::CpuInfo::Init();
   return RUN_ALL_TESTS();
 }
+

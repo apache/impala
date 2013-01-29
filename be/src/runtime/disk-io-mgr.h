@@ -56,13 +56,30 @@ namespace impala {
 // The disk threads do not synchronize with each other.  The readers don't synchronize
 // with each other.  There is a lock and condition variable for each reader queue and 
 // each disk queue.
-// IMPORTANT: whenever both locks are needed, the lock order is to grab the disk lock
-// before the reader lock.
+// IMPORTANT: whenever both locks are needed, the lock order is to grab the reader lock
+// before the disk lock.
 // If multiple reader locks are needed, the locks should be taken in increasing reader
-// context addresses. TODO: we currently never do this.
+// context addresses. This is not currently done ever.
+//
+// Resource Management: effective resource management in the io mgr is key to good
+// performance.  The resource that can be controlled is the number of io buffers
+// per reader.  If this number is too low, the disks might not be kept busy OR
+// the cores might be idle.  Having this too high causes excessive memory usage,
+// particularly in the multiple query scenario. 
+// There are two per reader knobs to control resource usage.  The first, is the number
+// of io buffers the reader can use.  The second is the number of scan ranges that
+// should be processed in parallel.  Buffers can either all come from different ranges,
+// all from the same range or something in between.  Since we cannot parallelize
+// processing a single range, the number of flight controls the amount of CPU usage
+// in the scanner threads.  Both these settings can be changed dynamically and the io mgr
+// will ramp them down under higher load.
+// TODO: we need to think about this some more.  One way to model this is that the
+// machine has a fixed amount of total io throughput and fixed amount of compute.  The
+// total CPU usage can be limited by have a total max in flight scan ranges (since
+// each scan range maps roughly to one core).
 // TODO: IoMgr should be able to request additional scan ranges from the coordinator
 // to help deal with stragglers.
-// TODO: look into reducing the number of locks taken in the disk thread loop
+// TODO: look into using a lock free queue
 class DiskIoMgr {
  public:
   struct ReaderContext;
@@ -196,9 +213,17 @@ class DiskIoMgr {
   // each reader.
   // hdfs: is the handle to the hdfs connection.  If NULL, it is assumed all
   //    scan ranges are on the local file system
-  // io_buffers_per_disk: The maximum number of io buffers for this reader per disk.
-  //    Reads will not happen if there are no available io buffers.
-  Status RegisterReader(hdfsFS hdfs, int io_buffers_per_disk, ReaderContext** reader);
+  // max_io_buffers: The maximum number of io buffers for this reader.
+  //    Reads will not happen if there are no available io buffers.  This limits
+  //    the memory usage for this reader.
+  // max_parallel_ranges: The maximum number of scan ranges that should be read in
+  //    parallel for this reader.  If it's 0, a default will be used. This controls
+  //    how many scan ranges can be processed in parallel. 
+  // If max_parallel_ranges is less than max_io_buffers, multiple buffers will 
+  // potentially be queued per range.  If max_parallel_ranges is greater, some ranges
+  // will be started without any buffers queued for it.  
+  Status RegisterReader(hdfsFS hdfs, int max_io_buffers, int max_parallel_ranges,
+      ReaderContext** reader);
 
   // Unregisters reader from the disk io mgr.  This must be called for every 
   // RegisterReader() regardless of cancellation and must be called in the
@@ -216,9 +241,28 @@ class DiskIoMgr {
   // want readers to be associated with a fragment id and also be able to cancel on that.
   void CancelReader(ReaderContext* reader);
 
+  // Sets the maximum io buffers for this reader.  This can be higher or lower than
+  // the current quota.  The update is not instantenously; in flight buffers are not
+  // taken back right away.  
+  // A value of 0 will effectively halt the reader.  
+  // If 'max_io_buffers' is non-zero, this will return true if the request is possible 
+  // and false otherwise.  It might be impossible to satisfy this request if the new
+  // quota is lower than the minimum number of buffers required for this reader
+  // (due to grouped scan ranges).
+  // This is mostly used for testing.  The IO mgr will automatically adjust this for
+  // readers.
+  // TODO: this needs some policy.
+  bool SetMaxIoBuffers(ReaderContext* reader, int max_io_buffers);
+
   // Adds the scan ranges to the queues. This call is non-blocking.  The caller must
   // not deallocate the scan range pointers before UnregisterReader.
-  Status AddScanRanges(ReaderContext* reader, const std::vector<ScanRange*>& ranges);
+  // If is_grouped, then the ranges in the vector are part of the same group and
+  // the IO mgr will guarantee that if any of the grouped ranges have ready buffers,
+  // all ranges in that group will also have ready buffers. 
+  // If a reader has multiple groups, this can be called repeatedly, once for each
+  // group.
+  Status AddScanRanges(ReaderContext* reader, const std::vector<ScanRange*>& ranges,
+      bool is_grouped = false);
 
   // Get the next buffer for this query. Results are returned in buffer. 
   // GetNext can be called from multiple threads for a single reader and has a few
@@ -240,6 +284,14 @@ class DiskIoMgr {
   // caused the error (file, offset, etc).  The buffer descriptor must be
   // returned in this case.
   Status GetNext(ReaderContext* reader, BufferDescriptor** buffer, bool* eos);
+
+  // Identical to GetNext() except that it will not block if this reader has
+  // exhausted all its buffers.  In that case.  *buffer will be set to NULL and
+  // this function will return right away.
+  // Note: this can still be blocking if there are buffers ready but not yet
+  // read by a disk thread.
+  // Currently, this is only uesd for testing.
+  Status TryGetNext(ReaderContext* reader, BufferDescriptor** buffer, bool* eos);
 
   // Reads the range and returns the result in bufer.  
   // This behaves like the typical synchronous read() api, blocking until the data 
@@ -321,7 +373,6 @@ class DiskIoMgr {
 
   // Per disk queues.  This is static and created once at Init() time.
   // One queue is allocated for each disk on the system and indexed by disk id
-  // TODO: try DiskQueue** instead of std::vector?
   std::vector<DiskQueue*> disk_queues_;
 
   // Gets a buffer description object, initialized for this reader, allocating
@@ -340,12 +391,8 @@ class DiskIoMgr {
   // allocated.
   char* GetFreeBuffer();
 
-  // Returns a buffer to the free list.
-  void ReturnFreeBuffer(char*);
-
-  // Removes the reader from the queue.  Both the disk and reader locks should be
-  // taken before.
-  void RemoveReaderFromDiskQueue(DiskQueue* queue, ReaderContext* reader);
+  // Returns a buffer to the free list.  
+  void ReturnFreeBuffer(char* buffer);
 
   // Disk worker thread loop.  This function reads the next range from the 
   // disk queue if there are available buffers and places the read buffer into 
@@ -370,11 +417,6 @@ class DiskIoMgr {
   Status ReadFromScanRange(hdfsFS hdfs_connection, ScanRange* range, 
       char* buffer, int64_t* bytes_read, bool* eosr);
 
-  // Decrements ref count on the reader for this disk.  If the disk ref count for
-  // this reader goes to 0, the disk complete condition variable is signaled.
-  // Reader lock must be taken before this call.
-  void DecrementDiskRefCount(ReaderContext* reader);
-
   // This is called from the disk thread to get the next scan to process.  It will
   // wait until a scan range is available and a buffer is available to do the work.
   // This functions returns the scan range, the reader and buffer to read into.
@@ -392,3 +434,4 @@ class DiskIoMgr {
 }
 
 #endif
+

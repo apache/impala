@@ -25,7 +25,7 @@ static const int MAX_READ_LEN = 20;
 static const int MIN_FILE_LEN = 10;
 static const int MAX_FILE_LEN = 1024;
 
-static const int NUM_BUFFERS_PER_DISK = 3;
+static const int MAX_BUFFERS = 12;
 
 // Make sure this is between MIN/MAX FILE_LEN to test more cases
 static const int READ_BUFFER_SIZE = 128;
@@ -222,7 +222,8 @@ void DiskIoMgrStress::NewClient(int i) {
     client.scan_ranges.push_back(range);
     assigned_len += range_len;
   }
-  Status status = io_mgr_->RegisterReader(NULL, NUM_BUFFERS_PER_DISK, &client.reader);
+  int num_buffers = (rand() % MAX_BUFFERS) + 1;
+  Status status = io_mgr_->RegisterReader(NULL, num_buffers, 0, &client.reader);
   CHECK(status.ok());
   status = io_mgr_->AddScanRanges(client.reader, client.scan_ranges);
   CHECK(status.ok());

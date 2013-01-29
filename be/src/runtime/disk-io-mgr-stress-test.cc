@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "runtime/disk-io-mgr-stress.h"
+#include "util/cpu-info.h"
 #include "util/string-parser.h"
 
 using namespace impala;
@@ -30,6 +31,7 @@ const bool TEST_CANCELLATION = true;
 
 int main(int argc, char** argv) {
   google::InitGoogleLogging(argv[0]);
+  CpuInfo::Init();
   int duration_sec = DEFAULT_DURATION_SEC;
 
   if (argc == 2) {
