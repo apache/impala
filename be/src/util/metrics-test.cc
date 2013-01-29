@@ -25,13 +25,13 @@ namespace impala {
 class MetricsTest : public testing::Test {
  public:
   Metrics* metrics() { return metrics_.get(); }
-  MetricsTest() : metrics_(new Metrics()) { 
+  MetricsTest() : metrics_(new Metrics()) {
     bool_metric_ = metrics_->CreateAndRegisterPrimitiveMetric("bool",
         false);
     int_metric_ = metrics_->CreateAndRegisterPrimitiveMetric("int", 0L);
     double_metric_ = metrics_->CreateAndRegisterPrimitiveMetric("double",
         1.23);
-    string_metric_ = metrics_->CreateAndRegisterPrimitiveMetric("string", 
+    string_metric_ = metrics_->CreateAndRegisterPrimitiveMetric("string",
         string("hello world"));
 
     vector<int> items;
@@ -40,6 +40,11 @@ class MetricsTest : public testing::Test {
     set<int> item_set;
     item_set.insert(4); item_set.insert(5); item_set.insert(6);
     set_metric_ = metrics_->RegisterMetric(new SetMetric<int>("set", item_set));
+
+    set<string> string_set;
+    string_set.insert("one"); string_set.insert("two");
+    string_set_metric_ = metrics_->RegisterMetric(new SetMetric<string>("string_set",
+                                                                        string_set));
   }
   Metrics::BooleanMetric* bool_metric_;
   Metrics::IntMetric* int_metric_;
@@ -48,6 +53,7 @@ class MetricsTest : public testing::Test {
 
   ListMetric<int>* list_metric_;
   SetMetric<int>* set_metric_;
+  SetMetric<string>* string_set_metric_; // For quote testing
 
  private:
   boost::scoped_ptr<Metrics> metrics_;
@@ -107,6 +113,22 @@ TEST_F(MetricsTest, Increment) {
   int_metric_->Update(1);
   EXPECT_EQ(int_metric_->Increment(10), 11);
   EXPECT_EQ(int_metric_->value(), 11);
+}
+
+TEST_F(MetricsTest, JsonQuoting) {
+  // Strings should be quoted in Json output
+  EXPECT_NE(metrics()->DebugStringJson().find("\"string\": \"hello world\""),
+            string::npos);
+
+  // Other types should not be quoted
+  EXPECT_NE(metrics()->DebugStringJson().find("\"bool\": 0"), string::npos);
+
+  // Strings in sets should be quoted
+  EXPECT_NE(metrics()->DebugStringJson().find("\"string_set\": [\"one\", \"two\"]"),
+            string::npos);
+
+  // Other types in sets should not be quoted
+  EXPECT_NE(metrics()->DebugStringJson().find("\"set\": [4, 5, 6]"), string::npos);
 }
 }
 

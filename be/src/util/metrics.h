@@ -29,6 +29,15 @@
 
 namespace impala {
 
+// Helper method to print a single primitive value as a Json atom
+template<typename T> void PrintPrimitiveAsJson(const T& v, std::stringstream* out) {
+  (*out) << v;
+}
+
+// Specialisation to print string values inside quotes when writing to Json
+template<> void PrintPrimitiveAsJson<std::string>(const std::string& v,
+                                                  std::stringstream* out);
+
 // Publishes execution metrics to a webserver page
 // TODO: Reconsider naming here; Metrics is too general.
 class Metrics {
@@ -47,13 +56,13 @@ class Metrics {
   };
 
  public:
-  // Structure containing a metric value. Provides for thread-safe update and 
+  // Structure containing a metric value. Provides for thread-safe update and
   // test-and-set operations.
   template<typename T>
   class Metric : GenericMetric {
    public:
     // Sets current metric value to parameter
-    void Update(const T& value) { 
+    void Update(const T& value) {
       boost::lock_guard<boost::mutex> l(lock_);
       value_ = value;
     }
@@ -64,7 +73,7 @@ class Metrics {
     }
 
     // If current value == test_, update with new value. In all cases return
-    // current value so that success can be detected. 
+    // current value so that success can be detected.
     T TestAndSet(const T& value, const T& test) {
       boost::lock_guard<boost::mutex> l(lock_);
       if (value_ == test) {
@@ -84,7 +93,7 @@ class Metrics {
       boost::lock_guard<boost::mutex> l(lock_);
       (*out) << key_ << ":";
       PrintValue(out);
-    }    
+    }
 
     virtual void PrintJson(std::stringstream* out) {
       boost::lock_guard<boost::mutex> l(lock_);
@@ -92,7 +101,7 @@ class Metrics {
       PrintValueJson(out);
     }
 
-    Metric(const std::string& key, const T& value) 
+    Metric(const std::string& key, const T& value)
         : value_(value), key_(key) { }
 
    protected:
@@ -114,11 +123,11 @@ class Metrics {
   };
 
   // PrimitiveMetrics are the most common metric type, whose values natively
-  // support operator<< and optionally operator+. 
+  // support operator<< and optionally operator+.
   template<typename T>
   class PrimitiveMetric : public Metric<T> {
    public:
-    PrimitiveMetric(const std::string& key, const T& value) 
+    PrimitiveMetric(const std::string& key, const T& value)
         : Metric<T>(key, value) {
     }
 
@@ -132,11 +141,11 @@ class Metrics {
    protected:
     virtual void PrintValue(std::stringstream* out)  {
       (*out) << this->value_;
-    }    
+    }
 
     virtual void PrintValueJson(std::stringstream* out)  {
-      (*out) << "\"" << this->value_ << "\"";
-    }    
+      PrintPrimitiveAsJson(this->value_, out);
+    }
   };
 
   // Convenient typedefs for common primitive metric types.
@@ -151,7 +160,7 @@ class Metrics {
   // this object) If a metric is already registered to this name it will be
   // overwritten (in debug builds it is an error)
   template<typename T>
-  PrimitiveMetric<T>* CreateAndRegisterPrimitiveMetric(const std::string& key, 
+  PrimitiveMetric<T>* CreateAndRegisterPrimitiveMetric(const std::string& key,
       const T& value) {
     return RegisterMetric(new PrimitiveMetric<T>(key, value));
   }
@@ -159,26 +168,26 @@ class Metrics {
   // Registers a new metric. Ownership of the metric will be transferred to this
   // Metrics object, so callers should take care not to destroy the Metric they
   // pass in.
-  // If a metric already exists with the supplied metric's key, it is replaced. 
+  // If a metric already exists with the supplied metric's key, it is replaced.
   // The template parameter M must be a subclass of Metric.
   template <typename M>
   M* RegisterMetric(M* metric) {
-    boost::lock_guard<boost::mutex> l(lock_);    
+    boost::lock_guard<boost::mutex> l(lock_);
     DCHECK(!metric->key_.empty());
-    DCHECK(metric_map_.find(metric->key_) == metric_map_.end()) 
+    DCHECK(metric_map_.find(metric->key_) == metric_map_.end())
       << "Multiple registrations of metric key: " << metric->key_;
 
     M* mt = obj_pool_->Add(metric);
     metric_map_[metric->key_] = mt;
-    return mt;    
+    return mt;
   }
 
-  // Returns a metric by key.  Returns NULL if there is no metric with that 
+  // Returns a metric by key.  Returns NULL if there is no metric with that
   // key.  This is not a very cheap operation and should not be called in a loop.
   // If the metric needs to be updated in a loop, the returned metric should be cached.
   template <typename M>
   M* GetMetric(const std::string& key) {
-    boost::lock_guard<boost::mutex> l(lock_);    
+    boost::lock_guard<boost::mutex> l(lock_);
     MetricMap::iterator it = metric_map_.find(key);
     if (it == metric_map_.end()) return NULL;
     return reinterpret_cast<M*>(it->second);
@@ -189,6 +198,9 @@ class Metrics {
 
   // Useful for debuggers, returns the output of TextCallback
   std::string DebugString();
+
+  // Same as above, but for Json output
+  std::string DebugStringJson();
 
  private:
   // Pool containing all metric objects
@@ -213,7 +225,7 @@ class Metrics {
   // Webserver callback (on /jsonmetrics), renders metrics as a single json document
   void JsonCallback(const Webserver::ArgumentMap& args, std::stringstream* output);
 };
-  
+
 // Specialize int metrics to use atomics and avoid locking
 template<>
 inline int64_t Metrics::PrimitiveMetric<int64_t>::Increment(const int64_t& delta) {

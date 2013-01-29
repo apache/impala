@@ -31,19 +31,19 @@ namespace impala {
 // it with a new one.
 // TODO: StructuredMetrics or ContainerMetrics are probably better names here.
 
-// Utility method to print an iterable type to a stringstream like ["v1", "v2", "v3"] 
+// Utility method to print an iterable type to a stringstream like ["v1", "v2", "v3"]
 // or [v1, v2, v3], depending on whether quotes are requested via the first parameter
 template <typename T, typename I>
-void PrintStringList(bool quoted_items, const I& iterable, std::stringstream* out) {
+void PrintStringList(bool print_as_json, const I& iterable, std::stringstream* out) {
   std::vector<std::string> strings;
   BOOST_FOREACH(const T& item, iterable) {
     std::stringstream ss;
-    if (quoted_items) {
-      ss << "\"" << item << "\"";
+    if (print_as_json) {
+      PrintPrimitiveAsJson(item, &ss);
     } else  {
       ss << item;
     }
-    strings.push_back(ss.str());    
+    strings.push_back(ss.str());
   }
 
   (*out) <<"[" << boost::algorithm::join(strings, ", ") << "]";
@@ -86,7 +86,7 @@ class SetMetric : public Metrics::Metric<std::set<T> > {
   }
 
  protected:
-  virtual void PrintValueJson(std::stringstream* out) {    
+  virtual void PrintValueJson(std::stringstream* out) {
     PrintStringList<T, std::set<T> >(true, this->value_, out);
   }
 
@@ -120,7 +120,8 @@ class MapMetric : public Metrics::Metric<std::map<K, V> > {
       std::stringstream ss;
       ss << "  ";
       if (quoted_items) {
-        ss << "\"" << entry.first << "\" : \"" << entry.second << "\"";
+        ss << "\"" << entry.first << "\" : ";
+        PrintPrimitiveAsJson(entry.second, &ss);
       } else {
         ss << entry.first << " : " << entry.second;
       }
@@ -131,7 +132,7 @@ class MapMetric : public Metrics::Metric<std::map<K, V> > {
   }
 
 
-  virtual void PrintValueJson(std::stringstream* out) {    
+  virtual void PrintValueJson(std::stringstream* out) {
     PrintToString(true, out);
   }
 
