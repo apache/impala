@@ -305,13 +305,11 @@ def write_results_to_datastore(results):
 
     workload_id = data_store.get_workload_id(workload, scale_factor)
     if workload_id is None:
-      print 'Skipping unkown workload: %s / %s' % (workload, scale_factor)
-      continue
+      workload_id = data_store.insert_workload_info(workload, scale_factor)
 
     query_id = data_store.get_query_id(query_name, query)
     if query_id is None:
-      print 'Skipping unkown query: %s / %s' % (query_name, query)
-      continue
+      query_id = data_store.insert_query_info(query_name, query)
 
     data_store.insert_execution_result(
         query_id=query_id, workload_id=workload_id, file_type_id=file_type_id,

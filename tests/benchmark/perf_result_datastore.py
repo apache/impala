@@ -32,9 +32,17 @@ class PerfResultDataStore(object):
     """ Gets the workload_id for the given workload / scale factor """
     return self.__get_workload_id(workload, scale_factor)
 
+  def insert_query_info(self, query_name, query_string):
+    """ Inserts a new record into the Query table and returns the ID """
+    return self.__insert_query_info(query_name, query_string)
+
   def insert_run_info(self, run_info):
     """ Inserts a new record into the run_info table and returns the ID """
     return self.__insert_run_info(run_info)
+
+  def insert_workload_info(self, workload_name, scale_factor):
+    """ Inserts a new record into the Workload table and returns the ID """
+    return self.__insert_workload_info(workload_name, scale_factor)
 
   def insert_execution_result(self, query_id, workload_id, file_type_id, cluster_name,
         executor_name, avg_time, stddev, run_date, version, notes, run_info_id,
@@ -105,6 +113,21 @@ class PerfResultDataStore(object):
         " %s, '%s', '%s', '%s', %s)" %\
         (run_info_id, query_id, workload_id, file_type_id, cluster_name, executor_name,
          avg_time, stddev, run_date, version, notes, is_official))
+
+  @cursor_wrapper
+  def __insert_query_info(self, name, query, cursor):
+    cursor.execute("insert into Query (name, query) values ('%s', '%s')" % (name, query))
+    result = cursor.execute("SELECT LAST_INSERT_ID()")
+    query_id = cursor.fetchone()
+    return query_id[0] if query_id else None
+
+  @cursor_wrapper
+  def __insert_workload_info(self, name, scale_factor, cursor):
+    cursor.execute("insert into Workload (name, scale_factor) "\
+        "values('%s', '%s')" % (name, scale_factor))
+    result = cursor.execute("SELECT LAST_INSERT_ID()")
+    workload_id = cursor.fetchone()
+    return workload_id[0] if workload_id else None
 
   @cursor_wrapper
   def __print_execution_results(self, run_info_id, cursor):
