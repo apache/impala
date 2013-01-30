@@ -69,6 +69,16 @@ class Tuple {
   void DeepCopy(Tuple* dst, const TupleDescriptor& desc, MemPool* pool,
                 bool convert_ptrs = false);
 
+  // Create a copy of 'this', including all referenced string data, into
+  // data. The tuple is written first, followed by any strings. data and offset
+  // will be incremented by the total number of bytes written. data must already
+  // be allocated to the correct size.
+  // If 'convert_ptrs' is true, converts pointers that are part of the tuple
+  // into offsets in data, based on the provided offset. Otherwise they will be
+  // pointers directly into data.
+  void DeepCopy(const TupleDescriptor& desc, char** data, int* offset,
+                bool convert_ptrs = false);
+
   // Turn null indicator bit on.
   void SetNull(const NullIndicatorOffset& offset) {
     DCHECK(offset.bit_mask != 0);
@@ -83,7 +93,8 @@ class Tuple {
   }
 
   bool IsNull(const NullIndicatorOffset& offset) const {
-    const char* null_indicator_byte = reinterpret_cast<const char*>(this) + offset.byte_offset;
+    const char* null_indicator_byte =
+        reinterpret_cast<const char*>(this) + offset.byte_offset;
     return (*null_indicator_byte & offset.bit_mask) != 0;
   }
 

@@ -95,6 +95,7 @@ class DataStreamSender : public DataSink {
   RuntimeProfile::Counter* serialize_batch_timer_;
   RuntimeProfile::Counter* thrift_transmit_timer_;
   RuntimeProfile::Counter* bytes_sent_counter_;
+  RuntimeProfile::Counter* uncompressed_bytes_counter_;
 };
 
 }

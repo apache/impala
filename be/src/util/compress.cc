@@ -212,6 +212,6 @@ Status SnappyCompressor::ProcessBlock(int input_length, uint8_t* input,
       static_cast<size_t>(input_length),
       reinterpret_cast<char*>(out_buffer_), &out_len);
 
-  if (*output_length == 0) *output_length = out_len;
+  *output_length = out_len;
   return Status::OK;
 }

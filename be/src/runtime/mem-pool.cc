@@ -41,37 +41,6 @@ MemPool::MemPool(int chunk_size)
   DCHECK_GE(chunk_size_, 0);
 }
 
-MemPool::MemPool(const vector<string>& chunks)
-  : current_chunk_idx_(-1),
-    last_offset_conversion_chunk_idx_(-1),
-    chunk_size_(0),
-    total_allocated_bytes_(0),
-    peak_allocated_bytes_(0),
-    exceeded_limit_(false) {
-  if (chunks.empty()) return;
-  chunks_.reserve(chunks.size());
-  int64_t total_bytes_allocated = 0;
-  for (int i = 0; i < chunks.size(); ++i) {
-    chunks_.push_back(ChunkInfo());
-    ChunkInfo& chunk = chunks_.back();
-    chunk.owns_data = true;
-    chunk.data = new uint8_t[chunks[i].size()];
-    total_bytes_allocated += chunks[i].size();
-    memcpy(chunk.data, chunks[i].data(), chunks[i].size());
-    chunk.size = chunks[i].size();
-    chunk.allocated_bytes = chunk.size;
-    chunk.cumulative_allocated_bytes = total_allocated_bytes_;
-    total_allocated_bytes_ += chunk.size;
-  }
-  current_chunk_idx_ = chunks_.size() - 1;
-
-  MemLimit::UpdateLimits(total_bytes_allocated, &limits_);
-  exceeded_limit_ = MemLimit::LimitExceeded(limits_);
-  if (ImpaladMetrics::MEM_POOL_TOTAL_BYTES != NULL) {
-    ImpaladMetrics::MEM_POOL_TOTAL_BYTES->Increment(total_bytes_allocated);
-  }
-}
-
 MemPool::ChunkInfo::ChunkInfo(int size)
   : owns_data(true),
     data(new uint8_t[size]),

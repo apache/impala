@@ -80,12 +80,6 @@ class MemPool {
   // up to a limit.
   MemPool(int chunk_size = 0);
 
-  // Construct a mempool by initializing the chunk data with a copy of the data
-  // backing the strings (each chunk's allocated_bytes == size).
-  // Allocate() must never be called on this pool.
-  // TODO: fix this so we don't need to make a copy
-  MemPool(const std::vector<std::string>& chunks);
-
   // Frees all chunks of memory and subtracts the total allocated bytes
   // from the registered limits.
   ~MemPool();

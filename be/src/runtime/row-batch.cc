@@ -15,10 +15,14 @@
 #include "runtime/row-batch.h"
 
 #include <stdint.h>  // for intptr_t
+#include <snappy.h>
 
 #include "runtime/string-value.h"
 #include "runtime/tuple-row.h"
 #include "gen-cpp/Data_types.h"
+
+DEFINE_bool(compress_rowbatches, true,
+            "if true, compresses tuple data in Serialize");
 
 using namespace std;
 
@@ -35,18 +39,19 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
   // why does Thrift not generate a Clear() function?
   output_batch->row_tuples.clear();
   output_batch->tuple_offsets.clear();
-  output_batch->tuple_data.clear();
+  output_batch->is_compressed = false;
 
   output_batch->num_rows = num_rows_;
   row_desc_.ToThrift(&output_batch->row_tuples);
   output_batch->tuple_offsets.reserve(num_rows_ * num_tuples_per_row_);
-  MemPool output_pool;
 
-  // iterate through all tuples;
-  // for a self-contained batch, convert Tuple* and string pointers into offsets into
-  // our tuple_data_pool_;
-  // otherwise, copy the tuple data, including strings, into output_pool (converting
-  // string pointers into offset in the process)
+  int size = TotalByteSize();
+  output_batch->tuple_data.resize(size);
+
+  // Copy tuple data, including strings, into output_batch (converting string
+  // pointers into offsets in the process)
+  int offset = 0; // current offset into output_batch->tuple_data
+  char* tuple_data = const_cast<char*>(output_batch->tuple_data.c_str());
   for (int i = 0; i < num_rows_; ++i) {
     TupleRow* row = GetRow(i);
     const vector<TupleDescriptor*>& tuple_descs = row_desc_.tuple_descriptors();
@@ -57,48 +62,36 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
         output_batch->tuple_offsets.push_back(-1);
         continue;
       }
-
-      Tuple* t;
-      if (is_self_contained_) {
-        t = row->GetTuple(j);
-        output_batch->tuple_offsets.push_back(
-            tuple_data_pool_->GetOffset(reinterpret_cast<uint8_t*>(t)));
-
-        // convert string pointers to offsets
-        vector<SlotDescriptor*>::const_iterator slot = (*desc)->string_slots().begin();
-        for (; slot != (*desc)->string_slots().end(); ++slot) {
-          DCHECK_EQ((*slot)->type(), TYPE_STRING);
-          StringValue* string_val = t->GetStringSlot((*slot)->tuple_offset());
-          string_val->ptr = reinterpret_cast<char*>(tuple_data_pool_->GetOffset(
-                  reinterpret_cast<uint8_t*>(string_val->ptr)));
-        }
-      } else  {
-        // record offset before creating copy
-        output_batch->tuple_offsets.push_back(output_pool.GetCurrentOffset());
-        t = row->GetTuple(j)->DeepCopy(**desc, &output_pool, /* convert_ptrs */ true);
-      }
+      // Record offset before creating copy (which increments offset and tuple_data)
+      output_batch->tuple_offsets.push_back(offset);
+      row->GetTuple(j)->DeepCopy(**desc, &tuple_data, &offset, /* convert_ptrs */ true);
+      DCHECK_LE(offset, size);
     }
   }
+  DCHECK_EQ(offset, size);
 
-  if (is_self_contained_) {
-    output_pool.AcquireData(tuple_data_pool_.get(), false);
-    Reset();  // we passed on all data
+  if (FLAGS_compress_rowbatches && size > 0) {
+    // Try compressing tuple_data to compression_scratch_, swap if compressed data is
+    // smaller
+    int max_compressed_size = snappy::MaxCompressedLength(size);
+    if (compression_scratch_.size() < max_compressed_size) {
+      compression_scratch_.resize(max_compressed_size);
+    }
+    size_t compressed_size;
+    char* compressed_output = const_cast<char*>(compression_scratch_.c_str());
+    snappy::RawCompress(output_batch->tuple_data.c_str(), size,
+                        compressed_output, &compressed_size);
+    if (LIKELY(compressed_size < size)) {
+      compression_scratch_.resize(compressed_size);
+      output_batch->tuple_data.swap(compression_scratch_);
+      output_batch->is_compressed = true;
+    }
+    VLOG_ROW << "uncompressed size: " << size << ", compressed size: " << compressed_size;
   }
 
-  vector<pair<uint8_t*, int> > chunk_info;
-  output_pool.GetChunkInfo(&chunk_info);
-  output_batch->tuple_data.reserve(chunk_info.size());
-  for (int i = 0; i < chunk_info.size(); ++i) {
-    // TODO: this creates yet another data copy, figure out how to avoid that
-    // (Thrift should introduce something like StringPieces, that can hold
-    // references to data/length pairs)
-    string data(reinterpret_cast<char*>(chunk_info[i].first), chunk_info[i].second);
-    output_batch->tuple_data.push_back(string());
-    output_batch->tuple_data.back().swap(data);
-    DCHECK(data.empty());
-  }
-
-  return GetBatchSize(*output_batch);
+  // The size output_batch would be if we didn't compress tuple_data (will be equal to
+  // actual batch size if tuple_data isn't compressed)
+  return GetBatchSize(*output_batch) - output_batch->tuple_data.size() + size;
 }
 
 // TODO: we want our input_batch's tuple_data to come from our (not yet implemented)
@@ -109,13 +102,29 @@ int RowBatch::Serialize(TRowBatch* output_batch) {
 // (change via python script that runs over Data_types.cc)
 RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch)
   : has_in_flight_row_(false),
-    is_self_contained_(true),
     num_rows_(input_batch.num_rows),
     capacity_(num_rows_),
     num_tuples_per_row_(input_batch.row_tuples.size()),
     row_desc_(row_desc),
     tuple_ptrs_(new Tuple*[num_rows_ * input_batch.row_tuples.size()]),
-    tuple_data_pool_(new MemPool(input_batch.tuple_data)) {
+    tuple_data_pool_(new MemPool()) {
+  if (input_batch.is_compressed) {
+    // Decompress tuple data into data pool
+    const char* compressed_data = input_batch.tuple_data.c_str();
+    size_t compressed_size = input_batch.tuple_data.size();
+    size_t uncompressed_size;
+    bool success = snappy::GetUncompressedLength(compressed_data, compressed_size,
+                                                 &uncompressed_size);
+    DCHECK(success) << "snappy::GetUncompressedLength failed";
+    char* data = reinterpret_cast<char*>(tuple_data_pool_->Allocate(uncompressed_size));
+    success = snappy::RawUncompress(compressed_data, compressed_size, data);
+    DCHECK(success) << "snappy::RawUncompress failed";
+  } else {
+    // Tuple data uncompressed, copy directly into data pool
+    uint8_t* data = tuple_data_pool_->Allocate(input_batch.tuple_data.size());
+    memcpy(data, input_batch.tuple_data.c_str(), input_batch.tuple_data.size());
+  }
+
   // convert input_batch.tuple_offsets into pointers
   int tuple_idx = 0;
   for (vector<int32_t>::const_iterator offset = input_batch.tuple_offsets.begin();
@@ -161,10 +170,7 @@ RowBatch::RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch)
 }
 
 int RowBatch::GetBatchSize(const TRowBatch& batch) {
-  int result = 0;
-  for (int i = 0; i < batch.tuple_data.size(); ++i) {
-    result += batch.tuple_data[i].size();
-  }
+  int result = batch.tuple_data.size();
   result += batch.row_tuples.size() * sizeof(TTupleId);
   result += batch.tuple_offsets.size() * sizeof(int32_t);
   return result;
@@ -177,12 +183,10 @@ void RowBatch::Swap(RowBatch* other) {
 
   // The destination row batch should be empty.  
   DCHECK(!has_in_flight_row_);
-  DCHECK(!is_self_contained_);
   DCHECK(io_buffers_.empty());
   DCHECK_EQ(tuple_data_pool_->GetTotalChunkSizes(), 0);
 
   std::swap(has_in_flight_row_, other->has_in_flight_row_);
-  std::swap(is_self_contained_, other->is_self_contained_);
   std::swap(num_rows_, other->num_rows_);
   std::swap(capacity_, other->capacity_);
   std::swap(tuple_ptrs_, other->tuple_ptrs_);
@@ -190,4 +194,26 @@ void RowBatch::Swap(RowBatch* other) {
   tuple_data_pool_.swap(other->tuple_data_pool_);
 }
 
+// TODO: consider computing size of batches as they are built up
+int RowBatch::TotalByteSize() {
+  int result = 0;
+  for (int i = 0; i < num_rows_; ++i) {
+    TupleRow* row = GetRow(i);
+    const vector<TupleDescriptor*>& tuple_descs = row_desc_.tuple_descriptors();
+    vector<TupleDescriptor*>::const_iterator desc = tuple_descs.begin();
+    for (int j = 0; desc != tuple_descs.end(); ++desc, ++j) {
+      Tuple* tuple = row->GetTuple(j);
+      if (tuple == NULL) continue;
+      result += (*desc)->byte_size();
+      vector<SlotDescriptor*>::const_iterator slot = (*desc)->string_slots().begin();
+      for (; slot != (*desc)->string_slots().end(); ++slot) {
+        DCHECK_EQ((*slot)->type(), TYPE_STRING);
+        if (tuple->IsNull((*slot)->null_indicator_offset())) continue;
+        StringValue* string_val = tuple->GetStringSlot((*slot)->tuple_offset());
+        result += string_val->len;
+      }
+    }
+  }
+  return result;
+}
 }

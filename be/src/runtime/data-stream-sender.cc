@@ -226,8 +226,9 @@ Status DataStreamSender::Channel::SendCurrentBatch() {
   rpc_thread_.join();
   {
     SCOPED_TIMER(parent_->serialize_batch_timer_);
-    int num_bytes = batch_->Serialize(&thrift_batch_);
-    COUNTER_UPDATE(parent_->bytes_sent_counter_, num_bytes);
+    int uncompressed_bytes = batch_->Serialize(&thrift_batch_);
+    COUNTER_UPDATE(parent_->bytes_sent_counter_, RowBatch::GetBatchSize(thrift_batch_));
+    COUNTER_UPDATE(parent_->uncompressed_bytes_counter_, uncompressed_bytes);
   }
   batch_->Reset();
   RETURN_IF_ERROR(SendBatch(&thrift_batch_));
@@ -336,6 +337,8 @@ Status DataStreamSender::Init(RuntimeState* state) {
   profile_ = pool_->Add(new RuntimeProfile(pool_, "DataStreamSender"));
   bytes_sent_counter_ =
       ADD_COUNTER(profile(), "BytesSent", TCounterType::BYTES);
+  uncompressed_bytes_counter_ =
+      ADD_COUNTER(profile(), "UncompressedRowBatchSize", TCounterType::BYTES);
   serialize_batch_timer_ =
       ADD_TIMER(profile(), "SerializeBatchTime");
   thrift_transmit_timer_ = ADD_TIMER(profile(), "ThriftTransmitTime");
@@ -350,8 +353,9 @@ Status DataStreamSender::Send(RuntimeState* state, RowBatch* batch) {
     VLOG_ROW << "serializing " << batch->num_rows() << " rows";
     {
       SCOPED_TIMER(serialize_batch_timer_);
-      int num_bytes = batch->Serialize(current_thrift_batch_);
-      COUNTER_UPDATE(bytes_sent_counter_, num_bytes);
+      int uncompressed_bytes = batch->Serialize(current_thrift_batch_);
+      COUNTER_UPDATE(bytes_sent_counter_, RowBatch::GetBatchSize(*current_thrift_batch_));
+      COUNTER_UPDATE(uncompressed_bytes_counter_, uncompressed_bytes);
     }
 
     // SendBatch() will block if there are still in-flight rpcs (and those will

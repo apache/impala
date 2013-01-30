@@ -42,7 +42,10 @@ class TupleDescriptor;
 //      (don't copy strings) or from the tuple pool (strings are copied).  If external,
 //      the data is in an io buffer that may not be attached to this row batch.  The
 //      creator of that row batch has to make sure that the io buffer is not recycled
-//      until all batches that reference the memory have been consumed.  
+//      until all batches that reference the memory have been consumed.
+// In order to minimize memory allocations, RowBatches and TRowBatches that have been
+// serialized and sent over the wire should be reused (this prevents compression_scratch_
+// from being needlessly reallocated).
 // TODO: stick tuple_ptrs_ into a pool?
 class RowBatch {
  public:
@@ -50,7 +53,6 @@ class RowBatch {
   // by 'row_desc'.
   RowBatch(const RowDescriptor& row_desc, int capacity)
     : has_in_flight_row_(false),
-      is_self_contained_(false),
       num_rows_(0),
       capacity_(capacity),
       num_tuples_per_row_(row_desc.tuple_descriptors().size()),
@@ -63,7 +65,7 @@ class RowBatch {
 
   // Populate a row batch from input_batch by copying input_batch's
   // tuple_data into the row batch's mempool and converting all offsets
-  // in the data back into pointers. The row batch will be self-contained after the call.
+  // in the data back into pointers.
   // TODO: figure out how to transfer the data from input_batch to this RowBatch
   // (so that we don't need to make yet another copy)
   RowBatch(const RowDescriptor& row_desc, const TRowBatch& input_batch);
@@ -115,6 +117,10 @@ class RowBatch {
   int row_byte_size() {
     return num_tuples_per_row_ * sizeof(Tuple*);
   }
+
+  // The total size of all data represented in this row batch (tuples and referenced
+  // string data).
+  int TotalByteSize();
 
   TupleRow* GetRow(int row_idx) {
     DCHECK_GE(row_idx, 0);
@@ -177,27 +183,21 @@ class RowBatch {
   // this up.
   void Swap(RowBatch* other);
 
-  // Create a serialized version of this row batch in output_batch, attaching
-  // all of the data it references (TRowBatch::tuple_data) to output_batch.tuple_data.
+  // Create a serialized version of this row batch in output_batch, attaching all of the
+  // data it references to output_batch.tuple_data. output_batch.tuple_data will be
+  // snappy-compressed unless the compressed data is larger than the uncompressed
+  // data. Use output_batch.is_compressed to determine whether tuple_data is compressed.
   // If an in-flight row is present in this row batch, it is ignored.
-  // If this batch is self-contained, it simply does an in-place conversion of the
-  // string pointers contained in the tuple data into offsets and resets the batch
-  // after copying the data to TRowBatch.
-  // Returns the number of bytes in the result.
+  // This function does not Reset().
+  // Returns the uncompressed serialized size (this will be the true size of output_batch
+  // if tuple_data is actually uncompressed).
   int Serialize(TRowBatch* output_batch);
 
-  // utility function: return total tuple data size of 'batch'.
+  // Utility function: returns total size of batch.
   static int GetBatchSize(const TRowBatch& batch);
 
   int num_rows() const { return num_rows_; }
   int capacity() const { return capacity_; }
-
-  // A self-contained row batch contains all of the tuple data it references
-  // in tuple_data_pool_. The creator of the row batch needs to decide whether
-  // it's self-contained (ie, this is not something that the row batch can
-  // ascertain on its own).
-  bool is_self_contained() const { return is_self_contained_; }
-  void set_is_self_contained(bool v) { is_self_contained_ = v; }
 
   const RowDescriptor& row_desc() const { return row_desc_; }
 
@@ -205,7 +205,6 @@ class RowBatch {
   // All members need to be handled in RowBatch::Swap()
 
   bool has_in_flight_row_;  // if true, last row hasn't been committed yet
-  bool is_self_contained_;  // if true, contains all ref'd data in tuple_data_pool_
   int num_rows_;  // # of committed rows
   int capacity_;  // maximum # of rows
 
@@ -221,6 +220,15 @@ class RowBatch {
   boost::scoped_ptr<MemPool> tuple_data_pool_;
 
   std::vector<DiskIoMgr::BufferDescriptor*> io_buffers_;
+
+  // String to write compressed tuple data to in Serialize().
+  // This is a string so we can swap() with the string in the TRowBatch we're serializing
+  // to (we don't compress directly into the TRowBatch in case the compressed data is
+  // longer than the uncompressed data). Swapping avoids copying data to the TRowBatch and
+  // avoids excess memory allocations: since we reuse RowBatchs and TRowBatchs, and
+  // assuming all row batches are roughly the same size, all strings will eventually be
+  // allocated to the right size.
+  std::string compression_scratch_;
 };
 
 }

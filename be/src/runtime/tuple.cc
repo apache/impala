@@ -50,4 +50,23 @@ void Tuple::DeepCopy(Tuple* dst, const TupleDescriptor& desc, MemPool* pool,
   }
 }
 
+void Tuple::DeepCopy(const TupleDescriptor& desc, char** data, int* offset,
+                     bool convert_ptrs) {
+  Tuple* dst = reinterpret_cast<Tuple*>(*data);
+  memcpy(dst, this, desc.byte_size());
+  *data += desc.byte_size();
+  *offset += desc.byte_size();
+  for (vector<SlotDescriptor*>::const_iterator i = desc.string_slots().begin();
+       i != desc.string_slots().end(); ++i) {
+    DCHECK_EQ((*i)->type(), TYPE_STRING);
+    if (!dst->IsNull((*i)->null_indicator_offset())) {
+      StringValue* string_v = dst->GetStringSlot((*i)->tuple_offset());
+      memcpy(*data, string_v->ptr, string_v->len);
+      string_v->ptr = (convert_ptrs ? reinterpret_cast<char*>(*offset) : *data);
+      *data += string_v->len;
+      *offset += string_v->len;
+    }
+  }
+}
+
 }
