@@ -127,9 +127,7 @@ def verify_query_results(expected_results, actual_results):
   """Verifies the actual versus expected results of a query"""
   assert actual_results is not None
   assert expected_results is not None
-
-  failure_str = '\nExpected:\n%s\n\nActual:\n%s' % (expected_results, actual_results)
-  assert expected_results == actual_results, failure_str
+  assert expected_results == actual_results
 
 def verify_results(expected_results, actual_results, order_matters):
   """Verifies the actual versus expected result strings"""

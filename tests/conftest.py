@@ -3,6 +3,8 @@
 # py.test configuration module
 #
 import logging
+from common.test_result_verifier import QueryTestResult
+
 logging.basicConfig(level=logging.INFO, format='%(threadName)s: %(message)s')
 LOG = logging.getLogger('test_configuration')
 
@@ -28,6 +30,23 @@ def pytest_addoption(parser):
   parser.addoption("--table_formats", dest="table_formats", default=None, help=\
                    "Override the test vectors and run only using the specified table "\
                    "formats. Ex. --table_formats=seq/snap/block,text/none")
+
+def pytest_assertrepr_compare(op, left, right):
+  """
+  Provides a hook for outputting type-specific assertion messages
+
+  Expected to return a list or strings, where each string will be printed as a new line
+  in the result output report on assertion failure.
+  """
+  if isinstance(left, QueryTestResult) and isinstance(right, QueryTestResult)\
+        and op == "==":
+    result = ['Comparing QueryTestResults (expected vs actual):']
+    for l, r in map(None, left.rows, right.rows):
+      result.append("%s == %s" % (l, r) if l == r else "%s != %s" % (l, r))
+    if len(left.rows) != len(right.rows):
+      result.append('Number of rows returned (expected vs actual): %d != %d' %\
+          (len(left.rows), len(right.rows)))
+    return result
 
 def pytest_generate_tests(metafunc):
   """
