@@ -158,11 +158,12 @@ public class OpcodeRegistry {
         return false;
       }
       Signature s = (Signature) o;
-      if (s.argTypes.length != this.argTypes.length) {
-        return false;
-      }
       if (s.argTypes == null && this.argTypes == null) {
         return true;
+      }
+
+      if (s.argTypes.length != this.argTypes.length) {
+        return false;
       }
 
       for (int i = 0; i < this.argTypes.length; ++i) {

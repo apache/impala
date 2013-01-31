@@ -383,7 +383,8 @@ public class HBaseScanNode extends ScanNode {
       case LT: return CompareFilter.CompareOp.LESS;
       case LE: return CompareFilter.CompareOp.LESS_OR_EQUAL;
       // TODO: Add support for pushing LIKE/REGEX down to HBase with a different Filter.
-      default: throw null;
+      default: throw new IllegalArgumentException(
+          "HBase: Unsupported Impala compare operator: " + impalaOp);
     }
   }
 }

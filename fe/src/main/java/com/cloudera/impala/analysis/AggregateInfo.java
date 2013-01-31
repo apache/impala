@@ -481,11 +481,10 @@ public class AggregateInfo {
   public TupleDescriptor createAggTupleDesc(DescriptorTable descTbl) {
     TupleDescriptor result = descTbl.createTupleDescriptor();
     List<Expr> exprs = Lists.newLinkedList();
-    if (groupingExprs != null) {
-      exprs.addAll(groupingExprs);
-    }
-    int aggregateExprStartIndex = groupingExprs.size();
+    exprs.addAll(groupingExprs);
     exprs.addAll(aggregateExprs);
+
+    int aggregateExprStartIndex = groupingExprs.size();
     for (int i = 0; i < exprs.size(); ++i) {
       Expr expr = exprs.get(i);
       SlotDescriptor slotD = descTbl.addSlotDescriptor(result);
