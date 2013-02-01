@@ -37,15 +37,20 @@ Status ThriftClientImpl::Open() {
 }
 
 Status ThriftClientImpl::OpenWithRetry(
-    int num_retries, int wait_ms) {
-  DCHECK_GT(num_retries, 0);
+    int num_tries, int wait_ms) {
   DCHECK_GE(wait_ms, 0);
   Status status;
-  for (int i = 0; i < num_retries; ++i) {
+  int try_count = 0L;
+  while (num_tries <= 0 || try_count < num_tries) {
+    ++try_count;
     status = Open();
     if (status.ok()) return status;
-    LOG(INFO) << "Unable to connect to " << ipaddress_ << ":" << port_ 
-              << " (Attempt " << i + 1 << " of " << num_retries << ")";
+    LOG(INFO) << "Unable to connect to " << ipaddress_ << ":" << port_;
+    if (num_tries < 0) {
+      LOG(INFO) << "(Attempt " << try_count << ", will retry indefinitely)";
+    } else {
+      LOG(INFO) << "(Attempt " << try_count << " of " << num_tries << ")";
+    }
     usleep(wait_ms * 1000L);
   }
 

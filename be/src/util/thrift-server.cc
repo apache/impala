@@ -40,8 +40,9 @@ using namespace apache::thrift::protocol;
 using namespace apache::thrift::transport;
 using namespace apache::thrift::server;
 
-DEFINE_int32(rpc_cnxn_attempts, 10, 
-    "Advanced: The number of times to retry connecting to an RPC server");
+DEFINE_int32(rpc_cnxn_attempts, 10,
+    "Advanced: The number of times to retry connecting to an RPC server. If zero or less, "
+             "connections will be retried until successful");
 DEFINE_int32(rpc_cnxn_retry_interval_ms, 2000,
     "Advanced: The interval, in ms, between retrying connections to an RPC server");
 DECLARE_string(principal);
@@ -59,8 +60,8 @@ class ThriftServer::ThriftServerEventProcessor : public TServerEventHandler {
         signal_fired_(false) { }
 
   // Called by TNonBlockingServer when server has acquired its resources and is ready to
-  // serve, and signals to StartAndWaitForServer that start-up is finished. 
-  // From TServerEventHandler. 
+  // serve, and signals to StartAndWaitForServer that start-up is finished.
+  // From TServerEventHandler.
   virtual void preServe();
 
   // Called when a client connects; we create per-client state and call any
@@ -71,10 +72,10 @@ class ThriftServer::ThriftServerEventProcessor : public TServerEventHandler {
   virtual void processContext(void* context, shared_ptr<TTransport> output);
 
   // Called when a client disconnects; we call any SessionHandlerIf handler.
-  virtual void deleteContext(void* serverContext, shared_ptr<TProtocol> input, 
+  virtual void deleteContext(void* serverContext, shared_ptr<TProtocol> input,
       shared_ptr<TProtocol> output);
 
-  // Waits for a timeout of TIMEOUT_MS for a server to signal that it has started 
+  // Waits for a timeout of TIMEOUT_MS for a server to signal that it has started
   // correctly.
   Status StartAndWaitForServer();
 
@@ -207,13 +208,13 @@ void* ThriftServer::ThriftServerEventProcessor::createContext(shared_ptr<TProtoc
   } else {
     socket = static_cast<TSocket*>(
         static_cast<TSaslServerTransport*>(transport)->getUnderlyingTransport().get());
-  }    
-    
+  }
+
   ss << socket->getPeerAddress() << ":" << socket->getPeerPort();
 
   {
     lock_guard<mutex> l_(thrift_server_->session_keys_lock_);
-      
+
     shared_ptr<SessionKey> key_ptr(new string(ss.str()));
 
     __session_key__ = key_ptr.get();
@@ -230,12 +231,12 @@ void* ThriftServer::ThriftServerEventProcessor::createContext(shared_ptr<TProtoc
   return (void*)__session_key__;
 }
 
-void ThriftServer::ThriftServerEventProcessor::processContext(void* context, 
+void ThriftServer::ThriftServerEventProcessor::processContext(void* context,
     shared_ptr<TTransport> transport) {
   __session_key__ = reinterpret_cast<SessionKey*>(context);
 }
 
-void ThriftServer::ThriftServerEventProcessor::deleteContext(void* serverContext, 
+void ThriftServer::ThriftServerEventProcessor::deleteContext(void* serverContext,
     shared_ptr<TProtocol> input, shared_ptr<TProtocol> output) {
 
   __session_key__ = (SessionKey*)serverContext;
@@ -305,7 +306,7 @@ Status ThriftServer::Start() {
       if (transport_factory.get() == NULL) {
         transport_factory.reset(new TTransportFactory());
       }
-      server_.reset(new TNonblockingServer(processor_, 
+      server_.reset(new TNonblockingServer(processor_,
           transport_factory, transport_factory,
           protocol_factory, protocol_factory, port_, thread_mgr));
       break;

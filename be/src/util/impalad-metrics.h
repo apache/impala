@@ -26,14 +26,17 @@ class ImpaladMetricKeys {
   // Local time that the server started
   static const char* IMPALA_SERVER_START_TIME;
 
+  // True if Impala has finished initialisation
+  static const char* IMPALA_SERVER_READY;
+
   // Number of queries executed by this server, including failed and cancelled
   // queries
   static const char* IMPALA_SERVER_NUM_QUERIES;
-  
+
   // Number of fragments executed by this server, including failed and cancelled
   // queries
   static const char* IMPALA_SERVER_NUM_FRAGMENTS;
-  
+
   // Number of scan ranges processed
   static const char* TOTAL_SCAN_RANGES_PROCESSED;
 
@@ -51,12 +54,13 @@ class ImpaladMetricKeys {
 };
 
 // Global impalad-wide metrics.  This is useful for objects that want to update metrics
-// without having to do frequent metrics lookups.  
+// without having to do frequent metrics lookups.
 // These get created by impala-server from the Metrics object in ExecEnv right when the
 // ImpaladServer starts up.
 class ImpaladMetrics {
  public:
   static Metrics::StringMetric* IMPALA_SERVER_START_TIME;
+  static Metrics::BooleanMetric* IMPALA_SERVER_READY;
   static Metrics::IntMetric* IMPALA_SERVER_NUM_QUERIES;
   static Metrics::IntMetric* IMPALA_SERVER_NUM_FRAGMENTS;
   static Metrics::IntMetric* NUM_RANGES_PROCESSED;

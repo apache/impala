@@ -43,6 +43,7 @@
 #include "service/fe-support.h"
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaInternalService.h"
+#include "util/impalad-metrics.h"
 
 using namespace impala;
 using namespace std;
@@ -81,7 +82,7 @@ int main(int argc, char** argv) {
   ThriftServer* beeswax_server = NULL;
   ThriftServer* hs2_server = NULL;
   ThriftServer* be_server = NULL;
-  ImpalaServer* server = 
+  ImpalaServer* server =
       CreateImpalaServer(&exec_env, FLAGS_fe_port, FLAGS_hs2_port, FLAGS_be_port,
           &beeswax_server, &hs2_server, &be_server);
   be_server->Start();
@@ -123,6 +124,8 @@ int main(int argc, char** argv) {
   // this blocks until the beeswax and hs2 servers terminate
   beeswax_server->Start();
   hs2_server->Start();
+  ImpaladMetrics::IMPALA_SERVER_READY->Update(true);
+  LOG(INFO) << "Impala has started.";
   beeswax_server->Join();
   hs2_server->Join();
 
