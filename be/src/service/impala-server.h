@@ -394,8 +394,17 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Return exec state for given query_id, or NULL if not found.
   // If 'lock' is true, the returned exec state's lock() will be acquired before
   // the query_exec_state_map_lock_ is released.
-  boost::shared_ptr<QueryExecState> GetQueryExecState(
-      const TUniqueId& query_id, bool lock);
+  inline boost::shared_ptr<QueryExecState> GetQueryExecState(
+      const TUniqueId& query_id, bool lock) {
+    boost::lock_guard<boost::mutex> l(query_exec_state_map_lock_);
+    QueryExecStateMap::iterator i = query_exec_state_map_.find(query_id);
+    if (i == query_exec_state_map_.end()) {
+      return boost::shared_ptr<QueryExecState>();
+    } else {
+      if (lock) i->second->lock()->lock();
+      return i->second;
+    }
+  }
 
   // Return exec state for given fragment_instance_id, or NULL if not found.
   boost::shared_ptr<FragmentExecState> GetFragmentExecState(

@@ -1274,18 +1274,6 @@ inline shared_ptr<ImpalaServer::FragmentExecState> ImpalaServer::GetFragmentExec
   }
 }
 
-inline shared_ptr<ImpalaServer::QueryExecState> ImpalaServer::GetQueryExecState(
-    const TUniqueId& query_id, bool lock) {
-  lock_guard<mutex> l(query_exec_state_map_lock_);
-  QueryExecStateMap::iterator i = query_exec_state_map_.find(query_id);
-  if (i == query_exec_state_map_.end()) {
-    return shared_ptr<QueryExecState>();
-  } else {
-    if (lock) i->second->lock()->lock();
-    return i->second;
-  }
-}
-
 void ImpalaServer::ExecPlanFragment(
     TExecPlanFragmentResult& return_val, const TExecPlanFragmentParams& params) {
   VLOG_QUERY << "ExecPlanFragment() instance_id=" << params.params.fragment_instance_id
