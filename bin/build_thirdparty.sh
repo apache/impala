@@ -74,10 +74,12 @@ cd $IMPALA_HOME/thirdparty/gperftools-${IMPALA_GPERFTOOLS_VERSION}
 ./configure --enable-frame-pointers --with-pic
 make -j4
 
-# Build glog
-cd $IMPALA_HOME/thirdparty/glog-${IMPALA_GLOG_VERSION}
-./configure --with-pic
-make -j4
+if [ -z "$PIC_LIB_PATH" ]; then
+  # Build glog
+  cd $IMPALA_HOME/thirdparty/glog-${IMPALA_GLOG_VERSION}
+  ./configure --with-pic
+  make -j4
+fi
 
 # Build gtest
 cd $IMPALA_HOME/thirdparty/gtest-${IMPALA_GTEST_VERSION}
@@ -89,15 +91,17 @@ cd $IMPALA_HOME/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}
 ./configure --with-pic --prefix=$IMPALA_HOME/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}/build
 make install
 
-# Build Sasl
-# Disable everything except those protocols needed -- currently just Kerberos.
-# Sasl does not have a --with-pic configuration.
-cd $IMPALA_HOME/thirdparty/cyrus-sasl-${IMPALA_CYRUS_SASL_VERSION}
-CFLAGS="-fPIC -DPIC" CXXFLAGS="-fPIC -DPIC" ./configure \
-  --disable-digest --disable-sql --disable-cram --disable-ldap \
-  --disable-digest --disable-otp  \
-  --prefix=$IMPALA_HOME/thirdparty/cyrus-sasl-${IMPALA_CYRUS_SASL_VERSION}/build \
-  --enable-static --enable-staticdlopen
-# the first time you do a make it fails, ignore the error.
-(make || true)
-make install
+if [ -z "$PIC_LIB_PATH" ]; then
+  # Build Sasl
+  # Disable everything except those protocols needed -- currently just Kerberos.
+  # Sasl does not have a --with-pic configuration.
+  cd $IMPALA_HOME/thirdparty/cyrus-sasl-${IMPALA_CYRUS_SASL_VERSION}
+  CFLAGS="-fPIC -DPIC" CXXFLAGS="-fPIC -DPIC" ./configure \
+    --disable-digest --disable-sql --disable-cram --disable-ldap \
+    --disable-digest --disable-otp  \
+    --prefix=$IMPALA_HOME/thirdparty/cyrus-sasl-${IMPALA_CYRUS_SASL_VERSION}/build \
+    --enable-static --enable-staticdlopen
+  # the first time you do a make it fails, ignore the error.
+  (make || true)
+  make install
+fi

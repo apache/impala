@@ -5,13 +5,20 @@
 #  GLOG_STATIC_LIB, path to libglog.a (
 #  GLOG_FOUND, whether glog has been found
 
-set(GLOG_SEARCH_HEADER_PATHS
-  ${CMAKE_SOURCE_DIR}/thirdparty/glog-$ENV{IMPALA_GLOG_VERSION}/src
-)
+if (DEFINED ENV{PIC_LIB_PATH})
+  set(GLOG_SEARCH_HEADER_PATHS $ENV{PIC_LIB_PATH}/include)
+  set(GLOG_SEARCH_LIB_PATH $ENV{PIC_LIB_PATH}/lib)
+else ()
+  set(THIRDPARTY ${CMAKE_SOURCE_DIR}/thirdparty)
+  set(GLOG_SEARCH_HEADER_PATHS
+    ${THIRDPARTY}/glog-$ENV{IMPALA_GLOG_VERSION}/src
+  )
+  set(GLOG_SEARCH_LIB_PATH
+    ${THIRDPARTY}/glog-$EV{IMPALA_GLOG_VERSION}/.libs
+  )
+endif ()
 
-set(GLOG_SEARCH_LIB_PATH
-  ${CMAKE_SOURCE_DIR}/thirdparty/glog-$ENV{IMPALA_GLOG_VERSION}/.libs
-)
+
 
 find_path(GLOG_INCLUDE_DIR glog/logging.h PATHS
   ${GLOG_SEARCH_HEADER_PATHS}
