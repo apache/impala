@@ -107,9 +107,11 @@ done
 export PYTHONPATH
 
 # These arguments are, despite the name, passed to every JVM created
-# by an impalad. So they must point to the location of
-# libbackend.so.
-LIBHDFS_OPTS="-Djava.library.path=${HADOOP_HOME}/lib/native/"
+# by an impalad.
+# - Enable JNI check
+LIBHDFS_OPTS="-Xcheck:jni -Xcheck:nabounds"
+# - Points to the location of libbackend.so.
+LIBHDFS_OPTS="${LIBHDFS_OPTS} -Djava.library.path=${HADOOP_HOME}/lib/native/"
 # READER BEWARE: This always points to the debug build.
 # TODO: Consider having cmake scripts change this value depending on
 # the build type.
@@ -142,3 +144,4 @@ echo "PYTHONPATH             = $PYTHONPATH"
 echo "HADOOP_LZO             = $HADOOP_LZO"
 echo "IMPALA_LZO             = $IMPALA_LZO"
 echo "CLASSPATH              = $CLASSPATH"
+echo "LIBHDFS_OPTS           = $LIBHDFS_OPTS"

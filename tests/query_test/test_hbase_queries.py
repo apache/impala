@@ -15,6 +15,8 @@ class TestHBaseQueries(ImpalaTestSuite):
   @classmethod
   def add_test_dimensions(cls):
     super(TestHBaseQueries, cls).add_test_dimensions()
+    cls.TestMatrix.add_dimension(\
+        create_exec_option_dimension(cluster_sizes=SINGLE_NODE_ONLY))
     cls.TestMatrix.add_constraint(\
         lambda v: v.get_value('table_format').file_format == 'text')
 

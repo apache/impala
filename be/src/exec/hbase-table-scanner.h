@@ -163,7 +163,8 @@ class HBaseTableScanner {
   const ScanRangeVector* scan_range_vector_;
   int current_scan_range_idx_; // the index of the current scan range
 
-  // Instances related to scanning a table. Set in StartScan().
+  // Instances related to scanning a table. Set in StartScan(). They are global references
+  // because they cannot be automatically garbage collected by the JVM.
   jobject htable_;        // Java type HTable
   jobject scan_;          // Java type Scan
   jobject resultscanner_; // Java type ResultScanner

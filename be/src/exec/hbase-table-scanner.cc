@@ -278,11 +278,13 @@ Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_de
 
   // Setup an Scan object without the range
   // scan_ = new Scan();
+  DCHECK(scan_ == NULL);
   scan_ = env->NewObject(scan_cl_, scan_ctor_);
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  scan_ = env->NewGlobalRef(scan_);
 
   // scan_.setMaxVersions(1);
-  scan_ = env->CallObjectMethod(scan_, scan_set_max_versions_id_, 1);
+  env->CallObjectMethod(scan_, scan_set_max_versions_id_, 1);
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
 
   // scan_.setCaching(rows_cached_);
@@ -361,7 +363,7 @@ Status HBaseTableScanner::ScanSetup(JNIEnv* env, const TupleDescriptor* tuple_de
       RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
     }
     // scan.setFilter(filter_list);
-    scan_ = env->CallObjectMethod(scan_, scan_set_filter_id_, filter_list);
+    env->CallObjectMethod(scan_, scan_set_filter_id_, filter_list);
     RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
   }
 
@@ -374,16 +376,20 @@ Status HBaseTableScanner::InitScanRange(JNIEnv* env, const ScanRange& scan_range
   jbyteArray end_bytes;
   CreateByteArray(env, scan_range.stop_key(), &end_bytes);
 
-  // scan_ = scan_.setStartRow(start_bytes);
-  scan_ = env->CallObjectMethod(scan_, scan_set_start_row_id_, start_bytes);
+  // scan_.setStartRow(start_bytes);
+  env->CallObjectMethod(scan_, scan_set_start_row_id_, start_bytes);
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
 
-  // scan_ = scan_.setStopRow(end_bytes);
-  scan_ = env->CallObjectMethod(scan_, scan_set_stop_row_id_, end_bytes);
+  // scan_.setStopRow(end_bytes);
+  env->CallObjectMethod(scan_, scan_set_stop_row_id_, end_bytes);
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
 
   // resultscanner_ = htable_.getScanner(scan_);
+  if (resultscanner_ != NULL) env->DeleteGlobalRef(resultscanner_);
   resultscanner_ = env->CallObjectMethod(htable_, htable_get_scanner_id_, scan_);
+  RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
+  resultscanner_ = env->NewGlobalRef(resultscanner_);
+
   RETURN_ERROR_IF_EXC(env, JniUtil::throwable_to_string_id());
   return Status::OK;
 
@@ -560,5 +566,9 @@ void HBaseTableScanner::Close(JNIEnv* env) {
   if (resultscanner_ != NULL) {
     // resultscanner_.close();
     env->CallObjectMethod(resultscanner_, resultscanner_close_id_);
+    env->DeleteGlobalRef(resultscanner_);
+  }
+  if (scan_ != NULL) {
+    env->DeleteGlobalRef(scan_);
   }
 }
