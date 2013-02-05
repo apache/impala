@@ -15,12 +15,14 @@
 package com.cloudera.impala.catalog;
 
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.hadoop.hive.metastore.api.NoSuchObjectException;
@@ -29,14 +31,14 @@ import org.apache.log4j.Logger;
 import com.cloudera.impala.catalog.Catalog.MetadataLoadState;
 import com.cloudera.impala.catalog.Catalog.TableNotFoundException;
 import com.cloudera.impala.common.ImpalaException;
+import com.cloudera.impala.common.MetaStoreClientPool.MetaStoreClient;
 
-import com.google.common.base.Function;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ComputationException;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.MapMaker;
-import com.google.common.collect.Maps;
 
 /**
  * Internal representation of db-related metadata. Owned by Catalog instance.
@@ -57,13 +59,9 @@ public class Db {
   private final String name;
 
   private final Catalog parentCatalog;
-  private final HiveMetaStoreClient client;
 
   // map from table name to Table
   private final LazyTableMap tables;
-
-  // If true, table map values are populated lazily on read.
-  final boolean lazy;
 
   /**
    * Thrown when a table cannot be loaded due to an error. 
@@ -110,14 +108,15 @@ public class Db {
    * is thrown.
    */
   private class LazyTableMap {
-    // Map of lower-case table name to Table metadata
-    private final ConcurrentMap<String, Table> tableMetadataMap = new MapMaker()
-        .makeComputingMap(
-        new Function<String, Table>() {
-          public Table apply(String tableName) {
-            return loadTable(tableName);
-          }
-        });
+    // Cache of table metadata with key of lower-case table name
+    private final LoadingCache<String, Table> tableMetadataCache =
+        CacheBuilder.newBuilder().build(
+            new CacheLoader<String, Table>() {
+              public Table load(String tableName) throws TableNotFoundException,
+                  TableLoadingException {
+                return loadTable(tableName);
+              }
+            });
 
     // Map of lower-case table names to the metadata load state. It is only possible to
     // load metadata for tables that exist in this map.
@@ -145,8 +144,8 @@ public class Db {
      * Returns the Table object corresponding to the supplied table name. The table
      * name must exist in the table name map for the metadata load to succeed.
      * The exact behavior is:
-     * - If the table already exists in the metadata map, its value will be returned.
-     * - If the table is not present in the metadata map and the table exists in the
+     * - If the table already exists in the metadata cache, its value will be returned.
+     * - If the table is not present in the metadata cache and the table exists in the
      *   known table map, its metadata is loaded.
      * - If the table is not present the table name map, null is returned.
      *
@@ -157,8 +156,8 @@ public class Db {
       try {
         // There is no need to check the tableNameMap here because it is done within
         // the loadTable(...) function.
-        return tableMetadataMap.get(tableName.toLowerCase());
-      } catch (ComputationException e) {
+        return tableMetadataCache.get(tableName.toLowerCase());
+      } catch (ExecutionException e) {
         // Search for the cause of this exception and throw the correct inner exception
         // type. In the case of a TableNotFoundException, return null.
         Throwable cause = e.getCause();
@@ -170,46 +169,42 @@ public class Db {
           }
           cause = cause.getCause();
         }
-        throw e;
+        throw new IllegalStateException(e);
       }
     }
 
-    private Table loadTable(String tableName) {
+    private Table loadTable(String tableName) throws TableNotFoundException,
+        TableLoadingException {
       tableName = tableName.toLowerCase();
-      try {
-        MetadataLoadState metadataState = tableNameMap.get(tableName);
+      MetadataLoadState metadataState = tableNameMap.get(tableName);
 
-        // This table doesn't exist in the table name cache. Throw an exception.
-        if (metadataState == null) {
-          throw new TableNotFoundException("Table not found: " + tableName);
-        }
-
-        // We should never have a case where we make it here and the metadata is marked
-        // as already loaded.
-        Preconditions.checkState(metadataState != MetadataLoadState.LOADED);
-
-        // Try to load the table Metadata
-        Table table =
-            Table.load(parentCatalog.getNextTableId(), client, Db.this, tableName);
-        tableNameMap.put(tableName, MetadataLoadState.LOADED);
-        return table;
-      } catch (TableLoadingException e) {
-        // Convert to an unchecked exception
-        throw new ComputationException(e);
-      } catch (TableNotFoundException e) {
-        // Convert to an unchecked exception
-        throw new ComputationException(e);
+      // This table doesn't exist in the table name cache. Throw an exception.
+      if (metadataState == null) {
+        throw new TableNotFoundException("Table not found: " + tableName);
       }
+
+      // We should never have a case where we make it here and the metadata is marked
+      // as already loaded.
+      Preconditions.checkState(metadataState != MetadataLoadState.LOADED);
+      MetaStoreClient msClient = parentCatalog.getMetaStoreClient();
+      Table table = null;
+      try {
+        // Try to load the table Metadata
+        table = Table.load(parentCatalog.getNextTableId(), msClient.getHiveClient(),
+            Db.this, tableName);
+      } finally {
+        msClient.release();
+      }
+      tableNameMap.put(tableName, MetadataLoadState.LOADED);
+      return table;
     }
   }
 
-  private Db(String name, Catalog catalog, HiveMetaStoreClient hiveClient,
-      boolean lazy) throws MetaException {
+  private Db(String name, Catalog catalog, HiveMetaStoreClient hiveClient)
+      throws MetaException {
     this.name = name;
-    this.lazy = lazy;
     this.parentCatalog = catalog;
-    this.client = hiveClient;
-    this.tables = new LazyTableMap(client.getAllTables(name));
+    this.tables = new LazyTableMap(hiveClient.getAllTables(name));
   }
 
   /**
@@ -230,12 +225,22 @@ public class Db {
    * @return non-null Db instance (possibly containing no tables)
    */
   public static Db loadDb(Catalog catalog, HiveMetaStoreClient client, String dbName,
-      boolean lazy) {
+       boolean lazy) {
     try {
-      return new Db(dbName, catalog, client, lazy);
+      Db db = new Db(dbName, catalog, client);
+      if (!lazy) {
+        // Load all the table metadata
+        for (String tableName: db.getAllTableNames() ) {
+          db.getTable(tableName);
+        }
+      }
+      return db;
     } catch (MetaException e) {
       // turn into unchecked exception
-      throw new UnsupportedOperationException(e);
+      throw new IllegalStateException(e);
+    } catch (TableLoadingException e) {
+      // turn into unchecked exception
+      throw new IllegalStateException(e);
     }
   }
 

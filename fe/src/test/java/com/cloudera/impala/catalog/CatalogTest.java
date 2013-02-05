@@ -22,6 +22,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.cloudera.impala.catalog.Db.TableLoadingException;
+import com.cloudera.impala.common.MetaStoreClientPool;
 import com.cloudera.impala.analysis.IntLiteral;
 import com.cloudera.impala.analysis.LiteralExpr;
 import com.google.common.collect.Sets;
@@ -342,18 +343,20 @@ public class CatalogTest {
     }
   }
 
-  @Test public void TestHiveMetaStoreClientCreationRetry() throws MetaException {
+  @Test
+  public void TestHiveMetaStoreClientCreationRetry() throws MetaException {
     HiveConf conf = new HiveConf(CatalogTest.class);
     // Set the Metastore warehouse to an empty string to trigger a MetaException
     conf.setVar(HiveConf.ConfVars.METASTOREWAREHOUSE, "");
     try {
-      Catalog.createHiveMetaStoreClient(conf);
+      MetaStoreClientPool pool = new MetaStoreClientPool(1, conf);
       fail("Expected MetaException");
-    } catch (MetaException e) {
-
+    } catch (IllegalStateException e) {
+      assertTrue(e.getCause() instanceof MetaException);
     }
+
     conf.setVar(HiveConf.ConfVars.METASTOREWAREHOUSE, "/some/valid/path");
-    assertNotNull(Catalog.createHiveMetaStoreClient(conf));
+    MetaStoreClientPool pool = new MetaStoreClientPool(1, conf);
 
     // TODO: This doesn't fully validate the retry logic. In the future we
     // could throw an exception when the retry attempts maxed out. This exception

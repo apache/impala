@@ -16,6 +16,7 @@ package com.cloudera.impala.catalog;
 
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.ExecutionException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -33,12 +34,15 @@ import org.apache.hadoop.hive.metastore.api.MetaException;
 import org.apache.log4j.Logger;
 
 import com.cloudera.impala.common.ImpalaException;
+import com.cloudera.impala.common.MetaStoreClientPool;
+import com.cloudera.impala.common.MetaStoreClientPool.MetaStoreClient;
+
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ComputationException;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
 import com.google.common.collect.MapMaker;
-import com.google.common.base.Function;
 
 /**
  * Interface to metadata stored in MetaStore instance.
@@ -48,16 +52,12 @@ import com.google.common.base.Function;
 public class Catalog {
   public static final String DEFAULT_DB = "default";
   private static final Logger LOG = Logger.getLogger(Catalog.class);
-  private static final int MAX_METASTORE_CLIENT_INIT_RETRIES = 5;
-  private static final int MAX_METASTORE_RETRY_INTERVAL_IN_SECONDS = 5;
   private final boolean lazy;
-  private boolean closed = false;
   private int nextTableId;
+  private final MetaStoreClientPool metaStoreClientPool = new MetaStoreClientPool(5);
 
   // map from db name to DB
   private final LazyDbMap dbs;
-
-  private final HiveMetaStoreClient msClient;
 
   // Tracks whether a Table/Db has all of its metadata loaded.
   enum MetadataLoadState {
@@ -84,14 +84,14 @@ public class Catalog {
    * is thrown.
    */
   private class LazyDbMap {
-    // Map of lower-case database name to Db metadata
-    private final ConcurrentMap<String, Db> dbMetadataMap = new MapMaker()
-        .makeComputingMap(
-        new Function<String, Db>() {
-          public Db apply(String dbName) {
-            return loadDb(dbName);
-          }
-        });
+    // Cache of Db metadata with a key of lower-case database name
+    private final LoadingCache<String, Db> dbMetadataCache =
+        CacheBuilder.newBuilder().build(
+            new CacheLoader<String, Db>() {
+              public Db load(String dbName) throws DatabaseNotFoundException {
+                return loadDb(dbName);
+              }
+            });
 
     // Map of lower-case database names to their metadata load state. It is only possible
     // to load metadata for databases that exist in this map.
@@ -121,15 +121,15 @@ public class Catalog {
      * null if the database does not exist.
      *
      * The exact behavior is:
-     * - If the database already exists in the metadata map, its value will be returned.
-     * - If the database is not present in the metadata map AND the database exists in the
-     *   known database map the metadata will be loaded
+     * - If the database already exists in the metadata cache, its value will be returned.
+     * - If the database is not present in the metadata cache AND the database exists in
+     *   the known database map the metadata will be loaded
      * - If the database is not present the database name map, null is returned.
      */
     public Db get(String dbName) {
       try {
-        return dbMetadataMap.get(dbName.toLowerCase());
-      } catch (ComputationException e) {
+        return dbMetadataCache.get(dbName.toLowerCase());
+      } catch (ExecutionException e) {
         // Search for the cause of the exception. If a load failed due to the database not
         // being found, callers should get 'null' instead of having to handle the
         // exception.
@@ -140,31 +140,32 @@ public class Catalog {
           }
           cause = cause.getCause();
         }
-        throw e;
+        throw new IllegalStateException(e);
       }
     }
 
-    private Db loadDb(String dbName) {
+    private Db loadDb(String dbName) throws DatabaseNotFoundException {
       dbName = dbName.toLowerCase();
-      try {
-        MetadataLoadState metadataState = dbNameMap.get(dbName);
+      MetadataLoadState metadataState = dbNameMap.get(dbName);
 
-        // This database doesn't exist in the database name cache. Throw an exception.
-        if (metadataState == null) {
-          throw new DatabaseNotFoundException("Database not found: " + dbName);
-        }
-
-        // We should never have a case where we make it here and the metadata is marked
-        // as already loaded.
-        Preconditions.checkState(metadataState != MetadataLoadState.LOADED);
-
-        Db db = Db.loadDb(Catalog.this, msClient, dbName, lazy);
-        dbNameMap.put(dbName, MetadataLoadState.LOADED);
-        return db;
-      } catch (DatabaseNotFoundException e) {
-        // Convert to an unchecked exception
-        throw new ComputationException(e);
+      // This database doesn't exist in the database name cache. Throw an exception.
+      if (metadataState == null) {
+        throw new DatabaseNotFoundException("Database not found: " + dbName);
       }
+
+      // We should never have a case where we make it here and the metadata is marked
+      // as already loaded.
+      Preconditions.checkState(metadataState != MetadataLoadState.LOADED);
+      MetaStoreClient msClient = getMetaStoreClient();
+      Db db = null;
+      try {
+        db = Db.loadDb(Catalog.this, msClient.getHiveClient(), dbName, lazy);
+      } finally {
+        msClient.release();
+      }
+
+      dbNameMap.put(dbName, MetadataLoadState.LOADED);
+      return db;
     }
   }
 
@@ -202,70 +203,40 @@ public class Catalog {
   public Catalog(boolean lazy) {
     this.nextTableId = 0;
     this.lazy = lazy;
+    MetaStoreClient msClient = metaStoreClientPool.getClient();
     try {
-      this.msClient = createHiveMetaStoreClient(new HiveConf(Catalog.class));
-      this.dbs = new LazyDbMap(msClient.getAllDatabases());
-      if (!lazy) {
-        // Load all the metadata
-        for (String dbName: dbs.getAllDbNames()) {
-          dbs.get(dbName);
-        }
-      }
+      this.dbs = new LazyDbMap(msClient.getHiveClient().getAllDatabases());
     } catch (MetaException e) {
       // turn into unchecked exception
       throw new UnsupportedOperationException(e);
+    } finally {
+      msClient.release();
     }
-  }
 
-  /**
-   * Creates a HiveMetaStoreClient with the given configuration, retrying the operation
-   * if MetaStore exceptions occur. A random sleep is injected between retries to help
-   * reduce the likelihood of flooding the Meta Store with many requests at once.
-   */
-  static HiveMetaStoreClient createHiveMetaStoreClient(HiveConf conf)
-      throws MetaException {
-    // Ensure numbers are random across nodes.
-    Random randomGen = new Random(UUID.randomUUID().hashCode());
-    int maxRetries = MAX_METASTORE_CLIENT_INIT_RETRIES;
-    for (int retryAttempt = 0; retryAttempt <= maxRetries; ++retryAttempt) {
-      try {
-        return new HiveMetaStoreClient(conf);
-      } catch (MetaException e) {
-        LOG.error("Error initializing Hive Meta Store client", e);
-        if (retryAttempt == maxRetries) {
-          throw e;
-        }
-
-        // Randomize the retry interval so the meta store isn't flooded with attempts.
-        int retryInterval =
-          randomGen.nextInt(MAX_METASTORE_RETRY_INTERVAL_IN_SECONDS) + 1;
-        LOG.info(String.format("On retry attempt %d of %d. Sleeping %d seconds.",
-            retryAttempt + 1, maxRetries, retryInterval));
-        try {
-          Thread.sleep(retryInterval * 1000);
-        } catch (InterruptedException ie) {
-          // Do nothing
-        }
+    if (!lazy) {
+      // Load all the metadata
+      for (String dbName: dbs.getAllDbNames()) {
+        dbs.get(dbName);
       }
     }
-    // Should never make it to here. 
-    throw new UnsupportedOperationException(
-        "Unexpected error creating Hive Meta Store client");
   }
 
   /**
-   * Releases the Hive Metastore Client resources. This method can be called
-   * multiple times. Additional calls will be no-ops.
+   * Release the Hive Meta Store Client resources.
    */
   public void close() {
-    if (this.msClient != null && !closed) {
-      this.msClient.close();
-      closed = true;
-    }
+    metaStoreClientPool.close();
   }
 
   public TableId getNextTableId() {
     return new TableId(nextTableId++);
+  }
+
+  /**
+   * Returns a managed meta store client from the client connection pool.
+   */
+  public MetaStoreClient getMetaStoreClient() {
+    return metaStoreClientPool.getClient();
   }
 
   /**
@@ -275,10 +246,6 @@ public class Catalog {
     Preconditions.checkState(db != null && !db.isEmpty(),
         "Null or empty database name given as argument to Catalog.getDb");
     return dbs.get(db);
-  }
-
-  public HiveMetaStoreClient getMetaStoreClient() {
-    return msClient;
   }
 
   /**

@@ -23,8 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
+import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
+import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hive.service.cli.thrift.TGetColumnsReq;
 import org.apache.hive.service.cli.thrift.TGetSchemasReq;
 import org.apache.hive.service.cli.thrift.TGetTablesReq;
@@ -43,6 +44,7 @@ import com.cloudera.impala.catalog.Table;
 import com.cloudera.impala.common.AnalysisException;
 import com.cloudera.impala.common.ImpalaException;
 import com.cloudera.impala.common.InternalException;
+import com.cloudera.impala.common.MetaStoreClientPool.MetaStoreClient;
 import com.cloudera.impala.common.NotImplementedException;
 import com.cloudera.impala.planner.PlanFragment;
 import com.cloudera.impala.planner.Planner;
@@ -379,19 +381,23 @@ public class Frontend {
 
     String dbName = table.getDb().getName();
     String tblName = table.getName();
-    HiveMetaStoreClient msClient = catalog.getMetaStoreClient();
     if (table.getNumClusteringCols() > 0) {
-      // Add all partitions to metastore.
-      for (String partName: update.getCreated_partitions()) {
-        try {
-          LOG.info("Creating partition: " + partName + " in table: " + tblName);
-          msClient.appendPartitionByName(dbName, tblName, partName);
-        } catch (AlreadyExistsException e) {
-          LOG.info("Ignoring partition " + partName + ", since it already exists");
-          // Ignore since partition already exists.
-        } catch (Exception e) {
-          throw new InternalException("Error updating metastore", e);
+      MetaStoreClient msClient = catalog.getMetaStoreClient();
+      try {
+        // Add all partitions to metastore.
+        for (String partName: update.getCreated_partitions()) {
+          try {
+            LOG.info("Creating partition: " + partName + " in table: " + tblName);
+            msClient.getHiveClient().appendPartitionByName(dbName, tblName, partName);
+          } catch (AlreadyExistsException e) {
+            LOG.info("Ignoring partition " + partName + ", since it already exists");
+            // Ignore since partition already exists.
+          } catch (Exception e) {
+            throw new InternalException("Error updating metastore", e);
+          }
         }
+      } finally {
+        msClient.release();
       }
     }
   }
