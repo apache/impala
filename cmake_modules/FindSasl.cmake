@@ -4,7 +4,7 @@
 #  SASL_STATIC_LIBRARY, the library to use.
 #  SASL_FOUND, If false, do not try to use.
 
-set(THIRDPARTY_SASL thirdparty/cyrus-sasl-${IMPALA_CYRUS_SASL_VERSION})
+set(THIRDPARTY_SASL thirdparty/cyrus-sasl-$ENV{IMPALA_CYRUS_SASL_VERSION})
 
 if (DEFINED ENV{PIC_LIB_PATH})
   set(SASL_SEARCH_LIB_PATH $ENV{PIC_LIB_PATH}/lib)
@@ -12,10 +12,10 @@ if (DEFINED ENV{PIC_LIB_PATH})
 else ()
   set (THIRDPARTY ${CMAKE_SOURCE_DIR}/thirdparty)
   set(SASL_SEARCH_LIB_PATH
-    ${THIRDPARTY}/cyrus-sasl-${IMPALA_CYRUS_SASL_VERSION}/build/lib
+    ${THIRDPARTY}/cyrus-sasl-$ENV{IMPALA_CYRUS_SASL_VERSION}/build/lib
   )
   set(SASL_INCLUDE_DIR 
-    ${THIRDPARTY}/cyrus-sasl-${IMPALA_CYRUS_SASL_VERSION}/build/include
+    ${THIRDPARTY}/cyrus-sasl-$ENV{IMPALA_CYRUS_SASL_VERSION}/build/include
   )
 endif ()
 
