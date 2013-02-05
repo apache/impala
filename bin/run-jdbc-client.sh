@@ -5,6 +5,7 @@ bin=`dirname "$0"`
 bin=`cd "$bin"; pwd`
 . "$bin"/impala-config.sh
 
-export CLASSPATH=`hadoop classpath`
-java -cp $HIVE_JDBC_DRIVER_CLASSPATH:$IMPALA_FE_DIR/target/test-classes \
-    com.cloudera.impala.testutil.ImpalaJdbcClient "$@"
+JDBC_CP=$HIVE_JDBC_DRIVER_CLASSPATH
+JDBC_CP=$JDBC_CP:$IMPALA_FE_DIR/target/test-classes
+JDBC_CP=$JDBC_CP:$IMPALA_FE_DIR/target/dependency/*
+java -cp $JDBC_CP com.cloudera.impala.testutil.ImpalaJdbcClient "$@"
