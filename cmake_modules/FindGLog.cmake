@@ -14,7 +14,7 @@ else ()
     ${THIRDPARTY}/glog-$ENV{IMPALA_GLOG_VERSION}/src
   )
   set(GLOG_SEARCH_LIB_PATH
-    ${THIRDPARTY}/glog-$EV{IMPALA_GLOG_VERSION}/.libs
+    ${THIRDPARTY}/glog-$ENV{IMPALA_GLOG_VERSION}/.libs
   )
 endif ()
 
