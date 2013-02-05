@@ -16,7 +16,6 @@ import java.util.Set;
 
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.MetaException;
-import org.apache.hadoop.hive.serde.Constants;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;

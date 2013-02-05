@@ -37,7 +37,7 @@ import org.apache.hadoop.hdfs.DistributedFileSystem;
 import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
-import org.apache.hadoop.hive.serde.Constants;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -451,7 +451,7 @@ public class HdfsTable extends Table {
     int pos = 0;
     for (FieldSchema s : fieldSchemas) {
       // catch currently unsupported hive schema elements
-      if (!Constants.PrimitiveTypes.contains(s.getType())) {
+      if (!serdeConstants.PrimitiveTypes.contains(s.getType())) {
         throw new TableLoadingException("Failed to load metadata for table: " +
             getName() + " due to unsupported column type " + s.getType() + " in column " +
             s.getName());

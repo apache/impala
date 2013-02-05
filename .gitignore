@@ -27,3 +27,4 @@ llvm-ir/
 shell/gen-py/
 shell/build/
 tests/results
+hdfs-data/

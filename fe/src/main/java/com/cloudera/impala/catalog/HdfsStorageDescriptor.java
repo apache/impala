@@ -19,7 +19,7 @@ import java.util.Map;
 
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
-import org.apache.hadoop.hive.serde.Constants;
+import org.apache.hadoop.hive.serde.serdeConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,9 +56,9 @@ public class HdfsStorageDescriptor {
   // Important: don't change the ordering of these keys - if e.g. FIELD_DELIM is not
   // found, the value of LINE_DELIM is used, so LINE_DELIM must be found first.
   final static List<String> DELIMITER_KEYS =
-      ImmutableList.of(Constants.LINE_DELIM, Constants.FIELD_DELIM,
-        Constants.COLLECTION_DELIM, Constants.MAPKEY_DELIM, Constants.ESCAPE_CHAR,
-        Constants.QUOTE_CHAR);
+      ImmutableList.of(serdeConstants.LINE_DELIM, serdeConstants.FIELD_DELIM,
+        serdeConstants.COLLECTION_DELIM, serdeConstants.MAPKEY_DELIM, 
+        serdeConstants.ESCAPE_CHAR, serdeConstants.QUOTE_CHAR);
 
   private final static Logger LOG = LoggerFactory.getLogger(HdfsStorageDescriptor.class);
 
@@ -80,14 +80,14 @@ public class HdfsStorageDescriptor {
     for (String delimKey: DELIMITER_KEYS) {
       String delimValue = serdeInfo.getParameters().get(delimKey);
       if (delimValue == null) {
-        if (delimKey.equals(Constants.FIELD_DELIM)) {
+        if (delimKey.equals(serdeConstants.FIELD_DELIM)) {
           delimMap.put(delimKey, DEFAULT_FIELD_DELIM);
-        } else if (delimKey.equals(Constants.ESCAPE_CHAR)) {
+        } else if (delimKey.equals(serdeConstants.ESCAPE_CHAR)) {
           delimMap.put(delimKey, DEFAULT_ESCAPE_CHAR);
-        } else if (delimKey.equals(Constants.LINE_DELIM)) {
+        } else if (delimKey.equals(serdeConstants.LINE_DELIM)) {
           delimMap.put(delimKey, DEFAULT_LINE_DELIM);
         } else {
-          delimMap.put(delimKey, delimMap.get(Constants.FIELD_DELIM));
+          delimMap.put(delimKey, delimMap.get(serdeConstants.FIELD_DELIM));
         }
       } else {
         if (delimValue.length() != 1) {
@@ -209,9 +209,12 @@ public class HdfsStorageDescriptor {
     try {
       return new HdfsStorageDescriptor(tblName,
           HdfsFileFormat.fromJavaClassName(sd.getInputFormat()),
-          delimMap.get(Constants.LINE_DELIM), delimMap.get(Constants.FIELD_DELIM),
-          delimMap.get(Constants.COLLECTION_DELIM), delimMap.get(Constants.MAPKEY_DELIM),
-          delimMap.get(Constants.ESCAPE_CHAR), delimMap.get(Constants.QUOTE_CHAR),
+          delimMap.get(serdeConstants.LINE_DELIM), 
+          delimMap.get(serdeConstants.FIELD_DELIM),
+          delimMap.get(serdeConstants.COLLECTION_DELIM), 
+          delimMap.get(serdeConstants.MAPKEY_DELIM),
+          delimMap.get(serdeConstants.ESCAPE_CHAR), 
+          delimMap.get(serdeConstants.QUOTE_CHAR),
           blockSize, compression);
     } catch (IllegalArgumentException ex) {
       // Thrown by fromJavaClassName

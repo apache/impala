@@ -57,10 +57,9 @@ export IMPALA_SNAPPY_VERSION=1.0.5
 export IMPALA_CYRUS_SASL_VERSION=2.1.23
 export IMPALA_MONGOOSE_VERSION=3.3
 
-export IMPALA_HADOOP_VERSION=2.0.0-cdh4.1.0
-export IMPALA_HIVE_VERSION=0.9.0-cdh4.1.0
-export IMPALA_HIVE_JDBC_VERSION=0.10.0-cdh4.2.0
-export IMPALA_HBASE_VERSION=0.92.1-cdh4.1.0
+export IMPALA_HADOOP_VERSION=2.0.0-cdh4.2.0
+export IMPALA_HIVE_VERSION=0.10.0-cdh4.2.0
+export IMPALA_HBASE_VERSION=0.94.2-cdh4.2.0
 export IMPALA_THRIFT_VERSION=0.9.0
 
 export IMPALA_FE_DIR=$IMPALA_HOME/fe
@@ -72,14 +71,14 @@ export PATH=$IMPALA_HOME/bin:$PATH
 
 export HADOOP_HOME=$IMPALA_HOME/thirdparty/hadoop-${IMPALA_HADOOP_VERSION}/
 export HADOOP_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
-export MINI_DFS_BASE_DATA_DIR=$HADOOP_HOME/build/test/data
+export MINI_DFS_BASE_DATA_DIR=$IMPALA_HOME/hdfs-data
 export PATH=$HADOOP_HOME/bin:$PATH
 
 export HIVE_HOME=$IMPALA_HOME/thirdparty/hive-${IMPALA_HIVE_VERSION}/
 export PATH=$HIVE_HOME/bin:$PATH
 export HIVE_CONF_DIR=$IMPALA_FE_DIR/src/test/resources
 export HIVE_JDBC_DRIVER_CLASSPATH=${HIVE_JDBC_DRIVER_CLASSPATH-\
-$IMPALA_HOME/thirdparty/hive-${IMPALA_HIVE_JDBC_VERSION}/lib/*}
+$IMPALA_HOME/thirdparty/hive-${IMPALA_HIVE_VERSION}/lib/*}
 
 ### Hive looks for jar files in a single directory from HIVE_AUX_JARS_PATH plus
 ### any jars in AUX_CLASSPATH. (Or a list of jars in HIVE_AUX_JARS_PATH.)

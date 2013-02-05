@@ -113,6 +113,11 @@ then
   # remove everything listed in .gitignore
   git clean -Xdf
 
+  # clean shell build artifacts
+  cd $IMPALA_HOME/shell
+  # remove everything listed in .gitignore
+  git clean -Xdf
+
   # clean llvm
   rm $IMPALA_HOME/llvm-ir/impala*.ll
 

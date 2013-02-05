@@ -63,9 +63,8 @@ if [ $CREATE_METASTORE -eq 1 ]; then
   set -e
   createdb -U hiveuser hive_$METASTORE_DB
 
-  # TODO: Change location of the sql file when Hive release contains this script
   psql -U hiveuser -d hive_$METASTORE_DB \
-       -f ${IMPALA_HOME}/bin/hive-schema-0.9.0.postgres.sql
+       -f ${HIVE_HOME}/scripts/metastore/upgrade/postgres/hive-schema-0.10.0.postgres.sql
 fi
 
 function generate_config {

@@ -52,7 +52,8 @@ cd ${THRIFT_SRC_DIR}
 JAVA_PREFIX=${THRIFT_HOME}/java PY_PREFIX=${THRIFT_HOME}/python \
   ./configure --with-pic --prefix=${THRIFT_HOME} \
   --with-php=no --with-java=no --with-perl=no --with-erlang=no \
-  --with-ruby=no --with-haskell=no --with-erlang=no --with-d=no
+  --with-ruby=no --with-haskell=no --with-erlang=no --with-d=no \
+  --with-qt4=no
 make # Make with -j fails
 make install
 cd ${THRIFT_SRC_DIR}/contrib/fb303
