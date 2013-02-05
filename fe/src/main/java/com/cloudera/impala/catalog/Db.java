@@ -110,7 +110,7 @@ public class Db {
    * is thrown.
    */
   private class LazyTableMap {
-    // Map of table name to Table metadata
+    // Map of lower-case table name to Table metadata
     private final ConcurrentMap<String, Table> tableMetadataMap = new MapMaker()
         .makeComputingMap(
         new Function<String, Table>() {
@@ -119,8 +119,8 @@ public class Db {
           }
         });
 
-    // Map of table names to the metadata load state. It is only possible to load metadata
-    // for tables that exist in this map.
+    // Map of lower-case table names to the metadata load state. It is only possible to
+    // load metadata for tables that exist in this map.
     private final ConcurrentMap<String, MetadataLoadState> tableNameMap = new MapMaker()
         .makeMap();
 
@@ -175,6 +175,7 @@ public class Db {
     }
 
     private Table loadTable(String tableName) {
+      tableName = tableName.toLowerCase();
       try {
         MetadataLoadState metadataState = tableNameMap.get(tableName);
 

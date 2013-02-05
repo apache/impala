@@ -476,7 +476,13 @@ public class AnalyzerTest {
 
     // case-insensitive
     AnalyzesOk("SELECT INT_COL FROM ALLTYPES");
+    AnalyzesOk("SELECT INT_COL FROM testdb1.alltypes");
+    AnalyzesOk("SELECT INT_COL FROM testdb1.aLLTYPES");
+    AnalyzesOk("SELECT INT_COL FROM Testdb1.ALLTYPES");
+    AnalyzesOk("SELECT INT_COL FROM TESTDB1.ALLtypes");
+    AnalyzesOk("SELECT INT_COL FROM TESTDB1.alltypes");
     AnalyzesOk("select AllTypes.Int_Col from alltypes");
+
     // aliases work
     AnalyzesOk("select a.int_col from alltypes a");
     // implicit aliases

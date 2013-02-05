@@ -84,17 +84,17 @@ public class Catalog {
    * is thrown.
    */
   private class LazyDbMap {
-    // Map of database name to Db metadata
+    // Map of lower-case database name to Db metadata
     private final ConcurrentMap<String, Db> dbMetadataMap = new MapMaker()
         .makeComputingMap(
         new Function<String, Db>() {
           public Db apply(String dbName) {
-            return loadDb(dbName.toLowerCase());
+            return loadDb(dbName);
           }
         });
 
-    // Map of database names to their metadata load state. It is only possible to load
-    // metadata for databases that exist in this map.
+    // Map of lower-case database names to their metadata load state. It is only possible
+    // to load metadata for databases that exist in this map.
     private final ConcurrentMap<String, MetadataLoadState> dbNameMap = new MapMaker()
         .makeMap();
 
@@ -128,7 +128,7 @@ public class Catalog {
      */
     public Db get(String dbName) {
       try {
-        return dbMetadataMap.get(dbName);
+        return dbMetadataMap.get(dbName.toLowerCase());
       } catch (ComputationException e) {
         // Search for the cause of the exception. If a load failed due to the database not
         // being found, callers should get 'null' instead of having to handle the
@@ -145,6 +145,7 @@ public class Catalog {
     }
 
     private Db loadDb(String dbName) {
+      dbName = dbName.toLowerCase();
       try {
         MetadataLoadState metadataState = dbNameMap.get(dbName);
 

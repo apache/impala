@@ -40,7 +40,8 @@ show tables "default.alltypes"
 STRING
 ====
 ---- QUERY
-USE testdb1
+# Database names are case insensitive.
+USE TESTDB1
 ---- RESULTS
 
 ====
