@@ -36,7 +36,6 @@
     <backend.library.path>${env.IMPALA_HOME}/be/build/debug/service:${env.IMPALA_HOME}/be/build/release/service</backend.library.path>
     <beeswax_port>21000</beeswax_port>
     <impalad>localhost</impalad>
-    <use_external_impalad>false</use_external_impalad>
     <testExecutionMode>reduced</testExecutionMode>
     <hadoop.version>${env.IMPALA_HADOOP_VERSION}</hadoop.version>
     <hive.version>${env.IMPALA_HIVE_VERSION}</hive.version>
@@ -141,6 +140,11 @@
     <dependency>
       <groupId>org.apache.hive</groupId>
       <artifactId>hive-service</artifactId>
+      <version>${hive.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.hive</groupId>
+      <artifactId>hive-jdbc</artifactId>
       <version>${hive.version}</version>
     </dependency>
     <dependency>

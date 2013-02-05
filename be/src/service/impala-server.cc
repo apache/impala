@@ -1710,7 +1710,7 @@ Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
   }
 
   if (hs2_port != 0 && hs2_server != NULL) {
-    // TODO: does HS2 client support non-blocking server?
+    // HiveServer2 JDBC driver does not support non-blocking server.
     shared_ptr<TProcessor> hs2_fe_processor(
         new ImpalaHiveServer2ServiceProcessor(handler));
     *hs2_server = new ThriftServer("ImpalaServer HiveServer2 Frontend",

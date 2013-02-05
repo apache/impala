@@ -24,10 +24,9 @@
 #include <boost/scoped_ptr.hpp>
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
-// TODO: use boost::uuids when we move to boost 1.42+ in the build
-//#include <boost/uuid/uuid.hpp>
-//#include <boost/uuid/uuid_generators.hpp>
-//#include <boost/uuid/uuid_io.hpp>
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 #include "gen-cpp/ImpalaService.h"
 #include "gen-cpp/ImpalaHiveServer2Service.h"
 #include "gen-cpp/ImpalaInternalService.h"
@@ -717,8 +716,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   std::vector<THostPort> last_membership_;
 
   // Generate unique session id for HiveServer2 session
-  // TODO: use boost uuid when the build has moved to boost 1.42+
-  // boost::uuids::random_generator uuid_generator_;
+  boost::uuids::random_generator uuid_generator_;
 };
 
 // Create an ImpalaServer and Thrift servers.

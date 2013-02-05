@@ -22,7 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.cloudera.impala.catalog.PrimitiveType;
-import com.cloudera.impala.service.FeSupport;
 import com.cloudera.impala.thrift.TInsertResult;
 import com.cloudera.impala.thrift.TQueryOptions;
 import com.google.common.base.Preconditions;
@@ -545,17 +544,9 @@ public class TestUtils {
   }
 
   /**
-   * Start an in-process ImpalaServer using the default Beeswax and BE ports and then
-   * return an ImpaladClientExecutor that has been connected to the in-process
-   * ImpalaServer.
+   * Return an ImpaladClientExecutor that has been connected to an external ImpalaServer.
    */
   public static ImpaladClientExecutor createImpaladClientExecutor() {
-    boolean useExternalImpalad = Boolean.parseBoolean(
-        System.getProperty("use_external_impalad", "false"));
-
-    if (!useExternalImpalad) {
-      FeSupport.loadLibrary();
-    }
     String hostName = System.getProperty("impalad", DEFAULT_FE_HOST);
     int beeswaxPort = DEFAULT_BEESWAX_PORT;
     ImpaladClientExecutor client = null;

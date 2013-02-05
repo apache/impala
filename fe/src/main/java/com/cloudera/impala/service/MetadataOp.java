@@ -22,6 +22,7 @@ import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.cloudera.impala.analysis.OpcodeRegistry;
 import com.cloudera.impala.catalog.Catalog;
 import com.cloudera.impala.catalog.Column;
 import com.cloudera.impala.catalog.Db;
@@ -40,7 +41,6 @@ import com.google.common.collect.Lists;
  * Metadata operation. It contains static methods to execute HiveServer2 metadata
  * operations and return the results, result schema and an unique request id in
  * TMetadataOpResponse.
- * TODO: add unit tests
  */
 public class MetadataOp {
   private static final Logger LOG = LoggerFactory.getLogger(MetadataOp.class);
@@ -56,14 +56,20 @@ public class MetadataOp {
   private final static TResultSetMetadata GET_SCHEMAS_MD = new TResultSetMetadata();
   private final static TResultSetMetadata GET_TABLES_MD = new TResultSetMetadata();
   private static final TResultSetMetadata GET_TYPEINFO_MD = new TResultSetMetadata();
+  private static final TResultSetMetadata GET_TABLE_TYPES_MD = new TResultSetMetadata();
+  private static final TResultSetMetadata GET_FUNCTIONS_MD = new TResultSetMetadata();
 
   // GetTypeInfo contains all primitive types supported by Impala.
   private static final List<TResultRow> GET_TYPEINFO_RESULTS = Lists.newArrayList();
+
+  // GetTableTypes only returns a single value: "TABLE".
+  private static final List<TResultRow> GET_TABLE_TYPES_RESULTS = Lists.newArrayList();
 
   // Initialize result set schemas and static result set
   static {
     initialzeResultSetSchemas();
     createGetTypeInfoResults();
+    createGetTableTypesResults();
   }
 
   /**
@@ -120,14 +126,14 @@ public class MetadataOp {
         new TColumnDesc("IS_AUTO_INCREMENT", TPrimitiveType.STRING));
 
     GET_SCHEMAS_MD.addToColumnDescs(
-        new TColumnDesc("TABLE_SCHEMA", TPrimitiveType.STRING));
+        new TColumnDesc("TABLE_SCHEM", TPrimitiveType.STRING));
     GET_SCHEMAS_MD.addToColumnDescs(
         new TColumnDesc("TABLE_CATALOG", TPrimitiveType.STRING));
 
     GET_TABLES_MD.addToColumnDescs(
         new TColumnDesc("TABLE_CAT", TPrimitiveType.STRING));
     GET_TABLES_MD.addToColumnDescs(
-        new TColumnDesc("TABLE_SCHEMA", TPrimitiveType.STRING));
+        new TColumnDesc("TABLE_SCHEM", TPrimitiveType.STRING));
     GET_TABLES_MD.addToColumnDescs(
         new TColumnDesc("TABLE_NAME", TPrimitiveType.STRING));
     GET_TABLES_MD.addToColumnDescs(
@@ -143,6 +149,8 @@ public class MetadataOp {
         new TColumnDesc("PRECISION", TPrimitiveType.INT));
     GET_TYPEINFO_MD.addToColumnDescs(
         new TColumnDesc("LITERAL_PREFIX", TPrimitiveType.STRING));
+    GET_TYPEINFO_MD.addToColumnDescs(
+        new TColumnDesc("LITERAL_SUFFIX", TPrimitiveType.STRING));
     GET_TYPEINFO_MD.addToColumnDescs(
         new TColumnDesc("CREATE_PARAMS", TPrimitiveType.STRING));
     GET_TYPEINFO_MD.addToColumnDescs(
@@ -169,27 +177,57 @@ public class MetadataOp {
         new TColumnDesc("SQL_DATETIME_SUB", TPrimitiveType.INT));
     GET_TYPEINFO_MD.addToColumnDescs(
         new TColumnDesc("NUM_PREC_RADIX", TPrimitiveType.INT));
+
+    GET_TABLE_TYPES_MD.addToColumnDescs(
+        new TColumnDesc("TABLE_TYPE", TPrimitiveType.STRING));
+
+    GET_FUNCTIONS_MD.addToColumnDescs(
+        new TColumnDesc("FUNCTION_CAT", TPrimitiveType.STRING));
+    GET_FUNCTIONS_MD.addToColumnDescs(
+        new TColumnDesc("FUNCTION_SCHEM", TPrimitiveType.STRING));
+    GET_FUNCTIONS_MD.addToColumnDescs(
+        new TColumnDesc("FUNCTION_NAME", TPrimitiveType.STRING));
+    GET_FUNCTIONS_MD.addToColumnDescs(
+        new TColumnDesc("REMARKS", TPrimitiveType.STRING));
+    GET_FUNCTIONS_MD.addToColumnDescs(
+        new TColumnDesc("FUNCTION_TYPE", TPrimitiveType.INT));
+    GET_FUNCTIONS_MD.addToColumnDescs(
+        new TColumnDesc("SPECIFIC_NAME", TPrimitiveType.STRING));
   }
 
   /**
-   * Executes the GetCatalogs HiveServer2 operation and returns TMetadataOpResponse.
-   * Hive does not have a catalog concept. It always returns an empty result set.
+   * Contains lists of databases, lists of table belonging to the dbs, and list of columns
+   *  belonging to the tables.
    */
-  public static TMetadataOpResponse getCatalogs() {
-    return createEmptyMetadataOpResponse(GET_CATALOGS_MD);
+  private static class DbsTablesColumns {
+     // the list of database
+    public List<String> dbs = Lists.newArrayList();
+
+    // tableNames[i] are the tables within dbs[i]
+    public List<List<String>> tableNames = Lists.newArrayList();
+
+    // columns[i][j] are the columns of tableNames[j] in dbs[i]
+    public List<List<List<Column>>> columns = Lists.newArrayList();
   }
 
   /**
-   * Executes the GetColumns HiveServer2 operation and returns TMetadataOpResponse.
-   * It queries the Impala catalog to return the list of table columns that fit the
-   * search patterns.
+   * Returns the list of schemas, tables and columns that satisfy the search pattern.
    * catalogName, schemaName, tableName and columnName are JDBC search patterns.
    *
-   * TODO: coalesce getColumns, getTables and getSchemas
+   * The return value DbsTablesColumns.dbs contains the list of databases that satisfy
+   * the "schemaName" search pattern.
+   * DbsTablesColumns.tableNames[i] contains the list of tables inside dbs[i] that satisfy
+   * the "tableName" search pattern.
+   * DbsTablesColumns.columns[i][j] contains the list of columns of table[j] in dbs[i]
+   * that satisfy the search condition "columnName".
+   *
+   * If tableName is null, then DbsTablesColumns.tableNames and DbsTablesColumns.columns
+   * will not be populated.
+   * If columns is null, then DbsTablesColumns.columns will not be populated.
    */
-  public static TMetadataOpResponse getColumns(Catalog catalog, String catalogName,
+  private static DbsTablesColumns getDbsTablesColumns(Catalog catalog, String catalogName,
       String schemaName, String tableName, String columnName) throws ImpalaException {
-    TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_COLUMNS_MD);
+    DbsTablesColumns result = new DbsTablesColumns();
 
     // Hive does not have a catalog concept. Returns nothing if the request specifies an
     // non-empty catalog pattern.
@@ -207,32 +245,75 @@ public class MetadataOp {
 
     for (String dbName: catalog.getAllDbNames()) {
       if (!schemaPattern.matcher(dbName).matches()) {
-        LOG.debug("DB " + dbName + " does not match " + convertedSchemaPattern);
         continue;
       }
 
-      Db db = catalog.getDb(dbName);
-
-      for (String tabName: db.getAllTableNames()) {
-        if (!tablePattern.matcher(tabName).matches()) {
-          LOG.debug("Table " + tabName + " does not match " + convertedTablePattern);
-          continue;
-        }
-
-        for (Column column: db.getTable(tabName).getColumns()) {
-          String colName = column.getName();
-          if (!columnPattern.matcher(colName).matches()) {
-            LOG.debug("Column " + colName + " does not match " + convertedColumnPattern);
+      List<String> tableList = Lists.newArrayList();
+      List<List<Column>> tablesColumnsList = Lists.newArrayList();
+      if (tableName != null) {
+        Db db = catalog.getDb(dbName);
+        for (String tabName: db.getAllTableNames()) {
+          if (!tablePattern.matcher(tabName).matches()) {
             continue;
           }
-          PrimitiveType colType = column.getType();
+          tableList.add(tabName);
+          List<Column> columns = Lists.newArrayList();
 
+          if (columnName != null) {
+            for (Column column: db.getTable(tabName).getColumns()) {
+              String colName = column.getName();
+              if (!columnPattern.matcher(colName).matches()) {
+                continue;
+              }
+              columns.add(column);
+            }
+          }
+          tablesColumnsList.add(columns);
+        }
+      }
+
+      result.dbs.add(dbName);
+      result.tableNames.add(tableList);
+      result.columns.add(tablesColumnsList);
+    }
+    return result;
+  }
+
+  /**
+   * Executes the GetCatalogs HiveServer2 operation and returns TMetadataOpResponse.
+   * Hive does not have a catalog concept. It always returns an empty result set.
+   */
+  public static TMetadataOpResponse getCatalogs() {
+    return createEmptyMetadataOpResponse(GET_CATALOGS_MD);
+  }
+
+  /**
+   * Executes the GetColumns HiveServer2 operation and returns TMetadataOpResponse.
+   * It queries the Impala catalog to return the list of table columns that fit the
+   * search patterns.
+   * catalogName, schemaName, tableName and columnName are JDBC search patterns.
+   */
+  public static TMetadataOpResponse getColumns(Catalog catalog, String catalogName,
+      String schemaName, String tableName, String columnName) throws ImpalaException {
+    TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_COLUMNS_MD);
+
+    // Get the list of schemas, tables, and columns that satisfy the search conditions.
+    DbsTablesColumns dbsTablesColumns = getDbsTablesColumns(catalog, catalogName,
+        schemaName, tableName, columnName);
+
+    for (int i = 0; i < dbsTablesColumns.dbs.size(); ++i) {
+      String dbName = dbsTablesColumns.dbs.get(i);
+      for (int j = 0; j < dbsTablesColumns.tableNames.get(i).size(); ++j) {
+        String tabName = dbsTablesColumns.tableNames.get(i).get(j);
+        for (int k = 0; k < dbsTablesColumns.columns.get(i).get(j).size(); ++k) {
+          Column column = dbsTablesColumns.columns.get(i).get(j).get(k);
+          PrimitiveType colType = column.getType();
           TResultRow row = new TResultRow();
           row.colVals = Lists.newArrayList();
           row.colVals.add(NULL_COL_VAL); // TABLE_CAT
           row.colVals.add(createTColumnValue(dbName)); // TABLE_SCHEM
           row.colVals.add(createTColumnValue(tabName)); // TABLE_NAME
-          row.colVals.add(createTColumnValue(colName)); // COLUMN_NAME
+          row.colVals.add(createTColumnValue(column.getName())); // COLUMN_NAME
           row.colVals.add(createTColumnValue(colType.getJavaSQLType())); // DATA_TYPE
           row.colVals.add(createTColumnValue(colType.name())); // TYPE_NAME
           row.colVals.add(createTColumnValue(colType.getColumnSize())); // COLUMN_SIZE
@@ -248,7 +329,8 @@ public class MetadataOp {
           row.colVals.add(NULL_COL_VAL); // SQL_DATA_TYPE
           row.colVals.add(NULL_COL_VAL); // SQL_DATETIME_SUB
           row.colVals.add(NULL_COL_VAL); // CHAR_OCTET_LENGTH
-          row.colVals.add(createTColumnValue(column.getPosition())); // ORDINAL_POSITION
+          // ORDINAL_POSITION starts from 1
+          row.colVals.add(createTColumnValue(column.getPosition() + 1));
           row.colVals.add(createTColumnValue("YES")); // IS_NULLABLE
           row.colVals.add(NULL_COL_VAL); // SCOPE_CATALOG
           row.colVals.add(NULL_COL_VAL); // SCOPE_SCHEMA
@@ -270,30 +352,22 @@ public class MetadataOp {
    * catalogName and schemaName are JDBC search patterns.
    */
   public static TMetadataOpResponse getSchemas(Catalog catalog, String catalogName,
-      String schemaName) {
+      String schemaName) throws ImpalaException {
     TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_SCHEMAS_MD);
 
-    // Hive does not have a catalog concept. Returns nothing if the request specifies an
-    // non-empty catalog pattern.
-    if (!isEmptyPattern(catalogName)) {
-      return result;
-    }
+    // Get the list of schemas that satisfy the search condition.
+    DbsTablesColumns dbsTablesColumns = getDbsTablesColumns(catalog, catalogName,
+        schemaName, null, null);
 
-    // Creates the schema search pattern
-    String convertedSchemaPattern = convertPattern(schemaName);
-    Pattern schemaPattern = Pattern.compile(convertedSchemaPattern);
-
-    for (String dbName: catalog.getAllDbNames()) {
-      if (!schemaPattern.matcher(dbName).matches()) {
-        LOG.debug("DB " + dbName + " does not match " + convertedSchemaPattern);
-        continue;
-      }
+    for (int i = 0; i < dbsTablesColumns.dbs.size(); ++i) {
+      String dbName = dbsTablesColumns.dbs.get(i);
       TResultRow row = new TResultRow();
       row.colVals = Lists.newArrayList();
-      row.colVals.add(createTColumnValue(dbName)); // TABLE_SCHEMA
+      row.colVals.add(createTColumnValue(dbName)); // TABLE_SCHEM
       row.colVals.add(EMPTY_COL_VAL); // default Hive catalog is an empty string.
       result.results.add(row);
     }
+
     LOG.debug("Returning " + result.results.size() + " schemas");
     return result;
   }
@@ -306,14 +380,9 @@ public class MetadataOp {
    * tableTypes specifies which table types to search for (TABLE, VIEW, etc).
    */
   public static TMetadataOpResponse getTables(Catalog catalog, String catalogName,
-      String schemaName, String tableName, List<String> tableTypes) {
+      String schemaName, String tableName, List<String> tableTypes)
+          throws ImpalaException{
     TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_TABLES_MD);
-
-    // Hive does not have a catalog concept. Returns nothing if the request specifies an
-    // non-empty catalog pattern.
-    if (!isEmptyPattern(catalogName)) {
-      return result;
-    }
 
     // Impala catalog only contains TABLE. Returns an empty set if the search does not
     // include TABLE.
@@ -330,34 +399,19 @@ public class MetadataOp {
       }
     }
 
-    // Creates the schema and table search patterns
-    String convertedSchemaPattern = convertPattern(schemaName);
-    String convertedTablePattern = convertPattern(tableName);
-    Pattern schemaPattern = Pattern.compile(convertedSchemaPattern);
-    Pattern tablePattern =  Pattern.compile(convertedTablePattern);
+    // Get the list of schemas, tables that satisfy the search conditions.
+    DbsTablesColumns dbsTablesColumns = getDbsTablesColumns(catalog, catalogName,
+        schemaName, tableName, null);
 
-    for (String dbName: catalog.getAllDbNames()) {
-      if (!schemaPattern.matcher(dbName).matches()) {
-        LOG.debug("DB " + dbName + " does not match " + convertedSchemaPattern);
-        continue;
-      }
-
-      Db db = catalog.getDb(dbName);
-      TColumnValue schemaColVal = new TColumnValue();
-      schemaColVal.setStringVal(dbName);
-
-      for (String tabName: db.getAllTableNames()) {
-        if (!tablePattern.matcher(tabName).matches()) {
-          LOG.debug("Table " + tabName + " does not match " + convertedTablePattern);
-          continue;
-        }
-        TColumnValue tableColVal = new TColumnValue();
-        tableColVal.setStringVal(tabName);
+    for (int i = 0; i < dbsTablesColumns.dbs.size(); ++i) {
+      String dbName = dbsTablesColumns.dbs.get(i);
+      for (int j = 0; j < dbsTablesColumns.tableNames.get(i).size(); ++j) {
+        String tabName = dbsTablesColumns.tableNames.get(i).get(j);
         TResultRow row = new TResultRow();
         row.colVals = Lists.newArrayList();
         row.colVals.add(EMPTY_COL_VAL);
-        row.colVals.add(schemaColVal);
-        row.colVals.add(tableColVal);
+        row.colVals.add(createTColumnValue(dbName));
+        row.colVals.add(createTColumnValue(tabName));
         row.colVals.add(TABLE_TYPE_COL_VAL);
         // TODO: Return table comments when it is available in the Impala catalog.
         row.colVals.add(EMPTY_COL_VAL);
@@ -378,6 +432,50 @@ public class MetadataOp {
   }
 
   /**
+   * Executes the GetTableTypes HiveServer2 operation.
+   */
+  public static TMetadataOpResponse getTableTypes() {
+    TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_TABLE_TYPES_MD);
+    result.results = GET_TABLE_TYPES_RESULTS;
+    return result;
+  }
+
+  /**
+   * Executes the GetFunctions HiveServer2 operation and returns TMetadataOpResponse.
+   * Returns the list of functions that fit the search patterns.
+   * catalogName, schemaName and functionName are JDBC search patterns.
+   */
+  public static TMetadataOpResponse getFunctions(String catalogName, String schemaName,
+      String functionName) {
+    TMetadataOpResponse result = createEmptyMetadataOpResponse(GET_FUNCTIONS_MD);
+
+    // Impala's built-in functions do not have a catalog name or schema name.
+    if (!isEmptyPattern(catalogName) || !isEmptyPattern(schemaName)) {
+      return result;
+    }
+
+    Pattern functionPattern = Pattern.compile(convertPattern(functionName));
+
+    for (String builtinFn: OpcodeRegistry.instance().getFunctionNames()) {
+      if (!functionPattern.matcher(builtinFn).matches()) {
+        continue;
+      }
+
+      TResultRow row = new TResultRow();
+      row.colVals = Lists.newArrayList();
+      row.colVals.add(NULL_COL_VAL); // FUNCTION_CAT
+      row.colVals.add(NULL_COL_VAL); // FUNCTION_SCHEM
+      row.colVals.add(createTColumnValue(builtinFn)); // FUNCTION_NAME
+      row.colVals.add(EMPTY_COL_VAL); // REMARKS
+      // FUNCTION_TYPE
+      row.colVals.add(createTColumnValue(DatabaseMetaData.functionNoTable));
+      row.colVals.add(createTColumnValue(builtinFn)); // SPECIFIC_NAME
+      result.results.add(row);
+    }
+    return result;
+  }
+
+  /**
    * Fills the GET_TYPEINFO_RESULTS with supported primitive types.
    */
   private static void createGetTypeInfoResults() {
@@ -392,6 +490,7 @@ public class MetadataOp {
       row.colVals.add(createTColumnValue(ptype.name())); // TYPE_NAME
       row.colVals.add(createTColumnValue(ptype.getJavaSQLType()));  // DATA_TYPE
       row.colVals.add(createTColumnValue(ptype.getPrecision()));  // PRECISION
+      row.colVals.add(NULL_COL_VAL); // LITERAL_PREFIX
       row.colVals.add(NULL_COL_VAL); // LITERAL_SUFFIX
       row.colVals.add(NULL_COL_VAL); // CREATE_PARAMS
       row.colVals.add(createTColumnValue(DatabaseMetaData.typeNullable));  // NULLABLE
@@ -408,6 +507,16 @@ public class MetadataOp {
       row.colVals.add(createTColumnValue(ptype.getNumPrecRadix()));  // NUM_PREC_RADIX
       GET_TYPEINFO_RESULTS.add(row);
     }
+  }
+
+  /**
+   * Fills the GET_TYPEINFO_RESULTS with "TABLE".
+   */
+  private static void createGetTableTypesResults() {
+    TResultRow row = new TResultRow();
+    row.colVals = Lists.newArrayList();
+    row.colVals.add(createTColumnValue("TABLE"));
+    GET_TABLE_TYPES_RESULTS.add(row);
   }
 
   /**

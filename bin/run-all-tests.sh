@@ -37,21 +37,26 @@ do
   esac
 done
 
-
-# Run end-to-end tests using an in-process impala test cluster
+# Start an in-process impala test cluster for end-to-end test and frontend test.
 LOG_DIR=${IMPALA_HOME}/tests/results
 mkdir -p ${LOG_DIR}
 ${IMPALA_HOME}/bin/start-impala-cluster.py --in-process --log_dir=${LOG_DIR}\
     --wait_for_cluster --cluster_size=3
+
+# Run end-to-end tests using an in-process impala test cluster
 ${IMPALA_HOME}/tests/run-tests.py --exploration_strategy=$EXPLORATION_STRATEGY -x
-${IMPALA_HOME}/bin/start-impala-cluster.py --kill_only
 
 # Run JUnit frontend tests
+# Requires a running impalad cluster because some tests (such as DataErrorTest and
+# JdbcTest) queries against an impala cluster.
 # TODO: Currently planner tests require running the end-to-end tests first
 # so data is inserted into tables. This will go away once we move the planner
 # tests to the new python framework.
 cd $IMPALA_FE_DIR
 mvn test
+
+# end-to-end test and frontend tests are completed. Stop the impala test cluster.
+${IMPALA_HOME}/bin/start-impala-cluster.py --kill_only
 
 # Run backend tests
 ${IMPALA_HOME}/bin/run-backend-tests.sh

@@ -38,8 +38,7 @@
 using namespace std;
 using namespace boost;
 using namespace boost::algorithm;
-// TODO: use boost::uuids when we move to boost 1.42+ in the build
-//using namespace boost::uuids;
+using namespace boost::uuids;
 using namespace apache::thrift;
 using namespace apache::hive::service::cli::thrift;
 using namespace beeswax; // Converting QueryState
@@ -221,16 +220,10 @@ void ImpalaServer::OpenSession(TOpenSessionResp& return_val,
   VLOG_QUERY << "OpenSession(): request=" << ThriftDebugString(request);
 
   // Generate session id and the secret
-  // TODO: use boost uuid when the build has moved to boost 1.42+
-  //uuid sessionid = uuid_generator_();
-  //uuid secret = uuid_generator_();
-  //return_val.sessionHandle.sessionId.guid.assign(sessionid.begin(), sessionid.end());
-  //return_val.sessionHandle.sessionId.secret.assign(secret.begin(), secret.end());
-  TUniqueId sessionid;
-  sessionid.hi = rand();
-  sessionid.lo = rand();
-  TUniqueIdToTHandleIdentifier(sessionid, sessionid,
-      &(return_val.sessionHandle.sessionId));
+  uuid sessionid = uuid_generator_();
+  uuid secret = uuid_generator_();
+  return_val.sessionHandle.sessionId.guid.assign(sessionid.begin(), sessionid.end());
+  return_val.sessionHandle.sessionId.secret.assign(secret.begin(), secret.end());
   DCHECK_EQ(return_val.sessionHandle.sessionId.guid.size(), 16);
   DCHECK_EQ(return_val.sessionHandle.sessionId.secret.size(), 16);
   return_val.__isset.sessionHandle = true;
@@ -424,9 +417,19 @@ void ImpalaServer::GetTableTypes(
     const TGetTableTypesReq& request) {
   VLOG_QUERY << "GetTableTypes(): request=" << ThriftDebugString(request);
 
-  // TODO: skip it for now
-  HS2_RETURN_ERROR(return_val, "Unsupported operation",
-      SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED);
+  TMetadataOpRequest req;
+  req.__set_opcode(TMetadataOpcode::GET_TABLE_TYPES);
+  req.__set_get_table_types_req(request);
+
+  TOperationHandle handle;
+  apache::hive::service::cli::thrift::TStatus status;
+  ExecuteMetadataOp(req, &handle, &status);
+  handle.__set_operationType(TOperationType::GET_TABLE_TYPES);
+  return_val.__set_operationHandle(handle);
+  return_val.__set_status(status);
+
+  VLOG_QUERY << "GetTableTypes(): return_val=" << ThriftDebugString(return_val);
+
 }
 
 void ImpalaServer::GetColumns(
@@ -452,9 +455,19 @@ void ImpalaServer::GetFunctions(
     TGetFunctionsResp& return_val,
     const TGetFunctionsReq& request) {
   VLOG_QUERY << "GetFunctions(): request=" << ThriftDebugString(request);
-  // TODO: Do we need it? We don't support functions.
-  HS2_RETURN_ERROR(return_val, "Unsupported operation",
-      SQLSTATE_OPTIONAL_FEATURE_NOT_IMPLEMENTED);
+
+  TMetadataOpRequest req;
+  req.__set_opcode(TMetadataOpcode::GET_FUNCTIONS);
+  req.__set_get_functions_req(request);
+
+  TOperationHandle handle;
+  apache::hive::service::cli::thrift::TStatus status;
+  ExecuteMetadataOp(req, &handle, &status);
+  handle.__set_operationType(TOperationType::GET_FUNCTIONS);
+  return_val.__set_operationHandle(handle);
+  return_val.__set_status(status);
+
+  VLOG_QUERY << "GetFunctions(): return_val=" << ThriftDebugString(return_val);
 }
 
 void ImpalaServer::GetOperationStatus(

@@ -22,16 +22,14 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
-import java.util.Enumeration;
 
-import org.apache.log4j.Appender;
-import org.apache.log4j.ConsoleAppender;
-import org.apache.log4j.Logger;
-import org.apache.log4j.PatternLayout;
 import org.apache.commons.cli.BasicParser;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.log4j.ConsoleAppender;
+import org.apache.log4j.Logger;
+import org.apache.log4j.PatternLayout;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
@@ -49,6 +47,11 @@ public class ImpalaJdbcClient {
   // the Hive Server 2 JDBC driver (Hive .10 and later).
   private final static String HIVE_SERVER2_DRIVER_NAME =
       "org.apache.hive.jdbc.HiveDriver";
+
+  // The default connection string connects to localhost at the default hs2_port without
+  // Sasl.
+  private final static String DEFAULT_CONNECTION_STRING =
+      "jdbc:hive2://localhost:21050/;auth=noSasl";
 
   private final String driverName;
   private final String connString;
@@ -112,6 +115,10 @@ public class ImpalaJdbcClient {
 
   public Statement getStatement() {
     return stmt;
+  }
+
+  public static ImpalaJdbcClient createClientUsingHiveJdbcDriver() {
+    return new ImpalaJdbcClient(HIVE_SERVER2_DRIVER_NAME, DEFAULT_CONNECTION_STRING);
   }
 
   public static ImpalaJdbcClient createClientUsingHiveJdbcDriver(String connString) {

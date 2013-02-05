@@ -23,10 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.api.AlreadyExistsException;
-import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.hive.service.cli.thrift.TGetColumnsReq;
+import org.apache.hive.service.cli.thrift.TGetFunctionsReq;
 import org.apache.hive.service.cli.thrift.TGetSchemasReq;
 import org.apache.hive.service.cli.thrift.TGetTablesReq;
 import org.slf4j.Logger;
@@ -326,7 +325,6 @@ public class Frontend {
 
   /**
    * Executes a HiveServer2 metadata operation and returns a TMetadataOpResponse
-   * TODO: add unit test in FrontendTest.java
    */
   public TMetadataOpResponse execHiveServer2MetadataOp(TMetadataOpRequest request)
       throws ImpalaException {
@@ -350,6 +348,13 @@ public class Frontend {
             req.getTableName(), req.getColumnName());
       }
       case GET_CATALOGS: return MetadataOp.getCatalogs();
+      case GET_TABLE_TYPES: return MetadataOp.getTableTypes();
+      case GET_FUNCTIONS:
+      {
+        TGetFunctionsReq req = request.getGet_functions_req();
+        return MetadataOp.getFunctions(req.getCatalogName(), req.getSchemaName(),
+            req.getFunctionName());
+      }
       default:
         throw new NotImplementedException(request.opcode + " has not been implemented.");
     }

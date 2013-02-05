@@ -24,10 +24,8 @@ import org.slf4j.LoggerFactory;
  * fe-support.cc implements all the native calls.
  * If the planner is executed inside Impalad, Impalad would have registered all the JNI
  * native functions already. There's no need to load the shared library.
- * For unit test (mvn test), load the shared library because
- *   1. loading the shared library would started an in-process Impala Server for the test
- *      client to connect to.
- *   2. the native function has not been loaded yet.
+ * For unit test (mvn test), load the shared library because the native function has not
+ * been loaded yet.
  */
 public class FeSupport {
   private final static Logger LOG = LoggerFactory.getLogger(FeSupport.class);
@@ -46,10 +44,10 @@ public class FeSupport {
   }
 
   /**
-   * This function should only be called explicitly by the test util to ensure that
-   * the in-process impala server has already started.
+   * This function should only be called explicitly by the FeSupport to ensure that
+   * native functions are loaded.
    */
-  public static synchronized void loadLibrary() {
+  private static synchronized void loadLibrary() {
     if (loaded) {
       return;
     }
