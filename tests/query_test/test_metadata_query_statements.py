@@ -22,6 +22,12 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
         v.get_value('table_format').file_format == 'text' and\
         v.get_value('table_format').compression_codec == 'none')
 
+  def setup_method(self, method):
+    self.cleanup_db('hive_test_db')
+
+  def teardown_method(self, method):
+    self.cleanup_db('hive_test_db')
+
   def test_show_tables(self, vector):
     self.run_test_case('QueryTest/show', vector)
 
@@ -31,6 +37,13 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
   def test_use_table(self, vector):
     self.run_test_case('QueryTest/use', vector)
 
+  def cleanup_db(cls, db_name):
+    # To drop a db, we need to first drop all the tables in that db
+    if db_name in cls.hive_client.get_all_databases():
+      for table_name in cls.hive_client.get_all_tables(db_name):
+        cls.hive_client.drop_table(db_name, table_name, True)
+      cls.hive_client.drop_database(db_name, True, False)
+
   @pytest.mark.execute_serially
   def test_impala_sees_hive_created_tables_and_databases(self, vector):
     db_name = 'hive_test_db'
@@ -38,8 +51,6 @@ class TestMetadataQueryStatements(ImpalaTestSuite):
     self.client.refresh()
     result = self.execute_query("show databases");
     assert db_name not in result.data
-
-    call(["hive", "-e", "DROP DATABASE %s" % db_name])
     call(["hive", "-e", "CREATE DATABASE %s" % db_name])
 
     result = self.execute_query("show databases");
