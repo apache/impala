@@ -42,15 +42,15 @@ TSaslServerTransport::TSaslServerTransport(const string& mechanism,
                                            const string& protocol,
                                            const string& serverName, unsigned flags,
                                            const map<string, string>& props,
-                                           const vector<struct sasl_callback>& callbacks, 
-                                           shared_ptr<TTransport> transport) 
+                                           const vector<struct sasl_callback>& callbacks,
+                                           shared_ptr<TTransport> transport)
      : TSaslTransport(transport) {
   addServerDefinition(mechanism, protocol, serverName, flags, props, callbacks);
 }
 
 TSaslServerTransport:: TSaslServerTransport(
     const std::map<std::string, TSaslServerDefinition*>& serverMap,
-    boost::shared_ptr<TTransport> transport) 
+    boost::shared_ptr<TTransport> transport)
     : TSaslTransport(transport) {
   serverDefinitionMap_.insert(serverMap.begin(), serverMap.end());
 }
@@ -70,7 +70,11 @@ void TSaslServerTransport::handleSaslStartMessage() {
   uint32_t resLength;
   NegotiationStatus status;
 
-  char* message = reinterpret_cast<char*>(receiveSaslMessage(&status, &resLength));
+  uint8_t* message = receiveSaslMessage(&status, &resLength);
+  // Message is a non-null terminated string; to use it like a
+  // C-string we have to copy it into a null-terminated buffer.
+  string message_str(reinterpret_cast<char*>(message), resLength);
+
   if (status != TSASL_START) {
     stringstream ss;
     ss << "Expecting START status, received " << status;
@@ -79,10 +83,10 @@ void TSaslServerTransport::handleSaslStartMessage() {
     throw TTransportException(ss.str());
   }
   map<string, TSaslServerDefinition*>::iterator defn =
-      TSaslServerTransport::serverDefinitionMap_.find(message);
+      TSaslServerTransport::serverDefinitionMap_.find(message_str);
   if (defn == TSaslServerTransport::serverDefinitionMap_.end()) {
     stringstream ss;
-    ss << "Unsupported mechanism type " << message;
+    ss << "Unsupported mechanism type " << message_str;
     sendSaslMessage(TSASL_BAD,
                     reinterpret_cast<const uint8_t*>(ss.str().c_str()), ss.str().size());
     throw TTransportException(TTransportException::BAD_ARGS, ss.str());
@@ -94,8 +98,9 @@ void TSaslServerTransport::handleSaslStartMessage() {
                               serverDefinition->serverName_, realm,
                               serverDefinition->flags_,
                               &serverDefinition->callbacks_[0]));
-  sasl_->evaluateChallengeOrResponse(reinterpret_cast<uint8_t*>(message),
-                                     resLength, &resLength);
+  // First argument is interpreted as C-string
+  sasl_->evaluateChallengeOrResponse(
+      reinterpret_cast<const uint8_t*>(message_str.c_str()), resLength, &resLength);
 
 }
 
