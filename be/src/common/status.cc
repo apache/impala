@@ -22,8 +22,12 @@ using namespace boost::algorithm;
 
 namespace impala {
 
+// NOTE: this is statically initialized and we must be very careful what
+// functions these constructors call.  In particular, we cannot call
+// glog functions which also rely on static initializations.
+// TODO: is there a more controlled way to do this.
 const Status Status::OK;
-const Status Status::CANCELLED(TStatusCode::CANCELLED, "Cancelled");
+const Status Status::CANCELLED(TStatusCode::CANCELLED, "Cancelled", true);
 
 Status::ErrorDetail::ErrorDetail(const TStatus& status)
   : error_code(status.status_code),
