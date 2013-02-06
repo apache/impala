@@ -853,10 +853,14 @@ void ImpalaServer::CatalogPathHandler(const Webserver::ArgumentMap& args,
 
 void ImpalaServer::BackendsPathHandler(const Webserver::ArgumentMap& args,
     stringstream* output) {
-  (*output) << "<h2>Known Backends</h2>";
   Scheduler::HostList backends;
-  (*output) << "<pre>";
   exec_env_->scheduler()->GetAllKnownHosts(&backends);
+
+  (*output) << "<h2>Known Backends "
+            << "(" << backends.size() << ")"
+            << "</h2>";
+
+  (*output) << "<pre>";
   BOOST_FOREACH(const Scheduler::HostList::value_type& host, backends) {
     (*output) << host << endl;
   }
