@@ -26,6 +26,8 @@ bin=`cd "$bin"; pwd`
 
 . "$bin"/impala-config.sh
 
+USE_PIC_LIB_PATH=${PIC_LIB_PATH:-}
+
 clean_action=1
 
 for ARG in $*
@@ -75,7 +77,7 @@ cd $IMPALA_HOME/thirdparty/gperftools-${IMPALA_GPERFTOOLS_VERSION}
 ./configure --enable-frame-pointers --with-pic
 make -j4
 
-if [ -z "$PIC_LIB_PATH" ]; then
+if [ -z "$USE_PIC_LIB_PATH" ]; then
   # Build glog
   cd $IMPALA_HOME/thirdparty/glog-${IMPALA_GLOG_VERSION}
   ./configure --with-pic
@@ -92,7 +94,7 @@ cd $IMPALA_HOME/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}
 ./configure --with-pic --prefix=$IMPALA_HOME/thirdparty/snappy-${IMPALA_SNAPPY_VERSION}/build
 make install
 
-if [ -z "$PIC_LIB_PATH" ]; then
+if [ -z "$USE_PIC_LIB_PATH" ]; then
   # Build Sasl
   # Disable everything except those protocols needed -- currently just Kerberos.
   # Sasl does not have a --with-pic configuration.
