@@ -65,6 +65,7 @@ def kill_all():
   os.system("killall mini-impala-cluster")
   os.system("killall impalad")
   os.system("killall statestored")
+  sleep(1)
 
 def start_statestore():
   output_file = os.path.join(options.log_dir, 'statestored.out')

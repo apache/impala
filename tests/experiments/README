@@ -1,0 +1,2 @@
+The tests/experiments directory should be used to put test files that are not meant to be
+run on a regular basis as part of buildall.sh or run-tests.py.
