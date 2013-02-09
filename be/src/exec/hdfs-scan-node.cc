@@ -38,12 +38,14 @@
 #include "util/debug-util.h"
 #include "util/impalad-metrics.h"
 #include "util/runtime-profile.h"
+#include "util/disk-info.h"
 
 #include "gen-cpp/PlanNodes_types.h"
 
 // TODO: temp change to validate we don't have an incast problem for joins with big tables
 DEFINE_bool(randomize_scan_ranges, false, 
     "if true, randomizes the order of scan ranges");
+DEFINE_int32(max_row_batches, 0, "the maximum size of materialized_row_batches_");
 
 using namespace boost;
 using namespace impala;
@@ -70,6 +72,10 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       ranges_in_flight_(0),
       all_ranges_issued_(false),
       counters_reported_(false) {
+  max_materialized_row_batches_ = FLAGS_max_row_batches;
+  if (max_materialized_row_batches_ <= 0) {
+    max_materialized_row_batches_ = 10 * DiskInfo::num_disks();
+  }
 }
 
 HdfsScanNode::~HdfsScanNode() {
@@ -102,6 +108,7 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
     if (!materialized_row_batches_.empty()) {
       materialized_batch = materialized_row_batches_.front();
       materialized_row_batches_.pop_front();
+      row_batch_consumed_cv_.notify_one();
     }
   }
 
@@ -124,8 +131,12 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
       UpdateCounters();
       // Wake up disk thread notifying it we are done.  This triggers tear down
       // of the scanner threads.
-      done_ = true;
+      {
+        unique_lock<mutex> l(row_batches_lock_);
+        done_ = true;
+      }
       state->io_mgr()->CancelReader(reader_context_);
+      row_batch_consumed_cv_.notify_all();
     }
     delete materialized_batch;
     *eos = false;
@@ -455,9 +466,13 @@ Status HdfsScanNode::Open(RuntimeState* state) {
 
 Status HdfsScanNode::Close(RuntimeState* state) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::CLOSE));
-  done_ = true;
+  {
+    unique_lock<mutex> l(row_batches_lock_);
+    done_ = true;
+  }
   if (reader_context_ != NULL) {
     runtime_state_->io_mgr()->CancelReader(reader_context_);
+    row_batch_consumed_cv_.notify_all();
   }
 
   if (disk_read_thread_ != NULL) disk_read_thread_->join();
@@ -582,32 +597,42 @@ void HdfsScanNode::DiskThread() {
     Status status = 
         runtime_state_->io_mgr()->GetNext(reader_context_, &buffer_desc, &eos);
 
-    unique_lock<recursive_mutex> lock(lock_);
-
-    // done_ will trigger the io mgr to return CANCELLED, we can ignore that error
-    // since the scan node triggered it itself.
-    if (done_) {
-      if (buffer_desc != NULL) buffer_desc->Return();
-      break;
-    }
-
-    // The disk io mgr is done or error occurred.  Tear everything down.
-    if (!status.ok()) {
-      done_ = true;
-      if (buffer_desc != NULL) buffer_desc->Return();
-      status_.AddError(status);
-      break;
-    }
-    
-    DCHECK(buffer_desc != NULL);
+    ScanRangeContext* scan_range_context = NULL;
     {
+      unique_lock<recursive_mutex> lock(lock_);
+
+      // done_ will trigger the io mgr to return CANCELLED, we can ignore that error
+      // since the scan node triggered it itself.
+      if (done_) {
+        if (buffer_desc != NULL) buffer_desc->Return();
+        break;
+      }
+
+      // The disk io mgr is done or error occurred. Tear everything down.
+      if (!status.ok()) {
+        {
+          unique_lock<mutex> l(row_batches_lock_);
+          done_ = true;
+        }
+        if (buffer_desc != NULL) buffer_desc->Return();
+        status_.AddError(status);
+        break;
+      }
+
+      DCHECK(buffer_desc != NULL);
+
       ContextMap::iterator context_it = contexts_.find(buffer_desc->scan_range());
       if (context_it == contexts_.end()) {
         // New scan range.  Create a new scanner, context and thread for processing it.
         StartNewScannerThread(buffer_desc);
       } else {
-        context_it->second->AddBuffer(buffer_desc);
+        scan_range_context = context_it->second;
       }
+    }
+
+    if (scan_range_context != NULL) {
+      // Do not hold lock_ when calling AddBuffer.
+      scan_range_context->AddBuffer(buffer_desc);
     }
   }
   // At this point the disk thread is starting cleanup and will no longer read
@@ -629,16 +654,21 @@ void HdfsScanNode::DiskThread() {
   contexts_.clear();
    
   // Wake up thread in GetNext	
-  {
-    unique_lock<mutex> l(row_batches_lock_);
-    done_ = true;
-  }
   row_batch_added_cv_.notify_one();
 }
 
 void HdfsScanNode::AddMaterializedRowBatch(RowBatch* row_batch) {
   {
     unique_lock<mutex> l(row_batches_lock_);
+    while (materialized_row_batches_.size() >= max_materialized_row_batches_ && !done_) {
+      row_batch_consumed_cv_.wait(l);
+    }
+
+    if (done_) {
+      delete row_batch;
+      return;
+    }
+
     materialized_row_batches_.push_back(row_batch);
   }
   row_batch_added_cv_.notify_one();
@@ -677,7 +707,10 @@ void HdfsScanNode::ScannerThread(HdfsScanner* scanner, ScanRangeContext* context
     }
   
     status_ = status;
-    done_ = true;
+    {
+      unique_lock<mutex> l(row_batches_lock_);
+      done_ = true;
+    }
     // Notify the disk which will trigger tear down of all threads.
     runtime_state_->io_mgr()->CancelReader(reader_context_);
     // Notify the main thread which reports the error

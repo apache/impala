@@ -139,6 +139,8 @@ class HdfsScanNode : public ScanNode {
 
   // Adds a materialized row batch for the scan node.  This is called from scanner
   // threads.
+  // If the scan node is done, the row batch will be discarded.
+  // This function will block if materailized_row_batches_ is full.
   void AddMaterializedRowBatch(RowBatch* row_batch);
 
   // Allocate a new scan range object.  This is thread safe.
@@ -298,7 +300,11 @@ class HdfsScanNode : public ScanNode {
   // This lock cannot be taken together with any other locks except lock_.
   boost::mutex row_batches_lock_;
   boost::condition_variable row_batch_added_cv_;
+  boost::condition_variable row_batch_consumed_cv_;
   std::list<RowBatch*> materialized_row_batches_;
+
+  // Maximum size of materialized_row_batches_.
+  int max_materialized_row_batches_;
 
   // Flag signaling that all scanner threads are done.  This could be because they
   // are finished, an error/cancellation occurred, or the limit was reached.
