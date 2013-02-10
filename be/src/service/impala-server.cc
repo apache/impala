@@ -79,13 +79,16 @@ using namespace beeswax;
 DEFINE_bool(use_planservice, false, "Use external planservice if true");
 DECLARE_string(planservice_host);
 DECLARE_int32(planservice_port);
+DECLARE_int32(be_port);
+
 // TODO: coordinate with CM to rename this port to beeswax_port
 DEFINE_int32(fe_port, 21000, "port on which Beeswax client requests are served");
 DEFINE_int32(hs2_port, 21050, "port on which HiveServer2 client requests are served");
 
+// TODO: not yet implemented - add to bootstrap CM
+DEFINE_int64(mem_limit, -1, "Process memory limit in bytes");
 DEFINE_int32(fe_service_threads, 64,
     "number of threads available to serve client requests");
-DECLARE_int32(be_port);
 DEFINE_int32(be_service_threads, 64,
     "(Advanced) number of threads available to serve backend execution requests");
 DEFINE_bool(load_catalog_at_startup, false, "if true, load all catalog data at startup");
