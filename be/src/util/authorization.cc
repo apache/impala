@@ -41,8 +41,9 @@ DEFINE_int32(kerberos_ticket_life, 0, \
   "0 implies twice the reinit interval");
 DEFINE_int32(kerberos_reinit_interval, 60, \
     "Number of minutes between reestablishing our ticket with the kerberos server");
-DEFINE_string(sasl_path, "/usr/lib/sasl2:/usr/lib64/sasl2:/usr/local/lib/sasl2",
-    "Colon separated list of paths to look for SASL security library plugins.");
+DEFINE_string(sasl_path, "/usr/lib/sasl2:/usr/lib64/sasl2:/usr/local/lib/sasl2:"
+    "/usr/lib/x86_64-linux-gnu/sasl2", "Colon separated list of paths to look for SASL "
+    "security library plugins.");
 
 namespace impala {
 
