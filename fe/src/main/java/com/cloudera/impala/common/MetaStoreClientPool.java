@@ -35,7 +35,6 @@ public class MetaStoreClientPool {
   private static final Logger LOG = Logger.getLogger(MetaStoreClientPool.class);
   private final ConcurrentLinkedQueue<MetaStoreClient> clientPool =
       new ConcurrentLinkedQueue<MetaStoreClient>();
-  private final HiveConf hiveConf;
   private Boolean poolClosed = false;
 
   /**
@@ -46,11 +45,11 @@ public class MetaStoreClientPool {
     private final HiveMetaStoreClient hiveClient;
     private boolean isInUse;
 
-    private MetaStoreClient() {
+    private MetaStoreClient(HiveConf hiveConf) {
       try {
         LOG.debug("Creating MetaStoreClient. Pool Size = " + clientPool.size());
         this.hiveClient = createHiveClient(hiveConf);
-      } catch (MetaException e) {
+      } catch (Exception e) {
         // Turn in to an unchecked exception
         throw new IllegalStateException(e);
       }
@@ -94,9 +93,8 @@ public class MetaStoreClientPool {
   }
 
   public MetaStoreClientPool(int initialSize, HiveConf hiveConf) {
-    this.hiveConf = hiveConf;
-    for (int i = 0; i <= initialSize; ++i) {
-      clientPool.add(new MetaStoreClient());
+    for (int i = 0; i < initialSize; ++i) {
+      clientPool.add(new MetaStoreClient(hiveConf));
     }
   }
 
@@ -107,7 +105,7 @@ public class MetaStoreClientPool {
     MetaStoreClient client = clientPool.poll();
     // The pool was empty so create a new client and return that.
     if (client == null) {
-      client = new MetaStoreClient();
+      client = new MetaStoreClient(new HiveConf(MetaStoreClientPool.class));
     }
     client.markInUse();
     return client;
@@ -115,12 +113,14 @@ public class MetaStoreClientPool {
 
   /**
    * Removes all items from the connection pool and closes all Hive Meta Store client
-   * connections.
+   * connections. Can be called multiple times.
    */
   public void close() {
-    Preconditions.checkState(!poolClosed);
     // Ensure no more items get added to the pool once close is called.
     synchronized (poolClosed) {
+      if (poolClosed) {
+        return;
+      }
       poolClosed = true;
     }
 
@@ -136,14 +136,15 @@ public class MetaStoreClientPool {
    * the Meta Store with many requests at once.
    */
   private static HiveMetaStoreClient createHiveClient(HiveConf conf)
-      throws MetaException {
+      throws Exception {
+    Preconditions.checkNotNull(conf);
     // Ensure numbers are random across nodes.
     Random randomGen = new Random(UUID.randomUUID().hashCode());
     int maxRetries = MAX_METASTORE_CLIENT_INIT_RETRIES;
     for (int retryAttempt = 0; retryAttempt <= maxRetries; ++retryAttempt) {
       try {
         return new HiveMetaStoreClient(conf);
-      } catch (MetaException e) {
+      } catch (Exception e) {
         LOG.error("Error initializing Hive Meta Store client", e);
         if (retryAttempt == maxRetries) {
           throw e;

@@ -54,7 +54,7 @@ public class AnalyzerTest {
 
   @BeforeClass
   public static void setUp() throws Exception {
-    catalog = new Catalog(true);
+    catalog = new Catalog();
   }
 
   @AfterClass

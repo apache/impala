@@ -77,21 +77,21 @@ import com.google.common.collect.Maps;
  */
 public class Frontend {
   private final static Logger LOG = LoggerFactory.getLogger(Frontend.class);
+  private final boolean lazyCatalog;
   private Catalog catalog;
-  final boolean lazyCatalog;
 
   // For generating a string of the current time.
   private final SimpleDateFormat formatter =
       new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
 
   public Frontend() {
-    // Default to eager loading
-    this(false);
+    // Default to lazy loading
+    this(true);
   }
 
   public Frontend(boolean lazy) {
-    this.catalog = new Catalog(lazy);
     this.lazyCatalog = lazy;
+    this.catalog = new Catalog(lazy, false);
   }
 
   /**
@@ -99,9 +99,8 @@ public class Frontend {
    */
   public void resetCatalog() {
     this.catalog.close();
-    this.catalog = new Catalog(lazyCatalog);
+    this.catalog = new Catalog(lazyCatalog, true);
   }
-
 
   public void close() {
     this.catalog.close();

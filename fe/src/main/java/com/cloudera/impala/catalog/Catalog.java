@@ -52,9 +52,10 @@ import com.google.common.collect.MapMaker;
 public class Catalog {
   public static final String DEFAULT_DB = "default";
   private static final Logger LOG = Logger.getLogger(Catalog.class);
+  private static final int META_STORE_CLIENT_POOL_SIZE = 5;
   private final boolean lazy;
   private int nextTableId;
-  private final MetaStoreClientPool metaStoreClientPool = new MetaStoreClientPool(5);
+  private final MetaStoreClientPool metaStoreClientPool;
 
   // map from db name to DB
   private final LazyDbMap dbs;
@@ -193,36 +194,56 @@ public class Catalog {
 
 
   public Catalog() {
-    this(true);
+    this(true, true);
   }
 
   /**
    * If lazy is true, tables are loaded on read, otherwise they are loaded eagerly in
-   * the constructor.
+   * the constructor. If raiseExceptions is false, exceptions will be logged and
+   * swallowed. Otherwise, exceptions are re-raised.
    */
-  public Catalog(boolean lazy) {
+  public Catalog(boolean lazy, boolean raiseExceptions) {
     this.nextTableId = 0;
     this.lazy = lazy;
-    MetaStoreClient msClient = metaStoreClientPool.getClient();
+
+    MetaStoreClientPool clientPool = null;
+    LazyDbMap dbMap = null;
     try {
-      this.dbs = new LazyDbMap(msClient.getHiveClient().getAllDatabases());
-    } catch (MetaException e) {
-      // turn into unchecked exception
-      throw new UnsupportedOperationException(e);
-    } finally {
-      msClient.release();
+      clientPool = new MetaStoreClientPool(META_STORE_CLIENT_POOL_SIZE);
+      MetaStoreClient msClient = clientPool.getClient();
+
+      try {
+        dbMap = new LazyDbMap(msClient.getHiveClient().getAllDatabases());
+      } finally {
+        msClient.release();
+      }
+
+      if (!lazy) {
+        // Load all the metadata
+        for (String dbName: dbMap.getAllDbNames()) {
+          dbMap.get(dbName);
+        }
+      }
+    } catch (Exception e) {
+      if (raiseExceptions) {
+        // If exception is already an IllegalStateException, don't wrap it.
+        if (e instanceof IllegalStateException) {
+          throw (IllegalStateException) e;
+        }
+        throw new IllegalStateException(e);
+      }
+      
+      LOG.error(e);
+      LOG.error("Error initializing Catalog. Catalog may be empty.");
     }
 
-    if (!lazy) {
-      // Load all the metadata
-      for (String dbName: dbs.getAllDbNames()) {
-        dbs.get(dbName);
-      }
-    }
+    metaStoreClientPool = clientPool == null ? new MetaStoreClientPool(0) : clientPool;
+    dbs = dbMap == null ? new LazyDbMap(new ArrayList<String>()) : dbMap;
   }
 
   /**
-   * Release the Hive Meta Store Client resources.
+   * Release the Hive Meta Store Client resources. Can be called multiple times
+   * (additional calls will be no-ops).
    */
   public void close() {
     metaStoreClientPool.close();
