@@ -70,7 +70,7 @@ PrimitiveType ThriftToType(TPrimitiveType::type ttype);
 TPrimitiveType::type ToThrift(PrimitiveType ptype);
 std::string TypeToString(PrimitiveType t);
 std::string TypeToOdbcString(PrimitiveType t);
-apache::hive::service::cli::thrift::TType::type TypeToHiveServer2Type(PrimitiveType t);
+apache::hive::service::cli::thrift::TTypeId::type TypeToHiveServer2Type(PrimitiveType t);
 }
 
 #endif

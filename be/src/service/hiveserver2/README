@@ -1,3 +1,0 @@
-This directory contains a modified version of the HiveServer2 Thrift generated C++ files
-to work around the Thrift UNION issue (THRIFT-1833). When the issue is resolved, remove
-all files from this directory and use the generated C++ files instead.

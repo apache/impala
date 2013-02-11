@@ -60,38 +60,15 @@ function(THRIFT_GEN VAR)
       set(CPP_ARGS -r ${THRIFT_INCLUDE_DIR_OPTION} --gen cpp -o ${BE_OUTPUT_DIR})
     ENDIF(FIL STREQUAL "beeswax.thrift")
     
-
-    IF (FIL STREQUAL "cli_service.thrift")
-      # TODO: HiveServer2 files are not generated because
-      # Java: we don't use HS2 java thrift
-      # C++: Thrift generates incorrect C++ union; C++ files are checked-in and copied from
-      #      be/src/service/hiveserver2/
-      # Python: HS2 cannot generate python thrift
-      # Removes this when the Thrift issues are resolved.
-      set(HS2_SRC_DIR "${CMAKE_SOURCE_DIR}/be/src/service/hiveserver2/")
-      add_custom_command(
-        OUTPUT ${OUTPUT_BE_FILE}
-        COMMAND cp ${HS2_SRC_DIR}/${FIL_WE}_types.cpp ${BE_OUTPUT_DIR}/gen-cpp/
-        COMMAND cp ${HS2_SRC_DIR}/${FIL_WE}_types.h ${BE_OUTPUT_DIR}/gen-cpp/
-        COMMAND cp ${HS2_SRC_DIR}/${FIL_WE}_constants.cpp ${BE_OUTPUT_DIR}/gen-cpp/
-        COMMAND cp ${HS2_SRC_DIR}/${FIL_WE}_constants.h ${BE_OUTPUT_DIR}/gen-cpp/
-        COMMAND cp ${HS2_SRC_DIR}/TCLIService.cpp ${BE_OUTPUT_DIR}/gen-cpp/
-        COMMAND cp ${HS2_SRC_DIR}/TCLIService.h ${BE_OUTPUT_DIR}/gen-cpp/
-        DEPENDS ${ABS_FIL}
-        COMMENT "Copying HiveServer2 c++ files to generated dir"
-        VERBATIM
-      )
-    ELSE (FIL STREQUAL "cli_service.thrift")
-      add_custom_command(
-        OUTPUT ${OUTPUT_BE_FILE}
-        COMMAND ${THRIFT_COMPILER} ${CPP_ARGS} ${FIL}
-        COMMAND ${THRIFT_COMPILER} ${JAVA_ARGS} ${FIL}
-        COMMAND ${THRIFT_COMPILER} ${PYTHON_ARGS} ${FIL}
-        DEPENDS ${ABS_FIL}
-        COMMENT "Running thrift compiler on ${FIL}"
-        VERBATIM
-      )
-    ENDIF(FIL STREQUAL "cli_service.thrift")
+    add_custom_command(
+      OUTPUT ${OUTPUT_BE_FILE}
+      COMMAND ${THRIFT_COMPILER} ${CPP_ARGS} ${FIL}
+      COMMAND ${THRIFT_COMPILER} ${JAVA_ARGS} ${FIL}
+      COMMAND ${THRIFT_COMPILER} ${PYTHON_ARGS} ${FIL}
+      DEPENDS ${ABS_FIL}
+      COMMENT "Running thrift compiler on ${FIL}"
+      VERBATIM
+    )
   endforeach(FIL)
 
   set(${VAR} ${${VAR}} PARENT_SCOPE)
