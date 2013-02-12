@@ -12,6 +12,7 @@ from tests.common.test_dimensions import *
 from tests.common.test_result_verifier import *
 from tests.common.test_vector import *
 from tests.util.test_file_parser import *
+from tests.util.thrift_util import create_transport
 from tests.common.base_test_suite import BaseTestSuite
 
 # Imports required for Hive Metastore Client
@@ -44,8 +45,12 @@ class ImpalaTestSuite(BaseTestSuite):
     cls.hive_client, cls.client = [None, None]
     # Create a Hive Metastore Client (used for executing some test SETUP steps
     hive_server_host, hive_server_port = pytest.config.option.hive_server.split(':')
-    cls.hive_transport = TTransport.TBufferedTransport(TSocket.TSocket(hive_server_host,
-                                                      int(hive_server_port)))
+    cls.hive_transport = create_transport(
+        use_kerberos=pytest.config.option.use_kerberos,
+        host=hive_server_host,
+        port=hive_server_port,
+        service=pytest.config.option.hive_service_name)
+
     protocol = TBinaryProtocol.TBinaryProtocol(cls.hive_transport)
     cls.hive_client = ThriftHiveMetastore.Client(protocol)
     cls.hive_transport.open()
@@ -65,7 +70,7 @@ class ImpalaTestSuite(BaseTestSuite):
 
   @classmethod
   def create_impala_client(cls):
-    client = ImpalaBeeswaxClient(IMPALAD, use_kerberos=False)
+    client = ImpalaBeeswaxClient(IMPALAD, use_kerberos=pytest.config.option.use_kerberos)
     client.connect()
     return client
 
@@ -145,7 +150,7 @@ class ImpalaTestSuite(BaseTestSuite):
   def change_database(self, table_format, exec_options):
     db_name =  QueryTestSectionReader.get_db_name(table_format)
     query = 'use %s' % db_name
-    self.__execute_query(IMPALAD, query, exec_options, False)
+    self.__execute_query(IMPALAD, query, exec_options)
 
   def execute_wrapper(function):
     """
@@ -170,25 +175,24 @@ class ImpalaTestSuite(BaseTestSuite):
     return wrapper
 
   @execute_wrapper
-  def execute_query_expect_success(self, impalad, query, query_exec_options=None,
-                                   use_kerberos=False):
+  def execute_query_expect_success(self, impalad, query, query_exec_options=None):
     """Executes a query and asserts if the query fails"""
-    result = self.__execute_query(impalad, query, query_exec_options, use_kerberos)
+    result = self.__execute_query(impalad, query, query_exec_options)
     assert result.success
     return result
 
   @execute_wrapper
-  def execute_query(self, query, query_exec_options=None, use_kerberos=False):
-    return self.__execute_query(IMPALAD, query, query_exec_options, use_kerberos)
+  def execute_query(self, query, query_exec_options=None):
+    return self.__execute_query(IMPALAD, query, query_exec_options)
 
   @execute_wrapper
-  def execute_query_async(self, query, query_exec_options=None, use_kerberos=False):
+  def execute_query_async(self, query, query_exec_options=None):
     self.__set_exec_options(query_exec_options)
     return self.client.execute_query_async(query)
 
   @execute_wrapper
-  def execute_scalar(self, query, query_exec_options=None, use_kerberos=False):
-    result = self.__execute_query(IMPALAD, query, query_exec_options, use_kerberos)
+  def execute_scalar(self, query, query_exec_options=None):
+    result = self.__execute_query(IMPALAD, query, query_exec_options)
     assert len(result.data) <= 1, 'Multiple values returned from scalar'
     return result.data[0] if len(result.data) == 1 else None
 
@@ -198,7 +202,7 @@ class ImpalaTestSuite(BaseTestSuite):
     for partition in self.hive_client.get_partition_names(db_name, table_name, 0):
       self.hive_client.drop_partition_by_name(db_name, table_name, partition, True)
 
-  def __execute_query(self, impalad, query, query_exec_options=None, use_kerberos=False):
+  def __execute_query(self, impalad, query, query_exec_options=None):
     """Executes the given query against the specified Impalad"""
     LOG.info('Executing Query: \n%s\n' % query)
     self.__set_exec_options(query_exec_options)

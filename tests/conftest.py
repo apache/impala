@@ -31,6 +31,13 @@ def pytest_addoption(parser):
                    "Override the test vectors and run only using the specified table "\
                    "formats. Ex. --table_formats=seq/snap/block,text/none")
 
+  parser.addoption("--hive_service_name", dest="hive_service_name",
+                   default="Hive Metastore Server", help="The principal service name "\
+                   "for the hive metastore client when using kerberos.")
+
+  parser.addoption("--use_kerberos", action="store_true", default=False,
+                   help="Use kerberos transport for running tests")
+
 def pytest_assertrepr_compare(op, left, right):
   """
   Provides a hook for outputting type-specific assertion messages

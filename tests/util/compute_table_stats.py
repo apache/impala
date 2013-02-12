@@ -11,7 +11,7 @@ from thrift.transport import TSocket
 from thrift.protocol import TBinaryProtocol
 
 COMPUTE_STATS_STATEMENT =\
-    'ANALYZE TABLE %(table_name)s %(partitions)s COMPUTE STATISTICS'
+    'ANALYZE TABLE %(db_name)s.%(table_name)s %(partitions)s COMPUTE STATISTICS'
 
 def compute_stats(hive_server_host, hive_server_port, db_names=None, table_names=None):
   """
@@ -22,8 +22,8 @@ def compute_stats(hive_server_host, hive_server_port, db_names=None, table_names
   """
 
   # Create a Hive Metastore Client (used for executing some test SETUP steps
-  hive_transport =\
-      TTransport.TBufferedTransport(TSocket.TSocket(hive_server_host, hive_server_port))
+  hive_transport = TTransport.TBufferedTransport(
+      TSocket.TSocket(hive_server_host, int(hive_server_port)))
   protocol = TBinaryProtocol.TBinaryProtocol(hive_transport)
   hive_metastore_client = ThriftHiveMetastore.Client(protocol)
   hive_client = ThriftHive.Client(protocol)
@@ -65,7 +65,7 @@ def __build_compute_stat_statement(metastore_client, db_name, table_name):
   if len(partitions) > 0:
     partition_names = [p.split('=')[0] for p in partitions[0].split('/')]
     partition_str = 'PARTITION(%s)' % ', '.join(partition_names)
-  return COMPUTE_STATS_STATEMENT % {'table_name': table_name,
+  return COMPUTE_STATS_STATEMENT % {'db_name': db_name, 'table_name': table_name,
                                     'partitions': partition_str}
 
 if __name__ == "__main__":

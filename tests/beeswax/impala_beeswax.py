@@ -21,6 +21,7 @@ from beeswaxd.BeeswaxService import QueryState
 from ImpalaService.constants import DEFAULT_QUERY_OPTIONS
 from ImpalaService import ImpalaService
 from ImpalaService.ImpalaService import TImpalaQueryOptions
+from tests.util.thrift_util import create_transport
 from thrift.transport.TSocket import TSocket
 from thrift.transport.TTransport import TBufferedTransport, TTransportException
 from thrift.protocol import TBinaryProtocol
@@ -138,29 +139,9 @@ class ImpalaBeeswaxClient(object):
       self.transport.close()
 
   def __get_transport(self):
-    """Create a Transport.
-
-       A non-kerberized impalad just needs a simple buffered transport. For
-       the kerberized version, a sasl transport is created.
-    """
-    sock = TSocket(self.impalad[0], int(self.impalad[1]))
-    if not self.use_kerberos:
-      return TBufferedTransport(sock)
-    # Initializes a sasl client
-    from shell.thrift_sasl import TSaslClientTransport
-    def sasl_factory():
-      try:
-        import saslwrapper as sasl
-      except ImportError:
-        print 'saslwrapper not found, trying to import sasl'
-        import sasl
-      sasl_client = sasl.Client()
-      sasl_client.setAttr("host", self.impalad[0])
-      sasl_client.setAttr("service", "impala")
-      sasl_client.init()
-      return sasl_client
-    # GSSASPI is the underlying mechanism used by kerberos to authenticate.
-    return TSaslClientTransport(sasl_factory, "GSSAPI", sock)
+    """Creates the proper transport type based environment (secure vs unsecure)"""
+    return create_transport(use_kerberos=self.use_kerberos,
+        host=self.impalad[0], port=int(self.impalad[1]), service='impala')
 
   def execute(self, query_string):
     """Re-directs the query to its appropriate handler, returns QueryResult"""
