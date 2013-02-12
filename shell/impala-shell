@@ -22,10 +22,17 @@
 #
 # The required directories are:
 # gen-py/ -- containing the Python thrift stubs for connecting to Impalad
-# lib/ -- containing the Hive Beeswax libraries, and the Python thrift 0.7 libraries
+# lib/ -- containing the Hive Beeswax libraries, and the Python thrift 0.9 libraries
+# ext-py/ -- containing all the eggs for the modules packaged with the shell.
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 SHELL_HOME=${IMPALA_SHELL_HOME:-${SCRIPT_DIR}}
 
-PYTHONPATH="${SHELL_HOME}/gen-py:${SHELL_HOME}/lib:${PYTHONPATH}" \
+# External module eggs are located in /ext-py, append them to the PYTHONPATH
+EGG_PATH=''
+for EGG in $(ls ${SHELL_HOME}/ext-py/*.egg); do
+   EGG_PATH="${EGG}:${EGG_PATH}"
+done
+
+PYTHONPATH="${EGG_PATH}${SHELL_HOME}/gen-py:${SHELL_HOME}/lib:${PYTHONPATH}" \
   exec python ${SHELL_HOME}/impala_shell.py "$@"

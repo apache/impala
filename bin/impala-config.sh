@@ -90,20 +90,8 @@ export PATH=$HBASE_HOME/bin:$PATH
 export HBASE_CONF_DIR=$HIVE_CONF_DIR
 
 export THRIFT_SRC_DIR=${IMPALA_HOME}/thirdparty/thrift-${IMPALA_THRIFT_VERSION}/
-export THRIFT_HOME=${THRIFT_SRC_DIR}/build/
+export THRIFT_HOME=${THRIFT_SRC_DIR}build/
 
-# set the python path for test modules and beeswax
-PYTHONPATH=$IMPALA_HOME:$IMPALA_HOME/shell/gen-py:$HIVE_HOME/lib/py
-
-# There should be just a single version of python that created the
-# site-packages directory.
-# Note: this could go wrong if we have used two different versions of
-# Python to build Thrift on this machine, and the first version is not
-# compatible with the second.
-for PYTHON_DIR in ${THRIFT_HOME}/python/lib/python*/site-packages; do
-    PYTHONPATH=$PYTHONPATH:${PYTHON_DIR}/
-done
-export PYTHONPATH
 
 # These arguments are, despite the name, passed to every JVM created
 # by an impalad.
@@ -139,7 +127,6 @@ echo "HIVE_CONF_DIR          = $HIVE_CONF_DIR"
 echo "HBASE_HOME             = $HBASE_HOME"
 echo "HBASE_CONF_DIR         = $HBASE_CONF_DIR"
 echo "THRIFT_HOME            = $THRIFT_HOME"
-echo "PYTHONPATH             = $PYTHONPATH"
 echo "HADOOP_LZO             = $HADOOP_LZO"
 echo "IMPALA_LZO             = $IMPALA_LZO"
 echo "CLASSPATH              = $CLASSPATH"

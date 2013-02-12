@@ -636,17 +636,12 @@ if __name__ == "__main__":
     sys.exit(0)
 
   if options.use_kerberos:
-    # The saslwrapper module has the same API as sasl, and is easier
-    # to install on CentOS / RHEL. Look for saslwrapper first before
-    # looking for the sasl module.
+    # The sasl module is bundled with the shell.
     try:
-      import saslwrapper as sasl
+      import sasl
     except ImportError:
-      try:
-        import sasl
-      except ImportError:
-        print 'Neither saslwrapper nor sasl module found'
-        sys.exit(1)
+      print 'sasl not found.'
+      sys.exit(1)
     from thrift_sasl import TSaslClientTransport
 
     # The service name defaults to 'impala' if not specified by the user.

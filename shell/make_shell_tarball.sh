@@ -33,10 +33,14 @@ SHELL_HOME=${IMPALA_HOME}/shell
 BUILD_DIR=${SHELL_HOME}/build
 TARBALL_ROOT=${BUILD_DIR}/impala-shell-${VERSION}
 
-echo "Deleting all files in ${TARBALL_ROOT}/{gen-py,lib}"
+set -u
+set -e
+echo "Deleting all files in ${TARBALL_ROOT}/{gen-py,lib,ext-py}"
 rm -rf ${TARBALL_ROOT}/lib/* 2>&1 > /dev/null
 rm -rf ${TARBALL_ROOT}/gen-py/* 2>&1 > /dev/null
+rm -rf ${TARBALL_ROOT}/ext-py/* 2>&1 > /dev/null
 mkdir -p ${TARBALL_ROOT}/lib
+mkdir -p ${TARBALL_ROOT}/ext-py
 
 if [ ! -f ${IMPALA_VERSION_INFO_FILE} ]; then
   echo "No version.info file found. Generating new version info"
@@ -71,10 +75,28 @@ def get_build_date():
   return "${BUILD_DATE}"
 EOF
 
+# Building all eggs.
+echo "Building all external modules into eggs"
+for MODULE in ${SHELL_HOME}/ext-py/*; do
+  pushd ${MODULE} > /dev/null 2>&1
+  echo "Cleaning up old build artifacts."
+  rm -rf dist 2>&1 > /dev/null
+  rm -rf build 2>&1 > /dev/null
+  echo "Creating an egg for ${MODULE}"
+  python setup.py bdist_egg clean
+  cp dist/*.egg ${TARBALL_ROOT}/ext-py
+  popd 2>&1 > /dev/null
+done
+
 # Copy all the shell files into the build dir
-cp -r ${HIVE_HOME}/lib/py/* ${TARBALL_ROOT}/lib
-cp -r ${THRIFT_HOME}/python/lib/python*/site-packages/thrift\
-    ${TARBALL_ROOT}/lib
+# The location of python libs for thrift is different in rhel/centos/sles
+if [ -d ${THRIFT_HOME}python/lib/python*/site-packages/thrift ]; then
+  cp -r ${THRIFT_HOME}python/lib/python*/site-packages/thrift\
+        ${TARBALL_ROOT}/lib
+else
+  cp -r ${THRIFT_HOME}python/lib64/python*/site-packages/thrift\
+        ${TARBALL_ROOT}/lib
+fi
 cp -r ${SHELL_HOME}/gen-py ${TARBALL_ROOT}
 cp ${SHELL_HOME}/thrift_sasl.py ${TARBALL_ROOT}/lib
 cp ${SHELL_HOME}/impala-shell ${TARBALL_ROOT}
