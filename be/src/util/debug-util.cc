@@ -43,6 +43,7 @@
 
 using namespace std;
 using namespace beeswax;
+using namespace parquet;
 
 namespace impala {
 
@@ -73,6 +74,7 @@ THRIFT_ENUM_OUTPUT_FN(THdfsFileFormat);
 THRIFT_ENUM_OUTPUT_FN(THdfsCompression);
 THRIFT_ENUM_OUTPUT_FN(TStmtType);
 THRIFT_ENUM_OUTPUT_FN(QueryState);
+THRIFT_ENUM_OUTPUT_FN(Encoding);
 
 THRIFT_ENUM_PRINT_FN(TStmtType);
 THRIFT_ENUM_PRINT_FN(QueryState);

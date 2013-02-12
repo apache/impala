@@ -15,8 +15,7 @@
 #include "exec/base-sequence-scanner.h"
 
 #include "exec/hdfs-scan-node.h"
-#include "exec/scan-range-context.h"
-#include "exec/serde-utils.inline.h"
+#include "exec/scanner-context.inline.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-search.h"
 #include "util/codec.h"
@@ -33,15 +32,15 @@ const int BaseSequenceScanner::SYNC_MARKER = -1;
 void BaseSequenceScanner::IssueInitialRanges(HdfsScanNode* scan_node, 
     const vector<HdfsFileDesc*>& files) {
   // Issue just the header range for each file.  When the header is complete,
-  // we'll issue the ranges for that file.  Ranges cannot be processed until the
-  // header is parsed (the header object is then shared across scan ranges of that
-  // file).
+  // we'll issue the splits for that file.  Splits cannot be processed until the
+  // header is parsed (the header object is then shared across splits for that file).
   for (int i = 0; i < files.size(); ++i) {
-    int64_t partition_id = reinterpret_cast<int64_t>(files[i]->ranges[0]->meta_data());
+    ScanRangeMetadata* metadata =
+        reinterpret_cast<ScanRangeMetadata*>(files[i]->splits[0]->meta_data());
     // TODO: add remote disk id and plumb that through to the io mgr.  It should have
     // 1 queue for each NIC as well?
     DiskIoMgr::ScanRange* header_range = scan_node->AllocateScanRange(
-        files[i]->filename.c_str(), HEADER_SIZE, 0, partition_id, -1);
+        files[i]->filename.c_str(), HEADER_SIZE, 0, metadata->partition_id, -1);
     scan_node->AddDiskIoRange(header_range);
   }
 }
@@ -69,7 +68,7 @@ Status BaseSequenceScanner::Prepare() {
 
 Status BaseSequenceScanner::Close() {
   context_->AcquirePool(data_buffer_pool_.get());
-  context_->Flush();
+  context_->Close();
   if (!only_parsing_header_) {
     scan_node_->RangeComplete(file_format(), header_->compression_type);
   }
@@ -79,11 +78,11 @@ Status BaseSequenceScanner::Close() {
   return Status::OK;
 }
 
-Status BaseSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
-  context_ = context;
+Status BaseSequenceScanner::ProcessSplit(ScannerContext* context) {
+  SetContext(context);
 
   header_ = reinterpret_cast<FileHeader*>(
-      scan_node_->GetFileMetadata(context_->filename()));
+      scan_node_->GetFileMetadata(stream_->filename()));
   if (header_ == NULL) {
     // This is the initial scan range just to parse the header
     only_parsing_header_ = true;
@@ -92,13 +91,13 @@ Status BaseSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
     if (!status.ok()) {
       if (state_->abort_on_error()) return status;
       // We need to complete the ranges for this file.
-      CloseFileRanges(context_->filename());
+      CloseFileRanges(stream_->filename());
       return Status::OK;
     }
 
     // Header is parsed, set the metadata in the scan node and issue more ranges
-    scan_node_->SetFileMetadata(context_->filename(), header_);
-    IssueFileRanges(context_->filename());
+    scan_node_->SetFileMetadata(stream_->filename(), header_);
+    IssueFileRanges(stream_->filename());
     return Status::OK;
   }
   
@@ -109,13 +108,13 @@ Status BaseSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
   Status status;
 
   // Find the first record
-  if (context_->scan_range()->offset() == 0) {
+  if (stream_->scan_range()->offset() == 0) {
     // scan range that starts at the beginning of the file, just skip ahead by
     // the header size.
-    if (!SerDeUtils::SkipBytes(context_, header_->header_size, &status)) return status;
+    if (!stream_->SkipBytes(header_->header_size, &status)) return status;
   } else {
     status = SkipToSync(header_->sync, SYNC_HASH_SIZE);
-    if (context_->eosr()) {
+    if (stream_->eosr()) {
       // We don't care about status here -- OK if we can't find the sync but
       // we're at the end of the scan range
       return Status::OK;
@@ -132,7 +131,7 @@ Status BaseSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
     status = ProcessRange();
     if (status.IsCancelled()) return status;
     // Save the offset of any error.
-    if (first_error_offset == 0) first_error_offset = context_->file_offset();
+    if (first_error_offset == 0) first_error_offset = stream_->file_offset();
 
     // Catch errors from file format parsing.  We call some utilities
     // that do not log errors so generate a reasonable message.
@@ -140,7 +139,7 @@ Status BaseSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
       if (state_->LogHasSpace()) {
         stringstream ss;
         ss << "Format error in record or block header ";
-        if (context_->eosr()) {
+        if (stream_->eosr()) {
           ss << "at end of file.";
         } else {
           ss << "at offset: "  << block_start_;
@@ -152,28 +151,28 @@ Status BaseSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
     // If no errors or we abort on error then exit loop, otherwise try to recover.
     if (state_->abort_on_error() || status.ok()) break;
 
-    if (!context_->eosr()) {
+    if (!stream_->eosr()) {
       parse_status_ = Status::OK;
       ++num_errors;
       // Recover by skipping to the next sync.
-      int64_t error_offset = context_->file_offset();
+      int64_t error_offset = stream_->file_offset();
       status = SkipToSync(header_->sync, SYNC_HASH_SIZE);
-      COUNTER_UPDATE(bytes_skipped_counter_, context_->file_offset() - error_offset);
+      COUNTER_UPDATE(bytes_skipped_counter_, stream_->file_offset() - error_offset);
       if (status.IsCancelled()) return status;
-      if (context_->eosr()) break;
+      if (stream_->eosr()) break;
 
       // An error status is explicitly ignored here so we can skip over bad blocks.
       // We will continue through this loop again looking for the next sync.
     }
-  } while (!context_->eosr());
+  } while (!stream_->eosr());
 
   if (num_errors != 0 || !status.ok()) {
     if (state_->LogHasSpace()) {
       stringstream ss;
-      ss  << "First error while processing: " << context_->filename()
+      ss  << "First error while processing: " << stream_->filename()
           << " at offset: "  << first_error_offset;
       state_->LogError(ss.str());
-      state_->ReportFileErrors(context_->filename(), num_errors == 0 ? 1 : num_errors);
+      state_->ReportFileErrors(stream_->filename(), num_errors == 0 ? 1 : num_errors);
     }
     if (state_->abort_on_error()) return status;
   }
@@ -185,18 +184,18 @@ Status BaseSequenceScanner::ProcessScanRange(ScanRangeContext* context) {
 Status BaseSequenceScanner::ReadSync() {
   // We are finished when we read a sync marker occurring completely in the next
   // scan range
-  finished_ = context_->eosr();
+  finished_ = stream_->eosr();
 
   uint8_t* hash;
   int out_len;
   bool eos;
   RETURN_IF_FALSE(
-      context_->GetBytes(&hash, SYNC_HASH_SIZE, &out_len, &eos, &parse_status_));
+      stream_->GetBytes(SYNC_HASH_SIZE, &hash, &out_len, &eos, &parse_status_));
   if (out_len != SYNC_HASH_SIZE || memcmp(hash, header_->sync, SYNC_HASH_SIZE)) {
     if (state_->LogHasSpace()) {
       stringstream ss;
       ss  << "Bad sync hash at file offset "
-          << (context_->file_offset() - SYNC_HASH_SIZE) << "." << endl
+          << (stream_->file_offset() - SYNC_HASH_SIZE) << "." << endl
           << "Expected: '"
           << SerDeUtils::HexDump(header_->sync, SYNC_HASH_SIZE)
           << "'" << endl
@@ -258,7 +257,7 @@ Status BaseSequenceScanner::SkipToSync(const uint8_t* sync, int sync_size) {
   uint8_t split_buffer[2 * tail_size];
 
   // Read buffers until we find a sync or reach end of scan range
-  RETURN_IF_ERROR(context_->GetRawBytes(&buffer, &buffer_len, &eosr));
+  RETURN_IF_ERROR(stream_->GetRawBytes(&buffer, &buffer_len, &eosr));
   while (true) {
     // Check if sync fully contained in current buffer
     offset = FindSyncBlock(buffer, buffer_len, sync, sync_size);
@@ -271,8 +270,8 @@ Status BaseSequenceScanner::SkipToSync(const uint8_t* sync, int sync_size) {
     memcpy(split_buffer, bp, bytes_first_buffer);
 
     // Read the next buffer
-    if (!SerDeUtils::SkipBytes(context_, buffer_len, &status)) return status;
-    RETURN_IF_ERROR(context_->GetRawBytes(&buffer, &buffer_len, &eosr));
+    if (!stream_->SkipBytes(buffer_len, &status)) return status;
+    RETURN_IF_ERROR(stream_->GetRawBytes(&buffer, &buffer_len, &eosr));
 
     // Copy the first few bytes of the next buffer and check again.
     int bytes_second_buffer = ::min(tail_size, buffer_len);
@@ -295,18 +294,18 @@ Status BaseSequenceScanner::SkipToSync(const uint8_t* sync, int sync_size) {
   // We found a sync at offset. offset cannot be 0 since it points to the end of
   // the sync in the current buffer.
   DCHECK_GT(offset, 0);
-  if (!SerDeUtils::SkipBytes(context_, offset, &status)) return status;
-  VLOG_FILE << "Found sync for: " << context_->filename()
-            << " at " << context_->file_offset() - sync_size;
+  if (!stream_->SkipBytes(offset, &status)) return status;
+  VLOG_FILE << "Found sync for: " << stream_->filename()
+            << " at " << stream_->file_offset() - sync_size;
   return Status::OK;
 }
 
 void BaseSequenceScanner::CloseFileRanges(const char* filename) {
   DCHECK(only_parsing_header_);
   HdfsFileDesc* desc = scan_node_->GetFileDesc(filename);
-  const vector<DiskIoMgr::ScanRange*>& ranges = desc->ranges;
-  for (int i = 0; i < ranges.size(); ++i) {
-    COUNTER_UPDATE(bytes_skipped_counter_, ranges[i]->len());
+  const vector<DiskIoMgr::ScanRange*>& splits = desc->splits;
+  for (int i = 0; i < splits.size(); ++i) {
+    COUNTER_UPDATE(bytes_skipped_counter_, splits[i]->len());
     scan_node_->RangeComplete(file_format(), THdfsCompression::NONE);
   }
 }

@@ -653,7 +653,7 @@ int64_t DiskIoMgr::GetReadThroughput() {
 
 Status DiskIoMgr::AddScanRanges(ReaderContext* reader, const vector<ScanRange*>& ranges,
     bool is_grouped) {
-  DCHECK(!ranges.empty());
+  if (ranges.empty()) return Status::OK;
 
   // Validate all ranges before adding any
   for (int i = 0; i < ranges.size(); ++i) {

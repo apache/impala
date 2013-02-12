@@ -89,6 +89,8 @@ class BitReader {
       bit_offset_(0) {
   }
 
+  BitReader() : buffer_(NULL), num_bytes_(0) {}
+
   // Gets the next bool from the buffers.  
   // Returns true if 'v' could be read or false if there are not enough bytes left.
   bool GetBool(bool* b);

@@ -22,7 +22,7 @@
 namespace impala {
 
 class DelimitedTextParser;
-class ScanRangeContext;
+class ScannerContext;
 struct HdfsFileDesc;
 
 // HdfsScanner implementation that understands text-formatted
@@ -35,7 +35,7 @@ class HdfsTextScanner : public HdfsScanner {
   // Implementation of HdfsScanner interface.
   virtual Status Prepare();
   virtual Status GetNext(RowBatch* row_batch, bool* eosr);
-  virtual Status ProcessScanRange(ScanRangeContext* context);
+  virtual Status ProcessSplit(ScannerContext* context);
   virtual Status Close();
 
   // Issue io manager byte ranges for 'files'
@@ -65,7 +65,7 @@ class HdfsTextScanner : public HdfsScanner {
 
   // Initializes this scanner for this context.  The context maps to a single
   // scan range.
-  void InitNewRange(ScanRangeContext* context);
+  void InitNewRange(ScannerContext* context);
 
   // Finds the start of the first tuple in this scan range and initializes 
   // byte_buffer_ptr to be the next character (the start of the first tuple).  If 

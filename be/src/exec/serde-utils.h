@@ -21,20 +21,8 @@
 
 namespace impala {
 
-class ScanRangeContext;
-
 // SerDeUtils:
-// A collection of utility functions for deserializing
-// data written using either standard Java serialization
-// or Hadoop Writables.
-//
-// Ref: http://download.oracle.com/javase/6/docs/api/java/io/DataInput.html
-// Ref: http://hadoop.apache.org/common/docs/current/api/org/apache/hadoop/io/Writable.html
-//
-// There are 2 version of some of the serde utilities.
-//  1. The buffer is known to be big enough, simply parse it for the value.
-//  2. The buffer if read from scan range context.  This blocks and waits for more
-//     bytes as needed (bytes are provided asynchronously by another thread).
+// A collection of utility functions for deserializing data from buffers.
 class SerDeUtils {
  public:
   static const int MAX_VINT_LEN = 9;
@@ -58,43 +46,10 @@ class SerDeUtils {
   // starting at the specified byte offset.
   static int GetVLong(uint8_t* buf, int64_t offset, int64_t* vlong);
 
-  // Read a Boolean primitive value written using Java serialization.
-  // Equivalent to java.io.DataInput.readBoolean()
-  static bool ReadBoolean(ScanRangeContext* context, bool* boolean, Status*);
-  
-  // Read an Integer primitive value written using Java serialization.
-  // Equivalent to java.io.DataInput.readInt()
-  static bool ReadInt(ScanRangeContext* context, int32_t* val, Status*);
-  
-  // Read a variable-length Long value written using Writable serialization.
-  // Ref: org.apache.hadoop.io.WritableUtils.readVLong()
-  static bool ReadVLong(ScanRangeContext* context, int64_t* val, Status*);
-  
-  // Read a variable length Integer value written using Writable serialization.
-  // Ref: org.apache.hadoop.io.WritableUtils.readVInt()
-  static bool ReadVInt(ScanRangeContext* context, int32_t* val, Status*);
-  
-  // Read a zigzag encoded long
-  static bool ReadZLong(ScanRangeContext* context, int64_t* val, Status*);
-  
-  // Read length bytes into the supplied buffer.
-  static bool ReadBytes(ScanRangeContext* context, int length, uint8_t** buf, Status*);
-  
-  // Skip over the next length bytes in the specified HDFS file.
-  static bool SkipBytes(ScanRangeContext* context, int length, Status*);
-  
-  // Read a Writable Text value from the supplied file.
-  // Ref: org.apache.hadoop.io.WritableUtils.readString()
-  static bool ReadText(ScanRangeContext* context, uint8_t** buf, int* length, Status*);
-  
-  // Skip this text object.
-  static bool SkipText(ScanRangeContext* context, Status*);
-
   // Dump the first length bytes of buf to a Hex string.
   static std::string HexDump(const uint8_t* buf, int64_t length);
   static std::string HexDump(const char* buf, int64_t length);
 
- private:
   // Determines the sign of a VInt/VLong from the first byte.
   static bool IsNegativeVInt(int8_t byte);
 

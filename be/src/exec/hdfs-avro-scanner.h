@@ -53,7 +53,7 @@
 
 // TODO: figure out how to forward declare this
 #include <ValidSchema.hh>
-#include "exec/scan-range-context.h"
+#include "exec/scanner-context.h"
 #include "exec/serde-utils.h"
 #include "runtime/tuple.h"
 #include "runtime/tuple-row.h"

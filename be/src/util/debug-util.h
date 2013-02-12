@@ -26,6 +26,7 @@
 #include "gen-cpp/PlanNodes_types.h"
 #include "gen-cpp/RuntimeProfile_types.h"
 #include "gen-cpp/ImpalaService_types.h"
+#include "gen-cpp/parquet_types.h"
 
 namespace impala {
 
@@ -42,6 +43,7 @@ std::ostream& operator<<(std::ostream& os, const THdfsFileFormat::type& type);
 std::ostream& operator<<(std::ostream& os, const THdfsCompression::type& type);
 std::ostream& operator<<(std::ostream& os, const TStmtType::type& type);
 std::ostream& operator<<(std::ostream& os, const beeswax::QueryState::type& type);
+std::ostream& operator<<(std::ostream& os, const parquet::Encoding::type& type);
 
 std::string PrintTuple(const Tuple* t, const TupleDescriptor& d);
 std::string PrintRow(TupleRow* row, const RowDescriptor& d);

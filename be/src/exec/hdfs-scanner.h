@@ -23,6 +23,7 @@
 #include <boost/scoped_ptr.hpp>
 
 #include "exec/scan-node.h"
+#include "exec/scanner-context.h"
 #include "runtime/disk-io-mgr.h"
 
 namespace impala {
@@ -34,7 +35,6 @@ class HdfsPartitionDescriptor;
 class HdfsScanNode;
 class MemPool;
 class RowBatch;
-class ScanRangeContext;
 class SlotDescriptor;
 class Status;
 class TextConverter;
@@ -58,13 +58,13 @@ struct FieldLocation {
 };
 
 // HdfsScanner is the superclass for different hdfs file format parsers.  There is
-// an instance of the scanner object created for each scan range, each driven in
-// a different thread created by the scan node.  The scan node calls:
+// an instance of the scanner object created for each split, each driven by a different
+// thread created by the scan node.  The scan node calls:
 // 1. Prepare
-// 2. ProcessScanRange
+// 2. ProcessSplit
 // 3. Close
-// ProcessScanRange does not return until the scan range is complete (or an error)
-// occurred.  The HdfsScanner works in tandem with the ScanRangeContext to parallelize IO
+// ProcessSplit does not return until the split is complete (or an error) occurred.  
+// The HdfsScanner works in tandem with the ScannerContext to interleave IO
 // and parsing.
 // For codegen, the implementation is split into two parts.  
 // 1. During the Prepare() phase of the ScanNode, the scanner subclass's static 
@@ -76,7 +76,7 @@ struct FieldLocation {
 // This way, we only codegen once per scanner type, rather than once per scanner object.
 class HdfsScanner {
  public:
-  // Assumed size of a OS file block.  Used mostly when reading file format headers, etc.
+  // Assumed size of an OS file block.  Used mostly when reading file format headers, etc.
   // This probably ought to be a derived number from the environment.
   const static int FILE_BLOCK_SIZE = 4096;
 
@@ -87,27 +87,30 @@ class HdfsScanner {
   // One-time initialisation of state that is constant across scan ranges.
   virtual Status Prepare();
 
-  // Process an entire scan range reading bytes from context.  Context is initialized
-  // with the scan range meta data (e.g. template tuple, partition descriptor, etc).
+  // Process an entire split, reading bytes from the context's streams.  Context is 
+  // initialized with the split data (e.g. template tuple, partition descriptor, etc).
   // This function should only return on error or end of scan range.
-  virtual Status ProcessScanRange(ScanRangeContext* context) = 0;
+  virtual Status ProcessSplit(ScannerContext* context) = 0;
 
   // Release all resources the scanner has allocated.  This is the last chance for
-  // the scanner to attach any resources to the ScanRangeContext object.
+  // the scanner to attach any resources to the ScannerContext object.
   virtual Status Close() = 0;
 
   // Scanner subclasses must implement these static functions as well.  Unfortunately,
   // c++ does not allow static virtual functions.
 
-  // Issue the initial ranges for 'files'.  HdfsFileDesc groups all the scan ranges
+  // Issue the initial ranges for 'files'.  HdfsFileDesc groups all the splits
   // assigned to this scan node by file.  This is called before any of the scanner
-  // subclasses are created to process scan ranges in 'files'.
+  // subclasses are created to process splits in 'files'.
   // The strategy on how to parse the scan ranges depends on the file format.
-  // - For simple text files, all the ranges are simply issued to the io mgr.
-  // - For formats with a header, the header is first parsed, and then the ranges are
-  // issued to the io mgr.
+  // - For simple text files, all the splits are simply issued to the io mgr and
+  // one split == one scan range.
+  // - For formats with a header, the metadata is first parsed, and then the ranges are
+  // issued to the io mgr.  There is one scan range for the header and one range for
+  // each split.
   // - For columnar formats, the header is parsed and only the relevant byte ranges
-  // should be issued to the io mgr.
+  // should be issued to the io mgr.  This is one range for the metadata and one 
+  // range for each column, for each split.
   // This function is how scanners can pick their strategy.
   // void IssueInitialRanges(HdfsScanNode*, const std::vector<HdfsFileDesc*>& files);
 
@@ -125,8 +128,11 @@ class HdfsScanner {
   // RuntimeState for error reporting
   RuntimeState* state_;
   
-  // Context for this scan range
-  ScanRangeContext* context_;
+  // Context for this scanner
+  ScannerContext* context_;
+  
+  // The first stream for context_
+  ScannerContext::Stream* stream_;
 
   // Conjuncts for this scanner.  Multiple scanners from multiple threads can
   // be scanning and Exprs are currently not thread safe.
@@ -164,9 +170,6 @@ class HdfsScanner {
   // how to treat buffer memory that contains slot data.
   bool has_noncompact_strings_;
   
-  // The scan range currently being read
-  DiskIoMgr::ScanRange* current_scan_range_;
-  
   // Number of null bytes in the tuple.
   int32_t num_null_bytes_;
 
@@ -175,6 +178,12 @@ class HdfsScanner {
   // objects inline a bunch of string functions.  Also, status objects aren't extremely
   // cheap to create and destroy.
   Status parse_status_;
+
+  // Initialize the context and stream
+  void SetContext(ScannerContext* context) {
+    context_ = context;
+    stream_ = context->GetStream();
+  }
 
   // Matching typedef for WriteAlignedTuples for codegen.  Refer to comments for
   // that function.
@@ -203,7 +212,7 @@ class HdfsScanner {
   int WriteEmptyTuples(RowBatch* row_batch, int num_tuples);
 
   // Write empty tuples and commit them to the context object
-  int WriteEmptyTuples(ScanRangeContext* context, TupleRow* tuple_row, int num_tuples);
+  int WriteEmptyTuples(ScannerContext* context, TupleRow* tuple_row, int num_tuples);
 
   // Processes batches of fields and writes them out to tuple_row_mem.
   // - 'pool' mempool to allocate from for auxiliary tuple memory
@@ -270,7 +279,7 @@ class HdfsScanner {
   // Report parse error for column @ desc
   void ReportColumnParseError(const SlotDescriptor* desc, const char* data, int len);
   
-  // Issue all the scan ranges for 'filename' assigned to scan_node_.
+  // Utility function to issue all splits for 'filename' as a single range per split.
   void IssueFileRanges(const char* filename);
 
   // Initialize a tuple.

@@ -19,6 +19,7 @@
 #include "exec/hdfs-sequence-scanner.h"
 #include "exec/hdfs-rcfile-scanner.h"
 #include "exec/hdfs-avro-scanner.h"
+#include "exec/hdfs-parquet-scanner.h"
 
 #include <sstream>
 #include <boost/algorithm/string.hpp>
@@ -27,7 +28,6 @@
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
 #include "common/object-pool.h"
-#include "exec/scan-range-context.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
 #include "runtime/hdfs-fs-cache.h"
@@ -36,6 +36,7 @@
 #include "runtime/raw-value.h"
 #include "runtime/row-batch.h"
 #include "util/debug-util.h"
+#include "util/hdfs-util.h"
 #include "util/impalad-metrics.h"
 #include "util/runtime-profile.h"
 #include "util/disk-info.h"
@@ -43,8 +44,8 @@
 #include "gen-cpp/PlanNodes_types.h"
 
 // TODO: temp change to validate we don't have an incast problem for joins with big tables
-DEFINE_bool(randomize_scan_ranges, false, 
-    "if true, randomizes the order of scan ranges");
+DEFINE_bool(randomize_splits, false, 
+    "if true, randomizes the order of splits");
 DEFINE_int32(max_row_batches, 0, "the maximum size of materialized_row_batches_");
 
 using namespace boost;
@@ -68,10 +69,6 @@ HdfsScanNode::HdfsScanNode(ObjectPool* pool, const TPlanNode& tnode,
       num_owned_io_buffers_(0),
       done_(false),
       partition_key_pool_(new MemPool()),
-      next_range_to_issue_idx_(0),
-      all_ranges_in_queue_(false),
-      ranges_in_flight_(0),
-      all_ranges_issued_(false),
       counters_reported_(false) {
   max_materialized_row_batches_ = FLAGS_max_row_batches;
   if (max_materialized_row_batches_ <= 0) {
@@ -92,7 +89,7 @@ Status HdfsScanNode::GetNext(RuntimeState* state, RowBatch* row_batch, bool* eos
 
   {
     unique_lock<recursive_mutex> l(lock_);
-    if (per_file_scan_ranges_.size() == 0 || ReachedLimit() || !status_.ok()) {
+    if (per_file_splits_.size() == 0 || ReachedLimit() || !status_.ok()) {
       UpdateCounters();
       *eos = true;
       return status_;
@@ -177,10 +174,11 @@ Status HdfsScanNode::SetScanRanges(const vector<TScanRangeParams>& scan_range_pa
     const string& path = split.path;
 
     HdfsFileDesc* desc = NULL;
-    ScanRangeMap::iterator desc_it = per_file_scan_ranges_.find(path);
-    if (desc_it == per_file_scan_ranges_.end()) {
+    SplitsMap::iterator desc_it = per_file_splits_.find(path);
+    if (desc_it == per_file_splits_.end()) {
       desc = runtime_state_->obj_pool()->Add(new HdfsFileDesc(path));
-      per_file_scan_ranges_[path] = desc;
+      per_file_splits_[path] = desc;
+      RETURN_IF_ERROR(GetFileSize(hdfs_connection(), path.c_str(), &desc->file_length));
     } else {
       desc = desc_it->second;
     }
@@ -192,7 +190,7 @@ Status HdfsScanNode::SetScanRanges(const vector<TScanRangeParams>& scan_range_pa
       ++num_ranges_missing_volume_id;
     }
 
-    desc->ranges.push_back(AllocateScanRange(desc->filename.c_str(), 
+    desc->splits.push_back(AllocateScanRange(desc->filename.c_str(), 
        split.length, split.offset, split.partition_id, scan_range_params[i].volume_id));
   }
 
@@ -205,7 +203,7 @@ Status HdfsScanNode::SetScanRanges(const vector<TScanRangeParams>& scan_range_pa
 }
 
 DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(const char* file, int64_t len,
-    int64_t offset, int64_t partition_id, int disk_id) {
+    int64_t offset, int64_t partition_id, int disk_id, ScannerContext::Stream* stream) {
   DCHECK_GE(disk_id, -1);
   if (disk_id == -1) {
     // disk id is unknown, assign it a random one.
@@ -217,15 +215,18 @@ DiskIoMgr::ScanRange* HdfsScanNode::AllocateScanRange(const char* file, int64_t 
   // data node.
   disk_id %= runtime_state_->io_mgr()->num_disks();
 
+  ScanRangeMetadata* metadata = 
+      runtime_state_->obj_pool()->Add(new ScanRangeMetadata(partition_id, stream));
   DiskIoMgr::ScanRange* range = 
       runtime_state_->obj_pool()->Add(new DiskIoMgr::ScanRange());
-  range->Reset(file, len, offset, disk_id, reinterpret_cast<void*>(partition_id));
+  range->Reset(file, len, offset, disk_id, metadata);
+
   return range;
 }
 
 HdfsFileDesc* HdfsScanNode::GetFileDesc(const string& filename) {
-  DCHECK(per_file_scan_ranges_.find(filename) != per_file_scan_ranges_.end());
-  return per_file_scan_ranges_[filename];
+  DCHECK(per_file_splits_.find(filename) != per_file_splits_.end());
+  return per_file_splits_[filename];
 }
 
 void HdfsScanNode::SetFileMetadata(const string& filename, void* metadata) {
@@ -267,11 +268,9 @@ HdfsScanner* HdfsScanNode::CreateScanner(HdfsPartitionDescriptor* partition) {
     case THdfsFileFormat::AVRO:
       scanner = new HdfsAvroScanner(this, runtime_state_);
       break;
-#if 0
-    case THdfsFileFormat::TREVNI:
-      scanner = new HdfsTrevniScanner(this, runtime_state_, tuple_pool_.get());
+    case THdfsFileFormat::PARQUET:
+      scanner = new HdfsParquetScanner(this, runtime_state_);
       break;
-#endif
     default:
       DCHECK(false) << "Unknown Hdfs file format type:" << partition->file_format();
       return NULL;
@@ -291,7 +290,6 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
 
   tuple_desc_ = state->desc_tbl().GetTupleDescriptor(tuple_id_);
   DCHECK(tuple_desc_ != NULL);
-  current_range_idx_ = 0;
 
   // One-time initialisation of state that is constant across scan ranges
   DCHECK(tuple_desc_->table_desc() != NULL);
@@ -333,6 +331,13 @@ Status HdfsScanNode::Prepare(RuntimeState* state) {
       materialized_slots_.push_back(slot_desc);
     }
   }
+  
+  hdfs_connection_ = state->fs_cache()->GetDefaultConnection();
+  if (hdfs_connection_ == NULL) {
+    stringstream ss;
+    ss << "Failed to connect to HDFS." << "\nError(" << errno << "):" << strerror(errno);
+    return Status(ss.str());
+  } 
 
   // Codegen scanner specific functions
   if (state->llvm_codegen() != NULL) {
@@ -368,23 +373,16 @@ Tuple* HdfsScanNode::InitTemplateTuple(RuntimeState* state,
 }
 
 // This function initiates the connection to hdfs and starts up the disk thread.
-// Scan ranges are accumulated by file type and the scanner subclasses are passed
-// the initial ranges.  Scanners are expected to queue up a non-zero number of
-// those ranges to the io mgr (via the ScanNode).
+// Splits are accumulated by file type and the scanner subclasses are passed
+// the initial splits.  Scanners are expected to queue up a non-zero number of
+// those splits to the io mgr (via the ScanNode).
 Status HdfsScanNode::Open(RuntimeState* state) {
   RETURN_IF_ERROR(ExecDebugAction(TExecNodePhase::OPEN));
 
-  if (per_file_scan_ranges_.empty()) {
+  if (per_file_splits_.empty()) {
     done_ = true;
     return Status::OK;
   }
-
-  hdfs_connection_ = state->fs_cache()->GetDefaultConnection();
-  if (hdfs_connection_ == NULL) {
-    stringstream ss;
-    ss << "Failed to connect to HDFS." << "\nError(" << errno << "):" << strerror(errno);
-    return Status(ss.str());
-  } 
 
   RETURN_IF_ERROR(runtime_state_->io_mgr()->RegisterReader(
       hdfs_connection_, state->max_io_buffers(), state->num_scanner_threads(), 
@@ -392,19 +390,19 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   runtime_state_->io_mgr()->set_bytes_read_counter(reader_context_, bytes_read_counter());
   runtime_state_->io_mgr()->set_read_timer(reader_context_, read_timer());
 
-  current_file_scan_ranges_ = per_file_scan_ranges_.begin();
-
-  int total_scan_ranges = 0;
+  int total_splits = 0;
   // Walk all the files on this node and coalesce all the files with the same
   // format.
   // Also, initialize all the exprs for all the partition keys.
   map<THdfsFileFormat::type, vector<HdfsFileDesc*> > per_type_files;
-  for (ScanRangeMap::iterator it = per_file_scan_ranges_.begin(); 
-       it != per_file_scan_ranges_.end(); ++it) {
-    vector<DiskIoMgr::ScanRange*>& ranges = it->second->ranges;
-    DCHECK(!ranges.empty());
+  for (SplitsMap::iterator it = per_file_splits_.begin(); 
+       it != per_file_splits_.end(); ++it) {
+    vector<DiskIoMgr::ScanRange*>& splits = it->second->splits;
+    DCHECK(!splits.empty());
     
-    int64_t partition_id = reinterpret_cast<int64_t>(ranges[0]->meta_data());
+    ScanRangeMetadata* metadata = 
+        reinterpret_cast<ScanRangeMetadata*>(splits[0]->meta_data());
+    int64_t partition_id = metadata->partition_id;
     HdfsPartitionDescriptor* partition = hdfs_table_->GetPartition(partition_id);
     if (partition == NULL) {
       stringstream ss;
@@ -413,31 +411,22 @@ Status HdfsScanNode::Open(RuntimeState* state) {
     }
 
     ++num_unqueued_files_;
-    total_scan_ranges += ranges.size();
+    total_splits += splits.size();
 
     RETURN_IF_ERROR(partition->PrepareExprs(state));
     per_type_files[partition->file_format()].push_back(it->second);
   }
 
-  if (total_scan_ranges == 0) {
+  if (total_splits == 0) {
     done_ = true;
     return Status::OK;
   }
 
   stringstream ss;
-  ss << "Scan ranges complete (node=" << id() << "):";
-  progress_ = ProgressUpdater(ss.str(), total_scan_ranges);
+  ss << "Splits complete (node=" << id() << "):";
+  progress_ = ProgressUpdater(ss.str(), total_splits);
 
-  max_scanner_threads_ = state->num_scanner_threads();
-  if (max_scanner_threads_ == 0) {
-    max_scanner_threads_ = total_scan_ranges;
-  } else {
-    max_scanner_threads_ = min(state->num_scanner_threads(), total_scan_ranges);
-  }
-  VLOG_FILE << "Using " << max_scanner_threads_ << " simultaneous scanner threads.";
-  DCHECK_GT(max_scanner_threads_, 0);
-
-  if (FLAGS_randomize_scan_ranges) {
+  if (FLAGS_randomize_splits) {
     unsigned int seed = time(NULL);
     srand(seed);
     VLOG_QUERY << "Randomizing scan range order with seed=" << seed;
@@ -445,7 +434,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
     for (it = per_type_files.begin(); it != per_type_files.end(); ++it) {
       vector<HdfsFileDesc*>& file_descs = it->second;
       for (int i = 0; i < file_descs.size(); ++i) {
-        random_shuffle(file_descs[i]->ranges.begin(), file_descs[i]->ranges.end());
+        random_shuffle(file_descs[i]->splits.begin(), file_descs[i]->splits.end());
       }
       random_shuffle(file_descs.begin(), file_descs.end());
     }
@@ -459,6 +448,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
       per_type_files[THdfsFileFormat::RC_FILE]);
   BaseSequenceScanner::IssueInitialRanges(this,
       per_type_files[THdfsFileFormat::AVRO]);
+  HdfsParquetScanner::IssueInitialRanges(this, per_type_files[THdfsFileFormat::PARQUET]);
   if (!per_type_files[THdfsFileFormat::LZO_TEXT].empty()) {
     // This will dlopen the lzo binary and can fail if it is not present
     RETURN_IF_ERROR(HdfsLzoTextScanner::IssueInitialRanges(state,
@@ -472,7 +462,7 @@ Status HdfsScanNode::Open(RuntimeState* state) {
   // TODO: gdb seems to cause a SIGSEGV when the java call this triggers in the
   // I/O threads when the thread created above appears during that operation. 
   // We create it first and then wake up the I/O threads. Need to investigate.
-  IssueMoreRanges();
+  IssueQueuedRanges();
 
   return Status::OK;
 }
@@ -515,27 +505,22 @@ Status HdfsScanNode::Close(RuntimeState* state) {
 
 void HdfsScanNode::AddDiskIoRange(DiskIoMgr::ScanRange* range) {
   unique_lock<recursive_mutex> lock(lock_);
-  all_ranges_.push_back(range);
+  queued_ranges_.push_back(range);
 }
 
 void HdfsScanNode::AddDiskIoRange(const HdfsFileDesc* desc) {
-  const vector<DiskIoMgr::ScanRange*>& ranges = desc->ranges;
+  const vector<DiskIoMgr::ScanRange*>& splits = desc->splits;
   unique_lock<recursive_mutex> lock(lock_);
-  for (int j = 0; j < ranges.size(); ++j) {
-    all_ranges_.push_back(ranges[j]);
+  for (int j = 0; j < splits.size(); ++j) {
+    queued_ranges_.push_back(splits[j]);
   }
   FileQueued(desc->filename.c_str());
 }
 
 void HdfsScanNode::FileQueued(const char* filename) {
   unique_lock<recursive_mutex> lock(lock_);
-  // all_ranges_issued_ is only set to true after all_ranges_in_queue_ is set to
-  // true.
-  DCHECK(!all_ranges_issued_);
   DCHECK_GT(num_unqueued_files_, 0);
-  if (--num_unqueued_files_ == 0) {
-    all_ranges_in_queue_ = true;
-  }
+  if (--num_unqueued_files_ == 0) IssueQueuedRanges();
 }
 
 // TODO: this is not in the final state.  Currently, each scanner thread only
@@ -549,62 +534,41 @@ void HdfsScanNode::FileQueued(const char* filename) {
 // up all the disks with 1 scanner thread.
 // 2. Update the scanner threads to be able to switch between scan ranges.  This is
 // more flexible and can be done with getcontext()/setcontext() (or libtask).  
-// ScanRangeContext provides this abstraction already (when GetBytes() blocks, switch
+// ScannerContext provides this abstraction already (when GetBytes() blocks, switch
 // to another scan range).
 //
-// Currently, we have implemented a poor man's version of #1 above in the scan node.
-// An alternative stop gap would be remove num_scanner_threads and always spin up
-// threads = num_buffers_per_disk * num_disks.  This will let us use the disks
-// better and closely mimics the final state with solution #2.
-Status HdfsScanNode::IssueMoreRanges() {
+// Currently, we have implemented #1.
+Status HdfsScanNode::IssueQueuedRanges() {
   unique_lock<recursive_mutex> lock(lock_);
-
-  int num_remaining = all_ranges_.size() - next_range_to_issue_idx_;
-  int threads_remaining = max_scanner_threads_ - ranges_in_flight_;
-  int ranges_to_issue = min(threads_remaining, num_remaining);
-
-  vector<DiskIoMgr::ScanRange*> ranges;
-  if (ranges_to_issue > 0) {
-    for (int i = 0; i < ranges_to_issue; ++i, ++next_range_to_issue_idx_) {
-      ranges.push_back(all_ranges_[next_range_to_issue_idx_]);
-    }
-  }
-  ranges_in_flight_ += ranges.size();
-  
-  if (next_range_to_issue_idx_ == all_ranges_.size() && all_ranges_in_queue_) {
-    all_ranges_issued_ = true;
-  }
-    
-  if (!ranges.empty()) {
-    RETURN_IF_ERROR(runtime_state_->io_mgr()->AddScanRanges(reader_context_, ranges));
-  }
-
+  RETURN_IF_ERROR(
+      runtime_state_->io_mgr()->AddScanRanges(reader_context_, queued_ranges_));
+  queued_ranges_.clear();
   return Status::OK;
 }
 
 // lock_ should be taken before calling this.
 void HdfsScanNode::StartNewScannerThread(DiskIoMgr::BufferDescriptor* buffer) {
-  DiskIoMgr::ScanRange* range = buffer->scan_range();
-  int64_t partition_id = reinterpret_cast<int64_t>(range->meta_data());
+  ScanRangeMetadata* metadata = 
+      reinterpret_cast<ScanRangeMetadata*>(buffer->scan_range()->meta_data());
+  int64_t partition_id = metadata->partition_id;
   HdfsPartitionDescriptor* partition = hdfs_table_->GetPartition(partition_id);
 
-  // TODO: no reason these have to be reallocated.  Reuse them.
-  ScanRangeContext* context = runtime_state_->obj_pool()->Add(
-      new ScanRangeContext(runtime_state_, this, partition, buffer));
-  contexts_[range] = context;
-  HdfsScanner* scanner = CreateScanner(partition);
+  ScannerContext* context = runtime_state_->obj_pool()->Add(
+      new ScannerContext(runtime_state_, this, partition, buffer));
+  metadata->stream = context->GetStream();
 
+  // Track this context as active
+  active_contexts_.insert(context);
+
+  HdfsScanner* scanner = CreateScanner(partition);
   scanner_threads_.add_thread(new thread(&HdfsScanNode::ScannerThread, this,
         scanner, context)); 
 }
 
-// The disk thread continuously reads from the io mgr queuing buffers to the 
-// correct scan range context.  Each scan range context maps to a single scan range.
-// Each buffer the io mgr returns can be mapped to the scan range it is for.  The
-// disk thread is responsible for figuring out the mapping and then queueing the
-// new buffer onto the corresponding context.  If no context exists (i.e. it is the
-// first buffer for this scan range), a new context object is created as well as a
-// new scanner thread to process it.
+// The disk thread continuously reads from the io mgr, queuing buffers to the 
+// correct ScannerContext::Stream.  If the buffer is from a new stream (i.e. first
+// buffer for the stream), then a new ScannerContext (and Stream) is created and
+// a new thread is created for the ScannerContext.
 void HdfsScanNode::DiskThread() {
   while (true) {
     bool eos = false;
@@ -612,7 +576,7 @@ void HdfsScanNode::DiskThread() {
     Status status = 
         runtime_state_->io_mgr()->GetNext(reader_context_, &buffer_desc, &eos);
 
-    ScanRangeContext* scan_range_context = NULL;
+    ScannerContext::Stream* stream = NULL;
     {
       unique_lock<recursive_mutex> lock(lock_);
 
@@ -637,18 +601,20 @@ void HdfsScanNode::DiskThread() {
       DCHECK(buffer_desc != NULL);
       __sync_fetch_and_add(&num_owned_io_buffers_, 1);
 
-      ContextMap::iterator context_it = contexts_.find(buffer_desc->scan_range());
-      if (context_it == contexts_.end()) {
-        // New scan range.  Create a new scanner, context and thread for processing it.
+      ScanRangeMetadata* metadata = 
+          reinterpret_cast<ScanRangeMetadata*>(buffer_desc->scan_range()->meta_data());
+      if (metadata->stream == NULL) {
+        // This buffer is not part of an existing stream, create a new scanner,
+        // context and stream to process it.
         StartNewScannerThread(buffer_desc);
       } else {
-        scan_range_context = context_it->second;
+        stream = metadata->stream;
       }
     }
 
-    if (scan_range_context != NULL) {
+    if (stream != NULL) {
       // Do not hold lock_ when calling AddBuffer.
-      scan_range_context->AddBuffer(buffer_desc);
+      stream->AddBuffer(buffer_desc);
     }
   }
   // At this point the disk thread is starting cleanup and will no longer read
@@ -662,8 +628,13 @@ void HdfsScanNode::DiskThread() {
   // Wake up all contexts that are still waiting.  done_ indicates that the
   // node is complete (e.g. parse error or limit reached()) and the scanner should
   // terminate immediately.
-  for (ContextMap::iterator it = contexts_.begin(); it != contexts_.end(); ++it) {
-    it->second->Cancel();
+  {
+    unique_lock<recursive_mutex> lock(lock_);
+    for (unordered_set<ScannerContext*>::iterator it = active_contexts_.begin(); 
+        it != active_contexts_.end(); ++it) {
+      (*it)->Cancel();
+    }
+    active_contexts_.clear();
   }
 
   scanner_threads_.join_all();
@@ -691,18 +662,21 @@ void HdfsScanNode::AddMaterializedRowBatch(RowBatch* row_batch) {
   row_batch_added_cv_.notify_one();
 }
 
-void HdfsScanNode::ScannerThread(HdfsScanner* scanner, ScanRangeContext* context) {
+void HdfsScanNode::ScannerThread(HdfsScanner* scanner, ScannerContext* context) {
   // Call into the scanner to process the range.  From the scanner's perspective,
   // everything is single threaded.
   Status status;
   {
     SCOPED_THREAD_COUNTER_MEASUREMENT(scanner_thread_counters());
-    status = scanner->ProcessScanRange(context);
+    status = scanner->ProcessSplit(context);
     scanner->Close();
   }
 
   // Scanner thread completed. Take a look and update the status 
   unique_lock<recursive_mutex> l(lock_);
+  active_contexts_.erase(context);
+  ScannerContext::Stream* stream = context->GetStream();
+  DCHECK(stream != NULL);
   
   // If there was already an error, the disk thread will do the cleanup.
   if (!status_.ok()) return;
@@ -720,9 +694,9 @@ void HdfsScanNode::ScannerThread(HdfsScanner* scanner, ScanRangeContext* context
     if (VLOG_QUERY_IS_ON && !runtime_state_->error_log().empty()) {
       stringstream ss;
       ss << "Scan node (id=" << id() << ") ran into a parse error for scan range "
-         << context->filename() << "(" << context->scan_range()->offset() << ":" 
-         << context->scan_range()->len() 
-         << ").  Processed " << context->total_bytes_returned() << " bytes." << endl
+         << stream->filename() << "(" << stream->scan_range()->offset() << ":" 
+         << stream->scan_range()->len() 
+         << ").  Processed " << stream->total_bytes_returned() << " bytes." << endl
          << runtime_state_->ErrorLog();
       VLOG_QUERY << ss.str();
     }
@@ -738,7 +712,6 @@ void HdfsScanNode::ScannerThread(HdfsScanner* scanner, ScanRangeContext* context
     row_batch_added_cv_.notify_one();
   }
 
-  --ranges_in_flight_;
   if (progress_.done()) {
     // All ranges are finished.  Indicate we are done.
     {
@@ -747,8 +720,9 @@ void HdfsScanNode::ScannerThread(HdfsScanner* scanner, ScanRangeContext* context
     }
     row_batch_added_cv_.notify_one();
   } else {
-    IssueMoreRanges();
-  }
+    // The scanner could have queued more ranges.  Send them to the io mgr.
+    IssueQueuedRanges();
+  } 
 }
 
 void HdfsScanNode::RangeComplete(const THdfsFileFormat::type& file_type, 

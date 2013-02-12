@@ -16,8 +16,9 @@
 
 #include <boost/algorithm/string.hpp>
 
-#include "exec/serde-utils.inline.h"
+#include "exec/hdfs-scan-node.h"
 #include "exec/hdfs-sequence-scanner.h"
+#include "exec/scanner-context.inline.h"
 #include "exec/text-converter.inline.h"
 #include "exprs/expr.h"
 #include "runtime/descriptors.h"
@@ -28,7 +29,6 @@
 #include "runtime/tuple.h"
 #include "runtime/string-value.h"
 #include "util/codec.h"
-#include "exec/hdfs-scan-node.h"
 
 #include "gen-cpp/PlanNodes_types.h"
 
@@ -84,7 +84,7 @@ Status HdfsRCFileScanner::InitNewRange() {
 
   if (header_->is_compressed) {
     RETURN_IF_ERROR(Codec::CreateDecompressor(state_,
-        data_buffer_pool_.get(), context_->compact_data(),
+        data_buffer_pool_.get(), stream_->compact_data(),
         header_->codec, &decompressor_));
   } 
   
@@ -97,7 +97,7 @@ Status HdfsRCFileScanner::ReadFileHeader() {
 
   RcFileHeader* rc_header = reinterpret_cast<RcFileHeader*>(header_);
   // Validate file version
-  RETURN_IF_FALSE(SerDeUtils::ReadBytes(context_,
+  RETURN_IF_FALSE(stream_->ReadBytes(
       sizeof(RCFILE_VERSION_HEADER), &header, &parse_status_));
   if (!memcmp(header, HdfsSequenceScanner::SEQFILE_VERSION_HEADER, 
       sizeof(HdfsSequenceScanner::SEQFILE_VERSION_HEADER))) {
@@ -116,7 +116,7 @@ Status HdfsRCFileScanner::ReadFileHeader() {
     uint8_t* class_name_key;
     int len;
     RETURN_IF_FALSE(
-        SerDeUtils::ReadText(context_, &class_name_key, &len, &parse_status_));
+        stream_->ReadText(&class_name_key, &len, &parse_status_));
     if (len != strlen(HdfsRCFileScanner::RCFILE_KEY_CLASS_NAME) ||
         memcmp(class_name_key, HdfsRCFileScanner::RCFILE_KEY_CLASS_NAME, len)) {
       stringstream ss;
@@ -128,7 +128,7 @@ Status HdfsRCFileScanner::ReadFileHeader() {
 
     uint8_t* class_name_val;
     RETURN_IF_FALSE(
-        SerDeUtils::ReadText(context_, &class_name_val, &len, &parse_status_));
+        stream_->ReadText(&class_name_val, &len, &parse_status_));
     if (len != strlen(HdfsRCFileScanner::RCFILE_VALUE_CLASS_NAME) ||
         memcmp(class_name_val, HdfsRCFileScanner::RCFILE_VALUE_CLASS_NAME, len)) {
       stringstream ss;
@@ -141,14 +141,14 @@ Status HdfsRCFileScanner::ReadFileHeader() {
 
   // Check for compression
   RETURN_IF_FALSE(
-      SerDeUtils::ReadBoolean(context_, &header_->is_compressed, &parse_status_));
+      stream_->ReadBoolean(&header_->is_compressed, &parse_status_));
   if (rc_header->version == SEQ6) {
     // Read the is_blk_compressed header field. This field should *always*
     // be FALSE, and is the result of using the sequence file header format in the
     // original RCFile format.
     bool is_blk_compressed;
     RETURN_IF_FALSE(
-        SerDeUtils::ReadBoolean(context_, &is_blk_compressed, &parse_status_));
+        stream_->ReadBoolean(&is_blk_compressed, &parse_status_));
     if (is_blk_compressed) {
       stringstream ss;
       ss << "RC files do no support block compression.";
@@ -159,7 +159,7 @@ Status HdfsRCFileScanner::ReadFileHeader() {
     uint8_t* codec_ptr;
     int len;
     // Read the codec and get the right decompressor class.
-    RETURN_IF_FALSE(SerDeUtils::ReadText(context_, &codec_ptr, &len, &parse_status_));
+    RETURN_IF_FALSE(stream_->ReadText(&codec_ptr, &len, &parse_status_));
     header_->codec = string(reinterpret_cast<char*>(codec_ptr), len);
     Codec::CodecMap::const_iterator it = Codec::CODEC_MAP.find(header_->codec);
     DCHECK(it != Codec::CODEC_MAP.end());
@@ -167,7 +167,7 @@ Status HdfsRCFileScanner::ReadFileHeader() {
   } else {
     header_->compression_type = THdfsCompression::NONE;
   }
-  VLOG_FILE << context_->filename() << ": "
+  VLOG_FILE << stream_->filename() << ": "
             << (header_->is_compressed ?  "compressed" : "not compressed");
   if (header_->is_compressed) VLOG_FILE << header_->codec;
 
@@ -176,22 +176,22 @@ Status HdfsRCFileScanner::ReadFileHeader() {
 
   // Read file sync marker
   uint8_t* sync;
-  RETURN_IF_FALSE(SerDeUtils::ReadBytes(context_, SYNC_HASH_SIZE, &sync, &parse_status_));
+  RETURN_IF_FALSE(stream_->ReadBytes(SYNC_HASH_SIZE, &sync, &parse_status_));
   memcpy(header_->sync, sync, SYNC_HASH_SIZE);
   
-  header_->header_size = context_->total_bytes_returned();
+  header_->header_size = stream_->total_bytes_returned();
   return Status::OK;
 }
 
 Status HdfsRCFileScanner::VerifyNumColumnsMetadata() {
   int map_size = 0;
-  RETURN_IF_FALSE(SerDeUtils::ReadInt(context_, &map_size, &parse_status_));
+  RETURN_IF_FALSE(stream_->ReadInt(&map_size, &parse_status_));
 
   for (int i = 0; i < map_size; ++i) {
     uint8_t* key, *value;
     int key_len, value_len;
-    RETURN_IF_FALSE(SerDeUtils::ReadText(context_, &key, &key_len, &parse_status_));
-    RETURN_IF_FALSE(SerDeUtils::ReadText(context_, &value, &value_len, &parse_status_));
+    RETURN_IF_FALSE(stream_->ReadText(&key, &key_len, &parse_status_));
+    RETURN_IF_FALSE(stream_->ReadText(&value, &value_len, &parse_status_));
 
     if (key_len == strlen(RCFILE_METADATA_KEY_NUM_COLS) &&
         !memcmp(key, HdfsRCFileScanner::RCFILE_METADATA_KEY_NUM_COLS, key_len)) {
@@ -228,7 +228,7 @@ void HdfsRCFileScanner::ResetRowGroup() {
     columns_[i].current_field_len_rep = 0;
   }
 
-  if (!context_->compact_data()) {
+  if (!stream_->compact_data()) {
     // We are done with this row group, pass along non-compact external buffers
     context_->AcquirePool(data_buffer_pool_.get());
     row_group_buffer_size_ = 0;
@@ -241,7 +241,7 @@ Status HdfsRCFileScanner::ReadRowGroup() {
   while (num_rows_ == 0) {
     RETURN_IF_ERROR(ReadRowGroupHeader());
     RETURN_IF_ERROR(ReadKeyBuffers());
-    if (context_->compact_data() || row_group_buffer_size_ < row_group_length_) {
+    if (stream_->compact_data() || row_group_buffer_size_ < row_group_length_) {
       // Allocate a new buffer for reading the row group.  Row groups have a
       // fixed number of rows so take a guess at how big it will be based on
       // the previous row group size.
@@ -249,10 +249,10 @@ Status HdfsRCFileScanner::ReadRowGroup() {
       row_group_buffer_size_ = row_group_length_;
     }
     RETURN_IF_ERROR(ReadColumnBuffers());
-    if (context_->eosr()) {
+    if (stream_->eosr()) {
       // We must read up to the next sync marker.
       int32_t record_length;
-      bool read_success = SerDeUtils::ReadInt(context_, &record_length, &parse_status_);
+      bool read_success = stream_->ReadInt(&record_length, &parse_status_);
       if (!read_success) {
         // We are at the end of the file, nothing left
         break;
@@ -271,31 +271,31 @@ Status HdfsRCFileScanner::ReadRowGroup() {
 
 Status HdfsRCFileScanner::ReadRowGroupHeader() {
   int32_t record_length;
-  RETURN_IF_FALSE(SerDeUtils::ReadInt(context_, &record_length, &parse_status_));
+  RETURN_IF_FALSE(stream_->ReadInt(&record_length, &parse_status_));
   // The sync block is marked with a record_length of -1.
   if (record_length == HdfsRCFileScanner::SYNC_MARKER) {
     RETURN_IF_ERROR(ReadSync());
-    RETURN_IF_FALSE(SerDeUtils::ReadInt(context_, &record_length, &parse_status_));
+    RETURN_IF_FALSE(stream_->ReadInt(&record_length, &parse_status_));
   }
   if (record_length < 0) {
     stringstream ss;
-    int64_t position = context_->file_offset();
+    int64_t position = stream_->file_offset();
     position -= sizeof(int32_t);
     ss << "Bad record length: " << record_length << " at offset: " << position;
     return Status(ss.str());
   }
-  RETURN_IF_FALSE(SerDeUtils::ReadInt(context_, &key_length_, &parse_status_));
+  RETURN_IF_FALSE(stream_->ReadInt(&key_length_, &parse_status_));
   if (key_length_ < 0) {
     stringstream ss;
-    int64_t position = context_->file_offset();
+    int64_t position = stream_->file_offset();
     position -= sizeof(int32_t);
     ss << "Bad key length: " << key_length_ << " at offset: " << position;
     return Status(ss.str());
   }
-  RETURN_IF_FALSE(SerDeUtils::ReadInt(context_, &compressed_key_length_, &parse_status_));
+  RETURN_IF_FALSE(stream_->ReadInt(&compressed_key_length_, &parse_status_));
   if (compressed_key_length_ < 0) {
     stringstream ss;
-    int64_t position = context_->file_offset();
+    int64_t position = stream_->file_offset();
     position -= sizeof(int32_t);
     ss << "Bad compressed key length: " << compressed_key_length_ 
        << " at offset: " << position;
@@ -310,14 +310,14 @@ Status HdfsRCFileScanner::ReadKeyBuffers() {
 
   if (header_->is_compressed) {
     uint8_t* compressed_buffer;
-    RETURN_IF_FALSE(SerDeUtils::ReadBytes(context_,
+    RETURN_IF_FALSE(stream_->ReadBytes(
         compressed_key_length_, &compressed_buffer, &parse_status_));
     RETURN_IF_ERROR(decompressor_->ProcessBlock(compressed_key_length_,
         compressed_buffer, &key_length_, &key_buffer));
   } else {
     uint8_t* buffer;
     RETURN_IF_FALSE(
-        SerDeUtils::ReadBytes(context_, key_length_, &buffer, &parse_status_));
+        stream_->ReadBytes(key_length_, &buffer, &parse_status_));
     // Make a copy of this buffer.  The underlying IO buffer will get recycled
     memcpy(key_buffer, buffer, key_length_);
   }
@@ -373,7 +373,7 @@ inline Status HdfsRCFileScanner::NextField(int col_idx) {
     uint8_t* col_key_buf = col_info.key_buffer;
     int bytes_read = SerDeUtils::GetVLong(col_key_buf, col_info.key_buffer_pos, &length);
     if (bytes_read == -1) {
-        int64_t position = context_->file_offset();
+        int64_t position = stream_->file_offset();
         stringstream ss;
         ss << "Invalid column length at offset: " << position;
         if (state_->LogHasSpace()) state_->LogError(ss.str());
@@ -411,7 +411,7 @@ Status HdfsRCFileScanner::ReadColumnBuffers() {
     if (!columns_[col_idx].materialize_column) {
       // Not materializing this column, just skip it.
       RETURN_IF_FALSE(
-          SerDeUtils::SkipBytes(context_, column.buffer_len, &parse_status_));
+          stream_->SkipBytes(column.buffer_len, &parse_status_));
       continue;
     } 
       
@@ -420,7 +420,7 @@ Status HdfsRCFileScanner::ReadColumnBuffers() {
     DCHECK_LE(column.uncompressed_buffer_len + column.start_offset, row_group_length_);
     if (header_->is_compressed) {
       uint8_t* compressed_input;
-      RETURN_IF_FALSE(SerDeUtils::ReadBytes(context_,
+      RETURN_IF_FALSE(stream_->ReadBytes(
           column.buffer_len, &compressed_input, &parse_status_));
       uint8_t* compressed_output = row_group_buffer_ + column.start_offset;
       RETURN_IF_ERROR(decompressor_->ProcessBlock(column.buffer_len,
@@ -428,7 +428,7 @@ Status HdfsRCFileScanner::ReadColumnBuffers() {
           &compressed_output));
     } else {
       uint8_t* uncompressed_data;
-      RETURN_IF_FALSE(SerDeUtils::ReadBytes(context_,
+      RETURN_IF_FALSE(stream_->ReadBytes(
           column.buffer_len, &uncompressed_data, &parse_status_));
       // TODO: this is bad.  Remove this copy.
       memcpy(row_group_buffer_ + column.start_offset, 
@@ -445,7 +445,7 @@ Status HdfsRCFileScanner::ProcessRange() {
   // materialized columns into a row group buffer.
   // It will then materialize tuples from the row group buffer.  When the row
   // group is complete, it will move onto the next row group.
-  while (!context_->eosr() || num_rows_ != row_pos_) {
+  while (!stream_->eosr() || num_rows_ != row_pos_) {
     if (num_rows_ == row_pos_) {
       // Finished materializing this row group, read the next one.
       RETURN_IF_ERROR(ReadRowGroup());
@@ -497,7 +497,7 @@ Status HdfsRCFileScanner::ProcessRange() {
             reinterpret_cast<const char*>(row_group_buffer_ + row_group_length_));
 
         if (!text_converter_->WriteSlot(slot_desc, tuple, 
-              col_start, field_len, context_->compact_data(), false, pool)) {
+              col_start, field_len, stream_->compact_data(), false, pool)) {
           ReportColumnParseError(slot_desc, col_start, field_len);
           error_in_row = true;
         }
@@ -507,11 +507,11 @@ Status HdfsRCFileScanner::ProcessRange() {
         error_in_row = false;
         if (state_->LogHasSpace()) {
           stringstream ss;
-          ss << "file: " << context_->filename();
+          ss << "file: " << stream_->filename();
           state_->LogError(ss.str());
         }
         if (state_->abort_on_error()) {
-          state_->ReportFileErrors(context_->filename(), 1);
+          state_->ReportFileErrors(stream_->filename(), 1);
           return Status(state_->ErrorLog());
         }
       }
@@ -534,7 +534,7 @@ void HdfsRCFileScanner::DebugString(int indentation_level, stringstream* out) co
   // TODO: Add more details of internal state.
   *out << string(indentation_level * 2, ' ')
        << "HdfsRCFileScanner(tupleid=" << scan_node_->tuple_idx() 
-       << " file=" << context_->filename();
+       << " file=" << stream_->filename();
   // TODO: Scanner::DebugString
   //  ExecNode::DebugString(indentation_level, out);
   *out << "])" << endl;

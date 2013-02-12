@@ -22,7 +22,6 @@
 #include "common/object-pool.h"
 #include "exec/text-converter.h"
 #include "exec/hdfs-scan-node.h"
-#include "exec/scan-range-context.h"
 #include "exec/serde-utils.inline.h"
 #include "exec/text-converter.inline.h"
 #include "exprs/expr.h"
@@ -89,7 +88,7 @@ Status HdfsScanner::InitializeCodegenFn(HdfsPartitionDescriptor* partition,
   
   if (codegen_fn == NULL) return Status::OK;
   if (!scan_node_->tuple_desc()->string_slots().empty() && 
-        ((partition->escape_char() != '\0') || context_->compact_data())) {
+        ((partition->escape_char() != '\0') || stream_->compact_data())) {
     // Cannot use codegen if there are strings slots and we need to 
     // compact (i.e. copy) the data.
     return Status::OK;
@@ -152,7 +151,7 @@ int HdfsScanner::WriteEmptyTuples(RowBatch* row_batch, int num_tuples) {
 //   1. template_tuple_ is the complete tuple.
 //   2. Eval conjuncts against the tuple.
 //   3. If it passes, stamp out 'num_tuples' copies of it into the row_batch.
-int HdfsScanner::WriteEmptyTuples(ScanRangeContext* context, 
+int HdfsScanner::WriteEmptyTuples(ScannerContext* context, 
     TupleRow* row, int num_tuples) {
   // Cap the number of result tuples up at the limit
   if (scan_node_->limit() != -1) {
@@ -193,7 +192,7 @@ bool HdfsScanner::WriteCompleteTuple(MemPool* pool, FieldLocation* fields,
 
     SlotDescriptor* desc = scan_node_->materialized_slots()[i];
     bool error = !text_converter_->WriteSlot(desc, tuple,
-        fields[i].start, len, context_->compact_data(), need_escape, pool);
+        fields[i].start, len, stream_->compact_data(), need_escape, pool);
     error_fields[i] = error;
     *error_in_row |= error;
   }
@@ -483,14 +482,14 @@ bool HdfsScanner::ReportTupleParseError(FieldLocation* fields, uint8_t* errors,
   // Call into subclass to log a more accurate error message.
   if (state_->LogHasSpace()) {
     stringstream ss;
-    ss << "file: " << context_->filename() << endl << "record: ";
+    ss << "file: " << stream_->filename() << endl << "record: ";
     LogRowParseError(&ss, row_idx);
     state_->LogError(ss.str());
   }
   
   ++num_errors_in_file_;
   if (state_->abort_on_error()) {
-    state_->ReportFileErrors(context_->filename(), 1);
+    state_->ReportFileErrors(stream_->filename(), 1);
     parse_status_ = Status(state_->ErrorLog());
   }
   return parse_status_.ok();

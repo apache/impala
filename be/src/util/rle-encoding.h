@@ -82,6 +82,8 @@ class RleDecoder {
       literal_count_(0) {
     DCHECK_EQ(bit_width_, 1);
   }
+  
+  RleDecoder() {}
 
   // Gets the next value.  Returns false if there are no more.
   template<typename T>

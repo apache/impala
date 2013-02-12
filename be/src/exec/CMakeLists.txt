@@ -33,7 +33,6 @@ add_library(Exec STATIC
   hash-join-node.cc
   hash-join-node-ir.cc
   hash-table.cc
-  hdfs-byte-stream.cc
   hdfs-scan-node.cc
   hdfs-scanner.cc
   hdfs-scanner-ir.cc
@@ -46,15 +45,16 @@ add_library(Exec STATIC
   hdfs-lzo-text-scanner.cc
   hdfs-text-table-writer.cc
   merge-node.cc
-#  hdfs-trevni-scanner.cc
+  hdfs-parquet-scanner.cc
   hdfs-parquet-table-writer.cc
   hbase-scan-node.cc
   hbase-table-scanner.cc
+  merge-node.cc
   read-write-util.cc
-  scan-range-context.cc
+  scan-node.cc
+  scanner-context.cc
   select-node.cc
   serde-utils.cc
-  scan-node.cc
   text-converter.cc
   topn-node.cc
 )

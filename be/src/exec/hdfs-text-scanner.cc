@@ -13,12 +13,10 @@
 // limitations under the License.
 
 #include "codegen/llvm-codegen.h"
-#include "exec/byte-stream.h"
 #include "exec/delimited-text-parser.h"
 #include "exec/delimited-text-parser.inline.h"
 #include "exec/hdfs-scan-node.h"
 #include "exec/hdfs-text-scanner.h"
-#include "exec/scan-range-context.h"
 #include "exec/text-converter.h"
 #include "exec/text-converter.inline.h"
 #include "runtime/row-batch.h"
@@ -56,7 +54,7 @@ void HdfsTextScanner::IssueInitialRanges(HdfsScanNode* scan_node,
   }
 }
 
-Status HdfsTextScanner::ProcessScanRange(ScanRangeContext* context) {
+Status HdfsTextScanner::ProcessSplit(ScannerContext* context) {
   // Reset state for new scan range
   InitNewRange(context);
 
@@ -83,7 +81,7 @@ Status HdfsTextScanner::Close() {
   context_->AcquirePool(boundary_mem_pool_.get());
   // We must flush any pending batches in the row batch before telling the scan node
   // the range is complete. 
-  context_->Flush();
+  context_->Close();
   scan_node_->RangeComplete(THdfsFileFormat::TEXT, THdfsCompression::NONE);
   
   COUNTER_UPDATE(scan_node_->memory_used_counter(),
@@ -91,9 +89,9 @@ Status HdfsTextScanner::Close() {
   return Status::OK;
 }
 
-void HdfsTextScanner::InitNewRange(ScanRangeContext* context) {
-  context->set_read_past_buffer_size(NEXT_BLOCK_READ_SIZE);
-  context_ = context;
+void HdfsTextScanner::InitNewRange(ScannerContext* context) {
+  SetContext(context);
+  stream_->set_read_past_buffer_size(NEXT_BLOCK_READ_SIZE);
   HdfsPartitionDescriptor* hdfs_partition = context_->partition_descriptor();
   
   char field_delim = hdfs_partition->field_delim();
@@ -147,8 +145,8 @@ Status HdfsTextScanner::FinishScanRange() {
       if (status.IsCancelled()) return status;
       
       if (!status.ok()) {
-        ss << "Read failed while trying to finish scan range: " << context_->filename() 
-           << ":" << context_->file_offset() << endl << status.GetErrorMsg();
+        ss << "Read failed while trying to finish scan range: " << stream_->filename() 
+           << ":" << stream_->file_offset() << endl << status.GetErrorMsg();
         if (state_->LogHasSpace()) state_->LogError(ss.str());
         if (state_->abort_on_error()) return Status(ss.str());
       } else if (!partial_tuple_empty_ || !boundary_column_.Empty() || 
@@ -186,7 +184,7 @@ Status HdfsTextScanner::FinishScanRange() {
 }
 
 Status HdfsTextScanner::ProcessRange(int* num_tuples, bool past_scan_range) {
-  bool eosr = past_scan_range || context_->eosr();
+  bool eosr = past_scan_range || stream_->eosr();
 
   while (true) {
     if (!eosr && byte_buffer_ptr_ == byte_buffer_end_) {
@@ -276,16 +274,15 @@ Status HdfsTextScanner::ProcessRange(int* num_tuples, bool past_scan_range) {
 Status HdfsTextScanner::FillByteBuffer(bool* eosr, int num_bytes) {
   *eosr = false;
   Status status;
-  context_->GetBytes(
-      reinterpret_cast<uint8_t**>(&byte_buffer_ptr_), num_bytes, 
-          &byte_buffer_read_size_, eosr, &status);
+  stream_->GetBytes(num_bytes, reinterpret_cast<uint8_t**>(&byte_buffer_ptr_),
+      &byte_buffer_read_size_, eosr, &status);
   byte_buffer_end_ = byte_buffer_ptr_ + byte_buffer_read_size_;
   return status;
 }
 
 Status HdfsTextScanner::FindFirstTuple(bool* tuple_found) {
   *tuple_found = true;
-  if (context_->scan_range()->offset() != 0) {
+  if (stream_->scan_range()->offset() != 0) {
     *tuple_found = false;
     // Offset may not point to tuple boundary, skip ahead to the first full tuple
     // start.
@@ -398,7 +395,7 @@ int HdfsTextScanner::WriteFields(MemPool* pool, TupleRow* tuple_row,
       if (UNLIKELY(error_in_row_)) {
         if (state_->LogHasSpace()) {
           stringstream ss;
-          ss << "file: " << context_->filename() << endl << "record: ";
+          ss << "file: " << stream_->filename() << endl << "record: ";
           LogRowParseError(&ss, 0);
           state_->LogError(ss.str());
         }

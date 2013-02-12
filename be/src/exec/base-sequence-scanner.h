@@ -26,7 +26,7 @@ namespace impala {
 
 class Codec;
 struct HdfsFileDesc;
-class ScanRangeContext;
+class ScannerContext;
 
 // Superclass for all sequence container based file formats: 
 // e.g. SequenceFile, RCFile, Avro
@@ -40,7 +40,7 @@ class BaseSequenceScanner : public HdfsScanner {
 
   virtual Status Prepare();
   virtual Status Close();
-  virtual Status ProcessScanRange(ScanRangeContext* context);
+  virtual Status ProcessSplit(ScannerContext* context);
 
   virtual ~BaseSequenceScanner();
 
@@ -84,14 +84,14 @@ class BaseSequenceScanner : public HdfsScanner {
   // Reset internal state for a new scan range.
   virtual Status InitNewRange() = 0;
 
-  // Read the file header.  The underlying ScanRangeContext is at the start of
+  // Read the file header.  The underlying ScannerContext is at the start of
   // the file header.  This function must read the file header (which advances
   // context_ past it) and initialize header_.
   virtual Status ReadFileHeader() = 0;
   
   // Process the current range until the end or an error occurred.  Note this might
   // be called multiple times if we skip over bad data.
-  // This function should read from the underlying ScanRangeContext materializing
+  // This function should read from the underlying ScannerContext materializing
   // tuples to the context.  When this function is called, it is guaranteed to be
   // at the start of a data block (i.e. right after the sync marker).
   virtual Status ProcessRange() = 0;

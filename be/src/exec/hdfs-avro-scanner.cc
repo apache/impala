@@ -22,7 +22,7 @@
 
 #include <boost/array.hpp>
 #include "exec/hdfs-scan-node.h"
-#include "exec/serde-utils.inline.h"
+#include "exec/scanner-context.inline.h"
 #include "util/codec.h"
 
 // Note: the Avro C++ library uses exceptions for error handling. Any Avro
@@ -57,8 +57,8 @@ Status HdfsAvroScanner::ReadFileHeader() {
 
   // Check version header
   uint8_t* header;
-  RETURN_IF_FALSE(SerDeUtils::ReadBytes(
-      context_, sizeof(AVRO_VERSION_HEADER), &header, &parse_status_));
+  RETURN_IF_FALSE(stream_->ReadBytes(
+      sizeof(AVRO_VERSION_HEADER), &header, &parse_status_));
   if (memcmp(header, AVRO_VERSION_HEADER, sizeof(AVRO_VERSION_HEADER))) {
     stringstream ss;
     ss << "Invalid AVRO_VERSION_HEADER: '"
@@ -71,10 +71,10 @@ Status HdfsAvroScanner::ReadFileHeader() {
 
   // Read file sync marker
   uint8_t* sync;
-  RETURN_IF_FALSE(SerDeUtils::ReadBytes(context_, SYNC_HASH_SIZE, &sync, &parse_status_));
+  RETURN_IF_FALSE(stream_->ReadBytes(SYNC_HASH_SIZE, &sync, &parse_status_));
   memcpy(header_->sync, sync, SYNC_HASH_SIZE);
 
-  header_->header_size = context_->total_bytes_returned();
+  header_->header_size = stream_->total_bytes_returned();
   return Status::OK;
 }
 
@@ -84,7 +84,7 @@ Status HdfsAvroScanner::ParseMetadata() {
   header_->compression_type = THdfsCompression::NONE;
 
   int64_t num_entries;
-  RETURN_IF_FALSE(SerDeUtils::ReadZLong(context_, &num_entries, &parse_status_));
+  RETURN_IF_FALSE(stream_->ReadZLong(&num_entries, &parse_status_));
   if (num_entries < 1) return Status("File header metadata has no data");
 
   while (num_entries != 0) {
@@ -94,17 +94,17 @@ Status HdfsAvroScanner::ParseMetadata() {
       string key;
       uint8_t* key_buf;
       int64_t key_len;
-      RETURN_IF_FALSE(SerDeUtils::ReadZLong(context_, &key_len, &parse_status_));
+      RETURN_IF_FALSE(stream_->ReadZLong(&key_len, &parse_status_));
       DCHECK_GE(key_len, 0);
-      RETURN_IF_FALSE(SerDeUtils::ReadBytes(context_, key_len, &key_buf, &parse_status_));
+      RETURN_IF_FALSE(stream_->ReadBytes(key_len, &key_buf, &parse_status_));
       key = string(reinterpret_cast<char*>(key_buf), key_len);
 
       // Decode Avro bytes-type value
       uint8_t* value;
       int64_t value_len;
-      RETURN_IF_FALSE(SerDeUtils::ReadZLong(context_, &value_len, &parse_status_));
+      RETURN_IF_FALSE(stream_->ReadZLong(&value_len, &parse_status_));
       DCHECK_GE(value_len, 0);
-      RETURN_IF_FALSE(SerDeUtils::ReadBytes(context_, value_len, &value, &parse_status_));
+      RETURN_IF_FALSE(stream_->ReadBytes(value_len, &value, &parse_status_));
 
       if (key == AVRO_SCHEMA_KEY) {
         try {
@@ -134,10 +134,10 @@ Status HdfsAvroScanner::ParseMetadata() {
         VLOG_ROW << "Skipping metadata entry: " << key;
       }
     }
-    RETURN_IF_FALSE(SerDeUtils::ReadZLong(context_, &num_entries, &parse_status_));
+    RETURN_IF_FALSE(stream_->ReadZLong(&num_entries, &parse_status_));
   }
 
-  VLOG_FILE << context_->filename() << ": "
+  VLOG_FILE << stream_->filename() << ": "
             << (header_->is_compressed ?  "compressed" : "not compressed");
   if (header_->is_compressed) VLOG_FILE << header_->codec;
   if (!found_schema) return Status("Schema not found in file header metadata");
@@ -152,10 +152,10 @@ Status HdfsAvroScanner::InitNewRange() {
   template_tuple_ = context_->template_tuple();
   // We always copy strings out of IO buffers (I'm not sure how to avoid doing
   // this, see ReadRecord)
-  context_->set_compact_data(true);
+  stream_->set_compact_data(true);
   if (header_->is_compressed) {
     RETURN_IF_ERROR(Codec::CreateDecompressor(state_,
-        data_buffer_pool_.get(), context_->compact_data(),
+        data_buffer_pool_.get(), stream_->compact_data(),
         header_->compression_type, &decompressor_));
   }
   return Status::OK;
@@ -168,7 +168,7 @@ Status HdfsAvroScanner::ProcessRange() {
 
   while (!finished()) {
     // Read new data block
-    block_start_ = context_->file_offset();
+    block_start_ = stream_->file_offset();
 
     int64_t num_records;
     uint8_t* compressed_data;
@@ -177,12 +177,12 @@ Status HdfsAvroScanner::ProcessRange() {
     int size;
 
     RETURN_IF_FALSE(
-        SerDeUtils::ReadZLong(context_, &num_records, &parse_status_));
+        stream_->ReadZLong(&num_records, &parse_status_));
     DCHECK_GE(num_records, 0);
-    RETURN_IF_FALSE(SerDeUtils::ReadZLong(context_, &compressed_size, &parse_status_));
+    RETURN_IF_FALSE(stream_->ReadZLong(&compressed_size, &parse_status_));
     DCHECK_GE(compressed_size, 0);
-    RETURN_IF_FALSE(SerDeUtils::ReadBytes(
-        context_, compressed_size, &compressed_data, &parse_status_));
+    RETURN_IF_FALSE(stream_->ReadBytes(
+        compressed_size, &compressed_data, &parse_status_));
 
     if (header_->is_compressed) {
       if (header_->compression_type == THdfsCompression::SNAPPY) {
@@ -226,7 +226,7 @@ Status HdfsAvroScanner::ProcessRange() {
       if (scan_node_->ReachedLimit()) return Status::OK;
     }
 
-    if (!context_->compact_data()) {
+    if (!stream_->compact_data()) {
       context_->AcquirePool(data_buffer_pool_.get());
     }
     RETURN_IF_ERROR(ReadSync());

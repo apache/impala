@@ -18,12 +18,7 @@
 
 #include "exec/serde-utils.h"
 
-#include "exec/scan-range-context.h"
-
 using namespace impala;
-
-// Macro to return false if condition is false. Only defined for this file.
-#define RETURN_IF_FALSE(x) if (UNLIKELY(!(x))) return false
 
 inline int16_t SerDeUtils::GetSmallInt(const uint8_t* buf) {
   return (buf[0] << 8) | buf[1];
@@ -48,103 +43,6 @@ inline void SerDeUtils::PutInt(uint8_t* buf, int32_t integer) {
   buf[3] = integer;
 }
   
-inline bool SerDeUtils::ReadBytes(ScanRangeContext* context, int length,
-      uint8_t** buf, Status* status) {
-  if (UNLIKELY(length < 0)) {
-    *status = Status("Negative length");
-    return false;
-  }
-  int bytes_read;
-  bool dummy_eos;
-  RETURN_IF_FALSE(context->GetBytes(buf, length, &bytes_read, &dummy_eos, status));
-  if (UNLIKELY(length != bytes_read)) {
-    *status = Status("incomplete read");
-    return false;
-  }
-  return true;
-}
-
-inline bool SerDeUtils::SkipBytes(ScanRangeContext* context, int length, Status* status) {
-  uint8_t* dummy_buf;
-  int bytes_read;
-  bool dummy_eos;
-  RETURN_IF_FALSE(context->GetBytes(&dummy_buf, length, &bytes_read, &dummy_eos, status));
-  if (UNLIKELY(length != bytes_read)) {
-    *status = Status("incomplete read");
-    return false;
-  }
-  return true;
-}
-
-inline bool SerDeUtils::SkipText(ScanRangeContext* context, Status* status) {
-  uint8_t* dummy_buffer;
-  int bytes_read;
-  return SerDeUtils::ReadText(context, &dummy_buffer, &bytes_read, status);
-}
-
-inline bool SerDeUtils::ReadText(ScanRangeContext* context, 
-    uint8_t** buf, int* len, Status* status) {
-  RETURN_IF_FALSE(SerDeUtils::ReadVInt(context, len, status));
-  RETURN_IF_FALSE(SerDeUtils::ReadBytes(context, *len, buf, status));
-  return true;
-}
-
-inline bool SerDeUtils::ReadBoolean(ScanRangeContext* context, bool* b, Status* status) {
-  uint8_t* val;
-  RETURN_IF_FALSE(SerDeUtils::ReadBytes(context, 1, &val, status));
-  *b = *val != 0;
-  return true;
-}
-
-inline bool SerDeUtils::ReadInt(ScanRangeContext* context, int32_t* val, Status* status) {
-  uint8_t* bytes;
-  RETURN_IF_FALSE(SerDeUtils::ReadBytes(context, sizeof(int32_t), &bytes, status));
-  *val = GetInt(bytes);
-  return true;
-}
-
-inline bool SerDeUtils::ReadVInt(ScanRangeContext* context, int32_t* value, 
-    Status* status) {
-  int64_t vlong;
-  RETURN_IF_FALSE(ReadVLong(context, &vlong, status));
-  *value = static_cast<int32_t>(vlong);
-  return true;
-}
-
-inline bool SerDeUtils::ReadVLong(ScanRangeContext* context, int64_t* value, 
-    Status* status) {
-  int8_t* firstbyte;
-  uint8_t* bytes;
-
-  RETURN_IF_FALSE(SerDeUtils::ReadBytes(context, 1, 
-        reinterpret_cast<uint8_t**>(&firstbyte), status));
-
-  int len = DecodeVIntSize(*firstbyte);
-  if (len > MAX_VINT_LEN) {
-    *status = Status("ReadVLong: size is too big");
-    return false;
-  }
-  
-  if (len == 1) {
-    *value = static_cast<int64_t>(*firstbyte);
-    return true;
-  }
-  --len;
-
-  RETURN_IF_FALSE(SerDeUtils::ReadBytes(context, len, &bytes, status));
-
-  *value = 0;
-
-  for (int i = 0; i < len; i++) {
-    *value = (*value << 8) | (bytes[i] & 0xFF);
-  }
-
-  if (IsNegativeVInt(*firstbyte)) {
-    *value = *value ^ (static_cast<int64_t>(-1));
-  }
-  return true;
-}
-
 inline int SerDeUtils::GetVInt(uint8_t* buf, int32_t* vint) {
   int64_t vlong = 0;
   int len = GetVLong(buf, &vlong);
@@ -192,20 +90,6 @@ inline int SerDeUtils::DecodeVIntSize(int8_t byte) {
   return -111 - byte;
 }
 
-inline bool SerDeUtils::ReadZLong(ScanRangeContext* context, int64_t* value, 
-    Status* status) {
-  uint32_t zlong = 0;
-  int shift = 0;
-  uint8_t* byte;
-  do {
-    DCHECK_LE(shift, 64);
-    RETURN_IF_FALSE(SerDeUtils::ReadBytes(context, 1, &byte, status));
-    zlong |= static_cast<uint64_t>(*byte & 0x7f) << shift;
-    shift += 7;
-  } while (*byte & 0x80);
-  *value = (zlong >> 1) ^ -(zlong & 1);
-  return true;
-}
 #undef RETURN_IF_FALSE
 
 #endif
