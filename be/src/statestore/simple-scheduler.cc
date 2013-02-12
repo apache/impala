@@ -39,15 +39,16 @@ static const string LOCAL_ASSIGNMENTS_KEY("simple-scheduler.local-assignments.to
 static const string ASSIGNMENTS_KEY("simple-scheduler.assignments.total");
 static const string SCHEDULER_INIT_KEY("simple-scheduler.initialized");
 
-static const string SUBSCRIPTION_ID("simple.scheduler");
+const string SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC("impala-membership");
 
-SimpleScheduler::SimpleScheduler(SubscriptionManager* subscription_manager,
-    const ServiceId& backend_service_id, Metrics* metrics)
+SimpleScheduler::SimpleScheduler(StateStoreSubscriber* subscriber,
+    const string& backend_id, const TNetworkAddress& backend_address,
+    Metrics* metrics)
   : metrics_(metrics),
-    subscription_manager_(subscription_manager),
-    callback_(bind<void>(mem_fn(&SimpleScheduler::UpdateMembership), this, _1)),
-    subscription_id_(INVALID_SUBSCRIPTION_ID),
-    backend_service_id_(backend_service_id),
+    statestore_subscriber_(subscriber),
+    backend_id_(backend_id),
+    backend_address_(backend_address),
+    thrift_serializer_(false),
     total_assignments_(NULL),
     total_local_assignments_(NULL),
     initialised_(NULL) {
@@ -57,46 +58,47 @@ SimpleScheduler::SimpleScheduler(SubscriptionManager* subscription_manager,
 SimpleScheduler::SimpleScheduler(const vector<TNetworkAddress>& backends,
                                  Metrics* metrics)
   : metrics_(metrics),
-    subscription_manager_(NULL),
-    callback_(NULL),
-    subscription_id_(INVALID_SUBSCRIPTION_ID),
+    statestore_subscriber_(NULL),
+    thrift_serializer_(false),
     total_assignments_(NULL),
     total_local_assignments_(NULL),
     initialised_(NULL) {
   DCHECK(backends.size() > 0);
   for (int i = 0; i < backends.size(); ++i) {
-    vector<string> addresses;
-    Status status = HostnameToIpAddrs(backends[i].hostname, &addresses);
+    vector<string> ipaddrs;
+    Status status = HostnameToIpAddrs(backends[i].hostname, &ipaddrs);
     if (!status.ok()) {
       VLOG(1) << "Failed to resolve " << backends[i].hostname << ": "
               << status.GetErrorMsg();
       continue;
     }
 
-    string ipaddr = addresses[0];
-    if (!FindFirstNonLocalhost(addresses, &ipaddr)) {
+    // Try to find a non-localhost address, otherwise just use the
+    // first IP address returned.
+    string ipaddr = ipaddrs[0];
+    if (!FindFirstNonLocalhost(ipaddrs, &ipaddr)) {
       VLOG(1) << "Only localhost addresses found for " << backends[i].hostname;
     }
-    HostLocalityMap::iterator it = host_map_.find(ipaddr);
+
+    HostMap::iterator it = host_map_.find(ipaddr);
     if (it == host_map_.end()) {
-      it = host_map_.insert(make_pair(ipaddr, list<TNetworkAddress>())).first;
+      it = host_map_.insert(
+          make_pair(ipaddr, list<TNetworkAddress>())).first;
     }
-    it->second.push_back(backends[i]);
+
+    TNetworkAddress backend_address = MakeNetworkAddress(ipaddr, backends[i].port);
+    it->second.push_back(backend_address);
   }
   next_nonlocal_host_entry_ = host_map_.begin();
 }
 
-SimpleScheduler::~SimpleScheduler() {
-  DCHECK_EQ(subscription_id_, INVALID_SUBSCRIPTION_ID) << "Did not call Close()";
-}
-
 impala::Status SimpleScheduler::Init() {
   LOG(INFO) << "Starting simple scheduler";
-  if (subscription_manager_ != NULL) {
-    unordered_set<string> services;
-    services.insert(backend_service_id_);
-    RETURN_IF_ERROR(subscription_manager_->RegisterSubscription(
-        services, SUBSCRIPTION_ID, &callback_));
+  if (statestore_subscriber_ != NULL) {
+    StateStoreSubscriber::UpdateCallback cb =
+        bind<void>(mem_fn(&SimpleScheduler::UpdateMembership), this, _1, _2);
+    RETURN_IF_ERROR(
+        statestore_subscriber_->AddTopic(IMPALA_MEMBERSHIP_TOPIC, true, cb));
   }
   if (metrics_ != NULL) {
     total_assignments_ =
@@ -109,46 +111,82 @@ impala::Status SimpleScheduler::Init() {
   return Status::OK;
 }
 
-void SimpleScheduler::UpdateMembership(const ServiceStateMap& service_state) {
-  // Build a local hostmap without taking the lock, since name
-  // resolution might be expensive.  In the future, the statestore
-  // will record the ipaddress of each backend.
-  HostLocalityMap host_map_copy;
-  VLOG(4) << "Received update from subscription manager" << endl;
-  ServiceStateMap::const_iterator it = service_state.find(backend_service_id_);
-  if (it != service_state.end()) {
-    VLOG(4) << "Found membership information for " << backend_service_id_;
-    ServiceState service_state = it->second;
-    BOOST_FOREACH(const Membership::value_type& member, service_state.membership) {
-      VLOG(4) << "Got member: " << member.second;
-      vector<string> addresses;
-      Status status = HostnameToIpAddrs(member.second.hostname, &addresses);
+void SimpleScheduler::UpdateMembership(
+    const StateStoreSubscriber::TopicDeltaMap& service_state,
+    vector<TTopicUpdate>* topic_updates) {
+  // TODO: Work on a copy if possible, or at least do resolution as a separate step
+  // First look to see if the topic(s) we're interested in have an update
+  StateStoreSubscriber::TopicDeltaMap::const_iterator topic =
+      service_state.find(IMPALA_MEMBERSHIP_TOPIC);
+
+  // Copy to work on without holding the map lock
+  HostMap host_map_copy;
+  bool found_self = false;
+  if (topic != service_state.end()) {
+    const TTopicDelta& delta = topic->second;
+    if (delta.is_delta) {
+      // TODO: Handle deltas when the state-store starts sending them
+      LOG(WARNING) << "Unexpected delta update from state-store, ignoring as scheduler"
+                      " cannot handle deltas";
+      return;
+    }
+
+    BOOST_FOREACH(const TTopicItem& item, delta.topic_entries) {
+      if (item.key == backend_id_) found_self = true;
+
+      TNetworkAddress backend_address;
+      // Benchmarks have suggested that this method can deserialize
+      // ~10m messages per second, so no immediate need to consider optimisation.
+      uint32_t len = item.value.size();
+      Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
+          item.value.data()), &len, false, &backend_address);
       if (!status.ok()) {
-        string s;
-        status.GetErrorMsg(&s);
-        VLOG(1) << "Failed to resolve " << member.second.hostname << ": " << s;
+        VLOG(2) << "Error deserializing topic item with key: " << item.key;
         continue;
       }
-      string ipaddr = addresses[0];
-      if (!FindFirstNonLocalhost(addresses, &ipaddr)) {
+      vector<string> ipaddrs;
+      status = HostnameToIpAddrs(backend_address.hostname, &ipaddrs);
+      if (!status.ok()) {
+        VLOG(1) << "Failed to resolve " << backend_address.hostname << ": "
+                << status.GetErrorMsg();
+        continue;
+      }
+      // Find a non-localhost address for this host; if one can't be
+      // found use the first address returned by HostnameToIpAddrs
+      string ipaddr = ipaddrs[0];
+      if (!FindFirstNonLocalhost(ipaddrs, &ipaddr)) {
         // Someone *might* be running this on localhost with no
         // external interface (for debugging); keep going.
-        VLOG(2) << "Only localhost addresses found for " << member.second.hostname;
+        VLOG(2) << "Only localhost addresses found for " << backend_address.hostname;
       }
 
-      HostLocalityMap::iterator host_it = host_map_copy.find(ipaddr);
-      if (host_it == host_map_copy.end()) {
-        host_it = host_map_copy.insert(make_pair(ipaddr, list<TNetworkAddress>())).first;
-      }
-      host_it->second.push_back(member.second);
+      host_map_copy[ipaddr].push_back(backend_address);
     }
-  } else {
-    VLOG(4) << "No membership information found.";
+  }
+
+  // If this impalad is not in our view of the membership list, we
+  // should add it and tell the state-store.
+  if (!found_self) {
+    VLOG(2) << "Registering local backend with state-store";
+    topic_updates->push_back(TTopicUpdate());
+    TTopicUpdate& update = topic_updates->back();
+    update.topic_name = IMPALA_MEMBERSHIP_TOPIC;
+    update.topic_updates.push_back(TTopicItem());
+
+    TTopicItem& item = update.topic_updates.back();
+    item.key = backend_id_;
+
+    Status status = thrift_serializer_.Serialize(&backend_address_, &item.value);
+    if (!status.ok()) {
+      LOG(INFO) << "Failed to serialize Impala backend address for state-store topic: "
+                << status.GetErrorMsg();
+      topic_updates->pop_back();
+    }
   }
 
   {
     lock_guard<mutex> lock(host_map_lock_);
-    host_map_ = host_map_copy;
+    host_map_.swap(host_map_copy);
     next_nonlocal_host_entry_ = host_map_.begin();
   }
 }
@@ -171,30 +209,30 @@ Status SimpleScheduler::GetHost(const TNetworkAddress& data_location,
   if (host_map_.size() == 0) {
     return Status("No backends configured");
   }
-  int num_local_assignments = 0;
-  HostLocalityMap::iterator entry = host_map_.find(data_location.hostname);
+  bool local_assignment = false;
+  HostMap::iterator entry = host_map_.find(data_location.hostname);
   if (entry == host_map_.end()) {
-    // round robin the hostname
+    // round robin the ipaddress
     entry = next_nonlocal_host_entry_;
     ++next_nonlocal_host_entry_;
     if (next_nonlocal_host_entry_ == host_map_.end()) {
       next_nonlocal_host_entry_ = host_map_.begin();
     }
   } else {
-    ++num_local_assignments;
+    local_assignment = true;
   }
   DCHECK(!entry->second.empty());
   // Round-robin between impalads on the same ipaddress.
   // Pick the first one, then move it to the back of the queue
-  TNetworkAddress chosen_hostport = entry->second.front();
-  hostport->__set_hostname(chosen_hostport.hostname);
-  hostport->__set_port(chosen_hostport.port);
+  *hostport = entry->second.front();
   entry->second.pop_front();
-  entry->second.push_back(chosen_hostport);
+  entry->second.push_back(*hostport);
 
   if (metrics_ != NULL) {
     total_assignments_->Increment(1);
-    total_local_assignments_->Increment(num_local_assignments);
+    if (local_assignment) {
+      total_local_assignments_->Increment(1L);
+    }
   }
 
   if (VLOG_FILE_IS_ON) {
@@ -209,26 +247,9 @@ Status SimpleScheduler::GetHost(const TNetworkAddress& data_location,
 void SimpleScheduler::GetAllKnownHosts(HostList* hostports) {
   lock_guard<mutex> lock(host_map_lock_);
   hostports->clear();
-  BOOST_FOREACH(const HostLocalityMap::value_type& host, host_map_) {
-    BOOST_FOREACH(const TNetworkAddress& address, host.second) {
-      hostports->push_back(address);
-    }
+  BOOST_FOREACH(const HostMap::value_type& hosts, host_map_) {
+    hostports->insert(hostports->end(), hosts.second.begin(), hosts.second.end());
   }
-}
-
-void SimpleScheduler::Close() {
-  if (subscription_manager_ != NULL && subscription_id_ != INVALID_SUBSCRIPTION_ID) {
-    VLOG_QUERY << "Unregistering simple scheduler with subscription manager";
-    Status status = subscription_manager_->UnregisterSubscription(subscription_id_);
-    if (!status.ok()) {
-      LOG(ERROR) << "Error unsubscribing from subscription manager: "
-                 << status.GetErrorMsg();
-    }
-  }
-  // Reset everything to make sure no one can use this anymore
-  subscription_id_ = INVALID_SUBSCRIPTION_ID;
-  subscription_manager_ = NULL;
-  host_map_.clear();
 }
 
 }

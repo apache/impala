@@ -13,8 +13,8 @@
 // limitations under the License.
 
 
-#ifndef SPARROW_SCHEDULER_H
-#define SPARROW_SCHEDULER_H
+#ifndef STATESTORE_SCHEDULER_H
+#define STATESTORE_SCHEDULER_H
 
 #include <vector>
 #include <string>
@@ -57,9 +57,6 @@ class Scheduler {
   // Initialises the scheduler, acquiring all resources needed to make
   // scheduling decisions once this method returns.
   virtual impala::Status Init() = 0;
-
-  // Scheduler should clean up all resources in Close()
-  virtual void Close() = 0;
 };
 
 }

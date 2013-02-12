@@ -13,8 +13,8 @@
 // limitations under the License.
 
 
-#ifndef SPARROW_SIMPLE_SCHEDULER_H
-#define SPARROW_SIMPLE_SCHEDULER_H
+#ifndef STATESTORE_SIMPLE_SCHEDULER_H
+#define STATESTORE_SIMPLE_SCHEDULER_H
 
 #include <vector>
 #include <string>
@@ -24,8 +24,7 @@
 
 #include "common/status.h"
 #include "statestore/scheduler.h"
-#include "statestore/subscription-manager.h"
-#include "statestore/util.h"
+#include "statestore/state-store-subscriber.h"
 #include "statestore/state-store.h"
 #include "util/metrics.h"
 #include "gen-cpp/Types_types.h"  // for TNetworkAddress
@@ -35,19 +34,23 @@ namespace impala {
 // Performs simple scheduling by matching between a list of hosts configured
 // either from the state-store, or from a static list of addresses, and a list
 // of target data locations.
+//
+// TODO: Notice when there are duplicate state-store registrations (IMPALA-23)
+// TODO: Handle deltas from the state-store
 class SimpleScheduler : public Scheduler {
  public:
+  static const std::string IMPALA_MEMBERSHIP_TOPIC;
+
   // Initialize with a subscription manager that we can register with for updates to the
   // set of available backends.
-  SimpleScheduler(SubscriptionManager* subscription_manager,
-      const ServiceId& backend_service_id, impala::Metrics* metrics);
+  //  - backend_id - unique identifier for this Impala backend (usually a host:port)
+  //  - backend_address - the address that this backend listens on
+  SimpleScheduler(StateStoreSubscriber* subscriber, const std::string& backend_id,
+      const TNetworkAddress& backend_address, Metrics* metrics);
 
   // Initialize with a list of <host:port> pairs in 'static' mode - i.e. the set of
   // backends is fixed and will not be updated.
-  SimpleScheduler(const std::vector<impala::TNetworkAddress>& backends,
-      impala::Metrics* metrics);
-
-  virtual ~SimpleScheduler();
+  SimpleScheduler(const std::vector<TNetworkAddress>& backends, Metrics* metrics);
 
   // Returns a list of backends such that the impalad at hostports[i] should be used to
   // read data from data_locations[i].
@@ -66,58 +69,54 @@ class SimpleScheduler : public Scheduler {
   virtual void GetAllKnownHosts(HostList* hostports);
 
   virtual bool HasLocalHost(const TNetworkAddress& data_location) {
-    boost::lock_guard<boost::mutex> lock(host_map_lock_);
-    HostLocalityMap::iterator entry = host_map_.find(data_location.hostname);
-    return (entry != host_map_.end());
+    boost::lock_guard<boost::mutex> l(host_map_lock_);
+    HostMap::iterator entry = host_map_.find(data_location.hostname);
+    return (entry != host_map_.end() && entry->second.size() > 0);
   }
 
   // Registers with the subscription manager if required
   virtual impala::Status Init();
 
-  // Unregister with the subscription manager
-  virtual void Close();
-
  private:
-  // Map from IP to a list of addresses of Impala daemons that are
-  // local for that address. Keys in this map must not be hostnames,
-  // since they are compared to the block location IP addresses
-  // returned by the namenode.
-  typedef boost::unordered_map<std::string, std::list<TNetworkAddress> > HostLocalityMap;
-  HostLocalityMap host_map_;
+  // Protects access to host_map_, which might otherwise be updated
+  // asynchronously with respect to reads. Also protects the locality
+  // counters, which are updated in GetHosts.
+  boost::mutex host_map_lock_;
+
+  // Map from a datanode's IP address to a list of backend addresses running on that node.
+  typedef boost::unordered_map<std::string, std::list<TNetworkAddress> > HostMap;
+  HostMap host_map_;
 
   // Metrics subsystem access
   impala::Metrics* metrics_;
 
-  // Protects access to host_map_, which may be updated asynchronously with respect to
-  // reads. Also protects the locality counters, which are updated in GetHosts.
-  boost::mutex host_map_lock_;
-
-  // round robin entry in HostLocalityMap for non-local host assignment
-  HostLocalityMap::iterator next_nonlocal_host_entry_;
+  // round robin entry in HostMap for non-local host assignment
+  HostMap::iterator next_nonlocal_host_entry_;
 
   // Pointer to a subscription manager (which we do not own) which is used to register
   // for dynamic updates to the set of available backends. May be NULL if the set of
   // backends is fixed.
-  SubscriptionManager* subscription_manager_;
+  StateStoreSubscriber* statestore_subscriber_;
 
-  // UpdateCallback to use for registering a subscription with the subscription manager.
-  SubscriptionManager::UpdateCallback callback_;
+  // Unique - across the cluster - identifier for this impala backend
+  const std::string backend_id_;
 
-  // Subscription handle, used to unregister with subscription manager
-  SubscriptionId subscription_id_;
+  // The address that the impala backend running here can be accessed
+  // on by other Impalads.
+  const TNetworkAddress backend_address_;
 
-  // Service identifier to subscribe to for backend membership information
-  ServiceId backend_service_id_;
+  ThriftSerializer thrift_serializer_;
 
   // Locality metrics
-  impala::Metrics::IntMetric* total_assignments_;
-  impala::Metrics::IntMetric* total_local_assignments_;
+  Metrics::IntMetric* total_assignments_;
+  Metrics::IntMetric* total_local_assignments_;
 
   // Initialisation metric
-  impala::Metrics::BooleanMetric* initialised_;
+  Metrics::BooleanMetric* initialised_;
 
   // Called asynchronously when an update is received from the subscription manager
-  void UpdateMembership(const ServiceStateMap& service_state);
+  void UpdateMembership(const StateStoreSubscriber::TopicDeltaMap& service_state,
+      std::vector<TTopicUpdate>* topic_updates);
 };
 
 }

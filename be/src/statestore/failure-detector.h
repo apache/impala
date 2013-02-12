@@ -13,8 +13,8 @@
 // limitations under the License.
 
 
-#ifndef IMPALA_SPARROW_FAILURE_DETECTOR_H
-#define IMPALA_SPARROW_FAILURE_DETECTOR_H
+#ifndef STATESTORE_FAILURE_DETECTOR_H
+#define STATESTORE_FAILURE_DETECTOR_H
 
 #include <boost/thread/thread_time.hpp>
 #include <string>
@@ -24,7 +24,7 @@
 namespace impala {
 
 // A failure detector tracks the liveness of a set of peers which is computed as
-// a function of received 'heartbeat' signals. 
+// a function of received 'heartbeat' signals.
 // A peer may be in one of four states:
 //   FAILED -> the peer is assumed to be failed
 //   SUSPECTED -> the peer may have failed, and may be moved to the FAILED state shortly.
@@ -36,7 +36,7 @@ class FailureDetector {
     FAILED = 0,
     SUSPECTED = 1,
     OK = 2,
-    UNKNOWN = 3    
+    UNKNOWN = 3
   };
 
   // Updates the state of a peer according to the most recent heartbeat
@@ -63,13 +63,13 @@ class FailureDetector {
 class TimeoutFailureDetector : public FailureDetector {
  public:
   TimeoutFailureDetector(boost::posix_time::time_duration failure_timeout,
-      boost::posix_time::time_duration suspect_timeout) 
+      boost::posix_time::time_duration suspect_timeout)
       : failure_timeout_(failure_timeout),
         suspect_timeout_(suspect_timeout) { };
 
   virtual PeerState UpdateHeartbeat(const std::string& peer, bool seen);
 
-  virtual PeerState GetPeerState(const std::string& peer); 
+  virtual PeerState GetPeerState(const std::string& peer);
 
  private:
   // Protects all members
@@ -83,12 +83,12 @@ class TimeoutFailureDetector : public FailureDetector {
   const boost::posix_time::time_duration failure_timeout_;
 
   // The maximum time that may elapse without a heartbeat before a peer is
-  // suspected of failure  
+  // suspected of failure
   const boost::posix_time::time_duration suspect_timeout_;
 };
 
 // A failure detector based on a maximum number of consecutive heartbeats missed
-// before a peer is considered failed. Clients must call 
+// before a peer is considered failed. Clients must call
 // UpdateHeartbeat(..., false) to indicate that a heartbeat has been missed.
 // The MissedHeartbeatFailureDetector is most appropriate when heartbeats are
 // being sent, not being received, because it is easy in that situation to tell
@@ -101,13 +101,13 @@ class MissedHeartbeatFailureDetector : public FailureDetector {
   // suspect_missed_heartbeats -> the number of heartbeats that can be missed before a
   // peer is suspected of failure.
   MissedHeartbeatFailureDetector(int32_t max_missed_heartbeats,
-      int32_t suspect_missed_heartbeats) 
+      int32_t suspect_missed_heartbeats)
     : max_missed_heartbeats_(max_missed_heartbeats),
       suspect_missed_heartbeats_(suspect_missed_heartbeats) { }
 
   virtual PeerState UpdateHeartbeat(const std::string& peer, bool seen);
 
-  virtual PeerState GetPeerState(const std::string& peer); 
+  virtual PeerState GetPeerState(const std::string& peer);
 
  private:
   // Protects all members

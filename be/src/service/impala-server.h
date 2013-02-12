@@ -36,7 +36,6 @@
 #include "exec/ddl-executor.h"
 #include "util/metrics.h"
 #include "util/runtime-profile.h"
-#include "statestore/util.h"
 #include "runtime/coordinator.h"
 #include "runtime/primitive-type.h"
 #include "runtime/timestamp-value.h"
@@ -215,7 +214,10 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
   // Called when a membership update is received from the state-store. Looks for
   // active nodes that have failed, and cancels any queries running on them.
-  void MembershipCallback(const ServiceStateMap& service_state);
+  //  - topic_deltas: all changes to registered state-store topics
+  //  - topic_updates: output parameter to publish any topic updates to. Unused.
+  void MembershipCallback(const StateStoreSubscriber::TopicDeltaMap& topic_deltas,
+      vector<TTopicUpdate>* topic_updates);
 
   // Reads a configuration value from Hadoop's configuration in the
   // front-end. If the configuration key is not found, returns the
@@ -259,8 +261,8 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // TODO: Consider renaming to RequestExecState for consistency.
   class QueryExecState {
    public:
-    QueryExecState(ExecEnv* exec_env, ImpalaServer* server, 
-        boost::shared_ptr<SessionState> session, 
+    QueryExecState(ExecEnv* exec_env, ImpalaServer* server,
+        boost::shared_ptr<SessionState> session,
         const TSessionState& query_session_state)
       : exec_env_(exec_env),
         parent_session_(session),
@@ -512,7 +514,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Webserver callback.  Prints the query profile (via PrettyPrint)
   void QueryProfilePathHandler(const Webserver::ArgumentMap& args,
       std::stringstream* output);
-  
+
   // Webserver callback.  Prints the query profile as a base64 encoded object.
   void QueryProfileEncodedPathHandler(const Webserver::ArgumentMap& args,
       std::stringstream* output);
@@ -783,7 +785,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
     // Time the session was created
     TimestampValue start_time;
-    
+
     // User for this session
     std::string user;
 
@@ -791,7 +793,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     // If this lock has to be taken with query_exec_state_map_lock, take this lock first.
     boost::mutex lock;
 
-    // If true, the session has been closed. 
+    // If true, the session has been closed.
     bool closed;
 
     // The default database (changed as a result of 'use' query execution)
@@ -799,7 +801,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
     // The default query options of this session
     TQueryOptions default_query_options;
-    
+
     // Inflight queries belonging to this session
     boost::unordered_set<TUniqueId> inflight_queries;
 
@@ -816,7 +818,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
     SessionStateMap;
   SessionStateMap session_state_map_;
 
-  // Return session state for given session_id. 
+  // Return session state for given session_id.
   // If not found, session_state will be NULL and an error status will be returned.
   inline Status GetSessionState(const ThriftServer::SessionKey& session_id,
       boost::shared_ptr<SessionState>* session_state) {

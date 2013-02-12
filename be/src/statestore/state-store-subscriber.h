@@ -13,23 +13,22 @@
 // limitations under the License.
 
 
-#ifndef STATESTORE_STATE_STORE_SUBSCRIBER_SERVICE_H
-#define STATESTORE_STATE_STORE_SUBSCRIBER_SERVICE_H
+#ifndef STATESTORE_STATE_STORE_SUBSCRIBER_H
+#define STATESTORE_STATE_STORE_SUBSCRIBER_H
 
 #include <string>
 
-#include <boost/enable_shared_from_this.hpp>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/thread.hpp>
 
-#include "statestore/util.h"
-#include "statestore/subscription-manager.h"
+#include "statestore/state-store.h"
 #include "util/thrift-util.h"
 #include "util/thrift-client.h"
+#include "util/metrics.h"
 #include "gen-cpp/StateStoreService.h"
-#include "gen-cpp/StateStoreSubscriberService.h"
+#include "gen-cpp/StateStoreSubscriber.h"
 
 namespace impala {
 
@@ -38,165 +37,161 @@ class Status;
 class TNetworkAddress;
 class ThriftServer;
 
-} // namespace impala
-
-namespace impala {
-
-class StateStoreTest;
-
-// The StateStoreSubscriber class implements the
-// StateStoreSubscriberService interface, which allows it to receive
-// updates from the central state store.  It also allows local
-// services to register with and register for updates from the
-// StateStore through implementing StateStoreSubcriberInternalIf.
-// This class is thread-safe. It is always wrapped by a SubscriptionManager from
-// the local client's perspective, which exposes only the APIs suitable for
-// client use (other public methods in this class are invoked by RPC calls).
-class StateStoreSubscriber
-  : public StateStoreSubscriberServiceIf,
-    public boost::enable_shared_from_this<StateStoreSubscriber> {
+// A StateStoreSubscriber communicates with a state-store periodically
+// through the exchange of heartbeat messages. These messages contain
+// updates from the state-store to a list of 'topics' that the
+// subscriber is interested in; in response the subscriber sends a
+// list of changes that it wishes to make to a topic.
+//
+// Clients of the subscriber register topics of interest, and a
+// function to call once an update has been received. Each callback
+// may optionally add one or more updates to a list of topic updates
+// to be sent back to the state-store. See AddTopic for the
+// requirements placed on these callbacks.
+//
+// Topics must be subscribed to before the subscriber is connected to
+// the state-store: there is no way to add a new subscription after
+// the subscriber has successfully registered.
+//
+// If the subscriber does not receive heartbeats from the state-store
+// within a configurable period of time, the subscriber enters
+// 'recovery mode', where it continually attempts to re-register with
+// the state-store.
+class StateStoreSubscriber {
  public:
-  StateStoreSubscriber(const std::string& hostname, int port,
-                       const std::string& state_store_host, int state_store_port);
+  // Only constructor.
+  //   subscriber_id - should be unique across the cluster, identifies this subscriber
+  //
+  //   heartbeat_address - the local address on which the heartbeat service which
+  //                       communicates with the state-store should be started.
+  //
+  //   state_store_address - the address of the state-store to register with
+  StateStoreSubscriber(const std::string& subscriber_id,
+      const TNetworkAddress& heartbeat_address,
+      const TNetworkAddress& state_store_address,
+      Metrics* metrics);
 
-  ~StateStoreSubscriber();
+  // A TopicDeltaMap is passed to each callback. See UpdateCallback for more details.
+  typedef std::map<StateStore::TopicId, TTopicDelta> TopicDeltaMap;
 
-  // Whether the StateStoreSubscriberService server is running.
-  bool IsRunning();
+  // Function called to update a service with new state. Called in a
+  // separate thread to the one in which it is registered.
+  //
+  // Every UpdateCallback is invoked every time that an update is
+  // received from the state-store. Therefore the callback should not
+  // assume that the TopicDeltaMap contains an entry for their
+  // particular topic of interest.
+  //
+  // If a delta for a particular topic does not have the 'is_delta'
+  // flag set, clients should assume that the delta contains the
+  // entire known state for that topic. This occurs particularly after
+  // state-store failure, and usually clients will need to republish
+  // any local state that is missing.
+  //
+  // Callbacks may publish new updates to any topic via the
+  // topic_updates parameter, although updates for unknown topics
+  // (i.e. those with no subscribers) will be ignored.
+  typedef boost::function<void (const TopicDeltaMap& state,
+                                std::vector<TTopicUpdate>* topic_updates)> UpdateCallback;
 
-  // Internal API implementation
-  // Calling any of the Register or Unregister functions before starting the
-  // StateStoreSubscriber service (using Start()) will cause an error.
+  // Adds a topic to the set of topics that updates will be received
+  // for. When a topic update is received, the supplied UpdateCallback
+  // will be invoked. Therefore clients should ensure that it is safe
+  // to invoke callback for the entire lifetime of the subscriber; in
+  // particular this means that the subscriber should be torn-down
+  // before any objects that own callbacks.
+  //
+  // Must be called before Start(), in which case it will return
+  // Status::OK. Otherwise an error will be returned.
+  Status AddTopic(const StateStore::TopicId& topic_id, bool is_transient,
+      const UpdateCallback& callback);
 
-  // Starts a thread that exports StateStoreSubscriberService. The thread will run until
-  // the server terminates or Stop() is called. Before Start() is called,
-  // a boost::shared_ptr<StateStoreSubscriber> to this StateStoreSubscriber must exist
-  // somewhere outside of this class.
-  impala::Status Start();
-
-  // Stops exporting StateStoreSubscriberService and unregisters all subscriptions.
-  void UnregisterAll();
-
-  // Registers with the state store to receive updates for the given services.
-  // Fills in the given id with an id identifying the subscription, which should be
-  // used when unregistering.  The given UpdateCallback will be called with updates and
-  // takes a single ServiceStateMap as a parameter, which contains a mapping of service
-  // ids to the relevant state for that service. The callback may not Register() or
-  // Unregister() any subscriptions.
-  impala::Status RegisterSubscription(
-      const boost::unordered_set<std::string>& update_services, const SubscriptionId& id,
-      SubscriptionManager::UpdateCallback* update);
-
-  // Unregisters the subscription identified by the given id with the state store. Also
-  // unregisters the associated callback, so that it will no longer be called.
-  impala::Status UnregisterSubscription(const SubscriptionId& id);
-
-  // Registers an instance of the given service type at the given
-  // address with the state store.
-  // TODO: Make it a condition that this can be called only before Start()
-  impala::Status RegisterService(const ServiceId& service_id,
-      const impala::TNetworkAddress& address);
-
-  // Unregisters an instance of the given service type with the state store.
-  virtual impala::Status UnregisterService(const ServiceId& service_id);
-
-  // StateStoreSubscriberServiceIf implementation
-
-  // Implements the UpdateState() method of the thrift StateStateSubscriberServiceIf.
-  // This method is thread-safe.
-  virtual void UpdateState(TUpdateStateResponse& response,
-      const TUpdateStateRequest& request);
+  // Registers this subscriber with the state-store, and starts the
+  // heartbeat service, as well as a thread to check for failure and
+  // initiate recovery mode.
+  //
+  // Returns OK unless some error occurred, like a failure to connect.
+  Status Start();
 
  private:
+  // Unique, but opaque, identifier for this subscriber.
+  const std::string subscriber_id_;
+
+  // Address that the heartbeat service should be started on.
+  TNetworkAddress heartbeat_address_;
+
+  // Address of the state-store
+  TNetworkAddress state_store_address_;
+
+  // Implementation of the heartbeat thrift interface, which proxies
+  // calls onto this object.
+  boost::shared_ptr<StateStoreSubscriberIf> thrift_iface_;
+
+  // Container for the heartbeat server.
+  boost::shared_ptr<ThriftServer> heartbeat_server_;
+
+  // Failure detector that monitors heartbeats from the state-store.
+  boost::scoped_ptr<impala::TimeoutFailureDetector> failure_detector_;
+
+  // Thread in which RecoveryModeChecker runs.
+  boost::scoped_ptr<boost::thread> recovery_mode_thread_;
+
   // Class-wide lock. Protects all subsequent members. Most private methods must
   // be called holding this lock; this is noted in the method comments.
   boost::mutex lock_;
 
- // Mapping of subscription ids to the associated callback. Because this mapping
- // stores a pointer to an UpdateCallback, memory errors will occur if an UpdateCallback
- // is deleted before being unregistered. The UpdateCallback destructor checks for
- // such problems, so that we will have an assertion failure rather than a memory error.
-  typedef boost::unordered_map<SubscriptionId, SubscriptionManager::UpdateCallback*>
+  // Set to true after Register(...) is successful, after which no
+  // more topics may be subscribed to.
+  bool is_registered_;
+
+  // Mapping of subscription ids to the associated callback. Because this mapping
+  // stores a pointer to an UpdateCallback, memory errors will occur if an UpdateCallback
+  // is deleted before being unregistered. The UpdateCallback destructor checks for
+  // such problems, so that we will have an assertion failure rather than a memory error.
+  typedef boost::unordered_map<StateStore::TopicId, std::vector<UpdateCallback> >
       UpdateCallbacks;
-
-  static const char* DISCONNECTED_FROM_STATE_STORE_ERROR;
-
-  // Whether the Thrift service is running.
-  bool server_running_;
-
-  // Address where the StateStoreSubscriberService is running.
-  impala::TNetworkAddress host_port_;
-
-  // Address of state store.
-  impala::TNetworkAddress state_store_host_port_;
-
-  // Thrift server.
-  boost::scoped_ptr<impala::ThriftServer> server_;
-
-  // Client to use to connect to the StateStore.
-  boost::shared_ptr<impala::ThriftClient<StateStoreServiceClient> > client_;
 
   // Callback for all services that have registered for updates (indexed by the
   // associated SubscriptionId), and associated lock.
   UpdateCallbacks update_callbacks_;
 
-  // Subscriptions registered from this subscriber. Used to properly reregister
-  // if recovery mode is entered.
-  typedef boost::unordered_map<SubscriptionId, boost::unordered_set<ServiceId> >
-      SubscriptionRegistrations;
-  SubscriptionRegistrations subscriptions_;
+  // One entry for every topic subscribed to. The value is whether
+  // this subscriber considers this topic to be 'transient', that is
+  // any updates it makes will be deleted upon failure or
+  // disconnection.
+  std::map<StateStore::TopicId, bool> topic_registrations_;
 
-  // Services registered with this subscriber. Used to properly unregister if the
-  // subscriber is Stop()ed, and to reregister if recovery mode is entered
-  typedef boost::unordered_map<ServiceId, impala::TNetworkAddress> ServiceRegistrations;
-  ServiceRegistrations services_;
+  // Client to use to connect to the StateStore.
+  boost::shared_ptr<impala::ThriftClient<StateStoreServiceClient> > client_;
 
-  // Thread in which RecoveryModeChecker runs.
-  boost::scoped_ptr<boost::thread> recovery_mode_thread_;
+  // Metric to indicate if we are successfully registered with the statestore
+  Metrics::BooleanMetric* connected_to_statestore_metric_;
 
-  // Failure detector that monitors heartbeats from the state-store.
-  boost::scoped_ptr<impala::TimeoutFailureDetector> failure_detector_;
+  // Subscriber thrift implementation, needs to access UpdateState
+  friend class StateStoreSubscriberThriftIf;
 
-  // Initializes client_, if it hasn't been initialized already. Returns an
-  // error if in recovery mode. Must be called with lock_ held.
-  impala::Status InitClient();
-
-  // Executes an RPC to unregister the given service with the state store. Must
-  // be called with lock_ held.
-  impala::Status UnregisterServiceInternal(const ServiceId& service_id);
-
-  // Executes an RPC to unregister the given subscription with the state
-  // store. Must be called with lock_ held.
-  impala::Status UnregisterSubscriptionInternal(const SubscriptionId& id);
-
-  // Must be called with lock_
-  impala::Status RegisterServiceInternal(const ServiceId& service_id,
-                                         const impala::TNetworkAddress& address);
-
-  // Registers a subscription with the given ID to all services
-  // Must be called with lock_
-  impala::Status RegisterSubscriptionInternal(
-      const boost::unordered_set<std::string>& update_services, const SubscriptionId& id,
-      SubscriptionManager::UpdateCallback* update);
+  // Called when the state-store sends a heartbeat. Each registered
+  // callback is called in turn with the given list of topic deltas,
+  // and any updates are aggregated in topic_updates.
+  void UpdateState(const TopicDeltaMap& topic_deltas,
+      std::vector<TTopicUpdate>* topic_updates);
 
   // Run in a separate thread. In a loop, check failure_detector_ to see if the
   // state-store is still sending heartbeats. If not, enter 'recovery mode'
   // where a reconnection is repeatedly attempted. Once reconnected, all
   // existing subscriptions and services are reregistered and normal operation
   // resumes.
+  //
   // During recovery mode, any public methods that are started will block on
   // lock_, which is only released when recovery finishes. In practice, all
   // registrations are made early in the life of an impalad before the
   // state-store could be detected as failed.
   void RecoveryModeChecker();
 
-  // Once the state-store is reconnected to after a failure, this method
-  // re-registers all subscriptions and service instances. Must be called with
-  // lock_ held.
-  impala::Status Reregister();
-
-  // Friend so that tests can force shutdown to simulate failure.
-  friend class StateStoreTest;
+  // Creates a client of the remote state-store and sends a list of
+  // topics to register for. Returns OK unless there is some problem
+  // connecting, or the state-store reports an error.
+  Status Register();
 };
 
 }

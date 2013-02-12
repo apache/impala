@@ -122,9 +122,7 @@ set (SRC_FILES
   Partitions.thrift
   parquet.thrift
   RuntimeProfile.thrift
-  StatestoreTypes.thrift
   StateStoreService.thrift
-  StateStoreSubscriberService.thrift
   Status.thrift
   Types.thrift
   ${GENERATES_SRC_FILES}

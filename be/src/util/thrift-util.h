@@ -54,8 +54,8 @@ class ThriftSerializer {
     memcpy(&((*result)[0]), buffer, len);
     return Status::OK;
   }
-  
-  // Serialize obj into a memory buffer.  The result is returned in buffer/len.  The 
+
+  // Serialize obj into a memory buffer.  The result is returned in buffer/len.  The
   // memory returned is owned by this object and will be invalid when another object
   // is serialized.
   template <class T>
@@ -69,6 +69,20 @@ class ThriftSerializer {
       return Status(msg.str());
     }
     mem_buffer_->getBuffer(buffer, len);
+    return Status::OK;
+  }
+
+  template <class T>
+  Status Serialize(T* obj, std::string* result) {
+    try {
+      mem_buffer_->resetBuffer();
+      obj->write(protocol_.get());
+    } catch (apache::thrift::TApplicationException& e) {
+      std::stringstream msg;
+      msg << "Couldn't serialize thrift object:\n" << e.what();
+      return Status(msg.str());
+    }
+    *result = mem_buffer_->getBufferAsString();
     return Status::OK;
   }
 
@@ -104,7 +118,7 @@ Status SerializeThriftMsg(JNIEnv* env, T* msg, jbyteArray* serialized_msg) {
 }
 
 // Utility to create a protocol (deserialization) object for 'mem'.
-boost::shared_ptr<apache::thrift::protocol::TProtocol> 
+boost::shared_ptr<apache::thrift::protocol::TProtocol>
 CreateDeserializeProtocol(
     boost::shared_ptr<apache::thrift::transport::TMemoryBuffer> mem, bool compact);
 
@@ -112,12 +126,14 @@ CreateDeserializeProtocol(
 // all the bytes needed to store the thrift message.  On return, len will be
 // set to the actual length of the header.
 template <class T>
-Status DeserializeThriftMsg(uint8_t* buf, uint32_t* len, bool compact, 
+Status DeserializeThriftMsg(const uint8_t* buf, uint32_t* len, bool compact,
     T* deserialized_msg) {
-  // Deserialize msg bytes into c++ thrift msg using memory transport.
+  // Deserialize msg bytes into c++ thrift msg using memory
+  // transport. TMemoryBuffer is not const-safe, although we use it in
+  // a const-safe way, so we have to explicitly cast away the const.
   boost::shared_ptr<apache::thrift::transport::TMemoryBuffer> tmem_transport(
-      new apache::thrift::transport::TMemoryBuffer(buf, *len));
-  boost::shared_ptr<apache::thrift::protocol::TProtocol> tproto = 
+      new apache::thrift::transport::TMemoryBuffer(const_cast<uint8_t*>(buf), *len));
+  boost::shared_ptr<apache::thrift::protocol::TProtocol> tproto =
       CreateDeserializeProtocol(tmem_transport, compact);
   try {
     deserialized_msg->read(tproto.get());
@@ -125,6 +141,9 @@ Status DeserializeThriftMsg(uint8_t* buf, uint32_t* len, bool compact,
     std::stringstream msg;
     msg << "couldn't deserialize thrift msg:\n" << e.what();
     return Status(msg.str());
+  } catch (...) {
+    // TODO: Find the right exception for 0 bytes
+    return Status("Unknown exception");
   }
   uint32_t bytes_left = tmem_transport->available_read();
   *len = *len - bytes_left;
@@ -139,7 +158,7 @@ Status DeserializeThriftMsg(JNIEnv* env, jbyteArray serialized_msg, T* deseriali
 
   RETURN_IF_ERROR(DeserializeThriftMsg(
       reinterpret_cast<uint8_t*>(buf), &buf_size, false, deserialized_msg));
-  
+
   // Return buffer back. JNI_ABORT indicates to not copy contents back to java
   // side.
   env->ReleaseByteArrayElements(serialized_msg, buf, JNI_ABORT);

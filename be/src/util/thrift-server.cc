@@ -322,6 +322,7 @@ Status ThriftServer::Start() {
 
   // Note - if you change the transport types here, you must check that the
   // logic in createContext is still accurate.
+  TServerSocket* server_socket;
   switch (server_type_) {
     case Nonblocking:
       if (transport_factory.get() == NULL) {
@@ -340,7 +341,9 @@ Status ThriftServer::Start() {
           transport_factory, protocol_factory, thread_mgr));
       break;
     case Threaded:
-      fe_server_transport.reset(new TServerSocket(port_));
+      server_socket = new TServerSocket(port_);
+      //      server_socket->setAcceptTimeout(500);
+      fe_server_transport.reset(server_socket);
       if (transport_factory.get() == NULL) {
         transport_factory.reset(new TBufferedTransportFactory());
       }

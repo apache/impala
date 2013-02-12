@@ -63,14 +63,11 @@ set(SRC_FILES
   parquet_types.cpp
   RuntimeProfile_constants.cpp
   RuntimeProfile_types.cpp
-  StatestoreTypes_constants.cpp
-  StatestoreTypes_types.cpp
   StateStoreService.cpp
   StateStoreService_constants.cpp
   StateStoreService_types.cpp
-  StateStoreSubscriberService.cpp
-  StateStoreSubscriberService_constants.cpp
-  StateStoreSubscriberService_types.cpp
+  StateStoreSubscriber.cpp
+
   Status_constants.cpp
   Status_types.cpp
   Types_constants.cpp

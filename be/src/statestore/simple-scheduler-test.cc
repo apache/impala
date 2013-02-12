@@ -18,7 +18,6 @@
 
 #include "common/logging.h"
 #include "simple-scheduler.h"
-#include "subscription-manager.h"
 
 using namespace std;
 using namespace boost;
@@ -67,12 +66,6 @@ class SimpleSchedulerTest : public testing::Test {
       }
     }
     local_remote_scheduler_.reset(new SimpleScheduler(backends, NULL));
-  }
-
-  virtual void TearDown() {
-    localhost_scheduler_->Close();
-    remote_scheduler_->Close();
-    local_remote_scheduler_->Close();
   }
 
   int base_port_;
@@ -140,13 +133,6 @@ TEST_F(SimpleSchedulerTest, NonLocalHost) {
   EXPECT_EQ(hostports.at(4).hostname, "127.0.0.1");
   EXPECT_EQ(hostports.at(4).port, 1000);
 }
-
- TEST_F(SimpleSchedulerTest, CleanShutdownWithoutInit) {
-   SubscriptionManager subscription_manager;
-   SimpleScheduler simple_scheduler(&subscription_manager, "dummy_service_id", NULL);
-   // We're checking that the SimpleScheduler destructor finishes cleanly if Init is not
-   // called, so just allow simple_scheduler to go out of scope.
- }
 
 }
 

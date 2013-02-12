@@ -30,7 +30,6 @@
 
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
-#include "common/service-ids.h"
 #include "common/version.h"
 #include "exec/ddl-executor.h"
 #include "exec/exec-node.h"
@@ -660,6 +659,13 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
   ImpaladMetrics::CreateMetrics(exec_env->metrics());
   ImpaladMetrics::IMPALA_SERVER_START_TIME->Update(
       TimestampValue::local_time().DebugString());
+
+  // Register the membership callback if required
+  if (exec_env->subscriber() != NULL) {
+    StateStoreSubscriber::UpdateCallback cb =
+        bind<void>(mem_fn(&ImpalaServer::MembershipCallback), this, _1, _2);
+    exec_env->subscriber()->AddTopic(SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC, true, cb);
+  }
 }
 
 void ImpalaServer::RenderHadoopConfigs(const Webserver::ArgumentMap& args,
@@ -915,7 +921,7 @@ void ImpalaServer::SessionPathHandler(const Webserver::ArgumentMap& args,
             << "<th>User</th>"
             << "<th>Session Key</th>"
             << "<th>Default Database</th>"
-            << "<th>Start Time</th></tr>" 
+            << "<th>Start Time</th></tr>"
             << endl;
   BOOST_FOREACH(const SessionStateMap::value_type& session, session_state_map_) {
     string session_type;
@@ -1036,10 +1042,10 @@ Status ImpalaServer::Execute(const TClientRequest& request,
 }
 
 Status ImpalaServer::ExecuteInternal(
-    const TClientRequest& request, 
+    const TClientRequest& request,
     shared_ptr<SessionState> session_state,
     const TSessionState& query_session_state,
-    bool* registered_exec_state, 
+    bool* registered_exec_state,
     shared_ptr<QueryExecState>* exec_state) {
   DCHECK(session_state != NULL);
 
@@ -1808,15 +1814,35 @@ void ImpalaServer::SessionState::ToThrift(TSessionState* state) {
   state->database = database;
 }
 
-void ImpalaServer::MembershipCallback(const ServiceStateMap& service_state) {
+void ImpalaServer::MembershipCallback(
+    const StateStoreSubscriber::TopicDeltaMap& topic_deltas,
+    vector<TTopicUpdate>* topic_updates) {
   // TODO: Consider rate-limiting this. In the short term, best to have
   // state-store heartbeat less frequently.
-  ServiceStateMap::const_iterator it = service_state.find(IMPALA_SERVICE_ID);
-  if (it != service_state.end()) {
-    vector<TNetworkAddress> current_membership(it->second.membership.size());;
-    // TODO: Why is Membership not just a set? Would save a copy.
-    BOOST_FOREACH(const Membership::value_type& member, it->second.membership) {
-      current_membership.push_back(member.second);
+  StateStoreSubscriber::TopicDeltaMap::const_iterator topic =
+      topic_deltas.find(SimpleScheduler::IMPALA_MEMBERSHIP_TOPIC);
+
+  if (topic != topic_deltas.end()) {
+    const TTopicDelta& delta = topic->second;
+    // Although the protocol allows for it, we don't accept true
+    // deltas from the state-store, but expect each topic to contains
+    // its entire contents.
+    if (delta.is_delta) {
+      VLOG(1) << "Unexpected topic delta from state-store, ignoring.";
+      return;
+    }
+    vector<TNetworkAddress> current_membership(delta.topic_entries.size());
+
+    BOOST_FOREACH(const TTopicItem& item, delta.topic_entries) {
+      uint32_t len = item.value.size();
+      TNetworkAddress backend_address;
+      Status status = DeserializeThriftMsg(reinterpret_cast<const uint8_t*>(
+          item.value.data()), &len, false, &backend_address);
+      if (!status.ok()) {
+        VLOG(2) << "Error deserializing topic item with key: " << item.key;
+        continue;
+      }
+      current_membership.push_back(backend_address);
     }
 
     vector<TNetworkAddress> difference;
@@ -1844,7 +1870,7 @@ void ImpalaServer::MembershipCallback(const ServiceStateMap& service_state) {
     BOOST_FOREACH(const TUniqueId& query_id, to_cancel) {
       CancelInternal(query_id);
     }
-    last_membership_ = current_membership;
+    last_membership_.swap(current_membership);
   }
 }
 

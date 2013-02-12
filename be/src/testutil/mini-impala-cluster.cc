@@ -16,6 +16,8 @@
 // A standalone test utility that starts multiple Impala backends and a state store
 // within a single process.
 
+#include <boost/foreach.hpp>
+
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
 #include "common/daemon.h"
@@ -72,6 +74,7 @@ int main(int argc, char** argv) {
 
   scoped_ptr<InProcessStateStore> state_store(new InProcessStateStore(23000, 25100));
   if (FLAGS_use_statestore) EXIT_IF_ERROR(state_store->Start());
+  LOG(INFO) << "Started in-process state-store";
 
   vector<InProcessImpalaServer*> impala_servers;
   for (int i = 0; i < FLAGS_num_backends; ++i) {

@@ -36,6 +36,9 @@ using namespace std;
 using namespace boost;
 using namespace impala;
 
+using namespace ::apache::thrift::server;
+using namespace ::apache::thrift::transport;
+
 int main(int argc, char** argv) {
   // Override default for webserver port
   FLAGS_webserver_port = 25010;
@@ -57,10 +60,14 @@ int main(int argc, char** argv) {
   scoped_ptr<Metrics> metrics(new Metrics());
   metrics->Init(FLAGS_enable_webserver ? webserver.get() : NULL);
 
-  shared_ptr<StateStore> state_store(
-      new StateStore(StateStore::DEFAULT_UPDATE_FREQUENCY_MS,
-          metrics.get()));
-  state_store->RegisterWebpages(webserver.get());
-  state_store->Start(FLAGS_state_store_port);
-  state_store->WaitForServerToStop();
+  StateStore state_store(metrics.get());
+  state_store.RegisterWebpages(webserver.get());
+  shared_ptr<TProcessor> processor(
+      new StateStoreServiceProcessor(state_store.thrift_iface()));
+
+  ThriftServer* server = new ThriftServer("StateStoreService", processor,
+                                          FLAGS_state_store_port, metrics.get(), 5);
+  server->Start();
+
+  state_store.MainLoop();
 }

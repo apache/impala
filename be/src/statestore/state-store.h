@@ -12,261 +12,341 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifndef STATESTORE_STATE_STORE2_H
+#define STATESTORE_STATE_STORE2_H
 
-#ifndef STATESTORE_STATE_STORE_H
-#define STATESTORE_STATE_STORE_H
-
+#include <stdint.h>
 #include <string>
-
-#include <boost/enable_shared_from_this.hpp>
-#include <boost/scoped_ptr.hpp>
-#include <boost/shared_ptr.hpp>
-#include <boost/thread/recursive_mutex.hpp>
-#include <boost/thread/thread.hpp>
+#include <vector>
+#include <map>
 #include <boost/unordered_map.hpp>
-#include <boost/unordered_set.hpp>
+#include <boost/scoped_ptr.hpp>
+#include <boost/thread/condition_variable.hpp>
+
+#include "gen-cpp/Types_types.h"
+#include "gen-cpp/StateStoreSubscriber.h"
+#include "gen-cpp/StateStoreService.h"
 #include "util/metrics.h"
 #include "util/non-primitive-metrics.h"
 #include "util/thrift-client.h"
-#include "util/thrift-server.h"
-
-#include "statestore/util.h"
-#include "util/thrift-util.h"
-#include "gen-cpp/StatestoreTypes_types.h"
-#include "gen-cpp/StateStoreService.h"
-#include "gen-cpp/StateStoreSubscriberService.h"
+#include "util/webserver.h"
+#include "runtime/client-cache.h"
 #include "statestore/failure-detector.h"
 
 namespace impala {
 
+using namespace impala;
+
 class Status;
-class TNetworkAddress;
-class Webserver;
-}
 
-namespace impala {
-
-class TUpdateStateRequest;
-class StateStoreTest;
-
-// The StateStore is a single, centralized repository that stores soft state. It stores
-// both membership information about the instances of each service, and generic
-// versioned key-value pairs. The StateStoreServiceIf interface implementation is thread
-// safe.
-// TODO: Send membership changes as a delta, rather than a full update.
-// TODO: Add versioned objects to the state store.
-class StateStore : public StateStoreServiceIf,
-                   public boost::enable_shared_from_this<StateStore> {
+// The StateStore is a soft-state key-value store that maintains a set
+// of Topics, which are maps from string keys to byte array values.
+//
+// Topics are subscribed to by subscribers, which are remote clients
+// of the state-store which express an interest in some set of
+// Topics. The state-store sends topic updates to subscribers via
+// periodic heartbeat messages, which are also used to detect the
+// liveness of a subscriber.
+//
+// Subscribers, in return, send topic updates to the state-store to
+// merge with the current topic. These updates are then sent to all
+// other subscribers in the next heartbeat.
+//
+// Topic entries usually have human-readable keys, and values which
+// are some serialised representation of a data structure, e.g. a
+// Thrift struct. The contents of a value's bye string is opaque to
+// the state-store, which maintains no information about how to
+// deserialise it. Subscribers must use convention to interpret each
+// other's updates.
+//
+// A subscriber may have marked some updates that it made as
+// 'transient', which implies that those entries should be deleted
+// once the subscriber is no longer connected (this is judged by the
+// state-store's failure-detector, which will mark a subscriber as
+// failed when it has not responded to a number of successive
+// heartbeats). Transience is tracked per-topic-per-subscriber, so two
+// different subscribers may treat the same topic differently wrt to
+// the transience of their updates.
+//
+// TODO: Compute deltas based on subscriber last-seen version numbers
+// and only send the changes.
+class StateStore {
  public:
-  // Frequency at which subscribers are updated.
-  static const int DEFAULT_UPDATE_FREQUENCY_MS = 1000;
+  // A SubscriberId uniquely identifies a single subscriber, and is
+  // provided by the susbcriber at registration time.
+  typedef std::string SubscriberId;
 
-  StateStore(int subscriber_update_frequency_ms, impala::Metrics* metrics);
+  // A TopicId uniquely identifies a single topic
+  typedef std::string TopicId;
 
-  // StateStoreServiceIf RPCS.
-  virtual void RegisterService(TRegisterServiceResponse& response,
-                               const TRegisterServiceRequest& request);
-  virtual void UnregisterService(TUnregisterServiceResponse& response,
-                                 const TUnregisterServiceRequest& request);
-  virtual void RegisterSubscription(TRegisterSubscriptionResponse& response,
-                                    const TRegisterSubscriptionRequest& request);
-  virtual void UnregisterSubscription(TUnregisterSubscriptionResponse& response,
-                                      const TUnregisterSubscriptionRequest& request);
+  // A TopicEntryKey uniquely identifies a single entry in a topic
+  typedef std::string TopicEntryKey;
 
-  // Starts the state store by starting one new thread to perform updates and a second
-  // new thread that exports StateStoreService on the given port. Before Start() is
-  // called, there must be a boost::shared_ptr<StateStore> to this StateStore.
-  void Start(int port);
+  // The only constructor; initialises member variables only.
+  StateStore(Metrics* metrics);
 
-  // Stops the server. Once the server is stopped it may not be restarted.
-  // Should only be used for testing.
-  void Stop();
+  // Registers a new subscriber with the given unique subscriber ID,
+  // running a heartbeat service at the given location, with the
+  // provided list of topic subscriptions.
+  Status RegisterSubscriber(const SubscriberId& subscriber_id,
+      const TNetworkAddress& location,
+      const std::vector<TTopicRegistration>& topic_registrations);
 
-  // Blocks until the server stops (which will occur if the server
-  // returns due to an error, for example). Note that is_updating does
-  // not control whether the Thrift server is running.
-  void WaitForServerToStop();
+  void RegisterWebpages(Webserver* webserver);
 
-  int subscriber_update_frequency_ms() { return subscriber_update_frequency_ms_; }
+  // The main processing loop. Starts a number of threads to send
+  // heartbeats to subscribers, and coordinates handing work to them
+  // until told to exit via SetExitFlag. This method blocks until the
+  // exit flag is set.
+  //
+  // Returns OK unless there is an unrecoverable error.
+  Status MainLoop();
 
-  impala::Status RegisterWebpages(impala::Webserver* server);
+  // Returns the Thrift API interface that proxies requests onto the local StateStore.
+  const boost::shared_ptr<StateStoreServiceIf>& thrift_iface() const {
+    return thrift_iface_;
+  }
+
+  // Tells the StateStore to shut down. Does not wait for the
+  // processing loop to exit before returning.
+  void SetExitFlag();
 
  private:
-  typedef impala::ThriftClient<StateStoreSubscriberServiceClient> SubscriberClient;
-
-  // Describes a subscriber connected to the StateStore. This class is not thread safe,
-  // which is fine because access to subscribers_ is always protected by a lock.
-  class Subscriber {
+  // A TopicEntry is a single entry in a topic, and logically is a
+  // <string, byte string> pair. If the byte string is NULL, the entry
+  // has been deleted, but may be retained to track changes to send to
+  // subscribers.
+  class TopicEntry {
    public:
-    // Count of the number of registered subscriptions for each service id.
-    typedef boost::unordered_map<ServiceId, int> ServiceSubscriptionCounts;
+    // A Value is a string of bytes, for which std::string is a
+    // convenient representation.
+    typedef std::string Value;
 
-    // Mapping between a subscription id, and a list of service ids for which updates
-    // should be pushed.
-    typedef boost::unordered_map<SubscriptionId, boost::unordered_set<ServiceId> >
-        Subscriptions;
+    // A version is a monotonically increasing counter. Each update to
+    // a topic has its own unique version with the guarantee that
+    // sequentially later updates have larger version numbers.
+    typedef uint64_t Version;
 
-    Subscriber(SubscriberId id) : id_(id) {};
+    // Representation of an empty Value
+    static const Value NULL_VALUE;
 
-    // Initializes the underlying thrift transport and StateStoreSubscriberServiceClient,
-    // but doesn't open the transport.
-    void Init(const impala::TNetworkAddress& address);
+    // Sets the value of this entry to the byte / length
+    // pair. NULL_VALUE implies this entry has been deleted.  The
+    // caller is responsible for ensuring, if required, that the
+    // version parameter is larger than the current version()
+    // TODO: Consider enforcing version monotonicity here.
+    void SetValue(const Value& bytes, Version version);
 
-    // Adds an instance of the given service.
-    void AddService(const ServiceId& service_id);
+    TopicEntry() : value_(NULL_VALUE), version_(0L) { }
 
-    // Removes the instance of the given service.
-    void RemoveService(const ServiceId& service_id);
-
-    // Add a subscription for the given services. The subscription will have the
-    // id given, and any existing subscription with this ID will be overwritten.
-    void AddSubscription(const std::set<ServiceId>& services, const SubscriptionId& id);
-
-    // Removes the subscription with the given identifier. Returns true if the
-    // subscription was removed, and false if the subscription did not exist.
-    bool RemoveSubscription(SubscriptionId id);
-
-    // Returns true if the subscriber has no more subscriptions and no registered
-    // service instances (so needs to be cleaned up), and false otherwise.
-    bool IsZombie();
-
-    SubscriberId id() { return id_; };
-
-    boost::shared_ptr<SubscriberClient> client() const {
-      return client_;
-    };
-
-    const ServiceSubscriptionCounts& service_subscription_counts() const {
-      return service_subscription_counts_;
-    }
-
-    const Subscriptions& subscriptions() const {
-      return subscriptions_;
-    }
-
-    const boost::unordered_set<ServiceId>& service_ids() const {
-      return service_ids_;
-    }
+    const Value& value() const { return value_; }
+    uint64_t version() const { return version_; }
+    uint32_t length() const { return value_.size(); }
 
    private:
+    // Byte string value, owned by this TopicEntry. The value is
+    // opaque to the state-store, and is interpreted only by
+    // subscribers.
+    Value value_;
 
-    // Unique identifier for the subscriber.
-    SubscriberId id_;
-
-    // Exported services that are associated with the subscriber (needed when a subscriber
-    // become unreachable, to determine which service instances should also be marked
-    // as unreachable).
-    boost::unordered_set<ServiceId> service_ids_;
-
-    Subscriptions subscriptions_;
-
-    ServiceSubscriptionCounts service_subscription_counts_;
-
-    // Thrift connection information.
-    boost::shared_ptr<SubscriberClient> client_;
+    // The version of this entry. Every update is assigned a
+    // monotonically increasing version number so that only the
+    // minimal set of changes can be sent from the state-store to a
+    // subscriber.
+    Version version_;
   };
 
-  // Information needed to update a subscriber with the latest state. Because we use
-  // shared pointers to the thrift transport and client, it is fine if the corresponding
-  // Subscriber gets deleted before this SubscriberUpdate is used.
-  struct SubscriberUpdate {
-    // Address of the subscriber to receive this update
-    impala::TNetworkAddress subscriber_address;
+  // Map from TopicEntryKey to TopicEntry, maintained by a Topic object.
+  typedef boost::unordered_map<TopicEntryKey, TopicEntry> TopicEntryMap;
 
-    boost::shared_ptr<SubscriberClient> client;
-    TUpdateStateRequest request;
+  // A Topic is logically a map between a string key and a sequence of
+  // bytes. A <string, bytes> pair is a TopicEntry.
+  //
+  // Each topic has a unique version number that tracks the number of
+  // updates made to the topic. This is to support sending only the
+  // delta of changes on every update.
+  class Topic {
+   public:
+    Topic(const TopicId& topic_id) : topic_id_(topic_id) { }
 
-    SubscriberUpdate(const impala::TNetworkAddress& address, Subscriber* subscriber)
-      : subscriber_address(address),
-        client(subscriber->client()) {}
+    // Adds an entry with the given key. If bytes == NULL_VALUE, the entry
+    // is considered deleted, and may be garbage collected in the
+    // future. The entry is assigned a new version number by the Topic,
+    // and that version number is returned.
+    //
+    // Must be called holding the topic lock
+    TopicEntry::Version Put(const TopicEntryKey& key, const TopicEntry::Value& bytes);
+
+    // Utility method to support removing transient entries. We track
+    // the version numbers of entries added by subscribers, and remove
+    // entries with the same version number when that subscriber fails
+    // (the same entry may exist, but may have been updated by another
+    // subscriber giving it a new version number)
+    //
+    // Deletion means setting the entry's value to NULL and
+    // incrementing its version number.
+    //
+    // Must be called holding the topic lock
+    void DeleteIfVersionsMatch(TopicEntry::Version version, const TopicEntryKey& key);
+
+    const TopicId& id() const { return topic_id_; }
+    const TopicEntryMap& entries() const { return entries_; }
+
+   private:
+    // Map from topic entry key to topic entry.
+    TopicEntryMap entries_;
+
+    // Unique identifier for this topic. Should be human-readable.
+    const TopicId topic_id_;
+
+    // Incremented on every Put(..), and each TopicEntry is tagged
+    // with the current version.
+    TopicEntry::Version last_version_;
   };
 
-  // Mapping of service ids to the corresponding membership.
-  typedef boost::unordered_map<ServiceId, Membership> ServiceMemberships;
+  // A note about locking: no two mutexes should be held at the same
+  // time. It has so far been possible to implement mutual exclusion
+  // without requiring more than one lock to be held
+  // concurrently. Subscribers and Topics should be accessed under
+  // their own coarse locks, and worker threads will use worker_lock_
+  // to ensure safe access to the subscriber work queue.
 
-  // Information about each subscriber, indexed by the address of the subscriber.
-  typedef boost::unordered_map<impala::TNetworkAddress, Subscriber> Subscribers;
-  Subscribers subscribers_;
+  // Protects access to exit_flag_, but is used mostly to ensure
+  // visibility of updates between threads..
+  boost::mutex exit_flag_lock_;
+  bool exit_flag_;
 
-  // Lock for is_updating_. This lock is necessary for visibility: it ensures that the
-  // change to is_updating_ will be visible in the update loop.
-  boost::mutex is_updating_lock_;
+  // Controls access to topics_
+  boost::mutex topic_lock_;
 
-  // Whether updates are currently being performed. Must be volatile because it is
-  // updated in one thread and read in a different one (making it volatile prevents
-  // the compiler from caching the value in a register, for example).
-  volatile bool is_updating_;
+  // The entire set of topics tracked by the state-store
+  typedef boost::unordered_map<TopicId, Topic> TopicMap;
+  TopicMap topics_;
 
-  boost::scoped_ptr<boost::thread> update_thread_;
+  // The state-store-side representation of an individual subscriber
+  // client, which tracks a variety of bookkeeping information. This
+  // includes the list of subscribed topics (and whether updates to
+  // them should be deleted on failure), the list of updates made by
+  // this subscriber (in order to be able to efficiently delete them
+  // on failure), and the subscriber's ID and network location.
+  class Subscriber {
+   public:
+    Subscriber(const SubscriberId& subscriber_id, const TNetworkAddress& network_address,
+               const std::vector<TTopicRegistration>& subscribed_topics);
 
-  boost::scoped_ptr<impala::ThriftServer> server_;
+    // The set of topics subscribed to, and whether entries to each
+    // topic written by this subcriber should be considered transient.
+    typedef boost::unordered_map<TopicId, bool> Topics;
 
-  // Protects all following member variables. Recursive because all of the RPC methods
-  // take this lock before modifying member variables, but many of them subsequently
-  // call GetOrCreateSubscriber(), which also needs the lock.
-  boost::recursive_mutex lock_;
+    const Topics& subscribed_topics() const { return subscribed_topics_; }
+    const TNetworkAddress& network_address() const { return network_address_; }
+    const SubscriberId& id() const { return subscriber_id_; }
 
-  // A set of instances for each service.
-  ServiceMemberships service_instances_;
+    // Records the fact that an update to this topic is owned by this
+    // subscriber.  The version number of the update is saved so that
+    // only those updates which are made most recently by this
+    // subscriber - and not overwritten by another subscriber - are
+    // deleted on failure. If the topic the entry belongs to is not
+    // marked as transient, no update will be recorded.
+    void AddTransientUpdate(const TopicId& topic_id, const TopicEntryKey& topic_key,
+        TopicEntry::Version version);
 
-  // Next id to use for a StateStoreSubscriber.
-  SubscriberId next_subscriber_id_;
+    // Map from the topic / key pair to the version of a transient
+    // update made by this subscriber.
+    typedef boost::unordered_map<std::pair<TopicId, TopicEntryKey>, TopicEntry::Version>
+        TransientEntryMap;
 
-  // Frequency of updates to subscribers
-  int subscriber_update_frequency_ms_;
+    const TransientEntryMap& transient_entries() const { return transient_entries_; }
 
-  boost::scoped_ptr<impala::MissedHeartbeatFailureDetector> failure_detector_;
+   private:
+    // Unique human-readable identifier for this subscriber, set by
+    // the subscriber itself on a Register call
+    const SubscriberId subscriber_id_;
 
-  // May not be NULL. Not owned by us.
-  impala::Metrics* metrics_;
+    // The location of the heartbeat service that this subscriber runs
+    const TNetworkAddress network_address_;
 
-  // Metric that tracks the number of backends registered and alive.
-  // Should only measure live IMPALAD backends, but because there
-  // aren't any other types right now, so just tracks the total
-  // services registered which is the same thing.
-  impala::Metrics::IntMetric* num_backends_metric_;
-  impala::SetMetric<std::string>* backend_set_metric_;
+    // List of subscriber topics, with a boolean for each describing
+    // whether updates on that topic are 'transient' (i.e., to be
+    // deleted upon subscriber failure) or not.
+    boost::unordered_map<TopicId, bool> subscribed_topics_;
 
-  // Tracks the failed / ok state of each subscriber
-  impala::MapMetric<std::string, std::string>* subscriber_state_metric_;
+    // List of updates made by this subscriber so that transient
+    // entries may be deleted on failure
+    TransientEntryMap transient_entries_;
+  };
 
-  // Getter and setter for is_updating_, both are thread safe.
-  bool is_updating();
-  void set_is_updating(bool is_updating);
+  // Protects access to subscribers_
+  boost::mutex subscribers_lock_;
 
-  // Adds a subscriber corresponding to the given TNetworkAddress to
-  // subscribers_, if it is not there already, and returns a reference
-  // to the Subscriber.
-  Subscriber& GetOrCreateSubscriber(const impala::TNetworkAddress& host_port);
+  // Map of subscribers currently connected; upon failure their entry
+  // is removed from this map.
+  typedef boost::unordered_map<SubscriberId, Subscriber> SubscriberMap;
+  SubscriberMap subscribers_;
 
-  // Begins updating all StateStoreSubscriberServices with the new state.  Should be
-  // called in its own thread, because this method blocks until is_updating_ is false.
-  void UpdateLoop();
+  // Cache of subscriber clients. Only one client per subscriber
+  // should be used, but the cache helps with the client lifecycle on
+  // failure.
+  boost::scoped_ptr<ClientCache<StateStoreSubscriberClient> > client_cache_;
 
-  // Fills in updates with a SubscriberUpdate (including a filled in TUpdateStateRequest)
-  // for each currently registered subscriber.
-  void GenerateUpdates(std::vector<StateStore::SubscriberUpdate>* updates);
+  // Thrift API implementation which proxies requests onto this StateStore
+  boost::shared_ptr<StateStoreServiceIf> thrift_iface_;
 
-  // Removes all subscriptions and registered services for the subscriber with
-  // the given address.
-  impala::Status UnregisterSubscriberCompletely(const impala::TNetworkAddress& address);
+  // Failure detector for subscribers. If a subscriber misses a
+  // configurable number of consecutive heartbeats, it is considered
+  // failed and a) its transient topic entries are removed and b) its
+  // entry in the subscriber map is erased.
+  boost::scoped_ptr<MissedHeartbeatFailureDetector> failure_detector_;
 
-  // Webserver callback to write a list of active subscriptions
-  void SubscriptionsCallback(const impala::Webserver::ArgumentMap& args,
-                             std::stringstream* output);
+  // Metric that track the registered, non-failed subscribers.
+  Metrics::IntMetric* num_subscribers_metric_;
+  SetMetric<std::string>* subscriber_set_metric_;
 
-  // Unregisters the given subscription associated with the subscriber at the
-  // given address.
-  impala::Status UnregisterSubscriptionInternal(const impala::TNetworkAddress& address,
-                                                const SubscriptionId& id);
+  // Shared mutex that protects all subsequent members, which are used
+  // to coordinate work between the master thread and the worker
+  // threads that send heartbeats to subscribers.
+  boost::mutex worker_lock_;
 
-  // Unregisters the service instance of the given type at the given address
-  impala::Status UnregisterServiceInternal(const impala::TNetworkAddress& address,
-                                           const ServiceId& service_id);
+  // Shared work queue between all worker threads. Each entry is a
+  // subscriber to which to send a heartbeat.
+  std::vector<Subscriber*> subscriber_work_queue_;
 
+  // number of subscribers remaining to be processed
+  uint32_t num_subscribers_remaining_;
 
-  // Friend class so that tests can manipulate internal data structures
-  friend class StateStoreTest;
+  // Both subsequent condition variables should be wait()'ed on whilst
+  // worker_lock_ is held.
+
+  // Condition variable that indicates more work to do on the queue
+  boost::condition_variable work_available_;
+
+  // Condition variable that indicates the last subscriber has been
+  // processed, so the main loop should wake up to re-fill the
+  // subscriber queue.
+  boost::condition_variable last_subscriber_processed_;
+
+  // This method is executed by several worker threads, which
+  // collectively read a list of active subscribers and send
+  // heartbeats to each one (by calling ProcessOneSubscriber).
+  void SubscriberUpdateLoop();
+
+  // Does the work of updating a single subscriber. Tries to call
+  // UpdateState on the client. If that fails, informs the failure
+  // detector, and if the client is failed, adds it to the list of
+  // failed subscribers. Otherwise, it sends the deltas to the
+  // subscriber, and receives and processes a list of updates.
+  Status ProcessOneSubscriber(Subscriber* subscriber);
+
+  // True if the shutdown flag has been set true, false otherwise.
+  bool ShouldExit();
+
+  // Webpage handler: prints the list of all topics and their
+  // subscription counts
+  void TopicsHandler(const Webserver::ArgumentMap& args, std::stringstream* output);
+
+  // Webpage handler: prints the list of subscribers
+  void SubscribersHandler(const Webserver::ArgumentMap& args, std::stringstream* output);
+
 };
 
 }

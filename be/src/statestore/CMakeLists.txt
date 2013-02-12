@@ -20,17 +20,15 @@ set(LIBRARY_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/statestore")
 set(EXECUTABLE_OUTPUT_PATH "${BUILD_OUTPUT_ROOT_DIRECTORY}/statestore")
 
 add_library(Statestore STATIC
-  util.cc
   failure-detector.cc
   simple-scheduler.cc
   state-store.cc
   state-store-subscriber.cc
-  subscription-manager.cc
 )
 
 add_executable(statestored statestored-main.cc)
 target_link_libraries(statestored ${IMPALA_LINK_LIBS})
 
 # Disabled pending state-store rewrite
-# ADD_BE_TEST(state-store-test)
+# ADD_BE_TEST(state-store-2.0-test)
 ADD_BE_TEST(simple-scheduler-test)

@@ -36,9 +36,7 @@
 #include "util/logging.h"
 #include "util/network-util.h"
 #include "util/thrift-util.h"
-#include "statestore/subscription-manager.h"
 #include "util/thrift-server.h"
-#include "common/service-ids.h"
 #include "util/authorization.h"
 #include "service/impala-server.h"
 #include "service/fe-support.h"
@@ -94,33 +92,6 @@ int main(int argc, char** argv) {
     LOG(ERROR) << "Impalad services did not start correctly, exiting";
     ShutdownLogging();
     exit(1);
-  }
-
-  // register be service *after* starting the be server thread and after starting
-  // the subscription mgr handler thread
-  scoped_ptr<SubscriptionManager::UpdateCallback> cb;
-  if (FLAGS_use_statestore) {
-    TNetworkAddress host_port;
-    host_port.port = FLAGS_be_port;
-    host_port.hostname = FLAGS_hostname;
-    // TODO: Unregister on tear-down (after impala service changes)
-    Status status =
-        exec_env.subscription_mgr()->RegisterService(IMPALA_SERVICE_ID,
-          MakeNetworkAddress(FLAGS_hostname, FLAGS_be_port));
-
-    unordered_set<ServiceId> services;
-    services.insert(IMPALA_SERVICE_ID);
-    cb.reset(new SubscriptionManager::UpdateCallback(
-        bind<void>(mem_fn(&ImpalaServer::MembershipCallback), server, _1)));
-    exec_env.subscription_mgr()->RegisterSubscription(services, "impala.server",
-        cb.get());
-
-    if (!status.ok()) {
-      LOG(ERROR) << "Could not register with state store service: "
-                 << status.GetErrorMsg();
-      ShutdownLogging();
-      exit(1);
-    }
   }
 
   // this blocks until the beeswax and hs2 servers terminate

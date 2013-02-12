@@ -29,7 +29,6 @@
 
 #include "codegen/llvm-codegen.h"
 #include "common/logging.h"
-#include "common/service-ids.h"
 #include "common/version.h"
 #include "exec/ddl-executor.h"
 #include "exec/exec-node.h"
@@ -149,7 +148,7 @@ void ImpalaServer::query(QueryHandle& query_handle, const Query& query) {
   GetSessionState(*session_key, &session);
   DCHECK(session != NULL);  // We made these keys...
   {
-    // The session is created when it connects.  We don't know the user until 
+    // The session is created when it connects.  We don't know the user until
     // something is run.
     lock_guard<mutex> l(session->lock);
     if (session->user.empty()) session->user = query.hadoop_user;
@@ -195,7 +194,7 @@ void ImpalaServer::executeAndWait(QueryHandle& query_handle, const Query& query,
   GetSessionState(*session_key, &session);
   DCHECK(session != NULL);  // We made these keys...
   {
-    // The session is created when it connects.  We don't know the user until 
+    // The session is created when it connects.  We don't know the user until
     // something is run.
     lock_guard<mutex> l(session->lock);
     if (session->user.empty()) session->user = query.hadoop_user;

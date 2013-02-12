@@ -17,9 +17,9 @@
 
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
+#include <boost/thread.hpp>
 
 #include "common/status.h"
-#include "statestore/subscription-manager.h"
 
 namespace impala {
 
@@ -78,13 +78,6 @@ class InProcessImpalaServer {
   // Frontend Beeswax server.
   boost::scoped_ptr<ThriftServer> beeswax_server_;
 
-  // Callback to register with the statestore subscriber when
-  // membership of the cluster changes. Will be removed in the
-  // statestore rewrite.
-  boost::scoped_ptr<SubscriptionManager::UpdateCallback> callback;
-
-  // This will happily disappear with the state-store rewrite
-  Status RegisterWithStateStore();
 };
 
 // An in-process state-store, with webserver and metrics.
@@ -96,6 +89,8 @@ class InProcessStateStore {
   // Starts the state-store server, and the processing thread.
   Status Start();
 
+  uint32_t port() { return state_store_port_; }
+
  private:
   // Websever object to serve debug pages through.
   boost::scoped_ptr<Webserver> webserver_;
@@ -106,11 +101,13 @@ class InProcessStateStore {
   // Port to start the state-store on.
   uint32_t state_store_port_;
 
-  // TODO: Revert to scoped_ptr when state-store rewrite is done
-  boost::shared_ptr<StateStore> state_store_;
+  // The state-store instance
+  boost::scoped_ptr<StateStore> state_store_;
 
   // State-store Thrift server
   boost::scoped_ptr<ThriftServer> state_store_server_;
+
+  boost::scoped_ptr<boost::thread> state_store_main_loop_;
 };
 
 }

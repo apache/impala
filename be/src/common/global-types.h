@@ -15,8 +15,6 @@
 //
 // This file contains type definitions that are used throughout the code base.
 
-#include "statestore/util.h"
-
 namespace impala {
 
 // for now, these are simply ints; if we find we need to generate ids in the

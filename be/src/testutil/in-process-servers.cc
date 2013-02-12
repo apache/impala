@@ -14,14 +14,13 @@
 
 #include "testutil/in-process-servers.h"
 
-#include "statestore/subscription-manager.h"
+#include "statestore/state-store.h"
 #include "util/thrift-util.h"
 #include "util/thrift-server.h"
 #include "util/network-util.h"
 #include "util/webserver.h"
 #include "util/default-path-handlers.h"
 #include "util/metrics.h"
-#include "common/service-ids.h"
 #include "runtime/exec-env.h"
 #include "service/impala-server.h"
 
@@ -62,7 +61,6 @@ Status InProcessImpalaServer::StartWithClientServers(int beeswax_port, int hs2_p
   // Wait for up to 1s for the backend server to start
   RETURN_IF_ERROR(WaitForServer(hostname_, backend_port_, 100, 100));
 
-  if (use_statestore) RETURN_IF_ERROR(RegisterWithStateStore());
   return Status::OK;
 }
 
@@ -75,7 +73,6 @@ Status InProcessImpalaServer::StartAsBackendOnly(bool use_statestore) {
   be_server_.reset(be_server);
   impala_server_.reset(impala_server);
   RETURN_IF_ERROR(be_server_->Start());
-  if (use_statestore) RETURN_IF_ERROR(RegisterWithStateStore());
   return Status::OK;
 }
 
@@ -84,34 +81,24 @@ Status InProcessImpalaServer::Join() {
   return Status::OK;
 }
 
-Status InProcessImpalaServer::RegisterWithStateStore() {
-  // This will happily disappear with the state-store rewrite
-  // TODO: Unregister on tear-down (after impala service changes)
-  Status status =
-      exec_env_->subscription_mgr()->RegisterService(
-          IMPALA_SERVICE_ID, MakeNetworkAddress(hostname_, backend_port_));
-
-  unordered_set<ServiceId> services;
-  services.insert(IMPALA_SERVICE_ID);
-  callback.reset(new SubscriptionManager::UpdateCallback(
-      bind<void>(mem_fn(&ImpalaServer::MembershipCallback), impala_server_.get(), _1)));
-  exec_env_->subscription_mgr()->RegisterSubscription(services, "impala.server",
-                                                      callback.get());
-
-  return status;
-}
-
 InProcessStateStore::InProcessStateStore(int state_store_port, int webserver_port)
     : webserver_(new Webserver(webserver_port)),
       metrics_(new Metrics()),
       state_store_port_(state_store_port),
-      state_store_(new StateStore(1000, metrics_.get())) {
+      state_store_(new StateStore(metrics_.get())) {
   AddDefaultPathHandlers(webserver_.get());
   state_store_->RegisterWebpages(webserver_.get());
 }
 
 Status InProcessStateStore::Start() {
   webserver_->Start();
-  state_store_->Start(state_store_port_);
-  return WaitForServer(FLAGS_hostname, state_store_port_, 10, 100);
+  shared_ptr<TProcessor> processor(
+      new StateStoreServiceProcessor(state_store_->thrift_iface()));
+
+  state_store_server_.reset(new ThriftServer("StateStoreService", processor,
+                                             state_store_port_, metrics_.get(), 5));
+  state_store_main_loop_.reset(new thread(&StateStore::MainLoop, state_store_.get()));
+
+  state_store_server_->Start();
+  return WaitForServer("localhost", state_store_port_, 10, 100);
 }
