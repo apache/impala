@@ -87,7 +87,7 @@ def create_executor(impalad_proc, iterations, query):
   # Move to use beeswax when available.
   options = RunQueryExecOptions(
                       iterations=iterations,
-                      impalad='%s:%s' % (impalad_proc.hostname, impalad_proc.fe_port),
+                      impalad='%s:%s' % (impalad_proc.hostname, impalad_proc.beeswax_port),
                       runquery_cmd='run-query.sh ')
 
   return QueryExecutor('test',execute_using_runquery, options, query)

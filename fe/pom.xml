@@ -34,7 +34,7 @@
   <properties>
     <test.hive.testdata>${project.basedir}/../testdata/target/AllTypes.txt</test.hive.testdata>
     <backend.library.path>${env.IMPALA_HOME}/be/build/debug/service:${env.IMPALA_HOME}/be/build/release/service</backend.library.path>
-    <fe_port>21000</fe_port>
+    <beeswax_port>21000</beeswax_port>
     <impalad>localhost</impalad>
     <use_external_impalad>false</use_external_impalad>
     <testExecutionMode>reduced</testExecutionMode>
@@ -344,8 +344,8 @@
               <value>${testExecutionMode}</value>
             </property>
             <property>
-              <name>fe_port</name>
-              <value>${fe_port}</value>
+              <name>beeswax_port</name>
+              <value>${beeswax_port}</value>
               <name>impalad</name>
               <value>${impalad}</value>
               <name>use_external_impalad</name>

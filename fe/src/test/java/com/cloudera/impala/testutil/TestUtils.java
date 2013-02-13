@@ -45,7 +45,7 @@ public class TestUtils {
   private final static String HDFS_FILE_PATH_FILTER = "-*\\d+--\\d+_\\d+.*$";
   private final static String HDFS_HOST_PORT_FILTER = "//\\w+:\\d+/";
 
-  private static final int DEFAULT_FE_PORT = 21000;
+  private static final int DEFAULT_BEESWAX_PORT = 21000;
   private static final String DEFAULT_FE_HOST = "localhost";
 
   // Maps from uppercase type name to PrimitiveType
@@ -545,8 +545,9 @@ public class TestUtils {
   }
 
   /**
-   * Start an in-process ImpalaServer using the default FE and BE ports and then return
-   * an ImpaladClientExecutor that has been connected to the in-process ImpalaServer.
+   * Start an in-process ImpalaServer using the default Beeswax and BE ports and then
+   * return an ImpaladClientExecutor that has been connected to the in-process
+   * ImpalaServer.
    */
   public static ImpaladClientExecutor createImpaladClientExecutor() {
     boolean useExternalImpalad = Boolean.parseBoolean(
@@ -556,16 +557,16 @@ public class TestUtils {
       FeSupport.loadLibrary();
     }
     String hostName = System.getProperty("impalad", DEFAULT_FE_HOST);
-    int fePort = DEFAULT_FE_PORT;
+    int beeswaxPort = DEFAULT_BEESWAX_PORT;
     ImpaladClientExecutor client = null;
     try {
-      fePort = Integer.parseInt(
-          System.getProperty("fe_port", Integer.toString(DEFAULT_FE_PORT)));
+      beeswaxPort = Integer.parseInt(
+          System.getProperty("BEESWAX_PORT", Integer.toString(DEFAULT_BEESWAX_PORT)));
     } catch (NumberFormatException nfe) {
       fail("Invalid port format.");
     }
 
-    client = new ImpaladClientExecutor(hostName, fePort);
+    client = new ImpaladClientExecutor(hostName, beeswaxPort);
     try {
       client.init();
     } catch (TTransportException e) {

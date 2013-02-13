@@ -56,7 +56,7 @@ using namespace apache::thrift::concurrency;
 DECLARE_string(classpath);
 DECLARE_string(ipaddress);
 DECLARE_bool(use_statestore);
-DECLARE_int32(fe_port);
+DECLARE_int32(beeswax_port);
 DECLARE_int32(hs2_port);
 DECLARE_int32(be_port);
 DECLARE_string(principal);
@@ -83,7 +83,7 @@ int main(int argc, char** argv) {
   ThriftServer* hs2_server = NULL;
   ThriftServer* be_server = NULL;
   ImpalaServer* server =
-      CreateImpalaServer(&exec_env, FLAGS_fe_port, FLAGS_hs2_port, FLAGS_be_port,
+      CreateImpalaServer(&exec_env, FLAGS_beeswax_port, FLAGS_hs2_port, FLAGS_be_port,
           &beeswax_server, &hs2_server, &be_server);
   be_server->Start();
 

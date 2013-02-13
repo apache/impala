@@ -55,7 +55,7 @@
 
 DECLARE_bool(serialize_batch);
 DECLARE_int32(be_port);
-DECLARE_int32(fe_port);
+DECLARE_int32(beeswax_port);
 
 using namespace impala;
 using namespace std;
@@ -104,8 +104,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
   VLOG_CONNECTION << "starting backends";
   test_env->StartBackends();
 
-  CreateImpalaServer(test_env, FLAGS_fe_port, 0, FLAGS_be_port, &beeswax_server, NULL,
-      &be_server);
+  CreateImpalaServer(test_env, FLAGS_beeswax_port, 0, FLAGS_be_port, &beeswax_server,
+      NULL, &be_server);
   beeswax_server->Start();
   be_server->Start();
   return JNI_VERSION_1_4;

@@ -50,7 +50,7 @@
 #include "gen-cpp/hive_metastore_types.h"
 
 DECLARE_int32(be_port);
-DECLARE_int32(fe_port);
+DECLARE_int32(beeswax_port);
 DECLARE_string(impalad);
 
 using namespace impala;
@@ -2207,7 +2207,7 @@ int main(int argc, char **argv) {
   test_env_->StartBackends();
 
   CreateImpalaServer(test_env_,
-      FLAGS_fe_port, 0, FLAGS_be_port, &beeswax_server_, NULL, &be_server_);
+      FLAGS_beeswax_port, 0, FLAGS_be_port, &beeswax_server_, NULL, &be_server_);
   beeswax_server_->Start();
   be_server_->Start();
 

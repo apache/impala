@@ -81,8 +81,7 @@ DECLARE_string(planservice_host);
 DECLARE_int32(planservice_port);
 DECLARE_int32(be_port);
 
-// TODO: coordinate with CM to rename this port to beeswax_port
-DEFINE_int32(fe_port, 21000, "port on which Beeswax client requests are served");
+DEFINE_int32(beeswax_port, 21000, "port on which Beeswax client requests are served");
 DEFINE_int32(hs2_port, 21050, "port on which HiveServer2 client requests are served");
 
 // TODO: not yet implemented - add to bootstrap CM

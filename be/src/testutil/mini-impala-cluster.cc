@@ -32,7 +32,7 @@
 
 DEFINE_int32(num_backends, 3, "The number of backends to start");
 DECLARE_int32(be_port);
-DECLARE_int32(fe_port);
+DECLARE_int32(beeswax_port);
 DECLARE_int32(hs2_port);
 DECLARE_string(principal);
 
@@ -76,7 +76,7 @@ int main(int argc, char** argv) {
   LOG(INFO) << "Starting backends";
   test_env_->StartBackends();
 
-  CreateImpalaServer(test_env_, FLAGS_fe_port, FLAGS_hs2_port, FLAGS_be_port,
+  CreateImpalaServer(test_env_, FLAGS_beeswax_port, FLAGS_hs2_port, FLAGS_be_port,
       &beeswax_server_, &hs2_server_, &be_server_);
   be_server_->Start();
   beeswax_server_->Start();

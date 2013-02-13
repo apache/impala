@@ -270,12 +270,12 @@ class ImpalaStateStoreProcess(Process):
 
 # Represents a single Impalad process
 class ImpaladProcess(Process):
-  def __init__(self, host, cm_role, be_port=22000, fe_port=21000):
+  def __init__(self, host, cm_role, be_port=22000, beeswax_port=21000):
     Process.__init__(self, host, 'impalad');
     self.role = cm_role
     self.host = host
     self.be_port = be_port
-    self.fe_port = fe_port
+    self.beeswax_port = beeswax_port
     self.__pid = None
 
   def get_pid(self):
@@ -292,8 +292,8 @@ class ImpaladProcess(Process):
     return self.__pid
 
   def __str__(self):
-    return 'Name: %s, Host: %s BE Port: %d FE Port: %d PID: %s'\
-        % (self.name, self.hostname, self.be_port, self.fe_port, self.__pid)
+    return 'Name: %s, Host: %s BE Port: %d Beeswax Port: %d PID: %s'\
+        % (self.name, self.hostname, self.be_port, self.beeswax_port, self.__pid)
 
 def first(collection, match_function):
   """ Returns the first item in the collection that satisfies the match function """
