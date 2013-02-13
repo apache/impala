@@ -48,6 +48,9 @@ set(SRC_FILES
   Frontend_constants.cpp
   hive_metastore_constants.cpp
   hive_metastore_types.cpp
+  NetworkTest_constants.cpp
+  NetworkTest_types.cpp
+  NetworkTestService.cpp
   Opcodes_constants.cpp
   Opcodes_types.cpp
   PlanNodes_constants.cpp

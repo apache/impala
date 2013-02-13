@@ -57,7 +57,9 @@ add_library(Webserver STATIC
 target_link_libraries(Webserver pthread dl)
 
 add_executable(refresh-catalog refresh-catalog.cc)
+add_executable(network-perf-benchmark network-perf-benchmark.cc)
 target_link_libraries(refresh-catalog ${IMPALA_LINK_LIBS})
+target_link_libraries(network-perf-benchmark ${IMPALA_LINK_LIBS})
 
 ADD_BE_TEST(integer-array-test)
 ADD_BE_TEST(runtime-profile-test)

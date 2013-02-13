@@ -103,6 +103,7 @@ set (SRC_FILES
   ImpalaInternalService.thrift
   ImpalaPlanService.thrift
   ImpalaService.thrift
+  NetworkTest.thrift
   PlanNodes.thrift
   Planner.thrift
   Partitions.thrift
