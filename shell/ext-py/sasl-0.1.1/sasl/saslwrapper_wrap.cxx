@@ -2623,7 +2623,7 @@ namespace swig {
 
 
 #include <iostream>
-
+#include <cstddef>
   
 namespace swig {
   struct stop_iteration {
