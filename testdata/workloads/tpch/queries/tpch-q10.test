@@ -36,7 +36,7 @@ order by
   revenue desc
 limit 20
 ---- TYPES
-int, string, double, bigint, string, string, string, string
+bigint, string, double, bigint, string, string, string, string
 ---- RESULTS
 57040,'Customer#000057040',734235.2455,632,'JAPAN','Eioyzjf4pp','22-895-641-3466','sits. slyly regular requests sleep alongside of the regular inst'
 143347,'Customer#000143347',721002.6948000001,2557,'EGYPT','1aReFYv,Kw4','14-742-935-3718','ggle carefully enticing requests. final deposits use bold, bold pinto beans. ironic, idle re'

@@ -63,7 +63,7 @@ order by
   t1.p_partkey
 limit 100
 ---- TYPES
-DOUBLE, STRING, STRING, INT, STRING, STRING, STRING, STRING
+DOUBLE, STRING, STRING, BIGINT, STRING, STRING, STRING, STRING
 ---- RESULTS
 9938.530000000001,'Supplier#000005359','UNITED KINGDOM',185358,'Manufacturer#4','QKuHYh,vZGiwu2FWEJoLDx04','33-429-790-6131','uriously regular requests hag'
 9937.84,'Supplier#000005969','ROMANIA',108438,'Manufacturer#1','ANDENSOSmk,miq23Xfb5RWt6dvUcvt6Qa','29-520-692-3537','efully express instructions. regular requests against the slyly fin'

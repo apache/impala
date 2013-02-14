@@ -42,7 +42,7 @@ join tpch.max_revenue m
 order by s_suppkey
 limit 100
 ---- TYPES
-int, string, string, string, double
+bigint, string, string, string, double
 ---- RESULTS
 8449,'Supplier#000008449','Wp34zim9qYFbVctdW','20-469-856-8873',1772630
 ====
