@@ -14,6 +14,7 @@ CREATE TABLE ExecutionResults (
      query_id BIGINT NOT NULL,
      workload_id BIGINT NOT NULL,
      file_type_id BIGINT NOT NULL,
+     num_clients INT NOT NULL DEFAULT 1,
      cluster_name char(255),
      executor_name char(255),
      avg_time double NULL,

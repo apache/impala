@@ -44,13 +44,13 @@ class PerfResultDataStore(object):
     """ Inserts a new record into the Workload table and returns the ID """
     return self.__insert_workload_info(workload_name, scale_factor)
 
-  def insert_execution_result(self, query_id, workload_id, file_type_id, cluster_name,
-        executor_name, avg_time, stddev, run_date, version, notes, run_info_id,
-        is_official=False):
+  def insert_execution_result(self, query_id, workload_id, file_type_id, num_clients,
+        cluster_name, executor_name, avg_time, stddev, run_date, version, notes,
+        run_info_id, is_official=False):
     """ Inserts a perf execution result record """
     return self.__insert_execution_result(query_id, workload_id, file_type_id,
-        cluster_name, executor_name, avg_time, stddev, run_date, version, notes,
-        run_info_id, is_official)
+        num_clients, cluster_name, executor_name, avg_time, stddev, run_date, version,
+        notes, run_info_id, is_official)
 
   def print_execution_results(self, run_info_id):
     """ Prints results that were inserted for the given run_info_id """
@@ -104,15 +104,15 @@ class PerfResultDataStore(object):
     return run_info_id[0] if run_info_id else None
 
   @cursor_wrapper
-  def __insert_execution_result(self, query_id, workload_id, file_type_id, cluster_name,
-                             executor_name, avg_time, stddev, run_date, version, notes,
-                             run_info_id, is_official, cursor):
+  def __insert_execution_result(self, query_id, workload_id, file_type_id, num_clients, 
+      cluster_name, executor_name, avg_time, stddev, run_date, version, notes,
+      run_info_id, is_official, cursor):
     result = cursor.execute("insert into ExecutionResults (run_info_id, query_id, "\
-        "workload_id, file_type_id, cluster_name, executor_name,  avg_time, stddev, "\
-        "run_date, version, notes, is_official) values (%d, %d, %d, %d, '%s', '%s', %s,"\
-        " %s, '%s', '%s', '%s', %s)" %\
-        (run_info_id, query_id, workload_id, file_type_id, cluster_name, executor_name,
-         avg_time, stddev, run_date, version, notes, is_official))
+        "workload_id, file_type_id, num_clients, cluster_name, executor_name,  avg_time,"\
+        " stddev, run_date, version, notes, is_official) values (%d, %d, %d, %d, %d, "\
+        "'%s', '%s', %s, %s, '%s', '%s', '%s', %s)" %\
+        (run_info_id, query_id, workload_id, file_type_id, num_clients, cluster_name,
+         executor_name, avg_time, stddev, run_date, version, notes, is_official))
 
   @cursor_wrapper
   def __insert_query_info(self, name, query, cursor):

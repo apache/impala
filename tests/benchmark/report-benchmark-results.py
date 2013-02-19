@@ -78,8 +78,9 @@ FILE_FORMAT_IDX = 5
 COMPRESSION_IDX = 6
 AVG_IDX = 7
 STDDEV_IDX = 8
-HIVE_AVG_IDX = 9
-HIVE_STDDEV_IDX = 10
+NUM_CLIENTS_IDX = 9
+HIVE_AVG_IDX = 10
+HIVE_STDDEV_IDX = 11
 
 # Formats a string so that is is wrapped across multiple lines with no single line
 # being longer than the given width
@@ -261,6 +262,9 @@ def write_junit_output_file(results, output_file):
 def read_csv_result_file(file_name):
   results = []
   for row in csv.reader(open(file_name, 'rb'), delimiter='|'):
+    # Older results may not have num_clients, so default to 1
+    if len(row) == STDDEV_IDX + 1:
+      row.append('1')
     results.append(row)
   return results
 
@@ -313,8 +317,9 @@ def write_results_to_datastore(results):
 
     data_store.insert_execution_result(
         query_id=query_id, workload_id=workload_id, file_type_id=file_type_id,
-        cluster_name=options.cluster_name, executor_name=executor, avg_time=avg_time,
-        stddev=stddev, run_date=current_date, version=options.build_version,
+        num_clients=int(row[NUM_CLIENTS_IDX]), cluster_name=options.cluster_name,
+        executor_name=executor, avg_time=avg_time, stddev=stddev,
+        run_date=current_date, version=options.build_version,
         notes=options.report_description, run_info_id=run_info_id,
         is_official=options.is_official)
 
@@ -359,6 +364,8 @@ if not options.no_output_table:
   results_sorted = sorted(results, key=sort_key)
 
   summary += build_summary_header()
+  if results:
+    summary += 'Num Clients: %s' % results[0][NUM_CLIENTS_IDX]
   summary += "\nWorkload / Scale Factor\n\n"
 
   # First step is to break the result down into groups or workload/scale factor
