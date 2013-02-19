@@ -67,8 +67,9 @@ make install
 
 # build gflags
 cd $IMPALA_HOME/thirdparty/gflags-${IMPALA_GFLAGS_VERSION}
-./configure --with-pic
-make -j4
+GFLAGS_INSTALL=`pwd`/third-party-install
+./configure --with-pic --prefix=${GFLAGS_INSTALL}
+make -j4 install
 
 # Build pprof
 cd $IMPALA_HOME/thirdparty/gperftools-${IMPALA_GPERFTOOLS_VERSION}
@@ -78,12 +79,21 @@ cd $IMPALA_HOME/thirdparty/gperftools-${IMPALA_GPERFTOOLS_VERSION}
 ./configure --enable-frame-pointers --with-pic
 make -j4
 
-if [ -z "$USE_PIC_LIB_PATH" ]; then
-  # Build glog
-  cd $IMPALA_HOME/thirdparty/glog-${IMPALA_GLOG_VERSION}
-  ./configure --with-pic
-  make -j4
-fi
+# Build glog
+cd $IMPALA_HOME/thirdparty/glog-${IMPALA_GLOG_VERSION}
+./configure --with-pic --with-gflags=${GFLAGS_INSTALL}
+
+# SLES's gcc45-c++ is required for sse2 support (default is 4.3), but crashes
+# when building logging_unittest-logging_unittest.o. Telling it to uses the
+# stabs format for debugging symbols instead of dwarf exercises a different
+# code path to work around this issue.
+cat > Makefile.gcc45sles_workaround <<EOF
+logging_unittest-logging_unittest.o : CXXFLAGS= -gstabs -O2
+EOF
+cat Makefile >> Makefile.gcc45sles_workaround
+mv Makefile.gcc45sles_workaround Makefile
+
+make -j4
 
 # Build gtest
 cd $IMPALA_HOME/thirdparty/gtest-${IMPALA_GTEST_VERSION}
