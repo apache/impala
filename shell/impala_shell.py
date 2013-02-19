@@ -196,6 +196,10 @@ class ImpalaShell(cmd.Cmd):
     # None is crutch to tell shell loop to quit
     return None
 
+  def do_exit(self, args):
+    """Exit the impala shell"""
+    return self.do_quit(args)
+
   def do_connect(self, args):
     """Connect to an Impalad instance:
     Usage: connect <hostname:port>
