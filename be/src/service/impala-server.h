@@ -215,6 +215,12 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // active nodes that have failed, and cancels any queries running on them.
   void MembershipCallback(const ServiceStateMap& service_state);
 
+  // Reads a configuration value from Hadoop's configuration in the
+  // front-end. If the configuration key is not found, returns the
+  // empty string.
+  // Returns Status::OK unless there is a JNI error.
+  Status GetHadoopConfigValue(const std::string& key, std::string* output);
+
  private:
   class FragmentExecState;
 
@@ -622,12 +628,13 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
   // Index that allows lookup via TUniqueId into the query log
   typedef boost::unordered_map<TUniqueId, QueryLog::iterator> QueryLogIndex;
   QueryLogIndex query_log_index_;
-  
+
   // global, per-server state
   jobject fe_;  // instance of com.cloudera.impala.service.JniFrontend
   jmethodID create_exec_request_id_;  // JniFrontend.createExecRequest()
   jmethodID get_explain_plan_id_;  // JniFrontend.getExplainPlan()
   jmethodID get_hadoop_config_id_;  // JniFrontend.getHadoopConfigAsHtml()
+  jmethodID get_hadoop_config_value_id_; // JniFrontend.getHadoopConfigValue
   jmethodID reset_catalog_id_; // JniFrontend.resetCatalog()
   jmethodID update_metastore_id_; // JniFrontend.updateMetastore()
   jmethodID get_table_names_id_; // JniFrontend.getTableNames
@@ -677,7 +684,7 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 
     // Time the session was created
     boost::posix_time::ptime start_time;
-    
+
     // The default query options of this session
     TQueryOptions default_query_options;
 

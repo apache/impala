@@ -531,13 +531,17 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     create_exec_request_id_ =
         jni_env->GetMethodID(fe_class, "createExecRequest", "([B)[B");
     EXIT_IF_EXC(jni_env);
-    get_explain_plan_id_ = jni_env->GetMethodID(fe_class, "getExplainPlan",
-        "([B)Ljava/lang/String;");
+    get_explain_plan_id_ =
+        jni_env->GetMethodID(fe_class, "getExplainPlan", "([B)Ljava/lang/String;");
     EXIT_IF_EXC(jni_env);
     reset_catalog_id_ = jni_env->GetMethodID(fe_class, "resetCatalog", "()V");
     EXIT_IF_EXC(jni_env);
-    get_hadoop_config_id_ = jni_env->GetMethodID(fe_class, "getHadoopConfigAsHtml",
-        "()Ljava/lang/String;");
+    get_hadoop_config_id_ =
+        jni_env->GetMethodID(fe_class, "getHadoopConfigAsHtml", "()Ljava/lang/String;");
+    EXIT_IF_EXC(jni_env);
+    get_hadoop_config_value_id_ =
+        jni_env->GetMethodID(fe_class, "getHadoopConfigValue",
+          "(Ljava/lang/String;)Ljava/lang/String;");
     EXIT_IF_EXC(jni_env);
     update_metastore_id_ = jni_env->GetMethodID(fe_class, "updateMetastore", "([B)V");
     EXIT_IF_EXC(jni_env);
@@ -602,15 +606,33 @@ void ImpalaServer::RenderHadoopConfigs(const Webserver::ArgumentMap& args,
     return;
   }
   JNIEnv* jni_env = getJNIEnv();
-  jstring java_explain_string =
+  jstring java_html_string =
       static_cast<jstring>(jni_env->CallObjectMethod(fe_, get_hadoop_config_id_));
   RETURN_IF_EXC(jni_env);
   jboolean is_copy;
-  const char *str = jni_env->GetStringUTFChars(java_explain_string, &is_copy);
+  const char *str = jni_env->GetStringUTFChars(java_html_string, &is_copy);
   RETURN_IF_EXC(jni_env);
   (*output) << str;
-  jni_env->ReleaseStringUTFChars(java_explain_string, str);
+  jni_env->ReleaseStringUTFChars(java_html_string, str);
   RETURN_IF_EXC(jni_env);
+}
+
+Status ImpalaServer::GetHadoopConfigValue(const string& key, string* output) {
+  if (FLAGS_use_planservice) {
+    return Status("Using external PlanService, no Hadoop configs available");
+  }
+  JNIEnv* jni_env = getJNIEnv();
+  jstring value_arg = jni_env->NewStringUTF(key.c_str());
+  jstring java_config_value = static_cast<jstring>(
+      jni_env->CallObjectMethod(fe_, get_hadoop_config_value_id_, value_arg));
+  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  const char *str = jni_env->GetStringUTFChars(java_config_value, NULL);
+  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  *output = str;
+  jni_env->ReleaseStringUTFChars(java_config_value, str);
+  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+
+  return Status::OK;
 }
 
 void ImpalaServer::QueryProfilePathHandler(const Webserver::ArgumentMap& args,

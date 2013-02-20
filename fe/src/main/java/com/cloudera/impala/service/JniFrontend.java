@@ -226,6 +226,15 @@ public class JniFrontend {
     return output.toString();
   }
 
+  /**
+   * Returns a string representation of a config value. If the config
+   * can't be found, the empty string is returned. (This method is
+   * called from JNI, and so NULL handling is easier to avoid.)
+   */
+  public String getHadoopConfigValue(String confName) {
+    return CONF.get(confName, "");
+  }
+
   public void resetCatalog() {
     frontend.resetCatalog();
   }

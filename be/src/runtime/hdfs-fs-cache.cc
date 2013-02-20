@@ -18,17 +18,22 @@
 
 #include "common/logging.h"
 
+using namespace std;
 using namespace boost;
 
-DEFINE_string(nn, "localhost", "hostname or ip address of HDFS namenode");
-DEFINE_int32(nn_port, 20500, "namenode port");
+// TODO: Consider retiring these altogether once reading from Hadoop
+// config has proven itself
+DEFINE_string(nn, "", "hostname or ip address of HDFS namenode. If not explicitly set, "
+              "Impala will read the value from its Hadoop configuration files.");
+DEFINE_int32(nn_port, 0, "namenode port. If -nn is not explicitly set, Impala will read "
+             "the value from its Hadoop configuration files");
 
 namespace impala {
 
 HdfsFsCache::~HdfsFsCache() {
   for (HdfsFsMap::iterator i = fs_map_.begin(); i != fs_map_.end(); ++i) {
     int status = hdfsDisconnect(i->second);
-    if (status != 0) { 
+    if (status != 0) {
       // TODO: add error details
       LOG(ERROR) << "hdfsDisconnect(\"" << i->first.first << "\", " << i->first.second
                  << ") failed: " << " Error(" << errno << "): " << strerror(errno);
@@ -36,7 +41,7 @@ HdfsFsCache::~HdfsFsCache() {
   }
 }
 
-hdfsFS HdfsFsCache::GetConnection(const std::string& host, int port) {
+hdfsFS HdfsFsCache::GetConnection(const string& host, int port) {
   lock_guard<mutex> l(lock_);
   HdfsFsMap::iterator i = fs_map_.find(make_pair(host, port));
   if (i == fs_map_.end()) {
