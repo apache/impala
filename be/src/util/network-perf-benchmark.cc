@@ -170,8 +170,16 @@ void HandleBroadcast(const vector<string>& tokens) {
   cout << "Send rate cluster: (MB/s) " << (mb * clients.size() / sec) << endl;
 }
 
+void ConvertToLowerCase(vector<string>* tokens) {
+  for (int i = 0; i < tokens->size(); ++i) {
+    transform(
+        (*tokens)[i].begin(), (*tokens)[i].end(), (*tokens)[i].begin(), ::tolower);
+  }
+}
+
 bool ProcessCommand(const vector<string>& tokens) {
   if (tokens.empty()) return false;
+
   if (tokens[0] == "quit") return true;;
 
   if (tokens[0] == "send") {
@@ -194,8 +202,8 @@ int main(int argc, char** argv) {
     vector<string> tokens;
     for (int i = 1; i < argc; ++i) {
       tokens.push_back(argv[i]);
-      transform(tokens[i].begin(), tokens[i].end(), tokens[i].begin(), ::tolower);
     }
+    ConvertToLowerCase(&tokens);
     ProcessCommand(tokens);
     return 0;
   }
@@ -217,9 +225,9 @@ int main(int argc, char** argv) {
     getline(cin, input);
     if (cin.eof()) break;
 
-    transform(input.begin(), input.end(), input.begin(), ::tolower);
     split(tokens, input, is_any_of(" "), token_compress_on);
-
+    
+    ConvertToLowerCase(&tokens);
     if (ProcessCommand(tokens)) break;
   }
 
