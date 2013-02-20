@@ -44,7 +44,7 @@ public class BlockIdGenerator {
       writer = new FileWriter(output);
 
       // Load all tables in the catalog
-      Catalog catalog = new Catalog(false);
+      Catalog catalog = new Catalog();
       Db database = catalog.getDb(null);
 
       for (String tableName: database.getAllTableNames()) {

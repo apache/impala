@@ -15,7 +15,7 @@ public class ToSqlTest {
   private static Catalog catalog;
   @BeforeClass
   public static void setUp() throws Exception {
-    catalog = new Catalog(true);
+    catalog = new Catalog();
   }
 
   @AfterClass
