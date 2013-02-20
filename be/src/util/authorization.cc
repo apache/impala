@@ -36,11 +36,9 @@ using namespace boost::random;
 
 DECLARE_string(keytab_file);
 DECLARE_string(principal);
-DEFINE_int32(kerberos_ticket_life, 0, \
-  "Number of minutes to request for a ticket lifetime." \
-  "0 implies twice the reinit interval");
 DEFINE_int32(kerberos_reinit_interval, 60, \
-    "Number of minutes between reestablishing our ticket with the kerberos server");
+    "Interval, in minutes, between kerberos ticket renewals. Each renewal will request "
+    "a ticket with a lifetime that is at least 2x the renewal interval.");
 DEFINE_string(sasl_path, "/usr/lib/sasl2:/usr/lib64/sasl2:/usr/local/lib/sasl2:"
     "/usr/lib/x86_64-linux-gnu/sasl2", "Colon separated list of paths to look for SASL "
     "security library plugins.");
@@ -171,14 +169,20 @@ static int SaslGetPath(void* context, const char** path) {
 // Periodically call kinit to get a ticket granting ticket from the kerberos server.
 // This is kept in the kerberos cache associated with this process.
 static void RunKinit() {
+  // Minumum lifetime to request for each ticket renewal.
+  static const int MIN_TICKET_LIFETIME_IN_MINS = 1440;
   stringstream sysstream;
 
-  if (FLAGS_kerberos_ticket_life == 0) {
-    FLAGS_kerberos_ticket_life = 2 * FLAGS_kerberos_reinit_interval;
-  }
+  // Set the ticket lifetime to an arbitrarily large value or 2x the renewal interval,
+  // whichever is larger. The KDC will automatically fall back to using the maximum
+  // allowed allowed value if a longer lifetime is requested, so it is okay to be greedy
+  // here.
+  int ticket_lifetime =
+      max(MIN_TICKET_LIFETIME_IN_MINS, FLAGS_kerberos_reinit_interval * 2);
+
   // Pass the path to the key file and the principal. Make the ticket renewable.
   // Calling kinit -R ensures the ticket makes it to the cache.
-  sysstream << "kinit -r " << FLAGS_kerberos_ticket_life
+  sysstream << "kinit -r " << ticket_lifetime
             << "m -k -t " << FLAGS_keytab_file << " " << FLAGS_principal
             << " 2>&1 && kinit -R 2>&1";
 
@@ -213,11 +217,12 @@ static void RunKinit() {
       VLOG_CONNECTION << "kinit returned: '" << kreturn << "'";
     }
     started = true;
-    // Sleep for some number of minutes.  Avoid a storm at the KDC, randomize over
-    // a 5 minute interval.
+    // Sleep for the renewal interval, minus a random time between 0-5 minutes to help
+    // avoid a storm at the KDC. Additionally, never sleep less than a minute to
+    // reduce KDC stress due to frequent renewals.
     mt19937 generator;
     uniform_int<> dist(0, 300);
-    sleep((60 * FLAGS_kerberos_reinit_interval) + dist(generator));
+    sleep(max((60 * FLAGS_kerberos_reinit_interval) - dist(generator), 60));
   }
 }
 
