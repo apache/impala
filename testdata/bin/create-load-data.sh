@@ -58,6 +58,14 @@ rm -rf /tmp/alltypesaggmultifiles
 hadoop fs -get /test-warehouse/alltypesaggmultifiles /tmp
 (cd /tmp/alltypesaggmultifiles; lzop */*/*/*)
 
+# Create a hidden file in AllTypesSmall
+hadoop fs -rm -f /test-warehouse/alltypessmall/year=2009/month=1/_hidden
+hadoop fs -rm -f /test-warehouse/alltypessmall/year=2009/month=1/.hidden
+hadoop fs -cp  /test-warehouse/zipcode_incomes/DEC_00_SF3_P077_with_ann_noheader.csv \
+ /test-warehouse/alltypessmall/year=2009/month=1/_hidden
+hadoop fs -cp  /test-warehouse/zipcode_incomes/DEC_00_SF3_P077_with_ann_noheader.csv \
+ /test-warehouse/alltypessmall/year=2009/month=1/.hidden
+
 # Create lzo compressed versions of the Alltypes data files.
 (cd ${IMPALA_HOME}/testdata/target/AllTypes; rm -f *.lzo; lzop *.txt)
 

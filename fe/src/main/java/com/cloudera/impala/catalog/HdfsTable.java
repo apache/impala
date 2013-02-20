@@ -530,6 +530,11 @@ public class HdfsTable extends Table {
     FileSystem fs = path.getFileSystem(new Configuration());
     if (fs.exists(path)) {
       for (FileStatus fileStatus: fs.listStatus(path)) {
+        String fileName = fileStatus.getPath().getName().toString();
+        if (fileName.startsWith(".") || fileName.startsWith("_")) {
+          // Ignore hidden file starting with . or _
+          continue;
+        }
         FileDescriptor fd = new FileDescriptor(fileStatus.getPath().toString(),
             fileStatus.getLen());
         fileDescriptors.add(fd);
