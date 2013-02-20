@@ -104,6 +104,8 @@ DEFINE_int32(log_mem_usage_interval, 0, "If non-zero, impalad will output memory
 DEFINE_string(heap_profile_dir, "", "if non-empty, enable heap profiling and output "
     " to specified directory.");
 
+DEFINE_bool(abort_on_config_error, true, "Abort Impala if there are improper configs.");
+
 namespace impala {
 
 ThreadManager* fe_tm;
@@ -546,6 +548,9 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
         jni_env->GetMethodID(fe_class, "getHadoopConfigValue",
           "(Ljava/lang/String;)Ljava/lang/String;");
     EXIT_IF_EXC(jni_env);
+    check_hadoop_config_id_ = jni_env->GetMethodID(fe_class, "checkHadoopConfig",
+       "()Ljava/lang/String;");
+    EXIT_IF_EXC(jni_env);
     update_metastore_id_ = jni_env->GetMethodID(fe_class, "updateMetastore", "([B)V");
     EXIT_IF_EXC(jni_env);
     get_table_names_id_ = jni_env->GetMethodID(fe_class, "getTableNames", "([B)[B");
@@ -562,6 +567,15 @@ ImpalaServer::ImpalaServer(ExecEnv* exec_env)
     jobject fe = jni_env->NewObject(fe_class, fe_ctor, lazy);
     EXIT_IF_EXC(jni_env);
     EXIT_IF_ERROR(JniUtil::LocalToGlobalRef(jni_env, fe, &fe_));
+
+    Status status = ValidateSettings();
+    if (!status.ok()) {
+      LOG(ERROR) << status.GetErrorMsg();
+      if (FLAGS_abort_on_config_error) {
+        LOG(ERROR) << "Impala is aborted due to improper configurations.";
+        exit(1);
+      }
+    }
   } else {
     planservice_socket_.reset(new TSocket(FLAGS_planservice_host,
         FLAGS_planservice_port));
@@ -1476,6 +1490,28 @@ void ImpalaServer::InitializeConfigVariables() {
   support_start_over.__set_value("false");
   default_configs_.push_back(support_start_over);
 }
+
+Status ImpalaServer::ValidateSettings() {
+  // Use FE to check Hadoop config setting
+  // TODO: check OS setting
+  stringstream ss;
+  JNIEnv* jni_env = getJNIEnv();
+  jstring error_string =
+      static_cast<jstring>(jni_env->CallObjectMethod(fe_, check_hadoop_config_id_));
+  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  jboolean is_copy;
+  const char *str = jni_env->GetStringUTFChars(error_string, &is_copy);
+  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+  ss << str;
+  jni_env->ReleaseStringUTFChars(error_string, str);
+  RETURN_ERROR_IF_EXC(jni_env, JniUtil::throwable_to_string_id());
+
+  if (ss.str().size() > 0) {
+    return Status(ss.str());
+  }
+  return Status::OK;
+}
+
 
 void ImpalaServer::TQueryOptionsToMap(const TQueryOptions& query_option,
     map<string, string>* configuration) {

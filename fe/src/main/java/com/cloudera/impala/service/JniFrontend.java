@@ -14,10 +14,12 @@
 
 package com.cloudera.impala.service;
 
+import java.io.File;
 import java.util.List;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hdfs.DFSConfigKeys;
 import org.apache.thrift.TBase;
 import org.apache.thrift.TDeserializer;
 import org.apache.thrift.TException;
@@ -233,6 +235,78 @@ public class JniFrontend {
    */
   public String getHadoopConfigValue(String confName) {
     return CONF.get(confName, "");
+  }
+
+  /**
+   * Returns an error string describing all configuration issues. If no config issues are
+   * found, returns an empty string.
+   * @return
+   */
+  public String checkHadoopConfig() {
+    StringBuilder output = new StringBuilder();
+
+    output.append(checkShortCircuitRead(CONF));
+    output.append(checkBlockLocationTracking(CONF));
+
+    return output.toString();
+  }
+
+  /**
+   * Return an empty string if short circuit read is properly enabled. If not, return an
+   * error string describing the issues.
+   */
+  private String checkShortCircuitRead(Configuration conf) {
+    StringBuilder output = new StringBuilder();
+    String errorMessage = "ERROR: short-circuit local reads is disabled because\n";
+    String prefix = "  - ";
+    StringBuilder errorCause = new StringBuilder();
+
+    // dfs.domain.socket.path must be set properly
+    String domainSocketPath = conf.getTrimmed(DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY,
+            DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_DEFAULT);
+    if (domainSocketPath.isEmpty()) {
+      errorCause.append(prefix);
+      errorCause.append(DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY);
+      errorCause.append(" is not configured.\n");
+    } else {
+      // The socket path parent directory must be readable and executable.
+      File socketFile = new File(domainSocketPath);
+      File socketDir = socketFile.getParentFile();
+      if (socketDir == null || !socketDir.canRead() || !socketDir.canExecute()) {
+        errorCause.append(prefix);
+        errorCause.append("Impala cannot read or execute the parent directory of ");
+        errorCause.append(DFSConfigKeys.DFS_DOMAIN_SOCKET_PATH_KEY);
+        errorCause.append("\n");
+      }
+    }
+
+    // dfs.client.read.shortcircuit must be set to true.
+    if (!conf.getBoolean(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY,
+        DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_DEFAULT)) {
+      errorCause.append(prefix);
+      errorCause.append(DFSConfigKeys.DFS_CLIENT_READ_SHORTCIRCUIT_KEY);
+      errorCause.append(" is not enabled.\n");
+    }
+
+    if (errorCause.length() > 0) {
+      output.append(errorMessage);
+      output.append(errorCause);
+    }
+
+    return output.toString();
+  }
+
+  /**
+   * Return an empty string if block location tracking is properly enabled. If not,
+   * return an error string describing the issues.
+   */
+  private String checkBlockLocationTracking(Configuration conf) {
+    if (!conf.getBoolean(DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED,
+        DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED_DEFAULT)) {
+      return "ERROR: block location tracking is disabled because " +
+          DFSConfigKeys.DFS_HDFS_BLOCKS_METADATA_ENABLED + " is not enabled.\n";
+    }
+    return "";
   }
 
   public void resetCatalog() {
