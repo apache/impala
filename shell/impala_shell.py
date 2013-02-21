@@ -203,22 +203,23 @@ class ImpalaShell(cmd.Cmd):
   def do_connect(self, args):
     """Connect to an Impalad instance:
     Usage: connect <hostname:port>
+           connect <hostname>, defaults to port 21000
 
     """
     tokens = args.split(" ")
     if len(tokens) != 1:
-      print "CONNECT takes exactly one argument: <hostname:port> of impalad to connect to"
+      print ("CONNECT takes exactly one argument: <hostname:port> or"
+             " <hostname> of the impalad to connect to")
       return False
-    try:
-      connection_params = tokens[0].split(':')
-      if len(connection_params) > 1:
-        host, port = connection_params
-      else:
-        host, port = connection_params[0], 21000
-      self.impalad = (host, port)
-    except ValueError:
-      print "Connect string must be of form <hostname:port>"
+
+    # validate the connection string.
+    host_port = [val for val in tokens[0].split(':') if val.strip()]
+    if (':' in tokens[0] and len(host_port) != 2) or (not host_port):
+      print "Connect string must be of form <hostname:port> or <hostname>"
       return False
+    elif len(host_port) == 1:
+      host_port.append(21000)
+    self.impalad = tuple(host_port)
 
     if self.__connect():
       self.__print_if_verbose('Connected to %s:%s' % self.impalad)
@@ -460,7 +461,7 @@ class ImpalaShell(cmd.Cmd):
     except BeeswaxService.QueryNotFoundException, q:
       print 'Error: Stale query handle'
     # beeswaxException prints out the entire object, printing
-    # just the message a far more readable/helpful.
+    # just the message is far more readable/helpful.
     except BeeswaxService.BeeswaxException, b:
       print "ERROR: %s" % (b.message,)
     except TTransportException, e:
