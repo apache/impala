@@ -421,3 +421,27 @@ bigint
 ---- RESULTS
 100
 ====
+---- QUERY
+# static partition insert into string-partitioned table with special characters in partition key
+INSERT INTO TABLE insert_string_partitioned PARTITION(s2="/\%.") SELECT "value" FROM alltypessmall LIMIT 1;
+---- SETUP
+DROP PARTITIONS insert_string_partitioned
+---- PARTITIONS
+s2=%2F%5C%25./: 1
+====
+---- QUERY
+# select with unencoded partition key
+SELECT * FROM insert_string_partitioned;
+---- TYPES
+string, string
+---- RESULTS
+'/\%.','value'
+====
+---- QUERY
+# select with unencoded partition key as column predicate
+SELECT * FROM insert_string_partitioned WHERE s2 = "/\%.";
+---- TYPES
+string, string
+---- RESULTS
+'/\%.','value'
+====

@@ -47,6 +47,7 @@ add_library(Util
   static-asserts.cc
   stopwatch.cc
   url-parser.cc
+  url-coding.cc
   )
 
 add_library(Webserver STATIC
@@ -54,7 +55,7 @@ add_library(Webserver STATIC
   webserver.cc
 )
 
-target_link_libraries(Webserver pthread dl)
+target_link_libraries(Webserver pthread dl Util)
 
 add_executable(refresh-catalog refresh-catalog.cc)
 add_executable(network-perf-benchmark network-perf-benchmark.cc)
@@ -67,5 +68,6 @@ ADD_BE_TEST(benchmark-test)
 ADD_BE_TEST(decompress-test)
 ADD_BE_TEST(metrics-test)
 ADD_BE_TEST(debug-util-test)
+ADD_BE_TEST(url-coding-test)
 #ADD_BE_TEST(perf-counters-test)
 

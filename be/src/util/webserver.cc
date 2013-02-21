@@ -23,6 +23,7 @@
 #include <boost/algorithm/string.hpp>
 
 #include "common/logging.h"
+#include "util/url-coding.h"
 #include "util/webserver.h"
 #include "util/logging.h"
 #include "util/debug-util.h"
@@ -36,11 +37,11 @@ const char* GetDefaultDocumentRoot();
 DEFINE_int32(webserver_port, 25000, "Port to start debug webserver on");
 DEFINE_string(webserver_interface, "",
     "Interface to start debug webserver on. If blank, webserver binds to 0.0.0.0");
-DEFINE_string(webserver_doc_root, GetDefaultDocumentRoot(), 
+DEFINE_string(webserver_doc_root, GetDefaultDocumentRoot(),
     "Files under <webserver_doc_root>/www are accessible via the debug webserver. "
     "Defaults to $IMPALA_HOME, or if $IMPALA_HOME is not set, disables the document "
     "root");
-DEFINE_bool(enable_webserver_doc_root, true, 
+DEFINE_bool(enable_webserver_doc_root, true,
     "If true, webserver may serve static files from the webserver_doc_root");
 
 // Mongoose requires a non-null return from the callback to signify successful processing
@@ -65,37 +66,6 @@ const char* GetDefaultDocumentRoot() {
 }
 
 namespace impala {
-
-// Utility method to decode a string that was base64 encoded.
-// Adapted from
-// http://www.boost.org/doc/libs/1_40_0/doc/html/boost_asio/
-//   example/http/server3/request_handler.cpp
-// See http://www.boost.org/LICENSE_1_0.txt for license for this method.
-bool UrlDecode(const std::string& in, std::string* out) {
-  out->clear();
-  out->reserve(in.size());
-  for (size_t i = 0; i < in.size(); ++i) {
-    if (in[i] == '%') {
-      if (i + 3 <= in.size()) {
-        int value = 0;
-        istringstream is(in.substr(i + 1, 2));
-        if (is >> hex >> value) {
-          (*out) += static_cast<char>(value);
-          i += 2;
-        } else {
-          return false;
-        }
-      } else {
-        return false;
-      }
-    } else if (in[i] == '+') {
-      (*out) += ' ';
-    } else {
-      (*out) += in[i];
-    }
-  }
-  return true;
-}
 
 Webserver::Webserver()
   : port_(FLAGS_webserver_port),
@@ -132,7 +102,7 @@ void Webserver::BuildArgumentMap(const string& args, ArgumentMap* output) {
     vector<string> key_value;
     split(key_value, arg_pair, is_any_of("="));
     if (key_value.empty()) continue;
-    
+
     string key;
     if (!UrlDecode(key_value[0], &key)) continue;
     string value;
@@ -202,7 +172,7 @@ void Webserver::Stop() {
 void* Webserver::MongooseCallbackStatic(enum mg_event event,
     struct mg_connection* connection) {
   const struct mg_request_info* request_info = mg_get_request_info(connection);
-  Webserver* instance = 
+  Webserver* instance =
       reinterpret_cast<Webserver*>(mg_get_user_data(connection));
   return instance->MongooseCallback(event, connection, request_info);
 }
@@ -283,7 +253,7 @@ const string PAGE_HEADER = "<!DOCTYPE html>"
 
 static const string PAGE_FOOTER = "</div></body></html>";
 
-static const string NAVIGATION_BAR_PREFIX = 
+static const string NAVIGATION_BAR_PREFIX =
 "<div class='navbar navbar-inverse navbar-fixed-top'>"
 "      <div class='navbar-inner'>"
 "        <div class='container'>"
@@ -296,7 +266,7 @@ static const string NAVIGATION_BAR_PREFIX =
 "          <div class='nav-collapse collapse'>"
 "            <ul class='nav'>";
 
-static const string NAVIGATION_BAR_SUFFIX = 
+static const string NAVIGATION_BAR_SUFFIX =
 "            </ul>"
 "          </div>"
 "        </div>"
@@ -309,10 +279,10 @@ void Webserver::BootstrapPageHeader(stringstream* output) {
   (*output) << NAVIGATION_BAR_PREFIX;
   BOOST_FOREACH(const PathHandlerMap::value_type& handler, path_handlers_) {
     if (handler.second.is_styled()) {
-      (*output) << "<li><a href=\"" << handler.first << "\">" << handler.first 
+      (*output) << "<li><a href=\"" << handler.first << "\">" << handler.first
                 << "</a></li>";
     }
-  }  
+  }
   (*output) << NAVIGATION_BAR_SUFFIX;
 }
 

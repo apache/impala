@@ -119,7 +119,7 @@ class Coordinator::BackendExecState {
 
   BackendExecState(Coordinator* coord, const THostPort& coord_hostport,
       int backend_num, const TPlanFragment& fragment, int fragment_idx,
-      const FragmentExecParams& params, int instance_idx, 
+      const FragmentExecParams& params, int instance_idx,
       DebugOptions* debug_options, ObjectPool* obj_pool)
     : fragment_instance_id(params.instance_ids[instance_idx]),
       hostport(params.hosts[instance_idx]),
@@ -386,7 +386,7 @@ Status Coordinator::Exec(
     DCHECK_GT(num_hosts, 0);
     for (int instance_idx = 0; instance_idx < num_hosts; ++instance_idx) {
       DebugOptions* backend_debug_options =
-          (debug_options.phase != TExecNodePhase::INVALID 
+          (debug_options.phase != TExecNodePhase::INVALID
             && (debug_options.backend_num == -1
                 || debug_options.backend_num == backend_num)
             ? &debug_options

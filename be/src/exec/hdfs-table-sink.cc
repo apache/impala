@@ -24,6 +24,7 @@
 #include "runtime/row-batch.h"
 #include "runtime/runtime-state.h"
 #include "runtime/string-value.inline.h"
+#include "util/url-coding.h"
 
 #include <vector>
 #include <sstream>
@@ -194,7 +195,19 @@ void HdfsTableSink::BuildHdfsFileNames(OutputPartition* output_partition) {
     } else {
       string value_str;
       partition_key_exprs_[j]->PrintValue(value, &value_str);
-      common_suffix << value_str;
+      // Directory names containing partition-key values need to be
+      // UrlEncoded, in particular to avoid problems when '/' is part
+      // of the key value (which might occur, for example, with date
+      // strings). Hive will URL decode the value transparently when
+      // Impala's frontend asks the metastore for partition key
+      // values, which makes it particularly important that we use the
+      // same encoding as Hive. It's also not necessary to encode the
+      // values when writing partition metadata. You can check this
+      // with 'show partitions <tbl>' in Hive, followed by a select
+      // from a decoded partition key value.
+      string encoded_str;
+      UrlEncode(value_str, &encoded_str);
+      common_suffix << encoded_str;
     }
     common_suffix << "/";
   }
@@ -214,7 +227,7 @@ void HdfsTableSink::BuildHdfsFileNames(OutputPartition* output_partition) {
 }
 
 //TODO: Clean up temporary files on error.
-Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state, 
+Status HdfsTableSink::CreateNewTmpFile(RuntimeState* state,
     OutputPartition* output_partition) {
   stringstream filename;
   filename << output_partition->tmp_hdfs_file_name_template

@@ -201,6 +201,13 @@ CREATE TABLE {db_name}{db_suffix}.{table_name} (col1 int) PARTITIONED BY (col2 i
 ---- DATASET
 functional
 ---- BASE_TABLE_NAME
+insert_string_partitioned
+----
+CREATE TABLE {db_name}{db_suffix}.{table_name} (s1 string) PARTITIONED BY (s2 string);
+====
+---- DATASET
+functional
+---- BASE_TABLE_NAME
 alltypeserror
 ---- CREATE
 CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
@@ -854,7 +861,7 @@ stringpartitionkey
 ---- CREATE
 -- Regression for IMP-163, failure to load tables partitioned by string column
 CREATE EXTERNAL TABLE {db_name}{db_suffix}.{table_name} (
-  id int) 
+  id int)
 PARTITIONED BY (string_col string)
 STORED AS {file_format}
 LOCATION '${{hiveconf:hive.metastore.warehouse.dir}}/{hdfs_location}';
