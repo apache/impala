@@ -95,7 +95,9 @@ Status TestExecEnv::StartBackends() {
   for (int i = 0; i < num_backends_; ++i) {
     BackendInfo* info = new BackendInfo(next_free_port++, state_store_port_);
     int backend_port = next_free_port++;
-    CreateImpalaServer(&info->exec_env, 0, 0, backend_port, NULL, NULL, &info->server);
+    EXIT_IF_ERROR(
+        CreateImpalaServer(&info->exec_env, 0, 0, backend_port, NULL, NULL, &info->server,
+          NULL));
     DCHECK(info->server != NULL);
     backend_info_.push_back(info);
     info->exec_env.StartServices();

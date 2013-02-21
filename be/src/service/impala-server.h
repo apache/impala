@@ -727,9 +727,11 @@ class ImpalaServer : public ImpalaServiceIf, public ImpalaHiveServer2ServiceIf,
 // Returns created ImpalaServer. The caller owns fe_server and be_server.
 // The returned ImpalaServer is referenced by both of these via shared_ptrs and will be
 // deleted automatically.
-ImpalaServer* CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
+// Returns OK unless there was some error creating the servers, in
+// which case none of the output parameters can be assumed to be valid.
+Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
     int be_port, ThriftServer** beeswax_server, ThriftServer** hs2_server,
-    ThriftServer** be_server);
+    ThriftServer** be_server, ImpalaServer** impala_server);
 
 }
 

@@ -106,7 +106,7 @@ class ExprTest : public testing::Test {
     min_float_values_[TYPE_FLOAT] = 1.1;
     min_float_values_[TYPE_DOUBLE] =
         static_cast<double>(numeric_limits<float>::max()) + 1.1;
- 
+
     // Set up default test types, values, and strings.
     default_bool_str_ = "false";
     default_string_str_ = "'abc'";
@@ -144,7 +144,7 @@ class ExprTest : public testing::Test {
     *interpreted_value = ConvertValue(expr_type, result_row);
   }
 
-  void* ConvertValue(PrimitiveType type, const string& value) { 
+  void* ConvertValue(PrimitiveType type, const string& value) {
     StringParser::ParseResult result;
     if (value.compare("NULL") == 0) return NULL;
     switch (type) {
@@ -248,7 +248,7 @@ class ExprTest : public testing::Test {
         ASSERT_TRUE(false) << "invalid TestValue() type: " << TypeToString(expr_type);
     }
   }
-  
+
   void TestIsNull(const string& expr, PrimitiveType expr_type) {
     void* result;
     GetValue(expr, expr_type, &result);
@@ -313,7 +313,7 @@ class ExprTest : public testing::Test {
     TestValue<bool>("'abc' >= 'abcd'", TYPE_BOOLEAN, false);
     TestValue<bool>("'abcd' >= 'abc'", TYPE_BOOLEAN, true);
     TestValue<bool>("'abcd' >= 'abcd'", TYPE_BOOLEAN, true);
-    
+
     // Test some empty strings
     TestValue<bool>("'abcd' >= ''", TYPE_BOOLEAN, true);
     TestValue<bool>("'' > ''", TYPE_BOOLEAN, false);
@@ -485,21 +485,21 @@ class ExprTest : public testing::Test {
   // Test casting stmt to all types.  Expected result is val.
   template<typename T>
   void TestCast(const string& stmt, T val) {
-    TestValue("cast(" + stmt + " as boolean)", 
+    TestValue("cast(" + stmt + " as boolean)",
         TYPE_BOOLEAN, static_cast<bool>(val));
-    TestValue("cast(" + stmt + " as tinyint)", 
+    TestValue("cast(" + stmt + " as tinyint)",
         TYPE_TINYINT, static_cast<int8_t>(val));
-    TestValue("cast(" + stmt + " as smallint)", 
+    TestValue("cast(" + stmt + " as smallint)",
         TYPE_SMALLINT, static_cast<int16_t>(val));
-    TestValue("cast(" + stmt + " as int)", 
+    TestValue("cast(" + stmt + " as int)",
         TYPE_INT, static_cast<int32_t>(val));
-    TestValue("cast(" + stmt + " as bigint)", 
+    TestValue("cast(" + stmt + " as bigint)",
         TYPE_BIGINT, static_cast<int64_t>(val));
-    TestValue("cast(" + stmt + " as float)", 
+    TestValue("cast(" + stmt + " as float)",
         TYPE_FLOAT, static_cast<float>(val));
-    TestValue("cast(" + stmt + " as double)", 
+    TestValue("cast(" + stmt + " as double)",
         TYPE_DOUBLE, static_cast<double>(val));
-    TestStringValue("cast(" + stmt + " as string)", 
+    TestStringValue("cast(" + stmt + " as string)",
         lexical_cast<string>(val));
   }
 };
@@ -536,15 +536,15 @@ void ExprTest::TestCast(const string& stmt, const char* val) {
     TestValue(stmt + " as boolean)", TYPE_BOOLEAN, lexical_cast<bool>(val));
 #endif
     TestValue("cast(" + stmt + " as tinyint)", TYPE_TINYINT, val8);
-    TestValue("cast(" + stmt + " as smallint)", TYPE_SMALLINT, 
+    TestValue("cast(" + stmt + " as smallint)", TYPE_SMALLINT,
         lexical_cast<int16_t>(val));
-    TestValue("cast(" + stmt + " as int)", TYPE_INT, 
+    TestValue("cast(" + stmt + " as int)", TYPE_INT,
         lexical_cast<int32_t>(val));
-    TestValue("cast(" + stmt + " as bigint)", TYPE_BIGINT, 
+    TestValue("cast(" + stmt + " as bigint)", TYPE_BIGINT,
         lexical_cast<int64_t>(val));
-    TestValue("cast(" + stmt + " as float)", TYPE_FLOAT, 
+    TestValue("cast(" + stmt + " as float)", TYPE_FLOAT,
         lexical_cast<float>(val));
-    TestValue("cast(" + stmt + " as double)", TYPE_DOUBLE, 
+    TestValue("cast(" + stmt + " as double)", TYPE_DOUBLE,
         lexical_cast<double>(val));
   } catch (bad_lexical_cast& e) {
     EXPECT_TRUE(false) << e.what();
@@ -570,7 +570,7 @@ TEST_F(ExprTest, NullLiteral) {
   // TODO: how do we get the planner to use null literal vs literal predicate?
   // For now, just make it manually.  It is used by the partition creation code.
   RuntimeState state;
-  
+
   for (int type = TYPE_BOOLEAN; type != TYPE_DATE; ++type) {
     NullLiteral expr(static_cast<PrimitiveType>(type));
     Status status = Expr::Prepare(&expr, &state, RowDescriptor());
@@ -782,7 +782,7 @@ TEST_F(ExprTest, CastExprs) {
   TestCast("cast(0 as boolean)", 0);
   TestCast("cast(5 as boolean)", 1);
   TestCast("cast(-5 as boolean)", 1);
-  
+
   // From Float
   TestCast("cast(0.0 as float)", 0.0f);
   TestCast("cast(5.0 as float)", 5.0f);
@@ -792,7 +792,7 @@ TEST_F(ExprTest, CastExprs) {
   TestCast("cast(0.0 as double)", 0.0);
   TestCast("cast(5.0 as double)", 5.0);
   TestCast("cast(-5.0 as double)", -5.0);
-  
+
   // From String
   TestCast("'0'", "0");
   TestCast("'5'", "5");
@@ -1816,33 +1816,33 @@ TEST_F(ExprTest, TimestampFunctions) {
       cast('2011-12-22 09:10:11.12345678' as timestamp)", TYPE_BOOLEAN, false);
   TestValue("cast('2011-12-22 09:10:11.000000' as timestamp) = \
       cast('2011-12-22 09:10:11' as timestamp)", TYPE_BOOLEAN, true);
-  TestValue("year(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 2011); 
-  TestValue("month(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 12); 
-  TestValue("dayofmonth(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 22); 
-  TestValue("day(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 356); 
-  TestValue("weekofyear(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 51); 
-  TestValue("hour(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 9); 
-  TestValue("minute(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 10); 
-  TestValue("second(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 11); 
-  TestValue("year(cast('2011-12-22' as timestamp))", TYPE_INT, 2011); 
-  TestValue("month(cast('2011-12-22' as timestamp))", TYPE_INT, 12); 
-  TestValue("dayofmonth(cast('2011-12-22' as timestamp))", TYPE_INT, 22); 
-  TestValue("day(cast('2011-12-22' as timestamp))", TYPE_INT, 356); 
-  TestValue("weekofyear(cast('2011-12-22' as timestamp))", TYPE_INT, 51); 
-  TestValue("hour(cast('09:10:11.000000' as timestamp))", TYPE_INT, 9); 
-  TestValue("minute(cast('09:10:11.000000' as timestamp))", TYPE_INT, 10); 
-  TestValue("second(cast('09:10:11.000000' as timestamp))", TYPE_INT, 11); 
+  TestValue("year(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 2011);
+  TestValue("month(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 12);
+  TestValue("dayofmonth(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 22);
+  TestValue("day(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 356);
+  TestValue("weekofyear(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 51);
+  TestValue("hour(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 9);
+  TestValue("minute(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 10);
+  TestValue("second(cast('2011-12-22 09:10:11.000000' as timestamp))", TYPE_INT, 11);
+  TestValue("year(cast('2011-12-22' as timestamp))", TYPE_INT, 2011);
+  TestValue("month(cast('2011-12-22' as timestamp))", TYPE_INT, 12);
+  TestValue("dayofmonth(cast('2011-12-22' as timestamp))", TYPE_INT, 22);
+  TestValue("day(cast('2011-12-22' as timestamp))", TYPE_INT, 356);
+  TestValue("weekofyear(cast('2011-12-22' as timestamp))", TYPE_INT, 51);
+  TestValue("hour(cast('09:10:11.000000' as timestamp))", TYPE_INT, 9);
+  TestValue("minute(cast('09:10:11.000000' as timestamp))", TYPE_INT, 10);
+  TestValue("second(cast('09:10:11.000000' as timestamp))", TYPE_INT, 11);
   TestStringValue(
       "to_date(cast('2011-12-22 09:10:11.12345678' as timestamp))", "2011-12-22");
-  
+
   TestValue("datediff('2011-12-22 09:10:11.12345678', '2012-12-22')", TYPE_INT, -366);
   TestValue("datediff('2012-12-22', '2011-12-22 09:10:11.12345678')", TYPE_INT, 366);
 
-  TestIsNull("year(cast('09:10:11.000000' as timestamp))", TYPE_INT); 
-  TestIsNull("month(cast('09:10:11.000000' as timestamp))", TYPE_INT); 
-  TestIsNull("dayofmonth(cast('09:10:11.000000' as timestamp))", TYPE_INT); 
-  TestIsNull("day(cast('09:10:11.000000' as timestamp))", TYPE_INT); 
-  TestIsNull("weekofyear(cast('09:10:11.000000' as timestamp))", TYPE_INT); 
+  TestIsNull("year(cast('09:10:11.000000' as timestamp))", TYPE_INT);
+  TestIsNull("month(cast('09:10:11.000000' as timestamp))", TYPE_INT);
+  TestIsNull("dayofmonth(cast('09:10:11.000000' as timestamp))", TYPE_INT);
+  TestIsNull("day(cast('09:10:11.000000' as timestamp))", TYPE_INT);
+  TestIsNull("weekofyear(cast('09:10:11.000000' as timestamp))", TYPE_INT);
   TestIsNull("datediff(cast('09:10:11.12345678' as timestamp), "
       "cast('2012-12-22' as timestamp))", TYPE_INT);
 
@@ -2064,12 +2064,12 @@ TEST_F(ExprTest, ConditionalFunctions) {
       "else " + default_timestamp_str_ + " end", default_timestamp_val_);
 }
 
-// Validates that Expr::ComputeResultsLayout() for 'exprs' is correct.  
+// Validates that Expr::ComputeResultsLayout() for 'exprs' is correct.
 //   - expected_byte_size: total byte size to store all results for exprs
 //   - expected_var_begin: byte offset where variable length types begin
 //   - expected_offsets: mapping of byte sizes to a set valid offsets
 //     exprs that have the same byte size can end up in a number of locations
-void ValidateLayout(const vector<Expr*>& exprs, int expected_byte_size, 
+void ValidateLayout(const vector<Expr*>& exprs, int expected_byte_size,
     int expected_var_begin, const map<int, set<int> >& expected_offsets) {
 
   vector<int> offsets;
@@ -2128,7 +2128,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   expected_offsets.clear();
   exprs.clear();
 
-  // Test layout adding a bunch of exprs.  This is designed to trigger padding.  
+  // Test layout adding a bunch of exprs.  This is designed to trigger padding.
   // The expected result is computed along the way
   exprs.push_back(Expr::CreateLiteral(&pool, TYPE_BOOLEAN, "0"));
   exprs.push_back(Expr::CreateLiteral(&pool, TYPE_TINYINT, "0"));
@@ -2176,7 +2176,7 @@ TEST_F(ExprTest, ResultsLayoutTest) {
   // Validate computed layout
   ValidateLayout(exprs, expected_byte_size, expected_var_begin, expected_offsets);
 
-  // Randomize the expr order and validate again.  This is implemented by a 
+  // Randomize the expr order and validate again.  This is implemented by a
   // sort when the layout is computed so it shouldn't be very sensitive to
   // a particular order.
 
@@ -2206,8 +2206,8 @@ int main(int argc, char **argv) {
   VLOG_CONNECTION << "starting backends";
   test_env_->StartBackends();
 
-  CreateImpalaServer(test_env_,
-      FLAGS_beeswax_port, 0, FLAGS_be_port, &beeswax_server_, NULL, &be_server_);
+  EXIT_IF_ERROR(CreateImpalaServer(test_env_, FLAGS_beeswax_port, 0, FLAGS_be_port,
+      &beeswax_server_, NULL, &be_server_, NULL));
   beeswax_server_->Start();
   be_server_->Start();
 

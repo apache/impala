@@ -24,6 +24,7 @@
 #include <boost/foreach.hpp>
 #include <boost/bind.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
 #include <google/heap-profiler.h>
 #include <google/malloc_extension.h>
 
@@ -80,6 +81,8 @@ DEFINE_bool(use_planservice, false, "Use external planservice if true");
 DECLARE_string(planservice_host);
 DECLARE_int32(planservice_port);
 DECLARE_int32(be_port);
+DECLARE_string(nn);
+DECLARE_int32(nn_port);
 
 DEFINE_int32(beeswax_port, 21000, "port on which Beeswax client requests are served");
 DEFINE_int32(hs2_port, 21050, "port on which HiveServer2 client requests are served");
@@ -1599,14 +1602,60 @@ ImpalaServer::QueryStateRecord::QueryStateRecord(const QueryExecState& exec_stat
   }
 }
 
-ImpalaServer* CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
+Status CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_port,
     int be_port, ThriftServer** beeswax_server, ThriftServer** hs2_server,
-    ThriftServer** be_server) {
+    ThriftServer** be_server, ImpalaServer** impala_server) {
   DCHECK((beeswax_port == 0) == (beeswax_server == NULL));
   DCHECK((hs2_port == 0) == (hs2_server == NULL));
   DCHECK((be_port == 0) == (be_server == NULL));
 
   shared_ptr<ImpalaServer> handler(new ImpalaServer(exec_env));
+
+  // If the user hasn't deliberately specified a namenode URI, read it
+  // from the frontend and parse it into FLAGS_nn{_port}.
+
+  // This must be done *after* ImpalaServer's constructor which
+  // creates a JNI environment but before any queries are run (which
+  // cause FLAGS_nn to be read)
+  if (FLAGS_nn.empty()) {
+    // Read the namenode name and port from the Hadoop config.
+    string default_fs;
+    RETURN_IF_ERROR(handler->GetHadoopConfigValue("fs.defaultFS", &default_fs));
+    if (default_fs.empty()) {
+      RETURN_IF_ERROR(handler->GetHadoopConfigValue("fs.default.name", &default_fs));
+      if (!default_fs.empty()) {
+        LOG(INFO) << "fs.defaultFS not found. Falling back to fs.default.name from Hadoop"
+                  << " config: " << default_fs;
+      }
+    } else {
+      LOG(INFO) << "Read fs.defaultFS from Hadoop config: " << default_fs;
+    }
+
+    if (!default_fs.empty()) {
+      size_t double_slash_pos = default_fs.find("//");
+      if (double_slash_pos != string::npos) {
+        default_fs.erase(0, double_slash_pos + 2);
+      }
+      vector<string> strs;
+      split(strs, default_fs, is_any_of(":"));
+      FLAGS_nn = strs[0];
+      DCHECK(!strs[0].empty());
+      LOG(INFO) << "Setting default name (-nn): " << strs[0];
+      if (strs.size() > 1) {
+        LOG(INFO) << "Setting default port (-nn_port): " << strs[1];
+        try {
+          FLAGS_nn_port = lexical_cast<int>(strs[1]);
+        } catch (bad_lexical_cast) {
+          LOG(ERROR) << "Could not set -nn_port from Hadoop configuration. Port was: "
+                     << strs[1];
+        }
+      }
+    } else {
+      return Status("Could not find valid namenode URI. Set fs.defaultFS in Impala's "
+                    "Hadoop configuration files");
+    }
+  }
+
   // TODO: do we want a BoostThreadFactory?
   // TODO: we want separate thread factories here, so that fe requests can't starve
   // be requests
@@ -1642,8 +1691,9 @@ ImpalaServer* CreateImpalaServer(ExecEnv* exec_env, int beeswax_port, int hs2_po
 
     LOG(INFO) << "ImpalaInternalService listening on " << be_port;
   }
+  if (impala_server != NULL) *impala_server = handler.get();
 
-  return handler.get();
+  return Status::OK;
 }
 
 }

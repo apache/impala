@@ -76,8 +76,8 @@ int main(int argc, char** argv) {
   LOG(INFO) << "Starting backends";
   test_env_->StartBackends();
 
-  CreateImpalaServer(test_env_, FLAGS_beeswax_port, FLAGS_hs2_port, FLAGS_be_port,
-      &beeswax_server_, &hs2_server_, &be_server_);
+  EXIT_IF_ERROR(CreateImpalaServer(test_env_, FLAGS_beeswax_port, FLAGS_hs2_port,
+      FLAGS_be_port, &beeswax_server_, &hs2_server_, &be_server_, NULL));
   be_server_->Start();
   beeswax_server_->Start();
   hs2_server_->Start();

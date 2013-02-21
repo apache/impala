@@ -104,8 +104,8 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* pvt) {
   VLOG_CONNECTION << "starting backends";
   test_env->StartBackends();
 
-  CreateImpalaServer(test_env, FLAGS_beeswax_port, 0, FLAGS_be_port, &beeswax_server,
-      NULL, &be_server);
+  EXIT_IF_ERROR(CreateImpalaServer(test_env, FLAGS_beeswax_port, 0, FLAGS_be_port,
+      &beeswax_server, NULL, &be_server, NULL));
   beeswax_server->Start();
   be_server->Start();
   return JNI_VERSION_1_4;

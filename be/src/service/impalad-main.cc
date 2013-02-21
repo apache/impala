@@ -20,8 +20,6 @@
 #include <jni.h>
 #include <boost/scoped_ptr.hpp>
 #include <boost/unordered_map.hpp>
-#include <boost/algorithm/string.hpp>
-#include <boost/lexical_cast.hpp>
 
 #include "common/logging.h"
 #include "common/daemon.h"
@@ -62,8 +60,6 @@ DECLARE_int32(beeswax_port);
 DECLARE_int32(hs2_port);
 DECLARE_int32(be_port);
 DECLARE_string(principal);
-DECLARE_string(nn);
-DECLARE_int32(nn_port);
 
 int main(int argc, char** argv) {
   InitDaemon(argc, argv);
@@ -86,56 +82,9 @@ int main(int argc, char** argv) {
   ThriftServer* beeswax_server = NULL;
   ThriftServer* hs2_server = NULL;
   ThriftServer* be_server = NULL;
-  ImpalaServer* server =
-      CreateImpalaServer(&exec_env, FLAGS_beeswax_port, FLAGS_hs2_port, FLAGS_be_port,
-          &beeswax_server, &hs2_server, &be_server);
-
-  // If the user hasn't deliberately specified a namenode URI, read it
-  // from the frontend and parse it into FLAGS_nn{_port}.
-
-  // This must be done *after* ImpalaServer's constructor which
-  // creates a JNI environment but before any queries are run (which
-  // cause FLAGS_nn to be read)
-  if (FLAGS_nn.empty()) {
-    // Read the namenode name and port from the Hadoop config.
-    string default_fs;
-    EXIT_IF_ERROR(server->GetHadoopConfigValue("fs.defaultFS", &default_fs));
-    if (default_fs.empty()) {
-      EXIT_IF_ERROR(server->GetHadoopConfigValue("fs.default.name", &default_fs));
-      if (!default_fs.empty()) {
-        LOG(INFO) << "fs.defaultFS not found. Falling back to fs.default.name from Hadoop"
-                  << " config: " << default_fs;
-      }
-    } else {
-      LOG(INFO) << "Read fs.defaultFS from Hadoop config: " << default_fs;
-    }
-
-    if (!default_fs.empty()) {
-      size_t double_slash_pos = default_fs.find("//");
-      if (double_slash_pos != string::npos) {
-        default_fs.erase(0, double_slash_pos + 2);
-      }
-      vector<string> strs;
-      split(strs, default_fs, is_any_of(":"));
-      FLAGS_nn = strs[0];
-      DCHECK(!strs[0].empty());
-      LOG(INFO) << "Setting default name (-nn): " << strs[0];
-      if (strs.size() > 1) {
-        LOG(INFO) << "Setting default port (-nn_port): " << strs[1];
-        try {
-          FLAGS_nn_port = lexical_cast<int>(strs[1]);
-        } catch (bad_lexical_cast) {
-          LOG(ERROR) << "Could not set -nn_port from Hadoop configuration. Port was: "
-                     << strs[1];
-        }
-      }
-    } else {
-      LOG(ERROR) << "Could not find valid namenode URI. Set fs.defaultFS in Impala's "
-                 << "Hadoop configuration files";
-      exit(1);
-    }
-  }
-
+  ImpalaServer* server = NULL;
+  EXIT_IF_ERROR(CreateImpalaServer(&exec_env, FLAGS_beeswax_port, FLAGS_hs2_port,
+      FLAGS_be_port, &beeswax_server, &hs2_server, &be_server, &server));
 
   be_server->Start();
 
