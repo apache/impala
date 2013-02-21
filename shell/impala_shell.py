@@ -586,7 +586,7 @@ def execute_queries_non_interactive_mode(options):
       print 'Error: %s' % e
       sys.exit(1)
   elif options.query:
-    queries = [options.query]
+    queries = parse_query_text(options.query)
   shell = ImpalaShell(options)
   # The impalad was specified on the command line and the connection failed.
   # Return with an error, no need to process the query.
