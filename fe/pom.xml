@@ -569,9 +569,6 @@
                     <!-- start HDFS and HBase without formatting -->
                     <exec executable="${env.IMPALA_HOME}/testdata/bin/run-all.sh">
                     </exec>
-                    <!-- load Hive built in -->
-                    <exec executable="${env.IMPALA_HOME}/testdata/bin/load-hive-builtins.sh">
-                    </exec>
                   </target>
                 </configuration>
               </execution>
@@ -586,15 +583,6 @@
                     <!-- start HDFS and HBase clean -->
                     <exec executable="${env.IMPALA_HOME}/testdata/bin/run-all.sh">
                       <arg value="-format"/>
-                    </exec>
-                    <!-- load Hive built in -->
-                    <exec executable="${env.IMPALA_HOME}/testdata/bin/load-hive-builtins.sh" failonerror="true">
-                    </exec>
-                    <!-- create HBase tables, load some hbase table data -->
-                    <exec executable="${env.IMPALA_HOME}/testdata/bin/create-hbase.sh" failonerror="true">
-                    </exec>
-                    <!-- create Hive table and load Hive data -->
-                    <exec executable="${env.IMPALA_HOME}/testdata/bin/create-load-data.sh" failonerror="true">
                     </exec>
                   </target>
                     <!-- split HBase tables -->

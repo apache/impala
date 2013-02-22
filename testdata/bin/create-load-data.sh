@@ -23,6 +23,12 @@ set -e
 # snapshot file and pass it to the load-test-warehouse-snapshot.sh script for processing.
 if [[ $1 ]]; then
   ${IMPALA_HOME}/testdata/bin/load-test-warehouse-snapshot.sh "$1"
+else
+  echo "Loading hive builtins"
+  ${IMPALA_HOME}/testdata/bin/load-hive-builtins.sh
+
+  echo "Generating HBase data"
+  ${IMPALA_HOME}/testdata/bin/create-hbase.sh
 fi
 set -u
 

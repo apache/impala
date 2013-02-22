@@ -208,7 +208,8 @@ public abstract class BaseQueryTest {
   }
 
   private static void resetTables(List<String> tableNames) throws Exception {
-    HiveMetaStoreClient client = new HiveMetaStoreClient(new HiveConf(QueryTest.class));
+    HiveMetaStoreClient client =
+        new HiveMetaStoreClient(new HiveConf(BaseQueryTest.class));
     for (String tableName: tableNames) {
       try {
         String db_tblname[] = TestUtils.splitDbTablename(tableName.trim());
@@ -225,7 +226,8 @@ public abstract class BaseQueryTest {
   }
 
   private static void dropPartitions(List<String> tableNames) throws Exception {
-    HiveMetaStoreClient client = new HiveMetaStoreClient(new HiveConf(QueryTest.class));
+    HiveMetaStoreClient client =
+        new HiveMetaStoreClient(new HiveConf(BaseQueryTest.class));
     for (String tableName: tableNames) {
       try {
         for (String name:

@@ -78,6 +78,7 @@ from alltypessmall
 where year=2009 and month=4
 ---- SETUP
 DROP PARTITIONS alltypesinsert$TABLE
+RESET alltypesinsert$TABLE
 ---- RESULTS
 ---- PARTITIONS
 /year=2009/month=4/: 25
