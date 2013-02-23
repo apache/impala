@@ -5,10 +5,10 @@ select count(*) from bad_seq_snap
 Bad sync hash at file offset 899498.
 Expected: '6e 91 6 ec be 78 a0 ac 72 10 7e 41 b4 da 93 3c '
 Actual:   '6e 91 6 78 78 78 a0 ac 72 10 7e 41 b4 da 93 3c '
-Format error in record or block header at offset: 899494
-Format error in record or block header at offset: 1784305
-Format error in record or block header at offset: 1790543
-Format error in record or block header at offset: 1791224
+Format error in record or block header at offset: 149
+Format error in record or block header at offset: 1784325
+Format error in record or block header at offset: 1790563
+Format error in record or block header at offset: 1791244
 Format error in record or block header at end of file.
 First error while processing: hdfs: test-warehouse/bad_seq_snap/bad_file at offset: 899514
 ---- TYPES
