@@ -178,6 +178,10 @@ mvn dependency:copy-dependencies
 # classes.
 mvn package -DskipTests=true
 
+# Build the shell tarball
+echo "Creating shell tarball"
+${IMPALA_HOME}/shell/make_shell_tarball.sh
+
 cd $IMPALA_FE_DIR
 if [ $FORMAT_CLUSTER -eq 1 ]
 then
@@ -204,10 +208,6 @@ if [ $TESTS_ACTION -eq 1 ]
 then
     ${IMPALA_HOME}/bin/run-all-tests.sh -e $EXPLORATION_STRATEGY
 fi
-
-# Build the shell tarball
-echo "Creating shell tarball"
-${IMPALA_HOME}/shell/make_shell_tarball.sh
 
 # Generate list of files for Cscope to index
 $IMPALA_HOME/bin/gen-cscope.sh

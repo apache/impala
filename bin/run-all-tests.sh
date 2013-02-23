@@ -19,7 +19,7 @@
 # Exit on reference to uninitialized variables and non-zero exit codes
 set -u
 set -e
-
+. $IMPALA_HOME/bin/set-pythonpath.sh
 EXPLORATION_STRATEGY=core
 
 # parse command line options

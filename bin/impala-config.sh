@@ -93,6 +93,8 @@ export HBASE_CONF_DIR=$HIVE_CONF_DIR
 export THRIFT_SRC_DIR=${IMPALA_HOME}/thirdparty/thrift-${IMPALA_THRIFT_VERSION}/
 export THRIFT_HOME=${THRIFT_SRC_DIR}build/
 
+# Configure python path
+. $IMPALA_HOME/bin/set-pythonpath.sh
 
 # These arguments are, despite the name, passed to every JVM created
 # by an impalad.
@@ -132,3 +134,4 @@ echo "HADOOP_LZO             = $HADOOP_LZO"
 echo "IMPALA_LZO             = $IMPALA_LZO"
 echo "CLASSPATH              = $CLASSPATH"
 echo "LIBHDFS_OPTS           = $LIBHDFS_OPTS"
+echo "PYTHONPATH             = $PYTHONPATH"
